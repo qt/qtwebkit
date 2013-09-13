@@ -46,7 +46,10 @@ WebInspector.HeapSnapshotGridNode = function(tree, hasChildren)
      * Position is an item position in the provider.
      */
     this._retrievedChildrenRanges = [];
-    this.addEventListener("populate", this._populate, this);
+}
+
+WebInspector.HeapSnapshotGridNode.Events = {
+    PopulateComplete: "PopulateComplete"
 }
 
 WebInspector.HeapSnapshotGridNode.prototype = {
@@ -142,15 +145,19 @@ WebInspector.HeapSnapshotGridNode.prototype = {
                 percentSpan.className = "percent-column";
                 percentSpan.textContent = this.data[percentColumn];
                 div.appendChild(percentSpan);
+                div.addStyleClass("heap-snapshot-multiple-values");
             }
             cell.appendChild(div);
         }
         return cell;
     },
 
-    _populate: function(event)
+    populate: function(event)
     {
-        this.removeEventListener("populate", this._populate, this);
+        if (this._populated)
+            return;
+        this._populated = true;
+
         function sorted()
         {
             this._populateChildren();
@@ -160,8 +167,8 @@ WebInspector.HeapSnapshotGridNode.prototype = {
 
     expandWithoutPopulate: function(callback)
     {
-        // Make sure default _populate won't be invoked.
-        this.removeEventListener("populate", this._populate, this);
+        // Make sure default populate won't take action.
+        this._populated = true;
         this.expand();
         this._provider().sortAndRewind(this.comparator(), callback);
     },
@@ -289,7 +296,7 @@ WebInspector.HeapSnapshotGridNode.prototype = {
 
             if (afterPopulate)
                 afterPopulate();
-            this.dispatchEventToListeners("populate complete");
+            this.dispatchEventToListeners(WebInspector.HeapSnapshotGridNode.Events.PopulateComplete);
         }
         serializeNextChunk.call(this);
     },
@@ -350,20 +357,21 @@ WebInspector.HeapSnapshotGenericObjectNode = function(tree, node)
     if (!node)
         return;
     this._name = node.name;
+    this._displayName = node.displayName;
     this._type = node.type;
-    this._distanceToWindow = node.distanceToWindow;
+    this._distance = node.distance;
     this._shallowSize = node.selfSize;
     this._retainedSize = node.retainedSize;
     this.snapshotNodeId = node.id;
     this.snapshotNodeIndex = node.nodeIndex;
     if (this._type === "string")
         this._reachableFromWindow = true;
-    else if (this._type === "object" && this.isWindow(this._name)) {
+    else if (this._type === "object" && this._name.startsWith("Window")) {
         this._name = this.shortenWindowURL(this._name, false);
         this._reachableFromWindow = true;
-    } else if (node.flags & tree.snapshot.nodeFlags.canBeQueried)
+    } else if (node.canBeQueried)
         this._reachableFromWindow = true;
-    if (node.flags & tree.snapshot.nodeFlags.detachedDOMTreeNode)
+    if (node.detachedDOMTreeNode)
         this.detachedDOMTreeNode = true;
 };
 
@@ -383,19 +391,31 @@ WebInspector.HeapSnapshotGenericObjectNode.prototype = {
         var div = document.createElement("div");
         div.className = "source-code event-properties";
         div.style.overflow = "visible";
+
         var data = this.data["object"];
         if (this._prefixObjectCell)
             this._prefixObjectCell(div, data);
+
         var valueSpan = document.createElement("span");
         valueSpan.className = "value console-formatted-" + data.valueStyle;
         valueSpan.textContent = data.value;
         div.appendChild(valueSpan);
+
+        if (this.data.displayName) {
+            var nameSpan = document.createElement("span");
+            nameSpan.className = "name console-formatted-name";
+            nameSpan.textContent = " " + this.data.displayName;
+            div.appendChild(nameSpan);
+        }
+
         var idSpan = document.createElement("span");
         idSpan.className = "console-formatted-id";
         idSpan.textContent = " @" + data["nodeId"];
         div.appendChild(idSpan);
+
         if (this._postfixObjectCell)
             this._postfixObjectCell(div, data);
+
         cell.appendChild(div);
         cell.addStyleClass("disclosure");
         if (this.depth)
@@ -444,7 +464,8 @@ WebInspector.HeapSnapshotGenericObjectNode.prototype = {
             valueStyle += " detached-dom-tree-node";
         data["object"] = { valueStyle: valueStyle, value: value, nodeId: this.snapshotNodeId };
 
-        data["distanceToWindow"] =  this._distanceToWindow;
+        data["displayName"] = this._displayName;
+        data["distance"] =  this._distance;
         data["shallowSize"] = Number.withThousandsSeparator(this._shallowSize);
         data["retainedSize"] = Number.withThousandsSeparator(this._retainedSize);
         data["shallowSize-percent"] = this._toPercentString(this._shallowSizePercent);
@@ -465,7 +486,7 @@ WebInspector.HeapSnapshotGenericObjectNode.prototype = {
                 else
                     callback(WebInspector.RemoteObject.fromPrimitiveValue(WebInspector.UIString("Not available")));
             }
-            ProfilerAgent.getObjectByHeapObjectId(String(this.snapshotNodeId), objectGroupName, formatResult);
+            HeapProfilerAgent.getObjectByHeapObjectId(String(this.snapshotNodeId), objectGroupName, formatResult);
         }
     },
 
@@ -488,11 +509,6 @@ WebInspector.HeapSnapshotGenericObjectNode.prototype = {
         this._provider().isEmpty(isEmptyCallback.bind(this));
     },
 
-    isWindow: function(fullName)
-    {
-        return fullName.substr(0, 9) === "Window";
-    },
-
     shortenWindowURL: function(fullName, hasObjectId)
     {
         var startPos = fullName.indexOf("/");
@@ -501,7 +517,7 @@ WebInspector.HeapSnapshotGenericObjectNode.prototype = {
             var fullURL = fullName.substring(startPos + 1, endPos).trimLeft();
             var url = fullURL.trimURL();
             if (url.length > 40)
-                url = url.trimMiddle(40);
+                url = url.centerEllipsizedToLength(40);
             return fullName.substr(0, startPos + 2) + url + fullName.substr(endPos);
         } else
             return fullName;
@@ -521,8 +537,7 @@ WebInspector.HeapSnapshotObjectNode = function(tree, isFromBaseSnapshot, edge, p
     WebInspector.HeapSnapshotGenericObjectNode.call(this, tree, edge.node);
     this._referenceName = edge.name;
     this._referenceType = edge.type;
-    this._propertyAccessor = edge.propertyAccessor;
-    this._distanceToWindow = edge.distanceToWindow;
+    this._distance = edge.distance;
     this.showRetainingEdges = tree.showRetainingEdges;
     this._isFromBaseSnapshot = isFromBaseSnapshot;
 
@@ -540,16 +555,11 @@ WebInspector.HeapSnapshotObjectNode.prototype = {
     {
         var tree = this._dataGrid;
         var showHiddenData = WebInspector.settings.showHeapSnapshotObjectsHiddenProperties.get();
-        var filter = "function(edge) {\n" +
-                     "    return !edge.isInvisible()\n" +
-                     "        && (" + !tree.showRetainingEdges + " || (edge.node().id() !== 1 && !edge.node().isSynthetic() && !edge.isWeak()))\n" +
-                     "        && (" + showHiddenData + " || (!edge.isHidden() && !edge.node().isHidden()));\n" +
-                     "}\n";
         var snapshot = this._isFromBaseSnapshot ? tree.baseSnapshot : tree.snapshot;
         if (this.showRetainingEdges)
-            return snapshot.createRetainingEdgesProvider(this.snapshotNodeIndex, filter);
+            return snapshot.createRetainingEdgesProvider(this.snapshotNodeIndex, showHiddenData);
         else
-            return snapshot.createEdgesProvider(this.snapshotNodeIndex, filter);
+            return snapshot.createEdgesProvider(this.snapshotNodeIndex, showHiddenData);
     },
 
     _findAncestorWithSameSnapshotNodeId: function()
@@ -582,14 +592,14 @@ WebInspector.HeapSnapshotObjectNode.prototype = {
 
     comparator: function()
     {
-        var sortAscending = this._dataGrid.sortOrder === "ascending";
-        var sortColumnIdentifier = this._dataGrid.sortColumnIdentifier;
+        var sortAscending = this._dataGrid.isSortOrderAscending();
+        var sortColumnIdentifier = this._dataGrid.sortColumnIdentifier();
         var sortFields = {
             object: ["!edgeName", sortAscending, "retainedSize", false],
             count: ["!edgeName", true, "retainedSize", false],
             shallowSize: ["selfSize", sortAscending, "!edgeName", true],
             retainedSize: ["retainedSize", sortAscending, "!edgeName", true],
-            distanceToWindow: ["distanceToWindow", sortAscending, "_name", true]
+            distance: ["distance", sortAscending, "_name", true]
         }[sortColumnIdentifier] || ["!edgeName", true, "retainedSize", false];
         return WebInspector.HeapSnapshotFilteredOrderedIterator.prototype.createComparator(sortFields);
     },
@@ -618,7 +628,7 @@ WebInspector.HeapSnapshotObjectNode.prototype = {
         }
         data["object"].nameClass = nameClass;
         data["object"].name = name;
-        data["distanceToWindow"] = this._distanceToWindow;
+        data["distance"] = this._distance;
         return data;
     },
 
@@ -659,10 +669,7 @@ WebInspector.HeapSnapshotInstanceNode.prototype = {
         var showHiddenData = WebInspector.settings.showHeapSnapshotObjectsHiddenProperties.get();
         return this._baseSnapshotOrSnapshot.createEdgesProvider(
             this.snapshotNodeIndex,
-            "function(edge) {" +
-            "    return !edge.isInvisible()" +
-            "        && (" + showHiddenData + " || (!edge.isHidden() && !edge.node().isHidden()));" +
-            "}");
+            showHiddenData);
     },
 
     _createChildNode: function(item)
@@ -682,11 +689,11 @@ WebInspector.HeapSnapshotInstanceNode.prototype = {
 
     comparator: function()
     {
-        var sortAscending = this._dataGrid.sortOrder === "ascending";
-        var sortColumnIdentifier = this._dataGrid.sortColumnIdentifier;
+        var sortAscending = this._dataGrid.isSortOrderAscending();
+        var sortColumnIdentifier = this._dataGrid.sortColumnIdentifier();
         var sortFields = {
             object: ["!edgeName", sortAscending, "retainedSize", false],
-            distanceToWindow: ["distanceToWindow", sortAscending, "retainedSize", false],
+            distance: ["distance", sortAscending, "retainedSize", false],
             count: ["!edgeName", true, "retainedSize", false],
             addedSize: ["selfSize", sortAscending, "!edgeName", true],
             removedSize: ["selfSize", sortAscending, "!edgeName", true],
@@ -698,7 +705,7 @@ WebInspector.HeapSnapshotInstanceNode.prototype = {
 
     _emptyData: function()
     {
-        return {count:"", countDelta:"", sizeDelta: ""};
+        return {count: "", countDelta: "", sizeDelta: ""};
     },
 
     _enhanceData: function(data)
@@ -734,7 +741,7 @@ WebInspector.HeapSnapshotConstructorNode = function(tree, className, aggregate, 
     WebInspector.HeapSnapshotGridNode.call(this, tree, aggregate.count > 0);
     this._name = className;
     this._aggregatesKey = aggregatesKey;
-    this._distanceToWindow = aggregate.distanceToWindow;
+    this._distance = aggregate.distance;
     this._count = aggregate.count;
     this._shallowSize = aggregate.self;
     this._retainedSize = aggregate.maxRet;
@@ -801,11 +808,11 @@ WebInspector.HeapSnapshotConstructorNode.prototype = {
 
     comparator: function()
     {
-        var sortAscending = this._dataGrid.sortOrder === "ascending";
-        var sortColumnIdentifier = this._dataGrid.sortColumnIdentifier;
+        var sortAscending = this._dataGrid.isSortOrderAscending();
+        var sortColumnIdentifier = this._dataGrid.sortColumnIdentifier();
         var sortFields = {
             object: ["id", sortAscending, "retainedSize", false],
-            distanceToWindow: ["distanceToWindow", true, "retainedSize", false],
+            distance: ["distance", true, "retainedSize", false],
             count: ["id", true, "retainedSize", false],
             shallowSize: ["selfSize", sortAscending, "id", true],
             retainedSize: ["retainedSize", sortAscending, "id", true]
@@ -827,7 +834,7 @@ WebInspector.HeapSnapshotConstructorNode.prototype = {
     {
         var data = { object: this._name };
         data["count"] =  Number.withThousandsSeparator(this._count);
-        data["distanceToWindow"] =  this._distanceToWindow;
+        data["distance"] =  this._distance;
         data["shallowSize"] = Number.withThousandsSeparator(this._shallowSize);
         data["retainedSize"] = Number.withThousandsSeparator(this._retainedSize);
         data["count-percent"] =  this._toPercentString(this._countPercent);
@@ -981,8 +988,8 @@ WebInspector.HeapSnapshotDiffNode.prototype = {
 
     comparator: function()
     {
-        var sortAscending = this._dataGrid.sortOrder === "ascending";
-        var sortColumnIdentifier = this._dataGrid.sortColumnIdentifier;
+        var sortAscending = this._dataGrid.isSortOrderAscending();
+        var sortColumnIdentifier = this._dataGrid.sortColumnIdentifier();
         var sortFields = {
             object: ["id", sortAscending, "selfSize", false],
             addedCount: ["selfSize", sortAscending, "id", true],
@@ -1092,8 +1099,8 @@ WebInspector.HeapSnapshotDominatorObjectNode.prototype = {
 
     comparator: function()
     {
-        var sortAscending = this._dataGrid.sortOrder === "ascending";
-        var sortColumnIdentifier = this._dataGrid.sortColumnIdentifier;
+        var sortAscending = this._dataGrid.isSortOrderAscending();
+        var sortColumnIdentifier = this._dataGrid.sortColumnIdentifier();
         var sortFields = {
             object: ["id", sortAscending, "retainedSize", false],
             shallowSize: ["selfSize", sortAscending, "id", true],

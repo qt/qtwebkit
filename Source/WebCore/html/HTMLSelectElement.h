@@ -111,11 +111,11 @@ protected:
 private:
     virtual const AtomicString& formControlType() const;
     
-    virtual bool isKeyboardFocusable(KeyboardEvent*) const;
-    virtual bool isMouseFocusable() const;
+    virtual bool isKeyboardFocusable(KeyboardEvent*) const OVERRIDE;
+    virtual bool isMouseFocusable() const OVERRIDE;
 
-    virtual void dispatchFocusEvent(PassRefPtr<Node> oldFocusedNode);
-    virtual void dispatchBlurEvent(PassRefPtr<Node> newFocusedNode);
+    virtual void dispatchFocusEvent(PassRefPtr<Element> oldFocusedElement, FocusDirection) OVERRIDE FINAL;
+    virtual void dispatchBlurEvent(PassRefPtr<Element> newFocusedElement) OVERRIDE FINAL;
     
     virtual bool canStartSelection() const { return false; }
 
@@ -202,24 +202,11 @@ private:
     mutable bool m_shouldRecalcListItems;
 };
 
-inline bool isHTMLSelectElement(const Node* node)
-{
-    return node->hasTagName(HTMLNames::selectTag);
-}
-
 inline HTMLSelectElement* toHTMLSelectElement(Node* node)
 {
-    ASSERT(!node || isHTMLSelectElement(node));
+    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->hasTagName(HTMLNames::selectTag));
     return static_cast<HTMLSelectElement*>(node);
 }
-
-inline const HTMLSelectElement* toHTMLSelectElement(const Node* node)
-{
-    ASSERT(!node || isHTMLSelectElement(node));
-    return static_cast<const HTMLSelectElement*>(node);
-}
-
-void toHTMLSelectElement(const HTMLSelectElement*); // This overload will catch anyone doing an unnecessary cast.
 
 } // namespace
 

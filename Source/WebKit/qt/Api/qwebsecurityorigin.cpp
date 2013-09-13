@@ -21,10 +21,11 @@
 #include "qwebsecurityorigin.h"
 
 #include "ApplicationCacheStorage.h"
-#include "DatabaseTracker.h"
+#include "DatabaseManager.h"
 #include "KURL.h"
 #include "SchemeRegistry.h"
 #include "SecurityOrigin.h"
+#include "SecurityPolicy.h"
 #include "qwebdatabase.h"
 #include "qwebdatabase_p.h"
 #include "qwebsecurityorigin_p.h"
@@ -121,7 +122,7 @@ int QWebSecurityOrigin::port() const
 qint64 QWebSecurityOrigin::databaseUsage() const
 {
 #if ENABLE(SQL_DATABASE)
-    return DatabaseTracker::tracker().usageForOrigin(d->origin.get());
+    return DatabaseManager::manager().usageForOrigin(d->origin.get());
 #else
     return 0;
 #endif
@@ -133,7 +134,7 @@ qint64 QWebSecurityOrigin::databaseUsage() const
 qint64 QWebSecurityOrigin::databaseQuota() const
 {
 #if ENABLE(SQL_DATABASE)
-    return DatabaseTracker::tracker().quotaForOrigin(d->origin.get());
+    return DatabaseManager::manager().quotaForOrigin(d->origin.get());
 #else
     return 0;
 #endif
@@ -149,7 +150,7 @@ qint64 QWebSecurityOrigin::databaseQuota() const
 void QWebSecurityOrigin::setDatabaseQuota(qint64 quota)
 {
 #if ENABLE(SQL_DATABASE)
-    DatabaseTracker::tracker().setQuota(d->origin.get(), quota);
+    DatabaseManager::manager().setQuota(d->origin.get(), quota);
 #endif
 }
 
@@ -181,7 +182,7 @@ QList<QWebSecurityOrigin> QWebSecurityOrigin::allOrigins()
 
 #if ENABLE(SQL_DATABASE)
     Vector<RefPtr<SecurityOrigin> > coreOrigins;
-    DatabaseTracker::tracker().origins(coreOrigins);
+    DatabaseManager::manager().origins(coreOrigins);
 
     for (unsigned i = 0; i < coreOrigins.size(); ++i) {
         QWebSecurityOriginPrivate* priv = new QWebSecurityOriginPrivate(coreOrigins[i].get());
@@ -202,7 +203,7 @@ QList<QWebDatabase> QWebSecurityOrigin::databases() const
 #if ENABLE(SQL_DATABASE)
     Vector<String> nameVector;
 
-    if (!DatabaseTracker::tracker().databaseNamesForOrigin(d->origin.get(), nameVector))
+    if (!DatabaseManager::manager().databaseNamesForOrigin(d->origin.get(), nameVector))
         return databases;
     for (unsigned i = 0; i < nameVector.size(); ++i) {
         QWebDatabasePrivate* priv = new QWebDatabasePrivate();
@@ -265,3 +266,35 @@ QStringList QWebSecurityOrigin::localSchemes()
     }
     return list;
 }
+
+
+/*!
+    Allows contruction of QWebSecurityOrigin() as per the specified \a url.
+*/
+QWebSecurityOrigin::QWebSecurityOrigin(const QUrl& url)
+{
+    d = new QWebSecurityOriginPrivate(SecurityOrigin::create(KURL(url)));
+}
+
+/*!
+    Allows the origin to access the specified \a host using the specified \a scheme.
+    Specifying AllowSubdomains in \a subdomainSetting will allow the source origin to access
+    the \a host's subdomains as well, whereas passing DisallowSubdomains would prevent this.
+    
+    Such cross origin requests are otherwise restricted as per the same-origin-policy.
+*/
+void QWebSecurityOrigin::addAccessWhitelistEntry(const QString& scheme, const QString& host, SubdomainSetting subdomainSetting)
+{
+    SecurityPolicy::addOriginAccessWhitelistEntry(*(d->origin), scheme, host, subdomainSetting == AllowSubdomains);
+}
+
+/*!
+    Removes the origin's whitelisted access to the specified \a host using the specified \a scheme
+    as per the specified \a subdomainSetting.
+*/
+void QWebSecurityOrigin::removeAccessWhitelistEntry(const QString& scheme, const QString& host, SubdomainSetting subdomainSetting)
+{
+    SecurityPolicy::removeOriginAccessWhitelistEntry(*(d->origin), scheme, host, subdomainSetting == AllowSubdomains);
+}
+
+

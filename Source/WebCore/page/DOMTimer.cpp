@@ -30,7 +30,7 @@
 #include "InspectorInstrumentation.h"
 #include "ScheduledAction.h"
 #include "ScriptExecutionContext.h"
-#include "WebCoreMemoryInstrumentation.h"
+#include "UserGestureIndicator.h"
 #include <wtf/CurrentTime.h>
 #include <wtf/HashSet.h>
 #include <wtf/StdLibExtras.h>
@@ -54,15 +54,15 @@ static inline bool shouldForwardUserGesture(int interval, int nestingLevel)
 
 DOMTimer::DOMTimer(ScriptExecutionContext* context, PassOwnPtr<ScheduledAction> action, int interval, bool singleShot)
     : SuspendableTimer(context)
-    , m_timeoutId(context->newUniqueID())
     , m_nestingLevel(timerNestingLevel + 1)
     , m_action(action)
     , m_originalInterval(interval)
+    , m_shouldForwardUserGesture(shouldForwardUserGesture(interval, m_nestingLevel))
 {
-    if (shouldForwardUserGesture(interval, m_nestingLevel))
-        m_userGestureToken = UserGestureIndicator::currentToken();
-
-    context->addTimeout(m_timeoutId, this);
+    // Keep asking for the next id until we're given one that we don't already have.
+    do {
+        m_timeoutId = context->circularSequentialID();
+    } while (!context->addTimeout(m_timeoutId, this));
 
     double intervalMilliseconds = intervalClampedToMinimum(interval, context->minimumTimerInterval());
     if (singleShot)
@@ -108,8 +108,9 @@ void DOMTimer::fired()
     ScriptExecutionContext* context = scriptExecutionContext();
     timerNestingLevel = m_nestingLevel;
     ASSERT(!context->activeDOMObjectsAreSuspended());
+    UserGestureIndicator gestureIndicator(m_shouldForwardUserGesture ? DefinitelyProcessingUserGesture : PossiblyProcessingUserGesture);
     // Only the first execution of a multi-shot timer should get an affirmative user gesture indicator.
-    UserGestureIndicator gestureIndicator(m_userGestureToken.release());
+    m_shouldForwardUserGesture = false;
 
     InspectorInstrumentationCookie cookie = InspectorInstrumentation::willFireTimer(context, m_timeoutId);
 
@@ -197,14 +198,6 @@ double DOMTimer::alignedFireTime(double fireTime) const
     }
 
     return fireTime;
-}
-
-void DOMTimer::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::DOM);
-    SuspendableTimer::reportMemoryUsage(memoryObjectInfo);
-    info.addMember(m_action);
-    info.addMember(m_userGestureToken);
 }
 
 } // namespace WebCore

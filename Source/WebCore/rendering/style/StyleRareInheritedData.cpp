@@ -28,8 +28,6 @@
 #include "RenderStyleConstants.h"
 #include "ShadowData.h"
 #include "StyleImage.h"
-#include "WebCoreMemoryInstrumentation.h"
-#include <wtf/MemoryObjectInfo.h>
 
 namespace WebCore {
 
@@ -70,13 +68,14 @@ StyleRareInheritedData::StyleRareInheritedData()
     , m_effectiveZoom(RenderStyle::initialZoom())
     , widows(RenderStyle::initialWidows())
     , orphans(RenderStyle::initialOrphans())
+    , m_hasAutoWidows(true)
+    , m_hasAutoOrphans(true)
     , textSecurity(RenderStyle::initialTextSecurity())
     , userModify(READ_ONLY)
     , wordBreak(RenderStyle::initialWordBreak())
     , overflowWrap(RenderStyle::initialOverflowWrap())
     , nbspMode(NBNORMAL)
     , lineBreak(LineBreakAuto)
-    , textSizeAdjust(RenderStyle::initialTextSizeAdjust())
     , resize(RenderStyle::initialResize())
     , userSelect(RenderStyle::initialUserSelect())
     , colorSpace(ColorSpaceDeviceRGB)
@@ -85,6 +84,11 @@ StyleRareInheritedData::StyleRareInheritedData()
     , textEmphasisFill(TextEmphasisFillFilled)
     , textEmphasisMark(TextEmphasisMarkNone)
     , textEmphasisPosition(TextEmphasisPositionOver)
+    , m_textOrientation(TextOrientationVerticalRight)
+#if ENABLE(CSS3_TEXT)
+    , m_textIndentLine(RenderStyle::initialTextIndentLine())
+    , m_textIndentType(RenderStyle::initialTextIndentType())
+#endif
     , m_lineBoxContain(RenderStyle::initialLineBoxContain())
 #if ENABLE(CSS_IMAGE_ORIENTATION)
     , m_imageOrientation(RenderStyle::initialImageOrientation())
@@ -101,6 +105,8 @@ StyleRareInheritedData::StyleRareInheritedData()
 #endif
 #if ENABLE(CSS3_TEXT)
     , m_textAlignLast(RenderStyle::initialTextAlignLast())
+    , m_textJustify(RenderStyle::initialTextJustify())
+    , m_textUnderlinePosition(RenderStyle::initialTextUnderlinePosition())
 #endif // CSS3_TEXT
     , m_rubyPosition(RenderStyle::initialRubyPosition())
     , hyphenationLimitBefore(-1)
@@ -137,13 +143,14 @@ StyleRareInheritedData::StyleRareInheritedData(const StyleRareInheritedData& o)
     , m_effectiveZoom(o.m_effectiveZoom)
     , widows(o.widows)
     , orphans(o.orphans)
+    , m_hasAutoWidows(o.m_hasAutoWidows)
+    , m_hasAutoOrphans(o.m_hasAutoOrphans)
     , textSecurity(o.textSecurity)
     , userModify(o.userModify)
     , wordBreak(o.wordBreak)
     , overflowWrap(o.overflowWrap)
     , nbspMode(o.nbspMode)
     , lineBreak(o.lineBreak)
-    , textSizeAdjust(o.textSizeAdjust)
     , resize(o.resize)
     , userSelect(o.userSelect)
     , colorSpace(o.colorSpace)
@@ -152,6 +159,11 @@ StyleRareInheritedData::StyleRareInheritedData(const StyleRareInheritedData& o)
     , textEmphasisFill(o.textEmphasisFill)
     , textEmphasisMark(o.textEmphasisMark)
     , textEmphasisPosition(o.textEmphasisPosition)
+    , m_textOrientation(o.m_textOrientation)
+#if ENABLE(CSS3_TEXT)
+    , m_textIndentLine(o.m_textIndentLine)
+    , m_textIndentType(o.m_textIndentType)
+#endif
     , m_lineBoxContain(o.m_lineBoxContain)
 #if ENABLE(CSS_IMAGE_ORIENTATION)
     , m_imageOrientation(o.m_imageOrientation)
@@ -168,6 +180,8 @@ StyleRareInheritedData::StyleRareInheritedData(const StyleRareInheritedData& o)
 #endif
 #if ENABLE(CSS3_TEXT)
     , m_textAlignLast(o.m_textAlignLast)
+    , m_textJustify(o.m_textJustify)
+    , m_textUnderlinePosition(o.m_textUnderlinePosition)
 #endif // CSS3_TEXT
     , m_rubyPosition(o.m_rubyPosition)
     , hyphenationString(o.hyphenationString)
@@ -203,6 +217,15 @@ static bool cursorDataEquivalent(const CursorList* c1, const CursorList* c2)
     return (*c1 == *c2);
 }
 
+static bool quotesDataEquivalent(const QuotesData* q1, const QuotesData* q2)
+{
+    if (q1 == q2)
+        return true;
+    if ((!q1 && q2) || (q1 && !q2))
+        return false;
+    return (*q1 == *q2);
+}
+
 bool StyleRareInheritedData::operator==(const StyleRareInheritedData& o) const
 {
     return textStrokeColor == o.textStrokeColor
@@ -222,6 +245,8 @@ bool StyleRareInheritedData::operator==(const StyleRareInheritedData& o) const
         && m_effectiveZoom == o.m_effectiveZoom
         && widows == o.widows
         && orphans == o.orphans
+        && m_hasAutoWidows == o.m_hasAutoWidows
+        && m_hasAutoOrphans == o.m_hasAutoOrphans
         && textSecurity == o.textSecurity
         && userModify == o.userModify
         && wordBreak == o.wordBreak
@@ -231,7 +256,6 @@ bool StyleRareInheritedData::operator==(const StyleRareInheritedData& o) const
 #if ENABLE(ACCELERATED_OVERFLOW_SCROLLING)
         && useTouchOverflowScrolling == o.useTouchOverflowScrolling
 #endif
-        && textSizeAdjust == o.textSizeAdjust
         && resize == o.resize
         && userSelect == o.userSelect
         && colorSpace == o.colorSpace
@@ -243,11 +267,16 @@ bool StyleRareInheritedData::operator==(const StyleRareInheritedData& o) const
         && textEmphasisFill == o.textEmphasisFill
         && textEmphasisMark == o.textEmphasisMark
         && textEmphasisPosition == o.textEmphasisPosition
+        && m_textOrientation == o.m_textOrientation
+#if ENABLE(CSS3_TEXT)
+        && m_textIndentLine == o.m_textIndentLine
+        && m_textIndentType == o.m_textIndentType
+#endif
         && m_lineBoxContain == o.m_lineBoxContain
         && hyphenationString == o.hyphenationString
         && locale == o.locale
         && textEmphasisCustomMark == o.textEmphasisCustomMark
-        && QuotesData::equals(quotes.get(), o.quotes.get())
+        && quotesDataEquivalent(quotes.get(), o.quotes.get())
         && m_tabSize == o.m_tabSize
         && m_lineGrid == o.m_lineGrid
 #if ENABLE(CSS_IMAGE_ORIENTATION)
@@ -261,6 +290,8 @@ bool StyleRareInheritedData::operator==(const StyleRareInheritedData& o) const
 #endif
 #if ENABLE(CSS3_TEXT)
         && m_textAlignLast == o.m_textAlignLast
+        && m_textJustify == o.m_textJustify
+        && m_textUnderlinePosition == o.m_textUnderlinePosition
 #endif // CSS3_TEXT
         && m_rubyPosition == o.m_rubyPosition
         && m_lineSnap == o.m_lineSnap
@@ -278,22 +309,6 @@ bool StyleRareInheritedData::shadowDataEquivalent(const StyleRareInheritedData& 
     if (textShadow && o.textShadow && (*textShadow != *o.textShadow))
         return false;
     return true;
-}
-
-void StyleRareInheritedData::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
-    info.addMember(textShadow);
-    info.addMember(highlight);
-    info.addMember(cursorData);
-    info.addMember(hyphenationString);
-    info.addMember(locale);
-    info.addMember(textEmphasisCustomMark);
-    info.addMember(quotes);
-    info.addMember(m_lineGrid);
-#if ENABLE(CSS_VARIABLES)
-    info.addMember(m_variables);
-#endif
 }
 
 } // namespace WebCore

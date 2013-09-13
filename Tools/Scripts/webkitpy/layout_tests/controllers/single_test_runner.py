@@ -32,7 +32,7 @@ import re
 import time
 
 from webkitpy.layout_tests.controllers import test_result_writer
-from webkitpy.layout_tests.port.driver import DriverInput, DriverOutput
+from webkitpy.port.driver import DriverInput, DriverOutput
 from webkitpy.layout_tests.models import test_expectations
 from webkitpy.layout_tests.models import test_failures
 from webkitpy.layout_tests.models.test_results import TestResult
@@ -41,18 +41,19 @@ from webkitpy.layout_tests.models.test_results import TestResult
 _log = logging.getLogger(__name__)
 
 
-def run_single_test(port, options, test_input, driver, worker_name, stop_when_done):
-    runner = SingleTestRunner(options, port, driver, test_input, worker_name, stop_when_done)
+def run_single_test(port, options, results_directory, worker_name, driver, test_input, stop_when_done):
+    runner = SingleTestRunner(port, options, results_directory, worker_name, driver, test_input, stop_when_done)
     return runner.run()
 
 
 class SingleTestRunner(object):
     (ALONGSIDE_TEST, PLATFORM_DIR, VERSION_DIR, UPDATE) = ('alongside', 'platform', 'version', 'update')
 
-    def __init__(self, options, port, driver, test_input, worker_name, stop_when_done):
-        self._options = options
+    def __init__(self, port, options, results_directory, worker_name, driver, test_input, stop_when_done):
         self._port = port
         self._filesystem = port.host.filesystem
+        self._options = options
+        self._results_directory = results_directory
         self._driver = driver
         self._timeout = test_input.timeout
         self._worker_name = worker_name
@@ -114,17 +115,17 @@ class SingleTestRunner(object):
         test_result = self._compare_output(expected_driver_output, driver_output)
         if self._options.new_test_results:
             self._add_missing_baselines(test_result, driver_output)
-        test_result_writer.write_test_result(self._filesystem, self._port, self._test_name, driver_output, expected_driver_output, test_result.failures)
+        test_result_writer.write_test_result(self._filesystem, self._port, self._results_directory, self._test_name, driver_output, expected_driver_output, test_result.failures)
         return test_result
 
     def _run_rebaseline(self):
         driver_output = self._driver.run_test(self._driver_input(), self._stop_when_done)
         failures = self._handle_error(driver_output)
-        test_result_writer.write_test_result(self._filesystem, self._port, self._test_name, driver_output, None, failures)
+        test_result_writer.write_test_result(self._filesystem, self._port, self._results_directory, self._test_name, driver_output, None, failures)
         # FIXME: It the test crashed or timed out, it might be better to avoid
         # to write new baselines.
         self._overwrite_baselines(driver_output)
-        return TestResult(self._test_name, failures, driver_output.test_time, driver_output.has_stderr())
+        return TestResult(self._test_name, failures, driver_output.test_time, driver_output.has_stderr(), pid=driver_output.pid)
 
     _render_tree_dump_pattern = re.compile(r"^layer at \(\d+,\d+\) size \d+x\d+\n")
 
@@ -217,13 +218,13 @@ class SingleTestRunner(object):
         if driver_output.crash:
             # Don't continue any more if we already have a crash.
             # In case of timeouts, we continue since we still want to see the text and image output.
-            return TestResult(self._test_name, failures, driver_output.test_time, driver_output.has_stderr())
+            return TestResult(self._test_name, failures, driver_output.test_time, driver_output.has_stderr(), pid=driver_output.pid)
 
         failures.extend(self._compare_text(expected_driver_output.text, driver_output.text))
         failures.extend(self._compare_audio(expected_driver_output.audio, driver_output.audio))
         if self._should_run_pixel_test:
             failures.extend(self._compare_image(expected_driver_output, driver_output))
-        return TestResult(self._test_name, failures, driver_output.test_time, driver_output.has_stderr())
+        return TestResult(self._test_name, failures, driver_output.test_time, driver_output.has_stderr(), pid=driver_output.pid)
 
     def _compare_text(self, expected_text, actual_text):
         failures = []
@@ -293,8 +294,10 @@ class SingleTestRunner(object):
         # Note that sorting by the expectation sorts "!=" before "==" so this is easy to do.
 
         putAllMismatchBeforeMatch = sorted
+        reference_test_names = []
         for expectation, reference_filename in putAllMismatchBeforeMatch(self._reference_files):
             reference_test_name = self._port.relative_test_filename(reference_filename)
+            reference_test_names.append(reference_test_name)
             reference_output = self._driver.run_test(DriverInput(reference_test_name, self._timeout, None, should_run_pixel_test=True), self._stop_when_done)
             test_result = self._compare_output_with_reference(reference_output, test_output, reference_filename, expectation == '!=')
 
@@ -303,9 +306,9 @@ class SingleTestRunner(object):
             total_test_time += test_result.test_run_time
 
         assert(reference_output)
-        test_result_writer.write_test_result(self._filesystem, self._port, self._test_name, test_output, reference_output, test_result.failures)
+        test_result_writer.write_test_result(self._filesystem, self._port, self._results_directory, self._test_name, test_output, reference_output, test_result.failures)
         reftest_type = set([reference_file[0] for reference_file in self._reference_files])
-        return TestResult(self._test_name, test_result.failures, total_test_time + test_result.test_run_time, test_result.has_stderr, reftest_type=reftest_type)
+        return TestResult(self._test_name, test_result.failures, total_test_time + test_result.test_run_time, test_result.has_stderr, reftest_type=reftest_type, pid=test_result.pid, references=reference_test_names)
 
     def _compare_output_with_reference(self, reference_driver_output, actual_driver_output, reference_filename, mismatch):
         total_test_time = reference_driver_output.test_time + actual_driver_output.test_time
@@ -317,7 +320,7 @@ class SingleTestRunner(object):
             return TestResult(self._test_name, failures, total_test_time, has_stderr)
         failures.extend(self._handle_error(reference_driver_output, reference_filename=reference_filename))
         if failures:
-            return TestResult(self._test_name, failures, total_test_time, has_stderr)
+            return TestResult(self._test_name, failures, total_test_time, has_stderr, pid=actual_driver_output.pid)
 
         if not reference_driver_output.image_hash and not actual_driver_output.image_hash:
             failures.append(test_failures.FailureReftestNoImagesGenerated(reference_filename))
@@ -336,4 +339,4 @@ class SingleTestRunner(object):
             else:
                 _log.warning("  %s -> ref test hashes didn't match but diff passed" % self._test_name)
 
-        return TestResult(self._test_name, failures, total_test_time, has_stderr)
+        return TestResult(self._test_name, failures, total_test_time, has_stderr, pid=actual_driver_output.pid)

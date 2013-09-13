@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, 2011, 2012 Research In Motion Limited. All rights reserved.
+ * Copyright (C) 2010, 2011, 2012, 2013 Research In Motion Limited. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -21,11 +21,11 @@
 #include "WebPageCompositor.h"
 
 #if USE(ACCELERATED_COMPOSITING)
-#include "WebPageCompositorClient.h"
-#include "WebPageCompositor_p.h"
-
 #include "BackingStore_p.h"
 #include "LayerWebKitThread.h"
+#include "WebOverlay_p.h"
+#include "WebPageCompositorClient.h"
+#include "WebPageCompositor_p.h"
 #include "WebPage_p.h"
 
 #include <BlackBerryPlatformDebugMacros.h>
@@ -45,7 +45,9 @@ namespace WebKit {
 WebPageCompositorPrivate::WebPageCompositorPrivate(WebPagePrivate* page, WebPageCompositorClient* client)
     : m_client(client)
     , m_webPage(page)
+    , m_context(0)
     , m_drawsRootLayer(false)
+    , m_childWindowPlacement(WebPageCompositor::DocumentCoordinates)
 {
     ASSERT(m_webPage);
     setOneShot(true); // one-shot animation client
@@ -60,7 +62,9 @@ void WebPageCompositorPrivate::detach()
 {
     if (m_webPage)
         Platform::AnimationFrameRateController::instance()->removeClient(this);
+
     m_webPage = 0;
+    detachOverlays();
 }
 
 void WebPageCompositorPrivate::setPage(WebPagePrivate *p)
@@ -70,6 +74,22 @@ void WebPageCompositorPrivate::setPage(WebPagePrivate *p)
     ASSERT(p);
     ASSERT(m_webPage); // if this is null, we have a bug and we need to re-add.
     m_webPage = p;
+    attachOverlays();
+}
+
+void WebPageCompositorPrivate::attachOverlays(LayerCompositingThread* overlayRoot, WebPagePrivate* page)
+{
+    if (!overlayRoot)
+        return;
+
+    const Vector<RefPtr<LayerCompositingThread> >& overlays = overlayRoot->sublayers();
+    for (size_t i = 0; i < overlays.size(); ++i) {
+        LayerCompositingThread* overlay = overlays[i].get();
+        if (LayerCompositingThreadClient* client = overlay->client()) {
+            if (WebOverlayPrivate* webOverlay = static_cast<WebOverlayLayerCompositingThreadClient*>(client)->overlay())
+                webOverlay->setPage(page);
+        }
+    }
 }
 
 void WebPageCompositorPrivate::setContext(Platform::Graphics::GLES2Context* context)
@@ -77,9 +97,10 @@ void WebPageCompositorPrivate::setContext(Platform::Graphics::GLES2Context* cont
     if (m_context == context)
         return;
 
-    m_context = context;
-    if (!m_context)
+    // LayerRenderer needs to clean up using the previous context.
+    if (!context)
         m_layerRenderer.clear();
+    m_context = context;
 }
 
 void WebPageCompositorPrivate::setRootLayer(LayerCompositingThread* rootLayer)
@@ -105,7 +126,7 @@ void WebPageCompositorPrivate::prepareFrame(double animationTime)
         return;
 
     if (!m_layerRenderer) {
-        m_layerRenderer = LayerRenderer::create(m_context);
+        m_layerRenderer = LayerRenderer::create(this);
         if (!m_layerRenderer->hardwareCompositing()) {
             m_layerRenderer.clear();
             return;
@@ -123,7 +144,7 @@ void WebPageCompositorPrivate::prepareFrame(double animationTime)
         m_layerRenderer->prepareFrame(animationTime, m_compositingThreadOverlayLayer.get());
 }
 
-void WebPageCompositorPrivate::render(const IntRect& targetRect, const IntRect& clipRect, const TransformationMatrix& transformIn, const FloatRect& transformedContents, const FloatRect& /*viewport*/)
+void WebPageCompositorPrivate::render(const IntRect& targetRect, const IntRect& clipRect, const TransformationMatrix& transformIn, const FloatRect& documentSrcRect)
 {
     // m_layerRenderer should have been created in prepareFrame
     if (!m_layerRenderer)
@@ -136,17 +157,13 @@ void WebPageCompositorPrivate::render(const IntRect& targetRect, const IntRect& 
     if (!m_webPage || m_webPage->compositor() != this)
         return;
 
-    m_layerRenderer->setClearSurfaceOnDrawLayers(false);
-
-    FloatRect contents = m_webPage->mapFromTransformedFloatRect(transformedContents);
-
-    m_layerRenderer->setViewport(targetRect, clipRect, contents, m_layoutRectForCompositing, m_contentsSizeForCompositing);
+    m_layerRenderer->setViewport(targetRect, clipRect, documentSrcRect, m_layoutRect, m_documentRect.size());
 
     TransformationMatrix transform(transformIn);
-    transform *= *m_webPage->m_transformationMatrix;
+    transform.translate(-m_documentRect.x(), -m_documentRect.y());
 
     if (!drawsRootLayer())
-        m_webPage->m_backingStore->d->compositeContents(m_layerRenderer.get(), transform, contents, !m_backgroundColor.hasAlpha());
+        m_webPage->m_backingStore->d->compositeContents(m_layerRenderer.get(), transform, documentSrcRect, !m_backgroundColor.hasAlpha());
 
     compositeLayers(transform);
 }
@@ -184,11 +201,6 @@ bool WebPageCompositorPrivate::drawLayers(const IntRect& dstRect, const FloatRec
     if (!m_layerRenderer)
         return false;
 
-    bool shouldClear = drawsRootLayer();
-    if (BackingStore* backingStore = m_webPage->m_backingStore)
-        shouldClear = shouldClear || !backingStore->d->isOpenGLCompositing();
-    m_layerRenderer->setClearSurfaceOnDrawLayers(shouldClear);
-
     // OpenGL window coordinates origin is at the lower left corner of the surface while
     // WebKit uses upper left as the origin of the window coordinate system. The passed in 'dstRect'
     // is in WebKit window coordinate system. Here we setup the viewport to the corresponding value
@@ -196,14 +208,14 @@ bool WebPageCompositorPrivate::drawLayers(const IntRect& dstRect, const FloatRec
     int viewportY = std::max(0, m_context->surfaceSize().height() - dstRect.maxY());
     IntRect viewport = IntRect(dstRect.x(), viewportY, dstRect.width(), dstRect.height());
 
-    m_layerRenderer->setViewport(viewport, viewport, contents, m_layoutRectForCompositing, m_contentsSizeForCompositing);
+    m_layerRenderer->setViewport(viewport, viewport, contents, m_layoutRect, m_documentRect.size());
 
     // WebKit uses row vectors which are multiplied by the matrix on the left (i.e. v*M)
     // Transformations are composed on the left so that M1.xform(M2) means M2*M1
     // We therefore start with our (othogonal) projection matrix, which will be applied
     // as the last transformation.
     TransformationMatrix transform = LayerRenderer::orthoMatrix(0, contents.width(), contents.height(), 0, -1000, 1000);
-    transform.translate3d(-contents.x(), -contents.y(), 0);
+    transform.translate3d(-contents.x() - m_documentRect.x(), -contents.y() - m_documentRect.y(), 0);
     compositeLayers(transform);
 
     return true;
@@ -220,6 +232,11 @@ void WebPageCompositorPrivate::releaseLayerResources()
         m_layerRenderer->releaseLayerResources();
 }
 
+bool WebPageCompositorPrivate::shouldChildWindowsUseDocumentCoordinates()
+{
+    return m_childWindowPlacement == WebPageCompositor::DocumentCoordinates;
+}
+
 void WebPageCompositorPrivate::animationFrameChanged()
 {
     BackingStore* backingStore = m_webPage->m_backingStore;
@@ -232,19 +249,8 @@ void WebPageCompositorPrivate::animationFrameChanged()
         return;
     }
 
-    if (backingStore->d->shouldDirectRenderingToWindow()) {
-        if (backingStore->d->isDirectRenderingAnimationMessageScheduled())
-            return; // don't send new messages as long as we haven't rerendered
-
-        using namespace BlackBerry::Platform;
-
-        backingStore->d->setDirectRenderingAnimationMessageScheduled();
-        webKitThreadMessageClient()->dispatchMessage(createMethodCallMessage(&BackingStorePrivate::renderVisibleContents, backingStore->d));
-        return;
-    }
-
     if (!m_webPage->needsOneShotDrawingSynchronization())
-        m_webPage->blitVisibleContents();
+        backingStore->blitVisibleContents();
 }
 
 void WebPageCompositorPrivate::compositorDestroyed()
@@ -269,8 +275,25 @@ void WebPageCompositorPrivate::removeOverlay(LayerCompositingThread* layer)
 
     layer->removeFromSuperlayer();
 
-    if (m_compositingThreadOverlayLayer && m_compositingThreadOverlayLayer->getSublayers().isEmpty())
+    if (m_compositingThreadOverlayLayer && m_compositingThreadOverlayLayer->sublayers().isEmpty())
         m_compositingThreadOverlayLayer.clear();
+}
+
+void WebPageCompositorPrivate::findFixedElementRect(LayerCompositingThread* layer, WebCore::IntRect& fixedElementRect)
+{
+    if ((layer->hasFixedContainer() || layer->isFixedPosition() || layer->hasFixedAncestorInDOMTree()) && layer->layerRenderer()) {
+        IntRect fixedRect = layer->layerRenderer()->toPixelViewportCoordinates(layer->boundingBox());
+        // FIXME: It's possible that the rects don't intersect now, but will be connected by a fixed rect found later.
+        // We need to handle it as well.
+        if (fixedElementRect.isEmpty() || fixedElementRect.intersects(fixedRect)) // Unite rects if they intersect each other.
+            fixedElementRect.unite(fixedRect);
+        else if (fixedRect.y() < fixedElementRect.y()) // Replace the fixedElementRect with fixedRect if fixedRect is above it (closer to top).
+            fixedElementRect = fixedRect;
+    }
+
+    const Vector<RefPtr<LayerCompositingThread> >& sublayers = layer->sublayers();
+    for (size_t i = 0; i < sublayers.size(); i++)
+        findFixedElementRect(sublayers[i].get(), fixedElementRect);
 }
 
 WebPageCompositor::WebPageCompositor(WebPage* page, WebPageCompositorClient* client)
@@ -278,6 +301,10 @@ WebPageCompositor::WebPageCompositor(WebPage* page, WebPageCompositorClient* cli
     using namespace BlackBerry::Platform;
 
     RefPtr<WebPageCompositorPrivate> tmp = WebPageCompositorPrivate::create(page->d, client);
+
+    // FIXME: For legacy reasons, the internal default is to use document coordinates.
+    // Use window coordinates for new clients.
+    tmp->setChildWindowPlacement(WindowCoordinates);
 
     // Keep one ref ourselves...
     d = tmp.get();
@@ -306,24 +333,24 @@ WebPageCompositorClient* WebPageCompositor::client() const
     return d->client();
 }
 
+void WebPageCompositor::setChildWindowPlacement(ChildWindowPlacement placement)
+{
+    d->setChildWindowPlacement(placement);
+}
+
 void WebPageCompositor::prepareFrame(Platform::Graphics::GLES2Context* context, double animationTime)
 {
     d->setContext(context);
     d->prepareFrame(animationTime);
 }
 
-void WebPageCompositor::render(Platform::Graphics::GLES2Context* context,
-                               const Platform::IntRect& targetRect,
-                               const Platform::IntRect& clipRect,
-                               const Platform::TransformationMatrix& transform,
-                               const Platform::FloatRect& contents,
-                               const Platform::FloatRect& viewport)
+void WebPageCompositor::render(Platform::Graphics::GLES2Context* context, const Platform::IntRect& targetRect, const Platform::IntRect& clipRect, const Platform::TransformationMatrix& transform, const Platform::FloatRect& documentSrcRect)
 {
     d->setContext(context);
-    d->render(targetRect, clipRect, TransformationMatrix(reinterpret_cast<const TransformationMatrix&>(transform)), contents, viewport);
+    d->render(targetRect, clipRect, TransformationMatrix(reinterpret_cast<const TransformationMatrix&>(transform)), documentSrcRect);
 }
 
-void WebPageCompositor::cleanup(Platform::Graphics::GLES2Context* context)
+void WebPageCompositor::cleanup(Platform::Graphics::GLES2Context*)
 {
     d->setContext(0);
 }
@@ -358,16 +385,19 @@ WebPageCompositorClient* WebPageCompositor::client() const
     return 0;
 }
 
+void WebPageCompositor::setChildWindowPlacement(ChildWindowPlacement)
+{
+}
+
 void WebPageCompositor::prepareFrame(Platform::Graphics::GLES2Context*, double)
 {
 }
 
 void WebPageCompositor::render(Platform::Graphics::GLES2Context*,
-                               const Platform::IntRect&,
-                               const Platform::IntRect&,
-                               const Platform::TransformationMatrix&,
-                               const Platform::FloatRect&,
-                               const Platform::FloatRect&)
+    const Platform::IntRect&,
+    const Platform::IntRect&,
+    const Platform::TransformationMatrix&,
+    const Platform::FloatRect&)
 {
 }
 

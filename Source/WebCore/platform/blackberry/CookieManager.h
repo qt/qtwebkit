@@ -99,19 +99,20 @@ public:
     String getCookie(const KURL& requestURL, CookieFilter) const;
 
     // Returns all cookies that are associated with the specified URL as raw cookies.
-    void getRawCookies(Vector<ParsedCookie*>& stackOfCookies, const KURL& requestURL, CookieFilter = WithHttpOnlyCookies) const;
+    void getRawCookies(Vector<RefPtr<ParsedCookie> >& stackOfCookies, const KURL& requestURL, CookieFilter = WithHttpOnlyCookies) const;
 
 private:
     friend CookieManager& cookieManager();
+    friend class CookieDatabaseBackingStore;
 
     CookieManager();
     virtual ~CookieManager();
 
-    void checkAndTreatCookie(ParsedCookie*, BackingStoreRemovalPolicy, CookieFilter = WithHttpOnlyCookies);
+    void checkAndTreatCookie(PassRefPtr<ParsedCookie> prpCandidateCookie, BackingStoreRemovalPolicy, CookieFilter = WithHttpOnlyCookies);
 
-    void addCookieToMap(CookieMap* targetMap, ParsedCookie* candidateCookie, BackingStoreRemovalPolicy postToBackingStore, CookieFilter = WithHttpOnlyCookies);
+    void addCookieToMap(CookieMap* targetMap, PassRefPtr<ParsedCookie> prpCandidateCookie, BackingStoreRemovalPolicy postToBackingStore, CookieFilter = WithHttpOnlyCookies);
 
-    CookieMap* findOrCreateCookieMap(CookieMap* protocolMap, const ParsedCookie& candidateCookie);
+    CookieMap* findOrCreateCookieMap(CookieMap* protocolMap, const PassRefPtr<ParsedCookie> candidateCookie);
 
     void initiateCookieLimitCleanUp();
     void cookieLimitCleanUp(Timer<CookieManager>*);
@@ -122,6 +123,7 @@ private:
 
     bool m_privateMode;
     bool m_shouldDumpAllCookies;
+    bool m_syncedWithDatabase;
 
     String m_cookieJarFileName;
 
@@ -136,6 +138,7 @@ private:
     CookieDatabaseBackingStore* m_cookieBackingStore;
     Timer<CookieManager> m_limitTimer;
 
+    DISABLE_COPY(CookieManager)
 };
 
 // Get the global instance.

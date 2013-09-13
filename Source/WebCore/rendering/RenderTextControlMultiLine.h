@@ -28,7 +28,7 @@ namespace WebCore {
 
 class RenderTextControlMultiLine : public RenderTextControl {
 public:
-    RenderTextControlMultiLine(Node*);
+    RenderTextControlMultiLine(Element*);
     virtual ~RenderTextControlMultiLine();
 
 private:
@@ -37,8 +37,8 @@ private:
     virtual bool nodeAtPoint(const HitTestRequest&, HitTestResult&, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, HitTestAction) OVERRIDE;
 
     virtual float getAvgCharWidth(AtomicString family);
-    virtual LayoutUnit preferredContentWidth(float charWidth) const;
-    virtual LayoutUnit computeControlHeight(LayoutUnit lineHeight, LayoutUnit nonContentHeight) const OVERRIDE;
+    virtual LayoutUnit preferredContentLogicalWidth(float charWidth) const;
+    virtual LayoutUnit computeControlLogicalHeight(LayoutUnit lineHeight, LayoutUnit nonContentHeight) const OVERRIDE;
     virtual int baselinePosition(FontBaseline, bool firstLine, LineDirectionMode, LinePositionMode = PositionOnContainingLine) const;
 
     virtual RenderStyle* textBaseStyle() const;
@@ -48,7 +48,7 @@ private:
 
 inline RenderTextControlMultiLine* toRenderTextControlMultiLine(RenderObject* object)
 { 
-    ASSERT(!object || object->isTextArea());
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isTextArea());
     return static_cast<RenderTextControlMultiLine*>(object);
 }
 

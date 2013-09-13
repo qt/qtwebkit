@@ -88,6 +88,8 @@ WebInspector.AdvancedSearchController.prototype = {
         if (!this._searchView)
             this._searchView = new WebInspector.SearchView(this);
         
+        this._searchView.syncToSelection();
+
         if (this._searchView.isShowing())
             this._searchView.focus();
         else
@@ -228,7 +230,7 @@ WebInspector.SearchView.prototype = {
     /**
      * @return {Array.<Element>}
      */
-    get statusBarItems()
+    statusBarItems: function()
     {
         return [this._searchStatusBarElement, this._searchResultsMessageElement];
     },
@@ -239,6 +241,13 @@ WebInspector.SearchView.prototype = {
     get searchConfig()
     {
         return new WebInspector.SearchConfig(this._search.value, this._ignoreCaseCheckbox.checked, this._regexCheckbox.checked);
+    },
+
+    syncToSelection: function()
+    {
+        var selection = window.getSelection();
+        if (selection.rangeCount)
+            this._search.value = selection.toString().replace(/\r?\n.*/, "");
     },
     
     /**
@@ -502,7 +511,7 @@ WebInspector.FileBasedSearchResultsPane.prototype = {
     {
         var anchor = document.createElement("a");
         anchor.preferredPanel = "scripts";
-        anchor.href = sanitizeHref(uiSourceCode.url);
+        anchor.href = sanitizeHref(uiSourceCode.originURL());
         anchor.uiSourceCode = uiSourceCode;
         anchor.lineNumber = lineNumber;
         return anchor;
@@ -517,7 +526,7 @@ WebInspector.FileBasedSearchResultsPane.prototype = {
         var uiSourceCode = searchResult.uiSourceCode;
         var searchMatches = searchResult.searchMatches;
 
-        var fileTreeElement = this._addFileTreeElement(uiSourceCode.url, searchMatches.length, this._searchResults.length - 1);
+        var fileTreeElement = this._addFileTreeElement(uiSourceCode.originURL(), searchMatches.length, this._searchResults.length - 1);
     },
 
     /**

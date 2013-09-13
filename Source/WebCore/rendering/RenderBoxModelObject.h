@@ -26,7 +26,6 @@
 
 #include "LayoutRect.h"
 #include "RenderLayerModelObject.h"
-#include "ShadowData.h"
 
 namespace WebCore {
 
@@ -45,6 +44,7 @@ enum BackgroundBleedAvoidance {
 enum ContentChangeType {
     ImageChanged,
     MaskImageChanged,
+    BackgroundImageChanged,
     CanvasChanged,
     CanvasPixelsChanged,
     VideoChanged,
@@ -52,6 +52,7 @@ enum ContentChangeType {
 };
 
 class KeyframeList;
+class InlineFlowBox;
 class StickyPositionViewportConstraints;
 
 // This class is the base for all objects that adhere to the CSS box model as described
@@ -59,7 +60,7 @@ class StickyPositionViewportConstraints;
 
 class RenderBoxModelObject : public RenderLayerModelObject {
 public:
-    RenderBoxModelObject(Node*);
+    RenderBoxModelObject(ContainerNode*);
     virtual ~RenderBoxModelObject();
     
     LayoutSize relativePositionOffset() const;
@@ -80,8 +81,8 @@ public:
 
     int pixelSnappedOffsetLeft() const { return roundToInt(offsetLeft()); }
     int pixelSnappedOffsetTop() const { return roundToInt(offsetTop()); }
-    int pixelSnappedOffsetWidth() const;
-    int pixelSnappedOffsetHeight() const;
+    virtual int pixelSnappedOffsetWidth() const;
+    virtual int pixelSnappedOffsetHeight() const;
 
     virtual void updateFromStyle() OVERRIDE;
 
@@ -91,14 +92,14 @@ public:
     virtual IntRect borderBoundingBox() const = 0;
 
     // These return the CSS computed padding values.
-    LayoutUnit computedCSSPaddingTop() const;
-    LayoutUnit computedCSSPaddingBottom() const;
-    LayoutUnit computedCSSPaddingLeft() const;
-    LayoutUnit computedCSSPaddingRight() const;
-    LayoutUnit computedCSSPaddingBefore() const;
-    LayoutUnit computedCSSPaddingAfter() const;
-    LayoutUnit computedCSSPaddingStart() const;
-    LayoutUnit computedCSSPaddingEnd() const;
+    LayoutUnit computedCSSPaddingTop() const { return computedCSSPadding(style()->paddingTop()); }
+    LayoutUnit computedCSSPaddingBottom() const { return computedCSSPadding(style()->paddingBottom()); }
+    LayoutUnit computedCSSPaddingLeft() const { return computedCSSPadding(style()->paddingLeft()); }
+    LayoutUnit computedCSSPaddingRight() const { return computedCSSPadding(style()->paddingRight()); }
+    LayoutUnit computedCSSPaddingBefore() const { return computedCSSPadding(style()->paddingBefore()); }
+    LayoutUnit computedCSSPaddingAfter() const { return computedCSSPadding(style()->paddingAfter()); }
+    LayoutUnit computedCSSPaddingStart() const { return computedCSSPadding(style()->paddingStart()); }
+    LayoutUnit computedCSSPaddingEnd() const { return computedCSSPadding(style()->paddingEnd()); }
 
     // These functions are used during layout. Table cells and the MathML
     // code override them to include some extra intrinsic padding.
@@ -120,16 +121,22 @@ public:
     virtual int borderStart() const { return style()->borderStartWidth(); }
     virtual int borderEnd() const { return style()->borderEndWidth(); }
 
+    LayoutUnit borderAndPaddingStart() const { return borderStart() + paddingStart(); }
+    LayoutUnit borderAndPaddingBefore() const { return borderBefore() + paddingBefore(); }
+    LayoutUnit borderAndPaddingAfter() const { return borderAfter() + paddingAfter(); }
+
     LayoutUnit borderAndPaddingHeight() const { return borderTop() + borderBottom() + paddingTop() + paddingBottom(); }
     LayoutUnit borderAndPaddingWidth() const { return borderLeft() + borderRight() + paddingLeft() + paddingRight(); }
-    LayoutUnit borderAndPaddingLogicalHeight() const { return borderBefore() + borderAfter() + paddingBefore() + paddingAfter(); }
+    LayoutUnit borderAndPaddingLogicalHeight() const { return borderAndPaddingBefore() + borderAndPaddingAfter(); }
     LayoutUnit borderAndPaddingLogicalWidth() const { return borderStart() + borderEnd() + paddingStart() + paddingEnd(); }
     LayoutUnit borderAndPaddingLogicalLeft() const { return style()->isHorizontalWritingMode() ? borderLeft() + paddingLeft() : borderTop() + paddingTop(); }
 
-    LayoutUnit borderAndPaddingStart() const { return borderStart() + paddingStart(); }
     LayoutUnit borderLogicalLeft() const { return style()->isHorizontalWritingMode() ? borderLeft() : borderTop(); }
     LayoutUnit borderLogicalRight() const { return style()->isHorizontalWritingMode() ? borderRight() : borderBottom(); }
 
+    LayoutUnit paddingLogicalLeft() const { return style()->isHorizontalWritingMode() ? paddingLeft() : paddingTop(); }
+    LayoutUnit paddingLogicalRight() const { return style()->isHorizontalWritingMode() ? paddingRight() : paddingBottom(); }
+    
     virtual LayoutUnit marginTop() const = 0;
     virtual LayoutUnit marginBottom() const = 0;
     virtual LayoutUnit marginLeft() const = 0;
@@ -140,6 +147,8 @@ public:
     virtual LayoutUnit marginEnd(const RenderStyle* otherStyle = 0) const = 0;
     LayoutUnit marginHeight() const { return marginTop() + marginBottom(); }
     LayoutUnit marginWidth() const { return marginLeft() + marginRight(); }
+    LayoutUnit marginLogicalHeight() const { return marginBefore() + marginAfter(); }
+    LayoutUnit marginLogicalWidth() const { return marginStart() + marginEnd(); }
 
     bool hasInlineDirectionBordersPaddingOrMargin() const { return hasInlineDirectionBordersOrPadding() || marginStart()|| marginEnd(); }
     bool hasInlineDirectionBordersOrPadding() const { return borderStart() || borderEnd() || paddingStart()|| paddingEnd(); }
@@ -165,6 +174,10 @@ public:
 
     virtual void setSelectionState(SelectionState s);
 
+    bool canHaveBoxInfoInRegion() const { return !isFloating() && !isReplaced() && !isInline() && !hasColumns() && !isTableCell() && isBlockFlow() && !isRenderSVGBlock(); }
+
+
+    void getGeometryForBackgroundImage(const RenderLayerModelObject* paintContainer, IntRect& destRect, IntPoint& phase, IntSize& tileSize) const;
 #if USE(ACCELERATED_COMPOSITING)
     void contentChanged(ContentChangeType);
     bool hasAcceleratedCompositing() const;
@@ -185,6 +198,9 @@ protected:
 
     class BackgroundImageGeometry {
     public:
+        BackgroundImageGeometry()
+            : m_hasNonLocalGeometry(false)
+        { }
         IntPoint destOrigin() const { return m_destOrigin; }
         void setDestOrigin(const IntPoint& destOrigin)
         {
@@ -221,16 +237,21 @@ protected:
         void useFixedAttachment(const IntPoint& attachmentPoint);
         
         void clip(const IntRect&);
+        
+        void setHasNonLocalGeometry(bool hasNonLocalGeometry = true) { m_hasNonLocalGeometry = hasNonLocalGeometry; }
+        bool hasNonLocalGeometry() const { return m_hasNonLocalGeometry; }
+
     private:
         IntRect m_destRect;
         IntPoint m_destOrigin;
         IntPoint m_phase;
         IntSize m_tileSize;
+        bool m_hasNonLocalGeometry; // Has background-attachment: fixed. Implies that we can't always cheaply compute destRect.
     };
 
     LayoutPoint adjustedPositionRelativeToOffsetParent(const LayoutPoint&) const;
 
-    void calculateBackgroundImageGeometry(const FillLayer*, const LayoutRect& paintRect, BackgroundImageGeometry&);
+    void calculateBackgroundImageGeometry(const RenderLayerModelObject* paintContainer, const FillLayer*, const LayoutRect& paintRect, BackgroundImageGeometry&, RenderObject* = 0) const;
     void getBorderEdgeInfo(class BorderEdge[], const RenderStyle*, bool includeLogicalLeftEdge = true, bool includeLogicalRightEdge = true) const;
     bool borderObscuresBackgroundEdge(const FloatSize& contextScale) const;
     bool borderObscuresBackground() const;
@@ -247,6 +268,8 @@ protected:
     static bool shouldAntialiasLines(GraphicsContext*);
 
     static void clipRoundedInnerRect(GraphicsContext*, const LayoutRect&, const RoundedRect& clipRect);
+
+    bool hasAutoHeightOrContainingBlockWithAutoHeight() const;
 
 public:
     // For RenderBlocks and RenderInlines with m_style->styleType() == FIRST_LETTER, this tracks their remaining text fragments
@@ -278,6 +301,7 @@ public:
     void moveChildrenTo(RenderBoxModelObject* toBoxModelObject, RenderObject* startChild, RenderObject* endChild, RenderObject* beforeChild, bool fullRemoveInsert = false);
 
 private:
+    LayoutUnit computedCSSPadding(Length) const;
     virtual bool isBoxModelObject() const { return true; }
     
     virtual LayoutRect frameRectForStickyPositioning() const = 0;
@@ -289,7 +313,8 @@ private:
 
     RoundedRect getBackgroundRoundedRect(const LayoutRect&, InlineFlowBox*, LayoutUnit inlineBoxWidth, LayoutUnit inlineBoxHeight,
         bool includeLogicalLeftEdge, bool includeLogicalRightEdge) const;
-
+    
+    bool fixedBackgroundPaintsInLocalCoordinates() const;
 
     void clipBorderSidePolygon(GraphicsContext*, const RoundedRect& outerBorder, const RoundedRect& innerBorder,
                                BoxSide, bool firstEdgeMatches, bool secondEdgeMatches);
@@ -309,13 +334,13 @@ private:
 
 inline RenderBoxModelObject* toRenderBoxModelObject(RenderObject* object)
 { 
-    ASSERT(!object || object->isBoxModelObject());
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isBoxModelObject());
     return static_cast<RenderBoxModelObject*>(object);
 }
 
 inline const RenderBoxModelObject* toRenderBoxModelObject(const RenderObject* object)
 { 
-    ASSERT(!object || object->isBoxModelObject());
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isBoxModelObject());
     return static_cast<const RenderBoxModelObject*>(object);
 }
 

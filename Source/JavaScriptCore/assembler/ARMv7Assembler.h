@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009, 2010, 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2009, 2010, 2012, 2013 Apple Inc. All rights reserved.
  * Copyright (C) 2010 University of Szeged
  *
  * Redistribution and use in source and binary forms, with or without
@@ -422,21 +422,21 @@ public:
     // (HS, LO, HI, LS) -> (AE, B, A, BE)
     // (VS, VC) -> (O, NO)
     typedef enum {
-        ConditionEQ,
-        ConditionNE,
-        ConditionHS, ConditionCS = ConditionHS,
-        ConditionLO, ConditionCC = ConditionLO,
-        ConditionMI,
-        ConditionPL,
-        ConditionVS,
-        ConditionVC,
-        ConditionHI,
-        ConditionLS,
-        ConditionGE,
-        ConditionLT,
-        ConditionGT,
-        ConditionLE,
-        ConditionAL,
+        ConditionEQ, // Zero / Equal.
+        ConditionNE, // Non-zero / Not equal.
+        ConditionHS, ConditionCS = ConditionHS, // Unsigned higher or same.
+        ConditionLO, ConditionCC = ConditionLO, // Unsigned lower.
+        ConditionMI, // Negative.
+        ConditionPL, // Positive or zero.
+        ConditionVS, // Overflowed.
+        ConditionVC, // Not overflowed.
+        ConditionHI, // Unsigned higher.
+        ConditionLS, // Unsigned lower or same.
+        ConditionGE, // Signed greater than or equal.
+        ConditionLT, // Signed less than.
+        ConditionGT, // Signed greater than.
+        ConditionLE, // Signed less than or equal.
+        ConditionAL, // Unconditional / Always execute.
         ConditionInvalid
     } Condition;
 
@@ -661,6 +661,10 @@ private:
         OP_ROR_reg_T2   = 0xFA60,
         OP_CLZ          = 0xFAB0,
         OP_SMULL_T1     = 0xFB80,
+#if CPU(APPLE_ARMV7S)
+        OP_SDIV_T1      = 0xFB90,
+        OP_UDIV_T1      = 0xFBB0,
+#endif
     } OpcodeID1;
 
     typedef enum {
@@ -1403,6 +1407,16 @@ public:
         m_formatter.twoWordOp12Reg4FourFours(OP_ROR_reg_T2, rn, FourFours(0xf, rd, 0, rm));
     }
 
+#if CPU(APPLE_ARMV7S)
+    ALWAYS_INLINE void sdiv(RegisterID rd, RegisterID rn, RegisterID rm)
+    {
+        ASSERT(!BadReg(rd));
+        ASSERT(!BadReg(rn));
+        ASSERT(!BadReg(rm));
+        m_formatter.twoWordOp12Reg4FourFours(OP_SDIV_T1, rn, FourFours(0xf, rd, 0xf, rm));
+    }
+#endif
+
     ALWAYS_INLINE void smull(RegisterID rdLo, RegisterID rdHi, RegisterID rn, RegisterID rm)
     {
         ASSERT(!BadReg(rdLo));
@@ -1739,6 +1753,16 @@ public:
         m_formatter.twoWordOp12Reg40Imm3Reg4Imm20Imm5(OP_UBFX_T1, rd, rn, (lsb & 0x1c) << 10, (lsb & 0x3) << 6, (width - 1) & 0x1f);
     }
 
+#if CPU(APPLE_ARMV7S)
+    ALWAYS_INLINE void udiv(RegisterID rd, RegisterID rn, RegisterID rm)
+    {
+        ASSERT(!BadReg(rd));
+        ASSERT(!BadReg(rn));
+        ASSERT(!BadReg(rm));
+        m_formatter.twoWordOp12Reg4FourFours(OP_UDIV_T1, rn, FourFours(0xf, rd, 0xf, rm));
+    }
+#endif
+
     void vadd(FPDoubleRegisterID rd, FPDoubleRegisterID rn, FPDoubleRegisterID rm)
     {
         m_formatter.vfpOp(OP_VADD_T2, OP_VADD_T2b, true, rn, rd, rm);
@@ -2011,7 +2035,7 @@ public:
             offsets[ptr++] = offset;
     }
     
-    Vector<LinkRecord>& jumpsToLink()
+    Vector<LinkRecord, 0, UnsafeVectorOverflow>& jumpsToLink()
     {
         std::sort(m_jumpsToLink.begin(), m_jumpsToLink.end(), linkRecordSourceComparator);
         return m_jumpsToLink;
@@ -2042,7 +2066,7 @@ public:
             linkBX(reinterpret_cast_ptr<uint16_t*>(from), to);
             break;
         default:
-            ASSERT_NOT_REACHED();
+            RELEASE_ASSERT_NOT_REACHED();
             break;
         }
     }
@@ -2202,7 +2226,7 @@ public:
             cacheFlush(ptr, sizeof(uint16_t) * 2);
             break;
         default:
-            ASSERT_NOT_REACHED();
+            RELEASE_ASSERT_NOT_REACHED();
         }
     }
 
@@ -2222,17 +2246,15 @@ public:
         case OP_ADD_imm_T3:
             break;
         default:
-            ASSERT_NOT_REACHED();
+            RELEASE_ASSERT_NOT_REACHED();
         }
     }
 
     unsigned debugOffset() { return m_formatter.debugOffset(); }
 
-    static void cacheFlush(void* code, size_t size)
+#if OS(LINUX)
+    static inline void linuxPageFlush(uintptr_t begin, uintptr_t end)
     {
-#if OS(IOS)
-        sys_cache_control(kCacheFunctionPrepareForExecution, code, size);
-#elif OS(LINUX)
         asm volatile(
             "push    {r7}\n"
             "mov     r0, %0\n"
@@ -2243,8 +2265,32 @@ public:
             "svc     0x0\n"
             "pop     {r7}\n"
             :
-            : "r" (code), "r" (reinterpret_cast<char*>(code) + size)
+            : "r" (begin), "r" (end)
             : "r0", "r1", "r2");
+    }
+#endif
+
+    static void cacheFlush(void* code, size_t size)
+    {
+#if OS(IOS)
+        sys_cache_control(kCacheFunctionPrepareForExecution, code, size);
+#elif OS(LINUX)
+        size_t page = pageSize();
+        uintptr_t current = reinterpret_cast<uintptr_t>(code);
+        uintptr_t end = current + size;
+        uintptr_t firstPageEnd = (current & ~(page - 1)) + page;
+
+        if (end <= firstPageEnd) {
+            linuxPageFlush(current, end);
+            return;
+        }
+
+        linuxPageFlush(current, firstPageEnd);
+
+        for (current = firstPageEnd; current + page < end; current += page)
+            linuxPageFlush(current, current + page);
+
+        linuxPageFlush(current, end);
 #elif OS(WINCE)
         CacheRangeFlush(code, size, CACHE_SYNC_ALL);
 #elif OS(QNX)
@@ -2732,8 +2778,7 @@ private:
         AssemblerBuffer m_buffer;
     } m_formatter;
 
-    Vector<LinkRecord> m_jumpsToLink;
-    Vector<int32_t> m_offsets;
+    Vector<LinkRecord, 0, UnsafeVectorOverflow> m_jumpsToLink;
     int m_indexOfLastWatchpoint;
     int m_indexOfTailOfLastWatchpoint;
 };

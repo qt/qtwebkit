@@ -30,6 +30,20 @@
 
 namespace WebCore {
 
+UIEventInit::UIEventInit()
+    : view(0)
+    , detail(0)
+{
+}
+
+UIEventInit::UIEventInit(bool bubbles, bool cancelable)
+    : EventInit(bubbles, cancelable)
+    , view(0)
+    , detail(0)
+{
+}
+
+    
 UIEvent::UIEvent()
     : m_detail(0)
 {
@@ -39,6 +53,20 @@ UIEvent::UIEvent(const AtomicString& eventType, bool canBubbleArg, bool cancelab
     : Event(eventType, canBubbleArg, cancelableArg)
     , m_view(viewArg)
     , m_detail(detailArg)
+{
+}
+
+UIEvent::UIEvent(const AtomicString& eventType, bool canBubbleArg, bool cancelableArg, double timestamp, PassRefPtr<AbstractView> viewArg, int detailArg)
+    : Event(eventType, canBubbleArg, cancelableArg, timestamp)
+    , m_view(viewArg)
+    , m_detail(detailArg)
+{
+}
+
+UIEvent::UIEvent(const AtomicString& eventType, const UIEventInit& initializer)
+    : Event(eventType, initializer)
+    , m_view(initializer.view)
+    , m_detail(initializer.detail)
 {
 }
 
@@ -100,40 +128,6 @@ int UIEvent::pageY() const
 int UIEvent::which() const
 {
     return 0;
-}
-
-PassRefPtr<FocusInEventDispatchMediator> FocusInEventDispatchMediator::create(PassRefPtr<Event> event, PassRefPtr<Node> oldFocusedNode)
-{
-    return adoptRef(new FocusInEventDispatchMediator(event, oldFocusedNode));
-}
-
-FocusInEventDispatchMediator::FocusInEventDispatchMediator(PassRefPtr<Event> event, PassRefPtr<Node> oldFocusedNode)
-    : EventDispatchMediator(event)
-    , m_oldFocusedNode(oldFocusedNode)
-{
-}
-
-bool FocusInEventDispatchMediator::dispatchEvent(EventDispatcher* dispatcher) const
-{
-    dispatcher->adjustRelatedTarget(event(), m_oldFocusedNode);
-    return EventDispatchMediator::dispatchEvent(dispatcher);
-}
-
-PassRefPtr<FocusOutEventDispatchMediator> FocusOutEventDispatchMediator::create(PassRefPtr<Event> event, PassRefPtr<Node> newFocusedNode)
-{
-    return adoptRef(new FocusOutEventDispatchMediator(event, newFocusedNode));
-}
-
-FocusOutEventDispatchMediator::FocusOutEventDispatchMediator(PassRefPtr<Event> event, PassRefPtr<Node> newFocusedNode)
-    : EventDispatchMediator(event)
-    , m_newFocusedNode(newFocusedNode)
-{
-}
-
-bool FocusOutEventDispatchMediator::dispatchEvent(EventDispatcher* dispatcher) const
-{
-    dispatcher->adjustRelatedTarget(event(), m_newFocusedNode);
-    return EventDispatchMediator::dispatchEvent(dispatcher);
 }
 
 } // namespace WebCore

@@ -34,6 +34,7 @@
 #include "FixedTableLayout.cpp"
 #include "HitTestingTransformState.cpp"
 #include "HitTestResult.cpp"
+#include "HitTestLocation.cpp"
 #include "InlineBox.cpp"
 #include "InlineFlowBox.cpp"
 #include "InlineTextBox.cpp"
@@ -74,6 +75,7 @@
 #include "RenderListMarker.cpp"
 #include "RenderMarquee.cpp"
 #include "RenderMedia.cpp"
+#include "RenderMediaControlElements.cpp"
 #include "RenderMediaControls.cpp"
 #include "RenderMenuList.cpp"
 #include "RenderMeter.cpp"
@@ -108,6 +110,7 @@
 #include "RenderTextControlMultiLine.cpp"
 #include "RenderTextControlSingleLine.cpp"
 #include "RenderTextFragment.cpp"
+#include "RenderTextTrackCue.cpp"
 #include "RenderTheme.cpp"
 #if PLATFORM(WIN)
 #include "RenderThemeWin.cpp"
@@ -120,3 +123,4 @@
 #include "RootInlineBox.cpp"
 #include "ScrollBehavior.cpp"
 #include "break_lines.cpp"
+

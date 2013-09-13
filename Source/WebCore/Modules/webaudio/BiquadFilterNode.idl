@@ -36,15 +36,14 @@
     const unsigned short NOTCH = 6;
     const unsigned short ALLPASS = 7;
 
-    attribute unsigned short type
-        setter raises(DOMException);
+    [CustomSetter] attribute DOMString type;
     
     readonly attribute AudioParam frequency; // in Hertz
     readonly attribute AudioParam detune; // in Cents
     readonly attribute AudioParam Q; // Quality factor
     readonly attribute AudioParam gain; // in Decibels
 
-    void getFrequencyResponse(in Float32Array frequencyHz,
-                              in Float32Array magResponse,
-                              in Float32Array phaseResponse);
+    void getFrequencyResponse(Float32Array frequencyHz,
+                              Float32Array magResponse,
+                              Float32Array phaseResponse);
 };

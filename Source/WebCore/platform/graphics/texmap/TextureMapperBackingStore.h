@@ -20,7 +20,7 @@
 #ifndef TextureMapperBackingStore_h
 #define TextureMapperBackingStore_h
 
-#if USE(ACCELERATED_COMPOSITING)
+#if USE(ACCELERATED_COMPOSITING) && USE(TEXTURE_MAPPER)
 
 #include "FloatRect.h"
 #include "Image.h"
@@ -39,81 +39,12 @@ class GraphicsLayer;
 class TextureMapperBackingStore : public TextureMapperPlatformLayer, public RefCounted<TextureMapperBackingStore> {
 public:
     virtual PassRefPtr<BitmapTexture> texture() const = 0;
-    virtual void paintToTextureMapper(TextureMapper*, const FloatRect&, const TransformationMatrix&, float, BitmapTexture*) = 0;
+    virtual void paintToTextureMapper(TextureMapper*, const FloatRect&, const TransformationMatrix&, float) = 0;
+    virtual void drawRepaintCounter(TextureMapper*, int /* repaintCount */, const Color&, const FloatRect&, const TransformationMatrix&) { }
     virtual ~TextureMapperBackingStore() { }
 
 protected:
     static unsigned calculateExposedTileEdges(const FloatRect& totalRect, const FloatRect& tileRect);
-};
-
-#if USE(GRAPHICS_SURFACE)
-class TextureMapperSurfaceBackingStore : public TextureMapperBackingStore {
-public:
-    static PassRefPtr<TextureMapperSurfaceBackingStore> create() { return adoptRef(new TextureMapperSurfaceBackingStore); }
-    void setGraphicsSurface(PassRefPtr<GraphicsSurface>);
-    void swapBuffersIfNeeded(uint32_t frontBuffer);
-    virtual PassRefPtr<BitmapTexture> texture() const;
-    virtual void paintToTextureMapper(TextureMapper*, const FloatRect&, const TransformationMatrix&, float, BitmapTexture*);
-    virtual ~TextureMapperSurfaceBackingStore() { }
-
-private:
-    TextureMapperSurfaceBackingStore()
-        : TextureMapperBackingStore()
-        { }
-
-    RefPtr<GraphicsSurface> m_graphicsSurface;
-};
-#endif
-
-class TextureMapperTile {
-public:
-    inline PassRefPtr<BitmapTexture> texture() const { return m_texture; }
-    inline FloatRect rect() const { return m_rect; }
-    inline void setTexture(BitmapTexture* texture) { m_texture = texture; }
-    inline void setRect(const FloatRect& rect) { m_rect = rect; }
-
-    void updateContents(TextureMapper*, Image*, const IntRect&, BitmapTexture::UpdateContentsFlag UpdateCanModifyOriginalImageData);
-    void updateContents(TextureMapper*, GraphicsLayer*, const IntRect&, BitmapTexture::UpdateContentsFlag UpdateCanModifyOriginalImageData);
-    virtual void paint(TextureMapper*, const TransformationMatrix&, float, BitmapTexture*, const unsigned exposedEdges);
-    virtual ~TextureMapperTile() { }
-
-    explicit TextureMapperTile(const FloatRect& rect)
-        : m_rect(rect)
-    {
-    }
-
-private:
-    RefPtr<BitmapTexture> m_texture;
-    FloatRect m_rect;
-};
-
-class TextureMapperTiledBackingStore : public TextureMapperBackingStore {
-public:
-    static PassRefPtr<TextureMapperTiledBackingStore> create() { return adoptRef(new TextureMapperTiledBackingStore); }
-    virtual ~TextureMapperTiledBackingStore() { }
-
-    virtual PassRefPtr<BitmapTexture> texture() const OVERRIDE;
-    virtual void paintToTextureMapper(TextureMapper*, const FloatRect&, const TransformationMatrix&, float, BitmapTexture*) OVERRIDE;
-    void updateContents(TextureMapper*, Image*, const FloatSize&, const IntRect&, BitmapTexture::UpdateContentsFlag);
-    void updateContents(TextureMapper*, GraphicsLayer*, const FloatSize&, const IntRect&, BitmapTexture::UpdateContentsFlag);
-
-    void setContentsToImage(Image* image) { m_image = image; }
-    void setShowDebugBorders(bool drawsDebugBorders) { m_drawsDebugBorders = drawsDebugBorders; }
-    void setDebugBorder(const Color&, float width);
-
-private:
-    TextureMapperTiledBackingStore();
-    void createOrDestroyTilesIfNeeded(const FloatSize& backingStoreSize, const IntSize& tileSize, bool hasAlpha);
-    void updateContentsFromImageIfNeeded(TextureMapper*);
-    inline FloatRect rect() const { return FloatRect(FloatPoint::zero(), m_size); }
-
-    Vector<TextureMapperTile> m_tiles;
-    FloatSize m_size;
-    RefPtr<Image> m_image;
-
-    bool m_drawsDebugBorders;
-    Color m_debugBorderColor;
-    float m_debugBorderWidth;
 };
 
 }

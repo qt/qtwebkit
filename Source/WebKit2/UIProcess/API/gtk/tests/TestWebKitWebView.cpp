@@ -48,12 +48,10 @@ static void testWebViewCustomCharset(WebViewTest* test, gconstpointer)
 static void testWebViewSettings(WebViewTest* test, gconstpointer)
 {
     WebKitSettings* defaultSettings = webkit_web_view_get_settings(test->m_webView);
-    test->assertObjectIsDeletedWhenTestFinishes(G_OBJECT(defaultSettings));
     g_assert(defaultSettings);
     g_assert(webkit_settings_get_enable_javascript(defaultSettings));
 
     GRefPtr<WebKitSettings> newSettings = adoptGRef(webkit_settings_new());
-    test->assertObjectIsDeletedWhenTestFinishes(G_OBJECT(newSettings.get()));
     g_object_set(G_OBJECT(newSettings.get()), "enable-javascript", FALSE, NULL);
     webkit_web_view_set_settings(test->m_webView, newSettings.get());
 
@@ -67,7 +65,6 @@ static void testWebViewSettings(WebViewTest* test, gconstpointer)
     g_assert(webkit_web_view_get_settings(WEBKIT_WEB_VIEW(webView2.get())) == settings);
 
     GRefPtr<WebKitSettings> newSettings2 = adoptGRef(webkit_settings_new());
-    test->assertObjectIsDeletedWhenTestFinishes(G_OBJECT(newSettings2.get()));
     webkit_web_view_set_settings(WEBKIT_WEB_VIEW(webView2.get()), newSettings2.get());
     settings = webkit_web_view_get_settings(WEBKIT_WEB_VIEW(webView2.get()));
     g_assert(settings == newSettings2.get());
@@ -479,8 +476,9 @@ static void testWebViewMouseTarget(UIClientTest* test, gconstpointer)
         " <a style='position:absolute; left:1; top:1' href='http://www.webkitgtk.org' title='WebKitGTK+ Title'>WebKitGTK+ Website</a>"
         " <img style='position:absolute; left:1; top:10' src='0xdeadbeef' width=5 height=5></img>"
         " <a style='position:absolute; left:1; top:20' href='http://www.webkitgtk.org/logo' title='WebKitGTK+ Logo'><img src='0xdeadbeef' width=5 height=5></img></a>"
-        " <video style='position:absolute; left:1; top:30' width=10 height=10 controls='controls'><source src='movie.ogg' type='video/ogg' /></video>"
-        " <input style='position:absolute; left:1; top:50' size='10'></input>"
+        " <input style='position:absolute; left:1; top:30' size='10'></input>"
+        " <div style='position:absolute; left:1; top:50; width:30; height:30; overflow:scroll'>&nbsp;</div>"
+        " <video style='position:absolute; left:1; top:100' width='300' height='300' controls='controls' preload='none'><source src='movie.ogg' type='video/ogg' /></video>"
         "</body></html>";
 
     test->loadHtml(linksHoveredHTML, "file:///");
@@ -511,6 +509,7 @@ static void testWebViewMouseTarget(UIClientTest* test, gconstpointer)
     g_assert(webkit_hit_test_result_context_is_image(hitTestResult));
     g_assert(!webkit_hit_test_result_context_is_media(hitTestResult));
     g_assert(!webkit_hit_test_result_context_is_editable(hitTestResult));
+    g_assert(!webkit_hit_test_result_context_is_scrollbar(hitTestResult));
     g_assert_cmpstr(webkit_hit_test_result_get_image_uri(hitTestResult), ==, "file:///0xdeadbeef");
     g_assert(test->m_mouseTargetModifiers & GDK_CONTROL_MASK);
 
@@ -520,6 +519,7 @@ static void testWebViewMouseTarget(UIClientTest* test, gconstpointer)
     g_assert(webkit_hit_test_result_context_is_image(hitTestResult));
     g_assert(!webkit_hit_test_result_context_is_media(hitTestResult));
     g_assert(!webkit_hit_test_result_context_is_editable(hitTestResult));
+    g_assert(!webkit_hit_test_result_context_is_scrollbar(hitTestResult));
     g_assert_cmpstr(webkit_hit_test_result_get_link_uri(hitTestResult), ==, "http://www.webkitgtk.org/logo");
     g_assert_cmpstr(webkit_hit_test_result_get_image_uri(hitTestResult), ==, "file:///0xdeadbeef");
     g_assert_cmpstr(webkit_hit_test_result_get_link_title(hitTestResult), ==, "WebKitGTK+ Logo");
@@ -527,20 +527,31 @@ static void testWebViewMouseTarget(UIClientTest* test, gconstpointer)
     g_assert(!test->m_mouseTargetModifiers);
 
     // Move over media.
-    hitTestResult = test->moveMouseAndWaitUntilMouseTargetChanged(1, 30);
+    hitTestResult = test->moveMouseAndWaitUntilMouseTargetChanged(1, 100);
     g_assert(!webkit_hit_test_result_context_is_link(hitTestResult));
     g_assert(!webkit_hit_test_result_context_is_image(hitTestResult));
     g_assert(webkit_hit_test_result_context_is_media(hitTestResult));
     g_assert(!webkit_hit_test_result_context_is_editable(hitTestResult));
+    g_assert(!webkit_hit_test_result_context_is_scrollbar(hitTestResult));
     g_assert_cmpstr(webkit_hit_test_result_get_media_uri(hitTestResult), ==, "file:///movie.ogg");
     g_assert(!test->m_mouseTargetModifiers);
 
     // Mover over input.
-    hitTestResult = test->moveMouseAndWaitUntilMouseTargetChanged(5, 55);
+    hitTestResult = test->moveMouseAndWaitUntilMouseTargetChanged(5, 35);
     g_assert(!webkit_hit_test_result_context_is_link(hitTestResult));
     g_assert(!webkit_hit_test_result_context_is_image(hitTestResult));
     g_assert(!webkit_hit_test_result_context_is_media(hitTestResult));
+    g_assert(!webkit_hit_test_result_context_is_scrollbar(hitTestResult));
     g_assert(webkit_hit_test_result_context_is_editable(hitTestResult));
+    g_assert(!test->m_mouseTargetModifiers);
+
+    // Move over scrollbar.
+    hitTestResult = test->moveMouseAndWaitUntilMouseTargetChanged(5, 75);
+    g_assert(!webkit_hit_test_result_context_is_link(hitTestResult));
+    g_assert(!webkit_hit_test_result_context_is_image(hitTestResult));
+    g_assert(!webkit_hit_test_result_context_is_media(hitTestResult));
+    g_assert(!webkit_hit_test_result_context_is_editable(hitTestResult));
+    g_assert(webkit_hit_test_result_context_is_scrollbar(hitTestResult));
     g_assert(!test->m_mouseTargetModifiers);
 }
 
@@ -1050,6 +1061,174 @@ static void testWebViewSave(SaveWebViewTest* test, gconstpointer)
     g_assert_cmpint(g_file_info_get_size(fileInfo.get()), ==, totalBytesFromStream);
 }
 
+static void testWebViewMode(WebViewTest* test, gconstpointer)
+{
+    static const char* indexHTML = "<html><body><p>Test Web View Mode</p></body></html>";
+
+    // Web mode.
+    g_assert_cmpuint(webkit_web_view_get_view_mode(test->m_webView), ==, WEBKIT_VIEW_MODE_WEB);
+    test->loadHtml(indexHTML, 0);
+    test->waitUntilLoadFinished();
+    WebKitJavascriptResult* javascriptResult = test->runJavaScriptAndWaitUntilFinished("window.document.body.textContent;", 0);
+    GOwnPtr<char> valueString(WebViewTest::javascriptResultToCString(javascriptResult));
+    g_assert_cmpstr(valueString.get(), ==, "Test Web View Mode");
+
+    // Source mode.
+    webkit_web_view_set_view_mode(test->m_webView, WEBKIT_VIEW_MODE_SOURCE);
+    test->loadHtml(indexHTML, 0);
+    test->waitUntilLoadFinished();
+    javascriptResult = test->runJavaScriptAndWaitUntilFinished("window.document.body.textContent;", 0);
+    valueString.set(WebViewTest::javascriptResultToCString(javascriptResult));
+    g_assert_cmpstr(valueString.get(), ==, indexHTML);
+}
+
+// To test page visibility API. Currently only 'visible' and 'hidden' states are implemented fully in WebCore.
+// See also http://www.w3.org/TR/2011/WD-page-visibility-20110602/ and https://developers.google.com/chrome/whitepapers/pagevisibility
+static void testWebViewPageVisibility(WebViewTest* test, gconstpointer)
+{
+    test->loadHtml("<html><title></title>"
+        "<body><p>Test Web Page Visibility</p>"
+        "<script>"
+        "document.addEventListener(\"webkitvisibilitychange\", onVisibilityChange, false);"
+        "function onVisibilityChange() {"
+        "    document.title = document.webkitVisibilityState;"
+        "}"
+        "</script>"
+        "</body></html>",
+        0);
+
+    // Wait untill the page is loaded. Initial visibility should be 'hidden'.
+    test->waitUntilLoadFinished();
+
+    GOwnPtr<GError> error;
+    WebKitJavascriptResult* javascriptResult = test->runJavaScriptAndWaitUntilFinished("document.webkitVisibilityState;", &error.outPtr());
+    g_assert(javascriptResult);
+    g_assert(!error.get());
+    GOwnPtr<char> valueString(WebViewTest::javascriptResultToCString(javascriptResult));
+    g_assert_cmpstr(valueString.get(), ==, "hidden");
+
+    javascriptResult = test->runJavaScriptAndWaitUntilFinished("document.webkitHidden;", &error.outPtr());
+    g_assert(javascriptResult);
+    g_assert(!error.get());
+    g_assert(WebViewTest::javascriptResultToBoolean(javascriptResult));
+
+    // Show the page. The visibility should be updated to 'visible'.
+    test->showInWindow();
+    test->waitUntilTitleChanged();
+
+    javascriptResult = test->runJavaScriptAndWaitUntilFinished("document.webkitVisibilityState;", &error.outPtr());
+    g_assert(javascriptResult);
+    g_assert(!error.get());
+    valueString.set(WebViewTest::javascriptResultToCString(javascriptResult));
+    g_assert_cmpstr(valueString.get(), ==, "visible");
+
+    javascriptResult = test->runJavaScriptAndWaitUntilFinished("document.webkitHidden;", &error.outPtr());
+    g_assert(javascriptResult);
+    g_assert(!error.get());
+    g_assert(!WebViewTest::javascriptResultToBoolean(javascriptResult));
+
+    // Hide the page. The visibility should be updated to 'hidden'.
+    gtk_widget_hide(GTK_WIDGET(test->m_webView));
+    test->waitUntilTitleChanged();
+
+    javascriptResult = test->runJavaScriptAndWaitUntilFinished("document.webkitVisibilityState;", &error.outPtr());
+    g_assert(javascriptResult);
+    g_assert(!error.get());
+    valueString.set(WebViewTest::javascriptResultToCString(javascriptResult));
+    g_assert_cmpstr(valueString.get(), ==, "hidden");
+
+    javascriptResult = test->runJavaScriptAndWaitUntilFinished("document.webkitHidden;", &error.outPtr());
+    g_assert(javascriptResult);
+    g_assert(!error.get());
+    g_assert(WebViewTest::javascriptResultToBoolean(javascriptResult));
+}
+
+class SnapshotWebViewTest: public WebViewTest {
+public:
+    MAKE_GLIB_TEST_FIXTURE(SnapshotWebViewTest);
+
+    static void onSnapshotCancelledReady(WebKitWebView* web_view, GAsyncResult* res, SnapshotWebViewTest* test)
+    {
+        GOwnPtr<GError> error;
+        test->m_surface = webkit_web_view_get_snapshot_finish(web_view, res, &error.outPtr());
+        g_assert(!test->m_surface);
+        g_assert_error(error.get(), G_IO_ERROR, G_IO_ERROR_CANCELLED);
+        test->quitMainLoop();
+    }
+
+    gboolean getSnapshotAndCancel()
+    {
+        if (m_surface)
+            cairo_surface_destroy(m_surface);
+        m_surface = 0;
+        GRefPtr<GCancellable> cancellable = adoptGRef(g_cancellable_new());
+        webkit_web_view_get_snapshot(m_webView, WEBKIT_SNAPSHOT_REGION_VISIBLE, WEBKIT_SNAPSHOT_OPTIONS_NONE, cancellable.get(), reinterpret_cast<GAsyncReadyCallback>(onSnapshotCancelledReady), this);
+        g_cancellable_cancel(cancellable.get());
+        g_main_loop_run(m_mainLoop);
+
+        return true;
+    }
+
+};
+
+static void testWebViewSnapshot(SnapshotWebViewTest* test, gconstpointer)
+{
+    test->loadHtml("<html><body><p>Whatever</p></body></html>", 0);
+    test->waitUntilLoadFinished();
+
+    // WebView not visible.
+    cairo_surface_t* surface1 = test->getSnapshotAndWaitUntilReady(WEBKIT_SNAPSHOT_REGION_VISIBLE, WEBKIT_SNAPSHOT_OPTIONS_NONE);
+    g_assert(!surface1);
+
+    // Show surface, resize to 50x50, try again.
+    test->showInWindowAndWaitUntilMapped();
+    test->resizeView(50, 50);
+    surface1 = test->getSnapshotAndWaitUntilReady(WEBKIT_SNAPSHOT_REGION_VISIBLE, WEBKIT_SNAPSHOT_OPTIONS_NONE);
+    g_assert(surface1);
+
+    // obtained surface should be at the most 50x50. Store the size
+    // for comparison later.
+    int width = cairo_image_surface_get_width(surface1);
+    int height = cairo_image_surface_get_height(surface1);
+    g_assert_cmpint(width, <=, 50);
+    g_assert_cmpint(height, <=, 50);
+
+    // Select all text in the WebView, request a snapshot ignoring selection.
+    test->selectAll();
+    surface1 = cairo_surface_reference(test->getSnapshotAndWaitUntilReady(WEBKIT_SNAPSHOT_REGION_VISIBLE, WEBKIT_SNAPSHOT_OPTIONS_NONE));
+    g_assert(surface1);
+    g_assert_cmpint(cairo_image_surface_get_width(surface1), ==, width);
+    g_assert_cmpint(cairo_image_surface_get_height(surface1), ==, height);
+
+    // Create identical surface.
+    cairo_surface_t* surface2 = test->getSnapshotAndWaitUntilReady(WEBKIT_SNAPSHOT_REGION_VISIBLE, WEBKIT_SNAPSHOT_OPTIONS_NONE);
+    g_assert(surface2);
+
+    // Compare these two, they should be identical.
+    g_assert(Test::cairoSurfacesEqual(surface1, surface2));
+
+    // Request a new snapshot, including the selection this time. The
+    // size should be the same but the result must be different to the
+    // one previously obtained.
+    surface2 = test->getSnapshotAndWaitUntilReady(WEBKIT_SNAPSHOT_REGION_VISIBLE, WEBKIT_SNAPSHOT_OPTIONS_INCLUDE_SELECTION_HIGHLIGHTING);
+    g_assert(surface2);
+    g_assert_cmpint(cairo_image_surface_get_width(surface2), ==, width);
+    g_assert_cmpint(cairo_image_surface_get_height(surface2), ==, height);
+    g_assert(!Test::cairoSurfacesEqual(surface1, surface2));
+
+    // Request a snapshot of the whole document in the WebView. The
+    // result should be different from the size obtained previously.
+    surface2 = test->getSnapshotAndWaitUntilReady(WEBKIT_SNAPSHOT_REGION_FULL_DOCUMENT, WEBKIT_SNAPSHOT_OPTIONS_NONE);
+    g_assert(surface2);
+    g_assert_cmpint(cairo_image_surface_get_width(surface2),  >, width);
+    g_assert_cmpint(cairo_image_surface_get_height(surface2), >, height);
+    g_assert(!Test::cairoSurfacesEqual(surface1, surface2));
+
+    cairo_surface_destroy(surface1);
+
+    g_assert(test->getSnapshotAndCancel());
+}
+
 void beforeAll()
 {
     WebViewTest::add("WebKitWebView", "default-context", testWebViewDefaultContext);
@@ -1069,6 +1248,9 @@ void beforeAll()
     WebViewTest::add("WebKitWebView", "can-show-mime-type", testWebViewCanShowMIMEType);
     FormClientTest::add("WebKitWebView", "submit-form", testWebViewSubmitForm);
     SaveWebViewTest::add("WebKitWebView", "save", testWebViewSave);
+    WebViewTest::add("WebKitWebView", "view-mode", testWebViewMode);
+    SnapshotWebViewTest::add("WebKitWebView", "snapshot", testWebViewSnapshot);
+    WebViewTest::add("WebKitWebView", "page-visibility", testWebViewPageVisibility);
 }
 
 void afterAll()

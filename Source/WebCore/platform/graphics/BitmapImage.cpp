@@ -31,10 +31,8 @@
 #include "ImageObserver.h"
 #include "IntRect.h"
 #include "MIMETypeRegistry.h"
-#include "PlatformMemoryInstrumentation.h"
 #include "Timer.h"
 #include <wtf/CurrentTime.h>
-#include <wtf/MemoryInstrumentationVector.h>
 #include <wtf/Vector.h>
 #include <wtf/text/WTFString.h>
 
@@ -298,7 +296,7 @@ bool BitmapImage::ensureFrameIsCached(size_t index)
     return true;
 }
 
-NativeImagePtr BitmapImage::frameAtIndex(size_t index)
+PassNativeImagePtr BitmapImage::frameAtIndex(size_t index)
 {
     if (!ensureFrameIsCached(index))
         return 0;
@@ -307,19 +305,19 @@ NativeImagePtr BitmapImage::frameAtIndex(size_t index)
 
 bool BitmapImage::frameIsCompleteAtIndex(size_t index)
 {
-    if (!ensureFrameIsCached(index))
-        return false;
-    return m_frames[index].m_isComplete;
+    if (index < m_frames.size() && m_frames[index].m_haveMetadata && m_frames[index].m_isComplete)
+        return true;
+    return m_source.frameIsCompleteAtIndex(index);
 }
 
 float BitmapImage::frameDurationAtIndex(size_t index)
 {
-    if (!ensureFrameIsCached(index))
-        return 0;
-    return m_frames[index].m_duration;
+    if (index < m_frames.size() && m_frames[index].m_haveMetadata)
+        return m_frames[index].m_duration;
+    return m_source.frameDurationAtIndex(index);
 }
 
-NativeImagePtr BitmapImage::nativeImageForCurrentFrame()
+PassNativeImagePtr BitmapImage::nativeImageForCurrentFrame()
 {
     return frameAtIndex(currentFrame());
 }
@@ -335,9 +333,9 @@ bool BitmapImage::frameHasAlphaAtIndex(size_t index)
     return m_source.frameHasAlphaAtIndex(index);
 }
 
-bool BitmapImage::currentFrameHasAlpha()
+bool BitmapImage::currentFrameKnownToBeOpaque()
 {
-    return frameHasAlphaAtIndex(currentFrame());
+    return !frameHasAlphaAtIndex(currentFrame());
 }
 
 ImageOrientation BitmapImage::currentFrameOrientation()
@@ -572,26 +570,10 @@ Color BitmapImage::solidColor() const
 {
     return m_solidColor;
 }
-
-void BitmapImage::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+    
+bool BitmapImage::canAnimate()
 {
-    MemoryClassInfo info(memoryObjectInfo, this, PlatformMemoryTypes::Image);
-    Image::reportMemoryUsage(memoryObjectInfo);
-    info.addMember(m_source);
-    info.addMember(m_frameTimer);
-    info.addMember(m_frames);
-}
-
-void FrameData::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, PlatformMemoryTypes::Image);
-#if OS(WINCE) && !PLATFORM(QT)
-    info.addRawBuffer(m_frame.get(), m_frameBytes);
-#elif USE(SKIA)
-    info.addMember(m_frame);
-#else
-    info.addRawBuffer(m_frame, m_frameBytes);
-#endif
+    return shouldAnimate() && frameCount() > 1;
 }
 
 }

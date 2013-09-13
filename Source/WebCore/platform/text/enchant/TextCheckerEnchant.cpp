@@ -60,7 +60,7 @@ void TextCheckerEnchant::ignoreWord(const String& word)
 void TextCheckerEnchant::learnWord(const String& word)
 {
     for (Vector<EnchantDict*>::const_iterator iter = m_enchantDictionaries.begin(); iter != m_enchantDictionaries.end(); ++iter)
-        enchant_dict_add_to_personal(*iter, word.utf8().data(), -1);
+        enchant_dict_add(*iter, word.utf8().data(), -1);
 }
 
 void TextCheckerEnchant::checkSpellingOfWord(const CString& word, int start, int end, int& misspellingLocation, int& misspellingLength)
@@ -74,12 +74,12 @@ void TextCheckerEnchant::checkSpellingOfWord(const CString& word, int start, int
             // Stop checking, this word is ok in at least one dict.
             misspellingLocation = -1;
             misspellingLength = 0;
-            break;
+            return;
         }
-
-        misspellingLocation = start;
-        misspellingLength = end - start;
     }
+
+    misspellingLocation = start;
+    misspellingLength = end - start;
 }
 
 void TextCheckerEnchant::checkSpellingOfString(const String& string, int& misspellingLocation, int& misspellingLength)
@@ -98,8 +98,12 @@ void TextCheckerEnchant::checkSpellingOfString(const String& string, int& misspe
     CString utf8String = string.utf8();
     int start = textBreakFirst(iter);
     for (int end = textBreakNext(iter); end != TextBreakDone; end = textBreakNext(iter)) {
-        if (isWordTextBreak(iter))
+        if (isWordTextBreak(iter)) {
             checkSpellingOfWord(utf8String, start, end, misspellingLocation, misspellingLength);
+            // Stop checking the next words If the current word is misspelled, to do not overwrite its misspelled location and length.
+            if (misspellingLength)
+                return;
+        }
         start = end;
     }
 }
@@ -122,7 +126,7 @@ Vector<String> TextCheckerEnchant::getGuessesForWord(const String& word)
             numberOfSuggestions = maximumNumberOfSuggestions;
 
         for (i = 0; i < numberOfSuggestions; i++)
-            guesses.append(String(suggestions[i]));
+            guesses.append(String::fromUTF8(suggestions[i]));
 
         enchant_dict_free_suggestions(*iter, suggestions);
     }

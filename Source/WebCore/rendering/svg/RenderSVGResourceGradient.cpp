@@ -31,7 +31,6 @@
 #include "RenderSVGText.h"
 #include "SVGRenderSupport.h"
 #include "SVGRenderingContext.h"
-#include <wtf/UnusedParam.h>
 
 namespace WebCore {
 
@@ -68,7 +67,7 @@ static inline bool createMaskAndSwapContextForTextGradient(GraphicsContext*& con
     ASSERT(textRootBlock);
 
     AffineTransform absoluteTransform;
-    SVGRenderingContext::calculateTransformationToOutermostSVGCoordinateSystem(textRootBlock, absoluteTransform);
+    SVGRenderingContext::calculateTransformationToOutermostCoordinateSystem(textRootBlock, absoluteTransform);
 
     FloatRect repaintRect = textRootBlock->repaintRectInLocalCoordinates();
     OwnPtr<ImageBuffer> maskImage;
@@ -95,7 +94,7 @@ static inline AffineTransform clipToTextMask(GraphicsContext* context,
     ASSERT(textRootBlock);
 
     AffineTransform absoluteTransform;
-    SVGRenderingContext::calculateTransformationToOutermostSVGCoordinateSystem(textRootBlock, absoluteTransform);
+    SVGRenderingContext::calculateTransformationToOutermostCoordinateSystem(textRootBlock, absoluteTransform);
 
     targetRect = textRootBlock->repaintRectInLocalCoordinates();
     SVGRenderingContext::clipToImageBuffer(context, absoluteTransform, targetRect, imageBuffer, false);
@@ -122,12 +121,12 @@ bool RenderSVGResourceGradient::applyResource(RenderObject* object, RenderStyle*
     // Otherwhise the call to collectGradientAttributes() in createTileImage(), may cause the SVG DOM property
     // synchronization to kick in, which causes removeAllClientsFromCache() to be called, which in turn deletes our
     // GradientData object! Leaving out the line below will cause svg/dynamic-updates/SVG*GradientElement-svgdom* to crash.
-    SVGGradientElement* gradientElement = static_cast<SVGGradientElement*>(node());
+    SVGGradientElement* gradientElement = toSVGGradientElement(node());
     if (!gradientElement)
         return false;
 
     if (m_shouldCollectGradientAttributes) {
-        gradientElement->updateAnimatedSVGAttribute(anyQName());
+        gradientElement->synchronizeAnimatedSVGAttribute(anyQName());
         if (!collectGradientAttributes(gradientElement))
             return false;
 

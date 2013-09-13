@@ -26,8 +26,13 @@
 #include <BlackBerryPlatformPlayer.h>
 
 namespace BlackBerry {
+
 namespace Platform {
 class IntRect;
+
+namespace Graphics {
+class GLES2Program;
+}
 }
 
 namespace WebKit {
@@ -55,7 +60,7 @@ public:
 #if USE(ACCELERATED_COMPOSITING)
     virtual PlatformMedia platformMedia() const;
     virtual PlatformLayer* platformLayer() const;
-    void drawBufferingAnimation(const TransformationMatrix&, int positionLocation, int texCoordLocation);
+    void drawBufferingAnimation(const TransformationMatrix&, const BlackBerry::Platform::Graphics::GLES2Program&);
 #endif
 
     virtual void play();
@@ -79,8 +84,11 @@ public:
     virtual void setRate(float);
 
     virtual bool paused() const;
+    virtual bool muted() const;
+    virtual bool supportsMuting() const { return true; }
 
     virtual void setVolume(float);
+    virtual void setMuted(bool);
 
     virtual MediaPlayer::NetworkState networkState() const;
     virtual MediaPlayer::ReadyState readyState() const;
@@ -108,6 +116,8 @@ public:
     virtual bool hasSingleSecurityOrigin() const;
 
     virtual MediaPlayer::MovieLoadType movieLoadType() const;
+
+    virtual void prepareForRendering();
 
     void resizeSourceDimensions();
     void setFullscreenWebPageClient(BlackBerry::WebKit::WebPageClient*);
@@ -139,13 +149,18 @@ public:
 #endif
     virtual void onAuthenticationNeeded(BlackBerry::Platform::MMRAuthChallenge&);
     virtual void onAuthenticationAccepted(const BlackBerry::Platform::MMRAuthChallenge&) const;
+    virtual void onConditionallyEnterFullscreen();
+    virtual void onExitFullscreen();
+    virtual void onCreateHolePunchRect();
+    virtual void onDestroyHolePunchRect();
 
     virtual void notifyChallengeResult(const KURL&, const ProtectionSpace&, AuthenticationChallengeResult, const Credential&);
 
+    virtual bool isProcessingUserGesture() const;
     virtual bool isFullscreen() const;
     virtual bool isElementPaused() const;
     virtual bool isTabVisible() const;
-    virtual int showErrorDialog(BlackBerry::Platform::PlatformPlayer::Error);
+    virtual int onShowErrorDialog(BlackBerry::Platform::PlatformPlayer::Error);
     virtual BlackBerry::Platform::Graphics::Window* platformWindow();
     virtual BlackBerry::Platform::WebMediaStreamDescriptor lookupMediaStream(const BlackBerry::Platform::String& url);
 
@@ -171,10 +186,8 @@ private:
     Timer<MediaPlayerPrivate> m_bufferingTimer;
     RefPtr<PlatformLayer> m_platformLayer;
     bool m_showBufferingImage;
-    bool m_mediaIsBuffering;
 #endif
 
-    void conditionallyGoFullscreenAfterPlay();
     void userDrivenSeekTimerFired(Timer<MediaPlayerPrivate>*);
     Timer<MediaPlayerPrivate> m_userDrivenSeekTimer;
     float m_lastSeekTime;

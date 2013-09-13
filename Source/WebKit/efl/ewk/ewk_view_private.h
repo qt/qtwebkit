@@ -23,6 +23,7 @@
 #define ewk_view_private_h
 
 #include "Frame.h"
+#include "NetworkStorageSession.h"
 #include "Page.h"
 #include "Widget.h"
 #include "ewk_paint_context_private.h"
@@ -39,6 +40,9 @@ class Cursor;
 class GraphicsContext3D;
 class GraphicsLayer;
 #endif
+class HTMLPlugInElement;
+class IntRect;
+class IntSize;
 class PopupMenuClient;
 }
 
@@ -96,6 +100,7 @@ void ewk_view_add_console_message(Evas_Object* ewkView, const char* message, uns
 
 void ewk_view_run_javascript_alert(Evas_Object* ewkView, Evas_Object* frame, const char* message);
 bool ewk_view_run_javascript_confirm(Evas_Object* ewkView, Evas_Object* frame, const char* message);
+bool ewk_view_run_before_unload_confirm(Evas_Object* ewkView, Evas_Object* frame, const char* message);
 bool ewk_view_run_javascript_prompt(Evas_Object* ewkView, Evas_Object* frame, const char* message, const char* defaultValue, const char** value);
 bool ewk_view_should_interrupt_javascript(Evas_Object* ewkView);
 int64_t ewk_view_exceeded_application_cache_quota(Evas_Object* ewkView, Ewk_Security_Origin *origin, int64_t defaultOriginQuota, int64_t totalSpaceNeeded);
@@ -104,7 +109,7 @@ uint64_t ewk_view_exceeded_database_quota(Evas_Object* ewkView, Evas_Object* fra
 bool ewk_view_run_open_panel(Evas_Object* ewkView, Evas_Object* frame, Ewk_File_Chooser* fileChooser, Eina_List** selectedFilenames);
 
 void ewk_view_repaint(Evas_Object* ewkView, Evas_Coord x, Evas_Coord y, Evas_Coord width, Evas_Coord height);
-void ewk_view_scroll(Evas_Object* ewkView, Evas_Coord deltaX, Evas_Coord deltaY, Evas_Coord scrollX, Evas_Coord scrollY, Evas_Coord scrollWidth, Evas_Coord scrollHeight, Evas_Coord centerX, Evas_Coord centerY, Evas_Coord centerW, Evas_Coord centerHeight);
+void ewk_view_scroll(Evas_Object*, const WebCore::IntSize& delta, const WebCore::IntRect& rectToScroll, const WebCore::IntRect& clipRect);
 WebCore::Page* ewk_view_core_page_get(const Evas_Object* ewkView);
 
 WTF::PassRefPtr<WebCore::Frame> ewk_view_frame_create(Evas_Object* ewkView, Evas_Object* frame, const WTF::String& name, WebCore::HTMLFrameOwnerElement* ownerElement, const WebCore::KURL& url, const WTF::String& referrer);
@@ -144,7 +149,8 @@ bool ewk_view_need_touch_events_get(const Evas_Object*);
 #endif
 
 const Eina_Rectangle* ewk_view_repaints_pop(Ewk_View_Private_Data* priv, size_t* count);
-const Ewk_Scroll_Request* ewk_view_scroll_requests_get(const Ewk_View_Private_Data* priv, size_t* count);
+const Vector<WebCore::IntSize>& ewk_view_scroll_offsets_get(const Ewk_View_Private_Data*);
+const Vector<WebCore::IntRect>& ewk_view_scroll_rects_get(const Ewk_View_Private_Data*);
 
 void ewk_view_repaint_add(Ewk_View_Private_Data* priv, Evas_Coord x, Evas_Coord y, Evas_Coord width, Evas_Coord height);
 
@@ -174,6 +180,7 @@ void ewk_view_fullscreen_exit(const Evas_Object* ewkView);
 namespace EWKPrivate {
 WebCore::Page *corePage(const Evas_Object *ewkView);
 PlatformPageClient corePageClient(Evas_Object* ewkView);
+WebCore::NetworkStorageSession* storageSession(const Evas_Object* ewkView);
 } // namespace EWKPrivate
 
 #endif // ewk_view_private_h

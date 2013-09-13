@@ -26,7 +26,7 @@
 #include "config.h"
 #include "EventHandler.h"
 
-#include "ClipboardGtk.h"
+#include "Clipboard.h"
 #include "FloatPoint.h"
 #include "FocusController.h"
 #include "Frame.h"
@@ -91,12 +91,12 @@ bool EventHandler::passWheelEventToWidget(const PlatformWheelEvent& event, Widge
     if (!widget->isFrameView())
         return false;
 
-    return static_cast<FrameView*>(widget)->frame()->eventHandler()->handleWheelEvent(event);
+    return toFrameView(widget)->frame()->eventHandler()->handleWheelEvent(event);
 }
 
 PassRefPtr<Clipboard> EventHandler::createDraggingClipboard() const
 {
-    return ClipboardGtk::create(ClipboardWritable, DataObjectGtk::create(), Clipboard::DragAndDrop, m_frame);
+    return Clipboard::createForDragAndDrop();
 }
 
 bool EventHandler::passMousePressEventToSubframe(MouseEventWithHitTestResults& mev, Frame* subframe)

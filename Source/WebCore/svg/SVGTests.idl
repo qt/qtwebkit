@@ -25,15 +25,15 @@
  */
 
 [
+    NoInterfaceObject,
     Conditional=SVG,
     ObjCProtocol,
     SuppressToJSObject,
-    OmitConstructor
 ] interface SVGTests {
     readonly attribute SVGStringList requiredFeatures;
     readonly attribute SVGStringList requiredExtensions;
     readonly attribute SVGStringList systemLanguage;
 
-    boolean hasExtension(in [Optional=DefaultIsUndefined] DOMString extension);
+    boolean hasExtension([Default=Undefined] optional DOMString extension);
 };
 

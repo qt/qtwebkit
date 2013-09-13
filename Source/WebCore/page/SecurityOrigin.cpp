@@ -30,7 +30,6 @@
 #include "SecurityOrigin.h"
 
 #include "BlobURL.h"
-#include "Document.h"
 #include "FileSystem.h"
 #include "KURL.h"
 #include "SchemeRegistry.h"
@@ -45,7 +44,7 @@ namespace WebCore {
 const int InvalidPort = 0;
 const int MaxAllowedPort = 65535;
 
-static bool schemeRequiresAuthority(const KURL& url)
+static bool schemeRequiresHost(const KURL& url)
 {
     // We expect URLs with these schemes to have authority components. If the
     // URL lacks an authority component, we get concerned and mark the origin
@@ -56,6 +55,7 @@ static bool schemeRequiresAuthority(const KURL& url)
 bool SecurityOrigin::shouldUseInnerURL(const KURL& url)
 {
 #if ENABLE(BLOB)
+    // FIXME: Blob URLs don't have inner URLs. Their form is "blob:<inner-origin>/<UUID>", so treating the part after "blob:" as a URL is incorrect.
     if (url.protocolIs("blob"))
         return true;
 #endif
@@ -84,6 +84,8 @@ static PassRefPtr<SecurityOrigin> getCachedOrigin(const KURL& url)
 #if ENABLE(BLOB)
     if (url.protocolIs("blob"))
         return ThreadableBlobRegistry::getCachedOrigin(url);
+#else
+    UNUSED_PARAM(url);
 #endif
     return 0;
 }
@@ -99,9 +101,9 @@ static bool shouldTreatAsUniqueOrigin(const KURL& url)
     // FIXME: Check whether innerURL is valid.
 
     // For edge case URLs that were probably misparsed, make sure that the origin is unique.
-    // FIXME: Do we really need to do this? This looks to be a hack around a
-    // security bug in CFNetwork that might have been fixed.
-    if (schemeRequiresAuthority(innerURL) && innerURL.host().isEmpty())
+    // This is an additional safety net against bugs in KURL parsing, and for network back-ends that parse URLs differently,
+    // and could misinterpret another component for hostname.
+    if (schemeRequiresHost(innerURL) && innerURL.host().isEmpty())
         return true;
 
     // SchemeRegistry needs a lower case protocol because it uses HashMaps
@@ -157,7 +159,6 @@ SecurityOrigin::SecurityOrigin()
 SecurityOrigin::SecurityOrigin(const SecurityOrigin* other)
     : m_protocol(other->m_protocol.isolatedCopy())
     , m_host(other->m_host.isolatedCopy())
-    , m_encodedHost(other->m_encodedHost.isolatedCopy())
     , m_domain(other->m_domain.isolatedCopy())
     , m_filePath(other->m_filePath.isolatedCopy())
     , m_port(other->m_port)
@@ -380,17 +381,23 @@ bool SecurityOrigin::canDisplay(const KURL& url) const
     return true;
 }
 
-bool SecurityOrigin::canAccessStorage(const SecurityOrigin* topOrigin) const
+bool SecurityOrigin::canAccessStorage(const SecurityOrigin* topOrigin, ShouldAllowFromThirdParty shouldAllowFromThirdParty) const
 {
     if (isUnique())
+        return false;
+
+    if (m_storageBlockingPolicy == BlockAllStorage)
         return false;
 
     // FIXME: This check should be replaced with an ASSERT once we can guarantee that topOrigin is not null.
     if (!topOrigin)
         return true;
 
-    if (m_storageBlockingPolicy == BlockAllStorage || topOrigin->m_storageBlockingPolicy == BlockAllStorage)
+    if (topOrigin->m_storageBlockingPolicy == BlockAllStorage)
         return false;
+
+    if (shouldAllowFromThirdParty == AlwaysAllowFromThirdParty)
+        return true;
 
     if ((m_storageBlockingPolicy == BlockThirdPartyStorage || topOrigin->m_storageBlockingPolicy == BlockThirdPartyStorage) && topOrigin->isThirdParty(this))
         return false;
@@ -434,6 +441,19 @@ void SecurityOrigin::grantUniversalAccess()
 {
     m_universalAccess = true;
 }
+
+#if ENABLE(CACHE_PARTITIONING)
+String SecurityOrigin::cachePartition() const
+{
+    if (m_storageBlockingPolicy != BlockThirdPartyStorage)
+        return String();
+
+    if (m_protocol != "http" && m_protocol != "https")
+        return String();
+
+    return host();
+}
+#endif
 
 void SecurityOrigin::enforceFilePathSeparation()
 {
@@ -479,17 +499,17 @@ PassRefPtr<SecurityOrigin> SecurityOrigin::createFromString(const String& origin
     return SecurityOrigin::create(KURL(KURL(), originString));
 }
 
-static const char SeparatorCharacter = '_';
+static const char separatorCharacter = '_';
 
 PassRefPtr<SecurityOrigin> SecurityOrigin::createFromDatabaseIdentifier(const String& databaseIdentifier)
 { 
     // Make sure there's a first separator
-    size_t separator1 = databaseIdentifier.find(SeparatorCharacter);
+    size_t separator1 = databaseIdentifier.find(separatorCharacter);
     if (separator1 == notFound)
         return create(KURL());
         
     // Make sure there's a second separator
-    size_t separator2 = databaseIdentifier.reverseFind(SeparatorCharacter);
+    size_t separator2 = databaseIdentifier.reverseFind(separatorCharacter);
     if (separator2 == notFound)
         return create(KURL());
         
@@ -513,15 +533,15 @@ PassRefPtr<SecurityOrigin> SecurityOrigin::createFromDatabaseIdentifier(const St
     String host = databaseIdentifier.substring(separator1 + 1, separator2 - separator1 - 1);
     
     host = decodeURLEscapeSequences(host);
-    return create(KURL(KURL(), protocol + "://" + host + ":" + String::number(port)));
+    return create(KURL(KURL(), protocol + "://" + host + ":" + String::number(port) + "/"));
 }
 
 PassRefPtr<SecurityOrigin> SecurityOrigin::create(const String& protocol, const String& host, int port)
 {
     if (port < 0 || port > MaxAllowedPort)
-        createUnique();
+        return createUnique();
     String decodedHost = decodeURLEscapeSequences(host);
-    return create(KURL(KURL(), protocol + "://" + host + ":" + String::number(port)));
+    return create(KURL(KURL(), protocol + "://" + host + ":" + String::number(port) + "/"));
 }
 
 String SecurityOrigin::databaseIdentifier() const 
@@ -534,12 +554,14 @@ String SecurityOrigin::databaseIdentifier() const
     if (m_needsDatabaseIdentifierQuirkForFiles)
         return "file__0";
 
-    String separatorString(&SeparatorCharacter, 1);
+    StringBuilder stringBuilder;
+    stringBuilder.append(m_protocol);
+    stringBuilder.append(separatorCharacter);
+    stringBuilder.append(encodeForFileName(m_host));
+    stringBuilder.append(separatorCharacter);
+    stringBuilder.appendNumber(m_port);
 
-    if (m_encodedHost.isEmpty())
-        m_encodedHost = encodeForFileName(m_host);
-
-    return m_protocol + separatorString + m_encodedHost + separatorString + String::number(m_port); 
+    return stringBuilder.toString();
 }
 
 bool SecurityOrigin::equal(const SecurityOrigin* other) const 
@@ -574,6 +596,13 @@ bool SecurityOrigin::isSameSchemeHostPort(const SecurityOrigin* other) const
         return false;
 
     return true;
+}
+
+String SecurityOrigin::urlWithUniqueSecurityOrigin()
+{
+    ASSERT(isMainThread());
+    DEFINE_STATIC_LOCAL(const String, uniqueSecurityOriginURL, (ASCIILiteral("data:,")));
+    return uniqueSecurityOriginURL;
 }
 
 } // namespace WebCore

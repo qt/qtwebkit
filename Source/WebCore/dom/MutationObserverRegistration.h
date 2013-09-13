@@ -31,8 +31,6 @@
 #ifndef MutationObserverRegistration_h
 #define MutationObserverRegistration_h
 
-#if ENABLE(MUTATION_OBSERVERS)
-
 #include "MutationObserver.h"
 #include <wtf/HashSet.h>
 #include <wtf/text/AtomicString.h>
@@ -51,7 +49,7 @@ public:
     void observedSubtreeNodeWillDetach(Node*);
     void clearTransientRegistrations();
     bool hasTransientRegistrations() const { return m_transientRegistrationNodes && !m_transientRegistrationNodes->isEmpty(); }
-    void unregister();
+    static void unregisterAndDelete(MutationObserverRegistration*);
 
     bool shouldReceiveMutationFrom(Node*, MutationObserver::MutationType, const QualifiedName* attributeName) const;
     bool isSubtree() const { return m_options & MutationObserver::Subtree; }
@@ -76,7 +74,5 @@ private:
 };
 
 } // namespace WebCore
-
-#endif // ENABLE(MUTATION_OBSERVERS)
 
 #endif // MutationObserverRegistration_h

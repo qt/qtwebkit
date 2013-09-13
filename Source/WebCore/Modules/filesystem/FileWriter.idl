@@ -30,9 +30,9 @@
  */
 
 [
+    NoInterfaceObject,
     Conditional=FILE_SYSTEM,
     ActiveDOMObject,
-    CallWith=ScriptExecutionContext,
     EventTarget,
     JSNoStaticTables
 ] interface FileWriter {
@@ -43,11 +43,11 @@
     readonly attribute unsigned short readyState;
 
     // async write/modify methods
-    void write(in Blob data) raises (FileException);
-    void seek(in long long position) raises (FileException);
-    void truncate(in long long size) raises (FileException);
+    [RaisesException] void write(Blob data);
+    [RaisesException] void seek(long long position);
+    [RaisesException] void truncate(long long size);
 
-    void abort() raises (FileException);
+    [RaisesException] void abort();
 
     readonly attribute FileError error;
     readonly attribute long long position;
@@ -61,12 +61,11 @@
              attribute EventListener onwriteend;
 
     // EventTarget interface
-    void addEventListener(in DOMString type,
-                          in EventListener listener,
-                          in [Optional] boolean useCapture);
-    void removeEventListener(in DOMString type,
-                             in EventListener listener,
-                             in [Optional] boolean useCapture);
-    boolean dispatchEvent(in Event evt)
-        raises(EventException);
+    void addEventListener(DOMString type,
+                          EventListener listener,
+                          optional boolean useCapture);
+    void removeEventListener(DOMString type,
+                             EventListener listener,
+                             optional boolean useCapture);
+    [RaisesException] boolean dispatchEvent(Event evt);
 };

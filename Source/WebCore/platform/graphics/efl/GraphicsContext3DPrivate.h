@@ -1,6 +1,6 @@
 /*
     Copyright (C) 2012 Samsung Electronics
-    Copyright (C) 2012 Intel Corporation.
+    Copyright (C) 2012 Intel Corporation. All rights reserved.
 
     This library is free software; you can redistribute it and/or
     modify it under the terms of the GNU Library General Public
@@ -41,36 +41,56 @@ class GraphicsContext3DPrivate
 #endif
 {
 public:
-    GraphicsContext3DPrivate(GraphicsContext3D*, HostWindow*, GraphicsContext3D::RenderStyle);
+    static PassOwnPtr<GraphicsContext3DPrivate> create(GraphicsContext3D*, HostWindow*);
     ~GraphicsContext3DPrivate();
 
     bool createSurface(PageClientEfl*, bool);
     PlatformGraphicsContext3D platformGraphicsContext3D() const;
-    void setContextLostCallback(PassOwnPtr<GraphicsContext3D::ContextLostCallback>  callBack);
-#if USE(ACCELERATED_COMPOSITING)
-    PlatformLayer* platformLayer() const;
-#endif
+    void setContextLostCallback(PassOwnPtr<GraphicsContext3D::ContextLostCallback>);
 #if USE(TEXTURE_MAPPER_GL)
-    virtual void paintToTextureMapper(TextureMapper*, const FloatRect& target, const TransformationMatrix&, float opacity, BitmapTexture* mask);
+    virtual void paintToTextureMapper(TextureMapper*, const FloatRect&, const TransformationMatrix&, float) OVERRIDE;
 #endif
 #if USE(GRAPHICS_SURFACE)
-    virtual uint32_t copyToGraphicsSurface();
-    virtual GraphicsSurfaceToken graphicsSurfaceToken() const;
-    void createGraphicsSurfaces(const IntSize&);
+    virtual IntSize platformLayerSize() const OVERRIDE;
+    virtual uint32_t copyToGraphicsSurface() OVERRIDE;
+    virtual GraphicsSurfaceToken graphicsSurfaceToken() const OVERRIDE;
+    virtual GraphicsSurface::Flags graphicsSurfaceFlags() const OVERRIDE;
+    void didResizeCanvas(const IntSize&);
 #endif
-    bool makeContextCurrent();
+    bool makeContextCurrent() const;
+
+private:
+#if USE(GRAPHICS_SURFACE)
+    enum PendingOperation {
+        Default = 0x00, // No Pending Operation.
+        CreateSurface = 0x01,
+        Resize = 0x02,
+        DeletePreviousSurface = 0x04
+    };
+
+    typedef unsigned PendingSurfaceOperation;
+#endif
+
+    GraphicsContext3DPrivate(GraphicsContext3D*, HostWindow*);
+    bool initialize();
+    void createGraphicsSurface();
+    bool prepareBuffer() const;
     void releaseResources();
-    GraphicsContext3D::Attributes m_attributes;
+
     GraphicsContext3D* m_context;
     HostWindow* m_hostWindow;
-    OwnPtr<GLPlatformContext> m_platformContext;
-    OwnPtr<GLPlatformSurface> m_platformSurface;
+    OwnPtr<GLPlatformContext> m_offScreenContext;
+    OwnPtr<GLPlatformSurface> m_offScreenSurface;
 #if USE(GRAPHICS_SURFACE)
     GraphicsSurfaceToken m_surfaceHandle;
+    RefPtr<GraphicsSurface> m_graphicsSurface;
+    RefPtr<GraphicsSurface> m_previousGraphicsSurface;
+    PendingSurfaceOperation m_surfaceOperation : 3;
 #endif
     OwnPtr<GraphicsContext3D::ContextLostCallback> m_contextLostCallback;
     ListHashSet<GC3Denum> m_syntheticErrors;
-    bool m_pendingSurfaceResize;
+    IntSize m_size;
+    IntRect m_targetRect;
 };
 
 } // namespace WebCore

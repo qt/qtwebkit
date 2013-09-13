@@ -30,10 +30,10 @@
 #include "CounterDirectives.h"
 #include "CursorData.h"
 #include "DataRef.h"
-#include "ExclusionShapeValue.h"
 #include "FillLayer.h"
 #include "LineClampValue.h"
 #include "NinePieceImage.h"
+#include "ShapeValue.h"
 #include <wtf/OwnPtr.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/Vector.h>
@@ -91,8 +91,6 @@ public:
     bool animationDataEquivalent(const StyleRareNonInheritedData&) const;
     bool transitionDataEquivalent(const StyleRareNonInheritedData&) const;
 
-    void reportMemoryUsage(MemoryObjectInfo*) const;
-
     float opacity; // Whether or not we're transparent.
 
     float m_aspectRatioDenominator;
@@ -138,13 +136,17 @@ public:
 
     LengthSize m_pageSize;
 
-    RefPtr<ExclusionShapeValue> m_shapeInside;
-    RefPtr<ExclusionShapeValue> m_shapeOutside;
+    RefPtr<ShapeValue> m_shapeInside;
+    RefPtr<ShapeValue> m_shapeOutside;
     Length m_shapeMargin;
     Length m_shapePadding;
 
     RefPtr<ClipPathOperation> m_clipPath;
 
+#if ENABLE(CSS3_TEXT)
+    Color m_textDecorationColor;
+    Color m_visitedLinkTextDecorationColor;
+#endif // CSS3_TEXT
     Color m_visitedLinkBackgroundColor;
     Color m_visitedLinkOutlineColor;
     Color m_visitedLinkBorderLeftColor;
@@ -156,7 +158,7 @@ public:
 
     AtomicString m_flowThread;
     AtomicString m_regionThread;
-    unsigned m_regionOverflow : 1; // RegionOverflow
+    unsigned m_regionFragment : 1; // RegionFragment
 
     unsigned m_regionBreakAfter : 2; // EPageBreak
     unsigned m_regionBreakBefore : 2; // EPageBreak

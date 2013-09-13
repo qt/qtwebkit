@@ -42,16 +42,6 @@ ALWAYS_INLINE JSValue JIT::getConstantOperand(unsigned src)
     return m_codeBlock->getConstant(src);
 }
 
-ALWAYS_INLINE void JIT::emitPutCellToCallFrameHeader(RegisterID from, JSStack::CallFrameHeaderEntry entry)
-{
-#if USE(JSVALUE32_64)
-    store32(TrustedImm32(JSValue::CellTag), tagFor(entry, callFrameRegister));
-    store32(from, payloadFor(entry, callFrameRegister));
-#else
-    store64(from, addressFor(entry, callFrameRegister));
-#endif
-}
-
 ALWAYS_INLINE void JIT::emitPutIntToCallFrameHeader(RegisterID from, JSStack::CallFrameHeaderEntry entry)
 {
 #if USE(JSVALUE32_64)
@@ -60,20 +50,6 @@ ALWAYS_INLINE void JIT::emitPutIntToCallFrameHeader(RegisterID from, JSStack::Ca
 #else
     store64(from, addressFor(entry, callFrameRegister));
 #endif
-}
-
-ALWAYS_INLINE void JIT::emitPutToCallFrameHeader(RegisterID from, JSStack::CallFrameHeaderEntry entry)
-{
-#if USE(JSVALUE32_64)
-    storePtr(from, payloadFor(entry, callFrameRegister));
-#else
-    store64(from, addressFor(entry, callFrameRegister));
-#endif
-}
-
-ALWAYS_INLINE void JIT::emitPutImmediateToCallFrameHeader(void* value, JSStack::CallFrameHeaderEntry entry)
-{
-    storePtr(TrustedImmPtr(value), Address(callFrameRegister, entry * sizeof(Register)));
 }
 
 ALWAYS_INLINE void JIT::emitGetFromCallFrameHeaderPtr(JSStack::CallFrameHeaderEntry entry, RegisterID to, RegisterID from)
@@ -102,16 +78,16 @@ ALWAYS_INLINE void JIT::emitGetFromCallFrameHeader64(JSStack::CallFrameHeaderEnt
 
 ALWAYS_INLINE void JIT::emitLoadCharacterString(RegisterID src, RegisterID dst, JumpList& failures)
 {
-    failures.append(branchPtr(NotEqual, Address(src, JSCell::structureOffset()), TrustedImmPtr(m_globalData->stringStructure.get())));
+    failures.append(branchPtr(NotEqual, Address(src, JSCell::structureOffset()), TrustedImmPtr(m_vm->stringStructure.get())));
     failures.append(branch32(NotEqual, MacroAssembler::Address(src, ThunkHelpers::jsStringLengthOffset()), TrustedImm32(1)));
     loadPtr(MacroAssembler::Address(src, ThunkHelpers::jsStringValueOffset()), dst);
     failures.append(branchTest32(Zero, dst));
-    loadPtr(MacroAssembler::Address(dst, ThunkHelpers::stringImplFlagsOffset()), regT1);
-    loadPtr(MacroAssembler::Address(dst, ThunkHelpers::stringImplDataOffset()), dst);
+    loadPtr(MacroAssembler::Address(dst, StringImpl::flagsOffset()), regT1);
+    loadPtr(MacroAssembler::Address(dst, StringImpl::dataOffset()), dst);
 
     JumpList is16Bit;
     JumpList cont8Bit;
-    is16Bit.append(branchTest32(Zero, regT1, TrustedImm32(ThunkHelpers::stringImpl8BitFlag())));
+    is16Bit.append(branchTest32(Zero, regT1, TrustedImm32(StringImpl::flagIs8Bit())));
     load8(MacroAssembler::Address(dst, 0), dst);
     cont8Bit.append(jump());
     is16Bit.link(this);
@@ -160,18 +136,15 @@ ALWAYS_INLINE void JIT::beginUninterruptedSequence(int insnSpace, int constSpace
     m_assembler.ensureSpace(insnSpace + m_assembler.maxInstructionSize + 2, constSpace + 8);
 #endif
 
-#if defined(ASSEMBLER_HAS_CONSTANT_POOL) && ASSEMBLER_HAS_CONSTANT_POOL
 #ifndef NDEBUG
     m_uninterruptedInstructionSequenceBegin = label();
     m_uninterruptedConstantSequenceBegin = sizeOfConstantPool();
-#endif
 #endif
 }
 
 ALWAYS_INLINE void JIT::endUninterruptedSequence(int insnSpace, int constSpace, int dst)
 {
-    UNUSED_PARAM(dst);
-#if defined(ASSEMBLER_HAS_CONSTANT_POOL) && ASSEMBLER_HAS_CONSTANT_POOL
+#ifndef NDEBUG
     /* There are several cases when the uninterrupted sequence is larger than
      * maximum required offset for pathing the same sequence. Eg.: if in a
      * uninterrupted sequence the last macroassembler's instruction is a stub
@@ -179,6 +152,7 @@ ALWAYS_INLINE void JIT::endUninterruptedSequence(int insnSpace, int constSpace, 
      * calculation of length of uninterrupted sequence. So, the insnSpace and
      * constSpace should be upper limit instead of hard limit.
      */
+
 #if CPU(SH4)
     if ((dst > 15) || (dst < -16)) {
         insnSpace += 8;
@@ -187,100 +161,30 @@ ALWAYS_INLINE void JIT::endUninterruptedSequence(int insnSpace, int constSpace, 
 
     if (((dst >= -16) && (dst < 0)) || ((dst > 7) && (dst <= 15)))
         insnSpace += 8;
+#else
+    UNUSED_PARAM(dst);
 #endif
+
     ASSERT(differenceBetween(m_uninterruptedInstructionSequenceBegin, label()) <= insnSpace);
     ASSERT(sizeOfConstantPool() - m_uninterruptedConstantSequenceBegin <= constSpace);
+#else
+    UNUSED_PARAM(insnSpace);
+    UNUSED_PARAM(constSpace);
+    UNUSED_PARAM(dst);
 #endif
 }
 
-#endif
-
-#if CPU(ARM)
-
-ALWAYS_INLINE void JIT::preserveReturnAddressAfterCall(RegisterID reg)
-{
-    move(linkRegister, reg);
-}
-
-ALWAYS_INLINE void JIT::restoreReturnAddressBeforeReturn(RegisterID reg)
-{
-    move(reg, linkRegister);
-}
-
-ALWAYS_INLINE void JIT::restoreReturnAddressBeforeReturn(Address address)
-{
-    loadPtr(address, linkRegister);
-}
-#elif CPU(SH4)
-
-ALWAYS_INLINE void JIT::preserveReturnAddressAfterCall(RegisterID reg)
-{
-    m_assembler.stspr(reg);
-}
-
-ALWAYS_INLINE void JIT::restoreReturnAddressBeforeReturn(RegisterID reg)
-{
-    m_assembler.ldspr(reg);
-}
-
-ALWAYS_INLINE void JIT::restoreReturnAddressBeforeReturn(Address address)
-{
-    loadPtrLinkReg(address);
-}
-
-#elif CPU(MIPS)
-
-ALWAYS_INLINE void JIT::preserveReturnAddressAfterCall(RegisterID reg)
-{
-    move(returnAddressRegister, reg);
-}
-
-ALWAYS_INLINE void JIT::restoreReturnAddressBeforeReturn(RegisterID reg)
-{
-    move(reg, returnAddressRegister);
-}
-
-ALWAYS_INLINE void JIT::restoreReturnAddressBeforeReturn(Address address)
-{
-    loadPtr(address, returnAddressRegister);
-}
-
-#else // CPU(X86) || CPU(X86_64)
-
-ALWAYS_INLINE void JIT::preserveReturnAddressAfterCall(RegisterID reg)
-{
-    pop(reg);
-}
-
-ALWAYS_INLINE void JIT::restoreReturnAddressBeforeReturn(RegisterID reg)
-{
-    push(reg);
-}
-
-ALWAYS_INLINE void JIT::restoreReturnAddressBeforeReturn(Address address)
-{
-    push(address);
-}
-
-#endif
-
-ALWAYS_INLINE void JIT::restoreArgumentReference()
-{
-    move(stackPointerRegister, firstArgumentRegister);
-    poke(callFrameRegister, OBJECT_OFFSETOF(struct JITStackFrame, callFrame) / sizeof(void*));
-}
+#endif // ASSEMBLER_HAS_CONSTANT_POOL
 
 ALWAYS_INLINE void JIT::updateTopCallFrame()
 {
     ASSERT(static_cast<int>(m_bytecodeOffset) >= 0);
-    if (m_bytecodeOffset) {
 #if USE(JSVALUE32_64)
-        storePtr(TrustedImmPtr(m_codeBlock->instructions().begin() + m_bytecodeOffset + 1), intTagFor(JSStack::ArgumentCount));
+    storePtr(TrustedImmPtr(m_codeBlock->instructions().begin() + m_bytecodeOffset + 1), intTagFor(JSStack::ArgumentCount));
 #else
-        store32(TrustedImm32(m_bytecodeOffset + 1), intTagFor(JSStack::ArgumentCount));
+    store32(TrustedImm32(m_bytecodeOffset + 1), intTagFor(JSStack::ArgumentCount));
 #endif
-    }
-    storePtr(callFrameRegister, &m_globalData->topCallFrame);
+    storePtr(callFrameRegister, &m_vm->topCallFrame);
 }
 
 ALWAYS_INLINE void JIT::restoreArgumentReferenceForTrampoline()
@@ -351,12 +255,6 @@ ALWAYS_INLINE JIT::Jump JIT::emitJumpIfNotObject(RegisterID structureReg)
     return branch8(Below, Address(structureReg, Structure::typeInfoTypeOffset()), TrustedImm32(ObjectType));
 }
 
-ALWAYS_INLINE JIT::Jump JIT::emitJumpIfNotType(RegisterID baseReg, RegisterID scratchReg, JSType type)
-{
-    loadPtr(Address(baseReg, JSCell::structureOffset()), scratchReg);
-    return branch8(NotEqual, Address(scratchReg, Structure::typeInfoTypeOffset()), TrustedImm32(type));
-}
-
 #if ENABLE(SAMPLING_FLAGS)
 ALWAYS_INLINE void JIT::setSamplingFlag(int32_t flag)
 {
@@ -415,33 +313,21 @@ ALWAYS_INLINE bool JIT::isOperandConstantImmediateChar(unsigned src)
     return m_codeBlock->isConstantRegisterIndex(src) && getConstantOperand(src).isString() && asString(getConstantOperand(src).asCell())->length() == 1;
 }
 
-template <typename ClassType, MarkedBlock::DestructorType destructorType, typename StructureType> inline void JIT::emitAllocateBasicJSObject(StructureType structure, RegisterID result, RegisterID storagePtr)
+template<typename StructureType>
+inline void JIT::emitAllocateJSObject(RegisterID allocator, StructureType structure, RegisterID result, RegisterID scratch)
 {
-    size_t size = ClassType::allocationSize(INLINE_STORAGE_CAPACITY);
-    MarkedAllocator* allocator = 0;
-    if (destructorType == MarkedBlock::Normal)
-        allocator = &m_globalData->heap.allocatorForObjectWithNormalDestructor(size);
-    else if (destructorType == MarkedBlock::ImmortalStructure)
-        allocator = &m_globalData->heap.allocatorForObjectWithImmortalStructureDestructor(size);
-    else
-        allocator = &m_globalData->heap.allocatorForObjectWithoutDestructor(size);
-    loadPtr(&allocator->m_freeList.head, result);
+    loadPtr(Address(allocator, MarkedAllocator::offsetOfFreeListHead()), result);
     addSlowCase(branchTestPtr(Zero, result));
 
     // remove the object from the free list
-    loadPtr(Address(result), storagePtr);
-    storePtr(storagePtr, &allocator->m_freeList.head);
+    loadPtr(Address(result), scratch);
+    storePtr(scratch, Address(allocator, MarkedAllocator::offsetOfFreeListHead()));
 
     // initialize the object's structure
     storePtr(structure, Address(result, JSCell::structureOffset()));
 
     // initialize the object's property storage pointer
     storePtr(TrustedImmPtr(0), Address(result, JSObject::butterflyOffset()));
-}
-
-template <typename T> inline void JIT::emitAllocateJSFinalObject(T structure, RegisterID result, RegisterID scratch)
-{
-    emitAllocateBasicJSObject<JSFinalObject, MarkedBlock::None, T>(structure, result, scratch);
 }
 
 #if ENABLE(VALUE_PROFILER)
@@ -503,7 +389,7 @@ inline void JIT::emitArrayProfilingSite(RegisterID structureAndIndexingType, Reg
     RegisterID structure = structureAndIndexingType;
     RegisterID indexingType = structureAndIndexingType;
     
-    if (canBeOptimized())
+    if (shouldEmitProfiling())
         storePtr(structure, arrayProfile->addressOfLastSeenStructure());
 
     load8(Address(structure, Structure::indexingTypeOffset()), indexingType);
@@ -523,6 +409,15 @@ inline void JIT::emitArrayProfileStoreToHoleSpecialCase(ArrayProfile* arrayProfi
 {
 #if ENABLE(VALUE_PROFILER)    
     store8(TrustedImm32(1), arrayProfile->addressOfMayStoreToHole());
+#else
+    UNUSED_PARAM(arrayProfile);
+#endif
+}
+
+inline void JIT::emitArrayProfileOutOfBoundsSpecialCase(ArrayProfile* arrayProfile)
+{
+#if ENABLE(VALUE_PROFILER)    
+    store8(TrustedImm32(1), arrayProfile->addressOfOutOfBounds());
 #else
     UNUSED_PARAM(arrayProfile);
 #endif
@@ -605,10 +500,10 @@ inline void JIT::emitLoad(const JSValue& v, RegisterID tag, RegisterID payload)
 
 inline void JIT::emitLoad(int index, RegisterID tag, RegisterID payload, RegisterID base)
 {
-    ASSERT(tag != payload);
+    RELEASE_ASSERT(tag != payload);
 
     if (base == callFrameRegister) {
-        ASSERT(payload != base);
+        RELEASE_ASSERT(payload != base);
         emitLoadPayload(index, payload);
         emitLoadTag(index, tag);
         return;
@@ -732,8 +627,8 @@ inline void JIT::map(unsigned bytecodeOffset, int virtualRegisterIndex, Register
     m_mappedTag = tag;
     m_mappedPayload = payload;
     
-    ASSERT(!canBeOptimized() || m_mappedPayload == regT0);
-    ASSERT(!canBeOptimized() || m_mappedTag == regT1);
+    ASSERT(!canBeOptimizedOrInlined() || m_mappedPayload == regT0);
+    ASSERT(!canBeOptimizedOrInlined() || m_mappedTag == regT1);
 }
 
 inline void JIT::unmap(RegisterID registerID)
@@ -919,11 +814,6 @@ ALWAYS_INLINE void JIT::emitJumpSlowCaseIfJSCell(RegisterID reg)
     addSlowCase(emitJumpIfJSCell(reg));
 }
 
-ALWAYS_INLINE JIT::Jump JIT::emitJumpIfNotJSCell(RegisterID reg)
-{
-    return branchTest64(NonZero, reg, tagMaskRegister);
-}
-
 ALWAYS_INLINE void JIT::emitJumpSlowCaseIfNotJSCell(RegisterID reg)
 {
     addSlowCase(emitJumpIfNotJSCell(reg));
@@ -988,14 +878,6 @@ ALWAYS_INLINE void JIT::emitJumpSlowCaseIfNotImmediateNumber(RegisterID reg)
 ALWAYS_INLINE void JIT::emitFastArithReTagImmediate(RegisterID src, RegisterID dest)
 {
     emitFastArithIntToImmNoCheck(src, dest);
-}
-
-// operand is int32_t, must have been zero-extended if register is 64-bit.
-ALWAYS_INLINE void JIT::emitFastArithIntToImmNoCheck(RegisterID src, RegisterID dest)
-{
-    if (src != dest)
-        move(src, dest);
-    or64(tagTypeNumberRegister, dest);
 }
 
 ALWAYS_INLINE void JIT::emitTagAsBoolImmediate(RegisterID reg)

@@ -34,7 +34,7 @@ static const unsigned maxRowIndex = 0x7FFFFFFE; // 2,147,483,646
 
 class RenderTableRow : public RenderBox {
 public:
-    explicit RenderTableRow(Node*);
+    explicit RenderTableRow(Element*);
 
     RenderObject* firstChild() const { ASSERT(children() == virtualChildren()); return children()->firstChild(); }
     RenderObject* lastChild() const { ASSERT(children() == virtualChildren()); return children()->lastChild(); }
@@ -45,9 +45,9 @@ public:
     RenderTableSection* section() const { return toRenderTableSection(parent()); }
     RenderTable* table() const { return toRenderTable(parent()->parent()); }
 
-    void updateBeforeAndAfterContent();
     void paintOutlineForRowIfNeeded(PaintInfo&, const LayoutPoint&);
 
+    static RenderTableRow* createAnonymous(Document*);
     static RenderTableRow* createAnonymousWithParentRenderer(const RenderObject*);
     virtual RenderBox* createAnonymousBoxWithSameTypeAs(const RenderObject* parent) const OVERRIDE
     {
@@ -92,7 +92,7 @@ private:
     virtual RenderObjectChildList* virtualChildren() { return children(); }
     virtual const RenderObjectChildList* virtualChildren() const { return children(); }
 
-    virtual const char* renderName() const { return isAnonymous() ? "RenderTableRow (anonymous)" : "RenderTableRow"; }
+    virtual const char* renderName() const { return (isAnonymous() || isPseudoElement()) ? "RenderTableRow (anonymous)" : "RenderTableRow"; }
 
     virtual bool isTableRow() const { return true; }
 
@@ -117,13 +117,13 @@ private:
 
 inline RenderTableRow* toRenderTableRow(RenderObject* object)
 {
-    ASSERT(!object || object->isTableRow());
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isTableRow());
     return static_cast<RenderTableRow*>(object);
 }
 
 inline const RenderTableRow* toRenderTableRow(const RenderObject* object)
 {
-    ASSERT(!object || object->isTableRow());
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isTableRow());
     return static_cast<const RenderTableRow*>(object);
 }
 

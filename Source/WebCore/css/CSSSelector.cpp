@@ -3,7 +3,7 @@
  *               1999 Waldo Bastian (bastian@kde.org)
  *               2001 Andreas Schlapbach (schlpbch@iam.unibe.ch)
  *               2001-2003 Dirk Mueller (mueller@kde.org)
- * Copyright (C) 2002, 2006, 2007, 2008, 2009, 2010 Apple Inc. All rights reserved.
+ * Copyright (C) 2002, 2006, 2007, 2008, 2009, 2010, 2013 Apple Inc. All rights reserved.
  * Copyright (C) 2008 David Smith (catfish.man@gmail.com)
  * Copyright (C) 2010 Google Inc. All rights reserved.
  *
@@ -41,6 +41,7 @@ using namespace HTMLNames;
 
 void CSSSelector::createRareData()
 {
+    ASSERT(m_match != Tag);
     if (m_hasRareData)
         return;
     // Move the value to the rare data stucture.
@@ -55,11 +56,14 @@ unsigned CSSSelector::specificity() const
     static const unsigned idMask = 0xff0000;
     static const unsigned classMask = 0xff00;
     static const unsigned elementMask = 0xff;
+
+    if (isForPage())
+        return specificityForPage() & maxValueMask;
+
     unsigned total = 0;
     unsigned temp = 0;
+
     for (const CSSSelector* selector = this; selector; selector = selector->tagHistory()) {
-        if (selector->m_isForPage)
-            return (total + selector->specificityForPage()) & maxValueMask;
         temp = total + selector->specificityForOneSelector();
         // Clamp each component to its max in the case of overflow.
         if ((temp & idMask) < (total & idMask))
@@ -78,11 +82,9 @@ inline unsigned CSSSelector::specificityForOneSelector() const
 {
     // FIXME: Pseudo-elements and pseudo-classes do not have the same specificity. This function
     // isn't quite correct.
-    unsigned s = (m_tag.localName() == starAtom ? 0 : 1);
     switch (m_match) {
     case Id:
-        s += 0x10000;
-        break;
+        return 0x10000;
     case Exact:
     case Class:
     case Set:
@@ -96,32 +98,45 @@ inline unsigned CSSSelector::specificityForOneSelector() const
         // FIXME: PsuedoAny should base the specificity on the sub-selectors.
         // See http://lists.w3.org/Archives/Public/www-style/2010Sep/0530.html
         if (pseudoType() == PseudoNot && selectorList())
-            s += selectorList()->first()->specificityForOneSelector();
-        else
-            s += 0x100;
-    case None:
-        break;
+            return selectorList()->first()->specificityForOneSelector();
+        return 0x100;
+    case Tag:
+        return (tagQName().localName() != starAtom) ? 1 : 0;
+    case Unknown:
+        return 0;
     }
-    return s;
+    ASSERT_NOT_REACHED();
+    return 0;
 }
 
 unsigned CSSSelector::specificityForPage() const
 {
     // See http://dev.w3.org/csswg/css3-page/#cascading-and-page-context
-    unsigned s = (m_tag.localName() == starAtom ? 0 : 4);
+    unsigned s = 0;
 
-    switch (pseudoType()) {
-    case PseudoFirstPage:
-        s += 2;
-        break;
-    case PseudoLeftPage:
-    case PseudoRightPage:
-        s += 1;
-        break;
-    case PseudoNotParsed:
-        break;
-    default:
-        ASSERT_NOT_REACHED();
+    for (const CSSSelector* component = this; component; component = component->tagHistory()) {
+        switch (component->m_match) {
+        case Tag:
+            s += tagQName().localName() == starAtom ? 0 : 4;
+            break;
+        case PseudoClass:
+            switch (component->pseudoType()) {
+            case PseudoFirstPage:
+                s += 2;
+                break;
+            case PseudoLeftPage:
+            case PseudoRightPage:
+                s += 1;
+                break;
+            case PseudoNotParsed:
+                break;
+            default:
+                ASSERT_NOT_REACHED();
+            }
+            break;
+        default:
+            break;
+        }
     }
     return s;
 }
@@ -200,6 +215,7 @@ PseudoId CSSSelector::pseudoId(PseudoType type)
     case PseudoLang:
     case PseudoNot:
     case PseudoRoot:
+    case PseudoScope:
     case PseudoScrollbarBack:
     case PseudoScrollbarForward:
     case PseudoWindowInactive:
@@ -220,6 +236,14 @@ PseudoId CSSSelector::pseudoId(PseudoType type)
     case PseudoOutOfRange:
     case PseudoUserAgentCustomElement:
     case PseudoWebKitCustomElement:
+#if ENABLE(VIDEO_TRACK)
+    case PseudoCue:
+    case PseudoFutureCue:
+    case PseudoPastCue:
+#endif
+#if ENABLE(IFRAME_SEAMLESS)
+    case PseudoSeamlessDocument:
+#endif
         return NOPSEUDO;
     case PseudoNotParsed:
         ASSERT_NOT_REACHED();
@@ -302,8 +326,17 @@ static HashMap<AtomicStringImpl*, CSSSelector::PseudoType>* nameToPseudoTypeMap(
     DEFINE_STATIC_LOCAL(AtomicString, fullScreenAncestor, ("-webkit-full-screen-ancestor", AtomicString::ConstructFromLiteral));
     DEFINE_STATIC_LOCAL(AtomicString, animatingFullScreenTransition, ("-webkit-animating-full-screen-transition", AtomicString::ConstructFromLiteral));
 #endif
+#if ENABLE(VIDEO_TRACK)
+    DEFINE_STATIC_LOCAL(AtomicString, cue, ("cue(", AtomicString::ConstructFromLiteral));
+    DEFINE_STATIC_LOCAL(AtomicString, futureCue, ("future", AtomicString::ConstructFromLiteral));
+    DEFINE_STATIC_LOCAL(AtomicString, pastCue, ("past", AtomicString::ConstructFromLiteral));
+#endif
+#if ENABLE(IFRAME_SEAMLESS)
+    DEFINE_STATIC_LOCAL(AtomicString, seamlessDocument, ("-webkit-seamless-document", AtomicString::ConstructFromLiteral));
+#endif
     DEFINE_STATIC_LOCAL(AtomicString, inRange, ("in-range", AtomicString::ConstructFromLiteral));
     DEFINE_STATIC_LOCAL(AtomicString, outOfRange, ("out-of-range", AtomicString::ConstructFromLiteral));
+    DEFINE_STATIC_LOCAL(AtomicString, scope, ("scope", AtomicString::ConstructFromLiteral));
 
     static HashMap<AtomicStringImpl*, CSSSelector::PseudoType>* nameToPseudoType = 0;
     if (!nameToPseudoType) {
@@ -358,6 +391,7 @@ static HashMap<AtomicStringImpl*, CSSSelector::PseudoType>* nameToPseudoTypeMap(
         nameToPseudoType->set(optional.impl(), CSSSelector::PseudoOptional);
         nameToPseudoType->set(required.impl(), CSSSelector::PseudoRequired);
         nameToPseudoType->set(resizer.impl(), CSSSelector::PseudoResizer);
+        nameToPseudoType->set(scope.impl(), CSSSelector::PseudoScope);
         nameToPseudoType->set(scrollbar.impl(), CSSSelector::PseudoScrollbar);
         nameToPseudoType->set(scrollbarButton.impl(), CSSSelector::PseudoScrollbarButton);
         nameToPseudoType->set(scrollbarCorner.impl(), CSSSelector::PseudoScrollbarCorner);
@@ -377,6 +411,14 @@ static HashMap<AtomicStringImpl*, CSSSelector::PseudoType>* nameToPseudoTypeMap(
         nameToPseudoType->set(fullScreenAncestor.impl(), CSSSelector::PseudoFullScreenAncestor);
         nameToPseudoType->set(animatingFullScreenTransition.impl(), CSSSelector::PseudoAnimatingFullScreenTransition);
 #endif
+#if ENABLE(VIDEO_TRACK)
+        nameToPseudoType->set(cue.impl(), CSSSelector::PseudoCue);
+        nameToPseudoType->set(futureCue.impl(), CSSSelector::PseudoFutureCue);
+        nameToPseudoType->set(pastCue.impl(), CSSSelector::PseudoPastCue);
+#endif
+#if ENABLE(IFRAME_SEAMLESS)
+        nameToPseudoType->set(seamlessDocument.impl(), CSSSelector::PseudoSeamlessDocument);
+#endif
         nameToPseudoType->set(inRange.impl(), CSSSelector::PseudoInRange);
         nameToPseudoType->set(outOfRange.impl(), CSSSelector::PseudoOutOfRange);
     }
@@ -395,16 +437,10 @@ CSSSelector::PseudoType CSSSelector::parsePseudoType(const AtomicString& name)
 
     if (name.startsWith("-webkit-"))
         return PseudoWebKitCustomElement;
-    if (name.startsWith("x-"))
+    if (name.startsWith("x-") || name.startsWith("cue"))
         return PseudoUserAgentCustomElement;
 
     return PseudoUnknown;
-}
-
-bool CSSSelector::isCustomPseudoType(const AtomicString& name)
-{
-    CSSSelector::PseudoType type = parsePseudoType(name);
-    return type == PseudoUserAgentCustomElement || type == PseudoWebKitCustomElement;
 }
 
 void CSSSelector::extractPseudoType() const
@@ -421,9 +457,15 @@ void CSSSelector::extractPseudoType() const
     switch (m_pseudoType) {
     case PseudoAfter:
     case PseudoBefore:
+#if ENABLE(VIDEO_TRACK)
+    case PseudoCue:
+#endif
     case PseudoFirstLetter:
     case PseudoFirstLine:
         compat = true;
+#if ENABLE(SHADOW_DOM)
+    case PseudoDistributed:
+#endif
     case PseudoResizer:
     case PseudoScrollbar:
     case PseudoScrollbarCorner:
@@ -466,6 +508,7 @@ void CSSSelector::extractPseudoType() const
     case PseudoRequired:
     case PseudoReadOnly:
     case PseudoReadWrite:
+    case PseudoScope:
     case PseudoValid:
     case PseudoInvalid:
     case PseudoIndeterminate:
@@ -493,8 +536,15 @@ void CSSSelector::extractPseudoType() const
     case PseudoFullScreenAncestor:
     case PseudoAnimatingFullScreenTransition:
 #endif
+#if ENABLE(IFRAME_SEAMLESS)
+    case PseudoSeamlessDocument:
+#endif
     case PseudoInRange:
     case PseudoOutOfRange:
+#if ENABLE(VIDEO_TRACK)
+    case PseudoFutureCue:
+    case PseudoPastCue:
+#endif
         break;
     case PseudoFirstPage:
     case PseudoLeftPage:
@@ -515,18 +565,24 @@ void CSSSelector::extractPseudoType() const
         m_pseudoType = PseudoUnknown;
 }
 
-bool CSSSelector::operator==(const CSSSelector& other)
+bool CSSSelector::operator==(const CSSSelector& other) const
 {
     const CSSSelector* sel1 = this;
     const CSSSelector* sel2 = &other;
 
     while (sel1 && sel2) {
-        if (sel1->m_tag != sel2->m_tag || sel1->attribute() != sel2->attribute() ||
-             sel1->relation() != sel2->relation() || sel1->m_match != sel2->m_match ||
-             sel1->value() != sel2->value() ||
-             sel1->pseudoType() != sel2->pseudoType() ||
-             sel1->argument() != sel2->argument())
+        if (sel1->attribute() != sel2->attribute()
+            || sel1->relation() != sel2->relation()
+            || sel1->m_match != sel2->m_match
+            || sel1->value() != sel2->value()
+            || sel1->pseudoType() != sel2->pseudoType()
+            || sel1->argument() != sel2->argument()) {
             return false;
+        }
+        if (sel1->m_match == Tag) {
+            if (sel1->tagQName() != sel2->tagQName())
+                return false;
+        }
         sel1 = sel1->tagHistory();
         sel2 = sel2->tagHistory();
     }
@@ -537,19 +593,17 @@ bool CSSSelector::operator==(const CSSSelector& other)
     return true;
 }
 
-String CSSSelector::selectorText() const
+String CSSSelector::selectorText(const String& rightSide) const
 {
     StringBuilder str;
 
-    const AtomicString& prefix = m_tag.prefix();
-    const AtomicString& localName = m_tag.localName();
-    if (m_match == CSSSelector::None || !prefix.isNull() || localName != starAtom) {
-        if (prefix.isNull())
-            str.append(localName);
+    if (m_match == CSSSelector::Tag && !m_tagIsForNamespaceRule) {
+        if (tagQName().prefix().isNull())
+            str.append(tagQName().localName());
         else {
-            str.append(prefix.string());
+            str.append(tagQName().prefix().string());
             str.append('|');
-            str.append(localName);
+            str.append(tagQName().localName());
         }
     }
 
@@ -567,7 +621,7 @@ String CSSSelector::selectorText() const
 
             switch (cs->pseudoType()) {
             case PseudoNot:
-                if (CSSSelectorList* selectorList = cs->selectorList())
+                if (const CSSSelectorList* selectorList = cs->selectorList())
                     str.append(selectorList->first()->selectorText());
                 str.append(')');
                 break;
@@ -580,8 +634,8 @@ String CSSSelector::selectorText() const
                 str.append(')');
                 break;
             case PseudoAny: {
-                CSSSelector* firstSubSelector = cs->selectorList()->first();
-                for (CSSSelector* subSelector = firstSubSelector; subSelector; subSelector = CSSSelectorList::next(subSelector)) {
+                const CSSSelector* firstSubSelector = cs->selectorList()->first();
+                for (const CSSSelector* subSelector = firstSubSelector; subSelector; subSelector = CSSSelectorList::next(subSelector)) {
                     if (subSelector != firstSubSelector)
                         str.append(',');
                     str.append(subSelector->selectorText());
@@ -600,7 +654,7 @@ String CSSSelector::selectorText() const
             const AtomicString& prefix = cs->attribute().prefix();
             if (!prefix.isNull()) {
                 str.append(prefix);
-                str.append("|");
+                str.append('|');
             }
             str.append(cs->attribute().localName());
             switch (cs->m_match) {
@@ -639,31 +693,30 @@ String CSSSelector::selectorText() const
         cs = cs->tagHistory();
     }
 
-    if (CSSSelector* tagHistory = cs->tagHistory()) {
-        String tagHistoryText = tagHistory->selectorText();
+    if (const CSSSelector* tagHistory = cs->tagHistory()) {
         switch (cs->relation()) {
         case CSSSelector::Descendant:
-            return tagHistoryText + " " + str.toString();
+            return tagHistory->selectorText(" " + str.toString() + rightSide);
         case CSSSelector::Child:
-            return tagHistoryText + " > " + str.toString();
+            return tagHistory->selectorText(" > " + str.toString() + rightSide);
         case CSSSelector::DirectAdjacent:
-            return tagHistoryText + " + " + str.toString();
+            return tagHistory->selectorText(" + " + str.toString() + rightSide);
         case CSSSelector::IndirectAdjacent:
-            return tagHistoryText + " ~ " + str.toString();
+            return tagHistory->selectorText(" ~ " + str.toString() + rightSide);
         case CSSSelector::SubSelector:
             ASSERT_NOT_REACHED();
         case CSSSelector::ShadowDescendant:
-            return tagHistoryText + str.toString();
+            return tagHistory->selectorText(str.toString() + rightSide);
         }
     }
-
-    return str.toString();
+    return str.toString() + rightSide;
 }
 
-void CSSSelector::setAttribute(const QualifiedName& value)
+void CSSSelector::setAttribute(const QualifiedName& value, bool isCaseInsensitive)
 {
     createRareData();
     m_data.m_rareData->m_attribute = value;
+    m_data.m_rareData->m_attributeCanonicalLocalName = isCaseInsensitive ? value.localName().lower() : value.localName();
 }
 
 void CSSSelector::setArgument(const AtomicString& value)
@@ -678,7 +731,7 @@ void CSSSelector::setSelectorList(PassOwnPtr<CSSSelectorList> selectorList)
     m_data.m_rareData->m_selectorList = selectorList;
 }
 
-bool CSSSelector::parseNth()
+bool CSSSelector::parseNth() const
 {
     if (!m_hasRareData)
         return false;
@@ -688,35 +741,10 @@ bool CSSSelector::parseNth()
     return m_parsedNth;
 }
 
-bool CSSSelector::matchNth(int count)
+bool CSSSelector::matchNth(int count) const
 {
     ASSERT(m_hasRareData);
     return m_data.m_rareData->matchNth(count);
-}
-
-bool CSSSelector::isSimple() const
-{
-    if (selectorList() || tagHistory() || matchesPseudoElement())
-        return false;
-
-    int numConditions = 0;
-
-    // hasTag() cannot be be used here because namespace may not be nullAtom.
-    // Example:
-    //     @namespace "http://www.w3.org/2000/svg";
-    //     svg:not(:root) { ...
-    if (m_tag != starAtom)
-        numConditions++;
-
-    if (m_match == Id || m_match == Class || m_match == PseudoClass)
-        numConditions++;
-
-    if (m_hasRareData && m_data.m_rareData->m_attribute != anyQName())
-        numConditions++;
-
-    // numConditions is 0 for a universal selector.
-    // numConditions is 1 for other simple selectors.
-    return numConditions <= 1;
 }
 
 CSSSelector::RareData::RareData(PassRefPtr<AtomicStringImpl> value)

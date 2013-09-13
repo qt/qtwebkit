@@ -24,8 +24,8 @@
  */
 
 [
-    Conditional=ENCRYPTED_MEDIA,
-    V8EnabledAtRuntime=encryptedMedia, 
+    Conditional=ENCRYPTED_MEDIA|ENCRYPTED_MEDIA_V2,
+    ImplementationLacksVTable
 ] interface MediaKeyError {
     const unsigned short MEDIA_KEYERR_UNKNOWN = 1;
     const unsigned short MEDIA_KEYERR_CLIENT = 2;
@@ -34,4 +34,5 @@
     const unsigned short MEDIA_KEYERR_HARDWARECHANGE = 5;
     const unsigned short MEDIA_KEYERR_DOMAIN = 6;
     readonly attribute unsigned short code;
+    [Conditional=ENCRYPTED_MEDIA_V2] readonly attribute unsigned long systemCode;
 };

@@ -37,7 +37,7 @@
 #include "Page.h"
 #include "ScriptObject.h"
 #include "ScriptState.h"
-#include <profiler/Profiler.h>
+#include <profiler/LegacyProfiler.h>
 #include <wtf/Forward.h>
 
 namespace WebCore {
@@ -59,7 +59,7 @@ unsigned ScriptProfiler::getHeapObjectId(const ScriptValue&)
 
 void ScriptProfiler::start(ScriptState* state, const String& title)
 {
-    JSC::Profiler::profiler()->startProfiling(state, title);
+    JSC::LegacyProfiler::profiler()->startProfiling(state, title);
 }
 
 void ScriptProfiler::startForPage(Page* inspectedPage, const String& title)
@@ -69,15 +69,15 @@ void ScriptProfiler::startForPage(Page* inspectedPage, const String& title)
 }
 
 #if ENABLE(WORKERS)
-void ScriptProfiler::startForWorkerContext(WorkerContext* context, const String& title)
+void ScriptProfiler::startForWorkerGlobalScope(WorkerGlobalScope* context, const String& title)
 {
-    start(scriptStateFromWorkerContext(context), title);
+    start(scriptStateFromWorkerGlobalScope(context), title);
 }
 #endif
 
 PassRefPtr<ScriptProfile> ScriptProfiler::stop(ScriptState* state, const String& title)
 {
-    RefPtr<JSC::Profile> profile = JSC::Profiler::profiler()->stopProfiling(state, title);
+    RefPtr<JSC::Profile> profile = JSC::LegacyProfiler::profiler()->stopProfiling(state, title);
     return ScriptProfile::create(profile);
 }
 
@@ -88,9 +88,9 @@ PassRefPtr<ScriptProfile> ScriptProfiler::stopForPage(Page* inspectedPage, const
 }
 
 #if ENABLE(WORKERS)
-PassRefPtr<ScriptProfile> ScriptProfiler::stopForWorkerContext(WorkerContext* context, const String& title)
+PassRefPtr<ScriptProfile> ScriptProfiler::stopForWorkerGlobalScope(WorkerGlobalScope* context, const String& title)
 {
-    return stop(scriptStateFromWorkerContext(context), title);
+    return stop(scriptStateFromWorkerGlobalScope(context), title);
 }
 #endif
 

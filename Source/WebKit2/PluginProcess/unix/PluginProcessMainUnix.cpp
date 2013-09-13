@@ -33,7 +33,7 @@
 #include "Logging.h"
 #include "NetscapePlugin.h"
 #include "PluginProcess.h"
-#include "ScriptController.h"
+#include "WebKit2Initialize.h"
 #include <WebCore/RunLoop.h>
 #if PLATFORM(GTK)
 #include <gdk/gdkx.h>
@@ -73,9 +73,8 @@ static int webkitXError(Display* xdisplay, XErrorEvent* error)
 
 WK_EXPORT int PluginProcessMainUnix(int argc, char* argv[])
 {
-    ASSERT_UNUSED(argc, argc == 2 || argc == 3);
     bool scanPlugin = !strcmp(argv[1], "-scanPlugin");
-    ASSERT_UNUSED(argc, argc == 2 || (argc == 3 && scanPlugin));
+    ASSERT_UNUSED(argc, argc == 3);
 
 #if PLATFORM(GTK)
     gtk_init(&argc, &argv);
@@ -86,7 +85,7 @@ WK_EXPORT int PluginProcessMainUnix(int argc, char* argv[])
         return 1;
 #endif
 
-    ScriptController::initializeThreading();
+    InitializeWebKit2();
 
     if (scanPlugin) {
         String pluginPath(argv[2]);
@@ -94,8 +93,6 @@ WK_EXPORT int PluginProcessMainUnix(int argc, char* argv[])
             return EXIT_FAILURE;
         return EXIT_SUCCESS;
     }
-
-    RunLoop::initializeMainRunLoop();
 
     // Plugins can produce X errors that are handled by the GDK X error handler, which
     // exits the process. Since we don't want to crash due to plugin bugs, we install a
@@ -106,7 +103,13 @@ WK_EXPORT int PluginProcessMainUnix(int argc, char* argv[])
 #endif
 
     int socket = atoi(argv[1]);
-    WebKit::PluginProcess::shared().initialize(socket, RunLoop::main());
+
+    WebKit::ChildProcessInitializationParameters parameters;
+    parameters.connectionIdentifier = socket;
+    parameters.extraInitializationData.add("plugin-path", argv[2]);
+
+    WebKit::PluginProcess::shared().initialize(parameters);
+
     RunLoop::run();
 
     return 0;

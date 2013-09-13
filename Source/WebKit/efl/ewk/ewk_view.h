@@ -123,7 +123,7 @@
 
 #include <Evas.h>
 #include <cairo.h>
-#include <libsoup/soup-session.h>
+#include <libsoup/soup.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -187,6 +187,7 @@ struct _Ewk_View_Smart_Class {
     void (*add_console_message)(Ewk_View_Smart_Data *sd, const char *message, unsigned int lineNumber, const char *sourceID);
     void (*run_javascript_alert)(Ewk_View_Smart_Data *sd, Evas_Object *frame, const char *message);
     Eina_Bool (*run_javascript_confirm)(Ewk_View_Smart_Data *sd, Evas_Object *frame, const char *message);
+    Eina_Bool (*run_before_unload_confirm)(Ewk_View_Smart_Data *sd, Evas_Object *frame, const char *message);
     Eina_Bool (*run_javascript_prompt)(Ewk_View_Smart_Data *sd, Evas_Object *frame, const char *message, const char *defaultValue, const char **value);
     Eina_Bool (*should_interrupt_javascript)(Ewk_View_Smart_Data *sd);
     int64_t (*exceeded_application_cache_quota)(Ewk_View_Smart_Data *sd, Ewk_Security_Origin* origin, int64_t defaultOriginQuota, int64_t totalSpaceNeeded);
@@ -214,7 +215,7 @@ struct _Ewk_View_Smart_Class {
  * @see EWK_VIEW_SMART_CLASS_INIT_VERSION
  * @see EWK_VIEW_SMART_CLASS_INIT_NAME_VERSION
  */
-#define EWK_VIEW_SMART_CLASS_INIT(smart_class_init) {smart_class_init, EWK_VIEW_SMART_CLASS_VERSION, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+#define EWK_VIEW_SMART_CLASS_INIT(smart_class_init) {smart_class_init, EWK_VIEW_SMART_CLASS_VERSION, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 
 /**
  * Initializes to zero a whole @a Ewk_View_Smart_Class structure.
@@ -336,13 +337,6 @@ typedef struct _Ewk_View_Redirection_Data Ewk_View_Redirection_Data;
 struct _Ewk_View_Redirection_Data {
     const char *source_url;  /**< Redirect source URL. */
     const char *destination_url;  /**< Redirect destination URL. */ 
-};
-/// Creates a type name for @a _Ewk_Scroll_Request.
-typedef struct _Ewk_Scroll_Request Ewk_Scroll_Request;
-/// Contains the scroll request that should be processed by subclass implementations.
-struct _Ewk_Scroll_Request {
-    Evas_Coord dx, dy;
-    Evas_Coord x, y, w, h, x2, y2;
 };
 
 /// Creates a type name for @a _Ewk_Color.
@@ -2428,13 +2422,53 @@ EAPI Eina_Bool ewk_view_user_scalable_set(Evas_Object *o, Eina_Bool user_scalabl
 EAPI Eina_Bool ewk_view_user_scalable_get(const Evas_Object *o);
 
 /**
- * Gets the device pixel ratio value.
+ * Queries the ratio between the CSS units and device pixels when the content is unscaled.
  *
- * @param o view to get the device pixel ratio value
+ * When designing touch-friendly contents, knowing the approximated target size on a device
+ * is important for contents providers in order to get the intented layout and element
+ * sizes.
  *
- * @return the device pixel ratio value on success or @c -1.0 on failure
+ * As most first generation touch devices had a PPI of approximately 160, this became a
+ * de-facto value, when used in conjunction with the viewport meta tag.
+ *
+ * Devices with a higher PPI learning towards 240 or 320, applies a pre-scaling on all
+ * content, of either 1.5 or 2.0, not affecting the CSS scale or pinch zooming.
+ *
+ * This value can be set using this property and it is exposed to CSS media queries using
+ * the -webkit-device-pixel-ratio query.
+ *
+ * For instance, if you want to load an image without having it upscaled on a web view
+ * using a device pixel ratio of 2.0 it can be done by loading an image of say 100x100
+ * pixels but showing it at half the size.
+ *
+ * @media (-webkit-min-device-pixel-ratio: 1.5) {
+ *     .icon {
+ *         width: 50px;
+ *         height: 50px;
+ *         url: "/images/icon@2x.png"; // This is actually a 100x100 image
+ *     }
+ * }
+ *
+ * If the above is used on a device with device pixel ratio of 1.5, it will be scaled
+ * down but still provide a better looking image.
+ *
+ * @param o view object to get device pixel ratio
+ *
+ * @return the ratio between the CSS units and device pixels,
+ *         or @c -1.0 on failure
  */
 EAPI float ewk_view_device_pixel_ratio_get(const Evas_Object *o);
+
+/**
+ * Sets the ratio between the CSS units and device pixels when the content is unscaled.
+ *
+ * @param o view object to set device pixel ratio
+ *
+ * @return @c EINA_TRUE if the device pixel ratio was set, @c EINA_FALSE otherwise
+ *
+ * @see ewk_view_device_pixel_ratio_get()
+ */
+EAPI Eina_Bool ewk_view_device_pixel_ratio_set(Evas_Object *o, float ratio);
 
 /**
  * Changes the text direction of the selected input node.
@@ -2682,27 +2716,6 @@ EAPI Eina_Bool ewk_view_setting_should_display_text_descriptions_get(const Evas_
  * @c EINA_FALSE to disable.
  */
 EAPI void ewk_view_setting_should_display_text_descriptions_set(Evas_Object *o, Eina_Bool enable);
-
-/**
- * Queries if the web audio feature of HTML5 is enabled.
- *
- * @param o view object to query if the web audio feature is enabled
- *
- * @return @c EINA_TRUE if web audio is enabled,
- *         @c EINA_FALSE if not or on failure
- */
-EAPI Eina_Bool    ewk_view_setting_web_audio_get(const Evas_Object *o);
-
-/**
- * Enables/disables the web audio feature of HTML5.
- *
- * @param o view object to set the web audio
- * @param enable @c EINA_TRUE to enable the web audio feature,
- *        @c EINA_FALSE to disable
- *
- * @return @c EINA_TRUE on success or @c EINA_FALSE on failure
- */
-EAPI Eina_Bool    ewk_view_setting_web_audio_set(Evas_Object *o, Eina_Bool enable);
 
 /**
  * Show the inspector to debug a web page.

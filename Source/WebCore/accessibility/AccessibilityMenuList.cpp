@@ -39,9 +39,7 @@ AccessibilityMenuList::AccessibilityMenuList(RenderMenuList* renderer)
 
 PassRefPtr<AccessibilityMenuList> AccessibilityMenuList::create(RenderMenuList* renderer)
 {
-    AccessibilityMenuList* obj = new AccessibilityMenuList(renderer);
-    obj->init();
-    return adoptRef(obj);
+    return adoptRef(new AccessibilityMenuList(renderer));
 }
 
 bool AccessibilityMenuList::press() const
@@ -64,12 +62,12 @@ void AccessibilityMenuList::addChildren()
     if (!list)
         return;
 
-    if (list->accessibilityPlatformIncludesObject() == IgnoreObject) {
+    static_cast<AccessibilityMockObject*>(list)->setParent(this);
+    if (list->accessibilityIsIgnored()) {
         cache->remove(list->axObjectID());
         return;
     }
 
-    static_cast<AccessibilityMockObject*>(list)->setParent(this);
     m_children.append(list);
 
     list->addChildren();
@@ -94,7 +92,7 @@ bool AccessibilityMenuList::canSetFocusAttribute() const
     if (!node())
         return false;
 
-    return static_cast<Element*>(node())->isEnabledFormControl();
+    return !toElement(node())->isDisabledFormControl();
 }
 
 void AccessibilityMenuList::didUpdateActiveOption(int optionIndex)

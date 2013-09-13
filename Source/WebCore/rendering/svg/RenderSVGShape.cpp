@@ -39,23 +39,24 @@
 #include "RenderSVGContainer.h"
 #include "RenderSVGResourceMarker.h"
 #include "RenderSVGResourceSolidColor.h"
+#include "SVGGraphicsElement.h"
 #include "SVGPathData.h"
 #include "SVGRenderingContext.h"
 #include "SVGResources.h"
 #include "SVGResourcesCache.h"
-#include "SVGStyledTransformableElement.h"
 #include "SVGTransformList.h"
 #include "SVGURIReference.h"
 #include "StrokeStyleApplier.h"
 #include <wtf/MathExtras.h>
+#include <wtf/StackStats.h>
 
 namespace WebCore {
 
-RenderSVGShape::RenderSVGShape(SVGStyledTransformableElement* node)
+RenderSVGShape::RenderSVGShape(SVGGraphicsElement* node)
     : RenderSVGModelObject(node)
     , m_needsBoundariesUpdate(false) // Default is false, the cached rects are empty from the beginning.
-    , m_needsShapeUpdate(true) // Default is true, so we grab a Path object once from SVGStyledTransformableElement.
-    , m_needsTransformUpdate(true) // Default is true, so we grab a AffineTransform object once from SVGStyledTransformableElement.
+    , m_needsShapeUpdate(true) // Default is true, so we grab a Path object once from SVGGraphicsElement.
+    , m_needsTransformUpdate(true) // Default is true, so we grab a AffineTransform object once from SVGGraphicsElement.
 {
 }
 
@@ -69,7 +70,7 @@ void RenderSVGShape::updateShapeFromElement()
     m_path = adoptPtr(new Path);
     ASSERT(RenderSVGShape::isEmpty());
 
-    SVGStyledTransformableElement* element = static_cast<SVGStyledTransformableElement*>(node());
+    SVGGraphicsElement* element = toSVGGraphicsElement(node());
     updatePathFromGraphicsElement(element, path());
     processMarkerPositions();
 
@@ -146,7 +147,7 @@ void RenderSVGShape::layout()
 {
     StackStats::LayoutCheckPoint layoutCheckPoint;
     LayoutRepainter repainter(*this, SVGRenderSupport::checkForSVGRepaintDuringLayout(this) && selfNeedsLayout());
-    SVGStyledTransformableElement* element = static_cast<SVGStyledTransformableElement*>(node());
+    SVGGraphicsElement* element = toSVGGraphicsElement(node());
 
     bool updateCachedBoundariesInParents = false;
 
@@ -198,7 +199,7 @@ bool RenderSVGShape::setupNonScalingStrokeContext(AffineTransform& strokeTransfo
 
 AffineTransform RenderSVGShape::nonScalingStrokeTransform() const
 {
-    SVGStyledTransformableElement* element = static_cast<SVGStyledTransformableElement*>(node());
+    SVGGraphicsElement* element = toSVGGraphicsElement(node());
     return element->getScreenCTM(SVGLocatable::DisallowStyleUpdate);
 }
 
@@ -207,7 +208,7 @@ bool RenderSVGShape::shouldGenerateMarkerPositions() const
     if (!style()->svgStyle()->hasMarkers())
         return false;
 
-    SVGStyledTransformableElement* element = static_cast<SVGStyledTransformableElement*>(node());
+    SVGGraphicsElement* element = toSVGGraphicsElement(node());
     if (!element->supportsMarkers())
         return false;
 
@@ -258,7 +259,6 @@ void RenderSVGShape::fillAndStrokeShape(GraphicsContext* context)
         return;
 
     GraphicsContextStateSaver stateSaver(*context, false);
-    AffineTransform nonScalingTransform;
 
     if (hasNonScalingStroke()) {
         AffineTransform nonScalingTransform = nonScalingStrokeTransform();
@@ -298,13 +298,13 @@ void RenderSVGShape::paint(PaintInfo& paintInfo, const LayoutPoint&)
         }
 
         if (drawsOutline)
-            paintOutline(childPaintInfo.context, IntRect(boundingBox));
+            paintOutline(childPaintInfo, IntRect(boundingBox));
     }
 }
 
 // This method is called from inside paintOutline() since we call paintOutline()
 // while transformed to our coord system, return local coords
-void RenderSVGShape::addFocusRingRects(Vector<IntRect>& rects, const LayoutPoint&)
+void RenderSVGShape::addFocusRingRects(Vector<IntRect>& rects, const LayoutPoint&, const RenderLayerModelObject*)
 {
     IntRect rect = enclosingIntRect(repaintRectInLocalCoordinates());
     if (!rect.isEmpty())
@@ -416,7 +416,7 @@ void RenderSVGShape::updateRepaintBoundingBox()
 
 float RenderSVGShape::strokeWidth() const
 {
-    SVGElement* svgElement = static_cast<SVGElement*>(node());
+    SVGElement* svgElement = toSVGElement(node());
     SVGLengthContext lengthContext(svgElement);
     return style()->svgStyle()->strokeWidth().value(lengthContext);
 }

@@ -27,12 +27,14 @@
 #include "config.h"
 #include "WebCoreArgumentCoders.h"
 
+#include "PlatformCertificateInfo.h"
 #include <WebCore/ResourceError.h>
 #include <WebCore/ResourceRequest.h>
 #include <WebCore/ResourceResponse.h>
 #include <wtf/text/CString.h>
 
 using namespace WebCore;
+using namespace WebKit;
 
 namespace CoreIPC {
 
@@ -41,10 +43,10 @@ void ArgumentCoder<ResourceRequest>::encodePlatformData(ArgumentEncoder& encoder
     encoder << static_cast<uint32_t>(resourceRequest.soupMessageFlags());
 }
 
-bool ArgumentCoder<ResourceRequest>::decodePlatformData(ArgumentDecoder* decoder, ResourceRequest& resourceRequest)
+bool ArgumentCoder<ResourceRequest>::decodePlatformData(ArgumentDecoder& decoder, ResourceRequest& resourceRequest)
 {
     uint32_t soupMessageFlags;
-    if (!decoder->decode(soupMessageFlags))
+    if (!decoder.decode(soupMessageFlags))
         return false;
     resourceRequest.setSoupMessageFlags(static_cast<SoupMessageFlags>(soupMessageFlags));
     return true;
@@ -56,22 +58,29 @@ void ArgumentCoder<ResourceResponse>::encodePlatformData(ArgumentEncoder& encode
     encoder << static_cast<uint32_t>(resourceResponse.soupMessageFlags());
 }
 
-bool ArgumentCoder<ResourceResponse>::decodePlatformData(ArgumentDecoder* decoder, ResourceResponse& resourceResponse)
+bool ArgumentCoder<ResourceResponse>::decodePlatformData(ArgumentDecoder& decoder, ResourceResponse& resourceResponse)
 {
     uint32_t soupMessageFlags;
-    if (!decoder->decode(soupMessageFlags))
+    if (!decoder.decode(soupMessageFlags))
         return false;
     resourceResponse.setSoupMessageFlags(static_cast<SoupMessageFlags>(soupMessageFlags));
     return true;
 }
 
 
-void ArgumentCoder<ResourceError>::encodePlatformData(ArgumentEncoder&, const ResourceError&)
+void ArgumentCoder<ResourceError>::encodePlatformData(ArgumentEncoder& encoder, const ResourceError& resourceError)
 {
+    encoder << PlatformCertificateInfo(resourceError);
 }
 
-bool ArgumentCoder<ResourceError>::decodePlatformData(ArgumentDecoder*, ResourceError&)
+bool ArgumentCoder<ResourceError>::decodePlatformData(ArgumentDecoder& decoder, ResourceError& resourceError)
 {
+    PlatformCertificateInfo certificateInfo;
+    if (!decoder.decode(certificateInfo))
+        return false;
+
+    resourceError.setCertificate(certificateInfo.certificate());
+    resourceError.setTLSErrors(certificateInfo.tlsErrors());
     return true;
 }
 

@@ -26,7 +26,7 @@
 [
     Conditional=VIDEO,
     Constructor,
-    CallWith=ScriptExecutionContext,
+    ConstructorCallWith=ScriptExecutionContext,
     JSGenerateToJSObject,
     EventTarget
 ] interface MediaController {
@@ -34,28 +34,27 @@
     readonly attribute TimeRanges seekable;
 
     readonly attribute double duration;
-    attribute double currentTime
-        setter raises (DOMException);
+    [SetterRaisesException] attribute double currentTime;
 
     readonly attribute boolean paused;
     readonly attribute TimeRanges played;
+    readonly attribute DOMString playbackState;
     void play();
     void pause();
+    void unpause();
 
     attribute double defaultPlaybackRate;
     attribute double playbackRate;
 
-    attribute double volume
-        setter raises (DOMException);
+    [SetterRaisesException] attribute double volume;
     attribute boolean muted;
 
     // EventTarget interface
-    void addEventListener(in DOMString type, 
-                          in EventListener listener, 
-                          in [Optional] boolean useCapture);
-    void removeEventListener(in DOMString type, 
-                             in EventListener listener, 
-                             in [Optional] boolean useCapture);
-    boolean dispatchEvent(in Event evt)
-        raises(EventException);
+    void addEventListener(DOMString type, 
+                          EventListener listener, 
+                          optional boolean useCapture);
+    void removeEventListener(DOMString type, 
+                             EventListener listener, 
+                             optional boolean useCapture);
+    [RaisesException] boolean dispatchEvent(Event evt);
 };

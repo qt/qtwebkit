@@ -31,14 +31,13 @@
 #include "Document.h"
 #include "ExceptionCode.h"
 #include "HTMLNames.h"
+#include "HTMLStyleElement.h"
 #include "MediaList.h"
 #include "Node.h"
 #include "SVGNames.h"
 #include "SecurityOrigin.h"
 #include "StyleRule.h"
 #include "StyleSheetContents.h"
-#include "WebCoreMemoryInstrumentation.h"
-#include <wtf/MemoryInstrumentationVector.h>
 #include <wtf/text/StringBuilder.h>
 
 namespace WebCore {
@@ -56,12 +55,6 @@ private:
     
     virtual CSSStyleSheet* styleSheet() const { return m_styleSheet; }
 
-    virtual void reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const OVERRIDE
-    {
-        MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
-        info.addMember(m_styleSheet);
-    }
-    
     CSSStyleSheet* m_styleSheet;
 };
 
@@ -72,7 +65,7 @@ static bool isAcceptableCSSStyleSheetParent(Node* parentNode)
     return !parentNode
         || parentNode->isDocumentNode()
         || parentNode->hasTagName(HTMLNames::linkTag)
-        || parentNode->hasTagName(HTMLNames::styleTag)
+        || isHTMLStyleElement(parentNode)
 #if ENABLE(SVG)
         || parentNode->hasTagName(SVGNames::styleTag)
 #endif
@@ -154,12 +147,15 @@ void CSSStyleSheet::willMutateRules()
     reattachChildRuleCSSOMWrappers();
 }
 
-void CSSStyleSheet::didMutateRules()
+void CSSStyleSheet::didMutateRules(RuleMutationType mutationType)
 {
     ASSERT(m_contents->isMutable());
     ASSERT(m_contents->hasOneClient());
 
-    didMutate();
+    Document* owner = ownerDocument();
+    if (!owner)
+        return;
+    owner->styleResolverChanged(mutationType == InsertionIntoEmptySheet ? DeferRecalcStyleIfNeeded : DeferRecalcStyle);
 }
 
 void CSSStyleSheet::didMutate()
@@ -170,6 +166,15 @@ void CSSStyleSheet::didMutate()
     owner->styleResolverChanged(DeferRecalcStyle);
 }
 
+void CSSStyleSheet::clearOwnerNode()
+{
+    Document* owner = ownerDocument();
+    m_ownerNode = 0;
+    if (!owner)
+        return;
+    owner->styleResolverChanged(DeferRecalcStyleIfNeeded);
+}
+
 void CSSStyleSheet::reattachChildRuleCSSOMWrappers()
 {
     for (unsigned i = 0; i < m_childRuleCSSOMWrappers.size(); ++i) {
@@ -177,18 +182,6 @@ void CSSStyleSheet::reattachChildRuleCSSOMWrappers()
             continue;
         m_childRuleCSSOMWrappers[i]->reattach(m_contents->ruleAt(i));
     }
-}
-
-void CSSStyleSheet::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
-    info.addMember(m_contents);
-    info.addMember(m_title);
-    info.addMember(m_mediaQueries);
-    info.addMember(m_ownerNode);
-    info.addMember(m_ownerRule);
-    info.addMember(m_mediaCSSOMWrapper);
-    info.addMember(m_childRuleCSSOMWrappers);
 }
 
 void CSSStyleSheet::setDisabled(bool disabled)
@@ -285,7 +278,9 @@ unsigned CSSStyleSheet::insertRule(const String& ruleString, unsigned index, Exc
         ec = SYNTAX_ERR;
         return 0;
     }
-    RuleMutationScope mutationScope(this);
+
+    RuleMutationType mutationType = !length() ? InsertionIntoEmptySheet : OtherMutation;
+    RuleMutationScope mutationScope(this, mutationType);
 
     bool success = m_contents->wrapperInsertRule(rule, index);
     if (!success) {

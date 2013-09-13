@@ -26,6 +26,7 @@
 #ifndef CachedResourceRequest_h
 #define CachedResourceRequest_h
 
+#include "Element.h"
 #include "ResourceLoadPriority.h"
 #include "ResourceLoaderOptions.h"
 #include "ResourceRequest.h"
@@ -34,7 +35,6 @@
 
 namespace WebCore {
 class Document;
-class Element;
 
 class CachedResourceRequest {
 public:
@@ -51,6 +51,7 @@ public:
     void setCharset(const String& charset) { m_charset = charset; }
     const ResourceLoaderOptions& options() const { return m_options; }
     void setOptions(const ResourceLoaderOptions& options) { m_options = options; }
+    void setPriority(ResourceLoadPriority priority) { m_priority = priority; }
     ResourceLoadPriority priority() const { return m_priority; }
     bool forPreload() const { return m_forPreload; }
     void setForPreload(bool forPreload) { m_forPreload = forPreload; }
@@ -59,7 +60,6 @@ public:
     void setInitiator(PassRefPtr<Element>);
     void setInitiator(const AtomicString& name);
     const AtomicString& initiatorName() const;
-    PassRefPtr<Element> initiatorElement();
 
 private:
     ResourceRequest m_resourceRequest;

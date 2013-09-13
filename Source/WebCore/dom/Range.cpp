@@ -35,18 +35,20 @@
 #include "HTMLElement.h"
 #include "HTMLNames.h"
 #include "Node.h"
+#include "NodeTraversal.h"
 #include "NodeWithIndex.h"
 #include "Page.h"
 #include "ProcessingInstruction.h"
 #include "RangeException.h"
 #include "RenderBoxModelObject.h"
 #include "RenderText.h"
+#include "ScopedEventQueue.h"
 #include "Text.h"
 #include "TextIterator.h"
 #include "VisiblePosition.h"
+#include "VisibleUnits.h"
 #include "htmlediting.h"
 #include "markup.h"
-#include "visible_units.h"
 #include <stdio.h>
 #include <wtf/RefCountedLeakCounter.h>
 #include <wtf/Vector.h>
@@ -691,9 +693,13 @@ PassRefPtr<DocumentFragment> Range::processContents(ActionType action, Exception
         return fragment;
     }
 
+    // Since mutation events can modify the range during the process, the boundary points need to be saved.
+    RangeBoundaryPoint originalStart(m_start);
+    RangeBoundaryPoint originalEnd(m_end);
+
     // what is the highest node that partially selects the start / end of the range?
-    RefPtr<Node> partialStart = highestAncestorUnderCommonRoot(m_start.container(), commonRoot.get());
-    RefPtr<Node> partialEnd = highestAncestorUnderCommonRoot(m_end.container(), commonRoot.get());
+    RefPtr<Node> partialStart = highestAncestorUnderCommonRoot(originalStart.container(), commonRoot.get());
+    RefPtr<Node> partialEnd = highestAncestorUnderCommonRoot(originalEnd.container(), commonRoot.get());
 
     // Start and end containers are different.
     // There are three possibilities here:
@@ -716,22 +722,22 @@ PassRefPtr<DocumentFragment> Range::processContents(ActionType action, Exception
     // after any DOM mutation event, at various stages below. See webkit bug 60350.
 
     RefPtr<Node> leftContents;
-    if (m_start.container() != commonRoot && commonRoot->contains(m_start.container())) {
-        leftContents = processContentsBetweenOffsets(action, 0, m_start.container(), m_start.offset(), lengthOfContentsInNode(m_start.container()), ec);
-        leftContents = processAncestorsAndTheirSiblings(action, m_start.container(), ProcessContentsForward, leftContents, commonRoot.get(), ec);
+    if (originalStart.container() != commonRoot && commonRoot->contains(originalStart.container())) {
+        leftContents = processContentsBetweenOffsets(action, 0, originalStart.container(), originalStart.offset(), lengthOfContentsInNode(originalStart.container()), ec);
+        leftContents = processAncestorsAndTheirSiblings(action, originalStart.container(), ProcessContentsForward, leftContents, commonRoot.get(), ec);
     }
 
     RefPtr<Node> rightContents;
-    if (m_end.container() != commonRoot && commonRoot->contains(m_end.container())) {
-        rightContents = processContentsBetweenOffsets(action, 0, m_end.container(), 0, m_end.offset(), ec);
-        rightContents = processAncestorsAndTheirSiblings(action, m_end.container(), ProcessContentsBackward, rightContents, commonRoot.get(), ec);
+    if (m_end.container() != commonRoot && commonRoot->contains(originalEnd.container())) {
+        rightContents = processContentsBetweenOffsets(action, 0, originalEnd.container(), 0, originalEnd.offset(), ec);
+        rightContents = processAncestorsAndTheirSiblings(action, originalEnd.container(), ProcessContentsBackward, rightContents, commonRoot.get(), ec);
     }
 
     // delete all children of commonRoot between the start and end container
-    RefPtr<Node> processStart = childOfCommonRootBeforeOffset(m_start.container(), m_start.offset(), commonRoot.get());
-    if (processStart && m_start.container() != commonRoot) // processStart contains nodes before m_start.
+    RefPtr<Node> processStart = childOfCommonRootBeforeOffset(originalStart.container(), originalStart.offset(), commonRoot.get());
+    if (processStart && originalStart.container() != commonRoot) // processStart contains nodes before m_start.
         processStart = processStart->nextSibling();
-    RefPtr<Node> processEnd = childOfCommonRootBeforeOffset(m_end.container(), m_end.offset(), commonRoot.get());
+    RefPtr<Node> processEnd = childOfCommonRootBeforeOffset(originalEnd.container(), originalEnd.offset(), commonRoot.get());
 
     // Collapse the range, making sure that the result is not within a node that was partially selected.
     if (action == EXTRACT_CONTENTS || action == DELETE_CONTENTS) {
@@ -872,7 +878,7 @@ PassRefPtr<Node> Range::processAncestorsAndTheirSiblings(ActionType action, Node
         ancestors.append(n);
 
     RefPtr<Node> firstChildInAncestorToProcess = direction == ProcessContentsForward ? container->nextSibling() : container->previousSibling();
-    for (Vector<RefPtr<Node> >::const_iterator it = ancestors.begin(); it != ancestors.end(); it++) {
+    for (Vector<RefPtr<Node> >::const_iterator it = ancestors.begin(); it != ancestors.end(); ++it) {
         RefPtr<Node> ancestor = *it;
         if (action == EXTRACT_CONTENTS || action == CLONE_CONTENTS) {
             if (RefPtr<Node> clonedAncestor = ancestor->cloneNode(false)) { // Might have been removed already during mutation event.
@@ -891,7 +897,7 @@ PassRefPtr<Node> Range::processAncestorsAndTheirSiblings(ActionType action, Node
             child = (direction == ProcessContentsForward) ? child->nextSibling() : child->previousSibling())
             nodes.append(child);
 
-        for (NodeVector::const_iterator it = nodes.begin(); it != nodes.end(); it++) {
+        for (NodeVector::const_iterator it = nodes.begin(); it != nodes.end(); ++it) {
             Node* child = it->get();
             switch (action) {
             case DELETE_CONTENTS:
@@ -1020,6 +1026,7 @@ void Range::insertNode(PassRefPtr<Node> prpNewNode, ExceptionCode& ec)
         break;
     }
 
+    EventQueueScope scope;
     bool collapsed = m_start == m_end;
     RefPtr<Node> container;
     if (startIsText) {
@@ -1033,8 +1040,6 @@ void Range::insertNode(PassRefPtr<Node> prpNewNode, ExceptionCode& ec)
         if (ec)
             return;
 
-        // This special case doesn't seem to match the DOM specification, but it's currently required
-        // to pass Acid3. We might later decide to remove this.
         if (collapsed)
             m_end.setToBeforeChild(newText.get());
     } else {
@@ -1048,8 +1053,6 @@ void Range::insertNode(PassRefPtr<Node> prpNewNode, ExceptionCode& ec)
         if (ec)
             return;
 
-        // This special case doesn't seem to match the DOM specification, but it's currently required
-        // to pass Acid3. We might later decide to remove this.
         if (collapsed && numNewChildren)
             m_end.set(m_start.container(), startOffset + numNewChildren, lastChild.get());
     }
@@ -1065,13 +1068,13 @@ String Range::toString(ExceptionCode& ec) const
     StringBuilder builder;
 
     Node* pastLast = pastLastNode();
-    for (Node* n = firstNode(); n != pastLast; n = n->traverseNextNode()) {
+    for (Node* n = firstNode(); n != pastLast; n = NodeTraversal::next(n)) {
         if (n->nodeType() == Node::TEXT_NODE || n->nodeType() == Node::CDATA_SECTION_NODE) {
-            String data = static_cast<CharacterData*>(n)->data();
+            const String& data = static_cast<CharacterData*>(n)->data();
             int length = data.length();
             int start = (n == m_start.container()) ? min(max(0, m_start.offset()), length) : 0;
             int end = (n == m_end.container()) ? min(max(start, m_end.offset()), length) : length;
-            builder.append(data.characters() + start, end - start);
+            builder.append(data, start, end - start);
         }
     }
 
@@ -1517,7 +1520,7 @@ void Range::checkDeleteExtract(ExceptionCode& ec)
         return;
         
     Node* pastLast = pastLastNode();
-    for (Node* n = firstNode(); n != pastLast; n = n->traverseNextNode()) {
+    for (Node* n = firstNode(); n != pastLast; n = NodeTraversal::next(n)) {
         if (n->isReadOnlyNode()) {
             ec = NO_MODIFICATION_ALLOWED_ERR;
             return;
@@ -1557,12 +1560,12 @@ Node* Range::firstNode() const
         return child;
     if (!m_start.offset())
         return m_start.container();
-    return m_start.container()->traverseNextSibling();
+    return NodeTraversal::nextSkippingChildren(m_start.container());
 }
 
 ShadowRoot* Range::shadowRoot() const
 {
-    return startContainer() ? startContainer()->shadowRoot() : 0;
+    return startContainer() ? startContainer()->containingShadowRoot() : 0;
 }
 
 Node* Range::pastLastNode() const
@@ -1570,10 +1573,10 @@ Node* Range::pastLastNode() const
     if (!m_start.container() || !m_end.container())
         return 0;
     if (m_end.container()->offsetInCharacters())
-        return m_end.container()->traverseNextSibling();
+        return NodeTraversal::nextSkippingChildren(m_end.container());
     if (Node* child = m_end.container()->childNode(m_end.offset()))
         return child;
-    return m_end.container()->traverseNextSibling();
+    return NodeTraversal::nextSkippingChildren(m_end.container());
 }
 
 IntRect Range::boundingBox() const
@@ -1602,7 +1605,7 @@ void Range::textRects(Vector<IntRect>& rects, bool useSelectionHeight, RangeInFi
     bool someFixed = false;
 
     Node* stopNode = pastLastNode();
-    for (Node* node = firstNode(); node != stopNode; node = node->traverseNextNode()) {
+    for (Node* node = firstNode(); node != stopNode; node = NodeTraversal::next(node)) {
         RenderObject* r = node->renderer();
         if (!r || !r->isText())
             continue;
@@ -1634,7 +1637,7 @@ void Range::textQuads(Vector<FloatQuad>& quads, bool useSelectionHeight, RangeIn
     bool someFixed = false;
 
     Node* stopNode = pastLastNode();
-    for (Node* node = firstNode(); node != stopNode; node = node->traverseNextNode()) {
+    for (Node* node = firstNode(); node != stopNode; node = NodeTraversal::next(node)) {
         RenderObject* r = node->renderer();
         if (!r || !r->isText())
             continue;
@@ -1908,22 +1911,25 @@ void Range::getBorderAndTextQuads(Vector<FloatQuad>& quads) const
     Node* endContainer = m_end.container();
     Node* stopNode = pastLastNode();
 
-    HashSet<Node*> nodeSet;
-    for (Node* node = firstNode(); node != stopNode; node = node->traverseNextNode()) {
+    HashSet<Node*> selectedElementsSet;
+    for (Node* node = firstNode(); node != stopNode; node = NodeTraversal::next(node)) {
         if (node->isElementNode())
-            nodeSet.add(node);
+            selectedElementsSet.add(node);
     }
 
-    for (Node* node = firstNode(); node != stopNode; node = node->traverseNextNode()) {
-        if (node->isElementNode()) {
-            if (!nodeSet.contains(node->parentNode())) {
-                if (RenderBoxModelObject* renderBoxModelObject = static_cast<Element*>(node)->renderBoxModelObject()) {
-                    Vector<FloatQuad> elementQuads;
-                    renderBoxModelObject->absoluteQuads(elementQuads);
-                    m_ownerDocument->adjustFloatQuadsForScrollAndAbsoluteZoomAndFrameScale(elementQuads, renderBoxModelObject);
+    // Don't include elements that are only partially selected.
+    Node* lastNode = m_end.childBefore() ? m_end.childBefore() : endContainer;
+    for (Node* parent = lastNode->parentNode(); parent; parent = parent->parentNode())
+        selectedElementsSet.remove(parent);
 
-                    quads.append(elementQuads);
-                }
+    for (Node* node = firstNode(); node != stopNode; node = NodeTraversal::next(node)) {
+        if (node->isElementNode() && selectedElementsSet.contains(node) && !selectedElementsSet.contains(node->parentNode())) {
+            if (RenderBoxModelObject* renderBoxModelObject = toElement(node)->renderBoxModelObject()) {
+                Vector<FloatQuad> elementQuads;
+                renderBoxModelObject->absoluteQuads(elementQuads);
+                m_ownerDocument->adjustFloatQuadsForScrollAndAbsoluteZoomAndFrameScale(elementQuads, renderBoxModelObject);
+
+                quads.appendVector(elementQuads);
             }
         } else if (node->isTextNode()) {
             if (RenderObject* renderer = toText(node)->renderer()) {
@@ -1935,7 +1941,7 @@ void Range::getBorderAndTextQuads(Vector<FloatQuad>& quads) const
                 renderText->absoluteQuadsForRange(textQuads, startOffset, endOffset);
                 m_ownerDocument->adjustFloatQuadsForScrollAndAbsoluteZoomAndFrameScale(textQuads, renderText);
 
-                quads.append(textQuads);
+                quads.appendVector(textQuads);
             }
         }
     }

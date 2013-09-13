@@ -82,13 +82,10 @@ sub buildMyProject
     if (isAppleMacWebKit()) {
         $result = system "sh", "-c", ('xcodebuild -project ' . $projectName . '.xcodeproj "$@" | grep -v setenv && exit ${PIPESTATUS[0]}'), "xcodebuild",  @options, @ARGV, @coverageSupportOptions;
     } elsif (isAppleWinWebKit()) {
-        $result = buildVisualStudioProject("$projectName.vcproj/$projectName.sln");
+        $result = buildVisualStudioProject("$projectName.vcxproj/$projectName.submit.sln");
     } elsif (isGtk()) {
         checkForArgumentAndRemoveFromARGV("--gtk");
-        $result = buildGtkProject($projectName, 0, @ARGV);
-    } elsif (isWx()) {
-        # Builds everything in one-shot. No need to build anything here.
-        $result = 0;
+        $result = buildGtkProject($projectName, 0);
     } else {
         die "Building not defined for this platform!\n";
     }

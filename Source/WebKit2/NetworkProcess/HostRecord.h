@@ -28,36 +28,52 @@
 
 #if ENABLE(NETWORK_PROCESS)
 
-#include <WebCore/ResourceRequest.h>
+#include <WebCore/ResourceLoadPriority.h>
 #include <wtf/Deque.h>
 #include <wtf/HashSet.h>
+#include <wtf/RefCounted.h>
 #include <wtf/text/WTFString.h>
 
 namespace WebKit {
 
 class NetworkResourceLoader;
+class SchedulableLoader;
+class SyncNetworkResourceLoader;
+
+typedef Deque<RefPtr<SchedulableLoader>> LoaderQueue;
 typedef uint64_t ResourceLoadIdentifier;
 
-class HostRecord {
-    WTF_MAKE_NONCOPYABLE(HostRecord); WTF_MAKE_FAST_ALLOCATED;
+class HostRecord : public RefCounted<HostRecord> {
 public:
-    HostRecord(const String& name, int maxRequestsInFlight);
+    static PassRefPtr<HostRecord> create(const String& name, int maxRequestsInFlight)
+    {
+        return adoptRef(new HostRecord(name, maxRequestsInFlight));
+    }
+    
     ~HostRecord();
     
     const String& name() const { return m_name; }
-    void schedule(PassRefPtr<NetworkResourceLoader>);
-    void addLoadInProgress(ResourceLoadIdentifier);
-    void remove(ResourceLoadIdentifier);
+    
+    void scheduleResourceLoader(PassRefPtr<SchedulableLoader>);
+    void addLoaderInProgress(SchedulableLoader*);
+    void removeLoader(SchedulableLoader*);
     bool hasRequests() const;
-    bool limitRequests(WebCore::ResourceLoadPriority, bool serialLoadingEnabled) const;
+    void servePendingRequests(WebCore::ResourceLoadPriority);
 
-    typedef Deque<RefPtr<NetworkResourceLoader> > LoaderQueue;
-    LoaderQueue& loadersPending(WebCore::ResourceLoadPriority priority) { return m_loadersPending[priority]; }
+    uint64_t pendingRequestCount() const;
+    uint64_t activeLoadCount() const;
 
-private:                    
+private:
+    HostRecord(const String& name, int maxRequestsInFlight);
+
+    void servePendingRequestsForQueue(LoaderQueue&, WebCore::ResourceLoadPriority);
+    bool limitsRequests(WebCore::ResourceLoadPriority, SchedulableLoader*) const;
+
     LoaderQueue m_loadersPending[WebCore::ResourceLoadPriorityHighest + 1];
-    typedef HashSet<ResourceLoadIdentifier> ResourceLoadIdentifierSet;
-    ResourceLoadIdentifierSet m_resourceIdentifiersLoading;
+    LoaderQueue m_syncLoadersPending;
+
+    typedef HashSet<RefPtr<SchedulableLoader>> SchedulableLoaderSet;
+    SchedulableLoaderSet m_loadersInProgress;
 
     const String m_name;
     int m_maxRequestsInFlight;

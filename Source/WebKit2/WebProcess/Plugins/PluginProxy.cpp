@@ -44,6 +44,7 @@
 #include "WebProcessConnectionMessages.h"
 #include <WebCore/GraphicsContext.h>
 #include <WebCore/NotImplemented.h>
+#include <WebCore/SharedBuffer.h>
 
 using namespace WebCore;
 
@@ -55,13 +56,13 @@ static uint64_t generatePluginInstanceID()
     return ++uniquePluginInstanceID;
 }
 
-PassRefPtr<PluginProxy> PluginProxy::create(const String& pluginPath, PluginProcess::Type processType)
+PassRefPtr<PluginProxy> PluginProxy::create(uint64_t pluginProcessToken, bool isRestartedProcess)
 {
-    return adoptRef(new PluginProxy(pluginPath, processType));
+    return adoptRef(new PluginProxy(pluginProcessToken, isRestartedProcess));
 }
 
-PluginProxy::PluginProxy(const String& pluginPath, PluginProcess::Type processType)
-    : m_pluginPath(pluginPath)
+PluginProxy::PluginProxy(uint64_t pluginProcessToken, bool isRestartedProcess)
+    : m_pluginProcessToken(pluginProcessToken)
     , m_pluginInstanceID(generatePluginInstanceID())
     , m_pluginBackingStoreContainsValidData(false)
     , m_isStarted(false)
@@ -69,7 +70,7 @@ PluginProxy::PluginProxy(const String& pluginPath, PluginProcess::Type processTy
     , m_wantsWheelEvents(false)
     , m_remoteLayerClientID(0)
     , m_waitingOnAsynchronousInitialization(false)
-    , m_processType(processType)
+    , m_isRestartedProcess(isRestartedProcess)
 {
 }
 
@@ -85,7 +86,7 @@ void PluginProxy::pluginProcessCrashed()
 bool PluginProxy::initialize(const Parameters& parameters)
 {
     ASSERT(!m_connection);
-    m_connection = WebProcess::shared().pluginProcessConnectionManager().getPluginProcessConnection(m_pluginPath, m_processType);
+    m_connection = WebProcess::shared().pluginProcessConnectionManager().getPluginProcessConnection(m_pluginProcessToken);
     
     if (!m_connection)
         return false;
@@ -228,6 +229,18 @@ void PluginProxy::paint(GraphicsContext* graphicsContext, const IntRect& dirtyRe
     }
 }
 
+bool PluginProxy::supportsSnapshotting() const
+{
+    if (m_waitingOnAsynchronousInitialization)
+        return false;
+
+    bool isSupported = false;
+    if (m_connection && !m_connection->connection()->sendSync(Messages::PluginControllerProxy::SupportsSnapshotting(), Messages::PluginControllerProxy::SupportsSnapshotting::Reply(isSupported), m_pluginInstanceID))
+        return false;
+
+    return isSupported;
+}
+
 PassRefPtr<ShareableBitmap> PluginProxy::snapshot()
 {
     ShareableBitmap::Handle snapshotStoreHandle;
@@ -353,6 +366,9 @@ void PluginProxy::manualStreamDidFail(bool wasCancelled)
 
 bool PluginProxy::handleMouseEvent(const WebMouseEvent& mouseEvent)
 {
+    if (m_waitingOnAsynchronousInitialization)
+        return false;
+
     bool handled = false;
     if (!m_connection->connection()->sendSync(Messages::PluginControllerProxy::HandleMouseEvent(mouseEvent), Messages::PluginControllerProxy::HandleMouseEvent::Reply(handled), m_pluginInstanceID))
         return false;
@@ -362,6 +378,9 @@ bool PluginProxy::handleMouseEvent(const WebMouseEvent& mouseEvent)
 
 bool PluginProxy::handleWheelEvent(const WebWheelEvent& wheelEvent)
 {
+    if (m_waitingOnAsynchronousInitialization)
+        return false;
+
     bool handled = false;
     if (!m_connection->connection()->sendSync(Messages::PluginControllerProxy::HandleWheelEvent(wheelEvent), Messages::PluginControllerProxy::HandleWheelEvent::Reply(handled), m_pluginInstanceID))
         return false;
@@ -371,6 +390,9 @@ bool PluginProxy::handleWheelEvent(const WebWheelEvent& wheelEvent)
 
 bool PluginProxy::handleMouseEnterEvent(const WebMouseEvent& mouseEnterEvent)
 {
+    if (m_waitingOnAsynchronousInitialization)
+        return false;
+
     bool handled = false;
     if (!m_connection->connection()->sendSync(Messages::PluginControllerProxy::HandleMouseEnterEvent(mouseEnterEvent), Messages::PluginControllerProxy::HandleMouseEnterEvent::Reply(handled), m_pluginInstanceID))
         return false;
@@ -380,6 +402,9 @@ bool PluginProxy::handleMouseEnterEvent(const WebMouseEvent& mouseEnterEvent)
 
 bool PluginProxy::handleMouseLeaveEvent(const WebMouseEvent& mouseLeaveEvent)
 {
+    if (m_waitingOnAsynchronousInitialization)
+        return false;
+
     bool handled = false;
     if (!m_connection->connection()->sendSync(Messages::PluginControllerProxy::HandleMouseLeaveEvent(mouseLeaveEvent), Messages::PluginControllerProxy::HandleMouseLeaveEvent::Reply(handled), m_pluginInstanceID))
         return false;
@@ -395,6 +420,9 @@ bool PluginProxy::handleContextMenuEvent(const WebMouseEvent&)
 
 bool PluginProxy::handleKeyboardEvent(const WebKeyboardEvent& keyboardEvent)
 {
+    if (m_waitingOnAsynchronousInitialization)
+        return false;
+
     bool handled = false;
     if (!m_connection->connection()->sendSync(Messages::PluginControllerProxy::HandleKeyboardEvent(keyboardEvent), Messages::PluginControllerProxy::HandleKeyboardEvent::Reply(handled), m_pluginInstanceID))
         return false;
@@ -409,6 +437,9 @@ void PluginProxy::setFocus(bool hasFocus)
 
 bool PluginProxy::handleEditingCommand(const String& commandName, const String& argument)
 {
+    if (m_waitingOnAsynchronousInitialization)
+        return false;
+
     bool handled = false;
     if (!m_connection->connection()->sendSync(Messages::PluginControllerProxy::HandleEditingCommand(commandName, argument), Messages::PluginControllerProxy::HandleEditingCommand::Reply(handled), m_pluginInstanceID))
         return false;
@@ -418,6 +449,9 @@ bool PluginProxy::handleEditingCommand(const String& commandName, const String& 
     
 bool PluginProxy::isEditingCommandEnabled(const String& commandName)
 {
+    if (m_waitingOnAsynchronousInitialization)
+        return false;
+
     bool enabled = false;
     if (!m_connection->connection()->sendSync(Messages::PluginControllerProxy::IsEditingCommandEnabled(commandName), Messages::PluginControllerProxy::IsEditingCommandEnabled::Reply(enabled), m_pluginInstanceID))
         return false;
@@ -427,6 +461,9 @@ bool PluginProxy::isEditingCommandEnabled(const String& commandName)
     
 bool PluginProxy::handlesPageScaleFactor()
 {
+    if (m_waitingOnAsynchronousInitialization)
+        return false;
+
     bool handled = false;
     if (!m_connection->connection()->sendSync(Messages::PluginControllerProxy::HandlesPageScaleFactor(), Messages::PluginControllerProxy::HandlesPageScaleFactor::Reply(handled), m_pluginInstanceID))
         return false;
@@ -669,6 +706,11 @@ void PluginProxy::update(const IntRect& paintedRect)
 IntPoint PluginProxy::convertToRootView(const IntPoint& point) const
 {
     return m_pluginToRootViewTransform.mapPoint(point);
+}
+
+PassRefPtr<WebCore::SharedBuffer> PluginProxy::liveResourceData() const
+{
+    return 0;
 }
 
 } // namespace WebKit

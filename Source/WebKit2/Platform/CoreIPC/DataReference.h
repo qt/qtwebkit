@@ -64,7 +64,7 @@ public:
         return m_data; 
     }
 
-    Vector<uint8_t> vector()
+    Vector<uint8_t> vector() const
     {
         Vector<uint8_t> result;
         result.append(m_data, m_size);
@@ -73,7 +73,7 @@ public:
     }
 
     void encode(ArgumentEncoder&) const;
-    static bool decode(ArgumentDecoder* decoder, DataReference& dataReference);
+    static bool decode(ArgumentDecoder&, DataReference&);
 
 private:
     const uint8_t* m_data;

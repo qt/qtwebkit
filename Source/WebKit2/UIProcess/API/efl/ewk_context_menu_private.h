@@ -26,34 +26,30 @@
 #ifndef ewk_context_menu_private_h
 #define ewk_context_menu_private_h
 
-#include "WebContextMenuItemData.h"
 #include "ewk_context_menu_item.h"
+#include "ewk_object_private.h"
 #include <Eina.h>
-#include <wtf/PassOwnPtr.h>
-#include <wtf/Vector.h>
+#include <wtf/PassRefPtr.h>
 
-namespace WebKit {
-class WebContextMenuItemData;
-class WebContextMenuProxyEfl;
-}
+class EwkView;
 
-class EwkViewImpl;
-
-class EwkContextMenu {
+class EwkContextMenu : public EwkObject {
 public:
-    static PassOwnPtr<EwkContextMenu> create(EwkViewImpl* viewImpl, WebKit::WebContextMenuProxyEfl* contextMenuProxy, const Vector<WebKit::WebContextMenuItemData>& items)
+    EWK_OBJECT_DECLARE(EwkContextMenu)
+
+    static PassRefPtr<EwkContextMenu> create(EwkView* viewImpl, WKArrayRef items)
     {
-        return adoptPtr(new EwkContextMenu(viewImpl, contextMenuProxy, items));
+        return adoptRef(new EwkContextMenu(viewImpl, items));
     }
 
-    static PassOwnPtr<EwkContextMenu> create()
+    static PassRefPtr<EwkContextMenu> create()
     {
-        return adoptPtr(new EwkContextMenu());
+        return adoptRef(new EwkContextMenu());
     }
 
-    static PassOwnPtr<EwkContextMenu> create(Eina_List* items)
+    static PassRefPtr<EwkContextMenu> create(Eina_List* items)
     {
-        return adoptPtr(new EwkContextMenu(items));
+        return adoptRef(new EwkContextMenu(items));
     }
 
     ~EwkContextMenu();
@@ -63,15 +59,17 @@ public:
     void removeItem(EwkContextMenuItem*);
 
     const Eina_List* items() const { return m_contextMenuItems; }
-    void contextMenuItemSelected(const WebKit::WebContextMenuItemData& item);
+    bool contextMenuItemSelected(WKContextMenuItemRef item);
+
+    EwkView* ewkView() const { return m_viewImpl; }
+    void setEwkView(EwkView* ewkView) { m_viewImpl = ewkView; }
 
 private:
     EwkContextMenu();
     EwkContextMenu(Eina_List* items);
-    EwkContextMenu(EwkViewImpl* viewImpl, WebKit::WebContextMenuProxyEfl*, const Vector<WebKit::WebContextMenuItemData>& items);
+    EwkContextMenu(EwkView* viewImpl, WKArrayRef items);
 
-    EwkViewImpl* m_viewImpl;
-    WebKit::WebContextMenuProxyEfl* m_contextMenuProxy;
+    EwkView* m_viewImpl;
     Eina_List* m_contextMenuItems;
 };
 

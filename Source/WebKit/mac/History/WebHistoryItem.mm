@@ -73,7 +73,6 @@ static NSString *weeklyVisitCountKey = @"W"; // short key to save space
 NSString *WebHistoryItemChangedNotification = @"WebHistoryItemChangedNotification";
 
 using namespace WebCore;
-using namespace std;
 
 typedef HashMap<HistoryItem*, WebHistoryItem*> HistoryItemMap;
 
@@ -241,10 +240,6 @@ void WKNotifyHistoryItemChanged(HistoryItem*)
 
 @end
 
-@interface WebWindowWatcher : NSObject
-@end
-
-
 @implementation WebHistoryItem (WebInternal)
 
 HistoryItem* core(WebHistoryItem *item)
@@ -272,17 +267,6 @@ WebHistoryItem *kit(HistoryItem* item)
 + (WebHistoryItem *)entryWithURL:(NSURL *)URL
 {
     return [[[self alloc] initWithURL:URL title:nil] autorelease];
-}
-
-static WebWindowWatcher *_windowWatcher = nil;
-
-+ (void)initWindowWatcherIfNecessary
-{
-    if (_windowWatcher)
-        return;
-    _windowWatcher = [[WebWindowWatcher alloc] init];
-    [[NSNotificationCenter defaultCenter] addObserver:_windowWatcher selector:@selector(windowWillClose:)
-        name:NSWindowWillCloseNotification object:nil];
 }
 
 - (id)initWithURL:(NSURL *)URL target:(NSString *)target parent:(NSString *)parent title:(NSString *)title
@@ -390,9 +374,9 @@ static WebWindowWatcher *_windowWatcher = nil;
 
         // Daily and weekly counts < 0 are errors in the data read from disk, so reset to 0.
         for (size_t i = 0; i < coreDailyCounts.size(); ++i)
-            coreDailyCounts[i] = max([[dailyCounts _webkit_numberAtIndex:i] intValue], 0);
+            coreDailyCounts[i] = std::max([[dailyCounts _webkit_numberAtIndex:i] intValue], 0);
         for (size_t i = 0; i < coreWeeklyCounts.size(); ++i)
-            coreWeeklyCounts[i] = max([[weeklyCounts _webkit_numberAtIndex:i] intValue], 0);
+            coreWeeklyCounts[i] = std::max([[weeklyCounts _webkit_numberAtIndex:i] intValue], 0);
     
         core(_private)->adoptVisitCounts(coreDailyCounts, coreWeeklyCounts);
     }
@@ -580,7 +564,6 @@ static WebWindowWatcher *_windowWatcher = nil;
 
 + (void)_releaseAllPendingPageCaches
 {
-    pageCache()->releaseAutoreleasedPagesNow();
 }
 
 - (id)_transientPropertyForKey:(NSString *)key
@@ -636,22 +619,14 @@ static WebWindowWatcher *_windowWatcher = nil;
     return coreItem->weeklyVisitCounts().size();
 }
 
-@end
-
-
-// FIXME: <rdar://problem/4886761>.
-// This is a bizarre policy. We flush the page caches ANY time ANY window is closed?
-
-@implementation WebWindowWatcher
-
-- (void)windowWillClose:(NSNotification *)notification
+- (BOOL)_isInPageCache
 {
-    if (!pthread_main_np()) {
-        [self performSelectorOnMainThread:_cmd withObject:notification waitUntilDone:NO];
-        return;
-    }
+    return core(_private)->isInPageCache();
+}
 
-    pageCache()->releaseAutoreleasedPagesNow();
+- (BOOL)_hasCachedPageExpired
+{
+    return core(_private)->hasCachedPageExpired();
 }
 
 @end

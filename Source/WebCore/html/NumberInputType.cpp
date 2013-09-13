@@ -32,7 +32,6 @@
 #include "config.h"
 #include "NumberInputType.h"
 
-#include "BeforeTextInsertedEvent.h"
 #include "ExceptionCode.h"
 #include "HTMLInputElement.h"
 #include "HTMLNames.h"
@@ -101,6 +100,12 @@ PassOwnPtr<InputType> NumberInputType::create(HTMLInputElement* element)
     return adoptPtr(new NumberInputType(element));
 }
 
+void NumberInputType::attach()
+{
+    TextFieldInputType::attach();
+    observeFeatureIfVisible(FeatureObserver::InputTypeNumber);
+}
+
 const AtomicString& NumberInputType::formControlType() const
 {
     return InputTypeNames::number();
@@ -150,7 +155,7 @@ void NumberInputType::setValueAsDecimal(const Decimal& newValue, TextFieldEventB
 
 bool NumberInputType::typeMismatchFor(const String& value) const
 {
-    return !value.isEmpty() && !isfinite(parseToDoubleForNumberType(value));
+    return !value.isEmpty() && !std::isfinite(parseToDoubleForNumberType(value));
 }
 
 bool NumberInputType::typeMismatch() const
@@ -255,13 +260,13 @@ String NumberInputType::sanitizeValue(const String& proposedValue) const
 {
     if (proposedValue.isEmpty())
         return proposedValue;
-    return isfinite(parseToDoubleForNumberType(proposedValue)) ? proposedValue : emptyString();
+    return std::isfinite(parseToDoubleForNumberType(proposedValue)) ? proposedValue : emptyString();
 }
 
 bool NumberInputType::hasBadInput() const
 {
     String standardValue = convertFromVisibleValue(element()->innerTextValue());
-    return !standardValue.isEmpty() && !isfinite(parseToDoubleForNumberType(standardValue));
+    return !standardValue.isEmpty() && !std::isfinite(parseToDoubleForNumberType(standardValue));
 }
 
 String NumberInputType::badInputText() const

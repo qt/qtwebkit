@@ -35,10 +35,11 @@ import codecs
 import logging
 import os
 import shutil
+import stat
 import sys
 import tarfile
 import tempfile
-import urllib
+import urllib2
 import urlparse
 import zipfile
 
@@ -173,7 +174,7 @@ class AutoInstaller(object):
         return scratch_dir
 
     def _url_downloaded_path(self, target_name):
-        return os.path.join(self._target_dir, ".%s.url" % target_name)
+        return os.path.join(self._target_dir, ".%s.url" % target_name.replace('/', '_'))
 
     def _is_downloaded(self, target_name, url):
         version_path = self._url_downloaded_path(target_name)
@@ -283,17 +284,27 @@ class AutoInstaller(object):
         return new_path
 
     def _download_to_stream(self, url, stream):
-        try:
-            netstream = urllib.urlopen(url)
-        except IOError, err:
-            # Append existing Error message to new Error.
-            message = ('Could not download Python modules from URL "%s".\n'
-                       " Make sure you are connected to the internet.\n"
-                       " You must be connected to the internet when "
-                       "downloading needed modules for the first time.\n"
-                       " --> Inner message: %s"
-                       % (url, err))
-            raise IOError(message)
+        failures = 0
+        while True:
+            try:
+                netstream = urllib2.urlopen(url)
+                break
+            except IOError, err:
+                # Try multiple times
+                if failures < 5:
+                    _log.warning("Failed to download %s, %s retrying" % (
+                        url, err))
+                    failures += 1
+                    continue
+
+                # Append existing Error message to new Error.
+                message = ('Could not download Python modules from URL "%s".\n'
+                           " Make sure you are connected to the internet.\n"
+                           " You must be connected to the internet when "
+                           "downloading needed modules for the first time.\n"
+                           " --> Inner message: %s"
+                           % (url, err))
+                raise IOError(message)
         code = 200
         if hasattr(netstream, "getcode"):
             code = netstream.getcode()
@@ -319,8 +330,7 @@ class AutoInstaller(object):
 
         return target_path
 
-    def _install(self, scratch_dir, package_name, target_path, url,
-                 url_subpath):
+    def _install(self, scratch_dir, package_name, target_path, url, url_subpath, files_to_remove):
         """Install a python package from an URL.
 
         This internal method overwrites the target path if the target
@@ -334,6 +344,13 @@ class AutoInstaller(object):
             source_path = path
         else:
             source_path = os.path.join(path, url_subpath)
+
+        for filename in files_to_remove:
+            path = os.path.join(source_path, filename.replace('/', os.sep))
+            if os.path.exists(path):
+                # Pre-emptively change the permissions to #0777 to try and work around win32 permissions issues.
+                os.chmod(path, stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
+                os.remove(path)
 
         if os.path.exists(target_path):
             if os.path.isdir(target_path):
@@ -354,7 +371,7 @@ class AutoInstaller(object):
         self._record_url_downloaded(package_name, url)
 
     def install(self, url, should_refresh=False, target_name=None,
-                url_subpath=None):
+                url_subpath=None, files_to_remove=None):
         """Install a python package from an URL.
 
         Args:
@@ -382,10 +399,11 @@ class AutoInstaller(object):
             url_subpath = os.path.normpath(url_subpath)
             target_name = os.path.basename(url_subpath)
 
-        target_path = os.path.join(self._target_dir, target_name)
+        target_path = os.path.join(self._target_dir, target_name.replace('/', os.sep))
         if not should_refresh and self._is_downloaded(target_name, url):
             return False
 
+        files_to_remove = files_to_remove or []
         package_name = target_name.replace(os.sep, '.')
         _log.info("Auto-installing package: %s" % package_name)
 
@@ -399,7 +417,8 @@ class AutoInstaller(object):
                           target_path=target_path,
                           scratch_dir=scratch_dir,
                           url=url,
-                          url_subpath=url_subpath)
+                          url_subpath=url_subpath,
+                          files_to_remove=files_to_remove)
         except Exception, err:
             # Append existing Error message to new Error.
             message = ("Error auto-installing the %s package to:\n"

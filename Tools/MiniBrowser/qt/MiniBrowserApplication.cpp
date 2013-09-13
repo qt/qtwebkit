@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2010 Nokia Corporation and/or its subsidiary(-ies)
  * Copyright (C) 2010 University of Szeged
+ * Copyright (C) 2013 Digia Plc and/or its subsidiary(-ies).
  *
  * All rights reserved.
  *
@@ -83,7 +84,7 @@ MiniBrowserApplication::MiniBrowserApplication(int& argc, char** argv)
     , m_windowOptions(this)
     , m_holdingControl(false)
 {
-    setOrganizationName("Nokia");
+    setOrganizationName("QtProject");
     setApplicationName("QtMiniBrowser");
     setApplicationVersion("0.1");
 
@@ -110,6 +111,8 @@ bool MiniBrowserApplication::notify(QObject* target, QEvent* event)
     if (!browserWindow)
         return QGuiApplication::notify(target, event);
 
+    m_holdingControl = QGuiApplication::keyboardModifiers().testFlag(Qt::ControlModifier);
+
     // In QML events are propagated through parents. But since the WebView
     // may consume key events, a shortcut might never reach the top QQuickItem.
     // Therefore we are checking here for shortcuts.
@@ -123,19 +126,25 @@ bool MiniBrowserApplication::notify(QObject* target, QEvent* event)
             browserWindow->focusAddressBar();
             return true;
         }
+        if ((keyEvent->key() == Qt::Key_F && keyEvent->modifiers() == Qt::ControlModifier) || keyEvent->key() == Qt::Key_F3) {
+            browserWindow->toggleFind();
+            return true;
+        }
     }
 
     if (event->type() == QEvent::KeyRelease && static_cast<QKeyEvent*>(event)->key() == Qt::Key_Control) {
         foreach (int id, m_heldTouchPoints)
-            if (m_touchPoints.contains(id))
+            if (m_touchPoints.contains(id) && !QGuiApplication::mouseButtons().testFlag(Qt::MouseButton(id))) {
                 m_touchPoints[id].setState(Qt::TouchPointReleased);
-        m_heldTouchPoints.clear();
-        sendTouchEvent(browserWindow, QEvent::TouchEnd, static_cast<QKeyEvent*>(event)->timestamp());
+                m_heldTouchPoints.remove(id);
+            } else
+                m_touchPoints[id].setState(Qt::TouchPointStationary);
+
+        sendTouchEvent(browserWindow, m_heldTouchPoints.isEmpty() ? QEvent::TouchEnd : QEvent::TouchUpdate, static_cast<QKeyEvent*>(event)->timestamp());
     }
 
     if (isMouseEvent(event)) {
         const QMouseEvent* const mouseEvent = static_cast<QMouseEvent*>(event);
-        m_holdingControl = mouseEvent->modifiers().testFlag(Qt::ControlModifier);
 
         QTouchEvent::TouchPoint touchPoint;
         touchPoint.setPressure(1);

@@ -29,6 +29,7 @@
 #include <WebKit2/WKBundlePage.h>
 #include <WebKit2/WKBundleScriptWorld.h>
 #include <WebKit2/WKRetainPtr.h>
+#include <wtf/text/WTFString.h>
 
 namespace WTR {
 
@@ -39,10 +40,6 @@ public:
 
     WKBundlePageRef page() const { return m_page; }
 
-#if ENABLE(WEB_INTENTS)
-    WKBundleIntentRequestRef currentIntentRequest() const { return m_currentIntentRequest.get(); }
-#endif
-
     void dump();
 
     void stopLoading();
@@ -50,7 +47,7 @@ public:
     void prepare();
     void resetAfterTest();
 
-    void dumpBackForwardList();
+    void dumpBackForwardList(WTF::StringBuilder&);
 
 private:
     // Loader Client
@@ -78,8 +75,6 @@ private:
     static void didFinishLoadForResource(WKBundlePageRef, WKBundleFrameRef, uint64_t identifier, const void*);
     static void didFailLoadForResource(WKBundlePageRef, WKBundleFrameRef, uint64_t identifier, WKErrorRef, const void*);
     static bool shouldCacheResponse(WKBundlePageRef, WKBundleFrameRef, uint64_t identifier, const void*);
-    static void didReceiveIntentForFrame(WKBundlePageRef, WKBundleFrameRef, WKBundleIntentRequestRef, WKTypeRef*, const void*);
-    static void registerIntentServiceForFrame(WKBundlePageRef, WKBundleFrameRef, WKIntentServiceInfoRef, WKTypeRef*, const void*);
 
     void didStartProvisionalLoadForFrame(WKBundleFrameRef);
     void didReceiveServerRedirectForProvisionalLoadForFrame(WKBundleFrameRef);
@@ -169,8 +164,9 @@ private:
     void didChange(WKStringRef notificationName);
     void didChangeSelection(WKStringRef notificationName);
 
-    void dumpAllFramesText();
-    void dumpAllFrameScrollPositions();
+    void dumpAllFramesText(WTF::StringBuilder&);
+    void dumpAllFrameScrollPositions(WTF::StringBuilder&);
+    void dumpDOMAsWebArchive(WKBundleFrameRef, WTF::StringBuilder&);
 
     void platformDidStartProvisionalLoadForFrame(WKBundleFrameRef);
 
@@ -179,10 +175,6 @@ private:
     WKBundlePageRef m_page;
     WKRetainPtr<WKBundleScriptWorldRef> m_world;
     WKRetainPtr<WKBundleBackForwardListItemRef> m_previousTestBackForwardListItem;
-
-#if ENABLE(WEB_INTENTS)
-    WKRetainPtr<WKBundleIntentRequestRef> m_currentIntentRequest;
-#endif
 };
 
 } // namespace WTR

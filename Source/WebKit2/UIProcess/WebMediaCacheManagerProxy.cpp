@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -33,22 +33,34 @@
 
 namespace WebKit {
 
+const char* WebMediaCacheManagerProxy::supplementName()
+{
+    return "WebMediaCacheManagerProxy";
+}
+
 PassRefPtr<WebMediaCacheManagerProxy> WebMediaCacheManagerProxy::create(WebContext* context)
 {
     return adoptRef(new WebMediaCacheManagerProxy(context));
 }
 
 WebMediaCacheManagerProxy::WebMediaCacheManagerProxy(WebContext* context)
-    : m_webContext(context)
+    : WebContextSupplement(context)
 {
-    m_webContext->addMessageReceiver(Messages::WebMediaCacheManagerProxy::messageReceiverName(), this);
+    WebContextSupplement::context()->addMessageReceiver(Messages::WebMediaCacheManagerProxy::messageReceiverName(), this);
 }
 
 WebMediaCacheManagerProxy::~WebMediaCacheManagerProxy()
 {
 }
 
-void WebMediaCacheManagerProxy::invalidate()
+// WebContextSupplement
+
+void WebMediaCacheManagerProxy::contextDestroyed()
+{
+    invalidateCallbackMap(m_arrayCallbacks);
+}
+
+void WebMediaCacheManagerProxy::processDidClose(WebProcessProxy*)
 {
     invalidateCallbackMap(m_arrayCallbacks);
 }
@@ -58,9 +70,14 @@ bool WebMediaCacheManagerProxy::shouldTerminate(WebProcessProxy*) const
     return m_arrayCallbacks.isEmpty();
 }
 
-void WebMediaCacheManagerProxy::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::MessageDecoder& decoder)
+void WebMediaCacheManagerProxy::refWebContextSupplement()
 {
-    didReceiveWebMediaCacheManagerProxyMessage(connection, messageID, decoder);
+    APIObject::ref();
+}
+
+void WebMediaCacheManagerProxy::derefWebContextSupplement()
+{
+    APIObject::deref();
 }
 
 void WebMediaCacheManagerProxy::getHostnamesWithMediaCache(PassRefPtr<ArrayCallback> prpCallback)
@@ -70,7 +87,7 @@ void WebMediaCacheManagerProxy::getHostnamesWithMediaCache(PassRefPtr<ArrayCallb
     m_arrayCallbacks.set(callbackID, callback.release());
 
     // FIXME (Multi-WebProcess): <rdar://problem/12239765> When we're sending this to multiple processes, we need to aggregate the callback data when it comes back.
-    m_webContext->sendToAllProcessesRelaunchingThemIfNecessary(Messages::WebMediaCacheManager::GetHostnamesWithMediaCache(callbackID));
+    context()->sendToAllProcessesRelaunchingThemIfNecessary(Messages::WebMediaCacheManager::GetHostnamesWithMediaCache(callbackID));
 }
     
 void WebMediaCacheManagerProxy::didGetHostnamesWithMediaCache(const Vector<String>& hostnameList, uint64_t callbackID)
@@ -82,7 +99,7 @@ void WebMediaCacheManagerProxy::didGetHostnamesWithMediaCache(const Vector<Strin
     }
 
     size_t hostnameCount = hostnameList.size();
-    Vector<RefPtr<APIObject> > hostnames(hostnameCount);
+    Vector<RefPtr<APIObject>> hostnames(hostnameCount);
 
     for (size_t i = 0; i < hostnameCount; ++i)
         hostnames[i] = WebString::create(hostnameList[i]);
@@ -92,12 +109,12 @@ void WebMediaCacheManagerProxy::didGetHostnamesWithMediaCache(const Vector<Strin
 
 void WebMediaCacheManagerProxy::clearCacheForHostname(const String& hostname)
 {
-    m_webContext->sendToAllProcessesRelaunchingThemIfNecessary(Messages::WebMediaCacheManager::ClearCacheForHostname(hostname));
+    context()->sendToAllProcessesRelaunchingThemIfNecessary(Messages::WebMediaCacheManager::ClearCacheForHostname(hostname));
 }
 
 void WebMediaCacheManagerProxy::clearCacheForAllHostnames()
 {
-    m_webContext->sendToAllProcessesRelaunchingThemIfNecessary(Messages::WebMediaCacheManager::ClearCacheForAllHostnames());
+    context()->sendToAllProcessesRelaunchingThemIfNecessary(Messages::WebMediaCacheManager::ClearCacheForAllHostnames());
 }
 
 } // namespace WebKit

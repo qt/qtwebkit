@@ -21,7 +21,6 @@
 #ifndef HTMLFrameOwnerElement_h
 #define HTMLFrameOwnerElement_h
 
-#include "FrameLoaderTypes.h"
 #include "HTMLElement.h"
 
 namespace WebCore {
@@ -43,7 +42,7 @@ public:
     Document* contentDocument() const;
 
     void setContentFrame(Frame*);
-    void clearContentFrame() { m_contentFrame = 0; }
+    void clearContentFrame();
 
     void disconnectContentFrame();
 
@@ -65,7 +64,7 @@ protected:
     void setSandboxFlags(SandboxFlags);
 
 private:
-    virtual bool isKeyboardFocusable(KeyboardEvent*) const;
+    virtual bool isKeyboardFocusable(KeyboardEvent*) const OVERRIDE;
     virtual bool isFrameOwnerElement() const OVERRIDE { return true; }
 
     Frame* m_contentFrame;
@@ -74,7 +73,7 @@ private:
 
 inline HTMLFrameOwnerElement* toFrameOwnerElement(Node* node)
 {
-    ASSERT(!node || node->isFrameOwnerElement());
+    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->isFrameOwnerElement());
     return static_cast<HTMLFrameOwnerElement*>(node);
 }
 
@@ -93,7 +92,7 @@ public:
 
     static bool canLoadFrame(HTMLFrameOwnerElement* owner)
     {
-        for (Node* node = owner; node; node = node->parentOrHostNode()) {
+        for (Node* node = owner; node; node = node->parentOrShadowHostNode()) {
             if (disabledSubtreeRoots().contains(node))
                 return false;
         }

@@ -35,7 +35,7 @@
  */
 WebInspector.FileSystemView = function(fileSystem)
 {
-    WebInspector.SidebarView.call(this, WebInspector.SidebarView.SidebarPosition.Left, "FileSystemViewSidebarWidth");
+    WebInspector.SidebarView.call(this, WebInspector.SidebarView.SidebarPosition.Start, "FileSystemViewSidebarWidth");
     this.element.addStyleClass("file-system-view");
     this.element.addStyleClass("storage-view");
 
@@ -61,9 +61,9 @@ WebInspector.FileSystemView = function(fileSystem)
 
 WebInspector.FileSystemView.prototype = {
     /**
-     * @type {Array.<Element>}
+     * @return {Array.<Element>}
      */
-    get statusBarItems()
+    statusBarItems: function()
     {
         return [this._refreshButton.element, this._deleteButton.element];
     },
@@ -177,7 +177,7 @@ WebInspector.FileSystemView.EntryTreeElement.prototype = {
         while (newEntryIndex < entries.length && oldChildIndex < oldChildren.length) {
             var newEntry = entries[newEntryIndex];
             var oldChild = oldChildren[oldChildIndex];
-            var order = newEntry.name.localeCompare(oldChild._entry.name);
+            var order = newEntry.name.compareTo(oldChild._entry.name);
 
             if (order === 0) {
                 if (oldChild._entry.isDirectory)

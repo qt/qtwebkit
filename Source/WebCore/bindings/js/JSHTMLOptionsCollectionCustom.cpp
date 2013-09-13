@@ -37,44 +37,13 @@ using namespace JSC;
 
 namespace WebCore {
 
-static JSValue getNamedItems(ExecState* exec, JSHTMLOptionsCollection* collection, PropertyName propertyName)
-{
-    Vector<RefPtr<Node> > namedItems;
-    const AtomicString& name = propertyNameToAtomicString(propertyName);
-    collection->impl()->namedItems(name, namedItems);
-
-    if (namedItems.isEmpty())
-        return jsUndefined();
-    if (namedItems.size() == 1)
-        return toJS(exec, collection->globalObject(), namedItems[0].get());
-
-    // FIXME: HTML5 specifies that this should be a LiveNodeList.
-    return toJS(exec, collection->globalObject(), StaticNodeList::adopt(namedItems).get());
-}
-
-bool JSHTMLOptionsCollection::canGetItemsForName(ExecState*, HTMLOptionsCollection* collection, PropertyName propertyName)
-{
-    return collection->hasNamedItem(propertyNameToAtomicString(propertyName));
-}
-
-JSValue JSHTMLOptionsCollection::nameGetter(ExecState* exec, JSValue slotBase, PropertyName propertyName)
-{
-    JSHTMLOptionsCollection* thisObj = jsCast<JSHTMLOptionsCollection*>(asObject(slotBase));
-    return getNamedItems(exec, thisObj, propertyName);
-}
-
-JSValue JSHTMLOptionsCollection::namedItem(ExecState* exec)
-{
-    return getNamedItems(exec, this, Identifier(exec, exec->argument(0).toString(exec)->value(exec)));
-}
-
 void JSHTMLOptionsCollection::setLength(ExecState* exec, JSValue value)
 {
     HTMLOptionsCollection* imp = static_cast<HTMLOptionsCollection*>(impl());
     ExceptionCode ec = 0;
     unsigned newLength = 0;
     double lengthValue = value.toNumber(exec);
-    if (!isnan(lengthValue) && !isinf(lengthValue)) {
+    if (!std::isnan(lengthValue) && !std::isinf(lengthValue)) {
         if (lengthValue < 0.0)
             ec = INDEX_SIZE_ERR;
         else if (lengthValue > static_cast<double>(UINT_MAX))
@@ -90,7 +59,7 @@ void JSHTMLOptionsCollection::setLength(ExecState* exec, JSValue value)
 void JSHTMLOptionsCollection::indexSetter(ExecState* exec, unsigned index, JSValue value)
 {
     HTMLOptionsCollection* imp = static_cast<HTMLOptionsCollection*>(impl());
-    HTMLSelectElement* base = toHTMLSelectElement(imp->base());
+    HTMLSelectElement* base = toHTMLSelectElement(imp->ownerNode());
     selectIndexSetter(base, exec, index, value);
 }
 
@@ -102,14 +71,10 @@ JSValue JSHTMLOptionsCollection::add(ExecState* exec)
     if (exec->argumentCount() < 2)
         imp->add(option, ec);
     else {
-        bool ok;
-        int index = finiteInt32Value(exec->argument(1), exec, ok);
+        int index = exec->argument(1).toInt32(exec);
         if (exec->hadException())
             return jsUndefined();
-        if (!ok)
-            ec = TYPE_MISMATCH_ERR;
-        else
-            imp->add(option, index, ec);
+        imp->add(option, index, ec);
     }
     setDOMException(exec, ec);
     return jsUndefined();
@@ -118,7 +83,7 @@ JSValue JSHTMLOptionsCollection::add(ExecState* exec)
 JSValue JSHTMLOptionsCollection::remove(ExecState* exec)
 {
     HTMLOptionsCollection* imp = static_cast<HTMLOptionsCollection*>(impl());
-    JSHTMLSelectElement* base = jsCast<JSHTMLSelectElement*>(asObject(toJS(exec, globalObject(), imp->base())));
+    JSHTMLSelectElement* base = jsCast<JSHTMLSelectElement*>(asObject(toJS(exec, globalObject(), imp->ownerNode())));
     return base->remove(exec);
 }
 

@@ -31,14 +31,12 @@ class FlexBoxIterator;
 
 class RenderDeprecatedFlexibleBox : public RenderBlock {
 public:
-    RenderDeprecatedFlexibleBox(Node*);
+    RenderDeprecatedFlexibleBox(Element*);
     virtual ~RenderDeprecatedFlexibleBox();
 
-    virtual const char* renderName() const;
+    static RenderDeprecatedFlexibleBox* createAnonymous(Document*);
 
-    virtual void computePreferredLogicalWidths();
-    void calcHorizontalPrefWidths();
-    void calcVerticalPrefWidths();
+    virtual const char* renderName() const;
 
     virtual void styleWillChange(StyleDifference, const RenderStyle* newStyle) OVERRIDE;
 
@@ -51,9 +49,12 @@ public:
     virtual bool isStretchingChildren() const { return m_stretchingChildren; }
     virtual bool canCollapseAnonymousBlockChild() const OVERRIDE { return false; }
 
-    void placeChild(RenderBox* child, const LayoutPoint& location);
+    void placeChild(RenderBox* child, const LayoutPoint& location, LayoutSize* childLayoutDelta = 0);
 
 protected:
+    virtual void computeIntrinsicLogicalWidths(LayoutUnit& minLogicalWidth, LayoutUnit& maxLogicalWidth) const OVERRIDE;
+    virtual void computePreferredLogicalWidths() OVERRIDE;
+
     LayoutUnit allowedChildFlex(RenderBox* child, bool expanding, unsigned group);
 
     bool hasMultipleLines() const { return style()->boxLines() == MULTIPLE; }

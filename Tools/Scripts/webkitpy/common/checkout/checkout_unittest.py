@@ -30,12 +30,13 @@ import codecs
 import os
 import shutil
 import tempfile
-import unittest
+import unittest2 as unittest
 
 from .checkout import Checkout
 from .changelog import ChangeLogEntry
 from .scm import CommitMessage, SCMDetector
 from .scm.scm_mock import MockSCM
+from webkitpy.common.webkit_finder import WebKitFinder
 from webkitpy.common.system.executive import Executive, ScriptError
 from webkitpy.common.system.filesystem import FileSystem  # FIXME: This should not be needed.
 from webkitpy.common.system.filesystem_mock import MockFileSystem
@@ -102,6 +103,7 @@ Second part of this complicated change by me, Tor Arne Vestb\u00f8!
         self.temp_dir = str(self.filesystem.mkdtemp(suffix="changelogs"))
         self.old_cwd = self.filesystem.getcwd()
         self.filesystem.chdir(self.temp_dir)
+        self.webkit_base = WebKitFinder(self.filesystem).webkit_base()
 
         # Trick commit-log-editor into thinking we're in a Subversion working copy so it won't
         # complain about not being able to figure out what SCM is in use.
@@ -130,7 +132,7 @@ Second part of this complicated change by me, Tor Arne Vestb\u00f8!
             return executive.run_command(*args, **kwargs)
 
         detector = SCMDetector(self.filesystem, executive)
-        real_scm = detector.detect_scm_system(self.old_cwd)
+        real_scm = detector.detect_scm_system(self.webkit_base)
 
         mock_scm = MockSCM()
         mock_scm.run = mock_run
@@ -141,7 +143,7 @@ Second part of this complicated change by me, Tor Arne Vestb\u00f8!
         commit_message = checkout.commit_message_for_this_commit(git_commit=None, return_stderr=True)
         # Throw away the first line - a warning about unknown VCS root.
         commit_message.message_lines = commit_message.message_lines[1:]
-        self.assertEqual(commit_message.message(), self.expected_commit_message)
+        self.assertMultiLineEqual(commit_message.message(), self.expected_commit_message)
 
 
 class CheckoutTest(unittest.TestCase):
@@ -160,7 +162,7 @@ class CheckoutTest(unittest.TestCase):
         checkout = self._make_checkout()
         checkout._scm.contents_at_revision = mock_contents_at_revision
         entry = checkout._latest_entry_for_changelog_at_revision("foo", "bar")
-        self.assertEqual(entry.contents(), _changelog1entry1)
+        self.assertMultiLineEqual(entry.contents(), _changelog1entry1)  # Pylint is confused about this line, pylint: disable=E1101
 
     # FIXME: This tests a hack around our current changed_files handling.
     # Right now changelog_entries_for_revision tries to fetch deleted files
@@ -191,10 +193,10 @@ class CheckoutTest(unittest.TestCase):
         self.assertEqual(commitinfo.bug_id(), 36629)
         self.assertEqual(commitinfo.author_name(), u"Tor Arne Vestb\u00f8")
         self.assertEqual(commitinfo.author_email(), "vestbo@webkit.org")
-        self.assertEqual(commitinfo.reviewer_text(), None)
-        self.assertEqual(commitinfo.reviewer(), None)
+        self.assertIsNone(commitinfo.reviewer_text())
+        self.assertIsNone(commitinfo.reviewer())
         self.assertEqual(commitinfo.committer_email(), "committer@example.com")
-        self.assertEqual(commitinfo.committer(), None)
+        self.assertIsNone(commitinfo.committer())
         self.assertEqual(commitinfo.to_json(), {
             'bug_id': 36629,
             'author_email': 'vestbo@webkit.org',
@@ -207,7 +209,7 @@ class CheckoutTest(unittest.TestCase):
         })
 
         checkout.changelog_entries_for_revision = lambda revision, changed_files=None: []
-        self.assertEqual(checkout.commit_info_for_revision(1), None)
+        self.assertIsNone(checkout.commit_info_for_revision(1))
 
     def test_bug_id_for_revision(self):
         checkout = self._make_checkout()
@@ -246,11 +248,6 @@ class CheckoutTest(unittest.TestCase):
         reviewers = checkout.suggested_reviewers(git_commit=None)
         reviewer_names = [reviewer.full_name for reviewer in reviewers]
         self.assertEqual(reviewer_names, [u'Tor Arne Vestb\xf8'])
-
-    def test_chromium_deps(self):
-        checkout = self._make_checkout()
-        checkout._scm.checkout_root = "/foo/bar"
-        self.assertEqual(checkout.chromium_deps()._path, '/foo/bar/Source/WebKit/chromium/DEPS')
 
     def test_apply_patch(self):
         checkout = self._make_checkout()

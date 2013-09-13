@@ -38,27 +38,21 @@
     attribute EventListener onerror;
     attribute EventListener onversionchange;
 
-    IDBObjectStore createObjectStore(in DOMString name, in [Optional] Dictionary options)
-        raises (DOMException);
-    void deleteObjectStore(in DOMString name)
-        raises (DOMException);
-    [CallWith=ScriptExecutionContext] IDBTransaction transaction(in DOMStringList storeNames, in [Optional=DefaultIsNullString] DOMString mode)
-        raises (DOMException);
-    [CallWith=ScriptExecutionContext] IDBTransaction transaction(in sequence<String> storeNames, in [Optional=DefaultIsNullString] DOMString mode)
-        raises (DOMException);
-    [CallWith=ScriptExecutionContext] IDBTransaction transaction(in DOMString storeName, in [Optional=DefaultIsNullString] DOMString mode)
-        raises (DOMException);
+    [Custom, RaisesException] IDBObjectStore createObjectStore(DOMString name, optional Dictionary options);
+    [RaisesException] void deleteObjectStore(DOMString name);
+    [CallWith=ScriptExecutionContext, RaisesException] IDBTransaction transaction(DOMStringList storeNames, [Default=NullString] optional DOMString mode);
+    [CallWith=ScriptExecutionContext, RaisesException] IDBTransaction transaction(sequence<DOMString> storeNames, [Default=NullString] optional DOMString mode);
+    [CallWith=ScriptExecutionContext, RaisesException] IDBTransaction transaction(DOMString storeName, [Default=NullString] optional DOMString mode);
 
     void close();
 
     // EventTarget interface
-    void addEventListener(in DOMString type,
-                          in EventListener listener,
-                          in [Optional] boolean useCapture);
-    void removeEventListener(in DOMString type,
-                             in EventListener listener,
-                             in [Optional] boolean useCapture);
-    boolean dispatchEvent(in Event evt)
-        raises(EventException);
+    void addEventListener(DOMString type,
+                          EventListener listener,
+                          optional boolean useCapture);
+    void removeEventListener(DOMString type,
+                             EventListener listener,
+                             optional boolean useCapture);
+    [RaisesException] boolean dispatchEvent(Event evt);
 };
 

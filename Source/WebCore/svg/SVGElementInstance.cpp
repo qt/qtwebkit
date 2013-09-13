@@ -31,6 +31,7 @@
 #include "EventNames.h"
 #include "FrameView.h"
 #include "SVGDocumentExtensions.h"
+#include "SVGElement.h"
 #include "SVGElementInstanceList.h"
 #include "SVGUseElement.h"
 
@@ -40,8 +41,58 @@ namespace WebCore {
 
 DEFINE_DEBUG_ONLY_GLOBAL(WTF::RefCountedLeakCounter, instanceCounter, ("WebCoreSVGElementInstance"));
 
+// EventTarget API
+DEFINE_FORWARDING_ATTRIBUTE_EVENT_LISTENER(SVGElementInstance, correspondingElement(), abort);
+DEFINE_FORWARDING_ATTRIBUTE_EVENT_LISTENER(SVGElementInstance, correspondingElement(), blur);
+DEFINE_FORWARDING_ATTRIBUTE_EVENT_LISTENER(SVGElementInstance, correspondingElement(), change);
+DEFINE_FORWARDING_ATTRIBUTE_EVENT_LISTENER(SVGElementInstance, correspondingElement(), click);
+DEFINE_FORWARDING_ATTRIBUTE_EVENT_LISTENER(SVGElementInstance, correspondingElement(), contextmenu);
+DEFINE_FORWARDING_ATTRIBUTE_EVENT_LISTENER(SVGElementInstance, correspondingElement(), dblclick);
+DEFINE_FORWARDING_ATTRIBUTE_EVENT_LISTENER(SVGElementInstance, correspondingElement(), error);
+DEFINE_FORWARDING_ATTRIBUTE_EVENT_LISTENER(SVGElementInstance, correspondingElement(), focus);
+DEFINE_FORWARDING_ATTRIBUTE_EVENT_LISTENER(SVGElementInstance, correspondingElement(), input);
+DEFINE_FORWARDING_ATTRIBUTE_EVENT_LISTENER(SVGElementInstance, correspondingElement(), keydown);
+DEFINE_FORWARDING_ATTRIBUTE_EVENT_LISTENER(SVGElementInstance, correspondingElement(), keypress);
+DEFINE_FORWARDING_ATTRIBUTE_EVENT_LISTENER(SVGElementInstance, correspondingElement(), keyup);
+DEFINE_FORWARDING_ATTRIBUTE_EVENT_LISTENER(SVGElementInstance, correspondingElement(), load);
+DEFINE_FORWARDING_ATTRIBUTE_EVENT_LISTENER(SVGElementInstance, correspondingElement(), mousedown);
+DEFINE_FORWARDING_ATTRIBUTE_EVENT_LISTENER(SVGElementInstance, correspondingElement(), mouseenter);
+DEFINE_FORWARDING_ATTRIBUTE_EVENT_LISTENER(SVGElementInstance, correspondingElement(), mouseleave);
+DEFINE_FORWARDING_ATTRIBUTE_EVENT_LISTENER(SVGElementInstance, correspondingElement(), mousemove);
+DEFINE_FORWARDING_ATTRIBUTE_EVENT_LISTENER(SVGElementInstance, correspondingElement(), mouseout);
+DEFINE_FORWARDING_ATTRIBUTE_EVENT_LISTENER(SVGElementInstance, correspondingElement(), mouseover);
+DEFINE_FORWARDING_ATTRIBUTE_EVENT_LISTENER(SVGElementInstance, correspondingElement(), mouseup);
+DEFINE_FORWARDING_ATTRIBUTE_EVENT_LISTENER(SVGElementInstance, correspondingElement(), mousewheel);
+DEFINE_FORWARDING_ATTRIBUTE_EVENT_LISTENER(SVGElementInstance, correspondingElement(), beforecut);
+DEFINE_FORWARDING_ATTRIBUTE_EVENT_LISTENER(SVGElementInstance, correspondingElement(), cut);
+DEFINE_FORWARDING_ATTRIBUTE_EVENT_LISTENER(SVGElementInstance, correspondingElement(), beforecopy);
+DEFINE_FORWARDING_ATTRIBUTE_EVENT_LISTENER(SVGElementInstance, correspondingElement(), copy);
+DEFINE_FORWARDING_ATTRIBUTE_EVENT_LISTENER(SVGElementInstance, correspondingElement(), beforepaste);
+DEFINE_FORWARDING_ATTRIBUTE_EVENT_LISTENER(SVGElementInstance, correspondingElement(), paste);
+DEFINE_FORWARDING_ATTRIBUTE_EVENT_LISTENER(SVGElementInstance, correspondingElement(), dragenter);
+DEFINE_FORWARDING_ATTRIBUTE_EVENT_LISTENER(SVGElementInstance, correspondingElement(), dragover);
+DEFINE_FORWARDING_ATTRIBUTE_EVENT_LISTENER(SVGElementInstance, correspondingElement(), dragleave);
+DEFINE_FORWARDING_ATTRIBUTE_EVENT_LISTENER(SVGElementInstance, correspondingElement(), drop);
+DEFINE_FORWARDING_ATTRIBUTE_EVENT_LISTENER(SVGElementInstance, correspondingElement(), dragstart);
+DEFINE_FORWARDING_ATTRIBUTE_EVENT_LISTENER(SVGElementInstance, correspondingElement(), drag);
+DEFINE_FORWARDING_ATTRIBUTE_EVENT_LISTENER(SVGElementInstance, correspondingElement(), dragend);
+DEFINE_FORWARDING_ATTRIBUTE_EVENT_LISTENER(SVGElementInstance, correspondingElement(), reset);
+DEFINE_FORWARDING_ATTRIBUTE_EVENT_LISTENER(SVGElementInstance, correspondingElement(), resize);
+DEFINE_FORWARDING_ATTRIBUTE_EVENT_LISTENER(SVGElementInstance, correspondingElement(), scroll);
+DEFINE_FORWARDING_ATTRIBUTE_EVENT_LISTENER(SVGElementInstance, correspondingElement(), search);
+DEFINE_FORWARDING_ATTRIBUTE_EVENT_LISTENER(SVGElementInstance, correspondingElement(), select);
+DEFINE_FORWARDING_ATTRIBUTE_EVENT_LISTENER(SVGElementInstance, correspondingElement(), selectstart);
+DEFINE_FORWARDING_ATTRIBUTE_EVENT_LISTENER(SVGElementInstance, correspondingElement(), submit);
+DEFINE_FORWARDING_ATTRIBUTE_EVENT_LISTENER(SVGElementInstance, correspondingElement(), unload);
+
+PassRefPtr<SVGElementInstance> SVGElementInstance::create(SVGUseElement* correspondingUseElement, SVGUseElement* directUseElement, PassRefPtr<SVGElement> originalElement)
+{
+    return adoptRef(new SVGElementInstance(correspondingUseElement, directUseElement, originalElement));
+}
+
 SVGElementInstance::SVGElementInstance(SVGUseElement* correspondingUseElement, SVGUseElement* directUseElement, PassRefPtr<SVGElement> originalElement)
-    : m_correspondingUseElement(correspondingUseElement)
+    : m_parentInstance(0)
+    , m_correspondingUseElement(correspondingUseElement)
     , m_directUseElement(directUseElement)
     , m_element(originalElement)
     , m_previousSibling(0)
@@ -82,6 +133,11 @@ void SVGElementInstance::removedLastRef()
     delete this;
 }
 
+Node* SVGElementInstance::toNode()
+{
+    return shadowTreeElement();
+}
+
 void SVGElementInstance::detach()
 {
     // Clear all pointers. When the node is detached from the shadow DOM it should be removed but,
@@ -100,12 +156,17 @@ void SVGElementInstance::detach()
     m_directUseElement = 0;
     m_correspondingUseElement = 0;
 
-    removeAllChildrenInContainer<SVGElementInstance, SVGElementInstance>(this);
+    removeDetachedChildrenInContainer<SVGElementInstance, SVGElementInstance>(this);
 }
 
 PassRefPtr<SVGElementInstanceList> SVGElementInstance::childNodes()
 {
     return SVGElementInstanceList::create(this);
+}
+
+Document* SVGElementInstance::ownerDocument() const
+{
+    return m_element ? m_element->ownerDocument() : 0;
 }
 
 void SVGElementInstance::setShadowTreeElement(SVGElement* element)
@@ -124,7 +185,7 @@ void SVGElementInstance::invalidateAllInstancesOfElement(SVGElement* element)
     if (!element || !element->inDocument())
         return;
 
-    if (element->isStyled() && static_cast<SVGStyledElement*>(element)->instanceUpdatesBlocked())
+    if (element->isSVGStyledElement() && toSVGStyledElement(element)->instanceUpdatesBlocked())
         return;
 
     const HashSet<SVGElementInstance*>& set = element->instancesForElement();
@@ -139,14 +200,6 @@ void SVGElementInstance::invalidateAllInstancesOfElement(SVGElement* element)
         ASSERT((*it)->shadowTreeElement()->correspondingElement() == (*it)->correspondingElement());
         ASSERT((*it)->correspondingElement() == element);
         (*it)->shadowTreeElement()->setCorrespondingElement(0);
-
-        // The shadow tree, which is eventually animated, is mutated. In order to keep the animVal
-        // logic correct, we have to stop the animation, and restart it once the shadow tree has
-        // recloned. Otherwise we miss to call stopAnimValAnimation() on the old shadow tree element
-        // which leads to an assertion once garbage is collected, if the animVal bindings have been
-        // accessed from JS. It would also assert on the next updateAnimations() call as the new
-        // SVGAnimatedProperty object hasn't been initialized yet (using startAnimValAnimation).
-        element->document()->accessSVGExtensions()->removeAllAnimationElementsFromTarget(element);
 
         if (SVGUseElement* element = (*it)->correspondingUseElement()) {
             ASSERT(element->inDocument());
@@ -193,9 +246,7 @@ bool SVGElementInstance::dispatchEvent(PassRefPtr<Event> event)
 
 EventTargetData* SVGElementInstance::eventTargetData()
 {
-    // EventTarget would use these methods if we were actually using its add/removeEventListener logic.
-    // As we're forwarding those calls to the correspondingElement(), no one should ever call this function.
-    ASSERT_NOT_REACHED();
+    // Since no event listeners are added to an SVGElementInstance, we don't have eventTargetData.
     return 0;
 }
 
@@ -208,7 +259,7 @@ EventTargetData* SVGElementInstance::ensureEventTargetData()
 }
 
 SVGElementInstance::InstanceUpdateBlocker::InstanceUpdateBlocker(SVGElement* targetElement)
-    : m_targetElement(targetElement->isStyled() ? static_cast<SVGStyledElement*>(targetElement) : 0)
+    : m_targetElement(targetElement->isSVGStyledElement() ? toSVGStyledElement(targetElement) : 0)
 {
     if (m_targetElement)
         m_targetElement->setInstanceUpdatesBlocked(true);

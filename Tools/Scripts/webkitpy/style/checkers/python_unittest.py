@@ -23,7 +23,7 @@
 """Unit tests for python.py."""
 
 import os
-import unittest
+import unittest2 as unittest
 
 from python import PythonChecker
 
@@ -61,3 +61,20 @@ class PythonCheckerTest(unittest.TestCase):
             (4, "pep8/W291", 5, "trailing whitespace"),
             (4, "pylint/E0602", 5, "Undefined variable 'error'"),
             ])
+
+    def test_pylint_false_positives(self):
+        """Test that pylint false positives are suppressed."""
+        errors = []
+
+        def _mock_handle_style_error(line_number, category, confidence,
+                                     message):
+            error = (line_number, category, confidence, message)
+            errors.append(error)
+
+        current_dir = os.path.dirname(__file__)
+        file_path = os.path.join(current_dir, "python_unittest_falsepositives.py")
+
+        checker = PythonChecker(file_path, _mock_handle_style_error)
+        checker.check(lines=[])
+
+        self.assertEqual(errors, [])

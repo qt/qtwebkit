@@ -76,7 +76,7 @@ private:
     static PassOwnPtr<MediaPlayerPrivateInterface> create(MediaPlayer*);
     static void getSupportedTypes(HashSet<String>& types);
     static MediaPlayer::SupportsType supportsType(const String& type, const String& codecs, const KURL&);
-#if ENABLE(ENCRYPTED_MEDIA)
+#if ENABLE(ENCRYPTED_MEDIA) || ENABLE(ENCRYPTED_MEDIA_V2)
     static MediaPlayer::SupportsType extendedSupportsType(const String& type, const String& codecs, const String& keySystem, const KURL&);
 #endif
 
@@ -86,7 +86,7 @@ private:
     static bool isAvailable();
 
     PlatformMedia platformMedia() const;
-#if USE(ACCELERATED_COMPOSITING) && !(PLATFORM(QT) && USE(QTKIT))
+#if USE(ACCELERATED_COMPOSITING)
     PlatformLayer* platformLayer() const;
 #endif
 
@@ -139,7 +139,7 @@ private:
     virtual void prepareForRendering();
 
 
-#if USE(ACCELERATED_COMPOSITING) && !(PLATFORM(QT) && USE(QTKIT))
+#if USE(ACCELERATED_COMPOSITING)
     bool supportsAcceleratedRendering() const;
     void acceleratedRenderingStateChanged();
 #endif

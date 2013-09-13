@@ -26,16 +26,12 @@
 #include "config.h"
 #include "LayerTreeHost.h"
 
-#if USE(CA)
 #if PLATFORM(MAC)
-#include "LayerTreeHostCAMac.h"
-#elif PLATFORM(WIN)
-#include "LayerTreeHostCAWin.h"
-#endif
+#include "LayerTreeHostMac.h"
 #endif
 
 #if USE(COORDINATED_GRAPHICS)
-#include "LayerTreeCoordinator.h"
+#include "CoordinatedLayerTreeHost.h"
 #endif
 
 #if PLATFORM(GTK) && USE(TEXTURE_MAPPER_GL)
@@ -49,11 +45,9 @@ namespace WebKit {
 PassRefPtr<LayerTreeHost> LayerTreeHost::create(WebPage* webPage)
 {
 #if PLATFORM(MAC)
-    return LayerTreeHostCAMac::create(webPage);
-#elif PLATFORM(WIN) && HAVE(WKQCA)
-    return LayerTreeHostCAWin::create(webPage);
+    return LayerTreeHostMac::create(webPage);
 #elif USE(COORDINATED_GRAPHICS)
-    return LayerTreeCoordinator::create(webPage);
+    return CoordinatedLayerTreeHost::create(webPage);
 #elif PLATFORM(GTK) && USE(TEXTURE_MAPPER_GL)
     return LayerTreeHostGtk::create(webPage);
 #else

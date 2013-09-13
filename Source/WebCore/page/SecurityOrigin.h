@@ -34,7 +34,6 @@
 
 namespace WebCore {
 
-class Document;
 class KURL;
 
 class SecurityOrigin : public ThreadSafeRefCounted<SecurityOrigin> {
@@ -142,19 +141,20 @@ public:
 
     void setStorageBlockingPolicy(StorageBlockingPolicy policy) { m_storageBlockingPolicy = policy; }
 
+#if ENABLE(CACHE_PARTITIONING)
+    String cachePartition() const;
+#endif
+
     bool canAccessDatabase(const SecurityOrigin* topOrigin = 0) const { return canAccessStorage(topOrigin); };
+    bool canAccessSessionStorage(const SecurityOrigin* topOrigin) const { return canAccessStorage(topOrigin, AlwaysAllowFromThirdParty); }
     bool canAccessLocalStorage(const SecurityOrigin* topOrigin) const { return canAccessStorage(topOrigin); };
     bool canAccessSharedWorkers(const SecurityOrigin* topOrigin) const { return canAccessStorage(topOrigin); }
     bool canAccessPluginStorage(const SecurityOrigin* topOrigin) const { return canAccessStorage(topOrigin); }
+    bool canAccessApplicationCache(const SecurityOrigin* topOrigin) const { return canAccessStorage(topOrigin); }
     bool canAccessCookies() const { return !isUnique(); }
     bool canAccessPasswordManager() const { return !isUnique(); }
     bool canAccessFileSystem() const { return !isUnique(); }
     Policy canShowNotifications() const;
-
-    // Technically, we should always allow access to sessionStorage, but we
-    // currently don't handle creating a sessionStorage area for unique
-    // origins.
-    bool canAccessSessionStorage() const { return !isUnique(); }
 
     // The local SecurityOrigin is the most privileged SecurityOrigin.
     // The local SecurityOrigin can script any document, navigate to local
@@ -205,6 +205,8 @@ public:
     // (and whether it was set) but considering the host. It is used for postMessage.
     bool isSameSchemeHostPort(const SecurityOrigin*) const;
 
+    static String urlWithUniqueSecurityOrigin();
+
 private:
     SecurityOrigin();
     explicit SecurityOrigin(const KURL&);
@@ -213,11 +215,12 @@ private:
     // FIXME: Rename this function to something more semantic.
     bool passesFileCheck(const SecurityOrigin*) const;
     bool isThirdParty(const SecurityOrigin*) const;
-    bool canAccessStorage(const SecurityOrigin*) const;
+    
+    enum ShouldAllowFromThirdParty { AlwaysAllowFromThirdParty, MaybeAllowFromThirdParty };
+    bool canAccessStorage(const SecurityOrigin*, ShouldAllowFromThirdParty = MaybeAllowFromThirdParty) const;
 
     String m_protocol;
     String m_host;
-    mutable String m_encodedHost;
     String m_domain;
     String m_filePath;
     unsigned short m_port;

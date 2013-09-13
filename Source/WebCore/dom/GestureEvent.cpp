@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2012 Google Inc. All rights reserved.
+ * Copyright (C) 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,6 +30,7 @@
 
 #include "GestureEvent.h"
 
+#include "Element.h"
 #include <wtf/text/AtomicString.h>
 
 namespace WebCore {
@@ -47,22 +49,19 @@ PassRefPtr<GestureEvent> GestureEvent::create(PassRefPtr<AbstractView> view, con
     case PlatformEvent::GestureScrollEnd:
         eventType = eventNames().gesturescrollendEvent; break;
     case PlatformEvent::GestureScrollUpdate:
+    case PlatformEvent::GestureScrollUpdateWithoutPropagation:
         eventType = eventNames().gesturescrollupdateEvent; break;
     case PlatformEvent::GestureTap:
         eventType = eventNames().gesturetapEvent; break;
     case PlatformEvent::GestureTapDown:
         eventType = eventNames().gesturetapdownEvent; break;
-    case PlatformEvent::GestureDoubleTap:
     case PlatformEvent::GestureTwoFingerTap:
     case PlatformEvent::GestureLongPress:
-    case PlatformEvent::GesturePinchBegin:
-    case PlatformEvent::GesturePinchEnd:
-    case PlatformEvent::GesturePinchUpdate:
     case PlatformEvent::GestureTapDownCancel:
     default:
         return 0;
     }
-    return adoptRef(new GestureEvent(eventType, view, event.globalPosition().x(), event.globalPosition().y(), event.position().x(), event.position().y(), event.ctrlKey(), event.altKey(), event.shiftKey(), event.metaKey(), event.deltaX(), event.deltaY()));
+    return adoptRef(new GestureEvent(eventType, event.timestamp(), view, event.globalPosition().x(), event.globalPosition().y(), event.position().x(), event.position().y(), event.ctrlKey(), event.altKey(), event.shiftKey(), event.metaKey(), event.deltaX(), event.deltaY()));
 }
 
 void GestureEvent::initGestureEvent(const AtomicString& type, PassRefPtr<AbstractView> view, int screenX, int screenY, int clientX, int clientY, bool ctrlKey, bool altKey, bool shiftKey, bool metaKey, float deltaX, float deltaY)
@@ -95,8 +94,8 @@ GestureEvent::GestureEvent()
 {
 }
 
-GestureEvent::GestureEvent(const AtomicString& type, PassRefPtr<AbstractView> view, int screenX, int screenY, int clientX, int clientY, bool ctrlKey, bool altKey, bool shiftKey, bool metaKey, float deltaX, float deltaY)
-    : MouseRelatedEvent(type, true, true, view, 0, IntPoint(screenX, screenY), IntPoint(clientX, clientY),
+GestureEvent::GestureEvent(const AtomicString& type, double timestamp, PassRefPtr<AbstractView> view, int screenX, int screenY, int clientX, int clientY, bool ctrlKey, bool altKey, bool shiftKey, bool metaKey, float deltaX, float deltaY)
+    : MouseRelatedEvent(type, true, true, timestamp, view, 0, IntPoint(screenX, screenY), IntPoint(clientX, clientY),
 #if ENABLE(POINTER_LOCK)
                         IntPoint(0, 0),
 #endif
@@ -118,10 +117,10 @@ GestureEvent* GestureEventDispatchMediator::event() const
 
 bool GestureEventDispatchMediator::dispatchEvent(EventDispatcher* dispatcher) const
 {
-    if (dispatcher->node()->disabled())
+    if (isDisabledFormControl(dispatcher->node()))
         return true;
 
-    dispatcher->dispatchEvent(event());
+    dispatcher->dispatch();
     ASSERT(!event()->defaultPrevented());
     return event()->defaultHandled() || event()->defaultPrevented();
 }

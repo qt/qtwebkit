@@ -334,13 +334,15 @@ void WebChromeClient::setResizable(bool resizable)
     }
 }
 
-void WebChromeClient::addMessageToConsole(MessageSource source, MessageType type, MessageLevel level, const String& message, unsigned line, const String& url)
+void WebChromeClient::addMessageToConsole(MessageSource source, MessageLevel level, const String& message, unsigned lineNumber, unsigned columnNumber, const String& url)
 {
+    UNUSED_PARAM(columnNumber);
+
     COMPtr<IWebUIDelegate> uiDelegate;
     if (SUCCEEDED(m_webView->uiDelegate(&uiDelegate))) {
         COMPtr<IWebUIDelegatePrivate> uiPrivate;
         if (SUCCEEDED(uiDelegate->QueryInterface(IID_IWebUIDelegatePrivate, (void**)&uiPrivate)))
-            uiPrivate->webViewAddMessageToConsole(m_webView, BString(message), line, BString(url), true);
+            uiPrivate->webViewAddMessageToConsole(m_webView, BString(message), lineNumber, BString(url), true);
     }
 }
 
@@ -581,7 +583,7 @@ void WebChromeClient::print(Frame* frame)
 }
 
 #if ENABLE(SQL_DATABASE)
-void WebChromeClient::exceededDatabaseQuota(Frame* frame, const String& databaseIdentifier)
+void WebChromeClient::exceededDatabaseQuota(Frame* frame, const String& databaseIdentifier, DatabaseDetails)
 {
     COMPtr<WebSecurityOrigin> origin(AdoptCOM, WebSecurityOrigin::createInstance(frame->document()->securityOrigin()));
     COMPtr<IWebUIDelegate> uiDelegate;
@@ -668,11 +670,11 @@ void WebChromeClient::runOpenPanel(Frame*, PassRefPtr<FileChooser> prpFileChoose
     ofn.hwndOwner = viewWindow;
     String allFiles = allFilesText();
     allFiles.append(L"\0*.*\0\0", 6);
-    ofn.lpstrFilter = allFiles.charactersWithNullTermination();
+    ofn.lpstrFilter = allFiles.charactersWithNullTermination().data();
     ofn.lpstrFile = fileBuf.data();
     ofn.nMaxFile = fileBuf.size();
     String dialogTitle = uploadFileText();
-    ofn.lpstrTitle = dialogTitle.charactersWithNullTermination();
+    ofn.lpstrTitle = dialogTitle.charactersWithNullTermination().data();
     ofn.Flags = OFN_ENABLESIZING | OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_EXPLORER;
     if (multiFile)
         ofn.Flags = ofn.Flags | OFN_ALLOWMULTISELECT;
@@ -854,5 +856,20 @@ void WebChromeClient::exitFullScreenForElement(Element* element)
     ASSERT(element == m_webView->fullScreenElement());
     m_webView->fullScreenController()->exitFullScreen();
 }
-
 #endif
+
+void WebChromeClient::AXStartFrameLoad()
+{
+    COMPtr<IAccessibilityDelegate> delegate;
+    m_webView->accessibilityDelegate(&delegate);
+    if (delegate)
+        delegate->fireFrameLoadStartedEvents();
+}
+
+void WebChromeClient::AXFinishFrameLoad()
+{
+    COMPtr<IAccessibilityDelegate> delegate;
+    m_webView->accessibilityDelegate(&delegate);
+    if (delegate)
+        delegate->fireFrameLoadFinishedEvents();
+}

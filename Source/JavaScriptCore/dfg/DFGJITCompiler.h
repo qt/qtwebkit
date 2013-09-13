@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -34,6 +34,7 @@
 #include "DFGFPRInfo.h"
 #include "DFGGPRInfo.h"
 #include "DFGGraph.h"
+#include "DFGOSRExitCompilationInfo.h"
 #include "DFGRegisterBank.h"
 #include "DFGRegisterSet.h"
 #include "JITCode.h"
@@ -44,12 +45,13 @@ namespace JSC {
 
 class AbstractSamplingCounter;
 class CodeBlock;
-class JSGlobalData;
+class VM;
 
 namespace DFG {
 
 class JITCodeGenerator;
 class NodeToRegisterMap;
+class OSRExitJumpPlaceholder;
 class SlowPathGenerator;
 class SpeculativeJIT;
 class SpeculationRecovery;
@@ -264,11 +266,11 @@ public:
         m_disassembler->setForBlock(blockIndex, labelIgnoringWatchpoints());
     }
     
-    void setForNode(NodeIndex nodeIndex)
+    void setForNode(Node* node)
     {
         if (LIKELY(!m_disassembler))
             return;
-        m_disassembler->setForNode(nodeIndex, labelIgnoringWatchpoints());
+        m_disassembler->setForNode(node, labelIgnoringWatchpoints());
     }
     
     void setEndOfMainPath()
@@ -338,16 +340,18 @@ public:
         m_exceptionChecks.append(CallExceptionRecord(functionCall, exceptionCheck, codeOrigin));
     }
     
-    // Helper methods to get predictions
-    SpeculatedType getSpeculation(Node& node) { return node.prediction(); }
-    SpeculatedType getSpeculation(NodeIndex nodeIndex) { return getSpeculation(graph()[nodeIndex]); }
-    SpeculatedType getSpeculation(Edge nodeUse) { return getSpeculation(nodeUse.index()); }
+    void appendExitInfo(MacroAssembler::JumpList jumpsToFail = MacroAssembler::JumpList())
+    {
+        OSRExitCompilationInfo info;
+        info.m_failureJumps = jumpsToFail;
+        m_exitCompilationInfo.append(info);
+    }
 
 #if USE(JSVALUE32_64)
-    void* addressOfDoubleConstant(NodeIndex nodeIndex)
+    void* addressOfDoubleConstant(Node* node)
     {
-        ASSERT(m_graph.isNumberConstant(nodeIndex));
-        unsigned constantIndex = graph()[nodeIndex].constantNumber();
+        ASSERT(m_graph.isNumberConstant(node));
+        unsigned constantIndex = node->constantNumber();
         return &(codeBlock()->constantRegister(FirstConstantRegisterIndex + constantIndex));
     }
 #endif
@@ -401,15 +405,15 @@ public:
         // value of (None, []). But the old JIT may stash some values there. So we really
         // need (Top, TOP).
         for (size_t argument = 0; argument < basicBlock.variablesAtHead.numberOfArguments(); ++argument) {
-            NodeIndex nodeIndex = basicBlock.variablesAtHead.argument(argument);
-            if (nodeIndex == NoNode || !m_graph[nodeIndex].shouldGenerate())
+            Node* node = basicBlock.variablesAtHead.argument(argument);
+            if (!node || !node->shouldGenerate())
                 entry->m_expectedValues.argument(argument).makeTop();
         }
         for (size_t local = 0; local < basicBlock.variablesAtHead.numberOfLocals(); ++local) {
-            NodeIndex nodeIndex = basicBlock.variablesAtHead.local(local);
-            if (nodeIndex == NoNode || !m_graph[nodeIndex].shouldGenerate())
+            Node* node = basicBlock.variablesAtHead.local(local);
+            if (!node || !node->shouldGenerate())
                 entry->m_expectedValues.local(local).makeTop();
-            else if (m_graph[nodeIndex].variableAccessData()->shouldUseDoubleFormat())
+            else if (node->variableAccessData()->shouldUseDoubleFormat())
                 entry->m_localsForcedDouble.set(local);
         }
 #else
@@ -420,6 +424,8 @@ public:
     }
 
 private:
+    friend class OSRExitJumpPlaceholder;
+    
     // Internal implementation to compile.
     void compileEntry();
     void compileBody(SpeculativeJIT&);
@@ -460,6 +466,8 @@ private:
     
     Vector<PropertyAccessRecord, 4> m_propertyAccesses;
     Vector<JSCallRecord, 4> m_jsCalls;
+    Vector<OSRExitCompilationInfo> m_exitCompilationInfo;
+    Vector<Vector<Label> > m_exitSiteLabels;
     unsigned m_currentCodeOriginIndex;
 };
 

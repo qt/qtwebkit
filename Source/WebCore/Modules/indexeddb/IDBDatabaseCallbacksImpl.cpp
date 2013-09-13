@@ -52,12 +52,6 @@ void IDBDatabaseCallbacksImpl::onForcedClose()
         m_database->forceClose();
 }
 
-void IDBDatabaseCallbacksImpl::onVersionChange(const String& version)
-{
-    if (m_database)
-        m_database->onVersionChange(version);
-}
-
 void IDBDatabaseCallbacksImpl::onVersionChange(int64_t oldVersion, int64_t newVersion)
 {
     if (m_database)
@@ -69,6 +63,18 @@ void IDBDatabaseCallbacksImpl::connect(IDBDatabase* database)
     ASSERT(!m_database);
     ASSERT(database);
     m_database = database;
+}
+
+void IDBDatabaseCallbacksImpl::onAbort(int64_t transactionId, PassRefPtr<IDBDatabaseError> error)
+{
+    if (m_database)
+        m_database->onAbort(transactionId, error);
+}
+
+void IDBDatabaseCallbacksImpl::onComplete(int64_t transactionId)
+{
+    if (m_database)
+        m_database->onComplete(transactionId);
 }
 
 } // namespace WebCore

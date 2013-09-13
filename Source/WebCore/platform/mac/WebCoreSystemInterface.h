@@ -50,6 +50,7 @@ typedef struct _CFURLResponse *CFURLResponseRef;
 typedef const struct _CFURLRequest *CFURLRequestRef;
 typedef const struct __CTFont * CTFontRef;
 typedef const struct __CTLine * CTLineRef;
+typedef const struct __CTRun * CTRunRef;
 typedef const struct __CTTypesetter * CTTypesetterRef;
 typedef const struct __AXUIElement *AXUIElementRef;
 typedef struct _NSRange NSRange;
@@ -90,6 +91,7 @@ OBJC_CLASS NSEvent;
 OBJC_CLASS NSFont;
 OBJC_CLASS NSHTTPCookie;
 OBJC_CLASS NSImage;
+OBJC_CLASS NSLocale;
 OBJC_CLASS NSMenu;
 OBJC_CLASS NSMutableURLRequest;
 OBJC_CLASS NSString;
@@ -135,7 +137,7 @@ extern CFReadStreamRef (*wkCreateCustomCFReadStream)(void *(*formCreate)(CFReadS
     void *context);
 extern CFStringRef (*wkCopyCFLocalizationPreferredName)(CFStringRef);
 extern NSString* (*wkCopyNSURLResponseStatusLine)(NSURLResponse*);
-extern id (*wkCreateNSURLConnectionDelegateProxy)(void);
+extern CFArrayRef (*wkCopyNSURLResponseCertificateChain)(NSURLResponse*);
 extern void (*wkDrawBezeledTextFieldCell)(NSRect, BOOL enabled);
 extern void (*wkDrawTextFieldCellFocusRing)(NSTextFieldCell*, NSRect);
 extern void (*wkDrawCapsLockIndicator)(CGContextRef, CGRect);
@@ -214,7 +216,7 @@ extern void (*wkSetHTTPPipeliningPriority)(CFURLRequestRef, int priority);
 extern void (*wkSetHTTPPipeliningMinimumFastLanePriority)(int priority);
 extern void (*wkSetCONNECTProxyForStream)(CFReadStreamRef, CFStringRef proxyHost, CFNumberRef proxyPort);
 extern void (*wkSetCONNECTProxyAuthorizationForStream)(CFReadStreamRef, CFStringRef proxyAuthorizationString);
-extern CFHTTPMessageRef (*wkCopyCONNECTProxyResponse)(CFReadStreamRef, CFURLRef responseURL);
+extern CFHTTPMessageRef (*wkCopyCONNECTProxyResponse)(CFReadStreamRef, CFURLRef responseURL, CFStringRef proxyHost, CFNumberRef proxyPort);
 
 extern void (*wkGetGlyphsForCharacters)(CGFontRef, const UniChar[], CGGlyph[], size_t);
 extern bool (*wkGetVerticalGlyphsForCharacters)(CTFontRef, const UniChar[], CGGlyph[], size_t);
@@ -253,6 +255,8 @@ extern bool (*wkCTFontTransformGlyphs)(CTFontRef font, CGGlyph glyphs[], CGSize 
 
 extern CTTypesetterRef (*wkCreateCTTypesetterWithUniCharProviderAndOptions)(const UniChar* (*provide)(CFIndex stringIndex, CFIndex* charCount, CFDictionaryRef* attributes, void*), void (*dispose)(const UniChar* chars, void*), void*, CFDictionaryRef options);
 
+extern CGSize (*wkCTRunGetInitialAdvance)(CTRunRef);
+
 #if PLATFORM(MAC) && USE(CA)
 extern CGContextRef (*wkIOSurfaceContextCreate)(IOSurfaceRef surface, unsigned width, unsigned height, CGColorSpaceRef colorSpace);
 extern CGImageRef (*wkIOSurfaceContextCreateImage)(CGContextRef context);
@@ -270,6 +274,11 @@ extern NSURL *(*wkAVAssetResolvedURL)(AVAsset*);
 extern NSCursor *(*wkCursor)(const char*);
 
 #endif
+    
+#if PLATFORM(MAC)
+extern NSArray *(*wkSpeechSynthesisGetVoiceIdentifiers)(void);
+extern NSString *(*wkSpeechSynthesisGetDefaultVoiceIdentifierForLocale)(NSLocale *);
+#endif
 
 extern void (*wkUnregisterUniqueIdForElement)(id element);
 extern void (*wkAccessibilityHandleFocusChanged)(void);    
@@ -282,7 +291,7 @@ extern CFTypeRef (*wkCreateAXTextMarker)(const void *bytes, size_t len);
 extern BOOL (*wkGetBytesFromAXTextMarker)(CFTypeRef textMarker, void *bytes, size_t length);
 extern AXUIElementRef (*wkCreateAXUIElementRef)(id element);
 
-#if __MAC_OS_X_VERSION_MIN_REQUIRED <= 1060
+#if __MAC_OS_X_VERSION_MIN_REQUIRED == 1060
 typedef struct __CFURLStorageSession* CFURLStorageSessionRef;
 #else
 typedef const struct __CFURLStorageSession* CFURLStorageSessionRef;
@@ -306,6 +315,8 @@ extern CFHTTPMessageRef (*wkGetCFURLResponseHTTPResponse)(CFURLResponseRef);
 extern CFStringRef (*wkCopyCFURLResponseSuggestedFilename)(CFURLResponseRef);
 extern void (*wkSetCFURLResponseMIMEType)(CFURLResponseRef, CFStringRef mimeType);
 
+extern void(*wkDestroyRenderingResources)(void);
+
 #if USE(CFNETWORK)
 extern CFHTTPCookieStorageRef (*wkGetDefaultHTTPCookieStorage)();
 extern WKCFURLCredentialRef (*wkCopyCredentialFromCFPersistentStorage)(CFURLProtectionSpaceRef protectionSpace);
@@ -323,8 +334,11 @@ extern dispatch_source_t (*wkCreateVMPressureDispatchOnMainQueue)(void);
 
 #endif
 
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
+extern dispatch_source_t (*wkCreateMemoryStatusPressureCriticalDispatchOnMainQueue)(void);
+#endif
+    
 #if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1080
-extern NSString *(*wkGetMacOSXVersionString)(void);
 extern bool (*wkExecutableWasLinkedOnOrBeforeLion)(void);
 #endif
 
@@ -336,53 +350,28 @@ extern void (*wkCGPathAddRoundedRect)(CGMutablePathRef path, const CGAffineTrans
 extern void (*wkCFURLRequestAllowAllPostCaching)(CFURLRequestRef);
 #endif
 
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1080 && !PLATFORM(IOS)
+#if USE(CONTENT_FILTERING)
 extern BOOL (*wkFilterIsManagedSession)(void);
 extern WebFilterEvaluator *(*wkFilterCreateInstance)(NSURLResponse *);
-extern void (*wkFilterRelease)(WebFilterEvaluator *);
 extern BOOL (*wkFilterWasBlocked)(WebFilterEvaluator *);
-extern const char* (*wkFilterAddData)(WebFilterEvaluator *, const char* data, int* length);
-extern const char* (*wkFilterDataComplete)(WebFilterEvaluator *, int* length);
+extern BOOL (*wkFilterIsBuffering)(WebFilterEvaluator *);
+extern NSData *(*wkFilterAddData)(WebFilterEvaluator *, NSData *);
+extern NSData *(*wkFilterDataComplete)(WebFilterEvaluator *);
+#endif
 
+#if !PLATFORM(IOS) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1080
 extern CGFloat (*wkNSElasticDeltaForTimeDelta)(CGFloat initialPosition, CGFloat initialVelocity, CGFloat elapsedTime);
 extern CGFloat (*wkNSElasticDeltaForReboundDelta)(CGFloat delta);
 extern CGFloat (*wkNSReboundDeltaForElasticDelta)(CGFloat delta);
 #endif
 
-typedef enum {
-    wkCaptionFontStyleDefault = 0,
-    wkCaptionFontStyleMonospacedWithSerif,
-    wkCaptionFontStyleProportionalWithSerif,
-    wkCaptionFontStyleMonospacedWithoutSerif,
-    wkCaptionFontStyleProportionalWithoutSerif,
-    wkCaptionFontStyleCasual,
-    wkCaptionFontStyleCursive,
-    wkCaptionFontStyleSmallCapital,
-    wkCaptionFontStyleMax
-} wkCaptionFontStyle;
+#if ENABLE(PUBLIC_SUFFIX_LIST)
+extern bool (*wkIsPublicSuffix)(NSString *host);
+#endif
 
-typedef enum {
-    wkCaptionTextEdgeStyleUndefined = 0,
-    wkCaptionTextEdgeStyleNone,
-    wkCaptionTextEdgeStyleRaised,
-    wkCaptionTextEdgeStyleDepressed,
-    wkCaptionTextEdgeStyleUniform,
-    wkCaptionTextEdgeStyleDropShadow,
-    wkCaptionTextEdgeStyleMax
-} wkCaptionTextEdgeStyle;
-
-extern bool (*wkCaptionAppearanceHasUserPreferences)(void);
-extern bool (*wkCaptionAppearanceShowCaptionsWhenAvailable)(void);
-extern CGColorRef(*wkCaptionAppearanceCopyForegroundColor)(void);
-extern CGColorRef(*wkCaptionAppearanceCopyBackgroundColor)(void);
-extern CGColorRef(*wkCaptionAppearanceCopyWindowColor)(void);
-extern bool(*wkCaptionAppearanceGetForegroundOpacity)(CGFloat*);
-extern bool(*wkCaptionAppearanceGetBackgroundOpacity)(CGFloat*);
-extern bool(*wkCaptionAppearanceGetWindowOpacity)(CGFloat*);
-extern CGFontRef(*wkCaptionAppearanceCopyFontForStyle)(int);
-extern bool(*wkCaptionAppearanceGetRelativeCharacterSize)(CGFloat*);
-extern int(*wkCaptionAppearanceGetTextEdgeStyle)(void);
-extern CFStringRef(*wkCaptionAppearanceGetSettingsChangedNotification)(void);
+#if ENABLE(CACHE_PARTITIONING)
+extern CFStringRef (*wkCachePartitionKey)(void);
+#endif
 }
 
 #endif

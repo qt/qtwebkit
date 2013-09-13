@@ -28,10 +28,7 @@
 
 #include "WebGLSharedObject.h"
 
-#include <wtf/ArrayBuffer.h>
 #include <wtf/Forward.h>
-#include <wtf/PassRefPtr.h>
-#include <wtf/RefCounted.h>
 
 namespace WebCore {
 
@@ -95,9 +92,9 @@ private:
     void clearCachedMaxIndices();
 
     // Helper function called by the three associateBufferData().
-    bool associateBufferDataImpl(ArrayBuffer* array, GC3Dintptr byteOffset, GC3Dsizeiptr byteLength);
+    bool associateBufferDataImpl(const void* data, GC3Dsizeiptr byteLength);
     // Helper function called by the two associateBufferSubData().
-    bool associateBufferSubDataImpl(GC3Dintptr offset, ArrayBuffer* array, GC3Dintptr arrayByteOffset, GC3Dsizeiptr byteLength);
+    bool associateBufferSubDataImpl(GC3Dintptr offset, const void* data, GC3Dsizeiptr byteLength);
 };
 
 } // namespace WebCore

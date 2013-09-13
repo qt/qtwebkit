@@ -50,17 +50,13 @@ typedef HICON HCURSOR;
 OBJC_CLASS NSCursor;
 #endif
 
-#if PLATFORM(WX)
-class wxCursor;
-#endif
-
 #if PLATFORM(WIN)
 typedef struct HICON__ *HICON;
 typedef HICON HCURSOR;
 #endif
 
-// Looks like it's just PLATFORM(WX) and PLATFORM(BLACKBERRY) still not using this?
-#if PLATFORM(WIN) || PLATFORM(MAC) || PLATFORM(GTK) || PLATFORM(QT) || PLATFORM(EFL) || PLATFORM(CHROMIUM)
+// Looks like it's just PLATFORM(BLACKBERRY) still not using this?
+#if PLATFORM(WIN) || PLATFORM(MAC) || PLATFORM(GTK) || PLATFORM(QT) || PLATFORM(EFL)
 #define WTF_USE_LAZY_NATIVE_CURSOR 1
 #endif
 
@@ -88,8 +84,6 @@ namespace WebCore {
 #elif PLATFORM(QT) && !defined(QT_NO_CURSOR)
     // Do not need to be shared but need to be created dynamically via ensurePlatformCursor.
     typedef QCursor* PlatformCursor;
-#elif PLATFORM(WX)
-    typedef wxCursor* PlatformCursor;
 #elif PLATFORM(BLACKBERRY)
     typedef BlackBerry::Platform::BlackBerryCursor PlatformCursor;
 #else
@@ -164,6 +158,12 @@ namespace WebCore {
 #if !PLATFORM(IOS)
         Cursor(Image*, const IntPoint& hotSpot);
         Cursor(const Cursor&);
+
+#if ENABLE(MOUSE_CURSOR_SCALE)
+        // Hot spot is in image pixels.
+        Cursor(Image*, const IntPoint& hotSpot, float imageScaleFactor);
+#endif
+
         ~Cursor();
         Cursor& operator=(const Cursor&);
 
@@ -176,6 +176,10 @@ namespace WebCore {
         }
         Image* image() const { return m_image.get(); }
         const IntPoint& hotSpot() const { return m_hotSpot; }
+#if ENABLE(MOUSE_CURSOR_SCALE)
+        // Image scale in image pixels per logical (UI) pixel.
+        float imageScaleFactor() const { return m_imageScaleFactor; }
+#endif
         PlatformCursor platformCursor() const;
 #else
         explicit Cursor(PlatformCursor);
@@ -189,6 +193,9 @@ namespace WebCore {
         Type m_type;
         RefPtr<Image> m_image;
         IntPoint m_hotSpot;
+#if ENABLE(MOUSE_CURSOR_SCALE)
+        float m_imageScaleFactor;
+#endif
 #endif
 
 #if !PLATFORM(MAC)

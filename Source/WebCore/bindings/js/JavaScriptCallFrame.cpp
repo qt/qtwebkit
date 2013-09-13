@@ -25,7 +25,7 @@
 
 #include "config.h"
 
-#if ENABLE(JAVASCRIPT_DEBUGGER) && USE(JSC)
+#if ENABLE(JAVASCRIPT_DEBUGGER)
 
 #include "JavaScriptCallFrame.h"
 
@@ -33,10 +33,10 @@
 #include "JSDOMWindowBase.h"
 #include <debugger/DebuggerCallFrame.h>
 #include <runtime/Completion.h>
+#include <runtime/JSCJSValue.h>
 #include <runtime/JSGlobalObject.h>
 #include <runtime/JSLock.h>
 #include <runtime/JSObject.h>
-#include <runtime/JSValue.h>
 #include <wtf/text/WTFString.h>
 
 using namespace JSC;

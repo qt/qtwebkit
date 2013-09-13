@@ -26,23 +26,28 @@
 #include "config.h"
 #include "CachedPage.h"
 
+#include "AnimationController.h"
 #include "CachedFramePlatformData.h"
 #include "DOMWindow.h"
 #include "Document.h"
 #include "DocumentLoader.h"
-#include "ExceptionCode.h"
+#include "EventHandler.h"
 #include "EventNames.h"
+#include "ExceptionCode.h"
 #include "FocusController.h"
 #include "Frame.h"
+#include "FrameLoader.h"
 #include "FrameLoaderClient.h"
 #include "FrameView.h"
+#include "HistoryController.h"
 #include "HistoryItem.h"
 #include "Logging.h"
 #include "Page.h"
 #include "PageTransitionEvent.h"
+#include "ScriptController.h"
 #include "SerializedScriptValue.h"
-#include <wtf/text/CString.h>
 #include <wtf/RefCountedLeakCounter.h>
+#include <wtf/text/CString.h>
 
 #if ENABLE(SVG)
 #include "SVGDocumentExtensions.h"
@@ -106,7 +111,7 @@ void CachedFrameBase::restore()
 
     frame->animation()->resumeAnimationsForDocument(m_document.get());
     frame->eventHandler()->setMousePressNode(m_mousePressNode.get());
-    m_document->resumeActiveDOMObjects();
+    m_document->resumeActiveDOMObjects(ActiveDOMObject::DocumentWillBecomeInactive);
     m_document->resumeScriptedAnimationControllerCallbacks();
 
     // It is necessary to update any platform script objects after restoring the
@@ -137,8 +142,8 @@ void CachedFrameBase::restore()
     m_document->enqueuePopstateEvent(historyItem && historyItem->stateObject() ? historyItem->stateObject() : SerializedScriptValue::nullValue());
     
 #if ENABLE(TOUCH_EVENTS)
-    if (m_document->touchEventHandlerCount())
-        m_document->page()->chrome()->client()->needTouchEvents(true);
+    if (m_document->hasTouchEventHandlers())
+        m_document->page()->chrome().client()->needTouchEvents(true);
 #endif
 
     m_document->documentDidResumeFromPageCache();

@@ -51,18 +51,20 @@ private:
     DrawingAreaImpl(WebPage*, const WebPageCreationParameters&);
 
     // DrawingArea
-    virtual void setNeedsDisplay(const WebCore::IntRect&);
-    virtual void scroll(const WebCore::IntRect& scrollRect, const WebCore::IntSize& scrollOffset);
+    virtual void setNeedsDisplay() OVERRIDE;
+    virtual void setNeedsDisplayInRect(const WebCore::IntRect&) OVERRIDE;
+    virtual void scroll(const WebCore::IntRect& scrollRect, const WebCore::IntSize& scrollDelta);
+    virtual void pageBackgroundTransparencyChanged() OVERRIDE;
     virtual void setLayerTreeStateIsFrozen(bool);
     virtual bool layerTreeStateIsFrozen() const { return m_layerTreeStateIsFrozen; }
     virtual LayerTreeHost* layerTreeHost() const { return m_layerTreeHost.get(); }
     virtual void forceRepaint();
     virtual bool forceRepaintAsync(uint64_t callbackID);
 
-    virtual void didInstallPageOverlay();
-    virtual void didUninstallPageOverlay();
-    virtual void setPageOverlayNeedsDisplay(const WebCore::IntRect&);
-    virtual void setPageOverlayOpacity(float);
+    virtual void didInstallPageOverlay(PageOverlay*);
+    virtual void didUninstallPageOverlay(PageOverlay*);
+    virtual void setPageOverlayNeedsDisplay(PageOverlay*, const WebCore::IntRect&);
+    virtual void setPageOverlayOpacity(PageOverlay*, float);
     virtual bool pageOverlayShouldApplyFadeWhenPainting() const;
 
     virtual void setPaintingEnabled(bool);
@@ -74,16 +76,12 @@ private:
     virtual void scheduleCompositingLayerFlush() OVERRIDE;
 #endif
 
-#if PLATFORM(WIN)
-    virtual void scheduleChildWindowGeometryUpdate(const WindowGeometry&);
-#endif
-
 #if PLATFORM(MAC)
     virtual void setLayerHostingMode(uint32_t) OVERRIDE;
 #endif
 
 #if USE(COORDINATED_GRAPHICS)
-    virtual void didReceiveLayerTreeCoordinatorMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::MessageDecoder&);
+    virtual void didReceiveCoordinatedLayerTreeHostMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&);
 #endif
 
     // CoreIPC message handlers.
@@ -92,8 +90,6 @@ private:
     virtual void suspendPainting();
     virtual void resumePainting();
     
-    virtual void pageCustomRepresentationChanged();
-
     void sendDidUpdateBackingStoreState();
 
     void enterAcceleratedCompositingMode(WebCore::GraphicsLayer*);
@@ -105,7 +101,6 @@ private:
     void displayTimerFired();
     void display();
     void display(UpdateInfo&);
-    PassOwnPtr<WebCore::GraphicsContext> createGraphicsContext(ShareableBitmap*);
 
     uint64_t m_backingStoreStateID;
 

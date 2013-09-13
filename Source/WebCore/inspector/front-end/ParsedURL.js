@@ -87,6 +87,37 @@ WebInspector.ParsedURL = function(url)
 }
 
 /**
+ * @param {string} url
+ * @return {Array.<string>}
+ */
+WebInspector.ParsedURL.splitURL = function(url)
+{
+    var parsedURL = new WebInspector.ParsedURL(url);
+    var origin;
+    var folderPath;
+    var name;
+    if (parsedURL.isValid) {
+        origin = parsedURL.scheme + "://" + parsedURL.host;
+        if (parsedURL.port)
+            origin += ":" + parsedURL.port;
+        folderPath = parsedURL.folderPathComponents;
+        name = parsedURL.lastPathComponent;
+        if (parsedURL.queryParams)
+            name += "?" + parsedURL.queryParams;
+    } else {
+        origin = "";
+        folderPath = "";
+        name = url;
+    }
+    var result = [origin];
+    var splittedPath = folderPath.split("/");
+    for (var i = 1; i < splittedPath.length; ++i)
+        result.push(splittedPath[i]);
+    result.push(name);
+    return result;
+}
+
+/**
  * @param {string} baseURL
  * @param {string} href
  * @return {?string}
@@ -108,6 +139,8 @@ WebInspector.ParsedURL.completeURL = function(baseURL, href)
 
     var parsedURL = baseURL.asParsedURL();
     if (parsedURL) {
+        if (parsedURL.isDataURL())
+            return href;
         var path = href;
         if (path.charAt(0) !== "/") {
             var basePath = parsedURL.path;
@@ -150,8 +183,8 @@ WebInspector.ParsedURL.prototype = {
             return this.url;
 
         this._displayName = this.lastPathComponent;
-        if (!this._displayName)
-            this._displayName = this.host;
+        if (!this._displayName && this.host)
+            this._displayName = this.host + "/";
         if (!this._displayName && this.url)
             this._displayName = this.url.trimURL(WebInspector.inspectedPageDomain ? WebInspector.inspectedPageDomain : "");
         if (this._displayName === "/")

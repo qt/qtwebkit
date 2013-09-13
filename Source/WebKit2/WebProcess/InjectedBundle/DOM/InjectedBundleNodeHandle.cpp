@@ -26,11 +26,16 @@
 #include "config.h"
 #include "InjectedBundleNodeHandle.h"
 
+#include "ShareableBitmap.h"
 #include "WebFrame.h"
 #include "WebFrameLoaderClient.h"
+#include "WebImage.h"
 #include <JavaScriptCore/APICast.h>
 #include <WebCore/Document.h>
 #include <WebCore/Frame.h>
+#include <WebCore/FrameLoader.h>
+#include <WebCore/FrameView.h>
+#include <WebCore/GraphicsContext.h>
 #include <WebCore/HTMLFrameElement.h>
 #include <WebCore/HTMLIFrameElement.h>
 #include <WebCore/HTMLInputElement.h>
@@ -40,6 +45,8 @@
 #include <WebCore/IntRect.h>
 #include <WebCore/JSNode.h>
 #include <WebCore/Node.h>
+#include <WebCore/Page.h>
+#include <WebCore/RenderObject.h>
 #include <wtf/HashMap.h>
 #include <wtf/text/WTFString.h>
 
@@ -109,7 +116,7 @@ IntRect InjectedBundleNodeHandle::elementBounds() const
     if (!m_node->isElementNode())
         return IntRect();
 
-    return static_cast<Element*>(m_node.get())->boundsInRootViewSpace();
+    return toElement(m_node.get())->boundsInRootViewSpace();
 }
     
 IntRect InjectedBundleNodeHandle::renderRect(bool* isReplaced) const
@@ -117,44 +124,98 @@ IntRect InjectedBundleNodeHandle::renderRect(bool* isReplaced) const
     return m_node.get()->pixelSnappedRenderRect(isReplaced);
 }
 
+static PassRefPtr<WebImage> imageForRect(FrameView* frameView, const IntRect& rect, SnapshotOptions options)
+{
+    IntSize bitmapSize = rect.size();
+    float scaleFactor = frameView->frame()->page()->deviceScaleFactor();
+    bitmapSize.scale(scaleFactor);
+
+    RefPtr<WebImage> snapshot = WebImage::create(bitmapSize, snapshotOptionsToImageOptions(options));
+    if (!snapshot->bitmap())
+        return 0;
+
+    OwnPtr<GraphicsContext> graphicsContext = snapshot->bitmap()->createGraphicsContext();
+    graphicsContext->clearRect(IntRect(IntPoint(), bitmapSize));
+    graphicsContext->applyDeviceScaleFactor(scaleFactor);
+    graphicsContext->translate(-rect.x(), -rect.y());
+
+    FrameView::SelectionInSnaphot shouldPaintSelection = FrameView::IncludeSelection;
+    if (options & SnapshotOptionsExcludeSelectionHighlighting)
+        shouldPaintSelection = FrameView::ExcludeSelection;
+
+    frameView->paintContentsForSnapshot(graphicsContext.get(), rect, shouldPaintSelection, FrameView::DocumentCoordinates);
+
+    return snapshot.release();
+}
+
+PassRefPtr<WebImage> InjectedBundleNodeHandle::renderedImage(SnapshotOptions options)
+{
+    Document* document = m_node->document();
+    if (!document)
+        return 0;
+
+    Frame* frame = document->frame();
+    if (!frame)
+        return 0;
+
+    FrameView* frameView = frame->view();
+    if (!frameView)
+        return 0;
+
+    document->updateLayout();
+
+    RenderObject* renderer = m_node->renderer();
+    if (!renderer)
+        return 0;
+
+    LayoutRect topLevelRect;
+    IntRect paintingRect = pixelSnappedIntRect(renderer->paintingRootRect(topLevelRect));
+
+    frameView->setNodeToDraw(m_node.get());
+    RefPtr<WebImage> image = imageForRect(frameView, paintingRect, options);
+    frameView->setNodeToDraw(0);
+
+    return image.release();
+}
+
 void InjectedBundleNodeHandle::setHTMLInputElementValueForUser(const String& value)
 {
-    if (!m_node->hasTagName(inputTag))
+    if (!isHTMLInputElement(m_node.get()))
         return;
 
-    static_cast<HTMLInputElement*>(m_node.get())->setValueForUser(value);
+    toHTMLInputElement(m_node.get())->setValueForUser(value);
 }
 
 bool InjectedBundleNodeHandle::isHTMLInputElementAutofilled() const
 {
-    if (!m_node->hasTagName(inputTag))
+    if (!isHTMLInputElement(m_node.get()))
         return false;
     
-    return static_cast<HTMLInputElement*>(m_node.get())->isAutofilled();
+    return toHTMLInputElement(m_node.get())->isAutofilled();
 }
 
 void InjectedBundleNodeHandle::setHTMLInputElementAutofilled(bool filled)
 {
-    if (!m_node->hasTagName(inputTag))
+    if (!isHTMLInputElement(m_node.get()))
         return;
 
-    static_cast<HTMLInputElement*>(m_node.get())->setAutofilled(filled);
+    toHTMLInputElement(m_node.get())->setAutofilled(filled);
 }
 
 bool InjectedBundleNodeHandle::htmlInputElementLastChangeWasUserEdit()
 {
-    if (!m_node->hasTagName(inputTag))
+    if (!isHTMLInputElement(m_node.get()))
         return false;
 
-    return static_cast<HTMLInputElement*>(m_node.get())->lastChangeWasUserEdit();
+    return toHTMLInputElement(m_node.get())->lastChangeWasUserEdit();
 }
 
 bool InjectedBundleNodeHandle::htmlTextAreaElementLastChangeWasUserEdit()
 {
-    if (!m_node->hasTagName(textareaTag))
+    if (!isHTMLTextAreaElement(m_node.get()))
         return false;
 
-    return static_cast<HTMLTextAreaElement*>(m_node.get())->lastChangeWasUserEdit();
+    return toHTMLTextAreaElement(m_node.get())->lastChangeWasUserEdit();
 }
 
 PassRefPtr<InjectedBundleNodeHandle> InjectedBundleNodeHandle::htmlTableCellElementCellAbove()
@@ -174,7 +235,8 @@ PassRefPtr<WebFrame> InjectedBundleNodeHandle::documentFrame()
     if (!frame)
         return 0;
 
-    return static_cast<WebFrameLoaderClient*>(frame->loader()->client())->webFrame();
+    WebFrameLoaderClient* webFrameLoaderClient = toWebFrameLoaderClient(frame->loader()->client());
+    return webFrameLoaderClient ? webFrameLoaderClient->webFrame() : 0;
 }
 
 PassRefPtr<WebFrame> InjectedBundleNodeHandle::htmlFrameElementContentFrame()
@@ -186,7 +248,8 @@ PassRefPtr<WebFrame> InjectedBundleNodeHandle::htmlFrameElementContentFrame()
     if (!frame)
         return 0;
 
-    return static_cast<WebFrameLoaderClient*>(frame->loader()->client())->webFrame();
+    WebFrameLoaderClient* webFrameLoaderClient = toWebFrameLoaderClient(frame->loader()->client());
+    return webFrameLoaderClient ? webFrameLoaderClient->webFrame() : 0;
 }
 
 PassRefPtr<WebFrame> InjectedBundleNodeHandle::htmlIFrameElementContentFrame()
@@ -194,11 +257,12 @@ PassRefPtr<WebFrame> InjectedBundleNodeHandle::htmlIFrameElementContentFrame()
     if (!m_node->hasTagName(iframeTag))
         return 0;
 
-    Frame* frame = static_cast<HTMLIFrameElement*>(m_node.get())->contentFrame();
+    Frame* frame = toHTMLIFrameElement(m_node.get())->contentFrame();
     if (!frame)
         return 0;
 
-    return static_cast<WebFrameLoaderClient*>(frame->loader()->client())->webFrame();
+    WebFrameLoaderClient* webFrameLoaderClient = toWebFrameLoaderClient(frame->loader()->client());
+    return webFrameLoaderClient ? webFrameLoaderClient->webFrame() : 0;
 }
 
 } // namespace WebKit

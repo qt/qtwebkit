@@ -36,8 +36,8 @@ public:
     typedef JSDOMWrapper Base;
     static JSTestInterface* create(JSC::Structure* structure, JSDOMGlobalObject* globalObject, PassRefPtr<TestInterface> impl)
     {
-        JSTestInterface* ptr = new (NotNull, JSC::allocateCell<JSTestInterface>(globalObject->globalData().heap)) JSTestInterface(structure, globalObject, impl);
-        ptr->finishCreation(globalObject->globalData());
+        JSTestInterface* ptr = new (NotNull, JSC::allocateCell<JSTestInterface>(globalObject->vm().heap)) JSTestInterface(structure, globalObject, impl);
+        ptr->finishCreation(globalObject->vm());
         return ptr;
     }
 
@@ -51,14 +51,20 @@ public:
     ~JSTestInterface();
     static const JSC::ClassInfo s_info;
 
-    static JSC::Structure* createStructure(JSC::JSGlobalData& globalData, JSC::JSGlobalObject* globalObject, JSC::JSValue prototype)
+    static JSC::Structure* createStructure(JSC::VM& vm, JSC::JSGlobalObject* globalObject, JSC::JSValue prototype)
     {
-        return JSC::Structure::create(globalData, globalObject, prototype, JSC::TypeInfo(JSC::ObjectType, StructureFlags), &s_info);
+        return JSC::Structure::create(vm, globalObject, prototype, JSC::TypeInfo(JSC::ObjectType, StructureFlags), &s_info);
     }
 
     static JSC::JSValue getConstructor(JSC::ExecState*, JSC::JSGlobalObject*);
 
     // Custom attributes
+#if ENABLE(Condition22) || ENABLE(Condition23)
+    JSC::JSValue implementsStr3(JSC::ExecState*) const;
+#endif
+#if ENABLE(Condition22) || ENABLE(Condition23)
+    void setImplementsStr3(JSC::ExecState*, JSC::JSValue);
+#endif
 #if ENABLE(Condition11) || ENABLE(Condition12)
     JSC::JSValue supplementalStr3(JSC::ExecState*) const;
 #endif
@@ -67,19 +73,28 @@ public:
 #endif
 
     // Custom functions
+#if ENABLE(Condition22) || ENABLE(Condition23)
+    JSC::JSValue implementsMethod3(JSC::ExecState*);
+#endif
 #if ENABLE(Condition11) || ENABLE(Condition12)
     JSC::JSValue supplementalMethod3(JSC::ExecState*);
 #endif
     TestInterface* impl() const { return m_impl; }
     void releaseImpl() { m_impl->deref(); m_impl = 0; }
 
-    void releaseImplIfNotNull() { if (m_impl) { m_impl->deref(); m_impl = 0; } }
+    void releaseImplIfNotNull()
+    {
+        if (m_impl) {
+            m_impl->deref();
+            m_impl = 0;
+        }
+    }
 
 private:
     TestInterface* m_impl;
 protected:
     JSTestInterface(JSC::Structure*, JSDOMGlobalObject*, PassRefPtr<TestInterface>);
-    void finishCreation(JSC::JSGlobalData&);
+    void finishCreation(JSC::VM&);
     static const unsigned StructureFlags = JSC::OverridesGetOwnPropertySlot | JSC::InterceptsGetOwnPropertySlotByIndexEvenWhenLengthIsNotZero | Base::StructureFlags;
 };
 
@@ -107,23 +122,23 @@ class JSTestInterfacePrototype : public JSC::JSNonFinalObject {
 public:
     typedef JSC::JSNonFinalObject Base;
     static JSC::JSObject* self(JSC::ExecState*, JSC::JSGlobalObject*);
-    static JSTestInterfacePrototype* create(JSC::JSGlobalData& globalData, JSC::JSGlobalObject* globalObject, JSC::Structure* structure)
+    static JSTestInterfacePrototype* create(JSC::VM& vm, JSC::JSGlobalObject* globalObject, JSC::Structure* structure)
     {
-        JSTestInterfacePrototype* ptr = new (NotNull, JSC::allocateCell<JSTestInterfacePrototype>(globalData.heap)) JSTestInterfacePrototype(globalData, globalObject, structure);
-        ptr->finishCreation(globalData);
+        JSTestInterfacePrototype* ptr = new (NotNull, JSC::allocateCell<JSTestInterfacePrototype>(vm.heap)) JSTestInterfacePrototype(vm, globalObject, structure);
+        ptr->finishCreation(vm);
         return ptr;
     }
 
     static const JSC::ClassInfo s_info;
     static bool getOwnPropertySlot(JSC::JSCell*, JSC::ExecState*, JSC::PropertyName, JSC::PropertySlot&);
     static bool getOwnPropertyDescriptor(JSC::JSObject*, JSC::ExecState*, JSC::PropertyName, JSC::PropertyDescriptor&);
-    static JSC::Structure* createStructure(JSC::JSGlobalData& globalData, JSC::JSGlobalObject* globalObject, JSC::JSValue prototype)
+    static JSC::Structure* createStructure(JSC::VM& vm, JSC::JSGlobalObject* globalObject, JSC::JSValue prototype)
     {
-        return JSC::Structure::create(globalData, globalObject, prototype, JSC::TypeInfo(JSC::ObjectType, StructureFlags), &s_info);
+        return JSC::Structure::create(vm, globalObject, prototype, JSC::TypeInfo(JSC::ObjectType, StructureFlags), &s_info);
     }
 
 private:
-    JSTestInterfacePrototype(JSC::JSGlobalData& globalData, JSC::JSGlobalObject*, JSC::Structure* structure) : JSC::JSNonFinalObject(globalData, structure) { }
+    JSTestInterfacePrototype(JSC::VM& vm, JSC::JSGlobalObject*, JSC::Structure* structure) : JSC::JSNonFinalObject(vm, structure) { }
 protected:
     static const unsigned StructureFlags = JSC::OverridesGetOwnPropertySlot | Base::StructureFlags;
 };
@@ -145,18 +160,32 @@ public:
     static bool getOwnPropertySlot(JSC::JSCell*, JSC::ExecState*, JSC::PropertyName, JSC::PropertySlot&);
     static bool getOwnPropertyDescriptor(JSC::JSObject*, JSC::ExecState*, JSC::PropertyName, JSC::PropertyDescriptor&);
     static const JSC::ClassInfo s_info;
-    static JSC::Structure* createStructure(JSC::JSGlobalData& globalData, JSC::JSGlobalObject* globalObject, JSC::JSValue prototype)
+    static JSC::Structure* createStructure(JSC::VM& vm, JSC::JSGlobalObject* globalObject, JSC::JSValue prototype)
     {
-        return JSC::Structure::create(globalData, globalObject, prototype, JSC::TypeInfo(JSC::ObjectType, StructureFlags), &s_info);
+        return JSC::Structure::create(vm, globalObject, prototype, JSC::TypeInfo(JSC::ObjectType, StructureFlags), &s_info);
     }
 protected:
     static const unsigned StructureFlags = JSC::OverridesGetOwnPropertySlot | JSC::ImplementsHasInstance | DOMConstructorObject::StructureFlags;
     static JSC::EncodedJSValue JSC_HOST_CALL constructJSTestInterface(JSC::ExecState*);
+#if ENABLE(TEST_INTERFACE)
     static JSC::ConstructType getConstructData(JSC::JSCell*, JSC::ConstructData&);
+#endif // ENABLE(TEST_INTERFACE)
 };
 
 // Functions
 
+#if ENABLE(Condition22) || ENABLE(Condition23)
+JSC::EncodedJSValue JSC_HOST_CALL jsTestInterfacePrototypeFunctionImplementsMethod1(JSC::ExecState*);
+#endif
+#if ENABLE(Condition22) || ENABLE(Condition23)
+JSC::EncodedJSValue JSC_HOST_CALL jsTestInterfacePrototypeFunctionImplementsMethod2(JSC::ExecState*);
+#endif
+#if ENABLE(Condition22) || ENABLE(Condition23)
+JSC::EncodedJSValue JSC_HOST_CALL jsTestInterfacePrototypeFunctionImplementsMethod3(JSC::ExecState*);
+#endif
+#if ENABLE(Condition22) || ENABLE(Condition23)
+JSC::EncodedJSValue JSC_HOST_CALL jsTestInterfaceConstructorFunctionImplementsMethod4(JSC::ExecState*);
+#endif
 #if ENABLE(Condition11) || ENABLE(Condition12)
 JSC::EncodedJSValue JSC_HOST_CALL jsTestInterfacePrototypeFunctionSupplementalMethod1(JSC::ExecState*);
 #endif
@@ -171,6 +200,28 @@ JSC::EncodedJSValue JSC_HOST_CALL jsTestInterfaceConstructorFunctionSupplemental
 #endif
 // Attributes
 
+#if ENABLE(Condition22) || ENABLE(Condition23)
+JSC::JSValue jsTestInterfaceConstructorImplementsStaticReadOnlyAttr(JSC::ExecState*, JSC::JSValue, JSC::PropertyName);
+#endif
+#if ENABLE(Condition22) || ENABLE(Condition23)
+JSC::JSValue jsTestInterfaceConstructorImplementsStaticAttr(JSC::ExecState*, JSC::JSValue, JSC::PropertyName);
+void setJSTestInterfaceConstructorImplementsStaticAttr(JSC::ExecState*, JSC::JSObject*, JSC::JSValue);
+#endif
+#if ENABLE(Condition22) || ENABLE(Condition23)
+JSC::JSValue jsTestInterfaceImplementsStr1(JSC::ExecState*, JSC::JSValue, JSC::PropertyName);
+#endif
+#if ENABLE(Condition22) || ENABLE(Condition23)
+JSC::JSValue jsTestInterfaceImplementsStr2(JSC::ExecState*, JSC::JSValue, JSC::PropertyName);
+void setJSTestInterfaceImplementsStr2(JSC::ExecState*, JSC::JSObject*, JSC::JSValue);
+#endif
+#if ENABLE(Condition22) || ENABLE(Condition23)
+JSC::JSValue jsTestInterfaceImplementsStr3(JSC::ExecState*, JSC::JSValue, JSC::PropertyName);
+void setJSTestInterfaceImplementsStr3(JSC::ExecState*, JSC::JSObject*, JSC::JSValue);
+#endif
+#if ENABLE(Condition22) || ENABLE(Condition23)
+JSC::JSValue jsTestInterfaceImplementsNode(JSC::ExecState*, JSC::JSValue, JSC::PropertyName);
+void setJSTestInterfaceImplementsNode(JSC::ExecState*, JSC::JSObject*, JSC::JSValue);
+#endif
 #if ENABLE(Condition11) || ENABLE(Condition12)
 JSC::JSValue jsTestInterfaceConstructorSupplementalStaticReadOnlyAttr(JSC::ExecState*, JSC::JSValue, JSC::PropertyName);
 #endif
@@ -196,6 +247,12 @@ void setJSTestInterfaceSupplementalNode(JSC::ExecState*, JSC::JSObject*, JSC::JS
 JSC::JSValue jsTestInterfaceConstructor(JSC::ExecState*, JSC::JSValue, JSC::PropertyName);
 // Constants
 
+#if ENABLE(Condition22) || ENABLE(Condition23)
+JSC::JSValue jsTestInterfaceIMPLEMENTSCONSTANT1(JSC::ExecState*, JSC::JSValue, JSC::PropertyName);
+#endif
+#if ENABLE(Condition22) || ENABLE(Condition23)
+JSC::JSValue jsTestInterfaceIMPLEMENTSCONSTANT2(JSC::ExecState*, JSC::JSValue, JSC::PropertyName);
+#endif
 #if ENABLE(Condition11) || ENABLE(Condition12)
 JSC::JSValue jsTestInterfaceSUPPLEMENTALCONSTANT1(JSC::ExecState*, JSC::JSValue, JSC::PropertyName);
 #endif

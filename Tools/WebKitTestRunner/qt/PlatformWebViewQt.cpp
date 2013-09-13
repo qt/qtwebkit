@@ -47,7 +47,10 @@ public:
         : QQuickView(QUrl("data:text/plain,import QtQuick 2.0\nItem { objectName: 'root' }"))
         , m_view(view)
     {
-        connect(this, SIGNAL(statusChanged(QQuickView::Status)), SLOT(handleStatusChanged(QQuickView::Status)));
+        if (status() == QQuickView::Ready)
+            handleStatusChanged(QQuickView::Ready);
+        else
+            connect(this, SIGNAL(statusChanged(QQuickView::Status)), SLOT(handleStatusChanged(QQuickView::Status)));
     }
 
 private Q_SLOTS:
@@ -65,6 +68,11 @@ private Q_SLOTS:
         if (PlatformWebView::windowShapshotEnabled()) {
             setSurfaceType(OpenGLSurface);
             create();
+#if QT_VERSION < QT_VERSION_CHECK(5, 1, 0)
+            QQuickWindowPrivate::get(this)->setRenderWithoutShowing(true);
+#else
+            m_view->experimental()->setRenderToOffscreenBuffer(true);
+#endif
         } else
             m_view->experimental()->setRenderToOffscreenBuffer(true);
 
@@ -76,8 +84,9 @@ private:
     QQuickWebView* m_view;
 };
 
-PlatformWebView::PlatformWebView(WKContextRef contextRef, WKPageGroupRef pageGroupRef, WKDictionaryRef options)
+PlatformWebView::PlatformWebView(WKContextRef contextRef, WKPageGroupRef pageGroupRef, WKPageRef /* relatedPage */, WKDictionaryRef options)
     : m_windowIsKey(true)
+    , m_options(options)
     , m_modalEventLoop(0)
 {
     WKRetainPtr<WKStringRef> useFixedLayoutKey(AdoptWK, WKStringCreateWithUTF8CString("UseFixedLayout"));
@@ -119,6 +128,7 @@ WKPageRef PlatformWebView::page()
 
 void PlatformWebView::focus()
 {
+    QWindowSystemInterface::handleWindowActivated(m_window);
     m_view->setFocus(true);
 }
 
@@ -181,6 +191,10 @@ bool PlatformWebView::viewSupportsOptions(WKDictionaryRef options) const
     WKRetainPtr<WKStringRef> useFixedLayoutKey(AdoptWK, WKStringCreateWithUTF8CString("UseFixedLayout"));
 
     return m_usingFixedLayout == (options ? WKBooleanGetValue(static_cast<WKBooleanRef>(WKDictionaryGetItemForKey(options, useFixedLayoutKey.get()))) : false);
+}
+
+void PlatformWebView::didInitializeClients()
+{
 }
 
 } // namespace WTR

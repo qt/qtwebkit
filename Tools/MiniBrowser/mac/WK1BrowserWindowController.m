@@ -26,6 +26,7 @@
 #import "WK1BrowserWindowController.h"
 
 #import <WebKit/WebKit.h>
+#import <WebKit/WebViewPrivate.h>
 #import "AppDelegate.h"
 
 @interface WK1BrowserWindowController ()
@@ -48,6 +49,9 @@
 
 - (void)dealloc
 {
+    [_webView setFrameLoadDelegate:nil];
+    [_webView setUIDelegate:nil];
+    [_webView setResourceLoadDelegate:nil];
     [_webView release];
 
     [super dealloc];
@@ -105,11 +109,6 @@
     [_webView goForward:sender];
 }
 
-- (BOOL)isPaginated
-{
-    return NO;
-}
-
 - (BOOL)validateMenuItem:(NSMenuItem *)menuItem
 {
     SEL action = [menuItem action];
@@ -129,6 +128,8 @@
         [menuItem setState:_zoomTextOnly ? NSOnState : NSOffState];
     else if ([menuItem action] == @selector(togglePaginationMode:))
         [menuItem setState:[self isPaginated] ? NSOnState : NSOffState];
+    else if ([menuItem action] == @selector(toggleTransparentWindow:))
+        [menuItem setState:[[self window] isOpaque] ? NSOffState : NSOnState];
 
     return YES;
 }
@@ -216,8 +217,36 @@
     _zoomTextOnly = !_zoomTextOnly;
 }
 
+- (BOOL)isPaginated
+{
+    return [_webView _paginationMode] != WebPaginationModeUnpaginated;
+}
+
 - (IBAction)togglePaginationMode:(id)sender
 {
+    if ([self isPaginated]) {
+        [_webView _setPaginationMode:WebPaginationModeUnpaginated];
+    } else {
+        [_webView _setPaginationMode:WebPaginationModeRightToLeft];
+        [_webView _setPageLength:_webView.bounds.size.width / 2];
+        [_webView _setGapBetweenPages:10];
+    }
+}
+
+- (IBAction)toggleTransparentWindow:(id)sender
+{
+    BOOL isTransparent = ![[self window] isOpaque];
+    isTransparent = !isTransparent;
+    
+    [[self window] setOpaque:!isTransparent];
+    [[self window] setHasShadow:!isTransparent];
+
+    if (isTransparent)
+        [_webView setBackgroundColor:[NSColor clearColor]];
+    else
+        [_webView setBackgroundColor:[NSColor whiteColor]];
+
+    [[self window] display];
 }
 
 - (IBAction)find:(id)sender
@@ -248,6 +277,18 @@
         return;
 
     [[self window] setTitle:[title stringByAppendingString:@" [WK1]"]];
+}
+
+- (void)webView:(WebView *)sender runJavaScriptAlertPanelWithMessage:(NSString *)message initiatedByFrame:(WebFrame *)frame
+{
+    NSAlert *alert = [[NSAlert alloc] init];
+    [alert addButtonWithTitle:@"OK"];
+
+    alert.messageText = [NSString stringWithFormat:@"JavaScript alert dialog from %@.", frame.dataSource.request.URL.absoluteString];
+    alert.informativeText = message;
+
+    [alert runModal];
+    [alert release];
 }
 
 @end

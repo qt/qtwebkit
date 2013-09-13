@@ -198,7 +198,7 @@ PluginPackage* PluginDatabase::pluginForMIMEType(const String& mimeType)
 
     String key = mimeType.lower();
     PluginSet::const_iterator end = m_plugins.end();
-    PluginPackage* preferredPlugin = m_preferredPlugins.get(key).get();
+    PluginPackage* preferredPlugin = m_preferredPlugins.get(key);
     if (preferredPlugin
         && preferredPlugin->isEnabled()
         && preferredPlugin->mimeToDescriptions().contains(key)) {
@@ -248,7 +248,7 @@ String PluginDatabase::MIMETypeForExtension(const String& extension) const
 
         for (MIMEToExtensionsMap::const_iterator mime_it = (*it)->mimeToExtensions().begin(); mime_it != mime_end; ++mime_it) {
             mimeType = mime_it->key;
-            PluginPackage* preferredPlugin = m_preferredPlugins.get(mimeType).get();
+            PluginPackage* preferredPlugin = m_preferredPlugins.get(mimeType);
             const Vector<String>& extensions = mime_it->value;
             bool foundMapping = false;
             for (unsigned i = 0; i < extensions.size(); i++) {
@@ -312,11 +312,20 @@ void PluginDatabase::setPreferredPluginForMIMEType(const String& mimeType, Plugi
         m_preferredPlugins.set(mimeType.lower(), plugin);
 }
 
+bool PluginDatabase::fileExistsAndIsNotDisabled(const String& filePath) const
+{
+    // Skip plugin files that are disabled by filename.
+    if (m_disabledPluginFiles.contains(pathGetFileName(filePath)))
+        return false;
+
+    return fileExists(filePath);
+}
+
 void PluginDatabase::getDeletedPlugins(PluginSet& plugins) const
 {
     PluginSet::const_iterator end = m_plugins.end();
     for (PluginSet::const_iterator it = m_plugins.begin(); it != end; ++it) {
-        if (!fileExists((*it)->path()))
+        if (!fileExistsAndIsNotDisabled((*it)->path()))
             plugins.add(*it);
     }
 }
@@ -360,6 +369,20 @@ void PluginDatabase::clear()
 #endif
 }
 
+bool PluginDatabase::removeDisabledPluginFile(const String& fileName)
+{
+    if (!m_disabledPluginFiles.contains(fileName))
+        return false;
+
+    m_disabledPluginFiles.remove(fileName);
+    return true;
+}
+
+bool PluginDatabase::addDisabledPluginFile(const String& fileName)
+{
+    return m_disabledPluginFiles.add(fileName).isNewEntry;
+}
+
 #if (!OS(WINCE)) && (!OS(WINDOWS) || !ENABLE(NETSCAPE_PLUGIN_API))
 // For Safari/Win the following three methods are implemented
 // in PluginDatabaseWin.cpp, but if we can use WebCore constructs
@@ -370,7 +393,7 @@ Vector<String> PluginDatabase::defaultPluginDirectories()
     Vector<String> paths;
 
     // Add paths specific to each platform
-#if defined(XP_UNIX)
+#if defined(XP_UNIX) && !PLATFORM(BLACKBERRY)
     String userPluginPath = homeDirectoryPath();
     userPluginPath.append(String("/.mozilla/plugins"));
     paths.append(userPluginPath);
@@ -405,7 +428,9 @@ Vector<String> PluginDatabase::defaultPluginDirectories()
     Vector<String> mozPaths;
     String mozPath(getenv("MOZ_PLUGIN_PATH"));
     mozPath.split(UChar(':'), /* allowEmptyEntries */ false, mozPaths);
-    paths.append(mozPaths);
+    paths.appendVector(mozPaths);
+#elif PLATFORM(BLACKBERRY)
+    paths.append(BlackBerry::Platform::Settings::instance()->applicationPluginDirectory().c_str());
 #elif defined(XP_MACOSX)
     String userPluginPath = homeDirectoryPath();
     userPluginPath.append(String("/Library/Internet Plug-Ins"));
@@ -422,7 +447,7 @@ Vector<String> PluginDatabase::defaultPluginDirectories()
     Vector<String> qtPaths;
     String qtPath(qgetenv("QTWEBKIT_PLUGIN_PATH").constData());
     qtPath.split(UChar(':'), /* allowEmptyEntries */ false, qtPaths);
-    paths.append(qtPaths);
+    paths.appendVector(qtPaths);
 #endif
 
     return paths;
@@ -432,10 +457,10 @@ bool PluginDatabase::isPreferredPluginDirectory(const String& path)
 {
     String preferredPath = homeDirectoryPath();
 
-#if PLATFORM(BLACKBERRY)
-    preferredPath = BlackBerry::Platform::Settings::instance()->applicationPluginDirectory().c_str();
-#elif defined(XP_UNIX)
+#if defined(XP_UNIX) && !PLATFORM(BLACKBERRY)
     preferredPath.append(String("/.mozilla/plugins"));
+#elif PLATFORM(BLACKBERRY)
+    preferredPath = BlackBerry::Platform::Settings::instance()->applicationPluginDirectory().c_str();
 #elif defined(XP_MACOSX)
     preferredPath.append(String("/Library/Internet Plug-Ins"));
 #elif defined(XP_WIN)
@@ -462,7 +487,7 @@ void PluginDatabase::getPluginPathsInDirectories(HashSet<String>& paths) const
         Vector<String> pluginPaths = listDirectory(*dIt, fileNameFilter);
         Vector<String>::const_iterator pluginsEnd = pluginPaths.end();
         for (Vector<String>::const_iterator pIt = pluginPaths.begin(); pIt != pluginsEnd; ++pIt) {
-            if (!fileExists(*pIt))
+            if (!fileExistsAndIsNotDisabled(*pIt))
                 continue;
 
             paths.add(*pIt);

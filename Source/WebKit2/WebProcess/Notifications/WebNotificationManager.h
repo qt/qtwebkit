@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2012, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,6 +27,7 @@
 #define WebNotificationManager_h
 
 #include "MessageReceiver.h"
+#include "WebProcessSupplement.h"
 #include <WebCore/NotificationClient.h>
 #include <wtf/HashMap.h>
 #include <wtf/Noncopyable.h>
@@ -44,13 +45,13 @@ namespace WebKit {
 class WebPage;
 class WebProcess;
 
-class WebNotificationManager : private CoreIPC::MessageReceiver {
+class WebNotificationManager : public WebProcessSupplement, public CoreIPC::MessageReceiver {
     WTF_MAKE_NONCOPYABLE(WebNotificationManager);
 public:
     explicit WebNotificationManager(WebProcess*);
     ~WebNotificationManager();
 
-    void initialize(const HashMap<String, bool>& permissions);
+    static const char* supplementName();
     
     bool show(WebCore::Notification*, WebPage*);
     void cancel(WebCore::Notification*, WebPage*);
@@ -67,11 +68,12 @@ public:
     uint64_t notificationIDForTesting(WebCore::Notification*);
 
 private:
-    // CoreIPC::MessageReceiver
-    void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::MessageDecoder&) OVERRIDE;
+    // WebProcessSupplement
+    virtual void initialize(const WebProcessCreationParameters&) OVERRIDE;
 
+    // CoreIPC::MessageReceiver
     // Implemented in generated WebNotificationManagerMessageReceiver.cpp
-    void didReceiveWebNotificationManagerMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::MessageDecoder&);
+    virtual void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&) OVERRIDE;
     
     void didShowNotification(uint64_t notificationID);
     void didClickNotification(uint64_t notificationID);
@@ -88,10 +90,10 @@ private:
     typedef HashMap<RefPtr<WebCore::Notification>, uint64_t> NotificationMap;
     NotificationMap m_notificationMap;
     
-    typedef HashMap<uint64_t, RefPtr<WebCore::Notification> > NotificationIDMap;
+    typedef HashMap<uint64_t, RefPtr<WebCore::Notification>> NotificationIDMap;
     NotificationIDMap m_notificationIDMap;
     
-    typedef HashMap<RefPtr<WebCore::ScriptExecutionContext>, Vector<uint64_t> > NotificationContextMap;
+    typedef HashMap<RefPtr<WebCore::ScriptExecutionContext>, Vector<uint64_t>> NotificationContextMap;
     NotificationContextMap m_notificationContextMap;
     
     HashMap<String, bool> m_permissionsMap;

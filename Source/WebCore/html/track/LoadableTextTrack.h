@@ -30,7 +30,6 @@
 
 #include "TextTrack.h"
 #include "TextTrackLoader.h"
-#include <wtf/PassRefPtr.h>
 #include <wtf/Vector.h>
 
 namespace WebCore {
@@ -60,6 +59,8 @@ public:
 
     size_t trackElementIndex();
     HTMLTrackElement* trackElement() { return m_trackElement; }
+    void setTrackElement(HTMLTrackElement*);
+    virtual Element* element() OVERRIDE;
 
     virtual bool isDefault() const OVERRIDE { return m_isDefault; }
     virtual void setIsDefault(bool isDefault) OVERRIDE  { m_isDefault = isDefault; }
@@ -70,6 +71,9 @@ private:
     virtual void newCuesAvailable(TextTrackLoader*);
     virtual void cueLoadingStarted(TextTrackLoader*);
     virtual void cueLoadingCompleted(TextTrackLoader*, bool loadingFailed);
+#if ENABLE(WEBVTT_REGIONS)
+    virtual void newRegionsAvailable(TextTrackLoader*);
+#endif
 
     LoadableTextTrack(HTMLTrackElement*, const String& kind, const String& label, const String& language);
 

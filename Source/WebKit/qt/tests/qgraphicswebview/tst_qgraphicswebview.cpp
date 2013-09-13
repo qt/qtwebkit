@@ -571,6 +571,7 @@ GraphicsView::GraphicsView()
 
 void tst_QGraphicsWebView::webglSoftwareFallbackVerticalOrientation()
 {
+    QSKIP("Hangs on X11 -- https://bugs.webkit.org/show_bug.cgi?id=105820");
     QSize canvasSize(100, 100);
     QImage reference(canvasSize, QImage::Format_ARGB32);
     reference.fill(0xFF00FF00);
@@ -590,6 +591,7 @@ void tst_QGraphicsWebView::webglSoftwareFallbackVerticalOrientation()
 
 void tst_QGraphicsWebView::webglSoftwareFallbackHorizontalOrientation()
 {
+    QSKIP("Hangs on X11 -- https://bugs.webkit.org/show_bug.cgi?id=105820");
     QSize canvasSize(100, 100);
     QImage reference(canvasSize, QImage::Format_ARGB32);
     reference.fill(0xFF00FF00);
@@ -670,6 +672,7 @@ void tst_QGraphicsWebView::windowResizeEvent()
     webView.page()->mainFrame()->addToJavaScriptWindowObject("resizeSpy",
                                                              &resizeSpy);
     webView.setGeometry(QRect(0, 0, 50, 50));
+    QEXPECT_FAIL("", "https://bugs.webkit.org/show_bug.cgi?id=118670", Continue);
     QVERIFY(::waitForSignal(&resizeSpy, SIGNAL(resized()), 1000));
     QCOMPARE(resizeSpy.size(), QSize(50, 50));
 

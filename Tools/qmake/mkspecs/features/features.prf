@@ -22,6 +22,7 @@ defineTest(detectFeatures) {
     }
 
     WEBKIT_CONFIG += use_tiled_backing_store
+    WEBKIT_CONFIG += use_cross_platform_context_menus
 
     # ------------- Prepare for feature detection -------------
 
@@ -36,6 +37,8 @@ defineTest(detectFeatures) {
     qtHaveModule(printsupport): WEBKIT_CONFIG += have_qtprintsupport
     qtHaveModule(widgets): WEBKIT_CONFIG += have_qstyle
     qtHaveModule(testlib): WEBKIT_CONFIG += have_qttestlib
+#    qtHaveModule(location): WEBKIT_CONFIG += have_qtlocation
+    qtHaveModule(sensors): WEBKIT_CONFIG += have_qtsensors
 
     config_libxml2: WEBKIT_CONFIG += use_libxml2
     config_libxslt: WEBKIT_CONFIG += xslt
@@ -71,7 +74,7 @@ defineTest(detectFeatures) {
             plugin_architecture_x11 \
             plugin_process
 
-    } else: mac|win32 {
+    } else: unix|win32-*:!embedded:!wince* {
         WEBKIT_CONFIG += netscape_plugin_api
         # WebKit2
         WEBKIT_CONFIG += plugin_architecture_unsupported
@@ -94,11 +97,13 @@ defineTest(detectFeatures) {
     # Enable CSS shaders when CSS filters and WebGL are enabled
     enable?(css_filters):enable?(webgl): WEBKIT_CONFIG += css_shaders
 
-    # Geolocation support if QtMobility exists
-    qtHaveModule(location): WEBKIT_CONFIG += geolocation
+    # Geolocation support if QtLocation exists or if we're doing a developer build (Mock implementation exists
+    # and used for layout tests)
+    have?(qtlocation)|!production_build: WEBKIT_CONFIG += geolocation
 
-    # Orientation support
-    qtHaveModule(sensors): WEBKIT_CONFIG += orientation_events device_orientation
+    # Orientation support if QtSensors exists or if we're doing a developer build (Mock implementation exists
+    # and used for layout tests)
+    have?(qtsensors)|!production_build: WEBKIT_CONFIG += orientation_events device_orientation
 
     # HTML5 Media Support for non-Mac builds
     !mac {
@@ -113,6 +118,10 @@ defineTest(detectFeatures) {
 
     !enable?(video):qtHaveModule(multimediawidgets) {
         WEBKIT_CONFIG += video use_qt_multimedia
+    }
+
+    !enable?(video) {
+        CONFIGURE_WARNINGS += "Missing GStreamer, QTKit or QtMultimedia, disabling media element support"
     }
 
     # Try to use an system wide SQlite installation
@@ -138,8 +147,6 @@ defineTest(detectFeatures) {
     enable?(touch_events): WEBKIT_CONFIG += touch_slider
 
 
-    # Minibrowser must be able to query for QtTestSupport
-    build?(qttestsupport): WEBKIT_CONFIG += have_qttestsupport
 
     # ---------------- Sanitize features -------------------
 
@@ -162,6 +169,12 @@ defineTest(santizeFeatures) {
 
     # WK2's plugin process code requires NPAPI
     !enable?(netscape_plugin_api): WEBKIT_CONFIG -= plugin_process
+
+    # Web Audio requires GStreamer.
+    !use?(gstreamer): WEBKIT_CONFIG -= web_audio
+
+    # Minibrowser must be able to query for QtTestSupport
+    build?(qttestsupport): WEBKIT_CONFIG += have_qttestsupport
 
     export(WEBKIT_CONFIG)
 }

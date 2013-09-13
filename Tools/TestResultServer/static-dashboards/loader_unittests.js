@@ -29,7 +29,11 @@
 module('loader');
 
 test('loading steps', 1, function() {
+    resetGlobals();
     var loadedSteps = [];
+    g_history._handleLocationChange = function() {
+        deepEqual(loadedSteps, ['step 1', 'step 2']);
+    }
     var resourceLoader = new loader.Loader();
     function loadingStep1() {
         loadedSteps.push('step 1');
@@ -40,21 +44,15 @@ test('loading steps', 1, function() {
         resourceLoader.load();
     }
 
-    var loadingCompleteCallback = resourceLoadingComplete;
-    resourceLoadingComplete = function() {
-        deepEqual(loadedSteps, ['step 1', 'step 2']);
-    }
-
-    try {
-        resourceLoader._loadingSteps = [loadingStep1, loadingStep2];
-        resourceLoader.load();
-    } finally {
-        resourceLoadingComplete = loadingCompleteCallback;
-    }
+    resourceLoader._loadingSteps = [loadingStep1, loadingStep2];
+    resourceLoader.load();
 });
 
-test('results files loading', 5, function() {
-    var expectedLoadedBuilders = ["WebKit Linux", "WebKit Win"];
+// Total number of assertions is 1 for the deepEqual of the builder lists
+// and then 2 per builder (one for ok, one for deepEqual of tests).
+test('results files loading', 9, function() {
+    resetGlobals();
+    var expectedLoadedBuilders =  ['Apple Lion Debug WK2 (Tests)', 'Apple Lion Release WK2 (Tests)', 'GTK Linux 64-bit Release', 'Qt Linux Tests'];
     var loadedBuilders = [];
     var resourceLoader = new loader.Loader();
     resourceLoader._loadNext = function() {
@@ -67,28 +65,25 @@ test('results files loading', 5, function() {
 
     var requestFunction = loader.request;
     loader.request = function(url, successCallback, errorCallback) {
-        var builderName = /builder=([\w ]+)&/.exec(url)[1];
+        var builderName = /builder=([\w ().-]+)&/.exec(url)[1];
         loadedBuilders.push(builderName);
         successCallback({responseText: '{"version": 4, "' + builderName + '": {"secondsSinceEpoch": [' + Date.now() + '], "tests": {}}}'});
     }
 
-    g_builders = {"WebKit Linux": true, "WebKit Win": true};
-
-    builders.masters['ChromiumWebkit'] = {'tests': {'layout-tests': {builders: ["WebKit Linux", "WebKit Win"]}}};
-    loadBuildersList('@ToT - chromium.org', 'layout-tests');
-
+    loadBuildersList('@ToT - webkit.org', 'layout-tests');
+ 
     try {
         resourceLoader._loadResultsFiles();
     } finally {
-        g_builders = undefined;
-        g_resultsByBuilder = {};
         loader.request = requestFunction;
     }
 });
 
 test('expectations files loading', 1, function() {
-    var expectedLoadedPlatforms = ["chromium", "chromium-android", "efl", "efl-wk1", "efl-wk2", "gtk",
-                                   "gtk-wk2", "mac", "mac-lion", "mac-snowleopard", "qt", "win", "wk2"];
+    resetGlobals();
+    g_history.parseCrossDashboardParameters();
+    var expectedLoadedPlatforms = ["efl", "efl-wk1", "efl-wk2", "gtk", "gtk-wk2",
+        "mac", "mac-lion", "mac-wk2", "mac-wk2", "qt", "win", "wk2"];
     var loadedPlatforms = [];
     var resourceLoader = new loader.Loader();
     resourceLoader._loadNext = function() {
@@ -109,10 +104,9 @@ test('expectations files loading', 1, function() {
 });
 
 test('results file failing to load', 2, function() {
-    // FIXME: loader shouldn't depend on state defined in dashboard_base.js.
-    g_buildersThatFailedToLoad = [];
-    g_builders = {};
-
+    resetGlobals();
+    loadBuildersList('@ToT - webkit.org', 'layout-tests');
+    
     var resourceLoader = new loader.Loader();
     var resourceLoadCount = 0;
     resourceLoader._handleResourceLoad = function() {
@@ -120,14 +114,56 @@ test('results file failing to load', 2, function() {
     }
 
     var builder1 = 'builder1';
-    g_builders[builder1] = true;
+    currentBuilders()[builder1] = true;
     resourceLoader._handleResultsFileLoadError(builder1);
 
     var builder2 = 'builder2';
-    g_builders[builder2] = true;
+    currentBuilders()[builder2] = true;
     resourceLoader._handleResultsFileLoadError(builder2);
 
-    deepEqual(g_buildersThatFailedToLoad, [builder1, builder2]);
+    deepEqual(resourceLoader._buildersThatFailedToLoad, [builder1, builder2]);
     equal(resourceLoadCount, 2);
 
-})
+});
+
+test('Default builder gets set.', 3, function() {
+    resetGlobals();
+    loadBuildersList('@ToT - webkit.org', 'layout-tests');
+    
+    var defaultBuilder = currentBuilderGroup().defaultBuilder();
+    ok(defaultBuilder, "Default builder should exist.");
+   
+    // Simulate error loading the default builder data, then make sure
+    // a new defaultBuilder is set, and isn't the now invalid one.
+    var resourceLoader = new loader.Loader();
+    resourceLoader._handleResultsFileLoadError(defaultBuilder);
+    var newDefaultBuilder = currentBuilderGroup().defaultBuilder();
+    ok(newDefaultBuilder, "There should still be a default builder.");
+    notEqual(newDefaultBuilder, defaultBuilder, "Default builder should not be the old default builder");
+});
+
+test('addBuilderLoadErrors', 1, function() {
+    var resourceLoader = new loader.Loader();
+    resourceLoader._buildersThatFailedToLoad = ['builder1', 'builder2'];
+    resourceLoader._staleBuilders = ['staleBuilder1'];
+    resourceLoader._addErrors();
+    equal(resourceLoader._errors._messages, 'ERROR: Failed to get data from builder1,builder2.<br>ERROR: Data from staleBuilder1 is more than 1 day stale.<br>');
+});
+
+
+test('flattenTrie', 1, function() {
+    resetGlobals();
+    var tests = {
+        'bar.html': {'results': [[100, 'F']], 'times': [[100, 0]]},
+        'foo': {
+            'bar': {
+                'baz.html': {'results': [[100, 'F']], 'times': [[100, 0]]},
+            }
+        }
+    };
+    var expectedFlattenedTests = {
+        'bar.html': {'results': [[100, 'F']], 'times': [[100, 0]]},
+        'foo/bar/baz.html': {'results': [[100, 'F']], 'times': [[100, 0]]},
+    };
+    equal(JSON.stringify(loader.Loader._flattenTrie(tests)), JSON.stringify(expectedFlattenedTests))
+});

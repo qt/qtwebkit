@@ -7,11 +7,8 @@
 // debug.cpp: Debugging utilities.
 
 #include "common/debug.h"
-
-#include <stdio.h>
-#include <stdarg.h>
+#include "common/system.h"
 #include <d3d9.h>
-#include <windows.h>
 
 namespace gl
 {
@@ -84,6 +81,12 @@ bool perfActive()
 ScopedPerfEventHelper::ScopedPerfEventHelper(const char* format, ...)
 {
 #if !defined(ANGLE_DISABLE_PERF)
+#if defined(ANGLE_DISABLE_TRACE)
+    if (!perfActive())
+    {
+        return;
+    }
+#endif
     va_list vararg;
     va_start(vararg, format);
     output(true, reinterpret_cast<PerfOutputFunction>(D3DPERF_BeginEvent), format, vararg);

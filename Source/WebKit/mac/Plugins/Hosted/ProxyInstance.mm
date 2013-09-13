@@ -43,7 +43,6 @@ extern "C" {
 
 using namespace JSC;
 using namespace JSC::Bindings;
-using namespace std;
 using namespace WebCore;
 
 namespace WebKit {
@@ -163,7 +162,7 @@ JSValue ProxyInstance::invoke(JSC::ExecState* exec, InvokeType type, uint64_t id
         return jsUndefined();
     }
     
-    auto_ptr<NetscapePluginInstanceProxy::BooleanAndDataReply> reply = waitForReply<NetscapePluginInstanceProxy::BooleanAndDataReply>(requestID);
+    std::auto_ptr<NetscapePluginInstanceProxy::BooleanAndDataReply> reply = waitForReply<NetscapePluginInstanceProxy::BooleanAndDataReply>(requestID);
     NetscapePluginInstanceProxy::moveGlobalExceptionToExecState(exec);
 
     if (m_instanceProxy) {
@@ -184,16 +183,16 @@ public:
     static ProxyRuntimeMethod* create(ExecState* exec, JSGlobalObject* globalObject, const String& name, Bindings::Method* method)
     {
         // FIXME: deprecatedGetDOMStructure uses the prototype off of the wrong global object
-        // exec-globalData() is also likely wrong.
+        // exec-vm() is also likely wrong.
         Structure* domStructure = deprecatedGetDOMStructure<ProxyRuntimeMethod>(exec);
         ProxyRuntimeMethod* runtimeMethod = new (allocateCell<ProxyRuntimeMethod>(*exec->heap())) ProxyRuntimeMethod(globalObject, domStructure, method);
-        runtimeMethod->finishCreation(exec->globalData(), name);
+        runtimeMethod->finishCreation(exec->vm(), name);
         return runtimeMethod;
     }
 
-    static Structure* createStructure(JSGlobalData& globalData, JSGlobalObject* globalObject, JSValue prototype)
+    static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype)
     {
-        return Structure::create(globalData, globalObject, prototype, TypeInfo(ObjectType, StructureFlags), &s_info);
+        return Structure::create(vm, globalObject, prototype, TypeInfo(ObjectType, StructureFlags), &s_info);
     }
 
     static const ClassInfo s_info;
@@ -204,9 +203,9 @@ private:
     {
     }
 
-    void finishCreation(JSGlobalData& globalData, const String& name)
+    void finishCreation(VM& vm, const String& name)
     {
-        Base::finishCreation(globalData, name);
+        Base::finishCreation(vm, name);
         ASSERT(inherits(&s_info));
     }
 };
@@ -242,7 +241,7 @@ bool ProxyInstance::supportsInvokeDefaultMethod() const
                                             m_objectID) != KERN_SUCCESS)
         return false;
     
-    auto_ptr<NetscapePluginInstanceProxy::BooleanReply> reply = waitForReply<NetscapePluginInstanceProxy::BooleanReply>(requestID);
+    std::auto_ptr<NetscapePluginInstanceProxy::BooleanReply> reply = waitForReply<NetscapePluginInstanceProxy::BooleanReply>(requestID);
     if (reply.get() && reply->m_result)
         return true;
         
@@ -266,7 +265,7 @@ bool ProxyInstance::supportsConstruct() const
                                         m_objectID) != KERN_SUCCESS)
         return false;
     
-    auto_ptr<NetscapePluginInstanceProxy::BooleanReply> reply = waitForReply<NetscapePluginInstanceProxy::BooleanReply>(requestID);
+    std::auto_ptr<NetscapePluginInstanceProxy::BooleanReply> reply = waitForReply<NetscapePluginInstanceProxy::BooleanReply>(requestID);
     if (reply.get() && reply->m_result)
         return true;
         
@@ -320,7 +319,7 @@ void ProxyInstance::getPropertyNames(ExecState* exec, PropertyNameArray& nameArr
     if (_WKPHNPObjectEnumerate(m_instanceProxy->hostProxy()->port(), m_instanceProxy->pluginID(), requestID, m_objectID) != KERN_SUCCESS)
         return;
     
-    auto_ptr<NetscapePluginInstanceProxy::BooleanAndDataReply> reply = waitForReply<NetscapePluginInstanceProxy::BooleanAndDataReply>(requestID);
+    std::auto_ptr<NetscapePluginInstanceProxy::BooleanAndDataReply> reply = waitForReply<NetscapePluginInstanceProxy::BooleanAndDataReply>(requestID);
     NetscapePluginInstanceProxy::moveGlobalExceptionToExecState(exec);
     if (!reply.get() || !reply->m_returnValue)
         return;
@@ -337,7 +336,7 @@ void ProxyInstance::getPropertyNames(ExecState* exec, PropertyNameArray& nameArr
 
         if (identifier->isString()) {
             const char* str = identifier->string();
-            nameArray.add(Identifier(JSDOMWindow::commonJSGlobalData(), String::fromUTF8WithLatin1Fallback(str, strlen(str))));
+            nameArray.add(Identifier(JSDOMWindow::commonVM(), String::fromUTF8WithLatin1Fallback(str, strlen(str))));
         } else
             nameArray.add(Identifier::from(exec, identifier->number()));
     }
@@ -367,7 +366,7 @@ Method* ProxyInstance::methodNamed(PropertyName propertyName)
                                m_objectID, methodName) != KERN_SUCCESS)
         return 0;
     
-    auto_ptr<NetscapePluginInstanceProxy::BooleanReply> reply = waitForReply<NetscapePluginInstanceProxy::BooleanReply>(requestID);
+    std::auto_ptr<NetscapePluginInstanceProxy::BooleanReply> reply = waitForReply<NetscapePluginInstanceProxy::BooleanReply>(requestID);
     if (!reply.get())
         return 0;
 
@@ -404,7 +403,7 @@ Field* ProxyInstance::fieldNamed(PropertyName propertyName)
                                  m_objectID, identifier) != KERN_SUCCESS)
         return 0;
     
-    auto_ptr<NetscapePluginInstanceProxy::BooleanReply> reply = waitForReply<NetscapePluginInstanceProxy::BooleanReply>(requestID);
+    std::auto_ptr<NetscapePluginInstanceProxy::BooleanReply> reply = waitForReply<NetscapePluginInstanceProxy::BooleanReply>(requestID);
     if (!reply.get())
         return 0;
     
@@ -431,7 +430,7 @@ JSC::JSValue ProxyInstance::fieldValue(ExecState* exec, const Field* field) cons
                                  m_objectID, serverIdentifier) != KERN_SUCCESS)
         return jsUndefined();
     
-    auto_ptr<NetscapePluginInstanceProxy::BooleanAndDataReply> reply = waitForReply<NetscapePluginInstanceProxy::BooleanAndDataReply>(requestID);
+    std::auto_ptr<NetscapePluginInstanceProxy::BooleanAndDataReply> reply = waitForReply<NetscapePluginInstanceProxy::BooleanAndDataReply>(requestID);
     NetscapePluginInstanceProxy::moveGlobalExceptionToExecState(exec);
     if (!reply.get() || !reply->m_returnValue)
         return jsUndefined();
@@ -461,7 +460,7 @@ void ProxyInstance::setFieldValue(ExecState* exec, const Field* field, JSValue v
     if (kr != KERN_SUCCESS)
         return;
     
-    auto_ptr<NetscapePluginInstanceProxy::BooleanReply> reply = waitForReply<NetscapePluginInstanceProxy::BooleanReply>(requestID);
+    std::auto_ptr<NetscapePluginInstanceProxy::BooleanReply> reply = waitForReply<NetscapePluginInstanceProxy::BooleanReply>(requestID);
     NetscapePluginInstanceProxy::moveGlobalExceptionToExecState(exec);
 }
 

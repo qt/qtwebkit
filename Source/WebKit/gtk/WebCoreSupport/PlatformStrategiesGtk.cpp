@@ -43,6 +43,11 @@ CookiesStrategy* PlatformStrategiesGtk::createCookiesStrategy()
     return this;
 }
 
+DatabaseStrategy* PlatformStrategiesGtk::createDatabaseStrategy()
+{
+    return this;
+}
+
 LoaderStrategy* PlatformStrategiesGtk::createLoaderStrategy()
 {
     return this;
@@ -65,59 +70,45 @@ SharedWorkerStrategy* PlatformStrategiesGtk::createSharedWorkerStrategy()
     return this;
 }
 
+StorageStrategy* PlatformStrategiesGtk::createStorageStrategy()
+{
+    return this;
+}
+
 VisitedLinkStrategy* PlatformStrategiesGtk::createVisitedLinkStrategy()
 {
     return this;
 }
 
 // CookiesStrategy
-void PlatformStrategiesGtk::notifyCookiesChanged()
+String PlatformStrategiesGtk::cookiesForDOM(const NetworkStorageSession& session, const KURL& firstParty, const KURL& url)
 {
+    return WebCore::cookiesForDOM(session, firstParty, url);
 }
 
-String PlatformStrategiesGtk::cookiesForDOM(NetworkingContext* context, const KURL& firstParty, const KURL& url)
+void PlatformStrategiesGtk::setCookiesFromDOM(const NetworkStorageSession& session, const KURL& firstParty, const KURL& url, const String& cookieString)
 {
-    return WebCore::cookiesForDOM(context, firstParty, url);
+    WebCore::setCookiesFromDOM(session, firstParty, url, cookieString);
 }
 
-void PlatformStrategiesGtk::setCookiesFromDOM(NetworkingContext* context, const KURL& firstParty, const KURL& url, const String& cookieString)
+bool PlatformStrategiesGtk::cookiesEnabled(const NetworkStorageSession& session, const KURL& firstParty, const KURL& url)
 {
-    WebCore::setCookiesFromDOM(context, firstParty, url, cookieString);
+    return WebCore::cookiesEnabled(session, firstParty, url);
 }
 
-bool PlatformStrategiesGtk::cookiesEnabled(NetworkingContext* context, const KURL& firstParty, const KURL& url)
+String PlatformStrategiesGtk::cookieRequestHeaderFieldValue(const NetworkStorageSession& session, const KURL& firstParty, const KURL& url)
 {
-    return WebCore::cookiesEnabled(context, firstParty, url);
+    return WebCore::cookieRequestHeaderFieldValue(session, firstParty, url);
 }
 
-String PlatformStrategiesGtk::cookieRequestHeaderFieldValue(NetworkingContext* context, const KURL& firstParty, const KURL& url)
+bool PlatformStrategiesGtk::getRawCookies(const NetworkStorageSession& session, const KURL& firstParty, const KURL& url, Vector<Cookie>& rawCookies)
 {
-    return WebCore::cookieRequestHeaderFieldValue(context, firstParty, url);
+    return WebCore::getRawCookies(session, firstParty, url, rawCookies);
 }
 
-bool PlatformStrategiesGtk::getRawCookies(NetworkingContext* context, const KURL& firstParty, const KURL& url, Vector<Cookie>& rawCookies)
+void PlatformStrategiesGtk::deleteCookie(const NetworkStorageSession& session, const KURL& url, const String& cookieName)
 {
-    return WebCore::getRawCookies(context, firstParty, url, rawCookies);
-}
-
-void PlatformStrategiesGtk::deleteCookie(NetworkingContext* context, const KURL& url, const String& cookieName)
-{
-    WebCore::deleteCookie(context, url, cookieName);
-}
-
-void PlatformStrategiesGtk::getHostnamesWithCookies(NetworkingContext* context, HashSet<String>& hostnames)
-{
-    WebCore::getHostnamesWithCookies(context, hostnames);
-}
-
-void PlatformStrategiesGtk::deleteCookiesForHostname(NetworkingContext* context, const String& hostname)
-{
-    WebCore::deleteCookiesForHostname(context, hostname);
-}
-
-void PlatformStrategiesGtk::deleteAllCookies(NetworkingContext* context)
-{
-    WebCore::deleteAllCookies(context);
+    WebCore::deleteCookie(session, url, cookieName);
 }
 
 // PluginStrategy
@@ -130,7 +121,6 @@ void PlatformStrategiesGtk::getPluginInfo(const Page* page, Vector<PluginInfo>& 
 {
     PluginDatabase* database = PluginDatabase::installedPlugins();
     const Vector<PluginPackage*> &plugins = database->plugins();
-    outPlugins.resize(plugins.size());
 
     for (size_t i = 0; i < plugins.size(); ++i) {
         PluginPackage* package = plugins[i];

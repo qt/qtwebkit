@@ -29,18 +29,13 @@
  */
 
 #include "config.h"
+#if ENABLE(INPUT_TYPE_DATE)
 #include "DateInputType.h"
 
-#if ENABLE(INPUT_TYPE_DATE)
 #include "DateComponents.h"
-#include "DateTimeFieldsState.h"
 #include "HTMLInputElement.h"
 #include "HTMLNames.h"
 #include "InputTypeNames.h"
-#include "KeyboardEvent.h"
-#include "LocalizedStrings.h"
-#include "PickerIndicatorElement.h"
-#include "PlatformLocale.h"
 #include <wtf/PassOwnPtr.h>
 
 namespace WebCore {
@@ -52,13 +47,18 @@ static const int dateDefaultStepBase = 0;
 static const int dateStepScaleFactor = 86400000;
 
 inline DateInputType::DateInputType(HTMLInputElement* element)
-    : BaseDateInputType(element)
+    : BaseChooserOnlyDateAndTimeInputType(element)
 {
 }
 
 PassOwnPtr<InputType> DateInputType::create(HTMLInputElement* element)
 {
     return adoptPtr(new DateInputType(element));
+}
+
+void DateInputType::attach()
+{
+    observeFeatureIfVisible(FeatureObserver::InputTypeDate);
 }
 
 const AtomicString& DateInputType::formControlType() const
@@ -99,27 +99,6 @@ bool DateInputType::isDateField() const
 {
     return true;
 }
-
-#if ENABLE(INPUT_MULTIPLE_FIELDS_UI)
-String DateInputType::formatDateTimeFieldsState(const DateTimeFieldsState& dateTimeFieldsState) const
-{
-    if (!dateTimeFieldsState.hasDayOfMonth() || !dateTimeFieldsState.hasMonth() || !dateTimeFieldsState.hasYear())
-        return emptyString();
-
-    return String::format("%04u-%02u-%02u", dateTimeFieldsState.year(), dateTimeFieldsState.month(), dateTimeFieldsState.dayOfMonth());
-}
-
-void DateInputType::setupLayoutParameters(DateTimeEditElement::LayoutParameters& layoutParameters, const DateComponents& date) const
-{
-    layoutParameters.dateTimeFormat = layoutParameters.locale.dateFormat();
-    layoutParameters.fallbackDateTimeFormat = ASCIILiteral("yyyy-MM-dd");
-    layoutParameters.minimumYear = fullYear(element()->fastGetAttribute(minAttr));
-    layoutParameters.maximumYear = fullYear(element()->fastGetAttribute(maxAttr));
-    layoutParameters.placeholderForDay = placeholderForDayOfMonthField();
-    layoutParameters.placeholderForMonth = placeholderForMonthField();
-    layoutParameters.placeholderForYear = placeholderForYearField();
-}
-#endif
 
 } // namespace WebCore
 #endif

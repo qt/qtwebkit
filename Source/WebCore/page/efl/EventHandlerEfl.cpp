@@ -29,7 +29,7 @@
 #include "config.h"
 #include "EventHandler.h"
 
-#include "ClipboardEfl.h"
+#include "Clipboard.h"
 #include "EventNames.h"
 #include "FloatPoint.h"
 #include "FocusController.h"
@@ -42,7 +42,6 @@
 #include "PlatformKeyboardEvent.h"
 #include "PlatformWheelEvent.h"
 #include "RenderWidget.h"
-#include "Scrollbar.h"
 
 namespace WebCore {
 
@@ -94,13 +93,13 @@ bool EventHandler::passWheelEventToWidget(const PlatformWheelEvent& event, Widge
     if (!widget->isFrameView())
         return false;
 
-    return static_cast<FrameView*>(widget)->frame()->eventHandler()->handleWheelEvent(event);
+    return toFrameView(widget)->frame()->eventHandler()->handleWheelEvent(event);
 }
 
 #if ENABLE(DRAG_SUPPORT)
 PassRefPtr<Clipboard> EventHandler::createDraggingClipboard() const
 {
-    return ClipboardEfl::create(ClipboardWritable, Clipboard::DragAndDrop);
+    return Clipboard::createForDragAndDrop();
 }
 #endif
 

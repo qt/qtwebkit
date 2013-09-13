@@ -29,7 +29,6 @@
 #define WebKitWebViewBasePrivate_h
 
 #include "WebContextMenuProxyGtk.h"
-#include "WebKit2GtkAuthenticationDialog.h"
 #include "WebKitPrivate.h"
 #include "WebKitWebViewBase.h"
 #include "WebPageProxy.h"
@@ -50,6 +49,8 @@ void webkitWebViewBaseSetInspectorViewHeight(WebKitWebViewBase*, unsigned height
 void webkitWebViewBaseSetActiveContextMenuProxy(WebKitWebViewBase*, WebKit::WebContextMenuProxyGtk*);
 WebKit::WebContextMenuProxyGtk* webkitWebViewBaseGetActiveContextMenuProxy(WebKitWebViewBase*);
 GdkEvent* webkitWebViewBaseTakeContextMenuEvent(WebKitWebViewBase*);
+void webkitWebViewBaseSetInputMethodState(WebKitWebViewBase*, bool enabled);
+void webkitWebViewBaseUpdateTextInputState(WebKitWebViewBase*);
 
 #if USE(TEXTURE_MAPPER_GL)
 void webkitWebViewBaseQueueDrawOfAcceleratedCompositingResults(WebKitWebViewBase*);
@@ -65,7 +66,7 @@ typedef void (*WebKitWebViewBaseDownloadRequestHandler) (WebKitWebViewBase*, Web
 void webkitWebViewBaseSetDownloadRequestHandler(WebKitWebViewBase*, WebKitWebViewBaseDownloadRequestHandler);
 void webkitWebViewBaseHandleDownloadRequest(WebKitWebViewBase*, WebKit::DownloadProxy*);
 
-void webkitWebViewBaseAddAuthenticationDialog(WebKitWebViewBase*, WebKit::WebKit2GtkAuthenticationDialog*);
+void webkitWebViewBaseAddAuthenticationDialog(WebKitWebViewBase*, GtkWidget* authDialog);
 void webkitWebViewBaseCancelAuthenticationDialog(WebKitWebViewBase*);
 void webkitWebViewBaseAddWebInspector(WebKitWebViewBase*, GtkWidget* inspector);
 

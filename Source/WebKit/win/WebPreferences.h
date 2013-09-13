@@ -169,6 +169,12 @@ public:
     virtual HRESULT STDMETHODCALLTYPE setCSSRegionsEnabled(
         /* [in] */ BOOL);
     
+    virtual HRESULT STDMETHODCALLTYPE areSeamlessIFramesEnabled(
+        /* [retval][out] */ BOOL* enabled);
+    
+    virtual HRESULT STDMETHODCALLTYPE setSeamlessIFramesEnabled(
+        /* [in] */ BOOL);
+    
     virtual HRESULT STDMETHODCALLTYPE allowsAnimatedImages( 
         /* [retval][out] */ BOOL* enabled);
     
@@ -446,9 +452,6 @@ public:
 
     virtual HRESULT STDMETHODCALLTYPE setDNSPrefetchingEnabled(BOOL);
     virtual HRESULT STDMETHODCALLTYPE isDNSPrefetchingEnabled(BOOL*);
-
-    virtual HRESULT STDMETHODCALLTYPE setMemoryInfoEnabled(BOOL);
-    virtual HRESULT STDMETHODCALLTYPE memoryInfoEnabled(BOOL*);
 
     virtual HRESULT STDMETHODCALLTYPE hyperlinkAuditingEnabled(BOOL*);
     virtual HRESULT STDMETHODCALLTYPE setHyperlinkAuditingEnabled(BOOL);

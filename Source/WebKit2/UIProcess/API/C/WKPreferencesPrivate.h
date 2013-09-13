@@ -76,12 +76,20 @@ WK_EXPORT void WKPreferencesSetAcceleratedCompositingEnabled(WKPreferencesRef, b
 WK_EXPORT bool WKPreferencesGetAcceleratedCompositingEnabled(WKPreferencesRef);
 
 // Defaults to false.
+WK_EXPORT void WKPreferencesSetAcceleratedCompositingForOverflowScrollEnabled(WKPreferencesRef, bool);
+WK_EXPORT bool WKPreferencesGetAcceleratedCompositingForOverflowScrollEnabled(WKPreferencesRef);
+
+// Defaults to false.
 WK_EXPORT void WKPreferencesSetCompositingBordersVisible(WKPreferencesRef, bool);
 WK_EXPORT bool WKPreferencesGetCompositingBordersVisible(WKPreferencesRef);
 
 // Defaults to false.
 WK_EXPORT void WKPreferencesSetCompositingRepaintCountersVisible(WKPreferencesRef, bool);
 WK_EXPORT bool WKPreferencesGetCompositingRepaintCountersVisible(WKPreferencesRef);
+
+// Defaults to false.
+WK_EXPORT void WKPreferencesSetTiledScrollingIndicatorVisible(WKPreferencesRef, bool);
+WK_EXPORT bool WKPreferencesGetTiledScrollingIndicatorVisible(WKPreferencesRef);
 
 // Defaults to true.
 WK_EXPORT void WKPreferencesSetCSSCustomFilterEnabled(WKPreferencesRef, bool flag);
@@ -230,6 +238,54 @@ WK_EXPORT bool WKPreferencesGetCookieEnabled(WKPreferencesRef preferences);
 // Defaults to false
 WK_EXPORT void WKPreferencesSetPDFPluginEnabled(WKPreferencesRef preferences, bool enabled);
 WK_EXPORT bool WKPreferencesGetPDFPluginEnabled(WKPreferencesRef preferences);
+
+// Defaults to false
+WK_EXPORT void WKPreferencesSetAggressiveTileRetentionEnabled(WKPreferencesRef preferences, bool enabled);
+WK_EXPORT bool WKPreferencesGetAggressiveTileRetentionEnabled(WKPreferencesRef preferences);
+
+// Defaults to false
+WK_EXPORT void WKPreferencesSetLogsPageMessagesToSystemConsoleEnabled(WKPreferencesRef preferences, bool enabled);
+WK_EXPORT bool WKPreferencesGetLogsPageMessagesToSystemConsoleEnabled(WKPreferencesRef preferences);
+
+// Defaults to false
+WK_EXPORT void WKPreferencesSetPageVisibilityBasedProcessSuppressionEnabled(WKPreferencesRef preferences, bool enabled);
+WK_EXPORT bool WKPreferencesGetPageVisibilityBasedProcessSuppressionEnabled(WKPreferencesRef);
+
+// Defaults to true
+WK_EXPORT void WKPreferencesSetSmartInsertDeleteEnabled(WKPreferencesRef preferences, bool enabled);
+WK_EXPORT bool WKPreferencesGetSmartInsertDeleteEnabled(WKPreferencesRef preferences);
+
+// Defaults to false
+WK_EXPORT void WKPreferencesSetSelectTrailingWhitespaceEnabled(WKPreferencesRef preferences, bool enabled);
+WK_EXPORT bool WKPreferencesGetSelectTrailingWhitespaceEnabled(WKPreferencesRef preferences);
+
+// Defaults to false
+WK_EXPORT void WKPreferencesSetShowsURLsInToolTipsEnabled(WKPreferencesRef preferences, bool enabled);
+WK_EXPORT bool WKPreferencesGetShowsURLsInToolTipsEnabled(WKPreferencesRef preferences);
+
+// Defaults to true on Mac, false on other platforms.
+WK_EXPORT void WKPreferencesSetHiddenPageDOMTimerThrottlingEnabled(WKPreferencesRef preferences, bool enabled);
+WK_EXPORT bool WKPreferencesGetHiddenPageDOMTimerThrottlingEnabled(WKPreferencesRef preferences);
+
+// Defaults to true on Mac, false on other platforms.
+WK_EXPORT void WKPreferencesSetHiddenPageCSSAnimationSuspensionEnabled(WKPreferencesRef preferences, bool enabled);
+WK_EXPORT bool WKPreferencesGetHiddenPageCSSAnimationSuspensionEnabled(WKPreferencesRef preferences);
+
+// Defaults to false
+WK_EXPORT void WKPreferencesSetSnapshotAllPlugIns(WKPreferencesRef preferencesRef, bool enabled);
+WK_EXPORT bool WKPreferencesGetSnapshotAllPlugIns(WKPreferencesRef preferencesRef);
+
+// Defaults to true
+WK_EXPORT void WKPreferencesSetAutostartOriginPlugInSnapshottingEnabled(WKPreferencesRef preferencesRef, bool enabled);
+WK_EXPORT bool WKPreferencesGetAutostartOriginPlugInSnapshottingEnabled(WKPreferencesRef preferencesRef);
+
+// Defaults to true
+WK_EXPORT void WKPreferencesSetPrimaryPlugInSnapshotDetectionEnabled(WKPreferencesRef preferencesRef, bool enabled);
+WK_EXPORT bool WKPreferencesGetPrimaryPlugInSnapshotDetectionEnabled(WKPreferencesRef preferencesRef);
+
+// Defaults to 5 seconds.
+WK_EXPORT void WKPreferencesSetIncrementalRenderingSuppressionTimeout(WKPreferencesRef preferencesRef, double timeout);
+WK_EXPORT double WKPreferencesGetIncrementalRenderingSuppressionTimeout(WKPreferencesRef preferencesRef);
 
 WK_EXPORT void WKPreferencesResetTestRunnerOverrides(WKPreferencesRef preferencesRef);
 

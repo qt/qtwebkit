@@ -5,6 +5,7 @@
     <file>ApplicationCacheItemsView.js</file>
     <file>ApplicationCacheModel.js</file>
     <file>AuditCategories.js</file>
+    <file>AuditController.js</file>
     <file>AuditFormatters.js</file>
     <file>AuditLauncherView.js</file>
     <file>AuditResultView.js</file>
@@ -24,14 +25,14 @@
     <file>ConsolePanel.js</file>
     <file>ConsoleView.js</file>
     <file>ContentProvider.js</file>
+    <file>ContentProviderBasedProjectDelegate.js</file>
     <file>ContentProviders.js</file>
     <file>ContextMenu.js</file>
     <file>CookieItemsView.js</file>
     <file>CookieParser.js</file>
     <file>CookiesTable.js</file>
     <file>CPUProfileView.js</file>
-    <file>CSSCompletions.js</file>
-    <file>CSSKeywordCompletions.js</file>
+    <file>CSSMetadata.js</file>
     <file>CSSNamedFlowCollectionsView.js</file>
     <file>CSSNamedFlowView.js</file>
     <file>CSSSelectorProfileView.js</file>
@@ -41,6 +42,8 @@
     <file>cm/codemirror.js</file>
     <file>cm/css.js</file>
     <file>cm/htmlmixed.js</file>
+    <file>cm/closebrackets.js</file>
+    <file>cm/matchbrackets.js</file>
     <file>cm/javascript.js</file>
     <file>cm/xml.js</file>
     <file>Database.js</file>
@@ -49,11 +52,13 @@
     <file>DataGrid.js</file>
     <file>DebuggerModel.js</file>
     <file>DebuggerScriptMapping.js</file>
+    <file>DefaultScriptMapping.js</file>
     <file>DefaultTextEditor.js</file>
     <file>Dialog.js</file>
     <file>DirectoryContentView.js</file>
     <file>DOMAgent.js</file>
     <file>DOMBreakpointsSidebarPane.js</file>
+    <file>DOMCountersGraph.js</file>
     <file>DOMExtension.js</file>
     <file>DOMPresentationUtils.js</file>
     <file>DOMStorage.js</file>
@@ -72,12 +77,17 @@
     <file>ExtensionRegistryStub.js</file>
     <file>ExtensionServer.js</file>
     <file>ExtensionView.js</file>
+    <file>externs.js</file>
     <file>FileContentView.js</file>
     <file>FileManager.js</file>
+    <file>FileMapping.js</file>
+    <file>FileSystemMapping.js</file>
     <file>FileSystemModel.js</file>
     <file>FileSystemView.js</file>
+    <file>FileSystemProjectDelegate.js</file>
     <file>FileUtils.js</file>
     <file>FilteredItemSelectionDialog.js</file>
+    <file>FlameChart.js</file>
     <file>FontView.js</file>
     <file>GoToLineDialog.js</file>
     <file>HAREntry.js</file>
@@ -99,15 +109,20 @@
     <file>InspectorFrontendAPI.js</file>
     <file>InspectorFrontendHostStub.js</file>
     <file>InspectorView.js</file>
+    <file>JSHeapSnapshot.js</file>
+    <file>IsolatedFileSystem.js</file>
+    <file>IsolatedFileSystemManager.js</file>
     <file>JavaScriptFormatter.js</file>
     <file>JavaScriptSourceFrame.js</file>
     <file>jsdifflib.js</file>
     <file>KeyboardShortcut.js</file>
     <file>Linkifier.js</file>
+    <file>LiveEditSupport.js</file>
     <file>MemoryStatistics.js</file>
     <file>MetricsSidebarPane.js</file>
     <file>NativeBreakpointsSidebarPane.js</file>
-    <file>NativeMemorySnapshotView.js</file>
+    <file>NativeHeapSnapshot.js</file>
+    <file>NativeMemoryGraph.js</file>
     <file>NavigatorOverlayController.js</file>
     <file>NavigatorView.js</file>
     <file>NetworkItemView.js</file>
@@ -117,11 +132,12 @@
     <file>NetworkPanelDescriptor.js</file>
     <file>NetworkRequest.js</file>
     <file>NetworkUISourceCodeProvider.js</file>
-    <file>NetworkWorkspaceProvider.js</file>
+    <file>InspectElementModeController.js</file>
     <file>Object.js</file>
     <file>ObjectPopoverHelper.js</file>
     <file>ObjectPropertiesSection.js</file>
     <file>OverridesView.js</file>
+    <file>OverviewGrid.js</file>
     <file>Panel.js</file>
     <file>PanelEnablerView.js</file>
     <file>ParsedURL.js</file>
@@ -131,6 +147,7 @@
     <file>ProfileDataGridTree.js</file>
     <file>ProfileLauncherView.js</file>
     <file>ProfilesPanel.js</file>
+    <file>ProfilesPanelDescriptor.js</file>
     <file>Progress.js</file>
     <file>ProgressIndicator.js</file>
     <file>PropertiesSection.js</file>
@@ -174,6 +191,7 @@
     <file>SidebarPane.js</file>
     <file>SidebarTreeElement.js</file>
     <file>SidebarView.js</file>
+    <file>SimpleWorkspaceProvider.js</file>
     <file>SnippetJavaScriptSourceFrame.js</file>
     <file>SnippetStorage.js</file>
     <file>SoftContextMenu.js</file>
@@ -181,6 +199,7 @@
     <file>SourceFrame.js</file>
     <file>SourceHTMLTokenizer.js</file>
     <file>SourceJavaScriptTokenizer.js</file>
+    <file>SourceMap.js</file>
     <file>SourceMapping.js</file>
     <file>SourceTokenizer.js</file>
     <file>Spectrum.js</file>
@@ -189,6 +208,7 @@
     <file>StyleSheetOutlineDialog.js</file>
     <file>StylesSourceMapping.js</file>
     <file>StylesSidebarPane.js</file>
+    <file>SuggestBox.js</file>
     <file>TabbedEditorContainer.js</file>
     <file>TabbedPane.js</file>
     <file>TestController.js</file>
@@ -196,6 +216,7 @@
     <file>TextEditorHighlighter.js</file>
     <file>TextEditorModel.js</file>
     <file>TextPrompt.js</file>
+    <file>TextUtils.js</file>
     <file>TimelineFrameController.js</file>
     <file>TimelineManager.js</file>
     <file>TimelineModel.js</file>
@@ -215,6 +236,7 @@
     <file>UserMetrics.js</file>
     <file>utilities.js</file>
     <file>View.js</file>
+    <file>ViewportControl.js</file>
     <file>WatchExpressionsSidebarPane.js</file>
     <file>WorkerManager.js</file>
     <file>WorkersSidebarPane.js</file>
@@ -222,19 +244,20 @@
     <file>UglifyJS/parse-js.js</file>
     <file>auditsPanel.css</file>
     <file>breadcrumbList.css</file>
+    <file>breakpointsList.css</file>
     <file>canvasProfiler.css</file>
     <file>cssNamedFlows.css</file>
     <file>dataGrid.css</file>
     <file>dialog.css</file>
     <file>elementsPanel.css</file>
     <file>filteredItemSelectionDialog.css</file>
+    <file>flameChart.css</file>
     <file>heapProfiler.css</file>
     <file>helpScreen.css</file>
     <file>indexedDBViews.css</file>
     <file>inspector.css</file>
     <file>inspectorCommon.css</file>
     <file>inspectorSyntaxHighlight.css</file>
-    <file>nativeMemoryProfiler.css</file>
     <file>navigatorView.css</file>
     <file>networkLogView.css</file>
     <file>networkPanel.css</file>
@@ -245,6 +268,7 @@
     <file>resourcesPanel.css</file>
     <file>revisionHistory.css</file>
     <file>scriptsPanel.css</file>
+    <file>sidebarPane.css</file>
     <file>spectrum.css</file>
     <file>splitView.css</file>
     <file>tabbedPane.css</file>

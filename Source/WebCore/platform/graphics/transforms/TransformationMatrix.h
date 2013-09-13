@@ -35,25 +35,16 @@
 #if USE(CA)
 typedef struct CATransform3D CATransform3D;
 #endif
-#if USE(CLUTTER)
-typedef struct _CoglMatrix CoglMatrix;
-#endif
 #if USE(CG)
 typedef struct CGAffineTransform CGAffineTransform;
 #elif USE(CAIRO)
 #include <cairo.h>
-#elif PLATFORM(OPENVG)
-#include "VGUtils.h"
 #elif PLATFORM(QT)
 #include <QMatrix4x4>
 #include <QTransform>
-#elif USE(SKIA)
-#include <SkMatrix.h>
-#elif PLATFORM(WX) && USE(WXGC)
-#include <wx/graphics.h>
 #endif
 
-#if PLATFORM(WIN) || (PLATFORM(GTK) && OS(WINDOWS)) || (PLATFORM(QT) && OS(WINDOWS)) || (PLATFORM(WX) && OS(WINDOWS))
+#if PLATFORM(WIN) || (PLATFORM(GTK) && OS(WINDOWS)) || (PLATFORM(QT) && OS(WINDOWS))
 #if COMPILER(MINGW) && !COMPILER(MINGW64)
 typedef struct _XFORM XFORM;
 #else
@@ -69,11 +60,20 @@ class LayoutRect;
 class FloatRect;
 class FloatQuad;
 
+#if CPU(X86_64)
+#define TRANSFORMATION_MATRIX_USE_X86_64_SSE2
+#endif
+
 class TransformationMatrix {
     WTF_MAKE_FAST_ALLOCATED;
 public:
-#if CPU(APPLE_ARMV7S)
+
+#if CPU(APPLE_ARMV7S) || defined(TRANSFORMATION_MATRIX_USE_X86_64_SSE2)
+#if COMPILER(MSVC)
+    __declspec(align(16)) typedef double Matrix4[4][4];
+#else
     typedef double Matrix4[4][4] __attribute__((aligned (16)));
+#endif
 #else
     typedef double Matrix4[4][4];
 #endif
@@ -226,7 +226,7 @@ public:
     double f() const { return m_matrix[3][1]; }
     void setF(double f) { m_matrix[3][1] = f; }
 
-    // this = this * mat
+    // this = mat * this.
     TransformationMatrix& multiply(const TransformationMatrix&);
 
     TransformationMatrix& scale(double);
@@ -331,26 +331,17 @@ public:
     TransformationMatrix(const CATransform3D&);
     operator CATransform3D() const;
 #endif
-#if USE(CLUTTER)
-    operator CoglMatrix() const;
-#endif
 #if USE(CG)
     TransformationMatrix(const CGAffineTransform&);
     operator CGAffineTransform() const;
 #elif USE(CAIRO)
     operator cairo_matrix_t() const;
-#elif PLATFORM(OPENVG)
-    operator VGMatrix() const;
 #elif PLATFORM(QT)
     operator QTransform() const;
     operator QMatrix4x4() const;
-#elif USE(SKIA)
-    operator SkMatrix() const;
-#elif PLATFORM(WX) && USE(WXGC)
-    operator wxGraphicsMatrix() const;
 #endif
 
-#if PLATFORM(WIN) || (PLATFORM(GTK) && OS(WINDOWS)) || (PLATFORM(QT) && OS(WINDOWS)) || (PLATFORM(WX) && OS(WINDOWS))
+#if PLATFORM(WIN) || (PLATFORM(GTK) && OS(WINDOWS)) || (PLATFORM(QT) && OS(WINDOWS))
     operator XFORM() const;
 #endif
 

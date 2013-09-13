@@ -133,7 +133,7 @@ void Image::setPlatformResource(const char* name, const QPixmap& pixmap)
 }
 
 void Image::drawPattern(GraphicsContext* ctxt, const FloatRect& tileRect, const AffineTransform& patternTransform,
-                        const FloatPoint& phase, ColorSpace, CompositeOperator op, const FloatRect& destRect)
+    const FloatPoint& phase, ColorSpace, CompositeOperator op, const FloatRect& destRect, BlendMode)
 {
     QPixmap* framePixmap = nativeImageForCurrentFrame();
     if (!framePixmap) // If it's too early we won't have an image yet.
@@ -276,7 +276,7 @@ QPixmap* prescaleImageIfRequired(QPainter* painter, QPixmap* image, QPixmap* buf
 
 // Drawing Routines
 void BitmapImage::draw(GraphicsContext* ctxt, const FloatRect& dst,
-                       const FloatRect& src, ColorSpace styleColorSpace, CompositeOperator op)
+    const FloatRect& src, ColorSpace styleColorSpace, CompositeOperator op, BlendMode blendMode)
 {
     QRectF normalizedDst = dst.normalized();
     QRectF normalizedSrc = src.normalized();
@@ -303,21 +303,22 @@ void BitmapImage::draw(GraphicsContext* ctxt, const FloatRect& dst,
     image = prescaleImageIfRequired(ctxt->platformContext(), image, &prescaledBuffer, normalizedDst, &normalizedSrc);
 
     CompositeOperator previousOperator = ctxt->compositeOperation();
-    ctxt->setCompositeOperation(!image->hasAlpha() && op == CompositeSourceOver ? CompositeCopy : op);
+    BlendMode previousBlendMode = ctxt->blendModeOperation();
+    ctxt->setCompositeOperation(!image->hasAlpha() && op == CompositeSourceOver && blendMode == BlendModeNormal ? CompositeCopy : op, blendMode);
 
     if (ctxt->hasShadow()) {
-        ShadowBlur* shadow = ctxt->shadowBlur();
-        GraphicsContext* shadowContext = shadow->beginShadowLayer(ctxt, normalizedDst);
+        ShadowBlur shadow(ctxt->state());
+        GraphicsContext* shadowContext = shadow.beginShadowLayer(ctxt, normalizedDst);
         if (shadowContext) {
             QPainter* shadowPainter = shadowContext->platformContext();
             shadowPainter->drawPixmap(normalizedDst, *image, normalizedSrc);
-            shadow->endShadowLayer(ctxt);
+            shadow.endShadowLayer(ctxt);
         }
     }
 
     ctxt->platformContext()->drawPixmap(normalizedDst, *image, normalizedSrc);
 
-    ctxt->setCompositeOperation(previousOperator);
+    ctxt->setCompositeOperation(previousOperator, previousBlendMode);
 
     if (imageObserver())
         imageObserver()->didDraw(this);

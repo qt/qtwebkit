@@ -28,6 +28,7 @@
 
 #include <wtf/FastAllocBase.h>
 #include <wtf/Noncopyable.h>
+#include <wtf/Vector.h>
 
 #if PLATFORM(MAC)
 
@@ -48,6 +49,7 @@ typedef const struct __SCDynamicStore * SCDynamicStoreRef;
 #elif PLATFORM(EFL)
 
 typedef struct _Ecore_Fd_Handler Ecore_Fd_Handler;
+typedef unsigned char Eina_Bool;
 
 #endif
 
@@ -64,16 +66,13 @@ public:
 #if PLATFORM(EFL)
     ~NetworkStateNotifier();
 #endif
-    void setNetworkStateChangedFunction(void (*)());
+    typedef void (*NetworkStateChangeListener)(bool m_isOnLine);
+    void addNetworkStateChangeListener(NetworkStateChangeListener);
 
     bool onLine() const { return m_isOnLine; }
 
 #if (PLATFORM(QT) && !defined(QT_NO_BEARERMANAGEMENT))
     void setNetworkAccessAllowed(bool);
-#elif PLATFORM(CHROMIUM)
-    void setOnLine(bool);
-#elif PLATFORM(EFL)
-    void networkInterfaceChanged();
 #endif
 
 #if PLATFORM(BLACKBERRY)
@@ -82,8 +81,9 @@ public:
 
 private:
     bool m_isOnLine;
-    void (*m_networkStateChangedFunction)();
+    Vector<NetworkStateChangeListener> m_listeners;
 
+    void notifyNetworkStateChange();
     void updateState();
 
 #if PLATFORM(MAC)
@@ -104,6 +104,10 @@ private:
     OVERLAPPED m_overlapped;
 
 #elif PLATFORM(EFL)
+    void networkInterfaceChanged();
+    static Eina_Bool readSocketCallback(void* userData, Ecore_Fd_Handler*);
+
+    int m_netlinkSocket;
     Ecore_Fd_Handler* m_fdHandler;
 
 #elif (PLATFORM(QT) && !defined(QT_NO_BEARERMANAGEMENT))
@@ -116,7 +120,6 @@ private:
 
 inline NetworkStateNotifier::NetworkStateNotifier()
     : m_isOnLine(true)
-    , m_networkStateChangedFunction(0)
 {
 }
 

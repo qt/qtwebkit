@@ -22,16 +22,28 @@
 
 #if ENABLE(NETWORK_PROCESS)
 
-messages -> NetworkProcess {
+messages -> NetworkProcess LegacyReceiver {
     # Initializes the network process.
     InitializeNetworkProcess(WebKit::NetworkProcessCreationParameters processCreationParameters)
 
     # Creates a connection for communication with a WebProcess
     CreateNetworkConnectionToWebProcess()
 
+    EnsurePrivateBrowsingSession()
+    DestroyPrivateBrowsingSession()
+
+    DownloadRequest(uint64_t downloadID, WebCore::ResourceRequest request)
+    CancelDownload(uint64_t downloadID)
+
 #if PLATFORM(MAC)
-    SetApplicationIsOccluded(bool flag)
+    SetProcessSuppressionEnabled(bool flag)
 #endif
+
+    AllowSpecificHTTPSCertificateForHost(WebKit::PlatformCertificateInfo certificate, WTF::String host)
+    
+    GetNetworkProcessStatistics(uint64_t callbackID)
+    
+    ClearCacheForAllOrigins(uint32_t cachesToClear)
 }
 
 #endif // ENABLE(NETWORK_PROCESS)

@@ -26,30 +26,25 @@
 #ifndef ContextMenuClientEfl_h
 #define ContextMenuClientEfl_h
 
-#include "WKRetainPtr.h"
-#include "ewk_context.h"
-#include <WebKit2/WKBase.h>
-#include <wtf/HashMap.h>
 #include <wtf/PassOwnPtr.h>
-#include <wtf/text/WTFString.h>
 
-class EwkViewImpl;
+class EwkView;
 
 namespace WebKit {
 
 class ContextMenuClientEfl {
 public:
-    static PassOwnPtr<ContextMenuClientEfl> create(EwkViewImpl* viewImpl)
+    static PassOwnPtr<ContextMenuClientEfl> create(EwkView* viewImpl)
     {
         return adoptPtr(new ContextMenuClientEfl(viewImpl));
     }
 
-    static void getContextMenuFromProposedMenu(WKPageRef, WKArrayRef proposedMenu, WKArrayRef* newMenu, WKHitTestResultRef, WKTypeRef userData, const void* clientInfo);
+    EwkView* view() { return m_view; }
 
 private:
-    explicit ContextMenuClientEfl(EwkViewImpl*);
+    explicit ContextMenuClientEfl(EwkView*);
 
-    EwkViewImpl* m_viewImpl;
+    EwkView* m_view;
 };
 
 } // namespace WebKit

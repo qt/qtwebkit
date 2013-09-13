@@ -34,7 +34,6 @@
 #include "RenderObject.h"
 #include "StyleCachedImage.h"
 #include "StyleGeneratedImage.h"
-#include "WebCoreMemoryInstrumentation.h"
 #include <wtf/text/StringBuilder.h>
 
 namespace WebCore {
@@ -52,17 +51,17 @@ static bool subimageIsPending(CSSValue* value)
     return false;
 }
 
-static bool subimageHasAlpha(CSSValue* value, const RenderObject* renderer)
+static bool subimageKnownToBeOpaque(CSSValue* value, const RenderObject* renderer)
 {
     if (value->isImageValue())
-        return static_cast<CSSImageValue*>(value)->hasAlpha(renderer);
+        return static_cast<CSSImageValue*>(value)->knownToBeOpaque(renderer);
 
     if (value->isImageGeneratorValue())
-        return static_cast<CSSImageGeneratorValue*>(value)->hasAlpha(renderer);
+        return static_cast<CSSImageGeneratorValue*>(value)->knownToBeOpaque(renderer);
 
     ASSERT_NOT_REACHED();
 
-    return true;
+    return false;
 }
 
 static CachedImage* cachedImageForCSSValue(CSSValue* value, CachedResourceLoader* cachedResourceLoader)
@@ -139,35 +138,34 @@ bool CSSCrossfadeValue::isPending() const
     return subimageIsPending(m_fromValue.get()) || subimageIsPending(m_toValue.get());
 }
 
-bool CSSCrossfadeValue::hasAlpha(const RenderObject* renderer) const
+bool CSSCrossfadeValue::knownToBeOpaque(const RenderObject* renderer) const
 {
-    return subimageHasAlpha(m_fromValue.get(), renderer) || subimageHasAlpha(m_toValue.get(), renderer);
+    return subimageKnownToBeOpaque(m_fromValue.get(), renderer) && subimageKnownToBeOpaque(m_toValue.get(), renderer);
 }
 
 void CSSCrossfadeValue::loadSubimages(CachedResourceLoader* cachedResourceLoader)
 {
+    CachedResourceHandle<CachedImage> oldCachedFromImage = m_cachedFromImage;
+    CachedResourceHandle<CachedImage> oldCachedToImage = m_cachedToImage;
+
     m_cachedFromImage = cachedImageForCSSValue(m_fromValue.get(), cachedResourceLoader);
     m_cachedToImage = cachedImageForCSSValue(m_toValue.get(), cachedResourceLoader);
 
-    if (m_cachedFromImage)
-        m_cachedFromImage->addClient(&m_crossfadeSubimageObserver);
-    if (m_cachedToImage)
-        m_cachedToImage->addClient(&m_crossfadeSubimageObserver);
+    if (m_cachedFromImage != oldCachedFromImage) {
+        if (oldCachedFromImage)
+            oldCachedFromImage->removeClient(&m_crossfadeSubimageObserver);
+        if (m_cachedFromImage)
+            m_cachedFromImage->addClient(&m_crossfadeSubimageObserver);
+    }
+
+    if (m_cachedToImage != oldCachedToImage) {
+        if (oldCachedToImage)
+            oldCachedToImage->removeClient(&m_crossfadeSubimageObserver);
+        if (m_cachedToImage)
+            m_cachedToImage->addClient(&m_crossfadeSubimageObserver);
+    }
 
     m_crossfadeSubimageObserver.setReady(true);
-}
-
-void CSSCrossfadeValue::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
-    CSSImageGeneratorValue::reportBaseClassMemoryUsage(memoryObjectInfo);
-    info.addMember(m_fromValue);
-    info.addMember(m_toValue);
-    info.addMember(m_percentageValue);
-    // FIXME: add instrumentation for
-    // m_cachedFromImage
-    // m_cachedToImage
-    // m_generatedImage
 }
 
 PassRefPtr<Image> CSSCrossfadeValue::image(RenderObject* renderer, const IntSize& size)
@@ -195,8 +193,8 @@ PassRefPtr<Image> CSSCrossfadeValue::image(RenderObject* renderer, const IntSize
 
 void CSSCrossfadeValue::crossfadeChanged(const IntRect&)
 {
-    RenderObjectSizeCountMap::const_iterator end = clients().end();
-    for (RenderObjectSizeCountMap::const_iterator curr = clients().begin(); curr != end; ++curr) {
+    HashCountedSet<RenderObject*>::const_iterator end = clients().end();
+    for (HashCountedSet<RenderObject*>::const_iterator curr = clients().begin(); curr != end; ++curr) {
         RenderObject* client = const_cast<RenderObject*>(curr->key);
         client->imageChanged(static_cast<WrappedImagePtr>(this));
     }
@@ -215,6 +213,13 @@ bool CSSCrossfadeValue::hasFailedOrCanceledSubresources() const
     if (m_cachedToImage && m_cachedToImage->loadFailedOrCanceled())
         return true;
     return false;
+}
+
+bool CSSCrossfadeValue::equals(const CSSCrossfadeValue& other) const
+{
+    return compareCSSValuePtr(m_fromValue, other.m_fromValue)
+        && compareCSSValuePtr(m_toValue, other.m_toValue)
+        && compareCSSValuePtr(m_percentageValue, other.m_percentageValue);
 }
 
 } // namespace WebCore

@@ -27,6 +27,9 @@
 #include "ShareableResource.h"
 
 #include "ArgumentCoders.h"
+#include <WebCore/SharedBuffer.h>
+
+using namespace WebCore;
 
 namespace WebKit {
 
@@ -41,15 +44,52 @@ void ShareableResource::Handle::encode(CoreIPC::ArgumentEncoder& encoder) const
     encoder << m_size;
 }
 
-bool ShareableResource::Handle::decode(CoreIPC::ArgumentDecoder* decoder, Handle& handle)
+bool ShareableResource::Handle::decode(CoreIPC::ArgumentDecoder& decoder, Handle& handle)
 {
-    if (!decoder->decode(handle.m_handle))
+    if (!decoder.decode(handle.m_handle))
         return false;
-    if (!decoder->decode(handle.m_offset))
+    if (!decoder.decode(handle.m_offset))
         return false;
-    if (!decoder->decode(handle.m_size))
+    if (!decoder.decode(handle.m_size))
         return false;
     return true;
+}
+
+static void shareableResourceDeallocate(void *ptr, void *info)
+{
+    (static_cast<ShareableResource*>(info))->deref(); // Balanced by ref() in createShareableResourceDeallocator()
+}
+    
+static CFAllocatorRef createShareableResourceDeallocator(ShareableResource* resource)
+{
+    resource->ref(); // Balanced by deref in shareableResourceDeallocate()
+
+    CFAllocatorContext context = { 0,
+        resource,
+        NULL, // retain
+        NULL, // release
+        NULL, // copyDescription
+        NULL, // allocate
+        NULL, // reallocate
+        shareableResourceDeallocate,
+        NULL, // preferredSize
+    };
+
+    return CFAllocatorCreate(kCFAllocatorDefault, &context);
+}
+
+PassRefPtr<SharedBuffer> ShareableResource::Handle::tryWrapInSharedBuffer() const
+{
+    RefPtr<ShareableResource> resource = ShareableResource::create(*this);
+    if (!resource) {
+        LOG_ERROR("Failed to recreate ShareableResource from handle.");
+        return 0;
+    }
+
+    RetainPtr<CFAllocatorRef> deallocator = adoptCF(createShareableResourceDeallocator(resource.get()));
+    RetainPtr<CFDataRef> data = adoptCF(CFDataCreateWithBytesNoCopy(kCFAllocatorDefault, reinterpret_cast<const UInt8*>(resource->data()), static_cast<CFIndex>(resource->size()), deallocator.get()));
+
+    return SharedBuffer::wrapCFData(data.get());
 }
     
 PassRefPtr<ShareableResource> ShareableResource::create(PassRefPtr<SharedMemory> sharedMemory, unsigned offset, unsigned size)

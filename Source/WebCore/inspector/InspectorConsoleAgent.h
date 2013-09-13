@@ -27,6 +27,7 @@
 
 #if ENABLE(INSPECTOR)
 
+#include "ConsoleAPITypes.h"
 #include "ConsoleTypes.h"
 #include "InspectorBaseAgent.h"
 #include "InspectorFrontend.h"
@@ -56,7 +57,7 @@ typedef String ErrorString;
 class InspectorConsoleAgent : public InspectorBaseAgent<InspectorConsoleAgent>, public InspectorBackendDispatcher::ConsoleCommandHandler {
     WTF_MAKE_NONCOPYABLE(InspectorConsoleAgent);
 public:
-    InspectorConsoleAgent(InstrumentingAgents*, InspectorState*, InjectedScriptManager*);
+    InspectorConsoleAgent(InstrumentingAgents*, InspectorCompositeState*, InjectedScriptManager*);
     virtual ~InspectorConsoleAgent();
 
     virtual void enable(ErrorString*);
@@ -70,7 +71,7 @@ public:
     virtual void restore();
 
     void addMessageToConsole(MessageSource, MessageType, MessageLevel, const String& message, ScriptState*, PassRefPtr<ScriptArguments>, unsigned long requestIdentifier = 0);
-    void addMessageToConsole(MessageSource, MessageType, MessageLevel, const String& message, const String& scriptId, unsigned lineNumber, unsigned long requestIdentifier = 0);
+    void addMessageToConsole(MessageSource, MessageType, MessageLevel, const String& message, const String& scriptId, unsigned lineNumber, unsigned columnNumber, ScriptState* = 0, unsigned long requestIdentifier = 0);
 
     // FIXME: Remove once we no longer generate stacks outside of Inspector.
     void addMessageToConsole(MessageSource, MessageType, MessageLevel, const String& message, PassRefPtr<ScriptCallStack>, unsigned long requestIdentifier = 0);
@@ -87,12 +88,14 @@ public:
     void didReceiveResponse(unsigned long requestIdentifier, const ResourceResponse&);
     void didFailLoading(unsigned long requestIdentifier, const ResourceError&);
 #if ENABLE(JAVASCRIPT_DEBUGGER)
-    void addProfileFinishedMessageToConsole(PassRefPtr<ScriptProfile>, unsigned lineNumber, const String& sourceURL);
-    void addStartProfilingMessageToConsole(const String& title, unsigned lineNumber, const String& sourceURL);
+    void addProfileFinishedMessageToConsole(PassRefPtr<ScriptProfile>, unsigned lineNumber, unsigned columnNumber, const String& sourceURL);
+    void addStartProfilingMessageToConsole(const String& title, unsigned lineNumber, unsigned columnNumber, const String& sourceURL);
 #endif
     virtual void setMonitoringXHREnabled(ErrorString*, bool enabled);
     virtual void addInspectedNode(ErrorString*, int nodeId) = 0;
     virtual void addInspectedHeapObject(ErrorString*, int inspectedHeapObjectId);
+
+    virtual bool isWorkerAgent() = 0;
 
 protected:
     void addConsoleMessage(PassOwnPtr<ConsoleMessage>);

@@ -27,9 +27,7 @@
 #include "config.h"
 #include "SharedBuffer.h"
 
-#include "PlatformMemoryInstrumentation.h"
 #include "PurgeableBuffer.h"
-#include <wtf/MemoryInstrumentationVector.h>
 #include <wtf/PassOwnPtr.h>
 #include <wtf/unicode/UTF8.h>
 #include <wtf/unicode/Unicode.h>
@@ -274,16 +272,6 @@ const Vector<char>& SharedBuffer::buffer() const
     return m_buffer;
 }
 
-void SharedBuffer::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this);
-    info.addMember(m_buffer);
-    info.addMember(m_segments);
-    for (unsigned i = 0; i < m_segments.size(); ++i)
-        info.addRawBuffer(m_segments[i], segmentSize);
-    info.addMember(m_purgeableBuffer.get());
-}
-
 unsigned SharedBuffer::getSomeData(const char*& someData, unsigned position) const
 {
     unsigned totalSize = size();
@@ -293,12 +281,12 @@ unsigned SharedBuffer::getSomeData(const char*& someData, unsigned position) con
     }
 
     if (hasPlatformData() || m_purgeableBuffer) {
-        ASSERT(position < size());
+        ASSERT_WITH_SECURITY_IMPLICATION(position < size());
         someData = data() + position;
         return totalSize - position;
     }
 
-    ASSERT(position < m_size);
+    ASSERT_WITH_SECURITY_IMPLICATION(position < m_size);
     unsigned consecutiveSize = m_buffer.size();
     if (position < consecutiveSize) {
         someData = m_buffer.data() + position;

@@ -24,6 +24,7 @@
 #include "BlobData.h"
 #include "HTTPParsers.h"
 #include "MIMETypeRegistry.h"
+#include "NetworkingContext.h"
 #include "ResourceHandle.h"
 #include "ResourceHandleClient.h"
 #include "ResourceHandleInternal.h"
@@ -651,7 +652,7 @@ void QNetworkReplyHandler::redirect(ResourceResponse& response, const QUrl& redi
     newRequest.setURL(newUrl);
 
     // Should not set Referer after a redirect from a secure resource to non-secure one.
-    if (!newRequest.url().protocolIs("https") && protocolIs(newRequest.httpReferrer(), "https"))
+    if (!newRequest.url().protocolIs("https") && protocolIs(newRequest.httpReferrer(), "https") && m_resourceHandle->context()->shouldClearReferrerOnHTTPSToHTTPRedirect())
         newRequest.clearHTTPReferrer();
 
     client->willSendRequest(m_resourceHandle, newRequest, response);

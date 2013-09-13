@@ -27,7 +27,7 @@
 #ifndef  RedirectedXCompositeWindow_h
 #define  RedirectedXCompositeWindow_h
 
-#if PLATFORM(X11)
+#if USE(OPENGL) && PLATFORM(X11)
 
 #include "GLContext.h"
 #include "IntSize.h"
@@ -80,6 +80,6 @@ private:
 
 } // namespace WebCore
 
-#endif // PLATFORM(X11)
+#endif // USE(OPENGL) && PLATFORM(X11)
 
 #endif // RedirectedXCompositeWindow_h

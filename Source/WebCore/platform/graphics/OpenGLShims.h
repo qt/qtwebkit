@@ -27,6 +27,7 @@
 #include <QSurface>
 #else
 #include <GL/gl.h>
+#include <GL/glext.h>
 #endif
 
 #if defined(GL_ES_VERSION_2_0)
@@ -53,6 +54,7 @@ typedef void (GLAPIENTRY *glBindAttribLocationType) (GLuint, GLuint, const char*
 typedef void (GLAPIENTRY *glBindBufferType) (GLenum, GLuint);
 typedef void (GLAPIENTRY *glBindFramebufferType) (GLenum, GLuint);
 typedef void (GLAPIENTRY *glBindRenderbufferType) (GLenum, GLuint);
+typedef void (GLAPIENTRY *glBindVertexArrayType) (GLuint);
 typedef void (GLAPIENTRY *glBlendColorType) (GLclampf, GLclampf, GLclampf, GLclampf);
 typedef void (GLAPIENTRY *glBlendEquationType) (GLenum);
 typedef void (GLAPIENTRY *glBlendEquationSeparateType)(GLenum, GLenum);
@@ -71,6 +73,7 @@ typedef void (GLAPIENTRY *glDeleteFramebuffersType) (GLsizei n, const GLuint*);
 typedef void (GLAPIENTRY *glDeleteProgramType) (GLuint);
 typedef void (GLAPIENTRY *glDeleteRenderbuffersType) (GLsizei n, const GLuint*);
 typedef void (GLAPIENTRY *glDeleteShaderType) (GLuint);
+typedef void (GLAPIENTRY *glDeleteVertexArraysType) (GLsizei, const GLuint*);
 typedef void (GLAPIENTRY *glDetachShaderType) (GLuint, GLuint);
 typedef void (GLAPIENTRY *glDisableVertexAttribArrayType) (GLuint);
 typedef void (GLAPIENTRY *glEnableVertexAttribArrayType) (GLuint);
@@ -80,6 +83,7 @@ typedef void (GLAPIENTRY *glGenBuffersType) (GLsizei, GLuint*);
 typedef void (GLAPIENTRY *glGenerateMipmapType) (GLenum target);
 typedef void (GLAPIENTRY *glGenFramebuffersType) (GLsizei, GLuint*);
 typedef void (GLAPIENTRY *glGenRenderbuffersType) (GLsizei, GLuint*);
+typedef void (GLAPIENTRY *glGenVertexArraysType) (GLsizei, GLuint*);
 typedef void (GLAPIENTRY *glGetActiveAttribType) (GLuint, GLuint, GLsizei, GLsizei*, GLint*, GLenum*, GLchar*);
 typedef void (GLAPIENTRY *glGetActiveUniformType) (GLuint, GLuint, GLsizei, GLsizei*, GLint*, GLenum*, GLchar*);
 typedef void (GLAPIENTRY *glGetAttachedShadersType) (GLuint, GLsizei, GLsizei*, GLuint*);
@@ -103,6 +107,7 @@ typedef GLboolean (GLAPIENTRY *glIsFramebufferType) (GLuint);
 typedef GLboolean (GLAPIENTRY *glIsProgramType) (GLuint);
 typedef GLboolean (GLAPIENTRY *glIsRenderbufferType) (GLuint);
 typedef GLboolean (GLAPIENTRY *glIsShaderType) (GLuint);
+typedef GLboolean (GLAPIENTRY *glIsVertexArrayType) (GLuint);
 typedef void (GLAPIENTRY *glLinkProgramType) (GLuint);
 typedef void (GLAPIENTRY *glRenderbufferStorageType) (GLenum, GLenum, GLsizei, GLsizei);
 typedef void (GLAPIENTRY *glRenderbufferStorageMultisampleType) (GLenum, GLsizei, GLenum, GLsizei, GLsizei);
@@ -151,6 +156,7 @@ typedef struct _OpenGLFunctionTable {
     FUNCTION_TABLE_ENTRY(glBindBuffer);
     FUNCTION_TABLE_ENTRY(glBindFramebuffer);
     FUNCTION_TABLE_ENTRY(glBindRenderbuffer);
+    FUNCTION_TABLE_ENTRY(glBindVertexArray);
     FUNCTION_TABLE_ENTRY(glBlendColor);
     FUNCTION_TABLE_ENTRY(glBlendEquation);
     FUNCTION_TABLE_ENTRY(glBlendEquationSeparate);
@@ -169,6 +175,7 @@ typedef struct _OpenGLFunctionTable {
     FUNCTION_TABLE_ENTRY(glDeleteProgram);
     FUNCTION_TABLE_ENTRY(glDeleteRenderbuffers);
     FUNCTION_TABLE_ENTRY(glDeleteShader);
+    FUNCTION_TABLE_ENTRY(glDeleteVertexArrays);
     FUNCTION_TABLE_ENTRY(glDetachShader);
     FUNCTION_TABLE_ENTRY(glDisableVertexAttribArray);
     FUNCTION_TABLE_ENTRY(glEnableVertexAttribArray);
@@ -178,6 +185,7 @@ typedef struct _OpenGLFunctionTable {
     FUNCTION_TABLE_ENTRY(glGenerateMipmap);
     FUNCTION_TABLE_ENTRY(glGenFramebuffers);
     FUNCTION_TABLE_ENTRY(glGenRenderbuffers);
+    FUNCTION_TABLE_ENTRY(glGenVertexArrays);
     FUNCTION_TABLE_ENTRY(glGetActiveAttrib);
     FUNCTION_TABLE_ENTRY(glGetActiveUniform);
     FUNCTION_TABLE_ENTRY(glGetAttachedShaders);
@@ -201,6 +209,7 @@ typedef struct _OpenGLFunctionTable {
     FUNCTION_TABLE_ENTRY(glIsProgram);
     FUNCTION_TABLE_ENTRY(glIsRenderbuffer);
     FUNCTION_TABLE_ENTRY(glIsShader);
+    FUNCTION_TABLE_ENTRY(glIsVertexArray);
     FUNCTION_TABLE_ENTRY(glLinkProgram);
     FUNCTION_TABLE_ENTRY(glRenderbufferStorage);
     FUNCTION_TABLE_ENTRY(glRenderbufferStorageMultisample);
@@ -252,6 +261,8 @@ typedef struct _OpenGLFunctionTable {
 #define glBindFramebuffer                      LOOKUP_GL_FUNCTION(glBindFramebuffer)
 #define glBindRenderbufferEXT                  glBindRenderbuffer
 #define glBindRenderbuffer                     LOOKUP_GL_FUNCTION(glBindRenderbuffer)
+#define glBindVertexArrayOES                   glBindVertexArray
+#define glBindVertexArray                      LOOKUP_GL_FUNCTION(glBindVertexArray)
 #define glBlendColor                           LOOKUP_GL_FUNCTION(glBlendColor)
 #define glBlendEquation                        LOOKUP_GL_FUNCTION(glBlendEquation)
 #define glBlendEquationSeparate                LOOKUP_GL_FUNCTION(glBlendEquationSeparate)
@@ -274,6 +285,8 @@ typedef struct _OpenGLFunctionTable {
 #define glDeleteRenderbuffersEXT               glDeleteRenderbuffers
 #define glDeleteRenderbuffers                  LOOKUP_GL_FUNCTION(glDeleteRenderbuffers)
 #define glDeleteShader                         LOOKUP_GL_FUNCTION(glDeleteShader)
+#define glDeleteVertexArraysOES                glDeleteVertexArrays
+#define glDeleteVertexArrays                   LOOKUP_GL_FUNCTION(glDeleteVertexArrays)
 #define glDetachShader                         LOOKUP_GL_FUNCTION(glDetachShader)
 #define glDisableVertexAttribArray             LOOKUP_GL_FUNCTION(glDisableVertexAttribArray)
 #define glEnableVertexAttribArray              LOOKUP_GL_FUNCTION(glEnableVertexAttribArray)
@@ -288,6 +301,8 @@ typedef struct _OpenGLFunctionTable {
 #define glGenFramebuffers                      LOOKUP_GL_FUNCTION(glGenFramebuffers)
 #define glGenRenderbuffersEXT                  glGenRenderbuffers
 #define glGenRenderbuffers                     LOOKUP_GL_FUNCTION(glGenRenderbuffers)
+#define glGenVertexArraysOES                   glGenVertexArrays;
+#define glGenVertexArrays                      LOOKUP_GL_FUNCTION(glGenVertexArrays)
 #define glGetActiveAttrib                      LOOKUP_GL_FUNCTION(glGetActiveAttrib)
 #define glGetActiveUniform                     LOOKUP_GL_FUNCTION(glGetActiveUniform)
 #define glGetAttachedShaders                   LOOKUP_GL_FUNCTION(glGetAttachedShaders)
@@ -316,6 +331,8 @@ typedef struct _OpenGLFunctionTable {
 #define glIsRenderbufferEXT                    glIsRenderbuffer
 #define glIsRenderbuffer                       LOOKUP_GL_FUNCTION(glIsRenderbuffer)
 #define glIsShader                             LOOKUP_GL_FUNCTION(glIsShader)
+#define glIsVertexArrayOES                     glIsVertexArray;
+#define glIsVertexArray                        LOOKUP_GL_FUNCTION(glIsVertexArray)
 #define glLinkProgram                          LOOKUP_GL_FUNCTION(glLinkProgram)
 #define glRenderbufferStorageEXT               glRenderbufferStorage
 #define glRenderbufferStorage                  LOOKUP_GL_FUNCTION(glRenderbufferStorage)

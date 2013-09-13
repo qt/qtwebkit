@@ -38,14 +38,12 @@
 
 namespace WebCore {
 
-CustomFilterOperation::CustomFilterOperation(PassRefPtr<CustomFilterProgram> program, const CustomFilterParameterList& sortedParameters, unsigned meshRows, unsigned meshColumns, CustomFilterMeshBoxType meshBoxType, CustomFilterMeshType meshType)
+CustomFilterOperation::CustomFilterOperation(PassRefPtr<CustomFilterProgram> program, const CustomFilterParameterList& sortedParameters, unsigned meshRows, unsigned meshColumns)
     : FilterOperation(CUSTOM)
     , m_program(program)
     , m_parameters(sortedParameters)
     , m_meshRows(meshRows)
     , m_meshColumns(meshColumns)
-    , m_meshBoxType(meshBoxType)
-    , m_meshType(meshType)
 {
     // Make sure that the parameters are alwyas sorted by name. We use that to merge two CustomFilterOperations in animations.
     ASSERT(m_parameters.checkAlphabeticalOrder());
@@ -64,16 +62,14 @@ PassRefPtr<FilterOperation> CustomFilterOperation::blend(const FilterOperation* 
         return this;
     
     const CustomFilterOperation* fromOp = static_cast<const CustomFilterOperation*>(from);
-    if (*m_program.get() != *fromOp->m_program.get()
+    if (m_program.get() != fromOp->m_program.get()
         || m_meshRows != fromOp->m_meshRows
-        || m_meshColumns != fromOp->m_meshColumns
-        || m_meshBoxType != fromOp->m_meshBoxType
-        || m_meshType != fromOp->m_meshType)
+        || m_meshColumns != fromOp->m_meshColumns)
         return this;
     
     CustomFilterParameterList animatedParameters;
     m_parameters.blend(fromOp->m_parameters, progress, size, animatedParameters);
-    return CustomFilterOperation::create(m_program, animatedParameters, m_meshRows, m_meshColumns, m_meshBoxType, m_meshType);
+    return CustomFilterOperation::create(m_program, animatedParameters, m_meshRows, m_meshColumns);
 }
 
 } // namespace WebCore

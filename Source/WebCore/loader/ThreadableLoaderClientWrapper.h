@@ -74,12 +74,6 @@ public:
             m_client->didReceiveData(data, dataLength);
     }
 
-    void didReceiveCachedMetadata(const char* data, int dataLength)
-    {
-        if (m_client)
-            m_client->didReceiveCachedMetadata(data, dataLength);
-    }
-
     void didFinishLoading(unsigned long identifier, double finishTime)
     {
         m_done = true;
@@ -94,6 +88,13 @@ public:
             m_client->didFail(error);
     }
 
+    void didFailAccessControlCheck(const ResourceError& error)
+    {
+        m_done = true;
+        if (m_client)
+            m_client->didFailAccessControlCheck(error);
+    }
+
     void didFailRedirectCheck()
     {
         m_done = true;
@@ -106,14 +107,6 @@ public:
         if (m_client)
             m_client->didReceiveResponse(identifier, response);
     }
-
-#if PLATFORM(CHROMIUM)
-    void didDownloadData(int dataLength)
-    {
-        if (m_client)
-            m_client->didDownloadData(dataLength);
-    }
-#endif
 
 protected:
     explicit ThreadableLoaderClientWrapper(ThreadableLoaderClient* client)

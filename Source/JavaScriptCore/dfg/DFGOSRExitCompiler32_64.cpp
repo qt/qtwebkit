@@ -29,6 +29,7 @@
 #if ENABLE(DFG_JIT) && USE(JSVALUE32_64)
 
 #include "DFGOperations.h"
+#include "Operations.h"
 #include <wtf/DataLog.h>
 
 namespace JSC { namespace DFG {
@@ -37,7 +38,7 @@ void OSRExitCompiler::compileExit(const OSRExit& exit, const Operands<ValueRecov
 {
     // 1) Pro-forma stuff.
 #if DFG_ENABLE(DEBUG_VERBOSE)
-    dataLogF("OSR exit for Node @%d (", (int)exit.m_nodeIndex);
+    dataLogF("OSR exit (");
     for (CodeOrigin codeOrigin = exit.m_codeOrigin; ; codeOrigin = codeOrigin.inlineCallFrame->caller) {
         dataLogF("bc#%u", codeOrigin.bytecodeIndex);
         if (!codeOrigin.inlineCallFrame)
@@ -47,13 +48,13 @@ void OSRExitCompiler::compileExit(const OSRExit& exit, const Operands<ValueRecov
     dataLogF(") at JIT offset 0x%x  ", m_jit.debugOffset());
     dumpOperands(operands, WTF::dataFile());
 #endif
-#if DFG_ENABLE(VERBOSE_SPECULATION_FAILURE)
-    SpeculationFailureDebugInfo* debugInfo = new SpeculationFailureDebugInfo;
-    debugInfo->codeBlock = m_jit.codeBlock();
-    debugInfo->nodeIndex = exit.m_nodeIndex;
     
-    m_jit.debugCall(debugOperationPrintSpeculationFailure, debugInfo);
-#endif
+    if (Options::printEachOSRExit()) {
+        SpeculationFailureDebugInfo* debugInfo = new SpeculationFailureDebugInfo;
+        debugInfo->codeBlock = m_jit.codeBlock();
+        
+        m_jit.debugCall(debugOperationPrintSpeculationFailure, debugInfo);
+    }
     
 #if DFG_ENABLE(JIT_BREAK_ON_SPECULATION_FAILURE)
     m_jit.breakpoint();
@@ -263,7 +264,7 @@ void OSRExitCompiler::compileExit(const OSRExit& exit, const Operands<ValueRecov
     }
     
     unsigned scratchBufferLengthBeforeUInt32s = numberOfPoisonedVirtualRegisters + ((numberOfDisplacedVirtualRegisters * 2) <= GPRInfo::numberOfRegisters ? 0 : numberOfDisplacedVirtualRegisters);
-    ScratchBuffer* scratchBuffer = m_jit.globalData()->scratchBufferForSize(sizeof(EncodedJSValue) * (scratchBufferLengthBeforeUInt32s + (haveUInt32s ? 2 : 0)));
+    ScratchBuffer* scratchBuffer = m_jit.vm()->scratchBufferForSize(sizeof(EncodedJSValue) * (scratchBufferLengthBeforeUInt32s + (haveUInt32s ? 2 : 0)));
     EncodedJSValue* scratchDataBuffer = scratchBuffer ? static_cast<EncodedJSValue*>(scratchBuffer->dataBuffer()) : 0;
 
     // From here on, the code assumes that it is profitable to maximize the distance
@@ -640,7 +641,7 @@ void OSRExitCompiler::compileExit(const OSRExit& exit, const Operands<ValueRecov
         CodeBlock* baselineCodeBlockForCaller = m_jit.baselineCodeBlockFor(inlineCallFrame->caller);
         Vector<BytecodeAndMachineOffset>& decodedCodeMap = m_jit.decodedCodeMapFor(baselineCodeBlockForCaller);
         unsigned returnBytecodeIndex = inlineCallFrame->caller.bytecodeIndex + OPCODE_LENGTH(op_call);
-        BytecodeAndMachineOffset* mapping = binarySearch<BytecodeAndMachineOffset, unsigned, BytecodeAndMachineOffset::getBytecodeIndex>(decodedCodeMap.begin(), decodedCodeMap.size(), returnBytecodeIndex);
+        BytecodeAndMachineOffset* mapping = binarySearch<BytecodeAndMachineOffset, unsigned>(decodedCodeMap, decodedCodeMap.size(), returnBytecodeIndex, BytecodeAndMachineOffset::getBytecodeIndex);
         
         ASSERT(mapping);
         ASSERT(mapping->m_bytecodeIndex == returnBytecodeIndex);
@@ -656,13 +657,15 @@ void OSRExitCompiler::compileExit(const OSRExit& exit, const Operands<ValueRecov
         
         m_jit.storePtr(AssemblyHelpers::TrustedImmPtr(baselineCodeBlock), AssemblyHelpers::addressFor((VirtualRegister)(inlineCallFrame->stackOffset + JSStack::CodeBlock)));
         m_jit.store32(AssemblyHelpers::TrustedImm32(JSValue::CellTag), AssemblyHelpers::tagFor((VirtualRegister)(inlineCallFrame->stackOffset + JSStack::ScopeChain)));
-        m_jit.storePtr(AssemblyHelpers::TrustedImmPtr(inlineCallFrame->callee->scope()), AssemblyHelpers::payloadFor((VirtualRegister)(inlineCallFrame->stackOffset + JSStack::ScopeChain)));
+        if (!inlineCallFrame->isClosureCall())
+            m_jit.storePtr(AssemblyHelpers::TrustedImmPtr(inlineCallFrame->callee->scope()), AssemblyHelpers::payloadFor((VirtualRegister)(inlineCallFrame->stackOffset + JSStack::ScopeChain)));
         m_jit.store32(AssemblyHelpers::TrustedImm32(JSValue::CellTag), AssemblyHelpers::tagFor((VirtualRegister)(inlineCallFrame->stackOffset + JSStack::CallerFrame)));
         m_jit.storePtr(callerFrameGPR, AssemblyHelpers::payloadFor((VirtualRegister)(inlineCallFrame->stackOffset + JSStack::CallerFrame)));
         m_jit.storePtr(AssemblyHelpers::TrustedImmPtr(jumpTarget), AssemblyHelpers::payloadFor((VirtualRegister)(inlineCallFrame->stackOffset + JSStack::ReturnPC)));
         m_jit.store32(AssemblyHelpers::TrustedImm32(inlineCallFrame->arguments.size()), AssemblyHelpers::payloadFor((VirtualRegister)(inlineCallFrame->stackOffset + JSStack::ArgumentCount)));
         m_jit.store32(AssemblyHelpers::TrustedImm32(JSValue::CellTag), AssemblyHelpers::tagFor((VirtualRegister)(inlineCallFrame->stackOffset + JSStack::Callee)));
-        m_jit.storePtr(AssemblyHelpers::TrustedImmPtr(inlineCallFrame->callee.get()), AssemblyHelpers::payloadFor((VirtualRegister)(inlineCallFrame->stackOffset + JSStack::Callee)));
+        if (!inlineCallFrame->isClosureCall())
+            m_jit.storePtr(AssemblyHelpers::TrustedImmPtr(inlineCallFrame->callee.get()), AssemblyHelpers::payloadFor((VirtualRegister)(inlineCallFrame->stackOffset + JSStack::Callee)));
     }
     
     // 14) Create arguments if necessary and place them into the appropriate aliased
@@ -749,7 +752,7 @@ void OSRExitCompiler::compileExit(const OSRExit& exit, const Operands<ValueRecov
     CodeBlock* baselineCodeBlock = m_jit.baselineCodeBlockFor(exit.m_codeOrigin);
     Vector<BytecodeAndMachineOffset>& decodedCodeMap = m_jit.decodedCodeMapFor(baselineCodeBlock);
     
-    BytecodeAndMachineOffset* mapping = binarySearch<BytecodeAndMachineOffset, unsigned, BytecodeAndMachineOffset::getBytecodeIndex>(decodedCodeMap.begin(), decodedCodeMap.size(), exit.m_codeOrigin.bytecodeIndex);
+    BytecodeAndMachineOffset* mapping = binarySearch<BytecodeAndMachineOffset, unsigned>(decodedCodeMap, decodedCodeMap.size(), exit.m_codeOrigin.bytecodeIndex, BytecodeAndMachineOffset::getBytecodeIndex);
     
     ASSERT(mapping);
     ASSERT(mapping->m_bytecodeIndex == exit.m_codeOrigin.bytecodeIndex);

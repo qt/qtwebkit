@@ -32,10 +32,11 @@
 
 #include "Font.h"
 #include "FontCache.h"
-#include "OpenTypeVerticalData.h"
-
 #include <wtf/MathExtras.h>
-#include <wtf/UnusedParam.h>
+
+#if ENABLE(OPENTYPE_VERTICAL)
+#include "OpenTypeVerticalData.h"
+#endif
 
 using namespace std;
 
@@ -113,6 +114,7 @@ void SimpleFontData::platformGlyphInit()
         LOG_ERROR("Failed to get glyph page zero.");
         m_spaceGlyph = 0;
         m_spaceWidth = 0;
+        m_zeroGlyph = 0;
         m_adjustedSpaceWidth = 0;
         determinePitch();
         m_zeroWidthSpaceGlyph = 0;
@@ -129,6 +131,8 @@ void SimpleFontData::platformGlyphInit()
     m_spaceGlyph = glyphPageZero->glyphDataForCharacter(' ').glyph;
     float width = widthForGlyph(m_spaceGlyph);
     m_spaceWidth = width;
+    m_zeroGlyph = glyphPageZero->glyphDataForCharacter('0').glyph;
+    m_fontMetrics.setZeroWidth(widthForGlyph(m_zeroGlyph));
     determinePitch();
     m_adjustedSpaceWidth = m_treatAsFixedPitch ? ceilf(width) : roundf(width);
 
@@ -148,9 +152,7 @@ void SimpleFontData::platformGlyphInit()
 
 SimpleFontData::~SimpleFontData()
 {
-#if ENABLE(SVG_FONTS)
     if (!m_fontData)
-#endif
         platformDestroy();
 
     if (isCustomFont())
@@ -227,6 +229,20 @@ PassRefPtr<SimpleFontData> SimpleFontData::brokenIdeographFontData() const
     return m_derivedFontData->brokenIdeograph;
 }
 
+PassRefPtr<SimpleFontData> SimpleFontData::nonSyntheticItalicFontData() const
+{
+    if (!m_derivedFontData)
+        m_derivedFontData = DerivedFontData::create(isCustomFont());
+    if (!m_derivedFontData->nonSyntheticItalic) {
+        FontPlatformData nonSyntheticItalicFontPlatformData(m_platformData);
+#if PLATFORM(MAC)
+        nonSyntheticItalicFontPlatformData.m_syntheticOblique = false;
+#endif
+        m_derivedFontData->nonSyntheticItalic = create(nonSyntheticItalicFontPlatformData, isCustomFont(), false, true);
+    }
+    return m_derivedFontData->nonSyntheticItalic;
+}
+
 #ifndef NDEBUG
 String SimpleFontData::description() const
 {
@@ -268,12 +284,21 @@ SimpleFontData::DerivedFontData::~DerivedFontData()
             SimpleFontData** fonts = stash.data();
             CFDictionaryGetKeysAndValues(dictionary, 0, (const void **)fonts);
             while (count-- > 0 && *fonts) {
-                OwnPtr<SimpleFontData> afont = adoptPtr(*fonts++);
+                RefPtr<SimpleFontData> afont = adoptRef(*fonts++);
                 GlyphPageTreeNode::pruneTreeCustomFontData(afont.get());
             }
         }
     }
 #endif
+}
+
+PassRefPtr<SimpleFontData> SimpleFontData::createScaledFontData(const FontDescription& fontDescription, float scaleFactor) const
+{
+    // FIXME: Support scaled fonts that used AdditionalFontData.
+    if (m_fontData)
+        return 0;
+
+    return platformCreateScaledFontData(fontDescription, scaleFactor);
 }
 
 } // namespace WebCore

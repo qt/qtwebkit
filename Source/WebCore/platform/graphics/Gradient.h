@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006, 2007, 2008, 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2006, 2007, 2008, 2011, 2012, 2013 Apple Inc. All rights reserved.
  * Copyright (C) 2007 Alp Toker <alp@atoker.com>
  * Copyright (C) 2008 Torch Mobile, Inc.
  *
@@ -30,9 +30,9 @@
 
 #include "AffineTransform.h"
 #include "FloatPoint.h"
-#include "Generator.h"
 #include "GraphicsTypes.h"
 #include <wtf/PassRefPtr.h>
+#include <wtf/RefCounted.h>
 #include <wtf/Vector.h>
 
 #if USE(CG)
@@ -50,13 +50,15 @@ typedef QGradient* PlatformGradient;
 #elif USE(CAIRO)
 typedef struct _cairo_pattern cairo_pattern_t;
 typedef cairo_pattern_t* PlatformGradient;
-#elif USE(SKIA)
-class SkShader;
-typedef class SkShader* PlatformGradient;
-typedef class SkShader* PlatformPattern;
-#elif PLATFORM(WX)
-class wxGraphicsBrush;
-typedef wxGraphicsBrush* PlatformGradient;
+#elif PLATFORM(BLACKBERRY)
+namespace BlackBerry {
+namespace Platform {
+namespace Graphics {
+class Gradient;
+}
+}
+}
+typedef BlackBerry::Platform::Graphics::Gradient* PlatformGradient;
 #else
 typedef void* PlatformGradient;
 #endif
@@ -64,8 +66,10 @@ typedef void* PlatformGradient;
 namespace WebCore {
 
     class Color;
+    class FloatRect;
+    class GraphicsContext;
 
-    class Gradient : public Generator {
+    class Gradient : public RefCounted<Gradient> {
     public:
         static PassRefPtr<Gradient> create(const FloatPoint& p0, const FloatPoint& p1)
         {
@@ -75,13 +79,12 @@ namespace WebCore {
         {
             return adoptRef(new Gradient(p0, r0, p1, r1, aspectRatio));
         }
-        virtual ~Gradient();
+        ~Gradient();
 
         struct ColorStop;
         void addColorStop(const ColorStop&);
         void addColorStop(float, const Color&);
 
-        void getColor(float value, float* r, float* g, float* b, float* a) const;
         bool hasAlpha() const;
 
         bool isRadial() const { return m_radial; }
@@ -135,7 +138,7 @@ namespace WebCore {
 
         float aspectRatio() const { return m_aspectRatio; }
 
-#if OS(WINCE) && !PLATFORM(QT)
+#if USE(WINGDI)
         const Vector<ColorStop, 2>& getStops() const;
 #else
         PlatformGradient platformGradient();
@@ -160,12 +163,12 @@ namespace WebCore {
         // Qt and CG transform the gradient at draw time
         AffineTransform gradientSpaceTransform() { return m_gradientSpaceTransformation; }
 
-        virtual void fill(GraphicsContext*, const FloatRect&);
-        virtual void adjustParametersForTiledDrawing(IntSize& size, FloatRect& srcRect);
+        void fill(GraphicsContext*, const FloatRect&);
+        void adjustParametersForTiledDrawing(IntSize&, FloatRect&);
 
         void setPlatformGradientSpaceTransform(const AffineTransform& gradientSpaceTransformation);
 
-        virtual unsigned hash() const OVERRIDE;
+        unsigned hash() const;
         void invalidateHash() { m_cachedHash = 0; }
 
 #if USE(CG)
@@ -182,7 +185,6 @@ namespace WebCore {
         void platformInit() { m_gradient = 0; }
         void platformDestroy();
 
-        int findStop(float value) const;
         void sortStopsIfNecessary();
 
         // Keep any parameters relevant to rendering in sync with the structure in Gradient::hash().
@@ -194,7 +196,6 @@ namespace WebCore {
         float m_aspectRatio; // For elliptical gradient, width / height.
         mutable Vector<ColorStop, 2> m_stops;
         mutable bool m_stopsSorted;
-        mutable int m_lastStop;
         GradientSpreadMethod m_spreadMethod;
         AffineTransform m_gradientSpaceTransformation;
 

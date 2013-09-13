@@ -26,7 +26,6 @@
 #define Attribute_h
 
 #include "QualifiedName.h"
-#include "WebCoreMemoryInstrumentation.h"
 
 namespace WebCore {
 
@@ -41,12 +40,6 @@ public:
     {
     }
 
-    Attribute(const AtomicString& name, const AtomicString& value)
-        : m_name(nullAtom, name, nullAtom)
-        , m_value(value)
-    {
-    }
-
     // NOTE: The references returned by these functions are only valid for as long
     // as the Attribute stays in place. For example, calling a function that mutates
     // an Element's internal attribute storage may invalidate them.
@@ -57,8 +50,8 @@ public:
 
     const QualifiedName& name() const { return m_name; }
 
-    bool isNull() const { return m_value.isNull(); }
     bool isEmpty() const { return m_value.isEmpty(); }
+    bool matches(const AtomicString& prefix, const AtomicString& localName, const AtomicString& namespaceURI) const;
 
     void setValue(const AtomicString& value) { m_value = value; }
     void setPrefix(const AtomicString& prefix) { m_name.setPrefix(prefix); }
@@ -68,17 +61,23 @@ public:
     // elements may have placed the Attribute in a hash by name.
     void parserSetName(const QualifiedName& name) { m_name = name; }
 
-    void reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-    {
-        MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::DOM);
-        info.addMember(m_name);
-        info.addMember(m_value);
-    }
+#if COMPILER(MSVC)
+    // NOTE: This constructor is not actually implemented, it's just defined so MSVC
+    // will let us use a zero-length array of Attributes.
+    Attribute();
+#endif
 
 private:
     QualifiedName m_name;
     AtomicString m_value;
 };
+
+inline bool Attribute::matches(const AtomicString& prefix, const AtomicString& localName, const AtomicString& namespaceURI) const
+{
+    if (localName != this->localName())
+        return false;
+    return prefix == starAtom || namespaceURI == this->namespaceURI();
+}
 
 } // namespace WebCore
 

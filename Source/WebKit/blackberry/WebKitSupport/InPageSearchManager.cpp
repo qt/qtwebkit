@@ -84,12 +84,13 @@ InPageSearchManager::~InPageSearchManager()
     cancelPendingScopingEffort();
 }
 
-bool InPageSearchManager::findNextString(const String& text, FindOptions findOptions, bool wrap, bool highlightAllMatches)
+bool InPageSearchManager::findNextString(const String& text, FindOptions findOptions, bool wrap, bool highlightAllMatches, bool selectActiveMatchOnClear)
 {
+    bool highlightAllMatchesStateChanged = m_highlightAllMatches != highlightAllMatches;
     m_highlightAllMatches = highlightAllMatches;
 
     if (!text.length()) {
-        clearTextMatches();
+        clearTextMatches(selectActiveMatchOnClear);
         cancelPendingScopingEffort();
         m_activeSearchString = String();
         m_webPage->m_client->updateFindStringResult(m_activeMatchCount, m_activeMatchIndex);
@@ -108,7 +109,7 @@ bool InPageSearchManager::findNextString(const String& text, FindOptions findOpt
 
     ExceptionCode ec = 0;
     RefPtr<Range> searchStartingPoint = m_activeMatch ? m_activeMatch->cloneRange(ec) : 0;
-    bool newSearch = m_activeSearchString != text;
+    bool newSearch = highlightAllMatchesStateChanged || (m_activeSearchString != text);
     bool forward = !(findOptions & WebCore::Backwards);
     if (newSearch) { // Start a new search.
         m_activeSearchString = text;
@@ -179,11 +180,18 @@ bool InPageSearchManager::shouldSearchForText(const String& text)
 
 bool InPageSearchManager::findAndMarkText(const String& text, Range* range, Frame* frame, const FindOptions& options, bool isNewSearch, bool startFromSelection)
 {
-    if (RefPtr<Range> match = frame->editor()->findStringAndScrollToVisible(text, range, options)) {
+    if (RefPtr<Range> match = frame->editor().findStringAndScrollToVisible(text, range, options)) {
         // Move the highlight to the new match.
         setActiveMatchAndMarker(match);
         if (isNewSearch) {
             scopeStringMatches(text, true /* reset */, false /* locateActiveMatchOnly */);
+            if (!m_highlightAllMatches) {
+                // Not highlighting all matches, we need to add the marker here,
+                // because scopeStringMatches does not add any markers, it only counts the number.
+                // No need to unmarkAllTextMatches, it is already done from the caller because of newSearch
+                m_activeMatch->ownerDocument()->markers()->addTextMatchMarker(m_activeMatch.get(), true);
+                frame->editor().setMarkedTextMatchesAreHighlighted(true /* highlight */);
+            }
             return true;
         }
         if (startFromSelection || m_locatingActiveMatch) {
@@ -215,7 +223,7 @@ bool InPageSearchManager::findAndMarkText(const String& text, Range* range, Fram
             // all matches but count them.
             m_webPage->m_page->unmarkAllTextMatches();
             m_activeMatch->ownerDocument()->markers()->addTextMatchMarker(m_activeMatch.get(), true);
-            frame->editor()->setMarkedTextMatchesAreHighlighted(true /* highlight */);
+            frame->editor().setMarkedTextMatchesAreHighlighted(true /* highlight */);
         }
 
         return true;
@@ -223,8 +231,12 @@ bool InPageSearchManager::findAndMarkText(const String& text, Range* range, Fram
     return false;
 }
 
-void InPageSearchManager::clearTextMatches()
+void InPageSearchManager::clearTextMatches(bool selectActiveMatchOnClear)
 {
+    if (selectActiveMatchOnClear && m_activeMatch.get()) {
+        VisibleSelection selection(m_activeMatch.get());
+        m_activeMatch->ownerDocument()->frame()->selection()->setSelection(selection);
+    }
     m_webPage->m_page->unmarkAllTextMatches();
     m_activeMatch = 0;
     m_activeMatchCount = 0;
@@ -313,7 +325,7 @@ void InPageSearchManager::scopeStringMatches(const String& text, bool reset, boo
         if (resultRange->collapsed(ec)) {
             if (!resultRange->startContainer()->isInShadowTree())
                 break;
-            searchRange->setStartAfter(resultRange->startContainer()->shadowAncestorNode(), ec);
+            searchRange->setStartAfter(resultRange->startContainer()->deprecatedShadowAncestorNode(), ec);
             searchRange->setEnd(originalEndContainer, originalEndOffset, ec);
             continue;
         }
@@ -348,7 +360,7 @@ void InPageSearchManager::scopeStringMatches(const String& text, bool reset, boo
             m_activeMatchIndex += matchCount;
         } else {
             if (m_highlightAllMatches)
-                scopingFrame->editor()->setMarkedTextMatchesAreHighlighted(true /* highlight */);
+                scopingFrame->editor().setMarkedTextMatchesAreHighlighted(true /* highlight */);
             m_activeMatchCount += matchCount;
             m_webPage->m_client->updateFindStringResult(m_activeMatchCount, m_activeMatchIndex);
         }

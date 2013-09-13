@@ -36,6 +36,7 @@ class ArgumentEncoder;
 }
 
 namespace WebCore {
+class ResourceError;
 class ResourceResponse;
 }
 
@@ -45,13 +46,14 @@ class PlatformCertificateInfo {
 public:
     PlatformCertificateInfo();
     explicit PlatformCertificateInfo(const WebCore::ResourceResponse&);
+    explicit PlatformCertificateInfo(const WebCore::ResourceError&);
     ~PlatformCertificateInfo();
 
     GTlsCertificate* certificate() const { return m_certificate.get(); }
     GTlsCertificateFlags tlsErrors() const { return m_tlsErrors; }
 
     void encode(CoreIPC::ArgumentEncoder&) const;
-    static bool decode(CoreIPC::ArgumentDecoder*, PlatformCertificateInfo&);
+    static bool decode(CoreIPC::ArgumentDecoder&, PlatformCertificateInfo&);
 
 private:
     GRefPtr<GTlsCertificate> m_certificate;

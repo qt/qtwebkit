@@ -1,6 +1,6 @@
 /*
  *  Copyright (C) 1999-2001 Harri Porten (porten@kde.org)
- *  Copyright (C) 2004, 2005, 2006, 2007, 2008 Apple Inc. All rights reserved.
+ *  Copyright (C) 2004, 2005, 2006, 2007, 2008, 2013 Apple Inc. All rights reserved.
  *  Copyright (C) 2009 Torch Mobile, Inc.
  *
  *  This library is free software; you can redistribute it and/or
@@ -82,80 +82,67 @@ static EncodedJSValue JSC_HOST_CALL stringProtoFuncTrim(ExecState*);
 static EncodedJSValue JSC_HOST_CALL stringProtoFuncTrimLeft(ExecState*);
 static EncodedJSValue JSC_HOST_CALL stringProtoFuncTrimRight(ExecState*);
 
-}
-
-#include "StringPrototype.lut.h"
-
-namespace JSC {
-
-const ClassInfo StringPrototype::s_info = { "String", &StringObject::s_info, 0, ExecState::stringTable, CREATE_METHOD_TABLE(StringPrototype) };
-
-/* Source for StringPrototype.lut.h
-@begin stringTable 26
-    toString              stringProtoFuncToString          DontEnum|Function       0
-    valueOf               stringProtoFuncToString          DontEnum|Function       0
-    charAt                stringProtoFuncCharAt            DontEnum|Function       1
-    charCodeAt            stringProtoFuncCharCodeAt        DontEnum|Function       1
-    concat                stringProtoFuncConcat            DontEnum|Function       1
-    indexOf               stringProtoFuncIndexOf           DontEnum|Function       1
-    lastIndexOf           stringProtoFuncLastIndexOf       DontEnum|Function       1
-    match                 stringProtoFuncMatch             DontEnum|Function       1
-    replace               stringProtoFuncReplace           DontEnum|Function       2
-    search                stringProtoFuncSearch            DontEnum|Function       1
-    slice                 stringProtoFuncSlice             DontEnum|Function       2
-    split                 stringProtoFuncSplit             DontEnum|Function       2
-    substr                stringProtoFuncSubstr            DontEnum|Function       2
-    substring             stringProtoFuncSubstring         DontEnum|Function       2
-    toLowerCase           stringProtoFuncToLowerCase       DontEnum|Function       0
-    toUpperCase           stringProtoFuncToUpperCase       DontEnum|Function       0
-    localeCompare         stringProtoFuncLocaleCompare     DontEnum|Function       1
-
-    # toLocaleLowerCase and toLocaleUpperCase are currently identical to toLowerCase and toUpperCase
-    toLocaleLowerCase     stringProtoFuncToLowerCase       DontEnum|Function       0
-    toLocaleUpperCase     stringProtoFuncToUpperCase       DontEnum|Function       0
-
-    big                   stringProtoFuncBig               DontEnum|Function       0
-    small                 stringProtoFuncSmall             DontEnum|Function       0
-    blink                 stringProtoFuncBlink             DontEnum|Function       0
-    bold                  stringProtoFuncBold              DontEnum|Function       0
-    fixed                 stringProtoFuncFixed             DontEnum|Function       0
-    italics               stringProtoFuncItalics           DontEnum|Function       0
-    strike                stringProtoFuncStrike            DontEnum|Function       0
-    sub                   stringProtoFuncSub               DontEnum|Function       0
-    sup                   stringProtoFuncSup               DontEnum|Function       0
-    fontcolor             stringProtoFuncFontcolor         DontEnum|Function       1
-    fontsize              stringProtoFuncFontsize          DontEnum|Function       1
-    anchor                stringProtoFuncAnchor            DontEnum|Function       1
-    link                  stringProtoFuncLink              DontEnum|Function       1
-    trim                  stringProtoFuncTrim              DontEnum|Function       0
-    trimLeft              stringProtoFuncTrimLeft          DontEnum|Function       0
-    trimRight             stringProtoFuncTrimRight         DontEnum|Function       0
-@end
-*/
+const ClassInfo StringPrototype::s_info = { "String", &StringObject::s_info, 0, 0, CREATE_METHOD_TABLE(StringPrototype) };
 
 // ECMA 15.5.4
 StringPrototype::StringPrototype(ExecState* exec, Structure* structure)
-    : StringObject(exec->globalData(), structure)
+    : StringObject(exec->vm(), structure)
 {
 }
 
-void StringPrototype::finishCreation(ExecState* exec, JSGlobalObject*, JSString* nameAndMessage)
+void StringPrototype::finishCreation(ExecState* exec, JSGlobalObject* globalObject, JSString* nameAndMessage)
 {
-    Base::finishCreation(exec->globalData(), nameAndMessage);
+    VM& vm = exec->vm();
+    
+    Base::finishCreation(vm, nameAndMessage);
     ASSERT(inherits(&s_info));
 
+    JSC_NATIVE_INTRINSIC_FUNCTION(vm.propertyNames->toString, stringProtoFuncToString, DontEnum, 0, StringPrototypeValueOfIntrinsic);
+    JSC_NATIVE_INTRINSIC_FUNCTION(vm.propertyNames->valueOf, stringProtoFuncToString, DontEnum, 0, StringPrototypeValueOfIntrinsic);
+    JSC_NATIVE_INTRINSIC_FUNCTION("charAt", stringProtoFuncCharAt, DontEnum, 1, CharAtIntrinsic);
+    JSC_NATIVE_INTRINSIC_FUNCTION("charCodeAt", stringProtoFuncCharCodeAt, DontEnum, 1, CharCodeAtIntrinsic);
+    JSC_NATIVE_FUNCTION("concat", stringProtoFuncConcat, DontEnum, 1);
+    JSC_NATIVE_FUNCTION("indexOf", stringProtoFuncIndexOf, DontEnum, 1);
+    JSC_NATIVE_FUNCTION("lastIndexOf", stringProtoFuncLastIndexOf, DontEnum, 1);
+    JSC_NATIVE_FUNCTION("match", stringProtoFuncMatch, DontEnum, 1);
+    JSC_NATIVE_FUNCTION("replace", stringProtoFuncReplace, DontEnum, 2);
+    JSC_NATIVE_FUNCTION("search", stringProtoFuncSearch, DontEnum, 1);
+    JSC_NATIVE_FUNCTION("slice", stringProtoFuncSlice, DontEnum, 2);
+    JSC_NATIVE_FUNCTION("split", stringProtoFuncSplit, DontEnum, 2);
+    JSC_NATIVE_FUNCTION("substr", stringProtoFuncSubstr, DontEnum, 2);
+    JSC_NATIVE_FUNCTION("substring", stringProtoFuncSubstring, DontEnum, 2);
+    JSC_NATIVE_FUNCTION("toLowerCase", stringProtoFuncToLowerCase, DontEnum, 0);
+    JSC_NATIVE_FUNCTION("toUpperCase", stringProtoFuncToUpperCase, DontEnum, 0);
+    JSC_NATIVE_FUNCTION("localeCompare", stringProtoFuncLocaleCompare, DontEnum, 1);
+    JSC_NATIVE_FUNCTION("toLocaleLowerCase", stringProtoFuncToLowerCase, DontEnum, 0);
+    JSC_NATIVE_FUNCTION("toLocaleUpperCase", stringProtoFuncToUpperCase, DontEnum, 0);
+    JSC_NATIVE_FUNCTION("big", stringProtoFuncBig, DontEnum, 0);
+    JSC_NATIVE_FUNCTION("small", stringProtoFuncSmall, DontEnum, 0);
+    JSC_NATIVE_FUNCTION("blink", stringProtoFuncBlink, DontEnum, 0);
+    JSC_NATIVE_FUNCTION("bold", stringProtoFuncBold, DontEnum, 0);
+    JSC_NATIVE_FUNCTION("fixed", stringProtoFuncFixed, DontEnum, 0);
+    JSC_NATIVE_FUNCTION("italics", stringProtoFuncItalics, DontEnum, 0);
+    JSC_NATIVE_FUNCTION("strike", stringProtoFuncStrike, DontEnum, 0);
+    JSC_NATIVE_FUNCTION("sub", stringProtoFuncSub, DontEnum, 0);
+    JSC_NATIVE_FUNCTION("sup", stringProtoFuncSup, DontEnum, 0);
+    JSC_NATIVE_FUNCTION("fontcolor", stringProtoFuncFontcolor, DontEnum, 1);
+    JSC_NATIVE_FUNCTION("fontsize", stringProtoFuncFontsize, DontEnum, 1);
+    JSC_NATIVE_FUNCTION("anchor", stringProtoFuncAnchor, DontEnum, 1);
+    JSC_NATIVE_FUNCTION("link", stringProtoFuncLink, DontEnum, 1);
+    JSC_NATIVE_FUNCTION("trim", stringProtoFuncTrim, DontEnum, 0);
+    JSC_NATIVE_FUNCTION("trimLeft", stringProtoFuncTrimLeft, DontEnum, 0);
+    JSC_NATIVE_FUNCTION("trimRight", stringProtoFuncTrimRight, DontEnum, 0);
+
     // The constructor will be added later, after StringConstructor has been built
-    putDirectWithoutTransition(exec->globalData(), exec->propertyNames().length, jsNumber(0), DontDelete | ReadOnly | DontEnum);
+    putDirectWithoutTransition(exec->vm(), exec->propertyNames().length, jsNumber(0), DontDelete | ReadOnly | DontEnum);
 }
 
-bool StringPrototype::getOwnPropertySlot(JSCell* cell, ExecState* exec, PropertyName propertyName, PropertySlot &slot)
+StringPrototype* StringPrototype::create(ExecState* exec, JSGlobalObject* globalObject, Structure* structure)
 {
-    return getStaticFunctionSlot<StringObject>(exec, ExecState::stringTable(exec), jsCast<StringPrototype*>(cell), propertyName, slot);
-}
-
-bool StringPrototype::getOwnPropertyDescriptor(JSObject* object, ExecState* exec, PropertyName propertyName, PropertyDescriptor& descriptor)
-{
-    return getStaticFunctionDescriptor<StringObject>(exec, ExecState::stringTable(exec), jsCast<StringPrototype*>(object), propertyName, descriptor);
+    JSString* empty = jsEmptyString(exec);
+    StringPrototype* prototype = new (NotNull, allocateCell<StringPrototype>(*exec->heap())) StringPrototype(exec, structure);
+    prototype->finishCreation(exec, globalObject, empty);
+    return prototype;
 }
 
 // ------------------------------ Functions --------------------------
@@ -418,12 +405,12 @@ static NEVER_INLINE EncodedJSValue removeUsingRegExpSearch(ExecState* exec, JSSt
     unsigned startPosition = 0;
 
     Vector<StringRange, 16> sourceRanges;
-    JSGlobalData* globalData = &exec->globalData();
+    VM* vm = &exec->vm();
     RegExpConstructor* regExpConstructor = exec->lexicalGlobalObject()->regExpConstructor();
     unsigned sourceLen = source.length();
 
     while (true) {
-        MatchResult result = regExpConstructor->performMatch(*globalData, regExp, string, source, startPosition);
+        MatchResult result = regExpConstructor->performMatch(*vm, regExp, string, source, startPosition);
         if (!result)
             break;
 
@@ -493,11 +480,11 @@ static NEVER_INLINE EncodedJSValue replaceUsingRegExpSearch(ExecState* exec, JSS
         CachedCall cachedCall(exec, func, argCount);
         if (exec->hadException())
             return JSValue::encode(jsNull());
-        JSGlobalData* globalData = &exec->globalData();
+        VM* vm = &exec->vm();
         if (source.is8Bit()) {
             while (true) {
                 int* ovector;
-                MatchResult result = regExpConstructor->performMatch(*globalData, regExp, string, source, startPosition, &ovector);
+                MatchResult result = regExpConstructor->performMatch(*vm, regExp, string, source, startPosition, &ovector);
                 if (!result)
                     break;
 
@@ -511,7 +498,7 @@ static NEVER_INLINE EncodedJSValue replaceUsingRegExpSearch(ExecState* exec, JSS
                     if (matchStart < 0)
                         cachedCall.setArgument(i, jsUndefined());
                     else
-                        cachedCall.setArgument(i, jsSubstring8(globalData, source, matchStart, matchLen));
+                        cachedCall.setArgument(i, jsSubstring8(vm, source, matchStart, matchLen));
                 }
 
                 cachedCall.setArgument(i++, jsNumber(result.start));
@@ -536,7 +523,7 @@ static NEVER_INLINE EncodedJSValue replaceUsingRegExpSearch(ExecState* exec, JSS
         } else {
             while (true) {
                 int* ovector;
-                MatchResult result = regExpConstructor->performMatch(*globalData, regExp, string, source, startPosition, &ovector);
+                MatchResult result = regExpConstructor->performMatch(*vm, regExp, string, source, startPosition, &ovector);
                 if (!result)
                     break;
 
@@ -550,7 +537,7 @@ static NEVER_INLINE EncodedJSValue replaceUsingRegExpSearch(ExecState* exec, JSS
                     if (matchStart < 0)
                         cachedCall.setArgument(i, jsUndefined());
                     else
-                        cachedCall.setArgument(i, jsSubstring(globalData, source, matchStart, matchLen));
+                        cachedCall.setArgument(i, jsSubstring(vm, source, matchStart, matchLen));
                 }
 
                 cachedCall.setArgument(i++, jsNumber(result.start));
@@ -574,10 +561,10 @@ static NEVER_INLINE EncodedJSValue replaceUsingRegExpSearch(ExecState* exec, JSS
             }
         }
     } else {
-        JSGlobalData* globalData = &exec->globalData();
+        VM* vm = &exec->vm();
         do {
             int* ovector;
-            MatchResult result = regExpConstructor->performMatch(*globalData, regExp, string, source, startPosition, &ovector);
+            MatchResult result = regExpConstructor->performMatch(*vm, regExp, string, source, startPosition, &ovector);
             if (!result)
                 break;
 
@@ -810,7 +797,12 @@ EncodedJSValue JSC_HOST_CALL stringProtoFuncLastIndexOf(ExecState* exec)
     else if (!(dpos <= len)) // true for NaN
         dpos = len;
 
-    size_t result = s.reverseFind(u2, static_cast<unsigned>(dpos));
+    size_t result;
+    unsigned startPosition = static_cast<unsigned>(dpos);
+    if (!startPosition)
+        result = s.startsWith(u2) ? 0 : notFound;
+    else
+        result = s.reverseFind(u2, startPosition);
     if (result == notFound)
         return JSValue::encode(jsNumber(-1));
     return JSValue::encode(jsNumber(result));
@@ -823,7 +815,7 @@ EncodedJSValue JSC_HOST_CALL stringProtoFuncMatch(ExecState* exec)
         return throwVMTypeError(exec);
     JSString* string = thisValue.toString(exec);
     String s = string->value(exec);
-    JSGlobalData* globalData = &exec->globalData();
+    VM* vm = &exec->vm();
 
     JSValue a0 = exec->argument(0);
 
@@ -845,12 +837,12 @@ EncodedJSValue JSC_HOST_CALL stringProtoFuncMatch(ExecState* exec)
          *  replaced with the result of the expression new RegExp(regexp).
          *  Per ECMA 15.10.4.1, if a0 is undefined substitute the empty string.
          */
-        regExp = RegExp::create(exec->globalData(), a0.isUndefined() ? String("") : a0.toString(exec)->value(exec), NoFlags);
+        regExp = RegExp::create(exec->vm(), a0.isUndefined() ? String("") : a0.toString(exec)->value(exec), NoFlags);
         if (!regExp->isValid())
             return throwVMError(exec, createSyntaxError(exec, regExp->errorMessage()));
     }
     RegExpConstructor* regExpConstructor = exec->lexicalGlobalObject()->regExpConstructor();
-    MatchResult result = regExpConstructor->performMatch(*globalData, regExp, string, s, 0);
+    MatchResult result = regExpConstructor->performMatch(*vm, regExp, string, s, 0);
     // case without 'g' flag is handled like RegExp.prototype.exec
     if (!global)
         return JSValue::encode(result ? RegExpMatchesArray::create(exec, string, regExp, result) : jsNull());
@@ -863,7 +855,7 @@ EncodedJSValue JSC_HOST_CALL stringProtoFuncMatch(ExecState* exec)
         list.append(jsSubstring(exec, s, result.start, length));
         if (!length)
             ++end;
-        result = regExpConstructor->performMatch(*globalData, regExp, string, s, end);
+        result = regExpConstructor->performMatch(*vm, regExp, string, s, end);
     }
     if (list.isEmpty()) {
         // if there are no matches at all, it's important to return
@@ -882,7 +874,7 @@ EncodedJSValue JSC_HOST_CALL stringProtoFuncSearch(ExecState* exec)
         return throwVMTypeError(exec);
     JSString* string = thisValue.toString(exec);
     String s = string->value(exec);
-    JSGlobalData* globalData = &exec->globalData();
+    VM* vm = &exec->vm();
 
     JSValue a0 = exec->argument(0);
 
@@ -896,12 +888,12 @@ EncodedJSValue JSC_HOST_CALL stringProtoFuncSearch(ExecState* exec)
          *  replaced with the result of the expression new RegExp(regexp).
          *  Per ECMA 15.10.4.1, if a0 is undefined substitute the empty string.
          */
-        reg = RegExp::create(exec->globalData(), a0.isUndefined() ? String("") : a0.toString(exec)->value(exec), NoFlags);
+        reg = RegExp::create(exec->vm(), a0.isUndefined() ? String("") : a0.toString(exec)->value(exec), NoFlags);
         if (!reg->isValid())
             return throwVMError(exec, createSyntaxError(exec, reg->errorMessage()));
     }
     RegExpConstructor* regExpConstructor = exec->lexicalGlobalObject()->regExpConstructor();
-    MatchResult result = regExpConstructor->performMatch(*globalData, reg, string, s, 0);
+    MatchResult result = regExpConstructor->performMatch(*vm, reg, string, s, 0);
     return JSValue::encode(result ? jsNumber(result.start) : jsNumber(-1));
 }
 
@@ -991,7 +983,7 @@ EncodedJSValue JSC_HOST_CALL stringProtoFuncSplit(ExecState* exec)
     //    otherwise let R = ToString(separator).
     JSValue separatorValue = exec->argument(0);
     if (separatorValue.inherits(&RegExpObject::s_info)) {
-        JSGlobalData* globalData = &exec->globalData();
+        VM* vm = &exec->vm();
         RegExp* reg = asRegExpObject(separatorValue)->regExp();
 
         // 9. If lim == 0, return A.
@@ -1014,7 +1006,7 @@ EncodedJSValue JSC_HOST_CALL stringProtoFuncSplit(ExecState* exec)
             // c. Call the [[DefineOwnProperty]] internal method of A with arguments "0",
             //    Property Descriptor {[[Value]]: S, [[Writable]]: true, [[Enumerable]]: true, [[Configurable]]: true}, and false.
             // d. Return A.
-            if (!reg->match(*globalData, input, 0))
+            if (!reg->match(*vm, input, 0))
                 result->putDirectIndex(exec, 0, jsStringWithReuse(exec, thisValue, input));
             return JSValue::encode(result);
         }
@@ -1025,7 +1017,7 @@ EncodedJSValue JSC_HOST_CALL stringProtoFuncSplit(ExecState* exec)
         while (matchPosition < input.length()) {
             // a. Call SplitMatch(S, q, R) and let z be its MatchResult result.
             Vector<int, 32> ovector;
-            int mpos = reg->match(*globalData, input, matchPosition, ovector);
+            int mpos = reg->match(*vm, input, matchPosition, ovector);
             // b. If z is failure, then let q = q + 1.
             if (mpos < 0)
                 break;
@@ -1290,9 +1282,6 @@ EncodedJSValue JSC_HOST_CALL stringProtoFuncToUpperCase(ExecState* exec)
 
 EncodedJSValue JSC_HOST_CALL stringProtoFuncLocaleCompare(ExecState* exec)
 {
-    if (exec->argumentCount() < 1)
-      return JSValue::encode(jsNumber(0));
-
     JSValue thisValue = exec->hostThisValue();
     if (thisValue.isUndefinedOrNull()) // CheckObjectCoercible
         return throwVMTypeError(exec);

@@ -48,20 +48,18 @@ public:
     ~LayerTreeContext();
 
     void encode(CoreIPC::ArgumentEncoder&) const;
-    static bool decode(CoreIPC::ArgumentDecoder*, LayerTreeContext&);
+    static bool decode(CoreIPC::ArgumentDecoder&, LayerTreeContext&);
 
     bool isEmpty() const;
 
 #if PLATFORM(MAC)
     uint32_t contextID;
-#elif PLATFORM(WIN)
-    HWND window;
 #elif PLATFORM(QT)
-    uint32_t webLayerID;
+    uint32_t coordinatedLayerID;
 #elif PLATFORM(GTK)
     uint64_t windowHandle;
 #elif PLATFORM(EFL)
-    uint32_t webLayerID;
+    uint32_t coordinatedLayerID;
 #endif
 };
 

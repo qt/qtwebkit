@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Apple Inc. All rights reserved.
+ * Copyright (C) 2009, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -40,7 +40,7 @@ namespace JSC { namespace Yarr {
 
 template<YarrJITCompileMode compileMode>
 class YarrGenerator : private MacroAssembler {
-    friend void jitCompile(JSGlobalData*, YarrCodeBlock& jitObject, const String& pattern, unsigned& numSubpatterns, const char*& error, bool ignoreCase, bool multiline);
+    friend void jitCompile(VM*, YarrCodeBlock& jitObject, const String& pattern, unsigned& numSubpatterns, const char*& error, bool ignoreCase, bool multiline);
 
 #if CPU(ARM)
     static const RegisterID input = ARMRegisters::r0;
@@ -179,8 +179,8 @@ class YarrGenerator : private MacroAssembler {
     void matchCharacterClass(RegisterID character, JumpList& matchDest, const CharacterClass* charClass)
     {
         if (charClass->m_table) {
-            ExtendedAddress tableEntry(character, reinterpret_cast<intptr_t>(charClass->m_table->m_table));
-            matchDest.append(branchTest8(charClass->m_table->m_inverted ? Zero : NonZero, tableEntry));
+            ExtendedAddress tableEntry(character, reinterpret_cast<intptr_t>(charClass->m_table));
+            matchDest.append(branchTest8(charClass->m_tableInverted ? Zero : NonZero, tableEntry));
             return;
         }
         Jump unicodeFail;
@@ -1265,7 +1265,7 @@ class YarrGenerator : private MacroAssembler {
 
         case PatternTerm::TypeParenthesesSubpattern:
         case PatternTerm::TypeParentheticalAssertion:
-            ASSERT_NOT_REACHED();
+            RELEASE_ASSERT_NOT_REACHED();
         case PatternTerm::TypeBackReference:
             m_shouldFallBack = true;
             break;
@@ -1331,7 +1331,7 @@ class YarrGenerator : private MacroAssembler {
 
         case PatternTerm::TypeParenthesesSubpattern:
         case PatternTerm::TypeParentheticalAssertion:
-            ASSERT_NOT_REACHED();
+            RELEASE_ASSERT_NOT_REACHED();
 
         case PatternTerm::TypeDotStarEnclosure:
             backtrackDotStarEnclosure(opIndex);
@@ -2325,11 +2325,11 @@ class YarrGenerator : private MacroAssembler {
         m_ops.append(alternativeBeginOpCode);
         m_ops.last().m_previousOp = notFound;
         m_ops.last().m_term = term;
-        Vector<PatternAlternative*>& alternatives =  term->parentheses.disjunction->m_alternatives;
+        Vector<OwnPtr<PatternAlternative> >& alternatives =  term->parentheses.disjunction->m_alternatives;
         for (unsigned i = 0; i < alternatives.size(); ++i) {
             size_t lastOpIndex = m_ops.size() - 1;
 
-            PatternAlternative* nestedAlternative = alternatives[i];
+            PatternAlternative* nestedAlternative = alternatives[i].get();
             opCompileAlternative(nestedAlternative);
 
             size_t thisOpIndex = m_ops.size();
@@ -2376,11 +2376,11 @@ class YarrGenerator : private MacroAssembler {
         m_ops.append(OpSimpleNestedAlternativeBegin);
         m_ops.last().m_previousOp = notFound;
         m_ops.last().m_term = term;
-        Vector<PatternAlternative*>& alternatives =  term->parentheses.disjunction->m_alternatives;
+        Vector<OwnPtr<PatternAlternative> >& alternatives =  term->parentheses.disjunction->m_alternatives;
         for (unsigned i = 0; i < alternatives.size(); ++i) {
             size_t lastOpIndex = m_ops.size() - 1;
 
-            PatternAlternative* nestedAlternative = alternatives[i];
+            PatternAlternative* nestedAlternative = alternatives[i].get();
             opCompileAlternative(nestedAlternative);
 
             size_t thisOpIndex = m_ops.size();
@@ -2450,7 +2450,7 @@ class YarrGenerator : private MacroAssembler {
     // to return the failing result.
     void opCompileBody(PatternDisjunction* disjunction)
     {
-        Vector<PatternAlternative*>& alternatives =  disjunction->m_alternatives;
+        Vector<OwnPtr<PatternAlternative> >& alternatives = disjunction->m_alternatives;
         size_t currentAlternativeIndex = 0;
 
         // Emit the 'once through' alternatives.
@@ -2460,7 +2460,7 @@ class YarrGenerator : private MacroAssembler {
 
             do {
                 size_t lastOpIndex = m_ops.size() - 1;
-                PatternAlternative* alternative = alternatives[currentAlternativeIndex];
+                PatternAlternative* alternative = alternatives[currentAlternativeIndex].get();
                 opCompileAlternative(alternative);
 
                 size_t thisOpIndex = m_ops.size();
@@ -2495,7 +2495,7 @@ class YarrGenerator : private MacroAssembler {
         m_ops.last().m_previousOp = notFound;
         do {
             size_t lastOpIndex = m_ops.size() - 1;
-            PatternAlternative* alternative = alternatives[currentAlternativeIndex];
+            PatternAlternative* alternative = alternatives[currentAlternativeIndex].get();
             ASSERT(!alternative->onceThrough());
             opCompileAlternative(alternative);
 
@@ -2524,6 +2524,9 @@ class YarrGenerator : private MacroAssembler {
         push(X86Registers::ebp);
         move(stackPointerRegister, X86Registers::ebp);
         push(X86Registers::ebx);
+        // The ABI doesn't guarantee the upper bits are zero on unsigned arguments, so clear them ourselves.
+        zeroExtend32ToPtr(index, index);
+        zeroExtend32ToPtr(length, length);
 #if OS(WINDOWS)
         if (compileMode == IncludeSubpatterns)
             loadPtr(Address(X86Registers::ebp, 6 * sizeof(void*)), output);
@@ -2605,7 +2608,7 @@ public:
     {
     }
 
-    void compile(JSGlobalData* globalData, YarrCodeBlock& jitObject)
+    void compile(VM* vm, YarrCodeBlock& jitObject)
     {
         generateEnter();
 
@@ -2639,7 +2642,7 @@ public:
         backtrack();
 
         // Link & finalize the code.
-        LinkBuffer linkBuffer(*globalData, this, REGEXP_CODE_ID);
+        LinkBuffer linkBuffer(*vm, this, REGEXP_CODE_ID);
         m_backtrackingState.linkDataLabels(linkBuffer);
 
         if (compileMode == MatchOnly) {
@@ -2686,12 +2689,12 @@ private:
     BacktrackingState m_backtrackingState;
 };
 
-void jitCompile(YarrPattern& pattern, YarrCharSize charSize, JSGlobalData* globalData, YarrCodeBlock& jitObject, YarrJITCompileMode mode)
+void jitCompile(YarrPattern& pattern, YarrCharSize charSize, VM* vm, YarrCodeBlock& jitObject, YarrJITCompileMode mode)
 {
     if (mode == MatchOnly)
-        YarrGenerator<MatchOnly>(pattern, charSize).compile(globalData, jitObject);
+        YarrGenerator<MatchOnly>(pattern, charSize).compile(vm, jitObject);
     else
-        YarrGenerator<IncludeSubpatterns>(pattern, charSize).compile(globalData, jitObject);
+        YarrGenerator<IncludeSubpatterns>(pattern, charSize).compile(vm, jitObject);
 }
 
 }}

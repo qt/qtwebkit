@@ -34,7 +34,6 @@
 namespace CoreIPC {
 class Connection;
 class MessageDecoder;
-class MessageID;
 }
 
 namespace WebCore {
@@ -52,7 +51,7 @@ public:
     static PassRefPtr<WebFullScreenManager> create(WebPage*);
     virtual ~WebFullScreenManager();
 
-    void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::MessageDecoder&);
+    void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&);
 
     bool supportsFullScreen(bool withKeyboard);
     void enterFullScreenForElement(WebCore::Element*);
@@ -72,11 +71,14 @@ protected:
 
     void setAnimatingFullScreen(bool);
     void requestExitFullScreen();
+    void saveScrollPosition();
+    void restoreScrollPosition();
 
-    void didReceiveWebFullScreenManagerMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::MessageDecoder&);
+    void didReceiveWebFullScreenManagerMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&);
 
     WebCore::IntRect m_initialFrame;
     WebCore::IntRect m_finalFrame;
+    WebCore::IntPoint m_scrollPosition;
     RefPtr<WebPage> m_page;
     RefPtr<WebCore::Element> m_element;
 };

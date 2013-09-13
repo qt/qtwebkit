@@ -27,7 +27,6 @@
 #include "ResourceBuffer.h"
 
 #include "PurgeableBuffer.h"
-#include "WebCoreMemoryInstrumentation.h"
 
 namespace WebCore {
 
@@ -71,6 +70,11 @@ void ResourceBuffer::append(const char* data, unsigned size)
     m_sharedBuffer->append(data, size);
 }
 
+void ResourceBuffer::append(SharedBuffer* buffer)
+{
+    m_sharedBuffer->append(buffer);
+}
+
 #if USE(NETWORK_CFDATA_ARRAY_CALLBACK)
 void ResourceBuffer::append(CFDataRef data)
 {
@@ -111,6 +115,8 @@ bool ResourceBuffer::hasPurgeableBuffer() const
 void ResourceBuffer::createPurgeableBuffer() const
 {
     ASSERT(m_sharedBuffer);
+    if (!sharedBuffer()->hasOneRef())
+        return;
     sharedBuffer()->createPurgeableBuffer();
 }
 
@@ -125,18 +131,5 @@ CFDataRef ResourceBuffer::createCFData()
     return m_sharedBuffer->createCFData();
 }
 #endif
-
-#if HAVE(NETWORK_CFDATA_ARRAY_CALLBACK)
-void ResourceBuffer::append(CFDataRef dataRef)
-{
-    m_sharedBuffer->append(dataRef);
-}
-#endif
-
-void ResourceBuffer::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this);
-    info.addMember(m_sharedBuffer);
-}
 
 } // namespace WebCore

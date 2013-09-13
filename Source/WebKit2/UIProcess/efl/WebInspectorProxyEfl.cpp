@@ -28,13 +28,20 @@
 
 #if ENABLE(INSPECTOR)
 
-#include "EwkViewImpl.h"
+#include "EwkView.h"
 #include "WebProcessProxy.h"
+#include "ewk_context_private.h"
+#include "ewk_page_group_private.h"
 #include "ewk_settings.h"
 #include "ewk_view.h"
 #include "ewk_view_private.h"
+#include <WebCore/EflInspectorUtilities.h>
 #include <WebCore/NotImplemented.h>
-#include <unistd.h>
+#include <WebKit2/WKPage.h>
+#include <WebKit2/WKPageGroup.h>
+#include <WebKit2/WKPreferencesPrivate.h>
+#include <WebKit2/WKString.h>
+#include <WebKit2/WKViewEfl.h>
 #include <wtf/text/CString.h>
 #include <wtf/text/StringBuilder.h>
 #include <wtf/text/WTFString.h>
@@ -87,25 +94,30 @@ WebPageProxy* WebInspectorProxy::platformCreateInspectorPage()
 {
     ASSERT(m_page);
 
-#if USE(ACCELERATED_COMPOSITING) && defined HAVE_ECORE_X
+#ifdef HAVE_ECORE_X
     const char* engine = "opengl_x11";
     m_inspectorWindow = ecore_evas_new(engine, 0, 0, initialWindowWidth, initialWindowHeight, 0);
 
     // Gracefully fall back to software if evas_gl engine is not available.
     if (!m_inspectorWindow)
 #endif
-        m_inspectorWindow = ecore_evas_new(0, 0, 0, initialWindowWidth, initialWindowHeight, 0);
+    m_inspectorWindow = ecore_evas_new(0, 0, 0, initialWindowWidth, initialWindowHeight, 0);
     if (!m_inspectorWindow)
         return 0;
 
-    m_inspectorView = ewk_view_base_add(ecore_evas_get(m_inspectorWindow), toAPI(page()->process()->context()), toAPI(inspectorPageGroup()), EwkViewImpl::LegacyBehavior);
-    EwkViewImpl* inspectorViewImpl = EwkViewImpl::fromEvasObject(m_inspectorView);
-    inspectorViewImpl->setThemePath(TEST_THEME_DIR "/default.edj");
+    WKContextRef wkContext = toAPI(page()->process()->context());
+    WKPageGroupRef wkPageGroup = toAPI(inspectorPageGroup());
 
-    Ewk_Settings* settings = inspectorViewImpl->settings();
-    ewk_settings_file_access_from_file_urls_allowed_set(settings, true);
+    m_inspectorView = EWKViewCreate(wkContext, wkPageGroup, ecore_evas_get(m_inspectorWindow), /* smart */ 0);
+    WKViewRef wkView = EWKViewGetWKView(m_inspectorView);
 
-    return inspectorViewImpl->page();
+    WKRetainPtr<WKStringRef> wkTheme = adoptWK(WKStringCreateWithUTF8CString(TEST_THEME_DIR "/default.edj"));
+    WKViewSetThemePath(wkView, wkTheme.get());
+
+    WKPreferencesRef wkPreferences = WKPageGroupGetPreferences(wkPageGroup);
+    WKPreferencesSetFileAccessFromFileURLsAllowed(wkPreferences, true);
+
+    return toImpl(WKViewGetPage(wkView));
 }
 
 void WebInspectorProxy::platformOpen()
@@ -129,6 +141,11 @@ void WebInspectorProxy::platformDidClose()
         ecore_evas_free(m_inspectorWindow);
         m_inspectorWindow = 0;
     }
+}
+
+void WebInspectorProxy::platformHide()
+{
+    notImplemented();
 }
 
 void WebInspectorProxy::platformBringToFront()
@@ -162,14 +179,16 @@ String WebInspectorProxy::inspectorPageURL() const
 
 String WebInspectorProxy::inspectorBaseURL() const
 {
-    String inspectorFilesPath = WEB_INSPECTOR_INSTALL_DIR;
-    if (access(inspectorFilesPath.utf8().data(), R_OK))
-        inspectorFilesPath = WEB_INSPECTOR_DIR;
-
-    return "file://" + inspectorFilesPath;
+    return "file://" + WebCore::inspectorResourcePath();
 }
 
 unsigned WebInspectorProxy::platformInspectedWindowHeight()
+{
+    notImplemented();
+    return 0;
+}
+
+unsigned WebInspectorProxy::platformInspectedWindowWidth()
 {
     notImplemented();
     return 0;
@@ -186,6 +205,26 @@ void WebInspectorProxy::platformDetach()
 }
 
 void WebInspectorProxy::platformSetAttachedWindowHeight(unsigned)
+{
+    notImplemented();
+}
+
+void WebInspectorProxy::platformSetAttachedWindowWidth(unsigned)
+{
+    notImplemented();
+}
+
+void WebInspectorProxy::platformSetToolbarHeight(unsigned)
+{
+    notImplemented();
+}
+
+void WebInspectorProxy::platformSave(const String&, const String&, bool)
+{
+    notImplemented();
+}
+
+void WebInspectorProxy::platformAppend(const String&, const String&)
 {
     notImplemented();
 }

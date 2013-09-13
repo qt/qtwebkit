@@ -27,7 +27,7 @@
 
 namespace WebCore {
 
-class HTMLAppletElement : public HTMLPlugInImageElement {
+class HTMLAppletElement FINAL : public HTMLPlugInImageElement {
 public:
     static PassRefPtr<HTMLAppletElement> create(const QualifiedName&, Document*, bool createdByParser);
 
@@ -43,9 +43,6 @@ private:
     virtual void updateWidget(PluginCreationOption) OVERRIDE;
 
     bool canEmbedJava() const;
-
-    virtual bool shouldRegisterAsNamedItem() const OVERRIDE { return true; }
-    virtual bool shouldRegisterAsExtraNamedItem() const OVERRIDE { return true; }
 };
 
 }

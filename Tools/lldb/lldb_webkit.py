@@ -30,15 +30,16 @@
 """
 
 import lldb
-
+import struct
 
 def __lldb_init_module(debugger, dict):
     debugger.HandleCommand('type summary add --expand -F lldb_webkit.WTFString_SummaryProvider WTF::String')
     debugger.HandleCommand('type summary add --expand -F lldb_webkit.WTFStringImpl_SummaryProvider WTF::StringImpl')
     debugger.HandleCommand('type summary add --expand -F lldb_webkit.WTFAtomicString_SummaryProvider WTF::AtomicString')
     debugger.HandleCommand('type summary add --expand -F lldb_webkit.WTFVector_SummaryProvider -x "WTF::Vector<.+>$"')
+    debugger.HandleCommand('type summary add --expand -F lldb_webkit.WTFHashTable_SummaryProvider -x "WTF::HashTable<.+>$"')
     debugger.HandleCommand('type synthetic add -x "WTF::Vector<.+>$" --python-class lldb_webkit.WTFVectorProvider')
-
+    debugger.HandleCommand('type synthetic add -x "WTF::HashTable<.+>$" --python-class lldb_webkit.WTFHashTableProvider')
 
 def WTFString_SummaryProvider(valobj, dict):
     provider = WTFStringProvider(valobj, dict)
@@ -58,6 +59,11 @@ def WTFVector_SummaryProvider(valobj, dict):
     provider = WTFVectorProvider(valobj, dict)
     return "{ size = %d, capacity = %d }" % (provider.size, provider.capacity)
 
+
+def WTFHashTable_SummaryProvider(valobj, dict):
+    provider = WTFHashTableProvider(valobj, dict)
+    return "{ tableSize = %d, keyCount = %d }" % (provider.tableSize(), provider.keyCount())
+
 # FIXME: Provide support for the following types:
 # def WTFVector_SummaryProvider(valobj, dict):
 # def WTFCString_SummaryProvider(valobj, dict):
@@ -67,44 +73,55 @@ def WTFVector_SummaryProvider(valobj, dict):
 # def JSCJSString_SummaryProvider(valobj, dict):
 
 
-def guess_string_length(valobj, error):
+def guess_string_length(valobj, charSize, error):
     if not valobj.GetValue():
         return 0
 
-    for i in xrange(0, 2048):
-        if valobj.GetPointeeData(i, 1).GetUnsignedInt16(error, 0) == 0:
+    maxLength = 256
+
+    pointer = valobj.GetValueAsUnsigned()
+    contents = valobj.GetProcess().ReadMemory(pointer, maxLength * charSize, lldb.SBError())
+    format = 'B' if charSize == 1 else 'H'
+
+    for i in xrange(0, maxLength):
+        if not struct.unpack_from(format, contents, i * charSize)[0]:
             return i
 
-    return 256
-
+    return maxLength
 
 def ustring_to_string(valobj, error, length=None):
     if length is None:
-        length = guess_string_length(valobj, error)
+        length = guess_string_length(valobj, 2, error)
     else:
         length = int(length)
 
-    out_string = u""
-    for i in xrange(0, length):
-        char_value = valobj.GetPointeeData(i, 1).GetUnsignedInt16(error, 0)
-        out_string = out_string + unichr(char_value)
+    pointer = valobj.GetValueAsUnsigned()
+    contents = valobj.GetProcess().ReadMemory(pointer, length * 2, lldb.SBError())
 
-    return out_string.encode('utf-8')
-
+    # lldb does not (currently) support returning unicode from python summary providers,
+    # so potentially convert this to ascii by escaping
+    string = contents.decode('utf16')
+    try:
+        return str(string)
+    except:
+        return string.encode('unicode_escape')
 
 def lstring_to_string(valobj, error, length=None):
     if length is None:
-        length = guess_string_length(valobj, error)
+        length = guess_string_length(valobj, 1, error)
     else:
         length = int(length)
 
-    out_string = u""
-    for i in xrange(0, length):
-        char_value = valobj.GetPointeeData(i, 1).GetUnsignedInt8(error, 0)
-        out_string = out_string + unichr(char_value)
+    pointer = valobj.GetValueAsUnsigned()
+    contents = valobj.GetProcess().ReadMemory(pointer, length, lldb.SBError())
 
-    return out_string.encode('utf-8')
-
+    # lldb does not (currently) support returning unicode from python summary providers,
+    # so potentially convert this to ascii by escaping
+    string = contents.decode('utf8')
+    try:
+        return str(string)
+    except:
+        return string.encode('unicode_escape')
 
 class WTFStringImplProvider:
     def __init__(self, valobj, dict):
@@ -158,13 +175,15 @@ class WTFVectorProvider:
         self.update()
 
     def num_children(self):
-        return self.size + 2
+        return self.size + 3
 
     def get_child_index(self, name):
         if name == "m_size":
             return self.size
-        elif name == "m_buffer":
+        elif name == "m_capacity":
             return self.size + 1
+        elif name == "m_buffer":
+            return self.size + 2
         else:
             return int(name.lstrip('[').rstrip(']'))
 
@@ -172,7 +191,9 @@ class WTFVectorProvider:
         if index == self.size:
             return self.valobj.GetChildMemberWithName("m_size")
         elif index == self.size + 1:
-            return self.vector_buffer
+            return self.valobj.GetChildMemberWithName("m_capacity")
+        elif index == self.size + 2:
+            return self.buffer
         elif index < self.size:
             offset = index * self.data_size
             child = self.buffer.CreateChildAtOffset('[' + str(index) + ']', offset, self.data_type)
@@ -181,11 +202,63 @@ class WTFVectorProvider:
             return None
 
     def update(self):
-        self.vector_buffer = self.valobj.GetChildMemberWithName('m_buffer')
-        self.buffer = self.vector_buffer.GetChildMemberWithName('m_buffer')
+        self.buffer = self.valobj.GetChildMemberWithName('m_buffer')
         self.size = self.valobj.GetChildMemberWithName('m_size').GetValueAsUnsigned(0)
-        self.capacity = self.vector_buffer.GetChildMemberWithName('m_capacity').GetValueAsUnsigned(0)
+        self.capacity = self.buffer.GetChildMemberWithName('m_capacity').GetValueAsUnsigned(0)
         self.data_type = self.buffer.GetType().GetPointeeType()
+        self.data_size = self.data_type.GetByteSize()
+
+    def has_children(self):
+        return True
+
+
+class WTFHashTableProvider:
+    def __init__(self, valobj, internal_dict):
+        self.valobj = valobj
+        self.update()
+
+    def num_children(self):
+        return self.tableSize() + 5
+
+    def get_child_index(self, name):
+        if name == "m_table":
+            return self.tableSize()
+        elif name == "m_tableSize":
+            return self.tableSize() + 1
+        elif name == "m_tableSizeMask":
+            return self.tableSize() + 2
+        elif name == "m_keyCount":
+            return self.tableSize() + 3
+        elif name == "m_deletedCount":
+            return self.tableSize() + 4
+        else:
+            return int(name.lstrip('[').rstrip(']'))
+
+    def get_child_at_index(self, index):
+        if index == self.tableSize():
+            return self.valobj.GetChildMemberWithName('m_table')
+        elif index == self.tableSize() + 1:
+            return self.valobj.GetChildMemberWithName('m_tableSize')
+        elif index == self.tableSize() + 2:
+            return self.valobj.GetChildMemberWithName('m_tableSizeMask')
+        elif index == self.tableSize() + 3:
+            return self.valobj.GetChildMemberWithName('m_keyCount')
+        elif index == self.tableSize() + 4:
+            return self.valobj.GetChildMemberWithName('m_deletedCount')
+        elif index < self.tableSize():
+            table = self.valobj.GetChildMemberWithName('m_table')
+            return table.CreateChildAtOffset('[' + str(index) + ']', index * self.data_size, self.data_type)
+        else:
+            return None
+
+    def tableSize(self):
+        return self.valobj.GetChildMemberWithName('m_tableSize').GetValueAsUnsigned(0)
+
+    def keyCount(self):
+        return self.valobj.GetChildMemberWithName('m_keyCount').GetValueAsUnsigned(0)
+
+    def update(self):
+        self.data_type = self.valobj.GetType().GetTemplateArgumentType(0)
         self.data_size = self.data_type.GetByteSize()
 
     def has_children(self):

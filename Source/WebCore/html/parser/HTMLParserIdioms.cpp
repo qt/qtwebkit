@@ -26,6 +26,8 @@
 #include "HTMLParserIdioms.h"
 
 #include "Decimal.h"
+#include "HTMLIdentifier.h"
+#include "QualifiedName.h"
 #include <limits>
 #include <wtf/MathExtras.h>
 #include <wtf/text/AtomicString.h>
@@ -133,7 +135,7 @@ double parseToDoubleForNumberType(const String& string, double fallbackValue)
         return fallbackValue;
 
     // NaN and infinity are considered valid by String::toDouble, but not valid here.
-    if (!isfinite(value))
+    if (!std::isfinite(value))
         return fallbackValue;
 
     // Numbers are considered finite IEEE 754 single-precision floating point values.
@@ -205,12 +207,12 @@ bool parseHTMLInteger(const String& input, int& value)
     // Step 1
     // Step 2
     unsigned length = input.length();
-    if (length && input.is8Bit()) {
+    if (!length || input.is8Bit()) {
         const LChar* start = input.characters8();
         return parseHTMLIntegerInternal(start, start + length, value);
     }
 
-    const UChar* start = input.characters();
+    const UChar* start = input.characters16();
     return parseHTMLIntegerInternal(start, start + length, value);
 }
 
@@ -274,5 +276,26 @@ bool parseHTMLNonNegativeInteger(const String& input, unsigned& value)
     const UChar* start = input.characters();
     return parseHTMLNonNegativeIntegerInternal(start, start + length, value);
 }
+
+static bool threadSafeEqual(const StringImpl* a, const StringImpl* b)
+{
+    if (a == b)
+        return true;
+    if (a->hash() != b->hash())
+        return false;
+    return equalNonNull(a, b);
+}
+
+bool threadSafeMatch(const QualifiedName& a, const QualifiedName& b)
+{
+    return threadSafeEqual(a.localName().impl(), b.localName().impl());
+}
+
+#if ENABLE(THREADED_HTML_PARSER)
+bool threadSafeMatch(const HTMLIdentifier& localName, const QualifiedName& qName)
+{
+    return threadSafeEqual(localName.asStringImpl(), qName.localName().impl());
+}
+#endif
 
 }

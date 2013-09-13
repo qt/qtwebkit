@@ -30,12 +30,6 @@
 #import <wtf/RetainPtr.h>
 #import <PDFKit/PDFDocument.h>
 
-#if __MAC_OS_X_VERSION_MIN_REQUIRED == 1050
-@interface PDFDocument (Internal)
-- (CGPDFDocumentRef)documentRef;
-@end
-#endif
-
 static void appendValuesInPDFNameSubtreeToVector(CGPDFDictionaryRef subtree, Vector<CGPDFObjectRef>& values)
 {
     CGPDFArrayRef names;
@@ -110,7 +104,7 @@ NSArray *allScriptsInPDFDocument(PDFDocument *document)
         RetainPtr<CFDataRef> data;
         if (CGPDFDictionaryGetStream(javaScriptAction, "JS", &stream)) {
             CGPDFDataFormat format;
-            data.adoptCF(CGPDFStreamCopyData(stream, &format));
+            data = adoptCF(CGPDFStreamCopyData(stream, &format));
             if (!data)
                 continue;
             bytes = CFDataGetBytePtr(data.get());

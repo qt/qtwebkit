@@ -27,6 +27,7 @@
 #define BlockAllocator_h
 
 #include "HeapBlock.h"
+#include "Region.h"
 #include <wtf/DoublyLinkedList.h>
 #include <wtf/Forward.h>
 #include <wtf/PageAllocationAligned.h>
@@ -38,122 +39,14 @@ namespace JSC {
 class BlockAllocator;
 class CopiedBlock;
 class CopyWorkListSegment;
+class HandleBlock;
+class VM;
 class MarkStackSegment;
 class MarkedBlock;
-class Region;
 class WeakBlock;
 
 // Simple allocator to reduce VM cost by holding onto blocks of memory for
 // short periods of time and then freeing them on a secondary thread.
-
-class DeadBlock : public HeapBlock<DeadBlock> {
-public:
-    DeadBlock(Region*);
-};
-
-inline DeadBlock::DeadBlock(Region* region)
-    : HeapBlock<DeadBlock>(region)
-{
-}
-
-class Region : public DoublyLinkedListNode<Region> {
-    friend CLASS_IF_GCC DoublyLinkedListNode<Region>;
-    friend class BlockAllocator;
-public:
-    ~Region();
-    static Region* create(size_t blockSize);
-    static Region* createCustomSize(size_t blockSize, size_t blockAlignment);
-    Region* reset(size_t blockSize);
-
-    size_t blockSize() const { return m_blockSize; }
-    bool isFull() const { return m_blocksInUse == m_totalBlocks; }
-    bool isEmpty() const { return !m_blocksInUse; }
-    bool isCustomSize() const { return m_isCustomSize; }
-
-    DeadBlock* allocate();
-    void deallocate(void*);
-
-    static const size_t s_regionSize = 64 * KB;
-
-private:
-    Region(PageAllocationAligned&, size_t blockSize, size_t totalBlocks);
-
-    PageAllocationAligned m_allocation;
-    size_t m_totalBlocks;
-    size_t m_blocksInUse;
-    size_t m_blockSize;
-    bool m_isCustomSize;
-    Region* m_prev;
-    Region* m_next;
-    DoublyLinkedList<DeadBlock> m_deadBlocks;
-};
-
-inline Region* Region::create(size_t blockSize)
-{
-    ASSERT(blockSize <= s_regionSize);
-    ASSERT(!(s_regionSize % blockSize));
-    PageAllocationAligned allocation = PageAllocationAligned::allocate(s_regionSize, s_regionSize, OSAllocator::JSGCHeapPages);
-    if (!static_cast<bool>(allocation))
-        CRASH();
-    return new Region(allocation, blockSize, s_regionSize / blockSize);
-}
-
-inline Region* Region::createCustomSize(size_t blockSize, size_t blockAlignment)
-{
-    PageAllocationAligned allocation = PageAllocationAligned::allocate(blockSize, blockAlignment, OSAllocator::JSGCHeapPages);
-    if (!static_cast<bool>(allocation))
-        CRASH();
-    Region* region = new Region(allocation, blockSize, 1);
-    region->m_isCustomSize = true;
-    return region;
-}
-
-inline Region::Region(PageAllocationAligned& allocation, size_t blockSize, size_t totalBlocks)
-    : DoublyLinkedListNode<Region>()
-    , m_allocation(allocation)
-    , m_totalBlocks(totalBlocks)
-    , m_blocksInUse(0)
-    , m_blockSize(blockSize)
-    , m_isCustomSize(false)
-    , m_prev(0)
-    , m_next(0)
-{
-    ASSERT(allocation);
-    char* start = static_cast<char*>(m_allocation.base());
-    char* end = start + m_allocation.size();
-    for (char* current = start; current < end; current += blockSize)
-        m_deadBlocks.append(new (NotNull, current) DeadBlock(this));
-}
-
-inline Region::~Region()
-{
-    ASSERT(isEmpty());
-    m_allocation.deallocate();
-}
-
-inline Region* Region::reset(size_t blockSize)
-{
-    ASSERT(isEmpty());
-    PageAllocationAligned allocation = m_allocation;
-    return new (NotNull, this) Region(allocation, blockSize, s_regionSize / blockSize);
-}
-
-inline DeadBlock* Region::allocate()
-{
-    ASSERT(!isFull());
-    m_blocksInUse++;
-    return m_deadBlocks.removeHead();
-}
-
-inline void Region::deallocate(void* base)
-{
-    ASSERT(base);
-    ASSERT(m_blocksInUse);
-    ASSERT(base >= m_allocation.base() && base < static_cast<char*>(m_allocation.base()) + m_allocation.size());
-    DeadBlock* block = new (NotNull, base) DeadBlock(this);
-    m_deadBlocks.push(block);
-    m_blocksInUse--;
-}
 
 class BlockAllocator {
 public:
@@ -178,6 +71,12 @@ private:
             , m_blockSize(blockSize)
         {
         }
+
+        bool isEmpty() const
+        {
+            return m_fullRegions.isEmpty() && m_partialRegions.isEmpty();
+        }
+
         DoublyLinkedList<Region> m_fullRegions;
         DoublyLinkedList<Region> m_partialRegions;
         size_t m_numberOfPartialRegions;
@@ -186,14 +85,16 @@ private:
 
     DeadBlock* tryAllocateFromRegion(RegionSet&, DoublyLinkedList<Region>&, size_t&);
 
+    bool allRegionSetsAreEmpty() const;
     void releaseFreeRegions();
 
     template <typename T> RegionSet& regionSetFor();
 
+    SuperRegion m_superRegion;
     RegionSet m_copiedRegionSet;
     RegionSet m_markedRegionSet;
     // WeakBlocks and MarkStackSegments use the same RegionSet since they're the same size.
-    RegionSet m_weakAndMarkStackRegionSet;
+    RegionSet m_fourKBBlockRegionSet;
     RegionSet m_workListRegionSet;
 
     DoublyLinkedList<Region> m_emptyRegions;
@@ -248,7 +149,7 @@ inline DeadBlock* BlockAllocator::allocate()
             return block;
     }
 
-    Region* newRegion = Region::create(T::blockSize);
+    Region* newRegion = Region::create(&m_superRegion, T::blockSize);
 
     SpinLockHolder locker(&m_regionLock);
     m_emptyRegions.push(newRegion);
@@ -261,7 +162,7 @@ inline DeadBlock* BlockAllocator::allocate()
 inline DeadBlock* BlockAllocator::allocateCustomSize(size_t blockSize, size_t blockAlignment)
 {
     size_t realSize = WTF::roundUpToMultipleOf(blockAlignment, blockSize);
-    Region* newRegion = Region::createCustomSize(realSize, blockAlignment);
+    Region* newRegion = Region::createCustomSize(&m_superRegion, realSize, blockAlignment);
     DeadBlock* block = newRegion->allocate();
     ASSERT(block);
     return block;
@@ -307,7 +208,7 @@ inline void BlockAllocator::deallocateCustomSize(T* block)
     Region* region = block->region();
     ASSERT(region->isCustomSize());
     region->deallocate(block);
-    delete region;
+    region->destroy();
 }
 
 template <>
@@ -325,19 +226,25 @@ inline BlockAllocator::RegionSet& BlockAllocator::regionSetFor<MarkedBlock>()
 template <>
 inline BlockAllocator::RegionSet& BlockAllocator::regionSetFor<WeakBlock>()
 {
-    return m_weakAndMarkStackRegionSet;
+    return m_fourKBBlockRegionSet;
 }
 
 template <>
 inline BlockAllocator::RegionSet& BlockAllocator::regionSetFor<MarkStackSegment>()
 {
-    return m_weakAndMarkStackRegionSet;
+    return m_fourKBBlockRegionSet;
 }
 
 template <>
 inline BlockAllocator::RegionSet& BlockAllocator::regionSetFor<CopyWorkListSegment>()
 {
     return m_workListRegionSet;
+}
+
+template <>
+inline BlockAllocator::RegionSet& BlockAllocator::regionSetFor<HandleBlock>()
+{
+    return m_fourKBBlockRegionSet;
 }
 
 template <>
@@ -355,13 +262,13 @@ inline BlockAllocator::RegionSet& BlockAllocator::regionSetFor<HeapBlock<MarkedB
 template <>
 inline BlockAllocator::RegionSet& BlockAllocator::regionSetFor<HeapBlock<WeakBlock> >()
 {
-    return m_weakAndMarkStackRegionSet;
+    return m_fourKBBlockRegionSet;
 }
 
 template <>
 inline BlockAllocator::RegionSet& BlockAllocator::regionSetFor<HeapBlock<MarkStackSegment> >()
 {
-    return m_weakAndMarkStackRegionSet;
+    return m_fourKBBlockRegionSet;
 }
 
 template <>
@@ -370,10 +277,16 @@ inline BlockAllocator::RegionSet& BlockAllocator::regionSetFor<HeapBlock<CopyWor
     return m_workListRegionSet;
 }
 
+template <>
+inline BlockAllocator::RegionSet& BlockAllocator::regionSetFor<HeapBlock<HandleBlock> >()
+{
+    return m_fourKBBlockRegionSet;
+}
+
 template <typename T>
 inline BlockAllocator::RegionSet& BlockAllocator::regionSetFor()
 {
-    ASSERT_NOT_REACHED();
+    RELEASE_ASSERT_NOT_REACHED();
     return *(RegionSet*)0;
 }
 

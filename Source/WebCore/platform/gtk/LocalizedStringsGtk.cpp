@@ -34,12 +34,12 @@
 #include <wtf/gobject/GOwnPtr.h>
 #include "IntSize.h"
 #include "NotImplemented.h"
+#include <wtf/MathExtras.h>
 #include <wtf/text/CString.h>
 #include <wtf/text/WTFString.h>
 
 #include <glib/gi18n-lib.h>
 #include <gtk/gtk.h>
-#include <math.h>
 
 namespace WebCore {
 
@@ -141,6 +141,16 @@ String contextMenuItemTagOpenAudioInNewWindow()
     return String::fromUTF8(_("Open _Audio in New Window"));
 }
 
+String contextMenuItemTagDownloadVideoToDisk()
+{
+    return String::fromUTF8(_("Download _Video"));
+}
+
+String contextMenuItemTagDownloadAudioToDisk()
+{
+    return String::fromUTF8(_("Download _Audio"));
+}
+
 String contextMenuItemTagCopyVideoLinkToClipboard()
 {
     return String::fromUTF8(_("Cop_y Video Link Location"));
@@ -154,6 +164,16 @@ String contextMenuItemTagCopyAudioLinkToClipboard()
 String contextMenuItemTagToggleMediaControls()
 {
     return String::fromUTF8(_("_Toggle Media Controls"));
+}
+
+String contextMenuItemTagShowMediaControls()
+{
+    return String::fromUTF8(_("_Show Media Controls"));
+}
+
+String contextMenuItemTagHideMediaControls()
+{
+    return String::fromUTF8(_("_Hide Media Controls"));
 }
 
 String contextMenuItemTagToggleMediaLoop()
@@ -407,14 +427,24 @@ String searchMenuClearRecentSearchesText()
     return String::fromUTF8(_("_Clear recent searches"));
 }
 
-String AXDefinitionListTermText()
+String AXDefinitionText()
+{
+    return String::fromUTF8(_("definition"));
+}
+
+String AXDescriptionListText()
+{
+    return String::fromUTF8(_("description list"));
+}
+
+String AXDescriptionListTermText()
 {
     return String::fromUTF8(_("term"));
 }
 
-String AXDefinitionListDefinitionText()
+String AXDescriptionListDetailText()
 {
-    return String::fromUTF8(_("definition"));
+    return String::fromUTF8(_("description"));
 }
 
 String AXFooterRoleDescriptionText()
@@ -458,6 +488,11 @@ String AXMenuListPopupActionVerb()
 }
 
 String AXMenuListActionVerb()
+{
+    return String();
+}
+
+String AXListItemActionVerb()
 {
     return String();
 }
@@ -527,9 +562,9 @@ String mediaElementLiveBroadcastStateText()
 String localizedMediaControlElementString(const String& name)
 {
     if (name == "AudioElement")
-        return String::fromUTF8(_("audio element controller"));
+        return String::fromUTF8(_("audio playback"));
     if (name == "VideoElement")
-        return String::fromUTF8(_("video element controller"));
+        return String::fromUTF8(_("video playback"));
     if (name == "MuteButton")
         return String::fromUTF8(_("mute"));
     if (name == "UnMuteButton")
@@ -618,10 +653,10 @@ String localizedMediaControlElementHelpText(const String& name)
 
 String localizedMediaTimeDescription(float time)
 {
-    if (!isfinite(time))
+    if (!std::isfinite(time))
         return String::fromUTF8(_("indefinite time"));
 
-    int seconds = (int)fabsf(time);
+    int seconds = static_cast<int>(abs(time));
     int days = seconds / (60 * 60 * 24);
     int hours = seconds / (60 * 60);
     int minutes = (seconds / 60) % 60;
@@ -745,6 +780,38 @@ String validationMessageBadInputForNumberText()
 {
     notImplemented();
     return validationMessageTypeMismatchText();
+}
+
+#if ENABLE(VIDEO_TRACK)
+String textTrackClosedCaptionsText()
+{
+    return String::fromUTF8(C_("Closed Captions", "Menu section heading for closed captions"));
+}
+
+String textTrackSubtitlesText()
+{
+    return String::fromUTF8(C_("Subtitles", "Menu section heading for subtitles"));
+}
+
+String textTrackOffText()
+{
+    return String::fromUTF8(C_("Off", "Menu item label for the track that represents disabling closed captions"));
+}
+
+String textTrackNoLabelText()
+{
+    return String::fromUTF8(C_("No label", "Menu item label for a closed captions track that has no other name"));
+}
+#endif
+
+String snapshottedPlugInLabelTitle()
+{
+    return String::fromUTF8(C_("Snapshotted Plug-In", "Title of the label to show on a snapshotted plug-in"));
+}
+
+String snapshottedPlugInLabelSubtitle()
+{
+    return String::fromUTF8(C_("Click to restart", "Subtitle of the label to show on a snapshotted plug-in"));
 }
 
 }

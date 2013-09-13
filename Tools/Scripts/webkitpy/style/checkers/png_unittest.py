@@ -23,7 +23,7 @@
 
 """Unit test for png.py."""
 
-import unittest
+import unittest2 as unittest
 from png import PNGChecker
 from webkitpy.common.system.filesystem_mock import MockFileSystem
 from webkitpy.common.system.systemhost_mock import MockSystemHost
@@ -129,6 +129,3 @@ class PNGCheckerTest(unittest.TestCase):
         checker.check()
         self.assertEqual(len(errors), 2)
         self.assertEqual(errors[0], (0, 'image/png', 5, 'Image lacks a checksum. Generate pngs using run-webkit-tests to ensure they have a checksum.'))
-
-if __name__ == '__main__':
-    unittest.main()

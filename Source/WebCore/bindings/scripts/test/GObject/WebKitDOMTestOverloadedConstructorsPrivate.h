@@ -22,12 +22,12 @@
 #define WebKitDOMTestOverloadedConstructorsPrivate_h
 
 #include "TestOverloadedConstructors.h"
-#include <webkit/WebKitDOMTestOverloadedConstructors.h>
+#include <webkitdom/WebKitDOMTestOverloadedConstructors.h>
 
 namespace WebKit {
 WebKitDOMTestOverloadedConstructors* wrapTestOverloadedConstructors(WebCore::TestOverloadedConstructors*);
-WebCore::TestOverloadedConstructors* core(WebKitDOMTestOverloadedConstructors* request);
-WebKitDOMTestOverloadedConstructors* kit(WebCore::TestOverloadedConstructors* node);
+WebKitDOMTestOverloadedConstructors* kit(WebCore::TestOverloadedConstructors*);
+WebCore::TestOverloadedConstructors* core(WebKitDOMTestOverloadedConstructors*);
 } // namespace WebKit
 
 #endif /* WebKitDOMTestOverloadedConstructorsPrivate_h */

@@ -45,9 +45,39 @@ WebInspector.View._cssFileToVisibleViewCount = {};
 WebInspector.View._cssFileToStyleElement = {};
 
 WebInspector.View.prototype = {
+     /**
+      * @return {Array.<Element>}
+      */
+     statusBarItems: function()
+     {
+         return [];
+     },
+
+     /**
+     * @return {?Element}
+     */
+    statusBarText: function()
+    {
+        return null;
+    },
+
     markAsRoot: function()
     {
+        WebInspector.View._assert(!this.element.parentElement, "Attempt to mark as root attached node");
         this._isRoot = true;
+    },
+
+    markAsLayoutBoundary: function()
+    {
+        this.element.addStyleClass("layout-boundary");
+    },
+
+    /**
+     * @return {?WebInspector.View}
+     */
+    parentView: function()
+    {
+        return this._parentView;
     },
 
     isShowing: function()
@@ -90,6 +120,8 @@ WebInspector.View.prototype = {
     _processWillShow: function()
     {
         this._loadCSSIfNeeded();
+        if (this.element.hasStyleClass("layout-boundary"))
+            this.element.style.removeProperty("height");
         this._callOnVisibleChildren(this._processWillShow);
     },
 
@@ -102,6 +134,8 @@ WebInspector.View.prototype = {
         this._notify(this.wasShown);
         this._notify(this.onResize);
         this._callOnVisibleChildren(this._processWasShown);
+        if (this.element.hasStyleClass("layout-boundary"))
+            this.element.style.height = this.element.offsetHeight + "px";
     },
 
     _processWillHide: function()
@@ -127,8 +161,12 @@ WebInspector.View.prototype = {
             return;
         if (!this.isShowing())
             return;
+        if (this.element.hasStyleClass("layout-boundary"))
+            this.element.style.removeProperty("height");
         this._notify(this.onResize);
         this._callOnVisibleChildren(this._processOnResize);
+        if (this.element.hasStyleClass("layout-boundary"))
+            this.element.style.height = this.element.offsetHeight + "px";
     },
 
     /**
@@ -290,6 +328,8 @@ WebInspector.View.prototype = {
 
     registerRequiredCSS: function(cssFile)
     {
+        if (window.flattenImports)
+            cssFile = cssFile.split("/").reverse()[0];
         this._cssFiles.push(cssFile);
     },
 

@@ -38,25 +38,25 @@ using namespace JSC;
 
 namespace WebCore {
 
-static JSValue toJS(ExecState* exec, JSDOMGlobalObject* globalObject, CanvasStyle* style)
+static JSValue toJS(ExecState* exec, JSDOMGlobalObject* globalObject, const CanvasStyle& style)
 {
-    if (style->canvasGradient())
-        return toJS(exec, globalObject, style->canvasGradient());
-    if (style->canvasPattern())
-        return toJS(exec, globalObject, style->canvasPattern());
-    return jsStringWithCache(exec, style->color());
+    if (style.canvasGradient())
+        return toJS(exec, globalObject, style.canvasGradient());
+    if (style.canvasPattern())
+        return toJS(exec, globalObject, style.canvasPattern());
+    return jsStringWithCache(exec, style.color());
 }
 
-static PassRefPtr<CanvasStyle> toHTMLCanvasStyle(ExecState*, JSValue value)
+static CanvasStyle toHTMLCanvasStyle(ExecState*, JSValue value)
 {
     if (!value.isObject())
-        return 0;
+        return CanvasStyle();
     JSObject* object = asObject(value);
     if (object->inherits(&JSCanvasGradient::s_info))
-        return CanvasStyle::createFromGradient(jsCast<JSCanvasGradient*>(object)->impl());
+        return CanvasStyle(jsCast<JSCanvasGradient*>(object)->impl());
     if (object->inherits(&JSCanvasPattern::s_info))
-        return CanvasStyle::createFromPattern(jsCast<JSCanvasPattern*>(object)->impl());
-    return 0;
+        return CanvasStyle(jsCast<JSCanvasPattern*>(object)->impl());
+    return CanvasStyle();
 }
 
 JSValue JSCanvasRenderingContext2D::strokeStyle(ExecState* exec) const
@@ -112,7 +112,7 @@ void JSCanvasRenderingContext2D::setWebkitLineDash(ExecState* exec, JSValue valu
     JSArray* valueArray = asArray(value);
     for (unsigned i = 0; i < valueArray->length(); ++i) {
         float elem = valueArray->getIndex(exec, i).toFloat(exec);
-        if (elem <= 0 || !isfinite(elem))
+        if (elem <= 0 || !std::isfinite(elem))
             return;
 
         dash.append(elem);

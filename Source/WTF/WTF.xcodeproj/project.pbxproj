@@ -26,54 +26,38 @@
 		0F9D3361165DBA73005AD387 /* FilePrintStream.h in Headers */ = {isa = PBXBuildFile; fileRef = 0F9D335C165DBA73005AD387 /* FilePrintStream.h */; };
 		0F9D3362165DBA73005AD387 /* PrintStream.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 0F9D335D165DBA73005AD387 /* PrintStream.cpp */; };
 		0F9D3363165DBA73005AD387 /* PrintStream.h in Headers */ = {isa = PBXBuildFile; fileRef = 0F9D335E165DBA73005AD387 /* PrintStream.h */; };
+		0FC4488316FE9FE100844BE9 /* ProcessID.h in Headers */ = {isa = PBXBuildFile; fileRef = 0FC4488216FE9FE100844BE9 /* ProcessID.h */; };
+		0FC4EDE61696149600F65041 /* CommaPrinter.h in Headers */ = {isa = PBXBuildFile; fileRef = 0FC4EDE51696149600F65041 /* CommaPrinter.h */; };
 		0FD81AC5154FB22E00983E72 /* FastBitVector.h in Headers */ = {isa = PBXBuildFile; fileRef = 0FD81AC4154FB22E00983E72 /* FastBitVector.h */; settings = {ATTRIBUTES = (); }; };
 		0FDDBFA71666DFA300C55FEF /* StringPrintStream.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 0FDDBFA51666DFA300C55FEF /* StringPrintStream.cpp */; };
 		0FDDBFA81666DFA300C55FEF /* StringPrintStream.h in Headers */ = {isa = PBXBuildFile; fileRef = 0FDDBFA61666DFA300C55FEF /* StringPrintStream.h */; };
 		143F611F1565F0F900DB514A /* RAMSize.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 143F611D1565F0F900DB514A /* RAMSize.cpp */; };
 		143F61201565F0F900DB514A /* RAMSize.h in Headers */ = {isa = PBXBuildFile; fileRef = 143F611E1565F0F900DB514A /* RAMSize.h */; settings = {ATTRIBUTES = (); }; };
+		1469419216EAAF6D0024E146 /* RunLoopTimer.h in Headers */ = {isa = PBXBuildFile; fileRef = 1469419016EAAF6D0024E146 /* RunLoopTimer.h */; settings = {ATTRIBUTES = (); }; };
+		1469419316EAAF6D0024E146 /* RunLoopTimerCF.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1469419116EAAF6D0024E146 /* RunLoopTimerCF.cpp */; };
+		1469419616EAAFF80024E146 /* SchedulePair.h in Headers */ = {isa = PBXBuildFile; fileRef = 1469419416EAAFF80024E146 /* SchedulePair.h */; settings = {ATTRIBUTES = (); }; };
+		1469419716EAAFF80024E146 /* SchedulePairMac.mm in Sources */ = {isa = PBXBuildFile; fileRef = 1469419516EAAFF80024E146 /* SchedulePairMac.mm */; };
+		1469419916EAB0410024E146 /* SchedulePairCF.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1469419816EAB0410024E146 /* SchedulePairCF.cpp */; };
+		1469419C16EAB10A0024E146 /* AutodrainedPool.h in Headers */ = {isa = PBXBuildFile; fileRef = 1469419A16EAB10A0024E146 /* AutodrainedPool.h */; settings = {ATTRIBUTES = (); }; };
+		1469419D16EAB10A0024E146 /* AutodrainedPoolMac.mm in Sources */ = {isa = PBXBuildFile; fileRef = 1469419B16EAB10A0024E146 /* AutodrainedPoolMac.mm */; };
+		149EF16316BBFE0D000A4331 /* TriState.h in Headers */ = {isa = PBXBuildFile; fileRef = 149EF16216BBFE0D000A4331 /* TriState.h */; settings = {ATTRIBUTES = (); }; };
 		14F3B0F715E45E4600210069 /* SaturatedArithmetic.h in Headers */ = {isa = PBXBuildFile; fileRef = 14F3B0F615E45E4600210069 /* SaturatedArithmetic.h */; settings = {ATTRIBUTES = (); }; };
+		1A1D8B9C173186CE00141DA4 /* FunctionDispatcher.h in Headers */ = {isa = PBXBuildFile; fileRef = 1A1D8B9B173186CE00141DA4 /* FunctionDispatcher.h */; };
+		1A1D8B9E1731879800141DA4 /* FunctionDispatcher.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1A1D8B9D1731879800141DA4 /* FunctionDispatcher.cpp */; };
 		1A6BB769162F300500DD16DB /* StreamBuffer.h in Headers */ = {isa = PBXBuildFile; fileRef = 1A6BB768162F300500DD16DB /* StreamBuffer.h */; };
 		26147B0A15DDCCDC00DDB907 /* IntegerToStringConversion.h in Headers */ = {isa = PBXBuildFile; fileRef = 26147B0815DDCCDC00DDB907 /* IntegerToStringConversion.h */; };
-		2661122E160FEAD40013F5C3 /* URLQueryCharsetConverter.h in Headers */ = {isa = PBXBuildFile; fileRef = 2661122D160FEAD40013F5C3 /* URLQueryCharsetConverter.h */; };
-		26E6C1EE1609037300CA6AF4 /* URLCanonEtc.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 26E6C1CE1609037300CA6AF4 /* URLCanonEtc.cpp */; };
-		26E6C1EF1609037300CA6AF4 /* URLCanonFilesystemurl.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 26E6C1CF1609037300CA6AF4 /* URLCanonFilesystemurl.cpp */; };
-		26E6C1F01609037300CA6AF4 /* URLCanonFileurl.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 26E6C1D01609037300CA6AF4 /* URLCanonFileurl.cpp */; };
-		26E6C1F11609037300CA6AF4 /* URLCanonHost.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 26E6C1D11609037300CA6AF4 /* URLCanonHost.cpp */; };
-		26E6C1F21609037300CA6AF4 /* URLCanonICU.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 26E6C1D21609037300CA6AF4 /* URLCanonICU.cpp */; };
-		26E6C1F51609037300CA6AF4 /* URLCanonInternal.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 26E6C1D51609037300CA6AF4 /* URLCanonInternal.cpp */; };
-		26E6C1F61609037300CA6AF4 /* URLCanonInternal.h in Headers */ = {isa = PBXBuildFile; fileRef = 26E6C1D61609037300CA6AF4 /* URLCanonInternal.h */; };
-		26E6C1F71609037300CA6AF4 /* URLCanonIP.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 26E6C1D71609037300CA6AF4 /* URLCanonIP.cpp */; };
-		26E6C1F91609037300CA6AF4 /* URLCanonMailto.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 26E6C1D91609037300CA6AF4 /* URLCanonMailto.cpp */; };
-		26E6C1FA1609037300CA6AF4 /* URLCanonPath.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 26E6C1DA1609037300CA6AF4 /* URLCanonPath.cpp */; };
-		26E6C1FB1609037300CA6AF4 /* URLCanonPathurl.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 26E6C1DB1609037300CA6AF4 /* URLCanonPathurl.cpp */; };
-		26E6C1FC1609037300CA6AF4 /* URLCanonQuery.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 26E6C1DC1609037300CA6AF4 /* URLCanonQuery.cpp */; };
-		26E6C1FD1609037300CA6AF4 /* URLCanonRelative.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 26E6C1DD1609037300CA6AF4 /* URLCanonRelative.cpp */; };
-		26E6C1FF1609037300CA6AF4 /* URLCanonStdURL.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 26E6C1DF1609037300CA6AF4 /* URLCanonStdURL.cpp */; };
-		26E6C2011609037300CA6AF4 /* URLCanon.h in Headers */ = {isa = PBXBuildFile; fileRef = 26E6C1E11609037300CA6AF4 /* URLCanon.h */; };
-		26E6C2031609037300CA6AF4 /* URLFile.h in Headers */ = {isa = PBXBuildFile; fileRef = 26E6C1E31609037300CA6AF4 /* URLFile.h */; };
-		26E6C2041609037300CA6AF4 /* URLParseFile.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 26E6C1E41609037300CA6AF4 /* URLParseFile.cpp */; };
-		26E6C2051609037300CA6AF4 /* URLParseInternal.h in Headers */ = {isa = PBXBuildFile; fileRef = 26E6C1E51609037300CA6AF4 /* URLParseInternal.h */; };
-		26E6C2071609037300CA6AF4 /* URLParse.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 26E6C1E71609037300CA6AF4 /* URLParse.cpp */; };
-		26E6C2081609037300CA6AF4 /* URLParse.h in Headers */ = {isa = PBXBuildFile; fileRef = 26E6C1E81609037300CA6AF4 /* URLParse.h */; };
-		26E6C20A1609037300CA6AF4 /* URLUtilInternal.h in Headers */ = {isa = PBXBuildFile; fileRef = 26E6C1EA1609037300CA6AF4 /* URLUtilInternal.h */; };
-		26E6C20C1609037300CA6AF4 /* URLUtil.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 26E6C1EC1609037300CA6AF4 /* URLUtil.cpp */; };
-		26E6C20D1609037300CA6AF4 /* URLUtil.h in Headers */ = {isa = PBXBuildFile; fileRef = 26E6C1ED1609037300CA6AF4 /* URLUtil.h */; };
 		2C05385415BC819000F21B96 /* GregorianDateTime.h in Headers */ = {isa = PBXBuildFile; fileRef = 2C05385315BC819000F21B96 /* GregorianDateTime.h */; };
 		2CCD892A15C0390200285083 /* GregorianDateTime.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2CCD892915C0390200285083 /* GregorianDateTime.cpp */; };
-		4330F38F15745B0500AAFA8F /* URLString.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4330F38E15745B0500AAFA8F /* URLString.cpp */; };
+		44F66008171AFAE600E4AD19 /* EnumClass.h in Headers */ = {isa = PBXBuildFile; fileRef = 44F66007171AFAA900E4AD19 /* EnumClass.h */; };
 		4F0321BC156AA8D1006EBAF6 /* BitArray.h in Headers */ = {isa = PBXBuildFile; fileRef = 4F0321BB156AA8D1006EBAF6 /* BitArray.h */; };
-		4F1B2DB6160B44AA00586559 /* MemoryInstrumentationHashSet.h in Headers */ = {isa = PBXBuildFile; fileRef = 4F1B2DB5160B44AA00586559 /* MemoryInstrumentationHashSet.h */; };
-		4F1D115415FF11BE0026E908 /* MemoryInstrumentation.h in Headers */ = {isa = PBXBuildFile; fileRef = 4F1D115315FF11BE0026E908 /* MemoryInstrumentation.h */; };
-		4FCB710A160A1A07008425EC /* MemoryInstrumentationVector.h in Headers */ = {isa = PBXBuildFile; fileRef = 4FCB7109160A1A07008425EC /* MemoryInstrumentationVector.h */; };
-		4FCF27E116172E8600CBF037 /* MemoryInstrumentationString.h in Headers */ = {isa = PBXBuildFile; fileRef = 4FCF27E016172E8600CBF037 /* MemoryInstrumentationString.h */; };
-		4FD2A359161B0EE100EBF236 /* MemoryInstrumentationParsedURL.h in Headers */ = {isa = PBXBuildFile; fileRef = 4FD2A358161B0EE100EBF236 /* MemoryInstrumentationParsedURL.h */; };
-		4FD8554716133E0E00C5B704 /* MemoryInstrumentationArrayBufferView.h in Headers */ = {isa = PBXBuildFile; fileRef = 4FD8554616133E0E00C5B704 /* MemoryInstrumentationArrayBufferView.h */; };
 		7E29C33E15FFD79B00516D61 /* ObjcRuntimeExtras.h in Headers */ = {isa = PBXBuildFile; fileRef = 7E29C33D15FFD79B00516D61 /* ObjcRuntimeExtras.h */; };
 		8134013815B092FD001FF0B8 /* Base64.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8134013615B092FD001FF0B8 /* Base64.cpp */; };
 		8134013915B092FD001FF0B8 /* Base64.h in Headers */ = {isa = PBXBuildFile; fileRef = 8134013715B092FD001FF0B8 /* Base64.h */; };
+		974CFC8E16A4F327006D5404 /* WeakPtr.h in Headers */ = {isa = PBXBuildFile; fileRef = 974CFC8D16A4F327006D5404 /* WeakPtr.h */; };
+		9BC70F05176C379D00101DEC /* AtomicStringTable.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9BC70F04176C379D00101DEC /* AtomicStringTable.cpp */; };
+		9BD8F40B176C2B470002D865 /* AtomicStringTable.h in Headers */ = {isa = PBXBuildFile; fileRef = 9BD8F40A176C2AD80002D865 /* AtomicStringTable.h */; };
 		A876DBD8151816E500DADB95 /* Platform.h in Headers */ = {isa = PBXBuildFile; fileRef = A876DBD7151816E500DADB95 /* Platform.h */; };
 		A8A4737F151A825B004123FF /* Alignment.h in Headers */ = {isa = PBXBuildFile; fileRef = A8A47254151A825A004123FF /* Alignment.h */; };
-		A8A47380151A825B004123FF /* AlwaysInline.h in Headers */ = {isa = PBXBuildFile; fileRef = A8A47255151A825A004123FF /* AlwaysInline.h */; };
 		A8A47381151A825B004123FF /* ArrayBuffer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A8A47256151A825A004123FF /* ArrayBuffer.cpp */; };
 		A8A47382151A825B004123FF /* ArrayBuffer.h in Headers */ = {isa = PBXBuildFile; fileRef = A8A47257151A825A004123FF /* ArrayBuffer.h */; };
 		A8A47383151A825B004123FF /* ArrayBufferView.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A8A47258151A825A004123FF /* ArrayBufferView.cpp */; };
@@ -93,7 +77,6 @@
 		A8A47394151A825B004123FF /* CheckedArithmetic.h in Headers */ = {isa = PBXBuildFile; fileRef = A8A4726A151A825A004123FF /* CheckedArithmetic.h */; };
 		A8A47395151A825B004123FF /* CheckedBoolean.h in Headers */ = {isa = PBXBuildFile; fileRef = A8A4726B151A825A004123FF /* CheckedBoolean.h */; };
 		A8A47398151A825B004123FF /* Compiler.h in Headers */ = {isa = PBXBuildFile; fileRef = A8A47270151A825A004123FF /* Compiler.h */; };
-		A8A47399151A825B004123FF /* Complex.h in Headers */ = {isa = PBXBuildFile; fileRef = A8A47271151A825A004123FF /* Complex.h */; };
 		A8A4739A151A825B004123FF /* CryptographicallyRandomNumber.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A8A47273151A825A004123FF /* CryptographicallyRandomNumber.cpp */; };
 		A8A4739B151A825B004123FF /* CryptographicallyRandomNumber.h in Headers */ = {isa = PBXBuildFile; fileRef = A8A47274151A825A004123FF /* CryptographicallyRandomNumber.h */; };
 		A8A4739C151A825B004123FF /* CurrentTime.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A8A47275151A825A004123FF /* CurrentTime.cpp */; };
@@ -156,12 +139,10 @@
 		A8A473DF151A825B004123FF /* Int32Array.h in Headers */ = {isa = PBXBuildFile; fileRef = A8A472BF151A825A004123FF /* Int32Array.h */; };
 		A8A473E0151A825B004123FF /* IntegralTypedArrayBase.h in Headers */ = {isa = PBXBuildFile; fileRef = A8A472C0151A825A004123FF /* IntegralTypedArrayBase.h */; };
 		A8A473E1151A825B004123FF /* ListHashSet.h in Headers */ = {isa = PBXBuildFile; fileRef = A8A472C1151A825A004123FF /* ListHashSet.h */; };
-		A8A473E2151A825B004123FF /* ListRefPtr.h in Headers */ = {isa = PBXBuildFile; fileRef = A8A472C2151A825A004123FF /* ListRefPtr.h */; };
 		A8A473E3151A825B004123FF /* Locker.h in Headers */ = {isa = PBXBuildFile; fileRef = A8A472C3151A825A004123FF /* Locker.h */; };
 		A8A473E4151A825B004123FF /* MainThreadMac.mm in Sources */ = {isa = PBXBuildFile; fileRef = A8A472C5151A825A004123FF /* MainThreadMac.mm */; };
 		A8A473E5151A825B004123FF /* MainThread.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A8A472C6151A825A004123FF /* MainThread.cpp */; };
 		A8A473E6151A825B004123FF /* MainThread.h in Headers */ = {isa = PBXBuildFile; fileRef = A8A472C7151A825B004123FF /* MainThread.h */; };
-		A8A473E7151A825B004123FF /* MallocZoneSupport.h in Headers */ = {isa = PBXBuildFile; fileRef = A8A472C8151A825B004123FF /* MallocZoneSupport.h */; };
 		A8A473E8151A825B004123FF /* MathExtras.h in Headers */ = {isa = PBXBuildFile; fileRef = A8A472C9151A825B004123FF /* MathExtras.h */; };
 		A8A473E9151A825B004123FF /* MD5.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A8A472CA151A825B004123FF /* MD5.cpp */; };
 		A8A473EA151A825B004123FF /* MD5.h in Headers */ = {isa = PBXBuildFile; fileRef = A8A472CB151A825B004123FF /* MD5.h */; };
@@ -221,7 +202,6 @@
 		A8A47428151A825B004123FF /* StackBounds.h in Headers */ = {isa = PBXBuildFile; fileRef = A8A4730F151A825B004123FF /* StackBounds.h */; };
 		A8A47429151A825B004123FF /* StaticConstructors.h in Headers */ = {isa = PBXBuildFile; fileRef = A8A47310151A825B004123FF /* StaticConstructors.h */; };
 		A8A4742A151A825B004123FF /* StdLibExtras.h in Headers */ = {isa = PBXBuildFile; fileRef = A8A47311151A825B004123FF /* StdLibExtras.h */; };
-		A8A4742B151A825B004123FF /* StringExtras.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A8A47312151A825B004123FF /* StringExtras.cpp */; };
 		A8A4742C151A825B004123FF /* StringExtras.h in Headers */ = {isa = PBXBuildFile; fileRef = A8A47313151A825B004123FF /* StringExtras.h */; };
 		A8A4742D151A825B004123FF /* StringHasher.h in Headers */ = {isa = PBXBuildFile; fileRef = A8A47314151A825B004123FF /* StringHasher.h */; };
 		A8A4742E151A825B004123FF /* TCPackedCache.h in Headers */ = {isa = PBXBuildFile; fileRef = A8A47315151A825B004123FF /* TCPackedCache.h */; };
@@ -279,17 +259,6 @@
 		A8A47469151A825B004123FF /* UTF8.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A8A47357151A825B004123FF /* UTF8.cpp */; };
 		A8A4746A151A825B004123FF /* UTF8.h in Headers */ = {isa = PBXBuildFile; fileRef = A8A47358151A825B004123FF /* UTF8.h */; };
 		A8A4746D151A825B004123FF /* UnionFind.h in Headers */ = {isa = PBXBuildFile; fileRef = A8A4735C151A825B004123FF /* UnionFind.h */; };
-		A8A4746E151A825B004123FF /* UnusedParam.h in Headers */ = {isa = PBXBuildFile; fileRef = A8A4735D151A825B004123FF /* UnusedParam.h */; };
-		A8A4746F151A825B004123FF /* ParsedURL.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A8A47360151A825B004123FF /* ParsedURL.cpp */; };
-		A8A47470151A825B004123FF /* ParsedURL.h in Headers */ = {isa = PBXBuildFile; fileRef = A8A47361151A825B004123FF /* ParsedURL.h */; };
-		A8A47471151A825B004123FF /* URLString.h in Headers */ = {isa = PBXBuildFile; fileRef = A8A47362151A825B004123FF /* URLString.h */; };
-		A8A47472151A825B004123FF /* RawURLBuffer.h in Headers */ = {isa = PBXBuildFile; fileRef = A8A47364151A825B004123FF /* RawURLBuffer.h */; };
-		A8A47473151A825B004123FF /* URLBuffer.h in Headers */ = {isa = PBXBuildFile; fileRef = A8A47365151A825B004123FF /* URLBuffer.h */; };
-		A8A47474151A825B004123FF /* URLCharacterTypes.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A8A47366151A825B004123FF /* URLCharacterTypes.cpp */; };
-		A8A47475151A825B004123FF /* URLCharacterTypes.h in Headers */ = {isa = PBXBuildFile; fileRef = A8A47367151A825B004123FF /* URLCharacterTypes.h */; };
-		A8A47476151A825B004123FF /* URLComponent.h in Headers */ = {isa = PBXBuildFile; fileRef = A8A47368151A825B004123FF /* URLComponent.h */; };
-		A8A4747B151A825B004123FF /* URLSegments.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A8A4736D151A825B004123FF /* URLSegments.cpp */; };
-		A8A4747C151A825B004123FF /* URLSegments.h in Headers */ = {isa = PBXBuildFile; fileRef = A8A4736E151A825B004123FF /* URLSegments.h */; };
 		A8A4747D151A825B004123FF /* ValueCheck.h in Headers */ = {isa = PBXBuildFile; fileRef = A8A4736F151A825B004123FF /* ValueCheck.h */; };
 		A8A4747E151A825B004123FF /* Vector.h in Headers */ = {isa = PBXBuildFile; fileRef = A8A47370151A825B004123FF /* Vector.h */; };
 		A8A4747F151A825B004123FF /* VectorTraits.h in Headers */ = {isa = PBXBuildFile; fileRef = A8A47371151A825B004123FF /* VectorTraits.h */; };
@@ -297,15 +266,10 @@
 		A8A47486151A825B004123FF /* WTFThreadData.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A8A4737A151A825B004123FF /* WTFThreadData.cpp */; };
 		A8A47487151A825B004123FF /* WTFThreadData.h in Headers */ = {isa = PBXBuildFile; fileRef = A8A4737B151A825B004123FF /* WTFThreadData.h */; };
 		A8A4748C151A8264004123FF /* config.h in Headers */ = {isa = PBXBuildFile; fileRef = A8A4748B151A8264004123FF /* config.h */; };
+		B38FD7BD168953E80065C969 /* FeatureDefines.h in Headers */ = {isa = PBXBuildFile; fileRef = B38FD7BC168953E80065C969 /* FeatureDefines.h */; };
 		CD5497AC15857D0300B5BC30 /* MediaTime.cpp in Sources */ = {isa = PBXBuildFile; fileRef = CD5497AA15857D0300B5BC30 /* MediaTime.cpp */; };
 		CD5497AD15857D0300B5BC30 /* MediaTime.h in Headers */ = {isa = PBXBuildFile; fileRef = CD5497AB15857D0300B5BC30 /* MediaTime.h */; };
 		EB95E1F0161A72410089A2F5 /* ByteOrder.h in Headers */ = {isa = PBXBuildFile; fileRef = EB95E1EF161A72410089A2F5 /* ByteOrder.h */; };
-		F322CCDF165699FF004852DD /* MemoryInstrumentation.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F322CCDE165699FF004852DD /* MemoryInstrumentation.cpp */; };
-		F322CCE116569A10004852DD /* MemoryObjectInfo.h in Headers */ = {isa = PBXBuildFile; fileRef = F322CCE016569A10004852DD /* MemoryObjectInfo.h */; };
-		F3525E2A16149FF400278BC1 /* MemoryInstrumentationListHashSet.h in Headers */ = {isa = PBXBuildFile; fileRef = F3525E2916149FF400278BC1 /* MemoryInstrumentationListHashSet.h */; };
-		F3525E461619A4EE00278BC1 /* MemoryInstrumentationHashMap.h in Headers */ = {isa = PBXBuildFile; fileRef = F3525E451619A4EE00278BC1 /* MemoryInstrumentationHashMap.h */; };
-		F3FBC71E161AF7BF00BB4BD4 /* MemoryInstrumentationHashCountedSet.h in Headers */ = {isa = PBXBuildFile; fileRef = F3FBC71D161AF7BF00BB4BD4 /* MemoryInstrumentationHashCountedSet.h */; };
-		F3FBC720161AF7CD00BB4BD4 /* MemoryInstrumentationSequence.h in Headers */ = {isa = PBXBuildFile; fileRef = F3FBC71F161AF7CD00BB4BD4 /* MemoryInstrumentationSequence.h */; };
 		FEDACD3D1630F83F00C69634 /* StackStats.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FEDACD3B1630F83F00C69634 /* StackStats.cpp */; };
 		FEDACD3E1630F83F00C69634 /* StackStats.h in Headers */ = {isa = PBXBuildFile; fileRef = FEDACD3C1630F83F00C69634 /* StackStats.h */; };
 /* End PBXBuildFile section */
@@ -326,60 +290,45 @@
 		0F9D335C165DBA73005AD387 /* FilePrintStream.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = FilePrintStream.h; sourceTree = "<group>"; };
 		0F9D335D165DBA73005AD387 /* PrintStream.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = PrintStream.cpp; sourceTree = "<group>"; };
 		0F9D335E165DBA73005AD387 /* PrintStream.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = PrintStream.h; sourceTree = "<group>"; };
+		0FC4488216FE9FE100844BE9 /* ProcessID.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ProcessID.h; sourceTree = "<group>"; };
+		0FC4EDE51696149600F65041 /* CommaPrinter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CommaPrinter.h; sourceTree = "<group>"; };
 		0FD81AC4154FB22E00983E72 /* FastBitVector.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = FastBitVector.h; sourceTree = "<group>"; };
 		0FDDBFA51666DFA300C55FEF /* StringPrintStream.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = StringPrintStream.cpp; sourceTree = "<group>"; };
 		0FDDBFA61666DFA300C55FEF /* StringPrintStream.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = StringPrintStream.h; sourceTree = "<group>"; };
 		143F611D1565F0F900DB514A /* RAMSize.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = RAMSize.cpp; sourceTree = "<group>"; };
 		143F611E1565F0F900DB514A /* RAMSize.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = RAMSize.h; sourceTree = "<group>"; };
+		1469419016EAAF6D0024E146 /* RunLoopTimer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = RunLoopTimer.h; sourceTree = "<group>"; };
+		1469419116EAAF6D0024E146 /* RunLoopTimerCF.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = RunLoopTimerCF.cpp; sourceTree = "<group>"; };
+		1469419416EAAFF80024E146 /* SchedulePair.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SchedulePair.h; sourceTree = "<group>"; };
+		1469419516EAAFF80024E146 /* SchedulePairMac.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = SchedulePairMac.mm; sourceTree = "<group>"; };
+		1469419816EAB0410024E146 /* SchedulePairCF.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = SchedulePairCF.cpp; sourceTree = "<group>"; };
+		1469419A16EAB10A0024E146 /* AutodrainedPool.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AutodrainedPool.h; sourceTree = "<group>"; };
+		1469419B16EAB10A0024E146 /* AutodrainedPoolMac.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = AutodrainedPoolMac.mm; sourceTree = "<group>"; };
+		149EF16216BBFE0D000A4331 /* TriState.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TriState.h; sourceTree = "<group>"; };
 		14F3B0F615E45E4600210069 /* SaturatedArithmetic.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SaturatedArithmetic.h; sourceTree = "<group>"; };
+		1A1D8B9B173186CE00141DA4 /* FunctionDispatcher.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = FunctionDispatcher.h; sourceTree = "<group>"; };
+		1A1D8B9D1731879800141DA4 /* FunctionDispatcher.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = FunctionDispatcher.cpp; sourceTree = "<group>"; };
+		1A3F6BE6174ADA2100B2EEA7 /* NeverDestroyed.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = NeverDestroyed.h; sourceTree = "<group>"; };
 		1A6BB768162F300500DD16DB /* StreamBuffer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = StreamBuffer.h; sourceTree = "<group>"; };
 		26147B0815DDCCDC00DDB907 /* IntegerToStringConversion.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = IntegerToStringConversion.h; sourceTree = "<group>"; };
-		2661122D160FEAD40013F5C3 /* URLQueryCharsetConverter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = URLQueryCharsetConverter.h; sourceTree = "<group>"; };
-		26E6C1CE1609037300CA6AF4 /* URLCanonEtc.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = URLCanonEtc.cpp; sourceTree = "<group>"; };
-		26E6C1CF1609037300CA6AF4 /* URLCanonFilesystemurl.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = URLCanonFilesystemurl.cpp; sourceTree = "<group>"; };
-		26E6C1D01609037300CA6AF4 /* URLCanonFileurl.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = URLCanonFileurl.cpp; sourceTree = "<group>"; };
-		26E6C1D11609037300CA6AF4 /* URLCanonHost.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = URLCanonHost.cpp; sourceTree = "<group>"; };
-		26E6C1D21609037300CA6AF4 /* URLCanonICU.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = URLCanonICU.cpp; sourceTree = "<group>"; };
-		26E6C1D51609037300CA6AF4 /* URLCanonInternal.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = URLCanonInternal.cpp; sourceTree = "<group>"; };
-		26E6C1D61609037300CA6AF4 /* URLCanonInternal.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = URLCanonInternal.h; sourceTree = "<group>"; };
-		26E6C1D71609037300CA6AF4 /* URLCanonIP.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = URLCanonIP.cpp; sourceTree = "<group>"; };
-		26E6C1D91609037300CA6AF4 /* URLCanonMailto.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = URLCanonMailto.cpp; sourceTree = "<group>"; };
-		26E6C1DA1609037300CA6AF4 /* URLCanonPath.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = URLCanonPath.cpp; sourceTree = "<group>"; };
-		26E6C1DB1609037300CA6AF4 /* URLCanonPathurl.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = URLCanonPathurl.cpp; sourceTree = "<group>"; };
-		26E6C1DC1609037300CA6AF4 /* URLCanonQuery.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = URLCanonQuery.cpp; sourceTree = "<group>"; };
-		26E6C1DD1609037300CA6AF4 /* URLCanonRelative.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = URLCanonRelative.cpp; sourceTree = "<group>"; };
-		26E6C1DF1609037300CA6AF4 /* URLCanonStdURL.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = URLCanonStdURL.cpp; sourceTree = "<group>"; };
-		26E6C1E11609037300CA6AF4 /* URLCanon.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = URLCanon.h; sourceTree = "<group>"; };
-		26E6C1E31609037300CA6AF4 /* URLFile.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = URLFile.h; sourceTree = "<group>"; };
-		26E6C1E41609037300CA6AF4 /* URLParseFile.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = URLParseFile.cpp; sourceTree = "<group>"; };
-		26E6C1E51609037300CA6AF4 /* URLParseInternal.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = URLParseInternal.h; sourceTree = "<group>"; };
-		26E6C1E71609037300CA6AF4 /* URLParse.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = URLParse.cpp; sourceTree = "<group>"; };
-		26E6C1E81609037300CA6AF4 /* URLParse.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = URLParse.h; sourceTree = "<group>"; };
-		26E6C1EA1609037300CA6AF4 /* URLUtilInternal.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = URLUtilInternal.h; sourceTree = "<group>"; };
-		26E6C1EC1609037300CA6AF4 /* URLUtil.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = URLUtil.cpp; sourceTree = "<group>"; };
-		26E6C1ED1609037300CA6AF4 /* URLUtil.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = URLUtil.h; sourceTree = "<group>"; };
 		2C05385315BC819000F21B96 /* GregorianDateTime.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = GregorianDateTime.h; sourceTree = "<group>"; };
 		2CCD892915C0390200285083 /* GregorianDateTime.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = GregorianDateTime.cpp; sourceTree = "<group>"; };
-		4330F38E15745B0500AAFA8F /* URLString.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = URLString.cpp; sourceTree = "<group>"; };
+		44DEE74A152274BB00C6EC37 /* iOS.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; path = iOS.xcconfig; sourceTree = "<group>"; };
+		44F66007171AFAA900E4AD19 /* EnumClass.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = EnumClass.h; sourceTree = "<group>"; };
 		4F0321BB156AA8D1006EBAF6 /* BitArray.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = BitArray.h; sourceTree = "<group>"; };
-		4F1B2DB5160B44AA00586559 /* MemoryInstrumentationHashSet.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MemoryInstrumentationHashSet.h; sourceTree = "<group>"; };
-		4F1D115315FF11BE0026E908 /* MemoryInstrumentation.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MemoryInstrumentation.h; sourceTree = "<group>"; };
-		4FCB7109160A1A07008425EC /* MemoryInstrumentationVector.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MemoryInstrumentationVector.h; sourceTree = "<group>"; };
-		4FCF27E016172E8600CBF037 /* MemoryInstrumentationString.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MemoryInstrumentationString.h; sourceTree = "<group>"; };
-		4FD2A358161B0EE100EBF236 /* MemoryInstrumentationParsedURL.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MemoryInstrumentationParsedURL.h; sourceTree = "<group>"; };
-		4FD8554616133E0E00C5B704 /* MemoryInstrumentationArrayBufferView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MemoryInstrumentationArrayBufferView.h; sourceTree = "<group>"; };
 		5D247B6214689B8600E78B76 /* libWTF.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libWTF.a; sourceTree = BUILT_PRODUCTS_DIR; };
 		5D247B6E14689C4700E78B76 /* Base.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Base.xcconfig; sourceTree = "<group>"; };
 		5D247B7014689C4700E78B76 /* DebugRelease.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = DebugRelease.xcconfig; sourceTree = "<group>"; };
 		5D247B7314689C4700E78B76 /* WTF.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = WTF.xcconfig; sourceTree = "<group>"; };
-		5D247EB11468B01500E78B76 /* HeaderDetection.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = HeaderDetection.h; path = DerivedSources/WTF/HeaderDetection.h; sourceTree = BUILT_PRODUCTS_DIR; };
 		6541CAF41630DB26006D0DEC /* CopyWTFHeaders.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; path = CopyWTFHeaders.xcconfig; sourceTree = "<group>"; };
 		7E29C33D15FFD79B00516D61 /* ObjcRuntimeExtras.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ObjcRuntimeExtras.h; sourceTree = "<group>"; };
 		8134013615B092FD001FF0B8 /* Base64.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Base64.cpp; sourceTree = "<group>"; };
 		8134013715B092FD001FF0B8 /* Base64.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Base64.h; sourceTree = "<group>"; };
+		974CFC8D16A4F327006D5404 /* WeakPtr.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = WeakPtr.h; sourceTree = "<group>"; };
+		9BC70F04176C379D00101DEC /* AtomicStringTable.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = AtomicStringTable.cpp; sourceTree = "<group>"; };
+		9BD8F40A176C2AD80002D865 /* AtomicStringTable.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AtomicStringTable.h; sourceTree = "<group>"; };
 		A876DBD7151816E500DADB95 /* Platform.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Platform.h; sourceTree = "<group>"; };
 		A8A47254151A825A004123FF /* Alignment.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Alignment.h; sourceTree = "<group>"; };
-		A8A47255151A825A004123FF /* AlwaysInline.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AlwaysInline.h; sourceTree = "<group>"; };
 		A8A47256151A825A004123FF /* ArrayBuffer.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ArrayBuffer.cpp; sourceTree = "<group>"; };
 		A8A47257151A825A004123FF /* ArrayBuffer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ArrayBuffer.h; sourceTree = "<group>"; };
 		A8A47258151A825A004123FF /* ArrayBufferView.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ArrayBufferView.cpp; sourceTree = "<group>"; };
@@ -399,7 +348,6 @@
 		A8A4726A151A825A004123FF /* CheckedArithmetic.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CheckedArithmetic.h; sourceTree = "<group>"; };
 		A8A4726B151A825A004123FF /* CheckedBoolean.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CheckedBoolean.h; sourceTree = "<group>"; };
 		A8A47270151A825A004123FF /* Compiler.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Compiler.h; sourceTree = "<group>"; };
-		A8A47271151A825A004123FF /* Complex.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Complex.h; sourceTree = "<group>"; };
 		A8A47273151A825A004123FF /* CryptographicallyRandomNumber.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CryptographicallyRandomNumber.cpp; sourceTree = "<group>"; };
 		A8A47274151A825A004123FF /* CryptographicallyRandomNumber.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CryptographicallyRandomNumber.h; sourceTree = "<group>"; };
 		A8A47275151A825A004123FF /* CurrentTime.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CurrentTime.cpp; sourceTree = "<group>"; };
@@ -465,12 +413,10 @@
 		A8A472BF151A825A004123FF /* Int32Array.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Int32Array.h; sourceTree = "<group>"; };
 		A8A472C0151A825A004123FF /* IntegralTypedArrayBase.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = IntegralTypedArrayBase.h; sourceTree = "<group>"; };
 		A8A472C1151A825A004123FF /* ListHashSet.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ListHashSet.h; sourceTree = "<group>"; };
-		A8A472C2151A825A004123FF /* ListRefPtr.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ListRefPtr.h; sourceTree = "<group>"; };
 		A8A472C3151A825A004123FF /* Locker.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Locker.h; sourceTree = "<group>"; };
 		A8A472C5151A825A004123FF /* MainThreadMac.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = MainThreadMac.mm; sourceTree = "<group>"; };
 		A8A472C6151A825A004123FF /* MainThread.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = MainThread.cpp; sourceTree = "<group>"; };
 		A8A472C7151A825B004123FF /* MainThread.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MainThread.h; sourceTree = "<group>"; };
-		A8A472C8151A825B004123FF /* MallocZoneSupport.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MallocZoneSupport.h; sourceTree = "<group>"; };
 		A8A472C9151A825B004123FF /* MathExtras.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MathExtras.h; sourceTree = "<group>"; };
 		A8A472CA151A825B004123FF /* MD5.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = MD5.cpp; sourceTree = "<group>"; };
 		A8A472CB151A825B004123FF /* MD5.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MD5.h; sourceTree = "<group>"; };
@@ -530,7 +476,6 @@
 		A8A4730F151A825B004123FF /* StackBounds.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = StackBounds.h; sourceTree = "<group>"; };
 		A8A47310151A825B004123FF /* StaticConstructors.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = StaticConstructors.h; sourceTree = "<group>"; };
 		A8A47311151A825B004123FF /* StdLibExtras.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = StdLibExtras.h; sourceTree = "<group>"; };
-		A8A47312151A825B004123FF /* StringExtras.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = StringExtras.cpp; sourceTree = "<group>"; };
 		A8A47313151A825B004123FF /* StringExtras.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = StringExtras.h; sourceTree = "<group>"; };
 		A8A47314151A825B004123FF /* StringHasher.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = StringHasher.h; sourceTree = "<group>"; };
 		A8A47315151A825B004123FF /* TCPackedCache.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TCPackedCache.h; sourceTree = "<group>"; };
@@ -588,17 +533,6 @@
 		A8A47357151A825B004123FF /* UTF8.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = UTF8.cpp; sourceTree = "<group>"; };
 		A8A47358151A825B004123FF /* UTF8.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = UTF8.h; sourceTree = "<group>"; };
 		A8A4735C151A825B004123FF /* UnionFind.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = UnionFind.h; sourceTree = "<group>"; };
-		A8A4735D151A825B004123FF /* UnusedParam.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = UnusedParam.h; sourceTree = "<group>"; };
-		A8A47360151A825B004123FF /* ParsedURL.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ParsedURL.cpp; sourceTree = "<group>"; };
-		A8A47361151A825B004123FF /* ParsedURL.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ParsedURL.h; sourceTree = "<group>"; };
-		A8A47362151A825B004123FF /* URLString.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = URLString.h; sourceTree = "<group>"; };
-		A8A47364151A825B004123FF /* RawURLBuffer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = RawURLBuffer.h; sourceTree = "<group>"; };
-		A8A47365151A825B004123FF /* URLBuffer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = URLBuffer.h; sourceTree = "<group>"; };
-		A8A47366151A825B004123FF /* URLCharacterTypes.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = URLCharacterTypes.cpp; sourceTree = "<group>"; };
-		A8A47367151A825B004123FF /* URLCharacterTypes.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = URLCharacterTypes.h; sourceTree = "<group>"; };
-		A8A47368151A825B004123FF /* URLComponent.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = URLComponent.h; sourceTree = "<group>"; };
-		A8A4736D151A825B004123FF /* URLSegments.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = URLSegments.cpp; sourceTree = "<group>"; };
-		A8A4736E151A825B004123FF /* URLSegments.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = URLSegments.h; sourceTree = "<group>"; };
 		A8A4736F151A825B004123FF /* ValueCheck.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ValueCheck.h; sourceTree = "<group>"; };
 		A8A47370151A825B004123FF /* Vector.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Vector.h; sourceTree = "<group>"; };
 		A8A47371151A825B004123FF /* VectorTraits.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = VectorTraits.h; sourceTree = "<group>"; };
@@ -606,15 +540,10 @@
 		A8A4737A151A825B004123FF /* WTFThreadData.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = WTFThreadData.cpp; sourceTree = "<group>"; };
 		A8A4737B151A825B004123FF /* WTFThreadData.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = WTFThreadData.h; sourceTree = "<group>"; };
 		A8A4748B151A8264004123FF /* config.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = config.h; sourceTree = "<group>"; };
+		B38FD7BC168953E80065C969 /* FeatureDefines.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = FeatureDefines.h; sourceTree = "<group>"; };
 		CD5497AA15857D0300B5BC30 /* MediaTime.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = MediaTime.cpp; sourceTree = "<group>"; };
 		CD5497AB15857D0300B5BC30 /* MediaTime.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MediaTime.h; sourceTree = "<group>"; };
 		EB95E1EF161A72410089A2F5 /* ByteOrder.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ByteOrder.h; sourceTree = "<group>"; };
-		F322CCDE165699FF004852DD /* MemoryInstrumentation.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = MemoryInstrumentation.cpp; sourceTree = "<group>"; };
-		F322CCE016569A10004852DD /* MemoryObjectInfo.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MemoryObjectInfo.h; sourceTree = "<group>"; };
-		F3525E2916149FF400278BC1 /* MemoryInstrumentationListHashSet.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MemoryInstrumentationListHashSet.h; sourceTree = "<group>"; };
-		F3525E451619A4EE00278BC1 /* MemoryInstrumentationHashMap.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MemoryInstrumentationHashMap.h; sourceTree = "<group>"; };
-		F3FBC71D161AF7BF00BB4BD4 /* MemoryInstrumentationHashCountedSet.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MemoryInstrumentationHashCountedSet.h; sourceTree = "<group>"; };
-		F3FBC71F161AF7CD00BB4BD4 /* MemoryInstrumentationSequence.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MemoryInstrumentationSequence.h; sourceTree = "<group>"; };
 		FEDACD3B1630F83F00C69634 /* StackStats.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = StackStats.cpp; sourceTree = "<group>"; };
 		FEDACD3C1630F83F00C69634 /* StackStats.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = StackStats.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -653,6 +582,7 @@
 				5D247B6E14689C4700E78B76 /* Base.xcconfig */,
 				6541CAF41630DB26006D0DEC /* CopyWTFHeaders.xcconfig */,
 				5D247B7014689C4700E78B76 /* DebugRelease.xcconfig */,
+				44DEE74A152274BB00C6EC37 /* iOS.xcconfig */,
 				5D247B7314689C4700E78B76 /* WTF.xcconfig */,
 			);
 			path = Configurations;
@@ -663,7 +593,6 @@
 			children = (
 				A876DBD6151816E500DADB95 /* wtf */,
 				A8A4748B151A8264004123FF /* config.h */,
-				5D247EB11468B01500E78B76 /* HeaderDetection.h */,
 			);
 			name = Source;
 			sourceTree = "<group>";
@@ -676,9 +605,7 @@
 				A8A4731B151A825B004123FF /* text */,
 				A8A47339151A825B004123FF /* threads */,
 				A8A47348151A825B004123FF /* unicode */,
-				A8A4735E151A825B004123FF /* url */,
 				A8A47254151A825A004123FF /* Alignment.h */,
-				A8A47255151A825A004123FF /* AlwaysInline.h */,
 				A8A47256151A825A004123FF /* ArrayBuffer.cpp */,
 				A8A47257151A825A004123FF /* ArrayBuffer.h */,
 				A8A47258151A825A004123FF /* ArrayBufferView.cpp */,
@@ -687,6 +614,8 @@
 				A8A4725B151A825A004123FF /* Assertions.cpp */,
 				A8A4725C151A825A004123FF /* Assertions.h */,
 				A8A4725D151A825A004123FF /* Atomics.h */,
+				1469419A16EAB10A0024E146 /* AutodrainedPool.h */,
+				1469419B16EAB10A0024E146 /* AutodrainedPoolMac.mm */,
 				A8A4725E151A825A004123FF /* AVLTree.h */,
 				4F0321BB156AA8D1006EBAF6 /* BitArray.h */,
 				A8A4725F151A825A004123FF /* Bitmap.h */,
@@ -699,8 +628,8 @@
 				EB95E1EF161A72410089A2F5 /* ByteOrder.h */,
 				A8A4726A151A825A004123FF /* CheckedArithmetic.h */,
 				A8A4726B151A825A004123FF /* CheckedBoolean.h */,
+				0FC4EDE51696149600F65041 /* CommaPrinter.h */,
 				A8A47270151A825A004123FF /* Compiler.h */,
-				A8A47271151A825A004123FF /* Complex.h */,
 				A8A47273151A825A004123FF /* CryptographicallyRandomNumber.cpp */,
 				A8A47274151A825A004123FF /* CryptographicallyRandomNumber.h */,
 				A8A47275151A825A004123FF /* CurrentTime.cpp */,
@@ -720,11 +649,13 @@
 				A8A47299151A825A004123FF /* DynamicAnnotations.cpp */,
 				A8A4729A151A825A004123FF /* DynamicAnnotations.h */,
 				A8A4729E151A825A004123FF /* Encoder.h */,
+				44F66007171AFAA900E4AD19 /* EnumClass.h */,
 				A8A4729F151A825A004123FF /* ExportMacros.h */,
 				A8A472A0151A825A004123FF /* FastAllocBase.h */,
 				0FD81AC4154FB22E00983E72 /* FastBitVector.h */,
 				A8A472A1151A825A004123FF /* FastMalloc.cpp */,
 				A8A472A2151A825A004123FF /* FastMalloc.h */,
+				B38FD7BC168953E80065C969 /* FeatureDefines.h */,
 				0F9D335B165DBA73005AD387 /* FilePrintStream.cpp */,
 				0F9D335C165DBA73005AD387 /* FilePrintStream.h */,
 				A8A472A3151A825A004123FF /* FixedArray.h */,
@@ -732,6 +663,8 @@
 				A8A472A5151A825A004123FF /* Float64Array.h */,
 				A8A472A6151A825A004123FF /* Forward.h */,
 				A8A472A7151A825A004123FF /* Functional.h */,
+				1A1D8B9D1731879800141DA4 /* FunctionDispatcher.cpp */,
+				1A1D8B9B173186CE00141DA4 /* FunctionDispatcher.h */,
 				A8A472A8151A825A004123FF /* GetPtr.h */,
 				2CCD892915C0390200285083 /* GregorianDateTime.cpp */,
 				2C05385315BC819000F21B96 /* GregorianDateTime.h */,
@@ -750,32 +683,19 @@
 				A8A472BD151A825A004123FF /* Int8Array.h */,
 				A8A472C0151A825A004123FF /* IntegralTypedArrayBase.h */,
 				A8A472C1151A825A004123FF /* ListHashSet.h */,
-				A8A472C2151A825A004123FF /* ListRefPtr.h */,
 				A8A472C3151A825A004123FF /* Locker.h */,
 				A8A472C6151A825A004123FF /* MainThread.cpp */,
 				A8A472C7151A825B004123FF /* MainThread.h */,
-				A8A472C8151A825B004123FF /* MallocZoneSupport.h */,
 				A8A472C9151A825B004123FF /* MathExtras.h */,
 				A8A472CA151A825B004123FF /* MD5.cpp */,
 				A8A472CB151A825B004123FF /* MD5.h */,
 				CD5497AA15857D0300B5BC30 /* MediaTime.cpp */,
 				CD5497AB15857D0300B5BC30 /* MediaTime.h */,
-				F322CCDE165699FF004852DD /* MemoryInstrumentation.cpp */,
-				4F1D115315FF11BE0026E908 /* MemoryInstrumentation.h */,
-				4FD8554616133E0E00C5B704 /* MemoryInstrumentationArrayBufferView.h */,
-				F3FBC71D161AF7BF00BB4BD4 /* MemoryInstrumentationHashCountedSet.h */,
-				F3525E451619A4EE00278BC1 /* MemoryInstrumentationHashMap.h */,
-				4F1B2DB5160B44AA00586559 /* MemoryInstrumentationHashSet.h */,
-				F3525E2916149FF400278BC1 /* MemoryInstrumentationListHashSet.h */,
-				4FD2A358161B0EE100EBF236 /* MemoryInstrumentationParsedURL.h */,
-				F3FBC71F161AF7CD00BB4BD4 /* MemoryInstrumentationSequence.h */,
-				4FCF27E016172E8600CBF037 /* MemoryInstrumentationString.h */,
-				4FCB7109160A1A07008425EC /* MemoryInstrumentationVector.h */,
-				F322CCE016569A10004852DD /* MemoryObjectInfo.h */,
 				A8A472CC151A825B004123FF /* MessageQueue.h */,
 				A8A472CD151A825B004123FF /* MetaAllocator.cpp */,
 				A8A472CE151A825B004123FF /* MetaAllocator.h */,
 				A8A472CF151A825B004123FF /* MetaAllocatorHandle.h */,
+				1A3F6BE6174ADA2100B2EEA7 /* NeverDestroyed.h */,
 				A8A472D0151A825B004123FF /* Noncopyable.h */,
 				A8A472D1151A825B004123FF /* NonCopyingSort.h */,
 				A8A472D2151A825B004123FF /* NotFound.h */,
@@ -805,9 +725,11 @@
 				A8A472ED151A825B004123FF /* PassRefPtr.h */,
 				A8A472EE151A825B004123FF /* PassTraits.h */,
 				A8A472EF151A825B004123FF /* Platform.h */,
+				A876DBD7151816E500DADB95 /* Platform.h */,
 				A8A472F3151A825B004123FF /* PossiblyNull.h */,
 				0F9D335D165DBA73005AD387 /* PrintStream.cpp */,
 				0F9D335E165DBA73005AD387 /* PrintStream.h */,
+				0FC4488216FE9FE100844BE9 /* ProcessID.h */,
 				143F611D1565F0F900DB514A /* RAMSize.cpp */,
 				143F611E1565F0F900DB514A /* RAMSize.h */,
 				A8A472FB151A825B004123FF /* RandomNumber.cpp */,
@@ -822,7 +744,12 @@
 				A8A47303151A825B004123FF /* RefPtr.h */,
 				A8A47304151A825B004123FF /* RefPtrHashMap.h */,
 				A8A47305151A825B004123FF /* RetainPtr.h */,
+				1469419016EAAF6D0024E146 /* RunLoopTimer.h */,
+				1469419116EAAF6D0024E146 /* RunLoopTimerCF.cpp */,
 				14F3B0F615E45E4600210069 /* SaturatedArithmetic.h */,
+				1469419416EAAFF80024E146 /* SchedulePair.h */,
+				1469419816EAB0410024E146 /* SchedulePairCF.cpp */,
+				1469419516EAAFF80024E146 /* SchedulePairMac.mm */,
 				A8A47306151A825B004123FF /* SegmentedVector.h */,
 				A8A47307151A825B004123FF /* SentinelLinkedList.h */,
 				A8A47308151A825B004123FF /* SHA1.cpp */,
@@ -838,7 +765,6 @@
 				A8A47310151A825B004123FF /* StaticConstructors.h */,
 				A8A47311151A825B004123FF /* StdLibExtras.h */,
 				1A6BB768162F300500DD16DB /* StreamBuffer.h */,
-				A8A47312151A825B004123FF /* StringExtras.cpp */,
 				A8A47313151A825B004123FF /* StringExtras.h */,
 				A8A47314151A825B004123FF /* StringHasher.h */,
 				0FDDBFA51666DFA300C55FEF /* StringPrintStream.cpp */,
@@ -859,6 +785,7 @@
 				A8A47338151A825B004123FF /* ThreadRestrictionVerifier.h */,
 				A8A4733E151A825B004123FF /* ThreadSafeRefCounted.h */,
 				A8A4733F151A825B004123FF /* ThreadSpecific.h */,
+				149EF16216BBFE0D000A4331 /* TriState.h */,
 				A8A47341151A825B004123FF /* TypedArrayBase.h */,
 				A8A47342151A825B004123FF /* TypeTraits.cpp */,
 				A8A47343151A825B004123FF /* TypeTraits.h */,
@@ -867,14 +794,13 @@
 				A8A47344151A825B004123FF /* Uint8Array.h */,
 				A8A47345151A825B004123FF /* Uint8ClampedArray.h */,
 				A8A4735C151A825B004123FF /* UnionFind.h */,
-				A8A4735D151A825B004123FF /* UnusedParam.h */,
 				A8A4736F151A825B004123FF /* ValueCheck.h */,
 				A8A47370151A825B004123FF /* Vector.h */,
 				A8A47371151A825B004123FF /* VectorTraits.h */,
 				A8A47372151A825B004123FF /* VMTags.h */,
+				974CFC8D16A4F327006D5404 /* WeakPtr.h */,
 				A8A4737A151A825B004123FF /* WTFThreadData.cpp */,
 				A8A4737B151A825B004123FF /* WTFThreadData.h */,
-				A876DBD7151816E500DADB95 /* Platform.h */,
 			);
 			path = wtf;
 			sourceTree = "<group>";
@@ -923,6 +849,8 @@
 				A8A4731E151A825B004123FF /* AtomicString.h */,
 				A8A4731F151A825B004123FF /* AtomicStringHash.h */,
 				A8A47320151A825B004123FF /* AtomicStringImpl.h */,
+				9BC70F04176C379D00101DEC /* AtomicStringTable.cpp */,
+				9BD8F40A176C2AD80002D865 /* AtomicStringTable.h */,
 				8134013615B092FD001FF0B8 /* Base64.cpp */,
 				8134013715B092FD001FF0B8 /* Base64.h */,
 				A8A47321151A825B004123FF /* CString.cpp */,
@@ -978,64 +906,6 @@
 			path = icu;
 			sourceTree = "<group>";
 		};
-		A8A4735E151A825B004123FF /* url */ = {
-			isa = PBXGroup;
-			children = (
-				A8A4735F151A825B004123FF /* api */,
-				A8A47363151A825B004123FF /* src */,
-			);
-			path = url;
-			sourceTree = "<group>";
-		};
-		A8A4735F151A825B004123FF /* api */ = {
-			isa = PBXGroup;
-			children = (
-				A8A47360151A825B004123FF /* ParsedURL.cpp */,
-				A8A47361151A825B004123FF /* ParsedURL.h */,
-				A8A47365151A825B004123FF /* URLBuffer.h */,
-				2661122D160FEAD40013F5C3 /* URLQueryCharsetConverter.h */,
-				4330F38E15745B0500AAFA8F /* URLString.cpp */,
-				A8A47362151A825B004123FF /* URLString.h */,
-			);
-			path = api;
-			sourceTree = "<group>";
-		};
-		A8A47363151A825B004123FF /* src */ = {
-			isa = PBXGroup;
-			children = (
-				A8A47364151A825B004123FF /* RawURLBuffer.h */,
-				26E6C1E11609037300CA6AF4 /* URLCanon.h */,
-				26E6C1CE1609037300CA6AF4 /* URLCanonEtc.cpp */,
-				26E6C1CF1609037300CA6AF4 /* URLCanonFilesystemurl.cpp */,
-				26E6C1D01609037300CA6AF4 /* URLCanonFileurl.cpp */,
-				26E6C1D11609037300CA6AF4 /* URLCanonHost.cpp */,
-				26E6C1D21609037300CA6AF4 /* URLCanonICU.cpp */,
-				26E6C1D51609037300CA6AF4 /* URLCanonInternal.cpp */,
-				26E6C1D61609037300CA6AF4 /* URLCanonInternal.h */,
-				26E6C1D71609037300CA6AF4 /* URLCanonIP.cpp */,
-				26E6C1D91609037300CA6AF4 /* URLCanonMailto.cpp */,
-				26E6C1DA1609037300CA6AF4 /* URLCanonPath.cpp */,
-				26E6C1DB1609037300CA6AF4 /* URLCanonPathurl.cpp */,
-				26E6C1DC1609037300CA6AF4 /* URLCanonQuery.cpp */,
-				26E6C1DD1609037300CA6AF4 /* URLCanonRelative.cpp */,
-				26E6C1DF1609037300CA6AF4 /* URLCanonStdURL.cpp */,
-				A8A47366151A825B004123FF /* URLCharacterTypes.cpp */,
-				A8A47367151A825B004123FF /* URLCharacterTypes.h */,
-				A8A47368151A825B004123FF /* URLComponent.h */,
-				26E6C1E31609037300CA6AF4 /* URLFile.h */,
-				26E6C1E71609037300CA6AF4 /* URLParse.cpp */,
-				26E6C1E81609037300CA6AF4 /* URLParse.h */,
-				26E6C1E41609037300CA6AF4 /* URLParseFile.cpp */,
-				26E6C1E51609037300CA6AF4 /* URLParseInternal.h */,
-				A8A4736D151A825B004123FF /* URLSegments.cpp */,
-				A8A4736E151A825B004123FF /* URLSegments.h */,
-				26E6C1EC1609037300CA6AF4 /* URLUtil.cpp */,
-				26E6C1ED1609037300CA6AF4 /* URLUtil.h */,
-				26E6C1EA1609037300CA6AF4 /* URLUtilInternal.h */,
-			);
-			path = src;
-			sourceTree = "<group>";
-		};
 /* End PBXGroup section */
 
 /* Begin PBXHeadersBuildPhase section */
@@ -1044,7 +914,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				A8A4737F151A825B004123FF /* Alignment.h in Headers */,
-				A8A47380151A825B004123FF /* AlwaysInline.h in Headers */,
 				A8A47382151A825B004123FF /* ArrayBuffer.h in Headers */,
 				A8A47384151A825B004123FF /* ArrayBufferView.h in Headers */,
 				A8A47385151A825B004123FF /* ASCIICType.h in Headers */,
@@ -1054,6 +923,8 @@
 				A8A47436151A825B004123FF /* AtomicString.h in Headers */,
 				A8A47437151A825B004123FF /* AtomicStringHash.h in Headers */,
 				A8A47438151A825B004123FF /* AtomicStringImpl.h in Headers */,
+				9BD8F40B176C2B470002D865 /* AtomicStringTable.h in Headers */,
+				1469419C16EAB10A0024E146 /* AutodrainedPool.h in Headers */,
 				A8A47389151A825B004123FF /* AVLTree.h in Headers */,
 				8134013915B092FD001FF0B8 /* Base64.h in Headers */,
 				A8A473A9151A825B004123FF /* bignum-dtoa.h in Headers */,
@@ -1072,8 +943,8 @@
 				A8A47394151A825B004123FF /* CheckedArithmetic.h in Headers */,
 				A8A47395151A825B004123FF /* CheckedBoolean.h in Headers */,
 				A8A4745F151A825B004123FF /* Collator.h in Headers */,
+				0FC4EDE61696149600F65041 /* CommaPrinter.h in Headers */,
 				A8A47398151A825B004123FF /* Compiler.h in Headers */,
-				A8A47399151A825B004123FF /* Complex.h in Headers */,
 				A8A4748C151A8264004123FF /* config.h in Headers */,
 				A8A4739B151A825B004123FF /* CryptographicallyRandomNumber.h in Headers */,
 				A8A4743A151A825B004123FF /* CString.h in Headers */,
@@ -1091,17 +962,21 @@
 				A8A473BB151A825B004123FF /* dtoa.h in Headers */,
 				A8A473BD151A825B004123FF /* DynamicAnnotations.h in Headers */,
 				A8A473C0151A825B004123FF /* Encoder.h in Headers */,
+				44F66008171AFAE600E4AD19 /* EnumClass.h in Headers */,
 				A8A473C1151A825B004123FF /* ExportMacros.h in Headers */,
 				A8A473B4151A825B004123FF /* fast-dtoa.h in Headers */,
 				A8A473C2151A825B004123FF /* FastAllocBase.h in Headers */,
 				0FD81AC5154FB22E00983E72 /* FastBitVector.h in Headers */,
 				A8A473C4151A825B004123FF /* FastMalloc.h in Headers */,
+				B38FD7BD168953E80065C969 /* FeatureDefines.h in Headers */,
+				0F9D3361165DBA73005AD387 /* FilePrintStream.h in Headers */,
 				A8A473B6151A825B004123FF /* fixed-dtoa.h in Headers */,
 				A8A473C5151A825B004123FF /* FixedArray.h in Headers */,
 				A8A473C6151A825B004123FF /* Float32Array.h in Headers */,
 				A8A473C7151A825B004123FF /* Float64Array.h in Headers */,
 				A8A473C8151A825B004123FF /* Forward.h in Headers */,
 				A8A473C9151A825B004123FF /* Functional.h in Headers */,
+				1A1D8B9C173186CE00141DA4 /* FunctionDispatcher.h in Headers */,
 				A8A473CA151A825B004123FF /* GetPtr.h in Headers */,
 				2C05385415BC819000F21B96 /* GregorianDateTime.h in Headers */,
 				A8A473D3151A825B004123FF /* HashCountedSet.h in Headers */,
@@ -1119,24 +994,11 @@
 				26147B0A15DDCCDC00DDB907 /* IntegerToStringConversion.h in Headers */,
 				A8A473E0151A825B004123FF /* IntegralTypedArrayBase.h in Headers */,
 				A8A473E1151A825B004123FF /* ListHashSet.h in Headers */,
-				A8A473E2151A825B004123FF /* ListRefPtr.h in Headers */,
 				A8A473E3151A825B004123FF /* Locker.h in Headers */,
 				A8A473E6151A825B004123FF /* MainThread.h in Headers */,
-				A8A473E7151A825B004123FF /* MallocZoneSupport.h in Headers */,
 				A8A473E8151A825B004123FF /* MathExtras.h in Headers */,
 				A8A473EA151A825B004123FF /* MD5.h in Headers */,
 				CD5497AD15857D0300B5BC30 /* MediaTime.h in Headers */,
-				4F1D115415FF11BE0026E908 /* MemoryInstrumentation.h in Headers */,
-				4FD8554716133E0E00C5B704 /* MemoryInstrumentationArrayBufferView.h in Headers */,
-				F3FBC71E161AF7BF00BB4BD4 /* MemoryInstrumentationHashCountedSet.h in Headers */,
-				F3525E461619A4EE00278BC1 /* MemoryInstrumentationHashMap.h in Headers */,
-				4F1B2DB6160B44AA00586559 /* MemoryInstrumentationHashSet.h in Headers */,
-				F3525E2A16149FF400278BC1 /* MemoryInstrumentationListHashSet.h in Headers */,
-				4FD2A359161B0EE100EBF236 /* MemoryInstrumentationParsedURL.h in Headers */,
-				F3FBC720161AF7CD00BB4BD4 /* MemoryInstrumentationSequence.h in Headers */,
-				4FCF27E116172E8600CBF037 /* MemoryInstrumentationString.h in Headers */,
-				4FCB710A160A1A07008425EC /* MemoryInstrumentationVector.h in Headers */,
-				F322CCE116569A10004852DD /* MemoryObjectInfo.h in Headers */,
 				A8A473EB151A825B004123FF /* MessageQueue.h in Headers */,
 				A8A473ED151A825B004123FF /* MetaAllocator.h in Headers */,
 				A8A473EE151A825B004123FF /* MetaAllocatorHandle.h in Headers */,
@@ -1158,7 +1020,6 @@
 				A8A47404151A825B004123FF /* PageReservation.h in Headers */,
 				A8A47405151A825B004123FF /* ParallelJobs.h in Headers */,
 				A8A47408151A825B004123FF /* ParallelJobsLibdispatch.h in Headers */,
-				A8A47470151A825B004123FF /* ParsedURL.h in Headers */,
 				A8A4740A151A825B004123FF /* PassOwnArrayPtr.h in Headers */,
 				A8A4740B151A825B004123FF /* PassOwnPtr.h in Headers */,
 				A8A4740C151A825B004123FF /* PassRefPtr.h in Headers */,
@@ -1166,10 +1027,12 @@
 				A876DBD8151816E500DADB95 /* Platform.h in Headers */,
 				A8A4740E151A825B004123FF /* Platform.h in Headers */,
 				A8A4740F151A825B004123FF /* PossiblyNull.h in Headers */,
+				0F9D3363165DBA73005AD387 /* PrintStream.h in Headers */,
+				0FC4488316FE9FE100844BE9 /* ProcessID.h in Headers */,
 				143F61201565F0F900DB514A /* RAMSize.h in Headers */,
 				A8A47415151A825B004123FF /* RandomNumber.h in Headers */,
 				A8A47416151A825B004123FF /* RandomNumberSeed.h in Headers */,
-				A8A47472151A825B004123FF /* RawURLBuffer.h in Headers */,
+				0F87105A16643F190090B0AD /* RawPointer.h in Headers */,
 				A8A47417151A825B004123FF /* RedBlackTree.h in Headers */,
 				A8A47418151A825B004123FF /* RefCounted.h in Headers */,
 				A8A47419151A825B004123FF /* RefCountedArray.h in Headers */,
@@ -1177,7 +1040,9 @@
 				A8A4741C151A825B004123FF /* RefPtr.h in Headers */,
 				A8A4741D151A825B004123FF /* RefPtrHashMap.h in Headers */,
 				A8A4741E151A825B004123FF /* RetainPtr.h in Headers */,
+				1469419216EAAF6D0024E146 /* RunLoopTimer.h in Headers */,
 				14F3B0F715E45E4600210069 /* SaturatedArithmetic.h in Headers */,
+				1469419616EAAFF80024E146 /* SchedulePair.h in Headers */,
 				A8A47466151A825B004123FF /* ScriptCodesFromICU.h in Headers */,
 				A8A4741F151A825B004123FF /* SegmentedVector.h in Headers */,
 				A8A47420151A825B004123FF /* SentinelLinkedList.h in Headers */,
@@ -1198,6 +1063,7 @@
 				A8A4742D151A825B004123FF /* StringHasher.h in Headers */,
 				A8A47441151A825B004123FF /* StringImpl.h in Headers */,
 				A8A47442151A825B004123FF /* StringOperators.h in Headers */,
+				0FDDBFA81666DFA300C55FEF /* StringPrintStream.h in Headers */,
 				A8A473B8151A825B004123FF /* strtod.h in Headers */,
 				A8A4742E151A825B004123FF /* TCPackedCache.h in Headers */,
 				A8A4742F151A825B004123FF /* TCPageMap.h in Headers */,
@@ -1212,6 +1078,7 @@
 				A8A47450151A825B004123FF /* ThreadRestrictionVerifier.h in Headers */,
 				A8A47454151A825B004123FF /* ThreadSafeRefCounted.h in Headers */,
 				A8A47455151A825B004123FF /* ThreadSpecific.h in Headers */,
+				149EF16316BBFE0D000A4331 /* TriState.h in Headers */,
 				A8A47457151A825B004123FF /* TypedArrayBase.h in Headers */,
 				A8A47459151A825B004123FF /* TypeTraits.h in Headers */,
 				A8A4745C151A825B004123FF /* Uint16Array.h in Headers */,
@@ -1222,32 +1089,15 @@
 				A8A47464151A825B004123FF /* UnicodeIcu.h in Headers */,
 				A8A47468151A825B004123FF /* UnicodeMacrosFromICU.h in Headers */,
 				A8A4746D151A825B004123FF /* UnionFind.h in Headers */,
-				A8A4746E151A825B004123FF /* UnusedParam.h in Headers */,
-				A8A47473151A825B004123FF /* URLBuffer.h in Headers */,
-				26E6C2011609037300CA6AF4 /* URLCanon.h in Headers */,
-				26E6C1F61609037300CA6AF4 /* URLCanonInternal.h in Headers */,
-				A8A47475151A825B004123FF /* URLCharacterTypes.h in Headers */,
-				A8A47476151A825B004123FF /* URLComponent.h in Headers */,
-				26E6C2031609037300CA6AF4 /* URLFile.h in Headers */,
-				26E6C2081609037300CA6AF4 /* URLParse.h in Headers */,
-				26E6C2051609037300CA6AF4 /* URLParseInternal.h in Headers */,
-				2661122E160FEAD40013F5C3 /* URLQueryCharsetConverter.h in Headers */,
-				A8A4747C151A825B004123FF /* URLSegments.h in Headers */,
-				A8A47471151A825B004123FF /* URLString.h in Headers */,
-				26E6C20D1609037300CA6AF4 /* URLUtil.h in Headers */,
-				26E6C20A1609037300CA6AF4 /* URLUtilInternal.h in Headers */,
 				A8A4746A151A825B004123FF /* UTF8.h in Headers */,
 				A8A473B9151A825B004123FF /* utils.h in Headers */,
 				A8A4747D151A825B004123FF /* ValueCheck.h in Headers */,
 				A8A4747E151A825B004123FF /* Vector.h in Headers */,
 				A8A4747F151A825B004123FF /* VectorTraits.h in Headers */,
 				A8A47480151A825B004123FF /* VMTags.h in Headers */,
+				974CFC8E16A4F327006D5404 /* WeakPtr.h in Headers */,
 				A8A47446151A825B004123FF /* WTFString.h in Headers */,
 				A8A47487151A825B004123FF /* WTFThreadData.h in Headers */,
-				0F9D3361165DBA73005AD387 /* FilePrintStream.h in Headers */,
-				0F9D3363165DBA73005AD387 /* PrintStream.h in Headers */,
-				0F87105A16643F190090B0AD /* RawPointer.h in Headers */,
-				0FDDBFA81666DFA300C55FEF /* StringPrintStream.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1258,7 +1108,6 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 5D247B6614689B8600E78B76 /* Build configuration list for PBXNativeTarget "WTF" */;
 			buildPhases = (
-				5D247E9D1468AEE200E78B76 /* Detect Available Headers */,
 				5D247B5E14689B8600E78B76 /* Sources */,
 				5D247B5F14689B8600E78B76 /* Frameworks */,
 				5D247B6014689B8600E78B76 /* Headers */,
@@ -1300,22 +1149,6 @@
 /* End PBXProject section */
 
 /* Begin PBXShellScriptBuildPhase section */
-		5D247E9D1468AEE200E78B76 /* Detect Available Headers */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputPaths = (
-				"$(SDKROOT)/System/Library/CoreServices/SystemVersion.plist",
-			);
-			name = "Detect Available Headers";
-			outputPaths = (
-				"$(BUILT_PRODUCTS_DIR)/DerivedSources/WTF/HeaderDetection.h",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "OUTPUT_FILE=\"${BUILT_PRODUCTS_DIR}/DerivedSources/WTF/HeaderDetection.h\"\necho \"/* This is a generated file. Do not edit. */\" > \"${OUTPUT_FILE}\"\n\nif [[ -f \"${SDKROOT}/System/Library/Frameworks/System.framework/PrivateHeaders/pthread_machdep.h\" ]]; then\n    echo \"#define HAVE_PTHREAD_MACHDEP_H 1\" >> \"${OUTPUT_FILE}\"\nfi\n";
-		};
 		65AFA1701630B977003D723C /* Copy WTF Headers */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
@@ -1341,6 +1174,8 @@
 				A8A47383151A825B004123FF /* ArrayBufferView.cpp in Sources */,
 				A8A47386151A825B004123FF /* Assertions.cpp in Sources */,
 				A8A47435151A825B004123FF /* AtomicString.cpp in Sources */,
+				9BC70F05176C379D00101DEC /* AtomicStringTable.cpp in Sources */,
+				1469419D16EAB10A0024E146 /* AutodrainedPoolMac.mm in Sources */,
 				8134013815B092FD001FF0B8 /* Base64.cpp in Sources */,
 				A8A473A8151A825B004123FF /* bignum-dtoa.cc in Sources */,
 				A8A473AA151A825B004123FF /* bignum.cc in Sources */,
@@ -1361,14 +1196,15 @@
 				A8A473BC151A825B004123FF /* DynamicAnnotations.cpp in Sources */,
 				A8A473B3151A825B004123FF /* fast-dtoa.cc in Sources */,
 				A8A473C3151A825B004123FF /* FastMalloc.cpp in Sources */,
+				0F9D3360165DBA73005AD387 /* FilePrintStream.cpp in Sources */,
 				A8A473B5151A825B004123FF /* fixed-dtoa.cc in Sources */,
+				1A1D8B9E1731879800141DA4 /* FunctionDispatcher.cpp in Sources */,
 				2CCD892A15C0390200285083 /* GregorianDateTime.cpp in Sources */,
 				A8A473D8151A825B004123FF /* HashTable.cpp in Sources */,
 				A8A473E5151A825B004123FF /* MainThread.cpp in Sources */,
 				A8A473E4151A825B004123FF /* MainThreadMac.mm in Sources */,
 				A8A473E9151A825B004123FF /* MD5.cpp in Sources */,
 				CD5497AC15857D0300B5BC30 /* MediaTime.cpp in Sources */,
-				F322CCDF165699FF004852DD /* MemoryInstrumentation.cpp in Sources */,
 				A8A473EC151A825B004123FF /* MetaAllocator.cpp in Sources */,
 				A8A473F2151A825B004123FF /* NullPtr.cpp in Sources */,
 				A8A473F4151A825B004123FF /* NumberOfCores.cpp in Sources */,
@@ -1376,17 +1212,20 @@
 				A8A473F9151A825B004123FF /* OSRandomSource.cpp in Sources */,
 				A8A47400151A825B004123FF /* PageAllocationAligned.cpp in Sources */,
 				A8A47402151A825B004123FF /* PageBlock.cpp in Sources */,
-				A8A4746F151A825B004123FF /* ParsedURL.cpp in Sources */,
+				0F9D3362165DBA73005AD387 /* PrintStream.cpp in Sources */,
 				143F611F1565F0F900DB514A /* RAMSize.cpp in Sources */,
 				A8A47414151A825B004123FF /* RandomNumber.cpp in Sources */,
 				A8A4741A151A825B004123FF /* RefCountedLeakCounter.cpp in Sources */,
+				1469419316EAAF6D0024E146 /* RunLoopTimerCF.cpp in Sources */,
+				1469419916EAB0410024E146 /* SchedulePairCF.cpp in Sources */,
+				1469419716EAAFF80024E146 /* SchedulePairMac.mm in Sources */,
 				A8A47421151A825B004123FF /* SHA1.cpp in Sources */,
 				A8A47425151A825B004123FF /* SizeLimits.cpp in Sources */,
 				A8A47427151A825B004123FF /* StackBounds.cpp in Sources */,
 				FEDACD3D1630F83F00C69634 /* StackStats.cpp in Sources */,
 				A8A4743C151A825B004123FF /* StringBuilder.cpp in Sources */,
-				A8A4742B151A825B004123FF /* StringExtras.cpp in Sources */,
 				A8A47440151A825B004123FF /* StringImpl.cpp in Sources */,
+				0FDDBFA71666DFA300C55FEF /* StringPrintStream.cpp in Sources */,
 				A8A47443151A825B004123FF /* StringStatics.cpp in Sources */,
 				A8A473B7151A825B004123FF /* strtod.cc in Sources */,
 				A8A47431151A825B004123FF /* TCSystemAlloc.cpp in Sources */,
@@ -1394,31 +1233,9 @@
 				A8A4744A151A825B004123FF /* Threading.cpp in Sources */,
 				A8A4744E151A825B004123FF /* ThreadingPthreads.cpp in Sources */,
 				A8A47458151A825B004123FF /* TypeTraits.cpp in Sources */,
-				26E6C1EE1609037300CA6AF4 /* URLCanonEtc.cpp in Sources */,
-				26E6C1EF1609037300CA6AF4 /* URLCanonFilesystemurl.cpp in Sources */,
-				26E6C1F01609037300CA6AF4 /* URLCanonFileurl.cpp in Sources */,
-				26E6C1F11609037300CA6AF4 /* URLCanonHost.cpp in Sources */,
-				26E6C1F21609037300CA6AF4 /* URLCanonICU.cpp in Sources */,
-				26E6C1F51609037300CA6AF4 /* URLCanonInternal.cpp in Sources */,
-				26E6C1F71609037300CA6AF4 /* URLCanonIP.cpp in Sources */,
-				26E6C1F91609037300CA6AF4 /* URLCanonMailto.cpp in Sources */,
-				26E6C1FA1609037300CA6AF4 /* URLCanonPath.cpp in Sources */,
-				26E6C1FB1609037300CA6AF4 /* URLCanonPathurl.cpp in Sources */,
-				26E6C1FC1609037300CA6AF4 /* URLCanonQuery.cpp in Sources */,
-				26E6C1FD1609037300CA6AF4 /* URLCanonRelative.cpp in Sources */,
-				26E6C1FF1609037300CA6AF4 /* URLCanonStdURL.cpp in Sources */,
-				A8A47474151A825B004123FF /* URLCharacterTypes.cpp in Sources */,
-				26E6C2071609037300CA6AF4 /* URLParse.cpp in Sources */,
-				26E6C2041609037300CA6AF4 /* URLParseFile.cpp in Sources */,
-				A8A4747B151A825B004123FF /* URLSegments.cpp in Sources */,
-				4330F38F15745B0500AAFA8F /* URLString.cpp in Sources */,
-				26E6C20C1609037300CA6AF4 /* URLUtil.cpp in Sources */,
 				A8A47469151A825B004123FF /* UTF8.cpp in Sources */,
 				A8A47445151A825B004123FF /* WTFString.cpp in Sources */,
 				A8A47486151A825B004123FF /* WTFThreadData.cpp in Sources */,
-				0F9D3360165DBA73005AD387 /* FilePrintStream.cpp in Sources */,
-				0F9D3362165DBA73005AD387 /* PrintStream.cpp in Sources */,
-				0FDDBFA71666DFA300C55FEF /* StringPrintStream.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

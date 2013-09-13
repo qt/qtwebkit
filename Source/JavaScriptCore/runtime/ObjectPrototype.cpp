@@ -25,6 +25,8 @@
 #include "JSFunction.h"
 #include "JSString.h"
 #include "JSStringBuilder.h"
+#include "Operations.h"
+#include "StructureRareDataInlines.h"
 
 namespace JSC {
 
@@ -38,51 +40,40 @@ static EncodedJSValue JSC_HOST_CALL objectProtoFuncLookupSetter(ExecState*);
 static EncodedJSValue JSC_HOST_CALL objectProtoFuncPropertyIsEnumerable(ExecState*);
 static EncodedJSValue JSC_HOST_CALL objectProtoFuncToLocaleString(ExecState*);
 
-}
-
-#include "ObjectPrototype.lut.h"
-
-namespace JSC {
-
 ASSERT_HAS_TRIVIAL_DESTRUCTOR(ObjectPrototype);
 
-const ClassInfo ObjectPrototype::s_info = { "Object", &JSNonFinalObject::s_info, 0, ExecState::objectPrototypeTable, CREATE_METHOD_TABLE(ObjectPrototype) };
-
-/* Source for ObjectPrototype.lut.h
-@begin objectPrototypeTable
-  toString              objectProtoFuncToString                 DontEnum|Function 0
-  toLocaleString        objectProtoFuncToLocaleString           DontEnum|Function 0
-  valueOf               objectProtoFuncValueOf                  DontEnum|Function 0
-  hasOwnProperty        objectProtoFuncHasOwnProperty           DontEnum|Function 1
-  propertyIsEnumerable  objectProtoFuncPropertyIsEnumerable     DontEnum|Function 1
-  isPrototypeOf         objectProtoFuncIsPrototypeOf            DontEnum|Function 1
-  __defineGetter__      objectProtoFuncDefineGetter             DontEnum|Function 2
-  __defineSetter__      objectProtoFuncDefineSetter             DontEnum|Function 2
-  __lookupGetter__      objectProtoFuncLookupGetter             DontEnum|Function 1
-  __lookupSetter__      objectProtoFuncLookupSetter             DontEnum|Function 1
-@end
-*/
+const ClassInfo ObjectPrototype::s_info = { "Object", &JSNonFinalObject::s_info, 0, 0, CREATE_METHOD_TABLE(ObjectPrototype) };
 
 ObjectPrototype::ObjectPrototype(ExecState* exec, Structure* stucture)
-    : JSNonFinalObject(exec->globalData(), stucture)
+    : JSNonFinalObject(exec->vm(), stucture)
 {
 }
 
-void ObjectPrototype::finishCreation(JSGlobalData& globalData, JSGlobalObject*)
+void ObjectPrototype::finishCreation(ExecState* exec, JSGlobalObject* globalObject)
 {
-    Base::finishCreation(globalData);
+    VM& vm = exec->vm();
+    
+    Base::finishCreation(vm);
     ASSERT(inherits(&s_info));
-    notifyUsedAsPrototype(globalData);
+    vm.prototypeMap.addPrototype(this);
+    
+    JSC_NATIVE_FUNCTION(vm.propertyNames->toString, objectProtoFuncToString, DontEnum, 0);
+    JSC_NATIVE_FUNCTION(vm.propertyNames->toLocaleString, objectProtoFuncToLocaleString, DontEnum, 0);
+    JSC_NATIVE_FUNCTION(vm.propertyNames->valueOf, objectProtoFuncValueOf, DontEnum, 0);
+    JSC_NATIVE_FUNCTION(vm.propertyNames->hasOwnProperty, objectProtoFuncHasOwnProperty, DontEnum, 1);
+    JSC_NATIVE_FUNCTION(vm.propertyNames->propertyIsEnumerable, objectProtoFuncPropertyIsEnumerable, DontEnum, 1);
+    JSC_NATIVE_FUNCTION(vm.propertyNames->isPrototypeOf, objectProtoFuncIsPrototypeOf, DontEnum, 1);
+    JSC_NATIVE_FUNCTION(vm.propertyNames->__defineGetter__, objectProtoFuncDefineGetter, DontEnum, 2);
+    JSC_NATIVE_FUNCTION(vm.propertyNames->__defineSetter__, objectProtoFuncDefineSetter, DontEnum, 2);
+    JSC_NATIVE_FUNCTION(vm.propertyNames->__lookupGetter__, objectProtoFuncLookupGetter, DontEnum, 1);
+    JSC_NATIVE_FUNCTION(vm.propertyNames->__lookupSetter__, objectProtoFuncLookupSetter, DontEnum, 1);
 }
 
-bool ObjectPrototype::getOwnPropertySlot(JSCell* cell, ExecState* exec, PropertyName propertyName, PropertySlot &slot)
+ObjectPrototype* ObjectPrototype::create(ExecState* exec, JSGlobalObject* globalObject, Structure* structure)
 {
-    return getStaticFunctionSlot<JSNonFinalObject>(exec, ExecState::objectPrototypeTable(exec), jsCast<ObjectPrototype*>(cell), propertyName, slot);
-}
-
-bool ObjectPrototype::getOwnPropertyDescriptor(JSObject* object, ExecState* exec, PropertyName propertyName, PropertyDescriptor& descriptor)
-{
-    return getStaticFunctionDescriptor<JSNonFinalObject>(exec, ExecState::objectPrototypeTable(exec), jsCast<ObjectPrototype*>(object), propertyName, descriptor);
+    ObjectPrototype* prototype = new (NotNull, allocateCell<ObjectPrototype>(*exec->heap())) ObjectPrototype(exec, structure);
+    prototype->finishCreation(exec, globalObject);
+    return prototype;
 }
 
 // ------------------------------ Functions --------------------------------
@@ -227,7 +218,7 @@ EncodedJSValue JSC_HOST_CALL objectProtoFuncToString(ExecState* exec)
             return JSValue::encode(throwOutOfMemoryError(exec));
 
         result = jsNontrivialString(exec, newString.release());
-        thisObject->structure()->setObjectToStringValue(exec->globalData(), thisObject, result);
+        thisObject->structure()->setObjectToStringValue(exec->vm(), thisObject, result);
     }
     return JSValue::encode(result);
 }

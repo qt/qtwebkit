@@ -53,8 +53,7 @@ MediaStreamSource::MediaStreamSource(const String& id, Type type, const String& 
 
 void MediaStreamSource::setReadyState(ReadyState readyState)
 {
-    ASSERT(m_readyState != ReadyStateEnded);
-    if (m_readyState != readyState) {
+    if (m_readyState != ReadyStateEnded && m_readyState != readyState) {
         m_readyState = readyState;
         for (Vector<Observer*>::iterator i = m_observers.begin(); i != m_observers.end(); ++i)
             (*i)->sourceChangedState();
@@ -90,6 +89,14 @@ bool MediaStreamSource::removeAudioConsumer(AudioDestinationConsumer* consumer)
         return true;
     }
     return false;
+}
+
+void MediaStreamSource::setAudioFormat(size_t numberOfChannels, float sampleRate)
+{
+    ASSERT(m_requiresConsumer);
+    MutexLocker locker(m_audioConsumersLock);
+    for (Vector<RefPtr<AudioDestinationConsumer> >::iterator it = m_audioConsumers.begin(); it != m_audioConsumers.end(); ++it)
+        (*it)->setFormat(numberOfChannels, sampleRate);
 }
 
 void MediaStreamSource::consumeAudio(AudioBus* bus, size_t numberOfFrames)

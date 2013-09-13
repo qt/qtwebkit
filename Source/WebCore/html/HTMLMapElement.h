@@ -30,7 +30,7 @@ namespace WebCore {
 class HitTestResult;
 class HTMLImageElement;
     
-class HTMLMapElement : public HTMLElement {
+class HTMLMapElement FINAL : public HTMLElement {
 public:
     static PassRefPtr<HTMLMapElement> create(Document*);
     static PassRefPtr<HTMLMapElement> create(const QualifiedName&, Document*);
@@ -53,6 +53,22 @@ private:
 
     AtomicString m_name;
 };
+
+inline bool isHTMLMapElement(Node* node)
+{
+    return node->hasTagName(HTMLNames::mapTag);
+}
+
+inline bool isHTMLMapElement(Element* element)
+{
+    return element->hasTagName(HTMLNames::mapTag);
+}
+
+inline HTMLMapElement* toHTMLMapElement(Node* node)
+{
+    ASSERT_WITH_SECURITY_IMPLICATION(!node || isHTMLMapElement(node));
+    return static_cast<HTMLMapElement*>(node);
+}
 
 } //namespace
 

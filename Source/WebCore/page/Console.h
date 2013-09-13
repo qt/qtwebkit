@@ -29,9 +29,7 @@
 #ifndef Console_h
 #define Console_h
 
-#include "ConsoleTypes.h"
 #include "DOMWindowProperty.h"
-#include "ScriptCallStack.h"
 #include "ScriptProfile.h"
 #include "ScriptState.h"
 #include "ScriptWrappable.h"
@@ -42,10 +40,8 @@
 namespace WebCore {
 
 class Frame;
-class MemoryInfo;
 class Page;
 class ScriptArguments;
-class ScriptCallStack;
 
 #if ENABLE(JAVASCRIPT_DEBUGGER)
 typedef Vector<RefPtr<ScriptProfile> > ProfilesArray;
@@ -56,9 +52,6 @@ public:
     static PassRefPtr<Console> create(Frame* frame) { return adoptRef(new Console(frame)); }
     virtual ~Console();
 
-    void addMessage(MessageSource, MessageType, MessageLevel, const String& message, const String& sourceURL = String(), unsigned lineNumber = 0, PassRefPtr<ScriptCallStack> = 0, unsigned long requestIdentifier = 0);
-    void addMessage(MessageSource, MessageType, MessageLevel, const String& message, PassRefPtr<ScriptCallStack>);
-
     void debug(ScriptState*, PassRefPtr<ScriptArguments>);
     void error(ScriptState*, PassRefPtr<ScriptArguments>);
     void info(ScriptState*, PassRefPtr<ScriptArguments>);
@@ -67,10 +60,10 @@ public:
     void warn(ScriptState*, PassRefPtr<ScriptArguments>);
     void dir(ScriptState*, PassRefPtr<ScriptArguments>);
     void dirxml(ScriptState*, PassRefPtr<ScriptArguments>);
+    void table(ScriptState*, PassRefPtr<ScriptArguments>);
     void trace(ScriptState*, PassRefPtr<ScriptArguments>);
     void assertCondition(ScriptState*, PassRefPtr<ScriptArguments>, bool condition);
     void count(ScriptState*, PassRefPtr<ScriptArguments>);
-    void markTimeline(PassRefPtr<ScriptArguments>);
 #if ENABLE(JAVASCRIPT_DEBUGGER)
     const ProfilesArray& profiles() const { return m_profiles; }
     void profile(const String&, ScriptState*);
@@ -83,17 +76,8 @@ public:
     void groupCollapsed(ScriptState*, PassRefPtr<ScriptArguments>);
     void groupEnd();
 
-    static void mute();
-    static void unmute();
-
-    static bool shouldPrintExceptions();
-    static void setShouldPrintExceptions(bool);
-
-    PassRefPtr<MemoryInfo> memory() const;
-
 private:
     inline Page* page() const;
-    void addMessage(MessageType, MessageLevel, ScriptState*, PassRefPtr<ScriptArguments>, bool acceptNoArguments = false, bool printTrace = false);
 
     explicit Console(Frame*);
 

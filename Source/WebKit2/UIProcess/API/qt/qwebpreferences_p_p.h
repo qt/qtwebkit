@@ -20,8 +20,6 @@
 #ifndef qwebpreferences_p_p_h
 #define qwebpreferences_p_p_h
 
-#include "WebPreferences.h"
-
 class QQuickWebViewPrivate;
 
 class QWebPreferencesPrivate {
@@ -42,9 +40,10 @@ public:
         WebGLEnabled,
         CSSCustomFilterEnabled,
         WebAudioEnabled,
-        ScrollAnimatorEnabled,
         CaretBrowsingEnabled,
-        NotificationsEnabled
+        NotificationsEnabled,
+        UniversalAccessFromFileURLsAllowed,
+        FileAccessFromFileURLsAllowed
     };
 
     enum FontFamily {
@@ -73,8 +72,6 @@ public:
 
     void setFontSize(FontSizeType type, unsigned size);
     unsigned fontSize(FontSizeType type) const;
-
-    WebKit::WebPreferences* preferences() const;
 
     QQuickWebViewPrivate* webViewPrivate;
 

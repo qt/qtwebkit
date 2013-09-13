@@ -37,12 +37,12 @@
 #include <WebCore/HTTPHeaderMap.h>
 #include <WebCore/IntRect.h>
 #include <WebCore/KURL.h>
+#include <WebCore/SharedBuffer.h>
 #include <runtime/JSObject.h>
 #include <utility>
 #include <wtf/text/CString.h>
 
 using namespace WebCore;
-using namespace std;
 
 namespace WebKit {
 
@@ -187,7 +187,7 @@ void NetscapePlugin::loadURL(const String& method, const String& urlString, cons
         // Eventually we are going to get a frameDidFinishLoading or frameDidFail call for this request.
         // Keep track of the notification data so we can call NPP_URLNotify.
         ASSERT(!m_pendingURLNotifications.contains(requestID));
-        m_pendingURLNotifications.set(requestID, make_pair(urlString, notificationData));
+        m_pendingURLNotifications.set(requestID, std::make_pair(urlString, notificationData));
     }
 }
 
@@ -528,12 +528,12 @@ bool NetscapePlugin::shouldLoadSrcURL()
 
 NetscapePluginStream* NetscapePlugin::streamFromID(uint64_t streamID)
 {
-    return m_streams.get(streamID).get();
+    return m_streams.get(streamID);
 }
 
 void NetscapePlugin::stopAllStreams()
 {
-    Vector<RefPtr<NetscapePluginStream> > streams;
+    Vector<RefPtr<NetscapePluginStream>> streams;
     copyValuesToVector(m_streams, streams);
 
     for (size_t i = 0; i < streams.size(); ++i)
@@ -629,6 +629,8 @@ bool NetscapePlugin::initialize(const Parameters& parameters)
 
     m_layerHostingMode = parameters.layerHostingMode;
 #endif
+
+    platformPreInitialize();
 
     NetscapePlugin* previousNPPNewPlugin = currentNPPNewPlugin;
     
@@ -926,6 +928,11 @@ bool NetscapePlugin::shouldAllowScripting()
     return true;
 }
 
+bool NetscapePlugin::shouldAllowNavigationFromDrags()
+{
+    return false;
+}
+
 bool NetscapePlugin::handlesPageScaleFactor()
 {
     return false;
@@ -952,6 +959,16 @@ NPObject* NetscapePlugin::pluginScriptableNPObject()
 #endif    
 
     return scriptableNPObject;
+}
+    
+unsigned NetscapePlugin::countFindMatches(const String&, WebCore::FindOptions, unsigned)
+{
+    return 0;
+}
+
+bool NetscapePlugin::findString(const String&, WebCore::FindOptions, unsigned)
+{
+    return false;
 }
 
 void NetscapePlugin::contentsScaleFactorChanged(float scaleFactor)
@@ -1031,6 +1048,11 @@ bool NetscapePlugin::supportsSnapshotting() const
     return m_pluginModule && m_pluginModule->pluginQuirks().contains(PluginQuirks::SupportsSnapshotting);
 #endif
     return false;
+}
+
+PassRefPtr<WebCore::SharedBuffer> NetscapePlugin::liveResourceData() const
+{
+    return 0;
 }
 
 IntPoint NetscapePlugin::convertToRootView(const IntPoint& pointInPluginCoordinates) const

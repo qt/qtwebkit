@@ -25,15 +25,11 @@
 
 [
     Conditional=SVG
-] interface SVGEllipseElement : SVGElement,
-                                                SVGTests,
-                                                SVGLangSpace,
-                                                SVGExternalResourcesRequired,
-                                                SVGStylable,
-                                                SVGTransformable {
+] interface SVGEllipseElement : SVGGraphicsElement {
     readonly attribute SVGAnimatedLength cx;
     readonly attribute SVGAnimatedLength cy;
     readonly attribute SVGAnimatedLength rx;
     readonly attribute SVGAnimatedLength ry;
 };
 
+SVGEllipseElement implements SVGExternalResourcesRequired;

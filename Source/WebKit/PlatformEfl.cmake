@@ -1,9 +1,6 @@
-LIST(APPEND WebKit_INCLUDE_DIRECTORIES
-    "${CMAKE_SOURCE_DIR}/Source"
+list(APPEND WebKit_INCLUDE_DIRECTORIES
     "${WEBKIT_DIR}/efl/ewk"
     "${WEBKIT_DIR}/efl/WebCoreSupport"
-    "${JAVASCRIPTCORE_DIR}/ForwardingHeaders"
-    "${WEBCORE_DIR}/Modules/filesystem"
     "${WEBCORE_DIR}/platform/efl"
     "${WEBCORE_DIR}/platform/graphics/cairo"
     "${WEBCORE_DIR}/platform/graphics/efl"
@@ -14,9 +11,11 @@ LIST(APPEND WebKit_INCLUDE_DIRECTORIES
     ${ECORE_EVAS_INCLUDE_DIRS}
     ${ECORE_INCLUDE_DIRS}
     ${ECORE_INPUT_INCLUDE_DIRS}
+    ${ECORE_X_INCLUDE_DIRS}
     ${EDJE_INCLUDE_DIRS}
     ${EFREET_INCLUDE_DIRS}
     ${EINA_INCLUDE_DIRS}
+    ${EO_INCLUDE_DIRS}
     ${EVAS_INCLUDE_DIRS}
     ${GLIB_INCLUDE_DIRS}
     ${HARFBUZZ_INCLUDE_DIRS}
@@ -26,69 +25,80 @@ LIST(APPEND WebKit_INCLUDE_DIRECTORIES
     ${SQLITE_INCLUDE_DIR}
 )
 
-IF (ENABLE_SVG)
-  LIST(APPEND WebKit_INCLUDE_DIRECTORIES
-    "${WEBCORE_DIR}/svg"
-    "${WEBCORE_DIR}/svg/animation"
-    "${WEBCORE_DIR}/rendering/svg"
-  )
-ENDIF ()
+if (ENABLE_SVG)
+    list(APPEND WebKit_INCLUDE_DIRECTORIES
+        "${WEBCORE_DIR}/svg"
+        "${WEBCORE_DIR}/svg/animation"
+        "${WEBCORE_DIR}/rendering/svg"
+    )
+endif ()
 
-IF (ENABLE_VIDEO)
-LIST(APPEND WebKit_INCLUDE_DIRECTORIES
-    "${WEBCORE_DIR}/platform/graphics/gstreamer"
-    ${GSTREAMER_APP_INCLUDE_DIRS}
-    ${GSTREAMER_INTERFACES_INCLUDE_DIRS}
-    ${GSTREAMER_PBUTILS_INCLUDE_DIRS}
-    ${GSTREAMER_VIDEO_INCLUDE_DIRS}
-)
-ENDIF()
+if (ENABLE_VIDEO)
+    list(APPEND WebKit_INCLUDE_DIRECTORIES
+        "${WEBCORE_DIR}/platform/graphics/gstreamer"
+        ${GSTREAMER_APP_INCLUDE_DIRS}
+        ${GSTREAMER_PBUTILS_INCLUDE_DIRS}
+        ${GSTREAMER_VIDEO_INCLUDE_DIRS}
+    )
+endif ()
 
-IF (ENABLE_VIDEO_TRACK)
-  LIST(APPEND WebKit_INCLUDE_DIRECTORIES
-    "${WEBCORE_DIR}/html/track"
-  )
-ENDIF ()
+if (ENABLE_VIDEO_TRACK)
+    list(APPEND WebKit_INCLUDE_DIRECTORIES
+        "${WEBCORE_DIR}/html/track"
+    )
+endif ()
 
-IF (ENABLE_NOTIFICATIONS)
-  LIST(APPEND WebKit_INCLUDE_DIRECTORIES
-    "${WEBCORE_DIR}/Modules/notifications"
-  )
-ENDIF ()
+if (ENABLE_NOTIFICATIONS)
+    list(APPEND WebKit_INCLUDE_DIRECTORIES
+        "${WEBCORE_DIR}/Modules/notifications"
+    )
+endif ()
 
-IF (ENABLE_VIBRATION)
-  LIST(APPEND WebKit_INCLUDE_DIRECTORIES
-    "${WEBCORE_DIR}/Modules/vibration"
-  )
-ENDIF ()
+if (ENABLE_VIBRATION)
+    list(APPEND WebKit_INCLUDE_DIRECTORIES
+        "${WEBCORE_DIR}/Modules/vibration"
+    )
+endif ()
 
-IF (ENABLE_BATTERY_STATUS)
-  LIST(APPEND WebKit_INCLUDE_DIRECTORIES
-    "${WEBCORE_DIR}/Modules/battery"
-  )
-ENDIF ()
+if (ENABLE_BATTERY_STATUS)
+    list(APPEND WebKit_INCLUDE_DIRECTORIES
+        "${WEBCORE_DIR}/Modules/battery"
+    )
+endif ()
 
-IF (ENABLE_NAVIGATOR_CONTENT_UTILS)
-  LIST(APPEND WebKit_INCLUDE_DIRECTORIES
-    "${WEBCORE_DIR}/Modules/navigatorcontentutils"
-  )
-ENDIF ()
+if (ENABLE_NAVIGATOR_CONTENT_UTILS)
+    list(APPEND WebKit_INCLUDE_DIRECTORIES
+        "${WEBCORE_DIR}/Modules/navigatorcontentutils"
+    )
+endif ()
 
-IF (WTF_USE_3D_GRAPHICS)
-  LIST(APPEND WebKit_INCLUDE_DIRECTORIES
-    "${WEBCORE_DIR}/platform/graphics/surfaces"
-    "${WEBCORE_DIR}/platform/graphics/texmap"
-    "${THIRDPARTY_DIR}/ANGLE/include/GLSLANG"
-  )
-ENDIF ()
+if (WTF_USE_3D_GRAPHICS)
+    list(APPEND WebKit_INCLUDE_DIRECTORIES
+        "${WEBCORE_DIR}/platform/graphics/surfaces"
+        "${WEBCORE_DIR}/platform/graphics/texmap"
+        "${THIRDPARTY_DIR}/ANGLE/include/KHR"
+        "${THIRDPARTY_DIR}/ANGLE/include/GLSLANG"
+    )
+endif ()
 
-IF (ENABLE_GEOLOCATION)
-  LIST(APPEND WebKit_INCLUDE_DIRECTORIES
-    "${WEBCORE_DIR}/Modules/geolocation"
-  )
-ENDIF ()
+if (ENABLE_GEOLOCATION)
+    list(APPEND WebKit_INCLUDE_DIRECTORIES
+        "${WEBCORE_DIR}/Modules/geolocation"
+    )
+endif ()
 
-LIST(APPEND WebKit_SOURCES
+if (ENABLE_ACCESSIBILITY)
+    list(APPEND WebKit_INCLUDE_DIRECTORIES
+        "${WEBCORE_DIR}/accessibility"
+        "${WEBCORE_DIR}/accessibility/atk"
+        ${ATK_INCLUDE_DIRS}
+    )
+    list(APPEND WebKit_LIBRARIES
+        ${ATK_LIBRARIES}
+    )
+endif ()
+
+list(APPEND WebKit_SOURCES
     efl/WebCoreSupport/AcceleratedCompositingContextEfl.cpp
     efl/WebCoreSupport/AssertMatchingEnums.cpp
     efl/WebCoreSupport/BatteryClientEfl.cpp
@@ -105,11 +115,11 @@ LIST(APPEND WebKit_SOURCES
     efl/WebCoreSupport/FullscreenVideoControllerEfl.cpp
     efl/WebCoreSupport/IconDatabaseClientEfl.cpp
     efl/WebCoreSupport/InspectorClientEfl.cpp
-    efl/WebCoreSupport/NavigatorContentUtilsClientEfl.cpp 
+    efl/WebCoreSupport/NavigatorContentUtilsClientEfl.cpp
     efl/WebCoreSupport/NetworkInfoClientEfl.cpp
     efl/WebCoreSupport/NotificationPresenterClientEfl.cpp
     efl/WebCoreSupport/PageClientEfl.cpp
-    efl/WebCoreSupport/PlatformStrategiesEfl.cpp 
+    efl/WebCoreSupport/PlatformStrategiesEfl.cpp
     efl/WebCoreSupport/PopupMenuEfl.cpp
     efl/WebCoreSupport/SearchPopupMenuEfl.cpp
     efl/WebCoreSupport/StorageTrackerClientEfl.cpp
@@ -123,8 +133,6 @@ LIST(APPEND WebKit_SOURCES
     efl/ewk/ewk_file_chooser.cpp
     efl/ewk/ewk_frame.cpp
     efl/ewk/ewk_history.cpp
-    efl/ewk/ewk_intent.cpp
-    efl/ewk/ewk_intent_request.cpp
     efl/ewk/ewk_js.cpp
     efl/ewk/ewk_main.cpp
     efl/ewk/ewk_network.cpp
@@ -143,12 +151,15 @@ LIST(APPEND WebKit_SOURCES
     efl/ewk/ewk_web_database.cpp
 )
 
-LIST(APPEND WebKit_LIBRARIES
+list(APPEND WebKit_LIBRARIES
     ${CAIRO_LIBRARIES}
     ${ECORE_LIBRARIES}
+    ${EDJE_LIBRARIES}
+    ${EINA_LIBRARIES}
     ${ECORE_EVAS_LIBRARIES}
     ${ECORE_INPUT_LIBRARIES}
     ${EFREET_LIBRARIES}
+    ${EO_LIBRARIES}
     ${EVAS_LIBRARIES}
     ${FREETYPE_LIBRARIES}
     ${HARFBUZZ_LIBRARIES}
@@ -163,22 +174,28 @@ LIST(APPEND WebKit_LIBRARIES
     ${LIBSOUP_LIBRARIES}
 )
 
-IF (SHARED_CORE)
-    SET(LIBS_PRIVATE "-l${WTF_LIBRARY_NAME} -l${JavaScriptCore_LIBRARY_NAME} -l${WebCore_LIBRARY_NAME}")
-ELSE ()
-    SET(LIBS_PRIVATE "")
-ENDIF ()
+if (ENABLE_ECORE_X)
+    list(APPEND WebKit_LIBRARIES
+        ${ECORE_X_LIBRARIES}
+    )
+endif ()
 
-CONFIGURE_FILE(
+if (SHARED_CORE)
+    set(LIBS_PRIVATE "-l${WTF_OUTPUT_NAME} -l${JavaScriptCore_OUTPUT_NAME} -l${WebCore_OUTPUT_NAME}")
+else ()
+    set(LIBS_PRIVATE "")
+endif ()
+
+configure_file(
     efl/ewebkit.pc.in
     ${CMAKE_BINARY_DIR}/WebKit/efl/ewebkit.pc
     @ONLY)
-INSTALL(FILES ${CMAKE_BINARY_DIR}/WebKit/efl/ewebkit.pc
+install(FILES ${CMAKE_BINARY_DIR}/WebKit/efl/ewebkit.pc
     DESTINATION lib/pkgconfig)
 
-UNSET(LIBS_PRIVATE)
+unset(LIBS_PRIVATE)
 
-SET(EWebKit_HEADERS
+set(EWebKit_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/efl/ewk/EWebKit.h
     ${CMAKE_CURRENT_SOURCE_DIR}/efl/ewk/ewk_auth.h
     ${CMAKE_CURRENT_SOURCE_DIR}/efl/ewk/ewk_contextmenu.h
@@ -186,8 +203,6 @@ SET(EWebKit_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/efl/ewk/ewk_file_chooser.h
     ${CMAKE_CURRENT_SOURCE_DIR}/efl/ewk/ewk_frame.h
     ${CMAKE_CURRENT_SOURCE_DIR}/efl/ewk/ewk_history.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/efl/ewk/ewk_intent.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/efl/ewk/ewk_intent_request.h
     ${CMAKE_CURRENT_SOURCE_DIR}/efl/ewk/ewk_js.h
     ${CMAKE_CURRENT_SOURCE_DIR}/efl/ewk/ewk_main.h
     ${CMAKE_CURRENT_SOURCE_DIR}/efl/ewk/ewk_network.h
@@ -199,16 +214,16 @@ SET(EWebKit_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/efl/ewk/ewk_web_database.h
 )
 
-INSTALL(FILES ${EWebKit_HEADERS}
-        DESTINATION include/${WebKit_LIBRARY_NAME}-${PROJECT_VERSION_MAJOR})
+install(FILES ${EWebKit_HEADERS}
+        DESTINATION include/${WebKit_OUTPUT_NAME}-${PROJECT_VERSION_MAJOR})
 
-INCLUDE_DIRECTORIES(${THIRDPARTY_DIR}/gtest/include)
+include_directories(${THIRDPARTY_DIR}/gtest/include)
 
-SET(EWKUnitTests_LIBRARIES
-    ${WTF_LIBRARY_NAME}
-    ${JavaScriptCore_LIBRARY_NAME}
-    ${WebCore_LIBRARY_NAME}
-    ${WebKit_LIBRARY_NAME}
+set(EWKUnitTests_LIBRARIES
+    WTF
+    JavaScriptCore
+    WebCore
+    WebKit
     ${ECORE_LIBRARIES}
     ${ECORE_EVAS_LIBRARIES}
     ${EVAS_LIBRARIES}
@@ -216,7 +231,7 @@ SET(EWKUnitTests_LIBRARIES
     gtest
 )
 
-SET(EWKUnitTests_INCLUDE_DIRECTORIES
+set(EWKUnitTests_INCLUDE_DIRECTORIES
     "${CMAKE_SOURCE_DIR}/Source"
     "${WEBKIT_DIR}/efl/ewk"
     "${JAVASCRIPTCORE_DIR}"
@@ -228,41 +243,42 @@ SET(EWKUnitTests_INCLUDE_DIRECTORIES
     ${EDJE_INCLUDE_DIRS}
 )
 
-LIST(APPEND EWKUnitTests_INCLUDE_DIRECTORIES "${WTF_DIR}/wtf/gobject")
-LIST(APPEND EWKUnitTests_LIBRARIES
+list(APPEND EWKUnitTests_INCLUDE_DIRECTORIES "${WTF_DIR}/wtf/gobject")
+list(APPEND EWKUnitTests_LIBRARIES
     ${GLIB_LIBRARIES}
     ${GLIB_GTHREAD_LIBRARIES}
 )
 
-SET(DEFAULT_TEST_PAGE_DIR ${CMAKE_SOURCE_DIR}/Source/WebKit/efl/tests/resources)
+set(DEFAULT_TEST_PAGE_DIR ${CMAKE_SOURCE_DIR}/Source/WebKit/efl/tests/resources)
 
-ADD_DEFINITIONS(-DDEFAULT_TEST_PAGE_DIR=\"${DEFAULT_TEST_PAGE_DIR}\"
+add_definitions(-DDEFAULT_TEST_PAGE_DIR=\"${DEFAULT_TEST_PAGE_DIR}\"
     -DDEFAULT_THEME_PATH=\"${THEME_BINARY_DIR}\"
     -DGTEST_LINKED_AS_SHARED_LIBRARY=1
 )
 
-ADD_LIBRARY(ewkTestUtils
+add_library(ewkTestUtils
     ${WEBKIT_DIR}/efl/tests/UnitTestUtils/EWKTestBase.cpp
     ${WEBKIT_DIR}/efl/tests/UnitTestUtils/EWKTestEnvironment.cpp
     ${WEBKIT_DIR}/efl/tests/UnitTestUtils/EWKTestView.cpp
 )
-TARGET_LINK_LIBRARIES(ewkTestUtils ${EWKUnitTests_LIBRARIES})
+target_link_libraries(ewkTestUtils ${EWKUnitTests_LIBRARIES})
 
-SET(WEBKIT_EFL_TEST_DIR "${WEBKIT_DIR}/efl/tests/")
+set(WEBKIT_EFL_TEST_DIR "${WEBKIT_DIR}/efl/tests/")
 
-SET(EWKUnitTests_BINARIES
+set(EWKUnitTests_BINARIES
     test_ewk_contextmenu
     test_ewk_frame
     test_ewk_view
+    test_ewk_setting
 )
 
-IF (ENABLE_API_TESTS)
-    FOREACH (testName ${EWKUnitTests_BINARIES})
-        ADD_EXECUTABLE(${testName} ${WEBKIT_EFL_TEST_DIR}/${testName}.cpp ${WEBKIT_EFL_TEST_DIR}/test_runner.cpp)
-        ADD_TEST(${testName} ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${testName})
-        SET_TESTS_PROPERTIES(${testName} PROPERTIES TIMEOUT 60)
-        TARGET_LINK_LIBRARIES(${testName} ${EWKUnitTests_LIBRARIES} ewkTestUtils)
-        SET_TARGET_PROPERTIES(${testName} PROPERTIES FOLDER "WebKit")
-    ENDFOREACH ()
-ENDIF ()
+if (ENABLE_API_TESTS)
+    foreach (testName ${EWKUnitTests_BINARIES})
+        add_executable(${testName} ${WEBKIT_EFL_TEST_DIR}/${testName}.cpp ${WEBKIT_EFL_TEST_DIR}/test_runner.cpp)
+        add_test(${testName} ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${testName})
+        set_tests_properties(${testName} PROPERTIES TIMEOUT 60)
+        target_link_libraries(${testName} ${EWKUnitTests_LIBRARIES} ewkTestUtils)
+        set_target_properties(${testName} PROPERTIES FOLDER "WebKit")
+    endforeach ()
+endif ()
 

@@ -26,14 +26,10 @@
 [
     Conditional=SCRIPTED_SPEECH,
     ConstructorTemplate=Event,
-    CustomIsReachable,
-    V8DependentLifetime
+    InterfaceName=webkitSpeechRecognitionEvent
 ] interface SpeechRecognitionEvent : Event {
-    // DEPRECATED
-    [InitializedByEventConstructor] readonly attribute SpeechRecognitionResult result;
-    [InitializedByEventConstructor] readonly attribute SpeechRecognitionResultList resultHistory;
-
-    [InitializedByEventConstructor] readonly attribute short resultIndex;
+    [InitializedByEventConstructor] readonly attribute unsigned long resultIndex;
     [InitializedByEventConstructor] readonly attribute SpeechRecognitionResultList results;
+
     readonly attribute Document emma;
 };

@@ -1,6 +1,7 @@
 # Copyright (c) 2009 Google Inc. All rights reserved.
 # Copyright (c) 2009 Apple Inc. All rights reserved.
 # Copyright (c) 2012 Intel Corporation. All rights reserved.
+# Copyright (c) 2013 University of Szeged. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are
@@ -41,33 +42,31 @@ from webkitpy.common.checkout.commitinfo import CommitInfo
 from webkitpy.common.config.committers import CommitterList
 import webkitpy.common.config.urls as config_urls
 from webkitpy.common.net.buildbot import BuildBot
+from webkitpy.common.net.bugzilla import Bugzilla
 from webkitpy.common.net.regressionwindow import RegressionWindow
 from webkitpy.common.system.crashlogs import CrashLogs
 from webkitpy.common.system.user import User
+from webkitpy.tool.commands.abstractsequencedcommand import AbstractSequencedCommand
 from webkitpy.tool.grammar import pluralize
-from webkitpy.tool.multicommandtool import AbstractDeclarativeCommand
+from webkitpy.tool.multicommandtool import Command
 from webkitpy.layout_tests.models.test_expectations import TestExpectations
-from webkitpy.layout_tests.port import platform_options, configuration_options
+from webkitpy.port import platform_options, configuration_options
 
 _log = logging.getLogger(__name__)
 
 
-class SuggestReviewers(AbstractDeclarativeCommand):
+class SuggestReviewers(AbstractSequencedCommand):
     name = "suggest-reviewers"
     help_text = "Suggest reviewers for a patch based on recent changes to the modified files."
+    steps = [
+        steps.SuggestReviewers,
+    ]
 
-    def __init__(self):
-        options = [
-            steps.Options.git_commit,
-        ]
-        AbstractDeclarativeCommand.__init__(self, options=options)
-
-    def execute(self, options, args, tool):
-        reviewers = tool.checkout().suggested_reviewers(options.git_commit)
-        print "\n".join([reviewer.full_name for reviewer in reviewers])
+    def _prepare_state(self, options, args, tool):
+        options.suggest_reviewers = True
 
 
-class BugsToCommit(AbstractDeclarativeCommand):
+class BugsToCommit(Command):
     name = "bugs-to-commit"
     help_text = "List bugs in the commit-queue"
 
@@ -78,7 +77,7 @@ class BugsToCommit(AbstractDeclarativeCommand):
             print "%s" % bug_id
 
 
-class PatchesInCommitQueue(AbstractDeclarativeCommand):
+class PatchesInCommitQueue(Command):
     name = "patches-in-commit-queue"
     help_text = "List patches in the commit-queue"
 
@@ -89,14 +88,14 @@ class PatchesInCommitQueue(AbstractDeclarativeCommand):
             print patch.url()
 
 
-class PatchesToCommitQueue(AbstractDeclarativeCommand):
+class PatchesToCommitQueue(Command):
     name = "patches-to-commit-queue"
     help_text = "Patches which should be added to the commit queue"
     def __init__(self):
         options = [
             make_option("--bugs", action="store_true", dest="bugs", help="Output bug links instead of patch links"),
         ]
-        AbstractDeclarativeCommand.__init__(self, options=options)
+        Command.__init__(self, options=options)
 
     @staticmethod
     def _needs_commit_queue(patch):
@@ -123,7 +122,7 @@ class PatchesToCommitQueue(AbstractDeclarativeCommand):
                 print "%s" % tool.bugs.attachment_url_for_id(patch.id(), action="edit")
 
 
-class PatchesToReview(AbstractDeclarativeCommand):
+class PatchesToReview(Command):
     name = "patches-to-review"
     help_text = "List bugs which have attachments pending review"
 
@@ -136,7 +135,7 @@ class PatchesToReview(AbstractDeclarativeCommand):
             make_option("--cc-email",
                         help="Specifies the email on the CC field (defaults to your bugzilla login email)"),
         ]
-        AbstractDeclarativeCommand.__init__(self, options=options)
+        Command.__init__(self, options=options)
 
     def _print_report(self, report, cc_email, print_all):
         if print_all:
@@ -176,7 +175,8 @@ class PatchesToReview(AbstractDeclarativeCommand):
         report = self._generate_report(bugs, options.include_cq_denied)
         self._print_report(report, cc_email, options.all)
 
-class WhatBroke(AbstractDeclarativeCommand):
+
+class WhatBroke(Command):
     name = "what-broke"
     help_text = "Print failing buildbots (%s) and what revisions broke them" % config_urls.buildbot_url
 
@@ -222,7 +222,7 @@ class WhatBroke(AbstractDeclarativeCommand):
             print "All builders are passing!"
 
 
-class ResultsFor(AbstractDeclarativeCommand):
+class ResultsFor(Command):
     name = "results-for"
     help_text = "Print a list of failures for the passed revision from bots on %s" % config_urls.buildbot_url
     argument_names = "REVISION"
@@ -244,7 +244,7 @@ class ResultsFor(AbstractDeclarativeCommand):
             self._print_layout_test_results(build.layout_test_results())
 
 
-class FailureReason(AbstractDeclarativeCommand):
+class FailureReason(Command):
     name = "failure-reason"
     help_text = "Lists revisions where individual test failures started at %s" % config_urls.buildbot_url
 
@@ -330,7 +330,7 @@ class FailureReason(AbstractDeclarativeCommand):
         return self._explain_failures_for_builder(builder, start_revision=int(start_revision))
 
 
-class FindFlakyTests(AbstractDeclarativeCommand):
+class FindFlakyTests(Command):
     name = "find-flaky-tests"
     help_text = "Lists tests that often fail for a single build at %s" % config_urls.buildbot_url
 
@@ -399,7 +399,7 @@ class FindFlakyTests(AbstractDeclarativeCommand):
         return self._walk_backwards_from(builder, latest_revision, limit=int(limit))
 
 
-class TreeStatus(AbstractDeclarativeCommand):
+class TreeStatus(Command):
     name = "tree-status"
     help_text = "Print the status of the %s buildbots" % config_urls.buildbot_url
     long_help = """Fetches build status from http://build.webkit.org/one_box_per_builder
@@ -411,7 +411,7 @@ and displayes the status of each builder."""
             print "%s : %s" % (status_string.ljust(4), builder["name"])
 
 
-class CrashLog(AbstractDeclarativeCommand):
+class CrashLog(Command):
     name = "crash-log"
     help_text = "Print the newest crash log for the given process"
     long_help = """Finds the newest crash log matching the given process name
@@ -426,7 +426,7 @@ and PID and prints it to stdout."""
         print crash_logs.find_newest_log(args[0], pid)
 
 
-class PrintExpectations(AbstractDeclarativeCommand):
+class PrintExpectations(Command):
     name = 'print-expectations'
     help_text = 'Print the expected result for the given test(s) on the given port(s)'
 
@@ -446,7 +446,7 @@ class PrintExpectations(AbstractDeclarativeCommand):
                         help='display the paths for all applicable expectation files'),
         ] + platform_options(use_globs=True)
 
-        AbstractDeclarativeCommand.__init__(self, options=options)
+        Command.__init__(self, options=options)
         self._expectation_models = {}
 
     def execute(self, options, args, tool):
@@ -514,13 +514,10 @@ class PrintExpectations(AbstractDeclarativeCommand):
 
     def _model(self, options, port_name, tests):
         port = self._tool.port_factory.get(port_name, options)
-        expectations_path = port.path_to_test_expectations_file()
-        if not expectations_path in self._expectation_models:
-            self._expectation_models[expectations_path] = TestExpectations(port, tests).model()
-        return self._expectation_models[expectations_path]
+        return TestExpectations(port, tests).model()
 
 
-class PrintBaselines(AbstractDeclarativeCommand):
+class PrintBaselines(Command):
     name = 'print-baselines'
     help_text = 'Prints the baseline locations for given test(s) on the given port(s)'
 
@@ -533,7 +530,7 @@ class PrintBaselines(AbstractDeclarativeCommand):
             make_option('--include-virtual-tests', action='store_true',
                         help='Include virtual tests'),
         ] + platform_options(use_globs=True)
-        AbstractDeclarativeCommand.__init__(self, options=options)
+        Command.__init__(self, options=options)
         self._platform_regexp = re.compile('platform/([^\/]+)/(.+)')
 
     def execute(self, options, args, tool):
@@ -579,3 +576,36 @@ class PrintBaselines(AbstractDeclarativeCommand):
         if platform_matchobj:
             return platform_matchobj.group(1)
         return None
+
+
+class FindResolvedBugs(Command):
+    name = "find-resolved-bugs"
+    help_text = "Collect the RESOLVED bugs in the given TestExpectations file"
+    argument_names = "TEST_EXPECTATIONS_FILE"
+
+    def execute(self, options, args, tool):
+        filename = args[0]
+        if not tool.filesystem.isfile(filename):
+            print "The given path is not a file, please pass a valid path."
+            return
+
+        ids = set()
+        inputfile = tool.filesystem.open_text_file_for_reading(filename)
+        for line in inputfile:
+            result = re.search("(https://bugs\.webkit\.org/show_bug\.cgi\?id=|webkit\.org/b/)([0-9]+)", line)
+            if result:
+                ids.add(result.group(2))
+        inputfile.close()
+
+        resolved_ids = set()
+        num_of_bugs = len(ids)
+        bugzilla = Bugzilla()
+        for i, bugid in enumerate(ids, start=1):
+            bug = bugzilla.fetch_bug(bugid)
+            print "Checking bug %s \t [%d/%d]" % (bugid, i, num_of_bugs)
+            if not bug.is_open():
+                resolved_ids.add(bugid)
+
+        print "Resolved bugs in %s :" % (filename)
+        for bugid in resolved_ids:
+            print "https://bugs.webkit.org/show_bug.cgi?id=%s" % (bugid)

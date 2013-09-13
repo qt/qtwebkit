@@ -27,6 +27,7 @@
 #include "StrictEvalActivation.h"
 
 #include "JSGlobalObject.h"
+#include "Operations.h"
 
 namespace JSC {
 
@@ -36,7 +37,7 @@ const ClassInfo StrictEvalActivation::s_info = { "Object", &Base::s_info, 0, 0, 
 
 StrictEvalActivation::StrictEvalActivation(ExecState* exec)
     : Base(
-        exec->globalData(),
+        exec->vm(),
         exec->lexicalGlobalObject()->strictEvalActivationStructure(),
         exec->scope()
     )

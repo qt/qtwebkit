@@ -29,7 +29,7 @@ namespace WebCore {
 class MeterValueElement;
 class RenderMeter;
 
-class HTMLMeterElement : public LabelableElement {
+class HTMLMeterElement FINAL : public LabelableElement {
 public:
     static PassRefPtr<HTMLMeterElement> create(const QualifiedName&, Document*);
 
@@ -38,8 +38,6 @@ public:
         GaugeRegionSuboptimal,
         GaugeRegionEvenLessGood
     };
-
-    bool hasAuthorShadowRoot() const { return m_hasAuthorShadowRoot; }
 
     double min() const;
     void setMin(double, ExceptionCode&);
@@ -68,13 +66,10 @@ private:
     HTMLMeterElement(const QualifiedName&, Document*);
     virtual ~HTMLMeterElement();
 
-    virtual void willAddAuthorShadowRoot() OVERRIDE;
     virtual bool areAuthorShadowsAllowed() const OVERRIDE { return false; }
     RenderMeter* renderMeter() const;
 
     virtual bool supportLabels() const OVERRIDE { return true; }
-
-    virtual bool supportsFocus() const;
 
     virtual bool recalcWillValidate() const { return false; }
     virtual RenderObject* createRenderer(RenderArena*, RenderStyle*);
@@ -82,10 +77,9 @@ private:
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
 
     void didElementStateChange();
-    void createShadowSubtree();
+    virtual void didAddUserAgentShadowRoot(ShadowRoot*) OVERRIDE;
 
     RefPtr<MeterValueElement> m_value;
-    bool m_hasAuthorShadowRoot;
 };
 
 inline bool isHTMLMeterElement(Node* node)
@@ -95,7 +89,7 @@ inline bool isHTMLMeterElement(Node* node)
 
 inline HTMLMeterElement* toHTMLMeterElement(Node* node)
 {
-    ASSERT(!node || isHTMLMeterElement(node));
+    ASSERT_WITH_SECURITY_IMPLICATION(!node || isHTMLMeterElement(node));
     return static_cast<HTMLMeterElement*>(node);
 }
 

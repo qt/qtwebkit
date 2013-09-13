@@ -28,7 +28,6 @@
 #include "ScriptWrappable.h"
 #include <wtf/Forward.h>
 #include <wtf/HashMap.h>
-#include <wtf/PassOwnPtr.h>
 #include <wtf/Vector.h>
 
 namespace WebCore {
@@ -62,8 +61,10 @@ public:
         return item(0) && !item(1);
     }
 
-    Node* base() const { return ownerNode(); }
     virtual Element* virtualItemAfter(unsigned& offsetInArray, Element*) const;
+
+    Element* traverseFirstElement(unsigned& offsetInArray, ContainerNode* root) const;
+    Element* traverseForwardToOffset(unsigned offset, Element* currentElement, unsigned& currentOffset, unsigned& offsetInArray, ContainerNode* root) const;
 
 protected:
     HTMLCollection(Node* base, CollectionType, ItemAfterOverrideType);
@@ -77,7 +78,7 @@ protected:
     void appendNameCache(const AtomicString& name, Element* element) const { append(m_nameCache, name, element); }
 
 private:
-    bool checkForNameMatch(Element*, bool checkName, const AtomicString& name) const;
+    Element* traverseNextElement(unsigned& offsetInArray, Element* previous, ContainerNode* root) const;
 
     virtual bool isLiveNodeList() const OVERRIDE { ASSERT_NOT_REACHED(); return true; }
 

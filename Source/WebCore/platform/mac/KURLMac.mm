@@ -26,15 +26,11 @@
 #import "config.h"
 #import "KURL.h"
 
+#import "CFURLExtras.h"
 #import "FoundationExtras.h"
-#import <CoreFoundation/CFURL.h>
-
-using namespace WTF;
+#import <wtf/text/CString.h>
 
 namespace WebCore {
-
-typedef Vector<char, 512> CharBuffer;
-extern CFURLRef createCFURLFromBuffer(const CharBuffer& buffer);
 
 KURL::KURL(NSURL *url)
 {
@@ -43,48 +39,34 @@ KURL::KURL(NSURL *url)
         return;
     }
 
-    CFIndex bytesLength = CFURLGetBytes(reinterpret_cast<CFURLRef>(url), 0, 0);
-    Vector<char, 512> buffer(bytesLength + 1);
-    char* bytes = &buffer[0];
-    CFURLGetBytes(reinterpret_cast<CFURLRef>(url), reinterpret_cast<UInt8*>(bytes), bytesLength);
-    bytes[bytesLength] = '\0';
-#if !USE(WTFURL)
-    parse(bytes);
-#else
-    m_urlImpl = adoptRef(new KURLWTFURLImpl());
-    String urlString(bytes, bytesLength);
-    m_urlImpl->m_parsedURL = ParsedURL(urlString, 0);
-    if (!m_urlImpl->m_parsedURL.isValid())
-        m_urlImpl->m_invalidUrlString = urlString;
-#endif // USE(WTFURL)
+    // FIXME: Why is it OK to ignore base URL here?
+    CString urlBytes;
+    getURLBytes(reinterpret_cast<CFURLRef>(url), urlBytes);
+    parse(urlBytes.data());
 }
 
 KURL::operator NSURL *() const
 {
-    return HardAutorelease(createCFURL());
+    // Creating a toll-free bridged CFURL, because a real NSURL would not preserve the original string.
+    // We'll need fidelity when round-tripping via CFURLGetBytes().
+    return HardAutorelease(createCFURL().leakRef());
 }
 
-// We use the toll-free bridge between NSURL and CFURL to
-// create a CFURLRef supporting both empty and null values.
-CFURLRef KURL::createCFURL() const
+RetainPtr<CFURLRef> KURL::createCFURL() const
 {
     if (isNull())
         return 0;
 
-    if (isEmpty())
-        return reinterpret_cast<CFURLRef>([[NSURL alloc] initWithString:@""]);
+    if (isEmpty()) {
+        // We use the toll-free bridge between NSURL and CFURL to
+        // create a CFURLRef supporting both empty and null values.
+        RetainPtr<NSURL> emptyNSURL = adoptNS([[NSURL alloc] initWithString:@""]);
+        return reinterpret_cast<CFURLRef>(emptyNSURL.get());
+    }
 
-    CharBuffer buffer;
-#if !USE(WTFURL)
+    URLCharBuffer buffer;
     copyToBuffer(buffer);
-#else
-    String urlString = string();
-    buffer.resize(urlString.length());
-    size_t length = urlString.length();
-    for (size_t i = 0; i < length; i++)
-        buffer[i] = static_cast<char>(urlString[i]);
-#endif
-    return createCFURLFromBuffer(buffer);
+    return createCFURLFromBuffer(buffer.data(), buffer.size());
 }
 
 

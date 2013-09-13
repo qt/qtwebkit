@@ -48,16 +48,12 @@ class SharedBuffer;
 
 #if USE(CG)
 typedef CGImageSourceRef NativeImageDecoderPtr;
-#elif !PLATFORM(CHROMIUM)
+#else
 class ImageDecoder;
 typedef ImageDecoder* NativeImageDecoderPtr;
 #endif
 
-#if PLATFORM(CHROMIUM)
-class DeferredImageDecoder;
-typedef DeferredImageDecoder NativeImageDecoder;
-typedef DeferredImageDecoder* NativeImageDecoderPtr;
-#elif USE(CG)
+#if USE(CG)
 #define NativeImageDecoder ImageDecoder
 #else
 typedef ImageDecoder NativeImageDecoder;
@@ -149,11 +145,11 @@ public:
 
     // Callers should not call this after calling clear() with a higher index;
     // see comments on clear() above.
-    NativeImagePtr createFrameAtIndex(size_t);
+    PassNativeImagePtr createFrameAtIndex(size_t);
 
-    float frameDurationAtIndex(size_t);
-    bool frameHasAlphaAtIndex(size_t); // Whether or not the frame actually used any alpha.
-    bool frameIsCompleteAtIndex(size_t); // Whether or not the frame is completely decoded.
+    float frameDurationAtIndex(size_t) const;
+    bool frameHasAlphaAtIndex(size_t) const; // Whether or not the frame actually used any alpha.
+    bool frameIsCompleteAtIndex(size_t) const; // Whether or not the frame is completely decoded.
     ImageOrientation orientationAtIndex(size_t) const; // EXIF image orientation
 
     // Return the number of bytes in the decoded frame. If the frame is not yet
@@ -164,8 +160,6 @@ public:
     static unsigned maxPixelsPerDecodedImage() { return s_maxPixelsPerDecodedImage; }
     static void setMaxPixelsPerDecodedImage(unsigned maxPixels) { s_maxPixelsPerDecodedImage = maxPixels; }
 #endif
-
-    void reportMemoryUsage(MemoryObjectInfo*) const;
 
 private:
     NativeImageDecoderPtr m_decoder;

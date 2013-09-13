@@ -32,6 +32,7 @@
 
 #import "AccessibilityController.h"
 #import "CheckedMalloc.h"
+#import "DefaultPolicyDelegate.h"
 #import "DumpRenderTreeDraggingInfo.h"
 #import "DumpRenderTreePasteboard.h"
 #import "DumpRenderTreeWindow.h"
@@ -110,6 +111,12 @@ using namespace std;
 +(void)setAllowsAnyHTTPSCertificate:(BOOL)allow forHost:(NSString *)host;
 @end
 
+#if USE(APPKIT)
+@interface NSSound (Details)
++ (void)_setAlertType:(NSUInteger)alertType;
+@end
+#endif
+
 static void runTest(const string& testPathOrURL);
 
 // Deciding when it's OK to dump out the state is a bit tricky.  All these must be true:
@@ -142,10 +149,11 @@ static EditingDelegate *editingDelegate;
 static ResourceLoadDelegate *resourceLoadDelegate;
 static HistoryDelegate *historyDelegate;
 PolicyDelegate *policyDelegate;
+DefaultPolicyDelegate *defaultPolicyDelegate;
 StorageTrackerDelegate *storageDelegate;
 
 static int dumpPixelsForAllTests = NO;
-static bool dumpPixelsForCurrentTest;
+static bool dumpPixelsForCurrentTest = false;
 static int threaded;
 static int dumpTree = YES;
 static int useTimeoutWatchdog = YES;
@@ -230,7 +238,7 @@ static bool shouldIgnoreWebCoreNodeLeaks(const string& URLString)
 
 static NSSet *allowedFontFamilySet()
 {
-    static NSSet *fontFamiliySet = [[NSSet setWithObjects:
+    static NSSet *fontFamilySet = [[NSSet setWithObjects:
         @"Ahem",
         @"Al Bayan",
         @"American Typewriter",
@@ -325,6 +333,8 @@ static NSSet *allowedFontFamilySet()
         @"Sathu",
         @"Silom",
         @"Skia",
+        @"Songti SC",
+        @"Songti TC",
         @"STFangsong",
         @"STHeiti",
         @"STIXGeneral",
@@ -347,7 +357,16 @@ static NSSet *allowedFontFamilySet()
         @"Zapfino",
         nil] retain];
     
-    return fontFamiliySet;
+    return fontFamilySet;
+}
+
+static NSSet *systemHiddenFontFamilySet()
+{
+    static NSSet *fontFamilySet = [[NSSet setWithObjects:
+        @".LucidaGrandeUI",
+        nil] retain];
+
+    return fontFamilySet;
 }
 
 static IMP appKitAvailableFontFamiliesIMP;
@@ -383,7 +402,11 @@ static NSArray *drt_NSFontManager_availableFonts(id self, SEL _cmd)
             [availableFontList addObject:[fontInfo objectAtIndex:0]];
         }
     }
-    
+
+    for (NSString *hiddenFontFamily in systemHiddenFontFamilySet()) {
+        [availableFontList addObject:hiddenFontFamily];
+    }
+
     availableFonts = availableFontList;
     return availableFonts;
 }
@@ -411,9 +434,6 @@ static void swizzleNSFontManagerMethods()
 
 static void activateTestingFonts()
 {
-    // Work around <rdar://problem/6698023> by activating fonts from disk
-    // FIXME: This code can be removed once <rdar://problem/6698023> is addressed.
-
     static const char* fontFileNames[] = {
         "AHEM____.TTF",
         "WebKitWeightWatcher100.ttf",
@@ -516,7 +536,7 @@ static void registerMockScrollbars()
 
 WebView *createWebViewAndOffscreenWindow()
 {
-    NSRect rect = NSMakeRect(0, 0, TestRunner::maxViewWidth, TestRunner::maxViewHeight);
+    NSRect rect = NSMakeRect(0, 0, TestRunner::viewWidth, TestRunner::viewHeight);
     WebView *webView = [[WebView alloc] initWithFrame:rect frameName:nil groupName:@"org.webkit.DumpRenderTree"];
         
     [webView setUIDelegate:uiDelegate];
@@ -533,8 +553,14 @@ WebView *createWebViewAndOffscreenWindow()
     [WebView registerURLSchemeAsLocal:@"feedsearch"];
     
     [webView setContinuousSpellCheckingEnabled:YES];
-    [webView setDefersCallbacks:NO];
+    [webView setAutomaticQuoteSubstitutionEnabled:NO];
+    [webView setAutomaticLinkDetectionEnabled:NO];
+    [webView setAutomaticDashSubstitutionEnabled:NO];
+    [webView setAutomaticTextReplacementEnabled:NO];
+    [webView setAutomaticSpellingCorrectionEnabled:YES];
     [webView setGrammarCheckingEnabled:YES];
+
+    [webView setDefersCallbacks:NO];
     [webView setInteractiveFormValidationEnabled:YES];
     [webView setValidationMessageTimerMagnification:-1];
     
@@ -544,9 +570,11 @@ WebView *createWebViewAndOffscreenWindow()
     DumpRenderTreeWindow *window = [[DumpRenderTreeWindow alloc] initWithContentRect:windowRect styleMask:NSBorderlessWindowMask backing:NSBackingStoreBuffered defer:YES];
 
     [window setColorSpace:[[NSScreen mainScreen] colorSpace]];
+    [window setCollectionBehavior:NSWindowCollectionBehaviorStationary];
     [[window contentView] addSubview:webView];
     [window orderBack:nil];
     [window setAutodisplay:NO];
+    [window _setWindowResolution:1 displayIfChanged:YES];
 
     [window startListeningForAcceleratedCompositingChanges];
     
@@ -587,6 +615,16 @@ static void resetDefaultsToConsistentValues()
     [defaults setBool:YES forKey:WebKitFullScreenEnabledPreferenceKey];
     [defaults setBool:YES forKey:@"UseWebKitWebInspector"];
 
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1070
+    [defaults setObject:[NSDictionary dictionaryWithObjectsAndKeys:
+        @"notational", @"notationl",
+        @"message", @"mesage",
+        @"would", @"wouldn",
+        @"welcome", @"wellcome",
+        @"hello\nworld", @"hellolfworld",
+        nil] forKey:@"NSTestCorrectionDictionary"];
+#endif
+
     // Scrollbars are drawn either using AppKit (which uses NSUserDefaults) or using HIToolbox (which uses CFPreferences / kCFPreferencesAnyApplication / kCFPreferencesCurrentUser / kCFPreferencesAnyHost)
     [defaults setObject:@"DoubleMax" forKey:@"AppleScrollBarVariant"];
     RetainPtr<CFTypeRef> initialValue = CFPreferencesCopyValue(CFSTR("AppleScrollBarVariant"), kCFPreferencesAnyApplication, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
@@ -598,7 +636,7 @@ static void resetDefaultsToConsistentValues()
 #endif
 
 
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1080 && !PLATFORM(CHROMIUM)
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1080
     [defaults setBool:NO forKey:@"NSScrollAnimationEnabled"];
 #else
     [defaults setBool:NO forKey:@"AppleScrollAnimationEnabled"];
@@ -675,6 +713,7 @@ static void resetDefaultsToConsistentValues()
     [preferences setUsePreHTML5ParserQuirks:NO];
     [preferences setAsynchronousSpellCheckingEnabled:NO];
     [preferences setMockScrollbarsEnabled:YES];
+    [preferences setSeamlessIFramesEnabled:YES];
 
 #if ENABLE(WEB_AUDIO)
     [preferences setWebAudioEnabled:YES];
@@ -736,28 +775,6 @@ static void testThreadIdentifierMap()
     createThread(runThread, 0, "DumpRenderTree: test");
 }
 
-static void crashHandler(int sig)
-{
-    char *signalName = strsignal(sig);
-    write(STDERR_FILENO, signalName, strlen(signalName));
-    write(STDERR_FILENO, "\n", 1);
-    exit(128 + sig);
-}
-
-static void installSignalHandlers()
-{
-    signal(SIGILL, crashHandler);    /* 4:   illegal instruction (not reset when caught) */
-    signal(SIGTRAP, crashHandler);   /* 5:   trace trap (not reset when caught) */
-    signal(SIGEMT, crashHandler);    /* 7:   EMT instruction */
-    signal(SIGFPE, crashHandler);    /* 8:   floating point exception */
-    signal(SIGBUS, crashHandler);    /* 10:  bus error */
-    signal(SIGSEGV, crashHandler);   /* 11:  segmentation violation */
-    signal(SIGSYS, crashHandler);    /* 12:  bad argument to system call */
-    signal(SIGPIPE, crashHandler);   /* 13:  write on a pipe with no reader */
-    signal(SIGXCPU, crashHandler);   /* 24:  exceeded CPU time limit */
-    signal(SIGXFSZ, crashHandler);   /* 25:  exceeded file size limit */
-}
-
 static void allocateGlobalControllers()
 {
     // FIXME: We should remove these and move to the ObjC standard [Foo sharedInstance] model
@@ -769,6 +786,7 @@ static void allocateGlobalControllers()
     policyDelegate = [[PolicyDelegate alloc] init];
     historyDelegate = [[HistoryDelegate alloc] init];
     storageDelegate = [[StorageTrackerDelegate alloc] init];
+    defaultPolicyDelegate = [[DefaultPolicyDelegate alloc] init];
 }
 
 // ObjC++ doens't seem to let me pass NSObject*& sadly.
@@ -855,6 +873,12 @@ static void prepareConsistentTestingEnvironment()
     allocateGlobalControllers();
     
     makeLargeMallocFailSilently();
+
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
+    NSActivityOptions options = (NSActivityUserInitiatedAllowingIdleSystemSleep | NSActivityLatencyCritical) & ~(NSActivitySuddenTerminationDisabled | NSActivityAutomaticTerminationDisabled);
+    static id assertion = [[[NSProcessInfo processInfo] beginActivityWithOptions:options reason:@"DumpRenderTree should not be subject to process suppression"] retain];
+    ASSERT_UNUSED(assertion, assertion);
+#endif
 }
 
 void dumpRenderTree(int argc, const char *argv[])
@@ -862,11 +886,13 @@ void dumpRenderTree(int argc, const char *argv[])
     initializeGlobalsFromCommandLineOptions(argc, argv);
     prepareConsistentTestingEnvironment();
     addTestPluginsToPluginSearchPath(argv[0]);
-    if (dumpPixelsForCurrentTest)
-        installSignalHandlers();
 
     if (forceComplexText)
         [WebView _setAlwaysUsesComplexTextCodePath:YES];
+
+#if USE(APPKIT)
+    [NSSound _setAlertType:0];
+#endif
 
     WebView *webView = createWebViewAndOffscreenWindow();
     mainFrame = [webView mainFrame];
@@ -887,7 +913,7 @@ void dumpRenderTree(int argc, const char *argv[])
         printSeparators = YES;
         runTestingServerLoop();
     } else {
-        printSeparators = (optind < argc - 1 || (dumpPixelsForCurrentTest && dumpTree));
+        printSeparators = optind < argc - 1;
         for (int i = optind; i != argc; ++i)
             runTest(argv[i]);
     }
@@ -1095,9 +1121,9 @@ static void sizeWebViewForCurrentTest()
     // W3C SVG tests expect to be 480x360
     bool isSVGW3CTest = (gTestRunner->testPathOrURL().find("svg/W3C-SVG-1.1") != string::npos);
     if (isSVGW3CTest)
-        [[mainFrame webView] setFrameSize:NSMakeSize(480, 360)];
+        [[mainFrame webView] setFrameSize:NSMakeSize(TestRunner::w3cSVGViewWidth, TestRunner::w3cSVGViewHeight)];
     else
-        [[mainFrame webView] setFrameSize:NSMakeSize(TestRunner::maxViewWidth, TestRunner::maxViewHeight)];
+        [[mainFrame webView] setFrameSize:NSMakeSize(TestRunner::viewWidth, TestRunner::viewHeight)];
 }
 
 static const char *methodNameStringForFailedTest()
@@ -1261,7 +1287,7 @@ static void resetWebViewToConsistentStateBeforeTesting()
     [webView _scaleWebView:1.0 atOrigin:NSZeroPoint];
     [webView _setCustomBackingScaleFactor:0];
     [webView setTabKeyCyclesThroughElements:YES];
-    [webView setPolicyDelegate:nil];
+    [webView setPolicyDelegate:defaultPolicyDelegate];
     [policyDelegate setPermissive:NO];
     [policyDelegate setControllerToNotifyDone:0];
     [frameLoadDelegate resetToConsistentState];
@@ -1270,7 +1296,6 @@ static void resetWebViewToConsistentStateBeforeTesting()
     [[webView undoManager] removeAllActions];
     [WebView _removeAllUserContentFromGroup:[webView groupName]];
     [[webView window] setAutodisplay:NO];
-    [webView _setMinimumTimerInterval:[WebView _defaultMinimumTimerInterval]];
     [webView setTracksRepaints:NO];
     
     resetDefaultsToConsistentValues();
@@ -1281,7 +1306,13 @@ static void resetWebViewToConsistentStateBeforeTesting()
         gTestRunner->removeChromeInputField();
     }
 
-    [[mainFrame webView] setSmartInsertDeleteEnabled:YES];
+    [webView setContinuousSpellCheckingEnabled:YES];
+    [webView setAutomaticQuoteSubstitutionEnabled:NO];
+    [webView setAutomaticLinkDetectionEnabled:NO];
+    [webView setAutomaticDashSubstitutionEnabled:NO];
+    [webView setAutomaticTextReplacementEnabled:NO];
+    [webView setAutomaticSpellingCorrectionEnabled:YES];
+    [webView setGrammarCheckingEnabled:YES];
 
     [WebView _setUsesTestModeFocusRingColor:YES];
     [WebView _resetOriginAccessWhitelists];

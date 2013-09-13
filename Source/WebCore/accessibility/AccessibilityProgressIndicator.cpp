@@ -21,10 +21,12 @@
 #include "config.h"
 #include "AccessibilityProgressIndicator.h"
 
-#if ENABLE(PROGRESS_ELEMENT)
+#if ENABLE(PROGRESS_ELEMENT) || ENABLE(METER_ELEMENT)
 #include "FloatConversion.h"
+#include "HTMLMeterElement.h"
 #include "HTMLNames.h"
 #include "HTMLProgressElement.h"
+#include "RenderMeter.h"
 #include "RenderObject.h"
 #include "RenderProgress.h"
 
@@ -32,6 +34,7 @@ namespace WebCore {
     
 using namespace HTMLNames;
 
+#if ENABLE(PROGRESS_ELEMENT)
 AccessibilityProgressIndicator::AccessibilityProgressIndicator(RenderProgress* renderer)
     : AccessibilityRenderObject(renderer)
 {
@@ -39,40 +42,114 @@ AccessibilityProgressIndicator::AccessibilityProgressIndicator(RenderProgress* r
 
 PassRefPtr<AccessibilityProgressIndicator> AccessibilityProgressIndicator::create(RenderProgress* renderer)
 {
-    AccessibilityProgressIndicator* obj = new AccessibilityProgressIndicator(renderer);
-    obj->init();
-    return adoptRef(obj);
+    return adoptRef(new AccessibilityProgressIndicator(renderer));
+}
+#endif 
+    
+#if ENABLE(METER_ELEMENT)
+AccessibilityProgressIndicator::AccessibilityProgressIndicator(RenderMeter* renderer)
+    : AccessibilityRenderObject(renderer)
+{
 }
 
-bool AccessibilityProgressIndicator::accessibilityIsIgnored() const
+PassRefPtr<AccessibilityProgressIndicator> AccessibilityProgressIndicator::create(RenderMeter* renderer)
 {
-    return accessibilityIsIgnoredBase() == IgnoreObject;
+    return adoptRef(new AccessibilityProgressIndicator(renderer));
+}
+#endif
+
+bool AccessibilityProgressIndicator::computeAccessibilityIsIgnored() const
+{
+    return accessibilityIsIgnoredByDefault();
 }
     
 float AccessibilityProgressIndicator::valueForRange() const
 {
-    if (element()->position() >= 0)
-        return narrowPrecisionToFloat(element()->value());
+    if (!m_renderer)
+        return 0.0;
+    
+#if ENABLE(PROGRESS_ELEMENT)
+    if (m_renderer->isProgress()) {
+        HTMLProgressElement* progress = progressElement();
+        if (progress && progress->position() >= 0)
+            return narrowPrecisionToFloat(progress->value());
+    }
+#endif
+
+#if ENABLE(METER_ELEMENT)
+    if (m_renderer->isMeter()) {
+        if (HTMLMeterElement* meter = meterElement())
+            return narrowPrecisionToFloat(meter->value());
+    }
+#endif
+
     // Indeterminate progress bar should return 0.
-    return 0.0f;
+    return 0.0;
 }
 
 float AccessibilityProgressIndicator::maxValueForRange() const
 {
-    return narrowPrecisionToFloat(element()->max());
+    if (!m_renderer)
+        return 0.0;
+
+#if ENABLE(PROGRESS_ELEMENT)
+    if (m_renderer->isProgress()) {
+        if (HTMLProgressElement* progress = progressElement())
+            return narrowPrecisionToFloat(progress->max());
+    }
+#endif
+    
+#if ENABLE(METER_ELEMENT)
+    if (m_renderer->isMeter()) {
+        if (HTMLMeterElement* meter = meterElement())
+            return narrowPrecisionToFloat(meter->max());
+    }
+#endif
+
+    return 0.0;
 }
 
 float AccessibilityProgressIndicator::minValueForRange() const
 {
-    return 0.0f;
+    if (!m_renderer)
+        return 0.0;
+    
+#if ENABLE(PROGRESS_ELEMENT)
+    if (m_renderer->isProgress())
+        return 0.0;
+#endif
+    
+#if ENABLE(METER_ELEMENT)
+    if (m_renderer->isMeter()) {
+        if (HTMLMeterElement* meter = meterElement())
+            return narrowPrecisionToFloat(meter->min());
+    }
+#endif
+    
+    return 0.0;
 }
 
-HTMLProgressElement* AccessibilityProgressIndicator::element() const
+#if ENABLE(PROGRESS_ELEMENT)
+HTMLProgressElement* AccessibilityProgressIndicator::progressElement() const
 {
+    if (!m_renderer->isProgress())
+        return 0;
+    
     return toRenderProgress(m_renderer)->progressElement();
 }
+#endif
 
+#if ENABLE(METER_ELEMENT)
+HTMLMeterElement* AccessibilityProgressIndicator::meterElement() const
+{
+    if (!m_renderer->isMeter())
+        return 0;
+
+    return toRenderMeter(m_renderer)->meterElement();
+}
+#endif
 
 } // namespace WebCore
 
-#endif // ENABLE(PROGRESS_ELEMENT)
+#endif // ENABLE(PROGRESS_ELEMENT) || ENABLE(METER_ELEMENT)
+

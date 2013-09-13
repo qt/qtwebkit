@@ -29,7 +29,6 @@
 #include "config.h"
 #include "CSSAspectRatioValue.h"
 
-#include "WebCoreMemoryInstrumentation.h"
 #include <wtf/text/StringBuilder.h>
 
 namespace WebCore {
@@ -39,9 +38,9 @@ String CSSAspectRatioValue::customCssText() const
     return String::number(m_numeratorValue) + '/' + String::number(m_denominatorValue);
 }
 
-void CSSAspectRatioValue::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+bool CSSAspectRatioValue::equals(const CSSAspectRatioValue& other) const
 {
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
+    return m_numeratorValue == other.m_numeratorValue && m_denominatorValue == other.m_denominatorValue;
 }
 
 }

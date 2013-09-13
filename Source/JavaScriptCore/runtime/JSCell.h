@@ -24,11 +24,9 @@
 #define JSCell_h
 
 #include "CallData.h"
-#include "CallFrame.h"
 #include "ConstructData.h"
 #include "Heap.h"
 #include "JSLock.h"
-#include "JSValueInlines.h"
 #include "SlotVisitor.h"
 #include "TypedArrayDescriptor.h"
 #include "WriteBarrier.h"
@@ -38,6 +36,7 @@
 namespace JSC {
 
 class CopyVisitor;
+class ExecState;
 class JSDestructibleObject;
 class JSGlobalObject;
 class LLIntOffsetsExtractor;
@@ -66,7 +65,7 @@ public:
     JSCell(CreatingEarlyCellTag);
 
 protected:
-    JSCell(JSGlobalData&, Structure*);
+    JSCell(VM&, Structure*);
     JS_EXPORT_PRIVATE static void destroy(JSCell*);
 
 public:
@@ -79,7 +78,7 @@ public:
     bool isAPIValueWrapper() const;
 
     Structure* structure() const;
-    void setStructure(JSGlobalData&, Structure*);
+    void setStructure(VM&, Structure*);
     void clearStructure() { m_structure.clear(); }
 
     const char* className();
@@ -97,6 +96,7 @@ public:
     JS_EXPORT_PRIVATE JSValue toPrimitive(ExecState*, PreferredPrimitiveType) const;
     bool getPrimitiveNumber(ExecState*, double& number, JSValue&) const;
     bool toBoolean(ExecState*) const;
+    TriState pureToBoolean() const;
     JS_EXPORT_PRIVATE double toNumber(ExecState*) const;
     JS_EXPORT_PRIVATE JSObject* toObject(ExecState*, JSGlobalObject*) const;
 
@@ -106,6 +106,7 @@ public:
     // Object operations, with the toObject operation included.
     const ClassInfo* classInfo() const;
     const MethodTable* methodTable() const;
+    const MethodTable* methodTableForDestruction() const;
     static void put(JSCell*, ExecState*, PropertyName, JSValue, PutPropertySlot&);
     static void putByIndex(JSCell*, ExecState*, unsigned propertyName, JSValue, bool shouldThrow);
         
@@ -141,8 +142,8 @@ public:
     static const TypedArrayType TypedArrayStorageType = TypedArrayNone;
 protected:
 
-    void finishCreation(JSGlobalData&);
-    void finishCreation(JSGlobalData&, Structure*, CreatingEarlyCellTag);
+    void finishCreation(VM&);
+    void finishCreation(VM&, Structure*, CreatingEarlyCellTag);
 
     // Base implementation; for non-object classes implements getPropertySlot.
     static bool getOwnPropertySlot(JSCell*, ExecState*, PropertyName, PropertySlot&);
@@ -150,12 +151,12 @@ protected:
 
     // Dummy implementations of override-able static functions for classes to put in their MethodTable
     static JSValue defaultValue(const JSObject*, ExecState*, PreferredPrimitiveType);
-    static NO_RETURN_DUE_TO_ASSERT void getOwnPropertyNames(JSObject*, ExecState*, PropertyNameArray&, EnumerationMode);
-    static NO_RETURN_DUE_TO_ASSERT void getOwnNonIndexPropertyNames(JSObject*, ExecState*, PropertyNameArray&, EnumerationMode);
-    static NO_RETURN_DUE_TO_ASSERT void getPropertyNames(JSObject*, ExecState*, PropertyNameArray&, EnumerationMode);
+    static NO_RETURN_DUE_TO_CRASH void getOwnPropertyNames(JSObject*, ExecState*, PropertyNameArray&, EnumerationMode);
+    static NO_RETURN_DUE_TO_CRASH void getOwnNonIndexPropertyNames(JSObject*, ExecState*, PropertyNameArray&, EnumerationMode);
+    static NO_RETURN_DUE_TO_CRASH void getPropertyNames(JSObject*, ExecState*, PropertyNameArray&, EnumerationMode);
     static String className(const JSObject*);
     JS_EXPORT_PRIVATE static bool customHasInstance(JSObject*, ExecState*, JSValue);
-    static NO_RETURN_DUE_TO_ASSERT void putDirectVirtual(JSObject*, ExecState*, PropertyName, JSValue, unsigned attributes);
+    static NO_RETURN_DUE_TO_CRASH void putDirectVirtual(JSObject*, ExecState*, PropertyName, JSValue, unsigned attributes);
     static bool defineOwnProperty(JSObject*, ExecState*, PropertyName, PropertyDescriptor&, bool shouldThrow);
     static bool getOwnPropertyDescriptor(JSObject*, ExecState*, PropertyName, PropertyDescriptor&);
 
@@ -164,174 +165,6 @@ private:
         
     WriteBarrier<Structure> m_structure;
 };
-
-inline JSCell::JSCell(CreatingEarlyCellTag)
-{
-}
-
-inline void JSCell::finishCreation(JSGlobalData& globalData)
-{
-#if ENABLE(GC_VALIDATION)
-    ASSERT(globalData.isInitializingObject());
-    globalData.setInitializingObjectClass(0);
-#else
-    UNUSED_PARAM(globalData);
-#endif
-    ASSERT(m_structure);
-}
-
-inline Structure* JSCell::structure() const
-{
-    return m_structure.get();
-}
-
-inline void JSCell::visitChildren(JSCell* cell, SlotVisitor& visitor)
-{
-    MARK_LOG_PARENT(visitor, cell);
-
-    visitor.append(&cell->m_structure);
-}
-
-// --- JSValue inlines ----------------------------
-
-inline bool JSValue::isString() const
-{
-    return isCell() && asCell()->isString();
-}
-
-inline bool JSValue::isPrimitive() const
-{
-    return !isCell() || asCell()->isString();
-}
-
-inline bool JSValue::isGetterSetter() const
-{
-    return isCell() && asCell()->isGetterSetter();
-}
-
-inline bool JSValue::isObject() const
-{
-    return isCell() && asCell()->isObject();
-}
-
-inline bool JSValue::getString(ExecState* exec, String& s) const
-{
-    return isCell() && asCell()->getString(exec, s);
-}
-
-inline String JSValue::getString(ExecState* exec) const
-{
-    return isCell() ? asCell()->getString(exec) : String();
-}
-
-template <typename Base> String HandleConverter<Base, Unknown>::getString(ExecState* exec) const
-{
-    return jsValue().getString(exec);
-}
-
-inline JSObject* JSValue::getObject() const
-{
-    return isCell() ? asCell()->getObject() : 0;
-}
-
-ALWAYS_INLINE bool JSValue::getUInt32(uint32_t& v) const
-{
-    if (isInt32()) {
-        int32_t i = asInt32();
-        v = static_cast<uint32_t>(i);
-        return i >= 0;
-    }
-    if (isDouble()) {
-        double d = asDouble();
-        v = static_cast<uint32_t>(d);
-        return v == d;
-    }
-    return false;
-}
-
-inline JSValue JSValue::toPrimitive(ExecState* exec, PreferredPrimitiveType preferredType) const
-{
-    return isCell() ? asCell()->toPrimitive(exec, preferredType) : asValue();
-}
-
-inline bool JSValue::getPrimitiveNumber(ExecState* exec, double& number, JSValue& value)
-{
-    if (isInt32()) {
-        number = asInt32();
-        value = *this;
-        return true;
-    }
-    if (isDouble()) {
-        number = asDouble();
-        value = *this;
-        return true;
-    }
-    if (isCell())
-        return asCell()->getPrimitiveNumber(exec, number, value);
-    if (isTrue()) {
-        number = 1.0;
-        value = *this;
-        return true;
-    }
-    if (isFalse() || isNull()) {
-        number = 0.0;
-        value = *this;
-        return true;
-    }
-    ASSERT(isUndefined());
-    number = QNaN;
-    value = *this;
-    return true;
-}
-
-ALWAYS_INLINE double JSValue::toNumber(ExecState* exec) const
-{
-    if (isInt32())
-        return asInt32();
-    if (isDouble())
-        return asDouble();
-    return toNumberSlowCase(exec);
-}
-
-inline JSObject* JSValue::toObject(ExecState* exec) const
-{
-    return isCell() ? asCell()->toObject(exec, exec->lexicalGlobalObject()) : toObjectSlowCase(exec, exec->lexicalGlobalObject());
-}
-
-inline JSObject* JSValue::toObject(ExecState* exec, JSGlobalObject* globalObject) const
-{
-    return isCell() ? asCell()->toObject(exec, globalObject) : toObjectSlowCase(exec, globalObject);
-}
-
-template<typename T>
-void* allocateCell(Heap& heap, size_t size)
-{
-    ASSERT(size >= sizeof(T));
-#if ENABLE(GC_VALIDATION)
-    ASSERT(!heap.globalData()->isInitializingObject());
-    heap.globalData()->setInitializingObjectClass(&T::s_info);
-#endif
-    JSCell* result = 0;
-    if (T::needsDestruction && T::hasImmortalStructure)
-        result = static_cast<JSCell*>(heap.allocateWithImmortalStructureDestructor(size));
-    else if (T::needsDestruction && !T::hasImmortalStructure)
-        result = static_cast<JSCell*>(heap.allocateWithNormalDestructor(size));
-    else 
-        result = static_cast<JSCell*>(heap.allocateWithoutDestructor(size));
-    result->clearStructure();
-    return result;
-}
-    
-template<typename T>
-void* allocateCell(Heap& heap)
-{
-    return allocateCell<T>(heap, sizeof(T));
-}
-    
-inline bool isZapped(const JSCell* cell)
-{
-    return cell->isZapped();
-}
 
 template<typename To, typename From>
 inline To jsCast(From* from)

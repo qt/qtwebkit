@@ -50,9 +50,12 @@ void AutoTableLayout::recalcColumn(unsigned effCol)
     RenderTableCell* maxContributor = 0;
 
     for (RenderObject* child = m_table->children()->firstChild(); child; child = child->nextSibling()) {
-        if (child->isRenderTableCol())
-            toRenderTableCol(child)->computePreferredLogicalWidths();
-        else if (child->isTableSection()) {
+        if (child->isRenderTableCol()){
+            // RenderTableCols don't have the concept of preferred logical width, but we need to clear their dirty bits
+            // so that if we call setPreferredWidthsDirty(true) on a col or one of its descendants, we'll mark it's
+            // ancestors as dirty.
+            toRenderTableCol(child)->clearPreferredLogicalWidthsDirtyBits();
+        } else if (child->isTableSection()) {
             RenderTableSection* section = toRenderTableSection(child);
             unsigned numRows = section->numRows();
             for (unsigned i = 0; i < numRows; i++) {
@@ -72,8 +75,6 @@ void AutoTableLayout::recalcColumn(unsigned effCol)
                 columnLayout.maxLogicalWidth = max<int>(columnLayout.maxLogicalWidth, 1);
 
                 if (cell->colSpan() == 1) {
-                    if (cell->preferredLogicalWidthsDirty())
-                        cell->computePreferredLogicalWidths();
                     columnLayout.minLogicalWidth = max<int>(cell->minPreferredLogicalWidth(), columnLayout.minLogicalWidth);
                     if (cell->maxPreferredLogicalWidth() > columnLayout.maxLogicalWidth) {
                         columnLayout.maxLogicalWidth = cell->maxPreferredLogicalWidth();
@@ -93,7 +94,7 @@ void AutoTableLayout::recalcColumn(unsigned effCol)
                     case Fixed:
                         // ignore width=0
                         if (cellLogicalWidth.isPositive() && !columnLayout.logicalWidth.isPercent()) {
-                            LayoutUnit logicalWidth = cell->adjustBorderBoxLogicalWidthForBoxSizing(cellLogicalWidth.value());
+                            int logicalWidth = cell->adjustBorderBoxLogicalWidthForBoxSizing(cellLogicalWidth.value());
                             if (columnLayout.logicalWidth.isFixed()) {
                                 // Nav/IE weirdness
                                 if ((logicalWidth > columnLayout.logicalWidth.value()) 
@@ -209,7 +210,7 @@ static bool shouldScaleColumns(RenderTable* table)
     return scale;
 }
 
-void AutoTableLayout::computePreferredLogicalWidths(LayoutUnit& minWidth, LayoutUnit& maxWidth)
+void AutoTableLayout::computeIntrinsicLogicalWidths(LayoutUnit& minWidth, LayoutUnit& maxWidth)
 {
     fullRecalc();
 
@@ -246,25 +247,13 @@ void AutoTableLayout::computePreferredLogicalWidths(LayoutUnit& minWidth, Layout
     }
 
     maxWidth = max<int>(maxWidth, spanMaxLogicalWidth);
+}
 
-    int bordersPaddingAndSpacing = m_table->bordersPaddingAndSpacingInRowDirection();
-    minWidth += bordersPaddingAndSpacing;
-    maxWidth += bordersPaddingAndSpacing;
-
+void AutoTableLayout::applyPreferredLogicalWidthQuirks(LayoutUnit& minWidth, LayoutUnit& maxWidth) const
+{
     Length tableLogicalWidth = m_table->style()->logicalWidth();
-    if (tableLogicalWidth.isFixed() && tableLogicalWidth.isPositive()) {
-        minWidth = max<int>(minWidth, tableLogicalWidth.value());
-        maxWidth = minWidth;
-    } else if (!remainingPercent && maxNonPercent) {
-        // if there was no remaining percent, maxWidth is invalid
-        maxWidth = tableMaxWidth;
-    }
-
-    Length tableLogicalMinWidth = m_table->style()->logicalMinWidth();
-    if (tableLogicalMinWidth.isFixed() && tableLogicalMinWidth.isPositive()) {
-        minWidth = max<int>(minWidth, tableLogicalMinWidth.value());
-        maxWidth = max<int>(minWidth, maxWidth);
-    }
+    if (tableLogicalWidth.isFixed() && tableLogicalWidth.isPositive())
+        minWidth = maxWidth = max<int>(minWidth, tableLogicalWidth.value());
 }
 
 /*

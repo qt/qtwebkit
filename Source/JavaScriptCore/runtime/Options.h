@@ -60,6 +60,33 @@ namespace JSC {
 // values after the sanity checks (for your own testing), then you're liable to
 // ensure that the new values set are sane and reasonable for your own run.
 
+class OptionRange {
+private:
+    enum RangeState { Uninitialized, InitError, Normal, Inverted };
+public:
+    OptionRange& operator= (const int& rhs)
+    { // Only needed for initialization
+        if (!rhs) {
+            m_state = Uninitialized;
+            m_rangeString = 0;
+            m_lowLimit = 0;
+            m_highLimit = 0;
+        }
+        return *this;
+    }
+
+    bool init(const char*);
+    bool isInRange(unsigned);
+    const char* rangeString() { return (m_state > InitError) ? m_rangeString : "<null>"; }
+
+private:
+    RangeState m_state;
+    const char* m_rangeString;
+    unsigned m_lowLimit;
+    unsigned m_highLimit;
+};
+
+typedef OptionRange optionRange;
 
 #define JSC_OPTIONS(v) \
     v(bool, useJIT,    true) \
@@ -74,10 +101,21 @@ namespace JSC {
     v(bool, showDisassembly, false) \
     v(bool, showDFGDisassembly, false) \
     v(bool, showAllDFGNodes, false) \
+    v(optionRange, bytecodeRangeToDFGCompile, 0) \
+    v(bool, dumpBytecodeAtDFGTime, false) \
+    v(bool, dumpGraphAtEachPhase, false) \
+    v(bool, verboseCompilation, false) \
+    v(bool, logCompilationChanges, false) \
+    v(bool, printEachOSRExit, false) \
+    v(bool, validateGraph, false) \
+    v(bool, validateGraphAtEachPhase, false) \
+    \
+    v(bool, enableProfiler, false) \
     \
     v(unsigned, maximumOptimizationCandidateInstructionCount, 10000) \
     \
     v(unsigned, maximumFunctionForCallInlineCandidateInstructionCount, 180) \
+    v(unsigned, maximumFunctionForClosureCallInlineCandidateInstructionCount, 100) \
     v(unsigned, maximumFunctionForConstructInlineCandidateInstructionCount, 100) \
     \
     /* Depth of inline stack, so 1 = no inlining, 2 = one level, etc. */ \
@@ -87,21 +125,20 @@ namespace JSC {
     v(int32, thresholdForJITSoon, 100) \
     \
     v(int32, thresholdForOptimizeAfterWarmUp, 1000) \
-    v(int32, thresholdForOptimizeAfterLongWarmUp, 5000) \
+    v(int32, thresholdForOptimizeAfterLongWarmUp, 1000) \
     v(int32, thresholdForOptimizeSoon, 1000) \
     \
     v(int32, executionCounterIncrementForLoop, 1) \
     v(int32, executionCounterIncrementForReturn, 15) \
     \
+    v(int32, evalThresholdMultiplier, 10) \
+    \
     v(bool, randomizeExecutionCountsBetweenCheckpoints, false) \
     v(int32, maximumExecutionCountsBetweenCheckpoints, 1000) \
     \
-    v(double, likelyToTakeSlowCaseThreshold, 0.15) \
-    v(double, couldTakeSlowCaseThreshold, 0.05) \
     v(unsigned, likelyToTakeSlowCaseMinimumCount, 100) \
     v(unsigned, couldTakeSlowCaseMinimumCount, 10) \
     \
-    v(double, osrExitProminenceForFrequentExitSite, 0.3) \
     v(unsigned, osrExitCountForReoptimization, 100) \
     v(unsigned, osrExitCountForReoptimizationFromLoop, 5) \
     \
@@ -170,6 +207,7 @@ private:
         unsignedType,
         doubleType,
         int32Type,
+        optionRangeType,
     };
 
     // For storing for an option value:
@@ -179,6 +217,7 @@ private:
             unsigned unsignedVal;
             double doubleVal;
             int32 int32Val;
+            OptionRange optionRangeVal;
         } u;
     };
 

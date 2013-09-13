@@ -26,16 +26,33 @@
 #ifndef TiledBacking_h
 #define TiledBacking_h
 
+#if PLATFORM(MAC)
+OBJC_CLASS CALayer;
+#endif
+
 namespace WebCore {
 
 class IntRect;
+
+enum ScrollingModeIndication {
+    MainThreadScrollingBecauseOfStyleIndication,
+    MainThreadScrollingBecauseOfEventHandlersIndication,
+    ThreadedScrollingIndication
+};
 
 class TiledBacking {
 public:
     virtual ~TiledBacking() { }
 
-    virtual void setVisibleRect(const IntRect&) = 0;
-    virtual IntRect visibleRect() const = 0;
+    virtual void setVisibleRect(const FloatRect&) = 0;
+    virtual FloatRect visibleRect() const = 0;
+    virtual bool tilesWouldChangeForVisibleRect(const FloatRect&) const = 0;
+
+    virtual void setExposedRect(const FloatRect&) = 0;
+    virtual void setClipsToExposedRect(bool) = 0;
+    virtual bool clipsToExposedRect() = 0;
+
+    virtual void prepopulateRect(const FloatRect&) = 0;
 
     virtual void setIsInWindow(bool) = 0;
 
@@ -58,9 +75,22 @@ public:
     virtual void setScrollingPerformanceLoggingEnabled(bool) = 0;
     virtual bool scrollingPerformanceLoggingEnabled() const = 0;
     
+    virtual void setAggressivelyRetainsTiles(bool) = 0;
+    virtual bool aggressivelyRetainsTiles() const = 0;
+    
+    virtual void setUnparentsOffscreenTiles(bool) = 0;
+    virtual bool unparentsOffscreenTiles() const = 0;
+    
+    virtual double retainedTileBackingStoreMemory() const = 0;
+
     // Exposed for testing
     virtual IntRect tileCoverageRect() const = 0;
     virtual IntRect tileGridExtent() const = 0;
+    virtual void setScrollingModeIndication(ScrollingModeIndication) = 0;
+
+#if PLATFORM(MAC)
+    virtual CALayer *tiledScrollingIndicatorLayer() = 0;
+#endif
 };
 
 } // namespace WebCore

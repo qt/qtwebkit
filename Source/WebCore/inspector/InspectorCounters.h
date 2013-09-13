@@ -53,6 +53,8 @@ public:
 #if ENABLE(INSPECTOR)
         ASSERT(isMainThread());
         ++s_counters[type];
+#else
+        UNUSED_PARAM(type);
 #endif
     }
 
@@ -61,6 +63,8 @@ public:
 #if ENABLE(INSPECTOR)
         ASSERT(isMainThread());
         --s_counters[type];
+#else
+        UNUSED_PARAM(type);
 #endif
     }
 

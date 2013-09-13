@@ -74,15 +74,13 @@ class XMLHttpRequest;
 
 #if ENABLE(WEB_SOCKETS)
 struct WebSocketFrame;
-class WebSocketHandshakeRequest;
-class WebSocketHandshakeResponse;
 #endif
 
 typedef String ErrorString;
 
 class InspectorResourceAgent : public InspectorBaseAgent<InspectorResourceAgent>, public InspectorBackendDispatcher::NetworkCommandHandler {
 public:
-    static PassOwnPtr<InspectorResourceAgent> create(InstrumentingAgents* instrumentingAgents, InspectorPageAgent* pageAgent, InspectorClient* client, InspectorState* state)
+    static PassOwnPtr<InspectorResourceAgent> create(InstrumentingAgents* instrumentingAgents, InspectorPageAgent* pageAgent, InspectorClient* client, InspectorCompositeState* state)
     {
         return adoptPtr(new InspectorResourceAgent(instrumentingAgents, pageAgent, client, state));
     }
@@ -91,7 +89,7 @@ public:
     virtual void clearFrontend();
     virtual void restore();
 
-    static PassRefPtr<InspectorResourceAgent> restore(Page*, InspectorState*, InspectorFrontend*);
+    static PassRefPtr<InspectorResourceAgent> restore(Page*, InspectorCompositeState*, InspectorFrontend*);
 
     ~InspectorResourceAgent();
 
@@ -127,8 +125,8 @@ public:
 
 #if ENABLE(WEB_SOCKETS)
     void didCreateWebSocket(unsigned long identifier, const KURL& requestURL);
-    void willSendWebSocketHandshakeRequest(unsigned long identifier, const WebSocketHandshakeRequest&);
-    void didReceiveWebSocketHandshakeResponse(unsigned long identifier, const WebSocketHandshakeResponse&);
+    void willSendWebSocketHandshakeRequest(unsigned long identifier, const ResourceRequest&);
+    void didReceiveWebSocketHandshakeResponse(unsigned long identifier, const ResourceResponse&);
     void didCloseWebSocket(unsigned long identifier);
     void didReceiveWebSocketFrame(unsigned long identifier, const WebSocketFrame&);
     void didSendWebSocketFrame(unsigned long identifier, const WebSocketFrame&);
@@ -153,10 +151,8 @@ public:
     virtual void clearBrowserCookies(ErrorString*);
     virtual void setCacheDisabled(ErrorString*, bool cacheDisabled);
 
-    virtual void reportMemoryUsage(MemoryObjectInfo*) const OVERRIDE;
-
 private:
-    InspectorResourceAgent(InstrumentingAgents*, InspectorPageAgent*, InspectorClient*, InspectorState*);
+    InspectorResourceAgent(InstrumentingAgents*, InspectorPageAgent*, InspectorClient*, InspectorCompositeState*);
 
     void enable();
 

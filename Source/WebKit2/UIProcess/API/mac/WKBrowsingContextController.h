@@ -48,16 +48,23 @@ WK_EXPORT
 /* Load a request. This is only valid for requests of non-file: URLs. Passing a
    file: URL will throw an exception. */
 - (void)loadRequest:(NSURLRequest *)request;
+- (void)loadRequest:(NSURLRequest *)request userData:(id)userData;
 
 /* Load a file: URL. Opens the sandbox only for files within allowedDirectory.
-    - Passing a non-file: URL to either parameter will yeild an exception.
+    - Passing a non-file: URL to either parameter will yield an exception.
     - Passing nil as the allowedDirectory will open the entire file-system for
-      reading. 
+      reading.
 */
 - (void)loadFileURL:(NSURL *)URL restrictToFilesWithin:(NSURL *)allowedDirectory;
+- (void)loadFileURL:(NSURL *)URL restrictToFilesWithin:(NSURL *)allowedDirectory userData:(id)userData;
 
 /* Load a page using the passed in string as its contents. */
 - (void)loadHTMLString:(NSString *)HTMLString baseURL:(NSURL *)baseURL;
+- (void)loadHTMLString:(NSString *)HTMLString baseURL:(NSURL *)baseURL userData:(id)userData;
+
+/* Load a page using the passed in data as its contents. */
+- (void)loadData:(NSData *)data MIMEType:(NSString *)MIMEType textEncodingName:(NSString *)encodingName baseURL:(NSURL *)baseURL;
+- (void)loadData:(NSData *)data MIMEType:(NSString *)MIMEType textEncodingName:(NSString *)encodingName baseURL:(NSURL *)baseURL userData:(id)userData;
 
 /* Stops the load associated with the active URL. */
 - (void)stopLoading;

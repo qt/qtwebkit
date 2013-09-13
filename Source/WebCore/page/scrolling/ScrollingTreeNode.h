@@ -41,15 +41,15 @@ class ScrollingStateScrollingNode;
 
 class ScrollingTreeNode {
 public:
-    explicit ScrollingTreeNode(ScrollingTree*);
+    explicit ScrollingTreeNode(ScrollingTree*, ScrollingNodeID);
     virtual ~ScrollingTreeNode();
 
-    virtual void update(ScrollingStateNode*) = 0;
+    virtual void updateBeforeChildren(ScrollingStateNode*) = 0;
+    virtual void updateAfterChildren(ScrollingStateNode*) { }
 
-    virtual void parentScrollPositionDidChange(const IntRect& viewportRect) = 0;
+    virtual void parentScrollPositionDidChange(const IntRect& viewportRect, const FloatSize& cumulativeDelta) = 0;
 
     ScrollingNodeID scrollingNodeID() const { return m_nodeID; }
-    void setScrollingNodeID(ScrollingNodeID nodeID) { m_nodeID = nodeID; }
 
     ScrollingTreeNode* parent() const { return m_parent; }
     void setParent(ScrollingTreeNode* parent) { m_parent = parent; }

@@ -48,7 +48,6 @@ public:
     virtual void frameWillDetachPage(Frame*) { }
     
     virtual bool shouldDeleteRange(Range*);
-    virtual bool shouldShowDeleteInterface(HTMLElement*);
     virtual bool smartInsertDeleteEnabled(); 
     virtual void toggleSmartInsertDelete();
     virtual bool isSelectTrailingWhitespaceEnabled(); 
@@ -73,7 +72,9 @@ public:
     virtual void respondToChangedContents();
     virtual void respondToChangedSelection(Frame*);
     virtual void didEndEditing();
+    virtual void willWriteSelectionToPasteboard(Range*);
     virtual void didWriteSelectionToPasteboard();
+    virtual void getClientPasteboardDataForRange(Range*, Vector<String>& pasteboardTypes, Vector<RefPtr<WebCore::SharedBuffer> >& pasteboardData);
     virtual void didSetSelectionTypesForPasteboard();
     
     virtual void registerUndoStep(PassRefPtr<UndoStep>);
@@ -110,9 +111,6 @@ public:
 
     bool isEditing() const;
 
-    void setSmartInsertDeleteEnabled(bool b) { m_smartInsertDeleteEnabled = b; }
-    void setSelectTrailingWhitespaceEnabled(bool b) { m_selectTrailingWhitespaceEnabled = b; }
-
     static bool dumpEditingCallbacks;
     static bool acceptsEditing;
 
@@ -121,8 +119,6 @@ private:
     QWebPageAdapter* m_page;
     bool m_editing;
     bool m_inUndoRedo; // our undo stack works differently - don't re-enter!
-    bool m_smartInsertDeleteEnabled;
-    bool m_selectTrailingWhitespaceEnabled;
 };
 
 }

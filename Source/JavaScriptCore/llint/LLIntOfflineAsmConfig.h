@@ -35,10 +35,13 @@
 #if ENABLE(LLINT_C_LOOP)
 #define OFFLINE_ASM_C_LOOP 1
 #define OFFLINE_ASM_X86 0
+#define OFFLINE_ASM_ARM 0
 #define OFFLINE_ASM_ARMv7 0
+#define OFFLINE_ASM_ARMv7_TRADITIONAL 0
 #define OFFLINE_ASM_X86_64 0
 #define OFFLINE_ASM_ARMv7s 0
 #define OFFLINE_ASM_MIPS 0
+#define OFFLINE_ASM_SH4 0
 
 #else // !ENABLE(LLINT_C_LOOP)
 
@@ -62,6 +65,19 @@
 #define OFFLINE_ASM_ARMv7 0
 #endif
 
+#if CPU(ARM_TRADITIONAL)
+#if WTF_ARM_ARCH_AT_LEAST(7)
+#define OFFLINE_ASM_ARMv7_TRADITIONAL 1
+#define OFFLINE_ASM_ARM 0
+#else
+#define OFFLINE_ASM_ARM 1
+#define OFFLINE_ASM_ARMv7_TRADITIONAL 0
+#endif
+#else
+#define OFFLINE_ASM_ARMv7_TRADITIONAL 0
+#define OFFLINE_ASM_ARM 0
+#endif
+
 #if CPU(X86_64)
 #define OFFLINE_ASM_X86_64 1
 #else
@@ -72,6 +88,12 @@
 #define OFFLINE_ASM_MIPS 1
 #else
 #define OFFLINE_ASM_MIPS 0
+#endif
+
+#if CPU(SH4)
+#define OFFLINE_ASM_SH4 1
+#else
+#define OFFLINE_ASM_SH4 0
 #endif
 
 #endif // !ENABLE(LLINT_C_LOOP)

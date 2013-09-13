@@ -33,7 +33,6 @@
 #include "JSSymbolTableObject.h"
 #include "Register.h"
 #include "SymbolTable.h"
-#include <wtf/UnusedParam.h>
 #include <wtf/OwnArrayPtr.h>
 
 namespace JSC {
@@ -59,13 +58,13 @@ namespace JSC {
         static const unsigned StructureFlags = Base::StructureFlags;
 
         JSVariableObject(
-            JSGlobalData& globalData,
+            VM& vm,
             Structure* structure,
             Register* registers,
             JSScope* scope,
             SharedSymbolTable* symbolTable = 0
         )
-            : Base(globalData, structure, scope, symbolTable)
+            : Base(vm, structure, scope, symbolTable)
             , m_registers(reinterpret_cast<WriteBarrierBase<Unknown>*>(registers))
         {
         }

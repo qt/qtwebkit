@@ -29,27 +29,22 @@
 
 #include "CSSParser.h"
 #include "ContentDistributor.h"
-#include "ContentSelectorQuery.h"
-#include "ElementShadow.h"
 #include "HTMLNames.h"
 #include "QualifiedName.h"
 #include "RuntimeEnabledFeatures.h"
 #include "ShadowRoot.h"
-#include <wtf/StdLibExtras.h>
 
 namespace WebCore {
 
 using HTMLNames::selectAttr;
 
+#if ENABLE(SHADOW_DOM)
+
 const QualifiedName& HTMLContentElement::contentTagName(Document*)
 {
-#if ENABLE(SHADOW_DOM)
     if (!RuntimeEnabledFeatures::shadowDOMEnabled())
         return HTMLNames::webkitShadowContentTag;
     return HTMLNames::contentTag;
-#else
-    return HTMLNames::webkitShadowContentTag;
-#endif
 }
 
 PassRefPtr<HTMLContentElement> HTMLContentElement::create(Document* document)
@@ -64,7 +59,6 @@ PassRefPtr<HTMLContentElement> HTMLContentElement::create(const QualifiedName& t
 
 HTMLContentElement::HTMLContentElement(const QualifiedName& name, Document* document)
     : InsertionPoint(name, document)
-    , m_registeredWithShadowRoot(false)
     , m_shouldParseSelectorList(false)
     , m_isValidSelector(true)
 {
@@ -72,6 +66,15 @@ HTMLContentElement::HTMLContentElement(const QualifiedName& name, Document* docu
 
 HTMLContentElement::~HTMLContentElement()
 {
+}
+
+InsertionPoint::MatchType HTMLContentElement::matchTypeFor(Node*)
+{
+    if (select().isNull() || select().isEmpty())
+        return AlwaysMatches;
+    if (!isSelectValid())
+        return NeverMatches;
+    return HasToMatchSelector;
 }
 
 const AtomicString& HTMLContentElement::select() const
@@ -101,49 +104,17 @@ void HTMLContentElement::ensureSelectParsed()
 void HTMLContentElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
     if (name == selectAttr) {
-        if (ShadowRoot* root = shadowRoot()) {
-            root->owner()->setShouldCollectSelectFeatureSet();
-            root->owner()->invalidateDistribution();
-        }
+        if (ShadowRoot* root = containingShadowRoot())
+            root->owner()->willAffectSelector();
         m_shouldParseSelectorList = true;
     } else
         InsertionPoint::parseAttribute(name, value);
 }
 
-Node::InsertionNotificationRequest HTMLContentElement::insertedInto(ContainerNode* insertionPoint)
-{
-    InsertionPoint::insertedInto(insertionPoint);
-
-    if (insertionPoint->inDocument() && isActive()) {
-        ShadowRoot* root = shadowRoot();
-        root->registerContentElement();
-        root->owner()->setShouldCollectSelectFeatureSet();
-        m_registeredWithShadowRoot = true;
-    }
-
-    return InsertionDone;
-}
-
-void HTMLContentElement::removedFrom(ContainerNode* insertionPoint)
-{
-    if (insertionPoint->inDocument() && m_registeredWithShadowRoot) {
-        ShadowRoot* root = shadowRoot();
-        if (!root)
-            root = insertionPoint->shadowRoot();
-        if (root)
-            root->unregisterContentElement();
-        m_registeredWithShadowRoot = false;
-
-        if (ElementShadow* elementShadow = root ? root->owner() : 0)
-            elementShadow->setShouldCollectSelectFeatureSet();
-    }
-    InsertionPoint::removedFrom(insertionPoint);
-}
-
-static bool validateSubSelector(CSSSelector* selector)
+static bool validateSubSelector(const CSSSelector* selector)
 {
     switch (selector->m_match) {
-    case CSSSelector::None:
+    case CSSSelector::Tag:
     case CSSSelector::Id:
     case CSSSelector::Class:
     case CSSSelector::Exact:
@@ -185,15 +156,15 @@ static bool validateSubSelector(CSSSelector* selector)
     }
 }
 
-static bool validateSelector(CSSSelector* selector)
+static bool validateSelector(const CSSSelector* selector)
 {
     ASSERT(selector);
 
     if (!validateSubSelector(selector))
         return false;
 
-    CSSSelector* prevSubSelector = selector;
-    CSSSelector* subSelector = selector->tagHistory();
+    const CSSSelector* prevSubSelector = selector;
+    const CSSSelector* subSelector = selector->tagHistory();
 
     while (subSelector) {
         if (prevSubSelector->relation() != CSSSelector::SubSelector)
@@ -215,10 +186,10 @@ bool HTMLContentElement::validateSelect() const
     if (select().isNull() || select().isEmpty())
         return true;
 
-    if (!m_selectorList.first())
+    if (!m_selectorList.isValid())
         return false;
 
-    for (CSSSelector* selector = m_selectorList.first(); selector; selector = m_selectorList.next(selector)) {
+    for (const CSSSelector* selector = m_selectorList.first(); selector; selector = m_selectorList.next(selector)) {
         if (!validateSelector(selector))
             return false;
     }
@@ -226,5 +197,7 @@ bool HTMLContentElement::validateSelect() const
     return true;
 }
 
+#endif // if ENABLE(SHADOW_DOM)
 
 }
+

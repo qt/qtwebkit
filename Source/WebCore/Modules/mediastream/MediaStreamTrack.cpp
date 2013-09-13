@@ -34,17 +34,16 @@
 
 namespace WebCore {
 
-PassRefPtr<MediaStreamTrack> MediaStreamTrack::create(ScriptExecutionContext* context, PassRefPtr<MediaStreamDescriptor> streamDescriptor, MediaStreamComponent* component)
+PassRefPtr<MediaStreamTrack> MediaStreamTrack::create(ScriptExecutionContext* context, MediaStreamComponent* component)
 {
-    RefPtr<MediaStreamTrack> track = adoptRef(new MediaStreamTrack(context, streamDescriptor, component));
+    RefPtr<MediaStreamTrack> track = adoptRef(new MediaStreamTrack(context, component));
     track->suspendIfNeeded();
     return track.release();
 }
 
-MediaStreamTrack::MediaStreamTrack(ScriptExecutionContext* context, PassRefPtr<MediaStreamDescriptor> streamDescriptor, MediaStreamComponent* component)
-    : ActiveDOMObject(context, this)
+MediaStreamTrack::MediaStreamTrack(ScriptExecutionContext* context, MediaStreamComponent* component)
+    : ActiveDOMObject(context)
     , m_stopped(false)
-    , m_streamDescriptor(streamDescriptor)
     , m_component(component)
 {
     m_component->source()->addObserver(this);
@@ -71,6 +70,11 @@ String MediaStreamTrack::kind() const
     return audioKind;
 }
 
+String MediaStreamTrack::id() const
+{
+    return m_component->id();
+}
+
 String MediaStreamTrack::label() const
 {
     return m_component->source()->name();
@@ -88,28 +92,33 @@ void MediaStreamTrack::setEnabled(bool enabled)
 
     m_component->setEnabled(enabled);
 
-    if (m_streamDescriptor->ended())
+    if (m_component->stream()->ended())
         return;
 
-    MediaStreamCenter::instance().didSetMediaStreamTrackEnabled(m_streamDescriptor.get(), m_component.get());
+    MediaStreamCenter::instance().didSetMediaStreamTrackEnabled(m_component->stream(), m_component.get());
 }
 
-MediaStreamTrack::ReadyState MediaStreamTrack::readyState() const
+String MediaStreamTrack::readyState() const
 {
     if (m_stopped)
-        return ENDED;
+        return ASCIILiteral("ended");
 
     switch (m_component->source()->readyState()) {
     case MediaStreamSource::ReadyStateLive:
-        return LIVE;
+        return ASCIILiteral("live");
     case MediaStreamSource::ReadyStateMuted:
-        return MUTED;
+        return ASCIILiteral("muted");
     case MediaStreamSource::ReadyStateEnded:
-        return ENDED;
+        return ASCIILiteral("ended");
     }
 
     ASSERT_NOT_REACHED();
-    return ENDED;
+    return String();
+}
+
+bool MediaStreamTrack::ended() const
+{
+    return m_stopped || (m_component->source()->readyState() == MediaStreamSource::ReadyStateEnded);
 }
 
 void MediaStreamTrack::sourceChangedState()
@@ -128,11 +137,6 @@ void MediaStreamTrack::sourceChangedState()
         dispatchEvent(Event::create(eventNames().endedEvent, false, false));
         break;
     }
-}
-
-MediaStreamDescriptor* MediaStreamTrack::streamDescriptor()
-{
-    return m_streamDescriptor.get();
 }
 
 MediaStreamComponent* MediaStreamTrack::component()

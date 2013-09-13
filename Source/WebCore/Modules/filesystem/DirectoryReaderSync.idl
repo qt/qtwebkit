@@ -29,8 +29,10 @@
  */
 
 [
+    NoInterfaceObject,
     Conditional=FILE_SYSTEM,
-    JSNoStaticTables
+    JSNoStaticTables,
+    ImplementationLacksVTable
 ] interface DirectoryReaderSync {
-    EntryArraySync readEntries() raises (FileException);
+    [RaisesException] EntryArraySync readEntries();
 };

@@ -79,7 +79,8 @@ ScriptProcessorNode::ScriptProcessorNode(AudioContext* context, float sampleRate
     , m_isRequestOutstanding(false)
     , m_numberOfInputChannels(numberOfInputChannels)
     , m_numberOfOutputChannels(numberOfOutputChannels)
-    , m_internalInputBus(numberOfInputChannels, AudioNode::ProcessingSizeInFrames, false)
+    , m_internalInputBus(AudioBus::create(numberOfInputChannels, AudioNode::ProcessingSizeInFrames, false))
+    , m_hasAudioProcessListener(false)
 {
     // Regardless of the allowed buffer sizes, we still need to process at the granularity of the AudioNode.
     if (m_bufferSize < AudioNode::ProcessingSizeInFrames)
@@ -138,7 +139,11 @@ void ScriptProcessorNode::process(size_t framesToProcess)
     // Additionally, there is a double-buffering for input and output which is exposed directly to JavaScript (see inputBuffer and outputBuffer below).
     // This node is the producer for inputBuffer and the consumer for outputBuffer.
     // The JavaScript code is the consumer of inputBuffer and the producer for outputBuffer.
-    
+
+    // Check if audioprocess listener is set.
+    if (!m_hasAudioProcessListener)
+        return;
+
     // Get input and output busses.
     AudioBus* inputBus = this->input(0)->bus();
     AudioBus* outputBus = this->output(0)->bus();
@@ -154,11 +159,11 @@ void ScriptProcessorNode::process(size_t framesToProcess)
     AudioBuffer* outputBuffer = m_outputBuffers[doubleBufferIndex].get();
 
     // Check the consistency of input and output buffers.
-    unsigned numberOfInputChannels = m_internalInputBus.numberOfChannels();
+    unsigned numberOfInputChannels = m_internalInputBus->numberOfChannels();
     bool buffersAreGood = outputBuffer && bufferSize() == outputBuffer->length() && m_bufferReadWriteIndex + framesToProcess <= bufferSize();
 
     // If the number of input channels is zero, it's ok to have inputBuffer = 0.
-    if (m_internalInputBus.numberOfChannels())
+    if (m_internalInputBus->numberOfChannels())
         buffersAreGood = buffersAreGood && inputBuffer && bufferSize() == inputBuffer->length();
 
     ASSERT(buffersAreGood);
@@ -179,10 +184,10 @@ void ScriptProcessorNode::process(size_t framesToProcess)
         return;
 
     for (unsigned i = 0; i < numberOfInputChannels; i++)
-        m_internalInputBus.setChannelMemory(i, inputBuffer->getChannelData(i)->data() + m_bufferReadWriteIndex, framesToProcess);
+        m_internalInputBus->setChannelMemory(i, inputBuffer->getChannelData(i)->data() + m_bufferReadWriteIndex, framesToProcess);
 
     if (numberOfInputChannels)
-        m_internalInputBus.copyFrom(*inputBus);
+        m_internalInputBus->copyFrom(*inputBus);
 
     // Copy from the output buffer to the output. 
     for (unsigned i = 0; i < numberOfOutputChannels; ++i)
@@ -212,6 +217,12 @@ void ScriptProcessorNode::process(size_t framesToProcess)
 
         swapBuffers();
     }
+}
+
+void ScriptProcessorNode::setOnaudioprocess(PassRefPtr<EventListener> listener)
+{
+    m_hasAudioProcessListener = listener;
+    setAttributeEventListener(eventNames().audioprocessEvent, listener);
 }
 
 void ScriptProcessorNode::fireProcessEventDispatch(void* userData)
@@ -261,16 +272,6 @@ void ScriptProcessorNode::reset()
         m_inputBuffers[i]->zero();
         m_outputBuffers[i]->zero();
     }
-}
-
-const AtomicString& ScriptProcessorNode::interfaceName() const
-{
-    return eventNames().interfaceForScriptProcessorNode;
-}
-
-ScriptExecutionContext* ScriptProcessorNode::scriptExecutionContext() const
-{
-    return const_cast<ScriptProcessorNode*>(this)->context()->scriptExecutionContext();
 }
 
 double ScriptProcessorNode::tailTime() const

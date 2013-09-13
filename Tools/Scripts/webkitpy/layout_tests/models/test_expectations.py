@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # Copyright (C) 2010 Google Inc. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -277,25 +276,16 @@ class TestExpectationParser(object):
         warnings = []
 
         WEBKIT_BUG_PREFIX = 'webkit.org/b/'
-        CHROMIUM_BUG_PREFIX = 'crbug.com/'
-        V8_BUG_PREFIX = 'code.google.com/p/v8/issues/detail?id='
 
         tokens = remaining_string.split()
         state = 'start'
         for token in tokens:
-            if (token.startswith(WEBKIT_BUG_PREFIX) or
-                token.startswith(CHROMIUM_BUG_PREFIX) or
-                token.startswith(V8_BUG_PREFIX) or
-                token.startswith('Bug(')):
+            if token.startswith(WEBKIT_BUG_PREFIX) or token.startswith('Bug('):
                 if state != 'start':
                     warnings.append('"%s" is not at the start of the line.' % token)
                     break
                 if token.startswith(WEBKIT_BUG_PREFIX):
                     bugs.append(token.replace(WEBKIT_BUG_PREFIX, 'BUGWK'))
-                elif token.startswith(CHROMIUM_BUG_PREFIX):
-                    bugs.append(token.replace(CHROMIUM_BUG_PREFIX, 'BUGCR'))
-                elif token.startswith(V8_BUG_PREFIX):
-                    bugs.append(token.replace(V8_BUG_PREFIX, 'BUGV8_'))
                 else:
                     match = re.match('Bug\((\w+)\)$', token)
                     if not match:
@@ -330,6 +320,8 @@ class TestExpectationParser(object):
             elif state == 'expectations':
                 if token in ('Rebaseline', 'Skip', 'Slow', 'WontFix'):
                     modifiers.append(token.upper())
+                elif token not in cls._expectation_tokens:
+                    warnings.append('Unrecognized expectation "%s"' % token)
                 else:
                     expectations.append(cls._expectation_tokens.get(token, token))
             elif state == 'name_found':
@@ -345,12 +337,12 @@ class TestExpectationParser(object):
             elif state not in ('name_found', 'done'):
                 warnings.append('Missing a "]"')
 
-        if 'WONTFIX' in modifiers and 'SKIP' not in modifiers:
+        if 'WONTFIX' in modifiers and 'SKIP' not in modifiers and not expectations:
             modifiers.append('SKIP')
 
         if 'SKIP' in modifiers and expectations:
             # FIXME: This is really a semantic warning and shouldn't be here. Remove when we drop the old syntax.
-            warnings.append('A test marked Skip or WontFix must not have other expectations.')
+            warnings.append('A test marked Skip must not have other expectations.')
         elif not expectations:
             if 'SKIP' not in modifiers and 'REBASELINE' not in modifiers and 'SLOW' not in modifiers:
                 modifiers.append('SKIP')
@@ -755,7 +747,8 @@ class TestExpectations(object):
                     'text': TEXT,
                     'timeout': TIMEOUT,
                     'crash': CRASH,
-                    'missing': MISSING}
+                    'missing': MISSING,
+                    'skip': SKIP}
 
     # (aggregated by category, pass/fail/skip, type)
     EXPECTATION_DESCRIPTIONS = {SKIP: 'skipped',
@@ -840,7 +833,7 @@ class TestExpectations(object):
     # FIXME: This constructor does too much work. We should move the actual parsing of
     # the expectations into separate routines so that linting and handling overrides
     # can be controlled separately, and the constructor can be more of a no-op.
-    def __init__(self, port, tests=None, include_overrides=True, expectations_to_lint=None):
+    def __init__(self, port, tests=None, include_generic=True, include_overrides=True, expectations_to_lint=None):
         self._full_test_list = tests
         self._test_config = port.test_configuration()
         self._is_lint_mode = expectations_to_lint is not None
@@ -848,16 +841,32 @@ class TestExpectations(object):
         self._parser = TestExpectationParser(port, tests, self._is_lint_mode)
         self._port = port
         self._skipped_tests_warnings = []
+        self._expectations = []
 
         expectations_dict = expectations_to_lint or port.expectations_dict()
-        self._expectations = self._parser.parse(expectations_dict.keys()[0], expectations_dict.values()[0])
-        self._add_expectations(self._expectations)
 
-        if len(expectations_dict) > 1 and include_overrides:
-            for name in expectations_dict.keys()[1:]:
-                expectations = self._parser.parse(name, expectations_dict[name])
+        expectations_dict_index = 0
+        # Populate generic expectations (if enabled by include_generic).
+        if port.path_to_generic_test_expectations_file() in expectations_dict:
+            if include_generic:
+                expectations = self._parser.parse(expectations_dict.keys()[expectations_dict_index], expectations_dict.values()[expectations_dict_index])
                 self._add_expectations(expectations)
                 self._expectations += expectations
+            expectations_dict_index += 1
+
+        # Populate default port expectations (always enabled).
+        if len(expectations_dict) > expectations_dict_index:
+            expectations = self._parser.parse(expectations_dict.keys()[expectations_dict_index], expectations_dict.values()[expectations_dict_index])
+            self._add_expectations(expectations)
+            self._expectations += expectations
+            expectations_dict_index += 1
+
+        # Populate override expectations (if enabled by include_overrides).
+        while len(expectations_dict) > expectations_dict_index and include_overrides:
+            expectations = self._parser.parse(expectations_dict.keys()[expectations_dict_index], expectations_dict.values()[expectations_dict_index])
+            self._add_expectations(expectations)
+            self._expectations += expectations
+            expectations_dict_index += 1
 
         # FIXME: move ignore_tests into port.skipped_layout_tests()
         self.add_skipped_tests(port.skipped_layout_tests(tests).union(set(port.get_option('ignore_tests', []))))

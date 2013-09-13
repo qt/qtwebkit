@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2012, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -35,6 +35,7 @@
 #include "ScrollingTreeFixedNode.h"
 #include "ScrollingTreeNode.h"
 #include "ScrollingTreeScrollingNode.h"
+#include "ScrollingTreeStickyNode.h"
 #include <wtf/MainThread.h>
 #include <wtf/TemporaryChange.h>
 
@@ -47,12 +48,17 @@ PassRefPtr<ScrollingTree> ScrollingTree::create(ScrollingCoordinator* scrollingC
 
 ScrollingTree::ScrollingTree(ScrollingCoordinator* scrollingCoordinator)
     : m_scrollingCoordinator(scrollingCoordinator)
-    , m_rootNode(ScrollingTreeScrollingNode::create(this))
     , m_hasWheelEventHandlers(false)
     , m_canGoBack(false)
     , m_canGoForward(false)
     , m_mainFramePinnedToTheLeft(false)
     , m_mainFramePinnedToTheRight(false)
+    , m_rubberBandsAtBottom(true)
+    , m_rubberBandsAtTop(true)
+    , m_mainFramePinnedToTheTop(false)
+    , m_mainFramePinnedToTheBottom(false)
+    , m_mainFrameIsRubberBanding(false)
+    , m_scrollPinningBehavior(DoNotPin)
     , m_scrollingPerformanceLoggingEnabled(false)
     , m_isHandlingProgrammaticScroll(false)
 {
@@ -98,8 +104,9 @@ void ScrollingTree::updateBackForwardState(bool canGoBack, bool canGoForward)
 void ScrollingTree::handleWheelEvent(const PlatformWheelEvent& wheelEvent)
 {
     ASSERT(ScrollingThread::isCurrentThread());
-
-    m_rootNode->handleWheelEvent(wheelEvent);
+    
+    if (m_rootNode)
+        m_rootNode->handleWheelEvent(wheelEvent);
 }
 
 static void derefScrollingCoordinator(ScrollingCoordinator* scrollingCoordinator)
@@ -126,52 +133,72 @@ void ScrollingTree::commitNewTreeState(PassOwnPtr<ScrollingStateTree> scrollingS
 {
     ASSERT(ScrollingThread::isCurrentThread());
 
-    if (scrollingStateTree->rootStateNode()->changedProperties() & (ScrollingStateScrollingNode::WheelEventHandlerCount | ScrollingStateScrollingNode::NonFastScrollableRegion) || scrollingStateTree->rootStateNode()->scrollLayerDidChange()) {
+    bool rootStateNodeChanged = scrollingStateTree->hasNewRootStateNode();
+    
+    ScrollingStateScrollingNode* rootNode = scrollingStateTree->rootStateNode();
+    if (rootNode
+        && (rootStateNodeChanged
+            || rootNode->hasChangedProperty(ScrollingStateScrollingNode::WheelEventHandlerCount)
+            || rootNode->hasChangedProperty(ScrollingStateScrollingNode::NonFastScrollableRegion)
+            || rootNode->hasChangedProperty(ScrollingStateNode::ScrollLayer))) {
         MutexLocker lock(m_mutex);
 
-        if (scrollingStateTree->rootStateNode()->scrollLayerDidChange())
+        if (rootStateNodeChanged || rootNode->hasChangedProperty(ScrollingStateNode::ScrollLayer))
             m_mainFrameScrollPosition = IntPoint();
-        if (scrollingStateTree->rootStateNode()->changedProperties() & ScrollingStateScrollingNode::WheelEventHandlerCount)
+        if (rootStateNodeChanged || rootNode->hasChangedProperty(ScrollingStateScrollingNode::WheelEventHandlerCount))
             m_hasWheelEventHandlers = scrollingStateTree->rootStateNode()->wheelEventHandlerCount();
-        if (scrollingStateTree->rootStateNode()->changedProperties() & ScrollingStateScrollingNode::NonFastScrollableRegion)
+        if (rootStateNodeChanged || rootNode->hasChangedProperty(ScrollingStateScrollingNode::NonFastScrollableRegion))
             m_nonFastScrollableRegion = scrollingStateTree->rootStateNode()->nonFastScrollableRegion();
     }
     
-    TemporaryChange<bool> changeHandlingProgrammaticScroll(m_isHandlingProgrammaticScroll, scrollingStateTree->rootStateNode()->requestedScrollPositionRepresentsProgrammaticScroll());
+    bool scrollRequestIsProgammatic = rootNode ? rootNode->requestedScrollPositionRepresentsProgrammaticScroll() : false;
+    TemporaryChange<bool> changeHandlingProgrammaticScroll(m_isHandlingProgrammaticScroll, scrollRequestIsProgammatic);
 
     removeDestroyedNodes(scrollingStateTree.get());
-    updateTreeFromStateNode(scrollingStateTree->rootStateNode());
-
-    updateDebugRootLayer();
+    updateTreeFromStateNode(rootNode);
 }
 
 void ScrollingTree::updateTreeFromStateNode(ScrollingStateNode* stateNode)
 {
+    if (!stateNode) {
+        m_nodeMap.clear();
+        m_rootNode = nullptr;
+        return;
+    }
+    
     // This fuction recurses through the ScrollingStateTree and updates the corresponding ScrollingTreeNodes.
     // Find the ScrollingTreeNode associated with the current stateNode using the shared ID and our HashMap.
     ScrollingTreeNodeMap::const_iterator it = m_nodeMap.find(stateNode->scrollingNodeID());
 
+    ScrollingTreeNode* node;
     if (it != m_nodeMap.end()) {
-        ScrollingTreeNode* node = it->value;
-        node->update(stateNode);
+        node = it->value;
+        node->updateBeforeChildren(stateNode);
     } else {
         // If the node isn't found, it's either new and needs to be added to the tree, or there is a new ID for our
         // root node.
+        ScrollingNodeID nodeID = stateNode->scrollingNodeID();
         if (!stateNode->parent()) {
-            // This is the root node.
-            m_rootNode->setScrollingNodeID(stateNode->scrollingNodeID());
-            m_nodeMap.set(stateNode->scrollingNodeID(), m_rootNode.get());
-            m_rootNode->update(stateNode);
+            // This is the root node. Nuke the node map.
+            m_nodeMap.clear();
+
+            m_rootNode = ScrollingTreeScrollingNode::create(this, nodeID);
+            m_nodeMap.set(nodeID, m_rootNode.get());
+            m_rootNode->updateBeforeChildren(stateNode);
+            node = m_rootNode.get();
         } else {
             OwnPtr<ScrollingTreeNode> newNode;
             if (stateNode->isScrollingNode())
-                newNode = ScrollingTreeScrollingNode::create(this);
+                newNode = ScrollingTreeScrollingNode::create(this, nodeID);
             else if (stateNode->isFixedNode())
-                newNode = ScrollingTreeFixedNode::create(this);
+                newNode = ScrollingTreeFixedNode::create(this, nodeID);
+            else if (stateNode->isStickyNode())
+                newNode = ScrollingTreeStickyNode::create(this, nodeID);
             else
                 ASSERT_NOT_REACHED();
-            ScrollingTreeNode* newNodeRawPtr = newNode.get();
-            m_nodeMap.set(stateNode->scrollingNodeID(), newNodeRawPtr);
+
+            node = newNode.get();
+            m_nodeMap.set(nodeID, node);
             ScrollingTreeNodeMap::const_iterator it = m_nodeMap.find(stateNode->parent()->scrollingNodeID());
             ASSERT(it != m_nodeMap.end());
             if (it != m_nodeMap.end()) {
@@ -179,18 +206,18 @@ void ScrollingTree::updateTreeFromStateNode(ScrollingStateNode* stateNode)
                 newNode->setParent(parent);
                 parent->appendChild(newNode.release());
             }
-            newNodeRawPtr->update(stateNode);
+            node->updateBeforeChildren(stateNode);
         }
     }
 
     // Now update the children if we have any.
     Vector<OwnPtr<ScrollingStateNode> >* stateNodeChildren = stateNode->children();
-    if (!stateNodeChildren)
-        return;
-
-    size_t size = stateNodeChildren->size();
-    for (size_t i = 0; i < size; ++i)
-        updateTreeFromStateNode(stateNodeChildren->at(i).get());
+    if (stateNodeChildren) {
+        size_t size = stateNodeChildren->size();
+        for (size_t i = 0; i < size; ++i)
+            updateTreeFromStateNode(stateNodeChildren->at(i).get());
+    }
+    node->updateAfterChildren(stateNode);
 }
 
 void ScrollingTree::removeDestroyedNodes(ScrollingStateTree* stateTree)
@@ -206,12 +233,14 @@ void ScrollingTree::removeDestroyedNodes(ScrollingStateTree* stateTree)
     }
 }
 
-void ScrollingTree::setMainFramePinState(bool pinnedToTheLeft, bool pinnedToTheRight)
+void ScrollingTree::setMainFramePinState(bool pinnedToTheLeft, bool pinnedToTheRight, bool pinnedToTheTop, bool pinnedToTheBottom)
 {
     MutexLocker locker(m_swipeStateMutex);
 
     m_mainFramePinnedToTheLeft = pinnedToTheLeft;
     m_mainFramePinnedToTheRight = pinnedToTheRight;
+    m_mainFramePinnedToTheTop = pinnedToTheTop;
+    m_mainFramePinnedToTheBottom = pinnedToTheBottom;
 }
 
 void ScrollingTree::updateMainFrameScrollPosition(const IntPoint& scrollPosition, SetOrSyncScrollingLayerPosition scrollingLayerPositionAction)
@@ -233,7 +262,7 @@ IntPoint ScrollingTree::mainFrameScrollPosition()
     return m_mainFrameScrollPosition;
 }
 
-#if PLATFORM(MAC) || (PLATFORM(CHROMIUM) && OS(DARWIN))
+#if PLATFORM(MAC)
 void ScrollingTree::handleWheelEventPhase(PlatformWheelEventPhase phase)
 {
     if (!m_scrollingCoordinator)
@@ -257,11 +286,65 @@ bool ScrollingTree::canGoForward()
     return m_canGoForward;
 }
 
+bool ScrollingTree::isRubberBandInProgress()
+{
+    MutexLocker lock(m_mutex);    
+
+    return m_mainFrameIsRubberBanding;
+}
+
+void ScrollingTree::setMainFrameIsRubberBanding(bool isRubberBanding)
+{
+    MutexLocker locker(m_mutex);
+
+    m_mainFrameIsRubberBanding = isRubberBanding;
+}
+
+bool ScrollingTree::rubberBandsAtBottom()
+{
+    MutexLocker lock(m_swipeStateMutex);
+
+    return m_rubberBandsAtBottom;
+}
+
+void ScrollingTree::setRubberBandsAtBottom(bool rubberBandsAtBottom)
+{
+    MutexLocker locker(m_swipeStateMutex);
+
+    m_rubberBandsAtBottom = rubberBandsAtBottom;
+}
+
+bool ScrollingTree::rubberBandsAtTop()
+{
+    MutexLocker lock(m_swipeStateMutex);
+
+    return m_rubberBandsAtTop;
+}
+
+void ScrollingTree::setRubberBandsAtTop(bool rubberBandsAtTop)
+{
+    MutexLocker locker(m_swipeStateMutex);
+
+    m_rubberBandsAtTop = rubberBandsAtTop;
+}
+    
+void ScrollingTree::setScrollPinningBehavior(ScrollPinningBehavior pinning)
+{
+    MutexLocker locker(m_swipeStateMutex);
+    
+    m_scrollPinningBehavior = pinning;
+}
+
+ScrollPinningBehavior ScrollingTree::scrollPinningBehavior()
+{
+    MutexLocker lock(m_swipeStateMutex);
+    
+    return m_scrollPinningBehavior;
+}
+
 bool ScrollingTree::willWheelEventStartSwipeGesture(const PlatformWheelEvent& wheelEvent)
 {
     if (wheelEvent.phase() != PlatformWheelEventPhaseBegan)
-        return false;
-    if (!wheelEvent.deltaX())
         return false;
 
     MutexLocker lock(m_swipeStateMutex);
@@ -269,6 +352,10 @@ bool ScrollingTree::willWheelEventStartSwipeGesture(const PlatformWheelEvent& wh
     if (wheelEvent.deltaX() > 0 && m_mainFramePinnedToTheLeft && m_canGoBack)
         return true;
     if (wheelEvent.deltaX() < 0 && m_mainFramePinnedToTheRight && m_canGoForward)
+        return true;
+    if (wheelEvent.deltaY() > 0 && m_mainFramePinnedToTheTop && !m_rubberBandsAtTop)
+        return true;
+    if (wheelEvent.deltaY() < 0 && m_mainFramePinnedToTheBottom && !m_rubberBandsAtBottom)
         return true;
 
     return false;

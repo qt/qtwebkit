@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, 2011, 2012 Research In Motion Limited. All rights reserved.
+ * Copyright (C) 2010, 2011, 2012, 2013 Research In Motion Limited. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -19,8 +19,6 @@
 #include "config.h"
 #include "SurfacePool.h"
 
-#include "PlatformContextSkia.h"
-
 #include <BlackBerryPlatformExecutableMessage.h>
 #include <BlackBerryPlatformGraphics.h>
 #include <BlackBerryPlatformLog.h>
@@ -34,8 +32,6 @@
 #if BLACKBERRY_PLATFORM_GRAPHICS_EGL
 #include <EGL/eglext.h>
 #endif
-
-#define SHARED_PIXMAP_GROUP "webkit_backingstore_group"
 
 namespace BlackBerry {
 namespace WebKit {
@@ -55,13 +51,16 @@ SurfacePool* SurfacePool::globalSurfacePool()
 }
 
 SurfacePool::SurfacePool()
-    : m_visibleTileBuffer(0)
-    , m_tileRenderingSurface(0)
-    , m_backBuffer(0)
+    : m_numberOfFrontBuffers(0)
     , m_initialized(false)
     , m_buffersSuspended(false)
     , m_hasFenceExtension(false)
 {
+}
+
+int SurfacePool::numberOfBackingStoreFrontBuffers() const
+{
+    return m_numberOfFrontBuffers;
 }
 
 void SurfacePool::initialize(const Platform::IntSize& tileSize)
@@ -70,28 +69,20 @@ void SurfacePool::initialize(const Platform::IntSize& tileSize)
         return;
     m_initialized = true;
 
-    const unsigned numberOfTiles = Platform::Settings::instance()->numberOfBackingStoreTiles();
-    const unsigned maxNumberOfTiles = Platform::Settings::instance()->maximumNumberOfBackingStoreTilesAcrossProcesses();
+    m_numberOfFrontBuffers = Platform::Settings::instance()->numberOfBackingStoreFrontBuffers();
 
-    if (numberOfTiles) { // Only allocate if we actually use a backingstore.
-        unsigned byteLimit = (maxNumberOfTiles /*pool*/ + 2 /*visible tile buffer, backbuffer*/) * tileSize.width() * tileSize.height() * 4;
-        bool success = Platform::Graphics::createPixmapGroup(SHARED_PIXMAP_GROUP, byteLimit);
-        if (!success) {
-            BBLOG(Platform::LogLevelWarn,
-                "Shared buffer pool could not be set up, using regular memory allocation instead.");
-        }
-    }
+    if (!m_numberOfFrontBuffers)
+        return; // We completely disable tile rendering when 0 tiles are specified.
 
-    m_tileRenderingSurface = Platform::Graphics::drawingSurface();
+    const unsigned numberOfBackBuffers = Platform::Settings::instance()->numberOfBackingStoreBackBuffers();
+    const unsigned numberOfPoolTiles = m_numberOfFrontBuffers + numberOfBackBuffers; // back buffer
 
-    if (!numberOfTiles)
-        return; // we only use direct rendering when 0 tiles are specified.
+    for (size_t i = 0; i < numberOfPoolTiles; ++i)
+        m_tileBufferPool.append(new TileBuffer(tileSize));
 
-    // Create the shared backbuffer.
-    m_backBuffer = reinterpret_cast<unsigned>(new TileBuffer(tileSize));
-
-    for (size_t i = 0; i < numberOfTiles; ++i)
-        m_tilePool.append(BackingStoreTile::create(tileSize, BackingStoreTile::DoubleBuffered));
+    // All buffers not used as front buffers are used as back buffers.
+    // Initially, that's all of them.
+    m_availableBackBufferPool = m_tileBufferPool;
 
 #if BLACKBERRY_PLATFORM_GRAPHICS_EGL
     const char* extensions = eglQueryString(Platform::Graphics::eglDisplay(), EGL_EXTENSIONS);
@@ -117,161 +108,91 @@ void SurfacePool::initialize(const Platform::IntSize& tileSize)
 
 PlatformGraphicsContext* SurfacePool::createPlatformGraphicsContext(Platform::Graphics::Drawable* drawable) const
 {
-    return new WebCore::PlatformContextSkia(drawable);
+    return drawable;
 }
 
-PlatformGraphicsContext* SurfacePool::lockTileRenderingSurface() const
+void SurfacePool::destroyPlatformGraphicsContext(PlatformGraphicsContext*) const
 {
-    if (!m_tileRenderingSurface)
+}
+
+unsigned SurfacePool::numberOfAvailableBackBuffers() const
+{
+    return m_availableBackBufferPool.size();
+}
+
+TileBuffer* SurfacePool::takeBackBuffer()
+{
+    ASSERT(!m_availableBackBufferPool.isEmpty());
+    if (m_availableBackBufferPool.isEmpty())
         return 0;
 
-    return createPlatformGraphicsContext(Platform::Graphics::lockBufferDrawable(m_tileRenderingSurface));
+    TileBuffer* buffer = m_availableBackBufferPool.first();
+
+    // Reorder so we get FIFO semantics. Should minimize fence waiting times.
+    for (unsigned i = 0; i < m_availableBackBufferPool.size() - 1; ++i)
+        m_availableBackBufferPool[i] = m_availableBackBufferPool[i + 1];
+    m_availableBackBufferPool.removeLast();
+
+    ASSERT(buffer);
+    return buffer;
 }
 
-void SurfacePool::releaseTileRenderingSurface(PlatformGraphicsContext* context) const
+void SurfacePool::addBackBuffer(TileBuffer* tileBuffer)
 {
-    if (!m_tileRenderingSurface)
-        return;
-
-    delete context;
-    Platform::Graphics::releaseBufferDrawable(m_tileRenderingSurface);
-}
-
-void SurfacePool::initializeVisibleTileBuffer(const Platform::IntSize& visibleSize)
-{
-    if (!m_visibleTileBuffer || m_visibleTileBuffer->size() != visibleSize) {
-        delete m_visibleTileBuffer;
-        m_visibleTileBuffer = BackingStoreTile::create(visibleSize, BackingStoreTile::SingleBuffered);
-    }
-}
-
-TileBuffer* SurfacePool::backBuffer() const
-{
-    ASSERT(m_backBuffer);
-    return reinterpret_cast<TileBuffer*>(m_backBuffer);
-}
-
-const char *SurfacePool::sharedPixmapGroup() const
-{
-    return SHARED_PIXMAP_GROUP;
+    ASSERT(tileBuffer);
+    tileBuffer->clearRenderedRegion();
+    m_availableBackBufferPool.append(tileBuffer);
 }
 
 void SurfacePool::createBuffers()
 {
-    if (!m_initialized || m_tilePool.isEmpty() || !m_buffersSuspended)
+    if (!m_initialized || m_tileBufferPool.isEmpty() || !m_buffersSuspended)
         return;
 
     // Create the tile pool.
-    for (size_t i = 0; i < m_tilePool.size(); ++i) {
-        if (m_tilePool[i]->frontBuffer()->wasNativeBufferCreated())
-            Platform::Graphics::createPixmapBuffer(m_tilePool[i]->frontBuffer()->nativeBuffer());
+    for (size_t i = 0; i < m_tileBufferPool.size(); ++i) {
+        if (m_tileBufferPool[i]->wasNativeBufferCreated())
+            Platform::Graphics::createPixmapBuffer(m_tileBufferPool[i]->nativeBuffer());
     }
-
-    if (m_visibleTileBuffer && m_visibleTileBuffer->frontBuffer()->wasNativeBufferCreated())
-        Platform::Graphics::createPixmapBuffer(m_visibleTileBuffer->frontBuffer()->nativeBuffer());
-
-    if (backBuffer() && backBuffer()->wasNativeBufferCreated())
-        Platform::Graphics::createPixmapBuffer(backBuffer()->nativeBuffer());
 
     m_buffersSuspended = false;
 }
 
 void SurfacePool::releaseBuffers()
 {
-    if (!m_initialized || m_tilePool.isEmpty() || m_buffersSuspended)
+    if (!m_initialized || m_tileBufferPool.isEmpty() || m_buffersSuspended)
         return;
 
     m_buffersSuspended = true;
 
     // Release the tile pool.
-    for (size_t i = 0; i < m_tilePool.size(); ++i) {
-        if (!m_tilePool[i]->frontBuffer()->wasNativeBufferCreated())
+    for (size_t i = 0; i < m_tileBufferPool.size(); ++i) {
+        if (!m_tileBufferPool[i]->wasNativeBufferCreated())
             continue;
-        m_tilePool[i]->frontBuffer()->clearRenderedRegion();
+        m_tileBufferPool[i]->clearRenderedRegion();
         // Clear the buffer to prevent accidental leakage of (possibly sensitive) pixel data.
-        Platform::Graphics::clearBuffer(m_tilePool[i]->frontBuffer()->nativeBuffer(), 0, 0, 0, 0);
-        Platform::Graphics::destroyPixmapBuffer(m_tilePool[i]->frontBuffer()->nativeBuffer());
-    }
-
-    if (m_visibleTileBuffer && m_visibleTileBuffer->frontBuffer()->wasNativeBufferCreated()) {
-        m_visibleTileBuffer->frontBuffer()->clearRenderedRegion();
-        Platform::Graphics::clearBuffer(m_visibleTileBuffer->frontBuffer()->nativeBuffer(), 0, 0, 0, 0);
-        Platform::Graphics::destroyPixmapBuffer(m_visibleTileBuffer->frontBuffer()->nativeBuffer());
-    }
-
-    if (backBuffer() && backBuffer()->wasNativeBufferCreated()) {
-        backBuffer()->clearRenderedRegion();
-        Platform::Graphics::clearBuffer(backBuffer()->nativeBuffer(), 0, 0, 0, 0);
-        Platform::Graphics::destroyPixmapBuffer(backBuffer()->nativeBuffer());
+        Platform::Graphics::clearBuffer(m_tileBufferPool[i]->nativeBuffer(), 0, 0, 0, 0);
+        Platform::Graphics::destroyPixmapBuffer(m_tileBufferPool[i]->nativeBuffer());
     }
 
     Platform::userInterfaceThreadMessageClient()->dispatchSyncMessage(
         Platform::createFunctionCallMessage(&Platform::Graphics::collectThreadSpecificGarbage));
 }
 
-void SurfacePool::waitForBuffer(TileBuffer* tileBuffer)
+void SurfacePool::waitForBuffer(TileBuffer*)
 {
     if (!m_hasFenceExtension)
         return;
-
-#if BLACKBERRY_PLATFORM_GRAPHICS_EGL
-    EGLSyncKHR platformSync;
-
-    {
-        Platform::MutexLocker locker(&m_mutex);
-        platformSync = tileBuffer->fence()->takePlatformSync();
-    }
-
-    if (!platformSync)
-        return;
-
-    if (!eglClientWaitSyncKHR(Platform::Graphics::eglDisplay(), platformSync, 0, 100000000LL))
-        Platform::logAlways(Platform::LogLevelWarn, "Failed to wait for EGLSyncKHR object!\n");
-
-    // Instead of assuming eglDestroySyncKHR is thread safe, we add it to
-    // a garbage list for later collection on the thread that created it.
-    {
-        Platform::MutexLocker locker(&m_mutex);
-        m_garbage.insert(platformSync);
-    }
-#endif
 }
 
-void SurfacePool::notifyBuffersComposited(const Vector<TileBuffer*>& tileBuffers)
+void SurfacePool::notifyBuffersComposited(const TileBufferList&)
 {
     if (!m_hasFenceExtension)
         return;
-
-#if BLACKBERRY_PLATFORM_GRAPHICS_EGL
-    Platform::MutexLocker locker(&m_mutex);
-
-    EGLDisplay display = Platform::Graphics::eglDisplay();
-
-    // The EGL_KHR_fence_sync spec is nice enough to specify that the sync object
-    // is not actually deleted until everyone has stopped using it.
-    for (std::set<void*>::const_iterator it = m_garbage.begin(); it != m_garbage.end(); ++it)
-        eglDestroySyncKHR(display, *it);
-    m_garbage.clear();
-
-    // If we didn't blit anything, we don't need to create a new fence.
-    if (tileBuffers.isEmpty())
-        return;
-
-    // Create a new fence and assign to the tiles that were blit. Invalidate any previous
-    // fence that may be active among these tiles and add its sync object to the garbage set
-    // for later destruction to make sure it doesn't leak.
-    RefPtr<Fence> fence = Fence::create(eglCreateSyncKHR(display, EGL_SYNC_FENCE_KHR, 0));
-    for (unsigned int i = 0; i < tileBuffers.size(); ++i)
-        tileBuffers[i]->setFence(fence);
-#endif
 }
 
-void SurfacePool::destroyPlatformSync(void* platformSync)
+void SurfacePool::destroyPlatformSync(void*)
 {
-#if BLACKBERRY_PLATFORM_GRAPHICS_EGL && USE(SKIA)
-    Platform::MutexLocker locker(&m_mutex);
-    m_garbage.insert(platformSync);
-#endif
 }
 
 }

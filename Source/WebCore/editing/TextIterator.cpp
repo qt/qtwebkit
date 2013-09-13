@@ -28,6 +28,7 @@
 #include "TextIterator.h"
 
 #include "Document.h"
+#include "ExceptionCodePlaceholder.h"
 #include "Font.h"
 #include "Frame.h"
 #include "HTMLElement.h"
@@ -35,7 +36,9 @@
 #include "HTMLNames.h"
 #include "htmlediting.h"
 #include "InlineTextBox.h"
+#include "NodeTraversal.h"
 #include "Range.h"
+#include "RenderImage.h"
 #include "RenderTableCell.h"
 #include "RenderTableRow.h"
 #include "RenderTextControl.h"
@@ -44,7 +47,7 @@
 #include "TextBoundaries.h"
 #include "TextBreakIterator.h"
 #include "VisiblePosition.h"
-#include "visible_units.h"
+#include "VisibleUnits.h"
 #include <wtf/text/CString.h>
 #include <wtf/unicode/CharacterNames.h>
 
@@ -176,7 +179,7 @@ unsigned BitStack::size() const
 static unsigned depthCrossingShadowBoundaries(Node* node)
 {
     unsigned depth = 0;
-    for (Node* parent = node->parentOrHostNode(); parent; parent = parent->parentOrHostNode())
+    for (Node* parent = node->parentOrShadowHostNode(); parent; parent = parent->parentOrShadowHostNode())
         ++depth;
     return depth;
 }
@@ -192,7 +195,7 @@ static Node* nextInPreOrderCrossingShadowBoundaries(Node* rangeEndContainer, int
         if (Node* next = rangeEndContainer->childNode(rangeEndOffset))
             return next;
     }
-    for (Node* node = rangeEndContainer; node; node = node->parentOrHostNode()) {
+    for (Node* node = rangeEndContainer; node; node = node->parentOrShadowHostNode()) {
         if (Node* next = node->nextSibling())
             return next;
     }
@@ -230,7 +233,7 @@ static void setUpFullyClippedStack(BitStack& stack, Node* node)
 {
     // Put the nodes in a vector so we can iterate in reverse order.
     Vector<Node*, 100> ancestry;
-    for (Node* parent = node->parentOrHostNode(); parent; parent = parent->parentOrHostNode())
+    for (Node* parent = node->parentOrShadowHostNode(); parent; parent = parent->parentOrShadowHostNode())
         ancestry.append(parent);
 
     // Call pushFullyClippedState on each node starting with the earliest ancestor.
@@ -241,32 +244,29 @@ static void setUpFullyClippedStack(BitStack& stack, Node* node)
 
     ASSERT(stack.size() == 1 + depthCrossingShadowBoundaries(node));
 }
+    
+static bool isRendererReplacedElement(RenderObject* renderer)
+{
+    if (!renderer)
+        return false;
+    
+    if (renderer->isImage() || renderer->isWidget())
+        return true;
+    
+    if (renderer->node() && renderer->node()->isElementNode()) {
+        Element* element = toElement(renderer->node());
+        if (element->isFormControlElement() || element->hasTagName(legendTag)
+            || element->hasTagName(meterTag) || element->hasTagName(progressTag))
+            return true;
+        
+        if (equalIgnoringCase(element->getAttribute(roleAttr), "img"))
+            return true;
+    }
+    
+    return false;
+}
 
 // --------
-
-TextIterator::TextIterator()
-    : m_startContainer(0)
-    , m_startOffset(0)
-    , m_endContainer(0)
-    , m_endOffset(0)
-    , m_positionNode(0)
-    , m_textCharacters(0)
-    , m_textLength(0)
-    , m_remainingTextBox(0)
-    , m_firstLetterText(0)
-    , m_lastCharacter(0)
-    , m_sortedTextBoxesPosition(0)
-    , m_emitsCharactersBetweenAllVisiblePositions(false)
-    , m_entersTextControls(false)
-    , m_emitsTextWithoutTranscoding(false)
-    , m_emitsOriginalText(false)
-    , m_handledFirstLetter(false)
-    , m_ignoresStyleVisibility(false)
-    , m_emitsObjectReplacementCharacters(false)
-    , m_stopsOnFormControls(false)
-    , m_shouldStop(false)
-{
-}
 
 TextIterator::TextIterator(const Range* r, TextIteratorBehavior behavior)
     : m_startContainer(0)
@@ -288,6 +288,7 @@ TextIterator::TextIterator(const Range* r, TextIteratorBehavior behavior)
     , m_emitsObjectReplacementCharacters(behavior & TextIteratorEmitsObjectReplacementCharacters)
     , m_stopsOnFormControls(behavior & TextIteratorStopsOnFormControls)
     , m_shouldStop(false)
+    , m_emitsImageAltText(behavior & TextIteratorEmitsImageAltText)
 {
     if (!r)
         return;
@@ -404,12 +405,7 @@ void TextIterator::advance()
             if (!m_handledNode) {
                 if (renderer->isText() && m_node->nodeType() == Node::TEXT_NODE) // FIXME: What about CDATA_SECTION_NODE?
                     m_handledNode = handleTextNode();
-                else if (renderer && (renderer->isImage() || renderer->isWidget() ||
-                         (renderer->node() && renderer->node()->isElementNode() &&
-                          (static_cast<Element*>(renderer->node())->isFormControlElement()
-                          || static_cast<Element*>(renderer->node())->hasTagName(legendTag)
-                          || static_cast<Element*>(renderer->node())->hasTagName(meterTag)
-                          || static_cast<Element*>(renderer->node())->hasTagName(progressTag)))))
+                else if (isRendererReplacedElement(renderer))
                     m_handledNode = handleReplacedElement();
                 else
                     m_handledNode = handleNonTextNode();
@@ -425,15 +421,15 @@ void TextIterator::advance()
         if (!next) {
             next = m_node->nextSibling();
             if (!next) {
-                bool pastEnd = m_node->traverseNextNode() == m_pastEndNode;
-                Node* parentNode = m_node->parentOrHostNode();
+                bool pastEnd = NodeTraversal::next(m_node) == m_pastEndNode;
+                Node* parentNode = m_node->parentOrShadowHostNode();
                 while (!next && parentNode) {
                     if ((pastEnd && parentNode == m_endContainer) || m_endContainer->isDescendantOf(parentNode))
                         return;
                     bool haveRenderer = m_node->renderer();
                     m_node = parentNode;
                     m_fullyClippedStack.pop();
-                    parentNode = m_node->parentOrHostNode();
+                    parentNode = m_node->parentOrShadowHostNode();
                     if (haveRenderer)
                         exitNode();
                     if (m_positionNode) {
@@ -464,7 +460,7 @@ void TextIterator::advance()
 
 UChar TextIterator::characterAt(unsigned index) const
 {
-    ASSERT(index < static_cast<unsigned>(length()));
+    ASSERT_WITH_SECURITY_IMPLICATION(index < static_cast<unsigned>(length()));
     if (!(index < static_cast<unsigned>(length())))
         return 0;
 
@@ -684,7 +680,7 @@ bool TextIterator::handleReplacedElement()
 
     if (m_entersTextControls && renderer->isTextControl()) {
         if (HTMLElement* innerTextElement = toRenderTextControl(renderer)->textFormControlElement()->innerTextElement()) {
-            m_node = innerTextElement->shadowRoot();
+            m_node = innerTextElement->containingShadowRoot();
             pushFullyClippedState(m_fullyClippedStack, m_node);
             m_offset = 0;
             return false;
@@ -710,10 +706,18 @@ bool TextIterator::handleReplacedElement()
     m_positionOffsetBaseNode = m_node;
     m_positionStartOffset = 0;
     m_positionEndOffset = 1;
-
     m_textCharacters = 0;
-    m_textLength = 0;
 
+    if (m_emitsImageAltText && renderer->isImage() && renderer->isRenderImage()) {
+        m_text = toRenderImage(renderer)->altText();
+        if (!m_text.isEmpty()) {
+            m_textLength = m_text.length();
+            m_lastCharacter = m_text[m_textLength - 1];
+            return true;
+        }
+    }
+
+    m_textLength = 0;
     m_lastCharacter = 0;
 
     return true;
@@ -745,14 +749,13 @@ static bool shouldEmitTabBeforeNode(Node* node)
     return t && (t->cellBefore(rc) || t->cellAbove(rc));
 }
 
-static bool shouldEmitNewlineForNode(Node* node)
+static bool shouldEmitNewlineForNode(Node* node, bool emitsOriginalText)
 {
-    // br elements are represented by a single newline.
-    RenderObject* r = node->renderer();
-    if (!r)
-        return node->hasTagName(brTag);
-        
-    return r->isBR();
+    RenderObject* renderer = node->renderer();
+
+    if (renderer ? !renderer->isBR() : !node->hasTagName(brTag))
+        return false;
+    return emitsOriginalText || !(node->isInShadowTree() && node->shadowHost()->toInputElement());
 }
 
 static bool shouldEmitNewlinesBeforeAndAfterNode(Node* node)
@@ -795,7 +798,8 @@ static bool shouldEmitNewlinesBeforeAndAfterNode(Node* node)
             return true;
     }
     
-    return !r->isInline() && r->isRenderBlock() && !r->isFloatingOrOutOfFlowPositioned() && !r->isBody();
+    return !r->isInline() && r->isRenderBlock()
+        && !r->isFloatingOrOutOfFlowPositioned() && !r->isBody() && !r->isRubyText();
 }
 
 static bool shouldEmitNewlineAfterNode(Node* node)
@@ -805,7 +809,7 @@ static bool shouldEmitNewlineAfterNode(Node* node)
         return false;
     // Check if this is the very last renderer in the document.
     // If so, then we should not emit a newline.
-    while ((node = node->traverseNextSibling()))
+    while ((node = NodeTraversal::nextSkippingChildren(node)))
         if (node->renderer())
             return true;
     return false;
@@ -953,7 +957,7 @@ void TextIterator::representNodeOffsetZero()
 
 bool TextIterator::handleNonTextNode()
 {
-    if (shouldEmitNewlineForNode(m_node))
+    if (shouldEmitNewlineForNode(m_node, m_emitsOriginalText))
         emitCharacter('\n', m_node->parentNode(), m_node, 0, 1);
     else if (m_emitsCharactersBetweenAllVisiblePositions && m_node->renderer() && m_node->renderer()->isHR())
         emitCharacter(' ', m_node->parentNode(), m_node, 0, 1);
@@ -1086,30 +1090,6 @@ Node* TextIterator::node() const
 
 // --------
 
-SimplifiedBackwardsTextIterator::SimplifiedBackwardsTextIterator()
-    : m_node(0)
-    , m_offset(0)
-    , m_handledNode(false)
-    , m_handledChildren(false)
-    , m_startNode(0)
-    , m_startOffset(0)
-    , m_endNode(0)
-    , m_endOffset(0)
-    , m_positionNode(0)
-    , m_positionStartOffset(0)
-    , m_positionEndOffset(0)
-    , m_textCharacters(0)
-    , m_textLength(0)
-    , m_lastTextNode(0)
-    , m_lastCharacter(0)
-    , m_singleCharacterBuffer(0)
-    , m_havePassedStartNode(false)
-    , m_shouldHandleFirstLetter(false)
-    , m_stopsOnFormControls(false)
-    , m_shouldStop(false)
-{
-}
-
 SimplifiedBackwardsTextIterator::SimplifiedBackwardsTextIterator(const Range* r, TextIteratorBehavior behavior)
     : m_node(0)
     , m_offset(0)
@@ -1131,6 +1111,7 @@ SimplifiedBackwardsTextIterator::SimplifiedBackwardsTextIterator(const Range* r,
     , m_shouldHandleFirstLetter(false)
     , m_stopsOnFormControls(behavior & TextIteratorStopsOnFormControls)
     , m_shouldStop(false)
+    , m_emitsOriginalText(false)
 {
     ASSERT(behavior == TextIteratorDefaultBehavior || behavior == TextIteratorStopsOnFormControls);
 
@@ -1233,7 +1214,7 @@ void SimplifiedBackwardsTextIterator::advance()
 
             // Exit all other containers.
             while (!m_node->previousSibling()) {
-                if (!advanceRespectingRange(m_node->parentOrHostNode()))
+                if (!advanceRespectingRange(m_node->parentOrShadowHostNode()))
                     break;
                 m_fullyClippedStack.pop();
                 exitNode();
@@ -1339,7 +1320,7 @@ bool SimplifiedBackwardsTextIterator::handleNonTextNode()
 {    
     // We can use a linefeed in place of a tab because this simple iterator is only used to
     // find boundaries, not actual content.  A linefeed breaks words, sentences, and paragraphs.
-    if (shouldEmitNewlineForNode(m_node) || shouldEmitNewlineAfterNode(m_node) || shouldEmitTabBeforeNode(m_node)) {
+    if (shouldEmitNewlineForNode(m_node, m_emitsOriginalText) || shouldEmitNewlineAfterNode(m_node) || shouldEmitTabBeforeNode(m_node)) {
         unsigned index = m_node->nodeIndex();
         // The start of this emitted range is wrong. Ensuring correctness would require
         // VisiblePositions and so would be slow. previousBoundary expects this.
@@ -1350,7 +1331,7 @@ bool SimplifiedBackwardsTextIterator::handleNonTextNode()
 
 void SimplifiedBackwardsTextIterator::exitNode()
 {
-    if (shouldEmitNewlineForNode(m_node) || shouldEmitNewlineBeforeNode(m_node) || shouldEmitTabBeforeNode(m_node)) {
+    if (shouldEmitNewlineForNode(m_node, m_emitsOriginalText) || shouldEmitNewlineBeforeNode(m_node) || shouldEmitTabBeforeNode(m_node)) {
         // The start of this emitted range is wrong. Ensuring correctness would require
         // VisiblePositions and so would be slow. previousBoundary expects this.
         emitCharacter('\n', m_node, 0, 0);
@@ -1389,13 +1370,6 @@ PassRefPtr<Range> SimplifiedBackwardsTextIterator::range() const
 
 // --------
 
-CharacterIterator::CharacterIterator()
-    : m_offset(0)
-    , m_runOffset(0)
-    , m_atBreak(true)
-{
-}
-
 CharacterIterator::CharacterIterator(const Range* r, TextIteratorBehavior behavior)
     : m_offset(0)
     , m_runOffset(0)
@@ -1416,10 +1390,8 @@ PassRefPtr<Range> CharacterIterator::range() const
             Node* n = r->startContainer();
             ASSERT(n == r->endContainer());
             int offset = r->startOffset() + m_runOffset;
-            ExceptionCode ec = 0;
-            r->setStart(n, offset, ec);
-            r->setEnd(n, offset + 1, ec);
-            ASSERT(!ec);
+            r->setStart(n, offset, ASSERT_NO_EXCEPTION);
+            r->setEnd(n, offset + 1, ASSERT_NO_EXCEPTION);
         }
     }
     return r.release();
@@ -1497,13 +1469,6 @@ static PassRefPtr<Range> characterSubrange(CharacterIterator& it, int offset, in
         end->endContainer(), end->endOffset());
 }
 
-BackwardsCharacterIterator::BackwardsCharacterIterator()
-    : m_offset(0)
-    , m_runOffset(0)
-    , m_atBreak(true)
-{
-}
-
 BackwardsCharacterIterator::BackwardsCharacterIterator(const Range* range, TextIteratorBehavior behavior)
     : m_offset(0)
     , m_runOffset(0)
@@ -1524,10 +1489,8 @@ PassRefPtr<Range> BackwardsCharacterIterator::range() const
             Node* n = r->startContainer();
             ASSERT(n == r->endContainer());
             int offset = r->endOffset() - m_runOffset;
-            ExceptionCode ec = 0;
-            r->setStart(n, offset - 1, ec);
-            r->setEnd(n, offset, ec);
-            ASSERT(!ec);
+            r->setStart(n, offset - 1, ASSERT_NO_EXCEPTION);
+            r->setEnd(n, offset, ASSERT_NO_EXCEPTION);
         }
     }
     return r.release();
@@ -1573,12 +1536,6 @@ void BackwardsCharacterIterator::advance(int count)
 }
 
 // --------
-
-WordAwareIterator::WordAwareIterator()
-    : m_previousText(0)
-    , m_didLookAhead(false)
-{
-}
 
 WordAwareIterator::WordAwareIterator(const Range* r)
     : m_previousText(0)
@@ -2094,7 +2051,7 @@ inline void SearchBuffer::prependContext(const UChar* characters, size_t length)
     }
 
     size_t usableLength = min(m_buffer.capacity() - m_prefixLength, length - wordBoundaryContextStart);
-    m_buffer.prepend(characters + length - usableLength, usableLength);
+    m_buffer.insert(0, characters + length - usableLength, usableLength);
     m_prefixLength += usableLength;
 
     if (wordBoundaryContextStart || m_prefixLength == m_buffer.capacity())
@@ -2275,7 +2232,7 @@ nextMatch:
     }
 
     size_t matchedLength = usearch_getMatchedLength(searcher);
-    ASSERT(matchStart + matchedLength <= size);
+    ASSERT_WITH_SECURITY_IMPLICATION(matchStart + matchedLength <= size);
 
     // If this match is "bad", move on to the next match.
     if (isBadMatch(m_buffer.data() + matchStart, matchedLength) || ((m_options & AtWordStarts) && !isWordStartMatch(matchStart, matchedLength))) {
@@ -2438,11 +2395,8 @@ PassRefPtr<Range> TextIterator::rangeFromLocationAndLength(ContainerNode* scope,
     if (rangeLocation == 0 && rangeLength == 0 && it.atEnd()) {
         textRunRange = it.range();
         
-        ExceptionCode ec = 0;
-        resultRange->setStart(textRunRange->startContainer(), 0, ec);
-        ASSERT(!ec);
-        resultRange->setEnd(textRunRange->startContainer(), 0, ec);
-        ASSERT(!ec);
+        resultRange->setStart(textRunRange->startContainer(), 0, ASSERT_NO_EXCEPTION);
+        resultRange->setEnd(textRunRange->startContainer(), 0, ASSERT_NO_EXCEPTION);
         
         return resultRange.release();
     }
@@ -2464,17 +2418,12 @@ PassRefPtr<Range> TextIterator::rangeFromLocationAndLength(ContainerNode* scope,
                 it.advance();
                 if (!it.atEnd()) {
                     RefPtr<Range> range = it.range();
-                    ExceptionCode ec = 0;
-                    textRunRange->setEnd(range->startContainer(), range->startOffset(), ec);
-                    ASSERT(!ec);
+                    textRunRange->setEnd(range->startContainer(), range->startOffset(), ASSERT_NO_EXCEPTION);
                 } else {
                     Position runStart = textRunRange->startPosition();
                     Position runEnd = VisiblePosition(runStart).next().deepEquivalent();
-                    if (runEnd.isNotNull()) {
-                        ExceptionCode ec = 0;
-                        textRunRange->setEnd(runEnd.containerNode(), runEnd.computeOffsetInContainerNode(), ec);
-                        ASSERT(!ec);
-                    }
+                    if (runEnd.isNotNull())
+                        textRunRange->setEnd(runEnd.containerNode(), runEnd.computeOffsetInContainerNode(), ASSERT_NO_EXCEPTION);
                 }
             }
         }
@@ -2521,7 +2470,7 @@ PassRefPtr<Range> TextIterator::rangeFromLocationAndLength(ContainerNode* scope,
     return resultRange.release();
 }
 
-bool TextIterator::getLocationAndLengthFromRange(Element* scope, const Range* range, size_t& location, size_t& length)
+bool TextIterator::getLocationAndLengthFromRange(Node* scope, const Range* range, size_t& location, size_t& length)
 {
     location = notFound;
     length = 0;
@@ -2542,9 +2491,8 @@ bool TextIterator::getLocationAndLengthFromRange(Element* scope, const Range* ra
     RefPtr<Range> testRange = Range::create(scope->document(), scope, 0, range->startContainer(), range->startOffset());
     ASSERT(testRange->startContainer() == scope);
     location = TextIterator::rangeLength(testRange.get());
-    
-    ExceptionCode ec;
-    testRange->setEnd(range->endContainer(), range->endOffset(), ec);
+
+    testRange->setEnd(range->endContainer(), range->endOffset(), IGNORE_EXCEPTION);
     ASSERT(testRange->startContainer() == scope);
     length = TextIterator::rangeLength(testRange.get()) - location;
     return true;
@@ -2555,19 +2503,16 @@ bool TextIterator::getLocationAndLengthFromRange(Element* scope, const Range* ra
 String plainText(const Range* r, TextIteratorBehavior defaultBehavior, bool isDisplayString)
 {
     // The initial buffer size can be critical for performance: https://bugs.webkit.org/show_bug.cgi?id=81192
-    static const unsigned cMaxSegmentSize = 1 << 15;
+    static const unsigned initialCapacity = 1 << 15;
 
     unsigned bufferLength = 0;
     StringBuilder builder;
-    builder.reserveCapacity(cMaxSegmentSize);
+    builder.reserveCapacity(initialCapacity);
     TextIteratorBehavior behavior = defaultBehavior;
     if (!isDisplayString)
         behavior = static_cast<TextIteratorBehavior>(behavior | TextIteratorEmitsTextsWithoutTranscoding);
     
     for (TextIterator it(r, behavior); !it.atEnd(); it.advance()) {
-        if (builder.capacity() < builder.length() + it.length())
-            builder.reserveCapacity(builder.capacity() + cMaxSegmentSize);
-
         it.appendTextToStringBuilder(builder);
         bufferLength += it.length();
     }
@@ -2583,24 +2528,10 @@ String plainText(const Range* r, TextIteratorBehavior defaultBehavior, bool isDi
     return result;
 }
 
-static inline bool isAllCollapsibleWhitespace(const String& string)
-{
-    const UChar* characters = string.characters();
-    unsigned length = string.length();
-    for (unsigned i = 0; i < length; ++i) {
-        if (!isCollapsibleWhitespace(characters[i]))
-            return false;
-    }
-    return true;
-}
-
 static PassRefPtr<Range> collapsedToBoundary(const Range* range, bool forward)
 {
-    ExceptionCode ec = 0;
-    RefPtr<Range> result = range->cloneRange(ec);
-    ASSERT(!ec);
-    result->collapse(!forward, ec);
-    ASSERT(!ec);
+    RefPtr<Range> result = range->cloneRange(ASSERT_NO_EXCEPTION);
+    result->collapse(!forward, ASSERT_NO_EXCEPTION);
     return result.release();
 }
 
@@ -2614,8 +2545,7 @@ static size_t findPlainText(CharacterIterator& it, const String& target, FindOpt
     if (buffer.needsMoreContext()) {
         RefPtr<Range> startRange = it.range();
         RefPtr<Range> beforeStartRange = startRange->ownerDocument()->createRange();
-        ExceptionCode ec = 0;
-        beforeStartRange->setEnd(startRange->startContainer(), startRange->startOffset(), ec);
+        beforeStartRange->setEnd(startRange->startContainer(), startRange->startOffset(), IGNORE_EXCEPTION);
         for (SimplifiedBackwardsTextIterator backwardsIterator(beforeStartRange.get()); !backwardsIterator.atEnd(); backwardsIterator.advance()) {
             buffer.prependContext(backwardsIterator.characters(), backwardsIterator.length());
             if (!buffer.needsMoreContext())

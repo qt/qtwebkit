@@ -33,12 +33,11 @@ class SlotVisitor;
 
 class MarkedArgumentBuffer {
     WTF_MAKE_NONCOPYABLE(MarkedArgumentBuffer);
-    friend class JSGlobalData;
+    friend class VM;
     friend class ArgList;
 
 private:
     static const size_t inlineCapacity = 8;
-    typedef Vector<Register, inlineCapacity> VectorType;
     typedef HashSet<MarkedArgumentBuffer*> ListSet;
 
 public:

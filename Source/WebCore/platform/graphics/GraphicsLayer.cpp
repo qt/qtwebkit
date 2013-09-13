@@ -53,10 +53,10 @@ static RepaintMap& repaintRectMap()
     return map;
 }
 
-void KeyframeValueList::insert(const AnimationValue* value)
+void KeyframeValueList::insert(PassOwnPtr<const AnimationValue> value)
 {
     for (size_t i = 0; i < m_values.size(); ++i) {
-        const AnimationValue* curValue = m_values[i];
+        const AnimationValue* curValue = m_values[i].get();
         if (curValue->keyTime() == value->keyTime()) {
             ASSERT_NOT_REACHED();
             // insert after
@@ -78,11 +78,10 @@ GraphicsLayer::GraphicsLayer(GraphicsLayerClient* client)
     , m_anchorPoint(0.5f, 0.5f, 0)
     , m_opacity(1)
     , m_zPosition(0)
-    , m_backgroundColorSet(false)
     , m_contentsOpaque(false)
     , m_preserves3D(false)
     , m_backfaceVisibility(true)
-    , m_usingTiledLayer(false)
+    , m_usingTiledBacking(false)
     , m_masksToBounds(false)
     , m_drawsContent(false)
     , m_contentsVisible(true)
@@ -311,25 +310,18 @@ void GraphicsLayer::setOffsetFromRenderer(const IntSize& offset, ShouldSetNeedsD
 void GraphicsLayer::setBackgroundColor(const Color& color)
 {
     m_backgroundColor = color;
-    m_backgroundColorSet = true;
-}
-
-void GraphicsLayer::clearBackgroundColor()
-{
-    m_backgroundColor = Color();
-    m_backgroundColorSet = false;
 }
 
 void GraphicsLayer::paintGraphicsLayerContents(GraphicsContext& context, const IntRect& clip)
 {
     if (m_client) {
-        LayoutSize offset = offsetFromRenderer();
+        IntSize offset = offsetFromRenderer();
         context.translate(-offset);
 
-        LayoutRect clipRect(clip);
+        IntRect clipRect(clip);
         clipRect.move(offset);
 
-        m_client->paintContents(this, context, m_paintingPhase, pixelSnappedIntRect(clipRect));
+        m_client->paintContents(this, context, m_paintingPhase, clipRect);
     }
 }
 
@@ -338,7 +330,7 @@ String GraphicsLayer::animationNameForTransition(AnimatedPropertyID property)
     // | is not a valid identifier character in CSS, so this can never conflict with a keyframe identifier.
     StringBuilder id;
     id.appendLiteral("-|transition");
-    id.append(static_cast<char>(property));
+    id.appendNumber(static_cast<int>(property));
     id.append('-');
     return id.toString();
 }
@@ -354,7 +346,7 @@ void GraphicsLayer::resumeAnimations()
 void GraphicsLayer::getDebugBorderInfo(Color& color, float& width) const
 {
     if (drawsContent()) {
-        if (m_usingTiledLayer) {
+        if (m_usingTiledBacking) {
             color = Color(255, 128, 0, 128); // tiled layer: orange
             width = 2;
             return;
@@ -416,19 +408,10 @@ void GraphicsLayer::distributeOpacity(float accumulatedOpacity)
     }
 }
 
-#if PLATFORM(QT) || PLATFORM(GTK) || PLATFORM(EFL)
-GraphicsLayer::GraphicsLayerFactoryCallback* GraphicsLayer::s_graphicsLayerFactory = 0;
-
-void GraphicsLayer::setGraphicsLayerFactory(GraphicsLayer::GraphicsLayerFactoryCallback factory)
-{
-    s_graphicsLayerFactory = factory;
-}
-#endif
-
 #if ENABLE(CSS_FILTERS)
-static inline const FilterOperations* filterOperationsAt(const KeyframeValueList& valueList, size_t index)
+static inline const FilterOperations& filterOperationsAt(const KeyframeValueList& valueList, size_t index)
 {
-    return static_cast<const FilterAnimationValue*>(valueList.at(index))->value();
+    return static_cast<const FilterAnimationValue&>(valueList.at(index)).value();
 }
 
 int GraphicsLayer::validateFilterOperations(const KeyframeValueList& valueList)
@@ -441,23 +424,23 @@ int GraphicsLayer::validateFilterOperations(const KeyframeValueList& valueList)
     // Empty filters match anything, so find the first non-empty entry as the reference
     size_t firstIndex = 0;
     for ( ; firstIndex < valueList.size(); ++firstIndex) {
-        if (filterOperationsAt(valueList, firstIndex)->operations().size() > 0)
+        if (!filterOperationsAt(valueList, firstIndex).operations().isEmpty())
             break;
     }
 
     if (firstIndex >= valueList.size())
         return -1;
 
-    const FilterOperations* firstVal = filterOperationsAt(valueList, firstIndex);
+    const FilterOperations& firstVal = filterOperationsAt(valueList, firstIndex);
     
     for (size_t i = firstIndex + 1; i < valueList.size(); ++i) {
-        const FilterOperations* val = filterOperationsAt(valueList, i);
+        const FilterOperations& val = filterOperationsAt(valueList, i);
         
         // An emtpy filter list matches anything.
-        if (val->operations().isEmpty())
+        if (val.operations().isEmpty())
             continue;
         
-        if (!firstVal->operationsMatch(*val))
+        if (!firstVal.operationsMatch(val))
             return -1;
     }
     
@@ -469,9 +452,9 @@ int GraphicsLayer::validateFilterOperations(const KeyframeValueList& valueList)
 // The hasBigRotation flag will always return false if isValid is false. Otherwise hasBigRotation is 
 // true if the rotation between any two keyframes is >= 180 degrees.
 
-static inline const TransformOperations* operationsAt(const KeyframeValueList& valueList, size_t index)
+static inline const TransformOperations& operationsAt(const KeyframeValueList& valueList, size_t index)
 {
-    return static_cast<const TransformAnimationValue*>(valueList.at(index))->value();
+    return static_cast<const TransformAnimationValue&>(valueList.at(index)).value();
 }
 
 int GraphicsLayer::validateTransformOperations(const KeyframeValueList& valueList, bool& hasBigRotation)
@@ -486,24 +469,24 @@ int GraphicsLayer::validateTransformOperations(const KeyframeValueList& valueLis
     // Empty transforms match anything, so find the first non-empty entry as the reference.
     size_t firstIndex = 0;
     for ( ; firstIndex < valueList.size(); ++firstIndex) {
-        if (operationsAt(valueList, firstIndex)->operations().size() > 0)
+        if (!operationsAt(valueList, firstIndex).operations().isEmpty())
             break;
     }
     
     if (firstIndex >= valueList.size())
         return -1;
         
-    const TransformOperations* firstVal = operationsAt(valueList, firstIndex);
+    const TransformOperations& firstVal = operationsAt(valueList, firstIndex);
     
     // See if the keyframes are valid.
     for (size_t i = firstIndex + 1; i < valueList.size(); ++i) {
-        const TransformOperations* val = operationsAt(valueList, i);
+        const TransformOperations& val = operationsAt(valueList, i);
         
-        // An emtpy transform list matches anything.
-        if (val->operations().isEmpty())
+        // An empty transform list matches anything.
+        if (val.operations().isEmpty())
             continue;
             
-        if (!firstVal->operationsMatch(*val))
+        if (!firstVal.operationsMatch(val))
             return -1;
     }
 
@@ -511,22 +494,22 @@ int GraphicsLayer::validateTransformOperations(const KeyframeValueList& valueLis
     double lastRotAngle = 0.0;
     double maxRotAngle = -1.0;
         
-    for (size_t j = 0; j < firstVal->operations().size(); ++j) {
-        TransformOperation::OperationType type = firstVal->operations().at(j)->getOperationType();
+    for (size_t j = 0; j < firstVal.operations().size(); ++j) {
+        TransformOperation::OperationType type = firstVal.operations().at(j)->getOperationType();
         
         // if this is a rotation entry, we need to see if any angle differences are >= 180 deg
         if (type == TransformOperation::ROTATE_X ||
             type == TransformOperation::ROTATE_Y ||
             type == TransformOperation::ROTATE_Z ||
             type == TransformOperation::ROTATE_3D) {
-            lastRotAngle = static_cast<RotateTransformOperation*>(firstVal->operations().at(j).get())->angle();
+            lastRotAngle = static_cast<RotateTransformOperation*>(firstVal.operations().at(j).get())->angle();
             
             if (maxRotAngle < 0)
                 maxRotAngle = fabs(lastRotAngle);
             
             for (size_t i = firstIndex + 1; i < valueList.size(); ++i) {
-                const TransformOperations* val = operationsAt(valueList, i);
-                double rotAngle = val->operations().isEmpty() ? 0 : (static_cast<RotateTransformOperation*>(val->operations().at(j).get())->angle());
+                const TransformOperations& val = operationsAt(valueList, i);
+                double rotAngle = val.operations().isEmpty() ? 0 : (static_cast<RotateTransformOperation*>(val.operations().at(j).get())->angle());
                 double diffAngle = fabs(rotAngle - lastRotAngle);
                 if (diffAngle > maxRotAngle)
                     maxRotAngle = diffAngle;
@@ -620,9 +603,14 @@ void GraphicsLayer::dumpProperties(TextStream& ts, int indent, LayerTreeAsTextBe
         ts << "(opacity " << m_opacity << ")\n";
     }
     
-    if (m_usingTiledLayer) {
+    if (m_usingTiledBacking) {
         writeIndent(ts, indent + 1);
-        ts << "(usingTiledLayer " << m_usingTiledLayer << ")\n";
+        ts << "(usingTiledLayer " << m_usingTiledBacking << ")\n";
+    }
+
+    if (m_contentsOpaque) {
+        writeIndent(ts, indent + 1);
+        ts << "(contentsOpaque " << m_contentsOpaque << ")\n";
     }
 
     if (m_preserves3D) {
@@ -655,7 +643,7 @@ void GraphicsLayer::dumpProperties(TextStream& ts, int indent, LayerTreeAsTextBe
         ts << ")\n";
     }
 
-    if (m_backgroundColorSet) {
+    if (m_backgroundColor.isValid()) {
         writeIndent(ts, indent + 1);
         ts << "(backgroundColor " << m_backgroundColor.nameForRenderTreeAsText() << ")\n";
     }
@@ -714,7 +702,34 @@ void GraphicsLayer::dumpProperties(TextStream& ts, int indent, LayerTreeAsTextBe
         writeIndent(ts, indent + 1);
         ts << ")\n";
     }
-    
+
+    if (behavior & LayerTreeAsTextIncludePaintingPhases && paintingPhase()) {
+        writeIndent(ts, indent + 1);
+        ts << "(paintingPhases\n";
+        if (paintingPhase() & GraphicsLayerPaintBackground) {
+            writeIndent(ts, indent + 2);
+            ts << "GraphicsLayerPaintBackground\n";
+        }
+        if (paintingPhase() & GraphicsLayerPaintForeground) {
+            writeIndent(ts, indent + 2);
+            ts << "GraphicsLayerPaintForeground\n";
+        }
+        if (paintingPhase() & GraphicsLayerPaintMask) {
+            writeIndent(ts, indent + 2);
+            ts << "GraphicsLayerPaintMask\n";
+        }
+        if (paintingPhase() & GraphicsLayerPaintOverflowContents) {
+            writeIndent(ts, indent + 2);
+            ts << "GraphicsLayerPaintOverflowContents\n";
+        }
+        if (paintingPhase() & GraphicsLayerPaintCompositedScroll) {
+            writeIndent(ts, indent + 2);
+            ts << "GraphicsLayerPaintCompositedScroll\n";
+        }
+        writeIndent(ts, indent + 1);
+        ts << ")\n";
+    }
+
     dumpAdditionalProperties(ts, indent, behavior);
     
     if (m_children.size()) {

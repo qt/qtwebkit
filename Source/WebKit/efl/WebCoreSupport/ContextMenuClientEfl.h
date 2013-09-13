@@ -29,6 +29,8 @@
 #ifndef ContextMenuClientEfl_h
 #define ContextMenuClientEfl_h
 
+#if ENABLE(CONTEXT_MENUS)
+
 #include "ContextMenuClient.h"
 
 #include <wtf/RefCounted.h>
@@ -40,7 +42,7 @@ class ContextMenuClientEfl : public ContextMenuClient {
 public:
     virtual void contextMenuDestroyed();
 
-    virtual PlatformMenuDescription getCustomMenuFromDefaultItems(ContextMenu*);
+    virtual PassOwnPtr<ContextMenu> customizeMenu(PassOwnPtr<ContextMenu>);
     virtual void contextMenuItemSelected(ContextMenuItem*, const ContextMenu*);
 
     virtual void downloadURL(const KURL&);
@@ -52,4 +54,5 @@ public:
 };
 }
 
+#endif // ENABLE(CONTEXT_MENUS)
 #endif

@@ -19,6 +19,7 @@
  */
 
 #include "config.h"
+#include "ewk_view_private.h"
 #include "PlatformWebView.h"
 
 #include "EWebKit2.h"
@@ -26,6 +27,7 @@
 #include <Ecore_Evas.h>
 #include <WebCore/RefPtrCairo.h>
 #include <WebKit2/WKImageCairo.h>
+#include <WebKit2/WKViewEfl.h>
 #include <cairo.h>
 
 using namespace WebKit;
@@ -52,21 +54,22 @@ static Ecore_Evas* initEcoreEvas()
     return ecoreEvas;
 }
 
-PlatformWebView::PlatformWebView(WKContextRef context, WKPageGroupRef pageGroup, WKDictionaryRef options)
+PlatformWebView::PlatformWebView(WKContextRef context, WKPageGroupRef pageGroup, WKPageRef /* relatedPage */, WKDictionaryRef options)
+    : m_options(options)
 {
     WKRetainPtr<WKStringRef> useFixedLayoutKey(AdoptWK, WKStringCreateWithUTF8CString("UseFixedLayout"));
     m_usingFixedLayout = options ? WKBooleanGetValue(static_cast<WKBooleanRef>(WKDictionaryGetItemForKey(options, useFixedLayoutKey.get()))) : false;
 
     m_window = initEcoreEvas();
-    Evas* evas = ecore_evas_get(m_window);
 
-    if (m_usingFixedLayout) {
-        m_view = toImpl(WKViewCreateWithFixedLayout(evas, context, pageGroup));
-        evas_object_resize(m_view, 800, 600);
-    } else
-        m_view = toImpl(WKViewCreate(evas, context, pageGroup));
+    m_view = EWKViewCreate(context, pageGroup, ecore_evas_get(m_window), /* smart */ 0);
 
-    ewk_view_theme_set(m_view, THEME_DIR"/default.edj");
+    WKPageSetUseFixedLayout(WKViewGetPage(EWKViewGetWKView(m_view)), m_usingFixedLayout);
+
+    if (m_usingFixedLayout)
+        resizeTo(800, 600);
+
+    ewk_view_theme_set(m_view, TEST_THEME_DIR "/default.edj");
     m_windowIsKey = false;
     evas_object_show(m_view);
 }
@@ -74,6 +77,7 @@ PlatformWebView::PlatformWebView(WKContextRef context, WKPageGroupRef pageGroup,
 PlatformWebView::~PlatformWebView()
 {
     evas_object_del(m_view);
+
     ecore_evas_free(m_window);
 }
 
@@ -84,7 +88,7 @@ void PlatformWebView::resizeTo(unsigned width, unsigned height)
 
 WKPageRef PlatformWebView::page()
 {
-    return WKViewGetPage(toAPI(m_view));
+    return WKViewGetPage(EWKViewGetWKView(m_view));
 }
 
 void PlatformWebView::focus()
@@ -101,16 +105,14 @@ WKRect PlatformWebView::windowFrame()
 {
     int x, y, width, height;
 
-    Ecore_Evas* ee = ecore_evas_ecore_evas_get(evas_object_evas_get(m_view));
-    ecore_evas_request_geometry_get(ee, &x, &y, &width, &height);
+    ecore_evas_request_geometry_get(m_window, &x, &y, &width, &height);
 
     return WKRectMake(x, y, width, height);
 }
 
 void PlatformWebView::setWindowFrame(WKRect frame)
 {
-    Ecore_Evas* ee = ecore_evas_ecore_evas_get(evas_object_evas_get(m_view));
-    ecore_evas_move_resize(ee, frame.origin.x, frame.origin.y, frame.size.width, frame.size.height);
+    ecore_evas_move_resize(m_window, frame.origin.x, frame.origin.y, frame.size.width, frame.size.height);
 }
 
 void PlatformWebView::addChromeInputField()
@@ -127,15 +129,12 @@ void PlatformWebView::makeWebViewFirstResponder()
 
 WKRetainPtr<WKImageRef> PlatformWebView::windowSnapshotImage()
 {
-    Ecore_Evas* ee = ecore_evas_ecore_evas_get(evas_object_evas_get(m_view));
-    ASSERT(ee);
-
     int width;
     int height;
-    ecore_evas_geometry_get(ee, 0, 0, &width, &height);
+    ecore_evas_geometry_get(m_window, 0, 0, &width, &height);
     ASSERT(width > 0 && height > 0);
 
-    return adoptWK(WKViewGetSnapshot(toAPI(m_view)));
+    return adoptWK(WKViewCreateSnapshot(EWKViewGetWKView(m_view)));
 }
 
 bool PlatformWebView::viewSupportsOptions(WKDictionaryRef options) const
@@ -143,6 +142,10 @@ bool PlatformWebView::viewSupportsOptions(WKDictionaryRef options) const
     WKRetainPtr<WKStringRef> useFixedLayoutKey(AdoptWK, WKStringCreateWithUTF8CString("UseFixedLayout"));
 
     return m_usingFixedLayout == (options ? WKBooleanGetValue(static_cast<WKBooleanRef>(WKDictionaryGetItemForKey(options, useFixedLayoutKey.get()))) : false);
+}
+
+void PlatformWebView::didInitializeClients()
+{
 }
 
 } // namespace WTR

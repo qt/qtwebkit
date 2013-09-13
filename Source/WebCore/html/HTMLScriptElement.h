@@ -24,12 +24,12 @@
 #ifndef HTMLScriptElement_h
 #define HTMLScriptElement_h
 
-#include "ScriptElement.h"
 #include "HTMLElement.h"
+#include "ScriptElement.h"
 
 namespace WebCore {
 
-class HTMLScriptElement : public HTMLElement, public ScriptElement {
+class HTMLScriptElement FINAL : public HTMLElement, public ScriptElement {
 public:
     static PassRefPtr<HTMLScriptElement> create(const QualifiedName&, Document*, bool wasInsertedByParser, bool alreadyStarted = false);
 
@@ -66,6 +66,17 @@ private:
 
     virtual PassRefPtr<Element> cloneElementWithoutAttributesAndChildren();
 };
+
+inline bool isHTMLScriptElement(Node* node)
+{
+    return node->hasTagName(HTMLNames::scriptTag);
+}
+
+inline HTMLScriptElement* toHTMLScriptElement(Node* node)
+{
+    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->hasTagName(HTMLNames::scriptTag));
+    return static_cast<HTMLScriptElement*>(node);
+}
 
 } //namespace
 

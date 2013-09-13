@@ -60,6 +60,8 @@ class QPropertyAnimation;
 class QLineEdit;
 QT_END_NAMESPACE
 
+struct HighlightedElement;
+
 class WindowOptions {
 public:
     WindowOptions()
@@ -68,6 +70,7 @@ public:
         , useCompositing(true)
         , useTiledBackingStore(false)
         , useWebGL(false)
+        , useWebAudio(false)
         , useFrameFlattening(false)
         , cacheWebView(false)
         , showFrameRate(false)
@@ -92,6 +95,7 @@ public:
     bool useCompositing;
     bool useTiledBackingStore;
     bool useWebGL;
+    bool useWebAudio;
     bool useFrameFlattening;
     bool cacheWebView;
     bool showFrameRate;
@@ -152,9 +156,11 @@ protected Q_SLOTS:
     void toggleTiledBackingStore(bool toggle);
     void toggleResizesToContents(bool toggle);
     void toggleWebGL(bool toggle);
+    void toggleWebAudio(bool toggle);
     void toggleSpatialNavigation(bool b);
     void toggleFullScreenMode(bool enable);
     void toggleFrameFlattening(bool toggle);
+    void toggleJavaScriptEnabled(bool enable);
     void toggleInterruptingJavaScriptEnabled(bool enable);
     void toggleJavascriptCanOpenWindows(bool enable);
     void toggleAutoLoadImages(bool enable);
@@ -178,6 +184,7 @@ protected Q_SLOTS:
     void animatedFlip();
     void animatedYFlip();
     void selectElements();
+    void clearSelection();
     void showFPS(bool enable);
     void showUserAgentDialog();
 
@@ -222,6 +229,7 @@ private:
     QNetworkReply* m_reply;
 #endif
     QList<QTouchEvent::TouchPoint> m_touchPoints;
+    QList<HighlightedElement> m_highlightedElements;
     bool m_touchMocking;
 
     QString m_inputUrl;

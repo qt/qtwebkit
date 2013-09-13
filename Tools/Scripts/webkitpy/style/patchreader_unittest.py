@@ -1,5 +1,3 @@
-#!/usr/bin/python
-#
 # Copyright (C) 2010 Google Inc. All rights reserved.
 # Copyright (C) 2009 Torch Mobile Inc.
 # Copyright (C) 2009 Apple Inc. All rights reserved.
@@ -31,7 +29,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import unittest
+import unittest2 as unittest
 
 from webkitpy.common.system.filesystem_mock import MockFileSystem
 from webkitpy.style.patchreader import PatchReader

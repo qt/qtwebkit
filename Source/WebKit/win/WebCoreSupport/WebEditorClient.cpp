@@ -40,8 +40,10 @@
 #include <WebCore/KeyboardEvent.h>
 #include <WebCore/LocalizedStrings.h>
 #include <WebCore/NotImplemented.h>
+#include <WebCore/Page.h>
 #include <WebCore/PlatformKeyboardEvent.h>
 #include <WebCore/Range.h>
+#include <WebCore/Settings.h>
 #include <WebCore/UndoStep.h>
 #include <WebCore/UserTypingGestureIndicator.h>
 #include <WebCore/VisibleSelection.h>
@@ -227,6 +229,16 @@ void WebEditorClient::didWriteSelectionToPasteboard()
     notImplemented();
 }
 
+void WebEditorClient::willWriteSelectionToPasteboard(WebCore::Range*)
+{
+    notImplemented();
+}
+
+void WebEditorClient::getClientPasteboardDataForRange(WebCore::Range*, Vector<String>&, Vector<RefPtr<WebCore::SharedBuffer> >&)
+{
+    notImplemented();
+}
+
 void WebEditorClient::didSetSelectionTypesForPasteboard()
 {
     notImplemented();
@@ -291,21 +303,20 @@ void WebEditorClient::webViewDidChangeTypingStyle(WebNotification* /*notificatio
 void WebEditorClient::webViewDidChangeSelection(WebNotification* /*notification*/)
 {  notImplemented(); }
 
-bool WebEditorClient::shouldShowDeleteInterface(HTMLElement* /*element*/)
-{ notImplemented(); return false; }
-
 bool WebEditorClient::smartInsertDeleteEnabled(void)
-{ 
-    BOOL enabled = FALSE; 
-    m_webView->smartInsertDeleteEnabled(&enabled);
-    return !!enabled;
+{
+    Page* page = m_webView->page();
+    if (!page)
+        return false;
+    return page->settings()->smartInsertDeleteEnabled();
 }
 
 bool WebEditorClient::isSelectTrailingWhitespaceEnabled(void)
 {
-    BOOL enabled = FALSE;
-    m_webView->isSelectTrailingWhitespaceEnabled(&enabled);
-    return !!enabled;
+    Page* page = m_webView->page();
+    if (!page)
+        return false;
+    return page->settings()->selectTrailingWhitespaceEnabled();
 }
 
 bool WebEditorClient::shouldChangeSelectedRange(WebCore::Range*, WebCore::Range*, WebCore::EAffinity, bool)
@@ -508,6 +519,8 @@ static String undoNameForEditAction(EditAction editAction)
     case EditActionSetWritingDirection: return WEB_UI_STRING_KEY("Set Writing Direction", "Set Writing Direction (Undo action name)", "Undo action name");
     case EditActionSubscript: return WEB_UI_STRING_KEY("Subscript", "Subscript (Undo action name)", "Undo action name");
     case EditActionSuperscript: return WEB_UI_STRING_KEY("Superscript", "Superscript (Undo action name)", "Undo action name");
+    case EditActionBold: return WEB_UI_STRING_KEY("Bold", "Bold (Undo action name)", "Undo action name");
+    case EditActionItalics: return WEB_UI_STRING_KEY("Italics", "Italics (Undo action name)", "Undo action name");
     case EditActionUnderline: return WEB_UI_STRING_KEY("Underline", "Underline (Undo action name)", "Undo action name");
     case EditActionOutline: return WEB_UI_STRING_KEY("Outline", "Outline (Undo action name)", "Undo action name");
     case EditActionUnscript: return WEB_UI_STRING_KEY("Unscript", "Unscript (Undo action name)", "Undo action name");

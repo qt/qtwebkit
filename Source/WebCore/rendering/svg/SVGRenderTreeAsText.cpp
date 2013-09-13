@@ -262,7 +262,7 @@ static void writeSVGPaintingResource(TextStream& ts, RenderSVGResource* resource
     else if (resource->resourceType() == RadialGradientResourceType)
         ts << "[type=RADIAL-GRADIENT]";
 
-    ts << " [id=\"" << static_cast<SVGElement*>(node)->getIdAttribute() << "\"]";
+    ts << " [id=\"" << toSVGElement(node)->getIdAttribute() << "\"]";
 }
 
 static void writeStyle(TextStream& ts, const RenderObject& object)
@@ -285,7 +285,7 @@ static void writeStyle(TextStream& ts, const RenderObject& object)
             ts << " [stroke={" << s;
             writeSVGPaintingResource(ts, strokePaintingResource);
 
-            SVGLengthContext lengthContext(static_cast<SVGElement*>(shape.node()));
+            SVGLengthContext lengthContext(toSVGElement(shape.node()));
             double dashOffset = svgStyle->strokeDashOffset().value(lengthContext);
             double strokeWidth = svgStyle->strokeWidth().value(lengthContext);
             const Vector<SVGLength>& dashes = svgStyle->strokeDashArray();
@@ -336,7 +336,7 @@ static TextStream& operator<<(TextStream& ts, const RenderSVGShape& shape)
     writePositionAndStyle(ts, shape);
 
     ASSERT(shape.node()->isSVGElement());
-    SVGElement* svgElement = static_cast<SVGElement*>(shape.node());
+    SVGElement* svgElement = toSVGElement(shape.node());
     SVGLengthContext lengthContext(svgElement);
 
     if (svgElement->hasTagName(SVGNames::rectTag)) {
@@ -366,7 +366,7 @@ static TextStream& operator<<(TextStream& ts, const RenderSVGShape& shape)
         SVGPolyElement* element = static_cast<SVGPolyElement*>(svgElement);
         writeNameAndQuotedValue(ts, "points", element->pointList().valueAsString());
     } else if (svgElement->hasTagName(SVGNames::pathTag)) {
-        SVGPathElement* element = static_cast<SVGPathElement*>(svgElement);
+        SVGPathElement* element = toSVGPathElement(svgElement);
         String pathString;
         // FIXME: We should switch to UnalteredParsing here - this will affect the path dumping output of dozens of tests.
         buildStringFromByteStream(element->pathByteStream(), pathString, NormalizedParsing);
@@ -459,7 +459,7 @@ static inline void writeSVGInlineTextBoxes(TextStream& ts, const RenderText& tex
         if (!box->isSVGInlineTextBox())
             continue;
 
-        writeSVGInlineTextBox(ts, static_cast<SVGInlineTextBox*>(box), indent);
+        writeSVGInlineTextBox(ts, toSVGInlineTextBox(box), indent);
     }
 }
 
@@ -493,7 +493,7 @@ void writeSVGResourceContainer(TextStream& ts, const RenderObject& object, int i
 {
     writeStandardPrefix(ts, object, indent);
 
-    Element* element = static_cast<Element*>(object.node());
+    Element* element = toElement(object.node());
     const AtomicString& id = element->getIdAttribute();
     writeNameAndQuotedValue(ts, "id", id);    
 

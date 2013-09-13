@@ -41,16 +41,10 @@ namespace WebKit {
 
 struct DictionaryPopupInfo {
     void encode(CoreIPC::ArgumentEncoder&) const;
-    static bool decode(CoreIPC::ArgumentDecoder*, DictionaryPopupInfo&);
-
-    enum Type {
-        ContextMenu,
-        HotKey
-    };
+    static bool decode(CoreIPC::ArgumentDecoder&, DictionaryPopupInfo&);
 
     WebCore::FloatPoint origin;
-    Type type;
-#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1070
+#if PLATFORM(MAC)
     RetainPtr<CFDictionaryRef> options;
 #endif
 };

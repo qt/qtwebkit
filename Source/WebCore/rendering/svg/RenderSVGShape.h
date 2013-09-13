@@ -42,7 +42,7 @@ class GraphicsContextStateSaver;
 class RenderSVGContainer;
 class RenderSVGPath;
 class RenderSVGResource;
-class SVGStyledTransformableElement;
+class SVGGraphicsElement;
 
 class BoundingRectStrokeStyleApplier : public StrokeStyleApplier {
 public:
@@ -66,16 +66,18 @@ private:
 
 class RenderSVGShape : public RenderSVGModelObject {
 public:
-    explicit RenderSVGShape(SVGStyledTransformableElement*);
-    RenderSVGShape(SVGStyledTransformableElement*, Path*, bool);
+    explicit RenderSVGShape(SVGGraphicsElement*);
+    RenderSVGShape(SVGGraphicsElement*, Path*, bool);
     virtual ~RenderSVGShape();
 
     void setNeedsShapeUpdate() { m_needsShapeUpdate = true; }
     virtual void setNeedsBoundariesUpdate() { m_needsBoundariesUpdate = true; }
+    virtual bool needsBoundariesUpdate() OVERRIDE { return m_needsBoundariesUpdate; }
     virtual void setNeedsTransformUpdate() { m_needsTransformUpdate = true; }
     virtual void fillShape(GraphicsContext*) const;
     virtual void strokeShape(GraphicsContext*) const;
 
+    bool hasPath() const { return m_path.get(); }
     Path& path() const
     {
         ASSERT(m_path);
@@ -88,7 +90,6 @@ protected:
     virtual bool shapeDependentStrokeContains(const FloatPoint&);
     virtual bool shapeDependentFillContains(const FloatPoint&, const WindRule) const;
     float strokeWidth() const;
-    bool hasPath() const { return m_path.get(); }
     bool hasSmoothStroke() const;
 
     bool hasNonScalingStroke() const { return style()->svgStyle()->vectorEffect() == VE_NON_SCALING_STROKE; }
@@ -113,7 +114,7 @@ private:
 
     virtual void layout();
     virtual void paint(PaintInfo&, const LayoutPoint&);
-    virtual void addFocusRingRects(Vector<IntRect>&, const LayoutPoint&);
+    virtual void addFocusRingRects(Vector<IntRect>&, const LayoutPoint& additionalOffset, const RenderLayerModelObject* paintContainer = 0) OVERRIDE;
 
     virtual bool nodeAtFloatPoint(const HitTestRequest&, HitTestResult&, const FloatPoint& pointInParent, HitTestAction);
 
@@ -148,13 +149,13 @@ private:
 
 inline RenderSVGShape* toRenderSVGShape(RenderObject* object)
 {
-    ASSERT(!object || object->isSVGShape());
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isSVGShape());
     return static_cast<RenderSVGShape*>(object);
 }
 
 inline const RenderSVGShape* toRenderSVGShape(const RenderObject* object)
 {
-    ASSERT(!object || object->isSVGShape());
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isSVGShape());
     return static_cast<const RenderSVGShape*>(object);
 }
 

@@ -30,7 +30,6 @@
 #include "SVGAnimatedRect.h"
 #include "SVGExternalResourcesRequired.h"
 #include "SVGFitToViewBox.h"
-#include "SVGLangSpace.h"
 #include "SVGStyledElement.h"
 
 namespace WebCore {
@@ -95,10 +94,9 @@ struct SVGPropertyTraits<SVGMarkerOrientType> {
     }
 };
 
-class SVGMarkerElement : public SVGStyledElement,
-                         public SVGLangSpace,
-                         public SVGExternalResourcesRequired,
-                         public SVGFitToViewBox {
+class SVGMarkerElement FINAL : public SVGStyledElement,
+                               public SVGExternalResourcesRequired,
+                               public SVGFitToViewBox {
 public:
     // Forward declare enumerations in the W3C naming scheme, for IDL generation.
     enum {
@@ -156,8 +154,8 @@ private:
   
 public:
     // Custom 'orientType' property.
-    static void synchronizeOrientType(void* contextElement);
-    static PassRefPtr<SVGAnimatedProperty> lookupOrCreateOrientTypeWrapper(void* contextElement);
+    static void synchronizeOrientType(SVGElement* contextElement);
+    static PassRefPtr<SVGAnimatedProperty> lookupOrCreateOrientTypeWrapper(SVGElement* contextElement);
     SVGMarkerOrientType& orientType() const { return m_orientType.value; }
     SVGMarkerOrientType& orientTypeBaseValue() const { return m_orientType.value; }
     void setOrientTypeBaseValue(const SVGMarkerOrientType& type) { m_orientType.value = type; }
@@ -166,6 +164,12 @@ public:
 private:
     mutable SVGSynchronizableAnimatedProperty<SVGMarkerOrientType> m_orientType;
 };
+
+inline SVGMarkerElement* toSVGMarkerElement(Node* node)
+{
+    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->hasTagName(SVGNames::markerTag));
+    return static_cast<SVGMarkerElement*>(node);
+}
 
 }
 

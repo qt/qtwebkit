@@ -23,31 +23,29 @@
  */
 
 [
+    NoInterfaceObject,
     Conditional=MEDIA_STREAM,
     EventTarget,
     ActiveDOMObject
 ] interface MediaStreamTrack {
     readonly attribute DOMString kind;
+    readonly attribute DOMString id;
     readonly attribute DOMString label;
              attribute boolean enabled;
 
-    const unsigned short LIVE = 0;
-    const unsigned short MUTED = 1;
-    const unsigned short ENDED = 2;
-    readonly attribute unsigned short readyState;
+    readonly attribute DOMString readyState;
 
     attribute EventListener onmute;
     attribute EventListener onunmute;
     attribute EventListener onended;
 
     // EventTarget interface
-    void addEventListener(in DOMString type,
-                          in EventListener listener,
-                          in [Optional] boolean useCapture);
-    void removeEventListener(in DOMString type,
-                             in EventListener listener,
-                             in [Optional] boolean useCapture);
-    boolean dispatchEvent(in Event event)
-        raises(EventException);
+    void addEventListener(DOMString type,
+                          EventListener listener,
+                          optional boolean useCapture);
+    void removeEventListener(DOMString type,
+                             EventListener listener,
+                             optional boolean useCapture);
+    [RaisesException] boolean dispatchEvent(Event event);
 };
 

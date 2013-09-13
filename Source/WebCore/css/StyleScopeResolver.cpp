@@ -31,6 +31,7 @@
 
 #include "CSSStyleRule.h"
 #include "CSSStyleSheet.h"
+#include "ContentDistributor.h"
 #include "ContextFeatures.h"
 #include "ElementShadow.h"
 #include "HTMLNames.h"
@@ -38,10 +39,6 @@
 #include "RuleFeature.h"
 #include "RuleSet.h"
 #include "ShadowRoot.h"
-#include "WebCoreMemoryInstrumentation.h"
-#include <wtf/MemoryInstrumentationHashMap.h>
-#include <wtf/MemoryInstrumentationHashSet.h>
-#include <wtf/MemoryInstrumentationVector.h>
 
 namespace WebCore {
 
@@ -63,12 +60,12 @@ const ContainerNode* StyleScopeResolver::scopeFor(const CSSStyleSheet* sheet)
     if (!document)
         return 0;
     Node* ownerNode = sheet->ownerNode();
-    if (!ownerNode || !ownerNode->isHTMLElement() || !ownerNode->hasTagName(HTMLNames::styleTag))
+    if (!ownerNode || !ownerNode->isHTMLElement() || !isHTMLStyleElement(ownerNode))
         return 0;
 
-    HTMLStyleElement* styleElement = static_cast<HTMLStyleElement*>(ownerNode);
+    HTMLStyleElement* styleElement = toHTMLStyleElement(ownerNode);
     if (!styleElement->scoped())
-        return styleElement->isInShadowTree() ? styleElement->shadowRoot() : 0;
+        return styleElement->isInShadowTree() ? styleElement->containingShadowRoot() : 0;
 
     ContainerNode* parent = styleElement->parentNode();
     if (!parent)
@@ -100,7 +97,7 @@ void StyleScopeResolver::setupStack(const ContainerNode* parent)
 
     m_stack.shrink(0);
     int authorStyleBoundsIndex = 0;
-    for (const ContainerNode* scope = parent; scope; scope = scope->parentOrHostNode()) {
+    for (const ContainerNode* scope = parent; scope; scope = scope->parentOrShadowHostNode()) {
         RuleSet* ruleSet = ruleSetFor(scope);
         if (ruleSet)
             m_stack.append(StackFrame(scope, authorStyleBoundsIndex, ruleSet));
@@ -146,7 +143,7 @@ void StyleScopeResolver::pop(const ContainerNode* scope)
             m_stack.removeLast();
         if (scope->isShadowRoot() && !toShadowRoot(scope)->applyAuthorStyles())
             --m_stackParentBoundsIndex;
-        m_stackParent = scope->parentOrHostNode();
+        m_stackParent = scope->parentOrShadowHostNode();
     }
 }
 
@@ -154,6 +151,10 @@ void StyleScopeResolver::collectFeaturesTo(RuleFeatureSet& features)
 {
     for (ScopedRuleSetMap::iterator it = m_authorStyles.begin(); it != m_authorStyles.end(); ++it)
         features.add(it->value->features());
+#if ENABLE(SHADOW_DOM)
+    for (ScopedRuleSetMap::iterator it = m_atHostRules.begin(); it != m_atHostRules.end(); ++it)
+        features.add(it->value->features());
+#endif
 }
 
 inline RuleSet* StyleScopeResolver::ensureAtHostRuleSetFor(const ShadowRoot* shadowRoot)
@@ -170,12 +171,13 @@ inline RuleSet* StyleScopeResolver::atHostRuleSetFor(const ShadowRoot* shadowRoo
     return it != m_atHostRules.end() ? it->value.get() : 0;
 }
 
+#if ENABLE(SHADOW_DOM)
 void StyleScopeResolver::addHostRule(StyleRuleHost* hostRule, bool hasDocumentSecurityOrigin, const ContainerNode* scope)
 {
     if (!scope || !scope->isInShadowTree())
         return;
 
-    ShadowRoot* shadowRoot = scope->shadowRoot();
+    ShadowRoot* shadowRoot = scope->containingShadowRoot();
     if (!shadowRoot || !shadowRoot->host())
         return;
 
@@ -183,13 +185,14 @@ void StyleScopeResolver::addHostRule(StyleRuleHost* hostRule, bool hasDocumentSe
 
     const Vector<RefPtr<StyleRuleBase> >& childRules = hostRule->childRules();
     AddRuleFlags addRuleFlags = hasDocumentSecurityOrigin ? RuleHasDocumentSecurityOrigin : RuleHasNoSpecialState;
-    addRuleFlags = static_cast<AddRuleFlags>(addRuleFlags | RuleCanUseFastCheckSelector | RuleIsHostRule);
+    addRuleFlags = static_cast<AddRuleFlags>(addRuleFlags | RuleCanUseFastCheckSelector);
     for (unsigned i = 0; i < childRules.size(); ++i) {
         StyleRuleBase* hostStylingRule = childRules[i].get();
         if (hostStylingRule->isStyleRule())
             rule->addStyleRule(static_cast<StyleRule*>(hostStylingRule), addRuleFlags);
     }
 }
+#endif
 
 bool StyleScopeResolver::styleSharingCandidateMatchesHostRules(const Element* element)
 {
@@ -204,12 +207,9 @@ bool StyleScopeResolver::styleSharingCandidateMatchesHostRules(const Element* el
     // add a new flag to ElementShadow and cache whether any@host @-rules are
     // applied to the element or not. So we can avoid always traversing
     // shadow roots.
-    for (ShadowRoot* shadowRoot = shadow->youngestShadowRoot(); shadowRoot; shadowRoot = shadowRoot->olderShadowRoot()) {
+    if (ShadowRoot* shadowRoot = shadow->shadowRoot()) {
         if (atHostRuleSetFor(shadowRoot))
             return true;
-
-        if (!shadowRoot->hasShadowInsertionPoint())
-            break;
     }
     return false;
 }
@@ -227,20 +227,10 @@ void StyleScopeResolver::matchHostRules(const Element* element, Vector<RuleSet*>
     // add a new flag to ElementShadow and cache whether any @host @-rules are
     // applied to the element or not. So we can quickly exit this method
     // by using the flag.
-    for (ShadowRoot* shadowRoot = shadow->youngestShadowRoot(); shadowRoot; shadowRoot = shadowRoot->olderShadowRoot()) { 
+    if (ShadowRoot* shadowRoot = shadow->shadowRoot()) {
         if (RuleSet* ruleSet = atHostRuleSetFor(shadowRoot))
             matchedRules.append(ruleSet);
-        if (!shadowRoot->hasShadowInsertionPoint())
-            break;
     }
-}
-
-void StyleScopeResolver::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
-    info.addMember(m_authorStyles);
-    info.addMember(m_stack);
-    info.addMember(m_atHostRules);
 }
 
 }

@@ -39,8 +39,8 @@ LayoutState::LayoutState(LayoutState* prev, RenderBox* renderer, const LayoutSiz
     : m_columnInfo(columnInfo)
     , m_lineGrid(0)
     , m_next(prev)
-#if ENABLE(CSS_EXCLUSIONS)
-    , m_exclusionShapeInsideInfo(0)
+#if ENABLE(CSS_SHAPES)
+    , m_shapeInsideInfo(0)
 #endif
 #ifndef NDEBUG
     , m_renderer(renderer)
@@ -110,11 +110,12 @@ LayoutState::LayoutState(LayoutState* prev, RenderBox* renderer, const LayoutSiz
     if (!m_columnInfo)
         m_columnInfo = m_next->m_columnInfo;
 
-#if ENABLE(CSS_EXCLUSIONS)
+#if ENABLE(CSS_SHAPES)
     if (renderer->isRenderBlock()) {
-        m_exclusionShapeInsideInfo = toRenderBlock(renderer)->exclusionShapeInsideInfo();
-        if (!m_exclusionShapeInsideInfo)
-            m_exclusionShapeInsideInfo = m_next->m_exclusionShapeInsideInfo;
+        const RenderBlock* renderBlock = toRenderBlock(renderer);
+        m_shapeInsideInfo = renderBlock->shapeInsideInfo();
+        if (!m_shapeInsideInfo && m_next->m_shapeInsideInfo && renderBlock->allowsShapeInsideInfoSharing())
+            m_shapeInsideInfo = m_next->m_shapeInsideInfo;
     }
 #endif
 
@@ -147,8 +148,8 @@ LayoutState::LayoutState(RenderObject* root)
     , m_columnInfo(0)
     , m_lineGrid(0)
     , m_next(0)
-#if ENABLE(CSS_EXCLUSIONS)
-    , m_exclusionShapeInsideInfo(0)
+#if ENABLE(CSS_SHAPES)
+    , m_shapeInsideInfo(0)
 #endif
     , m_pageLogicalHeight(0)
 #ifndef NDEBUG
@@ -156,7 +157,7 @@ LayoutState::LayoutState(RenderObject* root)
 #endif
 {
     RenderObject* container = root->container();
-    FloatPoint absContentPoint = container->localToAbsolute(FloatPoint(), UseTransforms | SnapOffsetForTransforms);
+    FloatPoint absContentPoint = container->localToAbsolute(FloatPoint(), UseTransforms);
     m_paintOffset = LayoutSize(absContentPoint.x(), absContentPoint.y());
 
     if (container->hasOverflowClip()) {

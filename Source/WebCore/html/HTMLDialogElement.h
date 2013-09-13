@@ -27,7 +27,6 @@
 #define HTMLDialogElement_h
 
 #if ENABLE(DIALOG_ELEMENT)
-
 #include "HTMLElement.h"
 
 namespace WebCore {
@@ -35,7 +34,7 @@ namespace WebCore {
 class Document;
 class QualifiedName;
 
-class HTMLDialogElement : public HTMLElement {
+class HTMLDialogElement FINAL : public HTMLElement {
 public:
     static PassRefPtr<HTMLDialogElement> create(const QualifiedName&, Document*);
 

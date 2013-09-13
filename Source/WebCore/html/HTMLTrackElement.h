@@ -27,7 +27,6 @@
 #define HTMLTrackElement_h
 
 #if ENABLE(VIDEO_TRACK)
-
 #include "HTMLElement.h"
 #include "LoadableTextTrack.h"
 #include "TextTrack.h"
@@ -36,7 +35,7 @@ namespace WebCore {
 
 class HTMLMediaElement;
 
-class HTMLTrackElement : public HTMLElement, public TextTrackClient {
+class HTMLTrackElement FINAL : public HTMLElement, public TextTrackClient {
 public:
     static PassRefPtr<HTMLTrackElement> create(const QualifiedName&, Document*);
 
@@ -79,6 +78,8 @@ private:
     virtual void removedFrom(ContainerNode*) OVERRIDE;
     virtual bool isURLAttribute(const Attribute&) const OVERRIDE;
 
+    void loadTimerFired(Timer<HTMLTrackElement>*);
+
 #if ENABLE(MICRODATA)
     virtual String itemValueText() const OVERRIDE;
     virtual void setItemValueText(const String&, ExceptionCode&) OVERRIDE;
@@ -98,6 +99,7 @@ private:
     virtual bool canLoadUrl(const KURL&);
 
     RefPtr<LoadableTextTrack> m_track;
+    Timer<HTMLTrackElement> m_loadTimer;
 };
 
 }

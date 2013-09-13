@@ -23,6 +23,7 @@
  */
 
 [
+    NoInterfaceObject,
     Conditional=MEDIA_STREAM,
     EventTarget
 ] interface RTCDataChannel {
@@ -31,17 +32,12 @@
     readonly attribute DOMString readyState;
     readonly attribute unsigned long bufferedAmount;
 
-    attribute DOMString binaryType
-        setter raises(DOMException);
+    [SetterRaisesException] attribute DOMString binaryType;
 
-    void send(in ArrayBuffer data)
-        raises(DOMException);
-    void send(in ArrayBufferView data)
-        raises(DOMException);
-    void send(in Blob data)
-        raises(DOMException);
-    void send(in DOMString data)
-        raises(DOMException);
+    [RaisesException] void send(ArrayBuffer data);
+    [RaisesException] void send(ArrayBufferView data);
+    [RaisesException] void send(Blob data);
+    [RaisesException] void send(DOMString data);
 
     void close();
 
@@ -51,12 +47,11 @@
     attribute EventListener onmessage;
 
     // EventTarget interface
-    void addEventListener(in DOMString type,
-                          in EventListener listener,
-                          in [Optional] boolean useCapture);
-    void removeEventListener(in DOMString type,
-                             in EventListener listener,
-                             in [Optional] boolean useCapture);
-    boolean dispatchEvent(in Event event)
-        raises(EventException);
+    void addEventListener(DOMString type,
+                          EventListener listener,
+                          optional boolean useCapture);
+    void removeEventListener(DOMString type,
+                             EventListener listener,
+                             optional boolean useCapture);
+    [RaisesException] boolean dispatchEvent(Event event);
 };

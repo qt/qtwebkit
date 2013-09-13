@@ -35,26 +35,26 @@
 #include <wtf/Threading.h>
 
 namespace JSC {
-    class JSGlobalData;
+    class VM;
 }
 
 namespace WebCore {
 
-    class JSWorkerContext;
+    class JSWorkerGlobalScope;
     class ScriptSourceCode;
     class ScriptValue;
-    class WorkerContext;
+    class WorkerGlobalScope;
 
     class WorkerScriptController {
         WTF_MAKE_NONCOPYABLE(WorkerScriptController); WTF_MAKE_FAST_ALLOCATED;
     public:
-        WorkerScriptController(WorkerContext*);
+        WorkerScriptController(WorkerGlobalScope*);
         ~WorkerScriptController();
 
-        JSWorkerContext* workerContextWrapper()
+        JSWorkerGlobalScope* workerGlobalScopeWrapper()
         {
             initScriptIfNeeded();
-            return m_workerContextWrapper.get();
+            return m_workerGlobalScopeWrapper.get();
         }
 
         void evaluate(const ScriptSourceCode&);
@@ -77,7 +77,7 @@ namespace WebCore {
 
         void disableEval(const String& errorMessage);
 
-        JSC::JSGlobalData* globalData() { return m_globalData.get(); }
+        JSC::VM* vm() { return m_vm.get(); }
 
         void attachDebugger(JSC::Debugger*);
         void detachDebugger(JSC::Debugger*);
@@ -85,14 +85,14 @@ namespace WebCore {
     private:
         void initScriptIfNeeded()
         {
-            if (!m_workerContextWrapper)
+            if (!m_workerGlobalScopeWrapper)
                 initScript();
         }
         void initScript();
 
-        RefPtr<JSC::JSGlobalData> m_globalData;
-        WorkerContext* m_workerContext;
-        JSC::Strong<JSWorkerContext> m_workerContextWrapper;
+        RefPtr<JSC::VM> m_vm;
+        WorkerGlobalScope* m_workerGlobalScope;
+        JSC::Strong<JSWorkerGlobalScope> m_workerGlobalScopeWrapper;
         bool m_executionForbidden;
         mutable Mutex m_scheduledTerminationMutex;
     };

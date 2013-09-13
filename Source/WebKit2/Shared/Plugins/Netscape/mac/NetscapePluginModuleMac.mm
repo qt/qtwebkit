@@ -31,7 +31,7 @@
 #import "PluginProcessProxy.h"
 #import <WebCore/WebCoreNSStringExtras.h>
 #import <wtf/HashSet.h>
-
+#import <wtf/MainThread.h>
 
 using namespace WebCore;
 
@@ -39,7 +39,7 @@ namespace WebKit {
 
 static bool getPluginArchitecture(CFBundleRef bundle, PluginModuleInfo& plugin)
 {
-    RetainPtr<CFArrayRef> pluginArchitecturesArray(AdoptCF, CFBundleCopyExecutableArchitectures(bundle));
+    RetainPtr<CFArrayRef> pluginArchitecturesArray = adoptCF(CFBundleCopyExecutableArchitectures(bundle));
     if (!pluginArchitecturesArray)
         return false;
 
@@ -97,22 +97,22 @@ static RetainPtr<CFDictionaryRef> contentsOfPropertyListAtURL(CFURLRef propertyL
     if (!propertyListData)
         return 0;
 
-    RetainPtr<CFPropertyListRef> propertyList(AdoptCF, CFPropertyListCreateWithData(kCFAllocatorDefault, (CFDataRef)propertyListData.get(), kCFPropertyListImmutable, 0, 0));
+    RetainPtr<CFPropertyListRef> propertyList = adoptCF(CFPropertyListCreateWithData(kCFAllocatorDefault, (CFDataRef)propertyListData.get(), kCFPropertyListImmutable, 0, 0));
     if (!propertyList)
         return 0;
 
     if (CFGetTypeID(propertyList.get()) != CFDictionaryGetTypeID())
         return 0;
 
-    return RetainPtr<CFDictionaryRef>(AdoptCF, static_cast<CFDictionaryRef>(propertyList.leakRef()));
+    return static_cast<CFDictionaryRef>(propertyList.get());
 }
 
 static RetainPtr<CFDictionaryRef> getMIMETypesFromPluginBundle(CFBundleRef bundle, const PluginModuleInfo& plugin)
 {
     CFStringRef propertyListFilename = static_cast<CFStringRef>(CFBundleGetValueForInfoDictionaryKey(bundle, CFSTR("WebPluginMIMETypesFilename")));
     if (propertyListFilename) {
-        RetainPtr<CFStringRef> propertyListPath(AdoptCF, CFStringCreateWithFormat(kCFAllocatorDefault, 0, CFSTR("%@/Library/Preferences/%@"), NSHomeDirectory(), propertyListFilename));
-        RetainPtr<CFURLRef> propertyListURL(AdoptCF, CFURLCreateWithFileSystemPath(kCFAllocatorDefault, propertyListPath.get(), kCFURLPOSIXPathStyle, FALSE));
+        RetainPtr<CFStringRef> propertyListPath = adoptCF(CFStringCreateWithFormat(kCFAllocatorDefault, 0, CFSTR("%@/Library/Preferences/%@"), NSHomeDirectory(), propertyListFilename));
+        RetainPtr<CFURLRef> propertyListURL = adoptCF(CFURLCreateWithFileSystemPath(kCFAllocatorDefault, propertyListPath.get(), kCFURLPOSIXPathStyle, FALSE));
 
         RetainPtr<CFDictionaryRef> propertyList = contentsOfPropertyListAtURL(propertyListURL.get());
 
@@ -274,7 +274,7 @@ static bool getStringListResource(ResID resourceID, Vector<String>& stringList) 
         // Get the string length.
         unsigned char stringLength = *ptr++;
 
-        RetainPtr<CFStringRef> cfString(AdoptCF, CFStringCreateWithBytesNoCopy(kCFAllocatorDefault, ptr, stringLength, stringEncoding, false, kCFAllocatorNull));
+        RetainPtr<CFStringRef> cfString = adoptCF(CFStringCreateWithBytesNoCopy(kCFAllocatorDefault, ptr, stringLength, stringEncoding, false, kCFAllocatorNull));
         if (!cfString.get())
             return false;
 
@@ -298,6 +298,8 @@ static const ResID MIMEListStringStringNumber = 128;
 
 static bool getPluginInfoFromCarbonResources(CFBundleRef bundle, PluginModuleInfo& plugin)
 {
+    ASSERT(isMainThread());
+
     ResourceMap resourceMap(bundle);
     if (!resourceMap.isValid())
         return false;
@@ -375,19 +377,31 @@ bool NetscapePluginModule::getPluginInfo(const String& pluginPath, PluginModuleI
         if (CFGetTypeID(versionTypeRef) == CFStringGetTypeID())
             plugin.versionString = static_cast<CFStringRef>(versionTypeRef);
     }
-    
+
+    if (CFTypeRef shortVersionTypeRef = CFBundleGetValueForInfoDictionaryKey(bundle.get(), CFSTR("CFBundleShortVersionString"))) {
+        if (CFGetTypeID(shortVersionTypeRef) == CFStringGetTypeID())
+            plugin.shortVersionString = static_cast<CFStringRef>(shortVersionTypeRef);
+    }
+
+    if (CFTypeRef preferencePathTypeRef = CFBundleGetValueForInfoDictionaryKey(bundle.get(), CFSTR("WebPluginPreferencePanePath"))) {
+        if (CFGetTypeID(preferencePathTypeRef) == CFStringGetTypeID())
+            plugin.preferencePanePath = static_cast<CFStringRef>(preferencePathTypeRef);
+    }
+
     // Check that there's valid info for this plug-in.
     if (!getPluginInfoFromPropertyLists(bundle.get(), plugin) &&
         !getPluginInfoFromCarbonResources(bundle.get(), plugin))
         return false;
     
-    RetainPtr<CFStringRef> filename(AdoptCF, CFURLCopyLastPathComponent(bundleURL.get()));
+    RetainPtr<CFStringRef> filename = adoptCF(CFURLCopyLastPathComponent(bundleURL.get()));
     plugin.info.file = filename.get();
     
     if (plugin.info.name.isNull())
         plugin.info.name = plugin.info.file;
     if (plugin.info.desc.isNull())
         plugin.info.desc = plugin.info.file;
+
+    plugin.info.isApplicationPlugin = false;
     
     return true;
 }
@@ -467,6 +481,9 @@ void NetscapePluginModule::determineQuirks()
 
         // Flash returns a retained Core Animation layer.
         m_pluginQuirks.add(PluginQuirks::ReturnsRetainedCoreAnimationLayer);
+
+        // Flash has a bug where NSExceptions can be released too early.
+        m_pluginQuirks.add(PluginQuirks::LeakAllThrownNSExceptions);
     }
 
     if (plugin.bundleIdentifier == "com.microsoft.SilverlightPlugin") {

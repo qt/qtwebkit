@@ -40,7 +40,7 @@ void JSRopeString::RopeBuilder::expand()
 {
     ASSERT(m_index == JSRopeString::s_maxInternalRopeLength);
     JSString* jsString = m_jsString;
-    m_jsString = jsStringBuilder(&m_globalData);
+    m_jsString = jsStringBuilder(&m_vm);
     m_index = 0;
     append(jsString);
 }
@@ -154,7 +154,7 @@ void JSRopeString::resolveRope(ExecState* exec) const
 void JSRopeString::resolveRopeSlowCase8(LChar* buffer) const
 {
     LChar* position = buffer + m_length; // We will be working backwards over the rope.
-    Vector<JSString*, 32> workQueue; // Putting strings into a Vector is only OK because there are no GC points in this method.
+    Vector<JSString*, 32, UnsafeVectorOverflow> workQueue; // Putting strings into a Vector is only OK because there are no GC points in this method.
     
     for (size_t i = 0; i < s_maxInternalRopeLength && m_fibers[i]; ++i) {
         workQueue.append(m_fibers[i].get());
@@ -186,7 +186,7 @@ void JSRopeString::resolveRopeSlowCase8(LChar* buffer) const
 void JSRopeString::resolveRopeSlowCase(UChar* buffer) const
 {
     UChar* position = buffer + m_length; // We will be working backwards over the rope.
-    Vector<JSString*, 32> workQueue; // These strings are kept alive by the parent rope, so using a Vector is OK.
+    Vector<JSString*, 32, UnsafeVectorOverflow> workQueue; // These strings are kept alive by the parent rope, so using a Vector is OK.
 
     for (size_t i = 0; i < s_maxInternalRopeLength && m_fibers[i]; ++i)
         workQueue.append(m_fibers[i].get());
@@ -233,7 +233,7 @@ JSString* JSRopeString::getIndexSlowCase(ExecState* exec, unsigned i)
     if (exec->exception())
         return jsEmptyString(exec);
     ASSERT(!isRope());
-    ASSERT(i < m_value.length());
+    RELEASE_ASSERT(i < m_value.length());
     return jsSingleCharacterSubstring(exec, m_value, i);
 }
 
@@ -261,8 +261,8 @@ double JSString::toNumber(ExecState* exec) const
 
 inline StringObject* StringObject::create(ExecState* exec, JSGlobalObject* globalObject, JSString* string)
 {
-    StringObject* object = new (NotNull, allocateCell<StringObject>(*exec->heap())) StringObject(exec->globalData(), globalObject->stringObjectStructure());
-    object->finishCreation(exec->globalData(), string);
+    StringObject* object = new (NotNull, allocateCell<StringObject>(*exec->heap())) StringObject(exec->vm(), globalObject->stringObjectStructure());
+    object->finishCreation(exec->vm(), string);
     return object;
 }
 

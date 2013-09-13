@@ -31,9 +31,11 @@
 /**
  * @constructor
  * @extends {WebInspector.Object}
+ * @param {WebInspector.Workspace} workspace
  */
-WebInspector.CSSStyleModel = function()
+WebInspector.CSSStyleModel = function(workspace)
 {
+    this._workspace = workspace;
     this._pendingCommandsMajorState = [];
     /** @type {Array.<WebInspector.CSSStyleModel.LiveLocation>} */
     this._locations = [];
@@ -41,6 +43,7 @@ WebInspector.CSSStyleModel = function()
     WebInspector.domAgent.addEventListener(WebInspector.DOMAgent.Events.UndoRedoRequested, this._undoRedoRequested, this);
     WebInspector.domAgent.addEventListener(WebInspector.DOMAgent.Events.UndoRedoCompleted, this._undoRedoCompleted, this);
     this._resourceBinding = new WebInspector.CSSStyleModelResourceBinding();
+    WebInspector.resourceTreeModel.addEventListener(WebInspector.ResourceTreeModel.EventTypes.MainFrameCreatedOrNavigated, this._mainFrameCreatedOrNavigated, this);
     this._namedFlowCollections = {};
     WebInspector.domAgent.addEventListener(WebInspector.DOMAgent.Events.DocumentUpdated, this._resetNamedFlowCollections, this);
     InspectorBackend.registerCSSDispatcher(new WebInspector.CSSDispatcher(this));
@@ -57,7 +60,7 @@ WebInspector.CSSStyleModel.parseRuleArrayPayload = function(ruleArray)
         result.push(WebInspector.CSSRule.parsePayload(ruleArray[i]));
     return result;
 }
-
+    
 /**
  * @param {Array.<CSSAgent.RuleMatch>} matchArray
  */
@@ -74,8 +77,11 @@ WebInspector.CSSStyleModel.Events = {
     MediaQueryResultChanged: "MediaQueryResultChanged",
     NamedFlowCreated: "NamedFlowCreated",
     NamedFlowRemoved: "NamedFlowRemoved",
-    RegionLayoutUpdated: "RegionLayoutUpdated"
+    RegionLayoutUpdated: "RegionLayoutUpdated",
+    RegionOversetChanged: "RegionOversetChanged"
 }
+
+WebInspector.CSSStyleModel.MediaTypes = ["all", "braille", "embossed", "handheld", "print", "projection", "screen", "speech", "tty", "tv"];
 
 WebInspector.CSSStyleModel.prototype = {
     /**
@@ -423,6 +429,21 @@ WebInspector.CSSStyleModel.prototype = {
         namedFlowCollection._appendNamedFlow(namedFlow);
         this.dispatchEventToListeners(WebInspector.CSSStyleModel.Events.RegionLayoutUpdated, namedFlow);
     },
+    
+    /**
+     * @param {CSSAgent.NamedFlow} namedFlowPayload
+     */
+    _regionOversetChanged: function(namedFlowPayload)
+    {
+        var namedFlow = WebInspector.NamedFlow.parsePayload(namedFlowPayload);
+        var namedFlowCollection = this._namedFlowCollections[namedFlow.documentNodeId];
+        
+        if (!namedFlowCollection)
+            return;
+        
+        namedFlowCollection._appendNamedFlow(namedFlow);
+        this.dispatchEventToListeners(WebInspector.CSSStyleModel.Events.RegionOversetChanged, namedFlow);
+    },
 
     /**
      * @param {CSSAgent.StyleSheetId} styleSheetId
@@ -477,16 +498,28 @@ WebInspector.CSSStyleModel.prototype = {
     },
 
     /**
+     * @param {WebInspector.Event} event
+     */
+    _mainFrameCreatedOrNavigated: function(event)
+    {
+        this._resetSourceMappings();
+        this._resourceBinding._reset();
+    },
+
+    /**
      * @param {string} url
      * @param {WebInspector.SourceMapping} sourceMapping
      */
     setSourceMapping: function(url, sourceMapping)
     {
-        this._sourceMappings[url] = sourceMapping;
+        if (sourceMapping)
+            this._sourceMappings[url] = sourceMapping;
+        else
+            delete this._sourceMappings[url];
         this._updateLocations();
     },
 
-    resetSourceMappings: function()
+    _resetSourceMappings: function()
     {
         this._sourceMappings = {};
     },
@@ -503,6 +536,7 @@ WebInspector.CSSStyleModel.prototype = {
     },
 
     /**
+     * @param {WebInspector.CSSRule} cssRule
      * @param {function(WebInspector.UILocation):(boolean|undefined)} updateDelegate
      * @return {?WebInspector.LiveLocation}
      */
@@ -522,10 +556,18 @@ WebInspector.CSSStyleModel.prototype = {
      * @param {WebInspector.CSSLocation} rawLocation
      * @return {?WebInspector.UILocation}
      */
-    _rawLocationToUILocation: function(rawLocation)
+    rawLocationToUILocation: function(rawLocation)
     {
         var sourceMapping = this._sourceMappings[rawLocation.url];
-        return sourceMapping ? sourceMapping.rawLocationToUILocation(rawLocation) : null;
+        if (sourceMapping) {
+            var uiLocation = sourceMapping.rawLocationToUILocation(rawLocation);
+            if (uiLocation)
+                return uiLocation;
+        }
+        var uiSourceCode = this._workspace.uiSourceCodeForURL(rawLocation.url);
+        if (!uiSourceCode)
+            return null;
+        return new WebInspector.UILocation(uiSourceCode, rawLocation.lineNumber, rawLocation.columnNumber);
     },
 
     __proto__: WebInspector.Object.prototype
@@ -549,7 +591,7 @@ WebInspector.CSSStyleModel.LiveLocation.prototype = {
     uiLocation: function()
     {
         var cssLocation = /** @type WebInspector.CSSLocation */ (this.rawLocation());
-        return WebInspector.cssModel._rawLocationToUILocation(cssLocation);
+        return WebInspector.cssModel.rawLocationToUILocation(cssLocation);
     },
 
     dispose: function()
@@ -568,11 +610,13 @@ WebInspector.CSSStyleModel.LiveLocation.prototype = {
  * @implements {WebInspector.RawLocation}
  * @param {string} url
  * @param {number} lineNumber
+ * @param {number=} columnNumber
  */
-WebInspector.CSSLocation = function(url, lineNumber)
+WebInspector.CSSLocation = function(url, lineNumber, columnNumber)
 {
     this.url = url;
     this.lineNumber = lineNumber;
+    this.columnNumber = columnNumber || 0;
 }
 
 /**
@@ -694,7 +738,7 @@ WebInspector.CSSStyleDeclaration.prototype = {
      */
     longhandProperties: function(name)
     {
-        var longhands = WebInspector.CSSCompletions.cssPropertiesMetainfo.longhands(name);
+        var longhands = WebInspector.CSSMetadata.cssPropertiesMetainfo.longhands(name);
         var result = [];
         for (var i = 0; longhands && i < longhands.length; ++i) {
             var property = this._livePropertyMap[longhands[i]];
@@ -748,16 +792,15 @@ WebInspector.CSSStyleDeclaration.prototype = {
      * @param {number} index
      * @param {string} name
      * @param {string} value
-     * @param {function(?WebInspector.CSSStyleDeclaration)} userCallback
+     * @param {function(?WebInspector.CSSStyleDeclaration)=} userCallback
      */
     insertPropertyAt: function(index, name, value, userCallback)
     {
         /**
-         * @param {function(?WebInspector.CSSStyleDeclaration)} userCallback
          * @param {?string} error
          * @param {CSSAgent.CSSStyle} payload
          */
-        function callback(userCallback, error, payload)
+        function callback(error, payload)
         {
             WebInspector.cssModel._pendingCommandsMajorState.pop();
             if (!userCallback)
@@ -775,13 +818,13 @@ WebInspector.CSSStyleDeclaration.prototype = {
             throw "No style id";
 
         WebInspector.cssModel._pendingCommandsMajorState.push(true);
-        CSSAgent.setPropertyText(this.id, index, name + ": " + value + ";", false, callback.bind(this, userCallback));
+        CSSAgent.setPropertyText(this.id, index, name + ": " + value + ";", false, callback.bind(this));
     },
 
     /**
      * @param {string} name
      * @param {string} value
-     * @param {function(?WebInspector.CSSStyleDeclaration)} userCallback
+     * @param {function(?WebInspector.CSSStyleDeclaration)=} userCallback
      */
     appendProperty: function(name, value, userCallback)
     {
@@ -800,17 +843,16 @@ WebInspector.CSSRule = function(payload, matchingSelectors)
     if (matchingSelectors)
         this.matchingSelectors = matchingSelectors;
     this.selectors = payload.selectorList.selectors;
-    this.selectorText = payload.selectorList.text;
+    this.selectorText = this.selectors.join(", ");
     this.selectorRange = payload.selectorList.range;
     this.sourceLine = payload.sourceLine;
     this.sourceURL = payload.sourceURL;
-    if (payload.sourceURL)
-        this._rawLocation = new WebInspector.CSSLocation(payload.sourceURL, payload.sourceLine);
     this.origin = payload.origin;
     this.style = WebInspector.CSSStyleDeclaration.parsePayload(payload.style);
     this.style.parentRule = this;
     if (payload.media)
         this.media = WebInspector.CSSMedia.parseMediaArrayPayload(payload.media);
+    this._setRawLocation(payload);
 }
 
 /**
@@ -824,6 +866,20 @@ WebInspector.CSSRule.parsePayload = function(payload, matchingIndices)
 }
 
 WebInspector.CSSRule.prototype = {
+    _setRawLocation: function(payload)
+    {
+        if (!payload.sourceURL)
+            return;
+        if (this.selectorRange) {
+            var resource = WebInspector.resourceTreeModel.resourceForURL(payload.sourceURL);
+            if (resource && resource.type === WebInspector.resourceTypes.Stylesheet) {
+                this._rawLocation = new WebInspector.CSSLocation(payload.sourceURL, this.selectorRange.startLine, this.selectorRange.startColumn);
+                return;
+            }
+        }
+        this._rawLocation = new WebInspector.CSSLocation(payload.sourceURL, payload.sourceLine);
+    },
+
     get isUserAgent()
     {
         return this.origin === "user-agent";
@@ -842,6 +898,17 @@ WebInspector.CSSRule.prototype = {
     get isRegular()
     {
         return this.origin === "regular";
+    },
+
+    /**
+     * @return {boolean}
+     */
+    isSourceNavigable: function()
+    {
+        if (!this.sourceURL)
+            return false;
+        var resource = WebInspector.resourceTreeModel.resourceForURL(this.sourceURL);
+        return !!resource && resource.contentType() === WebInspector.resourceTypes.Stylesheet;
     }
 }
 
@@ -856,8 +923,9 @@ WebInspector.CSSRule.prototype = {
  * @param {boolean} parsedOk
  * @param {boolean} implicit
  * @param {?string=} text
+ * @param {CSSAgent.SourceRange=} range
  */
-WebInspector.CSSProperty = function(ownerStyle, index, name, value, priority, status, parsedOk, implicit, text)
+WebInspector.CSSProperty = function(ownerStyle, index, name, value, priority, status, parsedOk, implicit, text, range)
 {
     this.ownerStyle = ownerStyle;
     this.index = index;
@@ -868,6 +936,7 @@ WebInspector.CSSProperty = function(ownerStyle, index, name, value, priority, st
     this.parsedOk = parsedOk;
     this.implicit = implicit;
     this.text = text;
+    this.range = range;
 }
 
 /**
@@ -884,7 +953,7 @@ WebInspector.CSSProperty.parsePayload = function(ownerStyle, index, payload)
     // implicit: false
     // status: "style"
     var result = new WebInspector.CSSProperty(
-        ownerStyle, index, payload.name, payload.value, payload.priority || "", payload.status || "style", ("parsedOk" in payload) ? !!payload.parsedOk : true, !!payload.implicit, payload.text);
+        ownerStyle, index, payload.name, payload.value, payload.priority || "", payload.status || "style", ("parsedOk" in payload) ? !!payload.parsedOk : true, !!payload.implicit, payload.text, payload.range);
     return result;
 }
 
@@ -1028,6 +1097,23 @@ WebInspector.CSSProperty.prototype = {
 
         WebInspector.cssModel._pendingCommandsMajorState.push(false);
         CSSAgent.toggleProperty(this.ownerStyle.id, this.index, disabled, callback.bind(this));
+    },
+
+    /**
+     * @param {boolean} forName
+     * @return {WebInspector.UILocation}
+     */
+    uiLocation: function(forName)
+    {
+        if (!this.range || !this.ownerStyle || !this.ownerStyle.parentRule || !this.ownerStyle.parentRule.sourceURL)
+            return null;
+
+        var range = this.range;
+        var line = forName ? range.startLine : range.endLine;
+        // End of range is exclusive, so subtract 1 from the end offset.
+        var column = forName ? range.startColumn : range.endColumn - 1;
+        var rawLocation = new WebInspector.CSSLocation(this.ownerStyle.parentRule.sourceURL, line, column);
+        return WebInspector.cssModel.rawLocationToUILocation(rawLocation);
     }
 }
 
@@ -1149,9 +1235,7 @@ WebInspector.CSSStyleSheet.prototype = {
  */
 WebInspector.CSSStyleModelResourceBinding = function()
 {
-    this._frameAndURLToStyleSheetId = {};
-    this._styleSheetIdToHeader = {};
-    WebInspector.resourceTreeModel.addEventListener(WebInspector.ResourceTreeModel.EventTypes.InspectedURLChanged, this._inspectedURLChanged, this);
+    this._reset();
 }
 
 WebInspector.CSSStyleModelResourceBinding.prototype = {
@@ -1209,16 +1293,6 @@ WebInspector.CSSStyleModelResourceBinding.prototype = {
     _styleSheetIdForResource: function(resource)
     {
         return this._frameAndURLToStyleSheetId[resource.frameId + ":" + resource.url];
-    },
-
-    /**
-     * @param {WebInspector.Event} event
-     */
-    _inspectedURLChanged: function(event)
-    {
-        // Main frame navigation - clear history.
-        this._frameAndURLToStyleSheetId = {};
-        this._styleSheetIdToHeader = {};
     },
 
     /**
@@ -1324,6 +1398,13 @@ WebInspector.CSSStyleModelResourceBinding.prototype = {
             fakeURL += "/";
         fakeURL += "inspector-stylesheet";
         return fakeURL;
+    },
+
+    _reset: function()
+    {
+        // Main frame navigation - clear history.
+        this._frameAndURLToStyleSheetId = {};
+        this._styleSheetIdToHeader = {};
     }
 }
 
@@ -1374,6 +1455,14 @@ WebInspector.CSSDispatcher.prototype = {
     regionLayoutUpdated: function(namedFlowPayload)
     {
         this._cssModel._regionLayoutUpdated(namedFlowPayload);
+    },
+    
+    /**
+     * @param {CSSAgent.NamedFlow} namedFlowPayload
+     */
+    regionOversetChanged: function(namedFlowPayload)
+    {
+        this._cssModel._regionOversetChanged(namedFlowPayload);
     }
 }
 

@@ -1,17 +1,24 @@
-SET(MiniBrowser_DIR "${TOOLS_DIR}/MiniBrowser/efl")
+set(MiniBrowser_DIR "${TOOLS_DIR}/MiniBrowser/efl")
 
-SET(MiniBrowser_SOURCES
+# Elementary is needed to build MiniBrowser
+find_package(Elementary 1.6)
+
+set(MiniBrowser_SOURCES
     ${TOOLS_DIR}/EWebLauncher/url_utils.c
     ${MiniBrowser_DIR}/main.c
 )
 
-SET(MiniBrowser_INCLUDE_DIRECTORIES
+set(MiniBrowser_INCLUDE_DIRECTORIES
     ${CAIRO_INCLUDE_DIRS}
     ${ECORE_INCLUDE_DIRS}
     ${ECORE_EVAS_INCLUDE_DIRS}
+    ${ECORE_CON_INCLUDE_DIRS}
     ${ECORE_FILE_INCLUDE_DIRS}
+    ${ECORE_IMF_INCLUDE_DIRS}
+    ${ECORE_INPUT_INCLUDE_DIRS}
     ${EDJE_INCLUDE_DIRS}
     ${EET_INCLUDE_DIRS}
+    ${EO_INCLUDE_DIRS}
     ${DBUS_INCLUDE_DIRS}
     ${E_DBUS_INCLUDE_DIRS}
     ${EFREET_INCLUDE_DIRS}
@@ -24,37 +31,33 @@ SET(MiniBrowser_INCLUDE_DIRECTORIES
     ${CMAKE_SOURCE_DIR}/Source
 )
 
-SET(MiniBrowser_LIBRARIES
-    ${JavaScriptCore_LIBRARY_NAME}
-    ${WebCore_LIBRARY_NAME}
-    ${WebKit2_LIBRARY_NAME}
+set(MiniBrowser_LIBRARIES
+    JavaScriptCore
+    WebCore
+    WebKit2
     ${CAIRO_LIBRARIES}
     ${ECORE_LIBRARIES}
     ${ECORE_EVAS_LIBRARIES}
     ${ECORE_FILE_LIBRARIES}
     ${EDJE_LIBRARIES}
+    ${EET_LIBRARIES}
     ${EINA_LIBRARIES}
     ${ELEMENTARY_LIBRARIES}
+    ${EO_LIBRARIES}
     ${EVAS_LIBRARIES}
     ${FONTCONFIG_LIBRARIES}
+    ${GLIB_LIBRARIES}
+    ${GLIB_GTHREAD_LIBRARIES}
     ${LIBSOUP_LIBRARIES}
     ${LIBXML2_LIBRARIES}
-    ${LIBXSLT_LIBRARIES}
+    ${LIBXSLT_LIBRARIES} -lm
     ${OPENGL_LIBRARIES}
     ${SQLITE_LIBRARIES}
 )
 
-IF (ENABLE_GLIB_SUPPORT)
-    LIST(APPEND MiniBrowser_LIBRARIES
-        ${GLIB_LIBRARIES}
-        ${GLIB_GTHREAD_LIBRARIES}
-    )
-ENDIF ()
-
-ADD_DEFINITIONS(-DTHEME_DIR=\"${THEME_BINARY_DIR}\")
-
-INCLUDE_DIRECTORIES(${MiniBrowser_INCLUDE_DIRECTORIES})
-
-ADD_EXECUTABLE(MiniBrowser ${MiniBrowser_SOURCES})
-TARGET_LINK_LIBRARIES(MiniBrowser ${MiniBrowser_LIBRARIES})
-SET_TARGET_PROPERTIES(MiniBrowser PROPERTIES FOLDER "Tools")
+if (ELEMENTARY_FOUND)
+    include_directories(${MiniBrowser_INCLUDE_DIRECTORIES})
+    add_executable(MiniBrowser ${MiniBrowser_SOURCES})
+    target_link_libraries(MiniBrowser ${MiniBrowser_LIBRARIES})
+    set_target_properties(MiniBrowser PROPERTIES FOLDER "Tools")
+endif ()

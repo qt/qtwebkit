@@ -415,15 +415,15 @@ static inline void addTypesFromClass(NSMutableDictionary *allTypes, Class objCCl
 
 - (WebFrame *)webFrame
 {
-    FrameLoader* frameLoader = toPrivate(_private)->loader->frameLoader();
-    if (!frameLoader)
-        return nil;
-    return static_cast<WebFrameLoaderClient*>(frameLoader->client())->webFrame();
+    if (Frame* frame = toPrivate(_private)->loader->frame())
+        return kit(frame);
+
+    return nil;
 }
 
 - (NSURLRequest *)initialRequest
 {
-    return toPrivate(_private)->loader->originalRequest().nsURLRequest();
+    return toPrivate(_private)->loader->originalRequest().nsURLRequest(UpdateHTTPBody);
 }
 
 - (NSMutableURLRequest *)request
@@ -433,7 +433,7 @@ static inline void addTypesFromClass(NSMutableDictionary *allTypes, Class objCCl
         return nil;
 
     // FIXME: this cast is dubious
-    return (NSMutableURLRequest *)toPrivate(_private)->loader->request().nsURLRequest();
+    return (NSMutableURLRequest *)toPrivate(_private)->loader->request().nsURLRequest(UpdateHTTPBody);
 }
 
 - (NSURLResponse *)response

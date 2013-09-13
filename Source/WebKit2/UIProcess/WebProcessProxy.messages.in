@@ -20,7 +20,7 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-messages -> WebProcessProxy {
+messages -> WebProcessProxy LegacyReceiver {
 
     # History client messages.
     DidNavigateWithNavigationData(uint64_t pageID, WebKit::WebNavigationDataStore store, uint64_t frameID)
@@ -33,13 +33,15 @@ messages -> WebProcessProxy {
 
     ShouldTerminate() -> (bool shouldTerminate)
 
+    EnableSuddenTermination()
+    DisableSuddenTermination()
+
     # Plugin messages.
 #if ENABLE(NETSCAPE_PLUGIN_API)
-    GetPlugins(uint64_t requestID, bool refresh) DispatchOnConnectionQueue
-    GetPluginPath(WTF::String mimeType, WTF::String urlString) -> (WTF::String pluginPath, uint32_t pluginLoadPolicy)
+    GetPlugins(bool refresh) -> (Vector<WebCore::PluginInfo> plugins)
 #endif // ENABLE(NETSCAPE_PLUGIN_API)
 #if ENABLE(PLUGIN_PROCESS)
-    GetPluginProcessConnection(WTF::String pluginPath, uint32_t processType) -> (CoreIPC::Attachment connectionHandle, bool supportsAsynchronousInitialization) Delayed
+    GetPluginProcessConnection(uint64_t pluginProcessToken) -> (CoreIPC::Attachment connectionHandle, bool supportsAsynchronousInitialization) Delayed
 #endif
 #if ENABLE(NETSCAPE_PLUGIN_API) && !ENABLE(PLUGIN_PROCESS)
     void DidGetSitesWithPluginData(Vector<WTF::String> sites, uint64_t callbackID)
@@ -50,11 +52,6 @@ messages -> WebProcessProxy {
 #endif
 #if ENABLE(SHARED_WORKER_PROCESS)
     GetSharedWorkerProcessConnection(WTF::String url, WTF::String name) -> (CoreIPC::Attachment connectionHandle) Delayed
-#endif
-
-#if USE(SECURITY_FRAMEWORK)
-    SecItemRequest(uint64_t requestID, WebKit::SecItemRequestData request) DispatchOnConnectionQueue
-    SecKeychainItemRequest(uint64_t requestID, WebKit::SecKeychainItemRequestData request) DispatchOnConnectionQueue
 #endif
 
 }

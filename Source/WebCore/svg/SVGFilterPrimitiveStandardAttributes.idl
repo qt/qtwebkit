@@ -25,9 +25,10 @@
  */
 
 [
+    NoInterfaceObject,
     Conditional=SVG,
     ObjCProtocol
-] interface SVGFilterPrimitiveStandardAttributes : SVGStylable {
+] interface SVGFilterPrimitiveStandardAttributes {
     readonly attribute SVGAnimatedLength x;
     readonly attribute SVGAnimatedLength y;
     readonly attribute SVGAnimatedLength width;

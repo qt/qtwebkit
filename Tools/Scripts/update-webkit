@@ -45,12 +45,7 @@ sub runGitUpdate();
 # Handle options
 my $quiet = '';
 my $showHelp;
-my $useGYP = 0;
-my $useMake = 0;
-my $useNinja = 0;
 
-determineIsChromium();
-determineIsChromiumAndroid();
 determineIsQt();
 determineIsWinCairo();
 
@@ -59,31 +54,16 @@ chdirWebKit();
 my $getOptionsResult = GetOptions(
     'h|help'  => \$showHelp,
     'q|quiet' => \$quiet,
-    'gyp' => \$useGYP,
-    'make' => \$useMake,
-    'ninja' => \$useNinja,
 ); 
 
 if (!$getOptionsResult || $showHelp) {
     print STDERR <<__END__;
 Usage: @{[ basename($0) ]} [options]
-  --chromium          also update dependencies of the chromium port
-  --make              generate the Makefile-based build system (Chromium only)
-  --ninja             generate the ninja-based build system (Chromium only)
-  --chromium-android  also update dependencies of the chromium port for Android
   -h|--help           show the help message
   -q|--quiet          pass -q to svn update for quiet updates
-  --gyp               generate project files from gyp after update
   --wincairo          also update dependencies of the WinCairo port
 __END__
     exit 1;
-}
-
-if ($useMake) {
-    $ENV{"GYP_GENERATORS"} = "make";
-}
-if ($useNinja) {
-    $ENV{"GYP_GENERATORS"} = "ninja";
 }
 
 my @svnOptions = ();
@@ -101,11 +81,6 @@ if (-d "../Internal") {
     print "Updating Internal\n" unless $quiet;
     runSvnUpdate() if isSVNDirectory(".");
     runGitUpdate() if isGitDirectory(".");
-} elsif (isChromium()) {
-    my @chromiumUpdateArgs = ("perl", "Tools/Scripts/update-webkit-chromium");
-    push @chromiumUpdateArgs, "--chromium-android" if isChromiumAndroid();
-    push @chromiumUpdateArgs, "--force" if forceChromiumUpdate();
-    system(@chromiumUpdateArgs) == 0 or die $!;
 } elsif (isAppleWinWebKit()) {
     system("perl", "Tools/Scripts/update-webkit-auxiliary-libs") == 0 or die;
     if (isWinCairo()) {
@@ -115,11 +90,6 @@ if (-d "../Internal") {
 }
 
 setupAppleWinEnv() if isAppleWinWebKit();
-
-if ($useGYP) {
-    print "Generating Project Files\n";
-    system("perl", "Tools/Scripts/generate-project-files") == 0 or die "Failed to run generate-project-files";
-}
 
 exit 0;
 

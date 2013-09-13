@@ -30,7 +30,7 @@
 #include "config.h"
 #include "JSNotAnObject.h"
 
-#include <wtf/UnusedParam.h>
+#include "Operations.h"
 
 namespace JSC {
 

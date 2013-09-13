@@ -28,7 +28,6 @@
 #include "ImageBuffer.h"
 
 #include "IntRect.h"
-#include "PlatformMemoryInstrumentation.h"
 #include <wtf/MathExtras.h>
 
 namespace WebCore {
@@ -99,25 +98,21 @@ void ImageBuffer::convertToLuminanceMask()
     genericConvertToLuminanceMask();
 }
 
-#if USE(ACCELERATED_COMPOSITING) && !USE(SKIA)
+#if USE(ACCELERATED_COMPOSITING) && !USE(CAIRO) && !PLATFORM(BLACKBERRY)
 PlatformLayer* ImageBuffer::platformLayer() const
 {
     return 0;
 }
 #endif
 
-#if !USE(SKIA)
 bool ImageBuffer::copyToPlatformTexture(GraphicsContext3D&, Platform3DObject, GC3Denum, bool, bool)
 {
     return false;
 }
-#endif
 
-void ImageBuffer::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+PassOwnPtr<ImageBuffer> ImageBuffer::createCompatibleBuffer(const IntSize& size, float resolutionScale, ColorSpace colorSpace, const GraphicsContext* context, bool)
 {
-    MemoryClassInfo info(memoryObjectInfo, this, PlatformMemoryTypes::Image);
-    info.addMember(m_data);
-    info.addMember(m_context);
+    return create(size, resolutionScale, colorSpace, context->isAcceleratedContext() ? Accelerated : Unaccelerated);
 }
 
 }

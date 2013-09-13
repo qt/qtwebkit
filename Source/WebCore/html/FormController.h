@@ -23,7 +23,6 @@
 #define FormController_h
 
 #include "CheckedRadioButtons.h"
-#include <wtf/Deque.h>
 #include <wtf/Forward.h>
 #include <wtf/ListHashSet.h>
 #include <wtf/Vector.h>
@@ -82,9 +81,9 @@ public:
     ~FormController();
 
     CheckedRadioButtons& checkedRadioButtons() { return m_checkedRadioButtons; }
-    
-    void registerFormElementWithState(HTMLFormControlElementWithState* control) { m_formElementsWithState.add(control); }
-    void unregisterFormElementWithState(HTMLFormControlElementWithState* control) { m_formElementsWithState.remove(control); }
+
+    void registerFormElementWithState(HTMLFormControlElementWithState*);
+    void unregisterFormElementWithState(HTMLFormControlElementWithState*);
     // This should be callled only by Document::formElementsState().
     Vector<String> formElementsState() const;
     // This should be callled only by Document::setStateForNewFormElements().
@@ -96,7 +95,7 @@ public:
     static Vector<String> getReferencedFilePaths(const Vector<String>& stateVector);
 
 private:
-    typedef ListHashSet<HTMLFormControlElementWithState*, 64> FormElementListHashSet;
+    typedef ListHashSet<RefPtr<HTMLFormControlElementWithState>, 64> FormElementListHashSet;
     typedef HashMap<RefPtr<AtomicStringImpl>, OwnPtr<SavedFormState> > SavedFormStateMap;
 
     FormController();

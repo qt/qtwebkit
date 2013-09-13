@@ -20,6 +20,7 @@
 #define WebSettings_h
 
 #include "BlackBerryGlobal.h"
+#include "BlackBerryPlatformMisc.h"
 
 namespace BlackBerry {
 namespace WebKit {
@@ -213,9 +214,6 @@ public:
     bool isFrameFlatteningEnabled() const;
     void setFrameFlatteningEnabled(bool);
 
-    bool isDirectRenderingToWindowEnabled() const;
-    void setDirectRenderingToWindowEnabled(bool);
-
     unsigned maxPluginInstances() const;
     void setMaxPluginInstances(unsigned num);
 
@@ -240,10 +238,19 @@ public:
     double devicePixelRatio() const;
     void setDevicePixelRatio(double);
 
+    bool isBackingStoreEnabled() const;
+    void setBackingStoreEnabled(bool);
+
+    bool applyDeviceScaleFactorInCompositor() const;
+    void setApplyDeviceScaleFactorInCompositor(bool);
+
+    bool isTextAutosizingEnabled() const;
+    void setTextAutosizingEnabled(bool);
+
 private:
     WebSettingsPrivate* m_private;
     WebSettings();
-    WebSettings(const WebSettings&);
+    DISABLE_COPY(WebSettings);
 };
 
 /*!

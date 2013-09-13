@@ -25,7 +25,7 @@
 #ifndef RTCStatsReport_h
 #define RTCStatsReport_h
 
-#include "RTCStatsElement.h"
+#include <wtf/HashMap.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
 #include <wtf/Vector.h>
@@ -35,19 +35,28 @@ namespace WebCore {
 
 class RTCStatsReport : public RefCounted<RTCStatsReport> {
 public:
-    static PassRefPtr<RTCStatsReport> create();
+    static PassRefPtr<RTCStatsReport> create(const String& id, const String& type, double timestamp);
 
-    const PassRefPtr<RTCStatsElement> local() const { return m_local.get(); }
-    const PassRefPtr<RTCStatsElement> remote() const { return m_remote.get(); }
+    double timestamp() const { return m_timestamp; }
+    String id() { return m_id; }
+    String type() { return m_type; }
+    String stat(const String& name) { return m_stats.get(name); }
+    Vector<String> names() const;
 
-    void addElement(bool isLocal, double timestamp);
-    void addStatistic(bool isLocal, String name, String value);
+    // DEPRECATED
+    const PassRefPtr<RTCStatsReport> local();
+    // DEPRECATED
+    const PassRefPtr<RTCStatsReport> remote();
+
+    void addStatistic(const String& name, const String& value);
 
 private:
-    RTCStatsReport();
+    RTCStatsReport(const String& id, const String& type, double timestamp);
 
-    RefPtr<RTCStatsElement> m_local;
-    RefPtr<RTCStatsElement> m_remote;
+    String m_id;
+    String m_type;
+    double m_timestamp;
+    HashMap<String, String> m_stats;
 };
 
 } // namespace WebCore

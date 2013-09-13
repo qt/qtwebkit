@@ -28,10 +28,11 @@
 #include "RenderSVGContainer.h"
 #include "RenderSVGRoot.h"
 #include "SVGElement.h"
+#include "SVGGraphicsElement.h"
 #include "SVGMarkerElement.h"
 #include "SVGRenderSupport.h"
 #include "SVGStyledElement.h"
-#include "SVGStyledTransformableElement.h"
+#include <wtf/StackStats.h>
 
 namespace WebCore {
 
@@ -96,7 +97,7 @@ const AffineTransform& RenderSVGResourceMarker::localToParentTransform() const
 
 FloatPoint RenderSVGResourceMarker::referencePoint() const
 {
-    SVGMarkerElement* marker = static_cast<SVGMarkerElement*>(node());
+    SVGMarkerElement* marker = toSVGMarkerElement(node());
     ASSERT(marker);
 
     SVGLengthContext lengthContext(marker);
@@ -105,7 +106,7 @@ FloatPoint RenderSVGResourceMarker::referencePoint() const
 
 float RenderSVGResourceMarker::angle() const
 {
-    SVGMarkerElement* marker = static_cast<SVGMarkerElement*>(node());
+    SVGMarkerElement* marker = toSVGMarkerElement(node());
     ASSERT(marker);
 
     float angle = -1;
@@ -117,7 +118,7 @@ float RenderSVGResourceMarker::angle() const
 
 AffineTransform RenderSVGResourceMarker::markerTransformation(const FloatPoint& origin, float autoAngle, float strokeWidth) const
 {
-    SVGMarkerElement* marker = static_cast<SVGMarkerElement*>(node());
+    SVGMarkerElement* marker = toSVGMarkerElement(node());
     ASSERT(marker);
 
     float markerAngle = angle();
@@ -132,6 +133,12 @@ AffineTransform RenderSVGResourceMarker::markerTransformation(const FloatPoint& 
 
 void RenderSVGResourceMarker::draw(PaintInfo& paintInfo, const AffineTransform& transform)
 {
+    // An empty viewBox disables rendering.
+    SVGMarkerElement* marker = toSVGMarkerElement(toSVGElement(node()));
+    ASSERT(marker);
+    if (marker->hasAttribute(SVGNames::viewBoxAttr) && marker->viewBoxIsValid() && marker->viewBox().isEmpty())
+        return;
+
     PaintInfo info(paintInfo);
     GraphicsContextStateSaver stateSaver(*info.context);
     info.applyTransform(transform);
@@ -153,7 +160,7 @@ AffineTransform RenderSVGResourceMarker::markerContentTransformation(const Affin
 
 AffineTransform RenderSVGResourceMarker::viewportTransform() const
 {
-    SVGMarkerElement* marker = static_cast<SVGMarkerElement*>(node());
+    SVGMarkerElement* marker = toSVGMarkerElement(node());
     ASSERT(marker);
 
     return marker->viewBoxToViewTransform(m_viewport.width(), m_viewport.height());
@@ -164,7 +171,7 @@ void RenderSVGResourceMarker::calcViewport()
     if (!selfNeedsLayout())
         return;
 
-    SVGMarkerElement* marker = static_cast<SVGMarkerElement*>(node());
+    SVGMarkerElement* marker = toSVGMarkerElement(node());
     ASSERT(marker);
     
     SVGLengthContext lengthContext(marker);

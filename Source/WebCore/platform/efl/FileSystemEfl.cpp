@@ -33,8 +33,6 @@
 #include "config.h"
 #include "FileSystem.h"
 
-#include "NotImplemented.h"
-
 #include <Ecore.h>
 #include <Ecore_File.h>
 #include <Eina.h>
@@ -44,7 +42,6 @@
 #include <fnmatch.h>
 #include <glib.h> // TODO: remove me after following TODO is solved.
 #include <limits.h>
-#include <stdio.h>
 #include <sys/stat.h>
 #include <sys/statvfs.h>
 #include <unistd.h>

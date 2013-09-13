@@ -55,10 +55,8 @@ public:
 
     WebFrame* webFrame() const { return m_webFrame.get(); }
 
-    virtual void frameLoaderDestroyed() OVERRIDE;
-    void receivedPolicyDecison(WebCore::PolicyAction);
-
 private:
+    virtual void frameLoaderDestroyed() OVERRIDE;
     virtual bool hasWebView() const OVERRIDE; // mainly for assertions
 
     virtual void makeRepresentation(WebCore::DocumentLoader*) OVERRIDE;
@@ -71,7 +69,7 @@ private:
     virtual void detachedFromParent2() OVERRIDE;
     virtual void detachedFromParent3() OVERRIDE;
 
-    virtual void download(WebCore::ResourceHandle*, const WebCore::ResourceRequest&, const WebCore::ResourceResponse&) OVERRIDE;
+    virtual void convertMainResourceLoadToDownload(WebCore::DocumentLoader*, const WebCore::ResourceRequest&, const WebCore::ResourceResponse&) OVERRIDE;
 
     virtual void assignIdentifierToInitialRequest(unsigned long identifier, WebCore::DocumentLoader*, const WebCore::ResourceRequest&) OVERRIDE;
 
@@ -123,7 +121,7 @@ private:
 
     virtual void dispatchUnableToImplementPolicy(const WebCore::ResourceError&) OVERRIDE;
 
-    virtual void dispatchWillSendSubmitEvent(PassRefPtr<WebCore::FormState>) OVERRIDE { }
+    virtual void dispatchWillSendSubmitEvent(PassRefPtr<WebCore::FormState>) OVERRIDE;
     virtual void dispatchWillSubmitForm(WebCore::FramePolicyFunction, PassRefPtr<WebCore::FormState>) OVERRIDE;
 
     virtual void revertToProvisionalState(WebCore::DocumentLoader*) OVERRIDE;
@@ -237,5 +235,4 @@ private:
     RetainPtr<WebFrame> m_webFrame;
 
     RetainPtr<WebFramePolicyListener> m_policyListener;
-    WebCore::FramePolicyFunction m_policyFunction;
 };

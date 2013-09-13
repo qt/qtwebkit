@@ -29,8 +29,7 @@
 #include "BlockAllocator.h"
 #include "CopyWorkList.h"
 #include "HeapBlock.h"
-#include "JSValue.h"
-#include "JSValueInlines.h"
+#include "JSCJSValue.h"
 #include "Options.h"
 #include <wtf/Atomics.h>
 #include <wtf/OwnPtr.h>
@@ -117,7 +116,7 @@ inline void CopiedBlock::zeroFillWilderness()
 #else
     JSValue emptyValue;
     JSValue* limit = reinterpret_cast_ptr<JSValue*>(wildernessEnd());
-    for (JSValue* currentValue = reinterpret_cast<JSValue*>(wilderness()); currentValue < limit; currentValue++)
+    for (JSValue* currentValue = reinterpret_cast_ptr<JSValue*>(wilderness()); currentValue < limit; currentValue++)
         *currentValue = emptyValue;
 #endif
 }

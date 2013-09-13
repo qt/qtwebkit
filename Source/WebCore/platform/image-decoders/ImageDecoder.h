@@ -38,11 +38,6 @@
 #include <wtf/Vector.h>
 #include <wtf/text/WTFString.h>
 
-#if USE(SKIA)
-#include "NativeImageSkia.h"
-#include "SkColorPriv.h"
-#endif
-
 #if USE(QCMSLIB)
 #include "qcms.h"
 #if OS(DARWIN)
@@ -69,11 +64,7 @@ namespace WebCore {
             DisposeOverwritePrevious  // Clear frame to previous framebuffer
                                       // contents
         };
-#if USE(SKIA)
-        typedef uint32_t PixelData;
-#else
         typedef unsigned PixelData;
-#endif
 
         ImageFrame();
 
@@ -86,6 +77,7 @@ namespace WebCore {
         // These do not touch other metadata, only the raw pixel data.
         void clearPixelData();
         void zeroFillPixelData();
+        void zeroFillFrameRect(const IntRect&);
 
         // Makes this frame have an independent copy of the provided image's
         // pixel data, so that modifications in one frame are not reflected in
@@ -115,7 +107,7 @@ namespace WebCore {
         // Returns a caller-owned pointer to the underlying native image data.
         // (Actual use: This pointer will be owned by BitmapImage and freed in
         // FrameData::clear()).
-        NativeImagePtr asNewNativeImage() const;
+        PassNativeImagePtr asNewNativeImage() const;
 
         bool hasAlpha() const;
         const IntRect& originalFrameRect() const { return m_originalFrameRect; }
@@ -123,7 +115,6 @@ namespace WebCore {
         unsigned duration() const { return m_duration; }
         FrameDisposalMethod disposalMethod() const { return m_disposalMethod; }
         bool premultiplyAlpha() const { return m_premultiplyAlpha; }
-        void reportMemoryUsage(MemoryObjectInfo*) const;
 
         void setHasAlpha(bool alpha);
         void setColorProfile(const ColorProfile&);
@@ -140,24 +131,23 @@ namespace WebCore {
 
         inline PixelData* getAddr(int x, int y)
         {
-#if USE(SKIA)
-            return m_bitmap.bitmap().getAddr32(x, y);
-#else
             return m_bytes + (y * width()) + x;
-#endif
         }
 
-#if PLATFORM(CHROMIUM)
-        void setSkBitmap(const SkBitmap& bitmap)
+        inline bool hasPixelData() const
         {
-            m_bitmap = NativeImageSkia(bitmap, 1);
+            return m_bytes;
         }
 
-        const SkBitmap& getSkBitmap() const
+        // Use fix point multiplier instead of integer division or floating point math.
+        // This multipler produces exactly the same result for all values in range 0 - 255.
+        static const unsigned fixPointShift = 24;
+        static const unsigned fixPointMult = static_cast<unsigned>(1.0 / 255.0 * (1 << fixPointShift)) + 1;
+        // Multiplies unsigned value by fixpoint value and converts back to unsigned.
+        static unsigned fixPointUnsignedMultiply(unsigned fixed, unsigned v)
         {
-            return m_bitmap.bitmap();
+            return  (fixed * v) >> fixPointShift;
         }
-#endif
 
         inline void setRGBA(PixelData* dest, unsigned r, unsigned g, unsigned b, unsigned a)
         {
@@ -167,48 +157,30 @@ namespace WebCore {
                     return;
                 }
 
-                float alphaPercent = a / 255.0f;
-                r = static_cast<unsigned>(r * alphaPercent);
-                g = static_cast<unsigned>(g * alphaPercent);
-                b = static_cast<unsigned>(b * alphaPercent);
+                unsigned alphaMult = a * fixPointMult;
+                r = fixPointUnsignedMultiply(r, alphaMult);
+                g = fixPointUnsignedMultiply(g, alphaMult);
+                b = fixPointUnsignedMultiply(b, alphaMult);
             }
-#if USE(SKIA)
-            // Call the "NoCheck" version since we may deliberately pass non-premultiplied
-            // values, and we don't want an assert.
-            *dest = SkPackARGB32NoCheck(a, r, g, b);
-#else
             *dest = (a << 24 | r << 16 | g << 8 | b);
-#endif
         }
 
     private:
         int width() const
         {
-#if USE(SKIA)
-            return m_bitmap.bitmap().width();
-#else
             return m_size.width();
-#endif
         }
 
         int height() const
         {
-#if USE(SKIA)
-            return m_bitmap.bitmap().height();
-#else
             return m_size.height();
-#endif
         }
 
-#if USE(SKIA)
-        NativeImageSkia m_bitmap;
-#else
         Vector<PixelData> m_backingStore;
         PixelData* m_bytes; // The memory is backed by m_backingStore.
         IntSize m_size;
         // FIXME: Do we need m_colorProfile anymore?
         ColorProfile m_colorProfile;
-#endif
         bool m_hasAlpha;
         IntRect m_originalFrameRect; // This will always just be the entire
                                      // buffer except for GIF frames whose
@@ -308,6 +280,12 @@ namespace WebCore {
         // Make the best effort guess to check if the requested frame has alpha channel.
         virtual bool frameHasAlphaAtIndex(size_t) const;
 
+        // Whether or not the frame is fully received.
+        virtual bool frameIsCompleteAtIndex(size_t) const;
+
+        // Duration for displaying a frame in seconds. This method is used by animated images only.
+        virtual float frameDurationAtIndex(size_t) const { return 0; }
+
         // Number of bytes in the decoded frame requested. Return 0 if not yet decoded.
         virtual unsigned frameBytesAtIndex(size_t) const;
 
@@ -342,7 +320,7 @@ namespace WebCore {
                 qcmsInitialized = true;
                 // FIXME: Add optional ICCv4 support.
 #if OS(DARWIN)
-                RetainPtr<CGColorSpaceRef> monitorColorSpace(AdoptCF, CGDisplayCopyColorSpace(CGMainDisplayID()));
+                RetainPtr<CGColorSpaceRef> monitorColorSpace = adoptCF(CGDisplayCopyColorSpace(CGMainDisplayID()));
                 CFDataRef iccProfile(CGColorSpaceCopyICCProfile(monitorColorSpace.get()));
                 if (iccProfile) {
                     size_t length = CFDataGetLength(iccProfile);
@@ -393,8 +371,6 @@ namespace WebCore {
         // If the image has a cursor hot-spot, stores it in the argument
         // and returns true. Otherwise returns false.
         virtual bool hotSpot(IntPoint&) const { return false; }
-
-        virtual void reportMemoryUsage(MemoryObjectInfo*) const;
 
     protected:
         void prepareScaleDataIfNecessary();

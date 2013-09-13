@@ -1,8 +1,7 @@
-SET(WTF_HEADERS
+set(WTF_HEADERS
     ASCIICType.h
     AVLTree.h
     Alignment.h
-    AlwaysInline.h
     Assertions.h
     Atomics.h
     BitArray.h
@@ -12,7 +11,6 @@ SET(WTF_HEADERS
     BumpPointerAllocator.h
     ByteOrder.h
     Compiler.h
-    Complex.h
     CryptographicallyRandomNumber.h
     CurrentTime.h
     DateMath.h
@@ -26,9 +24,12 @@ SET(WTF_HEADERS
     Encoder.h
     FastAllocBase.h
     FastMalloc.h
+    FeatureDefines.h
     FilePrintStream.h
     FixedArray.h
     Forward.h
+    FunctionDispatcher.h
+    Functional.h
     GetPtr.h
     GregorianDateTime.h
     HashCountedSet.h
@@ -40,24 +41,11 @@ SET(WTF_HEADERS
     HashTraits.h
     HexNumber.h
     ListHashSet.h
-    ListRefPtr.h
     Locker.h
     MD5.h
     MainThread.h
-    MallocZoneSupport.h
     MathExtras.h
     MediaTime.h
-    MemoryInstrumentation.h
-    MemoryInstrumentationArrayBufferView.h
-    MemoryInstrumentationHashCountedSet.h
-    MemoryInstrumentationHashMap.h
-    MemoryInstrumentationHashSet.h
-    MemoryInstrumentationListHashSet.h
-    MemoryInstrumentationParsedURL.h
-    MemoryInstrumentationSequence.h
-    MemoryInstrumentationString.h
-    MemoryInstrumentationVector.h
-    MemoryObjectInfo.h
     MessageQueue.h
     MetaAllocator.h
     MetaAllocatorHandle.h
@@ -88,6 +76,7 @@ SET(WTF_HEADERS
     Platform.h
     PossiblyNull.h
     PrintStream.h
+    ProcessID.h
     RandomNumber.h
     RandomNumberSeed.h
     RawPointer.h
@@ -116,12 +105,12 @@ SET(WTF_HEADERS
     Threading.h
     ThreadingPrimitives.h
     TypeTraits.h
-    UnusedParam.h
     VMTags.h
     ValueCheck.h
     Vector.h
     VectorTraits.h
     WTFThreadData.h
+    WeakPtr.h
     dtoa.h
 
     dtoa/bignum-dtoa.h
@@ -137,6 +126,7 @@ SET(WTF_HEADERS
 
     text/AtomicString.h
     text/AtomicStringImpl.h
+    text/AtomicStringTable.h
     text/Base64.h
     text/CString.h
     text/IntegerToStringConversion.h
@@ -153,7 +143,7 @@ SET(WTF_HEADERS
     unicode/Unicode.h
 )
 
-SET(WTF_SOURCES
+set(WTF_SOURCES
     ArrayBuffer.cpp
     ArrayBufferView.cpp
     Assertions.cpp
@@ -167,14 +157,15 @@ SET(WTF_SOURCES
     DynamicAnnotations.cpp
     FastMalloc.cpp
     FilePrintStream.cpp
+    FunctionDispatcher.cpp
     GregorianDateTime.cpp
     HashTable.cpp
     MD5.cpp
     MainThread.cpp
     MediaTime.cpp
     MetaAllocator.cpp
+    NullPtr.cpp
     OSRandomSource.cpp
-    MemoryInstrumentation.cpp
     NumberOfCores.cpp
     RAMSize.cpp
     PageAllocationAligned.cpp
@@ -185,8 +176,8 @@ SET(WTF_SOURCES
     RefCountedLeakCounter.cpp
     SHA1.cpp
     StackBounds.cpp
-    StringExtras.cpp
     StringPrintStream.cpp
+    TCSystemAlloc.cpp
     Threading.cpp
     TypeTraits.cpp
     WTFThreadData.cpp
@@ -202,6 +193,7 @@ SET(WTF_SOURCES
     dtoa/strtod.cc
 
     text/AtomicString.cpp
+    text/AtomicStringTable.cpp
     text/Base64.cpp
     text/CString.cpp
     text/StringBuilder.cpp
@@ -214,7 +206,7 @@ SET(WTF_SOURCES
     unicode/UTF8.cpp
 )
 
-SET(WTF_INCLUDE_DIRECTORIES
+set(WTF_INCLUDE_DIRECTORIES
     "${WTF_DIR}"
     "${WTF_DIR}/wtf"
     "${WTF_DIR}/wtf/dtoa"
@@ -224,17 +216,62 @@ SET(WTF_INCLUDE_DIRECTORIES
     "${CMAKE_BINARY_DIR}"
 )
 
-IF (NOT USE_SYSTEM_MALLOC)
-    LIST(APPEND WTF_SOURCES
-        TCSystemAlloc.cpp
+set(WTF_LIBRARIES
+    ${CMAKE_DL_LIBS}
+)
+
+if (WTF_USE_ICU_UNICODE)
+    list(APPEND WTF_HEADERS
+        unicode/icu/UnicodeIcu.h
     )
-ENDIF()
+    list(APPEND WTF_SOURCES
+        unicode/icu/CollatorICU.cpp
+    )
+    list(APPEND WTF_INCLUDE_DIRECTORIES
+        ${ICU_INCLUDE_DIRS}
+    )
+    list(APPEND WTF_LIBRARIES
+        ${ICU_I18N_LIBRARIES}
+        ${ICU_LIBRARIES}
+    )
+elseif (WTF_USE_WCHAR_UNICODE)
+    list(APPEND WTF_HEADERS
+        unicode/wchar/UnicodeWchar.h
+    )
+    list(APPEND WTF_SOURCES
+        unicode/CollatorDefault.cpp
+        unicode/wchar/UnicodeWchar.cpp
+    )
+endif ()
+
+if (WIN32)
+    list(APPEND WTF_SOURCES
+        OSAllocatorWin.cpp
+        ThreadSpecificWin.cpp
+        ThreadingWin.cpp
+
+        win/OwnPtrWin.cpp
+    )
+else ()
+    list(APPEND WTF_HEADERS
+        ThreadIdentifierDataPthreads.h
+    )
+    list(APPEND WTF_SOURCES
+        OSAllocatorPosix.cpp
+        ThreadIdentifierDataPthreads.cpp
+        ThreadingPthreads.cpp
+    )
+endif ()
 
 WEBKIT_INCLUDE_CONFIG_FILES_IF_EXISTS()
 
 WEBKIT_WRAP_SOURCELIST(${WTF_SOURCES})
-INCLUDE_DIRECTORIES(${WTF_INCLUDE_DIRECTORIES})
-ADD_DEFINITIONS(-DBUILDING_WTF)
-ADD_LIBRARY(${WTF_LIBRARY_NAME} STATIC ${WTF_HEADERS} ${WTF_SOURCES})
-TARGET_LINK_LIBRARIES(${WTF_LIBRARY_NAME} ${WTF_LIBRARIES})
-SET_TARGET_PROPERTIES(${WTF_LIBRARY_NAME} PROPERTIES FOLDER "JavaScriptCore")
+include_directories(${WTF_INCLUDE_DIRECTORIES})
+add_definitions(-DBUILDING_WTF)
+add_library(WTF STATIC ${WTF_HEADERS} ${WTF_SOURCES})
+target_link_libraries(WTF ${WTF_LIBRARIES})
+set_target_properties(WTF PROPERTIES FOLDER "JavaScriptCore")
+
+if (WTF_OUTPUT_NAME)
+    set_target_properties(WTF PROPERTIES OUTPUT_NAME ${WTF_OUTPUT_NAME})
+endif ()

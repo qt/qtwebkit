@@ -32,6 +32,7 @@
 #include "Node.h"
 #include "NotImplemented.h"
 #include <windows.h>
+#include <wtf/OwnArrayPtr.h>
 #include <wtf/Vector.h>
 #include <wtf/text/CString.h>
 
@@ -82,14 +83,14 @@ void ContextMenu::getContextMenuItems(HMENU menu, Vector<ContextMenuItem>& items
 #endif
 }
 
-HMENU ContextMenu::createNativeMenuFromItems(const Vector<ContextMenuItem>& items)
+HMENU ContextMenu::createPlatformContextMenuFromItems(const Vector<ContextMenuItem>& items)
 {
     HMENU menu = ::CreatePopupMenu();
 
     for (size_t i = 0; i < items.size(); ++i) {
         const ContextMenuItem& item = items[i];
 
-        MENUITEMINFO menuItem = item.nativeMenuItem();
+        MENUITEMINFO menuItem = item.platformContextMenuItem();
 
 #if OS(WINCE)
         UINT flags = MF_BYPOSITION;
@@ -116,13 +117,16 @@ HMENU ContextMenu::createNativeMenuFromItems(const Vector<ContextMenuItem>& item
 
         ::InsertMenuW(menu, i, flags, newItem, title);
 #else
-        // ContextMenuItem::nativeMenuItem doesn't set the title of the MENUITEMINFO to make the
+        // ContextMenuItem::platformContextMenuItem doesn't set the title of the MENUITEMINFO to make the
         // lifetime handling easier for callers.
-        String itemTitle = item.title();
+        Vector<UChar> wideCharTitle; // Retain buffer for long enough to make the InsertMenuItem call
+
+        const String& itemTitle = item.title();
         if (item.type() != SeparatorType) {
             menuItem.fMask |= MIIM_STRING;
             menuItem.cch = itemTitle.length();
-            menuItem.dwTypeData = const_cast<LPWSTR>(itemTitle.charactersWithNullTermination());
+            wideCharTitle = itemTitle.charactersWithNullTermination();
+            menuItem.dwTypeData = const_cast<LPWSTR>(wideCharTitle.data());
         }
 
         ::InsertMenuItem(menu, i, TRUE, &menuItem);
@@ -132,9 +136,9 @@ HMENU ContextMenu::createNativeMenuFromItems(const Vector<ContextMenuItem>& item
     return menu;
 }
 
-HMENU ContextMenu::nativeMenu() const
+HMENU ContextMenu::platformContextMenu() const
 {
-    return createNativeMenuFromItems(m_items);
+    return createPlatformContextMenuFromItems(m_items);
 }
 
 } // namespace WebCore

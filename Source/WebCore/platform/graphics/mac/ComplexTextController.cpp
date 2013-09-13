@@ -159,8 +159,16 @@ ComplexTextController::ComplexTextController(const Font* font, const TextRun& ru
     collectComplexTextRuns();
     adjustGlyphsAndAdvances();
 
-    if (!m_isLTROnly)
+    if (!m_isLTROnly) {
         m_runIndices.reserveInitialCapacity(m_complexTextRuns.size());
+
+        m_glyphCountFromStartToIndex.reserveInitialCapacity(m_complexTextRuns.size());
+        unsigned glyphCountSoFar = 0;
+        for (unsigned i = 0; i < m_complexTextRuns.size(); ++i) {
+            m_glyphCountFromStartToIndex.uncheckedAppend(glyphCountSoFar);
+            glyphCountSoFar += m_complexTextRuns[i]->glyphCount();
+        }
+    }
 
     m_runWidthSoFar = m_leadingExpansion;
 }
@@ -327,11 +335,9 @@ void ComplexTextController::collectComplexTextRuns()
     }
 
     nextIsMissingGlyph = false;
-#if !PLATFORM(WX)
     nextFontData = m_font.fontDataForCombiningCharacterSequence(sequenceStart, curr - sequenceStart, nextIsSmallCaps ? SmallCapsVariant : NormalVariant);
     if (!nextFontData)
         nextIsMissingGlyph = true;
-#endif
 
     while (curr < end) {
         fontData = nextFontData;
@@ -354,13 +360,11 @@ void ComplexTextController::collectComplexTextRuns()
         nextIsMissingGlyph = false;
         if (baseCharacter == zeroWidthJoiner)
             nextFontData = fontData;
-#if !PLATFORM(WX)
         else {
             nextFontData = m_font.fontDataForCombiningCharacterSequence(cp + index, curr - cp - index, nextIsSmallCaps ? SmallCapsVariant : NormalVariant);
             if (!nextFontData)
                 nextIsMissingGlyph = true;
         }
-#endif
 
         if (nextFontData != fontData || nextIsMissingGlyph != isMissingGlyph) {
             int itemStart = static_cast<int>(indexOfFontTransition);
@@ -423,8 +427,21 @@ unsigned ComplexTextController::indexOfCurrentRun(unsigned& leftmostGlyph)
         return m_currentRun;
     }
 
+    if (m_runIndices.isEmpty()) {
+        unsigned firstRun = 0;
+        unsigned firstRunOffset = stringBegin(*m_complexTextRuns[0]);
+        for (unsigned i = 1; i < runCount; ++i) {
+            unsigned offset = stringBegin(*m_complexTextRuns[i]);
+            if (offset < firstRunOffset) {
+                firstRun = i;
+                firstRunOffset = offset;
+            }
+        }
+        m_runIndices.uncheckedAppend(firstRun);
+    }
+
     while (m_runIndices.size() <= m_currentRun) {
-        unsigned offset = m_runIndices.isEmpty() ? 0 : stringEnd(*m_complexTextRuns[m_runIndices.last()]);
+        unsigned offset = stringEnd(*m_complexTextRuns[m_runIndices.last()]);
 
         for (unsigned i = 0; i < runCount; ++i) {
             if (offset == stringBegin(*m_complexTextRuns[i])) {
@@ -435,8 +452,7 @@ unsigned ComplexTextController::indexOfCurrentRun(unsigned& leftmostGlyph)
     }
 
     unsigned currentRunIndex = m_runIndices[m_currentRun];
-    for (unsigned i = 0; i < currentRunIndex; ++i)
-        leftmostGlyph += m_complexTextRuns[i]->glyphCount();
+    leftmostGlyph = m_glyphCountFromStartToIndex[currentRunIndex];
     return currentRunIndex;
 }
 
@@ -479,6 +495,12 @@ void ComplexTextController::advance(unsigned offset, GlyphBuffer* glyphBuffer, G
         unsigned k = leftmostGlyph + g;
         if (fallbackFonts && complexTextRun.fontData() != m_font.primaryFont())
             fallbackFonts->add(complexTextRun.fontData());
+
+        // We must store the initial advance for the first glyph we are going to draw.
+        // When leftmostGlyph is 0, it represents the first glyph to draw, taking into
+        // account the text direction.
+        if (glyphBuffer && !leftmostGlyph)
+            glyphBuffer->setInitialAdvance(complexTextRun.initialAdvance());
 
         while (m_glyphInCurrentRun < glyphCount) {
             unsigned glyphStartOffset = complexTextRun.indexAt(g);
@@ -544,6 +566,15 @@ void ComplexTextController::adjustGlyphsAndAdvances()
         ComplexTextRun& complexTextRun = *m_complexTextRuns[r];
         unsigned glyphCount = complexTextRun.glyphCount();
         const SimpleFontData* fontData = complexTextRun.fontData();
+
+        // Represent the initial advance for a text run by adjusting the advance
+        // of the last glyph of the previous text run in the glyph buffer.
+        if (r && m_adjustedAdvances.size()) {
+            CGSize previousAdvance = m_adjustedAdvances.last();
+            previousAdvance.width += complexTextRun.initialAdvance().width;
+            previousAdvance.height -= complexTextRun.initialAdvance().height;
+            m_adjustedAdvances[m_adjustedAdvances.size() - 1] = previousAdvance;
+        }
 
         if (!complexTextRun.isLTR())
             m_isLTROnly = false;

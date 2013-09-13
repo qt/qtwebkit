@@ -24,8 +24,10 @@
  */
 
 [
+    NoInterfaceObject,
     JSGenerateToJSObject,
-    IndexedGetter,
 ] interface RadioNodeList : NodeList {
     attribute DOMString value;
+
+    getter Node ([IsIndex,Default=Undefined] optional unsigned long index);
 };

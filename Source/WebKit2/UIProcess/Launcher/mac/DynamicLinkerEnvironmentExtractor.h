@@ -26,8 +26,6 @@
 #ifndef DynamicLinkerEnvironmentExtractor_h
 #define DynamicLinkerEnvironmentExtractor_h
 
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1070
-
 #include <mach/machine.h>
 #include <wtf/Noncopyable.h>
 #include <wtf/RetainPtr.h>
@@ -56,11 +54,9 @@ private:
     RetainPtr<NSString> m_executablePath;
     cpu_type_t m_architecture;
 
-    Vector<std::pair<CString, CString> > m_extractedVariables;
+    Vector<std::pair<CString, CString>> m_extractedVariables;
 };
 
 } // namespace WebKit
-
-#endif // __MAC_OS_X_VERSION_MIN_REQUIRED == 1060
 
 #endif // DynamicLinkerEnvironmentExtractor_h

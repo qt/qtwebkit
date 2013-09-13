@@ -38,7 +38,9 @@
 #include "CSSStyleSheet.h"
 #include "ContentSecurityPolicy.h"
 #include "DOMWindow.h"
+#include "ExceptionCodePlaceholder.h"
 #include "HTMLHeadElement.h"
+#include "HTMLStyleElement.h"
 #include "InspectorDOMAgent.h"
 #include "InspectorHistory.h"
 #include "InspectorState.h"
@@ -49,6 +51,7 @@
 #include "Node.h"
 #include "NodeList.h"
 #include "RenderRegion.h"
+#include "SVGStyleElement.h"
 #include "StylePropertySet.h"
 #include "StylePropertyShorthand.h"
 #include "StyleResolver.h"
@@ -287,6 +290,54 @@ void UpdateRegionLayoutTask::onTimer(Timer<UpdateRegionLayoutTask>*)
     if (!m_namedFlows.isEmpty() && !m_timer.isActive())
         m_timer.startOneShot(0);
 }
+    
+class ChangeRegionOversetTask {
+public:
+    ChangeRegionOversetTask(InspectorCSSAgent*);
+    void scheduleFor(WebKitNamedFlow*, int documentNodeId);
+    void unschedule(WebKitNamedFlow*);
+    void reset();
+    void onTimer(Timer<ChangeRegionOversetTask>*);
+    
+private:
+    InspectorCSSAgent* m_cssAgent;
+    Timer<ChangeRegionOversetTask> m_timer;
+    HashMap<WebKitNamedFlow*, int> m_namedFlows;
+};
+
+ChangeRegionOversetTask::ChangeRegionOversetTask(InspectorCSSAgent* cssAgent)
+    : m_cssAgent(cssAgent)
+    , m_timer(this, &ChangeRegionOversetTask::onTimer)
+{
+}
+
+void ChangeRegionOversetTask::scheduleFor(WebKitNamedFlow* namedFlow, int documentNodeId)
+{
+    m_namedFlows.add(namedFlow, documentNodeId);
+    
+    if (!m_timer.isActive())
+        m_timer.startOneShot(0);
+}
+
+void ChangeRegionOversetTask::unschedule(WebKitNamedFlow* namedFlow)
+{
+    m_namedFlows.remove(namedFlow);
+}
+
+void ChangeRegionOversetTask::reset()
+{
+    m_timer.stop();
+    m_namedFlows.clear();
+}
+
+void ChangeRegionOversetTask::onTimer(Timer<ChangeRegionOversetTask>*)
+{
+    // The timer is stopped on m_cssAgent destruction, so this method will never be called after m_cssAgent has been destroyed.
+    for (HashMap<WebKitNamedFlow*, int>::iterator it = m_namedFlows.begin(), end = m_namedFlows.end(); it != end; ++it)
+        m_cssAgent->regionOversetChanged(it->key, it->value);
+
+    m_namedFlows.clear();
+}
 
 class InspectorCSSAgent::StyleSheetAction : public InspectorHistory::Action {
     WTF_MAKE_NONCOPYABLE(StyleSheetAction);
@@ -317,18 +368,18 @@ public:
         return redo(ec);
     }
 
-    virtual bool undo(ExceptionCode&)
+    virtual bool undo(ExceptionCode& ec)
     {
-        if (m_styleSheet->setText(m_oldText)) {
+        if (m_styleSheet->setText(m_oldText, ec)) {
             m_styleSheet->reparseStyleSheet(m_oldText);
             return true;
         }
         return false;
     }
 
-    virtual bool redo(ExceptionCode&)
+    virtual bool redo(ExceptionCode& ec)
     {
-        if (m_styleSheet->setText(m_text)) {
+        if (m_styleSheet->setText(m_text, ec)) {
             m_styleSheet->reparseStyleSheet(m_text);
             return true;
         }
@@ -349,6 +400,51 @@ public:
     }
 
 private:
+    String m_text;
+    String m_oldText;
+};
+
+class InspectorCSSAgent::SetStyleTextAction : public InspectorCSSAgent::StyleSheetAction {
+    WTF_MAKE_NONCOPYABLE(SetStyleTextAction);
+public:
+    SetStyleTextAction(InspectorStyleSheet* styleSheet, const InspectorCSSId& cssId, const String& text)
+        : InspectorCSSAgent::StyleSheetAction(ASCIILiteral("SetStyleText"), styleSheet)
+        , m_cssId(cssId)
+        , m_text(text)
+    {
+    }
+
+    virtual bool perform(ExceptionCode& ec)
+    {
+        return redo(ec);
+    }
+
+    virtual bool undo(ExceptionCode& ec)
+    {
+        return m_styleSheet->setStyleText(m_cssId, m_oldText, 0, ec);
+    }
+
+    virtual bool redo(ExceptionCode& ec)
+    {
+        return m_styleSheet->setStyleText(m_cssId, m_text, &m_oldText, ec);
+    }
+
+    virtual String mergeId()
+    {
+        ASSERT(m_styleSheet->id() == m_cssId.styleSheetId());
+        return String::format("SetStyleText %s:%u", m_styleSheet->id().utf8().data(), m_cssId.ordinal());
+    }
+
+    virtual void merge(PassOwnPtr<Action> action)
+    {
+        ASSERT(action->mergeId() == mergeId());
+
+        SetStyleTextAction* other = static_cast<SetStyleTextAction*>(action.get());
+        m_text = other->m_text;
+    }
+
+private:
+    InspectorCSSId m_cssId;
     String m_text;
     String m_oldText;
 };
@@ -389,6 +485,7 @@ public:
         // FIXME: remove this once the model handles this case.
         if (!m_oldText.endsWith(';'))
             m_oldText.append(';');
+
         return result;
     }
 
@@ -523,7 +620,7 @@ CSSStyleRule* InspectorCSSAgent::asCSSStyleRule(CSSRule* rule)
     return static_cast<CSSStyleRule*>(rule);
 }
 
-InspectorCSSAgent::InspectorCSSAgent(InstrumentingAgents* instrumentingAgents, InspectorState* state, InspectorDOMAgent* domAgent)
+InspectorCSSAgent::InspectorCSSAgent(InstrumentingAgents* instrumentingAgents, InspectorCompositeState* state, InspectorDOMAgent* domAgent)
     : InspectorBaseAgent<InspectorCSSAgent>("CSS", instrumentingAgents, state)
     , m_frontend(0)
     , m_domAgent(domAgent)
@@ -585,6 +682,8 @@ void InspectorCSSAgent::resetNonPersistentData()
     m_namedFlowCollectionsRequested.clear();
     if (m_updateRegionLayoutTask)
         m_updateRegionLayoutTask->reset();
+    if (m_changeRegionOversetTask)
+        m_changeRegionOversetTask->reset();
     resetPseudoStates();
 }
 
@@ -624,6 +723,9 @@ void InspectorCSSAgent::willRemoveNamedFlow(Document* document, WebKitNamedFlow*
 
     if (m_updateRegionLayoutTask)
         m_updateRegionLayoutTask->unschedule(namedFlow);
+    
+    if (m_changeRegionOversetTask)
+        m_changeRegionOversetTask->unschedule(namedFlow);
 
     m_frontend->namedFlowRemoved(documentNodeId, namedFlow->name().string());
 }
@@ -648,6 +750,28 @@ void InspectorCSSAgent::regionLayoutUpdated(WebKitNamedFlow* namedFlow, int docu
     RefPtr<WebKitNamedFlow> protector(namedFlow);
 
     m_frontend->regionLayoutUpdated(buildObjectForNamedFlow(&errorString, namedFlow, documentNodeId));
+}
+
+void InspectorCSSAgent::didChangeRegionOverset(Document* document, WebKitNamedFlow* namedFlow)
+{
+    int documentNodeId = documentNodeWithRequestedFlowsId(document);
+    if (!documentNodeId)
+        return;
+    
+    if (!m_changeRegionOversetTask)
+        m_changeRegionOversetTask = adoptPtr(new ChangeRegionOversetTask(this));
+    m_changeRegionOversetTask->scheduleFor(namedFlow, documentNodeId);
+}
+
+void InspectorCSSAgent::regionOversetChanged(WebKitNamedFlow* namedFlow, int documentNodeId)
+{
+    if (namedFlow->flowState() == WebKitNamedFlow::FlowStateNull)
+        return;
+    
+    ErrorString errorString;
+    RefPtr<WebKitNamedFlow> protector(namedFlow);
+    
+    m_frontend->regionOversetChanged(buildObjectForNamedFlow(&errorString, namedFlow, documentNodeId));
 }
 
 bool InspectorCSSAgent::forcePseudoState(Element* element, CSSSelector::PseudoType pseudoType)
@@ -685,19 +809,19 @@ void InspectorCSSAgent::getMatchedStylesForNode(ErrorString* errorString, int no
         return;
 
     // Matched rules.
-    StyleResolver* styleResolver = element->ownerDocument()->styleResolver();
-    RefPtr<CSSRuleList> matchedRules = styleResolver->styleRulesForElement(element, StyleResolver::AllCSSRules);
-    matchedCSSRules = buildArrayForMatchedRuleList(matchedRules.get(), styleResolver, element);
+    StyleResolver* styleResolver = element->ownerDocument()->ensureStyleResolver();
+    Vector<RefPtr<StyleRuleBase> > matchedRules = styleResolver->styleRulesForElement(element, StyleResolver::AllCSSRules);
+    matchedCSSRules = buildArrayForMatchedRuleList(matchedRules, styleResolver, element);
 
     // Pseudo elements.
     if (!includePseudo || *includePseudo) {
         RefPtr<TypeBuilder::Array<TypeBuilder::CSS::PseudoIdMatches> > pseudoElements = TypeBuilder::Array<TypeBuilder::CSS::PseudoIdMatches>::create();
         for (PseudoId pseudoId = FIRST_PUBLIC_PSEUDOID; pseudoId < AFTER_LAST_INTERNAL_PSEUDOID; pseudoId = static_cast<PseudoId>(pseudoId + 1)) {
-            RefPtr<CSSRuleList> matchedRules = styleResolver->pseudoStyleRulesForElement(element, pseudoId, StyleResolver::AllCSSRules);
-            if (matchedRules && matchedRules->length()) {
+            Vector<RefPtr<StyleRuleBase> > matchedRules = styleResolver->pseudoStyleRulesForElement(element, pseudoId, StyleResolver::AllCSSRules);
+            if (!matchedRules.isEmpty()) {
                 RefPtr<TypeBuilder::CSS::PseudoIdMatches> matches = TypeBuilder::CSS::PseudoIdMatches::create()
                     .setPseudoId(static_cast<int>(pseudoId))
-                    .setMatches(buildArrayForMatchedRuleList(matchedRules.get(), styleResolver, element));
+                    .setMatches(buildArrayForMatchedRuleList(matchedRules, styleResolver, element));
                 pseudoElements->addItem(matches.release());
             }
         }
@@ -710,10 +834,10 @@ void InspectorCSSAgent::getMatchedStylesForNode(ErrorString* errorString, int no
         RefPtr<TypeBuilder::Array<TypeBuilder::CSS::InheritedStyleEntry> > entries = TypeBuilder::Array<TypeBuilder::CSS::InheritedStyleEntry>::create();
         Element* parentElement = element->parentElement();
         while (parentElement) {
-            StyleResolver* parentStyleResolver = parentElement->ownerDocument()->styleResolver();
-            RefPtr<CSSRuleList> parentMatchedRules = parentStyleResolver->styleRulesForElement(parentElement, StyleResolver::AllCSSRules);
+            StyleResolver* parentStyleResolver = parentElement->ownerDocument()->ensureStyleResolver();
+            Vector<RefPtr<StyleRuleBase> > parentMatchedRules = parentStyleResolver->styleRulesForElement(parentElement, StyleResolver::AllCSSRules);
             RefPtr<TypeBuilder::CSS::InheritedStyleEntry> entry = TypeBuilder::CSS::InheritedStyleEntry::create()
-                .setMatchedCSSRules(buildArrayForMatchedRuleList(parentMatchedRules.get(), styleResolver, parentElement));
+                .setMatchedCSSRules(buildArrayForMatchedRuleList(parentMatchedRules, styleResolver, parentElement));
             if (parentElement->style() && parentElement->style()->length()) {
                 InspectorStyleSheetForInlineStyle* styleSheet = asInspectorStyleSheet(parentElement);
                 if (styleSheet)
@@ -794,6 +918,22 @@ void InspectorCSSAgent::setStyleSheetText(ErrorString* errorString, const String
 
     ExceptionCode ec = 0;
     m_domAgent->history()->perform(adoptPtr(new SetStyleSheetTextAction(inspectorStyleSheet, text)), ec);
+    *errorString = InspectorDOMAgent::toErrorString(ec);
+}
+
+void InspectorCSSAgent::setStyleText(ErrorString* errorString, const RefPtr<InspectorObject>& fullStyleId, const String& text, RefPtr<TypeBuilder::CSS::CSSStyle>& result)
+{
+    InspectorCSSId compoundId(fullStyleId);
+    ASSERT(!compoundId.isEmpty());
+
+    InspectorStyleSheet* inspectorStyleSheet = assertStyleSheetForId(errorString, compoundId.styleSheetId());
+    if (!inspectorStyleSheet)
+        return;
+
+    ExceptionCode ec = 0;
+    bool success = m_domAgent->history()->perform(adoptPtr(new SetStyleTextAction(inspectorStyleSheet, compoundId, text)), ec);
+    if (success)
+        result = inspectorStyleSheet->buildObjectForStyle(inspectorStyleSheet->styleForId(compoundId));
     *errorString = InspectorDOMAgent::toErrorString(ec);
 }
 
@@ -956,10 +1096,11 @@ PassRefPtr<TypeBuilder::CSS::SelectorProfile> InspectorCSSAgent::stopSelectorPro
     return result.release();
 }
 
-void InspectorCSSAgent::willMatchRule(const CSSStyleRule* rule)
+void InspectorCSSAgent::willMatchRule(StyleRule* rule, InspectorCSSOMWrappers& inspectorCSSOMWrappers, DocumentStyleSheetCollection* styleSheetCollection)
 {
+//    printf("InspectorCSSAgent::willMatchRule %s\n", rule->selectorList().selectorsText().utf8().data());
     if (m_currentSelectorProfile)
-        m_currentSelectorProfile->startSelector(rule);
+        m_currentSelectorProfile->startSelector(inspectorCSSOMWrappers.getWrapperForRuleInSheets(rule, styleSheetCollection));
 }
 
 void InspectorCSSAgent::didMatchRule(bool matched)
@@ -968,10 +1109,10 @@ void InspectorCSSAgent::didMatchRule(bool matched)
         m_currentSelectorProfile->commitSelector(matched);
 }
 
-void InspectorCSSAgent::willProcessRule(const CSSStyleRule* rule)
+void InspectorCSSAgent::willProcessRule(StyleRule* rule, StyleResolver* styleResolver)
 {
     if (m_currentSelectorProfile)
-        m_currentSelectorProfile->startSelector(rule);
+        m_currentSelectorProfile->startSelector(styleResolver->inspectorCSSOMWrappers().getWrapperForRuleInSheets(rule, styleResolver->document()->styleSheetCollection()));
 }
 
 void InspectorCSSAgent::didProcessRule()
@@ -1055,6 +1196,9 @@ InspectorStyleSheet* InspectorCSSAgent::viaInspectorStyleSheet(Document* documen
         return 0;
     }
 
+    if (!document->isHTMLDocument() && !document->isSVGDocument())
+        return 0;
+
     RefPtr<InspectorStyleSheet> inspectorStyleSheet = m_documentToInspectorStyleSheet.get(document);
     if (inspectorStyleSheet || !createIfAbsent)
         return inspectorStyleSheet.get();
@@ -1078,11 +1222,18 @@ InspectorStyleSheet* InspectorCSSAgent::viaInspectorStyleSheet(Document* documen
     }
     if (ec)
         return 0;
-    StyleSheetList* styleSheets = document->styleSheets();
-    StyleSheet* styleSheet = styleSheets->item(styleSheets->length() - 1);
-    if (!styleSheet || !styleSheet->isCSSStyleSheet())
+
+    CSSStyleSheet* cssStyleSheet = 0;
+    if (styleElement->isHTMLElement())
+        cssStyleSheet = toHTMLStyleElement(styleElement.get())->sheet();
+#if ENABLE(SVG)
+    else if (styleElement->isSVGElement())
+        cssStyleSheet = static_cast<SVGStyleElement*>(styleElement.get())->sheet();
+#endif
+
+    if (!cssStyleSheet)
         return 0;
-    CSSStyleSheet* cssStyleSheet = static_cast<CSSStyleSheet*>(styleSheet);
+
     String id = String::number(m_lastStyleSheetId++);
     inspectorStyleSheet = InspectorStyleSheet::create(m_domAgent->pageAgent(), id, cssStyleSheet, TypeBuilder::CSS::StyleSheetOrigin::Inspector, InspectorDOMAgent::documentURLString(document), this);
     m_idToInspectorStyleSheet.set(id, inspectorStyleSheet);
@@ -1116,24 +1267,31 @@ TypeBuilder::CSS::StyleSheetOrigin::Enum InspectorCSSAgent::detectOrigin(CSSStyl
     return origin;
 }
 
-PassRefPtr<TypeBuilder::CSS::CSSRule> InspectorCSSAgent::buildObjectForRule(CSSStyleRule* rule, StyleResolver* styleResolver)
+PassRefPtr<TypeBuilder::CSS::CSSRule> InspectorCSSAgent::buildObjectForRule(StyleRule* styleRule, StyleResolver* styleResolver)
+{
+    if (!styleRule)
+        return 0;
+
+    // StyleRules returned by StyleResolver::styleRulesForElement lack parent pointers since that infomation is not cheaply available.
+    // Since the inspector wants to walk the parent chain, we construct the full wrappers here.
+    CSSStyleRule* cssomWrapper = styleResolver->inspectorCSSOMWrappers().getWrapperForRuleInSheets(styleRule, styleResolver->document()->styleSheetCollection());
+    if (!cssomWrapper)
+        return 0;
+    InspectorStyleSheet* inspectorStyleSheet = bindStyleSheet(cssomWrapper->parentStyleSheet());
+    return inspectorStyleSheet ? inspectorStyleSheet->buildObjectForRule(cssomWrapper) : 0;
+}
+
+PassRefPtr<TypeBuilder::CSS::CSSRule> InspectorCSSAgent::buildObjectForRule(CSSStyleRule* rule)
 {
     if (!rule)
         return 0;
 
-    // CSSRules returned by StyleResolver::styleRulesForElement lack parent pointers since that infomation is not cheaply available.
-    // Since the inspector wants to walk the parent chain, we construct the full wrappers here.
-    // FIXME: This could be factored better. StyleResolver::styleRulesForElement should return a StyleRule vector, not a CSSRuleList.
-    if (!rule->parentStyleSheet()) {
-        rule = styleResolver->ensureFullCSSOMWrapperForInspector(rule->styleRule());
-        if (!rule)
-            return 0;
-    }
+    ASSERT(rule->parentStyleSheet());
     InspectorStyleSheet* inspectorStyleSheet = bindStyleSheet(rule->parentStyleSheet());
     return inspectorStyleSheet ? inspectorStyleSheet->buildObjectForRule(rule) : 0;
 }
 
-PassRefPtr<TypeBuilder::Array<TypeBuilder::CSS::CSSRule> > InspectorCSSAgent::buildArrayForRuleList(CSSRuleList* ruleList, StyleResolver* styleResolver)
+PassRefPtr<TypeBuilder::Array<TypeBuilder::CSS::CSSRule> > InspectorCSSAgent::buildArrayForRuleList(CSSRuleList* ruleList)
 {
     RefPtr<TypeBuilder::Array<TypeBuilder::CSS::CSSRule> > result = TypeBuilder::Array<TypeBuilder::CSS::CSSRule>::create();
     if (!ruleList)
@@ -1141,7 +1299,7 @@ PassRefPtr<TypeBuilder::Array<TypeBuilder::CSS::CSSRule> > InspectorCSSAgent::bu
 
     for (unsigned i = 0, size = ruleList->length(); i < size; ++i) {
         CSSStyleRule* rule = asCSSStyleRule(ruleList->item(i));
-        RefPtr<TypeBuilder::CSS::CSSRule> ruleObject = buildObjectForRule(rule, styleResolver);
+        RefPtr<TypeBuilder::CSS::CSSRule> ruleObject = buildObjectForRule(rule);
         if (!ruleObject)
             continue;
         result->addItem(ruleObject);
@@ -1149,23 +1307,22 @@ PassRefPtr<TypeBuilder::Array<TypeBuilder::CSS::CSSRule> > InspectorCSSAgent::bu
     return result.release();
 }
 
-PassRefPtr<TypeBuilder::Array<TypeBuilder::CSS::RuleMatch> > InspectorCSSAgent::buildArrayForMatchedRuleList(CSSRuleList* ruleList, StyleResolver* styleResolver, Element* element)
+PassRefPtr<TypeBuilder::Array<TypeBuilder::CSS::RuleMatch> > InspectorCSSAgent::buildArrayForMatchedRuleList(const Vector<RefPtr<StyleRuleBase> >& matchedRules, StyleResolver* styleResolver, Element* element)
 {
     RefPtr<TypeBuilder::Array<TypeBuilder::CSS::RuleMatch> > result = TypeBuilder::Array<TypeBuilder::CSS::RuleMatch>::create();
-    if (!ruleList)
-        return result.release();
 
-    for (unsigned i = 0, size = ruleList->length(); i < size; ++i) {
-        CSSStyleRule* rule = asCSSStyleRule(ruleList->item(i));
-        RefPtr<TypeBuilder::CSS::CSSRule> ruleObject = buildObjectForRule(rule, styleResolver);
+    for (unsigned i = 0; i < matchedRules.size(); ++i) {
+        if (!matchedRules[i]->isStyleRule())
+            continue;
+        StyleRule* matchedStyleRule = static_cast<StyleRule*>(matchedRules[i].get());
+        RefPtr<TypeBuilder::CSS::CSSRule> ruleObject = buildObjectForRule(matchedStyleRule, styleResolver);
         if (!ruleObject)
             continue;
         RefPtr<TypeBuilder::Array<int> > matchingSelectors = TypeBuilder::Array<int>::create();
-        const CSSSelectorList& selectorList = rule->styleRule()->selectorList();
+        const CSSSelectorList& selectorList = matchedStyleRule->selectorList();
         long index = 0;
-        for (CSSSelector* selector = selectorList.first(); selector; selector = CSSSelectorList::next(selector)) {
-            ExceptionCode ec;
-            bool matched = element->webkitMatchesSelector(selector->selectorText(), ec);
+        for (const CSSSelector* selector = selectorList.first(); selector; selector = CSSSelectorList::next(selector)) {
+            bool matched = element->webkitMatchesSelector(selector->selectorText(), IGNORE_EXCEPTION);
             if (matched)
                 matchingSelectors->addItem(index);
             ++index;
@@ -1176,7 +1333,7 @@ PassRefPtr<TypeBuilder::Array<TypeBuilder::CSS::RuleMatch> > InspectorCSSAgent::
         result->addItem(match);
     }
 
-    return result;
+    return result.release();
 }
 
 PassRefPtr<TypeBuilder::CSS::CSSStyle> InspectorCSSAgent::buildObjectForAttributesStyle(Element* element)
@@ -1184,11 +1341,15 @@ PassRefPtr<TypeBuilder::CSS::CSSStyle> InspectorCSSAgent::buildObjectForAttribut
     if (!element->isStyledElement())
         return 0;
 
-    const StylePropertySet* attributeStyle = static_cast<StyledElement*>(element)->presentationAttributeStyle();
+    // FIXME: Ugliness below.
+    StylePropertySet* attributeStyle = const_cast<StylePropertySet*>(static_cast<StyledElement*>(element)->presentationAttributeStyle());
     if (!attributeStyle)
         return 0;
 
-    RefPtr<InspectorStyle> inspectorStyle = InspectorStyle::create(InspectorCSSId(), const_cast<StylePropertySet*>(attributeStyle)->ensureCSSStyleDeclaration(), 0);
+    ASSERT(attributeStyle->isMutable());
+    MutableStylePropertySet* mutableAttributeStyle = static_cast<MutableStylePropertySet*>(attributeStyle);
+
+    RefPtr<InspectorStyle> inspectorStyle = InspectorStyle::create(InspectorCSSId(), mutableAttributeStyle->ensureCSSStyleDeclaration(), 0);
     return inspectorStyle->buildObjectForStyle();
 }
 
@@ -1199,17 +1360,17 @@ PassRefPtr<TypeBuilder::Array<TypeBuilder::CSS::Region> > InspectorCSSAgent::bui
     for (unsigned i = 0; i < regionList->length(); ++i) {
         TypeBuilder::CSS::Region::RegionOverset::Enum regionOverset;
 
-        switch (toElement(regionList->item(i))->renderRegion()->regionState()) {
-        case RenderRegion::RegionFit:
+        switch (toElement(regionList->item(i))->renderRegion()->regionOversetState()) {
+        case RegionFit:
             regionOverset = TypeBuilder::CSS::Region::RegionOverset::Fit;
             break;
-        case RenderRegion::RegionEmpty:
+        case RegionEmpty:
             regionOverset = TypeBuilder::CSS::Region::RegionOverset::Empty;
             break;
-        case RenderRegion::RegionOverset:
+        case RegionOverset:
             regionOverset = TypeBuilder::CSS::Region::RegionOverset::Overset;
             break;
-        case RenderRegion::RegionUndefined:
+        case RegionUndefined:
             continue;
         default:
             ASSERT_NOT_REACHED();

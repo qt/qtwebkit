@@ -46,6 +46,8 @@ struct OperandValueTraits {
     static void dump(const T& value, PrintStream& out) { value.dump(out); }
 };
 
+enum OperandKind { ArgumentOperand, LocalOperand };
+
 template<typename T, typename Traits = OperandValueTraits<T> >
 class Operands {
 public:
@@ -65,6 +67,28 @@ public:
     
     T& local(size_t idx) { return m_locals[idx]; }
     const T& local(size_t idx) const { return m_locals[idx]; }
+    
+    template<OperandKind operandKind>
+    size_t sizeFor() const
+    {
+        if (operandKind == ArgumentOperand)
+            return numberOfArguments();
+        return numberOfLocals();
+    }
+    template<OperandKind operandKind>
+    T& atFor(size_t idx)
+    {
+        if (operandKind == ArgumentOperand)
+            return argument(idx);
+        return local(idx);
+    }
+    template<OperandKind operandKind>
+    const T& atFor(size_t idx) const
+    {
+        if (operandKind == ArgumentOperand)
+            return argument(idx);
+        return local(idx);
+    }
     
     void ensureLocals(size_t size)
     {
@@ -192,15 +216,17 @@ private:
 template<typename T, typename Traits>
 void dumpOperands(const Operands<T, Traits>& operands, PrintStream& out)
 {
-    for (size_t argument = 0; argument < operands.numberOfArguments(); ++argument) {
-        if (argument)
+    for (size_t argument = operands.numberOfArguments(); argument--;) {
+        if (argument != operands.numberOfArguments() - 1)
             out.printf(" ");
+        out.print("arg", argument, ":");
         Traits::dump(operands.argument(argument), out);
     }
     out.printf(" : ");
     for (size_t local = 0; local < operands.numberOfLocals(); ++local) {
         if (local)
             out.printf(" ");
+        out.print("r", local, ":");
         Traits::dump(operands.local(local), out);
     }
 }

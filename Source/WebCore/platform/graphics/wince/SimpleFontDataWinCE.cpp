@@ -63,7 +63,7 @@ void SimpleFontData::platformDestroy()
 {
 }
 
-PassRefPtr<SimpleFontData> SimpleFontData::createScaledFontData(const FontDescription& fontDescription, float scaleFactor) const
+PassRefPtr<SimpleFontData> SimpleFontData::platformCreateScaledFontData(const FontDescription& fontDescription, float scaleFactor) const
 {
     FontDescription fontDesc(fontDescription);
     fontDesc.setComputedSize(lroundf(scaleFactor * fontDesc.computedSize()));
@@ -87,11 +87,7 @@ bool SimpleFontData::containsCharacters(const UChar* characters, int length) con
     // cover a given code page?
 
     // FIXME: in the case that we failed to get the interface, still use the font.
-#if defined(IMLANG_FONT_LINK) && (IMLANG_FONT_LINK == 2)
-    IMLangFontLink2* langFontLink = fontCache()->getFontLinkInterface();
-#else
-    IMLangFontLink* langFontLink = fontCache()->getFontLinkInterface();
-#endif
+    IMLangFontLinkType* langFontLink = fontCache()->getFontLinkInterface();
     if (!langFontLink)
         return true;
 

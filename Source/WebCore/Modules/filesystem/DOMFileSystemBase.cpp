@@ -71,7 +71,7 @@ DOMFileSystemBase::~DOMFileSystemBase()
 {
 }
 
-#if !PLATFORM(CHROMIUM)
+#if !PLATFORM(BLACKBERRY)
 // static
 bool DOMFileSystemBase::isValidType(FileSystemType type)
 {

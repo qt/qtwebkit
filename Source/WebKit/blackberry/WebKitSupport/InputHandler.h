@@ -23,6 +23,7 @@
 #include "TextChecking.h"
 
 #include <BlackBerryPlatformInputEvents.h>
+#include <BlackBerryPlatformMisc.h>
 #include <BlackBerryPlatformSettings.h>
 
 #include <imf/events.h>
@@ -45,9 +46,11 @@ class IntRect;
 class Node;
 class Range;
 class SpellChecker;
+class SpellCheckRequest;
 class TextCheckingRequest;
 class VisiblePosition;
 class VisibleSelection;
+class SuggestionBoxHandler;
 }
 
 namespace BlackBerry {
@@ -59,6 +62,7 @@ class KeyboardEvent;
 
 namespace WebKit {
 
+class SpellingHandler;
 class WebPagePrivate;
 
 class InputHandler {
@@ -67,9 +71,11 @@ public:
     ~InputHandler();
 
     enum FocusElementType { TextEdit, TextPopup /* Date/Time & Color */, SelectPopup, Plugin };
-    enum CaretScrollType { CenterAlways = BlackBerry::Platform::Settings::ScrollAdjustmentCenterAlways,
-                           CenterIfNeeded = BlackBerry::Platform::Settings::ScrollAdjustmentCenterIfNeeded,
-                           EdgeIfNeeded = BlackBerry::Platform::Settings::ScrollAdjustmentEdgeIfNeeded };
+    enum CaretScrollType {
+        CenterAlways = BlackBerry::Platform::Settings::ScrollAdjustmentCenterAlways,
+        CenterIfNeeded = BlackBerry::Platform::Settings::ScrollAdjustmentCenterIfNeeded,
+        EdgeIfNeeded = BlackBerry::Platform::Settings::ScrollAdjustmentEdgeIfNeeded
+    };
 
     bool isInputModeEnabled() const;
     void setInputModeEnabled(bool active = true);
@@ -94,6 +100,10 @@ public:
 
     void setInputValue(const WTF::String&);
 
+    void focusNextField();
+    void focusPreviousField();
+    void submitForm();
+
     void setDelayKeyboardVisibilityChange(bool value);
     void processPendingKeyboardVisibilityChange();
 
@@ -104,7 +114,6 @@ public:
     PassRefPtr<WebCore::Element> currentFocusElement() const { return m_currentFocusElement; }
 
     void ensureFocusElementVisible(bool centerFieldInDisplay = true);
-    void handleInputLocaleChanged(bool isRTL);
 
     // PopupMenu methods.
     bool willOpenPopupForNode(WebCore::Node*);
@@ -120,6 +129,8 @@ public:
     WTF::String elementText();
 
     WebCore::IntRect boundingBoxForInputField();
+
+    bool isCaretAtEndOfText();
 
     // IMF driven calls.
     bool setBatchEditingActive(bool);
@@ -137,12 +148,21 @@ public:
     int32_t setComposingText(spannable_string_t*, int32_t relativeCursorPosition);
     int32_t commitText(spannable_string_t*, int32_t relativeCursorPosition);
 
-    void requestCheckingOfString(WTF::PassRefPtr<WebCore::TextCheckingRequest>);
+    void requestCheckingOfString(PassRefPtr<WebCore::SpellCheckRequest>);
     void spellCheckingRequestProcessed(int32_t transactionId, spannable_string_t*);
-    void spellCheckingRequestCancelled(int32_t transactionId);
+    void stopPendingSpellCheckRequests(bool isRestartRequired = false);
+    void spellCheckTextBlock(WebCore::Element* = 0);
 
-    bool shouldRequestSpellCheckingOptionsForPoint(Platform::IntPoint&, const WebCore::Element*, imf_sp_text_t&);
-    void requestSpellingCheckingOptions(imf_sp_text_t&, const WebCore::IntSize& screenOffset);
+    bool shouldRequestSpellCheckingOptionsForPoint(const Platform::IntPoint& documentContentPosition, const WebCore::Element*, imf_sp_text_t&);
+    void requestSpellingCheckingOptions(imf_sp_text_t&, WebCore::IntSize& screenOffset, const bool shouldMoveDialog = false);
+    void clearDidSpellCheckState() { m_didSpellCheckWord = false; }
+    void redrawSpellCheckDialogIfRequired(const bool shouldMoveDialog = true);
+
+    void callRequestCheckingFor(PassRefPtr<WebCore::SpellCheckRequest>);
+    void setSystemSpellCheckStatus(bool enabled) { m_spellCheckStatusConfirmed = true; m_globalSpellCheckStatus = enabled; }
+
+    void elementTouched(WebCore::Element*);
+    void restoreViewState();
 
 private:
     enum PendingKeyboardStateChange { NoChange, Visible, NotVisible };
@@ -199,18 +219,30 @@ private:
 
     void learnText();
     void sendLearnTextDetails(const WTF::String&);
-    void spellCheckBlock(WebCore::VisibleSelection&, WebCore::TextCheckingProcessType);
-    PassRefPtr<WebCore::Range> getRangeForSpellCheckWithFineGranularity(WebCore::VisiblePosition startPosition, WebCore::VisiblePosition endPosition);
     WebCore::SpellChecker* getSpellChecker();
     bool shouldSpellCheckElement(const WebCore::Element*) const;
+    bool didSpellCheckWord() const { return m_didSpellCheckWord; }
+
+    void updateFormState();
+
+    bool shouldNotifyWebView(const Platform::KeyboardEvent&);
+
+    void showTextInputTypeSuggestionBox(bool allowEmptyPrefix = false);
+    void hideTextInputTypeSuggestionBox();
+
+    bool isNavigationKey(unsigned character) const;
 
     WebPagePrivate* m_webPage;
 
     RefPtr<WebCore::Element> m_currentFocusElement;
+    RefPtr<WebCore::Element> m_previousFocusableTextElement;
+    RefPtr<WebCore::Element> m_nextFocusableTextElement;
+
+    bool m_hasSubmitButton;
     bool m_inputModeEnabled;
 
     bool m_processingChange;
-    bool m_changingFocus;
+    bool m_shouldEnsureFocusTextElementVisibleOnSelectionChanged;
 
     FocusElementType m_currentFocusElementType;
     int64_t m_currentFocusElementTextEditMask;
@@ -221,11 +253,24 @@ private:
     PendingKeyboardStateChange m_pendingKeyboardVisibilityChange;
     bool m_delayKeyboardVisibilityChange;
 
-    RefPtr<WebCore::TextCheckingRequest> m_request;
+    RefPtr<WebCore::SpellCheckRequest> m_request;
     int32_t m_processingTransactionId;
 
-    bool m_receivedBackspaceKeyDown;
-    unsigned short m_expectedKeyUpChar;
+    bool m_shouldNotifyWebView;
+    unsigned m_expectedKeyUpChar;
+
+    imf_sp_text_t m_spellCheckingOptionsRequest;
+    WebCore::IntSize m_screenOffset;
+    bool m_didSpellCheckWord;
+    SpellingHandler* m_spellingHandler;
+    bool m_spellCheckStatusConfirmed;
+    bool m_globalSpellCheckStatus;
+    int m_minimumSpellCheckingRequestSequence;
+
+    OwnPtr<WebCore::SuggestionBoxHandler> m_suggestionDropdownBoxHandler;
+    bool m_elementTouchedIsCrossFrame;
+
+    DISABLE_COPY(InputHandler);
 };
 
 }

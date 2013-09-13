@@ -35,7 +35,7 @@
 #include "ScriptExecutionContext.h"
 
 #if ENABLE(WORKERS)
-#include "WorkerContext.h"
+#include "WorkerGlobalScope.h"
 #endif
 
 namespace WebCore {
@@ -53,19 +53,6 @@ bool ActiveDOMCallback::canInvokeCallback() const
 {
     ScriptExecutionContext* context = scriptExecutionContext();
     return context && !context->activeDOMObjectsAreSuspended() && !context->activeDOMObjectsAreStopped();
-}
-
-bool ActiveDOMCallback::isScriptControllerTerminating() const
-{
-#if ENABLE(WORKERS)
-    ScriptExecutionContext* context = scriptExecutionContext();
-    if (context && context->isWorkerContext()) {
-        WorkerScriptController* scriptController = static_cast<WorkerContext*>(context)->script();
-        if (!scriptController || scriptController->isExecutionForbidden() || scriptController->isExecutionTerminating())
-            return true;
-    }
-#endif
-    return false;
 }
 
 } // namespace WebCore

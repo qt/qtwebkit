@@ -26,13 +26,13 @@
 #ifndef PageGroup_h
 #define PageGroup_h
 
-#include <wtf/HashSet.h>
-#include <wtf/Noncopyable.h>
 #include "LinkHash.h"
+#include "SecurityOriginHash.h"
 #include "Supplementable.h"
 #include "UserScript.h"
 #include "UserStyleSheet.h"
-#include <wtf/text/StringHash.h>
+#include <wtf/HashSet.h>
+#include <wtf/Noncopyable.h>
 
 namespace WebCore {
 
@@ -60,6 +60,7 @@ namespace WebCore {
 
         static void clearLocalStorageForAllOrigins();
         static void clearLocalStorageForOrigin(SecurityOrigin*);
+        static void closeIdleLocalStorageDatabases();
         // DumpRenderTree helper that triggers a StorageArea sync.
         static void syncLocalStorage();
 
@@ -86,6 +87,8 @@ namespace WebCore {
         StorageNamespace* localStorage();
         bool hasLocalStorage() { return m_localStorage; }
 
+        StorageNamespace* transientLocalStorage(SecurityOrigin* topOrigin);
+
         void addUserScriptToWorld(DOMWrapperWorld*, const String& source, const KURL&,
                                   const Vector<String>& whitelist, const Vector<String>& blacklist,
                                   UserScriptInjectionTime, UserContentInjectedFrames);
@@ -108,22 +111,16 @@ namespace WebCore {
         GroupSettings* groupSettings() const { return m_groupSettings.get(); }
 
 #if ENABLE(VIDEO_TRACK)
-        bool userPrefersCaptions();
-        bool userHasCaptionPreferences();
-        float captionFontSizeScale();
-        void registerForCaptionPreferencesChangedCallbacks(CaptionPreferencesChangedListener*);
-        void unregisterForCaptionPreferencesChangedCallbacks(CaptionPreferencesChangedListener*);
+        void captionPreferencesChanged();
+        CaptionUserPreferences* captionPreferences();
 #endif
 
     private:
         PageGroup(Page*);
 
-        void addVisitedLink(LinkHash stringHash);
+        void addVisitedLink(LinkHash);
         void invalidatedInjectedStyleSheetCacheInAllFrames();
-  
-#if ENABLE(VIDEO_TRACK)
-        CaptionUserPreferences* captionPreferences();
-#endif
+
         String m_name;
 
         HashSet<Page*> m_pages;
@@ -133,6 +130,7 @@ namespace WebCore {
 
         unsigned m_identifier;
         RefPtr<StorageNamespace> m_localStorage;
+        HashMap<RefPtr<SecurityOrigin>, RefPtr<StorageNamespace> > m_transientLocalStorageMap;
 
         OwnPtr<UserScriptMap> m_userScripts;
         OwnPtr<UserStyleSheetMap> m_userStyleSheets;

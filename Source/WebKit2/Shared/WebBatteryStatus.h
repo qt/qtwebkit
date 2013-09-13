@@ -35,13 +35,11 @@
 
 namespace WebKit {
 
-class WebBatteryStatus : public APIObject {
+class WebBatteryStatus : public TypedAPIObject<APIObject::TypeBatteryStatus> {
 public:
-    static const Type APIType = TypeBatteryStatus;
-
     struct Data {
         void encode(CoreIPC::ArgumentEncoder&) const;
-        static bool decode(CoreIPC::ArgumentDecoder*, Data&);
+        static bool decode(CoreIPC::ArgumentDecoder&, Data&);
 
         bool isCharging;
         double chargingTime;
@@ -64,8 +62,6 @@ public:
 
 private:
     WebBatteryStatus(bool isCharging, double chargingTime, double dischargingTime, double level);
-
-    virtual Type type() const { return APIType; }
 
     Data m_data;
 };

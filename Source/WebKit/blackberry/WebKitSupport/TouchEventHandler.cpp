@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, 2011, 2012 Research In Motion Limited. All rights reserved.
+ * Copyright (C) 2010, 2011, 2012, 2013 Research In Motion Limited. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -44,9 +44,11 @@
 #include "RenderTheme.h"
 #include "RenderView.h"
 #include "SelectionHandler.h"
+#include "WebKitThreadViewportAccessor.h"
 #include "WebPage_p.h"
 #include "WebTapHighlight.h"
 
+#include <BlackBerryPlatformViewportAccessor.h>
 #include <wtf/MathExtras.h>
 
 using namespace WebCore;
@@ -66,44 +68,69 @@ TouchEventHandler::~TouchEventHandler()
 {
 }
 
-void TouchEventHandler::doFatFingers(Platform::TouchPoint& point)
+void TouchEventHandler::doFatFingers(const Platform::TouchPoint& point)
 {
-    m_lastScreenPoint = point.m_screenPos;
+    m_lastScreenPoint = point.screenPosition();
     m_lastFatFingersResult.reset(); // Theoretically this shouldn't be required. Keep it just in case states get mangled.
-    IntPoint contentPos(m_webPage->mapFromViewportToContents(point.m_pos));
     m_webPage->postponeDocumentStyleRecalc();
-    m_lastFatFingersResult = FatFingers(m_webPage, contentPos, FatFingers::ClickableElement).findBestPoint();
+    m_lastFatFingersResult = FatFingers(m_webPage, point.documentContentPosition(), FatFingers::ClickableElement).findBestPoint();
     m_webPage->resumeDocumentStyleRecalc();
 }
 
-void TouchEventHandler::sendClickAtFatFingersPoint()
+void TouchEventHandler::sendClickAtFatFingersPoint(unsigned modifiers)
 {
-    handleFatFingerPressed();
-    PlatformMouseEvent mouseRelease(m_webPage->mapFromContentsToViewport(m_lastFatFingersResult.adjustedPosition()), m_lastScreenPoint, PlatformEvent::MouseReleased, 1, LeftButton, TouchScreen);
+    bool shiftActive = modifiers & KEYMOD_SHIFT;
+    bool altActive = modifiers & KEYMOD_ALT;
+    bool ctrlActive = modifiers & KEYMOD_CTRL;
+
+    handleFatFingerPressed(shiftActive, altActive, ctrlActive);
+
+    const Platform::ViewportAccessor* viewportAccessor = m_webPage->m_webkitThreadViewportAccessor;
+    IntPoint documentViewportAdjustedPosition = viewportAccessor->documentViewportFromContents(m_lastFatFingersResult.adjustedPosition());
+    PlatformMouseEvent mouseRelease(documentViewportAdjustedPosition, m_lastScreenPoint, PlatformEvent::MouseReleased, 1, LeftButton, shiftActive, ctrlActive, altActive, TouchScreen);
+
     m_webPage->handleMouseEvent(mouseRelease);
 }
 
-void TouchEventHandler::handleTouchPoint(Platform::TouchPoint& point)
+void TouchEventHandler::handleTouchHold()
+{
+    // Clear and reset focus if the user touch-holds on a different frame.
+    // Special case for highlighting text on a frame not currently under focus [PR 285211].
+    Node* nodeUnderFatFinger = m_lastFatFingersResult.node();
+    if (nodeUnderFatFinger && nodeUnderFatFinger->document()->frame() != m_webPage->focusedOrMainFrame()) {
+        m_webPage->clearFocusNode();
+        m_webPage->m_selectionHandler->cancelSelection();
+        m_webPage->m_page->focusController()->setFocusedFrame(nodeUnderFatFinger->document()->frame());
+    }
+}
+
+void TouchEventHandler::handleTouchPoint(const Platform::TouchPoint& point, unsigned modifiers)
 {
     // Enable input mode on any touch event.
     m_webPage->m_inputHandler->setInputModeEnabled();
-    switch (point.m_state) {
+
+    bool shiftActive = modifiers & KEYMOD_SHIFT;
+    bool altActive = modifiers & KEYMOD_ALT;
+    bool ctrlActive = modifiers & KEYMOD_CTRL;
+
+    switch (point.state()) {
     case Platform::TouchPoint::TouchPressed:
         {
-            doFatFingers(point);
+            // Clear spellcheck state on any touch event
+            m_webPage->m_inputHandler->clearDidSpellCheckState();
 
-            // FIXME Draw tap highlight as soon as possible if we can
-            Element* elementUnderFatFinger = m_lastFatFingersResult.nodeAsElementIfApplicable();
-            if (elementUnderFatFinger)
-                drawTapHighlight();
+            if (!m_lastFatFingersResult.isValid())
+                doFatFingers(point);
 
             // Check for text selection
             if (m_lastFatFingersResult.isTextInput()) {
-                elementUnderFatFinger = m_lastFatFingersResult.nodeAsElementIfApplicable(FatFingersResult::ShadowContentNotAllowed, true /* shouldUseRootEditableElement */);
-                m_shouldRequestSpellCheckOptions = m_webPage->m_inputHandler->shouldRequestSpellCheckingOptionsForPoint(point.m_pos, elementUnderFatFinger, m_spellCheckOptionRequest);
+                Element* elementUnderFatFinger = m_lastFatFingersResult.nodeAsElementIfApplicable(FatFingersResult::ShadowContentNotAllowed, true /* shouldUseRootEditableElement */);
+                m_shouldRequestSpellCheckOptions = m_webPage->m_inputHandler->shouldRequestSpellCheckingOptionsForPoint(m_lastFatFingersResult.adjustedPosition(), elementUnderFatFinger, m_spellCheckOptionRequest);
             }
 
-            handleFatFingerPressed();
+            m_webPage->m_inputHandler->elementTouched(lastFatFingersResult().nodeAsElementIfApplicable(FatFingersResult::ShadowContentNotAllowed));
+
+            handleFatFingerPressed(shiftActive, altActive, ctrlActive);
             break;
         }
     case Platform::TouchPoint::TouchReleased:
@@ -120,14 +147,20 @@ void TouchEventHandler::handleTouchPoint(Platform::TouchPoint& point)
                 m_webPage->m_inputHandler->notifyClientOfKeyboardVisibilityChange(true);
 
             m_webPage->m_tapHighlight->hide();
+            m_webPage->m_selectionHighlight->hide();
 
-            IntPoint adjustedPoint = m_webPage->mapFromContentsToViewport(m_lastFatFingersResult.adjustedPosition());
-            PlatformMouseEvent mouseEvent(adjustedPoint, m_lastScreenPoint, PlatformEvent::MouseReleased, 1, LeftButton, TouchScreen);
+            const Platform::ViewportAccessor* viewportAccessor = m_webPage->m_webkitThreadViewportAccessor;
+            IntPoint documentViewportAdjustedPosition = viewportAccessor->documentViewportFromContents(m_lastFatFingersResult.adjustedPosition());
+            PlatformMouseEvent mouseEvent(documentViewportAdjustedPosition, m_lastScreenPoint, PlatformEvent::MouseReleased, 1, LeftButton, shiftActive, ctrlActive, altActive, TouchScreen);
+
             m_webPage->handleMouseEvent(mouseEvent);
 
             if (m_shouldRequestSpellCheckOptions) {
-                IntPoint pixelPositionRelativeToViewport = m_webPage->mapToTransformed(adjustedPoint);
-                m_webPage->m_inputHandler->requestSpellingCheckingOptions(m_spellCheckOptionRequest, IntSize(m_lastScreenPoint - pixelPositionRelativeToViewport));
+                IntPoint pixelPositionRelativeToViewport = viewportAccessor->pixelViewportFromContents(
+                    viewportAccessor->roundToPixelFromDocumentContents(WebCore::FloatPoint(m_lastFatFingersResult.adjustedPosition())));
+                IntSize screenOffset(m_lastScreenPoint - pixelPositionRelativeToViewport);
+                m_webPage->m_inputHandler->requestSpellingCheckingOptions(m_spellCheckOptionRequest, screenOffset);
+                m_shouldRequestSpellCheckOptions = false;
             }
 
             m_lastFatFingersResult.reset(); // Reset the fat finger result as its no longer valid when a user's finger is not on the screen.
@@ -135,9 +168,12 @@ void TouchEventHandler::handleTouchPoint(Platform::TouchPoint& point)
         }
     case Platform::TouchPoint::TouchMoved:
         {
+            // Clear spellcheck state on any touch event
+            m_webPage->m_inputHandler->clearDidSpellCheckState();
+
             // You can still send mouse move events
-            PlatformMouseEvent mouseEvent(point.m_pos, m_lastScreenPoint, PlatformEvent::MouseMoved, 1, LeftButton, TouchScreen);
-            m_lastScreenPoint = point.m_screenPos;
+            PlatformMouseEvent mouseEvent(point.documentViewportPosition(), m_lastScreenPoint, PlatformEvent::MouseMoved, 1, LeftButton, shiftActive, ctrlActive, altActive, TouchScreen);
+            m_lastScreenPoint = point.screenPosition();
             m_webPage->handleMouseEvent(mouseEvent);
             break;
         }
@@ -146,14 +182,17 @@ void TouchEventHandler::handleTouchPoint(Platform::TouchPoint& point)
     }
 }
 
-void TouchEventHandler::handleFatFingerPressed()
+void TouchEventHandler::handleFatFingerPressed(bool shiftActive, bool altActive, bool ctrlActive)
 {
+    const Platform::ViewportAccessor* viewportAccessor = m_webPage->m_webkitThreadViewportAccessor;
+    IntPoint documentViewportAdjustedPosition = viewportAccessor->documentViewportFromContents(m_lastFatFingersResult.adjustedPosition());
+
     // First update the mouse position with a MouseMoved event.
-    PlatformMouseEvent mouseMoveEvent(m_webPage->mapFromContentsToViewport(m_lastFatFingersResult.adjustedPosition()), m_lastScreenPoint, PlatformEvent::MouseMoved, 0, LeftButton, TouchScreen);
+    PlatformMouseEvent mouseMoveEvent(documentViewportAdjustedPosition, m_lastScreenPoint, PlatformEvent::MouseMoved, 0, LeftButton, shiftActive, ctrlActive, altActive, TouchScreen);
     m_webPage->handleMouseEvent(mouseMoveEvent);
 
     // Then send the MousePressed event.
-    PlatformMouseEvent mousePressedEvent(m_webPage->mapFromContentsToViewport(m_lastFatFingersResult.adjustedPosition()), m_lastScreenPoint, PlatformEvent::MousePressed, 1, LeftButton, TouchScreen);
+    PlatformMouseEvent mousePressedEvent(documentViewportAdjustedPosition, m_lastScreenPoint, PlatformEvent::MousePressed, 1, LeftButton, shiftActive, ctrlActive, altActive, TouchScreen);
     m_webPage->handleMouseEvent(mousePressedEvent);
 }
 
@@ -171,8 +210,8 @@ static Element* elementForTapHighlight(Element* elementUnderFatFinger)
             return elementUnderFatFinger;
     }
 
-    bool isArea = elementUnderFatFinger->hasTagName(HTMLNames::areaTag);
-    Node* linkNode = elementUnderFatFinger->enclosingLinkEventParentOrSelf();
+    bool isArea = isHTMLAreaElement(elementUnderFatFinger);
+    Node* linkNode = elementUnderFatFinger->isLink() ? elementUnderFatFinger : 0;
     if (!linkNode || !linkNode->isHTMLElement() || (!linkNode->renderer() && !isArea))
         return 0;
 
@@ -180,12 +219,12 @@ static Element* elementForTapHighlight(Element* elementUnderFatFinger)
 
     // FatFingers class selector ensure only anchor with valid href attr value get here.
     // It includes empty hrefs.
-    Element* highlightCandidateElement = static_cast<Element*>(linkNode);
+    Element* highlightCandidateElement = toElement(linkNode);
 
     if (!isArea)
         return highlightCandidateElement;
 
-    HTMLAreaElement* area = static_cast<HTMLAreaElement*>(highlightCandidateElement);
+    HTMLAreaElement* area = toHTMLAreaElement(highlightCandidateElement);
     HTMLImageElement* image = area->imageElement();
     if (image && image->renderer())
         return image;
@@ -252,8 +291,8 @@ void TouchEventHandler::drawTapHighlight()
     Color highlightColor = element->renderStyle()->tapHighlightColor();
 
     m_webPage->m_tapHighlight->draw(region,
-                                    highlightColor.red(), highlightColor.green(), highlightColor.blue(), highlightColor.alpha(),
-                                    shouldHideTapHighlightRightAfterScrolling);
+        highlightColor.red(), highlightColor.green(), highlightColor.blue(), highlightColor.alpha(),
+        shouldHideTapHighlightRightAfterScrolling);
 }
 
 void TouchEventHandler::playSoundIfAnchorIsTarget() const

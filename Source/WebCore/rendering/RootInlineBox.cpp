@@ -29,6 +29,7 @@
 #include "GraphicsContext.h"
 #include "HitTestResult.h"
 #include "InlineTextBox.h"
+#include "LogicalSelectionOffsetCaches.h"
 #include "Page.h"
 #include "PaintInfo.h"
 #include "RenderArena.h"
@@ -42,6 +43,13 @@ using namespace std;
 
 namespace WebCore {
     
+struct SameSizeAsRootInlineBox : public InlineFlowBox {
+    unsigned variables[5];
+    void* pointers[4];
+};
+
+COMPILE_ASSERT(sizeof(RootInlineBox) == sizeof(SameSizeAsRootInlineBox), RootInlineBox_should_stay_small);
+
 typedef WTF::HashMap<const RootInlineBox*, EllipsisBox*> EllipsisBoxMap;
 static EllipsisBoxMap* gEllipsisBoxMap = 0;
 
@@ -180,7 +188,7 @@ void RootInlineBox::addHighlightOverflow()
 
     // Highlight acts as a selection inflation.
     FloatRect rootRect(0, selectionTop(), logicalWidth(), selectionHeight());
-    IntRect inflatedRect = enclosingIntRect(page->chrome()->client()->customHighlightRect(renderer()->node(), renderer()->style()->highlight(), rootRect));
+    IntRect inflatedRect = enclosingIntRect(page->chrome().client()->customHighlightRect(renderer()->node(), renderer()->style()->highlight(), rootRect));
     setOverflowFromLogicalRects(inflatedRect, inflatedRect, lineTop(), lineBottom());
 }
 
@@ -198,9 +206,9 @@ void RootInlineBox::paintCustomHighlight(PaintInfo& paintInfo, const LayoutPoint
 
     // Get the inflated rect so that we can properly hit test.
     FloatRect rootRect(paintOffset.x() + x(), paintOffset.y() + selectionTop(), logicalWidth(), selectionHeight());
-    FloatRect inflatedRect = page->chrome()->client()->customHighlightRect(renderer()->node(), highlightType, rootRect);
+    FloatRect inflatedRect = page->chrome().client()->customHighlightRect(renderer()->node(), highlightType, rootRect);
     if (inflatedRect.intersects(paintInfo.rect))
-        page->chrome()->client()->paintCustomHighlight(renderer()->node(), highlightType, rootRect, rootRect, false, true);
+        page->chrome().client()->paintCustomHighlight(renderer()->node(), highlightType, rootRect, rootRect, false, true);
 }
 
 #endif
@@ -250,28 +258,27 @@ void RootInlineBox::childRemoved(InlineBox* box)
     }
 }
 
+RenderRegion* RootInlineBox::containingRegion() const
+{
+    RenderRegion* region = m_fragmentationData ? m_fragmentationData->m_containingRegion : 0;
+
+#ifndef NDEBUG
+    if (region) {
+        RenderFlowThread* flowThread = block()->flowThreadContainingBlock();
+        const RenderRegionList& regionList = flowThread->renderRegionList();
+        ASSERT(regionList.contains(region));
+    }
+#endif
+
+    return region;
+}
+
 void RootInlineBox::setContainingRegion(RenderRegion* region)
 {
     ASSERT(!isDirty());
-    ASSERT(block()->inRenderFlowThread());
+    ASSERT(block()->flowThreadContainingBlock());
     LineFragmentationData* fragmentationData  = ensureLineFragmentationData();
     fragmentationData->m_containingRegion = region;
-    fragmentationData->m_hasContainingRegion = !!region;
-}
-
-RootInlineBox::LineFragmentationData* RootInlineBox::LineFragmentationData::sanitize(const RenderBlock* block)
-{
-    ASSERT(block->inRenderFlowThread());
-    if (!m_containingRegion)
-        return this;
-
-    RenderFlowThread* flowThread = block->enclosingRenderFlowThread();
-    const RenderRegionList& regionList = flowThread->renderRegionList();
-    // For pointer types the hash function is |safeToCompareToEmptyOrDeleted|. There shouldn't be any problems if m_containingRegion was deleted.
-    if (!regionList.contains(m_containingRegion))
-        m_containingRegion = 0;
-
-    return this;
 }
 
 LayoutUnit RootInlineBox::alignBoxesInBlockDirection(LayoutUnit heightOfBlock, GlyphOverflowAndFallbackFontsMap& textBoxDataMap, VerticalPositionCache& verticalPositionCache)
@@ -334,6 +341,15 @@ LayoutUnit RootInlineBox::alignBoxesInBlockDirection(LayoutUnit heightOfBlock, G
 
     return heightOfBlock + maxHeight;
 }
+
+#if ENABLE(CSS3_TEXT)
+float RootInlineBox::maxLogicalTop() const
+{
+    float maxLogicalTop = 0;
+    computeMaxLogicalTop(maxLogicalTop);
+    return maxLogicalTop;
+}
+#endif // CSS3_TEXT
 
 LayoutUnit RootInlineBox::beforeAnnotationsAdjustment() const
 {
@@ -414,7 +430,7 @@ LayoutUnit RootInlineBox::lineSnapAdjustment(LayoutUnit delta) const
     if (layoutState->isPaginated() && layoutState->pageLogicalHeight()) {
         pageLogicalTop = block()->pageLogicalTopForOffset(lineTopWithLeading() + delta);
         if (pageLogicalTop > firstLineTopWithLeading)
-            firstTextTop = pageLogicalTop + lineGridBox->logicalTop() - lineGrid->borderBefore() - lineGrid->paddingBefore() + lineGridPaginationOrigin;
+            firstTextTop = pageLogicalTop + lineGridBox->logicalTop() - lineGrid->borderAndPaddingBefore() + lineGridPaginationOrigin;
     }
 
     if (block()->style()->lineSnap() == LineSnapContain) {
@@ -457,8 +473,8 @@ LayoutUnit RootInlineBox::lineSnapAdjustment(LayoutUnit delta) const
     return lineSnapAdjustment(newPageLogicalTop - (blockOffset + lineTopWithLeading()));
 }
 
-GapRects RootInlineBox::lineSelectionGap(RenderBlock* rootBlock, const LayoutPoint& rootBlockPhysicalPosition, const LayoutSize& offsetFromRootBlock, 
-                                         LayoutUnit selTop, LayoutUnit selHeight, const PaintInfo* paintInfo)
+GapRects RootInlineBox::lineSelectionGap(RenderBlock* rootBlock, const LayoutPoint& rootBlockPhysicalPosition, const LayoutSize& offsetFromRootBlock,
+    LayoutUnit selTop, LayoutUnit selHeight, const LogicalSelectionOffsetCaches& cache, const PaintInfo* paintInfo)
 {
     RenderObject::SelectionState lineState = selectionState();
 
@@ -469,12 +485,14 @@ GapRects RootInlineBox::lineSelectionGap(RenderBlock* rootBlock, const LayoutPoi
 
     InlineBox* firstBox = firstSelectedBox();
     InlineBox* lastBox = lastSelectedBox();
-    if (leftGap)
-        result.uniteLeft(block()->logicalLeftSelectionGap(rootBlock, rootBlockPhysicalPosition, offsetFromRootBlock,
-                                                          firstBox->parent()->renderer(), firstBox->logicalLeft(), selTop, selHeight, paintInfo));
-    if (rightGap)
-        result.uniteRight(block()->logicalRightSelectionGap(rootBlock, rootBlockPhysicalPosition, offsetFromRootBlock,
-                                                            lastBox->parent()->renderer(), lastBox->logicalRight(), selTop, selHeight, paintInfo));
+    if (leftGap) {
+        result.uniteLeft(block()->logicalLeftSelectionGap(rootBlock, rootBlockPhysicalPosition, offsetFromRootBlock, firstBox->parent()->renderer(), firstBox->logicalLeft(),
+            selTop, selHeight, cache, paintInfo));
+    }
+    if (rightGap) {
+        result.uniteRight(block()->logicalRightSelectionGap(rootBlock, rootBlockPhysicalPosition, offsetFromRootBlock, lastBox->parent()->renderer(), lastBox->logicalRight(),
+            selTop, selHeight, cache, paintInfo));
+    }
 
     // When dealing with bidi text, a non-contiguous selection region is possible.
     // e.g. The logical text aaaAAAbbb (capitals denote RTL text and non-capitals LTR) is layed out
@@ -563,7 +581,7 @@ LayoutUnit RootInlineBox::selectionTop() const
     if (renderer()->style()->isFlippedLinesWritingMode())
         return selectionTop;
 
-    LayoutUnit prevBottom = prevRootBox() ? prevRootBox()->selectionBottom() : block()->borderBefore() + block()->paddingBefore();
+    LayoutUnit prevBottom = prevRootBox() ? prevRootBox()->selectionBottom() : block()->borderAndPaddingBefore();
     if (prevBottom < selectionTop && block()->containsFloats()) {
         // This line has actually been moved further down, probably from a large line-height, but possibly because the
         // line was forced to clear floats.  If so, let's check the offsets, and only be willing to use the previous
@@ -831,8 +849,8 @@ void RootInlineBox::ascentAndDescentForBox(InlineBox* box, GlyphOverflowAndFallb
     }
     
     if (includeFontForBox(box) && !setUsedFont) {
-        int fontAscent = box->renderer()->style(isFirstLineStyle())->fontMetrics().ascent();
-        int fontDescent = box->renderer()->style(isFirstLineStyle())->fontMetrics().descent();
+        int fontAscent = box->renderer()->style(isFirstLineStyle())->fontMetrics().ascent(baselineType());
+        int fontDescent = box->renderer()->style(isFirstLineStyle())->fontMetrics().descent(baselineType());
         setAscentAndDescent(ascent, descent, fontAscent, fontDescent, ascentDescentSet);
         affectsAscent = fontAscent - box->logicalTop() > 0;
         affectsDescent = fontDescent + box->logicalTop() > 0; 
@@ -842,16 +860,16 @@ void RootInlineBox::ascentAndDescentForBox(InlineBox* box, GlyphOverflowAndFallb
         setAscentAndDescent(ascent, descent, glyphOverflow->top, glyphOverflow->bottom, ascentDescentSet);
         affectsAscent = glyphOverflow->top - box->logicalTop() > 0;
         affectsDescent = glyphOverflow->bottom + box->logicalTop() > 0; 
-        glyphOverflow->top = min(glyphOverflow->top, max(0, glyphOverflow->top - box->renderer()->style(isFirstLineStyle())->fontMetrics().ascent()));
-        glyphOverflow->bottom = min(glyphOverflow->bottom, max(0, glyphOverflow->bottom - box->renderer()->style(isFirstLineStyle())->fontMetrics().descent()));
+        glyphOverflow->top = min(glyphOverflow->top, max(0, glyphOverflow->top - box->renderer()->style(isFirstLineStyle())->fontMetrics().ascent(baselineType())));
+        glyphOverflow->bottom = min(glyphOverflow->bottom, max(0, glyphOverflow->bottom - box->renderer()->style(isFirstLineStyle())->fontMetrics().descent(baselineType())));
     }
 
     if (includeMarginForBox(box)) {
-        LayoutUnit ascentWithMargin = box->renderer()->style(isFirstLineStyle())->fontMetrics().ascent();
-        LayoutUnit descentWithMargin = box->renderer()->style(isFirstLineStyle())->fontMetrics().descent();
+        LayoutUnit ascentWithMargin = box->renderer()->style(isFirstLineStyle())->fontMetrics().ascent(baselineType());
+        LayoutUnit descentWithMargin = box->renderer()->style(isFirstLineStyle())->fontMetrics().descent(baselineType());
         if (box->parent() && !box->renderer()->isText()) {
-            ascentWithMargin += box->boxModelObject()->borderBefore() + box->boxModelObject()->paddingBefore() + box->boxModelObject()->marginBefore();
-            descentWithMargin += box->boxModelObject()->borderAfter() + box->boxModelObject()->paddingAfter() + box->boxModelObject()->marginAfter();
+            ascentWithMargin += box->boxModelObject()->borderAndPaddingBefore() + box->boxModelObject()->marginBefore();
+            descentWithMargin += box->boxModelObject()->borderAndPaddingAfter() + box->boxModelObject()->marginAfter();
         }
         setAscentAndDescent(ascent, descent, ascentWithMargin, descentWithMargin, ascentDescentSet);
         

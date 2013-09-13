@@ -33,22 +33,16 @@
 
 #if ENABLE(INPUT_TYPE_TIME)
 #include "BaseChooserOnlyDateAndTimeInputType.h"
-#include "BaseMultipleFieldsDateAndTimeInputType.h"
 
 namespace WebCore {
 
-#if ENABLE(INPUT_MULTIPLE_FIELDS_UI)
-typedef BaseMultipleFieldsDateAndTimeInputType BaseTimeInputType;
-#else
-typedef BaseChooserOnlyDateAndTimeInputType BaseTimeInputType;
-#endif
-
-class TimeInputType : public BaseTimeInputType {
+class TimeInputType : public BaseChooserOnlyDateAndTimeInputType {
 public:
     static PassOwnPtr<InputType> create(HTMLInputElement*);
 
 private:
     TimeInputType(HTMLInputElement*);
+    virtual void attach() OVERRIDE;
     virtual const AtomicString& formControlType() const OVERRIDE;
     virtual DateComponents::Type dateType() const OVERRIDE;
     virtual Decimal defaultValueForStepUp() const OVERRIDE;
@@ -56,13 +50,6 @@ private:
     virtual bool parseToDateComponentsInternal(const UChar*, unsigned length, DateComponents*) const OVERRIDE;
     virtual bool setMillisecondToDateComponents(double, DateComponents*) const OVERRIDE;
     virtual bool isTimeField() const OVERRIDE;
-#if ENABLE(INPUT_MULTIPLE_FIELDS_UI)
-    virtual String localizeValue(const String&) const OVERRIDE;
-
-    // BaseMultipleFieldsDateAndTimeInputType functions
-    virtual String formatDateTimeFieldsState(const DateTimeFieldsState&) const OVERRIDE FINAL;
-    virtual void setupLayoutParameters(DateTimeEditElement::LayoutParameters&, const DateComponents&) const OVERRIDE FINAL;
-#endif
 };
 
 } // namespace WebCore

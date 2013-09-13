@@ -32,7 +32,7 @@ namespace WebCore {
 class HTMLDataListElement;
 class HTMLSelectElement;
 
-class HTMLOptionElement : public HTMLElement {
+class HTMLOptionElement FINAL : public HTMLElement {
 public:
     static PassRefPtr<HTMLOptionElement> create(Document*);
     static PassRefPtr<HTMLOptionElement> create(const QualifiedName&, Document*);
@@ -58,10 +58,9 @@ public:
     String label() const;
     void setLabel(const String&);
 
-    virtual bool isEnabledFormControl() const OVERRIDE { return !disabled(); }
     bool ownElementDisabled() const { return m_disabled; }
 
-    virtual bool disabled() const;
+    virtual bool isDisabledFormControl() const OVERRIDE;
 
     String textIndentedToRespectGroupLabel() const;
 
@@ -70,11 +69,10 @@ public:
 private:
     HTMLOptionElement(const QualifiedName&, Document*);
 
-    virtual bool supportsFocus() const;
-    virtual bool isFocusable() const;
+    virtual bool isFocusable() const OVERRIDE;
     virtual bool rendererIsNeeded(const NodeRenderingContext&) { return false; }
-    virtual void attach();
-    virtual void detach();
+    virtual void attach(const AttachContext& = AttachContext()) OVERRIDE;
+    virtual void detach(const AttachContext& = AttachContext()) OVERRIDE;
 
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
 
@@ -97,25 +95,21 @@ private:
     RefPtr<RenderStyle> m_style;
 };
 
-HTMLOptionElement* toHTMLOptionElement(Node*);
-const HTMLOptionElement* toHTMLOptionElement(const Node*);
-void toHTMLOptionElement(const HTMLOptionElement*); // This overload will catch anyone doing an unnecessary cast.
+inline bool isHTMLOptionElement(Node* node)
+{
+    return node->hasTagName(HTMLNames::optionTag);
+}
 
-#ifdef NDEBUG
-
-// The debug versions of these, with assertions, are not inlined.
+inline bool isHTMLOptionElement(Element* element)
+{
+    return element->hasTagName(HTMLNames::optionTag);
+}
 
 inline HTMLOptionElement* toHTMLOptionElement(Node* node)
 {
+    ASSERT_WITH_SECURITY_IMPLICATION(!node || isHTMLOptionElement(node));
     return static_cast<HTMLOptionElement*>(node);
 }
-
-inline const HTMLOptionElement* toHTMLOptionElement(const Node* node)
-{
-    return static_cast<const HTMLOptionElement*>(node);
-}
-
-#endif
 
 } // namespace
 

@@ -39,12 +39,7 @@
 #include <utility>
 #include <wtf/text/StringBuilder.h>
 
-#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1070
-#include "NetscapeSandboxFunctions.h"
-#endif
-
 using namespace WebCore;
-using namespace std;
 
 namespace WebKit {
 
@@ -252,7 +247,7 @@ static NPError parsePostBuffer(bool isFile, const char *buffer, uint32_t length,
                 String contentLength = headerFields.get("Content-Length");
                 
                 if (!contentLength.isNull())
-                    dataLength = min(contentLength.toInt(), (int)dataLength);
+                    dataLength = std::min(contentLength.toInt(), (int)dataLength);
                 headerFields.remove("Content-Length");
                 
                 postBuffer += location;
@@ -412,10 +407,9 @@ static const unsigned WKNVSupportsCompositingCoreAnimationPluginsBool = 74656;
 // Whether the browser expects a non-retained Core Animation layer.
 static const unsigned WKNVExpectsNonretainedLayer = 74657;
 
-// Whether plug-in code is allowed to enter (arbitrary) sandbox for the process.
-static const unsigned WKNVAllowedToEnterSandbox = 74658;
+// 74658 and 74659 are no longer implemented.
 
-// WKNVSandboxFunctions = 74659 is defined in NetscapeSandboxFunctions.h
+static const unsigned WKNVPlugInContainer = 74660;
 
 #endif
 
@@ -501,17 +495,11 @@ static NPError NPN_GetValue(NPP npp, NPNVariable variable, void *value)
             break;
         }
 
-        case WKNVAllowedToEnterSandbox:
-            *(NPBool*)value = true;
-            break;
-
-#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1070 && ENABLE(PLUGIN_PROCESS)
-        case WKNVSandboxFunctions:
-        {
-            *(WKNSandboxFunctions **)value = netscapeSandboxFunctions();
+        case WKNVPlugInContainer: {
+            RefPtr<NetscapePlugin> plugin = NetscapePlugin::fromNPP(npp);
+            *reinterpret_cast<void**>(value) = plugin->plugInContainer();
             break;
         }
-#endif
 
 #ifndef NP_NO_QUICKDRAW
         case NPNVsupportsQuickDrawBool:
@@ -524,15 +512,6 @@ static NPError NPN_GetValue(NPP npp, NPNVariable variable, void *value)
             *(NPBool*)value = true;
             break;
 #endif
-#elif PLATFORM(WIN)
-       case NPNVnetscapeWindow: {
-           RefPtr<NetscapePlugin> plugin = NetscapePlugin::fromNPP(npp);
-           *reinterpret_cast<HWND*>(value) = plugin->containingWindow();
-           break;
-       }
-       case NPNVSupportsWindowless:
-           *(NPBool*)value = true;
-           break;
 #elif PLUGIN_ARCHITECTURE(X11)
        case NPNVxDisplay: {
            if (!npp)

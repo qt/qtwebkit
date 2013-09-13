@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006, 2007, 2008, 2009, 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2006-2009, 2011, 2013 Apple Inc. All rights reserved.
  * Copyright (C) Research In Motion Limited 2009. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -52,6 +52,7 @@
 #include "WebScriptWorld.h"
 #include "WebURLResponse.h"
 #include "WebView.h"
+#include <WebCore/AnimationController.h>
 #include <WebCore/BString.h>
 #include <WebCore/COMPtr.h>
 #include <WebCore/MemoryCache.h>
@@ -60,6 +61,7 @@
 #include <WebCore/DocumentMarkerController.h>
 #include <WebCore/DOMImplementation.h>
 #include <WebCore/DOMWindow.h>
+#include <WebCore/Editor.h>
 #include <WebCore/Event.h>
 #include <WebCore/EventHandler.h>
 #include <WebCore/FormState.h>
@@ -87,8 +89,10 @@
 #include <WebCore/PluginData.h>
 #include <WebCore/PluginDatabase.h>
 #include <WebCore/PluginView.h>
+#include <WebCore/PolicyChecker.h>
 #include <WebCore/PrintContext.h>
 #include <WebCore/ResourceHandle.h>
+#include <WebCore/ResourceLoader.h>
 #include <WebCore/ResourceRequest.h>
 #include <WebCore/RenderView.h>
 #include <WebCore/RenderTreeAsText.h>
@@ -99,9 +103,9 @@
 #include <WebCore/ScriptValue.h>
 #include <WebCore/SecurityOrigin.h>
 #include <JavaScriptCore/APICast.h>
+#include <JavaScriptCore/JSCJSValue.h>
 #include <JavaScriptCore/JSLock.h>
 #include <JavaScriptCore/JSObject.h>
-#include <JavaScriptCore/JSValue.h>
 #include <wtf/MathExtras.h>
 
 #if USE(CG)
@@ -200,8 +204,8 @@ static HTMLFormElement *formElementFromDOMElement(IDOMElement *element)
         Element* ele;
         hr = elePriv->coreElement((void**)&ele);
         elePriv->Release();
-        if (SUCCEEDED(hr) && ele && ele->hasTagName(formTag))
-            return static_cast<HTMLFormElement*>(ele);
+        if (SUCCEEDED(hr) && ele && isHTMLFormElement(ele))
+            return toHTMLFormElement(ele);
     }
     return 0;
 }
@@ -217,8 +221,8 @@ static HTMLInputElement* inputElementFromDOMElement(IDOMElement* element)
         Element* ele;
         hr = elePriv->coreElement((void**)&ele);
         elePriv->Release();
-        if (SUCCEEDED(hr) && ele && ele->hasTagName(inputTag))
-            return static_cast<HTMLInputElement*>(ele);
+        if (SUCCEEDED(hr) && ele && isHTMLInputElement(ele))
+            return toHTMLInputElement(ele);
     }
     return 0;
 }
@@ -1001,7 +1005,7 @@ HRESULT STDMETHODCALLTYPE WebFrame::hasSpellingMarker(
     Frame* coreFrame = core(this);
     if (!coreFrame)
         return E_FAIL;
-    *result = coreFrame->editor()->selectionStartHasMarkerFor(DocumentMarker::Spelling, from, length);
+    *result = coreFrame->editor().selectionStartHasMarkerFor(DocumentMarker::Spelling, from, length);
     return S_OK;
 }
 
@@ -1017,16 +1021,16 @@ HRESULT STDMETHODCALLTYPE WebFrame::clearOpener()
 HRESULT WebFrame::setTextDirection(BSTR direction)
 {
     Frame* coreFrame = core(this);
-    if (!coreFrame || !coreFrame->editor())
+    if (!coreFrame)
         return E_FAIL;
 
     String directionString(direction, SysStringLen(direction));
     if (directionString == "auto")
-        coreFrame->editor()->setBaseWritingDirection(NaturalWritingDirection);
+        coreFrame->editor().setBaseWritingDirection(NaturalWritingDirection);
     else if (directionString == "ltr")
-        coreFrame->editor()->setBaseWritingDirection(LeftToRightWritingDirection);
+        coreFrame->editor().setBaseWritingDirection(LeftToRightWritingDirection);
     else if (directionString == "rtl")
-        coreFrame->editor()->setBaseWritingDirection(RightToLeftWritingDirection);
+        coreFrame->editor().setBaseWritingDirection(RightToLeftWritingDirection);
     return S_OK;
 }
 
@@ -1048,7 +1052,7 @@ HRESULT STDMETHODCALLTYPE WebFrame::selectedString(
     if (!coreFrame)
         return E_FAIL;
 
-    String text = coreFrame->displayStringModifiedByEncoding(coreFrame->editor()->selectedText());
+    String text = coreFrame->displayStringModifiedByEncoding(coreFrame->editor().selectedText());
 
     *result = BString(text).release();
     return S_OK;
@@ -1060,7 +1064,7 @@ HRESULT STDMETHODCALLTYPE WebFrame::selectAll()
     if (!coreFrame)
         return E_FAIL;
 
-    if (!coreFrame->editor()->command("SelectAll").execute())
+    if (!coreFrame->editor().command("SelectAll").execute())
         return E_FAIL;
 
     return S_OK;
@@ -1263,7 +1267,7 @@ HRESULT WebFrame::visibleContentRect(RECT* rect)
     if (!view)
         return E_FAIL;
 
-    *rect = view->visibleContentRect(false);
+    *rect = view->visibleContentRect();
     return S_OK;
 }
 
@@ -1790,7 +1794,7 @@ void WebFrame::dispatchUnableToImplementPolicy(const ResourceError& error)
     policyDelegate->unableToImplementPolicyWithError(d->webView, webError.get(), this);
 }
 
-void WebFrame::download(ResourceHandle* handle, const ResourceRequest& request, const ResourceResponse& response)
+void WebFrame::convertMainResourceLoadToDownload(DocumentLoader* documentLoader, const ResourceRequest& request, const ResourceResponse& response)
 {
     COMPtr<IWebDownloadDelegate> downloadDelegate;
     COMPtr<IWebView> webView;
@@ -1806,7 +1810,7 @@ void WebFrame::download(ResourceHandle* handle, const ResourceRequest& request, 
     // Its the delegate's job to ref the WebDownload to keep it alive - otherwise it will be destroyed
     // when this method returns
     COMPtr<WebDownload> download;
-    download.adoptRef(WebDownload::createInstance(handle, request, response, downloadDelegate.get()));
+    download.adoptRef(WebDownload::createInstance(documentLoader->mainResourceLoader()->handle(), request, response, downloadDelegate.get()));
 }
 
 bool WebFrame::dispatchDidLoadResourceFromMemoryCache(DocumentLoader*, const ResourceRequest&, const ResourceResponse&, int /*length*/)
@@ -2470,7 +2474,7 @@ HRESULT STDMETHODCALLTYPE WebFrame::frameBounds(
     if (!view)
         return E_FAIL;
 
-    FloatRect bounds = view->visibleContentRect(true);
+    FloatRect bounds = view->visibleContentRect(ScrollableArea::IncludeScrollbars);
     result->bottom = (LONG) bounds.height();
     result->right = (LONG) bounds.width();
     return S_OK;
@@ -2586,7 +2590,7 @@ COMPtr<IAccessible> WebFrame::accessible() const
         // the Document renderer was destroyed and its wrapper was detached, or
         // the previous Document is in the page cache, and the current document
         // needs to be wrapped.
-        m_accessible = new AccessibleDocument(currentDocument);
+        m_accessible = new AccessibleDocument(currentDocument, webView()->viewWindow());
     }
     return m_accessible.get();
 }

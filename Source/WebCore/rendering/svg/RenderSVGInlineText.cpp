@@ -185,7 +185,7 @@ VisiblePosition RenderSVGInlineText::positionForPoint(const LayoutPoint& point)
         if (!box->isSVGInlineTextBox())
             continue;
 
-        SVGInlineTextBox* textBox = static_cast<SVGInlineTextBox*>(box);
+        SVGInlineTextBox* textBox = toSVGInlineTextBox(box);
         Vector<SVGTextFragment>& fragments = textBox->textFragments();
 
         unsigned textFragmentsSize = fragments.size();
@@ -228,8 +228,7 @@ void RenderSVGInlineText::computeNewScaledFontForStyle(RenderObject* renderer, c
     Document* document = renderer->document();
     ASSERT(document);
     
-    StyleResolver* styleResolver = document->styleResolver();
-    ASSERT(styleResolver);
+    StyleResolver* styleResolver = document->ensureStyleResolver();
 
     // Alter font-size to the right on-screen value to avoid scaling the glyphs themselves, except when GeometricPrecision is specified
     scalingFactor = SVGRenderingContext::calculateScreenFontSizeScalingFactor(renderer);

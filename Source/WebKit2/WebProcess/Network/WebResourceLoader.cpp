@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2012, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,11 +30,15 @@
 
 #include "DataReference.h"
 #include "Logging.h"
-#include "NetworkConnectionToWebProcessMessages.h"
 #include "NetworkProcessConnection.h"
 #include "NetworkResourceLoaderMessages.h"
+#include "PlatformCertificateInfo.h"
 #include "WebCoreArgumentCoders.h"
+#include "WebErrors.h"
 #include "WebProcess.h"
+#include <WebCore/DocumentLoader.h>
+#include <WebCore/ResourceBuffer.h>
+#include <WebCore/ResourceError.h>
 #include <WebCore/ResourceLoader.h>
 
 using namespace WebCore;
@@ -55,36 +59,68 @@ WebResourceLoader::~WebResourceLoader()
 {
 }
 
-CoreIPC::Connection* WebResourceLoader::connection() const
+CoreIPC::Connection* WebResourceLoader::messageSenderConnection()
 {
     return WebProcess::shared().networkConnection()->connection();
 }
 
-uint64_t WebResourceLoader::destinationID() const
+uint64_t WebResourceLoader::messageSenderDestinationID()
 {
     return m_coreLoader->identifier();
 }
 
-void WebResourceLoader::willSendRequest(uint64_t requestID, const ResourceRequest& proposedRequest, const ResourceResponse& redirectResponse)
+void WebResourceLoader::cancelResourceLoader()
+{
+    m_coreLoader->cancel();
+}
+
+void WebResourceLoader::detachFromCoreLoader()
+{
+    m_coreLoader = 0;
+}
+
+void WebResourceLoader::willSendRequest(const ResourceRequest& proposedRequest, const ResourceResponse& redirectResponse)
 {
     LOG(Network, "(WebProcess) WebResourceLoader::willSendRequest to '%s'", proposedRequest.url().string().utf8().data());
+
+    RefPtr<WebResourceLoader> protector(this);
     
     ResourceRequest newRequest = proposedRequest;
     m_coreLoader->willSendRequest(newRequest, redirectResponse);
-
-    send(Messages::NetworkResourceLoader::WillSendRequestHandled(requestID, newRequest));
+    
+    if (!m_coreLoader)
+        return;
+    
+    send(Messages::NetworkResourceLoader::ContinueWillSendRequest(newRequest));
 }
 
-void WebResourceLoader::didReceiveResponse(const WebCore::ResourceResponse& response)
+void WebResourceLoader::didSendData(uint64_t bytesSent, uint64_t totalBytesToBeSent)
 {
-    LOG(Network, "(WebProcess) WebResourceLoader::didReceiveResponse for '%s'", m_coreLoader->url().string().utf8().data());
-    m_coreLoader->didReceiveResponse(response);
+    m_coreLoader->didSendData(bytesSent, totalBytesToBeSent);
 }
 
-void WebResourceLoader::didReceiveData(const CoreIPC::DataReference& data, int64_t encodedDataLength, bool allAtOnce)
+void WebResourceLoader::didReceiveResponseWithCertificateInfo(const ResourceResponse& response, const PlatformCertificateInfo& certificateInfo, bool needsContinueDidReceiveResponseMessage)
+{
+    LOG(Network, "(WebProcess) WebResourceLoader::didReceiveResponseWithCertificateInfo for '%s'. Status %d.", m_coreLoader->url().string().utf8().data(), response.httpStatusCode());
+
+    RefPtr<WebResourceLoader> protector(this);
+
+    ResourceResponse responseCopy(response);
+    responseCopy.setCertificateChain(certificateInfo.certificateChain());
+    m_coreLoader->didReceiveResponse(responseCopy);
+
+    // If m_coreLoader becomes null as a result of the didReceiveResponse callback, we can't use the send function(). 
+    if (!m_coreLoader)
+        return;
+
+    if (needsContinueDidReceiveResponseMessage)
+        send(Messages::NetworkResourceLoader::ContinueDidReceiveResponse());
+}
+
+void WebResourceLoader::didReceiveData(const CoreIPC::DataReference& data, int64_t encodedDataLength)
 {
     LOG(Network, "(WebProcess) WebResourceLoader::didReceiveData of size %i for '%s'", (int)data.size(), m_coreLoader->url().string().utf8().data());
-    m_coreLoader->didReceiveData(reinterpret_cast<const char*>(data.data()), data.size(), encodedDataLength, allAtOnce);
+    m_coreLoader->didReceiveData(reinterpret_cast<const char*>(data.data()), data.size(), encodedDataLength, DataPayloadBytes);
 }
 
 void WebResourceLoader::didFinishResourceLoad(double finishTime)
@@ -104,68 +140,35 @@ void WebResourceLoader::didReceiveResource(const ShareableResource::Handle& hand
 {
     LOG(Network, "(WebProcess) WebResourceLoader::didReceiveResource for '%s'", m_coreLoader->url().string().utf8().data());
 
-    RefPtr<ShareableResource> resource = ShareableResource::create(handle);
+    RefPtr<SharedBuffer> buffer = handle.tryWrapInSharedBuffer();
+    if (!buffer) {
+        LOG_ERROR("Unable to create buffer from ShareableResource sent from the network process.");
+        m_coreLoader->didFail(internalError(m_coreLoader->request().url()));
+        return;
+    }
+
+    RefPtr<WebResourceLoader> protector(this);
 
     // Only send data to the didReceiveData callback if it exists.
-    if (!resource->size()) {
-        // FIXME (NetworkProcess): Give ResourceLoader the ability to take ResourceBuffer arguments.
-        // That will allow us to pass it along to CachedResources and allow them to hang on to the shared memory behind the scenes.
-        // FIXME (NetworkProcess): Pass along the correct value for encodedDataLength.
-        m_coreLoader->didReceiveData(reinterpret_cast<const char*>(resource->data()), resource->size(), -1 /* encodedDataLength */ , true);
-    }
+    if (buffer->size())
+        m_coreLoader->didReceiveBuffer(buffer.get(), buffer->size(), DataPayloadWholeResource);
+
+    if (!m_coreLoader)
+        return;
 
     m_coreLoader->didFinishLoading(finishTime);
 }
 
-void WebResourceLoader::canAuthenticateAgainstProtectionSpace(uint64_t requestID, const ProtectionSpace& protectionSpace)
+void WebResourceLoader::canAuthenticateAgainstProtectionSpace(const ProtectionSpace& protectionSpace)
 {
-    send(Messages::NetworkResourceLoader::CanAuthenticateAgainstProtectionSpaceHandled(requestID, m_coreLoader->canAuthenticateAgainstProtectionSpace(protectionSpace)));
-}
+    RefPtr<WebResourceLoader> protector(this);
 
-void WebResourceLoader::didReceiveAuthenticationChallenge(const AuthenticationChallenge& challenge)
-{
-    LOG(Network, "(WebProcess) WebResourceLoader::didReceiveAuthenticationChallenge for '%s'", m_coreLoader->url().string().utf8().data());
+    bool result = m_coreLoader->canAuthenticateAgainstProtectionSpace(protectionSpace);
 
-    m_currentAuthenticationChallenge = adoptPtr(new AuthenticationChallenge(challenge));
-    m_currentAuthenticationChallenge->setAuthenticationClient(this);
-
-    m_coreLoader->didReceiveAuthenticationChallenge(*m_currentAuthenticationChallenge);
-}
-
-void WebResourceLoader::didCancelAuthenticationChallenge(const AuthenticationChallenge& challenge)
-{
-    if (m_currentAuthenticationChallenge->identifier() != challenge.identifier())
+    if (!m_coreLoader)
         return;
 
-    LOG(Network, "(WebProcess) WebResourceLoader::didCancelAuthenticationChallenge for '%s'", m_coreLoader->url().string().utf8().data());
-
-    m_coreLoader->didCancelAuthenticationChallenge(*m_currentAuthenticationChallenge);
-    m_currentAuthenticationChallenge.clear();
-}
-
-// WebCore::AuthenticationClient
-void WebResourceLoader::receivedCredential(const AuthenticationChallenge& challenge, const Credential& credential)
-{
-    ASSERT(m_currentAuthenticationChallenge && challenge == *m_currentAuthenticationChallenge);
-    send(Messages::NetworkResourceLoader::ReceivedAuthenticationCredential(challenge, credential));
-
-    m_currentAuthenticationChallenge.clear();
-}
-
-void WebResourceLoader::receivedRequestToContinueWithoutCredential(const AuthenticationChallenge& challenge)
-{
-    ASSERT(m_currentAuthenticationChallenge && challenge == *m_currentAuthenticationChallenge);
-    send(Messages::NetworkResourceLoader::ReceivedRequestToContinueWithoutAuthenticationCredential(challenge));
-
-    m_currentAuthenticationChallenge.clear();
-}
-
-void WebResourceLoader::receivedCancellation(const AuthenticationChallenge& challenge)
-{
-    ASSERT(m_currentAuthenticationChallenge && challenge == *m_currentAuthenticationChallenge);
-    send(Messages::NetworkResourceLoader::ReceivedAuthenticationCancellation(challenge));
-
-    m_currentAuthenticationChallenge.clear();
+    send(Messages::NetworkResourceLoader::ContinueCanAuthenticateAgainstProtectionSpace(result));
 }
 
 } // namespace WebKit

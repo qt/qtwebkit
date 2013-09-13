@@ -42,7 +42,6 @@
 #include "Settings.h"
 #include "WorkQueue.h"
 #include "WorkQueueItem.h"
-#include "WorkerThread.h"
 
 #include <JavaScriptCore/APICast.h>
 #include <SharedPointer.h>
@@ -50,7 +49,6 @@
 #include <WebSettings.h>
 
 #include <wtf/OwnArrayPtr.h>
-#include <wtf/UnusedParam.h>
 #include <wtf/text/CString.h>
 
 using WebCore::toElement;
@@ -191,9 +189,7 @@ void TestRunner::setCacheModel(int)
 
 void TestRunner::setCustomPolicyDelegate(bool setDelegate, bool permissive)
 {
-    UNUSED_PARAM(setDelegate);
-    UNUSED_PARAM(permissive);
-    notImplemented();
+    BlackBerry::WebKit::DumpRenderTree::currentInstance()->setCustomPolicyDelegate(setDelegate, permissive);
 }
 
 void TestRunner::clearApplicationCacheForOrigin(OpaqueJSString*)
@@ -263,17 +259,6 @@ void TestRunner::setXSSAuditorEnabled(bool flag)
     BlackBerry::WebKit::DumpRenderTree::currentInstance()->page()->settings()->setXSSAuditorEnabled(flag);
 }
 
-void TestRunner::setSelectTrailingWhitespaceEnabled(bool flag)
-{
-    BlackBerry::WebKit::DumpRenderTree::currentInstance()->setSelectTrailingWhitespaceEnabled(flag);
-}
-
-void TestRunner::setSmartInsertDeleteEnabled(bool flag)
-{
-    UNUSED_PARAM(flag);
-    notImplemented();
-}
-
 void TestRunner::setTabKeyCyclesThroughElements(bool cycles)
 {
     if (!mainFrame)
@@ -297,11 +282,12 @@ void TestRunner::setUserStyleSheetEnabled(bool flag)
 void TestRunner::setUserStyleSheetLocation(JSStringRef path)
 {
     String pathStr = jsStringRefToWebCoreString(path);
-    BlackBerry::WebKit::DumpRenderTree::currentInstance()->page()->settings()->setUserStyleSheetLocation(pathStr.utf8().data());
+    BlackBerry::WebKit::DumpRenderTree::currentInstance()->page()->settings()->setUserStyleSheetLocation(pathStr);
 }
 
 void TestRunner::waitForPolicyDelegate()
 {
+    setCustomPolicyDelegate(true, true);
     setWaitToDump(true);
     waitForPolicy = true;
 }
@@ -317,13 +303,6 @@ int TestRunner::windowCount()
 {
     notImplemented();
     return 0;
-}
-
-bool TestRunner::elementDoesAutoCompleteForElementWithId(JSStringRef id)
-{
-    UNUSED_PARAM(id);
-    notImplemented();
-    return false;
 }
 
 void TestRunner::setWaitToDump(bool waitToDump)
@@ -342,83 +321,9 @@ void TestRunner::setWindowIsKey(bool windowIsKey)
     notImplemented();
 }
 
-bool TestRunner::pauseAnimationAtTimeOnElementWithId(JSStringRef animationName, double time, JSStringRef elementId)
-{
-    if (!mainFrame)
-        return false;
-
-    int nameLen = JSStringGetMaximumUTF8CStringSize(animationName);
-    int idLen = JSStringGetMaximumUTF8CStringSize(elementId);
-    OwnArrayPtr<char> name = adoptArrayPtr(new char[nameLen]);
-    OwnArrayPtr<char> eId = adoptArrayPtr(new char[idLen]);
-
-    JSStringGetUTF8CString(animationName, name.get(), nameLen);
-    JSStringGetUTF8CString(elementId, eId.get(), idLen);
-
-    WebCore::AnimationController* animationController = mainFrame->animation();
-    if (!animationController)
-        return false;
-
-    WebCore::Node* node = mainFrame->document()->getElementById(eId.get());
-    if (!node || !node->renderer())
-        return false;
-
-    return animationController->pauseAnimationAtTime(node->renderer(), name.get(), time);
-}
-
-bool TestRunner::pauseTransitionAtTimeOnElementWithId(JSStringRef propertyName, double time, JSStringRef elementId)
-{
-    if (!mainFrame)
-        return false;
-
-    int nameLen = JSStringGetMaximumUTF8CStringSize(propertyName);
-    int idLen = JSStringGetMaximumUTF8CStringSize(elementId);
-    OwnArrayPtr<char> name = adoptArrayPtr(new char[nameLen]);
-    OwnArrayPtr<char> eId = adoptArrayPtr(new char[idLen]);
-
-    JSStringGetUTF8CString(propertyName, name.get(), nameLen);
-    JSStringGetUTF8CString(elementId, eId.get(), idLen);
-
-    WebCore::AnimationController* animationController = mainFrame->animation();
-    if (!animationController)
-        return false;
-
-    WebCore::Node* node = mainFrame->document()->getElementById(eId.get());
-    if (!node || !node->renderer())
-        return false;
-
-    return animationController->pauseTransitionAtTime(node->renderer(), name.get(), time);
-}
-
-unsigned TestRunner::numberOfActiveAnimations() const
-{
-    if (!mainFrame)
-        return false;
-
-    WebCore::AnimationController* animationController = mainFrame->animation();
-    if (!animationController)
-        return false;
-
-    return animationController->numberOfActiveAnimations(mainFrame->document());
-}
-
-unsigned TestRunner::workerThreadCount() const
-{
-#if ENABLE_WORKERS
-    return WebCore::WorkerThread::workerThreadCount();
-#else
-    return 0;
-#endif
-}
-
 void TestRunner::removeAllVisitedLinks()
 {
     notImplemented();
-}
-
-void TestRunner::disableImageLoading()
-{
-    BlackBerry::WebKit::DumpRenderTree::currentInstance()->page()->settings()->setLoadsImagesAutomatically(false);
 }
 
 void TestRunner::overridePreference(JSStringRef key, JSStringRef value)
@@ -439,6 +344,10 @@ void TestRunner::overridePreference(JSStringRef key, JSStringRef value)
         mainFrame->page()->settings()->setHyperlinkAuditingEnabled(valueStr == "true" || valueStr == "1");
     else if (keyStr == "WebSocketsEnabled")
         BlackBerry::WebKit::DumpRenderTree::currentInstance()->page()->settings()->setWebSocketsEnabled(valueStr == "true" || valueStr == "1");
+    else if (keyStr == "WebKitDefaultTextEncodingName")
+        BlackBerry::WebKit::DumpRenderTree::currentInstance()->page()->settings()->setDefaultTextEncodingName(valueStr);
+    else if (keyStr == "WebKitDisplayImagesKey")
+        BlackBerry::WebKit::DumpRenderTree::currentInstance()->page()->settings()->setLoadsImagesAutomatically(valueStr == "true" || valueStr == "1");
 }
 
 void TestRunner::setAlwaysAcceptCookies(bool alwaysAcceptCookies)
@@ -447,15 +356,15 @@ void TestRunner::setAlwaysAcceptCookies(bool alwaysAcceptCookies)
     notImplemented();
 }
 
-void TestRunner::setMockGeolocationPosition(double latitude, double longitude, double accuracy)
+void TestRunner::setMockGeolocationPosition(double latitude, double longitude, double accuracy, bool providesAltitude, double altitude, bool providesAltitudeAccuracy, double altitudeAccuracy, bool providesHeading, double heading, bool providesSpeed, double speed)
 {
-    DumpRenderTreeSupport::setMockGeolocationPosition(BlackBerry::WebKit::DumpRenderTree::currentInstance()->page(), latitude, longitude, accuracy);
+    DumpRenderTreeSupport::setMockGeolocationPosition(BlackBerry::WebKit::DumpRenderTree::currentInstance()->page(), latitude, longitude, accuracy, providesAltitude, altitude, providesAltitudeAccuracy, altitudeAccuracy, providesHeading, heading, providesSpeed, speed);
 }
 
-void TestRunner::setMockGeolocationError(int code, JSStringRef message)
+void TestRunner::setMockGeolocationPositionUnavailableError(JSStringRef message)
 {
     String messageStr = jsStringRefToWebCoreString(message);
-    DumpRenderTreeSupport::setMockGeolocationError(BlackBerry::WebKit::DumpRenderTree::currentInstance()->page(), code, messageStr);
+    DumpRenderTreeSupport::setMockGeolocationPositionUnavailableError(BlackBerry::WebKit::DumpRenderTree::currentInstance()->page(), messageStr);
 }
 
 void TestRunner::showWebInspector()
@@ -514,7 +423,7 @@ void TestRunner::setWebViewEditable(bool)
     notImplemented();
 }
 
-void TestRunner::authenticateSession(JSStringRef url, JSStringRef username, JSStringRef password)
+void TestRunner::authenticateSession(JSStringRef, JSStringRef, JSStringRef)
 {
     notImplemented();
 }
@@ -525,12 +434,7 @@ bool TestRunner::callShouldCloseOnWebView()
     return false;
 }
 
-void TestRunner::setFrameFlatteningEnabled(bool enable)
-{
-    BlackBerry::WebKit::DumpRenderTree::currentInstance()->page()->settings()->setFrameFlatteningEnabled(enable);
-}
-
-void TestRunner::setSpatialNavigationEnabled(bool enable)
+void TestRunner::setSpatialNavigationEnabled(bool)
 {
     notImplemented();
 }
@@ -567,7 +471,7 @@ void TestRunner::setAllowUniversalAccessFromFileURLs(bool enabled)
     mainFrame->page()->settings()->setAllowUniversalAccessFromFileURLs(enabled);
 }
 
-void TestRunner::apiTestNewWindowDataLoadBaseURL(JSStringRef utf8Data, JSStringRef baseURL)
+void TestRunner::apiTestNewWindowDataLoadBaseURL(JSStringRef, JSStringRef)
 {
     notImplemented();
 }
@@ -582,28 +486,7 @@ void TestRunner::setJavaScriptCanAccessClipboard(bool flag)
     BlackBerry::WebKit::DumpRenderTree::currentInstance()->page()->setJavaScriptCanAccessClipboard(flag);
 }
 
-JSValueRef TestRunner::computedStyleIncludingVisitedInfo(JSContextRef context, JSValueRef value)
-{
-    return DumpRenderTreeSupport::computedStyleIncludingVisitedInfo(context, value);
-}
-
-JSRetainPtr<JSStringRef> TestRunner::layerTreeAsText() const
-{
-    notImplemented();
-    return 0;
-}
-
-JSRetainPtr<JSStringRef> TestRunner::markerTextForListItem(JSContextRef context, JSValueRef nodeObject) const
-{
-    WebCore::Element* element = toElement(toJS(toJS(context), nodeObject));
-    if (!element)
-        return 0;
-
-    JSRetainPtr<JSStringRef> markerText(Adopt, JSStringCreateWithUTF8CString(WebCore::markerTextForListItem(element).utf8().data()));
-    return markerText;
-}
-
-void TestRunner::setPluginsEnabled(bool flag)
+void TestRunner::setPluginsEnabled(bool)
 {
     notImplemented();
 }
@@ -618,7 +501,7 @@ void TestRunner::clearAllApplicationCaches()
     notImplemented();
 }
 
-void TestRunner::setApplicationCacheOriginQuota(unsigned long long quota)
+void TestRunner::setApplicationCacheOriginQuota(unsigned long long)
 {
     notImplemented();
 }
@@ -628,7 +511,7 @@ void TestRunner::setMockDeviceOrientation(bool canProvideAlpha, double alpha, bo
     DumpRenderTreeSupport::setMockDeviceOrientation(BlackBerry::WebKit::DumpRenderTree::currentInstance()->page(), canProvideAlpha, alpha, canProvideBeta, beta, canProvideGamma, gamma);
 }
 
-void TestRunner::addMockSpeechInputResult(JSStringRef result, double confidence, JSStringRef language)
+void TestRunner::addMockSpeechInputResult(JSStringRef, double, JSStringRef)
 {
     notImplemented();
 }
@@ -639,7 +522,7 @@ void TestRunner::setGeolocationPermission(bool allow)
     DumpRenderTreeSupport::setMockGeolocationPermission(BlackBerry::WebKit::DumpRenderTree::currentInstance()->page(), allow);
 }
 
-void TestRunner::setViewModeMediaFeature(const JSStringRef mode)
+void TestRunner::setViewModeMediaFeature(const JSStringRef)
 {
     notImplemented();
 }
@@ -647,11 +530,6 @@ void TestRunner::setViewModeMediaFeature(const JSStringRef mode)
 void TestRunner::setSerializeHTTPLoads(bool)
 {
     // FIXME: Implement if needed for https://bugs.webkit.org/show_bug.cgi?id=50758.
-    notImplemented();
-}
-
-void TestRunner::setMinimumTimerInterval(double)
-{
     notImplemented();
 }
 
@@ -691,24 +569,6 @@ void TestRunner::syncLocalStorage()
 void TestRunner::deleteAllLocalStorage()
 {
     notImplemented();
-}
-
-void TestRunner::setAsynchronousSpellCheckingEnabled(bool)
-{
-    notImplemented();
-}
-
-void TestRunner::setAutofilled(JSContextRef context, JSValueRef nodeObject, bool autofilled)
-{
-    JSC::ExecState* exec = toJS(context);
-    WebCore::Element* element = toElement(toJS(exec, nodeObject));
-    if (!element)
-        return;
-    WebCore::HTMLInputElement* inputElement = element->toInputElement();
-    if (!inputElement)
-        return;
-
-    inputElement->setAutofilled(autofilled);
 }
 
 int TestRunner::numberOfPendingGeolocationPermissionRequests()
@@ -757,12 +617,12 @@ bool TestRunner::findString(JSContextRef context, JSStringRef target, JSObjectRe
 
     // Our layout tests assume find will wrap and highlight all matches.
     BlackBerry::WebKit::DumpRenderTree::currentInstance()->page()->findNextString(nameStr.utf8().data(),
-        !(options & WebCore::Backwards), !(options & WebCore::CaseInsensitive), true /* wrap */, true /* highlightAllMatches */);
+        !(options & WebCore::Backwards), !(options & WebCore::CaseInsensitive), true /* wrap */, true /* highlightAllMatches */, false /* selectActiveMatchOnClear */);
 
     return mainFrame->page()->findString(nameStr, options);
 }
 
-void TestRunner::deleteLocalStorageForOrigin(JSStringRef URL)
+void TestRunner::deleteLocalStorageForOrigin(JSStringRef)
 {
     // FIXME: Implement.
 }
@@ -780,7 +640,7 @@ void TestRunner::setValueForUser(JSContextRef context, JSValueRef nodeObject, JS
     inputElement->setValueForUser(jsStringRefToWebCoreString(value));
 }
 
-long long TestRunner::applicationCacheDiskUsageForOrigin(JSStringRef origin)
+long long TestRunner::applicationCacheDiskUsageForOrigin(JSStringRef)
 {
     // FIXME: Implement to support getting disk usage by all application caches for an origin.
     return 0;
@@ -806,11 +666,11 @@ void TestRunner::setMockSpeechInputDumpRect(bool)
 {
 }
 
-void TestRunner::grantWebNotificationPermission(JSStringRef origin)
+void TestRunner::grantWebNotificationPermission(JSStringRef)
 {
 }
 
-void TestRunner::denyWebNotificationPermission(JSStringRef jsOrigin)
+void TestRunner::denyWebNotificationPermission(JSStringRef)
 {
 }
 
@@ -818,11 +678,11 @@ void TestRunner::removeAllWebNotificationPermissions()
 {
 }
 
-void TestRunner::simulateWebNotificationClick(JSValueRef jsNotification)
+void TestRunner::simulateWebNotificationClick(JSValueRef)
 {
 }
 
-void TestRunner::simulateLegacyWebNotificationClick(JSStringRef title)
+void TestRunner::simulateLegacyWebNotificationClick(JSStringRef)
 {
 }
 
@@ -841,18 +701,13 @@ void TestRunner::setAutomaticLinkDetectionEnabled(bool)
     notImplemented();
 }
 
-void TestRunner::sendWebIntentResponse(JSStringRef)
-{
-    notImplemented();
-}
-
-void TestRunner::deliverWebIntent(JSStringRef, JSStringRef, JSStringRef)
-{
-    notImplemented();
-}
-
 void TestRunner::setStorageDatabaseIdleInterval(double)
 {
     // FIXME: Implement this.
+    notImplemented();
+}
+
+void TestRunner::closeIdleLocalStorageDatabases()
+{
     notImplemented();
 }

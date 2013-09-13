@@ -26,19 +26,21 @@
 #include "config.h"
 #include "WebProcessMainEfl.h"
 
-#define LIBSOUP_USE_UNSTABLE_REQUEST_API
-
 #include "ProxyResolverSoup.h"
 #include "WKBase.h"
+#include "WebKit2Initialize.h"
 #include <Ecore.h>
+#include <Ecore_Evas.h>
+#include <Edje.h>
 #include <Efreet.h>
+#include <WebCore/AuthenticationChallenge.h>
+#include <WebCore/NetworkingContext.h>
 #include <WebCore/ResourceHandle.h>
 #include <WebCore/RunLoop.h>
 #include <WebKit2/WebProcess.h>
-#include <libsoup/soup-cache.h>
-#include <runtime/InitializeThreading.h>
+#include <libsoup/soup.h>
+#include <runtime/Operations.h>
 #include <unistd.h>
-#include <wtf/MainThread.h>
 #include <wtf/text/CString.h>
 
 #ifdef HAVE_ECORE_X
@@ -50,10 +52,6 @@ static int dummyExtensionErrorHandler(Display*, _Xconst char*, _Xconst char*)
 {
     return 0;
 }
-#endif
-
-#if USE(COORDINATED_GRAPHICS)
-#include "CoordinatedGraphicsLayer.h"
 #endif
 
 using namespace WebCore;
@@ -88,17 +86,33 @@ WK_EXPORT int WebProcessMainEfl(int argc, char* argv[])
     }
 #endif
 
-#if ENABLE(GLIB_SUPPORT)
+    if (!ecore_evas_init()) {
+#ifdef HAVE_ECORE_X
+        ecore_x_shutdown();
+#endif
+        ecore_shutdown();
+        eina_shutdown();
+        return 1;
+    }
+
+    if (!edje_init()) {
+        ecore_evas_shutdown();
+#ifdef HAVE_ECORE_X
+        ecore_x_shutdown();
+#endif
+        ecore_shutdown();
+        eina_shutdown();
+        return 1;
+    }
+
+#if !GLIB_CHECK_VERSION(2, 35, 0)
     g_type_init();
+#endif
 
     if (!ecore_main_loop_glib_integrate())
         return 1;
-#endif
 
-    JSC::initializeThreading();
-    WTF::initializeMainThread();
-
-    RunLoop::initializeMainRunLoop();
+    InitializeWebKit2();
 
     SoupSession* session = WebCore::ResourceHandle::defaultSession();
     const char* httpProxy = getenv("http_proxy");
@@ -109,27 +123,25 @@ WK_EXPORT int WebProcessMainEfl(int argc, char* argv[])
         g_object_unref(resolverEfl);
     }
 
-    // Set SOUP cache.
-    String soupCacheDirectory = String::fromUTF8(efreet_cache_home_get()) + "/WebKitEfl";
-    SoupCache* soupCache = soup_cache_new(soupCacheDirectory.utf8().data(), SOUP_CACHE_SINGLE_USER);
-    soup_session_add_feature(session, SOUP_SESSION_FEATURE(soupCache));
-    soup_cache_load(soupCache);
-
-#if USE(COORDINATED_GRAPHICS)
-    CoordinatedGraphicsLayer::initFactory();
-#endif
-
-    WebCore::ResourceHandle::setIgnoreSSLErrors(true);
-
     int socket = atoi(argv[1]);
-    WebProcess::shared().initialize(socket, RunLoop::main());
+
+    ChildProcessInitializationParameters parameters;
+    parameters.connectionIdentifier = socket;
+
+    WebProcess::shared().initialize(parameters);
+
     RunLoop::run();
 
-    soup_cache_flush(soupCache);
-    soup_cache_dump(soupCache);
-    g_object_unref(soupCache);
+    if (SoupSessionFeature* soupCache = soup_session_get_feature(session, SOUP_TYPE_CACHE)) {
+        soup_cache_flush(SOUP_CACHE(soupCache));
+        soup_cache_dump(SOUP_CACHE(soupCache));
+    }
 
+    edje_shutdown();
+    ecore_evas_shutdown();
+#ifdef HAVE_ECORE_X
     ecore_x_shutdown();
+#endif
     ecore_shutdown();
     eina_shutdown();
 

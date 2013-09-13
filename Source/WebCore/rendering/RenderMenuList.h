@@ -27,7 +27,7 @@
 #include "LayoutRect.h"
 #include "PopupMenu.h"
 #include "PopupMenuClient.h"
-#include "RenderDeprecatedFlexibleBox.h"
+#include "RenderFlexibleBox.h"
 
 #if PLATFORM(MAC)
 #define POPUP_MENU_PULLS_DOWN 0
@@ -40,7 +40,7 @@ namespace WebCore {
 class HTMLSelectElement;
 class RenderText;
 
-class RenderMenuList : public RenderDeprecatedFlexibleBox, private PopupMenuClient {
+class RenderMenuList : public RenderFlexibleBox, private PopupMenuClient {
 
 public:
     RenderMenuList(Element*);
@@ -51,7 +51,7 @@ public:
     void showPopup();
     void hidePopup();
 
-    void setOptionsChanged(bool changed) { m_optionsChanged = changed; }
+    void setOptionsChanged(bool changed) { m_needsOptionsWidthUpdate = changed; }
 
     void didSetSelectedIndex(int listIndex);
 
@@ -75,7 +75,8 @@ private:
 
     virtual const char* renderName() const { return "RenderMenuList"; }
 
-    virtual void computePreferredLogicalWidths();
+    virtual void computeIntrinsicLogicalWidths(LayoutUnit& minLogicalWidth, LayoutUnit& maxLogicalWidth) const OVERRIDE;
+    virtual void computePreferredLogicalWidths() OVERRIDE;
 
     virtual void styleDidChange(StyleDifference, const RenderStyle* oldStyle);
 
@@ -114,7 +115,16 @@ private:
 
     virtual bool hasLineIfEmpty() const { return true; }
 
-    Color itemBackgroundColor(unsigned listIndex) const;
+    // Flexbox defines baselines differently than regular blocks.
+    // For backwards compatibility, menulists need to do the regular block behavior.
+    virtual int baselinePosition(FontBaseline baseline, bool firstLine, LineDirectionMode direction, LinePositionMode position) const OVERRIDE
+    {
+        return RenderBlock::baselinePosition(baseline, firstLine, direction, position);
+    }
+    virtual int firstLineBoxBaseline() const OVERRIDE { return RenderBlock::firstLineBoxBaseline(); }
+    virtual int inlineBlockBaseline(LineDirectionMode direction) const OVERRIDE { return RenderBlock::inlineBlockBaseline(direction); }
+
+    void getItemBackgroundColor(unsigned listIndex, Color&, bool& itemHasCustomBackgroundColor) const;
 
     void createInnerBlock();
     void adjustInnerStyle();
@@ -127,7 +137,7 @@ private:
     RenderText* m_buttonText;
     RenderBlock* m_innerBlock;
 
-    bool m_optionsChanged;
+    bool m_needsOptionsWidthUpdate;
     int m_optionsWidth;
 
     int m_lastActiveIndex;
@@ -140,7 +150,7 @@ private:
 
 inline RenderMenuList* toRenderMenuList(RenderObject* object)
 {
-    ASSERT(!object || object->isMenuList());
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isMenuList());
     return static_cast<RenderMenuList*>(object);
 }
 

@@ -63,7 +63,6 @@ WebInspector.DebuggerModel.PauseOnExceptionsState = {
 /**
  * @constructor
  * @implements {WebInspector.RawLocation}
- * @extends {DebuggerAgent.Location}
  * @param {string} scriptId
  * @param {number} lineNumber
  * @param {number} columnNumber
@@ -377,6 +376,15 @@ WebInspector.DebuggerModel.prototype = {
     _parsedScriptSource: function(scriptId, sourceURL, startLine, startColumn, endLine, endColumn, isContentScript, sourceMapURL, hasSourceURL)
     {
         var script = new WebInspector.Script(scriptId, sourceURL, startLine, startColumn, endLine, endColumn, isContentScript, sourceMapURL, hasSourceURL);
+        if (!script.isAnonymousScript() && !script.isInlineScript()) {
+            var existingScripts = this._scriptsBySourceURL[script.sourceURL] || [];
+            for (var i = 0; i < existingScripts.length; ++i) {
+                if (existingScripts[i].isInlineScript()) {
+                    script.setIsDynamicScript(true); 
+                    break;
+                }
+            }
+        }
         this._registerScript(script);
         this.dispatchEventToListeners(WebInspector.DebuggerModel.Events.ParsedScriptSource, script);
     },
@@ -695,6 +703,14 @@ WebInspector.DebuggerModel.CallFrame.prototype = {
     get type()
     {
         return this._payload.type;
+    },
+
+    /**
+     * @return {string}
+     */
+    get id()
+    {
+        return this._payload.callFrameId;
     },
 
     /**

@@ -23,7 +23,6 @@
 
 #if ENABLE(SVG)
 #include "Document.h"
-#include "XLinkNames.h"
 
 namespace WebCore {
 
@@ -54,7 +53,7 @@ public:
     }
 
 protected:
-    virtual void setHrefBaseValue(const String&) = 0;
+    virtual void setHrefBaseValue(const String&, const bool validValue = true) = 0;
 };
 
 } // namespace WebCore

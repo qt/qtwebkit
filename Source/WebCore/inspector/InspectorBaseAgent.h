@@ -33,18 +33,20 @@
 
 #include "InspectorBackendDispatcher.h"
 #include <wtf/Forward.h>
+#include <wtf/PassOwnPtr.h>
 #include <wtf/Vector.h>
 #include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
 class InspectorFrontend;
+class InspectorCompositeState;
 class InspectorState;
 class InstrumentingAgents;
 
 class InspectorBaseAgentInterface {
 public:
-    InspectorBaseAgentInterface(const String&, InstrumentingAgents*, InspectorState*);
+    InspectorBaseAgentInterface(const String&, InstrumentingAgents*, InspectorCompositeState*);
     virtual ~InspectorBaseAgentInterface();
 
     virtual void setFrontend(InspectorFrontend*) { }
@@ -54,8 +56,6 @@ public:
     virtual void discardAgent() { }
 
     String name() { return m_name; }
-
-    virtual void reportMemoryUsage(MemoryObjectInfo*) const;
 
 protected:
     InstrumentingAgents* m_instrumentingAgents;
@@ -90,7 +90,7 @@ public:
     }
 
 protected:
-    InspectorBaseAgent(const String& name, InstrumentingAgents* instrumentingAgents, InspectorState* inspectorState)
+    InspectorBaseAgent(const String& name, InstrumentingAgents* instrumentingAgents, InspectorCompositeState* inspectorState)
         : InspectorBaseAgentInterface(name, instrumentingAgents, inspectorState)
     {
     }

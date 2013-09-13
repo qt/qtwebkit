@@ -30,6 +30,7 @@
 #include "DataURL.h"
 #include "HTTPParsers.h"
 #include "MIMETypeRegistry.h"
+#include "NetworkingContext.h"
 #include "NotImplemented.h"
 #include "ResourceError.h"
 #include "ResourceHandleClient.h"
@@ -38,7 +39,6 @@
 #include "Timer.h"
 
 #include <wtf/MainThread.h>
-#include <wtf/UnusedParam.h>
 #include <wtf/text/CString.h>
 
 #include <windows.h>
@@ -49,7 +49,7 @@ namespace WebCore {
 static inline HINTERNET createInternetHandle(const String& userAgent, bool asynchronous)
 {
     String userAgentString = userAgent;
-    HINTERNET internetHandle = InternetOpenW(userAgentString.charactersWithNullTermination(), INTERNET_OPEN_TYPE_PRECONFIG, 0, 0, asynchronous ? INTERNET_FLAG_ASYNC : 0);
+    HINTERNET internetHandle = InternetOpenW(userAgentString.charactersWithNullTermination().data(), INTERNET_OPEN_TYPE_PRECONFIG, 0, 0, asynchronous ? INTERNET_FLAG_ASYNC : 0);
 
     if (asynchronous)
         InternetSetStatusCallback(internetHandle, &ResourceHandle::internetStatusCallback);
@@ -264,7 +264,7 @@ bool ResourceHandle::onRequestComplete()
     return false;
 }
 
-bool ResourceHandle::start(NetworkingContext* context)
+bool ResourceHandle::start()
 {
     if (firstRequest().url().isLocalFile() || firstRequest().url().protocolIsData()) {
         ref(); // balanced by deref in fileLoadTimer
@@ -276,7 +276,7 @@ bool ResourceHandle::start(NetworkingContext* context)
     }
 
     if (!d->m_internetHandle)
-        d->m_internetHandle = asynchronousInternetHandle(context->userAgent());
+        d->m_internetHandle = asynchronousInternetHandle(d->m_context->userAgent());
 
     if (!d->m_internetHandle)
         return false;
@@ -287,7 +287,7 @@ bool ResourceHandle::start(NetworkingContext* context)
         | INTERNET_FLAG_DONT_CACHE
         | INTERNET_FLAG_RELOAD;
 
-    d->m_connectHandle = InternetConnectW(d->m_internetHandle, firstRequest().url().host().charactersWithNullTermination(), firstRequest().url().port(),
+    d->m_connectHandle = InternetConnectW(d->m_internetHandle, firstRequest().url().host().charactersWithNullTermination().data(), firstRequest().url().port(),
                                           0, 0, INTERNET_SERVICE_HTTP, flags, reinterpret_cast<DWORD_PTR>(this));
 
     if (!d->m_connectHandle)
@@ -306,8 +306,8 @@ bool ResourceHandle::start(NetworkingContext* context)
 
     LPCWSTR httpAccept[] = { L"*/*", 0 };
 
-    d->m_requestHandle = HttpOpenRequestW(d->m_connectHandle, httpMethod.charactersWithNullTermination(), urlStr.charactersWithNullTermination(),
-                                          0, httpReferrer.charactersWithNullTermination(), httpAccept, flags, reinterpret_cast<DWORD_PTR>(this));
+    d->m_requestHandle = HttpOpenRequestW(d->m_connectHandle, httpMethod.charactersWithNullTermination().data(), urlStr.charactersWithNullTermination().data(),
+                                          0, httpReferrer.charactersWithNullTermination().data(), httpAccept, flags, reinterpret_cast<DWORD_PTR>(this));
 
     if (!d->m_requestHandle) {
         InternetCloseHandle(d->m_connectHandle);
@@ -364,7 +364,7 @@ void ResourceHandle::fileLoadTimer(Timer<ResourceHandle>*)
     }
 
     String fileName = firstRequest().url().fileSystemPath();
-    HANDLE fileHandle = CreateFileW(fileName.charactersWithNullTermination(), GENERIC_READ, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
+    HANDLE fileHandle = CreateFileW(fileName.charactersWithNullTermination().data(), GENERIC_READ, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
 
     if (fileHandle == INVALID_HANDLE_VALUE) {
         client()->didFail(this, ResourceError());
@@ -413,27 +413,21 @@ void ResourceHandle::cancel()
         d->m_fileLoadTimer.stop();
 }
 
-void ResourceHandle::loadResourceSynchronously(NetworkingContext* context, const ResourceRequest& request, StoredCredentials storedCredentials, ResourceError& error, ResourceResponse& response, Vector<char>& data)
+void ResourceHandle::platformLoadResourceSynchronously(NetworkingContext* context, const ResourceRequest& request, StoredCredentials storedCredentials, ResourceError& error, ResourceResponse& response, Vector<char>& data)
 {
     UNUSED_PARAM(storedCredentials);
 
     WebCoreSynchronousLoader syncLoader(error, response, data, request.httpUserAgent());
-    ResourceHandle handle(request, &syncLoader, true, false);
+    ResourceHandle handle(context, request, &syncLoader, true, false);
 
     handle.setSynchronousInternetHandle(syncLoader.internetHandle());
-    handle.start(context);
+    handle.start();
 }
 
 void ResourceHandle::setSynchronousInternetHandle(HINTERNET internetHandle)
 {
     d->m_internetHandle = internetHandle;
     d->m_loadSynchronously = true;
-}
-
-bool ResourceHandle::willLoadFromCache(ResourceRequest&, Frame*)
-{
-    notImplemented();
-    return false;
 }
 
 void prefetchDNS(const String&)

@@ -25,7 +25,7 @@
 
 #import "config.h"
 #import "WKBrowsingContextGroup.h"
-#import "WKBrowsingContextGroupInternal.h"
+#import "WKBrowsingContextGroupPrivate.h"
 
 #import "WKArray.h"
 #import "WKPageGroup.h"
@@ -56,6 +56,12 @@
     _data = [[WKBrowsingContextGroupData alloc] init];
     _data->_pageGroupRef = adoptWK(WKPageGroupCreateWithIdentifier(adoptWK(WKStringCreateWithCFString((CFStringRef)identifier)).get()));
 
+    // Give the WKBrowsingContextGroup a identifier-less preferences, so that they
+    // don't get automatically written to the disk. The automatic writing has proven
+    // confusing to users of the API.
+    WKRetainPtr<WKPreferencesRef> preferences = adoptWK(WKPreferencesCreate());
+    WKPageGroupSetPreferences(_data->_pageGroupRef.get(), preferences.get());
+
     return self;
 }
 
@@ -73,6 +79,16 @@
 - (void)setAllowsJavaScript:(BOOL)allowsJavaScript
 {
     WKPreferencesSetJavaScriptEnabled(WKPageGroupGetPreferences(self._pageGroupRef), allowsJavaScript);
+}
+
+- (BOOL)allowsJavaScriptMarkup
+{
+    return WKPreferencesGetJavaScriptMarkupEnabled(WKPageGroupGetPreferences(self._pageGroupRef));
+}
+
+- (void)setAllowsJavaScriptMarkup:(BOOL)allowsJavaScriptMarkup
+{
+    WKPreferencesSetJavaScriptMarkupEnabled(WKPageGroupGetPreferences(self._pageGroupRef), allowsJavaScriptMarkup);
 }
 
 - (BOOL)allowsPlugIns
@@ -143,7 +159,7 @@ static WKArrayRef createWKArray(NSArray *array)
 
 @end
 
-@implementation WKBrowsingContextGroup (Internal)
+@implementation WKBrowsingContextGroup (Private)
 
 - (WKPageGroupRef)_pageGroupRef
 {

@@ -21,9 +21,10 @@
 #include "webkitsoupauthdialog.h"
 
 #include "AuthenticationClient.h"
-#include "GtkAuthenticationDialog.h"
 #include "ResourceHandle.h"
+#include "webkitauthenticationdialog.h"
 #include "webkitmarshal.h"
+#include <wtf/text/CString.h>
 
 using namespace WebCore;
 
@@ -109,15 +110,14 @@ static void webkit_soup_auth_dialog_class_init(WebKitSoupAuthDialogClass* klass)
      *
      * Since: 1.1.1
      */
-    signals[CURRENT_TOPLEVEL] =
-      g_signal_new("current-toplevel",
-                   G_OBJECT_CLASS_TYPE(objectClass),
-                   G_SIGNAL_RUN_LAST,
-                   G_STRUCT_OFFSET(WebKitSoupAuthDialogClass, current_toplevel),
-                   0, 0,
-                   webkit_marshal_OBJECT__OBJECT,
-                   GTK_TYPE_WIDGET, 1,
-                   SOUP_TYPE_MESSAGE);
+    signals[CURRENT_TOPLEVEL] = g_signal_new("current-toplevel",
+        G_OBJECT_CLASS_TYPE(objectClass),
+        G_SIGNAL_RUN_LAST,
+        G_STRUCT_OFFSET(WebKitSoupAuthDialogClass, current_toplevel),
+        0, 0,
+        webkit_marshal_OBJECT__OBJECT,
+        GTK_TYPE_WIDGET, 1,
+        SOUP_TYPE_MESSAGE);
 }
 
 static void webkit_soup_auth_dialog_init(WebKitSoupAuthDialog*)
@@ -143,8 +143,8 @@ static void sessionAuthenticate(SoupSession* session, SoupMessage* message, Soup
     // impossible with gcc, due to WebKitSoupAuthDialogAuthenticationClient's two superclasses.
     client->derefWebKitSoupAuthDialogAuthenticationClient();
 
-    GtkAuthenticationDialog* authDialog = new GtkAuthenticationDialog(toplevel, challenge);
-    authDialog->show();
+    GtkWidget* authDialog = createAuthenticationDialog(toplevel, challenge, DisallowPersistentStorage);
+    gtk_widget_show(authDialog);
 }
 
 static void attach(SoupSessionFeature* manager, SoupSession* session)

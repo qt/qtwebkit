@@ -34,16 +34,15 @@
 #if ENABLE(INSPECTOR)
 
 #include "InspectorBaseAgent.h"
+#include "InspectorFrontend.h"
 #include <wtf/PassOwnPtr.h>
 #include <wtf/RefPtr.h>
 
 namespace WebCore {
 
-class InspectorClient;
 class InspectorDOMStorageAgent;
 class InspectorState;
 class InstrumentingAgents;
-class Page;
 
 typedef String ErrorString;
 
@@ -52,22 +51,18 @@ class InspectorMemoryAgent : public InspectorBaseAgent<InspectorMemoryAgent>, pu
 public:
     typedef Vector<OwnPtr<InspectorBaseAgentInterface> > InspectorAgents;
 
-    static PassOwnPtr<InspectorMemoryAgent> create(InstrumentingAgents* instrumentingAgents, InspectorClient* client, InspectorState* state, Page* page)
-    {
-        return adoptPtr(new InspectorMemoryAgent(instrumentingAgents, client, state, page));
-    }
+    static PassOwnPtr<InspectorMemoryAgent> create(InstrumentingAgents* instrumentingAgents, InspectorCompositeState* state);
     virtual ~InspectorMemoryAgent();
 
-    virtual void getDOMNodeCount(ErrorString*, RefPtr<TypeBuilder::Array<TypeBuilder::Memory::DOMGroup> >& domGroups, RefPtr<TypeBuilder::Memory::StringStatistics>& strings);
-    virtual void getProcessMemoryDistribution(ErrorString*, RefPtr<TypeBuilder::Memory::MemoryBlock>& processMemory);
+    virtual void getDOMCounters(ErrorString*, int* documents, int* nodes, int* jsEventListeners);
 
-    virtual void reportMemoryUsage(MemoryObjectInfo*) const;
+    virtual void setFrontend(InspectorFrontend*);
+    virtual void clearFrontend();
 
 private:
-    InspectorMemoryAgent(InstrumentingAgents*, InspectorClient*, InspectorState*, Page*);
+    InspectorMemoryAgent(InstrumentingAgents*, InspectorCompositeState*);
 
-    InspectorClient* m_inspectorClient;
-    Page* m_page;
+    InspectorFrontend::Memory* m_frontend;
 };
 
 } // namespace WebCore

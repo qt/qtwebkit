@@ -69,6 +69,7 @@ JSClassRef AccessibilityController::wrapperClass()
     return JSAccessibilityController::accessibilityControllerClass();
 }
 
+#if !PLATFORM(GTK) && !PLATFORM(EFL)
 PassRefPtr<AccessibilityUIElement> AccessibilityController::rootElement()
 {
     // FIXME: Make this work on Windows.
@@ -94,6 +95,7 @@ PassRefPtr<AccessibilityUIElement> AccessibilityController::focusedElement()
     return AccessibilityUIElement::create(static_cast<PlatformUIElement>(root));    
 #endif
 }
+#endif
 
 PassRefPtr<AccessibilityUIElement> AccessibilityController::elementAtPoint(int x, int y)
 {
@@ -106,10 +108,13 @@ PassRefPtr<AccessibilityUIElement> AccessibilityController::elementAtPoint(int x
 #if !PLATFORM(MAC)
 bool AccessibilityController::addNotificationListener(JSValueRef) { return false; }
 bool AccessibilityController::removeNotificationListener() { return false; }
+#endif
+
+#if !PLATFORM(MAC) && !PLATFORM(GTK) && !PLATFORM(EFL)
 PassRefPtr<AccessibilityUIElement> AccessibilityController::accessibleElementById(JSStringRef attribute) { return 0; }
 #endif
 
-#if !PLATFORM(GTK) && !PLATFORM(EFL)
+#if !PLATFORM(GTK) && !PLATFORM(EFL) && !PLATFORM(MAC)
 void AccessibilityController::logAccessibilityEvents() { }
 void AccessibilityController::resetToConsistentState() { }
 #endif

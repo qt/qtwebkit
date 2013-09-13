@@ -31,10 +31,9 @@
 #ifndef ColorInputType_h
 #define ColorInputType_h
 
+#if ENABLE(INPUT_TYPE_COLOR)
 #include "BaseClickableWithKeyInputType.h"
 #include "ColorChooserClient.h"
-
-#if ENABLE(INPUT_TYPE_COLOR)
 
 namespace WebCore {
 
@@ -53,6 +52,7 @@ public:
 
 private:
     ColorInputType(HTMLInputElement* element) : BaseClickableWithKeyInputType(element) { }
+    virtual void attach() OVERRIDE;
     virtual bool isColorControl() const OVERRIDE;
     virtual const AtomicString& formControlType() const OVERRIDE;
     virtual bool supportsRequired() const OVERRIDE;

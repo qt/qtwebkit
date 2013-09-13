@@ -29,6 +29,7 @@
 #ifndef SegmentedVector_h
 #define SegmentedVector_h
 
+#include <wtf/Noncopyable.h>
 #include <wtf/Vector.h>
 
 namespace WTF {
@@ -104,13 +105,14 @@ namespace WTF {
     template <typename T, size_t SegmentSize, size_t InlineCapacity>
     class SegmentedVector {
         friend class SegmentedVectorIterator<T, SegmentSize, InlineCapacity>;
+        WTF_MAKE_NONCOPYABLE(SegmentedVector);
+
     public:
         typedef SegmentedVectorIterator<T, SegmentSize, InlineCapacity> Iterator;
 
         SegmentedVector()
             : m_size(0)
         {
-            m_segments.append(&m_inlineSegment);
         }
 
         ~SegmentedVector()
@@ -123,12 +125,20 @@ namespace WTF {
 
         T& at(size_t index)
         {
-            if (index < SegmentSize)
-                return m_inlineSegment[index];
             return segmentFor(index)->at(subscriptFor(index));
         }
 
+        const T& at(size_t index) const
+        {
+            return const_cast<SegmentedVector<T, SegmentSize, InlineCapacity>*>(this)->at(index);
+        }
+
         T& operator[](size_t index)
+        {
+            return at(index);
+        }
+
+        const T& operator[](size_t index) const
         {
             return at(index);
         }
@@ -141,11 +151,6 @@ namespace WTF {
         template <typename U> void append(const U& value)
         {
             ++m_size;
-
-            if (m_size <= SegmentSize) {
-                m_inlineSegment.uncheckedAppend(value);
-                return;
-            }
 
             if (!segmentExistsFor(m_size - 1))
                 m_segments.append(new Segment);
@@ -160,10 +165,7 @@ namespace WTF {
 
         void removeLast()
         {
-            if (m_size <= SegmentSize)
-                m_inlineSegment.removeLast();
-            else
-                segmentFor(m_size - 1)->removeLast();
+            segmentFor(m_size - 1)->removeLast();
             --m_size;
         }
 
@@ -177,8 +179,7 @@ namespace WTF {
         void clear()
         {
             deleteAllSegments();
-            m_segments.resize(1);
-            m_inlineSegment.clear();
+            m_segments.clear();
             m_size = 0;
         }
 
@@ -202,9 +203,7 @@ namespace WTF {
 
         void deleteAllSegments()
         {
-            // Skip the first segment, because it's our inline segment, which was
-            // not created by new.
-            for (size_t i = 1; i < m_segments.size(); i++)
+            for (size_t i = 0; i < m_segments.size(); i++)
                 delete m_segments[i];
         }
 
@@ -225,18 +224,12 @@ namespace WTF {
 
         void ensureSegmentsFor(size_t size)
         {
-            size_t segmentCount = m_size / SegmentSize;
-            if (m_size % SegmentSize)
-                ++segmentCount;
-            segmentCount = std::max<size_t>(segmentCount, 1); // We always have at least our inline segment.
-
-            size_t neededSegmentCount = size / SegmentSize;
-            if (size % SegmentSize)
-                ++neededSegmentCount;
+            size_t segmentCount = (m_size + SegmentSize - 1) / SegmentSize;
+            size_t neededSegmentCount = (size + SegmentSize - 1) / SegmentSize;
 
             // Fill up to N - 1 segments.
             size_t end = neededSegmentCount - 1;
-            for (size_t i = segmentCount - 1; i < end; ++i)
+            for (size_t i = segmentCount ? segmentCount - 1 : 0; i < end; ++i)
                 ensureSegment(i, SegmentSize);
 
             // Grow segment N to accomodate the remainder.
@@ -245,15 +238,14 @@ namespace WTF {
 
         void ensureSegment(size_t segmentIndex, size_t size)
         {
-            ASSERT(segmentIndex <= m_segments.size());
+            ASSERT_WITH_SECURITY_IMPLICATION(segmentIndex <= m_segments.size());
             if (segmentIndex == m_segments.size())
                 m_segments.append(new Segment);
             m_segments[segmentIndex]->grow(size);
         }
 
         size_t m_size;
-        Segment m_inlineSegment;
-        Vector<Segment*, InlineCapacity> m_segments;
+        Vector<Segment*> m_segments;
     };
 
 } // namespace WTF

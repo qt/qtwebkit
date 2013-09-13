@@ -19,11 +19,12 @@
  */
 
 #include "config.h"
+#if ENABLE(DETAILS_ELEMENT)
 #include "RenderDetailsMarker.h"
 
-#if ENABLE(DETAILS_ELEMENT) || ENABLE(INPUT_MULTIPLE_FIELDS_UI)
 #include "Element.h"
 #include "GraphicsContext.h"
+#include "HTMLInputElement.h"
 #include "HTMLNames.h"
 #include "PaintInfo.h"
 
@@ -31,8 +32,8 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-RenderDetailsMarker::RenderDetailsMarker(Node* node)
-    : RenderBlock(node)
+RenderDetailsMarker::RenderDetailsMarker(Element* element)
+    : RenderBlock(element)
 {
 }
 
@@ -144,7 +145,7 @@ bool RenderDetailsMarker::isOpen() const
             continue;
         if (renderer->node()->hasTagName(detailsTag))
             return !toElement(renderer->node())->getAttribute(openAttr).isNull();
-        if (renderer->node()->hasTagName(inputTag))
+        if (isHTMLInputElement(renderer->node()))
             return true;
     }
 

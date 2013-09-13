@@ -46,14 +46,6 @@ _log = logging.getLogger(__name__)
 
 class ScriptError(Exception):
 
-    # This is a custom List.__str__ implementation to allow size limiting.
-    def _string_from_args(self, args, limit=100):
-        args_string = unicode(args)
-        # We could make this much fancier, but for now this is OK.
-        if len(args_string) > limit:
-            return args_string[:limit - 3] + "..."
-        return args_string
-
     def __init__(self,
                  message=None,
                  script_args=None,
@@ -61,7 +53,7 @@ class ScriptError(Exception):
                  output=None,
                  cwd=None):
         if not message:
-            message = 'Failed to run "%s"' % self._string_from_args(script_args)
+            message = 'Failed to run "%s"' % repr(script_args)
             if exit_code:
                 message += " exit_code: %d" % exit_code
             if cwd:
@@ -92,6 +84,9 @@ class Executive(object):
     PIPE = subprocess.PIPE
     STDOUT = subprocess.STDOUT
 
+    def __init__(self):
+        self.pid_to_system_pid = {}
+
     def _should_close_fds(self):
         # We need to pass close_fds=True to work around Python bug #2320
         # (otherwise we can hang when we kill DumpRenderTree when we are running
@@ -101,9 +96,6 @@ class Executive(object):
         return sys.platform not in ('win32', 'cygwin')
 
     def _run_command_with_teed_output(self, args, teed_output, **kwargs):
-        args = map(unicode, args)  # Popen will throw an exception if args are non-strings (like int())
-        args = map(self._encode_argument_if_needed, args)
-
         child_process = self.popen(args,
                                    stdout=self.PIPE,
                                    stderr=self.STDOUT,
@@ -153,6 +145,12 @@ class Executive(object):
         return child_output
 
     def cpu_count(self):
+        try:
+            cpus = int(os.environ.get('NUMBER_OF_PROCESSORS'))
+            if cpus > 0:
+                return cpus
+        except (ValueError, TypeError):
+            pass
         return multiprocessing.cpu_count()
 
     @staticmethod
@@ -272,26 +270,37 @@ class Executive(object):
             return False
 
     def running_pids(self, process_name_filter=None):
+        if sys.platform == "win32":
+            # FIXME: running_pids isn't implemented on native Windows yet...
+            return []
+
         if not process_name_filter:
             process_name_filter = lambda process_name: True
 
         running_pids = []
-
-        if sys.platform in ("win32", "cygwin"):
-            # FIXME: running_pids isn't implemented on Windows yet...
-            return []
-
-        ps_process = self.popen(['ps', '-eo', 'pid,comm'], stdout=self.PIPE, stderr=self.PIPE)
-        stdout, _ = ps_process.communicate()
-        for line in stdout.splitlines():
-            try:
-                # In some cases the line can contain one or more
-                # leading white-spaces, so strip it before split.
-                pid, process_name = line.strip().split(' ', 1)
-                if process_name_filter(process_name):
-                    running_pids.append(int(pid))
-            except ValueError, e:
-                pass
+        if sys.platform in ("cygwin"):
+            ps_process = self.run_command(['ps', '-e'], error_handler=Executive.ignore_error)
+            for line in ps_process.splitlines():
+                tokens = line.strip().split()
+                try:
+                    pid, ppid, pgid, winpid, tty, uid, stime, process_name = tokens
+                    if process_name_filter(process_name):
+                        running_pids.append(int(pid))
+                        self.pid_to_system_pid[int(pid)] = int(winpid)
+                except ValueError, e:
+                    pass
+        else:
+            ps_process = self.popen(['ps', '-eo', 'pid,comm'], stdout=self.PIPE, stderr=self.PIPE)
+            stdout, _ = ps_process.communicate()
+            for line in stdout.splitlines():
+                try:
+                    # In some cases the line can contain one or more
+                    # leading white-spaces, so strip it before split.
+                    pid, process_name = line.strip().split(' ', 1)
+                    if process_name_filter(process_name):
+                        running_pids.append(int(pid))
+                except ValueError, e:
+                    pass
 
         return sorted(running_pids)
 
@@ -307,6 +316,13 @@ class Executive(object):
         while self.check_running_pid(pid):
             time.sleep(0.25)
 
+    def wait_limited(self, pid, limit_in_seconds=None, check_frequency_in_seconds=None):
+        seconds_left = limit_in_seconds or 10
+        sleep_length = check_frequency_in_seconds or 1
+        while seconds_left > 0 and self.check_running_pid(pid):
+            seconds_left -= sleep_length
+            time.sleep(sleep_length)
+
     def _windows_image_name(self, process_name):
         name, extension = os.path.splitext(process_name)
         if not extension:
@@ -314,6 +330,17 @@ class Executive(object):
             # If necessary we could add a flag to disable appending .exe.
             process_name = "%s.exe" % name
         return process_name
+
+    def interrupt(self, pid):
+        interrupt_signal = signal.SIGINT
+        # FIXME: The python docs seem to imply that platform == 'win32' may need to use signal.CTRL_C_EVENT
+        # http://docs.python.org/2/library/signal.html
+        try:
+            os.kill(pid, interrupt_signal)
+        except OSError:
+            # Silently ignore when the pid doesn't exist.
+            # It's impossible for callers to avoid race conditions with process shutdown.
+            pass
 
     def kill_all(self, process_name):
         """Attempts to kill processes matching process_name.
@@ -365,9 +392,10 @@ class Executive(object):
             input = input.encode(self._child_process_encoding())
         return (self.PIPE, input)
 
-    def _command_for_printing(self, args):
+    def command_for_printing(self, args):
         """Returns a print-ready string representing command args.
         The string should be copy/paste ready for execution in a shell."""
+        args = self._stringify_args(args)
         escaped_args = []
         for arg in args:
             if isinstance(arg, unicode):
@@ -390,8 +418,6 @@ class Executive(object):
         """Popen wrapper for convenience and to work around python bugs."""
         assert(isinstance(args, list) or isinstance(args, tuple))
         start_time = time.time()
-        args = map(unicode, args)  # Popen will throw an exception if args are non-strings (like int())
-        args = map(self._encode_argument_if_needed, args)
 
         stdin, string_to_communicate = self._compute_stdin(input)
         stderr = self.STDOUT if return_stderr else None
@@ -413,7 +439,7 @@ class Executive(object):
         # http://bugs.python.org/issue1731717
         exit_code = process.wait()
 
-        _log.debug('"%s" took %.2fs' % (self._command_for_printing(args), time.time() - start_time))
+        _log.debug('"%s" took %.2fs' % (self.command_for_printing(args), time.time() - start_time))
 
         if return_exit_code:
             return exit_code
@@ -457,8 +483,23 @@ class Executive(object):
             return argument
         return argument.encode(self._child_process_encoding())
 
-    def popen(self, *args, **kwargs):
-        return subprocess.Popen(*args, **kwargs)
+    def _stringify_args(self, args):
+        # Popen will throw an exception if args are non-strings (like int())
+        string_args = map(unicode, args)
+        # The Windows implementation of Popen cannot handle unicode strings. :(
+        return map(self._encode_argument_if_needed, string_args)
+
+    # The only required arugment to popen is named "args", the rest are optional keyword arguments.
+    def popen(self, args, **kwargs):
+        # FIXME: We should always be stringifying the args, but callers who pass shell=True
+        # expect that the exact bytes passed will get passed to the shell (even if they're wrongly encoded).
+        # shell=True is wrong for many other reasons, and we should remove this
+        # hack as soon as we can fix all callers to not use shell=True.
+        if kwargs.get('shell') == True:
+            string_args = args
+        else:
+            string_args = self._stringify_args(args)
+        return subprocess.Popen(string_args, **kwargs)
 
     def run_in_parallel(self, command_lines_and_cwds, processes=None):
         """Runs a list of (cmd_line list, cwd string) tuples in parallel and returns a list of (retcode, stdout, stderr) tuples."""

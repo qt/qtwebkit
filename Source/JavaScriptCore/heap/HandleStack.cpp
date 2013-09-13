@@ -28,7 +28,7 @@
 
 #include "HeapRootVisitor.h"
 #include "JSObject.h"
-#include "JSValueInlines.h"
+#include "Operations.h"
 
 namespace JSC {
 

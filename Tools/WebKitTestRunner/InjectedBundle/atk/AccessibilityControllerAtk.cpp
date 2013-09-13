@@ -29,6 +29,9 @@
 #include "AccessibilityController.h"
 
 #include "InjectedBundle.h"
+#include "InjectedBundlePage.h"
+
+#include <WebKit2/WKBundlePagePrivate.h>
 #include <atk/atk.h>
 #include <cstdio>
 #include <wtf/gobject/GOwnPtr.h>
@@ -55,7 +58,7 @@ static void printAccessibilityEvent(AtkObject* accessible, const gchar* signalNa
 
     GOwnPtr<gchar> signalNameAndValue(signalValue ? g_strdup_printf("%s = %s", signalName, signalValue) : g_strdup(signalName));
     GOwnPtr<gchar> accessibilityEventString(g_strdup_printf("Accessibility object emitted \"%s\" / Name: \"%s\" / Role: %d\n", signalNameAndValue.get(), objectName, objectRole));
-    InjectedBundle::shared().stringBuilder()->append(accessibilityEventString.get());
+    InjectedBundle::shared().outputText(String::fromUTF8(accessibilityEventString.get()));
 }
 
 static gboolean axObjectEventListener(GSignalInvocationHint *signalHint, guint numParamValues, const GValue *paramValues, gpointer data)
@@ -145,6 +148,69 @@ void AccessibilityController::resetToConsistentState()
         atk_remove_global_event_listener(m_visibleDataChangedListenerId);
         m_visibleDataChangedListenerId = 0;
     }
+}
+
+static AtkObject* childElementById(AtkObject* parent, const char* id)
+{
+    if (!ATK_IS_OBJECT(parent))
+        return 0;
+
+    bool parentFound = false;
+    AtkAttributeSet* attributeSet = atk_object_get_attributes(parent);
+    for (AtkAttributeSet* attributes = attributeSet; attributes; attributes = attributes->next) {
+        AtkAttribute* attribute = static_cast<AtkAttribute*>(attributes->data);
+        if (!strcmp(attribute->name, "html-id")) {
+            if (!strcmp(attribute->value, id))
+                parentFound = true;
+            break;
+        }
+    }
+    atk_attribute_set_free(attributeSet);
+
+    if (parentFound)
+        return parent;
+
+    int childCount = atk_object_get_n_accessible_children(parent);
+    for (int i = 0; i < childCount; i++) {
+        AtkObject* result = childElementById(atk_object_ref_accessible_child(parent, i), id);
+        if (ATK_IS_OBJECT(result))
+            return result;
+    }
+
+    return 0;
+}
+
+PassRefPtr<AccessibilityUIElement> AccessibilityController::accessibleElementById(JSStringRef id)
+{
+    AtkObject* root = ATK_OBJECT(WKAccessibilityRootObject(InjectedBundle::shared().page()->page()));
+    if (!root)
+        return 0;
+
+    size_t bufferSize = JSStringGetMaximumUTF8CStringSize(id);
+    GOwnPtr<gchar> idBuffer(static_cast<gchar*>(g_malloc(bufferSize)));
+    JSStringGetUTF8CString(id, idBuffer.get(), bufferSize);
+
+    AtkObject* result = childElementById(root, idBuffer.get());
+    if (ATK_IS_OBJECT(result))
+        return AccessibilityUIElement::create(result);
+
+    return 0;
+}
+
+PassRefPtr<AccessibilityUIElement> AccessibilityController::rootElement()
+{
+    WKBundlePageRef page = InjectedBundle::shared().page()->page();
+    void* root = WKAccessibilityRootObject(page);
+
+    return AccessibilityUIElement::create(static_cast<AtkObject*>(root));
+}
+
+PassRefPtr<AccessibilityUIElement> AccessibilityController::focusedElement()
+{
+    WKBundlePageRef page = InjectedBundle::shared().page()->page();
+    void* root = WKAccessibilityFocusedObject(page);
+
+    return AccessibilityUIElement::create(static_cast<AtkObject*>(root));
 }
 
 } // namespace WTR

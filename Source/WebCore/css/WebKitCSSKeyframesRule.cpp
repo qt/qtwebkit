@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007, 2008, 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2007, 2008, 2012, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,7 +32,6 @@
 #include "StylePropertySet.h"
 #include "StyleSheet.h"
 #include "WebKitCSSKeyframeRule.h"
-#include <wtf/MemoryInstrumentationVector.h>
 #include <wtf/text/StringBuilder.h>
 
 namespace WebCore {
@@ -74,9 +73,9 @@ int StyleRuleKeyframes::findKeyframeIndex(const String& key) const
 {
     String percentageString;
     if (equalIgnoringCase(key, "from"))
-        percentageString = "0%";
+        percentageString = ASCIILiteral("0%");
     else if (equalIgnoringCase(key, "to"))
-        percentageString = "100%";
+        percentageString = ASCIILiteral("100%");
     else
         percentageString = key;
     
@@ -85,13 +84,6 @@ int StyleRuleKeyframes::findKeyframeIndex(const String& key) const
             return i;
     }
     return -1;
-}
-
-void StyleRuleKeyframes::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
-    info.addMember(m_keyframes);
-    info.addMember(m_name);
 }
 
 WebKitCSSKeyframesRule::WebKitCSSKeyframesRule(StyleRuleKeyframes* keyframesRule, CSSStyleSheet* parent)
@@ -161,17 +153,17 @@ WebKitCSSKeyframeRule* WebKitCSSKeyframesRule::findRule(const String& s)
 String WebKitCSSKeyframesRule::cssText() const
 {
     StringBuilder result;
-    result.append("@-webkit-keyframes ");
+    result.appendLiteral("@-webkit-keyframes ");
     result.append(name());
-    result.append(" { \n");
+    result.appendLiteral(" { \n");
 
     unsigned size = length();
     for (unsigned i = 0; i < size; ++i) {
-        result.append("  ");
+        result.appendLiteral("  ");
         result.append(m_keyframesRule->keyframes()[i]->cssText());
-        result.append("\n");
+        result.append('\n');
     }
-    result.append("}");
+    result.append('}');
     return result.toString();
 }
 
@@ -203,17 +195,8 @@ CSSRuleList* WebKitCSSKeyframesRule::cssRules()
 void WebKitCSSKeyframesRule::reattach(StyleRuleBase* rule)
 {
     ASSERT(rule);
-    ASSERT(rule->isKeyframesRule());
+    ASSERT_WITH_SECURITY_IMPLICATION(rule->isKeyframesRule());
     m_keyframesRule = static_cast<StyleRuleKeyframes*>(rule);
-}
-
-void WebKitCSSKeyframesRule::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
-    CSSRule::reportMemoryUsage(memoryObjectInfo);
-    info.addMember(m_keyframesRule);
-    info.addMember(m_childRuleCSSOMWrappers);
-    info.addMember(m_ruleListCSSOMWrapper);
 }
 
 } // namespace WebCore

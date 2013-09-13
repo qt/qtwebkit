@@ -26,12 +26,9 @@
 #include "config.h"
 #include "ContextMenuClientEfl.h"
 
-#include "EwkViewImpl.h"
-#include "NotImplemented.h"
+#include "EwkView.h"
 #include "WKArray.h"
 #include "WKPage.h"
-#include "WebContextMenuItem.h"   
-#include <Evas.h>
 
 using namespace WebKit;
 
@@ -40,10 +37,25 @@ static inline ContextMenuClientEfl* toContextClientEfl(const void* clientInfo)
     return static_cast<ContextMenuClientEfl*>(const_cast<void*>(clientInfo));
 }
 
-ContextMenuClientEfl::ContextMenuClientEfl(EwkViewImpl* viewImpl)
-    : m_viewImpl(viewImpl)
+static void customContextMenuItemSelected(WKPageRef, WKContextMenuItemRef contextMenuItem, const void* clientInfo)
 {
-    WKPageRef pageRef = m_viewImpl->wkPage();
+    toContextClientEfl(clientInfo)->view()->customContextMenuItemSelected(contextMenuItem);
+}
+
+static void showContextMenu(WKPageRef, WKPoint menuLocation, WKArrayRef menuItems, const void* clientInfo)
+{
+    toContextClientEfl(clientInfo)->view()->showContextMenu(menuLocation, menuItems);
+}
+
+static void hideContextMenu(WKPageRef, const void* clientInfo)
+{
+    toContextClientEfl(clientInfo)->view()->hideContextMenu();
+}
+
+ContextMenuClientEfl::ContextMenuClientEfl(EwkView* view)
+    : m_view(view)
+{
+    WKPageRef pageRef = m_view->wkPage();
     ASSERT(pageRef);
 
     WKPageContextMenuClient contextMenuClient;
@@ -51,14 +63,12 @@ ContextMenuClientEfl::ContextMenuClientEfl(EwkViewImpl* viewImpl)
     contextMenuClient.version = kWKPageContextMenuClientCurrentVersion;
     contextMenuClient.clientInfo = this;
     contextMenuClient.getContextMenuFromProposedMenu_deprecatedForUseWithV0 = 0;
-    contextMenuClient.customContextMenuItemSelected = 0;
+    contextMenuClient.customContextMenuItemSelected = customContextMenuItemSelected;
     contextMenuClient.contextMenuDismissed = 0;
     contextMenuClient.getContextMenuFromProposedMenu = 0;
+    contextMenuClient.showContextMenu = showContextMenu;
+    contextMenuClient.hideContextMenu = hideContextMenu;
 
     WKPageSetPageContextMenuClient(pageRef, &contextMenuClient);
 }
 
-void ContextMenuClientEfl::getContextMenuFromProposedMenu(WKPageRef, WKArrayRef, WKArrayRef*, WKHitTestResultRef, WKTypeRef, const void*)
-{
-    notImplemented();
-}

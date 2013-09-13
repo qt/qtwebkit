@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2010, 2011, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -38,6 +38,7 @@ WK_EXPORT bool WKBundlePageIsEditingCommandEnabled(WKBundlePageRef page, WKStrin
 WK_EXPORT void WKBundlePageClearMainFrameName(WKBundlePageRef page);
 WK_EXPORT void WKBundlePageClose(WKBundlePageRef page);
 WK_EXPORT WKStringRef WKBundlePageCopyRenderTreeExternalRepresentation(WKBundlePageRef page);
+WK_EXPORT WKStringRef WKBundlePageCopyRenderTreeExternalRepresentationForPrinting(WKBundlePageRef page);
 WK_EXPORT void WKBundlePageExecuteEditingCommand(WKBundlePageRef page, WKStringRef commandName, WKStringRef argument);
 
 WK_EXPORT double WKBundlePageGetTextZoomFactor(WKBundlePageRef page);
@@ -78,6 +79,12 @@ WK_EXPORT void* WKAccessibilityRootObject(WKBundlePageRef);
 WK_EXPORT void* WKAccessibilityFocusedObject(WKBundlePageRef);
 
 WK_EXPORT WKArrayRef WKBundlePageCopyContextMenuItemTitles(WKBundlePageRef);
+WK_EXPORT WKArrayRef WKBundlePageCopyContextMenuAtPointInWindow(WKBundlePageRef, WKPoint);
+
+// This only works if the SuppressesIncrementalRendering preference is set as well.
+typedef unsigned WKRenderingSuppressionToken;
+WK_EXPORT WKRenderingSuppressionToken WKBundlePageExtendIncrementalRenderingSuppression(WKBundlePageRef);
+WK_EXPORT void WKBundlePageStopExtendingIncrementalRenderingSuppression(WKBundlePageRef, WKRenderingSuppressionToken);
 
 #ifdef __cplusplus
 }

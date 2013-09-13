@@ -1,4 +1,134 @@
 =================
+WebKitGTK+  2.1.3
+=================
+
+What's new in WebKitGTK+ 2.1.3?
+
+  - Add support for preload="metadata" to GStreamer media backend.
+  - Do not expose '\n' for wrapped lines with ATK_TEXT_BOUNDARY_CHAR.
+  - Fix potential race condition in GStreamer media backend when
+    getting the video sink caps.
+  - Fix performance issues rendering a page with animations.
+  - Several fixes and improvements in GStreamer video accelerated
+    compositing support.
+  - Adjust internal size on GStreamer HTTP source element when
+    receiving data if necessary.
+  - Actually disable the memory cache when DOCUMENT_VIEWER cache model
+    is used in WebKit1.
+  - Fix runtime critical warning in WebKit2 when unloading a module
+    that failed to load.
+  - Fix several memory leaks.
+
+=================
+WebKitGTK+  2.1.2
+=================
+
+What's new in WebKitGTK+ 2.1.2?
+
+  - Set the subresources load priority using new libsoup API available
+    in 2.43.
+  - Do not use X11 WidgetBackingStore implementation in Wayland.
+  - Support using GLContext from multiple threads.
+  - Make sure gstreamer source element is thread-safe.
+  - Prevent race condition when pad caps is set on gstreamer player.
+  - Invalidate the ProcessLauncher when the process is terminated
+    before it has finished launching
+  - Use custom cairo code instead of Pango API for highlighting
+    misspelled words.
+  - Respect PKG_CONFIG env variable when generating gtk-doc.
+  - Fix a crash due to an assert in gstreamer backend when seeking.
+  - Fix memory leak when web process is terminated.
+  - Translation updates: Telugu, Hindi, Kannada, Odia.
+
+=================
+WebKitGTK+  2.1.1
+=================
+
+What's new in WebKitGTK+ 2.1.1?
+
+  - Add webkit_uri_scheme_request_finish_error to WebKit2 GTK+ API.
+  - Add a setting to control whether or not accelerated 2D canvas is
+    enabled in WebKit2.
+  - Add a setting to WebKit2 to allow sending console log messages to
+    stdout.
+  - Always use EGL to create the GL context when running on Wayland.
+  - Fix rendering of WebKitWebView child widgets with recent GTK+.
+  - Notify the web process in WebKitURISchemeRequest when we fail to read
+    from the user InputStream.
+  - Fixed race conditions closing the socket descriptor when the web
+    process crashes.
+  - Add video accelerated compositing support to the GStreamer backend.
+  - Add support for audio/speex MIME type to the GStreamer backend.
+  - Fix seek after video finished in GStreamer backend.
+  - Initialize WebKitWebPlugin path to prevent double-free in WebKit1.
+  - Fix several GObject instrospection warnings.
+  - Fixed several memory leaks.
+
+=================
+WebKitGTK+ 1.11.5
+=================
+
+What's new in WebKitGTK+ 1.11.5?
+
+  - Fix crashes related to libsoup, gstreamer, and accessibility.
+  - Implement the WebKit2 resources API using the injected bundle.
+  - Add API to prefetch DNS of a given hostname to the WebKit2 API.
+  - Move Authentication and Downloads from WebProcess to Shared in
+    WebKit2.
+  - Many improvements to the GStreamer backend including the resurrection of
+    the native fullscreen mode for increased performance, support for
+    setPreservesPitch, bug fixes, support for Opus files, and
+    some other performance improvements.
+  - New features enabled: CSS Image Resolution, CSS Image Orientation,
+    and the performance timeline in the Web Inspector via resource timing
+    and navigation timing.
+  - Add support for blend modes to the Cairo backend.
+  - Fix for checkSpellingOfString erroneously treating multiple words
+    as spelled correctly.
+  - Characters outside the BMP are now properly rendered.
+  - Synthetic bold is now applied to fallback fonts properly.
+  - Better drag and drop icons during drags on non-composited desktops.
+  - The page title is now preserved in WebKit when disappearing when clicking on
+    an anchor link.
+  - The web database path setting in WebKit1 now also controls where IndexedDB
+    databases are stored.
+  - Fix various issues in the build tools, testing tools, Web Inspector, and
+    MiniBrowser.
+
+
+=================
+WebKitGTK+ 1.11.4
+=================
+
+What's new in WebKitGTK+ 1.11.4?
+
+  - Add support for loading web process extensions to WebKit2 GTK+.
+  - Embed the HTTP authentication dialog into the WebView in WebKit2.
+  - Add support for IME Composition to WebKit2.
+  - Add API to notify about display/execution of insecure content to
+    WebKit2 GTK+ API.
+  - Add GTK+ API to set a WebKitWebView in view source mode to WebKit2.
+  - Add API to set a TLS errors policy to WebKit2 GTK+ API.
+  - Add WEBKIT_HIT_TEST_RESULT_CONTEXT_SCROLLBAR to WebKit2 GTK+ API.
+  - Add support for remote Web Inspector to WebKit2.
+  - Complete the documentation od sections in WebKit2 GTK+ API.
+  - Fix cookies and custom URI requests when the web process is
+    re-launched after a crash.
+  - Fix a crash in WebKit2 when running inside Xvfb.
+  - Fix a crash in WebKit2 when the WebView is resized with the
+    inspector attached.
+  - Use Harfbuzz instead of Pango in GTK+ port.
+  - Add support for WebP image.
+  - Port WebAudio backend to GStreamer 1.0 API.
+  - Fix the buffering ranges reported with GStreamer 1.0.
+  - Implement multipart/x-mixed-replace in the soup network backend.
+  - Fix invalid entries for plugins in navigator.plugins.
+  - Add implementation for AccessibilityUIElementGtk::isSelectable()
+    and AccessibilityUIElementGtk::isMultiSelectable().
+  - Expose ARIA roles for tab, tabpanel and tablist.
+  - Fixed several memory leaks.
+
+=================
 WebKitGTK+ 1.11.2
 =================
 

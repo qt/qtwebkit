@@ -33,14 +33,12 @@
 
 #include "BlobData.h"
 #include <wtf/Forward.h>
-#include <wtf/RefCounted.h>
 
 namespace WebCore {
 
 // FIXME: Move this file to BlobBuilder.h
 
 class Blob;
-class ScriptExecutionContext;
 class TextEncoding;
 
 typedef int ExceptionCode;
@@ -52,7 +50,7 @@ public:
     void append(Blob*);
     void append(const String& text, const String& ending);
 #if ENABLE(BLOB)
-    void append(ScriptExecutionContext*, ArrayBuffer*);
+    void append(ArrayBuffer*);
     void append(ArrayBufferView*);
 #endif
 

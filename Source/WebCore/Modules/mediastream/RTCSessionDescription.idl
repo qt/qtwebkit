@@ -30,12 +30,10 @@
 
 [
     Conditional=MEDIA_STREAM,
-    Constructor(in Dictionary dictionary),
+    Constructor(Dictionary dictionary),
     ConstructorRaisesException
 ] interface RTCSessionDescription {
-    attribute DOMString type
-        setter raises(DOMException);
-    attribute DOMString sdp
-        setter raises(DOMException);
+    [SetterRaisesException] attribute DOMString type;
+    [SetterRaisesException] attribute DOMString sdp;
 };
 

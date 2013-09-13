@@ -51,15 +51,10 @@ public:
     static PassOwnPtr<LocaleMac> create(NSLocale*);
     ~LocaleMac();
 
-#if ENABLE(CALENDAR_PICKER)
-    virtual const Vector<String>& weekDayShortLabels() OVERRIDE;
-    virtual unsigned firstDayOfWeek() OVERRIDE;
-    virtual bool isRTL() OVERRIDE;
-#endif
-
 #if ENABLE(DATE_AND_TIME_INPUT_TYPES)
     virtual String dateFormat() OVERRIDE;
     virtual String monthFormat() OVERRIDE;
+    virtual String shortMonthFormat() OVERRIDE;
     virtual String timeFormat() OVERRIDE;
     virtual String shortTimeFormat() OVERRIDE;
     virtual String dateTimeFormatWithSeconds() OVERRIDE;
@@ -78,9 +73,6 @@ private:
 
     RetainPtr<NSLocale> m_locale;
     RetainPtr<NSCalendar> m_gregorianCalendar;
-#if ENABLE(CALENDAR_PICKER)
-    Vector<String> m_weekDayShortLabels;
-#endif
 #if ENABLE(DATE_AND_TIME_INPUT_TYPES)
     Vector<String> m_monthLabels;
     RetainPtr<NSDateFormatter> timeFormatter();
@@ -90,6 +82,7 @@ private:
 
     String m_dateFormat;
     String m_monthFormat;
+    String m_shortMonthFormat;
     String m_timeFormatWithSeconds;
     String m_timeFormatWithoutSeconds;
     String m_dateTimeFormatWithSeconds;

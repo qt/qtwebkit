@@ -50,6 +50,7 @@
 #include <cstring>
 #include <getopt.h>
 #include <gtk/gtk.h>
+#include <locale.h>
 #include <webkit/webkit.h>
 #include <wtf/Assertions.h>
 #include <wtf/gobject/GOwnPtr.h>
@@ -173,6 +174,7 @@ static void initializeGtkFontSettings(const char* testURL)
                  "gtk-xft-antialias", 1,
                  "gtk-xft-hinting", 0,
                  "gtk-font-name", "Liberation Sans 12",
+                 "gtk-icon-theme-name", "gnome",
                  NULL);
     gdk_screen_set_resolution(gdk_screen_get_default(), 96.0);
 
@@ -194,7 +196,7 @@ CString getTopLevelPath()
 
 CString getOutputDir()
 {
-    const char* webkitOutputDir = g_getenv("WEBKITOUTPUTDIR");
+    const char* webkitOutputDir = g_getenv("WEBKIT_OUTPUTDIR");
     if (webkitOutputDir)
         return webkitOutputDir;
 
@@ -243,8 +245,7 @@ static void initializeFonts(const char* testURL = 0)
     if (fontsPath.isNull())
         g_error("Could not locate test fonts at %s. Is WEBKIT_TOP_LEVEL set?", fontsPath.data());
 
-    GOwnPtr<GError> error;
-    GOwnPtr<GDir> fontsDirectory(g_dir_open(fontsPath.data(), 0, &error.outPtr()));
+    GOwnPtr<GDir> fontsDirectory(g_dir_open(fontsPath.data(), 0, 0));
     while (const char* directoryEntry = g_dir_read_name(fontsDirectory.get())) {
         if (!g_str_has_suffix(directoryEntry, ".ttf") && !g_str_has_suffix(directoryEntry, ".otf"))
             continue;
@@ -438,41 +439,41 @@ static void resetDefaultsToConsistentValues()
     WebKitWebSettings* settings = webkit_web_view_get_settings(webView);
     GOwnPtr<gchar> localStoragePath(g_build_filename(g_get_user_data_dir(), "DumpRenderTreeGtk", "databases", NULL));
     g_object_set(G_OBJECT(settings),
-                 "enable-private-browsing", FALSE,
-                 "enable-developer-extras", FALSE,
-                 "enable-spell-checking", TRUE,
-                 "enable-html5-database", TRUE,
-                 "enable-html5-local-storage", TRUE,
-                 "html5-local-storage-database-path", localStoragePath.get(),
-                 "enable-xss-auditor", FALSE,
-                 "enable-spatial-navigation", FALSE,
-                 "enable-frame-flattening", FALSE,
-                 "javascript-can-access-clipboard", TRUE,
-                 "javascript-can-open-windows-automatically", TRUE,
-                 "enable-offline-web-application-cache", TRUE,
-                 "enable-universal-access-from-file-uris", TRUE,
-                 "enable-file-access-from-file-uris", TRUE,
-                 "enable-scripts", TRUE,
-                 "enable-dom-paste", TRUE,
-                 "default-font-family", "Times",
-                 "monospace-font-family", "Courier",
-                 "serif-font-family", "Times",
-                 "sans-serif-font-family", "Helvetica",
-                 "cursive-font-family", "cursive",
-                 "fantasy-font-family", "fantasy",
-                 "default-font-size", 12,
-                 "default-monospace-font-size", 10,
-                 "minimum-font-size", 0,
-                 "enable-caret-browsing", FALSE,
-                 "enable-page-cache", FALSE,
-                 "auto-resize-window", TRUE,
-                 "auto-load-images", TRUE,
-                 "enable-java-applet", FALSE,
-                 "enable-plugins", TRUE,
-                 "enable-hyperlink-auditing", FALSE,
-                 "editing-behavior", WEBKIT_EDITING_BEHAVIOR_UNIX,
-                 "enable-fullscreen", TRUE,
-                 NULL);
+        "enable-accelerated-compositing", FALSE,
+        "enable-private-browsing", FALSE,
+        "enable-developer-extras", FALSE,
+        "enable-spell-checking", TRUE,
+        "enable-html5-database", TRUE,
+        "enable-html5-local-storage", TRUE,
+        "html5-local-storage-database-path", localStoragePath.get(),
+        "enable-xss-auditor", FALSE,
+        "enable-spatial-navigation", FALSE,
+        "javascript-can-access-clipboard", TRUE,
+        "javascript-can-open-windows-automatically", TRUE,
+        "enable-offline-web-application-cache", TRUE,
+        "enable-universal-access-from-file-uris", TRUE,
+        "enable-file-access-from-file-uris", TRUE,
+        "enable-scripts", TRUE,
+        "enable-dom-paste", TRUE,
+        "default-font-family", "Times",
+        "monospace-font-family", "Courier",
+        "serif-font-family", "Times",
+        "sans-serif-font-family", "Helvetica",
+        "cursive-font-family", "cursive",
+        "fantasy-font-family", "fantasy",
+        "default-font-size", 12,
+        "default-monospace-font-size", 10,
+        "minimum-font-size", 0,
+        "enable-caret-browsing", FALSE,
+        "enable-page-cache", FALSE,
+        "auto-resize-window", TRUE,
+        "auto-load-images", TRUE,
+        "enable-java-applet", FALSE,
+        "enable-plugins", TRUE,
+        "enable-hyperlink-auditing", FALSE,
+        "editing-behavior", WEBKIT_EDITING_BEHAVIOR_UNIX,
+        "enable-fullscreen", TRUE,
+        NULL);
     webkit_web_view_set_settings(webView, settings);
     webkit_set_cache_model(WEBKIT_CACHE_MODEL_DOCUMENT_BROWSER);
 
@@ -483,7 +484,6 @@ static void resetDefaultsToConsistentValues()
     g_object_set(G_OBJECT(inspector), "javascript-profiling-enabled", FALSE, NULL);
 
     webkit_web_view_set_zoom_level(webView, 1.0);
-    DumpRenderTreeSupportGtk::setMinimumTimerInterval(webView, DumpRenderTreeSupportGtk::defaultMinimumTimerInterval());
 
     DumpRenderTreeSupportGtk::resetOriginAccessWhiteLists();
 
@@ -502,8 +502,6 @@ static void resetDefaultsToConsistentValues()
 
     DumpRenderTreeSupportGtk::setLinksIncludedInFocusChain(true);
     webkit_icon_database_set_path(webkit_get_icon_database(), 0);
-    DumpRenderTreeSupportGtk::setSelectTrailingWhitespaceEnabled(false);
-    DumpRenderTreeSupportGtk::setSmartInsertDeleteEnabled(webView, true);
     DumpRenderTreeSupportGtk::setDefersLoading(webView, false);
     DumpRenderTreeSupportGtk::setSerializeHTTPLoads(false);
 
@@ -518,8 +516,18 @@ static void resetDefaultsToConsistentValues()
     DumpRenderTreeSupportGtk::setCSSGridLayoutEnabled(webView, false);
     DumpRenderTreeSupportGtk::setCSSRegionsEnabled(webView, true);
     DumpRenderTreeSupportGtk::setCSSCustomFilterEnabled(webView, false);
+    DumpRenderTreeSupportGtk::setExperimentalContentSecurityPolicyFeaturesEnabled(true);
+    DumpRenderTreeSupportGtk::setSeamlessIFramesEnabled(true);
     DumpRenderTreeSupportGtk::setShadowDOMEnabled(true);
     DumpRenderTreeSupportGtk::setStyleScopedEnabled(true);
+
+    if (gTestRunner) {
+        gTestRunner->setAuthenticationPassword("");
+        gTestRunner->setAuthenticationUsername("");
+        gTestRunner->setHandlesAuthenticationChallenges(false);
+    }
+
+    gtk_widget_set_direction(GTK_WIDGET(webView), GTK_TEXT_DIR_NONE);
 }
 
 static bool useLongRunningServerMode(int argc, char *argv[])
@@ -643,6 +651,15 @@ void dump()
     gtk_main_quit();
 }
 
+static CString temporaryDatabaseDirectory()
+{
+    const char* directoryFromEnvironment = g_getenv("DUMPRENDERTREE_TEMP");
+    if (directoryFromEnvironment)
+        return directoryFromEnvironment;
+    GOwnPtr<char> fallback(g_build_filename(g_get_user_data_dir(), "gtkwebkitdrt", "databases", NULL));
+    return fallback.get();
+}
+
 static void setDefaultsToConsistentStateValuesForTesting()
 {
     resetDefaultsToConsistentValues();
@@ -651,9 +668,7 @@ static void setDefaultsToConsistentStateValuesForTesting()
     webkit_web_settings_add_extra_plugin_directory(webView, TEST_PLUGIN_DIR);
 #endif
 
-    gchar* databaseDirectory = g_build_filename(g_get_user_data_dir(), "gtkwebkitdrt", "databases", NULL);
-    webkit_set_web_database_directory_path(databaseDirectory);
-    g_free(databaseDirectory);
+    webkit_set_web_database_directory_path(temporaryDatabaseDirectory().data());
 
 #if defined(GTK_API_VERSION_2)
     gtk_rc_parse_string("style \"nix_scrollbar_spacing\"                    "
@@ -733,8 +748,8 @@ static void runTest(const string& inputLine)
     bool isSVGW3CTest = (testURL.find("svg/W3C-SVG-1.1") != string::npos);
     GtkAllocation size;
     size.x = size.y = 0;
-    size.width = isSVGW3CTest ? 480 : TestRunner::maxViewWidth;
-    size.height = isSVGW3CTest ? 360 : TestRunner::maxViewHeight;
+    size.width = isSVGW3CTest ? TestRunner::w3cSVGViewWidth : TestRunner::viewWidth;
+    size.height = isSVGW3CTest ? TestRunner::w3cSVGViewHeight : TestRunner::viewHeight;
     gtk_window_resize(GTK_WINDOW(window), size.width, size.height);
     gtk_widget_size_allocate(container, &size);
 
@@ -1053,7 +1068,7 @@ static WebKitWebView* webViewCreate(WebKitWebView*, WebKitWebFrame*);
 
 static gboolean webInspectorShowWindow(WebKitWebInspector*, gpointer data)
 {
-    gtk_window_set_default_size(GTK_WINDOW(webInspectorWindow), 800, 600);
+    gtk_window_set_default_size(GTK_WINDOW(webInspectorWindow), TestRunner::viewWidth, TestRunner::viewHeight);
     gtk_widget_show_all(webInspectorWindow);
     return TRUE;
 }
@@ -1231,8 +1246,7 @@ static CString descriptionSuitableForTestResult(WebKitNetworkRequest* request)
     CString mainDocumentURIString(descriptionSuitableForTestResult(mainDocumentURI));
     CString path(convertNetworkRequestToURLPath(request));
     GOwnPtr<char> description(g_strdup_printf("<NSURLRequest URL %s, main document URL %s, http method %s>",
-                                              path.data(), mainDocumentURIString.data(),
-                                              soupMessage ? soupMessage->method : "(none)"));
+        path.data(), mainDocumentURIString.data(), soupMessage->method));
     return CString(description.get());
 }
 
@@ -1275,15 +1289,23 @@ static void willSendRequestCallback(WebKitWebView* webView, WebKitWebFrame* webF
     SoupMessage* soupMessage = webkit_network_request_get_message(request);
     SoupURI* uri = soup_uri_new(webkit_network_request_get_uri(request));
 
-    if (SOUP_URI_VALID_FOR_HTTP(uri) && g_strcmp0(uri->host, "127.0.0.1")
-        && g_strcmp0(uri->host, "255.255.255.255")
-        && g_ascii_strncasecmp(uri->host, "localhost", 9)) {
-        printf("Blocked access to external URL %s\n", soup_uri_to_string(uri, FALSE));
-        // Cancel load of blocked resource to avoid potential
-        // network-related timeouts in tests.
-        webkit_network_request_set_uri(request, "about:blank");
-        soup_uri_free(uri);
-        return;
+    if (SOUP_URI_IS_VALID(uri)) {
+        GOwnPtr<char> uriString(soup_uri_to_string(uri, FALSE));
+
+        if (SOUP_URI_VALID_FOR_HTTP(uri) && g_strcmp0(uri->host, "127.0.0.1")
+            && g_strcmp0(uri->host, "255.255.255.255")
+            && g_ascii_strncasecmp(uri->host, "localhost", 9)) {
+            printf("Blocked access to external URL %s\n", uriString.get());
+            // Cancel load of blocked resource to avoid potential
+            // network-related timeouts in tests.
+            webkit_network_request_set_uri(request, "about:blank");
+            soup_uri_free(uri);
+            return;
+        }
+
+        const string& destination = gTestRunner->redirectionDestinationForURL(uriString.get());
+        if (!destination.empty())
+            webkit_network_request_set_uri(request, destination.c_str());
     }
 
     if (uri)
@@ -1337,11 +1359,55 @@ static gboolean webViewRunFileChooser(WebKitWebView*, WebKitFileChooserRequest*)
     return TRUE;
 }
 
+static void frameLoadEventCallback(WebKitWebFrame* frame, DumpRenderTreeSupportGtk::FrameLoadEvent event, const char* url)
+{
+    if (done || !gTestRunner->dumpFrameLoadCallbacks())
+        return;
+
+    GOwnPtr<char> frameName(getFrameNameSuitableForTestResult(webkit_web_frame_get_web_view(frame), frame));
+    switch (event) {
+    case DumpRenderTreeSupportGtk::WillPerformClientRedirectToURL:
+        ASSERT(url);
+        printf("%s - willPerformClientRedirectToURL: %s \n", frameName.get(), url);
+        break;
+    case DumpRenderTreeSupportGtk::DidCancelClientRedirect:
+        printf("%s - didCancelClientRedirectForFrame\n", frameName.get());
+        break;
+    case DumpRenderTreeSupportGtk::DidReceiveServerRedirectForProvisionalLoad:
+        printf("%s - didReceiveServerRedirectForProvisionalLoadForFrame\n", frameName.get());
+        break;
+    case DumpRenderTreeSupportGtk::DidDisplayInsecureContent:
+        printf ("didDisplayInsecureContent\n");
+        break;
+    case DumpRenderTreeSupportGtk::DidDetectXSS:
+        printf ("didDetectXSS\n");
+        break;
+    default:
+        ASSERT_NOT_REACHED();
+    }
+}
+
+static bool authenticationCallback(CString& username, CString& password)
+{
+    if (!gTestRunner->handlesAuthenticationChallenges()) {
+        printf("<unknown> - didReceiveAuthenticationChallenge - Simulating cancelled authentication sheet\n");
+        return false;
+    }
+
+    username = gTestRunner->authenticationUsername().c_str();
+    password = gTestRunner->authenticationPassword().c_str();
+    printf("<unknown> - didReceiveAuthenticationChallenge - Responding with %s:%s\n", username.data(), password.data());
+    return true;
+}
+
 static WebKitWebView* createWebView()
 {
     // It is important to declare DRT is running early so when creating
     // web view mock clients are used instead of proper ones.
     DumpRenderTreeSupportGtk::setDumpRenderTreeModeEnabled(true);
+
+    DumpRenderTreeSupportGtk::setFrameLoadEventCallback(frameLoadEventCallback);
+    DumpRenderTreeSupportGtk::setAuthenticationCallback(authenticationCallback);
 
     WebKitWebView* view = WEBKIT_WEB_VIEW(self_scrolling_webkit_web_view_new());
 
@@ -1427,7 +1493,7 @@ int main(int argc, char* argv[])
     initializeGlobalsFromCommandLineOptions(argc, argv);
     initializeFonts();
 
-    window = gtk_window_new(GTK_WINDOW_POPUP);
+    window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
 #ifdef GTK_API_VERSION_2
     container = gtk_hbox_new(TRUE, 0);
 #else

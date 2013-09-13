@@ -78,6 +78,10 @@ WebInspector.InspectorFrontendHostStub.prototype = {
     {
     },
 
+    setAttachedWindowWidth: function(width)
+    {
+    },
+
     moveWindowBy: function(x, y)
     {
     },
@@ -93,11 +97,6 @@ WebInspector.InspectorFrontendHostStub.prototype = {
     localizedStringsURL: function()
     {
         return undefined;
-    },
-
-    hiddenPanels: function()
-    {
-        return WebInspector.queryParamsObject["hiddenPanels"] || "";
     },
 
     inspectedURLChanged: function(url)
@@ -195,13 +194,35 @@ WebInspector.InspectorFrontendHostStub.prototype = {
         return loadXHR(url);
     },
 
+    supportsFileSystems: function()
+    {
+        return false;
+    },
+
+    requestFileSystems: function()
+    {
+    },
+
+    addFileSystem: function()
+    {
+    },
+
+    removeFileSystem: function(fileSystemPath)
+    {
+    },
+
+    isolatedFileSystem: function(fileSystemId, registeredName)
+    {
+        return null;
+    },
+
     setZoomFactor: function(zoom)
     {
     },
 
-    canInspectWorkers: function()
+    isUnderTest: function()
     {
-        return true;
+        return false;
     }
 }
 

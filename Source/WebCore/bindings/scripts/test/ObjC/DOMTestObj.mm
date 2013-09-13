@@ -35,47 +35,44 @@
 #import "DOMDictionaryInternal.h"
 #import "DOMDocumentInternal.h"
 #import "DOMEventInternal.h"
-#import "DOMIDBKeyInternal.h"
 #import "DOMNodeInternal.h"
 #import "DOMSVGDocumentInternal.h"
 #import "DOMSVGPointInternal.h"
 #import "DOMStyleSheetInternal.h"
+#import "DOMTestEnumTypeInternal.h"
+#import "DOMTestNodeInternal.h"
 #import "DOMTestObjInternal.h"
 #import "DOMTestObjectAConstructorInternal.h"
 #import "DOMTestObjectBConstructorInternal.h"
 #import "DOMTestObjectCConstructorInternal.h"
-#import "DOMaInternal.h"
+#import "DOMTestSubObjConstructorInternal.h"
 #import "DOManyInternal.h"
-#import "DOMbInternal.h"
 #import "DOMboolInternal.h"
-#import "DOMdInternal.h"
-#import "DOMeInternal.h"
 #import "Dictionary.h"
 #import "Document.h"
 #import "EventListener.h"
 #import "ExceptionHandlers.h"
 #import "HTMLNames.h"
-#import "IDBKey.h"
 #import "JSMainThreadExecState.h"
 #import "KURL.h"
 #import "Node.h"
 #import "ObjCEventListener.h"
 #import "SVGDocument.h"
+#import "SVGPoint.h"
 #import "SVGStaticPropertyTearOff.h"
 #import "SerializedScriptValue.h"
+#import "TestEnumType.h"
+#import "TestNode.h"
 #import "TestObj.h"
 #import "TestObjectAConstructor.h"
 #import "TestObjectBConstructor.h"
 #import "TestObjectCConstructor.h"
+#import "TestSubObjConstructor.h"
 #import "ThreadCheck.h"
 #import "WebCoreObjCExtras.h"
 #import "WebScriptObjectPrivate.h"
-#import "a.h"
 #import "any.h"
-#import "b.h"
 #import "bool.h"
-#import "d.h"
-#import "e.h"
 #import <wtf/GetPtr.h>
 
 #define IMPL reinterpret_cast<WebCore::TestObj*>(_internal)
@@ -115,6 +112,44 @@
 {
     WebCore::JSMainThreadNullState state;
     return kit(WTF::getPtr(IMPL->readOnlyTestObjAttr()));
+}
+
+- (DOMTestSubObjConstructor *)TestSubObjEnabledBySetting
+{
+    WebCore::JSMainThreadNullState state;
+    return kit(WTF::getPtr(IMPL->testSubObjEnabledBySetting()));
+}
+
+- (void)setTestSubObjEnabledBySetting:(DOMTestSubObjConstructor *)newTestSubObjEnabledBySetting
+{
+    WebCore::JSMainThreadNullState state;
+    ASSERT(newTestSubObjEnabledBySetting);
+
+    IMPL->setTestSubObjEnabledBySetting(core(newTestSubObjEnabledBySetting));
+}
+
+- (char)byteAttr
+{
+    WebCore::JSMainThreadNullState state;
+    return IMPL->byteAttr();
+}
+
+- (void)setByteAttr:(char)newByteAttr
+{
+    WebCore::JSMainThreadNullState state;
+    IMPL->setByteAttr(newByteAttr);
+}
+
+- (unsigned char)octetAttr
+{
+    WebCore::JSMainThreadNullState state;
+    return IMPL->octetAttr();
+}
+
+- (void)setOctetAttr:(unsigned char)newOctetAttr
+{
+    WebCore::JSMainThreadNullState state;
+    IMPL->setOctetAttr(newOctetAttr);
 }
 
 - (short)shortAttr
@@ -232,7 +267,7 @@
 - (NSString *)reflectedStringAttr
 {
     WebCore::JSMainThreadNullState state;
-    return IMPL->getAttribute(WebCore::HTMLNames::reflectedstringattrAttr);
+    return IMPL->fastGetAttribute(WebCore::HTMLNames::reflectedstringattrAttr);
 }
 
 - (void)setReflectedStringAttr:(NSString *)newReflectedStringAttr
@@ -268,7 +303,7 @@
 - (BOOL)reflectedBooleanAttr
 {
     WebCore::JSMainThreadNullState state;
-    return IMPL->hasAttribute(WebCore::HTMLNames::reflectedbooleanattrAttr);
+    return IMPL->fastHasAttribute(WebCore::HTMLNames::reflectedbooleanattrAttr);
 }
 
 - (void)setReflectedBooleanAttr:(BOOL)newReflectedBooleanAttr
@@ -292,7 +327,7 @@
 - (NSString *)reflectedStringAttr
 {
     WebCore::JSMainThreadNullState state;
-    return IMPL->getAttribute(WebCore::HTMLNames::customContentStringAttrAttr);
+    return IMPL->fastGetAttribute(WebCore::HTMLNames::customContentStringAttrAttr);
 }
 
 - (void)setReflectedStringAttr:(NSString *)newReflectedStringAttr
@@ -316,7 +351,7 @@
 - (BOOL)reflectedCustomBooleanAttr
 {
     WebCore::JSMainThreadNullState state;
-    return IMPL->hasAttribute(WebCore::HTMLNames::customContentBooleanAttrAttr);
+    return IMPL->fastHasAttribute(WebCore::HTMLNames::customContentBooleanAttrAttr);
 }
 
 - (void)setReflectedCustomBooleanAttr:(BOOL)newReflectedCustomBooleanAttr
@@ -639,7 +674,7 @@
 - (DOMSVGPoint *)mutablePoint
 {
     WebCore::JSMainThreadNullState state;
-    return kit(WTF::getPtr(WebCore::SVGStaticPropertyTearOff<WebCore::TestObj, WebCore::FloatPoint>::create(IMPL, IMPL->mutablePoint(), &WebCore::TestObj::updateMutablePoint)));
+    return kit(WTF::getPtr(WebCore::SVGStaticPropertyTearOff<WebCore::TestObj, WebCore::SVGPoint>::create(IMPL, IMPL->mutablePoint(), &WebCore::TestObj::updateMutablePoint)));
 }
 
 - (void)setMutablePoint:(DOMSVGPoint *)newMutablePoint
@@ -653,7 +688,7 @@
 - (DOMSVGPoint *)immutablePoint
 {
     WebCore::JSMainThreadNullState state;
-    return kit(WTF::getPtr(WebCore::SVGPropertyTearOff<WebCore::FloatPoint>::create(IMPL->immutablePoint())));
+    return kit(WTF::getPtr(WebCore::SVGPropertyTearOff<WebCore::SVGPoint>::create(IMPL->immutablePoint())));
 }
 
 - (void)setImmutablePoint:(DOMSVGPoint *)newImmutablePoint
@@ -718,6 +753,57 @@
     return IMPL->replaceableAttribute();
 }
 
+- (double)nullableDoubleAttribute
+{
+    WebCore::JSMainThreadNullState state;
+    return IMPL->nullableDoubleAttribute(isNull);
+}
+
+- (int)nullableLongAttribute
+{
+    WebCore::JSMainThreadNullState state;
+    return IMPL->nullableLongAttribute(isNull);
+}
+
+- (BOOL)nullableBooleanAttribute
+{
+    WebCore::JSMainThreadNullState state;
+    return IMPL->nullableBooleanAttribute(isNull);
+}
+
+- (NSString *)nullableStringAttribute
+{
+    WebCore::JSMainThreadNullState state;
+    return IMPL->nullableStringAttribute(isNull);
+}
+
+- (int)nullableLongSettableAttribute
+{
+    WebCore::JSMainThreadNullState state;
+    return IMPL->nullableLongSettableAttribute(isNull);
+}
+
+- (void)setNullableLongSettableAttribute:(int)newNullableLongSettableAttribute
+{
+    WebCore::JSMainThreadNullState state;
+    IMPL->setNullableLongSettableAttribute(newNullableLongSettableAttribute);
+}
+
+- (int)nullableStringValue
+{
+    WebCore::JSMainThreadNullState state;
+    WebCore::ExceptionCode ec = 0;
+    int result = IMPL->nullableStringValue(isNull, ec);
+    WebCore::raiseOnDOMError(ec);
+    return result;
+}
+
+- (void)setNullableStringValue:(int)newNullableStringValue
+{
+    WebCore::JSMainThreadNullState state;
+    IMPL->setNullableStringValue(newNullableStringValue);
+}
+
 - (void)voidMethod
 {
     WebCore::JSMainThreadNullState state;
@@ -728,6 +814,30 @@
 {
     WebCore::JSMainThreadNullState state;
     IMPL->voidMethodWithArgs(longArg, strArg, core(objArg));
+}
+
+- (char)byteMethod
+{
+    WebCore::JSMainThreadNullState state;
+    return IMPL->byteMethod();
+}
+
+- (char)byteMethodWithArgs:(char)byteArg strArg:(NSString *)strArg objArg:(DOMTestObj *)objArg
+{
+    WebCore::JSMainThreadNullState state;
+    return IMPL->byteMethodWithArgs(byteArg, strArg, core(objArg));
+}
+
+- (unsigned char)octetMethod
+{
+    WebCore::JSMainThreadNullState state;
+    return IMPL->octetMethod();
+}
+
+- (unsigned char)octetMethodWithArgs:(unsigned char)octetArg strArg:(NSString *)strArg objArg:(DOMTestObj *)objArg
+{
+    WebCore::JSMainThreadNullState state;
+    return IMPL->octetMethodWithArgs(octetArg, strArg, core(objArg));
 }
 
 - (int)longMethod
@@ -754,6 +864,12 @@
     return kit(WTF::getPtr(IMPL->objMethodWithArgs(longArg, strArg, core(objArg))));
 }
 
+- (void)methodWithEnumArg:(DOMTestEnumType *)enumArg
+{
+    WebCore::JSMainThreadNullState state;
+    IMPL->methodWithEnumArg(core(enumArg));
+}
+
 - (DOMTestObj *)methodThatRequiresAllArgsAndThrows:(NSString *)strArg objArg:(DOMTestObj *)objArg
 {
     WebCore::JSMainThreadNullState state;
@@ -767,12 +883,6 @@
 {
     WebCore::JSMainThreadNullState state;
     IMPL->serializedValue(WebCore::SerializedScriptValue::create(WTF::String(serializedArg)));
-}
-
-- (void)idbKey:(DOMIDBKey *)key
-{
-    WebCore::JSMainThreadNullState state;
-    IMPL->idbKey(core(key));
 }
 
 - (void)optionsObject:(DOMDictionary *)oo ooo:(DOMDictionary *)ooo
@@ -990,25 +1100,25 @@
     return result;
 }
 
-- (void)convert1:(DOMa *)value
+- (void)convert1:(DOMTestNode *)value
 {
     WebCore::JSMainThreadNullState state;
     IMPL->convert1(core(value));
 }
 
-- (void)convert2:(DOMb *)value
+- (void)convert2:(DOMTestNode *)value
 {
     WebCore::JSMainThreadNullState state;
     IMPL->convert2(core(value));
 }
 
-- (void)convert4:(DOMd *)value
+- (void)convert4:(DOMTestNode *)value
 {
     WebCore::JSMainThreadNullState state;
     IMPL->convert4(core(value));
 }
 
-- (void)convert5:(DOMe *)value
+- (void)convert5:(DOMTestNode *)value
 {
     WebCore::JSMainThreadNullState state;
     IMPL->convert5(core(value));
@@ -1017,13 +1127,13 @@
 - (DOMSVGPoint *)mutablePointFunction
 {
     WebCore::JSMainThreadNullState state;
-    return kit(WTF::getPtr(WebCore::SVGPropertyTearOff<WebCore::FloatPoint>::create(IMPL->mutablePointFunction())));
+    return kit(WTF::getPtr(WebCore::SVGPropertyTearOff<WebCore::SVGPoint>::create(IMPL->mutablePointFunction())));
 }
 
 - (DOMSVGPoint *)immutablePointFunction
 {
     WebCore::JSMainThreadNullState state;
-    return kit(WTF::getPtr(WebCore::SVGPropertyTearOff<WebCore::FloatPoint>::create(IMPL->immutablePointFunction())));
+    return kit(WTF::getPtr(WebCore::SVGPropertyTearOff<WebCore::SVGPoint>::create(IMPL->immutablePointFunction())));
 }
 
 - (void)orange

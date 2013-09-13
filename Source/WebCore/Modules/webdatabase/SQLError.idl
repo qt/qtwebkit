@@ -27,9 +27,10 @@
  */
 
 [
+    NoInterfaceObject,
     Conditional=SQL_DATABASE,
-    OmitConstructor,
-    JSNoStaticTables
+    JSNoStaticTables,
+    ImplementationLacksVTable
 ] interface SQLError {
     readonly attribute unsigned long code;
     readonly attribute DOMString message;

@@ -20,11 +20,10 @@
 #include "config.h"
 #include "ewk_js.h"
 
-#include <wtf/UnusedParam.h>
-
 #if ENABLE(NETSCAPE_PLUGIN_API)
 
 #include "NP_jsobject.h"
+#include "Operations.h"
 #include "ewk_js_private.h"
 #include "ewk_private.h"
 #include "npruntime.h"

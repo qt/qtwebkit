@@ -36,7 +36,6 @@
 namespace CoreIPC {
     class Connection;
     class MessageDecoder;
-    class MessageID;
 }
 
 namespace WebCore {
@@ -48,13 +47,10 @@ namespace WebKit {
 
 struct ColorSpaceData;
 class LayerTreeHost;
+class PageOverlay;
 class WebPage;
 struct WebPageCreationParameters;
 struct WebPreferencesStore;
-
-#if PLATFORM(WIN)
-struct WindowGeometry;
-#endif
 
 class DrawingArea {
     WTF_MAKE_NONCOPYABLE(DrawingArea);
@@ -63,10 +59,11 @@ public:
     static PassOwnPtr<DrawingArea> create(WebPage*, const WebPageCreationParameters&);
     virtual ~DrawingArea();
     
-    void didReceiveDrawingAreaMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::MessageDecoder&);
+    void didReceiveDrawingAreaMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&);
 
-    virtual void setNeedsDisplay(const WebCore::IntRect&) = 0;
-    virtual void scroll(const WebCore::IntRect& scrollRect, const WebCore::IntSize& scrollOffset) = 0;
+    virtual void setNeedsDisplay() = 0;
+    virtual void setNeedsDisplayInRect(const WebCore::IntRect&) = 0;
+    virtual void scroll(const WebCore::IntRect& scrollRect, const WebCore::IntSize& scrollDelta) = 0;
 
     // FIXME: These should be pure virtual.
     virtual void pageBackgroundTransparencyChanged() { }
@@ -76,17 +73,22 @@ public:
     virtual bool layerTreeStateIsFrozen() const { return false; }
     virtual LayerTreeHost* layerTreeHost() const { return 0; }
 
-    virtual void didInstallPageOverlay() { }
-    virtual void didUninstallPageOverlay() { }
-    virtual void setPageOverlayNeedsDisplay(const WebCore::IntRect&) { }
-    virtual void setPageOverlayOpacity(float) { }
+    virtual void didInstallPageOverlay(PageOverlay*) { }
+    virtual void didUninstallPageOverlay(PageOverlay*) { }
+    virtual void setPageOverlayNeedsDisplay(PageOverlay*, const WebCore::IntRect&) { }
+    virtual void setPageOverlayOpacity(PageOverlay*, float) { }
     // If this function returns false, PageOverlay should apply opacity when painting.
     virtual bool pageOverlayShouldApplyFadeWhenPainting() const { return true; }
-    virtual void pageCustomRepresentationChanged() { }
 
     virtual void setPaintingEnabled(bool) { }
     virtual void updatePreferences(const WebPreferencesStore&) { }
     virtual void mainFrameContentSizeChanged(const WebCore::IntSize&) { }
+
+    virtual void setExposedRect(const WebCore::FloatRect&) { }
+    virtual void setClipsToExposedRect(bool) { }
+    virtual void mainFrameScrollabilityChanged(bool) { }
+
+    virtual void didChangeScrollOffsetForAnyFrame() { }
 
 #if USE(ACCELERATED_COMPOSITING)
     virtual WebCore::GraphicsLayerFactory* graphicsLayerFactory() { return 0; }
@@ -95,11 +97,7 @@ public:
 #endif
 
 #if USE(COORDINATED_GRAPHICS)
-    virtual void didReceiveLayerTreeCoordinatorMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::MessageDecoder&) = 0;
-#endif
-
-#if PLATFORM(WIN)
-    virtual void scheduleChildWindowGeometryUpdate(const WindowGeometry&) = 0;
+    virtual void didReceiveCoordinatedLayerTreeHostMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&) = 0;
 #endif
 
     virtual void dispatchAfterEnsuringUpdatedScrollPosition(const Function<void ()>&);
@@ -122,7 +120,7 @@ private:
 
 #if PLATFORM(MAC)
     // Used by TiledCoreAnimationDrawingArea.
-    virtual void updateGeometry(const WebCore::IntSize& viewSize, double minimumLayoutWidth) { }
+    virtual void updateGeometry(const WebCore::IntSize& viewSize, const WebCore::IntSize& layerPosition) { }
     virtual void setDeviceScaleFactor(float) { }
     virtual void setColorSpace(const ColorSpaceData&) { }
 #endif

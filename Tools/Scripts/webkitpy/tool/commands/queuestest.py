@@ -26,7 +26,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import unittest
+import unittest2 as unittest
 
 from webkitpy.common.net.bugzilla import Attachment
 from webkitpy.common.system.outputcapture import OutputCapture
@@ -37,7 +37,7 @@ from webkitpy.tool.mocktool import MockTool
 
 
 class MockQueueEngine(object):
-    def __init__(self, name, queue, wakeup_event):
+    def __init__(self, name, queue, wakeup_event, seconds_to_sleep):
         pass
 
     def run(self):
@@ -79,7 +79,7 @@ class QueuesTest(unittest.TestCase):
             tool = MockTool()
             # This is a hack to make it easy for callers to not have to setup a custom MockFileSystem just to test the commit-queue
             # the cq tries to read the layout test results, and will hit a KeyError in MockFileSystem if we don't do this.
-            tool.filesystem.write_text_file('/mock-results/results.html', "")
+            tool.filesystem.write_text_file('/mock-results/full_results.json', "")
         if not expected_stdout:
             expected_stdout = {}
         if not expected_stderr:

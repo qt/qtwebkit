@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, 2012 Research In Motion Limited. All rights reserved.
+ * Copyright (C) 2011, 2012, 2013 Research In Motion Limited. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -19,17 +19,21 @@
 #include "config.h"
 #include "InRegionScrollableArea.h"
 
+#include "DOMSupport.h"
 #include "Document.h"
 #include "Frame.h"
-#include "LayerWebKitThread.h"
 #include "InRegionScroller_p.h"
+#include "LayerWebKitThread.h"
 #include "RenderBox.h"
 #include "RenderLayer.h"
 #include "RenderLayerBacking.h"
 #include "RenderLayerCompositor.h"
 #include "RenderObject.h"
 #include "RenderView.h"
+#include "WebKitThreadViewportAccessor.h"
 #include "WebPage_p.h"
+
+#include <BlackBerryPlatformViewportAccessor.h>
 
 using namespace WebCore;
 
@@ -79,9 +83,11 @@ InRegionScrollableArea::InRegionScrollableArea(WebPagePrivate* webPage, RenderLa
         Frame* frame = view->frame();
         ASSERT_UNUSED(frame, frame);
 
-        m_scrollPosition = m_webPage->mapToTransformed(view->scrollPosition());
-        m_contentsSize = m_webPage->mapToTransformed(view->contentsSize());
-        m_viewportSize = m_webPage->mapToTransformed(view->visibleContentRect(false /*includeScrollbars*/)).size();
+        const Platform::ViewportAccessor* viewportAccessor = m_webPage->m_webkitThreadViewportAccessor;
+        m_scrollPosition = viewportAccessor->roundToPixelFromDocumentContents(WebCore::FloatPoint(view->scrollPosition()));
+        m_contentsSize = viewportAccessor->roundToPixelFromDocumentContents(Platform::FloatRect(Platform::FloatPoint::zero(), WebCore::FloatSize(view->contentsSize()))).size();
+        m_viewportSize = viewportAccessor->roundToPixelFromDocumentContents(WebCore::FloatRect(view->visibleContentRect(ScrollableArea::ExcludeScrollbars))).size();
+        m_documentViewportRect = view->frameRect();
 
         m_scrollsHorizontally = view->contentsWidth() > view->visibleWidth();
         m_scrollsVertically = view->contentsHeight() > view->visibleHeight();
@@ -101,19 +107,36 @@ InRegionScrollableArea::InRegionScrollableArea(WebPagePrivate* webPage, RenderLa
         ASSERT(box);
         ASSERT(InRegionScrollerPrivate::canScrollRenderBox(box));
 
+        const Platform::ViewportAccessor* viewportAccessor = m_webPage->m_webkitThreadViewportAccessor;
         ScrollableArea* scrollableArea = static_cast<ScrollableArea*>(m_layer);
-        m_scrollPosition = m_webPage->mapToTransformed(scrollableArea->scrollPosition());
-        m_contentsSize = m_webPage->mapToTransformed(scrollableArea->contentsSize());
-        m_viewportSize = m_webPage->mapToTransformed(scrollableArea->visibleContentRect(false /*includeScrollbars*/)).size();
 
-        m_scrollsHorizontally = box->scrollWidth() != box->clientWidth() && box->scrollsOverflowX();
-        m_scrollsVertically = box->scrollHeight() != box->clientHeight() && box->scrollsOverflowY();
+        m_scrollPosition = viewportAccessor->roundToPixelFromDocumentContents(WebCore::FloatPoint(scrollableArea->scrollPosition()));
+        m_contentsSize = viewportAccessor->roundToPixelFromDocumentContents(Platform::FloatRect(Platform::FloatPoint::zero(), WebCore::FloatSize(scrollableArea->contentsSize()))).size();
+        m_viewportSize = viewportAccessor->roundToPixelFromDocumentContents(WebCore::FloatRect(scrollableArea->visibleContentRect(ScrollableArea::ExcludeScrollbars))).size();
+        m_documentViewportRect = enclosingIntRect(box->absoluteClippedOverflowRect());
+
+        m_scrollsHorizontally = box->scrollWidth() != box->clientWidth();
+        m_scrollsVertically = box->scrollHeight() != box->clientHeight();
+
+        // Check the overflow if its not an input field because overflow can be set to hidden etc. by the content.
+        if (!DOMSupport::isShadowHostTextInputElement(box->node())) {
+            m_scrollsHorizontally = m_scrollsHorizontally && box->scrollsOverflowX();
+            m_scrollsVertically = m_scrollsVertically && box->scrollsOverflowY();
+        }
 
         m_scrollTarget = BlockElement;
 
         // Both caches below are self-exclusive.
         if (m_layer->usesCompositedScrolling()) {
-            m_forceContentToBeVerticallyScrollable = true;
+            m_forceContentToBeHorizontallyScrollable = m_scrollsHorizontally;
+            m_forceContentToBeVerticallyScrollable = m_scrollsVertically;
+            // Force content to be scrollable even if it doesn't need to scroll in either direction.
+            if (!m_scrollsHorizontally && !m_scrollsVertically) {
+                if (box->scrollsOverflowY())
+                    m_forceContentToBeVerticallyScrollable = true;
+                else if (box->scrollsOverflowX()) // If it's already forced scrollable vertically, don't force it to scroll horizontally
+                    m_forceContentToBeHorizontallyScrollable = true;
+            }
             m_supportsCompositedScrolling = true;
             ASSERT(m_layer->backing()->hasScrollingLayer());
             m_camouflagedCompositedScrollableLayer = reinterpret_cast<unsigned>(m_layer->backing()->scrollingContentsLayer()->platformLayer());
@@ -149,6 +172,16 @@ Document* InRegionScrollableArea::document() const
 {
     ASSERT(!m_isNull);
     return m_document;
+}
+
+LayerWebKitThread* InRegionScrollableArea::cachedScrollableLayer() const
+{
+    return m_cachedCompositedScrollableLayer.get();
+}
+
+Node* InRegionScrollableArea::cachedScrollableNode() const
+{
+    return m_cachedNonCompositedScrollableNode.get();
 }
 
 }

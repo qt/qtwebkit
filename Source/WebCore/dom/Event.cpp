@@ -2,7 +2,7 @@
  * Copyright (C) 2001 Peter Kelly (pmk@post.com)
  * Copyright (C) 2001 Tobias Anton (anton@stud.fbi.fh-darmstadt.de)
  * Copyright (C) 2006 Samuel Weinig (sam.weinig@gmail.com)
- * Copyright (C) 2003, 2005, 2006, 2008 Apple Inc. All rights reserved.
+ * Copyright (C) 2003, 2005, 2006, 2008, 2013 Apple Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -27,7 +27,6 @@
 #include "EventNames.h"
 #include "EventTarget.h"
 #include "UserGestureIndicator.h"
-#include "WebCoreMemoryInstrumentation.h"
 #include <wtf/CurrentTime.h>
 #include <wtf/text/AtomicString.h>
 
@@ -39,6 +38,11 @@ EventInit::EventInit()
 {
 }
 
+EventInit::EventInit(bool b, bool c)
+    : bubbles(b)
+    , cancelable(c)
+{
+}
 
 Event::Event()
     : m_canBubble(false)
@@ -66,6 +70,21 @@ Event::Event(const AtomicString& eventType, bool canBubbleArg, bool cancelableAr
     , m_eventPhase(0)
     , m_currentTarget(0)
     , m_createTime(convertSecondsToDOMTimeStamp(currentTime()))
+{
+}
+
+Event::Event(const AtomicString& eventType, bool canBubbleArg, bool cancelableArg, double timestamp)
+    : m_type(eventType)
+    , m_canBubble(canBubbleArg)
+    , m_cancelable(cancelableArg)
+    , m_propagationStopped(false)
+    , m_immediatePropagationStopped(false)
+    , m_defaultPrevented(false)
+    , m_defaultHandled(false)
+    , m_cancelBubble(false)
+    , m_eventPhase(0)
+    , m_currentTarget(0)
+    , m_createTime(convertSecondsToDOMTimeStamp(timestamp))
 {
 }
 
@@ -122,6 +141,11 @@ bool Event::isMouseEvent() const
     return false;
 }
 
+bool Event::isFocusEvent() const
+{
+    return false;
+}
+
 bool Event::isKeyboardEvent() const
 {
     return false;
@@ -154,15 +178,6 @@ bool Event::isBeforeTextInsertedEvent() const
 
 void Event::storeResult(const String&)
 {
-}
-
-void Event::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::DOM);
-    info.addMember(m_type);
-    info.addMember(m_currentTarget);
-    info.addMember(m_target);
-    info.addMember(m_underlyingEvent);
 }
 
 PassRefPtr<Event> Event::cloneFor(HTMLIFrameElement*) const

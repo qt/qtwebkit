@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2012 Google Inc. All rights reserved.
+ * Copyright (C) 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -680,10 +681,10 @@ Decimal Decimal::floor() const
 
 Decimal Decimal::fromDouble(double doubleValue)
 {
-    if (isfinite(doubleValue))
+    if (std::isfinite(doubleValue))
         return fromString(String::numberToStringECMAScript(doubleValue));
 
-    if (isinf(doubleValue))
+    if (std::isinf(doubleValue))
         return infinity(doubleValue < 0 ? Negative : Positive);
 
     return nan();
@@ -945,10 +946,10 @@ String Decimal::toString() const
 {
     switch (m_data.formatClass()) {
     case EncodedData::ClassInfinity:
-        return sign() ? "-Infinity" : "Infinity";
+        return sign() ? ASCIILiteral("-Infinity") : ASCIILiteral("Infinity");
 
     case EncodedData::ClassNaN:
-        return "NaN";
+        return ASCIILiteral("NaN");
 
     case EncodedData::ClassNormal:
     case EncodedData::ClassZero:
@@ -956,7 +957,7 @@ String Decimal::toString() const
 
     default:
         ASSERT_NOT_REACHED();
-        return "";
+        return emptyString();
     }
 
     StringBuilder builder;

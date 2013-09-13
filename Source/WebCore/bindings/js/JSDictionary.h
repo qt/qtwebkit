@@ -30,20 +30,29 @@
 #include <heap/Strong.h>
 #include <heap/StrongInlines.h>
 #include <interpreter/CallFrame.h>
+#include <runtime/Operations.h>
 #include <wtf/Forward.h>
 
 namespace WebCore {
 
 class ArrayValue;
+class CSSFontFaceRule;
 class Dictionary;
+class DOMError;
 class DOMWindow;
 class EventTarget;
 class MediaKeyError;
+class MediaStream;
 class Node;
 class ScriptValue;
 class SerializedScriptValue;
 class Storage;
 class TrackBase;
+class VoidCallback;
+
+#if ENABLE(SCRIPTED_SPEECH)
+class SpeechRecognitionResultList;
+#endif
 
 class JSDictionary {
 public:
@@ -51,7 +60,7 @@ public:
         : m_exec(exec)
     {
         if (exec && initializerObject)
-            m_initializerObject = JSC::Strong<JSC::JSObject>(exec->globalData(), initializerObject);
+            m_initializerObject = JSC::Strong<JSC::JSObject>(exec->vm(), initializerObject);
     }
 
     // Returns false if any exceptions were thrown, regardless of whether the property was found.
@@ -92,6 +101,7 @@ private:
     static void convertValue(JSC::ExecState*, JSC::JSValue, int& result);
     static void convertValue(JSC::ExecState*, JSC::JSValue, unsigned& result);
     static void convertValue(JSC::ExecState*, JSC::JSValue, unsigned short& result);
+    static void convertValue(JSC::ExecState*, JSC::JSValue, unsigned long& result);
     static void convertValue(JSC::ExecState*, JSC::JSValue, unsigned long long& result);
     static void convertValue(JSC::ExecState*, JSC::JSValue, double& result);
     static void convertValue(JSC::ExecState*, JSC::JSValue, Dictionary& result);
@@ -107,13 +117,22 @@ private:
 #if ENABLE(VIDEO_TRACK)
     static void convertValue(JSC::ExecState*, JSC::JSValue, RefPtr<TrackBase>& result);
 #endif
-#if ENABLE(MUTATION_OBSERVERS) || ENABLE(WEB_INTENTS)
     static void convertValue(JSC::ExecState*, JSC::JSValue, HashSet<AtomicString>& result);
-#endif
     static void convertValue(JSC::ExecState*, JSC::JSValue, ArrayValue& result);
     static void convertValue(JSC::ExecState*, JSC::JSValue, RefPtr<Uint8Array>& result);
 #if ENABLE(ENCRYPTED_MEDIA)
     static void convertValue(JSC::ExecState*, JSC::JSValue, RefPtr<MediaKeyError>& result);
+#endif
+#if ENABLE(MEDIA_STREAM)
+    static void convertValue(JSC::ExecState*, JSC::JSValue, RefPtr<MediaStream>& result);
+#endif
+#if ENABLE(FONT_LOAD_EVENTS)
+    static void convertValue(JSC::ExecState*, JSC::JSValue, RefPtr<CSSFontFaceRule>& result);
+    static void convertValue(JSC::ExecState*, JSC::JSValue, RefPtr<DOMError>& result);
+    static void convertValue(JSC::ExecState*, JSC::JSValue, RefPtr<VoidCallback>& result);
+#endif
+#if ENABLE(SCRIPTED_SPEECH)
+    static void convertValue(JSC::ExecState*, JSC::JSValue, RefPtr<SpeechRecognitionResultList>&);
 #endif
 
     JSC::ExecState* m_exec;

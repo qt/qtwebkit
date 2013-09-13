@@ -27,6 +27,7 @@
 #include <QtCore/QFile>
 #include <QtCore/QFileInfo>
 #include <QtCore/QMimeDatabase>
+#include <QtCore/QUrl>
 
 QQuickUrlSchemeDelegate::QQuickUrlSchemeDelegate(QObject* parent)
     : QObject(parent)

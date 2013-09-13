@@ -27,8 +27,6 @@
 #include "JSNode.h"
 
 #include "Attr.h"
-#include "CachedImage.h"
-#include "CachedScript.h"
 #include "CDATASection.h"
 #include "Comment.h"
 #include "Document.h"
@@ -107,13 +105,13 @@ static inline bool isReachableFromDOM(JSNode* jsNode, Node* node, SlotVisitor& v
         // because it is the only thing keeping the image element alive, and if
         // the element is destroyed, its load event will not fire.
         // FIXME: The DOM should manage this issue without the help of JavaScript wrappers.
-        if (node->hasTagName(imgTag)) {
-            if (static_cast<HTMLImageElement*>(node)->hasPendingActivity())
+        if (isHTMLImageElement(node)) {
+            if (toHTMLImageElement(node)->hasPendingActivity())
                 return true;
         }
     #if ENABLE(VIDEO)
-        else if (node->hasTagName(audioTag)) {
-            if (!static_cast<HTMLAudioElement*>(node)->paused())
+        else if (isHTMLAudioElement(node)) {
+            if (!toHTMLAudioElement(node)->paused())
                 return true;
         }
     #endif
@@ -145,7 +143,7 @@ JSValue JSNode::insertBefore(ExecState* exec)
 {
     Node* imp = static_cast<Node*>(impl());
     ExceptionCode ec = 0;
-    bool ok = imp->insertBefore(toNode(exec->argument(0)), toNode(exec->argument(1)), ec, true);
+    bool ok = imp->insertBefore(toNode(exec->argument(0)), toNode(exec->argument(1)), ec, AttachLazily);
     setDOMException(exec, ec);
     if (ok)
         return exec->argument(0);
@@ -156,7 +154,7 @@ JSValue JSNode::replaceChild(ExecState* exec)
 {
     Node* imp = static_cast<Node*>(impl());
     ExceptionCode ec = 0;
-    bool ok = imp->replaceChild(toNode(exec->argument(0)), toNode(exec->argument(1)), ec, true);
+    bool ok = imp->replaceChild(toNode(exec->argument(0)), toNode(exec->argument(1)), ec, AttachLazily);
     setDOMException(exec, ec);
     if (ok)
         return exec->argument(1);
@@ -178,7 +176,7 @@ JSValue JSNode::appendChild(ExecState* exec)
 {
     Node* imp = static_cast<Node*>(impl());
     ExceptionCode ec = 0;
-    bool ok = imp->appendChild(toNode(exec->argument(0)), ec, true);
+    bool ok = imp->appendChild(toNode(exec->argument(0)), ec, AttachLazily);
     setDOMException(exec, ec);
     if (ok)
         return exec->argument(0);
@@ -218,7 +216,7 @@ static ALWAYS_INLINE JSValue createWrapperInline(ExecState* exec, JSDOMGlobalObj
                 wrapper = createJSHTMLWrapper(exec, globalObject, toHTMLElement(node));
 #if ENABLE(SVG)
             else if (node->isSVGElement())
-                wrapper = createJSSVGWrapper(exec, globalObject, static_cast<SVGElement*>(node));
+                wrapper = createJSSVGWrapper(exec, globalObject, toSVGElement(node));
 #endif
             else
                 wrapper = CREATE_DOM_WRAPPER(exec, globalObject, Element, node);
@@ -243,7 +241,7 @@ static ALWAYS_INLINE JSValue createWrapperInline(ExecState* exec, JSDOMGlobalObj
             break;
         case Node::DOCUMENT_NODE:
             // we don't want to cache the document itself in the per-document dictionary
-            return toJS(exec, globalObject, static_cast<Document*>(node));
+            return toJS(exec, globalObject, toDocument(node));
         case Node::DOCUMENT_TYPE_NODE:
             wrapper = CREATE_DOM_WRAPPER(exec, globalObject, DocumentType, node);
             break;

@@ -1,6 +1,6 @@
 /*
  * (C) 1999-2003 Lars Knoll (knoll@kde.org)
- * Copyright (C) 2004, 2005, 2006, 2008 Apple Inc. All rights reserved.
+ * Copyright (C) 2004, 2005, 2006, 2008, 2013 Apple Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -33,16 +33,8 @@
 #include "MemoryCache.h"
 #include "StyleCachedImage.h"
 #include "StylePendingImage.h"
-#include "WebCoreMemoryInstrumentation.h"
 
 namespace WebCore {
-
-CSSImageValue::CSSImageValue(ClassType classType, const String& url)
-    : CSSValue(classType)
-    , m_url(url)
-    , m_accessedImage(false)
-{
-}
 
 CSSImageValue::CSSImageValue(const String& url)
     : CSSValue(ImageClass)
@@ -71,25 +63,18 @@ StyleImage* CSSImageValue::cachedOrPendingImage()
     return m_image.get();
 }
 
-StyleCachedImage* CSSImageValue::cachedImage(CachedResourceLoader* loader, Element* initiatorElement)
-{
-    if (isCursorImageValue())
-        return static_cast<CSSCursorImageValue*>(this)->cachedImage(loader);
-    return cachedImage(loader, m_url, initiatorElement);
-}
-
-StyleCachedImage* CSSImageValue::cachedImage(CachedResourceLoader* loader, const String& url, Element* initiatorElement)
+StyleCachedImage* CSSImageValue::cachedImage(CachedResourceLoader* loader, const ResourceLoaderOptions& options)
 {
     ASSERT(loader);
 
     if (!m_accessedImage) {
         m_accessedImage = true;
 
-        CachedResourceRequest request(ResourceRequest(loader->document()->completeURL(url)));
-        if (initiatorElement)
-            request.setInitiator(initiatorElement);
-        else
+        CachedResourceRequest request(ResourceRequest(loader->document()->completeURL(m_url)), options);
+        if (m_initiatorName.isEmpty())
             request.setInitiator(cachedResourceRequestInitiators().css);
+        else
+            request.setInitiator(m_initiatorName);
         if (CachedResourceHandle<CachedImage> cachedImage = loader->requestImage(request))
             m_image = StyleCachedImage::create(cachedImage.get());
     }
@@ -97,17 +82,9 @@ StyleCachedImage* CSSImageValue::cachedImage(CachedResourceLoader* loader, const
     return (m_image && m_image->isCachedImage()) ? static_cast<StyleCachedImage*>(m_image.get()) : 0;
 }
 
-String CSSImageValue::cachedImageURL()
+StyleCachedImage* CSSImageValue::cachedImage(CachedResourceLoader* loader)
 {
-    if (!m_image || !m_image->isCachedImage())
-        return String();
-    return static_cast<StyleCachedImage*>(m_image.get())->cachedImage()->url();
-}
-
-void CSSImageValue::clearCachedImage()
-{
-    m_image = 0;
-    m_accessedImage = false;
+    return cachedImage(loader, CachedResourceLoader::defaultCachedResourceOptions());
 }
 
 bool CSSImageValue::hasFailedOrCanceledSubresources() const
@@ -120,9 +97,14 @@ bool CSSImageValue::hasFailedOrCanceledSubresources() const
     return cachedResource->loadFailedOrCanceled();
 }
 
+bool CSSImageValue::equals(const CSSImageValue& other) const
+{
+    return m_url == other.m_url;
+}
+
 String CSSImageValue::customCssText() const
 {
-    return "url(" + quoteCSSURLIfNeeded(m_url) + ")";
+    return "url(" + quoteCSSURLIfNeeded(m_url) + ')';
 }
 
 PassRefPtr<CSSValue> CSSImageValue::cloneForCSSOM() const
@@ -133,16 +115,9 @@ PassRefPtr<CSSValue> CSSImageValue::cloneForCSSOM() const
     return uriValue.release();
 }
 
-void CSSImageValue::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+bool CSSImageValue::knownToBeOpaque(const RenderObject* renderer) const
 {
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
-    info.addMember(m_url);
-    // No need to report m_image as it is counted as part of RenderArena.
-}
-
-bool CSSImageValue::hasAlpha(const RenderObject* renderer) const
-{
-    return m_image ? m_image->hasAlpha(renderer) : true;
+    return m_image ? m_image->knownToBeOpaque(renderer) : false;
 }
 
 } // namespace WebCore

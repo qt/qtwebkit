@@ -32,15 +32,18 @@
 #include "TestController.h"
 #include <climits>
 #include <cstdio>
-#include <WebKit2/WKDictionary.h>
 #include <WebKit2/WKContextPrivate.h>
+#include <WebKit2/WKData.h>
+#include <WebKit2/WKDictionary.h>
 #include <WebKit2/WKInspector.h>
 #include <WebKit2/WKRetainPtr.h>
 #include <wtf/OwnArrayPtr.h>
 #include <wtf/PassOwnArrayPtr.h>
+#include <wtf/PassOwnPtr.h>
 #include <wtf/text/CString.h>
 
 #if PLATFORM(MAC)
+#include <Carbon/Carbon.h>
 #include <WebKit2/WKPagePrivateMac.h>
 #endif
 
@@ -101,6 +104,7 @@ TestInvocation::TestInvocation(const std::string& pathOrURL)
     : m_url(AdoptWK, createWKURL(pathOrURL.c_str()))
     , m_pathOrURL(pathOrURL)
     , m_dumpPixels(false)
+    , m_timeout(0)
     , m_gotInitialResponse(false)
     , m_gotFinalMessage(false)
     , m_gotRepaint(false)
@@ -119,20 +123,21 @@ void TestInvocation::setIsPixelTest(const std::string& expectedPixelHash)
     m_expectedPixelHash = expectedPixelHash;
 }
 
-static const unsigned w3cSVGWidth = 480;
-static const unsigned w3cSVGHeight = 360;
-static const unsigned normalWidth = 800;
-static const unsigned normalHeight = 600;
+void TestInvocation::setCustomTimeout(int timeout)
+{
+    m_timeout = timeout;
+}
 
 static void sizeWebViewForCurrentTest(const char* pathOrURL)
 {
     bool isSVGW3CTest = strstr(pathOrURL, "svg/W3C-SVG-1.1") || strstr(pathOrURL, "svg\\W3C-SVG-1.1");
 
     if (isSVGW3CTest)
-        TestController::shared().mainWebView()->resizeTo(w3cSVGWidth, w3cSVGHeight);
+        TestController::shared().mainWebView()->resizeTo(TestController::w3cSVGViewWidth, TestController::w3cSVGViewHeight);
     else
-        TestController::shared().mainWebView()->resizeTo(normalWidth, normalHeight);
+        TestController::shared().mainWebView()->resizeTo(TestController::viewWidth, TestController::viewHeight);
 }
+
 static bool shouldLogFrameLoadDelegates(const char* pathOrURL)
 {
     return strstr(pathOrURL, "loading/");
@@ -166,32 +171,40 @@ static void updateTiledDrawingForCurrentTest(const char* pathOrURL)
 #endif
 }
 
-#if ENABLE(CSS_DEVICE_ADAPTATION)
 static bool shouldUseFixedLayout(const char* pathOrURL)
 {
-    return strstr(pathOrURL, "device-adapt/") || strstr(pathOrURL, "device-adapt\\");
-}
+#if ENABLE(CSS_DEVICE_ADAPTATION)
+    if (strstr(pathOrURL, "device-adapt/") || strstr(pathOrURL, "device-adapt\\"))
+        return true;
 #endif
+
+#if USE(TILED_BACKING_STORE) && PLATFORM(EFL)
+    if (strstr(pathOrURL, "sticky/") || strstr(pathOrURL, "sticky\\"))
+        return true;
+#endif
+    return false;
+
+    UNUSED_PARAM(pathOrURL);
+}
 
 static void updateLayoutType(const char* pathOrURL)
 {
-#if ENABLE(CSS_DEVICE_ADAPTATION)
     WKRetainPtr<WKMutableDictionaryRef> viewOptions = adoptWK(WKMutableDictionaryCreate());
     WKRetainPtr<WKStringRef> useFixedLayoutKey = adoptWK(WKStringCreateWithUTF8CString("UseFixedLayout"));
     WKRetainPtr<WKBooleanRef> useFixedLayoutValue = adoptWK(WKBooleanCreate(shouldUseFixedLayout(pathOrURL)));
     WKDictionaryAddItem(viewOptions.get(), useFixedLayoutKey.get(), useFixedLayoutValue.get());
 
     TestController::shared().ensureViewSupportsOptions(viewOptions.get());
-#else
-    UNUSED_PARAM(pathOrURL);
-#endif
 }
 
 void TestInvocation::invoke()
 {
+    TestController::TimeoutDuration timeoutToUse = TestController::LongTimeout;
     sizeWebViewForCurrentTest(m_pathOrURL.c_str());
     updateLayoutType(m_pathOrURL.c_str());
     updateTiledDrawingForCurrentTest(m_pathOrURL.c_str());
+
+    m_textOutput.clear();
 
     WKRetainPtr<WKStringRef> messageName = adoptWK(WKStringCreateWithUTF8CString("BeginTest"));
     WKRetainPtr<WKMutableDictionaryRef> beginTestMessageBody = adoptWK(WKMutableDictionaryCreate());
@@ -207,6 +220,10 @@ void TestInvocation::invoke()
     WKRetainPtr<WKStringRef> useWaitToDumpWatchdogTimerKey = adoptWK(WKStringCreateWithUTF8CString("UseWaitToDumpWatchdogTimer"));
     WKRetainPtr<WKBooleanRef> useWaitToDumpWatchdogTimerValue = adoptWK(WKBooleanCreate(TestController::shared().useWaitToDumpWatchdogTimer()));
     WKDictionaryAddItem(beginTestMessageBody.get(), useWaitToDumpWatchdogTimerKey.get(), useWaitToDumpWatchdogTimerValue.get());
+
+    WKRetainPtr<WKStringRef> timeoutKey = adoptWK(WKStringCreateWithUTF8CString("Timeout"));
+    WKRetainPtr<WKUInt64Ref> timeoutValue = adoptWK(WKUInt64Create(m_timeout));
+    WKDictionaryAddItem(beginTestMessageBody.get(), timeoutKey.get(), timeoutValue.get());
 
     WKContextPostMessageToInjectedBundle(TestController::shared().context(), messageName.get(), beginTestMessageBody.get());
 
@@ -226,7 +243,13 @@ void TestInvocation::invoke()
 
     WKPageLoadURL(TestController::shared().mainWebView()->page(), m_url.get());
 
-    TestController::shared().runUntil(m_gotFinalMessage, TestController::shared().useWaitToDumpWatchdogTimer() ? TestController::LongTimeout : TestController::NoTimeout);
+    if (TestController::shared().useWaitToDumpWatchdogTimer()) {
+        if (m_timeout > 0)
+            timeoutToUse = TestController::CustomTimeout;
+    } else
+        timeoutToUse = TestController::NoTimeout;
+    TestController::shared().runUntil(m_gotFinalMessage, timeoutToUse);
+
     if (!m_gotFinalMessage) {
         m_errorMessage = "Timed out waiting for final message from web process\n";
         m_webProcessIsUnresponsive = true;
@@ -253,6 +276,11 @@ end:
 
 void TestInvocation::dumpWebProcessUnresponsiveness()
 {
+    dumpWebProcessUnresponsiveness(m_errorMessage.c_str());
+}
+
+void TestInvocation::dumpWebProcessUnresponsiveness(const char* errorMessage)
+{
     const char* errorMessageToStderr = 0;
 #if PLATFORM(MAC)
     char buffer[64];
@@ -263,7 +291,7 @@ void TestInvocation::dumpWebProcessUnresponsiveness()
     errorMessageToStderr = "#PROCESS UNRESPONSIVE - WebProcess";
 #endif
 
-    dump(m_errorMessage.c_str(), errorMessageToStderr, true);
+    dump(errorMessage, errorMessageToStderr, true);
 }
 
 void TestInvocation::dump(const char* textToStdout, const char* textToStderr, bool seenError)
@@ -284,13 +312,42 @@ void TestInvocation::dump(const char* textToStdout, const char* textToStderr, bo
 
 void TestInvocation::dumpResults()
 {
-    dump(toWTFString(m_textOutput.get()).utf8().data());
+    if (m_textOutput.length() || !m_audioResult)
+        dump(m_textOutput.toString().utf8().data());
+    else
+        dumpAudio(m_audioResult.get());
 
     if (m_dumpPixels && m_pixelResult)
         dumpPixelsAndCompareWithExpected(m_pixelResult.get(), m_repaintRects.get());
 
     fputs("#EOF\n", stdout);
     fflush(stdout);
+    fflush(stderr);
+}
+
+void TestInvocation::dumpAudio(WKDataRef audioData)
+{
+    size_t length = WKDataGetSize(audioData);
+    if (!length)
+        return;
+
+    const unsigned char* data = WKDataGetBytes(audioData);
+
+    printf("Content-Type: audio/wav\n");
+    printf("Content-Length: %lu\n", static_cast<unsigned long>(length));
+
+    const size_t bytesToWriteInOneChunk = 1 << 15;
+    size_t dataRemainingToWrite = length;
+    while (dataRemainingToWrite) {
+        size_t bytesToWriteInThisChunk = std::min(dataRemainingToWrite, bytesToWriteInOneChunk);
+        size_t bytesWritten = fwrite(data, 1, bytesToWriteInThisChunk, stdout);
+        if (bytesWritten != bytesToWriteInThisChunk)
+            break;
+        dataRemainingToWrite -= bytesWritten;
+        data += bytesWritten;
+    }
+    printf("#EOF\n");
+    fprintf(stderr, "#EOF\n");
 }
 
 bool TestInvocation::compareActualHashToExpectedAndDumpResults(const char actualHash[33])
@@ -336,9 +393,6 @@ void TestInvocation::didReceiveMessageFromInjectedBundle(WKStringRef messageName
         ASSERT(WKGetTypeID(messageBody) == WKDictionaryGetTypeID());
         WKDictionaryRef messageBodyDictionary = static_cast<WKDictionaryRef>(messageBody);
 
-        WKRetainPtr<WKStringRef> textOutputKey(AdoptWK, WKStringCreateWithUTF8CString("TextOutput"));
-        m_textOutput = static_cast<WKStringRef>(WKDictionaryGetItemForKey(messageBodyDictionary, textOutputKey.get()));
-
         WKRetainPtr<WKStringRef> pixelResultKey = adoptWK(WKStringCreateWithUTF8CString("PixelResult"));
         m_pixelResult = static_cast<WKImageRef>(WKDictionaryGetItemForKey(messageBodyDictionary, pixelResultKey.get()));
         ASSERT(!m_pixelResult || m_dumpPixels);
@@ -346,11 +400,21 @@ void TestInvocation::didReceiveMessageFromInjectedBundle(WKStringRef messageName
         WKRetainPtr<WKStringRef> repaintRectsKey = adoptWK(WKStringCreateWithUTF8CString("RepaintRects"));
         m_repaintRects = static_cast<WKArrayRef>(WKDictionaryGetItemForKey(messageBodyDictionary, repaintRectsKey.get()));
 
+        WKRetainPtr<WKStringRef> audioResultKey =  adoptWK(WKStringCreateWithUTF8CString("AudioResult"));
+        m_audioResult = static_cast<WKDataRef>(WKDictionaryGetItemForKey(messageBodyDictionary, audioResultKey.get()));
+
         m_gotFinalMessage = true;
         TestController::shared().notifyDone();
         return;
     }
-    
+
+    if (WKStringIsEqualToUTF8CString(messageName, "TextOutput")) {
+        ASSERT(WKGetTypeID(messageBody) == WKStringGetTypeID());
+        WKStringRef textOutput = static_cast<WKStringRef>(messageBody);
+        m_textOutput.append(toWTFString(textOutput));
+        return;
+    }
+
     if (WKStringIsEqualToUTF8CString(messageName, "BeforeUnloadReturnValue")) {
         ASSERT(WKGetTypeID(messageBody) == WKBooleanGetTypeID());
         WKBooleanRef beforeUnloadReturnValue = static_cast<WKBooleanRef>(messageBody);
@@ -566,6 +630,34 @@ void TestInvocation::didReceiveMessageFromInjectedBundle(WKStringRef messageName
         return;
     }
 
+    if (WKStringIsEqualToUTF8CString(messageName, "SetHandlesAuthenticationChallenge")) {
+        ASSERT(WKGetTypeID(messageBody) == WKBooleanGetTypeID());
+        WKBooleanRef value = static_cast<WKBooleanRef>(messageBody);
+        TestController::shared().setHandlesAuthenticationChallenges(WKBooleanGetValue(value));
+        return;
+    }
+
+    if (WKStringIsEqualToUTF8CString(messageName, "SetAuthenticationUsername")) {
+        ASSERT(WKGetTypeID(messageBody) == WKStringGetTypeID());
+        WKStringRef username = static_cast<WKStringRef>(messageBody);
+        TestController::shared().setAuthenticationUsername(toWTFString(username));
+        return;
+    }
+
+    if (WKStringIsEqualToUTF8CString(messageName, "SetAuthenticationPassword")) {
+        ASSERT(WKGetTypeID(messageBody) == WKStringGetTypeID());
+        WKStringRef password = static_cast<WKStringRef>(messageBody);
+        TestController::shared().setAuthenticationPassword(toWTFString(password));
+        return;
+    }
+
+    if (WKStringIsEqualToUTF8CString(messageName, "SetBlockAllPlugins")) {
+        ASSERT(WKGetTypeID(messageBody) == WKBooleanGetTypeID());
+        WKBooleanRef shouldBlock = static_cast<WKBooleanRef>(messageBody);
+        TestController::shared().setBlockAllPlugins(WKBooleanGetValue(shouldBlock));
+        return;
+    }
+
     ASSERT_NOT_REACHED();
 }
 
@@ -584,8 +676,21 @@ WKRetainPtr<WKTypeRef> TestInvocation::didReceiveSynchronousMessageFromInjectedB
         return result;
     }
 
+    if (WKStringIsEqualToUTF8CString(messageName, "SecureEventInputIsEnabled")) {
+#if PLATFORM(MAC)
+        WKRetainPtr<WKBooleanRef> result(AdoptWK, WKBooleanCreate(IsSecureEventInputEnabled()));
+#else
+        WKRetainPtr<WKBooleanRef> result(AdoptWK, WKBooleanCreate(false));
+#endif
+        return result;
+    }
     ASSERT_NOT_REACHED();
     return 0;
+}
+
+void TestInvocation::outputText(const WTF::String& text)
+{
+    m_textOutput.append(text);
 }
 
 } // namespace WTR

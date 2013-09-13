@@ -30,10 +30,11 @@
 #include <wtf/Vector.h>
 #include <wtf/text/WTFString.h>
 
-typedef struct _Evas_Object Evas_Object;
+#if HAVE(ACCESSIBILITY)
+#include <atk/atk.h>
+#endif
+
 typedef struct _Ewk_History_Item Ewk_History_Item;
-typedef struct _Ewk_Intent Ewk_Intent;
-typedef struct _Ewk_Intent_Request Ewk_Intent_Request;
 
 typedef Vector<Ewk_History_Item*> HistoryItemChildrenVector;
 
@@ -52,17 +53,13 @@ public:
     static void setDumpRenderTreeModeEnabled(bool);
     static bool dumpRenderTreeModeEnabled();
 
-    static unsigned activeAnimationsCount(const Evas_Object* ewkFrame);
     static bool callShouldCloseOnWebView(Evas_Object* ewkFrame);
     static void clearFrameName(Evas_Object* ewkFrame);
     static void clearOpener(Evas_Object* ewkFrame);
     static String counterValueByElementId(const Evas_Object* ewkFrame, const char* elementId);
-    static bool elementDoesAutoCompleteForElementWithId(const Evas_Object* ewkFrame, const String& elementId);
     static Eina_List* frameChildren(const Evas_Object* ewkFrame);
     static WebCore::Frame* frameParent(const Evas_Object* ewkFrame);
     static void layoutFrame(Evas_Object* ewkFrame);
-    static bool pauseAnimation(Evas_Object* ewkFrame, const char* name, const char* elementId, double time);
-    static bool pauseTransition(Evas_Object* ewkFrame, const char* name, const char* elementId, double time);
     static unsigned pendingUnloadEventCount(const Evas_Object* ewkFrame);
     static String renderTreeDump(Evas_Object* ewkFrame);
     static String responseMimeType(const Evas_Object* ewkFrame);
@@ -70,7 +67,6 @@ public:
     static String suitableDRTFrameName(const Evas_Object* ewkFrame);
     static String layerTreeAsText(const Evas_Object* ewkFrame);
     static void setValueForUser(JSContextRef, JSValueRef nodeObject, const String& value);
-    static void setAutofilled(JSContextRef, JSValueRef nodeObject, bool autofilled);
     static void setDefersLoading(Evas_Object* ewkView, bool defers);
     static void setLoadsSiteIconsIgnoringImageLoadingSetting(Evas_Object* ewkView, bool loadsSiteIconsIgnoringImageLoadingPreferences);
     static void setMinimumLogicalFontSize(Evas_Object* ewkView, int size);
@@ -84,8 +80,8 @@ public:
     static bool isCommandEnabled(const Evas_Object* ewkView, const char* name);
     static void setCSSGridLayoutEnabled(const Evas_Object* ewkView, bool enabled);
     static void setCSSRegionsEnabled(const Evas_Object* ewkView, bool enabled);
-    static void setSmartInsertDeleteEnabled(Evas_Object* ewkView, bool enabled);
-    static void setSelectTrailingWhitespaceEnabled(Evas_Object* ewkView, bool enabled);
+    static void setSeamlessIFramesEnabled(bool);
+    static void setWebAudioEnabled(Evas_Object* ewkView, bool);
 
     static void forceLayout(Evas_Object* ewkFrame);
     static void setTracksRepaints(Evas_Object* ewkFrame, bool enabled);
@@ -96,7 +92,6 @@ public:
     static void garbageCollectorCollect();
     static void garbageCollectorCollectOnAlternateThread(bool waitUntilDone);
     static size_t javaScriptObjectsCount();
-    static unsigned workerThreadCount();
 
     static void setDeadDecodedDataDeletionInterval(double);
 
@@ -110,20 +105,13 @@ public:
     static void setMockScrollbarsEnabled(bool);
 
     static void deliverAllMutationsIfNecessary();
-    static String markerTextForListItem(JSContextRef, JSValueRef nodeObject);
     static void setInteractiveFormValidationEnabled(Evas_Object* ewkView, bool enabled);
     static void setValidationMessageTimerMagnification(Evas_Object* ewkView, int value);
-    static JSValueRef computedStyleIncludingVisitedInfo(JSContextRef, JSValueRef);
     static void setAuthorAndUserStylesEnabled(Evas_Object* ewkView, bool);
     static void setDomainRelaxationForbiddenForURLScheme(bool forbidden, const String& scheme);
     static void setSerializeHTTPLoads(bool);
     static void setShouldTrackVisitedLinks(bool);
     
-    // Web Intents
-    static void sendWebIntentResponse(Ewk_Intent_Request*, JSStringRef response);
-    static WebCore::MessagePortChannelArray* intentMessagePorts(const Ewk_Intent*);
-    static void deliverWebIntent(Evas_Object* ewkFrame, JSStringRef action, JSStringRef type, JSStringRef data);
-
     // TextInputController
     static void setComposition(Evas_Object*, const char*, int, int);
     static bool hasComposition(const Evas_Object*);
@@ -138,6 +126,12 @@ public:
     static void setMockGeolocationPosition(const Evas_Object*, double latitude, double longitude, double accuracy, bool canProvideAltitude, double altitude, bool canProvideAltitudeAccuracy, double altitudeAccuracy, bool canProvideHeading, double heading, bool canProvideSpeed, double speed);
     static void setMockGeolocationPositionUnavailableError(const Evas_Object*, const char* errorMessage);
     static int numberOfPendingGeolocationPermissionRequests(const Evas_Object*);
+
+#if HAVE(ACCESSIBILITY)
+    static String accessibilityHelpText(const AtkObject* axObject);
+    static AtkObject* focusedAccessibleElement(const Evas_Object*);
+    static AtkObject* rootAccessibleElement(const Evas_Object*);
+#endif
 
 private:
     static bool s_drtRun;

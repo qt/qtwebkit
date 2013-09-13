@@ -56,7 +56,7 @@
 #define info(format, args...)       \
     do {                            \
         if (verbose)                \
-            printf(format, ##args); \
+            printf(format"\n", ##args); \
     } while (0)
 
 #define MIN_ZOOM_LEVEL 0
@@ -115,6 +115,8 @@ static const Ecore_Getopt options = {
              ecore_getopt_callback_ecore_evas_list_engines, NULL),
         ECORE_GETOPT_CHOICE
             ('b', "backing-store", "choose backing store to use.", backingStores),
+        ECORE_GETOPT_STORE_DOUBLE
+            ('r', "device-pixel-ratio", "Ratio between the CSS units and device pixels."),
         ECORE_GETOPT_STORE_DEF_BOOL
             ('c', "encoding-detector", "enable/disable encoding detector", 0),
         ECORE_GETOPT_STORE_DEF_BOOL
@@ -148,6 +150,7 @@ typedef struct _User_Arguments {
     char *engine;
     Eina_Bool quitOption;
     char *backingStore;
+    float device_pixel_ratio;
     Eina_Bool enableEncodingDetector;
     Eina_Bool enableTiledBackingStore;
     Eina_Bool isFlattening;
@@ -323,16 +326,16 @@ on_load_finished(void *user_data, Evas_Object *webview, void *event_info)
     const Ewk_Frame_Load_Error *err = (const Ewk_Frame_Load_Error *)event_info;
 
     if (!err)
-        info("Succeeded loading page.\n");
+        info("Succeeded loading page.");
     else if (err->is_cancellation)
-        info("Load was cancelled.\n");
+        info("Load was cancelled.");
     else
-        info("Failed loading page: %d %s \"%s\", url=%s\n",
+        info("Failed loading page: %d %s \"%s\", url=%s",
              err->code, err->domain, err->description, err->failing_url);
 
     currentZoom = ewk_view_zoom_get(webview);
     currentZoomLevel = nearest_zoom_level_get(currentZoom);
-    info("WebCore Zoom=%f, currentZoomLevel=%d\n", currentZoom, currentZoomLevel);
+    info("WebCore Zoom=%f, currentZoomLevel=%d", currentZoom, currentZoomLevel);
 }
 
 static void
@@ -429,13 +432,13 @@ static void
 on_tooltip_text_set(void* user_data, Evas_Object* webview, void* event_info)
 {
     const char *text = (const char *)event_info;
-    info("Tooltip is set: %s\n", text);
+    info("Tooltip is set: %s", text);
 }
 
 static void
 on_tooltip_text_unset(void* user_data, Evas_Object* webview, void* event_info)
 {
-    info("Tooltip is unset\n");
+    info("Tooltip is unset");
 }
 
 static void
@@ -443,13 +446,13 @@ on_inputmethod_changed(void* user_data, Evas_Object* webview, void* event_info)
 {
     Eina_Bool active = (Eina_Bool)(long)event_info;
     unsigned int imh;
-    info("Keyboard changed: %d\n", active);
+    info("Keyboard changed: %d", active);
 
     if (!active)
         return;
 
     imh = ewk_view_imh_get(webview);
-    info("    Keyboard flags: %#.2x\n", imh);
+    info("    Keyboard flags: %#.2x", imh);
 
 }
 
@@ -474,13 +477,13 @@ on_mouse_down(void* data, Evas* e, Evas_Object* webview, void* event_info)
 static void
 on_focus_out(void *data, Evas *e, Evas_Object *obj, void *event_info)
 {
-    info("the webview lost keyboard focus\n");
+    info("the webview lost keyboard focus");
 }
 
 static void
 on_focus_in(void *data, Evas *e, Evas_Object *obj, void *event_info)
 {
-    info("the webview gained keyboard focus\n");
+    info("the webview gained keyboard focus");
 }
 
 static void
@@ -494,12 +497,14 @@ on_key_down(void *data, Evas *e, Evas_Object *obj, void *event_info)
         NULL
     };
     static int currentEncoding = -1;
-    Eina_Bool ctrlPressed = evas_key_modifier_is_set(evas_key_modifier_get(e), "Control");
+    const Evas_Modifier *mod = evas_key_modifier_get(e);
+    Eina_Bool ctrlPressed = evas_key_modifier_is_set(mod, "Control");
+    Eina_Bool altPressed = evas_key_modifier_is_set(mod, "Alt");
 
     if (!strcmp(ev->key, "Escape")) {
         closeWindow(app->ee);
-    } else if (!strcmp(ev->key, "F1")) {
-        info("Back (F1) was pressed\n");
+    } else if (!strcmp(ev->key, "Left") && altPressed) {
+        info("Back (Alt+Left) was pressed");
         if (ewk_view_back_possible(obj)) {
             Ewk_History *history = ewk_view_history_get(obj);
             Eina_List *list = ewk_history_back_list_get(history);
@@ -507,9 +512,9 @@ on_key_down(void *data, Evas *e, Evas_Object *obj, void *event_info)
             ewk_history_item_list_free(list);
             ewk_view_back(obj);
         } else
-            info("Back ignored: No back history\n");
-    } else if (!strcmp(ev->key, "F2")) {
-        info("Forward (F2) was pressed\n");
+            info("Back ignored: No back history");
+    } else if (!strcmp(ev->key, "Right") && altPressed) {
+        info("Forward (Alt+Right) was pressed");
         if (ewk_view_forward_possible(obj)) {
             Ewk_History *history = ewk_view_history_get(obj);
             Eina_List *list = ewk_history_forward_list_get(history);
@@ -517,7 +522,7 @@ on_key_down(void *data, Evas *e, Evas_Object *obj, void *event_info)
             ewk_history_item_list_free(list);
             ewk_view_forward(obj);
         } else
-            info("Forward ignored: No forward history\n");
+            info("Forward ignored: No forward history");
     } else if (!strcmp(ev->key, "F3")) {
         currentEncoding++;
         currentEncoding %= (sizeof(encodings) / sizeof(encodings[0]));
@@ -570,29 +575,29 @@ on_key_down(void *data, Evas *e, Evas_Object *obj, void *event_info)
         }
 
     } else if (!strcmp(ev->key, "F5")) {
-        info("Reload (F5) was pressed, reloading.\n");
+        info("Reload (F5) was pressed, reloading.");
         ewk_view_reload(obj);
     } else if (!strcmp(ev->key, "F6")) {
-        info("Stop (F6) was pressed, stop loading.\n");
+        info("Stop (F6) was pressed, stop loading.");
         ewk_view_stop(obj);
     } else if (!strcmp(ev->key, "F12")) {
         Eina_Bool status = ewk_view_setting_spatial_navigation_get(obj);
         ewk_view_setting_spatial_navigation_set(obj, !status);
-        info("Command::keyboard navigation toggle\n");
+        info("Command::keyboard navigation toggle");
     } else if ((!strcmp(ev->key, "minus") || !strcmp(ev->key, "KP_Subtract")) && ctrlPressed) {
         if (currentZoomLevel > MIN_ZOOM_LEVEL && zoom_level_set(obj, currentZoomLevel - 1))
             currentZoomLevel--;
-        info("Zoom out (Ctrl + '-') was pressed, zoom level became %.2f\n", zoomLevels[currentZoomLevel] / 100.0);
+        info("Zoom out (Ctrl + '-') was pressed, zoom level became %.2f", zoomLevels[currentZoomLevel] / 100.0);
     } else if ((!strcmp(ev->key, "equal") || !strcmp(ev->key, "KP_Add")) && ctrlPressed) {
         if (currentZoomLevel < MAX_ZOOM_LEVEL && zoom_level_set(obj, currentZoomLevel + 1))
             currentZoomLevel++;
-        info("Zoom in (Ctrl + '+') was pressed, zoom level became %.2f\n", zoomLevels[currentZoomLevel] / 100.0);
+        info("Zoom in (Ctrl + '+') was pressed, zoom level became %.2f", zoomLevels[currentZoomLevel] / 100.0);
     } else if (!strcmp(ev->key, "0") && ctrlPressed) {
         if (zoom_level_set(obj, DEFAULT_ZOOM_LEVEL))
             currentZoomLevel = DEFAULT_ZOOM_LEVEL;
-        info("Zoom to default (Ctrl + '0') was pressed, zoom level became %.2f\n", zoomLevels[currentZoomLevel] / 100.0);
+        info("Zoom to default (Ctrl + '0') was pressed, zoom level became %.2f", zoomLevels[currentZoomLevel] / 100.0);
     } else if (!strcmp(ev->key, "n") && ctrlPressed) {
-        info("Create new window (Ctrl+n) was pressed.\n");
+        info("Create new window (Ctrl+n) was pressed.");
         browserCreate("http://www.google.com", app->userArgs);
     } else if (!strcmp(ev->key, "g") && ctrlPressed ) {
         Evas_Coord x, y, w, h;
@@ -604,7 +609,7 @@ on_key_down(void *data, Evas *e, Evas_Object *obj, void *event_info)
         y -= h;
         w *= 4;
         h *= 4;
-        info("Pre-render %d,%d + %dx%d\n", x, y, w, h);
+        info("Pre-render %d,%d + %dx%d", x, y, w, h);
         ewk_view_pre_render_region(obj, x, y, w, h, zoom);
     } else if (!strcmp(ev->key, "r") && ctrlPressed) {
         info("Pre-render 1 extra column/row with current zoom");
@@ -652,10 +657,10 @@ on_key_down(void *data, Evas *e, Evas_Object *obj, void *event_info)
     } else if (!strcmp(ev->key, "i") && ctrlPressed) {
         Evas_Object *inspector_view = ewk_view_inspector_view_get(obj);
         if (inspector_view) {
-            info("Web Inspector close\n");
+            info("Web Inspector close");
             ewk_view_inspector_close(obj);
         } else {
-            info("Web Inspector show\n");
+            info("Web Inspector show");
             ewk_view_inspector_show(obj);
         }
     }
@@ -846,10 +851,10 @@ windowCreate(User_Arguments *userArgs)
 
     if (userArgs->backingStore && !strcasecmp(userArgs->backingStore, "tiled")) {
         app->browser = ewk_view_tiled_add(app->evas);
-        info("backing store: tiled\n");
+        info("backing store: tiled");
     } else {
         app->browser = ewk_view_single_add(app->evas);
-        info("backing store: single\n");
+        info("backing store: single");
 
         ewk_view_setting_tiled_backing_store_enabled_set(app->browser, userArgs->enableTiledBackingStore);
     }
@@ -861,6 +866,7 @@ windowCreate(User_Arguments *userArgs)
     ewk_view_setting_local_storage_database_path_set(app->browser, userArgs->databasePath);
     ewk_view_setting_enable_frame_flattening_set(app->browser, userArgs->isFlattening);
     ewk_view_setting_encoding_detector_set(app->browser, userArgs->enableEncodingDetector);
+    ewk_view_device_pixel_ratio_set(app->browser, userArgs->device_pixel_ratio);
 
     app->userArgs = userArgs;
     app->url_bar = NULL;
@@ -911,7 +917,7 @@ main_signal_exit(void *data, int ev_type, void *ev)
 static char *
 findThemePath(const char *theme)
 {
-    const char *default_theme = THEME_DIR"/default.edj";
+    const char *default_theme = TEST_THEME_DIR "/default.edj";
     char *rpath;
     struct stat st;
 
@@ -936,6 +942,7 @@ parseUserArguments(int argc, char *argv[], User_Arguments *userArgs)
     userArgs->engine = NULL;
     userArgs->quitOption = EINA_FALSE;
     userArgs->backingStore = (char *)backingStores[1];
+    userArgs->device_pixel_ratio = 1.0;
     userArgs->enableEncodingDetector = EINA_FALSE;
     userArgs->enableTiledBackingStore = EINA_FALSE;
     userArgs->isFlattening = EINA_FALSE;
@@ -951,6 +958,7 @@ parseUserArguments(int argc, char *argv[], User_Arguments *userArgs)
         ECORE_GETOPT_VALUE_STR(userArgs->engine),
         ECORE_GETOPT_VALUE_BOOL(userArgs->quitOption),
         ECORE_GETOPT_VALUE_STR(userArgs->backingStore),
+        ECORE_GETOPT_VALUE_DOUBLE(userArgs->device_pixel_ratio),
         ECORE_GETOPT_VALUE_BOOL(userArgs->enableEncodingDetector),
         ECORE_GETOPT_VALUE_BOOL(userArgs->isFlattening),
         ECORE_GETOPT_VALUE_BOOL(userArgs->isFullscreen),
@@ -990,17 +998,11 @@ main(int argc, char *argv[])
 
     User_Arguments userArgs;
 
-    if (!ecore_evas_init())
+    if (!ewk_init())
         return EXIT_FAILURE;
-
-    if (!edje_init()) {
-        ecore_evas_shutdown();
-        return EXIT_FAILURE;
-    }
 
     if (!ecore_file_init()) {
-        edje_shutdown();
-        ecore_evas_shutdown();
+        ewk_shutdown();
         return EXIT_FAILURE;
     }
 
@@ -1014,7 +1016,6 @@ main(int argc, char *argv[])
     if (!themePath)
         return quit(EINA_FALSE, "ERROR: could not find theme.\n");
 
-    ewk_init();
     tmp = getenv("TMPDIR");
     if (!tmp)
         tmp = "/tmp";
@@ -1042,6 +1043,7 @@ main(int argc, char *argv[])
 
     ecore_main_loop_begin();
 
+    ecore_file_shutdown();
     ewk_shutdown();
 
     return quit(EINA_TRUE, NULL);

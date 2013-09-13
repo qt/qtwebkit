@@ -26,7 +26,7 @@
 #ifndef ScrollingStateFixedNode_h
 #define ScrollingStateFixedNode_h
 
-#if ENABLE(THREADED_SCROLLING)
+#if ENABLE(THREADED_SCROLLING) || USE(COORDINATED_GRAPHICS)
 
 #include "ScrollingConstraints.h"
 #include "ScrollingStateNode.h"
@@ -45,11 +45,9 @@ public:
 
     virtual ~ScrollingStateFixedNode();
 
-    enum ChangedPropertyForFixed {
-        ViewportConstraints = 1 << 0
+    enum {
+        ViewportConstraints = NumStateNodeBits
     };
-
-    virtual unsigned changedProperties() const OVERRIDE { return m_changedProperties; }
 
     void updateConstraints(const FixedPositionViewportConstraints&);
     const FixedPositionViewportConstraints& viewportConstraints() const { return m_constraints; }
@@ -60,18 +58,16 @@ private:
 
     virtual bool isFixedNode() OVERRIDE { return true; }
 
-    virtual bool hasChangedProperties() const OVERRIDE { return m_changedProperties; }
-    virtual void resetChangedProperties() OVERRIDE { m_changedProperties = 0; }
+    virtual void syncLayerPositionForViewportRect(const LayoutRect& viewportRect) OVERRIDE;
 
     virtual void dumpProperties(TextStream&, int indent) const OVERRIDE;
 
     FixedPositionViewportConstraints m_constraints;
-    unsigned m_changedProperties;
 };
 
 inline ScrollingStateFixedNode* toScrollingStateFixedNode(ScrollingStateNode* node)
 {
-    ASSERT(!node || node->isFixedNode());
+    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->isFixedNode());
     return static_cast<ScrollingStateFixedNode*>(node);
 }
     
@@ -80,6 +76,6 @@ void toScrollingStateFixedNode(const ScrollingStateFixedNode*);
 
 } // namespace WebCore
 
-#endif // ENABLE(THREADED_SCROLLING)
+#endif // ENABLE(THREADED_SCROLLING) || USE(COORDINATED_GRAPHICS)
 
 #endif // ScrollingStateFixedNode_h

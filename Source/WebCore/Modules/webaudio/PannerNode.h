@@ -26,9 +26,9 @@
 #define PannerNode_h
 
 #include "AudioBus.h"
-#include "AudioGain.h"
 #include "AudioListener.h"
 #include "AudioNode.h"
+#include "AudioParam.h"
 #include "Cone.h"
 #include "Distance.h"
 #include "FloatPoint3D.h"
@@ -60,7 +60,7 @@ public:
         INVERSE_DISTANCE = 1,
         EXPONENTIAL_DISTANCE = 2,
     };
-    
+
     static PassRefPtr<PannerNode> create(AudioContext* context, float sampleRate)
     {
         return adoptRef(new PannerNode(context, sampleRate));
@@ -79,8 +79,9 @@ public:
     AudioListener* listener();
 
     // Panning model
-    unsigned short panningModel() const { return m_panningModel; }
-    void setPanningModel(unsigned short, ExceptionCode&);
+    String panningModel() const;
+    bool setPanningModel(unsigned); // Returns true on success.
+    void setPanningModel(const String&);
 
     // Position
     FloatPoint3D position() const { return m_position; }
@@ -95,34 +96,35 @@ public:
     void setVelocity(float x, float y, float z) { m_velocity = FloatPoint3D(x, y, z); }
 
     // Distance parameters
-    unsigned short distanceModel() { return m_distanceEffect.model(); }
-    void setDistanceModel(unsigned short, ExceptionCode&);
+    String distanceModel() const;
+    bool setDistanceModel(unsigned); // Returns true on success.
+    void setDistanceModel(const String&);
 
-    float refDistance() { return static_cast<float>(m_distanceEffect.refDistance()); }
-    void setRefDistance(float refDistance) { m_distanceEffect.setRefDistance(refDistance); }
+    double refDistance() { return m_distanceEffect.refDistance(); }
+    void setRefDistance(double refDistance) { m_distanceEffect.setRefDistance(refDistance); }
 
-    float maxDistance() { return static_cast<float>(m_distanceEffect.maxDistance()); }
-    void setMaxDistance(float maxDistance) { m_distanceEffect.setMaxDistance(maxDistance); }
+    double maxDistance() { return m_distanceEffect.maxDistance(); }
+    void setMaxDistance(double maxDistance) { m_distanceEffect.setMaxDistance(maxDistance); }
 
-    float rolloffFactor() { return static_cast<float>(m_distanceEffect.rolloffFactor()); }
-    void setRolloffFactor(float rolloffFactor) { m_distanceEffect.setRolloffFactor(rolloffFactor); }
+    double rolloffFactor() { return m_distanceEffect.rolloffFactor(); }
+    void setRolloffFactor(double rolloffFactor) { m_distanceEffect.setRolloffFactor(rolloffFactor); }
 
     // Sound cones - angles in degrees
-    float coneInnerAngle() const { return static_cast<float>(m_coneEffect.innerAngle()); }
-    void setConeInnerAngle(float angle) { m_coneEffect.setInnerAngle(angle); }
+    double coneInnerAngle() const { return m_coneEffect.innerAngle(); }
+    void setConeInnerAngle(double angle) { m_coneEffect.setInnerAngle(angle); }
 
-    float coneOuterAngle() const { return static_cast<float>(m_coneEffect.outerAngle()); }
-    void setConeOuterAngle(float angle) { m_coneEffect.setOuterAngle(angle); }
+    double coneOuterAngle() const { return m_coneEffect.outerAngle(); }
+    void setConeOuterAngle(double angle) { m_coneEffect.setOuterAngle(angle); }
 
-    float coneOuterGain() const { return static_cast<float>(m_coneEffect.outerGain()); }
-    void setConeOuterGain(float angle) { m_coneEffect.setOuterGain(angle); }
+    double coneOuterGain() const { return m_coneEffect.outerGain(); }
+    void setConeOuterGain(double angle) { m_coneEffect.setOuterGain(angle); }
 
     void getAzimuthElevation(double* outAzimuth, double* outElevation);
     float dopplerRate();
 
     // Accessors for dynamically calculated gain values.
-    AudioGain* distanceGain() { return m_distanceGain.get(); }                                        
-    AudioGain* coneGain() { return m_coneGain.get(); }                                        
+    AudioParam* distanceGain() { return m_distanceGain.get(); }
+    AudioParam* coneGain() { return m_coneGain.get(); }
 
     virtual double tailTime() const OVERRIDE { return m_panner ? m_panner->tailTime() : 0; }
     virtual double latencyTime() const OVERRIDE { return m_panner ? m_panner->latencyTime() : 0; }
@@ -145,13 +147,16 @@ private:
     FloatPoint3D m_velocity;
 
     // Gain
-    RefPtr<AudioGain> m_distanceGain;
-    RefPtr<AudioGain> m_coneGain;
+    RefPtr<AudioParam> m_distanceGain;
+    RefPtr<AudioParam> m_coneGain;
     DistanceEffect m_distanceEffect;
     ConeEffect m_coneEffect;
     float m_lastGain;
 
     unsigned m_connectionCount;
+
+    // Synchronize process() and setPanningModel() which can change the panner.
+    mutable Mutex m_pannerLock;
 };
 
 } // namespace WebCore

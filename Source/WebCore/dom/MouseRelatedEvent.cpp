@@ -2,7 +2,7 @@
  * Copyright (C) 2001 Peter Kelly (pmk@post.com)
  * Copyright (C) 2001 Tobias Anton (anton@stud.fbi.fh-darmstadt.de)
  * Copyright (C) 2006 Samuel Weinig (sam.weinig@gmail.com)
- * Copyright (C) 2003, 2005, 2006, 2008 Apple Inc. All rights reserved.
+ * Copyright (C) 2003, 2005, 2006, 2008, 2013 Apple Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -52,13 +52,13 @@ static LayoutSize contentsScrollOffset(AbstractView* abstractView)
     return LayoutSize(frameView->scrollX() / scaleFactor, frameView->scrollY() / scaleFactor);
 }
 
-MouseRelatedEvent::MouseRelatedEvent(const AtomicString& eventType, bool canBubble, bool cancelable, PassRefPtr<AbstractView> abstractView,
+MouseRelatedEvent::MouseRelatedEvent(const AtomicString& eventType, bool canBubble, bool cancelable, double timestamp, PassRefPtr<AbstractView> abstractView,
                                      int detail, const IntPoint& screenLocation, const IntPoint& windowLocation,
 #if ENABLE(POINTER_LOCK)
                                      const IntPoint& movementDelta,
 #endif
                                      bool ctrlKey, bool altKey, bool shiftKey, bool metaKey, bool isSimulated)
-    : UIEventWithKeyState(eventType, canBubble, cancelable, abstractView, detail, ctrlKey, altKey, shiftKey, metaKey)
+    : UIEventWithKeyState(eventType, canBubble, cancelable, timestamp, abstractView, detail, ctrlKey, altKey, shiftKey, metaKey)
     , m_screenLocation(screenLocation)
 #if ENABLE(POINTER_LOCK)
     , m_movementDelta(movementDelta)
@@ -73,15 +73,10 @@ MouseRelatedEvent::MouseRelatedEvent(const AtomicString& eventType, bool canBubb
         if (FrameView* frameView = frame->view()) {
             scrollPosition = frameView->scrollPosition();
             adjustedPageLocation = frameView->windowToContents(windowLocation);
-            float scaleFactor = frame->pageZoomFactor() * frame->frameScaleFactor();
+            float scaleFactor = 1 / (frame->pageZoomFactor() * frame->frameScaleFactor());
             if (scaleFactor != 1.0f) {
-                // Adjust our pageX and pageY to account for the page zoom.
-                adjustedPageLocation.scale(1 / scaleFactor, 1 / scaleFactor);
-
-                // FIXME: Change this to use float math and proper rounding (or
-                // better yet, use LayoutPoint::scale).
-                scrollPosition.setX(scrollPosition.x() / scaleFactor);
-                scrollPosition.setY(scrollPosition.y() / scaleFactor);
+                adjustedPageLocation.scale(scaleFactor, scaleFactor);
+                scrollPosition.scale(scaleFactor, scaleFactor);
             }
         }
     }
@@ -161,11 +156,11 @@ void MouseRelatedEvent::computeRelativePosition()
     m_offsetLocation = m_pageLocation;
 
     // Must have an updated render tree for this math to work correctly.
-    targetNode->document()->updateStyleIfNeeded();
+    targetNode->document()->updateLayoutIgnorePendingStylesheets();
 
     // Adjust offsetLocation to be relative to the target's position.
     if (RenderObject* r = targetNode->renderer()) {
-        FloatPoint localPos = r->absoluteToLocal(absoluteLocation(), UseTransforms | SnapOffsetForTransforms);
+        FloatPoint localPos = r->absoluteToLocal(absoluteLocation(), UseTransforms);
         m_offsetLocation = roundedLayoutPoint(localPos);
         float scaleFactor = 1 / (pageZoomFactor(this) * frameScaleFactor(this));
         if (scaleFactor != 1.0f)
@@ -173,17 +168,15 @@ void MouseRelatedEvent::computeRelativePosition()
     }
 
     // Adjust layerLocation to be relative to the layer.
-    // FIXME: We're pretty sure this is the wrong definition of "layer."
-    // Our RenderLayer is a more modern concept, and layerX/Y is some
-    // other notion about groups of elements (left over from the Netscape 4 days?);
-    // we should test and fix this.
+    // FIXME: event.layerX and event.layerY are poorly defined,
+    // and probably don't always correspond to RenderLayer offsets.
+    // https://bugs.webkit.org/show_bug.cgi?id=21868
     Node* n = targetNode;
     while (n && !n->renderer())
         n = n->parentNode();
 
     RenderLayer* layer;
     if (n && (layer = n->renderer()->enclosingLayer())) {
-        layer->updateLayerPosition();
         for (; layer; layer = layer->parent()) {
             m_layerLocation -= toLayoutSize(layer->location());
         }

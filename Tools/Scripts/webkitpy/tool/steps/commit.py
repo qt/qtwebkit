@@ -40,20 +40,17 @@ _log = logging.getLogger(__name__)
 
 
 class Commit(AbstractStep):
-    # FIXME: This option exists only to make sure we don't break scripts which include --ignore-builders
-    # You can safely delete this option any time after 11/01/11.
     @classmethod
     def options(cls):
         return AbstractStep.options() + [
-            Options.check_builders,
             Options.non_interactive,
         ]
 
     def _commit_warning(self, error):
-        working_directory_message = "" if error.working_directory_is_clean else " and working copy changes"
-        return ('There are %s local commits%s. Everything will be committed as a single commit. '
+        return ('There are %s local commits (and possibly changes in the working directory. '
+                'Everything will be committed as a single commit. '
                 'To avoid this prompt, set "git config webkit-patch.commit-should-always-squash true".' % (
-                error.num_local_commits, working_directory_message))
+                error.num_local_commits))
 
     def _check_test_expectations(self, changed_files):
         test_expectations_files = [filename for filename in changed_files if filename.endswith('TestExpectations')]
@@ -63,7 +60,7 @@ class Commit(AbstractStep):
         args = ["--diff-files"]
         args.extend(test_expectations_files)
         try:
-            self._tool.executive.run_and_throw_if_fail(self._tool.port().check_webkit_style_command() + args, cwd=self._tool.scm().checkout_root)
+            self._tool.executive.run_and_throw_if_fail(self._tool.deprecated_port().check_webkit_style_command() + args, cwd=self._tool.scm().checkout_root)
         except ScriptError, e:
             if self._options.non_interactive:
                 raise
@@ -76,12 +73,11 @@ class Commit(AbstractStep):
             raise Exception("Attempted to commit with a commit message shorter than 10 characters.  Either your patch is missing a ChangeLog or webkit-patch may have a bug.")
 
         self._check_test_expectations(self._changed_files(state))
-
         self._state = state
 
         username = None
         password = None
-        force_squash = False
+        force_squash = self._options.non_interactive
 
         num_tries = 0
         while num_tries < 3:
@@ -95,7 +91,7 @@ class Commit(AbstractStep):
                 self._state["commit_text"] = commit_text
                 break;
             except AmbiguousCommitError, e:
-                if self._options.non_interactive or self._tool.user.confirm(self._commit_warning(e)):
+                if self._tool.user.confirm(self._commit_warning(e)):
                     force_squash = True
                 else:
                     # This will correctly interrupt the rest of the commit process.

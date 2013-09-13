@@ -27,8 +27,6 @@
 #define UserGestureIndicator_h
 
 #include <wtf/Noncopyable.h>
-#include <wtf/RefCounted.h>
-#include <wtf/RefPtr.h>
 
 namespace WebCore {
 
@@ -41,25 +39,15 @@ enum ProcessingUserGestureState {
 class UserGestureIndicator {
     WTF_MAKE_NONCOPYABLE(UserGestureIndicator);
 public:
-    class Token : public RefCounted<Token> {
-    public:
-        virtual ~Token() { }
-    };
-
-    static bool processingUserGesture();
-    static bool consumeUserGesture();
-    static Token* currentToken();
+    static bool processingUserGesture() { return s_state == DefinitelyProcessingUserGesture; }
 
     explicit UserGestureIndicator(ProcessingUserGestureState);
-    explicit UserGestureIndicator(PassRefPtr<Token>);
     ~UserGestureIndicator();
 
 
 private:
     static ProcessingUserGestureState s_state;
-    static UserGestureIndicator* s_topmostIndicator;
     ProcessingUserGestureState m_previousState;
-    RefPtr<Token> m_token;
 };
 
 }

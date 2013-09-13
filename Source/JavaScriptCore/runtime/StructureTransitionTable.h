@@ -85,7 +85,7 @@ inline IndexingType newIndexingType(IndexingType oldType, NonPropertyTransition 
     case AddIndexedAccessors:
         return oldType | MayHaveIndexedAccessors;
     default:
-        ASSERT_NOT_REACHED();
+        RELEASE_ASSERT_NOT_REACHED();
         return oldType;
     }
 }
@@ -111,21 +111,7 @@ class StructureTransitionTable {
         static const bool safeToCompareToEmptyOrDeleted = true;
     };
 
-    struct WeakGCMapFinalizerCallback {
-        static void* finalizerContextFor(Hash::Key)
-        {
-            return 0;
-        }
-
-        static inline Hash::Key keyForFinalizer(void* context, Structure* structure)
-        {
-            return keyForWeakGCMapFinalizer(context, structure);
-        }
-    };
-
-    typedef WeakGCMap<Hash::Key, Structure, WeakGCMapFinalizerCallback, Hash> TransitionMap;
-
-    static Hash::Key keyForWeakGCMapFinalizer(void* context, Structure*);
+    typedef WeakGCMap<Hash::Key, Structure, Hash> TransitionMap;
 
 public:
     StructureTransitionTable()
@@ -146,7 +132,7 @@ public:
         WeakSet::deallocate(impl);
     }
 
-    inline void add(JSGlobalData&, Structure*);
+    inline void add(VM&, Structure*);
     inline bool contains(StringImpl* rep, unsigned attributes) const;
     inline Structure* get(StringImpl* rep, unsigned attributes) const;
 
@@ -191,7 +177,7 @@ private:
         return 0;
     }
     
-    void setSingleTransition(JSGlobalData&, Structure* structure)
+    void setSingleTransition(VM&, Structure* structure)
     {
         ASSERT(isUsingSingleSlot());
         if (WeakImpl* impl = this->weakImpl())

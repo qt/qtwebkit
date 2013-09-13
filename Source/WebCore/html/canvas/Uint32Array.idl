@@ -25,22 +25,24 @@
  */
 
 [
+    GlobalContext=DOMWindow&WorkerGlobalScope,
     ConstructorTemplate=TypedArray,
-    ConstructorParameters=1,
-    NumericIndexedGetter,
     CustomIndexedSetter,
     JSGenerateToNativeObject,
     JSNoStaticTables,
     CustomToJSObject,
     DoNotCheckConstants,
-    TypedArray=unsigned int
+    TypedArray=unsigned int,
+    ImplementationNamespace=WTF
 ] interface Uint32Array : ArrayBufferView {
     const unsigned long BYTES_PER_ELEMENT = 4;
 
     readonly attribute unsigned long length;
-    Uint32Array subarray(in [Optional=DefaultIsUndefined] long start, in [Optional] long end);
+    Uint32Array subarray([Default=Undefined] optional long start, optional long end);
 
-    // void set(in Uint32Array array, [Optional] in unsigned long offset);
-    // void set(in sequence<long> array, [Optional] in unsigned long offset);
+    getter unsigned long (unsigned long index);
+
+    // void set(Uint32Array array, optional unsigned long offset);
+    // void set(sequence<long> array, optional unsigned long offset);
     void set();
 };

@@ -69,7 +69,7 @@ void XSLTMessageHandler::handleMessage(QtMsgType type, const QString& descriptio
     MessageLevel level;
     switch (type) {
     case QtDebugMsg:
-        level = TipMessageLevel;
+        level = DebugMessageLevel;
         break;
     case QtWarningMsg:
         level = WarningMessageLevel;
@@ -84,7 +84,7 @@ void XSLTMessageHandler::handleMessage(QtMsgType type, const QString& descriptio
     }
 
     Console* console = m_document->domWindow()->console();
-    console->addMessage(XMLMessageSource, LogMessageType, level, description, sourceLocation.uri().toString(), sourceLocation.line());
+    console->addMessage(XMLMessageSource, level, description, sourceLocation.uri().toString(), sourceLocation.line(), sourceLocation.column());
 }
 
 class XSLTUriResolver : public QAbstractUriResolver {

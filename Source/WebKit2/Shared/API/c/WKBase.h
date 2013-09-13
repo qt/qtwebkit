@@ -29,10 +29,6 @@
 
 #include <stdint.h>
 
-#if (defined(WIN32) || defined(_WIN32)) && !defined(BUILDING_QT__)
-#include <WebKit2/WKBaseWin.h>
-#endif
-
 #if defined(BUILDING_GTK__)
 #include <WebKit2/WKBaseGtk.h>
 #endif
@@ -43,6 +39,10 @@
 
 #if defined(BUILDING_EFL__)
 #include <WebKit2/WKBaseEfl.h>
+#endif
+
+#if defined(__APPLE__) && !defined(BUILDING_QT__)
+#include <WebKit2/WKBaseMac.h>
 #endif
 
 /* WebKit2 shared types */
@@ -78,6 +78,8 @@ typedef const struct OpaqueWKURL* WKURLRef;
 typedef const struct OpaqueWKURLRequest* WKURLRequestRef;
 typedef const struct OpaqueWKURLResponse* WKURLResponseRef;
 typedef const struct OpaqueWKUserContentURLPattern* WKUserContentURLPatternRef;
+typedef const struct OpaqueWKWebArchive* WKWebArchiveRef;
+typedef const struct OpaqueWKWebArchiveResource* WKWebArchiveResourceRef;
 
 enum WKUserContentInjectedFrames {
     kWKInjectInAllFrames,
@@ -117,8 +119,6 @@ typedef const struct OpaqueWKGrammarDetail* WKGrammarDetailRef;
 typedef const struct OpaqueWKHitTestResult* WKHitTestResultRef;
 typedef const struct OpaqueWKIconDatabase* WKIconDatabaseRef;
 typedef const struct OpaqueWKInspector* WKInspectorRef;
-typedef const struct OpaqueWKIntentData* WKIntentDataRef;
-typedef const struct OpaqueWKIntentServiceInfo* WKIntentServiceInfoRef;
 typedef const struct OpaqueWKKeyValueStorageManager* WKKeyValueStorageManagerRef;
 typedef const struct OpaqueWKMediaCacheManager* WKMediaCacheManagerRef;
 typedef const struct OpaqueWKNavigationData* WKNavigationDataRef;
@@ -137,6 +137,7 @@ typedef const struct OpaqueWKPreferences* WKPreferencesRef;
 typedef const struct OpaqueWKProtectionSpace* WKProtectionSpaceRef;
 typedef const struct OpaqueWKTextChecker* WKTextCheckerRef;
 typedef const struct OpaqueWKVibration* WKVibrationRef;
+typedef const struct OpaqueWKViewportAttributes* WKViewportAttributesRef;
 
 /* WebKit2 Bundle types */
 
@@ -148,11 +149,10 @@ typedef const struct OpaqueWKBundleDOMWindowExtension* WKBundleDOMWindowExtensio
 typedef const struct OpaqueWKBundleFrame* WKBundleFrameRef;
 typedef const struct OpaqueWKBundleHitTestResult* WKBundleHitTestResultRef;
 typedef const struct OpaqueWKBundleInspector* WKBundleInspectorRef;
-typedef const struct OpaqueWKBundleIntent* WKBundleIntentRef;
-typedef const struct OpaqueWKBundleIntentRequest* WKBundleIntentRequestRef;
 typedef const struct OpaqueWKBundleNavigationAction* WKBundleNavigationActionRef;
 typedef const struct OpaqueWKBundleNodeHandle* WKBundleNodeHandleRef;
 typedef const struct OpaqueWKBundlePage* WKBundlePageRef;
+typedef const struct OpaqueWKBundlePageBanner* WKBundlePageBannerRef;
 typedef const struct OpaqueWKBundlePageGroup* WKBundlePageGroupRef;
 typedef const struct OpaqueWKBundlePageOverlay* WKBundlePageOverlayRef;
 typedef const struct OpaqueWKBundleRangeHandle* WKBundleRangeHandleRef;

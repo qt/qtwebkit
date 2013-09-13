@@ -25,11 +25,7 @@
 
 [
     Conditional=SVG
-] interface SVGTextContentElement : SVGElement,
-                                                    SVGTests,
-                                                    SVGLangSpace,
-                                                    SVGExternalResourcesRequired,
-                                                    SVGStylable {
+] interface SVGTextContentElement : SVGGraphicsElement {
     // lengthAdjust Types
     const unsigned short LENGTHADJUST_UNKNOWN          = 0;
     const unsigned short LENGTHADJUST_SPACING          = 1;
@@ -40,20 +36,16 @@
 
     long getNumberOfChars();
     float getComputedTextLength();
-    float getSubStringLength(in [Optional=DefaultIsUndefined,IsIndex] unsigned long offset, 
-                             in [Optional=DefaultIsUndefined,IsIndex] unsigned long length)
-        raises(DOMException);
-    SVGPoint getStartPositionOfChar(in [Optional=DefaultIsUndefined,IsIndex] unsigned long offset)
-        raises(DOMException);
-    SVGPoint getEndPositionOfChar(in [Optional=DefaultIsUndefined,IsIndex] unsigned long offset)
-        raises(DOMException);
-    SVGRect getExtentOfChar(in [Optional=DefaultIsUndefined,IsIndex] unsigned long offset)
-        raises(DOMException);
-    float getRotationOfChar(in [Optional=DefaultIsUndefined,IsIndex] unsigned long offset)
-        raises(DOMException);
-    long getCharNumAtPosition(in [Optional=DefaultIsUndefined] SVGPoint point);
-    void selectSubString(in [Optional=DefaultIsUndefined,IsIndex] unsigned long offset, 
-                         in [Optional=DefaultIsUndefined,IsIndex] unsigned long length)
-        raises(DOMException);
+    [RaisesException] float getSubStringLength([Default=Undefined,IsIndex] optional unsigned long offset, 
+                             [Default=Undefined,IsIndex] optional unsigned long length);
+    [RaisesException] SVGPoint getStartPositionOfChar([Default=Undefined,IsIndex] optional unsigned long offset);
+    [RaisesException] SVGPoint getEndPositionOfChar([Default=Undefined,IsIndex] optional unsigned long offset);
+    [RaisesException] SVGRect getExtentOfChar([Default=Undefined,IsIndex] optional unsigned long offset);
+    [RaisesException] float getRotationOfChar([Default=Undefined,IsIndex] optional unsigned long offset);
+    long getCharNumAtPosition([Default=Undefined] optional SVGPoint point);
+    [RaisesException] void selectSubString([Default=Undefined,IsIndex] optional unsigned long offset, 
+                         [Default=Undefined,IsIndex] optional unsigned long length);
 };
 
+// FIXME: SVGTextContentElement is not supposed to implement SVGExternalResourcesRequired.
+SVGTextContentElement implements SVGExternalResourcesRequired;

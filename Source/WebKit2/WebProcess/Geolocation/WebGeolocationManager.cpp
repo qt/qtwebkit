@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2012, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -40,6 +40,11 @@ using namespace WebCore;
 
 namespace WebKit {
 
+const char* WebGeolocationManager::supplementName()
+{
+    return "WebGeolocationManager";
+}
+
 WebGeolocationManager::WebGeolocationManager(WebProcess* process)
     : m_process(process)
 {
@@ -50,11 +55,6 @@ WebGeolocationManager::~WebGeolocationManager()
 {
 }
 
-void WebGeolocationManager::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::MessageDecoder& decoder)
-{
-    didReceiveWebGeolocationManagerMessage(connection, messageID, decoder);
-}
-
 void WebGeolocationManager::registerWebPage(WebPage* page)
 {
     bool wasEmpty = m_pageSet.isEmpty();
@@ -62,7 +62,7 @@ void WebGeolocationManager::registerWebPage(WebPage* page)
     m_pageSet.add(page);
     
     if (wasEmpty)
-        m_process->connection()->send(Messages::WebGeolocationManagerProxy::StartUpdating(), 0);
+        m_process->parentProcessConnection()->send(Messages::WebGeolocationManagerProxy::StartUpdating(), 0);
 }
 
 void WebGeolocationManager::unregisterWebPage(WebPage* page)
@@ -70,7 +70,7 @@ void WebGeolocationManager::unregisterWebPage(WebPage* page)
     m_pageSet.remove(page);
 
     if (m_pageSet.isEmpty())
-        m_process->connection()->send(Messages::WebGeolocationManagerProxy::StopUpdating(), 0);
+        m_process->parentProcessConnection()->send(Messages::WebGeolocationManagerProxy::StopUpdating(), 0);
 }
 
 void WebGeolocationManager::didChangePosition(const WebGeolocationPosition::Data& data)
@@ -78,7 +78,7 @@ void WebGeolocationManager::didChangePosition(const WebGeolocationPosition::Data
 #if ENABLE(GEOLOCATION)
     RefPtr<GeolocationPosition> position = GeolocationPosition::create(data.timestamp, data.latitude, data.longitude, data.accuracy, data.canProvideAltitude, data.altitude, data.canProvideAltitudeAccuracy, data.altitudeAccuracy, data.canProvideHeading, data.heading, data.canProvideSpeed, data.speed);
 
-    Vector<RefPtr<WebPage> > webPageCopy;
+    Vector<RefPtr<WebPage>> webPageCopy;
     copyToVector(m_pageSet, webPageCopy);
     for (size_t i = 0; i < webPageCopy.size(); ++i) {
         WebPage* page = webPageCopy[i].get();
@@ -96,7 +96,7 @@ void WebGeolocationManager::didFailToDeterminePosition(const String& errorMessag
     // FIXME: Add localized error string.
     RefPtr<GeolocationError> error = GeolocationError::create(GeolocationError::PositionUnavailable, errorMessage);
 
-    Vector<RefPtr<WebPage> > webPageCopy;
+    Vector<RefPtr<WebPage>> webPageCopy;
     copyToVector(m_pageSet, webPageCopy);
     for (size_t i = 0; i < webPageCopy.size(); ++i) {
         WebPage* page = webPageCopy[i].get();

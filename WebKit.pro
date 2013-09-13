@@ -44,8 +44,17 @@ QtWebKit.file = Source/QtWebKit.pro
 QtWebKit.makefile = Makefile.QtWebKit
 SUBDIRS += QtWebKit
 
+!production_build {
+    # Only tested on Linux so far.
+    linux* {
+        gtest.file = Source/ThirdParty/gtest/gtest.pro
+        gtest.makefile = Makefile.gtest
+        SUBDIRS += gtest
+    }
+}
+
 Tools.file = Tools/Tools.pro
 Tools.makefile = Makefile.Tools
 SUBDIRS += Tools
 
-# Number of times incremental builds have failed: 0
+# Number of times incremental builds have failed: 1

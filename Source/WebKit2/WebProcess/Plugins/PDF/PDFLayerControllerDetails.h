@@ -25,18 +25,23 @@
 
 #import <PDFKit/PDFKit.h>
 
+@class CPReadingModel;
+
 @protocol PDFLayerControllerDelegate <NSObject>
 
 - (void)updateScrollPosition:(CGPoint)newPosition;
 - (void)writeItemsToPasteboard:(NSArray *)items withTypes:(NSArray *)types;
 - (void)showDefinitionForAttributedString:(NSAttributedString *)string atPoint:(CGPoint)point;
 - (void)performWebSearch:(NSString *)string;
-- (void)openWithPreview;
+- (void)performSpotlightSearch:(NSString *)string;
+- (void)openWithNativeApplication;
 - (void)saveToPDF;
 
 - (void)pdfLayerController:(PDFLayerController *)pdfLayerController didChangeActiveAnnotation:(PDFAnnotation *)annotation;
 - (void)pdfLayerController:(PDFLayerController *)pdfLayerController clickedLinkWithURL:(NSURL *)url;
 - (void)pdfLayerController:(PDFLayerController *)pdfLayerController didChangeContentScaleFactor:(CGFloat)scaleFactor;
+- (void)pdfLayerController:(PDFLayerController *)pdfLayerController didChangeDisplayMode:(int)mode;
+- (void)pdfLayerController:(PDFLayerController *)pdfLayerController didChangeSelection:(PDFSelection *)selection;
 
 @end
 
@@ -51,7 +56,8 @@
 
 - (void)setFrameSize:(CGSize)size;
 
-- (void)setDisplayMode:(int)mode;
+- (PDFDisplayMode)displayMode;
+- (void)setDisplayMode:(PDFDisplayMode)mode;
 - (void)setDisplaysPageBreaks:(BOOL)pageBreaks;
 
 - (CGFloat)contentScaleFactor;
@@ -83,7 +89,18 @@
 
 - (NSArray *)findString:(NSString *)string caseSensitive:(BOOL)isCaseSensitive highlightMatches:(BOOL)shouldHighlightMatches;
 
-- (id)currentSelection;
+- (PDFSelection *)currentSelection;
+- (void)setCurrentSelection:(PDFSelection *)selection;
+- (PDFSelection *)searchSelection;
+- (void)setSearchSelection:(PDFSelection *)selection;
+- (void)gotoSelection:(PDFSelection *)selection;
+- (PDFSelection *)getSelectionForWordAtPoint:(CGPoint)point;
+
+- (NSUInteger)lastPageIndex;
+- (NSUInteger)currentPageIndex;
+- (void)gotoNextPage;
+- (void)gotoPreviousPage;
+
 - (void)copySelection;
 - (void)selectAll;
 
@@ -93,5 +110,34 @@
 - (BOOL)hudEnabled;
 
 - (CGRect)boundsForAnnotation:(PDFAnnotation *)annotation;
+- (void)activateNextAnnotation:(BOOL)previous;
+
+- (void)attemptToUnlockWithPassword:(NSString *)password;
+
+- (void)searchInDictionaryWithSelection:(PDFSelection *)selection;
+
+// Accessibility
+
+- (CPReadingModel *)readingModel;
+- (id)accessibilityFocusedUIElement;
+- (NSArray *)accessibilityAttributeNames;
+- (BOOL)accessibilityIsAttributeSettable:(NSString *)attribute;
+- (void)accessibilitySetValue:(id)value forAttribute:(NSString *)attribute;
+- (NSArray *)accessibilityParameterizedAttributeNames;
+- (NSString *)accessibilityRoleAttribute;
+- (NSString *)accessibilityRoleDescriptionAttribute;
+- (NSString *)accessibilityValueAttribute;
+- (BOOL)accessibilityIsValueAttributeSettable;
+- (NSString *)accessibilitySelectedTextAttribute;
+- (BOOL)accessibilityIsSelectedTextAttributeSettable;
+- (NSValue *)accessibilitySelectedTextRangeAttribute;
+- (NSNumber *)accessibilityNumberOfCharactersAttribute;
+- (BOOL)accessibilityIsNumberOfCharactersAttributeSettable;
+- (NSValue *)accessibilityVisibleCharacterRangeAttribute;
+- (BOOL)accessibilityIsVisibleCharacterRangeAttributeSettable;
+- (NSNumber *)accessibilityLineForIndexAttributeForParameter:(id)parameter;
+- (NSValue *)accessibilityRangeForLineAttributeForParameter:(id)parameter;
+- (NSString *)accessibilityStringForRangeAttributeForParameter:(id)parameter;
+- (NSValue *)accessibilityBoundsForRangeAttributeForParameter:(id)parameter;
 
 @end

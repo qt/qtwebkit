@@ -82,7 +82,7 @@ bool SVGFEGaussianBlurElement::isSupportedAttribute(const QualifiedName& attrNam
         supportedAttributes.add(SVGNames::inAttr);
         supportedAttributes.add(SVGNames::stdDeviationAttr);
     }
-    return supportedAttributes.contains<QualifiedName, SVGAttributeHashTranslator>(attrName);
+    return supportedAttributes.contains<SVGAttributeHashTranslator>(attrName);
 }
 
 void SVGFEGaussianBlurElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
@@ -131,6 +131,9 @@ PassRefPtr<FilterEffect> SVGFEGaussianBlurElement::build(SVGFilterBuilder* filte
     FilterEffect* input1 = filterBuilder->getEffectById(in1());
 
     if (!input1)
+        return 0;
+
+    if (stdDeviationX() < 0 || stdDeviationY() < 0)
         return 0;
 
     RefPtr<FilterEffect> effect = FEGaussianBlur::create(filter, stdDeviationX(), stdDeviationY());

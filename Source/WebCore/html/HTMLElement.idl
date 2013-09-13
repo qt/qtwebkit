@@ -21,7 +21,6 @@
 [
     JSGenerateToNativeObject,
     JSCustomPushEventHandlerScope,
-    V8CustomToJSObject
 ] interface HTMLElement : Element {
              // iht.com relies on id returning the empty string when no id is present. 
              // Other browsers do this as well. So we don't convert null to JS null.
@@ -38,29 +37,21 @@
              [Reflect] attribute DOMString accessKey;
 
     // Extensions
-             [TreatNullAs=NullString] attribute DOMString innerHTML
-                 setter raises(DOMException);
-             [TreatNullAs=NullString] attribute DOMString innerText
-                 setter raises(DOMException);
-             [TreatNullAs=NullString] attribute DOMString outerHTML
-                 setter raises(DOMException);
-             [TreatNullAs=NullString] attribute DOMString outerText
-                 setter raises(DOMException);
+             [TreatNullAs=NullString, SetterRaisesException] attribute DOMString innerHTML;
+             [TreatNullAs=NullString, SetterRaisesException] attribute DOMString innerText;
+             [TreatNullAs=NullString, SetterRaisesException] attribute DOMString outerHTML;
+             [TreatNullAs=NullString, SetterRaisesException] attribute DOMString outerText;
 
-    Element insertAdjacentElement(in [Optional=DefaultIsUndefined] DOMString where,
-                                  in [Optional=DefaultIsUndefined] Element element)
-        raises(DOMException);
-    void insertAdjacentHTML(in [Optional=DefaultIsUndefined] DOMString where,
-                            in [Optional=DefaultIsUndefined] DOMString html)
-        raises(DOMException);
-    void insertAdjacentText(in [Optional=DefaultIsUndefined] DOMString where,
-                            in [Optional=DefaultIsUndefined] DOMString text)
-        raises(DOMException);
+    [RaisesException] Element insertAdjacentElement([Default=Undefined] optional DOMString where,
+                                  [Default=Undefined] optional Element element);
+    [RaisesException] void insertAdjacentHTML([Default=Undefined] optional DOMString where,
+                            [Default=Undefined] optional DOMString html);
+    [RaisesException] void insertAdjacentText([Default=Undefined] optional DOMString where,
+                            [Default=Undefined] optional DOMString text);
 
     readonly attribute HTMLCollection children;
 
-             [TreatNullAs=NullString] attribute DOMString contentEditable
-                 setter raises(DOMException);
+             [TreatNullAs=NullString, SetterRaisesException] attribute DOMString contentEditable;
     readonly attribute boolean isContentEditable;
 
              attribute boolean spellcheck;
@@ -73,15 +64,12 @@
     [Conditional=MICRODATA] readonly attribute DOMSettableTokenList itemRef;
     [Conditional=MICRODATA] readonly attribute DOMSettableTokenList itemProp;
 
-#if defined(ENABLE_MICRODATA) && ENABLE_MICRODATA
     [Conditional=MICRODATA] readonly attribute HTMLPropertiesCollection properties;
-#endif
 #endif
 
 #if !defined(LANGUAGE_CPP) || !LANGUAGE_CPP
 #if !defined(LANGUAGE_OBJECTIVE_C) || !LANGUAGE_OBJECTIVE_C
-             [Conditional=MICRODATA, Custom] attribute DOMObject itemValue
-                 setter raises(DOMException);
+             [Conditional=MICRODATA, Custom, SetterRaisesException] attribute any itemValue;
 #endif
 #endif
 

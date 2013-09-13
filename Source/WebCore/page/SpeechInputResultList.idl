@@ -24,10 +24,11 @@
  */
 
 [
-    IndexedGetter,
-    Conditional=INPUT_SPEECH
+    NoInterfaceObject,
+    Conditional=INPUT_SPEECH,
+    ImplementationLacksVTable
 ] interface SpeechInputResultList {
     readonly attribute unsigned long length;
-    SpeechInputResult item(in [IsIndex] unsigned long index);
+    getter SpeechInputResult item([IsIndex] unsigned long index);
 };
 

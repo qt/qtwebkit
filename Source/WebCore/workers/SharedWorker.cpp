@@ -35,6 +35,7 @@
 
 #include "SharedWorker.h"
 
+#include "ExceptionCode.h"
 #include "FeatureObserver.h"
 #include "InspectorInstrumentation.h"
 #include "KURL.h"
@@ -60,7 +61,7 @@ PassRefPtr<SharedWorker> SharedWorker::create(ScriptExecutionContext* context, c
 
     RefPtr<MessageChannel> channel = MessageChannel::create(context);
     worker->m_port = channel->port1();
-    OwnPtr<MessagePortChannel> remotePort = channel->port2()->disentangle(ec);
+    OwnPtr<MessagePortChannel> remotePort = channel->port2()->disentangle();
     ASSERT(remotePort);
 
     worker->suspendIfNeeded();
@@ -70,9 +71,9 @@ PassRefPtr<SharedWorker> SharedWorker::create(ScriptExecutionContext* context, c
         return 0;
 
     // We don't currently support nested workers, so workers can only be created from documents.
-    ASSERT(context->isDocument());
+    ASSERT_WITH_SECURITY_IMPLICATION(context->isDocument());
     Document* document = static_cast<Document*>(context);
-    if (!document->securityOrigin()->canAccessSharedWorkers(document->topDocument()->securityOrigin())) {
+    if (!document->securityOrigin()->canAccessSharedWorkers(document->topOrigin())) {
         ec = SECURITY_ERR;
         return 0;
     }

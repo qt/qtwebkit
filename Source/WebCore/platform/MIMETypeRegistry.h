@@ -67,6 +67,11 @@ public:
     // Check to see if a mime type is suitable for being loaded using <video> and <audio>
     static bool isSupportedMediaMIMEType(const String& mimeType); 
 
+#if ENABLE(MEDIA_SOURCE)
+    // Check to see if the mime type and codecs are supported by the MediaSource implementation.
+    static bool isSupportedMediaSourceMIMEType(const String& mimeType, const String& codecs);
+#endif
+
     // Check to see if the mime type is not suitable for being loaded as a text
     // document in a frame. Only valid for mime types begining with "text/".
     static bool isUnsupportedTextMIMEType(const String& mimeType);
@@ -78,6 +83,9 @@ public:
     // browser (e.g. a Qt Plugin).
     static bool isApplicationPluginMIMEType(const String& mimeType);
 
+    // Check to see if a mime type is one of the common PDF/PS types.
+    static bool isPDFOrPostScriptMIMEType(const String& mimeType);
+
     // Check to see if a mime type is suitable for being shown inside a page.
     // Returns true if any of isSupportedImageMIMEType(), isSupportedNonImageMIMEType(), isSupportedMediaMIMEType() returns true
     // or if given mime type begins with "text/" and isUnsupportedTextMIMEType() returns false.
@@ -88,6 +96,7 @@ public:
     static HashSet<String>& getSupportedImageMIMETypesForEncoding();
     static HashSet<String>& getSupportedNonImageMIMETypes();
     static HashSet<String>& getSupportedMediaMIMETypes();
+    static HashSet<String>& getPDFAndPostScriptMIMETypes();
     static HashSet<String>& getUnsupportedTextMIMETypes();
 
     static String getNormalizedMIMEType(const String&);

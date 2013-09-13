@@ -27,7 +27,7 @@
 #include "QtWebPageEventHandler.h"
 #include "ShareableBitmap.h"
 #if ENABLE(INPUT_TYPE_COLOR)
-#include "WebColorChooserProxyQt.h"
+#include "WebColorPickerQt.h"
 #endif
 #include "WebContextMenuProxyQt.h"
 #include "WebEditCommandProxy.h"
@@ -221,9 +221,9 @@ PassRefPtr<WebContextMenuProxy> QtPageClient::createContextMenuProxy(WebPageProx
 }
 
 #if ENABLE(INPUT_TYPE_COLOR)
-PassRefPtr<WebColorChooserProxy> QtPageClient::createColorChooserProxy(WebPageProxy* webPageProxy, const WebCore::Color& initialColor, const WebCore::IntRect& elementRect)
+PassRefPtr<WebColorPicker> QtPageClient::createColorPicker(WebPageProxy* webPageProxy, const WebCore::Color& initialColor, const WebCore::IntRect& elementRect)
 {
-    return WebColorChooserProxyQt::create(webPageProxy, m_webView, initialColor, elementRect);
+    return WebColorPickerQt::create(webPageProxy, m_webView, initialColor, elementRect);
 }
 #endif
 
@@ -243,11 +243,6 @@ void QtPageClient::didFindZoomableArea(const IntPoint& target, const IntRect& ar
 {
     ASSERT(m_eventHandler);
     m_eventHandler->didFindZoomableArea(target, area);
-}
-
-void QtPageClient::didReceiveMessageFromNavigatorQtObject(const String& message)
-{
-    QQuickWebViewPrivate::get(m_webView)->didReceiveMessageFromNavigatorQtObject(message);
 }
 
 void QtPageClient::updateTextInputState()

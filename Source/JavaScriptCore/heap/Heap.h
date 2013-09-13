@@ -55,7 +55,7 @@ namespace JSC {
     class IncrementalSweeper;
     class JITStubRoutine;
     class JSCell;
-    class JSGlobalData;
+    class VM;
     class JSStack;
     class JSValue;
     class LiveObjectIterator;
@@ -96,16 +96,16 @@ namespace JSC {
         static void writeBarrier(const JSCell*, JSCell*);
         static uint8_t* addressOfCardFor(JSCell*);
 
-        Heap(JSGlobalData*, HeapType);
+        Heap(VM*, HeapType);
         ~Heap();
         JS_EXPORT_PRIVATE void lastChanceToFinalize();
 
-        JSGlobalData* globalData() const { return m_globalData; }
+        VM* vm() const { return m_vm; }
         MarkedSpace& objectSpace() { return m_objectSpace; }
         MachineThreads& machineThreads() { return m_machineThreads; }
 
         JS_EXPORT_PRIVATE GCActivityCallback* activityCallback();
-        JS_EXPORT_PRIVATE void setActivityCallback(GCActivityCallback*);
+        JS_EXPORT_PRIVATE void setActivityCallback(PassOwnPtr<GCActivityCallback>);
         JS_EXPORT_PRIVATE void setGarbageCollectionTimerEnabled(bool);
 
         JS_EXPORT_PRIVATE IncrementalSweeper* sweeper();
@@ -113,7 +113,6 @@ namespace JSC {
         // true if an allocation or collection is in progress
         inline bool isBusy();
         
-        MarkedAllocator& firstAllocatorWithoutDestructors() { return m_objectSpace.firstAllocator(); }
         MarkedAllocator& allocatorForObjectWithoutDestructor(size_t bytes) { return m_objectSpace.allocatorFor(bytes); }
         MarkedAllocator& allocatorForObjectWithNormalDestructor(size_t bytes) { return m_objectSpace.normalDestructorAllocatorFor(bytes); }
         MarkedAllocator& allocatorForObjectWithImmortalStructureDestructor(size_t bytes) { return m_objectSpace.immortalStructureDestructorAllocatorFor(bytes); }
@@ -151,8 +150,8 @@ namespace JSC {
         JS_EXPORT_PRIVATE PassOwnPtr<TypeCountSet> objectTypeCounts();
         void showStatistics();
 
-        void pushTempSortVector(Vector<ValueStringPair>*);
-        void popTempSortVector(Vector<ValueStringPair>*);
+        void pushTempSortVector(Vector<ValueStringPair, 0, UnsafeVectorOverflow>*);
+        void popTempSortVector(Vector<ValueStringPair, 0, UnsafeVectorOverflow>*);
     
         HashSet<MarkedArgumentBuffer*>& markListSet() { if (!m_markListSet) m_markListSet = adoptPtr(new HashSet<MarkedArgumentBuffer*>); return *m_markListSet; }
         
@@ -162,6 +161,7 @@ namespace JSC {
         HandleSet* handleSet() { return &m_handleSet; }
         HandleStack* handleStack() { return &m_handleStack; }
 
+        void canonicalizeCellLivenessData();
         void getConservativeRegisterRoots(HashSet<JSCell*>& roots);
 
         double lastGCLength() { return m_lastGCLength; }
@@ -173,7 +173,6 @@ namespace JSC {
         void didAbandon(size_t);
 
         bool isPagedOut(double deadline);
-        void didStartVMShutdown();
         
         const JITStubRoutineSet& jitStubRoutines() { return m_jitStubRoutines; }
 
@@ -181,6 +180,7 @@ namespace JSC {
         friend class CodeBlock;
         friend class CopiedBlock;
         friend class GCAwareJITStubRoutine;
+        friend class HandleSet;
         friend class JITStubRoutine;
         friend class LLIntOffsetsExtractor;
         friend class MarkedSpace;
@@ -189,6 +189,7 @@ namespace JSC {
         friend class CopiedSpace;
         friend class CopyVisitor;
         friend class SlotVisitor;
+        friend class SuperRegion;
         friend class IncrementalSweeper;
         friend class HeapStatistics;
         friend class WeakSet;
@@ -209,7 +210,7 @@ namespace JSC {
         JS_EXPORT_PRIVATE bool isValidAllocation(size_t);
         JS_EXPORT_PRIVATE void reportExtraMemoryCostSlowCase(size_t);
 
-        void markRoots(bool fullGC);
+        void markRoots();
         void markProtectedObjects(HeapRootVisitor&);
         void markTempSortVectors(HeapRootVisitor&);
         void copyBackingStores();
@@ -241,7 +242,7 @@ namespace JSC {
 #endif
 
         ProtectCountSet m_protectedValues;
-        Vector<Vector<ValueStringPair>* > m_tempSortingVectors;
+        Vector<Vector<ValueStringPair, 0, UnsafeVectorOverflow>* > m_tempSortingVectors;
         OwnPtr<HashSet<MarkedArgumentBuffer*> > m_markListSet;
 
         MachineThreads m_machineThreads;
@@ -258,14 +259,14 @@ namespace JSC {
         
         bool m_isSafeToCollect;
 
-        JSGlobalData* m_globalData;
+        VM* m_vm;
         double m_lastGCLength;
         double m_lastCodeDiscardTime;
 
         DoublyLinkedList<ExecutableBase> m_compiledCode;
         
-        GCActivityCallback* m_activityCallback;
-        IncrementalSweeper* m_sweeper;
+        OwnPtr<GCActivityCallback> m_activityCallback;
+        OwnPtr<IncrementalSweeper> m_sweeper;
         Vector<MarkedBlock*> m_blockSnapshot;
     };
 
@@ -286,11 +287,7 @@ namespace JSC {
     {
         if (Options::gcMaxHeapSize())
             return m_bytesAllocated > Options::gcMaxHeapSize() && m_isSafeToCollect && m_operationInProgress == NoOperation;
-#if ENABLE(GGC)
-        return m_objectSpace.nurseryWaterMark() >= m_minBytesPerCycle && m_isSafeToCollect && m_operationInProgress == NoOperation;
-#else
         return m_bytesAllocated > m_bytesAllocatedLimit && m_isSafeToCollect && m_operationInProgress == NoOperation;
-#endif
     }
 
     bool Heap::isBusy()
@@ -332,36 +329,12 @@ namespace JSC {
 
     inline bool Heap::isWriteBarrierEnabled()
     {
-#if ENABLE(GGC) || ENABLE(WRITE_BARRIER_PROFILING)
+#if ENABLE(WRITE_BARRIER_PROFILING)
         return true;
 #else
         return false;
 #endif
     }
-
-#if ENABLE(GGC)
-    inline uint8_t* Heap::addressOfCardFor(JSCell* cell)
-    {
-        return MarkedBlock::blockFor(cell)->addressOfCardFor(cell);
-    }
-
-    inline void Heap::writeBarrier(const JSCell* owner, JSCell*)
-    {
-        WriteBarrierCounters::countWriteBarrier();
-        MarkedBlock* block = MarkedBlock::blockFor(owner);
-        if (block->isMarked(owner))
-            block->setDirtyObject(owner);
-    }
-
-    inline void Heap::writeBarrier(const JSCell* owner, JSValue value)
-    {
-        if (!value)
-            return;
-        if (!value.isCell())
-            return;
-        writeBarrier(owner, value.asCell());
-    }
-#else
 
     inline void Heap::writeBarrier(const JSCell*, JSCell*)
     {
@@ -372,7 +345,6 @@ namespace JSC {
     {
         WriteBarrierCounters::countWriteBarrier();
     }
-#endif
 
     inline void Heap::reportExtraMemoryCost(size_t cost)
     {

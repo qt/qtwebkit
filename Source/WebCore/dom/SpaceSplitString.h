@@ -51,7 +51,7 @@ namespace WebCore {
 
         bool isUnique() const { return m_keyString.isNull(); } 
         size_t size() const { return m_vector.size(); }
-        const AtomicString& operator[](size_t i) { ASSERT(i < size()); return m_vector[i]; }
+        const AtomicString& operator[](size_t i) { ASSERT_WITH_SECURITY_IMPLICATION(i < size()); return m_vector[i]; }
 
     private:
         explicit SpaceSplitStringData(const AtomicString&);
@@ -82,7 +82,14 @@ namespace WebCore {
 
         size_t size() const { return m_data ? m_data->size() : 0; }
         bool isNull() const { return !m_data; }
-        const AtomicString& operator[](size_t i) const { ASSERT(i < size()); return (*m_data)[i]; }
+        const AtomicString& operator[](size_t i) const { ASSERT_WITH_SECURITY_IMPLICATION(i < size()); return (*m_data)[i]; }
+
+        static bool spaceSplitStringContainsValue(const String& spaceSplitString, const char* value, unsigned length, bool shouldFoldCase);
+        template<size_t length>
+        static bool spaceSplitStringContainsValue(const String& spaceSplitString, const char (&value)[length], bool shouldFoldCase)
+        {
+            return spaceSplitStringContainsValue(spaceSplitString, value, length - 1, shouldFoldCase);
+        }
 
     private:
         void ensureUnique()

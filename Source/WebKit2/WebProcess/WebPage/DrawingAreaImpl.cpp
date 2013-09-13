@@ -38,7 +38,6 @@
 #include <WebCore/Settings.h>
 
 using namespace WebCore;
-using namespace std;
 
 namespace WebKit {
 
@@ -65,8 +64,8 @@ DrawingAreaImpl::DrawingAreaImpl(WebPage* webPage, const WebPageCreationParamete
     , m_wantsToExitAcceleratedCompositingMode(false)
     , m_isPaintingSuspended(!parameters.isVisible)
     , m_alwaysUseCompositing(false)
-    , m_displayTimer(WebProcess::shared().runLoop(), this, &DrawingAreaImpl::displayTimerFired)
-    , m_exitCompositingTimer(WebProcess::shared().runLoop(), this, &DrawingAreaImpl::exitAcceleratedCompositingMode)
+    , m_displayTimer(RunLoop::main(), this, &DrawingAreaImpl::displayTimerFired)
+    , m_exitCompositingTimer(RunLoop::main(), this, &DrawingAreaImpl::exitAcceleratedCompositingMode)
 {
     if (webPage->corePage()->settings()->acceleratedDrawingEnabled() || webPage->corePage()->settings()->forceCompositingMode())
         m_alwaysUseCompositing = true;
@@ -79,32 +78,42 @@ DrawingAreaImpl::DrawingAreaImpl(WebPage* webPage, const WebPageCreationParamete
         enterAcceleratedCompositingMode(0);
 }
 
-void DrawingAreaImpl::setNeedsDisplay(const IntRect& rect)
+void DrawingAreaImpl::setNeedsDisplay()
 {
     if (!m_isPaintingEnabled)
         return;
 
+    if (m_layerTreeHost) {
+        ASSERT(m_dirtyRegion.isEmpty());
+        m_layerTreeHost->setNonCompositedContentsNeedDisplay();
+        return;
+    }
+
+    setNeedsDisplayInRect(m_webPage->bounds());
+}
+
+void DrawingAreaImpl::setNeedsDisplayInRect(const IntRect& rect)
+{
+    if (!m_isPaintingEnabled)
+        return;
+
+    if (m_layerTreeHost) {
+        ASSERT(m_dirtyRegion.isEmpty());
+        m_layerTreeHost->setNonCompositedContentsNeedDisplayInRect(rect);
+        return;
+    }
+    
     IntRect dirtyRect = rect;
     dirtyRect.intersect(m_webPage->bounds());
 
     if (dirtyRect.isEmpty())
         return;
 
-    if (m_layerTreeHost) {
-        ASSERT(m_dirtyRegion.isEmpty());
-
-        m_layerTreeHost->setNonCompositedContentsNeedDisplay(dirtyRect);
-        return;
-    }
-    
-    if (m_webPage->mainFrameHasCustomRepresentation())
-        return;
-
     m_dirtyRegion.unite(dirtyRect);
     scheduleDisplay();
 }
 
-void DrawingAreaImpl::scroll(const IntRect& scrollRect, const IntSize& scrollOffset)
+void DrawingAreaImpl::scroll(const IntRect& scrollRect, const IntSize& scrollDelta)
 {
     if (!m_isPaintingEnabled)
         return;
@@ -114,12 +123,9 @@ void DrawingAreaImpl::scroll(const IntRect& scrollRect, const IntSize& scrollOff
         ASSERT(m_scrollOffset.isEmpty());
         ASSERT(m_dirtyRegion.isEmpty());
 
-        m_layerTreeHost->scrollNonCompositedContents(scrollRect, scrollOffset);
+        m_layerTreeHost->scrollNonCompositedContents(scrollRect);
         return;
     }
-
-    if (m_webPage->mainFrameHasCustomRepresentation())
-        return;
 
     if (scrollRect.isEmpty())
         return;
@@ -131,12 +137,12 @@ void DrawingAreaImpl::scroll(const IntRect& scrollRect, const IntSize& scrollOff
         if (currentScrollArea >= scrollArea) {
             // The rect being scrolled is at least as large as the rect we'd like to scroll.
             // Go ahead and just invalidate the scroll rect.
-            setNeedsDisplay(scrollRect);
+            setNeedsDisplayInRect(scrollRect);
             return;
         }
 
         // Just repaint the entire current scroll rect, we'll scroll the new rect instead.
-        setNeedsDisplay(m_scrollRect);
+        setNeedsDisplayInRect(m_scrollRect);
         m_scrollRect = IntRect();
         m_scrollOffset = IntSize();
     }
@@ -149,20 +155,26 @@ void DrawingAreaImpl::scroll(const IntRect& scrollRect, const IntSize& scrollOff
         m_dirtyRegion.subtract(scrollRect);
 
         // Move the dirty parts.
-        Region movedDirtyRegionInScrollRect = intersect(translate(dirtyRegionInScrollRect, scrollOffset), scrollRect);
+        Region movedDirtyRegionInScrollRect = intersect(translate(dirtyRegionInScrollRect, scrollDelta), scrollRect);
 
         // And add them back.
         m_dirtyRegion.unite(movedDirtyRegionInScrollRect);
     } 
     
     // Compute the scroll repaint region.
-    Region scrollRepaintRegion = subtract(scrollRect, translate(scrollRect, scrollOffset));
+    Region scrollRepaintRegion = subtract(scrollRect, translate(scrollRect, scrollDelta));
 
     m_dirtyRegion.unite(scrollRepaintRegion);
     scheduleDisplay();
 
     m_scrollRect = scrollRect;
-    m_scrollOffset += scrollOffset;
+    m_scrollOffset += scrollDelta;
+}
+
+void DrawingAreaImpl::pageBackgroundTransparencyChanged()
+{
+    if (m_layerTreeHost)
+        m_layerTreeHost->pageBackgroundTransparencyChanged();
 }
 
 void DrawingAreaImpl::setLayerTreeStateIsFrozen(bool isFrozen)
@@ -183,7 +195,7 @@ void DrawingAreaImpl::setLayerTreeStateIsFrozen(bool isFrozen)
 
 void DrawingAreaImpl::forceRepaint()
 {
-    setNeedsDisplay(m_webPage->bounds());
+    setNeedsDisplay();
 
     m_webPage->layoutIfNeeded();
 
@@ -211,34 +223,34 @@ bool DrawingAreaImpl::forceRepaintAsync(uint64_t callbackID)
     return m_layerTreeHost && m_layerTreeHost->forceRepaintAsync(callbackID);
 }
 
-void DrawingAreaImpl::didInstallPageOverlay()
+void DrawingAreaImpl::didInstallPageOverlay(PageOverlay* pageOverlay)
 {
     if (m_layerTreeHost)
-        m_layerTreeHost->didInstallPageOverlay();
+        m_layerTreeHost->didInstallPageOverlay(pageOverlay);
 }
 
-void DrawingAreaImpl::didUninstallPageOverlay()
+void DrawingAreaImpl::didUninstallPageOverlay(PageOverlay* pageOverlay)
 {
     if (m_layerTreeHost)
-        m_layerTreeHost->didUninstallPageOverlay();
+        m_layerTreeHost->didUninstallPageOverlay(pageOverlay);
 
-    setNeedsDisplay(m_webPage->bounds());
+    setNeedsDisplay();
 }
 
-void DrawingAreaImpl::setPageOverlayNeedsDisplay(const IntRect& rect)
+void DrawingAreaImpl::setPageOverlayNeedsDisplay(PageOverlay* pageOverlay, const IntRect& rect)
 {
     if (m_layerTreeHost) {
-        m_layerTreeHost->setPageOverlayNeedsDisplay(rect);
+        m_layerTreeHost->setPageOverlayNeedsDisplay(pageOverlay, rect);
         return;
     }
 
-    setNeedsDisplay(rect);
+    setNeedsDisplayInRect(rect);
 }
 
-void DrawingAreaImpl::setPageOverlayOpacity(float value)
+void DrawingAreaImpl::setPageOverlayOpacity(PageOverlay* pageOverlay, float value)
 {
     if (m_layerTreeHost)
-        m_layerTreeHost->setPageOverlayOpacity(value);
+        m_layerTreeHost->setPageOverlayOpacity(pageOverlay, value);
 }
 
 bool DrawingAreaImpl::pageOverlayShouldApplyFadeWhenPainting() const
@@ -247,18 +259,6 @@ bool DrawingAreaImpl::pageOverlayShouldApplyFadeWhenPainting() const
         return false;
 
     return true;
-}
-
-void DrawingAreaImpl::pageCustomRepresentationChanged()
-{
-    if (!m_alwaysUseCompositing)
-        return;
-
-    if (m_webPage->mainFrameHasCustomRepresentation()) {
-        if (m_layerTreeHost)
-            exitAcceleratedCompositingMode();
-    } else if (!m_layerTreeHost)
-        enterAcceleratedCompositingMode(0);
 }
 
 void DrawingAreaImpl::setPaintingEnabled(bool paintingEnabled)
@@ -380,10 +380,11 @@ void DrawingAreaImpl::updateBackingStoreState(uint64_t stateID, bool respondImme
         m_webPage->scrollMainFrameIfNotAtMaxScrollPosition(scrollOffset);
 
         if (m_layerTreeHost) {
-            m_layerTreeHost->deviceScaleFactorDidChange();
-            // Use the previously set page size instead of the argument.
-            // It gets adjusted properly when using the fixed layout mode.
-            m_layerTreeHost->sizeDidChange(m_webPage->size());
+#if USE(COORDINATED_GRAPHICS)
+            // Coordinated Graphics sets the size of the root layer to contents size.
+            if (!m_webPage->useFixedLayout())
+#endif
+                m_layerTreeHost->sizeDidChange(m_webPage->size());
         } else
             m_dirtyRegion = m_webPage->bounds();
     } else {
@@ -488,7 +489,7 @@ void DrawingAreaImpl::resumePainting()
     m_isPaintingSuspended = false;
 
     // FIXME: We shouldn't always repaint everything here.
-    setNeedsDisplay(m_webPage->bounds());
+    setNeedsDisplay();
 
 #if PLATFORM(MAC)
     if (m_webPage->windowIsVisible())
@@ -521,7 +522,7 @@ void DrawingAreaImpl::enterAcceleratedCompositingMode(GraphicsLayer* graphicsLay
 
 void DrawingAreaImpl::exitAcceleratedCompositingMode()
 {
-    if (m_alwaysUseCompositing && !m_webPage->mainFrameHasCustomRepresentation())
+    if (m_alwaysUseCompositing)
         return;
 
     ASSERT(!m_layerTreeStateIsFrozen);
@@ -652,25 +653,11 @@ static bool shouldPaintBoundsRect(const IntRect& bounds, const Vector<IntRect>& 
     return wastedSpace <= wastedSpaceThreshold;
 }
 
-#if !PLATFORM(WIN)
-PassOwnPtr<GraphicsContext> DrawingAreaImpl::createGraphicsContext(ShareableBitmap* bitmap)
-{
-    return bitmap->createGraphicsContext();
-}
-#endif
-
 void DrawingAreaImpl::display(UpdateInfo& updateInfo)
 {
     ASSERT(!m_isPaintingSuspended);
     ASSERT(!m_layerTreeHost);
     ASSERT(!m_webPage->size().isEmpty());
-
-    // FIXME: It would be better if we could avoid painting altogether when there is a custom representation.
-    if (m_webPage->mainFrameHasCustomRepresentation()) {
-        // ASSUMPTION: the custom representation will be painting the dirty region for us.
-        m_dirtyRegion = Region();
-        return;
-    }
 
     m_webPage->layoutIfNeeded();
 
@@ -709,7 +696,7 @@ void DrawingAreaImpl::display(UpdateInfo& updateInfo)
     m_scrollRect = IntRect();
     m_scrollOffset = IntSize();
 
-    OwnPtr<GraphicsContext> graphicsContext = createGraphicsContext(bitmap.get());
+    OwnPtr<GraphicsContext> graphicsContext = bitmap->createGraphicsContext();
     graphicsContext->applyDeviceScaleFactor(deviceScaleFactor);
     
     updateInfo.updateRectBounds = bounds;
@@ -718,8 +705,14 @@ void DrawingAreaImpl::display(UpdateInfo& updateInfo)
 
     for (size_t i = 0; i < rects.size(); ++i) {
         m_webPage->drawRect(*graphicsContext, rects[i]);
-        if (m_webPage->hasPageOverlay())
-            m_webPage->drawPageOverlay(*graphicsContext, rects[i]);
+
+        if (m_webPage->hasPageOverlay()) {
+            PageOverlayList& pageOverlays = m_webPage->pageOverlays();
+            PageOverlayList::iterator end = pageOverlays.end();
+            for (PageOverlayList::iterator it = pageOverlays.begin(); it != end; ++it)
+                m_webPage->drawPageOverlay(it->get(), *graphicsContext, rects[i]);
+        }
+
         updateInfo.updateRects.append(rects[i]);
     }
 
@@ -729,10 +722,10 @@ void DrawingAreaImpl::display(UpdateInfo& updateInfo)
 }
 
 #if USE(COORDINATED_GRAPHICS)
-void DrawingAreaImpl::didReceiveLayerTreeCoordinatorMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::MessageDecoder& decoder)
+void DrawingAreaImpl::didReceiveCoordinatedLayerTreeHostMessage(CoreIPC::Connection* connection, CoreIPC::MessageDecoder& decoder)
 {
     if (m_layerTreeHost)
-        m_layerTreeHost->didReceiveLayerTreeCoordinatorMessage(connection, messageID, decoder);
+        m_layerTreeHost->didReceiveCoordinatedLayerTreeHostMessage(connection, decoder);
 }
 #endif
 

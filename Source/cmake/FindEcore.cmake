@@ -5,7 +5,7 @@
 #  ECORE_INCLUDE_DIRS - directories which contain the Ecore headers.
 #  ECORE_LIBRARIES - libraries required to link against Ecore.
 #
-# Optionally, the COMPONENTS keyword can be passed to FIND_PACKAGE()
+# Optionally, the COMPONENTS keyword can be passed to find_package()
 # and additional Ecore libraries can be looked for. Currently, the
 # following libraries can be searched, and they define the following
 # variables if found:
@@ -38,7 +38,7 @@
 # OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 # ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-INCLUDE(EFLHelpers)
+include(EFLHelpers)
 
 FIND_EFL_LIBRARY(ECORE
     HEADERS Ecore.h
@@ -47,39 +47,46 @@ FIND_EFL_LIBRARY(ECORE
 )
 
 # Components.
+# Since EFL version 1.8, include path of Ecore sub modules have been changed
+# from ecore-1 to ecore-XXX-1
 FIND_EFL_LIBRARY(ECORE_EVAS
     HEADERS Ecore_Evas.h
-    HEADER_PREFIXES ecore-1
+    HEADER_PREFIXES ecore-1 ecore-evas-1
     LIBRARY ecore_evas
 )
 FIND_EFL_LIBRARY(ECORE_FILE
     HEADERS Ecore_File.h
-    HEADER_PREFIXES ecore-1
+    HEADER_PREFIXES ecore-1 ecore-file-1
     LIBRARY ecore_file
 )
 FIND_EFL_LIBRARY(ECORE_INPUT
     HEADERS Ecore_Input.h
-    HEADER_PREFIXES ecore-1
+    HEADER_PREFIXES ecore-1 ecore-input-1
     LIBRARY ecore_input
 )
 FIND_EFL_LIBRARY(ECORE_X
     HEADERS Ecore_X.h
-    HEADER_PREFIXES ecore-1
+    HEADER_PREFIXES ecore-1 ecore-x-1
     LIBRARY ecore_x
 )
 FIND_EFL_LIBRARY(ECORE_IMF
-    HEADERS Ecore_IMF.h Ecore_IMF_Evas.h
-    HEADER_PREFIXES ecore-1
+    HEADERS Ecore_IMF.h
+    HEADER_PREFIXES ecore-1 ecore-imf-1
     LIBRARY ecore_imf
 )
+FIND_EFL_LIBRARY(ECORE_IMF_EVAS
+    HEADERS Ecore_IMF_Evas.h
+    HEADER_PREFIXES ecore-1 ecore-imf-evas-1
+    LIBRARY ecore_imf_evas
+)
 
-FOREACH(_component ${Ecore_FIND_COMPONENTS})
-    SET(_ecore_component "ECORE_${_component}")
-    STRING(TOUPPER ${_ecore_component} _UPPER_NAME)
+foreach (_component ${Ecore_FIND_COMPONENTS})
+    set(_ecore_component "ECORE_${_component}")
+    string(TOUPPER ${_ecore_component} _UPPER_NAME)
 
-    LIST(APPEND _ECORE_REQUIRED_COMPONENT_VARS ${_UPPER_NAME}_INCLUDE_DIRS ${_UPPER_NAME}_LIBRARIES)
-ENDFOREACH()
+    list(APPEND _ECORE_REQUIRED_COMPONENT_VARS ${_UPPER_NAME}_INCLUDE_DIRS ${_UPPER_NAME}_LIBRARIES)
+endforeach ()
 
-INCLUDE(FindPackageHandleStandardArgs)
+include(FindPackageHandleStandardArgs)
 FIND_PACKAGE_HANDLE_STANDARD_ARGS(Ecore REQUIRED_VARS ECORE_INCLUDE_DIRS ECORE_LIBRARIES ${_ECORE_REQUIRED_COMPONENT_VARS}
                                         VERSION_VAR   ECORE_VERSION)

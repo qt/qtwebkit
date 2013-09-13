@@ -35,20 +35,22 @@ enum PrintColorAdjust {
 };
 
 // The difference between two styles.  The following values are used:
-// (1) StyleDifferenceEqual - The two styles are identical
-// (2) StyleDifferenceRecompositeLayer - The layer needs its position and transform updated, but no repaint
-// (3) StyleDifferenceRepaint - The object just needs to be repainted.
-// (4) StyleDifferenceRepaintLayer - The layer and its descendant layers needs to be repainted.
-// (5) StyleDifferenceLayoutPositionedMovementOnly - Only the position of this positioned object has been updated
-// (6) StyleDifferenceSimplifiedLayout - Only overflow needs to be recomputed
-// (7) StyleDifferenceSimplifiedLayoutAndPositionedMovement - Both positioned movement and simplified layout updates are required.
-// (8) StyleDifferenceLayout - A full layout is required.
+// - StyleDifferenceEqual - The two styles are identical
+// - StyleDifferenceRecompositeLayer - The layer needs its position and transform updated, but no repaint
+// - StyleDifferenceRepaint - The object just needs to be repainted.
+// - StyleDifferenceRepaintIfText - The object needs to be repainted if it contains text.
+// - StyleDifferenceRepaintLayer - The layer and its descendant layers needs to be repainted.
+// - StyleDifferenceLayoutPositionedMovementOnly - Only the position of this positioned object has been updated
+// - StyleDifferenceSimplifiedLayout - Only overflow needs to be recomputed
+// - StyleDifferenceSimplifiedLayoutAndPositionedMovement - Both positioned movement and simplified layout updates are required.
+// - StyleDifferenceLayout - A full layout is required.
 enum StyleDifference {
     StyleDifferenceEqual,
 #if USE(ACCELERATED_COMPOSITING)
     StyleDifferenceRecompositeLayer,
 #endif
     StyleDifferenceRepaint,
+    StyleDifferenceRepaintIfText,
     StyleDifferenceRepaintLayer,
     StyleDifferenceLayoutPositionedMovementOnly,
     StyleDifferenceSimplifiedLayout,
@@ -94,7 +96,12 @@ enum EBorderPrecedence { BOFF, BTABLE, BCOLGROUP, BCOL, BROWGROUP, BROW, BCELL }
 enum OutlineIsAuto { AUTO_OFF = 0, AUTO_ON };
 
 enum EPosition {
-    StaticPosition, RelativePosition, AbsolutePosition, FixedPosition, StickyPosition
+    StaticPosition = 0,
+    RelativePosition = 1,
+    AbsolutePosition = 2,
+    StickyPosition = 3,
+    // This value is required to pack our bits efficiently in RenderObject.
+    FixedPosition = 6
 };
 
 enum EFloat {
@@ -152,6 +159,9 @@ enum EFillLayerType {
 
 // CSS3 Background Values
 enum EFillSizeType { Contain, Cover, SizeLength, SizeNone };
+
+// CSS3 Background Position
+enum BackgroundEdgeOrigin { TopEdge, RightEdge, BottomEdge, LeftEdge };
 
 // CSS3 Marquee Properties
 
@@ -329,12 +339,12 @@ enum ETextTransform {
     CAPITALIZE, UPPERCASE, LOWERCASE, TTNONE
 };
 
-static const size_t ETextDecorationBits = 4;
-enum ETextDecoration {
-    TDNONE = 0x0 , UNDERLINE = 0x1, OVERLINE = 0x2, LINE_THROUGH= 0x4, BLINK = 0x8
+static const size_t TextDecorationBits = 4;
+enum TextDecoration {
+    TextDecorationNone = 0x0, TextDecorationUnderline = 0x1, TextDecorationOverline = 0x2, TextDecorationLineThrough = 0x4, TextDecorationBlink = 0x8
 };
-inline ETextDecoration operator|(ETextDecoration a, ETextDecoration b) { return ETextDecoration(int(a) | int(b)); }
-inline ETextDecoration& operator|=(ETextDecoration& a, ETextDecoration b) { return a = a | b; }
+inline TextDecoration operator| (TextDecoration a, TextDecoration b) { return TextDecoration(int(a) | int(b)); }
+inline TextDecoration& operator|= (TextDecoration& a, TextDecoration b) { return a = a | b; }
 
 enum TextDecorationStyle {
     TextDecorationStyleSolid,
@@ -347,8 +357,17 @@ enum TextDecorationStyle {
 };
 
 #if ENABLE(CSS3_TEXT)
-enum ETextAlignLast {
+enum TextAlignLast {
     TextAlignLastAuto, TextAlignLastStart, TextAlignLastEnd, TextAlignLastLeft, TextAlignLastRight, TextAlignLastCenter, TextAlignLastJustify
+};
+
+enum TextUnderlinePosition {
+    // FIXME: Implement support for 'under left' and 'under right' values.
+    TextUnderlinePositionAuto = 0x1, TextUnderlinePositionAlphabetic = 0x2, TextUnderlinePositionUnder = 0x4
+};
+
+enum TextJustify {
+    TextJustifyAuto, TextJustifyNone, TextJustifyInterWord, TextJustifyInterIdeograph, TextJustifyInterCluster, TextJustifyDistribute, TextJustifyKashida
 };
 #endif // CSS3_TEXT
 
@@ -410,6 +429,13 @@ enum ECursor {
     CURSOR_NONE
 };
 
+#if ENABLE(CURSOR_VISIBILITY)
+enum CursorVisibility {
+    CursorVisibilityAuto,
+    CursorVisibilityAutoHide,
+};
+#endif
+
 // The order of this enum must match the order of the display values in CSSValueKeywords.in.
 enum EDisplay {
     INLINE, BLOCK, LIST_ITEM, RUN_IN, COMPACT, INLINE_BLOCK,
@@ -451,9 +477,11 @@ enum TextEmphasisMark { TextEmphasisMarkNone, TextEmphasisMarkAuto, TextEmphasis
 
 enum TextEmphasisPosition { TextEmphasisPositionOver, TextEmphasisPositionUnder };
 
+enum TextOrientation { TextOrientationVerticalRight, TextOrientationUpright, TextOrientationSideways, TextOrientationSidewaysRight };
+
 enum TextOverflow { TextOverflowClip = 0, TextOverflowEllipsis };
 
-enum EImageRendering { ImageRenderingAuto, ImageRenderingOptimizeSpeed, ImageRenderingOptimizeQuality, ImageRenderingOptimizeContrast };
+enum EImageRendering { ImageRenderingAuto = 0, ImageRenderingOptimizeSpeed, ImageRenderingOptimizeQuality, ImageRenderingCrispEdges };
 
 enum ImageResolutionSource { ImageResolutionSpecified = 0, ImageResolutionFromImage };
 
@@ -461,7 +489,7 @@ enum ImageResolutionSnap { ImageResolutionNoSnap = 0, ImageResolutionSnapPixels 
 
 enum Order { LogicalOrder = 0, VisualOrder };
 
-enum RegionOverflow { AutoRegionOverflow, BreakRegionOverflow };
+enum RegionFragment { AutoRegionFragment, BreakRegionFragment };
 
 enum ColumnAxis { HorizontalColumnAxis, VerticalColumnAxis, AutoColumnAxis };
 
@@ -477,8 +505,18 @@ enum WrapThrough { WrapThroughWrap, WrapThroughNone };
 
 enum RubyPosition { RubyPositionBefore, RubyPositionAfter };
 
+enum GridAutoFlow { AutoFlowNone, AutoFlowColumn, AutoFlowRow };
+
 #if ENABLE(DRAGGABLE_REGION)
 enum DraggableRegionMode { DraggableRegionNone, DraggableRegionDrag, DraggableRegionNoDrag };
+#endif
+
+// Reasonable maximum to prevent insane font sizes from causing crashes on some platforms (such as Windows).
+static const float maximumAllowedFontSize = 1000000.0f;
+
+#if ENABLE(CSS3_TEXT)
+enum TextIndentLine { TextIndentFirstLine, TextIndentEachLine };
+enum TextIndentType { TextIndentNormal, TextIndentHanging };
 #endif
 
 } // namespace WebCore

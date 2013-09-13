@@ -36,11 +36,14 @@
 #include "HTMLNames.h"
 #include "HTMLPlugInElement.h"
 #include "HostWindow.h"
+#include "JSDOMWindowBase.h"
 #include "MouseEvent.h"
 #include "NotImplemented.h"
 #include "PluginPackage.h"
+#include "ScriptController.h"
 #include "npruntime_impl.h"
 #include "runtime/JSLock.h"
+#include "runtime/Operations.h"
 #include <Ecore_Evas.h>
 #include <Ecore_X.h>
 #include <Evas.h>
@@ -55,7 +58,7 @@ bool PluginView::dispatchNPEvent(NPEvent& event)
         return false;
 
     PluginView::setCurrentPluginView(this);
-    JSC::JSLock::DropAllLocks dropAllLocks(JSDOMWindowBase::commonJSGlobalData());
+    JSC::JSLock::DropAllLocks dropAllLocks(JSDOMWindowBase::commonVM());
     setCallingPlugin(true);
 
     bool accepted = m_plugin->pluginFuncs()->event(m_instance, &event);
@@ -122,7 +125,7 @@ void PluginView::updatePluginWidget()
 void PluginView::setFocus(bool focused)
 {
     if (focused)
-        m_element->document()->setFocusedNode(m_element);
+        m_element->document()->setFocusedElement(m_element);
 
     Widget::setFocus(focused);
 }
@@ -282,7 +285,7 @@ bool PluginView::platformGetValue(NPNVariable variable, void* value, NPError* re
     }
 
     case NPNVnetscapeWindow: {
-        Evas* evas = m_parentFrame->view()->evas();
+        Evas* evas = evas_object_evas_get(m_parentFrame->view()->evasObject());
         if (!evas)
             return false;
 

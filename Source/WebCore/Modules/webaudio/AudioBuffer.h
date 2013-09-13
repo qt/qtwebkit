@@ -55,7 +55,7 @@ public:
 
     // Channel data access
     unsigned numberOfChannels() const { return m_channels.size(); }
-    Float32Array* getChannelData(unsigned channelIndex, ExceptionCode&);
+    PassRefPtr<Float32Array> getChannelData(unsigned channelIndex, ExceptionCode&);
     Float32Array* getChannelData(unsigned channelIndex);
     void zero();
 
@@ -67,6 +67,8 @@ public:
     // releaseMemory() can be called when the AudioContext goes away, so we can release the memory earlier than when the garbage collection happens.
     // Careful! Only call this when the page unloads, after the AudioContext is no longer processing.
     void releaseMemory();
+
+    size_t memoryCost() const;
     
 protected:
     AudioBuffer(unsigned numberOfChannels, size_t numberOfFrames, float sampleRate);

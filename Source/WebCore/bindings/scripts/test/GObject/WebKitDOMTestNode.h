@@ -18,13 +18,16 @@
     Boston, MA 02110-1301, USA.
 */
 
+#if !defined(__WEBKITDOM_H_INSIDE__) && !defined(BUILDING_WEBKIT)
+#error "Only <webkitdom/webkitdom.h> can be included directly."
+#endif
+
 #ifndef WebKitDOMTestNode_h
 #define WebKitDOMTestNode_h
 
 #include <glib-object.h>
-#include <webkit/WebKitDOMNode.h>
-#include <webkit/webkitdefines.h>
-#include <webkit/webkitdomdefines.h>
+#include <webkitdom/WebKitDOMNode.h>
+#include <webkitdom/webkitdomdefines.h>
 
 G_BEGIN_DECLS
 

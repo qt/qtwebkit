@@ -1,9 +1,9 @@
-SET(WEBKIT_TESTRUNNER_DIR "${TOOLS_DIR}/WebKitTestRunner")
-SET(WEBKIT_TESTRUNNER_INJECTEDBUNDLE_DIR "${TOOLS_DIR}/WebKitTestRunner/InjectedBundle")
+set(WEBKIT_TESTRUNNER_DIR "${TOOLS_DIR}/WebKitTestRunner")
+set(WEBKIT_TESTRUNNER_INJECTEDBUNDLE_DIR "${TOOLS_DIR}/WebKitTestRunner/InjectedBundle")
 
-FILE(MAKE_DIRECTORY ${DERIVED_SOURCES_DIR}/InjectedBundle)
+file(MAKE_DIRECTORY ${DERIVED_SOURCES_DIR}/InjectedBundle)
 
-SET(WebKitTestRunner_SOURCES
+set(WebKitTestRunner_SOURCES
     ${WEBKIT_TESTRUNNER_DIR}/CyclicRedundancyCheck.cpp
     ${WEBKIT_TESTRUNNER_DIR}/GeolocationProviderMock.cpp
     ${WEBKIT_TESTRUNNER_DIR}/PixelDumpSupport.cpp
@@ -13,14 +13,14 @@ SET(WebKitTestRunner_SOURCES
     ${WEBKIT_TESTRUNNER_DIR}/WorkQueueManager.cpp
 )
 
-SET(WebKitTestRunner_LIBRARIES
-    ${JavaScriptCore_LIBRARY_NAME}
-    ${WebCore_LIBRARY_NAME}
-    ${WebCoreTestSupport_LIBRARY_NAME}
-    ${WebKit2_LIBRARY_NAME}
+set(WebKitTestRunner_LIBRARIES
+    JavaScriptCore
+    WebCore
+    WebCoreTestSupport
+    WebKit2
 )
 
-SET(WebKitTestRunner_INCLUDE_DIRECTORIES
+set(WebKitTestRunner_INCLUDE_DIRECTORIES
     ${WEBKIT_TESTRUNNER_DIR}
     ${WEBKIT_TESTRUNNER_DIR}/InjectedBundle
     ${WEBKIT_TESTRUNNER_DIR}/InjectedBundle/Bindings
@@ -36,9 +36,12 @@ SET(WebKitTestRunner_INCLUDE_DIRECTORIES
     ${WEBCORE_DIR}/testing/js
     ${WEBKIT2_DIR}/Shared
     ${WEBKIT2_DIR}/Shared/API/c
+    ${WEBKIT2_DIR}/Shared/Plugins
     ${WEBKIT2_DIR}/UIProcess
     ${WEBKIT2_DIR}/UIProcess/API/C/efl
     ${WEBKIT2_DIR}/UIProcess/API/C/soup
+    ${WEBKIT2_DIR}/WebProcess/InjectedBundle
+    ${WEBKIT2_DIR}/WebProcess/InjectedBundle/API/c
     ${WTF_DIR}
     ${DERIVED_SOURCES_WEBCORE_DIR}
     ${DERIVED_SOURCES_WEBCORE_DIR}/include
@@ -49,7 +52,7 @@ SET(WebKitTestRunner_INCLUDE_DIRECTORIES
     ${LIBSOUP_INCLUDE_DIRS}
 )
 
-SET(WebKitTestRunnerInjectedBundle_SOURCES
+set(WebKitTestRunnerInjectedBundle_SOURCES
     ${WEBKIT_TESTRUNNER_INJECTEDBUNDLE_DIR}/AccessibilityController.cpp
     ${WEBKIT_TESTRUNNER_INJECTEDBUNDLE_DIR}/AccessibilityTextMarker.cpp
     ${WEBKIT_TESTRUNNER_INJECTEDBUNDLE_DIR}/AccessibilityTextMarkerRange.cpp
@@ -65,7 +68,7 @@ SET(WebKitTestRunnerInjectedBundle_SOURCES
     ${WEBKIT_TESTRUNNER_INJECTEDBUNDLE_DIR}/Bindings/JSWrapper.cpp
 )
 
-SET(WebKitTestRunnerInjectedBundle_IDL_FILES
+set(WebKitTestRunnerInjectedBundle_IDL_FILES
     "${WEBKIT_TESTRUNNER_INJECTEDBUNDLE_DIR}/Bindings/AccessibilityController.idl"
     "${WEBKIT_TESTRUNNER_INJECTEDBUNDLE_DIR}/Bindings/AccessibilityTextMarker.idl"
     "${WEBKIT_TESTRUNNER_INJECTEDBUNDLE_DIR}/Bindings/AccessibilityTextMarkerRange.idl"
@@ -76,23 +79,33 @@ SET(WebKitTestRunnerInjectedBundle_IDL_FILES
     "${WEBKIT_TESTRUNNER_INJECTEDBUNDLE_DIR}/Bindings/TextInputController.idl"
 )
 
+set(WebKitTestRunnerInjectedBundle_LIBRARIES
+    ${WebKitTestRunner_LIBRARIES}
+    ${ATK_LIBRARIES}
+    ${ECORE_LIBRARIES}
+    ${ECORE_FILE_LIBRARIES}
+    ${FONTCONFIG_LIBRARIES}
+    ${GLIB_LIBRARIES}
+    ${GLIB_GOBJECT_LIBRARIES}
+)
+
 GENERATE_BINDINGS(WebKitTestRunnerInjectedBundle_SOURCES
     "${WebKitTestRunnerInjectedBundle_IDL_FILES}"
     "${WEBKIT_TESTRUNNER_INJECTEDBUNDLE_DIR}/Bindings"
     "--include=${WEBKIT_TESTRUNNER_INJECTEDBUNDLE_DIR}/Bindings"
     "${FEATURE_DEFINES_WITH_SPACE_SEPARATOR}"
     ${DERIVED_SOURCES_DIR}/InjectedBundle JS TestRunner
-    )
+    ${WEBCORE_DIR}/bindings/scripts/IDLAttributes.txt)
 
 INCLUDE_IF_EXISTS(${WEBKIT_TESTRUNNER_DIR}/Platform${PORT}.cmake)
 
-INCLUDE_DIRECTORIES(${WebKitTestRunner_INCLUDE_DIRECTORIES})
+include_directories(${WebKitTestRunner_INCLUDE_DIRECTORIES})
 
-ADD_LIBRARY(TestRunnerInjectedBundle SHARED ${WebKitTestRunnerInjectedBundle_SOURCES})
-TARGET_LINK_LIBRARIES(TestRunnerInjectedBundle ${WebKitTestRunner_LIBRARIES})
+add_library(TestRunnerInjectedBundle SHARED ${WebKitTestRunnerInjectedBundle_SOURCES})
+target_link_libraries(TestRunnerInjectedBundle ${WebKitTestRunnerInjectedBundle_LIBRARIES})
 
-ADD_EXECUTABLE(WebKitTestRunner ${WebKitTestRunner_SOURCES})
-TARGET_LINK_LIBRARIES(WebKitTestRunner ${WebKitTestRunner_LIBRARIES})
+add_executable(WebKitTestRunner ${WebKitTestRunner_SOURCES})
+target_link_libraries(WebKitTestRunner ${WebKitTestRunner_LIBRARIES})
 
-ADD_DEPENDENCIES(${WebKit2_LIBRARY_NAME} ${ForwardingHeadersForWebKitTestRunner_NAME})
-ADD_DEPENDENCIES(${WebKit2_LIBRARY_NAME} ${ForwardingNetworkHeadersForWebKitTestRunner_NAME})
+add_dependencies(WebKit2 ${ForwardingHeadersForWebKitTestRunner_NAME})
+add_dependencies(WebKit2 ${ForwardingNetworkHeadersForWebKitTestRunner_NAME})

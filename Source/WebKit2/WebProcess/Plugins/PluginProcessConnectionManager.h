@@ -38,31 +38,36 @@
 
 // Manages plug-in process connections for the given web process.
 
-namespace CoreIPC {
-    class Connection;
-}
-
 namespace WebKit {
 
 class PluginProcessConnection;
         
-class PluginProcessConnectionManager {
-    WTF_MAKE_NONCOPYABLE(PluginProcessConnectionManager);
+class PluginProcessConnectionManager : public CoreIPC::Connection::WorkQueueMessageReceiver {
 public:
-    PluginProcessConnectionManager();
+    static PassRefPtr<PluginProcessConnectionManager> create();
     ~PluginProcessConnectionManager();
 
-    PluginProcessConnection* getPluginProcessConnection(const String& pluginPath, PluginProcess::Type);
+    void initializeConnection(CoreIPC::Connection*);
+
+    PluginProcessConnection* getPluginProcessConnection(uint64_t pluginProcessToken);
     void removePluginProcessConnection(PluginProcessConnection*);
 
-    // Called on the web process connection work queue.
-    void pluginProcessCrashed(const String& pluginPath, PluginProcess::Type);
+    void didReceivePluginProcessConnectionManagerMessageOnConnectionWorkQueue(CoreIPC::Connection*, OwnPtr<CoreIPC::MessageDecoder>&);
 
 private:
-    Vector<RefPtr<PluginProcessConnection> > m_pluginProcessConnections;
+    PluginProcessConnectionManager();
 
-    Mutex m_pathsAndConnectionsMutex;
-    HashMap<std::pair<String, PluginProcess::Type>, RefPtr<CoreIPC::Connection> > m_pathsAndConnections;
+    // CoreIPC::Connection::WorkQueueMessageReceiver.
+    virtual void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&) OVERRIDE;
+
+    void pluginProcessCrashed(uint64_t pluginProcessToken);
+
+    RefPtr<WorkQueue> m_queue;
+
+    Vector<RefPtr<PluginProcessConnection>> m_pluginProcessConnections;
+
+    Mutex m_tokensAndConnectionsMutex;
+    HashMap<uint64_t, RefPtr<CoreIPC::Connection>> m_tokensAndConnections;
 };
 
 }

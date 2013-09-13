@@ -24,9 +24,9 @@
  */
 
 [
+    NoInterfaceObject,
     Conditional=WEBGL,
-    JSGenerateIsReachable=ImplContext,
-    OmitConstructor,
+    GenerateIsReachable=ImplContext,
     DoNotCheckConstants
 ] interface WebGLDebugRendererInfo {
     const unsigned int UNMASKED_VENDOR_WEBGL = 0x9245;

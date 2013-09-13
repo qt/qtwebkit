@@ -32,6 +32,7 @@
 #include "Element.h"
 #include "ExceptionCode.h"
 #include "Frame.h"
+#include "FrameLoader.h"
 #include "FrameLoaderClient.h"
 #include "FTPDirectoryDocument.h"
 #include "HTMLDocument.h"
@@ -46,7 +47,6 @@
 #include "Page.h"
 #include "PluginData.h"
 #include "PluginDocument.h"
-#include "RegularExpression.h"
 #include "SecurityOrigin.h"
 #include "Settings.h"
 #include "StyleSheetContents.h"
@@ -315,11 +315,10 @@ PassRefPtr<Document> DOMImplementation::createDocument(const String& namespaceUR
         return 0;
     }
 
-    // FIXME: Shouldn't this call appendChild instead?
     if (doctype)
-        doc->parserAppendChild(doctype);
+        doc->appendChild(doctype);
     if (documentElement)
-        doc->parserAppendChild(documentElement.release());
+        doc->appendChild(documentElement.release());
 
     return doc.release();
 }
@@ -333,27 +332,34 @@ PassRefPtr<CSSStyleSheet> DOMImplementation::createCSSStyleSheet(const String&, 
     return sheet;
 }
 
-static const char* const validXMLMIMETypeChars = "[0-9a-zA-Z_\\-+~!$\\^{}|.%'`#&*]"; // per RFCs: 3023, 2045
-
-XMLMIMETypeRegExp::XMLMIMETypeRegExp()
-    : m_regex(adoptPtr(new RegularExpression(WTF::makeString("^", validXMLMIMETypeChars, "+/", validXMLMIMETypeChars, "+\\+xml$"), TextCaseSensitive)))
+static inline bool isValidXMLMIMETypeChar(UChar c)
 {
-}
-
-XMLMIMETypeRegExp::~XMLMIMETypeRegExp()
-{
-}
-
-bool XMLMIMETypeRegExp::isXMLMIMEType(const String& mimeType)
-{
-    return m_regex->match(mimeType) > -1;
+    // Valid characters per RFCs 3023 and 2045:
+    // 0-9a-zA-Z_-+~!$^{}|.%'`#&*
+    return isASCIIAlphanumeric(c) || c == '!' || c == '#' || c == '$' || c == '%' || c == '&' || c == '\'' || c == '*' || c == '+'
+        || c == '-' || c == '.' || c == '^' || c == '_' || c == '`' || c == '{' || c == '|' || c == '}' || c == '~';
 }
 
 bool DOMImplementation::isXMLMIMEType(const String& mimeType)
 {
     if (mimeType == "text/xml" || mimeType == "application/xml" || mimeType == "text/xsl")
         return true;
-    return threadGlobalData().xmlTypeRegExp().isXMLMIMEType(mimeType);
+
+    if (!mimeType.endsWith("+xml"))
+        return false;
+
+    size_t slashPosition = mimeType.find('/');
+    // Take into account the '+xml' ending of mimeType.
+    if (slashPosition == notFound || !slashPosition || slashPosition == mimeType.length() - 5)
+        return false;
+
+    // Again, mimeType ends with '+xml', no need to check the validity of that substring.
+    for (size_t i = 0; i < mimeType.length() - 4; ++i) {
+        if (!isValidXMLMIMETypeChar(mimeType[i]) && i != slashPosition)
+            return false;
+    }
+
+    return true;
 }
 
 bool DOMImplementation::isTextMIMEType(const String& mimeType)
@@ -397,12 +403,17 @@ PassRefPtr<Document> DOMImplementation::createDocument(const String& type, Frame
 #endif
 
     PluginData* pluginData = 0;
-    if (frame && frame->page() && frame->loader()->subframeLoader()->allowPlugins(NotAboutToInstantiatePlugin))
+    PluginData::AllowedPluginTypes allowedPluginTypes = PluginData::OnlyApplicationPlugins;
+    if (frame && frame->page()) {
+        if (frame->loader()->subframeLoader()->allowPlugins(NotAboutToInstantiatePlugin))
+            allowedPluginTypes = PluginData::AllPlugins;
+
         pluginData = frame->page()->pluginData();
+    }
 
     // PDF is one image type for which a plugin can override built-in support.
     // We do not want QuickTime to take over all image types, obviously.
-    if ((type == "application/pdf" || type == "text/pdf") && pluginData && pluginData->supportsMimeType(type))
+    if ((MIMETypeRegistry::isPDFOrPostScriptMIMEType(type)) && pluginData && pluginData->supportsMimeType(type, allowedPluginTypes))
         return PluginDocument::create(frame, url);
     if (Image::supportsType(type))
         return ImageDocument::create(frame, url);
@@ -418,7 +429,7 @@ PassRefPtr<Document> DOMImplementation::createDocument(const String& type, Frame
     // Everything else except text/plain can be overridden by plugins. In particular, Adobe SVG Viewer should be used for SVG, if installed.
     // Disallowing plug-ins to use text/plain prevents plug-ins from hijacking a fundamental type that the browser is expected to handle,
     // and also serves as an optimization to prevent loading the plug-in database in the common case.
-    if (type != "text/plain" && pluginData && pluginData->supportsMimeType(type)) 
+    if (type != "text/plain" && ((pluginData && pluginData->supportsMimeType(type, allowedPluginTypes)) || (frame && frame->loader()->client()->shouldAlwaysUsePluginDocument(type))))
         return PluginDocument::create(frame, url);
     if (isTextMIMEType(type))
         return TextDocument::create(frame, url);

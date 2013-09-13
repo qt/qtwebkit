@@ -48,7 +48,7 @@ class InspectorObject;
 class InspectorValue;
 class InstrumentingAgents;
 class ScriptDebugServer;
-class WorkerContext;
+class WorkerGlobalScope;
 
 typedef String ErrorString;
 
@@ -61,6 +61,7 @@ public:
     // Part of the protocol.
     virtual void enable(ErrorString*) { m_enabled = true; }
     virtual void disable(ErrorString*) { m_enabled = false; }
+    virtual void parse(ErrorString*, const String& expression, TypeBuilder::Runtime::SyntaxErrorType::Enum* result, TypeBuilder::OptOutput<String>* message, RefPtr<TypeBuilder::Runtime::ErrorRange>&);
     virtual void evaluate(ErrorString*,
                   const String& expression,
                   const String* objectGroup,
@@ -90,7 +91,7 @@ public:
 #endif
 
 protected:
-    InspectorRuntimeAgent(InstrumentingAgents*, InspectorState*, InjectedScriptManager*);
+    InspectorRuntimeAgent(InstrumentingAgents*, InspectorCompositeState*, InjectedScriptManager*);
     virtual InjectedScript injectedScriptForEval(ErrorString*, const int* executionContextId) = 0;
 
     virtual void muteConsole() = 0;

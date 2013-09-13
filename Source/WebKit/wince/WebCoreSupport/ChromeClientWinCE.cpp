@@ -184,7 +184,7 @@ bool ChromeClientWinCE::runBeforeUnloadConfirmPanel(const String& message, Frame
     return runJavaScriptConfirm(frame, message);
 }
 
-void ChromeClientWinCE::addMessageToConsole(MessageSource, MessageType, MessageLevel, const String&, unsigned int, const String&)
+void ChromeClientWinCE::addMessageToConsole(MessageSource, MessageLevel, const String&, unsigned, unsigned, const String&)
 {
     notImplemented();
 }
@@ -299,7 +299,7 @@ void ChromeClientWinCE::print(Frame*)
 }
 
 #if ENABLE(SQL_DATABASE)
-void ChromeClientWinCE::exceededDatabaseQuota(Frame*, const String&)
+void ChromeClientWinCE::exceededDatabaseQuota(Frame*, const String&, DatabaseDetails)
 {
     notImplemented();
 }
@@ -360,6 +360,16 @@ void ChromeClientWinCE::setCursorHiddenUntilMouseMoves(bool)
 }
 
 void ChromeClientWinCE::setLastSetCursorToCurrentCursor()
+{
+    notImplemented();
+}
+
+void ChromeClientWinCE::AXStartFrameLoad()
+{
+    notImplemented();
+}
+
+void ChromeClientWinCE::AXFinishFrameLoad()
 {
     notImplemented();
 }

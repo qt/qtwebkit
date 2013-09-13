@@ -24,7 +24,8 @@
 
 [
     Conditional=WEB_AUDIO,
-    JSGenerateToJSObject
+    JSGenerateToJSObject,
+    InterfaceName=webkitAudioPannerNode
 ] interface PannerNode : AudioNode {
     // Panning model
     const unsigned short EQUALPOWER = 0;
@@ -37,24 +38,22 @@
     const unsigned short EXPONENTIAL_DISTANCE = 2;
 
     // Default model for stereo is HRTF 
-    attribute unsigned short panningModel
-        setter raises(DOMException);
+    [CustomSetter] attribute DOMString panningModel;
 
     // Uses a 3D cartesian coordinate system 
-    void setPosition(in float x, in float y, in float z);
-    void setOrientation(in float x, in float y, in float z);
-    void setVelocity(in float x, in float y, in float z);
+    void setPosition(float x, float y, float z);
+    void setOrientation(float x, float y, float z);
+    void setVelocity(float x, float y, float z);
 
     // Distance model
-    attribute unsigned short distanceModel
-        setter raises(DOMException);
+    [CustomSetter] attribute DOMString distanceModel;
 
-    attribute float refDistance;
-    attribute float maxDistance;
-    attribute float rolloffFactor;
+    attribute double refDistance;
+    attribute double maxDistance;
+    attribute double rolloffFactor;
 
     // Directional sound cone
-    attribute float coneInnerAngle;
-    attribute float coneOuterAngle;
-    attribute float coneOuterGain;
+    attribute double coneInnerAngle;
+    attribute double coneOuterAngle;
+    attribute double coneOuterGain;
 };

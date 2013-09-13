@@ -30,6 +30,7 @@
 
 /**
  * @constructor
+ * @extends {WebInspector.Object}
  */
 WebInspector.DockController = function()
 {
@@ -41,12 +42,17 @@ WebInspector.DockController = function()
         this._dockToggleButton.makeLongClickEnabled(this._createDockOptions.bind(this));
 
     this.setDockSide(WebInspector.queryParamsObject["dockSide"] || "bottom");
+    WebInspector.settings.showToolbarIcons.addChangeListener(this._updateUI.bind(this));
 }
 
 WebInspector.DockController.State = {
     DockedToBottom: "bottom",
     DockedToRight: "right",
     Undocked: "undocked"
+}
+
+WebInspector.DockController.Events = {
+    DockSideChanged: "DockSideChanged"
 }
 
 WebInspector.DockController.prototype = {
@@ -56,6 +62,14 @@ WebInspector.DockController.prototype = {
     get element()
     {
         return this._dockToggleButton.element;
+    },
+
+    /**
+     * @return {string}
+     */
+    dockSide: function()
+    {
+        return this._dockSide;
     },
 
     /**
@@ -75,6 +89,7 @@ WebInspector.DockController.prototype = {
         else
             WebInspector.userMetrics.WindowUndocked.record();
         this._updateUI();
+        this.dispatchEventToListeners(WebInspector.DockController.Events.DockSideChanged, this._dockSide);
     },
 
     /**
@@ -93,21 +108,26 @@ WebInspector.DockController.prototype = {
         case WebInspector.DockController.State.DockedToBottom:
             body.removeStyleClass("undocked");
             body.removeStyleClass("dock-to-right");
-            this.setCompactMode(true);
+            body.addStyleClass("dock-to-bottom");
             break;
         case WebInspector.DockController.State.DockedToRight: 
             body.removeStyleClass("undocked");
             body.addStyleClass("dock-to-right");
-            this.setCompactMode(false);
+            body.removeStyleClass("dock-to-bottom");
             break;
         case WebInspector.DockController.State.Undocked: 
             body.addStyleClass("undocked");
             body.removeStyleClass("dock-to-right");
-            this.setCompactMode(false);
+            body.removeStyleClass("dock-to-bottom");
             break;
         }
 
-        if (this._isDockingUnavailable) {
+        if (WebInspector.settings.showToolbarIcons.get())
+            document.body.addStyleClass("show-toolbar-icons");
+        else
+            document.body.removeStyleClass("show-toolbar-icons");
+
+        if (this._isDockingUnavailable && this._dockSide === WebInspector.DockController.State.Undocked) {
             this._dockToggleButton.state = "undock";
             this._dockToggleButton.setEnabled(false);
             return;
@@ -170,26 +190,10 @@ WebInspector.DockController.prototype = {
         InspectorFrontendHost.requestSetDockSide(action);
     },
 
-    /**
-     * @return {boolean}
-     */
-    isCompactMode: function()
-    {
-        return this._isCompactMode;
-    },
-
-    /**
-     * @param {boolean} isCompactMode
-     */
-    setCompactMode: function(isCompactMode)
-    {
-        var body = document.body;
-        this._isCompactMode = isCompactMode;
-        if (WebInspector.toolbar)
-            WebInspector.toolbar.setCompactMode(isCompactMode);
-        if (isCompactMode)
-            body.addStyleClass("compact");
-        else
-            body.removeStyleClass("compact");
-    }
+    __proto__: WebInspector.Object.prototype
 }
+
+/**
+ * @type {?WebInspector.DockController}
+ */
+WebInspector.dockController = null;

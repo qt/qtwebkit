@@ -33,7 +33,7 @@
 #include "ApplicationCacheStorage.h"
 #include "ColorChooser.h"
 #include "ColorChooserClient.h"
-#include "DatabaseTracker.h"
+#include "DatabaseManager.h"
 #include "Document.h"
 #include "FileChooser.h"
 #include "FileIconLoader.h"
@@ -73,9 +73,10 @@
 #include <qdebug.h>
 #include <qeventloop.h>
 #include <qwindow.h>
+#include <wtf/CurrentTime.h>
 #include <wtf/OwnPtr.h>
 
-#if ENABLE(VIDEO) && ((USE(GSTREAMER) && !defined(GST_API_VERSION_1)) || USE(QT_MULTIMEDIA) || USE(QTKIT))
+#if ENABLE(VIDEO) && ((USE(GSTREAMER) && USE(NATIVE_FULLSCREEN_VIDEO)) || USE(QT_MULTIMEDIA))
 #include "FullScreenVideoQt.h"
 #include "HTMLMediaElement.h"
 #include "HTMLNames.h"
@@ -126,7 +127,7 @@ bool ChromeClientQt::dumpVisitedLinksCallbacks = false;
 ChromeClientQt::ChromeClientQt(QWebPageAdapter* webPageAdapter)
     : m_webPage(webPageAdapter)
     , m_eventLoop(0)
-#if ENABLE(VIDEO) && ((USE(GSTREAMER) && !defined(GST_API_VERSION_1)) || USE(QT_MULTIMEDIA) || USE(QTKIT))
+#if ENABLE(VIDEO) && ((USE(GSTREAMER) && USE(NATIVE_FULLSCREEN_VIDEO)) || USE(QT_MULTIMEDIA))
     , m_fullScreenVideo(0)
 #endif
 {
@@ -138,7 +139,7 @@ ChromeClientQt::~ChromeClientQt()
     if (m_eventLoop)
         m_eventLoop->exit();
 
-#if ENABLE(VIDEO) && ((USE(GSTREAMER) && !defined(GST_API_VERSION_1)) || USE(QT_MULTIMEDIA) || USE(QTKIT))
+#if ENABLE(VIDEO) && ((USE(GSTREAMER) && USE(NATIVE_FULLSCREEN_VIDEO)) || USE(QT_MULTIMEDIA))
     delete m_fullScreenVideo;
 #endif
 }
@@ -307,10 +308,11 @@ void ChromeClientQt::setResizable(bool)
     notImplemented();
 }
 
-void ChromeClientQt::addMessageToConsole(MessageSource, MessageType, MessageLevel, const String& message, unsigned lineNumber, const String& sourceID)
+void ChromeClientQt::addMessageToConsole(MessageSource, MessageLevel, const String& message, unsigned lineNumber, unsigned columnNumber, const String& sourceID)
 {
     QString x = message;
     QString y = sourceID;
+    UNUSED_PARAM(columnNumber);
     m_webPage->javaScriptConsoleMessage(x, lineNumber, y);
 }
 
@@ -405,7 +407,7 @@ IntRect ChromeClientQt::windowResizerRect() const
     // always draw scrollbars on the right hand side, so we assume this to be the
     // location when computing the resize rect to reserve for WebKit.
     QPoint resizeCornerTopLeft = QPoint(topLevelGeometry.width(), topLevelGeometry.height())
-        - QPoint(scollbarThickness, scollbarThickness)
+        - QPoint(scollbarThickness, scollbarThickness))
         - m_webPage->viewRectRelativeToWindow().topLeft();
 
     QRect resizeCornerRect = QRect(resizeCornerTopLeft, QSize(scollbarThickness, scollbarThickness));
@@ -535,12 +537,12 @@ void ChromeClientQt::print(Frame* frame)
 }
 
 #if ENABLE(SQL_DATABASE)
-void ChromeClientQt::exceededDatabaseQuota(Frame* frame, const String& databaseName)
+void ChromeClientQt::exceededDatabaseQuota(Frame* frame, const String& databaseName, DatabaseDetails)
 {
     quint64 quota = QWebSettings::offlineStorageDefaultQuota();
 
-    if (!DatabaseTracker::tracker().hasEntryForOrigin(frame->document()->securityOrigin()))
-        DatabaseTracker::tracker().setQuota(frame->document()->securityOrigin(), quota);
+    if (!DatabaseManager::manager().hasEntryForOrigin(frame->document()->securityOrigin()))
+        DatabaseManager::manager().setQuota(frame->document()->securityOrigin(), quota);
 
     m_webPage->databaseQuotaExceeded(QWebFrameAdapter::kit(frame), databaseName);
 }
@@ -625,7 +627,7 @@ void ChromeClientQt::scheduleAnimation()
 
 void ChromeClientQt::serviceScriptedAnimations()
 {
-    m_webPage->mainFrameAdapter()->frame->view()->serviceScriptedAnimations(convertSecondsToDOMTimeStamp(currentTime()));
+    m_webPage->mainFrameAdapter()->frame->view()->serviceScriptedAnimations(currentTime());
 }
 #endif
 
@@ -677,7 +679,7 @@ IntRect ChromeClientQt::visibleRectForTiledBackingStore() const
 }
 #endif
 
-#if ENABLE(VIDEO) && ((USE(GSTREAMER) && !defined(GST_API_VERSION_1)) || USE(QT_MULTIMEDIA) || USE(QTKIT))
+#if ENABLE(VIDEO) && ((USE(GSTREAMER) && USE(NATIVE_FULLSCREEN_VIDEO)) || USE(QT_MULTIMEDIA))
 FullScreenVideoQt* ChromeClientQt::fullScreenVideo()
 {
     if (!m_fullScreenVideo)

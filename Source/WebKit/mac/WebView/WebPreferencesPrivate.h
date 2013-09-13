@@ -193,6 +193,9 @@ extern NSString *WebPreferencesCacheModelChangedInternalNotification;
 - (BOOL)cssRegionsEnabled;
 - (void)setCSSRegionsEnabled:(BOOL)enabled;
 
+- (BOOL)cssCompositingEnabled;
+- (void)setCSSCompositingEnabled:(BOOL)enabled;
+
 - (BOOL)cssGridLayoutEnabled;
 - (void)setCSSGridLayoutEnabled:(BOOL)enabled;
 
@@ -214,9 +217,6 @@ extern NSString *WebPreferencesCacheModelChangedInternalNotification;
 - (BOOL)paginateDuringLayoutEnabled;
 - (void)setPaginateDuringLayoutEnabled:(BOOL)flag;
 
-- (BOOL)memoryInfoEnabled;
-- (void)setMemoryInfoEnabled:(BOOL)enabled;
-
 - (BOOL)hyperlinkAuditingEnabled;
 - (void)setHyperlinkAuditingEnabled:(BOOL)enabled;
 
@@ -235,6 +235,10 @@ extern NSString *WebPreferencesCacheModelChangedInternalNotification;
 // This is a global setting.
 - (BOOL)mockScrollbarsEnabled;
 - (void)setMockScrollbarsEnabled:(BOOL)flag;
+
+// This is a global setting.
+- (BOOL)seamlessIFramesEnabled;
+- (void)setSeamlessIFramesEnabled:(BOOL)enabled;
 
 // Other private methods
 - (void)_postPreferencesChangedNotification;
@@ -275,6 +279,9 @@ extern NSString *WebPreferencesCacheModelChangedInternalNotification;
 // compiled with USE_AVFOUNDATION.
 - (void)setAVFoundationEnabled:(BOOL)flag;
 - (BOOL)isAVFoundationEnabled;
+
+- (void)setQTKitEnabled:(BOOL)flag;
+- (BOOL)isQTKitEnabled;
 
 // WebSocket support depends on ENABLE(WEB_SOCKETS).
 - (void)setHixie76WebSocketProtocolEnabled:(BOOL)flag;
@@ -321,5 +328,15 @@ extern NSString *WebPreferencesCacheModelChangedInternalNotification;
 
 - (BOOL)plugInSnapshottingEnabled;
 - (void)setPlugInSnapshottingEnabled:(BOOL)enabled;
+
+- (BOOL)hiddenPageDOMTimerThrottlingEnabled;
+- (void)setHiddenPageDOMTimerThrottlingEnabled:(BOOL)flag;
+
+- (BOOL)hiddenPageCSSAnimationSuspensionEnabled;
+- (void)setHiddenPageCSSAnimationSuspensionEnabled:(BOOL)flag;
+
+- (BOOL)lowPowerVideoAudioBufferSizeEnabled;
+- (void)setLowPowerVideoAudioBufferSizeEnabled:(BOOL)enabled;
+
 
 @end

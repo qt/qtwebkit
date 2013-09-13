@@ -57,6 +57,7 @@ public:
 
     virtual bool supportsControlTints() const { return false; }
     virtual bool usesOverlayScrollbars() const { return false; }
+    virtual void usesOverlayScrollbarsChanged() { }
     virtual void updateScrollbarOverlayStyle(ScrollbarThemeClient*) { }
 
     virtual void themeChanged() {}
@@ -90,7 +91,7 @@ public:
     virtual void paintOverhangAreas(ScrollView*, GraphicsContext*, const IntRect&, const IntRect&, const IntRect&) { }
 
 #if USE(ACCELERATED_COMPOSITING) && ENABLE(RUBBER_BANDING)
-    virtual void setUpOverhangAreasLayerContents(GraphicsLayer*) { }
+    virtual void setUpOverhangAreasLayerContents(GraphicsLayer*, const Color&) { }
     virtual void setUpContentShadowLayer(GraphicsLayer*) { }
 #endif
 

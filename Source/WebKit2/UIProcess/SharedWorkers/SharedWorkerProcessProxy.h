@@ -59,7 +59,7 @@ public:
     bool isValid() const { return m_connection; }
 
 #if PLATFORM(MAC)
-    void setApplicationIsOccluded(bool);
+    void setProcessSuppressionEnabled(bool);
 #endif
 
 private:
@@ -68,7 +68,7 @@ private:
     void sharedWorkerProcessCrashedOrFailedToLaunch();
 
     // CoreIPC::Connection::Client
-    virtual void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::MessageDecoder&);
+    virtual void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&);
     virtual void didClose(CoreIPC::Connection*);
     virtual void didReceiveInvalidMessage(CoreIPC::Connection*, CoreIPC::StringReference messageReceiverName, CoreIPC::StringReference messageName);
 
@@ -76,7 +76,7 @@ private:
     virtual void didFinishLaunching(ProcessLauncher*, CoreIPC::Connection::Identifier);
 
     // Message handlers
-    void didReceiveSharedWorkerProcessProxyMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::MessageDecoder&);
+    void didReceiveSharedWorkerProcessProxyMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&);
     void didCreateWebProcessConnection(const CoreIPC::Attachment&);
 
     void platformInitializeSharedWorkerProcess(SharedWorkerProcessCreationParameters&);
@@ -90,7 +90,7 @@ private:
     // The process launcher for the plug-in host process.
     RefPtr<ProcessLauncher> m_processLauncher;
 
-    Deque<RefPtr<Messages::WebProcessProxy::GetSharedWorkerProcessConnection::DelayedReply> > m_pendingConnectionReplies;
+    Deque<RefPtr<Messages::WebProcessProxy::GetSharedWorkerProcessConnection::DelayedReply>> m_pendingConnectionReplies;
 
     // If createPluginConnection is called while the process is still launching we'll keep count of it and send a bunch of requests
     // when the process finishes launching.

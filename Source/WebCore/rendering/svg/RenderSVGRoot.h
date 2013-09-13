@@ -52,13 +52,15 @@ public:
 
     bool isLayoutSizeChanged() const { return m_isLayoutSizeChanged; }
     virtual void setNeedsBoundariesUpdate() { m_needsBoundariesOrTransformUpdate = true; }
+    virtual bool needsBoundariesUpdate() OVERRIDE { return m_needsBoundariesOrTransformUpdate; }
     virtual void setNeedsTransformUpdate() { m_needsBoundariesOrTransformUpdate = true; }
 
     IntSize containerSize() const { return m_containerSize; }
     void setContainerSize(const IntSize& containerSize) { m_containerSize = containerSize; }
 
-    virtual bool hasRelativeDimensions() const;
-    virtual bool hasRelativeLogicalHeight() const;
+    virtual bool hasRelativeDimensions() const OVERRIDE;
+    virtual bool hasRelativeIntrinsicLogicalWidth() const OVERRIDE;
+    virtual bool hasRelativeLogicalHeight() const OVERRIDE;
 
     // localToBorderBoxTransform maps local SVG viewport coordinates to local CSS box coordinates.  
     const AffineTransform& localToBorderBoxTransform() const { return m_localToBorderBoxTransform; }
@@ -77,7 +79,7 @@ private:
     virtual bool isSVGRoot() const { return true; }
     virtual const char* renderName() const { return "RenderSVGRoot"; }
 
-    virtual LayoutUnit computeReplacedLogicalWidth(bool includeMaxWidth = true) const;
+    virtual LayoutUnit computeReplacedLogicalWidth(ShouldComputePreferred  = ComputeActual) const OVERRIDE;
     virtual LayoutUnit computeReplacedLogicalHeight() const;
     virtual void layout();
     virtual void paintReplaced(PaintInfo&, const LayoutPoint&);
@@ -103,7 +105,7 @@ private:
     virtual LayoutRect clippedOverflowRectForRepaint(const RenderLayerModelObject* repaintContainer) const OVERRIDE;
     virtual void computeFloatRectForRepaint(const RenderLayerModelObject* repaintContainer, FloatRect& repaintRect, bool fixed) const OVERRIDE;
 
-    virtual void mapLocalToContainer(const RenderLayerModelObject* repaintContainer, TransformState&, MapCoordinatesFlags = ApplyContainerFlip | SnapOffsetForTransforms, bool* wasFixed = 0) const OVERRIDE;
+    virtual void mapLocalToContainer(const RenderLayerModelObject* repaintContainer, TransformState&, MapCoordinatesFlags = ApplyContainerFlip, bool* wasFixed = 0) const OVERRIDE;
     virtual const RenderObject* pushMappingToContainer(const RenderLayerModelObject* ancestorToStopAt, RenderGeometryMap&) const OVERRIDE;
 
     virtual bool canBeSelectionLeaf() const { return false; }
@@ -129,13 +131,13 @@ private:
 
 inline RenderSVGRoot* toRenderSVGRoot(RenderObject* object)
 { 
-    ASSERT(!object || object->isSVGRoot());
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isSVGRoot());
     return static_cast<RenderSVGRoot*>(object);
 }
 
 inline const RenderSVGRoot* toRenderSVGRoot(const RenderObject* object)
 { 
-    ASSERT(!object || object->isSVGRoot());
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isSVGRoot());
     return static_cast<const RenderSVGRoot*>(object);
 }
 

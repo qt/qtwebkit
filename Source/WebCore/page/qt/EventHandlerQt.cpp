@@ -28,7 +28,7 @@
 #include "config.h"
 #include "EventHandler.h"
 
-#include "ClipboardQt.h"
+#include "Clipboard.h"
 #include "Cursor.h"
 #include "Document.h"
 #include "EventNames.h"
@@ -91,12 +91,12 @@ bool EventHandler::passWheelEventToWidget(const PlatformWheelEvent& event, Widge
     if (!widget->isFrameView())
         return false;
 
-    return static_cast<FrameView*>(widget)->frame()->eventHandler()->handleWheelEvent(event);
+    return toFrameView(widget)->frame()->eventHandler()->handleWheelEvent(event);
 }
 
 PassRefPtr<Clipboard> EventHandler::createDraggingClipboard() const
 {
-    return ClipboardQt::create(ClipboardWritable, m_frame, Clipboard::DragAndDrop);
+    return Clipboard::createForDragAndDrop();
 }
 
 bool EventHandler::passMousePressEventToSubframe(MouseEventWithHitTestResults& mev, Frame* subframe)

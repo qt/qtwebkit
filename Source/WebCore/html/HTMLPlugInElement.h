@@ -25,12 +25,16 @@
 
 #include "HTMLFrameOwnerElement.h"
 #include "Image.h"
-#include "ImageLoaderClient.h"
-#include "ScriptInstance.h"
 
 #if ENABLE(NETSCAPE_PLUGIN_API)
 struct NPObject;
 #endif
+
+namespace JSC {
+namespace Bindings {
+class Instance;
+}
+}
 
 namespace WebCore {
 
@@ -44,20 +48,22 @@ public:
 
     void resetInstance();
 
-    PassScriptInstance getInstance();
+    PassRefPtr<JSC::Bindings::Instance> getInstance();
 
     Widget* pluginWidget() const;
 
     enum DisplayState {
         WaitingForSnapshot,
         DisplayingSnapshot,
-        PlayingWithPendingMouseClick,
+        Restarting,
+        RestartingWithPendingMouseClick,
         Playing
     };
     DisplayState displayState() const { return m_displayState; }
-    void setDisplayState(DisplayState state) { m_displayState = state; }
+    virtual void setDisplayState(DisplayState state) { m_displayState = state; }
     virtual void updateSnapshot(PassRefPtr<Image>) { }
     virtual void dispatchPendingMouseClick() { }
+    virtual bool isRestartedPlugin() const { return false; }
 
 #if ENABLE(NETSCAPE_PLUGIN_API)
     NPObject* getNPObject();
@@ -72,30 +78,37 @@ public:
 
     virtual bool willRespondToMouseClickEvents() OVERRIDE;
 
+    virtual bool isPlugInImageElement() const { return false; }
+
 protected:
     HTMLPlugInElement(const QualifiedName& tagName, Document*);
 
-    virtual void detach();
+    virtual void detach(const AttachContext& = AttachContext()) OVERRIDE;
     virtual bool isPresentationAttribute(const QualifiedName&) const OVERRIDE;
-    virtual void collectStyleForPresentationAttribute(const Attribute&, StylePropertySet*) OVERRIDE;
-    virtual bool areAuthorShadowsAllowed() const OVERRIDE { return false; }
+    virtual void collectStyleForPresentationAttribute(const QualifiedName&, const AtomicString&, MutableStylePropertySet*) OVERRIDE;
 
-    bool m_inBeforeLoadEventHandler;
+    virtual bool useFallbackContent() const { return false; }
+
+    virtual void defaultEventHandler(Event*) OVERRIDE;
+
     // Subclasses should use guardedDispatchBeforeLoadEvent instead of calling dispatchBeforeLoadEvent directly.
     bool guardedDispatchBeforeLoadEvent(const String& sourceURL);
+
+    bool m_inBeforeLoadEventHandler;
 
 private:
     bool dispatchBeforeLoadEvent(const String& sourceURL); // Not implemented, generates a compile error if subclasses call this by mistake.
 
-    virtual void defaultEventHandler(Event*);
+    virtual bool areAuthorShadowsAllowed() const OVERRIDE { return false; }
 
     virtual RenderWidget* renderWidgetForJSBindings() const = 0;
 
-    virtual bool isKeyboardFocusable(KeyboardEvent*) const;
-    virtual bool isPluginElement() const;
+    virtual bool supportsFocus() const OVERRIDE;
 
-private:
-    mutable ScriptInstance m_instance;
+    virtual bool isKeyboardFocusable(KeyboardEvent*) const OVERRIDE;
+    virtual bool isPluginElement() const OVERRIDE;
+
+    RefPtr<JSC::Bindings::Instance> m_instance;
 #if ENABLE(NETSCAPE_PLUGIN_API)
     NPObject* m_NPObject;
 #endif
@@ -103,6 +116,21 @@ private:
 
     DisplayState m_displayState;
 };
+
+inline HTMLPlugInElement* toHTMLPlugInElement(Node* node)
+{
+    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->isPluginElement());
+    return static_cast<HTMLPlugInElement*>(node);
+}
+
+inline const HTMLPlugInElement* toHTMLPlugInElement(const Node* node)
+{
+    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->isPluginElement());
+    return static_cast<const HTMLPlugInElement*>(node);
+}
+
+// This will catch anyone doing an unnecessary cast.
+void toHTMLPlugInElement(const HTMLPlugInElement*);
 
 } // namespace WebCore
 

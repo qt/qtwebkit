@@ -30,6 +30,7 @@
 
 #include "DFGAbstractValue.h"
 #include "DFGGraph.h"
+#include "Operations.h"
 
 namespace JSC { namespace DFG {
 
@@ -111,9 +112,11 @@ ArrayMode ArrayMode::fromObserved(ArrayProfile* profile, Array::Action action, b
         else
             type = Array::Undecided;
         
-        if (observed & (asArrayModes(ArrayWithUndecided) | asArrayModes(ArrayWithInt32) | asArrayModes(ArrayWithDouble) | asArrayModes(ArrayWithContiguous) | asArrayModes(ArrayWithArrayStorage) | asArrayModes(ArrayWithSlowPutArrayStorage)))
+        if (hasSeenArray(observed) && hasSeenNonArray(observed))
+            arrayClass = Array::PossiblyArray;
+        else if (hasSeenArray(observed))
             arrayClass = Array::Array;
-        else if (observed & (asArrayModes(NonArray) | asArrayModes(NonArrayWithInt32) | asArrayModes(NonArrayWithDouble) | asArrayModes(NonArrayWithContiguous) | asArrayModes(NonArrayWithArrayStorage) | asArrayModes(NonArrayWithSlowPutArrayStorage)))
+        else if (hasSeenNonArray(observed))
             arrayClass = Array::NonArray;
         else
             arrayClass = Array::PossiblyArray;
@@ -122,7 +125,7 @@ ArrayMode ArrayMode::fromObserved(ArrayProfile* profile, Array::Action action, b
     }
 }
 
-ArrayMode ArrayMode::refine(SpeculatedType base, SpeculatedType index, SpeculatedType value) const
+ArrayMode ArrayMode::refine(SpeculatedType base, SpeculatedType index, SpeculatedType value, NodeFlags flags) const
 {
     if (!base || !index) {
         // It can be that we had a legitimate arrayMode but no incoming predictions. That'll
@@ -132,8 +135,18 @@ ArrayMode ArrayMode::refine(SpeculatedType base, SpeculatedType index, Speculate
         return ArrayMode(Array::ForceExit);
     }
     
-    if (!isInt32Speculation(index) || !isCellSpeculation(base))
+    if (!isInt32Speculation(index))
         return ArrayMode(Array::Generic);
+    
+    // Note: our profiling currently doesn't give us good information in case we have
+    // an unlikely control flow path that sets the base to a non-cell value. Value
+    // profiling and prediction propagation will probably tell us that the value is
+    // either a cell or not, but that doesn't tell us which is more likely: that this
+    // is an array access on a cell (what we want and can optimize) or that the user is
+    // doing a crazy by-val access on a primitive (we can't easily optimize this and
+    // don't want to). So, for now, we assume that if the base is not a cell according
+    // to value profiling, but the array profile tells us something else, then we
+    // should just trust the array profile.
     
     switch (type()) {
     case Array::Unprofiled:
@@ -156,11 +169,20 @@ ArrayMode ArrayMode::refine(SpeculatedType base, SpeculatedType index, Speculate
         return withTypeAndConversion(Array::Contiguous, Array::Convert);
         
     case Array::Double:
+        if (flags & NodeUsedAsInt)
+            return withTypeAndConversion(Array::Contiguous, Array::RageConvert);
         if (!value || isNumberSpeculation(value))
             return *this;
         return withTypeAndConversion(Array::Contiguous, Array::Convert);
         
+    case Array::Contiguous:
+        if (doesConversion() && (flags & NodeUsedAsInt))
+            return withConversion(Array::RageConvert);
+        return *this;
+        
     case Array::SelectUsingPredictions:
+        base &= ~SpecOther;
+        
         if (isStringSpeculation(base))
             return ArrayMode(Array::String);
         
@@ -223,19 +245,19 @@ Structure* ArrayMode::originalArrayStructure(Graph& graph, const CodeOrigin& cod
     }
 }
 
-Structure* ArrayMode::originalArrayStructure(Graph& graph, Node& node) const
+Structure* ArrayMode::originalArrayStructure(Graph& graph, Node* node) const
 {
-    return originalArrayStructure(graph, node.codeOrigin);
+    return originalArrayStructure(graph, node->codeOrigin);
 }
 
-bool ArrayMode::alreadyChecked(Graph& graph, Node& node, AbstractValue& value, IndexingType shape) const
+bool ArrayMode::alreadyChecked(Graph& graph, Node* node, AbstractValue& value, IndexingType shape) const
 {
     switch (arrayClass()) {
     case Array::OriginalArray:
         return value.m_currentKnownStructure.hasSingleton()
             && (value.m_currentKnownStructure.singleton()->indexingType() & IndexingShapeMask) == shape
             && (value.m_currentKnownStructure.singleton()->indexingType() & IsArray)
-            && graph.globalObjectFor(node.codeOrigin)->isOriginalArrayStructure(value.m_currentKnownStructure.singleton());
+            && graph.globalObjectFor(node->codeOrigin)->isOriginalArrayStructure(value.m_currentKnownStructure.singleton());
         
     case Array::Array:
         if (arrayModesAlreadyChecked(value.m_arrayModes, asArrayModes(shape | IsArray)))
@@ -252,7 +274,7 @@ bool ArrayMode::alreadyChecked(Graph& graph, Node& node, AbstractValue& value, I
     }
 }
 
-bool ArrayMode::alreadyChecked(Graph& graph, Node& node, AbstractValue& value) const
+bool ArrayMode::alreadyChecked(Graph& graph, Node* node, AbstractValue& value) const
 {
     switch (type()) {
     case Array::Generic:
@@ -429,19 +451,43 @@ const char* arrayConversionToString(Array::Conversion conversion)
         return "AsIs";
     case Array::Convert:
         return "Convert";
+    case Array::RageConvert:
+        return "RageConvert";
     default:
         return "Unknown!";
     }
 }
 
-const char* ArrayMode::toString() const
+void ArrayMode::dump(PrintStream& out) const
 {
-    static char buffer[256];
-    snprintf(buffer, sizeof(buffer), "%s%s%s%s", arrayTypeToString(type()), arrayClassToString(arrayClass()), arraySpeculationToString(speculation()), arrayConversionToString(conversion()));
-    return buffer;
+    out.print(type(), arrayClass(), speculation(), conversion());
 }
 
 } } // namespace JSC::DFG
+
+namespace WTF {
+
+void printInternal(PrintStream& out, JSC::DFG::Array::Type type)
+{
+    out.print(JSC::DFG::arrayTypeToString(type));
+}
+
+void printInternal(PrintStream& out, JSC::DFG::Array::Class arrayClass)
+{
+    out.print(JSC::DFG::arrayClassToString(arrayClass));
+}
+
+void printInternal(PrintStream& out, JSC::DFG::Array::Speculation speculation)
+{
+    out.print(JSC::DFG::arraySpeculationToString(speculation));
+}
+
+void printInternal(PrintStream& out, JSC::DFG::Array::Conversion conversion)
+{
+    out.print(JSC::DFG::arrayConversionToString(conversion));
+}
+
+} // namespace WTF
 
 #endif // ENABLE(DFG_JIT)
 

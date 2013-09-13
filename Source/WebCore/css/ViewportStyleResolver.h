@@ -41,8 +41,8 @@ namespace WebCore {
 
 class CSSPrimitiveValue;
 class Document;
+class MutableStylePropertySet;
 class StyleRuleViewport;
-class StylePropertySet;
 
 class ViewportStyleResolver : public RefCounted<ViewportStyleResolver> {
 public:
@@ -50,6 +50,8 @@ public:
     {
         return adoptRef(new ViewportStyleResolver(document));
     }
+
+    ~ViewportStyleResolver();
 
     void addViewportRule(StyleRuleViewport*);
 
@@ -62,9 +64,7 @@ private:
     float getViewportArgumentValue(CSSPropertyID) const;
 
     Document* m_document;
-    RefPtr<StylePropertySet> m_propertySet;
-
-    FloatSize m_initialViewportSize;
+    RefPtr<MutableStylePropertySet> m_propertySet;
 };
 
 } // namespace WebCore

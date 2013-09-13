@@ -36,14 +36,14 @@ using namespace WebCore;
 
 namespace WebKit {
 
-void WebVibrationClient::vibrate(const unsigned long& vibrationTime)
+void WebVibrationClient::vibrate(const unsigned& vibrationTime)
 {
-    WebProcess::shared().connection()->send(Messages::WebVibrationProxy::Vibrate(vibrationTime), m_page->pageID());
+    WebProcess::shared().parentProcessConnection()->send(Messages::WebVibrationProxy::Vibrate(vibrationTime), m_page->pageID());
 }
 
 void WebVibrationClient::cancelVibration()
 {
-    WebProcess::shared().connection()->send(Messages::WebVibrationProxy::CancelVibration(), m_page->pageID());
+    WebProcess::shared().parentProcessConnection()->send(Messages::WebVibrationProxy::CancelVibration(), m_page->pageID());
 }
 
 void WebVibrationClient::vibrationDestroyed()

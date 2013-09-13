@@ -48,9 +48,8 @@ public:
     ~PageViewportControllerClientQt();
 
     virtual void setViewportPosition(const WebCore::FloatPoint& contentsPoint);
-    virtual void setContentsScale(float scale, bool treatAsInitialValue);
+    virtual void setPageScaleFactor(float);
 
-    virtual void didResumeContent();
     virtual void didChangeContentsSize(const WebCore::IntSize&);
     virtual void didChangeVisibleContents();
     virtual void didChangeViewportAttributes();
@@ -64,7 +63,6 @@ public:
     bool scrollAnimationActive() const;
     void cancelScrollAnimation();
 
-    bool panGestureActive() const;
     void panGestureStarted(const QPointF& position, qint64 eventTimestampMillis);
     void panGestureRequestUpdate(const QPointF& position, qint64 eventTimestampMillis);
     void panGestureEnded(const QPointF& position, qint64 eventTimestampMillis);
@@ -73,7 +71,6 @@ public:
     bool scaleAnimationActive() const;
     void interruptScaleAnimation();
 
-    bool pinchGestureActive() const;
     void pinchGestureStarted(const QPointF& pinchCenterInViewportCoordinates);
     void pinchGestureRequestUpdate(const QPointF& pinchCenterInViewportCoordinates, qreal totalScaleFactor);
     void pinchGestureEnded();

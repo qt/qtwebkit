@@ -38,6 +38,7 @@
 #include "ContentSecurityPolicy.h"
 #include "DiagnosticLoggingKeys.h"
 #include "Frame.h"
+#include "FrameLoader.h"
 #include "FrameLoaderClient.h"
 #include "HTMLAppletElement.h"
 #include "HTMLFrameElementBase.h"
@@ -49,6 +50,7 @@
 #include "PluginDocument.h"
 #include "RenderEmbeddedObject.h"
 #include "RenderView.h"
+#include "ScriptController.h"
 #include "SecurityOrigin.h"
 #include "SecurityPolicy.h"
 #include "Settings.h"
@@ -145,7 +147,6 @@ bool SubframeLoader::pluginIsLoadable(HTMLPlugInImageElement* pluginElement, con
 
 bool SubframeLoader::requestPlugin(HTMLPlugInImageElement* ownerElement, const KURL& url, const String& mimeType, const Vector<String>& paramNames, const Vector<String>& paramValues, bool useFallback)
 {
-
     // Application plug-ins are plug-ins implemented by the user agent, for example Qt plug-ins,
     // as opposed to third-party code such as Flash. The user agent decides whether or not they are
     // permitted, rather than WebKit.
@@ -202,7 +203,7 @@ static void logPluginRequest(Page* page, const String& mimeType, const String& u
     String pluginFile = pluginData ? pluginData->pluginFileForMimeType(newMIMEType) : String();
     String description = !pluginFile ? newMIMEType : pluginFile;
 
-    ChromeClient* client = page->chrome()->client();
+    ChromeClient* client = page->chrome().client();
     client->logDiagnosticMessage(success ? DiagnosticLoggingKeys::pluginLoadedKey() : DiagnosticLoggingKeys::pluginLoadingFailedKey(), description, DiagnosticLoggingKeys::noopKey());
 
     if (!page->hasSeenAnyPlugin())
@@ -246,7 +247,7 @@ bool SubframeLoader::requestObject(HTMLPlugInImageElement* ownerElement, const S
 PassRefPtr<Widget> SubframeLoader::loadMediaPlayerProxyPlugin(Node* node, const KURL& url,
     const Vector<String>& paramNames, const Vector<String>& paramValues)
 {
-    ASSERT(node->hasTagName(videoTag) || node->hasTagName(audioTag));
+    ASSERT(node->hasTagName(videoTag) || isHTMLAudioElement(node));
 
     KURL completedURL;
     if (!url.isEmpty())
@@ -260,7 +261,7 @@ PassRefPtr<Widget> SubframeLoader::loadMediaPlayerProxyPlugin(Node* node, const 
     if (!m_frame->document()->contentSecurityPolicy()->allowMediaFromSource(completedURL))
         return 0;
 
-    HTMLMediaElement* mediaElement = static_cast<HTMLMediaElement*>(node);
+    HTMLMediaElement* mediaElement = toHTMLMediaElement(node);
     RenderPart* renderer = toRenderPart(node->renderer());
     IntSize size;
 
@@ -323,7 +324,7 @@ PassRefPtr<Widget> SubframeLoader::createJavaAppletWidget(const IntSize& size, H
     if (!widget) {
         RenderEmbeddedObject* renderer = element->renderEmbeddedObject();
 
-        if (!renderer->showsUnavailablePluginIndicator())
+        if (!renderer->isPluginUnavailable())
             renderer->setPluginUnavailabilityReason(RenderEmbeddedObject::PluginMissing);
         return 0;
     }
@@ -352,19 +353,16 @@ Frame* SubframeLoader::loadSubframe(HTMLFrameOwnerElement* ownerElement, const K
     int marginWidth = -1;
     int marginHeight = -1;
     if (ownerElement->hasTagName(frameTag) || ownerElement->hasTagName(iframeTag)) {
-        HTMLFrameElementBase* o = static_cast<HTMLFrameElementBase*>(ownerElement);
-        allowsScrolling = o->scrollingMode() != ScrollbarAlwaysOff;
-        marginWidth = o->marginWidth();
-        marginHeight = o->marginHeight();
+        HTMLFrameElementBase* frameElementBase = toHTMLFrameElementBase(ownerElement);
+        allowsScrolling = frameElementBase->scrollingMode() != ScrollbarAlwaysOff;
+        marginWidth = frameElementBase->marginWidth();
+        marginHeight = frameElementBase->marginHeight();
     }
 
     if (!ownerElement->document()->securityOrigin()->canDisplay(url)) {
         FrameLoader::reportLocalLoadFailed(m_frame, url.string());
         return 0;
     }
-
-    if (!ownerElement->document()->contentSecurityPolicy()->allowChildFrameFromSource(url))
-        return 0;
 
     String referrerToUse = SecurityPolicy::generateReferrerHeader(ownerElement->document()->referrerPolicy(), url, referrer);
     RefPtr<Frame> frame = m_frame->loader()->client()->createFrame(url, name, ownerElement, referrerToUse, allowsScrolling, marginWidth, marginHeight);
@@ -415,7 +413,7 @@ bool SubframeLoader::allowPlugins(ReasonForCallingAllowPlugins reason)
 
 bool SubframeLoader::shouldUsePlugin(const KURL& url, const String& mimeType, bool shouldPreferPlugInsForImages, bool hasFallback, bool& useFallback)
 {
-    if (m_frame->loader()->client()->shouldUsePluginDocument(mimeType)) {
+    if (m_frame->loader()->client()->shouldAlwaysUsePluginDocument(mimeType)) {
         useFallback = false;
         return true;
     }
@@ -450,21 +448,24 @@ bool SubframeLoader::loadPlugin(HTMLPlugInImageElement* pluginElement, const KUR
     if (!renderer || useFallback)
         return false;
 
+    pluginElement->subframeLoaderWillCreatePlugIn(url);
+
     IntSize contentSize = roundedIntSize(LayoutSize(renderer->contentWidth(), renderer->contentHeight()));
     bool loadManually = document()->isPluginDocument() && !m_containsPlugins && toPluginDocument(document())->shouldLoadPluginManually();
     RefPtr<Widget> widget = m_frame->loader()->client()->createPlugin(contentSize,
         pluginElement, url, paramNames, paramValues, mimeType, loadManually);
 
     if (!widget) {
-        if (!renderer->showsUnavailablePluginIndicator())
+        if (!renderer->isPluginUnavailable())
             renderer->setPluginUnavailabilityReason(RenderEmbeddedObject::PluginMissing);
         return false;
     }
 
+    pluginElement->subframeLoaderDidCreatePlugIn(widget.get());
     renderer->setWidget(widget);
     m_containsPlugins = true;
  
-#if ENABLE(PLUGIN_PROXY_FOR_VIDEO) || ENABLE(3D_PLUGIN)
+#if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
     pluginElement->setNeedsStyleRecalc(SyntheticStyleChange);
 #endif
     return true;

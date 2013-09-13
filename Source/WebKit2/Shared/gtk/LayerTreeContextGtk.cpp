@@ -42,12 +42,12 @@ LayerTreeContext::~LayerTreeContext()
 
 void LayerTreeContext::encode(CoreIPC::ArgumentEncoder& encoder) const
 {
-    encoder.encode(windowHandle);
+    encoder << windowHandle;
 }
 
-bool LayerTreeContext::decode(CoreIPC::ArgumentDecoder* decoder, LayerTreeContext& context)
+bool LayerTreeContext::decode(CoreIPC::ArgumentDecoder& decoder, LayerTreeContext& context)
 {
-    return decoder->decode(context.windowHandle);
+    return decoder.decode(context.windowHandle);
 }
 
 bool LayerTreeContext::isEmpty() const

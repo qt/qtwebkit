@@ -83,7 +83,7 @@ WebInspector.ObjectPopoverHelper.prototype = {
                             return;
                         }
                         var container = document.createElement("div");
-                        container.style.display = "inline-block";
+                        container.className = "inline-block";
 
                         var title = container.createChild("div", "function-popover-title source-code");
                         var functionName = title.createChild("span", "function-name");
@@ -106,8 +106,9 @@ WebInspector.ObjectPopoverHelper.prototype = {
                     popoverContentElement.textContent = "\"" + popoverContentElement.textContent + "\"";
                 popover.show(popoverContentElement, anchorElement);
             } else {
+                if (result.subtype === "node")
+                    result.highlightAsDOMNode();
                 popoverContentElement = document.createElement("div");
-
                 this._titleElement = document.createElement("div");
                 this._titleElement.className = "source-frame-popover-title monospace";
                 this._titleElement.textContent = result.description;
@@ -134,6 +135,7 @@ WebInspector.ObjectPopoverHelper.prototype = {
 
     _onHideObjectPopover: function()
     {
+        WebInspector.domAgent.hideDOMNodeHighlight();
         if (this._linkifier) {
             this._linkifier.reset();
             delete this._linkifier;

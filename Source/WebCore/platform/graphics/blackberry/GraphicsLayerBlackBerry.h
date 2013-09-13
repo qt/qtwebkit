@@ -29,8 +29,6 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "Platform.h"
-
 #ifndef GraphicsLayerBlackBerry_h
 #define GraphicsLayerBlackBerry_h
 
@@ -75,7 +73,6 @@ public:
     virtual void setContentsVisible(bool);
     virtual void setMaskLayer(GraphicsLayer*);
     virtual void setReplicatedByLayer(GraphicsLayer*);
-    virtual void setFixedPosition(bool);
     virtual void setHasFixedContainer(bool);
     virtual void setHasFixedAncestorInDOMTree(bool);
 
@@ -86,7 +83,6 @@ public:
 #endif
 
     virtual void setBackgroundColor(const Color&);
-    virtual void clearBackgroundColor();
 
     virtual void setContentsOpaque(bool);
     virtual void setBackfaceVisibility(bool);
@@ -128,8 +124,6 @@ public:
             m_client->notifyAnimationStarted(this, time);
     }
 
-    bool contentsVisible(const IntRect& contentRect) const;
-
 private:
     virtual void willBeDestroyed();
 
@@ -150,7 +144,6 @@ private:
     void updateBackfaceVisibility();
     void updateLayerPreserves3D();
     void updateLayerIsDrawable();
-    void updateFixedPosition();
     void updateHasFixedContainer();
     void updateHasFixedAncestorInDOMTree();
     void updateLayerBackgroundColor();
@@ -186,7 +179,6 @@ private:
     };
 
     ContentsLayerPurpose m_contentsLayerPurpose;
-    bool m_contentsLayerHasBackgroundColor : 1;
 };
 
 } // namespace WebCore

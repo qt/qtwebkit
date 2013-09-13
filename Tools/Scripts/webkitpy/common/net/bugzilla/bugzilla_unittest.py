@@ -26,7 +26,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import unittest
+import unittest2 as unittest
 import datetime
 import StringIO
 
@@ -85,9 +85,9 @@ class BugzillaTest(unittest.TestCase):
     def test_url_creation(self):
         # FIXME: These would be all better as doctests
         bugs = Bugzilla()
-        self.assertEqual(None, bugs.bug_url_for_bug_id(None))
-        self.assertEqual(None, bugs.short_bug_url_for_bug_id(None))
-        self.assertEqual(None, bugs.attachment_url_for_id(None))
+        self.assertIsNone(bugs.bug_url_for_bug_id(None))
+        self.assertIsNone(bugs.short_bug_url_for_bug_id(None))
+        self.assertIsNone(bugs.attachment_url_for_id(None))
 
     def test_parse_bug_id(self):
         # Test that we can parse the urls we produce.
@@ -198,7 +198,7 @@ Ignore this bug.  Just for testing failure modes of webkit-patch and the commit-
     # FIXME: This should move to a central location and be shared by more unit tests.
     def _assert_dictionaries_equal(self, actual, expected):
         # Make sure we aren't parsing more or less than we expect
-        self.assertEqual(sorted(actual.keys()), sorted(expected.keys()))
+        self.assertItemsEqual(actual.keys(), expected.keys())
 
         for key, expected_value in expected.items():
             self.assertEqual(actual[key], expected_value, ("Failure for key: %s: Actual='%s' Expected='%s'" % (key, actual[key], expected_value)))
@@ -305,8 +305,7 @@ Ignore this bug.  Just for testing failure modes of webkit-patch and the commit-
 
         bugzilla.committers = CommitterList(reviewers=[Reviewer("WebKit Reviewer", "reviewer@webkit.org")],
             committers=[Committer("WebKit Committer", "committer@webkit.org")],
-            contributors=[Contributor("WebKit Contributor", "contributor@webkit.org")],
-            watchers=[])
+            contributors=[Contributor("WebKit Contributor", "contributor@webkit.org")])
 
         def assert_commit_queue_flag(mark_for_landing, mark_for_commit_queue, expected, username=None):
             bugzilla.username = username
@@ -336,6 +335,15 @@ Ignore this bug.  Just for testing failure modes of webkit-patch and the commit-
         assert_commit_queue_flag(mark_for_landing=False, mark_for_commit_queue=True, expected='?', username='reviewer@webkit.org')
         assert_commit_queue_flag(mark_for_landing=True, mark_for_commit_queue=False, expected='+', username='reviewer@webkit.org')
         assert_commit_queue_flag(mark_for_landing=True, mark_for_commit_queue=True, expected='+', username='reviewer@webkit.org')
+
+    def test__check_create_bug_response(self):
+        bugzilla = Bugzilla()
+
+        title_html_bugzilla_323 = "<title>Bug 101640 Submitted</title>"
+        self.assertEqual(bugzilla._check_create_bug_response(title_html_bugzilla_323), '101640')
+
+        title_html_bugzilla_425 = "<title>Bug 101640 Submitted &ndash; Testing webkit-patch again</title>"
+        self.assertEqual(bugzilla._check_create_bug_response(title_html_bugzilla_425), '101640')
 
 
 class BugzillaQueriesTest(unittest.TestCase):

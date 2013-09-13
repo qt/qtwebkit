@@ -19,7 +19,7 @@
  */
 
 [
-    JSGenerateToNativeObject
+    JSGenerateToNativeObject,
 ] interface HTMLImageElement : HTMLElement {
     [Reflect] attribute DOMString name;
     [Reflect] attribute DOMString align;

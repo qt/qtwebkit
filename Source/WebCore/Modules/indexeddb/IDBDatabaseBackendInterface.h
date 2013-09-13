@@ -26,8 +26,10 @@
 #ifndef IDBDatabaseBackendInterface_h
 #define IDBDatabaseBackendInterface_h
 
+#include "IDBDatabaseError.h"
+#include "IndexedDB.h"
 #include <wtf/PassRefPtr.h>
-#include <wtf/Threading.h>
+#include <wtf/RefCounted.h>
 #include <wtf/text/WTFString.h>
 
 #if ENABLE(INDEXED_DATABASE)
@@ -36,29 +38,60 @@ namespace WebCore {
 
 class IDBCallbacks;
 class IDBDatabaseCallbacks;
+class IDBKey;
 class IDBKeyPath;
-class IDBObjectStoreBackendInterface;
-class IDBTransactionBackendInterface;
+class IDBKeyRange;
 struct IDBDatabaseMetadata;
+class SharedBuffer;
 
 typedef int ExceptionCode;
 
-// This class is shared by IDBDatabase (async) and IDBDatabaseSync (sync).
 // This is implemented by IDBDatabaseBackendImpl and optionally others (in order to proxy
 // calls across process barriers). All calls to these classes should be non-blocking and
 // trigger work on a background thread if necessary.
-class IDBDatabaseBackendInterface : public ThreadSafeRefCounted<IDBDatabaseBackendInterface> {
+class IDBDatabaseBackendInterface : public RefCounted<IDBDatabaseBackendInterface> {
 public:
     virtual ~IDBDatabaseBackendInterface() { }
 
-    virtual IDBDatabaseMetadata metadata() const = 0;
-
-    virtual PassRefPtr<IDBObjectStoreBackendInterface> createObjectStore(int64_t, const String& name, const IDBKeyPath&, bool autoIncrement, IDBTransactionBackendInterface*, ExceptionCode&) = 0;
-    virtual void deleteObjectStore(int64_t, IDBTransactionBackendInterface*, ExceptionCode&) = 0;
-    // FIXME: Remove this as part of https://bugs.webkit.org/show_bug.cgi?id=102733.
-    virtual PassRefPtr<IDBTransactionBackendInterface> transaction(const Vector<int64_t>& objectStoreIds, unsigned short mode) = 0;
-    virtual PassRefPtr<IDBTransactionBackendInterface> createTransaction(int64_t transactionId, const Vector<int64_t>& objectStoreIds, unsigned short mode) = 0;
+    virtual void createObjectStore(int64_t transactionId, int64_t objectStoreId, const String& name, const IDBKeyPath&, bool autoIncrement) = 0;
+    virtual void deleteObjectStore(int64_t transactionId, int64_t objectStoreId) = 0;
+    virtual void createTransaction(int64_t transactionId, PassRefPtr<IDBDatabaseCallbacks>, const Vector<int64_t>& objectStoreIds, unsigned short mode) = 0;
     virtual void close(PassRefPtr<IDBDatabaseCallbacks>) = 0;
+
+    // Transaction-specific operations.
+    virtual void commit(int64_t transactionId) = 0;
+    virtual void abort(int64_t transactionId) = 0;
+    virtual void abort(int64_t transactionId, PassRefPtr<IDBDatabaseError>) = 0;
+
+    virtual void createIndex(int64_t transactionId, int64_t objectStoreId, int64_t indexId, const String& name, const IDBKeyPath&, bool unique, bool multiEntry) = 0;
+    virtual void deleteIndex(int64_t transactionId, int64_t objectStoreId, int64_t indexId) = 0;
+
+    enum TaskType {
+        NormalTask = 0,
+        PreemptiveTask
+    };
+
+    enum PutMode {
+        AddOrUpdate,
+        AddOnly,
+        CursorUpdate
+    };
+
+    static const int64_t MinimumIndexId = 30;
+
+    typedef Vector<RefPtr<IDBKey> > IndexKeys;
+
+    virtual void get(int64_t transactionId, int64_t objectStoreId, int64_t indexId, PassRefPtr<IDBKeyRange>, bool keyOnly, PassRefPtr<IDBCallbacks>) = 0;
+    // Note that 'value' may be consumed/adopted by this call.
+    virtual void put(int64_t transactionId, int64_t objectStoreId, PassRefPtr<SharedBuffer> value, PassRefPtr<IDBKey>, PutMode, PassRefPtr<IDBCallbacks>, const Vector<int64_t>& indexIds, const Vector<IndexKeys>&) = 0;
+    virtual void setIndexKeys(int64_t transactionId, int64_t objectStoreId, PassRefPtr<IDBKey> prpPrimaryKey, const Vector<int64_t>& indexIds, const Vector<IndexKeys>&) = 0;
+    virtual void setIndexesReady(int64_t transactionId, int64_t objectStoreId, const Vector<int64_t>& indexIds) = 0;
+    virtual void openCursor(int64_t transactionId, int64_t objectStoreId, int64_t indexId, PassRefPtr<IDBKeyRange>, IndexedDB::CursorDirection, bool keyOnly, TaskType, PassRefPtr<IDBCallbacks>) = 0;
+    virtual void count(int64_t transactionId, int64_t objectStoreId, int64_t indexId, PassRefPtr<IDBKeyRange>, PassRefPtr<IDBCallbacks>) = 0;
+    virtual void deleteRange(int64_t transactionId, int64_t objectStoreId, PassRefPtr<IDBKeyRange>, PassRefPtr<IDBCallbacks>) = 0;
+    virtual void clear(int64_t transactionId, int64_t objectStoreId, PassRefPtr<IDBCallbacks>) = 0;
+
+
 };
 
 } // namespace WebCore

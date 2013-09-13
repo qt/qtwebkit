@@ -33,12 +33,16 @@ class Position;
 
 class RenderInline : public RenderBoxModelObject {
 public:
-    explicit RenderInline(Node*);
+    explicit RenderInline(Element*);
+
+    static RenderInline* createAnonymous(Document*);
 
     RenderObject* firstChild() const { ASSERT(children() == virtualChildren()); return children()->firstChild(); }
     RenderObject* lastChild() const { ASSERT(children() == virtualChildren()); return children()->lastChild(); }
 
     virtual void addChild(RenderObject* newChild, RenderObject* beforeChild = 0);
+
+    Element* node() const { return toElement(RenderBoxModelObject::node()); }
 
     virtual LayoutUnit marginLeft() const;
     virtual LayoutUnit marginRight() const;
@@ -77,8 +81,8 @@ public:
     
     LayoutSize offsetForInFlowPositionedInline(const RenderBox* child) const;
 
-    virtual void addFocusRingRects(Vector<IntRect>&, const LayoutPoint&);
-    void paintOutline(GraphicsContext*, const LayoutPoint&);
+    virtual void addFocusRingRects(Vector<IntRect>&, const LayoutPoint& additionalOffset, const RenderLayerModelObject* paintContainer = 0) OVERRIDE;
+    void paintOutline(PaintInfo&, const LayoutPoint&);
 
     using RenderBoxModelObject::continuation;
     using RenderBoxModelObject::setContinuation;
@@ -140,7 +144,7 @@ private:
     virtual LayoutRect rectWithOutlineForRepaint(const RenderLayerModelObject* repaintContainer, LayoutUnit outlineWidth) const OVERRIDE;
     virtual void computeRectForRepaint(const RenderLayerModelObject* repaintContainer, LayoutRect&, bool fixed) const OVERRIDE;
 
-    virtual void mapLocalToContainer(const RenderLayerModelObject* repaintContainer, TransformState&, MapCoordinatesFlags = ApplyContainerFlip | SnapOffsetForTransforms, bool* wasFixed = 0) const OVERRIDE;
+    virtual void mapLocalToContainer(const RenderLayerModelObject* repaintContainer, TransformState&, MapCoordinatesFlags = ApplyContainerFlip, bool* wasFixed = 0) const OVERRIDE;
     virtual const RenderObject* pushMappingToContainer(const RenderLayerModelObject* ancestorToStopAt, RenderGeometryMap&) const OVERRIDE;
 
     virtual VisiblePosition positionForPoint(const LayoutPoint&);
@@ -186,13 +190,13 @@ private:
 
 inline RenderInline* toRenderInline(RenderObject* object)
 { 
-    ASSERT(!object || object->isRenderInline());
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isRenderInline());
     return static_cast<RenderInline*>(object);
 }
 
 inline const RenderInline* toRenderInline(const RenderObject* object)
 { 
-    ASSERT(!object || object->isRenderInline());
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isRenderInline());
     return static_cast<const RenderInline*>(object);
 }
 

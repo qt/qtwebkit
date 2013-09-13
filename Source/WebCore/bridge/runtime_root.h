@@ -28,6 +28,7 @@
 
 #include <heap/Strong.h>
 #include <heap/Weak.h>
+#include <heap/WeakInlines.h>
 #include <wtf/Forward.h>
 #include <wtf/HashCountedSet.h>
 #include <wtf/HashSet.h>
@@ -69,7 +70,7 @@ public:
     JSGlobalObject* globalObject() const;
     void updateGlobalObject(JSGlobalObject*);
 
-    void addRuntimeObject(JSGlobalData&, RuntimeObject*);
+    void addRuntimeObject(VM&, RuntimeObject*);
     void removeRuntimeObject(RuntimeObject*);
 
     struct InvalidationCallback {

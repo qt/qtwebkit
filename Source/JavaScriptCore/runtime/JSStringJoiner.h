@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2012, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,7 +26,7 @@
 #ifndef JSStringJoiner_h
 #define JSStringJoiner_h
 
-#include "JSValue.h"
+#include "JSCJSValue.h"
 #include <wtf/Vector.h>
 #include <wtf/text/WTFString.h>
 
@@ -40,20 +40,19 @@ public:
     JSStringJoiner(const String& separator, size_t stringCount);
 
     void append(const String&);
-    JSValue build(ExecState*);
+    JSValue join(ExecState*);
 
 private:
     String m_separator;
     Vector<String> m_strings;
 
-    unsigned m_cumulatedStringsLength;
+    Checked<unsigned, RecordOverflow> m_accumulatedStringsLength;
     bool m_isValid;
     bool m_is8Bits;
 };
 
 inline JSStringJoiner::JSStringJoiner(const String& separator, size_t stringCount)
     : m_separator(separator)
-    , m_cumulatedStringsLength(0)
     , m_isValid(true)
     , m_is8Bits(m_separator.is8Bit())
 {
@@ -66,9 +65,9 @@ inline void JSStringJoiner::append(const String& str)
     if (!m_isValid)
         return;
 
-    m_strings.uncheckedAppend(str);
+    m_strings.append(str);
     if (!str.isNull()) {
-        m_cumulatedStringsLength += str.length();
+        m_accumulatedStringsLength += str.length();
         m_is8Bits = m_is8Bits && str.is8Bit();
     }
 }

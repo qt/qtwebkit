@@ -25,7 +25,8 @@
 
 [
     Conditional=INDEXED_DATABASE,
-    JSNoStaticTables
+    JSNoStaticTables,
+    ImplementationLacksVTable
 ] interface IDBIndex {
     readonly attribute DOMString name;
     readonly attribute IDBObjectStore objectStore;
@@ -33,27 +34,17 @@
     readonly attribute boolean unique;
     readonly attribute boolean multiEntry;
 
-    [CallWith=ScriptExecutionContext] IDBRequest openCursor(in [Optional] IDBKeyRange? range, in [Optional] DOMString direction)
-        raises (DOMException);
-    [CallWith=ScriptExecutionContext] IDBRequest openCursor(in IDBKey key, in [Optional] DOMString direction)
-        raises (DOMException);
-    
-    [CallWith=ScriptExecutionContext] IDBRequest openKeyCursor(in [Optional] IDBKeyRange? range, in [Optional] DOMString  direction)
-        raises (DOMException);
-    [CallWith=ScriptExecutionContext] IDBRequest openKeyCursor(in IDBKey key, in [Optional] DOMString direction)
-        raises (DOMException);
+    [CallWith=ScriptExecutionContext, RaisesException] IDBRequest openCursor(optional IDBKeyRange? range, optional DOMString direction);
+    [CallWith=ScriptExecutionContext, RaisesException] IDBRequest openCursor(any key, optional DOMString direction);
 
-    [CallWith=ScriptExecutionContext] IDBRequest get(in IDBKeyRange? key)
-        raises (DOMException);
-    [CallWith=ScriptExecutionContext] IDBRequest get(in IDBKey key)
-        raises (DOMException);
-    [CallWith=ScriptExecutionContext] IDBRequest getKey(in IDBKeyRange? key)
-        raises (DOMException);
-    [CallWith=ScriptExecutionContext] IDBRequest getKey(in IDBKey key)
-        raises (DOMException);
-    [CallWith=ScriptExecutionContext] IDBRequest count(in [Optional] IDBKeyRange? range)
-        raises (DOMException);
-    [CallWith=ScriptExecutionContext] IDBRequest count(in IDBKey key)
-        raises (DOMException);
+    [CallWith=ScriptExecutionContext, RaisesException] IDBRequest openKeyCursor(optional IDBKeyRange? range, optional DOMString  direction);
+    [CallWith=ScriptExecutionContext, RaisesException] IDBRequest openKeyCursor(any key, optional DOMString direction);
+
+    [CallWith=ScriptExecutionContext, RaisesException] IDBRequest get(IDBKeyRange? key);
+    [CallWith=ScriptExecutionContext, RaisesException] IDBRequest get(any key);
+    [CallWith=ScriptExecutionContext, RaisesException] IDBRequest getKey(IDBKeyRange? key);
+    [CallWith=ScriptExecutionContext, RaisesException] IDBRequest getKey(any key);
+    [CallWith=ScriptExecutionContext, RaisesException] IDBRequest count(optional IDBKeyRange? range);
+    [CallWith=ScriptExecutionContext, RaisesException] IDBRequest count(any key);
 };
 

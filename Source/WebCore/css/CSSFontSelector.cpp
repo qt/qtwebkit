@@ -29,6 +29,7 @@
 
 #include "CachedFont.h"
 #include "CSSFontFace.h"
+#include "CSSFontFaceRule.h"
 #include "CSSFontFaceSource.h"
 #include "CSSFontFaceSrcValue.h"
 #include "CSSPrimitiveValue.h"
@@ -41,6 +42,7 @@
 #include "Document.h"
 #include "FontCache.h"
 #include "Frame.h"
+#include "FrameLoader.h"
 #include "RenderObject.h"
 #include "Settings.h"
 #include "SimpleFontData.h"
@@ -59,10 +61,14 @@ using namespace std;
 
 namespace WebCore {
 
+static unsigned fontSelectorId;
+
 CSSFontSelector::CSSFontSelector(Document* document)
     : m_document(document)
     , m_beginLoadingTimer(this, &CSSFontSelector::beginLoadTimerFired)
+    , m_uniqueId(++fontSelectorId)
     , m_version(0)
+    
 {
     // FIXME: An old comment used to say there was no need to hold a reference to m_document
     // because "we are guaranteed to be destroyed before the document". But there does not
@@ -109,7 +115,7 @@ void CSSFontSelector::addFontFaceRule(const StyleRuleFontFace* fontFaceRule)
         if (!fontStyle->isPrimitiveValue())
             return;
 
-        switch (static_cast<CSSPrimitiveValue*>(fontStyle.get())->getIdent()) {
+        switch (static_cast<CSSPrimitiveValue*>(fontStyle.get())->getValueID()) {
         case CSSValueNormal:
             traitsMask |= FontStyleNormalMask;
             break;
@@ -127,7 +133,7 @@ void CSSFontSelector::addFontFaceRule(const StyleRuleFontFace* fontFaceRule)
         if (!fontWeight->isPrimitiveValue())
             return;
 
-        switch (static_cast<CSSPrimitiveValue*>(fontWeight.get())->getIdent()) {
+        switch (static_cast<CSSPrimitiveValue*>(fontWeight.get())->getValueID()) {
         case CSSValueBold:
         case CSSValue700:
             traitsMask |= FontWeight700Mask;
@@ -178,7 +184,7 @@ void CSSFontSelector::addFontFaceRule(const StyleRuleFontFace* fontFaceRule)
             return;
 
         for (unsigned i = 0; i < numVariants; ++i) {
-            switch (static_cast<CSSPrimitiveValue*>(variantList->itemWithoutBoundsCheck(i))->getIdent()) {
+            switch (static_cast<CSSPrimitiveValue*>(variantList->itemWithoutBoundsCheck(i))->getValueID()) {
                 case CSSValueNormal:
                     traitsMask |= FontVariantNormalMask;
                     break;
@@ -224,8 +230,15 @@ void CSSFontSelector::addFontFaceRule(const StyleRuleFontFace* fontFaceRule)
             source = adoptPtr(new CSSFontFaceSource(item->resource()));
         }
 
-        if (!fontFace)
-            fontFace = CSSFontFace::create(static_cast<FontTraitsMask>(traitsMask));
+        if (!fontFace) {
+            RefPtr<CSSFontFaceRule> rule;
+#if ENABLE(FONT_LOAD_EVENTS)
+            // FIXME: https://bugs.webkit.org/show_bug.cgi?id=112116 - This CSSFontFaceRule has no parent.
+            if (RuntimeEnabledFeatures::fontLoadEventsEnabled())
+                rule = static_pointer_cast<CSSFontFaceRule>(fontFaceRule->createCSSOMWrapper());
+#endif
+            fontFace = CSSFontFace::create(static_cast<FontTraitsMask>(traitsMask), rule);
+        }
 
         if (source) {
 #if ENABLE(SVG_FONTS)
@@ -253,12 +266,12 @@ void CSSFontSelector::addFontFaceRule(const StyleRuleFontFace* fontFaceRule)
     for (int i = 0; i < familyLength; i++) {
         CSSPrimitiveValue* item = static_cast<CSSPrimitiveValue*>(familyList->itemWithoutBoundsCheck(i));
         String familyName;
-        if (item->isString())
+        if (item->isString()) {
             familyName = item->getStringValue();
-        else if (item->isIdent()) {
+        } else if (item->isValueID()) {
             // We need to use the raw text for all the generic family types, since @font-face is a way of actually
             // defining what font to use for those types.
-            switch (item->getIdent()) {
+            switch (item->getValueID()) {
                 case CSSValueSerif:
                     familyName = serifFamily;
                     break;
@@ -297,7 +310,7 @@ void CSSFontSelector::addFontFaceRule(const StyleRuleFontFace* fontFaceRule)
                 OwnPtr<Vector<RefPtr<CSSFontFace> > > familyLocallyInstalledFaces = adoptPtr(new Vector<RefPtr<CSSFontFace> >);
 
                 for (unsigned i = 0; i < numLocallyInstalledFaces; ++i) {
-                    RefPtr<CSSFontFace> locallyInstalledFontFace = CSSFontFace::create(static_cast<FontTraitsMask>(locallyInstalledFontsTraitsMasks[i]), true);
+                    RefPtr<CSSFontFace> locallyInstalledFontFace = CSSFontFace::create(static_cast<FontTraitsMask>(locallyInstalledFontsTraitsMasks[i]), 0, true);
                     locallyInstalledFontFace->addSource(adoptPtr(new CSSFontFaceSource(familyName)));
                     ASSERT(locallyInstalledFontFace->isValid());
                     familyLocallyInstalledFaces->append(locallyInstalledFontFace);
@@ -325,6 +338,8 @@ void CSSFontSelector::unregisterForInvalidationCallbacks(FontSelectorClient* cli
 
 void CSSFontSelector::dispatchInvalidationCallbacks()
 {
+    ++m_version;
+
     Vector<FontSelectorClient*> clients;
     copyToVector(m_clients, clients);
     for (size_t i = 0; i < clients.size(); ++i)
@@ -475,17 +490,25 @@ PassRefPtr<FontData> CSSFontSelector::getFontData(const FontDescription& fontDes
         return 0;
     }
 
-    String family = familyName.string();
-
-    Vector<RefPtr<CSSFontFace> >* familyFontFaces = m_fontFaces.get(family);
+    CSSSegmentedFontFace* face = getFontFace(fontDescription, familyName);
     // If no face was found, then return 0 and let the OS come up with its best match for the name.
-    if (!familyFontFaces || familyFontFaces->isEmpty()) {
+    if (!face) {
         // If we were handed a generic family, but there was no match, go ahead and return the correct font based off our
         // settings.
         if (fontDescription.genericFamily() == FontDescription::StandardFamily && !fontDescription.isSpecifiedFont())
             return fontDataForGenericFamily(m_document, fontDescription, "-webkit-standard");
         return fontDataForGenericFamily(m_document, fontDescription, familyName);
     }
+
+    // We have a face. Ask it for a font data. If it cannot produce one, it will fail, and the OS will take over.
+    return face->getFontData(fontDescription);
+}
+
+CSSSegmentedFontFace* CSSFontSelector::getFontFace(const FontDescription& fontDescription, const AtomicString& family)
+{
+    Vector<RefPtr<CSSFontFace> >* familyFontFaces = m_fontFaces.get(family);
+    if (!familyFontFaces || familyFontFaces->isEmpty())
+        return 0;
 
     OwnPtr<HashMap<unsigned, RefPtr<CSSSegmentedFontFace> > >& segmentedFontFaceCache = m_fonts.add(family, nullptr).iterator->value;
     if (!segmentedFontFaceCache)
@@ -534,9 +557,7 @@ PassRefPtr<FontData> CSSFontSelector::getFontData(const FontDescription& fontDes
         for (unsigned i = 0; i < numCandidates; ++i)
             face->appendFontFace(candidateFontFaces[i]);
     }
-
-    // We have a face.  Ask it for a font data.  If it cannot produce one, it will fail, and the OS will take over.
-    return face->getFontData(fontDescription);
+    return face.get();
 }
 
 void CSSFontSelector::clearDocument()
@@ -588,11 +609,29 @@ void CSSFontSelector::beginLoadTimerFired(Timer<WebCore::CSSFontSelector>*)
         cachedResourceLoader->decrementRequestCount(fontsToBeginLoading[i].get());
     }
     // Ensure that if the request count reaches zero, the frame loader will know about it.
-    cachedResourceLoader->loadDone();
+    cachedResourceLoader->loadDone(0);
     // New font loads may be triggered by layout after the document load is complete but before we have dispatched
     // didFinishLoading for the frame. Make sure the delegate is always dispatched by checking explicitly.
     if (m_document && m_document->frame())
         m_document->frame()->loader()->checkLoadComplete();
+}
+
+bool CSSFontSelector::resolvesFamilyFor(const FontDescription& description) const
+{
+    for (unsigned i = 0; i < description.familyCount(); ++i) {
+        const AtomicString& familyName = description.familyAt(i);
+        if (description.genericFamily() == FontDescription::StandardFamily && !description.isSpecifiedFont())
+            return true;
+        if (familyName.isEmpty())
+            continue;
+        if (m_fontFaces.contains(familyName))
+            return true;
+        DEFINE_STATIC_LOCAL(String, webkitPrefix, ("-webkit-"));
+        if (familyName.startsWith(webkitPrefix))
+            return true;
+            
+    }
+    return false;
 }
 
 }

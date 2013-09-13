@@ -29,117 +29,87 @@
 
 #include "ContentDistributor.h"
 #include "ExceptionCode.h"
-#include "SelectRuleFeatureSet.h"
 #include "ShadowRoot.h"
-#include <wtf/DoublyLinkedList.h>
 #include <wtf/Noncopyable.h>
-#include <wtf/OwnPtr.h>
+#include <wtf/PassOwnPtr.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/Vector.h>
 
 namespace WebCore {
 
-class Node;
-class Element;
-class TreeScope;
-
 class ElementShadow {
    WTF_MAKE_NONCOPYABLE(ElementShadow); WTF_MAKE_FAST_ALLOCATED;
 public:
-    ElementShadow();
-    ~ElementShadow();
+    static PassOwnPtr<ElementShadow> create()
+    {
+        return adoptPtr(new ElementShadow());
+    }
+
+    ~ElementShadow()
+    {
+        removeShadowRoot();
+    }
 
     Element* host() const;
-    ShadowRoot* youngestShadowRoot() const;
-    ShadowRoot* oldestShadowRoot() const;
+    ShadowRoot* shadowRoot() const { return m_shadowRoot.get(); }
+    ElementShadow* containingShadow() const;
 
-    void removeAllShadowRoots();
-    void addShadowRoot(Element* shadowHost, PassRefPtr<ShadowRoot>, ShadowRoot::ShadowRootType, ExceptionCode&);
+    ShadowRoot* addShadowRoot(Element* shadowHost, ShadowRoot::ShadowRootType);
 
-    void attach();
-    void detach();
+    void attach(const Node::AttachContext&);
+    void detach(const Node::AttachContext&);
 
-    bool childNeedsStyleRecalc();
-    bool needsStyleRecalc();
+    bool childNeedsStyleRecalc() const;
+    bool needsStyleRecalc() const;
     void recalcStyle(Node::StyleChange);
+    void removeAllEventListeners();
 
-    void setValidityUndetermined();
-    void invalidateDistribution();
-    void ensureDistribution();
+    void invalidateDistribution() { m_distributor.invalidateDistribution(host()); }
 
-    ContentDistributor& distributor();
-    const ContentDistributor& distributor() const;
-
-    bool shouldCollectSelectFeatureSet() const { return m_shouldCollectSelectFeatureSet; }
-    void setShouldCollectSelectFeatureSet();
-    void ensureSelectFeatureSetCollected();
-
-    const SelectRuleFeatureSet& selectRuleFeatureSet() const;
-
-    void reportMemoryUsage(MemoryObjectInfo*) const;
+    ContentDistributor& distributor() { return m_distributor; }
+    const ContentDistributor& distributor() const { return m_distributor; }
 
 private:
-    void invalidateDistribution(Element* host);
+    ElementShadow() { }
 
-    void collectSelectFeatureSetFrom(ShadowRoot*);
+    void removeShadowRoot();
 
-    DoublyLinkedList<ShadowRoot> m_shadowRoots;
+    RefPtr<ShadowRoot> m_shadowRoot;
     ContentDistributor m_distributor;
-    SelectRuleFeatureSet m_selectFeatures;
-    bool m_shouldCollectSelectFeatureSet : 1;
 };
-
-void invalidateParentDistributionIfNecessary(Element*, SelectRuleFeatureSet::SelectRuleFeatureMask updatedFeatures);
-
-inline ShadowRoot* ElementShadow::youngestShadowRoot() const
-{
-    return m_shadowRoots.head();
-}
-
-inline ShadowRoot* ElementShadow::oldestShadowRoot() const
-{
-    return m_shadowRoots.tail();
-}
-
-inline ContentDistributor& ElementShadow::distributor()
-{
-    return m_distributor;
-}
-
-inline const ContentDistributor& ElementShadow::distributor() const
-{
-    return m_distributor;
-}
 
 inline Element* ElementShadow::host() const
 {
-    ASSERT(!m_shadowRoots.isEmpty());
-    return youngestShadowRoot()->host();
+    ASSERT(m_shadowRoot);
+    return m_shadowRoot->host();
 }
 
-inline const SelectRuleFeatureSet& ElementShadow::selectRuleFeatureSet() const
-{
-    ASSERT(!m_shouldCollectSelectFeatureSet);
-    return m_selectFeatures;
-}
-
-inline ShadowRoot* Node::youngestShadowRoot() const
+inline ShadowRoot* Node::shadowRoot() const
 {
     if (!this->isElementNode())
         return 0;
     if (ElementShadow* shadow = toElement(this)->shadow())
-        return shadow->youngestShadowRoot();
+        return shadow->shadowRoot();
     return 0;
 }
 
-class ShadowRootVector : public Vector<RefPtr<ShadowRoot> > {
-public:
-    explicit ShadowRootVector(ElementShadow* tree)
-    {
-        for (ShadowRoot* root = tree->youngestShadowRoot(); root; root = root->olderShadowRoot())
-            append(root);
-    }
-};
+inline ElementShadow* ElementShadow::containingShadow() const
+{
+    if (ShadowRoot* parentRoot = host()->containingShadowRoot())
+        return parentRoot->owner();
+    return 0;
+}
+
+inline ElementShadow* shadowOfParent(const Node* node)
+{
+    if (!node)
+        return 0;
+    if (Node* parent = node->parentNode())
+        if (parent->isElementNode())
+            return toElement(parent)->shadow();
+    return 0;
+}
+
 
 } // namespace
 

@@ -30,14 +30,15 @@
 
 #include "GraphicsContext3D.h"
 
-#include "BitmapImageSingleFrameSkia.h"
 #include "Extensions3DOpenGLES.h"
 #include "GraphicsContext.h"
 #include "OpenGLESShims.h"
 #include "WebGLLayerWebKitThread.h"
 
 #include <BlackBerryPlatformGraphics.h>
+#include <BlackBerryPlatformGraphicsContext.h>
 #include <BlackBerryPlatformLog.h>
+#include <TiledImage.h>
 
 namespace WebCore {
 
@@ -55,16 +56,12 @@ GraphicsContext3D::GraphicsContext3D(GraphicsContext3D::Attributes attrs, HostWi
     , m_currentHeight(0)
     , m_context(BlackBerry::Platform::Graphics::createWebGLContext())
     , m_compiler(SH_ESSL_OUTPUT)
-    , m_extensions(adoptPtr(new Extensions3DOpenGLES(this)))
     , m_attrs(attrs)
     , m_texture(0)
     , m_fbo(0)
     , m_depthStencilBuffer(0)
     , m_layerComposited(false)
     , m_internalColorFormat(GL_RGBA)
-    , m_boundFBO(0)
-    , m_activeTexture(GL_TEXTURE0)
-    , m_boundTexture0(0)
     , m_isImaginationHardware(0)
 {
     if (renderStyle != RenderDirectlyToHostWindow) {
@@ -87,7 +84,7 @@ GraphicsContext3D::GraphicsContext3D(GraphicsContext3D::Attributes attrs, HostWi
         ::glBindFramebuffer(GL_FRAMEBUFFER, m_fbo);
         if (m_attrs.stencil || m_attrs.depth)
             ::glGenRenderbuffers(1, &m_depthStencilBuffer);
-        m_boundFBO = m_fbo;
+        m_state.boundFBO = m_fbo;
 
 #if USE(ACCELERATED_COMPOSITING)
         static_cast<WebGLLayerWebKitThread*>(m_compositingLayer.get())->setWebGLContext(this);
@@ -111,10 +108,10 @@ GraphicsContext3D::GraphicsContext3D(GraphicsContext3D::Attributes attrs, HostWi
     getIntegerv(GraphicsContext3D::MAX_TEXTURE_IMAGE_UNITS, &ANGLEResources.MaxTextureImageUnits);
     getIntegerv(GraphicsContext3D::MAX_FRAGMENT_UNIFORM_VECTORS, &ANGLEResources.MaxFragmentUniformVectors);
 
-    ANGLEResources.MaxDrawBuffers = 1; // Always set to 1 for OpenGL ES.
-    ANGLEResources.OES_standard_derivatives = m_extensions->supports("GL_OES_standard_derivatives");
-    ANGLEResources.OES_EGL_image_external = m_extensions->supports("GL_EGL_image_external");
-    ANGLEResources.ARB_texture_rectangle = m_extensions->supports("GL_ARB_texture_rectangle");
+    GC3Dint range[2], precision;
+    getShaderPrecisionFormat(GraphicsContext3D::FRAGMENT_SHADER, GraphicsContext3D::HIGH_FLOAT, range, &precision);
+    ANGLEResources.FragmentPrecisionHigh = (range[0] || range[1] || precision);
+
     m_compiler.setResources(ANGLEResources);
 
     ::glClearColor(0, 0, 0, 0);
@@ -130,7 +127,7 @@ GraphicsContext3D::~GraphicsContext3D()
         ::glDeleteFramebuffers(1, &m_fbo);
     }
 
-    m_compositingLayer = 0; // Must release compositing layer before destroying the context.
+    static_cast<WebGLLayerWebKitThread *>(m_compositingLayer.get())->webGLContextDestroyed(); // Must release compositing layer before destroying the context.
     BlackBerry::Platform::Graphics::destroyWebGLContext(m_context);
 }
 
@@ -188,7 +185,7 @@ bool GraphicsContext3D::reshapeFBOs(const IntSize& size)
     }
 
     bool mustRestoreFBO = false;
-    if (m_boundFBO != m_fbo) {
+    if (m_state.boundFBO != m_fbo) {
         mustRestoreFBO = true;
         ::glBindFramebufferEXT(GraphicsContext3D::FRAMEBUFFER, m_fbo);
     }
@@ -282,9 +279,9 @@ void GraphicsContext3D::readPixelsIMG(GC3Dint x, GC3Dint y, GC3Dsizei width, GC3
     // If this ever changes, this code will need to be updated.
 
     // Calculate the strides of our data and canvas
-    unsigned int formatSize = 4; // RGBA UNSIGNED_BYTE
-    unsigned int dataStride = width * formatSize;
-    unsigned int canvasStride = m_currentWidth * formatSize;
+    unsigned formatSize = 4; // RGBA UNSIGNED_BYTE
+    unsigned dataStride = width * formatSize;
+    unsigned canvasStride = m_currentWidth * formatSize;
 
     // If we are using a pack alignment of 8, then we need to align our strides to 8 byte boundaries
     // See: http://en.wikipedia.org/wiki/Data_structure_alignment (computing padding)
@@ -314,10 +311,10 @@ void GraphicsContext3D::readPixelsIMG(GC3Dint x, GC3Dint y, GC3Dsizei width, GC3
     IntRect canvasRect(0, 0, m_currentWidth, m_currentHeight);
     IntRect nonZeroDataRect = intersection(dataRect, canvasRect);
 
-    unsigned int xDataOffset = x < 0 ? -x * formatSize : 0;
-    unsigned int yDataOffset = y < 0 ? -y * dataStride : 0;
-    unsigned int xCanvasOffset = nonZeroDataRect.x() * formatSize;
-    unsigned int yCanvasOffset = nonZeroDataRect.y() * canvasStride;
+    unsigned xDataOffset = x < 0 ? -x * formatSize : 0;
+    unsigned yDataOffset = y < 0 ? -y * dataStride : 0;
+    unsigned xCanvasOffset = nonZeroDataRect.x() * formatSize;
+    unsigned yCanvasOffset = nonZeroDataRect.y() * canvasStride;
     unsigned char* dst = static_cast<unsigned char*>(data) + xDataOffset + yDataOffset;
     unsigned char* src = canvasData + xCanvasOffset + yCanvasOffset;
     for (int row = 0; row < nonZeroDataRect.height(); row++) {
@@ -345,16 +342,6 @@ bool GraphicsContext3D::isGLES2Compliant() const
     return true;
 }
 
-bool GraphicsContext3D::isGLES2NPOTStrict() const
-{
-    return true;
-}
-
-bool GraphicsContext3D::isErrorGeneratedOnOutOfBoundsAccesses() const
-{
-    return false;
-}
-
 Platform3DObject GraphicsContext3D::platformTexture() const
 {
     return m_texture;
@@ -373,32 +360,17 @@ PlatformLayer* GraphicsContext3D::platformLayer() const
 #endif
 
 void GraphicsContext3D::paintToCanvas(const unsigned char* imagePixels, int imageWidth, int imageHeight, int canvasWidth, int canvasHeight,
-       GraphicsContext* context)
+    GraphicsContext* context)
 {
-    unsigned char* tempPixels = new unsigned char[imageWidth * imageHeight * 4];
-
-    // 3D images have already been converted to BGRA. Don't do it twice!!
-    for (int y = 0; y < imageHeight; y++) {
-        const unsigned char *srcRow = imagePixels + (imageWidth * 4 * y);
-        unsigned char *destRow = tempPixels + (imageWidth * 4 * (imageHeight - y - 1));
-        for (int i = 0; i < imageWidth * 4; i += 4)
-            memcpy(destRow + i, srcRow + i, 4);
-    }
-
-    SkBitmap canvasBitmap;
-
-    canvasBitmap.setConfig(SkBitmap::kARGB_8888_Config, canvasWidth, canvasHeight);
-    canvasBitmap.allocPixels(0, 0);
-    canvasBitmap.lockPixels();
-    memcpy(canvasBitmap.getPixels(), tempPixels, imageWidth * imageHeight * 4);
-    canvasBitmap.unlockPixels();
-    delete [] tempPixels;
-
     FloatRect src(0, 0, canvasWidth, canvasHeight);
     FloatRect dst(0, 0, imageWidth, imageHeight);
-
-    RefPtr<BitmapImageSingleFrameSkia> bitmapImage = BitmapImageSingleFrameSkia::create(canvasBitmap, false);
-    context->drawImage(bitmapImage.get(), ColorSpaceDeviceRGB, dst, src, CompositeCopy, RespectImageOrientation, false);
+    double oldTransform[6];
+    double flipYTransform[6] = { 1.0f, 0.0f, 0.0f, -1.0f, 0.0f, imageHeight };
+    context->platformContext()->getTransform(oldTransform);
+    context->platformContext()->setTransform(flipYTransform);
+    BlackBerry::Platform::Graphics::TiledImage image(IntSize(imageWidth, imageHeight), reinterpret_cast_ptr<const unsigned*>(imagePixels));
+    context->platformContext()->addImage(dst, src, &image);
+    context->platformContext()->setTransform(oldTransform);
 }
 
 void GraphicsContext3D::setContextLostCallback(PassOwnPtr<ContextLostCallback> callback)
@@ -408,6 +380,41 @@ void GraphicsContext3D::setContextLostCallback(PassOwnPtr<ContextLostCallback> c
 
 void GraphicsContext3D::setErrorMessageCallback(PassOwnPtr<ErrorMessageCallback>)
 {
+}
+
+GraphicsContext3D::ImageExtractor::~ImageExtractor()
+{
+}
+
+bool GraphicsContext3D::ImageExtractor::extractImage(bool premultiplyAlpha, bool)
+{
+    if (!m_image)
+        return false;
+
+    NativeImagePtr nativeImage = m_image->nativeImageForCurrentFrame();
+    if (!nativeImage)
+        return false;
+
+    m_imageWidth = nativeImage->width();
+    m_imageHeight = nativeImage->height();
+    if (!m_imageWidth || !m_imageHeight)
+        return false;
+
+    unsigned imageSize = m_imageWidth * m_imageHeight;
+    m_imageData.resize(imageSize);
+    if (!nativeImage->readPixels(m_imageData.data(), imageSize))
+        return false;
+
+    // Raw image data is premultiplied
+    m_alphaOp = AlphaDoNothing;
+    if (!premultiplyAlpha)
+        m_alphaOp = AlphaDoUnmultiply;
+
+    m_imagePixelData = m_imageData.data();
+    m_imageSourceFormat = DataFormatBGRA8;
+    m_imageSourceUnpackAlignment = 0;
+
+    return true;
 }
 
 } // namespace WebCore

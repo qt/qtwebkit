@@ -162,7 +162,7 @@ WebCore::InspectorFrontendChannel* WebInspectorClient::openInspectorFrontend(Ins
 
     COMPtr<WebMutableURLRequest> request(AdoptCOM, WebMutableURLRequest::createInstance());
 
-    RetainPtr<CFURLRef> htmlURLRef(AdoptCF, CFBundleCopyResourceURL(getWebKitBundle(), CFSTR("inspector"), CFSTR("html"), CFSTR("inspector")));
+    RetainPtr<CFURLRef> htmlURLRef = adoptCF(CFBundleCopyResourceURL(getWebKitBundle(), CFSTR("inspector"), CFSTR("html"), CFSTR("inspector")));
     if (!htmlURLRef)
         return 0;
 
@@ -257,22 +257,16 @@ void WebInspectorFrontendClient::frontendLoaded()
     if (m_attached)
         restoreAttachedWindowHeight();
 
-    setAttachedWindow(m_attached);
+    setAttachedWindow(m_attached ? DOCKED_TO_BOTTOM : UNDOCKED);
 }
 
 String WebInspectorFrontendClient::localizedStringsURL()
 {
-    RetainPtr<CFURLRef> url(AdoptCF, CFBundleCopyResourceURL(getWebKitBundle(), CFSTR("localizedStrings"), CFSTR("js"), 0));
+    RetainPtr<CFURLRef> url = adoptCF(CFBundleCopyResourceURL(getWebKitBundle(), CFSTR("localizedStrings"), CFSTR("js"), 0));
     if (!url)
         return String();
 
     return CFURLGetString(url.get());
-}
-
-String WebInspectorFrontendClient::hiddenPanels()
-{
-    // FIXME: implement this
-    return String();
 }
 
 void WebInspectorFrontendClient::bringToFront()
@@ -285,7 +279,7 @@ void WebInspectorFrontendClient::closeWindow()
     destroyInspectorView(true);
 }
 
-void WebInspectorFrontendClient::attachWindow()
+void WebInspectorFrontendClient::attachWindow(DockSide)
 {
     if (m_attached)
         return;
@@ -340,6 +334,16 @@ void WebInspectorFrontendClient::setAttachedWindowHeight(unsigned height)
 
     RedrawWindow(m_frontendWebViewHwnd, 0, 0, RDW_INVALIDATE | RDW_ALLCHILDREN | RDW_UPDATENOW); 
     RedrawWindow(m_inspectedWebViewHwnd, 0, 0, RDW_INVALIDATE | RDW_ALLCHILDREN | RDW_UPDATENOW);
+}
+
+void WebInspectorFrontendClient::setAttachedWindowWidth(unsigned)
+{
+    notImplemented();
+}
+
+void WebInspectorFrontendClient::setToolbarHeight(unsigned)
+{
+    notImplemented();
 }
 
 void WebInspectorFrontendClient::inspectedURLChanged(const String& newURL)
@@ -444,7 +448,7 @@ void WebInspectorFrontendClient::destroyInspectorView(bool notifyInspectorContro
 void WebInspectorFrontendClient::updateWindowTitle()
 {
     String title = makeString("Web Inspector ", static_cast<UChar>(0x2014), ' ', m_inspectedURL);
-    ::SetWindowText(m_frontendHwnd, title.charactersWithNullTermination());
+    ::SetWindowText(m_frontendHwnd, title.charactersWithNullTermination().data());
 }
 
 LRESULT WebInspectorFrontendClient::onGetMinMaxInfo(WPARAM, LPARAM lParam)

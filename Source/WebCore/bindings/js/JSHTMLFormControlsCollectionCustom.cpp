@@ -49,7 +49,7 @@ static JSValue getNamedItems(ExecState* exec, JSHTMLFormControlsCollection* coll
         return toJS(exec, collection->globalObject(), namedItems[0].get());
 
     ASSERT(collection->impl()->type() == FormControls);
-    return toJS(exec, collection->globalObject(), collection->impl()->base()->radioNodeList(name).get());
+    return toJS(exec, collection->globalObject(), collection->impl()->ownerNode()->radioNodeList(name).get());
 }
 
 bool JSHTMLFormControlsCollection::canGetItemsForName(ExecState*, HTMLFormControlsCollection* collection, PropertyName propertyName)
@@ -65,7 +65,8 @@ JSValue JSHTMLFormControlsCollection::nameGetter(ExecState* exec, JSValue slotBa
 
 JSValue JSHTMLFormControlsCollection::namedItem(ExecState* exec)
 {
-    return getNamedItems(exec, this, Identifier(exec, exec->argument(0).toString(exec)->value(exec)));
+    JSValue value = getNamedItems(exec, this, Identifier(exec, exec->argument(0).toString(exec)->value(exec)));
+    return value.isUndefined() ? jsNull() : value;
 }
 
 } // namespace WebCore

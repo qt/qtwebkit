@@ -22,9 +22,11 @@
 #include "TouchAdjustment.h"
 
 #include "ContainerNode.h"
+#include "Editor.h"
 #include "FloatPoint.h"
 #include "FloatQuad.h"
 #include "FrameView.h"
+#include "HTMLFrameOwnerElement.h"
 #include "HTMLInputElement.h"
 #include "HTMLLabelElement.h"
 #include "HTMLNames.h"
@@ -71,13 +73,13 @@ typedef float (*DistanceFunction)(const IntPoint&, const IntRect&, const Subtarg
 // Takes non-const Node* because isContentEditable is a non-const function.
 bool nodeRespondsToTapGesture(Node* node)
 {
-    if (node->isMouseFocusable())
-        return true;
     if (node->willRespondToMouseClickEvents() || node->willRespondToMouseMoveEvents())
         return true;
     // Accept nodes that has a CSS effect when touched.
     if (node->isElementNode()) {
         Element* element = toElement(node);
+        if (element->isMouseFocusable())
+            return true;
         if (element->childrenAffectedByActive() || element->childrenAffectedByHover())
             return true;
     }
@@ -114,7 +116,7 @@ bool providesContextMenuItems(Node* node)
         return true;
     if (node->renderer()->canBeSelectionLeaf()) {
         // If the context menu gesture will trigger a selection all selectable nodes are valid targets.
-        if (node->renderer()->frame()->editor()->behavior().shouldSelectOnContextualMenuClick())
+        if (node->renderer()->frame()->editor().behavior().shouldSelectOnContextualMenuClick())
             return true;
         // Only the selected part of the renderer is a valid target, but this will be corrected in
         // appendContextSubtargetsForNode.
@@ -155,7 +157,7 @@ static inline void appendContextSubtargetsForNode(Node* node, SubtargetGeometryL
     Text* textNode = static_cast<WebCore::Text*>(node);
     RenderText* textRenderer = static_cast<RenderText*>(textNode->renderer());
 
-    if (textRenderer->frame()->editor()->behavior().shouldSelectOnContextualMenuClick()) {
+    if (textRenderer->frame()->editor().behavior().shouldSelectOnContextualMenuClick()) {
         // Make subtargets out of every word.
         String textValue = textNode->data();
         TextBreakIterator* wordIterator = wordBreakIterator(textValue.characters(), textValue.length());
@@ -221,8 +223,17 @@ static inline void appendZoomableSubtargets(Node* node, SubtargetGeometryList& s
         subtargets.append(SubtargetGeometry(node, *it));
 }
 
+static inline Node* parentShadowHostOrOwner(const Node* node)
+{
+    if (Node* ancestor = node->parentOrShadowHostNode())
+        return ancestor;
+    if (node->isDocumentNode())
+        return toDocument(node)->ownerElement();
+    return 0;
+}
+
 // Compiles a list of subtargets of all the relevant target nodes.
-void compileSubtargetList(const NodeList& intersectedNodes, SubtargetGeometryList& subtargets, NodeFilter nodeFilter, AppendSubtargetsForNode appendSubtargetsForNode)
+void compileSubtargetList(const NodeListHashSet& intersectedNodes, SubtargetGeometryList& subtargets, NodeFilter nodeFilter, AppendSubtargetsForNode appendSubtargetsForNode)
 {
     // Find candidates responding to tap gesture events in O(n) time.
     HashMap<Node*, Node*> responderMap;
@@ -233,12 +244,12 @@ void compileSubtargetList(const NodeList& intersectedNodes, SubtargetGeometryLis
     // A node matching the NodeFilter is called a responder. Candidate nodes must either be a
     // responder or have an ancestor that is a responder.
     // This iteration tests all ancestors at most once by caching earlier results.
-    unsigned length = intersectedNodes.length();
-    for (unsigned i = 0; i < length; ++i) {
-        Node* const node = intersectedNodes.item(i);
+    NodeListHashSet::const_iterator end = intersectedNodes.end();
+    for (NodeListHashSet::const_iterator it = intersectedNodes.begin(); it != end; ++it) {
+        Node* const node = it->get();
         Vector<Node*> visitedNodes;
         Node* respondingNode = 0;
-        for (Node* visitedNode = node; visitedNode; visitedNode = visitedNode->parentOrHostNode()) {
+        for (Node* visitedNode = node; visitedNode; visitedNode = visitedNode->parentOrShadowHostNode()) {
             // Check if we already have a result for a common ancestor from another candidate.
             respondingNode = responderMap.get(visitedNode);
             if (respondingNode)
@@ -248,7 +259,7 @@ void compileSubtargetList(const NodeList& intersectedNodes, SubtargetGeometryLis
             if (nodeFilter(visitedNode)) {
                 respondingNode = visitedNode;
                 // Continue the iteration to collect the ancestors of the responder, which we will need later.
-                for (visitedNode = visitedNode->parentOrHostNode(); visitedNode; visitedNode = visitedNode->parentOrHostNode()) {
+                for (visitedNode = parentShadowHostOrOwner(visitedNode); visitedNode; visitedNode = parentShadowHostOrOwner(visitedNode)) {
                     HashSet<Node*>::AddResult addResult = ancestorsToRespondersSet.add(visitedNode);
                     if (!addResult.isNewEntry)
                         break;
@@ -266,7 +277,7 @@ void compileSubtargetList(const NodeList& intersectedNodes, SubtargetGeometryLis
 
     // We compile the list of component absolute quads instead of using the bounding rect
     // to be able to perform better hit-testing on inline links on line-breaks.
-    length = candidates.size();
+    unsigned length = candidates.size();
     for (unsigned i = 0; i < length; i++) {
         Node* candidate = candidates[i];
         // Skip nodes who's responders are ancestors of other responders. This gives preference to
@@ -281,7 +292,7 @@ void compileSubtargetList(const NodeList& intersectedNodes, SubtargetGeometryLis
             continue;
         if (candidate->isContentEditable()) {
             Node* replacement = candidate;
-            Node* parent = candidate->parentOrHostNode();
+            Node* parent = candidate->parentOrShadowHostNode();
             while (parent && parent->isContentEditable()) {
                 replacement = parent;
                 if (editableAncestors.contains(replacement)) {
@@ -289,7 +300,7 @@ void compileSubtargetList(const NodeList& intersectedNodes, SubtargetGeometryLis
                     break;
                 }
                 editableAncestors.add(replacement);
-                parent = parent->parentOrHostNode();
+                parent = parent->parentOrShadowHostNode();
             }
             candidate = replacement;
         }
@@ -299,11 +310,11 @@ void compileSubtargetList(const NodeList& intersectedNodes, SubtargetGeometryLis
 }
 
 // Compiles a list of zoomable subtargets.
-void compileZoomableSubtargets(const NodeList& intersectedNodes, SubtargetGeometryList& subtargets)
+void compileZoomableSubtargets(const NodeListHashSet& intersectedNodes, SubtargetGeometryList& subtargets)
 {
-    unsigned length = intersectedNodes.length();
-    for (unsigned i = 0; i < length; ++i) {
-        Node* const candidate = intersectedNodes.item(i);
+    NodeListHashSet::const_iterator end = intersectedNodes.end();
+    for (NodeListHashSet::const_iterator it = intersectedNodes.begin(); it != end; ++it) {
+        Node* const candidate = it->get();
         if (nodeIsZoomTarget(candidate))
             appendZoomableSubtargets(candidate, subtargets);
     }
@@ -465,7 +476,7 @@ bool findNodeWithLowestDistanceMetric(Node*& targetNode, IntPoint& targetPoint, 
 
 } // namespace TouchAdjustment
 
-bool findBestClickableCandidate(Node*& targetNode, IntPoint &targetPoint, const IntPoint &touchHotspot, const IntRect &touchArea, const NodeList& nodeList)
+bool findBestClickableCandidate(Node*& targetNode, IntPoint &targetPoint, const IntPoint &touchHotspot, const IntRect &touchArea, const NodeListHashSet& nodeList)
 {
     IntRect targetArea;
     TouchAdjustment::SubtargetGeometryList subtargets;
@@ -473,7 +484,7 @@ bool findBestClickableCandidate(Node*& targetNode, IntPoint &targetPoint, const 
     return TouchAdjustment::findNodeWithLowestDistanceMetric(targetNode, targetPoint, targetArea, touchHotspot, touchArea, subtargets, TouchAdjustment::hybridDistanceFunction);
 }
 
-bool findBestContextMenuCandidate(Node*& targetNode, IntPoint &targetPoint, const IntPoint &touchHotspot, const IntRect &touchArea, const NodeList& nodeList)
+bool findBestContextMenuCandidate(Node*& targetNode, IntPoint &targetPoint, const IntPoint &touchHotspot, const IntRect &touchArea, const NodeListHashSet& nodeList)
 {
     IntRect targetArea;
     TouchAdjustment::SubtargetGeometryList subtargets;
@@ -481,7 +492,7 @@ bool findBestContextMenuCandidate(Node*& targetNode, IntPoint &targetPoint, cons
     return TouchAdjustment::findNodeWithLowestDistanceMetric(targetNode, targetPoint, targetArea, touchHotspot, touchArea, subtargets, TouchAdjustment::hybridDistanceFunction);
 }
 
-bool findBestZoomableArea(Node*& targetNode, IntRect& targetArea, const IntPoint& touchHotspot, const IntRect& touchArea, const NodeList& nodeList)
+bool findBestZoomableArea(Node*& targetNode, IntRect& targetArea, const IntPoint& touchHotspot, const IntRect& touchArea, const NodeListHashSet& nodeList)
 {
     IntPoint targetPoint;
     TouchAdjustment::SubtargetGeometryList subtargets;

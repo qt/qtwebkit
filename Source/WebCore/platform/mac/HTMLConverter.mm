@@ -27,6 +27,7 @@
 #import "HTMLConverter.h"
 
 #import "ArchiveResource.h"
+#import "CachedImage.h"
 #import "ColorMac.h"
 #import "Document.h"
 #import "DocumentLoader.h"
@@ -38,8 +39,11 @@
 #import "Element.h"
 #import "Font.h"
 #import "Frame.h"
+#import "FrameLoader.h"
+#import "HTMLImageElement.h"
 #import "HTMLNames.h"
 #import "HTMLParserIdioms.h"
+#import "HTMLTableElement.h"
 #import "LoaderNSURLExtras.h"
 #import "RenderImage.h"
 #import "TextIterator.h"
@@ -50,8 +54,6 @@ using namespace HTMLNames;
 
 static NSFileWrapper *fileWrapperForURL(DocumentLoader *, NSURL *);
 static NSFileWrapper *fileWrapperForElement(Element*);
-
-#if PLATFORM(IOS) || __MAC_OS_X_VERSION_MIN_REQUIRED >= 1060
 
 // Additional control Unicode characters
 const unichar WebNextLineCharacter = 0x0085;
@@ -97,11 +99,7 @@ static NSFont *WebDefaultFont()
     return defaultFont;
 }
 
-#endif
-
 @implementation WebHTMLConverter
-
-#if PLATFORM(IOS) || __MAC_OS_X_VERSION_MIN_REQUIRED >= 1060
 
 static NSFont *_fontForNameAndSize(NSString *fontName, CGFloat size, NSMutableDictionary *cache)
 {
@@ -264,7 +262,7 @@ static NSFont *_fontForNameAndSize(NSString *fontName, CGFloat size, NSMutableDi
                     result = @"block";
                 else if (coreElement->hasTagName(liTag))
                     result = @"list-item";
-                else if (coreElement->hasTagName(tableTag))
+                else if (isHTMLTableElement(coreElement))
                     result = @"table";
                 else if (coreElement->hasTagName(trTag))
                     result = @"table-row";
@@ -1662,29 +1660,26 @@ static NSInteger _colCompare(id block1, id block2, void *)
     return (0 == _errorCode) ? [[_attrStr retain] autorelease] : nil;
 }
 
-#endif // PLATFORM(IOS) || __MAC_OS_X_VERSION_MIN_REQUIRED >= 1060
-
 // This function uses TextIterator, which makes offsets in its result compatible with HTML editing.
 + (NSAttributedString *)editingAttributedStringFromRange:(Range*)range
 {
     NSFontManager *fontManager = [NSFontManager sharedFontManager];
     NSMutableAttributedString *string = [[NSMutableAttributedString alloc] init];
     NSUInteger stringLength = 0;
-    RetainPtr<NSMutableDictionary> attrs(AdoptNS, [[NSMutableDictionary alloc] init]);
+    RetainPtr<NSMutableDictionary> attrs = adoptNS([[NSMutableDictionary alloc] init]);
 
     for (TextIterator it(range); !it.atEnd(); it.advance()) {
         RefPtr<Range> currentTextRange = it.range();
-        ExceptionCode ec = 0;
-        Node* startContainer = currentTextRange->startContainer(ec);
-        Node* endContainer = currentTextRange->endContainer(ec);
-        int startOffset = currentTextRange->startOffset(ec);
-        int endOffset = currentTextRange->endOffset(ec);
+        Node* startContainer = currentTextRange->startContainer();
+        Node* endContainer = currentTextRange->endContainer();
+        int startOffset = currentTextRange->startOffset();
+        int endOffset = currentTextRange->endOffset();
         
         if (startContainer == endContainer && (startOffset == endOffset - 1)) {
             Node* node = startContainer->childNode(startOffset);
-            if (node && node->hasTagName(imgTag)) {
-                NSFileWrapper *fileWrapper = fileWrapperForElement(static_cast<Element*>(node));
-                NSTextAttachment *attachment = [[NSTextAttachment alloc] initWithFileWrapper:fileWrapper];
+            if (node && isHTMLImageElement(node)) {
+                NSFileWrapper* fileWrapper = fileWrapperForElement(toElement(node));
+                NSTextAttachment* attachment = [[NSTextAttachment alloc] initWithFileWrapper:fileWrapper];
                 [string appendAttributedString:[NSAttributedString attributedStringWithAttachment:attachment]];
                 [attachment release];
             }
@@ -1699,7 +1694,7 @@ static NSInteger _colCompare(id block1, id block2, void *)
         if (!renderer)
             continue;
         RenderStyle* style = renderer->style();
-        if (style->textDecorationsInEffect() & UNDERLINE)
+        if (style->textDecorationsInEffect() & TextDecorationUnderline)
             [attrs.get() setObject:[NSNumber numberWithInteger:NSUnderlineStyleSingle] forKey:NSUnderlineStyleAttributeName];
         if (NSFont *font = style->font().primaryFont()->getNSFont())
             [attrs.get() setObject:font forKey:NSFontAttributeName];
@@ -1714,7 +1709,7 @@ static NSInteger _colCompare(id block1, id block2, void *)
         else
             [attrs.get() removeObjectForKey:NSBackgroundColorAttributeName];
 
-        RetainPtr<NSString> substring(AdoptNS, [[NSString alloc] initWithCharactersNoCopy:const_cast<UChar*>(it.characters()) length:currentTextLength freeWhenDone:NO]);
+        RetainPtr<NSString> substring = adoptNS([[NSString alloc] initWithCharactersNoCopy:const_cast<UChar*>(it.characters()) length:currentTextLength freeWhenDone:NO]);
         [string replaceCharactersInRange:NSMakeRange(stringLength, 0) withString:substring.get()];
         [string setAttributes:attrs.get() range:NSMakeRange(stringLength, currentTextLength)];
         stringLength += currentTextLength;

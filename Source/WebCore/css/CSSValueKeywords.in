@@ -220,6 +220,16 @@ justify
 -webkit-center
 -webkit-match-parent
 //
+// CSS_PROP_TEXT_JUSTIFY:
+//
+//auto
+//none
+inter-word
+inter-ideograph
+inter-cluster
+distribute
+kashida
+//
 // CSS_PROP_LIST_STYLE_POSITION:
 //
 outside
@@ -376,6 +386,10 @@ all-scroll
 -webkit-grab
 -webkit-grabbing
 // none
+//
+// CSS_PROP_CURSOR_VISIBILITY:
+// auto
+auto-hide
 //
 // CSS_PROP_DIRECTION:
 //
@@ -680,6 +694,7 @@ searchfield-decoration
 searchfield-results-decoration
 searchfield-results-button
 searchfield-cancel-button
+snapshotted-plugin-overlay
 textfield
 relevancy-level-indicator
 continuous-capacity-level-indicator
@@ -836,12 +851,14 @@ exact
 //default
 sRGB
 
+#if defined(ENABLE_VIEW_MODE_CSS_MEDIA) && ENABLE_VIEW_MODE_CSS_MEDIA
 // (-webkit-view-mode:) media feature:
 floating
 fullscreen
 maximized
 minimized
 windowed
+#endif // ENABLE_VIEW_MODE_CSS_MEDIA
 
 // -webkit-hyphenate-limit-lines
 no-limit
@@ -899,6 +916,8 @@ farthest-corner
 // cover
 
 // -webkit-text-orientation
+sideways
+sideways-right
 upright
 vertical-right
 
@@ -913,9 +932,10 @@ on
 off
 
 // image-rendering
-//auto
-//optimizeSpeed
+// auto
+// optimizeSpeed
 optimizeQuality
+-webkit-crisp-edges
 -webkit-optimize-contrast
 
 // -webkit-shape-inside
@@ -924,7 +944,7 @@ nonzero
 evenodd
 outside-shape
 
-// -webkit-region-overflow
+// -webkit-region-fragment
 // auto
 break
 
@@ -943,6 +963,10 @@ wrap
 // -webkit-line-align
 edges
 
+#if (defined(ENABLE_SVG) && ENABLE_SVG) || (defined(ENABLE_CSS3_TEXT) && ENABLE_CSS3_TEXT)
+alphabetic
+#endif
+
 // position
 #if defined(ENABLE_CSS_STICKY_POSITION) && ENABLE_CSS_STICKY_POSITION
 -webkit-sticky
@@ -960,6 +984,7 @@ fine
 // border-box
 // padding-box
 // content-box
+attached
 filter-box
 detached
 #endif // CSS_SHADERS
@@ -996,3 +1021,10 @@ snap
 drag
 no-drag
 #endif
+
+#if defined(ENABLE_CSS3_TEXT) && ENABLE_CSS3_TEXT
+// text-indent
+-webkit-each-line
+-webkit-hanging
+#endif
+

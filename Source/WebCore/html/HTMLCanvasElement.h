@@ -33,7 +33,7 @@
 #include "IntSize.h"
 #include <wtf/Forward.h>
 
-#if PLATFORM(CHROMIUM) || PLATFORM(QT)
+#if PLATFORM(QT)
 #define DefaultInterpolationQuality InterpolationMedium
 #elif USE(CG)
 #define DefaultInterpolationQuality InterpolationLow
@@ -62,7 +62,7 @@ public:
     virtual void canvasDestroyed(HTMLCanvasElement*) = 0;
 };
 
-class HTMLCanvasElement : public HTMLElement {
+class HTMLCanvasElement FINAL : public HTMLElement {
 public:
     static PassRefPtr<HTMLCanvasElement> create(Document*);
     static PassRefPtr<HTMLCanvasElement> create(const QualifiedName&, Document*);
@@ -92,6 +92,11 @@ public:
     }
 
     CanvasRenderingContext* getContext(const String&, CanvasContextAttributes* attributes = 0);
+    bool supportsContext(const String&, CanvasContextAttributes* = 0);
+    static bool is2dType(const String&);
+#if ENABLE(WEBGL)
+    static bool is3dType(const String&);
+#endif
 
     static String toEncodingMimeType(const String& mimeType);
     String toDataURL(const String& mimeType, const double* quality, ExceptionCode&);
@@ -99,6 +104,7 @@ public:
 
     // Used for rendering
     void didDraw(const FloatRect&);
+    void notifyObserversCanvasChanged(const FloatRect&);
 
     void paint(GraphicsContext*, const LayoutRect&, bool useLowQualityScale = false);
 
@@ -123,8 +129,6 @@ public:
     void setOriginTainted() { m_originClean = false; }
     bool originClean() const { return m_originClean; }
 
-    StyleResolver* styleResolver();
-
     AffineTransform baseTransform() const;
 
 #if ENABLE(WEBGL)    
@@ -138,15 +142,16 @@ public:
 
     float deviceScaleFactor() const { return m_deviceScaleFactor; }
 
-    virtual void reportMemoryUsage(MemoryObjectInfo*) const OVERRIDE;
-
 private:
     HTMLCanvasElement(const QualifiedName&, Document*);
 
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
     virtual RenderObject* createRenderer(RenderArena*, RenderStyle*);
-    virtual void attach();
-    virtual bool areAuthorShadowsAllowed() const OVERRIDE { return false; }
+    virtual void attach(const AttachContext& = AttachContext()) OVERRIDE;
+    virtual bool areAuthorShadowsAllowed() const OVERRIDE;
+
+    virtual bool canContainRangeEndPoint() const OVERRIDE;
+    virtual bool canStartSelection() const OVERRIDE;
 
     void reset();
 
@@ -156,8 +161,6 @@ private:
     void clearImageBuffer() const;
 
     void setSurfaceSize(const IntSize&);
-
-    bool shouldDefer() const;
 
     bool paintsIntoCanvasBuffer() const;
 

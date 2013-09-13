@@ -41,6 +41,10 @@ WebInspector.CookieItemsView = function(treeElement, cookieDomain)
     this._deleteButton.visible = false;
     this._deleteButton.addEventListener("click", this._deleteButtonClicked, this);
 
+    this._clearButton = new WebInspector.StatusBarButton(WebInspector.UIString("Clear"), "clear-storage-status-bar-item");
+    this._clearButton.visible = false;
+    this._clearButton.addEventListener("click", this._clearButtonClicked, this);
+
     this._refreshButton = new WebInspector.StatusBarButton(WebInspector.UIString("Refresh"), "refresh-storage-status-bar-item");
     this._refreshButton.addEventListener("click", this._refreshButtonClicked, this);
 
@@ -54,9 +58,9 @@ WebInspector.CookieItemsView = function(treeElement, cookieDomain)
 }
 
 WebInspector.CookieItemsView.prototype = {
-    get statusBarItems()
+    statusBarItems: function()
     {
-        return [this._refreshButton.element, this._deleteButton.element];
+        return [this._refreshButton.element, this._clearButton.element, this._deleteButton.element];
     },
 
     wasShown: function()
@@ -85,6 +89,7 @@ WebInspector.CookieItemsView.prototype = {
         if (!this._cookies.length) {
             // Nothing to show.
             this._emptyView.show(this.element);
+            this._clearButton.visible = false;
             this._deleteButton.visible = false;
             if (this._cookiesTable)
                 this._cookiesTable.detach();
@@ -92,7 +97,7 @@ WebInspector.CookieItemsView.prototype = {
         }
 
         if (!this._cookiesTable)
-            this._cookiesTable = isAdvanced ? new WebInspector.CookiesTable(this._cookieDomain, false, this._deleteCookie.bind(this), this._update.bind(this)) : new WebInspector.SimpleCookiesTable();
+            this._cookiesTable = isAdvanced ? new WebInspector.CookiesTable(false, this._update.bind(this), this._showDeleteButton.bind(this)) : new WebInspector.SimpleCookiesTable();
 
         this._cookiesTable.setCookies(this._cookies);
         this._emptyView.detach();
@@ -100,7 +105,8 @@ WebInspector.CookieItemsView.prototype = {
         if (isAdvanced) {
             this._treeElement.subtitle = String.sprintf(WebInspector.UIString("%d cookies (%s)"), this._cookies.length,
                 Number.bytesToString(this._totalSize));
-            this._deleteButton.visible = true;
+            this._clearButton.visible = true;
+            this._deleteButton.visible = !!this._cookiesTable.selectedCookie();
         }
     },
 
@@ -138,19 +144,29 @@ WebInspector.CookieItemsView.prototype = {
         return cookies;
     },
 
-    /**
-     * @param {WebInspector.Cookie} cookie
-     */
-    _deleteCookie: function(cookie)
+    clear: function()
     {
-        PageAgent.deleteCookie(cookie.name, this._cookieDomain);
+        this._cookiesTable.clear();
         this._update();
+    },
+
+    _clearButtonClicked: function()
+    {
+        this.clear();
+    },
+
+    _showDeleteButton: function()
+    {
+        this._deleteButton.visible = true;
     },
 
     _deleteButtonClicked: function()
     {
-        if (this._cookiesTable.selectedCookie)
-            this._deleteCookie(this._cookiesTable.selectedCookie);
+        var selectedCookie = this._cookiesTable.selectedCookie();
+        if (selectedCookie) {
+            selectedCookie.remove();
+            this._update();
+        }
     },
 
     _refreshButtonClicked: function(event)
@@ -178,11 +194,10 @@ WebInspector.SimpleCookiesTable = function()
 {
     WebInspector.View.call(this);
 
-    var columns = {};
-    columns[0] = {};
-    columns[1] = {};
-    columns[0].title = WebInspector.UIString("Name");
-    columns[1].title = WebInspector.UIString("Value");
+    var columns = [
+        {title: WebInspector.UIString("Name")},
+        {title: WebInspector.UIString("Value")}
+    ];
 
     this._dataGrid = new WebInspector.DataGrid(columns);
     this._dataGrid.autoSizeColumns(20, 80);
@@ -198,12 +213,12 @@ WebInspector.SimpleCookiesTable.prototype = {
         this._dataGrid.rootNode().removeChildren();
         var addedCookies = {};
         for (var i = 0; i < cookies.length; ++i) {
-            if (addedCookies[cookies[i].name])
+            if (addedCookies[cookies[i].name()])
                 continue;
-            addedCookies[cookies[i].name] = true;
+            addedCookies[cookies[i].name()] = true;
             var data = {};
-            data[0] = cookies[i].name;
-            data[1] = cookies[i].value;
+            data[0] = cookies[i].name();
+            data[1] = cookies[i].value();
 
             var node = new WebInspector.DataGridNode(data, false);
             node.selectable = true;

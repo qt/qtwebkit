@@ -56,6 +56,7 @@ public:
     GraphicsContext* savedContext;
     AffineTransform shearFreeAbsoluteTransform;
     FloatRect boundaries;
+    FloatRect drawingRegion;
     FloatSize scale;
     FilterDataState state;
 };
@@ -68,7 +69,7 @@ public:
     virtual ~RenderSVGResourceFilter();
 
     virtual const char* renderName() const { return "RenderSVGResourceFilter"; }
-    virtual bool isSVGResourceFilter() const { return true; }
+    virtual bool isSVGResourceFilter() const OVERRIDE { return true; }
 
     virtual void removeAllClientsFromCache(bool markForInvalidation = true);
     virtual void removeClientFromCache(RenderObject*, bool markForInvalidation = true);
@@ -80,19 +81,26 @@ public:
 
     PassRefPtr<SVGFilterBuilder> buildPrimitives(SVGFilter*);
 
-    SVGUnitTypes::SVGUnitType filterUnits() const { return static_cast<SVGFilterElement*>(node())->filterUnits(); }
-    SVGUnitTypes::SVGUnitType primitiveUnits() const { return static_cast<SVGFilterElement*>(node())->primitiveUnits(); }
+    SVGUnitTypes::SVGUnitType filterUnits() const { return toSVGFilterElement(node())->filterUnits(); }
+    SVGUnitTypes::SVGUnitType primitiveUnits() const { return toSVGFilterElement(node())->primitiveUnits(); }
 
     void primitiveAttributeChanged(RenderObject*, const QualifiedName&);
 
     virtual RenderSVGResourceType resourceType() const { return s_resourceType; }
     static RenderSVGResourceType s_resourceType;
 
+    FloatRect drawingRegion(RenderObject*) const;
 private:
     bool fitsInMaximumImageSize(const FloatSize&, FloatSize&);
 
     HashMap<RenderObject*, FilterData*> m_filter;
 };
+
+inline RenderSVGResourceFilter* toRenderSVGFilter(RenderObject* object)
+{
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isSVGResourceFilter());
+    return static_cast<RenderSVGResourceFilter*>(object);
+}
 
 }
 

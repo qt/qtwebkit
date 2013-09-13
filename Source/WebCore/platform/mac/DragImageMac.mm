@@ -28,7 +28,6 @@
 
 #if ENABLE(DRAG_SUPPORT)
 #import "BitmapImage.h"
-#import "CachedImage.h"
 #import "Font.h"
 #import "FontCache.h"
 #import "FontDescription.h"
@@ -37,7 +36,6 @@
 #import "Image.h"
 #import "KURL.h"
 #import "ResourceResponse.h"
-#import "Settings.h"
 #import "StringTruncator.h"
 #import "TextRun.h"
 
@@ -67,22 +65,16 @@ RetainPtr<NSImage> scaleDragImage(RetainPtr<NSImage> image, FloatSize scale)
     
 RetainPtr<NSImage> dissolveDragImageToFraction(RetainPtr<NSImage> image, float delta)
 {
-    RetainPtr<NSImage> dissolvedImage(AdoptNS, [[NSImage alloc] initWithSize:[image.get() size]]);
-    
-    NSPoint point = [image.get() isFlipped] ? NSMakePoint(0, [image.get() size].height) : NSZeroPoint;
-    
-    // In this case the dragging image is always correct.
-    [dissolvedImage.get() setFlipped:[image.get() isFlipped]];
+    if (!image)
+        return nil;
+
+    RetainPtr<NSImage> dissolvedImage = adoptNS([[NSImage alloc] initWithSize:[image.get() size]]);
     
     [dissolvedImage.get() lockFocus];
-    [image.get() dissolveToPoint:point fraction: delta];
+    [image.get() drawAtPoint:NSZeroPoint fromRect:NSMakeRect(0, 0, [image size].width, [image size].height) operation:NSCompositeCopy fraction:delta];
     [dissolvedImage.get() unlockFocus];
-    
-    [image.get() lockFocus];
-    [dissolvedImage.get() compositeToPoint:point operation:NSCompositeCopy];
-    [image.get() unlockFocus];
-    
-    return image;
+
+    return dissolvedImage;
 }
         
 RetainPtr<NSImage> createDragImageFromImage(Image* image, RespectImageOrientationEnum shouldRespectImageOrientation)
@@ -101,7 +93,7 @@ RetainPtr<NSImage> createDragImageFromImage(Image* image, RespectImageOrientatio
             // Construct a correctly-rotated copy of the image to use as the drag image.
             FloatRect destRect(FloatPoint(), sizeRespectingOrientation);
 
-            RetainPtr<NSImage> rotatedDragImage(AdoptNS, [[NSImage alloc] initWithSize:(NSSize)(sizeRespectingOrientation)]);
+            RetainPtr<NSImage> rotatedDragImage = adoptNS([[NSImage alloc] initWithSize:(NSSize)(sizeRespectingOrientation)]);
             [rotatedDragImage.get() lockFocus];
 
             // ImageOrientation uses top-left coordinates, need to flip to bottom-left, apply...
@@ -116,7 +108,7 @@ RetainPtr<NSImage> createDragImageFromImage(Image* image, RespectImageOrientatio
             transform = CGAffineTransformTranslate(transform, 0, destRect.height());
             transform = CGAffineTransformScale(transform, 1, -1);
 
-            RetainPtr<NSAffineTransform> cocoaTransform(AdoptNS, [[NSAffineTransform alloc] init]);
+            RetainPtr<NSAffineTransform> cocoaTransform = adoptNS([[NSAffineTransform alloc] init]);
             [cocoaTransform.get() setTransformStruct:*(NSAffineTransformStruct*)&transform];
             [cocoaTransform.get() concat];
 
@@ -127,14 +119,13 @@ RetainPtr<NSImage> createDragImageFromImage(Image* image, RespectImageOrientatio
         }
     }
 
-    RetainPtr<NSImage> dragImage(AdoptNS, [image->getNSImage() copy]);
+    RetainPtr<NSImage> dragImage = adoptNS([image->getNSImage() copy]);
     [dragImage.get() setSize:(NSSize)size];
     return dragImage;
 }
     
-RetainPtr<NSImage> createDragImageIconForCachedImage(CachedImage* image)
+RetainPtr<NSImage> createDragImageIconForCachedImageFilename(const String& filename)
 {
-    const String& filename = image->response().suggestedFilename();
     NSString *extension = nil;
     size_t dotIndex = filename.reverseFind('.');
     
@@ -276,10 +267,8 @@ static void drawDoubledAtPoint(NSString *string, NSPoint textPoint, NSColor *top
         drawAtPoint(string, textPoint, font, topColor);
 }
 
-DragImageRef createDragImageForLink(KURL& url, const String& title, Frame* frame)
+DragImageRef createDragImageForLink(KURL& url, const String& title, FontRenderingMode)
 {
-    if (!frame)
-        return nil;
     NSString *label = nsStringNilIfEmpty(title);
     NSURL *cocoaURL = url;
     NSString *urlString = [cocoaURL absoluteString];

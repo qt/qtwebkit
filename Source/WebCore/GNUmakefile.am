@@ -1,4 +1,3 @@
-include $(srcdir)/Source/WebCore/GNUmakefile.features.am
 include $(srcdir)/Source/WebCore/GNUmakefile.list.am
 
 WEBCORE_CSS_PROPERTY_NAMES := $(WebCore)/css/CSSPropertyNames.in
@@ -8,15 +7,19 @@ webcore_cppflags += \
 	-I$(srcdir)/Source/ThirdParty/ANGLE/src \
 	-I$(srcdir)/Source/ThirdParty/ANGLE/include \
 	-I$(srcdir)/Source/ThirdParty/ANGLE/include/GLSLANG \
+	-I$(srcdir)/Source/ThirdParty/ANGLE/include/KHR \
 	-I$(srcdir)/Source/WebCore \
+	-I$(srcdir)/Source/WebCore/Modules/battery \
 	-I$(srcdir)/Source/WebCore/Modules/filesystem \
 	-I$(srcdir)/Source/WebCore/Modules/gamepad \
 	-I$(srcdir)/Source/WebCore/Modules/geolocation \
 	-I$(srcdir)/Source/WebCore/Modules/indexeddb \
+	-I$(srcdir)/Source/WebCore/Modules/indieui \
 	-I$(srcdir)/Source/WebCore/Modules/mediasource \
 	-I$(srcdir)/Source/WebCore/Modules/mediastream \
 	-I$(srcdir)/Source/WebCore/Modules/navigatorcontentutils \
 	-I$(srcdir)/Source/WebCore/Modules/notifications \
+	-I$(srcdir)/Source/WebCore/Modules/proximity \
 	-I$(srcdir)/Source/WebCore/Modules/quota \
 	-I$(srcdir)/Source/WebCore/Modules/webaudio \
 	-I$(srcdir)/Source/WebCore/Modules/webdatabase \
@@ -36,6 +39,7 @@ webcore_cppflags += \
 	-I$(srcdir)/Source/WebCore/history \
 	-I$(srcdir)/Source/WebCore/html \
 	-I$(srcdir)/Source/WebCore/html/canvas \
+	-I$(srcdir)/Source/WebCore/html/forms \
 	-I$(srcdir)/Source/WebCore/html/parser \
 	-I$(srcdir)/Source/WebCore/html/shadow \
 	-I$(srcdir)/Source/WebCore/html/track \
@@ -58,7 +62,10 @@ webcore_cppflags += \
 	-I$(srcdir)/Source/WebCore/platform/graphics/cpu/arm/filters/ \
 	-I$(srcdir)/Source/WebCore/platform/graphics/filters \
 	-I$(srcdir)/Source/WebCore/platform/graphics/filters/texmap \
+	-I$(srcdir)/Source/WebCore/platform/graphics/freetype \
 	-I$(srcdir)/Source/WebCore/platform/graphics/gpu \
+	-I$(srcdir)/Source/WebCore/platform/graphics/harfbuzz \
+	-I$(srcdir)/Source/WebCore/platform/graphics/harfbuzz/ng \
 	-I$(srcdir)/Source/WebCore/platform/graphics/opengl \
 	-I$(srcdir)/Source/WebCore/platform/graphics/opentype \
 	-I$(srcdir)/Source/WebCore/platform/graphics/transforms \
@@ -67,8 +74,8 @@ webcore_cppflags += \
 	-I$(srcdir)/Source/WebCore/platform/image-decoders/gif \
 	-I$(srcdir)/Source/WebCore/platform/image-decoders/ico \
 	-I$(srcdir)/Source/WebCore/platform/image-decoders/jpeg \
-	-I$(srcdir)/Source/WebCore/platform/image-decoders/webp \
 	-I$(srcdir)/Source/WebCore/platform/image-decoders/png \
+	-I$(srcdir)/Source/WebCore/platform/image-decoders/webp \
 	-I$(srcdir)/Source/WebCore/platform/leveldb \
 	-I$(srcdir)/Source/WebCore/platform/linux \
 	-I$(srcdir)/Source/WebCore/platform/mediastream \
@@ -84,6 +91,7 @@ webcore_cppflags += \
 	-I$(srcdir)/Source/WebCore/plugins/win \
 	-I$(srcdir)/Source/WebCore/rendering \
 	-I$(srcdir)/Source/WebCore/rendering/mathml \
+	-I$(srcdir)/Source/WebCore/rendering/shapes \
 	-I$(srcdir)/Source/WebCore/rendering/style \
 	-I$(srcdir)/Source/WebCore/rendering/svg \
 	-I$(srcdir)/Source/WebCore/storage \
@@ -101,44 +109,26 @@ webcore_cppflags += \
 	-I$(top_builddir)/WebCore/bindings/js \
 	-I$(top_builddir)/DerivedSources/WebCore \
 	-I$(top_builddir)/DerivedSources \
-	-I$(top_builddir)/DerivedSources/JavaScriptCore \
-	-DDATA_DIR=\"${datadir}\"
+	-I$(top_builddir)/DerivedSources/JavaScriptCore
 
 webcoregtk_cppflags += \
 	-DWEBKITGTK_API_VERSION_STRING=\"@WEBKITGTK_API_VERSION@\" \
-	-DWTF_USE_SOUP=1 \
 	-I$(srcdir)/Source/WebCore/accessibility/atk \
 	-I$(srcdir)/Source/WebCore/loader/gtk \
 	-I$(srcdir)/Source/WebCore/page/gtk \
 	-I$(srcdir)/Source/WebCore/platform/cairo \
 	-I$(srcdir)/Source/WebCore/platform/audio/gstreamer \
-	-I$(srcdir)/Source/WebCore/platform/geoclue \
 	-I$(srcdir)/Source/WebCore/platform/graphics/cairo \
+	-I$(srcdir)/Source/WebCore/platform/graphics/freetype \
 	-I$(srcdir)/Source/WebCore/platform/graphics/glx \
+	-I$(srcdir)/Source/WebCore/platform/graphics/harfbuzz \
+	-I$(srcdir)/Source/WebCore/platform/graphics/harfbuzz/ng \
 	-I$(srcdir)/Source/WebCore/platform/graphics/egl \
 	-I$(srcdir)/Source/WebCore/platform/graphics/gstreamer \
 	-I$(srcdir)/Source/WebCore/platform/graphics/gtk \
 	-I$(srcdir)/Source/WebCore/platform/gtk \
 	-I$(srcdir)/Source/WebCore/platform/network/soup \
 	-I$(srcdir)/Source/WebCore/platform/text/enchant
-
-# ---
-# FreeType font backend
-# ---
-if USE_FREETYPE
-webcoregtk_cppflags += \
-	-DWTF_USE_FREETYPE=1 \
-	-I$(srcdir)/Source/WebCore/platform/graphics/freetype
-endif # END USE_FREETYPE
-
-# ---
-# Pango font backend
-# ---
-if USE_PANGO
-webcoregtk_cppflags += \
-	-DWTF_USE_PANGO=1 \
-	-I$(srcdir)/Source/WebCore/platform/graphics/pango
-endif # END USE_PANGO
 
 # ---
 # Windows plugin support
@@ -148,124 +138,16 @@ webcoregtk_cppflags += \
 	-I$(srcdir)/Source/WebCore/platform/graphics/win
 endif # END TARGET_WIN32
 
-# ----
-# Gamepad support
-# ---
-if ENABLE_GAMEPAD
-feature_defines_overrides += ENABLE_GAMEPAD=1
-else
-feature_defines_overrides += ENABLE_GAMEPAD=0
-endif # END ENABLE_GAMEPAD
-
-# ----
-# Indexed Database API support
-# ----
-if ENABLE_INDEXED_DATABASE
-feature_defines_overrides += ENABLE_INDEXED_DATABASE=1
-else
-feature_defines_overrides += ENABLE_INDEXED_DATABASE=0
-endif # END ENABLE_INDEXED_DATABASE
-
-if USE_LEVELDB
-webcore_cppflags += -DWTF_USE_LEVELDB
-endif # END USE_LEVELDB
-
-# ----
-# Video Support
-# ----
-if ENABLE_VIDEO
-feature_defines_overrides += ENABLE_VIDEO=1
-if USE_GSTREAMER
-if ENABLE_DEBUG
-webcore_cppflags += -DGST_DISABLE_DEPRECATED
-endif # END ENABLE_DEBUG
-endif # END USE_GSTREAMER
-else
-feature_defines_overrides += ENABLE_VIDEO=0 ENABLE_VIDEO_TRACK=0
-endif # END ENABLE_VIDEO
-
-# ----
-# Filters
-# ----
-if ENABLE_CSS_FILTERS
-feature_defines_overrides += ENABLE_CSS_FILTERS=1
-else
-feature_defines_overrides += ENABLE_CSS_FILTERS=0
-endif # END ENABLE_CSS_FILTERS
-
-# ----
-# Media Stream Support
-# ----
-if ENABLE_MEDIA_STREAM
-feature_defines_overrides += ENABLE_MEDIA_STREAM=1
-else
-feature_defines_overrides += ENABLE_MEDIA_STREAM=0
-endif # END ENABLE_MEDIA_STREAM
-
 # XPath grammar
 $(GENSOURCES_WEBCORE)/XPathGrammar.h: $(GENSOURCES_WEBCORE)/XPathGrammar.cpp
 $(GENSOURCES_WEBCORE)/XPathGrammar.cpp: $(WebCore)/xml/XPathGrammar.y
 	$(AM_V_GEN)
 	$(AM_V_at)perl $(WebCore)/css/makegrammar.pl --outputDir $(GENSOURCES_WEBCORE) --bison "$(BISON)" --symbolsPrefix xpathyy $<
 
-# ----
-# XHR timeout Support
-# ----
-if ENABLE_XHR_TIMEOUT
-feature_defines_overrides += ENABLE_XHR_TIMEOUT=1
-else
-feature_defines_overrides += ENABLE_XHR_TIMEOUT=0
-endif # END ENABLE_XHR_TIMEOUT
-
-# ----
-# XSLT Support
-# ----
-if ENABLE_XSLT
-feature_defines_overrides += ENABLE_XSLT=1
-else
-feature_defines_overrides += ENABLE_XSLT=0
-endif # END ENABLE_XSLT
-
-# ----
-# Filters
-# ----
-if ENABLE_FILTERS
-feature_defines_overrides += ENABLE_FILTERS=1
-else
-feature_defines_overrides += ENABLE_FILTERS=0
-endif # END ENABLE_FILTERS
-
-# ----
-# CSS Device Adaptation
-# ----
-if ENABLE_CSS_DEVICE_ADAPTATION
-feature_defines_overrides += ENABLE_CSS_DEVICE_ADAPTATION=1
-else
-feature_defines_overrides += ENABLE_CSS_DEVICE_ADAPTATION=0
-endif # END ENABLE_CSS_DEVICE_ADAPTATION
-
-# ----
-# Shaders
-# ----
-if ENABLE_CSS_SHADERS
-feature_defines_overrides += ENABLE_CSS_SHADERS=1
-else
-feature_defines_overrides += ENABLE_CSS_SHADERS=0
-endif # END ENABLE_CSS_SHADERS
-
-# ----
-# Geolocation
-# ----
-if ENABLE_GEOLOCATION
-feature_defines_overrides += ENABLE_GEOLOCATION=1
-else
-feature_defines_overrides += ENABLE_GEOLOCATION=0
-endif # END ENABLE_GEOLOCATION
-
 # MathML tag and attribute names, and element factory
 DerivedSources/WebCore/MathMLElementFactory.h: DerivedSources/WebCore/MathMLElementFactory.cpp
 DerivedSources/WebCore/MathMLNames.h: DerivedSources/WebCore/MathMLNames.cpp
-DerivedSources/WebCore/MathMLElementFactory.cpp DerivedSources/WebCore/MathMLNames.cpp: $(WebCore)/dom/make_names.pl $(WebCore)/mathml/mathtags.in $(WebCore)/mathml/mathattrs.in
+DerivedSources/WebCore/MathMLElementFactory.cpp DerivedSources/WebCore/MathMLNames.cpp: $(WebCore)/dom/make_names.pl $(WebCore)/bindings/scripts/Hasher.pm $(WebCore)/bindings/scripts/StaticString.pm $(WebCore)/mathml/mathtags.in $(WebCore)/mathml/mathattrs.in
 	$(AM_V_GEN)$(PERL) -I$(WebCore)/bindings/scripts $< --tags $(WebCore)/mathml/mathtags.in --attrs $(WebCore)/mathml/mathattrs.in --factory --wrapperFactory --outputDir "$(GENSOURCES_WEBCORE)"
 
 # ----
@@ -281,163 +163,60 @@ libWebCoreSVG_la_SOURCES = \
 	$(webcore_svg_sources)
 
 libWebCoreSVG_la_CXXFLAGS = \
-	$(SYMBOL_VISIBILITY_INLINES) \
+	-fvisibility-inlines-hidden \
 	$(global_cxxflags)
 
 libWebCoreSVG_la_CFLAGS = \
-	$(SYMBOL_VISIBILITY) \
+	-fvisibility=hidden \
 	$(global_cflags)
 
 libWebCoreSVG_la_CPPFLAGS = \
 	-DBUILDING_WebCore \
 	-DBUILDING_WEBKIT \
 	$(global_cppflags) \
+	$(platform_cppflags) \
+	$(platformgtk_cppflags) \
 	$(webcore_cppflags) \
 	$(webcoregtk_cppflags) \
 	$(javascriptcore_cppflags) \
 	-fno-strict-aliasing \
 	$(CAIRO_CFLAGS) \
-	$(LIBSOUP_CFLAGS)
+	$(FREETYPE_CFLAGS) \
+	$(LIBSOUP_CFLAGS) \
+	$(UNICODE_CFLAGS)
 
-feature_defines_overrides += ENABLE_SVG=1
 WEBCORE_CSS_PROPERTY_NAMES += $(WebCore)/css/SVGCSSPropertyNames.in
 WEBCORE_CSS_VALUE_KEYWORDS += $(WebCore)/css/SVGCSSValueKeywords.in
-# SVG Features
-if ENABLE_SVG_FONTS
-feature_defines_overrides += ENABLE_SVG_FONTS=1
-else
-feature_defines_overrides += ENABLE_SVG_FONTS=0
-endif
-else
-feature_defines_overrides += ENABLE_SVG=0 ENABLE_SVG_FONTS=0
-endif # END ENABLE_SVG
+
+endif # END_ENABLE_SVG
 
 # SVG tag and attribute names (need to pass an extra flag if svg experimental features are enabled)
 DerivedSources/WebCore/SVGNames.cpp: DerivedSources/WebCore/SVGElementFactory.cpp
 DerivedSources/WebCore/JSSVGElementWrapperFactory.cpp: DerivedSources/WebCore/SVGElementFactory.cpp
-DerivedSources/WebCore/SVGElementFactory.cpp: $(WebCore)/dom/make_names.pl $(WebCore)/svg/svgtags.in $(WebCore)/svg/svgattrs.in
+DerivedSources/WebCore/SVGElementFactory.cpp: $(WebCore)/dom/make_names.pl $(WebCore)/bindings/scripts/Hasher.pm $(WebCore)/bindings/scripts/StaticString.pm $(WebCore)/svg/svgtags.in $(WebCore)/svg/svgattrs.in
 	$(AM_V_GEN)$(PERL) -I$(WebCore)/bindings/scripts $< --tags $(WebCore)/svg/svgtags.in --attrs $(WebCore)/svg/svgattrs.in --extraDefines "$(feature_defines)" --factory --wrapperFactory --outputDir "$(GENSOURCES_WEBCORE)"
 
 # end SVG Features
 
 DerivedSources/WebCore/XLinkNames.h: DerivedSources/WebCore/XLinkNames.cpp
-DerivedSources/WebCore/XLinkNames.cpp : $(WebCore)/dom/make_names.pl $(WebCore)/svg/xlinkattrs.in
+DerivedSources/WebCore/XLinkNames.cpp : $(WebCore)/dom/make_names.pl $(WebCore)/bindings/scripts/Hasher.pm $(WebCore)/bindings/scripts/StaticString.pm $(WebCore)/svg/xlinkattrs.in
 	$(AM_V_GEN)$(PERL) -I$(WebCore)/bindings/scripts $< --attrs $(WebCore)/svg/xlinkattrs.in --outputDir "$(GENSOURCES_WEBCORE)"
-
-# ----
-# Web Audio Support
-# ----
-if ENABLE_WEB_AUDIO
-feature_defines_overrides += ENABLE_WEB_AUDIO=1
-else
-feature_defines_overrides += ENABLE_WEB_AUDIO=0
-endif
-
-if USE_WEBAUDIO_GSTREAMER
-webcore_cppflags += -DWTF_USE_WEBAUDIO_GSTREAMER=1
-endif
-
-# ---
-# 3D canvas (WebGL) support
-# ---
-if ENABLE_WEBGL
-feature_defines_overrides += ENABLE_WEBGL=1
-else
-feature_defines_overrides += ENABLE_WEBGL=0
-endif  # END ENABLE_WEBGL
-
-# ---
-# Accelerated compositing support
-# ---
-if USE_ACCELERATED_COMPOSITING
-feature_defines_overrides += ENABLE_3D_RENDERING=1
-else
-feature_defines_overrides += ENABLE_3D_RENDERING=0
-endif  # END USE_ACCELERATED_COMPOSITING
-
-if USE_TEXTURE_MAPPER_CAIRO
-webcore_cppflags += \
-	-I$(srcdir)/Source/WebCore/platform/graphics/texmap
-endif  # END USE_TEXTURE_MAPPER_CAIRO
 
 if USE_TEXTURE_MAPPER_GL
 webcore_cppflags += \
 	-I$(srcdir)/Source/WebCore/platform/graphics/texmap
 endif  # END USETEXTURE_MAPPER_GL
 
-if USE_CLUTTER
+if ENABLE_INDEXED_DATABASE
 webcore_cppflags += \
-	-I$(srcdir)/Source/WebCore/platform/clutter \
-	-I$(srcdir)/Source/WebCore/platform/graphics/clutter
-endif  # END USE_CLUTTER
-
-# ---
-# Spell check support
-# ---
-if ENABLE_SPELLCHECK
-feature_defines_overrides += ENABLE_SPELLCHECK=1
-else
-feature_defines_overrides += ENABLE_SPELLCHECK=0
-endif  # END ENABLE_SPELLCHECK
-
-# ---
-# CSS3 Background support
-# ---
-if ENABLE_CSS3_BACKGROUND
-feature_defines_overrides += ENABLE_CSS3_BACKGROUND=1
-else
-feature_defines_overrides += ENABLE_CSS3_BACKGROUND=0
-endif  # END ENABLE_CSS3_BACKGROUND
-
-# ---
-# CSS3 Conditional Rules support
-# ---
-if ENABLE_CSS3_CONDITIONAL_RULES
-feature_defines_overrides += ENABLE_CSS3_CONDITIONAL_RULES=1
-else
-feature_defines_overrides += ENABLE_CSS3_CONDITIONAL_RULES=0
-endif  # END ENABLE_CSS3_CONDITIONAL_RULES
-
-# ---
-# Unstable features
-# If unstable features should not be enabled, their defines should be overriden with a 0 value.
-# ---
-if !ENABLE_UNSTABLE_FEATURES
-feature_defines_unstable += \
-	ENABLE_CSP_NEXT=0 \
-	ENABLE_CSS3_TEXT=0 \
-	ENABLE_CSS_STICKY_POSITION=0 \
-	ENABLE_LINK_PREFETCH=0 \
-	ENABLE_MICRODATA=0 \
-	ENABLE_MUTATION_OBSERVERS=0 \
-	ENABLE_STYLE_SCOPED=0 \
-	ENABLE_VIDEO_TRACK=0 \
-	ENABLE_WEB_TIMING=0
+	-DWTF_USE_LEVELDB=1 \
+	-I$(srcdir)/Source/ThirdParty/leveldb \
+	-I$(srcdir)/Source/ThirdParty/leveldb/include
+platform_cppflags += \
+	-DWTF_USE_LEVELDB=1 \
+	-I$(srcdir)/Source/ThirdParty/leveldb \
+	-I$(srcdir)/Source/ThirdParty/leveldb/include
 endif
-
-
-# Fill the feature_defines variable with all the defines, making it possible
-# to override the default define value (as set in feature_defines_defaults)
-# through adding the feature define with the desired value to either
-# feature_defines_unstable or feature_defines_overrides.
-feature_defines += $(strip $(foreach bare_define, \
-	$(foreach define,$(feature_defines_defaults), \
-		$(foreach fvalue,0 1, \
-			$(if $(findstring =$(fvalue),$(define)),$(patsubst %=$(fvalue),%,$(define))) \
-		) \
-	), \
-	$(if $(findstring $(bare_define)=, $(feature_defines_unstable)), \
-		$(filter $(bare_define)=%,$(feature_defines_unstable)), \
-		$(if $(findstring $(bare_define)=, $(feature_defines_overrides)), \
-			$(filter $(bare_define)=%,$(feature_defines_overrides)), \
-			$(filter $(bare_define)=%,$(feature_defines_defaults)) \
-		) \
-	) \
-))
-
-# Add the feature defines to webcore_cppflags in macro form.
-webcore_cppflags += $(foreach define,$(feature_defines),-D$(define))
-
 
 $(WEBCORE_CSS_PROPERTY_NAMES): $(srcdir)/configure.ac $(srcdir)/Source/WebCore/GNUmakefile.am
 
@@ -470,10 +249,6 @@ DerivedSources/WebCore/XMLViewerJS.h: $(WebCore)/xml/XMLViewer.js
 DerivedSources/WebCore/HTMLEntityTable.cpp: $(WebCore)/html/parser/HTMLEntityNames.in $(WebCore)/html/parser/create-html-entity-table
 	$(AM_V_GEN)$(PYTHON) $(WebCore)/html/parser/create-html-entity-table -o $(GENSOURCES_WEBCORE)/HTMLEntityTable.cpp $(WebCore)/html/parser/HTMLEntityNames.in
 
-# color names
-DerivedSources/WebCore/ColorData.cpp: $(WebCore)/platform/ColorData.gperf $(WebCore)/make-hash-tools.pl
-	$(AM_V_GEN)$(PERL) $(WebCore)/make-hash-tools.pl $(GENSOURCES_WEBCORE) $(WebCore)/platform/ColorData.gperf
-
 # CSS grammar
 
 DerivedSources/WebCore/CSSGrammar.h: $(GENSOURCES_WEBCORE)/CSSGrammar.cpp
@@ -490,7 +265,12 @@ USER_AGENT_STYLE_SHEETS = \
 	$(WebCore)/css/svg.css \
 	$(WebCore)/css/mediaControls.css \
 	$(WebCore)/css/mediaControlsGtk.css \
-	$(WebCore)/css/fullscreen.css
+	$(WebCore)/css/fullscreen.css \
+	$(WebCore)/css/plugIns.css
+
+# plug-in resources
+PLUG_INS_RESOURCES = \
+	$(WebCore)/Resources/plugIns.js
 
 # new-style JavaScript bindings
 SCRIPTS_FOR_GENERATE_BINDINGS = \
@@ -502,16 +282,15 @@ SCRIPTS_FOR_GENERATE_BINDINGS = \
 	$(WebCore)/bindings/scripts/preprocessor.pm
 
 SCRIPTS_FOR_PREPROCESS_IDLS = \
-	$(WebCore)/bindings/scripts/IDLParser.pm \
 	$(WebCore)/bindings/scripts/preprocess-idls.pl
 
 DerivedSources/WebCore/UserAgentStyleSheetsData.cpp: DerivedSources/WebCore/UserAgentStyleSheets.h
 DerivedSources/WebCore/UserAgentStyleSheets.h: $(WebCore)/css/make-css-file-arrays.pl $(WebCore)/bindings/scripts/preprocessor.pm $(USER_AGENT_STYLE_SHEETS)
 	$(AM_V_GEN)$(PERL) -I$(WebCore)/bindings/scripts $<  --defines "$(feature_defines)" $@ DerivedSources/WebCore/UserAgentStyleSheetsData.cpp $(USER_AGENT_STYLE_SHEETS)
 
-DerivedSources/WebCore/WebKitFontFamilyNames.cpp: DerivedSources/WebCore/WebKitFontFamilyNames.h
-DerivedSources/WebCore/WebKitFontFamilyNames.h: $(WebCore)/dom/make_names.pl $(WebCore)/css/WebKitFontFamilyNames.in
-	$(AM_V_GEN)$(PERL) -I$(WebCore)/bindings/scripts $< --fonts $(WebCore)/css/WebKitFontFamilyNames.in --outputDir "$(GENSOURCES_WEBCORE)"
+DerivedSources/WebCore/PlugInsResourcesData.cpp: DerivedSources/WebCore/PlugInsResources.h
+DerivedSources/WebCore/PlugInsResources.h: $(WebCore)/css/make-css-file-arrays.pl $(WebCore)/bindings/scripts/preprocessor.pm $(PLUG_INS_RESOURCES)
+	$(AM_V_GEN)$(PERL) -I$(WebCore)/bindings/scripts $<  --defines "$(feature_defines)" $@ DerivedSources/WebCore/PlugInsResourcesData.cpp $(PLUG_INS_RESOURCES)
 
 
 # HTML tag and attribute names
@@ -519,14 +298,14 @@ DerivedSources/WebCore/JSHTMLElementWrapperFactory.cpp: DerivedSources/WebCore/H
 DerivedSources/WebCore/HTMLElementFactory.cpp: DerivedSources/WebCore/HTMLElementFactory.h
 DerivedSources/WebCore/HTMLElementFactory.h: DerivedSources/WebCore/HTMLNames.cpp
 DerivedSources/WebCore/HTMLNames.cpp: DerivedSources/WebCore/HTMLNames.h
-DerivedSources/WebCore/HTMLNames.h: $(WebCore)/dom/make_names.pl $(WebCore)/html/HTMLTagNames.in $(WebCore)/html/HTMLAttributeNames.in
+DerivedSources/WebCore/HTMLNames.h: $(WebCore)/dom/make_names.pl $(WebCore)/bindings/scripts/Hasher.pm $(WebCore)/bindings/scripts/StaticString.pm $(WebCore)/html/HTMLTagNames.in $(WebCore)/html/HTMLAttributeNames.in
 	$(AM_V_GEN)$(PERL) -I$(WebCore)/bindings/scripts $< --tags $(WebCore)/html/HTMLTagNames.in --attrs $(WebCore)/html/HTMLAttributeNames.in --extraDefines "$(feature_defines)" --factory --wrapperFactory --outputDir "$(GENSOURCES_WEBCORE)"
 
 
-DerivedSources/WebCore/XMLNSNames.cpp DerivedSources/WebCore/XMLNSNames.h: $(WebCore)/dom/make_names.pl $(WebCore)/xml/xmlnsattrs.in
+DerivedSources/WebCore/XMLNSNames.cpp DerivedSources/WebCore/XMLNSNames.h: $(WebCore)/dom/make_names.pl $(WebCore)/bindings/scripts/Hasher.pm $(WebCore)/bindings/scripts/StaticString.pm $(WebCore)/xml/xmlnsattrs.in
 	$(AM_V_GEN)$(PERL) -I$(WebCore)/bindings/scripts $< --attrs $(WebCore)/xml/xmlnsattrs.in --outputDir "$(GENSOURCES_WEBCORE)"
 
-DerivedSources/WebCore/XMLNames.cpp DerivedSources/WebCore/XMLNames.h: $(WebCore)/dom/make_names.pl $(WebCore)/xml/xmlattrs.in
+DerivedSources/WebCore/XMLNames.cpp DerivedSources/WebCore/XMLNames.h: $(WebCore)/dom/make_names.pl $(WebCore)/bindings/scripts/Hasher.pm $(WebCore)/bindings/scripts/StaticString.pm $(WebCore)/xml/xmlattrs.in
 	$(AM_V_GEN)$(PERL) -I$(WebCore)/bindings/scripts $< --attrs $(WebCore)/xml/xmlattrs.in --outputDir "$(GENSOURCES_WEBCORE)"
 
 DerivedSources/WebCore/EventFactory.cpp DerivedSources/WebCore/EventHeaders.h DerivedSources/WebCore/EventInterfaces.h: $(WebCore)/dom/make_event_factory.pl $(WebCore)/dom/EventNames.in
@@ -538,8 +317,11 @@ DerivedSources/WebCore/EventTargetHeaders.h DerivedSources/WebCore/EventTargetIn
 DerivedSources/WebCore/ExceptionCodeDescription.cpp DerivedSources/WebCore/ExceptionCodeDescription.h DerivedSources/WebCore/ExceptionHeaders.h DerivedSources/WebCore/ExceptionInterfaces.h: $(WebCore)/dom/make_dom_exceptions.pl $(WebCore)/dom/DOMExceptions.in
 	$(AM_V_GEN)$(PERL) -I$(WebCore)/bindings/scripts $< --input $(WebCore)/dom/DOMExceptions.in --outputDir "$(GENSOURCES_WEBCORE)"
 
-DerivedSources/WebCore/SettingsMacros.h: $(WebCore)/page/make_settings.pl $(WebCore)/page/Settings.in
+DerivedSources/WebCore/SettingsMacros.h DerivedSources/WebCore/InternalSettingsGenerated.idl DerivedSources/WebCore/InternalSettingsGenerated.cpp DerivedSources/WebCore/InternalSettingsGenerated.h: $(WebCore)/page/make_settings.pl $(WebCore)/page/Settings.in
 	$(AM_V_GEN)$(PERL) -I$(WebCore)/bindings/scripts $< --input $(WebCore)/page/Settings.in --outputDir "$(GENSOURCES_WEBCORE)"
+
+dom_binding_idls += \
+  DerivedSources/WebCore/InternalSettingsGenerated.idl
 
 # All Web Inspector generated files are created with this one call to CodeGeneratorInspector.py
 DerivedSources/WebCore/InspectorProtocolVersion.h : $(WebCore)/inspector/Inspector.json $(WebCore)/inspector/generate-inspector-protocol-version
@@ -568,7 +350,7 @@ dist_audio_DATA = $(audio_DATA)
 endif  # END ENABLE_WEB_AUDIO
 
 # ANGLE tokenizer & parser
-DerivedSources/ANGLE/glslang.cpp: Source/ThirdParty/ANGLE/src/compiler/glslang.l
+DerivedSources/ANGLE/glslang.cpp: Source/ThirdParty/ANGLE/src/compiler/glslang.l DerivedSources/ANGLE/glslang_tab.cpp
 	$(AM_V_GEN)$(FLEX) --noline --nounistd --outfile="$@" "$<"
 
 DerivedSources/ANGLE/glslang_tab.cpp: Source/ThirdParty/ANGLE/src/compiler/glslang.y
@@ -576,6 +358,7 @@ DerivedSources/ANGLE/glslang_tab.cpp: Source/ThirdParty/ANGLE/src/compiler/glsla
 DerivedSources/ANGLE/glslang_tab.h: DerivedSources/ANGLE/glslang_tab.cpp
 
 IDL_PATH := \
+    $(WebCore)/Modules/battery \
     $(WebCore)/Modules/filesystem \
     $(WebCore)/Modules/gamepad \
     $(WebCore)/Modules/geolocation \
@@ -583,6 +366,7 @@ IDL_PATH := \
     $(WebCore)/Modules/mediasource \
     $(WebCore)/Modules/mediastream \
     $(WebCore)/Modules/notifications \
+    $(WebCore)/Modules/proximity \
     $(WebCore)/Modules/quota \
     $(WebCore)/Modules/webaudio \
     $(WebCore)/Modules/webdatabase \
@@ -608,23 +392,33 @@ IDL_PATH := \
 vpath %.idl $(IDL_PATH)
 
 supplemental_dependency_file = $(top_builddir)/DerivedSources/WebCore/idl_supplemental_dependencies
+window_constructors_file = $(top_builddir)/DerivedSources/WebCore/DOMWindowConstructors.idl
+workerglobalscope_constructors_file = $(top_builddir)/DerivedSources/WebCore/WorkerGlobalScopeConstructors.idl
+sharedworkerglobalscope_constructors_file = $(top_builddir)/DerivedSources/WebCore/SharedWorkerGlobalScopeConstructors.idl
+dedicatedworkerglobalscope_constructors_file = $(top_builddir)/DerivedSources/WebCore/DedicatedWorkerGlobalScopeConstructors.idl
 idl_files_list = $(top_builddir)/DerivedSources/WebCore/idl_files_list
 idl_attributes_file = $(WebCore)/bindings/scripts/IDLAttributes.txt
 
 .SECONDARY:
-$(supplemental_dependency_file): $(SCRIPTS_FOR_PREPROCESS_IDLS) $(dom_binding_idls) $(idl_attributes_file)
+$(supplemental_dependency_file): $(SCRIPTS_FOR_PREPROCESS_IDLS) $(dom_binding_idls)
 	$(AM_V_GEN)
 	$(AM_V_at)echo -n > $(idl_files_list)
 	$(AM_V_at)($(foreach idl, $(dom_binding_idls), echo $(idl) &&) echo -n) >> $(idl_files_list)
-	$(AM_V_at)$(PERL) -I$(WebCore)/bindings/scripts $(WebCore)/bindings/scripts/preprocess-idls.pl --defines "LANGUAGE_JAVASCRIPT=1 $(feature_defines)" --idlFilesList $(idl_files_list) --supplementalDependencyFile $@ --idlAttributesFile $(idl_attributes_file)
+	$(AM_V_at)$(PERL) -I$(WebCore)/bindings/scripts $(WebCore)/bindings/scripts/preprocess-idls.pl --defines "LANGUAGE_JAVASCRIPT=1 $(feature_defines)" --idlFilesList $(idl_files_list) --windowConstructorsFile $(window_constructors_file) --workerGlobalScopeConstructorsFile $(workerglobalscope_constructors_file) --sharedWorkerGlobalScopeConstructorsFile $(sharedworkerglobalscope_constructors_file) --dedicatedWorkerGlobalScopeConstructorsFile $(dedicatedworkerglobalscope_constructors_file) --supplementalDependencyFile $@
+
+.PHONY: $(window_constructors_file) $(workerglobalscope_constructors_file) $(sharedworkerglobalscope_constructors_file) $(dedicatedworkerglobalscope_constructors_file)
 
 # This does not appear to work correctly with gnumake unless
 # it includes an empty command list (the semicolon).
 DerivedSources/WebCore/JS%.cpp: DerivedSources/WebCore/JS%.h;
 
 .SECONDARY:
-DerivedSources/WebCore/JS%.h: %.idl $(SCRIPTS_FOR_GENERATE_BINDINGS) $(WebCore)/bindings/scripts/CodeGeneratorJS.pm $(supplemental_dependency_file)
-	$(AM_V_GEN)$(PERL) -I$(WebCore)/bindings/scripts $(WebCore)/bindings/scripts/generate-bindings.pl $(IDL_PATH:%=--include "%") --outputDir "$(GENSOURCES_WEBCORE)" --defines "LANGUAGE_JAVASCRIPT=1 $(feature_defines)" --generator JS --supplementalDependencyFile $(supplemental_dependency_file) $<
+DerivedSources/WebCore/JS%.h: %.idl $(SCRIPTS_FOR_GENERATE_BINDINGS) $(WebCore)/bindings/scripts/CodeGeneratorJS.pm $(supplemental_dependency_file) $(idl_attributes_file)
+	$(AM_V_GEN)$(PERL) -I$(WebCore)/bindings/scripts $(WebCore)/bindings/scripts/generate-bindings.pl $(IDL_PATH:%=--include "%") --outputDir "$(GENSOURCES_WEBCORE)" --defines "LANGUAGE_JAVASCRIPT=1 $(feature_defines)" --generator JS --idlAttributesFile $(idl_attributes_file) --supplementalDependencyFile $(supplemental_dependency_file) $<
+
+.SECONDARY:
+DerivedSources/WebCore/JSInternalSettingsGenerated.h: DerivedSources/WebCore/InternalSettingsGenerated.idl $(SCRIPTS_FOR_GENERATE_BINDINGS) $(WebCore)/bindings/scripts/CodeGeneratorJS.pm $(supplemental_dependency_file) $(idl_attributes_file)
+	$(AM_V_GEN)$(PERL) -I$(WebCore)/bindings/scripts $(WebCore)/bindings/scripts/generate-bindings.pl $(IDL_PATH:%=--include "%") --outputDir "$(GENSOURCES_WEBCORE)" --defines "LANGUAGE_JAVASCRIPT=1 $(feature_defines)" --generator JS --idlAttributesFile $(idl_attributes_file) --supplementalDependencyFile $(supplemental_dependency_file) $<
 
 # See https://bugs.webkit.org/show_bug.cgi?id=76388
 # We need to introduce a manual dependency to prevent non-generated sources from
@@ -632,7 +426,7 @@ DerivedSources/WebCore/JS%.h: %.idl $(SCRIPTS_FOR_GENERATE_BINDINGS) $(WebCore)/
 # IDL generation takes a long time. The pipe represents an order-only dependency,
 # which means that GNUmake will only try to build the dependencies first, but
 # not rebuild all the targets if the dependencies change.
-$(webkitgtk_sources) $(webkit2_sources) $(webkit2_plugin_process_sources) $(webcore_sources) $(webcoregtk_sources) : | $(supplemental_dependency_file) $(webcore_built_sources)
+$(webkitgtk_sources) $(webkit2_sources) $(webkit2_plugin_process_sources) $(webcore_sources) $(webcoregtk_sources) $(platform_sources) $(platformgtk_sources) : | $(supplemental_dependency_file) $(window_constructors_file) $(workerglobalscope_constructors_file) $(sharedworkerglobalscope_constructors_file) $(dedictedworkerglobalscope_constructors_file) $(webcore_built_sources) $(platform_built_sources)
 
 noinst_LTLIBRARIES += \
 	libWebCorePlatform.la \
@@ -644,15 +438,14 @@ noinst_LTLIBRARIES += \
 	libWebCoreSVG.la
 endif
 
-# Artificial dependency to try to force a relink of the WebCore libraries
-# When their makefiles change.
+# Artificial dependencies to try to force a relink of the WebCore libraries when their makefiles change.
 webcore_lib_for_dep = libWebCore.la
-$(webcore_lib_for_dep): $(srcdir)/Source/WebCore/GNUmakefile.am $(srcdir)/Source/WebCore/GNUmakefile.list.am
+$(webcore_lib_for_dep): $(srcdir)/Source/WebCore/GNUmakefile.am $(srcdir)/Source/WebCore/GNUmakefile.list.am $(srcdir)/Source/autotools/symbols.filter
 
-webcoremodules_lib_for_dep = libWebcoreModules.la
+webcoremodules_lib_for_dep = libWebCoreModules.la
 $(webcoremodules_lib_for_dep): $(srcdir)/Source/WebCore/GNUmakefile.am $(srcdir)/Source/WebCore/GNUmakefile.list.am
 
-webcoreplatform_lib_for_dep = libWebcorePlatform.la
+webcoreplatform_lib_for_dep = libWebCorePlatform.la
 $(webcoreplatform_lib_for_dep): $(srcdir)/Source/WebCore/GNUmakefile.am $(srcdir)/Source/WebCore/GNUmakefile.list.am
 
 webcoresvg_lib_for_dep = libWebCoreSVG.la
@@ -668,25 +461,27 @@ libWebCore_la_SOURCES = \
 	$(webcore_sources)
 
 libWebCore_la_CXXFLAGS = \
-	$(SYMBOL_VISIBILITY_INLINES) \
+	-fvisibility-inlines-hidden \
 	$(global_cxxflags)
 
 libWebCore_la_CFLAGS = \
-	$(SYMBOL_VISIBILITY) \
+	-fvisibility=hidden \
 	$(global_cflags)
 
 libWebCore_la_CPPFLAGS = \
 	-DBUILDING_WebCore \
 	-DBUILDING_WEBKIT \
 	$(global_cppflags) \
+	$(platform_cppflags) \
+	$(platformgtk_cppflags) \
 	$(webcore_cppflags) \
 	$(webcoregtk_cppflags) \
 	$(javascriptcore_cppflags) \
 	-fno-strict-aliasing \
 	$(CAIRO_CFLAGS) \
-	$(CLUTTER_CFLAGS) \
 	$(COVERAGE_CFLAGS) \
 	$(ENCHANT_CFLAGS) \
+	$(FREETYPE_CFLAGS) \
 	$(GAMEPAD_CFLAGS) \
 	$(GEOCLUE_CFLAGS) \
 	$(GLIB_CFLAGS) \
@@ -708,35 +503,31 @@ endif
 
 libWebCoreModules_la_SOURCES = \
 	$(webcore_modules_sources)
-
 libWebCoreModules_la_CXXFLAGS = $(libWebCore_la_CXXFLAGS)
-
 libWebCoreModules_la_CFLAGS = $(libWebCore_la_CFLAGS)
-
 libWebCoreModules_la_CPPFLAGS = $(libWebCore_la_CPPFLAGS)
 
 libWebCorePlatform_la_SOURCES = \
 	$(webcore_platform_sources)
-
 libWebCorePlatform_la_CXXFLAGS = \
-	$(SYMBOL_VISIBILITY_INLINES) \
+	-fvisibility-inlines-hidden \
 	$(global_cxxflags)
-
 libWebCorePlatform_la_CFLAGS = \
-	$(SYMBOL_VISIBILITY) \
+	-fvisibility=hidden \
 	$(global_cflags)
-
 libWebCorePlatform_la_CPPFLAGS = \
 	-DBUILDING_WEBKIT \
 	$(global_cppflags) \
+	$(platform_cppflags) \
+	$(platformgtk_cppflags) \
 	$(webcore_cppflags) \
 	$(webcoregtk_cppflags) \
 	$(javascriptcore_cppflags) \
 	-fno-strict-aliasing \
 	$(CAIRO_CFLAGS) \
-	$(CLUTTER_CFLAGS) \
 	$(COVERAGE_CFLAGS) \
 	$(ENCHANT_CFLAGS) \
+	$(FREETYPE_CFLAGS) \
 	$(GAMEPAD_CFLAGS) \
 	$(GEOCLUE_CFLAGS) \
 	$(GLIB_CFLAGS) \
@@ -763,34 +554,33 @@ libWebCoreGtk_la_SOURCES = \
 	$(webcoregtk_sources)
 
 libWebCoreGtk_la_CXXFLAGS = \
-	$(SYMBOL_VISIBILITY_INLINES) \
+	-fvisibility-inlines-hidden \
 	$(global_cxxflags)
 
 libWebCoreGtk_la_CFLAGS = \
-	$(SYMBOL_VISIBILITY) \
+	-fvisibility=hidden \
 	$(global_cflags)
 
 libWebCoreGtk_la_CPPFLAGS = \
 	-DBUILDING_WebCore \
 	-DBUILDING_WEBKIT \
 	$(global_cppflags) \
+	$(platform_cppflags) \
+	$(platformgtk_cppflags) \
 	$(webcore_cppflags) \
 	$(webcoregtk_cppflags) \
 	$(javascriptcore_cppflags) \
 	-fno-strict-aliasing \
-	$(HILDON_CPPFLAGS) \
 	$(CAIRO_CFLAGS) \
-	$(CLUTTER_CFLAGS) \
 	$(COVERAGE_CFLAGS) \
 	$(ENCHANT_CFLAGS) \
-	$(FARSTREAM_CFLAGS) \
+	$(FREETYPE_CFLAGS) \
 	$(GAIL_CFLAGS) \
 	$(GAMEPAD_CFLAGS) \
 	$(GEOCLUE_CFLAGS) \
 	$(GLIB_CFLAGS) \
 	$(GSTREAMER_CFLAGS) \
 	$(GTK_CFLAGS) \
-	$(HILDON_CFLAGS) \
 	$(LIBSECRET_CFLAGS) \
 	$(LIBSOUP_CFLAGS) \
 	$(LIBXML_CFLAGS) \
@@ -803,6 +593,7 @@ libWebCoreGtk_la_CPPFLAGS = \
 	$(XT_CFLAGS)
 
 EXTRA_DIST += \
+	$(wildcard $(srcdir)/Source/WebCore/Modules/battery/*.idl) \
 	$(wildcard $(srcdir)/Source/WebCore/Modules/filesystem/*.idl) \
 	$(wildcard $(srcdir)/Source/WebCore/Modules/gamepad/*.idl) \
 	$(wildcard $(srcdir)/Source/WebCore/Modules/geolocation/*.idl) \
@@ -811,6 +602,7 @@ EXTRA_DIST += \
 	$(wildcard $(srcdir)/Source/WebCore/Modules/mediastream/*.idl) \
 	$(wildcard $(srcdir)/Source/WebCore/Modules/navigatorcontentutils/*.idl) \
 	$(wildcard $(srcdir)/Source/WebCore/Modules/notifications/*.idl) \
+	$(wildcard $(srcdir)/Source/WebCore/Modules/proximity/*.idl) \
 	$(wildcard $(srcdir)/Source/WebCore/Modules/quota/*.idl) \
 	$(wildcard $(srcdir)/Source/WebCore/Modules/webaudio/*.idl) \
 	$(wildcard $(srcdir)/Source/WebCore/Modules/webdatabase/*.idl) \
@@ -836,10 +628,12 @@ EXTRA_DIST += \
 	Source/WebCore/bindings/scripts/CodeGeneratorGObject.pm \
 	Source/WebCore/bindings/scripts/CodeGeneratorJS.pm \
 	Source/WebCore/bindings/scripts/CodeGenerator.pm \
+	Source/WebCore/bindings/scripts/Hasher.pm \
 	Source/WebCore/bindings/scripts/IDLAttributes.txt \
 	Source/WebCore/bindings/scripts/IDLParser.pm \
 	Source/WebCore/bindings/scripts/InFilesCompiler.pm \
 	Source/WebCore/bindings/scripts/InFilesParser.pm \
+	Source/WebCore/bindings/scripts/StaticString.pm \
 	Source/WebCore/bindings/scripts/generate-bindings.pl \
 	Source/WebCore/bindings/scripts/gobject-generate-headers.pl \
 	Source/WebCore/bindings/scripts/preprocessor.pm \
@@ -861,6 +655,7 @@ EXTRA_DIST += \
 	Source/WebCore/css/mathml.css \
 	Source/WebCore/css/mediaControls.css \
 	Source/WebCore/css/mediaControlsGtk.css \
+	Source/WebCore/css/plugIns.css \
 	Source/WebCore/css/quirks.css \
 	Source/WebCore/css/svg.css \
 	Source/WebCore/css/SVGCSSPropertyNames.in \
@@ -878,6 +673,7 @@ EXTRA_DIST += \
 	Source/WebCore/html/parser/HTMLEntityNames.in \
 	Source/WebCore/icu/LICENSE \
 	Source/WebCore/inspector/CodeGeneratorInspector.py \
+	Source/WebCore/inspector/CodeGeneratorInspectorStrings.py \
 	Source/WebCore/inspector/InjectedScriptCanvasModuleSource.js \
 	Source/WebCore/inspector/InjectedScriptSource.js \
 	Source/WebCore/inspector/Inspector.json \
@@ -895,6 +691,7 @@ EXTRA_DIST += \
 	Source/WebCore/page/Settings.in \
 	Source/WebCore/platform/ColorData.gperf \
 	Source/WebCore/platform/text/mac/make-charset-table.pl \
+	Source/WebCore/Resources/plugIns.js \
 	Source/WebCore/svg/svgattrs.in \
 	Source/WebCore/svg/svgtags.in \
 	Source/WebCore/svg/xlinkattrs.in \
@@ -924,7 +721,7 @@ dist_webinspectorimages_DATA = \
 
 # It seems that $(shell) does not expand when it is a rule dependency, so
 # we must redefine this list of copied files with traditional dependency wildcards.
-noinst_DATA = ${GENSOURCES_INSPECTOR}/inspector.html
+noinst_DATA += ${GENSOURCES_INSPECTOR}/inspector.html
 ${GENSOURCES_INSPECTOR}/inspector.html: $(WebCore)/inspector/front-end/*.html \
 		$(WebCore)/inspector/front-end/*.js \
 		$(WebCore)/inspector/front-end/UglifyJS/*.js \

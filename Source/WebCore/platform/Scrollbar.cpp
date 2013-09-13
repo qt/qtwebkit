@@ -29,6 +29,7 @@
 #include "GraphicsContext.h"
 #include "PlatformMouseEvent.h"
 #include "ScrollAnimator.h"
+#include "ScrollView.h"
 #include "ScrollableArea.h"
 #include "ScrollbarTheme.h"
 #include <algorithm>
@@ -37,17 +38,9 @@
 #include "PlatformGestureEvent.h"
 #endif
 
-// FIXME: The following #includes are a layering violation and should be removed.
-#include "AXObjectCache.h"
-#include "AccessibilityScrollbar.h"
-#include "Document.h"
-#include "EventHandler.h"
-#include "Frame.h"
-#include "FrameView.h"
-
 using namespace std;
 
-#if (PLATFORM(CHROMIUM) && (OS(UNIX) && !OS(DARWIN))) || PLATFORM(GTK)
+#if PLATFORM(GTK)
 // The position of the scrollbar thumb affects the appearance of the steppers, so
 // when the thumb moves, we have to invalidate them for painting.
 #define THUMB_POSITION_AFFECTS_BUTTONS
@@ -110,9 +103,6 @@ Scrollbar::Scrollbar(ScrollableArea* scrollableArea, ScrollbarOrientation orient
 
 Scrollbar::~Scrollbar()
 {
-    if (AXObjectCache::accessibilityEnabled() && axObjectCache())
-        axObjectCache()->remove(this);
-    
     stopTimerIfNeeded();
     
     m_theme->unregisterScrollbar(this);
@@ -136,7 +126,7 @@ bool Scrollbar::isScrollableAreaActive() const
 
 bool Scrollbar::isScrollViewScrollbar() const
 {
-    return parent() && parent()->isFrameView() && static_cast<FrameView*>(parent())->isScrollViewScrollbar(this);
+    return parent() && parent()->isScrollViewScrollbar(this);
 }
 
 void Scrollbar::offsetDidChange()
@@ -373,6 +363,7 @@ bool Scrollbar::gestureEvent(const PlatformGestureEvent& evt)
         }
         break;
     case PlatformEvent::GestureScrollUpdate:
+    case PlatformEvent::GestureScrollUpdateWithoutPropagation:
         if (m_pressedPart == ThumbPart) {
             m_scrollPos += HorizontalScrollbar ? evt.deltaX() : evt.deltaY();
             moveThumb(m_scrollPos, false);
@@ -462,9 +453,6 @@ bool Scrollbar::mouseUp(const PlatformMouseEvent& mouseEvent)
         if (part == NoPart)
             m_scrollableArea->mouseExitedScrollbar(this);
     }
-
-    if (parent() && parent()->isFrameView())
-        static_cast<FrameView*>(parent())->frame()->eventHandler()->setMousePressed(false);
 
     return true;
 }
@@ -564,17 +552,6 @@ bool Scrollbar::shouldParticipateInHitTesting()
 bool Scrollbar::isWindowActive() const
 {
     return m_scrollableArea && m_scrollableArea->isActive();
-}
-    
-AXObjectCache* Scrollbar::axObjectCache() const
-{
-    if (!parent() || !parent()->isFrameView())
-        return 0;
-    
-    // FIXME: Accessing the FrameView and Document here is a layering violation
-    // and should be removed.
-    Document* document = static_cast<FrameView*>(parent())->frame()->document();
-    return document->axObjectCache();
 }
 
 void Scrollbar::invalidateRect(const IntRect& rect)

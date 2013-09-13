@@ -36,10 +36,10 @@
 #include "KURL.h"
 #include "MemoryCache.h"
 #include "PublicURLManager.h"
+#include "ResourceRequest.h"
 #include "ScriptExecutionContext.h"
 #include "SecurityOrigin.h"
 #include "ThreadableBlobRegistry.h"
-#include <wtf/PassOwnPtr.h>
 #include <wtf/MainThread.h>
 
 #if ENABLE(MEDIA_SOURCE)
@@ -114,9 +114,13 @@ void DOMURL::revokeObjectURL(ScriptExecutionContext* scriptExecutionContext, con
     if (!scriptExecutionContext)
         return;
 
-    MemoryCache::removeUrlFromCache(scriptExecutionContext, urlString);
-
     KURL url(KURL(), urlString);
+    ResourceRequest request(url);
+#if ENABLE(CACHE_PARTITIONING)
+    request.setCachePartition(scriptExecutionContext->topOrigin()->cachePartition());
+#endif
+    MemoryCache::removeRequestFromCache(scriptExecutionContext, request);
+
     HashSet<String>& blobURLs = scriptExecutionContext->publicURLManager().blobURLs();
     if (blobURLs.contains(url.string())) {
         ThreadableBlobRegistry::unregisterBlobURL(url);

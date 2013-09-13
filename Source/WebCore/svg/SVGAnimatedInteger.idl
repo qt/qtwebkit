@@ -24,10 +24,10 @@
  */
 
 [
-    Conditional=SVG
+    Conditional=SVG,
+    SkipVTableValidation
 ] interface SVGAnimatedInteger {
-    [StrictTypeChecking] attribute long baseVal
-        setter raises(DOMException);
+    [StrictTypeChecking, SetterRaisesException] attribute long baseVal;
     readonly attribute long animVal;
 };
 

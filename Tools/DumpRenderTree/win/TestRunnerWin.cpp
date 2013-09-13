@@ -137,19 +137,6 @@ JSStringRef TestRunner::copyEncodedHostName(JSStringRef name)
     return 0;
 }
 
-void TestRunner::disableImageLoading()
-{
-    COMPtr<IWebView> webView;
-    if (FAILED(frame->webView(&webView)))
-        return;
-    
-    COMPtr<IWebPreferences> preferences;
-    if (FAILED(webView->preferences(&preferences)))
-        return;
-    
-    preferences->setLoadsImagesAutomatically(FALSE);
-}
-
 void TestRunner::dispatchPendingLoadRequests()
 {
     // FIXME: Implement for testing fix for 6727495
@@ -171,39 +158,6 @@ void TestRunner::keepWebHistory()
         return;
 
     history->setOptionalSharedHistory(sharedHistory.get());
-}
-
-JSValueRef TestRunner::computedStyleIncludingVisitedInfo(JSContextRef context, JSValueRef value)
-{
-    // FIXME: Implement this.
-    return JSValueMakeUndefined(context);
-}
-
-JSRetainPtr<JSStringRef> TestRunner::markerTextForListItem(JSContextRef context, JSValueRef nodeObject) const
-{
-    COMPtr<IWebView> webView;
-    if (FAILED(frame->webView(&webView)))
-        return 0;
-
-    COMPtr<IWebViewPrivate> webViewPrivate(Query, webView);
-    if (!webViewPrivate)
-        return 0;
-
-    COMPtr<IDOMElement> element;
-    if (FAILED(webViewPrivate->elementFromJS(context, nodeObject, &element)))
-        return 0;
-
-    COMPtr<IDOMElementPrivate> elementPrivate(Query, element);
-    if (!elementPrivate)
-        return 0;
-
-    BSTR textBSTR = 0;
-    if (FAILED(elementPrivate->markerTextForListItem(&textBSTR)))
-        return 0;
-
-    JSRetainPtr<JSStringRef> markerText(Adopt, JSStringCreateWithBSTR(textBSTR));
-    SysFreeString(textBSTR);
-    return markerText;
 }
 
 void TestRunner::waitForPolicyDelegate()
@@ -235,17 +189,6 @@ size_t TestRunner::webHistoryItemCount()
     if (FAILED(sharedHistoryPrivate->allItems(&count, 0)))
         return 0;
 
-    return count;
-}
-
-unsigned TestRunner::workerThreadCount() const
-{
-    COMPtr<IWebWorkersPrivate> workers;
-    if (FAILED(WebKitCreateInstance(CLSID_WebWorkersPrivate, 0, __uuidof(workers), reinterpret_cast<void**>(&workers))))
-        return 0;
-    unsigned count;
-    if (FAILED(workers->workerThreadCount(&count)))
-        return 0;
     return count;
 }
 
@@ -359,27 +302,6 @@ void TestRunner::setAuthorAndUserStylesEnabled(bool flag)
     prefsPrivate->setAuthorAndUserStylesEnabled(flag);
 }
 
-void TestRunner::setAutofilled(JSContextRef context, JSValueRef nodeObject, bool autofilled)
-{
-    COMPtr<IWebView> webView;
-    if (FAILED(frame->webView(&webView)))
-        return;
-
-    COMPtr<IWebViewPrivate> webViewPrivate(Query, webView);
-    if (!webViewPrivate)
-        return;
-
-    COMPtr<IDOMElement> element;
-    if (FAILED(webViewPrivate->elementFromJS(context, nodeObject, &element)))
-        return;
-
-    COMPtr<IFormsAutoFillTransition> autofillElement(Query, element);
-    if (!autofillElement)
-        return;
-
-    autofillElement->setAutofilled(autofilled);
-}
-
 void TestRunner::setCustomPolicyDelegate(bool setDelegate, bool permissive)
 {
     COMPtr<IWebView> webView;
@@ -487,23 +409,6 @@ void TestRunner::setXSSAuditorEnabled(bool enabled)
         return;
 
     prefsPrivate->setXSSAuditorEnabled(enabled);
-}
-
-void TestRunner::setFrameFlatteningEnabled(bool enabled)
-{
-    COMPtr<IWebView> webView;
-    if (FAILED(frame->webView(&webView)))
-        return;
-
-    COMPtr<IWebPreferences> preferences;
-    if (FAILED(webView->preferences(&preferences)))
-        return;
-
-    COMPtr<IWebPreferencesPrivate> prefsPrivate(Query, preferences);
-    if (!prefsPrivate)
-        return;
-
-    prefsPrivate->setFrameFlatteningEnabled(enabled);
 }
 
 void TestRunner::setSpatialNavigationEnabled(bool enabled)
@@ -728,13 +633,13 @@ void TestRunner::setUserStyleSheetLocation(JSStringRef jsURL)
     if (FAILED(webView->preferences(&preferences)))
         return;
 
-    RetainPtr<CFStringRef> urlString(AdoptCF, JSStringCopyCFString(0, jsURL));
-    RetainPtr<CFURLRef> url(AdoptCF, CFURLCreateWithString(0, urlString.get(), 0));
+    RetainPtr<CFStringRef> urlString = adoptCF(JSStringCopyCFString(0, jsURL));
+    RetainPtr<CFURLRef> url = adoptCF(CFURLCreateWithString(0, urlString.get(), 0));
     if (!url)
         return;
 
     // Now copy the file system path, POSIX style.
-    RetainPtr<CFStringRef> pathCF(AdoptCF, CFURLCopyFileSystemPath(url.get(), kCFURLPOSIXPathStyle));
+    RetainPtr<CFStringRef> pathCF = adoptCF(CFURLCopyFileSystemPath(url.get(), kCFURLPOSIXPathStyle));
     if (!pathCF)
         return;
 
@@ -792,7 +697,7 @@ void TestRunner::setViewModeMediaFeature(JSStringRef mode)
 
 void TestRunner::setPersistentUserStyleSheetLocation(JSStringRef jsURL)
 {
-    RetainPtr<CFStringRef> urlString(AdoptCF, JSStringCopyCFString(0, jsURL));
+    RetainPtr<CFStringRef> urlString = adoptCF(JSStringCopyCFString(0, jsURL));
     ::setPersistentUserStyleSheetLocation(urlString.get());
 }
 
@@ -818,32 +723,6 @@ void TestRunner::setWindowIsKey(bool flag)
     ::SendMessage(webViewWindow, flag ? WM_SETFOCUS : WM_KILLFOCUS, (WPARAM)::GetDesktopWindow(), 0);
 }
 
-void TestRunner::setSmartInsertDeleteEnabled(bool flag)
-{
-    COMPtr<IWebView> webView;
-    if (FAILED(frame->webView(&webView)))
-        return;
-
-    COMPtr<IWebViewEditing> viewEditing;
-    if (FAILED(webView->QueryInterface(&viewEditing)))
-        return;
-
-    viewEditing->setSmartInsertDeleteEnabled(flag ? TRUE : FALSE);
-}
-
-void TestRunner::setSelectTrailingWhitespaceEnabled(bool flag)
-{
-    COMPtr<IWebView> webView;
-    if (FAILED(frame->webView(&webView)))
-        return;
-
-    COMPtr<IWebViewEditing> viewEditing;
-    if (FAILED(webView->QueryInterface(&viewEditing)))
-        return;
-
-    viewEditing->setSelectTrailingWhitespaceEnabled(flag ? TRUE : FALSE);
-}
-
 static const CFTimeInterval waitToDumpWatchdogInterval = 30.0;
 
 static void CALLBACK waitUntilDoneWatchdogFired(HWND, UINT, UINT_PTR, DWORD)
@@ -861,32 +740,6 @@ void TestRunner::setWaitToDump(bool waitUntilDone)
 int TestRunner::windowCount()
 {
     return openWindows().size();
-}
-
-bool TestRunner::elementDoesAutoCompleteForElementWithId(JSStringRef id)
-{
-    COMPtr<IDOMDocument> document;
-    if (FAILED(frame->DOMDocument(&document)))
-        return false;
-
-    wstring idWstring = jsStringRefToWString(id);
-    BSTR idBSTR = SysAllocStringLen((OLECHAR*)idWstring.c_str(), idWstring.length());
-    COMPtr<IDOMElement> element;
-    HRESULT result = document->getElementById(idBSTR, &element);
-    SysFreeString(idBSTR);
-
-    if (FAILED(result))
-        return false;
-
-    COMPtr<IWebFramePrivate> framePrivate(Query, frame);
-    if (!framePrivate)
-        return false;
-
-    BOOL autoCompletes;
-    if (FAILED(framePrivate->elementDoesAutoComplete(element.get(), &autoCompletes)))
-        return false;
-
-    return autoCompletes;
 }
 
 void TestRunner::execCommand(JSStringRef name, JSStringRef value)
@@ -1026,69 +879,6 @@ void TestRunner::setAppCacheMaximumSize(unsigned long long size)
     printf("ERROR: TestRunner::setAppCacheMaximumSize() not implemented\n");
 }
 
-bool TestRunner::pauseAnimationAtTimeOnElementWithId(JSStringRef animationName, double time, JSStringRef elementId)
-{
-    COMPtr<IDOMDocument> document;
-    if (FAILED(frame->DOMDocument(&document)))
-        return false;
-
-    BSTR idBSTR = JSStringCopyBSTR(elementId);
-    COMPtr<IDOMElement> element;
-    HRESULT hr = document->getElementById(idBSTR, &element);
-    SysFreeString(idBSTR);
-    if (FAILED(hr))
-        return false;
-
-    COMPtr<IWebFramePrivate> framePrivate(Query, frame);
-    if (!framePrivate)
-        return false;
-
-    BSTR nameBSTR = JSStringCopyBSTR(animationName);
-    BOOL wasRunning = FALSE;
-    hr = framePrivate->pauseAnimation(nameBSTR, element.get(), time, &wasRunning);
-    SysFreeString(nameBSTR);
-
-    return SUCCEEDED(hr) && wasRunning;
-}
-
-bool TestRunner::pauseTransitionAtTimeOnElementWithId(JSStringRef propertyName, double time, JSStringRef elementId)
-{
-    COMPtr<IDOMDocument> document;
-    if (FAILED(frame->DOMDocument(&document)))
-        return false;
-
-    BSTR idBSTR = JSStringCopyBSTR(elementId);
-    COMPtr<IDOMElement> element;
-    HRESULT hr = document->getElementById(idBSTR, &element);
-    SysFreeString(idBSTR);
-    if (FAILED(hr))
-        return false;
-
-    COMPtr<IWebFramePrivate> framePrivate(Query, frame);
-    if (!framePrivate)
-        return false;
-
-    BSTR nameBSTR = JSStringCopyBSTR(propertyName);
-    BOOL wasRunning = FALSE;
-    hr = framePrivate->pauseTransition(nameBSTR, element.get(), time, &wasRunning);
-    SysFreeString(nameBSTR);
-
-    return SUCCEEDED(hr) && wasRunning;
-}
-
-unsigned TestRunner::numberOfActiveAnimations() const
-{
-    COMPtr<IWebFramePrivate> framePrivate(Query, frame);
-    if (!framePrivate)
-        return 0;
-
-    UINT number = 0;
-    if (FAILED(framePrivate->numberOfActiveAnimations(&number)))
-        return 0;
-
-    return number;
-}
-
 static _bstr_t bstrT(JSStringRef jsString)
 {
     // The false parameter tells the _bstr_t constructor to adopt the BSTR we pass it.
@@ -1160,11 +950,6 @@ void TestRunner::setDeveloperExtrasEnabled(bool enabled)
         return;
 
     prefsPrivate->setDeveloperExtrasEnabled(enabled);
-}
-
-void TestRunner::setAsynchronousSpellCheckingEnabled(bool)
-{
-    // FIXME: Implement this.
 }
 
 void TestRunner::showWebInspector()
@@ -1357,19 +1142,6 @@ void TestRunner::deleteLocalStorageForOrigin(JSStringRef URL)
     // FIXME: Implement.
 }
 
-void TestRunner::setMinimumTimerInterval(double minimumTimerInterval)
-{
-    COMPtr<IWebView> webView;
-    if (FAILED(frame->webView(&webView)))
-        return;
-
-    COMPtr<IWebViewPrivate> viewPrivate(Query, webView);
-    if (!viewPrivate)
-        return;
-
-    viewPrivate->setMinimumTimerInterval(minimumTimerInterval);
-}
-
 void TestRunner::setTextDirection(JSStringRef direction)
 {
     COMPtr<IWebFramePrivate> framePrivate(Query, frame);
@@ -1431,17 +1203,12 @@ void TestRunner::setAutomaticLinkDetectionEnabled(bool)
     // FIXME: Implement this.
 }
 
-void TestRunner::sendWebIntentResponse(JSStringRef)
-{
-    // FIXME: Implement this.
-}
-
-void TestRunner::deliverWebIntent(JSStringRef, JSStringRef, JSStringRef)
-{
-    // FIXME: Implement this.
-}
-
 void TestRunner::setStorageDatabaseIdleInterval(double)
+{
+    // FIXME: Implement this.
+}
+
+void TestRunner::closeIdleLocalStorageDatabases()
 {
     // FIXME: Implement this.
 }

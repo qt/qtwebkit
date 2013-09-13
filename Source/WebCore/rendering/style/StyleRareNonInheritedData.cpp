@@ -30,10 +30,6 @@
 #include "StyleTransformData.h"
 #include "StyleImage.h"
 #include "StyleResolver.h"
-#include "WebCoreMemoryInstrumentation.h"
-#include <wtf/MemoryInstrumentationHashMap.h>
-#include <wtf/MemoryInstrumentationVector.h>
-#include <wtf/MemoryObjectInfo.h>
 
 namespace WebCore {
 
@@ -59,7 +55,7 @@ StyleRareNonInheritedData::StyleRareNonInheritedData()
     , m_order(RenderStyle::initialOrder())
     , m_flowThread(RenderStyle::initialFlowThread())
     , m_regionThread(RenderStyle::initialRegionThread())
-    , m_regionOverflow(RenderStyle::initialRegionOverflow())
+    , m_regionFragment(RenderStyle::initialRegionFragment())
     , m_regionBreakAfter(RenderStyle::initialPageBreak())
     , m_regionBreakBefore(RenderStyle::initialPageBreak())
     , m_regionBreakInside(RenderStyle::initialPageBreak())
@@ -129,6 +125,10 @@ StyleRareNonInheritedData::StyleRareNonInheritedData(const StyleRareNonInherited
     , m_shapeMargin(o.m_shapeMargin)
     , m_shapePadding(o.m_shapePadding)
     , m_clipPath(o.m_clipPath)
+#if ENABLE(CSS3_TEXT)
+    , m_textDecorationColor(o.m_textDecorationColor)
+    , m_visitedLinkTextDecorationColor(o.m_visitedLinkTextDecorationColor)
+#endif // CSS3_TEXT
     , m_visitedLinkBackgroundColor(o.m_visitedLinkBackgroundColor)
     , m_visitedLinkOutlineColor(o.m_visitedLinkOutlineColor)
     , m_visitedLinkBorderLeftColor(o.m_visitedLinkBorderLeftColor)
@@ -138,7 +138,7 @@ StyleRareNonInheritedData::StyleRareNonInheritedData(const StyleRareNonInherited
     , m_order(o.m_order)
     , m_flowThread(o.m_flowThread)
     , m_regionThread(o.m_regionThread)
-    , m_regionOverflow(o.m_regionOverflow)
+    , m_regionFragment(o.m_regionFragment)
     , m_regionBreakAfter(o.m_regionBreakAfter)
     , m_regionBreakBefore(o.m_regionBreakBefore)
     , m_regionBreakInside(o.m_regionBreakInside)
@@ -214,6 +214,10 @@ bool StyleRareNonInheritedData::operator==(const StyleRareNonInheritedData& o) c
         && m_shapeMargin == o.m_shapeMargin
         && m_shapePadding == o.m_shapePadding
         && m_clipPath == o.m_clipPath
+#if ENABLE(CSS3_TEXT)
+        && m_textDecorationColor == o.m_textDecorationColor
+        && m_visitedLinkTextDecorationColor == o.m_visitedLinkTextDecorationColor
+#endif // CSS3_TEXT
         && m_visitedLinkBackgroundColor == o.m_visitedLinkBackgroundColor
         && m_visitedLinkOutlineColor == o.m_visitedLinkOutlineColor
         && m_visitedLinkBorderLeftColor == o.m_visitedLinkBorderLeftColor
@@ -223,7 +227,7 @@ bool StyleRareNonInheritedData::operator==(const StyleRareNonInheritedData& o) c
         && m_order == o.m_order
         && m_flowThread == o.m_flowThread
         && m_regionThread == o.m_regionThread
-        && m_regionOverflow == o.m_regionOverflow
+        && m_regionFragment == o.m_regionFragment
         && m_regionBreakAfter == o.m_regionBreakAfter
         && m_regionBreakBefore == o.m_regionBreakBefore
         && m_regionBreakInside == o.m_regionBreakInside
@@ -314,35 +318,6 @@ bool StyleRareNonInheritedData::transitionDataEquivalent(const StyleRareNonInher
     if (m_transitions && o.m_transitions && (*m_transitions != *o.m_transitions))
         return false;
     return true;
-}
-
-void StyleRareNonInheritedData::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
-#if ENABLE(DASHBOARD_SUPPORT)
-    info.addMember(m_dashboardRegions);
-#endif
-    info.addMember(m_deprecatedFlexibleBox);
-    info.addMember(m_flexibleBox);
-    info.addMember(m_marquee);
-    info.addMember(m_multiCol);
-    info.addMember(m_transform);
-#if ENABLE(CSS_FILTERS)
-    info.addMember(m_filter);
-#endif
-    info.addMember(m_grid);
-    info.addMember(m_gridItem);
-    info.addMember(m_content);
-    info.addMember(m_counterDirectives);
-    info.addMember(m_boxShadow);
-    info.addMember(m_boxReflect);
-    info.addMember(m_animations);
-    info.addMember(m_transitions);
-    info.addMember(m_shapeInside);
-    info.addMember(m_shapeOutside);
-    info.addMember(m_clipPath);
-    info.addMember(m_flowThread);
-    info.addMember(m_regionThread);
 }
 
 } // namespace WebCore

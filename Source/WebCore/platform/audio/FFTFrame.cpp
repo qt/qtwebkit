@@ -32,20 +32,14 @@
 
 #include "FFTFrame.h"
 
+#include "Logging.h"
+#include <complex>
+#include <wtf/MathExtras.h>
+#include <wtf/OwnPtr.h>
+
 #ifndef NDEBUG
 #include <stdio.h>
 #endif
-
-#include "Logging.h"
-#include "PlatformMemoryInstrumentation.h"
-#include <wtf/Complex.h>
-#include <wtf/MathExtras.h>
-#include <wtf/MemoryObjectInfo.h>
-#include <wtf/OwnPtr.h>
-
-#if !USE_ACCELERATE_FFT && USE(WEBAUDIO_FFMPEG)
-void reportMemoryUsage(const RDFTContext* const&, WTF::MemoryObjectInfo*);
-#endif // USE(WEBAUDIO_FFMPEG)
 
 namespace WebCore {
 
@@ -105,8 +99,8 @@ void FFTFrame::interpolateFrequencyComponents(const FFTFrame& frame1, const FFTF
     int n = m_FFTSize / 2;
 
     for (int i = 1; i < n; ++i) {
-        Complex c1(realP1[i], imagP1[i]);
-        Complex c2(realP2[i], imagP2[i]);
+        std::complex<double> c1(realP1[i], imagP1[i]);
+        std::complex<double> c2(realP2[i], imagP2[i]);
 
         double mag1 = abs(c1);
         double mag2 = abs(c2);
@@ -172,7 +166,7 @@ void FFTFrame::interpolateFrequencyComponents(const FFTFrame& frame1, const FFTF
         if (phaseAccum < -piDouble)
             phaseAccum += 2.0 * piDouble;
 
-        Complex c = complexFromMagnitudePhase(mag, phaseAccum);
+        std::complex<double> c = std::polar(mag, phaseAccum);
 
         realP[i] = static_cast<float>(c.real());
         imagP[i] = static_cast<float>(c.imag());
@@ -194,7 +188,7 @@ double FFTFrame::extractAverageGroupDelay()
 
     // Calculate weighted average group delay
     for (int i = 0; i < halfSize; i++) {
-        Complex c(realP[i], imagP[i]);
+        std::complex<double> c(realP[i], imagP[i]);
         double mag = abs(c);
         double phase = arg(c);
 
@@ -241,60 +235,17 @@ void FFTFrame::addConstantGroupDelay(double sampleFrameDelay)
 
     // Add constant group delay
     for (int i = 1; i < halfSize; i++) {
-        Complex c(realP[i], imagP[i]);
+        std::complex<double> c(realP[i], imagP[i]);
         double mag = abs(c);
         double phase = arg(c);
 
         phase += i * phaseAdj;
 
-        Complex c2 = complexFromMagnitudePhase(mag, phase);
+        std::complex<double> c2 = std::polar(mag, phase);
 
         realP[i] = static_cast<float>(c2.real());
         imagP[i] = static_cast<float>(c2.imag());
     }
-}
-
-void FFTFrame::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, PlatformMemoryTypes::AudioSharedData);
-#if USE_ACCELERATE_FFT
-    info.addMember(m_frame);
-    info.addMember(m_realData);
-    info.addMember(m_imagData);
-#else // !USE_ACCELERATE_FFT
-
-#if USE(WEBAUDIO_MKL)
-    info.addMember(m_handle);
-    info.addMember(m_complexData);
-    info.addMember(m_realData);
-    info.addMember(m_imagData);
-#endif // USE(WEBAUDIO_MKL)
-
-#if USE(WEBAUDIO_FFMPEG)
-    info.addMember(m_forwardContext);
-    info.addMember(m_inverseContext);
-    info.addMember(m_complexData);
-    info.addMember(m_realData);
-    info.addMember(m_imagData);
-#endif // USE(WEBAUDIO_FFMPEG)
-
-#if USE(WEBAUDIO_GSTREAMER)
-    info.addMember(m_fft);
-    info.addMember(m_inverseFft);
-    info.addMember(m_complexData);
-    info.addMember(m_realData);
-    info.addMember(m_imagData);
-#endif // USE(WEBAUDIO_GSTREAMER)
-
-#if USE(WEBAUDIO_IPP)
-    info.addMember(m_buffer);
-    info.addMember(m_DFTSpec);
-    info.addMember(m_complexData);
-    info.addMember(m_realData);
-    info.addMember(m_imagData);
-#endif // USE(WEBAUDIO_IPP)
-
-#endif // !USE_ACCELERATE_FFT
 }
 
 #ifndef NDEBUG

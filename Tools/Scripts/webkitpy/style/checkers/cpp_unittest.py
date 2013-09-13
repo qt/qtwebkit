@@ -1,4 +1,3 @@
-#!/usr/bin/python
 # -*- coding: utf-8; -*-
 #
 # Copyright (C) 2011 Google Inc. All rights reserved.
@@ -40,7 +39,7 @@ import codecs
 import os
 import random
 import re
-import unittest
+import unittest2 as unittest
 import cpp as cpp_style
 from cpp import CppChecker
 from ..filter import FilterConfiguration
@@ -2761,15 +2760,6 @@ class OrderOfIncludesTest(CppStyleTestBase):
                                          'wtf includes should be <wtf/file.h> instead of "wtf/file.h".'
                                          '  [build/include] [4]')
 
-    def test_check_cc_includes(self):
-        self.assert_language_rules_check('bar/chromium/foo.cpp',
-                                         '#include "config.h"\n'
-                                         '#include "foo.h"\n'
-                                         '\n'
-                                         '#include "cc/CCProxy.h"\n',
-                                         'cc includes should be "CCFoo.h" instead of "cc/CCFoo.h".'
-                                         '  [build/include] [4]')
-
     def test_classify_include(self):
         classify_include = cpp_style._classify_include
         include_state = cpp_style._IncludeState()
@@ -3293,6 +3283,21 @@ class NoNonVirtualDestructorsTest(CppStyleTestBase):
                     FooOne,
                     FooTwo = FooOne,
                 };''',
+            '')
+
+        self.assert_multi_line_lint(
+            '''\
+                // WebIDL enum
+                enum Foo {
+                    FOO_ONE = 1,
+                    FOO_TWO = 2,
+                };''',
+            '')
+
+        self.assert_multi_line_lint(
+            '''\
+                // WebKitIDL enum
+                enum Foo { FOO_ONE, FOO_TWO };''',
             '')
 
     def test_destructor_non_virtual_when_virtual_needed(self):
@@ -4397,6 +4402,9 @@ class WebKitStyleTest(CppStyleTestBase):
             'gtk_style_context_get_style(context, "propertyName", &value, "otherName", &otherValue, NULL);',
             '')
         self.assert_lint(
+            'gtk_style_context_get(context, static_cast<GtkStateFlags>(0), "property", &value, NULL);',
+            '')
+        self.assert_lint(
             'gtk_widget_style_get_property(style, NULL, NULL);',
             'Use 0 instead of NULL.  [readability/null] [5]',
             'foo.cpp')
@@ -4481,6 +4489,13 @@ class WebKitStyleTest(CppStyleTestBase):
             "Use 'using namespace std;' instead of 'using std::min;'."
             "  [build/using_std] [4]",
             'foo.cpp')
+
+    def test_using_namespace(self):
+        self.assert_lint(
+            'using namespace foo;',
+            "Do not use 'using namespace foo;'."
+            "  [build/using_namespace] [4]",
+            'foo.h')
 
     def test_max_macro(self):
         self.assert_lint(
@@ -4778,50 +4793,16 @@ class WebKitStyleTest(CppStyleTestBase):
                          '  [whitespace/comments] [5]')
 
     def test_webkit_export_check(self):
-        webkit_export_error_rules = ('-',
-                                  '+readability/webkit_export')
+        webkit_export_error_rules = ('-', '+readability/webkit_export')
         self.assertEqual('',
-                          self.perform_lint('WEBKIT_EXPORT int foo();\n',
-                                            'WebKit/chromium/public/test.h',
-                                            webkit_export_error_rules))
-        self.assertEqual('',
-                          self.perform_lint('WEBKIT_EXPORT int foo();\n',
-                                            'WebKit/chromium/tests/test.h',
-                                            webkit_export_error_rules))
-        self.assertEqual('WEBKIT_EXPORT should only be used in header files.  [readability/webkit_export] [5]',
-                          self.perform_lint('WEBKIT_EXPORT int foo();\n',
-                                            'WebKit/chromium/public/test.cpp',
-                                            webkit_export_error_rules))
-        self.assertEqual('WEBKIT_EXPORT should only appear in the chromium public (or tests) directory.  [readability/webkit_export] [5]',
-                          self.perform_lint('WEBKIT_EXPORT int foo();\n',
-                                            'WebKit/chromium/src/test.h',
-                                            webkit_export_error_rules))
-        self.assertEqual('WEBKIT_EXPORT should not be used on a function with a body.  [readability/webkit_export] [5]',
-                          self.perform_lint('WEBKIT_EXPORT int foo() { }\n',
-                                            'WebKit/chromium/public/test.h',
-                                            webkit_export_error_rules))
-        self.assertEqual('WEBKIT_EXPORT should not be used on a function with a body.  [readability/webkit_export] [5]',
-                          self.perform_lint('WEBKIT_EXPORT inline int foo()\n'
-                                            '{\n'
-                                            '}\n',
-                                            'WebKit/chromium/public/test.h',
-                                            webkit_export_error_rules))
-        self.assertEqual('WEBKIT_EXPORT should not be used with a pure virtual function.  [readability/webkit_export] [5]',
-                          self.perform_lint('{}\n'
-                                            'WEBKIT_EXPORT\n'
-                                            'virtual\n'
-                                            'int\n'
-                                            'foo() = 0;\n',
-                                            'WebKit/chromium/public/test.h',
-                                            webkit_export_error_rules))
-        self.assertEqual('',
-                          self.perform_lint('{}\n'
-                                            'WEBKIT_EXPORT\n'
-                                            'virtual\n'
-                                            'int\n'
-                                            'foo() = 0;\n',
-                                            'test.h',
-                                            webkit_export_error_rules))
+            self.perform_lint(
+                '{}\n'
+                'WEBKIT_EXPORT\n'
+                'virtual\n'
+                'int\n'
+                'foo() = 0;\n',
+                'test.h',
+                webkit_export_error_rules))
 
     def test_other(self):
         # FIXME: Implement this.
@@ -4874,30 +4855,3 @@ class CppCheckerTest(unittest.TestCase):
         # Thus, just check the distinguishing case to verify that the
         # code defines __ne__.
         self.assertFalse(checker1 != checker2)
-
-
-def tearDown():
-    """A global check to make sure all error-categories have been tested.
-
-    The main tearDown() routine is the only code we can guarantee will be
-    run after all other tests have been executed.
-    """
-    try:
-        if _run_verifyallcategoriesseen:
-            ErrorCollector(None).verify_all_categories_are_seen()
-    except NameError:
-        # If nobody set the global _run_verifyallcategoriesseen, then
-        # we assume we shouldn't run the test
-        pass
-
-if __name__ == '__main__':
-    import sys
-    # We don't want to run the verify_all_categories_are_seen() test unless
-    # we're running the full test suite: if we only run one test,
-    # obviously we're not going to see all the error categories.  So we
-    # only run verify_all_categories_are_seen() when no commandline flags
-    # are passed in.
-    global _run_verifyallcategoriesseen
-    _run_verifyallcategoriesseen = (len(sys.argv) == 1)
-
-    unittest.main()

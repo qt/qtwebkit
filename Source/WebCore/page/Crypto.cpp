@@ -31,6 +31,7 @@
 #include "Crypto.h"
 
 #include "ExceptionCode.h"
+#include "ScriptWrappableInlines.h"
 #include <wtf/ArrayBufferView.h>
 #include <wtf/CryptographicallyRandomNumber.h>
 
@@ -58,7 +59,6 @@ Crypto::Crypto()
 
 void Crypto::getRandomValues(ArrayBufferView* array, ExceptionCode& ec)
 {
-#if USE(OS_RANDOMNESS)
     if (!array || !isIntegerArray(array)) {
         ec = TYPE_MISMATCH_ERR;
         return;
@@ -68,10 +68,6 @@ void Crypto::getRandomValues(ArrayBufferView* array, ExceptionCode& ec)
         return;
     }
     cryptographicallyRandomValues(array->baseAddress(), array->byteLength());
-#else
-    ASSERT_UNUSED(array, array);
-    ec = NOT_SUPPORTED_ERR;
-#endif
 }
 
 }

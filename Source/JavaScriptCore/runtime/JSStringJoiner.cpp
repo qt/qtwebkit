@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2012, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,8 +29,8 @@
 #include "ExceptionHelpers.h"
 #include "JSScope.h"
 #include "JSString.h"
+#include "Operations.h"
 #include <wtf/text/StringImpl.h>
-
 
 namespace JSC {
 
@@ -94,7 +94,7 @@ static inline PassRefPtr<StringImpl> joinStrings(const Vector<String>& strings, 
     return outputStringImpl.release();
 }
 
-JSValue JSStringJoiner::build(ExecState* exec)
+JSValue JSStringJoiner::join(ExecState* exec)
 {
     if (!m_isValid)
         return throwOutOfMemoryError(exec);
@@ -102,25 +102,29 @@ JSValue JSStringJoiner::build(ExecState* exec)
     if (!m_strings.size())
         return jsEmptyString(exec);
 
-    size_t separatorLength = m_separator.length();
+    Checked<size_t, RecordOverflow> separatorLength = m_separator.length();
     // FIXME: add special cases of joinStrings() for (separatorLength == 0) and (separatorLength == 1).
     ASSERT(m_strings.size() > 0);
-    size_t totalSeparactorsLength = separatorLength * (m_strings.size() - 1);
-    size_t outputStringSize = totalSeparactorsLength + m_cumulatedStringsLength;
+    Checked<size_t, RecordOverflow> totalSeparactorsLength = separatorLength * (m_strings.size() - 1);
+    Checked<size_t, RecordOverflow> outputStringSize = totalSeparactorsLength + m_accumulatedStringsLength;
 
+    size_t finalSize;
+    if (outputStringSize.safeGet(finalSize) == CheckedState::DidOverflow)
+        return throwOutOfMemoryError(exec);
+        
     if (!outputStringSize)
         return jsEmptyString(exec);
 
     RefPtr<StringImpl> outputStringImpl;
     if (m_is8Bits)
-        outputStringImpl = joinStrings<LChar>(m_strings, m_separator, outputStringSize);
+        outputStringImpl = joinStrings<LChar>(m_strings, m_separator, finalSize);
     else
-        outputStringImpl = joinStrings<UChar>(m_strings, m_separator, outputStringSize);
+        outputStringImpl = joinStrings<UChar>(m_strings, m_separator, finalSize);
 
     if (!outputStringImpl)
         return throwOutOfMemoryError(exec);
 
-    return JSString::create(exec->globalData(), outputStringImpl.release());
+    return JSString::create(exec->vm(), outputStringImpl.release());
 }
 
 }

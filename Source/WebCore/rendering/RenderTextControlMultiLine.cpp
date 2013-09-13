@@ -32,15 +32,15 @@
 
 namespace WebCore {
 
-RenderTextControlMultiLine::RenderTextControlMultiLine(Node* node)
-    : RenderTextControl(node)
+RenderTextControlMultiLine::RenderTextControlMultiLine(Element* element)
+    : RenderTextControl(element)
 {
 }
 
 RenderTextControlMultiLine::~RenderTextControlMultiLine()
 {
     if (node() && node()->inDocument())
-        static_cast<HTMLTextAreaElement*>(node())->rendererWillBeDestroyed();
+        toHTMLTextAreaElement(node())->rendererWillBeDestroyed();
 }
 
 bool RenderTextControlMultiLine::nodeAtPoint(const HitTestRequest& request, HitTestResult& result, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, HitTestAction hitTestAction)
@@ -65,15 +65,15 @@ float RenderTextControlMultiLine::getAvgCharWidth(AtomicString family)
     return RenderTextControl::getAvgCharWidth(family);
 }
 
-LayoutUnit RenderTextControlMultiLine::preferredContentWidth(float charWidth) const
+LayoutUnit RenderTextControlMultiLine::preferredContentLogicalWidth(float charWidth) const
 {
-    int factor = static_cast<HTMLTextAreaElement*>(node())->cols();
+    int factor = toHTMLTextAreaElement(node())->cols();
     return static_cast<LayoutUnit>(ceilf(charWidth * factor)) + scrollbarThickness();
 }
 
-LayoutUnit RenderTextControlMultiLine::computeControlHeight(LayoutUnit lineHeight, LayoutUnit nonContentHeight) const
+LayoutUnit RenderTextControlMultiLine::computeControlLogicalHeight(LayoutUnit lineHeight, LayoutUnit nonContentHeight) const
 {
-    return lineHeight * static_cast<HTMLTextAreaElement*>(node())->rows() + nonContentHeight;
+    return lineHeight * toHTMLTextAreaElement(node())->rows() + nonContentHeight;
 }
 
 int RenderTextControlMultiLine::baselinePosition(FontBaseline baselineType, bool firstLine, LineDirectionMode direction, LinePositionMode linePositionMode) const
@@ -104,7 +104,7 @@ RenderObject* RenderTextControlMultiLine::layoutSpecialExcludedChild(bool relayo
     if (!placeholderRenderer->isBox())
         return placeholderRenderer;
     RenderBox* placeholderBox = toRenderBox(placeholderRenderer);
-    placeholderBox->style()->setWidth(Length(contentWidth() - placeholderBox->borderAndPaddingWidth(), Fixed));
+    placeholderBox->style()->setLogicalWidth(Length(contentLogicalWidth() - placeholderBox->borderAndPaddingLogicalWidth(), Fixed));
     placeholderBox->layoutIfNeeded();
     placeholderBox->setX(borderLeft() + paddingLeft());
     placeholderBox->setY(borderTop() + paddingTop());

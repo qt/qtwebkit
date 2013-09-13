@@ -21,16 +21,12 @@
 #define SVGVKernElement_h
 
 #if ENABLE(SVG_FONTS)
+#include "SVGElement.h"
 #include "SVGFontElement.h"
-#include "SVGParserUtilities.h"
-#include "SVGStyledElement.h"
-
-#include <limits>
-#include <wtf/Forward.h>
 
 namespace WebCore {
 
-class SVGVKernElement : public SVGElement {
+class SVGVKernElement FINAL : public SVGElement {
 public:
     static PassRefPtr<SVGVKernElement> create(const QualifiedName&, Document*);
 

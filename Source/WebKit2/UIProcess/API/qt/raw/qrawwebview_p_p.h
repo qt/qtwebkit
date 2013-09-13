@@ -37,17 +37,11 @@ public:
 
     virtual void pageClosed() { }
 
+    virtual void preferencesDidChange() { }
+
     virtual void setFindIndicator(PassRefPtr<WebKit::FindIndicator>, bool fadeOut, bool animate) { }
-    virtual void didCommitLoadForMainFrame(bool useCustomRepresentation) { }
-    virtual void didFinishLoadingDataForCustomRepresentation(const String& suggestedFilename, const CoreIPC::DataReference&) { }
-    virtual double customRepresentationZoomFactor() { return 1; }
-    virtual void setCustomRepresentationZoomFactor(double) { }
-    virtual void didChangeScrollbarsForMainFrame() const { }
-    virtual void findStringInCustomRepresentation(const String&, WebKit::FindOptions, unsigned maxMatchCount) { }
-    virtual void countStringMatchesInCustomRepresentation(const String&, WebKit::FindOptions, unsigned maxMatchCount) { }
     virtual void clearAllEditCommands() { }
 
-    virtual void didReceiveMessageFromNavigatorQtObject(const String& message);
     virtual void didChangeViewportProperties(const WebCore::ViewportAttributes& attr);
     virtual void handleDownloadRequest(WebKit::DownloadProxy* download);
 
@@ -76,6 +70,7 @@ public:
     virtual void doneWithGestureEvent(const WebKit::WebGestureEvent& event, bool wasEventHandled);
 #endif
     virtual void displayView();
+    virtual bool canScrollView() { return false; }
     virtual void scrollView(const WebCore::IntRect& scrollRect, const WebCore::IntSize& scrollOffset);
 
     virtual void flashBackingStoreUpdates(const Vector<WebCore::IntRect>&);
@@ -91,7 +86,7 @@ public:
     virtual PassRefPtr<WebKit::WebContextMenuProxy> createContextMenuProxy(WebKit::WebPageProxy* webPageProxy);
 
 #if ENABLE(INPUT_TYPE_COLOR)
-    virtual PassRefPtr<WebKit::WebColorChooserProxy> createColorChooserProxy(WebKit::WebPageProxy*, const WebCore::Color& intialColor, const WebCore::IntRect&);
+    virtual PassRefPtr<WebKit::WebColorPicker> createColorPicker(WebKit::WebPageProxy*, const WebCore::Color& intialColor, const WebCore::IntRect&);
 #endif
 
     QRawWebViewPrivate(WebKit::WebContext*, WebKit::WebPageGroup*, QRawWebViewClient*);

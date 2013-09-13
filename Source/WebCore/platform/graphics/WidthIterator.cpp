@@ -192,8 +192,10 @@ inline unsigned WidthIterator::advanceInternal(TextIterator& textIterator, Glyph
         }
 
         if (fontData != lastFontData && width) {
-            if (shouldApplyFontTransforms())
+            if (shouldApplyFontTransforms()) {
                 m_runWidthSoFar += applyFontTransforms(glyphBuffer, m_run.ltr(), lastGlyphCount, lastFontData, m_typesettingFeatures, charactersTreatedAsSpace);
+                lastGlyphCount = glyphBuffer->size(); // applyFontTransforms doesn't update when there had been only one glyph.
+            }
 
             lastFontData = fontData;
             if (m_fallbackFonts && fontData != primaryFont) {
@@ -227,7 +229,10 @@ inline unsigned WidthIterator::advanceInternal(TextIterator& textIterator, Glyph
                         m_runWidthSoFar += expansionAtThisOpportunity;
                         if (glyphBuffer) {
                             if (glyphBuffer->isEmpty()) {
-                                glyphBuffer->add(fontData->spaceGlyph(), fontData, expansionAtThisOpportunity);
+                                if (m_forTextEmphasis)
+                                    glyphBuffer->add(fontData->zeroWidthSpaceGlyph(), fontData, m_expansionPerOpportunity);
+                                else
+                                    glyphBuffer->add(fontData->spaceGlyph(), fontData, expansionAtThisOpportunity);
                                 m_characterIndexOfGlyph.append(currentCharacterIndex);
                             } else
                                 glyphBuffer->expandLastAdvance(expansionAtThisOpportunity);
@@ -253,7 +258,7 @@ inline unsigned WidthIterator::advanceInternal(TextIterator& textIterator, Glyph
 
         if (shouldApplyFontTransforms() && glyphBuffer && Font::treatAsSpace(character))
             charactersTreatedAsSpace.append(make_pair(glyphBuffer->size(),
-                OriginalAdvancesForCharacterTreatedAsSpace(character == ' ', glyphBuffer->size() ? glyphBuffer->advanceAt(glyphBuffer->size() - 1) : 0, width)));
+                OriginalAdvancesForCharacterTreatedAsSpace(character == ' ', glyphBuffer->size() ? glyphBuffer->advanceAt(glyphBuffer->size() - 1).width() : 0, width)));
 
         if (m_accountForGlyphBounds) {
             bounds = fontData->boundsForGlyph(glyph);

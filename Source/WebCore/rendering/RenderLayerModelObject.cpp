@@ -37,7 +37,7 @@ bool RenderLayerModelObject::s_hadLayer = false;
 bool RenderLayerModelObject::s_hadTransform = false;
 bool RenderLayerModelObject::s_layerWasSelfPainting = false;
 
-RenderLayerModelObject::RenderLayerModelObject(Node* node)
+RenderLayerModelObject::RenderLayerModelObject(ContainerNode* node)
     : RenderObject(node)
     , m_layer(0)
 {
@@ -75,6 +75,16 @@ bool RenderLayerModelObject::hasSelfPaintingLayer() const
 
 void RenderLayerModelObject::willBeDestroyed()
 {
+    if (isPositioned()) {
+        // Don't use this->view() because the document's renderView has been set to 0 during destruction.
+        if (Frame* frame = this->frame()) {
+            if (FrameView* frameView = frame->view()) {
+                if (style()->hasViewportConstrainedPosition())
+                    frameView->removeViewportConstrainedObject(this);
+            }
+        }
+    }
+
     // RenderObject::willBeDestroyed calls back to destroyLayer() for layer destruction
     RenderObject::willBeDestroyed();
 }

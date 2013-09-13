@@ -41,7 +41,7 @@ AccessibilityMenuListOption::AccessibilityMenuListOption()
 
 void AccessibilityMenuListOption::setElement(HTMLElement* element)
 {
-    ASSERT_ARG(element, element->hasTagName(optionTag));
+    ASSERT_ARG(element, isHTMLOptionElement(element));
     m_element = element;
 }
 
@@ -52,9 +52,9 @@ Element* AccessibilityMenuListOption::actionElement() const
     
 bool AccessibilityMenuListOption::isEnabled() const
 {
-    // disabled() returns true if the parent <select> element is disabled,
+    // isDisabledFormControl() returns true if the parent <select> element is disabled,
     // which we don't want.
-    return !static_cast<HTMLOptionElement*>(m_element.get())->ownElementDisabled();
+    return !toHTMLOptionElement(m_element.get())->ownElementDisabled();
 }
 
 bool AccessibilityMenuListOption::isVisible() const
@@ -75,7 +75,7 @@ bool AccessibilityMenuListOption::isOffScreen() const
 
 bool AccessibilityMenuListOption::isSelected() const
 {
-    return static_cast<HTMLOptionElement*>(m_element.get())->selected();
+    return toHTMLOptionElement(m_element.get())->selected();
 }
 
 void AccessibilityMenuListOption::setSelected(bool b)
@@ -83,7 +83,7 @@ void AccessibilityMenuListOption::setSelected(bool b)
     if (!canSetSelectedAttribute())
         return;
 
-    static_cast<HTMLOptionElement*>(m_element.get())->setSelected(b);
+    toHTMLOptionElement(m_element.get())->setSelected(b);
 }
 
 String AccessibilityMenuListOption::nameForMSAA() const
@@ -96,9 +96,9 @@ bool AccessibilityMenuListOption::canSetSelectedAttribute() const
     return isEnabled();
 }
 
-bool AccessibilityMenuListOption::accessibilityIsIgnored() const
+bool AccessibilityMenuListOption::computeAccessibilityIsIgnored() const
 {
-    return accessibilityPlatformIncludesObject() != IncludeObject;
+    return accessibilityIsIgnoredByDefault();
 }
 
 LayoutRect AccessibilityMenuListOption::elementRect() const
@@ -114,7 +114,7 @@ LayoutRect AccessibilityMenuListOption::elementRect() const
 
 String AccessibilityMenuListOption::stringValue() const
 {
-    return static_cast<HTMLOptionElement*>(m_element.get())->text();
+    return toHTMLOptionElement(m_element.get())->text();
 }
 
 } // namespace WebCore

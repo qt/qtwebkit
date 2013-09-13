@@ -26,15 +26,27 @@
 #ifndef LoaderStrategy_h
 #define LoaderStrategy_h
 
-#if USE(PLATFORM_STRATEGIES)
+#include "ResourceHandleTypes.h"
+#include <wtf/Vector.h>
 
 namespace WebCore {
 
+class BlobRegistry;
+class NetworkingContext;
+class ResourceError;
 class ResourceLoadScheduler;
+class ResourceRequest;
+class ResourceResponse;
 
 class LoaderStrategy {
 public:
     virtual ResourceLoadScheduler* resourceLoadScheduler();
+
+    virtual void loadResourceSynchronously(NetworkingContext*, unsigned long identifier, const ResourceRequest&, StoredCredentials, ClientCredentialPolicy, ResourceError&, ResourceResponse&, Vector<char>& data);
+
+#if ENABLE(BLOB)
+    virtual BlobRegistry* createBlobRegistry();
+#endif
 
 protected:
     virtual ~LoaderStrategy()
@@ -43,7 +55,5 @@ protected:
 };
 
 } // namespace WebCore
-
-#endif // USE(PLATFORM_STRATEGIES)
 
 #endif // LoaderStrategy_h

@@ -22,7 +22,7 @@
 
 """Unit tests for common.py."""
 
-import unittest
+import unittest2 as unittest
 
 from common import CarriageReturnChecker
 from common import TabChecker
@@ -119,6 +119,3 @@ class TabCheckerTest(unittest.TestCase):
     def test_tab(self):
         self.assert_tab(['\tfoo'], [1])
         self.assert_tab(['line1', '\tline2', 'line3\t'], [2, 3])
-
-if __name__ == '__main__':
-    unittest.main()

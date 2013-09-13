@@ -20,16 +20,12 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-messages -> WebProcess {
+messages -> WebProcess LegacyReceiver {
     # Initialize the WebProcess. 
     InitializeWebProcess(WebKit::WebProcessCreationParameters processCreationParameters, WebKit::WebContextUserMessageEncoder initializationUserData) Variadic
 
     # Create a new page.
     CreateWebPage(uint64_t newPageID, WebKit::WebPageCreationParameters pageCreationParameters)
-
-#if ENABLE(WEB_INTENTS)
-    RemoveMessagePortChannel(uint64_t channelID);
-#endif
 
     # Visited link tracking.
     SetVisitedLinkTable(WebKit::SharedMemory::Handle handle)
@@ -51,26 +47,21 @@ messages -> WebProcess {
     SetShouldUseFontSmoothing(bool useFontSmoothing)
     UserPreferredLanguagesChanged(Vector<WTF::String> languages)
     FullKeyboardAccessModeChanged(bool fullKeyboardAccessEnabled)
-#if PLATFORM(WIN)
-    SetShouldPaintNativeControls(bool shouldPaintNativeControls)
+#if USE(SOUP)
+    SetIgnoreTLSErrors(bool ignoreTLSErrors)
 #endif
 
+    // Private browsing session is per process. Individual pages or page groups may use the private session or the default one as appropriate.
+    EnsurePrivateBrowsingSession()
+    DestroyPrivateBrowsingSession()
+
     # Plug-ins.
-#if ENABLE(NETSCAPE_PLUGIN_API)
-    DidGetPlugins(uint64_t requestID, Vector<WebCore::PluginInfo> plugins) DispatchOnConnectionQueue
-#endif
 #if ENABLE(NETSCAPE_PLUGIN_API) && !ENABLE(PLUGIN_PROCESS)
     GetSitesWithPluginData(Vector<WTF::String> pluginPaths, uint64_t callbackID)
     ClearPluginSiteData(Vector<WTF::String> pluginPaths, Vector<WTF::String> sites, uint64_t flags, uint64_t maxAgeInSeconds, uint64_t callbackID)
 #endif
-
-#if ENABLE(NETWORK_PROCESS)
-    NetworkProcessCrashed() DispatchOnConnectionQueue
-#endif
-
-#if ENABLE(PLUGIN_PROCESS)
-    PluginProcessCrashed(String pluginProcess, uint32_t processType) DispatchOnConnectionQueue
-#endif
+    DidAddPlugInAutoStartOriginHash(uint32_t hash, double expirationTime)
+    ResetPlugInAutoStartOriginHashes(HashMap<uint32_t,double> hashes)
 
     void StartMemorySampler(WebKit::SandboxExtension::Handle sampleLogFileHandle, WTF::String sampleLogFilePath, double interval);
     void StopMemorySampler();
@@ -93,17 +84,9 @@ messages -> WebProcess {
 
     PostInjectedBundleMessage(CoreIPC::DataReference messageData);
 
-#if USE(SECURITY_FRAMEWORK)
-    SecItemResponse(uint64_t requestID, WebKit::SecItemResponseData response) DispatchOnConnectionQueue
-    SecKeychainItemResponse(uint64_t requestID, WebKit::SecKeychainItemResponseData response) DispatchOnConnectionQueue
-#endif
+    ReleasePageCache()
 
 #if PLATFORM(MAC)
-    SetApplicationIsOccluded(bool flag);
-#endif
-
-#if ENABLE(CUSTOM_PROTOCOLS)
-    RegisterSchemeForCustomProtocol(WTF::String name)
-    UnregisterSchemeForCustomProtocol(WTF::String name)
+    SetProcessSuppressionEnabled(bool flag);
 #endif
 }

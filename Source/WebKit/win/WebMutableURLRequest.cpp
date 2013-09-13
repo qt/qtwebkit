@@ -33,7 +33,6 @@
 #include <WebCore/BString.h>
 #include <WebCore/COMPtr.h>
 #include <WebCore/FormData.h>
-#include <WebCore/NotImplemented.h>
 #include <WebCore/ResourceHandle.h>
 #include <wtf/text/CString.h>
 #include <wtf/RetainPtr.h>
@@ -367,7 +366,7 @@ HRESULT STDMETHODCALLTYPE WebMutableURLRequest::setClientCertificate(
 
 CFURLRequestRef STDMETHODCALLTYPE WebMutableURLRequest::cfRequest()
 {
-    return m_request.cfURLRequest();
+    return m_request.cfURLRequest(UpdateHTTPBody);
 }
 
 HRESULT STDMETHODCALLTYPE WebMutableURLRequest::mutableCopy(
@@ -377,7 +376,7 @@ HRESULT STDMETHODCALLTYPE WebMutableURLRequest::mutableCopy(
         return E_POINTER;
 
 #if USE(CFNETWORK)
-    RetainPtr<CFMutableURLRequestRef> mutableRequest(AdoptCF, CFURLRequestCreateMutableCopy(kCFAllocatorDefault, m_request.cfURLRequest()));
+    RetainPtr<CFMutableURLRequestRef> mutableRequest = adoptCF(CFURLRequestCreateMutableCopy(kCFAllocatorDefault, m_request.cfURLRequest(UpdateHTTPBody)));
     *result = createInstance(ResourceRequest(mutableRequest.get()));
     return S_OK;
 #else

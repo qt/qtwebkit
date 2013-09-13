@@ -29,6 +29,7 @@
 // This header contains WebView declarations that can be used anywhere in WebKit, but are neither SPI nor API.
 
 #import "WebTypesInternal.h"
+#import <JavaScriptCore/JSBase.h>
 
 @class WebView;
 
@@ -52,6 +53,9 @@ struct WebResourceDelegateImplementationCache {
 };
 
 struct WebFrameLoadDelegateImplementationCache {
+#if JSC_OBJC_API_ENABLED
+    IMP didCreateJavaScriptContextForFrameFunc;
+#endif
     IMP didClearWindowObjectForFrameFunc;
     IMP didClearWindowObjectForFrameInScriptWorldFunc;
     IMP didClearInspectorWindowObjectForFrameFunc;
@@ -79,6 +83,7 @@ struct WebFrameLoadDelegateImplementationCache {
     IMP didDisplayInsecureContentFunc;
     IMP didRunInsecureContentFunc;
     IMP didDetectXSSFunc;
+    IMP didRemoveFrameFromHierarchyFunc;
 };
 
 struct WebScriptDebugDelegateImplementationCache {
@@ -96,6 +101,7 @@ struct WebHistoryDelegateImplementationCache {
     IMP navigatedFunc;
     IMP clientRedirectFunc;
     IMP serverRedirectFunc;
+    IMP deprecatedSetTitleFunc;
     IMP setTitleFunc;
     IMP populateVisitedLinksFunc;
 };
@@ -106,6 +112,7 @@ WebScriptDebugDelegateImplementationCache* WebViewGetScriptDebugDelegateImplemen
 WebHistoryDelegateImplementationCache* WebViewGetHistoryDelegateImplementations(WebView *webView);
 
 id CallFormDelegate(WebView *, SEL, id, id);
+id CallFormDelegate(WebView *, SEL, id, id, id);
 id CallFormDelegate(WebView *self, SEL selector, id object1, id object2, id object3, id object4, id object5);
 BOOL CallFormDelegateReturningBoolean(BOOL, WebView *, SEL, id, SEL, id);
 

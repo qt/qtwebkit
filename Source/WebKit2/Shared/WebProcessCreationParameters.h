@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Apple Inc. All rights reserved.
+ * Copyright (C) 2010, 2011, 2012 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -38,6 +38,10 @@
 #include "MachPort.h"
 #endif
 
+#if USE(SOUP)
+#include "HTTPCookieAcceptPolicy.h"
+#endif
+
 namespace CoreIPC {
     class ArgumentDecoder;
     class ArgumentEncoder;
@@ -49,7 +53,7 @@ struct WebProcessCreationParameters {
     WebProcessCreationParameters();
 
     void encode(CoreIPC::ArgumentEncoder&) const;
-    static bool decode(CoreIPC::ArgumentDecoder*, WebProcessCreationParameters&);
+    static bool decode(CoreIPC::ArgumentDecoder&, WebProcessCreationParameters&);
 
     String injectedBundlePath;
     SandboxExtension::Handle injectedBundlePathExtensionHandle;
@@ -75,6 +79,13 @@ struct WebProcessCreationParameters {
 #if ENABLE(CUSTOM_PROTOCOLS)
     Vector<String> urlSchemesRegisteredForCustomProtocols;
 #endif
+#if USE(SOUP)
+    Vector<String> urlSchemesRegistered;
+    String cookiePersistentStoragePath;
+    uint32_t cookiePersistentStorageType;
+    HTTPCookieAcceptPolicy cookieAcceptPolicy;
+    bool ignoreTLSErrors;
+#endif
 
     CacheModel cacheModel;
     bool shouldTrackVisitedLinks;
@@ -99,8 +110,6 @@ struct WebProcessCreationParameters {
 #endif
 
 #if PLATFORM(MAC)
-    String parentProcessName;
-
     pid_t presenterApplicationPid;
 
     uint64_t nsURLCacheMemoryCapacity;
@@ -113,19 +122,7 @@ struct WebProcessCreationParameters {
 
     bool shouldForceScreenFontSubstitution;
     bool shouldEnableKerningAndLigaturesByDefault;
-
-#elif PLATFORM(WIN)
-    uint64_t cfURLCacheDiskCapacity;
-    uint64_t cfURLCacheMemoryCapacity;
-
-    uint32_t initialHTTPCookieAcceptPolicy;
-
-    bool shouldPaintNativeControls;
-
-#if USE(CFNETWORK)
-    RetainPtr<CFDataRef> serializedDefaultStorageSession;
-#endif
-#endif // PLATFORM(WIN)
+#endif // PLATFORM(MAC)
 
 #if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
     HashMap<String, bool> notificationPermissions;
@@ -134,6 +131,9 @@ struct WebProcessCreationParameters {
 #if ENABLE(NETWORK_PROCESS)
     bool usesNetworkProcess;
 #endif
+
+    HashMap<unsigned, double> plugInAutoStartOriginHashes;
+    Vector<String> plugInAutoStartOrigins;
 };
 
 } // namespace WebKit

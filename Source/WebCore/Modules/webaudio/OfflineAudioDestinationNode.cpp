@@ -46,7 +46,7 @@ OfflineAudioDestinationNode::OfflineAudioDestinationNode(AudioContext* context, 
     , m_renderThread(0)
     , m_startedRendering(false)
 {
-    m_renderBus = adoptPtr(new AudioBus(renderTarget->numberOfChannels(), renderQuantumSize));
+    m_renderBus = AudioBus::create(renderTarget->numberOfChannels(), renderQuantumSize);
 }
 
 OfflineAudioDestinationNode::~OfflineAudioDestinationNode()
@@ -116,7 +116,7 @@ void OfflineAudioDestinationNode::offlineRender()
         
     // Synchronize with HRTFDatabaseLoader.
     // The database must be loaded before we can proceed.
-    HRTFDatabaseLoader* loader = HRTFDatabaseLoader::loader();
+    HRTFDatabaseLoader* loader = context()->hrtfDatabaseLoader();
     ASSERT(loader);
     if (!loader)
         return;

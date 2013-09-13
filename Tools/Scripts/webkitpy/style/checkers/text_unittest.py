@@ -1,4 +1,3 @@
-#!/usr/bin/python
 # Copyright (C) 2009 Google Inc. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -29,7 +28,7 @@
 
 """Unit test for text_style.py."""
 
-import unittest
+import unittest2 as unittest
 
 import text as text_style
 from text import TextChecker
@@ -46,7 +45,7 @@ class TextStyleTestCase(unittest.TestCase):
             self.had_error = True
 
         text_style.process_file_data('', lines, error_for_test)
-        self.assertTrue(not self.had_error, '%s should not have any errors.' % lines)
+        self.assertFalse(self.had_error, '%s should not have any errors.' % lines)
 
     def assertError(self, lines, expected_line_number):
         """Asserts that the specified lines has an error."""
@@ -88,7 +87,3 @@ class TextCheckerTest(unittest.TestCase):
         checker = TextChecker("foo.txt", self.mock_handle_style_error)
         self.assertEqual(checker.file_path, "foo.txt")
         self.assertEqual(checker.handle_style_error, self.mock_handle_style_error)
-
-
-if __name__ == '__main__':
-    unittest.main()

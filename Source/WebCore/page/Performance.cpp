@@ -34,7 +34,6 @@
 
 #include "Document.h"
 #include "DocumentLoader.h"
-#include "MemoryInfo.h"
 #include "PerformanceEntry.h"
 #include "PerformanceNavigation.h"
 #include "PerformanceResourceTiming.h"
@@ -80,11 +79,6 @@ ScriptExecutionContext* Performance::scriptExecutionContext() const
     return frame()->document();
 }
 
-PassRefPtr<MemoryInfo> Performance::memory() const
-{
-    return MemoryInfo::create(m_frame);
-}
-
 PerformanceNavigation* Performance::navigation() const
 {
     if (!m_navigation)
@@ -102,7 +96,6 @@ PerformanceTiming* Performance::timing() const
 }
 
 #if ENABLE(PERFORMANCE_TIMELINE)
-
 PassRefPtr<PerformanceEntryList> Performance::webkitGetEntries() const
 {
     RefPtr<PerformanceEntryList> entries = PerformanceEntryList::create();

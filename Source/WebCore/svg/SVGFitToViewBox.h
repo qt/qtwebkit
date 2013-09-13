@@ -22,7 +22,6 @@
 #define SVGFitToViewBox_h
 
 #if ENABLE(SVG)
-#include "Attribute.h"
 #include "FloatRect.h"
 #include "QualifiedName.h"
 #include "SVGNames.h"
@@ -48,9 +47,8 @@ public:
         ASSERT(target->document());
         if (name == SVGNames::viewBoxAttr) {
             FloatRect viewBox;
-            if (!value.isNull())
-                parseViewBox(target->document(), value, viewBox);
-            target->setViewBoxBaseValue(viewBox);
+            bool valueIsValid = !value.isNull() && parseViewBox(target->document(), value, viewBox);
+            target->setViewBoxBaseValue(viewBox, valueIsValid);
             return true;
         }
 

@@ -25,14 +25,11 @@
 #include "config.h"
 #include "AuthenticationChallenge.h"
 
-#include "ResourceHandle.h"
-
 namespace WebCore {
 
 AuthenticationChallengeBase::AuthenticationChallengeBase()
     : m_isNull(true)
     , m_previousFailureCount(0)
-    , m_identifier(0)
 {
 }
 
@@ -47,7 +44,6 @@ AuthenticationChallengeBase::AuthenticationChallengeBase(const ProtectionSpace& 
     , m_previousFailureCount(previousFailureCount)
     , m_failureResponse(response)
     , m_error(error)
-    , m_identifier(0)
 {
 }
 

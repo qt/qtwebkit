@@ -32,6 +32,8 @@
 #include "JSArray.h"
 #include "JSString.h"
 #include "Lexer.h"
+#include "ObjectConstructor.h"
+#include "Operations.h"
 #include "StrongInlines.h"
 #include <wtf/ASCIICType.h>
 #include <wtf/dtoa.h>
@@ -55,22 +57,24 @@ bool LiteralParser<CharType>::tryJSONPParse(Vector<JSONPData>& results, bool nee
     do {
         Vector<JSONPPathEntry> path;
         // Unguarded next to start off the lexer
-        Identifier name = Identifier(&m_exec->globalData(), m_lexer.currentToken().start, m_lexer.currentToken().end - m_lexer.currentToken().start);
+        Identifier name = Identifier(&m_exec->vm(), m_lexer.currentToken().start, m_lexer.currentToken().end - m_lexer.currentToken().start);
         JSONPPathEntry entry;
-        if (name == m_exec->globalData().propertyNames->varKeyword) {
+        if (name == m_exec->vm().propertyNames->varKeyword) {
             if (m_lexer.next() != TokIdentifier)
                 return false;
             entry.m_type = JSONPPathEntryTypeDeclare;
-            entry.m_pathEntryName = Identifier(&m_exec->globalData(), m_lexer.currentToken().start, m_lexer.currentToken().end - m_lexer.currentToken().start);
+            entry.m_pathEntryName = Identifier(&m_exec->vm(), m_lexer.currentToken().start, m_lexer.currentToken().end - m_lexer.currentToken().start);
             path.append(entry);
         } else {
             entry.m_type = JSONPPathEntryTypeDot;
-            entry.m_pathEntryName = Identifier(&m_exec->globalData(), m_lexer.currentToken().start, m_lexer.currentToken().end - m_lexer.currentToken().start);
+            entry.m_pathEntryName = Identifier(&m_exec->vm(), m_lexer.currentToken().start, m_lexer.currentToken().end - m_lexer.currentToken().start);
             path.append(entry);
         }
-        if (m_exec->globalData().keywords->isKeyword(entry.m_pathEntryName))
+        if (m_exec->vm().keywords->isKeyword(entry.m_pathEntryName))
             return false;
         TokenType tokenType = m_lexer.next();
+        if (entry.m_type == JSONPPathEntryTypeDeclare && tokenType != TokAssign)
+            return false;
         while (tokenType != TokAssign) {
             switch (tokenType) {
             case TokLBracket: {
@@ -90,7 +94,7 @@ bool LiteralParser<CharType>::tryJSONPParse(Vector<JSONPData>& results, bool nee
                 entry.m_type = JSONPPathEntryTypeDot;
                 if (m_lexer.next() != TokIdentifier)
                     return false;
-                entry.m_pathEntryName = Identifier(&m_exec->globalData(), m_lexer.currentToken().start, m_lexer.currentToken().end - m_lexer.currentToken().start);
+                entry.m_pathEntryName = Identifier(&m_exec->vm(), m_lexer.currentToken().start, m_lexer.currentToken().end - m_lexer.currentToken().start);
                 break;
             }
             case TokLParen: {
@@ -109,7 +113,7 @@ bool LiteralParser<CharType>::tryJSONPParse(Vector<JSONPData>& results, bool nee
     startJSON:
         m_lexer.next();
         results.append(JSONPData());
-        results.last().m_value.set(m_exec->globalData(), parse(StartParseExpression));
+        results.last().m_value.set(m_exec->vm(), parse(StartParseExpression));
         if (!results.last().m_value)
             return false;
         results.last().m_path.swap(path);
@@ -129,19 +133,19 @@ template <typename CharType>
 ALWAYS_INLINE const Identifier LiteralParser<CharType>::makeIdentifier(const LChar* characters, size_t length)
 {
     if (!length)
-        return m_exec->globalData().propertyNames->emptyIdentifier;
+        return m_exec->vm().propertyNames->emptyIdentifier;
     if (characters[0] >= MaximumCachableCharacter)
-        return Identifier(&m_exec->globalData(), characters, length);
+        return Identifier(&m_exec->vm(), characters, length);
 
     if (length == 1) {
         if (!m_shortIdentifiers[characters[0]].isNull())
             return m_shortIdentifiers[characters[0]];
-        m_shortIdentifiers[characters[0]] = Identifier(&m_exec->globalData(), characters, length);
+        m_shortIdentifiers[characters[0]] = Identifier(&m_exec->vm(), characters, length);
         return m_shortIdentifiers[characters[0]];
     }
     if (!m_recentIdentifiers[characters[0]].isNull() && Identifier::equal(m_recentIdentifiers[characters[0]].impl(), characters, length))
         return m_recentIdentifiers[characters[0]];
-    m_recentIdentifiers[characters[0]] = Identifier(&m_exec->globalData(), characters, length);
+    m_recentIdentifiers[characters[0]] = Identifier(&m_exec->vm(), characters, length);
     return m_recentIdentifiers[characters[0]];
 }
 
@@ -149,19 +153,19 @@ template <typename CharType>
 ALWAYS_INLINE const Identifier LiteralParser<CharType>::makeIdentifier(const UChar* characters, size_t length)
 {
     if (!length)
-        return m_exec->globalData().propertyNames->emptyIdentifier;
+        return m_exec->vm().propertyNames->emptyIdentifier;
     if (characters[0] >= MaximumCachableCharacter)
-        return Identifier(&m_exec->globalData(), characters, length);
+        return Identifier(&m_exec->vm(), characters, length);
 
     if (length == 1) {
         if (!m_shortIdentifiers[characters[0]].isNull())
             return m_shortIdentifiers[characters[0]];
-        m_shortIdentifiers[characters[0]] = Identifier(&m_exec->globalData(), characters, length);
+        m_shortIdentifiers[characters[0]] = Identifier(&m_exec->vm(), characters, length);
         return m_shortIdentifiers[characters[0]];
     }
     if (!m_recentIdentifiers[characters[0]].isNull() && Identifier::equal(m_recentIdentifiers[characters[0]].impl(), characters, length))
         return m_recentIdentifiers[characters[0]];
-    m_recentIdentifiers[characters[0]] = Identifier(&m_exec->globalData(), characters, length);
+    m_recentIdentifiers[characters[0]] = Identifier(&m_exec->vm(), characters, length);
     return m_recentIdentifiers[characters[0]];
 }
 
@@ -542,8 +546,8 @@ JSValue LiteralParser<CharType>::parse(ParserState initialState)
     ParserState state = initialState;
     MarkedArgumentBuffer objectStack;
     JSValue lastValue;
-    Vector<ParserState, 16> stateStack;
-    Vector<Identifier, 16> identifierStack;
+    Vector<ParserState, 16, UnsafeVectorOverflow> stateStack;
+    Vector<Identifier, 16, UnsafeVectorOverflow> identifierStack;
     while (1) {
         switch(state) {
             startParseArray:
@@ -649,7 +653,7 @@ JSValue LiteralParser<CharType>::parse(ParserState initialState)
                 if (i != PropertyName::NotAnIndex)
                     object->putDirectIndex(m_exec, i, lastValue);
                 else
-                    object->putDirect(m_exec->globalData(), ident, lastValue);
+                    object->putDirect(m_exec->vm(), ident, lastValue);
                 identifierStack.removeLast();
                 if (m_lexer.currentToken().type == TokComma)
                     goto doParseObjectStartExpression;
@@ -814,7 +818,7 @@ JSValue LiteralParser<CharType>::parse(ParserState initialState)
                 return JSValue();
             }
             default:
-                ASSERT_NOT_REACHED();
+                RELEASE_ASSERT_NOT_REACHED();
         }
         if (stateStack.isEmpty())
             return lastValue;

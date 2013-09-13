@@ -1,4 +1,4 @@
-# Copyright (C) 2007, 2008, 2009 Apple Inc.  All rights reserved.
+# Copyright (C) 2007, 2008, 2009, 2010, 2011, 2012, 2013 Apple Inc.  All rights reserved.
 # Copyright (C) 2009, 2010 Chris Jerdonek (chris.jerdonek@gmail.com)
 # Copyright (C) 2010, 2011 Research In Motion Limited. All rights reserved.
 # Copyright (C) 2012 Daniel Bates (dbates@intudata.com)
@@ -107,8 +107,11 @@ my $svnVersion;
 # Project time zone for Cupertino, CA, US
 my $changeLogTimeZone = "PST8PDT";
 
-my $gitDiffStartRegEx = qr#^diff --git (\w/)?(.+) (\w/)?([^\r\n]+)#;
+my $gitDiffStartRegEx = qr#^diff --git [^\r\n]+#;
+my $gitDiffStartWithPrefixRegEx = qr#^diff --git \w/(.+) \w/([^\r\n]+)#; # We suppose that --src-prefix and --dst-prefix don't contain a non-word character (\W) and end with '/'.
+my $gitDiffStartWithoutPrefixNoSpaceRegEx = qr#^diff --git (\S+) (\S+)$#;
 my $svnDiffStartRegEx = qr#^Index: ([^\r\n]+)#;
+my $gitDiffStartWithoutPrefixSourceDirectoryPrefixRegExp = qr#^diff --git ([^/]+/)#;
 my $svnPropertiesStartRegEx = qr#^Property changes on: ([^\r\n]+)#; # $1 is normally the same as the index path.
 my $svnPropertyStartRegEx = qr#^(Modified|Name|Added|Deleted): ([^\r\n]+)#; # $2 is the name of the property.
 my $svnPropertyValueStartRegEx = qr#^\s*(\+|-|Merged|Reverse-merged)\s*([^\r\n]+)#; # $2 is the start of the property's value (which may span multiple lines).
@@ -233,11 +236,33 @@ sub isGitSVN()
     return $isGitSVN;
 }
 
+sub gitDirectory()
+{
+    chomp(my $result = `git rev-parse --git-dir`);
+    return $result;
+}
+
+sub gitBisectStartBranch()
+{
+    my $bisectStartFile = File::Spec->catfile(gitDirectory(), "BISECT_START");
+    if (!-f $bisectStartFile) {
+        return "";
+    }
+    open(BISECT_START, $bisectStartFile) or die "Failed to open $bisectStartFile: $!";
+    chomp(my $result = <BISECT_START>);
+    close(BISECT_START);
+    return $result;
+}
+
 sub gitBranch()
 {
     unless (defined $gitBranch) {
         chomp($gitBranch = `git symbolic-ref -q HEAD`);
-        $gitBranch = "" if exitStatus($?);
+        my $hasDetachedHead = exitStatus($?);
+        if ($hasDetachedHead) {
+            # We may be in a git bisect session.
+            $gitBranch = gitBisectStartBranch();
+        }
         $gitBranch =~ s#^refs/heads/##;
         $gitBranch = "" if $gitBranch eq "master";
     }
@@ -302,12 +327,6 @@ sub chdirReturningRelativePath($)
     return File::Spec->abs2rel($previousDirectory, $newDirectory);
 }
 
-sub determineGitRoot()
-{
-    chomp(my $gitDir = `git rev-parse --git-dir`);
-    return dirname($gitDir);
-}
-
 sub determineSVNRoot()
 {
     my $last = '';
@@ -356,7 +375,7 @@ sub determineSVNRoot()
 sub determineVCSRoot()
 {
     if (isGit()) {
-        return determineGitRoot();
+        return dirname(gitDirectory());
     }
 
     if (!isSVN()) {
@@ -615,6 +634,32 @@ sub isExecutable($)
     return $fileMode % 2;
 }
 
+# Parse the Git diff header start line.
+#
+# Args:
+#   $line: "diff --git" line.
+#
+# Returns the path of the target file.
+sub parseGitDiffStartLine($)
+{
+    my $line = shift;
+    $_ = $line;
+    if (/$gitDiffStartWithPrefixRegEx/ || /$gitDiffStartWithoutPrefixNoSpaceRegEx/) {
+        return $2;
+    }
+    # Assume the diff was generated with --no-prefix (e.g. git diff --no-prefix).
+    if (!/$gitDiffStartWithoutPrefixSourceDirectoryPrefixRegExp/) {
+        # FIXME: Moving top directory file is not supported (e.g diff --git A.txt B.txt).
+        die("Could not find '/' in \"diff --git\" line: \"$line\"; only non-prefixed git diffs (i.e. not generated with --no-prefix) that move a top-level directory file are supported.");
+    }
+    my $pathPrefix = $1;
+    if (!/^diff --git \Q$pathPrefix\E.+ (\Q$pathPrefix\E.+)$/) {
+        # FIXME: Moving a file through sub directories of top directory is not supported (e.g diff --git A/B.txt C/B.txt).
+        die("Could not find '/' in \"diff --git\" line: \"$line\"; only non-prefixed git diffs (i.e. not generated with --no-prefix) that move a file between top-level directories are supported.");
+    }
+    return $1;
+}
+
 # Parse the next Git diff header from the given file handle, and advance
 # the handle so the last line read is the first line after the header.
 #
@@ -656,12 +701,15 @@ sub parseGitDiffHeader($$)
 
     my $indexPath;
     if (/$gitDiffStartRegEx/) {
+        # Use $POSTMATCH to preserve the end-of-line character.
+        my $eol = $POSTMATCH;
+
         # The first and second paths can differ in the case of copies
         # and renames.  We use the second file path because it is the
         # destination path.
-        $indexPath = adjustPathForRecentRenamings($4);
-        # Use $POSTMATCH to preserve the end-of-line character.
-        $_ = "Index: $indexPath$POSTMATCH"; # Convert to SVN format.
+        $indexPath = adjustPathForRecentRenamings(parseGitDiffStartLine($_));
+
+        $_ = "Index: $indexPath$eol"; # Convert to SVN format.
     } else {
         die("Could not parse leading \"diff --git\" line: \"$line\".");
     }
@@ -690,9 +738,9 @@ sub parseGitDiffHeader($$)
             $isNew = 1 if $1;
         } elsif (/^similarity index (\d+)%/) {
             $similarityIndex = $1;
-        } elsif (/^copy from (\S+)/) {
+        } elsif (/^copy from ([^\t\r\n]+)/) {
             $copiedFromPath = $1;
-        } elsif (/^rename from (\S+)/) {
+        } elsif (/^rename from ([^\t\r\n]+)/) {
             # FIXME: Record this as a move rather than as a copy-and-delete.
             #        This will simplify adding rename support to svn-unapply.
             #        Otherwise, the hash for a deletion would have to know
@@ -702,9 +750,17 @@ sub parseGitDiffHeader($$)
             $copiedFromPath = $1;
             $shouldDeleteSource = 1;
         } elsif (/^--- \S+/) {
-            $_ = "--- $indexPath"; # Convert to SVN format.
+            # Convert to SVN format.
+            # We emit the suffix "\t(revision 0)" to handle $indexPath which contains a space character.
+            # The patch(1) command thinks a file path is characters before a tab.
+            # This suffix make our diff more closely match the SVN diff format.
+            $_ = "--- $indexPath\t(revision 0)";
         } elsif (/^\+\+\+ \S+/) {
-            $_ = "+++ $indexPath"; # Convert to SVN format.
+            # Convert to SVN format.
+            # We emit the suffix "\t(working copy)" to handle $indexPath which contains a space character.
+            # The patch(1) command thinks a file path is characters before a tab.
+            # This suffix make our diff more closely match the SVN diff format.
+            $_ = "+++ $indexPath\t(working copy)";
             $foundHeaderEnding = 1;
         } elsif (/^GIT binary patch$/ ) {
             $isBinary = 1;
@@ -1005,13 +1061,23 @@ sub parseDiff($$;$)
             # Then we are in the body of the diff.
             my $isChunkRange = defined(parseChunkRange($line));
             $numTextChunks += 1 if $isChunkRange;
+            my $nextLine = <$fileHandle>;
+            my $willAddNewLineAtEndOfFile = defined($nextLine) && $nextLine =~ /^\\ No newline at end of file$/;
+            if ($willAddNewLineAtEndOfFile) {
+                # Diff(1) always emits a LF character preceeding the line "\ No newline at end of file".
+                # We must preserve both the added LF character and the line ending of this sentinel line
+                # or patch(1) will complain.
+                $svnText .= $line . $nextLine;
+                $line = <$fileHandle>;
+                next;
+            }
             if ($indexPathEOL && !$isChunkRange) {
                 # The chunk range is part of the body of the diff, but its line endings should't be
                 # modified or patch(1) will complain. So, we only modify non-chunk range lines.
                 $line =~ s/\r\n|\r|\n/$indexPathEOL/g;
             }
             $svnText .= $line;
-            $line = <$fileHandle>;
+            $line = $nextLine;
             next;
         } # Otherwise, we found a diff header.
 
@@ -1023,6 +1089,10 @@ sub parseDiff($$;$)
 
         ($headerHashRef, $line) = parseDiffHeader($fileHandle, $line);
         if (!$optionsHashRef || !$optionsHashRef->{shouldNotUseIndexPathEOL}) {
+            # FIXME: We shouldn't query the file system (via firstEOLInFile()) to determine the
+            #        line endings of the file indexPath. Instead, either the caller to parseDiff()
+            #        should provide this information or parseDiff() should take a delegate that it
+            #        can use to query for this information.
             $indexPathEOL = firstEOLInFile($headerHashRef->{indexPath}) if !$headerHashRef->{isNew} && !$headerHashRef->{isBinary};
         }
 
@@ -1815,9 +1885,6 @@ sub gitConfig($)
     my ($config) = @_;
 
     my $result = `git config $config`;
-    if (($? >> 8)) {
-        $result = `git repo-config $config`;
-    }
     chomp $result;
     return $result;
 }

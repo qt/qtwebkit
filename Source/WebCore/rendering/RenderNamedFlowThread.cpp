@@ -26,10 +26,14 @@
 #include "config.h"
 #include "RenderNamedFlowThread.h"
 
+#include "ExceptionCodePlaceholder.h"
 #include "FlowThreadController.h"
 #include "InlineTextBox.h"
 #include "InspectorInstrumentation.h"
+#include "NodeRenderingContext.h"
+#include "NodeTraversal.h"
 #include "Position.h"
+#include "Range.h"
 #include "RenderInline.h"
 #include "RenderRegion.h"
 #include "RenderText.h"
@@ -39,10 +43,19 @@
 
 namespace WebCore {
 
-RenderNamedFlowThread::RenderNamedFlowThread(Node* node, PassRefPtr<WebKitNamedFlow> namedFlow)
-    : RenderFlowThread(node)
+RenderNamedFlowThread* RenderNamedFlowThread::createAnonymous(Document* document, PassRefPtr<WebKitNamedFlow> namedFlow)
+{
+    ASSERT(document->cssRegionsEnabled());
+    RenderNamedFlowThread* renderer = new (document->renderArena()) RenderNamedFlowThread(namedFlow);
+    renderer->setDocumentForAnonymous(document);
+    return renderer;
+}
+
+RenderNamedFlowThread::RenderNamedFlowThread(PassRefPtr<WebKitNamedFlow> namedFlow)
+    : m_overset(true)
     , m_namedFlow(namedFlow)
     , m_regionLayoutUpdateEventTimer(this, &RenderNamedFlowThread::regionLayoutUpdateEventTimerFired)
+    , m_regionOversetChangeEventTimer(this, &RenderNamedFlowThread::regionOversetChangeEventTimerFired)
 {
 }
 
@@ -220,27 +233,34 @@ static void addRegionToList(RenderRegionList& regionList, RenderRegion* renderRe
     }
 }
 
-void RenderNamedFlowThread::addRegionToThread(RenderRegion* renderRegion)
+void RenderNamedFlowThread::addRegionToNamedFlowThread(RenderRegion* renderRegion)
 {
     ASSERT(renderRegion);
-
-    resetMarkForDestruction();
-
     ASSERT(!renderRegion->isValid());
-    if (renderRegion->parentNamedFlowThread()) {
-        if (renderRegion->parentNamedFlowThread()->dependsOn(this)) {
-            // The order of invalid regions is irrelevant.
-            m_invalidRegionList.add(renderRegion);
-            // Register ourself to get a notification when the state changes.
-            renderRegion->parentNamedFlowThread()->m_observerThreadsSet.add(this);
-            return;
-        }
 
+    if (renderRegion->parentNamedFlowThread())
         addDependencyOnFlowThread(renderRegion->parentNamedFlowThread());
-    }
 
     renderRegion->setIsValid(true);
     addRegionToList(m_regionList, renderRegion);
+}
+
+void RenderNamedFlowThread::addRegionToThread(RenderRegion* renderRegion)
+{
+    ASSERT(renderRegion);
+    ASSERT(!renderRegion->isValid());
+
+    resetMarkForDestruction();
+
+    if (renderRegion->parentNamedFlowThread() && renderRegion->parentNamedFlowThread()->dependsOn(this)) {
+        // The order of invalid regions is irrelevant.
+        m_invalidRegionList.add(renderRegion);
+        // Register ourself to get a notification when the state changes.
+        renderRegion->parentNamedFlowThread()->m_observerThreadsSet.add(this);
+        return;
+    }
+
+    addRegionToNamedFlowThread(renderRegion);
 
     invalidateRegions();
 }
@@ -248,7 +268,6 @@ void RenderNamedFlowThread::addRegionToThread(RenderRegion* renderRegion)
 void RenderNamedFlowThread::removeRegionFromThread(RenderRegion* renderRegion)
 {
     ASSERT(renderRegion);
-    m_regionRangeMap.clear();
 
     if (renderRegion->parentNamedFlowThread()) {
         if (!renderRegion->isValid()) {
@@ -275,6 +294,54 @@ void RenderNamedFlowThread::removeRegionFromThread(RenderRegion* renderRegion)
     invalidateRegions();
 }
 
+void RenderNamedFlowThread::computeOversetStateForRegions(LayoutUnit oldClientAfterEdge)
+{
+    LayoutUnit height = oldClientAfterEdge;
+
+    // FIXME: the visual overflow of middle region (if it is the last one to contain any content in a render flow thread)
+    // might not be taken into account because the render flow thread height is greater that that regions height + its visual overflow
+    // because of how computeLogicalHeight is implemented for RenderNamedFlowThread (as a sum of all regions height).
+    // This means that the middle region will be marked as fit (even if it has visual overflow flowing into the next region)
+    if (hasRenderOverflow()
+        && ( (isHorizontalWritingMode() && visualOverflowRect().maxY() > clientBoxRect().maxY())
+            || (!isHorizontalWritingMode() && visualOverflowRect().maxX() > clientBoxRect().maxX())))
+        height = isHorizontalWritingMode() ? visualOverflowRect().maxY() : visualOverflowRect().maxX();
+
+    RenderRegion* lastReg = lastRegion();
+    for (RenderRegionList::iterator iter = m_regionList.begin(); iter != m_regionList.end(); ++iter) {
+        RenderRegion* region = *iter;
+        LayoutUnit flowMin = height - (isHorizontalWritingMode() ? region->flowThreadPortionRect().y() : region->flowThreadPortionRect().x());
+        LayoutUnit flowMax = height - (isHorizontalWritingMode() ? region->flowThreadPortionRect().maxY() : region->flowThreadPortionRect().maxX());
+        RegionOversetState previousState = region->regionOversetState();
+        RegionOversetState state = RegionFit;
+        if (flowMin <= 0)
+            state = RegionEmpty;
+        if (flowMax > 0 && region == lastReg)
+            state = RegionOverset;
+        region->setRegionOversetState(state);
+        // determine whether the NamedFlow object should dispatch a regionLayoutUpdate event
+        // FIXME: currently it cannot determine whether a region whose regionOverset state remained either "fit" or "overset" has actually
+        // changed, so it just assumes that the NamedFlow should dispatch the event
+        if (previousState != state
+            || state == RegionFit
+            || state == RegionOverset)
+            setDispatchRegionLayoutUpdateEvent(true);
+        
+        if (previousState != state)
+            setDispatchRegionOversetChangeEvent(true);
+    }
+    
+    // If the number of regions has changed since we last computed the overset property, schedule the regionOversetChange event.
+    if (previousRegionCountChanged()) {
+        setDispatchRegionOversetChangeEvent(true);
+        updatePreviousRegionCount();
+    }
+
+    // With the regions overflow state computed we can also set the overset flag for the named flow.
+    // If there are no valid regions in the chain, overset is true.
+    m_overset = lastReg ? lastReg->regionOversetState() == RegionOverset : true;
+}
+
 void RenderNamedFlowThread::checkInvalidRegions()
 {
     Vector<RenderRegion*> newValidRegions;
@@ -292,9 +359,7 @@ void RenderNamedFlowThread::checkInvalidRegions()
         RenderRegion* region = *iter;
         m_invalidRegionList.remove(region);
         region->parentNamedFlowThread()->m_observerThreadsSet.remove(this);
-        region->setIsValid(true);
-        addDependencyOnFlowThread(region->parentNamedFlowThread());
-        addRegionToList(m_regionList, region);
+        addRegionToNamedFlowThread(region);
     }
 
     if (!newValidRegions.isEmpty())
@@ -387,6 +452,22 @@ const AtomicString& RenderNamedFlowThread::flowThreadName() const
     return m_namedFlow->name();
 }
 
+bool RenderNamedFlowThread::isChildAllowed(RenderObject* child, RenderStyle* style) const
+{
+    ASSERT(child);
+    ASSERT(style);
+
+    if (!child->node())
+        return true;
+
+    ASSERT(child->node()->isElementNode());
+    RenderObject* parentRenderer = NodeRenderingContext(child->node()).parentRenderer();
+    if (!parentRenderer)
+        return true;
+
+    return parentRenderer->isChildAllowed(child, style);
+}
+
 void RenderNamedFlowThread::dispatchRegionLayoutUpdateEvent()
 {
     RenderFlowThread::dispatchRegionLayoutUpdateEvent();
@@ -396,11 +477,27 @@ void RenderNamedFlowThread::dispatchRegionLayoutUpdateEvent()
         m_regionLayoutUpdateEventTimer.startOneShot(0);
 }
 
+void RenderNamedFlowThread::dispatchRegionOversetChangeEvent()
+{
+    RenderFlowThread::dispatchRegionOversetChangeEvent();
+    InspectorInstrumentation::didChangeRegionOverset(document(), m_namedFlow.get());
+    
+    if (!m_regionOversetChangeEventTimer.isActive() && m_namedFlow->hasEventListeners())
+        m_regionOversetChangeEventTimer.startOneShot(0);
+}
+
 void RenderNamedFlowThread::regionLayoutUpdateEventTimerFired(Timer<RenderNamedFlowThread>*)
 {
     ASSERT(m_namedFlow);
 
     m_namedFlow->dispatchRegionLayoutUpdateEvent();
+}
+
+void RenderNamedFlowThread::regionOversetChangeEventTimerFired(Timer<RenderNamedFlowThread>*)
+{
+    ASSERT(m_namedFlow);
+    
+    m_namedFlow->dispatchRegionOversetChangeEvent();
 }
 
 void RenderNamedFlowThread::setMarkForDestruction()
@@ -476,7 +573,6 @@ void RenderNamedFlowThread::getRanges(Vector<RefPtr<Range> >& rangeObjects, cons
         if (!contentNode->renderer())
             continue;
 
-        ExceptionCode ignoredException;
         RefPtr<Range> range = Range::create(contentNode->document());
         bool foundStartPosition = false;
         bool startsAboveRegion = true;
@@ -484,7 +580,7 @@ void RenderNamedFlowThread::getRanges(Vector<RefPtr<Range> >& rangeObjects, cons
         bool skipOverOutsideNodes = false;
         Node* lastEndNode = 0;
 
-        for (Node* node = contentNode; node; node = node->traverseNextNode(contentNode)) {
+        for (Node* node = contentNode; node; node = NodeTraversal::next(node, contentNode)) {
             RenderObject* renderer = node->renderer();
             if (!renderer)
                 continue;
@@ -515,16 +611,16 @@ void RenderNamedFlowThread::getRanges(Vector<RefPtr<Range> >& rangeObjects, cons
             if (!boxIntersectsRegion(logicalTopForRenderer, logicalBottomForRenderer, logicalTopForRegion, logicalBottomForRegion)) {
                 if (foundStartPosition) {
                     if (!startsAboveRegion) {
-                        if (range->intersectsNode(node, ignoredException))
-                            range->setEndBefore(node, ignoredException);
-                        rangeObjects.append(range->cloneRange(ignoredException));
+                        if (range->intersectsNode(node, IGNORE_EXCEPTION))
+                            range->setEndBefore(node, IGNORE_EXCEPTION);
+                        rangeObjects.append(range->cloneRange(IGNORE_EXCEPTION));
                         range = Range::create(contentNode->document());
                         startsAboveRegion = true;
                     } else
                         skipOverOutsideNodes = true;
                 }
                 if (skipOverOutsideNodes)
-                    range->setStartAfter(node, ignoredException);
+                    range->setStartAfter(node, IGNORE_EXCEPTION);
                 foundStartPosition = false;
                 continue;
             }
@@ -551,7 +647,7 @@ void RenderNamedFlowThread::getRanges(Vector<RefPtr<Range> >& rangeObjects, cons
                 // the range is closed.
                 if (startsAboveRegion) {
                     startsAboveRegion = false;
-                    range->setStartBefore(node, ignoredException);
+                    range->setStartBefore(node, IGNORE_EXCEPTION);
                 }
             }
             skipOverOutsideNodes  = false;
@@ -585,7 +681,7 @@ void RenderNamedFlowThread::getRanges(Vector<RefPtr<Range> >& rangeObjects, cons
                 // for elements that ends inside the region, set the end position to be after them
                 // allow this end position to be changed only by other elements that are not descendants of the current end node
                 if (endsBelowRegion || (!endsBelowRegion && !node->isDescendantOf(lastEndNode))) {
-                    range->setEndAfter(node, ignoredException);
+                    range->setEndAfter(node, IGNORE_EXCEPTION);
                     endsBelowRegion = false;
                     lastEndNode = node;
                 }

@@ -35,7 +35,7 @@ namespace WebCore {
 
 class ActiveDOMObject : public ContextDestructionObserver {
 public:
-    ActiveDOMObject(ScriptExecutionContext*, void* upcastPointer);
+    ActiveDOMObject(ScriptExecutionContext*);
 
     // suspendIfNeeded() should be called exactly once after object construction to synchronize
     // the suspend state with that in ScriptExecutionContext.
@@ -76,8 +76,6 @@ public:
         --m_pendingActivityCount;
         thisObject->deref();
     }
-
-    virtual void reportMemoryUsage(MemoryObjectInfo*) const;
 
 protected:
     virtual ~ActiveDOMObject();

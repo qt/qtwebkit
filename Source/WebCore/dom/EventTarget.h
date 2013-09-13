@@ -40,8 +40,10 @@
 
 namespace WebCore {
 
+    class AudioNode;
     class AudioContext;
-    class DedicatedWorkerContext;
+    class AudioTrackList;
+    class DedicatedWorkerGlobalScope;
     class DOMApplicationCache;
     class DOMWindow;
     class Event;
@@ -52,7 +54,6 @@ namespace WebCore {
     class IDBDatabase;
     class IDBRequest;
     class IDBTransaction;
-    class IDBVersionChangeRequest;
     class ScriptProcessorNode;
     class LocalMediaStream;
     class MediaController;
@@ -64,10 +65,11 @@ namespace WebCore {
     class SVGElementInstance;
     class ScriptExecutionContext;
     class SharedWorker;
-    class SharedWorkerContext;
+    class SharedWorkerGlobalScope;
     class SourceBufferList;
     class TextTrack;
     class TextTrackCue;
+    class VideoTrackList;
     class WebSocket;
     class WebKitNamedFlow;
     class Worker;
@@ -125,15 +127,14 @@ namespace WebCore {
 
         bool hasEventListeners();
         bool hasEventListeners(const AtomicString& eventType);
+        bool hasCapturingEventListeners(const AtomicString& eventType);
         const EventListenerVector& getEventListeners(const AtomicString& eventType);
 
         bool fireEventListeners(Event*);
         bool isFiringEventListeners();
 
-#if USE(JSC)
         void visitJSEventListeners(JSC::SlotVisitor&);
         void invalidateJSEventListeners(JSC::JSObject*);
-#endif
 
     protected:
         virtual ~EventTarget();
@@ -172,18 +173,20 @@ namespace WebCore {
         EventListener* on##attribute() { return getAttributeEventListener(eventNames().eventName##Event); } \
         void setOn##attribute(PassRefPtr<EventListener> listener) { setAttributeEventListener(eventNames().eventName##Event, listener); } \
 
-    #define DEFINE_FORWARDING_ATTRIBUTE_EVENT_LISTENER(recipient, attribute) \
-        EventListener* on##attribute() { return recipient ? recipient->getAttributeEventListener(eventNames().attribute##Event) : 0; } \
-        void setOn##attribute(PassRefPtr<EventListener> listener) { if (recipient) recipient->setAttributeEventListener(eventNames().attribute##Event, listener); } \
+    #define DECLARE_FORWARDING_ATTRIBUTE_EVENT_LISTENER(recipient, attribute) \
+        EventListener* on##attribute(); \
+        void setOn##attribute(PassRefPtr<EventListener> listener);
 
-#if USE(JSC)
+    #define DEFINE_FORWARDING_ATTRIBUTE_EVENT_LISTENER(type, recipient, attribute) \
+        EventListener* type::on##attribute() { return recipient ? recipient->getAttributeEventListener(eventNames().attribute##Event) : 0; } \
+        void type::setOn##attribute(PassRefPtr<EventListener> listener) { if (recipient) recipient->setAttributeEventListener(eventNames().attribute##Event, listener); }
+
     inline void EventTarget::visitJSEventListeners(JSC::SlotVisitor& visitor)
     {
         EventListenerIterator iterator(this);
         while (EventListener* listener = iterator.nextListener())
             listener->visitJSFunction(visitor);
     }
-#endif
 
     inline bool EventTarget::isFiringEventListeners()
     {
@@ -207,6 +210,14 @@ namespace WebCore {
         if (!d)
             return false;
         return d->eventListenerMap.contains(eventType);
+    }
+
+    inline bool EventTarget::hasCapturingEventListeners(const AtomicString& eventType)
+    {
+        EventTargetData* d = eventTargetData();
+        if (!d)
+            return false;
+        return d->eventListenerMap.containsCapturing(eventType);
     }
 
 } // namespace WebCore

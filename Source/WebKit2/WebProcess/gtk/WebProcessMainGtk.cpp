@@ -27,17 +27,17 @@
 #include "config.h"
 #include "WebProcessMainGtk.h"
 
-#define LIBSOUP_USE_UNSTABLE_REQUEST_API
-
 #include "WKBase.h"
+#include "WebKit2Initialize.h"
+#include <WebCore/AuthenticationChallenge.h>
+#include <WebCore/NetworkingContext.h>
 #include <WebCore/ResourceHandle.h>
 #include <WebCore/RunLoop.h>
 #include <WebKit2/WebProcess.h>
 #include <gtk/gtk.h>
-#include <libsoup/soup-cache.h>
-#include <runtime/InitializeThreading.h>
+#include <libintl.h>
+#include <libsoup/soup.h>
 #include <unistd.h>
-#include <wtf/MainThread.h>
 #include <wtf/gobject/GOwnPtr.h>
 #include <wtf/gobject/GRefPtr.h>
 
@@ -55,14 +55,18 @@ WK_EXPORT int WebProcessMainGtk(int argc, char* argv[])
 #endif
 
     gtk_init(&argc, &argv);
-    g_type_init();
 
-    JSC::initializeThreading();
-    WTF::initializeMainThread();
+    bindtextdomain(GETTEXT_PACKAGE, PACKAGE_LOCALE_DIR);
+    bind_textdomain_codeset(GETTEXT_PACKAGE, "UTF-8");
 
-    RunLoop::initializeMainRunLoop();
+    InitializeWebKit2();
+
     int socket = atoi(argv[1]);
-    WebProcess::shared().initialize(socket, RunLoop::main());
+
+    ChildProcessInitializationParameters parameters;
+    parameters.connectionIdentifier = socket;
+
+    WebProcess::shared().initialize(parameters);
 
     // Despite using system CAs to validate certificates we're
     // accepting invalid certificates by default. New API will be
@@ -71,18 +75,12 @@ WK_EXPORT int WebProcessMainGtk(int argc, char* argv[])
     g_object_set(session, SOUP_SESSION_SSL_USE_SYSTEM_CA_FILE, TRUE,
                  SOUP_SESSION_SSL_STRICT, FALSE, NULL);
 
-    GOwnPtr<char> soupCacheDirectory(g_build_filename(g_get_user_cache_dir(), g_get_prgname(), NULL));
-    GRefPtr<SoupCache> soupCache = adoptGRef(soup_cache_new(soupCacheDirectory.get(), SOUP_CACHE_SINGLE_USER));
-    soup_session_add_feature(session, SOUP_SESSION_FEATURE(soupCache.get()));
-    soup_cache_load(soupCache.get());
-
-    // This is for compatibility, it will be removed when UI process can handle SSL errors.
-    WebCore::ResourceHandle::setIgnoreSSLErrors(true);
-
     RunLoop::run();
 
-    soup_cache_flush(soupCache.get());
-    soup_cache_dump(soupCache.get());
+    if (SoupSessionFeature* soupCache = soup_session_get_feature(session, SOUP_TYPE_CACHE)) {
+        soup_cache_flush(SOUP_CACHE(soupCache));
+        soup_cache_dump(SOUP_CACHE(soupCache));
+    }
 
     return 0;
 }

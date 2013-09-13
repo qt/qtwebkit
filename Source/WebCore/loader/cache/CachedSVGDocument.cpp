@@ -53,11 +53,8 @@ String CachedSVGDocument::encoding() const
     return m_decoder->encoding().name();
 }
 
-void CachedSVGDocument::data(PassRefPtr<ResourceBuffer> data, bool allDataReceived)
+void CachedSVGDocument::finishLoading(ResourceBuffer* data)
 {
-    if (!allDataReceived)
-        return;
-
     if (data) {
         StringBuilder decodedText;
         decodedText.append(m_decoder->decode(data->data(), data->size()));
@@ -66,17 +63,7 @@ void CachedSVGDocument::data(PassRefPtr<ResourceBuffer> data, bool allDataReceiv
         m_document = SVGDocument::create(0, response().url());
         m_document->setContent(decodedText.toString());
     }
-
-    setLoading(false);
-    checkNotify();
-}
-
-void CachedSVGDocument::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CachedResourceSVG);
-    CachedResource::reportMemoryUsage(memoryObjectInfo);
-    info.addMember(m_document);
-    info.addMember(m_decoder);
+    CachedResource::finishLoading(data);
 }
 
 }

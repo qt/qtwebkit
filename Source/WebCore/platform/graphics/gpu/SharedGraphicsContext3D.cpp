@@ -38,11 +38,11 @@ public:
     SharedGraphicsContext3DImpl() : m_context(0) { }
     PassRefPtr<GraphicsContext3D> getOrCreateContext()
     {
+        bool wasCreated = false;
+
         // If we lost the context, or can't make it current, create a new one.
         if (m_context && (!m_context->makeContextCurrent() || (m_context->getExtensions()->getGraphicsResetStatusARB() != GraphicsContext3D::NO_ERROR)))
             m_context.clear();
-
-        bool wasCreated = false;
 
         if (!m_context) {
             createContext();
@@ -54,7 +54,6 @@ public:
 
         if (m_context && wasCreated)
             m_context->getExtensions()->pushGroupMarkerEXT("SharedGraphicsContext");
-
         return m_context;
     }
 
@@ -70,7 +69,6 @@ public:
         attributes.stencil = true;
         attributes.antialias = false;
         attributes.shareResources = true;
-        attributes.preferDiscreteGPU = true;
         m_context = GraphicsContext3D::create(attributes, 0);
         return m_context;
     }
@@ -96,7 +94,6 @@ static PassRefPtr<GraphicsContext3D> getOrCreateContextForImplThread(ContextOper
 
 PassRefPtr<GraphicsContext3D> SharedGraphicsContext3D::getForImplThread()
 {
-    ASSERT(!isMainThread());
     return getOrCreateContextForImplThread(Get);
 }
 

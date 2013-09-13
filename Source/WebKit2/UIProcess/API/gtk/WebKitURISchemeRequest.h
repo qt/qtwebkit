@@ -26,6 +26,7 @@
 
 #include <glib-object.h>
 #include <webkit2/WebKitDefines.h>
+#include <webkit2/WebKitForwardDeclarations.h>
 
 G_BEGIN_DECLS
 
@@ -48,6 +49,11 @@ struct _WebKitURISchemeRequest {
 
 struct _WebKitURISchemeRequestClass {
     GObjectClass parent_class;
+
+    void (*_webkit_reserved0) (void);
+    void (*_webkit_reserved1) (void);
+    void (*_webkit_reserved2) (void);
+    void (*_webkit_reserved3) (void);
 };
 
 WEBKIT_API GType
@@ -70,6 +76,10 @@ webkit_uri_scheme_request_finish       (WebKitURISchemeRequest *request,
                                         GInputStream           *stream,
                                         gint64                  stream_length,
                                         const gchar            *mime_type);
+
+WEBKIT_API void
+webkit_uri_scheme_request_finish_error (WebKitURISchemeRequest *request,
+                                        GError                 *error);
 
 G_END_DECLS
 

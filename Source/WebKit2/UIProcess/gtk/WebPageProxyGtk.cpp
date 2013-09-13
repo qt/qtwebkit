@@ -50,7 +50,10 @@ String WebPageProxy::standardUserAgent(const String& applicationNameForUserAgent
 
 void WebPageProxy::getEditorCommandsForKeyEvent(const AtomicString& eventType, Vector<WTF::String>& commandsList)
 {
-    m_pageClient->getEditorCommandsForKeyEvent(m_keyEventQueue.first(), eventType, commandsList);
+    // When the keyboard event is started in the WebProcess side (e.g. from the Inspector)
+    // it will arrive without a GdkEvent associated, so the keyEventQueue will be empty.
+    if (!m_keyEventQueue.isEmpty())
+        m_pageClient->getEditorCommandsForKeyEvent(m_keyEventQueue.first(), eventType, commandsList);
 }
 
 void WebPageProxy::bindAccessibilityTree(const String& plugID)
@@ -107,6 +110,11 @@ void WebPageProxy::windowedPluginGeometryDidChange(const WebCore::IntRect& frame
     }
 
     webkitWebViewBaseChildMoveResize(WEBKIT_WEB_VIEW_BASE(viewWidget()), plugin, frameRect);
+}
+
+void WebPageProxy::setInputMethodState(bool enabled)
+{
+    webkitWebViewBaseSetInputMethodState(WEBKIT_WEB_VIEW_BASE(viewWidget()), enabled);
 }
 
 #if USE(TEXTURE_MAPPER_GL)

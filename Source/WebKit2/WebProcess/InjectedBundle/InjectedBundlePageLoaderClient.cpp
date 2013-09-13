@@ -26,23 +26,48 @@
 #include "config.h"
 #include "InjectedBundlePageLoaderClient.h"
 
+#include "ImmutableArray.h"
 #include "InjectedBundleDOMWindowExtension.h"
 #include "InjectedBundleScriptWorld.h"
 #include "WKAPICast.h"
 #include "WKBundleAPICast.h"
+#include "WebData.h"
 #include "WebError.h"
+#include "WebURLRequest.h"
+#include <WebCore/SharedBuffer.h>
 #include <wtf/text/WTFString.h>
-
-#if ENABLE(WEB_INTENTS)
-#include "InjectedBundleIntentRequest.h"
-#endif
-#if ENABLE(WEB_INTENTS_TAG)
-#include "WebIntentServiceInfo.h"
-#endif
 
 using namespace WebCore;
 
 namespace WebKit {
+
+void InjectedBundlePageLoaderClient::willLoadURLRequest(WebPage* page, const ResourceRequest& request, APIObject* userData)
+{
+    if (!m_client.willLoadURLRequest)
+        return;
+
+    m_client.willLoadURLRequest(toAPI(page), toAPI(request), toAPI(userData), m_client.clientInfo);
+}
+
+static void releaseSharedBuffer(unsigned char*, const void* data)
+{
+    // Balanced by ref() in InjectedBundlePageLoaderClient::willLoadDataRequest().
+    static_cast<SharedBuffer*>(const_cast<void*>(data))->deref();
+}
+
+void InjectedBundlePageLoaderClient::willLoadDataRequest(WebPage* page, const ResourceRequest& request, const SharedBuffer* data, const String& MIMEType, const String& encodingName, const KURL& unreachableURL, APIObject* userData)
+{
+    if (!m_client.willLoadDataRequest)
+        return;
+
+    RefPtr<WebData> webData;
+    if (data) {
+        const_cast<SharedBuffer*>(data)->ref();
+        webData = WebData::createWithoutCopying((const unsigned char*)data->data(), data->size(), releaseSharedBuffer, data);
+    }
+
+    m_client.willLoadDataRequest(toAPI(page), toAPI(request), toAPI(webData.get()), toAPI(MIMEType.impl()), toAPI(encodingName.impl()), toURLRef(unreachableURL.string().impl()), toAPI(userData), m_client.clientInfo);
+}
 
 bool InjectedBundlePageLoaderClient::shouldGoToBackForwardListItem(WebPage* page, InjectedBundleBackForwardListItem* item, RefPtr<APIObject>& userData)
 {
@@ -194,30 +219,6 @@ void InjectedBundlePageLoaderClient::didDetectXSSForFrame(WebPage* page, WebFram
     userData = adoptRef(toImpl(userDataToPass));
 }
 
-#if ENABLE(WEB_INTENTS)
-void InjectedBundlePageLoaderClient::didReceiveIntentForFrame(WebPage* page, WebFrame* frame, InjectedBundleIntentRequest* intentRequest, RefPtr<APIObject>& userData)
-{
-    if (!m_client.didReceiveIntentForFrame)
-        return;
-
-    WKTypeRef userDataToPass = 0;
-    m_client.didReceiveIntentForFrame(toAPI(page), toAPI(frame), toAPI(intentRequest), &userDataToPass, m_client.clientInfo);
-    userData = adoptRef(toImpl(userDataToPass));
-}
-#endif
-
-#if ENABLE(WEB_INTENTS_TAG)
-void InjectedBundlePageLoaderClient::registerIntentServiceForFrame(WebPage* page, WebFrame* frame, WebIntentServiceInfo* service, RefPtr<APIObject>& userData)
-{
-    if (!m_client.registerIntentServiceForFrame)
-        return;
-
-    WKTypeRef userDataToPass = 0;
-    m_client.registerIntentServiceForFrame(toAPI(page), toAPI(frame), toAPI(service), &userDataToPass, m_client.clientInfo);
-    userData = adoptRef(toImpl(userDataToPass));
-}
-#endif
-
 void InjectedBundlePageLoaderClient::didFirstLayoutForFrame(WebPage* page, WebFrame* frame, RefPtr<APIObject>& userData)
 {
     if (!m_client.didFirstLayoutForFrame)
@@ -343,6 +344,22 @@ bool InjectedBundlePageLoaderClient::shouldForceUniversalAccessFromLocalURL(WebP
         return false;
 
     return m_client.shouldForceUniversalAccessFromLocalURL(toAPI(page), toAPI(url.impl()), m_client.clientInfo);
+}
+
+void InjectedBundlePageLoaderClient::featuresUsedInPage(WebPage* page, const Vector<String>& features)
+{
+    if (!m_client.featuresUsedInPage)
+        return;
+
+    Vector<RefPtr<APIObject>> featureStringObjectsVector;
+
+    Vector<String>::const_iterator end = features.end();
+    for (Vector<String>::const_iterator it = features.begin(); it != end; ++it)
+        featureStringObjectsVector.append(WebString::create((*it)));
+
+    RefPtr<ImmutableArray> featureStringObjectsArray = ImmutableArray::adopt(featureStringObjectsVector);
+
+    return m_client.featuresUsedInPage(toAPI(page), toAPI(featureStringObjectsArray.get()), m_client.clientInfo);
 }
 
 } // namespace WebKit

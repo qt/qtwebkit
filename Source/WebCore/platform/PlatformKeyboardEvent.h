@@ -49,10 +49,6 @@ class QKeyEvent;
 QT_END_NAMESPACE
 #endif
 
-#if PLATFORM(WX)
-class wxKeyEvent;
-#endif
-
 #if PLATFORM(BLACKBERRY)
 namespace BlackBerry {
 namespace Platform {
@@ -87,6 +83,7 @@ namespace WebCore {
 #endif
 #if PLATFORM(QT)
             , m_qtEvent(0)
+            , m_useNativeVirtualKeyAsDOMKey(false)
 #endif
         {
         }
@@ -138,7 +135,7 @@ namespace WebCore {
         static void getCurrentModifierState(bool& shiftKey, bool& ctrlKey, bool& altKey, bool& metaKey);
 
 #if PLATFORM(BLACKBERRY)
-        unsigned short unmodifiedCharacter() const { return m_unmodifiedCharacter; }
+        unsigned unmodifiedCharacter() const { return m_unmodifiedCharacter; }
 #endif
 
 #if PLATFORM(MAC)
@@ -161,14 +158,10 @@ namespace WebCore {
 #endif
 
 #if PLATFORM(QT)
-        PlatformKeyboardEvent(QKeyEvent*);
+        PlatformKeyboardEvent(QKeyEvent*, bool);
         QKeyEvent* qtEvent() const { return m_qtEvent; }
         uint32_t nativeModifiers() const;
         uint32_t nativeScanCode() const;
-#endif
-
-#if PLATFORM(WX)
-        PlatformKeyboardEvent(wxKeyEvent&);
 #endif
 
 #if PLATFORM(BLACKBERRY)
@@ -192,7 +185,7 @@ namespace WebCore {
         bool m_isSystemKey;
 
 #if PLATFORM(BLACKBERRY)
-        unsigned short m_unmodifiedCharacter;
+        unsigned m_unmodifiedCharacter;
 #endif
 
 #if PLATFORM(MAC)
@@ -204,6 +197,7 @@ namespace WebCore {
 #endif
 #if PLATFORM(QT)
         QKeyEvent* m_qtEvent;
+        bool m_useNativeVirtualKeyAsDOMKey;
 #endif
     };
     

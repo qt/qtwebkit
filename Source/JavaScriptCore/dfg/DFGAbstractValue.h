@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2012, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -65,7 +65,7 @@ struct AbstractValue {
     
     void makeTop()
     {
-        m_type = SpecTop;
+        m_type |= SpecTop; // The state may have included SpecEmpty, in which case we want this to become SpecEmptyOrTop.
         m_arrayModes = ALL_ARRAY_MODES;
         m_currentKnownStructure.makeTop();
         m_futurePossibleStructure.makeTop();
@@ -193,6 +193,9 @@ struct AbstractValue {
     
     bool merge(const AbstractValue& other)
     {
+        if (other.isClear())
+            return false;
+        
 #if !ASSERT_DISABLED
         AbstractValue oldMe = *this;
 #endif
@@ -231,6 +234,9 @@ struct AbstractValue {
     
     void filter(const StructureSet& other)
     {
+        // FIXME: This could be optimized for the common case of m_type not
+        // having structures, array modes, or a specific value.
+        // https://bugs.webkit.org/show_bug.cgi?id=109663
         m_type &= other.speculationFromStructures();
         m_arrayModes &= other.arrayModesFromStructures();
         m_currentKnownStructure.filter(other);
@@ -284,19 +290,11 @@ struct AbstractValue {
         checkConsistency();
     }
     
-    bool filterByValue(JSValue value)
+    void filterByValue(JSValue value)
     {
-        if (!validate(value))
-            return false;
-        
-        if (!!value && value.isCell())
-            filter(StructureSet(value.asCell()->structure()));
-        else
-            filter(speculationFromValue(value));
-        
-        m_value = value;
-        
-        return true;
+        filter(speculationFromValue(value));
+        if (m_type)
+            m_value = value;
     }
     
     bool validateType(JSValue value) const
@@ -374,10 +372,10 @@ struct AbstractValue {
     void dump(PrintStream& out) const
     {
         out.print(
-            "(", SpeculationDump(m_type), ", ", arrayModesToString(m_arrayModes), ", ",
+            "(", SpeculationDump(m_type), ", ", ArrayModesDump(m_arrayModes), ", ",
             m_currentKnownStructure, ", ", m_futurePossibleStructure);
         if (!!m_value)
-            out.print(", ", m_value.description());
+            out.print(", ", m_value);
         out.print(")");
     }
     
@@ -415,6 +413,8 @@ struct AbstractValue {
     //    change x's structure and we have no way of proving otherwise, but
     //    x's m_futurePossibleStructure will be whatever structure we had checked
     //    when getting property 'f'.
+    
+    // NB. All fields in this struct must have trivial destructors.
 
     // This is a proven constraint on the structures that this value can have right
     // now. The structure of the current value must belong to this set. The set may
@@ -525,8 +525,17 @@ private:
             m_arrayModes = 0;
         else if (!(m_type & ~SpecArray))
             m_arrayModes &= ALL_ARRAY_ARRAY_MODES;
-        else if (!(m_type & SpecArray))
-            m_arrayModes &= ALL_NON_ARRAY_ARRAY_MODES;
+
+        // NOTE: If m_type doesn't have SpecArray set, that doesn't mean that the
+        // array modes have to be a subset of ALL_NON_ARRAY_ARRAY_MODES, since
+        // in the speculated type type-system, RegExpMatchesArry and ArrayPrototype
+        // are Otherobj (since they are not *exactly* JSArray) but in the ArrayModes
+        // type system they are arrays (since they expose the magical length
+        // property and are otherwise allocated using array allocation). Hence the
+        // following would be wrong:
+        //
+        // if (!(m_type & SpecArray))
+        //    m_arrayModes &= ALL_NON_ARRAY_ARRAY_MODES;
     }
 };
 

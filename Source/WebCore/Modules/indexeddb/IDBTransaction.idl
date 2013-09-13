@@ -35,24 +35,22 @@
     readonly attribute DOMString mode;
     readonly attribute IDBDatabase db;
     readonly attribute DOMError error;
+    [TreatReturnedNullStringAs=Undefined] readonly attribute DOMString webkitErrorMessage;
 
     // Methods
-    IDBObjectStore objectStore (in DOMString name)
-        raises (DOMException);
-    void abort ()
-        raises (DOMException);
+    [RaisesException] IDBObjectStore objectStore (DOMString name);
+    [RaisesException] void abort ();
 
     // Events
     attribute EventListener onabort;
     attribute EventListener oncomplete;
     attribute EventListener onerror;
     // EventTarget interface
-    void addEventListener(in DOMString type,
-                          in EventListener listener,
-                          in [Optional] boolean useCapture);
-    void removeEventListener(in DOMString type,
-                             in EventListener listener,
-                             in [Optional] boolean useCapture);
-    boolean dispatchEvent(in Event evt) 
-        raises(EventException);
+    void addEventListener(DOMString type,
+                          EventListener listener,
+                          optional boolean useCapture);
+    void removeEventListener(DOMString type,
+                             EventListener listener,
+                             optional boolean useCapture);
+    [RaisesException] boolean dispatchEvent(Event evt);
 };

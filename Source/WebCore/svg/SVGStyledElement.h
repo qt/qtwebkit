@@ -24,24 +24,28 @@
 #if ENABLE(SVG)
 #include "CSSPropertyNames.h"
 #include "SVGAnimatedString.h"
+#include "SVGElement.h"
 #include "SVGLocatable.h"
-#include "SVGStylable.h"
 #include <wtf/HashSet.h>
+#include <wtf/PassRefPtr.h>
 
 namespace WebCore {
 
 void mapAttributeToCSSProperty(HashMap<AtomicStringImpl*, CSSPropertyID>* propertyNameToIdMap, const QualifiedName& attrName);
 
-class SVGStyledElement : public SVGElement,
-                         public SVGStylable {
+class CSSValue;
+class CSSStyleDeclaration;
+
+// FIXME(webkit.org/b/107386): SVGStyledElement should be merged into SVGElement as specified by SVG2.
+class SVGStyledElement : public SVGElement {
 public:
-    virtual String title() const;
+    virtual String title() const OVERRIDE;
 
     bool hasRelativeLengths() const { return !m_elementsWithRelativeLengths.isEmpty(); }
 
     virtual bool supportsMarkers() const { return false; }
 
-    virtual PassRefPtr<CSSValue> getPresentationAttribute(const String& name);
+    PassRefPtr<CSSValue> getPresentationAttribute(const String& name);
 
     bool isKnownAttribute(const QualifiedName&);
 
@@ -53,7 +57,6 @@ public:
 
     virtual AffineTransform localCoordinateSpaceTransform(SVGLocatable::CTMScope) const;
 
-    virtual CSSStyleDeclaration* style() { return StyledElement::style(); }
     virtual bool needsPendingResourceHandling() const { return true; }
 
 protected: 
@@ -62,7 +65,7 @@ protected:
 
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
     virtual bool isPresentationAttribute(const QualifiedName&) const OVERRIDE;
-    virtual void collectStyleForPresentationAttribute(const Attribute&, StylePropertySet*) OVERRIDE;
+    virtual void collectStyleForPresentationAttribute(const QualifiedName&, const AtomicString&, MutableStylePropertySet*) OVERRIDE;
     virtual void svgAttributeChanged(const QualifiedName&) OVERRIDE;
 
     virtual InsertionNotificationRequest insertedInto(ContainerNode*) OVERRIDE;
@@ -76,10 +79,10 @@ protected:
     virtual bool selfHasRelativeLengths() const { return false; }
 
 private:
-    virtual bool isStyled() const { return true; }
+    virtual bool isSVGStyledElement() const OVERRIDE FINAL { return true; }
 
-    virtual bool isKeyboardFocusable(KeyboardEvent*) const;
-    virtual bool isMouseFocusable() const;
+    virtual bool isKeyboardFocusable(KeyboardEvent*) const OVERRIDE;
+    virtual bool isMouseFocusable() const OVERRIDE;
 
     void buildPendingResourcesIfNeeded();
 
@@ -92,7 +95,7 @@ private:
 
 inline SVGStyledElement* toSVGStyledElement(Node* node)
 {
-    ASSERT(!node || (node->isStyledElement() && node->isSVGElement()));
+    ASSERT_WITH_SECURITY_IMPLICATION(!node || (node->isStyledElement() && node->isSVGElement()));
     return static_cast<SVGStyledElement*>(node);
 }
 

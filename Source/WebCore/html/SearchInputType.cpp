@@ -57,6 +57,12 @@ PassOwnPtr<InputType> SearchInputType::create(HTMLInputElement* element)
     return adoptPtr(new SearchInputType(element));
 }
 
+void SearchInputType::attach()
+{
+    TextFieldInputType::attach();
+    observeFeatureIfVisible(FeatureObserver::InputTypeSearch);
+}
+
 void SearchInputType::addSearchResult()
 {
     if (RenderObject* renderer = element()->renderer())
@@ -99,14 +105,13 @@ void SearchInputType::createShadowSubtree()
     ASSERT(container);
     ASSERT(textWrapper);
 
-    ExceptionCode ec = 0;
     RefPtr<SearchFieldResultsButtonElement> resultsButton = SearchFieldResultsButtonElement::create(element()->document());
     m_resultsButton = resultsButton.get();
-    container->insertBefore(m_resultsButton, textWrapper, ec);
+    container->insertBefore(m_resultsButton, textWrapper, IGNORE_EXCEPTION);
 
     RefPtr<SearchFieldCancelButtonElement> cancelButton = SearchFieldCancelButtonElement::create(element()->document());
     m_cancelButton = cancelButton.get();
-    container->insertBefore(m_cancelButton, textWrapper->nextSibling(), ec);
+    container->insertBefore(m_cancelButton, textWrapper->nextSibling(), IGNORE_EXCEPTION);
 }
 
 HTMLElement* SearchInputType::resultsButtonElement() const
@@ -121,7 +126,7 @@ HTMLElement* SearchInputType::cancelButtonElement() const
 
 void SearchInputType::handleKeydownEvent(KeyboardEvent* event)
 {
-    if (element()->disabled() || element()->readOnly()) {
+    if (element()->isDisabledOrReadOnly()) {
         TextFieldInputType::handleKeydownEvent(event);
         return;
     }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2012, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,6 +26,7 @@
 #ifndef NetworkResourceLoadParameters_h
 #define NetworkResourceLoadParameters_h
 
+#include "SandboxExtension.h"
 #include <WebCore/ResourceHandle.h>
 #include <WebCore/ResourceLoaderOptions.h>
 #include <WebCore/ResourceRequest.h>
@@ -44,21 +45,23 @@ typedef uint64_t ResourceLoadIdentifier;
 class NetworkResourceLoadParameters {
 public:
     NetworkResourceLoadParameters();
-    NetworkResourceLoadParameters(const WebCore::ResourceRequest&, WebCore::ResourceLoadPriority, WebCore::ContentSniffingPolicy, WebCore::StoredCredentials);
 
     void encode(CoreIPC::ArgumentEncoder&) const;
-    static bool decode(CoreIPC::ArgumentDecoder*, NetworkResourceLoadParameters&);
+    static bool decode(CoreIPC::ArgumentDecoder&, NetworkResourceLoadParameters&);
 
-    const WebCore::ResourceRequest& request() const { return m_request; }
-    WebCore::ResourceLoadPriority priority() const { return m_priority; }
-    WebCore::ContentSniffingPolicy contentSniffingPolicy() const { return m_contentSniffingPolicy; }
-    WebCore::StoredCredentials allowStoredCredentials() const { return m_allowStoredCredentials; }
-
-private:
-    WebCore::ResourceRequest m_request;
-    WebCore::ResourceLoadPriority m_priority;
-    WebCore::ContentSniffingPolicy m_contentSniffingPolicy;
-    WebCore::StoredCredentials m_allowStoredCredentials;
+    ResourceLoadIdentifier identifier;
+    uint64_t webPageID;
+    uint64_t webFrameID;
+    WebCore::ResourceRequest request;
+    SandboxExtension::HandleArray requestBodySandboxExtensions; // Created automatically for the sender.
+    SandboxExtension::Handle resourceSandboxExtension; // Created automatically for the sender.
+    WebCore::ResourceLoadPriority priority;
+    WebCore::ContentSniffingPolicy contentSniffingPolicy;
+    WebCore::StoredCredentials allowStoredCredentials;
+    WebCore::ClientCredentialPolicy clientCredentialPolicy;
+    bool inPrivateBrowsingMode;
+    bool shouldClearReferrerOnHTTPSToHTTPRedirect;
+    bool isMainResource;
 };
 
 } // namespace WebKit

@@ -40,6 +40,7 @@
 #include "RenderLayer.h"
 #include "RenderView.h"
 #include "Settings.h"
+#include <wtf/StackStats.h>
 
 namespace WebCore {
 
@@ -155,24 +156,6 @@ void RenderFrameSet::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
             yPos += borderThickness;
         }
     }
-}
-
-bool RenderFrameSet::nodeAtPoint(const HitTestRequest& request, HitTestResult& result,
-    const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, HitTestAction action)
-{
-    if (action != HitTestForeground)
-        return false;
-
-    bool inside = RenderBox::nodeAtPoint(request, result, locationInContainer, accumulatedOffset, action)
-        || m_isResizing;
-
-    if (inside && frameSet()->noResize()
-            && !request.readOnly() && !result.innerNode() && !request.touchMove()) {
-        result.setInnerNode(node());
-        result.setInnerNonSharedNode(node());
-    }
-
-    return inside || m_isChildResizing;
 }
 
 void RenderFrameSet::GridAxis::resize(int size)
@@ -420,10 +403,10 @@ void RenderFrameSet::computeEdgeInfo()
     if (!child)
         return;
 
-    int rows = frameSet()->totalRows();
-    int cols = frameSet()->totalCols();
-    for (int r = 0; r < rows; ++r) {
-        for (int c = 0; c < cols; ++c) {
+    size_t rows = m_rows.m_sizes.size();
+    size_t cols = m_cols.m_sizes.size();
+    for (size_t r = 0; r < rows; ++r) {
+        for (size_t c = 0; c < cols; ++c) {
             FrameEdgeInfo edgeInfo;
             if (child->isFrameSet())
                 edgeInfo = toRenderFrameSet(child)->edgeInfo();
@@ -464,8 +447,11 @@ void RenderFrameSet::layout()
 
     bool doFullRepaint = selfNeedsLayout() && checkForRepaintDuringLayout();
     LayoutRect oldBounds;
-    if (doFullRepaint)
-        oldBounds = absoluteClippedOverflowRect();
+    RenderLayerModelObject* repaintContainer = 0;
+    if (doFullRepaint) {
+        repaintContainer = containerForRepaint();
+        oldBounds = clippedOverflowRectForRepaint(repaintContainer);
+    }
 
     if (!parent()->isFrameSet() && !document()->printing()) {
         setWidth(view()->viewWidth());
@@ -493,18 +479,14 @@ void RenderFrameSet::layout()
 
     computeEdgeInfo();
 
-    if (doFullRepaint) {
-        view()->repaintViewRectangle(oldBounds);
-        LayoutRect newBounds = absoluteClippedOverflowRect();
-        if (newBounds != oldBounds)
-            view()->repaintViewRectangle(newBounds);
-    }
+    updateLayerTransform();
 
-    // If this FrameSet has a transform matrix then we need to recompute it
-    // because the transform origin is a function the size of the RenderFrameSet
-    // which may not be computed until it is attached to the render tree.
-    if (layer() && hasTransform())
-        layer()->updateTransform();
+    if (doFullRepaint) {
+        repaintUsingContainer(repaintContainer, pixelSnappedIntRect(oldBounds));
+        LayoutRect newBounds = clippedOverflowRectForRepaint(repaintContainer);
+        if (newBounds != oldBounds)
+            repaintUsingContainer(repaintContainer, pixelSnappedIntRect(newBounds));
+    }
 
     setNeedsLayout(false);
 }
@@ -700,7 +682,7 @@ bool RenderFrameSet::userResize(MouseEvent* evt)
         if (needsLayout())
             return false;
         if (evt->type() == eventNames().mousedownEvent && evt->button() == LeftButton) {
-            FloatPoint localPos = absoluteToLocal(evt->absoluteLocation(), UseTransforms | SnapOffsetForTransforms);
+            FloatPoint localPos = absoluteToLocal(evt->absoluteLocation(), UseTransforms);
             startResizing(m_cols, localPos.x());
             startResizing(m_rows, localPos.y());
             if (m_cols.m_splitBeingResized != noSplit || m_rows.m_splitBeingResized != noSplit) {
@@ -710,7 +692,7 @@ bool RenderFrameSet::userResize(MouseEvent* evt)
         }
     } else {
         if (evt->type() == eventNames().mousemoveEvent || (evt->type() == eventNames().mouseupEvent && evt->button() == LeftButton)) {
-            FloatPoint localPos = absoluteToLocal(evt->absoluteLocation(), UseTransforms | SnapOffsetForTransforms);
+            FloatPoint localPos = absoluteToLocal(evt->absoluteLocation(), UseTransforms);
             continueResizing(m_cols, localPos.x());
             continueResizing(m_rows, localPos.y());
             if (evt->type() == eventNames().mouseupEvent && evt->button() == LeftButton) {

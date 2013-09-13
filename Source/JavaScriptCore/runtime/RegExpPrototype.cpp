@@ -24,12 +24,13 @@
 #include "ArrayPrototype.h"
 #include "Error.h"
 #include "JSArray.h"
+#include "JSCJSValue.h"
 #include "JSFunction.h"
 #include "JSObject.h"
 #include "JSString.h"
 #include "JSStringBuilder.h"
-#include "JSValue.h"
 #include "ObjectPrototype.h"
+#include "Operations.h"
 #include "RegExpObject.h"
 #include "RegExp.h"
 #include "RegExpCache.h"
@@ -119,13 +120,13 @@ EncodedJSValue JSC_HOST_CALL regExpProtoFuncCompile(ExecState* exec)
             if (flags == InvalidFlags)
                 return throwVMError(exec, createSyntaxError(exec, ASCIILiteral("Invalid flags supplied to RegExp constructor.")));
         }
-        regExp = RegExp::create(exec->globalData(), pattern, flags);
+        regExp = RegExp::create(exec->vm(), pattern, flags);
     }
 
     if (!regExp->isValid())
         return throwVMError(exec, createSyntaxError(exec, regExp->errorMessage()));
 
-    asRegExpObject(thisValue)->setRegExp(exec->globalData(), regExp);
+    asRegExpObject(thisValue)->setRegExp(exec->vm(), regExp);
     asRegExpObject(thisValue)->setLastIndex(exec, 0);
     return JSValue::encode(jsUndefined());
 }

@@ -42,8 +42,6 @@ public:
     virtual ~AccessibilityTableRow();
     
     virtual bool isTableRow() const;
-    virtual AccessibilityRole roleValue() const;
-    virtual bool accessibilityIsIgnored() const;
 
     // retrieves the "row" header (a th tag in the rightmost column)
     virtual AccessibilityObject* headerObject();
@@ -56,10 +54,14 @@ public:
     // in the row, but their col/row spans overlap into it
     void appendChild(AccessibilityObject*);
     
+protected:
+    virtual AccessibilityRole determineAccessibilityRole();
+
 private:
     int m_rowIndex;
     
     virtual AccessibilityObject* observableObject() const;
+    virtual bool computeAccessibilityIsIgnored() const;
 }; 
    
 } // namespace WebCore 

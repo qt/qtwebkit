@@ -27,12 +27,13 @@
 #include "JSClassRef.h"
 
 #include "APICast.h"
+#include "Identifier.h"
+#include "InitializeThreading.h"
 #include "JSCallbackObject.h"
+#include "JSGlobalObject.h"
 #include "JSObjectRef.h"
-#include <runtime/InitializeThreading.h>
-#include <runtime/JSGlobalObject.h>
-#include <runtime/ObjectPrototype.h>
-#include <runtime/Identifier.h>
+#include "ObjectPrototype.h"
+#include "Operations.h"
 #include <wtf/text/StringHash.h>
 #include <wtf/unicode/UTF8.h>
 
@@ -126,7 +127,7 @@ PassRefPtr<OpaqueJSClass> OpaqueJSClass::create(const JSClassDefinition* clientD
     return adoptRef(new OpaqueJSClass(&definition, protoClass.get()));
 }
 
-OpaqueJSClassContextData::OpaqueJSClassContextData(JSC::JSGlobalData&, OpaqueJSClass* jsClass)
+OpaqueJSClassContextData::OpaqueJSClassContextData(JSC::VM&, OpaqueJSClass* jsClass)
     : m_class(jsClass)
 {
     if (jsClass->m_staticValues) {
@@ -150,9 +151,9 @@ OpaqueJSClassContextData::OpaqueJSClassContextData(JSC::JSGlobalData&, OpaqueJSC
 
 OpaqueJSClassContextData& OpaqueJSClass::contextData(ExecState* exec)
 {
-    OwnPtr<OpaqueJSClassContextData>& contextData = exec->globalData().opaqueJSClassData.add(this, nullptr).iterator->value;
+    OwnPtr<OpaqueJSClassContextData>& contextData = exec->lexicalGlobalObject()->opaqueJSClassData().add(this, nullptr).iterator->value;
     if (!contextData)
-        contextData = adoptPtr(new OpaqueJSClassContextData(exec->globalData(), this));
+        contextData = adoptPtr(new OpaqueJSClassContextData(exec->vm(), this));
     return *contextData;
 }
 
@@ -202,7 +203,7 @@ JSObject* OpaqueJSClass::prototype(ExecState* exec)
     JSObject* prototype = JSCallbackObject<JSDestructibleObject>::create(exec, exec->lexicalGlobalObject(), exec->lexicalGlobalObject()->callbackObjectStructure(), prototypeClass, &jsClassData); // set jsClassData as the object's private data, so it can clear our reference on destruction
     if (parentClass) {
         if (JSObject* parentPrototype = parentClass->prototype(exec))
-            prototype->setPrototype(exec->globalData(), parentPrototype);
+            prototype->setPrototype(exec->vm(), parentPrototype);
     }
 
     jsClassData.cachedPrototype = PassWeak<JSObject>(prototype);

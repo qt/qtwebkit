@@ -19,9 +19,10 @@
  */
 
 [
+    NoInterfaceObject,
     ObjCProtocol,
-    OmitConstructor
+    SkipVTableValidation
 ] interface XPathNSResolver {
-    [TreatReturnedNullStringAs=Null] DOMString lookupNamespaceURI(in [Optional=DefaultIsUndefined] DOMString prefix);
+    [TreatReturnedNullStringAs=Null] DOMString lookupNamespaceURI([Default=Undefined] optional DOMString prefix);
 };
 

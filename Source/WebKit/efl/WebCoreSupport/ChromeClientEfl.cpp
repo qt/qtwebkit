@@ -68,7 +68,7 @@
 
 #if ENABLE(SQL_DATABASE)
 #include "DatabaseDetails.h"
-#include "DatabaseTracker.h"
+#include "DatabaseManager.h"
 #endif
 
 #if ENABLE(INPUT_TYPE_COLOR)
@@ -270,12 +270,13 @@ bool ChromeClientEfl::canRunBeforeUnloadConfirmPanel()
 
 bool ChromeClientEfl::runBeforeUnloadConfirmPanel(const String& message, Frame* frame)
 {
-    return runJavaScriptConfirm(frame, message);
+    return ewk_view_run_before_unload_confirm(m_view, kit(frame), message.utf8().data());
 }
 
-void ChromeClientEfl::addMessageToConsole(MessageSource, MessageType, MessageLevel, const String& message,
-                                          unsigned int lineNumber, const String& sourceID)
+void ChromeClientEfl::addMessageToConsole(MessageSource, MessageLevel, const String& message,
+                                          unsigned lineNumber, unsigned columnNumber, const String& sourceID)
 {
+    UNUSED_PARAM(columnNumber);
     ewk_view_add_console_message(m_view, message.utf8().data(), lineNumber, sourceID.utf8().data());
 }
 
@@ -420,12 +421,11 @@ void ChromeClientEfl::needTouchEvents(bool needed)
 #endif
 
 #if ENABLE(SQL_DATABASE)
-void ChromeClientEfl::exceededDatabaseQuota(Frame* frame, const String& databaseName)
+void ChromeClientEfl::exceededDatabaseQuota(Frame* frame, const String& databaseName, DatabaseDetails details)
 {
     uint64_t quota;
     SecurityOrigin* origin = frame->document()->securityOrigin();
 
-    DatabaseDetails details = DatabaseTracker::tracker().detailsForNameAndOrigin(databaseName, origin);
     quota = ewk_view_exceeded_database_quota(m_view,
                                              kit(frame), databaseName.utf8().data(),
                                              details.currentUsage(), details.expectedUsage());
@@ -433,10 +433,10 @@ void ChromeClientEfl::exceededDatabaseQuota(Frame* frame, const String& database
     /* if client did not set quota, and database is being created now, the
      * default quota is applied
      */
-    if (!quota && !DatabaseTracker::tracker().hasEntryForOrigin(origin))
+    if (!quota && !DatabaseManager::manager().hasEntryForOrigin(origin))
         quota = ewk_settings_web_database_default_quota_get();
 
-    DatabaseTracker::tracker().setQuota(origin, quota);
+    DatabaseManager::manager().setQuota(origin, quota);
 }
 #endif
 
@@ -505,6 +505,18 @@ void ChromeClientEfl::setCursorHiddenUntilMouseMoves(bool)
     notImplemented();
 }
 
+#if ENABLE(REQUEST_ANIMATION_FRAME) && !USE(REQUEST_ANIMATION_FRAME_TIMER)
+void ChromeClientEfl::scheduleAnimation()
+{
+    notImplemented();
+}
+
+void ChromeClientEfl::serviceScriptedAnimations()
+{
+    notImplemented();
+}
+#endif
+
 void ChromeClientEfl::cancelGeolocationPermissionForFrame(Frame*, Geolocation*)
 {
     notImplemented();
@@ -546,7 +558,7 @@ void ChromeClientEfl::invalidateContentsForSlowScroll(const IntRect& updateRect,
 
 void ChromeClientEfl::scroll(const IntSize& scrollDelta, const IntRect& rectToScroll, const IntRect& clipRect)
 {
-    ewk_view_scroll(m_view, scrollDelta.width(), scrollDelta.height(), rectToScroll.x(), rectToScroll.y(), rectToScroll.width(), rectToScroll.height(), clipRect.x(), clipRect.y(), clipRect.width(), clipRect.height());
+    ewk_view_scroll(m_view, scrollDelta, rectToScroll, clipRect);
 }
 
 void ChromeClientEfl::cancelGeolocationPermissionRequestForFrame(Frame*)

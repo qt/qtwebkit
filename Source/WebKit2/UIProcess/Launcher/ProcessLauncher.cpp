@@ -31,11 +31,9 @@
 
 namespace WebKit {
 
-static WorkQueue& processLauncherWorkQueue()
+static WorkQueue* processLauncherWorkQueue()
 {
-    // Give in to VisualStudio and its 31 character thread name limit and shorten the thread name to ProcLauncher instead of class name.
-    // See createThread() in Threading.cpp.
-    DEFINE_STATIC_LOCAL(WorkQueue, processLauncherWorkQueue, ("com.apple.WebKit.ProcLauncher"));
+    static WorkQueue* processLauncherWorkQueue = WorkQueue::create("com.apple.WebKit.ProcessLauncher").leakRef();
     return processLauncherWorkQueue;
 }
 
@@ -46,7 +44,7 @@ ProcessLauncher::ProcessLauncher(Client* client, const LaunchOptions& launchOpti
 {
     // Launch the process.
     m_isLaunching = true;
-    processLauncherWorkQueue().dispatch(bind(&ProcessLauncher::launchProcess, this));
+    processLauncherWorkQueue()->dispatch(bind(&ProcessLauncher::launchProcess, this));
 }
 
 void ProcessLauncher::didFinishLaunchingProcess(PlatformProcessIdentifier processIdentifier, CoreIPC::Connection::Identifier identifier)
@@ -55,7 +53,18 @@ void ProcessLauncher::didFinishLaunchingProcess(PlatformProcessIdentifier proces
     m_isLaunching = false;
     
     if (!m_client) {
-        // FIXME: Dispose of the connection identifier.
+        // FIXME: Make Identifier a move-only object and release port rights/connections in the destructor.
+#if PLATFORM(MAC)
+        if (identifier.port)
+            mach_port_mod_refs(mach_task_self(), identifier.port, MACH_PORT_RIGHT_RECEIVE, -1);
+
+#if HAVE(XPC)
+        if (identifier.xpcConnection) {
+            xpc_release(identifier.xpcConnection);
+            identifier.xpcConnection = 0;
+        }
+#endif
+#endif
         return;
     }
     

@@ -68,7 +68,7 @@ public:
 
     PassRefPtr<WebKitCSSFilterValue> cloneForCSSOM() const;
 
-    void reportDescendantMemoryUsage(MemoryObjectInfo*) const;
+    bool equals(const WebKitCSSFilterValue&) const;
 
 private:
     WebKitCSSFilterValue(FilterOperationType);

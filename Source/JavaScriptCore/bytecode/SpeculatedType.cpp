@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2012, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,6 +32,8 @@
 #include "Arguments.h"
 #include "JSArray.h"
 #include "JSFunction.h"
+#include "Operations.h"
+#include "StringObject.h"
 #include "ValueProfile.h"
 #include <wtf/BoundsCheckedPointer.h>
 #include <wtf/StringPrintStream.h>
@@ -119,18 +121,18 @@ void dumpSpeculation(PrintStream& out, SpeculatedType value)
     else
         isTop = false;
     
-    if (value & SpecMyArguments)
-        myOut.print("Myarguments");
-    else
-        isTop = false;
-    
-    if (value & SpecForeignArguments)
-        myOut.print("Foreignarguments");
+    if (value & SpecArguments)
+        myOut.print("Arguments");
     else
         isTop = false;
     
     if (value & SpecString)
         myOut.print("String");
+    else
+        isTop = false;
+    
+    if (value & SpecStringObject)
+        myOut.print("Stringobject");
     else
         isTop = false;
     
@@ -196,10 +198,12 @@ static const char* speculationToAbbreviatedString(SpeculatedType prediction)
         return "<Float32array>";
     if (isFloat64ArraySpeculation(prediction))
         return "<Float64array>";
-    if (isMyArgumentsSpeculation(prediction))
-        return "<Myarguments>";
     if (isArgumentsSpeculation(prediction))
         return "<Arguments>";
+    if (isStringObjectSpeculation(prediction))
+        return "<StringObject>";
+    if (isStringOrStringObjectSpeculation(prediction))
+        return "<StringOrStringObject>";
     if (isObjectSpeculation(prediction))
         return "<Object>";
     if (isCellSpeculation(prediction))
@@ -231,11 +235,13 @@ SpeculatedType speculationFromClassInfo(const ClassInfo* classInfo)
         return SpecArray;
     
     if (classInfo == &Arguments::s_info)
-        return SpecArguments; // Cannot distinguish between MyArguments and ForeignArguments at this stage. That happens in the flow analysis.
+        return SpecArguments;
+    
+    if (classInfo == &StringObject::s_info)
+        return SpecStringObject;
     
     if (classInfo->isSubClassOf(&JSFunction::s_info))
         return SpecFunction;
-
     
     if (classInfo->typedArrayStorageType != TypedArrayNone) {
         switch (classInfo->typedArrayStorageType) {

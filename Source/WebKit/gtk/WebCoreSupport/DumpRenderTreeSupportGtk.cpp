@@ -28,11 +28,11 @@
 #include "AccessibilityObject.h"
 #include "AnimationController.h"
 #include "ApplicationCacheStorage.h"
-#include "CSSComputedStyleDeclaration.h"
 #include "Chrome.h"
 #include "ChromeClientGtk.h"
 #include "DOMWrapperWorld.h"
 #include "Document.h"
+#include "Editor.h"
 #include "EditorClientGtk.h"
 #include "Element.h"
 #include "FocusController.h"
@@ -45,13 +45,13 @@
 #include "GeolocationPosition.h"
 #include "GraphicsContext.h"
 #include "HTMLInputElement.h"
+#include "JSCJSValue.h"
 #include "JSCSSStyleDeclaration.h"
 #include "JSDOMWindow.h"
 #include "JSDocument.h"
 #include "JSElement.h"
 #include "JSLock.h"
 #include "JSNodeList.h"
-#include "JSValue.h"
 #include "MemoryCache.h"
 #include "MutationObserver.h"
 #include "NodeList.h"
@@ -68,7 +68,6 @@
 #include "Settings.h"
 #include "TextIterator.h"
 #include "WebKitAccessibleWrapperAtk.h"
-#include "WorkerThread.h"
 #include "webkitglobalsprivate.h"
 #include "webkitwebframe.h"
 #include "webkitwebframeprivate.h"
@@ -83,7 +82,8 @@ using namespace WebKit;
 
 bool DumpRenderTreeSupportGtk::s_drtRun = false;
 bool DumpRenderTreeSupportGtk::s_linksIncludedInTabChain = true;
-bool DumpRenderTreeSupportGtk::s_selectTrailingWhitespaceEnabled = false;
+DumpRenderTreeSupportGtk::FrameLoadEventCallback DumpRenderTreeSupportGtk::s_frameLoadEventCallback = 0;
+DumpRenderTreeSupportGtk::AuthenticationCallback DumpRenderTreeSupportGtk::s_authenticationCallback = 0;
 
 DumpRenderTreeSupportGtk::DumpRenderTreeSupportGtk()
 {
@@ -110,16 +110,6 @@ void DumpRenderTreeSupportGtk::setLinksIncludedInFocusChain(bool enabled)
 bool DumpRenderTreeSupportGtk::linksIncludedInFocusChain()
 {
     return s_linksIncludedInTabChain;
-}
-
-void DumpRenderTreeSupportGtk::setSelectTrailingWhitespaceEnabled(bool enabled)
-{
-    s_selectTrailingWhitespaceEnabled = enabled;
-}
-
-bool DumpRenderTreeSupportGtk::selectTrailingWhitespaceEnabled()
-{
-    return s_selectTrailingWhitespaceEnabled;
 }
 
 /**
@@ -192,6 +182,20 @@ CString DumpRenderTreeSupportGtk::dumpRenderTree(WebKitWebFrame* frame)
     return externalRepresentation(coreFrame).utf8();
 }
 
+void DumpRenderTreeSupportGtk::addUserScript(WebKitWebFrame* frame, const char* sourceCode, bool runAtStart, bool allFrames)
+{
+    g_return_if_fail(WEBKIT_IS_WEB_FRAME(frame));
+
+    Frame* coreFrame = core(frame);
+    if (!coreFrame)
+        return;
+
+    WebKitWebView* webView = getViewFromFrame(frame);
+    Page* page = core(webView);
+    page->group().addUserScriptToWorld(mainThreadNormalWorld(), sourceCode, KURL(), Vector<String>(), Vector<String>(),
+        runAtStart ? InjectAtDocumentStart : InjectAtDocumentEnd, allFrames ? InjectInAllFrames : InjectInTopFrameOnly);
+}
+
 /**
  * addUserStyleSheet
  * @frame: a #WebKitWebFrame
@@ -222,43 +226,6 @@ guint DumpRenderTreeSupportGtk::getPendingUnloadEventCount(WebKitWebFrame* frame
     g_return_val_if_fail(WEBKIT_IS_WEB_FRAME(frame), 0);
 
     return core(frame)->document()->domWindow()->pendingUnloadEventListeners();
-}
-
-bool DumpRenderTreeSupportGtk::pauseAnimation(WebKitWebFrame* frame, const char* name, double time, const char* element)
-{
-    ASSERT(core(frame));
-    Element* coreElement = core(frame)->document()->getElementById(AtomicString(element));
-    if (!coreElement || !coreElement->renderer())
-        return false;
-    return core(frame)->animation()->pauseAnimationAtTime(coreElement->renderer(), AtomicString(name), time);
-}
-
-bool DumpRenderTreeSupportGtk::pauseTransition(WebKitWebFrame* frame, const char* name, double time, const char* element)
-{
-    ASSERT(core(frame));
-    Element* coreElement = core(frame)->document()->getElementById(AtomicString(element));
-    if (!coreElement || !coreElement->renderer())
-        return false;
-    return core(frame)->animation()->pauseTransitionAtTime(coreElement->renderer(), AtomicString(name), time);
-}
-
-CString DumpRenderTreeSupportGtk::markerTextForListItem(WebKitWebFrame* frame, JSContextRef context, JSValueRef nodeObject)
-{
-    JSC::ExecState* exec = toJS(context);
-    Element* element = toElement(toJS(exec, nodeObject));
-    if (!element)
-        return CString();
-
-    return WebCore::markerTextForListItem(element).utf8();
-}
-
-unsigned int DumpRenderTreeSupportGtk::numberOfActiveAnimations(WebKitWebFrame* frame)
-{
-    Frame* coreFrame = core(frame);
-    if (!coreFrame)
-        return 0;
-
-    return coreFrame->animation()->numberOfActiveAnimations(coreFrame->document());
 }
 
 void DumpRenderTreeSupportGtk::clearMainFrameName(WebKitWebFrame* frame)
@@ -309,7 +276,7 @@ void DumpRenderTreeSupportGtk::executeCoreCommandByName(WebKitWebView* webView, 
     g_return_if_fail(name);
     g_return_if_fail(value);
 
-    core(webView)->focusController()->focusedOrMainFrame()->editor()->command(name).execute(value);
+    core(webView)->focusController()->focusedOrMainFrame()->editor().command(name).execute(value);
 }
 
 bool DumpRenderTreeSupportGtk::isCommandEnabled(WebKitWebView* webView, const gchar* name)
@@ -317,7 +284,7 @@ bool DumpRenderTreeSupportGtk::isCommandEnabled(WebKitWebView* webView, const gc
     g_return_val_if_fail(WEBKIT_IS_WEB_VIEW(webView), FALSE);
     g_return_val_if_fail(name, FALSE);
 
-    return core(webView)->focusController()->focusedOrMainFrame()->editor()->command(name).isEnabled();
+    return core(webView)->focusController()->focusedOrMainFrame()->editor().command(name).isEnabled();
 }
 
 void DumpRenderTreeSupportGtk::setComposition(WebKitWebView* webView, const char* text, int start, int length)
@@ -329,14 +296,14 @@ void DumpRenderTreeSupportGtk::setComposition(WebKitWebView* webView, const char
     if (!frame)
         return;
 
-    Editor* editor = frame->editor();
-    if (!editor || (!editor->canEdit() && !editor->hasComposition()))
+    Editor& editor = frame->editor();
+    if (!editor.canEdit() && !editor.hasComposition())
         return;
 
     String compositionString = String::fromUTF8(text);
     Vector<CompositionUnderline> underlines;
     underlines.append(CompositionUnderline(0, compositionString.length(), Color(0, 0, 0), false));
-    editor->setComposition(compositionString, underlines, start, start + length);
+    editor.setComposition(compositionString, underlines, start, start + length);
 }
 
 bool DumpRenderTreeSupportGtk::hasComposition(WebKitWebView* webView)
@@ -345,11 +312,8 @@ bool DumpRenderTreeSupportGtk::hasComposition(WebKitWebView* webView)
     Frame* frame = core(webView)->focusController()->focusedOrMainFrame();
     if (!frame)
         return false;
-    Editor* editor = frame->editor();
-    if (!editor)
-        return false;
 
-    return editor->hasComposition();
+    return frame->editor().hasComposition();
 }
 
 bool DumpRenderTreeSupportGtk::compositionRange(WebKitWebView* webView, int* start, int* length)
@@ -362,12 +326,12 @@ bool DumpRenderTreeSupportGtk::compositionRange(WebKitWebView* webView, int* sta
     if (!frame)
         return false;
 
-    Editor* editor = frame->editor();
-    if (!editor || !editor->hasComposition())
+    Editor& editor = frame->editor();
+    if (!editor.hasComposition())
         return false;
 
-    *start = editor->compositionStart();
-    *length = editor->compositionEnd() - *start;
+    *start = editor.compositionStart();
+    *length = editor.compositionEnd() - *start;
     return true;
 }
 
@@ -379,19 +343,17 @@ void DumpRenderTreeSupportGtk::confirmComposition(WebKitWebView* webView, const 
     if (!frame)
         return;
 
-    Editor* editor = frame->editor();
-    if (!editor)
-        return;
+    Editor& editor = frame->editor();
 
-    if (!editor->hasComposition()) {
-        editor->insertText(String::fromUTF8(text), 0);
+    if (!editor.hasComposition()) {
+        editor.insertText(String::fromUTF8(text), 0);
         return;
     }
     if (text) {
-        editor->confirmComposition(String::fromUTF8(text));
+        editor.confirmComposition(String::fromUTF8(text));
         return;
     }
-    editor->confirmComposition();
+    editor.confirmComposition();
 }
 
 void DumpRenderTreeSupportGtk::doCommand(WebKitWebView* webView, const char* command)
@@ -401,9 +363,7 @@ void DumpRenderTreeSupportGtk::doCommand(WebKitWebView* webView, const char* com
     if (!frame)
         return;
 
-    Editor* editor = frame->editor();
-    if (!editor)
-        return;
+    Editor& editor = frame->editor();
 
     String commandString(command);
     // Remove ending : here.
@@ -416,7 +376,7 @@ void DumpRenderTreeSupportGtk::doCommand(WebKitWebView* webView, const char* com
     firstChar.makeUpper();
     commandString.insert(firstChar, 0);
 
-    editor->command(commandString).execute();
+    editor.command(commandString).execute();
 }
 
 bool DumpRenderTreeSupportGtk::firstRectForCharacterRange(WebKitWebView* webView, int location, int length, cairo_rectangle_int_t* rect)
@@ -431,15 +391,13 @@ bool DumpRenderTreeSupportGtk::firstRectForCharacterRange(WebKitWebView* webView
     if (!frame)
         return false;
 
-    Editor* editor = frame->editor();
-    if (!editor)
-        return false;
+    Editor& editor = frame->editor();
 
     RefPtr<Range> range = TextIterator::rangeFromLocationAndLength(frame->selection()->rootEditableElementOrDocumentElement(), location, length);
     if (!range)
         return false;
 
-    *rect = editor->firstRectForRange(range.get());
+    *rect = editor.firstRectForRange(range.get());
     return true;
 }
 
@@ -476,20 +434,11 @@ void DumpRenderTreeSupportGtk::setDefersLoading(WebKitWebView* webView, bool def
     core(webView)->setDefersLoading(defers);
 }
 
-void DumpRenderTreeSupportGtk::setSmartInsertDeleteEnabled(WebKitWebView* webView, bool enabled)
-{
-    g_return_if_fail(WEBKIT_IS_WEB_VIEW(webView));
-    g_return_if_fail(webView);
-
-    WebKit::EditorClient* client = static_cast<WebKit::EditorClient*>(core(webView)->editorClient());
-    client->setSmartInsertDeleteEnabled(enabled);
-}
-
 void DumpRenderTreeSupportGtk::forceWebViewPaint(WebKitWebView* webView)
 {
     g_return_if_fail(WEBKIT_IS_WEB_VIEW(webView));
 
-    static_cast<WebKit::ChromeClient*>(core(webView)->chrome()->client())->forcePaint();
+    static_cast<WebKit::ChromeClient*>(core(webView)->chrome().client())->forcePaint();
 }
 
 void DumpRenderTreeSupportGtk::whiteListAccessFromOrigin(const gchar* sourceOrigin, const gchar* destinationProtocol, const gchar* destinationHost, bool allowDestinationSubdomains)
@@ -519,8 +468,8 @@ void DumpRenderTreeSupportGtk::gcCollectJavascriptObjectsOnAlternateThread(bool 
 
 unsigned long DumpRenderTreeSupportGtk::gcCountJavascriptObjects()
 {
-    JSC::JSLockHolder lock(JSDOMWindow::commonJSGlobalData());
-    return JSDOMWindow::commonJSGlobalData()->heap.objectCount();
+    JSC::JSLockHolder lock(JSDOMWindow::commonVM());
+    return JSDOMWindow::commonVM()->heap.objectCount();
 }
 
 void DumpRenderTreeSupportGtk::layoutFrame(WebKitWebFrame* frame)
@@ -543,28 +492,9 @@ void DumpRenderTreeSupportGtk::clearOpener(WebKitWebFrame* frame)
         coreFrame->loader()->setOpener(0);
 }
 
-unsigned int DumpRenderTreeSupportGtk::workerThreadCount()
-{
-#if ENABLE(WORKERS)
-    return WebCore::WorkerThread::workerThreadCount();
-#else
-    return 0;
-#endif
-}
-
 bool DumpRenderTreeSupportGtk::findString(WebKitWebView* webView, const gchar* targetString, WebKitFindOptions findOptions)
 {
     return core(webView)->findString(String::fromUTF8(targetString), findOptions);
-}
-
-double DumpRenderTreeSupportGtk::defaultMinimumTimerInterval()
-{
-    return Settings::defaultMinDOMTimerInterval();
-}
-
-void DumpRenderTreeSupportGtk::setMinimumTimerInterval(WebKitWebView* webView, double interval)
-{
-    core(webView)->settings()->setMinDOMTimerInterval(interval);
 }
 
 CString DumpRenderTreeSupportGtk::accessibilityHelpText(AtkObject* axObject)
@@ -577,19 +507,6 @@ CString DumpRenderTreeSupportGtk::accessibilityHelpText(AtkObject* axObject)
         return CString();
 
     return coreObject->helpText().utf8();
-}
-
-void DumpRenderTreeSupportGtk::setAutofilled(JSContextRef context, JSValueRef nodeObject, bool autofilled)
-{
-    JSC::ExecState* exec = toJS(context);
-    Element* element = toElement(toJS(exec, nodeObject));
-    if (!element)
-        return;
-    HTMLInputElement* inputElement = element->toInputElement();
-    if (!inputElement)
-        return;
-
-    inputElement->setAutofilled(autofilled);
 }
 
 void DumpRenderTreeSupportGtk::setValueForUser(JSContextRef context, JSValueRef nodeObject, JSStringRef value)
@@ -700,6 +617,20 @@ void DumpRenderTreeSupportGtk::setCSSCustomFilterEnabled(WebKitWebView* webView,
 #endif
 }
 
+void DumpRenderTreeSupportGtk::setExperimentalContentSecurityPolicyFeaturesEnabled(bool enabled)
+{
+#if ENABLE(CSP_NEXT)
+    RuntimeEnabledFeatures::setExperimentalContentSecurityPolicyFeaturesEnabled(enabled);
+#endif
+}
+
+void DumpRenderTreeSupportGtk::setSeamlessIFramesEnabled(bool enabled)
+{
+#if ENABLE(IFRAME_SEAMLESS)
+    RuntimeEnabledFeatures::setSeamlessIFramesEnabled(enabled);
+#endif
+}
+
 void DumpRenderTreeSupportGtk::setShadowDOMEnabled(bool enabled)
 {
 #if ENABLE(SHADOW_DOM)
@@ -714,50 +645,9 @@ void DumpRenderTreeSupportGtk::setStyleScopedEnabled(bool enabled)
 #endif
 }
 
-bool DumpRenderTreeSupportGtk::elementDoesAutoCompleteForElementWithId(WebKitWebFrame* frame, JSStringRef id)
-{
-    Frame* coreFrame = core(frame);
-    if (!coreFrame)
-        return false;
-
-    Document* document = coreFrame->document();
-    ASSERT(document);
-
-    size_t bufferSize = JSStringGetMaximumUTF8CStringSize(id);
-    GOwnPtr<gchar> idBuffer(static_cast<gchar*>(g_malloc(bufferSize)));
-    JSStringGetUTF8CString(id, idBuffer.get(), bufferSize);
-    Node* coreNode = document->getElementById(String::fromUTF8(idBuffer.get()));
-    if (!coreNode || !coreNode->renderer())
-        return false;
-
-    HTMLInputElement* inputElement = static_cast<HTMLInputElement*>(coreNode);
-    if (!inputElement)
-        return false;
-
-    return inputElement->isTextField() && !inputElement->isPasswordField() && inputElement->shouldAutocomplete();
-}
-
-JSValueRef DumpRenderTreeSupportGtk::computedStyleIncludingVisitedInfo(JSContextRef context, JSValueRef nodeObject)
-{
-    JSC::ExecState* exec = toJS(context);
-    if (!nodeObject)
-        return JSValueMakeUndefined(context);
-
-    JSValue jsValue = toJS(exec, nodeObject);
-    if (!jsValue.inherits(&JSElement::s_info))
-        return JSValueMakeUndefined(context);
-
-    JSElement* jsElement = static_cast<JSElement*>(asObject(jsValue));
-    Element* element = jsElement->impl();
-    RefPtr<CSSComputedStyleDeclaration> style = CSSComputedStyleDeclaration::create(element, true);
-    return toRef(exec, toJS(exec, jsElement->globalObject(), style.get()));
-}
-
 void DumpRenderTreeSupportGtk::deliverAllMutationsIfNecessary()
 {
-#if ENABLE(MUTATION_OBSERVERS)
     MutationObserver::deliverAllMutations();
-#endif
 }
 
 void DumpRenderTreeSupportGtk::setDomainRelaxationForbiddenForURLScheme(bool forbidden, const char* urlScheme)
@@ -830,4 +720,25 @@ void DumpRenderTreeSupportGtk::clearApplicationCache()
 {
     cacheStorage().empty();
     cacheStorage().vacuumDatabaseFile();
+}
+
+void DumpRenderTreeSupportGtk::setFrameLoadEventCallback(FrameLoadEventCallback frameLoadEventCallback)
+{
+    s_frameLoadEventCallback = frameLoadEventCallback;
+}
+
+void DumpRenderTreeSupportGtk::setAuthenticationCallback(AuthenticationCallback authenticationCallback)
+{
+    s_authenticationCallback = authenticationCallback;
+}
+
+void DumpRenderTreeSupportGtk::setPageVisibility(WebKitWebView* webView, WebCore::PageVisibilityState visibilityState, bool isInitialState)
+{
+#if ENABLE(PAGE_VISIBILITY_API)
+    Page* page = core(webView);
+    if (!page)
+        return;
+
+    page->setVisibilityState(visibilityState, isInitialState);
+#endif
 }

@@ -44,6 +44,7 @@
 #include "qt_runtime.h"
 #include "NodeList.h"
 #include "RenderImage.h"
+#include "ScriptController.h"
 #include "ScriptSourceCode.h"
 #include "ScriptState.h"
 #include "StaticNodeList.h"
@@ -520,7 +521,7 @@ bool QWebElement::hasFocus() const
     if (!m_element)
         return false;
     if (m_element->document())
-        return m_element == m_element->document()->focusedNode();
+        return m_element == m_element->document()->focusedElement();
     return false;
 }
 
@@ -534,7 +535,7 @@ void QWebElement::setFocus()
     if (!m_element)
         return;
     if (m_element->document() && m_element->isFocusable())
-        m_element->document()->setFocusedNode(m_element);
+        m_element->document()->setFocusedElement(m_element);
 }
 
 /*!
@@ -617,7 +618,7 @@ QWebElement QWebElement::firstChild() const
     for (Node* child = m_element->firstChild(); child; child = child->nextSibling()) {
         if (!child->isElementNode())
             continue;
-        Element* e = static_cast<Element*>(child);
+        Element* e = toElement(child);
         return QWebElement(e);
     }
     return QWebElement();
@@ -635,7 +636,7 @@ QWebElement QWebElement::lastChild() const
     for (Node* child = m_element->lastChild(); child; child = child->previousSibling()) {
         if (!child->isElementNode())
             continue;
-        Element* e = static_cast<Element*>(child);
+        Element* e = toElement(child);
         return QWebElement(e);
     }
     return QWebElement();
@@ -653,7 +654,7 @@ QWebElement QWebElement::nextSibling() const
     for (Node* sib = m_element->nextSibling(); sib; sib = sib->nextSibling()) {
         if (!sib->isElementNode())
             continue;
-        Element* e = static_cast<Element*>(sib);
+        Element* e = toElement(sib);
         return QWebElement(e);
     }
     return QWebElement();
@@ -671,7 +672,7 @@ QWebElement QWebElement::previousSibling() const
     for (Node* sib = m_element->previousSibling(); sib; sib = sib->previousSibling()) {
         if (!sib->isElementNode())
             continue;
-        Element* e = static_cast<Element*>(sib);
+        Element* e = toElement(sib);
         return QWebElement(e);
     }
     return QWebElement();
@@ -812,13 +813,16 @@ QString QWebElement::styleProperty(const QString &name, StyleResolveStrategy str
     if (!propID)
         return QString();
 
-    const StylePropertySet* style = static_cast<StyledElement*>(m_element)->ensureMutableInlineStyle();
-
-    if (strategy == InlineStyle)
+    if (strategy == InlineStyle) {
+        const StylePropertySet* style = static_cast<StyledElement*>(m_element)->inlineStyle();
+        if (!style)
+            return QString();
         return style->getPropertyValue(propID);
+    }
 
     if (strategy == CascadedStyle) {
-        if (style->propertyIsImportant(propID))
+        const StylePropertySet* style = static_cast<StyledElement*>(m_element)->inlineStyle();
+        if (style && style->propertyIsImportant(propID))
             return style->getPropertyValue(propID);
 
         // We are going to resolve the style property by walking through the
@@ -830,18 +834,21 @@ QString QWebElement::styleProperty(const QString &name, StyleResolveStrategy str
         // declarations, as well as embedded and inline style declarations.
 
         Document* doc = m_element->document();
-        if (RefPtr<CSSRuleList> rules = doc->styleResolver()->styleRulesForElement(m_element, StyleResolver::AuthorCSSRules | StyleResolver::CrossOriginCSSRules)) {
-            for (int i = rules->length(); i > 0; --i) {
-                CSSStyleRule* rule = static_cast<CSSStyleRule*>(rules->item(i - 1));
+        Vector<RefPtr<StyleRuleBase> > rules = doc->ensureStyleResolver()->styleRulesForElement(m_element, StyleResolver::AuthorCSSRules | StyleResolver::CrossOriginCSSRules);
+        for (int i = rules.size(); i > 0; --i) {
+            if (!rules[i - 1]->isStyleRule())
+                continue;
+            StyleRule* styleRule = static_cast<StyleRule*>(rules[i - 1].get());
 
-                if (rule->styleRule()->properties()->propertyIsImportant(propID))
-                    return rule->styleRule()->properties()->getPropertyValue(propID);
+            if (styleRule->properties()->propertyIsImportant(propID))
+                return styleRule->properties()->getPropertyValue(propID);
 
-                if (style->getPropertyValue(propID).isEmpty())
-                    style = rule->styleRule()->properties();
-            }
+            if (!style || style->getPropertyValue(propID).isEmpty())
+                style = styleRule->properties();
         }
 
+        if (!style)
+            return QString();
         return style->getPropertyValue(propID);
     }
 
@@ -1203,7 +1210,7 @@ void QWebElement::removeAllChildren()
     if (!m_element)
         return;
 
-    m_element->removeAllChildren();
+    m_element->removeChildren();
 }
 
 // FIXME: This code, and all callers are wrong, and have no place in a
@@ -1648,7 +1655,7 @@ QWebElement QWebElementCollection::at(int i) const
     if (!d)
         return QWebElement();
     Node* n = d->m_result->item(i);
-    return QWebElement(static_cast<Element*>(n));
+    return QWebElement(toElement(n));
 }
 
 /*!
@@ -1683,7 +1690,7 @@ QList<QWebElement> QWebElementCollection::toList() const
     Node* n = d->m_result->item(i);
     while (n) {
         if (n->isElementNode())
-            elements.append(QWebElement(static_cast<Element*>(n)));
+            elements.append(QWebElement(toElement(n)));
         n = d->m_result->item(++i);
     }
     return elements;

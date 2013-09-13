@@ -32,25 +32,35 @@ namespace WebKit {
 
 class RemoteNetworkingContext : public WebCore::NetworkingContext {
 public:
-    static PassRefPtr<RemoteNetworkingContext> create(bool needsSiteSpecificQuirks, bool localFileContentSniffingEnabled)
+    static PassRefPtr<RemoteNetworkingContext> create(bool needsSiteSpecificQuirks, bool localFileContentSniffingEnabled, bool privateBrowsingEnabled, bool shouldClearReferrerOnHTTPSToHTTPRedirect)
     {
-        return adoptRef(new RemoteNetworkingContext(needsSiteSpecificQuirks, localFileContentSniffingEnabled));
+        return adoptRef(new RemoteNetworkingContext(needsSiteSpecificQuirks, localFileContentSniffingEnabled, privateBrowsingEnabled, shouldClearReferrerOnHTTPSToHTTPRedirect));
     }
     virtual ~RemoteNetworkingContext();
 
+    static void setPrivateBrowsingStorageSessionIdentifierBase(const String&);
+    static void ensurePrivateBrowsingSession();
+    static void destroyPrivateBrowsingSession();
+
+    static WebCore::NetworkStorageSession* privateBrowsingSession();
+
+    virtual bool shouldClearReferrerOnHTTPSToHTTPRedirect() const OVERRIDE;
+
 private:
-    RemoteNetworkingContext(bool needsSiteSpecificQuirks, bool localFileContentSniffingEnabled);
+    RemoteNetworkingContext(bool needsSiteSpecificQuirks, bool localFileContentSniffingEnabled, bool privateBrowsingEnabled, bool m_shouldClearReferrerOnHTTPSToHTTPRedirect);
 
     virtual bool isValid() const OVERRIDE;
 
     virtual bool needsSiteSpecificQuirks() const OVERRIDE;
     virtual bool localFileContentSniffingEnabled() const OVERRIDE;
-    virtual CFURLStorageSessionRef storageSession() const OVERRIDE;
-    virtual NSOperationQueue *scheduledOperationQueue() const OVERRIDE;
+    virtual WebCore::NetworkStorageSession& storageSession() const OVERRIDE;
+    virtual RetainPtr<CFDataRef> sourceApplicationAuditData() const OVERRIDE;
     virtual WebCore::ResourceError blockedError(const WebCore::ResourceRequest&) const OVERRIDE;
 
     bool m_needsSiteSpecificQuirks;
     bool m_localFileContentSniffingEnabled;
+    bool m_privateBrowsingEnabled;
+    bool m_shouldClearReferrerOnHTTPSToHTTPRedirect;
 };
 
 }

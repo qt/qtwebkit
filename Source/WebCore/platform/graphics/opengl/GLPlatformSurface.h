@@ -29,8 +29,8 @@
 #if USE(ACCELERATED_COMPOSITING)
 
 #include "GLDefs.h"
+#include "IntRect.h"
 #include <wtf/Noncopyable.h>
-#include <wtf/PassOwnPtr.h>
 
 // Encapsulates a surface that can be rendered to with GL, hiding platform
 // specific management.
@@ -40,46 +40,56 @@ class GLPlatformSurface {
     WTF_MAKE_NONCOPYABLE(GLPlatformSurface);
 
 public:
-    // Creates a GL surface used for offscreen rendering.
-    static PassOwnPtr<GLPlatformSurface> createOffscreenSurface();
+    enum Attributes {
+        Default = 0x00, // No Alpha channel. Only R,G,B values set.
+        SupportAlpha = 0x01,
+        DoubleBuffered = 0x02
+    };
 
-    // Creates a GL surface used for offscreen rendering. The results can be transported
-    // to the UI process for display.
-    static PassOwnPtr<GLPlatformSurface> createTransportSurface();
+    typedef unsigned SurfaceAttributes;
+    // Creates a GL surface used for offscreen rendering.
+    static PassOwnPtr<GLPlatformSurface> createOffScreenSurface(SurfaceAttributes = GLPlatformSurface::Default);
 
     virtual ~GLPlatformSurface();
 
     const IntRect& geometry() const;
 
-    // Get the underlying platform specific surface handle.
-    PlatformSurface handle() const;
+    // Get the underlying platform specific buffer handle.
+    // The handle will be null if surface doesn't support
+    // buffer sharing.
+    PlatformBufferHandle handle() const;
+
+    PlatformDrawable drawable() const;
 
     PlatformDisplay sharedDisplay() const;
 
+    virtual SurfaceAttributes attributes() const;
+
     virtual void swapBuffers();
 
-    virtual void copyTexture(uint32_t texture, const IntRect& sourceRect);
+    virtual bool isCurrentDrawable() const;
+    virtual void onMakeCurrent();
 
-    // Convenience Function to update surface backbuffer with texture contents and restore current FBO.
+    // Convenience Function to update surface backbuffer with texture contents.
+    // Note that the function doesn't track or restore any GL states.
     // Function does the following(in order):
-    // a)Blits texture contents to back buffer.
-    // b)Calls Swap Buffers.
-    // c)Sets current FBO as bindFboId.
-    virtual void updateContents(uint32_t texture, const IntRect& sourceRect, const GLuint bindFboId);
+    // a) Blits texture contents to back buffer.
+    // b) Calls Swap Buffers.
+    virtual void updateContents(const uint32_t);
 
-    virtual void setGeometry(const IntRect& newRect);
+    virtual void setGeometry(const IntRect&);
 
     virtual PlatformSurfaceConfig configuration();
 
     virtual void destroy();
 
 protected:
-    GLPlatformSurface();
-    bool m_restoreNeeded;
-    IntRect m_rect;
-    GLuint m_fboId;
+    GLPlatformSurface(SurfaceAttributes);
+
     PlatformDisplay m_sharedDisplay;
-    PlatformSurface m_drawable;
+    PlatformDrawable m_drawable;
+    PlatformBufferHandle m_bufferHandle;
+    IntRect m_rect;
 };
 
 }
@@ -87,3 +97,4 @@ protected:
 #endif
 
 #endif
+

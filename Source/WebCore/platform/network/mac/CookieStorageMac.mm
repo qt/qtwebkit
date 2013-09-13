@@ -25,25 +25,20 @@
 
 #include "config.h"
 #include "CookieStorage.h"
-#include "CookieStorageCFNet.h"
 
 #import "ResourceHandle.h"
 
 #import "WebCoreSystemInterface.h"
 #import <wtf/RetainPtr.h>
-#import <wtf/UnusedParam.h>
-
-#if USE(PLATFORM_STRATEGIES)
-#include "CookiesStrategy.h"
-#include "PlatformStrategies.h"
-#endif
 
 using namespace WebCore;
 
-@interface WebCookieStorageObjCAdapter : NSObject
+@interface WebCookieStorageObjCAdapter : NSObject {
+    CookieChangeCallbackPtr m_cookieChangeCallback;
+}
 -(void)notifyCookiesChangedOnMainThread;
 -(void)cookiesChangedNotificationHandler:(NSNotification *)notification;
--(void)startListeningForCookieChangeNotifications;
+-(void)startListeningForCookieChangeNotificationsWithCallback:(CookieChangeCallbackPtr)callback;
 -(void)stopListeningForCookieChangeNotifications;
 @end
 
@@ -51,9 +46,7 @@ using namespace WebCore;
 
 -(void)notifyCookiesChangedOnMainThread
 {
-#if USE(PLATFORM_STRATEGIES)
-    platformStrategies()->cookiesStrategy()->notifyCookiesChanged();
-#endif
+    m_cookieChangeCallback();
 }
 
 -(void)cookiesChangedNotificationHandler:(NSNotification *)notification
@@ -63,14 +56,17 @@ using namespace WebCore;
     [self performSelectorOnMainThread:@selector(notifyCookiesChangedOnMainThread) withObject:nil waitUntilDone:FALSE];
 }
 
--(void)startListeningForCookieChangeNotifications
+-(void)startListeningForCookieChangeNotificationsWithCallback:(CookieChangeCallbackPtr)callback
 {
+    ASSERT(!m_cookieChangeCallback);
+    m_cookieChangeCallback = callback;
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(cookiesChangedNotificationHandler:) name:NSHTTPCookieManagerCookiesChangedNotification object:[NSHTTPCookieStorage sharedHTTPCookieStorage]];
 }
 
 -(void)stopListeningForCookieChangeNotifications
 {
     [[NSNotificationCenter defaultCenter] removeObserver:self name:NSHTTPCookieManagerCookiesChangedNotification object:nil];
+    m_cookieChangeCallback = 0;
 }
 
 @end
@@ -79,11 +75,11 @@ namespace WebCore {
 
 static WebCookieStorageObjCAdapter *cookieStorageAdapter;
 
-void startObservingCookieChanges()
+void startObservingCookieChanges(CookieChangeCallbackPtr callback)
 {
     if (!cookieStorageAdapter)
         cookieStorageAdapter = [[WebCookieStorageObjCAdapter alloc] init];
-    [cookieStorageAdapter startListeningForCookieChangeNotifications];
+    [cookieStorageAdapter startListeningForCookieChangeNotificationsWithCallback:callback];
 }
 
 void stopObservingCookieChanges()

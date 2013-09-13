@@ -28,25 +28,28 @@
 #define PageUIClientEfl_h
 
 #include "WKPage.h"
+#include "WKPopupItem.h"
 #include <WebKit2/WKBase.h>
 #include <wtf/PassOwnPtr.h>
 
-class EwkViewImpl;
+class EwkView;
 
 namespace WebKit {
 
 class PageUIClientEfl {
 public:
-    static PassOwnPtr<PageUIClientEfl> create(EwkViewImpl* viewImpl)
+    static PassOwnPtr<PageUIClientEfl> create(EwkView* view)
     {
-        return adoptPtr(new PageUIClientEfl(viewImpl));
+        return adoptPtr(new PageUIClientEfl(view));
     }
 
 private:
-    explicit PageUIClientEfl(EwkViewImpl*);
+    explicit PageUIClientEfl(EwkView*);
 
-    static void closePage(WKPageRef, const void*);
-    static WKPageRef createNewPage(WKPageRef, WKURLRequestRef, WKDictionaryRef, WKEventModifiers, WKEventMouseButton, const void*);
+    static void close(WKPageRef, const void*);
+    static void takeFocus(WKPageRef, WKFocusDirection, const void*);
+    static void focus(WKPageRef, const void*);
+    static void unfocus(WKPageRef, const void*);
     static void runJavaScriptAlert(WKPageRef, WKStringRef, WKFrameRef, const void*);
     static bool runJavaScriptConfirm(WKPageRef, WKStringRef, WKFrameRef, const void*);
     static WKStringRef runJavaScriptPrompt(WKPageRef, WKStringRef, WKStringRef, WKFrameRef, const void*);
@@ -58,21 +61,23 @@ private:
     static void setStatusBarIsVisible(WKPageRef, bool, const void* clientInfo);
     static bool isResizable(WKPageRef, const void* clientInfo);
     static void setIsResizable(WKPageRef, bool, const void* clientInfo);
+    static WKRect getWindowFrame(WKPageRef, const void*);
+    static void setWindowFrame(WKPageRef, WKRect, const void*);
+    static bool runBeforeUnloadConfirmPanel(WKPageRef, WKStringRef, WKFrameRef, const void*);
+#if ENABLE(SQL_DATABASE)
+    static unsigned long long exceededDatabaseQuota(WKPageRef, WKFrameRef, WKSecurityOriginRef, WKStringRef, WKStringRef, unsigned long long currentQuota, unsigned long long, unsigned long long, unsigned long long, const void*);
+#endif
+    static void runOpenPanel(WKPageRef, WKFrameRef, WKOpenPanelParametersRef, WKOpenPanelResultListenerRef, const void*);
+    static WKPageRef createNewPage(WKPageRef, WKURLRequestRef, WKDictionaryRef, WKEventModifiers, WKEventMouseButton, const void*);
 #if ENABLE(INPUT_TYPE_COLOR)
     static void showColorPicker(WKPageRef, WKStringRef initialColor, WKColorPickerResultListenerRef, const void*);
     static void hideColorPicker(WKPageRef, const void*);
 #endif
-#if ENABLE(SQL_DATABASE)
-    static unsigned long long exceededDatabaseQuota(WKPageRef, WKFrameRef, WKSecurityOriginRef, WKStringRef, WKStringRef, unsigned long long currentQuota, unsigned long long, unsigned long long, unsigned long long, const void*);
-#endif
-    static void focus(WKPageRef, const void*);
-    static void unfocus(WKPageRef, const void*);
-    static void takeFocus(WKPageRef, WKFocusDirection, const void*);
-    static WKRect getWindowFrame(WKPageRef, const void*);
-    static void setWindowFrame(WKPageRef, WKRect, const void*);
-    static void runOpenPanel(WKPageRef, WKFrameRef, WKOpenPanelParametersRef, WKOpenPanelResultListenerRef, const void*);
 
-    EwkViewImpl* m_viewImpl;
+    static void showPopupMenu(WKPageRef, WKPopupMenuListenerRef, WKRect, WKPopupItemTextDirection, double pageScaleFactor, WKArrayRef itemsRef, int32_t selectedIndex, const void* clientInfo);
+    static void hidePopupMenu(WKPageRef, const void* clientInfo);
+
+    EwkView* m_view;
 };
 
 } // namespace WebKit

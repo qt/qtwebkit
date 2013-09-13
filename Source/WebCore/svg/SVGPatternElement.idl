@@ -25,14 +25,7 @@
 
 [
     Conditional=SVG
-] interface SVGPatternElement : SVGElement,
-                                                SVGURIReference,
-                                                SVGTests,
-                                                SVGLangSpace,
-                                                SVGExternalResourcesRequired,
-                                                SVGStylable,
-                                                SVGFitToViewBox
-                                             /* SVGUnitTypes */ {
+] interface SVGPatternElement : SVGStyledElement {
     readonly attribute SVGAnimatedEnumeration   patternUnits;
     readonly attribute SVGAnimatedEnumeration   patternContentUnits;
     readonly attribute SVGAnimatedTransformList patternTransform;
@@ -42,3 +35,7 @@
     readonly attribute SVGAnimatedLength        height;
 };
 
+SVGPatternElement implements SVGExternalResourcesRequired;
+SVGPatternElement implements SVGFitToViewBox;
+SVGPatternElement implements SVGTests;
+SVGPatternElement implements SVGURIReference;

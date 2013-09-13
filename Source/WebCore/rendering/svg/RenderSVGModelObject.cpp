@@ -57,9 +57,9 @@ void RenderSVGModelObject::computeFloatRectForRepaint(const RenderLayerModelObje
     SVGRenderSupport::computeFloatRectForRepaint(this, repaintContainer, repaintRect, fixed);
 }
 
-void RenderSVGModelObject::mapLocalToContainer(const RenderLayerModelObject* repaintContainer, TransformState& transformState, MapCoordinatesFlags mode, bool* wasFixed) const
+void RenderSVGModelObject::mapLocalToContainer(const RenderLayerModelObject* repaintContainer, TransformState& transformState, MapCoordinatesFlags, bool* wasFixed) const
 {
-    SVGRenderSupport::mapLocalToContainer(this, repaintContainer, transformState, mode & SnapOffsetForTransforms, wasFixed);
+    SVGRenderSupport::mapLocalToContainer(this, repaintContainer, transformState, wasFixed);
 }
 
 const RenderObject* RenderSVGModelObject::pushMappingToContainer(const RenderLayerModelObject* ancestorToStopAt, RenderGeometryMap& geometryMap) const
@@ -131,8 +131,8 @@ static void getElementCTM(SVGElement* element, AffineTransform& transform)
     Node* current = element;
 
     while (current && current->isSVGElement()) {
-        SVGElement* currentElement = static_cast<SVGElement*>(current);
-        if (currentElement->isStyled()) {
+        SVGElement* currentElement = toSVGElement(current);
+        if (currentElement->isSVGStyledElement()) {
             localTransform = currentElement->renderer()->localToParentTransform();
             transform = localTransform.multiply(transform);
         }
@@ -140,7 +140,7 @@ static void getElementCTM(SVGElement* element, AffineTransform& transform)
         if (currentElement == stopAtElement)
             break;
 
-        current = current->parentOrHostNode();
+        current = current->parentOrShadowHostNode();
     }
 }
 
@@ -180,7 +180,7 @@ bool RenderSVGModelObject::checkIntersection(RenderObject* renderer, const Float
     if (!isGraphicsElement(renderer))
         return false;
     AffineTransform ctm;
-    SVGElement* svgElement = static_cast<SVGElement*>(renderer->node());
+    SVGElement* svgElement = toSVGElement(renderer->node());
     getElementCTM(svgElement, ctm);
     ASSERT(svgElement->renderer());
     return intersectsAllowingEmpty(rect, ctm.mapRect(svgElement->renderer()->repaintRectInLocalCoordinates()));
@@ -193,7 +193,7 @@ bool RenderSVGModelObject::checkEnclosure(RenderObject* renderer, const FloatRec
     if (!isGraphicsElement(renderer))
         return false;
     AffineTransform ctm;
-    SVGElement* svgElement = static_cast<SVGElement*>(renderer->node());
+    SVGElement* svgElement = toSVGElement(renderer->node());
     getElementCTM(svgElement, ctm);
     ASSERT(svgElement->renderer());
     return rect.contains(ctm.mapRect(svgElement->renderer()->repaintRectInLocalCoordinates()));

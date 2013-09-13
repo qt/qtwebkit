@@ -43,13 +43,13 @@ class InspectorObject;
 class InspectorState;
 class InstrumentingAgents;
 class KURL;
-class WorkerContextProxy;
+class WorkerGlobalScopeProxy;
 
 typedef String ErrorString;
 
 class InspectorWorkerAgent : public InspectorBaseAgent<InspectorWorkerAgent>, public InspectorBackendDispatcher::WorkerCommandHandler {
 public:
-    static PassOwnPtr<InspectorWorkerAgent> create(InstrumentingAgents*, InspectorState*);
+    static PassOwnPtr<InspectorWorkerAgent> create(InstrumentingAgents*, InspectorCompositeState*);
     ~InspectorWorkerAgent();
 
     virtual void setFrontend(InspectorFrontend*);
@@ -58,21 +58,22 @@ public:
 
     // Called from InspectorInstrumentation
     bool shouldPauseDedicatedWorkerOnStart();
-    void didStartWorkerContext(WorkerContextProxy*, const KURL&);
-    void workerContextTerminated(WorkerContextProxy*);
+    void didStartWorkerGlobalScope(WorkerGlobalScopeProxy*, const KURL&);
+    void workerGlobalScopeTerminated(WorkerGlobalScopeProxy*);
 
     // Called from InspectorBackendDispatcher
     virtual void enable(ErrorString*);
     virtual void disable(ErrorString*);
+    virtual void canInspectWorkers(ErrorString*, bool*);
     virtual void connectToWorker(ErrorString*, int workerId);
     virtual void disconnectFromWorker(ErrorString*, int workerId);
     virtual void sendMessageToWorker(ErrorString*, int workerId, const RefPtr<InspectorObject>& message);
     virtual void setAutoconnectToWorkers(ErrorString*, bool value);
 
 private:
-    InspectorWorkerAgent(InstrumentingAgents*, InspectorState*);
+    InspectorWorkerAgent(InstrumentingAgents*, InspectorCompositeState*);
     void createWorkerFrontendChannelsForExistingWorkers();
-    void createWorkerFrontendChannel(WorkerContextProxy*, const String& url);
+    void createWorkerFrontendChannel(WorkerGlobalScopeProxy*, const String& url);
     void destroyWorkerFrontendChannels();
 
     InspectorFrontend* m_inspectorFrontend;
@@ -80,7 +81,7 @@ private:
     class WorkerFrontendChannel;
     typedef HashMap<int, WorkerFrontendChannel*> WorkerChannels;
     WorkerChannels m_idToChannel;
-    typedef HashMap<WorkerContextProxy*, String> DedicatedWorkers;
+    typedef HashMap<WorkerGlobalScopeProxy*, String> DedicatedWorkers;
     DedicatedWorkers m_dedicatedWorkers;
 };
 

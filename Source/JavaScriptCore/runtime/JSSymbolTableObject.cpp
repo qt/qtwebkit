@@ -32,6 +32,7 @@
 #include "JSActivation.h"
 #include "JSGlobalObject.h"
 #include "JSNameScope.h"
+#include "Operations.h"
 #include "PropertyNameArray.h"
 
 namespace JSC {
@@ -70,7 +71,7 @@ void JSSymbolTableObject::getOwnNonIndexPropertyNames(JSObject* object, ExecStat
 
 void JSSymbolTableObject::putDirectVirtual(JSObject*, ExecState*, PropertyName, JSValue, unsigned)
 {
-    ASSERT_NOT_REACHED();
+    RELEASE_ASSERT_NOT_REACHED();
 }
 
 } // namespace JSC

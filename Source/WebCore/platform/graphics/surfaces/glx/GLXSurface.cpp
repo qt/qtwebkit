@@ -26,54 +26,62 @@
 #include "config.h"
 #include "GLXSurface.h"
 
-#if USE(ACCELERATED_COMPOSITING) && HAVE(GLX)
+#if USE(ACCELERATED_COMPOSITING) && USE(GLX)
 
 namespace WebCore {
 
-SharedX11Resources* SharedX11Resources::m_staticSharedResource = 0;
+static PFNGLXBINDTEXIMAGEEXTPROC pGlXBindTexImageEXT = 0;
+static PFNGLXRELEASETEXIMAGEEXTPROC pGlXReleaseTexImageEXT = 0;
 
-static const int pbufferAttributes[] = { GLX_PBUFFER_WIDTH, 1, GLX_PBUFFER_HEIGHT, 1, 0 };
-
-GLXSurface::GLXSurface()
-    : GLPlatformSurface()
+static bool resolveGLMethods()
 {
-    m_sharedResources = SharedX11Resources::create();
-    m_sharedDisplay = m_sharedResources->display();
+    static bool resolved = false;
+    if (resolved)
+        return true;
+
+    pGlXBindTexImageEXT = reinterpret_cast<PFNGLXBINDTEXIMAGEEXTPROC>(glXGetProcAddress(reinterpret_cast<const GLubyte*>("glXBindTexImageEXT")));
+    pGlXReleaseTexImageEXT = reinterpret_cast<PFNGLXRELEASETEXIMAGEEXTPROC>(glXGetProcAddress(reinterpret_cast<const GLubyte*>("glXReleaseTexImageEXT")));
+
+    resolved = pGlXBindTexImageEXT && pGlXReleaseTexImageEXT;
+
+    return resolved;
 }
 
-GLXSurface::~GLXSurface()
+static int glxAttributes[] = {
+    GLX_TEXTURE_FORMAT_EXT,
+    GLX_TEXTURE_FORMAT_RGBA_EXT,
+    GLX_TEXTURE_TARGET_EXT,
+    GLX_TEXTURE_2D_EXT,
+    0
+};
+
+static bool isMesaGLX()
 {
+    static bool isMesa = !!strstr(glXGetClientString(X11Helper::nativeDisplay(), GLX_VENDOR), "Mesa");
+    return isMesa;
 }
 
-XVisualInfo* GLXSurface::visualInfo()
+GLXTransportSurface::GLXTransportSurface(const IntSize& size, SurfaceAttributes attributes)
+    : GLTransportSurface(size, attributes)
 {
-    return m_sharedResources->visualInfo();
-}
+    m_sharedDisplay = X11Helper::nativeDisplay();
+    attributes |= GLPlatformSurface::DoubleBuffered;
+    m_configSelector = adoptPtr(new GLXConfigSelector(attributes));
+    OwnPtrX11<XVisualInfo> visInfo(m_configSelector->visualInfo(m_configSelector->surfaceContextConfig()));
 
-Window GLXSurface::xWindow()
-{
-    return m_sharedResources->getXWindow();
-}
+    if (!visInfo.get()) {
+        destroy();
+        return;
+    }
 
-GLXFBConfig GLXSurface::pBufferConfiguration()
-{
-    return m_sharedResources->pBufferContextConfig();
-}
+    X11Helper::createOffScreenWindow(&m_bufferHandle, *visInfo.get(), size);
 
-GLXFBConfig GLXSurface::transportSurfaceConfiguration()
-{
-    return m_sharedResources->surfaceContextConfig();
-}
+    if (!m_bufferHandle) {
+        destroy();
+        return;
+    }
 
-bool GLXSurface::isXRenderExtensionSupported()
-{
-    return m_sharedResources->isXRenderExtensionSupported();
-}
-
-GLXTransportSurface::GLXTransportSurface()
-    : GLXSurface()
-{
-    initialize();
+    m_drawable = m_bufferHandle;
 }
 
 GLXTransportSurface::~GLXTransportSurface()
@@ -82,7 +90,15 @@ GLXTransportSurface::~GLXTransportSurface()
 
 PlatformSurfaceConfig GLXTransportSurface::configuration()
 {
-    return transportSurfaceConfiguration();
+    return m_configSelector->surfaceContextConfig();
+}
+
+void GLXTransportSurface::setGeometry(const IntRect& newRect)
+{
+    GLTransportSurface::setGeometry(newRect);
+    X11Helper::resizeWindow(newRect, m_drawable);
+    // Force resize of GL surface after window resize.
+    glXSwapBuffers(sharedDisplay(), m_drawable);
 }
 
 void GLXTransportSurface::swapBuffers()
@@ -90,113 +106,176 @@ void GLXTransportSurface::swapBuffers()
     if (!m_drawable)
         return;
 
-    if (m_restoreNeeded) {
-        GLint oldFBO;
-        glGetIntegerv(GL_FRAMEBUFFER_BINDING, &oldFBO);
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        glXSwapBuffers(sharedDisplay(), m_drawable);
-        glBindFramebuffer(GL_FRAMEBUFFER, oldFBO);
-    } else
-        glXSwapBuffers(sharedDisplay(), m_drawable);
-}
-
-void GLXTransportSurface::setGeometry(const IntRect& newRect)
-{
-    GLPlatformSurface::setGeometry(newRect);
-    int width = newRect.width();
-    int height = newRect.height();
-    XResizeWindow(sharedDisplay(), m_drawable, width, height);
-}
-
-void GLXTransportSurface::initialize()
-{
-    Display* display = sharedDisplay();
-    GLXFBConfig config = transportSurfaceConfiguration();
-    if (!config)
-        return;
-
-    XVisualInfo* visInfo = visualInfo();
-    if (!visInfo)
-        return;
-
-    Colormap cmap = XCreateColormap(display, xWindow(), visInfo->visual, AllocNone);
-    XSetWindowAttributes attribute;
-    attribute.background_pixel = WhitePixel(display, 0);
-    attribute.border_pixel = BlackPixel(display, 0);
-    attribute.colormap = cmap;
-    m_drawable = XCreateWindow(display, xWindow(), 0, 0, 1, 1, 0, visInfo->depth, InputOutput, visInfo->visual, CWBackPixel | CWBorderPixel | CWColormap, &attribute);
-    if (!m_drawable)
-        return;
-
-    XSetWindowBackgroundPixmap(display, m_drawable, 0);
-    XCompositeRedirectWindow(display, m_drawable, CompositeRedirectManual);
-
-    if (isXRenderExtensionSupported())
-        XMapWindow(display, m_drawable);
+    glXSwapBuffers(sharedDisplay(), m_drawable);
 }
 
 void GLXTransportSurface::destroy()
 {
-    freeResources();
-    GLPlatformSurface::destroy();
+    GLTransportSurface::destroy();
+
+    if (m_bufferHandle) {
+        X11Helper::destroyWindow(m_bufferHandle);
+        m_bufferHandle = 0;
+        m_drawable = 0;
+    }
+
+    m_configSelector = nullptr;
 }
 
-void GLXTransportSurface::freeResources()
+GLPlatformSurface::SurfaceAttributes GLXTransportSurface::attributes() const
 {
-    if (!m_drawable)
-        return;
+    return m_configSelector->attributes();
+}
 
-    GLPlatformSurface::destroy();
+GLXOffScreenSurface::GLXOffScreenSurface(SurfaceAttributes surfaceAttributes)
+    : GLPlatformSurface(surfaceAttributes)
+    , m_pixmap(0)
+    , m_glxPixmap(0)
+{
+    initialize(surfaceAttributes);
+}
+
+GLXOffScreenSurface::~GLXOffScreenSurface()
+{
+}
+
+void GLXOffScreenSurface::initialize(SurfaceAttributes attributes)
+{
+    m_sharedDisplay = X11Helper::nativeDisplay();
+
+    m_configSelector = adoptPtr(new GLXConfigSelector(attributes));
+
+    OwnPtrX11<XVisualInfo> visualInfo(m_configSelector->visualInfo(m_configSelector->pixmapContextConfig()));
+    X11Helper::createPixmap(&m_pixmap, *visualInfo.get());
+
+    if (!m_pixmap) {
+        destroy();
+        return;
+    }
+
+    m_glxPixmap = glXCreateGLXPixmap(m_sharedDisplay, visualInfo.get(), m_pixmap);
+
+    if (!m_glxPixmap) {
+        destroy();
+        return;
+    }
+
+    m_drawable = m_glxPixmap;
+}
+
+PlatformSurfaceConfig GLXOffScreenSurface::configuration()
+{
+    return m_configSelector->pixmapContextConfig();
+}
+
+void GLXOffScreenSurface::destroy()
+{
+    freeResources();
+}
+
+void GLXOffScreenSurface::freeResources()
+{
     Display* display = sharedDisplay();
+
     if (!display)
         return;
 
-    XDestroyWindow(display, m_drawable);
+    if (m_glxPixmap) {
+        glXDestroyGLXPixmap(display, m_glxPixmap);
+        glXWaitGL();
+        m_glxPixmap = 0;
+    }
+
+    if (m_pixmap) {
+        X11Helper::destroyPixmap(m_pixmap);
+        m_pixmap = 0;
+    }
+
+    m_configSelector = nullptr;
     m_drawable = 0;
 }
 
-GLXPBuffer::GLXPBuffer()
-    : GLXSurface()
+GLXTransportSurfaceClient::GLXTransportSurfaceClient(const PlatformBufferHandle handle, bool hasAlpha)
+    : GLTransportSurfaceClient()
 {
-    initialize();
-}
-
-GLXPBuffer::~GLXPBuffer()
-{
-}
-
-void GLXPBuffer::initialize()
-{
-    Display* display = sharedDisplay();
-    GLXFBConfig config = pBufferConfiguration();
-    if (!config)
+    if (!resolveGLMethods())
         return;
 
-    m_drawable = glXCreatePbuffer(display, config, pbufferAttributes);
-}
-
-PlatformSurfaceConfig GLXPBuffer::configuration()
-{
-    return pBufferConfiguration();
-}
-
-void GLXPBuffer::destroy()
-{
-    freeResources();
-}
-
-void GLXPBuffer::freeResources()
-{
-    if (!m_drawable)
+    XWindowAttributes attr;
+    Display* display = X11Helper::nativeDisplay();
+    if (!XGetWindowAttributes(display, handle, &attr))
         return;
 
-    GLPlatformSurface::destroy();
-    Display* display = sharedDisplay();
+    // Ensure that the window is mapped.
+    if (attr.map_state == IsUnmapped || attr.map_state == IsUnviewable)
+        return;
+
+    ScopedXPixmapCreationErrorHandler handler;
+
+    XRenderPictFormat* format = XRenderFindVisualFormat(display, attr.visual);
+    m_xPixmap = XCompositeNameWindowPixmap(display, handle);
+
+    if (!m_xPixmap)
+        return;
+
+    glxAttributes[1] = (format->depth == 32 && hasAlpha) ? GLX_TEXTURE_FORMAT_RGBA_EXT : GLX_TEXTURE_FORMAT_RGB_EXT;
+
+    GLPlatformSurface::SurfaceAttributes sharedSurfaceAttributes = GLPlatformSurface::Default;
+
+    if (hasAlpha)
+        sharedSurfaceAttributes = GLPlatformSurface::SupportAlpha;
+
+    GLXConfigSelector configSelector(sharedSurfaceAttributes);
+
+    m_glxPixmap = glXCreatePixmap(display, configSelector.surfaceClientConfig(format->depth, XVisualIDFromVisual(attr.visual)), m_xPixmap, glxAttributes);
+
+    if (!m_glxPixmap || !handler.isValidOperation()) {
+        destroy();
+        return;
+    }
+
+    createTexture();
+    glXWaitX();
+    pGlXBindTexImageEXT(display, m_glxPixmap, GLX_FRONT_EXT, 0);
+}
+
+GLXTransportSurfaceClient::~GLXTransportSurfaceClient()
+{
+}
+
+void GLXTransportSurfaceClient::destroy()
+{
+    Display* display = X11Helper::nativeDisplay();
     if (!display)
         return;
 
-    glXDestroyPbuffer(display, m_drawable);
-    m_drawable = 0;
+    if (m_texture) {
+        pGlXReleaseTexImageEXT(display, m_glxPixmap, GLX_FRONT_EXT);
+        GLTransportSurfaceClient::destroy();
+    }
+
+    if (m_glxPixmap) {
+        glXDestroyPixmap(display, m_glxPixmap);
+        m_glxPixmap = 0;
+        glXWaitGL();
+    }
+
+    if (m_xPixmap) {
+        X11Helper::destroyPixmap(m_xPixmap);
+        m_xPixmap = 0;
+    }
+}
+
+void GLXTransportSurfaceClient::prepareTexture()
+{
+    if (isMesaGLX() && m_texture) {
+        Display* display = X11Helper::nativeDisplay();
+        glBindTexture(GL_TEXTURE_2D, m_texture);
+        // Mesa doesn't re-bind texture to the front buffer on glXSwapBufer
+        // Manually release previous lock and rebind texture to surface to ensure frame updates.
+        pGlXReleaseTexImageEXT(display, m_glxPixmap, GLX_FRONT_EXT);
+        pGlXBindTexImageEXT(display, m_glxPixmap, GLX_FRONT_EXT, 0);
+    }
 }
 
 }

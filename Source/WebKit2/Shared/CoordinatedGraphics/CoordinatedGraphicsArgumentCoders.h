@@ -32,9 +32,14 @@
 #include "ArgumentCoders.h"
 
 namespace WebCore {
+struct CoordinatedGraphicsLayerState;
+struct CoordinatedGraphicsState;
 class FloatPoint3D;
 class GraphicsLayerAnimation;
 class GraphicsLayerAnimations;
+class SurfaceUpdateInfo;
+struct TileCreationInfo;
+struct TileUpdateInfo;
 class TransformationMatrix;
 class TransformOperations;
 struct Length;
@@ -56,54 +61,79 @@ namespace CoreIPC {
 
 template<> struct ArgumentCoder<WebCore::FloatPoint3D> {
     static void encode(ArgumentEncoder&, const WebCore::FloatPoint3D&);
-    static bool decode(ArgumentDecoder*, WebCore::FloatPoint3D&);
+    static bool decode(ArgumentDecoder&, WebCore::FloatPoint3D&);
 };
 
 template<> struct ArgumentCoder<WebCore::Length> {
     static void encode(ArgumentEncoder&, const WebCore::Length&);
-    static bool decode(ArgumentDecoder*, WebCore::Length&);
+    static bool decode(ArgumentDecoder&, WebCore::Length&);
 };
 
 template<> struct ArgumentCoder<WebCore::TransformationMatrix> {
     static void encode(ArgumentEncoder&, const WebCore::TransformationMatrix&);
-    static bool decode(ArgumentDecoder*, WebCore::TransformationMatrix&);
+    static bool decode(ArgumentDecoder&, WebCore::TransformationMatrix&);
 };
 
 #if ENABLE(CSS_FILTERS)
 template<> struct ArgumentCoder<WebCore::FilterOperations> {
     static void encode(ArgumentEncoder&, const WebCore::FilterOperations&);
-    static bool decode(ArgumentDecoder*, WebCore::FilterOperations&);
+    static bool decode(ArgumentDecoder&, WebCore::FilterOperations&);
 };
 #endif
 
 #if ENABLE(CSS_SHADERS)
 template<> struct ArgumentCoder<WebCore::CustomFilterProgramInfo> {
     static void encode(ArgumentEncoder&, const WebCore::CustomFilterProgramInfo&);
-    static bool decode(ArgumentDecoder*, WebCore::CustomFilterProgramInfo&);
+    static bool decode(ArgumentDecoder&, WebCore::CustomFilterProgramInfo&);
 };
 #endif
 
 template<> struct ArgumentCoder<WebCore::TransformOperations> {
     static void encode(ArgumentEncoder&, const WebCore::TransformOperations&);
-    static bool decode(ArgumentDecoder*, WebCore::TransformOperations&);
+    static bool decode(ArgumentDecoder&, WebCore::TransformOperations&);
 };
 
 template<> struct ArgumentCoder<WebCore::GraphicsLayerAnimations> {
     static void encode(ArgumentEncoder&, const WebCore::GraphicsLayerAnimations&);
-    static bool decode(ArgumentDecoder*, WebCore::GraphicsLayerAnimations&);
+    static bool decode(ArgumentDecoder&, WebCore::GraphicsLayerAnimations&);
 };
 
 template<> struct ArgumentCoder<WebCore::GraphicsLayerAnimation> {
     static void encode(ArgumentEncoder&, const WebCore::GraphicsLayerAnimation&);
-    static bool decode(ArgumentDecoder*, WebCore::GraphicsLayerAnimation&);
+    static bool decode(ArgumentDecoder&, WebCore::GraphicsLayerAnimation&);
 };
 
 #if USE(GRAPHICS_SURFACE)
 template<> struct ArgumentCoder<WebCore::GraphicsSurfaceToken> {
     static void encode(ArgumentEncoder&, const WebCore::GraphicsSurfaceToken&);
-    static bool decode(ArgumentDecoder*, WebCore::GraphicsSurfaceToken&);
+    static bool decode(ArgumentDecoder&, WebCore::GraphicsSurfaceToken&);
 };
 #endif
+
+template<> struct ArgumentCoder<WebCore::SurfaceUpdateInfo> {
+    static void encode(ArgumentEncoder&, const WebCore::SurfaceUpdateInfo&);
+    static bool decode(ArgumentDecoder&, WebCore::SurfaceUpdateInfo&);
+};
+
+template<> struct ArgumentCoder<WebCore::CoordinatedGraphicsLayerState> {
+    static void encode(ArgumentEncoder&, const WebCore::CoordinatedGraphicsLayerState&);
+    static bool decode(ArgumentDecoder&, WebCore::CoordinatedGraphicsLayerState&);
+};
+
+template<> struct ArgumentCoder<WebCore::TileUpdateInfo> {
+    static void encode(ArgumentEncoder&, const WebCore::TileUpdateInfo&);
+    static bool decode(ArgumentDecoder&, WebCore::TileUpdateInfo&);
+};
+
+template<> struct ArgumentCoder<WebCore::TileCreationInfo> {
+    static void encode(ArgumentEncoder&, const WebCore::TileCreationInfo&);
+    static bool decode(ArgumentDecoder&, WebCore::TileCreationInfo&);
+};
+
+template<> struct ArgumentCoder<WebCore::CoordinatedGraphicsState> {
+    static void encode(ArgumentEncoder&, const WebCore::CoordinatedGraphicsState&);
+    static bool decode(ArgumentDecoder&, WebCore::CoordinatedGraphicsState&);
+};
 
 } // namespace CoreIPC
 

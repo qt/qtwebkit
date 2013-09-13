@@ -28,10 +28,17 @@
 #include "stdafx.h"
 #include "WinLauncher.h"
 
+#include "AccessibilityDelegate.h"
 #include "DOMDefaultImpl.h"
 #include "PrintWebUIDelegate.h"
 #include <WebKit/WebKitCOMAPI.h>
+#include <wtf/Platform.h>
 
+#if USE(CF)
+#include <CoreFoundation/CFRunLoop.h>
+#endif
+
+#include <assert.h>
 #include <commctrl.h>
 #include <commdlg.h>
 #include <objbase.h>
@@ -54,6 +61,7 @@ IWebViewPrivate* gWebViewPrivate = 0;
 HWND gViewWindow = 0;
 WinLauncherWebHost* gWebHost = 0;
 PrintWebUIDelegate* gPrintDelegate = 0;
+AccessibilityDelegate* gAccessibilityDelegate = 0;
 TCHAR szTitle[MAX_LOADSTRING];                    // The title bar text
 TCHAR szWindowClass[MAX_LOADSTRING];            // the main window class name
 
@@ -257,6 +265,10 @@ BOOL WINAPI DllMain(HINSTANCE dllInstance, DWORD reason, LPVOID)
     return TRUE;
 }
 
+#if USE(CF)
+extern "C" void _CFRunLoopSetWindowsMessageQueueMask(CFRunLoopRef, uint32_t, CFStringRef);
+#endif
+
 extern "C" __declspec(dllexport) int WINAPI dllLauncherEntryPoint(HINSTANCE, HINSTANCE, LPTSTR, int nCmdShow)
 {
 #ifdef _CRTDBG_MAP_ALLOC
@@ -274,6 +286,7 @@ extern "C" __declspec(dllexport) int WINAPI dllLauncherEntryPoint(HINSTANCE, HIN
     InitCtrlEx.dwICC  = 0x00004000; //ICC_STANDARD_CLASSES;
     InitCommonControlsEx(&InitCtrlEx);
 
+    BSTR requestedURL = 0;
     int argc = 0;
     WCHAR** argv = CommandLineToArgvW(GetCommandLineW(), &argc);
     for (int i = 1; i < argc; ++i) {
@@ -281,6 +294,8 @@ extern "C" __declspec(dllexport) int WINAPI dllLauncherEntryPoint(HINSTANCE, HIN
             s_usesLayeredWebView = true;
         else if (!wcsicmp(argv[i], L"--desktop"))
             s_fullDesktop = true;
+        else if (!requestedURL)
+            requestedURL = ::SysAllocString(argv[i]);
     }
 
     // Initialize global strings
@@ -340,6 +355,7 @@ extern "C" __declspec(dllexport) int WINAPI dllLauncherEntryPoint(HINSTANCE, HIN
         goto exit;
 
     standardPreferences->setAcceleratedCompositingEnabled(TRUE);
+    standardPreferences->setAVFoundationEnabled(TRUE);
 
     HRESULT hr = WebKitCreateInstance(CLSID_WebView, 0, IID_IWebView, reinterpret_cast<void**>(&gWebView));
     if (FAILED(hr))
@@ -361,6 +377,12 @@ extern "C" __declspec(dllexport) int WINAPI dllLauncherEntryPoint(HINSTANCE, HIN
     if (FAILED (hr))
         goto exit;
 
+    gAccessibilityDelegate = new AccessibilityDelegate;
+    gAccessibilityDelegate->AddRef();
+    hr = gWebView->setAccessibilityDelegate(gAccessibilityDelegate);
+    if (FAILED (hr))
+        goto exit;
+
     hr = gWebView->setHostWindow(reinterpret_cast<OLE_HANDLE>(hMainWnd));
     if (FAILED(hr))
         goto exit;
@@ -369,14 +391,16 @@ extern "C" __declspec(dllexport) int WINAPI dllLauncherEntryPoint(HINSTANCE, HIN
     if (FAILED(hr))
         goto exit;
 
-    IWebFrame* frame;
-    hr = gWebView->mainFrame(&frame);
-    if (FAILED(hr))
-        goto exit;
+    if (!requestedURL) {
+        IWebFrame* frame;
+        hr = gWebView->mainFrame(&frame);
+        if (FAILED(hr))
+            goto exit;
 
-    static BSTR defaultHTML = SysAllocString(TEXT("<p style=\"background-color: #00FF00\">Testing</p><img id=\"webkit logo\" src=\"http://webkit.org/images/icon-gold.png\" alt=\"Face\"><div style=\"border: solid blue; background: white;\" contenteditable=\"true\">div with blue border</div><ul><li>foo<li>bar<li>baz</ul>"));
-    frame->loadHTMLString(defaultHTML, 0);
-    frame->Release();
+        static BSTR defaultHTML = SysAllocString(TEXT("<p style=\"background-color: #00FF00\">Testing</p><img id=\"webkit logo\" src=\"http://webkit.org/images/icon-gold.png\" alt=\"Face\"><div style=\"border: solid blue; background: white;\" contenteditable=\"true\">div with blue border</div><ul><li>foo<li>bar<li>baz</ul>"));
+        frame->loadHTMLString(defaultHTML, 0);
+        frame->Release();
+    }
 
     hr = gWebViewPrivate->setTransparent(usesLayeredWebView());
     if (FAILED(hr))
@@ -400,13 +424,24 @@ extern "C" __declspec(dllexport) int WINAPI dllLauncherEntryPoint(HINSTANCE, HIN
 
     hAccelTable = LoadAccelerators(hInst, MAKEINTRESOURCE(IDC_WINLAUNCHER));
 
+    if (requestedURL) {
+        loadURL(requestedURL);
+        ::SysFreeString(requestedURL);
+        requestedURL = 0;
+    }
+
     // Main message loop:
+#if USE(CF)
+    _CFRunLoopSetWindowsMessageQueueMask(CFRunLoopGetMain(), QS_ALLINPUT | QS_ALLPOSTMESSAGE, kCFRunLoopDefaultMode);
+    CFRunLoopRun();
+#else
     while (GetMessage(&msg, NULL, 0, 0)) {
         if (!TranslateAccelerator(msg.hwnd, hAccelTable, &msg)) {
             TranslateMessage(&msg);
             DispatchMessage(&msg);
         }
     }
+#endif
 
 exit:
     gPrintDelegate->Release();

@@ -27,7 +27,8 @@
 #include "ResolveGlobalStatus.h"
 
 #include "CodeBlock.h"
-#include "JSValue.h"
+#include "JSCJSValue.h"
+#include "Operations.h"
 #include "Structure.h"
 
 namespace JSC {
@@ -36,7 +37,7 @@ static ResolveGlobalStatus computeForStructure(CodeBlock* codeBlock, Structure* 
 {
     unsigned attributesIgnored;
     JSCell* specificValue;
-    PropertyOffset offset = structure->get(*codeBlock->globalData(), identifier, attributesIgnored, specificValue);
+    PropertyOffset offset = structure->get(*codeBlock->vm(), identifier, attributesIgnored, specificValue);
     if (structure->isDictionary())
         specificValue = 0;
     if (!isValidOffset(offset))

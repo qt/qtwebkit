@@ -22,16 +22,17 @@
 #define CSSStyleDeclaration_h
 
 #include "CSSPropertyNames.h"
-#include "CSSRule.h"
 #include "ScriptWrappable.h"
-#include "StylePropertySet.h"
 #include <wtf/Forward.h>
 
 namespace WebCore {
 
 class CSSProperty;
+class CSSRule;
 class CSSStyleSheet;
 class CSSValue;
+class MutableStylePropertySet;
+class StylePropertySet;
 class StyledElement;
 
 typedef int ExceptionCode;
@@ -64,13 +65,9 @@ public:
     virtual String getPropertyValueInternal(CSSPropertyID) = 0;
     virtual void setPropertyInternal(CSSPropertyID, const String& value, bool important, ExceptionCode&) = 0;
 
-    virtual PassRefPtr<StylePropertySet> copy() const = 0;
-    virtual PassRefPtr<StylePropertySet> makeMutable() = 0;
+    virtual PassRefPtr<MutableStylePropertySet> copyProperties() const = 0;
 
-    virtual bool cssPropertyMatches(const StylePropertySet::PropertyReference&) const = 0;
     virtual CSSStyleSheet* parentStyleSheet() const { return 0; }
-
-    virtual void reportMemoryUsage(MemoryObjectInfo*) const = 0;
 
 protected:
     CSSStyleDeclaration() { }

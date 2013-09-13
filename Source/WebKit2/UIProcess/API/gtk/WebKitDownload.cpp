@@ -34,6 +34,19 @@
 using namespace WebKit;
 using namespace WebCore;
 
+/**
+ * SECTION: WebKitDownload
+ * @Short_description: Object used to communicate with the application when downloading
+ * @Title: WebKitDownload
+ *
+ * #WebKitDownload carries information about a download request and
+ * response, including a #WebKitURIRequest and a #WebKitURIResponse
+ * objects. The application may use this object to control the
+ * download process, or to simply figure out what is to be downloaded,
+ * and handle the download process itself.
+ *
+ */
+
 enum {
     RECEIVED_DATA,
     FINISHED,
@@ -101,7 +114,12 @@ static gboolean webkitDownloadDecideDestination(WebKitDownload* download, const 
         return FALSE;
 
     GOwnPtr<char> filename(g_strdelimit(g_strdup(suggestedFilename), G_DIR_SEPARATOR_S, '_'));
-    GOwnPtr<char> destination(g_build_filename(g_get_user_special_dir(G_USER_DIRECTORY_DOWNLOAD), filename.get(), NULL));
+    const gchar *downloadsDir = g_get_user_special_dir(G_USER_DIRECTORY_DOWNLOAD);
+    if (!downloadsDir) {
+        // If we don't have XDG user dirs info, set just to HOME.
+        downloadsDir = g_get_home_dir();
+    }
+    GOwnPtr<char> destination(g_build_filename(downloadsDir, filename.get(), NULL));
     GOwnPtr<char> destinationURI(g_filename_to_uri(destination.get(), 0, 0));
     download->priv->destinationURI = destinationURI.get();
     g_object_notify(G_OBJECT(download), "destination");
@@ -260,6 +278,13 @@ WebKitDownload* webkitDownloadCreate(DownloadProxy* downloadProxy)
     ASSERT(downloadProxy);
     WebKitDownload* download = WEBKIT_DOWNLOAD(g_object_new(WEBKIT_TYPE_DOWNLOAD, NULL));
     download->priv->download = downloadProxy;
+    return download;
+}
+
+WebKitDownload* webkitDownloadCreateForRequest(DownloadProxy* downloadProxy, const ResourceRequest& request)
+{
+    WebKitDownload* download = webkitDownloadCreate(downloadProxy);
+    download->priv->request = adoptGRef(webkitURIRequestCreateForResourceRequest(request));
     return download;
 }
 

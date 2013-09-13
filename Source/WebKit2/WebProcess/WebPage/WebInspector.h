@@ -43,23 +43,26 @@ class WebInspectorFrontendClient;
 class WebPage;
 struct WebPageCreationParameters;
 
-class WebInspector : public APIObject {
+class WebInspector : public TypedAPIObject<APIObject::TypeBundleInspector> {
 public:
-    static const Type APIType = TypeBundleInspector;
-
     static PassRefPtr<WebInspector> create(WebPage*, WebCore::InspectorFrontendChannel*);
 
     WebPage* page() const { return m_page; }
     WebPage* inspectorPage() const { return m_inspectorPage; }
 
     // Implemented in generated WebInspectorMessageReceiver.cpp
-    void didReceiveWebInspectorMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::MessageDecoder&);
+    void didReceiveWebInspectorMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&);
 
     // Called by WebInspector messages
     void show();
     void close();
 
-    void setAttachedWindow(bool);
+    void didSave(const String& url);
+    void didAppend(const String& url);
+
+    void attachedBottom();
+    void attachedRight();
+    void detached();
 
     void evaluateScriptForTest(long callID, const String& script);
 
@@ -85,22 +88,26 @@ private:
 
     explicit WebInspector(WebPage*, WebCore::InspectorFrontendChannel*);
 
-    virtual Type type() const { return APIType; }
-
     // Called from WebInspectorClient
     WebPage* createInspectorPage();
     void destroyInspectorPage();
 
     // Called from WebInspectorFrontendClient
-    void didLoadInspectorPage();
     void didClose();
     void bringToFront();
     void inspectedURLChanged(const String&);
 
-    void attach();
+    bool canSave() const;
+    void save(const String& filename, const String& content, bool forceSaveAs);
+    void append(const String& filename, const String& content);
+
+    void attachBottom();
+    void attachRight();
     void detach();
 
     void setAttachedWindowHeight(unsigned);
+    void setAttachedWindowWidth(unsigned);
+    void setToolbarHeight(unsigned);
 
     // Implemented in platform WebInspector file
     String localizedStringsURL() const;
@@ -124,7 +131,9 @@ private:
     WebInspectorFrontendClient* m_frontendClient;
     WebCore::InspectorFrontendChannel* m_frontendChannel;
 #if PLATFORM(MAC)
-    String m_localizedStringsURL;
+    mutable String m_localizedStringsURL;
+    mutable bool m_hasLocalizedStringsURL;
+    bool m_usesWebKitUserInterface;
 #endif
 #if ENABLE(INSPECTOR_SERVER)
     bool m_remoteFrontendConnected;

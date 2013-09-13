@@ -101,13 +101,6 @@ bool EditorClientQt::shouldDeleteRange(Range* range)
     return true;
 }
 
-bool EditorClientQt::shouldShowDeleteInterface(HTMLElement* element)
-{
-    if (QWebPageAdapter::drtRun)
-        return element->getAttribute(classAttr) == "needsDeletionUI";
-    return false;
-}
-
 bool EditorClientQt::isContinuousSpellCheckingEnabled()
 {
     return m_textCheckerClient.isContinousSpellCheckingEnabled();
@@ -213,12 +206,12 @@ void EditorClientQt::respondToChangedSelection(Frame* frame)
     if (supportsGlobalSelection() && frame->selection()->isRange()) {
         bool oldSelectionMode = Pasteboard::generalPasteboard()->isSelectionMode();
         Pasteboard::generalPasteboard()->setSelectionMode(true);
-        Pasteboard::generalPasteboard()->writeSelection(frame->selection()->toNormalizedRange().get(), frame->editor()->canSmartCopyOrDelete(), frame);
+        Pasteboard::generalPasteboard()->writeSelection(frame->selection()->toNormalizedRange().get(), frame->editor().canSmartCopyOrDelete(), frame);
         Pasteboard::generalPasteboard()->setSelectionMode(oldSelectionMode);
     }
 
     m_page->respondToChangedSelection();
-    if (!frame->editor()->ignoreCompositionSelectionChange())
+    if (!frame->editor().ignoreCompositionSelectionChange())
         emit m_page->microFocusChanged();
 }
 
@@ -230,6 +223,14 @@ void EditorClientQt::didEndEditing()
 }
 
 void EditorClientQt::didWriteSelectionToPasteboard()
+{
+}
+
+void EditorClientQt::willWriteSelectionToPasteboard(Range*)
+{
+}
+
+void EditorClientQt::getClientPasteboardDataForRange(Range*, Vector<String>&, Vector<RefPtr<SharedBuffer> >&)
 {
 }
 
@@ -247,7 +248,7 @@ void EditorClientQt::registerUndoStep(WTF::PassRefPtr<WebCore::UndoStep> step)
 {
 #ifndef QT_NO_UNDOSTACK
     Frame* frame = m_page->page->focusController()->focusedOrMainFrame();
-    if (m_inUndoRedo || (frame && !frame->editor()->lastEditCommand() /* HACK!! Don't recreate undos */))
+    if (m_inUndoRedo || (frame && !frame->editor().lastEditCommand() /* HACK!! Don't recreate undos */))
         return;
     m_page->registerUndoStep(step);
 #endif // QT_NO_UNDOSTACK
@@ -332,18 +333,27 @@ void EditorClientQt::pageDestroyed()
 
 bool EditorClientQt::smartInsertDeleteEnabled()
 {
-    return m_smartInsertDeleteEnabled;
+    Page* page = m_page->page;
+    if (!page)
+        return false;
+    return page->settings()->smartInsertDeleteEnabled();
 }
 
 void EditorClientQt::toggleSmartInsertDelete()
 {
-    bool current = m_smartInsertDeleteEnabled;
-    m_smartInsertDeleteEnabled = !current;
+    Page* page = m_page->page;
+    if (page) {
+        page->settings()->setSmartInsertDeleteEnabled(!page->settings()->smartInsertDeleteEnabled());
+        page->settings()->setSelectTrailingWhitespaceEnabled(!page->settings()->selectTrailingWhitespaceEnabled());
+    }
 }
 
 bool EditorClientQt::isSelectTrailingWhitespaceEnabled()
 {
-    return m_selectTrailingWhitespaceEnabled;
+    Page* page = m_page->page;
+    if (!page)
+        return false;
+    return page->settings()->selectTrailingWhitespaceEnabled();
 }
 
 void EditorClientQt::toggleContinuousSpellChecking()
@@ -445,7 +455,7 @@ void EditorClientQt::handleKeyboardEvent(KeyboardEvent* event)
             // WebKit doesn't have enough information about mode to decide how commands that just insert text if executed via Editor should be treated,
             // so we leave it upon WebCore to either handle them immediately (e.g. Tab that changes focus) or let a keypress event be generated
             // (e.g. Tab that inserts a Tab character, or Enter).
-            if (frame->editor()->command(cmd).isTextInsertion()
+            if (frame->editor().command(cmd).isTextInsertion()
                 && kevent->type() == PlatformEvent::RawKeyDown)
                 return;
 
@@ -457,7 +467,7 @@ void EditorClientQt::handleKeyboardEvent(KeyboardEvent* event)
         {
             String commandName = editorCommandForKeyDownEvent(event);
             if (!commandName.isEmpty()) {
-                if (frame->editor()->command(commandName).execute()) // Event handled.
+                if (frame->editor().command(commandName).execute()) // Event handled.
                     event->setDefaultHandled();
                 return;
             }
@@ -485,7 +495,7 @@ void EditorClientQt::handleKeyboardEvent(KeyboardEvent* event)
             }
 
             if (shouldInsertText) {
-                frame->editor()->insertText(kevent->text(), event);
+                frame->editor().insertText(kevent->text(), event);
                 event->setDefaultHandled();
                 return;
             }
@@ -516,7 +526,7 @@ void EditorClientQt::handleKeyboardEvent(KeyboardEvent* event)
             {
                 String commandName = editorCommandForKeyDownEvent(event);
                 ASSERT(!commandName.isEmpty());
-                frame->editor()->command(commandName).execute();
+                frame->editor().command(commandName).execute();
                 event->setDefaultHandled();
                 return;
             }
@@ -540,8 +550,6 @@ EditorClientQt::EditorClientQt(QWebPageAdapter* pageAdapter)
     : m_page(pageAdapter)
     , m_editing(false)
     , m_inUndoRedo(false)
-    , m_smartInsertDeleteEnabled(true)
-    , m_selectTrailingWhitespaceEnabled(false)
 {
 }
 
@@ -610,9 +618,9 @@ void EditorClientQt::setInputMethodState(bool active)
 
         HTMLInputElement* inputElement = 0;
         Frame* frame = m_page->page->focusController()->focusedOrMainFrame();
-        if (frame && frame->document() && frame->document()->focusedNode())
-            if (frame->document()->focusedNode()->hasTagName(HTMLNames::inputTag))
-                inputElement = static_cast<HTMLInputElement*>(frame->document()->focusedNode());
+        if (frame && frame->document() && frame->document()->focusedElement())
+            if (isHTMLInputElement(frame->document()->focusedElement()))
+                inputElement = toHTMLInputElement(frame->document()->focusedElement());
 
         if (inputElement) {
             // Set input method hints for "number", "tel", "email", "url" and "password" input elements.

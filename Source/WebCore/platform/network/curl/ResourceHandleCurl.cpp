@@ -29,6 +29,8 @@
 #include "ResourceHandle.h"
 
 #include "CachedResourceLoader.h"
+#include "CredentialStorage.h"
+#include "NetworkingContext.h"
 #include "NotImplemented.h"
 #include "ResourceHandleInternal.h"
 #include "ResourceHandleManager.h"
@@ -95,14 +97,14 @@ ResourceHandle::~ResourceHandle()
     cancel();
 }
 
-bool ResourceHandle::start(NetworkingContext* context)
+bool ResourceHandle::start()
 {
     // The frame could be null if the ResourceHandle is not associated to any
     // Frame, e.g. if we are downloading a file.
     // If the frame is not null but the page is null this must be an attempted
     // load from an unload handler, so let's just block it.
     // If both the frame and the page are not null the context is valid.
-    if (context && !context->isValid())
+    if (d->m_context && !d->m_context->isValid())
         return false;
 
     ResourceHandleManager::sharedInstance()->add(this);
@@ -145,7 +147,6 @@ void ResourceHandle::setClientCertificate(const String& host, CFDataRef cert)
 
 void ResourceHandle::platformSetDefersLoading(bool defers)
 {
-#if LIBCURL_VERSION_NUM > 0x071200
     if (!d->m_handle)
         return;
 
@@ -160,15 +161,6 @@ void ResourceHandle::platformSetDefersLoading(bool defers)
             // Restarting the handle has failed so just cancel it.
             cancel();
     }
-#else
-    LOG_ERROR("Deferred loading is implemented if libcURL version is above 7.18.0");
-#endif
-}
-
-bool ResourceHandle::willLoadFromCache(ResourceRequest&, Frame*)
-{
-    notImplemented();
-    return false;
 }
 
 bool ResourceHandle::loadsBlocked()
@@ -177,10 +169,15 @@ bool ResourceHandle::loadsBlocked()
     return false;
 }
 
-void ResourceHandle::loadResourceSynchronously(NetworkingContext*, const ResourceRequest& request, StoredCredentials storedCredentials, ResourceError& error, ResourceResponse& response, Vector<char>& data)
+bool ResourceHandle::shouldUseCredentialStorage()
+{
+    return (!client() || client()->shouldUseCredentialStorage(this)) && firstRequest().url().protocolIsInHTTPFamily();
+}
+
+void ResourceHandle::platformLoadResourceSynchronously(NetworkingContext* context, const ResourceRequest& request, StoredCredentials storedCredentials, ResourceError& error, ResourceResponse& response, Vector<char>& data)
 {
     WebCoreSynchronousLoader syncLoader;
-    RefPtr<ResourceHandle> handle = adoptRef(new ResourceHandle(request, &syncLoader, true, false));
+    RefPtr<ResourceHandle> handle = adoptRef(new ResourceHandle(context, request, &syncLoader, true, false));
 
     ResourceHandleManager* manager = ResourceHandleManager::sharedInstance();
 
@@ -191,25 +188,78 @@ void ResourceHandle::loadResourceSynchronously(NetworkingContext*, const Resourc
     response = syncLoader.resourceResponse();
 }
 
-//stubs needed for windows version
-void ResourceHandle::didReceiveAuthenticationChallenge(const AuthenticationChallenge&) 
+void ResourceHandle::didReceiveAuthenticationChallenge(const AuthenticationChallenge& challenge)
 {
-    notImplemented();
+    if (shouldUseCredentialStorage()) {
+        if (!d->m_initialCredential.isEmpty() || challenge.previousFailureCount()) {
+            // The stored credential wasn't accepted, stop using it.
+            // There is a race condition here, since a different credential might have already been stored by another ResourceHandle,
+            // but the observable effect should be very minor, if any.
+            CredentialStorage::remove(challenge.protectionSpace());
+        }
+
+        if (!challenge.previousFailureCount()) {
+            Credential credential = CredentialStorage::get(challenge.protectionSpace());
+            if (!credential.isEmpty() && credential != d->m_initialCredential) {
+                ASSERT(credential.persistence() == CredentialPersistenceNone);
+                if (challenge.failureResponse().httpStatusCode() == 401) {
+                    // Store the credential back, possibly adding it as a default for this directory.
+                    CredentialStorage::set(credential, challenge.protectionSpace(), challenge.failureResponse().url());
+                }
+                String userpass = credential.user() + ":" + credential.password();
+                curl_easy_setopt(d->m_handle, CURLOPT_USERPWD, userpass.utf8().data());
+                return;
+            }
+        }
+    }
+
+    d->m_currentWebChallenge = challenge;
+    
+    if (client())
+        client()->didReceiveAuthenticationChallenge(this, d->m_currentWebChallenge);
 }
 
-void ResourceHandle::receivedCredential(const AuthenticationChallenge&, const Credential&) 
+void ResourceHandle::receivedCredential(const AuthenticationChallenge& challenge, const Credential& credential)
 {
-    notImplemented();
+    if (challenge != d->m_currentWebChallenge)
+        return;
+
+    if (credential.isEmpty()) {
+        receivedRequestToContinueWithoutCredential(challenge);
+        return;
+    }
+
+    if (shouldUseCredentialStorage()) {
+        if (challenge.failureResponse().httpStatusCode() == 401) {
+            KURL urlToStore = challenge.failureResponse().url();
+            CredentialStorage::set(credential, challenge.protectionSpace(), urlToStore);
+        }
+    }
+
+    String userpass = credential.user() + ":" + credential.password();
+    curl_easy_setopt(d->m_handle, CURLOPT_USERPWD, userpass.utf8().data());
+
+    clearAuthentication();
 }
 
-void ResourceHandle::receivedRequestToContinueWithoutCredential(const AuthenticationChallenge&) 
+void ResourceHandle::receivedRequestToContinueWithoutCredential(const AuthenticationChallenge& challenge)
 {
-    notImplemented();
+    if (challenge != d->m_currentWebChallenge)
+        return;
+
+    String userpass = "";
+    curl_easy_setopt(d->m_handle, CURLOPT_USERPWD, userpass.utf8().data());
+
+    clearAuthentication();
 }
 
-void ResourceHandle::receivedCancellation(const AuthenticationChallenge&)
+void ResourceHandle::receivedCancellation(const AuthenticationChallenge& challenge)
 {
-    notImplemented();
+    if (challenge != d->m_currentWebChallenge)
+        return;
+
+    if (client())
+        client()->receivedCancellation(this, challenge);
 }
 
 } // namespace WebCore

@@ -27,11 +27,28 @@
 #include "WebPageProxy.h"
 #include "WebSoupRequestManagerProxy.h"
 #include <WebCore/GOwnPtrSoup.h>
+#include <WebCore/ResourceError.h>
 #include <libsoup/soup.h>
 #include <wtf/gobject/GRefPtr.h>
 #include <wtf/text/CString.h>
 
 using namespace WebKit;
+
+/**
+ * SECTION: WebKitURISchemeRequest
+ * @Short_description: Represents a URI scheme request
+ * @Title: WebKitURISchemeRequest
+ *
+ * If you register a particular URI scheme in a #WebKitWebContext,
+ * using webkit_web_context_register_uri_scheme(), you have to provide
+ * a #WebKitURISchemeRequestCallback. After that, when a URI request
+ * is made with that particular scheme, your callback will be
+ * called. There you will be able to access properties such as the
+ * scheme, the URI and path, and the #WebKitWebView that initiated the
+ * request, and also finish the request with
+ * webkit_uri_scheme_request_finish().
+ *
+ */
 
 static const unsigned int gReadBufferSize = 8192;
 
@@ -146,10 +163,10 @@ WebKitWebView* webkit_uri_scheme_request_get_web_view(WebKitURISchemeRequest* re
 static void webkitURISchemeRequestReadCallback(GInputStream* inputStream, GAsyncResult* result, WebKitURISchemeRequest* schemeRequest)
 {
     GRefPtr<WebKitURISchemeRequest> request = adoptGRef(schemeRequest);
-    gssize bytesRead = g_input_stream_read_finish(inputStream, result, 0);
-    // FIXME: notify the WebProcess that we failed to read from the user stream.
+    GOwnPtr<GError> error;
+    gssize bytesRead = g_input_stream_read_finish(inputStream, result, &error.outPtr());
     if (bytesRead == -1) {
-        webkitWebContextDidFinishURIRequest(request->priv->webContext, request->priv->requestID);
+        webkit_uri_scheme_request_finish_error(request.get(), error.get());
         return;
     }
 
@@ -196,4 +213,26 @@ void webkit_uri_scheme_request_finish(WebKitURISchemeRequest* request, GInputStr
     request->priv->mimeType = mimeType;
     g_input_stream_read_async(inputStream, request->priv->readBuffer, gReadBufferSize, G_PRIORITY_DEFAULT, request->priv->cancellable.get(),
                               reinterpret_cast<GAsyncReadyCallback>(webkitURISchemeRequestReadCallback), g_object_ref(request));
+}
+
+/**
+ * webkit_uri_scheme_request_finish_error:
+ * @request: a #WebKitURISchemeRequest
+ * @error: a #GError that will be passed to the #WebKitWebView
+ *
+ * Finish a #WebKitURISchemeRequest with a #GError.
+ *
+ * Since: 2.2
+ */
+void webkit_uri_scheme_request_finish_error(WebKitURISchemeRequest* request, GError* error)
+{
+    g_return_if_fail(WEBKIT_IS_URI_SCHEME_REQUEST(request));
+    g_return_if_fail(error);
+
+    WebKitURISchemeRequestPrivate* priv = request->priv;
+
+    WebCore::ResourceError resourceError(g_quark_to_string(error->domain), error->code, priv->uri.data(), String::fromUTF8(error->message));
+    priv->webRequestManager->didFailURIRequest(resourceError, priv->requestID);
+
+    webkitWebContextDidFinishURIRequest(priv->webContext, priv->requestID);
 }

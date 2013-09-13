@@ -28,18 +28,41 @@
 
 #include "HTMLToken.h"
 #include "HTTPParsers.h"
+#include "KURL.h"
 #include "SuffixTree.h"
+#include "TextEncoding.h"
+#include <wtf/PassOwnPtr.h>
 
 namespace WebCore {
 
+class Document;
 class HTMLDocumentParser;
+class HTMLSourceTracker;
+class XSSInfo;
+class XSSAuditorDelegate;
+
+struct FilterTokenRequest {
+    FilterTokenRequest(HTMLToken& token, HTMLSourceTracker& sourceTracker, bool shouldAllowCDATA)
+        : token(token)
+        , sourceTracker(sourceTracker)
+        , shouldAllowCDATA(shouldAllowCDATA)
+    { }
+
+    HTMLToken& token;
+    HTMLSourceTracker& sourceTracker;
+    bool shouldAllowCDATA;
+};
 
 class XSSAuditor {
     WTF_MAKE_NONCOPYABLE(XSSAuditor);
 public:
-    explicit XSSAuditor(HTMLDocumentParser*);
+    XSSAuditor();
 
-    void filterToken(HTMLToken&);
+    void init(Document*, XSSAuditorDelegate*);
+    void initForFragment();
+
+    PassOwnPtr<XSSInfo> filterToken(const FilterTokenRequest&);
+    bool isSafeToSendToAnotherThread() const;
 
 private:
     static const size_t kMaximumFragmentLengthTarget = 100;
@@ -55,48 +78,47 @@ private:
         ScriptLikeAttribute
     };
 
-    void init();
+    bool filterStartToken(const FilterTokenRequest&);
+    void filterEndToken(const FilterTokenRequest&);
+    bool filterCharacterToken(const FilterTokenRequest&);
+    bool filterScriptToken(const FilterTokenRequest&);
+    bool filterObjectToken(const FilterTokenRequest&);
+    bool filterParamToken(const FilterTokenRequest&);
+    bool filterEmbedToken(const FilterTokenRequest&);
+    bool filterAppletToken(const FilterTokenRequest&);
+    bool filterIframeToken(const FilterTokenRequest&);
+    bool filterMetaToken(const FilterTokenRequest&);
+    bool filterBaseToken(const FilterTokenRequest&);
+    bool filterFormToken(const FilterTokenRequest&);
+    bool filterInputToken(const FilterTokenRequest&);
+    bool filterButtonToken(const FilterTokenRequest&);
 
-    bool filterStartToken(HTMLToken&);
-    void filterEndToken(HTMLToken&);
-    bool filterCharacterToken(HTMLToken&);
-    bool filterScriptToken(HTMLToken&);
-    bool filterObjectToken(HTMLToken&);
-    bool filterParamToken(HTMLToken&);
-    bool filterEmbedToken(HTMLToken&);
-    bool filterAppletToken(HTMLToken&);
-    bool filterIframeToken(HTMLToken&);
-    bool filterMetaToken(HTMLToken&);
-    bool filterBaseToken(HTMLToken&);
-    bool filterFormToken(HTMLToken&);
-
-    bool eraseDangerousAttributesIfInjected(HTMLToken&);
-    bool eraseAttributeIfInjected(HTMLToken&, const QualifiedName&, const String& replacementValue = String(), AttributeKind treatment = NormalAttribute);
+    bool eraseDangerousAttributesIfInjected(const FilterTokenRequest&);
+    bool eraseAttributeIfInjected(const FilterTokenRequest&, const QualifiedName&, const String& replacementValue = String(), AttributeKind treatment = NormalAttribute);
 
     String decodedSnippetForToken(const HTMLToken&);
-    String decodedSnippetForName(const HTMLToken&);
-    String decodedSnippetForAttribute(const HTMLToken&, const HTMLToken::Attribute&, AttributeKind treatment = NormalAttribute);
-    String decodedSnippetForJavaScript(const HTMLToken&);
+    String decodedSnippetForName(const FilterTokenRequest&);
+    String decodedSnippetForAttribute(const FilterTokenRequest&, const HTMLToken::Attribute&, AttributeKind treatment = NormalAttribute);
+    String decodedSnippetForJavaScript(const FilterTokenRequest&);
 
     bool isContainedInRequest(const String&);
     bool isLikelySafeResource(const String& url);
 
-    HTMLDocumentParser* m_parser;
+    KURL m_documentURL;
     bool m_isEnabled;
-    XSSProtectionDisposition m_xssProtection;
 
-    String m_originalURL;
-    String m_originalHTTPBody;
+    ContentSecurityPolicy::ReflectedXSSDisposition m_xssProtection;
+    bool m_didSendValidCSPHeader;
+    bool m_didSendValidXSSProtectionHeader;
+
     String m_decodedURL;
     String m_decodedHTTPBody;
     OwnPtr<SuffixTree<ASCIICodebook> > m_decodedHTTPBodySuffixTree;
 
     State m_state;
     String m_cachedDecodedSnippet;
-    bool m_shouldAllowCDATA;
     unsigned m_scriptTagNestingLevel;
-    bool m_notifyClient;
-    KURL m_reportURL;
+    TextEncoding m_encoding;
 };
 
 }

@@ -55,7 +55,7 @@ end
 
 
 class SpecialRegister < NoChildren
-    def dump
+    def clDump
         @name
     end
     def clValue(type=:int)
@@ -63,10 +63,10 @@ class SpecialRegister < NoChildren
     end
 end
 
-C_LOOP_SCRATCH_FPR = SpecialRegister.new("d8")
+C_LOOP_SCRATCH_FPR = SpecialRegister.new("d6")
 
 class RegisterID
-    def dump
+    def clDump
         case name
         when "t0"
             "t0"
@@ -95,12 +95,12 @@ class RegisterID
         end
     end
     def clValue(type=:int)
-        dump + cloopMapType(type)
+        clDump + cloopMapType(type)
     end
 end
 
 class FPRegisterID
-    def dump
+    def clDump
         case name
         when "ft0", "fr"
             "d0"
@@ -119,12 +119,12 @@ class FPRegisterID
         end
     end
     def clValue(type=:int)
-        dump + cloopMapType(type)
+        clDump + cloopMapType(type)
     end
 end
 
 class Immediate
-    def dump
+    def clDump
         "#{value}"
     end
     def clValue(type=:int)
@@ -156,8 +156,8 @@ class Immediate
 end
 
 class Address
-    def dump
-        "[#{base.dump}, #{offset.value}]"
+    def clDump
+        "[#{base.clDump}, #{offset.value}]"
     end
     def clValue(type=:int)
         case type
@@ -178,7 +178,7 @@ class Address
     def pointerExpr
         if base.is_a? RegisterID and base.name == "sp" 
             offsetValue = "#{offset.value}"
-            "(ASSERT(#{offsetValue} == offsetof(JITStackFrame, globalData)), &sp->globalData)"
+            "(ASSERT(#{offsetValue} == offsetof(JITStackFrame, vm)), &sp->vm)"
         elsif offset.value == 0
             "#{base.clValue(:int8Ptr)}"
         elsif offset.value > 0
@@ -229,8 +229,8 @@ class Address
 end
 
 class BaseIndex
-    def dump
-        "[#{base.dump}, #{offset.dump}, #{index.dump} << #{scaleShift}]"
+    def clDump
+        "[#{base.clDump}, #{offset.clDump}, #{index.clDump} << #{scaleShift}]"
     end
     def clValue(type=:int)
         case type
@@ -250,7 +250,7 @@ class BaseIndex
     def pointerExpr
         if base.is_a? RegisterID and base.name == "sp"
             offsetValue = "(#{index.clValue} << #{scaleShift}) + #{offset.clValue})"
-            "(ASSERT(#{offsetValue} == offsetof(JITStackFrame, globalData)), &sp->globalData)"
+            "(ASSERT(#{offsetValue} == offsetof(JITStackFrame, vm)), &sp->vm)"
         else
             "#{base.clValue(:int8Ptr)} + (#{index.clValue} << #{scaleShift}) + #{offset.clValue}"
         end
@@ -294,11 +294,11 @@ class BaseIndex
 end
 
 class AbsoluteAddress
-    def dump
+    def clDump
         "#{codeOriginString}"
     end
     def clValue
-        dump
+        clDump
     end
 end
 
@@ -348,7 +348,7 @@ class Sequence
 end
 
 def clOperands(operands)
-    operands.map{|v| v.dump}.join(", ")
+    operands.map{|v| v.clDump}.join(", ")
 end
 
 
@@ -358,14 +358,14 @@ def cloopEmitOperation(operands, type, operator)
     if operands.size == 3
         $asm.putc "#{operands[2].clValue(type)} = #{operands[1].clValue(type)} #{operator} #{operands[0].clValue(type)};"
         if operands[2].is_a? RegisterID and (type == :int32 or type == :uint32)
-            $asm.putc "#{operands[2].dump}.clearHighWord();" # Just clear it. It does nothing on the 32-bit port.
+            $asm.putc "#{operands[2].clDump}.clearHighWord();" # Just clear it. It does nothing on the 32-bit port.
         end
     else
         raise unless operands.size == 2
         raise unless not operands[1].is_a? Immediate
         $asm.putc "#{operands[1].clValue(type)} = #{operands[1].clValue(type)} #{operator} #{operands[0].clValue(type)};"
         if operands[1].is_a? RegisterID and (type == :int32 or type == :uint32)
-            $asm.putc "#{operands[1].dump}.clearHighWord();" # Just clear it. It does nothing on the 32-bit port.
+            $asm.putc "#{operands[1].clDump}.clearHighWord();" # Just clear it. It does nothing on the 32-bit port.
         end
     end
 end
@@ -375,14 +375,14 @@ def cloopEmitShiftOperation(operands, type, operator)
     if operands.size == 3
         $asm.putc "#{operands[2].clValue(type)} = #{operands[1].clValue(type)} #{operator} (#{operands[0].clValue(:int)} & 0x1f);"
         if operands[2].is_a? RegisterID and (type == :int32 or type == :uint32)
-            $asm.putc "#{operands[2].dump}.clearHighWord();" # Just clear it. It does nothing on the 32-bit port.
+            $asm.putc "#{operands[2].clDump}.clearHighWord();" # Just clear it. It does nothing on the 32-bit port.
         end
     else
         raise unless operands.size == 2
         raise unless not operands[1].is_a? Immediate
         $asm.putc "#{operands[1].clValue(type)} = #{operands[1].clValue(type)} #{operator} (#{operands[0].clValue(:int)} & 0x1f);"
         if operands[1].is_a? RegisterID and (type == :int32 or type == :uint32)
-            $asm.putc "#{operands[1].dump}.clearHighWord();" # Just clear it. It does nothing on the 32-bit port.
+            $asm.putc "#{operands[1].clDump}.clearHighWord();" # Just clear it. It does nothing on the 32-bit port.
         end
     end
 end
@@ -393,12 +393,12 @@ def cloopEmitUnaryOperation(operands, type, operator)
     raise unless not operands[0].is_a? Immediate
     $asm.putc "#{operands[0].clValue(type)} = #{operator}#{operands[0].clValue(type)};"
     if operands[0].is_a? RegisterID and (type == :int32 or type == :uint32)
-        $asm.putc "#{operands[0].dump}.clearHighWord();" # Just clear it. It does nothing on the 32-bit port.
+        $asm.putc "#{operands[0].clDump}.clearHighWord();" # Just clear it. It does nothing on the 32-bit port.
     end
 end
 
 def cloopEmitCompareDoubleWithNaNCheckAndBranch(operands, condition)
-    $asm.putc "if (isnan(#{operands[0].clValue(:double)}) || isnan(#{operands[1].clValue(:double)})"
+    $asm.putc "if (std::isnan(#{operands[0].clValue(:double)}) || isnan(#{operands[1].clValue(:double)})"
     $asm.putc "    || (#{operands[0].clValue(:double)} #{condition} #{operands[1].clValue(:double)}))"
     $asm.putc "    goto #{operands[2].cLabel};"
 end
@@ -465,9 +465,9 @@ def cloopEmitOpAndBranch(operands, operator, type, conditionTest)
 
     $asm.putc "{"
     $asm.putc "    #{tempType} temp = #{op2} #{operator} #{op1};"
+    $asm.putc "    #{op2} = temp;"
     $asm.putc "    if (temp #{conditionTest})"
     $asm.putc "        goto  #{operands[2].cLabel};"
-    $asm.putc "    #{op2} = temp;"
     $asm.putc "}"
 end
 
@@ -533,10 +533,10 @@ def cloopEmitOpAndBranchIfOverflow(operands, operator, type)
         raise "Unimplemented opeartor"
     end
 
-    $asm.putc "    if #{overflowTest} {"
-    $asm.putc "        goto #{operands[2].cLabel};"
-    $asm.putc "    }"
+    $asm.putc "    bool didOverflow = #{overflowTest};"
     $asm.putc "    #{operands[1].clValue(type)} = #{operands[1].clValue(type)} #{operator} #{operands[0].clValue(type)};"
+    $asm.putc "    if (didOverflow)"
+    $asm.putc "        goto #{operands[2].cLabel};"
     $asm.putc "}"
 end
 
@@ -703,16 +703,16 @@ class Instruction
 
         when "td2i"
             $asm.putc "#{operands[1].clValue(:int)} = #{operands[0].clValue(:double)};"
-            $asm.putc "#{operands[1].dump}.clearHighWord();"
+            $asm.putc "#{operands[1].clDump}.clearHighWord();"
 
         when "bcd2i"  # operands: srcDbl dstInt slowPath
             $asm.putc "{"
             $asm.putc "    double d = #{operands[0].clValue(:double)};"
             $asm.putc "    const int32_t asInt32 = int32_t(d);"
-            $asm.putc "    if (asInt32 != d || (!asInt32 && signbit(d))) // true for -0.0"
+            $asm.putc "    if (asInt32 != d || (!asInt32 && std::signbit(d))) // true for -0.0"
             $asm.putc "        goto  #{operands[2].cLabel};"
             $asm.putc "    #{operands[1].clValue} = asInt32;"            
-            $asm.putc "    #{operands[1].dump}.clearHighWord();"
+            $asm.putc "    #{operands[1].clDump}.clearHighWord();"
             $asm.putc "}"
 
         when "move"

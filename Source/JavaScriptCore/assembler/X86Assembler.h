@@ -1952,7 +1952,7 @@ public:
             *ptr = OP_MOV_GvEv;
             break;
         default:
-            ASSERT_NOT_REACHED();
+            RELEASE_ASSERT_NOT_REACHED();
         }
     }
     
@@ -1970,7 +1970,7 @@ public:
         case OP_LEA:
             break;
         default:
-            ASSERT_NOT_REACHED();
+            RELEASE_ASSERT_NOT_REACHED();
         }
     }
     
@@ -1991,9 +1991,9 @@ public:
         return b.m_offset - a.m_offset;
     }
     
-    PassRefPtr<ExecutableMemoryHandle> executableCopy(JSGlobalData& globalData, void* ownerUID, JITCompilationEffort effort)
+    PassRefPtr<ExecutableMemoryHandle> executableCopy(VM& vm, void* ownerUID, JITCompilationEffort effort)
     {
-        return m_formatter.executableCopy(globalData, ownerUID, effort);
+        return m_formatter.executableCopy(vm, ownerUID, effort);
     }
 
     unsigned debugOffset() { return m_formatter.debugOffset(); }
@@ -2349,9 +2349,9 @@ private:
         bool isAligned(int alignment) const { return m_buffer.isAligned(alignment); }
         void* data() const { return m_buffer.data(); }
 
-        PassRefPtr<ExecutableMemoryHandle> executableCopy(JSGlobalData& globalData, void* ownerUID, JITCompilationEffort effort)
+        PassRefPtr<ExecutableMemoryHandle> executableCopy(VM& vm, void* ownerUID, JITCompilationEffort effort)
         {
-            return m_buffer.executableCopy(globalData, ownerUID, effort);
+            return m_buffer.executableCopy(vm, ownerUID, effort);
         }
 
         unsigned debugOffset() { return m_buffer.debugOffset(); }

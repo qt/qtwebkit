@@ -23,7 +23,7 @@
 #if ENABLE(SVG)
 #include "SVGAnimatedBoolean.h"
 #include "SVGAnimatedString.h"
-#include "SVGDocumentExtensions.h"
+#include "SVGElement.h"
 #include "SVGExternalResourcesRequired.h"
 #include "SVGURIReference.h"
 
@@ -31,9 +31,9 @@ namespace WebCore {
     
 class SVGPathElement;
 
-class SVGMPathElement : public SVGElement,
-                        public SVGURIReference,
-                        public SVGExternalResourcesRequired {
+class SVGMPathElement FINAL : public SVGElement,
+                              public SVGURIReference,
+                              public SVGExternalResourcesRequired {
 public:
     static PassRefPtr<SVGMPathElement> create(const QualifiedName&, Document*);
 

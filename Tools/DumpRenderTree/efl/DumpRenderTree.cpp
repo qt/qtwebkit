@@ -69,10 +69,18 @@ static bool dumpPixelsForCurrentTest;
 static int dumpPixelsForAllTests = false;
 static int dumpTree = true;
 static int printSeparators = true;
+static int useTimeoutWatchdog = true;
 
 static String dumpFramesAsText(Evas_Object* frame)
 {
+    if (!frame)
+        return String();
+
     String result;
+    const char* frameContents = ewk_frame_plain_text_get(frame);
+
+    if (!frameContents)
+        return String();
 
     if (browser->mainFrame() != frame) {
         result.append("\n--------\nFrame: '");
@@ -80,7 +88,6 @@ static String dumpFramesAsText(Evas_Object* frame)
         result.append("'\n--------\n");
     }
 
-    const char* frameContents = ewk_frame_plain_text_get(frame);
     result.append(String::fromUTF8(frameContents));
     result.append("\n");
     eina_stringshare_del(frameContents);
@@ -161,6 +168,11 @@ static void sendPixelResultsEOF()
     fflush(stderr);
 }
 
+bool shouldSetWaitToDumpWatchdog()
+{
+    return !waitToDumpWatchdog && useTimeoutWatchdog;
+}
+
 static void invalidateAnyPreviousWaitToDumpWatchdog()
 {
     if (waitToDumpWatchdog) {
@@ -195,6 +207,7 @@ static bool parseCommandLineOptions(int argc, char** argv)
         {"notree", no_argument, &dumpTree, false},
         {"pixel-tests", no_argument, &dumpPixelsForAllTests, true},
         {"tree", no_argument, &dumpTree, true},
+        {"no-timeout", no_argument, &useTimeoutWatchdog, false},
         {0, 0, 0, 0}
     };
 
@@ -274,8 +287,8 @@ static void runTest(const char* inputLine)
     WorkQueue::shared()->setFrozen(false);
 
     const bool isSVGW3CTest = testURL.contains("svg/W3C-SVG-1.1");
-    const int width = isSVGW3CTest ? 480 : TestRunner::maxViewWidth;
-    const int height = isSVGW3CTest ? 360 : TestRunner::maxViewHeight;
+    const int width = isSVGW3CTest ? TestRunner::w3cSVGViewWidth : TestRunner::viewWidth;
+    const int height = isSVGW3CTest ? TestRunner::w3cSVGViewHeight : TestRunner::viewHeight;
     evas_object_resize(browser->mainView(), width, height);
 
     if (prevTestBFItem)
@@ -422,11 +435,12 @@ void dump()
 
 static Ecore_Evas* initEcoreEvas()
 {
-    const char* engine = 0;
+    Ecore_Evas* ecoreEvas = 0;
 #if defined(WTF_USE_ACCELERATED_COMPOSITING) && defined(HAVE_ECORE_X)
-    engine = "opengl_x11";
+    ecoreEvas = ecore_evas_new("opengl_x11", 0, 0, 800, 600, 0);
+    if (!ecoreEvas)
 #endif
-    Ecore_Evas* ecoreEvas = ecore_evas_new(engine, 0, 0, 800, 600, 0);
+    ecoreEvas = ecore_evas_new(0, 0, 0, 800, 600, 0);
     if (!ecoreEvas) {
         shutdownEfl();
         exit(EXIT_FAILURE);

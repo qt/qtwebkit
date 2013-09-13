@@ -24,10 +24,10 @@
  */
 
 [
-    Conditional=SVG
+    Conditional=SVG,
+    SkipVTableValidation
 ] interface SVGAnimatedString {
-    attribute DOMString baseVal
-        setter raises(DOMException);
+    [SetterRaisesException] attribute DOMString baseVal;
     readonly attribute DOMString animVal;
 };
 

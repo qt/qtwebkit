@@ -48,6 +48,7 @@
 #include "InstrumentingAgents.h"
 #include "Page.h"
 #include "ResourceRequest.h"
+#include "ScriptController.h"
 #include "ScriptFunctionCall.h"
 #include "ScriptObject.h"
 #include "SecurityOrigin.h"
@@ -55,15 +56,13 @@
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefPtr.h>
 
-using namespace std;
-
 namespace WebCore {
 
 namespace InspectorAgentState {
 static const char inspectorAgentEnabled[] = "inspectorAgentEnabled";
 }
 
-InspectorAgent::InspectorAgent(Page* page, InjectedScriptManager* injectedScriptManager, InstrumentingAgents* instrumentingAgents, InspectorState* state)
+InspectorAgent::InspectorAgent(Page* page, InjectedScriptManager* injectedScriptManager, InstrumentingAgents* instrumentingAgents, InspectorCompositeState* state)
     : InspectorBaseAgent<InspectorAgent>("Inspector", instrumentingAgents, state)
     , m_inspectedPage(page)
     , m_frontend(0)
@@ -86,10 +85,17 @@ void InspectorAgent::didClearWindowObjectInWorld(Frame* frame, DOMWrapperWorld* 
     if (m_injectedScriptForOrigin.isEmpty())
         return;
 
-    String origin = frame->document()->securityOrigin()->toString();
+    String origin = frame->document()->securityOrigin()->toRawString();
     String script = m_injectedScriptForOrigin.get(origin);
-    if (!script.isEmpty())
-        m_injectedScriptManager->injectScript(script, mainWorldScriptState(frame));
+    if (script.isEmpty())
+        return;
+    int injectedScriptId = m_injectedScriptManager->injectedScriptIdFor(mainWorldScriptState(frame));
+    StringBuilder scriptSource;
+    scriptSource.append(script);
+    scriptSource.append("(");
+    scriptSource.appendNumber(injectedScriptId);
+    scriptSource.append(")");
+    frame->script()->executeScript(scriptSource.toString());
 }
 
 void InspectorAgent::setFrontend(InspectorFrontend* inspectorFrontend)

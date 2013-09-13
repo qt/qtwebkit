@@ -31,16 +31,20 @@
 
 #include "APIShims.h"
 #include "Heap.h"
-#include "JSGlobalData.h"
+#include "VM.h"
 #include "JSLock.h"
 #include "JSObject.h"
 
 #include <wtf/RetainPtr.h>
 #include <wtf/WTFThreadData.h>
 
+#if PLATFORM(EFL)
+#include <wtf/MainThread.h>
+#endif
+
 namespace JSC {
 
-#if USE(CF) || PLATFORM(QT)
+#if USE(CF) || PLATFORM(QT) || PLATFORM(EFL)
 
 const double gcTimeSlicePerMB = 0.01; // Percentage of CPU time we will spend to reclaim 1 MB
 const double maxGCTimeSlice = 0.05; // The maximum amount of CPU time we want to use for opportunistic timer-triggered collections.
@@ -50,19 +54,25 @@ const double hour = 60 * 60;
 
 #if USE(CF)
 DefaultGCActivityCallback::DefaultGCActivityCallback(Heap* heap)
-    : GCActivityCallback(heap->globalData(), CFRunLoopGetCurrent())
+    : GCActivityCallback(heap->vm(), CFRunLoopGetCurrent())
     , m_delay(s_decade)
 {
 }
 
 DefaultGCActivityCallback::DefaultGCActivityCallback(Heap* heap, CFRunLoopRef runLoop)
-    : GCActivityCallback(heap->globalData(), runLoop)
+    : GCActivityCallback(heap->vm(), runLoop)
     , m_delay(s_decade)
 {
 }
 #elif PLATFORM(QT)
 DefaultGCActivityCallback::DefaultGCActivityCallback(Heap* heap)
-    : GCActivityCallback(heap->globalData())
+    : GCActivityCallback(heap->vm())
+    , m_delay(hour)
+{
+}
+#elif PLATFORM(EFL)
+DefaultGCActivityCallback::DefaultGCActivityCallback(Heap* heap)
+    : GCActivityCallback(heap->vm(), WTF::isMainThread())
     , m_delay(hour)
 {
 }
@@ -70,11 +80,11 @@ DefaultGCActivityCallback::DefaultGCActivityCallback(Heap* heap)
 
 void DefaultGCActivityCallback::doWork()
 {
-    Heap* heap = &m_globalData->heap;
+    Heap* heap = &m_vm->heap;
     if (!isEnabled())
         return;
     
-    APIEntryShim shim(m_globalData);
+    APIEntryShim shim(m_vm);
 #if !PLATFORM(IOS)
     double startTime = WTF::monotonicallyIncreasingTime();
     if (heap->isPagedOut(startTime + pagingTimeOut)) {
@@ -116,15 +126,40 @@ void DefaultGCActivityCallback::cancelTimer()
     m_delay = hour;
     m_timer.stop();
 }
+#elif PLATFORM(EFL)
+void DefaultGCActivityCallback::scheduleTimer(double newDelay)
+{
+    if (newDelay * timerSlop > m_delay)
+        return;
+
+    stop();
+    m_delay = newDelay;
+    
+    ASSERT(!m_timer);
+    m_timer = add(newDelay, this);
+}
+
+void DefaultGCActivityCallback::cancelTimer()
+{
+    m_delay = hour;
+    stop();
+}
 #endif
 
 void DefaultGCActivityCallback::didAllocate(size_t bytes)
 {
+#if PLATFORM(EFL)
+    if (!isEnabled())
+        return;
+
+    ASSERT(WTF::isMainThread());
+#endif
+
     // The first byte allocated in an allocation cycle will report 0 bytes to didAllocate. 
     // We pretend it's one byte so that we don't ignore this allocation entirely.
     if (!bytes)
         bytes = 1;
-    Heap* heap = static_cast<Heap*>(&m_globalData->heap);
+    Heap* heap = static_cast<Heap*>(&m_vm->heap);
     double gcTimeSlice = std::min((static_cast<double>(bytes) / MB) * gcTimeSlicePerMB, maxGCTimeSlice);
     double newDelay = heap->lastGCLength() / gcTimeSlice;
     scheduleTimer(newDelay);
@@ -143,7 +178,7 @@ void DefaultGCActivityCallback::cancel()
 #else
 
 DefaultGCActivityCallback::DefaultGCActivityCallback(Heap* heap)
-    : GCActivityCallback(heap->globalData())
+    : GCActivityCallback(heap->vm())
 {
 }
 

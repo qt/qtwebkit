@@ -43,14 +43,6 @@ extern "C" {
 /** Creates a type name for Ewk_Settings */
 typedef struct EwkSettings Ewk_Settings;
 
-/**
- * Creates a type name for the callback function used to notify the client when
- * the continuous spell checking setting was changed by WebKit.
- *
- * @param enable @c EINA_TRUE if continuous spell checking is enabled or @c EINA_FALSE if it's disabled
- */
-typedef void (*Ewk_Settings_Continuous_Spell_Checking_Change_Cb)(Eina_Bool enable);
-
 
 /**
  * Enables/disables the Javascript Fullscreen API. The Javascript API allows
@@ -229,76 +221,6 @@ EAPI Eina_Bool ewk_settings_dns_prefetching_enabled_set(Ewk_Settings *settings, 
 EAPI Eina_Bool ewk_settings_dns_prefetching_enabled_get(const Ewk_Settings *settings);
 
 /**
- * Sets a callback function used to notify the client when
- * the continuous spell checking setting was changed by WebKit.
- *
- * Specifying of this callback is needed if the application wants to receive notifications
- * once WebKit changes this setting.
- * If the application is not interested, this callback is not set.
- * Changing of this setting at the WebKit level can be made as a result of modifying
- * options in a Context Menu by a user.
- *
- * @param cb a new callback function to set or @c NULL to invalidate the previous one
- */
-EAPI void ewk_settings_continuous_spell_checking_change_cb_set(Ewk_Settings_Continuous_Spell_Checking_Change_Cb cb);
-
-/**
- * Queries if continuous spell checking is enabled.
- *
- * @return @c EINA_TRUE if continuous spell checking is enabled or @c EINA_FALSE if it's disabled
- */
-EAPI Eina_Bool ewk_settings_continuous_spell_checking_enabled_get(void);
-
-/**
- * Enables/disables continuous spell checking.
- *
- * Additionally, this function calls a callback function (if defined) to notify
- * the client about the change of the setting.
- * This feature is disabled by default.
- *
- * @see ewk_settings_continuous_spell_checking_change_cb_set
- *
- * @param enable @c EINA_TRUE to enable continuous spell checking or @c EINA_FALSE to disable
- */
-EAPI void ewk_settings_continuous_spell_checking_enabled_set(Eina_Bool enable);
-
-/**
- * Gets the the list of all available the spell checking languages to use.
- *
- * @see ewk_settings_spell_checking_languages_set
- *
- * @return the list with available spell checking languages, or @c NULL on failure
- *         the Eina_List and its items should be freed after, use eina_stringshare_del()
- */
-EAPI Eina_List *ewk_settings_spell_checking_available_languages_get(void);
-
-/**
- * Sets @a languages as the list of languages to use by default WebKit
- * implementation of spellchecker feature with Enchant library support.
- *
- * If @languages is @c NULL, the default language is used.
- * If the default language can not be determined then any available dictionary will be used.
- *
- * @note This function invalidates the previously set languages.
- *       The dictionaries are requested asynchronously.
- *
- * @param languages a list of comma (',') separated language codes
- *        of the form 'en_US', ie, language_VARIANT, may be @c NULL.
- */
-EAPI void ewk_settings_spell_checking_languages_set(const char *languages);
-
-/**
- * Gets the the list of the spell checking languages in use.
- *
- * @see ewk_settings_spell_checking_available_languages_get
- * @see ewk_settings_spell_checking_languages_set
- *
- * @return the list with the spell checking languages in use,
- *         the Eina_List and its items should be freed after, use eina_stringshare_del()
- */
-EAPI Eina_List *ewk_settings_spell_checking_languages_get(void);
-
-/**
  * Enables/disables the encoding detector.
  *
  * By default, the encoding detector is disabled.
@@ -423,6 +345,104 @@ EAPI Eina_Bool ewk_settings_local_storage_enabled_set(Ewk_Settings *settings, Ei
  *         @c EINA_FALSE if disabled or on failure
  */
 EAPI Eina_Bool ewk_settings_local_storage_enabled_get(const Ewk_Settings *settings);
+
+/**
+ * Toggles plug-ins support.
+ *
+ * By default, plug-ins support is enabled.
+ *
+ * @param settings settings object to set plug-ins support
+ * @param enable @c EINA_TRUE to enable plug-ins support
+ *        @c EINA_FALSE to disable
+ *
+ * @return @c EINA_TRUE on success or @c EINA_FALSE on failure
+ */
+EAPI Eina_Bool ewk_settings_plugins_enabled_set(Ewk_Settings *settings, Eina_Bool enable);
+
+/**
+ * Returns whether plug-ins support is enabled or not.
+ *
+ * @param settings settings object to query whether plug-ins support is enabled
+ *
+ * @return @c EINA_TRUE if plug-ins support is enabled
+ *         @c EINA_FALSE if not or on failure
+ */
+EAPI Eina_Bool ewk_settings_plugins_enabled_get(const Ewk_Settings *settings);
+
+/**
+ * Sets the default font size.
+ *
+ * By default, the default font size is @c 16.
+ *
+ * @param settings settings object to set the default font size
+ * @param size a new default font size to set
+ *
+ * @return @c EINA_TRUE on success or @c EINA_FALSE on failure
+ */
+EAPI Eina_Bool ewk_settings_default_font_size_set(Ewk_Settings *settings, int size);
+
+/**
+ * Returns the default font size.
+ *
+ * @param settings settings object to get the default font size
+ *
+ * @return @c the default font size or @c 0 on failure
+ */
+EAPI int ewk_settings_default_font_size_get(const Ewk_Settings *settings);
+
+/**
+ * Enables/disables private browsing.
+ *
+ * By default, private browsing is disabled.
+ *
+ * @param settings settings object to set private browsing
+ * @param enable @c EINA_TRUE to enable private browsing
+ *        @c EINA_FALSE to disable
+ *
+ * @return @c EINA_TRUE on success or @c EINA_FALSE on failure
+ */
+EAPI Eina_Bool ewk_settings_private_browsing_enabled_set(Ewk_Settings *settings, Eina_Bool enable);
+
+/**
+ * Returns whether private browsing is enabled or not.
+ *
+ * Private Browsing allows a user to browse the Internet without saving any information
+ * about which sites and pages a user has visited.
+ *
+ * @param settings settings object to query whether private browsing is enabled
+ *
+ * @return @c EINA_TRUE if private browsing is enabled
+ *         @c EINA_FALSE if not or on failure
+ */
+EAPI Eina_Bool ewk_settings_private_browsing_enabled_get(const Ewk_Settings *settings);
+
+/**
+ * Enables/disables text autosizing.
+ *
+ * By default, the text autosizing is disabled.
+ *
+ * @param settings settings object to set the text autosizing
+ * @param enable @c EINA_TRUE to enable the text autosizing
+ *               @c EINA_FALSE to disable
+ *
+ * @return @c EINA_TRUE on success or @c EINA_FALSE on failure
+ *
+ * @see ewk_settings_text_autosizing_enabled_get()
+ */
+EAPI Eina_Bool ewk_settings_text_autosizing_enabled_set(Ewk_Settings *settings, Eina_Bool enable);
+
+/**
+ * Returns whether the text autosizing is enabled.
+ *
+ * The text autosizing is a feature which adjusts the font size of text in wide
+ * columns, and makes text more legible.
+ *
+ * @param settings settings object to query whether text autosizing is enabled
+ *
+ * @return @c EINA_TRUE if the text autosizing is enabled
+ *         @c EINA_FALSE if not or on failure
+ */
+EAPI Eina_Bool ewk_settings_text_autosizing_enabled_get(const Ewk_Settings *settings);
 
 #ifdef __cplusplus
 }

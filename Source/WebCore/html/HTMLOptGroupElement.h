@@ -30,11 +30,11 @@ namespace WebCore {
     
 class HTMLSelectElement;
 
-class HTMLOptGroupElement : public HTMLElement {
+class HTMLOptGroupElement FINAL : public HTMLElement {
 public:
     static PassRefPtr<HTMLOptGroupElement> create(const QualifiedName&, Document*);
 
-    virtual bool disabled() const OVERRIDE;
+    virtual bool isDisabledFormControl() const OVERRIDE;
     HTMLSelectElement* ownerSelectElement() const;
     
     String groupLabelText() const;
@@ -43,13 +43,11 @@ private:
     HTMLOptGroupElement(const QualifiedName&, Document*);
 
     virtual const AtomicString& formControlType() const;
-    virtual bool supportsFocus() const;
-    virtual bool isFocusable() const;
-    virtual bool isEnabledFormControl() const OVERRIDE { return !disabled(); }
+    virtual bool isFocusable() const OVERRIDE;
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
     virtual bool rendererIsNeeded(const NodeRenderingContext&) { return false; }
-    virtual void attach();
-    virtual void detach();
+    virtual void attach(const AttachContext& = AttachContext()) OVERRIDE;
+    virtual void detach(const AttachContext& = AttachContext()) OVERRIDE;
 
     virtual void childrenChanged(bool changedByParser = false, Node* beforeChange = 0, Node* afterChange = 0, int childCountDelta = 0);
 
@@ -64,6 +62,22 @@ private:
 
     RefPtr<RenderStyle> m_style;
 };
+
+inline bool isHTMLOptGroupElement(Node* node)
+{
+    return node->hasTagName(HTMLNames::optgroupTag);
+}
+
+inline bool isHTMLOptGroupElement(Element* element)
+{
+    return element->hasTagName(HTMLNames::optgroupTag);
+}
+
+inline HTMLOptGroupElement* toHTMLOptGroupElement(Node* node)
+{
+    ASSERT_WITH_SECURITY_IMPLICATION(!node || isHTMLOptGroupElement(node));
+    return static_cast<HTMLOptGroupElement*>(node);
+}
 
 } //namespace
 

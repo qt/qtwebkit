@@ -66,7 +66,7 @@ public:
   
     FFTFrame* fftFrame() { return m_fftFrame.get(); }
     
-    size_t fftSize() const { return m_fftFrame->fftSize(); }
+    size_t fftSize() const;
     float frameDelay() const { return m_frameDelay; }
 
     float sampleRate() const { return m_sampleRate; }
@@ -74,8 +74,6 @@ public:
 
     // Converts back into impulse-response form.
     PassOwnPtr<AudioChannel> createImpulseResponse();
-
-    void reportMemoryUsage(MemoryObjectInfo*) const;
 
 private:
     // Note: this is destructive on the passed in AudioChannel.

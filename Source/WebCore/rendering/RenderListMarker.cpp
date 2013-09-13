@@ -25,13 +25,13 @@
 #include "config.h"
 #include "RenderListMarker.h"
 
-#include "CachedImage.h"
 #include "Document.h"
 #include "Font.h"
 #include "GraphicsContext.h"
 #include "RenderLayer.h"
 #include "RenderListItem.h"
 #include "RenderView.h"
+#include <wtf/StackStats.h>
 #include <wtf/text/StringBuilder.h>
 #include <wtf/unicode/CharacterNames.h>
 
@@ -1054,7 +1054,7 @@ String listMarkerText(EListStyleType type, int value)
 }
 
 RenderListMarker::RenderListMarker(RenderListItem* item)
-    : RenderBox(item->document())
+    : RenderBox(0)
     , m_listItem(item)
 {
     // init RenderObject attributes
@@ -1066,6 +1066,14 @@ RenderListMarker::~RenderListMarker()
 {
     if (m_image)
         m_image->removeClient(this);
+}
+
+RenderListMarker* RenderListMarker::createAnonymous(RenderListItem* item)
+{
+    Document* document = item->document();
+    RenderListMarker* renderer = new (document->renderArena()) RenderListMarker(item);
+    renderer->setDocumentForAnonymous(document);
+    return renderer;
 }
 
 void RenderListMarker::styleWillChange(StyleDifference diff, const RenderStyle* newStyle)
@@ -1317,6 +1325,7 @@ void RenderListMarker::layout()
     ASSERT(needsLayout());
  
     if (isImage()) {
+        updateMarginsAndContent();
         setWidth(m_image->imageSize(this, style()->effectiveZoom()).width());
         setHeight(m_image->imageSize(this, style()->effectiveZoom()).height());
     } else {
@@ -1349,26 +1358,134 @@ void RenderListMarker::imageChanged(WrappedImagePtr o, const IntRect*)
         repaint();
 }
 
-void RenderListMarker::computePreferredLogicalWidths()
+void RenderListMarker::updateMarginsAndContent()
 {
-    ASSERT(preferredLogicalWidthsDirty());
+    updateContent();
+    updateMargins();
+}
+
+void RenderListMarker::updateContent()
+{
+    // FIXME: This if-statement is just a performance optimization, but it's messy to use the preferredLogicalWidths dirty bit for this.
+    // It's unclear if this is a premature optimization.
+    if (!preferredLogicalWidthsDirty())
+        return;
 
     m_text = "";
-
-    const Font& font = style()->font();
-    const FontMetrics& fontMetrics = font.fontMetrics();
 
     if (isImage()) {
         // FIXME: This is a somewhat arbitrary width.  Generated images for markers really won't become particularly useful
         // until we support the CSS3 marker pseudoclass to allow control over the width and height of the marker box.
-        int bulletWidth = fontMetrics.ascent() / 2;
+        int bulletWidth = style()->fontMetrics().ascent() / 2;
         m_image->setContainerSizeForRenderer(this, IntSize(bulletWidth, bulletWidth), style()->effectiveZoom());
+        return;
+    }
+
+    EListStyleType type = style()->listStyleType();
+    switch (type) {
+    case NoneListStyle:
+        break;
+    case Circle:
+    case Disc:
+    case Square:
+        m_text = listMarkerText(type, 0); // value is ignored for these types
+        break;
+    case Asterisks:
+    case Footnotes:
+    case Afar:
+    case Amharic:
+    case AmharicAbegede:
+    case ArabicIndic:
+    case Armenian:
+    case BinaryListStyle:
+    case Bengali:
+    case Cambodian:
+    case CJKIdeographic:
+    case CjkEarthlyBranch:
+    case CjkHeavenlyStem:
+    case DecimalLeadingZero:
+    case DecimalListStyle:
+    case Devanagari:
+    case Ethiopic:
+    case EthiopicAbegede:
+    case EthiopicAbegedeAmEt:
+    case EthiopicAbegedeGez:
+    case EthiopicAbegedeTiEr:
+    case EthiopicAbegedeTiEt:
+    case EthiopicHalehameAaEr:
+    case EthiopicHalehameAaEt:
+    case EthiopicHalehameAmEt:
+    case EthiopicHalehameGez:
+    case EthiopicHalehameOmEt:
+    case EthiopicHalehameSidEt:
+    case EthiopicHalehameSoEt:
+    case EthiopicHalehameTiEr:
+    case EthiopicHalehameTiEt:
+    case EthiopicHalehameTig:
+    case Georgian:
+    case Gujarati:
+    case Gurmukhi:
+    case Hangul:
+    case HangulConsonant:
+    case Hebrew:
+    case Hiragana:
+    case HiraganaIroha:
+    case Kannada:
+    case Katakana:
+    case KatakanaIroha:
+    case Khmer:
+    case Lao:
+    case LowerAlpha:
+    case LowerArmenian:
+    case LowerGreek:
+    case LowerHexadecimal:
+    case LowerLatin:
+    case LowerNorwegian:
+    case LowerRoman:
+    case Malayalam:
+    case Mongolian:
+    case Myanmar:
+    case Octal:
+    case Oriya:
+    case Oromo:
+    case Persian:
+    case Sidama:
+    case Somali:
+    case Telugu:
+    case Thai:
+    case Tibetan:
+    case Tigre:
+    case TigrinyaEr:
+    case TigrinyaErAbegede:
+    case TigrinyaEt:
+    case TigrinyaEtAbegede:
+    case UpperAlpha:
+    case UpperArmenian:
+    case UpperGreek:
+    case UpperHexadecimal:
+    case UpperLatin:
+    case UpperNorwegian:
+    case UpperRoman:
+    case Urdu:
+        m_text = listMarkerText(type, m_listItem->value());
+        break;
+    }
+}
+
+void RenderListMarker::computePreferredLogicalWidths()
+{
+    ASSERT(preferredLogicalWidthsDirty());
+    updateContent();
+
+    if (isImage()) {
         LayoutSize imageSize = m_image->imageSize(this, style()->effectiveZoom());
         m_minPreferredLogicalWidth = m_maxPreferredLogicalWidth = style()->isHorizontalWritingMode() ? imageSize.width() : imageSize.height();
         setPreferredLogicalWidthsDirty(false);
         updateMargins();
         return;
     }
+
+    const Font& font = style()->font();
 
     LayoutUnit logicalWidth = 0;
     EListStyleType type = style()->listStyleType();
@@ -1377,14 +1494,12 @@ void RenderListMarker::computePreferredLogicalWidths()
             break;
         case Asterisks:
         case Footnotes:
-            m_text = listMarkerText(type, m_listItem->value());
             logicalWidth = font.width(m_text); // no suffix for these types
             break;
         case Circle:
         case Disc:
         case Square:
-            m_text = listMarkerText(type, 0); // value is ignored for these types
-            logicalWidth = (fontMetrics.ascent() * 2 / 3 + 1) / 2 + 2;
+            logicalWidth = (font.fontMetrics().ascent() * 2 / 3 + 1) / 2 + 2;
             break;
         case Afar:
         case Amharic:
@@ -1461,7 +1576,6 @@ void RenderListMarker::computePreferredLogicalWidths()
         case UpperNorwegian:
         case UpperRoman:
         case Urdu:
-            m_text = listMarkerText(type, m_listItem->value());
             if (m_text.isEmpty())
                 logicalWidth = 0;
             else {
@@ -1477,7 +1591,7 @@ void RenderListMarker::computePreferredLogicalWidths()
     m_maxPreferredLogicalWidth = logicalWidth;
 
     setPreferredLogicalWidthsDirty(false);
-    
+
     updateMargins();
 }
 

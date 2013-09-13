@@ -68,10 +68,8 @@ namespace WTF {
         // must have the following function members:
         //   static unsigned hash(const T&);
         //   static bool equal(const ValueType&, const T&);
-        // FIXME: We should reverse the order of the template arguments so that callers
-        // can just pass the translator and let the compiler deduce T.
-        template<typename T, typename HashTranslator> iterator find(const T&) const;
-        template<typename T, typename HashTranslator> bool contains(const T&) const;
+        template<typename HashTranslator, typename T> iterator find(const T&) const;
+        template<typename HashTranslator, typename T> bool contains(const T&) const;
 
         // The return value is a pair of an interator to the new value's location, 
         // and a bool that is true if an new entry was added.
@@ -83,13 +81,13 @@ namespace WTF {
         //   static unsigned hash(const T&);
         //   static bool equal(const ValueType&, const T&);
         //   static translate(ValueType&, const T&, unsigned hashCode);
-        // FIXME: We should reverse the order of the template arguments so that callers
-        // can just pass the translator and let the compiler deduce T.
-        template<typename T, typename HashTranslator> AddResult add(const T&);
+        template<typename HashTranslator, typename T> AddResult add(const T&);
 
         void remove(const ValueType&);
         void remove(iterator);
         void clear();
+
+        static bool isValidValue(const ValueType&);
 
     private:
         friend void deleteAllValues<>(const HashSet&);
@@ -160,7 +158,7 @@ namespace WTF {
     }
 
     template<typename Value, typename HashFunctions, typename Traits>
-    template<typename T, typename HashTranslator>
+    template<typename HashTranslator, typename T>
     typename HashSet<Value, HashFunctions, Traits>::iterator
     inline HashSet<Value, HashFunctions, Traits>::find(const T& value) const
     {
@@ -168,7 +166,7 @@ namespace WTF {
     }
 
     template<typename Value, typename HashFunctions, typename Traits>
-    template<typename T, typename HashTranslator>
+    template<typename HashTranslator, typename T>
     inline bool HashSet<Value, HashFunctions, Traits>::contains(const T& value) const
     {
         return m_impl.template contains<HashSetTranslatorAdapter<HashTranslator> >(value);
@@ -181,7 +179,7 @@ namespace WTF {
     }
 
     template<typename Value, typename HashFunctions, typename Traits>
-    template<typename T, typename HashTranslator>
+    template<typename HashTranslator, typename T>
     inline typename HashSet<Value, HashFunctions, Traits>::AddResult
     HashSet<Value, HashFunctions, Traits>::add(const T& value)
     {
@@ -209,6 +207,23 @@ namespace WTF {
         m_impl.clear(); 
     }
 
+    template<typename T, typename U, typename V>
+    inline bool HashSet<T, U, V>::isValidValue(const ValueType& value)
+    {
+        if (ValueTraits::isDeletedValue(value))
+            return false;
+
+        if (HashFunctions::safeToCompareToEmptyOrDeleted) {
+            if (value == ValueTraits::emptyValue())
+                return false;
+        } else {
+            if (isHashTraitsEmptyValue<ValueTraits>(value))
+                return false;
+        }
+
+        return true;
+    }
+
     template<typename ValueType, typename HashTableType>
     void deleteAllValues(HashTableType& collection)
     {
@@ -224,10 +239,10 @@ namespace WTF {
         deleteAllValues<typename HashSet<T, U, V>::ValueType>(collection.m_impl);
     }
 
-    template<typename T, typename U, typename V, typename W>
-    inline void copyToVector(const HashSet<T, U, V>& collection, W& vector)
+    template<typename C, typename W>
+    inline void copyToVector(const C& collection, W& vector)
     {
-        typedef typename HashSet<T, U, V>::const_iterator iterator;
+        typedef typename C::const_iterator iterator;
         
         vector.resize(collection.size());
         

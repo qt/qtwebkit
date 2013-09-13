@@ -21,19 +21,55 @@
 
 #if USE(OPENGL)
 
+#if USE(EGL)
 #include "GLContextEGL.h"
+#endif
+
+#if USE(GLX)
 #include "GLContextGLX.h"
-#include <wtf/MainThread.h>
+#endif
+
+#include <wtf/ThreadSpecific.h>
 
 #if PLATFORM(X11)
 #include <X11/Xlib.h>
 #endif
 
+#if PLATFORM(GTK)
+#include <gdk/gdk.h>
+#ifndef GTK_API_VERSION_2
+#ifdef GDK_WINDOWING_WAYLAND
+#include <gdk/gdkwayland.h>
+#endif
+#endif
+#endif
+
+using WTF::ThreadSpecific;
+
 namespace WebCore {
+
+class ThreadGlobalGLContext {
+public:
+    static ThreadSpecific<ThreadGlobalGLContext>* staticGLContext;
+
+    void setContext(GLContext* context) { m_context = context; }
+    GLContext* context() { return m_context; }
+
+private:
+    GLContext* m_context;
+};
+
+ThreadSpecific<ThreadGlobalGLContext>* ThreadGlobalGLContext::staticGLContext;
+
+inline ThreadGlobalGLContext* currentContext()
+{
+    if (!ThreadGlobalGLContext::staticGLContext)
+        ThreadGlobalGLContext::staticGLContext = new ThreadSpecific<ThreadGlobalGLContext>;
+    return *ThreadGlobalGLContext::staticGLContext;
+}
 
 GLContext* GLContext::sharingContext()
 {
-    ASSERT(isMainThread());
     DEFINE_STATIC_LOCAL(OwnPtr<GLContext>, sharing, (createOffscreenContext()));
     return sharing.get();
 }
@@ -113,6 +149,16 @@ void GLContext::cleanupActiveContextsAtExit()
 
 PassOwnPtr<GLContext> GLContext::createContextForWindow(uint64_t windowHandle, GLContext* sharingContext)
 {
+#if PLATFORM(GTK) && defined(GDK_WINDOWING_WAYLAND) && USE(EGL)
+    GdkDisplay* display = gdk_display_manager_get_default_display(gdk_display_manager_get());
+
+    if (GDK_IS_WAYLAND_DISPLAY(display)) {
+        if (OwnPtr<GLContext> eglContext = GLContextEGL::createContext(windowHandle, sharingContext))
+            return eglContext.release();
+        return nullptr;
+    }
+#endif
+
 #if USE(GLX)
     if (OwnPtr<GLContext> glxContext = GLContextGLX::createContext(windowHandle, sharingContext))
         return glxContext.release();
@@ -131,39 +177,25 @@ GLContext::GLContext()
 
 PassOwnPtr<GLContext> GLContext::createOffscreenContext(GLContext* sharingContext)
 {
-#if USE(GLX)
-    if (OwnPtr<GLContext> glxContext = GLContextGLX::createContext(0, sharingContext))
-        return glxContext.release();
-#endif
-#if USE(EGL)
-    if (OwnPtr<GLContext> eglContext = GLContextEGL::createContext(0, sharingContext))
-        return eglContext.release();
-#endif
-    return nullptr;
+    return createContextForWindow(0, sharingContext);
 }
-
-// FIXME: This should be a thread local eventually if we
-// want to support using GLContexts from multiple threads.
-static GLContext* gCurrentContext = 0;
 
 GLContext::~GLContext()
 {
-    if (this == gCurrentContext)
-        gCurrentContext = 0;
+    if (this == currentContext()->context())
+        currentContext()->setContext(0);
     removeActiveContext(this);
 }
 
 bool GLContext::makeContextCurrent()
 {
-    ASSERT(isMainThread());
-    gCurrentContext = this;
+    currentContext()->setContext(this);
     return true;
 }
 
 GLContext* GLContext::getCurrent()
 {
-    ASSERT(isMainThread());
-    return gCurrentContext;
+    return currentContext()->context();
 }
 
 } // namespace WebCore

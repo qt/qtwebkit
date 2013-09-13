@@ -25,18 +25,14 @@
 #if ENABLE(SVG)
 #include "SVGAnimatedBoolean.h"
 #include "SVGExternalResourcesRequired.h"
-#include "SVGLangSpace.h"
-#include "SVGStyledTransformableElement.h"
-#include "SVGTests.h"
+#include "SVGGraphicsElement.h"
 #include "SVGURIReference.h"
 
 namespace WebCore {
 
-class SVGAElement : public SVGStyledTransformableElement,
-                    public SVGURIReference,
-                    public SVGTests,
-                    public SVGLangSpace,
-                    public SVGExternalResourcesRequired {
+class SVGAElement FINAL : public SVGGraphicsElement,
+                          public SVGURIReference,
+                          public SVGExternalResourcesRequired {
 public:
     static PassRefPtr<SVGAElement> create(const QualifiedName&, Document*);
 
@@ -56,10 +52,11 @@ private:
 
     virtual void defaultEventHandler(Event*);
     
-    virtual bool supportsFocus() const;
-    virtual bool isMouseFocusable() const;
-    virtual bool isKeyboardFocusable(KeyboardEvent*) const;
-    virtual bool isFocusable() const;
+    virtual bool supportsFocus() const OVERRIDE;
+    virtual bool isMouseFocusable() const OVERRIDE;
+    virtual bool isKeyboardFocusable(KeyboardEvent*) const OVERRIDE;
+    virtual bool isFocusable() const OVERRIDE;
+    virtual bool isURLAttribute(const Attribute&) const;
 
     virtual bool childShouldCreateRenderer(const NodeRenderingContext&) const;
 
@@ -70,11 +67,6 @@ private:
         DECLARE_ANIMATED_STRING(Href, href)
         DECLARE_ANIMATED_BOOLEAN(ExternalResourcesRequired, externalResourcesRequired)
     END_DECLARE_ANIMATED_PROPERTIES
-
-    // SVGTests
-    virtual void synchronizeRequiredFeatures() { SVGTests::synchronizeRequiredFeatures(this); }
-    virtual void synchronizeRequiredExtensions() { SVGTests::synchronizeRequiredExtensions(this); }
-    virtual void synchronizeSystemLanguage() { SVGTests::synchronizeSystemLanguage(this); }
 };
 
 } // namespace WebCore

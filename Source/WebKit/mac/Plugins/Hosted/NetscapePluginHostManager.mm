@@ -44,7 +44,6 @@ extern "C" {
 #import "WebKitPluginHost.h"
 }
 
-using namespace std;
 using namespace WebCore;
 
 namespace WebKit {
@@ -114,12 +113,12 @@ bool NetscapePluginHostManager::spawnPluginHost(const String& pluginPath, cpu_ty
     NSString *pluginHostAppPath = [[NSBundle bundleWithIdentifier:@"com.apple.WebKit"] pathForAuxiliaryExecutable:pluginHostAppName];
     NSString *pluginHostAppExecutablePath = [[NSBundle bundleWithPath:pluginHostAppPath] executablePath];
 
-    RetainPtr<CFStringRef> localization(AdoptCF, WKCopyCFLocalizationPreferredName(NULL));
+    RetainPtr<CFStringRef> localization = adoptCF(WKCopyCFLocalizationPreferredName(NULL));
     
     NSDictionary *launchProperties = [[NSDictionary alloc] initWithObjectsAndKeys:
                                       pluginHostAppExecutablePath, @"pluginHostPath",
                                       [NSNumber numberWithInt:pluginArchitecture], @"cpuType",
-                                      localization.get(), @"localization",
+                                      (NSString *)localization.get(), @"localization",
                                       nil];
 
     NSData *data = [NSPropertyListSerialization dataFromPropertyList:launchProperties format:NSPropertyListBinaryFormat_v1_0 errorDescription:0];
@@ -225,7 +224,7 @@ PassRefPtr<NetscapePluginInstanceProxy> NetscapePluginHostManager::instantiatePl
     if (!hostProxy)
         return 0;
 
-    RetainPtr<NSMutableDictionary> properties(AdoptNS, [[NSMutableDictionary alloc] init]);
+    RetainPtr<NSMutableDictionary> properties = adoptNS([[NSMutableDictionary alloc] init]);
     
     if (mimeType)
         [properties.get() setObject:mimeType forKey:@"mimeType"];
@@ -265,10 +264,10 @@ PassRefPtr<NetscapePluginInstanceProxy> NetscapePluginHostManager::instantiatePl
         // Create a new instance.
         instance = NetscapePluginInstanceProxy::create(hostProxy, pluginView, fullFrame);
         requestID = instance->nextRequestID();
-        kr = _WKPHInstantiatePlugin(hostProxy->port(), requestID, (uint8_t*)[data bytes], [data length], instance->pluginID());
+        _WKPHInstantiatePlugin(hostProxy->port(), requestID, (uint8_t*)[data bytes], [data length], instance->pluginID());
     }
 
-    auto_ptr<NetscapePluginInstanceProxy::InstantiatePluginReply> reply = instance->waitForReply<NetscapePluginInstanceProxy::InstantiatePluginReply>(requestID);
+    std::auto_ptr<NetscapePluginInstanceProxy::InstantiatePluginReply> reply = instance->waitForReply<NetscapePluginInstanceProxy::InstantiatePluginReply>(requestID);
     if (!reply.get() || reply->m_resultCode != KERN_SUCCESS) {
         instance->cleanup();
         return 0;

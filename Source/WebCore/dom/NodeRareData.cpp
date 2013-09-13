@@ -31,38 +31,16 @@
 #include "config.h"
 #include "NodeRareData.h"
 
-#include "WebCoreMemoryInstrumentation.h"
-#include <wtf/MemoryInstrumentationHashMap.h>
-#include <wtf/MemoryInstrumentationHashSet.h>
-#include <wtf/MemoryInstrumentationVector.h>
-
 namespace WebCore {
 
-void NodeListsNodeData::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::DOM);
-    info.addMember(m_atomicNameCaches);
-    info.addMember(m_nameCaches);
-    info.addMember(m_tagNodeListCacheNS);
-}
-
-void NodeRareData::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::DOM);
-    info.addMember(m_treeScope);
-    info.addMember(m_nodeLists);
-    info.addMember(m_childNodeList);
-
-#if ENABLE(MUTATION_OBSERVERS)
-    info.addMember(m_mutationObserverRegistry);
-    info.addMember(m_transientMutationObserverRegistry);
-#endif
-
+struct SameSizeAsNodeRareData {
+    unsigned m_bitfields : 20;
+    void* m_pointer[3];
 #if ENABLE(MICRODATA)
-    info.addMember(m_itemProp);
-    info.addMember(m_itemRef);
-    info.addMember(m_itemType);
+    void* m_microData;
 #endif
-}
+};
+
+COMPILE_ASSERT(sizeof(NodeRareData) == sizeof(SameSizeAsNodeRareData), NodeRareDataShouldStaySmall);
 
 } // namespace WebCore

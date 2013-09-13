@@ -23,9 +23,12 @@
 #include "Text.h"
 
 #include "ExceptionCode.h"
+#include "ExceptionCodePlaceholder.h"
 #include "NodeRenderingContext.h"
 #include "RenderCombineText.h"
 #include "RenderText.h"
+#include "ScopedEventQueue.h"
+#include "ShadowRoot.h"
 
 #if ENABLE(SVG)
 #include "RenderSVGInlineText.h"
@@ -33,6 +36,7 @@
 #endif
 
 #include "StyleInheritedData.h"
+#include "StyleResolver.h"
 #include <wtf/text/CString.h>
 #include <wtf/text/StringBuilder.h>
 
@@ -61,6 +65,7 @@ PassRefPtr<Text> Text::splitText(unsigned offset, ExceptionCode& ec)
         return 0;
     }
 
+    EventQueueScope scope;
     String oldStr = data();
     RefPtr<Text> newText = virtualCreate(oldStr.substring(offset));
     setDataWithoutUpdate(oldStr.substring(0, offset));
@@ -154,11 +159,10 @@ PassRefPtr<Text> Text::replaceWholeText(const String& newText, ExceptionCode&)
 
     RefPtr<Text> protectedThis(this); // Mutation event handlers could cause our last ref to go away
     RefPtr<ContainerNode> parent = parentNode(); // Protect against mutation handlers moving this node during traversal
-    ExceptionCode ignored = 0;
     for (RefPtr<Node> n = startText; n && n != this && n->isTextNode() && n->parentNode() == parent;) {
         RefPtr<Node> nodeToRemove(n.release());
         n = nodeToRemove->nextSibling();
-        parent->removeChild(nodeToRemove.get(), ignored);
+        parent->removeChild(nodeToRemove.get(), IGNORE_EXCEPTION);
     }
 
     if (this != endText) {
@@ -166,17 +170,17 @@ PassRefPtr<Text> Text::replaceWholeText(const String& newText, ExceptionCode&)
         for (RefPtr<Node> n = nextSibling(); n && n != onePastEndText && n->isTextNode() && n->parentNode() == parent;) {
             RefPtr<Node> nodeToRemove(n.release());
             n = nodeToRemove->nextSibling();
-            parent->removeChild(nodeToRemove.get(), ignored);
+            parent->removeChild(nodeToRemove.get(), IGNORE_EXCEPTION);
         }
     }
 
     if (newText.isEmpty()) {
         if (parent && parentNode() == parent)
-            parent->removeChild(this, ignored);
+            parent->removeChild(this, IGNORE_EXCEPTION);
         return 0;
     }
 
-    setData(newText, ignored);
+    setData(newText, IGNORE_EXCEPTION);
     return protectedThis.release();
 }
 
@@ -251,8 +255,8 @@ static bool isSVGShadowText(Text* text)
 
 static bool isSVGText(Text* text)
 {
-    Node* parentOrHostNode = text->parentOrHostNode();
-    return parentOrHostNode->isSVGElement() && !parentOrHostNode->hasTagName(SVGNames::foreignObjectTag);
+    Node* parentOrShadowHostNode = text->parentOrShadowHostNode();
+    return parentOrShadowHostNode->isSVGElement() && !parentOrShadowHostNode->hasTagName(SVGNames::foreignObjectTag);
 }
 #endif
 
@@ -273,25 +277,18 @@ RenderText* Text::createTextRenderer(RenderArena* arena, RenderStyle* style)
     return new (arena) RenderText(this, dataImpl());
 }
 
-void Text::attach()
+void Text::attach(const AttachContext& context)
 {
     createTextRendererIfNeeded();
-    CharacterData::attach();
+    CharacterData::attach(context);
 }
 
 void Text::recalcTextStyle(StyleChange change)
 {
     RenderText* renderer = toRenderText(this->renderer());
-    // The only time we have a renderer and our parent doesn't is if our parent
-    // is a shadow root.
-    if (change != NoChange && renderer) {
-        if (!parentNode()->isShadowRoot())
-            renderer->setStyle(parentNode()->renderer()->style());
-#if ENABLE(SVG)
-        else if (isSVGShadowText(this))
-            renderer->setStyle(toShadowRoot(parentNode())->host()->renderer()->style());
-#endif
-    }
+
+    if (change != NoChange && renderer)
+        renderer->setStyle(document()->ensureStyleResolver()->styleForText(this));
 
     if (needsStyleRecalc()) {
         if (renderer)
@@ -307,7 +304,12 @@ void Text::updateTextRenderer(unsigned offsetOfReplacedData, unsigned lengthOfRe
     if (!attached())
         return;
     RenderText* textRenderer = toRenderText(renderer());
-    if (!textRenderer || !textRendererIsNeeded(NodeRenderingContext(this, textRenderer->style()))) {
+    if (!textRenderer) {
+        reattach();
+        return;
+    }
+    NodeRenderingContext renderingContext(this, textRenderer->style());
+    if (!textRendererIsNeeded(renderingContext)) {
         reattach();
         return;
     }
@@ -324,15 +326,15 @@ PassRefPtr<Text> Text::virtualCreate(const String& data)
     return create(document(), data);
 }
 
-PassRefPtr<Text> Text::createWithLengthLimit(Document* document, const String& data, unsigned start, unsigned maxChars)
+PassRefPtr<Text> Text::createWithLengthLimit(Document* document, const String& data, unsigned start, unsigned lengthLimit)
 {
     unsigned dataLength = data.length();
 
-    if (!start && dataLength <= maxChars)
+    if (!start && dataLength <= lengthLimit)
         return create(document, data);
 
     RefPtr<Text> result = Text::create(document, String());
-    result->parserAppendData(data, start, maxChars);
+    result->parserAppendData(data, start, lengthLimit);
 
     return result;
 }

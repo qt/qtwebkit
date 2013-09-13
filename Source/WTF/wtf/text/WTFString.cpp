@@ -28,6 +28,7 @@
 #include <wtf/DataLog.h>
 #include <wtf/HexNumber.h>
 #include <wtf/MathExtras.h>
+#include <wtf/NeverDestroyed.h>
 #include <wtf/text/CString.h>
 #include <wtf/StringExtras.h>
 #include <wtf/Vector.h>
@@ -54,15 +55,8 @@ String::String(const UChar* str)
 {
     if (!str)
         return;
-        
-    size_t len = 0;
-    while (str[len] != UChar(0))
-        ++len;
 
-    if (len > numeric_limits<unsigned>::max())
-        CRASH();
-    
-    m_impl = StringImpl::create(str, len);
+    m_impl = StringImpl::create(str, lengthOfNullTerminatedString(str));
 }
 
 // Construct a string with latin1 data.
@@ -125,7 +119,8 @@ void String::append(const String& str)
     }
 }
 
-void String::append(LChar c)
+template <typename CharacterType>
+inline void String::appendInternal(CharacterType c)
 {
     // FIXME: This is extremely inefficient. So much so that we might want to take this
     // out of String's API. We can make it better by optimizing the case where exactly
@@ -143,22 +138,14 @@ void String::append(LChar c)
         m_impl = StringImpl::create(&c, 1);
 }
 
+void String::append(LChar c)
+{
+    appendInternal(c);
+}
+
 void String::append(UChar c)
 {
-    // FIXME: This is extremely inefficient. So much so that we might want to take this
-    // out of String's API. We can make it better by optimizing the case where exactly
-    // one String is pointing at this StringImpl, but even then it's going to require a
-    // call to fastMalloc every single time.
-    if (m_impl) {
-        UChar* data;
-        if (m_impl->length() >= numeric_limits<unsigned>::max())
-            CRASH();
-        RefPtr<StringImpl> newImpl = StringImpl::createUninitialized(m_impl->length() + 1, data);
-        memcpy(data, m_impl->characters(), m_impl->length() * sizeof(UChar));
-        data[m_impl->length()] = c;
-        m_impl = newImpl.release();
-    } else
-        m_impl = StringImpl::create(&c, 1);
+    appendInternal(c);
 }
 
 int codePointCompare(const String& a, const String& b)
@@ -400,14 +387,26 @@ bool String::percentage(int& result) const
     return true;
 }
 
-const UChar* String::charactersWithNullTermination()
+Vector<UChar> String::charactersWithNullTermination() const
 {
-    if (!m_impl)
-        return 0;
-    if (m_impl->hasTerminatingNullCharacter())
-        return m_impl->characters();
-    m_impl = StringImpl::createWithTerminatingNullCharacter(*m_impl);
-    return m_impl->characters();
+    Vector<UChar> result;
+
+    if (m_impl) {
+        result.reserveInitialCapacity(length() + 1);
+
+        if (is8Bit()) {
+            const LChar* characters8 = m_impl->characters8();
+            for (size_t i = 0; i < length(); ++i)
+                result.uncheckedAppend(characters8[i]);
+        } else {
+            const UChar* characters16 = m_impl->characters16();
+            result.append(characters16, m_impl->length());
+        }
+
+        result.append(0);
+    }
+
+    return result;
 }
 
 String String::format(const char *format, ...)
@@ -654,11 +653,49 @@ float String::toFloat(bool* ok) const
     return m_impl->toFloat(ok);
 }
 
+#if COMPILER_SUPPORTS(CXX_REFERENCE_QUALIFIED_FUNCTIONS)
+String String::isolatedCopy() const &
+{
+    if (!m_impl)
+        return String();
+    return m_impl->isolatedCopy();
+}
+
+String String::isolatedCopy() const &&
+{
+    if (isSafeToSendToAnotherThread()) {
+        // Since we know that our string is a temporary that will be destroyed
+        // we can just steal the m_impl from it, thus avoiding a copy.
+        return String(std::move(*this));
+    }
+
+    if (!m_impl)
+        return String();
+
+    return m_impl->isolatedCopy();
+}
+#else
 String String::isolatedCopy() const
 {
     if (!m_impl)
         return String();
     return m_impl->isolatedCopy();
+}
+#endif
+
+bool String::isSafeToSendToAnotherThread() const
+{
+    if (!impl())
+        return true;
+    // AtomicStrings are not safe to send between threads as ~StringImpl()
+    // will try to remove them from the wrong AtomicStringTable.
+    if (impl()->isAtomic())
+        return false;
+    if (impl()->hasOneRef())
+        return true;
+    if (isEmpty())
+        return true;
+    return false;
 }
 
 void String::split(const String& separator, bool allowEmptyEntries, Vector<String>& result) const
@@ -880,29 +917,20 @@ String String::fromUTF8(const LChar* stringStart, size_t length)
     if (!length)
         return emptyString();
 
-    // We'll use a StringImpl as a buffer; if the source string only contains ascii this should be
-    // the right length, if there are any multi-byte sequences this buffer will be too large.
-    UChar* buffer;
-    String stringBuffer(StringImpl::createUninitialized(length, buffer));
-    UChar* bufferEnd = buffer + length;
+    if (charactersAreAllASCII(stringStart, length))
+        return StringImpl::create(stringStart, length);
+
+    Vector<UChar, 1024> buffer(length);
+    UChar* bufferStart = buffer.data();
  
-    // Try converting into the buffer.
+    UChar* bufferCurrent = bufferStart;
     const char* stringCurrent = reinterpret_cast<const char*>(stringStart);
-    bool isAllASCII;
-    if (convertUTF8ToUTF16(&stringCurrent, reinterpret_cast<const char *>(stringStart + length), &buffer, bufferEnd, &isAllASCII) != conversionOK)
+    if (convertUTF8ToUTF16(&stringCurrent, reinterpret_cast<const char *>(stringStart + length), &bufferCurrent, bufferCurrent + buffer.size()) != conversionOK)
         return String();
 
-    if (isAllASCII)
-        return String(stringStart, length);
-
-    // stringBuffer is full (the input must have been all ascii) so just return it!
-    if (buffer == bufferEnd)
-        return stringBuffer;
-
-    // stringBuffer served its purpose as a buffer, copy the contents out into a new string.
-    unsigned utf16Length = buffer - stringBuffer.characters();
+    unsigned utf16Length = bufferCurrent - bufferStart;
     ASSERT(utf16Length < length);
-    return String(stringBuffer.characters(), utf16Length);
+    return StringImpl::create(bufferStart, utf16Length);
 }
 
 String String::fromUTF8(const LChar* string)
@@ -910,6 +938,11 @@ String String::fromUTF8(const LChar* string)
     if (!string)
         return String();
     return fromUTF8(string, strlen(reinterpret_cast<const char*>(string)));
+}
+
+String String::fromUTF8(const CString& s)
+{
+    return fromUTF8(s.data());
 }
 
 String String::fromUTF8WithLatin1Fallback(const LChar* string, size_t size)
@@ -1199,7 +1232,8 @@ float charactersToFloat(const UChar* data, size_t length, size_t& parsedLength)
 
 const String& emptyString()
 {
-    DEFINE_STATIC_LOCAL(String, emptyString, (StringImpl::empty()));
+    static NeverDestroyed<String> emptyString(StringImpl::empty());
+
     return emptyString;
 }
 

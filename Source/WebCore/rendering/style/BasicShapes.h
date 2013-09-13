@@ -46,10 +46,11 @@ public:
     virtual ~BasicShape() { }
 
     enum Type {
-        BASIC_SHAPE_RECTANGLE = 1,
-        BASIC_SHAPE_CIRCLE = 2,
-        BASIC_SHAPE_ELLIPSE = 3,
-        BASIC_SHAPE_POLYGON = 4
+        BasicShapeRectangleType = 1,
+        BasicShapeCircleType = 2,
+        BasicShapeEllipseType = 3,
+        BasicShapePolygonType = 4,
+        BasicShapeInsetRectangleType = 5
     };
 
     bool canBlend(const BasicShape*) const;
@@ -78,18 +79,23 @@ public:
     void setY(Length y) { m_y = y; }
     void setWidth(Length width) { m_width = width; }
     void setHeight(Length height) { m_height = height; }
-    void setCornerRadiusX(Length radiusX) { m_cornerRadiusX = radiusX; }
-    void setCornerRadiusY(Length radiusY) { m_cornerRadiusY = radiusY; }
+    void setCornerRadiusX(Length radiusX)
+    {
+        ASSERT(!radiusX.isUndefined());
+        m_cornerRadiusX = radiusX;
+    }
+    void setCornerRadiusY(Length radiusY)
+    {
+        ASSERT(!radiusY.isUndefined());
+        m_cornerRadiusY = radiusY;
+    }
 
     virtual void path(Path&, const FloatRect&) OVERRIDE;
     virtual PassRefPtr<BasicShape> blend(const BasicShape*, double) const OVERRIDE;
 
-    virtual Type type() const { return BASIC_SHAPE_RECTANGLE; }
+    virtual Type type() const { return BasicShapeRectangleType; }
 private:
-    BasicShapeRectangle()
-        : m_cornerRadiusX(Undefined)
-        , m_cornerRadiusY(Undefined)
-    { }
+    BasicShapeRectangle() { }
 
     Length m_y;
     Length m_x;
@@ -114,7 +120,7 @@ public:
     virtual void path(Path&, const FloatRect&) OVERRIDE;
     virtual PassRefPtr<BasicShape> blend(const BasicShape*, double) const OVERRIDE;
 
-    virtual Type type() const { return BASIC_SHAPE_CIRCLE; }
+    virtual Type type() const { return BasicShapeCircleType; }
 private:
     BasicShapeCircle() { }
 
@@ -140,7 +146,7 @@ public:
     virtual void path(Path&, const FloatRect&) OVERRIDE;
     virtual PassRefPtr<BasicShape> blend(const BasicShape*, double) const OVERRIDE;
 
-    virtual Type type() const { return BASIC_SHAPE_ELLIPSE; } 
+    virtual Type type() const { return BasicShapeEllipseType; } 
 private:
     BasicShapeEllipse() { }
 
@@ -166,7 +172,7 @@ public:
 
     virtual WindRule windRule() const { return m_windRule; }
 
-    virtual Type type() const { return BASIC_SHAPE_POLYGON; }
+    virtual Type type() const { return BasicShapePolygonType; }
 private:
     BasicShapePolygon()
         : m_windRule(RULE_NONZERO)
@@ -174,6 +180,47 @@ private:
 
     WindRule m_windRule;
     Vector<Length> m_values;
+};
+
+class BasicShapeInsetRectangle : public BasicShape {
+public:
+    static PassRefPtr<BasicShapeInsetRectangle> create() { return adoptRef(new BasicShapeInsetRectangle); }
+
+    Length top() const { return m_top; }
+    Length right() const { return m_right; }
+    Length bottom() const { return m_bottom; }
+    Length left() const { return m_left; }
+    Length cornerRadiusX() const { return m_cornerRadiusX; }
+    Length cornerRadiusY() const { return m_cornerRadiusY; }
+
+    void setTop(Length top) { m_top = top; }
+    void setRight(Length right) { m_right = right; }
+    void setBottom(Length bottom) { m_bottom = bottom; }
+    void setLeft(Length left) { m_left = left; }
+    void setCornerRadiusX(Length radiusX)
+    {
+        ASSERT(!radiusX.isUndefined());
+        m_cornerRadiusX = radiusX;
+    }
+    void setCornerRadiusY(Length radiusY)
+    {
+        ASSERT(!radiusY.isUndefined());
+        m_cornerRadiusY = radiusY;
+    }
+
+    virtual void path(Path&, const FloatRect&) OVERRIDE;
+    virtual PassRefPtr<BasicShape> blend(const BasicShape*, double) const OVERRIDE;
+
+    virtual Type type() const { return BasicShapeInsetRectangleType; }
+private:
+    BasicShapeInsetRectangle() { }
+
+    Length m_right;
+    Length m_top;
+    Length m_bottom;
+    Length m_left;
+    Length m_cornerRadiusX;
+    Length m_cornerRadiusY;
 };
 }
 #endif

@@ -92,14 +92,16 @@ WebInspector.CSSSelectorProfileView = function(profile)
 
     this.showTimeAsPercent = WebInspector.settings.createSetting("selectorProfilerShowTimeAsPercent", true);
 
-    var columns = { "selector": { title: WebInspector.UIString("Selector"), width: "550px", sortable: true },
-                    "source": { title: WebInspector.UIString("Source"), width: "100px", sortable: true },
-                    "time": { title: WebInspector.UIString("Total"), width: "72px", sort: "descending", sortable: true },
-                    "matches": { title: WebInspector.UIString("Matches"), width: "72px", sortable: true } };
+    var columns = [
+        {id: "selector", title: WebInspector.UIString("Selector"), width: "550px", sortable: true},
+        {id: "source", title: WebInspector.UIString("Source"), width: "100px", sortable: true},
+        {id: "time", title: WebInspector.UIString("Total"), width: "72px", sort: WebInspector.DataGrid.Order.Descending, sortable: true},
+        {id: "matches", title: WebInspector.UIString("Matches"), width: "72px", sortable: true}
+    ];
 
     this.dataGrid = new WebInspector.DataGrid(columns);
     this.dataGrid.element.addStyleClass("selector-profile-view");
-    this.dataGrid.addEventListener("sorting changed", this._sortProfile, this);
+    this.dataGrid.addEventListener(WebInspector.DataGrid.Events.SortingChanged, this._sortProfile, this);
     this.dataGrid.element.addEventListener("mousedown", this._mouseDownInDataGrid.bind(this), true);
     this.dataGrid.show(this.element);
 
@@ -114,7 +116,7 @@ WebInspector.CSSSelectorProfileView = function(profile)
 }
 
 WebInspector.CSSSelectorProfileView.prototype = {
-    get statusBarItems()
+    statusBarItems: function()
     {
         return [this.percentButton.element];
     },
@@ -190,12 +192,12 @@ WebInspector.CSSSelectorProfileView.prototype = {
 
     _sortProfile: function()
     {
-        var sortAscending = this.dataGrid.sortOrder === "ascending";
-        var sortColumnIdentifier = this.dataGrid.sortColumnIdentifier;
+        var sortAscending = this.dataGrid.isSortOrderAscending();
+        var sortColumnIdentifier = this.dataGrid.sortColumnIdentifier();
 
         function selectorComparator(a, b)
         {
-            var result = b.rawData.selector.localeCompare(a.rawData.selector);
+            var result = b.rawData.selector.compareTo(a.rawData.selector);
             return sortAscending ? -result : result;
         }
 
@@ -203,7 +205,7 @@ WebInspector.CSSSelectorProfileView.prototype = {
         {
             var aRawData = a.rawData;
             var bRawData = b.rawData;
-            var result = bRawData.url.localeCompare(aRawData.url);
+            var result = bRawData.url.compareTo(aRawData.url);
             if (!result)
                 result = bRawData.lineNumber - aRawData.lineNumber;
             return sortAscending ? -result : result;
@@ -286,16 +288,15 @@ WebInspector.CSSSelectorProfileType.prototype = {
 
     /**
      * @override
-     * @param {WebInspector.ProfilesPanel} profilesPanel
      * @return {boolean}
      */
-    buttonClicked: function(profilesPanel)
+    buttonClicked: function()
     {
         if (this._recording) {
-            this._stopRecordingProfile(profilesPanel);
+            this._stopRecordingProfile();
             return false;
         } else {
-            this._startRecordingProfile(profilesPanel);
+            this._startRecordingProfile();
             return true;
         }
     },
@@ -320,20 +321,13 @@ WebInspector.CSSSelectorProfileType.prototype = {
         this._recording = isProfiling;
     },
 
-    /**
-     * @param {WebInspector.ProfilesPanel} profilesPanel
-     */
-    _startRecordingProfile: function(profilesPanel)
+    _startRecordingProfile: function()
     {
         this._recording = true;
         CSSAgent.startSelectorProfiler();
-        profilesPanel.setRecordingProfile(WebInspector.CSSSelectorProfileType.TypeId, true);
     },
 
-    /**
-     * @param {WebInspector.ProfilesPanel} profilesPanel
-     */
-    _stopRecordingProfile: function(profilesPanel)
+    _stopRecordingProfile: function()
     {
         /**
          * @param {?Protocol.Error} error
@@ -346,9 +340,7 @@ WebInspector.CSSSelectorProfileType.prototype = {
 
             var uid = this._profileUid++;
             var title = WebInspector.UIString("Profile %d", uid) + String.sprintf(" (%s)", Number.secondsToString(profile.totalTime / 1000));
-            var profileHeader = new WebInspector.CSSProfileHeader(this, title, uid, profile);
-            profilesPanel.addProfileHeader(profileHeader);
-            profilesPanel.setRecordingProfile(WebInspector.CSSSelectorProfileType.TypeId, false);
+            this.addProfile(new WebInspector.CSSProfileHeader(this, title, uid, profile));
         }
 
         this._recording = false;

@@ -50,9 +50,6 @@ SVGDocumentExtensions::SVGDocumentExtensions(Document* document)
 
 SVGDocumentExtensions::~SVGDocumentExtensions()
 {
-    deleteAllValues(m_animatedElements);
-    deleteAllValues(m_pendingResources);
-    deleteAllValues(m_pendingResourcesForRemoval);
 }
 
 void SVGDocumentExtensions::addTimeContainer(SVGSVGElement* element)
@@ -133,71 +130,10 @@ void SVGDocumentExtensions::dispatchSVGLoadEventToOutermostSVGElements()
     }
 }
 
-void SVGDocumentExtensions::addAnimationElementToTarget(SVGSMILElement* animationElement, SVGElement* targetElement)
-{
-    ASSERT(targetElement);
-    ASSERT(animationElement);
-
-    if (HashSet<SVGSMILElement*>* animationElementsForTarget = m_animatedElements.get(targetElement)) {
-        animationElementsForTarget->add(animationElement);
-        return;
-    }
-
-    HashSet<SVGSMILElement*>* animationElementsForTarget = new HashSet<SVGSMILElement*>;
-    animationElementsForTarget->add(animationElement);
-    m_animatedElements.set(targetElement, animationElementsForTarget);
-}
-
-void SVGDocumentExtensions::removeAnimationElementFromTarget(SVGSMILElement* animationElement, SVGElement* targetElement)
-{
-    ASSERT(targetElement);
-    ASSERT(animationElement);
-
-    HashMap<SVGElement*, HashSet<SVGSMILElement*>* >::iterator it = m_animatedElements.find(targetElement);
-    ASSERT(it != m_animatedElements.end());
-    
-    HashSet<SVGSMILElement*>* animationElementsForTarget = it->value;
-    ASSERT(!animationElementsForTarget->isEmpty());
-
-    animationElementsForTarget->remove(animationElement);
-    if (animationElementsForTarget->isEmpty()) {
-        m_animatedElements.remove(it);
-        delete animationElementsForTarget;
-    }
-}
-
-void SVGDocumentExtensions::removeAllAnimationElementsFromTarget(SVGElement* targetElement)
-{
-    ASSERT(targetElement);
-    HashMap<SVGElement*, HashSet<SVGSMILElement*>* >::iterator it = m_animatedElements.find(targetElement);
-    if (it == m_animatedElements.end())
-        return;
-
-    HashSet<SVGSMILElement*>* animationElementsForTarget = it->value;
-    Vector<SVGSMILElement*> toBeReset;
-
-    HashSet<SVGSMILElement*>::iterator end = animationElementsForTarget->end();
-    for (HashSet<SVGSMILElement*>::iterator it = animationElementsForTarget->begin(); it != end; ++it)
-        toBeReset.append(*it);
-
-    Vector<SVGSMILElement*>::iterator vectorEnd = toBeReset.end();
-    for (Vector<SVGSMILElement*>::iterator vectorIt = toBeReset.begin(); vectorIt != vectorEnd; ++vectorIt)
-        (*vectorIt)->resetTargetElement();
-}
-
-// FIXME: Callers should probably use ScriptController::eventHandlerLineNumber()
-static int parserLineNumber(Document* document)
-{
-    ScriptableDocumentParser* parser = document->scriptableDocumentParser();
-    if (!parser)
-        return 1;
-    return parser->lineNumber().oneBasedInt();
-}
-
 static void reportMessage(Document* document, MessageLevel level, const String& message)
 {
     if (document->frame())
-        document->domWindow()->console()->addMessage(JSMessageSource, LogMessageType, level, message, document->documentURI(), parserLineNumber(document));
+        document->addConsoleMessage(RenderingMessageSource, level, message);
 }
 
 void SVGDocumentExtensions::reportWarning(const String& message)
@@ -210,21 +146,17 @@ void SVGDocumentExtensions::reportError(const String& message)
     reportMessage(m_document, ErrorMessageLevel, "Error: " + message);
 }
 
-void SVGDocumentExtensions::addPendingResource(const AtomicString& id, SVGElement* element)
+void SVGDocumentExtensions::addPendingResource(const AtomicString& id, Element* element)
 {
     ASSERT(element);
 
     if (id.isEmpty())
         return;
 
-    // The HashMap add function leaves the map alone and returns a pointer to the element in the
-    // map if the element already exists. So we add with a value of 0, and it either finds the
-    // existing element or adds a new one in a single operation. The ".iterator->value" idiom gets
-    // us to the iterator from add's result, and then to the value inside the hash table.
-    SVGPendingElements*& set = m_pendingResources.add(id, 0).iterator->value;
-    if (!set)
-        set = new SVGPendingElements;
-    set->add(element);
+    HashMap<AtomicString, OwnPtr<SVGPendingElements> >::AddResult result = m_pendingResources.add(id, nullptr);
+    if (result.isNewEntry)
+        result.iterator->value = adoptPtr(new SVGPendingElements);
+    result.iterator->value->add(element);
 
     element->setHasPendingResources();
 }
@@ -237,16 +169,16 @@ bool SVGDocumentExtensions::hasPendingResource(const AtomicString& id) const
     return m_pendingResources.contains(id);
 }
 
-bool SVGDocumentExtensions::isElementPendingResources(SVGElement* element) const
+bool SVGDocumentExtensions::isElementPendingResources(Element* element) const
 {
     // This algorithm takes time proportional to the number of pending resources and need not.
     // If performance becomes an issue we can keep a counted set of elements and answer the question efficiently.
 
     ASSERT(element);
 
-    HashMap<AtomicString, SVGPendingElements*>::const_iterator end = m_pendingResources.end();
-    for (HashMap<AtomicString, SVGPendingElements*>::const_iterator it = m_pendingResources.begin(); it != end; ++it) {
-        SVGPendingElements* elements = it->value;
+    HashMap<AtomicString, OwnPtr<SVGPendingElements> >::const_iterator end = m_pendingResources.end();
+    for (HashMap<AtomicString, OwnPtr<SVGPendingElements> >::const_iterator it = m_pendingResources.begin(); it != end; ++it) {
+        SVGPendingElements* elements = it->value.get();
         ASSERT(elements);
 
         if (elements->contains(element))
@@ -255,7 +187,7 @@ bool SVGDocumentExtensions::isElementPendingResources(SVGElement* element) const
     return false;
 }
 
-bool SVGDocumentExtensions::isElementPendingResource(SVGElement* element, const AtomicString& id) const
+bool SVGDocumentExtensions::isElementPendingResource(Element* element, const AtomicString& id) const
 {
     ASSERT(element);
 
@@ -265,16 +197,22 @@ bool SVGDocumentExtensions::isElementPendingResource(SVGElement* element, const 
     return m_pendingResources.get(id)->contains(element);
 }
 
-void SVGDocumentExtensions::removeElementFromPendingResources(SVGElement* element)
+void SVGDocumentExtensions::clearHasPendingResourcesIfPossible(Element* element)
+{
+    if (!isElementPendingResources(element))
+        element->clearHasPendingResources();
+}
+
+void SVGDocumentExtensions::removeElementFromPendingResources(Element* element)
 {
     ASSERT(element);
 
     // Remove the element from pending resources.
     if (!m_pendingResources.isEmpty() && element->hasPendingResources()) {
         Vector<AtomicString> toBeRemoved;
-        HashMap<AtomicString, SVGPendingElements*>::iterator end = m_pendingResources.end();
-        for (HashMap<AtomicString, SVGPendingElements*>::iterator it = m_pendingResources.begin(); it != end; ++it) {
-            SVGPendingElements* elements = it->value;
+        HashMap<AtomicString, OwnPtr<SVGPendingElements> >::iterator end = m_pendingResources.end();
+        for (HashMap<AtomicString, OwnPtr<SVGPendingElements> >::iterator it = m_pendingResources.begin(); it != end; ++it) {
+            SVGPendingElements* elements = it->value.get();
             ASSERT(elements);
             ASSERT(!elements->isEmpty());
 
@@ -283,7 +221,7 @@ void SVGDocumentExtensions::removeElementFromPendingResources(SVGElement* elemen
                 toBeRemoved.append(it->key);
         }
 
-        element->clearHasPendingResourcesIfPossible();
+        clearHasPendingResourcesIfPossible(element);
 
         // We use the removePendingResource function here because it deals with set lifetime correctly.
         Vector<AtomicString>::iterator vectorEnd = toBeRemoved.end();
@@ -294,9 +232,9 @@ void SVGDocumentExtensions::removeElementFromPendingResources(SVGElement* elemen
     // Remove the element from pending resources that were scheduled for removal.
     if (!m_pendingResourcesForRemoval.isEmpty()) {
         Vector<AtomicString> toBeRemoved;
-        HashMap<AtomicString, SVGPendingElements*>::iterator end = m_pendingResourcesForRemoval.end();
-        for (HashMap<AtomicString, SVGPendingElements*>::iterator it = m_pendingResourcesForRemoval.begin(); it != end; ++it) {
-            SVGPendingElements* elements = it->value;
+        HashMap<AtomicString, OwnPtr<SVGPendingElements> >::iterator end = m_pendingResourcesForRemoval.end();
+        for (HashMap<AtomicString, OwnPtr<SVGPendingElements> >::iterator it = m_pendingResourcesForRemoval.begin(); it != end; ++it) {
+            SVGPendingElements* elements = it->value.get();
             ASSERT(elements);
             ASSERT(!elements->isEmpty());
 
@@ -315,13 +253,13 @@ void SVGDocumentExtensions::removeElementFromPendingResources(SVGElement* elemen
 PassOwnPtr<SVGDocumentExtensions::SVGPendingElements> SVGDocumentExtensions::removePendingResource(const AtomicString& id)
 {
     ASSERT(m_pendingResources.contains(id));
-    return adoptPtr(m_pendingResources.take(id));
+    return m_pendingResources.take(id);
 }
 
 PassOwnPtr<SVGDocumentExtensions::SVGPendingElements> SVGDocumentExtensions::removePendingResourceForRemoval(const AtomicString& id)
 {
     ASSERT(m_pendingResourcesForRemoval.contains(id));
-    return adoptPtr(m_pendingResourcesForRemoval.take(id));
+    return m_pendingResourcesForRemoval.take(id);
 }
 
 void SVGDocumentExtensions::markPendingResourcesForRemoval(const AtomicString& id)
@@ -331,12 +269,12 @@ void SVGDocumentExtensions::markPendingResourcesForRemoval(const AtomicString& i
 
     ASSERT(!m_pendingResourcesForRemoval.contains(id));
 
-    SVGPendingElements* existing = m_pendingResources.take(id);
+    OwnPtr<SVGPendingElements> existing = m_pendingResources.take(id);
     if (existing && !existing->isEmpty())
-        m_pendingResourcesForRemoval.add(id, existing);
+        m_pendingResourcesForRemoval.add(id, existing.release());
 }
 
-SVGElement* SVGDocumentExtensions::removeElementFromPendingResourcesForRemoval(const AtomicString& id)
+Element* SVGDocumentExtensions::removeElementFromPendingResourcesForRemoval(const AtomicString& id)
 {
     if (id.isEmpty())
         return 0;
@@ -346,7 +284,7 @@ SVGElement* SVGDocumentExtensions::removeElementFromPendingResourcesForRemoval(c
         return 0;
 
     SVGPendingElements::iterator firstElement = resourceSet->begin();
-    SVGElement* element = *firstElement;
+    Element* element = *firstElement;
 
     resourceSet->remove(firstElement);
 
@@ -402,7 +340,7 @@ void SVGDocumentExtensions::removeAllTargetReferencesForElement(SVGElement* refe
         m_elementDependencies.remove(*it);
 }
 
-void SVGDocumentExtensions::removeAllElementReferencesForTarget(SVGElement* referencedElement)
+void SVGDocumentExtensions::rebuildAllElementReferencesForTarget(SVGElement* referencedElement)
 {
     ASSERT(referencedElement);
     HashMap<SVGElement*, OwnPtr<HashSet<SVGElement*> > >::iterator it = m_elementDependencies.find(referencedElement);
@@ -425,8 +363,17 @@ void SVGDocumentExtensions::removeAllElementReferencesForTarget(SVGElement* refe
                 (*vectorIt)->svgAttributeChanged(XLinkNames::hrefAttr);
         }
     }
+}
 
-    m_elementDependencies.remove(referencedElement);
+void SVGDocumentExtensions::removeAllElementReferencesForTarget(SVGElement* referencedElement)
+{
+    ASSERT(referencedElement);
+    HashMap<SVGElement*, OwnPtr<HashSet<SVGElement*> > >::iterator it = m_elementDependencies.find(referencedElement);
+    if (it == m_elementDependencies.end())
+        return;
+    ASSERT(it->key == referencedElement);
+
+    m_elementDependencies.remove(it);
 }
 
 #if ENABLE(SVG_FONTS)

@@ -37,15 +37,14 @@
 #include "FloatPoint.h"
 #include "NotImplemented.h"
 #include <wtf/OwnArrayPtr.h>
-#include "PlatformGestureEvent.h"
 #include "ScrollableArea.h"
 #include "ScrollbarTheme.h"
 #include <algorithm>
 #include <wtf/CurrentTime.h>
 #include <wtf/PassOwnPtr.h>
 
-#if PLATFORM(CHROMIUM)
-#include "TraceEvent.h"
+#if ENABLE(GESTURE_EVENTS)
+#include "PlatformGestureEvent.h"
 #endif
 
 using namespace std;
@@ -433,10 +432,6 @@ bool ScrollAnimatorNone::scroll(ScrollbarOrientation orientation, ScrollGranular
     if (!m_scrollableArea->scrollAnimatorEnabled())
         return ScrollAnimator::scroll(orientation, granularity, step, multiplier);
 
-#if PLATFORM(CHROMIUM)
-    TRACE_EVENT0("webkit", "ScrollAnimatorNone::scroll");
-#endif
-
     // FIXME: get the type passed in. MouseWheel could also be by line, but should still have different
     // animation parameters than the keyboard.
     Parameters parameters;
@@ -472,6 +467,8 @@ void ScrollAnimatorNone::scrollToOffsetWithoutAnimation(const FloatPoint& offset
 {
     stopAnimationTimerIfNeeded();
 
+    FloatSize delta = FloatSize(offset.x() - *m_horizontalData.m_currentPosition, offset.y() - *m_verticalData.m_currentPosition);
+
     m_horizontalData.reset();
     *m_horizontalData.m_currentPosition = offset.x();
     m_horizontalData.m_desiredPosition = offset.x();
@@ -480,7 +477,7 @@ void ScrollAnimatorNone::scrollToOffsetWithoutAnimation(const FloatPoint& offset
     *m_verticalData.m_currentPosition = offset.y();
     m_verticalData.m_desiredPosition = offset.y();
 
-    notifyPositionChanged();
+    notifyPositionChanged(delta);
 }
 
 #if !USE(REQUEST_ANIMATION_FRAME_TIMER)
@@ -526,10 +523,6 @@ void ScrollAnimatorNone::animationTimerFired(Timer<ScrollAnimatorNone>* timer)
 
 void ScrollAnimatorNone::animationTimerFired()
 {
-#if PLATFORM(CHROMIUM)
-    TRACE_EVENT0("webkit", "ScrollAnimatorNone::animationTimerFired");
-#endif
-
     double currentTime = WTF::monotonicallyIncreasingTime();
     double deltaToNextFrame = ceil((currentTime - m_startTime) * kFrameRate) / kFrameRate - (currentTime - m_startTime);
     currentTime += deltaToNextFrame;
@@ -549,10 +542,7 @@ void ScrollAnimatorNone::animationTimerFired()
         m_animationActive = false;
 #endif
 
-#if PLATFORM(CHROMIUM)
-    TRACE_EVENT0("webkit", "ScrollAnimatorNone::notifyPositionChanged");
-#endif
-    notifyPositionChanged();
+    notifyPositionChanged(FloatSize());
 
     if (!continueAnimation)
         animationDidFinish();

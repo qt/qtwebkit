@@ -73,7 +73,7 @@ public:
     void deref(RenderArena*);
 
 protected:
-    RenderWidget(Node*);
+    RenderWidget(Element*);
 
     FrameView* frameView() const { return m_frameView; }
 
@@ -84,6 +84,8 @@ protected:
     virtual void paint(PaintInfo&, const LayoutPoint&);
     virtual CursorDirective getCursor(const LayoutPoint&, Cursor&) const;
     virtual bool nodeAtPoint(const HitTestRequest&, HitTestResult&, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, HitTestAction) OVERRIDE;
+
+    virtual void paintContents(PaintInfo&, const LayoutPoint&);
 
 private:
     virtual bool isWidget() const { return true; }
@@ -104,13 +106,13 @@ private:
 
 inline RenderWidget* toRenderWidget(RenderObject* object)
 {
-    ASSERT(!object || object->isWidget());
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isWidget());
     return static_cast<RenderWidget*>(object);
 }
 
 inline const RenderWidget* toRenderWidget(const RenderObject* object)
 {
-    ASSERT(!object || object->isWidget());
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isWidget());
     return static_cast<const RenderWidget*>(object);
 }
 

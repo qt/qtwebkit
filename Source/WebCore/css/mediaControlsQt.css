@@ -41,7 +41,7 @@ audio::-webkit-media-controls-panel, video::-webkit-media-controls-panel {
     margin-right: auto;
 }
 
-audio::-webkit-media-controls-mute-button, video::-webkit-media-controls-mute-button {
+audio::-webkit-media-controls-mute-button, video::-webkit-media-controls-mute-button  {
     width: 12px;
     height: 12px;
     padding: 6px;
@@ -57,7 +57,8 @@ audio::-webkit-media-controls-play-button, video::-webkit-media-controls-play-bu
     width: 9px;
     height: 12px;
     padding: 6px 12px 6px 11px;
-    margin: 5px 3px 5px 5px;
+    margin-left: 5px;
+    margin-right: 3px;
     border: none !important;
 }
 
@@ -71,13 +72,14 @@ audio::-webkit-media-controls-current-time-display, video::-webkit-media-control
     display: inline-block;
     height: 12px;
     padding: 6px;
-    margin: 5px 3px;
+    margin-left: 3px;
+    margin-right: 5px;
 
     overflow: hidden;
     cursor: default;
 
     text-align: center;
-    font-family: Verdana;
+    font: -webkit-small-control;
     font-size: 10px;
     font-weight: bold;
     color: white;
@@ -88,13 +90,13 @@ audio::-webkit-media-controls-time-remaining-display, video::-webkit-media-contr
 }
 
 audio::-webkit-media-controls-timeline, video::-webkit-media-controls-timeline {
-    display: -webkit-box;
-    -webkit-box-flex: 1 1;
+    display: -webkit-flex;
+    -webkit-flex: 1 1;
     height: 12px; /* See RenderThemeQt::adjustSliderThumbSize(). */
     padding: 6px 8px;
 }
 
-audio::-webkit-media-controls-volume-slider-container, video::-webkit-media-controls-volume-slider-container {
+audio::-webkit-media-controls-volume-slider-container, video::-webkit-media-controls-volume-slider-container  {
     -webkit-appearance: media-volume-slider-container;
     position: absolute;
     bottom: 29px;
@@ -104,7 +106,7 @@ audio::-webkit-media-controls-volume-slider-container, video::-webkit-media-cont
     height: 103px;
 }
 
-audio::-webkit-media-controls-volume-slider, video::-webkit-media-controls-volume-slider {
+audio::-webkit-media-controls-volume-slider, video::-webkit-media-controls-volume-slider  {
     -webkit-appearance: media-volume-slider;
     display: inline;
     position: absolute;
@@ -115,6 +117,7 @@ audio::-webkit-media-controls-volume-slider, video::-webkit-media-controls-volum
     width: 12px; /* See RenderThemeQt::adjustSliderThumbSize(). */
     padding: 6px;
     height: 88px;
+
 }
 
 audio::-webkit-media-controls-seek-back-button, video::-webkit-media-controls-seek-back-button {

@@ -41,6 +41,8 @@
 #include <wtf/text/StringHash.h>
 #include <wtf/text/WTFString.h>
 
+OBJC_CLASS AVPlayerLayer;
+
 namespace WebCore {
 
 class PlatformCALayer;
@@ -59,9 +61,10 @@ public:
         LayerTypeWebLayer,
         LayerTypeTransformLayer,
         LayerTypeWebTiledLayer,
-        LayerTypeTileCacheLayer,
-        LayerTypePageTileCacheLayer,
+        LayerTypeTiledBackingLayer,
+        LayerTypePageTiledBackingLayer,
         LayerTypeRootLayer,
+        LayerTypeAVPlayerLayer,
         LayerTypeCustom
     };
     enum FilterType { Linear, Nearest, Trilinear };
@@ -72,6 +75,8 @@ public:
     // is defined differently for Obj C and C++. This allows callers from both languages.
     static PassRefPtr<PlatformCALayer> create(void* platformLayer, PlatformCALayerClient*);
 
+    PassRefPtr<PlatformCALayer> clone(PlatformCALayerClient*) const;
+
     ~PlatformCALayer();
     
     // This function passes the layer as a void* rather than a PlatformLayer because PlatformLayer
@@ -81,9 +86,9 @@ public:
     PlatformLayer* platformLayer() const;
 
 #if PLATFORM(WIN)
-    bool usesTileCacheLayer() const { return false; }
+    bool usesTiledBackingLayer() const { return false; }
 #else
-    bool usesTileCacheLayer() const { return m_layerType == LayerTypePageTileCacheLayer || m_layerType == LayerTypeTileCacheLayer; }
+    bool usesTiledBackingLayer() const { return m_layerType == LayerTypePageTiledBackingLayer || m_layerType == LayerTypeTiledBackingLayer; }
 #endif
 
     PlatformCALayer* rootLayer() const;
@@ -227,8 +232,10 @@ public:
 
 protected:
     PlatformCALayer(LayerType, PlatformLayer*, PlatformCALayerClient*);
-    
+
 private:
+    AVPlayerLayer* playerLayer() const;
+
     PlatformCALayerClient* m_owner;
     LayerType m_layerType;
     

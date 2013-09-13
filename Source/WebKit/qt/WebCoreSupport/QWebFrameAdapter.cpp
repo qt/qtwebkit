@@ -25,6 +25,7 @@
 #include "Chrome.h"
 #include "ChromeClientQt.h"
 #include "DocumentLoader.h"
+#include "EventHandler.h"
 #include "FocusController.h"
 #include "Frame.h"
 #include "FrameLoadRequest.h"
@@ -37,10 +38,12 @@
 #include "JSDOMWindowBase.h"
 #include "KURL.h"
 #include "NavigationScheduler.h"
+#include "NetworkingContext.h"
 #include "NodeList.h"
 #include "Page.h"
 #include "QWebPageAdapter.h"
 #include "RenderObject.h"
+#include "ScriptController.h"
 #include "ScriptSourceCode.h"
 #include "ScriptValue.h"
 #include "SubstituteData.h"
@@ -201,9 +204,9 @@ QVariant QWebFrameAdapter::evaluateJavaScript(const QString &scriptSource)
         ScriptValue value = scriptController->executeScript(ScriptSourceCode(scriptSource));
         JSC::ExecState* exec = scriptController->globalObject(mainThreadNormalWorld())->globalExec();
         JSValueRef* ignoredException = 0;
-        JSC::JSLock::lock(exec);
+        exec->vm().apiLock().lock();
         JSValueRef valueRef = toRef(exec, value.jsValue());
-        JSC::JSLock::unlock(exec);
+        exec->vm().apiLock().unlock();
         rc = JSC::Bindings::convertValueToQVariant(toRef(exec), valueRef, QMetaType::Void, &distance, ignoredException);
     }
     return rc;
@@ -236,7 +239,7 @@ void QWebFrameAdapter::addToJavaScriptWindowObject(const QString& name, QObject*
     JSC::JSObject* runtimeObject = JSC::Bindings::QtInstance::getQtInstance(object, root, valueOwnership)->createRuntimeObject(exec);
 
     JSC::PutPropertySlot slot;
-    window->methodTable()->put(window, exec, JSC::Identifier(&exec->globalData(), reinterpret_cast_ptr<const UChar*>(name.constData()), name.length()), runtimeObject, slot);
+    window->methodTable()->put(window, exec, JSC::Identifier(&exec->vm(), reinterpret_cast_ptr<const UChar*>(name.constData()), name.length()), runtimeObject, slot);
 }
 
 QString QWebFrameAdapter::toHtml() const
@@ -391,7 +394,7 @@ QWebHitTestResultPrivate* QWebFrameAdapter::hitTestContent(const QPoint& pos) co
     if (!frame->view() || !frame->contentRenderer())
         return 0;
 
-    HitTestResult result = frame->eventHandler()->hitTestResultAtPoint(frame->view()->windowToContents(pos), /*allowShadowContent*/ false, /*ignoreClipping*/ true);
+    HitTestResult result = frame->eventHandler()->hitTestResultAtPoint(frame->view()->windowToContents(pos), HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::IgnoreClipping | HitTestRequest::DisallowShadowContent);
 
     if (result.scrollbar())
         return 0;
@@ -440,7 +443,7 @@ void QWebFrameAdapter::renderCompositedLayers(WebCore::GraphicsContext* context,
     WebCore::Page* page = frame->page();
     if (!page)
         return;
-    if (TextureMapperLayerClientQt* client = static_cast<ChromeClientQt*>(page->chrome()->client())->m_textureMapperLayerClient.get())
+    if (TextureMapperLayerClientQt* client = static_cast<ChromeClientQt*>(page->chrome().client())->m_textureMapperLayerClient.get())
         client->renderCompositedLayers(context, clip);
 }
 #endif
@@ -660,7 +663,7 @@ bool QWebFrameAdapter::renderFromTiledBackingStore(QPainter* painter, const QReg
 
 void QWebFrameAdapter::_q_orientationChanged()
 {
-#if ENABLE(ORIENTATION_EVENTS)
+#if ENABLE(ORIENTATION_EVENTS) && HAVE(QTSENSORS)
     int orientation;
 
     switch (m_orientation.reading()->orientation()) {
@@ -921,7 +924,7 @@ QWebElement QWebHitTestResultPrivate::elementForInnerNode() const
 {
     if (!innerNonSharedNode || !innerNonSharedNode->isElementNode())
         return QWebElement();
-    return QWebElement(static_cast<Element*>(innerNonSharedNode));
+    return QWebElement(toElement(innerNonSharedNode));
 }
 
 // ======================================================

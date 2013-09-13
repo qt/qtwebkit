@@ -63,6 +63,7 @@ class MockExecutive(object):
         self._running_pids = {'test-webkitpy': os.getpid()}
         self._proc = None
         self.calls = []
+        self.pid_to_system_pid = {}
 
     def check_running_pid(self, pid):
         return pid in self._running_pids.values()
@@ -86,6 +87,10 @@ class MockExecutive(object):
             raise ScriptError("Exception for %s" % args, output="MOCK command output")
         return "MOCK output of child process"
 
+    def command_for_printing(self, args):
+        string_args = map(unicode, args)
+        return " ".join(string_args)
+
     def run_command(self,
                     args,
                     cwd=None,
@@ -108,6 +113,10 @@ class MockExecutive(object):
                 input_string = ", input=%s" % input
             _log.info("MOCK run_command: %s, cwd=%s%s%s" % (args, cwd, env_string, input_string))
         output = "MOCK output of child process"
+
+        if self._should_throw_when_run.intersection(args):
+            raise ScriptError("Exception for %s" % args, output="MOCK command output")
+
         if self._should_throw:
             raise ScriptError("MOCK ScriptError", output=output)
         return output
@@ -170,7 +179,7 @@ class MockExecutive2(MockExecutive):
         self.calls.append(args)
         assert(isinstance(args, list) or isinstance(args, tuple))
         if self._exception:
-            raise self._exception  # pylint: disable-msg=E0702
+            raise self._exception  # pylint: disable=E0702
         if self._run_command_fn:
             return self._run_command_fn(args)
         if return_exit_code:

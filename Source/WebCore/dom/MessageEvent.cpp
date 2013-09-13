@@ -73,10 +73,6 @@ MessageEvent::MessageEvent(PassRefPtr<SerializedScriptValue> data, const String&
     , m_source(source)
     , m_ports(ports)
 {
-#if USE(V8)
-    if (m_dataAsSerializedScriptValue)
-        m_dataAsSerializedScriptValue->registerMemoryAllocatedWithCurrentScriptContext();
-#endif
 }
 
 MessageEvent::MessageEvent(const String& data, const String& origin)
@@ -138,11 +134,6 @@ void MessageEvent::initMessageEvent(const AtomicString& type, bool canBubble, bo
     m_lastEventId = lastEventId;
     m_source = source;
     m_ports = ports;
-
-#if USE(V8)
-    if (m_dataAsSerializedScriptValue)
-        m_dataAsSerializedScriptValue->registerMemoryAllocatedWithCurrentScriptContext();
-#endif
 }
 
 // FIXME: Remove this when we have custom ObjC binding support.
@@ -153,7 +144,6 @@ SerializedScriptValue* MessageEvent::data() const
     return m_dataAsSerializedScriptValue.get();
 }
 
-// FIXME: remove this when we update the ObjC bindings (bug #28774).
 MessagePort* MessageEvent::messagePort()
 {
     if (!m_ports)
@@ -162,7 +152,6 @@ MessagePort* MessageEvent::messagePort()
     return (*m_ports)[0].get();
 }
 
-// FIXME: remove this when we update the ObjC bindings (bug #28774).
 void MessageEvent::initMessageEvent(const AtomicString& type, bool canBubble, bool cancelable, PassRefPtr<SerializedScriptValue> data, const String& origin, const String& lastEventId, DOMWindow* source, MessagePort* port)
 {
     OwnPtr<MessagePortArray> ports;

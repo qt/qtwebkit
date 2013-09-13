@@ -56,8 +56,11 @@ WK_EXPORT void WKContextSetDomainRelaxationForbiddenForURLScheme(WKContextRef co
 
 WK_EXPORT void WKContextSetIconDatabasePath(WKContextRef context, WKStringRef iconDatabasePath);
 
+WK_EXPORT void WKContextAllowSpecificHTTPSCertificateForHost(WKContextRef context, WKCertificateInfoRef certificate, WKStringRef host);
+
 // FIXME: These functions are only effective if called before the Web process is launched. But
 // we should really change these settings to be on WebPreferences and changeable at runtime.
+WK_EXPORT void WKContextSetApplicationCacheDirectory(WKContextRef context, WKStringRef applicationCacheDirectory);
 WK_EXPORT void WKContextSetDatabaseDirectory(WKContextRef context, WKStringRef databaseDirectory);
 WK_EXPORT void WKContextSetLocalStorageDirectory(WKContextRef context, WKStringRef localStorageDirectory);
 WK_EXPORT void WKContextSetDiskCacheDirectory(WKContextRef context, WKStringRef diskCacheDirectory);
@@ -75,6 +78,9 @@ WK_EXPORT void WKContextWarmInitialProcess(WKContextRef context);
 // FIXME: This function is temporary and useful during the development of the NetworkProcess feature.
 // At some point it should be removed.
 WK_EXPORT void WKContextSetUsesNetworkProcess(WKContextRef context, bool usesNetworkProcess);
+
+typedef void (*WKContextInvalidMessageFunction)(WKStringRef messageName);
+WK_EXPORT void WKContextSetInvalidMessageFunction(WKContextInvalidMessageFunction invalidMessageFunction);
 
 #ifdef __cplusplus
 }

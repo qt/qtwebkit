@@ -26,12 +26,20 @@
 #include "ChromeClientGtk.h"
 #include "Frame.h"
 #include "FrameView.h"
+#include "GraphicsLayerTextureMapper.h"
 #include "PlatformContextCairo.h"
 #include "Settings.h"
 #include "TextureMapperGL.h"
 #include "TextureMapperLayer.h"
 #include "webkitwebviewprivate.h"
+#include <wtf/CurrentTime.h>
+
+#if USE(OPENGL_ES_2)
+#include <GLES2/gl2.h>
+#else
 #include <GL/gl.h>
+#endif
+
 #include <cairo.h>
 #include <gdk/gdk.h>
 #include <gtk/gtk.h>
@@ -148,7 +156,7 @@ bool AcceleratedCompositingContext::renderLayersToWindow(cairo_t* cr, const IntR
     cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
     cairo_fill(cr);
 
-    if (!m_layerFlushTimerCallbackId && toTextureMapperLayer(m_rootLayer.get())->descendantsOrSelfHaveRunningAnimations() || m_needsExtraFlush) {
+    if (!m_layerFlushTimerCallbackId && (toTextureMapperLayer(m_rootLayer.get())->descendantsOrSelfHaveRunningAnimations() || m_needsExtraFlush)) {
         m_needsExtraFlush = false;
         double nextFlush = max((1 / gFramesPerSecond) - (currentTime() - m_lastFlushTime), 0.0);
         m_layerFlushTimerCallbackId = g_timeout_add_full(GDK_PRIORITY_EVENTS, 1000 * nextFlush, reinterpret_cast<GSourceFunc>(layerFlushTimerFiredCallback), this, 0);
@@ -188,6 +196,7 @@ void AcceleratedCompositingContext::compositeLayersToContext(CompositePurpose pu
 
     m_textureMapper->beginPainting();
     toTextureMapperLayer(m_rootLayer.get())->paint();
+    m_fpsCounter.updateFPSAndDisplay(m_textureMapper.get());
     m_textureMapper->endPainting();
 
     context->swapBuffers();

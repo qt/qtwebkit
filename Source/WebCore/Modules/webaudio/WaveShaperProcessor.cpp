@@ -34,6 +34,7 @@ namespace WebCore {
     
 WaveShaperProcessor::WaveShaperProcessor(float sampleRate, size_t numberOfChannels)
     : AudioDSPKernelProcessor(sampleRate, numberOfChannels)
+    , m_oversample(OverSampleNone)
 {
 }
 
@@ -56,12 +57,32 @@ void WaveShaperProcessor::setCurve(Float32Array* curve)
     m_curve = curve;
 }
 
+void WaveShaperProcessor::setOversample(OverSampleType oversample)
+{
+    // This synchronizes with process().
+    MutexLocker processLocker(m_processLock);
+
+    m_oversample = oversample;
+
+    if (oversample != OverSampleNone) {
+        for (unsigned i = 0; i < m_kernels.size(); ++i) {
+            WaveShaperDSPKernel* kernel = static_cast<WaveShaperDSPKernel*>(m_kernels[i].get());
+            kernel->lazyInitializeOversampling();
+        }
+    }
+}
+
 void WaveShaperProcessor::process(const AudioBus* source, AudioBus* destination, size_t framesToProcess)
 {
     if (!isInitialized()) {
         destination->zero();
         return;
     }
+
+    bool channelCountMatches = source->numberOfChannels() == destination->numberOfChannels() && source->numberOfChannels() == m_kernels.size();
+    ASSERT(channelCountMatches);
+    if (!channelCountMatches)
+        return;
 
     // The audio thread can't block on this lock, so we call tryLock() instead.
     MutexTryLocker tryLocker(m_processLock);

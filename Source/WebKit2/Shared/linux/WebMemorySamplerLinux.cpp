@@ -32,6 +32,7 @@
 #include <JavaScriptCore/MemoryStatistics.h>
 #include <WebCore/JSDOMWindow.h>
 #include <runtime/JSLock.h>
+#include <runtime/Operations.h>
 #include <string.h>
 #include <sys/sysinfo.h>
 #include <wtf/CurrentTime.h>
@@ -153,9 +154,8 @@ WebMemoryStatistics WebMemorySampler::sampleWebKit() const
     appendKeyValuePair(webKitMemoryStats, ASCIILiteral("Fast Malloc Committed Memory"), fastMallocBytesCommitted);
 #endif
 
-#if USE(JSC)
-    size_t jscHeapBytesInUse = JSDOMWindow::commonJSGlobalData()->heap.size();
-    size_t jscHeapBytesCommitted = JSDOMWindow::commonJSGlobalData()->heap.capacity();
+    size_t jscHeapBytesInUse = JSDOMWindow::commonVM()->heap.size();
+    size_t jscHeapBytesCommitted = JSDOMWindow::commonVM()->heap.capacity();
     totalBytesInUse += jscHeapBytesInUse;
     totalBytesCommitted += jscHeapBytesCommitted;
 
@@ -168,7 +168,6 @@ WebMemoryStatistics WebMemorySampler::sampleWebKit() const
     
     appendKeyValuePair(webKitMemoryStats, ASCIILiteral("JavaScript Stack Bytes"), globalMemoryStats.stackBytes);
     appendKeyValuePair(webKitMemoryStats, ASCIILiteral("JavaScript JIT Bytes"), globalMemoryStats.JITBytes);
-#endif
 
     appendKeyValuePair(webKitMemoryStats, ASCIILiteral("Total Memory In Use"), totalBytesInUse);
     appendKeyValuePair(webKitMemoryStats, ASCIILiteral("Total Committed Memory"), totalBytesCommitted);

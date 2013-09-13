@@ -31,7 +31,7 @@ import os
 import shutil
 import tempfile
 import threading
-import unittest
+import unittest2 as unittest
 
 from webkitpy.common.system.executive import ScriptError
 from webkitpy.common.system.outputcapture import OutputCapture
@@ -168,12 +168,12 @@ class QueueEngineTest(unittest.TestCase):
     def test_now(self):
         """Make sure there are no typos in the QueueEngine.now() method."""
         engine = QueueEngine("test", None, None)
-        self.assertTrue(isinstance(engine._now(), datetime.datetime))
+        self.assertIsInstance(engine._now(), datetime.datetime)
 
     def test_sleep_message(self):
         engine = QueueEngine("test", None, None)
         engine._now = lambda: datetime.datetime(2010, 1, 1)
-        expected_sleep_message = "MESSAGE Sleeping until 2010-01-01 00:02:00 (2 mins)."
+        expected_sleep_message = "MESSAGE Sleeping until 2010-01-01 00:02:00 (120 seconds)."
         self.assertEqual(engine._sleep_message("MESSAGE"), expected_sleep_message)
 
     def setUp(self):
@@ -181,7 +181,3 @@ class QueueEngineTest(unittest.TestCase):
 
     def tearDown(self):
         shutil.rmtree(self.temp_dir)
-
-
-if __name__ == '__main__':
-    unittest.main()

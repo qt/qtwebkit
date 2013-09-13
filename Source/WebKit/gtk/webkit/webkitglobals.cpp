@@ -26,7 +26,7 @@
 #include "ContextMenuItem.h"
 #include "FrameNetworkingContextGtk.h"
 #include "IconDatabase.h"
-#include "Logging.h"
+#include "InitializeLogging.h"
 #include "MemoryCache.h"
 #include "Page.h"
 #include "PageCache.h"
@@ -54,10 +54,6 @@
 #include <wtf/MainThread.h>
 #include <wtf/gobject/GOwnPtr.h>
 #include <wtf/gobject/GRefPtr.h>
-
-#if USE(CLUTTER)
-#include <clutter-gtk/clutter-gtk.h>
-#endif
 
 static WebKitCacheModel cacheModel = WEBKIT_CACHE_MODEL_DEFAULT;
 
@@ -160,6 +156,8 @@ void webkit_set_cache_model(WebKitCacheModel model)
         g_return_if_reached();
     }
 
+    bool disableCache = !cacheMinDeadCapacity && !cacheMaxDeadCapacity && !cacheTotalCapacity;
+    memoryCache()->setDisabled(disableCache);
     memoryCache()->setCapacities(cacheMinDeadCapacity, cacheMaxDeadCapacity, cacheTotalCapacity);
     memoryCache()->setDeadDecodedDataDeletionInterval(deadDecodedDataDeletionInterval);
     pageCache()->setCapacity(pageCacheCapacity);
@@ -262,7 +260,7 @@ static void webkitExit()
 /**
  * webkit_get_text_checker:
  *
- * Returns: the #WebKitSpellChecker used by WebKit, or %NULL if spell
+ * Returns: (transfer none): the #WebKitSpellChecker used by WebKit, or %NULL if spell
  * checking is not enabled
  *
  * Since: 1.5.1
@@ -564,9 +562,10 @@ void webkitInit()
 
     WebCore::ResourceHandle::setIgnoreSSLErrors(true);
 
-#if USE(CLUTTER)
-    gtk_clutter_init(0, 0);
-#endif
-
     atexit(webkitExit);
+}
+
+const char* webkitPageGroupName()
+{
+    return "org.webkit.gtk.WebKitGTK";
 }

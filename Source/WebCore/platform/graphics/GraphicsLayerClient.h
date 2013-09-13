@@ -42,6 +42,7 @@ enum GraphicsLayerPaintingPhaseFlags {
     GraphicsLayerPaintForeground = (1 << 1),
     GraphicsLayerPaintMask = (1 << 2),
     GraphicsLayerPaintOverflowContents = (1 << 3),
+    GraphicsLayerPaintCompositedScroll = (1 << 4),
     GraphicsLayerPaintAllWithOverflowClip = (GraphicsLayerPaintBackground | GraphicsLayerPaintForeground | GraphicsLayerPaintMask)
 };
 typedef unsigned GraphicsLayerPaintingPhase;
@@ -58,7 +59,8 @@ class GraphicsLayerClient {
 public:
     virtual ~GraphicsLayerClient() {}
 
-    virtual bool shouldUseTileCache(const GraphicsLayer*) const { return false; }
+    virtual bool shouldUseTiledBacking(const GraphicsLayer*) const { return false; }
+    virtual void tiledBackingUsageChanged(const GraphicsLayer*, bool /*usingTiledBacking*/) { }
     
     // Callback for when hardware-accelerated animation started.
     virtual void notifyAnimationStarted(const GraphicsLayer*, double time) = 0;
@@ -77,6 +79,10 @@ public:
     // initialized to identity already. Returns false if the layer has no transform.
     virtual bool getCurrentTransform(const GraphicsLayer*, TransformationMatrix&) const { return false; }
 
+    // Allows the client to modify a layer position used during the visibleRect calculation, for example to ignore
+    // scroll overhang.
+    virtual void customPositionForVisibleRectComputation(const GraphicsLayer*, FloatPoint&) const { }
+
     // Multiplier for backing store size, related to high DPI.
     virtual float deviceScaleFactor() const { return 1; }
     // Page scale factor.
@@ -91,10 +97,6 @@ public:
     // to verify that we don't create or destroy GraphicsLayers
     // while painting.
     virtual void verifyNotPainting() { }
-#endif
-
-#if PLATFORM(BLACKBERRY)
-    virtual bool contentsVisible(const GraphicsLayer*, const IntRect& contentRect) const { return false; }
 #endif
 };
 

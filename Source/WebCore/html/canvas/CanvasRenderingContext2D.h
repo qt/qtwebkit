@@ -27,10 +27,11 @@
 #define CanvasRenderingContext2D_h
 
 #include "AffineTransform.h"
+#include "CanvasPathMethods.h"
 #include "CanvasRenderingContext.h"
+#include "CanvasStyle.h"
 #include "Color.h"
 #include "ColorSpace.h"
-#include "DashArray.h"
 #include "FloatSize.h"
 #include "Font.h"
 #include "GraphicsTypes.h"
@@ -47,7 +48,9 @@ namespace WebCore {
 
 class CanvasGradient;
 class CanvasPattern;
-class CanvasStyle;
+#if ENABLE(CANVAS_PATH)
+class DOMPath;
+#endif
 class FloatRect;
 class GraphicsContext;
 class HTMLCanvasElement;
@@ -58,7 +61,7 @@ class TextMetrics;
 
 typedef int ExceptionCode;
 
-class CanvasRenderingContext2D : public CanvasRenderingContext {
+class CanvasRenderingContext2D : public CanvasRenderingContext, public CanvasPathMethods {
 public:
     static PassOwnPtr<CanvasRenderingContext2D> create(HTMLCanvasElement* canvas, bool usesCSSCompatibilityParseMode, bool usesDashboardCompatibilityMode)
     {
@@ -66,11 +69,11 @@ public:
     }
     virtual ~CanvasRenderingContext2D();
 
-    CanvasStyle* strokeStyle() const;
-    void setStrokeStyle(PassRefPtr<CanvasStyle>);
+    const CanvasStyle& strokeStyle() const { return state().m_strokeStyle; }
+    void setStrokeStyle(CanvasStyle);
 
-    CanvasStyle* fillStyle() const;
-    void setFillStyle(PassRefPtr<CanvasStyle>);
+    const CanvasStyle& fillStyle() const { return state().m_fillStyle; }
+    void setFillStyle(CanvasStyle);
 
     float lineWidth() const;
     void setLineWidth(float);
@@ -135,26 +138,21 @@ public:
     void setFillColor(float c, float m, float y, float k, float a);
 
     void beginPath();
-    void closePath();
 
-    void moveTo(float x, float y);
-    void lineTo(float x, float y);
-    void quadraticCurveTo(float cpx, float cpy, float x, float y);
-    void bezierCurveTo(float cp1x, float cp1y, float cp2x, float cp2y, float x, float y);
-    void arcTo(float x0, float y0, float x1, float y1, float radius, ExceptionCode&);
-    void arc(float x, float y, float r, float sa, float ea, bool clockwise, ExceptionCode&);
-    void rect(float x, float y, float width, float height);
-
-    void fill();
+#if ENABLE(CANVAS_PATH)
+    PassRefPtr<DOMPath> currentPath();
+    void setCurrentPath(DOMPath*);
+#endif
+    void fill(const String& winding = "nonzero");
     void stroke();
-    void clip();
+    void clip(const String& winding = "nonzero");
 
-    bool isPointInPath(const float x, const float y);
+    bool isPointInPath(const float x, const float y, const String& winding = "nonzero");
+    bool isPointInStroke(const float x, const float y);
 
     void clearRect(float x, float y, float width, float height);
     void fillRect(float x, float y, float width, float height);
     void strokeRect(float x, float y, float width, float height);
-    void strokeRect(float x, float y, float width, float height, float lineWidth);
 
     void setShadow(float width, float height, float blur);
     void setShadow(float width, float height, float blur, const String& color);
@@ -174,7 +172,7 @@ public:
     void drawImage(HTMLCanvasElement*, float x, float y, float width, float height, ExceptionCode&);
     void drawImage(HTMLCanvasElement*, float sx, float sy, float sw, float sh, float dx, float dy, float dw, float dh, ExceptionCode&);
     void drawImage(HTMLCanvasElement*, const FloatRect& srcRect, const FloatRect& dstRect, ExceptionCode&);
-    void drawImage(HTMLImageElement*, const FloatRect& srcRect, const FloatRect& dstRect, const CompositeOperator&, ExceptionCode&);
+    void drawImage(HTMLImageElement*, const FloatRect& srcRect, const FloatRect& dstRect, const CompositeOperator&, const BlendMode&, ExceptionCode&);
 #if ENABLE(VIDEO)
     void drawImage(HTMLVideoElement*, float x, float y, ExceptionCode&);
     void drawImage(HTMLVideoElement*, float x, float y, float width, float height, ExceptionCode&);
@@ -240,8 +238,8 @@ private:
 
         String m_unparsedStrokeColor;
         String m_unparsedFillColor;
-        RefPtr<CanvasStyle> m_strokeStyle;
-        RefPtr<CanvasStyle> m_fillStyle;
+        CanvasStyle m_strokeStyle;
+        CanvasStyle m_fillStyle;
         float m_lineWidth;
         LineCap m_lineCap;
         LineJoin m_lineJoin;
@@ -251,6 +249,7 @@ private:
         RGBA32 m_shadowColor;
         float m_globalAlpha;
         CompositeOperator m_globalComposite;
+        BlendMode m_globalBlend;
         AffineTransform m_transform;
         bool m_invertibleCTM;
         Vector<float> m_lineDash;
@@ -330,11 +329,12 @@ private:
     virtual bool is2d() const OVERRIDE { return true; }
     virtual bool isAccelerated() const OVERRIDE;
 
+    virtual bool isTransformInvertible() const { return state().m_invertibleCTM; }
+
 #if ENABLE(ACCELERATED_2D_CANVAS) && USE(ACCELERATED_COMPOSITING)
     virtual PlatformLayer* platformLayer() const OVERRIDE;
 #endif
 
-    Path m_path;
     Vector<State, 1> m_stateStack;
     unsigned m_unrealizedSaveCount;
     bool m_usesCSSCompatibilityParseMode;

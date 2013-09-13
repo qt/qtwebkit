@@ -469,7 +469,7 @@ void FullscreenVideoController::createHUDWindow()
 
 static String timeToString(float time)
 {
-    if (!isfinite(time))
+    if (!std::isfinite(time))
         time = 0;
     int seconds = fabsf(time); 
     int hours = seconds / (60 * 60);
@@ -520,9 +520,7 @@ void FullscreenVideoController::draw()
     NONCLIENTMETRICS metrics;
     metrics.cbSize = sizeof(metrics);
     SystemParametersInfo(SPI_GETNONCLIENTMETRICS, metrics.cbSize, &metrics, 0);
-    FontFamily family;
-    family.setFamily(metrics.lfSmCaptionFont.lfFaceName);
-    desc.setFamily(family);
+    desc.setOneFamily(metrics.lfSmCaptionFont.lfFaceName);
 
     desc.setComputedSize(textSize);
     Font font = Font(desc, 0, 0);

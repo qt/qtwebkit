@@ -26,12 +26,11 @@
 #include "config.h"
 #include "CachedRawResource.h"
 
-#include "CachedResourceClient.h"
+#include "CachedRawResourceClient.h"
 #include "CachedResourceClientWalker.h"
 #include "CachedResourceLoader.h"
 #include "ResourceBuffer.h"
 #include "SubresourceLoader.h"
-#include "WebCoreMemoryInstrumentation.h"
 #include <wtf/PassRefPtr.h>
 
 namespace WebCore {
@@ -42,45 +41,96 @@ CachedRawResource::CachedRawResource(ResourceRequest& resourceRequest, Type type
 {
 }
 
-void CachedRawResource::data(PassRefPtr<ResourceBuffer> data, bool allDataReceived)
+const char* CachedRawResource::calculateIncrementalDataChunk(ResourceBuffer* data, unsigned& incrementalDataLength)
+{
+    incrementalDataLength = 0;
+    if (!data)
+        return 0;
+
+    unsigned previousDataLength = encodedSize();
+    ASSERT(data->size() >= previousDataLength);
+    incrementalDataLength = data->size() - previousDataLength;
+    return data->data() + previousDataLength;
+}
+
+void CachedRawResource::addDataBuffer(ResourceBuffer* data)
 {
     CachedResourceHandle<CachedRawResource> protect(this);
-    const char* incrementalData = 0;
-    size_t incrementalDataLength = 0;
-    if (data) {
-        // If we are buffering data, then we are saving the buffer in m_data and need to manually
-        // calculate the incremental data. If we are not buffering, then m_data will be null and
-        // the buffer contains only the incremental data.
-        size_t previousDataLength = (m_options.shouldBufferData == BufferData) ? encodedSize() : 0;
-        ASSERT(data->size() >= previousDataLength);
-        incrementalData = data->data() + previousDataLength;
-        incrementalDataLength = data->size() - previousDataLength;
+    ASSERT(m_options.dataBufferingPolicy == BufferData);
+    m_data = data;
+
+    unsigned incrementalDataLength;
+    const char* incrementalData = calculateIncrementalDataChunk(data, incrementalDataLength);
+    if (data)
+        setEncodedSize(data->size());
+    notifyClientsDataWasReceived(incrementalData, incrementalDataLength);
+    if (m_options.dataBufferingPolicy == DoNotBufferData) {
+        if (m_loader)
+            m_loader->setDataBufferingPolicy(DoNotBufferData);
+        clear();
     }
-    
-    if (m_options.shouldBufferData == BufferData) {
+}
+
+void CachedRawResource::addData(const char* data, unsigned length)
+{
+    ASSERT(m_options.dataBufferingPolicy == DoNotBufferData);
+    notifyClientsDataWasReceived(data, length);
+}
+
+void CachedRawResource::finishLoading(ResourceBuffer* data)
+{
+    CachedResourceHandle<CachedRawResource> protect(this);
+    DataBufferingPolicy dataBufferingPolicy = m_options.dataBufferingPolicy;
+    if (dataBufferingPolicy == BufferData) {
+        m_data = data;
+
+        unsigned incrementalDataLength;
+        const char* incrementalData = calculateIncrementalDataChunk(data, incrementalDataLength);
         if (data)
             setEncodedSize(data->size());
-        m_data = data;
+        notifyClientsDataWasReceived(incrementalData, incrementalDataLength);
     }
-    
-    if (incrementalDataLength) {
-        CachedResourceClientWalker<CachedRawResourceClient> w(m_clients);
-        while (CachedRawResourceClient* c = w.next())
-            c->dataReceived(this, incrementalData, incrementalDataLength);
+
+    CachedResource::finishLoading(data);
+    if (dataBufferingPolicy == BufferData && m_options.dataBufferingPolicy == DoNotBufferData) {
+        if (m_loader)
+            m_loader->setDataBufferingPolicy(DoNotBufferData);
+        clear();
     }
-    CachedResource::data(m_data, allDataReceived);
+}
+
+void CachedRawResource::notifyClientsDataWasReceived(const char* data, unsigned length)
+{
+    if (!length)
+        return;
+
+    CachedResourceHandle<CachedRawResource> protect(this);
+    CachedResourceClientWalker<CachedRawResourceClient> w(m_clients);
+    while (CachedRawResourceClient* c = w.next())
+        c->dataReceived(this, data, length);
 }
 
 void CachedRawResource::didAddClient(CachedResourceClient* c)
 {
-    if (m_response.isNull() || !hasClient(c))
+    if (!hasClient(c))
         return;
     // The calls to the client can result in events running, potentially causing
     // this resource to be evicted from the cache and all clients to be removed,
     // so a protector is necessary.
     CachedResourceHandle<CachedRawResource> protect(this);
     CachedRawResourceClient* client = static_cast<CachedRawResourceClient*>(c);
-    client->responseReceived(this, m_response);
+    size_t redirectCount = m_redirectChain.size();
+    for (size_t i = 0; i < redirectCount; i++) {
+        RedirectPair redirect = m_redirectChain[i];
+        ResourceRequest request(redirect.m_request);
+        client->redirectReceived(this, request, redirect.m_redirectResponse);
+        if (!hasClient(c))
+            return;
+    }
+    ASSERT(redirectCount == m_redirectChain.size());
+
+    if (!m_response.isNull())
+        client->responseReceived(this, m_response);
     if (!hasClient(c))
         return;
     if (m_data)
@@ -98,19 +148,22 @@ void CachedRawResource::allClientsRemoved()
 
 void CachedRawResource::willSendRequest(ResourceRequest& request, const ResourceResponse& response)
 {
+    CachedResourceHandle<CachedRawResource> protect(this);
     if (!response.isNull()) {
         CachedResourceClientWalker<CachedRawResourceClient> w(m_clients);
         while (CachedRawResourceClient* c = w.next())
             c->redirectReceived(this, request, response);
+        m_redirectChain.append(RedirectPair(request, response));
     }
     CachedResource::willSendRequest(request, response);
 }
 
-void CachedRawResource::setResponse(const ResourceResponse& response)
+void CachedRawResource::responseReceived(const ResourceResponse& response)
 {
+    CachedResourceHandle<CachedRawResource> protect(this);
     if (!m_identifier)
         m_identifier = m_loader->identifier();
-    CachedResource::setResponse(response);
+    CachedResource::responseReceived(response);
     CachedResourceClientWalker<CachedRawResourceClient> w(m_clients);
     while (CachedRawResourceClient* c = w.next())
         c->responseReceived(this, m_response);
@@ -123,15 +176,24 @@ void CachedRawResource::didSendData(unsigned long long bytesSent, unsigned long 
         c->dataSent(this, bytesSent, totalBytesToBeSent);
 }
 
+void CachedRawResource::switchClientsToRevalidatedResource()
+{
+    ASSERT(m_loader);
+    // If we're in the middle of a successful revalidation, responseReceived() hasn't been called, so we haven't set m_identifier.
+    ASSERT(!m_identifier);
+    static_cast<CachedRawResource*>(resourceToRevalidate())->m_identifier = m_loader->identifier();
+    CachedResource::switchClientsToRevalidatedResource();
+}
+
 void CachedRawResource::setDefersLoading(bool defers)
 {
     if (m_loader)
         m_loader->setDefersLoading(defers);
 }
 
-void CachedRawResource::setShouldBufferData(DataBufferingPolicy shouldBufferData)
+void CachedRawResource::setDataBufferingPolicy(DataBufferingPolicy dataBufferingPolicy)
 {
-    m_options.shouldBufferData = shouldBufferData;
+    m_options.dataBufferingPolicy = dataBufferingPolicy;
 }
 
 static bool shouldIgnoreHeaderForCacheReuse(AtomicString headerName)
@@ -154,7 +216,7 @@ static bool shouldIgnoreHeaderForCacheReuse(AtomicString headerName)
 
 bool CachedRawResource::canReuse(const ResourceRequest& newRequest) const
 {
-    if (m_options.shouldBufferData == DoNotBufferData)
+    if (m_options.dataBufferingPolicy == DoNotBufferData)
         return false;
 
     if (m_resourceRequest.httpMethod() != newRequest.httpMethod())
@@ -186,12 +248,13 @@ bool CachedRawResource::canReuse(const ResourceRequest& newRequest) const
         if (!shouldIgnoreHeaderForCacheReuse(headerName) && i->value != newHeaders.get(headerName))
             return false;
     }
-    return true;
-}
 
-SubresourceLoader* CachedRawResource::loader() const
-{
-    return m_loader.get();
+    for (size_t i = 0; i < m_redirectChain.size(); i++) {
+        if (m_redirectChain[i].m_redirectResponse.cacheControlContainsNoStore())
+            return false;
+    }
+
+    return true;
 }
 
 void CachedRawResource::clear()
@@ -201,12 +264,5 @@ void CachedRawResource::clear()
     if (m_loader)
         m_loader->clearResourceData();
 }
-
-void CachedRawResource::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CachedResourceRaw);
-    CachedResource::reportMemoryUsage(memoryObjectInfo);
-}
-
 
 } // namespace WebCore

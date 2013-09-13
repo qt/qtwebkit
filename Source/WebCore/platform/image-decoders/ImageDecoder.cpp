@@ -28,9 +28,10 @@
 #if PLATFORM(QT)
 #include "ImageDecoderQt.h"
 #endif
+#if !PLATFORM(QT) || USE(LIBJPEG)
 #include "JPEGImageDecoder.h"
+#endif
 #include "PNGImageDecoder.h"
-#include "PlatformMemoryInstrumentation.h"
 #include "SharedBuffer.h"
 #if USE(WEBP)
 #include "WEBPImageDecoder.h"
@@ -38,7 +39,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <wtf/MemoryInstrumentationVector.h>
 
 using namespace std;
 
@@ -138,8 +138,6 @@ ImageDecoder* ImageDecoder::create(const SharedBuffer& data, ImageSource::AlphaO
     return 0;
 }
 
-#if !USE(SKIA)
-
 ImageFrame::ImageFrame()
     : m_hasAlpha(false)
     , m_status(FrameEmpty)
@@ -178,6 +176,23 @@ void ImageFrame::zeroFillPixelData()
 {
     memset(m_bytes, 0, m_size.width() * m_size.height() * sizeof(PixelData));
     m_hasAlpha = true;
+}
+
+void ImageFrame::zeroFillFrameRect(const IntRect& rect)
+{
+    ASSERT(IntRect(IntPoint(), m_size).contains(rect));
+
+    if (rect.isEmpty())
+        return;
+
+    size_t rectWidthInBytes = rect.width() * sizeof(PixelData);
+    PixelData* start = m_bytes + (rect.y() * width()) + rect.x();
+    for (int i = 0; i < rect.height(); ++i) {
+        memset(start, 0, rectWidthInBytes);
+        start += width();
+    }
+
+    setHasAlpha(true);
 }
 
 bool ImageFrame::copyBitmapData(const ImageFrame& other)
@@ -226,14 +241,6 @@ void ImageFrame::setStatus(FrameStatus status)
     m_status = status;
 }
 
-void ImageFrame::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, PlatformMemoryTypes::Image);
-    info.addMember(m_backingStore);
-}
-
-#endif
-
 namespace {
 
 enum MatchType {
@@ -277,11 +284,12 @@ template <MatchType type> int getScaledValue(const Vector<int>& scaledValues, in
 
 bool ImageDecoder::frameHasAlphaAtIndex(size_t index) const
 {
-    if (m_frameBufferCache.size() <= index)
-        return true;
-    if (m_frameBufferCache[index].status() == ImageFrame::FrameComplete)
-        return m_frameBufferCache[index].hasAlpha();
-    return true;
+    return !frameIsCompleteAtIndex(index) || m_frameBufferCache[index].hasAlpha();
+}
+
+bool ImageDecoder::frameIsCompleteAtIndex(size_t index) const
+{
+    return (index < m_frameBufferCache.size()) && (m_frameBufferCache[index].status() == ImageFrame::FrameComplete);
 }
 
 unsigned ImageDecoder::frameBytesAtIndex(size_t index) const
@@ -333,16 +341,6 @@ int ImageDecoder::lowerBoundScaledY(int origY, int searchStart)
 int ImageDecoder::scaledY(int origY, int searchStart)
 {
     return getScaledValue<Exact>(m_scaledRows, origY, searchStart);
-}
-
-void ImageDecoder::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, PlatformMemoryTypes::Image);
-    info.addMember(m_data);
-    info.addMember(m_frameBufferCache);
-    info.addMember(m_colorProfile);
-    info.addMember(m_scaledColumns);
-    info.addMember(m_scaledRows);
 }
 
 }

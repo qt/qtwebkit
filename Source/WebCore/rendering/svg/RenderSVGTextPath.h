@@ -28,7 +28,7 @@ namespace WebCore {
 
 class RenderSVGTextPath : public RenderSVGInline {
 public:
-    RenderSVGTextPath(Node*);
+    RenderSVGTextPath(Element*);
 
     Path layoutPath() const;
     float startOffset() const;
@@ -45,7 +45,7 @@ private:
 
 inline RenderSVGTextPath* toRenderSVGTextPath(RenderObject* object)
 { 
-    ASSERT(!object || !strcmp(object->renderName(), "RenderSVGTextPath"));
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isSVGTextPath());
     return static_cast<RenderSVGTextPath*>(object);
 }
 

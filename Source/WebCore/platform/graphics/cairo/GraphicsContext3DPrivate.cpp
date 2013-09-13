@@ -78,12 +78,14 @@ PlatformGraphicsContext3D GraphicsContext3DPrivate::platformContext()
 }
 
 #if USE(ACCELERATED_COMPOSITING) && USE(TEXTURE_MAPPER)
-void GraphicsContext3DPrivate::paintToTextureMapper(TextureMapper* textureMapper, const FloatRect& targetRect, const TransformationMatrix& matrix, float opacity, BitmapTexture* mask)
+void GraphicsContext3DPrivate::paintToTextureMapper(TextureMapper* textureMapper, const FloatRect& targetRect, const TransformationMatrix& matrix, float opacity)
 {
     if (!m_glContext)
         return;
 
     ASSERT(m_renderStyle == GraphicsContext3D::RenderOffscreen);
+
+    m_context->markLayerComposited();
 
     // FIXME: We do not support mask for the moment with TextureMapperImageBuffer.
     if (textureMapper->accelerationMode() != TextureMapper::OpenGLMode) {
@@ -125,22 +127,22 @@ void GraphicsContext3DPrivate::paintToTextureMapper(TextureMapper* textureMapper
     }
 
 #if USE(TEXTURE_MAPPER_GL)
-    if (m_context->m_attrs.antialias && m_context->m_boundFBO == m_context->m_multisampleFBO) {
+    if (m_context->m_attrs.antialias && m_context->m_state.boundFBO == m_context->m_multisampleFBO) {
         GLContext* previousActiveContext = GLContext::getCurrent();
         if (previousActiveContext != m_glContext)
             m_context->makeContextCurrent();
 
         m_context->resolveMultisamplingIfNecessary();
-        ::glBindFramebuffer(GraphicsContext3D::FRAMEBUFFER, m_context->m_boundFBO);
+        ::glBindFramebuffer(GraphicsContext3D::FRAMEBUFFER, m_context->m_state.boundFBO);
 
         if (previousActiveContext && previousActiveContext != m_glContext)
             previousActiveContext->makeContextCurrent();
     }
 
     TextureMapperGL* texmapGL = static_cast<TextureMapperGL*>(textureMapper);
-    TextureMapperGL::Flags flags = TextureMapperGL::ShouldFlipTexture | (m_context->m_attrs.alpha ? TextureMapperGL::SupportsBlending : 0);
+    TextureMapperGL::Flags flags = TextureMapperGL::ShouldFlipTexture | (m_context->m_attrs.alpha ? TextureMapperGL::ShouldBlend : 0);
     IntSize textureSize(m_context->m_currentWidth, m_context->m_currentHeight);
-    texmapGL->drawTexture(m_context->m_texture, flags, textureSize, targetRect, matrix, opacity, mask);
+    texmapGL->drawTexture(m_context->m_texture, flags, textureSize, targetRect, matrix, opacity);
 #endif // USE(ACCELERATED_COMPOSITING_GL)
 }
 #endif // USE(ACCELERATED_COMPOSITING)

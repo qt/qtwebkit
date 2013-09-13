@@ -40,7 +40,9 @@ SOURCES += \
     API/JSClassRef.cpp \
     API/JSContextRef.cpp \
     API/JSObjectRef.cpp \
+    API/JSScriptRef.cpp \
     API/JSStringRef.cpp \
+    API/JSStringRefQt.cpp \
     API/JSValueRef.cpp \
     API/JSWeakObjectMapRefPrivate.cpp \
     API/OpaqueJSString.cpp \
@@ -49,7 +51,6 @@ SOURCES += \
     assembler/LinkBuffer.cpp \
     assembler/MacroAssembler.cpp \
     assembler/MacroAssemblerARM.cpp \
-    assembler/MacroAssemblerSH4.cpp \
     bytecode/ArrayAllocationProfile.cpp \
     bytecode/ArrayProfile.cpp \
     bytecode/CallLinkInfo.cpp \
@@ -60,13 +61,16 @@ SOURCES += \
     bytecode/CodeType.cpp \
     bytecode/DFGExitProfile.cpp \
     bytecode/ExecutionCounter.cpp \
+    bytecode/ExitKind.cpp \
     bytecode/GetByIdStatus.cpp \
     bytecode/JumpTable.cpp \
     bytecode/LazyOperandValueProfile.cpp \
     bytecode/MethodOfGettingAValueProfile.cpp \
     bytecode/Opcode.cpp \
     bytecode/PolymorphicPutByIdList.cpp \
+    bytecode/PreciseJumpTargets.cpp \
     bytecode/PutByIdStatus.cpp \
+    bytecode/ReduceWhitespace.cpp \
     bytecode/ResolveGlobalStatus.cpp \
     bytecode/SamplingTool.cpp \
     bytecode/SpecialPointer.cpp \
@@ -81,9 +85,10 @@ SOURCES += \
     heap/CopyVisitor.cpp \
     heap/ConservativeRoots.cpp \
     heap/DFGCodeBlocks.cpp \
-    heap/WeakSet.cpp \
-    heap/WeakHandleOwner.cpp \
+    heap/Weak.cpp \
     heap/WeakBlock.cpp \
+    heap/WeakHandleOwner.cpp \
+    heap/WeakSet.cpp \
     heap/HandleSet.cpp \
     heap/HandleStack.cpp \
     heap/BlockAllocator.cpp \
@@ -100,6 +105,7 @@ SOURCES += \
     heap/MarkedBlock.cpp \
     heap/MarkedSpace.cpp \
     heap/SlotVisitor.cpp \
+    heap/SuperRegion.cpp \
     heap/VTableSpectrum.cpp \
     heap/WriteBarrierSupport.cpp \
     debugger/DebuggerActivation.cpp \
@@ -109,20 +115,26 @@ SOURCES += \
     dfg/DFGArgumentsSimplificationPhase.cpp \
     dfg/DFGArrayMode.cpp \
     dfg/DFGAssemblyHelpers.cpp \
+    dfg/DFGBackwardsPropagationPhase.cpp \
     dfg/DFGByteCodeParser.cpp \
     dfg/DFGCapabilities.cpp \
+    dfg/DFGCommon.cpp \
     dfg/DFGCFAPhase.cpp \
     dfg/DFGCFGSimplificationPhase.cpp \
+    dfg/DFGCPSRethreadingPhase.cpp \
     dfg/DFGConstantFoldingPhase.cpp \
-    dfg/DFGCorrectableJumpPoint.cpp \
     dfg/DFGCSEPhase.cpp \
+    dfg/DFGDCEPhase.cpp \
     dfg/DFGDisassembler.cpp \
     dfg/DFGDominators.cpp \
     dfg/DFGDriver.cpp \
+    dfg/DFGEdge.cpp \
     dfg/DFGFixupPhase.cpp \
     dfg/DFGGraph.cpp \
     dfg/DFGJITCompiler.cpp \
+    dfg/DFGLongLivedState.cpp \
     dfg/DFGMinifiedNode.cpp \
+    dfg/DFGNode.cpp \
     dfg/DFGNodeFlags.cpp \
     dfg/DFGOperations.cpp \
     dfg/DFGOSREntry.cpp \
@@ -130,14 +142,18 @@ SOURCES += \
     dfg/DFGOSRExitCompiler.cpp \
     dfg/DFGOSRExitCompiler64.cpp \
     dfg/DFGOSRExitCompiler32_64.cpp \
+    dfg/DFGOSRExitJumpPlaceholder.cpp \
     dfg/DFGPhase.cpp \
     dfg/DFGPredictionPropagationPhase.cpp \
+    dfg/DFGPredictionInjectionPhase.cpp \
     dfg/DFGRepatch.cpp \
     dfg/DFGSpeculativeJIT.cpp \
     dfg/DFGSpeculativeJIT32_64.cpp \
     dfg/DFGSpeculativeJIT64.cpp \
-    dfg/DFGStructureCheckHoistingPhase.cpp \
+    dfg/DFGTypeCheckHoistingPhase.cpp \
     dfg/DFGThunks.cpp \
+    dfg/DFGUnificationPhase.cpp \
+    dfg/DFGUseKind.cpp \
     dfg/DFGValueSource.cpp \
     dfg/DFGVariableAccessDataDump.cpp \
     dfg/DFGVariableEvent.cpp \
@@ -168,6 +184,7 @@ SOURCES += \
     jit/JITPropertyAccess32_64.cpp \
     jit/JITStubRoutine.cpp \
     jit/JITStubs.cpp \
+    jit/JITThunks.cpp \
     jit/JumpReplacementWatchpoint.cpp \
     jit/ThunkGenerators.cpp \
     llint/LLIntCLoop.cpp \
@@ -181,11 +198,33 @@ SOURCES += \
     parser/Nodes.cpp \
     parser/ParserArena.cpp \
     parser/Parser.cpp \
+    parser/SourceProvider.cpp \
     parser/SourceProviderCache.cpp \
+    profiler/ProfilerBytecode.cpp \
+    profiler/ProfilerBytecode.h \
+    profiler/ProfilerBytecodeSequence.cpp \
+    profiler/ProfilerBytecodes.cpp \
+    profiler/ProfilerBytecodes.h \
+    profiler/ProfilerCompilation.cpp \
+    profiler/ProfilerCompilation.h \
+    profiler/ProfilerCompilationKind.cpp \
+    profiler/ProfilerCompilationKind.h \
+    profiler/ProfilerCompiledBytecode.cpp \
+    profiler/ProfilerCompiledBytecode.h \
+    profiler/ProfilerDatabase.cpp \
+    profiler/ProfilerDatabase.h \
+    profiler/ProfilerExecutionCounter.h \
+    profiler/ProfilerOrigin.cpp \
+    profiler/ProfilerOrigin.h \
+    profiler/ProfilerOriginStack.cpp \
+    profiler/ProfilerOriginStack.h \
+    profiler/ProfilerOSRExit.cpp \
+    profiler/ProfilerOSRExitSite.cpp \
+    profiler/ProfilerProfiledBytecodes.cpp \
     profiler/Profile.cpp \
     profiler/ProfileGenerator.cpp \
     profiler/ProfileNode.cpp \
-    profiler/Profiler.cpp \
+    profiler/LegacyProfiler.cpp \
     runtime/ArgList.cpp \
     runtime/Arguments.cpp \
     runtime/ArrayConstructor.cpp \
@@ -210,6 +249,7 @@ SOURCES += \
     runtime/ExceptionHelpers.cpp \
     runtime/Executable.cpp \
     runtime/FunctionConstructor.cpp \
+    runtime/FunctionExecutableDump.cpp \
     runtime/FunctionPrototype.cpp \
     runtime/GCActivityCallback.cpp \
     runtime/GetterSetter.cpp \
@@ -225,7 +265,7 @@ SOURCES += \
     runtime/JSDateMath.cpp \
     runtime/JSFunction.cpp \
     runtime/JSBoundFunction.cpp \
-    runtime/JSGlobalData.cpp \
+    runtime/VM.cpp \
     runtime/JSGlobalObject.cpp \
     runtime/JSGlobalObjectFunctions.cpp \
     runtime/JSProxy.cpp \
@@ -241,7 +281,7 @@ SOURCES += \
     runtime/JSString.cpp \
     runtime/JSStringJoiner.cpp \
     runtime/JSSymbolTableObject.cpp \
-    runtime/JSValue.cpp \
+    runtime/JSCJSValue.cpp \
     runtime/JSVariableObject.cpp \
     runtime/JSWrapperObject.cpp \
     runtime/LiteralParser.cpp \
@@ -262,6 +302,8 @@ SOURCES += \
     runtime/PropertyDescriptor.cpp \
     runtime/PropertyNameArray.cpp \
     runtime/PropertySlot.cpp \
+    runtime/PropertyTable.cpp \
+    runtime/PrototypeMap.cpp \
     runtime/RegExpConstructor.cpp \
     runtime/RegExpCachedResult.cpp \
     runtime/RegExpMatchesArray.cpp \
@@ -279,8 +321,10 @@ SOURCES += \
     runtime/StringRecursionChecker.cpp \
     runtime/StructureChain.cpp \
     runtime/Structure.cpp \
+    runtime/StructureRareData.cpp \
     runtime/SymbolTable.cpp \
-    runtime/TimeoutChecker.cpp \
+    runtime/Watchdog.cpp \
+    runtime/WatchdogNone.cpp \
     tools/CodeProfile.cpp \
     tools/CodeProfiling.cpp \
     yarr/YarrJIT.cpp \
@@ -310,17 +354,14 @@ win32:!win32-g++*:isEqual(QT_ARCH, "x86_64"):{
     ASM_SOURCES += jit/JITStubsMSVC64.asm
 }
 
+build?(qttestsupport) {
+    HEADERS += API/JSCTestRunnerUtils.h
+    SOURCES += API/JSCTestRunnerUtils.cpp
+}
+
 HEADERS += $$files(*.h, true)
 
 *sh4* {
     QMAKE_CXXFLAGS += -mieee -w
     QMAKE_CFLAGS   += -mieee -w
-}
-
-lessThan(QT_GCC_MAJOR_VERSION, 5) {
-    # GCC 4.5 and before
-    lessThan(QT_GCC_MINOR_VERSION, 6) {
-        # Disable C++0x mode in JSC for those who enabled it in their Qt's mkspec.
-        *-g++*:QMAKE_CXXFLAGS -= -std=c++0x -std=gnu++0x
-    }
 }

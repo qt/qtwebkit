@@ -30,7 +30,7 @@
 
 namespace WebCore {
 
-class HTMLTableCellElement : public HTMLTablePartElement {
+class HTMLTableCellElement FINAL : public HTMLTablePartElement {
 public:
     static PassRefPtr<HTMLTableCellElement> create(const QualifiedName&, Document*);
 
@@ -55,8 +55,7 @@ private:
 
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
     virtual bool isPresentationAttribute(const QualifiedName&) const OVERRIDE;
-    virtual void collectStyleForPresentationAttribute(const Attribute&, StylePropertySet*) OVERRIDE;
-
+    virtual void collectStyleForPresentationAttribute(const QualifiedName&, const AtomicString&, MutableStylePropertySet*) OVERRIDE;
     virtual const StylePropertySet* additionalPresentationAttributeStyle() OVERRIDE;
 
     virtual bool isURLAttribute(const Attribute&) const OVERRIDE;

@@ -66,29 +66,33 @@ public:
 
     void registerNamedFlowContentNode(Node*, RenderNamedFlowThread*);
     void unregisterNamedFlowContentNode(Node*);
+    bool isContentNodeRegisteredWithAnyNamedFlow(const Node*) const;
 
-    bool hasAutoLogicalHeightRegions() const { return m_autoLogicalHeightRegionsCount; }
-    void incrementAutoLogicalHeightRegions() { ++m_autoLogicalHeightRegionsCount; }
-    void decrementAutoLogicalHeightRegions() { ASSERT(m_autoLogicalHeightRegionsCount > 0); --m_autoLogicalHeightRegionsCount; }
+    bool hasFlowThreadsWithAutoLogicalHeightRegions() const { return m_flowThreadsWithAutoLogicalHeightRegions; }
+    void incrementFlowThreadsWithAutoLogicalHeightRegions() { ++m_flowThreadsWithAutoLogicalHeightRegions; }
+    void decrementFlowThreadsWithAutoLogicalHeightRegions() { ASSERT(m_flowThreadsWithAutoLogicalHeightRegions > 0); --m_flowThreadsWithAutoLogicalHeightRegions; }
+
+    bool updateFlowThreadsNeedingLayout();
+    bool updateFlowThreadsNeedingTwoStepLayout();
+    void updateFlowThreadsIntoConstrainedPhase();
 
 #ifndef NDEBUG
-    bool isAutoLogicalHeightRegionsFlagConsistent() const;
+    bool isAutoLogicalHeightRegionsCountConsistent() const;
 #endif
-
-    void resetRegionsOverrideLogicalContentHeight();
-    void markAutoLogicalHeightRegionsForLayout();
 
 protected:
     FlowThreadController(RenderView*);
+    void updateFlowThreadsChainIfNecessary();
+    void resetFlowThreadsWithAutoHeightRegions();
 
 private:
     RenderView* m_view;
     RenderFlowThread* m_currentRenderFlowThread;
     bool m_isRenderNamedFlowThreadOrderDirty;
-    unsigned m_autoLogicalHeightRegionsCount;
+    unsigned m_flowThreadsWithAutoLogicalHeightRegions;
     OwnPtr<RenderNamedFlowThreadList> m_renderNamedFlowThreadList;
     // maps a content node to its render flow thread.
-    HashMap<Node*, RenderNamedFlowThread*> m_mapNamedFlowContentNodes;
+    HashMap<const Node*, RenderNamedFlowThread*> m_mapNamedFlowContentNodes;
 };
 
 }

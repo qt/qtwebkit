@@ -34,7 +34,6 @@
 #include <wtf/MainThread.h>
 #include <wtf/MathExtras.h>
 #include <wtf/text/StringBuilder.h>
-#include <wtf/UnusedParam.h>
 
 using namespace WTF;
 using namespace Unicode;
@@ -73,7 +72,6 @@ TypesettingFeatures Font::s_defaultTypesettingFeatures = 0;
 Font::Font()
     : m_letterSpacing(0)
     , m_wordSpacing(0)
-    , m_isPlatformFont(false)
     , m_needsTranscoding(false)
     , m_typesettingFeatures(0)
 {
@@ -83,31 +81,27 @@ Font::Font(const FontDescription& fd, short letterSpacing, short wordSpacing)
     : m_fontDescription(fd)
     , m_letterSpacing(letterSpacing)
     , m_wordSpacing(wordSpacing)
-    , m_isPlatformFont(false)
     , m_needsTranscoding(fontTranscoder().needsTranscoding(fd))
     , m_typesettingFeatures(computeTypesettingFeatures())
 {
 }
 
 Font::Font(const FontPlatformData& fontData, bool isPrinterFont, FontSmoothingMode fontSmoothingMode)
-    : m_fontFallbackList(FontFallbackList::create())
+    : m_glyphs(FontGlyphs::createForPlatformFont(fontData))
     , m_letterSpacing(0)
     , m_wordSpacing(0)
-    , m_isPlatformFont(true)
     , m_typesettingFeatures(computeTypesettingFeatures())
 {
     m_fontDescription.setUsePrinterFont(isPrinterFont);
     m_fontDescription.setFontSmoothing(fontSmoothingMode);
     m_needsTranscoding = fontTranscoder().needsTranscoding(fontDescription());
-    m_fontFallbackList->setPlatformFont(fontData);
 }
 
 Font::Font(const Font& other)
     : m_fontDescription(other.m_fontDescription)
-    , m_fontFallbackList(other.m_fontFallbackList)
+    , m_glyphs(other.m_glyphs)
     , m_letterSpacing(other.m_letterSpacing)
     , m_wordSpacing(other.m_wordSpacing)
-    , m_isPlatformFont(other.m_isPlatformFont)
     , m_needsTranscoding(other.m_needsTranscoding)
     , m_typesettingFeatures(computeTypesettingFeatures())
 {
@@ -116,10 +110,9 @@ Font::Font(const Font& other)
 Font& Font::operator=(const Font& other)
 {
     m_fontDescription = other.m_fontDescription;
-    m_fontFallbackList = other.m_fontFallbackList;
+    m_glyphs = other.m_glyphs;
     m_letterSpacing = other.m_letterSpacing;
     m_wordSpacing = other.m_wordSpacing;
-    m_isPlatformFont = other.m_isPlatformFont;
     m_needsTranscoding = other.m_needsTranscoding;
     m_typesettingFeatures = other.m_typesettingFeatures;
     return *this;
@@ -131,28 +124,133 @@ bool Font::operator==(const Font& other) const
     // FIXME: This does not work if the font was made with the FontPlatformData constructor.
     if (loadingCustomFonts() || other.loadingCustomFonts())
         return false;
-    
-    FontSelector* first = m_fontFallbackList ? m_fontFallbackList->fontSelector() : 0;
-    FontSelector* second = other.m_fontFallbackList ? other.m_fontFallbackList->fontSelector() : 0;
 
-    return first == second
-        && m_fontDescription == other.m_fontDescription
-        && m_letterSpacing == other.m_letterSpacing
-        && m_wordSpacing == other.m_wordSpacing
-        && (m_fontFallbackList ? m_fontFallbackList->fontSelectorVersion() : 0) == (other.m_fontFallbackList ? other.m_fontFallbackList->fontSelectorVersion() : 0)
-        && (m_fontFallbackList ? m_fontFallbackList->generation() : 0) == (other.m_fontFallbackList ? other.m_fontFallbackList->generation() : 0);
+    if (m_fontDescription != other.m_fontDescription || m_letterSpacing != other.m_letterSpacing || m_wordSpacing != other.m_wordSpacing)
+        return false;
+    if (m_glyphs == other.m_glyphs)
+        return true;
+    if (!m_glyphs || !other.m_glyphs)
+        return false;
+    if (m_glyphs->fontSelector() != other.m_glyphs->fontSelector())
+        return false;
+    // Can these cases actually somehow occur? All fonts should get wiped out by full style recalc.
+    if (m_glyphs->fontSelectorVersion() != other.m_glyphs->fontSelectorVersion())
+        return false;
+    if (m_glyphs->generation() != other.m_glyphs->generation())
+        return false;
+    return true;
+}
+
+struct FontGlyphsCacheKey {
+    // This part of the key is shared with the lower level FontCache (caching FontData objects).
+    FontDescriptionFontDataCacheKey fontDescriptionCacheKey;
+    Vector<AtomicString, 3> families;
+    unsigned fontSelectorId;
+    unsigned fontSelectorVersion;
+    unsigned fontSelectorFlags;
+};
+
+struct FontGlyphsCacheEntry {
+    WTF_MAKE_FAST_ALLOCATED;
+public:
+    FontGlyphsCacheKey key;
+    RefPtr<FontGlyphs> glyphs;
+};
+
+typedef HashMap<unsigned, OwnPtr<FontGlyphsCacheEntry>, AlreadyHashed> FontGlyphsCache;
+
+static bool operator==(const FontGlyphsCacheKey& a, const FontGlyphsCacheKey& b)
+{
+    if (a.fontDescriptionCacheKey != b.fontDescriptionCacheKey)
+        return false;
+    if (a.families != b.families)
+        return false;
+    if (a.fontSelectorId != b.fontSelectorId || a.fontSelectorVersion != b.fontSelectorVersion || a.fontSelectorFlags != b.fontSelectorFlags)
+        return false;
+    return true;
+}
+
+static FontGlyphsCache& fontGlyphsCache()
+{
+    DEFINE_STATIC_LOCAL(FontGlyphsCache, cache, ());
+    return cache;
+}
+
+void invalidateFontGlyphsCache()
+{
+    fontGlyphsCache().clear();
+}
+
+static unsigned makeFontSelectorFlags(const FontDescription& description)
+{
+    return static_cast<unsigned>(description.script()) << 1 | static_cast<unsigned>(description.smallCaps());
+}
+
+static void makeFontGlyphsCacheKey(FontGlyphsCacheKey& key, const FontDescription& description, FontSelector* fontSelector)
+{
+    key.fontDescriptionCacheKey = FontDescriptionFontDataCacheKey(description);
+    for (unsigned i = 0; i < description.familyCount(); ++i)
+        key.families.append(description.familyAt(i).lower());
+    key.fontSelectorId = fontSelector ? fontSelector->uniqueId() : 0;
+    key.fontSelectorVersion = fontSelector ? fontSelector->version() : 0;
+    key.fontSelectorFlags = fontSelector && fontSelector->resolvesFamilyFor(description) ? makeFontSelectorFlags(description) : 0;
+}
+
+static unsigned computeFontGlyphsCacheHash(const FontGlyphsCacheKey& key)
+{
+    unsigned hashCodes[5] = {
+        StringHasher::hashMemory(key.families.data(), key.families.size() * sizeof(key.families[0])),
+        key.fontDescriptionCacheKey.computeHash(),
+        key.fontSelectorId,
+        key.fontSelectorVersion,
+        key.fontSelectorFlags
+    };
+    return StringHasher::hashMemory<sizeof(hashCodes)>(hashCodes);
+}
+
+void pruneUnreferencedEntriesFromFontGlyphsCache()
+{
+    Vector<unsigned, 50> toRemove;
+    FontGlyphsCache::iterator end = fontGlyphsCache().end();
+    for (FontGlyphsCache::iterator it = fontGlyphsCache().begin(); it != end; ++it) {
+        if (it->value->glyphs->hasOneRef())
+            toRemove.append(it->key);
+    }
+    for (unsigned i = 0; i < toRemove.size(); ++i)
+        fontGlyphsCache().remove(toRemove[i]);
+}
+
+static PassRefPtr<FontGlyphs> retrieveOrAddCachedFontGlyphs(const FontDescription& fontDescription, PassRefPtr<FontSelector> fontSelector)
+{
+    FontGlyphsCacheKey key;
+    makeFontGlyphsCacheKey(key, fontDescription, fontSelector.get());
+
+    unsigned hash = computeFontGlyphsCacheHash(key);
+    FontGlyphsCache::AddResult addResult = fontGlyphsCache().add(hash, PassOwnPtr<FontGlyphsCacheEntry>());
+    if (!addResult.isNewEntry && addResult.iterator->value->key == key)
+        return addResult.iterator->value->glyphs;
+
+    OwnPtr<FontGlyphsCacheEntry>& newEntry = addResult.iterator->value;
+    newEntry = adoptPtr(new FontGlyphsCacheEntry);
+    newEntry->glyphs = FontGlyphs::create(fontSelector);
+    newEntry->key = key;
+    RefPtr<FontGlyphs> glyphs = newEntry->glyphs;
+
+    static const unsigned unreferencedPruneInterval = 50;
+    static const int maximumEntries = 400;
+    static unsigned pruneCounter;
+    // Referenced FontGlyphs would exist anyway so pruning them saves little memory.
+    if (!(++pruneCounter % unreferencedPruneInterval))
+        pruneUnreferencedEntriesFromFontGlyphsCache();
+    // Prevent pathological growth.
+    if (fontGlyphsCache().size() > maximumEntries)
+        fontGlyphsCache().remove(fontGlyphsCache().begin());
+    return glyphs;
 }
 
 void Font::update(PassRefPtr<FontSelector> fontSelector) const
 {
-    // FIXME: It is pretty crazy that we are willing to just poke into a RefPtr, but it ends up 
-    // being reasonably safe (because inherited fonts in the render tree pick up the new
-    // style anyway. Other copies are transient, e.g., the state in the GraphicsContext, and
-    // won't stick around long enough to get you in trouble). Still, this is pretty disgusting,
-    // and could eventually be rectified by using RefPtrs for Fonts themselves.
-    if (!m_fontFallbackList)
-        m_fontFallbackList = FontFallbackList::create();
-    m_fontFallbackList->invalidate(fontSelector);
+    m_glyphs = retrieveOrAddCachedFontGlyphs(m_fontDescription, fontSelector.get());
     m_typesettingFeatures = computeTypesettingFeatures();
 }
 
@@ -200,9 +298,13 @@ float Font::width(const TextRun& run, HashSet<const SimpleFontData*>* fallbackFo
 
     bool hasKerningOrLigatures = typesettingFeatures() & (Kerning | Ligatures);
     bool hasWordSpacingOrLetterSpacing = wordSpacing() | letterSpacing();
-    float* cacheEntry = m_fontFallbackList->widthCache().add(run, std::numeric_limits<float>::quiet_NaN(), hasKerningOrLigatures, hasWordSpacingOrLetterSpacing, glyphOverflow);
-    if (cacheEntry && !isnan(*cacheEntry))
+    float* cacheEntry = m_glyphs->widthCache().add(run, std::numeric_limits<float>::quiet_NaN(), hasKerningOrLigatures, hasWordSpacingOrLetterSpacing, glyphOverflow);
+    if (cacheEntry && !std::isnan(*cacheEntry))
         return *cacheEntry;
+
+    HashSet<const SimpleFontData*> localFallbackFonts;
+    if (!fallbackFonts)
+        fallbackFonts = &localFallbackFonts;
 
     float result;
     if (codePathToUse == Complex)
@@ -210,7 +312,7 @@ float Font::width(const TextRun& run, HashSet<const SimpleFontData*>* fallbackFo
     else
         result = floatWidthForSimpleText(run, fallbackFonts, glyphOverflow);
 
-    if (cacheEntry && (!fallbackFonts || fallbackFonts->isEmpty()))
+    if (cacheEntry && fallbackFonts->isEmpty())
         *cacheEntry = result;
     return result;
 }
@@ -227,8 +329,7 @@ float Font::width(const TextRun& run, int& charsConsumed, String& glyphName) con
     return width(run);
 }
 
-#if !(PLATFORM(MAC) || (PLATFORM(CHROMIUM) && OS(DARWIN)))
-
+#if !PLATFORM(MAC)
 PassOwnPtr<TextLayout> Font::createLayout(RenderText*, float, bool) const
 {
     return nullptr;
@@ -243,7 +344,6 @@ float Font::width(TextLayout&, unsigned, unsigned, HashSet<const SimpleFontData*
     ASSERT_NOT_REACHED();
     return 0;
 }
-
 #endif
 
 FloatRect Font::selectionRectForText(const TextRun& run, const FloatPoint& point, int h, int from, int to) const
@@ -553,15 +653,88 @@ bool Font::isCJKIdeographOrSymbol(UChar32 c)
     if ((c == 0x2C7) || (c == 0x2CA) || (c == 0x2CB) || (c == 0x2D9))
         return true;
 
+    if ((c == 0x2020) || (c == 0x2021) || (c == 0x2030) || (c == 0x203B) || (c == 0x203C)
+        || (c == 0x2042) || (c == 0x2047) || (c == 0x2048) || (c == 0x2049) || (c == 0x2051)
+        || (c == 0x20DD) || (c == 0x20DE) || (c == 0x2100) || (c == 0x2103) || (c == 0x2105)
+        || (c == 0x2109) || (c == 0x210A) || (c == 0x2113) || (c == 0x2116) || (c == 0x2121)
+        || (c == 0x212B) || (c == 0x213B) || (c == 0x2150) || (c == 0x2151) || (c == 0x2152))
+        return true;
+
+    if (c >= 0x2156 && c <= 0x215A)
+        return true;
+
+    if (c >= 0x2160 && c <= 0x216B)
+        return true;
+
+    if (c >= 0x2170 && c <= 0x217B)
+        return true;
+
+    if ((c == 0x217F) || (c == 0x2189) || (c == 0x2307) || (c == 0x2312) || (c == 0x23BE) || (c == 0x23BF))
+        return true;
+
+    if (c >= 0x23C0 && c <= 0x23CC)
+        return true;
+
+    if ((c == 0x23CE) || (c == 0x2423))
+        return true;
+
+    if (c >= 0x2460 && c <= 0x2492)
+        return true;
+
+    if (c >= 0x249C && c <= 0x24FF)
+        return true;
+
+    if ((c == 0x25A0) || (c == 0x25A1) || (c == 0x25A2) || (c == 0x25AA) || (c == 0x25AB))
+        return true;
+
+    if ((c == 0x25B1) || (c == 0x25B2) || (c == 0x25B3) || (c == 0x25B6) || (c == 0x25B7) || (c == 0x25BC) || (c == 0x25BD))
+        return true;
+    
+    if ((c == 0x25C0) || (c == 0x25C1) || (c == 0x25C6) || (c == 0x25C7) || (c == 0x25C9) || (c == 0x25CB) || (c == 0x25CC))
+        return true;
+
+    if (c >= 0x25CE && c <= 0x25D3)
+        return true;
+
+    if (c >= 0x25E2 && c <= 0x25E6)
+        return true;
+
+    if (c == 0x25EF)
+        return true;
+
+    if (c >= 0x2600 && c <= 0x2603)
+        return true;
+
+    if ((c == 0x2605) || (c == 0x2606) || (c == 0x260E) || (c == 0x2616) || (c == 0x2617) || (c == 0x2640) || (c == 0x2642))
+        return true;
+
+    if (c >= 0x2660 && c <= 0x266F)
+        return true;
+
+    if (c >= 0x2672 && c <= 0x267D)
+        return true;
+
+    if ((c == 0x26A0) || (c == 0x26BD) || (c == 0x26BE) || (c == 0x2713) || (c == 0x271A) || (c == 0x273F) || (c == 0x2740) || (c == 0x2756))
+        return true;
+
+    if (c >= 0x2776 && c <= 0x277F)
+        return true;
+
+    if (c == 0x2B1A)
+        return true;
+
     // Ideographic Description Characters.
     if (c >= 0x2FF0 && c <= 0x2FFF)
         return true;
     
-    // CJK Symbols and Punctuation.
-    if (c >= 0x3000 && c <= 0x303F)
+    // CJK Symbols and Punctuation, excluding 0x3030.
+    if (c >= 0x3000 && c < 0x3030)
         return true;
-   
-    // Hiragana 
+
+    if (c > 0x3030 && c <= 0x303F)
+        return true;
+
+    // Hiragana
     if (c >= 0x3040 && c <= 0x309F)
         return true;
 
@@ -572,7 +745,10 @@ bool Font::isCJKIdeographOrSymbol(UChar32 c)
     // Bopomofo
     if (c >= 0x3100 && c <= 0x312F)
         return true;
-    
+
+    if (c >= 0x3190 && c <= 0x319F)
+        return true;
+
     // Bopomofo Extended
     if (c >= 0x31A0 && c <= 0x31BF)
         return true;
@@ -584,10 +760,19 @@ bool Font::isCJKIdeographOrSymbol(UChar32 c)
     // CJK Compatibility.
     if (c >= 0x3300 && c <= 0x33FF)
         return true;
-    
+
+    if (c >= 0xF860 && c <= 0xF862)
+        return true;
+
     // CJK Compatibility Forms.
     if (c >= 0xFE30 && c <= 0xFE4F)
         return true;
+
+    if ((c == 0xFE10) || (c == 0xFE11) || (c == 0xFE12) || (c == 0xFE19))
+        return true;
+
+    if ((c == 0xFF0D) || (c == 0xFF1B) || (c == 0xFF1C) || (c == 0xFF1E))
+        return false;
 
     // Halfwidth and Fullwidth Forms
     // Usually only used in CJK
@@ -595,6 +780,21 @@ bool Font::isCJKIdeographOrSymbol(UChar32 c)
         return true;
 
     // Emoji.
+    if (c == 0x1F100)
+        return true;
+
+    if (c >= 0x1F110 && c <= 0x1F129)
+        return true;
+
+    if (c >= 0x1F130 && c <= 0x1F149)
+        return true;
+
+    if (c >= 0x1F150 && c <= 0x1F169)
+        return true;
+
+    if (c >= 0x1F170 && c <= 0x1F189)
+        return true;
+
     if (c >= 0x1F200 && c <= 0x1F6F)
         return true;
 

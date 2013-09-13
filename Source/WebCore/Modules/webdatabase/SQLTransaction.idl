@@ -27,12 +27,13 @@
  */
 
 [
+    NoInterfaceObject,
     Conditional=SQL_DATABASE,
-    OmitConstructor,
-    JSNoStaticTables
+    JSNoStaticTables,
+    SkipVTableValidation
 ] interface SQLTransaction {
-    [Custom] void executeSql(in DOMString sqlStatement,
-                             in ObjectArray arguments,
-                             in [Optional, Callback] SQLStatementCallback callback,
-                             in [Optional, Callback] SQLStatementErrorCallback errorCallback);
+    [Custom] void executeSql(DOMString sqlStatement,
+                             ObjectArray arguments,
+                             optional SQLStatementCallback callback,
+                             optional SQLStatementErrorCallback errorCallback);
 };

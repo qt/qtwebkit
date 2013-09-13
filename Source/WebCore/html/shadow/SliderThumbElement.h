@@ -32,11 +32,9 @@
 #ifndef SliderThumbElement_h
 #define SliderThumbElement_h
 
-#include "FloatPoint.h"
 #include "HTMLDivElement.h"
 #include "HTMLNames.h"
 #include "RenderBlock.h"
-#include "RenderStyleConstants.h"
 #include <wtf/Forward.h>
 
 namespace WebCore {
@@ -46,7 +44,7 @@ class HTMLInputElement;
 class Event;
 class FloatPoint;
 
-class SliderThumbElement : public HTMLDivElement {
+class SliderThumbElement FINAL : public HTMLDivElement {
 public:
     static PassRefPtr<SliderThumbElement> create(Document*);
 
@@ -56,7 +54,7 @@ public:
     virtual void defaultEventHandler(Event*);
     virtual bool willRespondToMouseMoveEvents() OVERRIDE;
     virtual bool willRespondToMouseClickEvents() OVERRIDE;
-    virtual void detach();
+    virtual void detach(const AttachContext& = AttachContext()) OVERRIDE;
     virtual const AtomicString& shadowPseudoId() const;
     HTMLInputElement* hostInput() const;
     void setPositionFromPoint(const LayoutPoint&);
@@ -65,10 +63,10 @@ private:
     SliderThumbElement(Document*);
     virtual RenderObject* createRenderer(RenderArena*, RenderStyle*);
     virtual PassRefPtr<Element> cloneElementWithoutAttributesAndChildren();
-    virtual bool isEnabledFormControl() const;
-    virtual bool shouldMatchReadOnlySelector() const OVERRIDE;
-    virtual bool shouldMatchReadWriteSelector() const OVERRIDE;
-    virtual Node* focusDelegate();
+    virtual bool isDisabledFormControl() const OVERRIDE;
+    virtual bool matchesReadOnlyPseudoClass() const OVERRIDE;
+    virtual bool matchesReadWritePseudoClass() const OVERRIDE;
+    virtual Element* focusDelegate() OVERRIDE;
     void startDragging();
     void stopDragging();
 
@@ -93,7 +91,7 @@ inline PassRefPtr<Element> SliderThumbElement::cloneElementWithoutAttributesAndC
 
 inline SliderThumbElement* toSliderThumbElement(Node* node)
 {
-    ASSERT(!node || node->isHTMLElement());
+    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->isHTMLElement());
     return static_cast<SliderThumbElement*>(node);
 }
 
@@ -104,9 +102,9 @@ HTMLElement* sliderTrackElementOf(Node*);
 
 // --------------------------------
 
-class RenderSliderThumb : public RenderBlock {
+class RenderSliderThumb FINAL : public RenderBlock {
 public:
-    RenderSliderThumb(Node*);
+    RenderSliderThumb(SliderThumbElement*);
     void updateAppearance(RenderStyle* parentStyle);
 
 private:
@@ -115,7 +113,7 @@ private:
 
 // --------------------------------
 
-class SliderContainerElement : public HTMLDivElement {
+class SliderContainerElement FINAL : public HTMLDivElement {
 public:
     static PassRefPtr<SliderContainerElement> create(Document*);
 

@@ -43,10 +43,6 @@
 #include "Page.h"
 #include "ResourceError.h"
 
-#if USE(V8)
-#include <v8.h>
-#endif
-
 /*
  This file holds empty Client stubs for use by WebCore.
  Viewless element needs to create a dummy Page->Frame->FrameView tree for use in parsing or executing JavaScript.
@@ -70,7 +66,6 @@ public:
     virtual ~EmptyChromeClient() { }
     virtual void chromeDestroyed() { }
 
-    virtual void* webView() const { return 0; }
     virtual void setWindowRect(const FloatRect&) { }
     virtual FloatRect windowRect() { return FloatRect(); }
 
@@ -105,7 +100,7 @@ public:
 
     virtual void setResizable(bool) { }
 
-    virtual void addMessageToConsole(MessageSource, MessageType, MessageLevel, const String&, unsigned, const String&) { }
+    virtual void addMessageToConsole(MessageSource, MessageLevel, const String&, unsigned, unsigned, const String&) { }
 
     virtual bool canRunBeforeUnloadConfirmPanel() { return false; }
     virtual bool runBeforeUnloadConfirmPanel(const String&, Frame*) { return true; }
@@ -122,12 +117,6 @@ public:
     virtual bool hasOpenedPopup() const OVERRIDE { return false; }
     virtual PassRefPtr<PopupMenu> createPopupMenu(PopupMenuClient*) const OVERRIDE;
     virtual PassRefPtr<SearchPopupMenu> createSearchPopupMenu(PopupMenuClient*) const OVERRIDE;
-#if ENABLE(PAGE_POPUP)
-    virtual PagePopup* openPagePopup(PagePopupClient*, const IntRect&) OVERRIDE { return 0; }
-    virtual void closePagePopup(PagePopup*) OVERRIDE { }
-    virtual void setPagePopupDriver(PagePopupDriver*) OVERRIDE { }
-    virtual void resetPagePopupDriver() OVERRIDE { }
-#endif
 
     virtual void setStatusbarText(const String&) { }
 
@@ -159,7 +148,7 @@ public:
     virtual void print(Frame*) { }
 
 #if ENABLE(SQL_DATABASE)
-    virtual void exceededDatabaseQuota(Frame*, const String&) { }
+    virtual void exceededDatabaseQuota(Frame*, const String&, DatabaseDetails) { }
 #endif
 
     virtual void reachedMaxAppCacheSize(int64_t) { }
@@ -198,6 +187,8 @@ public:
 
 #if PLATFORM(WIN)
     virtual void setLastSetCursorToCurrentCursor() { }
+    virtual void AXStartFrameLoad() { }
+    virtual void AXFinishFrameLoad() { }
 #endif
 #if ENABLE(TOUCH_EVENTS)
     virtual void needTouchEvents(bool) { }
@@ -208,7 +199,12 @@ public:
     virtual bool shouldRubberBandInDirection(WebCore::ScrollDirection) const { return false; }
     
     virtual bool isEmptyChromeClient() const { return true; }
+
+    virtual void didAssociateFormControls(const Vector<RefPtr<Element> >&) { }
+    virtual bool shouldNotifyOnFormChanges() { return false; }
 };
+
+// FIXME (bug 116233): Get rid of EmptyFrameLoaderClient. It is a travesty.
 
 class EmptyFrameLoaderClient : public FrameLoaderClient {
     WTF_MAKE_NONCOPYABLE(EmptyFrameLoaderClient); WTF_MAKE_FAST_ALLOCATED;
@@ -228,7 +224,7 @@ public:
     virtual void detachedFromParent2() { }
     virtual void detachedFromParent3() { }
 
-    virtual void download(ResourceHandle*, const ResourceRequest&, const ResourceResponse&) { }
+    virtual void convertMainResourceLoadToDownload(DocumentLoader*, const ResourceRequest&, const ResourceResponse&) OVERRIDE { }
 
     virtual void assignIdentifierToInitialRequest(unsigned long, DocumentLoader*, const ResourceRequest&) { }
     virtual bool shouldUseCredentialStorage(DocumentLoader*, unsigned long) { return false; }
@@ -364,12 +360,6 @@ public:
 
     virtual void registerForIconNotification(bool) { }
 
-#if USE(V8)
-    virtual void didCreateScriptContext(v8::Handle<v8::Context>, int extensionGroup, int worldId) { }
-    virtual void willReleaseScriptContext(v8::Handle<v8::Context>, int worldId) { }
-    virtual bool allowScriptExtension(const String& extensionName, int extensionGroup, int worldId) { return false; }
-#endif
-
 #if PLATFORM(MAC)
     virtual RemoteAXObjectRef accessibilityRemoteObject() { return 0; }
     virtual NSCachedURLResponse* willCacheResponse(DocumentLoader*, unsigned long, NSCachedURLResponse* response) const { return response; }
@@ -381,13 +371,7 @@ public:
 
     virtual PassRefPtr<FrameNetworkingContext> createNetworkingContext() OVERRIDE;
 
-#if ENABLE(WEB_INTENTS)
-    virtual void dispatchIntent(PassRefPtr<IntentRequest>) OVERRIDE;
-#endif
-
-#if ENABLE(REQUEST_AUTOCOMPLETE)
-    virtual void didRequestAutocomplete(PassRefPtr<FormState>) OVERRIDE;
-#endif
+    virtual bool isEmptyFrameLoaderClient() OVERRIDE { return true; }
 };
 
 class EmptyTextCheckerClient : public TextCheckerClient {
@@ -416,7 +400,6 @@ public:
     virtual void frameWillDetachPage(Frame*) { }
 
     virtual bool shouldDeleteRange(Range*) { return false; }
-    virtual bool shouldShowDeleteInterface(HTMLElement*) { return false; }
     virtual bool smartInsertDeleteEnabled() { return false; }
     virtual bool isSelectTrailingWhitespaceEnabled() { return false; }
     virtual bool isContinuousSpellCheckingEnabled() { return false; }
@@ -441,7 +424,9 @@ public:
     virtual void respondToChangedContents() { }
     virtual void respondToChangedSelection(Frame*) { }
     virtual void didEndEditing() { }
+    virtual void willWriteSelectionToPasteboard(Range*) { }
     virtual void didWriteSelectionToPasteboard() { }
+    virtual void getClientPasteboardDataForRange(Range*, Vector<String>&, Vector<RefPtr<SharedBuffer> >&) { }
     virtual void didSetSelectionTypesForPasteboard() { }
 
     virtual void registerUndoStep(PassRefPtr<UndoStep>) OVERRIDE;
@@ -481,6 +466,7 @@ public:
     virtual void lowercaseWord() { }
     virtual void capitalizeWord() { }
 #endif
+
 #if USE(AUTOMATIC_TEXT_REPLACEMENT)
     virtual void showSubstitutionsPanel(bool) { }
     virtual bool substitutionsPanelIsShowing() { return false; }
@@ -496,6 +482,11 @@ public:
     virtual bool isAutomaticSpellingCorrectionEnabled() { return false; }
     virtual void toggleAutomaticSpellingCorrection() { }
 #endif
+
+#if ENABLE(DELETION_UI)
+    virtual bool shouldShowDeleteInterface(HTMLElement*) { return false; }
+#endif
+
 #if PLATFORM(GTK)
     virtual bool shouldShowUnicodeMenu() { return false; }
 #endif

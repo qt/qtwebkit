@@ -55,9 +55,9 @@ my @depsContent = ();
 
 # Hashes
 my %protocolTypeHash = ("XPathNSResolver" => 1, "EventListener" => 1, "EventTarget" => 1, "NodeFilter" => 1,
-                        "SVGLocatable" => 1, "SVGTransformable" => 1, "SVGStylable" => 1, "SVGFilterPrimitiveStandardAttributes" => 1, 
+                        "SVGFilterPrimitiveStandardAttributes" => 1, 
                         "SVGTests" => 1, "SVGLangSpace" => 1, "SVGExternalResourcesRequired" => 1, "SVGURIReference" => 1,
-                        "SVGZoomAndPan" => 1, "SVGFitToViewBox" => 1, "SVGAnimatedPathData" => 1, "ElementTimeControl" => 1);
+                        "SVGZoomAndPan" => 1, "SVGFitToViewBox" => 1, "SVGAnimatedPathData" => 1);
 my %nativeObjCTypeHash = ("URL" => 1, "Color" => 1);
 
 # FIXME: this should be replaced with a function that recurses up the tree
@@ -76,6 +76,7 @@ my %baseTypeHash = ("Object" => 1, "Node" => 1, "NodeList" => 1, "NamedNodeMap" 
                     "SVGStringList" => 1, "SVGTransform" => 1, "SVGTransformList" => 1, "SVGUnitTypes" => 1);
 
 # Constants
+my $nullableInit = "bool isNull = false;";
 my $exceptionInit = "WebCore::ExceptionCode ec = 0;";
 my $jsContextSetter = "WebCore::JSMainThreadNullState state;";
 my $exceptionRaiseOnError = "WebCore::raiseOnDOMError(ec);";
@@ -219,6 +220,8 @@ sub ReadPublicInterfaces
         $gccLocation = $ENV{CC};
     } elsif (($Config::Config{'osname'}) =~ /solaris/i) {
         $gccLocation = "/usr/sfw/bin/gcc";
+    } elsif (-x "/usr/bin/clang") {
+        $gccLocation = "/usr/bin/clang";
     } else {
         $gccLocation = "/usr/bin/gcc";
     }
@@ -263,6 +266,57 @@ sub ReadPublicInterfaces
     $interfaceAvailabilityVersion = "WEBKIT_VERSION_LATEST" if $newPublicClass;
 }
 
+sub AddMethodsConstantsAndAttributesFromParentInterfaces
+{
+    # Add to $interface all of its inherited interface members, except for those
+    # inherited through $interface's first listed parent.  If an array reference
+    # is passed in as $parents, the names of all ancestor interfaces visited
+    # will be appended to the array.  If $collectDirectParents is true, then
+    # even the names of $interface's first listed parent and its ancestors will
+    # be appended to $parents.
+
+    my $interface = shift;
+    my $parents = shift;
+    my $collectDirectParents = shift;
+
+    my $first = 1;
+
+    $codeGenerator->ForAllParents($interface, sub {
+        my $currentInterface = shift;
+
+        if ($first) {
+            # Ignore first parent class, already handled by the generation itself.
+            $first = 0;
+
+            if ($collectDirectParents) {
+                # Just collect the names of the direct ancestor interfaces,
+                # if necessary.
+                push(@$parents, $currentInterface->name);
+                $codeGenerator->ForAllParents($currentInterface, sub {
+                    my $currentInterface = shift;
+                    push(@$parents, $currentInterface->name);
+                }, undef);
+            }
+
+            # Prune the recursion here.
+            return 'prune';
+        }
+
+        # Collect the name of this additional parent.
+        push(@$parents, $currentInterface->name) if $parents;
+
+        print "  |  |>  -> Inheriting "
+            . @{$currentInterface->constants} . " constants, "
+            . @{$currentInterface->functions} . " functions, "
+            . @{$currentInterface->attributes} . " attributes...\n  |  |>\n" if $verbose;
+
+        # Add this parent's members to $interface.
+        push(@{$interface->constants}, @{$currentInterface->constants});
+        push(@{$interface->functions}, @{$currentInterface->functions});
+        push(@{$interface->attributes}, @{$currentInterface->attributes});
+    });
+}
+
 sub GenerateInterface
 {
     my $object = shift;
@@ -301,6 +355,8 @@ sub GetClassName
     return "NSString" if $codeGenerator->IsStringType($name) or $name eq "SerializedScriptValue";
     return "NS$name" if IsNativeObjCType($name);
     return "BOOL" if $name eq "boolean";
+    return "unsigned char" if $name eq "octet";
+    return "char" if $name eq "byte";
     return "unsigned" if $name eq "unsigned long";
     return "int" if $name eq "long";
     return "NSTimeInterval" if $name eq "Date";
@@ -446,10 +502,13 @@ sub SkipFunction
 sub SkipAttribute
 {
     my $attribute = shift;
+    my $type = $attribute->signature->type;
 
-    $codeGenerator->AssertNotSequenceType($attribute->signature->type);
-    return 1 if $codeGenerator->GetArrayType($attribute->signature->type);
-    return 1 if $codeGenerator->IsTypedArrayType($attribute->signature->type);
+    $codeGenerator->AssertNotSequenceType($type);
+    return 1 if $codeGenerator->GetArrayType($type);
+    return 1 if $codeGenerator->IsTypedArrayType($type);
+    return 1 if $codeGenerator->IsEnumType($type);
+    return 1 if $attribute->isStatic;
 
     # This is for DynamicsCompressorNode.idl
     if ($attribute->signature->name eq "release") {
@@ -617,6 +676,7 @@ sub AddIncludesForType
     }
 
     # FIXME: won't compile without these
+    $implIncludes{"CSSImportRule.h"} = 1 if $type eq "CSSRule";
     $implIncludes{"StylePropertySet.h"} = 1 if $type eq "CSSStyleDeclaration";
     $implIncludes{"NameNodeList.h"} = 1 if $type eq "NodeList";
 
@@ -783,11 +843,7 @@ sub GenerateHeader
             }
 
             my $attributeType = GetObjCType($attribute->signature->type);
-            my $attributeIsReadonly = ($attribute->type =~ /^readonly/);
-
-            my $property = "\@property" . GetPropertyAttributes($attribute->signature->type, $attributeIsReadonly);
-            # Some SVGFE*Element.idl use 'operator' as attribute name, rewrite as '_operator' to avoid clashes with C/C++
-            $attributeName =~ s/operator/_operator/ if ($attributeName =~ /operator/);
+            my $property = "\@property" . GetPropertyAttributes($attribute->signature->type, $attribute->isReadOnly);
             $property .= " " . $attributeType . ($attributeType =~ /\*$/ ? "" : " ") . $attributeName;
 
             my $publicInterfaceKey = $property . ";";
@@ -1011,9 +1067,9 @@ sub GenerateHeader
             push(@internalHeaderContent, "namespace WebCore {\n");
             $startedNamespace = 1;
             if ($interfaceName eq "Node") {
-                push(@internalHeaderContent, "    class EventTarget;\n    class Node;\n");
+                push(@internalHeaderContent, "class EventTarget;\n    class Node;\n");
             } else {
-                push(@internalHeaderContent, "    class $implClassName;\n");
+                push(@internalHeaderContent, "class $implClassName;\n");
             }
             push(@internalHeaderContent, "}\n\n");
         }
@@ -1041,7 +1097,7 @@ sub GenerateImplementation
     my @ancestorInterfaceNames = ();
 
     if (@{$interface->parents} > 1) {
-        $codeGenerator->AddMethodsConstantsAndAttributesFromParentInterfaces($interface, \@ancestorInterfaceNames);
+        AddMethodsConstantsAndAttributesFromParentInterfaces($interface, \@ancestorInterfaceNames);
     }
 
     my $interfaceName = $interface->name;
@@ -1161,7 +1217,6 @@ sub GenerateImplementation
 
             my $attributeName = $attribute->signature->name;
             my $attributeType = GetObjCType($attribute->signature->type);
-            my $attributeIsReadonly = ($attribute->type =~ /^readonly/);
             my $attributeClassName = GetClassName($attribute->signature->type);
 
             my $attributeInterfaceName = $attributeName;
@@ -1171,9 +1226,6 @@ sub GenerateImplementation
             } elsif ($attributeName eq "frame") {
                 # Special case attribute frame to be frameBorders.
                 $attributeInterfaceName .= "Borders";
-            } elsif ($attributeName eq "operator") {
-                # Avoid clash with C++ keyword.
-                $attributeInterfaceName = "_operator";
             }
 
             $attributeNames{$attributeInterfaceName} = 1;
@@ -1188,7 +1240,7 @@ sub GenerateImplementation
             # document when called on the document itself. Legacy behavior, see <https://bugs.webkit.org/show_bug.cgi?id=10889>.
             $getterExpressionPrefix =~ s/\bownerDocument\b/document/;
 
-            my $hasGetterException = @{$attribute->getterExceptions};
+            my $hasGetterException = $attribute->signature->extendedAttributes->{"GetterRaisesException"};
             my $getterContentHead;
             if ($attribute->signature->extendedAttributes->{"ImplementedBy"}) {
                 my $implementedBy = $attribute->signature->extendedAttributes->{"ImplementedBy"};
@@ -1273,12 +1325,6 @@ sub GenerateImplementation
                         $getter =~ s/\(//;
                         my $updateMethod = "&${implClassNameWithNamespace}::update" . $codeGenerator->WK_ucfirst($getter);
 
-                        if ($getterContentHead =~ /matrix/ and $implClassName eq "SVGTransform") {
-                            # SVGTransform offers a matrix() method for internal usage that returns an AffineTransform
-                            # and a svgMatrix() method returning a SVGMatrix, used for the bindings.
-                            $getterContentHead =~ s/matrix/svgMatrix/;
-                        }
-
                         $getterContentHead = "${tearOffType}::create(IMPL, $getterContentHead$getterContentTail, $updateMethod)";
 
                         $getterContentHead = "kit(WTF::getPtr($getterContentHead";
@@ -1330,8 +1376,17 @@ sub GenerateImplementation
             }
 
             my $getterContent;
-            if ($hasGetterException) {
-                $getterContent = $getterContentHead . ($getterContentHead =~ /\($|, $/ ? "ec" : ", ec") . $getterContentTail;
+            if ($hasGetterException || $attribute->signature->isNullable) {
+                $getterContent = $getterContentHead;
+                my $getterWithoutAttributes = $getterContentHead =~ /\($|, $/ ? "ec" : ", ec";
+                if ($attribute->signature->isNullable) {
+                    $getterContent .= $getterWithoutAttributes ? "isNull" : ", isNull";
+                    $getterWithoutAttributes = 0;
+                }
+                if ($hasGetterException) {
+                    $getterContent .= $getterWithoutAttributes ? "ec" : ", ec";
+                }
+                $getterContent .= $getterContentTail;
             } else {
                 $getterContent = $getterContentHead . $getterContentTail;
             }
@@ -1342,6 +1397,12 @@ sub GenerateImplementation
             push(@implContent, "{\n");
             push(@implContent, "    $jsContextSetter\n");
             push(@implContent, @customGetterContent);
+
+            # FIXME: Should we return a default value when isNull == true?
+            if ($attribute->signature->isNullable) {
+                push(@implContents, "    $nullableInit\n");
+            }
+
             if ($hasGetterException) {
                 # Differentiated between when the return type is a pointer and
                 # not for white space issue (ie. Foo *result vs. int result).
@@ -1361,9 +1422,9 @@ sub GenerateImplementation
             push(@implContent, "}\n");
 
             # - SETTER
-            if (!$attributeIsReadonly) {
+            if (!$attribute->isReadOnly) {
                 # Exception handling
-                my $hasSetterException = @{$attribute->setterExceptions};
+                my $hasSetterException = $attribute->signature->extendedAttributes->{"SetterRaisesException"};
 
                 my $coreSetterName = "set" . $codeGenerator->WK_ucfirst($attributeName);
                 my $setterName = "set" . ucfirst($attributeInterfaceName);
@@ -1458,7 +1519,7 @@ sub GenerateImplementation
             my $functionName = $function->signature->name;
             my $returnType = GetObjCType($function->signature->type);
             my $hasParameters = @{$function->parameters};
-            my $raisesExceptions = @{$function->raisesExceptions};
+            my $raisesExceptions = $function->signature->extendedAttributes->{"RaisesException"};
 
             my @parameterNames = ();
             my @needsAssert = ();

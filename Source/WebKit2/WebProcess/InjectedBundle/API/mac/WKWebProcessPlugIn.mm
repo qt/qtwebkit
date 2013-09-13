@@ -28,6 +28,7 @@
 #if defined(__LP64__) && defined(__clang__)
 
 #import "WKWebProcessPlugIn.h"
+#import "WKWebProcessPlugInPrivate.h"
 #import "WKWebProcessPlugInInternal.h"
 
 #import "InjectedBundle.h"
@@ -38,10 +39,10 @@
 #import "WKWebProcessPlugInBrowserContextControllerInternal.h"
 #import <wtf/RetainPtr.h>
 
-typedef HashMap<WKBundlePageRef, RetainPtr<WKWebProcessPlugInBrowserContextController *> > BundlePageWrapperCache;
+typedef HashMap<WKBundlePageRef, RetainPtr<WKWebProcessPlugInBrowserContextController *>> BundlePageWrapperCache;
 
 @interface WKWebProcessPlugInController () {
-    RetainPtr<id<WKWebProcessPlugIn> > _principalClassInstance;
+    RetainPtr<id <WKWebProcessPlugIn> > _principalClassInstance;
     WKRetainPtr<WKBundleRef> _bundleRef;
     BundlePageWrapperCache _bundlePageWrapperCache;
     RetainPtr<WKConnection *> _connectionWrapper;
@@ -136,6 +137,15 @@ static WKWebProcessPlugInController *sharedInstance;
 - (WKConnection *)connection
 {
     return _connectionWrapper.get();
+}
+
+@end
+
+@implementation WKWebProcessPlugInController (Private)
+
+- (WKBundleRef)_bundleRef
+{
+    return _bundleRef.get();
 }
 
 @end

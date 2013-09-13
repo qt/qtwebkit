@@ -109,7 +109,10 @@ class AutoinstallImportHook(object):
             not self._fs.exists(self._fs.join(_AUTOINSTALLED_DIR, "logilab/astng")) or
             not self._fs.exists(self._fs.join(_AUTOINSTALLED_DIR, "logilab/common"))):
             installer = AutoInstaller(target_dir=_AUTOINSTALLED_DIR)
-            did_install_something = installer.install("http://pypi.python.org/packages/source/l/logilab-common/logilab-common-0.58.1.tar.gz#md5=77298ab2d8bb8b4af9219791e7cee8ce", url_subpath="logilab-common-0.58.1", target_name="logilab/common")
+            files_to_remove = []
+            if sys.platform == 'win32':
+                files_to_remove = ['test/data/write_protected_file.txt']
+            did_install_something = installer.install("http://pypi.python.org/packages/source/l/logilab-common/logilab-common-0.58.1.tar.gz#md5=77298ab2d8bb8b4af9219791e7cee8ce", url_subpath="logilab-common-0.58.1", target_name="logilab/common", files_to_remove=files_to_remove)
             did_install_something |= installer.install("http://pypi.python.org/packages/source/l/logilab-astng/logilab-astng-0.24.1.tar.gz#md5=ddaf66e4d85714d9c47a46d4bed406de", url_subpath="logilab-astng-0.24.1", target_name="logilab/astng")
             did_install_something |= installer.install('http://pypi.python.org/packages/source/p/pylint/pylint-0.25.1.tar.gz#md5=728bbc2b339bc3749af013709a7f87a5', url_subpath="pylint-0.25.1", target_name="pylint")
         return did_install_something
@@ -153,6 +156,10 @@ class AutoinstallImportHook(object):
         did_install_something |= installer.install(url="http://downloads.sourceforge.net/project/python-irclib/python-irclib/0.4.8/python-irclib-0.4.8.zip",
                           url_subpath="ircbot.py")
         return did_install_something
+
+    def _install_unittest2(self):
+        self._ensure_autoinstalled_dir_is_in_sys_path()
+        return self._install(url="http://pypi.python.org/packages/source/u/unittest2/unittest2-0.5.1.tar.gz#md5=a0af5cac92bbbfa0c3b0e99571390e0f", url_subpath="unittest2-0.5.1/unittest2")
 
     def _install_webpagereplay(self):
         did_install_something = False

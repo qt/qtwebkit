@@ -60,7 +60,6 @@
 - (NSArray *)_web_lowercaseStrings;
 @end;
 
-using namespace std;
 using namespace WebCore;
 
 @implementation WebBasePluginPackage
@@ -134,7 +133,7 @@ static NSString *pathByResolvingSymlinksAndAliases(NSString *thePath)
         return nil;
         
     path = pathByResolvingSymlinksAndAliases(pluginPath);
-    cfBundle.adoptCF(CFBundleCreate(kCFAllocatorDefault, (CFURLRef)[NSURL fileURLWithPath:path]));
+    cfBundle = adoptCF(CFBundleCreate(kCFAllocatorDefault, (CFURLRef)[NSURL fileURLWithPath:path]));
 
     if (!cfBundle) {
         [self release];
@@ -213,8 +212,7 @@ static NSString *pathByResolvingSymlinksAndAliases(NSString *thePath)
 
     NSEnumerator *keyEnumerator = [MIMETypes keyEnumerator];
     NSDictionary *MIMEDictionary;
-    NSString *MIME, *description;
-    NSArray *extensions;
+    NSString *MIME;
 
     while ((MIME = [keyEnumerator nextObject]) != nil) {
         MIMEDictionary = [MIMETypes objectForKey:MIME];
@@ -226,7 +224,7 @@ static NSString *pathByResolvingSymlinksAndAliases(NSString *thePath)
 
         MimeClassInfo mimeClassInfo;
         
-        extensions = [[MIMEDictionary objectForKey:WebPluginExtensionsKey] _web_lowercaseStrings];
+        NSArray *extensions = [[MIMEDictionary objectForKey:WebPluginExtensionsKey] _web_lowercaseStrings];
         for (NSUInteger i = 0; i < [extensions count]; ++i) {
             // The DivX plug-in lists multiple extensions in a comma separated string instead of using
             // multiple array elements in the property list. Work around this here by splitting the
@@ -237,17 +235,11 @@ static NSString *pathByResolvingSymlinksAndAliases(NSString *thePath)
                 mimeClassInfo.extensions.append(extension);
         }
 
-        if ([extensions count] == 0)
-            extensions = [NSArray arrayWithObject:@""];
-
         mimeClassInfo.type = String(MIME).lower();
 
-        description = [MIMEDictionary objectForKey:WebPluginTypeDescriptionKey];
-        mimeClassInfo.desc = description;
+        mimeClassInfo.desc = [MIMEDictionary objectForKey:WebPluginTypeDescriptionKey];
 
         pluginInfo.mimes.append(mimeClassInfo);
-        if (!description)
-            description = @"";
     }
 
     NSString *filename = [(NSString *)path lastPathComponent];
@@ -258,10 +250,12 @@ static NSString *pathByResolvingSymlinksAndAliases(NSString *thePath)
         theName = filename;
     pluginInfo.name = theName;
 
-    description = [self _objectForInfoDictionaryKey:WebPluginDescriptionKey];
+    NSString *description = [self _objectForInfoDictionaryKey:WebPluginDescriptionKey];
     if (!description)
         description = filename;
     pluginInfo.desc = description;
+
+    pluginInfo.isApplicationPlugin = false;
 
     return YES;
 }
@@ -308,7 +302,7 @@ static NSString *pathByResolvingSymlinksAndAliases(NSString *thePath)
     for (size_t i = 0; i < pluginInfo.mimes.size(); ++i) {
         const Vector<String>& extensions = pluginInfo.mimes[i].extensions;
 
-        if (find(extensions.begin(), extensions.end(), extension) != extensions.end())
+        if (std::find(extensions.begin(), extensions.end(), extension) != extensions.end())
             return YES;
     }
 
@@ -335,7 +329,7 @@ static NSString *pathByResolvingSymlinksAndAliases(NSString *thePath)
         const MimeClassInfo& mimeClassInfo = pluginInfo.mimes[i];
         const Vector<String>& extensions = mimeClassInfo.extensions;
 
-        if (find(extensions.begin(), extensions.end(), extension) != extensions.end())
+        if (std::find(extensions.begin(), extensions.end(), extension) != extensions.end())
             return mimeClassInfo.type;
     }
 

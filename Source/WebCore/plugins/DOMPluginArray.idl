@@ -19,14 +19,12 @@
 */
 
 [
-    JSGenerateIsReachable=ImplFrame,
-    NamedGetter,
-    IndexedGetter,
+    GenerateIsReachable=ImplFrame,
     InterfaceName=PluginArray
 ] interface DOMPluginArray {
     readonly attribute unsigned long length;
-    DOMPlugin item(in [Optional=DefaultIsUndefined] unsigned long index);
-    DOMPlugin namedItem(in [Optional=DefaultIsUndefined] DOMString name);
-    void refresh(in [Optional=DefaultIsUndefined] boolean reload);
+    getter DOMPlugin item([Default=Undefined] optional unsigned long index);
+    getter DOMPlugin namedItem([Default=Undefined] optional DOMString name);
+    void refresh([Default=Undefined] optional boolean reload);
 };
 

@@ -67,7 +67,7 @@ public:
         ASSERT(m_values);
         ASSERT(m_wrappers);
         ASSERT(m_values->size() == m_wrappers->size());
-        ASSERT(itemIndex < m_wrappers->size());
+        ASSERT_WITH_SECURITY_IMPLICATION(itemIndex < m_wrappers->size());
 
         RefPtr<ListItemTearOff>& item = m_wrappers->at(itemIndex);
         item->detachWrapper();

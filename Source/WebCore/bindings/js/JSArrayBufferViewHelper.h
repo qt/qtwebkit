@@ -33,8 +33,9 @@
 #include <interpreter/CallFrame.h>
 #include <runtime/ArgList.h>
 #include <runtime/Error.h>
+#include <runtime/JSCJSValue.h>
 #include <runtime/JSObject.h>
-#include <runtime/JSValue.h>
+#include <runtime/Operations.h>
 #include <wtf/ArrayBufferView.h>
 #include <wtf/TypedArrayBase.h>
 
@@ -113,7 +114,7 @@ bool setWebGLArrayWithTypedArrayArgument(JSC::ExecState* exec, C* impl)
     if (exec->argumentCount() == 2)
         offset = exec->argument(1).toInt32(exec);
 
-    uint32_t length = asObject(exec->argument(0))->get(exec, JSC::Identifier(exec, "length")).toUInt32(exec);
+    uint32_t length = asObject(exec->argument(0))->get(exec, exec->vm().propertyNames->length).toUInt32(exec);
 
     if (!(copyTypedArrayBuffer<C, T>(impl, array.get(), length, offset)))
         throwError(exec, createRangeError(exec, "Index is out of range."));
@@ -137,7 +138,7 @@ JSC::JSValue setWebGLArrayHelper(JSC::ExecState* exec, C* impl)
         uint32_t offset = 0;
         if (exec->argumentCount() == 2)
             offset = exec->argument(1).toInt32(exec);
-        uint32_t length = array->get(exec, JSC::Identifier(exec, "length")).toInt32(exec);
+        uint32_t length = array->get(exec, exec->vm().propertyNames->length).toInt32(exec);
         if (!impl->checkInboundData(offset, length))
             throwError(exec, createRangeError(exec, "Index is out of range."));
         else {
@@ -168,7 +169,7 @@ PassRefPtr<C> constructArrayBufferViewWithTypedArrayArgument(JSC::ExecState* exe
     if (sourceType == ArrayBufferView::TypeDataView)
         return 0;
 
-    uint32_t length = asObject(exec->argument(0))->get(exec, JSC::Identifier(exec, "length")).toUInt32(exec);
+    uint32_t length = asObject(exec->argument(0))->get(exec, exec->vm().propertyNames->length).toUInt32(exec);
     RefPtr<C> array = C::createUninitialized(length);
     if (!array) {
         throwError(exec, createRangeError(exec, tooLargeSize));
@@ -243,7 +244,7 @@ PassRefPtr<C> constructArrayBufferView(JSC::ExecState* exec)
             return view;
 
         JSC::JSObject* srcArray = asObject(exec->argument(0));
-        uint32_t length = srcArray->get(exec, JSC::Identifier(exec, "length")).toUInt32(exec);
+        uint32_t length = srcArray->get(exec, exec->vm().propertyNames->length).toUInt32(exec);
         RefPtr<C> array = C::createUninitialized(length);
         if (!array) {
             throwError(exec, createRangeError(exec, tooLargeSize));

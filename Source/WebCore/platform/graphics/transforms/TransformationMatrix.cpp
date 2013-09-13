@@ -36,6 +36,10 @@
 #include <wtf/Assertions.h>
 #include <wtf/MathExtras.h>
 
+#if CPU(X86_64)
+#include <emmintrin.h>
+#endif
+
 using namespace std;
 
 namespace WebCore {
@@ -531,12 +535,12 @@ TransformationMatrix& TransformationMatrix::rotateFromVector(double x, double y)
 
 TransformationMatrix& TransformationMatrix::flipX()
 {
-    return scaleNonUniform(-1.0f, 1.0f);
+    return scaleNonUniform(-1.0, 1.0);
 }
 
 TransformationMatrix& TransformationMatrix::flipY()
 {
-    return scaleNonUniform(1.0f, -1.0f);
+    return scaleNonUniform(1.0, -1.0);
 }
 
 FloatPoint TransformationMatrix::projectPoint(const FloatPoint& p, bool* clamped) const
@@ -615,7 +619,7 @@ FloatQuad TransformationMatrix::projectQuad(const FloatQuad& q, bool* clamped) c
 
 static float clampEdgeValue(float f)
 {
-    ASSERT(!isnan(f));
+    ASSERT(!std::isnan(f));
     return min<float>(max<float>(f, -LayoutUnit::max() / 2), LayoutUnit::max() / 2);
 }
 
@@ -627,13 +631,13 @@ LayoutRect TransformationMatrix::clampedBoundsOfProjectedQuad(const FloatQuad& q
     float top = clampEdgeValue(floorf(mappedQuadBounds.y()));
 
     float right;
-    if (isinf(mappedQuadBounds.x()) && isinf(mappedQuadBounds.width()))
+    if (std::isinf(mappedQuadBounds.x()) && std::isinf(mappedQuadBounds.width()))
         right = LayoutUnit::max() / 2;
     else
         right = clampEdgeValue(ceilf(mappedQuadBounds.maxX()));
 
     float bottom;
-    if (isinf(mappedQuadBounds.y()) && isinf(mappedQuadBounds.height()))
+    if (std::isinf(mappedQuadBounds.y()) && std::isinf(mappedQuadBounds.height()))
         bottom = LayoutUnit::max() / 2;
     else
         bottom = clampEdgeValue(ceilf(mappedQuadBounds.maxY()));
@@ -752,45 +756,45 @@ TransformationMatrix& TransformationMatrix::rotate3d(double x, double y, double 
     TransformationMatrix mat;
 
     // Optimize cases where the axis is along a major axis
-    if (x == 1.0f && y == 0.0f && z == 0.0f) {
-        mat.m_matrix[0][0] = 1.0f;
-        mat.m_matrix[0][1] = 0.0f;
-        mat.m_matrix[0][2] = 0.0f;
-        mat.m_matrix[1][0] = 0.0f;
+    if (x == 1.0 && y == 0.0 && z == 0.0) {
+        mat.m_matrix[0][0] = 1.0;
+        mat.m_matrix[0][1] = 0.0;
+        mat.m_matrix[0][2] = 0.0;
+        mat.m_matrix[1][0] = 0.0;
         mat.m_matrix[1][1] = cosTheta;
         mat.m_matrix[1][2] = sinTheta;
-        mat.m_matrix[2][0] = 0.0f;
+        mat.m_matrix[2][0] = 0.0;
         mat.m_matrix[2][1] = -sinTheta;
         mat.m_matrix[2][2] = cosTheta;
-        mat.m_matrix[0][3] = mat.m_matrix[1][3] = mat.m_matrix[2][3] = 0.0f;
-        mat.m_matrix[3][0] = mat.m_matrix[3][1] = mat.m_matrix[3][2] = 0.0f;
-        mat.m_matrix[3][3] = 1.0f;
-    } else if (x == 0.0f && y == 1.0f && z == 0.0f) {
+        mat.m_matrix[0][3] = mat.m_matrix[1][3] = mat.m_matrix[2][3] = 0.0;
+        mat.m_matrix[3][0] = mat.m_matrix[3][1] = mat.m_matrix[3][2] = 0.0;
+        mat.m_matrix[3][3] = 1.0;
+    } else if (x == 0.0 && y == 1.0 && z == 0.0) {
         mat.m_matrix[0][0] = cosTheta;
-        mat.m_matrix[0][1] = 0.0f;
+        mat.m_matrix[0][1] = 0.0;
         mat.m_matrix[0][2] = -sinTheta;
-        mat.m_matrix[1][0] = 0.0f;
-        mat.m_matrix[1][1] = 1.0f;
-        mat.m_matrix[1][2] = 0.0f;
+        mat.m_matrix[1][0] = 0.0;
+        mat.m_matrix[1][1] = 1.0;
+        mat.m_matrix[1][2] = 0.0;
         mat.m_matrix[2][0] = sinTheta;
-        mat.m_matrix[2][1] = 0.0f;
+        mat.m_matrix[2][1] = 0.0;
         mat.m_matrix[2][2] = cosTheta;
-        mat.m_matrix[0][3] = mat.m_matrix[1][3] = mat.m_matrix[2][3] = 0.0f;
-        mat.m_matrix[3][0] = mat.m_matrix[3][1] = mat.m_matrix[3][2] = 0.0f;
-        mat.m_matrix[3][3] = 1.0f;
-    } else if (x == 0.0f && y == 0.0f && z == 1.0f) {
+        mat.m_matrix[0][3] = mat.m_matrix[1][3] = mat.m_matrix[2][3] = 0.0;
+        mat.m_matrix[3][0] = mat.m_matrix[3][1] = mat.m_matrix[3][2] = 0.0;
+        mat.m_matrix[3][3] = 1.0;
+    } else if (x == 0.0 && y == 0.0 && z == 1.0) {
         mat.m_matrix[0][0] = cosTheta;
         mat.m_matrix[0][1] = sinTheta;
-        mat.m_matrix[0][2] = 0.0f;
+        mat.m_matrix[0][2] = 0.0;
         mat.m_matrix[1][0] = -sinTheta;
         mat.m_matrix[1][1] = cosTheta;
-        mat.m_matrix[1][2] = 0.0f;
-        mat.m_matrix[2][0] = 0.0f;
-        mat.m_matrix[2][1] = 0.0f;
-        mat.m_matrix[2][2] = 1.0f;
-        mat.m_matrix[0][3] = mat.m_matrix[1][3] = mat.m_matrix[2][3] = 0.0f;
-        mat.m_matrix[3][0] = mat.m_matrix[3][1] = mat.m_matrix[3][2] = 0.0f;
-        mat.m_matrix[3][3] = 1.0f;
+        mat.m_matrix[1][2] = 0.0;
+        mat.m_matrix[2][0] = 0.0;
+        mat.m_matrix[2][1] = 0.0;
+        mat.m_matrix[2][2] = 1.0;
+        mat.m_matrix[0][3] = mat.m_matrix[1][3] = mat.m_matrix[2][3] = 0.0;
+        mat.m_matrix[3][0] = mat.m_matrix[3][1] = mat.m_matrix[3][2] = 0.0;
+        mat.m_matrix[3][3] = 1.0;
     } else {
         // This case is the rotation about an arbitrary unit vector.
         //
@@ -809,9 +813,9 @@ TransformationMatrix& TransformationMatrix::rotate3d(double x, double y, double 
         mat.m_matrix[2][0] = x * z * oneMinusCosTheta + y * sinTheta;
         mat.m_matrix[2][1] = y * z * oneMinusCosTheta - x * sinTheta;
         mat.m_matrix[2][2] = cosTheta + z * z * oneMinusCosTheta;
-        mat.m_matrix[0][3] = mat.m_matrix[1][3] = mat.m_matrix[2][3] = 0.0f;
-        mat.m_matrix[3][0] = mat.m_matrix[3][1] = mat.m_matrix[3][2] = 0.0f;
-        mat.m_matrix[3][3] = 1.0f;
+        mat.m_matrix[0][3] = mat.m_matrix[1][3] = mat.m_matrix[2][3] = 0.0;
+        mat.m_matrix[3][0] = mat.m_matrix[3][1] = mat.m_matrix[3][2] = 0.0;
+        mat.m_matrix[3][3] = 1.0;
     }
     multiply(mat);
     return *this;
@@ -831,16 +835,16 @@ TransformationMatrix& TransformationMatrix::rotate3d(double rx, double ry, doubl
     
     mat.m_matrix[0][0] = cosTheta;
     mat.m_matrix[0][1] = sinTheta;
-    mat.m_matrix[0][2] = 0.0f;
+    mat.m_matrix[0][2] = 0.0;
     mat.m_matrix[1][0] = -sinTheta;
     mat.m_matrix[1][1] = cosTheta;
-    mat.m_matrix[1][2] = 0.0f;
-    mat.m_matrix[2][0] = 0.0f;
-    mat.m_matrix[2][1] = 0.0f;
-    mat.m_matrix[2][2] = 1.0f;
-    mat.m_matrix[0][3] = mat.m_matrix[1][3] = mat.m_matrix[2][3] = 0.0f;
-    mat.m_matrix[3][0] = mat.m_matrix[3][1] = mat.m_matrix[3][2] = 0.0f;
-    mat.m_matrix[3][3] = 1.0f;
+    mat.m_matrix[1][2] = 0.0;
+    mat.m_matrix[2][0] = 0.0;
+    mat.m_matrix[2][1] = 0.0;
+    mat.m_matrix[2][2] = 1.0;
+    mat.m_matrix[0][3] = mat.m_matrix[1][3] = mat.m_matrix[2][3] = 0.0;
+    mat.m_matrix[3][0] = mat.m_matrix[3][1] = mat.m_matrix[3][2] = 0.0;
+    mat.m_matrix[3][3] = 1.0;
     
     TransformationMatrix rmat(mat);
     
@@ -848,35 +852,35 @@ TransformationMatrix& TransformationMatrix::rotate3d(double rx, double ry, doubl
     cosTheta = cos(ry);
     
     mat.m_matrix[0][0] = cosTheta;
-    mat.m_matrix[0][1] = 0.0f;
+    mat.m_matrix[0][1] = 0.0;
     mat.m_matrix[0][2] = -sinTheta;
-    mat.m_matrix[1][0] = 0.0f;
-    mat.m_matrix[1][1] = 1.0f;
-    mat.m_matrix[1][2] = 0.0f;
+    mat.m_matrix[1][0] = 0.0;
+    mat.m_matrix[1][1] = 1.0;
+    mat.m_matrix[1][2] = 0.0;
     mat.m_matrix[2][0] = sinTheta;
-    mat.m_matrix[2][1] = 0.0f;
+    mat.m_matrix[2][1] = 0.0;
     mat.m_matrix[2][2] = cosTheta;
-    mat.m_matrix[0][3] = mat.m_matrix[1][3] = mat.m_matrix[2][3] = 0.0f;
-    mat.m_matrix[3][0] = mat.m_matrix[3][1] = mat.m_matrix[3][2] = 0.0f;
-    mat.m_matrix[3][3] = 1.0f;
+    mat.m_matrix[0][3] = mat.m_matrix[1][3] = mat.m_matrix[2][3] = 0.0;
+    mat.m_matrix[3][0] = mat.m_matrix[3][1] = mat.m_matrix[3][2] = 0.0;
+    mat.m_matrix[3][3] = 1.0;
 
     rmat.multiply(mat);
 
     sinTheta = sin(rx);
     cosTheta = cos(rx);
     
-    mat.m_matrix[0][0] = 1.0f;
-    mat.m_matrix[0][1] = 0.0f;
-    mat.m_matrix[0][2] = 0.0f;
-    mat.m_matrix[1][0] = 0.0f;
+    mat.m_matrix[0][0] = 1.0;
+    mat.m_matrix[0][1] = 0.0;
+    mat.m_matrix[0][2] = 0.0;
+    mat.m_matrix[1][0] = 0.0;
     mat.m_matrix[1][1] = cosTheta;
     mat.m_matrix[1][2] = sinTheta;
-    mat.m_matrix[2][0] = 0.0f;
+    mat.m_matrix[2][0] = 0.0;
     mat.m_matrix[2][1] = -sinTheta;
     mat.m_matrix[2][2] = cosTheta;
-    mat.m_matrix[0][3] = mat.m_matrix[1][3] = mat.m_matrix[2][3] = 0.0f;
-    mat.m_matrix[3][0] = mat.m_matrix[3][1] = mat.m_matrix[3][2] = 0.0f;
-    mat.m_matrix[3][3] = 1.0f;
+    mat.m_matrix[0][3] = mat.m_matrix[1][3] = mat.m_matrix[2][3] = 0.0;
+    mat.m_matrix[3][0] = mat.m_matrix[3][1] = mat.m_matrix[3][2] = 0.0;
+    mat.m_matrix[3][3] = 1.0;
 
     rmat.multiply(mat);
 
@@ -968,9 +972,7 @@ TransformationMatrix TransformationMatrix::rectToRect(const FloatRect& from, con
                                 to.y() - from.y());
 }
 
-//
-// *this = mat * *this
-//
+// this = mat * this.
 TransformationMatrix& TransformationMatrix::multiply(const TransformationMatrix& mat)
 {
 #if CPU(APPLE_ARMV7S)
@@ -1115,6 +1117,129 @@ TransformationMatrix& TransformationMatrix::multiply(const TransformationMatrix&
     }
 #undef MATRIX_MULTIPLY_ONE_LINE
 
+#elif defined(TRANSFORMATION_MATRIX_USE_X86_64_SSE2)
+    // x86_64 has 16 XMM registers which is enough to do the multiplication fully in registers.
+    __m128d matrixBlockA = _mm_load_pd(&(m_matrix[0][0]));
+    __m128d matrixBlockC = _mm_load_pd(&(m_matrix[1][0]));
+    __m128d matrixBlockE = _mm_load_pd(&(m_matrix[2][0]));
+    __m128d matrixBlockG = _mm_load_pd(&(m_matrix[3][0]));
+
+    // First row.
+    __m128d otherMatrixFirstParam = _mm_set1_pd(mat.m_matrix[0][0]);
+    __m128d otherMatrixSecondParam = _mm_set1_pd(mat.m_matrix[0][1]);
+    __m128d otherMatrixThirdParam = _mm_set1_pd(mat.m_matrix[0][2]);
+    __m128d otherMatrixFourthParam = _mm_set1_pd(mat.m_matrix[0][3]);
+
+    // output00 and output01.
+    __m128d accumulator = _mm_mul_pd(matrixBlockA, otherMatrixFirstParam);
+    __m128d temp1 = _mm_mul_pd(matrixBlockC, otherMatrixSecondParam);
+    __m128d temp2 = _mm_mul_pd(matrixBlockE, otherMatrixThirdParam);
+    __m128d temp3 = _mm_mul_pd(matrixBlockG, otherMatrixFourthParam);
+
+    __m128d matrixBlockB = _mm_load_pd(&(m_matrix[0][2]));
+    __m128d matrixBlockD = _mm_load_pd(&(m_matrix[1][2]));
+    __m128d matrixBlockF = _mm_load_pd(&(m_matrix[2][2]));
+    __m128d matrixBlockH = _mm_load_pd(&(m_matrix[3][2]));
+
+    accumulator = _mm_add_pd(accumulator, temp1);
+    accumulator = _mm_add_pd(accumulator, temp2);
+    accumulator = _mm_add_pd(accumulator, temp3);
+    _mm_store_pd(&m_matrix[0][0], accumulator);
+
+    // output02 and output03.
+    accumulator = _mm_mul_pd(matrixBlockB, otherMatrixFirstParam);
+    temp1 = _mm_mul_pd(matrixBlockD, otherMatrixSecondParam);
+    temp2 = _mm_mul_pd(matrixBlockF, otherMatrixThirdParam);
+    temp3 = _mm_mul_pd(matrixBlockH, otherMatrixFourthParam);
+
+    accumulator = _mm_add_pd(accumulator, temp1);
+    accumulator = _mm_add_pd(accumulator, temp2);
+    accumulator = _mm_add_pd(accumulator, temp3);
+    _mm_store_pd(&m_matrix[0][2], accumulator);
+
+    // Second row.
+    otherMatrixFirstParam = _mm_set1_pd(mat.m_matrix[1][0]);
+    otherMatrixSecondParam = _mm_set1_pd(mat.m_matrix[1][1]);
+    otherMatrixThirdParam = _mm_set1_pd(mat.m_matrix[1][2]);
+    otherMatrixFourthParam = _mm_set1_pd(mat.m_matrix[1][3]);
+
+    // output10 and output11.
+    accumulator = _mm_mul_pd(matrixBlockA, otherMatrixFirstParam);
+    temp1 = _mm_mul_pd(matrixBlockC, otherMatrixSecondParam);
+    temp2 = _mm_mul_pd(matrixBlockE, otherMatrixThirdParam);
+    temp3 = _mm_mul_pd(matrixBlockG, otherMatrixFourthParam);
+
+    accumulator = _mm_add_pd(accumulator, temp1);
+    accumulator = _mm_add_pd(accumulator, temp2);
+    accumulator = _mm_add_pd(accumulator, temp3);
+    _mm_store_pd(&m_matrix[1][0], accumulator);
+
+    // output12 and output13.
+    accumulator = _mm_mul_pd(matrixBlockB, otherMatrixFirstParam);
+    temp1 = _mm_mul_pd(matrixBlockD, otherMatrixSecondParam);
+    temp2 = _mm_mul_pd(matrixBlockF, otherMatrixThirdParam);
+    temp3 = _mm_mul_pd(matrixBlockH, otherMatrixFourthParam);
+
+    accumulator = _mm_add_pd(accumulator, temp1);
+    accumulator = _mm_add_pd(accumulator, temp2);
+    accumulator = _mm_add_pd(accumulator, temp3);
+    _mm_store_pd(&m_matrix[1][2], accumulator);
+
+    // Third row.
+    otherMatrixFirstParam = _mm_set1_pd(mat.m_matrix[2][0]);
+    otherMatrixSecondParam = _mm_set1_pd(mat.m_matrix[2][1]);
+    otherMatrixThirdParam = _mm_set1_pd(mat.m_matrix[2][2]);
+    otherMatrixFourthParam = _mm_set1_pd(mat.m_matrix[2][3]);
+
+    // output20 and output21.
+    accumulator = _mm_mul_pd(matrixBlockA, otherMatrixFirstParam);
+    temp1 = _mm_mul_pd(matrixBlockC, otherMatrixSecondParam);
+    temp2 = _mm_mul_pd(matrixBlockE, otherMatrixThirdParam);
+    temp3 = _mm_mul_pd(matrixBlockG, otherMatrixFourthParam);
+
+    accumulator = _mm_add_pd(accumulator, temp1);
+    accumulator = _mm_add_pd(accumulator, temp2);
+    accumulator = _mm_add_pd(accumulator, temp3);
+    _mm_store_pd(&m_matrix[2][0], accumulator);
+
+    // output22 and output23.
+    accumulator = _mm_mul_pd(matrixBlockB, otherMatrixFirstParam);
+    temp1 = _mm_mul_pd(matrixBlockD, otherMatrixSecondParam);
+    temp2 = _mm_mul_pd(matrixBlockF, otherMatrixThirdParam);
+    temp3 = _mm_mul_pd(matrixBlockH, otherMatrixFourthParam);
+
+    accumulator = _mm_add_pd(accumulator, temp1);
+    accumulator = _mm_add_pd(accumulator, temp2);
+    accumulator = _mm_add_pd(accumulator, temp3);
+    _mm_store_pd(&m_matrix[2][2], accumulator);
+
+    // Fourth row.
+    otherMatrixFirstParam = _mm_set1_pd(mat.m_matrix[3][0]);
+    otherMatrixSecondParam = _mm_set1_pd(mat.m_matrix[3][1]);
+    otherMatrixThirdParam = _mm_set1_pd(mat.m_matrix[3][2]);
+    otherMatrixFourthParam = _mm_set1_pd(mat.m_matrix[3][3]);
+
+    // output30 and output31.
+    accumulator = _mm_mul_pd(matrixBlockA, otherMatrixFirstParam);
+    temp1 = _mm_mul_pd(matrixBlockC, otherMatrixSecondParam);
+    temp2 = _mm_mul_pd(matrixBlockE, otherMatrixThirdParam);
+    temp3 = _mm_mul_pd(matrixBlockG, otherMatrixFourthParam);
+
+    accumulator = _mm_add_pd(accumulator, temp1);
+    accumulator = _mm_add_pd(accumulator, temp2);
+    accumulator = _mm_add_pd(accumulator, temp3);
+    _mm_store_pd(&m_matrix[3][0], accumulator);
+
+    // output32 and output33.
+    accumulator = _mm_mul_pd(matrixBlockB, otherMatrixFirstParam);
+    temp1 = _mm_mul_pd(matrixBlockD, otherMatrixSecondParam);
+    temp2 = _mm_mul_pd(matrixBlockF, otherMatrixThirdParam);
+    temp3 = _mm_mul_pd(matrixBlockH, otherMatrixFourthParam);
+
+    accumulator = _mm_add_pd(accumulator, temp1);
+    accumulator = _mm_add_pd(accumulator, temp2);
+    accumulator = _mm_add_pd(accumulator, temp3);
+    _mm_store_pd(&m_matrix[3][2], accumulator);
 #else
     Matrix4 tmp;
     
@@ -1299,13 +1424,13 @@ void TransformationMatrix::recompose(const DecomposedType& decomp)
     makeIdentity();
     
     // first apply perspective
-    m_matrix[0][3] = (float) decomp.perspectiveX;
-    m_matrix[1][3] = (float) decomp.perspectiveY;
-    m_matrix[2][3] = (float) decomp.perspectiveZ;
-    m_matrix[3][3] = (float) decomp.perspectiveW;
+    m_matrix[0][3] = decomp.perspectiveX;
+    m_matrix[1][3] = decomp.perspectiveY;
+    m_matrix[2][3] = decomp.perspectiveZ;
+    m_matrix[3][3] = decomp.perspectiveW;
     
     // now translate
-    translate3d((float) decomp.translateX, (float) decomp.translateY, (float) decomp.translateZ);
+    translate3d(decomp.translateX, decomp.translateY, decomp.translateZ);
     
     // apply rotation
     double xx = decomp.quaternionX * decomp.quaternionX;
@@ -1329,24 +1454,24 @@ void TransformationMatrix::recompose(const DecomposedType& decomp)
     // now apply skew
     if (decomp.skewYZ) {
         TransformationMatrix tmp;
-        tmp.setM32((float) decomp.skewYZ);
+        tmp.setM32(decomp.skewYZ);
         multiply(tmp);
     }
     
     if (decomp.skewXZ) {
         TransformationMatrix tmp;
-        tmp.setM31((float) decomp.skewXZ);
+        tmp.setM31(decomp.skewXZ);
         multiply(tmp);
     }
     
     if (decomp.skewXY) {
         TransformationMatrix tmp;
-        tmp.setM21((float) decomp.skewXY);
+        tmp.setM21(decomp.skewXY);
         multiply(tmp);
     }
     
     // finally, apply scale
-    scale3d((float) decomp.scaleX, (float) decomp.scaleY, (float) decomp.scaleZ);
+    scale3d(decomp.scaleX, decomp.scaleY, decomp.scaleZ);
 }
 
 bool TransformationMatrix::isIntegerTranslation() const

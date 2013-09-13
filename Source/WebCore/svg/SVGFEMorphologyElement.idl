@@ -26,19 +26,19 @@
 [
     Conditional=SVG&FILTERS,
     DoNotCheckConstants
-] interface SVGFEMorphologyElement : SVGElement,
-                           SVGFilterPrimitiveStandardAttributes {
+] interface SVGFEMorphologyElement : SVGStyledElement {
     // Morphology Operators
     const unsigned short SVG_MORPHOLOGY_OPERATOR_UNKNOWN  = 0;
     const unsigned short SVG_MORPHOLOGY_OPERATOR_ERODE    = 1;
     const unsigned short SVG_MORPHOLOGY_OPERATOR_DILATE   = 2;
 
     readonly attribute SVGAnimatedString      in1;
-    readonly attribute SVGAnimatedEnumeration operator;
+    [ImplementedAs=svgOperator] readonly attribute SVGAnimatedEnumeration operator;
     readonly attribute SVGAnimatedNumber      radiusX;
     readonly attribute SVGAnimatedNumber      radiusY;
 
-    void setRadius(in [Optional=DefaultIsUndefined] float radiusX, 
-                   in [Optional=DefaultIsUndefined] float radiusY);
+    void setRadius([Default=Undefined] optional float radiusX, 
+                   [Default=Undefined] optional float radiusY);
 };
 
+SVGFEMorphologyElement implements SVGFilterPrimitiveStandardAttributes;

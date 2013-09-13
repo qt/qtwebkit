@@ -29,7 +29,6 @@
 #include "FloatRect.h"
 #include "GraphicsContext.h"
 #include "ImageBuffer.h"
-#include "PlatformMemoryInstrumentation.h"
 
 using namespace std;
 
@@ -81,7 +80,7 @@ void CrossfadeGeneratedImage::drawCrossfade(GraphicsContext* context)
     context->endTransparencyLayer();
 }
 
-void CrossfadeGeneratedImage::draw(GraphicsContext* context, const FloatRect& dstRect, const FloatRect& srcRect, ColorSpace, CompositeOperator compositeOp)
+void CrossfadeGeneratedImage::draw(GraphicsContext* context, const FloatRect& dstRect, const FloatRect& srcRect, ColorSpace, CompositeOperator compositeOp, BlendMode)
 {
     GraphicsContextStateSaver stateSaver(*context);
     context->setCompositeOperation(compositeOp);
@@ -94,7 +93,7 @@ void CrossfadeGeneratedImage::draw(GraphicsContext* context, const FloatRect& ds
     drawCrossfade(context);
 }
 
-void CrossfadeGeneratedImage::drawPattern(GraphicsContext* context, const FloatRect& srcRect, const AffineTransform& patternTransform, const FloatPoint& phase, ColorSpace styleColorSpace, CompositeOperator compositeOp, const FloatRect& dstRect)
+void CrossfadeGeneratedImage::drawPattern(GraphicsContext* context, const FloatRect& srcRect, const AffineTransform& patternTransform, const FloatPoint& phase, ColorSpace styleColorSpace, CompositeOperator compositeOp, const FloatRect& dstRect, BlendMode)
 {
     OwnPtr<ImageBuffer> imageBuffer = ImageBuffer::create(m_size, 1, ColorSpaceDeviceRGB, context->isAcceleratedContext() ? Accelerated : Unaccelerated);
     if (!imageBuffer)
@@ -106,14 +105,6 @@ void CrossfadeGeneratedImage::drawPattern(GraphicsContext* context, const FloatR
 
     // Tile the image buffer into the context.
     imageBuffer->drawPattern(context, srcRect, patternTransform, phase, styleColorSpace, compositeOp, dstRect);
-}
-
-void CrossfadeGeneratedImage::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, PlatformMemoryTypes::Image);
-    GeneratedImage::reportMemoryUsage(memoryObjectInfo);
-    info.addMember(m_fromImage);
-    info.addMember(m_toImage);
 }
 
 }

@@ -20,6 +20,7 @@
 #ifndef QWebPageAdapter_h
 #define QWebPageAdapter_h
 
+#include "PlatformExportMacros.h"
 #include "QWebPageClient.h"
 #include "ViewportArguments.h"
 #include "qwebhistory.h"
@@ -110,7 +111,10 @@ public:
         FindBackward = 1,
         FindCaseSensitively = 2,
         FindWrapsAroundDocument = 4,
-        HighlightAllOccurrences = 8
+        HighlightAllOccurrences = 8,
+        FindAtWordBeginningsOnly = 16,
+        TreatMedialCapitalAsWordBeginning = 32,
+        FindBeginsInSelection = 64
     };
 
     // valid values matching those from ScrollTypes.h
@@ -270,19 +274,6 @@ public:
 
     bool findText(const QString& subString, FindFlag options);
 
-    class TouchAdjuster {
-    public:
-        TouchAdjuster(unsigned topPadding, unsigned rightPadding, unsigned bottomPadding, unsigned leftPadding);
-
-        WebCore::IntPoint findCandidatePointForTouch(const WebCore::IntPoint&, WebCore::Document*) const;
-
-    private:
-        unsigned m_topPadding;
-        unsigned m_rightPadding;
-        unsigned m_bottomPadding;
-        unsigned m_leftPadding;
-    };
-
     void adjustPointForClicking(QMouseEvent*);
 
     void mouseMoveEvent(QMouseEvent*);
@@ -318,7 +309,7 @@ public:
     QString contextMenuItemTagForAction(MenuAction, bool* checkable) const;
 
     QStringList supportedContentTypes() const;
-#if ENABLE(GEOLOCATION)
+#if ENABLE(GEOLOCATION) && HAVE(QTLOCATION)
     void setGeolocationEnabledForFrame(QWebFrameAdapter*, bool);
 #endif
 #if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
@@ -368,6 +359,7 @@ public:
     QBasicTimer tripleClickTimer;
 
     bool clickCausedFocus;
+    bool m_useNativeVirtualKeyAsDOMKey;
     quint64 m_totalBytes;
     quint64 m_bytesReceived;
     QWebHistory history;

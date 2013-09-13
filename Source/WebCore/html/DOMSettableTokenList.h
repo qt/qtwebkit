@@ -27,7 +27,6 @@
 
 #include "DOMTokenList.h"
 #include "SpaceSplitString.h"
-#include <wtf/PassOwnPtr.h>
 #include <wtf/RefCounted.h>
 #include <wtf/text/AtomicString.h>
 
@@ -58,9 +57,10 @@ public:
 
     const SpaceSplitString& tokens() const { return m_tokens; }
 
-private:
+protected:
     DOMSettableTokenList();
 
+private:
     virtual void addInternal(const AtomicString&) OVERRIDE;
     virtual bool containsInternal(const AtomicString&) const OVERRIDE;
     virtual void removeInternal(const AtomicString&) OVERRIDE;

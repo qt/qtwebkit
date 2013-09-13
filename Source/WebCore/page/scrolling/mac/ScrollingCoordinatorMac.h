@@ -52,11 +52,8 @@ public:
     // Should be called whenever the root layer for the given frame view changes.
     virtual void frameViewRootLayerDidChange(FrameView*);
 
-    // Should be called whenever the horizontal scrollbar layer for the given frame view changes.
-    virtual void frameViewHorizontalScrollbarLayerDidChange(FrameView*, GraphicsLayer* horizontalScrollbarLayer);
-
-    // Should be called whenever the vertical scrollbar layer for the given frame view changes.
-    virtual void frameViewVerticalScrollbarLayerDidChange(FrameView*, GraphicsLayer* verticalScrollbarLayer);
+    // Should be called whenever the scrollbar layer for the given scrollable area changes.
+    virtual void scrollableAreaScrollbarLayerDidChange(ScrollableArea*, ScrollbarOrientation);
 
     // Requests that the scrolling coordinator updates the scroll position of the given frame view. If this function returns true, it means that the
     // position will be updated asynchronously. If it returns false, the caller should update the scrolling position itself.
@@ -75,6 +72,14 @@ public:
 
     virtual String scrollingStateTreeAsText() const OVERRIDE;
 
+    virtual bool isRubberBandInProgress() const OVERRIDE;
+    virtual bool rubberBandsAtBottom() const OVERRIDE;
+    virtual void setRubberBandsAtBottom(bool) OVERRIDE;
+    virtual bool rubberBandsAtTop() const OVERRIDE;
+    virtual void setRubberBandsAtTop(bool) OVERRIDE;
+    
+    virtual void setScrollPinningBehavior(ScrollPinningBehavior) OVERRIDE;
+
 private:
     // Return whether this scrolling coordinator can keep fixed position layers fixed to their
     // containers while scrolling.
@@ -83,16 +88,17 @@ private:
     // This function will update the ScrollingStateNode for the given viewport constrained object.
     virtual void updateViewportConstrainedNode(ScrollingNodeID, const ViewportConstraints&, GraphicsLayer*) OVERRIDE;
 
+    virtual void updateScrollingNode(ScrollingNodeID, GraphicsLayer* scrollLayer, GraphicsLayer* counterScrollingLayer) OVERRIDE;
+
     // Called to synch the GraphicsLayer positions for child layers when their CALayers have been moved by the scrolling thread.
     virtual void syncChildPositions(const LayoutRect& viewportRect) OVERRIDE;
 
     virtual void recomputeWheelEventHandlerCountForFrameView(FrameView*);
     virtual void setShouldUpdateScrollLayerPositionOnMainThread(MainThreadScrollingReasons);
 
-    virtual bool hasVisibleSlowRepaintFixedObjects(FrameView*) const { return false; }
+    virtual bool hasVisibleSlowRepaintViewportConstrainedObjects(FrameView*) const { return false; }
 
     void ensureRootStateNodeForFrameView(FrameView*);
-    ScrollingStateNode* stateNodeForID(ScrollingNodeID);
 
     struct ScrollParameters {
         ScrollElasticity horizontalScrollElasticity;
@@ -107,11 +113,19 @@ private:
         IntPoint scrollOrigin;
 
         IntRect viewportRect;
-        IntSize contentsSize;
+        IntSize totalContentsSize;
+        
+        float frameScaleFactor;
+
+        int headerHeight;
+        int footerHeight;
     };
 
     void setScrollParametersForNode(const ScrollParameters&, ScrollingStateScrollingNode*);
     void setScrollLayerForNode(GraphicsLayer*, ScrollingStateNode*);
+    void setCounterScrollingLayerForNode(GraphicsLayer*, ScrollingStateScrollingNode*);
+    void setHeaderLayerForNode(GraphicsLayer*, ScrollingStateScrollingNode*);
+    void setFooterLayerForNode(GraphicsLayer*, ScrollingStateScrollingNode*);
     void setNonFastScrollableRegionForNode(const Region&, ScrollingStateScrollingNode*);
     void setWheelEventHandlerCountForNode(unsigned, ScrollingStateScrollingNode*);
 
@@ -122,13 +136,9 @@ private:
     void scrollingStateTreeCommitterTimerFired(Timer<ScrollingCoordinatorMac>*);
     void commitTreeState();
 
-    void removeNode(ScrollingStateNode*);
-
     OwnPtr<ScrollingStateTree> m_scrollingStateTree;
     RefPtr<ScrollingTree> m_scrollingTree;
     Timer<ScrollingCoordinatorMac> m_scrollingStateTreeCommitterTimer;
-
-    HashMap<ScrollingNodeID, ScrollingStateNode*> m_stateNodeMap;
 };
 
 } // namespace WebCore

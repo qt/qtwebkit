@@ -106,12 +106,11 @@ static NSArray *createExcludedElementsForAttributedStringConversion()
     return elements;
 }
 
-DocumentFragment* WebEditorClient::documentFragmentFromAttributedString(NSAttributedString *string, Vector<RefPtr<ArchiveResource> >& resources)
+DocumentFragment* WebEditorClient::documentFragmentFromAttributedString(NSAttributedString *string, Vector<RefPtr<ArchiveResource>>& resources)
 {
     static NSArray *excludedElements = createExcludedElementsForAttributedStringConversion();
     
-    NSDictionary *dictionary = [[NSDictionary alloc] initWithObjectsAndKeys: excludedElements,
-        NSExcludedElementsDocumentAttribute, nil, @"WebResourceHandler", nil];
+    NSDictionary *dictionary = [NSDictionary dictionaryWithObject:excludedElements forKey:NSExcludedElementsDocumentAttribute];
     
     NSArray *subResources;
     Document* document = m_page->mainFrame() ? m_page->mainFrame()->document() : 0;
@@ -121,8 +120,7 @@ DocumentFragment* WebEditorClient::documentFragmentFromAttributedString(NSAttrib
                                                   subresources:&subResources];
     for (WebResource* resource in subResources)
         resources.append([resource _coreResource]);
-    
-    [dictionary release];
+
     return core(fragment);
 }
 
@@ -136,12 +134,12 @@ void WebEditorClient::setInsertionPasteboard(const String&)
 static void changeWordCase(WebPage* page, SEL selector)
 {
     Frame* frame = page->corePage()->focusController()->focusedOrMainFrame();
-    if (!frame->editor()->canEdit())
+    if (!frame->editor().canEdit())
         return;
 
-    frame->editor()->command("selectWord").execute();
+    frame->editor().command("selectWord").execute();
 
-    NSString *selectedString = frame->displayStringModifiedByEncoding(frame->editor()->selectedText());
+    NSString *selectedString = frame->displayStringModifiedByEncoding(frame->editor().selectedText());
     page->replaceSelectionWithText(frame, [selectedString performSelector:selector]);
 }
 

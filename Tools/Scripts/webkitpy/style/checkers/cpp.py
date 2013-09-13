@@ -1,4 +1,3 @@
-#!/usr/bin/python
 # -*- coding: utf-8 -*-
 #
 # Copyright (C) 2009, 2010, 2012 Google Inc. All rights reserved.
@@ -649,13 +648,16 @@ class FileInfo:
                 prefix = os.path.commonprefix([root_dir, project_dir])
                 return fullname[len(prefix) + 1:]
 
-            # Not SVN? Try to find a git top level directory by
+
+            # Not SVN <= 1.6? Try to find a git, or svn top level directory by
             # searching up from the current path.
             root_dir = os.path.dirname(fullname)
             while (root_dir != os.path.dirname(root_dir)
-                   and not os.path.exists(os.path.join(root_dir, ".git"))):
+                   and not os.path.exists(os.path.join(root_dir, ".git"))
+                   and not os.path.exists(os.path.join(root_dir, ".svn"))):
                 root_dir = os.path.dirname(root_dir)
-                if os.path.exists(os.path.join(root_dir, ".git")):
+                if (os.path.exists(os.path.join(root_dir, ".git")) or
+                   os.path.exists(os.path.join(root_dir, ".svn"))):
                     prefix = os.path.commonprefix([root_dir, project_dir])
                     return fullname[len(prefix) + 1:]
 
@@ -1217,6 +1219,7 @@ class _EnumState(object):
 
     def __init__(self):
         self.in_enum_decl = False
+        self.is_webidl_enum = False
 
     def process_clean_line(self, line):
         # FIXME: The regular expressions for expr_all_uppercase and expr_enum_end only accept integers
@@ -1229,21 +1232,27 @@ class _EnumState(object):
         if self.in_enum_decl:
             if match(r'\s*' + expr_enum_end + r'$', line):
                 self.in_enum_decl = False
+                self.is_webidl_enum = False
             elif match(expr_all_uppercase, line):
-                return False
+                return self.is_webidl_enum
             elif match(expr_starts_lowercase, line):
                 return False
         else:
-            if match(expr_enum_start + r'$', line):
+            matched = match(expr_enum_start + r'$', line)
+            if matched:
                 self.in_enum_decl = True
             else:
                 matched = match(expr_enum_start + r'(?P<members>.*)' + expr_enum_end + r'$', line)
                 if matched:
                     members = matched.group('members').split(',')
+                    found_invalid_member = False
                     for member in members:
                         if match(expr_all_uppercase, member):
-                            return False
+                            found_invalid_member = not self.is_webidl_enum
                         if match(expr_starts_lowercase, member):
+                            found_invalid_member = True
+                        if found_invalid_member:
+                            self.is_webidl_enum = False
                             return False
                     return True
         return True
@@ -1656,20 +1665,6 @@ def check_function_definition(filename, file_extension, clean_lines, line_number
         return
 
     modifiers_and_return_type = function_state.modifiers_and_return_type()
-    if filename.find('/chromium/') != -1 and search(r'\bWEBKIT_EXPORT\b', modifiers_and_return_type):
-        if filename.find('/chromium/public/') == -1 and filename.find('/chromium/tests/') == -1 and filename.find('chromium/platform') == -1:
-            error(function_state.function_name_start_position.row, 'readability/webkit_export', 5,
-                  'WEBKIT_EXPORT should only appear in the chromium public (or tests) directory.')
-        elif not file_extension == "h":
-            error(function_state.function_name_start_position.row, 'readability/webkit_export', 5,
-                  'WEBKIT_EXPORT should only be used in header files.')
-        elif not function_state.is_declaration or search(r'\binline\b', modifiers_and_return_type):
-            error(function_state.function_name_start_position.row, 'readability/webkit_export', 5,
-                  'WEBKIT_EXPORT should not be used on a function with a body.')
-        elif function_state.is_pure:
-            error(function_state.function_name_start_position.row, 'readability/webkit_export', 5,
-                  'WEBKIT_EXPORT should not be used with a pure virtual function.')
-
     check_function_definition_and_pass_ptr(modifiers_and_return_type, function_state.function_name_start_position.row, 'return', error)
 
     parameter_list = function_state.parameter_list()
@@ -2088,6 +2083,8 @@ def check_enum_casing(clean_lines, line_number, enum_state, error):
       error: The function to call with any errors found.
     """
 
+    enum_state.is_webidl_enum |= bool(match(r'\s*// Web(?:Kit)?IDL enum\s*$', clean_lines.raw_lines[line_number]))
+
     line = clean_lines.elided[line_number]  # Get rid of comments and strings.
     if not enum_state.process_clean_line(line):
         error(line_number, 'readability/enum_casing', 4,
@@ -2163,6 +2160,30 @@ def check_using_std(clean_lines, line_number, file_state, error):
     error(line_number, 'build/using_std', 4,
           "Use 'using namespace std;' instead of 'using std::%s;'." % method_name)
 
+
+def check_using_namespace(clean_lines, line_number, file_extension, error):
+    """Looks for 'using namespace foo;' which should be removed.
+
+    Args:
+      clean_lines: A CleansedLines instance containing the file.
+      line_number: The number of the line to check.
+      file_extension: The extension (dot not included) of the file.
+      error: The function to call with any errors found.
+    """
+
+    # This check applies only to headers.
+    if file_extension != 'h':
+        return
+
+    line = clean_lines.elided[line_number]  # Get rid of comments and strings.
+
+    using_namespace_match = match(r'\s*using\s+namespace\s+(?P<method_name>\S+)\s*;\s*$', line)
+    if not using_namespace_match:
+        return
+
+    method_name = using_namespace_match.group('method_name')
+    error(line_number, 'build/using_namespace', 4,
+          "Do not use 'using namespace %s;'." % method_name)
 
 def check_max_min_macros(clean_lines, line_number, file_state, error):
     """Looks use of MAX() and MIN() macros that should be replaced with std::max() and std::min().
@@ -2548,8 +2569,8 @@ def check_for_null(clean_lines, line_number, file_state, error):
     if search(r'\bgdk_pixbuf_save_to\w+\b', line):
         return
 
-    # Don't warn about NULL usage in gtk_widget_style_get() or gtk_style_context_get_style. See Bug 51758
-    if search(r'\bgtk_widget_style_get\(\w+\b', line) or search(r'\bgtk_style_context_get_style\(\w+\b', line):
+    # Don't warn about NULL usage in gtk_widget_style_get(), gtk_style_context_get_style(), or gtk_style_context_get(). See Bug 51758
+    if search(r'\bgtk_widget_style_get\(\w+\b', line) or search(r'\bgtk_style_context_get_style\(\w+\b', line) or search(r'\bgtk_style_context_get\(\w+\b', line):
         return
 
     # Don't warn about NULL usage in soup_server_new(). See Bug 77890.
@@ -2648,6 +2669,7 @@ def check_style(clean_lines, line_number, file_extension, class_state, file_stat
     check_namespace_indentation(clean_lines, line_number, file_extension, file_state, error)
     check_directive_indentation(clean_lines, line_number, file_state, error)
     check_using_std(clean_lines, line_number, file_state, error)
+    check_using_namespace(clean_lines, line_number, file_extension, error)
     check_max_min_macros(clean_lines, line_number, file_state, error)
     check_ctype_functions(clean_lines, line_number, file_state, error)
     check_switch_indentation(clean_lines, line_number, error)
@@ -2817,10 +2839,6 @@ def check_include_line(filename, file_extension, clean_lines, line_number, inclu
     if include.startswith('wtf/') and not is_system:
         error(line_number, 'build/include', 4,
               'wtf includes should be <wtf/file.h> instead of "wtf/file.h".')
-
-    if filename.find('/chromium/') != -1 and include.startswith('cc/CC'):
-        error(line_number, 'build/include', 4,
-              'cc includes should be "CCFoo.h" instead of "cc/CCFoo.h".')
 
     duplicate_header = include in include_state
     if duplicate_header:
@@ -3637,6 +3655,7 @@ class CppChecker(object):
         'build/printf_format',
         'build/storage_class',
         'build/using_std',
+        'build/using_namespace',
         'legal/copyright',
         'readability/braces',
         'readability/casting',

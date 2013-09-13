@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2012 Intel Corporation. All rights reserved.
+ * Copyright (C) 2013 Samsung Electronics. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,13 +27,10 @@
 #ifndef ewk_favicon_database_private_h
 #define ewk_favicon_database_private_h
 
+#include "WKRetainPtr.h"
 #include "ewk_favicon_database.h"
 #include <WebKit2/WKBase.h>
 #include <wtf/HashMap.h>
-
-namespace WebKit {
-class WebIconDatabase;
-}
 
 struct IconChangeCallbackData {
     Ewk_Favicon_Database_Icon_Change_Cb callback;
@@ -49,53 +47,28 @@ struct IconChangeCallbackData {
     { }
 };
 
-struct IconRequestCallbackData {
-    Ewk_Favicon_Database_Async_Icon_Get_Cb callback;
-    void* userData;
-    Evas* evas;
-
-    IconRequestCallbackData()
-        : callback(0)
-        , userData(0)
-        , evas(0)
-    { }
-
-    IconRequestCallbackData(Ewk_Favicon_Database_Async_Icon_Get_Cb _callback, void* _userData, Evas* _evas)
-        : callback(_callback)
-        , userData(_userData)
-        , evas(_evas)
-    { }
-};
-
 typedef HashMap<Ewk_Favicon_Database_Icon_Change_Cb, IconChangeCallbackData> ChangeListenerMap;
-typedef Vector<IconRequestCallbackData> PendingIconRequestVector;
-typedef HashMap<String /* pageURL */, PendingIconRequestVector> PendingIconRequestMap;
 
 class EwkFaviconDatabase {
 public:
-    static PassOwnPtr<EwkFaviconDatabase> create(WebKit::WebIconDatabase* iconDatabase)
+    static PassOwnPtr<EwkFaviconDatabase> create(WKIconDatabaseRef iconDatabase)
     {
         return adoptPtr(new EwkFaviconDatabase(iconDatabase));
     }
     ~EwkFaviconDatabase();
 
-    String iconURLForPageURL(const String& pageURL) const;
-    void iconForPageURL(const String& pageURL, const IconRequestCallbackData& callbackData);
-
+    PassRefPtr<cairo_surface_t> getIconSurfaceSynchronously(const char* pageURL) const;
     void watchChanges(const IconChangeCallbackData& callbackData);
     void unwatchChanges(Ewk_Favicon_Database_Icon_Change_Cb callback);
 
 private:
-    explicit EwkFaviconDatabase(WebKit::WebIconDatabase* iconDatabase);
-
-    PassRefPtr<cairo_surface_t> getIconSurfaceSynchronously(const String& pageURL) const;
+    explicit EwkFaviconDatabase(WKIconDatabaseRef iconDatabase);
 
     static void didChangeIconForPageURL(WKIconDatabaseRef iconDatabase, WKURLRef pageURL, const void* clientInfo);
     static void iconDataReadyForPageURL(WKIconDatabaseRef iconDatabase, WKURLRef pageURL, const void* clientInfo);
 
-    RefPtr<WebKit::WebIconDatabase> m_iconDatabase;
+    WKRetainPtr<WKIconDatabaseRef> m_iconDatabase;
     ChangeListenerMap m_changeListeners;
-    PendingIconRequestMap m_iconRequests;
 };
 
 #endif // ewk_favicon_database_private_h

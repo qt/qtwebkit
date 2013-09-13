@@ -57,7 +57,7 @@ protected:
     // Things you need to have a DFG compiler phase.
     Graph& m_graph;
     
-    JSGlobalData& globalData() { return m_graph.m_globalData; }
+    VM& vm() { return m_graph.m_vm; }
     CodeBlock* codeBlock() { return m_graph.m_codeBlock; }
     CodeBlock* profiledBlock() { return m_graph.m_profiledBlock; }
     
@@ -65,26 +65,16 @@ protected:
     
 private:
     // Call these hooks when starting and finishing.
-#if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
     void beginPhase();
-#else
-    void beginPhase() { }
-#endif
-#if DFG_ENABLE(PER_PHASE_VALIDATION)
     void endPhase();
-#else
-    void endPhase() { }
-#endif
 };
 
 template<typename PhaseType>
 bool runAndLog(PhaseType& phase)
 {
     bool result = phase.run();
-#if DFG_ENABLE(DEBUG_VERBOSE)
-    if (result)
+    if (result && logCompilationChanges())
         dataLogF("Phase %s changed the IR.\n", phase.name());
-#endif
     return result;
 }
 

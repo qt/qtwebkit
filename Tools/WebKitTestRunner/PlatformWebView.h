@@ -54,8 +54,12 @@ typedef struct _GtkWidget GtkWidget;
 typedef WKViewRef PlatformWKView;
 typedef GtkWidget* PlatformWindow;
 #elif PLATFORM(EFL)
-typedef struct _Evas_Object Evas_Object;
 typedef struct _Ecore_Evas Ecore_Evas;
+#if USE(EO)
+typedef struct _Eo Evas_Object;
+#else
+typedef struct _Evas_Object Evas_Object;
+#endif
 typedef Evas_Object* PlatformWKView;
 typedef Ecore_Evas* PlatformWindow;
 #endif
@@ -64,7 +68,7 @@ namespace WTR {
 
 class PlatformWebView {
 public:
-    PlatformWebView(WKContextRef, WKPageGroupRef, WKDictionaryRef options = 0);
+    PlatformWebView(WKContextRef, WKPageGroupRef, WKPageRef relatedPage, WKDictionaryRef options = 0);
     ~PlatformWebView();
 
     WKPageRef page();
@@ -82,6 +86,8 @@ public:
 
     WKRect windowFrame();
     void setWindowFrame(WKRect);
+
+    void didInitializeClients();
     
     void addChromeInputField();
     void removeChromeInputField();
@@ -96,11 +102,13 @@ public:
 #endif
 
     WKRetainPtr<WKImageRef> windowSnapshotImage();
+    WKDictionaryRef options() const { return m_options.get(); }
 
 private:
     PlatformWKView m_view;
     PlatformWindow m_window;
     bool m_windowIsKey;
+    WKRetainPtr<WKDictionaryRef> m_options;
 #if PLATFORM(EFL) || PLATFORM(QT)
     bool m_usingFixedLayout;
 #endif

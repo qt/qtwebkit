@@ -27,6 +27,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import datetime
 import logging
 import os
 import re
@@ -41,16 +42,12 @@ from .svn import SVN, SVNRepository
 _log = logging.getLogger(__name__)
 
 
-def run_command(*args, **kwargs):
-    # FIXME: This should not be a global static.
-    # New code should use Executive.run_command directly instead
-    return Executive().run_command(*args, **kwargs)
-
-
 class AmbiguousCommitError(Exception):
-    def __init__(self, num_local_commits, working_directory_is_clean):
+    def __init__(self, num_local_commits, has_working_directory_changes):
+        Exception.__init__(self, "Found %s local commits and the working directory is %s" % (
+            num_local_commits, ["clean", "not clean"][has_working_directory_changes]))
         self.num_local_commits = num_local_commits
-        self.working_directory_is_clean = working_directory_is_clean
+        self.has_working_directory_changes = has_working_directory_changes
 
 
 class Git(SCM, SVNRepository):
@@ -126,12 +123,13 @@ class Git(SCM, SVNRepository):
         return filepath.replace(root_end_with_slash, '')
 
     @classmethod
-    def read_git_config(cls, key, cwd=None):
+    def read_git_config(cls, key, cwd=None, executive=None):
         # FIXME: This should probably use cwd=self.checkout_root.
         # Pass --get-all for cases where the config has multiple values
         # Pass the cwd if provided so that we can handle the case of running webkit-patch outside of the working directory.
         # FIXME: This should use an Executive.
-        return run_command([cls.executable_name, "config", "--get-all", key], error_handler=Executive.ignore_error, cwd=cwd).rstrip('\n')
+        executive = executive or Executive()
+        return executive.run_command([cls.executable_name, "config", "--get-all", key], error_handler=Executive.ignore_error, cwd=cwd).rstrip('\n')
 
     @staticmethod
     def commit_success_regexp():
@@ -146,13 +144,13 @@ class Git(SCM, SVNRepository):
     def rebase_in_progress(self):
         return self._filesystem.exists(self.absolute_path(self._filesystem.join('.git', 'rebase-apply')))
 
-    def working_directory_is_clean(self):
-        return self._run_git(['diff', 'HEAD', '--no-renames', '--name-only']) == ""
+    def has_working_directory_changes(self):
+        return self._run_git(['diff', 'HEAD', '--no-renames', '--name-only']) != ""
 
-    def clean_working_directory(self):
-        # Could run git clean here too, but that wouldn't match working_directory_is_clean
-        self._run_git(['reset', '--hard', 'HEAD'])
-        # Aborting rebase even though this does not match working_directory_is_clean
+    def discard_working_directory_changes(self):
+        # Could run git clean here too, but that wouldn't match subversion
+        self._run_git(['reset', 'HEAD', '--hard'])
+        # Aborting rebase even though this does not match subversion
         if self.rebase_in_progress():
             self._run_git(['rebase', '--abort'])
 
@@ -164,8 +162,8 @@ class Git(SCM, SVNRepository):
     def _status_regexp(self, expected_types):
         return '^(?P<status>[%s])\t(?P<filename>.+)$' % expected_types
 
-    def add_list(self, paths, return_exit_code=False):
-        return self._run_git(["add"] + paths, return_exit_code=return_exit_code)
+    def add_list(self, paths):
+        self._run_git(["add"] + paths)
 
     def delete_list(self, paths):
         return self._run_git(["rm", "-f"] + paths)
@@ -182,7 +180,7 @@ class Git(SCM, SVNRepository):
 
     def _upstream_branch(self):
         current_branch = self._current_branch()
-        return self._branch_from_ref(self.read_git_config('branch.%s.merge' % current_branch, cwd=self.checkout_root).strip())
+        return self._branch_from_ref(self.read_git_config('branch.%s.merge' % current_branch, cwd=self.checkout_root, executive=self._executive).strip())
 
     def merge_base(self, git_commit):
         if git_commit:
@@ -248,13 +246,32 @@ class Git(SCM, SVNRepository):
     def display_name(self):
         return "git"
 
+    def _most_recent_log_matching(self, grep_str, path):
+        # We use '--grep=' + foo rather than '--grep', foo because
+        # git 1.7.0.4 (and earlier) didn't support the separate arg.
+        return self._run_git(['log', '-1', '--grep=' + grep_str, '--date=iso', self.find_checkout_root(path)])
+
     def svn_revision(self, path):
-        _log.debug('Running git.head_svn_revision... (Temporary logging message)')
-        git_log = self._run_git(['log', '-25', path])
+        git_log = self._most_recent_log_matching('git-svn-id:', path)
         match = re.search("^\s*git-svn-id:.*@(?P<svn_revision>\d+)\ ", git_log, re.MULTILINE)
         if not match:
             return ""
         return str(match.group('svn_revision'))
+
+    def timestamp_of_revision(self, path, revision):
+        git_log = self._most_recent_log_matching('git-svn-id:.*@%s' % revision, path)
+        match = re.search("^Date:\s*(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2}) ([+-])(\d{2})(\d{2})$", git_log, re.MULTILINE)
+        if not match:
+            return ""
+
+        # Manually modify the timezone since Git doesn't have an option to show it in UTC.
+        # Git also truncates milliseconds but we're going to ignore that for now.
+        time_with_timezone = datetime.datetime(int(match.group(1)), int(match.group(2)), int(match.group(3)),
+            int(match.group(4)), int(match.group(5)), int(match.group(6)), 0)
+
+        sign = 1 if match.group(7) == '+' else -1
+        time_without_timezone = time_with_timezone - datetime.timedelta(hours=sign * int(match.group(8)), minutes=int(match.group(9)))
+        return time_without_timezone.strftime('%Y-%m-%dT%H:%M:%SZ')
 
     def prepend_svn_revision(self, diff):
         revision = self.head_svn_revision()
@@ -293,6 +310,9 @@ class Git(SCM, SVNRepository):
 
     @memoized
     def git_commit_from_svn_revision(self, svn_revision):
+        # FIXME: https://bugs.webkit.org/show_bug.cgi?id=111668
+        # We should change this to run git log --grep 'git-svn-id' instead
+        # so that we don't require git+svn to be set up.
         git_commit = self._run_git_svn_find_rev('r%s' % svn_revision)
         if not git_commit:
             # FIXME: Alternatively we could offer to update the checkout? Or return None?
@@ -334,30 +354,30 @@ class Git(SCM, SVNRepository):
     def revert_files(self, file_paths):
         self._run_git(['checkout', 'HEAD'] + file_paths)
 
-    def _assert_can_squash(self, working_directory_is_clean):
-        squash = Git.read_git_config('webkit-patch.commit-should-always-squash', cwd=self.checkout_root)
+    def _assert_can_squash(self, has_working_directory_changes):
+        squash = self.read_git_config('webkit-patch.commit-should-always-squash', cwd=self.checkout_root, executive=self._executive)
         should_squash = squash and squash.lower() == "true"
 
         if not should_squash:
             # Only warn if there are actually multiple commits to squash.
             num_local_commits = len(self.local_commits())
-            if num_local_commits > 1 or (num_local_commits > 0 and not working_directory_is_clean):
-                raise AmbiguousCommitError(num_local_commits, working_directory_is_clean)
+            if num_local_commits > 1 or (num_local_commits > 0 and has_working_directory_changes):
+                raise AmbiguousCommitError(num_local_commits, has_working_directory_changes)
 
     def commit_with_message(self, message, username=None, password=None, git_commit=None, force_squash=False, changed_files=None):
         # Username is ignored during Git commits.
-        working_directory_is_clean = self.working_directory_is_clean()
+        has_working_directory_changes = self.has_working_directory_changes()
 
         if git_commit:
             # Special-case HEAD.. to mean working-copy changes only.
             if git_commit.upper() == 'HEAD..':
-                if working_directory_is_clean:
+                if not has_working_directory_changes:
                     raise ScriptError(message="The working copy is not modified. --git-commit=HEAD.. only commits working copy changes.")
                 self.commit_locally_with_message(message)
                 return self._commit_on_branch(message, 'HEAD', username=username, password=password)
 
             # Need working directory changes to be committed so we can checkout the merge branch.
-            if not working_directory_is_clean:
+            if has_working_directory_changes:
                 # FIXME: webkit-patch land will modify the ChangeLogs to correct the reviewer.
                 # That will modify the working-copy and cause us to hit this error.
                 # The ChangeLog modification could be made to modify the existing local commit.
@@ -365,7 +385,7 @@ class Git(SCM, SVNRepository):
             return self._commit_on_branch(message, git_commit, username=username, password=password)
 
         if not force_squash:
-            self._assert_can_squash(working_directory_is_clean)
+            self._assert_can_squash(has_working_directory_changes)
         self._run_git(['reset', '--soft', self.remote_merge_base()])
         self.commit_locally_with_message(message)
         return self.push_local_commits_to_server(username=username, password=password)
@@ -406,7 +426,7 @@ class Git(SCM, SVNRepository):
             commit_succeeded = False
         finally:
             # And then swap back to the original branch and clean up.
-            self.clean_working_directory()
+            self.discard_working_directory_changes()
             self._run_git(['checkout', '-q', branch_name])
             self.delete_branch(MERGE_BRANCH_NAME)
 
@@ -435,7 +455,7 @@ class Git(SCM, SVNRepository):
 
     def remote_branch_ref(self):
         # Use references so that we can avoid collisions, e.g. we don't want to operate on refs/heads/trunk if it exists.
-        remote_branch_refs = Git.read_git_config('svn-remote.svn.fetch', cwd=self.checkout_root)
+        remote_branch_refs = self.read_git_config('svn-remote.svn.fetch', cwd=self.checkout_root, executive=self._executive)
         if not remote_branch_refs:
             remote_master_ref = 'refs/remotes/origin/master'
             if not self._branch_ref_exists(remote_master_ref):
@@ -452,8 +472,8 @@ class Git(SCM, SVNRepository):
 
     def push_local_commits_to_server(self, username=None, password=None):
         dcommit_command = ['svn', 'dcommit']
-        if (not username or not password) and not self.has_authorization_for_realm(SVN.svn_server_realm):
-            raise AuthenticationError(SVN.svn_server_host, prompt_for_password=True)
+        if (not username or not password) and not self.has_authorization_for_realm(self.svn_server_realm):
+            raise AuthenticationError(self.svn_server_host, prompt_for_password=True)
         if username:
             dcommit_command.extend(["--username", username])
         output = self._run_git(dcommit_command, error_handler=commit_error_handler, input=password)

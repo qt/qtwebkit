@@ -65,21 +65,28 @@ public:
 
     virtual void requestSetDockSide(DockSide);
     virtual void changeAttachedWindowHeight(unsigned);
+    virtual void changeAttachedWindowWidth(unsigned);
     virtual void openInNewTab(const String& url);
     virtual bool canSave() { return false; }
     virtual void save(const String&, const String&, bool) { }
     virtual void append(const String&, const String&) { }
-    virtual bool canInspectWorkers() { return false; }
 
-    virtual void attachWindow() = 0;
+    virtual void attachWindow(DockSide) = 0;
     virtual void detachWindow() = 0;
 
     virtual void sendMessageToBackend(const String& message);
+
+    virtual bool supportsFileSystems() { return false; }
+    virtual void requestFileSystems() { }
+    virtual void addFileSystem() { }
+    virtual void removeFileSystem(const String&) { }
+    virtual bool isUnderTest();
 
     bool canAttachWindow();
     void setDockingUnavailable(bool);
 
     static unsigned constrainedAttachedWindowHeight(unsigned preferredHeight, unsigned totalWindowHeight);
+    static unsigned constrainedAttachedWindowWidth(unsigned preferredWidth, unsigned totalWindowWidth);
 
     // Direct Frontend API
     bool isDebuggingEnabled();
@@ -98,10 +105,11 @@ public:
     
     void showResources();
 
-    void setAttachedWindow(bool);
+    void setAttachedWindow(DockSide);
 
 protected:
     virtual void setAttachedWindowHeight(unsigned) = 0;
+    virtual void setAttachedWindowWidth(unsigned) = 0;
     void restoreAttachedWindowHeight();
 
 private:
@@ -115,6 +123,7 @@ private:
     RefPtr<InspectorFrontendHost> m_frontendHost;
     OwnPtr<InspectorFrontendClientLocal::Settings> m_settings;
     bool m_frontendLoaded;
+    DockSide m_dockSide;
     Vector<String> m_evaluateOnLoad;
     OwnPtr<InspectorBackendDispatchTask> m_dispatchTask;
 };

@@ -29,6 +29,7 @@
  */
 
 #include "config.h"
+#if ENABLE(INPUT_TYPE_WEEK)
 #include "WeekInputType.h"
 
 #include "DateComponents.h"
@@ -36,14 +37,6 @@
 #include "HTMLNames.h"
 #include "InputTypeNames.h"
 #include <wtf/PassOwnPtr.h>
-
-#if ENABLE(INPUT_TYPE_WEEK)
-
-#if ENABLE(INPUT_MULTIPLE_FIELDS_UI)
-#include "DateTimeFieldsState.h"
-#include "LocalizedStrings.h"
-#include <wtf/text/WTFString.h>
-#endif
 
 namespace WebCore {
 
@@ -56,6 +49,11 @@ static const int weekStepScaleFactor = 604800000;
 PassOwnPtr<InputType> WeekInputType::create(HTMLInputElement* element)
 {
     return adoptPtr(new WeekInputType(element));
+}
+
+void WeekInputType::attach()
+{
+    observeFeatureIfVisible(FeatureObserver::InputTypeWeek);
 }
 
 const AtomicString& WeekInputType::formControlType() const
@@ -96,25 +94,6 @@ bool WeekInputType::isWeekField() const
 {
     return true;
 }
-
-
-#if ENABLE(INPUT_MULTIPLE_FIELDS_UI)
-String WeekInputType::formatDateTimeFieldsState(const DateTimeFieldsState& dateTimeFieldsState) const
-{
-    if (!dateTimeFieldsState.hasYear() || !dateTimeFieldsState.hasWeekOfYear())
-        return emptyString();
-    return String::format("%04u-W%02u", dateTimeFieldsState.year(), dateTimeFieldsState.weekOfYear());
-}
-
-void WeekInputType::setupLayoutParameters(DateTimeEditElement::LayoutParameters& layoutParameters, const DateComponents&) const
-{
-    layoutParameters.dateTimeFormat = weekFormatInLDML();
-    layoutParameters.fallbackDateTimeFormat = "'Week' ww-yyyy";
-    layoutParameters.minimumYear = fullYear(element()->fastGetAttribute(minAttr));
-    layoutParameters.maximumYear = fullYear(element()->fastGetAttribute(maxAttr));
-    layoutParameters.placeholderForYear = "----";
-}
-#endif
 
 } // namespace WebCore
 

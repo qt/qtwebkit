@@ -43,6 +43,7 @@ class GeoTrackerListener;
 class IntRectRegion;
 class NetworkRequest;
 class NetworkStreamFactory;
+struct SelectionDetails;
 class ViewportAccessor;
 class WebUserMediaRequest;
 
@@ -89,14 +90,14 @@ public:
     virtual int getInstanceId() const = 0;
 
     virtual void notifyLoadStarted() = 0;
-    virtual void notifyLoadCommitted(const unsigned short* originalUrl, unsigned int originalUrlLength, const unsigned short* finalUrl, unsigned int finalUrlLength, const unsigned short* networkToken, unsigned int networkTokenLength) = 0;
-    virtual void notifyLoadFailedBeforeCommit(const unsigned short* originalUrl, unsigned int originalUrlLength, const unsigned short* finalUrl, unsigned int finalUrlLength, const unsigned short* networkToken, unsigned int networkTokenLength) = 0;
-    virtual void notifyLoadToAnchor(const unsigned short* url, unsigned int urlLength, const unsigned short* networkToken, unsigned int networkTokenLength) = 0;
+    virtual void notifyLoadCommitted(const unsigned short* originalUrl, unsigned originalUrlLength, const unsigned short* finalUrl, unsigned finalUrlLength, const unsigned short* networkToken, unsigned networkTokenLength) = 0;
+    virtual void notifyLoadFailedBeforeCommit(const unsigned short* originalUrl, unsigned originalUrlLength, const unsigned short* finalUrl, unsigned finalUrlLength, const unsigned short* networkToken, unsigned networkTokenLength) = 0;
+    virtual void notifyLoadToAnchor(const unsigned short* url, unsigned urlLength, const unsigned short* networkToken, unsigned networkTokenLength) = 0;
     virtual void notifyLoadProgress(int percentage) = 0;
     virtual void notifyLoadReadyToRender(bool pageIsVisuallyNonEmpty) = 0;
     virtual void notifyFirstVisuallyNonEmptyLayout() = 0;
     virtual void notifyLoadFinished(int status) = 0;
-    virtual void notifyClientRedirect(const unsigned short* originalUrl, unsigned int originalUrlLength, const unsigned short* finalUrl, unsigned int finalUrlLength) = 0;
+    virtual void notifyClientRedirect(const unsigned short* originalUrl, unsigned originalUrlLength, const unsigned short* finalUrl, unsigned finalUrlLength) = 0;
 
     virtual void notifyFrameDetached(const WebFrame) = 0;
 
@@ -107,9 +108,8 @@ public:
     virtual void notifyDocumentOnLoad(bool) = 0;
 
     virtual void notifyWindowObjectCleared() = 0;
-    virtual BlackBerry::Platform::String invokeClientJavaScriptCallback(const char* const* args, unsigned numArgs) = 0;
 
-    virtual void addMessageToConsole(const unsigned short* message, unsigned messageLength, const unsigned short* source, unsigned sourceLength, unsigned lineNumber) = 0;
+    virtual void addMessageToConsole(const unsigned short* message, unsigned messageLength, const unsigned short* source, unsigned sourceLength, unsigned lineNumber, unsigned columnNumber) = 0;
     virtual int showAlertDialog(AlertType) = 0;
 
     virtual BlackBerry::Platform::String serializePageCacheState() const = 0;
@@ -122,11 +122,6 @@ public:
 
     virtual bool shouldInterruptJavaScript() = 0;
 
-    virtual void javascriptSourceParsed(const unsigned short* url, unsigned urlLength, const unsigned short* script, unsigned scriptLength) = 0;
-    virtual void javascriptParsingFailed(const unsigned short* url, unsigned urlLength, const unsigned short* error, unsigned errorLength, int lineNumber) = 0;
-    virtual void javascriptPaused(const unsigned short* stack, unsigned stackLength) = 0;
-    virtual void javascriptContinued() = 0;
-
     virtual void contentsSizeChanged() = 0;
     virtual void scrollChanged() = 0;
     virtual void scaleChanged() = 0;
@@ -138,6 +133,7 @@ public:
     virtual void setPageTitle(const unsigned short* title, unsigned titleLength) = 0;
 
     virtual Platform::Graphics::Window* window() const = 0;
+    virtual void postToSurface(const Platform::IntRect&) = 0;
 
     virtual void notifyPixelContentRendered(const Platform::IntRect&) = 0;
 
@@ -147,15 +143,17 @@ public:
     virtual void inputSelectionChanged(unsigned selectionStart, unsigned selectionEnd) = 0;
     virtual void inputLearnText(wchar_t* text, int length) = 0;
 
+    virtual void showFormControls(bool visible, bool previousActive = false, bool nextActive = false) = 0;
     virtual void showVirtualKeyboard(bool) = 0;
 
-    virtual void requestSpellingCheckingOptions(imf_sp_text_t&, const BlackBerry::Platform::IntRect& documentCaretRect, const BlackBerry::Platform::IntSize& screenOffset) = 0;
+    virtual void requestSpellingCheckingOptions(imf_sp_text_t&, const BlackBerry::Platform::IntRect& documentCaretRect, const BlackBerry::Platform::IntSize& screenOffset, const bool shouldMoveDialog) = 0;
     virtual int32_t checkSpellingOfStringAsync(wchar_t* text, const unsigned length) = 0;
 
-    virtual void notifySelectionDetailsChanged(const Platform::IntRect& documentStartRect, const Platform::IntRect& documentEndRect, const Platform::IntRectRegion& documentRegion, bool overrideTouchHandling = false) = 0;
+    virtual void notifySelectionDetailsChanged(const BlackBerry::Platform::SelectionDetails&) = 0;
     virtual void cancelSelectionVisuals() = 0;
     virtual void notifySelectionHandlesReversed() = 0;
-    virtual void notifyCaretChanged(const Platform::IntRect& documentCaretRect, bool userTouchTriggered, bool isSingleLineInput = false, const Platform::IntRect& singleLineDocumentBoundingBox = Platform::IntRect()) = 0;
+    virtual void notifyCaretChanged(const Platform::IntRect& documentCaretRect, bool userTouchTriggered, bool isSingleLineInput = false, const Platform::IntRect& singleLineDocumentBoundingBox = Platform::IntRect(), bool textFieldIsEmpty = false) = 0;
+    virtual void notifySelectionScrollView(Platform::ScrollViewBase*) = 0;
 
     virtual void cursorChanged(Platform::CursorType, const char* url, const Platform::IntPoint& hotSpotInImage) = 0;
 
@@ -173,12 +171,12 @@ public:
     virtual void openPopupList(bool multiple, int size, const ScopeArray<BlackBerry::Platform::String>& labels, const bool* enableds, const int* itemType, const bool* selecteds) = 0;
     virtual bool chooseFilenames(bool allowMultiple, const SharedArray<BlackBerry::Platform::String>& acceptTypes, const SharedArray<BlackBerry::Platform::String>& initialFiles, const BlackBerry::Platform::String& capture, SharedArray<BlackBerry::Platform::String>& chosenFiles) = 0;
 
-    virtual WebPage* createWindow(int x, int y, int width, int height, unsigned flags, const BlackBerry::Platform::String& url, const BlackBerry::Platform::String& windowName) = 0;
+    virtual WebPage* createWindow(int x, int y, int width, int height, unsigned flags, const BlackBerry::Platform::String& url, const BlackBerry::Platform::String& windowName, const BlackBerry::Platform::String& openerFrameUrl, bool userGesture) = 0;
 
     virtual void scheduleCloseWindow() = 0;
 
     // Database interface.
-    virtual unsigned long long databaseQuota(const unsigned short* origin, unsigned originLength, const unsigned short* databaseName, unsigned databaseNameLength, unsigned long long totalUsage, unsigned long long originUsage, unsigned long long estimatedSize) = 0;
+    virtual unsigned long long databaseQuota(const BlackBerry::Platform::String& origin, const BlackBerry::Platform::String& databaseName, unsigned long long originUsage, unsigned long long currentQuota, unsigned long long estimatedSize) = 0;
 
     virtual void setIconForUrl(const BlackBerry::Platform::String& originalPageUrl, const BlackBerry::Platform::String& finalPageUrl, const BlackBerry::Platform::String& iconUrl) = 0;
     virtual void setFavicon(const BlackBerry::Platform::String& dataInBase64, const BlackBerry::Platform::String& url) = 0;
@@ -200,10 +198,10 @@ public:
 
     virtual BlackBerry::Platform::ViewportAccessor* userInterfaceViewportAccessor() const = 0;
 
-    virtual void animateBlockZoom(double finalScale, const Platform::FloatPoint& finalDocumentScrollPosition) = 0;
+    virtual void animateToScaleAndDocumentScrollPosition(double finalScale, const Platform::FloatPoint& finalDocumentScrollPosition, bool shouldConstrainScrollingToContentEdge) = 0;
 
     virtual void setPreventsScreenIdleDimming(bool noDimming) = 0;
-    virtual bool authenticationChallenge(const unsigned short* realm, unsigned realmLength, BlackBerry::Platform::String& username, BlackBerry::Platform::String& password) = 0;
+    virtual bool authenticationChallenge(const unsigned short* realm, unsigned realmLength, BlackBerry::Platform::String& username, BlackBerry::Platform::String& password, BlackBerry::Platform::String& requestURL, bool isProxy) = 0;
     virtual SaveCredentialType notifyShouldSaveCredential(bool isNew) = 0;
     virtual void syncProxyCredential(const BlackBerry::Platform::String& username, const BlackBerry::Platform::String& password) = 0;
     virtual void notifyPopupAutofillDialog(const std::vector<BlackBerry::Platform::String>&) = 0;
@@ -235,8 +233,6 @@ public:
 
     virtual int fullscreenSetWindowRect(const BlackBerry::Platform::IntRect& newWindowScreenRect) = 0;
 
-    virtual void drawVerticalScrollbar() = 0;
-    virtual void drawHorizontalScrollbar() = 0;
     virtual void populateCustomHeaders(Platform::NetworkRequest&) = 0;
 
     virtual void notifyWillUpdateApplicationCache() = 0;
@@ -278,6 +274,9 @@ public:
     virtual void cancelNotification(const BlackBerry::Platform::String& /*id*/) = 0;
     virtual void clearNotifications(const std::vector<BlackBerry::Platform::String>& /*notificationIds*/) = 0;
     virtual void notificationDestroyed(const BlackBerry::Platform::String& /*notificationId*/) = 0;
+    virtual void startSelectionScroll() = 0;
+    virtual void stopExpandingSelection() = 0;
+    virtual void suppressCaretChangeNotification(bool shouldClearState) = 0;
 };
 } // namespace WebKit
 } // namespace BlackBerry

@@ -37,10 +37,12 @@
 #import <wtf/text/WTFString.h>
 
 #ifdef __OBJC__
+@class NSURL;
 @class WebInspectorWindowController;
 @class WebNodeHighlighter;
 @class WebView;
 #else
+class NSURL;
 class WebInspectorWindowController;
 class WebNodeHighlighter;
 class WebView;
@@ -57,7 +59,7 @@ class WebInspectorFrontendClient;
 
 class WebInspectorClient : public WebCore::InspectorClient, public WebCore::InspectorFrontendChannel {
 public:
-    WebInspectorClient(WebView *);
+    explicit WebInspectorClient(WebView *);
 
     virtual void inspectorDestroyed() OVERRIDE;
 
@@ -73,6 +75,9 @@ public:
 
     bool inspectorStartsAttached();
     void setInspectorStartsAttached(bool);
+
+    bool inspectorAttachDisabled();
+    void setInspectorAttachDisabled(bool);
 
     void releaseFrontend();
 
@@ -95,22 +100,29 @@ public:
     virtual void frontendLoaded();
 
     virtual String localizedStringsURL();
-    virtual String hiddenPanels();
 
     virtual void bringToFront();
     virtual void closeWindow();
     virtual void disconnectFromBackend();
 
-    virtual void attachWindow();
+    virtual void attachWindow(DockSide);
     virtual void detachWindow();
 
     virtual void setAttachedWindowHeight(unsigned height);
+    virtual void setAttachedWindowWidth(unsigned height);
+    virtual void setToolbarHeight(unsigned) OVERRIDE;
+
     virtual void inspectedURLChanged(const String& newURL);
 
 private:
     void updateWindowTitle() const;
 
+    virtual bool canSave() OVERRIDE { return true; }
+    virtual void save(const String& url, const String& content, bool forceSaveAs) OVERRIDE;
+    virtual void append(const String& url, const String& content) OVERRIDE;
+
     WebView* m_inspectedWebView;
     RetainPtr<WebInspectorWindowController> m_windowController;
     String m_inspectedURL;
+    HashMap<String, RetainPtr<NSURL>> m_suggestedToActualURLMap;
 };

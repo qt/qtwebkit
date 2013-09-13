@@ -32,8 +32,12 @@
 #include "AudioBus.h"
 #include "AudioDestination.h"
 #include <AudioUnit/AudioUnit.h>
+#include <wtf/OwnPtr.h>
+#include <wtf/RefPtr.h>
 
 namespace WebCore {
+
+class AudioSessionManagerToken;
 
 // An AudioDestination using CoreAudio's default output AudioUnit
 
@@ -58,10 +62,14 @@ private:
 
     AudioUnit m_outputUnit;
     AudioIOCallback& m_callback;
-    AudioBus m_renderBus;
+    RefPtr<AudioBus> m_renderBus;
 
     float m_sampleRate;
     bool m_isPlaying;
+
+#if USE(AUDIO_SESSION)
+    OwnPtr<AudioSessionManagerToken> m_audioSessionManagerToken;
+#endif
 };
 
 } // namespace WebCore

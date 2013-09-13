@@ -35,25 +35,25 @@
 
 namespace WebKit {
 
+const char* WebNetworkInfoManagerProxy::supplementName()
+{
+    return "WebNetworkInfoManagerProxy";
+}
+
 PassRefPtr<WebNetworkInfoManagerProxy> WebNetworkInfoManagerProxy::create(WebContext* context)
 {
     return adoptRef(new WebNetworkInfoManagerProxy(context));
 }
 
 WebNetworkInfoManagerProxy::WebNetworkInfoManagerProxy(WebContext* context)
-    : m_isUpdating(false)
-    , m_context(context)
+    : WebContextSupplement(context)
+    , m_isUpdating(false)
 {
-    m_context->addMessageReceiver(Messages::WebNetworkInfoManagerProxy::messageReceiverName(), this);
+    WebContextSupplement::context()->addMessageReceiver(Messages::WebNetworkInfoManagerProxy::messageReceiverName(), this);
 }
 
 WebNetworkInfoManagerProxy::~WebNetworkInfoManagerProxy()
 {
-}
-
-void WebNetworkInfoManagerProxy::invalidate()
-{
-    stopUpdating();
 }
 
 void WebNetworkInfoManagerProxy::initializeProvider(const WKNetworkInfoProvider* provider)
@@ -63,20 +63,32 @@ void WebNetworkInfoManagerProxy::initializeProvider(const WKNetworkInfoProvider*
 
 void WebNetworkInfoManagerProxy::providerDidChangeNetworkInformation(const AtomicString& eventType, WebNetworkInfo* networkInformation)
 {
-    if (!m_context)
+    if (!context())
         return;
 
-    m_context->sendToAllProcesses(Messages::WebNetworkInfoManager::DidChangeNetworkInformation(eventType, networkInformation->data()));
+    context()->sendToAllProcesses(Messages::WebNetworkInfoManager::DidChangeNetworkInformation(eventType, networkInformation->data()));
 }
 
-void WebNetworkInfoManagerProxy::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::MessageDecoder& decoder)
+// WebContextSupplement
+
+void WebNetworkInfoManagerProxy::contextDestroyed()
 {
-    didReceiveWebNetworkInfoManagerProxyMessage(connection, messageID, decoder);
+    stopUpdating();
 }
 
-void WebNetworkInfoManagerProxy::didReceiveSyncMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::MessageDecoder& decoder, OwnPtr<CoreIPC::MessageEncoder>& replyEncoder)
+void WebNetworkInfoManagerProxy::processDidClose(WebProcessProxy*)
 {
-    didReceiveSyncWebNetworkInfoManagerProxyMessage(connection, messageID, decoder, replyEncoder);
+    stopUpdating();
+}
+
+void WebNetworkInfoManagerProxy::refWebContextSupplement()
+{
+    APIObject::ref();
+}
+
+void WebNetworkInfoManagerProxy::derefWebContextSupplement()
+{
+    APIObject::deref();
 }
 
 void WebNetworkInfoManagerProxy::startUpdating()

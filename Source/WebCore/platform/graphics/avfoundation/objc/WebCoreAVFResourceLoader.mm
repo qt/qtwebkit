@@ -68,7 +68,7 @@ void WebCoreAVFResourceLoader::startLoading()
 
     KURL requestURL = [[m_avRequest.get() request] URL];
 
-    CachedResourceRequest request(ResourceRequest(requestURL), ResourceLoaderOptions(SendCallbacks, DoNotSniffContent, BufferData, DoNotAllowStoredCredentials, DoNotAskClientForCrossOriginCredentials, DoSecurityCheck));
+    CachedResourceRequest request(ResourceRequest(requestURL), ResourceLoaderOptions(SendCallbacks, DoNotSniffContent, BufferData, DoNotAllowStoredCredentials, DoNotAskClientForCrossOriginCredentials, DoSecurityCheck, UseDefaultOriginRestrictionsForType));
 
     request.mutableResourceRequest().setPriority(ResourceLoadPriorityLow);
     CachedResourceLoader* loader = m_parent->player()->cachedResourceLoader();
@@ -122,8 +122,17 @@ void WebCoreAVFResourceLoader::dataReceived(CachedResource* resource, const char
 
 void WebCoreAVFResourceLoader::notifyFinished(CachedResource* resource)
 {
-    fulfillRequestWithResource(resource);
-    [m_avRequest.get() finishLoading];
+    if (resource->loadFailedOrCanceled()) {
+        // <rdar://problem/13987417> Set the contentType of the contentInformationRequest to an empty
+        // string to trigger AVAsset's playable value to complete loading.
+        if ([m_avRequest.get() contentInformationRequest] && ![[m_avRequest.get() contentInformationRequest] contentType])
+            [[m_avRequest.get() contentInformationRequest] setContentType:@""];
+
+        [m_avRequest.get() finishLoadingWithError:0];
+    } else {
+        fulfillRequestWithResource(resource);
+        [m_avRequest.get() finishLoading];
+    }
     stopLoading();
 }
 
@@ -134,7 +143,9 @@ void WebCoreAVFResourceLoader::fulfillRequestWithResource(CachedResource* resour
     if (!dataRequest)
         return;
 
-    SharedBuffer* data = resource->resourceBuffer()->sharedBuffer();
+    SharedBuffer* data = resource->resourceBuffer() ? resource->resourceBuffer()->sharedBuffer() : 0;
+    if (!data)
+        return;
 
     // Check for possible unsigned overflow.
     ASSERT([dataRequest currentOffset] >= [dataRequest requestedOffset]);

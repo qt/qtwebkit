@@ -45,15 +45,15 @@ WebNetworkInfo::~WebNetworkInfo()
 
 void WebNetworkInfo::Data::encode(CoreIPC::ArgumentEncoder& encoder) const
 {
-    encoder.encode(bandwidth);
-    encoder.encode(metered);
+    encoder << bandwidth;
+    encoder << metered;
 }
 
-bool WebNetworkInfo::Data::decode(CoreIPC::ArgumentDecoder* decoder, Data& result)
+bool WebNetworkInfo::Data::decode(CoreIPC::ArgumentDecoder& decoder, Data& result)
 {
-    if (!decoder->decode(result.bandwidth))
+    if (!decoder.decode(result.bandwidth))
         return false;
-    if (!decoder->decode(result.metered))
+    if (!decoder.decode(result.metered))
         return false;
 
     return true;

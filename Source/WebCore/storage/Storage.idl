@@ -24,22 +24,17 @@
  */
 
 [
-    NamedGetter,
-    JSGenerateIsReachable=ImplFrame,
+    GenerateIsReachable=ImplFrame,
     CustomDeleteProperty,
     CustomEnumerateProperty,
     CustomNamedSetter,
+    SkipVTableValidation
 ] interface Storage {
-    [NotEnumerable] readonly attribute unsigned long length getter raises(DOMException);
-    [NotEnumerable, TreatReturnedNullStringAs=Null] DOMString key(in unsigned long index)
-        raises(DOMException);
-    [NotEnumerable, TreatReturnedNullStringAs=Null] DOMString getItem(in DOMString key)
-        raises(DOMException);
-    [NotEnumerable] void setItem(in DOMString key, in DOMString data) 
-        raises(DOMException);
-    [NotEnumerable] void removeItem(in DOMString key)
-        raises(DOMException);
-    [NotEnumerable] void clear()
-        raises(DOMException);
+    [NotEnumerable, GetterRaisesException] readonly attribute unsigned long length;
+    [NotEnumerable, TreatReturnedNullStringAs=Null, RaisesException] DOMString key(unsigned long index);
+    [NotEnumerable, TreatReturnedNullStringAs=Null, RaisesException] getter DOMString getItem(DOMString key);
+    [NotEnumerable, RaisesException] void setItem(DOMString key, DOMString data);
+    [NotEnumerable, RaisesException] void removeItem(DOMString key);
+    [NotEnumerable, RaisesException] void clear();
 };
 

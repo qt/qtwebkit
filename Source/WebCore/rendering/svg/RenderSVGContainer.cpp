@@ -35,6 +35,7 @@
 #include "SVGResources.h"
 #include "SVGResourcesCache.h"
 #include "SVGStyledElement.h"
+#include <wtf/StackStats.h>
 
 namespace WebCore {
 
@@ -137,7 +138,7 @@ void RenderSVGContainer::paint(PaintInfo& paintInfo, const LayoutPoint&)
         }
 
         if (continueRendering) {
-            childPaintInfo.updatePaintingRootForChildren(this);
+            childPaintInfo.updateSubtreePaintRootForChildren(this);
             for (RenderObject* child = firstChild(); child; child = child->nextSibling())
                 child->paint(childPaintInfo, IntPoint());
         }
@@ -150,12 +151,12 @@ void RenderSVGContainer::paint(PaintInfo& paintInfo, const LayoutPoint&)
     // We should instead disable our clip during PaintPhaseOutline
     if ((paintInfo.phase == PaintPhaseOutline || paintInfo.phase == PaintPhaseSelfOutline) && style()->outlineWidth() && style()->visibility() == VISIBLE) {
         IntRect paintRectInParent = enclosingIntRect(localToParentTransform().mapRect(repaintRect));
-        paintOutline(paintInfo.context, paintRectInParent);
+        paintOutline(paintInfo, paintRectInParent);
     }
 }
 
 // addFocusRingRects is called from paintOutline and needs to be in the same coordinates as the paintOuline call
-void RenderSVGContainer::addFocusRingRects(Vector<IntRect>& rects, const LayoutPoint&)
+void RenderSVGContainer::addFocusRingRects(Vector<IntRect>& rects, const LayoutPoint&, const RenderLayerModelObject*)
 {
     IntRect paintRectInParent = enclosingIntRect(localToParentTransform().mapRect(repaintRectInLocalCoordinates()));
     if (!paintRectInParent.isEmpty())
@@ -186,6 +187,12 @@ bool RenderSVGContainer::nodeAtFloatPoint(const HitTestRequest& request, HitTest
         }
     }
 
+    // Accessibility wants to return SVG containers, if appropriate.
+    if (request.type() & HitTestRequest::AccessibilityHitTest && m_objectBoundingBox.contains(localPoint)) {
+        updateHitTestResult(result, roundedLayoutPoint(localPoint));
+        return true;
+    }
+    
     // Spec: Only graphical elements can be targeted by the mouse, period.
     // 16.4: "If there are no graphics elements whose relevant graphics content is under the pointer (i.e., there is no target element), the event is not dispatched."
     return false;

@@ -30,6 +30,7 @@
 #include "AccessibilityMenuList.h"
 #include "AccessibilityMenuListOption.h"
 #include "HTMLNames.h"
+#include "HTMLOptionElement.h"
 #include "HTMLSelectElement.h"
 #include "RenderMenuList.h"
 
@@ -62,18 +63,18 @@ bool AccessibilityMenuListPopup::isEnabled() const
     return m_parent->isEnabled();
 }
 
-bool AccessibilityMenuListPopup::accessibilityIsIgnored() const
+bool AccessibilityMenuListPopup::computeAccessibilityIsIgnored() const
 {
-    return accessibilityPlatformIncludesObject() != IncludeObject;
+    return accessibilityIsIgnoredByDefault();
 }
 
 AccessibilityMenuListOption* AccessibilityMenuListPopup::menuListOptionAccessibilityObject(HTMLElement* element) const
 {
-    if (!element || !element->hasTagName(optionTag))
+    if (!element || !isHTMLOptionElement(element))
         return 0;
 
     AccessibilityObject* object = document()->axObjectCache()->getOrCreate(MenuListOptionRole);
-    ASSERT(object->isMenuListOption());
+    ASSERT_WITH_SECURITY_IMPLICATION(object->isMenuListOption());
 
     AccessibilityMenuListOption* option = static_cast<AccessibilityMenuListOption*>(object);
     option->setElement(element);

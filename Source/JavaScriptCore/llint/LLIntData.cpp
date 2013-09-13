@@ -62,9 +62,9 @@ void initialize()
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wmissing-noreturn"
 #endif
-void Data::performAssertions(JSGlobalData& globalData)
+void Data::performAssertions(VM& vm)
 {
-    UNUSED_PARAM(globalData);
+    UNUSED_PARAM(vm);
     
     // Assertions to match LowLevelInterpreter.asm.  If you change any of this code, be
     // prepared to change LowLevelInterpreter.asm as well!!
@@ -107,11 +107,6 @@ void Data::performAssertions(JSGlobalData& globalData)
     ASSERT(MasqueradesAsUndefined == 1);
     ASSERT(ImplementsHasInstance == 2);
     ASSERT(ImplementsDefaultHasInstance == 8);
-#if USE(JSVALUE64)
-    ASSERT(&globalData.heap.allocatorForObjectWithoutDestructor(JSObject::allocationSize(INLINE_STORAGE_CAPACITY)) - &globalData.heap.firstAllocatorWithoutDestructors() == 1);
-#else
-    ASSERT(&globalData.heap.allocatorForObjectWithoutDestructor(JSObject::allocationSize(INLINE_STORAGE_CAPACITY)) - &globalData.heap.firstAllocatorWithoutDestructors() == 3);
-#endif
     ASSERT(FirstConstantRegisterIndex == 0x40000000);
     ASSERT(GlobalCode == 0);
     ASSERT(EvalCode == 1);
@@ -121,11 +116,11 @@ void Data::performAssertions(JSGlobalData& globalData)
 #if !ASSERT_DISABLED
     Vector<int> testVector;
     testVector.resize(42);
-    ASSERT(bitwise_cast<size_t*>(&testVector)[0] == 42);
-    ASSERT(bitwise_cast<int**>(&testVector)[1] == testVector.begin());
+    ASSERT(bitwise_cast<uint32_t*>(&testVector)[sizeof(void*)/sizeof(uint32_t) + 1] == 42);
+    ASSERT(bitwise_cast<int**>(&testVector)[0] == testVector.begin());
 #endif
 
-    ASSERT(StringImpl::s_hashFlag8BitBuffer == 64);
+    ASSERT(StringImpl::s_hashFlag8BitBuffer == 32);
 }
 #if COMPILER(CLANG)
 #pragma clang diagnostic pop

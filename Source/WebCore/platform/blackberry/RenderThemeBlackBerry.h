@@ -32,13 +32,16 @@ public:
 
 #if ENABLE(VIDEO)
     virtual String extraMediaControlsStyleSheet();
-    virtual String formatMediaControlsRemainingTime(float currentTime, float duration) const;
+    virtual bool usesVerticalVolumeSlider() const { return false; }
+#endif
+#if ENABLE(FULLSCREEN_API)
+    virtual String extraFullScreenStyleSheet();
 #endif
     virtual bool supportsHover(const RenderStyle*) const { return true; }
 
     virtual double caretBlinkInterval() const;
 
-    virtual void systemFont(int cssValueId, FontDescription&) const;
+    virtual void systemFont(CSSValueID, FontDescription&) const;
     virtual bool paintCheckbox(RenderObject*, const PaintInfo&, const IntRect&);
     virtual void setCheckboxSize(RenderStyle*) const;
     virtual bool paintRadio(RenderObject*, const PaintInfo&, const IntRect&);
@@ -50,6 +53,11 @@ public:
     virtual void adjustSliderThumbSize(RenderStyle*, Element*) const;
     virtual bool paintSliderTrack(RenderObject*, const PaintInfo&, const IntRect&);
     virtual bool paintSliderThumb(RenderObject*, const PaintInfo&, const IntRect&);
+
+#if ENABLE(DATALIST_ELEMENT)
+    virtual IntSize sliderTickSize() const OVERRIDE;
+    virtual int sliderTickOffsetFromTrackCenter() const OVERRIDE;
+#endif
 
 #if ENABLE(TOUCH_EVENTS)
     virtual Color platformTapHighlightColor() const;
@@ -82,6 +90,7 @@ public:
     virtual bool paintMediaVolumeSliderThumb(RenderObject*, const PaintInfo&, const IntRect&);
     virtual bool paintMediaPlayButton(RenderObject*, const PaintInfo&, const IntRect&);
     virtual bool paintMediaMuteButton(RenderObject*, const PaintInfo&, const IntRect&);
+    virtual bool paintMediaRewindButton(RenderObject*, const PaintInfo&, const IntRect&);
     virtual bool paintProgressBar(RenderObject*, const PaintInfo&, const IntRect&);
     virtual double animationRepeatIntervalForProgressBar(RenderProgress*) const;
     virtual double animationDurationForProgressBar(RenderProgress*) const;
@@ -91,6 +100,8 @@ public:
     // Highlighting colors for TextMatches.
     virtual Color platformActiveTextSearchHighlightColor() const;
     virtual Color platformInactiveTextSearchHighlightColor() const;
+
+    virtual bool supportsDataListUI(const AtomicString&) const;
 
 private:
     static const String& defaultGUIFont();
@@ -104,9 +115,11 @@ private:
     void setButtonStyle(RenderStyle*) const;
 
     bool paintTextFieldOrTextAreaOrSearchField(RenderObject*, const PaintInfo&, const IntRect&);
-    bool paintSliderTrackRect(RenderObject*, const PaintInfo&, const IntRect&);
 
     bool paintSliderTrackRect(RenderObject*, const PaintInfo&, const IntRect&, Image*);
+
+    bool paintProgressTrackRect(const PaintInfo&, const IntRect&, Image*);
+
     IntRect convertToPaintingRect(RenderObject* inputRenderer, const RenderObject* partRenderer, LayoutRect partRect, const IntRect& localOffset) const;
 
 };

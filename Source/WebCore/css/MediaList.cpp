@@ -31,8 +31,6 @@
 #include "MediaQuery.h"
 #include "MediaQueryExp.h"
 #include "ScriptableDocumentParser.h"
-#include "WebCoreMemoryInstrumentation.h"
-#include <wtf/MemoryInstrumentationVector.h>
 #include <wtf/text/StringBuilder.h>
 
 namespace WebCore {
@@ -218,12 +216,6 @@ String MediaQuerySet::mediaText() const
     return text.toString();
 }
 
-void MediaQuerySet::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
-    info.addMember(m_queries);
-}
-    
 MediaList::MediaList(MediaQuerySet* mediaQueries, CSSStyleSheet* parentSheet)
     : m_mediaQueries(mediaQueries)
     , m_parentStyleSheet(parentSheet)
@@ -296,12 +288,6 @@ void MediaList::reattach(MediaQuerySet* mediaQueries)
     m_mediaQueries = mediaQueries;
 }
 
-void MediaList::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
-    info.addMember(m_mediaQueries);
-}
-
 #if ENABLE(RESOLUTION_MEDIA_QUERY)
 static void addResolutionWarningMessageToConsole(Document* document, const String& serializedExpression, const CSSPrimitiveValue* value)
 {
@@ -324,12 +310,7 @@ static void addResolutionWarningMessageToConsole(Document* document, const Strin
 
     message.append(serializedExpression);
 
-    int lineNumber = 1;
-    ScriptableDocumentParser* parser = document->scriptableDocumentParser();
-    if (parser)
-        lineNumber = parser->lineNumber().oneBasedInt();
-
-    document->domWindow()->console()->addMessage(HTMLMessageSource, LogMessageType, TipMessageLevel, message, document->url().string(), lineNumber);
+    document->addConsoleMessage(CSSMessageSource, DebugMessageLevel, message);
 }
 
 void reportMediaQueryWarningIfNeeded(Document* document, const MediaQuerySet* mediaQuerySet)

@@ -54,7 +54,6 @@ public:
 
 private:    
     AccessibilityObject* listBoxOptionAccessibilityObject(HTMLElement*) const;
-    virtual bool accessibilityIsIgnored() const;
     virtual AccessibilityObject* elementAccessibilityHitTest(const IntPoint&) const;
 };
     

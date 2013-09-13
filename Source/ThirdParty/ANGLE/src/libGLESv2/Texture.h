@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2002-2010 The ANGLE Project Authors. All rights reserved.
+// Copyright (c) 2002-2013 The ANGLE Project Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 //
@@ -15,22 +15,30 @@
 
 #define GL_APICALL
 #include <GLES2/gl2.h>
-#include <d3d9.h>
 
 #include "common/debug.h"
 #include "common/RefCountObject.h"
-#include "libGLESv2/Renderbuffer.h"
-#include "libGLESv2/utilities.h"
+#include "libGLESv2/angletypes.h"
 
 namespace egl
 {
 class Surface;
 }
 
+namespace rx
+{
+class Renderer;
+class TextureStorageInterface;
+class TextureStorageInterface2D;
+class TextureStorageInterfaceCube;
+class RenderTarget;
+class Image;
+}
+
 namespace gl
 {
-class Blit;
 class Framebuffer;
+class Renderbuffer;
 
 enum
 {
@@ -43,130 +51,10 @@ enum
     IMPLEMENTATION_MAX_TEXTURE_LEVELS = 15   // 1+log2 of MAX_TEXTURE_SIZE
 };
 
-class Image
-{
-  public:
-    Image();
-    ~Image();
-
-    bool redefine(GLenum format, GLsizei width, GLsizei height, GLenum type, bool forceRelease);
-    void markDirty() {mDirty = true;}
-    void markClean() {mDirty = false;}
-
-    bool isRenderableFormat() const;
-    D3DFORMAT getD3DFormat() const;
-
-    GLsizei getWidth() const {return mWidth;}
-    GLsizei getHeight() const {return mHeight;}
-    GLenum getFormat() const {return mFormat;}
-    GLenum getType() const {return mType;}
-    bool isDirty() const {return mSurface && mDirty;}
-    IDirect3DSurface9 *getSurface();
-
-    void setManagedSurface(IDirect3DSurface9 *surface);
-    void updateSurface(IDirect3DSurface9 *dest, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height);
-
-    void loadData(GLint xoffset, GLint yoffset, GLsizei width, GLsizei height, GLenum type,
-                  GLint unpackAlignment, const void *input);
-
-    void loadAlphaData(GLsizei width, GLsizei height,
-                       int inputPitch, const void *input, size_t outputPitch, void *output) const;
-    void loadAlphaDataSSE2(GLsizei width, GLsizei height,
-                           int inputPitch, const void *input, size_t outputPitch, void *output) const;
-    void loadAlphaFloatData(GLsizei width, GLsizei height,
-                            int inputPitch, const void *input, size_t outputPitch, void *output) const;
-    void loadAlphaHalfFloatData(GLsizei width, GLsizei height,
-                                int inputPitch, const void *input, size_t outputPitch, void *output) const;
-    void loadLuminanceData(GLsizei width, GLsizei height,
-                           int inputPitch, const void *input, size_t outputPitch, void *output, bool native) const;
-    void loadLuminanceFloatData(GLsizei width, GLsizei height,
-                                int inputPitch, const void *input, size_t outputPitch, void *output) const;
-    void loadLuminanceHalfFloatData(GLsizei width, GLsizei height,
-                                    int inputPitch, const void *input, size_t outputPitch, void *output) const;
-    void loadLuminanceAlphaData(GLsizei width, GLsizei height,
-                                int inputPitch, const void *input, size_t outputPitch, void *output, bool native) const;
-    void loadLuminanceAlphaFloatData(GLsizei width, GLsizei height,
-                                     int inputPitch, const void *input, size_t outputPitch, void *output) const;
-    void loadLuminanceAlphaHalfFloatData(GLsizei width, GLsizei height,
-                                         int inputPitch, const void *input, size_t outputPitch, void *output) const;
-    void loadRGBUByteData(GLsizei width, GLsizei height,
-                          int inputPitch, const void *input, size_t outputPitch, void *output) const;
-    void loadRGB565Data(GLsizei width, GLsizei height,
-                        int inputPitch, const void *input, size_t outputPitch, void *output) const;
-    void loadRGBFloatData(GLsizei width, GLsizei height,
-                          int inputPitch, const void *input, size_t outputPitch, void *output) const;
-    void loadRGBHalfFloatData(GLsizei width, GLsizei height,
-                              int inputPitch, const void *input, size_t outputPitch, void *output) const;
-    void loadRGBAUByteDataSSE2(GLsizei width, GLsizei height,
-                               int inputPitch, const void *input, size_t outputPitch, void *output) const;
-    void loadRGBAUByteData(GLsizei width, GLsizei height,
-                           int inputPitch, const void *input, size_t outputPitch, void *output) const;
-    void loadRGBA4444Data(GLsizei width, GLsizei height,
-                          int inputPitch, const void *input, size_t outputPitch, void *output) const;
-    void loadRGBA5551Data(GLsizei width, GLsizei height,
-                          int inputPitch, const void *input, size_t outputPitch, void *output) const;
-    void loadRGBAFloatData(GLsizei width, GLsizei height,
-                           int inputPitch, const void *input, size_t outputPitch, void *output) const;
-    void loadRGBAHalfFloatData(GLsizei width, GLsizei height,
-                               int inputPitch, const void *input, size_t outputPitch, void *output) const;
-    void loadBGRAData(GLsizei width, GLsizei height,
-                      int inputPitch, const void *input, size_t outputPitch, void *output) const;
-    void loadCompressedData(GLint xoffset, GLint yoffset, GLsizei width, GLsizei height,
-                            const void *input);
-
-    void copy(GLint xoffset, GLint yoffset, GLint x, GLint y, GLsizei width, GLsizei height, IDirect3DSurface9 *renderTarget);
-
-  private:
-    DISALLOW_COPY_AND_ASSIGN(Image);
-
-    void createSurface();
-
-    HRESULT lock(D3DLOCKED_RECT *lockedRect, const RECT *rect);
-    void unlock();
-
-    GLsizei mWidth;
-    GLsizei mHeight;
-    GLenum mFormat;
-    GLenum mType;
-
-    bool mDirty;
-
-    D3DPOOL mD3DPool;   // can only be D3DPOOL_SYSTEMMEM or D3DPOOL_MANAGED since it needs to be lockable.
-    D3DFORMAT mD3DFormat;
-
-    IDirect3DSurface9 *mSurface;
-};
-
-class TextureStorage
-{
-  public:
-    explicit TextureStorage(DWORD usage);
-
-    virtual ~TextureStorage();
-
-    bool isRenderTarget() const;
-    bool isManaged() const;
-    D3DPOOL getPool() const;
-    DWORD getUsage() const;
-    unsigned int getTextureSerial() const;
-    virtual unsigned int getRenderTargetSerial(GLenum target) const = 0;
-
-  private:
-    DISALLOW_COPY_AND_ASSIGN(TextureStorage);
-
-    const DWORD mD3DUsage;
-    const D3DPOOL mD3DPool;
-
-    const unsigned int mTextureSerial;
-    static unsigned int issueTextureSerial();
-
-    static unsigned int mCurrentTextureSerial;
-};
-
 class Texture : public RefCountObject
 {
   public:
-    explicit Texture(GLuint id);
+    Texture(rx::Renderer *renderer, GLuint id);
 
     virtual ~Texture();
 
@@ -179,17 +67,22 @@ class Texture : public RefCountObject
     bool setMagFilter(GLenum filter);
     bool setWrapS(GLenum wrap);
     bool setWrapT(GLenum wrap);
+    bool setMaxAnisotropy(float textureMaxAnisotropy, float contextMaxAnisotropy);
     bool setUsage(GLenum usage);
 
     GLenum getMinFilter() const;
     GLenum getMagFilter() const;
     GLenum getWrapS() const;
     GLenum getWrapT() const;
+    float getMaxAnisotropy() const;
+    int getLodOffset();
+    void getSamplerState(SamplerState *sampler);
     GLenum getUsage() const;
+    bool isMipmapFiltered() const;
 
     virtual bool isSamplerComplete() const = 0;
 
-    IDirect3DBaseTexture9 *getTexture();
+    rx::TextureStorageInterface *getNativeTexture();
     virtual Renderbuffer *getRenderbuffer(GLenum target) = 0;
 
     virtual void generateMipmaps() = 0;
@@ -206,30 +99,24 @@ class Texture : public RefCountObject
     static const GLuint INCOMPLETE_TEXTURE_ID = static_cast<GLuint>(-1);   // Every texture takes an id at creation time. The value is arbitrary because it is never registered with the resource manager.
 
   protected:
-    void setImage(GLint unpackAlignment, const void *pixels, Image *image);
-    bool subImage(GLint xoffset, GLint yoffset, GLsizei width, GLsizei height, GLenum format, GLenum type, GLint unpackAlignment, const void *pixels, Image *image);
-    void setCompressedImage(GLsizei imageSize, const void *pixels, Image *image);
-    bool subImageCompressed(GLint xoffset, GLint yoffset, GLsizei width, GLsizei height, GLenum format, GLsizei imageSize, const void *pixels, Image *image);
+    void setImage(GLint unpackAlignment, const void *pixels, rx::Image *image);
+    bool subImage(GLint xoffset, GLint yoffset, GLsizei width, GLsizei height, GLenum format, GLenum type, GLint unpackAlignment, const void *pixels, rx::Image *image);
+    void setCompressedImage(GLsizei imageSize, const void *pixels, rx::Image *image);
+    bool subImageCompressed(GLint xoffset, GLint yoffset, GLsizei width, GLsizei height, GLenum format, GLsizei imageSize, const void *pixels, rx::Image *image);
 
     GLint creationLevels(GLsizei width, GLsizei height) const;
     GLint creationLevels(GLsizei size) const;
 
-    virtual IDirect3DBaseTexture9 *getBaseTexture() const = 0;
     virtual void createTexture() = 0;
     virtual void updateTexture() = 0;
     virtual void convertToRenderTarget() = 0;
-    virtual IDirect3DSurface9 *getRenderTarget(GLenum target) = 0;
+    virtual rx::RenderTarget *getRenderTarget(GLenum target) = 0;
 
-    int levelCount() const;
+    virtual int levelCount() = 0;
 
-    static Blit *getBlitter();
-    static bool copyToRenderTarget(IDirect3DSurface9 *dest, IDirect3DSurface9 *source, bool fromManaged);
+    rx::Renderer *mRenderer;
 
-    GLenum mMinFilter;
-    GLenum mMagFilter;
-    GLenum mWrapS;
-    GLenum mWrapT;
-    bool mDirtyParameters;
+    SamplerState mSamplerState;
     GLenum mUsage;
 
     bool mDirtyImages;
@@ -239,33 +126,13 @@ class Texture : public RefCountObject
   private:
     DISALLOW_COPY_AND_ASSIGN(Texture);
 
-    virtual TextureStorage *getStorage(bool renderTarget) = 0;
-};
-
-class TextureStorage2D : public TextureStorage
-{
-  public:
-    explicit TextureStorage2D(IDirect3DTexture9 *surfaceTexture);
-    TextureStorage2D(int levels, D3DFORMAT format, DWORD usage, int width, int height);
-
-    virtual ~TextureStorage2D();
-
-    IDirect3DSurface9 *getSurfaceLevel(int level);
-    IDirect3DBaseTexture9 *getBaseTexture() const;
-
-    virtual unsigned int getRenderTargetSerial(GLenum target) const;
-
-  private:
-    DISALLOW_COPY_AND_ASSIGN(TextureStorage2D);
-
-    IDirect3DTexture9 *mTexture;
-    const unsigned int mRenderTargetSerial;
+    virtual rx::TextureStorageInterface *getStorage(bool renderTarget) = 0;
 };
 
 class Texture2D : public Texture
 {
   public:
-    explicit Texture2D(GLuint id);
+    Texture2D(rx::Renderer *renderer, GLuint id);
 
     ~Texture2D();
 
@@ -277,7 +144,7 @@ class Texture2D : public Texture
     GLsizei getWidth(GLint level) const;
     GLsizei getHeight(GLint level) const;
     GLenum getInternalFormat(GLint level) const;
-    D3DFORMAT getD3DFormat(GLint level) const;
+    GLenum getActualFormat(GLint level) const;
     bool isCompressed(GLint level) const;
     bool isDepth(GLint level) const;
 
@@ -299,26 +166,26 @@ class Texture2D : public Texture
 
   protected:
     friend class RenderbufferTexture2D;
-    virtual IDirect3DSurface9 *getRenderTarget(GLenum target);
-    virtual IDirect3DSurface9 *getDepthStencil(GLenum target);
+    virtual rx::RenderTarget *getRenderTarget(GLenum target);
+    virtual rx::RenderTarget *getDepthStencil(GLenum target);
+    virtual int levelCount();
 
   private:
     DISALLOW_COPY_AND_ASSIGN(Texture2D);
 
-    virtual IDirect3DBaseTexture9 *getBaseTexture() const;
     virtual void createTexture();
     virtual void updateTexture();
     virtual void convertToRenderTarget();
-    virtual TextureStorage *getStorage(bool renderTarget);
+    virtual rx::TextureStorageInterface *getStorage(bool renderTarget);
 
     bool isMipmapComplete() const;
 
-    void redefineImage(GLint level, GLenum format, GLsizei width, GLsizei height, GLenum type);
+    void redefineImage(GLint level, GLint internalformat, GLsizei width, GLsizei height);
     void commitRect(GLint level, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height);
 
-    Image mImageArray[IMPLEMENTATION_MAX_TEXTURE_LEVELS];
+    rx::Image *mImageArray[IMPLEMENTATION_MAX_TEXTURE_LEVELS];
 
-    TextureStorage2D *mTexStorage;
+    rx::TextureStorageInterface2D *mTexStorage;
     egl::Surface *mSurface;
 
     // A specific internal reference count is kept for colorbuffer proxy references,
@@ -330,29 +197,10 @@ class Texture2D : public Texture
     unsigned int mProxyRefs;
 };
 
-class TextureStorageCubeMap : public TextureStorage
-{
-  public:
-    TextureStorageCubeMap(int levels, D3DFORMAT format, DWORD usage, int size);
-
-    virtual ~TextureStorageCubeMap();
-
-    IDirect3DSurface9 *getCubeMapSurface(GLenum faceTarget, int level);
-    IDirect3DBaseTexture9 *getBaseTexture() const;
-
-    virtual unsigned int getRenderTargetSerial(GLenum target) const;
-
-  private:
-    DISALLOW_COPY_AND_ASSIGN(TextureStorageCubeMap);
-
-    IDirect3DCubeTexture9 *mTexture;
-    const unsigned int mFirstRenderTargetSerial;
-};
-
 class TextureCubeMap : public Texture
 {
   public:
-    explicit TextureCubeMap(GLuint id);
+    TextureCubeMap(rx::Renderer *renderer, GLuint id);
 
     ~TextureCubeMap();
 
@@ -364,7 +212,7 @@ class TextureCubeMap : public Texture
     GLsizei getWidth(GLenum target, GLint level) const;
     GLsizei getHeight(GLenum target, GLint level) const;
     GLenum getInternalFormat(GLenum target, GLint level) const;
-    D3DFORMAT getD3DFormat(GLenum target, GLint level) const;
+    GLenum getActualFormat(GLenum target, GLint level) const;
     bool isCompressed(GLenum target, GLint level) const;
 
     void setImagePosX(GLint level, GLsizei width, GLsizei height, GLenum format, GLenum type, GLint unpackAlignment, const void *pixels);
@@ -392,27 +240,27 @@ class TextureCubeMap : public Texture
 
   protected:
     friend class RenderbufferTextureCubeMap;
-    virtual IDirect3DSurface9 *getRenderTarget(GLenum target);
+    virtual rx::RenderTarget *getRenderTarget(GLenum target);
+    virtual int levelCount();
 
   private:
     DISALLOW_COPY_AND_ASSIGN(TextureCubeMap);
 
-    virtual IDirect3DBaseTexture9 *getBaseTexture() const;
     virtual void createTexture();
     virtual void updateTexture();
     virtual void convertToRenderTarget();
-    virtual TextureStorage *getStorage(bool renderTarget);
+    virtual rx::TextureStorageInterface *getStorage(bool renderTarget);
 
     bool isCubeComplete() const;
     bool isMipmapCubeComplete() const;
 
     void setImage(int faceIndex, GLint level, GLsizei width, GLsizei height, GLenum format, GLenum type, GLint unpackAlignment, const void *pixels);
     void commitRect(int faceIndex, GLint level, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height);
-    void redefineImage(int faceIndex, GLint level, GLenum format, GLsizei width, GLsizei height, GLenum type);
+    void redefineImage(int faceIndex, GLint level, GLint internalformat, GLsizei width, GLsizei height);
 
-    Image mImageArray[6][IMPLEMENTATION_MAX_TEXTURE_LEVELS];
+    rx::Image *mImageArray[6][IMPLEMENTATION_MAX_TEXTURE_LEVELS];
 
-    TextureStorageCubeMap *mTexStorage;
+    rx::TextureStorageInterfaceCube *mTexStorage;
 
     // A specific internal reference count is kept for colorbuffer proxy references,
     // because, as the renderbuffer acting as proxy will maintain a binding pointer

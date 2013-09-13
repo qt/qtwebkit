@@ -25,6 +25,7 @@
 #if USE(ACCELERATED_COMPOSITING)
 
 #include "FrameView.h"
+#include "GraphicsLayerTextureMapper.h"
 #include "QWebFrameAdapter.h"
 #include "QWebPageAdapter.h"
 #include "TextureMapperLayer.h"
@@ -120,11 +121,15 @@ void TextureMapperLayerClientQt::renderCompositedLayers(GraphicsContext* context
         0, 0, 1, 0,
         transform.m31(), transform.m32(), 0, transform.m33()
         );
-    m_rootTextureMapperLayer->setTransform(matrix);
-    m_rootTextureMapperLayer->setOpacity(painter->opacity());
+    if (m_rootGraphicsLayer->opacity() != painter->opacity() || m_rootGraphicsLayer->transform() != matrix) {
+        m_rootGraphicsLayer->setOpacity(painter->opacity());
+        m_rootGraphicsLayer->setTransform(matrix);
+        m_rootGraphicsLayer->flushCompositingStateForThisLayerOnly();
+    }
     m_textureMapper->beginPainting();
     m_textureMapper->beginClip(matrix, clip);
     m_rootTextureMapperLayer->paint();
+    m_fpsCounter.updateFPSAndDisplay(m_textureMapper.get(), IntPoint::zero(), matrix);
     m_textureMapper->endClip();
     m_textureMapper->endPainting();
 }

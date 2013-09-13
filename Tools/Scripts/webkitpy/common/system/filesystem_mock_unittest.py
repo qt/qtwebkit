@@ -28,7 +28,7 @@
 
 import os
 import re
-import unittest
+import unittest2 as unittest
 
 
 from webkitpy.common.system import filesystem_mock
@@ -82,7 +82,3 @@ class MockFileSystemTest(unittest.TestCase, filesystem_unittest.GenericFileSyste
                          'foo/../bar',
                          'foo/../bar/baz',
                          '../foo')
-
-
-if __name__ == '__main__':
-    unittest.main()

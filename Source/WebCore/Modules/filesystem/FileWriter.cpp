@@ -55,7 +55,7 @@ PassRefPtr<FileWriter> FileWriter::create(ScriptExecutionContext* context)
 }
 
 FileWriter::FileWriter(ScriptExecutionContext* context)
-    : ActiveDOMObject(context, this)
+    : ActiveDOMObject(context)
     , m_readyState(INIT)
     , m_operationInProgress(OperationNone)
     , m_queuedOperation(OperationNone)
@@ -168,7 +168,7 @@ void FileWriter::truncate(long long position, ExceptionCode& ec)
     fireEvent(eventNames().writestartEvent);
 }
 
-void FileWriter::abort(ExceptionCode& ec)
+void FileWriter::abort(ExceptionCode&)
 {
     ASSERT(writer());
     if (m_readyState != WRITING)

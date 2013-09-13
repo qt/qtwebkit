@@ -40,8 +40,6 @@
 #include "DumpRenderTreeWin.h"
 #elif PLATFORM(GTK)
 #include "DumpRenderTreeGtk.h"
-#elif PLATFORM(WX)
-#include "DumpRenderTreeWx.h"
 #elif PLATFORM(EFL)
 #include "DumpRenderTreeEfl.h"
 #elif PLATFORM(BLACKBERRY)
@@ -66,11 +64,12 @@ void dump();
 void displayWebView();
 
 struct TestCommand {
-    TestCommand() : shouldDumpPixels(false) { }
+    TestCommand() : shouldDumpPixels(false), timeout(30000) { }
 
     std::string pathOrURL;
     bool shouldDumpPixels;
     std::string expectedPixelHash;
+    int timeout; // in ms
 };
 
 TestCommand parseInputLine(const std::string&);

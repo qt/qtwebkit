@@ -34,6 +34,7 @@
 #include "Editor.h"
 #include "HTMLElement.h"
 #include "HTMLNames.h"
+#include "HTMLTemplateElement.h"
 #include "KURL.h"
 #include "ProcessingInstruction.h"
 #include "XLinkNames.h"
@@ -99,10 +100,11 @@ void MarkupAccumulator::appendCharactersReplacingEntities(StringBuilder& result,
     }
 }
 
-MarkupAccumulator::MarkupAccumulator(Vector<Node*>* nodes, EAbsoluteURLs resolveUrlsMethod, const Range* range)
+MarkupAccumulator::MarkupAccumulator(Vector<Node*>* nodes, EAbsoluteURLs resolveUrlsMethod, const Range* range, EFragmentSerialization fragmentSerialization)
     : m_nodes(nodes)
     , m_range(range)
     , m_resolveURLsMethod(resolveUrlsMethod)
+    , m_fragmentSerialization(fragmentSerialization)
 {
 }
 
@@ -136,12 +138,22 @@ void MarkupAccumulator::serializeNodesWithNamespaces(Node* targetNode, Node* nod
     Namespaces namespaceHash;
     if (namespaces)
         namespaceHash = *namespaces;
+    else if (inXMLFragmentSerialization()) {
+        // Make sure xml prefix and namespace are always known to uphold the constraints listed at http://www.w3.org/TR/xml-names11/#xmlReserved.
+        namespaceHash.set(xmlAtom.impl(), XMLNames::xmlNamespaceURI.impl());
+        namespaceHash.set(XMLNames::xmlNamespaceURI.impl(), xmlAtom.impl());
+    }
 
     if (!childrenOnly)
         appendStartTag(targetNode, &namespaceHash);
 
     if (!(targetNode->document()->isHTMLDocument() && elementCannotHaveEndTag(targetNode))) {
-        for (Node* current = targetNode->firstChild(); current; current = current->nextSibling())
+#if ENABLE(TEMPLATE_ELEMENT)
+        Node* current = targetNode->hasTagName(templateTag) ? toHTMLTemplateElement(targetNode)->content()->firstChild() : targetNode->firstChild();
+#else
+        Node* current = targetNode->firstChild();
+#endif
+        for ( ; current; current = current->nextSibling())
             serializeNodesWithNamespaces(current, nodeToSkip, IncludeNode, &namespaceHash, tagNamesToSkip);
     }
 
@@ -239,11 +251,10 @@ void MarkupAccumulator::appendNodeValue(StringBuilder& result, const Node* node,
     unsigned start = 0;
 
     if (range) {
-        ExceptionCode ec;
-        if (node == range->endContainer(ec))
-            length = range->endOffset(ec);
-        if (node == range->startContainer(ec)) {
-            start = range->startOffset(ec);
+        if (node == range->endContainer())
+            length = range->endOffset();
+        if (node == range->startContainer()) {
+            start = range->startOffset();
             length -= start;
         }
     }
@@ -267,7 +278,8 @@ bool MarkupAccumulator::shouldAddNamespaceAttribute(const Attribute& attribute, 
     namespaces.checkConsistency();
 
     // Don't add namespace attributes twice
-    if (attribute.name() == XMLNSNames::xmlnsAttr) {
+    // HTML Parser will create xmlns attributes without namespace for HTML elements, allow those as well.
+    if (attribute.name().localName() == xmlnsAtom && (attribute.namespaceURI().isEmpty() || attribute.namespaceURI() == XMLNSNames::xmlnsNamespaceURI)) {
         namespaces.set(emptyAtom.impl(), attribute.value().impl());
         return false;
     }
@@ -290,7 +302,7 @@ void MarkupAccumulator::appendNamespace(StringBuilder& result, const AtomicStrin
     // Use emptyAtoms's impl() for both null and empty strings since the HashMap can't handle 0 as a key
     AtomicStringImpl* pre = prefix.isEmpty() ? emptyAtom.impl() : prefix.impl();
     AtomicStringImpl* foundNS = namespaces.get(pre);
-    if (foundNS != namespaceURI.impl()) {
+    if (foundNS != namespaceURI.impl() && !namespaces.get(namespaceURI.impl())) {
         namespaces.set(pre, namespaceURI.impl());
         result.append(' ');
         result.append(xmlnsAtom.string());
@@ -310,7 +322,7 @@ EntityMask MarkupAccumulator::entityMaskForText(Text* text) const
 {
     const QualifiedName* parentName = 0;
     if (text->parentElement())
-        parentName = &static_cast<Element*>(text->parentElement())->tagQName();
+        parentName = &(text->parentElement())->tagQName();
 
     if (parentName && (*parentName == scriptTag || *parentName == styleTag || *parentName == xmpTag))
         return EntityMaskInCDATA;
@@ -416,8 +428,17 @@ void MarkupAccumulator::appendElement(StringBuilder& result, Element* element, N
 void MarkupAccumulator::appendOpenTag(StringBuilder& result, Element* element, Namespaces* namespaces)
 {
     result.append('<');
+    if (inXMLFragmentSerialization() && namespaces && element->prefix().isEmpty()) {
+        // According to http://www.w3.org/TR/DOM-Level-3-Core/namespaces-algorithms.html#normalizeDocumentAlgo we now should create
+        // a default namespace declaration to make this namespace well-formed. However, http://www.w3.org/TR/xml-names11/#xmlReserved states
+        // "The prefix xml MUST NOT be declared as the default namespace.", so use the xml prefix explicitly.
+        if (element->namespaceURI() == XMLNames::xmlNamespaceURI) {
+            result.append(xmlAtom);
+            result.append(':');
+        }
+    }
     result.append(element->nodeNamePreservingCase());
-    if (!element->document()->isHTMLDocument() && namespaces && shouldAddNamespaceElement(element))
+    if ((inXMLFragmentSerialization() || !element->document()->isHTMLDocument()) && namespaces && shouldAddNamespaceElement(element))
         appendNamespace(result, element->prefix(), element->namespaceURI(), *namespaces);
 }
 
@@ -444,18 +465,18 @@ void MarkupAccumulator::appendAttribute(StringBuilder& result, Element* element,
 
     result.append(' ');
 
+    QualifiedName prefixedName = attribute.name();
     if (documentIsHTML && !attributeIsInSerializedNamespace(attribute))
         result.append(attribute.name().localName());
     else {
-        QualifiedName prefixedName = attribute.name();
         if (attribute.namespaceURI() == XLinkNames::xlinkNamespaceURI) {
-            if (attribute.prefix() != xlinkAtom)
+            if (!attribute.prefix())
                 prefixedName.setPrefix(xlinkAtom);
         } else if (attribute.namespaceURI() == XMLNames::xmlNamespaceURI) {
-            if (attribute.prefix() != xmlAtom)
+            if (!attribute.prefix())
                 prefixedName.setPrefix(xmlAtom);
         } else if (attribute.namespaceURI() == XMLNSNames::xmlnsNamespaceURI) {
-            if (attribute.name() != XMLNSNames::xmlnsAttr && attribute.prefix() != xmlnsAtom)
+            if (attribute.name() != XMLNSNames::xmlnsAttr && !attribute.prefix())
                 prefixedName.setPrefix(xmlnsAtom);
         }
         result.append(prefixedName.toString());
@@ -471,8 +492,8 @@ void MarkupAccumulator::appendAttribute(StringBuilder& result, Element* element,
         result.append('"');
     }
 
-    if (!documentIsHTML && namespaces && shouldAddNamespaceAttribute(attribute, *namespaces))
-        appendNamespace(result, attribute.prefix(), attribute.namespaceURI(), *namespaces);
+    if ((inXMLFragmentSerialization() || !documentIsHTML) && namespaces && shouldAddNamespaceAttribute(attribute, *namespaces))
+        appendNamespace(result, prefixedName.prefix(), prefixedName.namespaceURI(), *namespaces);
 }
 
 void MarkupAccumulator::appendCDATASection(StringBuilder& result, const String& section)
@@ -496,7 +517,7 @@ void MarkupAccumulator::appendStartMarkup(StringBuilder& result, const Node* nod
         appendComment(result, static_cast<const Comment*>(node)->data());
         break;
     case Node::DOCUMENT_NODE:
-        appendXMLDeclaration(result, static_cast<const Document*>(node));
+        appendXMLDeclaration(result, toDocument(node));
         break;
     case Node::DOCUMENT_FRAGMENT_NODE:
         break;
@@ -507,7 +528,7 @@ void MarkupAccumulator::appendStartMarkup(StringBuilder& result, const Node* nod
         appendProcessingInstruction(result, static_cast<const ProcessingInstruction*>(node)->target(), static_cast<const ProcessingInstruction*>(node)->data());
         break;
     case Node::ELEMENT_NODE:
-        appendElement(result, static_cast<Element*>(const_cast<Node*>(node)), namespaces);
+        appendElement(result, toElement(const_cast<Node*>(node)), namespaces);
         break;
     case Node::CDATA_SECTION_NODE:
         appendCDATASection(result, static_cast<const CDATASection*>(node)->data());
@@ -529,7 +550,7 @@ void MarkupAccumulator::appendStartMarkup(StringBuilder& result, const Node* nod
 // 4. Other elements self-close.
 bool MarkupAccumulator::shouldSelfClose(const Node* node)
 {
-    if (node->document()->isHTMLDocument())
+    if (!inXMLFragmentSerialization() && node->document()->isHTMLDocument())
         return false;
     if (node->hasChildNodes())
         return false;
@@ -557,7 +578,7 @@ void MarkupAccumulator::appendEndMarkup(StringBuilder& result, const Node* node)
 
     result.append('<');
     result.append('/');
-    result.append(static_cast<const Element*>(node)->nodeNamePreservingCase());
+    result.append(toElement(node)->nodeNamePreservingCase());
     result.append('>');
 }
 

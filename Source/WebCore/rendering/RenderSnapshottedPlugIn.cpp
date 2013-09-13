@@ -26,25 +26,30 @@
 #include "config.h"
 #include "RenderSnapshottedPlugIn.h"
 
+#include "CachedImage.h"
+#include "Chrome.h"
+#include "ChromeClient.h"
 #include "Cursor.h"
+#include "Filter.h"
 #include "FrameLoaderClient.h"
 #include "FrameView.h"
 #include "Gradient.h"
 #include "HTMLPlugInImageElement.h"
+#include "ImageBuffer.h"
 #include "MouseEvent.h"
+#include "Page.h"
 #include "PaintInfo.h"
 #include "Path.h"
+#include "PlatformMouseEvent.h"
+#include "RenderView.h"
+#include <wtf/StackStats.h>
 
 namespace WebCore {
-
-static const int autoStartPlugInSizeThresholdWidth = 1;
-static const int autoStartPlugInSizeThresholdHeight = 1;
-static const int startButtonPadding = 10;
 
 RenderSnapshottedPlugIn::RenderSnapshottedPlugIn(HTMLPlugInImageElement* element)
     : RenderEmbeddedObject(element)
     , m_snapshotResource(RenderImageResource::create())
-    , m_isMouseInButtonRect(false)
+    , m_isPotentialMouseActivation(false)
 {
     m_snapshotResource->initialize(this);
 }
@@ -57,7 +62,22 @@ RenderSnapshottedPlugIn::~RenderSnapshottedPlugIn()
 
 HTMLPlugInImageElement* RenderSnapshottedPlugIn::plugInImageElement() const
 {
-    return static_cast<HTMLPlugInImageElement*>(node());
+    return toHTMLPlugInImageElement(node());
+}
+
+void RenderSnapshottedPlugIn::layout()
+{
+    StackStats::LayoutCheckPoint layoutCheckPoint;
+    LayoutSize oldSize = contentBoxRect().size();
+
+    RenderEmbeddedObject::layout();
+
+    LayoutSize newSize = contentBoxRect().size();
+    if (newSize == oldSize)
+        return;
+
+    if (document()->view())
+        document()->view()->addWidgetToUpdate(this);
 }
 
 void RenderSnapshottedPlugIn::updateSnapshot(PassRefPtr<Image> image)
@@ -72,35 +92,35 @@ void RenderSnapshottedPlugIn::updateSnapshot(PassRefPtr<Image> image)
 
 void RenderSnapshottedPlugIn::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
 {
-    if (plugInImageElement()->displayState() < HTMLPlugInElement::PlayingWithPendingMouseClick) {
-        RenderReplaced::paint(paintInfo, paintOffset);
-        return;
+    if (paintInfo.phase == PaintPhaseForeground && plugInImageElement()->displayState() < HTMLPlugInElement::Restarting) {
+        paintSnapshot(paintInfo, paintOffset);
+    }
+
+    PaintPhase newPhase = (paintInfo.phase == PaintPhaseChildOutlines) ? PaintPhaseOutline : paintInfo.phase;
+    newPhase = (newPhase == PaintPhaseChildBlockBackgrounds) ? PaintPhaseChildBlockBackground : newPhase;
+
+    PaintInfo paintInfoForChild(paintInfo);
+    paintInfoForChild.phase = newPhase;
+    paintInfoForChild.updateSubtreePaintRootForChildren(this);
+
+    for (RenderBox* child = firstChildBox(); child; child = child->nextSiblingBox()) {
+        LayoutPoint childPoint = flipForWritingModeForChild(child, paintOffset);
+        if (!child->hasSelfPaintingLayer() && !child->isFloating())
+            child->paint(paintInfoForChild, childPoint);
     }
 
     RenderEmbeddedObject::paint(paintInfo, paintOffset);
 }
 
-void RenderSnapshottedPlugIn::paintReplaced(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
+void RenderSnapshottedPlugIn::paintSnapshot(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
 {
-    if (plugInImageElement()->displayState() < HTMLPlugInElement::PlayingWithPendingMouseClick) {
-        paintReplacedSnapshot(paintInfo, paintOffset);
-        paintButton(paintInfo, paintOffset);
+    Image* image = m_snapshotResource->image().get();
+    if (!image || image->isNull())
         return;
-    }
 
-    RenderEmbeddedObject::paintReplaced(paintInfo, paintOffset);
-}
-
-void RenderSnapshottedPlugIn::paintReplacedSnapshot(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
-{
-    // This code should be similar to RenderImage::paintReplaced() and RenderImage::paintIntoRect().
     LayoutUnit cWidth = contentWidth();
     LayoutUnit cHeight = contentHeight();
     if (!cWidth || !cHeight)
-        return;
-
-    RefPtr<Image> image = m_snapshotResource->image();
-    if (!image || image->isNull())
         return;
 
     GraphicsContext* context = paintInfo.context;
@@ -110,7 +130,7 @@ void RenderSnapshottedPlugIn::paintReplacedSnapshot(PaintInfo& paintInfo, const 
 #endif
 
     LayoutSize contentSize(cWidth, cHeight);
-    LayoutPoint contentLocation = paintOffset;
+    LayoutPoint contentLocation = location() + paintOffset;
     contentLocation.move(borderLeft() + paddingLeft(), borderTop() + paddingTop());
 
     LayoutRect rect(contentLocation, contentSize);
@@ -118,48 +138,13 @@ void RenderSnapshottedPlugIn::paintReplacedSnapshot(PaintInfo& paintInfo, const 
     if (alignedRect.width() <= 0 || alignedRect.height() <= 0)
         return;
 
-    bool useLowQualityScaling = shouldPaintAtLowQuality(context, image.get(), image.get(), alignedRect.size());
-    context->drawImage(image.get(), style()->colorSpace(), alignedRect, CompositeSourceOver, shouldRespectImageOrientation(), useLowQualityScaling);
-}
-
-static Image* startButtonImage()
-{
-    static Image* buttonImage = Image::loadPlatformResource("startButton").leakRef();
-    return buttonImage;
-}
-
-static Image* startButtonPressedImage()
-{
-    static Image* buttonImage = Image::loadPlatformResource("startButtonPressed").leakRef();
-    return buttonImage;
-}
-
-void RenderSnapshottedPlugIn::paintButton(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
-{
-    LayoutRect contentRect = contentBoxRect();
-    if (contentRect.isEmpty())
-        return;
-
-    Image* buttonImage = startButtonImage();
-    if (plugInImageElement()->active()) {
-        if (m_isMouseInButtonRect)
-            buttonImage = startButtonPressedImage();
-    } else if (!plugInImageElement()->hovered())
-        return;
-
-    LayoutPoint contentLocation = paintOffset + contentRect.maxXMaxYCorner() - buttonImage->size() - LayoutSize(startButtonPadding, startButtonPadding);
-    paintInfo.context->drawImage(buttonImage, ColorSpaceDeviceRGB, roundedIntPoint(contentLocation), buttonImage->rect());
-}
-
-void RenderSnapshottedPlugIn::repaintButton()
-{
-    // FIXME: This is unfortunate. We should just repaint the button.
-    repaint();
+    bool useLowQualityScaling = shouldPaintAtLowQuality(context, image, image, alignedRect.size());
+    context->drawImage(image, style()->colorSpace(), alignedRect, CompositeSourceOver, shouldRespectImageOrientation(), useLowQualityScaling);
 }
 
 CursorDirective RenderSnapshottedPlugIn::getCursor(const LayoutPoint& point, Cursor& overrideCursor) const
 {
-    if (plugInImageElement()->displayState() < HTMLPlugInElement::PlayingWithPendingMouseClick) {
+    if (plugInImageElement()->displayState() < HTMLPlugInElement::Restarting) {
         overrideCursor = handCursor();
         return SetCursor;
     }
@@ -173,43 +158,29 @@ void RenderSnapshottedPlugIn::handleEvent(Event* event)
 
     MouseEvent* mouseEvent = static_cast<MouseEvent*>(event);
 
-    if (event->type() == eventNames().clickEvent && mouseEvent->button() == LeftButton) {
-        if (m_isMouseInButtonRect)
-            plugInImageElement()->setDisplayState(HTMLPlugInElement::Playing);
-        else {
-            plugInImageElement()->setDisplayState(HTMLPlugInElement::PlayingWithPendingMouseClick);
-            plugInImageElement()->setPendingClickEvent(mouseEvent);
-        }
-        if (widget()) {
-            if (Frame* frame = document()->frame())
-                frame->loader()->client()->recreatePlugin(widget());
-            repaint();
-        }
+    // If we're a snapshotted plugin, we want to make sure we activate on
+    // clicks even if the page is preventing our default behaviour. Otherwise
+    // we can never restart. One we do restart, then the page will happily
+    // block the new plugin in the normal renderer. All this means we have to
+    // be on the lookout for a mouseup event that comes after a mousedown
+    // event. The code below is not completely foolproof, but the worst that
+    // could happen is that a snapshotted plugin restarts.
+
+    if (event->type() == eventNames().mouseoutEvent)
+        m_isPotentialMouseActivation = false;
+
+    if (mouseEvent->button() != LeftButton)
+        return;
+
+    if (event->type() == eventNames().clickEvent || (m_isPotentialMouseActivation && event->type() == eventNames().mouseupEvent)) {
+        m_isPotentialMouseActivation = false;
+        bool clickWasOnOverlay = plugInImageElement()->partOfSnapshotOverlay(event->target()->toNode());
+        plugInImageElement()->userDidClickSnapshot(mouseEvent, !clickWasOnOverlay);
         event->setDefaultHandled();
-    } else if (event->type() == eventNames().mouseoverEvent || event->type() == eventNames().mouseoutEvent)
-        repaintButton();
-    else if (event->type() == eventNames().mousedownEvent) {
-        bool isMouseInButtonRect = m_buttonRect.contains(IntPoint(mouseEvent->offsetX(), mouseEvent->offsetY()));
-        if (isMouseInButtonRect != m_isMouseInButtonRect) {
-            m_isMouseInButtonRect = isMouseInButtonRect;
-            repaintButton();
-        }
+    } else if (event->type() == eventNames().mousedownEvent) {
+        m_isPotentialMouseActivation = true;
+        event->setDefaultHandled();
     }
-}
-
-void RenderSnapshottedPlugIn::layout()
-{
-    RenderEmbeddedObject::layout();
-    if (plugInImageElement()->displayState() < HTMLPlugInElement::Playing) {
-        LayoutRect rect = contentBoxRect();
-        int width = rect.width();
-        int height = rect.height();
-        if (!width || !height || (width <= autoStartPlugInSizeThresholdWidth && height <= autoStartPlugInSizeThresholdHeight))
-            plugInImageElement()->setDisplayState(HTMLPlugInElement::Playing);
-    }
-
-    LayoutSize buttonSize = startButtonImage()->size();
-    m_buttonRect = LayoutRect(contentBoxRect().maxXMaxYCorner() - LayoutSize(startButtonPadding, startButtonPadding) - buttonSize, buttonSize);
 }
 
 } // namespace WebCore

@@ -21,6 +21,7 @@
 #ifndef AtomicString_h
 #define AtomicString_h
 
+#include <utility>
 #include <wtf/text/AtomicStringImpl.h>
 #include <wtf/text/WTFString.h>
 
@@ -35,7 +36,6 @@
 namespace WTF {
 
 struct AtomicStringHash;
-class MemoryObjectInfo;
 
 class AtomicString {
 public:
@@ -48,6 +48,13 @@ public:
     AtomicString(const UChar* s, unsigned length) : m_string(add(s, length)) { }
     AtomicString(const UChar* s, unsigned length, unsigned existingHash) : m_string(add(s, length, existingHash)) { }
     AtomicString(const UChar* s) : m_string(add(s)) { }
+
+    template<size_t inlineCapacity>
+    explicit AtomicString(const Vector<UChar, inlineCapacity>& characters)
+        : m_string(add(characters.data(), characters.size()))
+    {
+    }
+
     ATOMICSTRING_CONVERSION AtomicString(StringImpl* imp) : m_string(add(imp)) { }
     AtomicString(AtomicStringImpl* imp) : m_string(imp) { }
     ATOMICSTRING_CONVERSION AtomicString(const String& s) : m_string(add(s.impl())) { }
@@ -58,6 +65,7 @@ public:
         : m_string(addFromLiteralData(characters, length))
     {
     }
+
     template<unsigned charactersCount>
     ALWAYS_INLINE AtomicString(const char (&characters)[charactersCount], ConstructFromLiteralTag)
         : m_string(addFromLiteralData(characters, charactersCount - 1))
@@ -69,12 +77,10 @@ public:
 #if COMPILER_SUPPORTS(CXX_RVALUE_REFERENCES)
     // We have to declare the copy constructor and copy assignment operator as well, otherwise
     // they'll be implicitly deleted by adding the move constructor and move assignment operator.
-    // FIXME: Instead of explicitly casting to String&& here, we should use std::move, but that requires us to
-    // have a standard library that supports move semantics.
     AtomicString(const AtomicString& other) : m_string(other.m_string) { }
-    AtomicString(AtomicString&& other) : m_string(static_cast<String&&>(other.m_string)) { }
+    AtomicString(AtomicString&& other) : m_string(std::move(other.m_string)) { }
     AtomicString& operator=(const AtomicString& other) { m_string = other.m_string; return *this; }
-    AtomicString& operator=(AtomicString&& other) { m_string = static_cast<String&&>(other.m_string); return *this; }
+    AtomicString& operator=(AtomicString&& other) { m_string = std::move(other.m_string); return *this; }
 #endif
 
     // Hash table deleted values, which are only constructed and never copied or destroyed.
@@ -102,10 +108,10 @@ public:
     bool contains(const String& s, bool caseSensitive = true) const
         { return m_string.contains(s, caseSensitive); }
 
-    size_t find(UChar c, size_t start = 0) const { return m_string.find(c, start); }
-    size_t find(const LChar* s, size_t start = 0, bool caseSentitive = true) const
+    size_t find(UChar c, unsigned start = 0) const { return m_string.find(c, start); }
+    size_t find(const LChar* s, unsigned start = 0, bool caseSentitive = true) const
         { return m_string.find(s, start, caseSentitive); }
-    size_t find(const String& s, size_t start = 0, bool caseSentitive = true) const
+    size_t find(const String& s, unsigned start = 0, bool caseSentitive = true) const
         { return m_string.find(s, start, caseSentitive); }
     
     bool startsWith(const String& s, bool caseSensitive = true) const
@@ -176,11 +182,13 @@ private:
     WTF_EXPORT_STRING_API static PassRefPtr<StringImpl> add(const UChar*, unsigned length, unsigned existingHash);
     WTF_EXPORT_STRING_API static PassRefPtr<StringImpl> add(const UChar*);
     WTF_EXPORT_STRING_API static PassRefPtr<StringImpl> add(StringImpl*, unsigned offset, unsigned length);
-    ALWAYS_INLINE static PassRefPtr<StringImpl> add(StringImpl* r)
+    ALWAYS_INLINE static PassRefPtr<StringImpl> add(StringImpl* string)
     {
-        if (!r || r->isAtomic())
-            return r;
-        return addSlowCase(r);
+        if (!string || string->isAtomic()) {
+            ASSERT_WITH_MESSAGE(!string || isInAtomicStringTable(string), "The atomic string comes from an other thread!");
+            return string;
+        }
+        return addSlowCase(string);
     }
     WTF_EXPORT_STRING_API static PassRefPtr<StringImpl> addFromLiteralData(const char* characters, unsigned length);
     WTF_EXPORT_STRING_API static PassRefPtr<StringImpl> addSlowCase(StringImpl*);
@@ -189,6 +197,10 @@ private:
 #endif
 
     WTF_EXPORT_STRING_API static AtomicString fromUTF8Internal(const char*, const char*);
+
+#if !ASSERT_DISABLED
+    WTF_EXPORT_STRING_API static bool isInAtomicStringTable(StringImpl*);
+#endif
 };
 
 inline bool operator==(const AtomicString& a, const AtomicString& b) { return a.impl() == b.impl(); }

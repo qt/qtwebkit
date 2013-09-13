@@ -26,22 +26,16 @@
 #include <BlackBerryPlatformInputEvents.h>
 #include <BlackBerryPlatformString.h>
 #include <BlackBerryPlatformWebContext.h>
+#include <JavaScriptCore/JSBase.h>
 #include <imf/input_data.h>
 #include <network/NetworkRequest.h>
 #include <string>
 #include <vector>
 
-struct OpaqueJSContext;
-typedef const struct OpaqueJSContext* JSContextRef;
-
-struct OpaqueJSValue;
-typedef const struct OpaqueJSValue* JSValueRef;
-
 namespace WebCore {
 class ChromeClientBlackBerry;
 class Frame;
 class FrameLoaderClientBlackBerry;
-class PagePopupBlackBerry;
 }
 
 class WebDOMDocument;
@@ -67,6 +61,7 @@ class BackingStore;
 class BackingStoreClient;
 class BackingStorePrivate;
 class InRegionScroller;
+class PagePopup;
 class RenderQueue;
 class WebCookieJar;
 class WebOverlay;
@@ -80,6 +75,8 @@ class WebViewportArguments;
 
 enum JavaScriptDataType { JSUndefined = 0, JSNull, JSBoolean, JSNumber, JSString, JSObject, JSException, JSDataTypeMax };
 
+enum SelectionExpansionType { Word = 0, Sentence, Paragraph, NextParagraph };
+
 enum ActivationStateType { ActivationActive, ActivationInactive, ActivationStandby };
 
 enum TargetDetectionStrategy {PointBased, RectBased, FocusBased};
@@ -91,15 +88,11 @@ public:
 
     WebPageClient* client() const;
 
-    void load(const BlackBerry::Platform::String& url, const BlackBerry::Platform::String& networkToken, bool isInitial = false);
+    void loadFile(const BlackBerry::Platform::String& path, const BlackBerry::Platform::String& overrideContentType = BlackBerry::Platform::String::emptyString());
 
-    void loadExtended(const char* url, const char* networkToken, const char* method, Platform::NetworkRequest::CachePolicy = Platform::NetworkRequest::UseProtocolCachePolicy, const char* data = 0, size_t dataLength = 0, const char* const* headers = 0, size_t headersLength = 0, bool mustHandleInternally = false);
+    void loadString(const BlackBerry::Platform::String&, const BlackBerry::Platform::String& baseURL, const BlackBerry::Platform::String& contentType = BlackBerry::Platform::String::fromAscii("text/html"), const BlackBerry::Platform::String& failingURL = BlackBerry::Platform::String::emptyString());
 
-    void loadFile(const BlackBerry::Platform::String& path, const BlackBerry::Platform::String& overrideContentType = "");
-
-    void loadString(const BlackBerry::Platform::String&, const BlackBerry::Platform::String& baseURL, const BlackBerry::Platform::String& contentType = "text/html", const BlackBerry::Platform::String& failingURL = BlackBerry::Platform::String::emptyString());
-
-    void download(const Platform::NetworkRequest&);
+    void load(const Platform::NetworkRequest&, bool needReferer = false);
 
     bool executeJavaScript(const BlackBerry::Platform::String& script, JavaScriptDataType& returnType, BlackBerry::Platform::String& returnValue);
 
@@ -131,6 +124,8 @@ public:
 
     WebCookieJar* cookieJar() const;
 
+    bool isLoading() const;
+
     void setVisible(bool);
     bool isVisible() const;
 
@@ -138,13 +133,20 @@ public:
     void applyPendingOrientationIfNeeded();
 
     Platform::ViewportAccessor* webkitThreadViewportAccessor() const;
+
+    // Returns the size of the visual viewport.
     Platform::IntSize viewportSize() const;
-    void setViewportSize(const Platform::IntSize&, bool ensureFocusElementVisible = true);
+
+    // Sets the sizes of the visual viewport and the layout viewport.
+    void setViewportSize(const Platform::IntSize& viewportSize, const Platform::IntSize& defaultLayoutSize, bool ensureFocusElementVisible = true);
 
     void resetVirtualViewportOnCommitted(bool reset);
     void setVirtualViewportSize(const Platform::IntSize&);
 
-    // Used for default layout size unless overridden by web content or by other APIs.
+    // Returns the size of the layout viewport.
+    Platform::IntSize defaultLayoutSize() const;
+
+    // Set the size of the layout viewport, in document coordinates, independently of the visual viewport.
     void setDefaultLayoutSize(const Platform::IntSize&);
 
     bool mouseEvent(const Platform::MouseEvent&, bool* wheelDeltaAccepted = 0);
@@ -154,7 +156,7 @@ public:
 
     // For conversion to mouse events.
     void touchEventCancel();
-    void touchPointAsMouseEvent(const Platform::TouchPoint&);
+    void touchPointAsMouseEvent(const Platform::TouchPoint&, unsigned modifiers = 0);
 
     void playSoundIfAnchorIsTarget() const;
 
@@ -188,7 +190,7 @@ public:
     InRegionScroller* inRegionScroller() const;
 
     bool blockZoom(const Platform::IntPoint& documentTargetPoint);
-    void blockZoomAnimationFinished();
+    void zoomAnimationFinished(double finalScale, const Platform::FloatPoint& finalDocumentScrollPosition, bool shouldConstrainScrollingToContentEdge);
     void resetBlockZoom();
     bool isAtInitialZoom() const;
     bool isMaxZoomed() const;
@@ -210,6 +212,10 @@ public:
 
     void setFocused(bool);
 
+    void focusNextField();
+    void focusPreviousField();
+    void submitForm();
+
     void clearBrowsingData();
     void clearHistory();
     void clearCookies();
@@ -218,15 +224,15 @@ public:
     void clearCredentials();
     void clearAutofillData();
     void clearNeverRememberSites();
+    void clearWebFileSystem();
 
     void runLayoutTests();
 
     // Find the next utf8 string in the given direction.
     // Case sensitivity, wrapping, and highlighting all matches are also toggleable.
-    bool findNextString(const char*, bool forward, bool caseSensitive, bool wrap, bool highlightAllMatches);
+    bool findNextString(const char*, bool forward, bool caseSensitive, bool wrap, bool highlightAllMatches, bool selectActiveMatchOnClear);
 
-    JSContextRef scriptContext() const;
-    JSValueRef windowObject() const;
+    JSGlobalContextRef globalContext() const;
 
     unsigned timeoutForJavaScriptExecution() const;
     void setTimeoutForJavaScriptExecution(unsigned ms);
@@ -249,11 +255,15 @@ public:
 
     void setSpellCheckingEnabled(bool);
     void spellCheckingRequestProcessed(int32_t transactionId, spannable_string_t*);
-    void spellCheckingRequestCancelled(int32_t transactionId);
 
+    bool isInputMode() const;
     void setDocumentSelection(const Platform::IntPoint& documentStartPoint, const Platform::IntPoint& documentEndPoint);
     void setDocumentCaretPosition(const Platform::IntPoint&);
-    void selectAtDocumentPoint(const Platform::IntPoint&);
+    void selectAtDocumentPoint(const Platform::IntPoint&, SelectionExpansionType = Word);
+    void expandSelection(bool isScrollStarted);
+    void setOverlayExpansionPixelHeight(int);
+    void setParagraphExpansionPixelScrollMargin(const Platform::IntSize&);
+    void setSelectionDocumentViewportSize(const Platform::IntSize&);
     void selectionCancelled();
     bool selectionContainsDocumentPoint(const Platform::IntPoint&);
 
@@ -262,7 +272,6 @@ public:
     void setDateTimeInput(const BlackBerry::Platform::String& value);
     void setColorInput(const BlackBerry::Platform::String& value);
 
-    void onInputLocaleChanged(bool isRTL);
     static void onNetworkAvailabilityChanged(bool available);
     static void onCertificateStoreLocationSet(const BlackBerry::Platform::String& caPath);
 
@@ -293,15 +302,6 @@ public:
 
     void addVisitedLink(const unsigned short* url, unsigned length);
 
-#if defined(ENABLE_WEBDOM) && ENABLE_WEBDOM
-    WebDOMDocument document() const;
-    WebDOMNode nodeAtDocumentPoint(const Platform::IntPoint&);
-    bool getNodeRect(const WebDOMNode&, Platform::IntRect& result);
-    bool setNodeFocus(const WebDOMNode&, bool on);
-    bool setNodeHovered(const WebDOMNode&, bool on);
-    bool nodeHasHover(const WebDOMNode&);
-#endif
-
     bool defersLoading() const;
 
     bool isEnableLocalAccessToAllCookies() const;
@@ -318,6 +318,9 @@ public:
     void dispatchInspectorMessage(const BlackBerry::Platform::String& message);
     void inspectCurrentContextElement();
 
+    Platform::IntPoint adjustDocumentScrollPosition(const Platform::IntPoint& documentScrollPosition, const Platform::IntRect& documentPaddingRect);
+    Platform::IntSize fixedElementSizeDelta();
+
     // FIXME: Needs API review on this header. See PR #120402.
     void notifyPagePause();
     void notifyPageResume();
@@ -331,6 +334,8 @@ public:
     void notifyScreenPowerStateChanged(bool powered);
     void notifyFullScreenVideoExited(bool done);
     void clearPluginSiteData();
+    void setExtraPluginDirectory(const BlackBerry::Platform::String& path);
+    void updateDisabledPluginFiles(const BlackBerry::Platform::String& fileName, bool disabled);
     void setJavaScriptCanAccessClipboard(bool);
     bool isWebGLEnabled() const;
     void setWebGLEnabled(bool);
@@ -341,6 +346,7 @@ public:
     void resetUserViewportArguments();
 
     WebTapHighlight* tapHighlight() const;
+    WebTapHighlight* selectionHighlight() const;
 
     // Adds an overlay that can be modified on the WebKit thread, and
     // whose attributes can be overridden on the compositing thread.
@@ -353,14 +359,8 @@ public:
 
     // Popup client
     void initPopupWebView(BlackBerry::WebKit::WebPage*);
-    void popupOpened(WebCore::PagePopupBlackBerry* webPopup);
-    void popupClosed();
-    bool hasOpenedPopup() const;
-    WebCore::PagePopupBlackBerry* popup();
 
     void autofillTextField(const BlackBerry::Platform::String&);
-
-    void enableQnxJavaScriptObject(bool);
 
     BlackBerry::Platform::String renderTreeAsText();
 
@@ -370,19 +370,25 @@ public:
     void notificationError(const BlackBerry::Platform::String& notificationId);
     void notificationShown(const BlackBerry::Platform::String& notificationId);
 
+    void animateToScaleAndDocumentScrollPosition(double destinationZoomScale, const BlackBerry::Platform::FloatPoint& destinationScrollPosition, bool shouldConstrainScrollingToContentEdge = true);
+
+    bool isProcessingUserGesture() const;
+
+    void setShowDebugBorders(bool);
+
 private:
     virtual ~WebPage();
 
     friend class WebKit::BackingStore;
     friend class WebKit::BackingStoreClient;
     friend class WebKit::BackingStorePrivate;
+    friend class WebKit::PagePopup;
     friend class WebKit::RenderQueue;
     friend class WebKit::WebPageCompositor;
     friend class WebKit::WebPageGroupLoadDeferrer;
     friend class WebKit::WebPagePrivate;
     friend class WebCore::ChromeClientBlackBerry;
     friend class WebCore::FrameLoaderClientBlackBerry;
-    friend class WebCore::PagePopupBlackBerry;
     WebPagePrivate* d;
 };
 }

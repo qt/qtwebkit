@@ -73,9 +73,18 @@ bool WebKitNamedFlow::overset() const
     return m_parentFlowThread ? m_parentFlowThread->overset() : true;
 }
 
-static inline bool nodeInFlowThread(Node* contentNode, RenderNamedFlowThread* flowThread)
+static inline bool inFlowThread(RenderObject* renderer, RenderNamedFlowThread* flowThread)
 {
-    return contentNode->renderer() && contentNode->renderer()->inRenderFlowThread() && flowThread == contentNode->renderer()->enclosingRenderFlowThread();
+    if (!renderer)
+        return false;
+    RenderFlowThread* currentFlowThread = renderer->flowThreadContainingBlock();
+    if (flowThread == currentFlowThread)
+        return true;
+    if (renderer->flowThreadState() != RenderObject::InsideInFlowThread)
+        return false;
+    
+    // An in-flow flow thread can be nested inside an out-of-flow one, so we have to recur up to check.
+    return inFlowThread(currentFlowThread->containingBlock(), flowThread);
 }
 
 int WebKitNamedFlow::firstEmptyRegionIndex() const
@@ -92,7 +101,7 @@ int WebKitNamedFlow::firstEmptyRegionIndex() const
     RenderRegionList::const_iterator iter = regionList.begin();
     for (int index = 0; iter != regionList.end(); ++index, ++iter) {
         const RenderRegion* renderRegion = *iter;
-        if (renderRegion->regionState() == RenderRegion::RegionEmpty)
+        if (renderRegion->regionOversetState() == RegionEmpty)
             return index;
     }
     return -1;
@@ -113,7 +122,7 @@ PassRefPtr<NodeList> WebKitNamedFlow::getRegionsByContent(Node* contentNode)
     if (!m_parentFlowThread)
         return StaticNodeList::adopt(regionNodes);
 
-    if (nodeInFlowThread(contentNode, m_parentFlowThread)) {
+    if (inFlowThread(contentNode->renderer(), m_parentFlowThread)) {
         const RenderRegionList& regionList = m_parentFlowThread->renderRegionList();
         for (RenderRegionList::const_iterator iter = regionList.begin(); iter != regionList.end(); ++iter) {
             const RenderRegion* renderRegion = *iter;
@@ -205,6 +214,19 @@ void WebKitNamedFlow::dispatchRegionLayoutUpdateEvent()
 
     dispatchEvent(event);
 }
+    
+void WebKitNamedFlow::dispatchRegionOversetChangeEvent()
+{
+    ASSERT(!NoEventDispatchAssertion::isEventDispatchForbidden());
+    
+    // If the flow is in the "NULL" state the event should not be dispatched any more.
+    if (flowState() == FlowStateNull)
+        return;
+    
+    RefPtr<Event> event = UIEvent::create(eventNames().webkitregionoversetchangeEvent, false, false, m_flowManager->document()->defaultView(), 0);
+    
+    dispatchEvent(event);
+}
 
 const AtomicString& WebKitNamedFlow::interfaceName() const
 {
@@ -216,7 +238,7 @@ ScriptExecutionContext* WebKitNamedFlow::scriptExecutionContext() const
     return m_flowManager->document();
 }
 
-Node* WebKitNamedFlow::base() const
+Node* WebKitNamedFlow::ownerNode() const
 {
     return m_flowManager->document();
 }

@@ -51,7 +51,7 @@ PlatformCALayerWinInternal::PlatformCALayerWinInternal(PlatformCALayer* owner)
 {
     if (m_owner->layerType() == PlatformCALayer::LayerTypeWebTiledLayer) {
         // Tiled layers are placed in a child layer that is always the first child of the TiledLayer
-        m_tileParent.adoptCF(CACFLayerCreate(kCACFLayer));
+        m_tileParent = adoptCF(CACFLayerCreate(kCACFLayer));
         CACFLayerInsertSublayer(m_owner->platformLayer(), m_tileParent.get(), 0);
         updateTiles();
     }
@@ -124,9 +124,7 @@ void PlatformCALayerWinInternal::displayCallback(CACFLayerRef caLayer, CGContext
         NONCLIENTMETRICS metrics;
         metrics.cbSize = sizeof(metrics);
         SystemParametersInfo(SPI_GETNONCLIENTMETRICS, metrics.cbSize, &metrics, 0);
-        FontFamily family;
-        family.setFamily(metrics.lfSmCaptionFont.lfFaceName);
-        desc.setFamily(family);
+        desc.setOneFamily(metrics.lfSmCaptionFont.lfFaceName);
 
         desc.setComputedSize(18);
         
@@ -384,7 +382,7 @@ void PlatformCALayerWinInternal::tileDisplayCallback(CACFLayerRef layer, CGConte
 
 void PlatformCALayerWinInternal::addTile()
 {
-    RetainPtr<CACFLayerRef> newLayer(AdoptCF, CACFLayerCreate(kCACFLayer));
+    RetainPtr<CACFLayerRef> newLayer = adoptCF(CACFLayerCreate(kCACFLayer));
     CACFLayerSetAnchorPoint(newLayer.get(), CGPointMake(0, 1));
     CACFLayerSetUserData(newLayer.get(), this);
     CACFLayerSetDisplayCallback(newLayer.get(), tileDisplayCallback);

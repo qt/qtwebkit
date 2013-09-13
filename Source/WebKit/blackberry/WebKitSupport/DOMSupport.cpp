@@ -23,10 +23,12 @@
 #include "Frame.h"
 #include "FrameView.h"
 #include "HTMLFormElement.h"
+#include "HTMLFrameOwnerElement.h"
 #include "HTMLInputElement.h"
 #include "HTMLNames.h"
 #include "HTMLTextAreaElement.h"
 #include "Node.h"
+#include "NodeTraversal.h"
 #include "Range.h"
 #include "RenderObject.h"
 #include "RenderText.h"
@@ -34,9 +36,9 @@
 #include "TextIterator.h"
 #include "VisiblePosition.h"
 #include "VisibleSelection.h"
+#include "VisibleUnits.h"
 
 #include "htmlediting.h"
-#include "visible_units.h"
 
 #include <limits>
 
@@ -74,7 +76,7 @@ void visibleTextQuads(const Range& range, Vector<FloatQuad>& quads, bool useSele
         return;
 
     Node* stopNode = range.pastLastNode();
-    for (Node* node = range.firstNode(); node != stopNode; node = node->traverseNextNode()) {
+    for (Node* node = range.firstNode(); node && node != stopNode; node = NodeTraversal::next(node)) {
         RenderObject* r = node->renderer();
         if (!r || !r->isText())
             continue;
@@ -89,17 +91,26 @@ void visibleTextQuads(const Range& range, Vector<FloatQuad>& quads, bool useSele
     }
 }
 
+bool isShadowHostTextInputElement(Node* node)
+{
+    if (!node)
+        return false;
+
+    Element* element = node->shadowHost();
+    return element && DOMSupport::isTextInputElement(element);
+}
+
 bool isTextInputElement(Element* element)
 {
     return element->isTextFormControl()
-           || element->hasTagName(HTMLNames::textareaTag)
-           || element->isContentEditable();
+        || isHTMLTextAreaElement(element)
+        || element->isContentEditable();
 }
 
 bool isPasswordElement(const Element* element)
 {
-    return element && element->hasTagName(HTMLNames::inputTag)
-           && static_cast<const HTMLInputElement*>(element)->isPasswordField();
+    return element && isHTMLInputElement(element)
+        && toHTMLInputElement(element)->isPasswordField();
 }
 
 WTF::String inputElementText(Element* element)
@@ -108,11 +119,11 @@ WTF::String inputElementText(Element* element)
         return WTF::String();
 
     WTF::String elementText;
-    if (element->hasTagName(HTMLNames::inputTag)) {
-        const HTMLInputElement* inputElement = static_cast<const HTMLInputElement*>(element);
+    if (isHTMLInputElement(element)) {
+        const HTMLInputElement* inputElement = toHTMLInputElement(element);
         elementText = inputElement->value();
-    } else if (element->hasTagName(HTMLNames::textareaTag)) {
-        const HTMLTextAreaElement* inputElement = static_cast<const HTMLTextAreaElement*>(element);
+    } else if (isHTMLTextAreaElement(element)) {
+        const HTMLTextAreaElement* inputElement = toHTMLTextAreaElement(element);
         elementText = inputElement->value();
     } else if (element->isContentEditable()) {
         RefPtr<Range> rangeForNode = rangeOfContents(element);
@@ -151,7 +162,7 @@ HTMLTextFormControlElement* toTextControlElement(Node* node)
     if (!(node && node->isElementNode()))
         return 0;
 
-    Element* element = static_cast<Element*>(node);
+    Element* element = toElement(node);
     if (!element->isFormControlElement())
         return 0;
 
@@ -169,10 +180,10 @@ bool isPopupInputField(const Element* element)
 
 bool isDateTimeInputField(const Element* element)
 {
-    if (!element->hasTagName(HTMLNames::inputTag))
+    if (!isHTMLInputElement(element))
         return false;
 
-    const HTMLInputElement* inputElement = static_cast<const HTMLInputElement*>(element);
+    const HTMLInputElement* inputElement = toHTMLInputElement(element);
 
     // The following types have popup's.
     if (inputElement->isDateField()
@@ -187,10 +198,10 @@ bool isDateTimeInputField(const Element* element)
 
 bool isColorInputField(const Element* element)
 {
-    if (!element->hasTagName(HTMLNames::inputTag))
+    if (!isHTMLInputElement(element))
         return false;
 
-    const HTMLInputElement* inputElement = static_cast<const HTMLInputElement*>(element);
+    const HTMLInputElement* inputElement = toHTMLInputElement(element);
 
 #if ENABLE(INPUT_TYPE_COLOR)
     if (inputElement->isColorControl())
@@ -221,6 +232,11 @@ AttributeState elementSupportsSpellCheck(const Element* element)
     return elementAttributeState(element, HTMLNames::spellcheckAttr);
 }
 
+bool isElementReadOnly(const Element* element)
+{
+    return element->fastHasAttribute(HTMLNames::readonlyAttr);
+}
+
 AttributeState elementAttributeState(const Element* element, const QualifiedName& attributeName)
 {
     // First we check the input item itself. If the attribute is not defined,
@@ -248,13 +264,18 @@ AttributeState elementAttributeState(const Element* element, const QualifiedName
     return Default;
 }
 
+bool elementHasContinuousSpellCheckingEnabled(const PassRefPtr<WebCore::Element> element)
+{
+    return element && element->document()->frame() && element->document()->frame()->editor().isContinuousSpellCheckingEnabled();
+}
+
 // Check if this is an input field that will be focused & require input support.
 bool isTextBasedContentEditableElement(Element* element)
 {
     if (!element)
         return false;
 
-    if (element->isReadOnlyNode() || !element->isEnabledFormControl())
+    if (element->isReadOnlyNode() || element->isDisabledFormControl())
         return false;
 
     if (isPopupInputField(element))
@@ -373,7 +394,7 @@ static bool matchesReservedStringPreventingAutocomplete(const AtomicString& stri
 // login fields as input type=text and auto correction interfers with.
 bool elementIdOrNameIndicatesNoAutocomplete(const Element* element)
 {
-    if (!element->hasTagName(HTMLNames::inputTag))
+    if (!isHTMLInputElement(element))
         return false;
 
     AtomicString idAttribute = element->getIdAttribute();
@@ -452,8 +473,9 @@ IntPoint convertPointToFrame(const Frame* sourceFrame, const Frame* targetFrame,
 
     // Requested point is outside of target frame, return InvalidPoint.
     if (clampToTargetFrame && !targetFrameRect.contains(targetPoint))
-        targetPoint = IntPoint(targetPoint.x() < targetFrameRect.x() ? targetFrameRect.x() : std::min(targetPoint.x(), targetFrameRect.maxX()),
-                targetPoint.y() < targetFrameRect.y() ? targetFrameRect.y() : std::min(targetPoint.y(), targetFrameRect.maxY()));
+        targetPoint = IntPoint(
+            targetPoint.x() < targetFrameRect.x() ? targetFrameRect.x() : std::min(targetPoint.x(), targetFrameRect.maxX()),
+            targetPoint.y() < targetFrameRect.y() ? targetFrameRect.y() : std::min(targetPoint.y(), targetFrameRect.maxY()));
     else if (!targetFrameRect.contains(targetPoint))
         return InvalidPoint;
 
@@ -467,25 +489,30 @@ VisibleSelection visibleSelectionForClosestActualWordStart(const VisibleSelectio
     // it selects the paragraph marker. As well, if the position is at the end of a word, it will select
     // only the space between words. We want to select an actual word so we move the selection to
     // the start of the leftmost word if the character after the selection point is whitespace.
-    if (selection.selectionType() != VisibleSelection::RangeSelection && isWhitespace(selection.visibleStart().characterAfter())) {
+
+    if (selection.selectionType() != VisibleSelection::RangeSelection) {
+        int leftDistance = 0;
+        int rightDistance = 0;
+
         VisibleSelection leftSelection(previousWordPosition(selection.start()));
-        bool leftSelectionIsOnWord = !isWhitespace(leftSelection.visibleStart().characterAfter());
+        bool leftSelectionIsOnWord = !isWhitespace(leftSelection.visibleStart().characterAfter()) && leftSelection.start().containerNode() == selection.start().containerNode();
+        if (leftSelectionIsOnWord) {
+            VisibleSelection rangeSelection(endOfWord(leftSelection.start()), selection.visibleStart());
+            leftDistance = TextIterator::rangeLength(rangeSelection.toNormalizedRange().get());
+        }
 
-        VisibleSelection rangeSelection(endOfWord(leftSelection.start()), selection.visibleStart());
-        int leftDistance = TextIterator::rangeLength(rangeSelection.toNormalizedRange().get());
-
-        VisibleSelection rightSelection(nextWordPosition(selection.start()));
-        rightSelection = previousWordPosition(rightSelection.start());
-        bool rightSelectionIsOnWord = !isWhitespace(rightSelection.visibleStart().characterAfter());
-
-        rangeSelection = VisibleSelection(rightSelection.visibleStart(), selection.visibleStart());
-        int rightDistance = TextIterator::rangeLength(rangeSelection.toNormalizedRange().get());
+        VisibleSelection rightSelection = previousWordPosition(nextWordPosition(selection.start()));
+        bool rightSelectionIsOnWord = !isWhitespace(rightSelection.visibleStart().characterAfter()) && rightSelection.start().containerNode() == selection.start().containerNode();
+        if (rightSelectionIsOnWord) {
+            VisibleSelection rangeSelection = VisibleSelection(rightSelection.visibleStart(), selection.visibleStart());
+            rightDistance = TextIterator::rangeLength(rangeSelection.toNormalizedRange().get());
+        }
 
         // Make sure we found an actual word. If not, return the original selection.
         if (!leftSelectionIsOnWord && !rightSelectionIsOnWord)
             return selection;
 
-        if (!rightSelectionIsOnWord || (leftSelectionIsOnWord && leftDistance < rightDistance)) {
+        if (!rightSelectionIsOnWord || (leftSelectionIsOnWord && leftDistance <= rightDistance)) {
             // Left is closer or right is invalid.
             return leftSelection;
         }
@@ -498,6 +525,46 @@ VisibleSelection visibleSelectionForClosestActualWordStart(const VisibleSelectio
     return selection;
 }
 
+int offsetFromStartOfBlock(const VisiblePosition offset)
+{
+    RefPtr<Range> range = makeRange(startOfBlock(offset), offset);
+    if (!range)
+        return -1;
+
+    return range->text().latin1().length();
+}
+
+VisibleSelection visibleSelectionForFocusedBlock(Element* element)
+{
+    int textLength = inputElementText(element).length();
+
+    if (DOMSupport::toTextControlElement(element)) {
+        RenderTextControl* textRender = toRenderTextControl(element->renderer());
+        if (!textRender)
+            return VisibleSelection();
+
+        VisiblePosition startPosition = textRender->visiblePositionForIndex(0);
+        VisiblePosition endPosition;
+
+        if (textLength)
+            endPosition = textRender->visiblePositionForIndex(textLength);
+        else
+            endPosition = startPosition;
+        return VisibleSelection(startPosition, endPosition);
+    }
+
+    // Must be content editable, generate the range.
+    RefPtr<Range> selectionRange = TextIterator::rangeFromLocationAndLength(element, 0, textLength);
+
+    if (!selectionRange)
+        return VisibleSelection();
+
+    if (!textLength)
+        return VisibleSelection(selectionRange->startPosition(), DOWNSTREAM);
+
+    return VisibleSelection(selectionRange->startPosition(), selectionRange->endPosition());
+}
+
 // This function is copied from WebCore/page/Page.cpp.
 Frame* incrementFrame(Frame* curr, bool forward, bool wrapFlag)
 {
@@ -506,10 +573,15 @@ Frame* incrementFrame(Frame* curr, bool forward, bool wrapFlag)
         : curr->tree()->traversePreviousWithWrap(wrapFlag);
 }
 
+PassRefPtr<Range> trimWhitespaceFromRange(PassRefPtr<Range> range)
+{
+    return trimWhitespaceFromRange(VisiblePosition(range->startPosition()), VisiblePosition(range->endPosition()));
+}
+
 PassRefPtr<Range> trimWhitespaceFromRange(VisiblePosition startPosition, VisiblePosition endPosition)
 {
-    if (isEmptyRangeOrAllSpaces(startPosition, endPosition))
-        return VisibleSelection(endPosition, endPosition).toNormalizedRange();
+    if (startPosition == endPosition || isRangeTextAllWhitespace(startPosition, endPosition))
+        return 0;
 
     while (isWhitespace(startPosition.characterAfter()))
         startPosition = startPosition.next();
@@ -517,14 +589,11 @@ PassRefPtr<Range> trimWhitespaceFromRange(VisiblePosition startPosition, Visible
     while (isWhitespace(endPosition.characterBefore()))
         endPosition = endPosition.previous();
 
-    return VisibleSelection(startPosition, endPosition).toNormalizedRange();
+    return makeRange(startPosition, endPosition);
 }
 
-bool isEmptyRangeOrAllSpaces(VisiblePosition startPosition, VisiblePosition endPosition)
+bool isRangeTextAllWhitespace(VisiblePosition startPosition, VisiblePosition endPosition)
 {
-    if (startPosition == endPosition)
-        return true;
-
     while (isWhitespace(startPosition.characterAfter())) {
         startPosition = startPosition.next();
 
@@ -543,10 +612,65 @@ bool isFixedPositionOrHasFixedPositionAncestor(RenderObject* renderer)
         if (currentRenderer->isOutOfFlowPositioned() && currentRenderer->style()->position() == FixedPosition)
             return true;
 
+        // Check if the current frame is an iframe. If so, continue checking with the iframe's owner element.
+        if (!currentRenderer->parent() && currentRenderer->isRenderView() && currentRenderer->frame() && currentRenderer->frame()->ownerElement()) {
+            currentRenderer = currentRenderer->frame()->ownerElement()->renderer();
+            continue;
+        }
+
         currentRenderer = currentRenderer->parent();
     }
 
     return false;
+}
+
+Element* selectionContainerElement(const VisibleSelection& selection)
+{
+    if (!selection.isRange())
+        return 0;
+
+    Node* startContainer = 0;
+    if (selection.firstRange())
+        startContainer = selection.firstRange()->startContainer();
+
+    if (!startContainer)
+        return 0;
+
+    Element* element = 0;
+    if (startContainer->isInShadowTree())
+        element = startContainer->shadowHost();
+    else if (startContainer->isElementNode())
+        element = toElement(startContainer);
+    else
+        element = startContainer->parentElement();
+
+    return element;
+}
+
+BlackBerry::Platform::RequestedHandlePosition elementHandlePositionAttribute(const WebCore::Element* element)
+{
+    BlackBerry::Platform::RequestedHandlePosition position = BlackBerry::Platform::SmartPlacement;
+    if (!element)
+        return position;
+
+    DEFINE_STATIC_LOCAL(QualifiedName, qualifiedAttrNameForHandlePosition, (nullAtom, "data-blackberry-text-selection-handle-position", nullAtom));
+    AtomicString attributeString;
+    if (element->fastHasAttribute(qualifiedAttrNameForHandlePosition))
+        attributeString = element->fastGetAttribute(qualifiedAttrNameForHandlePosition);
+
+    if (attributeString.isNull() || attributeString.isEmpty())
+        return position;
+
+    if (equalIgnoringCase(attributeString, "above"))
+        position = BlackBerry::Platform::Above;
+    else if (equalIgnoringCase(attributeString, "below"))
+        position = BlackBerry::Platform::Below;
+    return position;
+}
+
+bool isElementAndDocumentAttached(const WebCore::Element* element)
+{
+    return element && element->attached() && element->document() && element->document()->attached();
 }
 
 } // DOMSupport

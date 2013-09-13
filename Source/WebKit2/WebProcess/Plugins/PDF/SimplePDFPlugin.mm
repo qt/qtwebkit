@@ -52,7 +52,8 @@
 #import <WebCore/ScrollbarTheme.h>
 
 using namespace WebCore;
-using namespace std;
+
+static const char* postScriptMIMEType = "application/postscript";
 
 static void appendValuesInPDFNameSubtreeToVector(CGPDFDictionaryRef subtree, Vector<CGPDFObjectRef>& values)
 {
@@ -85,7 +86,7 @@ static void getAllValuesInPDFNameTree(CGPDFDictionaryRef tree, Vector<CGPDFObjec
     appendValuesInPDFNameSubtreeToVector(tree, allValues);
 }
 
-static void getAllScriptsInPDFDocument(CGPDFDocumentRef pdfDocument, Vector<RetainPtr<CFStringRef> >& scripts)
+static void getAllScriptsInPDFDocument(CGPDFDocumentRef pdfDocument, Vector<RetainPtr<CFStringRef>>& scripts)
 {
     if (!pdfDocument)
         return;
@@ -126,7 +127,7 @@ static void getAllScriptsInPDFDocument(CGPDFDocumentRef pdfDocument, Vector<Reta
         RetainPtr<CFDataRef> data;
         if (CGPDFDictionaryGetStream(javaScriptAction, "JS", &stream)) {
             CGPDFDataFormat format;
-            data.adoptCF(CGPDFStreamCopyData(stream, &format));
+            data = adoptCF(CGPDFStreamCopyData(stream, &format));
             if (!data)
                 continue;
             bytes = CFDataGetBytePtr(data.get());
@@ -139,7 +140,7 @@ static void getAllScriptsInPDFDocument(CGPDFDocumentRef pdfDocument, Vector<Reta
             continue;
 
         CFStringEncoding encoding = (length > 1 && bytes[0] == 0xFE && bytes[1] == 0xFF) ? kCFStringEncodingUnicode : kCFStringEncodingUTF8;
-        RetainPtr<CFStringRef> script(AdoptCF, CFStringCreateWithBytes(kCFAllocatorDefault, bytes, length, encoding, true));
+        RetainPtr<CFStringRef> script = adoptCF(CFStringCreateWithBytes(kCFAllocatorDefault, bytes, length, encoding, true));
         if (!script)
             continue;
 
@@ -163,6 +164,8 @@ PassRefPtr<SimplePDFPlugin> SimplePDFPlugin::create(WebFrame* frame)
 
 SimplePDFPlugin::SimplePDFPlugin(WebFrame* frame)
     : m_frame(frame)
+    , m_isPostScript(false)
+    , m_pdfDocumentWasMutated(false)
 {
 }
 
@@ -174,13 +177,26 @@ PluginInfo SimplePDFPlugin::pluginInfo()
 {
     PluginInfo info;
     info.name = builtInPDFPluginName();
+    info.isApplicationPlugin = true;
 
-    MimeClassInfo mimeClassInfo;
-    mimeClassInfo.type = "application/pdf";
-    mimeClassInfo.desc = pdfDocumentTypeDescription();
-    mimeClassInfo.extensions.append("pdf");
+    MimeClassInfo pdfMimeClassInfo;
+    pdfMimeClassInfo.type = "application/pdf";
+    pdfMimeClassInfo.desc = pdfDocumentTypeDescription();
+    pdfMimeClassInfo.extensions.append("pdf");
+    info.mimes.append(pdfMimeClassInfo);
+    
+    MimeClassInfo textPDFMimeClassInfo;
+    textPDFMimeClassInfo.type = "text/pdf";
+    textPDFMimeClassInfo.desc = pdfDocumentTypeDescription();
+    textPDFMimeClassInfo.extensions.append("pdf");
+    info.mimes.append(textPDFMimeClassInfo);
 
-    info.mimes.append(mimeClassInfo);
+    MimeClassInfo postScriptMimeClassInfo;
+    postScriptMimeClassInfo.type = postScriptMIMEType;
+    postScriptMimeClassInfo.desc = postScriptDocumentTypeDescription();
+    postScriptMimeClassInfo.extensions.append("ps");
+    info.mimes.append(postScriptMimeClassInfo);
+
     return info;
 }
 
@@ -250,10 +266,7 @@ void SimplePDFPlugin::updateScrollbars()
 PassRefPtr<Scrollbar> SimplePDFPlugin::createScrollbar(ScrollbarOrientation orientation)
 {
     RefPtr<Scrollbar> widget = Scrollbar::createNativeScrollbar(this, orientation, RegularScrollbar);
-    if (orientation == HorizontalScrollbar)
-        didAddHorizontalScrollbar(widget.get());
-    else 
-        didAddVerticalScrollbar(widget.get());
+    didAddScrollbar(widget.get(), orientation);
     pluginView()->frame()->view()->addChild(widget.get());
     return widget.release();
 }
@@ -264,11 +277,7 @@ void SimplePDFPlugin::destroyScrollbar(ScrollbarOrientation orientation)
     if (!scrollbar)
         return;
 
-    if (orientation == HorizontalScrollbar)
-        willRemoveHorizontalScrollbar(scrollbar.get());
-    else
-        willRemoveVerticalScrollbar(scrollbar.get());
-
+    willRemoveScrollbar(scrollbar.get(), orientation);
     scrollbar->removeFromParent();
     scrollbar->disconnectFromScrollableArea();
     scrollbar = 0;
@@ -316,7 +325,7 @@ JSValueRef SimplePDFPlugin::jsPDFDocPrint(JSContextRef ctx, JSObjectRef function
     if (!page)
         return JSValueMakeUndefined(ctx);
     
-    page->chrome()->print(coreFrame);
+    page->chrome().print(coreFrame);
     
     return JSValueMakeUndefined(ctx);
 }
@@ -343,11 +352,27 @@ JSObjectRef SimplePDFPlugin::makeJSPDFDoc(JSContextRef ctx)
     return JSObjectMake(ctx, jsPDFDocClass, this);
 }
 
+static RetainPtr<CFMutableDataRef> convertPostScriptDataToPDF(RetainPtr<CFDataRef> postScriptData)
+{
+    // Convert PostScript to PDF using the Quartz 2D API.
+    // http://developer.apple.com/documentation/GraphicsImaging/Conceptual/drawingwithquartz2d/dq_ps_convert/chapter_16_section_1.html
+
+    CGPSConverterCallbacks callbacks = { 0, 0, 0, 0, 0, 0, 0, 0 };
+    RetainPtr<CGPSConverterRef> converter = adoptCF(CGPSConverterCreate(0, &callbacks, 0));
+    RetainPtr<CGDataProviderRef> provider = adoptCF(CGDataProviderCreateWithCFData(postScriptData.get()));
+    RetainPtr<CFMutableDataRef> pdfData = adoptCF(CFDataCreateMutable(kCFAllocatorDefault, 0));
+    RetainPtr<CGDataConsumerRef> consumer = adoptCF(CGDataConsumerCreateWithCFData(pdfData.get()));
+
+    CGPSConverterConvert(converter.get(), provider.get(), consumer.get(), 0);
+
+    return pdfData;
+}
+
 void SimplePDFPlugin::pdfDocumentDidLoad()
 {
     addArchiveResource();
 
-    m_pdfDocument.adoptNS([[pdfDocumentClass() alloc] initWithData:(NSData *)m_data.get()]);
+    m_pdfDocument = adoptNS([[pdfDocumentClass() alloc] initWithData:(NSData *)m_data.get()]);
 
     calculateSizes();
     updateScrollbars();
@@ -359,7 +384,7 @@ void SimplePDFPlugin::pdfDocumentDidLoad()
     
 void SimplePDFPlugin::runScriptsInPDFDocument()
 {
-    Vector<RetainPtr<CFStringRef> > scripts;
+    Vector<RetainPtr<CFStringRef>> scripts;
     getAllScriptsInPDFDocument([m_pdfDocument.get() documentRef], scripts);
 
     size_t scriptCount = scripts.size();
@@ -581,11 +606,23 @@ void SimplePDFPlugin::didEvaluateJavaScript(uint64_t, const WTF::String&)
     ASSERT_NOT_REACHED();
 }
 
-void SimplePDFPlugin::streamDidReceiveResponse(uint64_t streamID, const KURL&, uint32_t, uint32_t, const String&, const String&, const String& suggestedFilename)
+void SimplePDFPlugin::convertPostScriptDataIfNeeded()
+{
+    if (!m_isPostScript)
+        return;
+
+    m_suggestedFilename = String(m_suggestedFilename + ".pdf");
+    m_data = convertPostScriptDataToPDF(m_data);
+}
+
+void SimplePDFPlugin::streamDidReceiveResponse(uint64_t streamID, const KURL&, uint32_t, uint32_t, const String& mimeType, const String&, const String& suggestedFilename)
 {
     ASSERT_UNUSED(streamID, streamID == pdfDocumentRequestID);
 
     m_suggestedFilename = suggestedFilename;
+
+    if (equalIgnoringCase(mimeType, postScriptMIMEType))
+        m_isPostScript = true;
 }
                                            
 void SimplePDFPlugin::streamDidReceiveData(uint64_t streamID, const char* bytes, int length)
@@ -593,7 +630,7 @@ void SimplePDFPlugin::streamDidReceiveData(uint64_t streamID, const char* bytes,
     ASSERT_UNUSED(streamID, streamID == pdfDocumentRequestID);
 
     if (!m_data)
-        m_data.adoptCF(CFDataCreateMutable(0, 0));
+        m_data = adoptCF(CFDataCreateMutable(0, 0));
 
     CFDataAppendBytes(m_data.get(), reinterpret_cast<const UInt8*>(bytes), length);
 }
@@ -602,6 +639,7 @@ void SimplePDFPlugin::streamDidFinishLoading(uint64_t streamID)
 {
     ASSERT_UNUSED(streamID, streamID == pdfDocumentRequestID);
 
+    convertPostScriptDataIfNeeded();
     pdfDocumentDidLoad();
 }
 
@@ -615,19 +653,43 @@ void SimplePDFPlugin::streamDidFail(uint64_t streamID, bool wasCancelled)
 void SimplePDFPlugin::manualStreamDidReceiveResponse(const KURL& responseURL, uint32_t streamLength,  uint32_t lastModifiedTime, const String& mimeType, const String& headers, const String& suggestedFilename)
 {
     m_suggestedFilename = suggestedFilename;
+
+    if (equalIgnoringCase(mimeType, postScriptMIMEType))
+        m_isPostScript = true;
 }
 
 void SimplePDFPlugin::manualStreamDidReceiveData(const char* bytes, int length)
 {
     if (!m_data)
-        m_data.adoptCF(CFDataCreateMutable(0, 0));
+        m_data = adoptCF(CFDataCreateMutable(0, 0));
 
     CFDataAppendBytes(m_data.get(), reinterpret_cast<const UInt8*>(bytes), length);
 }
 
 void SimplePDFPlugin::manualStreamDidFinishLoading()
 {
+    convertPostScriptDataIfNeeded();
     pdfDocumentDidLoad();
+}
+
+NSData *SimplePDFPlugin::liveData() const
+{
+    // Save data straight from the resource instead of PDFKit if the document is
+    // untouched by the user, so that PDFs which PDFKit can't display will still be downloadable.
+    if (pdfDocumentWasMutated())
+        return [m_pdfDocument.get() dataRepresentation];
+    else
+        return rawData();
+}
+
+PassRefPtr<SharedBuffer> SimplePDFPlugin::liveResourceData() const
+{
+    NSData *pdfData = liveData();
+
+    if (!pdfData)
+        return 0;
+
+    return SharedBuffer::wrapNSData(pdfData);
 }
 
 void SimplePDFPlugin::manualStreamDidFail(bool)

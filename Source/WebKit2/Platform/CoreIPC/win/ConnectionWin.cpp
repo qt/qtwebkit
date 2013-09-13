@@ -26,14 +26,14 @@
 #include "config.h"
 #include "Connection.h"
 
-#include "BinarySemaphore.h"
 #include "DataReference.h"
 #include <wtf/Functional.h>
 #include <wtf/RandomNumber.h>
 #include <wtf/text/WTFString.h>
+#include <wtf/threads/BinarySemaphore.h>
 
 using namespace std;
- 
+
 namespace CoreIPC {
 
 // FIXME: Rename this or use a different constant on windows.
@@ -47,7 +47,7 @@ bool Connection::createServerAndClientIdentifiers(HANDLE& serverIdentifier, HAND
         unsigned uniqueID = randomNumber() * std::numeric_limits<unsigned>::max();
         pipeName = String::format("\\\\.\\pipe\\com.apple.WebKit.%x", uniqueID);
 
-        serverIdentifier = ::CreateNamedPipe(pipeName.charactersWithNullTermination(),
+        serverIdentifier = ::CreateNamedPipe(pipeName.charactersWithNullTermination().data(),
                                              PIPE_ACCESS_DUPLEX | FILE_FLAG_FIRST_PIPE_INSTANCE | FILE_FLAG_OVERLAPPED,
                                              PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE, 1, inlineMessageMaxSize, inlineMessageMaxSize,
                                              0, 0);
@@ -62,7 +62,7 @@ bool Connection::createServerAndClientIdentifiers(HANDLE& serverIdentifier, HAND
     if (!serverIdentifier)
         return false;
 
-    clientIdentifier = ::CreateFileW(pipeName.charactersWithNullTermination(), GENERIC_READ | GENERIC_WRITE, 0, 0, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, 0);
+    clientIdentifier = ::CreateFileW(pipeName.charactersWithNullTermination().data(), GENERIC_READ | GENERIC_WRITE, 0, 0, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, 0);
     if (!clientIdentifier) {
         ::CloseHandle(serverIdentifier);
         return false;
@@ -96,10 +96,10 @@ void Connection::platformInvalidate()
 
     m_isConnected = false;
 
-    m_connectionQueue.unregisterAndCloseHandle(m_readState.hEvent);
+    m_connectionQueue->unregisterAndCloseHandle(m_readState.hEvent);
     m_readState.hEvent = 0;
 
-    m_connectionQueue.unregisterAndCloseHandle(m_writeState.hEvent);
+    m_connectionQueue->unregisterAndCloseHandle(m_writeState.hEvent);
     m_writeState.hEvent = 0;
 
     ::CloseHandle(m_connectionPipe);
@@ -161,19 +161,8 @@ void Connection::readEventHandler()
         if (!m_readBuffer.isEmpty()) {
             // We have a message, let's dispatch it.
 
-            // The messageID is encoded at the end of the buffer.
-            // Note that we assume here that the message is the same size as m_readBuffer. We can
-            // assume this because we always size m_readBuffer to exactly match the size of the message,
-            // either when receiving ERROR_MORE_DATA from ::GetOverlappedResult above or when
-            // ::PeekNamedPipe tells us the size below. We never set m_readBuffer to a size larger
-            // than the message.
-            ASSERT(m_readBuffer.size() >= sizeof(MessageID));
-            size_t realBufferSize = m_readBuffer.size() - sizeof(MessageID);
-
-            unsigned messageID = *reinterpret_cast<unsigned*>(m_readBuffer.data() + realBufferSize);
-
-            OwnPtr<MessageDecoder> decoder = MessageDecoder::create(DataReference(m_readBuffer.data(), realBufferSize));
-            processIncomingMessage(MessageID::fromInt(messageID), decoder.release());
+            OwnPtr<MessageDecoder> decoder = MessageDecoder::create(DataReference(m_readBuffer.data(), m_readBuffer.size()));
+            processIncomingMessage(decoder.release());
         }
 
         // Find out the size of the next message in the pipe (if there is one) so that we can read
@@ -262,11 +251,11 @@ bool Connection::open()
     m_isConnected = true;
 
     // Start listening for read and write state events.
-    m_connectionQueue.registerHandle(m_readState.hEvent, bind(&Connection::readEventHandler, this));
-    m_connectionQueue.registerHandle(m_writeState.hEvent, bind(&Connection::writeEventHandler, this));
+    m_connectionQueue->registerHandle(m_readState.hEvent, bind(&Connection::readEventHandler, this));
+    m_connectionQueue->registerHandle(m_writeState.hEvent, bind(&Connection::writeEventHandler, this));
 
     // Schedule a read.
-    m_connectionQueue.dispatch(bind(&Connection::readEventHandler, this));
+    m_connectionQueue->dispatch(bind(&Connection::readEventHandler, this));
 
     return true;
 }
@@ -279,7 +268,7 @@ bool Connection::platformCanSendOutgoingMessages() const
     return !m_pendingWriteEncoder;
 }
 
-bool Connection::sendOutgoingMessage(MessageID messageID, PassOwnPtr<MessageEncoder> encoder)
+bool Connection::sendOutgoingMessage(PassOwnPtr<MessageEncoder> encoder)
 {
     ASSERT(!m_pendingWriteEncoder);
 
@@ -288,7 +277,7 @@ bool Connection::sendOutgoingMessage(MessageID messageID, PassOwnPtr<MessageEnco
         return false;
 
     // We put the message ID last.
-    encoder->encode(static_cast<uint32_t>(messageID.toInt()));
+    *encoder << 0;
 
     // Write the outgoing message.
 
@@ -318,7 +307,7 @@ bool Connection::sendOutgoingMessage(MessageID messageID, PassOwnPtr<MessageEnco
     return false;
 }
 
-bool Connection::dispatchSentMessagesUntil(const Vector<HWND>& windows, CoreIPC::BinarySemaphore& semaphore, double absoluteTime)
+bool Connection::dispatchSentMessagesUntil(const Vector<HWND>& windows, WTF::BinarySemaphore& semaphore, double absoluteTime)
 {
     if (windows.isEmpty())
         return semaphore.wait(absoluteTime);

@@ -21,6 +21,7 @@
 
 #include "BlackBerryGlobal.h"
 
+#include <BlackBerryPlatformMisc.h>
 #include <BlackBerryPlatformPrimitives.h>
 #include <interaction/ScrollViewBase.h>
 
@@ -30,6 +31,7 @@ namespace WebKit {
 class InRegionScrollerPrivate;
 class TouchEventHandler;
 class WebPagePrivate;
+class SelectionHandler;
 
 class BLACKBERRY_EXPORT InRegionScroller {
 public:
@@ -43,7 +45,9 @@ public:
 private:
     friend class WebPagePrivate;
     friend class TouchEventHandler;
+    friend class SelectionHandler;
     InRegionScrollerPrivate *d;
+    DISABLE_COPY(InRegionScroller)
 };
 
 }

@@ -26,7 +26,9 @@
 #include "config.h"
 #include "GLXContext.h"
 
-#if USE(ACCELERATED_COMPOSITING) && HAVE(GLX)
+#if USE(ACCELERATED_COMPOSITING) && USE(GLX)
+
+#include "X11Helper.h"
 
 namespace WebCore {
 
@@ -41,27 +43,26 @@ static int Attribs[] = {
 static void initializeARBExtensions()
 {
     static bool initialized = false;
-
     if (initialized)
         return;
 
     initialized = true;
-    glXCreateContextAttribsARB = reinterpret_cast<GLXCREATECONTEXTATTRIBSARBPROC>(glXGetProcAddress(reinterpret_cast<const GLubyte*>("glXCreateContextAttribsARB")));
+    if (GLPlatformContext::supportsGLXExtension(X11Helper::nativeDisplay(), "GLX_ARB_create_context_robustness"))
+        glXCreateContextAttribsARB = reinterpret_cast<GLXCREATECONTEXTATTRIBSARBPROC>(glXGetProcAddress(reinterpret_cast<const GLubyte*>("glXCreateContextAttribsARB")));
 }
 
 GLXOffScreenContext::GLXOffScreenContext()
     : GLPlatformContext()
-    , m_display(0)
 {
 }
 
-bool GLXOffScreenContext::initialize(GLPlatformSurface* surface)
+bool GLXOffScreenContext::initialize(GLPlatformSurface* surface, PlatformContext sharedContext)
 {
     if (!surface)
         return false;
 
-    m_display = surface->sharedDisplay();
-    if (!m_display)
+    Display* x11Display = surface->sharedDisplay();
+    if (!x11Display)
         return false;
 
     GLXFBConfig config = surface->configuration();
@@ -70,12 +71,22 @@ bool GLXOffScreenContext::initialize(GLPlatformSurface* surface)
         initializeARBExtensions();
 
         if (glXCreateContextAttribsARB)
-            m_contextHandle = glXCreateContextAttribsARB(m_display, config, 0, true, Attribs);
+            m_contextHandle = glXCreateContextAttribsARB(x11Display, config, sharedContext, true, Attribs);
 
-        if (m_contextHandle)
-            m_resetLostContext = true;
-        else
-            m_contextHandle = glXCreateNewContext(m_display, config, GLX_RGBA_TYPE, 0, true);
+        if (m_contextHandle) {
+            // The GLX_ARB_create_context_robustness spec requires that a context created with
+            // GLX_CONTEXT_ROBUST_ACCESS_BIT_ARB bit set must also support GL_ARB_robustness or
+            // a version of OpenGL incorporating equivalent functionality.
+            // The spec also defines similar requirements for attribute GLX_CONTEXT_RESET_NOTIFICATION_STRATEGY_ARB.
+            if (platformMakeCurrent(surface) && GLPlatformContext::supportsGLExtension("GL_ARB_robustness"))
+                m_resetLostContext = true;
+            else
+                glXDestroyContext(x11Display, m_contextHandle);
+        }
+
+        bool supportsAlpha = surface->attributes() & GLPlatformSurface::SupportAlpha;
+        if (!m_contextHandle)
+            m_contextHandle = glXCreateNewContext(x11Display, config, supportsAlpha ? GLX_RGBA_TYPE : 0, sharedContext, true);
 
         if (m_contextHandle)
             return true;
@@ -95,21 +106,28 @@ bool GLXOffScreenContext::isCurrentContext() const
 
 bool GLXOffScreenContext::platformMakeCurrent(GLPlatformSurface* surface)
 {
-    return glXMakeCurrent(surface->sharedDisplay(), surface->handle(), m_contextHandle);
+    return glXMakeCurrent(surface->sharedDisplay(), surface->drawable(), m_contextHandle);
 }
 
 void GLXOffScreenContext::platformReleaseCurrent()
 {
-    glXMakeCurrent(m_display, 0, 0);
+    Display* x11Display = X11Helper::nativeDisplay();
+    if (!x11Display)
+        return;
+
+    glXMakeCurrent(x11Display, 0, 0);
 }
 
 void GLXOffScreenContext::freeResources()
 {
+    Display* x11Display = X11Helper::nativeDisplay();
+    if (!x11Display)
+        return;
+
     if (m_contextHandle)
-        glXDestroyContext(m_display, m_contextHandle);
+        glXDestroyContext(x11Display, m_contextHandle);
 
     m_contextHandle = 0;
-    m_display = 0;
 }
 
 void GLXOffScreenContext::destroy()

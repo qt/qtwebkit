@@ -40,6 +40,10 @@ config.kPlatforms = {
             'Apple Lion Debug WK1 (Tests)' : {version: 'lion', debug: true},
             'Apple Lion Release WK2 (Tests)' : {version: 'lion' },
             'Apple Lion Debug WK2 (Tests)' : {version: 'lion', debug: true},
+            'Apple MountainLion Release WK1 (Tests)' : {version: 'mountainlion' },
+            'Apple MountainLion Debug WK1 (Tests)' : {version: 'mountainlion', debug: true},
+            'Apple MountainLion Release WK2 (Tests)' : {version: 'mountainlion' },
+            'Apple MountainLion Debug WK2 (Tests)' : {version: 'mountainlion', debug: true},
             // 'Apple Win XP Debug (Tests)' : {version: 'xp',debug: true},
             // 'Apple Win 7 Release (Tests)' : {version: 'win7'},
         },
@@ -54,48 +58,6 @@ config.kPlatforms = {
         },
         _builderApplies: function(builderName) {
             return builderName.indexOf('Apple') != -1;
-        },
-    },
-    'chromium' : {
-        label : 'Chromium',
-        buildConsoleURL: 'http://build.chromium.org/p/chromium.webkit',
-        layoutTestResultsURL: 'http://build.chromium.org/f/chromium/layout_test_results',
-        waterfallURL: 'http://build.chromium.org/p/chromium.webkit/waterfall',
-        builders: {
-            'WebKit XP': {version: 'xp'},
-            'WebKit Win7': {version: 'win7'},
-            'WebKit Win7 (dbg)(1)': {version: 'win7', debug: true},
-            'WebKit Win7 (dbg)(2)': {version: 'win7', debug: true},
-            'WebKit Linux': {version: 'lucid', is64bit: true},
-            'WebKit Linux 32': {version: 'lucid'},
-            'WebKit Linux (dbg)': {version: 'lucid', is64bit: true, debug: true},
-            'WebKit Mac10.6': {version: 'snowleopard'},
-            'WebKit Mac10.6 (dbg)': {version: 'snowleopard', debug: true},
-            'WebKit Mac10.7': {version: 'lion'},
-            'WebKit Mac10.7 (dbg)': {version: 'lion', debug: true},
-            'WebKit Mac10.8': {version: 'mountainlion'},
-        },
-        haveBuilderAccumulatedResults : true,
-        useDirectoryListingForOldBuilds: true,
-        useFlakinessDashboard: true,
-        resultsDirectoryNameFromBuilderName: function(builderName) {
-            return base.underscoredBuilderName(builderName);
-        },
-        resultsDirectoryForBuildNumber: function(buildNumber, revision) {
-            return buildNumber;
-        },
-        _builderApplies: function(builderName) {
-            // FIXME: Should garden-o-matic show these? I can imagine showing the deps bots being useful at least so
-            // that the gardener only need to look at garden-o-matic and never at the waterfall. Not really sure who
-            // watches the GPU bots.
-            // The 10.8 Tests bot is really an FYI bot at this point
-            // WebKit Android doesn't upload its results yet.
-            return builderName.indexOf('GPU') == -1 &&
-                   builderName.indexOf('deps') == -1 &&
-                   builderName.indexOf('ASAN') == -1 &&
-                   builderName.indexOf('Content Shell') == -1 &&
-                   builderName.indexOf('Mac10.8 Tests') == -1 &&
-                   builderName.indexOf('WebKit Android') == -1;
         },
     },
     'gtk' : {
@@ -183,7 +145,7 @@ config.kRelativeTimeUpdateFrequency = 1000 * 60;
 
 config.kExperimentalFeatures = window.location.search.search('enableExperiments=1') != -1;
 
-config.currentPlatform = base.getURLParameter('platform') || 'chromium';
+config.currentPlatform = base.getURLParameter('platform') || 'apple';
 
 // FIXME: We should add a way to restrict the results to a subset of the builders
 // (or maybe just a single builder) in the UI as well as via an URL parameter.

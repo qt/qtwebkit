@@ -26,23 +26,19 @@
 #include "config.h"
 #include "CookieJar.h"
 
+#include "CookiesStrategy.h"
 #include "Document.h"
 #include "Frame.h"
+#include "FrameLoader.h"
+#include "NetworkingContext.h"
 #include "PlatformCookieJar.h"
-
-#if USE(PLATFORM_STRATEGIES)
-#include "CookiesStrategy.h"
 #include "PlatformStrategies.h"
-#endif
-
-#if PLATFORM(BLACKBERRY)
-#error Blackberry currently uses a fork of this file because of layering violations
-#endif
 
 namespace WebCore {
 
 static NetworkingContext* networkingContext(const Document* document)
 {
+    // FIXME: Returning 0 means falling back to default context. That's not a choice that is appropriate to do at runtime
     if (!document)
         return 0;
     Frame* frame = document->frame();
@@ -54,85 +50,51 @@ static NetworkingContext* networkingContext(const Document* document)
     return loader->networkingContext();
 }
 
+#if PLATFORM(MAC) || USE(CFNETWORK) || USE(SOUP)
+inline NetworkStorageSession& storageSession(const Document* document)
+{
+    NetworkingContext* context = networkingContext(document);
+    return context ? context->storageSession() : NetworkStorageSession::defaultStorageSession();
+}
+#define LOCAL_SESSION(document) NetworkStorageSession& session = storageSession(document);
+#else
+#define LOCAL_SESSION(document) NetworkStorageSession session(networkingContext(document));
+#endif
+
 String cookies(const Document* document, const KURL& url)
 {
-#if USE(PLATFORM_STRATEGIES)
-    return platformStrategies()->cookiesStrategy()->cookiesForDOM(networkingContext(document), document->firstPartyForCookies(), url);
-#else
-    return cookiesForDOM(networkingContext(document), document->firstPartyForCookies(), url);
-#endif
+    LOCAL_SESSION(document)
+    return platformStrategies()->cookiesStrategy()->cookiesForDOM(session, document->firstPartyForCookies(), url);
 }
 
 void setCookies(Document* document, const KURL& url, const String& cookieString)
 {
-#if USE(PLATFORM_STRATEGIES)
-    platformStrategies()->cookiesStrategy()->setCookiesFromDOM(networkingContext(document), document->firstPartyForCookies(), url, cookieString);
-#else
-    setCookiesFromDOM(networkingContext(document), document->firstPartyForCookies(), url, cookieString);
-#endif
+    LOCAL_SESSION(document)
+    platformStrategies()->cookiesStrategy()->setCookiesFromDOM(session, document->firstPartyForCookies(), url, cookieString);
 }
 
 bool cookiesEnabled(const Document* document)
 {
-#if USE(PLATFORM_STRATEGIES)
-    return platformStrategies()->cookiesStrategy()->cookiesEnabled(networkingContext(document), document->firstPartyForCookies(), document->cookieURL());
-#else
-    return cookiesEnabled(networkingContext(document), document->firstPartyForCookies(), document->cookieURL());
-#endif
+    LOCAL_SESSION(document)
+    return platformStrategies()->cookiesStrategy()->cookiesEnabled(session, document->firstPartyForCookies(), document->cookieURL());
 }
 
 String cookieRequestHeaderFieldValue(const Document* document, const KURL& url)
 {
-#if USE(PLATFORM_STRATEGIES)
-    return platformStrategies()->cookiesStrategy()->cookieRequestHeaderFieldValue(networkingContext(document), document->firstPartyForCookies(), url);
-#else
-    return cookieRequestHeaderFieldValue(networkingContext(document), document->firstPartyForCookies(), url);
-#endif
+    LOCAL_SESSION(document)
+    return platformStrategies()->cookiesStrategy()->cookieRequestHeaderFieldValue(session, document->firstPartyForCookies(), url);
 }
 
 bool getRawCookies(const Document* document, const KURL& url, Vector<Cookie>& cookies)
 {
-#if USE(PLATFORM_STRATEGIES)
-    return platformStrategies()->cookiesStrategy()->getRawCookies(networkingContext(document), document->firstPartyForCookies(), url, cookies);
-#else
-    return getRawCookies(networkingContext(document), document->firstPartyForCookies(), url, cookies);
-#endif
+    LOCAL_SESSION(document)
+    return platformStrategies()->cookiesStrategy()->getRawCookies(session, document->firstPartyForCookies(), url, cookies);
 }
 
 void deleteCookie(const Document* document, const KURL& url, const String& cookieName)
 {
-#if USE(PLATFORM_STRATEGIES)
-    platformStrategies()->cookiesStrategy()->deleteCookie(networkingContext(document), url, cookieName);
-#else
-    deleteCookie(networkingContext(document), url, cookieName);
-#endif
-}
-
-void getHostnamesWithCookies(HashSet<String>& hostnames)
-{
-#if USE(PLATFORM_STRATEGIES)
-    platformStrategies()->cookiesStrategy()->getHostnamesWithCookies(0, hostnames);
-#else
-    getHostnamesWithCookies(0, hostnames);
-#endif
-}
-
-void deleteCookiesForHostname(const String& hostname)
-{
-#if USE(PLATFORM_STRATEGIES)
-    platformStrategies()->cookiesStrategy()->deleteCookiesForHostname(0, hostname);
-#else
-    deleteCookiesForHostname(0, hostname);
-#endif
-}
-
-void deleteAllCookies()
-{
-#if USE(PLATFORM_STRATEGIES)
-    platformStrategies()->cookiesStrategy()->deleteAllCookies(0);
-#else
-    deleteAllCookies(0);
-#endif
+    LOCAL_SESSION(document)
+    platformStrategies()->cookiesStrategy()->deleteCookie(session, url, cookieName);
 }
 
 }

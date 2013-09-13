@@ -26,17 +26,20 @@ macx: QT += xml
 HEADERS += \
     $$PWD/../WorkQueue.h \
     $$PWD/../DumpRenderTree.h \
+    $$PWD/../GCController.h \
+    $$PWD/../TestRunner.h \
     DumpRenderTreeQt.h \
     EventSenderQt.h \
     TextInputControllerQt.h \
     WorkQueueItemQt.h \
     TestRunnerQt.h \
-    GCControllerQt.h \
     testplugin.h
 
 SOURCES += \
     $$PWD/../WorkQueue.cpp \
     $$PWD/../DumpRenderTreeCommon.cpp \
+    $$PWD/../GCController.cpp \
+    $$PWD/../TestRunner.cpp \
     DumpRenderTreeQt.cpp \
     EventSenderQt.cpp \
     TextInputControllerQt.cpp \

@@ -52,16 +52,13 @@ public:
         GestureScrollBegin,
         GestureScrollEnd,
         GestureScrollUpdate,
+        GestureScrollUpdateWithoutPropagation,
         GestureTap,
         GestureTapDown,
         GestureTapDownCancel,
-        GestureDoubleTap,
         GestureTwoFingerTap,
         GestureLongPress,
         GestureLongTap,
-        GesturePinchBegin,
-        GesturePinchEnd,
-        GesturePinchUpdate,
 
 #if ENABLE(TOUCH_EVENTS)
         // PlatformTouchEvent

@@ -42,7 +42,7 @@
 #include <GLES2/gl2ext.h>
 #elif PLATFORM(MAC)
 #include <OpenGL/gl.h>
-#elif PLATFORM(GTK) || PLATFORM(EFL) || PLATFORM(QT)
+#elif PLATFORM(GTK) || PLATFORM(EFL) || PLATFORM(QT) || PLATFORM(WIN)
 #include "OpenGLShims.h"
 #endif
 
@@ -91,8 +91,8 @@ Extensions3DOpenGLCommon::Extensions3DOpenGLCommon(GraphicsContext3D* context)
         systemSupportsMultisampling = version >= 0x1072;
 #endif // SNOW_LEOPARD and LION
 
-    if (m_isNVIDIA || (m_isAMD && systemSupportsMultisampling))
-        m_maySupportMultisampling = true;
+    if (m_isAMD && !systemSupportsMultisampling)
+        m_maySupportMultisampling = false;
 #endif
 }
 
@@ -116,6 +116,15 @@ void Extensions3DOpenGLCommon::ensureEnabled(const String& name)
         ShBuiltInResources ANGLEResources = compiler.getResources();
         if (!ANGLEResources.OES_standard_derivatives) {
             ANGLEResources.OES_standard_derivatives = 1;
+            compiler.setResources(ANGLEResources);
+        }
+    } else if (name == "GL_EXT_draw_buffers") {
+        // Enable support in ANGLE (if not enabled already)
+        ANGLEWebKitBridge& compiler = m_context->m_compiler;
+        ShBuiltInResources ANGLEResources = compiler.getResources();
+        if (!ANGLEResources.EXT_draw_buffers) {
+            ANGLEResources.EXT_draw_buffers = 1;
+            m_context->getIntegerv(Extensions3D::MAX_DRAW_BUFFERS_EXT, &ANGLEResources.MaxDrawBuffers);
             compiler.setResources(ANGLEResources);
         }
     }
@@ -161,7 +170,7 @@ String Extensions3DOpenGLCommon::getTranslatedShaderSourceANGLE(Platform3DObject
 
     String translatedShaderSource;
     String shaderInfoLog;
-    int extraCompileOptions = SH_MAP_LONG_VARIABLE_NAMES;
+    int extraCompileOptions = SH_MAP_LONG_VARIABLE_NAMES | SH_CLAMP_INDIRECT_ARRAY_BOUNDS;
 
     if (m_requiresBuiltInFunctionEmulation)
         extraCompileOptions |= SH_EMULATE_BUILT_IN_FUNCTIONS;

@@ -52,14 +52,20 @@ public:
 
 protected:
 #if USE(CF)
-    GCActivityCallback(JSGlobalData* globalData, CFRunLoopRef runLoop)
-        : HeapTimer(globalData, runLoop)
+    GCActivityCallback(VM* vm, CFRunLoopRef runLoop)
+        : HeapTimer(vm, runLoop)
         , m_enabled(true)
     {
     }
+#elif PLATFORM(EFL)
+    GCActivityCallback(VM* vm, bool flag)
+        : HeapTimer(vm)
+        , m_enabled(flag)
+    {
+    }
 #else
-    GCActivityCallback(JSGlobalData* globalData)
-        : HeapTimer(globalData)
+    GCActivityCallback(VM* vm)
+        : HeapTimer(vm)
         , m_enabled(true)
     {
     }
@@ -70,7 +76,7 @@ protected:
 
 class DefaultGCActivityCallback : public GCActivityCallback {
 public:
-    static DefaultGCActivityCallback* create(Heap*);
+    static PassOwnPtr<DefaultGCActivityCallback> create(Heap*);
 
     DefaultGCActivityCallback(Heap*);
 
@@ -84,7 +90,7 @@ public:
 protected:
     DefaultGCActivityCallback(Heap*, CFRunLoopRef);
 #endif
-#if USE(CF) || PLATFORM(QT)
+#if USE(CF) || PLATFORM(QT) || PLATFORM(EFL)
 protected:
     void cancelTimer();
     void scheduleTimer(double);
@@ -94,9 +100,9 @@ private:
 #endif
 };
 
-inline DefaultGCActivityCallback* DefaultGCActivityCallback::create(Heap* heap)
+inline PassOwnPtr<DefaultGCActivityCallback> DefaultGCActivityCallback::create(Heap* heap)
 {
-    return new DefaultGCActivityCallback(heap);
+    return adoptPtr(new DefaultGCActivityCallback(heap));
 }
 
 }

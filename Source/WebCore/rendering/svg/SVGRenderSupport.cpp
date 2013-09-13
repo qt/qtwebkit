@@ -42,7 +42,6 @@
 #include "SVGResourcesCache.h"
 #include "SVGStyledElement.h"
 #include "TransformState.h"
-#include <wtf/UnusedParam.h>
 
 namespace WebCore {
 
@@ -50,6 +49,7 @@ FloatRect SVGRenderSupport::repaintRectForRendererInLocalCoordinatesExcludingSVG
 {
     // FIXME: Add support for RenderSVGBlock.
 
+    // FIXME: This should use a safer cast such as toRenderSVGModelObject().
     if (object->isSVGShape() || object->isSVGImage() || object->isSVGContainer())
         return static_cast<const RenderSVGModelObject*>(object)->repaintRectInLocalCoordinatesExcludingSVGShadow();
 
@@ -84,7 +84,7 @@ void SVGRenderSupport::computeFloatRectForRepaint(const RenderObject* object, co
     object->parent()->computeFloatRectForRepaint(repaintContainer, repaintRect, fixed);
 }
 
-void SVGRenderSupport::mapLocalToContainer(const RenderObject* object, const RenderLayerModelObject* repaintContainer, TransformState& transformState, bool snapOffsetForTransforms, bool* wasFixed)
+void SVGRenderSupport::mapLocalToContainer(const RenderObject* object, const RenderLayerModelObject* repaintContainer, TransformState& transformState, bool* wasFixed)
 {
     transformState.applyTransform(object->localToParentTransform());
 
@@ -97,8 +97,6 @@ void SVGRenderSupport::mapLocalToContainer(const RenderObject* object, const Ren
         transformState.applyTransform(toRenderSVGRoot(parent)->localToBorderBoxTransform());
 
     MapCoordinatesFlags mode = UseTransforms;
-    if (snapOffsetForTransforms)
-        mode |= SnapOffsetForTransforms;
     parent->mapLocalToContainer(repaintContainer, transformState, mode, wasFixed);
 }
 
@@ -231,11 +229,20 @@ void SVGRenderSupport::layoutChildren(RenderObject* start, bool selfNeedsLayout)
 {
     bool layoutSizeChanged = layoutSizeOfNearestViewportChanged(start);
     bool transformChanged = transformToRootChanged(start);
+    bool hasSVGShadow = rendererHasSVGShadow(start);
+    bool needsBoundariesUpdate = start->needsBoundariesUpdate();
     HashSet<RenderObject*> notlayoutedObjects;
 
     for (RenderObject* child = start->firstChild(); child; child = child->nextSibling()) {
         bool needsLayout = selfNeedsLayout;
         bool childEverHadLayout = child->everHadLayout();
+
+        if (needsBoundariesUpdate && hasSVGShadow) {
+            // If we have a shadow, our shadow is baked into our children's cached boundaries,
+            // so they need to update.
+            child->setNeedsBoundariesUpdate();
+            needsLayout = true;
+        }
 
         if (transformChanged) {
             // If the transform changed we need to update the text metrics (note: this also happens for layoutSizeChanged=true).
@@ -246,8 +253,8 @@ void SVGRenderSupport::layoutChildren(RenderObject* start, bool selfNeedsLayout)
 
         if (layoutSizeChanged) {
             // When selfNeedsLayout is false and the layout size changed, we have to check whether this child uses relative lengths
-            if (SVGElement* element = child->node()->isSVGElement() ? static_cast<SVGElement*>(child->node()) : 0) {
-                if (element->isStyled() && static_cast<SVGStyledElement*>(element)->hasRelativeLengths()) {
+            if (SVGElement* element = child->node()->isSVGElement() ? toSVGElement(child->node()) : 0) {
+                if (element->isSVGStyledElement() && toSVGStyledElement(element)->hasRelativeLengths()) {
                     // When the layout size changed and when using relative values tell the RenderSVGShape to update its shape object
                     if (child->isSVGShape())
                         toRenderSVGShape(child)->setNeedsShapeUpdate();
@@ -307,11 +314,12 @@ bool SVGRenderSupport::rendererHasSVGShadow(const RenderObject* object)
 {
     // FIXME: Add support for RenderSVGBlock.
 
+    // FIXME: This should use a safer cast such as toRenderSVGModelObject().
     if (object->isSVGShape() || object->isSVGImage() || object->isSVGContainer())
         return static_cast<const RenderSVGModelObject*>(object)->hasSVGShadow();
 
     if (object->isSVGRoot())
-        return static_cast<const RenderSVGRoot*>(object)->hasSVGShadow();
+        return toRenderSVGRoot(object)->hasSVGShadow();
 
     return false;
 }
@@ -320,6 +328,7 @@ void SVGRenderSupport::setRendererHasSVGShadow(RenderObject* object, bool hasSha
 {
     // FIXME: Add support for RenderSVGBlock.
 
+    // FIXME: This should use a safer cast such as toRenderSVGModelObject().
     if (object->isSVGShape() || object->isSVGImage() || object->isSVGContainer())
         return static_cast<RenderSVGModelObject*>(object)->setHasSVGShadow(hasShadow);
 
@@ -424,7 +433,7 @@ void SVGRenderSupport::applyStrokeStyleToContext(GraphicsContext* context, const
     const SVGRenderStyle* svgStyle = style->svgStyle();
     ASSERT(svgStyle);
 
-    SVGLengthContext lengthContext(static_cast<SVGElement*>(object->node()));
+    SVGLengthContext lengthContext(toSVGElement(object->node()));
     context->setStrokeThickness(svgStyle->strokeWidth().value(lengthContext));
     context->setLineCap(svgStyle->capStyle());
     context->setLineJoin(svgStyle->joinStyle());

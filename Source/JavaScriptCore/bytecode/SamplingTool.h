@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 Apple Inc. All rights reserved.
+ * Copyright (C) 2008, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,7 +30,6 @@
 #define SamplingTool_h
 
 #include "Strong.h"
-#include "Nodes.h"
 #include "Opcode.h"
 #include "SamplingCounter.h"
 #include <wtf/Assertions.h>
@@ -186,8 +185,8 @@ namespace JSC {
     struct Instruction;
 
     struct ScriptSampleRecord {
-        ScriptSampleRecord(JSGlobalData& globalData, ScriptExecutable* executable)
-            : m_executable(globalData, executable)
+        ScriptSampleRecord(VM& vm, ScriptExecutable* executable)
+            : m_executable(vm, executable)
             , m_codeBlock(0)
             , m_sampleCount(0)
             , m_opcodeSampleCount(0)
@@ -282,7 +281,7 @@ namespace JSC {
         JS_EXPORT_PRIVATE void setup();
         void dump(ExecState*);
 
-        void notifyOfScope(JSGlobalData&, ScriptExecutable* scope);
+        void notifyOfScope(VM&, ScriptExecutable* scope);
 
         void sample(CodeBlock* codeBlock, Instruction* vPC)
         {

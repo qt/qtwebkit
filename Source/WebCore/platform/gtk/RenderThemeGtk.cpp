@@ -26,6 +26,7 @@
 #include "RenderThemeGtk.h"
 
 #include "CSSValueKeywords.h"
+#include "ExceptionCodePlaceholder.h"
 #include "FileList.h"
 #include "FileSystem.h"
 #include "FontDescription.h"
@@ -34,7 +35,6 @@
 #include "GraphicsContext.h"
 #include "GtkVersioning.h"
 #include "HTMLMediaElement.h"
-#include "HTMLNames.h"
 #include "LocalizedStrings.h"
 #include "MediaControlElements.h"
 #include "PaintInfo.h"
@@ -44,6 +44,7 @@
 #include "StringTruncator.h"
 #include "TimeRanges.h"
 #include "UserAgentStyleSheets.h"
+#include <cmath>
 #include <gdk/gdk.h>
 #include <glib.h>
 #include <gtk/gtk.h>
@@ -58,8 +59,7 @@ namespace WebCore {
 // This would be a static method, except that forward declaring GType is tricky, since its
 // definition depends on including glib.h, negating the benefit of using a forward declaration.
 extern GRefPtr<GdkPixbuf> getStockIconForWidgetType(GType, const char* iconName, gint direction, gint state, gint iconSize);
-
-using namespace HTMLNames;
+extern GRefPtr<GdkPixbuf> getStockSymbolicIconForWidgetType(GType widgetType, const char* symbolicIconName, const char *fallbackStockIconName, gint direction, gint state, gint iconSize);
 
 #if ENABLE(VIDEO)
 static HTMLMediaElement* getMediaElementFromRenderObject(RenderObject* o)
@@ -68,18 +68,10 @@ static HTMLMediaElement* getMediaElementFromRenderObject(RenderObject* o)
     Node* mediaNode = node ? node->shadowHost() : 0;
     if (!mediaNode)
         mediaNode = node;
-    if (!mediaNode || !mediaNode->isElementNode() || !static_cast<Element*>(mediaNode)->isMediaElement())
+    if (!mediaNode || !mediaNode->isElementNode() || !toElement(mediaNode)->isMediaElement())
         return 0;
 
-    return static_cast<HTMLMediaElement*>(mediaNode);
-}
-
-static GtkIconSize getMediaButtonIconSize(int mediaIconSize)
-{
-    GtkIconSize iconSize = gtk_icon_size_from_name("webkit-media-button-size");
-    if (!iconSize)
-        iconSize = gtk_icon_size_register("webkit-media-button-size", mediaIconSize, mediaIconSize);
-    return iconSize;
+    return toHTMLMediaElement(mediaNode);
 }
 
 void RenderThemeGtk::initMediaButtons()
@@ -126,8 +118,6 @@ RenderThemeGtk::RenderThemeGtk()
     , m_sliderThumbColor(Color::white)
     , m_mediaIconSize(16)
     , m_mediaSliderHeight(14)
-    , m_mediaSliderThumbWidth(12)
-    , m_mediaSliderThumbHeight(12)
 {
     platformInit();
 #if ENABLE(VIDEO)
@@ -149,6 +139,11 @@ static bool supportsFocus(ControlPart appearance)
     case CheckboxPart:
     case SliderHorizontalPart:
     case SliderVerticalPart:
+    case MediaPlayButtonPart:
+    case MediaVolumeSliderPart:
+    case MediaMuteButtonPart:
+    case MediaEnterFullscreenButtonPart:
+    case MediaSliderPart:
         return true;
     default:
         return false;
@@ -442,7 +437,7 @@ double RenderThemeGtk::getScreenDPI()
     return dpi;
 }
 
-void RenderThemeGtk::systemFont(int, FontDescription& fontDescription) const
+void RenderThemeGtk::systemFont(CSSValueID, FontDescription& fontDescription) const
 {
     GtkSettings* settings = gtk_settings_get_default();
     if (!settings)
@@ -456,7 +451,7 @@ void RenderThemeGtk::systemFont(int, FontDescription& fontDescription) const
     if (!pangoDescription)
         return;
 
-    fontDescription.firstFamily().setFamily(pango_font_description_get_family(pangoDescription));
+    fontDescription.setOneFamily(pango_font_description_get_family(pangoDescription));
 
     int size = pango_font_description_get_size(pangoDescription) / PANGO_SCALE;
     // If the size of the font is in points, we need to convert it to pixels.
@@ -492,30 +487,25 @@ String RenderThemeGtk::extraFullScreenStyleSheet()
 }
 #endif
 
-void RenderThemeGtk::adjustMediaSliderThumbSize(RenderStyle* style) const
+bool RenderThemeGtk::paintMediaButton(RenderObject* renderObject, GraphicsContext* context, const IntRect& rect, const char* symbolicIconName, const char* fallbackStockIconName)
 {
-    ASSERT(style->appearance() == MediaSliderThumbPart);
-    style->setWidth(Length(m_mediaSliderThumbWidth, Fixed));
-    style->setHeight(Length(m_mediaSliderThumbHeight, Fixed));
-}
-
-bool RenderThemeGtk::paintMediaButton(RenderObject* renderObject, GraphicsContext* context, const IntRect& rect, const char* iconName)
-{
-    GRefPtr<GdkPixbuf> icon = getStockIconForWidgetType(GTK_TYPE_CONTAINER, iconName,
-                                                        gtkTextDirection(renderObject->style()->direction()),
-                                                        gtkIconState(this, renderObject),
-                                                        getMediaButtonIconSize(m_mediaIconSize));
     IntRect iconRect(rect.x() + (rect.width() - m_mediaIconSize) / 2,
                      rect.y() + (rect.height() - m_mediaIconSize) / 2,
                      m_mediaIconSize, m_mediaIconSize);
-    context->fillRect(FloatRect(rect), m_panelColor, ColorSpaceDeviceRGB);
+    GRefPtr<GdkPixbuf> icon = getStockSymbolicIconForWidgetType(GTK_TYPE_CONTAINER, symbolicIconName, fallbackStockIconName,
+        gtkTextDirection(renderObject->style()->direction()), gtkIconState(this, renderObject), iconRect.width());
     paintGdkPixbuf(context, icon.get(), iconRect);
     return false;
 }
 
+bool RenderThemeGtk::hasOwnDisabledStateHandlingFor(ControlPart part) const
+{
+    return (part != MediaMuteButtonPart);
+}
+
 bool RenderThemeGtk::paintMediaFullscreenButton(RenderObject* renderObject, const PaintInfo& paintInfo, const IntRect& rect)
 {
-    return paintMediaButton(renderObject, paintInfo.context, rect, GTK_STOCK_FULLSCREEN);
+    return paintMediaButton(renderObject, paintInfo.context, rect, "view-fullscreen-symbolic", GTK_STOCK_FULLSCREEN);
 }
 
 bool RenderThemeGtk::paintMediaMuteButton(RenderObject* renderObject, const PaintInfo& paintInfo, const IntRect& rect)
@@ -524,7 +514,10 @@ bool RenderThemeGtk::paintMediaMuteButton(RenderObject* renderObject, const Pain
     if (!mediaElement)
         return false;
 
-    return paintMediaButton(renderObject, paintInfo.context, rect, mediaElement->muted() ? "audio-volume-muted" : "audio-volume-high");
+    bool muted = mediaElement->muted();
+    return paintMediaButton(renderObject, paintInfo.context, rect,
+        muted ? "audio-volume-muted-symbolic" : "audio-volume-high-symbolic",
+        muted ? "audio-volume-muted" : "audio-volume-high");
 }
 
 bool RenderThemeGtk::paintMediaPlayButton(RenderObject* renderObject, const PaintInfo& paintInfo, const IntRect& rect)
@@ -535,73 +528,58 @@ bool RenderThemeGtk::paintMediaPlayButton(RenderObject* renderObject, const Pain
     if (!node->isMediaControlElement())
         return false;
 
-    return paintMediaButton(renderObject, paintInfo.context, rect, mediaControlElementType(node) == MediaPlayButton ? GTK_STOCK_MEDIA_PLAY : GTK_STOCK_MEDIA_PAUSE);
+    bool play = mediaControlElementType(node) == MediaPlayButton;
+    return paintMediaButton(renderObject, paintInfo.context, rect,
+        play ? "media-playback-start-symbolic" : "media-playback-pause-symbolic",
+        play ? GTK_STOCK_MEDIA_PLAY : GTK_STOCK_MEDIA_PAUSE);
 }
 
 bool RenderThemeGtk::paintMediaSeekBackButton(RenderObject* renderObject, const PaintInfo& paintInfo, const IntRect& rect)
 {
-    return paintMediaButton(renderObject, paintInfo.context, rect, GTK_STOCK_MEDIA_REWIND);
+    return paintMediaButton(renderObject, paintInfo.context, rect, "media-seek-backward-symbolic", GTK_STOCK_MEDIA_REWIND);
 }
 
 bool RenderThemeGtk::paintMediaSeekForwardButton(RenderObject* renderObject, const PaintInfo& paintInfo, const IntRect& rect)
 {
-    return paintMediaButton(renderObject, paintInfo.context, rect, GTK_STOCK_MEDIA_FORWARD);
+    return paintMediaButton(renderObject, paintInfo.context, rect, "media-seek-forward-symbolic", GTK_STOCK_MEDIA_FORWARD);
+}
+
+static RoundedRect::Radii borderRadiiFromStyle(RenderStyle* style)
+{
+    return RoundedRect::Radii(
+        IntSize(style->borderTopLeftRadius().width().intValue(), style->borderTopLeftRadius().height().intValue()),
+        IntSize(style->borderTopRightRadius().width().intValue(), style->borderTopRightRadius().height().intValue()),
+        IntSize(style->borderBottomLeftRadius().width().intValue(), style->borderBottomLeftRadius().height().intValue()),
+        IntSize(style->borderBottomRightRadius().width().intValue(), style->borderBottomRightRadius().height().intValue()));
 }
 
 bool RenderThemeGtk::paintMediaSliderTrack(RenderObject* o, const PaintInfo& paintInfo, const IntRect& r)
 {
-    GraphicsContext* context = paintInfo.context;
-
-    context->fillRect(FloatRect(r), m_panelColor, ColorSpaceDeviceRGB);
-    context->fillRect(FloatRect(IntRect(r.x(), r.y() + (r.height() - m_mediaSliderHeight) / 2,
-                                        r.width(), m_mediaSliderHeight)), m_sliderColor, ColorSpaceDeviceRGB);
-
-    RenderStyle* style = o->style();
     HTMLMediaElement* mediaElement = toParentMediaElement(o);
-
     if (!mediaElement)
         return false;
 
-    // Draw the buffered ranges. This code is highly inspired from
-    // Chrome for the gradient code.
-    float mediaDuration = mediaElement->duration();
-    RefPtr<TimeRanges> timeRanges = mediaElement->buffered();
-    IntRect trackRect = r;
-    int totalWidth = trackRect.width();
-
-    trackRect.inflate(-style->borderLeftWidth());
+    GraphicsContext* context = paintInfo.context;
     context->save();
     context->setStrokeStyle(NoStroke);
 
+    float mediaDuration = mediaElement->duration();
+    float totalTrackWidth = r.width();
+    RenderStyle* style = o->style();
+    RefPtr<TimeRanges> timeRanges = mediaElement->buffered();
     for (unsigned index = 0; index < timeRanges->length(); ++index) {
-        ExceptionCode ignoredException;
-        float start = timeRanges->start(index, ignoredException);
-        float end = timeRanges->end(index, ignoredException);
-        int width = ((end - start) * totalWidth) / mediaDuration;
-        IntRect rangeRect;
-        if (!index) {
-            rangeRect = trackRect;
-            rangeRect.setWidth(width);
-        } else {
-            rangeRect.setLocation(IntPoint(trackRect.x() + start / mediaDuration* totalWidth, trackRect.y()));
-            rangeRect.setSize(IntSize(width, trackRect.height()));
-        }
-
-        // Don't bother drawing empty range.
-        if (rangeRect.isEmpty())
+        float start = timeRanges->start(index, IGNORE_EXCEPTION);
+        float end = timeRanges->end(index, IGNORE_EXCEPTION);
+        float startRatio = start / mediaDuration;
+        float lengthRatio = (end - start) / mediaDuration;
+        if (!lengthRatio)
             continue;
 
-        IntPoint sliderTopLeft = rangeRect.location();
-        IntPoint sliderTopRight = sliderTopLeft;
-        sliderTopRight.move(0, rangeRect.height());
-
-        RefPtr<Gradient> gradient = Gradient::create(sliderTopLeft, sliderTopRight);
-        Color startColor = m_panelColor;
-        gradient->addColorStop(0.0, startColor);
-        gradient->addColorStop(1.0, Color(startColor.red() / 2, startColor.green() / 2, startColor.blue() / 2, startColor.alpha()));
-
-        context->setFillGradient(gradient);
-        context->fillRect(rangeRect);
+        IntRect rangeRect(r);
+        rangeRect.setWidth(lengthRatio * totalTrackWidth);
+        if (index)
+            rangeRect.move(startRatio * totalTrackWidth, 0);
+        context->fillRoundedRect(RoundedRect(rangeRect, borderRadiiFromStyle(style)), style->visitedDependentColor(CSSPropertyColor), style->colorSpace());
     }
 
     context->restore();
@@ -610,26 +588,47 @@ bool RenderThemeGtk::paintMediaSliderTrack(RenderObject* o, const PaintInfo& pai
 
 bool RenderThemeGtk::paintMediaSliderThumb(RenderObject* o, const PaintInfo& paintInfo, const IntRect& r)
 {
-    // Make the thumb nicer with rounded corners.
-    paintInfo.context->fillRoundedRect(r, IntSize(3, 3), IntSize(3, 3), IntSize(3, 3), IntSize(3, 3), m_sliderThumbColor, ColorSpaceDeviceRGB);
+    RenderStyle* style = o->style();
+    paintInfo.context->fillRoundedRect(RoundedRect(r, borderRadiiFromStyle(style)), style->visitedDependentColor(CSSPropertyColor), style->colorSpace());
     return false;
 }
 
 bool RenderThemeGtk::paintMediaVolumeSliderContainer(RenderObject*, const PaintInfo& paintInfo, const IntRect& rect)
 {
-    GraphicsContext* context = paintInfo.context;
-    context->fillRect(FloatRect(rect), m_panelColor, ColorSpaceDeviceRGB);
-    return false;
+    return true;
 }
 
 bool RenderThemeGtk::paintMediaVolumeSliderTrack(RenderObject* renderObject, const PaintInfo& paintInfo, const IntRect& rect)
 {
-    return paintSliderTrack(renderObject, paintInfo, rect);
+    HTMLMediaElement* mediaElement = toParentMediaElement(renderObject);
+    if (!mediaElement)
+        return true;
+
+    float volume = mediaElement->volume();
+    if (!volume)
+        return true;
+
+    GraphicsContext* context = paintInfo.context;
+    context->save();
+    context->setStrokeStyle(NoStroke);
+
+    int rectHeight = rect.height();
+    float trackHeight = rectHeight * volume;
+    RenderStyle* style = renderObject->style();
+    IntRect volumeRect(rect);
+    volumeRect.move(0, rectHeight - trackHeight);
+    volumeRect.setHeight(ceil(trackHeight));
+
+    context->fillRoundedRect(RoundedRect(volumeRect, borderRadiiFromStyle(style)),
+        style->visitedDependentColor(CSSPropertyColor), style->colorSpace());
+    context->restore();
+
+    return false;
 }
 
 bool RenderThemeGtk::paintMediaVolumeSliderThumb(RenderObject* renderObject, const PaintInfo& paintInfo, const IntRect& rect)
 {
-    return paintSliderThumb(renderObject, paintInfo, rect);
+    return paintMediaSliderThumb(renderObject, paintInfo, rect);
 }
 
 String RenderThemeGtk::formatMediaControlsCurrentTime(float currentTime, float duration) const
@@ -639,9 +638,6 @@ String RenderThemeGtk::formatMediaControlsCurrentTime(float currentTime, float d
 
 bool RenderThemeGtk::paintMediaCurrentTime(RenderObject* renderObject, const PaintInfo& paintInfo, const IntRect& rect)
 {
-    GraphicsContext* context = paintInfo.context;
-
-    context->fillRect(FloatRect(rect), m_panelColor, ColorSpaceDeviceRGB);
     return false;
 }
 #endif

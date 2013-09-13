@@ -35,6 +35,8 @@
 #include "Event.h"
 #include "EventException.h"
 #include "InspectorInstrumentation.h"
+#include "ScriptController.h"
+#include "WebKitTransitionEvent.h"
 #include <wtf/MainThread.h>
 #include <wtf/StdLibExtras.h>
 #include <wtf/Vector.h>
@@ -160,6 +162,14 @@ void EventTarget::uncaughtExceptionInEventHandler()
 {
 }
 
+static AtomicString prefixedType(const Event* event)
+{
+    if (event->type() == eventNames().transitionendEvent)
+        return eventNames().webkitTransitionEndEvent;
+
+    return emptyString();
+}
+
 bool EventTarget::fireEventListeners(Event* event)
 {
     ASSERT(!NoEventDispatchAssertion::isEventDispatchForbidden());
@@ -169,11 +179,38 @@ bool EventTarget::fireEventListeners(Event* event)
     if (!d)
         return true;
 
-    EventListenerVector* listenerVector = d->eventListenerMap.find(event->type());
+    EventListenerVector* listenerPrefixedVector = 0;
+    AtomicString prefixedTypeName = prefixedType(event);
+    if (!prefixedTypeName.isEmpty())
+        listenerPrefixedVector = d->eventListenerMap.find(prefixedTypeName);
 
-    if (listenerVector)
-        fireEventListeners(event, d, *listenerVector);
-    
+    EventListenerVector* listenerUnprefixedVector = d->eventListenerMap.find(event->type());
+
+    if (listenerUnprefixedVector)
+        fireEventListeners(event, d, *listenerUnprefixedVector);
+    else if (listenerPrefixedVector) {
+        AtomicString unprefixedTypeName = event->type();
+        event->setType(prefixedTypeName);
+        fireEventListeners(event, d, *listenerPrefixedVector);
+        event->setType(unprefixedTypeName);
+    }
+
+    if (!prefixedTypeName.isEmpty()) {
+        ScriptExecutionContext* context = scriptExecutionContext();
+        if (context && context->isDocument()) {
+            Document* document = toDocument(context);
+            if (document->domWindow()) {
+                if (listenerPrefixedVector)
+                    if (listenerUnprefixedVector)
+                        FeatureObserver::observe(document->domWindow(), FeatureObserver::PrefixedAndUnprefixedTransitionEndEvent);
+                    else
+                        FeatureObserver::observe(document->domWindow(), FeatureObserver::PrefixedTransitionEndEvent);
+                else if (listenerUnprefixedVector)
+                    FeatureObserver::observe(document->domWindow(), FeatureObserver::UnprefixedTransitionEndEvent);
+            }
+        }
+    }
+
     return !event->defaultPrevented();
 }
         
@@ -186,6 +223,7 @@ void EventTarget::fireEventListeners(Event* event, EventTargetData* d, EventList
     // dispatch. Conveniently, all new event listeners will be added after 'end',
     // so iterating to 'end' naturally excludes new event listeners.
 
+    bool userEventWasHandled = false;
     size_t i = 0;
     size_t end = entry.size();
     if (!d->firingEventIterators)
@@ -208,9 +246,18 @@ void EventTarget::fireEventListeners(Event* event, EventTargetData* d, EventList
         // To match Mozilla, the AT_TARGET phase fires both capturing and bubbling
         // event listeners, even though that violates some versions of the DOM spec.
         registeredListener.listener->handleEvent(context, event);
+        if (!userEventWasHandled && ScriptController::processingUserGesture())
+            userEventWasHandled = true;
         InspectorInstrumentation::didHandleEvent(cookie);
     }
     d->firingEventIterators->removeLast();
+    if (userEventWasHandled) {
+        ScriptExecutionContext* context = scriptExecutionContext();
+        if (context && context->isDocument()) {
+            Document* document = toDocument(context);
+            document->resetLastHandledUserGestureTimestamp();
+        }
+    }
 }
 
 const EventListenerVector& EventTarget::getEventListeners(const AtomicString& eventType)

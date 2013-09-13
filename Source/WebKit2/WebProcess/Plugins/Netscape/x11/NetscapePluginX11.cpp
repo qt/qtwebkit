@@ -47,7 +47,7 @@
 #include <Ecore_X.h>
 #endif
 
-#if USE(CAIRO) && !PLATFORM(WIN_CAIRO)
+#if USE(CAIRO)
 #include "PlatformContextCairo.h"
 #include "RefPtrCairo.h"
 #include <cairo/cairo-xlib.h>
@@ -248,6 +248,10 @@ bool NetscapePlugin::platformPostInitializeWindowless()
     return true;
 }
 
+void NetscapePlugin::platformPreInitialize()
+{
+}
+
 bool NetscapePlugin::platformPostInitialize()
 {
 #if PLATFORM(GTK)
@@ -308,9 +312,7 @@ void NetscapePlugin::platformGeometryDidChange()
 #if PLATFORM(GTK)
         windowID = static_cast<uint64_t>(GDK_WINDOW_XID(gtk_plug_get_socket_window(GTK_PLUG(m_platformPluginWidget))));
 #endif
-        IntRect clipRect(m_clipRect);
-        clipRect.move(-m_frameRectInWindowCoordinates.x(), -m_frameRectInWindowCoordinates.y());
-        controller()->windowedPluginGeometryDidChange(m_frameRectInWindowCoordinates, clipRect, windowID);
+        controller()->windowedPluginGeometryDidChange(m_frameRectInWindowCoordinates, m_clipRect, windowID);
         return;
     }
 
@@ -529,6 +531,7 @@ bool NetscapePlugin::platformHandleMouseEvent(const WebMouseEvent& event)
 #if ENABLE(GESTURE_EVENTS)
     case WebEvent::GestureScrollBegin:
     case WebEvent::GestureScrollEnd:
+    case WebEvent::GestureSingleTap:
 #endif
 #if ENABLE(TOUCH_EVENTS)
     case WebEvent::TouchStart:

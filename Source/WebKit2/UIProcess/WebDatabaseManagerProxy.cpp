@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Apple Inc. All rights reserved.
+ * Copyright (C) 2010, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -38,6 +38,11 @@
 using namespace WebCore;
 
 namespace WebKit {
+
+const char* WebDatabaseManagerProxy::supplementName()
+{
+    return "WebDatabaseManagerProxy";
+}
 
 String WebDatabaseManagerProxy::originKey()
 {
@@ -93,16 +98,28 @@ PassRefPtr<WebDatabaseManagerProxy> WebDatabaseManagerProxy::create(WebContext* 
 }
 
 WebDatabaseManagerProxy::WebDatabaseManagerProxy(WebContext* webContext)
-    : m_webContext(webContext)
+    : WebContextSupplement(webContext)
 {
-    m_webContext->addMessageReceiver(Messages::WebDatabaseManagerProxy::messageReceiverName(), this);
+    WebContextSupplement::context()->addMessageReceiver(Messages::WebDatabaseManagerProxy::messageReceiverName(), this);
 }
 
 WebDatabaseManagerProxy::~WebDatabaseManagerProxy()
 {
 }
 
-void WebDatabaseManagerProxy::invalidate()
+void WebDatabaseManagerProxy::initializeClient(const WKDatabaseManagerClient* client)
+{
+    m_client.initialize(client);
+}
+
+// WebContextSupplement
+
+void WebDatabaseManagerProxy::contextDestroyed()
+{
+    invalidateCallbackMap(m_arrayCallbacks);
+}
+
+void WebDatabaseManagerProxy::processDidClose(WebProcessProxy*)
 {
     invalidateCallbackMap(m_arrayCallbacks);
 }
@@ -112,9 +129,14 @@ bool WebDatabaseManagerProxy::shouldTerminate(WebProcessProxy*) const
     return m_arrayCallbacks.isEmpty();
 }
 
-void WebDatabaseManagerProxy::initializeClient(const WKDatabaseManagerClient* client)
+void WebDatabaseManagerProxy::refWebContextSupplement()
 {
-    m_client.initialize(client);
+    APIObject::ref();
+}
+
+void WebDatabaseManagerProxy::derefWebContextSupplement()
+{
+    APIObject::deref();
 }
 
 void WebDatabaseManagerProxy::getDatabasesByOrigin(PassRefPtr<ArrayCallback> prpCallback)
@@ -123,8 +145,7 @@ void WebDatabaseManagerProxy::getDatabasesByOrigin(PassRefPtr<ArrayCallback> prp
     uint64_t callbackID = callback->callbackID();
     m_arrayCallbacks.set(callbackID, callback.release());
 
-    // FIXME (Multi-WebProcess): <rdar://problem/12239765> Databases shouldn't be stored in the web process.
-    m_webContext->sendToAllProcessesRelaunchingThemIfNecessary(Messages::WebDatabaseManager::GetDatabasesByOrigin(callbackID));
+    context()->sendToOneProcess(Messages::WebDatabaseManager::GetDatabasesByOrigin(callbackID));
 }
 
 void WebDatabaseManagerProxy::didGetDatabasesByOrigin(const Vector<OriginAndDatabases>& originAndDatabasesVector, uint64_t callbackID)
@@ -136,7 +157,7 @@ void WebDatabaseManagerProxy::didGetDatabasesByOrigin(const Vector<OriginAndData
     }
 
     size_t originAndDatabasesCount = originAndDatabasesVector.size();
-    Vector<RefPtr<APIObject> > result(originAndDatabasesCount);
+    Vector<RefPtr<APIObject>> result(originAndDatabasesCount);
 
     for (size_t i = 0; i < originAndDatabasesCount; ++i) {
         const OriginAndDatabases& originAndDatabases = originAndDatabasesVector[i];
@@ -144,11 +165,11 @@ void WebDatabaseManagerProxy::didGetDatabasesByOrigin(const Vector<OriginAndData
         RefPtr<APIObject> origin = WebSecurityOrigin::createFromDatabaseIdentifier(originAndDatabases.originIdentifier);
     
         size_t databasesCount = originAndDatabases.databases.size();
-        Vector<RefPtr<APIObject> > databases(databasesCount);
+        Vector<RefPtr<APIObject>> databases(databasesCount);
     
         for (size_t j = 0; j < databasesCount; ++j) {
             const DatabaseDetails& details = originAndDatabases.databases[i];
-            HashMap<String, RefPtr<APIObject> > detailsMap;
+            HashMap<String, RefPtr<APIObject>> detailsMap;
 
             detailsMap.set(databaseDetailsNameKey(), WebString::create(details.name()));
             detailsMap.set(databaseDetailsDisplayNameKey(), WebString::create(details.displayName()));
@@ -157,7 +178,7 @@ void WebDatabaseManagerProxy::didGetDatabasesByOrigin(const Vector<OriginAndData
             databases.append(ImmutableDictionary::adopt(detailsMap));
         }
 
-        HashMap<String, RefPtr<APIObject> > originAndDatabasesMap;
+        HashMap<String, RefPtr<APIObject>> originAndDatabasesMap;
         originAndDatabasesMap.set(originKey(), origin);
         originAndDatabasesMap.set(originQuotaKey(), WebUInt64::create(originAndDatabases.originQuota));
         originAndDatabasesMap.set(originUsageKey(), WebUInt64::create(originAndDatabases.originUsage));
@@ -176,8 +197,7 @@ void WebDatabaseManagerProxy::getDatabaseOrigins(PassRefPtr<ArrayCallback> prpCa
     uint64_t callbackID = callback->callbackID();
     m_arrayCallbacks.set(callbackID, callback.release());
 
-    // FIXME (Multi-WebProcess): <rdar://problem/12239765> Databases shouldn't be stored in the web process.
-    m_webContext->sendToAllProcessesRelaunchingThemIfNecessary(Messages::WebDatabaseManager::GetDatabaseOrigins(callbackID));
+    context()->sendToOneProcess(Messages::WebDatabaseManager::GetDatabaseOrigins(callbackID));
 }
 
 void WebDatabaseManagerProxy::didGetDatabaseOrigins(const Vector<String>& originIdentifiers, uint64_t callbackID)
@@ -189,7 +209,7 @@ void WebDatabaseManagerProxy::didGetDatabaseOrigins(const Vector<String>& origin
     }
 
     size_t originIdentifiersCount = originIdentifiers.size();
-    Vector<RefPtr<APIObject> > securityOrigins(originIdentifiersCount);
+    Vector<RefPtr<APIObject>> securityOrigins(originIdentifiersCount);
 
     for (size_t i = 0; i < originIdentifiersCount; ++i)
         securityOrigins[i] = WebSecurityOrigin::createFromDatabaseIdentifier(originIdentifiers[i]);
@@ -199,26 +219,22 @@ void WebDatabaseManagerProxy::didGetDatabaseOrigins(const Vector<String>& origin
 
 void WebDatabaseManagerProxy::deleteDatabaseWithNameForOrigin(const String& databaseIdentifier, WebSecurityOrigin* origin)
 {
-    // FIXME (Multi-WebProcess): <rdar://problem/7855696> Databases shouldn't be stored in the web process.
-    m_webContext->sendToAllProcessesRelaunchingThemIfNecessary(Messages::WebDatabaseManager::DeleteDatabaseWithNameForOrigin(databaseIdentifier, origin->databaseIdentifier()));
+    context()->sendToOneProcess(Messages::WebDatabaseManager::DeleteDatabaseWithNameForOrigin(databaseIdentifier, origin->databaseIdentifier()));
 }
 
 void WebDatabaseManagerProxy::deleteDatabasesForOrigin(WebSecurityOrigin* origin)
 {
-    // FIXME (Multi-WebProcess): <rdar://problem/7855696> Databases shouldn't be stored in the web process.
-    m_webContext->sendToAllProcessesRelaunchingThemIfNecessary(Messages::WebDatabaseManager::DeleteDatabasesForOrigin(origin->databaseIdentifier()));
+    context()->sendToOneProcess(Messages::WebDatabaseManager::DeleteDatabasesForOrigin(origin->databaseIdentifier()));
 }
 
 void WebDatabaseManagerProxy::deleteAllDatabases()
 {
-    // FIXME (Multi-WebProcess): <rdar://problem/7855696> Databases shouldn't be stored in the web process.
-    m_webContext->sendToAllProcessesRelaunchingThemIfNecessary(Messages::WebDatabaseManager::DeleteAllDatabases());
+    context()->sendToOneProcess(Messages::WebDatabaseManager::DeleteAllDatabases());
 }
 
 void WebDatabaseManagerProxy::setQuotaForOrigin(WebSecurityOrigin* origin, uint64_t quota)
 {
-    // FIXME (Multi-WebProcess): <rdar://problem/7855696> Databases shouldn't be stored in the web process.
-    m_webContext->sendToAllProcessesRelaunchingThemIfNecessary(Messages::WebDatabaseManager::SetQuotaForOrigin(origin->databaseIdentifier(), quota));
+    context()->sendToOneProcess(Messages::WebDatabaseManager::SetQuotaForOrigin(origin->databaseIdentifier(), quota));
 }
 
 void WebDatabaseManagerProxy::didModifyOrigin(const String& originIdentifier)
@@ -231,11 +247,6 @@ void WebDatabaseManagerProxy::didModifyDatabase(const String& originIdentifier, 
 {
     RefPtr<WebSecurityOrigin> origin = WebSecurityOrigin::createFromDatabaseIdentifier(originIdentifier);
     m_client.didModifyDatabase(this, origin.get(), databaseIdentifier);
-}
-
-void WebDatabaseManagerProxy::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::MessageDecoder& decoder)
-{
-    didReceiveWebDatabaseManagerProxyMessage(connection, messageID, decoder);
 }
 
 } // namespace WebKit

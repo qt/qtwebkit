@@ -20,6 +20,7 @@
 #include <QtTest/QtTest>
 #include <QAction>
 
+#include "../util.h"
 #include "qwebpage.h"
 #include "qwebview.h"
 #include "qwebframe.h"
@@ -38,7 +39,7 @@ protected :
     void loadPage(int nr)
     {
         frame->load(QUrl("qrc:/resources/page" + QString::number(nr) + ".html"));
-        waitForLoadFinished.exec();
+        loadFinishedBarrier->ensureSignalEmitted();
     }
 
 public Q_SLOTS:
@@ -72,7 +73,7 @@ private:
     QWebPage* page;
     QWebFrame* frame;
     QWebHistory* hist;
-    QEventLoop waitForLoadFinished;  //operation on history are asynchronous!
+    QScopedPointer<SignalBarrier> loadFinishedBarrier;
     int histsize;
 };
 
@@ -88,7 +89,7 @@ void tst_QWebHistory::init()
 {
     page = new QWebPage(this);
     frame = page->mainFrame();
-    connect(page, SIGNAL(loadFinished(bool)), &waitForLoadFinished, SLOT(quit()), Qt::QueuedConnection);
+    loadFinishedBarrier.reset(new SignalBarrier(frame, SIGNAL(loadFinished(bool))));
 
     for (int i = 1;i < 6;i++) {
         loadPage(i);
@@ -99,6 +100,7 @@ void tst_QWebHistory::init()
 
 void tst_QWebHistory::cleanup()
 {
+    loadFinishedBarrier.reset();
     delete page;
 }
 
@@ -126,7 +128,7 @@ void tst_QWebHistory::back()
     for (int i = histsize;i > 1;i--) {
         QCOMPARE(page->mainFrame()->toPlainText(), QString("page") + QString::number(i));
         hist->back();
-        waitForLoadFinished.exec();
+        loadFinishedBarrier->ensureSignalEmitted();
     }
     //try one more time (too many). crash test
     hist->back();
@@ -141,13 +143,13 @@ void tst_QWebHistory::forward()
     //rewind history :-)
     while (hist->canGoBack()) {
         hist->back();
-        waitForLoadFinished.exec();
+        loadFinishedBarrier->ensureSignalEmitted();
     }
 
     for (int i = 1;i < histsize;i++) {
         QCOMPARE(page->mainFrame()->toPlainText(), QString("page") + QString::number(i));
         hist->forward();
-        waitForLoadFinished.exec();
+        loadFinishedBarrier->ensureSignalEmitted();
     }
     //try one more time (too many). crash test
     hist->forward();
@@ -175,12 +177,12 @@ void tst_QWebHistory::goToItem()
 {
     QWebHistoryItem current = hist->currentItem();
     hist->back();
-    waitForLoadFinished.exec();
+    loadFinishedBarrier->ensureSignalEmitted();
     hist->back();
-    waitForLoadFinished.exec();
+    loadFinishedBarrier->ensureSignalEmitted();
     QVERIFY(hist->currentItem().title() != current.title());
     hist->goToItem(current);
-    waitForLoadFinished.exec();
+    loadFinishedBarrier->ensureSignalEmitted();
     QCOMPARE(hist->currentItem().title(), current.title());
 }
 
@@ -244,10 +246,11 @@ void tst_QWebHistory::serialize_2()
     int initialCurrentIndex = hist->currentItemIndex();
 
     hist->back();
+    loadFinishedBarrier->ensureSignalEmitted();
     hist->back();
-    waitForLoadFinished.exec();
+    loadFinishedBarrier->ensureSignalEmitted();
     hist->back();
-    waitForLoadFinished.exec();
+    loadFinishedBarrier->ensureSignalEmitted();
     //check if current index was changed (make sure that it is not last item)
     QVERIFY(hist->currentItemIndex() != initialCurrentIndex);
     //save current index
@@ -262,10 +265,11 @@ void tst_QWebHistory::serialize_2()
     QCOMPARE(hist->currentItemIndex(), oldCurrentIndex);
 
     hist->forward();
-    waitForLoadFinished.exec();
+    loadFinishedBarrier->ensureSignalEmitted();
     hist->forward();
-    waitForLoadFinished.exec();
+    loadFinishedBarrier->ensureSignalEmitted();
     hist->forward();
+    loadFinishedBarrier->ensureSignalEmitted();
     QCOMPARE(hist->currentItemIndex(), initialCurrentIndex);
 }
 
@@ -443,7 +447,7 @@ void tst_QWebHistory::restoreIncompatibleVersion1()
 {
     // Uncomment this code to generate a dump similar to the one below with the current stream version.
     // dumpCurrentVersion(hist);
-    static const char version1Dump[] = {
+    static const unsigned char version1Dump[] = {
         0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00,
         0x32, 0x00, 0x71, 0x00, 0x72, 0x00, 0x63, 0x00, 0x3a, 0x00, 0x2f, 0x00, 0x72, 0x00, 0x65,
         0x00, 0x73, 0x00, 0x6f, 0x00, 0x75, 0x00, 0x72, 0x00, 0x63, 0x00, 0x65, 0x00, 0x73, 0x00,
@@ -510,7 +514,7 @@ void tst_QWebHistory::restoreIncompatibleVersion1()
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-    QByteArray version1(version1Dump, sizeof(version1Dump));
+    QByteArray version1(reinterpret_cast<const char*>(version1Dump), sizeof(version1Dump));
     QDataStream stream(&version1, QIODevice::ReadOnly);
 
     // This should fail to load, the history should be cleared and the stream should be broken.

@@ -31,11 +31,11 @@
 #include "Dictionary.h"
 #include "Event.h"
 #include "EventTarget.h"
-#include "IDBDatabaseBackendInterface.h"
 #include "IDBDatabaseCallbacks.h"
 #include "IDBMetadata.h"
 #include "IDBObjectStore.h"
 #include "IDBTransaction.h"
+#include "IndexedDB.h"
 #include "ScriptWrappable.h"
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
@@ -45,7 +45,6 @@
 
 namespace WebCore {
 
-class IDBVersionChangeRequest;
 class ScriptExecutionContext;
 
 typedef int ExceptionCode;
@@ -55,6 +54,7 @@ public:
     static PassRefPtr<IDBDatabase> create(ScriptExecutionContext*, PassRefPtr<IDBDatabaseBackendInterface>, PassRefPtr<IDBDatabaseCallbacks>);
     ~IDBDatabase();
 
+    void setMetadata(const IDBDatabaseMetadata& metadata) { m_metadata = metadata; }
     void transactionCreated(IDBTransaction*);
     void transactionFinished(IDBTransaction*);
 
@@ -64,6 +64,7 @@ public:
     PassRefPtr<DOMStringList> objectStoreNames() const;
 
     PassRefPtr<IDBObjectStore> createObjectStore(const String& name, const Dictionary&, ExceptionCode&);
+    PassRefPtr<IDBObjectStore> createObjectStore(const String& name, const IDBKeyPath&, bool autoIncrement, ExceptionCode&);
     PassRefPtr<IDBTransaction> transaction(ScriptExecutionContext* context, PassRefPtr<DOMStringList> scope, const String& mode, ExceptionCode& ec) { return transaction(context, *scope, mode, ec); }
     PassRefPtr<IDBTransaction> transaction(ScriptExecutionContext*, const Vector<String>&, const String& mode, ExceptionCode&);
     PassRefPtr<IDBTransaction> transaction(ScriptExecutionContext*, const String&, const String& mode, ExceptionCode&);
@@ -76,9 +77,11 @@ public:
 
     // IDBDatabaseCallbacks
     virtual void onVersionChange(int64_t oldVersion, int64_t newVersion);
-    virtual void onVersionChange(const String& requestedVersion);
+    virtual void onAbort(int64_t, PassRefPtr<IDBDatabaseError>);
+    virtual void onComplete(int64_t);
 
     // ActiveDOMObject
+    virtual bool hasPendingActivity() const OVERRIDE;
     virtual void stop() OVERRIDE;
 
     // EventTarget
@@ -89,14 +92,17 @@ public:
     void forceClose();
     const IDBDatabaseMetadata metadata() const { return m_metadata; }
     void enqueueEvent(PassRefPtr<Event>);
-    bool dispatchEvent(PassRefPtr<Event> event, ExceptionCode& ec) { return EventTarget::dispatchEvent(event, ec); }
-    virtual bool dispatchEvent(PassRefPtr<Event>);
+
+    using EventTarget::dispatchEvent;
+    virtual bool dispatchEvent(PassRefPtr<Event>) OVERRIDE;
 
     int64_t findObjectStoreId(const String& name) const;
     bool containsObjectStore(const String& name) const
     {
         return findObjectStoreId(name) != IDBObjectStoreMetadata::InvalidId;
     }
+
+    IDBDatabaseBackendInterface* backend() const { return m_backend.get(); }
 
     static int64_t nextTransactionId();
 
@@ -105,7 +111,6 @@ public:
 
 private:
     IDBDatabase(ScriptExecutionContext*, PassRefPtr<IDBDatabaseBackendInterface>, PassRefPtr<IDBDatabaseCallbacks>);
-
 
     // EventTarget
     virtual void refEventTarget() { ref(); }
@@ -118,7 +123,8 @@ private:
     IDBDatabaseMetadata m_metadata;
     RefPtr<IDBDatabaseBackendInterface> m_backend;
     RefPtr<IDBTransaction> m_versionChangeTransaction;
-    HashSet<IDBTransaction*> m_transactions;
+    typedef HashMap<int64_t, IDBTransaction*> TransactionMap;
+    TransactionMap m_transactions;
 
     bool m_closePending;
     bool m_contextStopped;

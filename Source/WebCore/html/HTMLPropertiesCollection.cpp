@@ -35,10 +35,10 @@
 #include "HTMLPropertiesCollection.h"
 
 #include "DOMSettableTokenList.h"
-#include "DOMStringList.h"
 #include "HTMLElement.h"
 #include "HTMLNames.h"
 #include "Node.h"
+#include "NodeTraversal.h"
 #include "PropertyNodeList.h"
 
 namespace WebCore {
@@ -66,7 +66,7 @@ void HTMLPropertiesCollection::updateRefElements() const
 
     m_itemRefElements.clear();
     setItemRefElementsCacheValid();
-    toHTMLElement(base())->getItemRefElements(m_itemRefElements);
+    toHTMLElement(ownerNode())->getItemRefElements(m_itemRefElements);
 }
 
 static Node* nextNodeWithProperty(Node* rootNode, Node* previous, Node* ownerNode)
@@ -76,7 +76,8 @@ static Node* nextNodeWithProperty(Node* rootNode, Node* previous, Node* ownerNod
     // that declares the property. If the property has an itemscope attribute specified then we need
     // to traverse the next sibling.
     return previous == ownerNode || (previous->isHTMLElement() && !toHTMLElement(previous)->fastHasAttribute(itemscopeAttr))
-            ? previous->traverseNextNode(rootNode) : previous->traverseNextSibling(rootNode);
+        ? NodeTraversal::next(previous, rootNode)
+        : NodeTraversal::nextSkippingChildren(previous, rootNode);
 }
 
 Element* HTMLPropertiesCollection::virtualItemAfter(unsigned& offsetInArray, Element* previousItem) const
@@ -120,7 +121,7 @@ void HTMLPropertiesCollection::updateNameCache() const
         for (HTMLElement* element = virtualItemAfter(refElement, 0); element; element = virtualItemAfter(refElement, element)) {
             DOMSettableTokenList* itemProperty = element->itemProp();
             for (unsigned propertyIndex = 0; propertyIndex < itemProperty->length(); ++propertyIndex)
-                updatePropertyCache(element, itemProperty->item(propertyIndex));
+                updatePropertyCache(itemProperty->item(propertyIndex));
         }
     }
 
@@ -135,9 +136,9 @@ PassRefPtr<DOMStringList> HTMLPropertiesCollection::names() const
     return m_propertyNames;
 }
 
-PassRefPtr<PropertyNodeList> HTMLPropertiesCollection::namedItem(const String& name) const
+PassRefPtr<PropertyNodeList> HTMLPropertiesCollection::propertyNodeList(const String& name) const
 {
-    return base()->propertyNodeList(name);
+    return ownerNode()->propertyNodeList(name);
 }
 
 bool HTMLPropertiesCollection::hasNamedItem(const AtomicString& name) const

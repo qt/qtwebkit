@@ -29,6 +29,7 @@
 #include "RenderSVGTextPath.h"
 #include "SVGElementInstance.h"
 #include "SVGNames.h"
+#include "XLinkNames.h"
 
 namespace WebCore {
 
@@ -81,7 +82,7 @@ bool SVGTextPathElement::isSupportedAttribute(const QualifiedName& attrName)
         supportedAttributes.add(SVGNames::methodAttr);
         supportedAttributes.add(SVGNames::spacingAttr);
     }
-    return supportedAttributes.contains<QualifiedName, SVGAttributeHashTranslator>(attrName);
+    return supportedAttributes.contains<SVGAttributeHashTranslator>(attrName);
 }
 
 void SVGTextPathElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
@@ -163,15 +164,18 @@ void SVGTextPathElement::buildPendingResource()
     String id;
     Element* target = SVGURIReference::targetElementFromIRIString(href(), document(), &id);
     if (!target) {
-        if (hasPendingResources() || id.isEmpty())
+        // Do not register as pending if we are already pending this resource.
+        if (document()->accessSVGExtensions()->isElementPendingResource(this, id))
             return;
 
-        document()->accessSVGExtensions()->addPendingResource(id, this);
-        ASSERT(hasPendingResources());
-    } else if (target->isSVGElement()) {
+        if (!id.isEmpty()) {
+            document()->accessSVGExtensions()->addPendingResource(id, this);
+            ASSERT(hasPendingResources());
+        }
+    } else if (target->hasTagName(SVGNames::pathTag)) {
         // Register us with the target in the dependencies map. Any change of hrefElement
         // that leads to relayout/repainting now informs us, so we can react to it.
-        document()->accessSVGExtensions()->addElementReferencingTarget(this, static_cast<SVGElement*>(target));
+        document()->accessSVGExtensions()->addElementReferencingTarget(this, toSVGElement(target));
     }
 }
 

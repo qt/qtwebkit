@@ -27,6 +27,7 @@
 #define WebLoaderClient_h
 
 #include "APIClient.h"
+#include "PluginModuleInfo.h"
 #include "SameDocumentNavigationType.h"
 #include "WKPage.h"
 #include <WebCore/LayoutMilestones.h>
@@ -43,18 +44,11 @@ namespace WebKit {
 class APIObject;
 class AuthenticationChallengeProxy;
 class AuthenticationDecisionListener;
+class ImmutableDictionary;
 class WebBackForwardListItem;
 class WebFrameProxy;
 class WebPageProxy;
 class WebProtectionSpace;
-
-#if ENABLE(WEB_INTENTS)
-class WebIntentData;
-#endif
-
-#if ENABLE(WEB_INTENTS_TAG)
-class WebIntentServiceInfo;
-#endif
 
 class WebLoaderClient : public APIClient<WKPageLoaderClient, kWKPageLoaderClientCurrentVersion> {
 public:
@@ -73,13 +67,6 @@ public:
     void didDisplayInsecureContentForFrame(WebPageProxy*, WebFrameProxy*, APIObject*);
     void didRunInsecureContentForFrame(WebPageProxy*, WebFrameProxy*, APIObject*);
     void didDetectXSSForFrame(WebPageProxy*, WebFrameProxy*, APIObject*);
-#if ENABLE(WEB_INTENTS)
-    void didReceiveIntentForFrame(WebPageProxy*, WebFrameProxy*, WebIntentData*, APIObject*);
-#endif
-
-#if ENABLE(WEB_INTENTS_TAG)
-    void registerIntentServiceForFrame(WebPageProxy*, WebFrameProxy*, WebIntentServiceInfo*, APIObject*);
-#endif
 
     // FIXME: didNewFirstVisuallyNonEmptyLayout should be removed. We should consider removing didFirstVisuallyNonEmptyLayoutForFrame
     // as well. They are both being replaced by didLayout.
@@ -99,12 +86,13 @@ public:
     void processDidBecomeResponsive(WebPageProxy*);
     void processDidCrash(WebPageProxy*);
 
-    void didChangeBackForwardList(WebPageProxy*, WebBackForwardListItem* addedItem, Vector<RefPtr<APIObject> >* removedItems);
+    void didChangeBackForwardList(WebPageProxy*, WebBackForwardListItem* addedItem, Vector<RefPtr<APIObject>>* removedItems);
     bool shouldGoToBackForwardListItem(WebPageProxy*, WebBackForwardListItem*);
     void willGoToBackForwardListItem(WebPageProxy*, WebBackForwardListItem*, APIObject*);
 
-    void didFailToInitializePlugin(WebPageProxy*, const String& mimeType);
-    void didBlockInsecurePluginVersion(WebPageProxy*, const String& mimeType, const String& pluginIdentifier, const String& pluginVersion);
+    PluginModuleLoadPolicy pluginLoadPolicy(WebPageProxy*, PluginModuleLoadPolicy currentPluginLoadPolicy, ImmutableDictionary*, String& unavailabilityDescriptionOutParameter);
+    void didFailToInitializePlugin(WebPageProxy*, ImmutableDictionary*);
+    void didBlockInsecurePluginVersion(WebPageProxy*, ImmutableDictionary*);
 };
 
 } // namespace WebKit

@@ -32,8 +32,25 @@
 #include "WebURLRequest.h"
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefPtr.h>
-#include <wtf/UnusedParam.h>
 #include <wtf/text/WTFString.h>
+
+// Supplements
+#include "WebApplicationCacheManagerProxy.h"
+#include "WebCookieManagerProxy.h"
+#include "WebGeolocationManagerProxy.h"
+#include "WebKeyValueStorageManager.h"
+#include "WebMediaCacheManagerProxy.h"
+#include "WebNotificationManagerProxy.h"
+#include "WebResourceCacheManagerProxy.h"
+#if ENABLE(SQL_DATABASE)
+#include "WebDatabaseManagerProxy.h"
+#endif
+#if ENABLE(BATTERY_STATUS)
+#include "WebBatteryManagerProxy.h"
+#endif
+#if ENABLE(NETWORK_INFO)
+#include "WebNetworkInfoManagerProxy.h"
+#endif
 
 using namespace WebKit;
 
@@ -60,6 +77,11 @@ WKContextRef WKContextCreateWithInjectedBundlePath(WKStringRef pathRef)
 {
     RefPtr<WebContext> context = WebContext::create(toImpl(pathRef)->string());
     return toAPI(context.release().leakRef());
+}
+
+void WKContextSetClient(WKContextRef contextRef, const WKContextClient* wkClient)
+{
+    toImpl(contextRef)->initializeClient(wkClient);
 }
 
 void WKContextSetInjectedBundleClient(WKContextRef contextRef, const WKContextInjectedBundleClient* wkClient)
@@ -131,6 +153,16 @@ WKProcessModel WKContextGetProcessModel(WKContextRef contextRef)
     return toAPI(toImpl(contextRef)->processModel());
 }
 
+void WKContextSetMaximumNumberOfProcesses(WKContextRef contextRef, unsigned numberOfProcesses)
+{
+    toImpl(contextRef)->setMaximumNumberOfProcesses(numberOfProcesses);
+}
+
+unsigned WKContextGetMaximumNumberOfProcesses(WKContextRef contextRef)
+{
+    return toImpl(contextRef)->maximumNumberOfProcesses();
+}
+
 void WKContextSetAlwaysUsesComplexTextCodePath(WKContextRef contextRef, bool alwaysUseComplexTextCodePath)
 {
     toImpl(contextRef)->setAlwaysUsesComplexTextCodePath(alwaysUseComplexTextCodePath);
@@ -168,18 +200,18 @@ void WKContextSetDomainRelaxationForbiddenForURLScheme(WKContextRef contextRef, 
 
 WKCookieManagerRef WKContextGetCookieManager(WKContextRef contextRef)
 {
-    return toAPI(toImpl(contextRef)->cookieManagerProxy());
+    return toAPI(toImpl(contextRef)->supplement<WebCookieManagerProxy>());
 }
 
 WKApplicationCacheManagerRef WKContextGetApplicationCacheManager(WKContextRef contextRef)
 {
-    return toAPI(toImpl(contextRef)->applicationCacheManagerProxy());
+    return toAPI(toImpl(contextRef)->supplement<WebApplicationCacheManagerProxy>());
 }
 
 WKBatteryManagerRef WKContextGetBatteryManager(WKContextRef contextRef)
 {
 #if ENABLE(BATTERY_STATUS)
-    return toAPI(toImpl(contextRef)->batteryManagerProxy());
+    return toAPI(toImpl(contextRef)->supplement<WebBatteryManagerProxy>());
 #else
     return 0;
 #endif
@@ -188,7 +220,7 @@ WKBatteryManagerRef WKContextGetBatteryManager(WKContextRef contextRef)
 WKDatabaseManagerRef WKContextGetDatabaseManager(WKContextRef contextRef)
 {
 #if ENABLE(SQL_DATABASE)
-    return toAPI(toImpl(contextRef)->databaseManagerProxy());
+    return toAPI(toImpl(contextRef)->supplement<WebDatabaseManagerProxy>());
 #else
     return 0;
 #endif
@@ -196,13 +228,13 @@ WKDatabaseManagerRef WKContextGetDatabaseManager(WKContextRef contextRef)
 
 WKGeolocationManagerRef WKContextGetGeolocationManager(WKContextRef contextRef)
 {
-    return toAPI(toImpl(contextRef)->geolocationManagerProxy());
+    return toAPI(toImpl(contextRef)->supplement<WebGeolocationManagerProxy>());
 }
 
 WKNetworkInfoManagerRef WKContextGetNetworkInfoManager(WKContextRef contextRef)
 {
 #if ENABLE(NETWORK_INFO)
-    return toAPI(toImpl(contextRef)->networkInfoManagerProxy());
+    return toAPI(toImpl(contextRef)->supplement<WebNetworkInfoManagerProxy>());
 #else
     return 0;
 #endif
@@ -215,17 +247,17 @@ WKIconDatabaseRef WKContextGetIconDatabase(WKContextRef contextRef)
 
 WKKeyValueStorageManagerRef WKContextGetKeyValueStorageManager(WKContextRef contextRef)
 {
-    return toAPI(toImpl(contextRef)->keyValueStorageManagerProxy());
+    return toAPI(toImpl(contextRef)->supplement<WebKeyValueStorageManager>());
 }
 
 WKMediaCacheManagerRef WKContextGetMediaCacheManager(WKContextRef contextRef)
 {
-    return toAPI(toImpl(contextRef)->mediaCacheManagerProxy());
+    return toAPI(toImpl(contextRef)->supplement<WebMediaCacheManagerProxy>());
 }
 
 WKNotificationManagerRef WKContextGetNotificationManager(WKContextRef contextRef)
 {
-    return toAPI(toImpl(contextRef)->notificationManagerProxy());
+    return toAPI(toImpl(contextRef)->supplement<WebNotificationManagerProxy>());
 }
 
 WKPluginSiteDataManagerRef WKContextGetPluginSiteDataManager(WKContextRef contextRef)
@@ -239,7 +271,7 @@ WKPluginSiteDataManagerRef WKContextGetPluginSiteDataManager(WKContextRef contex
 
 WKResourceCacheManagerRef WKContextGetResourceCacheManager(WKContextRef contextRef)
 {
-    return toAPI(toImpl(contextRef)->resourceCacheManagerProxy());
+    return toAPI(toImpl(contextRef)->supplement<WebResourceCacheManagerProxy>());
 }
 
 void WKContextStartMemorySampler(WKContextRef contextRef, WKDoubleRef interval)
@@ -255,6 +287,16 @@ void WKContextStopMemorySampler(WKContextRef contextRef)
 void WKContextSetIconDatabasePath(WKContextRef contextRef, WKStringRef iconDatabasePath)
 {
     toImpl(contextRef)->setIconDatabasePath(toImpl(iconDatabasePath)->string());
+}
+
+void WKContextAllowSpecificHTTPSCertificateForHost(WKContextRef contextRef, WKCertificateInfoRef certificateRef, WKStringRef hostRef)
+{
+    toImpl(contextRef)->allowSpecificHTTPSCertificateForHost(toImpl(certificateRef), toImpl(hostRef)->string());
+}
+
+WK_EXPORT void WKContextSetApplicationCacheDirectory(WKContextRef contextRef, WKStringRef applicationCacheDirectory)
+{
+    toImpl(contextRef)->setApplicationCacheDirectory(toImpl(applicationCacheDirectory)->string());
 }
 
 void WKContextSetDatabaseDirectory(WKContextRef contextRef, WKStringRef databaseDirectory)
@@ -299,7 +341,12 @@ void WKContextWarmInitialProcess(WKContextRef contextRef)
 
 void WKContextGetStatistics(WKContextRef contextRef, void* context, WKContextGetStatisticsFunction callback)
 {
-    toImpl(contextRef)->getWebCoreStatistics(DictionaryCallback::create(context, callback));    
+    toImpl(contextRef)->getStatistics(0xFFFFFFFF, DictionaryCallback::create(context, callback));
+}
+
+void WKContextGetStatisticsWithOptions(WKContextRef contextRef, WKStatisticsOptions optionsMask, void* context, WKContextGetStatisticsFunction callback)
+{
+    toImpl(contextRef)->getStatistics(optionsMask, DictionaryCallback::create(context, callback));
 }
 
 void WKContextGarbageCollectJavaScriptObjects(WKContextRef contextRef)
@@ -315,6 +362,30 @@ void WKContextSetJavaScriptGarbageCollectorTimerEnabled(WKContextRef contextRef,
 void WKContextSetUsesNetworkProcess(WKContextRef contextRef, bool usesNetworkProcess)
 {
     toImpl(contextRef)->setUsesNetworkProcess(usesNetworkProcess);
+}
+
+WKDictionaryRef WKContextCopyPlugInAutoStartOriginHashes(WKContextRef contextRef)
+{
+    return toAPI(toImpl(contextRef)->plugInAutoStartOriginHashes().leakRef());
+}
+
+void WKContextSetPlugInAutoStartOriginHashes(WKContextRef contextRef, WKDictionaryRef dictionaryRef)
+{
+    if (!dictionaryRef)
+        return;
+    toImpl(contextRef)->setPlugInAutoStartOriginHashes(*toImpl(dictionaryRef));
+}
+
+void WKContextSetPlugInAutoStartOrigins(WKContextRef contextRef, WKArrayRef arrayRef)
+{
+    if (!arrayRef)
+        return;
+    toImpl(contextRef)->setPlugInAutoStartOrigins(*toImpl(arrayRef));
+}
+
+void WKContextSetInvalidMessageFunction(WKContextInvalidMessageFunction invalidMessageFunction)
+{
+    WebContext::setInvalidMessageCallback(invalidMessageFunction);
 }
 
 // Deprecated functions.

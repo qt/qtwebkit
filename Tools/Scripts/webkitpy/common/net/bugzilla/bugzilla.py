@@ -531,7 +531,7 @@ class Bugzilla(object):
     # FIXME: Use enum instead of two booleans
     def _commit_queue_flag(self, mark_for_landing, mark_for_commit_queue):
         if mark_for_landing:
-            user = self.committers.account_by_email(self.username)
+            user = self.committers.contributor_by_email(self.username)
             mark_for_commit_queue = True
             if not user:
                 _log.warning("Your Bugzilla login is not listed in committers.py. Uploading with cq? instead of cq+")
@@ -629,7 +629,7 @@ class Bugzilla(object):
 
     # FIXME: There has to be a more concise way to write this method.
     def _check_create_bug_response(self, response_html):
-        match = re.search("<title>Bug (?P<bug_id>\d+) Submitted</title>",
+        match = re.search("<title>Bug (?P<bug_id>\d+) Submitted[^<]*</title>",
                           response_html)
         if match:
             return match.group('bug_id')
@@ -729,18 +729,12 @@ class Bugzilla(object):
                                attachment_id,
                                flag_name,
                                flag_value,
-                               comment_text=None,
-                               additional_comment_text=None):
+                               comment_text=None):
         # FIXME: We need a way to test this function on a live bugzilla
         # instance.
 
         self.authenticate()
-
-        # FIXME: additional_comment_text seems useless and should be merged into comment-text.
-        if additional_comment_text:
-            comment_text += "\n\n%s" % additional_comment_text
         _log.info(comment_text)
-
         self.browser.open(self.attachment_url_for_id(attachment_id, 'edit'))
         self.browser.select_form(nr=1)
 
@@ -817,11 +811,7 @@ class Bugzilla(object):
 
         if not self._has_control(self.browser, "assigned_to"):
             _log.warning("""Failed to assign bug to you (can't find assigned_to) control.
-Do you have EditBugs privileges at bugs.webkit.org?
-https://bugs.webkit.org/userprefs.cgi?tab=permissions
-
-If not, you should email webkit-committers@lists.webkit.org or ask in #webkit
-for someone to add EditBugs to your bugs.webkit.org account.""")
+Ignore this message if you don't have EditBugs privileges (https://bugs.webkit.org/userprefs.cgi?tab=permissions)""")
             return
 
         if comment_text:

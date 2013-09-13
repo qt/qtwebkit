@@ -28,17 +28,22 @@
 
 #include "ArgumentCoders.h"
 #include "DataReference.h"
+#include "MessageFlags.h"
 #include "StringReference.h"
+
+#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
+#include "ImportanceAssertion.h"
+#endif
 
 namespace CoreIPC {
 
 PassOwnPtr<MessageDecoder> MessageDecoder::create(const DataReference& buffer)
 {
-    Deque<Attachment> attachments;
+    Vector<Attachment> attachments;
     return adoptPtr(new MessageDecoder(buffer, attachments));
 }
 
-PassOwnPtr<MessageDecoder> MessageDecoder::create(const DataReference& buffer, Deque<Attachment>& attachments)
+PassOwnPtr<MessageDecoder> MessageDecoder::create(const DataReference& buffer, Vector<Attachment>& attachments)
 {
     return adoptPtr(new MessageDecoder(buffer, attachments));
 }
@@ -47,16 +52,36 @@ MessageDecoder::~MessageDecoder()
 {
 }
 
-MessageDecoder::MessageDecoder(const DataReference& buffer, Deque<Attachment>& attachments)
+MessageDecoder::MessageDecoder(const DataReference& buffer, Vector<Attachment>& attachments)
     : ArgumentDecoder(buffer.data(), buffer.size(), attachments)
 {
+    if (!decode(m_messageFlags))
+        return;
+
     if (!decode(m_messageReceiverName))
         return;
 
     if (!decode(m_messageName))
         return;
 
-    decodeUInt64(m_destinationID);
+    decode(m_destinationID);
 }
+
+bool MessageDecoder::isSyncMessage() const
+{
+    return m_messageFlags & SyncMessage;
+}
+
+bool MessageDecoder::shouldDispatchMessageWhenWaitingForSyncReply() const
+{
+    return m_messageFlags & DispatchMessageWhenWaitingForSyncReply;
+}
+
+#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
+void MessageDecoder::setImportanceAssertion(PassOwnPtr<ImportanceAssertion> assertion)
+{
+    m_importanceAssertion = assertion;
+}
+#endif
 
 } // namespace CoreIPC

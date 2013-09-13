@@ -32,6 +32,7 @@
 #include "RenderArena.h"
 #include "RenderBlock.h"
 #include "RenderFlowThread.h"
+#include "RenderFullScreen.h"
 #include "RenderGeometryMap.h"
 #include "RenderLayer.h"
 #include "RenderTheme.h"
@@ -39,8 +40,6 @@
 #include "StyleInheritedData.h"
 #include "TransformState.h"
 #include "VisiblePosition.h"
-
-#include <wtf/TemporaryChange.h>
 
 #if ENABLE(DASHBOARD_SUPPORT) || ENABLE(DRAGGABLE_REGION)
 #include "Frame.h"
@@ -50,11 +49,18 @@ using namespace std;
 
 namespace WebCore {
 
-RenderInline::RenderInline(Node* node)
-    : RenderBoxModelObject(node)
+RenderInline::RenderInline(Element* element)
+    : RenderBoxModelObject(element)
     , m_alwaysCreateLineBoxes(false)
 {
     setChildrenInline(true);
+}
+
+RenderInline* RenderInline::createAnonymous(Document* document)
+{
+    RenderInline* renderer = new (document->renderArena()) RenderInline(0);
+    renderer->setDocumentForAnonymous(document);
+    return renderer;
 }
 
 void RenderInline::willBeDestroyed()
@@ -169,18 +175,11 @@ void RenderInline::styleDidChange(StyleDifference diff, const RenderStyle* oldSt
     // need to pass its style on to anyone else.
     RenderStyle* newStyle = style();
     RenderInline* continuation = inlineElementContinuation();
-    {
-        TemporaryChange<bool> enableAfter(RenderObjectChildList::s_enableUpdateBeforeAfterContent, false);
-        RenderInline* nextInlineElementCont = 0;
-        for (RenderInline* currCont = continuation; currCont; currCont = nextInlineElementCont) {
-            nextInlineElementCont = currCont->inlineElementContinuation();
-            // We need to update :after content for the last continuation in the chain.
-            RenderObjectChildList::s_enableUpdateBeforeAfterContent = !nextInlineElementCont;
-            RenderBoxModelObject* nextCont = currCont->continuation();
-            currCont->setContinuation(0);
-            currCont->setStyle(newStyle);
-            currCont->setContinuation(nextCont);
-        }
+    for (RenderInline* currCont = continuation; currCont; currCont = currCont->inlineElementContinuation()) {
+        RenderBoxModelObject* nextCont = currCont->continuation();
+        currCont->setContinuation(0);
+        currCont->setStyle(newStyle);
+        currCont->setContinuation(nextCont);
     }
 
     // If an inline's in-flow positioning has changed then any descendant blocks will need to change their in-flow positioning accordingly.
@@ -201,12 +200,6 @@ void RenderInline::styleDidChange(StyleDifference diff, const RenderStyle* oldSt
         }
         m_alwaysCreateLineBoxes = alwaysCreateLineBoxes;
     }
-
-    // Update pseudos for :before and :after now.
-    if (!isAnonymous() && document()->styleSheetCollection()->usesBeforeAfterRules()) {
-        children()->updateBeforeAfterContent(this, BEFORE);
-        children()->updateBeforeAfterContent(this, AFTER);
-    }
 }
 
 void RenderInline::updateAlwaysCreateLineBoxes(bool fullLayout)
@@ -219,13 +212,14 @@ void RenderInline::updateAlwaysCreateLineBoxes(bool fullLayout)
     RenderStyle* parentStyle = parent()->style();
     RenderInline* parentRenderInline = parent()->isRenderInline() ? toRenderInline(parent()) : 0;
     bool checkFonts = document()->inNoQuirksMode();
+    RenderFlowThread* flowThread = flowThreadContainingBlock();
     bool alwaysCreateLineBoxes = (parentRenderInline && parentRenderInline->alwaysCreateLineBoxes())
         || (parentRenderInline && parentStyle->verticalAlign() != BASELINE)
         || style()->verticalAlign() != BASELINE
         || style()->textEmphasisMark() != TextEmphasisMarkNone
         || (checkFonts && (!parentStyle->font().fontMetrics().hasIdenticalAscentDescentAndLineGap(style()->font().fontMetrics())
         || parentStyle->lineHeight() != style()->lineHeight()))
-        || (inRenderFlowThread() && enclosingRenderFlowThread()->hasRegionsWithStyling());
+        || (flowThread && flowThread->hasRegionsWithStyling());
 
     if (!alwaysCreateLineBoxes && checkFonts && document()->styleSheetCollection()->usesFirstLineRules()) {
         // Have to check the first line style as well.
@@ -324,20 +318,10 @@ void RenderInline::addChildIgnoringContinuation(RenderObject* newChild, RenderOb
         if (RenderObject* positionedAncestor = inFlowPositionedInlineAncestor(this))
             newStyle->setPosition(positionedAncestor->style()->position());
 
-        RenderBlock* newBox = new (renderArena()) RenderBlock(document() /* anonymous box */);
+        RenderBlock* newBox = RenderBlock::createAnonymous(document());
         newBox->setStyle(newStyle.release());
         RenderBoxModelObject* oldContinuation = continuation();
         setContinuation(newBox);
-
-        // Someone may have put a <p> inside a <q>, causing a split.  When this happens, the :after content
-        // has to move into the inline continuation.  Call updateBeforeAfterContent to ensure that our :after
-        // content gets properly destroyed.
-        bool isLastChild = (beforeChild == lastChild());
-        if (document()->styleSheetCollection()->usesBeforeAfterRules())
-            children()->updateBeforeAfterContent(this, AFTER);
-        if (isLastChild && beforeChild != lastChild())
-            beforeChild = 0; // We destroyed the last child, so now we need to update our insertion
-                             // point to be 0.  It's just a straight append now.
 
         splitFlow(beforeChild, newBox, newChild, oldContinuation);
         return;
@@ -352,7 +336,7 @@ RenderInline* RenderInline::clone() const
 {
     RenderInline* cloneInline = new (renderArena()) RenderInline(node());
     cloneInline->setStyle(style());
-    cloneInline->setInRenderFlowThread(inRenderFlowThread());
+    cloneInline->setFlowThreadState(flowThreadState());
     return cloneInline;
 }
 
@@ -363,6 +347,17 @@ void RenderInline::splitInlines(RenderBlock* fromBlock, RenderBlock* toBlock,
     // Create a clone of this inline.
     RenderInline* cloneInline = clone();
     cloneInline->setContinuation(oldCont);
+
+#if ENABLE(FULLSCREEN_API)
+    // If we're splitting the inline containing the fullscreened element,
+    // |beforeChild| may be the renderer for the fullscreened element. However,
+    // that renderer is wrapped in a RenderFullScreen, so |this| is not its
+    // parent. Since the splitting logic expects |this| to be the parent, set
+    // |beforeChild| to be the RenderFullScreen.
+    const Element* fullScreenElement = document()->webkitCurrentFullScreenElement();
+    if (fullScreenElement && beforeChild && beforeChild->node() == fullScreenElement)
+        beforeChild = document()->fullScreenRenderer();
+#endif
 
     // Now take all of the children from beforeChild to the end and remove
     // them from |this| and place them in the clone.
@@ -404,12 +399,6 @@ void RenderInline::splitInlines(RenderBlock* fromBlock, RenderBlock* toBlock,
             oldCont = inlineCurr->continuation();
             inlineCurr->setContinuation(cloneInline);
             cloneInline->setContinuation(oldCont);
-
-            // Someone may have indirectly caused a <q> to split.  When this happens, the :after content
-            // has to move into the inline continuation.  Call updateBeforeAfterContent to ensure that the inline's :after
-            // content gets properly destroyed.
-            if (document()->styleSheetCollection()->usesBeforeAfterRules())
-                inlineCurr->children()->updateBeforeAfterContent(inlineCurr, AFTER);
 
             // Now we need to take all of the children starting from the first child
             // *after* currChild and append them all to the clone.
@@ -762,9 +751,12 @@ const char* RenderInline::renderName() const
         return "RenderInline (relative positioned)";
     if (isStickyPositioned())
         return "RenderInline (sticky positioned)";
+    // FIXME: Temporary hack while the new generated content system is being implemented.
+    if (isPseudoElement())
+        return "RenderInline (generated)";
     if (isAnonymous())
         return "RenderInline (generated)";
-    if (isRunIn())
+    if (style() && isRunIn())
         return "RenderInline (run-in)";
     return "RenderInline";
 }
@@ -811,7 +803,7 @@ bool RenderInline::hitTestCulledInline(const HitTestRequest& request, HitTestRes
         // We can not use addNodeToRectBasedTestResult to determine if we fully enclose the hit-test area
         // because it can only handle rectangular targets.
         result.addNodeToRectBasedTestResult(node(), request, locationInContainer);
-        return regionResult.contains(enclosingIntRect(tmpLocation.boundingBox()));
+        return regionResult.contains(tmpLocation.boundingBox());
     }
     return false;
 }
@@ -1149,7 +1141,9 @@ LayoutSize RenderInline::offsetFromContainer(RenderObject* container, const Layo
         offset -= toRenderBox(container)->scrolledContentOffset();
 
     if (offsetDependsOnPoint)
-        *offsetDependsOnPoint = container->hasColumns() || (container->isBox() && container->style()->isFlippedBlocksWritingMode());
+        *offsetDependsOnPoint = container->hasColumns()
+            || (container->isBox() && container->style()->isFlippedBlocksWritingMode())
+            || container->isRenderFlowThread();
 
     return offset;
 }
@@ -1184,8 +1178,6 @@ void RenderInline::mapLocalToContainer(const RenderLayerModelObject* repaintCont
     }
 
     LayoutSize containerOffset = offsetFromContainer(o, roundedLayoutPoint(transformState.mappedPoint()));
-    if (mode & SnapOffsetForTransforms)
-        containerOffset = roundedIntSize(containerOffset);
 
     bool preserve3D = mode & UseTransforms && (o->style()->preserves3D() || style()->preserves3D());
     if (mode & UseTransforms && shouldUseTransformFromContainer(o)) {
@@ -1224,8 +1216,6 @@ const RenderObject* RenderInline::pushMappingToContainer(const RenderLayerModelO
 
     bool offsetDependsOnPoint = false;
     LayoutSize containerOffset = offsetFromContainer(container, LayoutPoint(), &offsetDependsOnPoint);
-    if (geometryMap.mapCoordinatesFlags() & SnapOffsetForTransforms)
-        containerOffset = roundedIntSize(containerOffset);
 
     bool preserve3D = container->style()->preserves3D() || style()->preserves3D();
     if (shouldUseTransformFromContainer(container)) {
@@ -1400,7 +1390,7 @@ void RenderInline::imageChanged(WrappedImagePtr, const IntRect*)
     repaint();
 }
 
-void RenderInline::addFocusRingRects(Vector<IntRect>& rects, const LayoutPoint& additionalOffset)
+void RenderInline::addFocusRingRects(Vector<IntRect>& rects, const LayoutPoint& additionalOffset, const RenderLayerModelObject* paintContainer)
 {
     AbsoluteRectsGeneratorContext context(rects, additionalOffset);
     generateLineBoxRects(context);
@@ -1410,22 +1400,22 @@ void RenderInline::addFocusRingRects(Vector<IntRect>& rects, const LayoutPoint& 
             FloatPoint pos(additionalOffset);
             // FIXME: This doesn't work correctly with transforms.
             if (curr->hasLayer()) 
-                pos = curr->localToAbsolute();
+                pos = curr->localToContainerPoint(FloatPoint(), paintContainer);
             else if (curr->isBox())
                 pos.move(toRenderBox(curr)->locationOffset());
-            curr->addFocusRingRects(rects, flooredIntPoint(pos));
+            curr->addFocusRingRects(rects, flooredIntPoint(pos), paintContainer);
         }
     }
 
     if (continuation()) {
         if (continuation()->isInline())
-            continuation()->addFocusRingRects(rects, flooredLayoutPoint(additionalOffset + continuation()->containingBlock()->location() - containingBlock()->location()));
+            continuation()->addFocusRingRects(rects, flooredLayoutPoint(additionalOffset + continuation()->containingBlock()->location() - containingBlock()->location()), paintContainer);
         else
-            continuation()->addFocusRingRects(rects, flooredLayoutPoint(additionalOffset + toRenderBox(continuation())->location() - containingBlock()->location()));
+            continuation()->addFocusRingRects(rects, flooredLayoutPoint(additionalOffset + toRenderBox(continuation())->location() - containingBlock()->location()), paintContainer);
     }
 }
 
-void RenderInline::paintOutline(GraphicsContext* graphicsContext, const LayoutPoint& paintOffset)
+void RenderInline::paintOutline(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
 {
     if (!hasOutline())
         return;
@@ -1434,10 +1424,11 @@ void RenderInline::paintOutline(GraphicsContext* graphicsContext, const LayoutPo
     if (styleToUse->outlineStyleIsAuto() || hasOutlineAnnotation()) {
         if (!theme()->supportsFocusRing(styleToUse)) {
             // Only paint the focus ring by hand if the theme isn't able to draw the focus ring.
-            paintFocusRing(graphicsContext, paintOffset, styleToUse);
+            paintFocusRing(paintInfo, paintOffset, styleToUse);
         }
     }
 
+    GraphicsContext* graphicsContext = paintInfo.context;
     if (graphicsContext->paintingDisabled())
         return;
 

@@ -25,8 +25,8 @@
 
 #ifndef EvasGLSurface_h
 #define EvasGLSurface_h
-
 #if USE(ACCELERATED_COMPOSITING)
+
 #include <Evas_GL.h>
 #include <WebCore/IntSize.h>
 #include <wtf/PassOwnPtr.h>
@@ -39,7 +39,13 @@ public:
     {
         ASSERT(evasGL);
         ASSERT(cfg);
-        Evas_GL_Surface* surface = evas_gl_surface_create(evasGL, cfg, size.width(), size.height());
+
+        Evas_GL_Surface* surface = 0;
+
+        // Ensure that the surface is created with valid size.
+        if (size.width() && size.height())
+            surface = evas_gl_surface_create(evasGL, cfg, size.width(), size.height());
+
         if (!surface)
             return nullptr;
 
@@ -48,7 +54,7 @@ public:
     }
     ~EvasGLSurface();
 
-    inline Evas_GL_Surface* surface() const { return m_surface; }
+    Evas_GL_Surface* surface() { return m_surface; }
 
 private:
     EvasGLSurface(Evas_GL* evasGL, Evas_GL_Surface* passSurface);
@@ -60,5 +66,4 @@ private:
 } // namespace WebKit
 
 #endif // USE(ACCELERATED_COMPOSITING)
-
 #endif // EvasGLSurface_h

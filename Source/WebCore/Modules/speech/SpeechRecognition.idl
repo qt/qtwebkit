@@ -27,8 +27,9 @@
     Conditional=SCRIPTED_SPEECH,
     ActiveDOMObject,
     Constructor,
-    CallWith=ScriptExecutionContext,
+    ConstructorCallWith=ScriptExecutionContext,
     EventTarget,
+    InterfaceName=webkitSpeechRecognition
 ] interface SpeechRecognition {
     attribute SpeechGrammarList grammars;
     attribute DOMString lang;
@@ -36,7 +37,7 @@
     attribute boolean interimResults;
     attribute unsigned long maxAlternatives;
 
-    void start() raises (DOMException);
+    [RaisesException] void start();
     [ImplementedAs=stopFunction] void stop();
     void abort();
 
@@ -53,12 +54,11 @@
     attribute EventListener onend;
 
     // EventTarget interface
-    void addEventListener(in DOMString type,
-                          in EventListener listener,
-                          in [Optional] boolean useCapture);
-    void removeEventListener(in DOMString type,
-                             in EventListener listener,
-                             in [Optional] boolean useCapture);
-    boolean dispatchEvent(in Event evt)
-        raises(EventException);
+    void addEventListener(DOMString type,
+                          EventListener listener,
+                          optional boolean useCapture);
+    void removeEventListener(DOMString type,
+                             EventListener listener,
+                             optional boolean useCapture);
+    [RaisesException] boolean dispatchEvent(Event evt);
 };

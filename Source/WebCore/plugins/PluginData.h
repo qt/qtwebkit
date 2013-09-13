@@ -33,16 +33,6 @@ struct MimeClassInfo {
     String type;
     String desc;
     Vector<String> extensions;
-
-    MimeClassInfo isolatedCopy() const
-    {
-        MimeClassInfo clone;
-        clone.type = type.isolatedCopy();
-        clone.desc = desc.isolatedCopy();
-        for (unsigned i = 0; i < extensions.size(); ++i)
-            clone.extensions.append(extensions[i].isolatedCopy());
-        return clone;
-    }
 };
 
 inline bool operator==(const MimeClassInfo& a, const MimeClassInfo& b)
@@ -55,17 +45,7 @@ struct PluginInfo {
     String file;
     String desc;
     Vector<MimeClassInfo> mimes;
-
-    PluginInfo isolatedCopy() const
-    {
-        PluginInfo clone;
-        clone.name = name.isolatedCopy();
-        clone.file = file.isolatedCopy();
-        clone.desc = desc.isolatedCopy();
-        for (unsigned i = 0; i < mimes.size(); ++i)
-            clone.mimes.append(mimes[i].isolatedCopy());
-        return clone;
-    }
+    bool isApplicationPlugin;
 };
 
 // FIXME: merge with PluginDatabase in the future
@@ -76,8 +56,13 @@ public:
     const Vector<PluginInfo>& plugins() const { return m_plugins; }
     const Vector<MimeClassInfo>& mimes() const { return m_mimes; }
     const Vector<size_t>& mimePluginIndices() const { return m_mimePluginIndices; }
-    
-    bool supportsMimeType(const String& mimeType) const;
+
+    enum AllowedPluginTypes {
+        AllPlugins,
+        OnlyApplicationPlugins
+    };
+
+    bool supportsMimeType(const String& mimeType, const AllowedPluginTypes) const;
     String pluginNameForMimeType(const String& mimeType) const;
     String pluginFileForMimeType(const String& mimeType) const;
 

@@ -71,10 +71,9 @@ WebInspector.NetworkManager._MIMETypes = {
     "image/x-xbitmap":             {"image": true},
     "font/ttf":                    {"font": true},
     "font/opentype":               {"font": true},
-    "font/woff":                   {"font": true},
+    "application/font-woff":       {"font": true},
     "application/x-font-type1":    {"font": true},
     "application/x-font-ttf":      {"font": true},
-    "application/x-font-woff":     {"font": true},
     "application/x-truetype-font": {"font": true},
     "text/javascript":             {"script": true},
     "text/ecmascript":             {"script": true},
@@ -126,7 +125,7 @@ WebInspector.NetworkDispatcher = function(manager)
 WebInspector.NetworkDispatcher.prototype = {
     /**
      * @param {NetworkAgent.Headers} headersMap
-     * @return {Array.<Object>}
+     * @return {!Array.<!WebInspector.NetworkRequest.NameValue>}
      */
     _headersMapToHeadersArray: function(headersMap)
     {
@@ -134,7 +133,7 @@ WebInspector.NetworkDispatcher.prototype = {
         for (var name in headersMap) {
             var values = headersMap[name].split("\n");
             for (var i = 0; i < values.length; ++i)
-                result.push({ name: name, value: values[i] });
+                result.push({name: name, value: values[i]});
         }
         return result;
     },
@@ -182,7 +181,7 @@ WebInspector.NetworkDispatcher.prototype = {
 
         if (!this._mimeTypeIsConsistentWithType(networkRequest)) {
             WebInspector.console.addMessage(WebInspector.ConsoleMessage.create(WebInspector.ConsoleMessage.MessageSource.Network,
-                WebInspector.ConsoleMessage.MessageLevel.Warning,
+                WebInspector.ConsoleMessage.MessageLevel.Log,
                 WebInspector.UIString("Resource interpreted as %s but transferred with MIME type %s: \"%s\".", networkRequest.type.title(), networkRequest.mimeType, networkRequest.url),
                 WebInspector.ConsoleMessage.MessageType.Log,
                 "",
@@ -263,7 +262,7 @@ WebInspector.NetworkDispatcher.prototype = {
             // FIXME: move this check to the backend.
             if (!redirectResponse)
                 return;
-            this.responseReceived(requestId, frameId, loaderId, time, "Other", redirectResponse);
+            this.responseReceived(requestId, frameId, loaderId, time, PageAgent.ResourceType.Other, redirectResponse);
             networkRequest = this._appendRedirect(requestId, time, request.url);
         } else
             networkRequest = this._createNetworkRequest(requestId, frameId, loaderId, request.url, documentURL, initiator);
@@ -415,7 +414,6 @@ WebInspector.NetworkDispatcher.prototype = {
 
         networkRequest.requestMethod = "GET";
         networkRequest.requestHeaders = this._headersMapToHeadersArray(request.headers);
-        networkRequest.webSocketRequestKey3 = request.requestKey3;
         networkRequest.startTime = time;
 
         this._updateNetworkRequest(networkRequest);
@@ -435,7 +433,6 @@ WebInspector.NetworkDispatcher.prototype = {
         networkRequest.statusCode = response.status;
         networkRequest.statusText = response.statusText;
         networkRequest.responseHeaders = this._headersMapToHeadersArray(response.headers);
-        networkRequest.webSocketChallengeResponse = response.challengeResponse;
         networkRequest.responseReceivedTime = time;
 
         this._updateNetworkRequest(networkRequest);

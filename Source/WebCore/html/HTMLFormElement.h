@@ -40,7 +40,7 @@ class HTMLImageElement;
 class HTMLInputElement;
 class TextEncoding;
 
-class HTMLFormElement : public HTMLElement {
+class HTMLFormElement FINAL : public HTMLElement {
 public:
     static PassRefPtr<HTMLFormElement> create(Document*);
     static PassRefPtr<HTMLFormElement> create(const QualifiedName&, Document*);
@@ -98,16 +98,6 @@ public:
 
     bool checkValidity();
 
-#if ENABLE(REQUEST_AUTOCOMPLETE)
-    enum AutocompleteResult { AutocompleteResultSuccess, AutocompleteResultError };
-
-    void requestAutocomplete();
-    void finishRequestAutocomplete(AutocompleteResult);
-
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(autocomplete);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(autocompleteerror);
-#endif
-
     HTMLFormControlElement* elementForAlias(const AtomicString&);
     void addElementAlias(HTMLFormControlElement*, const AtomicString& alias);
 
@@ -134,8 +124,6 @@ private:
     virtual void documentDidResumeFromPageCache();
 
     virtual void didMoveToNewDocument(Document* oldDocument) OVERRIDE;
-
-    virtual bool shouldRegisterAsNamedItem() const OVERRIDE { return true; }
 
     virtual void copyNonAttributePropertiesFromElement(const Element&) OVERRIDE;
 
@@ -171,14 +159,23 @@ private:
     bool m_isInResetFunction;
 
     bool m_wasDemoted;
-
-#if ENABLE(REQUEST_AUTOCOMPLETE)
-    void requestAutocompleteTimerFired(Timer<HTMLFormElement>*);
-
-    Vector<RefPtr<Event> > m_pendingAutocompleteEvents;
-    Timer<HTMLFormElement> m_requestAutocompleteTimer;
-#endif
 };
+
+inline bool isHTMLFormElement(Node* node)
+{
+    return node->hasTagName(HTMLNames::formTag);
+}
+
+inline bool isHTMLFormElement(Element* element)
+{
+    return element->hasTagName(HTMLNames::formTag);
+}
+
+inline HTMLFormElement* toHTMLFormElement(Node* node)
+{
+    ASSERT_WITH_SECURITY_IMPLICATION(!node || isHTMLFormElement(node));
+    return static_cast<HTMLFormElement*>(node);
+}
 
 } // namespace WebCore
 

@@ -30,42 +30,40 @@
 
 #include "WorkerThread.h"
 
-#include "DatabaseContext.h"
-#include "DedicatedWorkerContext.h"
+#include "DedicatedWorkerGlobalScope.h"
 #include "InspectorInstrumentation.h"
 #include "KURL.h"
 #include "ScriptSourceCode.h"
 #include "ScriptValue.h"
+#include "SecurityOrigin.h"
 #include "ThreadGlobalData.h"
-
 #include <utility>
 #include <wtf/Noncopyable.h>
 #include <wtf/text/WTFString.h>
 
 #if ENABLE(SQL_DATABASE)
+#include "DatabaseManager.h"
 #include "DatabaseTask.h"
-#include "DatabaseTracker.h"
-#endif
-
-#if PLATFORM(CHROMIUM)
-#include <public/Platform.h>
-#include <public/WebWorkerRunLoop.h>
 #endif
 
 namespace WebCore {
 
-static Mutex& threadCountMutex()
+static Mutex& threadSetMutex()
 {
     AtomicallyInitializedStatic(Mutex&, mutex = *new Mutex);
     return mutex;
 }
 
-unsigned WorkerThread::m_threadCount = 0;
+static HashSet<WorkerThread*>& workerThreads()
+{
+    DEFINE_STATIC_LOCAL(HashSet<WorkerThread*>, threads, ());
+    return threads;
+}
 
 unsigned WorkerThread::workerThreadCount()
 {
-    MutexLocker lock(threadCountMutex());
-    return m_threadCount;
+    MutexLocker lock(threadSetMutex());
+    return workerThreads().size();
 }
 
 struct WorkerThreadStartupData {
@@ -115,15 +113,15 @@ WorkerThread::WorkerThread(const KURL& scriptURL, const String& userAgent, const
     , m_notificationClient(0)
 #endif
 {
-    MutexLocker lock(threadCountMutex());
-    m_threadCount++;
+    MutexLocker lock(threadSetMutex());
+    workerThreads().add(this);
 }
 
 WorkerThread::~WorkerThread()
 {
-    MutexLocker lock(threadCountMutex());
-    ASSERT(m_threadCount > 0);
-    m_threadCount--;
+    MutexLocker lock(threadSetMutex());
+    ASSERT(workerThreads().contains(this));
+    workerThreads().remove(this);
 }
 
 bool WorkerThread::start()
@@ -148,23 +146,18 @@ void WorkerThread::workerThread()
 {
     {
         MutexLocker lock(m_threadCreationMutex);
-        m_workerContext = createWorkerContext(m_startupData->m_scriptURL, m_startupData->m_userAgent, m_startupData->m_groupSettings.release(), m_startupData->m_contentSecurityPolicy, m_startupData->m_contentSecurityPolicyType, m_startupData->m_topOrigin.release());
+        m_workerGlobalScope = createWorkerGlobalScope(m_startupData->m_scriptURL, m_startupData->m_userAgent, m_startupData->m_groupSettings.release(), m_startupData->m_contentSecurityPolicy, m_startupData->m_contentSecurityPolicyType, m_startupData->m_topOrigin.release());
 
         if (m_runLoop.terminated()) {
             // The worker was terminated before the thread had a chance to run. Since the context didn't exist yet,
             // forbidExecution() couldn't be called from stop().
-           m_workerContext->script()->forbidExecution();
+            m_workerGlobalScope->script()->forbidExecution();
         }
     }
-#if PLATFORM(CHROMIUM)
-    // The corresponding call to didStopWorkerRunLoop is in
-    // ~WorkerScriptController.
-    WebKit::Platform::current()->didStartWorkerRunLoop(WebKit::WebWorkerRunLoop(&m_runLoop));
-#endif
 
-    WorkerScriptController* script = m_workerContext->script();
+    WorkerScriptController* script = m_workerGlobalScope->script();
 #if ENABLE(INSPECTOR)
-    InspectorInstrumentation::willEvaluateWorkerScript(workerContext(), m_startupData->m_startMode);
+    InspectorInstrumentation::willEvaluateWorkerScript(workerGlobalScope(), m_startupData->m_startMode);
 #endif
     script->evaluate(ScriptSourceCode(m_startupData->m_sourceCode, m_startupData->m_scriptURL));
     // Free the startup data to cause its member variable deref's happen on the worker's thread (since
@@ -176,11 +169,11 @@ void WorkerThread::workerThread()
 
     ThreadIdentifier threadID = m_threadID;
 
-    ASSERT(m_workerContext->hasOneRef());
+    ASSERT(m_workerGlobalScope->hasOneRef());
 
     // The below assignment will destroy the context, which will in turn notify messaging proxy.
     // We cannot let any objects survive past thread exit, because no other thread will run GC or otherwise destroy them.
-    m_workerContext = 0;
+    m_workerGlobalScope = 0;
 
     // Clean up WebCore::ThreadGlobalData before WTF::WTFThreadData goes away!
     threadGlobalData().destroy();
@@ -192,7 +185,7 @@ void WorkerThread::workerThread()
 void WorkerThread::runEventLoop()
 {
     // Does not return until terminated.
-    m_runLoop.run(m_workerContext.get());
+    m_runLoop.run(m_workerGlobalScope.get());
 }
 
 class WorkerThreadShutdownFinishTask : public ScriptExecutionContext::Task {
@@ -204,13 +197,13 @@ public:
 
     virtual void performTask(ScriptExecutionContext *context)
     {
-        ASSERT(context->isWorkerContext());
-        WorkerContext* workerContext = static_cast<WorkerContext*>(context);
+        ASSERT_WITH_SECURITY_IMPLICATION(context->isWorkerGlobalScope());
+        WorkerGlobalScope* workerGlobalScope = static_cast<WorkerGlobalScope*>(context);
 #if ENABLE(INSPECTOR)
-        workerContext->clearInspector();
+        workerGlobalScope->clearInspector();
 #endif
         // It's not safe to call clearScript until all the cleanup tasks posted by functions initiated by WorkerThreadShutdownStartTask have completed.
-        workerContext->clearScript();
+        workerGlobalScope->clearScript();
     }
 
     virtual bool isCleanupTask() const { return true; }
@@ -225,22 +218,22 @@ public:
 
     virtual void performTask(ScriptExecutionContext *context)
     {
-        ASSERT(context->isWorkerContext());
-        WorkerContext* workerContext = static_cast<WorkerContext*>(context);
+        ASSERT_WITH_SECURITY_IMPLICATION(context->isWorkerGlobalScope());
+        WorkerGlobalScope* workerGlobalScope = static_cast<WorkerGlobalScope*>(context);
 
 #if ENABLE(SQL_DATABASE)
         // FIXME: Should we stop the databases as part of stopActiveDOMObjects() below?
         DatabaseTaskSynchronizer cleanupSync;
-        DatabaseContext::stopDatabases(workerContext, &cleanupSync);
+        DatabaseManager::manager().stopDatabases(workerGlobalScope, &cleanupSync);
 #endif
 
-        workerContext->stopActiveDOMObjects();
+        workerGlobalScope->stopActiveDOMObjects();
 
-        workerContext->notifyObserversOfStop();
+        workerGlobalScope->notifyObserversOfStop();
 
         // Event listeners would keep DOMWrapperWorld objects alive for too long. Also, they have references to JS objects,
         // which become dangling once Heap is destroyed.
-        workerContext->removeAllEventListeners();
+        workerGlobalScope->removeAllEventListeners();
 
 #if ENABLE(SQL_DATABASE)
         // We wait for the database thread to clean up all its stuff so that we
@@ -250,7 +243,7 @@ public:
 
         // Stick a shutdown command at the end of the queue, so that we deal
         // with all the cleanup tasks the databases post first.
-        workerContext->postTask(WorkerThreadShutdownFinishTask::create());
+        workerGlobalScope->postTask(WorkerThreadShutdownFinishTask::create());
     }
 
     virtual bool isCleanupTask() const { return true; }
@@ -262,15 +255,29 @@ void WorkerThread::stop()
     MutexLocker lock(m_threadCreationMutex);
 
     // Ensure that tasks are being handled by thread event loop. If script execution weren't forbidden, a while(1) loop in JS could keep the thread alive forever.
-    if (m_workerContext) {
-        m_workerContext->script()->scheduleExecutionTermination();
+    if (m_workerGlobalScope) {
+        m_workerGlobalScope->script()->scheduleExecutionTermination();
 
 #if ENABLE(SQL_DATABASE)
-        DatabaseTracker::tracker().interruptAllDatabasesForContext(m_workerContext.get());
+        DatabaseManager::manager().interruptAllDatabasesForContext(m_workerGlobalScope.get());
 #endif
-        m_runLoop.postTask(WorkerThreadShutdownStartTask::create());
+        m_runLoop.postTaskAndTerminate(WorkerThreadShutdownStartTask::create());
+        return;
     }
     m_runLoop.terminate();
+}
+
+class ReleaseFastMallocFreeMemoryTask : public ScriptExecutionContext::Task {
+    virtual void performTask(ScriptExecutionContext*) OVERRIDE { WTF::releaseFastMallocFreeMemory(); }
+};
+
+void WorkerThread::releaseFastMallocFreeMemoryInAllThreads()
+{
+    MutexLocker lock(threadSetMutex());
+    HashSet<WorkerThread*>& threads = workerThreads();
+    HashSet<WorkerThread*>::iterator end = threads.end();
+    for (HashSet<WorkerThread*>::iterator it = threads.begin(); it != end; ++it)
+        (*it)->runLoop().postTask(adoptPtr(new ReleaseFastMallocFreeMemoryTask));
 }
 
 } // namespace WebCore

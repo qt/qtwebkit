@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # Copyright (C) 2012 Google Inc. All rights reserved.
 # Copyright (C) 2012 Zoltan Horvath, Adobe Systems Incorporated. All rights reserved.
 #
@@ -46,37 +45,166 @@ if sys.platform not in ('cygwin', 'win32'):
     import webkitpy.thirdparty.autoinstalled.webpagereplay.replay
 
 from webkitpy.layout_tests.controllers.test_result_writer import TestResultWriter
-from webkitpy.layout_tests.port.driver import DriverInput
-from webkitpy.layout_tests.port.driver import DriverOutput
+from webkitpy.port.driver import DriverInput
+from webkitpy.port.driver import DriverOutput
 
+DEFAULT_TEST_RUNNER_COUNT = 4
 
 _log = logging.getLogger(__name__)
 
 
+class PerfTestMetric(object):
+    def __init__(self, metric, unit=None, iterations=None):
+        # FIXME: Fix runner.js to report correct metric names
+        self._iterations = iterations or []
+        self._unit = unit or self.metric_to_unit(metric)
+        self._metric = self.time_unit_to_metric(self._unit) if metric == 'Time' else metric
+
+    def name(self):
+        return self._metric
+
+    def has_values(self):
+        return bool(self._iterations)
+
+    def append_group(self, group_values):
+        assert isinstance(group_values, list)
+        self._iterations.append(group_values)
+
+    def grouped_iteration_values(self):
+        return self._iterations
+
+    def flattened_iteration_values(self):
+        return [value for group_values in self._iterations for value in group_values]
+
+    def unit(self):
+        return self._unit
+
+    @staticmethod
+    def metric_to_unit(metric):
+        assert metric in ('Time', 'Malloc', 'JSHeap')
+        return 'ms' if metric == 'Time' else 'bytes'
+
+    @staticmethod
+    def time_unit_to_metric(unit):
+        return {'fps': 'FrameRate', 'runs/s': 'Runs', 'ms': 'Time'}[unit]
+
+
 class PerfTest(object):
-    def __init__(self, port, test_name, path_or_url):
+
+    def __init__(self, port, test_name, test_path, test_runner_count=DEFAULT_TEST_RUNNER_COUNT):
         self._port = port
         self._test_name = test_name
-        self._path_or_url = path_or_url
+        self._test_path = test_path
+        self._description = None
+        self._metrics = {}
+        self._ordered_metrics_name = []
+        self._test_runner_count = test_runner_count
 
     def test_name(self):
         return self._test_name
 
-    def path_or_url(self):
-        return self._path_or_url
+    def test_name_without_file_extension(self):
+        return re.sub(r'\.\w+$', '', self.test_name())
+
+    def test_path(self):
+        return self._test_path
+
+    def description(self):
+        return self._description
 
     def prepare(self, time_out_ms):
         return True
 
-    def run(self, driver, time_out_ms):
-        output = self.run_single(driver, self.path_or_url(), time_out_ms)
-        self._filter_stderr(output)
-        if self.run_failed(output):
-            return None
-        return self.parse_output(output)
+    def _create_driver(self):
+        return self._port.create_driver(worker_number=0, no_timeout=True)
 
-    def run_single(self, driver, path_or_url, time_out_ms, should_run_pixel_test=False):
-        return driver.run_test(DriverInput(path_or_url, time_out_ms, image_hash=None, should_run_pixel_test=should_run_pixel_test), stop_when_done=False)
+    def run(self, time_out_ms):
+        for _ in xrange(self._test_runner_count):
+            driver = self._create_driver()
+            try:
+                if not self._run_with_driver(driver, time_out_ms):
+                    return None
+            finally:
+                driver.stop()
+
+        should_log = not self._port.get_option('profile')
+        if should_log and self._description:
+            _log.info('DESCRIPTION: %s' % self._description)
+
+        results = {}
+        for metric_name in self._ordered_metrics_name:
+            metric = self._metrics[metric_name]
+            results[metric.name()] = metric.grouped_iteration_values()
+            if should_log:
+                legacy_chromium_bot_compatible_name = self.test_name_without_file_extension().replace('/', ': ')
+                self.log_statistics(legacy_chromium_bot_compatible_name + ': ' + metric.name(),
+                    metric.flattened_iteration_values(), metric.unit())
+
+        return results
+
+    @staticmethod
+    def log_statistics(test_name, values, unit):
+        sorted_values = sorted(values)
+
+        # Compute the mean and variance using Knuth's online algorithm (has good numerical stability).
+        square_sum = 0
+        mean = 0
+        for i, time in enumerate(sorted_values):
+            delta = time - mean
+            sweep = i + 1.0
+            mean += delta / sweep
+            square_sum += delta * (time - mean)
+
+        middle = int(len(sorted_values) / 2)
+        mean = sum(sorted_values) / len(values)
+        median = sorted_values[middle] if len(sorted_values) % 2 else (sorted_values[middle - 1] + sorted_values[middle]) / 2
+        stdev = math.sqrt(square_sum / (len(sorted_values) - 1)) if len(sorted_values) > 1 else 0
+
+        _log.info('RESULT %s= %s %s' % (test_name, mean, unit))
+        _log.info('median= %s %s, stdev= %s %s, min= %s %s, max= %s %s' %
+            (median, unit, stdev, unit, sorted_values[0], unit, sorted_values[-1], unit))
+
+    _description_regex = re.compile(r'^Description: (?P<description>.*)$', re.IGNORECASE)
+    _metrics_regex = re.compile(r'^(?P<metric>Time|Malloc|JS Heap):')
+    _statistics_keys = ['avg', 'median', 'stdev', 'min', 'max', 'unit', 'values']
+    _score_regex = re.compile(r'^(?P<key>' + r'|'.join(_statistics_keys) + r')\s+(?P<value>([0-9\.]+(,\s+)?)+)\s*(?P<unit>.*)')
+
+    def _run_with_driver(self, driver, time_out_ms):
+        output = self.run_single(driver, self.test_path(), time_out_ms)
+        self._filter_output(output)
+        if self.run_failed(output):
+            return False
+
+        current_metric = None
+        for line in re.split('\n', output.text):
+            description_match = self._description_regex.match(line)
+            metric_match = self._metrics_regex.match(line)
+            score = self._score_regex.match(line)
+
+            if description_match:
+                self._description = description_match.group('description')
+            elif metric_match:
+                current_metric = metric_match.group('metric').replace(' ', '')
+            elif score:
+                if score.group('key') != 'values':
+                    continue
+
+                metric = self._ensure_metrics(current_metric, score.group('unit'))
+                metric.append_group(map(lambda value: float(value), score.group('value').split(', ')))
+            else:
+                _log.error('ERROR: ' + line)
+                return False
+
+        return True
+
+    def _ensure_metrics(self, metric_name, unit=None):
+        if metric_name not in self._metrics:
+            self._metrics[metric_name] = PerfTestMetric(metric_name, unit)
+            self._ordered_metrics_name.append(metric_name)
+        return self._metrics[metric_name]
+
+    def run_single(self, driver, test_path, time_out_ms, should_run_pixel_test=False):
+        return driver.run_test(DriverInput(test_path, time_out_ms, image_hash=None, should_run_pixel_test=should_run_pixel_test), stop_when_done=False)
 
     def run_failed(self, output):
         if output.text == None or output.error:
@@ -93,7 +221,8 @@ class PerfTest(object):
 
         return True
 
-    def _should_ignore_line(self, regexps, line):
+    @staticmethod
+    def _should_ignore_line(regexps, line):
         if not line:
             return True
         for regexp in regexps:
@@ -105,16 +234,10 @@ class PerfTest(object):
         re.compile(r'^Unknown option:'),
         re.compile(r'^\[WARNING:proxy_service.cc'),
         re.compile(r'^\[INFO:'),
+        # These stderr messages come from content_shell on chromium-linux.
+        re.compile(r'INFO:SkFontHost_fontconfig.cpp'),
+        re.compile(r'Running without the SUID sandbox'),
     ]
-
-    def _should_ignore_line_in_stderr(self, line):
-        return self._should_ignore_line(self._lines_to_ignore_in_stderr, line)
-
-    def _filter_stderr(self, output):
-        if not output.error:
-            return
-        filtered_error = '\n'.join([line for line in re.split('\n', output.error) if not self._should_ignore_line_in_stderr(line)])
-        output.error = filtered_error if filtered_error else None
 
     _lines_to_ignore_in_parser_result = [
         re.compile(r'^Running \d+ times$'),
@@ -126,163 +249,23 @@ class PerfTest(object):
         re.compile(re.escape("""frame "<!--framePath //<!--frame0-->-->" - has 1 onunload handler(s)""")),
         re.compile(re.escape("""frame "<!--framePath //<!--frame0-->/<!--frame0-->-->" - has 1 onunload handler(s)""")),
         # Following is for html5.html
-        re.compile(re.escape("""Blocked access to external URL http://www.whatwg.org/specs/web-apps/current-work/"""))]
+        re.compile(re.escape("""Blocked access to external URL http://www.whatwg.org/specs/web-apps/current-work/""")),
+        re.compile(r"CONSOLE MESSAGE: (line \d+: )?Blocked script execution in '[A-Za-z0-9\-\.:]+' because the document's frame is sandboxed and the 'allow-scripts' permission is not set."),
+        re.compile(r"CONSOLE MESSAGE: (line \d+: )?Not allowed to load local resource"),
+        # Dromaeo reports values for subtests. Ignore them for now.
+        re.compile(r'(?P<name>.+): \[(?P<values>(\d+(.\d+)?,\s+)*\d+(.\d+)?)\]'),
+    ]
 
-    def _should_ignore_line_in_parser_test_result(self, line):
-        return self._should_ignore_line(self._lines_to_ignore_in_parser_result, line)
-
-    _description_regex = re.compile(r'^Description: (?P<description>.*)$', re.IGNORECASE)
-    _result_classes = ['Time', 'JS Heap', 'Malloc']
-    _result_class_regex = re.compile(r'^(?P<resultclass>' + r'|'.join(_result_classes) + '):')
-    _statistics_keys = ['avg', 'median', 'stdev', 'min', 'max', 'unit', 'values']
-    _score_regex = re.compile(r'^(?P<key>' + r'|'.join(_statistics_keys) + r')\s+(?P<value>([0-9\.]+(,\s+)?)+)\s*(?P<unit>.*)')
-
-    def parse_output(self, output):
-        test_failed = False
-        results = {}
-        ordered_results_keys = []
-        test_name = re.sub(r'\.\w+$', '', self._test_name)
-        description_string = ""
-        result_class = ""
-        for line in re.split('\n', output.text):
-            description = self._description_regex.match(line)
-            if description:
-                description_string = description.group('description')
-                continue
-
-            result_class_match = self._result_class_regex.match(line)
-            if result_class_match:
-                result_class = result_class_match.group('resultclass')
-                continue
-
-            score = self._score_regex.match(line)
-            if score:
-                key = score.group('key')
-                if key == 'values':
-                    value = [float(number) for number in score.group('value').split(', ')]
-                else:
-                    value = float(score.group('value'))
-                unit = score.group('unit')
-                name = test_name
-                if result_class != 'Time':
-                    name += ':' + result_class.replace(' ', '')
-                if name not in ordered_results_keys:
-                    ordered_results_keys.append(name)
-                results.setdefault(name, {})
-                results[name]['unit'] = unit
-                results[name][key] = value
-                continue
-
-            if not self._should_ignore_line_in_parser_test_result(line):
-                test_failed = True
-                _log.error(line)
-
-        if test_failed:
-            return None
-
-        if set(self._statistics_keys) != set(results[test_name].keys() + ['values']):
-            # values is not provided by Dromaeo tests.
-            _log.error("The test didn't report all statistics.")
-            return None
-
-        if not self._port.get_option('profile'):
-            for result_name in ordered_results_keys:
-                if result_name == test_name:
-                    self.output_statistics(result_name, results[result_name], description_string)
-                else:
-                    self.output_statistics(result_name, results[result_name])
-        return results
-
-    def output_statistics(self, test_name, results, description_string=None):
-        unit = results['unit']
-        if description_string:
-            _log.info('DESCRIPTION: %s' % description_string)
-        _log.info('RESULT %s= %s %s' % (test_name.replace(':', ': ').replace('/', ': '), results['avg'], unit))
-        _log.info(', '.join(['%s= %s %s' % (key, results[key], unit) for key in self._statistics_keys[1:5]]))
+    def _filter_output(self, output):
+        if output.error:
+            output.error = '\n'.join([line for line in re.split('\n', output.error) if not self._should_ignore_line(self._lines_to_ignore_in_stderr, line)])
+        if output.text:
+            output.text = '\n'.join([line for line in re.split('\n', output.text) if not self._should_ignore_line(self._lines_to_ignore_in_parser_result, line)])
 
 
-class ChromiumStylePerfTest(PerfTest):
-    _chromium_style_result_regex = re.compile(r'^RESULT\s+(?P<name>[^=]+)\s*=\s+(?P<value>\d+(\.\d+)?)\s*(?P<unit>\w+)$')
-
-    def __init__(self, port, test_name, path_or_url):
-        super(ChromiumStylePerfTest, self).__init__(port, test_name, path_or_url)
-
-    def parse_output(self, output):
-        test_failed = False
-        results = {}
-        for line in re.split('\n', output.text):
-            resultLine = ChromiumStylePerfTest._chromium_style_result_regex.match(line)
-            if resultLine:
-                # FIXME: Store the unit
-                results[self.test_name() + ':' + resultLine.group('name').replace(' ', '')] = float(resultLine.group('value'))
-                _log.info(line)
-            elif not len(line) == 0:
-                test_failed = True
-                _log.error(line)
-        return results if results and not test_failed else None
-
-
-class PageLoadingPerfTest(PerfTest):
-    _FORCE_GC_FILE = 'resources/force-gc.html'
-
-    def __init__(self, port, test_name, path_or_url):
-        super(PageLoadingPerfTest, self).__init__(port, test_name, path_or_url)
-        self.force_gc_test = self._port.host.filesystem.join(self._port.perf_tests_dir(), self._FORCE_GC_FILE)
-
-    def run_single(self, driver, path_or_url, time_out_ms, should_run_pixel_test=False):
-        # Force GC to prevent pageload noise. See https://bugs.webkit.org/show_bug.cgi?id=98203
-        super(PageLoadingPerfTest, self).run_single(driver, self.force_gc_test, time_out_ms, False)
-        return super(PageLoadingPerfTest, self).run_single(driver, path_or_url, time_out_ms, should_run_pixel_test)
-
-    def calculate_statistics(self, values):
-        sorted_values = sorted(values)
-
-        # Compute the mean and variance using Knuth's online algorithm (has good numerical stability).
-        squareSum = 0
-        mean = 0
-        for i, time in enumerate(sorted_values):
-            delta = time - mean
-            sweep = i + 1.0
-            mean += delta / sweep
-            squareSum += delta * (time - mean)
-
-        middle = int(len(sorted_values) / 2)
-        result = {'avg': mean,
-            'min': sorted_values[0],
-            'max': sorted_values[-1],
-            'median': sorted_values[middle] if len(sorted_values) % 2 else (sorted_values[middle - 1] + sorted_values[middle]) / 2,
-            'stdev': math.sqrt(squareSum / (len(sorted_values) - 1))}
-        return result
-
-    def run(self, driver, time_out_ms):
-        results = {}
-        results.setdefault(self.test_name(), {'unit': 'ms', 'values': []})
-
-        for i in range(0, 20):
-            output = self.run_single(driver, self.path_or_url(), time_out_ms)
-            if not output or self.run_failed(output):
-                return None
-            if i == 0:
-                continue
-
-            results[self.test_name()]['values'].append(output.test_time * 1000)
-
-            if not output.measurements:
-                continue
-
-            for result_class, result in output.measurements.items():
-                name = self.test_name() + ':' + result_class
-                if not name in results:
-                    results.setdefault(name, {'values': []})
-                results[name]['values'].append(result)
-                if result_class == 'Malloc' or result_class == 'JSHeap':
-                    results[name]['unit'] = 'bytes'
-
-        for result_class in results.keys():
-            results[result_class].update(self.calculate_statistics(results[result_class]['values']))
-            self.output_statistics(result_class, results[result_class], '')
-
-        return results
+class SingleProcessPerfTest(PerfTest):
+    def __init__(self, port, test_name, test_path, test_runner_count=1):
+        super(SingleProcessPerfTest, self).__init__(port, test_name, test_path, test_runner_count)
 
 
 class ReplayServer(object):
@@ -320,9 +303,12 @@ class ReplayServer(object):
         self.stop()
 
 
-class ReplayPerfTest(PageLoadingPerfTest):
-    def __init__(self, port, test_name, path_or_url):
-        super(ReplayPerfTest, self).__init__(port, test_name, path_or_url)
+class ReplayPerfTest(PerfTest):
+    _FORCE_GC_FILE = 'resources/force-gc.html'
+
+    def __init__(self, port, test_name, test_path, test_runner_count=DEFAULT_TEST_RUNNER_COUNT):
+        super(ReplayPerfTest, self).__init__(port, test_name, test_path, test_runner_count)
+        self.force_gc_test = self._port.host.filesystem.join(self._port.perf_tests_dir(), self._FORCE_GC_FILE)
 
     def _start_replay_server(self, archive, record):
         try:
@@ -335,11 +321,11 @@ class ReplayPerfTest(PageLoadingPerfTest):
 
     def prepare(self, time_out_ms):
         filesystem = self._port.host.filesystem
-        path_without_ext = filesystem.splitext(self.path_or_url())[0]
+        path_without_ext = filesystem.splitext(self.test_path())[0]
 
         self._archive_path = filesystem.join(path_without_ext + '.wpr')
         self._expected_image_path = filesystem.join(path_without_ext + '-expected.png')
-        self._url = filesystem.read_text_file(self.path_or_url()).split('\n')[0]
+        self._url = filesystem.read_text_file(self.test_path()).split('\n')[0]
 
         if filesystem.isfile(self._archive_path) and filesystem.isfile(self._expected_image_path):
             _log.info("Replay ready for %s" % self._archive_path)
@@ -361,6 +347,39 @@ class ReplayPerfTest(PageLoadingPerfTest):
 
         return True
 
+    def _run_with_driver(self, driver, time_out_ms):
+        times = []
+        malloc = []
+        js_heap = []
+
+        for i in range(0, 6):
+            output = self.run_single(driver, self.test_path(), time_out_ms)
+            if not output or self.run_failed(output):
+                return False
+            if i == 0:
+                continue
+
+            times.append(output.test_time * 1000)
+
+            if not output.measurements:
+                continue
+
+            for metric, result in output.measurements.items():
+                assert metric == 'Malloc' or metric == 'JSHeap'
+                if metric == 'Malloc':
+                    malloc.append(result)
+                else:
+                    js_heap.append(result)
+
+        if times:
+            self._ensure_metrics('Time').append_group(times)
+        if malloc:
+            self._ensure_metrics('Malloc').append_group(malloc)
+        if js_heap:
+            self._ensure_metrics('JSHeap').append_group(js_heap)
+
+        return True
+
     def run_single(self, driver, url, time_out_ms, record=False):
         server = self._start_replay_server(self._archive_path, record)
         if not server:
@@ -374,6 +393,8 @@ class ReplayPerfTest(PageLoadingPerfTest):
                 return None
 
             _log.debug("Web page replay started. Loading the page.")
+            # Force GC to prevent pageload noise. See https://bugs.webkit.org/show_bug.cgi?id=98203
+            super(ReplayPerfTest, self).run_single(driver, self.force_gc_test, time_out_ms, False)
             output = super(ReplayPerfTest, self).run_single(driver, self._url, time_out_ms, should_run_pixel_test=True)
             if self.run_failed(output):
                 return None
@@ -400,13 +421,13 @@ class ReplayPerfTest(PageLoadingPerfTest):
 class PerfTestFactory(object):
 
     _pattern_map = [
-        (re.compile(r'^inspector/'), ChromiumStylePerfTest),
+        (re.compile(r'^Dromaeo/'), SingleProcessPerfTest),
         (re.compile(r'(.+)\.replay$'), ReplayPerfTest),
     ]
 
     @classmethod
-    def create_perf_test(cls, port, test_name, path):
+    def create_perf_test(cls, port, test_name, path, test_runner_count=DEFAULT_TEST_RUNNER_COUNT):
         for (pattern, test_class) in cls._pattern_map:
             if pattern.match(test_name):
-                return test_class(port, test_name, path)
-        return PerfTest(port, test_name, path)
+                return test_class(port, test_name, path, test_runner_count)
+        return PerfTest(port, test_name, path, test_runner_count)

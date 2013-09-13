@@ -47,6 +47,7 @@ public:
     virtual FloatRect objectBoundingBox() const { return FloatRect(); }
     virtual FloatRect strokeBoundingBox() const { return FloatRect(); }
     virtual FloatRect repaintRectInLocalCoordinates() const { return FloatRect(); }
+    virtual bool nodeAtFloatPoint(const HitTestRequest&, HitTestResult&, const FloatPoint&, HitTestAction) OVERRIDE { return false; }
 
 protected:
     virtual void styleDidChange(StyleDifference, const RenderStyle* oldStyle);
@@ -57,7 +58,7 @@ private:
 
 inline const RenderSVGGradientStop* toRenderSVGGradientStop(const RenderObject* object)
 {
-    ASSERT(!object || object->isSVGGradientStop());
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isSVGGradientStop());
     return static_cast<const RenderSVGGradientStop*>(object);
 }
 

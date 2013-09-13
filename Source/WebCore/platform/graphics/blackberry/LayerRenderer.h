@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, 2011, 2012 Research In Motion Limited. All rights reserved.
+ * Copyright (C) 2010, 2011, 2012, 2013 Research In Motion Limited. All rights reserved.
  * Copyright (C) 2010 Google Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -41,6 +41,7 @@
 #include "TransformationMatrix.h"
 
 #include <BlackBerryPlatformGLES2Context.h>
+#include <BlackBerryPlatformGLES2Program.h>
 #include <BlackBerryPlatformIntRectRegion.h>
 #include <wtf/HashSet.h>
 #include <wtf/Noncopyable.h>
@@ -49,16 +50,14 @@
 
 namespace WebCore {
 
+class Color;
 class LayerCompositingThread;
+class LayerRendererClient;
 class LayerRendererSurface;
 
 class LayerRenderingResults {
 public:
     LayerRenderingResults() : wasEmpty(true), needsAnimationFrame(false) { }
-
-    void addHolePunchRect(const IntRect&);
-    IntRect holePunchRect(size_t index) const;
-    size_t holePunchRectSize() { return m_holePunchRects.size(); }
 
     static const int NumberOfDirtyRects = 3;
     const IntRect& dirtyRect(int i) const { return m_dirtyRects[i]; }
@@ -72,7 +71,6 @@ public:
     bool needsAnimationFrame;
 
 private:
-    Vector<IntRect> m_holePunchRects; // Rects are in compositing surface coordinates.
     IntRect m_dirtyRects[NumberOfDirtyRects];
 };
 
@@ -82,10 +80,12 @@ class LayerRenderer {
 public:
     static TransformationMatrix orthoMatrix(float left, float right, float bottom, float top, float nearZ, float farZ);
 
-    static PassOwnPtr<LayerRenderer> create(BlackBerry::Platform::Graphics::GLES2Context*);
+    static PassOwnPtr<LayerRenderer> create(LayerRendererClient*);
 
-    LayerRenderer(BlackBerry::Platform::Graphics::GLES2Context*);
+    LayerRenderer(LayerRendererClient*);
     ~LayerRenderer();
+
+    LayerRendererClient* client() const { return m_client; }
 
     void releaseLayerResources();
 
@@ -108,7 +108,7 @@ public:
     // transform is the model-view-project matrix that goes all the way from contents to normalized device coordinates.
     void compositeLayers(const TransformationMatrix&, LayerCompositingThread* rootLayer);
     void compositeBuffer(const TransformationMatrix&, const FloatRect& contents, BlackBerry::Platform::Graphics::Buffer*, bool contentsOpaque, float opacity);
-    void drawCheckerboardPattern(const TransformationMatrix&, const FloatRect& contents);
+    void drawColor(const TransformationMatrix&, const FloatRect& contents, const Color&);
 
     // Keep track of layers that need cleanup when the LayerRenderer is destroyed
     void addLayer(LayerCompositingThread*);
@@ -119,10 +119,7 @@ public:
 
     bool hardwareCompositing() const { return m_hardwareCompositing; }
 
-    void setClearSurfaceOnDrawLayers(bool clear) { m_clearSurfaceOnDrawLayers = clear; }
-    bool clearSurfaceOnDrawLayers() const { return m_clearSurfaceOnDrawLayers; }
-
-    BlackBerry::Platform::Graphics::GLES2Context* context() const { return m_context; }
+    BlackBerry::Platform::Graphics::GLES2Context* context() const;
 
     const LayerRenderingResults& lastRenderingResults() const { return m_lastRenderingResults; }
 
@@ -130,17 +127,21 @@ public:
     // Used when a layer discovers during rendering that it needs a commit.
     void setNeedsCommit() { m_needsCommit = true; }
 
-    IntRect toWebKitDocumentCoordinates(const FloatRect&) const;
+    IntRect toWindowCoordinates(const FloatRect&) const;
+    IntRect toPixelViewportCoordinates(const FloatRect&) const;
+    IntRect toDocumentViewportCoordinates(const FloatRect&) const;
 
     // If the layer has already been drawed on a surface.
     bool layerAlreadyOnSurface(LayerCompositingThread*) const;
+
+    void drawDebugBorder(const Vector<FloatPoint>&, const Color&, float borderWidth);
 
     static GLuint loadShader(GLenum type, const char* shaderSource);
     static GLuint loadShaderProgram(const char* vertexShaderSource, const char* fragmentShaderSource);
 
 private:
     void prepareFrameRecursive(LayerCompositingThread*, double animationTime, bool isContextCurrent);
-    void updateLayersRecursive(LayerCompositingThread*, const TransformationMatrix& parentMatrix, Vector<RefPtr<LayerCompositingThread> >& surfaceLayers, float opacity, FloatRect clipRect);
+    void updateLayersRecursive(LayerCompositingThread*, const TransformationMatrix& parentMatrix, const TransformationMatrix& projectionMatrix, Vector<RefPtr<LayerCompositingThread> >& surfaceLayers, float opacity, FloatRect clipRect);
     void compositeLayersRecursive(LayerCompositingThread*, int stencilValue, FloatRect clipRect);
     void updateScissorIfNeeded(const FloatRect& clipRect);
 
@@ -151,37 +152,37 @@ private:
     void drawHolePunchRect(LayerCompositingThread*);
 
     IntRect toOpenGLWindowCoordinates(const FloatRect&) const;
-    IntRect toWebKitWindowCoordinates(const FloatRect&) const;
-
-    void bindCommonAttribLocation(int location, const char* attribName);
 
     bool makeContextCurrent();
 
-    bool initializeSharedGLObjects();
+    enum ProgramIndex {
+        LayerProgramRGBA = LayerData::LayerProgramRGBA,
+        LayerProgramBGRA = LayerData::LayerProgramBGRA,
 
-    // GL shader program object IDs.
-    unsigned m_layerProgramObject[LayerData::NumberOfLayerProgramShaders];
-    unsigned m_layerMaskProgramObject[LayerData::NumberOfLayerProgramShaders];
-    unsigned m_colorProgramObject;
-    unsigned m_checkerProgramObject;
+        MaskPrograms,
+        LayerMaskProgramRGBA = MaskPrograms + LayerData::LayerProgramRGBA,
+        LayerMaskProgramBGRA = MaskPrograms + LayerData::LayerProgramBGRA,
+
+        InternalPrograms,
+        ColorProgram = InternalPrograms,
+
+        NumberOfPrograms
+    };
+
+    bool createProgram(ProgramIndex);
+    const BlackBerry::Platform::Graphics::GLES2Program& useProgram(ProgramIndex);
+    const BlackBerry::Platform::Graphics::GLES2Program& useLayerProgram(LayerData::LayerProgram, bool isMask = false);
+
+    LayerRendererClient* m_client;
+
+    BlackBerry::Platform::Graphics::GLES2Program m_programs[NumberOfPrograms];
 
     // Shader uniform and attribute locations.
-    const int m_positionLocation;
-    const int m_texCoordLocation;
 #if ENABLE(CSS_FILTERS)
     OwnPtr<LayerFilterRenderer> m_filterRenderer;
 #endif
 
-    int m_samplerLocation[LayerData::NumberOfLayerProgramShaders];
-    int m_alphaLocation[LayerData::NumberOfLayerProgramShaders];
-    int m_maskSamplerLocation[LayerData::NumberOfLayerProgramShaders];
-    int m_maskSamplerLocationMask[LayerData::NumberOfLayerProgramShaders];
-    int m_maskAlphaLocation[LayerData::NumberOfLayerProgramShaders];
-
     int m_colorColorLocation;
-    int m_checkerScaleLocation;
-    int m_checkerOriginLocation;
-    int m_checkerSurfaceHeightLocation;
 
     // Current draw configuration.
     double m_scale;
@@ -198,14 +199,11 @@ private:
     LayerRendererSurface* m_currentLayerRendererSurface;
 
     bool m_hardwareCompositing;
-    bool m_clearSurfaceOnDrawLayers;
 
     // Map associating layers with textures ids used by the GL compositor.
     typedef HashSet<LayerCompositingThread*> LayerSet;
     LayerSet m_layers;
     LayerSet m_layersLockingTextureResources;
-
-    BlackBerry::Platform::Graphics::GLES2Context* m_context;
 
     bool m_isRobustnessSupported;
     PFNGLGETGRAPHICSRESETSTATUSEXTPROC m_glGetGraphicsResetStatusEXT;

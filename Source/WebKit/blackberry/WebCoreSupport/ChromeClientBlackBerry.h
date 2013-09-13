@@ -28,15 +28,12 @@ class WebPagePrivate;
 }
 
 namespace WebCore {
-class PagePopup;
-class PagePopupClient;
 
 class ChromeClientBlackBerry : public ChromeClient {
 public:
     ChromeClientBlackBerry(BlackBerry::WebKit::WebPagePrivate*);
 
     virtual void chromeDestroyed();
-    virtual void* webView() const { return 0; };
     virtual void setWindowRect(const FloatRect&);
     virtual FloatRect windowRect();
     virtual FloatRect pageRect();
@@ -61,7 +58,7 @@ public:
     virtual void setMenubarVisible(bool);
     virtual bool menubarVisible();
     virtual void setResizable(bool);
-    virtual void addMessageToConsole(MessageSource, MessageType, MessageLevel, const String& message, unsigned int lineNumber, const String& sourceID);
+    virtual void addMessageToConsole(MessageSource, MessageLevel, const String& message, unsigned lineNumber, unsigned columnNumber, const String& sourceID);
     virtual bool canRunBeforeUnloadConfirmPanel();
     virtual bool runBeforeUnloadConfirmPanel(const String&, Frame*);
     virtual void closeWindowSoon();
@@ -81,7 +78,7 @@ public:
     virtual IntRect rootViewToScreen(const IntRect&) const;
     virtual void contentsSizeChanged(Frame*, const IntSize&) const;
     virtual void scrollRectIntoView(const IntRect&, const ScrollView*) const;
-    virtual void mouseDidMoveOverElement(const HitTestResult&, unsigned int);
+    virtual void mouseDidMoveOverElement(const HitTestResult&, unsigned);
     virtual void setToolTip(const String&, TextDirection);
 #if ENABLE(EVENT_MODE_METATAGS)
     virtual void didReceiveCursorEventMode(Frame*, CursorEventMode) const;
@@ -91,7 +88,7 @@ public:
     virtual bool shouldRubberBandInDirection(ScrollDirection) const { return true; }
     virtual void numWheelEventHandlersChanged(unsigned) { }
     virtual void print(Frame*);
-    virtual void exceededDatabaseQuota(Frame*, const String&);
+    virtual void exceededDatabaseQuota(Frame*, const String&, DatabaseDetails);
     virtual void runOpenPanel(Frame*, PassRefPtr<FileChooser>);
     virtual void loadIconForFiles(const Vector<String>&, FileIconLoader*);
     virtual void setCursor(const Cursor&);
@@ -141,9 +138,6 @@ public:
     virtual PassRefPtr<PopupMenu> createPopupMenu(PopupMenuClient*) const;
     virtual PassRefPtr<SearchPopupMenu> createSearchPopupMenu(PopupMenuClient*) const;
 
-    virtual WebCore::PagePopup* openPagePopup(WebCore::PagePopupClient*, const WebCore::IntRect&);
-    virtual void closePagePopup(WebCore::PagePopup*);
-
 #if USE(ACCELERATED_COMPOSITING)
     virtual void attachRootGraphicsLayer(Frame*, GraphicsLayer*);
     virtual void setNeedsOneShotDrawingSynchronization();
@@ -151,17 +145,9 @@ public:
     virtual bool allowsAcceleratedCompositing() const;
 #endif
 
-#if ENABLE(NAVIGATOR_CONTENT_UTILS)
-    virtual void registerProtocolHandler(const String& /*scheme*/, const String& /*baseURL*/, const String& /*url*/, const String& /*title*/);
-
-#if ENABLE(CUSTOM_SCHEME_HANDLER)
-    virtual CustomHandlersState isProtocolHandlerRegistered(const String& /*scheme*/, const String& /*baseURL*/, const String& /*url*/);
-    virtual void unregisterProtocolHandler(const String& /*scheme*/, const String& /*baseURL*/, const String& /*url*/);
+#if ENABLE(REQUEST_ANIMATION_FRAME) && !USE(REQUEST_ANIMATION_FRAME_TIMER)
+    virtual void scheduleAnimation();
 #endif
-#endif
-
-    virtual void addSearchProvider(const BlackBerry::Platform::String&, const BlackBerry::Platform::String&);
-    virtual int isSearchProviderInstalled(const BlackBerry::Platform::String&, const BlackBerry::Platform::String&);
 
     BlackBerry::WebKit::WebPagePrivate* webPagePrivate() const { return m_webPagePrivate; }
 

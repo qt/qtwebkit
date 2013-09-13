@@ -28,17 +28,17 @@
 
 #if ENABLE(CONTEXT_MENUS)
 
-#include "EwkViewImpl.h"
+#include "EwkView.h"
 #include "WebContextMenuItemData.h"
 #include "WebPageProxy.h"
-#include <wtf/text/CString.h>
+#include <WebCore/NotImplemented.h>
 
 using namespace WebCore;
 
 namespace WebKit {
 
-WebContextMenuProxyEfl::WebContextMenuProxyEfl(EwkViewImpl* viewImpl, WebPageProxy* page)
-    : m_viewImpl(viewImpl)
+WebContextMenuProxyEfl::WebContextMenuProxyEfl(EwkView* view, WebPageProxy* page)
+    : m_view(view)
     , m_page(page)
 {
 }
@@ -47,19 +47,14 @@ WebContextMenuProxyEfl::~WebContextMenuProxyEfl()
 {
 }
 
-void WebContextMenuProxyEfl::showContextMenu(const WebCore::IntPoint& position, const Vector<WebContextMenuItemData>& items)
+void WebContextMenuProxyEfl::showContextMenu(const WebCore::IntPoint&, const Vector<WebContextMenuItemData>&)
 {
-    m_viewImpl->showContextMenu(this, position, items);
+    notImplemented();
 }
 
 void WebContextMenuProxyEfl::hideContextMenu()
 {
-    m_viewImpl->hideContextMenu();
-}
-
-void WebContextMenuProxyEfl::contextMenuItemSelected(const WebContextMenuItemData& item)
-{
-    m_page->contextMenuItemSelected(item);
+    notImplemented();
 }
 
 } // namespace WebKit

@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2007, 2008, 2009, 2010, 2011 Apple Inc. All rights reserved.
- * Copyright (C) 2011 Google Inc. All rights reserved.
+ * Copyright (C) 2011, 2012 Google Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -33,6 +33,32 @@
 
 namespace WebCore {
 
+class MediaControlsApple;
+
+class MediaControlsAppleEventListener : public EventListener {
+public:
+    static PassRefPtr<MediaControlsAppleEventListener> create(MediaControlsApple* mediaControls) { return adoptRef(new MediaControlsAppleEventListener(mediaControls)); }
+    static const MediaControlsAppleEventListener* cast(const EventListener* listener)
+    {
+        return listener->type() == MediaControlsAppleEventListenerType
+            ? static_cast<const MediaControlsAppleEventListener*>(listener)
+            : 0;
+    }
+
+    virtual bool operator==(const EventListener& other);
+
+private:
+    MediaControlsAppleEventListener(MediaControlsApple* mediaControls)
+        : EventListener(MediaControlsAppleEventListenerType)
+        , m_mediaControls(mediaControls)
+    {
+    }
+
+    virtual void handleEvent(ScriptExecutionContext*, Event*);
+
+    MediaControlsApple* m_mediaControls;
+};
+
 class MediaControlsApple : public MediaControls {
 public:
     static PassRefPtr<MediaControlsApple> createControls(Document*);
@@ -59,11 +85,20 @@ public:
     virtual void updateStatusDisplay() OVERRIDE;
 
     virtual void changedClosedCaptionsVisibility() OVERRIDE;
-    void toggleClosedCaptionTrackList();
+    virtual void toggleClosedCaptionTrackList() OVERRIDE;
+    virtual void closedCaptionTracksChanged() OVERRIDE;
+
+    bool shouldClosedCaptionsContainerPreventPageScrolling(int wheelDeltaY);
+    void handleClickEvent(Event*);
 
 private:
     MediaControlsApple(Document*);
 
+    virtual void defaultEventHandler(Event*) OVERRIDE;
+    PassRefPtr<MediaControlsAppleEventListener> eventListener();
+
+    void showClosedCaptionTrackList();
+    void hideClosedCaptionTrackList();
 
     MediaControlRewindButtonElement* m_rewindButton;
     MediaControlReturnToRealtimeButtonElement* m_returnToRealTimeButton;
@@ -79,6 +114,7 @@ private:
     MediaControlFullscreenVolumeMinButtonElement* m_fullScreenMinVolumeButton;
     MediaControlFullscreenVolumeSliderElement* m_fullScreenVolumeSlider;
     MediaControlFullscreenVolumeMaxButtonElement* m_fullScreenMaxVolumeButton;
+    RefPtr<MediaControlsAppleEventListener> m_eventListener;
 };
 
 }

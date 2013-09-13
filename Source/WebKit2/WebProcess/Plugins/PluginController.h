@@ -45,10 +45,6 @@ namespace WebCore {
 
 namespace WebKit {
 
-#if PLATFORM(WIN)
-struct WindowGeometry;
-#endif
-
 class PluginController {
 public:
     // Returns false if the plugin has explicitly been hidden. Returns true otherwise (even if the plugin is currently obscured from view on screen.)
@@ -101,15 +97,6 @@ public:
     // Tells the controller that we're about to dispatch an event to the plug-in.
     virtual void willSendEventToPlugin() = 0;
     
-#if PLATFORM(WIN)
-    // The window to use as the parent of the plugin's window.
-    virtual HWND nativeParentWindow() = 0;
-
-    // Tells the controller that the given HWND needs to be positioned and clipped to the given
-    // coordinates sometime soon. The controller will decide exactly when this will happen.
-    virtual void scheduleWindowedPluginGeometryUpdate(const WindowGeometry&) = 0;
-#endif
-
 #if PLATFORM(MAC)
     // Tells the controller that the plug-in focus or window focus did change.
     virtual void pluginFocusOrWindowFocusChanged(bool) = 0;
@@ -119,6 +106,9 @@ public:
 
     // Returns the mach port of the compositing render server.
     virtual mach_port_t compositingRenderServerPort() = 0;
+
+    // Open the preference pane for this plug-in (as stated in the plug-in's Info.plist).
+    virtual void openPluginPreferencePane() = 0;
 #endif
 
     // Returns the contents scale factor.

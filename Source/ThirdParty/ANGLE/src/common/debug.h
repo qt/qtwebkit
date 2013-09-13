@@ -42,28 +42,30 @@ namespace gl
 #if defined(ANGLE_DISABLE_TRACE) && defined(ANGLE_DISABLE_PERF)
 #define TRACE(message, ...) (void(0))
 #else
-#define TRACE(message, ...) gl::trace(true, "trace: %s(%d): "message"\n", __FUNCTION__, __LINE__, __VA_ARGS__)
+#define TRACE(message, ...) gl::trace(true, "trace: %s(%d): " message "\n", __FUNCTION__, __LINE__, ##__VA_ARGS__)
 #endif
 
 // A macro to output a function call and its arguments to the debugging log, to denote an item in need of fixing.
 #if defined(ANGLE_DISABLE_TRACE) && defined(ANGLE_DISABLE_PERF)
 #define FIXME(message, ...) (void(0))
 #else
-#define FIXME(message, ...) gl::trace(false, "fixme: %s(%d): "message"\n", __FUNCTION__, __LINE__, __VA_ARGS__)
+#define FIXME(message, ...) gl::trace(false, "fixme: %s(%d): " message "\n", __FUNCTION__, __LINE__, ##__VA_ARGS__)
 #endif
 
 // A macro to output a function call and its arguments to the debugging log, in case of error.
 #if defined(ANGLE_DISABLE_TRACE) && defined(ANGLE_DISABLE_PERF)
 #define ERR(message, ...) (void(0))
 #else
-#define ERR(message, ...) gl::trace(false, "err: %s(%d): "message"\n", __FUNCTION__, __LINE__, __VA_ARGS__)
+#define ERR(message, ...) gl::trace(false, "err: %s(%d): " message "\n", __FUNCTION__, __LINE__, ##__VA_ARGS__)
 #endif
 
 // A macro to log a performance event around a scope.
 #if defined(ANGLE_DISABLE_TRACE) && defined(ANGLE_DISABLE_PERF)
 #define EVENT(message, ...) (void(0))
-#else
+#elif defined(_MSC_VER)
 #define EVENT(message, ...) gl::ScopedPerfEventHelper scopedPerfEventHelper ## __LINE__(__FUNCTION__ message "\n", __VA_ARGS__);
+#else
+#define EVENT(message, ...) gl::ScopedPerfEventHelper scopedPerfEventHelper(message "\n", ##__VA_ARGS__);
 #endif
 
 // A macro asserting a condition and outputting failures to the debug log
@@ -95,6 +97,13 @@ namespace gl
     } while(0)
 #else
     #define UNREACHABLE() ERR("\t! Unreachable reached: %s(%d)\n", __FUNCTION__, __LINE__)
+#endif
+
+// A macro that determines whether an object has a given runtime type.
+#if !defined(NDEBUG) && (!defined(_MSC_VER) || defined(_CPPRTTI))
+#define HAS_DYNAMIC_TYPE(type, obj) (dynamic_cast<type >(obj) != NULL)
+#else
+#define HAS_DYNAMIC_TYPE(type, obj) true
 #endif
 
 // A macro functioning as a compile-time assert to validate constant conditions

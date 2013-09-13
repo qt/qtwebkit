@@ -22,8 +22,10 @@
 
 #include "EventListener.h"
 #include "JSDOMWindow.h"
+#include <heap/PassWeak.h>
 #include <heap/StrongInlines.h>
 #include <heap/Weak.h>
+#include <heap/WeakInlines.h>
 
 namespace WebCore {
 
@@ -54,7 +56,7 @@ namespace WebCore {
         DOMWrapperWorld* isolatedWorld() const { return m_isolatedWorld.get(); }
 
         JSC::JSObject* wrapper() const { return m_wrapper.get(); }
-        void setWrapper(JSC::JSGlobalData&, JSC::JSObject* wrapper) const { m_wrapper = JSC::PassWeak<JSC::JSObject>(wrapper); }
+        void setWrapper(JSC::VM&, JSC::JSObject* wrapper) const { m_wrapper = JSC::PassWeak<JSC::JSObject>(wrapper); }
 
     private:
         virtual JSC::JSObject* initializeJSFunction(ScriptExecutionContext*) const;
@@ -78,7 +80,7 @@ namespace WebCore {
         // initializeJSFunction can trigger code that deletes this event listener
         // before we're done. It should always return 0 in this case.
         RefPtr<JSEventListener> protect(const_cast<JSEventListener*>(this));
-        JSC::Strong<JSC::JSObject> wrapper(*m_isolatedWorld->globalData(), m_wrapper.get());
+        JSC::Strong<JSC::JSObject> wrapper(*m_isolatedWorld->vm(), m_wrapper.get());
 
         if (!m_jsFunction) {
             JSC::JSObject* function = initializeJSFunction(scriptExecutionContext);

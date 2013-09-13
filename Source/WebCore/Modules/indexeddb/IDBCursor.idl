@@ -33,13 +33,8 @@
     readonly attribute any primaryKey;
     readonly attribute IDBAny source;
 
-    [CallWith=ScriptState] IDBRequest update(in any value)
-        raises (DOMException);
-    // FIXME: Make this [EnforceRange] unsigned long once webkit.org/b/96798 lands.
-    void advance(in long long count)
-        raises (DOMException);
-    [ImplementedAs=continueFunction] void continue(in [Optional] IDBKey key)
-        raises (DOMException);
-    [CallWith=ScriptExecutionContext, ImplementedAs=deleteFunction] IDBRequest delete()
-        raises (DOMException);
+    [CallWith=ScriptState, RaisesException] IDBRequest update(any value);
+    [RaisesException] void advance([EnforceRange] unsigned long count);
+    [CallWith=ScriptExecutionContext, ImplementedAs=continueFunction, RaisesException] void continue(optional any key);
+    [CallWith=ScriptExecutionContext, ImplementedAs=deleteFunction, RaisesException] IDBRequest delete();
 };

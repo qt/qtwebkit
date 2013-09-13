@@ -27,7 +27,7 @@
 #define PageClient_h
 
 #include "ShareableBitmap.h"
-#include "WebColorChooserProxy.h"
+#include "WebColorPicker.h"
 #include "WebPageProxy.h"
 #include "WebPopupMenuProxy.h"
 #include <WebCore/AlternativeTextClient.h>
@@ -65,11 +65,7 @@ class WebContextMenuProxy;
 class WebEditCommandProxy;
 class WebPopupMenuProxy;
 #if ENABLE(INPUT_TYPE_COLOR)
-class WebColorChooserProxy;
-#endif
-
-#if PLATFORM(WIN)
-struct WindowGeometry;
+class WebColorPicker;
 #endif
 
 #if PLATFORM(MAC)
@@ -89,6 +85,8 @@ public:
     // Tell the view to immediately display its invalid rect.
     virtual void displayView() = 0;
 
+    // Return true if scrollView() can copy bits in the view.
+    virtual bool canScrollView() = 0;
     // Tell the view to scroll scrollRect by scrollOffset.
     virtual void scrollView(const WebCore::IntRect& scrollRect, const WebCore::IntSize& scrollOffset) = 0;
 
@@ -114,6 +112,8 @@ public:
     virtual void didRelaunchProcess() = 0;
     virtual void pageClosed() = 0;
 
+    virtual void preferencesDidChange() = 0;
+
     virtual void toolTipChanged(const String&, const String&) = 0;
 
 #if USE(TILED_BACKING_STORE)
@@ -121,18 +121,19 @@ public:
     virtual void didRenderFrame(const WebCore::IntSize& contentsSize, const WebCore::IntRect& coveredRect) = 0;
     virtual void pageTransitionViewportReady() = 0;
 #endif
-#if PLATFORM(QT)
+#if USE(COORDINATED_GRAPHICS)
     virtual void didFindZoomableArea(const WebCore::IntPoint&, const WebCore::IntRect&) = 0;
-    virtual void didReceiveMessageFromNavigatorQtObject(const String&) = 0;
+#endif
+#if PLATFORM(QT)
     virtual void handleAuthenticationRequiredRequest(const String& hostname, const String& realm, const String& prefilledUsername, String& username, String& password) = 0;
     virtual void handleCertificateVerificationRequest(const String& hostname, bool& ignoreErrors) = 0;
     virtual void handleProxyAuthenticationRequiredRequest(const String& hostname, uint16_t port, const String& prefilledUsername, String& username, String& password) = 0;
     virtual void handleWillSetInputMethodState() = 0;
 #endif // PLATFORM(QT).
 
-#if PLATFORM(QT) || PLATFORM(EFL)
+#if PLATFORM(QT) || PLATFORM(EFL) || PLATFORM(GTK)
     virtual void updateTextInputState() = 0;
-#endif // PLATFORM(QT) || PLATFORM(EFL)
+#endif // PLATFORM(QT) || PLATFORM(EFL) || PLATOFRM(GTK)
 
 #if PLATFORM(QT) || PLATFORM(EFL) || PLATFORM(GTK)
     virtual void handleDownloadRequest(DownloadProxy*) = 0;
@@ -159,14 +160,12 @@ public:
     virtual bool interpretKeyEvent(const NativeWebKeyboardEvent&, Vector<WebCore::KeypressCommand>&) = 0;
     virtual bool executeSavedCommandBySelector(const String& selector) = 0;
     virtual void setDragImage(const WebCore::IntPoint& clientPosition, PassRefPtr<ShareableBitmap> dragImage, bool isLinkDrag) = 0;
-    virtual void updateTextInputState(bool updateSecureInputState) = 0;
-    virtual void resetTextInputState() = 0;
+    virtual void updateSecureInputState() = 0;
+    virtual void resetSecureInputState() = 0;
+    virtual void notifyInputContextAboutDiscardedComposition() = 0;
     virtual void makeFirstResponder() = 0;
     virtual void setPromisedData(const String& pasteboardName, PassRefPtr<WebCore::SharedBuffer> imageBuffer, const String& filename, const String& extension, const String& title,
                                  const String& url, const String& visibleUrl, PassRefPtr<WebCore::SharedBuffer> archiveBuffer) = 0;
-#endif
-#if PLATFORM(WIN)
-    virtual void compositionSelectionChanged(bool) = 0;
 #endif
 #if PLATFORM(GTK)
     virtual void getEditorCommandsForKeyEvent(const NativeWebKeyboardEvent&, const AtomicString&, Vector<WTF::String>&) = 0;
@@ -188,24 +187,15 @@ public:
     virtual PassRefPtr<WebContextMenuProxy> createContextMenuProxy(WebPageProxy*) = 0;
 
 #if ENABLE(INPUT_TYPE_COLOR)
-    virtual PassRefPtr<WebColorChooserProxy> createColorChooserProxy(WebPageProxy*, const WebCore::Color& initialColor, const WebCore::IntRect&) = 0;
+    virtual PassRefPtr<WebColorPicker> createColorPicker(WebPageProxy*, const WebCore::Color& initialColor, const WebCore::IntRect&) = 0;
 #endif
 
     virtual void setFindIndicator(PassRefPtr<FindIndicator>, bool fadeOut, bool animate) = 0;
-#if PLATFORM(WIN)
-    virtual void didInstallOrUninstallPageOverlay(bool) = 0;
-#endif
 
 #if USE(ACCELERATED_COMPOSITING)
     virtual void enterAcceleratedCompositingMode(const LayerTreeContext&) = 0;
     virtual void exitAcceleratedCompositingMode() = 0;
     virtual void updateAcceleratedCompositingMode(const LayerTreeContext&) = 0;
-#endif
-
-#if PLATFORM(WIN)
-    virtual HWND nativeWindow() = 0;
-    virtual void setGestureReachedScrollingLimit(bool) = 0;
-    virtual void scheduleChildWindowGeometryUpdate(const WindowGeometry&) = 0;
 #endif
 
 #if PLATFORM(MAC)
@@ -230,23 +220,12 @@ public:
     virtual uint64_t addDictationAlternatives(const RetainPtr<NSTextAlternatives>&) = 0;
     virtual void removeDictationAlternatives(uint64_t dictationContext) = 0;
     virtual void showDictationAlternativeUI(const WebCore::FloatRect& boundingBoxOfDictatedText, uint64_t dictationContext) = 0;
-    virtual void dismissDictationAlternativeUI() = 0;
     virtual Vector<String> dictationAlternatives(uint64_t dictationContext) = 0;
 #endif // USE(DICTATION_ALTERNATIVES)
 #endif // USE(APPKIT)
 #endif // PLATFORM(MAC)
 
-    virtual void didChangeScrollbarsForMainFrame() const = 0;
-
-    // Custom representations.
-    virtual void didCommitLoadForMainFrame(bool useCustomRepresentation) = 0;
-    virtual void didFinishLoadingDataForCustomRepresentation(const String& suggestedFilename, const CoreIPC::DataReference&) = 0;
-    virtual double customRepresentationZoomFactor() = 0;
-    virtual void setCustomRepresentationZoomFactor(double) = 0;
-
     virtual void flashBackingStoreUpdates(const Vector<WebCore::IntRect>& updateRects) = 0;
-    virtual void findStringInCustomRepresentation(const String&, FindOptions, unsigned maxMatchCount) = 0;
-    virtual void countStringMatchesInCustomRepresentation(const String&, FindOptions, unsigned maxMatchCount) = 0;
 };
 
 } // namespace WebKit

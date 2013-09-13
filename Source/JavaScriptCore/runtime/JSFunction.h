@@ -27,6 +27,7 @@
 #include "InternalFunction.h"
 #include "JSDestructibleObject.h"
 #include "JSScope.h"
+#include "ObjectAllocationProfile.h"
 #include "Watchpoint.h"
 
 namespace JSC {
@@ -52,7 +53,7 @@ namespace JSC {
         friend class JIT;
         friend class DFG::SpeculativeJIT;
         friend class DFG::JITCompiler;
-        friend class JSGlobalData;
+        friend class VM;
 
     public:
         typedef JSDestructibleObject Base;
@@ -61,10 +62,10 @@ namespace JSC {
 
         static JSFunction* create(ExecState* exec, FunctionExecutable* executable, JSScope* scope)
         {
-            JSGlobalData& globalData = exec->globalData();
-            JSFunction* function = new (NotNull, allocateCell<JSFunction>(globalData.heap)) JSFunction(globalData, executable, scope);
+            VM& vm = exec->vm();
+            JSFunction* function = new (NotNull, allocateCell<JSFunction>(vm.heap)) JSFunction(vm, executable, scope);
             ASSERT(function->structure()->globalObject());
-            function->finishCreation(globalData);
+            function->finishCreation(vm);
             return function;
         }
         
@@ -88,10 +89,10 @@ namespace JSC {
         {
             return m_scope.get();
         }
-        void setScope(JSGlobalData& globalData, JSScope* scope)
+        void setScope(VM& vm, JSScope* scope)
         {
             ASSERT(!isHostFunctionNonInline());
-            m_scope.set(globalData, this, scope);
+            m_scope.set(vm, this, scope);
         }
 
         ExecutableBase* executable() const { return m_executable.get(); }
@@ -104,10 +105,10 @@ namespace JSC {
 
         static JS_EXPORTDATA const ClassInfo s_info;
 
-        static Structure* createStructure(JSGlobalData& globalData, JSGlobalObject* globalObject, JSValue prototype) 
+        static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype) 
         {
             ASSERT(globalObject);
-            return Structure::create(globalData, globalObject, prototype, TypeInfo(JSFunctionType, StructureFlags), &s_info); 
+            return Structure::create(vm, globalObject, prototype, TypeInfo(JSFunctionType, StructureFlags), &s_info); 
         }
 
         NativeFunction nativeFunction();
@@ -116,53 +117,53 @@ namespace JSC {
         static ConstructType getConstructData(JSCell*, ConstructData&);
         static CallType getCallData(JSCell*, CallData&);
 
-        static inline size_t offsetOfScopeChain()
+        static inline ptrdiff_t offsetOfScopeChain()
         {
             return OBJECT_OFFSETOF(JSFunction, m_scope);
         }
 
-        static inline size_t offsetOfExecutable()
+        static inline ptrdiff_t offsetOfExecutable()
         {
             return OBJECT_OFFSETOF(JSFunction, m_executable);
         }
 
-        Structure* cachedInheritorID(ExecState* exec)
+        static inline ptrdiff_t offsetOfAllocationProfile()
         {
-            if (UNLIKELY(!m_cachedInheritorID))
-                return cacheInheritorID(exec);
-            return m_cachedInheritorID.get();
+            return OBJECT_OFFSETOF(JSFunction, m_allocationProfile);
         }
 
-        Structure* tryGetKnownInheritorID()
+        ObjectAllocationProfile* allocationProfile(ExecState* exec, unsigned inlineCapacity)
         {
-            if (!m_cachedInheritorID)
+            if (UNLIKELY(m_allocationProfile.isNull()))
+                return createAllocationProfile(exec, inlineCapacity);
+            return &m_allocationProfile;
+        }
+
+        ObjectAllocationProfile* tryGetAllocationProfile()
+        {
+            if (m_allocationProfile.isNull())
                 return 0;
-            if (m_inheritorIDWatchpoint.hasBeenInvalidated())
+            if (m_allocationProfileWatchpoint.hasBeenInvalidated())
                 return 0;
-            return m_cachedInheritorID.get();
+            return &m_allocationProfile;
         }
         
-        void addInheritorIDWatchpoint(Watchpoint* watchpoint)
+        void addAllocationProfileWatchpoint(Watchpoint* watchpoint)
         {
-            ASSERT(tryGetKnownInheritorID());
-            m_inheritorIDWatchpoint.add(watchpoint);
-        }
-
-        static size_t offsetOfCachedInheritorID()
-        {
-            return OBJECT_OFFSETOF(JSFunction, m_cachedInheritorID);
+            ASSERT(tryGetAllocationProfile());
+            m_allocationProfileWatchpoint.add(watchpoint);
         }
 
     protected:
         const static unsigned StructureFlags = OverridesGetOwnPropertySlot | ImplementsHasInstance | OverridesVisitChildren | OverridesGetPropertyNames | JSObject::StructureFlags;
 
         JS_EXPORT_PRIVATE JSFunction(ExecState*, JSGlobalObject*, Structure*);
-        JSFunction(JSGlobalData&, FunctionExecutable*, JSScope*);
+        JSFunction(VM&, FunctionExecutable*, JSScope*);
         
         void finishCreation(ExecState*, NativeExecutable*, int length, const String& name);
         using Base::finishCreation;
 
-        Structure* cacheInheritorID(ExecState*);
+        ObjectAllocationProfile* createAllocationProfile(ExecState*, size_t inlineCapacity);
 
         static bool getOwnPropertySlot(JSCell*, ExecState*, PropertyName, PropertySlot&);
         static bool getOwnPropertyDescriptor(JSObject*, ExecState*, PropertyName, PropertyDescriptor&);
@@ -187,14 +188,9 @@ namespace JSC {
 
         WriteBarrier<ExecutableBase> m_executable;
         WriteBarrier<JSScope> m_scope;
-        WriteBarrier<Structure> m_cachedInheritorID;
-        InlineWatchpointSet m_inheritorIDWatchpoint;
+        ObjectAllocationProfile m_allocationProfile;
+        InlineWatchpointSet m_allocationProfileWatchpoint;
     };
-
-    inline bool JSValue::isFunction() const
-    {
-        return isCell() && (asCell()->inherits(&JSFunction::s_info) || asCell()->inherits(&InternalFunction::s_info));
-    }
 
 } // namespace JSC
 

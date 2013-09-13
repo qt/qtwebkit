@@ -43,7 +43,6 @@
 #import "NativeWebKeyboardEvent.h"
 #import "NativeWebMouseEvent.h"
 #import "NativeWebWheelEvent.h"
-#import "PDFViewController.h"
 #import "PageClientImpl.h"
 #import "PasteboardTypes.h"
 #import "RemoteLayerTreeDrawingAreaProxy.h"
@@ -62,10 +61,13 @@
 #import "WebEventFactory.h"
 #import "WebFullScreenManagerProxy.h"
 #import "WebPage.h"
+#import "WebPageGroup.h"
 #import "WebPageProxy.h"
+#import "WebPreferences.h"
 #import "WebProcessProxy.h"
 #import "WebSystemInterface.h"
 #import <QuartzCore/QuartzCore.h>
+#import <WebCore/AXObjectCache.h>
 #import <WebCore/ColorMac.h>
 #import <WebCore/DragController.h>
 #import <WebCore/DragData.h>
@@ -82,6 +84,8 @@
 #import <WebCore/SharedBuffer.h>
 #import <WebCore/TextAlternativeWithRange.h>
 #import <WebCore/WebCoreNSStringExtras.h>
+#import <WebCore/WebCoreFullScreenPlaceholderView.h>
+#import <WebCore/WebCoreFullScreenWindow.h>
 #import <WebCore/FileSystem.h>
 #import <WebKitSystemInterface.h>
 #import <sys/stat.h>
@@ -90,9 +94,18 @@
 
 /* API internals. */
 #import "WKBrowsingContextControllerInternal.h"
-#import "WKBrowsingContextGroupInternal.h"
-#import "WKProcessGroupInternal.h"
+#import "WKBrowsingContextGroupPrivate.h"
+#import "WKProcessGroupPrivate.h"
 
+inline bool isWKContentAnchorRight(WKContentAnchor x)
+{
+    return x == WKContentAnchorTopRight || x == WKContentAnchorBottomRight;
+}
+
+inline bool isWKContentAnchorBottom(WKContentAnchor x)
+{
+    return x == WKContentAnchorBottomLeft || x == WKContentAnchorBottomRight;
+}
 
 @interface NSApplication (WKNSApplicationDetails)
 - (void)speakString:(NSString *)string;
@@ -105,13 +118,6 @@
 @end
 
 @interface NSWindow (WKNSWindowDetails)
-#if __MAC_OS_X_VERSION_MIN_REQUIRED == 1060
-- (NSRect)_growBoxRect;
-- (id)_growBoxOwner;
-- (void)_setShowOpaqueGrowBoxForOwner:(id)owner;
-- (BOOL)_updateGrowBoxForWindowFrameChange;
-#endif
-
 - (NSRect)_intersectBottomCornersWithRect:(NSRect)viewRect;
 - (void)_maskRoundedBottomCorners:(NSRect)clipRect;
 @end
@@ -122,7 +128,7 @@ using namespace WebCore;
 namespace WebKit {
 
 typedef id <NSValidatedUserInterfaceItem> ValidationItem;
-typedef Vector<RetainPtr<ValidationItem> > ValidationVector;
+typedef Vector<RetainPtr<ValidationItem>> ValidationVector;
 typedef HashMap<String, ValidationVector> ValidationMap;
 
 }
@@ -142,6 +148,10 @@ struct WKViewInterpretKeyEventsParameters {
 - (void)_setDrawingAreaSize:(NSSize)size;
 - (void)_setPluginComplexTextInputState:(PluginComplexTextInputState)pluginComplexTextInputState;
 - (BOOL)_shouldUseTiledDrawingArea;
+
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
+- (void)_setIsWindowOccluded:(BOOL)isWindowOccluded;
+#endif
 @end
 
 @interface WKViewData : NSObject {
@@ -163,8 +173,6 @@ struct WKViewInterpretKeyEventsParameters {
     
     // For asynchronous validation.
     ValidationMap _validationMap;
-
-    OwnPtr<PDFViewController> _pdfViewController;
 
     OwnPtr<FindIndicatorWindow> _findIndicatorWindow;
     // We keep here the event when resending it to
@@ -203,6 +211,12 @@ struct WKViewInterpretKeyEventsParameters {
     NSRect _windowBottomCornerIntersectionRect;
     
     unsigned _frameSizeUpdatesDisabledCount;
+    BOOL _shouldDeferViewInWindowChanges;
+
+    BOOL _viewInWindowChangeWasDeferred;
+
+    BOOL _needsViewFrameInWindowCoordinates;
+    BOOL _didScheduleWindowAndViewFrameUpdate;
 
     // Whether the containing window of the WKView has a valid backing store.
     // The window server invalidates the backing store whenever the window is resized or minimized.
@@ -216,14 +230,28 @@ struct WKViewInterpretKeyEventsParameters {
     String _promisedFilename;
     String _promisedURL;
 
+    // The frame origin can be seen as a position within the layer of painted page content where the
+    // top left corner of the frame will be positioned. This is usually 0,0 - but if the content
+    // anchor is set to a corner other than the top left, the origin will implicitly move as the
+    // the frame size is modified.
+    NSPoint _frameOrigin;
+    WKContentAnchor _contentAnchor;
+    
     NSSize _intrinsicContentSize;
+    BOOL _clipsToVisibleRect;
+    NSRect _contentPreparationRect;
+    BOOL _useContentPreparationRectForVisibleRect;
+
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
+    BOOL _isWindowOccluded;
+    BOOL _windowOcclusionDetectionEnabled;
+#endif
 }
 
 @end
 
 @implementation WKViewData
 @end
-
 
 @interface WKResponderChainSink : NSResponder {
     NSResponder *_lastResponderInChain;
@@ -267,6 +295,9 @@ struct WKViewInterpretKeyEventsParameters {
     [_data release];
     _data = nil;
 
+    NSNotificationCenter* workspaceNotificationCenter = [[NSWorkspace sharedWorkspace] notificationCenter];
+    [workspaceNotificationCenter removeObserver:self name:NSWorkspaceActiveSpaceDidChangeNotification object:nil];
+
     WebContext::statistics().wkViewCount--;
 
     [super dealloc];
@@ -275,7 +306,7 @@ struct WKViewInterpretKeyEventsParameters {
 - (WKBrowsingContextController *)browsingContextController
 {
     if (!_data->_browsingContextController)
-        _data->_browsingContextController.adoptNS([[WKBrowsingContextController alloc] _initWithPageRef:[self pageRef]]);
+        _data->_browsingContextController = adoptNS([[WKBrowsingContextController alloc] _initWithPageRef:[self pageRef]]);
     return _data->_browsingContextController.get();
 }
 
@@ -331,8 +362,11 @@ struct WKViewInterpretKeyEventsParameters {
 
     if (_data->_page->editorState().hasComposition && !_data->_page->editorState().shouldIgnoreCompositionSelectionChange)
         _data->_page->cancelComposition();
-    [self _resetTextInputState];
-    
+
+    [self _notifyInputContextAboutDiscardedComposition];
+
+    [self _resetSecureInputState];
+
     if (!_data->_page->maintainsInactiveSelection())
         _data->_page->clearSelection();
     
@@ -363,27 +397,91 @@ struct WKViewInterpretKeyEventsParameters {
     return _data->_intrinsicContentSize;
 }
 
+- (void)prepareContentInRect:(NSRect)rect
+{
+    _data->_contentPreparationRect = rect;
+    _data->_useContentPreparationRectForVisibleRect = YES;
+
+    [self _updateViewExposedRect];
+}
+
+- (void)_updateViewExposedRect
+{
+    NSRect exposedRect = [self visibleRect];
+
+    if (_data->_useContentPreparationRectForVisibleRect)
+        exposedRect = NSUnionRect(_data->_contentPreparationRect, exposedRect);
+
+    _data->_page->viewExposedRectChanged(exposedRect, _data->_clipsToVisibleRect);
+}
+
 - (void)setFrameSize:(NSSize)size
 {
     if (!NSEqualSizes(size, [self frame].size))
         _data->_windowHasValidBackingStore = NO;
 
-    [super setFrameSize:size];
+    bool frameSizeUpdatesEnabled = ![self frameSizeUpdatesDisabled];
+    NSPoint newFrameOrigin;
+
+    // If frame updates are enabled we'll synchronously wait on the repaint, so we can reposition
+    // the layers back to the origin. If frame updates are disabled then shift the layer position
+    // so that the currently painted contents remain anchored appropriately.
+    if (frameSizeUpdatesEnabled)
+        newFrameOrigin = NSZeroPoint;
+    else {
+        newFrameOrigin = _data->_frameOrigin;
+        if (isWKContentAnchorRight(_data->_contentAnchor))
+            newFrameOrigin.x += [self frame].size.width - size.width;
+        if (isWKContentAnchorBottom(_data->_contentAnchor))
+            newFrameOrigin.y += [self frame].size.height - size.height;
+    }
     
-    if (![self frameSizeUpdatesDisabled])
+    // If the frame origin has changed then update the layer position.
+    if (_data->_layerHostingView && !NSEqualPoints(_data->_frameOrigin, newFrameOrigin)) {
+        _data->_frameOrigin = newFrameOrigin;
+        CALayer *rootLayer = [[_data->_layerHostingView layer].sublayers objectAtIndex:0];
+        [CATransaction begin];
+        [CATransaction setDisableActions:YES];
+        rootLayer.position = CGPointMake(-newFrameOrigin.x, -newFrameOrigin.y);
+        [CATransaction commit];
+    }
+
+    [super setFrameSize:size];
+
+    if (frameSizeUpdatesEnabled) {
+        if (_data->_clipsToVisibleRect)
+            [self _updateViewExposedRect];
         [self _setDrawingAreaSize:size];
+    }
 }
 
 - (void)_updateWindowAndViewFrames
 {
-    NSWindow *window = [self window];
-    ASSERT(window);
-    
-    NSRect windowFrameInScreenCoordinates = [window frame];
-    NSRect viewFrameInWindowCoordinates = [self convertRect:[self frame] toView:nil];
-    NSPoint accessibilityPosition = [[self accessibilityAttributeValue:NSAccessibilityPositionAttribute] pointValue];
-    
-    _data->_page->windowAndViewFramesChanged(enclosingIntRect(windowFrameInScreenCoordinates), enclosingIntRect(viewFrameInWindowCoordinates), IntPoint(accessibilityPosition));
+    if (_data->_clipsToVisibleRect)
+        [self _updateViewExposedRect];
+
+    if (_data->_didScheduleWindowAndViewFrameUpdate)
+        return;
+
+    _data->_didScheduleWindowAndViewFrameUpdate = YES;
+
+    dispatch_async(dispatch_get_main_queue(), ^{
+        _data->_didScheduleWindowAndViewFrameUpdate = NO;
+
+        if (!_data->_needsViewFrameInWindowCoordinates && !WebCore::AXObjectCache::accessibilityEnabled())
+            return;
+
+        NSRect viewFrameInWindowCoordinates = NSZeroRect;
+        NSPoint accessibilityPosition = NSZeroPoint;
+
+        if (_data->_needsViewFrameInWindowCoordinates)
+            viewFrameInWindowCoordinates = [self convertRect:self.frame toView:nil];
+
+        if (WebCore::AXObjectCache::accessibilityEnabled())
+            accessibilityPosition = [[self accessibilityAttributeValue:NSAccessibilityPositionAttribute] pointValue];
+
+        _data->_page->windowAndViewFramesChanged(viewFrameInWindowCoordinates, accessibilityPosition);
+    });
 }
 
 - (void)renewGState
@@ -581,13 +679,22 @@ WEBCORE_COMMAND(yankAndSelect)
 
 - (id)validRequestorForSendType:(NSString *)sendType returnType:(NSString *)returnType
 {
-    BOOL isValidSendType = !sendType || ([PasteboardTypes::forSelection() containsObject:sendType] && !_data->_page->editorState().selectionIsNone);
+    EditorState editorState = _data->_page->editorState();
+    BOOL isValidSendType = NO;
+
+    if (sendType && !editorState.selectionIsNone) {
+        if (editorState.isInPlugin)
+            isValidSendType = [sendType isEqualToString:NSStringPboardType];
+        else
+            isValidSendType = [PasteboardTypes::forSelection() containsObject:sendType];
+    }
+
     BOOL isValidReturnType = NO;
     if (!returnType)
         isValidReturnType = YES;
-    else if ([PasteboardTypes::forEditing() containsObject:returnType] && _data->_page->editorState().isContentEditable) {
+    else if ([PasteboardTypes::forEditing() containsObject:returnType] && editorState.isContentEditable) {
         // We can insert strings in any editable context.  We can insert other types, like images, only in rich edit contexts.
-        isValidReturnType = _data->_page->editorState().isContentRichlyEditable || [returnType isEqualToString:NSStringPboardType];
+        isValidReturnType = editorState.isContentRichlyEditable || [returnType isEqualToString:NSStringPboardType];
     }
     if (isValidSendType && isValidReturnType)
         return self;
@@ -970,7 +1077,6 @@ static void speakString(WKStringRef string, WKErrorRef error, void*)
 
 - (void)displayIfNeeded
 {
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1070
     // FIXME: We should remove this code when <rdar://problem/9362085> is resolved. In the meantime,
     // it is necessary to disable scren updates so we get a chance to redraw the corners before this 
     // display is visible.
@@ -978,17 +1084,14 @@ static void speakString(WKStringRef string, WKErrorRef error, void*)
     BOOL shouldMaskWindow = window && !NSIsEmptyRect(_data->_windowBottomCornerIntersectionRect);
     if (shouldMaskWindow)
         NSDisableScreenUpdates();
-#endif
 
     [super displayIfNeeded];
 
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1070
     if (shouldMaskWindow) {
         [window _maskRoundedBottomCorners:_data->_windowBottomCornerIntersectionRect];
         NSEnableScreenUpdates();
         _data->_windowBottomCornerIntersectionRect = NSZeroRect;
     }
-#endif
 }
 
 // Events
@@ -1403,18 +1506,6 @@ static const short kIOHIDEventTypeScroll = 6;
     LOG(TextInput, "...done executing saved keypress commands.");
 }
 
-- (void)_notifyInputContextAboutDiscardedComposition
-{
-    // <rdar://problem/9359055>: -discardMarkedText can only be called for active contexts.
-    // FIXME: We fail to ever notify the input context if something (e.g. a navigation) happens while the window is not key.
-    // This is not a problem when the window is key, because we discard marked text on resigning first responder.
-    if (![[self window] isKeyWindow] || self != [[self window] firstResponder])
-        return;
-
-    LOG(TextInput, "-> discardMarkedText");
-    [[super inputContext] discardMarkedText]; // Inform the input method that we won't have an inline input area despite having been asked to.
-}
-
 - (NSTextInputContext *)inputContext
 {
     WKViewInterpretKeyEventsParameters* parameters = _data->_interpretKeyEventsParameters;
@@ -1692,7 +1783,6 @@ static void extractUnderlines(NSAttributedString *string, Vector<CompositionUnde
     _data->_page->dragUpdated(&dragData, [[draggingInfo draggingPasteboard] name]);
     
     WebCore::DragSession dragSession = _data->_page->dragSession();
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1070
     NSInteger numberOfValidItemsForDrop = dragSession.numberOfItemsToBeAccepted;
     NSDraggingFormation draggingFormation = NSDraggingFormationNone;
     if (dragSession.mouseIsOverFileInput && numberOfValidItemsForDrop > 0)
@@ -1702,7 +1792,7 @@ static void extractUnderlines(NSAttributedString *string, Vector<CompositionUnde
         [draggingInfo setNumberOfValidItemsForDrop:numberOfValidItemsForDrop];
     if ([draggingInfo draggingFormation] != draggingFormation)
         [draggingInfo setDraggingFormation:draggingFormation];
-#endif
+
     return dragSession.operation;
 }
 
@@ -1804,57 +1894,6 @@ static void createSandboxExtensionsForFileUpload(NSPasteboard *pasteboard, Sandb
 }
 
 
-#if __MAC_OS_X_VERSION_MIN_REQUIRED == 1060
-- (BOOL)_ownsWindowGrowBox
-{
-    NSWindow* window = [self window];
-    if (!window)
-        return NO;
-
-    NSView *superview = [self superview];
-    if (!superview)
-        return NO;
-
-    NSRect growBoxRect = [window _growBoxRect];
-    if (NSIsEmptyRect(growBoxRect))
-        return NO;
-
-    NSRect visibleRect = [self visibleRect];
-    if (NSIsEmptyRect(visibleRect))
-        return NO;
-
-    NSRect visibleRectInWindowCoords = [self convertRect:visibleRect toView:nil];
-    if (!NSIntersectsRect(growBoxRect, visibleRectInWindowCoords))
-        return NO;
-
-    return YES;
-}
-
-- (BOOL)_updateGrowBoxForWindowFrameChange
-{
-    // Temporarily enable the resize indicator to make a the _ownsWindowGrowBox calculation work.
-    BOOL wasShowingIndicator = [[self window] showsResizeIndicator];
-    if (!wasShowingIndicator)
-        [[self window] setShowsResizeIndicator:YES];
-
-    BOOL ownsGrowBox = [self _ownsWindowGrowBox];
-    _data->_page->setWindowResizerSize(ownsGrowBox ? enclosingIntRect([[self window] _growBoxRect]).size() : IntSize());
-
-    if (ownsGrowBox)
-        [[self window] _setShowOpaqueGrowBoxForOwner:(_data->_page->hasHorizontalScrollbar() || _data->_page->hasVerticalScrollbar() ? self : nil)];
-    else
-        [[self window] _setShowOpaqueGrowBoxForOwner:nil];
-
-    // Once WebCore can draw the window resizer, this should read:
-    // if (wasShowingIndicator)
-    //     [[self window] setShowsResizeIndicator:!ownsGrowBox];
-    if (!wasShowingIndicator)
-        [[self window] setShowsResizeIndicator:NO];
-
-    return ownsGrowBox;
-}
-#endif
-
 // FIXME: Use AppKit constants for these when they are available.
 static NSString * const windowDidChangeBackingPropertiesNotification = @"NSWindowDidChangeBackingPropertiesNotification";
 static NSString * const backingPropertyOldScaleFactorKey = @"NSBackingPropertyOldScaleFactorKey";
@@ -1882,6 +1921,10 @@ static NSString * const backingPropertyOldScaleFactorKey = @"NSBackingPropertyOl
                                                      name:windowDidChangeBackingPropertiesNotification object:window];
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(_windowDidChangeScreen:)
                                                      name:NSWindowDidChangeScreenNotification object:window];
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
+        [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(_windowDidChangeOcclusionState:)
+                                                     name:NSWindowDidChangeOcclusionStateNotification object:window];
+#endif
     }
 }
 
@@ -1897,10 +1940,14 @@ static NSString * const backingPropertyOldScaleFactorKey = @"NSBackingPropertyOl
     [[NSNotificationCenter defaultCenter] removeObserver:self name:NSWindowDidDeminiaturizeNotification object:window];
     [[NSNotificationCenter defaultCenter] removeObserver:self name:NSWindowDidMoveNotification object:window];
     [[NSNotificationCenter defaultCenter] removeObserver:self name:NSWindowDidResizeNotification object:window];
+    [[NSNotificationCenter defaultCenter] removeObserver:self name:@"NSWindowWillOrderOffScreenNotification" object:window];
     [[NSNotificationCenter defaultCenter] removeObserver:self name:@"NSWindowDidOrderOffScreenNotification" object:window];
     [[NSNotificationCenter defaultCenter] removeObserver:self name:@"_NSWindowDidBecomeVisible" object:window];
     [[NSNotificationCenter defaultCenter] removeObserver:self name:windowDidChangeBackingPropertiesNotification object:window];
     [[NSNotificationCenter defaultCenter] removeObserver:self name:NSWindowDidChangeScreenNotification object:window];
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
+    [[NSNotificationCenter defaultCenter] removeObserver:self name:NSWindowDidChangeOcclusionStateNotification object:window];
+#endif
 }
 
 - (void)viewWillMoveToWindow:(NSWindow *)window
@@ -1922,11 +1969,6 @@ static NSString * const backingPropertyOldScaleFactorKey = @"NSBackingPropertyOl
     
     [self removeWindowObservers];
     [self addWindowObserversForWindow:window];
-
-#if __MAC_OS_X_VERSION_MIN_REQUIRED == 1060
-    if ([currentWindow _growBoxOwner] == self)
-        [currentWindow _setShowOpaqueGrowBoxForOwner:nil];
-#endif
 }
 
 - (void)viewDidMoveToWindow
@@ -1935,10 +1977,21 @@ static NSString * const backingPropertyOldScaleFactorKey = @"NSBackingPropertyOl
     // update the active state first and then make it visible. If the view is about to be hidden, we hide it first and then
     // update the active state.
     if ([self window]) {
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
+        if (_data->_windowOcclusionDetectionEnabled)
+            [self _setIsWindowOccluded:([[self window] occlusionState] & NSWindowOcclusionStateVisible) != NSWindowOcclusionStateVisible];
+#endif
         _data->_windowHasValidBackingStore = NO;
+        [self doWindowDidChangeScreen];
         [self _updateWindowVisibility];
         _data->_page->viewStateDidChange(WebPageProxy::ViewWindowIsActive);
-        _data->_page->viewStateDidChange(WebPageProxy::ViewIsVisible | WebPageProxy::ViewIsInWindow);
+
+        if ([self isDeferringViewInWindowChanges]) {
+            _data->_page->viewStateDidChange(WebPageProxy::ViewIsVisible);
+            _data->_viewInWindowChangeWasDeferred = YES;
+        } else
+            _data->_page->viewStateDidChange(WebPageProxy::ViewIsVisible | WebPageProxy::ViewIsInWindow);
+
         [self _updateWindowAndViewFrames];
 
         if (!_data->_flagsChangedEventMonitor) {
@@ -1952,7 +2005,12 @@ static NSString * const backingPropertyOldScaleFactorKey = @"NSBackingPropertyOl
     } else {
         [self _updateWindowVisibility];
         _data->_page->viewStateDidChange(WebPageProxy::ViewIsVisible);
-        _data->_page->viewStateDidChange(WebPageProxy::ViewWindowIsActive | WebPageProxy::ViewIsInWindow);
+
+        if ([self isDeferringViewInWindowChanges]) {
+            _data->_page->viewStateDidChange(WebPageProxy::ViewWindowIsActive);
+            _data->_viewInWindowChangeWasDeferred = YES;
+        } else
+            _data->_page->viewStateDidChange(WebPageProxy::ViewWindowIsActive | WebPageProxy::ViewIsInWindow);
 
         [NSEvent removeMonitor:_data->_flagsChangedEventMonitor];
         _data->_flagsChangedEventMonitor = nil;
@@ -1963,9 +2021,7 @@ static NSString * const backingPropertyOldScaleFactorKey = @"NSBackingPropertyOl
             _data->_endGestureMonitor = nil;
         }
 #endif
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1070
         WKHideWordDefinitionWindow();
-#endif
     }
 
     _data->_page->setIntrinsicDeviceScaleFactor([self _intrinsicDeviceScaleFactor]);
@@ -1983,9 +2039,6 @@ static NSString * const backingPropertyOldScaleFactorKey = @"NSBackingPropertyOl
         [self _updateSecureInputState];
         _data->_page->viewStateDidChange(WebPageProxy::ViewWindowIsActive);
     }
-
-    // Send a change screen to make sure the initial displayID is set
-    [self doWindowDidChangeScreen];
 }
 
 - (void)_windowDidChangeScreen:(NSNotification *)notification
@@ -2057,6 +2110,16 @@ static NSString * const backingPropertyOldScaleFactorKey = @"NSBackingPropertyOl
     _data->_page->setIntrinsicDeviceScaleFactor(newBackingScaleFactor);
 }
 
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
+- (void)_windowDidChangeOcclusionState:(NSNotification *)notification
+{
+    if (!_data->_windowOcclusionDetectionEnabled)
+        return;
+
+    [self _setIsWindowOccluded:([self.window occlusionState] & NSWindowOcclusionStateVisible) != NSWindowOcclusionStateVisible];
+}
+#endif
+
 static void drawPageBackground(CGContextRef context, WebPageProxy* page, const IntRect& rect)
 {
     if (!page->drawsBackground())
@@ -2099,7 +2162,7 @@ static void drawPageBackground(CGContextRef context, WebPageProxy* page, const I
 
             // If the window doesn't have a valid backing store, we need to fill the parts of the page that we
             // didn't paint with the background color (white or clear), to avoid garbage in those areas.
-            if (!_data->_windowHasValidBackingStore) {
+            if (!_data->_windowHasValidBackingStore || !drawingArea->hasReceivedFirstUpdate()) {
                 Vector<IntRect> unpaintedRects = unpaintedRegion.rects();
                 for (size_t i = 0; i < unpaintedRects.size(); ++i)
                     drawPageBackground(context, _data->_page.get(), unpaintedRects[i]);
@@ -2146,11 +2209,16 @@ static void drawPageBackground(CGContextRef context, WebPageProxy* page, const I
         drawingArea->colorSpaceDidChange();
 }
 
+- (void)_activeSpaceDidChange:(NSNotification *)notification
+{
+    _data->_page->viewStateDidChange(WebPageProxy::ViewIsVisible);
+}
+
 - (void)_accessibilityRegisterUIProcessTokens
 {
     // Initialize remote accessibility when the window connection has been established.
     NSData *remoteElementToken = WKAXRemoteTokenForElement(self);
-    NSData *remoteWindowToken = WKAXRemoteTokenForElement([self accessibilityAttributeValue:NSAccessibilityWindowAttribute]);
+    NSData *remoteWindowToken = WKAXRemoteTokenForElement([self window]);
     CoreIPC::DataReference elementToken = CoreIPC::DataReference(reinterpret_cast<const uint8_t*>([remoteElementToken bytes]), [remoteElementToken length]);
     CoreIPC::DataReference windowToken = CoreIPC::DataReference(reinterpret_cast<const uint8_t*>([remoteWindowToken bytes]), [remoteWindowToken length]);
     _data->_page->registerUIProcessAccessibilityTokens(elementToken, windowToken);
@@ -2172,11 +2240,20 @@ static void drawPageBackground(CGContextRef context, WebPageProxy* page, const I
         WKAXRegisterRemoteProcess(registerProcess, pid); 
 }
 
+- (void)enableAccessibilityIfNecessary
+{
+    if (WebCore::AXObjectCache::accessibilityEnabled())
+        return;
+
+    // After enabling accessibility update the window frame on the web process so that the
+    // correct accessibility position is transmitted (when AX is off, that position is not calculated).
+    WebCore::AXObjectCache::enableAccessibility();
+    [self _updateWindowAndViewFrames];
+}
+
 - (id)accessibilityFocusedUIElement
 {
-    if (_data->_pdfViewController)
-        return NSAccessibilityUnignoredDescendant(_data->_pdfViewController->pdfView());
-
+    [self enableAccessibilityIfNecessary];
     return _data->_remoteAccessibilityChild.get();
 }
 
@@ -2187,20 +2264,18 @@ static void drawPageBackground(CGContextRef context, WebPageProxy* page, const I
 
 - (id)accessibilityHitTest:(NSPoint)point
 {
-    if (_data->_pdfViewController)
-        return [_data->_pdfViewController->pdfView() accessibilityHitTest:point];
-    
+    [self enableAccessibilityIfNecessary];
     return _data->_remoteAccessibilityChild.get();
 }
 
 - (id)accessibilityAttributeValue:(NSString*)attribute
 {
+    [self enableAccessibilityIfNecessary];
+
     if ([attribute isEqualToString:NSAccessibilityChildrenAttribute]) {
 
         id child = nil;
-        if (_data->_pdfViewController)
-            child = NSAccessibilityUnignoredDescendant(_data->_pdfViewController->pdfView());
-        else if (_data->_remoteAccessibilityChild)
+        if (_data->_remoteAccessibilityChild)
             child = _data->_remoteAccessibilityChild.get();
         
         if (!child)
@@ -2245,15 +2320,9 @@ static void drawPageBackground(CGContextRef context, WebPageProxy* page, const I
 - (float)_intrinsicDeviceScaleFactor
 {
     NSWindow *window = [self window];
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1070
     if (window)
         return [window backingScaleFactor];
     return [[NSScreen mainScreen] backingScaleFactor];
-#else
-    if (window)
-        return [window userSpaceScaleFactor];
-    return [[NSScreen mainScreen] userSpaceScaleFactor];
-#endif
 }
 
 - (void)_setDrawingAreaSize:(NSSize)size
@@ -2261,7 +2330,13 @@ static void drawPageBackground(CGContextRef context, WebPageProxy* page, const I
     if (!_data->_page->drawingArea())
         return;
     
-    _data->_page->drawingArea()->setSize(IntSize(size), IntSize(_data->_resizeScrollOffset));
+    NSSize layerOffset = NSMakeSize(_data->_frameOrigin.x, _data->_frameOrigin.y);
+    if (isWKContentAnchorRight(_data->_contentAnchor))
+        layerOffset.width += [self frame].size.width - size.width;
+    if (isWKContentAnchorBottom(_data->_contentAnchor))
+        layerOffset.height += [self frame].size.height - size.height;
+
+    _data->_page->drawingArea()->setSize(IntSize(size), IntSize(layerOffset), IntSize(_data->_resizeScrollOffset));
     _data->_resizeScrollOffset = NSZeroSize;
 }
 
@@ -2275,6 +2350,17 @@ static void drawPageBackground(CGContextRef context, WebPageProxy* page, const I
 {
     NSPoint locationInViewCoordinates = [self convertPoint:[event locationInWindow] fromView:nil];
     _data->_page->performDictionaryLookupAtLocation(FloatPoint(locationInViewCoordinates.x, locationInViewCoordinates.y));
+}
+#endif
+
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
+- (void)_setIsWindowOccluded:(BOOL)isWindowOccluded
+{
+    if (_data->_isWindowOccluded == isWindowOccluded)
+        return;
+    
+    _data->_isWindowOccluded = isWindowOccluded;
+    _data->_page->viewStateDidChange(WebPageProxy::ViewIsVisible);
 }
 #endif
 
@@ -2336,6 +2422,18 @@ static void drawPageBackground(CGContextRef context, WebPageProxy* page, const I
 - (void)_didRelaunchProcess
 {
     [self _accessibilityRegisterUIProcessTokens];
+}
+
+- (void)_preferencesDidChange
+{
+    BOOL needsViewFrameInWindowCoordinates = _data->_page->pageGroup()->preferences()->pluginsEnabled();
+
+    if (!!needsViewFrameInWindowCoordinates == !!_data->_needsViewFrameInWindowCoordinates)
+        return;
+
+    _data->_needsViewFrameInWindowCoordinates = needsViewFrameInWindowCoordinates;
+    if ([self window])
+        [self _updateWindowAndViewFrames];
 }
 
 - (void)_setCursor:(NSCursor *)cursor
@@ -2578,7 +2676,7 @@ static void drawPageBackground(CGContextRef context, WebPageProxy* page, const I
     if (rootLayer) {
         if (!_data->_layerHostingView) {
             // Create an NSView that will host our layer tree.
-            _data->_layerHostingView.adoptNS([[WKFlippedView alloc] initWithFrame:[self bounds]]);
+            _data->_layerHostingView = adoptNS([[WKFlippedView alloc] initWithFrame:[self bounds]]);
             [_data->_layerHostingView.get() setAutoresizingMask:NSViewWidthSizable | NSViewHeightSizable];
 
 
@@ -2602,6 +2700,7 @@ static void drawPageBackground(CGContextRef context, WebPageProxy* page, const I
             [_data->_layerHostingView setWantsLayer:NO];
 
             _data->_layerHostingView = nullptr;
+            _data->_frameOrigin = NSZeroPoint;
         }
     }
 
@@ -2652,57 +2751,6 @@ static void drawPageBackground(CGContextRef context, WebPageProxy* page, const I
     [self _setPluginComplexTextInputState:pluginComplexTextInputState];
 }
 
-- (void)_setPageHasCustomRepresentation:(BOOL)pageHasCustomRepresentation
-{
-    bool hadPDFView = _data->_pdfViewController;
-    _data->_pdfViewController = nullptr;
-
-    if (pageHasCustomRepresentation)
-        _data->_pdfViewController = PDFViewController::create(self);
-
-    if (pageHasCustomRepresentation != hadPDFView)
-        _data->_page->drawingArea()->pageCustomRepresentationChanged();
-}
-
-- (void)_didFinishLoadingDataForCustomRepresentationWithSuggestedFilename:(const String&)suggestedFilename dataReference:(const CoreIPC::DataReference&)dataReference
-{
-    ASSERT(_data->_pdfViewController);
-
-    _data->_pdfViewController->setPDFDocumentData(_data->_page->mainFrame()->mimeType(), suggestedFilename, dataReference);
-}
-
-- (double)_customRepresentationZoomFactor
-{
-    if (!_data->_pdfViewController)
-        return 1;
-
-    return _data->_pdfViewController->zoomFactor();
-}
-
-- (void)_setCustomRepresentationZoomFactor:(double)zoomFactor
-{
-    if (!_data->_pdfViewController)
-        return;
-
-    _data->_pdfViewController->setZoomFactor(zoomFactor);
-}
-
-- (void)_findStringInCustomRepresentation:(NSString *)string withFindOptions:(WebKit::FindOptions)options maxMatchCount:(NSUInteger)count
-{
-    if (!_data->_pdfViewController)
-        return;
-
-    _data->_pdfViewController->findString(string, options, count);
-}
-
-- (void)_countStringMatchesInCustomRepresentation:(NSString *)string withFindOptions:(WebKit::FindOptions)options maxMatchCount:(NSUInteger)count
-{
-    if (!_data->_pdfViewController)
-        return;
-
-    _data->_pdfViewController->countStringMatches(string, options, count);
-}
-
 - (void)_setDragImage:(NSImage *)image at:(NSPoint)clientPoint linkDrag:(BOOL)linkDrag
 {
     IntSize size([image size]);
@@ -2732,7 +2780,7 @@ static bool matchesExtensionOrEquivalent(NSString *filename, NSString *extension
 
 {
     NSPasteboard *pasteboard = [NSPasteboard pasteboardWithName:pasteboardName];
-    RetainPtr<NSMutableArray> types(AdoptNS, [[NSMutableArray alloc] initWithObjects:NSFilesPromisePboardType, nil]);
+    RetainPtr<NSMutableArray> types = adoptNS([[NSMutableArray alloc] initWithObjects:NSFilesPromisePboardType, nil]);
     
     [types.get() addObjectsFromArray:archiveBuffer ? PasteboardTypes::forImagesWithArchive() : PasteboardTypes::forImages()];
     [pasteboard declareTypes:types.get() owner:self];
@@ -2814,8 +2862,8 @@ static NSString *pathWithUniqueFilenameForPath(NSString *path)
     RetainPtr<NSData> data;
     
     if (_data->_promisedImage) {
-        data.adoptNS(_data->_promisedImage->data()->createNSData());
-        wrapper.adoptNS([[NSFileWrapper alloc] initRegularFileWithContents:data.get()]);
+        data = adoptNS(_data->_promisedImage->data()->createNSData());
+        wrapper = adoptNS([[NSFileWrapper alloc] initRegularFileWithContents:data.get()]);
         [wrapper.get() setPreferredFilename:_data->_promisedFilename];
     }
     
@@ -2864,38 +2912,24 @@ static NSString *pathWithUniqueFilenameForPath(NSString *path)
     _data->_inSecureInputState = isInPasswordField;
 }
 
-- (void)_updateTextInputStateIncludingSecureInputState:(BOOL)updateSecureInputState
+- (void)_resetSecureInputState
 {
-    const EditorState& editorState = _data->_page->editorState();
-    if (updateSecureInputState) {
-        // This is a temporary state when editing. Flipping secure input state too quickly can expose race conditions.
-        if (!editorState.selectionIsNone)
-            [self _updateSecureInputState];
-    }
-
-    if (!editorState.hasComposition || editorState.shouldIgnoreCompositionSelectionChange)
-        return;
-
-    _data->_page->cancelComposition();
-
-    [self _notifyInputContextAboutDiscardedComposition];
-}
-
-- (void)_resetTextInputState
-{
-    [self _notifyInputContextAboutDiscardedComposition];
-
     if (_data->_inSecureInputState) {
         DisableSecureEventInput();
         _data->_inSecureInputState = NO;
     }
 }
 
-- (void)_didChangeScrollbarsForMainFrame
+- (void)_notifyInputContextAboutDiscardedComposition
 {
-#if __MAC_OS_X_VERSION_MIN_REQUIRED == 1060
-    [self _updateGrowBoxForWindowFrameChange];
-#endif
+    // <rdar://problem/9359055>: -discardMarkedText can only be called for active contexts.
+    // FIXME: We fail to ever notify the input context if something (e.g. a navigation) happens while the window is not key.
+    // This is not a problem when the window is key, because we discard marked text on resigning first responder.
+    if (![[self window] isKeyWindow] || self != [[self window] firstResponder])
+        return;
+
+    LOG(TextInput, "-> discardMarkedText");
+    [[super inputContext] discardMarkedText]; // Inform the input method that we won't have an inline input area despite having been asked to.
 }
 
 #if ENABLE(FULLSCREEN_API)
@@ -2907,7 +2941,7 @@ static NSString *pathWithUniqueFilenameForPath(NSString *path)
 - (WKFullScreenWindowController*)fullScreenWindowController
 {
     if (!_data->_fullScreenWindowController) {
-        _data->_fullScreenWindowController.adoptNS([[WKFullScreenWindowController alloc] init]);
+        _data->_fullScreenWindowController = adoptNS([[WKFullScreenWindowController alloc] initWithWindow:[self createFullScreenWindow]]);
         [_data->_fullScreenWindowController.get() setWebView:self];
     }
     return _data->_fullScreenWindowController.get();
@@ -2926,7 +2960,7 @@ static NSString *pathWithUniqueFilenameForPath(NSString *path)
 {
     // The sink does two things: 1) Tells us if the responder went unhandled, and
     // 2) prevents any NSBeep; we don't ever want to beep here.
-    RetainPtr<WKResponderChainSink> sink(AdoptNS, [[WKResponderChainSink alloc] initWithResponderChain:self]);
+    RetainPtr<WKResponderChainSink> sink = adoptNS([[WKResponderChainSink alloc] initWithResponderChain:self]);
     [super doCommandBySelector:selector];
     [sink.get() detach];
     return ![sink.get() didReceiveUnhandledCommand];
@@ -2934,14 +2968,21 @@ static NSString *pathWithUniqueFilenameForPath(NSString *path)
 
 - (void)_setIntrinsicContentSize:(NSSize)intrinsicContentSize
 {
-    _data->_intrinsicContentSize = intrinsicContentSize;
+    // If the intrinsic content size is less than the minimum layout width, the content flowed to fit,
+    // so we can report that that dimension is flexible. If not, we need to report our intrinsic width
+    // so that autolayout will know to provide space for us.
+
+    NSSize intrinsicContentSizeAcknowledgingFlexibleWidth = intrinsicContentSize;
+    if (intrinsicContentSize.width < _data->_page->minimumLayoutSize().width())
+        intrinsicContentSizeAcknowledgingFlexibleWidth.width = NSViewNoInstrinsicMetric;
+
+    _data->_intrinsicContentSize = intrinsicContentSizeAcknowledgingFlexibleWidth;
     [self invalidateIntrinsicContentSize];
 }
 
 - (void)_cacheWindowBottomCornerRect
 {
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1070
-    // FIXME: We should remove this code when <rdar://problem/9362085> is resolved. 
+    // FIXME: We should remove this code when <rdar://problem/9362085> is resolved.
     NSWindow *window = [self window];
     if (!window)
         return;
@@ -2949,7 +2990,6 @@ static NSString *pathWithUniqueFilenameForPath(NSString *path)
     _data->_windowBottomCornerIntersectionRect = [window _intersectBottomCornersWithRect:[self convertRect:[self visibleRect] toView:nil]];
     if (!NSIsEmptyRect(_data->_windowBottomCornerIntersectionRect))
         [self setNeedsDisplayInRect:[self convertRect:_data->_windowBottomCornerIntersectionRect fromView:nil]];
-#endif
 }
 
 - (NSInteger)spellCheckerDocumentTag
@@ -2974,6 +3014,15 @@ static NSString *pathWithUniqueFilenameForPath(NSString *path)
 - (BOOL)_suppressVisibilityUpdates
 {
     return _data->_page->suppressVisibilityUpdates();
+}
+
+- (BOOL)_isWindowOccluded
+{
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
+    return _data->_isWindowOccluded;
+#else
+    return NO;
+#endif
 }
 
 @end
@@ -3006,14 +3055,10 @@ static NSString *pathWithUniqueFilenameForPath(NSString *path)
 
     // Legacy style scrollbars have design details that rely on tracking the mouse all the time.
     NSTrackingAreaOptions options = NSTrackingMouseMoved | NSTrackingMouseEnteredAndExited | NSTrackingInVisibleRect;
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1070
     if (WKRecommendedScrollerStyle() == NSScrollerStyleLegacy)
         options |= NSTrackingActiveAlways;
     else
         options |= NSTrackingActiveInKeyWindow;
-#else
-    options |= NSTrackingActiveInKeyWindow;
-#endif
 
     NSTrackingArea *trackingArea = [[NSTrackingArea alloc] initWithRect:frame
                                                                 options:options
@@ -3033,9 +3078,20 @@ static NSString *pathWithUniqueFilenameForPath(NSString *path)
 #endif
     _data->_mouseDownEvent = nil;
     _data->_ignoringMouseDraggedEvents = NO;
+    _data->_clipsToVisibleRect = NO;
+    _data->_useContentPreparationRectForVisibleRect = NO;
 
     _data->_intrinsicContentSize = NSMakeSize(NSViewNoInstrinsicMetric, NSViewNoInstrinsicMetric);
 
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
+    _data->_isWindowOccluded = NO;
+    _data->_windowOcclusionDetectionEnabled = YES;
+#endif
+
+    _data->_needsViewFrameInWindowCoordinates = _data->_page->pageGroup()->preferences()->pluginsEnabled();
+    _data->_frameOrigin = NSZeroPoint;
+    _data->_contentAnchor = WKContentAnchorTopLeft;
+    
     [self _registerDraggedTypes];
 
     if ([self _shouldUseTiledDrawingArea]) {
@@ -3046,6 +3102,9 @@ static NSString *pathWithUniqueFilenameForPath(NSString *path)
     }
 
     WebContext::statistics().wkViewCount++;
+
+    NSNotificationCenter* workspaceNotificationCenter = [[NSWorkspace sharedWorkspace] notificationCenter];
+    [workspaceNotificationCenter addObserver:self selector:@selector(_activeSpaceDidChange:) name:NSWorkspaceActiveSpaceDidChangeNotification object:nil];
 
     return self;
 }
@@ -3058,7 +3117,16 @@ static NSString *pathWithUniqueFilenameForPath(NSString *path)
 
 - (void)updateLayer
 {
-    self.layer.backgroundColor = CGColorGetConstantColor(kCGColorWhite);
+    if ([self drawsBackground] && ![self drawsTransparentBackground])
+        self.layer.backgroundColor = CGColorGetConstantColor(kCGColorWhite);
+    else
+        self.layer.backgroundColor = CGColorGetConstantColor(kCGColorClear);
+
+    // If asynchronous geometry updates have been sent by forceAsyncDrawingAreaSizeUpdate,
+    // then subsequent calls to setFrameSize should not result in us waiting for the did
+    // udpate response if setFrameSize is called.
+    if ([self frameSizeUpdatesDisabled])
+        return;
 
     if (DrawingAreaProxy* drawingArea = _data->_page->drawingArea())
         drawingArea->waitForPossibleGeometryUpdate();
@@ -3080,22 +3148,15 @@ static NSString *pathWithUniqueFilenameForPath(NSString *path)
 {
     LOG(View, "Creating an NSPrintOperation for frame '%s'", toImpl(frameRef)->url().utf8().data());
 
-    // Only the top frame can currently contain a PDF view.
-    if (_data->_pdfViewController) {
-        if (!toImpl(frameRef)->isMainFrame())
-            return 0;
-        return _data->_pdfViewController->makePrintOperation(printInfo);
-    } else {
-        // FIXME: If the frame cannot be printed (e.g. if it contains an encrypted PDF that disallows
-        // printing), this function should return nil.
-        RetainPtr<WKPrintingView> printingView(AdoptNS, [[WKPrintingView alloc] initWithFrameProxy:toImpl(frameRef) view:self]);
-        // NSPrintOperation takes ownership of the view.
-        NSPrintOperation *printOperation = [NSPrintOperation printOperationWithView:printingView.get()];
-        [printOperation setCanSpawnSeparateThread:YES];
-        [printOperation setJobTitle:toImpl(frameRef)->title()];
-        printingView->_printOperation = printOperation;
-        return printOperation;
-    }
+    // FIXME: If the frame cannot be printed (e.g. if it contains an encrypted PDF that disallows
+    // printing), this function should return nil.
+    RetainPtr<WKPrintingView> printingView = adoptNS([[WKPrintingView alloc] initWithFrameProxy:toImpl(frameRef) view:self]);
+    // NSPrintOperation takes ownership of the view.
+    NSPrintOperation *printOperation = [NSPrintOperation printOperationWithView:printingView.get() printInfo:printInfo];
+    [printOperation setCanSpawnSeparateThread:YES];
+    [printOperation setJobTitle:toImpl(frameRef)->title()];
+    printingView->_printOperation = printOperation;
+    return printOperation;
 }
 
 - (void)setFrame:(NSRect)rect andScrollBy:(NSSize)offset
@@ -3116,8 +3177,11 @@ static NSString *pathWithUniqueFilenameForPath(NSString *path)
     if (!_data->_frameSizeUpdatesDisabledCount)
         return;
     
-    if (!(--_data->_frameSizeUpdatesDisabledCount))
+    if (!(--_data->_frameSizeUpdatesDisabledCount)) {
+        if (_data->_clipsToVisibleRect)
+            [self _updateViewExposedRect];
         [self _setDrawingAreaSize:[self frame].size];
+    }
 }
 
 - (BOOL)frameSizeUpdatesDisabled
@@ -3136,19 +3200,232 @@ static NSString *pathWithUniqueFilenameForPath(NSString *path)
 
 + (void)hideWordDefinitionWindow
 {
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1070
     WKHideWordDefinitionWindow();
-#endif
 }
 
 - (CGFloat)minimumLayoutWidth
 {
-    return _data->_page->minimumLayoutWidth();
+    static BOOL loggedDeprecationWarning = NO;
+
+    if (!loggedDeprecationWarning) {
+        NSLog(@"Please use minimumSizeForAutoLayout instead of minimumLayoutWidth.");
+        loggedDeprecationWarning = YES;
+    }
+
+    return self.minimumSizeForAutoLayout.width;
 }
 
 - (void)setMinimumLayoutWidth:(CGFloat)minimumLayoutWidth
 {
-    _data->_page->setMinimumLayoutWidth(minimumLayoutWidth);
+    static BOOL loggedDeprecationWarning = NO;
+
+    if (!loggedDeprecationWarning) {
+        NSLog(@"Please use setMinimumSizeForAutoLayout: instead of setMinimumLayoutWidth:.");
+        loggedDeprecationWarning = YES;
+    }
+
+    [self setMinimumWidthForAutoLayout:minimumLayoutWidth];
+}
+
+- (CGFloat)minimumWidthForAutoLayout
+{
+    static BOOL loggedDeprecationWarning = NO;
+
+    if (!loggedDeprecationWarning) {
+        NSLog(@"Please use minimumSizeForAutoLayout instead of minimumWidthForAutoLayout.");
+        loggedDeprecationWarning = YES;
+    }
+
+    return self.minimumSizeForAutoLayout.width;
+}
+
+- (void)setMinimumWidthForAutoLayout:(CGFloat)minimumLayoutWidth
+{
+    static BOOL loggedDeprecationWarning = NO;
+
+    if (!loggedDeprecationWarning) {
+        NSLog(@"Please use setMinimumSizeForAutoLayout: instead of setMinimumWidthForAutoLayout:");
+        loggedDeprecationWarning = YES;
+    }
+
+    self.minimumSizeForAutoLayout = NSMakeSize(minimumLayoutWidth, self.minimumSizeForAutoLayout.height);
+}
+
+- (NSSize)minimumSizeForAutoLayout
+{
+    return _data->_page->minimumLayoutSize();
+}
+
+- (void)setMinimumSizeForAutoLayout:(NSSize)minimumSizeForAutoLayout
+{
+    BOOL expandsToFit = minimumSizeForAutoLayout.width > 0;
+
+    _data->_page->setMinimumLayoutSize(IntSize(minimumSizeForAutoLayout.width, minimumSizeForAutoLayout.height));
+    _data->_page->setMainFrameIsScrollable(!expandsToFit);
+
+    [self setShouldClipToVisibleRect:expandsToFit];
+}
+
+- (BOOL)shouldClipToVisibleRect
+{
+    return _data->_clipsToVisibleRect;
+}
+
+- (void)setShouldClipToVisibleRect:(BOOL)clipsToVisibleRect
+{
+    _data->_clipsToVisibleRect = clipsToVisibleRect;
+    [self _updateViewExposedRect];
+}
+
+- (NSColor *)underlayColor
+{
+    Color webColor = _data->_page->underlayColor();
+    if (!webColor.isValid())
+        return nil;
+
+    return nsColor(webColor);
+}
+
+- (void)setUnderlayColor:(NSColor *)underlayColor
+{
+    _data->_page->setUnderlayColor(colorFromNSColor(underlayColor));
+}
+
+- (NSView*)fullScreenPlaceholderView
+{
+#if ENABLE(FULLSCREEN_API)
+    if (_data->_fullScreenWindowController && [_data->_fullScreenWindowController isFullScreen])
+        return [_data->_fullScreenWindowController webViewPlaceholder];
+#endif
+    return nil;
+}
+
+- (void)beginDeferringViewInWindowChanges
+{
+    if (_data->_shouldDeferViewInWindowChanges) {
+        NSLog(@"beginDeferringViewInWindowChanges was called while already deferring view-in-window changes!");
+        return;
+    }
+
+    _data->_shouldDeferViewInWindowChanges = YES;
+}
+
+- (void)endDeferringViewInWindowChanges
+{
+    if (!_data->_shouldDeferViewInWindowChanges) {
+        NSLog(@"endDeferringViewInWindowChanges was called without beginDeferringViewInWindowChanges!");
+        return;
+    }
+
+    _data->_shouldDeferViewInWindowChanges = NO;
+
+    if (_data->_viewInWindowChangeWasDeferred) {
+        _data->_page->viewStateDidChange(WebPageProxy::ViewIsInWindow);
+        _data->_viewInWindowChangeWasDeferred = NO;
+    }
+}
+
+- (void)endDeferringViewInWindowChangesSync
+{
+    if (!_data->_shouldDeferViewInWindowChanges) {
+        NSLog(@"endDeferringViewInWindowChangesSync was called without beginDeferringViewInWindowChanges!");
+        return;
+    }
+
+    PageClient* pageClient = _data->_pageClient.get();
+    bool hasPendingViewInWindowChange = _data->_viewInWindowChangeWasDeferred && _data->_page->isInWindow() != pageClient->isViewInWindow();
+
+    [self endDeferringViewInWindowChanges];
+
+    if (hasPendingViewInWindowChange)
+        _data->_page->waitForDidUpdateInWindowState();
+}
+
+- (BOOL)isDeferringViewInWindowChanges
+{
+    return _data->_shouldDeferViewInWindowChanges;
+}
+
+- (BOOL)windowOcclusionDetectionEnabled
+{
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
+    return _data->_windowOcclusionDetectionEnabled;
+#else
+    return NO;
+#endif
+}
+
+- (void)setWindowOcclusionDetectionEnabled:(BOOL)flag
+{
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
+    if (_data->_windowOcclusionDetectionEnabled == flag)
+        return;
+
+    _data->_windowOcclusionDetectionEnabled = flag;
+
+    if (flag) {
+        // When enabling window occlusion detection, update the view's current occluded state
+        // immediately, as the notification only fires when it changes.
+        if (self.window)
+            [self _setIsWindowOccluded:([self.window occlusionState] & NSWindowOcclusionStateVisible) != NSWindowOcclusionStateVisible];
+    } else {
+        // When disabling window occlusion detection, force the view to think it is not occluded,
+        // as it may already be occluded at the time of calling.
+        [self _setIsWindowOccluded:NO];
+    }
+#endif
+}
+
+- (void)setContentAnchor:(WKContentAnchor)contentAnchor
+{
+    _data->_contentAnchor = contentAnchor;
+}
+
+- (WKContentAnchor)contentAnchor
+{
+    return _data->_contentAnchor;
+}
+
+// This method forces a drawing area geometry update, even if frame size updates are disabled.
+// The updated is performed asynchronously; we don't wait for the geometry update before returning.
+// The area drawn need not match the current frame size - if it differs it will be anchored to the
+// frame according to the current contentAnchor.
+- (void)forceAsyncDrawingAreaSizeUpdate:(NSSize)size
+{
+    if (_data->_clipsToVisibleRect)
+        [self _updateViewExposedRect];
+    [self _setDrawingAreaSize:size];
+
+    // If a geometry update is pending the new update won't be sent. Poll without waiting for any
+    // pending did-update message now, such that the new update can be sent. We do so after setting
+    // the drawing area size such that the latest update is sent.
+    if (DrawingAreaProxy* drawingArea = _data->_page->drawingArea())
+        drawingArea->waitForPossibleGeometryUpdate(0);
+}
+
+- (void)waitForAsyncDrawingAreaSizeUpdate
+{
+    if (DrawingAreaProxy* drawingArea = _data->_page->drawingArea()) {
+        // If a geometry update is still pending then the action of recieving the
+        // first geometry update may result in another update being scheduled -
+        // we should wait for this to complete too.
+        drawingArea->waitForPossibleGeometryUpdate(DrawingAreaProxy::didUpdateBackingStoreStateTimeout * 0.5);
+        drawingArea->waitForPossibleGeometryUpdate(DrawingAreaProxy::didUpdateBackingStoreStateTimeout * 0.5);
+    }
+}
+
+- (NSWindow*)createFullScreenWindow
+{
+#if ENABLE(FULLSCREEN_API)
+#if __MAC_OS_X_VERSION_MIN_REQUIRED <= 1080
+    NSRect contentRect = NSZeroRect;
+#else
+    NSRect contentRect = [[NSScreen mainScreen] frame];
+#endif
+    return [[[WebCoreFullScreenWindow alloc] initWithContentRect:contentRect styleMask:NSBorderlessWindowMask backing:NSBackingStoreBuffered defer:NO] autorelease];
+#else
+    return nil;
+#endif
 }
 
 @end

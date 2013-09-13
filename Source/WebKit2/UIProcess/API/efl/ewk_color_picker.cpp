@@ -24,7 +24,6 @@
 #include "WKColorPickerResultListener.h"
 #include "WKString.h"
 #include "ewk_color_picker_private.h"
-#include <WebCore/Color.h>
 #include <wtf/text/CString.h>
 #include <wtf/text/WTFString.h>
 
@@ -58,6 +57,11 @@ Eina_Bool ewk_color_picker_color_set(Ewk_Color_Picker* colorPicker, int r, int g
 
     return true;
 #else
+    UNUSED_PARAM(colorPicker);
+    UNUSED_PARAM(r);
+    UNUSED_PARAM(g);
+    UNUSED_PARAM(b);
+    UNUSED_PARAM(a);
     return false;
 #endif
 }
@@ -79,6 +83,11 @@ Eina_Bool ewk_color_picker_color_get(const Ewk_Color_Picker* colorPicker, int* r
 
     return true;
 #else
+    UNUSED_PARAM(colorPicker);
+    UNUSED_PARAM(r);
+    UNUSED_PARAM(g);
+    UNUSED_PARAM(b);
+    UNUSED_PARAM(a);
     return false;
 #endif
 }

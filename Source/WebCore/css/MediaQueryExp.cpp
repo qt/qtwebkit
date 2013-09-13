@@ -3,6 +3,7 @@
  *
  * Copyright (C) 2006 Kimmo Kinnunen <kimmo.t.kinnunen@nokia.com>.
  * Copyright (C) 2010 Nokia Corporation and/or its subsidiary(-ies).
+ * Copyright (C) 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -33,7 +34,6 @@
 #include "CSSParser.h"
 #include "CSSPrimitiveValue.h"
 #include "CSSValueList.h"
-#include "WebCoreMemoryInstrumentation.h"
 #include <wtf/text/StringBuilder.h>
 
 namespace WebCore {
@@ -44,7 +44,9 @@ static inline bool featureWithCSSValueID(const AtomicString& mediaFeature, const
         return false;
 
     return mediaFeature == MediaFeatureNames::orientationMediaFeature
+#if ENABLE(VIEW_MODE_CSS_MEDIA)
         || mediaFeature == MediaFeatureNames::view_modeMediaFeature
+#endif // ENABLE(VIEW_MODE_CSS_MEDIA)
         || mediaFeature == MediaFeatureNames::pointerMediaFeature;
 }
 
@@ -85,6 +87,9 @@ static inline bool featureWithPositiveInteger(const AtomicString& mediaFeature, 
     return mediaFeature == MediaFeatureNames::colorMediaFeature
         || mediaFeature == MediaFeatureNames::max_colorMediaFeature
         || mediaFeature == MediaFeatureNames::min_colorMediaFeature
+        || mediaFeature == MediaFeatureNames::color_indexMediaFeature
+        || mediaFeature == MediaFeatureNames::max_color_indexMediaFeature
+        || mediaFeature == MediaFeatureNames::min_color_indexMediaFeature
         || mediaFeature == MediaFeatureNames::min_monochromeMediaFeature
         || mediaFeature == MediaFeatureNames::max_monochromeMediaFeature;
 }
@@ -127,6 +132,7 @@ static inline bool featureWithoutValue(const AtomicString& mediaFeature)
     // Media features that are prefixed by min/max cannot be used without a value.
     return mediaFeature == MediaFeatureNames::monochromeMediaFeature
         || mediaFeature == MediaFeatureNames::colorMediaFeature
+        || mediaFeature == MediaFeatureNames::color_indexMediaFeature
         || mediaFeature == MediaFeatureNames::gridMediaFeature
         || mediaFeature == MediaFeatureNames::heightMediaFeature
         || mediaFeature == MediaFeatureNames::widthMediaFeature
@@ -140,7 +146,9 @@ static inline bool featureWithoutValue(const AtomicString& mediaFeature)
         || mediaFeature == MediaFeatureNames::transform_3dMediaFeature
         || mediaFeature == MediaFeatureNames::transitionMediaFeature
         || mediaFeature == MediaFeatureNames::animationMediaFeature
+#if ENABLE(VIEW_MODE_CSS_MEDIA)
         || mediaFeature == MediaFeatureNames::view_modeMediaFeature
+#endif // ENABLE(VIEW_MODE_CSS_MEDIA)
         || mediaFeature == MediaFeatureNames::pointerMediaFeature
         || mediaFeature == MediaFeatureNames::device_pixel_ratioMediaFeature
         || mediaFeature == MediaFeatureNames::resolutionMediaFeature;
@@ -229,24 +237,16 @@ String MediaQueryExp::serialize() const
         return m_serializationCache;
 
     StringBuilder result;
-    result.append("(");
+    result.append('(');
     result.append(m_mediaFeature.lower());
     if (m_value) {
-        result.append(": ");
+        result.appendLiteral(": ");
         result.append(m_value->cssText());
     }
-    result.append(")");
+    result.append(')');
 
     const_cast<MediaQueryExp*>(this)->m_serializationCache = result.toString();
     return m_serializationCache;
-}
-
-void MediaQueryExp::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
-    info.addMember(m_mediaFeature);
-    info.addMember(m_serializationCache);
-    info.addMember(m_value);
 }
 
 } // namespace

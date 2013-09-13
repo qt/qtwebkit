@@ -22,12 +22,12 @@
 #define WebKitDOMTestNamedConstructorPrivate_h
 
 #include "TestNamedConstructor.h"
-#include <webkit/WebKitDOMTestNamedConstructor.h>
+#include <webkitdom/WebKitDOMTestNamedConstructor.h>
 
 namespace WebKit {
 WebKitDOMTestNamedConstructor* wrapTestNamedConstructor(WebCore::TestNamedConstructor*);
-WebCore::TestNamedConstructor* core(WebKitDOMTestNamedConstructor* request);
-WebKitDOMTestNamedConstructor* kit(WebCore::TestNamedConstructor* node);
+WebKitDOMTestNamedConstructor* kit(WebCore::TestNamedConstructor*);
+WebCore::TestNamedConstructor* core(WebKitDOMTestNamedConstructor*);
 } // namespace WebKit
 
 #endif /* WebKitDOMTestNamedConstructorPrivate_h */

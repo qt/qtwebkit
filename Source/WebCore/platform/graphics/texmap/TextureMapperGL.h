@@ -20,9 +20,10 @@
 #ifndef TextureMapperGL_h
 #define TextureMapperGL_h
 
-#if USE(ACCELERATED_COMPOSITING)
+#if USE(ACCELERATED_COMPOSITING) && USE(TEXTURE_MAPPER)
 
 #include "CustomFilterProgramInfo.h"
+#include "FilterOperation.h"
 #include "FloatQuad.h"
 #include "GraphicsContext3D.h"
 #include "IntSize.h"
@@ -34,8 +35,8 @@ namespace WebCore {
 class CustomFilterProgram;
 class CustomFilterCompiledProgram;
 class TextureMapperGLData;
-class GraphicsContext;
 class TextureMapperShaderProgram;
+class FilterOperation;
 
 // An OpenGL-ES2 implementation of TextureMapper.
 class TextureMapperGL : public TextureMapper {
@@ -44,36 +45,33 @@ public:
     virtual ~TextureMapperGL();
 
     enum Flag {
-        SupportsBlending = 0x01,
-        ShouldFlipTexture = 0x02
+        ShouldBlend = 0x01,
+        ShouldFlipTexture = 0x02,
+        ShouldUseARBTextureRect = 0x04,
+        ShouldAntialias = 0x08
     };
 
     typedef int Flags;
 
     // TextureMapper implementation
-    virtual void drawBorder(const Color&, float borderWidth, const FloatRect& targetRect, const TransformationMatrix& modelViewMatrix = TransformationMatrix()) OVERRIDE;
-    virtual void drawRepaintCounter(int value, int pointSize, const FloatPoint&, const TransformationMatrix& modelViewMatrix = TransformationMatrix()) OVERRIDE;
-    virtual void drawTexture(const BitmapTexture&, const FloatRect&, const TransformationMatrix&, float opacity, const BitmapTexture* maskTexture, unsigned exposedEdges) OVERRIDE;
-    virtual void drawTexture(uint32_t texture, Flags, const IntSize& textureSize, const FloatRect& targetRect, const TransformationMatrix& modelViewMatrix, float opacity, const BitmapTexture* maskTexture, unsigned exposedEdges = AllEdges);
+    virtual void drawBorder(const Color&, float borderWidth, const FloatRect&, const TransformationMatrix&) OVERRIDE;
+    virtual void drawNumber(int number, const Color&, const FloatPoint&, const TransformationMatrix&) OVERRIDE;
+    virtual void drawTexture(const BitmapTexture&, const FloatRect&, const TransformationMatrix&, float opacity, unsigned exposedEdges) OVERRIDE;
+    virtual void drawTexture(Platform3DObject texture, Flags, const IntSize& textureSize, const FloatRect& targetRect, const TransformationMatrix& modelViewMatrix, float opacity, unsigned exposedEdges = AllEdges);
     virtual void drawSolidColor(const FloatRect&, const TransformationMatrix&, const Color&) OVERRIDE;
-
-#if !USE(TEXMAP_OPENGL_ES_2)
-    virtual void drawTextureRectangleARB(uint32_t texture, Flags, const IntSize& textureSize, const FloatRect& targetRect, const TransformationMatrix& modelViewMatrix, float opacity, const BitmapTexture* maskTexture);
-#endif
 
     virtual void bindSurface(BitmapTexture* surface) OVERRIDE;
     virtual void beginClip(const TransformationMatrix&, const FloatRect&) OVERRIDE;
     virtual void beginPainting(PaintFlags = 0) OVERRIDE;
     virtual void endPainting() OVERRIDE;
     virtual void endClip() OVERRIDE;
+    virtual IntRect clipBounds() OVERRIDE;
     virtual IntSize maxTextureSize() const OVERRIDE { return IntSize(2000, 2000); }
     virtual PassRefPtr<BitmapTexture> createTexture() OVERRIDE;
-    virtual GraphicsContext* graphicsContext() OVERRIDE { return m_context; }
     inline GraphicsContext3D* graphicsContext3D() const { return m_context3D.get(); }
-    virtual void setGraphicsContext(GraphicsContext* context) OVERRIDE { m_context = context; }
 
 #if ENABLE(CSS_FILTERS)
-    void drawFiltered(const BitmapTexture& sourceTexture, const BitmapTexture& contentTexture, const FilterOperation&, int pass);
+    void drawFiltered(const BitmapTexture& sourceTexture, const BitmapTexture* contentTexture, const FilterOperation&, int pass);
 #endif
 #if ENABLE(CSS_SHADERS)
     bool drawUsingCustomFilter(BitmapTexture& targetTexture, const BitmapTexture& sourceTexture, const FilterOperation&);
@@ -94,39 +92,53 @@ private:
 
     class ClipStack {
     public:
+        ClipStack()
+            : clipStateDirty(false)
+        { }
+
+        // Y-axis should be inverted only when painting into the window.
+        enum YAxisMode {
+            DefaultYAxis,
+            InvertedYAxis
+        };
+
         void push();
         void pop();
         void apply(GraphicsContext3D*);
+        void applyIfNeeded(GraphicsContext3D*);
         inline ClipState& current() { return clipState; }
-        void init(const IntRect&);
+        void reset(const IntRect&, YAxisMode);
+        void intersect(const IntRect&);
+        void setStencilIndex(int);
+        inline int getStencilIndex() const
+        {
+            return clipState.stencilIndex;
+        }
+        inline bool isCurrentScissorBoxEmpty() const
+        {
+            return clipState.scissorBox.isEmpty();
+        }
 
     private:
         ClipState clipState;
         Vector<ClipState> clipStack;
-    };
-
-    struct DrawQuad {
-        DrawQuad(const FloatRect& originalTargetRect, const FloatQuad& targetRectMappedToUnitSquare = FloatRect(FloatPoint(), FloatSize(1, 1)))
-            : originalTargetRect(originalTargetRect)
-            , targetRectMappedToUnitSquare(targetRectMappedToUnitSquare)
-        {
-        }
-
-        FloatRect originalTargetRect;
-        FloatQuad targetRectMappedToUnitSquare;
+        bool clipStateDirty;
+        IntSize size;
+        YAxisMode yAxisMode;
     };
 
     TextureMapperGL();
 
-    bool drawTextureWithAntialiasing(uint32_t texture, Flags, const FloatRect& originalTargetRect, const TransformationMatrix& modelViewMatrix, float opacity, const BitmapTexture* maskTexture, unsigned exposedEdges);
-    void drawTexturedQuadWithProgram(TextureMapperShaderProgram*, uint32_t texture, Flags, const DrawQuad&, const TransformationMatrix& modelViewMatrix, float opacity, const BitmapTexture* maskTexture);
-    void drawQuad(const DrawQuad&, const TransformationMatrix& modelViewMatrix, TextureMapperShaderProgram*, GC3Denum drawingMode, bool needsBlending);
+    void drawTexturedQuadWithProgram(TextureMapperShaderProgram*, uint32_t texture, Flags, const IntSize&, const FloatRect&, const TransformationMatrix& modelViewMatrix, float opacity);
+    void draw(const FloatRect&, const TransformationMatrix& modelViewMatrix, TextureMapperShaderProgram*, GC3Denum drawingMode, Flags);
+
+    void drawUnitRect(TextureMapperShaderProgram*, GC3Denum drawingMode);
+    void drawEdgeTriangles(TextureMapperShaderProgram*);
 
     bool beginScissorClip(const TransformationMatrix&, const FloatRect&);
     void bindDefaultSurface();
     ClipStack& clipStack();
     inline TextureMapperGLData& data() { return *m_data; }
-    GraphicsContext* m_context;
     RefPtr<GraphicsContext3D> m_context3D;
     TextureMapperGLData* m_data;
     ClipStack m_clipStack;
@@ -158,7 +170,19 @@ public:
     virtual bool isBackedByOpenGL() const { return true; }
 
 #if ENABLE(CSS_FILTERS)
-    virtual PassRefPtr<BitmapTexture> applyFilters(TextureMapper*, const BitmapTexture& contentTexture, const FilterOperations&);
+    virtual PassRefPtr<BitmapTexture> applyFilters(TextureMapper*, const FilterOperations&) OVERRIDE;
+    struct FilterInfo {
+        RefPtr<FilterOperation> filter;
+        unsigned pass;
+        RefPtr<BitmapTexture> contentTexture;
+
+        FilterInfo(PassRefPtr<FilterOperation> f = 0, unsigned p = 0, PassRefPtr<BitmapTexture> t = 0)
+            : filter(f)
+            , pass(p)
+            , contentTexture(t)
+            { }
+    };
+    const FilterInfo* filterInfo() const { return &m_filterInfo; }
 #endif
 
 private:
@@ -179,6 +203,10 @@ private:
 
     void clearIfNeeded();
     void createFboIfNeeded();
+
+#if ENABLE(CSS_FILTERS)
+    FilterInfo m_filterInfo;
+#endif
 
     friend class TextureMapperGL;
 };

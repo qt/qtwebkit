@@ -42,7 +42,7 @@ public:
     int value() const { return m_value; }
     String customCssText() const;
 
-    void reportDescendantMemoryUsage(MemoryObjectInfo*) const;
+    bool equals(const FontFeatureValue&) const;
 
 private:
     FontFeatureValue(const String&, int);

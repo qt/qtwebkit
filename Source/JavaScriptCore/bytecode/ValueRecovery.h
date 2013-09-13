@@ -27,7 +27,7 @@
 #define ValueRecovery_h
 
 #include "DataFormat.h"
-#include "JSValue.h"
+#include "JSCJSValue.h"
 #include "MacroAssembler.h"
 #include "VirtualRegister.h"
 #include <stdio.h>
@@ -331,7 +331,7 @@ public:
             out.printf("arguments");
             break;
         case Constant:
-            out.printf("[%s]", constant().description());
+            out.print("[", constant(), "]");
             break;
         case DontKnow:
             out.printf("!");

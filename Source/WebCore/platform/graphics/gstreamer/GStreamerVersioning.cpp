@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2012 Igalia, S.L.
+ * Copyright (C) 2013 Collabora Ltd.
  *
  *  This library is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU Library General Public
@@ -21,8 +22,18 @@
 
 #include "GStreamerVersioning.h"
 
+#if USE(GSTREAMER)
 #include "IntSize.h"
-#include <wtf/UnusedParam.h>
+
+#ifdef GST_API_VERSION_1
+#include <gst/audio/audio.h>
+#else
+#include <gst/audio/multichannel.h>
+#endif
+
+#ifdef GST_API_VERSION_1
+const char* webkitGstMapInfoQuarkString = "webkit-gst-map-info";
+#endif
 
 void webkitGstObjectRefSink(GstObject* gstObject)
 {
@@ -63,11 +74,24 @@ GRefPtr<GstCaps> webkitGstGetPadCaps(GstPad* pad)
 #endif
 }
 
+GRefPtr<GstBus> webkitGstPipelineGetBus(GstPipeline* pipeline)
+{
+#ifdef GST_API_VERSION_1
+    return adoptGRef(gst_pipeline_get_bus(pipeline));
+#else
+    // gst_pipeline_get_bus returns a floating reference in
+    // gstreamer 0.10 so we should not adopt.
+    return gst_pipeline_get_bus(pipeline);
+#endif
+}
+
+#if ENABLE(VIDEO)
 bool getVideoSizeAndFormatFromCaps(GstCaps* caps, WebCore::IntSize& size, GstVideoFormat& format, int& pixelAspectRatioNumerator, int& pixelAspectRatioDenominator, int& stride)
 {
 #ifdef GST_API_VERSION_1
     GstVideoInfo info;
-    if (!gst_video_info_from_caps(&info, caps))
+
+    if (!gst_caps_is_fixed(caps) || !gst_video_info_from_caps(&info, caps))
         return false;
 
     format = GST_VIDEO_INFO_FORMAT(&info);
@@ -90,6 +114,7 @@ bool getVideoSizeAndFormatFromCaps(GstCaps* caps, WebCore::IntSize& size, GstVid
 
     return true;
 }
+#endif
 
 GstBuffer* createGstBuffer(GstBuffer* buffer)
 {
@@ -110,6 +135,75 @@ GstBuffer* createGstBuffer(GstBuffer* buffer)
 #endif
     return newBuffer;
 }
+
+GstBuffer* createGstBufferForData(const char* data, int length)
+{
+    GstBuffer* buffer = gst_buffer_new_and_alloc(length);
+
+#ifdef GST_API_VERSION_1
+    gst_buffer_fill(buffer, 0, data, length);
+#else
+    memcpy(GST_BUFFER_DATA(buffer), data, length);
+#endif
+
+    return buffer;
+}
+
+int getGstBufferSize(GstBuffer* buffer)
+{
+#ifdef GST_API_VERSION_1
+    return gst_buffer_get_size(buffer);
+#else
+    return GST_BUFFER_SIZE(buffer);
+#endif
+}
+
+void setGstBufferSize(GstBuffer* buffer, int newSize)
+{
+#ifdef GST_API_VERSION_1
+    gst_buffer_set_size(buffer, static_cast<gssize>(newSize));
+#else
+    GST_BUFFER_SIZE(buffer) = static_cast<gsize>(newSize);
+#endif
+}
+
+char* getGstBufferDataPointer(GstBuffer* buffer)
+{
+#ifdef GST_API_VERSION_1
+    GstMiniObject* miniObject = reinterpret_cast<GstMiniObject*>(buffer);
+    GstMapInfo* mapInfo = static_cast<GstMapInfo*>(gst_mini_object_get_qdata(miniObject, g_quark_from_static_string(webkitGstMapInfoQuarkString)));
+    return reinterpret_cast<char*>(mapInfo->data);
+#else
+    return reinterpret_cast<char*>(GST_BUFFER_DATA(buffer));
+#endif
+}
+
+#ifdef GST_API_VERSION_1
+void mapGstBuffer(GstBuffer* buffer)
+{
+    GstMapInfo* mapInfo = g_slice_new(GstMapInfo);
+    if (!gst_buffer_map(buffer, mapInfo, GST_MAP_WRITE)) {
+        g_slice_free(GstMapInfo, mapInfo);
+        gst_buffer_unref(buffer);
+        return;
+    }
+
+    GstMiniObject* miniObject = reinterpret_cast<GstMiniObject*>(buffer);
+    gst_mini_object_set_qdata(miniObject, g_quark_from_static_string(webkitGstMapInfoQuarkString), mapInfo, 0);
+}
+
+void unmapGstBuffer(GstBuffer* buffer)
+{
+    GstMiniObject* miniObject = reinterpret_cast<GstMiniObject*>(buffer);
+    GstMapInfo* mapInfo = static_cast<GstMapInfo*>(gst_mini_object_steal_qdata(miniObject, g_quark_from_static_string(webkitGstMapInfoQuarkString)));
+
+    if (!mapInfo)
+        return;
+
+    gst_buffer_unmap(buffer, mapInfo);
+    g_slice_free(GstMapInfo, mapInfo);
+}
+#endif
 
 void setGstElementClassMetadata(GstElementClass* elementClass, const char* name, const char* longName, const char* description, const char* author)
 {
@@ -138,3 +232,22 @@ void notifyGstTagsOnPad(GstElement* element, GstPad* pad, GstTagList* tags)
     gst_element_found_tags_for_pad(element, pad, tags);
 #endif
 }
+
+#if ENABLE(WEB_AUDIO)
+GstCaps* getGstAudioCaps(int channels, float sampleRate)
+{
+#ifdef GST_API_VERSION_1
+    return gst_caps_new_simple("audio/x-raw", "rate", G_TYPE_INT, static_cast<int>(sampleRate),
+        "channels", G_TYPE_INT, channels,
+        "format", G_TYPE_STRING, gst_audio_format_to_string(GST_AUDIO_FORMAT_F32),
+        "layout", G_TYPE_STRING, "interleaved", NULL);
+#else
+    return gst_caps_new_simple("audio/x-raw-float", "rate", G_TYPE_INT, static_cast<int>(sampleRate),
+        "channels", G_TYPE_INT, channels,
+        "endianness", G_TYPE_INT, G_BYTE_ORDER,
+        "width", G_TYPE_INT, 32, NULL);
+#endif
+}
+#endif
+
+#endif // USE(GSTREAMER)

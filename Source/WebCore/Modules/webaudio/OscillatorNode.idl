@@ -26,7 +26,7 @@
 [
     Conditional=WEB_AUDIO,
     JSGenerateToJSObject
-] interface OscillatorNode : AudioSourceNode {
+] interface OscillatorNode : AudioNode {
 
     // Type constants.
     const unsigned short SINE = 0;
@@ -35,8 +35,7 @@
     const unsigned short TRIANGLE = 3;
     const unsigned short CUSTOM = 4;
 
-    attribute unsigned short type
-        setter raises(DOMException);        
+    [CustomSetter] attribute DOMString type;
 
     // Playback state constants.
     const unsigned short UNSCHEDULED_STATE = 0;
@@ -49,14 +48,13 @@
     readonly attribute AudioParam frequency; // in Hertz
     readonly attribute AudioParam detune; // in Cents
 
-    void start(in double when);
-    void stop(in double when);
+    [RaisesException] void start(double when);
+    [RaisesException] void stop(double when);
 
-#if defined(ENABLE_LEGACY_WEB_AUDIO) && ENABLE_LEGACY_WEB_AUDIO
-    void noteOn(in double when);
-    void noteOff(in double when);
-#endif
+    [Conditional=LEGACY_WEB_AUDIO, RaisesException] void noteOn(double when);
+    [Conditional=LEGACY_WEB_AUDIO, RaisesException] void noteOff(double when);
 
-    void setWaveTable(in WaveTable waveTable);
+    void setPeriodicWave(PeriodicWave wave);
 
+    attribute EventListener onended;
 };

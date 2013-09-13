@@ -35,14 +35,6 @@
 #include "IntSize.h"
 #include "LayoutUnit.h"
 
-#if PLATFORM(QT)
-#include <qglobal.h>
-QT_BEGIN_NAMESPACE
-class QSize;
-class QSizeF;
-QT_END_NAMESPACE
-#endif
-
 namespace WebCore {
 
 class LayoutPoint;
@@ -70,6 +62,12 @@ public:
     {
         m_width += width;
         m_height += height;
+    }
+    
+    void shrink(LayoutUnit width, LayoutUnit height)
+    {
+        m_width -= width;
+        m_height -= height;
     }
     
     void scale(float scale)
@@ -114,11 +112,7 @@ public:
         return LayoutSize(m_height, m_width);
     }
 
-#if PLATFORM(QT)
-    explicit LayoutSize(const QSize&);
-    explicit LayoutSize(const QSizeF&);
-    operator QSizeF() const;
-#endif
+    operator FloatSize() const { return FloatSize(m_width, m_height); }
 
 private:
     LayoutUnit m_width, m_height;

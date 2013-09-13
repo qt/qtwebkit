@@ -94,7 +94,7 @@ QImage ImageBufferData::toQImage() const
     return image;
 }
 
-ImageBuffer::ImageBuffer(const IntSize& size, float /* resolutionScale */, ColorSpace, RenderingMode, DeferralMode, bool& success)
+ImageBuffer::ImageBuffer(const IntSize& size, float /* resolutionScale */, ColorSpace, RenderingMode, bool& success)
     : m_data(size)
     , m_size(size)
     , m_logicalSize(size)
@@ -125,15 +125,20 @@ PassRefPtr<Image> ImageBuffer::copyImage(BackingStoreCopy copyBehavior, ScaleBeh
     return StillImage::createForRendering(&m_data.m_pixmap);
 }
 
+BackingStoreCopy ImageBuffer::fastCopyImageMode()
+{
+    return DontCopyBackingStore;
+}
+
 void ImageBuffer::draw(GraphicsContext* destContext, ColorSpace styleColorSpace, const FloatRect& destRect, const FloatRect& srcRect,
-                       CompositeOperator op, bool useLowQualityScale)
+    CompositeOperator op, BlendMode blendMode, bool useLowQualityScale)
 {
     if (destContext == context()) {
         // We're drawing into our own buffer.  In order for this to work, we need to copy the source buffer first.
         RefPtr<Image> copy = copyImage(CopyBackingStore);
-        destContext->drawImage(copy.get(), ColorSpaceDeviceRGB, destRect, srcRect, op, DoNotRespectImageOrientation, useLowQualityScale);
+        destContext->drawImage(copy.get(), ColorSpaceDeviceRGB, destRect, srcRect, op, blendMode, DoNotRespectImageOrientation, useLowQualityScale);
     } else
-        destContext->drawImage(m_data.m_image.get(), styleColorSpace, destRect, srcRect, op, DoNotRespectImageOrientation, useLowQualityScale);
+        destContext->drawImage(m_data.m_image.get(), styleColorSpace, destRect, srcRect, op, blendMode, DoNotRespectImageOrientation, useLowQualityScale);
 }
 
 void ImageBuffer::drawPattern(GraphicsContext* destContext, const FloatRect& srcRect, const AffineTransform& patternTransform,

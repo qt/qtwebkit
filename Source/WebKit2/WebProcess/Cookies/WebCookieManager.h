@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,35 +27,37 @@
 #define WebCookieManager_h
 
 #include "HTTPCookieAcceptPolicy.h"
+#include "MessageReceiver.h"
+#include "NetworkProcessSupplement.h"
+#include "WebProcessSupplement.h"
+#include <stdint.h>
+#include <wtf/Forward.h>
 #include <wtf/Noncopyable.h>
-#include <wtf/text/WTFString.h>
 
 #if USE(SOUP)
 #include "SoupCookiePersistentStorageType.h"
 #endif
 
-namespace CoreIPC {
-    class Connection;
-    class MessageDecoder;
-    class MessageID;
-}
-
 namespace WebKit {
 
-class WebCookieManager {
+class ChildProcess;
+
+class WebCookieManager : public WebProcessSupplement, public NetworkProcessSupplement, public CoreIPC::MessageReceiver {
     WTF_MAKE_NONCOPYABLE(WebCookieManager);
 public:
-    static WebCookieManager& shared();
+    WebCookieManager(ChildProcess*);
 
-    void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::MessageDecoder&);
-    
-    void dispatchCookiesDidChange();
+    static const char* supplementName();
 
     void setHTTPCookieAcceptPolicy(HTTPCookieAcceptPolicy);
+#if USE(SOUP)
+    void setCookiePersistentStorage(const String& storagePath, uint32_t storageType);
+#endif
 
 private:
-    WebCookieManager();
-    
+    // CoreIPC::MessageReceiver
+    virtual void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&) OVERRIDE;
+
     void getHostnamesWithCookies(uint64_t callbackID);
     void deleteCookiesForHostname(const String&);
     void deleteAllCookies();
@@ -67,11 +69,11 @@ private:
     void startObservingCookieChanges();
     void stopObservingCookieChanges();
 
-#if USE(SOUP)
-    void setCookiePersistentStorage(const String& storagePath, uint32_t storageType);
-#endif
+    static void cookiesDidChange();
+    void dispatchCookiesDidChange();
 
-    void didReceiveWebCookieManagerMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::MessageDecoder&);
+
+    ChildProcess* m_process;
 };
 
 } // namespace WebKit

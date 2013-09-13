@@ -28,8 +28,8 @@
 
 #if ENABLE(DFG_JIT)
 
-#include <assembler/MacroAssembler.h>
-#include <dfg/DFGRegisterBank.h>
+#include "DFGRegisterBank.h"
+#include "MacroAssembler.h"
 
 namespace JSC { namespace DFG {
 
@@ -147,15 +147,15 @@ public:
     static const char* debugName(FPRReg reg)
     {
         ASSERT(reg != InvalidFPRReg);
-        ASSERT(reg < 32);
+        ASSERT(static_cast<int>(reg) < 32);
         static const char* nameForRegister[32] = {
             "d0", "d1", "d2", "d3",
             "d4", "d5", "d6", "d7",
             "d8", "d9", "d10", "d11",
-            "d12", "d13", "d14", "d15"
-            "d16", "d17", "d18", "d19"
-            "d20", "d21", "d22", "d23"
-            "d24", "d25", "d26", "d27"
+            "d12", "d13", "d14", "d15",
+            "d16", "d17", "d18", "d19",
+            "d20", "d21", "d22", "d23",
+            "d24", "d25", "d26", "d27",
             "d28", "d29", "d30", "d31"
         };
         return nameForRegister[reg];
@@ -227,6 +227,69 @@ public:
     }
 private:
 
+    static const unsigned InvalidIndex = 0xffffffff;
+};
+
+#endif
+
+#if CPU(SH4)
+
+class FPRInfo {
+public:
+    typedef FPRReg RegisterType;
+    static const unsigned numberOfRegisters = 6;
+
+    // Temporary registers.
+    static const FPRReg fpRegT0 = SH4Registers::dr0;
+    static const FPRReg fpRegT1 = SH4Registers::dr2;
+    static const FPRReg fpRegT2 = SH4Registers::dr4;
+    static const FPRReg fpRegT3 = SH4Registers::dr6;
+    static const FPRReg fpRegT4 = SH4Registers::dr8;
+    static const FPRReg fpRegT5 = SH4Registers::dr10;
+
+    static const FPRReg returnValueFPR = SH4Registers::dr0;
+
+    static const FPRReg argumentFPR0 = SH4Registers::dr4;
+    static const FPRReg argumentFPR1 = SH4Registers::dr6;
+
+    static FPRReg toRegister(unsigned index)
+    {
+        static const FPRReg registerForIndex[numberOfRegisters] = {
+            fpRegT0, fpRegT1, fpRegT2, fpRegT3, fpRegT4, fpRegT5 };
+
+        ASSERT(index < numberOfRegisters);
+        return registerForIndex[index];
+    }
+
+    static unsigned toIndex(FPRReg reg)
+    {
+        ASSERT(reg != InvalidFPRReg);
+        ASSERT(reg < 16);
+        static const unsigned indexForRegister[16] = {
+            0, InvalidIndex, 1, InvalidIndex,
+            2, InvalidIndex, 3, InvalidIndex,
+            4, InvalidIndex, 5, InvalidIndex,
+            InvalidIndex, InvalidIndex, InvalidIndex, InvalidIndex
+        };
+        unsigned result = indexForRegister[reg];
+        ASSERT(result != InvalidIndex);
+        return result;
+    }
+
+    static const char* debugName(FPRReg reg)
+    {
+        ASSERT(reg != InvalidFPRReg);
+        ASSERT(reg < 16);
+        static const char* nameForRegister[16] = {
+            "dr0", "fr1", "dr2", "fr3",
+            "dr4", "fr5", "dr6", "fr7",
+            "dr8", "fr9", "dr10", "fr11",
+            "dr12", "fr13", "dr14", "fr15"
+        };
+        return nameForRegister[reg];
+    }
+
+private:
     static const unsigned InvalidIndex = 0xffffffff;
 };
 

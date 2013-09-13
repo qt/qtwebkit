@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2012, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,7 +29,8 @@
 #ifndef SpeculatedType_h
 #define SpeculatedType_h
 
-#include "JSValue.h"
+#include "JSCJSValue.h"
+#include <wtf/PrintStream.h>
 
 namespace JSC {
 
@@ -49,11 +50,10 @@ static const SpeculatedType SpecUint16Array       = 0x00000200; // It's definite
 static const SpeculatedType SpecUint32Array       = 0x00000400; // It's definitely an Uint32Array or one of its subclasses.
 static const SpeculatedType SpecFloat32Array      = 0x00000800; // It's definitely an Uint16Array or one of its subclasses.
 static const SpeculatedType SpecFloat64Array      = 0x00001000; // It's definitely an Uint16Array or one of its subclasses.
-static const SpeculatedType SpecMyArguments       = 0x00002000; // It's definitely an Arguments object, and it's definitely the one for my current frame.
-static const SpeculatedType SpecForeignArguments  = 0x00004000; // It's definitely an Arguments object, and it's definitely not mine.
-static const SpeculatedType SpecArguments         = 0x00006000; // It's definitely an Arguments object.
+static const SpeculatedType SpecArguments         = 0x00002000; // It's definitely an Arguments object.
+static const SpeculatedType SpecStringObject      = 0x00004000; // It's definitely a StringObject.
 static const SpeculatedType SpecObjectOther       = 0x00008000; // It's definitely an object but not JSFinalObject, JSArray, or JSFunction.
-static const SpeculatedType SpecObjectMask        = 0x0000ffff; // Bitmask used for testing for any kind of object prediction.
+static const SpeculatedType SpecObject            = 0x0000ffff; // Bitmask used for testing for any kind of object prediction.
 static const SpeculatedType SpecString            = 0x00010000; // It's definitely a JSString.
 static const SpeculatedType SpecCellOther         = 0x00020000; // It's definitely a JSCell but not a subclass of JSObject and definitely not a JSString.
 static const SpeculatedType SpecCell              = 0x0003ffff; // It's definitely a JSCell.
@@ -83,19 +83,14 @@ inline bool isCellSpeculation(SpeculatedType value)
     return !!(value & SpecCell) && !(value & ~SpecCell);
 }
 
-inline bool isNonStringCellSpeculation(SpeculatedType value)
-{
-    return !!(value & (SpecCell & ~SpecString)) && !(value & ~(SpecCell & ~SpecString));
-}
-
-inline bool isNonStringCellOrOtherSpeculation(SpeculatedType value)
-{
-    return !!(value & ((SpecCell & ~SpecString) | SpecOther)) && !(value & ~((SpecCell & ~SpecString) | SpecOther));
-}
-
 inline bool isObjectSpeculation(SpeculatedType value)
 {
-    return !!(value & SpecObjectMask) && !(value & ~SpecObjectMask);
+    return !!(value & SpecObject) && !(value & ~SpecObject);
+}
+
+inline bool isObjectOrOtherSpeculation(SpeculatedType value)
+{
+    return !!(value & (SpecObject | SpecOther)) && !(value & ~(SpecObject | SpecOther));
 }
 
 inline bool isFinalObjectSpeculation(SpeculatedType value)
@@ -219,9 +214,14 @@ inline bool isArrayOrOtherSpeculation(SpeculatedType value)
     return !!(value & (SpecArray | SpecOther)) && !(value & ~(SpecArray | SpecOther));
 }
 
-inline bool isMyArgumentsSpeculation(SpeculatedType value)
+inline bool isStringObjectSpeculation(SpeculatedType value)
 {
-    return value == SpecMyArguments;
+    return value == SpecStringObject;
+}
+
+inline bool isStringOrStringObjectSpeculation(SpeculatedType value)
+{
+    return !!value && !(value & ~(SpecString | SpecStringObject));
 }
 
 inline bool isInt32Speculation(SpeculatedType value)

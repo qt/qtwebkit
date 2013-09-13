@@ -144,7 +144,6 @@ bool WebFrameLoaderClient::shouldUseCredentialStorage(DocumentLoader* loader, un
 
 void WebFrameLoaderClient::dispatchDidReceiveAuthenticationChallenge(DocumentLoader* loader, unsigned long identifier, const AuthenticationChallenge& challenge)
 {
-#if USE(CFNETWORK)
     ASSERT(challenge.authenticationClient());
 
     WebView* webView = m_webFrame->webView();
@@ -158,9 +157,6 @@ void WebFrameLoaderClient::dispatchDidReceiveAuthenticationChallenge(DocumentLoa
     // If the ResourceLoadDelegate doesn't exist or fails to handle the call, we tell the ResourceHandle
     // to continue without credential - this is the best approximation of Mac behavior
     challenge.authenticationClient()->receivedRequestToContinueWithoutCredential(challenge);
-#else
-   notImplemented();
-#endif
 }
 
 void WebFrameLoaderClient::dispatchDidCancelAuthenticationChallenge(DocumentLoader* loader, unsigned long identifier, const AuthenticationChallenge& challenge)
@@ -419,14 +415,15 @@ void WebFrameLoaderClient::dispatchDidFinishLoad()
 void WebFrameLoaderClient::dispatchDidLayout(LayoutMilestones milestones)
 {
     WebView* webView = m_webFrame->webView();
-    COMPtr<IWebFrameLoadDelegatePrivate> frameLoadDelegatePrivate;
 
     if (milestones & DidFirstLayout) {
+        COMPtr<IWebFrameLoadDelegatePrivate> frameLoadDelegatePrivate;
         if (SUCCEEDED(webView->frameLoadDelegatePrivate(&frameLoadDelegatePrivate)) && frameLoadDelegatePrivate)
             frameLoadDelegatePrivate->didFirstLayoutInFrame(webView, m_webFrame);
     }
 
     if (milestones & DidFirstVisuallyNonEmptyLayout) {
+        COMPtr<IWebFrameLoadDelegatePrivate> frameLoadDelegatePrivate;
         if (SUCCEEDED(webView->frameLoadDelegatePrivate(&frameLoadDelegatePrivate)) && frameLoadDelegatePrivate)
             frameLoadDelegatePrivate->didFirstVisuallyNonEmptyLayoutInFrame(webView, m_webFrame);
     }
@@ -783,7 +780,7 @@ void WebFrameLoaderClient::dispatchDidFailToStartPlugin(const PluginView* plugin
     if (FAILED(webView->resourceLoadDelegate(&resourceLoadDelegate)))
         return;
 
-    RetainPtr<CFMutableDictionaryRef> userInfo(AdoptCF, CFDictionaryCreateMutable(0, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks));
+    RetainPtr<CFMutableDictionaryRef> userInfo = adoptCF(CFDictionaryCreateMutable(0, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks));
 
     Frame* frame = core(m_webFrame);
     ASSERT(frame == pluginView->parentFrame());
@@ -882,7 +879,7 @@ void WebFrameLoaderClient::redirectDataToPlugin(Widget* pluginWidget)
 {
     // Ideally, this function shouldn't be necessary, see <rdar://problem/4852889>
     if (!pluginWidget || pluginWidget->isPluginView())
-        m_manualLoader = static_cast<PluginView*>(pluginWidget);
+        m_manualLoader = toPluginView(pluginWidget);
     else 
         m_manualLoader = static_cast<EmbeddedWidget*>(pluginWidget);
 }
@@ -895,7 +892,7 @@ WebHistory* WebFrameLoaderClient::webHistory() const
     return WebHistory::sharedHistory();
 }
 
-bool WebFrameLoaderClient::shouldUsePluginDocument(const String& mimeType) const
+bool WebFrameLoaderClient::shouldAlwaysUsePluginDocument(const String& mimeType) const
 {
     WebView* webView = m_webFrame->webView();
     if (!webView)

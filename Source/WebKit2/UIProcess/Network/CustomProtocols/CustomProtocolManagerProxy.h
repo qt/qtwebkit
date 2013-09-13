@@ -28,7 +28,7 @@
 
 #if ENABLE(CUSTOM_PROTOCOLS)
 
-#include "MessageID.h"
+#include "MessageReceiver.h"
 
 #if PLATFORM(MAC)
 #include <wtf/HashMap.h>
@@ -36,34 +36,29 @@
 OBJC_CLASS WKCustomProtocolLoader;
 #endif
 
-namespace CoreIPC {
-class Connection;
-class MessageDecoder;
-} // namespace CoreIPC
-
 namespace WebCore {
 class ResourceRequest;
 } // namespace WebCore
 
 namespace WebKit {
 
-class WebProcessProxy;
+class ChildProcessProxy;
 
-class CustomProtocolManagerProxy {
+class CustomProtocolManagerProxy : public CoreIPC::MessageReceiver {
 public:
-    explicit CustomProtocolManagerProxy(WebProcessProxy*);
+    explicit CustomProtocolManagerProxy(ChildProcessProxy*);
 
-    void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::MessageDecoder&);
     void startLoading(uint64_t customProtocolID, const WebCore::ResourceRequest&);
     void stopLoading(uint64_t customProtocolID);
 
 private:
-    void didReceiveCustomProtocolManagerProxyMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::MessageDecoder&);
+    // CoreIPC::MessageReceiver
+    virtual void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&) OVERRIDE;
 
-    WebProcessProxy* m_webProcessProxy;
+    ChildProcessProxy* m_childProcessProxy;
 
 #if PLATFORM(MAC)
-    typedef HashMap<uint64_t, RetainPtr<WKCustomProtocolLoader> > LoaderMap;
+    typedef HashMap<uint64_t, RetainPtr<WKCustomProtocolLoader>> LoaderMap;
     LoaderMap m_loaderMap;
 #endif
 };

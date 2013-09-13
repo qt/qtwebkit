@@ -63,10 +63,6 @@ RenderObject* HTMLButtonElement::createRenderer(RenderArena* arena, RenderStyle*
     return new (arena) RenderButton(this);
 }
 
-void HTMLButtonElement::willAddAuthorShadowRoot()
-{
-}
-
 const AtomicString& HTMLButtonElement::formControlType() const
 {
     switch (m_type) {
@@ -115,7 +111,7 @@ void HTMLButtonElement::parseAttribute(const QualifiedName& name, const AtomicSt
 
 void HTMLButtonElement::defaultEventHandler(Event* event)
 {
-    if (event->type() == eventNames().DOMActivateEvent && !disabled()) {
+    if (event->type() == eventNames().DOMActivateEvent && !isDisabledFormControl()) {
         if (form() && m_type == SUBMIT) {
             m_isActivatedSubmit = true;
             form()->prepareForSubmission(event);
@@ -159,7 +155,7 @@ void HTMLButtonElement::defaultEventHandler(Event* event)
 
 bool HTMLButtonElement::willRespondToMouseClickEvents()
 {
-    if (!disabled() && form() && (m_type == SUBMIT || m_type == RESET))
+    if (!isDisabledFormControl() && form() && (m_type == SUBMIT || m_type == RESET))
         return true;
     return HTMLFormControlElement::willRespondToMouseClickEvents();
 }
@@ -168,7 +164,7 @@ bool HTMLButtonElement::isSuccessfulSubmitButton() const
 {
     // HTML spec says that buttons must have names to be considered successful.
     // However, other browsers do not impose this constraint.
-    return m_type == SUBMIT && !disabled();
+    return m_type == SUBMIT && !isDisabledFormControl();
 }
 
 bool HTMLButtonElement::isActivatedSubmit() const

@@ -22,7 +22,7 @@
 #include "APICast.h"
 #include "AccessibilityController.h"
 #include "BackForwardController.h"
-#include "BackForwardListImpl.h"
+#include "BackForwardListBlackBerry.h"
 #include "Credential.h"
 #include "DatabaseTracker.h"
 #include "DocumentLoader.h"
@@ -37,9 +37,13 @@
 #include "FrameLoaderTypes.h"
 #include "FrameTree.h"
 #include "FrameView.h"
+#include "HTTPParsers.h"
 #include "HistoryItem.h"
+#include "HitTestResult.h"
 #include "IntSize.h"
 #include "JSDOMBinding.h"
+#include "MouseEvent.h"
+#include "Node.h"
 #include "NotImplemented.h"
 #include "Page.h"
 #include "PageGroup.h"
@@ -138,16 +142,36 @@ static bool shouldLogFrameLoadDelegates(const String& url)
     return url.contains("loading/");
 }
 
+static bool shouldDumpAsText(const String& url)
+{
+    return url.contains("dumpAsText/");
+}
+
 namespace BlackBerry {
 namespace WebKit {
 
 DumpRenderTree* DumpRenderTree::s_currentInstance = 0;
-bool DumpRenderTree::s_selectTrailingWhitespaceEnabled = false;
 
 static void createFile(const String& fileName)
 {
     FILE* fd = fopen(fileName.utf8().data(), "wb");
-    fclose(fd);
+    if (fd)
+        fclose(fd);
+}
+
+static bool isFullUrl(const String& url)
+{
+    static Vector<String> *prefixes = 0;
+    if (!prefixes)  {
+        prefixes = new Vector<String>();
+        prefixes->append("http://");
+        prefixes->append("file://");
+    }
+    for (unsigned i = 0; i < prefixes->size(); ++i) {
+        if (url.startsWith(prefixes->at(i), false))
+            return true;
+    }
+    return false;
 }
 
 DumpRenderTree::DumpRenderTree(BlackBerry::WebKit::WebPage* page)
@@ -158,6 +182,8 @@ DumpRenderTree::DumpRenderTree(BlackBerry::WebKit::WebPage* page)
     , m_waitToDumpWatchdogTimer(this, &DumpRenderTree::waitToDumpWatchdogTimerFired)
     , m_workTimer(this, &DumpRenderTree::processWork)
     , m_acceptsEditing(true)
+    , m_policyDelegateEnabled(false)
+    , m_policyDelegateIsPermissive(false)
 {
     const char* workerNumber = getenv("WORKER_NUMBER") ? getenv("WORKER_NUMBER") : "0";
     String sdcardPath = SDCARD_PATH;
@@ -193,9 +219,14 @@ void DumpRenderTree::runTest(const String& url, const String& imageHash)
         freopen(stderrFile.utf8().data(), "wb", stderr);
     }
     FILE* current = fopen(m_currentTestFile.utf8().data(), "w");
-    fwrite(m_currentTest->utf8().data(), 1, m_currentTest->utf8().length(), current);
-    fclose(current);
-    m_page->load(url, BlackBerry::Platform::String::emptyString(), false);
+    if (current) {
+        fwrite(m_currentTest->utf8().data(), 1, m_currentTest->utf8().length(), current);
+        fclose(current);
+    }
+    BlackBerry::Platform::NetworkRequest request;
+    STATIC_LOCAL_STRING(s_get, "GET");
+    request.setRequestUrl(url, s_get);
+    m_page->load(request);
 }
 
 void DumpRenderTree::doneDrt()
@@ -221,7 +252,9 @@ void DumpRenderTree::runCurrentTest()
         m_currentHttpTest = m_currentTest->utf8().data();
         m_currentHttpTest.remove(0, strlen(httpTestSyntax));
         runTest(httpPrefixURL + m_currentHttpTest, imageHash);
-    } else
+    } else if (isFullUrl(*m_currentTest))
+        runTest(*m_currentTest, imageHash);
+    else
         runTest(kSDCLayoutTestsURI + *m_currentTest, imageHash);
 }
 
@@ -255,19 +288,26 @@ void DumpRenderTree::resetToConsistentStateBeforeTesting(const String& url, cons
 {
     gTestRunner = TestRunner::create(url.utf8().data(), imageHash.utf8().data());
 
+    if (shouldDumpAsText(url)) {
+        gTestRunner->setDumpAsText(true);
+        gTestRunner->setGeneratePixelResults(false);
+    }
     gTestRunner->setIconDatabaseEnabled(false);
 
     DumpRenderTreeSupport::resetGeolocationMock(m_page);
 
     topLoadingFrame = 0;
     m_loadFinished = false;
-    s_selectTrailingWhitespaceEnabled = false;
-
+    m_policyDelegateEnabled = false;
+    m_policyDelegateIsPermissive = false;
+    waitForPolicy = false;
     testDone = false;
     WorkQueue::shared()->clear();
     WorkQueue::shared()->setFrozen(false);
 
     WebSettings* settings = m_page->settings();
+    // Apply new settings to current page, see more in the destructor of WebSettingsTransaction.
+    WebSettingsTransaction webSettingTransaction(settings);
 
     settings->setTextReflowMode(WebSettings::TextReflowDisabled);
     settings->setJavaScriptEnabled(true);
@@ -277,21 +317,24 @@ void DumpRenderTree::resetToConsistentStateBeforeTesting(const String& url, cons
     settings->setDefaultFontSize(16);
     settings->setDefaultFixedFontSize(13);
     settings->setMinimumFontSize(1);
-    settings->setSerifFontFamily("Times");
-    settings->setFixedFontFamily("Courier New");
-    settings->setSansSerifFontFamily("Arial");
-    settings->setStandardFontFamily("Times");
+    STATIC_LOCAL_STRING(s_arial, "Arial");
+    STATIC_LOCAL_STRING(s_courier, "Courier New");
+    STATIC_LOCAL_STRING(s_times, "Times");
+    settings->setSerifFontFamily(s_times);
+    settings->setFixedFontFamily(s_courier);
+    settings->setSansSerifFontFamily(s_arial);
+    settings->setStandardFontFamily(s_times);
     settings->setXSSAuditorEnabled(false);
-    settings->setFrameFlatteningEnabled(false);
     settings->setMaximumPagesInCache(0);
     settings->setPluginsEnabled(true);
-    // Apply new settings to current page, see more in the destructor of WebSettingsTransaction.
-    WebSettingsTransaction webSettingTransaction(settings);
 
     BlackBerry::WebKit::DumpRenderTree::currentInstance()->page()->clearBackForwardList(false);
 
     setAcceptsEditing(true);
     DumpRenderTreeSupport::setLinksIncludedInFocusChain(true);
+#if ENABLE(STYLE_SCOPED)
+    DumpRenderTreeSupport::setStyleScopedEnabled(true);
+#endif
 
     m_page->setVirtualViewportSize(Platform::IntSize(800, 600));
     m_page->resetVirtualViewportOnCommitted(false);
@@ -313,7 +356,7 @@ void DumpRenderTree::resetToConsistentStateBeforeTesting(const String& url, cons
         page->settings()->setUsePreHTML5ParserQuirks(false);
         // FIXME: Other ports also clear history/backForwardList allong with visited links.
         page->group().removeVisitedLinks();
-        if (mainFrame = page->mainFrame()) {
+        if ((mainFrame = page->mainFrame())) {
             mainFrame->tree()->clearName();
             mainFrame->loader()->setOpener(0);
             // [WebKit bug #86899] Reset JS state settings.
@@ -431,7 +474,7 @@ static String dumpHistoryItem(PassRefPtr<WebCore::HistoryItem> item, int indent,
         start = 6;
     }
     for (int i = start; i < indent; i++)
-        result = result + " ";
+        result = result + ' ';
 
     String url = item->urlString();
     if (url.contains("file://")) {
@@ -453,7 +496,7 @@ static String dumpHistoryItem(PassRefPtr<WebCore::HistoryItem> item, int indent,
 
     if (item->isTargetItem())
         result = result + "  **nav target**";
-    result = result + "\n";
+    result = result + '\n';
 
     WebCore::HistoryItemVector children = item->children();
     // Must sort to eliminate arbitrary result ordering which defeats reproducible testing.
@@ -471,7 +514,8 @@ static String dumpBackForwardListForWebView()
     // FORMAT:
     // "        (file test):fast/loader/resources/click-fragment-link.html  **nav target**"
     // "curr->  (file test):fast/loader/resources/click-fragment-link.html#testfragment  **nav target**"
-    WebCore::BackForwardListImpl* bfList = static_cast<WebCore::BackForwardListImpl*>(mainFrame->page()->backForward()->client());
+    WebCore::BackForwardListBlackBerry* bfList = static_cast<WebCore::BackForwardListBlackBerry*>(mainFrame->page()->backForward()->client());
+
     int maxItems = bfList->capacity();
     WebCore::HistoryItemVector entries;
     bfList->backListWithLimit(maxItems, entries);
@@ -514,9 +558,6 @@ void DumpRenderTree::dump()
     dumpToFile(result);
 
     if (!runFromCommandLine) {
-        // signal end of text block
-        fputs("#EOF\n", stdout);
-
         // There are two scenarios for dumping pixels:
         // 1. When the test case explicitly asks for it by calling dumpAsText(true) with that extra true passed as a parameter value, from JavaScript
         bool explicitPixelResults = gTestRunner->dumpAsText() && gTestRunner->generatePixelResults();
@@ -525,8 +566,11 @@ void DumpRenderTree::dump()
 
         // But only if m_enablePixelTests is set, to say that the user wants to run pixel tests at all.
         bool generatePixelResults = m_enablePixelTests && (explicitPixelResults || implicitPixelResults);
-        if (generatePixelResults)
+        if (generatePixelResults) {
+            // signal end of text block
+            fputs("#EOF\n", stdout);
             dumpWebViewAsPixelsAndCompareWithExpected(gTestRunner->expectedPixelHash());
+        }
 
         String crashFile = dumpFile + ".crash";
         unlink(crashFile.utf8().data());
@@ -575,6 +619,16 @@ void DumpRenderTree::locationChangeForFrame(WebCore::Frame* frame)
 }
 
 // FrameLoadClient delegates.
+bool DumpRenderTree::willSendRequestForFrame(WebCore::Frame* frame, WebCore::ResourceRequest& request, const WebCore::ResourceResponse& redirectResponse)
+{
+    if (!testDone && (gTestRunner->willSendRequestReturnsNull() || (gTestRunner->willSendRequestReturnsNullOnRedirect() && !redirectResponse.isNull()))) {
+        request = WebCore::ResourceRequest();
+        return false;
+    }
+
+    return true;
+}
+
 void DumpRenderTree::didStartProvisionalLoadForFrame(WebCore::Frame* frame)
 {
     if (!testDone && gTestRunner->dumpFrameLoadCallbacks())
@@ -621,9 +675,10 @@ void DumpRenderTree::didFinishLoadForFrame(WebCore::Frame* frame)
     if (!testDone && gTestRunner->dumpFrameLoadCallbacks())
         printf("%s - didFinishLoadForFrame\n", drtFrameDescription(frame).utf8().data());
 
-    if (frame == topLoadingFrame)
+    if (frame == topLoadingFrame) {
         m_loadFinished = true;
-    locationChangeForFrame(frame);
+        locationChangeForFrame(frame);
+    }
 }
 
 void DumpRenderTree::didFinishDocumentLoadForFrame(WebCore::Frame* frame)
@@ -669,7 +724,7 @@ void DumpRenderTree::didReceiveTitleForFrame(const String& title, WebCore::Frame
 }
 
 // ChromeClient delegates.
-void DumpRenderTree::addMessageToConsole(const String& message, unsigned lineNumber, const String& sourceID)
+void DumpRenderTree::addMessageToConsole(const String& message, unsigned lineNumber, const String&)
 {
     printf("CONSOLE MESSAGE: ");
     if (lineNumber)
@@ -822,9 +877,9 @@ bool DumpRenderTree::shouldInsertText(const String& text, WebCore::Range* range,
     return m_acceptsEditing;
 }
 
-void DumpRenderTree::didDecidePolicyForNavigationAction(const WebCore::NavigationAction& action, const WebCore::ResourceRequest& request)
+void DumpRenderTree::didDecidePolicyForNavigationAction(const WebCore::NavigationAction& action, const WebCore::ResourceRequest& request, WebCore::Frame* frame)
 {
-    if (!waitForPolicy)
+    if (testDone || !m_policyDelegateEnabled)
         return;
 
     const char* typeDescription;
@@ -851,10 +906,34 @@ void DumpRenderTree::didDecidePolicyForNavigationAction(const WebCore::Navigatio
         typeDescription = "illegal value";
     }
 
-    printf("Policy delegate: attempt to load %s with navigation type '%s'\n", request.url().string().utf8().data(), typeDescription);
-    // FIXME: do originating part.
+    bool shouldWaitForResponse = !request.url().string().startsWith("mailto:");
+    printf("Policy delegate: attempt to load %s with navigation type '%s'", request.url().string().utf8().data(), typeDescription);
+    // Originating part, borrowed from Chromium.
+    RefPtr<WebCore::Node> node;
+    for (const WebCore::Event* event = action.event(); event; event = event->underlyingEvent()) {
+        if (event->isMouseEvent()) {
+            const WebCore::MouseEvent* mouseEvent = static_cast<const WebCore::MouseEvent*>(event);
+            node = frame->eventHandler()->hitTestResultAtPoint(mouseEvent->absoluteLocation(), false).innerNonSharedNode();
+            break;
+        }
+    }
+    if (node.get())
+        printf(" originating from %s\n", drtDumpPath(node.get()).utf8().data());
+    else
+        printf("\n");
 
-    gTestRunner->notifyDone();
+    if (waitForPolicy && !shouldWaitForResponse)
+        gTestRunner->notifyDone();
+}
+
+void DumpRenderTree::didDecidePolicyForResponse(const WebCore::ResourceResponse& response)
+{
+    if (!testDone && m_policyDelegateEnabled) {
+        if (WebCore::contentDispositionType(response.httpHeaderField("Content-Disposition")) == WebCore::ContentDispositionAttachment)
+            printf("Policy delegate: resource is an attachment, suggested file name '%s'\n", response.suggestedFilename().utf8().data());
+        if (waitForPolicy)
+            gTestRunner->notifyDone();
+    }
 }
 
 void DumpRenderTree::didDispatchWillPerformClientRedirect()
@@ -869,7 +948,7 @@ void DumpRenderTree::didHandleOnloadEventsForFrame(WebCore::Frame* frame)
         printf("%s - didHandleOnloadEventsForFrame\n", drtFrameDescription(frame).utf8().data());
 }
 
-void DumpRenderTree::didReceiveResponseForFrame(WebCore::Frame* frame, const WebCore::ResourceResponse& response)
+void DumpRenderTree::didReceiveResponseForFrame(WebCore::Frame*, const WebCore::ResourceResponse& response)
 {
     if (!testDone && gTestRunner->dumpResourceResponseMIMETypes())
         printf("%s has MIME type %s\n", response.url().lastPathComponent().utf8().data(), response.mimeType().utf8().data());
@@ -889,6 +968,11 @@ bool DumpRenderTree::didReceiveAuthenticationChallenge(WebCore::Credential& cred
     return true;
 }
 
+void DumpRenderTree::setCustomPolicyDelegate(bool setDelegate, bool permissive)
+{
+    m_policyDelegateEnabled = setDelegate;
+    m_policyDelegateIsPermissive = permissive;
+}
 }
 }
 

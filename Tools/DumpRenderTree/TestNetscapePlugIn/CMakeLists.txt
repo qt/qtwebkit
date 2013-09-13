@@ -1,6 +1,6 @@
-SET(WEBKIT_TESTNETSCAPEPLUGIN_DIR "${TOOLS_DIR}/DumpRenderTree/TestNetscapePlugIn")
+set(WEBKIT_TESTNETSCAPEPLUGIN_DIR "${TOOLS_DIR}/DumpRenderTree/TestNetscapePlugIn")
 
-SET(WebKitTestNetscapePlugin_SOURCES
+set(WebKitTestNetscapePlugin_SOURCES
     ${WEBKIT_TESTNETSCAPEPLUGIN_DIR}/PluginObject.cpp
     ${WEBKIT_TESTNETSCAPEPLUGIN_DIR}/PluginTest.cpp
     ${WEBKIT_TESTNETSCAPEPLUGIN_DIR}/TestObject.cpp
@@ -13,6 +13,7 @@ SET(WebKitTestNetscapePlugin_SOURCES
     ${WEBKIT_TESTNETSCAPEPLUGIN_DIR}/Tests/GetURLWithJavaScriptURL.cpp
     ${WEBKIT_TESTNETSCAPEPLUGIN_DIR}/Tests/GetURLWithJavaScriptURLDestroyingPlugin.cpp
     ${WEBKIT_TESTNETSCAPEPLUGIN_DIR}/Tests/GetUserAgentWithNullNPPFromNPPNew.cpp
+    ${WEBKIT_TESTNETSCAPEPLUGIN_DIR}/Tests/LogNPPSetWindow.cpp
     ${WEBKIT_TESTNETSCAPEPLUGIN_DIR}/Tests/NPDeallocateCalledBeforeNPShutdown.cpp
     ${WEBKIT_TESTNETSCAPEPLUGIN_DIR}/Tests/NPPNewFails.cpp
     ${WEBKIT_TESTNETSCAPEPLUGIN_DIR}/Tests/NPPSetWindowCalledDuringDestruction.cpp
@@ -24,15 +25,21 @@ SET(WebKitTestNetscapePlugin_SOURCES
     ${WEBKIT_TESTNETSCAPEPLUGIN_DIR}/Tests/PluginScriptableNPObjectInvokeDefault.cpp
     ${WEBKIT_TESTNETSCAPEPLUGIN_DIR}/Tests/PluginScriptableObjectOverridesAllProperties.cpp
     ${WEBKIT_TESTNETSCAPEPLUGIN_DIR}/Tests/PrivateBrowsing.cpp
+    ${WEBKIT_TESTNETSCAPEPLUGIN_DIR}/Tests/ToStringAndValueOfObject.cpp
     ${WEBKIT_TESTNETSCAPEPLUGIN_DIR}/Tests/x11/CallInvalidateRectWithNullNPPArgument.cpp
 )
 
-SET(WebKitTestNetscapePlugin_INCLUDE_DIRECTORIES
+set(WebKitTestNetscapePlugin_INCLUDE_DIRECTORIES
     ${WEBKIT_TESTNETSCAPEPLUGIN_DIR}
     ${WEBKIT_TESTNETSCAPEPLUGIN_DIR}/unix/ForwardingHeaders
     ${WEBCORE_DIR}
 )
 
-INCLUDE_DIRECTORIES(${WebKitTestNetscapePlugin_INCLUDE_DIRECTORIES})
+include_directories(${WebKitTestNetscapePlugin_INCLUDE_DIRECTORIES})
 
-ADD_LIBRARY(TestNetscapePlugin SHARED ${WebKitTestNetscapePlugin_SOURCES})
+set(WebKitTestNetscapePlugin_LIBRARIES
+    ${X11_LIBRARIES}
+)
+
+add_library(TestNetscapePlugin SHARED ${WebKitTestNetscapePlugin_SOURCES})
+target_link_libraries(TestNetscapePlugin ${WebKitTestNetscapePlugin_LIBRARIES})

@@ -37,6 +37,7 @@
 #include "EventListener.h"
 #include "JSNode.h"
 #include "Frame.h"
+#include "ScriptController.h"
 #include <runtime/Executable.h>
 #include <runtime/JSFunction.h>
 #include <runtime/JSLock.h>
@@ -98,12 +99,37 @@ String eventListenerHandlerBody(Document* document, EventListener* eventListener
     ASSERT(jsListener);
     if (!jsListener)
         return "";
-    JSLockHolder lock(jsListener->isolatedWorld()->globalData());
+    JSLockHolder lock(jsListener->isolatedWorld()->vm());
     JSC::JSObject* jsFunction = jsListener->jsFunction(document);
     if (!jsFunction)
         return "";
     ScriptState* scriptState = scriptStateFromNode(jsListener->isolatedWorld(), document);
     return jsFunction->toString(scriptState)->value(scriptState);
+}
+
+ScriptValue eventListenerHandler(Document* document, EventListener* eventListener)
+{
+    const JSEventListener* jsListener = JSEventListener::cast(eventListener);
+    ASSERT(jsListener);
+    if (!jsListener)
+        return ScriptValue();
+    JSLockHolder lock(jsListener->isolatedWorld()->vm());
+    JSC::JSObject* jsFunction = jsListener->jsFunction(document);
+    if (!jsFunction)
+        return ScriptValue();
+    return ScriptValue(*jsListener->isolatedWorld()->vm(), jsFunction);
+}
+
+ScriptState* eventListenerHandlerScriptState(Frame* frame, EventListener* eventListener)
+{
+    const JSEventListener* jsListener = JSEventListener::cast(eventListener);
+    ASSERT(jsListener);
+    if (!jsListener)
+        return 0;
+    if (!frame->script()->canExecuteScripts(NotAboutToExecuteScript))
+        return 0;
+    DOMWrapperWorld* world = jsListener->isolatedWorld();
+    return frame->script()->globalObject(world)->globalExec();
 }
 
 bool eventListenerHandlerLocation(Document* document, EventListener* eventListener, String& sourceName, String& scriptId, int& lineNumber)
@@ -112,7 +138,7 @@ bool eventListenerHandlerLocation(Document* document, EventListener* eventListen
     ASSERT(jsListener);
     if (!jsListener)
         return false;
-    JSLockHolder lock(jsListener->isolatedWorld()->globalData());
+    JSLockHolder lock(jsListener->isolatedWorld()->vm());
     JSC::JSObject* jsObject = jsListener->jsFunction(document);
     if (!jsObject)
         return false;

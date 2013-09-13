@@ -27,65 +27,23 @@
 #include "config.h"
 #include "ElementShadow.h"
 
-#include "CSSParser.h"
-#include "CSSSelectorList.h"
 #include "ContainerNodeAlgorithms.h"
-#include "Document.h"
-#include "Element.h"
-#include "HTMLContentElement.h"
-#include "HTMLShadowElement.h"
 #include "InspectorInstrumentation.h"
-#include "ShadowRoot.h"
-#include "StyleResolver.h"
-#include "Text.h"
 
 namespace WebCore {
 
-ElementShadow::ElementShadow()
-    : m_shouldCollectSelectFeatureSet(false)
+ShadowRoot* ElementShadow::addShadowRoot(Element* shadowHost, ShadowRoot::ShadowRootType type)
 {
-}
+    ASSERT(!m_shadowRoot);
+    m_shadowRoot = ShadowRoot::create(shadowHost->document(), type);
 
-ElementShadow::~ElementShadow()
-{
-    ASSERT(m_shadowRoots.isEmpty());
-}
+    m_shadowRoot->setParentOrShadowHostNode(shadowHost);
+    m_shadowRoot->setParentTreeScope(shadowHost->treeScope());
+    m_distributor.didShadowBoundaryChange(shadowHost);
+    ChildNodeInsertionNotifier(shadowHost).notify(m_shadowRoot.get());
 
-static bool validateShadowRoot(Document* document, ShadowRoot* shadowRoot, ExceptionCode& ec)
-{
-    if (!shadowRoot)
-        return true;
-
-    if (shadowRoot->host()) {
-        ec = HIERARCHY_REQUEST_ERR;
-        return false;
-    }
-
-    if (shadowRoot->document() != document) {
-        ec = WRONG_DOCUMENT_ERR;
-        return false;
-    }
-
-    return true;
-}
-
-void ElementShadow::addShadowRoot(Element* shadowHost, PassRefPtr<ShadowRoot> shadowRoot, ShadowRoot::ShadowRootType type, ExceptionCode& ec)
-{
-    ASSERT(shadowHost);
-    ASSERT(shadowRoot);
-
-    if (!validateShadowRoot(shadowHost->document(), shadowRoot.get(), ec))
-        return;
-
-    if (type == ShadowRoot::AuthorShadowRoot)
-        shadowHost->willAddAuthorShadowRoot();
-
-    shadowRoot->setHost(shadowHost);
-    shadowRoot->setParentTreeScope(shadowHost->treeScope());
-    m_shadowRoots.push(shadowRoot.get());
-    setValidityUndetermined();
-    invalidateDistribution(shadowHost);
-    ChildNodeInsertionNotifier(shadowHost).notify(shadowRoot.get());
+    // Existence of shadow roots requires the host and its children to do traversal using ComposedShadowTreeWalker.
+    shadowHost->setNeedsShadowTreeWalker();
 
     // FIXME(94905): ShadowHost should be reattached during recalcStyle.
     // Set some flag here and recreate shadow hosts' renderer in
@@ -93,187 +51,80 @@ void ElementShadow::addShadowRoot(Element* shadowHost, PassRefPtr<ShadowRoot> sh
     if (shadowHost->attached())
         shadowHost->lazyReattach();
 
-    InspectorInstrumentation::didPushShadowRoot(shadowHost, shadowRoot.get());
+    InspectorInstrumentation::didPushShadowRoot(shadowHost, m_shadowRoot.get());
+
+    return m_shadowRoot.get();
 }
 
-void ElementShadow::removeAllShadowRoots()
+void ElementShadow::removeShadowRoot()
 {
     // Dont protect this ref count.
     Element* shadowHost = host();
 
-    while (RefPtr<ShadowRoot> oldRoot = m_shadowRoots.head()) {
+    if (RefPtr<ShadowRoot> oldRoot = m_shadowRoot) {
         InspectorInstrumentation::willPopShadowRoot(shadowHost, oldRoot.get());
         shadowHost->document()->removeFocusedNodeOfSubtree(oldRoot.get());
 
         if (oldRoot->attached())
             oldRoot->detach();
 
-        m_shadowRoots.removeHead();
-        oldRoot->setHost(0);
-        oldRoot->setPrev(0);
-        oldRoot->setNext(0);
-        shadowHost->document()->adoptIfNeeded(oldRoot.get());
+        m_shadowRoot = 0;
+        oldRoot->setParentOrShadowHostNode(0);
+        oldRoot->setParentTreeScope(shadowHost->document());
         ChildNodeRemovalNotifier(shadowHost).notify(oldRoot.get());
     }
 
-    invalidateDistribution(shadowHost);
+    m_distributor.invalidateDistribution(shadowHost);
 }
 
-void ElementShadow::attach()
+void ElementShadow::attach(const Node::AttachContext& context)
 {
-    ensureDistribution();
-    for (ShadowRoot* root = youngestShadowRoot(); root; root = root->olderShadowRoot()) {
+    ContentDistributor::ensureDistribution(shadowRoot());
+
+    Node::AttachContext childrenContext(context);
+    childrenContext.resolvedStyle = 0;
+
+    if (ShadowRoot* root = shadowRoot()) {
         if (!root->attached())
-            root->attach();
+            root->attach(childrenContext);
     }
 }
 
-void ElementShadow::detach()
+void ElementShadow::detach(const Node::AttachContext& context)
 {
-    for (ShadowRoot* root = youngestShadowRoot(); root; root = root->olderShadowRoot()) {
+    Node::AttachContext childrenContext(context);
+    childrenContext.resolvedStyle = 0;
+
+    if (ShadowRoot* root = shadowRoot()) {
         if (root->attached())
-            root->detach();
+            root->detach(childrenContext);
     }
 }
 
-bool ElementShadow::childNeedsStyleRecalc()
+bool ElementShadow::childNeedsStyleRecalc() const
 {
-    ASSERT(youngestShadowRoot());
-    for (ShadowRoot* root = youngestShadowRoot(); root; root = root->olderShadowRoot())
-        if (root->childNeedsStyleRecalc())
-            return true;
-
-    return false;
+    ASSERT(shadowRoot());
+    return shadowRoot()->childNeedsStyleRecalc();
 }
 
-bool ElementShadow::needsStyleRecalc()
+bool ElementShadow::needsStyleRecalc() const
 {
-    ASSERT(youngestShadowRoot());
-    for (ShadowRoot* root = youngestShadowRoot(); root; root = root->olderShadowRoot())
-        if (root->needsStyleRecalc())
-            return true;
-
-    return false;
+    ASSERT(shadowRoot());
+    return shadowRoot()->needsStyleRecalc();
 }
 
 void ElementShadow::recalcStyle(Node::StyleChange change)
 {
-    for (ShadowRoot* root = youngestShadowRoot(); root; root = root->olderShadowRoot()) {
-        StyleResolver* styleResolver = root->document()->styleResolver();
-        styleResolver->pushParentShadowRoot(root);
+    if (ShadowRoot* root = shadowRoot())
+        root->recalcStyle(change);
+}
 
-        for (Node* n = root->firstChild(); n; n = n->nextSibling()) {
-            if (n->isElementNode())
-                static_cast<Element*>(n)->recalcStyle(change);
-            else if (n->isTextNode())
-                toText(n)->recalcTextStyle(change);
-        }
-
-        styleResolver->popParentShadowRoot(root);
-        root->clearNeedsStyleRecalc();
-        root->clearChildNeedsStyleRecalc();
+void ElementShadow::removeAllEventListeners()
+{
+    if (ShadowRoot* root = shadowRoot()) {
+        for (Node* node = root; node; node = NodeTraversal::next(node))
+            node->removeAllEventListeners();
     }
-}
-
-void ElementShadow::ensureDistribution()
-{
-    if (!m_distributor.needsDistribution())
-        return;
-    m_distributor.distribute(host());
-}
-
-void ElementShadow::setValidityUndetermined()
-{
-    m_distributor.setValidity(ContentDistributor::Undetermined);
-}
-
-void ElementShadow::invalidateDistribution()
-{
-    invalidateDistribution(host());
-}
-
-void ElementShadow::invalidateDistribution(Element* host)
-{
-    bool needsInvalidation = m_distributor.needsInvalidation();
-    bool needsReattach = needsInvalidation ? m_distributor.invalidate(host) : false;
-
-    if (needsReattach && host->attached()) {
-        for (Node* n = host->firstChild(); n; n = n->nextSibling())
-            n->lazyReattach();
-        host->setNeedsStyleRecalc();
-    }
-
-    if (needsInvalidation)
-        m_distributor.finishInivalidation();
-}
-
-void ElementShadow::setShouldCollectSelectFeatureSet()
-{
-    if (shouldCollectSelectFeatureSet())
-        return;
-
-    m_shouldCollectSelectFeatureSet = true;
-
-    if (ShadowRoot* parentShadowRoot = host()->shadowRoot()) {
-        if (ElementShadow* parentElementShadow = parentShadowRoot->owner())
-            parentElementShadow->setShouldCollectSelectFeatureSet();
-    }
-}
-
-void ElementShadow::ensureSelectFeatureSetCollected()
-{
-    if (!m_shouldCollectSelectFeatureSet)
-        return;
-
-    m_selectFeatures.clear();
-    for (ShadowRoot* root = oldestShadowRoot(); root; root = root->youngerShadowRoot())
-        collectSelectFeatureSetFrom(root);
-    m_shouldCollectSelectFeatureSet = false;
-}
-
-void ElementShadow::collectSelectFeatureSetFrom(ShadowRoot* root)
-{
-    if (root->hasElementShadow()) {
-        for (Node* node = root->firstChild(); node; node = node->traverseNextNode()) {
-            if (ElementShadow* elementShadow = node->isElementNode() ? toElement(node)->shadow() : 0) {
-                elementShadow->ensureSelectFeatureSetCollected();
-                m_selectFeatures.add(elementShadow->m_selectFeatures);
-            }
-        }
-    }
-
-    if (root->hasContentElement()) {
-        for (Node* node = root->firstChild(); node; node = node->traverseNextNode()) {
-            if (isHTMLContentElement(node)) {
-                const CSSSelectorList& list = toHTMLContentElement(node)->selectorList();
-                for (CSSSelector* selector = list.first(); selector; selector = list.next(selector))
-                    m_selectFeatures.collectFeaturesFromSelector(selector);                    
-            }
-        }
-    }
-}
-
-void ElementShadow::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::DOM);
-    info.addMember(m_shadowRoots);
-    ShadowRoot* shadowRoot = m_shadowRoots.head();
-    while (shadowRoot) {
-        info.addMember(shadowRoot);
-        shadowRoot = shadowRoot->next();
-    }
-    info.addMember(m_distributor);
-}
-
-void invalidateParentDistributionIfNecessary(Element* element, SelectRuleFeatureSet::SelectRuleFeatureMask updatedFeatures)
-{
-    ElementShadow* elementShadow = shadowOfParentForDistribution(element);
-    if (!elementShadow)
-        return;
-
-    elementShadow->ensureSelectFeatureSetCollected();
-    if (elementShadow->selectRuleFeatureSet().hasSelectorFor(updatedFeatures))
-        elementShadow->invalidateDistribution();
 }
 
 } // namespace

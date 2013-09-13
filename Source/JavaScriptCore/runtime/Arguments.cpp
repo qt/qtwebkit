@@ -28,6 +28,7 @@
 #include "JSActivation.h"
 #include "JSFunction.h"
 #include "JSGlobalObject.h"
+#include "Operations.h"
 
 using namespace std;
 
@@ -126,7 +127,7 @@ bool Arguments::getOwnPropertySlot(JSCell* cell, ExecState* exec, PropertyName p
     Arguments* thisObject = jsCast<Arguments*>(cell);
     unsigned i = propertyName.asIndex();
     if (JSValue value = thisObject->tryGetArgument(i)) {
-        ASSERT(i < PropertyName::NotAnIndex);
+        RELEASE_ASSERT(i < PropertyName::NotAnIndex);
         slot.setValue(value);
         return true;
     }
@@ -155,7 +156,7 @@ bool Arguments::getOwnPropertyDescriptor(JSObject* object, ExecState* exec, Prop
     Arguments* thisObject = jsCast<Arguments*>(object);
     unsigned i = propertyName.asIndex();
     if (JSValue value = thisObject->tryGetArgument(i)) {
-        ASSERT(i < PropertyName::NotAnIndex);
+        RELEASE_ASSERT(i < PropertyName::NotAnIndex);
         descriptor.setDescriptor(value, None);
         return true;
     }
@@ -197,7 +198,7 @@ void Arguments::getOwnPropertyNames(JSObject* object, ExecState* exec, PropertyN
 void Arguments::putByIndex(JSCell* cell, ExecState* exec, unsigned i, JSValue value, bool shouldThrow)
 {
     Arguments* thisObject = jsCast<Arguments*>(cell);
-    if (thisObject->trySetArgument(exec->globalData(), i, value))
+    if (thisObject->trySetArgument(exec->vm(), i, value))
         return;
 
     PutPropertySlot slot(shouldThrow);
@@ -208,19 +209,19 @@ void Arguments::put(JSCell* cell, ExecState* exec, PropertyName propertyName, JS
 {
     Arguments* thisObject = jsCast<Arguments*>(cell);
     unsigned i = propertyName.asIndex();
-    if (thisObject->trySetArgument(exec->globalData(), i, value))
+    if (thisObject->trySetArgument(exec->vm(), i, value))
         return;
 
     if (propertyName == exec->propertyNames().length && !thisObject->m_overrodeLength) {
         thisObject->m_overrodeLength = true;
-        thisObject->putDirect(exec->globalData(), propertyName, value, DontEnum);
+        thisObject->putDirect(exec->vm(), propertyName, value, DontEnum);
         return;
     }
 
     if (propertyName == exec->propertyNames().callee && !thisObject->m_overrodeCallee) {
         if (!thisObject->m_isStrictMode) {
             thisObject->m_overrodeCallee = true;
-            thisObject->putDirect(exec->globalData(), propertyName, value, DontEnum);
+            thisObject->putDirect(exec->vm(), propertyName, value, DontEnum);
             return;
         }
         thisObject->createStrictModeCalleeIfNecessary(exec);
@@ -246,13 +247,13 @@ bool Arguments::deletePropertyByIndex(JSCell* cell, ExecState* exec, unsigned i)
 
 bool Arguments::deleteProperty(JSCell* cell, ExecState* exec, PropertyName propertyName) 
 {
-    if (exec->globalData().isInDefineOwnProperty())
+    if (exec->vm().isInDefineOwnProperty())
         return Base::deleteProperty(cell, exec, propertyName);
 
     Arguments* thisObject = jsCast<Arguments*>(cell);
     unsigned i = propertyName.asIndex();
     if (i < thisObject->m_numArguments) {
-        ASSERT(i < PropertyName::NotAnIndex);
+        RELEASE_ASSERT(i < PropertyName::NotAnIndex);
         if (!Base::deleteProperty(cell, exec, propertyName))
             return false;
         if (thisObject->tryDeleteArgument(i))
@@ -283,7 +284,7 @@ bool Arguments::defineOwnProperty(JSObject* object, ExecState* exec, PropertyNam
     Arguments* thisObject = jsCast<Arguments*>(object);
     unsigned i = propertyName.asIndex();
     if (i < thisObject->m_numArguments) {
-        ASSERT(i < PropertyName::NotAnIndex);
+        RELEASE_ASSERT(i < PropertyName::NotAnIndex);
         // If the property is not yet present on the object, and is not yet marked as deleted, then add it now.
         PropertySlot slot;
         if (!thisObject->isDeletedArgument(i) && !JSObject::getOwnPropertySlot(thisObject, exec, propertyName, slot)) {
@@ -305,7 +306,7 @@ bool Arguments::defineOwnProperty(JSObject* object, ExecState* exec, PropertyNam
                 // i. If Desc.[[Value]] is present, then
                 // 1. Call the [[Put]] internal method of map passing P, Desc.[[Value]], and Throw as the arguments.
                 if (descriptor.value())
-                    thisObject->trySetArgument(exec->globalData(), i, descriptor.value());
+                    thisObject->trySetArgument(exec->vm(), i, descriptor.value());
                 // ii. If Desc.[[Writable]] is present and its value is false, then
                 // 1. Call the [[Delete]] internal method of map passing P and false as arguments.
                 if (descriptor.writablePresent() && !descriptor.writable())
@@ -316,10 +317,10 @@ bool Arguments::defineOwnProperty(JSObject* object, ExecState* exec, PropertyNam
     }
 
     if (propertyName == exec->propertyNames().length && !thisObject->m_overrodeLength) {
-        thisObject->putDirect(exec->globalData(), propertyName, jsNumber(thisObject->m_numArguments), DontEnum);
+        thisObject->putDirect(exec->vm(), propertyName, jsNumber(thisObject->m_numArguments), DontEnum);
         thisObject->m_overrodeLength = true;
     } else if (propertyName == exec->propertyNames().callee && !thisObject->m_overrodeCallee) {
-        thisObject->putDirect(exec->globalData(), propertyName, thisObject->m_callee.get(), DontEnum);
+        thisObject->putDirect(exec->vm(), propertyName, thisObject->m_callee.get(), DontEnum);
         thisObject->m_overrodeCallee = true;
     } else if (propertyName == exec->propertyNames().caller && thisObject->m_isStrictMode)
         thisObject->createStrictModeCallerIfNecessary(exec);
@@ -355,24 +356,24 @@ void Arguments::tearOff(CallFrame* callFrame)
 
     if (!callFrame->isInlineCallFrame()) {
         for (size_t i = 0; i < m_numArguments; ++i)
-            trySetArgument(callFrame->globalData(), i, callFrame->argumentAfterCapture(i));
+            trySetArgument(callFrame->vm(), i, callFrame->argumentAfterCapture(i));
         return;
     }
 
     tearOffForInlineCallFrame(
-        callFrame->globalData(), callFrame->registers(), callFrame->inlineCallFrame());
+        callFrame->vm(), callFrame->registers(), callFrame->inlineCallFrame());
 }
 
 void Arguments::didTearOffActivation(ExecState* exec, JSActivation* activation)
 {
-    ASSERT(activation);
+    RELEASE_ASSERT(activation);
     if (isTornOff())
         return;
 
     if (!m_numArguments)
         return;
     
-    m_activation.set(exec->globalData(), this, activation);
+    m_activation.set(exec->vm(), this, activation);
     tearOff(exec);
 }
 
@@ -388,11 +389,11 @@ void Arguments::tearOff(CallFrame* callFrame, InlineCallFrame* inlineCallFrame)
     m_registers = m_registerArray.get() + CallFrame::offsetFor(m_numArguments + 1);
 
     tearOffForInlineCallFrame(
-        callFrame->globalData(), callFrame->registers() + inlineCallFrame->stackOffset,
+        callFrame->vm(), callFrame->registers() + inlineCallFrame->stackOffset,
         inlineCallFrame);
 }
 
-void Arguments::tearOffForInlineCallFrame(JSGlobalData& globalData, Register* registers, InlineCallFrame* inlineCallFrame)
+void Arguments::tearOffForInlineCallFrame(VM& vm, Register* registers, InlineCallFrame* inlineCallFrame)
 {
     for (size_t i = 0; i < m_numArguments; ++i) {
         ValueRecovery& recovery = inlineCallFrame->arguments[i + 1];
@@ -427,10 +428,10 @@ void Arguments::tearOffForInlineCallFrame(JSGlobalData& globalData, Register* re
             value = recovery.constant();
             break;
         default:
-            ASSERT_NOT_REACHED();
+            RELEASE_ASSERT_NOT_REACHED();
             break;
         }
-        trySetArgument(globalData, i, value);
+        trySetArgument(vm, i, value);
     }
 }
 

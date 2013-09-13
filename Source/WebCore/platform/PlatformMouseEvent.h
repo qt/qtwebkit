@@ -43,10 +43,6 @@ typedef struct _Evas_Event_Mouse_Up Evas_Event_Mouse_Up;
 typedef struct _Evas_Event_Mouse_Move Evas_Event_Mouse_Move;
 #endif
 
-#if PLATFORM(WX)
-class wxMouseEvent;
-#endif
-
 namespace WebCore {
     
     // These button numbers match the ones used in the DOM API, 0 through 2, except for NoButton which isn't specified.
@@ -121,12 +117,8 @@ namespace WebCore {
         bool didActivateWebView() const { return m_didActivateWebView; }
 #endif
 
-#if PLATFORM(WX)
-        PlatformMouseEvent(const wxMouseEvent&, const wxPoint& globalPoint, int clickCount);
-#endif
-
 #if PLATFORM(BLACKBERRY)
-        PlatformMouseEvent(const IntPoint& eventPosition, const IntPoint& globalPosition, const PlatformEvent::Type, int clickCount, MouseButton, MouseInputMethod = PointingDevice);
+        PlatformMouseEvent(const IntPoint& eventPosition, const IntPoint& globalPosition, const PlatformEvent::Type, int clickCount, MouseButton, bool shiftKey, bool ctrlKey, bool altKey, MouseInputMethod = PointingDevice);
         MouseInputMethod inputMethod() const { return m_inputMethod; }
 #endif
     protected:

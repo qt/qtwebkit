@@ -23,7 +23,6 @@
 #include "EWK2UnitTestEnvironment.h"
 #include <Ecore.h>
 #include <glib-object.h>
-#include <wtf/UnusedParam.h>
 
 extern EWK2UnitTest::EWK2UnitTestEnvironment* environment;
 
@@ -51,15 +50,26 @@ void EWK2UnitTestBase::SetUp()
 #if defined(WTF_USE_ACCELERATED_COMPOSITING) && defined(HAVE_ECORE_X)
     const char* engine = "opengl_x11";
     m_ecoreEvas = ecore_evas_new(engine, 0, 0, width, height, 0);
-#else
-    m_ecoreEvas = ecore_evas_new(0, 0, 0, width, height, 0);
+    // Graceful fallback to software rendering if evas_gl engine is not available.
+    if (!m_ecoreEvas)
 #endif
+    m_ecoreEvas = ecore_evas_new(0, 0, 0, width, height, 0);
 
     ecore_evas_show(m_ecoreEvas);
     Evas* evas = ecore_evas_get(m_ecoreEvas);
 
     Evas_Smart* smart = evas_smart_class_new(&m_ewkViewClass.sc);
-    m_webView = ewk_view_smart_add(evas, smart, ewk_context_default_get());
+
+    Ewk_Context* newContext = ewk_context_new();
+    Ewk_Page_Group* newPageGroup = ewk_page_group_create("UnitTest");
+    m_webView = ewk_view_smart_add(evas, smart, newContext, newPageGroup);
+
+    // Clear HTTP cache files before running the unit tests, which prevents 
+    // performance degradation due to so many cache files.
+    ewk_context_resource_cache_clear(newContext);
+    ewk_object_unref(newContext);
+    ewk_object_unref(newPageGroup);
+
     ewk_view_theme_set(m_webView, environment->defaultTheme());
 
     evas_object_resize(m_webView, width, height);
@@ -96,7 +106,7 @@ public:
 
     bool isDone() const { return m_done; }
 
-    bool setDone()
+    void setDone()
     {
         if (m_timer) {
             ecore_timer_del(m_timer);
@@ -215,11 +225,29 @@ bool EWK2UnitTestBase::waitUntilURLChangedTo(const char* expectedURL, double tim
     return !data.didTimeOut();
 }
 
+bool EWK2UnitTestBase::waitUntilTrue(bool &flag, double timeoutSeconds)
+{
+    CallbackDataExpectedValue<bool> data(true, timeoutSeconds);
+
+    while (!data.isDone() && !flag)
+        ecore_main_loop_iterate();
+
+    return !data.didTimeOut();
+}
+
 void EWK2UnitTestBase::mouseClick(int x, int y, int button)
 {
     Evas* evas = evas_object_evas_get(m_webView);
     evas_event_feed_mouse_move(evas, x, y, 0, 0);
     evas_event_feed_mouse_down(evas, button, EVAS_BUTTON_NONE, 0, 0);
+    evas_event_feed_mouse_up(evas, button, EVAS_BUTTON_NONE, 0, 0);
+}
+
+void EWK2UnitTestBase::mouseDoubleClick(int x, int y, int button)
+{
+    Evas* evas = evas_object_evas_get(m_webView);
+    evas_event_feed_mouse_move(evas, x, y, 0, 0);
+    evas_event_feed_mouse_down(evas, button, EVAS_BUTTON_DOUBLE_CLICK, 0, 0);
     evas_event_feed_mouse_up(evas, button, EVAS_BUTTON_NONE, 0, 0);
 }
 

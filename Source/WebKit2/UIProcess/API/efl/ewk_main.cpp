@@ -85,7 +85,14 @@ int ewk_init(void)
     }
 #endif
 
+    if (!edje_init()) {
+        CRITICAL("Could not init edje.");
+        goto error_edje;
+    }
+
+#if !GLIB_CHECK_VERSION(2, 35, 0)
     g_type_init();
+#endif
 
     if (!ecore_main_loop_glib_integrate()) {
         WARN("Ecore was not compiled with GLib support, some plugins will not "
@@ -94,8 +101,11 @@ int ewk_init(void)
 
     return ++_ewkInitCount;
 
+error_edje:
 #ifdef HAVE_ECORE_X
+    ecore_x_shutdown();
 error_ecore_x:
+#else
     ecore_imf_shutdown();
 #endif
 error_ecore_imf:
@@ -118,6 +128,7 @@ int ewk_shutdown(void)
     if (--_ewkInitCount)
         return _ewkInitCount;
 
+    edje_shutdown();
 #ifdef HAVE_ECORE_X
     ecore_x_shutdown();
 #endif

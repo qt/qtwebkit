@@ -31,7 +31,7 @@
 #include "AudioDestinationNode.h"
 #include "EventListener.h"
 #include "EventTarget.h"
-#include "HRTFDatabaseLoader.h"
+#include "MediaCanStartListener.h"
 #include <wtf/HashSet.h>
 #include <wtf/MainThread.h>
 #include <wtf/OwnPtr.h>
@@ -51,6 +51,7 @@ class AudioBufferSourceNode;
 class MediaElementAudioSourceNode;
 class MediaStreamAudioDestinationNode;
 class MediaStreamAudioSourceNode;
+class HRTFDatabaseLoader;
 class HTMLMediaElement;
 class ChannelMergerNode;
 class ChannelSplitterNode;
@@ -67,12 +68,12 @@ class AnalyserNode;
 class WaveShaperNode;
 class ScriptProcessorNode;
 class OscillatorNode;
-class WaveTable;
+class PeriodicWave;
 
 // AudioContext is the cornerstone of the web audio API and all AudioNodes are created from it.
 // For thread safety between the audio thread and the main thread, it has a rendering graph locking mechanism. 
 
-class AudioContext : public ActiveDOMObject, public ThreadSafeRefCounted<AudioContext>, public EventTarget {
+class AudioContext : public ActiveDOMObject, public ThreadSafeRefCounted<AudioContext>, public EventTarget, public MediaCanStartListener {
 public:
     // Create an AudioContext for rendering to the audio hardware.
     static PassRefPtr<AudioContext> create(Document*, ExceptionCode&);
@@ -88,6 +89,8 @@ public:
 
     // Returns true when initialize() was called AND all asynchronous initialization has completed.
     bool isRunnable() const;
+
+    HRTFDatabaseLoader* hrtfDatabaseLoader() const { return m_hrtfDatabaseLoader.get(); }
 
     // Document notification
     virtual void stop();
@@ -138,7 +141,7 @@ public:
     PassRefPtr<ChannelMergerNode> createChannelMerger(ExceptionCode&);
     PassRefPtr<ChannelMergerNode> createChannelMerger(size_t numberOfInputs, ExceptionCode&);
     PassRefPtr<OscillatorNode> createOscillator();
-    PassRefPtr<WaveTable> createWaveTable(Float32Array* real, Float32Array* imag, ExceptionCode&);
+    PassRefPtr<PeriodicWave> createPeriodicWave(Float32Array* real, Float32Array* imag, ExceptionCode&);
 
     // When a source node has no more processing to do (has finished playing), then it tells the context to dereference it.
     void notifyNodeFinishedProcessing(AudioNode*);
@@ -248,11 +251,28 @@ public:
     
     static unsigned s_hardwareContextCount;
 
-    virtual void reportMemoryUsage(MemoryObjectInfo*) const OVERRIDE;
 
-private:
+    // Restrictions to change default behaviors.
+    enum BehaviorRestrictionFlags {
+        NoRestrictions = 0,
+        RequireUserGestureForAudioStartRestriction = 1 << 0,
+        RequirePageConsentForAudioStartRestriction = 1 << 1,
+    };
+    typedef unsigned BehaviorRestrictions;
+
+    bool userGestureRequiredForAudioStart() const { return m_restrictions & RequireUserGestureForAudioStartRestriction; }
+    bool pageConsentRequiredForAudioStart() const { return m_restrictions & RequirePageConsentForAudioStartRestriction; }
+
+    void addBehaviorRestriction(BehaviorRestrictions restriction) { m_restrictions |= restriction; }
+    void removeBehaviorRestriction(BehaviorRestrictions restriction) { m_restrictions &= ~restriction; }
+
+protected:
     explicit AudioContext(Document*);
     AudioContext(Document*, unsigned numberOfChannels, size_t numberOfFrames, float sampleRate);
+    
+    static bool isSampleRateRangeGood(float sampleRate);
+    
+private:
     void constructCommon();
 
     void lazyInitialize();
@@ -266,7 +286,9 @@ private:
 
     void scheduleNodeDeletion();
     static void deleteMarkedNodesDispatch(void* userData);
-    
+
+    virtual void mediaCanStart() OVERRIDE;
+
     bool m_isInitialized;
     bool m_isAudioThreadFinished;
 
@@ -346,6 +368,8 @@ private:
 
     // Number of AudioBufferSourceNodes that are active (playing).
     int m_activeSourceCount;
+
+    BehaviorRestrictions m_restrictions;
 };
 
 } // WebCore

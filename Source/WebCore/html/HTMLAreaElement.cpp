@@ -115,7 +115,7 @@ Path HTMLAreaElement::computePath(RenderObject* obj) const
         p.transform(zoomTransform);
     }
 
-    p.translate(absPos - FloatPoint());
+    p.translate(toFloatSize(absPos));
     return p;
 }
     
@@ -184,10 +184,10 @@ Path HTMLAreaElement::getRegion(const LayoutSize& size) const
 HTMLImageElement* HTMLAreaElement::imageElement() const
 {
     Node* mapElement = parentNode();
-    if (!mapElement || !mapElement->hasTagName(mapTag))
+    if (!mapElement || !isHTMLMapElement(mapElement))
         return 0;
     
-    return static_cast<HTMLMapElement*>(mapElement)->imageElement();
+    return toHTMLMapElement(mapElement)->imageElement();
 }
 
 bool HTMLAreaElement::isKeyboardFocusable(KeyboardEvent*) const

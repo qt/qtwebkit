@@ -32,6 +32,7 @@
 #include "CodeBlock.h"
 #include "DFGNode.h"
 #include "JIT.h"
+#include "Operations.h"
 
 namespace JSC { namespace DFG {
 
@@ -44,10 +45,10 @@ void* prepareOSREntry(ExecState* exec, CodeBlock* codeBlock, unsigned bytecodeIn
     ASSERT(!codeBlock->jitCodeMap());
 
 #if ENABLE(JIT_VERBOSE_OSR)
-    dataLogF("OSR in %p(%p) from bc#%u\n", codeBlock, codeBlock->alternative(), bytecodeIndex);
+    dataLog("OSR in ", *codeBlock->alternative(), " -> ", *codeBlock, " from bc#", bytecodeIndex, "\n");
 #endif
     
-    JSGlobalData* globalData = &exec->globalData();
+    VM* vm = &exec->vm();
     OSREntryData* entry = codeBlock->dfgOSREntryDataForBytecodeIndex(bytecodeIndex);
     
     if (!entry) {
@@ -101,9 +102,7 @@ void* prepareOSREntry(ExecState* exec, CodeBlock* codeBlock, unsigned bytecodeIn
         
         if (!entry->m_expectedValues.argument(argument).validate(value)) {
 #if ENABLE(JIT_VERBOSE_OSR)
-            dataLogF("    OSR failed because argument %zu is %s, expected ", argument, value.description());
-            entry->m_expectedValues.argument(argument).dump(WTF::dataFile());
-            dataLogF(".\n");
+            dataLog("    OSR failed because argument ", argument, " is ", value, ", expected ", entry->m_expectedValues.argument(argument), ".\n");
 #endif
             return 0;
         }
@@ -113,7 +112,7 @@ void* prepareOSREntry(ExecState* exec, CodeBlock* codeBlock, unsigned bytecodeIn
         if (entry->m_localsForcedDouble.get(local)) {
             if (!exec->registers()[local].jsValue().isNumber()) {
 #if ENABLE(JIT_VERBOSE_OSR)
-                dataLogF("    OSR failed because variable %zu is %s, expected number.\n", local, exec->registers()[local].jsValue().description());
+                dataLog("    OSR failed because variable ", local, " is ", exec->registers()[local].jsValue(), ", expected number.\n");
 #endif
                 return 0;
             }
@@ -121,9 +120,7 @@ void* prepareOSREntry(ExecState* exec, CodeBlock* codeBlock, unsigned bytecodeIn
         }
         if (!entry->m_expectedValues.local(local).validate(exec->registers()[local].jsValue())) {
 #if ENABLE(JIT_VERBOSE_OSR)
-            dataLogF("    OSR failed because variable %zu is %s, expected ", local, exec->registers()[local].jsValue().description());
-            entry->m_expectedValues.local(local).dump(WTF::dataFile());
-            dataLogF(".\n");
+            dataLog("    OSR failed because variable ", local, " is ", exec->registers()[local].jsValue(), ", expected ", entry->m_expectedValues.local(local), ".\n");
 #endif
             return 0;
         }
@@ -136,7 +133,7 @@ void* prepareOSREntry(ExecState* exec, CodeBlock* codeBlock, unsigned bytecodeIn
     //    it seems silly: you'd be diverting the program to error handling when it
     //    would have otherwise just kept running albeit less quickly.
     
-    if (!globalData->interpreter->stack().grow(&exec->registers()[codeBlock->m_numCalleeRegisters])) {
+    if (!vm->interpreter->stack().grow(&exec->registers()[codeBlock->m_numCalleeRegisters])) {
 #if ENABLE(JIT_VERBOSE_OSR)
         dataLogF("    OSR failed because stack growth failed.\n");
 #endif

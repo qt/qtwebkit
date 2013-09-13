@@ -26,7 +26,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import unittest
+import unittest2 as unittest
 
 from webkitpy.common.system.outputcapture import OutputCapture
 from webkitpy.common.config.ports import DeprecatedPort
@@ -99,10 +99,9 @@ class StepsTest(unittest.TestCase):
         mock_options = self._step_options()
         mock_options.non_interactive = False
         step = steps.RunTests(MockTool(log_executive=True), mock_options)
-        # FIXME: We shouldn't use a real port-object here, but there is too much to mock at the moment.
-        mock_port = DeprecatedPort()
         tool = MockTool(log_executive=True)
-        tool.port = lambda: mock_port
+        # FIXME: We shouldn't use a real port-object here, but there is too much to mock at the moment.
+        tool._deprecated_port = DeprecatedPort()
         step = steps.RunTests(tool, mock_options)
         expected_logs = """Running Python unit tests
 MOCK run_and_throw_if_fail: ['Tools/Scripts/test-webkitpy'], cwd=/mock-checkout
@@ -110,6 +109,8 @@ Running Perl unit tests
 MOCK run_and_throw_if_fail: ['Tools/Scripts/test-webkitperl'], cwd=/mock-checkout
 Running JavaScriptCore tests
 MOCK run_and_throw_if_fail: ['Tools/Scripts/run-javascriptcore-tests'], cwd=/mock-checkout
+Running bindings generation tests
+MOCK run_and_throw_if_fail: ['Tools/Scripts/run-bindings-tests'], cwd=/mock-checkout
 Running run-webkit-tests
 MOCK run_and_throw_if_fail: ['Tools/Scripts/run-webkit-tests', '--quiet'], cwd=/mock-checkout
 """

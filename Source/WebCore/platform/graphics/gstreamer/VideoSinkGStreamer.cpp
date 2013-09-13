@@ -26,9 +26,9 @@
  */
 
 #include "config.h"
-#if USE(GSTREAMER)
 #include "VideoSinkGStreamer.h"
 
+#if ENABLE(VIDEO) && USE(GSTREAMER)
 #include "GRefPtrGStreamer.h"
 #include "GStreamerVersioning.h"
 #include "IntSize.h"
@@ -41,19 +41,29 @@
 #include <wtf/FastAllocBase.h>
 
 // CAIRO_FORMAT_RGB24 used to render the video buffers is little/big endian dependant.
+#ifdef GST_API_VERSION_1
 #if G_BYTE_ORDER == G_LITTLE_ENDIAN
-#ifndef GST_API_VERSION_1
+#define GST_CAPS_FORMAT "{ BGRx, BGRA }"
+#else
+#define GST_CAPS_FORMAT "{ xRGB, ARGB }"
+#endif
+#if GST_CHECK_VERSION(1, 1, 0)
+#define GST_FEATURED_CAPS GST_VIDEO_CAPS_MAKE_WITH_FEATURES(GST_CAPS_FEATURE_META_GST_VIDEO_GL_TEXTURE_UPLOAD_META, GST_CAPS_FORMAT) ";"
+#else
+#define GST_FEATURED_CAPS
+#endif
+#endif // GST_API_VERSION_1
+
+#ifdef GST_API_VERSION_1
+#define WEBKIT_VIDEO_SINK_PAD_CAPS GST_FEATURED_CAPS GST_VIDEO_CAPS_MAKE(GST_CAPS_FORMAT)
+#else
+#if G_BYTE_ORDER == G_LITTLE_ENDIAN
 #define WEBKIT_VIDEO_SINK_PAD_CAPS GST_VIDEO_CAPS_BGRx ";" GST_VIDEO_CAPS_BGRA
 #else
-#define WEBKIT_VIDEO_SINK_PAD_CAPS GST_VIDEO_CAPS_MAKE("{ BGRx, BGRA }")
-#endif
-#else
-#ifndef GST_API_VERSION_1
 #define WEBKIT_VIDEO_SINK_PAD_CAPS GST_VIDEO_CAPS_xRGB ";" GST_VIDEO_CAPS_ARGB
-#else
-#define WEBKIT_VIDEO_SINK_PAD_CAPS GST_VIDEO_CAPS_MAKE("{ xRGB, ARGB }")
 #endif
-#endif
+#endif // GST_API_VERSION_1
+
 static GstStaticPadTemplate s_sinkTemplate = GST_STATIC_PAD_TEMPLATE("sink", GST_PAD_SINK, GST_PAD_ALWAYS, GST_STATIC_CAPS(WEBKIT_VIDEO_SINK_PAD_CAPS));
 
 
@@ -66,7 +76,8 @@ enum {
 };
 
 enum {
-    PROP_0
+    PROP_0,
+    PROP_CAPS
 };
 
 static guint webkitVideoSinkSignals[LAST_SIGNAL] = { 0, };
@@ -81,9 +92,11 @@ struct _WebKitVideoSinkPrivate {
     GstVideoInfo info;
 #endif
 
-#ifndef GST_API_VERSION_1
+#if USE(NATIVE_FULLSCREEN_VIDEO)
     WebCore::GStreamerGWorld* gstGWorld;
 #endif
+
+    GstCaps* currentCaps;
 
     // If this is TRUE all processing should finish ASAP
     // This is necessary because there could be a race between
@@ -154,7 +167,7 @@ static GstFlowReturn webkitVideoSinkRender(GstBaseSink* baseSink, GstBuffer* buf
         return GST_FLOW_OK;
     }
 
-#ifndef GST_API_VERSION_1
+#if USE(NATIVE_FULLSCREEN_VIDEO)
     // Ignore buffers if the video is already in fullscreen using
     // another sink.
     if (priv->gstGWorld->isFullscreen()) {
@@ -286,6 +299,24 @@ static void webkitVideoSinkDispose(GObject* object)
     G_OBJECT_CLASS(parent_class)->dispose(object);
 }
 
+static void webkitVideoSinkGetProperty(GObject* object, guint propertyId, GValue* value, GParamSpec* parameterSpec)
+{
+    WebKitVideoSink* sink = WEBKIT_VIDEO_SINK(object);
+    WebKitVideoSinkPrivate* priv = sink->priv;
+
+    switch (propertyId) {
+    case PROP_CAPS: {
+        GstCaps* caps = priv->currentCaps;
+        if (caps)
+            gst_caps_ref(caps);
+        g_value_take_boxed(value, caps);
+        break;
+    }
+    default:
+        G_OBJECT_WARN_INVALID_PROPERTY_ID(object, propertyId, parameterSpec);
+    }
+}
+
 static void unlockBufferMutex(WebKitVideoSinkPrivate* priv)
 {
     g_mutex_lock(priv->bufferMutex);
@@ -323,7 +354,15 @@ static gboolean webkitVideoSinkUnlockStop(GstBaseSink* baseSink)
 
 static gboolean webkitVideoSinkStop(GstBaseSink* baseSink)
 {
-    unlockBufferMutex(WEBKIT_VIDEO_SINK(baseSink)->priv);
+    WebKitVideoSinkPrivate* priv = WEBKIT_VIDEO_SINK(baseSink)->priv;
+
+    unlockBufferMutex(priv);
+
+    if (priv->currentCaps) {
+        gst_caps_unref(priv->currentCaps);
+        priv->currentCaps = 0;
+    }
+
     return TRUE;
 }
 
@@ -334,6 +373,25 @@ static gboolean webkitVideoSinkStart(GstBaseSink* baseSink)
     g_mutex_lock(priv->bufferMutex);
     priv->unlocked = false;
     g_mutex_unlock(priv->bufferMutex);
+    return TRUE;
+}
+
+static gboolean webkitVideoSinkSetCaps(GstBaseSink* baseSink, GstCaps* caps)
+{
+    WebKitVideoSink* sink = WEBKIT_VIDEO_SINK(baseSink);
+    WebKitVideoSinkPrivate* priv = sink->priv;
+
+    GST_DEBUG_OBJECT(sink, "Current caps %" GST_PTR_FORMAT ", setting caps %" GST_PTR_FORMAT, priv->currentCaps, caps);
+
+#ifdef GST_API_VERSION_1
+    GstVideoInfo info;
+    if (!gst_video_info_from_caps(&info, caps)) {
+        GST_ERROR_OBJECT(sink, "Invalid caps %" GST_PTR_FORMAT, caps);
+        return FALSE;
+    }
+#endif
+
+    gst_caps_replace(&priv->currentCaps, caps);
     return TRUE;
 }
 
@@ -351,6 +409,9 @@ static gboolean webkitVideoSinkProposeAllocation(GstBaseSink* baseSink, GstQuery
 
     gst_query_add_allocation_meta(query, GST_VIDEO_META_API_TYPE, 0);
     gst_query_add_allocation_meta(query, GST_VIDEO_CROP_META_API_TYPE, 0);
+#if GST_CHECK_VERSION(1, 1, 0)
+    gst_query_add_allocation_meta(query, GST_VIDEO_GL_TEXTURE_UPLOAD_META_API_TYPE, 0);
+#endif
     return TRUE;
 }
 #endif
@@ -390,6 +451,7 @@ static void webkit_video_sink_class_init(WebKitVideoSinkClass* klass)
     g_type_class_add_private(klass, sizeof(WebKitVideoSinkPrivate));
 
     gobjectClass->dispose = webkitVideoSinkDispose;
+    gobjectClass->get_property = webkitVideoSinkGetProperty;
 
     baseSinkClass->unlock = webkitVideoSinkUnlock;
     baseSinkClass->unlock_stop = webkitVideoSinkUnlockStop;
@@ -397,9 +459,13 @@ static void webkit_video_sink_class_init(WebKitVideoSinkClass* klass)
     baseSinkClass->preroll = webkitVideoSinkRender;
     baseSinkClass->stop = webkitVideoSinkStop;
     baseSinkClass->start = webkitVideoSinkStart;
+    baseSinkClass->set_caps = webkitVideoSinkSetCaps;
 #ifdef GST_API_VERSION_1
     baseSinkClass->propose_allocation = webkitVideoSinkProposeAllocation;
 #endif
+
+    g_object_class_install_property(gobjectClass, PROP_CAPS,
+        g_param_spec_boxed("current-caps", "Current-Caps", "Current caps", GST_TYPE_CAPS, G_PARAM_READABLE));
 
     webkitVideoSinkSignals[REPAINT_REQUESTED] = g_signal_new("repaint-requested",
             G_TYPE_FROM_CLASS(klass),
@@ -418,7 +484,7 @@ static void webkit_video_sink_class_init(WebKitVideoSinkClass* klass)
 }
 
 
-#ifndef GST_API_VERSION_1
+#if USE(NATIVE_FULLSCREEN_VIDEO)
 GstElement* webkitVideoSinkNew(WebCore::GStreamerGWorld* gstGWorld)
 {
     GstElement* element = GST_ELEMENT(g_object_new(WEBKIT_TYPE_VIDEO_SINK, 0));
@@ -432,4 +498,4 @@ GstElement* webkitVideoSinkNew()
 }
 #endif
 
-#endif // USE(GSTREAMER)
+#endif // ENABLE(VIDEO) && USE(GSTREAMER)

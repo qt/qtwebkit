@@ -26,8 +26,6 @@
 #ifndef PrintInfo_h
 #define PrintInfo_h
 
-#include <wtf/Platform.h>
-
 #if PLATFORM(MAC)
 OBJC_CLASS NSPrintInfo;
 #elif PLATFORM(GTK)
@@ -64,7 +62,7 @@ struct PrintInfo {
 #endif
 
     void encode(CoreIPC::ArgumentEncoder&) const;
-    static bool decode(CoreIPC::ArgumentDecoder*, PrintInfo&);
+    static bool decode(CoreIPC::ArgumentDecoder&, PrintInfo&);
 };
 
 }

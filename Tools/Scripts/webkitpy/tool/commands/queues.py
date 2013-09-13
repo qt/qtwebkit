@@ -72,7 +72,8 @@ class AbstractQueue(Command, QueueEngineDelegate):
             make_option("--no-confirm", action="store_false", dest="confirm", default=True, help="Do not ask the user for confirmation before running the queue.  Dangerous!"),
             make_option("--exit-after-iteration", action="store", type="int", dest="iterations", default=None, help="Stop running the queue after iterating this number of times."),
         ]
-        Command.__init__(self, "Run the %s" % self.name, options=options_list)
+        self.help_text = "Run the %s" % self.name
+        Command.__init__(self, options=options_list)
         self._iteration_count = 0
 
     def _cc_watchers(self, bug_id):
@@ -94,12 +95,17 @@ class AbstractQueue(Command, QueueEngineDelegate):
         if self._options.port:
             webkit_patch_args += ["--port=%s" % self._options.port]
         webkit_patch_args.extend(args)
-        # FIXME: There is probably no reason to use run_and_throw_if_fail anymore.
-        # run_and_throw_if_fail was invented to support tee'd output
-        # (where we write both to a log file and to the console at once),
-        # but the queues don't need live-progress, a dump-of-output at the
-        # end should be sufficient.
-        return self._tool.executive.run_and_throw_if_fail(webkit_patch_args, cwd=self._tool.scm().checkout_root)
+
+        try:
+            args_for_printing = list(webkit_patch_args)
+            args_for_printing[0] = 'webkit-patch'  # Printing our path for each log is redundant.
+            _log.info("Running: %s" % self._tool.executive.command_for_printing(args_for_printing))
+            command_output = self._tool.executive.run_command(webkit_patch_args, cwd=self._tool.scm().checkout_root)
+        except ScriptError, e:
+            # Make sure the whole output gets printed if the command failed.
+            _log.error(e.message_with_output(output_limit=None))
+            raise
+        return command_output
 
     def _log_directory(self):
         return os.path.join("..", "%s-logs" % self.name)
@@ -143,7 +149,7 @@ class AbstractQueue(Command, QueueEngineDelegate):
     def execute(self, options, args, tool, engine=QueueEngine):
         self._options = options # FIXME: This code is wrong.  Command.options is a list, this assumes an Options element!
         self._tool = tool  # FIXME: This code is wrong too!  Command.bind_to_tool handles this!
-        return engine(self.name, self, self._tool.wakeup_event).run()
+        return engine(self.name, self, self._tool.wakeup_event, self._options.seconds_to_sleep).run()
 
     @classmethod
     def _log_from_script_error_for_upload(cls, script_error, output_limit=None):
@@ -241,10 +247,44 @@ class AbstractPatchQueue(AbstractQueue):
         self._update_status(message, patch)
         self._release_work_item(patch)
 
-    # FIXME: This probably belongs at a layer below AbstractPatchQueue, but shared by CommitQueue and the EarlyWarningSystem.
+    def work_item_log_path(self, patch):
+        return os.path.join(self._log_directory(), "%s.log" % patch.bug_id())
+
+
+# Used to share code between the EWS and commit-queue.
+class PatchProcessingQueue(AbstractPatchQueue):
+    # Subclasses must override.
+    port_name = None
+
+    def __init__(self, options=None):
+        self._port = None  # We can't instantiate port here because tool isn't avaialble.
+        AbstractPatchQueue.__init__(self, options)
+
+    # FIXME: This is a hack to map between the old port names and the new port names.
+    def _new_port_name_from_old(self, port_name, platform):
+        # ApplePort.determine_full_port_name asserts if the name doesn't include version.
+        if port_name == 'mac':
+            return 'mac-' + platform.os_version
+        if port_name == 'win':
+            return 'win-future'
+        return port_name
+
+    def begin_work_queue(self):
+        AbstractPatchQueue.begin_work_queue(self)
+        if not self.port_name:
+            return
+        # FIXME: This is only used for self._deprecated_port.flag()
+        self._deprecated_port = DeprecatedPort.port(self.port_name)
+        # FIXME: This violates abstraction
+        self._tool._deprecated_port = self._deprecated_port
+        self._port = self._tool.port_factory.get(self._new_port_name_from_old(self.port_name, self._tool.platform))
+
     def _upload_results_archive_for_patch(self, patch, results_archive_zip):
+        if not self._port:
+            self._port = self._tool.port_factory.get(self._new_port_name_from_old(self.port_name, self._tool.platform))
+
         bot_id = self._tool.status_server.bot_id or "bot"
-        description = "Archive of layout-test-results from %s" % bot_id
+        description = "Archive of layout-test-results from %s for %s" % (bot_id, self._port.name())
         # results_archive is a ZipFile object, grab the File object (.fp) to pass to Mechanize for uploading.
         results_archive_file = results_archive_zip.fp
         # Rewind the file object to start (since Mechanize won't do that automatically)
@@ -255,30 +295,21 @@ class AbstractPatchQueue(AbstractQueue):
         comment_text = "The attached test failures were seen while running run-webkit-tests on the %s.\n" % (self.name)
         # FIXME: We could easily list the test failures from the archive here,
         # currently callers do that separately.
-        comment_text += BotInfo(self._tool).summary_text()
+        comment_text += BotInfo(self._tool, self._port.name()).summary_text()
         self._tool.bugs.add_attachment_to_bug(patch.bug_id(), results_archive_file, description, filename="layout-test-results.zip", comment_text=comment_text)
 
-    def work_item_log_path(self, patch):
-        return os.path.join(self._log_directory(), "%s.log" % patch.bug_id())
 
-
-class CommitQueue(AbstractPatchQueue, StepSequenceErrorHandler, CommitQueueTaskDelegate):
+class CommitQueue(PatchProcessingQueue, StepSequenceErrorHandler, CommitQueueTaskDelegate):
     name = "commit-queue"
-    port_name = "chromium-xvfb"
-
-    def __init__(self):
-        AbstractPatchQueue.__init__(self)
-        self.port = DeprecatedPort.port(self.port_name)
+    port_name = "mac-mountainlion"
 
     # AbstractPatchQueue methods
 
     def begin_work_queue(self):
-        # FIXME: This violates abstraction
-        self._tool._deprecated_port = self.port
-        AbstractPatchQueue.begin_work_queue(self)
+        PatchProcessingQueue.begin_work_queue(self)
         self.committer_validator = CommitterValidator(self._tool)
         self._expected_failures = ExpectedFailures()
-        self._layout_test_results_reader = LayoutTestResultsReader(self._tool, self._log_directory())
+        self._layout_test_results_reader = LayoutTestResultsReader(self._tool, self._port.results_directory(), self._log_directory())
 
     def next_work_item(self):
         return self._next_patch()
@@ -319,7 +350,7 @@ class CommitQueue(AbstractPatchQueue, StepSequenceErrorHandler, CommitQueueTaskD
     # CommitQueueTaskDelegate methods
 
     def run_command(self, command):
-        self.run_webkit_patch(command + [self.port.flag()])
+        self.run_webkit_patch(command + [self._deprecated_port.flag()])
 
     def command_passed(self, message, patch):
         self._update_status(message, patch=patch)
@@ -348,10 +379,10 @@ class CommitQueue(AbstractPatchQueue, StepSequenceErrorHandler, CommitQueueTaskD
         reporter.report_flaky_tests(patch, flaky_test_results, results_archive)
 
     def did_pass_testing_ews(self, patch):
-        # Currently, chromium-ews is the only testing EWS. Once there are more,
-        # should make sure they all pass.
-        status = self._tool.status_server.patch_status("chromium-ews", patch.id())
-        return status == self._pass_status
+        # Only Mac and Mac WK2 run tests
+        # FIXME: We shouldn't have to hard-code it here.
+        patch_status = self._tool.status_server.patch_status
+        return patch_status("mac-ews", patch.id()) == self._pass_status or patch_status("mac-wk2-ews", patch.id()) == self._pass_status
 
     # StepSequenceErrorHandler methods
 
@@ -376,10 +407,10 @@ class CommitQueue(AbstractPatchQueue, StepSequenceErrorHandler, CommitQueueTaskD
         raise TryAgain()
 
 
-class AbstractReviewQueue(AbstractPatchQueue, StepSequenceErrorHandler):
+class AbstractReviewQueue(PatchProcessingQueue, StepSequenceErrorHandler):
     """This is the base-class for the EWS queues and the style-queue."""
     def __init__(self, options=None):
-        AbstractPatchQueue.__init__(self, options)
+        PatchProcessingQueue.__init__(self, options)
 
     def review_patch(self, patch):
         raise NotImplementedError("subclasses must implement")
@@ -387,7 +418,7 @@ class AbstractReviewQueue(AbstractPatchQueue, StepSequenceErrorHandler):
     # AbstractPatchQueue methods
 
     def begin_work_queue(self):
-        AbstractPatchQueue.begin_work_queue(self)
+        PatchProcessingQueue.begin_work_queue(self)
 
     def next_work_item(self):
         return self._next_patch()

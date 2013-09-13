@@ -31,7 +31,6 @@
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QUuid>
-#include <wtf/Platform.h>
 #include <wtf/text/WTFString.h>
 
 namespace WebKit {
@@ -52,18 +51,18 @@ QtNetworkRequestData::QtNetworkRequestData(const QNetworkRequest& request, QNetw
 
 void QtNetworkRequestData::encode(CoreIPC::ArgumentEncoder& encoder) const
 {
-    encoder.encode(m_scheme);
-    encoder.encode(m_urlString);
-    encoder.encode(m_replyUuid);
+    encoder << m_scheme;
+    encoder << m_urlString;
+    encoder << m_replyUuid;
 }
 
-bool QtNetworkRequestData::decode(CoreIPC::ArgumentDecoder* decoder, QtNetworkRequestData& destination)
+bool QtNetworkRequestData::decode(CoreIPC::ArgumentDecoder& decoder, QtNetworkRequestData& destination)
 {
-    if (!decoder->decode(destination.m_scheme))
+    if (!decoder.decode(destination.m_scheme))
         return false;
-    if (!decoder->decode(destination.m_urlString))
+    if (!decoder.decode(destination.m_urlString))
         return false;
-    if (!decoder->decode(destination.m_replyUuid))
+    if (!decoder.decode(destination.m_replyUuid))
         return false;
     return true;
 }

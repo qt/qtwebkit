@@ -47,7 +47,7 @@ public:
     bool isPending() const { return false; }
     void loadSubimages(CachedResourceLoader*) { }
 
-    void reportDescendantMemoryUsage(MemoryObjectInfo*) const;
+    bool equals(const CSSCanvasValue&) const;
 
 private:
     CSSCanvasValue(const String& name)

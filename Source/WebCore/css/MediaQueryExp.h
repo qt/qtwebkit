@@ -52,7 +52,7 @@ public:
     {
         return (other.m_mediaFeature == m_mediaFeature)
             && ((!other.m_value && !m_value)
-                || (other.m_value && m_value && other.m_value->cssText() == m_value->cssText()));
+                || (other.m_value && m_value && other.m_value->equals(*m_value)));
     }
 
     bool isValid() const { return m_isValid; }
@@ -71,8 +71,6 @@ public:
     String serialize() const;
 
     PassOwnPtr<MediaQueryExp> copy() const { return adoptPtr(new MediaQueryExp(*this)); }
-
-    void reportMemoryUsage(MemoryObjectInfo*) const;
 
 private:
     MediaQueryExp(const AtomicString& mediaFeature, CSSParserValueList* values);

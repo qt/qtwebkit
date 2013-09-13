@@ -42,7 +42,8 @@ class FlakyTestReporter(object):
     def __init__(self, tool, bot_name):
         self._tool = tool
         self._bot_name = bot_name
-        self._bot_info = BotInfo(tool)
+        # FIXME: Use the real port object
+        self._bot_info = BotInfo(tool, tool.deprecated_port().name())
 
     def _author_emails_for_test(self, flaky_test):
         test_path = path_for_layout_test(flaky_test)
@@ -139,12 +140,8 @@ If you would like to track this test fix with another bug, please close this bug
             bug = self._tool.bugs.fetch_bug(bug.duplicate_of())
         return bug
 
-    # Maybe this logic should move into Bugzilla? a reopen=True arg to post_comment?
     def _update_bug_for_flaky_test(self, bug, latest_flake_message):
-        if bug.is_closed():
-            self._tool.bugs.reopen_bug(bug.id(), latest_flake_message)
-        else:
-            self._tool.bugs.post_comment_to_bug(bug.id(), latest_flake_message)
+        self._tool.bugs.post_comment_to_bug(bug.id(), latest_flake_message)
 
     # This method is needed because our archive paths include a leading tmp/layout-test-results
     def _find_in_archive(self, path, archive):

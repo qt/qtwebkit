@@ -30,6 +30,8 @@
 
 #include "PDFPluginAnnotation.h"
 
+#include <wtf/text/WTFString.h>
+
 namespace WebCore {
 class Element;
 }
@@ -41,19 +43,24 @@ namespace WebKit {
 class PDFPluginTextAnnotation : public PDFPluginAnnotation {
 public:
     static PassRefPtr<PDFPluginTextAnnotation> create(PDFAnnotation *, PDFLayerController *, PDFPlugin*);
+    virtual ~PDFPluginTextAnnotation();
 
     virtual void updateGeometry() OVERRIDE;
     virtual void commit() OVERRIDE;
 
-private:
+protected:
     PDFPluginTextAnnotation(PDFAnnotation *annotation, PDFLayerController *pdfLayerController, PDFPlugin* plugin)
         : PDFPluginAnnotation(annotation, pdfLayerController, plugin)
     {
     }
 
     virtual PassRefPtr<WebCore::Element> createAnnotationElement() OVERRIDE;
+    String value() const;
 
-    PDFAnnotationTextWidget * textAnnotation() { return static_cast<PDFAnnotationTextWidget *>(annotation()); }
+private:
+    virtual bool handleEvent(WebCore::Event*) OVERRIDE;
+
+    PDFAnnotationTextWidget *textAnnotation() const { return static_cast<PDFAnnotationTextWidget *>(annotation()); }
 };
 
 } // namespace WebKit

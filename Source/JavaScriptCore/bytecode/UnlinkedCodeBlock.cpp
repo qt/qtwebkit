@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Apple Inc. All Rights Reserved.
+ * Copyright (C) 2012, 2013 Apple Inc. All Rights Reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,6 +32,8 @@
 #include "CodeCache.h"
 #include "Executable.h"
 #include "JSString.h"
+#include "Operations.h"
+#include "Parser.h"
 #include "SourceProvider.h"
 #include "Structure.h"
 #include "SymbolTable.h"
@@ -45,6 +47,29 @@ const ClassInfo UnlinkedProgramCodeBlock::s_info = { "UnlinkedProgramCodeBlock",
 const ClassInfo UnlinkedEvalCodeBlock::s_info = { "UnlinkedEvalCodeBlock", &Base::s_info, 0, 0, CREATE_METHOD_TABLE(UnlinkedEvalCodeBlock) };
 const ClassInfo UnlinkedFunctionCodeBlock::s_info = { "UnlinkedFunctionCodeBlock", &Base::s_info, 0, 0, CREATE_METHOD_TABLE(UnlinkedFunctionCodeBlock) };
 
+static UnlinkedFunctionCodeBlock* generateFunctionCodeBlock(VM& vm, JSScope* scope, UnlinkedFunctionExecutable* executable, const SourceCode& source, CodeSpecializationKind kind, DebuggerMode debuggerMode, ProfilerMode profilerMode, ParserError& error)
+{
+    RefPtr<FunctionBodyNode> body = parse<FunctionBodyNode>(&vm, source, executable->parameters(), executable->name(), executable->isInStrictContext() ? JSParseStrict : JSParseNormal, JSParseFunctionCode, error);
+
+    if (!body) {
+        ASSERT(error.m_type != ParserError::ErrorNone);
+        return 0;
+    }
+
+    if (executable->forceUsesArguments())
+        body->setUsesArguments();
+    body->finishParsing(executable->parameters(), executable->name(), executable->functionNameIsInScopeToggle());
+    executable->recordParse(body->features(), body->hasCapturedVariables(), body->lineNo(), body->lastLine());
+    
+    UnlinkedFunctionCodeBlock* result = UnlinkedFunctionCodeBlock::create(&vm, FunctionCode, ExecutableInfo(body->needsActivation(), body->usesEval(), body->isStrictMode(), kind == CodeForConstruct));
+    OwnPtr<BytecodeGenerator> generator(adoptPtr(new BytecodeGenerator(vm, scope, body.get(), result, debuggerMode, profilerMode)));
+    error = generator->generate();
+    body->destroyData();
+    if (error.m_type != ParserError::ErrorNone)
+        return 0;
+    return result;
+}
+
 unsigned UnlinkedCodeBlock::addOrFindConstant(JSValue v)
 {
     unsigned numberOfConstants = numberOfConstantRegisters();
@@ -55,8 +80,8 @@ unsigned UnlinkedCodeBlock::addOrFindConstant(JSValue v)
     return addConstant(v);
 }
 
-UnlinkedFunctionExecutable::UnlinkedFunctionExecutable(JSGlobalData* globalData, Structure* structure, const SourceCode& source, FunctionBodyNode* node)
-    : Base(*globalData, structure)
+UnlinkedFunctionExecutable::UnlinkedFunctionExecutable(VM* vm, Structure* structure, const SourceCode& source, FunctionBodyNode* node)
+    : Base(*vm, structure)
     , m_numCapturedVariables(node->capturedVariableCount())
     , m_forceUsesArguments(node->usesArguments())
     , m_isInStrictContext(node->isStrictMode())
@@ -66,11 +91,18 @@ UnlinkedFunctionExecutable::UnlinkedFunctionExecutable(JSGlobalData* globalData,
     , m_parameters(node->parameters())
     , m_firstLineOffset(node->firstLine() - source.firstLine())
     , m_lineCount(node->lastLine() - node->firstLine())
+    , m_functionStartOffset(node->functionStart() - source.startOffset())
+    , m_functionStartColumn(node->startColumn())
     , m_startOffset(node->source().startOffset() - source.startOffset())
     , m_sourceLength(node->source().length())
     , m_features(node->features())
     , m_functionNameIsInScopeToggle(node->functionNameIsInScopeToggle())
 {
+}
+
+size_t UnlinkedFunctionExecutable::parameterCount() const
+{
+    return m_parameters->size();
 }
 
 void UnlinkedFunctionExecutable::visitChildren(JSCell* cell, SlotVisitor& visitor)
@@ -80,24 +112,31 @@ void UnlinkedFunctionExecutable::visitChildren(JSCell* cell, SlotVisitor& visito
     COMPILE_ASSERT(StructureFlags & OverridesVisitChildren, OverridesVisitChildrenWithoutSettingFlag);
     ASSERT(thisObject->structure()->typeInfo().overridesVisitChildren());
     Base::visitChildren(thisObject, visitor);
+    visitor.append(&thisObject->m_codeBlockForCall);
+    visitor.append(&thisObject->m_codeBlockForConstruct);
     visitor.append(&thisObject->m_nameValue);
     visitor.append(&thisObject->m_symbolTableForCall);
     visitor.append(&thisObject->m_symbolTableForConstruct);
 }
 
-FunctionExecutable* UnlinkedFunctionExecutable::link(JSGlobalData& globalData, const SourceCode& source, size_t lineOffset, size_t sourceOffset)
+FunctionExecutable* UnlinkedFunctionExecutable::link(VM& vm, const SourceCode& source, size_t lineOffset, size_t sourceOffset)
 {
     unsigned firstLine = lineOffset + m_firstLineOffset;
     unsigned startOffset = sourceOffset + m_startOffset;
-    SourceCode code(source.provider(), startOffset, startOffset + m_sourceLength, firstLine);
-    return FunctionExecutable::create(globalData, code, this, firstLine, firstLine + m_lineCount);
+    unsigned startColumn = m_functionStartColumn + 1; // startColumn should start from 1, not 0.
+    SourceCode code(source.provider(), startOffset, startOffset + m_sourceLength, firstLine, startColumn);
+    return FunctionExecutable::create(vm, code, this, firstLine, firstLine + m_lineCount, startColumn);
 }
 
 UnlinkedFunctionExecutable* UnlinkedFunctionExecutable::fromGlobalCode(const Identifier& name, ExecState* exec, Debugger*, const SourceCode& source, JSObject** exception)
 {
     ParserError error;
-    CodeCache* codeCache = exec->globalData().codeCache();
-    UnlinkedFunctionExecutable* executable = codeCache->getFunctionExecutableFromGlobalCode(exec->globalData(), name, source, error);
+    CodeCache* codeCache = exec->vm().codeCache();
+    UnlinkedFunctionExecutable* executable = codeCache->getFunctionExecutableFromGlobalCode(exec->vm(), name, source, error);
+
+    if (exec->lexicalGlobalObject()->hasDebugger())
+        exec->lexicalGlobalObject()->debugger()->sourceParsed(exec, source.provider(), error.m_line, error.m_message);
+
     if (error.m_type != ParserError::ErrorNone) {
         *exception = error.toErrorObject(exec->lexicalGlobalObject(), source);
         return 0;
@@ -106,36 +145,32 @@ UnlinkedFunctionExecutable* UnlinkedFunctionExecutable::fromGlobalCode(const Ide
     return executable;
 }
 
-UnlinkedFunctionCodeBlock* UnlinkedFunctionExecutable::codeBlockFor(JSGlobalData& globalData, const SourceCode& source, CodeSpecializationKind specializationKind, DebuggerMode debuggerMode, ProfilerMode profilerMode, ParserError& error)
+UnlinkedFunctionCodeBlock* UnlinkedFunctionExecutable::codeBlockFor(VM& vm, JSScope* scope, const SourceCode& source, CodeSpecializationKind specializationKind, DebuggerMode debuggerMode, ProfilerMode profilerMode, ParserError& error)
 {
     switch (specializationKind) {
     case CodeForCall:
-        if (UnlinkedFunctionCodeBlock* codeBlock = m_codeBlockForCall.get()) {
-            globalData.codeCache()->usedFunctionCode(globalData, codeBlock);
+        if (UnlinkedFunctionCodeBlock* codeBlock = m_codeBlockForCall.get())
             return codeBlock;
-        }
         break;
     case CodeForConstruct:
-        if (UnlinkedFunctionCodeBlock* codeBlock = m_codeBlockForConstruct.get()) {
-            globalData.codeCache()->usedFunctionCode(globalData, codeBlock);
+        if (UnlinkedFunctionCodeBlock* codeBlock = m_codeBlockForConstruct.get())
             return codeBlock;
-        }
         break;
     }
 
-    UnlinkedFunctionCodeBlock* result = globalData.codeCache()->getFunctionCodeBlock(globalData, this, source, specializationKind, debuggerMode, profilerMode, error);
+    UnlinkedFunctionCodeBlock* result = generateFunctionCodeBlock(vm, scope, this, source, specializationKind, debuggerMode, profilerMode, error);
     
     if (error.m_type != ParserError::ErrorNone)
         return 0;
 
     switch (specializationKind) {
     case CodeForCall:
-        m_codeBlockForCall = PassWeak<UnlinkedFunctionCodeBlock>(result);
-        m_symbolTableForCall.set(globalData, this, result->symbolTable());
+        m_codeBlockForCall.set(vm, this, result);
+        m_symbolTableForCall.set(vm, this, result->symbolTable());
         break;
     case CodeForConstruct:
-        m_codeBlockForConstruct = PassWeak<UnlinkedFunctionCodeBlock>(result);
-        m_symbolTableForConstruct.set(globalData, this, result->symbolTable());
+        m_codeBlockForConstruct.set(vm, this, result);
+        m_symbolTableForConstruct.set(vm, this, result->symbolTable());
         break;
     }
     return result;
@@ -148,18 +183,19 @@ String UnlinkedFunctionExecutable::paramString() const
     for (size_t pos = 0; pos < parameters.size(); ++pos) {
         if (!builder.isEmpty())
             builder.appendLiteral(", ");
-        builder.append(parameters[pos].string());
+        builder.append(parameters.at(pos).string());
     }
     return builder.toString();
 }
 
-UnlinkedCodeBlock::UnlinkedCodeBlock(JSGlobalData* globalData, Structure* structure, CodeType codeType, const ExecutableInfo& info)
-    : Base(*globalData, structure)
+UnlinkedCodeBlock::UnlinkedCodeBlock(VM* vm, Structure* structure, CodeType codeType, const ExecutableInfo& info)
+    : Base(*vm, structure)
     , m_numVars(0)
     , m_numCalleeRegisters(0)
     , m_numParameters(0)
-    , m_globalData(globalData)
+    , m_vm(vm)
     , m_argumentsRegister(-1)
+    , m_globalObjectRegister(-1)
     , m_needsFullScopeChain(info.m_needsActivation)
     , m_usesEval(info.m_usesEval)
     , m_isNumericCompareFunction(false)
@@ -174,6 +210,7 @@ UnlinkedCodeBlock::UnlinkedCodeBlock(JSGlobalData* globalData, Structure* struct
     , m_putToBaseOperationCount(1)
     , m_arrayProfileCount(0)
     , m_arrayAllocationProfileCount(0)
+    , m_objectAllocationProfileCount(0)
     , m_valueProfileCount(0)
     , m_llintCallLinkInfoCount(0)
 #if ENABLE(BYTECODE_COMMENTS)
@@ -205,24 +242,17 @@ void UnlinkedCodeBlock::visitChildren(JSCell* cell, SlotVisitor& visitor)
 int UnlinkedCodeBlock::lineNumberForBytecodeOffset(unsigned bytecodeOffset)
 {
     ASSERT(bytecodeOffset < instructions().size());
-    Vector<LineInfo>& lineInfo = m_lineInfo;
-    
-    int low = 0;
-    int high = lineInfo.size();
-    while (low < high) {
-        int mid = low + (high - low) / 2;
-        if (lineInfo[mid].instructionOffset <= bytecodeOffset)
-            low = mid + 1;
-        else
-            high = mid;
-    }
-    
-    if (!low)
-        return 0;
-    return lineInfo[low - 1].lineNumber;
+    int divot;
+    int startOffset;
+    int endOffset;
+    unsigned line;
+    unsigned column;
+    expressionRangeForBytecodeOffset(bytecodeOffset, divot, startOffset, endOffset, line, column);
+    return line;
 }
 
-void UnlinkedCodeBlock::expressionRangeForBytecodeOffset(unsigned bytecodeOffset, int& divot, int& startOffset, int& endOffset)
+void UnlinkedCodeBlock::expressionRangeForBytecodeOffset(unsigned bytecodeOffset,
+    int& divot, int& startOffset, int& endOffset, unsigned& line, unsigned& column)
 {
     ASSERT(bytecodeOffset < instructions().size());
 
@@ -230,6 +260,8 @@ void UnlinkedCodeBlock::expressionRangeForBytecodeOffset(unsigned bytecodeOffset
         startOffset = 0;
         endOffset = 0;
         divot = 0;
+        line = 0;
+        column = 0;
         return;
     }
 
@@ -245,17 +277,83 @@ void UnlinkedCodeBlock::expressionRangeForBytecodeOffset(unsigned bytecodeOffset
             high = mid;
     }
 
-    ASSERT(low);
-    if (!low) {
+    if (!low)
+        low = 1;
+
+    ExpressionRangeInfo& info = expressionInfo[low - 1];
+    startOffset = info.startOffset;
+    endOffset = info.endOffset;
+    divot = info.divotPoint;
+
+    switch (info.mode) {
+    case ExpressionRangeInfo::FatLineMode:
+        info.decodeFatLineMode(line, column);
+        break;
+    case ExpressionRangeInfo::FatColumnMode:
+        info.decodeFatColumnMode(line, column);
+        break;
+    case ExpressionRangeInfo::FatLineAndColumnMode: {
+        unsigned fatIndex = info.position;
+        ExpressionRangeInfo::FatPosition& fatPos = m_rareData->m_expressionInfoFatPositions[fatIndex];
+        line = fatPos.line;
+        column = fatPos.column;
+        break;
+    }
+    } // switch
+}
+
+void UnlinkedCodeBlock::addExpressionInfo(unsigned instructionOffset,
+    int divot, int startOffset, int endOffset, unsigned line, unsigned column)
+{
+    if (divot > ExpressionRangeInfo::MaxDivot) {
+        // Overflow has occurred, we can only give line number info for errors for this region
+        divot = 0;
         startOffset = 0;
         endOffset = 0;
-        divot = 0;
-        return;
+    } else if (startOffset > ExpressionRangeInfo::MaxOffset) {
+        // If the start offset is out of bounds we clear both offsets
+        // so we only get the divot marker. Error message will have to be reduced
+        // to line and charPosition number.
+        startOffset = 0;
+        endOffset = 0;
+    } else if (endOffset > ExpressionRangeInfo::MaxOffset) {
+        // The end offset is only used for additional context, and is much more likely
+        // to overflow (eg. function call arguments) so we are willing to drop it without
+        // dropping the rest of the range.
+        endOffset = 0;
     }
 
-    startOffset = expressionInfo[low - 1].startOffset;
-    endOffset = expressionInfo[low - 1].endOffset;
-    divot = expressionInfo[low - 1].divotPoint;
+    unsigned positionMode =
+        (line <= ExpressionRangeInfo::MaxFatLineModeLine && column <= ExpressionRangeInfo::MaxFatLineModeColumn) 
+        ? ExpressionRangeInfo::FatLineMode
+        : (line <= ExpressionRangeInfo::MaxFatColumnModeLine && column <= ExpressionRangeInfo::MaxFatColumnModeColumn)
+        ? ExpressionRangeInfo::FatColumnMode
+        : ExpressionRangeInfo::FatLineAndColumnMode;
+
+    ExpressionRangeInfo info;
+    info.instructionOffset = instructionOffset;
+    info.divotPoint = divot;
+    info.startOffset = startOffset;
+    info.endOffset = endOffset;
+
+    info.mode = positionMode;
+    switch (positionMode) {
+    case ExpressionRangeInfo::FatLineMode:
+        info.encodeFatLineMode(line, column);
+        break;
+    case ExpressionRangeInfo::FatColumnMode:
+        info.encodeFatColumnMode(line, column);
+        break;
+    case ExpressionRangeInfo::FatLineAndColumnMode: {
+        createRareDataIfNecessary();
+        unsigned fatIndex = m_rareData->m_expressionInfoFatPositions.size();
+        ExpressionRangeInfo::FatPosition fatPos = { line, column };
+        m_rareData->m_expressionInfoFatPositions.append(fatPos);
+        info.position = fatIndex;
+    }
+    } // switch
+
+    m_expressionInfo.append(info);
 }
 
 void UnlinkedProgramCodeBlock::visitChildren(JSCell* cell, SlotVisitor& visitor)

@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2002-2010 The ANGLE Project Authors. All rights reserved.
+// Copyright (c) 2002-2012 The ANGLE Project Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 //
@@ -14,39 +14,20 @@
 
 #include "common/debug.h"
 #include "libGLESv2/Texture.h"
+#include "libGLESv2/renderer/SwapChain.h"
+#include "libGLESv2/main.h"
 
 #include "libEGL/main.h"
 #include "libEGL/Display.h"
 
-#include <dwmapi.h>
-
 namespace egl
 {
-
-namespace
-{
-const int versionWindowsVista = MAKEWORD(0x00, 0x06);
-const int versionWindows7 = MAKEWORD(0x01, 0x06);
-
-// Return the version of the operating system in a format suitable for ordering
-// comparison.
-int getComparableOSVersion()
-{
-    DWORD version = GetVersion();
-    int majorVersion = LOBYTE(LOWORD(version));
-    int minorVersion = HIBYTE(LOWORD(version));
-    return MAKEWORD(minorVersion, majorVersion);
-}
-}
 
 Surface::Surface(Display *display, const Config *config, HWND window, EGLint postSubBufferSupported) 
     : mDisplay(display), mConfig(config), mWindow(window), mPostSubBufferSupported(postSubBufferSupported)
 {
+    mRenderer = mDisplay->getRenderer();
     mSwapChain = NULL;
-    mBackBuffer = NULL;
-    mDepthStencil = NULL;
-    mRenderTarget = NULL;
-    mOffscreenTexture = NULL;
     mShareHandle = NULL;
     mTexture = NULL;
     mTextureFormat = EGL_NO_TEXTURE;
@@ -56,6 +37,8 @@ Surface::Surface(Display *display, const Config *config, HWND window, EGLint pos
     mRenderBuffer = EGL_BACK_BUFFER;
     mSwapBehavior = EGL_BUFFER_PRESERVED;
     mSwapInterval = -1;
+    mWidth = -1;
+    mHeight = -1;
     setSwapInterval(1);
 
     subclassWindow();
@@ -64,11 +47,8 @@ Surface::Surface(Display *display, const Config *config, HWND window, EGLint pos
 Surface::Surface(Display *display, const Config *config, HANDLE shareHandle, EGLint width, EGLint height, EGLenum textureFormat, EGLenum textureType)
     : mDisplay(display), mWindow(NULL), mConfig(config), mShareHandle(shareHandle), mWidth(width), mHeight(height), mPostSubBufferSupported(EGL_FALSE)
 {
+    mRenderer = mDisplay->getRenderer();
     mSwapChain = NULL;
-    mBackBuffer = NULL;
-    mDepthStencil = NULL;
-    mRenderTarget = NULL;
-    mOffscreenTexture = NULL;
     mWindowSubclassed = false;
     mTexture = NULL;
     mTextureFormat = textureFormat;
@@ -89,264 +69,114 @@ Surface::~Surface()
 
 bool Surface::initialize()
 {
-    ASSERT(!mSwapChain && !mOffscreenTexture && !mDepthStencil);
-
     if (!resetSwapChain())
       return false;
-
-    // Modify present parameters for this window, if we are composited,
-    // to minimize the amount of queuing done by DWM between our calls to
-    // present and the actual screen.
-    if (mWindow && (getComparableOSVersion() >= versionWindowsVista)) {
-      BOOL isComposited;
-      HRESULT result = DwmIsCompositionEnabled(&isComposited);
-      if (SUCCEEDED(result) && isComposited) {
-        DWM_PRESENT_PARAMETERS presentParams;
-        memset(&presentParams, 0, sizeof(presentParams));
-        presentParams.cbSize = sizeof(DWM_PRESENT_PARAMETERS);
-        presentParams.cBuffer = 2;
-
-        result = DwmSetPresentParameters(mWindow, &presentParams);
-        if (FAILED(result))
-          ERR("Unable to set present parameters: 0x%08X", result);
-      }
-    }
 
     return true;
 }
 
 void Surface::release()
 {
-    if (mSwapChain)
-    {
-        mSwapChain->Release();
-        mSwapChain = NULL;
-    }
-
-    if (mBackBuffer)
-    {
-        mBackBuffer->Release();
-        mBackBuffer = NULL;
-    }
-
-    if (mDepthStencil)
-    {
-        mDepthStencil->Release();
-        mDepthStencil = NULL;
-    }
-
-    if (mRenderTarget)
-    {
-        mRenderTarget->Release();
-        mRenderTarget = NULL;
-    }
-
-    if (mOffscreenTexture)
-    {
-        mOffscreenTexture->Release();
-        mOffscreenTexture = NULL;
-    }
+    delete mSwapChain;
+    mSwapChain = NULL;
 
     if (mTexture)
     {
         mTexture->releaseTexImage();
         mTexture = NULL;
     }
-
-    mShareHandle = NULL;
 }
 
 bool Surface::resetSwapChain()
 {
-    if (!mWindow)
+    ASSERT(!mSwapChain);
+
+    int width;
+    int height;
+
+    if (mWindow)
     {
-        return resetSwapChain(mWidth, mHeight);
+        RECT windowRect;
+        if (!GetClientRect(getWindowHandle(), &windowRect))
+        {
+            ASSERT(false);
+
+            ERR("Could not retrieve the window dimensions");
+            return error(EGL_BAD_SURFACE, false);
+        }
+
+        width = windowRect.right - windowRect.left;
+        height = windowRect.bottom - windowRect.top;
+    }
+    else
+    {
+        // non-window surface - size is determined at creation
+        width = mWidth;
+        height = mHeight;
     }
 
-    RECT windowRect;
-    if (!GetClientRect(getWindowHandle(), &windowRect))
+    mSwapChain = mRenderer->createSwapChain(mWindow, mShareHandle,
+                                            mConfig->mRenderTargetFormat,
+                                            mConfig->mDepthStencilFormat);
+    if (!mSwapChain)
     {
-        ASSERT(false);
+        return error(EGL_BAD_ALLOC, false);
+    }
 
-        ERR("Could not retrieve the window dimensions");
+    if (!resetSwapChain(width, height))
+    {
+        delete mSwapChain;
+        mSwapChain = NULL;
         return false;
     }
 
-    return resetSwapChain(windowRect.right - windowRect.left, windowRect.bottom - windowRect.top);
+    return true;
+}
+
+bool Surface::resizeSwapChain(int backbufferWidth, int backbufferHeight)
+{
+    ASSERT(backbufferWidth >= 0 && backbufferHeight >= 0);
+    ASSERT(mSwapChain);
+
+    EGLint status = mSwapChain->resize(backbufferWidth, backbufferHeight);
+
+    if (status == EGL_CONTEXT_LOST)
+    {
+        mDisplay->notifyDeviceLost();
+        return false;
+    }
+    else if (status != EGL_SUCCESS)
+    {
+        return error(status, false);
+    }
+
+    mWidth = backbufferWidth;
+    mHeight = backbufferHeight;
+
+    return true;
 }
 
 bool Surface::resetSwapChain(int backbufferWidth, int backbufferHeight)
 {
-    IDirect3DDevice9 *device = mDisplay->getDevice();
+    ASSERT(backbufferWidth >= 0 && backbufferHeight >= 0);
+    ASSERT(mSwapChain);
 
-    if (device == NULL)
+    EGLint status = mSwapChain->reset(backbufferWidth, backbufferHeight, mSwapInterval);
+
+    if (status == EGL_CONTEXT_LOST)
     {
+        mRenderer->notifyDeviceLost();
         return false;
     }
-
-    // Evict all non-render target textures to system memory and release all resources
-    // before reallocating them to free up as much video memory as possible.
-    device->EvictManagedResources();
-
-    D3DPRESENT_PARAMETERS presentParameters = {0};
-    HRESULT result;
-
-    presentParameters.AutoDepthStencilFormat = mConfig->mDepthStencilFormat;
-    // We set BackBufferCount = 1 even when we use D3DSWAPEFFECT_FLIPEX.
-    // We do this because DirectX docs are a bit vague whether to set this to 1
-    // or 2. The runtime seems to accept 1, so we speculate that either it is
-    // forcing it to 2 without telling us, or better, doing something smart
-    // behind the scenes knowing that we don't need more.
-    presentParameters.BackBufferCount = 1;
-    presentParameters.BackBufferFormat = mConfig->mRenderTargetFormat;
-    presentParameters.EnableAutoDepthStencil = FALSE;
-    presentParameters.Flags = 0;
-    presentParameters.hDeviceWindow = getWindowHandle();
-    presentParameters.MultiSampleQuality = 0;                  // FIXME: Unimplemented
-    presentParameters.MultiSampleType = D3DMULTISAMPLE_NONE;   // FIXME: Unimplemented
-    presentParameters.PresentationInterval = mPresentInterval;
-    presentParameters.SwapEffect = D3DSWAPEFFECT_DISCARD;
-    presentParameters.Windowed = TRUE;
-    presentParameters.BackBufferWidth = backbufferWidth;
-    presentParameters.BackBufferHeight = backbufferHeight;
-
-    // Release specific resources to free up memory for the new render target, while the
-    // old render target still exists for the purpose of preserving its contents.
-    if (mSwapChain)
+    else if (status != EGL_SUCCESS)
     {
-        mSwapChain->Release();
-        mSwapChain = NULL;
+        return error(status, false);
     }
 
-    if (mBackBuffer)
-    {
-        mBackBuffer->Release();
-        mBackBuffer = NULL;
-    }
+    mWidth = backbufferWidth;
+    mHeight = backbufferHeight;
+    mSwapIntervalDirty = false;
 
-    if (mOffscreenTexture)
-    {
-        mOffscreenTexture->Release();
-        mOffscreenTexture = NULL;
-    }
-
-    if (mDepthStencil)
-    {
-        mDepthStencil->Release();
-        mDepthStencil = NULL;
-    }
-
-    mShareHandle = NULL;
-    HANDLE *pShareHandle = NULL;
-    if (!mWindow && mDisplay->shareHandleSupported())
-    {
-        pShareHandle = &mShareHandle;
-    }
-
-    result = device->CreateTexture(presentParameters.BackBufferWidth, presentParameters.BackBufferHeight, 1, D3DUSAGE_RENDERTARGET,
-                                   presentParameters.BackBufferFormat, D3DPOOL_DEFAULT, &mOffscreenTexture, pShareHandle);
-    if (FAILED(result))
-    {
-        ERR("Could not create offscreen texture: %08lX", result);
-        release();
-
-        if(isDeviceLostError(result))
-        {
-            mDisplay->notifyDeviceLost();
-            return false;
-        }
-        else
-        {
-            return error(EGL_BAD_ALLOC, false);
-        }
-    }
-
-    IDirect3DSurface9 *oldRenderTarget = mRenderTarget;
-
-    result = mOffscreenTexture->GetSurfaceLevel(0, &mRenderTarget);
-    ASSERT(SUCCEEDED(result));
-
-    if (oldRenderTarget)
-    {
-        RECT rect =
-        {
-            0, 0,
-            mWidth, mHeight
-        };
-
-        if (rect.right > static_cast<LONG>(presentParameters.BackBufferWidth))
-        {
-            rect.right = presentParameters.BackBufferWidth;
-        }
-
-        if (rect.bottom > static_cast<LONG>(presentParameters.BackBufferHeight))
-        {
-            rect.bottom = presentParameters.BackBufferHeight;
-        }
-
-        mDisplay->endScene();
-
-        result = device->StretchRect(oldRenderTarget, &rect, mRenderTarget, &rect, D3DTEXF_NONE);
-        ASSERT(SUCCEEDED(result));
-
-        oldRenderTarget->Release();
-    }
-
-    if (mWindow)
-    {
-        result = device->CreateAdditionalSwapChain(&presentParameters, &mSwapChain);
-
-        if (FAILED(result))
-        {
-            ASSERT(result == D3DERR_OUTOFVIDEOMEMORY || result == E_OUTOFMEMORY || result == D3DERR_INVALIDCALL || result == D3DERR_DEVICELOST);
-
-            ERR("Could not create additional swap chains or offscreen surfaces: %08lX", result);
-            release();
-
-            if(isDeviceLostError(result))
-            {
-                mDisplay->notifyDeviceLost();
-                return false;
-            }
-            else
-            {
-                return error(EGL_BAD_ALLOC, false);
-            }
-        }
-
-        result = mSwapChain->GetBackBuffer(0, D3DBACKBUFFER_TYPE_MONO, &mBackBuffer);
-        ASSERT(SUCCEEDED(result));
-    }
-
-    if (mConfig->mDepthStencilFormat != D3DFMT_UNKNOWN)
-    {
-        result = device->CreateDepthStencilSurface(presentParameters.BackBufferWidth, presentParameters.BackBufferHeight,
-                                                   presentParameters.AutoDepthStencilFormat, presentParameters.MultiSampleType,
-                                                   presentParameters.MultiSampleQuality, FALSE, &mDepthStencil, NULL);
-
-        if (FAILED(result))
-        {
-            ASSERT(result == D3DERR_OUTOFVIDEOMEMORY || result == E_OUTOFMEMORY || result == D3DERR_INVALIDCALL);
-
-            ERR("Could not create depthstencil surface for new swap chain: 0x%08X", result);
-            release();
-
-            if(isDeviceLostError(result))
-            {
-                mDisplay->notifyDeviceLost();
-                return false;
-            }
-            else
-            {
-                return error(EGL_BAD_ALLOC, false);
-            }
-        }
-    }
-
-    mWidth = presentParameters.BackBufferWidth;
-    mHeight = presentParameters.BackBufferHeight;
-
-    mPresentIntervalDirty = false;
     return true;
 }
 
@@ -372,85 +202,17 @@ bool Surface::swapRect(EGLint x, EGLint y, EGLint width, EGLint height)
         return true;
     }
 
-    IDirect3DDevice9 *device = mDisplay->getDevice();
+    EGLint status = mSwapChain->swapRect(x, y, width, height);
 
-    // Disable all pipeline operations
-    device->SetRenderState(D3DRS_ZENABLE, D3DZB_FALSE);
-    device->SetRenderState(D3DRS_FILLMODE, D3DFILL_SOLID);
-    device->SetRenderState(D3DRS_ALPHATESTENABLE, FALSE);
-    device->SetRenderState(D3DRS_ALPHABLENDENABLE, FALSE);
-    device->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
-    device->SetRenderState(D3DRS_STENCILENABLE, FALSE);
-    device->SetRenderState(D3DRS_CLIPPLANEENABLE, 0);
-    device->SetRenderState(D3DRS_COLORWRITEENABLE, D3DCOLORWRITEENABLE_ALPHA | D3DCOLORWRITEENABLE_BLUE | D3DCOLORWRITEENABLE_GREEN | D3DCOLORWRITEENABLE_RED);
-    device->SetRenderState(D3DRS_SRGBWRITEENABLE, FALSE);
-    device->SetRenderState(D3DRS_SCISSORTESTENABLE, FALSE);
-    device->SetPixelShader(NULL);
-    device->SetVertexShader(NULL);
-
-    device->SetRenderTarget(0, mBackBuffer);
-    device->SetDepthStencilSurface(NULL);
-
-    device->SetTexture(0, mOffscreenTexture);
-    device->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_SELECTARG1);
-    device->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_TEXTURE);
-    device->SetTextureStageState(1, D3DTSS_COLOROP, D3DTOP_DISABLE);
-    device->SetSamplerState(0, D3DSAMP_MAGFILTER, D3DTEXF_POINT);
-    device->SetSamplerState(0, D3DSAMP_MINFILTER, D3DTEXF_POINT);
-    device->SetSamplerState(0, D3DSAMP_ADDRESSU, D3DTADDRESS_CLAMP);
-    device->SetSamplerState(0, D3DSAMP_ADDRESSV, D3DTADDRESS_CLAMP);
-    device->SetFVF(D3DFVF_XYZRHW | D3DFVF_TEX1);
-
-    D3DVIEWPORT9 viewport = {0, 0, mWidth, mHeight, 0.0f, 1.0f};
-    device->SetViewport(&viewport);
-
-    float x1 = x - 0.5f;
-    float y1 = (mHeight - y - height) - 0.5f;
-    float x2 = (x + width) - 0.5f;
-    float y2 = (mHeight - y) - 0.5f;
-
-    float u1 = x / float(mWidth);
-    float v1 = y / float(mHeight);
-    float u2 = (x + width) / float(mWidth);
-    float v2 = (y + height) / float(mHeight);
-
-    float quad[4][6] = {{x1, y1, 0.0f, 1.0f, u1, v2},
-                        {x2, y1, 0.0f, 1.0f, u2, v2},
-                        {x2, y2, 0.0f, 1.0f, u2, v1},
-                        {x1, y2, 0.0f, 1.0f, u1, v1}};   // x, y, z, rhw, u, v
-
-    mDisplay->startScene();
-    device->DrawPrimitiveUP(D3DPT_TRIANGLEFAN, 2, quad, 6 * sizeof(float));
-    mDisplay->endScene();
-
-    device->SetTexture(0, NULL);
-
-    RECT rect =
+    if (status == EGL_CONTEXT_LOST)
     {
-        x, mHeight - y - height,
-        x + width, mHeight - y
-    };
-
-    HRESULT result = mSwapChain->Present(&rect, &rect, NULL, NULL, 0);
-
-    gl::Context *context = static_cast<gl::Context*>(glGetCurrentContext());
-    if (context)
-    {
-        context->markAllStateDirty();
-    }
-
-    if (isDeviceLostError(result))
-    {
-        mDisplay->notifyDeviceLost();
+        mRenderer->notifyDeviceLost();
         return false;
     }
-
-    if (result == D3DERR_OUTOFVIDEOMEMORY || result == E_OUTOFMEMORY || result == D3DERR_DRIVERINTERNALERROR)
+    else if (status != EGL_SUCCESS)
     {
-        return error(EGL_BAD_ALLOC, false);
+        return error(status, false);
     }
-
-    ASSERT(SUCCEEDED(result));
 
     checkForOutOfDateSwapChain();
 
@@ -547,9 +309,17 @@ bool Surface::checkForOutOfDateSwapChain()
     int clientHeight = client.bottom - client.top;
     bool sizeDirty = clientWidth != getWidth() || clientHeight != getHeight();
 
-    if (sizeDirty || mPresentIntervalDirty)
+    if (mSwapIntervalDirty)
     {
         resetSwapChain(clientWidth, clientHeight);
+    }
+    else if (sizeDirty)
+    {
+        resizeSwapChain(clientWidth, clientHeight);
+    }
+
+    if (mSwapIntervalDirty || sizeDirty)
+    {
         if (static_cast<egl::Surface*>(getCurrentDrawSurface()) == this)
         {
             glMakeCurrent(glGetCurrentContext(), static_cast<egl::Display*>(getCurrentDisplay()), this);
@@ -557,22 +327,8 @@ bool Surface::checkForOutOfDateSwapChain()
 
         return true;
     }
+
     return false;
-}
-
-DWORD Surface::convertInterval(EGLint interval)
-{
-    switch(interval)
-    {
-      case 0: return D3DPRESENT_INTERVAL_IMMEDIATE;
-      case 1: return D3DPRESENT_INTERVAL_ONE;
-      case 2: return D3DPRESENT_INTERVAL_TWO;
-      case 3: return D3DPRESENT_INTERVAL_THREE;
-      case 4: return D3DPRESENT_INTERVAL_FOUR;
-      default: UNREACHABLE();
-    }
-
-    return D3DPRESENT_INTERVAL_DEFAULT;
 }
 
 bool Surface::swap()
@@ -606,38 +362,9 @@ EGLint Surface::isPostSubBufferSupported() const
     return mPostSubBufferSupported;
 }
 
-// Increments refcount on surface.
-// caller must Release() the returned surface
-IDirect3DSurface9 *Surface::getRenderTarget()
+rx::SwapChain *Surface::getSwapChain() const
 {
-    if (mRenderTarget)
-    {
-        mRenderTarget->AddRef();
-    }
-
-    return mRenderTarget;
-}
-
-// Increments refcount on surface.
-// caller must Release() the returned surface
-IDirect3DSurface9 *Surface::getDepthStencil()
-{
-    if (mDepthStencil)
-    {
-        mDepthStencil->AddRef();
-    }
-
-    return mDepthStencil;
-}
-
-IDirect3DTexture9 *Surface::getOffscreenTexture()
-{
-    if (mOffscreenTexture)
-    {
-        mOffscreenTexture->AddRef();
-    }
-
-    return mOffscreenTexture;
+    return mSwapChain;
 }
 
 void Surface::setSwapInterval(EGLint interval)
@@ -648,11 +375,10 @@ void Surface::setSwapInterval(EGLint interval)
     }
     
     mSwapInterval = interval;
-    mSwapInterval = std::max(mSwapInterval, mDisplay->getMinSwapInterval());
-    mSwapInterval = std::min(mSwapInterval, mDisplay->getMaxSwapInterval());
+    mSwapInterval = std::max(mSwapInterval, mRenderer->getMinSwapInterval());
+    mSwapInterval = std::min(mSwapInterval, mRenderer->getMaxSwapInterval());
 
-    mPresentInterval = convertInterval(mSwapInterval);
-    mPresentIntervalDirty = true;
+    mSwapIntervalDirty = true;
 }
 
 EGLenum Surface::getTextureFormat() const
@@ -675,7 +401,7 @@ gl::Texture2D *Surface::getBoundTexture() const
     return mTexture;
 }
 
-D3DFORMAT Surface::getFormat() const
+EGLenum Surface::getFormat() const
 {
     return mConfig->mRenderTargetFormat;
 }

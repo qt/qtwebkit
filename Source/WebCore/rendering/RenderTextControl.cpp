@@ -36,10 +36,10 @@ using namespace std;
 
 namespace WebCore {
 
-RenderTextControl::RenderTextControl(Node* node)
-    : RenderBlock(node)
+RenderTextControl::RenderTextControl(Element* element)
+    : RenderBlock(element)
 {
-    ASSERT(toTextFormControl(node));
+    ASSERT(isHTMLTextFormControlElement(element));
 }
 
 RenderTextControl::~RenderTextControl()
@@ -48,7 +48,7 @@ RenderTextControl::~RenderTextControl()
 
 HTMLTextFormControlElement* RenderTextControl::textFormControlElement() const
 {
-    return static_cast<HTMLTextFormControlElement*>(node());
+    return toHTMLTextFormControlElement(node());
 }
 
 HTMLElement* RenderTextControl::innerTextElement() const
@@ -76,17 +76,17 @@ void RenderTextControl::styleDidChange(StyleDifference diff, const RenderStyle* 
 
 static inline bool updateUserModifyProperty(Node* node, RenderStyle* style)
 {
-    bool isEnabled = true;
+    bool isDisabled = false;
     bool isReadOnlyControl = false;
 
     if (node->isElementNode()) {
-        Element* element = static_cast<Element*>(node);
-        isEnabled = element->isEnabledFormControl();
-        isReadOnlyControl = element->isTextFormControl() && static_cast<HTMLTextFormControlElement*>(element)->readOnly();
+        Element* element = toElement(node);
+        isDisabled = element->isDisabledFormControl();
+        isReadOnlyControl = element->isTextFormControl() && toHTMLTextFormControlElement(element)->isReadOnly();
     }
 
-    style->setUserModify((isReadOnlyControl || !isEnabled) ? READ_ONLY : READ_WRITE_PLAINTEXT_ONLY);
-    return !isEnabled;
+    style->setUserModify((isReadOnlyControl || isDisabled) ? READ_ONLY : READ_WRITE_PLAINTEXT_ONLY);
+    return isDisabled;
 }
 
 void RenderTextControl::adjustInnerTextStyle(const RenderStyle* startStyle, RenderStyle* textBlockStyle) const
@@ -101,19 +101,19 @@ void RenderTextControl::adjustInnerTextStyle(const RenderStyle* startStyle, Rend
         textBlockStyle->setColor(theme()->disabledTextColor(textBlockStyle->visitedDependentColor(CSSPropertyColor), startStyle->visitedDependentColor(CSSPropertyBackgroundColor)));
 }
 
-int RenderTextControl::textBlockHeight() const
+int RenderTextControl::textBlockLogicalHeight() const
 {
-    return height() - borderAndPaddingHeight();
+    return logicalHeight() - borderAndPaddingLogicalHeight();
 }
 
-int RenderTextControl::textBlockWidth() const
+int RenderTextControl::textBlockLogicalWidth() const
 {
     Element* innerText = innerTextElement();
     ASSERT(innerText);
 
-    LayoutUnit unitWidth = width() - borderAndPaddingWidth();
+    LayoutUnit unitWidth = logicalWidth() - borderAndPaddingLogicalWidth();
     if (innerText->renderer())
-        unitWidth -= innerText->renderBox()->paddingLeft() + innerText->renderBox()->paddingRight();
+        unitWidth -= innerText->renderBox()->paddingStart() + innerText->renderBox()->paddingEnd();
 
     return unitWidth;
 }
@@ -129,10 +129,8 @@ VisiblePosition RenderTextControl::visiblePositionForIndex(int index) const
 {
     if (index <= 0)
         return VisiblePosition(firstPositionInNode(innerTextElement()), DOWNSTREAM);
-    ExceptionCode ec = 0;
     RefPtr<Range> range = Range::create(document());
-    range->selectNodeContents(innerTextElement(), ec);
-    ASSERT(!ec);
+    range->selectNodeContents(innerTextElement(), ASSERT_NO_EXCEPTION);
     CharacterIterator it(range.get());
     it.advance(index - 1);
     return VisiblePosition(it.range()->endPosition(), UPSTREAM);
@@ -150,10 +148,11 @@ void RenderTextControl::computeLogicalHeight(LayoutUnit logicalHeight, LayoutUni
     ASSERT(innerText);
     if (RenderBox* innerTextBox = innerText->renderBox()) {
         LayoutUnit nonContentHeight = innerTextBox->borderAndPaddingHeight() + innerTextBox->marginHeight();
-        logicalHeight = computeControlHeight(innerTextBox->lineHeight(true, HorizontalLine, PositionOfInteriorLineBoxes), nonContentHeight) + borderAndPaddingHeight();
+        logicalHeight = computeControlLogicalHeight(innerTextBox->lineHeight(true, HorizontalLine, PositionOfInteriorLineBoxes), nonContentHeight) + borderAndPaddingHeight();
 
         // We are able to have a horizontal scrollbar if the overflow style is scroll, or if its auto and there's no word wrap.
-        if (style()->overflowX() == OSCROLL ||  (style()->overflowX() == OAUTO && innerText->renderer()->style()->overflowWrap() == NormalOverflowWrap))
+        if ((isHorizontalWritingMode() && (style()->overflowX() == OSCROLL ||  (style()->overflowX() == OAUTO && innerText->renderer()->style()->overflowWrap() == NormalOverflowWrap)))
+            || (!isHorizontalWritingMode() && (style()->overflowY() == OSCROLL ||  (style()->overflowY() == OAUTO && innerText->renderer()->style()->overflowWrap() == NormalOverflowWrap))))
             logicalHeight += scrollbarThickness();
     }
 
@@ -219,11 +218,17 @@ static const char* fontFamiliesWithInvalidCharWidth[] = {
 // all platforms.
 bool RenderTextControl::hasValidAvgCharWidth(AtomicString family)
 {
-    static HashSet<AtomicString>* fontFamiliesWithInvalidCharWidthMap = 0;
-
     if (family.isEmpty())
         return false;
 
+    // Internal fonts on OS X also have an invalid entry in the table for avgCharWidth.
+    // They are hidden by having a name that begins with a period, so simply search
+    // for that here rather than try to keep the list up to date.
+    if (family.startsWith('.'))
+        return false;
+
+    static HashSet<AtomicString>* fontFamiliesWithInvalidCharWidthMap = 0;
+    
     if (!fontFamiliesWithInvalidCharWidthMap) {
         fontFamiliesWithInvalidCharWidthMap = new HashSet<AtomicString>;
 
@@ -254,6 +259,17 @@ float RenderTextControl::scaleEmToUnits(int x) const
     return roundf(style()->font().size() * x / unitsPerEm);
 }
 
+void RenderTextControl::computeIntrinsicLogicalWidths(LayoutUnit& minLogicalWidth, LayoutUnit& maxLogicalWidth) const
+{
+    // Use average character width. Matches IE.
+    const AtomicString& family = style()->font().firstFamily();
+    maxLogicalWidth = preferredContentLogicalWidth(const_cast<RenderTextControl*>(this)->getAvgCharWidth(family));
+    if (RenderBox* innerTextRenderBox = innerTextElement()->renderBox())
+        maxLogicalWidth += innerTextRenderBox->paddingStart() + innerTextRenderBox->paddingEnd();
+    if (!style()->logicalWidth().isPercent())
+        minLogicalWidth = maxLogicalWidth;
+}
+
 void RenderTextControl::computePreferredLogicalWidths()
 {
     ASSERT(preferredLogicalWidthsDirty());
@@ -261,30 +277,22 @@ void RenderTextControl::computePreferredLogicalWidths()
     m_minPreferredLogicalWidth = 0;
     m_maxPreferredLogicalWidth = 0;
 
-    if (style()->width().isFixed() && style()->width().value() >= 0)
-        m_minPreferredLogicalWidth = m_maxPreferredLogicalWidth = adjustContentBoxLogicalWidthForBoxSizing(style()->width().value());
-    else {
-        // Use average character width. Matches IE.
-        AtomicString family = style()->font().family().family();
-        m_maxPreferredLogicalWidth = preferredContentWidth(getAvgCharWidth(family));
-        if (RenderBox* innerTextRenderBox = innerTextElement()->renderBox())
-            m_maxPreferredLogicalWidth += innerTextRenderBox->paddingLeft() + innerTextRenderBox->paddingRight();
-    }
-
-    if (style()->minWidth().isFixed() && style()->minWidth().value() > 0) {
-        m_maxPreferredLogicalWidth = max(m_maxPreferredLogicalWidth, adjustContentBoxLogicalWidthForBoxSizing(style()->minWidth().value()));
-        m_minPreferredLogicalWidth = max(m_minPreferredLogicalWidth, adjustContentBoxLogicalWidthForBoxSizing(style()->minWidth().value()));
-    } else if (style()->width().isPercent() || (style()->width().isAuto() && style()->height().isPercent()))
-        m_minPreferredLogicalWidth = 0;
+    if (style()->logicalWidth().isFixed() && style()->logicalWidth().value() >= 0)
+        m_minPreferredLogicalWidth = m_maxPreferredLogicalWidth = adjustContentBoxLogicalWidthForBoxSizing(style()->logicalWidth().value());
     else
-        m_minPreferredLogicalWidth = m_maxPreferredLogicalWidth;
+        computeIntrinsicLogicalWidths(m_minPreferredLogicalWidth, m_maxPreferredLogicalWidth);
 
-    if (style()->maxWidth().isFixed()) {
-        m_maxPreferredLogicalWidth = min(m_maxPreferredLogicalWidth, adjustContentBoxLogicalWidthForBoxSizing(style()->maxWidth().value()));
-        m_minPreferredLogicalWidth = min(m_minPreferredLogicalWidth, adjustContentBoxLogicalWidthForBoxSizing(style()->maxWidth().value()));
+    if (style()->logicalMinWidth().isFixed() && style()->logicalMinWidth().value() > 0) {
+        m_maxPreferredLogicalWidth = max(m_maxPreferredLogicalWidth, adjustContentBoxLogicalWidthForBoxSizing(style()->logicalMinWidth().value()));
+        m_minPreferredLogicalWidth = max(m_minPreferredLogicalWidth, adjustContentBoxLogicalWidthForBoxSizing(style()->logicalMinWidth().value()));
     }
 
-    LayoutUnit toAdd = borderAndPaddingWidth();
+    if (style()->logicalMaxWidth().isFixed()) {
+        m_maxPreferredLogicalWidth = min(m_maxPreferredLogicalWidth, adjustContentBoxLogicalWidthForBoxSizing(style()->logicalMaxWidth().value()));
+        m_minPreferredLogicalWidth = min(m_minPreferredLogicalWidth, adjustContentBoxLogicalWidthForBoxSizing(style()->logicalMaxWidth().value()));
+    }
+
+    LayoutUnit toAdd = borderAndPaddingLogicalWidth();
 
     m_minPreferredLogicalWidth += toAdd;
     m_maxPreferredLogicalWidth += toAdd;
@@ -292,7 +300,7 @@ void RenderTextControl::computePreferredLogicalWidths()
     setPreferredLogicalWidthsDirty(false);
 }
 
-void RenderTextControl::addFocusRingRects(Vector<IntRect>& rects, const LayoutPoint& additionalOffset)
+void RenderTextControl::addFocusRingRects(Vector<IntRect>& rects, const LayoutPoint& additionalOffset, const RenderLayerModelObject*)
 {
     if (!size().isEmpty())
         rects.append(pixelSnappedIntRect(additionalOffset, size()));
@@ -300,7 +308,7 @@ void RenderTextControl::addFocusRingRects(Vector<IntRect>& rects, const LayoutPo
 
 RenderObject* RenderTextControl::layoutSpecialExcludedChild(bool relayoutChildren)
 {
-    HTMLElement* placeholder = toTextFormControl(node())->placeholderElement();
+    HTMLElement* placeholder = toHTMLTextFormControlElement(node())->placeholderElement();
     RenderObject* placeholderRenderer = placeholder ? placeholder->renderer() : 0;
     if (!placeholderRenderer)
         return 0;

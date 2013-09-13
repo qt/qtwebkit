@@ -28,17 +28,20 @@
 
 #include "CSSComputedStyleDeclaration.h"
 #include "HTMLNames.h"
+#include "HTMLTableElement.h"
+#include "InlineIterator.h"
 #include "InlineTextBox.h"
 #include "Logging.h"
 #include "PositionIterator.h"
 #include "RenderBlock.h"
+#include "RenderInline.h"
 #include "RenderText.h"
 #include "RuntimeEnabledFeatures.h"
 #include "Text.h"
 #include "TextIterator.h"
 #include "VisiblePosition.h"
+#include "VisibleUnits.h"
 #include "htmlediting.h"
-#include "visible_units.h"
 #include <stdio.h>
 #include <wtf/text/CString.h>
 #include <wtf/unicode/CharacterNames.h>
@@ -49,7 +52,7 @@ using namespace HTMLNames;
 
 static Node* nextRenderedEditable(Node* node)
 {
-    while ((node = node->nextLeafNode())) {
+    while ((node = nextLeafNode(node))) {
         if (!node->rendererIsEditable())
             continue;
         RenderObject* renderer = node->renderer();
@@ -63,7 +66,7 @@ static Node* nextRenderedEditable(Node* node)
 
 static Node* previousRenderedEditable(Node* node)
 {
-    while ((node = node->previousLeafNode())) {
+    while ((node = previousLeafNode(node))) {
         if (!node->rendererIsEditable())
             continue;
         RenderObject* renderer = node->renderer();
@@ -87,6 +90,7 @@ Position::Position(PassRefPtr<Node> anchorNode, LegacyEditingOffset offset)
 #else
     ASSERT(!m_anchorNode || !m_anchorNode->isShadowRoot());
 #endif
+    ASSERT(!m_anchorNode || !m_anchorNode->isPseudoElement());
 }
 
 Position::Position(PassRefPtr<Node> anchorNode, AnchorType anchorType)
@@ -101,6 +105,8 @@ Position::Position(PassRefPtr<Node> anchorNode, AnchorType anchorType)
 #else
     ASSERT(!m_anchorNode || !m_anchorNode->isShadowRoot());
 #endif
+
+    ASSERT(!m_anchorNode || !m_anchorNode->isPseudoElement());
 
     ASSERT(anchorType != PositionIsOffsetInAnchor);
     ASSERT(!((anchorType == PositionIsBeforeChildren || anchorType == PositionIsAfterChildren)
@@ -119,6 +125,8 @@ Position::Position(PassRefPtr<Node> anchorNode, int offset, AnchorType anchorTyp
 #else
     ASSERT(!m_anchorNode || !editingIgnoresContent(m_anchorNode.get()) || !m_anchorNode->isShadowRoot());
 #endif
+
+    ASSERT(!m_anchorNode || !m_anchorNode->isPseudoElement());
 
     ASSERT(anchorType == PositionIsOffsetInAnchor);
 }
@@ -293,15 +301,7 @@ Element* Position::element() const
     Node* n = anchorNode();
     while (n && !n->isElementNode())
         n = n->parentNode();
-    return static_cast<Element*>(n);
-}
-
-PassRefPtr<CSSComputedStyleDeclaration> Position::computedStyle() const
-{
-    Element* elem = element();
-    if (!elem)
-        return 0;
-    return CSSComputedStyleDeclaration::create(elem);
+    return toElement(n);
 }
 
 Position Position::previous(PositionMoveType moveType) const
@@ -562,7 +562,7 @@ static bool endsOfNodeAreVisuallyDistinctPositions(Node* node)
         return true;
         
     // Don't include inline tables.
-    if (node->hasTagName(tableTag))
+    if (isHTMLTableElement(node))
         return false;
     
     // There is a VisiblePosition inside an empty inline-block container.
@@ -836,13 +836,19 @@ Position Position::downstream(EditingBoundaryCrossingRule rule) const
     return lastVisible;
 }
 
+static int boundingBoxLogicalHeight(RenderObject *o, const IntRect &rect)
+{
+    return o->style()->isHorizontalWritingMode() ? rect.height() : rect.width();
+}
+
 bool Position::hasRenderedNonAnonymousDescendantsWithHeight(RenderObject* renderer)
 {
     RenderObject* stop = renderer->nextInPreOrderAfterChildren();
     for (RenderObject *o = renderer->firstChild(); o && o != stop; o = o->nextInPreOrder())
-        if (o->node()) {
-            if ((o->isText() && toRenderText(o)->linesBoundingBox().height()) ||
-                (o->isBox() && toRenderBox(o)->borderBoundingBox().height()))
+        if (o->nonPseudoNode()) {
+            if ((o->isText() && boundingBoxLogicalHeight(o, toRenderText(o)->linesBoundingBox()))
+                || (o->isBox() && toRenderBox(o)->pixelSnappedLogicalHeight())
+                || (o->isRenderInline() && isEmptyInline(o) && boundingBoxLogicalHeight(o, toRenderInline(o)->linesBoundingBox())))
                 return true;
         }
     return false;
@@ -920,7 +926,7 @@ bool Position::isCandidate() const
         return false;
         
     if (renderer->isBlockFlow()) {
-        if (toRenderBlock(renderer)->height() || m_anchorNode->hasTagName(bodyTag)) {
+        if (toRenderBlock(renderer)->logicalHeight() || m_anchorNode->hasTagName(bodyTag)) {
             if (!Position::hasRenderedNonAnonymousDescendantsWithHeight(renderer))
                 return atFirstEditingPositionForNode() && !Position::nodeIsUserSelectNone(deprecatedNode());
             return m_anchorNode->rendererIsEditable() && !Position::nodeIsUserSelectNone(deprecatedNode()) && atEditingBoundary();
@@ -980,6 +986,11 @@ bool Position::isRenderedCharacter() const
     return false;
 }
 
+static bool inSameEnclosingBlockFlowElement(Node* a, Node* b)
+{
+    return a && b && deprecatedEnclosingBlockFlowElement(a) == deprecatedEnclosingBlockFlowElement(b);
+}
+
 bool Position::rendersInDifferentPosition(const Position &pos) const
 {
     if (isNull() || pos.isNull())
@@ -1016,7 +1027,7 @@ bool Position::rendersInDifferentPosition(const Position &pos) const
     if (pos.deprecatedNode()->hasTagName(brTag) && isCandidate())
         return true;
                 
-    if (deprecatedNode()->enclosingBlockFlowElement() != pos.deprecatedNode()->enclosingBlockFlowElement())
+    if (!inSameEnclosingBlockFlowElement(deprecatedNode(), pos.deprecatedNode()))
         return true;
 
     if (deprecatedNode()->isTextNode() && !inRenderedText())
@@ -1077,7 +1088,7 @@ Position Position::leadingWhitespacePosition(EAffinity affinity, bool considerNo
         return Position();
 
     Position prev = previousCharacterPosition(affinity);
-    if (prev != *this && prev.deprecatedNode()->inSameContainingBlockFlowElement(deprecatedNode()) && prev.deprecatedNode()->isTextNode()) {
+    if (prev != *this && inSameEnclosingBlockFlowElement(deprecatedNode(), prev.deprecatedNode()) && prev.deprecatedNode()->isTextNode()) {
         String string = toText(prev.deprecatedNode())->data();
         UChar c = string[prev.deprecatedEditingOffset()];
         if (considerNonCollapsibleWhitespace ? (isSpaceOrNewline(c) || c == noBreakSpace) : isCollapsibleWhitespace(c))

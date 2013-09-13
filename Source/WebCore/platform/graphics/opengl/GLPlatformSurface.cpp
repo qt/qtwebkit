@@ -28,51 +28,57 @@
 
 #if USE(ACCELERATED_COMPOSITING)
 
-#if HAVE(GLX)
+#if USE(GLX)
 #include "GLXSurface.h"
+#endif
+
+#if USE(EGL)
+#include "EGLSurface.h"
 #endif
 
 #include "NotImplemented.h"
 
 namespace WebCore {
 
-PassOwnPtr<GLPlatformSurface> GLPlatformSurface::createOffscreenSurface()
-{
-#if HAVE(GLX)
-    OwnPtr<GLPlatformSurface> surface = adoptPtr(new GLXPBuffer());
+static GLPlatformSurface* m_currentDrawable = 0;
 
-    if (surface->handle())
-        return surface.release();
+PassOwnPtr<GLPlatformSurface> GLPlatformSurface::createOffScreenSurface(SurfaceAttributes attributes)
+{
+    OwnPtr<GLPlatformSurface> surface;
+#if USE(GLX)
+    surface = adoptPtr(new GLXOffScreenSurface(attributes));
+#elif USE(EGL)
+    surface = EGLOffScreenSurface::createOffScreenSurface(attributes);
+#else
+    // FIXME: Need WGL implementation for Windows
+    notImplemented();
 #endif
+
+    if (surface && surface->drawable())
+        return surface.release();
 
     return nullptr;
 }
 
-PassOwnPtr<GLPlatformSurface> GLPlatformSurface::createTransportSurface()
-{
-#if HAVE(GLX)
-    OwnPtr<GLPlatformSurface> surface = adoptPtr(new GLXTransportSurface());
-
-    if (surface->handle())
-        return surface.release();
-#endif
-
-    return nullptr;
-}
-
-GLPlatformSurface::GLPlatformSurface()
-    : m_restoreNeeded(true)
-    , m_fboId(0)
-    , m_sharedDisplay(0)
+GLPlatformSurface::GLPlatformSurface(SurfaceAttributes)
+    : m_sharedDisplay(0)
     , m_drawable(0)
+    , m_bufferHandle(0)
 {
 }
 
 GLPlatformSurface::~GLPlatformSurface()
 {
+    if (m_currentDrawable == this)
+        m_currentDrawable = 0;
 }
 
-PlatformSurface GLPlatformSurface::handle() const
+PlatformBufferHandle GLPlatformSurface::handle() const
+{
+    return m_bufferHandle;
+}
+
+PlatformDrawable GLPlatformSurface::drawable() const
 {
     return m_drawable;
 }
@@ -97,74 +103,33 @@ void GLPlatformSurface::swapBuffers()
     notImplemented();
 }
 
-void GLPlatformSurface::copyTexture(uint32_t texture, const IntRect& sourceRect)
+bool GLPlatformSurface::isCurrentDrawable() const
 {
-    if (!m_fboId)
-        glGenFramebuffers(1, &m_fboId);
-
-    m_restoreNeeded = true;
-    int x = sourceRect.x();
-    int y = sourceRect.y();
-    int width = sourceRect.width();
-    int height = sourceRect.height();
-
-    glPushAttrib(GL_COLOR_BUFFER_BIT);
-
-    GLint previousFBO;
-    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &previousFBO);
-
-    glBindFramebuffer(GL_READ_FRAMEBUFFER, m_fboId);
-
-    glBindTexture(GL_TEXTURE_2D, texture);
-    glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0);
-
-    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-
-    glBlitFramebuffer(x, y, width, height, x, y, width, height, GL_COLOR_BUFFER_BIT, GL_LINEAR);
-
-    glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
-    glBindTexture(GL_TEXTURE_2D, 0);
-    glBindFramebuffer(GL_FRAMEBUFFER, previousFBO);
-
-    glPopAttrib();
+    return m_currentDrawable == this;
 }
 
-void GLPlatformSurface::updateContents(uint32_t texture, const IntRect& sourceRect, const GLuint bindFboId)
+void GLPlatformSurface::onMakeCurrent()
 {
-    m_restoreNeeded = false;
-
-    if (!m_fboId)
-        glGenFramebuffers(1, &m_fboId);
-
-    int x = sourceRect.x();
-    int y = sourceRect.y();
-    int width = sourceRect.width();
-    int height = sourceRect.height();
-
-    glBindFramebuffer(GL_READ_FRAMEBUFFER, m_fboId);
-    glBindTexture(GL_TEXTURE_2D, texture);
-    glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0);
-    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-    glBlitFramebuffer(x, y, width, height, x, y, width, height, GL_COLOR_BUFFER_BIT, GL_LINEAR);
-    swapBuffers();
-    glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
-    glBindTexture(GL_TEXTURE_2D, 0);
-    glBindFramebuffer(GL_FRAMEBUFFER, bindFboId);
+    m_currentDrawable = this;
 }
 
-void GLPlatformSurface::setGeometry(const IntRect& newRect)
+void GLPlatformSurface::updateContents(const uint32_t)
 {
-    m_rect = newRect;
+}
+
+void GLPlatformSurface::setGeometry(const IntRect&)
+{
 }
 
 void GLPlatformSurface::destroy()
 {
-    m_rect = IntRect();
+    if (m_currentDrawable == this)
+        m_currentDrawable = 0;
+}
 
-    if (m_fboId)
-        glDeleteFramebuffers(1, &m_fboId);
-
-    m_fboId = 0;
+GLPlatformSurface::SurfaceAttributes GLPlatformSurface::attributes() const
+{
+    return GLPlatformSurface::Default;
 }
 
 }

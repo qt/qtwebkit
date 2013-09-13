@@ -36,6 +36,7 @@
 #include "CSSValueKeywords.h"
 #include "ElementShadow.h"
 #include "Event.h"
+#include "EventHandler.h"
 #include "Frame.h"
 #include "HTMLInputElement.h"
 #include "HTMLParserIdioms.h"
@@ -45,7 +46,6 @@
 #include "RenderTheme.h"
 #include "ShadowRoot.h"
 #include "StepRange.h"
-#include <wtf/MathExtras.h>
 
 using namespace std;
 
@@ -95,8 +95,8 @@ HTMLElement* sliderTrackElementOf(Node* node)
 
 // --------------------------------
 
-RenderSliderThumb::RenderSliderThumb(Node* node)
-    : RenderBlock(node)
+RenderSliderThumb::RenderSliderThumb(SliderThumbElement* element)
+    : RenderBlock(element)
 {
 }
 
@@ -127,8 +127,8 @@ bool RenderSliderThumb::isSliderThumb() const
 // http://webkit.org/b/62535
 class RenderSliderContainer : public RenderFlexibleBox {
 public:
-    RenderSliderContainer(Node* node)
-        : RenderFlexibleBox(node) { }
+    RenderSliderContainer(SliderContainerElement* element)
+        : RenderFlexibleBox(element) { }
 public:
     virtual void computeLogicalHeight(LayoutUnit logicalHeight, LayoutUnit logicalTop, LogicalExtentComputedValues&) const OVERRIDE;
 
@@ -177,20 +177,19 @@ void RenderSliderContainer::layout()
         style()->setDirection(LTR);
     }
 
-    RenderBox* thumb = 0;
-    if (input->sliderThumbElement() && input->sliderThumbElement()->renderer()) {
-        thumb = toRenderBox(input->sliderThumbElement()->renderer());
-        // Reset the thumb location before layout.
-        thumb->setLocation(LayoutPoint());
-    }
+    RenderBox* thumb = input->sliderThumbElement() ? input->sliderThumbElement()->renderBox() : 0;
+    RenderBox* track = input->sliderTrackElement() ? input->sliderTrackElement()->renderBox() : 0;
+    // Force a layout to reset the position of the thumb so the code below doesn't move the thumb to the wrong place.
+    // FIXME: Make a custom Render class for the track and move the thumb positioning code there.
+    if (track)
+        track->setChildNeedsLayout(true, MarkOnlyThis);
 
     RenderFlexibleBox::layout();
 
     style()->setDirection(oldTextDirection);
     // These should always exist, unless someone mutates the shadow DOM (e.g., in the inspector).
-    if (!thumb)
+    if (!thumb || !track)
         return;
-    RenderBox* track = toRenderBox(thumb->parent());
 
     double percentageOffset = sliderPosition(input).toDouble();
     LayoutUnit availableExtent = isVertical ? track->contentHeight() : track->contentWidth();
@@ -222,22 +221,22 @@ RenderObject* SliderThumbElement::createRenderer(RenderArena* arena, RenderStyle
     return new (arena) RenderSliderThumb(this);
 }
 
-bool SliderThumbElement::isEnabledFormControl() const
+bool SliderThumbElement::isDisabledFormControl() const
 {
-    return hostInput()->isEnabledFormControl();
+    return hostInput()->isDisabledFormControl();
 }
 
-bool SliderThumbElement::shouldMatchReadOnlySelector() const
+bool SliderThumbElement::matchesReadOnlyPseudoClass() const
 {
-    return hostInput()->shouldMatchReadOnlySelector();
+    return hostInput()->matchesReadOnlyPseudoClass();
 }
 
-bool SliderThumbElement::shouldMatchReadWriteSelector() const
+bool SliderThumbElement::matchesReadWritePseudoClass() const
 {
-    return hostInput()->shouldMatchReadWriteSelector();
+    return hostInput()->matchesReadWritePseudoClass();
 }
 
-Node* SliderThumbElement::focusDelegate()
+Element* SliderThumbElement::focusDelegate()
 {
     return hostInput();
 }
@@ -253,11 +252,11 @@ void SliderThumbElement::setPositionFromPoint(const LayoutPoint& point)
     HTMLInputElement* input = hostInput();
     HTMLElement* trackElement = sliderTrackElementOf(input);
 
-    if (!input->renderer() || !renderer() || !trackElement->renderer())
+    if (!input->renderer() || !renderBox() || !trackElement->renderBox())
         return;
 
     input->setTextAsOfLastFormControlChangeEvent(input->value());
-    LayoutPoint offset = roundedLayoutPoint(input->renderer()->absoluteToLocal(point, UseTransforms | SnapOffsetForTransforms));
+    LayoutPoint offset = roundedLayoutPoint(input->renderer()->absoluteToLocal(point, UseTransforms));
     bool isVertical = hasVerticalAppearance(input);
     bool isLeftToRightDirection = renderBox()->style()->isLeftToRightDirection();
     LayoutUnit trackSize;
@@ -282,9 +281,6 @@ void SliderThumbElement::setPositionFromPoint(const LayoutPoint& point)
         currentPosition = absoluteThumbOrigin.x() - absoluteSliderContentOrigin.x();
     }
     position = max<LayoutUnit>(0, min(position, trackSize));
-    if (position == currentPosition)
-        return;
-
     const Decimal ratio = Decimal::fromDouble(static_cast<double>(position) / trackSize);
     const Decimal fraction = isVertical || !isLeftToRightDirection ? Decimal(1) - ratio : ratio;
     StepRange stepRange(input->createStepRange(RejectAny));
@@ -304,8 +300,12 @@ void SliderThumbElement::setPositionFromPoint(const LayoutPoint& point)
     }
 #endif
 
+    String valueString = serializeForNumberType(value);
+    if (valueString == input->value())
+        return;
+
     // FIXME: This is no longer being set from renderer. Consider updating the method name.
-    input->setValueFromRenderer(serializeForNumberType(value));
+    input->setValueFromRenderer(valueString);
     renderer()->setNeedsLayout(true);
     input->dispatchFormControlChangeEvent();
 }
@@ -340,7 +340,7 @@ void SliderThumbElement::defaultEventHandler(Event* event)
     // FIXME: Should handle this readonly/disabled check in more general way.
     // Missing this kind of check is likely to occur elsewhere if adding it in each shadow element.
     HTMLInputElement* input = hostInput();
-    if (!input || input->readOnly() || !input->isEnabledFormControl()) {
+    if (!input || input->isDisabledOrReadOnly()) {
         stopDragging();
         HTMLDivElement::defaultEventHandler(event);
         return;
@@ -371,7 +371,7 @@ void SliderThumbElement::defaultEventHandler(Event* event)
 bool SliderThumbElement::willRespondToMouseMoveEvents()
 {
     const HTMLInputElement* input = hostInput();
-    if (input && !input->readOnly() && input->isEnabledFormControl() && m_inDragMode)
+    if (input && !input->isDisabledOrReadOnly() && m_inDragMode)
         return true;
 
     return HTMLDivElement::willRespondToMouseMoveEvents();
@@ -380,19 +380,19 @@ bool SliderThumbElement::willRespondToMouseMoveEvents()
 bool SliderThumbElement::willRespondToMouseClickEvents()
 {
     const HTMLInputElement* input = hostInput();
-    if (input && !input->readOnly() && input->isEnabledFormControl())
+    if (input && !input->isDisabledOrReadOnly())
         return true;
 
     return HTMLDivElement::willRespondToMouseClickEvents();
 }
 
-void SliderThumbElement::detach()
+void SliderThumbElement::detach(const AttachContext& context)
 {
     if (m_inDragMode) {
         if (Frame* frame = document()->frame())
             frame->eventHandler()->setCapturingMouseEventsNode(0);
     }
-    HTMLDivElement::detach();
+    HTMLDivElement::detach(context);
 }
 
 HTMLInputElement* SliderThumbElement::hostInput() const

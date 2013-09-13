@@ -27,7 +27,6 @@
 #include "DeleteSelectionCommand.h"
 
 #include "Document.h"
-#include "DocumentFragment.h"
 #include "DocumentMarkerController.h"
 #include "EditingBoundary.h"
 #include "Editor.h"
@@ -37,9 +36,11 @@
 #include "htmlediting.h"
 #include "HTMLInputElement.h"
 #include "HTMLNames.h"
+#include "HTMLTableElement.h"
+#include "NodeTraversal.h"
 #include "RenderTableCell.h"
 #include "Text.h"
-#include "visible_units.h"
+#include "VisibleUnits.h"
 
 namespace WebCore {
 
@@ -308,7 +309,10 @@ bool DeleteSelectionCommand::handleSpecialCaseBRDelete()
     // Check for special-case where the selection contains only a BR on a line by itself after another BR.
     bool upstreamStartIsBR = nodeAfterUpstreamStart->hasTagName(brTag);
     bool downstreamStartIsBR = nodeAfterDownstreamStart->hasTagName(brTag);
-    bool isBROnLineByItself = upstreamStartIsBR && downstreamStartIsBR && nodeAfterDownstreamStart == nodeAfterUpstreamEnd;
+    // We should consider that the BR is on a line by itself also when we have <br><br>. This test should be true only
+    // when the two elements are siblings and should be false in a case like <div><br></div><br>.
+    bool isBROnLineByItself = upstreamStartIsBR && downstreamStartIsBR && ((nodeAfterDownstreamStart == nodeAfterUpstreamEnd) || (nodeAfterUpstreamEnd && nodeAfterUpstreamEnd->hasTagName(brTag) && nodeAfterUpstreamStart->nextSibling() == nodeAfterUpstreamEnd));
+
     if (isBROnLineByItself) {
         removeNode(nodeAfterDownstreamStart);
         return true;
@@ -329,7 +333,7 @@ static Position firstEditablePositionInNode(Node* node)
     ASSERT(node);
     Node* next = node;
     while (next && !next->rendererIsEditable())
-        next = next->traverseNextNode(node);
+        next = NodeTraversal::next(next, node);
     return next ? firstPositionInOrBeforeNode(next) : Position();
 }
 
@@ -421,12 +425,14 @@ void DeleteSelectionCommand::makeStylingElementsDirectChildrenOfEditableRootToPr
     RefPtr<Range> range = m_selectionToDelete.toNormalizedRange();
     RefPtr<Node> node = range->firstNode();
     while (node && node != range->pastLastNode()) {
-        RefPtr<Node> nextNode = node->traverseNextNode();
+        RefPtr<Node> nextNode = NodeTraversal::next(node.get());
         if ((node->hasTagName(styleTag) && !(toElement(node.get())->hasAttribute(scopedAttr))) || node->hasTagName(linkTag)) {
-            nextNode = node->traverseNextSibling();
+            nextNode = NodeTraversal::nextSkippingChildren(node.get());
             RefPtr<ContainerNode> rootEditableElement = node->rootEditableElement();
-            removeNode(node);
-            appendNode(node, rootEditableElement);
+            if (rootEditableElement) {
+                removeNode(node);
+                appendNode(node, rootEditableElement);
+            }
         }
         node = nextNode;
     }
@@ -443,9 +449,9 @@ void DeleteSelectionCommand::handleGeneralDelete()
     makeStylingElementsDirectChildrenOfEditableRootToPreventStyleLoss();
 
     // Never remove the start block unless it's a table, in which case we won't merge content in.
-    if (startNode == m_startBlock && startOffset == 0 && canHaveChildrenForEditing(startNode) && !startNode->hasTagName(tableTag)) {
+    if (startNode == m_startBlock && startOffset == 0 && canHaveChildrenForEditing(startNode) && !isHTMLTableElement(startNode)) {
         startOffset = 0;
-        startNode = startNode->traverseNextNode();
+        startNode = NodeTraversal::next(startNode);
         if (!startNode)
             return;
     }
@@ -457,7 +463,7 @@ void DeleteSelectionCommand::handleGeneralDelete()
     }
 
     if (startOffset >= lastOffsetForEditing(startNode)) {
-        startNode = startNode->traverseNextSibling();
+        startNode = NodeTraversal::nextSkippingChildren(startNode);
         startOffset = 0;
     }
 
@@ -491,7 +497,7 @@ void DeleteSelectionCommand::handleGeneralDelete()
                 // in a text node that needs to be trimmed
                 Text* text = toText(node.get());
                 deleteTextFromNode(text, startOffset, text->length() - startOffset);
-                node = node->traverseNextNode();
+                node = NodeTraversal::next(node.get());
             } else {
                 node = startNode->childNode(startOffset);
             }
@@ -503,10 +509,10 @@ void DeleteSelectionCommand::handleGeneralDelete()
         // handle deleting all nodes that are completely selected
         while (node && node != m_downstreamEnd.deprecatedNode()) {
             if (comparePositions(firstPositionInOrBeforeNode(node.get()), m_downstreamEnd) >= 0) {
-                // traverseNextSibling just blew past the end position, so stop deleting
+                // NodeTraversal::nextSkippingChildren just blew past the end position, so stop deleting
                 node = 0;
             } else if (!m_downstreamEnd.deprecatedNode()->isDescendantOf(node.get())) {
-                RefPtr<Node> nextNode = node->traverseNextSibling();
+                RefPtr<Node> nextNode = NodeTraversal::nextSkippingChildren(node.get());
                 // if we just removed a node from the end container, update end position so the
                 // check above will work
                 updatePositionForNodeRemoval(m_downstreamEnd, node.get());
@@ -518,7 +524,7 @@ void DeleteSelectionCommand::handleGeneralDelete()
                     removeNode(node.get());
                     node = 0;
                 } else
-                    node = node->traverseNextNode();
+                    node = NodeTraversal::next(node.get());
             }
         }
         
@@ -647,7 +653,7 @@ void DeleteSelectionCommand::mergeParagraphs()
     
     RefPtr<Range> range = Range::create(document(), startOfParagraphToMove.deepEquivalent().parentAnchoredEquivalent(), endOfParagraphToMove.deepEquivalent().parentAnchoredEquivalent());
     RefPtr<Range> rangeToBeReplaced = Range::create(document(), mergeDestination.deepEquivalent().parentAnchoredEquivalent(), mergeDestination.deepEquivalent().parentAnchoredEquivalent());
-    if (!document()->frame()->editor()->client()->shouldMoveRangeAfterDelete(range.get(), rangeToBeReplaced.get()))
+    if (!document()->frame()->editor().client()->shouldMoveRangeAfterDelete(range.get(), rangeToBeReplaced.get()))
         return;
     
     // moveParagraphs will insert placeholders if it removes blocks that would require their use, don't let block
@@ -793,7 +799,7 @@ void DeleteSelectionCommand::doApply()
     if (!m_replace) {
         Element* textControl = enclosingTextFormControl(m_selectionToDelete.start());
         if (textControl && textControl->focused())
-            document()->frame()->editor()->textWillBeDeletedInTextField(textControl);
+            document()->frame()->editor().textWillBeDeletedInTextField(textControl);
     }
 
     // save this to later make the selection with
@@ -853,7 +859,7 @@ void DeleteSelectionCommand::doApply()
 
     if (!originalString.isEmpty()) {
         if (Frame* frame = document()->frame())
-            frame->editor()->deletedAutocorrectionAtPosition(m_endingPosition, originalString);
+            frame->editor().deletedAutocorrectionAtPosition(m_endingPosition, originalString);
     }
 
     setEndingSelection(VisibleSelection(m_endingPosition, affinity, endingSelection().isDirectional()));

@@ -22,7 +22,6 @@
 
 #include "CSSValueList.h"
 #include "CSSPrimitiveValue.h"
-#include "WebCoreMemoryInstrumentation.h"
 #include <wtf/text/StringBuilder.h>
 
 namespace WebCore {
@@ -65,15 +64,14 @@ String FontValue::customCssText() const
     return result.toString();
 }
 
-void FontValue::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+bool FontValue::equals(const FontValue& other) const
 {
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
-    info.addMember(style);
-    info.addMember(variant);
-    info.addMember(weight);
-    info.addMember(size);
-    info.addMember(lineHeight);
-    info.addMember(family);
+    return compareCSSValuePtr(style, other.style)
+        && compareCSSValuePtr(variant, other.variant)
+        && compareCSSValuePtr(weight, other.weight)
+        && compareCSSValuePtr(size, other.size)
+        && compareCSSValuePtr(lineHeight, other.lineHeight)
+        && compareCSSValuePtr(family, other.family);
 }
 
 }

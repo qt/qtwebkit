@@ -26,7 +26,10 @@ namespace WTF {
 
 String::String(const BlackBerry::Platform::String& webString)
 {
-    *this = String::fromUTF8(webString.data(), webString.length());
+    if (webString.isUtf8())
+        *this = String::fromUTF8(webString.data(), webString.length());
+    else
+        *this = String(webString.data(), webString.length());
 }
 
 String::operator BlackBerry::Platform::String() const
@@ -35,7 +38,7 @@ String::operator BlackBerry::Platform::String() const
         return BlackBerry::Platform::String::emptyString();
 
     if (is8Bit())
-        return BlackBerry::Platform::String(reinterpret_cast<const char*>(characters8()), length());
+        return BlackBerry::Platform::String::fromLatin1(reinterpret_cast<const char*>(characters8()), length());
 
     return BlackBerry::Platform::String(characters(), length());
 }

@@ -26,8 +26,6 @@
 
 [
     ConstructorTemplate=TypedArray,
-    ConstructorParameters=123,
-    NumericIndexedGetter,
     CustomIndexedSetter,
     JSGenerateToNativeObject,
     JSNoStaticTables,
@@ -35,6 +33,8 @@
     DoNotCheckConstants,
     TypedArray=double
 ] interface Float64Array : ArrayBufferView {
-    Int32Array foo(in Float32Array array);
+    Int32Array foo(Float32Array array);
     void set();
+
+    getter double (unsigned long index);
 };

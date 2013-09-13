@@ -44,7 +44,8 @@ using namespace HTMLNames;
 RenderHTMLCanvas::RenderHTMLCanvas(HTMLCanvasElement* element)
     : RenderReplaced(element, element->size())
 {
-    view()->frameView()->setIsVisuallyNonEmpty();
+    // Actual size is not known yet, report the default intrinsic size.
+    view()->frameView()->incrementVisuallyNonEmptyPixelCount(roundedIntSize(intrinsicSize()));
 }
 
 bool RenderHTMLCanvas::requiresLayer() const
@@ -68,7 +69,7 @@ void RenderHTMLCanvas::paintReplaced(PaintInfo& paintInfo, const LayoutPoint& pa
         }
     }
 
-    bool useLowQualityScale = style()->imageRendering() == ImageRenderingOptimizeContrast;
+    bool useLowQualityScale = style()->imageRendering() == ImageRenderingCrispEdges || style()->imageRendering() == ImageRenderingOptimizeSpeed;
     static_cast<HTMLCanvasElement*>(node())->paint(paintInfo.context, rect, useLowQualityScale);
 }
 

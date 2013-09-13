@@ -65,6 +65,11 @@ CookiesStrategy* PlatformStrategiesQt::createCookiesStrategy()
     return this;
 }
 
+DatabaseStrategy* PlatformStrategiesQt::createDatabaseStrategy()
+{
+    return this;
+}
+
 LoaderStrategy* PlatformStrategiesQt::createLoaderStrategy()
 {
     return this;
@@ -85,58 +90,44 @@ SharedWorkerStrategy* PlatformStrategiesQt::createSharedWorkerStrategy()
     return this;
 }
 
+StorageStrategy* PlatformStrategiesQt::createStorageStrategy()
+{
+    return this;
+}
+
 VisitedLinkStrategy* PlatformStrategiesQt::createVisitedLinkStrategy()
 {
     return this;
 }
 
-void PlatformStrategiesQt::notifyCookiesChanged()
+String PlatformStrategiesQt::cookiesForDOM(const NetworkStorageSession& session, const KURL& firstParty, const KURL& url)
 {
+    return WebCore::cookiesForDOM(session, firstParty, url);
 }
 
-String PlatformStrategiesQt::cookiesForDOM(NetworkingContext* context, const KURL& firstParty, const KURL& url)
+void PlatformStrategiesQt::setCookiesFromDOM(const NetworkStorageSession& session, const KURL& firstParty, const KURL& url, const String& cookieString)
 {
-    return WebCore::cookiesForDOM(context, firstParty, url);
+    WebCore::setCookiesFromDOM(session, firstParty, url, cookieString);
 }
 
-void PlatformStrategiesQt::setCookiesFromDOM(NetworkingContext* context, const KURL& firstParty, const KURL& url, const String& cookieString)
+bool PlatformStrategiesQt::cookiesEnabled(const NetworkStorageSession& session, const KURL& firstParty, const KURL& url)
 {
-    WebCore::setCookiesFromDOM(context, firstParty, url, cookieString);
+    return WebCore::cookiesEnabled(session, firstParty, url);
 }
 
-bool PlatformStrategiesQt::cookiesEnabled(NetworkingContext* context, const KURL& firstParty, const KURL& url)
+String PlatformStrategiesQt::cookieRequestHeaderFieldValue(const NetworkStorageSession& session, const KURL& firstParty, const KURL& url)
 {
-    return WebCore::cookiesEnabled(context, firstParty, url);
+    return WebCore::cookieRequestHeaderFieldValue(session, firstParty, url);
 }
 
-String PlatformStrategiesQt::cookieRequestHeaderFieldValue(NetworkingContext* context, const KURL& firstParty, const KURL& url)
+bool PlatformStrategiesQt::getRawCookies(const NetworkStorageSession& session, const KURL& firstParty, const KURL& url, Vector<Cookie>& rawCookies)
 {
-    return WebCore::cookieRequestHeaderFieldValue(context, firstParty, url);
+    return WebCore::getRawCookies(session, firstParty, url, rawCookies);
 }
 
-bool PlatformStrategiesQt::getRawCookies(NetworkingContext* context, const KURL& firstParty, const KURL& url, Vector<Cookie>& rawCookies)
+void PlatformStrategiesQt::deleteCookie(const NetworkStorageSession& session, const KURL& url, const String& cookieName)
 {
-    return WebCore::getRawCookies(context, firstParty, url, rawCookies);
-}
-
-void PlatformStrategiesQt::deleteCookie(NetworkingContext* context, const KURL& url, const String& cookieName)
-{
-    WebCore::deleteCookie(context, url, cookieName);
-}
-
-void PlatformStrategiesQt::getHostnamesWithCookies(NetworkingContext* context, HashSet<String>& hostnames)
-{
-    WebCore::getHostnamesWithCookies(context, hostnames);
-}
-
-void PlatformStrategiesQt::deleteCookiesForHostname(NetworkingContext* context, const String& hostname)
-{
-    WebCore::deleteCookiesForHostname(context, hostname);
-}
-
-void PlatformStrategiesQt::deleteAllCookies(NetworkingContext* context)
-{
-    WebCore::deleteAllCookies(context);
+    WebCore::deleteCookie(session, url, cookieName);
 }
 
 void PlatformStrategiesQt::refreshPlugins()
@@ -146,7 +137,10 @@ void PlatformStrategiesQt::refreshPlugins()
 
 void PlatformStrategiesQt::getPluginInfo(const WebCore::Page* page, Vector<WebCore::PluginInfo>& outPlugins)
 {
-    QWebPageAdapter* qPage = static_cast<ChromeClientQt*>(page->chrome()->client())->m_webPage;
+    QWebPageAdapter* qPage = 0;
+    if (!page->chrome().client()->isEmptyChromeClient())
+        qPage = static_cast<ChromeClientQt*>(page->chrome().client())->m_webPage;
+
     QWebPluginFactory* factory;
     if (qPage && (factory = qPage->pluginFactory)) {
 

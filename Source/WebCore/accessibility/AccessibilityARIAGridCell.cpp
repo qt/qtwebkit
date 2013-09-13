@@ -48,9 +48,7 @@ AccessibilityARIAGridCell::~AccessibilityARIAGridCell()
 
 PassRefPtr<AccessibilityARIAGridCell> AccessibilityARIAGridCell::create(RenderObject* renderer)
 {
-    AccessibilityARIAGridCell* obj = new AccessibilityARIAGridCell(renderer);
-    obj->init();
-    return adoptRef(obj);
+    return adoptRef(new AccessibilityARIAGridCell(renderer));
 }
 
 AccessibilityObject* AccessibilityARIAGridCell::parentTable() const
@@ -72,7 +70,7 @@ AccessibilityObject* AccessibilityARIAGridCell::parentTable() const
     return parent;
 }
     
-void AccessibilityARIAGridCell::rowIndexRange(pair<int, int>& rowRange)
+void AccessibilityARIAGridCell::rowIndexRange(pair<unsigned, unsigned>& rowRange)
 {
     AccessibilityObject* parent = parentObjectUnignored();
     if (!parent)
@@ -102,7 +100,7 @@ void AccessibilityARIAGridCell::rowIndexRange(pair<int, int>& rowRange)
     rowRange.second = 1;
 }
 
-void AccessibilityARIAGridCell::columnIndexRange(pair<int, int>& columnRange)
+void AccessibilityARIAGridCell::columnIndexRange(pair<unsigned, unsigned>& columnRange)
 {
     AccessibilityObject* parent = parentObjectUnignored();
     if (!parent)

@@ -27,7 +27,6 @@
 #include "CSSParser.h"
 #include "RGBColor.h"
 #include "SVGException.h"
-#include "WebCoreMemoryInstrumentation.h"
 
 namespace WebCore {
 
@@ -105,9 +104,9 @@ PassRefPtr<SVGColor> SVGColor::cloneForCSSOM() const
     return adoptRef(new SVGColor(SVGColorClass, *this));
 }
 
-void SVGColor::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+bool SVGColor::equals(const SVGColor& other) const
 {
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
+    return m_colorType == other.m_colorType && m_color == other.m_color;
 }
 
 }

@@ -42,7 +42,7 @@ inline HTMLOptGroupElement::HTMLOptGroupElement(const QualifiedName& tagName, Do
     : HTMLElement(tagName, document)
 {
     ASSERT(hasTagName(optgroupTag));
-    setHasCustomCallbacks();
+    setHasCustomStyleCallbacks();
 }
 
 PassRefPtr<HTMLOptGroupElement> HTMLOptGroupElement::create(const QualifiedName& tagName, Document* document)
@@ -50,14 +50,9 @@ PassRefPtr<HTMLOptGroupElement> HTMLOptGroupElement::create(const QualifiedName&
     return adoptRef(new HTMLOptGroupElement(tagName, document));
 }
 
-bool HTMLOptGroupElement::disabled() const
+bool HTMLOptGroupElement::isDisabledFormControl() const
 {
     return fastHasAttribute(disabledAttr);
-}
-
-bool HTMLOptGroupElement::supportsFocus() const
-{
-    return HTMLElement::supportsFocus();
 }
 
 bool HTMLOptGroupElement::isFocusable() const
@@ -84,7 +79,7 @@ void HTMLOptGroupElement::parseAttribute(const QualifiedName& name, const Atomic
     recalcSelectOptions();
 
     if (name == disabledAttr)
-        invalidateParentDistributionIfNecessary(this, SelectRuleFeatureSet::RuleFeatureDisabled | SelectRuleFeatureSet::RuleFeatureEnabled);
+        didAffectSelector(AffectedSelectorDisabled | AffectedSelectorEnabled);
 }
 
 void HTMLOptGroupElement::recalcSelectOptions()
@@ -96,9 +91,9 @@ void HTMLOptGroupElement::recalcSelectOptions()
         toHTMLSelectElement(select)->setRecalcListItems();
 }
 
-void HTMLOptGroupElement::attach()
+void HTMLOptGroupElement::attach(const AttachContext& context)
 {
-    HTMLElement::attach();
+    HTMLElement::attach(context);
     // If after attaching nothing called styleForRenderer() on this node we
     // manually cache the value. This happens if our parent doesn't have a
     // renderer like <optgroup> or if it doesn't allow children like <select>.
@@ -106,15 +101,15 @@ void HTMLOptGroupElement::attach()
         updateNonRenderStyle();
 }
 
-void HTMLOptGroupElement::detach()
+void HTMLOptGroupElement::detach(const AttachContext& context)
 {
     m_style.clear();
-    HTMLElement::detach();
+    HTMLElement::detach(context);
 }
 
 void HTMLOptGroupElement::updateNonRenderStyle()
 {
-    m_style = document()->styleResolver()->styleForElement(this);
+    m_style = document()->ensureStyleResolver()->styleForElement(this);
 }
 
 RenderStyle* HTMLOptGroupElement::nonRendererStyle() const

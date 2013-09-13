@@ -25,7 +25,7 @@
 #ifndef Cache_h
 #define Cache_h
 
-#include "CachedResource.h"
+#include "SecurityOriginHash.h"
 #include <wtf/HashMap.h>
 #include <wtf/HashSet.h>
 #include <wtf/Noncopyable.h>
@@ -39,8 +39,11 @@ class CachedCSSStyleSheet;
 class CachedResource;
 class CachedResourceLoader;
 class KURL;
+class ResourceRequest;
+class ResourceResponse;
 class ScriptExecutionContext;
 class SecurityOrigin;
+struct CrossThreadResourceRequestData;
 struct SecurityOriginHash;
 
 // This cache holds subresources used by Web pages: images, scripts, stylesheets, etc.
@@ -77,7 +80,12 @@ class MemoryCache {
 public:
     friend MemoryCache* memoryCache();
 
+#if ENABLE(CACHE_PARTITIONING)
+    typedef HashMap<String, CachedResource*> CachedResourceItem;
+    typedef HashMap<String, OwnPtr<CachedResourceItem> > CachedResourceMap;
+#else
     typedef HashMap<String, CachedResource*> CachedResourceMap;
+#endif
 
     struct LRUList {
         CachedResource* m_head;
@@ -103,8 +111,9 @@ public:
         TypeStatistic xslStyleSheets;
         TypeStatistic fonts;
     };
-    
+
     CachedResource* resourceForURL(const KURL&);
+    CachedResource* resourceForRequest(const ResourceRequest&);
     
     bool add(CachedResource* resource);
     void remove(CachedResource* resource) { evict(resource); }
@@ -152,13 +161,14 @@ public:
     static bool shouldMakeResourcePurgeableOnEviction();
 
     static void removeUrlFromCache(ScriptExecutionContext*, const String& urlString);
+    static void removeRequestFromCache(ScriptExecutionContext*, const ResourceRequest&);
 
     // Function to collect cache statistics for the caches window in the Safari Debug menu.
     Statistics getStatistics();
     
     void resourceAccessed(CachedResource*);
 
-    typedef HashSet<RefPtr<SecurityOrigin>, SecurityOriginHash> SecurityOriginSet;
+    typedef HashSet<RefPtr<SecurityOrigin> > SecurityOriginSet;
     void removeResourcesWithOrigin(SecurityOrigin*);
     void getOriginsWithCache(SecurityOriginSet& origins);
 
@@ -167,8 +177,6 @@ public:
     unsigned capacity() const { return m_capacity; }
     unsigned liveSize() const { return m_liveSize; }
     unsigned deadSize() const { return m_deadSize; }
-
-    void reportMemoryUsage(MemoryObjectInfo*) const;
 
 private:
     MemoryCache();
@@ -195,7 +203,8 @@ private:
     bool makeResourcePurgeable(CachedResource*);
     void evict(CachedResource*);
 
-    static void removeUrlFromCacheImpl(ScriptExecutionContext*, const String& urlString);
+    static void removeRequestFromCacheImpl(ScriptExecutionContext*, const ResourceRequest&);
+    static void crossThreadRemoveRequestFromCache(ScriptExecutionContext*, PassOwnPtr<CrossThreadResourceRequestData>);
 
     bool m_disabled;  // Whether or not the cache is enabled.
     bool m_pruneEnabled;
@@ -219,7 +228,7 @@ private:
     
     // A URL-based map of all resources that are in the cache (including the freshest version of objects that are currently being 
     // referenced by a Web page).
-    HashMap<String, CachedResource*> m_resources;
+    CachedResourceMap m_resources;
 };
 
 inline bool MemoryCache::shouldMakeResourcePurgeableOnEviction()

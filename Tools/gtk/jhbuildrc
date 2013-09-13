@@ -35,27 +35,30 @@ modules = [ 'webkitgtk-testing-dependencies', ]
 if __extra_modules != ['']:
     modules.extend(__extra_modules)
 
-if os.environ.has_key('WEBKITOUTPUTDIR'):
-    checkoutroot = os.path.abspath(os.path.join(os.environ['WEBKITOUTPUTDIR'], 'Dependencies', 'Source'))
-    prefix = os.path.abspath(os.path.join(os.environ['WEBKITOUTPUTDIR'], 'Dependencies', 'Root'))
+if os.environ.has_key('WEBKIT_OUTPUTDIR'):
+    checkoutroot = os.path.abspath(os.path.join(os.environ['WEBKIT_OUTPUTDIR'], 'Dependencies', 'Source'))
+    prefix = os.path.abspath(os.path.join(os.environ['WEBKIT_OUTPUTDIR'], 'Dependencies', 'Root'))
 else:
     checkoutroot = os.path.abspath(common.top_level_path('WebKitBuild','Dependencies', 'Source'))
     prefix = os.path.abspath(common.top_level_path('WebKitBuild','Dependencies', 'Root'))
 
 nonotify = True
 notrayicon = True
-os.environ['MAKEFLAGS'] = '-j%d' % multiprocessing.cpu_count()
 
-# Use system libraries while building.
-if use_lib64:
-    _libdir = 'lib64'
-else:
-    _libdir = 'lib'
-addpath('PKG_CONFIG_PATH', os.path.join(os.sep, 'usr', _libdir, 'pkgconfig'))
-addpath('PKG_CONFIG_PATH', os.path.join(os.sep, 'usr', 'share', 'pkgconfig'))
-
-addpath('XDG_DATA_DIRS', '/usr/share')
-addpath('XDG_CONFIG_DIRS', '/etc/xdg')
+if 'NUMBER_OF_PROCESSORS' in os.environ:
+    jobs = os.environ['NUMBER_OF_PROCESSORS']
 
 # GTK+ 3.0.12 misses the -lm flag when linking the tests.
 module_makeargs['gtk+'] = 'LDFLAGS="-lm" ' + makeargs
+
+# Avoid runtime conflicts with GStreamer system-wide plugins. We want
+# to use only the plugins we build in JHBuild.
+os.environ['GST_PLUGIN_SYSTEM_PATH'] = ''
+
+# We often end up using the memory backend anyway, so explicitly choosing
+# it will prevent the warning message.
+os.environ['GSETTINGS_BACKEND'] = 'memory'
+
+# We always enable introspection so that we can sniff out problems with our
+# annotations sooner rather than later.
+autogenargs='--enable-introspection'

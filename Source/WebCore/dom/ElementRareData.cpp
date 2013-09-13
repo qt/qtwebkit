@@ -30,22 +30,20 @@
 
 #include "config.h"
 #include "ElementRareData.h"
-
+#include "RegionOversetState.h"
 #include "RenderStyle.h"
-#include "WebCoreMemoryInstrumentation.h"
 
 namespace WebCore {
 
-void ElementRareData::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::DOM);
-    NodeRareData::reportMemoryUsage(memoryObjectInfo);
-    info.addMember(m_computedStyle);
+struct SameSizeAsElementRareData : NodeRareData {
+    short indices[2];
+    unsigned bitfields;
+    RegionOversetState regionOversetState;
+    LayoutSize sizeForResizing;
+    IntSize scrollOffset;
+    void* pointers[7];
+};
 
-    info.addMember(m_datasetDOMStringMap);
-    info.addMember(m_classList);
-    info.addMember(m_shadow);
-    info.addMember(m_attributeMap);
-}
+COMPILE_ASSERT(sizeof(ElementRareData) == sizeof(SameSizeAsElementRareData), ElementRareDataShouldStaySmall);
 
 } // namespace WebCore

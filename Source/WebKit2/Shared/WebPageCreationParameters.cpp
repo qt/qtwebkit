@@ -43,6 +43,7 @@ void WebPageCreationParameters::encode(CoreIPC::ArgumentEncoder& encoder) const
     encoder << pageGroupData;
     encoder << drawsBackground;
     encoder << drawsTransparentBackground;
+    encoder << underlayColor;
     encoder << areMemoryCacheClientCallsEnabled;
     encoder << useFixedLayout;
     encoder << fixedLayoutSize;
@@ -58,85 +59,79 @@ void WebPageCreationParameters::encode(CoreIPC::ArgumentEncoder& encoder) const
     encoder << deviceScaleFactor;
     encoder << mediaVolume;
     encoder << mayStartMediaWhenInWindow;
+    encoder << minimumLayoutSize;
+    encoder.encodeEnum(scrollPinningBehavior);
 
 #if PLATFORM(MAC)
-    encoder << isSmartInsertDeleteEnabled;
     encoder.encodeEnum(layerHostingMode);
     encoder << colorSpace;
 #endif
-
-#if PLATFORM(WIN)
-    encoder << reinterpret_cast<uint64_t>(nativeWindow);
-#endif
 }
 
-bool WebPageCreationParameters::decode(CoreIPC::ArgumentDecoder* decoder, WebPageCreationParameters& parameters)
+bool WebPageCreationParameters::decode(CoreIPC::ArgumentDecoder& decoder, WebPageCreationParameters& parameters)
 {
-    if (!decoder->decode(parameters.viewSize))
+    if (!decoder.decode(parameters.viewSize))
         return false;
-    if (!decoder->decode(parameters.isActive))
+    if (!decoder.decode(parameters.isActive))
         return false;
-    if (!decoder->decode(parameters.isFocused))
+    if (!decoder.decode(parameters.isFocused))
         return false;
-    if (!decoder->decode(parameters.isVisible))
+    if (!decoder.decode(parameters.isVisible))
         return false;
-    if (!decoder->decode(parameters.isInWindow))
+    if (!decoder.decode(parameters.isInWindow))
         return false;
-    if (!decoder->decode(parameters.store))
+    if (!decoder.decode(parameters.store))
         return false;
-    if (!decoder->decodeEnum(parameters.drawingAreaType))
+    if (!decoder.decodeEnum(parameters.drawingAreaType))
         return false;
-    if (!decoder->decode(parameters.pageGroupData))
+    if (!decoder.decode(parameters.pageGroupData))
         return false;
-    if (!decoder->decode(parameters.drawsBackground))
+    if (!decoder.decode(parameters.drawsBackground))
         return false;
-    if (!decoder->decode(parameters.drawsTransparentBackground))
+    if (!decoder.decode(parameters.drawsTransparentBackground))
         return false;
-    if (!decoder->decode(parameters.areMemoryCacheClientCallsEnabled))
+    if (!decoder.decode(parameters.underlayColor))
         return false;
-    if (!decoder->decode(parameters.useFixedLayout))
+    if (!decoder.decode(parameters.areMemoryCacheClientCallsEnabled))
         return false;
-    if (!decoder->decode(parameters.fixedLayoutSize))
+    if (!decoder.decode(parameters.useFixedLayout))
         return false;
-    if (!decoder->decodeEnum(parameters.paginationMode))
+    if (!decoder.decode(parameters.fixedLayoutSize))
         return false;
-    if (!decoder->decode(parameters.paginationBehavesLikeColumns))
+    if (!decoder.decodeEnum(parameters.paginationMode))
         return false;
-    if (!decoder->decode(parameters.pageLength))
+    if (!decoder.decode(parameters.paginationBehavesLikeColumns))
         return false;
-    if (!decoder->decode(parameters.gapBetweenPages))
+    if (!decoder.decode(parameters.pageLength))
         return false;
-    if (!decoder->decode(parameters.userAgent))
+    if (!decoder.decode(parameters.gapBetweenPages))
         return false;
-    if (!decoder->decode(parameters.sessionState))
+    if (!decoder.decode(parameters.userAgent))
         return false;
-    if (!decoder->decode(parameters.highestUsedBackForwardItemID))
+    if (!decoder.decode(parameters.sessionState))
         return false;
-    if (!decoder->decode(parameters.canRunBeforeUnloadConfirmPanel))
+    if (!decoder.decode(parameters.highestUsedBackForwardItemID))
         return false;
-    if (!decoder->decode(parameters.canRunModal))
+    if (!decoder.decode(parameters.canRunBeforeUnloadConfirmPanel))
         return false;
-    if (!decoder->decode(parameters.deviceScaleFactor))
+    if (!decoder.decode(parameters.canRunModal))
         return false;
-    if (!decoder->decode(parameters.mediaVolume))
+    if (!decoder.decode(parameters.deviceScaleFactor))
         return false;
-    if (!decoder->decode(parameters.mayStartMediaWhenInWindow))
+    if (!decoder.decode(parameters.mediaVolume))
         return false;
-
+    if (!decoder.decode(parameters.mayStartMediaWhenInWindow))
+        return false;
+    if (!decoder.decode(parameters.minimumLayoutSize))
+        return false;
+    if (!decoder.decodeEnum(parameters.scrollPinningBehavior))
+        return false;
+    
 #if PLATFORM(MAC)
-    if (!decoder->decode(parameters.isSmartInsertDeleteEnabled))
+    if (!decoder.decodeEnum(parameters.layerHostingMode))
         return false;
-    if (!decoder->decodeEnum(parameters.layerHostingMode))
+    if (!decoder.decode(parameters.colorSpace))
         return false;
-    if (!decoder->decode(parameters.colorSpace))
-        return false;
-#endif
-
-#if PLATFORM(WIN)
-    uint64_t nativeWindow;
-    if (!decoder->decode(nativeWindow))
-        return false;
-    parameters.nativeWindow = reinterpret_cast<HWND>(nativeWindow);
 #endif
 
     return true;

@@ -31,10 +31,11 @@
 #include "FloatConversion.h"
 #include "GraphicsContextCG.h"
 #include "ImageObserver.h"
+#include "SubimageCacheWithTimer.h"
 #include <ApplicationServices/ApplicationServices.h>
 #include <wtf/RetainPtr.h>
 
-#if PLATFORM(MAC) || PLATFORM(CHROMIUM)
+#if PLATFORM(MAC)
 #include "WebCoreSystemInterface.h"
 #endif
 
@@ -52,6 +53,9 @@ bool FrameData::clear(bool clearMetadata)
     m_orientation = DefaultImageOrientation;
 
     if (m_frame) {
+#if CACHE_SUBIMAGES
+        subimageCache().clearImage(m_frame);
+#endif
         CGImageRelease(m_frame);
         m_frame = 0;
         return true;
@@ -110,7 +114,7 @@ void BitmapImage::checkForSolidColor()
     // Currently we only check for solid color in the important special case of a 1x1 image.
     if (image && CGImageGetWidth(image) == 1 && CGImageGetHeight(image) == 1) {
         unsigned char pixel[4]; // RGBA
-        RetainPtr<CGContextRef> bmap(AdoptCF, CGBitmapContextCreate(pixel, 1, 1, 8, sizeof(pixel), deviceRGBColorSpaceRef(),
+        RetainPtr<CGContextRef> bmap = adoptCF(CGBitmapContextCreate(pixel, 1, 1, 8, sizeof(pixel), deviceRGBColorSpaceRef(),
             kCGImageAlphaPremultipliedLast | kCGBitmapByteOrder32Big));
         if (!bmap)
             return;
@@ -154,15 +158,15 @@ RetainPtr<CFArrayRef> BitmapImage::getCGImageArray()
         if (CGImageRef currFrame = frameAtIndex(i))
             CFArrayAppendValue(array, currFrame);
     }
-    return RetainPtr<CFArrayRef>(AdoptCF, array);
+    return adoptCF(array);
 }
 
-void BitmapImage::draw(GraphicsContext* ctx, const FloatRect& dstRect, const FloatRect& srcRect, ColorSpace styleColorSpace, CompositeOperator op)
+void BitmapImage::draw(GraphicsContext* ctx, const FloatRect& dstRect, const FloatRect& srcRect, ColorSpace styleColorSpace, CompositeOperator op, BlendMode blendMode)
 {
-    draw(ctx, dstRect, srcRect, styleColorSpace, op, DoNotRespectImageOrientation);
+    draw(ctx, dstRect, srcRect, styleColorSpace, op, blendMode, DoNotRespectImageOrientation);
 }
 
-void BitmapImage::draw(GraphicsContext* ctxt, const FloatRect& destRect, const FloatRect& srcRect, ColorSpace styleColorSpace, CompositeOperator compositeOp, RespectImageOrientationEnum shouldRespectImageOrientation)
+void BitmapImage::draw(GraphicsContext* ctxt, const FloatRect& destRect, const FloatRect& srcRect, ColorSpace styleColorSpace, CompositeOperator compositeOp, BlendMode blendMode, RespectImageOrientationEnum shouldRespectImageOrientation)
 {
     startAnimation();
 
@@ -181,7 +185,7 @@ void BitmapImage::draw(GraphicsContext* ctxt, const FloatRect& destRect, const F
     if (shouldRespectImageOrientation == RespectImageOrientation)
         orientation = frameOrientationAtIndex(m_currentFrame);
 
-    ctxt->drawNativeImage(image, selfSize, styleColorSpace, destRect, srcRect, compositeOp, orientation);
+    ctxt->drawNativeImage(image, selfSize, styleColorSpace, destRect, srcRect, compositeOp, blendMode, orientation);
 
     if (imageObserver())
         imageObserver()->didDraw(this);

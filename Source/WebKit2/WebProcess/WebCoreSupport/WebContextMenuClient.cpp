@@ -33,7 +33,9 @@
 #include "WebContextMenuItemData.h"
 #include "WebPage.h"
 #include <WebCore/ContextMenu.h>
+#include <WebCore/Event.h>
 #include <WebCore/Frame.h>
+#include <WebCore/FrameLoader.h>
 #include <WebCore/NotImplemented.h>
 #include <WebCore/Page.h>
 #include <WebCore/UserGestureIndicator.h>
@@ -72,11 +74,10 @@ void WebContextMenuClient::downloadURL(const KURL&)
     ASSERT_NOT_REACHED();
 }
 
+#if !PLATFORM(MAC)
 void WebContextMenuClient::searchWithGoogle(const Frame* frame)
 {
-    // FIXME: this should use NSPerformService on Mac to support the system default search provider.
-
-    String searchString = frame->editor()->selectedText();
+    String searchString = frame->editor().selectedText();
     searchString.stripWhiteSpace();
     String encoded = encodeWithURLEscapeSequences(searchString);
     encoded.replace("%20", "+");
@@ -88,6 +89,7 @@ void WebContextMenuClient::searchWithGoogle(const Frame* frame)
         page->mainFrame()->loader()->urlSelected(KURL(ParsedURLString, url), String(), 0, false, false, MaybeSendReferrer);
     }
 }
+#endif
 
 #if USE(ACCESSIBILITY_CONTEXT_MENUS)
 void WebContextMenuClient::showContextMenu()

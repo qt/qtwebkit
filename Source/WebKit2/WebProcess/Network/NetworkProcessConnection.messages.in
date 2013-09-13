@@ -22,7 +22,9 @@
 
 #if ENABLE(NETWORK_PROCESS)
 
-messages -> NetworkProcessConnection {
+messages -> NetworkProcessConnection LegacyReceiver {
+
+    DidCacheResource(WebCore::ResourceRequest request, WebKit::ShareableResource::Handle resource)
 
 }
 

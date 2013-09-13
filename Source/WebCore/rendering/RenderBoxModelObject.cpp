@@ -35,11 +35,12 @@
 #include "RenderBlock.h"
 #include "RenderInline.h"
 #include "RenderLayer.h"
+#include "RenderNamedFlowThread.h"
+#include "RenderRegion.h"
 #include "RenderView.h"
 #include "ScrollingConstraints.h"
 #include "Settings.h"
 #include "TransformState.h"
-#include <wtf/CurrentTime.h>
 
 #if USE(ACCELERATED_COMPOSITING)
 #include "RenderLayerBacking.h"
@@ -90,11 +91,13 @@ private:
     ObjectLayerSizeMap m_objectLayerSizeMap;
     Timer<ImageQualityController> m_timer;
     bool m_animatedResizeIsActive;
+    bool m_liveResizeOptimizationIsActive;
 };
 
 ImageQualityController::ImageQualityController()
     : m_timer(this, &ImageQualityController::highQualityRepaintTimerFired)
     , m_animatedResizeIsActive(false)
+    , m_liveResizeOptimizationIsActive(false)
 {
 }
 
@@ -129,11 +132,22 @@ void ImageQualityController::objectDestroyed(RenderBoxModelObject* object)
 
 void ImageQualityController::highQualityRepaintTimerFired(Timer<ImageQualityController>*)
 {
-    if (m_animatedResizeIsActive) {
-        m_animatedResizeIsActive = false;
-        for (ObjectLayerSizeMap::iterator it = m_objectLayerSizeMap.begin(); it != m_objectLayerSizeMap.end(); ++it)
-            it->key->repaint();
+    if (!m_animatedResizeIsActive && !m_liveResizeOptimizationIsActive)
+        return;
+    m_animatedResizeIsActive = false;
+
+    for (ObjectLayerSizeMap::iterator it = m_objectLayerSizeMap.begin(); it != m_objectLayerSizeMap.end(); ++it) {
+        if (Frame* frame = it->key->document()->frame()) {
+            // If this renderer's containing FrameView is in live resize, punt the timer and hold back for now.
+            if (frame->view() && frame->view()->inLiveResize()) {
+                restartTimer();
+                return;
+            }
+        }
+        it->key->repaint();
     }
+
+    m_liveResizeOptimizationIsActive = false;
 }
 
 void ImageQualityController::restartTimer()
@@ -148,9 +162,16 @@ bool ImageQualityController::shouldPaintAtLowQuality(GraphicsContext* context, R
     if (!image || !image->isBitmapImage() || context->paintingDisabled())
         return false;
 
-    if (object->style()->imageRendering() == ImageRenderingOptimizeContrast)
+    switch (object->style()->imageRendering()) {
+    case ImageRenderingOptimizeSpeed:
+    case ImageRenderingCrispEdges:
         return true;
-    
+    case ImageRenderingOptimizeQuality:
+        return false;
+    case ImageRenderingAuto:
+        break;
+    }
+
     // Make sure to use the unzoomed image size, since if a full page zoom is in effect, the image
     // is actually being scaled.
     IntSize imageSize(image->width(), image->height());
@@ -165,6 +186,22 @@ bool ImageQualityController::shouldPaintAtLowQuality(GraphicsContext* context, R
         if (j != innerMap->end()) {
             isFirstResize = false;
             oldSize = j->value;
+        }
+    }
+
+    // If the containing FrameView is being resized, paint at low quality until resizing is finished.
+    if (Frame* frame = object->document()->frame()) {
+        bool frameViewIsCurrentlyInLiveResize = frame->view() && frame->view()->inLiveResize();
+        if (frameViewIsCurrentlyInLiveResize) {
+            set(object, innerMap, layer, size);
+            restartTimer();
+            m_liveResizeOptimizationIsActive = true;
+            return true;
+        }
+        if (m_liveResizeOptimizationIsActive) {
+            // Live resize has ended, paint in HQ and remove this object from the list.
+            removeLayer(object, innerMap, layer);
+            return false;
         }
     }
 
@@ -310,7 +347,7 @@ bool RenderBoxModelObject::shouldPaintAtLowQuality(GraphicsContext* context, Ima
     return imageQualityController()->shouldPaintAtLowQuality(context, this, image, layer, size);
 }
 
-RenderBoxModelObject::RenderBoxModelObject(Node* node)
+RenderBoxModelObject::RenderBoxModelObject(ContainerNode* node)
     : RenderLayerModelObject(node)
 {
 }
@@ -331,15 +368,6 @@ void RenderBoxModelObject::willBeDestroyed()
     // A continuation of this RenderObject should be destroyed at subclasses.
     ASSERT(!continuation());
 
-    if (isPositioned()) {
-        if (RenderView* view = this->view()) {
-            if (FrameView* frameView = view->frameView()) {
-                if (style()->hasViewportConstrainedPosition())
-                    frameView->removeViewportConstrainedObject(this);
-            }
-        }
-    }
-
     // If this is a first-letter object with a remaining text fragment then the
     // entry needs to be cleared from the map.
     if (firstLetterRemainingText())
@@ -357,8 +385,7 @@ void RenderBoxModelObject::updateFromStyle()
     RenderStyle* styleToUse = style();
     setHasBoxDecorations(hasBackground() || styleToUse->hasBorder() || styleToUse->hasAppearance() || styleToUse->boxShadow());
     setInline(styleToUse->isDisplayInlineType());
-    setRelPositioned(styleToUse->position() == RelativePosition);
-    setStickyPositioned(styleToUse->position() == StickyPosition);
+    setPositionState(styleToUse->position());
     setHorizontalWritingMode(styleToUse->isHorizontalWritingMode());
 }
 
@@ -376,6 +403,37 @@ static LayoutSize accumulateInFlowPositionOffsets(const RenderObject* child)
         p = p->parent();
     }
     return offset;
+}
+
+bool RenderBoxModelObject::hasAutoHeightOrContainingBlockWithAutoHeight() const
+{
+    Length logicalHeightLength = style()->logicalHeight();
+    if (logicalHeightLength.isAuto())
+        return true;
+
+    // For percentage heights: The percentage is calculated with respect to the height of the generated box's
+    // containing block. If the height of the containing block is not specified explicitly (i.e., it depends
+    // on content height), and this element is not absolutely positioned, the value computes to 'auto'.
+    if (!logicalHeightLength.isPercent() || isOutOfFlowPositioned() || document()->inQuirksMode())
+        return false;
+
+    // Anonymous block boxes are ignored when resolving percentage values that would refer to it:
+    // the closest non-anonymous ancestor box is used instead.
+    RenderBlock* cb = containingBlock(); 
+    while (cb->isAnonymous())
+        cb = cb->containingBlock();
+
+    // Matching RenderBox::percentageLogicalHeightIsResolvableFromBlock() by
+    // ignoring table cell's attribute value, where it says that table cells violate
+    // what the CSS spec says to do with heights. Basically we
+    // don't care if the cell specified a height or not.
+    if (cb->isTableCell())
+        return false;
+    
+    if (!cb->style()->logicalHeight().isAuto() || (!cb->style()->logicalTop().isAuto() && !cb->style()->logicalBottom().isAuto()))
+        return false;
+
+    return true;
 }
 
 LayoutSize RenderBoxModelObject::relativePositionOffset() const
@@ -404,13 +462,13 @@ LayoutSize RenderBoxModelObject::relativePositionOffset() const
     // calculate the percent offset based on this height.
     // See <https://bugs.webkit.org/show_bug.cgi?id=26396>.
     if (!style()->top().isAuto()
-        && (!containingBlock->style()->height().isAuto()
+        && (!containingBlock->hasAutoHeightOrContainingBlockWithAutoHeight()
             || !style()->top().isPercent()
             || containingBlock->stretchesToViewport()))
         offset.expand(0, valueForLength(style()->top(), containingBlock->availableHeight(), view()));
 
     else if (!style()->bottom().isAuto()
-        && (!containingBlock->style()->height().isAuto()
+        && (!containingBlock->hasAutoHeightOrContainingBlockWithAutoHeight()
             || !style()->bottom().isPercent()
             || containingBlock->stretchesToViewport()))
         offset.expand(0, -valueForLength(style()->bottom(), containingBlock->availableHeight(), view()));
@@ -434,20 +492,31 @@ LayoutPoint RenderBoxModelObject::adjustedPositionRelativeToOffsetParent(const L
     if (const RenderBoxModelObject* offsetParent = this->offsetParent()) {
         if (offsetParent->isBox() && !offsetParent->isBody())
             referencePoint.move(-toRenderBox(offsetParent)->borderLeft(), -toRenderBox(offsetParent)->borderTop());
-        if (!isOutOfFlowPositioned()) {
+        if (!isOutOfFlowPositioned() || flowThreadContainingBlock()) {
             if (isRelPositioned())
                 referencePoint.move(relativePositionOffset());
             else if (isStickyPositioned())
                 referencePoint.move(stickyPositionOffset());
-            const RenderObject* curr = parent();
-            while (curr != offsetParent) {
+            
+            // CSS regions specification says that region flows should return the body element as their offsetParent.
+            // Since we will bypass the body’s renderer anyway, just end the loop if we encounter a region flow (named flow thread).
+            // See http://dev.w3.org/csswg/css-regions/#cssomview-offset-attributes
+            RenderObject* curr = parent();
+            while (curr != offsetParent && !curr->isRenderNamedFlowThread()) {
                 // FIXME: What are we supposed to do inside SVG content?
-                if (curr->isBox() && !curr->isTableRow())
-                    referencePoint.moveBy(toRenderBox(curr)->topLeftLocation());
-                referencePoint.move(curr->parent()->offsetForColumns(referencePoint));
+                if (!isOutOfFlowPositioned()) {
+                    if (curr->isBox() && !curr->isTableRow())
+                        referencePoint.moveBy(toRenderBox(curr)->topLeftLocation());
+                    referencePoint.move(curr->parent()->offsetForColumns(referencePoint));
+                }
                 curr = curr->parent();
             }
-            if (offsetParent->isBox() && offsetParent->isBody() && !offsetParent->isPositioned())
+            
+            // Compute the offset position for elements inside named flow threads for which the offsetParent was the body.
+            // See https://bugs.webkit.org/show_bug.cgi?id=115899
+            if (curr->isRenderNamedFlowThread())
+                referencePoint = toRenderNamedFlowThread(curr)->adjustedPositionRelativeToOffsetParent(*this, referencePoint);
+            else if (offsetParent->isBox() && offsetParent->isBody() && !offsetParent->isPositioned())
                 referencePoint.moveBy(toRenderBox(offsetParent)->topLeftLocation());
         }
     }
@@ -455,63 +524,116 @@ LayoutPoint RenderBoxModelObject::adjustedPositionRelativeToOffsetParent(const L
     return referencePoint;
 }
 
-void RenderBoxModelObject::computeStickyPositionConstraints(StickyPositionViewportConstraints& constraints, const FloatRect& viewportRect) const
+void RenderBoxModelObject::computeStickyPositionConstraints(StickyPositionViewportConstraints& constraints, const FloatRect& constrainingRect) const
 {
+    constraints.setConstrainingRectAtLastLayout(constrainingRect);
+
     RenderBlock* containingBlock = this->containingBlock();
+    RenderLayer* enclosingClippingLayer = layer()->enclosingOverflowClipLayer(ExcludeSelf);
+    RenderBox* enclosingClippingBox = enclosingClippingLayer ? toRenderBox(enclosingClippingLayer->renderer()) : view();
 
-    LayoutRect containerContentRect = containingBlock->contentBoxRect();
+    LayoutRect containerContentRect;
+    if (!enclosingClippingLayer || (containingBlock != enclosingClippingBox))
+        containerContentRect = containingBlock->contentBoxRect();
+    else {
+        containerContentRect = containingBlock->layoutOverflowRect();
+        LayoutPoint containerLocation = containerContentRect.location() + LayoutPoint(containingBlock->borderLeft() + containingBlock->paddingLeft(),
+            containingBlock->borderTop() + containingBlock->paddingTop());
+        containerContentRect.setLocation(containerLocation);
+    }
 
-    LayoutUnit minLeftMargin = minimumValueForLength(style()->marginLeft(), containingBlock->availableLogicalWidth(), view());
-    LayoutUnit minTopMargin = minimumValueForLength(style()->marginTop(), containingBlock->availableLogicalWidth(), view());
-    LayoutUnit minRightMargin = minimumValueForLength(style()->marginRight(), containingBlock->availableLogicalWidth(), view());
-    LayoutUnit minBottomMargin = minimumValueForLength(style()->marginBottom(), containingBlock->availableLogicalWidth(), view());
+    LayoutUnit maxWidth = containingBlock->availableLogicalWidth();
+
+    // Sticky positioned element ignore any override logical width on the containing block (as they don't call
+    // containingBlockLogicalWidthForContent). It's unclear whether this is totally fine.
+    LayoutBoxExtent minMargin(minimumValueForLength(style()->marginTop(), maxWidth, view()),
+        minimumValueForLength(style()->marginRight(), maxWidth, view()),
+        minimumValueForLength(style()->marginBottom(), maxWidth, view()),
+        minimumValueForLength(style()->marginLeft(), maxWidth, view()));
 
     // Compute the container-relative area within which the sticky element is allowed to move.
-    containerContentRect.move(minLeftMargin, minTopMargin);
-    containerContentRect.contract(minLeftMargin + minRightMargin, minTopMargin + minBottomMargin);
-    constraints.setAbsoluteContainingBlockRect(containingBlock->localToAbsoluteQuad(FloatRect(containerContentRect), SnapOffsetForTransforms).boundingBox());
+    containerContentRect.contract(minMargin);
 
+    // Finally compute container rect relative to the scrolling ancestor.
+    FloatRect containerRectRelativeToScrollingAncestor = containingBlock->localToContainerQuad(FloatRect(containerContentRect), enclosingClippingBox).boundingBox();
+    if (enclosingClippingLayer) {
+        FloatPoint containerLocationRelativeToScrollingAncestor = containerRectRelativeToScrollingAncestor.location() -
+            FloatSize(enclosingClippingBox->borderLeft() + enclosingClippingBox->paddingLeft(),
+            enclosingClippingBox->borderTop() + enclosingClippingBox->paddingTop());
+        if (enclosingClippingBox != containingBlock)
+            containerLocationRelativeToScrollingAncestor += enclosingClippingLayer->scrollOffset();
+        containerRectRelativeToScrollingAncestor.setLocation(containerLocationRelativeToScrollingAncestor);
+    }
+    constraints.setContainingBlockRect(containerRectRelativeToScrollingAncestor);
+
+    // Now compute the sticky box rect, also relative to the scrolling ancestor.
     LayoutRect stickyBoxRect = frameRectForStickyPositioning();
     LayoutRect flippedStickyBoxRect = stickyBoxRect;
     containingBlock->flipForWritingMode(flippedStickyBoxRect);
-    LayoutPoint stickyLocation = flippedStickyBoxRect.location();
+    FloatRect stickyBoxRelativeToScrollingAnecstor = flippedStickyBoxRect;
 
-    // FIXME: sucks to call localToAbsolute again, but we can't just offset from the previously computed rect if there are transforms.
-    FloatRect absContainerFrame = containingBlock->localToAbsoluteQuad(FloatRect(FloatPoint(), containingBlock->size()), SnapOffsetForTransforms).boundingBox();
-    // We can't call localToAbsolute on |this| because that will recur. FIXME: For now, assume that |this| is not transformed.
-    FloatRect absoluteStickyBoxRect(absContainerFrame.location() + stickyLocation, flippedStickyBoxRect.size());
-    constraints.setAbsoluteStickyBoxRect(absoluteStickyBoxRect);
+    // FIXME: sucks to call localToContainerQuad again, but we can't just offset from the previously computed rect if there are transforms.
+    // Map to the view to avoid including page scale factor.
+    FloatPoint stickyLocationRelativeToScrollingAncestor = flippedStickyBoxRect.location() + containingBlock->localToContainerQuad(FloatRect(FloatPoint(), containingBlock->size()), enclosingClippingBox).boundingBox().location();
+    if (enclosingClippingLayer) {
+        stickyLocationRelativeToScrollingAncestor -= FloatSize(enclosingClippingBox->borderLeft() + enclosingClippingBox->paddingLeft(),
+            enclosingClippingBox->borderTop() + enclosingClippingBox->paddingTop());
+        if (enclosingClippingBox != containingBlock)
+            stickyLocationRelativeToScrollingAncestor += enclosingClippingLayer->scrollOffset();
+    }
+    // FIXME: For now, assume that |this| is not transformed.
+    stickyBoxRelativeToScrollingAnecstor.setLocation(stickyLocationRelativeToScrollingAncestor);
+    constraints.setStickyBoxRect(stickyBoxRelativeToScrollingAnecstor);
 
     if (!style()->left().isAuto()) {
-        constraints.setLeftOffset(valueForLength(style()->left(), viewportRect.width(), view()));
+        constraints.setLeftOffset(valueForLength(style()->left(), constrainingRect.width(), view()));
         constraints.addAnchorEdge(ViewportConstraints::AnchorEdgeLeft);
     }
 
     if (!style()->right().isAuto()) {
-        constraints.setRightOffset(valueForLength(style()->right(), viewportRect.width(), view()));
+        constraints.setRightOffset(valueForLength(style()->right(), constrainingRect.width(), view()));
         constraints.addAnchorEdge(ViewportConstraints::AnchorEdgeRight);
     }
 
     if (!style()->top().isAuto()) {
-        constraints.setTopOffset(valueForLength(style()->top(), viewportRect.height(), view()));
+        constraints.setTopOffset(valueForLength(style()->top(), constrainingRect.height(), view()));
         constraints.addAnchorEdge(ViewportConstraints::AnchorEdgeTop);
     }
 
     if (!style()->bottom().isAuto()) {
-        constraints.setBottomOffset(valueForLength(style()->bottom(), viewportRect.height(), view()));
+        constraints.setBottomOffset(valueForLength(style()->bottom(), constrainingRect.height(), view()));
         constraints.addAnchorEdge(ViewportConstraints::AnchorEdgeBottom);
     }
 }
 
 LayoutSize RenderBoxModelObject::stickyPositionOffset() const
 {
-    LayoutRect viewportRect = view()->frameView()->visibleContentRect();
+    FloatRect constrainingRect;
 
+    ASSERT(hasLayer());
+    RenderLayer* enclosingClippingLayer = layer()->enclosingOverflowClipLayer(ExcludeSelf);
+    if (enclosingClippingLayer) {
+        RenderBox* enclosingClippingBox = toRenderBox(enclosingClippingLayer->renderer());
+        LayoutRect clipRect = enclosingClippingBox->overflowClipRect(LayoutPoint(), 0); // FIXME: make this work in regions.
+        constrainingRect = enclosingClippingBox->localToContainerQuad(FloatRect(clipRect), view()).boundingBox();
+
+        FloatPoint scrollOffset = FloatPoint() + enclosingClippingLayer->scrollOffset();
+        constrainingRect.setLocation(scrollOffset);
+    } else {
+        LayoutRect viewportRect = view()->frameView()->viewportConstrainedVisibleContentRect();
+        float scale = 1;
+        if (Frame* frame = view()->frameView()->frame())
+            scale = frame->frameScaleFactor();
+        
+        viewportRect.scale(1 / scale);
+        constrainingRect = viewportRect;
+    }
+    
     StickyPositionViewportConstraints constraints;
-    computeStickyPositionConstraints(constraints, viewportRect);
+    computeStickyPositionConstraints(constraints, constrainingRect);
     
     // The sticky offset is physical, so we can just return the delta computed in absolute coords (though it may be wrong with transforms).
-    return LayoutSize(constraints.computeStickyOffset(viewportRect));
+    return LayoutSize(constraints.computeStickyOffset(constrainingRect));
 }
 
 LayoutSize RenderBoxModelObject::offsetForInFlowPosition() const
@@ -549,97 +671,12 @@ int RenderBoxModelObject::pixelSnappedOffsetHeight() const
     return snapSizeToPixel(offsetHeight(), offsetTop());
 }
 
-LayoutUnit RenderBoxModelObject::computedCSSPaddingTop() const
+LayoutUnit RenderBoxModelObject::computedCSSPadding(Length padding) const
 {
     LayoutUnit w = 0;
     RenderView* renderView = 0;
-    Length padding = style()->paddingTop();
     if (padding.isPercent())
-        w = containingBlock()->availableLogicalWidth();
-    else if (padding.isViewportPercentage())
-        renderView = view();
-    return minimumValueForLength(padding, w, renderView);
-}
-
-LayoutUnit RenderBoxModelObject::computedCSSPaddingBottom() const
-{
-    LayoutUnit w = 0;
-    RenderView* renderView = 0;
-    Length padding = style()->paddingBottom();
-    if (padding.isPercent())
-        w = containingBlock()->availableLogicalWidth();
-    else if (padding.isViewportPercentage())
-        renderView = view();
-    return minimumValueForLength(padding, w, renderView);
-}
-
-LayoutUnit RenderBoxModelObject::computedCSSPaddingLeft() const
-{
-    LayoutUnit w = 0;
-    RenderView* renderView = 0;
-    Length padding = style()->paddingLeft();
-    if (padding.isPercent())
-        w = containingBlock()->availableLogicalWidth();
-    else if (padding.isViewportPercentage())
-        renderView = view();
-    return minimumValueForLength(padding, w, renderView);
-}
-
-LayoutUnit RenderBoxModelObject::computedCSSPaddingRight() const
-{
-    LayoutUnit w = 0;
-    RenderView* renderView = 0;
-    Length padding = style()->paddingRight();
-    if (padding.isPercent())
-        w = containingBlock()->availableLogicalWidth();
-    else if (padding.isViewportPercentage())
-        renderView = view();
-    return minimumValueForLength(padding, w, renderView);
-}
-
-LayoutUnit RenderBoxModelObject::computedCSSPaddingBefore() const
-{
-    LayoutUnit w = 0;
-    RenderView* renderView = 0;
-    Length padding = style()->paddingBefore();
-    if (padding.isPercent())
-        w = containingBlock()->availableLogicalWidth();
-    else if (padding.isViewportPercentage())
-        renderView = view();
-    return minimumValueForLength(padding, w, renderView);
-}
-
-LayoutUnit RenderBoxModelObject::computedCSSPaddingAfter() const
-{
-    LayoutUnit w = 0;
-    RenderView* renderView = 0;
-    Length padding = style()->paddingAfter();
-    if (padding.isPercent())
-        w = containingBlock()->availableLogicalWidth();
-    else if (padding.isViewportPercentage())
-        renderView = view();
-    return minimumValueForLength(padding, w, renderView);
-}
-
-LayoutUnit RenderBoxModelObject::computedCSSPaddingStart() const
-{
-    LayoutUnit w = 0;
-    RenderView* renderView = 0;
-    Length padding = style()->paddingStart();
-    if (padding.isPercent())
-        w = containingBlock()->availableLogicalWidth();
-    else if (padding.isViewportPercentage())
-        renderView = view();
-    return minimumValueForLength(padding, w, renderView);
-}
-
-LayoutUnit RenderBoxModelObject::computedCSSPaddingEnd() const
-{
-    LayoutUnit w = 0;
-    RenderView* renderView = 0;
-    Length padding = style()->paddingEnd();
-    if (padding.isPercent())
-        w = containingBlock()->availableLogicalWidth();
+        w = containingBlockLogicalWidthForContent();
     else if (padding.isViewportPercentage())
         renderView = view();
     return minimumValueForLength(padding, w, renderView);
@@ -661,31 +698,31 @@ RoundedRect RenderBoxModelObject::getBackgroundRoundedRect(const LayoutRect& bor
 void RenderBoxModelObject::clipRoundedInnerRect(GraphicsContext * context, const LayoutRect& rect, const RoundedRect& clipRect)
 {
     if (clipRect.isRenderable())
-        context->addRoundedRectClip(clipRect);
+        context->clipRoundedRect(clipRect);
     else {
         // We create a rounded rect for each of the corners and clip it, while making sure we clip opposing corners together.
         if (!clipRect.radii().topLeft().isEmpty() || !clipRect.radii().bottomRight().isEmpty()) {
             IntRect topCorner(clipRect.rect().x(), clipRect.rect().y(), rect.maxX() - clipRect.rect().x(), rect.maxY() - clipRect.rect().y());
             RoundedRect::Radii topCornerRadii;
             topCornerRadii.setTopLeft(clipRect.radii().topLeft());
-            context->addRoundedRectClip(RoundedRect(topCorner, topCornerRadii));
+            context->clipRoundedRect(RoundedRect(topCorner, topCornerRadii));
 
             IntRect bottomCorner(rect.x(), rect.y(), clipRect.rect().maxX() - rect.x(), clipRect.rect().maxY() - rect.y());
             RoundedRect::Radii bottomCornerRadii;
             bottomCornerRadii.setBottomRight(clipRect.radii().bottomRight());
-            context->addRoundedRectClip(RoundedRect(bottomCorner, bottomCornerRadii));
+            context->clipRoundedRect(RoundedRect(bottomCorner, bottomCornerRadii));
         } 
 
         if (!clipRect.radii().topRight().isEmpty() || !clipRect.radii().bottomLeft().isEmpty()) {
             IntRect topCorner(rect.x(), clipRect.rect().y(), clipRect.rect().maxX() - rect.x(), rect.maxY() - clipRect.rect().y());
             RoundedRect::Radii topCornerRadii;
             topCornerRadii.setTopRight(clipRect.radii().topRight());
-            context->addRoundedRectClip(RoundedRect(topCorner, topCornerRadii));
+            context->clipRoundedRect(RoundedRect(topCorner, topCornerRadii));
 
             IntRect bottomCorner(clipRect.rect().x(), rect.y(), rect.maxX() - clipRect.rect().x(), clipRect.rect().maxY() - rect.y());
             RoundedRect::Radii bottomCornerRadii;
             bottomCornerRadii.setBottomLeft(clipRect.radii().bottomLeft());
-            context->addRoundedRectClip(RoundedRect(bottomCorner, bottomCornerRadii));
+            context->clipRoundedRect(RoundedRect(bottomCorner, bottomCornerRadii));
         }
     }
 }
@@ -725,9 +762,9 @@ static void applyBoxShadowForBackground(GraphicsContext* context, RenderStyle* s
 
     FloatSize shadowOffset(boxShadow->x(), boxShadow->y());
     if (!boxShadow->isWebkitBoxShadow())
-        context->setShadow(shadowOffset, boxShadow->blur(), boxShadow->color(), style->colorSpace());
+        context->setShadow(shadowOffset, boxShadow->radius(), boxShadow->color(), style->colorSpace());
     else
-        context->setLegacyShadow(shadowOffset, boxShadow->blur(), boxShadow->color(), style->colorSpace());
+        context->setLegacyShadow(shadowOffset, boxShadow->radius(), boxShadow->color(), style->colorSpace());
 }
 
 void RenderBoxModelObject::paintFillLayerExtended(const PaintInfo& paintInfo, const Color& color, const FillLayer* bgLayer, const LayoutRect& rect,
@@ -787,10 +824,17 @@ void RenderBoxModelObject::paintFillLayerExtended(const PaintInfo& paintInfo, co
 
         if (hasRoundedBorder && bleedAvoidance != BackgroundBleedUseTransparencyLayer) {
             RoundedRect border = backgroundRoundedRectAdjustedForBleedAvoidance(context, rect, bleedAvoidance, box, boxSize, includeLeftEdge, includeRightEdge);
-            context->fillRoundedRect(border, bgColor, style()->colorSpace());
+            if (border.isRenderable())
+                context->fillRoundedRect(border, bgColor, style()->colorSpace());
+            else {
+                context->save();
+                clipRoundedInnerRect(context, rect, border);
+                context->fillRect(border.rect(), bgColor, style()->colorSpace());
+                context->restore();
+            }
         } else
             context->fillRect(pixelSnappedIntRect(rect), bgColor, style()->colorSpace());
-        
+
         return;
     }
 
@@ -861,7 +905,7 @@ void RenderBoxModelObject::paintFillLayerExtended(const PaintInfo& paintInfo, co
 
         // Now add the text to the clip.  We do this by painting using a special paint phase that signals to
         // InlineTextBoxes that they should just add their contents to the clip.
-        PaintInfo info(maskImageContext, maskRect, PaintPhaseTextClip, true, 0, paintInfo.renderRegion, 0);
+        PaintInfo info(maskImageContext, maskRect, PaintPhaseTextClip, PaintBehaviorForceBlackText, 0, paintInfo.renderRegion);
         if (box) {
             RootInlineBox* root = box->root();
             box->paint(info, LayoutPoint(scrolledPaintRect.x() - box->x(), scrolledPaintRect.y() - box->y()), root->lineTop(), root->lineBottom());
@@ -946,7 +990,7 @@ void RenderBoxModelObject::paintFillLayerExtended(const PaintInfo& paintInfo, co
     // no progressive loading of the background image
     if (shouldPaintBackgroundImage) {
         BackgroundImageGeometry geometry;
-        calculateBackgroundImageGeometry(bgLayer, scrolledPaintRect, geometry);
+        calculateBackgroundImageGeometry(paintInfo.paintContainer, bgLayer, scrolledPaintRect, geometry, backgroundObject);
         geometry.clip(paintInfo.rect);
         if (!geometry.destRect().isEmpty()) {
             CompositeOperator compositeOp = op == CompositeSourceOver ? bgLayer->composite() : op;
@@ -954,7 +998,7 @@ void RenderBoxModelObject::paintFillLayerExtended(const PaintInfo& paintInfo, co
             RefPtr<Image> image = bgImage->image(clientForBackgroundImage, geometry.tileSize());
             bool useLowQualityScaling = shouldPaintAtLowQuality(context, image.get(), bgLayer, geometry.tileSize());
             context->drawTiledImage(image.get(), style()->colorSpace(), geometry.destRect(), geometry.relativePhase(), geometry.tileSize(), 
-                compositeOp, useLowQualityScaling);
+                compositeOp, useLowQualityScaling, bgLayer->blendMode());
         }
     }
 
@@ -1085,7 +1129,7 @@ IntSize RenderBoxModelObject::calculateFillTileSize(const FillLayer* fillLayer, 
 
             if (layerWidth.isFixed())
                 tileSize.setWidth(layerWidth.value());
-            else if (layerWidth.isPercent() || layerHeight.isViewportPercentage())
+            else if (layerWidth.isPercent() || layerWidth.isViewportPercentage())
                 tileSize.setWidth(valueForLength(layerWidth, positioningAreaSize.width(), renderView));
             
             if (layerHeight.isFixed())
@@ -1165,8 +1209,27 @@ IntPoint RenderBoxModelObject::BackgroundImageGeometry::relativePhase() const
     return phase;
 }
 
-void RenderBoxModelObject::calculateBackgroundImageGeometry(const FillLayer* fillLayer, const LayoutRect& paintRect, 
-                                                            BackgroundImageGeometry& geometry)
+bool RenderBoxModelObject::fixedBackgroundPaintsInLocalCoordinates() const
+{
+#if USE(ACCELERATED_COMPOSITING)
+    if (!isRoot())
+        return false;
+
+    if (view()->frameView() && view()->frameView()->paintBehavior() & PaintBehaviorFlattenCompositingLayers)
+        return false;
+
+    RenderLayer* rootLayer = view()->layer();
+    if (!rootLayer || !rootLayer->isComposited())
+        return false;
+
+    return rootLayer->backing()->backgroundLayerPaintsFixedRootBackground();
+#else
+    return false;
+#endif
+}
+
+void RenderBoxModelObject::calculateBackgroundImageGeometry(const RenderLayerModelObject* paintContainer, const FillLayer* fillLayer, const LayoutRect& paintRect,
+    BackgroundImageGeometry& geometry, RenderObject* backgroundObject) const
 {
     LayoutUnit left = 0;
     LayoutUnit top = 0;
@@ -1175,8 +1238,9 @@ void RenderBoxModelObject::calculateBackgroundImageGeometry(const FillLayer* fil
 
     // Determine the background positioning area and set destRect to the background painting area.
     // destRect will be adjusted later if the background is non-repeating.
+    // FIXME: transforms spec says that fixed backgrounds behave like scroll inside transforms. https://bugs.webkit.org/show_bug.cgi?id=15679
     bool fixedAttachment = fillLayer->attachment() == FixedBackgroundAttachment;
-
+    
 #if ENABLE(FAST_MOBILE_SCROLLING)
     if (view()->frameView() && view()->frameView()->canBlitOnScroll()) {
         // As a side effect of an optimization to blit on scroll, we do not honor the CSS
@@ -1216,35 +1280,87 @@ void RenderBoxModelObject::calculateBackgroundImageGeometry(const FillLayer* fil
         } else
             positioningAreaSize = pixelSnappedIntSize(paintRect.size() - LayoutSize(left + right, top + bottom), paintRect.location());
     } else {
-        geometry.setDestRect(pixelSnappedIntRect(viewRect()));
+        geometry.setHasNonLocalGeometry();
+
+        IntRect viewportRect = pixelSnappedIntRect(viewRect());
+        if (fixedBackgroundPaintsInLocalCoordinates())
+            viewportRect.setLocation(IntPoint());
+        else if (FrameView* frameView = view()->frameView())
+            viewportRect.setLocation(IntPoint(frameView->scrollOffsetForFixedPosition()));
+
+        if (paintContainer) {
+            IntPoint absoluteContainerOffset = roundedIntPoint(paintContainer->localToAbsolute(FloatPoint()));
+            viewportRect.moveBy(-absoluteContainerOffset);
+        }
+
+        geometry.setDestRect(pixelSnappedIntRect(viewportRect));
         positioningAreaSize = geometry.destRect().size();
     }
 
+    const RenderObject* clientForBackgroundImage = backgroundObject ? backgroundObject : this;
     IntSize fillTileSize = calculateFillTileSize(fillLayer, positioningAreaSize);
-    fillLayer->image()->setContainerSizeForRenderer(this, fillTileSize, style()->effectiveZoom());
+    fillLayer->image()->setContainerSizeForRenderer(clientForBackgroundImage, fillTileSize, style()->effectiveZoom());
     geometry.setTileSize(fillTileSize);
 
     EFillRepeat backgroundRepeatX = fillLayer->repeatX();
     EFillRepeat backgroundRepeatY = fillLayer->repeatY();
     RenderView* renderView = view();
+    int availableWidth = positioningAreaSize.width() - geometry.tileSize().width();
+    int availableHeight = positioningAreaSize.height() - geometry.tileSize().height();
 
-    LayoutUnit xPosition = minimumValueForLength(fillLayer->xPosition(), positioningAreaSize.width() - geometry.tileSize().width(), renderView, true);
+    LayoutUnit computedXPosition = minimumValueForLength(fillLayer->xPosition(), availableWidth, renderView, true);
+    if (backgroundRepeatX == RoundFill && positioningAreaSize.width() > 0 && fillTileSize.width() > 0) {
+        int nrTiles = ceil((double)positioningAreaSize.width() / fillTileSize.width());
+
+        if (fillLayer->size().size.height().isAuto() && backgroundRepeatY != RoundFill)
+            fillTileSize.setHeight(fillTileSize.height() * positioningAreaSize.width() / (nrTiles * fillTileSize.width()));
+
+        fillTileSize.setWidth(positioningAreaSize.width() / nrTiles);
+        geometry.setTileSize(fillTileSize);
+        geometry.setPhaseX(geometry.tileSize().width() ? geometry.tileSize().width() - roundToInt(computedXPosition + left) % geometry.tileSize().width() : 0);
+    }
+
+    LayoutUnit computedYPosition = minimumValueForLength(fillLayer->yPosition(), availableHeight, renderView, true);
+    if (backgroundRepeatY == RoundFill && positioningAreaSize.height() > 0 && fillTileSize.height() > 0) {
+        int nrTiles = ceil((double)positioningAreaSize.height() / fillTileSize.height());
+
+        if (fillLayer->size().size.width().isAuto() && backgroundRepeatX != RoundFill)
+            fillTileSize.setWidth(fillTileSize.width() * positioningAreaSize.height() / (nrTiles * fillTileSize.height()));
+
+        fillTileSize.setHeight(positioningAreaSize.height() / nrTiles);
+        geometry.setTileSize(fillTileSize);
+        geometry.setPhaseY(geometry.tileSize().height() ? geometry.tileSize().height() - roundToInt(computedYPosition + top) % geometry.tileSize().height() : 0);
+    }
+
     if (backgroundRepeatX == RepeatFill)
-        geometry.setPhaseX(geometry.tileSize().width() ? geometry.tileSize().width() - roundToInt(xPosition + left) % geometry.tileSize().width() : 0);
-    else
-        geometry.setNoRepeatX(xPosition + left);
+        geometry.setPhaseX(geometry.tileSize().width() ? geometry.tileSize().width() - roundToInt(computedXPosition + left) % geometry.tileSize().width() : 0);
+    else if (backgroundRepeatX == NoRepeatFill) {
+        int xOffset = fillLayer->backgroundXOrigin() == RightEdge ? availableWidth - computedXPosition : computedXPosition;
+        geometry.setNoRepeatX(left + xOffset);
+    }
 
-    LayoutUnit yPosition = minimumValueForLength(fillLayer->yPosition(), positioningAreaSize.height() - geometry.tileSize().height(), renderView, true);
     if (backgroundRepeatY == RepeatFill)
-        geometry.setPhaseY(geometry.tileSize().height() ? geometry.tileSize().height() - roundToInt(yPosition + top) % geometry.tileSize().height() : 0);
-    else 
-        geometry.setNoRepeatY(yPosition + top);
+        geometry.setPhaseY(geometry.tileSize().height() ? geometry.tileSize().height() - roundToInt(computedYPosition + top) % geometry.tileSize().height() : 0);
+    else if (backgroundRepeatY == NoRepeatFill) {
+        int yOffset = fillLayer->backgroundYOrigin() == BottomEdge ? availableHeight - computedYPosition : computedYPosition;
+        geometry.setNoRepeatY(top + yOffset);
+    }
 
     if (fixedAttachment)
         geometry.useFixedAttachment(snappedPaintRect.location());
 
     geometry.clip(snappedPaintRect);
     geometry.setDestOrigin(geometry.destRect().location());
+}
+
+void RenderBoxModelObject::getGeometryForBackgroundImage(const RenderLayerModelObject* paintContainer, IntRect& destRect, IntPoint& phase, IntSize& tileSize) const
+{
+    const FillLayer* backgroundLayer = style()->backgroundLayers();
+    BackgroundImageGeometry geometry;
+    calculateBackgroundImageGeometry(paintContainer, backgroundLayer, destRect, geometry);
+    phase = geometry.phase();
+    tileSize = geometry.tileSize();
+    destRect = geometry.destRect();
 }
 
 static LayoutUnit computeBorderImageSide(Length borderSlice, LayoutUnit borderSide, LayoutUnit imageSide, LayoutUnit boxExtent, RenderView* renderView)
@@ -1795,13 +1911,17 @@ void RenderBoxModelObject::paintBorderSides(GraphicsContext* graphicsContext, co
 void RenderBoxModelObject::paintTranslucentBorderSides(GraphicsContext* graphicsContext, const RenderStyle* style, const RoundedRect& outerBorder, const RoundedRect& innerBorder, const IntPoint& innerBorderAdjustment,
     const BorderEdge edges[], BorderEdgeFlags edgesToDraw, BackgroundBleedAvoidance bleedAvoidance, bool includeLogicalLeftEdge, bool includeLogicalRightEdge, bool antialias)
 {
+    // willBeOverdrawn assumes that we draw in order: top, bottom, left, right.
+    // This is different from BoxSide enum order.
+    static BoxSide paintOrder[] = { BSTop, BSBottom, BSLeft, BSRight };
+
     while (edgesToDraw) {
         // Find undrawn edges sharing a color.
         Color commonColor;
         
         BorderEdgeFlags commonColorEdgeSet = 0;
-        for (int i = BSTop; i <= BSLeft; ++i) {
-            BoxSide currSide = static_cast<BoxSide>(i);
+        for (size_t i = 0; i < sizeof(paintOrder) / sizeof(paintOrder[0]); ++i) {
+            BoxSide currSide = paintOrder[i];
             if (!includesEdge(edgesToDraw, currSide))
                 continue;
 
@@ -1977,7 +2097,7 @@ void RenderBoxModelObject::paintBorder(const PaintInfo& info, const LayoutRect& 
     if (clipToOuterBorder) {
         // Clip to the inner and outer radii rects.
         if (bleedAvoidance != BackgroundBleedUseTransparencyLayer)
-            graphicsContext->addRoundedRectClip(outerBorder);
+            graphicsContext->clipRoundedRect(outerBorder);
         // isRenderable() check avoids issue described in https://bugs.webkit.org/show_bug.cgi?id=38787
         // The inside will be clipped out later (in clipBorderSideForComplexInnerPath)
         if (innerBorder.isRenderable())
@@ -2074,7 +2194,7 @@ void RenderBoxModelObject::drawBoxSideFromPath(GraphicsContext* graphicsContext,
                 innerBorderTopWidth, innerBorderBottomWidth, innerBorderLeftWidth, innerBorderRightWidth,
                 includeLogicalLeftEdge, includeLogicalRightEdge);
             
-            graphicsContext->addRoundedRectClip(innerClip);
+            graphicsContext->clipRoundedRect(innerClip);
             drawBoxSideFromPath(graphicsContext, borderRect, borderPath, edges, thickness, drawThickness, side, style, color, SOLID, bleedAvoidance, includeLogicalLeftEdge, includeLogicalRightEdge);
         }
 
@@ -2125,7 +2245,7 @@ void RenderBoxModelObject::drawBoxSideFromPath(GraphicsContext* graphicsContext,
             topWidth, bottomWidth, leftWidth, rightWidth,
             includeLogicalLeftEdge, includeLogicalRightEdge);
 
-        graphicsContext->addRoundedRectClip(clipRect);
+        graphicsContext->clipRoundedRect(clipRect);
         drawBoxSideFromPath(graphicsContext, borderRect, borderPath, edges, thickness, drawThickness, side, style, color, s2, bleedAvoidance, includeLogicalLeftEdge, includeLogicalRightEdge);
         return;
     }
@@ -2492,11 +2612,11 @@ bool RenderBoxModelObject::boxShadowShouldBeAppliedToBackground(BackgroundBleedA
     return true;
 }
 
-static inline IntRect areaCastingShadowInHole(const IntRect& holeRect, int shadowBlur, int shadowSpread, const IntSize& shadowOffset)
+static inline IntRect areaCastingShadowInHole(const IntRect& holeRect, int shadowExtent, int shadowSpread, const IntSize& shadowOffset)
 {
     IntRect bounds(holeRect);
     
-    bounds.inflate(shadowBlur);
+    bounds.inflate(shadowExtent);
 
     if (shadowSpread < 0)
         bounds.inflate(-shadowSpread);
@@ -2525,10 +2645,11 @@ void RenderBoxModelObject::paintBoxShadow(const PaintInfo& info, const LayoutRec
             continue;
 
         IntSize shadowOffset(shadow->x(), shadow->y());
-        int shadowBlur = shadow->blur();
+        int shadowRadius = shadow->radius();
+        int shadowPaintingExtent = shadow->paintingExtent();
         int shadowSpread = shadow->spread();
         
-        if (shadowOffset.isZero() && !shadowBlur && !shadowSpread)
+        if (shadowOffset.isZero() && !shadowRadius && !shadowSpread)
             continue;
         
         const Color& shadowColor = shadow->color();
@@ -2540,7 +2661,7 @@ void RenderBoxModelObject::paintBoxShadow(const PaintInfo& info, const LayoutRec
                 continue;
 
             IntRect shadowRect(border.rect());
-            shadowRect.inflate(shadowBlur + shadowSpread);
+            shadowRect.inflate(shadowPaintingExtent + shadowSpread);
             shadowRect.move(shadowOffset);
 
             GraphicsContextStateSaver stateSaver(*context);
@@ -2548,14 +2669,14 @@ void RenderBoxModelObject::paintBoxShadow(const PaintInfo& info, const LayoutRec
 
             // Move the fill just outside the clip, adding 1 pixel separation so that the fill does not
             // bleed in (due to antialiasing) if the context is transformed.
-            IntSize extraOffset(paintRect.pixelSnappedWidth() + max(0, shadowOffset.width()) + shadowBlur + 2 * shadowSpread + 1, 0);
+            IntSize extraOffset(paintRect.pixelSnappedWidth() + max(0, shadowOffset.width()) + shadowPaintingExtent + 2 * shadowSpread + 1, 0);
             shadowOffset -= extraOffset;
             fillRect.move(extraOffset);
 
             if (shadow->isWebkitBoxShadow())
-                context->setLegacyShadow(shadowOffset, shadowBlur, shadowColor, s->colorSpace());
+                context->setLegacyShadow(shadowOffset, shadowRadius, shadowColor, s->colorSpace());
             else
-                context->setShadow(shadowOffset, shadowBlur, shadowColor, s->colorSpace());
+                context->setShadow(shadowOffset, shadowRadius, shadowColor, s->colorSpace());
 
             if (hasBorderRadius) {
                 RoundedRect rectToClipOut = border;
@@ -2571,7 +2692,7 @@ void RenderBoxModelObject::paintBoxShadow(const PaintInfo& info, const LayoutRec
                     context->clipOutRoundedRect(rectToClipOut);
 
                 RoundedRect influenceRect(shadowRect, border.radii());
-                influenceRect.expandRadii(2 * shadowBlur + shadowSpread);
+                influenceRect.expandRadii(2 * shadowPaintingExtent + shadowSpread);
                 if (allCornersClippedOut(influenceRect, info.rect))
                     context->fillRect(fillRect.rect(), Color::black, s->colorSpace());
                 else {
@@ -2614,23 +2735,23 @@ void RenderBoxModelObject::paintBoxShadow(const PaintInfo& info, const LayoutRec
 
             if (!includeLogicalLeftEdge) {
                 if (isHorizontal) {
-                    holeRect.move(-max(shadowOffset.width(), 0) - shadowBlur, 0);
-                    holeRect.setWidth(holeRect.width() + max(shadowOffset.width(), 0) + shadowBlur);
+                    holeRect.move(-max(shadowOffset.width(), 0) - shadowPaintingExtent, 0);
+                    holeRect.setWidth(holeRect.width() + max(shadowOffset.width(), 0) + shadowPaintingExtent);
                 } else {
-                    holeRect.move(0, -max(shadowOffset.height(), 0) - shadowBlur);
-                    holeRect.setHeight(holeRect.height() + max(shadowOffset.height(), 0) + shadowBlur);
+                    holeRect.move(0, -max(shadowOffset.height(), 0) - shadowPaintingExtent);
+                    holeRect.setHeight(holeRect.height() + max(shadowOffset.height(), 0) + shadowPaintingExtent);
                 }
             }
             if (!includeLogicalRightEdge) {
                 if (isHorizontal)
-                    holeRect.setWidth(holeRect.width() - min(shadowOffset.width(), 0) + shadowBlur);
+                    holeRect.setWidth(holeRect.width() - min(shadowOffset.width(), 0) + shadowPaintingExtent);
                 else
-                    holeRect.setHeight(holeRect.height() - min(shadowOffset.height(), 0) + shadowBlur);
+                    holeRect.setHeight(holeRect.height() - min(shadowOffset.height(), 0) + shadowPaintingExtent);
             }
 
             Color fillColor(shadowColor.red(), shadowColor.green(), shadowColor.blue(), 255);
 
-            IntRect outerRect = areaCastingShadowInHole(border.rect(), shadowBlur, shadowSpread, shadowOffset);
+            IntRect outerRect = areaCastingShadowInHole(border.rect(), shadowPaintingExtent, shadowSpread, shadowOffset);
             RoundedRect roundedHole(holeRect, border.radii());
 
             GraphicsContextStateSaver stateSaver(*context);
@@ -2642,14 +2763,14 @@ void RenderBoxModelObject::paintBoxShadow(const PaintInfo& info, const LayoutRec
             } else
                 context->clip(border.rect());
 
-            IntSize extraOffset(2 * paintRect.pixelSnappedWidth() + max(0, shadowOffset.width()) + shadowBlur - 2 * shadowSpread + 1, 0);
+            IntSize extraOffset(2 * paintRect.pixelSnappedWidth() + max(0, shadowOffset.width()) + shadowPaintingExtent - 2 * shadowSpread + 1, 0);
             context->translate(extraOffset.width(), extraOffset.height());
             shadowOffset -= extraOffset;
 
             if (shadow->isWebkitBoxShadow())
-                context->setLegacyShadow(shadowOffset, shadowBlur, shadowColor, s->colorSpace());
+                context->setLegacyShadow(shadowOffset, shadowRadius, shadowColor, s->colorSpace());
             else
-                context->setShadow(shadowOffset, shadowBlur, shadowColor, s->colorSpace());
+                context->setShadow(shadowOffset, shadowRadius, shadowColor, s->colorSpace());
 
             context->fillRectWithRoundedHole(outerRect, roundedHole, fillColor, s->colorSpace());
         }
@@ -2776,12 +2897,24 @@ void RenderBoxModelObject::mapAbsoluteToLocalPoint(MapCoordinatesFlags mode, Tra
     if (!o)
         return;
 
+    // The point inside a box that's inside a region has its coordinates relative to the region,
+    // not the FlowThread that is its container in the RenderObject tree.
+    if (o->isRenderFlowThread() && isRenderBlock()) {
+        // FIXME (CSSREGIONS): switch to Box instead of Block when we'll have range information
+        // for boxes as well, not just for blocks.
+        RenderRegion* startRegion;
+        RenderRegion* endRegion;
+        toRenderFlowThread(o)->getRegionRangeForBox(toRenderBlock(this), startRegion, endRegion);
+        if (startRegion)
+            o = startRegion;
+    }
+
     o->mapAbsoluteToLocalPoint(mode, transformState);
 
     LayoutSize containerOffset = offsetFromContainer(o, LayoutPoint());
 
     if (!style()->hasOutOfFlowPosition() && o->hasColumns()) {
-        RenderBlock* block = static_cast<RenderBlock*>(o);
+        RenderBlock* block = toRenderBlock(o);
         LayoutPoint point(roundedLayoutPoint(transformState.mappedPoint()));
         point -= containerOffset;
         block->adjustForColumnRect(containerOffset, point);
@@ -2819,8 +2952,8 @@ void RenderBoxModelObject::moveChildrenTo(RenderBoxModelObject* toBoxModelObject
     // or when fullRemoveInsert is false.
     if (fullRemoveInsert && isRenderBlock()) {
         RenderBlock* block = toRenderBlock(this);
-        if (block->hasPositionedObjects())
-            block->removePositionedObjects(0);
+        block->removePositionedObjects(0);
+        block->removeFloatingObjects(); 
     }
 
     ASSERT(!beforeChild || toBoxModelObject == beforeChild->parent());

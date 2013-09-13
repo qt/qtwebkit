@@ -46,11 +46,11 @@
 #include "RenderBoxModelObject.h"
 #include "RenderInline.h"
 #include "RenderObject.h"
+#include "ScriptController.h"
 #include "ScriptSourceCode.h"
 #include "ScriptValue.h"
 #include "Settings.h"
 #include "StyledElement.h"
-#include "WebCoreMemoryInstrumentation.h"
 #include <wtf/text/StringBuilder.h>
 
 namespace WebCore {
@@ -182,14 +182,13 @@ static void buildNodeHighlight(Node* node, const HighlightConfig& highlightConfi
     }
 }
 
-static void buildRectHighlight(Page* page, IntRect* rect, const HighlightConfig& highlightConfig, Highlight *highlight)
+static void buildQuadHighlight(Page* page, const FloatQuad& quad, const HighlightConfig& highlightConfig, Highlight *highlight)
 {
     if (!page)
         return;
     highlight->setDataFromConfig(highlightConfig);
-    FloatRect highlightRect(*rect);
     highlight->type = HighlightTypeRects;
-    highlight->quads.append(highlightRect);
+    highlight->quads.append(quad);
 }
 
 } // anonymous namespace
@@ -206,18 +205,12 @@ InspectorOverlay::~InspectorOverlay()
 
 void InspectorOverlay::paint(GraphicsContext& context)
 {
-    if (m_pausedInDebuggerMessage.isNull() && !m_highlightNode && !m_highlightRect && m_size.isEmpty())
+    if (m_pausedInDebuggerMessage.isNull() && !m_highlightNode && !m_highlightQuad && m_size.isEmpty())
         return;
     GraphicsContextStateSaver stateSaver(context);
     FrameView* view = overlayPage()->mainFrame()->view();
     ASSERT(!view->needsLayout());
-
-    context.beginTransparencyLayer(1);
-    context.setCompositeOperation(CompositeCopy);
-
     view->paint(&context, IntRect(0, 0, view->width(), view->height()));
-
-    context.endTransparencyLayer();
 }
 
 void InspectorOverlay::drawOutline(GraphicsContext* context, const LayoutRect& rect, const Color& color)
@@ -228,14 +221,14 @@ void InspectorOverlay::drawOutline(GraphicsContext* context, const LayoutRect& r
 
 void InspectorOverlay::getHighlight(Highlight* highlight) const
 {
-    if (!m_highlightNode && !m_highlightRect)
+    if (!m_highlightNode && !m_highlightQuad)
         return;
 
     highlight->type = HighlightTypeRects;
     if (m_highlightNode)
         buildNodeHighlight(m_highlightNode.get(), m_nodeHighlightConfig, highlight);
     else
-        buildRectHighlight(m_page, m_highlightRect.get(), m_rectHighlightConfig, highlight);
+        buildQuadHighlight(m_page, *m_highlightQuad, m_quadHighlightConfig, highlight);
 }
 
 void InspectorOverlay::resize(const IntSize& size)
@@ -253,7 +246,7 @@ void InspectorOverlay::setPausedInDebuggerMessage(const String* message)
 void InspectorOverlay::hideHighlight()
 {
     m_highlightNode.clear();
-    m_highlightRect.clear();
+    m_highlightQuad.clear();
     update();
 }
 
@@ -264,10 +257,13 @@ void InspectorOverlay::highlightNode(Node* node, const HighlightConfig& highligh
     update();
 }
 
-void InspectorOverlay::highlightRect(PassOwnPtr<IntRect> rect, const HighlightConfig& highlightConfig)
+void InspectorOverlay::highlightQuad(PassOwnPtr<FloatQuad> quad, const HighlightConfig& highlightConfig)
 {
-    m_rectHighlightConfig = highlightConfig;
-    m_highlightRect = rect;
+    if (m_quadHighlightConfig.usePageCoordinates)
+        *quad -= m_page->mainFrame()->view()->scrollOffset();
+
+    m_quadHighlightConfig = highlightConfig;
+    m_highlightQuad = quad;
     update();
 }
 
@@ -278,7 +274,7 @@ Node* InspectorOverlay::highlightedNode() const
 
 void InspectorOverlay::update()
 {
-    if (!m_highlightNode && !m_highlightRect && m_pausedInDebuggerMessage.isNull() && m_size.isEmpty()) {
+    if (!m_highlightNode && !m_highlightQuad && m_pausedInDebuggerMessage.isNull() && m_size.isEmpty()) {
         m_client->hideHighlight();
         return;
     }
@@ -288,9 +284,11 @@ void InspectorOverlay::update()
         return;
 
     FrameView* overlayView = overlayPage()->mainFrame()->view();
-    IntSize viewportSize = enclosingIntRect(view->visibleContentRect()).size();
-    IntSize frameViewFullSize = enclosingIntRect(view->visibleContentRect(true)).size();
+    IntSize viewportSize = view->visibleContentRect().size();
+    IntSize frameViewFullSize = view->visibleContentRect(ScrollableArea::IncludeScrollbars).size();
     IntSize size = m_size.isEmpty() ? frameViewFullSize : m_size;
+    overlayPage()->setPageScaleFactor(m_page->pageScaleFactor(), IntPoint());
+    size.scale(m_page->pageScaleFactor());
     overlayView->resize(size);
 
     // Clear canvas and paint things.
@@ -299,7 +297,7 @@ void InspectorOverlay::update()
     // Include scrollbars to avoid masking them by the gutter.
     drawGutter();
     drawNodeHighlight();
-    drawRectHighlight();
+    drawQuadHighlight();
     drawPausedInDebuggerMessage();
 
     // Position DOM elements.
@@ -412,14 +410,14 @@ void InspectorOverlay::drawNodeHighlight()
     evaluateInOverlay("drawNodeHighlight", highlightObject);
 }
 
-void InspectorOverlay::drawRectHighlight()
+void InspectorOverlay::drawQuadHighlight()
 {
-    if (!m_highlightRect)
+    if (!m_highlightQuad)
         return;
 
     Highlight highlight;
-    buildRectHighlight(m_page, m_highlightRect.get(), m_rectHighlightConfig, &highlight);
-    evaluateInOverlay("drawRectHighlight", buildObjectForHighlight(m_page->mainFrame()->view(), highlight));
+    buildQuadHighlight(m_page, *m_highlightQuad, m_quadHighlightConfig, &highlight);
+    evaluateInOverlay("drawQuadHighlight", buildObjectForHighlight(m_page->mainFrame()->view(), highlight));
 }
 
 void InspectorOverlay::drawPausedInDebuggerMessage()
@@ -501,18 +499,9 @@ void InspectorOverlay::evaluateInOverlay(const String& method, PassRefPtr<Inspec
     overlayPage()->mainFrame()->script()->evaluate(ScriptSourceCode(makeString("dispatch(", command->toJSONString(), ")")));
 }
 
-void InspectorOverlay::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+void InspectorOverlay::freePage()
 {
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::InspectorOverlay);
-    info.addMember(m_page);
-    info.addWeakPointer(m_client);
-    info.addMember(m_pausedInDebuggerMessage);
-    info.addMember(m_highlightNode);
-    info.addMember(m_nodeHighlightConfig);
-    info.addMember(m_highlightRect);
-    info.addMember(m_overlayPage);
-    info.addMember(m_rectHighlightConfig);
-    info.addMember(m_size);
+    m_overlayPage.clear();
 }
 
 } // namespace WebCore

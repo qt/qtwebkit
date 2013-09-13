@@ -13,10 +13,20 @@
 #define GL_APICALL
 #include <GLES2/gl2.h>
 
+#ifdef _MSC_VER
 #include <hash_map>
+#else
+#include <unordered_map>
+#endif
 
 #include "common/angleutils.h"
+#include "libGLESv2/angletypes.h"
 #include "libGLESv2/HandleAllocator.h"
+
+namespace rx
+{
+class Renderer;
+}
 
 namespace gl
 {
@@ -26,25 +36,10 @@ class Program;
 class Texture;
 class Renderbuffer;
 
-enum TextureType
-{
-    TEXTURE_2D,
-    TEXTURE_CUBE,
-
-    TEXTURE_TYPE_COUNT,
-    TEXTURE_UNKNOWN
-};
-
-enum SamplerType
-{
-    SAMPLER_PIXEL,
-    SAMPLER_VERTEX
-};
-
 class ResourceManager
 {
   public:
-    ResourceManager();
+    explicit ResourceManager(rx::Renderer *renderer);
     ~ResourceManager();
 
     void addRef();
@@ -78,23 +73,32 @@ class ResourceManager
     DISALLOW_COPY_AND_ASSIGN(ResourceManager);
 
     std::size_t mRefCount;
+    rx::Renderer *mRenderer;
 
-    typedef stdext::hash_map<GLuint, Buffer*> BufferMap;
+#ifndef HASH_MAP
+# ifdef _MSC_VER
+#  define HASH_MAP stdext::hash_map
+# else
+#  define HASH_MAP std::unordered_map
+# endif
+#endif
+
+    typedef HASH_MAP<GLuint, Buffer*> BufferMap;
     BufferMap mBufferMap;
     HandleAllocator mBufferHandleAllocator;
 
-    typedef stdext::hash_map<GLuint, Shader*> ShaderMap;
+    typedef HASH_MAP<GLuint, Shader*> ShaderMap;
     ShaderMap mShaderMap;
 
-    typedef stdext::hash_map<GLuint, Program*> ProgramMap;
+    typedef HASH_MAP<GLuint, Program*> ProgramMap;
     ProgramMap mProgramMap;
     HandleAllocator mProgramShaderHandleAllocator;
 
-    typedef stdext::hash_map<GLuint, Texture*> TextureMap;
+    typedef HASH_MAP<GLuint, Texture*> TextureMap;
     TextureMap mTextureMap;
     HandleAllocator mTextureHandleAllocator;
 
-    typedef stdext::hash_map<GLuint, Renderbuffer*> RenderbufferMap;
+    typedef HASH_MAP<GLuint, Renderbuffer*> RenderbufferMap;
     RenderbufferMap mRenderbufferMap;
     HandleAllocator mRenderbufferHandleAllocator;
 };

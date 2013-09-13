@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2011 Nokia Inc. All rights reserved.
  * Copyright (C) 2012 Google Inc. All rights reserved.
+ * Copyright (C) 2013 Apple Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -22,52 +23,39 @@
 #ifndef RenderQuote_h
 #define RenderQuote_h
 
-#include "QuotesData.h"
-#include "RenderStyle.h"
-#include "RenderStyleConstants.h"
 #include "RenderText.h"
 
 namespace WebCore {
 
-class Document;
-
-class RenderQuote : public RenderText {
+class RenderQuote FINAL : public RenderText {
 public:
-    RenderQuote(Document*, const QuoteType);
+    RenderQuote(Document*, QuoteType);
     virtual ~RenderQuote();
+
     void attachQuote();
-    void detachQuote();
 
 private:
+    void detachQuote();
+
     virtual void willBeDestroyed() OVERRIDE;
-    virtual const char* renderName() const OVERRIDE { return "RenderQuote"; };
+    virtual const char* renderName() const OVERRIDE { return "RenderQuote"; }
     virtual bool isQuote() const OVERRIDE { return true; };
     virtual PassRefPtr<StringImpl> originalText() const OVERRIDE;
-
-    virtual void updateText() OVERRIDE;
-    virtual void computePreferredLogicalWidths(float leadWidth) OVERRIDE;
-
-    // We don't override insertedIntoTree to call attachQuote() as it would be attached
-    // too early and get the wrong depth since generated content is inserted into anonymous
-    // renderers before going into the main render tree. Once we can ensure that insertIntoTree,
-    // is called on an attached tree, we should override it here.
-
+    virtual void styleDidChange(StyleDifference, const RenderStyle*) OVERRIDE;
     virtual void willBeRemovedFromTree() OVERRIDE;
 
-    const QuotesData* quotesData() const;
     void updateDepth();
-    bool isAttached() { return m_attached; }
 
     QuoteType m_type;
     int m_depth;
     RenderQuote* m_next;
     RenderQuote* m_previous;
-    bool m_attached;
+    bool m_isAttached;
 };
 
 inline RenderQuote* toRenderQuote(RenderObject* object)
 {
-    ASSERT(!object || object->isQuote());
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isQuote());
     return static_cast<RenderQuote*>(object);
 }
 

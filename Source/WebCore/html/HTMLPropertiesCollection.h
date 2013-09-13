@@ -38,7 +38,6 @@
 
 namespace WebCore {
 
-class DOMStringList;
 class PropertyNodeList;
 
 class HTMLPropertiesCollection : public HTMLCollection {
@@ -49,7 +48,7 @@ public:
     void updateRefElements() const;
 
     PassRefPtr<DOMStringList> names() const;
-    virtual PassRefPtr<PropertyNodeList> namedItem(const String&) const OVERRIDE;
+    virtual PassRefPtr<PropertyNodeList> propertyNodeList(const String&) const;
     virtual bool hasNamedItem(const AtomicString&) const OVERRIDE;
 
     void invalidateCache() const
@@ -61,14 +60,12 @@ public:
 private:
     HTMLPropertiesCollection(Node*);
 
-    Node* findRefElements(Node* previous) const;
-
     virtual Element* virtualItemAfter(unsigned& offsetInArray, Element*) const OVERRIDE;
     HTMLElement* virtualItemAfter(HTMLElement* base, Element* previous) const;
 
     void updateNameCache() const;
 
-    void updatePropertyCache(Element*, const AtomicString& propertyName) const
+    void updatePropertyCache(const AtomicString& propertyName) const
     {
         if (!m_propertyNames)
             m_propertyNames = DOMStringList::create();

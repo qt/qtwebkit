@@ -34,6 +34,8 @@ typedef const struct OpaqueJSContext* JSContextRef;
 typedef struct OpaqueJSValue* JSObjectRef;
 typedef const struct OpaqueJSValue* JSValueRef;
 
+OBJC_CLASS NSData;
+
 namespace WebCore {
 struct PluginInfo;
 }
@@ -53,12 +55,15 @@ public:
     // In-process PDFViews don't support asynchronous initialization.
     virtual bool isBeingAsynchronouslyInitialized() const { return false; }
 
+    void didMutatePDFDocument() { m_pdfDocumentWasMutated = true; }
+    
+    WebCore::IntSize size() const { return m_size; }
+
 protected:
     explicit SimplePDFPlugin(WebFrame*);
 
     WebFrame* webFrame() const { return m_frame; }
 
-    WebCore::IntSize size() const { return m_size; }
     void setSize(WebCore::IntSize size) { m_size = size; }
 
     RetainPtr<PDFDocument> pdfDocument() const { return m_pdfDocument; }
@@ -69,7 +74,10 @@ protected:
 
     const String& suggestedFilename() { return m_suggestedFilename; }
     
-    RetainPtr<CFMutableDataRef> data() const { return m_data; }
+    virtual NSData *liveData() const;
+    NSData *rawData() const { return (NSData *)m_data.get(); }
+
+    bool pdfDocumentWasMutated() const { return m_pdfDocumentWasMutated; }
 
     // Regular plug-ins don't need access to view, but we add scrollbars to embedding FrameView for proper event handling.
     PluginView* pluginView();
@@ -93,6 +101,7 @@ protected:
     virtual void destroy();
     virtual void paint(WebCore::GraphicsContext*, const WebCore::IntRect& dirtyRectInWindowCoordinates);
     virtual void updateControlTints(WebCore::GraphicsContext*);
+    virtual bool supportsSnapshotting() const { return false; }
     virtual PassRefPtr<ShareableBitmap> snapshot();
 #if PLATFORM(MAC)
     virtual PlatformLayer* pluginLayer();
@@ -172,6 +181,15 @@ protected:
     virtual bool handlesPageScaleFactor() OVERRIDE;
 
     virtual bool shouldAllowScripting() OVERRIDE { return false; }
+    virtual bool shouldAllowNavigationFromDrags() { return true; }
+
+    virtual unsigned countFindMatches(const String&, WebCore::FindOptions, unsigned) OVERRIDE { return 0; }
+    virtual bool findString(const String&, WebCore::FindOptions, unsigned) OVERRIDE { return false; }
+
+    virtual PassRefPtr<WebCore::SharedBuffer> liveResourceData() const OVERRIDE;
+    virtual bool performDictionaryLookupAtLocation(const WebCore::FloatPoint&) OVERRIDE { return false; }
+
+    virtual String getSelectionString() const OVERRIDE { return String(); }
 
     WebCore::IntSize m_scrollOffset;
 
@@ -179,6 +197,10 @@ private:
 
     JSObjectRef makeJSPDFDoc(JSContextRef);
     static JSValueRef jsPDFDocPrint(JSContextRef, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception);
+
+    void convertPostScriptDataIfNeeded();
+
+    virtual bool shouldAlwaysAutoStart() const OVERRIDE { return true; }
 
     WebCore::IntSize m_size;
 
@@ -195,6 +217,9 @@ private:
     RefPtr<WebCore::Scrollbar> m_verticalScrollbar;
 
     WebFrame* m_frame;
+
+    bool m_isPostScript;
+    bool m_pdfDocumentWasMutated;
 };
 
 } // namespace WebKit

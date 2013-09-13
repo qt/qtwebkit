@@ -34,7 +34,6 @@
 #include "Node.h"
 #include "SVGFontFaceElement.h"
 #include "StyleSheetContents.h"
-#include "WebCoreMemoryInstrumentation.h"
 #include <wtf/text/StringBuilder.h>
 
 namespace WebCore {
@@ -104,15 +103,9 @@ CachedFont* CSSFontFaceSrcValue::cachedFont(Document* document)
     return m_cachedFont.get();
 }
 
-void CSSFontFaceSrcValue::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+bool CSSFontFaceSrcValue::equals(const CSSFontFaceSrcValue& other) const
 {
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
-    info.addMember(m_resource);
-    info.addMember(m_format);
-    // FIXME: add m_cachedFont when MemoryCache is instrumented.
-#if ENABLE(SVG_FONTS)
-    info.addMember(m_svgFontFaceElement);
-#endif
+    return m_isLocal == other.m_isLocal && m_format == other.m_format && m_resource == other.m_resource;
 }
 
 }

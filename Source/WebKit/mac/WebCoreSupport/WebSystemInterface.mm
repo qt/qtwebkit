@@ -58,8 +58,10 @@ void InitWebCoreSystemInterface(void)
     INIT(CopyCFLocalizationPreferredName);
     INIT(CopyCONNECTProxyResponse);
     INIT(CopyNSURLResponseStatusLine);
+#if PLATFORM(MAC)
+    INIT(CopyNSURLResponseCertificateChain);
+#endif
     INIT(CreateCustomCFReadStream);
-    INIT(CreateNSURLConnectionDelegateProxy);
     INIT(DrawCapsLockIndicator);
     INIT(DrawBezeledTextArea);
     INIT(DrawBezeledTextFieldCell);
@@ -124,7 +126,7 @@ void InitWebCoreSystemInterface(void)
     INIT(GetGlyphsForCharacters);
     INIT(GetVerticalGlyphsForCharacters);
 
-#if __MAC_OS_X_VERSION_MIN_REQUIRED <= 1060
+#if __MAC_OS_X_VERSION_MIN_REQUIRED == 1060
     INIT(GetHyphenationLocationBeforeIndex);
     INIT(GetNSEventMomentumPhase);
 #endif
@@ -135,6 +137,7 @@ void InitWebCoreSystemInterface(void)
     INIT(IOSurfaceContextCreate);
     INIT(IOSurfaceContextCreateImage);
     INIT(CreateCTTypesetterWithUniCharProviderAndOptions);
+    INIT(CTRunGetInitialAdvance);
     INIT(RecommendedScrollerStyle);
     INIT(ExecutableWasLinkedOnOrBeforeSnowLeopard);
     INIT(SetCrashReportApplicationSpecificInformation);
@@ -151,6 +154,10 @@ void InitWebCoreSystemInterface(void)
     INIT(SetRequestStorageSession);
 #endif
 
+#if PLATFORM(MAC)
+    INIT(SpeechSynthesisGetVoiceIdentifiers);
+    INIT(SpeechSynthesisGetDefaultVoiceIdentifierForLocale);
+#endif
     INIT(GetAXTextMarkerTypeID);
     INIT(GetAXTextMarkerRangeTypeID);
     INIT(CreateAXTextMarker);
@@ -186,12 +193,17 @@ void InitWebCoreSystemInterface(void)
 #if PLATFORM(MAC)
     // FIXME: We should stop using this file in Chromium.
 
+    INIT(DestroyRenderingResources);
+
 #if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1070
     INIT(CreateVMPressureDispatchOnMainQueue);
 #endif
+    
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
+    INIT(CreateMemoryStatusPressureCriticalDispatchOnMainQueue);
+#endif
 
 #if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1080
-    INIT(GetMacOSXVersionString);
     INIT(ExecutableWasLinkedOnOrBeforeLion);
 #endif
 
@@ -203,31 +215,28 @@ void InitWebCoreSystemInterface(void)
     INIT(CFURLRequestAllowAllPostCaching);
 #endif
 
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1080 && !PLATFORM(IOS)
+#if USE(CONTENT_FILTERING)
     INIT(FilterIsManagedSession);
     INIT(FilterCreateInstance);
-    INIT(FilterRelease);
     INIT(FilterWasBlocked);
+    INIT(FilterIsBuffering);
     INIT(FilterAddData);
     INIT(FilterDataComplete);
+#endif
 
+#if !PLATFORM(IOS) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1080
     INIT(NSElasticDeltaForTimeDelta);
     INIT(NSElasticDeltaForReboundDelta);
     INIT(NSReboundDeltaForElasticDelta);
 #endif
 
-    INIT(CaptionAppearanceHasUserPreferences);
-    INIT(CaptionAppearanceShowCaptionsWhenAvailable);
-    INIT(CaptionAppearanceCopyForegroundColor);
-    INIT(CaptionAppearanceCopyBackgroundColor);
-    INIT(CaptionAppearanceCopyWindowColor);
-    INIT(CaptionAppearanceGetForegroundOpacity);
-    INIT(CaptionAppearanceGetBackgroundOpacity);
-    INIT(CaptionAppearanceGetWindowOpacity);
-    INIT(CaptionAppearanceCopyFontForStyle);
-    INIT(CaptionAppearanceGetRelativeCharacterSize);
-    INIT(CaptionAppearanceGetTextEdgeStyle);
-    INIT(CaptionAppearanceGetSettingsChangedNotification);
+#if ENABLE(PUBLIC_SUFFIX_LIST)
+    INIT(IsPublicSuffix);
+#endif
+
+#if ENABLE(CACHE_PARTITIONING)
+    INIT(CachePartitionKey);
+#endif
 
 #endif
     didInit = true;

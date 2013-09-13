@@ -24,12 +24,12 @@
 #define webkitwebviewprivate_h
 
 #include "AcceleratedCompositingContext.h"
-#include "FullscreenVideoController.h"
 #include "GeolocationClientMock.h"
 #include "GtkClickCounter.h"
 #include "GtkDragAndDropHelper.h"
 #include "Page.h"
 #include "ResourceHandle.h"
+#include "ResourceResponse.h"
 #include "WebViewInputMethodFilter.h"
 #include "WidgetBackingStore.h"
 #include <webkit/webkitwebview.h>
@@ -90,10 +90,6 @@ struct _WebKitWebViewPrivate {
 
     gboolean disposing;
 
-#if ENABLE(VIDEO) && !defined(GST_API_VERSION_1)
-    FullscreenVideoController* fullscreenVideoController;
-#endif
-
     // These are hosted here because the DataSource object is
     // created too late in the frame loading process.
     GRefPtr<WebKitWebResource> mainResource;
@@ -133,7 +129,7 @@ void webkit_web_view_request_download(WebKitWebView*, WebKitNetworkRequest*, con
 
 void webkit_web_view_add_resource(WebKitWebView*, const char*, WebKitWebResource*);
 void webkit_web_view_add_main_resource(WebKitWebView*, const char*, WebKitWebResource*);
-void webkit_web_view_remove_resource(WebKitWebView*, const char*);
+void webkitWebViewRemoveSubresource(WebKitWebView*, const char*);
 WebKitWebResource* webkit_web_view_get_resource(WebKitWebView*, char*);
 WebKitWebResource* webkit_web_view_get_main_resource(WebKitWebView*);
 void webkit_web_view_clear_resources(WebKitWebView*);
@@ -141,9 +137,6 @@ GList* webkit_web_view_get_subresources(WebKitWebView*);
 
 void webkit_web_view_set_tooltip_text(WebKitWebView*, const char*);
 GtkMenu* webkit_web_view_get_context_menu(WebKitWebView*);
-
-void webViewEnterFullscreen(WebKitWebView* webView, WebCore::Node*);
-void webViewExitFullscreen(WebKitWebView* webView);
 
 void webkitWebViewRunFileChooserRequest(WebKitWebView*, WebKitFileChooserRequest*);
 

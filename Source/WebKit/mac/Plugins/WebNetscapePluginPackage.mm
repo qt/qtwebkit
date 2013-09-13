@@ -144,6 +144,8 @@ using namespace WebCore;
     if (!theName)
         theName = filename;
     pluginInfo.name = theName;
+
+    pluginInfo.isApplicationPlugin = false;
     
     [self closeResourceFile:resRef];
     
@@ -168,7 +170,7 @@ using namespace WebCore;
         return NO;
 
 #if USE(PLUGIN_HOST_PROCESS)
-    RetainPtr<CFArrayRef> archs(AdoptCF, CFBundleCopyExecutableArchitectures(cfBundle.get()));
+    RetainPtr<CFArrayRef> archs = adoptCF(CFBundleCopyExecutableArchitectures(cfBundle.get()));
 
     if ([(NSArray *)archs.get() containsObject:[NSNumber numberWithInteger:NSBundleExecutableArchitectureX86_64]])
         pluginHostArchitecture = CPU_TYPE_X86_64;
@@ -177,7 +179,7 @@ using namespace WebCore;
     else
         return NO;
 #else
-    RetainPtr<CFURLRef> executableURL(AdoptCF, CFBundleCopyExecutableURL(cfBundle.get()));
+    RetainPtr<CFURLRef> executableURL = adoptCF(CFBundleCopyExecutableURL(cfBundle.get()));
     if (!executableURL)
         return NO;
     NSFileHandle *executableFile = [NSFileHandle fileHandleForReadingAtPath:[(NSURL *)executableURL.get() path]];

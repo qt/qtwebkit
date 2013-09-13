@@ -60,15 +60,24 @@ public:
     void copyStateFrom(const ContentSecurityPolicy*);
 
     enum HeaderType {
-        ReportStableDirectives,
-        EnforceStableDirectives,
-        ReportAllDirectives,
-        EnforceAllDirectives
+        Report,
+        Enforce,
+        PrefixedReport,
+        PrefixedEnforce
     };
 
     enum ReportingStatus {
         SendReport,
         SuppressReport
+    };
+
+    // Be sure to update the behavior of XSSAuditor::combineXSSProtectionHeaderAndCSP whenever you change this enum's content or ordering.
+    enum ReflectedXSSDisposition {
+        ReflectedXSSUnset = 0,
+        AllowReflectedXSS,
+        ReflectedXSSInvalid,
+        FilterReflectedXSS,
+        BlockReflectedXSS
     };
 
     void didReceiveHeader(const String&, HeaderType);
@@ -95,6 +104,9 @@ public:
     bool allowMediaFromSource(const KURL&, ReportingStatus = SendReport) const;
     bool allowConnectToSource(const KURL&, ReportingStatus = SendReport) const;
     bool allowFormAction(const KURL&, ReportingStatus = SendReport) const;
+    bool allowBaseURI(const KURL&, ReportingStatus = SendReport) const;
+
+    ReflectedXSSDisposition reflectedXSSDisposition() const;
 
     void setOverrideAllowInlineStyle(bool);
 
@@ -109,8 +121,10 @@ public:
     void reportInvalidPluginTypes(const String&) const;
     void reportInvalidSandboxFlags(const String&) const;
     void reportInvalidSourceExpression(const String& directiveName, const String& source) const;
+    void reportInvalidReflectedXSS(const String&) const;
+    void reportMissingReportURI(const String&) const;
     void reportUnsupportedDirective(const String&) const;
-    void reportViolation(const String& directiveText, const String& consoleMessage, const KURL& blockedURL, const Vector<KURL>& reportURIs, const String& header, const String& contextURL = String(), const WTF::OrdinalNumber& contextLine = WTF::OrdinalNumber::beforeFirst(), ScriptState* = 0) const;
+    void reportViolation(const String& directiveText, const String& effectiveDirective, const String& consoleMessage, const KURL& blockedURL, const Vector<KURL>& reportURIs, const String& header, const String& contextURL = String(), const WTF::OrdinalNumber& contextLine = WTF::OrdinalNumber::beforeFirst(), ScriptState* = 0) const;
 
     void reportBlockedScriptExecutionToInspector(const String& directiveText) const;
 
@@ -119,6 +133,8 @@ public:
     SecurityOrigin* securityOrigin() const;
     void enforceSandboxFlags(SandboxFlags) const;
     String evalDisabledErrorMessage() const;
+
+    bool experimentalFeaturesEnabled() const;
 
 private:
     explicit ContentSecurityPolicy(ScriptExecutionContext*);

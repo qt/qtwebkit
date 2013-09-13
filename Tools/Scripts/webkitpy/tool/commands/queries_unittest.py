@@ -27,13 +27,13 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import unittest
+import unittest2 as unittest
 
 from webkitpy.common.system.outputcapture import OutputCapture
 from webkitpy.common.net.bugzilla import Bugzilla
 from webkitpy.common.system.outputcapture import OutputCapture
 from webkitpy.thirdparty.mock import Mock
-from webkitpy.layout_tests.port.test import TestPort
+from webkitpy.port.test import TestPort
 from webkitpy.tool.commands.commandtest import CommandsTest
 from webkitpy.tool.commands.queries import *
 from webkitpy.tool.mocktool import MockTool, MockOptions
@@ -173,7 +173,7 @@ class PrintExpectationsTest(unittest.TestCase):
             command.execute(options, tests, tool)
         finally:
             stdout, _, _ = oc.restore_output()
-        self.assertEqual(stdout, expected_stdout)
+        self.assertMultiLineEqual(stdout, expected_stdout)
 
     def test_basic(self):
         self.run_test(['failures/expected/text.html', 'failures/expected/image.html'],
@@ -223,10 +223,19 @@ class PrintExpectationsTest(unittest.TestCase):
 
     def test_paths(self):
         self.run_test([],
-                      ('LayoutTests/platform/test/TestExpectations\n'
+                      ('LayoutTests/TestExpectations\n'
+                       'LayoutTests/platform/test/TestExpectations\n'
                        'LayoutTests/platform/test-win-xp/TestExpectations\n'),
                       paths=True)
 
+    def test_platform(self):
+        self.run_test(['platform/test-mac-leopard/http/test.html'],
+                      ('// For test-mac-snowleopard\n'
+                       'platform/test-mac-leopard [ Pass Skip WontFix ]\n'  # Note that this is the expectation (from being skipped internally), not the test name
+                       '\n'
+                       '// For test-mac-leopard\n'
+                       'platform/test-mac-leopard/http/test.html [ Pass ]\n'),
+                      platform='test-mac-*')
 
 class PrintBaselinesTest(unittest.TestCase):
     def setUp(self):
@@ -255,7 +264,7 @@ class PrintBaselinesTest(unittest.TestCase):
         self.capture_output()
         command.execute(MockOptions(all=False, include_virtual_tests=False, csv=False, platform=None), ['passes/text.html'], self.tool)
         stdout, _, _ = self.restore_output()
-        self.assertEqual(stdout,
+        self.assertMultiLineEqual(stdout,
                           ('// For test-win-xp\n'
                            'passes/text-expected.png\n'
                            'passes/text-expected.txt\n'))
@@ -266,7 +275,7 @@ class PrintBaselinesTest(unittest.TestCase):
         self.capture_output()
         command.execute(MockOptions(all=False, include_virtual_tests=False, csv=False, platform='test-win-*'), ['passes/text.html'], self.tool)
         stdout, _, _ = self.restore_output()
-        self.assertEqual(stdout,
+        self.assertMultiLineEqual(stdout,
                           ('// For test-win-vista\n'
                            'passes/text-expected.png\n'
                            'passes/text-expected.txt\n'
@@ -285,6 +294,6 @@ class PrintBaselinesTest(unittest.TestCase):
         self.capture_output()
         command.execute(MockOptions(all=False, platform='*xp', csv=True, include_virtual_tests=False), ['passes/text.html'], self.tool)
         stdout, _, _ = self.restore_output()
-        self.assertEqual(stdout,
+        self.assertMultiLineEqual(stdout,
                           ('test-win-xp,passes/text.html,None,png,passes/text-expected.png,None\n'
                            'test-win-xp,passes/text.html,None,txt,passes/text-expected.txt,None\n'))

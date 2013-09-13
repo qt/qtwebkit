@@ -48,7 +48,7 @@ static RetainPtr<NSCursor> createCustomCursor(Image* image, const IntPoint& hotS
     if (!nsImage)
         return 0;
     BEGIN_BLOCK_OBJC_EXCEPTIONS;
-    return RetainPtr<NSCursor>(AdoptNS, [[NSCursor alloc] initWithImage:nsImage hotSpot:hotSpot]);
+    return adoptNS([[NSCursor alloc] initWithImage:nsImage hotSpot:hotSpot]);
     END_BLOCK_OBJC_EXCEPTIONS;
     return 0;
 }
@@ -56,8 +56,8 @@ static RetainPtr<NSCursor> createCustomCursor(Image* image, const IntPoint& hotS
 static RetainPtr<NSCursor> createNamedCursor(const char* name, int x, int y)
 {
     BEGIN_BLOCK_OBJC_EXCEPTIONS;
-    RetainPtr<NSString> resourceName(AdoptNS, [[NSString alloc] initWithUTF8String:name]);
-    RetainPtr<NSImage> cursorImage(AdoptNS, [[NSImage alloc] initWithContentsOfFile:[[NSBundle bundleForClass:[WebCoreCursorBundle class]] pathForResource:resourceName.get() ofType:@"png"]]);
+    RetainPtr<NSString> resourceName = adoptNS([[NSString alloc] initWithUTF8String:name]);
+    RetainPtr<NSImage> cursorImage = adoptNS([[NSImage alloc] initWithContentsOfFile:[[NSBundle bundleForClass:[WebCoreCursorBundle class]] pathForResource:resourceName.get() ofType:@"png"]]);
     
     RetainPtr<NSCursor> cursor;
 
@@ -187,6 +187,7 @@ void Cursor::ensurePlatformCursor() const
         break;
 
     case Cursor::WestResize:
+    case Cursor::WestPanning:
 #if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1070
         m_platformCursor = wkCursor("ResizeWest");
 #else
@@ -203,7 +204,6 @@ void Cursor::ensurePlatformCursor() const
         break;
 
     case Cursor::EastWestResize:
-    case Cursor::WestPanning:
 #if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1070
         m_platformCursor = wkCursor("ResizeEastWest");
 #else
@@ -253,11 +253,7 @@ void Cursor::ensurePlatformCursor() const
         break;
 
     case Cursor::ContextMenu:
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1060
         m_platformCursor = [NSCursor contextualMenuCursor];
-#else
-        m_platformCursor = createNamedCursor("contextMenuCursor", 3, 2);
-#endif
         break;
 
     case Cursor::Alias:
@@ -277,19 +273,11 @@ void Cursor::ensurePlatformCursor() const
         break;
 
     case Cursor::NoDrop:
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1060
         m_platformCursor = [NSCursor operationNotAllowedCursor];
-#else
-        m_platformCursor = createNamedCursor("noDropCursor", 3, 1);
-#endif
         break;
 
     case Cursor::Copy:
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1060
         m_platformCursor = [NSCursor dragCopyCursor];
-#else
-        m_platformCursor = createNamedCursor("copyCursor", 3, 2);
-#endif
         break;
 
     case Cursor::None:
@@ -297,11 +285,7 @@ void Cursor::ensurePlatformCursor() const
         break;
 
     case Cursor::NotAllowed:
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1060
         m_platformCursor = [NSCursor operationNotAllowedCursor];
-#else
-        m_platformCursor = createNamedCursor("notAllowedCursor", 11, 11);
-#endif
         break;
 
     case Cursor::ZoomIn:
@@ -340,6 +324,7 @@ Cursor::Cursor(const Cursor& other)
     : m_type(other.m_type)
     , m_image(other.m_image)
     , m_hotSpot(other.m_hotSpot)
+    , m_imageScaleFactor(other.m_imageScaleFactor)
     , m_platformCursor(other.m_platformCursor)
 {
 }
@@ -349,6 +334,7 @@ Cursor& Cursor::operator=(const Cursor& other)
     m_type = other.m_type;
     m_image = other.m_image;
     m_hotSpot = other.m_hotSpot;
+    m_imageScaleFactor = other.m_imageScaleFactor;
     m_platformCursor = other.m_platformCursor;
     return *this;
 }

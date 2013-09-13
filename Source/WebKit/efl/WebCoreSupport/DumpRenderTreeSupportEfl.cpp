@@ -25,26 +25,28 @@
 #include "FrameLoaderClientEfl.h"
 #include "ewk_frame_private.h"
 #include "ewk_history_private.h"
-#include "ewk_intent_private.h"
 #include "ewk_private.h"
 #include "ewk_view_private.h"
 
 #include <APICast.h>
 #include <AnimationController.h>
-#include <CSSComputedStyleDeclaration.h>
+#include <DOMWindow.h>
 #include <DocumentLoader.h>
+#include <Editor.h>
 #include <EditorClientEfl.h>
 #include <Eina.h>
 #include <Evas.h>
 #include <FindOptions.h>
 #include <FloatSize.h>
 #include <FocusController.h>
+#include <FrameLoader.h>
+#include <FrameSelection.h>
 #include <FrameView.h>
 #include <HTMLInputElement.h>
 #include <InspectorController.h>
 #include <IntRect.h>
-#include <Intent.h>
 #include <JSCSSStyleDeclaration.h>
+#include <JSDOMWindow.h>
 #include <JSElement.h>
 #include <JavaScriptCore/OpaqueJSString.h>
 #include <MemoryCache.h>
@@ -55,12 +57,12 @@
 #include <ResourceLoadScheduler.h>
 #include <RuntimeEnabledFeatures.h>
 #include <SchemeRegistry.h>
+#include <ScriptController.h>
 #include <ScriptValue.h>
 #include <Settings.h>
 #include <TextIterator.h>
 #include <bindings/js/GCController.h>
 #include <history/HistoryItem.h>
-#include <workers/WorkerThread.h>
 #include <wtf/HashMap.h>
 
 #if ENABLE(GEOLOCATION)
@@ -69,6 +71,12 @@
 #include <GeolocationError.h>
 #include <GeolocationPosition.h>
 #include <wtf/CurrentTime.h>
+#endif
+
+#if HAVE(ACCESSIBILITY)
+#include "AXObjectCache.h"
+#include "AccessibilityObject.h"
+#include "WebKitAccessibleWrapperAtk.h"
 #endif
 
 #define DRT_SUPPORT_FRAME_GET_OR_RETURN(ewkFrame, frame, ...) \
@@ -91,18 +99,6 @@ void DumpRenderTreeSupportEfl::setDumpRenderTreeModeEnabled(bool enabled)
 bool DumpRenderTreeSupportEfl::dumpRenderTreeModeEnabled()
 {
     return s_drtRun;
-}
-
-unsigned DumpRenderTreeSupportEfl::activeAnimationsCount(const Evas_Object* ewkFrame)
-{
-    DRT_SUPPORT_FRAME_GET_OR_RETURN(ewkFrame, frame, 0);
-
-    WebCore::AnimationController* animationController = frame->animation();
-
-    if (!animationController)
-        return 0;
-
-    return animationController->numberOfActiveAnimations(frame->document());
 }
 
 bool DumpRenderTreeSupportEfl::callShouldCloseOnWebView(Evas_Object* ewkFrame)
@@ -131,21 +127,6 @@ String DumpRenderTreeSupportEfl::layerTreeAsText(const Evas_Object* ewkFrame)
     DRT_SUPPORT_FRAME_GET_OR_RETURN(ewkFrame, frame, String());
 
     return frame->layerTreeAsText();
-}
-
-bool DumpRenderTreeSupportEfl::elementDoesAutoCompleteForElementWithId(const Evas_Object* ewkFrame, const String& elementId)
-{
-    DRT_SUPPORT_FRAME_GET_OR_RETURN(ewkFrame, frame, false);
-
-    WebCore::Document* document = frame->document();
-    ASSERT(document);
-
-    WebCore::HTMLInputElement* inputElement = static_cast<WebCore::HTMLInputElement*>(document->getElementById(elementId));
-
-    if (!inputElement)
-        return false;
-
-    return inputElement->isTextField() && !inputElement->isPasswordField() && inputElement->shouldAutocomplete();
 }
 
 Eina_List* DumpRenderTreeSupportEfl::frameChildren(const Evas_Object* ewkFrame)
@@ -182,30 +163,6 @@ void DumpRenderTreeSupportEfl::layoutFrame(Evas_Object* ewkFrame)
         return;
 
     frame->view()->layout();
-}
-
-bool DumpRenderTreeSupportEfl::pauseAnimation(Evas_Object* ewkFrame, const char* name, const char* elementId, double time)
-{
-    DRT_SUPPORT_FRAME_GET_OR_RETURN(ewkFrame, frame, false);
-
-    WebCore::Element* element = frame->document()->getElementById(elementId);
-
-    if (!element || !element->renderer())
-        return false;
-
-    return frame->animation()->pauseAnimationAtTime(element->renderer(), name, time);
-}
-
-bool DumpRenderTreeSupportEfl::pauseTransition(Evas_Object* ewkFrame, const char* name, const char* elementId, double time)
-{
-    DRT_SUPPORT_FRAME_GET_OR_RETURN(ewkFrame, frame, false);
-
-    WebCore::Element* element = frame->document()->getElementById(elementId);
-
-    if (!element || !element->renderer())
-        return false;
-
-    return frame->animation()->pauseTransitionAtTime(element->renderer(), name, time);
 }
 
 unsigned DumpRenderTreeSupportEfl::pendingUnloadEventCount(const Evas_Object* ewkFrame)
@@ -279,19 +236,6 @@ void DumpRenderTreeSupportEfl::setValueForUser(JSContextRef context, JSValueRef 
     inputElement->setValueForUser(value);
 }
 
-void DumpRenderTreeSupportEfl::setAutofilled(JSContextRef context, JSValueRef nodeObject, bool autofilled)
-{
-    JSC::ExecState* exec = toJS(context);
-    WebCore::Element* element = WebCore::toElement(toJS(exec, nodeObject));
-    if (!element)
-        return;
-    WebCore::HTMLInputElement* inputElement = element->toInputElement();
-    if (!inputElement)
-        return;
-
-    inputElement->setAutofilled(autofilled);
-}
-
 void DumpRenderTreeSupportEfl::setDefersLoading(Evas_Object* ewkView, bool defers)
 {
     DRT_SUPPRT_PAGE_GET_OR_RETURN(ewkView, page);
@@ -347,7 +291,7 @@ void DumpRenderTreeSupportEfl::executeCoreCommandByName(const Evas_Object* ewkVi
 {
     DRT_SUPPRT_PAGE_GET_OR_RETURN(ewkView, page);
 
-    page->focusController()->focusedOrMainFrame()->editor()->command(name).execute(value);
+    page->focusController()->focusedOrMainFrame()->editor().command(name).execute(value);
 }
 
 bool DumpRenderTreeSupportEfl::findString(const Evas_Object* ewkView, const String& text, WebCore::FindOptions options)
@@ -371,33 +315,32 @@ void DumpRenderTreeSupportEfl::setCSSRegionsEnabled(const Evas_Object* ewkView, 
     WebCore::RuntimeEnabledFeatures::setCSSRegionsEnabled(enabled);
 }
 
+void DumpRenderTreeSupportEfl::setSeamlessIFramesEnabled(bool enabled)
+{
+#if ENABLE(IFRAME_SEAMLESS)
+    WebCore::RuntimeEnabledFeatures::setSeamlessIFramesEnabled(enabled);
+#else
+    UNUSED_PARAM(enabled);
+#endif
+}
+
+void DumpRenderTreeSupportEfl::setWebAudioEnabled(Evas_Object* ewkView, bool enabled)
+{
+#if ENABLE(WEB_AUDIO)
+    DRT_SUPPRT_PAGE_GET_OR_RETURN(ewkView, page);
+
+    page->settings()->setWebAudioEnabled(enabled);
+#else
+    UNUSED_PARAM(ewkView);
+    UNUSED_PARAM(enabled);
+#endif
+}
+
 bool DumpRenderTreeSupportEfl::isCommandEnabled(const Evas_Object* ewkView, const char* name)
 {
     DRT_SUPPRT_PAGE_GET_OR_RETURN(ewkView, page, false);
 
-    return page->focusController()->focusedOrMainFrame()->editor()->command(name).isEnabled();
-}
-
-void DumpRenderTreeSupportEfl::setSmartInsertDeleteEnabled(Evas_Object* ewkView, bool enabled)
-{
-    DRT_SUPPRT_PAGE_GET_OR_RETURN(ewkView, page);
-
-    WebCore::EditorClientEfl* editorClient = static_cast<WebCore::EditorClientEfl*>(page->editorClient());
-    if (!editorClient)
-        return;
-
-    editorClient->setSmartInsertDeleteEnabled(enabled);
-}
-
-void DumpRenderTreeSupportEfl::setSelectTrailingWhitespaceEnabled(Evas_Object* ewkView, bool enabled)
-{
-    DRT_SUPPRT_PAGE_GET_OR_RETURN(ewkView, page);
-
-    WebCore::EditorClientEfl* editorClient = static_cast<WebCore::EditorClientEfl*>(page->editorClient());
-    if (!editorClient)
-        return;
-
-    editorClient->setSelectTrailingWhitespaceEnabled(enabled);
+    return page->focusController()->focusedOrMainFrame()->editor().command(name).isEnabled();
 }
 
 void DumpRenderTreeSupportEfl::forceLayout(Evas_Object* ewkFrame)
@@ -462,16 +405,7 @@ void DumpRenderTreeSupportEfl::garbageCollectorCollectOnAlternateThread(bool wai
 
 size_t DumpRenderTreeSupportEfl::javaScriptObjectsCount()
 {
-    return WebCore::JSDOMWindow::commonJSGlobalData()->heap.objectCount();
-}
-
-unsigned DumpRenderTreeSupportEfl::workerThreadCount()
-{
-#if ENABLE(WORKERS)
-    return WebCore::WorkerThread::workerThreadCount();
-#else
-    return 0;
-#endif
+    return WebCore::JSDOMWindow::commonVM()->heap.objectCount();
 }
 
 void DumpRenderTreeSupportEfl::setDeadDecodedDataDeletionInterval(double interval)
@@ -525,6 +459,10 @@ void DumpRenderTreeSupportEfl::evaluateInWebInspector(const Evas_Object* ewkView
 
     if (page->inspectorController())
         page->inspectorController()->evaluateForTestInFrontend(callId, script);
+#else
+    UNUSED_PARAM(ewkView);
+    UNUSED_PARAM(callId);
+    UNUSED_PARAM(script);
 #endif
 }
 
@@ -583,19 +521,7 @@ void DumpRenderTreeSupportEfl::setMockScrollbarsEnabled(bool enable)
 
 void DumpRenderTreeSupportEfl::deliverAllMutationsIfNecessary()
 {
-#if ENABLE(MUTATION_OBSERVERS)
     WebCore::MutationObserver::deliverAllMutations();
-#endif
-}
-
-String DumpRenderTreeSupportEfl::markerTextForListItem(JSContextRef context, JSValueRef nodeObject)
-{
-    JSC::ExecState* exec = toJS(context);
-    WebCore::Element* element = WebCore::toElement(toJS(exec, nodeObject));
-    if (!element)
-        return String();
-
-    return WebCore::markerTextForListItem(element);
 }
 
 void DumpRenderTreeSupportEfl::setInteractiveFormValidationEnabled(Evas_Object* ewkView, bool enabled)
@@ -610,22 +536,6 @@ void DumpRenderTreeSupportEfl::setValidationMessageTimerMagnification(Evas_Objec
     DRT_SUPPRT_PAGE_GET_OR_RETURN(ewkView, page);
 
     page->settings()->setValidationMessageTimerMagnification(value);
-}
-
-JSValueRef DumpRenderTreeSupportEfl::computedStyleIncludingVisitedInfo(JSContextRef context, JSValueRef value)
-{
-    if (!value)
-        return JSValueMakeUndefined(context);
-
-    JSC::ExecState* exec = toJS(context);
-    JSC::JSValue jsValue = toJS(exec, value);
-    if (!jsValue.inherits(&WebCore::JSElement::s_info))
-        return JSValueMakeUndefined(context);
-
-    WebCore::JSElement* jsElement = static_cast<WebCore::JSElement*>(asObject(jsValue));
-    WebCore::Element* element = jsElement->impl();
-    RefPtr<WebCore::CSSComputedStyleDeclaration> style = WebCore::CSSComputedStyleDeclaration::create(element, true);
-    return toRef(exec, toJS(exec, jsElement->globalObject(), style.get()));
 }
 
 void DumpRenderTreeSupportEfl::setAuthorAndUserStylesEnabled(Evas_Object* ewkView, bool enabled)
@@ -645,42 +555,6 @@ void DumpRenderTreeSupportEfl::setShouldTrackVisitedLinks(bool shouldTrack)
     WebCore::PageGroup::setShouldTrackVisitedLinks(shouldTrack);
 }
 
-void DumpRenderTreeSupportEfl::sendWebIntentResponse(Ewk_Intent_Request* request, JSStringRef response)
-{
-#if ENABLE(WEB_INTENTS)
-    String responseString = response->string();
-    if (responseString.isEmpty())
-        ewk_intent_request_failure_post(request, WebCore::SerializedScriptValue::create(String::fromUTF8("ERROR")));
-    else
-        ewk_intent_request_result_post(request, WebCore::SerializedScriptValue::create(String(responseString.impl())));
-#endif
-}
-
-WebCore::MessagePortChannelArray* DumpRenderTreeSupportEfl::intentMessagePorts(const Ewk_Intent* intent)
-{
-#if ENABLE(WEB_INTENTS)
-    const WebCore::Intent* coreIntent = EWKPrivate::coreIntent(intent);
-    return coreIntent ? coreIntent->messagePorts() : 0;
-#else
-    return 0;
-#endif
-}
-
-void DumpRenderTreeSupportEfl::deliverWebIntent(Evas_Object* ewkFrame, JSStringRef action, JSStringRef type, JSStringRef data)
-{
-#if ENABLE(WEB_INTENTS)
-    RefPtr<WebCore::SerializedScriptValue> serializedData = WebCore::SerializedScriptValue::create(data->string());
-    WebCore::ExceptionCode ec = 0;
-    WebCore::MessagePortArray ports;
-    RefPtr<WebCore::Intent> coreIntent = WebCore::Intent::create(action->string(), type->string(), serializedData.get(), ports, ec);
-    if (ec)
-        return;
-    Ewk_Intent* ewkIntent = ewk_intent_new(coreIntent.get());
-    ewk_frame_intent_deliver(ewkFrame, ewkIntent);
-    ewk_intent_free(ewkIntent);
-#endif
-}
-
 void DumpRenderTreeSupportEfl::setComposition(Evas_Object* ewkView, const char* text, int start, int length)
 {
     DRT_SUPPRT_PAGE_GET_OR_RETURN(ewkView, page);
@@ -688,14 +562,14 @@ void DumpRenderTreeSupportEfl::setComposition(Evas_Object* ewkView, const char* 
     if (!page->focusController() || !page->focusController()->focusedOrMainFrame())
         return;
 
-    WebCore::Editor* editor = page->focusController()->focusedOrMainFrame()->editor();
-    if (!editor || (!editor->canEdit() && !editor->hasComposition()))
+    WebCore::Editor& editor = page->focusController()->focusedOrMainFrame()->editor();
+    if (!editor.canEdit() && !editor.hasComposition())
         return;
 
     const String compositionString = String::fromUTF8(text);
     Vector<WebCore::CompositionUnderline> underlines;
     underlines.append(WebCore::CompositionUnderline(0, compositionString.length(), WebCore::Color(0, 0, 0), false));
-    editor->setComposition(compositionString, underlines, start, start + length);
+    editor.setComposition(compositionString, underlines, start, start + length);
 }
 
 bool DumpRenderTreeSupportEfl::hasComposition(const Evas_Object* ewkView)
@@ -705,11 +579,7 @@ bool DumpRenderTreeSupportEfl::hasComposition(const Evas_Object* ewkView)
     if (!page->focusController() || !page->focusController()->focusedOrMainFrame())
         return false;
 
-    const WebCore::Editor* editor = page->focusController()->focusedOrMainFrame()->editor();
-    if (!editor)
-        return false;
-
-    return editor->hasComposition();
+    return page->focusController()->focusedOrMainFrame()->editor().hasComposition();
 }
 
 bool DumpRenderTreeSupportEfl::compositionRange(Evas_Object* ewkView, int* start, int* length)
@@ -721,12 +591,12 @@ bool DumpRenderTreeSupportEfl::compositionRange(Evas_Object* ewkView, int* start
     if (!page->focusController() || !page->focusController()->focusedOrMainFrame())
         return false;
 
-    WebCore::Editor* editor = page->focusController()->focusedOrMainFrame()->editor();
-    if (!editor || !editor->hasComposition())
+    WebCore::Editor& editor = page->focusController()->focusedOrMainFrame()->editor();
+    if (!editor.hasComposition())
         return false;
 
-    *start = editor->compositionStart();
-    *length = editor->compositionEnd() - *start;
+    *start = editor.compositionStart();
+    *length = editor.compositionEnd() - *start;
     return true;
 }
 
@@ -737,40 +607,37 @@ void DumpRenderTreeSupportEfl::confirmComposition(Evas_Object* ewkView, const ch
     if (!page->focusController() || !page->focusController()->focusedOrMainFrame())
         return;
 
-    WebCore::Editor* editor = page->focusController()->focusedOrMainFrame()->editor();
-    if (!editor)
-        return;
+    WebCore::Editor& editor = page->focusController()->focusedOrMainFrame()->editor();
 
-    if (!editor->hasComposition()) {
-        editor->insertText(String::fromUTF8(text), 0);
+    if (!editor.hasComposition()) {
+        editor.insertText(String::fromUTF8(text), 0);
         return;
     }
 
     if (text) {
-        editor->confirmComposition(String::fromUTF8(text));
+        editor.confirmComposition(String::fromUTF8(text));
         return;
     }
-    editor->confirmComposition();
+    editor.confirmComposition();
 }
 
 WebCore::IntRect DumpRenderTreeSupportEfl::firstRectForCharacterRange(Evas_Object* ewkView, int location, int length)
 {
     DRT_SUPPRT_PAGE_GET_OR_RETURN(ewkView, page, WebCore::IntRect());
 
-    if (!page->focusController() || !page->focusController()->focusedOrMainFrame() || !page->focusController()->focusedOrMainFrame()->editor())
+    if (!page->focusController() || !page->focusController()->focusedOrMainFrame())
         return WebCore::IntRect();
 
     if ((location + length < location) && (location + length))
         length = 0;
 
     WebCore::Frame* frame = page->focusController()->focusedOrMainFrame();
-    WebCore::Editor* editor = frame->editor();
 
     RefPtr<WebCore::Range> range = WebCore::TextIterator::rangeFromLocationAndLength(frame->selection()->rootEditableElementOrDocumentElement(), location, length);
     if (!range)
         return WebCore::IntRect();
 
-    return editor->firstRectForRange(range.get());
+    return frame->editor().firstRectForRange(range.get());
 }
 
 bool DumpRenderTreeSupportEfl::selectedRange(Evas_Object* ewkView, int* start, int* length)
@@ -879,3 +746,43 @@ int DumpRenderTreeSupportEfl::numberOfPendingGeolocationPermissionRequests(const
     return 0;
 #endif
 }
+
+#if HAVE(ACCESSIBILITY)
+String DumpRenderTreeSupportEfl::accessibilityHelpText(const AtkObject* axObject)
+{
+    if (!axObject || !WEBKIT_IS_ACCESSIBLE(axObject))
+        return String();
+
+    WebCore::AccessibilityObject* coreObject = webkitAccessibleGetAccessibilityObject(WEBKIT_ACCESSIBLE(axObject));
+    if (!coreObject)
+        return String();
+
+    return coreObject->helpText();
+}
+
+AtkObject* DumpRenderTreeSupportEfl::rootAccessibleElement(const Evas_Object* ewkFrame)
+{
+    DRT_SUPPORT_FRAME_GET_OR_RETURN(ewkFrame, frame, 0);
+
+    if (!WebCore::AXObjectCache::accessibilityEnabled())
+        WebCore::AXObjectCache::enableAccessibility();
+
+    if (!frame->document())
+        return 0;
+
+    AtkObject* wrapper = frame->document()->axObjectCache()->rootObject()->wrapper();
+    if (!wrapper)
+        return 0;
+
+    return wrapper;
+}
+
+AtkObject* DumpRenderTreeSupportEfl::focusedAccessibleElement(const Evas_Object* ewkFrame)
+{
+    AtkObject* wrapper = rootAccessibleElement(ewkFrame);
+    if (!wrapper)
+        return 0;
+
+    return webkitAccessibleGetFocusedElement(WEBKIT_ACCESSIBLE(wrapper));
+}
+#endif

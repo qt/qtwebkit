@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2011 Apple Inc. All rights reserved.
- * Copyright (C) 2011 Google Inc. All rights reserved.
+ * Copyright (C) 2011, 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2012 Google Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,8 +31,6 @@
 
 #include "Chrome.h"
 #include "HTMLDivElement.h"
-#include "HTMLMediaElement.h"
-#include "HTMLNames.h"
 #include "MediaControlElements.h"
 #include "MouseEvent.h"
 #include "Page.h"
@@ -88,7 +86,9 @@ class MediaControls : public HTMLDivElement {
     virtual void changedVolume();
 
     virtual void changedClosedCaptionsVisibility();
+    virtual void refreshClosedCaptionsButtonVisibility();
     virtual void toggleClosedCaptionTrackList() { }
+    virtual void closedCaptionTracksChanged();
 
     virtual void enteredFullscreen();
     virtual void exitedFullscreen();
@@ -104,6 +104,7 @@ class MediaControls : public HTMLDivElement {
     virtual void showTextTrackDisplay();
     virtual void hideTextTrackDisplay();
     virtual void updateTextTrackDisplay();
+    virtual void textTrackPreferencesChanged();
 #endif
 
 protected:
@@ -128,7 +129,7 @@ protected:
     MediaControlCurrentTimeDisplayElement* m_currentTimeDisplay;
     MediaControlTimelineElement* m_timeline;
     MediaControlPanelMuteButtonElement* m_panelMuteButton;
-    MediaControlVolumeSliderElement* m_volumeSlider;
+    MediaControlPanelVolumeSliderElement* m_volumeSlider;
     MediaControlToggleClosedCaptionsButtonElement* m_toggleClosedCaptionsButton;
     MediaControlFullscreenButtonElement* m_fullScreenButton;
 
@@ -144,7 +145,7 @@ private:
 
 inline MediaControls* toMediaControls(Node* node)
 {
-    ASSERT(!node || node->isMediaControls());
+    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->isMediaControls());
     return static_cast<MediaControls*>(node);
 }
 

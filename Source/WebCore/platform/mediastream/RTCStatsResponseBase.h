@@ -37,9 +37,8 @@ class RTCStatsResponseBase : public RefCounted<RTCStatsResponseBase> {
 public:
     virtual ~RTCStatsResponseBase() { }
 
-    virtual size_t addReport() = 0;
-    virtual void addElement(size_t report, bool isLocal, double timestamp) = 0;
-    virtual void addStatistic(size_t report, bool isLocal, String name, String value) = 0;
+    virtual size_t addReport(String id, String type, double timestamp) = 0;
+    virtual void addStatistic(size_t report, String name, String value) = 0;
 };
 
 } // namespace WebCore

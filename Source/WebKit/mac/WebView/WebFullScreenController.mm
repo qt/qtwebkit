@@ -33,6 +33,8 @@
 #import <WebCore/Document.h>
 #import <WebCore/Element.h>
 #import <WebCore/FloatRect.h>
+#import <WebCore/Frame.h>
+#import <WebCore/FrameView.h>
 #import <WebCore/HTMLElement.h>
 #import <WebCore/IntRect.h>
 #import <WebCore/Page.h>
@@ -45,7 +47,6 @@
 #import <WebCore/WebWindowAnimation.h>
 #import <WebKitSystemInterface.h>
 #import <wtf/RetainPtr.h>
-#import <wtf/UnusedParam.h>
 
 using namespace WebCore;
 
@@ -56,7 +57,7 @@ static IntRect screenRectOfContents(Element* element)
     ASSERT(element);
     if (element->renderer() && element->renderer()->hasLayer() && element->renderer()->enclosingLayer()->isComposited()) {
         FloatQuad contentsBox = static_cast<FloatRect>(element->renderer()->enclosingLayer()->backing()->contentsBox());
-        contentsBox = element->renderer()->localToAbsoluteQuad(contentsBox, SnapOffsetForTransforms);
+        contentsBox = element->renderer()->localToAbsoluteQuad(contentsBox);
         return element->renderer()->view()->frameView()->contentsToScreen(contentsBox.enclosingBoundingBox());
     }
     return element->screenRect();
@@ -96,7 +97,7 @@ static NSRect convertRectToScreen(NSWindow *window, NSRect rect)
 - (id)init
 {
     // Do not defer window creation, to make sure -windowNumber is created (needed by WebWindowScaleAnimation).
-    NSWindow *window = [[WebCoreFullScreenWindow alloc] initWithContentRect:NSZeroRect styleMask:NSBorderlessWindowMask backing:NSBackingStoreBuffered defer:NO];
+    NSWindow *window = [[WebCoreFullScreenWindow alloc] initWithContentRect:NSZeroRect styleMask:NSClosableWindowMask backing:NSBackingStoreBuffered defer:NO];
     self = [super initWithWindow:window];
     [window release];
     if (!self)
@@ -137,6 +138,11 @@ static NSRect convertRectToScreen(NSWindow *window, NSRect rect)
     [webView retain];
     [_webView release];
     _webView = webView;
+}
+
+- (NSView*)webViewPlaceholder
+{
+    return _webViewPlaceholder.get();
 }
 
 - (Element*)element
@@ -227,11 +233,12 @@ static NSRect convertRectToScreen(NSWindow *window, NSRect rect)
 
     // Swap the webView placeholder into place.
     if (!_webViewPlaceholder) {
-        _webViewPlaceholder.adoptNS([[NSView alloc] init]);
+        _webViewPlaceholder = adoptNS([[NSView alloc] init]);
         [_webViewPlaceholder.get() setLayer:[CALayer layer]];
         [_webViewPlaceholder.get() setWantsLayer:YES];
     }
     [[_webViewPlaceholder.get() layer] setContents:(id)webViewContents.get()];
+    _scrollPosition = [_webView _mainCoreFrame]->view()->scrollPosition();
     [self _swapView:_webView with:_webViewPlaceholder.get()];
     
     // Then insert the WebView into the full screen window
@@ -360,6 +367,7 @@ static NSRect convertRectToScreen(NSWindow *window, NSRect rect)
     
     NSResponder *firstResponder = [[self window] firstResponder];
     [self _swapView:_webViewPlaceholder.get() with:_webView];
+    [_webView _mainCoreFrame]->view()->setScrollPosition(_scrollPosition);
     [[_webView window] makeResponder:firstResponder firstResponderIfDescendantOfView:_webView];
     
     NSRect windowBounds = [[self window] frame];
@@ -379,6 +387,12 @@ static NSRect convertRectToScreen(NSWindow *window, NSRect rect)
     [[_webView window] makeKeyAndOrderFront:self];
 
     NSEnableScreenUpdates();
+}
+
+- (void)performClose:(id)sender
+{
+    if (_isFullScreen)
+        [self cancelOperation:sender];
 }
 
 - (void)close
@@ -412,8 +426,6 @@ static NSRect convertRectToScreen(NSWindow *window, NSRect rect)
 
 - (void)_updateMenuAndDockForFullScreen
 {
-    // NSApplicationPresentationOptions is available on > 10.6 only:
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1060
     NSApplicationPresentationOptions options = NSApplicationPresentationDefault;
     NSScreen* fullscreenScreen = [[self window] screen];
     
@@ -433,7 +445,6 @@ static NSRect convertRectToScreen(NSWindow *window, NSRect rect)
     if ([NSApp respondsToSelector:@selector(setPresentationOptions:)])
         [NSApp setPresentationOptions:options];
     else
-#endif
         SetSystemUIMode(_isFullScreen ? kUIModeAllHidden : kUIModeNormal, 0);
 }
 

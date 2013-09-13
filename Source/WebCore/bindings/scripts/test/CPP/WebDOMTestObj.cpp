@@ -24,35 +24,28 @@
 #include "Dictionary.h"
 #include "Document.h"
 #include "HTMLNames.h"
-#include "IDBKey.h"
 #include "KURL.h"
 #include "Node.h"
 #include "SVGPoint.h"
 #include "SerializedScriptValue.h"
+#include "TestEnumType.h"
+#include "TestNode.h"
+#include "TestObj.h"
 #include "WebDOMDictionary.h"
 #include "WebDOMDocument.h"
-#include "WebDOMIDBKey.h"
 #include "WebDOMNode.h"
+#include "WebDOMObject.h"
 #include "WebDOMSVGPoint.h"
 #include "WebDOMString.h"
-#include "WebDOMTestObj.h"
-#include "WebDOMa.h"
-#include "WebDOMany.h"
-#include "WebDOMb.h"
+#include "WebDOMTestEnumType.h"
+#include "WebDOMTestNode.h"
 #include "WebDOMbool.h"
-#include "WebDOMd.h"
-#include "WebDOMe.h"
 #include "WebExceptionHandler.h"
 #include "WebNativeEventListener.h"
-#include "a.h"
-#include "any.h"
-#include "b.h"
 #include "bool.h"
-#include "d.h"
-#include "e.h"
-#include "wtf/text/AtomicString.h"
 #include <wtf/GetPtr.h>
 #include <wtf/RefPtr.h>
+#include <wtf/text/AtomicString.h>
 
 struct WebDOMTestObj::WebDOMTestObjPrivate {
     WebDOMTestObjPrivate(WebCore::TestObj* object = 0)
@@ -121,6 +114,38 @@ WebDOMTestObj WebDOMTestObj::readOnlyTestObjAttr() const
         return WebDOMTestObj();
 
     return toWebKit(WTF::getPtr(impl()->readOnlyTestObjAttr()));
+}
+
+char WebDOMTestObj::byteAttr() const
+{
+    if (!impl())
+        return char();
+
+    return impl()->byteAttr();
+}
+
+void WebDOMTestObj::setByteAttr(char newByteAttr)
+{
+    if (!impl())
+        return;
+
+    impl()->setByteAttr(newByteAttr);
+}
+
+unsigned char WebDOMTestObj::octetAttr() const
+{
+    if (!impl())
+        return unsigned char();
+
+    return impl()->octetAttr();
+}
+
+void WebDOMTestObj::setOctetAttr(unsigned char newOctetAttr)
+{
+    if (!impl())
+        return;
+
+    impl()->setOctetAttr(newOctetAttr);
 }
 
 short WebDOMTestObj::shortAttr() const
@@ -272,7 +297,7 @@ WebDOMString WebDOMTestObj::reflectedStringAttr() const
     if (!impl())
         return WebDOMString();
 
-    return static_cast<const WTF::String&>(impl()->getAttribute(WebCore::HTMLNames::reflectedstringattrAttr));
+    return static_cast<const WTF::String&>(impl()->fastGetAttribute(WebCore::HTMLNames::reflectedstringattrAttr));
 }
 
 void WebDOMTestObj::setReflectedStringAttr(const WebDOMString& newReflectedStringAttr)
@@ -320,7 +345,7 @@ bool WebDOMTestObj::reflectedBooleanAttr() const
     if (!impl())
         return false;
 
-    return impl()->hasAttribute(WebCore::HTMLNames::reflectedbooleanattrAttr);
+    return impl()->fastHasAttribute(WebCore::HTMLNames::reflectedbooleanattrAttr);
 }
 
 void WebDOMTestObj::setReflectedBooleanAttr(bool newReflectedBooleanAttr)
@@ -352,7 +377,7 @@ WebDOMString WebDOMTestObj::reflectedStringAttr() const
     if (!impl())
         return WebDOMString();
 
-    return static_cast<const WTF::String&>(impl()->getAttribute(WebCore::HTMLNames::customContentStringAttrAttr));
+    return static_cast<const WTF::String&>(impl()->fastGetAttribute(WebCore::HTMLNames::customContentStringAttrAttr));
 }
 
 void WebDOMTestObj::setReflectedStringAttr(const WebDOMString& newReflectedStringAttr)
@@ -384,7 +409,7 @@ bool WebDOMTestObj::reflectedCustomBooleanAttr() const
     if (!impl())
         return false;
 
-    return impl()->hasAttribute(WebCore::HTMLNames::customContentBooleanAttrAttr);
+    return impl()->fastHasAttribute(WebCore::HTMLNames::customContentBooleanAttrAttr);
 }
 
 void WebDOMTestObj::setReflectedCustomBooleanAttr(bool newReflectedCustomBooleanAttr)
@@ -539,15 +564,15 @@ void WebDOMTestObj::setConditionalAttr3(int newConditionalAttr3)
 }
 
 #endif
-WebDOMany WebDOMTestObj::anyAttribute() const
+WebDOMObject WebDOMTestObj::anyAttribute() const
 {
     if (!impl())
-        return WebDOMany();
+        return WebDOMObject();
 
     return toWebKit(WTF::getPtr(impl()->anyAttribute()));
 }
 
-void WebDOMTestObj::setAnyAttribute(const WebDOMany& newAnyAttribute)
+void WebDOMTestObj::setAnyAttribute(const WebDOMObject& newAnyAttribute)
 {
     if (!impl())
         return;
@@ -667,6 +692,79 @@ int WebDOMTestObj::replaceableAttribute() const
     return impl()->replaceableAttribute();
 }
 
+double WebDOMTestObj::nullableDoubleAttribute() const
+{
+    if (!impl())
+        return 0;
+
+    bool isNull = false;
+    return impl()->nullableDoubleAttribute(isNull);
+}
+
+int WebDOMTestObj::nullableLongAttribute() const
+{
+    if (!impl())
+        return 0;
+
+    bool isNull = false;
+    return impl()->nullableLongAttribute(isNull);
+}
+
+bool WebDOMTestObj::nullableBooleanAttribute() const
+{
+    if (!impl())
+        return false;
+
+    bool isNull = false;
+    return impl()->nullableBooleanAttribute(isNull);
+}
+
+WebDOMString WebDOMTestObj::nullableStringAttribute() const
+{
+    if (!impl())
+        return WebDOMString();
+
+    bool isNull = false;
+    return static_cast<const WTF::String&>(impl()->nullableStringAttribute(isNull));
+}
+
+int WebDOMTestObj::nullableLongSettableAttribute() const
+{
+    if (!impl())
+        return 0;
+
+    bool isNull = false;
+    return impl()->nullableLongSettableAttribute(isNull);
+}
+
+void WebDOMTestObj::setNullableLongSettableAttribute(int newNullableLongSettableAttribute)
+{
+    if (!impl())
+        return;
+
+    impl()->setNullableLongSettableAttribute(newNullableLongSettableAttribute);
+}
+
+int WebDOMTestObj::nullableStringValue() const
+{
+    if (!impl())
+        return 0;
+
+    bool isNull = false;
+    WebCore::ExceptionCode ec = 0;
+    int result = impl()->nullableStringValue(isNull, ec);
+    webDOMRaiseError(static_cast<WebDOMExceptionCode>(ec));
+    return result;
+}
+
+void WebDOMTestObj::setNullableStringValue(int newNullableStringValue)
+{
+    if (!impl())
+        return;
+
+    impl()->setNullableStringValue(newNullableStringValue);
+}
+
 void WebDOMTestObj::voidMethod()
 {
     if (!impl())
@@ -681,6 +779,38 @@ void WebDOMTestObj::voidMethodWithArgs(int longArg, const WebDOMString& strArg, 
         return;
 
     impl()->voidMethodWithArgs(longArg, strArg, toWebCore(objArg));
+}
+
+char WebDOMTestObj::byteMethod()
+{
+    if (!impl())
+        return char();
+
+    return impl()->byteMethod();
+}
+
+char WebDOMTestObj::byteMethodWithArgs(char byteArg, const WebDOMString& strArg, const WebDOMTestObj& objArg)
+{
+    if (!impl())
+        return char();
+
+    return impl()->byteMethodWithArgs(byteArg, strArg, toWebCore(objArg));
+}
+
+unsigned char WebDOMTestObj::octetMethod()
+{
+    if (!impl())
+        return unsigned char();
+
+    return impl()->octetMethod();
+}
+
+unsigned char WebDOMTestObj::octetMethodWithArgs(unsigned char octetArg, const WebDOMString& strArg, const WebDOMTestObj& objArg)
+{
+    if (!impl())
+        return unsigned char();
+
+    return impl()->octetMethodWithArgs(octetArg, strArg, toWebCore(objArg));
 }
 
 int WebDOMTestObj::longMethod()
@@ -715,6 +845,14 @@ WebDOMTestObj WebDOMTestObj::objMethodWithArgs(int longArg, const WebDOMString& 
     return toWebKit(WTF::getPtr(impl()->objMethodWithArgs(longArg, strArg, toWebCore(objArg))));
 }
 
+void WebDOMTestObj::methodWithEnumArg(const WebDOMTestEnumType& enumArg)
+{
+    if (!impl())
+        return;
+
+    impl()->methodWithEnumArg(toWebCore(enumArg));
+}
+
 WebDOMTestObj WebDOMTestObj::methodThatRequiresAllArgsAndThrows(const WebDOMString& strArg, const WebDOMTestObj& objArg)
 {
     if (!impl())
@@ -732,14 +870,6 @@ void WebDOMTestObj::serializedValue(const WebDOMString& serializedArg)
         return;
 
     impl()->serializedValue(WebCore::SerializedScriptValue::create(WTF::String(serializedArg)));
-}
-
-void WebDOMTestObj::idbKey(const WebDOMIDBKey& key)
-{
-    if (!impl())
-        return;
-
-    impl()->idbKey(toWebCore(key));
 }
 
 void WebDOMTestObj::optionsObject(const WebDOMDictionary& oo, const WebDOMDictionary& ooo)
@@ -900,7 +1030,7 @@ void WebDOMTestObj::overloadedMethod1(const WebDOMString& type)
 
 #endif
 
-void WebDOMTestObj::convert1(const WebDOMa& value)
+void WebDOMTestObj::convert1(const WebDOMTestNode& value)
 {
     if (!impl())
         return;
@@ -908,7 +1038,7 @@ void WebDOMTestObj::convert1(const WebDOMa& value)
     impl()->convert1(toWebCore(value));
 }
 
-void WebDOMTestObj::convert2(const WebDOMb& value)
+void WebDOMTestObj::convert2(const WebDOMTestNode& value)
 {
     if (!impl())
         return;
@@ -916,7 +1046,7 @@ void WebDOMTestObj::convert2(const WebDOMb& value)
     impl()->convert2(toWebCore(value));
 }
 
-void WebDOMTestObj::convert4(const WebDOMd& value)
+void WebDOMTestObj::convert4(const WebDOMTestNode& value)
 {
     if (!impl())
         return;
@@ -924,7 +1054,7 @@ void WebDOMTestObj::convert4(const WebDOMd& value)
     impl()->convert4(toWebCore(value));
 }
 
-void WebDOMTestObj::convert5(const WebDOMe& value)
+void WebDOMTestObj::convert5(const WebDOMTestNode& value)
 {
     if (!impl())
         return;

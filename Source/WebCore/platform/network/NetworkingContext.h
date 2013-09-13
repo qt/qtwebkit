@@ -20,16 +20,12 @@
 #ifndef NetworkingContext_h
 #define NetworkingContext_h
 
+#include "NetworkStorageSession.h"
 #include <wtf/RefCounted.h>
+#include <wtf/RetainPtr.h>
 
 #if PLATFORM(MAC)
-#include "SchedulePair.h"
-#endif
-
-#if PLATFORM(CHROMIUM)
-namespace WebKit {
-class WebCookieJar;
-}
+#include <wtf/SchedulePair.h>
 #endif
 
 #if PLATFORM(QT)
@@ -38,10 +34,6 @@ class WebCookieJar;
 
 #if PLATFORM(MAC)
 OBJC_CLASS NSOperationQueue;
-#endif
-
-#if PLATFORM(MAC) || USE(CFNETWORK)
-typedef const struct __CFURLStorageSession* CFURLStorageSessionRef;
 #endif
 
 #if PLATFORM(QT)
@@ -67,23 +59,22 @@ public:
 
     virtual bool isValid() const { return true; }
 
-#if PLATFORM(CHROMIUM)
-    virtual WebKit::WebCookieJar* cookieJar() const = 0;
-#endif
+    virtual bool shouldClearReferrerOnHTTPSToHTTPRedirect() const = 0;
 
 #if PLATFORM(MAC)
     virtual bool needsSiteSpecificQuirks() const = 0;
     virtual bool localFileContentSniffingEnabled() const = 0; // FIXME: Reconcile with ResourceHandle::forceContentSniffing().
     virtual SchedulePairHashSet* scheduledRunLoopPairs() const { return 0; }
-    virtual NSOperationQueue *scheduledOperationQueue() const { return 0; }
+    virtual RetainPtr<CFDataRef> sourceApplicationAuditData() const = 0;
     virtual ResourceError blockedError(const ResourceRequest&) const = 0;
 #endif
 
-#if PLATFORM(MAC) || USE(CFNETWORK)
-    virtual CFURLStorageSessionRef storageSession() const = 0;
+#if PLATFORM(MAC) || USE(CFNETWORK) || USE(SOUP)
+    virtual NetworkStorageSession& storageSession() const = 0;
 #endif
 
 #if PLATFORM(QT)
+    // FIXME: Wrap QNetworkAccessManager into a NetworkStorageSession to make the code cross-platform.
     virtual QObject* originatingObject() const = 0;
     virtual QNetworkAccessManager* networkAccessManager() const = 0;
     virtual bool mimeSniffingEnabled() const = 0;
@@ -97,7 +88,6 @@ public:
 #endif
 
 #if USE(SOUP)
-    virtual SoupSession* soupSession() const = 0;
     virtual uint64_t initiatingPageID() const = 0;
 #endif
 

@@ -31,20 +31,25 @@
 
 #import "AnimationUtilities.h"
 #import "BlockExceptions.h"
-#import "FloatConversion.h"
 #import "GraphicsContext.h"
 #import "GraphicsLayerCA.h"
 #import "LengthFunctions.h"
+#import "PlatformCAFilters.h"
+#import "SoftLinking.h"
 #import "TiledBacking.h"
 #import "WebLayer.h"
 #import "WebTiledLayer.h"
-#import "WebTileCacheLayer.h"
+#import "WebTiledBackingLayer.h"
 #import <objc/objc-auto.h>
 #import <objc/runtime.h>
+#import <AVFoundation/AVFoundation.h>
 #import <QuartzCore/QuartzCore.h>
 #import <wtf/CurrentTime.h>
 #import <wtf/MathExtras.h>
-#import <wtf/UnusedParam.h>
+#import <wtf/RetainPtr.h>
+
+SOFT_LINK_FRAMEWORK_OPTIONAL(AVFoundation)
+SOFT_LINK_CLASS(AVFoundation, AVPlayerLayer)
 
 using std::min;
 using std::max;
@@ -76,7 +81,7 @@ static double mediaTimeToCurrentTime(CFTimeInterval t)
     // hasNonZeroBeginTime is stored in a key in the animation
     bool hasNonZeroBeginTime = [[animation valueForKey:WKNonZeroBeginTimeFlag] boolValue];
     CFTimeInterval startTime;
-    
+
     if (hasNonZeroBeginTime) {
         // We don't know what time CA used to commit the animation, so just use the current time
         // (even though this will be slightly off).
@@ -173,13 +178,16 @@ PlatformCALayer::PlatformCALayer(LayerType layerType, PlatformLayer* layer, Plat
 {
     BEGIN_BLOCK_OBJC_EXCEPTIONS
     if (layer) {
-        m_layerType = LayerTypeCustom;
+        if ([layer isKindOfClass:getAVPlayerLayerClass()])
+            m_layerType = LayerTypeAVPlayerLayer;
+        else
+            m_layerType = LayerTypeCustom;
         m_layer = layer;
     } else {
         m_layerType = layerType;
     
         Class layerClass = Nil;
-        switch(layerType) {
+        switch (layerType) {
             case LayerTypeLayer:
             case LayerTypeRootLayer:
                 layerClass = [CALayer class];
@@ -193,16 +201,19 @@ PlatformCALayer::PlatformCALayer(LayerType layerType, PlatformLayer* layer, Plat
             case LayerTypeWebTiledLayer:
                 layerClass = [WebTiledLayer class];
                 break;
-            case LayerTypeTileCacheLayer:
-            case LayerTypePageTileCacheLayer:
-                layerClass = [WebTileCacheLayer class];
+            case LayerTypeTiledBackingLayer:
+            case LayerTypePageTiledBackingLayer:
+                layerClass = [WebTiledBackingLayer class];
+                break;
+            case LayerTypeAVPlayerLayer:
+                layerClass = getAVPlayerLayerClass();
                 break;
             case LayerTypeCustom:
                 break;
         }
 
         if (layerClass)
-            m_layer.adoptNS([[layerClass alloc] init]);
+            m_layer = adoptNS([[layerClass alloc] init]);
     }
     
     // Save a pointer to 'this' in the CALayer
@@ -220,13 +231,56 @@ PlatformCALayer::PlatformCALayer(LayerType layerType, PlatformLayer* layer, Plat
         [tiledLayer setContentsGravity:@"bottomLeft"];
     }
     
-    if (usesTileCacheLayer()) {
+    if (usesTiledBackingLayer()) {
         m_customSublayers = adoptPtr(new PlatformCALayerList(1));
-        CALayer* tileCacheTileContainerLayer = [static_cast<WebTileCacheLayer *>(m_layer.get()) tileContainerLayer];
+        CALayer* tileCacheTileContainerLayer = [static_cast<WebTiledBackingLayer *>(m_layer.get()) tileContainerLayer];
         (*m_customSublayers)[0] = PlatformCALayer::create(tileCacheTileContainerLayer, 0);
     }
     
     END_BLOCK_OBJC_EXCEPTIONS
+}
+
+PassRefPtr<PlatformCALayer> PlatformCALayer::clone(PlatformCALayerClient* owner) const
+{
+    LayerType type;
+    switch (layerType()) {
+    case LayerTypeTransformLayer:
+        type = LayerTypeTransformLayer;
+        break;
+    case LayerTypeAVPlayerLayer:
+        type = LayerTypeAVPlayerLayer;
+        break;
+    case LayerTypeLayer:
+    default:
+        type = LayerTypeLayer;
+        break;
+    };
+    RefPtr<PlatformCALayer> newLayer = PlatformCALayer::create(type, owner);
+
+    newLayer->setPosition(position());
+    newLayer->setBounds(bounds());
+    newLayer->setAnchorPoint(anchorPoint());
+    newLayer->setTransform(transform());
+    newLayer->setSublayerTransform(sublayerTransform());
+    newLayer->setContents(contents());
+    newLayer->setMasksToBounds(masksToBounds());
+    newLayer->setDoubleSided(isDoubleSided());
+    newLayer->setOpaque(isOpaque());
+    newLayer->setBackgroundColor(backgroundColor());
+    newLayer->setContentsScale(contentsScale());
+#if ENABLE(CSS_FILTERS)
+    newLayer->copyFiltersFrom(this);
+#endif
+
+    if (type == LayerTypeAVPlayerLayer) {
+        AVPlayerLayer* destinationPlayerLayer = newLayer->playerLayer();
+        AVPlayerLayer* sourcePlayerLayer = playerLayer();
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [destinationPlayerLayer setPlayer:[sourcePlayerLayer player]];
+        });
+    }
+
+    return newLayer;
 }
 
 PlatformCALayer::~PlatformCALayer()
@@ -240,8 +294,8 @@ PlatformCALayer::~PlatformCALayer()
     // Remove the owner pointer from the delegate in case there is a pending animationStarted event.
     [static_cast<WebAnimationDelegate*>(m_delegate.get()) setOwner:nil];
 
-    if (usesTileCacheLayer())
-        [static_cast<WebTileCacheLayer *>(m_layer.get()) invalidate];
+    if (usesTiledBackingLayer())
+        [static_cast<WebTiledBackingLayer *>(m_layer.get()) invalidate];
 }
 
 PlatformCALayer* PlatformCALayer::platformCALayer(void* platformLayer)
@@ -379,12 +433,11 @@ void PlatformCALayer::addAnimationForKey(const String& key, PlatformCAAnimation*
     // Add the delegate
     if (!m_delegate) {
         WebAnimationDelegate* webAnimationDelegate = [[WebAnimationDelegate alloc] init];
-        m_delegate.adoptNS(webAnimationDelegate);
+        m_delegate = adoptNS(webAnimationDelegate);
         [webAnimationDelegate setOwner:this];
     }
     
     CAPropertyAnimation* propertyAnimation = static_cast<CAPropertyAnimation*>(animation->platformAnimation());
-
     if (![propertyAnimation delegate])
         [propertyAnimation setDelegate:static_cast<id>(m_delegate.get())];
      
@@ -626,8 +679,8 @@ void PlatformCALayer::setBackgroundColor(const Color& value)
     CGFloat components[4];
     value.getRGBA(components[0], components[1], components[2], components[3]);
 
-    RetainPtr<CGColorSpaceRef> colorSpace(AdoptCF, CGColorSpaceCreateDeviceRGB());
-    RetainPtr<CGColorRef> color(AdoptCF, CGColorCreate(colorSpace.get(), components));
+    RetainPtr<CGColorSpaceRef> colorSpace = adoptCF(CGColorSpaceCreateDeviceRGB());
+    RetainPtr<CGColorRef> color = adoptCF(CGColorCreate(colorSpace.get(), components));
 
     BEGIN_BLOCK_OBJC_EXCEPTIONS
     [m_layer.get() setBackgroundColor:color.get()];
@@ -656,8 +709,8 @@ void PlatformCALayer::setBorderColor(const Color& value)
     CGFloat components[4];
     value.getRGBA(components[0], components[1], components[2], components[3]);
 
-    RetainPtr<CGColorSpaceRef> colorSpace(AdoptCF, CGColorSpaceCreateDeviceRGB());
-    RetainPtr<CGColorRef> color(AdoptCF, CGColorCreate(colorSpace.get(), components));
+    RetainPtr<CGColorSpaceRef> colorSpace = adoptCF(CGColorSpaceCreateDeviceRGB());
+    RetainPtr<CGColorRef> color = adoptCF(CGColorCreate(colorSpace.get(), components));
 
     BEGIN_BLOCK_OBJC_EXCEPTIONS
     [m_layer.get() setBorderColor:color.get()];
@@ -679,162 +732,7 @@ void PlatformCALayer::setOpacity(float value)
 #if ENABLE(CSS_FILTERS)
 void PlatformCALayer::setFilters(const FilterOperations& filters)
 {
-    if (!filters.size()) {
-        BEGIN_BLOCK_OBJC_EXCEPTIONS
-        [m_layer.get() setFilters:nil];
-        [m_layer.get() setShadowOffset:CGSizeZero];
-        [m_layer.get() setShadowColor:nil];
-        [m_layer.get() setShadowRadius:0];
-        [m_layer.get() setShadowOpacity:0];
-        END_BLOCK_OBJC_EXCEPTIONS
-        return;
-    }
-    
-    // Assume filtersCanBeComposited was called and it returned true
-    ASSERT(filtersCanBeComposited(filters));
-    
-    BEGIN_BLOCK_OBJC_EXCEPTIONS
-    
-    RetainPtr<NSMutableArray> array(AdoptNS, [[NSMutableArray alloc] init]);
-    
-    for (unsigned i = 0; i < filters.size(); ++i) {
-        String filterName = String::format("filter_%d", i);
-        
-        const FilterOperation* filterOperation = filters.at(i);
-        switch(filterOperation->getOperationType()) {
-        case FilterOperation::DROP_SHADOW: {
-            // FIXME: For now assume drop shadow is the last filter, put it on the layer
-            const DropShadowFilterOperation* op = static_cast<const DropShadowFilterOperation*>(filterOperation);
-            [m_layer.get() setShadowOffset:CGSizeMake(op->x(), op->y())];
-
-            CGFloat components[4];
-            op->color().getRGBA(components[0], components[1], components[2], components[3]);
-            RetainPtr<CGColorSpaceRef> colorSpace(AdoptCF, CGColorSpaceCreateDeviceRGB());
-            RetainPtr<CGColorRef> color(AdoptCF, CGColorCreate(colorSpace.get(), components));
-            [m_layer.get() setShadowColor:color.get()];
-            
-            [m_layer.get() setShadowRadius:op->stdDeviation()];
-            [m_layer.get() setShadowOpacity:1];
-            break;
-        }
-        case FilterOperation::GRAYSCALE: {
-            const BasicColorMatrixFilterOperation* op = static_cast<const BasicColorMatrixFilterOperation*>(filterOperation);
-            CIFilter* caFilter = [CIFilter filterWithName:@"CIColorMonochrome"];
-            [caFilter setDefaults];
-            [caFilter setValue:[NSNumber numberWithFloat:op->amount()] forKey:@"inputIntensity"];
-            [caFilter setValue:[CIColor colorWithRed:1 green:1 blue:1] forKey:@"inputColor"];
-            [caFilter setName:filterName];
-            [array.get() addObject:caFilter];
-            break;
-        }
-        case FilterOperation::SEPIA: {
-            const BasicColorMatrixFilterOperation* op = static_cast<const BasicColorMatrixFilterOperation*>(filterOperation);
-            CIFilter* caFilter = [CIFilter filterWithName:@"CIColorMatrix"];
-            [caFilter setDefaults];
-            
-            double t = op->amount();
-            t = min(max(0.0, t), 1.0);
-
-            // FIXME: Should put these values into constants (https://bugs.webkit.org/show_bug.cgi?id=76008)
-            [caFilter setValue:[CIVector vectorWithX:WebCore::blend(1.0, 0.393, t) Y:WebCore::blend(0.0, 0.769, t) Z:WebCore::blend(0.0, 0.189, t) W:0] forKey:@"inputRVector"];
-            [caFilter setValue:[CIVector vectorWithX:WebCore::blend(0.0, 0.349, t) Y:WebCore::blend(1.0, 0.686, t) Z:WebCore::blend(0.0, 0.168, t) W:0] forKey:@"inputGVector"];
-            [caFilter setValue:[CIVector vectorWithX:WebCore::blend(0.0, 0.272, t) Y:WebCore::blend(0.0, 0.534, t) Z:WebCore::blend(1.0, 0.131, t) W:0] forKey:@"inputBVector"];
-            [caFilter setValue:[CIVector vectorWithX:0 Y:0 Z:0 W:1] forKey:@"inputAVector"];
-            [caFilter setValue:[CIVector vectorWithX:0 Y:0 Z:0 W:0] forKey:@"inputBiasVector"];
-            [caFilter setName:filterName];
-            [array.get() addObject:caFilter];
-            break;
-        }
-        case FilterOperation::SATURATE: {
-            const BasicColorMatrixFilterOperation* op = static_cast<const BasicColorMatrixFilterOperation*>(filterOperation);
-            CIFilter* caFilter = [CIFilter filterWithName:@"CIColorControls"];
-            [caFilter setDefaults];
-            [caFilter setValue:[NSNumber numberWithFloat:op->amount()] forKey:@"inputSaturation"];
-            [caFilter setName:filterName];
-            [array.get() addObject:caFilter];
-            break;
-        }
-        case FilterOperation::HUE_ROTATE: {
-            const BasicColorMatrixFilterOperation* op = static_cast<const BasicColorMatrixFilterOperation*>(filterOperation);
-            CIFilter* caFilter = [CIFilter filterWithName:@"CIHueAdjust"];
-            [caFilter setDefaults];
-            
-            // The CIHueAdjust value is in radians
-            [caFilter setValue:[NSNumber numberWithFloat:deg2rad(op->amount())] forKey:@"inputAngle"];
-            [caFilter setName:filterName];
-            [array.get() addObject:caFilter];
-            break;
-        }
-        case FilterOperation::INVERT: {
-            const BasicComponentTransferFilterOperation* op = static_cast<const BasicComponentTransferFilterOperation*>(filterOperation);
-            CIFilter* caFilter = [CIFilter filterWithName:@"CIColorMatrix"];
-            [caFilter setDefaults];
-            
-            double multiplier = 1 - op->amount() * 2;
-            
-            [caFilter setValue:[CIVector vectorWithX:multiplier Y:0 Z:0 W:0] forKey:@"inputRVector"];
-            [caFilter setValue:[CIVector vectorWithX:0 Y:multiplier Z:0 W:0] forKey:@"inputGVector"];
-            [caFilter setValue:[CIVector vectorWithX:0 Y:0 Z:multiplier W:0] forKey:@"inputBVector"];
-            [caFilter setValue:[CIVector vectorWithX:0 Y:0 Z:0 W:1] forKey:@"inputAVector"];
-            [caFilter setValue:[CIVector vectorWithX:op->amount() Y:op->amount() Z:op->amount() W:0] forKey:@"inputBiasVector"];
-            [caFilter setName:filterName];
-            [array.get() addObject:caFilter];
-            break;
-        }
-        case FilterOperation::OPACITY: {
-            const BasicComponentTransferFilterOperation* op = static_cast<const BasicComponentTransferFilterOperation*>(filterOperation);
-            CIFilter* caFilter = [CIFilter filterWithName:@"CIColorMatrix"];
-            [caFilter setDefaults];
-            
-            [caFilter setValue:[CIVector vectorWithX:1 Y:0 Z:0 W:0] forKey:@"inputRVector"];
-            [caFilter setValue:[CIVector vectorWithX:0 Y:1 Z:0 W:0] forKey:@"inputGVector"];
-            [caFilter setValue:[CIVector vectorWithX:0 Y:0 Z:1 W:0] forKey:@"inputBVector"];
-            [caFilter setValue:[CIVector vectorWithX:0 Y:0 Z:0 W:op->amount()] forKey:@"inputAVector"];
-            [caFilter setValue:[CIVector vectorWithX:0 Y:0 Z:0 W:0] forKey:@"inputBiasVector"];
-            [caFilter setName:filterName];
-            [array.get() addObject:caFilter];
-            break;
-        }
-        case FilterOperation::BLUR: {
-            // FIXME: For now we ignore stdDeviationY
-            const BlurFilterOperation* op = static_cast<const BlurFilterOperation*>(filterOperation);
-            CIFilter* caFilter = [CIFilter filterWithName:@"CIGaussianBlur"];
-            [caFilter setDefaults];
-            [caFilter setValue:[NSNumber numberWithFloat:floatValueForLength(op->stdDeviation(), 0)] forKey:@"inputRadius"];
-            [caFilter setName:filterName];
-            [array.get() addObject:caFilter];
-            break;
-        }
-        case FilterOperation::CONTRAST: {
-            const BasicComponentTransferFilterOperation* op = static_cast<const BasicComponentTransferFilterOperation*>(filterOperation);
-            CIFilter* caFilter = [CIFilter filterWithName:@"CIColorControls"];
-            [caFilter setDefaults];
-            [caFilter setValue:[NSNumber numberWithFloat:op->amount()] forKey:@"inputContrast"];
-            [caFilter setName:filterName];
-            [array.get() addObject:caFilter];
-            break;
-        }
-        case FilterOperation::BRIGHTNESS: {
-            const BasicComponentTransferFilterOperation* op = static_cast<const BasicComponentTransferFilterOperation*>(filterOperation);
-            CIFilter* caFilter = [CIFilter filterWithName:@"CIColorControls"];
-            [caFilter setDefaults];
-            [caFilter setValue:[NSNumber numberWithFloat:op->amount()] forKey:@"inputBrightness"];
-            [caFilter setName:filterName];
-            [array.get() addObject:caFilter];
-            break;
-        }
-        case FilterOperation::PASSTHROUGH:
-            break;
-        default:
-            ASSERT(0);
-            break;
-        }
-    }
-
-    if ([array.get() count] > 0)
-        [m_layer.get() setFilters:array.get()];
-    
-    END_BLOCK_OBJC_EXCEPTIONS
+    PlatformCAFilters::setFiltersOnLayer(this, filters);
 }
 
 void PlatformCALayer::copyFiltersFrom(const PlatformCALayer* sourceLayer)
@@ -852,7 +750,7 @@ bool PlatformCALayer::filtersCanBeComposited(const FilterOperations& filters)
         
     for (unsigned i = 0; i < filters.size(); ++i) {
         const FilterOperation* filterOperation = filters.at(i);
-        switch(filterOperation->getOperationType()) {
+        switch (filterOperation->getOperationType()) {
         case FilterOperation::REFERENCE:
 #if ENABLE(CSS_SHADERS)
         case FilterOperation::CUSTOM:
@@ -943,11 +841,11 @@ void PlatformCALayer::setContentsScale(float value)
 
 TiledBacking* PlatformCALayer::tiledBacking()
 {
-    if (!usesTileCacheLayer())
+    if (!usesTiledBackingLayer())
         return 0;
 
-    WebTileCacheLayer *tileCacheLayer = static_cast<WebTileCacheLayer *>(m_layer.get());
-    return [tileCacheLayer tiledBacking];
+    WebTiledBackingLayer *tiledBackingLayer = static_cast<WebTiledBackingLayer *>(m_layer.get());
+    return [tiledBackingLayer tiledBacking];
 }
 
 #if PLATFORM(IOS) || __MAC_OS_X_VERSION_MIN_REQUIRED >= 1070
@@ -966,5 +864,11 @@ void PlatformCALayer::synchronouslyDisplayTilesInRect(const FloatRect& rect)
     END_BLOCK_OBJC_EXCEPTIONS
 }
 #endif
+
+AVPlayerLayer* PlatformCALayer::playerLayer() const
+{
+    ASSERT([m_layer.get() isKindOfClass:getAVPlayerLayerClass()]);
+    return (AVPlayerLayer*)m_layer.get();
+}
 
 #endif // USE(ACCELERATED_COMPOSITING)

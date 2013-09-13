@@ -37,6 +37,7 @@ WebInspector.SourceFrame = function(contentProvider)
 {
     WebInspector.View.call(this);
     this.element.addStyleClass("script-view");
+    this.element.addStyleClass("fill");
 
     this._url = contentProvider.contentURL();
     this._contentProvider = contentProvider;
@@ -44,8 +45,11 @@ WebInspector.SourceFrame = function(contentProvider)
     var textEditorDelegate = new WebInspector.TextEditorDelegateForSourceFrame(this);
 
     if (WebInspector.experimentsSettings.codemirror.isEnabled()) {
-        importScript("CodeMirrorTextEditor.js");
+        loadScript("CodeMirrorTextEditor.js");
         this._textEditor = new WebInspector.CodeMirrorTextEditor(this._url, textEditorDelegate);
+    } else if (WebInspector.experimentsSettings.aceTextEditor.isEnabled()) {
+        loadScript("AceTextEditor.js");
+        this._textEditor = new WebInspector.AceTextEditor(this._url, textEditorDelegate);
     } else
         this._textEditor = new WebInspector.DefaultTextEditor(this._url, textEditorDelegate);
 
@@ -61,6 +65,9 @@ WebInspector.SourceFrame = function(contentProvider)
     this._shortcuts = {};
     this._shortcuts[WebInspector.KeyboardShortcut.makeKey("s", WebInspector.KeyboardShortcut.Modifiers.CtrlOrMeta)] = this._commitEditing.bind(this);
     this.element.addEventListener("keydown", this._handleKeyDown.bind(this), false);
+
+    this._sourcePositionElement = document.createElement("div");
+    this._sourcePositionElement.className = "source-frame-cursor-position";
 }
 
 /**
@@ -97,7 +104,16 @@ WebInspector.SourceFrame.prototype = {
     {
         this._ensureContentLoaded();
         this._textEditor.show(this.element);
+        this._editorAttached = true;
         this._wasShownOrLoaded();
+    },
+
+    /**
+     * @return {boolean}
+     */
+    _isEditorShowing: function()
+    {
+        return this.isShowing() && this._editorAttached;
     },
 
     willHide: function()
@@ -106,6 +122,14 @@ WebInspector.SourceFrame.prototype = {
 
         this._clearLineHighlight();
         this._clearLineToReveal();
+    },
+
+    /**
+     * @return {?Element}
+     */
+    statusBarText: function()
+    {
+        return this._sourcePositionElement;
     },
 
     /**
@@ -155,14 +179,13 @@ WebInspector.SourceFrame.prototype = {
     {
         for (var line in this._messageBubbles) {
             var bubble = this._messageBubbles[line];
-            bubble.parentNode.removeChild(bubble);
+            var lineNumber = parseInt(line, 10);
+            this._textEditor.removeDecoration(lineNumber, bubble);
         }
 
         this._messages = [];
         this._rowMessages = {};
         this._messageBubbles = {};
-
-        this._textEditor.doResize();
     },
 
     /**
@@ -188,7 +211,7 @@ WebInspector.SourceFrame.prototype = {
     _innerHighlightLineIfNeeded: function()
     {
         if (typeof this._lineToHighlight === "number") {
-            if (this.loaded && this._textEditor.isShowing()) {
+            if (this.loaded && this._isEditorShowing()) {
                 this._textEditor.highlightLine(this._lineToHighlight);
                 delete this._lineToHighlight
             }
@@ -215,7 +238,7 @@ WebInspector.SourceFrame.prototype = {
     _innerRevealLineIfNeeded: function()
     {
         if (typeof this._lineToReveal === "number") {
-            if (this.loaded && this._textEditor.isShowing()) {
+            if (this.loaded && this._isEditorShowing()) {
                 this._textEditor.revealLine(this._lineToReveal);
                 delete this._lineToReveal
             }
@@ -241,9 +264,9 @@ WebInspector.SourceFrame.prototype = {
     _innerScrollToLineIfNeeded: function()
     {
         if (typeof this._lineToScrollTo === "number") {
-            if (this.loaded && this._textEditor.isShowing()) {
+            if (this.loaded && this._isEditorShowing()) {
                 this._textEditor.scrollToLine(this._lineToScrollTo);
-                delete this._lineToScrollTo
+                delete this._lineToScrollTo;
             }
         }
     },
@@ -264,7 +287,7 @@ WebInspector.SourceFrame.prototype = {
 
     _innerSetSelectionIfNeeded: function()
     {
-        if (this._selectionToSet && this.loaded && this._textEditor.isShowing()) {
+        if (this._selectionToSet && this.loaded && this._isEditorShowing()) {
             this._textEditor.setSelection(this._selectionToSet);
             delete this._selectionToSet;
         }
@@ -294,8 +317,11 @@ WebInspector.SourceFrame.prototype = {
     {
         this._textEditor.mimeType = mimeType;
 
-        this._loaded = true;
-        this._textEditor.setText(content || "");
+        if (!this._loaded) {
+            this._loaded = true;
+            this._textEditor.setText(content || "");
+        } else
+            this._textEditor.editRange(this._textEditor.range(), content || "");
 
         this._textEditor.beginUpdates();
 
@@ -323,8 +349,6 @@ WebInspector.SourceFrame.prototype = {
         this._textEditor.beginUpdates();
 
         this._addExistingMessagesToSource();
-
-        this._textEditor.doResize();
 
         this._textEditor.endUpdates();
     },
@@ -487,20 +511,16 @@ WebInspector.SourceFrame.prototype = {
             this.addMessageToSource(this._messages[i].line - 1, this._messages[i]);
     },
 
+    /**
+     * @param {number} lineNumber
+     * @param {WebInspector.ConsoleMessage} msg
+     */
     addMessageToSource: function(lineNumber, msg)
     {
         if (lineNumber >= this._textEditor.linesCount)
             lineNumber = this._textEditor.linesCount - 1;
         if (lineNumber < 0)
             lineNumber = 0;
-
-        var messageBubbleElement = this._messageBubbles[lineNumber];
-        if (!messageBubbleElement || messageBubbleElement.nodeType !== Node.ELEMENT_NODE || !messageBubbleElement.hasStyleClass("webkit-html-message-bubble")) {
-            messageBubbleElement = document.createElement("div");
-            messageBubbleElement.className = "webkit-html-message-bubble";
-            this._messageBubbles[lineNumber] = messageBubbleElement;
-            this._textEditor.addDecoration(lineNumber, messageBubbleElement);
-        }
 
         var rowMessages = this._rowMessages[lineNumber];
         if (!rowMessages) {
@@ -518,6 +538,15 @@ WebInspector.SourceFrame.prototype = {
 
         var rowMessage = { consoleMessage: msg };
         rowMessages.push(rowMessage);
+
+        this._textEditor.beginUpdates();
+        var messageBubbleElement = this._messageBubbles[lineNumber];
+        if (!messageBubbleElement) {
+            messageBubbleElement = document.createElement("div");
+            messageBubbleElement.className = "webkit-html-message-bubble";
+            this._messageBubbles[lineNumber] = messageBubbleElement;
+            this._textEditor.addDecoration(lineNumber, messageBubbleElement);
+        }
 
         var imageURL;
         switch (msg.level) {
@@ -545,6 +574,7 @@ WebInspector.SourceFrame.prototype = {
         rowMessage.element = messageLineElement;
         rowMessage.repeatCount = msg.totalRepeatCount;
         this._updateMessageRepeatCount(rowMessage);
+        this._textEditor.endUpdates();
     },
 
     _updateMessageRepeatCount: function(rowMessage)
@@ -561,6 +591,10 @@ WebInspector.SourceFrame.prototype = {
         rowMessage.repeatCountElement.textContent = WebInspector.UIString(" (repeated %d times)", rowMessage.repeatCount);
     },
 
+    /**
+     * @param {number} lineNumber
+     * @param {WebInspector.ConsoleMessage} msg
+     */
     removeMessageFromSource: function(lineNumber, msg)
     {
         if (lineNumber >= this._textEditor.linesCount)
@@ -621,7 +655,29 @@ WebInspector.SourceFrame.prototype = {
      */
     selectionChanged: function(textRange)
     {
+        this._updateSourcePosition(textRange);
         this.dispatchEventToListeners(WebInspector.SourceFrame.Events.SelectionChanged, textRange);
+    },
+
+    /**
+     * @param {WebInspector.TextRange} textRange
+     */
+    _updateSourcePosition: function(textRange)
+    {
+        if (!textRange)
+            return;
+
+        if (textRange.isEmpty()) {
+            this._sourcePositionElement.textContent = WebInspector.UIString("Line %d, Column %d", textRange.endLine + 1, textRange.endColumn + 1);
+            return;
+        }
+        textRange = textRange.normalize();
+
+        var selectedText = this._textEditor.copyRange(textRange);
+        if (textRange.startLine === textRange.endLine)
+            this._sourcePositionElement.textContent = WebInspector.UIString("%d characters selected", selectedText.length);
+        else
+            this._sourcePositionElement.textContent = WebInspector.UIString("%d lines, %d characters selected", textRange.endLine - textRange.startLine + 1, selectedText.length);
     },
 
     /**

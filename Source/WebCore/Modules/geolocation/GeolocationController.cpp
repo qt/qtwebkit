@@ -103,7 +103,7 @@ void GeolocationController::positionChanged(GeolocationPosition* position)
 {
     position = InspectorInstrumentation::overrideGeolocationPosition(m_page, position);
     if (!position) {
-        errorOccurred(GeolocationError::create(GeolocationError::PositionUnavailable, "PositionUnavailable").get());
+        errorOccurred(GeolocationError::create(GeolocationError::PositionUnavailable, ASCIILiteral("PositionUnavailable")).get());
         return;
     }
     m_lastPosition = position;
@@ -132,10 +132,9 @@ GeolocationPosition* GeolocationController::lastPosition()
     return m_client->lastPosition();
 }
 
-const AtomicString& GeolocationController::supplementName()
+const char* GeolocationController::supplementName()
 {
-    DEFINE_STATIC_LOCAL(AtomicString, name, ("GeolocationController", AtomicString::ConstructFromLiteral));
-    return name;
+    return "GeolocationController";
 }
 
 void provideGeolocationTo(Page* page, GeolocationClient* client)

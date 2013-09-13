@@ -8,19 +8,20 @@
 #include "GCThread.h"
 #include "JSArray.h"
 #include "JSDestructibleObject.h"
-#include "JSGlobalData.h"
+#include "VM.h"
 #include "JSObject.h"
 #include "JSString.h"
+#include "Operations.h"
 #include <wtf/StackStats.h>
 
 namespace JSC {
 
 SlotVisitor::SlotVisitor(GCThreadSharedData& shared)
-    : m_stack(shared.m_globalData->heap.blockAllocator())
+    : m_stack(shared.m_vm->heap.blockAllocator())
     , m_visitCount(0)
     , m_isInParallelMode(false)
     , m_shared(shared)
-    , m_shouldHashConst(false)
+    , m_shouldHashCons(false)
 #if !ASSERT_DISABLED
     , m_isCheckingForDefaultMarkViolation(false)
     , m_isDraining(false)
@@ -35,11 +36,11 @@ SlotVisitor::~SlotVisitor()
 
 void SlotVisitor::setup()
 {
-    m_shared.m_shouldHashConst = m_shared.m_globalData->haveEnoughNewStringsToHashConst();
-    m_shouldHashConst = m_shared.m_shouldHashConst;
+    m_shared.m_shouldHashCons = m_shared.m_vm->haveEnoughNewStringsToHashCons();
+    m_shouldHashCons = m_shared.m_shouldHashCons;
 #if ENABLE(PARALLEL_GC)
     for (unsigned i = 0; i < m_shared.m_gcThreads.size(); ++i)
-        m_shared.m_gcThreads[i]->slotVisitor()->m_shouldHashConst = m_shared.m_shouldHashConst;
+        m_shared.m_gcThreads[i]->slotVisitor()->m_shouldHashCons = m_shared.m_shouldHashCons;
 #endif
 }
 
@@ -52,9 +53,9 @@ void SlotVisitor::reset()
 #else
     m_opaqueRoots.clear();
 #endif
-    if (m_shouldHashConst) {
+    if (m_shouldHashCons) {
         m_uniqueStrings.clear();
-        m_shouldHashConst = false;
+        m_shouldHashCons = false;
     }
 }
 
@@ -240,15 +241,15 @@ void SlotVisitor::mergeOpaqueRoots()
     m_opaqueRoots.clear();
 }
 
-ALWAYS_INLINE bool JSString::tryHashConstLock()
+ALWAYS_INLINE bool JSString::tryHashConsLock()
 {
 #if ENABLE(PARALLEL_GC)
     unsigned currentFlags = m_flags;
 
-    if (currentFlags & HashConstLock)
+    if (currentFlags & HashConsLock)
         return false;
 
-    unsigned newFlags = currentFlags | HashConstLock;
+    unsigned newFlags = currentFlags | HashConsLock;
 
     if (!WTF::weakCompareAndSwap(&m_flags, currentFlags, newFlags))
         return false;
@@ -256,26 +257,26 @@ ALWAYS_INLINE bool JSString::tryHashConstLock()
     WTF::memoryBarrierAfterLock();
     return true;
 #else
-    if (isHashConstSingleton())
+    if (isHashConsSingleton())
         return false;
 
-    m_flags |= HashConstLock;
+    m_flags |= HashConsLock;
 
     return true;
 #endif
 }
 
-ALWAYS_INLINE void JSString::releaseHashConstLock()
+ALWAYS_INLINE void JSString::releaseHashConsLock()
 {
 #if ENABLE(PARALLEL_GC)
     WTF::memoryBarrierBeforeUnlock();
 #endif
-    m_flags &= ~HashConstLock;
+    m_flags &= ~HashConsLock;
 }
 
-ALWAYS_INLINE bool JSString::shouldTryHashConst()
+ALWAYS_INLINE bool JSString::shouldTryHashCons()
 {
-    return ((length() > 1) && !isRope() && !isHashConstSingleton());
+    return ((length() > 1) && !isRope() && !isHashConsSingleton());
 }
 
 ALWAYS_INLINE void SlotVisitor::internalAppend(JSValue* slot)
@@ -297,21 +298,21 @@ ALWAYS_INLINE void SlotVisitor::internalAppend(JSValue* slot)
 
     validate(cell);
 
-    if (m_shouldHashConst && cell->isString()) {
+    if (m_shouldHashCons && cell->isString()) {
         JSString* string = jsCast<JSString*>(cell);
-        if (string->shouldTryHashConst() && string->tryHashConstLock()) {
+        if (string->shouldTryHashCons() && string->tryHashConsLock()) {
             UniqueStringMap::AddResult addResult = m_uniqueStrings.add(string->string().impl(), value);
             if (addResult.isNewEntry)
-                string->setHashConstSingleton();
+                string->setHashConsSingleton();
             else {
                 JSValue existingJSValue = addResult.iterator->value;
                 if (value != existingJSValue)
-                    jsCast<JSString*>(existingJSValue.asCell())->clearHashConstSingleton();
+                    jsCast<JSString*>(existingJSValue.asCell())->clearHashConsSingleton();
                 *slot = existingJSValue;
-                string->releaseHashConstLock();
+                string->releaseHashConsLock();
                 return;
             }
-            string->releaseHashConstLock();
+            string->releaseHashConsLock();
         }
     }
 
@@ -335,10 +336,7 @@ void SlotVisitor::finalizeUnconditionalFinalizers()
 #if ENABLE(GC_VALIDATION)
 void SlotVisitor::validate(JSCell* cell)
 {
-    if (!cell) {
-        dataLogF("cell is NULL\n");
-        CRASH();
-    }
+    RELEASE_ASSERT(cell);
 
     if (!cell->structure()) {
         dataLogF("cell at %p has a null structure\n" , cell);

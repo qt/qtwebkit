@@ -52,6 +52,25 @@ struct TextMarkerData {
     EAffinity affinity;
 };
 
+class AXComputedObjectAttributeCache {
+public:
+    static PassOwnPtr<AXComputedObjectAttributeCache> create() { return adoptPtr(new AXComputedObjectAttributeCache()); }
+
+    AccessibilityObjectInclusion getIgnored(AXID) const;
+    void setIgnored(AXID, AccessibilityObjectInclusion);
+
+private:
+    AXComputedObjectAttributeCache() { }
+
+    struct CachedAXObjectAttributes {
+        CachedAXObjectAttributes() : ignored(DefaultBehavior) { }
+
+        AccessibilityObjectInclusion ignored;
+    };
+
+    HashMap<AXID, CachedAXObjectAttributes> m_idMapping;
+};
+
 enum PostType { PostSynchronously, PostAsynchronously };
 
 class AXObjectCache {
@@ -131,7 +150,7 @@ public:
     bool nodeIsTextControl(const Node*);
 
     AXID platformGenerateAXID() const;
-    AccessibilityObject* objectFromAXID(AXID id) const { return m_objects.get(id).get(); }
+    AccessibilityObject* objectFromAXID(AXID id) const { return m_objects.get(id); }
 
     // Text marker utilities.
     void textMarkerDataForVisiblePosition(TextMarkerData&, const VisiblePosition&);
@@ -182,6 +201,11 @@ public:
 
     bool nodeHasRole(Node*, const AtomicString& role);
 
+    void startCachingComputedObjectAttributesUntilTreeMutates();
+    void stopCachingComputedObjectAttributes();
+
+    AXComputedObjectAttributeCache* computedObjectAttributeCache() { return m_computedObjectAttributeCache.get(); }
+
 protected:
     void postPlatformNotification(AccessibilityObject*, AXNotification);
     void nodeTextChangePlatformNotification(AccessibilityObject*, AXTextChange, unsigned offset, const String&);
@@ -201,6 +225,7 @@ private:
     HashMap<Widget*, AXID> m_widgetObjectMapping;
     HashMap<Node*, AXID> m_nodeObjectMapping;
     HashSet<Node*> m_textMarkerNodes;
+    OwnPtr<AXComputedObjectAttributeCache> m_computedObjectAttributeCache;
     static bool gAccessibilityEnabled;
     static bool gAccessibilityEnhancedUserInterfaceEnabled;
     
@@ -215,11 +240,23 @@ private:
     AXID getAXID(AccessibilityObject*);
 };
 
+class AXAttributeCacheEnabler
+{
+public:
+    explicit AXAttributeCacheEnabler(AXObjectCache *cache);
+    ~AXAttributeCacheEnabler();
+    
+private:
+    AXObjectCache* m_cache;
+};
+    
 bool nodeHasRole(Node*, const String& role);
 // This will let you know if aria-hidden was explicitly set to false.
 bool isNodeAriaVisible(Node*);
     
 #if !HAVE(ACCESSIBILITY)
+inline AccessibilityObjectInclusion AXComputedObjectAttributeCache::getIgnored(AXID) const { return DefaultBehavior; }
+inline void AXComputedObjectAttributeCache::setIgnored(AXID, AccessibilityObjectInclusion) { }
 inline AXObjectCache::AXObjectCache(const Document* doc) : m_document(const_cast<Document*>(doc)), m_notificationPostTimer(this, 0) { }
 inline AXObjectCache::~AXObjectCache() { }
 inline AccessibilityObject* AXObjectCache::focusedUIElementForPage(const Page*) { return 0; }
@@ -234,6 +271,8 @@ inline AccessibilityObject* AXObjectCache::rootObject() { return 0; }
 inline AccessibilityObject* AXObjectCache::rootObjectForFrame(Frame*) { return 0; }
 inline Element* AXObjectCache::rootAXEditableElement(Node*) { return 0; }
 inline bool nodeHasRole(Node*, const String&) { return false; }
+inline void AXObjectCache::startCachingComputedObjectAttributesUntilTreeMutates() { }
+inline void AXObjectCache::stopCachingComputedObjectAttributes() { }
 inline bool isNodeAriaVisible(Node*) { return true; }
 inline const Element* AXObjectCache::rootAXEditableElement(const Node*) { return 0; }
 inline void AXObjectCache::attachWrapper(AccessibilityObject*) { }

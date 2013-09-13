@@ -31,6 +31,7 @@
 #include "WKAPICast.h"
 #include "WKBundleAPICast.h"
 #include "WKBundlePrivate.h"
+#include "WebData.h"
 
 using namespace WebKit;
 
@@ -212,6 +213,11 @@ void WKBundleResetOriginAccessWhitelists(WKBundleRef bundleRef)
     toImpl(bundleRef)->resetOriginAccessWhitelists();
 }
 
+void WKBundleSetAsynchronousSpellCheckingEnabled(WKBundleRef bundleRef, WKBundlePageGroupRef pageGroupRef, bool enabled)
+{
+    toImpl(bundleRef)->setAsynchronousSpellCheckingEnabled(toImpl(pageGroupRef), enabled);
+}
+
 void WKBundleReportException(JSContextRef context, JSValueRef exception)
 {
     InjectedBundle::reportException(context, exception);
@@ -263,9 +269,10 @@ WKArrayRef WKBundleCopyOriginsWithApplicationCache(WKBundleRef bundleRef)
     return toAPI(origins.release().leakRef());
 }
 
-void WKBundleSetMinimumTimerInterval(WKBundleRef bundleRef, WKBundlePageGroupRef pageGroupRef, double seconds)
+WKDataRef WKBundleCreateWKDataFromUInt8Array(WKBundleRef bundle, JSContextRef context, JSValueRef data)
 {
-    toImpl(bundleRef)->setMinimumTimerInterval(toImpl(pageGroupRef), seconds);
+    RefPtr<WebData> webData = toImpl(bundle)->createWebDataFromUint8Array(context, data);
+    return toAPI(webData.release().leakRef());
 }
 
 int WKBundleNumberOfPages(WKBundleRef bundleRef, WKBundleFrameRef frameRef, double pageWidthInPixels, double pageHeightInPixels)
@@ -291,12 +298,6 @@ bool WKBundleIsPageBoxVisible(WKBundleRef bundleRef, WKBundleFrameRef frameRef, 
 bool WKBundleIsProcessingUserGesture(WKBundleRef)
 {
     return InjectedBundle::isProcessingUserGesture();
-}
-
-size_t WKBundleGetWorkerThreadCount(WKBundleRef)
-{
-    // Actually do not need argument here, keeping it however for consistency.
-    return InjectedBundle::workerThreadCount();
 }
 
 void WKBundleSetUserStyleSheetLocation(WKBundleRef bundleRef, WKBundlePageGroupRef pageGroupRef, WKStringRef location)
@@ -332,6 +333,11 @@ void WKBundleSetSerialLoadingEnabled(WKBundleRef bundleRef, bool enabled)
 void WKBundleSetShadowDOMEnabled(WKBundleRef bundleRef, bool enabled)
 {
     toImpl(bundleRef)->setShadowDOMEnabled(enabled);
+}
+
+void WKBundleSetSeamlessIFramesEnabled(WKBundleRef bundleRef, bool enabled)
+{
+    toImpl(bundleRef)->setSeamlessIFramesEnabled(enabled);
 }
 
 void WKBundleDispatchPendingLoadRequests(WKBundleRef bundleRef)

@@ -22,7 +22,7 @@
 #define SVGFEImageElement_h
 
 #if ENABLE(SVG) && ENABLE(FILTERS)
-#include "CachedImage.h"
+#include "CachedImageClient.h"
 #include "CachedResourceHandle.h"
 #include "ImageBuffer.h"
 #include "SVGAnimatedBoolean.h"
@@ -30,16 +30,14 @@
 #include "SVGExternalResourcesRequired.h"
 #include "SVGFEImage.h"
 #include "SVGFilterPrimitiveStandardAttributes.h"
-#include "SVGLangSpace.h"
 #include "SVGURIReference.h"
 
 namespace WebCore {
 
-class SVGFEImageElement : public SVGFilterPrimitiveStandardAttributes,
-                          public SVGURIReference,
-                          public SVGLangSpace,
-                          public SVGExternalResourcesRequired,
-                          public CachedImageClient {
+class SVGFEImageElement FINAL : public SVGFilterPrimitiveStandardAttributes,
+                                public SVGURIReference,
+                                public SVGExternalResourcesRequired,
+                                public CachedImageClient {
 public:
     static PassRefPtr<SVGFEImageElement> create(const QualifiedName&, Document*);
 

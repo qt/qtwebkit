@@ -43,18 +43,36 @@
 #include "FrameLoader.h"
 #include "InspectorInstrumentation.h"
 #include "MessageEvent.h"
+#include "NetworkStateNotifier.h"
 #include "TextEncoding.h"
-#include "WorkerContextProxy.h"
+#include "WorkerGlobalScopeProxy.h"
 #include "WorkerScriptLoader.h"
 #include "WorkerThread.h"
+#include <wtf/HashSet.h>
 #include <wtf/MainThread.h>
 
 namespace WebCore {
 
+static HashSet<Worker*>* allWorkers;
+
+void networkStateChanged(bool isOnLine)
+{
+    HashSet<Worker*>::iterator end = allWorkers->end();
+    for (HashSet<Worker*>::iterator it = allWorkers->begin(); it != end; ++it)
+        (*it)->notifyNetworkStateChange(isOnLine);
+}
+
 inline Worker::Worker(ScriptExecutionContext* context)
     : AbstractWorker(context)
-    , m_contextProxy(WorkerContextProxy::create(this))
+    , m_contextProxy(WorkerGlobalScopeProxy::create(this))
 {
+    if (!allWorkers) {
+        allWorkers = new HashSet<Worker*>;
+        networkStateNotifier().addNetworkStateChangeListener(networkStateChanged);
+    }
+
+    HashSet<Worker*>::AddResult addResult = allWorkers->add(this);
+    ASSERT_UNUSED(addResult, addResult.isNewEntry);
 }
 
 PassRefPtr<Worker> Worker::create(ScriptExecutionContext* context, const String& url, ExceptionCode& ec)
@@ -86,6 +104,7 @@ Worker::~Worker()
 {
     ASSERT(isMainThread());
     ASSERT(scriptExecutionContext()); // The context is protected by worker context proxy, so it cannot be destroyed while a Worker exists.
+    allWorkers->remove(this);
     m_contextProxy->workerObjectDestroyed();
 }
 
@@ -94,7 +113,6 @@ const AtomicString& Worker::interfaceName() const
     return eventNames().interfaceForWorker;
 }
 
-// FIXME: remove this when we update the ObjC bindings (bug #28774).
 void Worker::postMessage(PassRefPtr<SerializedScriptValue> message, MessagePort* port, ExceptionCode& ec)
 {
     MessagePortArray ports;
@@ -103,23 +121,18 @@ void Worker::postMessage(PassRefPtr<SerializedScriptValue> message, MessagePort*
     postMessage(message, &ports, ec);
 }
 
-void Worker::postMessage(PassRefPtr<SerializedScriptValue> message, ExceptionCode& ec)
-{
-    postMessage(message, static_cast<MessagePortArray*>(0), ec);
-}
-
 void Worker::postMessage(PassRefPtr<SerializedScriptValue> message, const MessagePortArray* ports, ExceptionCode& ec)
 {
     // Disentangle the port in preparation for sending it to the remote context.
     OwnPtr<MessagePortChannelArray> channels = MessagePort::disentanglePorts(ports, ec);
     if (ec)
         return;
-    m_contextProxy->postMessageToWorkerContext(message, channels.release());
+    m_contextProxy->postMessageToWorkerGlobalScope(message, channels.release());
 }
 
 void Worker::terminate()
 {
-    m_contextProxy->terminateWorkerContext();
+    m_contextProxy->terminateWorkerGlobalScope();
 }
 
 bool Worker::canSuspend() const
@@ -138,6 +151,11 @@ bool Worker::hasPendingActivity() const
     return m_contextProxy->hasPendingActivity() || ActiveDOMObject::hasPendingActivity();
 }
 
+void Worker::notifyNetworkStateChange(bool isOnLine)
+{
+    m_contextProxy->notifyNetworkStateChange(isOnLine);
+}
+
 void Worker::didReceiveResponse(unsigned long identifier, const ResourceResponse&)
 {
     InspectorInstrumentation::didReceiveScriptResponse(scriptExecutionContext(), identifier);
@@ -148,10 +166,10 @@ void Worker::notifyFinished()
     if (m_scriptLoader->failed())
         dispatchEvent(Event::create(eventNames().errorEvent, false, true));
     else {
-        WorkerThreadStartMode startMode = DontPauseWorkerContextOnStart;
+        WorkerThreadStartMode startMode = DontPauseWorkerGlobalScopeOnStart;
         if (InspectorInstrumentation::shouldPauseDedicatedWorkerOnStart(scriptExecutionContext()))
-            startMode = PauseWorkerContextOnStart;
-        m_contextProxy->startWorkerContext(m_scriptLoader->url(), scriptExecutionContext()->userAgent(m_scriptLoader->url()), m_scriptLoader->script(), startMode);
+            startMode = PauseWorkerGlobalScopeOnStart;
+        m_contextProxy->startWorkerGlobalScope(m_scriptLoader->url(), scriptExecutionContext()->userAgent(m_scriptLoader->url()), m_scriptLoader->script(), startMode);
         InspectorInstrumentation::scriptImported(scriptExecutionContext(), m_scriptLoader->identifier(), m_scriptLoader->script());
     }
     m_scriptLoader = nullptr;

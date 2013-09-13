@@ -42,10 +42,10 @@
 .timeline .sidebar {
     overflow-y: hidden;
     min-height: 100%;
-    bottom: auto;
+    bottom: auto !important;
 }
 
-.timeline .split-view-resizer {
+.timeline.split-view-vertical .split-view-resizer {
     top: 20px;
 }
 
@@ -88,63 +88,12 @@
     pointer-events: auto;
 }
 
-.timeline-window-selector {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    background-color: rgba(125, 173, 217, 0.5);
-    z-index: 250;
-}
-
-.timeline-overview-window {
-    background-color: white;
-    position: absolute;
-    left: 0;
-    right: 0;
-    top: 0;
-    bottom: 60px;
-    z-index: 150;
-}
-
-.timeline-frame-overview .timeline-overview-window {
+.timeline-frame-overview .overview-grid-window {
     bottom: 0;
 }
 
-.timeline-overview-dividers-background {
-    left: 0%;
-    right: 0%;
-    top: 0px;
-    bottom: 60px;
-    background-color: black;
-    position: absolute;
-}
-
-.timeline-frame-overview .timeline-overview-dividers-background {
+.timeline-frame-overview .overview-grid-dividers-background {
     bottom: 0;
-}
-
-.timeline-overview-window-rulers {
-    top: 0;
-    bottom: 0;
-    position: absolute;
-    opacity: 0.2;
-    border-right: 1px solid black;
-    border-left: 1px solid black;
-    z-index: 150;
-}
-
-.timeline-window-resizer {
-    position: absolute;
-    top: 0px;
-    bottom: 60px;
-    width: 5px;
-    margin-left: -3px;
-    margin-right: -2px;
-    background-color: rgb(153, 153, 153);
-    z-index: 500;
-    cursor: ew-resize;
-    -webkit-border-radius: 2px;
-    -webkit-box-shadow: white 1px 0 0, white -1px 0 0, white 0 1px 0, white 0 -1px 0;
 }
 
 #timeline-overview-grid #resources-graphs {
@@ -166,13 +115,22 @@
     overflow-x: hidden;
 }
 
-#timeline-container .split-view-sidebar-left {
+#timeline-container .split-view-sidebar {
     z-index: 1;
 }
 
 #timeline-container .webkit-html-external-link,
 #timeline-container .webkit-html-resource-link {
     color: inherit;
+}
+
+.timeline-misc-status-bar-items {
+    right: 64px;
+}
+
+.timeline-misc-status-bar-filters {
+    display: -webkit-flex;
+    -webkit-flex-orientation: row;
 }
 
 .timeline-category-statusbar-item {
@@ -183,6 +141,8 @@
     text-overflow: ellipsis;
     overflow: hidden;
     font-weight: bold;
+    min-width: 20px;
+    -webkit-flex: auto 0 1;
 }
 
 .timeline-category-statusbar-item,
@@ -252,7 +212,6 @@
 }
 
 .timeline-tree-item .count {
-    font-family: Helvetica, Arial, sans-serif;
     font-weight: bold;
 }
 
@@ -265,6 +224,10 @@
     border-radius: 1px;
     border: solid 1px;
     position: absolute;
+}
+
+.timeline-tree-item.background .timeline-tree-icon {
+    background: none !important;
 }
 
 .timeline-tree-item.even {
@@ -286,7 +249,7 @@
     color: rgba(0, 0, 0, 0.7);
 }
 
-#timeline-overview-timelines,
+#timeline-overview-events,
 #timeline-overview-memory {
     position: absolute;
     left: 0;
@@ -358,6 +321,11 @@
     opacity: 0.7;
 }
 
+.timeline-graph-side.background .timeline-graph-bar {
+    background: transparent !important;
+    border-width: 2px;
+}
+
 .timeline-graph-side.even {
     background-color: rgba(0, 0, 0, 0.05);
 }
@@ -377,46 +345,6 @@
     margin-left: 0px;
 }
 
-.timeline-details {
-    -webkit-user-select: text;
-    vertical-align: top;
-}
-
-.timeline-function-name {
-    text-align: right;
-}
-
-.timeline-stacktrace-title {
-    padding-top: 4px;
-}
-
-.timeline-details-row-title {
-    font-weight: bold;
-    text-align: right;
-    white-space: nowrap;
-}
-
-.timeline-details-row-data {
-    white-space: nowrap;
-}
-
-.timeline-details-title {
-    border-bottom: 1px solid #B8B8B8;
-    font-size: 11px;
-    font-weight: bold;
-    padding-bottom: 5px;
-    padding-top: 0px;
-    white-space: nowrap;
-}
-
-.timeline-filter-status-bar-item .glyph {
-    -webkit-mask-position: -32px -48px;
-}
-
-.timeline-filter-status-bar-item.toggled-on .glyph {
-    background-color: rgb(66, 129, 235) !important;
-}
-
 .garbage-collect-status-bar-item .glyph {
     -webkit-mask-position: -128px -24px;
 }
@@ -430,14 +358,20 @@
 }
 
 .timeline-records-stats, .storage-application-cache-status, .storage-application-cache-connectivity {
-    font-size: 11px;
     text-shadow: white 0 1px 0;
 }
 
 .timeline-records-stats {
-    float: right;
     margin-top: 5px;
-    margin-right: 6px;
+    margin-left: 6px;
+    -webkit-flex: 1;
+}
+
+.timeline-records-stats-container {
+    display: inline-block;
+    border-left: 1px solid rgb(202, 202, 202);
+    height: 24px;
+    margin-left: 6px;
 }
 
 .timeline-frames-stats {
@@ -551,7 +485,7 @@
     border-right: 1px solid #AAA;
 }
 
-#memory-graphs-canvas-container .resources-dividers {
+#memory-graphs-canvas-container.dom-counters .resources-dividers {
     top: 15px;
 }
 
@@ -560,7 +494,6 @@
 }
 
 .memory-counter-sidebar-info {
-    font-size: 11px;
     margin: 10px;
 }
 
@@ -578,7 +511,6 @@
 
 .memory-counter-value {
     margin: 4px;
-    font-size: 11px;
 }
 
 #counter-values-bar {
@@ -623,6 +555,7 @@
     border-style: none;
     width: 1px;
     height: 100%;
+    pointer-events: none;
 }
 
 .sidebar-tree-item .timeline-frame-overview-status-bar-item {
@@ -655,7 +588,6 @@
     top: 90px;
     bottom: 0;
     pointer-events: none;
-    z-index: -100;
 }
 
 .timeline-cpu-bars {
@@ -669,10 +601,25 @@
 
 .timeline-cpu-bars .timeline-graph-bar {
     border-color: rgb(192, 192, 192);
-    background-color: rgba(0, 0, 0, 0.15);
-    top: 2px;
-    bottom: 2px;
+    background-color: rgba(0, 0, 0, 0.1);
+    top: 4px;
+    bottom: 4px;
     height: auto;
+}
+
+.timeline-cpu-curtain-left, .timeline-cpu-curtain-right {
+    background-color: rgba(0, 0, 0, 0.15);
+    position: absolute;
+    top: 0;
+    height: 100%;
+}
+
+.timeline-cpu-curtain-left {
+    left: 0;
+}
+
+.timeline-cpu-curtain-right {
+    right: 0;
 }
 
 .image-preview-container {
@@ -691,4 +638,17 @@
 
 .image-container {
     padding: 0;
+}
+
+.memory-category-value {
+    float: right;
+}
+
+.highlighted-timeline-record {
+    -webkit-animation: "timeline_record_highlight" 2s 0s;
+}
+
+@-webkit-keyframes timeline_record_highlight {
+    from {background-color: rgba(255, 255, 120, 1); }
+    to { background-color: rgba(255, 255, 120, 0); }
 }

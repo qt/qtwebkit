@@ -28,6 +28,7 @@
 
 #include <wtf/Noncopyable.h>
 #include <wtf/Threading.h>
+#include <wtf/Vector.h>
 
 namespace WebCore {
 
@@ -72,6 +73,9 @@ private:
 
     bool inHeap() const { return m_heapIndex != -1; }
 
+    bool hasValidHeapPosition() const;
+    void updateHeapIfNeeded(double oldTime);
+
     void heapDecreaseKey();
     void heapDelete();
     void heapDeleteMin();
@@ -80,14 +84,18 @@ private:
     void heapPop();
     void heapPopMin();
 
+    Vector<TimerBase*>& timerHeap() const { ASSERT(m_cachedThreadGlobalTimerHeap); return *m_cachedThreadGlobalTimerHeap; }
+
     double m_nextFireTime; // 0 if inactive
     double m_unalignedNextFireTime; // m_nextFireTime not considering alignment interval
     double m_repeatInterval; // 0 if not repeating
     int m_heapIndex; // -1 if not in heap
     unsigned m_heapInsertionOrder; // Used to keep order among equal-fire-time timers
+    Vector<TimerBase*>* m_cachedThreadGlobalTimerHeap;
 
 #ifndef NDEBUG
     ThreadIdentifier m_thread;
+    bool m_wasDeleted;
 #endif
 
     friend class ThreadTimers;
@@ -115,7 +123,7 @@ inline bool TimerBase::isActive() const
     return m_nextFireTime;
 }
 
-template <typename TimerFiredClass> class DeferrableOneShotTimer : private TimerBase {
+template <typename TimerFiredClass> class DeferrableOneShotTimer : protected TimerBase {
 public:
     typedef void (TimerFiredClass::*TimerFiredFunction)(DeferrableOneShotTimer*);
 
@@ -140,19 +148,14 @@ public:
         startOneShot(m_delay);
     }
 
-    void setDelay(double delay)
+    void stop()
     {
-        m_delay = delay;
-        if (isActive()) {
-            stop();
-            restart();
-        }
+        m_shouldRestartWhenTimerFires = false;
+        TimerBase::stop();
     }
 
-    double delay() const { return m_delay; }
-
-    using TimerBase::stop;
     using TimerBase::isActive;
+
 private:
     virtual void fired()
     {

@@ -139,11 +139,57 @@ SVGSMILElement::SVGSMILElement(const QualifiedName& tagName, Document* doc)
 
 SVGSMILElement::~SVGSMILElement()
 {
+    clearResourceReferences();
     disconnectConditions();
     if (m_timeContainer && m_targetElement && hasValidAttributeName())
         m_timeContainer->unschedule(this, m_targetElement, m_attributeName);
-    if (m_targetElement)
-        document()->accessSVGExtensions()->removeAnimationElementFromTarget(this, m_targetElement);
+}
+
+void SVGSMILElement::clearResourceReferences()
+{
+    ASSERT(document());
+    document()->accessSVGExtensions()->removeAllTargetReferencesForElement(this);
+}
+
+void SVGSMILElement::buildPendingResource()
+{
+    clearResourceReferences();
+
+    if (!inDocument()) {
+        // Reset the target element if we are no longer in the document.
+        setTargetElement(0);
+        return;
+    }
+
+    String id;
+    String href = getAttribute(XLinkNames::hrefAttr);
+    Element* target;
+    if (href.isEmpty())
+        target = parentNode() && parentNode()->isElementNode() ? toElement(parentNode()) : 0;
+    else
+        target = SVGURIReference::targetElementFromIRIString(href, document(), &id);
+    SVGElement* svgTarget = target && target->isSVGElement() ? toSVGElement(target) : 0;
+
+    if (svgTarget && !svgTarget->inDocument())
+        svgTarget = 0;
+
+    if (svgTarget != targetElement())
+        setTargetElement(svgTarget);
+
+    if (!svgTarget) {
+        // Do not register as pending if we are already pending this resource.
+        if (document()->accessSVGExtensions()->isElementPendingResource(this, id))
+            return;
+
+        if (!id.isEmpty()) {
+            document()->accessSVGExtensions()->addPendingResource(id, this);
+            ASSERT(hasPendingResources());
+        }
+    } else {
+        // Register us with the target in the dependencies map. Any change of hrefElement
+        // that leads to relayout/repainting now informs us, so we can react to it.
+        document()->accessSVGExtensions()->addElementReferencingTarget(this, svgTarget);
+    }
 }
 
 static inline QualifiedName constructQualifiedName(const SVGElement* svgElement, const String& attributeName)
@@ -156,10 +202,8 @@ static inline QualifiedName constructQualifiedName(const SVGElement* svgElement,
     
     String prefix;
     String localName;
-    ExceptionCode ec = 0;
-    if (!Document::parseQualifiedName(attributeName, prefix, localName, ec))
+    if (!Document::parseQualifiedName(attributeName, prefix, localName, ASSERT_NO_EXCEPTION))
         return anyQName();
-    ASSERT(!ec);
     
     String namespaceURI = svgElement->lookupNamespaceURI(prefix);    
     if (namespaceURI.isEmpty())
@@ -216,11 +260,10 @@ Node::InsertionNotificationRequest SVGSMILElement::insertedInto(ContainerNode* r
     if (m_isWaitingForFirstInterval)
         resolveFirstInterval();
 
-    // Force resolution of target element
-    if (!m_targetElement)
-        targetElement();
     if (m_timeContainer)
         m_timeContainer->notifyIntervalsChanged();
+
+    buildPendingResource();
 
     return InsertionDone;
 }
@@ -228,21 +271,12 @@ Node::InsertionNotificationRequest SVGSMILElement::insertedInto(ContainerNode* r
 void SVGSMILElement::removedFrom(ContainerNode* rootParent)
 {
     if (rootParent->inDocument()) {
-        if (m_timeContainer) {
-            if (m_targetElement && hasValidAttributeName())
-                m_timeContainer->unschedule(this, m_targetElement, m_attributeName);
-            m_timeContainer = 0;
-        }
-        // Calling disconnectConditions() may kill us if there are syncbase conditions.
-        // OK, but we don't want to die inside the call.
-        RefPtr<SVGSMILElement> keepAlive(this);
+        clearResourceReferences();
         disconnectConditions();
-
-        // Clear target now, because disconnectConditions calls targetElement() which will recreate the target if we removed it sooner. 
-        if (m_targetElement)
-            resetTargetElement(DoNotResolveNewTarget);
-
+        setTargetElement(0);
         setAttributeName(anyQName());
+        animationAttributeChanged();
+        m_timeContainer = 0;
     }
 
     SVGElement::removedFrom(rootParent);
@@ -423,7 +457,7 @@ bool SVGSMILElement::isSupportedAttribute(const QualifiedName& attrName)
         supportedAttributes.add(SVGNames::attributeNameAttr);
         supportedAttributes.add(XLinkNames::hrefAttr);
     }
-    return supportedAttributes.contains<QualifiedName, SVGAttributeHashTranslator>(attrName);
+    return supportedAttributes.contains<SVGAttributeHashTranslator>(attrName);
 }
 
 void SVGSMILElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
@@ -467,22 +501,16 @@ void SVGSMILElement::svgAttributeChanged(const QualifiedName& attrName)
         m_cachedMin = invalidCachedTime;
     else if (attrName == SVGNames::maxAttr)
         m_cachedMax = invalidCachedTime;
-    else if (inDocument()) {
+    else if (attrName == SVGNames::attributeNameAttr)
+        setAttributeName(constructQualifiedName(this, fastGetAttribute(SVGNames::attributeNameAttr)));
+    else if (attrName.matches(XLinkNames::hrefAttr)) {
+        SVGElementInstance::InvalidationGuard invalidationGuard(this);
+        buildPendingResource();
+    } else if (inDocument()) {
         if (attrName == SVGNames::beginAttr)
             beginListChanged(elapsed());
         else if (attrName == SVGNames::endAttr)
             endListChanged(elapsed());
-        else if (attrName == SVGNames::attributeNameAttr) {
-            setAttributeName(constructQualifiedName(this, fastGetAttribute(SVGNames::attributeNameAttr)));
-            if (m_targetElement) {
-                resetTargetElement();
-                return;
-            }
-        } else if (attrName.matches(XLinkNames::hrefAttr)) {
-            // targetElement is resolved lazily but targetElement() will handle calling targetElementWillChange().
-            if (SVGElement* targetElement = this->targetElement())
-                document()->accessSVGExtensions()->removeAllAnimationElementsFromTarget(targetElement);
-        }
     }
 
     animationAttributeChanged();
@@ -562,57 +590,32 @@ void SVGSMILElement::setAttributeName(const QualifiedName& attributeName)
             m_timeContainer->schedule(this, m_targetElement, m_attributeName);
     } else
         m_attributeName = attributeName;
-}
-
-SVGElement* SVGSMILElement::targetElement(ResolveTarget resolveTarget)
-{
-    if (m_targetElement)
-        return m_targetElement;
-
-    if (!inDocument() || resolveTarget == DoNotResolveNewTarget)
-        return 0;
-
-    String href = getAttribute(XLinkNames::hrefAttr);
-    ContainerNode* target = href.isEmpty() ? parentNode() : SVGURIReference::targetElementFromIRIString(href, document());
-    if (!target || !target->isSVGElement())
-        return 0;
-
-    SVGElement* targetElement = static_cast<SVGElement*>(target);
-    targetElementWillChange(m_targetElement, targetElement);
-    m_targetElement = targetElement;
-    document()->accessSVGExtensions()->addAnimationElementToTarget(this, m_targetElement);
-    return m_targetElement;
-}
-
-void SVGSMILElement::targetElementWillChange(SVGElement* currentTarget, SVGElement* newTarget)
-{
-    if (m_timeContainer && hasValidAttributeName()) {
-        if (currentTarget)
-            m_timeContainer->unschedule(this, currentTarget, m_attributeName);
-        if (newTarget)
-            m_timeContainer->schedule(this, newTarget, m_attributeName);
-    }
 
     // Only clear the animated type, if we had a target before.
-    if (currentTarget)
-        clearAnimatedType(currentTarget);
+    if (m_targetElement)
+        clearAnimatedType(m_targetElement);
+}
+
+void SVGSMILElement::setTargetElement(SVGElement* target)
+{
+    if (m_timeContainer && hasValidAttributeName()) {
+        if (m_targetElement)
+            m_timeContainer->unschedule(this, m_targetElement, m_attributeName);
+        if (target)
+            m_timeContainer->schedule(this, target, m_attributeName);
+    }
+
+    if (m_targetElement) {
+        // Clear values that may depend on the previous target.
+        clearAnimatedType(m_targetElement);
+        disconnectConditions();
+    }
 
     // If the animation state is not Inactive, always reset to a clear state before leaving the old target element.
     if (m_activeState != Inactive)
         endedActiveInterval();
-}
 
-void SVGSMILElement::resetTargetElement(ResolveTarget resolveTarget)
-{
-    document()->accessSVGExtensions()->removeAnimationElementFromTarget(this, m_targetElement);
-    targetElementWillChange(m_targetElement, 0);
-    m_targetElement = 0;
-
-    // Immediately resolve the new targetElement (and call targetElementWillChange if needed) instead of doing it lazily.
-    if (resolveTarget == ResolveNewTarget)
-        targetElement();
-
-    animationAttributeChanged();
+    m_targetElement = target;
 }
 
 SMILTime SVGSMILElement::elapsed() const
@@ -710,7 +713,7 @@ SMILTime SVGSMILElement::simpleDuration() const
 
 void SVGSMILElement::addBeginTime(SMILTime eventTime, SMILTime beginTime, SMILTimeWithOrigin::Origin origin)
 {
-    ASSERT(!isnan(beginTime.value()));
+    ASSERT(!std::isnan(beginTime.value()));
     m_beginTimes.append(SMILTimeWithOrigin(beginTime, origin));
     sortTimeList(m_beginTimes);
     beginListChanged(eventTime);
@@ -718,7 +721,7 @@ void SVGSMILElement::addBeginTime(SMILTime eventTime, SMILTime beginTime, SMILTi
 
 void SVGSMILElement::addEndTime(SMILTime eventTime, SMILTime endTime, SMILTimeWithOrigin::Origin origin)
 {
-    ASSERT(!isnan(endTime.value()));
+    ASSERT(!std::isnan(endTime.value()));
     m_endTimes.append(SMILTimeWithOrigin(endTime, origin));
     sortTimeList(m_endTimes);
     endListChanged(eventTime);
@@ -737,9 +740,13 @@ SMILTime SVGSMILElement::findInstanceTime(BeginOrEnd beginOrEnd, SMILTime minimu
     if (!sizeOfList)
         return beginOrEnd == Begin ? SMILTime::unresolved() : SMILTime::indefinite();
 
-    const SMILTimeWithOrigin* result = binarySearch<const SMILTimeWithOrigin, SMILTime, extractTimeFromVector>(list.begin(), sizeOfList, minimumTime, WTF::KeyMustNotBePresentInArray);
+    const SMILTimeWithOrigin* result = approximateBinarySearch<const SMILTimeWithOrigin, SMILTime>(list, sizeOfList, minimumTime, extractTimeFromVector);
     int indexOfResult = result - list.begin();
-    ASSERT(indexOfResult < sizeOfList);
+    ASSERT_WITH_SECURITY_IMPLICATION(indexOfResult < sizeOfList);
+
+    if (list[indexOfResult].time() < minimumTime && indexOfResult < sizeOfList - 1)
+        ++indexOfResult;
+
     const SMILTime& currentTime = list[indexOfResult].time();
 
     // The special value "indefinite" does not yield an instance time in the begin list.
@@ -1063,8 +1070,11 @@ bool SVGSMILElement::progress(SMILTime elapsed, SVGSMILElement* resultElement, b
 
     if (elapsed < m_intervalBegin) {
         ASSERT(m_activeState != Active);
-        if (m_activeState == Frozen)
+        if (m_activeState == Frozen) {
+            if (this == resultElement)
+                resetAnimatedType();
             updateAnimation(m_lastPercent, m_lastRepeat, resultElement);
+        }
         m_nextProgressTime = m_intervalBegin;
         return false;
     }

@@ -30,7 +30,7 @@ messages -> WebPageProxy {
     RunJavaScriptPrompt(uint64_t frameID, WTF::String message, WTF::String defaultValue) -> (WTF::String result)
     ShouldInterruptJavaScript() -> (bool shouldInterupt)
     MouseDidMoveOverElement(WebKit::WebHitTestResult::Data hitTestResultData, uint32_t modifiers, WebKit::InjectedBundleUserMessageEncoder userData) Variadic
-    UnavailablePluginButtonClicked(uint32_t pluginUnavailabilityReason, WTF::String mimeType, WTF::String url, WTF::String pluginsPageURL)
+    UnavailablePluginButtonClicked(uint32_t pluginUnavailabilityReason, WTF::String mimeType, WTF::String pluginURLString, WTF::String pluginspageAttributeURLString, WTF::String frameURLString, WTF::String pageURLString)
     DidChangeViewportProperties(WebCore::ViewportAttributes attributes)
     DidReceiveEvent(uint32_t type, bool handled)
     StopResponsivenessTimer()
@@ -65,8 +65,8 @@ messages -> WebPageProxy {
     DidChangeScrollbarsForMainFrame(bool hasHorizontalScrollbar, bool hasVerticalScrollbar)
     DidChangeScrollOffsetPinningForMainFrame(bool pinnedToLeftSide, bool pinnedToRightSide, bool pinnedToTopSide, bool pinnedToBottomSide)
     DidChangePageCount(unsigned pageCount);
-    DidFailToInitializePlugin(WTF::String mimeType)
-    DidBlockInsecurePluginVersion(WTF::String mimeType, WTF::String urlString)
+    DidFailToInitializePlugin(WTF::String mimeType, WTF::String frameURLString, WTF::String pageURLString)
+    DidBlockInsecurePluginVersion(WTF::String mimeType, WTF::String pluginURLString, WTF::String frameURLString, WTF::String pageURLString, bool replacementObscured)
     SetCanShortCircuitHorizontalWheelEvents(bool canShortCircuitHorizontalWheelEvents)
 
 #if PLATFORM(EFL)
@@ -77,8 +77,10 @@ messages -> WebPageProxy {
     PageDidRequestScroll(WebCore::IntPoint point)
     PageTransitionViewportReady()
 #endif
-#if PLATFORM(QT)
+#if USE(COORDINATED_GRAPHICS)
     DidFindZoomableArea(WebCore::IntPoint target, WebCore::IntRect area)
+#endif
+#if PLATFORM(QT)
     AuthenticationRequiredRequest(WTF::String hostname, WTF::String realm, WTF::String prefilledUsername) -> (WTF::String username, WTF::String password)
     CertificateVerificationRequest(WTF::String hostname) -> (bool ignoreErrors)
     ProxyAuthenticationRequiredRequest(WTF::String hostname, uint16_t port, WTF::String prefilledUsername) -> (WTF::String username, WTF::String password)
@@ -99,18 +101,10 @@ messages -> WebPageProxy {
 #endif
 
     # Policy messages
-    DecidePolicyForResponse(uint64_t frameID, WebCore::ResourceResponse response, WebCore::ResourceRequest request, uint64_t listenerID, WebKit::InjectedBundleUserMessageEncoder userData) -> (bool receivedPolicyAction, uint64_t policyAction, uint64_t downloadID) Variadic
+    DecidePolicyForResponseSync(uint64_t frameID, WebCore::ResourceResponse response, WebCore::ResourceRequest request, uint64_t listenerID, WebKit::InjectedBundleUserMessageEncoder userData) -> (bool receivedPolicyAction, uint64_t policyAction, uint64_t downloadID) Variadic
     DecidePolicyForNavigationAction(uint64_t frameID, uint32_t navigationType, uint32_t modifiers, int32_t mouseButton, WebCore::ResourceRequest request, uint64_t listenerID, WebKit::InjectedBundleUserMessageEncoder userData) -> (bool receivedPolicyAction, uint64_t policyAction, uint64_t downloadID) Variadic
     DecidePolicyForNewWindowAction(uint64_t frameID, uint32_t navigationType, uint32_t modifiers, int32_t mouseButton, WebCore::ResourceRequest request, WTF::String frameName, uint64_t listenerID, WebKit::InjectedBundleUserMessageEncoder userData) Variadic
     UnableToImplementPolicy(uint64_t frameID, WebCore::ResourceError error, WebKit::InjectedBundleUserMessageEncoder userData)  Variadic
-
-    # Intent messages
-#if ENABLE(WEB_INTENTS)
-    DidReceiveIntentForFrame(uint64_t frameID, WebKit::IntentData intent, WebKit::InjectedBundleUserMessageEncoder userData) Variadic
-#endif
-#if ENABLE(WEB_INTENTS_TAG)
-    RegisterIntentServiceForFrame(uint64_t frameID, WebKit::IntentServiceInfo serviceInfo, WebKit::InjectedBundleUserMessageEncoder userData) Variadic
-#endif
 
     # Progress messages
     DidChangeProgress(double value)
@@ -119,12 +113,10 @@ messages -> WebPageProxy {
 
     # Frame lifetime messages
     DidCreateMainFrame(uint64_t frameID)
-    DidCreateSubframe(uint64_t frameID, uint64_t parentFrameID)
-    DidSaveFrameToPageCache(uint64_t frameID);
-    DidRestoreFrameFromPageCache(uint64_t frameID, uint64_t parentFrameID);
+    DidCreateSubframe(uint64_t frameID)
 
     # Frame load messages
-    DidCommitLoadForFrame(uint64_t frameID, WTF::String mimeType, bool hasCustomRepresentation, WebKit::PlatformCertificateInfo certificateInfo, WebKit::InjectedBundleUserMessageEncoder userData) Variadic
+    DidCommitLoadForFrame(uint64_t frameID, WTF::String mimeType, uint32_t loadType, WebKit::PlatformCertificateInfo certificateInfo, WebKit::InjectedBundleUserMessageEncoder userData) Variadic
     DidFailLoadForFrame(uint64_t frameID, WebCore::ResourceError error, WebKit::InjectedBundleUserMessageEncoder userData) Variadic
     DidFailProvisionalLoadForFrame(uint64_t frameID, WebCore::ResourceError error, WebKit::InjectedBundleUserMessageEncoder userData) Variadic
     DidFinishDocumentLoadForFrame(uint64_t frameID, WebKit::InjectedBundleUserMessageEncoder userData) Variadic
@@ -144,23 +136,12 @@ messages -> WebPageProxy {
 
     FrameDidBecomeFrameSet(uint64_t frameID, bool value)
 
-    # Resource load messages
-    DidInitiateLoadForResource(uint64_t frameID, uint64_t resourceIdentifier, WebCore::ResourceRequest request, bool pageIsProvisionallyLoading)
-    DidSendRequestForResource(uint64_t frameID, uint64_t resourceIdentifier, WebCore::ResourceRequest request, WebCore::ResourceResponse redirectResponse)
-    DidReceiveResponseForResource(uint64_t frameID, uint64_t resourceIdentifier, WebCore::ResourceResponse response)
-    DidReceiveContentLengthForResource(uint64_t frameID, uint64_t resourceIdentifier, uint64_t contentLength)
-    DidFinishLoadForResource(uint64_t frameID, uint64_t resourceIdentifier)
-    DidFailLoadForResource(uint64_t frameID, uint64_t resourceIdentifier, WebCore::ResourceError error)
 #if PLATFORM(QT)
     ResolveApplicationSchemeRequest(WebKit::QtNetworkRequestData request)
 #endif
 
-
-    # Custom representations
-    DidFinishLoadingDataForCustomRepresentation(WTF::String suggestedFilename, CoreIPC::DataReference data)
-
     # Forms messages
-    WillSubmitForm(uint64_t frameID, uint64_t sourceFrameID, WebKit::StringPairVector textFieldValues, uint64_t listenerID, WebKit::InjectedBundleUserMessageEncoder userData) Variadic
+    WillSubmitForm(uint64_t frameID, uint64_t sourceFrameID, WTF::Vector<std::pair<WTF::String, WTF::String>> textFieldValues, uint64_t listenerID, WebKit::InjectedBundleUserMessageEncoder userData) Variadic
 
     # Callback messages
     VoidCallback(uint64_t callbackID)
@@ -175,6 +156,7 @@ messages -> WebPageProxy {
 #endif
 
     PageScaleFactorDidChange(double scaleFactor)
+    PageZoomFactorDidChange(double zoomFactor)
 
 #if PLATFORM(GTK)
     # Support for GTK+ platform keybindings
@@ -182,6 +164,8 @@ messages -> WebPageProxy {
 
     # Support for connecting the Accessibility worlds of the UI and the Web processes
     BindAccessibilityTree(WTF::String plugID)
+
+    SetInputMethodState(bool enabled);
 #endif
 
     # BackForward messages
@@ -202,9 +186,6 @@ messages -> WebPageProxy {
 
     # Editor notifications
     EditorStateChanged(WebKit::EditorState editorState)
-#if PLATFORM(WIN)
-    DidChangeCompositionSelection(bool hasChanged)
-#endif
 #if PLATFORM(QT)
     WillSetInputMethodState()
 #endif
@@ -213,16 +194,12 @@ messages -> WebPageProxy {
     SetFindIndicator(WebCore::FloatRect selectionRect, Vector<WebCore::FloatRect> textRects, float contentImageScaleFactor, WebKit::ShareableBitmap::Handle contentImageHandle, bool fadeOut, bool animate)
     DidFindString(WTF::String string, uint32_t matchCount)
     DidFailToFindString(WTF::String string)
-#if PLATFORM(WIN)
-    DidInstallOrUninstallPageOverlay(bool didInstall)
-#endif
+    DidFindStringMatches(WTF::String string, Vector<Vector<WebCore::IntRect>> matches, int32_t firstIndexAfterSelection)
+    DidGetImageForFindMatch(WebKit::ShareableBitmap::Handle contentImageHandle, uint32_t matchIndex)
 
     # PopupMenu messages
     ShowPopupMenu(WebCore::IntRect rect, uint64_t textDirection, Vector<WebKit::WebPopupItem> items, int32_t selectedIndex, WebKit::PlatformPopupMenuData data)
     HidePopupMenu()
-#if PLATFORM(WIN)
-    SetPopupMenuSelectedIndex(int32_t selectedIndex)
-#endif
 
 #if ENABLE(CONTEXT_MENUS)
     # ContextMenu messages
@@ -234,7 +211,7 @@ messages -> WebPageProxy {
     DidReceiveAuthenticationChallenge(uint64_t frameID, WebCore::AuthenticationChallenge challenge, uint64_t challengeID)
 
     # Database messages
-    ExceededDatabaseQuota(uint64_t frameID, WTF::String originIdentifier, WTF::String databaseName, WTF::String databaseDisplayName, uint64_t currentQuota, uint64_t currentOriginUsage, uint64_t currentDatabaseUsage, uint64_t expectedUsage) -> (uint64_t newQuota)
+    ExceededDatabaseQuota(uint64_t frameID, WTF::String originIdentifier, WTF::String databaseName, WTF::String databaseDisplayName, uint64_t currentQuota, uint64_t currentOriginUsage, uint64_t currentDatabaseUsage, uint64_t expectedUsage) -> (uint64_t newQuota) Delayed
 
     # Geolocation messages
     RequestGeolocationPermissionForFrame(uint64_t geolocationID, uint64_t frameID, WTF::String originIdentifier)
@@ -242,6 +219,9 @@ messages -> WebPageProxy {
     # Notification messages
     RequestNotificationPermission(uint64_t requestID, WTF::String originIdentifier)
     ShowNotification(WTF::String title, WTF::String body, WTF::String iconURL, WTF::String tag, WTF::String lang, WTF::String dir, WTF::String originIdentifier, uint64_t notificationID)
+    CancelNotification(uint64_t notificationID)
+    ClearNotifications(Vector<uint64_t> notificationIDs)
+    DidDestroyNotification(uint64_t notificationID)
 
     # Spelling and grammar messages
 #if USE(UNIFIED_TEXT_CHECKING)  
@@ -255,6 +235,7 @@ messages -> WebPageProxy {
     GetGuessesForWord(WTF::String word, WTF::String context) -> (Vector<WTF::String> guesses)
     LearnWord(WTF::String word);
     IgnoreWord(WTF::String word);
+    RequestCheckingOfString(uint64_t requestID, WebCore::TextCheckingRequestData request)
 
     # Drag and drop messages
 #if ENABLE(DRAG_SUPPORT)
@@ -263,9 +244,6 @@ messages -> WebPageProxy {
 #if PLATFORM(MAC) && ENABLE(DRAG_SUPPORT)
     SetDragImage(WebCore::IntPoint clientPosition, WebKit::ShareableBitmap::Handle dragImage, bool linkDrag)
     SetPromisedData(WTF::String pasteboardName, WebKit::SharedMemory::Handle imageHandle, uint64_t imageSize, WTF::String filename, WTF::String extension, WTF::String title, WTF::String url, WTF::String visibleURL, WebKit::SharedMemory::Handle archiveHandle, uint64_t archiveSize)
-#endif
-#if PLATFORM(WIN) && ENABLE(DRAG_SUPPORT)
-    StartDragDrop(WebCore::IntPoint imagePoint, WebCore::IntPoint dragPoint, uint64_t okEffect, HashMap<UINT,Vector<String> > dataMap, uint64_t fileSize, String pathname, WebKit::SharedMemory::Handle fileContentHandle, WebCore::IntSize dragImageSize, WebKit::SharedMemory::Handle dragImage, bool linkDrag)
 #endif
 #if (PLATFORM(QT) || PLATFORM(GTK)) && ENABLE(DRAG_SUPPORT)
     StartDrag(WebCore::DragData dragData, WebKit::ShareableBitmap::Handle dragImage)
@@ -295,12 +273,14 @@ messages -> WebPageProxy {
 
     # Spotlight
     SearchWithSpotlight(WTF::String string)
+
+    SearchTheWeb(WTF::String string)
 #endif
 
 #if PLATFORM(MAC)
     SubstitutionsPanelIsShowing() -> (bool isShowing)
 #endif
-#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1070
+#if PLATFORM(MAC)
     # Autocorrection messages
     ShowCorrectionPanel(int32_t panelType, WebCore::FloatRect boundingBoxOfReplacedString, String replacedString, String replacementString, Vector<String> alternativeReplacementStrings)
     DismissCorrectionPanel(int32_t reason)
@@ -310,17 +290,8 @@ messages -> WebPageProxy {
 
 #if USE(DICTATION_ALTERNATIVES)
     ShowDictationAlternativeUI(WebCore::FloatRect boundingBoxOfDictatedText, uint64_t dictationContext)
-    DismissDictationAlternativeUI()
     RemoveDictationAlternatives(uint64_t dictationContext)
     DictationAlternatives(uint64_t dictationContext) -> (Vector<String> alternatives)
-#endif
-
-#if PLATFORM(WIN)
-    # Windows 7 Gesture Messages
-    SetGestureReachedScrollingLimit(bool limitReached)
-
-    # Miscellaneous Windows messages
-    ScheduleChildWindowGeometryUpdate(WebKit::WindowGeometry geometry)
 #endif
 
 #if PLUGIN_ARCHITECTURE(X11)
@@ -339,4 +310,17 @@ messages -> WebPageProxy {
 #endif
 
     SavePDFToFileInDownloadsFolder(WTF::String suggestedFilename, WTF::String originatingURLString, CoreIPC::DataReference data)
+
+#if PLATFORM(MAC)
+    SavePDFToTemporaryFolderAndOpenWithNativeApplication(WTF::String suggestedFilename, WTF::String originatingURLString, CoreIPC::DataReference data, WTF::String pdfUUID)
+    OpenPDFFromTemporaryFolderWithNativeApplication(WTF::String pdfUUID)
+#endif
+
+#if ENABLE(NETSCAPE_PLUGIN_API)
+    FindPlugin(WTF::String mimeType, uint32_t processType, WTF::String urlString, WTF::String frameURLString, WTF::String pageURLString, bool allowOnlyApplicationPlugins) -> (uint64_t pluginProcessToken, WTF::String newMIMEType, uint32_t pluginLoadPolicy, WTF::String unavailabilityDescription)
+#endif
+
+    DidUpdateInWindowState()
+    
+    DidSaveToPageCache()
 }

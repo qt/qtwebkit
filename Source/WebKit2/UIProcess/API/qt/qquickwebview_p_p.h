@@ -33,8 +33,13 @@
 #include <QtCore/QObject>
 #include <QtCore/QScopedPointer>
 #include <WebCore/ViewportArguments.h>
+#include <WebKit2/WKRetainPtr.h>
 #include <wtf/OwnPtr.h>
 #include <wtf/RefPtr.h>
+
+namespace WebCore {
+class CoordinatedGraphicsScene;
+}
 
 namespace WebKit {
 class DownloadProxy;
@@ -43,7 +48,7 @@ class QtDialogRunner;
 class PageViewportControllerClientQt;
 class QtWebContext;
 class QtWebError;
-class QtWebPageLoadClient;
+class QtWebPageEventHandler;
 class QtWebPagePolicyClient;
 class WebPageProxy;
 }
@@ -65,6 +70,7 @@ class QQuickWebViewPrivate {
 
 public:
     static QQuickWebViewPrivate* get(QQuickWebView* q) { return q->d_ptr.data(); }
+    static QQuickWebViewPrivate* get(WKPageRef);
 
     virtual ~QQuickWebViewPrivate();
 
@@ -72,17 +78,11 @@ public:
 
     virtual void onComponentComplete() { }
 
-    virtual void provisionalLoadDidStart(const WTF::String& url);
-    virtual void didReceiveServerRedirectForProvisionalLoad(const WTF::String& url);
-    virtual void loadDidCommit();
-    virtual void didSameDocumentNavigation();
-    virtual void titleDidChange();
     virtual void loadProgressDidChange(int loadProgress);
-    virtual void backForwardListDidChange();
-    virtual void loadDidSucceed();
-    virtual void loadDidStop();
-    virtual void loadDidFail(const WebKit::QtWebError& error);
     virtual void handleMouseEvent(QMouseEvent*);
+
+    static void didFindString(WKPageRef page, WKStringRef string, unsigned matchCount, const void* clientInfo);
+    static void didFailToFindString(WKPageRef page, WKStringRef string, const void* clientInfo);
 
     virtual void didChangeViewportProperties(const WebCore::ViewportAttributes& attr) { }
 
@@ -130,14 +130,17 @@ public:
 
     // PageClient.
     WebCore::IntSize viewSize() const;
-    void didReceiveMessageFromNavigatorQtObject(const String& message);
     virtual void pageDidRequestScroll(const QPoint& pos) { }
     void processDidCrash();
     void didRelaunchProcess();
-    void processDidBecomeUnresponsive();
-    void processDidBecomeResponsive();
     PassOwnPtr<WebKit::DrawingAreaProxy> createDrawingAreaProxy();
     void handleDownloadRequest(WebKit::DownloadProxy*);
+
+    void didReceiveMessageFromNavigatorQtObject(WKStringRef message);
+
+    WebCore::CoordinatedGraphicsScene* coordinatedGraphicsScene();
+    float deviceScaleFactor();
+    void setIntrinsicDeviceScaleFactor(float);
 
 protected:
     class FlickableAxisLocker {
@@ -159,22 +162,39 @@ protected:
         QPointF adjust(const QPointF&);
     };
 
+    // WKPageLoadClient callbacks.
+    static void didStartProvisionalLoadForFrame(WKPageRef, WKFrameRef, WKTypeRef userData, const void* clientInfo);
+    static void didReceiveServerRedirectForProvisionalLoadForFrame(WKPageRef, WKFrameRef, WKTypeRef userData, const void* clientInfo);
+    static void didFailLoad(WKPageRef, WKFrameRef, WKErrorRef, WKTypeRef userData, const void* clientInfo);
+    static void didCommitLoadForFrame(WKPageRef, WKFrameRef, WKTypeRef userData, const void* clientInfo);
+    static void didFinishLoadForFrame(WKPageRef, WKFrameRef, WKTypeRef userData, const void* clientInfo);
+    static void didSameDocumentNavigationForFrame(WKPageRef, WKFrameRef, WKSameDocumentNavigationType, WKTypeRef userData, const void* clientInfo);
+    static void didReceiveTitleForFrame(WKPageRef, WKStringRef, WKFrameRef, WKTypeRef userData, const void* clientInfo);
+    static void didStartProgress(WKPageRef, const void* clientInfo);
+    static void didChangeProgress(WKPageRef, const void* clientInfo);
+    static void didFinishProgress(WKPageRef, const void* clientInfo);
+    static void didChangeBackForwardList(WKPageRef, WKBackForwardListItemRef, WKArrayRef, const void *clientInfo);
+    static void processDidBecomeUnresponsive(WKPageRef, const void* clientInfo);
+    static void processDidBecomeResponsive(WKPageRef, const void* clientInfo);
+
     QQuickWebViewPrivate(QQuickWebView* viewport);
-    RefPtr<WebKit::QtWebContext> context;
     RefPtr<WebKit::WebPageProxy> webPageProxy;
+    WKRetainPtr<WKPageRef> webPage;
+    WKRetainPtr<WKPageGroupRef> pageGroup;
 
     WebKit::QtPageClient pageClient;
     WebKit::DefaultUndoController undoController;
     OwnPtr<QWebNavigationHistory> navigationHistory;
     OwnPtr<QWebPreferences> preferences;
 
-    QScopedPointer<WebKit::QtWebPageLoadClient> pageLoadClient;
     QScopedPointer<WebKit::QtWebPagePolicyClient> pagePolicyClient;
     QScopedPointer<WebKit::QtWebPageUIClient> pageUIClient;
 
     QScopedPointer<QQuickWebPage> pageView;
+    QScopedPointer<WebKit::QtWebPageEventHandler> pageEventHandler;
     QQuickWebView* q_ptr;
     QQuickWebViewExperimental* experimental;
+    WebKit::QtWebContext* context;
 
     FlickableAxisLocker axisLocker;
 
@@ -196,9 +216,9 @@ protected:
     bool m_navigatorQtObjectEnabled;
     bool m_renderToOffscreenBuffer;
     bool m_allowAnyHTTPSCertificateForLocalHost;
-    WTF::String m_iconUrl;
+    QUrl m_iconUrl;
     int m_loadProgress;
-    WTF::String m_currentUrl;
+    QString m_currentUrl;
 };
 
 class QQuickWebViewLegacyPrivate : public QQuickWebViewPrivate {
@@ -226,7 +246,6 @@ public:
     virtual void updateViewportSize();
 
     virtual void pageDidRequestScroll(const QPoint& pos);
-    virtual void handleMouseEvent(QMouseEvent*);
 
 private:
     QScopedPointer<WebKit::PageViewportController> m_pageViewportController;

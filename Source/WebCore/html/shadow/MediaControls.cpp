@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2011 Apple Inc. All rights reserved.
- * Copyright (C) 2011 Google Inc. All rights reserved.
+ * Copyright (C) 2011, 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2012 Google Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,6 +28,9 @@
 
 #if ENABLE(VIDEO)
 #include "MediaControls.h"
+
+#include "ExceptionCodePlaceholder.h"
+#include "Settings.h"
 
 namespace WebCore {
 
@@ -89,8 +92,8 @@ void MediaControls::reset()
 
     updateCurrentTimeDisplay();
 
-    float duration = m_mediaController->duration();
-    if (isfinite(duration) || page->theme()->hasOwnDisabledStateHandlingFor(MediaSliderPart)) {
+    double duration = m_mediaController->duration();
+    if (std::isfinite(duration) || page->theme()->hasOwnDisabledStateHandlingFor(MediaSliderPart)) {
         m_timeline->setDuration(duration);
         m_timeline->setPosition(m_mediaController->currentTime());
     }
@@ -109,12 +112,7 @@ void MediaControls::reset()
         }
     }
 
-    if (m_toggleClosedCaptionsButton) {
-        if (m_mediaController->hasClosedCaptions())
-            m_toggleClosedCaptionsButton->show();
-        else
-            m_toggleClosedCaptionsButton->hide();
-    }
+    refreshClosedCaptionsButtonVisibility();
 
     if (m_fullScreenButton) {
         if (m_mediaController->supportsFullscreen() && m_mediaController->hasVideo())
@@ -151,6 +149,7 @@ void MediaControls::loadedMetadata()
 
 void MediaControls::show()
 {
+    makeOpaque();
     m_panel->setIsDisplayed(true);
     m_panel->show();
 }
@@ -215,14 +214,13 @@ void MediaControls::playbackStopped()
 
 void MediaControls::updateCurrentTimeDisplay()
 {
-    float now = m_mediaController->currentTime();
+    double now = m_mediaController->currentTime();
 
     Page* page = document()->page();
     if (!page)
         return;
 
-    ExceptionCode ec;
-    m_currentTimeDisplay->setInnerText(page->theme()->formatMediaControlsTime(now), ec);
+    m_currentTimeDisplay->setInnerText(page->theme()->formatMediaControlsTime(now), IGNORE_EXCEPTION);
     m_currentTimeDisplay->setCurrentValue(now);
 }
 
@@ -243,6 +241,8 @@ void MediaControls::changedVolume()
 {
     if (m_volumeSlider)
         m_volumeSlider->setVolume(m_mediaController->volume());
+    if (m_panelMuteButton && m_panelMuteButton->renderer())
+        m_panelMuteButton->renderer()->repaint();
 }
 
 void MediaControls::changedClosedCaptionsVisibility()
@@ -251,15 +251,35 @@ void MediaControls::changedClosedCaptionsVisibility()
         m_toggleClosedCaptionsButton->updateDisplayType();
 }
 
+void MediaControls::refreshClosedCaptionsButtonVisibility()
+{
+    if (!m_toggleClosedCaptionsButton)
+        return;
+
+    if (m_mediaController->hasClosedCaptions())
+        m_toggleClosedCaptionsButton->show();
+    else
+        m_toggleClosedCaptionsButton->hide();
+}
+
+void MediaControls::closedCaptionTracksChanged()
+{
+    refreshClosedCaptionsButtonVisibility();
+}
+
 void MediaControls::enteredFullscreen()
 {
     m_isFullscreen = true;
     m_fullScreenButton->setIsFullscreen(true);
 
     if (Page* page = document()->page())
-        page->chrome()->setCursorHiddenUntilMouseMoves(true);
+        page->chrome().setCursorHiddenUntilMouseMoves(true);
 
     startHideFullscreenControlsTimer();
+#if ENABLE(VIDEO_TRACK)
+    if (m_textDisplayContainer)
+        m_textDisplayContainer->enteredFullscreen();
+#endif
 }
 
 void MediaControls::exitedFullscreen()
@@ -267,6 +287,10 @@ void MediaControls::exitedFullscreen()
     m_isFullscreen = false;
     m_fullScreenButton->setIsFullscreen(false);
     stopHideFullscreenControlsTimer();
+#if ENABLE(VIDEO_TRACK)
+    if (m_textDisplayContainer)
+        m_textDisplayContainer->exitedFullscreen();
+#endif
 }
 
 void MediaControls::defaultEventHandler(Event* event)
@@ -317,7 +341,7 @@ void MediaControls::hideFullscreenControlsTimerFired(Timer<MediaControls>*)
         return;
 
     if (Page* page = document()->page())
-        page->chrome()->setCursorHiddenUntilMouseMoves(true);
+        page->chrome().setCursorHiddenUntilMouseMoves(true);
 
     makeTransparent();
 }
@@ -331,7 +355,7 @@ void MediaControls::startHideFullscreenControlsTimer()
     if (!page)
         return;
 
-    m_hideFullscreenControlsTimer.startOneShot(page->theme()->timeWithoutMouseMovementBeforeHidingControls());
+    m_hideFullscreenControlsTimer.startOneShot(page->settings()->timeWithoutMouseMovementBeforeHidingControls());
 }
 
 void MediaControls::stopHideFullscreenControlsTimer()
@@ -368,8 +392,7 @@ void MediaControls::createTextTrackDisplay()
         m_textDisplayContainer->setMediaController(m_mediaController);
 
     // Insert it before the first controller element so it always displays behind the controls.
-    ExceptionCode ec;
-    insertBefore(textDisplayContainer.release(), m_panel, ec, true);
+    insertBefore(textDisplayContainer.release(), m_panel, IGNORE_EXCEPTION, AttachLazily);
 }
 
 void MediaControls::showTextTrackDisplay()
@@ -392,6 +415,13 @@ void MediaControls::updateTextTrackDisplay()
         createTextTrackDisplay();
 
     m_textDisplayContainer->updateDisplay();
+}
+    
+void MediaControls::textTrackPreferencesChanged()
+{
+    closedCaptionTracksChanged();
+    if (m_textDisplayContainer)
+        m_textDisplayContainer->updateSizes(true);
 }
 #endif
 

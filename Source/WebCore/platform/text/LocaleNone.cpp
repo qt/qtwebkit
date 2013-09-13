@@ -36,12 +36,10 @@ public:
 
 private:
     virtual void initializeLocaleData() OVERRIDE FINAL;
-#if ENABLE(CALENDAR_PICKER)
-    virtual bool isRTL() OVERRIDE;
-#endif
 #if ENABLE(DATE_AND_TIME_INPUT_TYPES)
     virtual String dateFormat() OVERRIDE;
     virtual String monthFormat() OVERRIDE;
+    virtual String shortMonthFormat() OVERRIDE;
     virtual String timeFormat() OVERRIDE;
     virtual String shortTimeFormat() OVERRIDE;
     virtual String dateTimeFormatWithSeconds() OVERRIDE;
@@ -71,13 +69,6 @@ void LocaleNone::initializeLocaleData()
 {
 }
 
-#if ENABLE(CALENDAR_PICKER)
-bool LocaleNone::isRTL()
-{
-    return false;
-}
-#endif
-
 #if ENABLE(DATE_AND_TIME_INPUT_TYPES)
 const Vector<String>& LocaleNone::monthLabels()
 {
@@ -91,10 +82,15 @@ const Vector<String>& LocaleNone::monthLabels()
 
 String LocaleNone::dateFormat()
 {
-    return ASCIILiteral("dd/MM/yyyyy");
+    return ASCIILiteral("yyyy-MM-dd");
 }
 
 String LocaleNone::monthFormat()
+{
+    return ASCIILiteral("yyyy-MM");
+}
+
+String LocaleNone::shortMonthFormat()
 {
     return ASCIILiteral("yyyy-MM");
 }
@@ -111,12 +107,12 @@ String LocaleNone::shortTimeFormat()
 
 String LocaleNone::dateTimeFormatWithSeconds()
 {
-    return ASCIILiteral("dd/MM/yyyyy HH:mm:ss");
+    return ASCIILiteral("yyyy-MM-dd'T'HH:mm:ss");
 }
 
 String LocaleNone::dateTimeFormatWithoutSeconds()
 {
-    return ASCIILiteral("dd/MM/yyyyy HH:mm");
+    return ASCIILiteral("yyyy-MM-dd'T'HH:mm");
 }
 
 const Vector<String>& LocaleNone::shortMonthLabels()

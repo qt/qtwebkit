@@ -46,6 +46,7 @@
 #include <sys/resource.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <wtf/UniStdExtras.h>
 
 #ifdef SOCK_SEQPACKET
 #define SOCKET_TYPE SOCK_SEQPACKET
@@ -77,15 +78,6 @@ SharedWorkerProcess::~SharedWorkerProcess()
 {
 }
 
-void SharedWorkerProcess::initialize(CoreIPC::Connection::Identifier serverIdentifier, RunLoop* runLoop)
-{
-    ASSERT(!m_connection);
-
-    m_connection = CoreIPC::Connection::createClientConnection(serverIdentifier, this, runLoop);
-    m_connection->setDidCloseOnConnectionWorkQueueCallback(didCloseOnConnectionWorkQueue);
-    m_connection->open();
-}
-
 void SharedWorkerProcess::removeWebProcessConnection(WebProcessConnection* webProcessConnection)
 {
     size_t vectorIndex = m_webProcessConnections.find(webProcessConnection);
@@ -103,9 +95,9 @@ bool SharedWorkerProcess::shouldTerminate()
     return true;
 }
 
-void SharedWorkerProcess::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::MessageDecoder& decoder)
+void SharedWorkerProcess::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::MessageDecoder& decoder)
 {
-    didReceiveSharedWorkerProcessMessage(connection, messageID, decoder);
+    didReceiveSharedWorkerProcessMessage(connection, decoder);
 }
 
 void SharedWorkerProcess::didClose(CoreIPC::Connection*)
@@ -122,8 +114,6 @@ void SharedWorkerProcess::initializeSharedWorkerProcess(const SharedWorkerProces
 {
     setMinimumLifetime(parameters.minimumLifetime);
     setTerminationTimeout(parameters.terminationTimeout);
-
-    platformInitialize(parameters);
 }
 
 void SharedWorkerProcess::createWebProcessConnection()
@@ -138,7 +128,7 @@ void SharedWorkerProcess::createWebProcessConnection()
     m_webProcessConnections.append(connection.release());
 
     CoreIPC::Attachment clientPort(listeningPort, MACH_MSG_TYPE_MAKE_SEND);
-    m_connection->send(Messages::SharedWorkerProcessProxy::DidCreateWebProcessConnection(clientPort), 0);
+    parentProcessConnection()->send(Messages::SharedWorkerProcessProxy::DidCreateWebProcessConnection(clientPort), 0);
 #elif USE(UNIX_DOMAIN_SOCKETS)
     int sockets[2];
     if (socketpair(AF_UNIX, SOCKET_TYPE, 0, sockets) == -1) {
@@ -150,8 +140,8 @@ void SharedWorkerProcess::createWebProcessConnection()
     while (fcntl(sockets[1], F_SETFD, FD_CLOEXEC)  == -1) {
         if (errno != EINTR) {
             ASSERT_NOT_REACHED();
-            while (close(sockets[0]) == -1 && errno == EINTR) { }
-            while (close(sockets[1]) == -1 && errno == EINTR) { }
+            closeWithRetry(sockets[0]);
+            closeWithRetry(sockets[1]);
             return;
         }
     }
@@ -160,8 +150,8 @@ void SharedWorkerProcess::createWebProcessConnection()
     while (fcntl(sockets[0], F_SETFD, FD_CLOEXEC) == -1) {
         if (errno != EINTR) {
             ASSERT_NOT_REACHED();
-            while (close(sockets[0]) == -1 && errno == EINTR) { }
-            while (close(sockets[1]) == -1 && errno == EINTR) { }
+            closeWithRetry(sockets[0]);
+            closeWithRetry(sockets[1]);
             return;
         }
     }
@@ -170,7 +160,7 @@ void SharedWorkerProcess::createWebProcessConnection()
     m_webProcessConnections.append(connection.release());
 
     CoreIPC::Attachment clientSocket(sockets[0]);
-    m_connection->send(Messages::SharedWorkerProcessProxy::DidCreateWebProcessConnection(clientSocket), 0);
+    parentProcessConnection()->send(Messages::SharedWorkerProcessProxy::DidCreateWebProcessConnection(clientSocket), 0);
 #else
     notImplemented();
 #endif
@@ -192,6 +182,16 @@ void SharedWorkerProcess::minimumLifetimeTimerFired()
 {
     enableTermination();
 }
+
+#if !PLATFORM(MAC)
+void SharedWorkerProcess::initializeProcess(const ChildProcessInitializationParameters&)
+{
+}
+
+void SharedWorkerProcess::initializeProcessName(const ChildProcessInitializationParameters&)
+{
+}
+#endif
 
 } // namespace WebKit
 

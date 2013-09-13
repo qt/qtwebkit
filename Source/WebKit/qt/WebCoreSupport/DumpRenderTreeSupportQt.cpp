@@ -25,7 +25,6 @@
 
 #include "APICast.h"
 #include "ApplicationCacheStorage.h"
-#include "CSSComputedStyleDeclaration.h"
 #include "ChromeClientQt.h"
 #include "ContainerNode.h"
 #include "ContextMenu.h"
@@ -67,6 +66,7 @@
 #include "QWebPageAdapter.h"
 #include "RenderListItem.h"
 #include "RenderTreeAsText.h"
+#include "RuntimeEnabledFeatures.h"
 #include "SchemeRegistry.h"
 #include "ScriptController.h"
 #include "ScriptSourceCode.h"
@@ -77,7 +77,6 @@
 #include "TextIterator.h"
 #include "ThirdPartyCookiesQt.h"
 #include "WebCoreTestSupport.h"
-#include "WorkerThread.h"
 #include "qt_runtime.h"
 #include "qwebelement.h"
 #include "qwebhistory.h"
@@ -209,15 +208,6 @@ void DumpRenderTreeSupportQt::overwritePluginDirectories()
     db->refresh();
 }
 
-int DumpRenderTreeSupportQt::workerThreadCount()
-{
-#if ENABLE(WORKERS)
-    return WebCore::WorkerThread::workerThreadCount();
-#else
-    return 0;
-#endif
-}
-
 void DumpRenderTreeSupportQt::setDumpRenderTreeModeEnabled(bool b)
 {
     QWebPageAdapter::drtRun = b;
@@ -274,18 +264,6 @@ bool DumpRenderTreeSupportQt::hasDocumentElement(QWebFrameAdapter *adapter)
     return adapter->frame->document()->documentElement();
 }
 
-void DumpRenderTreeSupportQt::setAutofilled(const QWebElement& element, bool isAutofilled)
-{
-    WebCore::Element* webElement = element.m_element;
-    if (!webElement)
-        return;
-    HTMLInputElement* inputElement = webElement->toInputElement();
-    if (!inputElement)
-        return;
-
-    inputElement->setAutofilled(isAutofilled);
-}
-
 void DumpRenderTreeSupportQt::setValueForUser(const QWebElement& element, const QString& value)
 {
     WebCore::Element* webElement = element.m_element;
@@ -298,63 +276,6 @@ void DumpRenderTreeSupportQt::setValueForUser(const QWebElement& element, const 
     inputElement->setValueForUser(value);
 }
 
-// Pause a given CSS animation or transition on the target node at a specific time.
-// If the animation or transition is already paused, it will update its pause time.
-// This method is only intended to be used for testing the CSS animation and transition system.
-bool DumpRenderTreeSupportQt::pauseAnimation(QWebFrameAdapter *adapter, const QString &animationName, double time, const QString &elementId)
-{
-    Frame* coreFrame = adapter->frame;
-    if (!coreFrame)
-        return false;
-
-    AnimationController* controller = coreFrame->animation();
-    if (!controller)
-        return false;
-
-    Document* doc = coreFrame->document();
-    Q_ASSERT(doc);
-
-    Node* coreNode = doc->getElementById(elementId);
-    if (!coreNode || !coreNode->renderer())
-        return false;
-
-    return controller->pauseAnimationAtTime(coreNode->renderer(), animationName, time);
-}
-
-bool DumpRenderTreeSupportQt::pauseTransitionOfProperty(QWebFrameAdapter *adapter, const QString &propertyName, double time, const QString &elementId)
-{
-    Frame* coreFrame = adapter->frame;
-    if (!coreFrame)
-        return false;
-
-    AnimationController* controller = coreFrame->animation();
-    if (!controller)
-        return false;
-
-    Document* doc = coreFrame->document();
-    Q_ASSERT(doc);
-
-    Node* coreNode = doc->getElementById(elementId);
-    if (!coreNode || !coreNode->renderer())
-        return false;
-
-    return controller->pauseTransitionAtTime(coreNode->renderer(), propertyName, time);
-}
-
-// Returns the total number of currently running animations (includes both CSS transitions and CSS animations).
-int DumpRenderTreeSupportQt::numberOfActiveAnimations(QWebFrameAdapter *adapter)
-{
-    Frame* coreFrame = adapter->frame;
-    if (!coreFrame)
-        return false;
-
-    AnimationController* controller = coreFrame->animation();
-    if (!controller)
-        return false;
-
-    return controller->numberOfActiveAnimations(coreFrame->document());
-}
-
 void DumpRenderTreeSupportQt::clearFrameName(QWebFrameAdapter *adapter)
 {
     Frame* coreFrame = adapter->frame;
@@ -363,7 +284,7 @@ void DumpRenderTreeSupportQt::clearFrameName(QWebFrameAdapter *adapter)
 
 int DumpRenderTreeSupportQt::javaScriptObjectsCount()
 {
-    return JSDOMWindowBase::commonJSGlobalData()->heap.globalObjectCount();
+    return JSDOMWindowBase::commonVM()->heap.globalObjectCount();
 }
 
 void DumpRenderTreeSupportQt::garbageCollectorCollect()
@@ -406,89 +327,14 @@ void DumpRenderTreeSupportQt::setAuthorAndUserStylesEnabled(QWebPageAdapter* ada
     adapter->page->settings()->setAuthorAndUserStylesEnabled(value);
 }
 
-void DumpRenderTreeSupportQt::setSmartInsertDeleteEnabled(QWebPageAdapter *adapter, bool enabled)
-{
-    static_cast<EditorClientQt*>(adapter->page->editorClient())->setSmartInsertDeleteEnabled(enabled);
-}
-
-
-void DumpRenderTreeSupportQt::setSelectTrailingWhitespaceEnabled(QWebPageAdapter *adapter, bool enabled)
-{
-    static_cast<EditorClientQt*>(adapter->page->editorClient())->setSelectTrailingWhitespaceEnabled(enabled);
-}
-
-
 void DumpRenderTreeSupportQt::executeCoreCommandByName(QWebPageAdapter* adapter, const QString& name, const QString& value)
 {
-    adapter->page->focusController()->focusedOrMainFrame()->editor()->command(name).execute(value);
+    adapter->page->focusController()->focusedOrMainFrame()->editor().command(name).execute(value);
 }
 
 bool DumpRenderTreeSupportQt::isCommandEnabled(QWebPageAdapter *adapter, const QString& name)
 {
-    return adapter->page->focusController()->focusedOrMainFrame()->editor()->command(name).isEnabled();
-}
-
-bool DumpRenderTreeSupportQt::findString(QWebPageAdapter *adapter, const QString& string, const QStringList& optionArray)
-{
-    // 1. Parse the options from the array
-    WebCore::FindOptions options = 0;
-    const int optionCount = optionArray.size();
-    for (int i = 0; i < optionCount; ++i) {
-        const QString& option = optionArray.at(i);
-        if (option == QLatin1String("CaseInsensitive"))
-            options |= WebCore::CaseInsensitive;
-        else if (option == QLatin1String("AtWordStarts"))
-            options |= WebCore::AtWordStarts;
-        else if (option == QLatin1String("TreatMedialCapitalAsWordStart"))
-            options |= WebCore::TreatMedialCapitalAsWordStart;
-        else if (option == QLatin1String("Backwards"))
-            options |= WebCore::Backwards;
-        else if (option == QLatin1String("WrapAround"))
-            options |= WebCore::WrapAround;
-        else if (option == QLatin1String("StartInSelection"))
-            options |= WebCore::StartInSelection;
-    }
-
-    // 2. find the string
-    WebCore::Frame* frame = adapter->page->focusController()->focusedOrMainFrame();
-    return frame && frame->editor()->findString(string, options);
-}
-
-QString DumpRenderTreeSupportQt::markerTextForListItem(const QWebElement& listItem)
-{
-    return WebCore::markerTextForListItem(listItem.m_element);
-}
-
-static QString convertToPropertyName(const QString& name)
-{
-    QStringList parts = name.split(QLatin1Char('-'));
-    QString camelCaseName;
-    for (int j = 0; j < parts.count(); ++j) {
-        QString part = parts.at(j);
-        if (j)
-            camelCaseName.append(part.replace(0, 1, part.left(1).toUpper()));
-        else
-            camelCaseName.append(part);
-    }
-    return camelCaseName;
-}
-
-QVariantMap DumpRenderTreeSupportQt::computedStyleIncludingVisitedInfo(const QWebElement& element)
-{
-    QVariantMap res;
-
-    WebCore::Element* webElement = element.m_element;
-    if (!webElement)
-        return res;
-
-    RefPtr<WebCore::CSSComputedStyleDeclaration> computedStyleDeclaration = CSSComputedStyleDeclaration::create(webElement, true);
-    CSSStyleDeclaration* style = static_cast<WebCore::CSSStyleDeclaration*>(computedStyleDeclaration.get());
-    for (unsigned i = 0; i < style->length(); i++) {
-        QString name = style->item(i);
-        QString value = style->getPropertyValue(name);
-        res[convertToPropertyName(name)] = QVariant(value);
-    }
-    return res;
+    return adapter->page->focusController()->focusedOrMainFrame()->editor().command(name).isEnabled();
 }
 
 QVariantList DumpRenderTreeSupportQt::selectedRange(QWebPageAdapter *adapter)
@@ -528,27 +374,9 @@ QVariantList DumpRenderTreeSupportQt::firstRectForCharacterRange(QWebPageAdapter
     if (!range)
         return QVariantList();
 
-    QRect resultRect = frame->editor()->firstRectForRange(range.get());
+    QRect resultRect = frame->editor().firstRectForRange(range.get());
     rect << resultRect.x() << resultRect.y() << resultRect.width() << resultRect.height();
     return rect;
-}
-
-bool DumpRenderTreeSupportQt::elementDoesAutoCompleteForElementWithId(QWebFrameAdapter *adapter, const QString& elementId)
-{
-    Frame* coreFrame = adapter->frame;
-    if (!coreFrame)
-        return false;
-
-    Document* doc = coreFrame->document();
-    Q_ASSERT(doc);
-
-    Node* coreNode = doc->getElementById(elementId);
-    if (!coreNode || !coreNode->renderer())
-        return false;
-
-    HTMLInputElement* inputElement = static_cast<HTMLInputElement*>(coreNode);
-
-    return inputElement->isTextField() && !inputElement->isPasswordField() && inputElement->shouldAutocomplete();
 }
 
 void DumpRenderTreeSupportQt::setWindowsBehaviorAsEditingBehavior(QWebPageAdapter* adapter)
@@ -864,20 +692,6 @@ QStringList DumpRenderTreeSupportQt::contextMenu(QWebPageAdapter* page)
     return page->menuActionsAsText();
 }
 
-double DumpRenderTreeSupportQt::defaultMinimumTimerInterval()
-{
-    return Settings::defaultMinDOMTimerInterval();
-}
-
-void DumpRenderTreeSupportQt::setMinimumTimerInterval(QWebPageAdapter* adapter, double interval)
-{
-    Page* corePage = adapter->page;
-    if (!corePage)
-        return;
-
-    corePage->settings()->setMinDOMTimerInterval(interval);
-}
-
 bool DumpRenderTreeSupportQt::thirdPartyCookiePolicyAllows(QWebPageAdapter *adapter, const QUrl& url, const QUrl& firstPartyUrl)
 {
     Page* corePage = adapter->page;
@@ -906,7 +720,7 @@ QUrl DumpRenderTreeSupportQt::mediaContentUrlByElementId(QWebFrameAdapter* adapt
     if (!coreNode)
         return res;
 
-    HTMLVideoElement* videoElement = static_cast<HTMLVideoElement*>(coreNode);
+    HTMLVideoElement* videoElement = toHTMLVideoElement(coreNode);
     PlatformMedia platformMedia = videoElement->platformMedia();
     if (platformMedia.type != PlatformMedia::QtMediaPlayerType)
         return res;
@@ -937,17 +751,17 @@ void DumpRenderTreeSupportQt::confirmComposition(QWebPageAdapter *adapter, const
     if (!frame)
         return;
 
-    Editor* editor = frame->editor();
-    if (!editor || (!editor->hasComposition() && !text))
+    Editor& editor = frame->editor();
+    if (!editor.hasComposition() && !text)
         return;
 
-    if (editor->hasComposition()) {
+    if (editor.hasComposition()) {
         if (text)
-            editor->confirmComposition(String::fromUTF8(text));
+            editor.confirmComposition(String::fromUTF8(text));
         else
-            editor->confirmComposition();
+            editor.confirmComposition();
     } else
-        editor->insertText(String::fromUTF8(text), 0);
+        editor.insertText(String::fromUTF8(text), 0);
 }
 
 void DumpRenderTreeSupportQt::injectInternalsObject(QWebFrameAdapter* adapter)
@@ -1050,9 +864,13 @@ void DumpRenderTreeSupportQt::getTrackedRepaintRects(QWebFrameAdapter* adapter, 
         result.append(rects[i]);
 }
 
-void DumpRenderTreeSupportQt::disableDefaultTypesettingFeatures()
+void DumpRenderTreeSupportQt::setSeamlessIFramesEnabled(bool enabled)
 {
-    WebCore::Font::setDefaultTypesettingFeatures(0);
+#if ENABLE(IFRAME_SEAMLESS)
+    WebCore::RuntimeEnabledFeatures::setSeamlessIFramesEnabled(enabled);
+#else
+    UNUSED_PARAM(enabled);
+#endif
 }
 
 void DumpRenderTreeSupportQt::setShouldUseFontSmoothing(bool enabled)
@@ -1066,4 +884,33 @@ QString DumpRenderTreeSupportQt::frameRenderTreeDump(QWebFrameAdapter* adapter)
         adapter->frame->view()->layout();
 
     return externalRepresentation(adapter->frame);
+}
+
+void DumpRenderTreeSupportQt::clearNotificationPermissions()
+{
+#if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
+    WebCore::NotificationPresenterClientQt::notificationPresenter()->clearCachedPermissions();
+#endif
+}
+
+void DumpRenderTreeSupportQt::disableDefaultTypesettingFeatures()
+{
+    WebCore::Font::setDefaultTypesettingFeatures(0);
+}
+
+void DumpRenderTreeSupportQt::resetPageVisibility(QWebPageAdapter* adapter)
+{
+#if ENABLE(PAGE_VISIBILITY_API)
+    // Set visibility without emitting an event.
+    adapter->page->setVisibilityState(PageVisibilityStateVisible, true);
+#else
+    UNUSED_PARAM(adapter);
+#endif
+}
+
+void DumpRenderTreeSupportQt::getJSWindowObject(QWebFrameAdapter* adapter, JSContextRef* context, JSObjectRef* object)
+{
+    JSDOMWindow* window = toJSDOMWindow(adapter->frame, mainThreadNormalWorld());
+    *object = toRef(window);
+    *context = toRef(window->globalExec());
 }

@@ -38,12 +38,13 @@ namespace WebCore {
 
 class ScrollingTreeScrollingNodeMac : public ScrollingTreeScrollingNode, private ScrollElasticityControllerClient {
 public:
-    explicit ScrollingTreeScrollingNodeMac(ScrollingTree*);
+    explicit ScrollingTreeScrollingNodeMac(ScrollingTree*, ScrollingNodeID);
     virtual ~ScrollingTreeScrollingNodeMac();
 
 private:
     // ScrollingTreeNode member functions.
-    virtual void update(ScrollingStateNode*) OVERRIDE;
+    virtual void updateBeforeChildren(ScrollingStateNode*) OVERRIDE;
+    virtual void updateAfterChildren(ScrollingStateNode*) OVERRIDE;
     virtual void handleWheelEvent(const PlatformWheelEvent&) OVERRIDE;
 
     // ScrollElasticityController member functions.
@@ -80,7 +81,11 @@ private:
     RetainPtr<CFRunLoopTimerRef> m_snapRubberbandTimer;
 
     RetainPtr<CALayer> m_scrollLayer;
+    RetainPtr<CALayer> m_counterScrollingLayer;
+    RetainPtr<CALayer> m_headerLayer;
+    RetainPtr<CALayer> m_footerLayer;
     IntPoint m_probableMainThreadScrollPosition;
+    bool m_lastScrollHadUnfilledPixels;
 };
 
 } // namespace WebCore

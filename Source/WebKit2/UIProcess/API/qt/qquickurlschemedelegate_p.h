@@ -23,11 +23,11 @@
 
 #include "qwebkitglobal.h"
 #include <QObject>
-#include <QtCore/QUrl>
 #include <QtQuick/qquickitem.h>
 
 class QQuickNetworkRequest;
 class QQuickNetworkReply;
+class QUrl;
 
 class QWEBKIT_EXPORT QQuickUrlSchemeDelegate : public QObject {
     Q_OBJECT

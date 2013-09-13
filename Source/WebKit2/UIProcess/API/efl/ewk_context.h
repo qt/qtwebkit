@@ -128,7 +128,7 @@ EAPI Ewk_Context *ewk_context_default_get(void);
  *
  * @return Ewk_Context object on success or @c NULL on failure
  *
- * @see ewk_context_unref
+ * @see ewk_object_unref
  * @see ewk_context_new_with_injected_bundle_path
  */
 EAPI Ewk_Context *ewk_context_new(void);
@@ -142,7 +142,7 @@ EAPI Ewk_Context *ewk_context_new(void);
  *
  * @return Ewk_Context object on success or @c NULL on failure
  *
- * @see ewk_context_unref
+ * @see ewk_object_unref
  * @see ewk_context_new
  */
 EAPI Ewk_Context *ewk_context_new_with_injected_bundle_path(const char *path);
@@ -310,6 +310,14 @@ EAPI Ewk_Cache_Model ewk_context_cache_model_get(const Ewk_Context *context);
  * @return @c EINA_TRUE on success or @c EINA_FALSE on failure
  */
 EAPI Eina_Bool ewk_context_additional_plugin_path_set(Ewk_Context *context, const char *path);
+
+/**
+ * Clears HTTP caches in local storage and all resources cached in memory 
+ * such as images, CSS, JavaScript, XSL, and fonts for @a context.
+ *
+ * @param context context object to clear all resource caches
+ */
+EAPI void ewk_context_resource_cache_clear(Ewk_Context *context);
 
 #ifdef __cplusplus
 }

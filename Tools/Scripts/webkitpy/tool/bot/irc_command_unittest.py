@@ -26,12 +26,15 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import unittest
+import os
+import unittest2 as unittest
 
 from webkitpy.common.system.outputcapture import OutputCapture
 from webkitpy.tool.bot.irc_command import *
 from webkitpy.tool.mocktool import MockTool
+from webkitpy.common.net.web_mock import MockWeb
 from webkitpy.common.system.executive_mock import MockExecutive
+from webkitpy.common.system.filesystem_mock import MockFileSystem
 
 
 class IRCCommandTest(unittest.TestCase):
@@ -39,21 +42,23 @@ class IRCCommandTest(unittest.TestCase):
         whois = Whois()
         self.assertEqual("tom: Usage: whois SEARCH_STRING",
                           whois.execute("tom", [], None, None))
-        self.assertEqual("tom: Usage: whois SEARCH_STRING",
+        self.assertEqual('tom: Adam Barth is "Adam Barth" <abarth@webkit.org> (:abarth) (r). Why do you ask?',
                           whois.execute("tom", ["Adam", "Barth"], None, None))
         self.assertEqual("tom: Sorry, I don't know any contributors matching 'unknown@example.com'.",
                           whois.execute("tom", ["unknown@example.com"], None, None))
-        self.assertEqual("tom: tonyg@chromium.org is tonyg-cr. Why do you ask?",
+        self.assertEqual('tom: tonyg@chromium.org is "Tony Gentilcore" <tonyg@chromium.org> (:tonyg-cr) (r). Why do you ask?',
                           whois.execute("tom", ["tonyg@chromium.org"], None, None))
-        self.assertEqual("tom: TonyG@Chromium.org is tonyg-cr. Why do you ask?",
+        self.assertEqual('tom: TonyG@Chromium.org is "Tony Gentilcore" <tonyg@chromium.org> (:tonyg-cr) (r). Why do you ask?',
                           whois.execute("tom", ["TonyG@Chromium.org"], None, None))
-        self.assertEqual("tom: rniwa is rniwa (rniwa@webkit.org). Why do you ask?",
+        self.assertEqual('tom: rniwa is "Ryosuke Niwa" <rniwa@webkit.org> (:rniwa) (r). Why do you ask?',
                           whois.execute("tom", ["rniwa"], None, None))
-        self.assertEqual("tom: lopez is xan (xan.lopez@gmail.com, xan@gnome.org, xan@webkit.org, xlopez@igalia.com). Why do you ask?",
+        self.assertEqual('tom: lopez is "Xan Lopez" <xan.lopez@gmail.com> (:xan) (r). Why do you ask?',
                           whois.execute("tom", ["lopez"], None, None))
+        self.assertEqual(u'tom: Osztrogon\u00e1c is "Csaba Osztrogon\u00e1c" <ossy@webkit.org> (:ossy) (r). Why do you ask?',
+                          whois.execute("tom", [u'Osztrogon\u00e1c'], None, None))
         self.assertEqual('tom: "Vicki Murley" <vicki@apple.com> hasn\'t told me their nick. Boo hoo :-(',
                           whois.execute("tom", ["vicki@apple.com"], None, None))
-        self.assertEqual('tom: I\'m not sure who you mean?  gavinp or gbarra could be \'Gavin\'.',
+        self.assertEqual('tom: I\'m not sure who you mean?  "Gavin Peters" <gavinp@chromium.org> (:gavinp) (c) or "Gavin Barraclough" <barraclough@apple.com> (:gbarra) (r) could be \'Gavin\'.',
                           whois.execute("tom", ["Gavin"], None, None))
         self.assertEqual('tom: More than 5 contributors match \'david\', could you be more specific?',
                           whois.execute("tom", ["david"], None, None))
@@ -76,11 +81,6 @@ class IRCCommandTest(unittest.TestCase):
         tool.bugs.create_bug = mock_create_bug
         self.assertEqual("tom: Failed to create bug:\nException from bugzilla!",
                           create_bug.execute("tom", example_args, tool, None))
-
-    def test_roll_chromium_deps(self):
-        roll = RollChromiumDEPS()
-        self.assertEqual(None, roll._parse_args([]))
-        self.assertEqual("1234", roll._parse_args(["1234"]))
 
     def test_rollout_updates_working_copy(self):
         rollout = Rollout()
@@ -113,5 +113,31 @@ class IRCCommandTest(unittest.TestCase):
         # Invalid arguments result in the USAGE message.
         self.assertEqual("tom: Usage: rollout SVN_REVISION [SVN_REVISIONS] REASON",
                           rollout.execute("tom", [], None, None))
+
+        tool = MockTool()
+        tool.filesystem.files["/mock-checkout/test/file/one"] = ""
+        tool.filesystem.files["/mock-checkout/test/file/two"] = ""
+        self.assertEqual("Failed to apply reverse diff for file(s): test/file/one, test/file/two",
+                          rollout._check_diff_failure("""
+Preparing rollout for bug 123456.
+Updating working directory
+Failed to apply reverse diff for revision 123456 because of the following conflicts:
+test/file/one
+test/file/two
+Failed to apply reverse diff for revision 123456 because of the following conflicts:
+test/file/one
+test/file/two
+Updating OpenSource
+Current branch master is up to date.
+        """, tool))
+        self.assertEqual(None, rollout._check_diff_failure("""
+Preparing rollout for bug 123456.
+Updating working directory
+Some other error report involving file paths:
+test/file/one
+test/file/two
+Updating OpenSource
+Current branch master is up to date.
+        """, tool))
 
         # FIXME: We need a better way to test IRCCommands which call tool.irc().post()

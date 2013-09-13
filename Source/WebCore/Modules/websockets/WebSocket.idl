@@ -30,17 +30,17 @@
  */
 
 [
+    GlobalContext=DOMWindow&WorkerGlobalScope,
+    EnabledAtRuntime,
     Conditional=WEB_SOCKETS,
     ActiveDOMObject,
-    Constructor(in DOMString url),
-    Constructor(in DOMString url, in sequence<String> protocols),
-    Constructor(in DOMString url, in DOMString protocol),
+    Constructor(DOMString url),
+    Constructor(DOMString url, sequence<DOMString> protocols),
+    Constructor(DOMString url, DOMString protocol),
     ConstructorRaisesException,
-    CallWith=ScriptExecutionContext,
+    ConstructorCallWith=ScriptExecutionContext,
     EventTarget,
     JSNoStaticTables,
-    JSCustomConstructor,
-    ConstructorParameters=1
 ] interface WebSocket {
     readonly attribute DOMString URL; // Lowercased .url is the one in the spec, but leaving .URL for compatibility reasons.
     readonly attribute DOMString url;
@@ -65,24 +65,19 @@
 
     attribute DOMString binaryType;
 
-    boolean send(in ArrayBuffer data)
-        raises(DOMException);
-    boolean send(in ArrayBufferView data)
-        raises(DOMException);
-    boolean send(in Blob data)
-        raises(DOMException);
-    boolean send(in DOMString data)
-        raises(DOMException);
+    [RaisesException] void send(ArrayBuffer data);
+    [RaisesException] void send(ArrayBufferView data);
+    [RaisesException] void send(Blob data);
+    [RaisesException] void send(DOMString data);
 
-    void close(in [Clamp, Optional] unsigned short code, in [Optional] DOMString reason) raises(DOMException);
+    [RaisesException] void close([Clamp] optional unsigned short code, optional DOMString reason);
 
     // EventTarget interface
-    void addEventListener(in DOMString type,
-                          in EventListener listener,
-                          in [Optional] boolean useCapture);
-    void removeEventListener(in DOMString type,
-                             in EventListener listener,
-                             in [Optional] boolean useCapture);
-    boolean dispatchEvent(in Event evt)
-        raises(EventException);
+    void addEventListener(DOMString type,
+                          EventListener listener,
+                          optional boolean useCapture);
+    void removeEventListener(DOMString type,
+                             EventListener listener,
+                             optional boolean useCapture);
+    [RaisesException] boolean dispatchEvent(Event evt);
 };

@@ -40,9 +40,9 @@ WebInspector.ConsolePanel = function()
 }
 
 WebInspector.ConsolePanel.prototype = {
-    get statusBarItems()
+    statusBarItems: function()
     {
-        return this._view.statusBarItems;
+        return this._view.statusBarItems();
     },
 
     wasShown: function()
@@ -81,7 +81,7 @@ WebInspector.ConsolePanel.prototype = {
         this._searchRegex = createPlainTextSearchRegex(query, "gi");
 
         this._searchResults = [];
-        var messages = WebInspector.consoleView.messages;
+        var messages = WebInspector.console.messages;
         for (var i = 0; i < messages.length; i++) {
             if (messages[i].matchesRegex(this._searchRegex)) {
                 this._searchResults.push(messages[i]);
@@ -109,7 +109,6 @@ WebInspector.ConsolePanel.prototype = {
         if (index === -1)
             index = this._searchResults.length - 1;
         this._jumpToSearchResult(index);
-        return true;
     },
 
     _clearCurrentSearchResultHighlight: function()

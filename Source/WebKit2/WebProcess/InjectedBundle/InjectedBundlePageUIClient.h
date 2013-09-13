@@ -29,12 +29,13 @@
 #include "APIClient.h"
 #include "WKBundlePage.h"
 #include "WebEvent.h"
+#include <WebCore/RenderSnapshottedPlugIn.h>
 #include <wtf/Forward.h>
 
 namespace WebCore {
-    class GraphicsContext;
-    class HitTestResult;
-    class IntRect;
+class GraphicsContext;
+class HitTestResult;
+class IntRect;
 }
 
 namespace WebKit {
@@ -68,6 +69,12 @@ public:
 
     void didReachApplicationCacheOriginQuota(WebPage*, WebSecurityOrigin*, int64_t totalBytesNeeded);
     uint64_t didExceedDatabaseQuota(WebPage*, WebSecurityOrigin*, const String& databaseName, const String& databaseDisplayName, uint64_t currentQuotaBytes, uint64_t currentOriginUsageBytes, uint64_t currentDatabaseUsageBytes, uint64_t expectedUsageBytes);
+
+    String plugInStartLabelTitle(const String& mimeType) const;
+    String plugInStartLabelSubtitle(const String& mimeType) const;
+    String plugInExtraStyleSheet() const;
+    String plugInExtraScript() const;
+
 };
 
 } // namespace WebKit

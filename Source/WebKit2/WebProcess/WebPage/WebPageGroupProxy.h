@@ -33,7 +33,6 @@
 namespace CoreIPC {
 class Connection;
 class MessageDecoder;
-class MessageID;
 }
 
 namespace WebCore {
@@ -42,10 +41,8 @@ class PageGroup;
 
 namespace WebKit {
 
-class WebPageGroupProxy : public APIObject {
+class WebPageGroupProxy : public TypedAPIObject<APIObject::TypeBundlePageGroup> {
 public:
-    static const Type APIType = TypeBundlePageGroup;
-
     static PassRefPtr<WebPageGroupProxy> create(const WebPageGroupData&);
     virtual ~WebPageGroupProxy();
 
@@ -53,16 +50,13 @@ public:
     uint64_t pageGroupID() const { return m_data.pageGroupID; }
     bool isVisibleToInjectedBundle() const { return m_data.visibleToInjectedBundle; }
     bool isVisibleToHistoryClient() const { return m_data.visibleToHistoryClient; }
-    
-    void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::MessageDecoder&);
+    WebCore::PageGroup* corePageGroup() const { return m_pageGroup; }
+
+    void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&);
 
 private:
     WebPageGroupProxy(const WebPageGroupData&);
 
-    virtual Type type() const { return APIType; }
-    
-    void didReceiveWebPageGroupProxyMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::MessageDecoder&);
-    
     void addUserStyleSheet(const WebCore::UserStyleSheet&);
     void addUserScript(const WebCore::UserScript&);
     void removeAllUserStyleSheets();

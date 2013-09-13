@@ -36,11 +36,79 @@
 
 #include "InspectorController.h"
 #include "Page.h"
-#include "WorkerContext.h"
+#include "WorkerGlobalScope.h"
 #include "WorkerInspectorController.h"
 #include <wtf/MainThread.h>
 
 namespace WebCore {
+
+InstrumentingAgents::InstrumentingAgents()
+    : m_inspectorAgent(0)
+    , m_inspectorPageAgent(0)
+    , m_inspectorCSSAgent(0)
+#if USE(ACCELERATED_COMPOSITING)
+    , m_inspectorLayerTreeAgent(0)
+#endif
+    , m_inspectorConsoleAgent(0)
+    , m_inspectorDOMAgent(0)
+    , m_inspectorResourceAgent(0)
+    , m_pageRuntimeAgent(0)
+    , m_workerRuntimeAgent(0)
+    , m_inspectorTimelineAgent(0)
+    , m_inspectorDOMStorageAgent(0)
+#if ENABLE(SQL_DATABASE)
+    , m_inspectorDatabaseAgent(0)
+#endif
+#if ENABLE(FILE_SYSTEM)
+    , m_inspectorFileSystemAgent(0)
+#endif
+    , m_inspectorApplicationCacheAgent(0)
+#if ENABLE(JAVASCRIPT_DEBUGGER)
+    , m_inspectorDebuggerAgent(0)
+    , m_pageDebuggerAgent(0)
+    , m_inspectorDOMDebuggerAgent(0)
+    , m_inspectorProfilerAgent(0)
+#endif
+#if ENABLE(WORKERS)
+    , m_inspectorWorkerAgent(0)
+#endif
+    , m_inspectorCanvasAgent(0)
+{
+}
+
+void InstrumentingAgents::reset()
+{
+    m_inspectorAgent = 0;
+    m_inspectorPageAgent = 0;
+    m_inspectorCSSAgent = 0;
+#if USE(ACCELERATED_COMPOSITING)
+    m_inspectorLayerTreeAgent = 0;
+#endif
+    m_inspectorConsoleAgent = 0;
+    m_inspectorDOMAgent = 0;
+    m_inspectorResourceAgent = 0;
+    m_pageRuntimeAgent = 0;
+    m_workerRuntimeAgent = 0;
+    m_inspectorTimelineAgent = 0;
+    m_inspectorDOMStorageAgent = 0;
+#if ENABLE(SQL_DATABASE)
+    m_inspectorDatabaseAgent = 0;
+#endif
+#if ENABLE(FILE_SYSTEM)
+    m_inspectorFileSystemAgent = 0;
+#endif
+    m_inspectorApplicationCacheAgent = 0;
+#if ENABLE(JAVASCRIPT_DEBUGGER)
+    m_inspectorDebuggerAgent = 0;
+    m_pageDebuggerAgent = 0;
+    m_inspectorDOMDebuggerAgent = 0;
+    m_inspectorProfilerAgent = 0;
+#endif
+#if ENABLE(WORKERS)
+    m_inspectorWorkerAgent = 0;
+#endif
+    m_inspectorCanvasAgent = 0;
+}
 
 InstrumentingAgents* instrumentationForPage(Page* page)
 {
@@ -51,9 +119,9 @@ InstrumentingAgents* instrumentationForPage(Page* page)
 }
 
 #if ENABLE(WORKERS)
-InstrumentingAgents* instrumentationForWorkerContext(WorkerContext* workerContext)
+InstrumentingAgents* instrumentationForWorkerGlobalScope(WorkerGlobalScope* workerGlobalScope)
 {
-    if (WorkerInspectorController* controller = workerContext->workerInspectorController())
+    if (WorkerInspectorController* controller = workerGlobalScope->workerInspectorController())
         return controller->m_instrumentingAgents.get();
     return 0;
 }

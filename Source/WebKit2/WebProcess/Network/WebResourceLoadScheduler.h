@@ -30,6 +30,7 @@
 #include <WebCore/ResourceLoadPriority.h>
 #include <WebCore/ResourceLoadScheduler.h>
 #include <WebCore/ResourceLoader.h>
+#include <WebCore/RunLoop.h>
 
 #if ENABLE(NETWORK_PROCESS)
 
@@ -47,7 +48,6 @@ public:
     virtual PassRefPtr<WebCore::SubresourceLoader> scheduleSubresourceLoad(WebCore::Frame*, WebCore::CachedResource*, const WebCore::ResourceRequest&, WebCore::ResourceLoadPriority, const WebCore::ResourceLoaderOptions&) OVERRIDE;
     virtual PassRefPtr<WebCore::NetscapePlugInStreamLoader> schedulePluginStreamLoad(WebCore::Frame*, WebCore::NetscapePlugInStreamLoaderClient*, const WebCore::ResourceRequest&) OVERRIDE;
     
-    virtual void addMainResourceLoad(WebCore::ResourceLoader*) OVERRIDE;
     virtual void remove(WebCore::ResourceLoader*) OVERRIDE;
     virtual void crossOriginRedirectReceived(WebCore::ResourceLoader*, const WebCore::KURL& redirectURL) OVERRIDE;
     
@@ -58,13 +58,19 @@ public:
 
     virtual void setSerialLoadingEnabled(bool) OVERRIDE;
 
-    WebResourceLoader* webResourceLoaderForIdentifier(ResourceLoadIdentifier identifier) const { return m_webResourceLoaders.get(identifier).get(); }
+    WebResourceLoader* webResourceLoaderForIdentifier(ResourceLoadIdentifier identifier) const { return m_webResourceLoaders.get(identifier); }
+
+    void networkProcessCrashed();
 
 private:
-    void scheduleLoad(WebCore::ResourceLoader*, WebCore::ResourceLoadPriority);
+    void scheduleLoad(WebCore::ResourceLoader*, WebCore::CachedResource*, WebCore::ResourceLoadPriority, bool shouldClearReferrerOnHTTPSToHTTPRedirect);
+    void scheduleInternallyFailedLoad(WebCore::ResourceLoader*);
+    void internallyFailedLoadTimerFired();
     
-    HashMap<unsigned long, RefPtr<WebCore::ResourceLoader> > m_coreResourceLoaders;
-    HashMap<unsigned long, RefPtr<WebResourceLoader> > m_webResourceLoaders;
+    HashSet<RefPtr<WebCore::ResourceLoader>> m_internallyFailedResourceLoaders;
+    WebCore::RunLoop::Timer<WebResourceLoadScheduler> m_internallyFailedLoadTimer;
+    
+    HashMap<unsigned long, RefPtr<WebResourceLoader>> m_webResourceLoaders;
     
     unsigned m_suspendPendingRequestsCount;
 

@@ -23,24 +23,27 @@
 VPATH = \
     $(WebKit2) \
     $(WebKit2)/NetworkProcess \
+    $(WebKit2)/NetworkProcess/mac \
     $(WebKit2)/PluginProcess \
     $(WebKit2)/PluginProcess/mac \
     $(WebKit2)/Shared/Plugins \
     $(WebKit2)/Shared \
+    $(WebKit2)/Shared/mac \
+    $(WebKit2)/Shared/Authentication \
+    $(WebKit2)/Shared/Network/CustomProtocols \
     $(WebKit2)/SharedWorkerProcess \
+    $(WebKit2)/OfflineStorageProcess \
     $(WebKit2)/WebProcess/ApplicationCache \
-    $(WebKit2)/WebProcess/Authentication \
     $(WebKit2)/WebProcess/Cookies \
     $(WebKit2)/WebProcess/FullScreen \
     $(WebKit2)/WebProcess/Geolocation \
     $(WebKit2)/WebProcess/IconDatabase \
-    $(WebKit2)/WebProcess/KeyValueStorage \
     $(WebKit2)/WebProcess/MediaCache \
     $(WebKit2)/WebProcess/Network \
-    $(WebKit2)/WebProcess/Network/CustomProtocols \
     $(WebKit2)/WebProcess/Notifications \
     $(WebKit2)/WebProcess/Plugins \
     $(WebKit2)/WebProcess/ResourceCache \
+    $(WebKit2)/WebProcess/Storage \
     $(WebKit2)/WebProcess/WebCoreSupport \
     $(WebKit2)/WebProcess/WebPage \
     $(WebKit2)/WebProcess \
@@ -51,6 +54,7 @@ VPATH = \
     $(WebKit2)/UIProcess/Notifications \
     $(WebKit2)/UIProcess/Plugins \
     $(WebKit2)/UIProcess/SharedWorkers \
+    $(WebKit2)/UIProcess/Storage \
     $(WebKit2)/UIProcess/mac \
 #
 
@@ -65,22 +69,28 @@ MESSAGE_RECEIVERS = \
     NetworkProcess \
     NetworkProcessConnection \
     NetworkProcessProxy \
+    NetworkResourceLoader \
     NPObjectMessageReceiver \
+    OfflineStorageProcess \
     PluginControllerProxy \
     PluginProcess \
     PluginProcessConnection \
+    PluginProcessConnectionManager \
     PluginProcessProxy \
     PluginProxy \
     SharedWorkerProcess \
     SharedWorkerProcessProxy \
+    StorageManager \
     WebApplicationCacheManager \
     WebApplicationCacheManagerProxy \
     WebCookieManager \
     WebCookieManagerProxy \
     WebConnection \
     NetworkConnectionToWebProcess \
-    NetworkResourceLoader \
     RemoteLayerTreeHost \
+    SecItemShim \
+    SecItemShimProxy \
+    StorageAreaMap \
     WebContext \
     WebDatabaseManager \
     WebDatabaseManagerProxy \
@@ -92,11 +102,8 @@ MESSAGE_RECEIVERS = \
     WebIconDatabaseProxy \
     WebInspector \
     WebInspectorProxy \
-    WebKeyValueStorageManager \
-    WebKeyValueStorageManagerProxy \
     WebMediaCacheManager \
     WebMediaCacheManagerProxy \
-    WebNotificationManagerProxy \
     WebNotificationManager \
     WebPage \
     WebPageGroupProxy \
@@ -135,11 +142,19 @@ all : \
 
 # Mac-specific rules
 
-ifeq ($(OS),MACOS)
+ifeq ($(PLATFORM_NAME),macosx)
 
 FRAMEWORK_FLAGS = $(shell echo $(BUILT_PRODUCTS_DIR) $(FRAMEWORK_SEARCH_PATHS) | perl -e 'print "-F " . join(" -F ", split(" ", <>));')
 HEADER_FLAGS = $(shell echo $(BUILT_PRODUCTS_DIR) $(HEADER_SEARCH_PATHS) | perl -e 'print "-I" . join(" -I", split(" ", <>));')
+
+# Some versions of clang incorrectly strip out // comments in c89 code.
+# Use -traditional as a workaround, but only when needed since that causes
+# other problems with later versions of clang.
+ifeq ($(shell echo '//x' | $(CC) -E -P -x c -std=c89 - | grep x),)
 TEXT_PREPROCESSOR_FLAGS=-E -P -x c -traditional -w
+else
+TEXT_PREPROCESSOR_FLAGS=-E -P -x c -std=c89 -w
+endif
 
 ifneq ($(SDKROOT),)
 	SDK_FLAGS=-isysroot $(SDKROOT)
@@ -147,7 +162,7 @@ endif
 
 SANDBOX_PROFILES = \
 	com.apple.WebProcess.sb \
-	com.apple.WebKit.PluginProcess.sb
+	com.apple.WebKit.NetworkProcess.sb
 
 all: $(SANDBOX_PROFILES)
 
@@ -155,7 +170,7 @@ all: $(SANDBOX_PROFILES)
 	@echo Pre-processing $* sandbox profile...
 	$(CC) $(SDK_FLAGS) $(TEXT_PREPROCESSOR_FLAGS) $(FRAMEWORK_FLAGS) $(HEADER_FLAGS) -include "wtf/Platform.h" $< > $@
 
-endif # MACOS
+endif # macosx
 
 # ------------------------
 

@@ -33,6 +33,8 @@
 #include "Page.h"
 #include "PlatformKeyboardEvent.h"
 #include "SelectionHandler.h"
+#include "Settings.h"
+#include "SpellChecker.h"
 #include "WebPage_p.h"
 #include "WindowsKeyboardCodes.h"
 
@@ -67,23 +69,20 @@ bool EditorClientBlackBerry::shouldDeleteRange(Range* range)
     return true;
 }
 
-bool EditorClientBlackBerry::shouldShowDeleteInterface(HTMLElement*)
-{
-    notImplemented();
-    return false;
-}
-
 bool EditorClientBlackBerry::smartInsertDeleteEnabled()
 {
-    notImplemented();
-    return false;
+    Page* page = WebPagePrivate::core(m_webPagePrivate->m_webPage);
+    if (!page)
+        return false;
+    return page->settings()->smartInsertDeleteEnabled();
 }
 
 bool EditorClientBlackBerry::isSelectTrailingWhitespaceEnabled()
 {
-    if (m_webPagePrivate->m_dumpRenderTree)
-        return m_webPagePrivate->m_dumpRenderTree->isSelectTrailingWhitespaceEnabled();
-    return false;
+    Page* page = WebPagePrivate::core(m_webPagePrivate->m_webPage);
+    if (!page)
+        return false;
+    return page->settings()->selectTrailingWhitespaceEnabled();
 }
 
 void EditorClientBlackBerry::enableSpellChecking(bool enable)
@@ -97,7 +96,7 @@ bool EditorClientBlackBerry::shouldSpellCheckFocusedField()
     if (!frame || !frame->document() || !frame->editor())
         return false;
 
-    const Node* node = frame->document()->focusedNode();
+    const Node* node = frame->document()->focusedElement();
     // NOTE: This logic is taken from EditorClientImpl::shouldSpellcheckByDefault
     // If |node| is null, we default to allowing spellchecking. This is done in
     // order to mitigate the issue when the user clicks outside the textbox, as a
@@ -110,13 +109,13 @@ bool EditorClientBlackBerry::shouldSpellCheckFocusedField()
 
     // If the field does not support autocomplete, do not do spellchecking.
     if (node->isElementNode()) {
-        const Element* element = static_cast<const Element*>(node);
-        if (element->hasTagName(HTMLNames::inputTag) && !DOMSupport::elementSupportsAutocomplete(element))
+        const Element* element = toElement(node);
+        if (isHTMLInputElement(element) && !DOMSupport::elementSupportsAutocomplete(element))
             return false;
     }
 
     // Check if the node disables spell checking directly.
-    return frame->editor()->isSpellCheckingEnabledInFocusedNode();
+    return frame->editor().isSpellCheckingEnabledInFocusedNode();
 }
 
 bool EditorClientBlackBerry::isContinuousSpellCheckingEnabled()
@@ -191,8 +190,12 @@ bool EditorClientBlackBerry::shouldChangeSelectedRange(Range* fromRange, Range* 
 
     Frame* frame = m_webPagePrivate->focusedOrMainFrame();
     if (frame && frame->document()) {
-        if (frame->document()->focusedNode() && frame->document()->focusedNode()->hasTagName(HTMLNames::selectTag))
-            return false;
+        if (Element* focusedElement = frame->document()->focusedElement()) {
+            if (focusedElement->hasTagName(HTMLNames::selectTag))
+                return false;
+            if (DOMSupport::isPopupInputField(focusedElement))
+                return false;
+        }
 
         // Check if this change does not represent a focus change and input is active and if so ensure the keyboard is visible.
         if (m_webPagePrivate->m_inputHandler->isInputMode() && fromRange && toRange && (fromRange->startContainer() == toRange->startContainer()))
@@ -249,6 +252,16 @@ void EditorClientBlackBerry::respondToSelectionAppearanceChange()
 }
 
 void EditorClientBlackBerry::didWriteSelectionToPasteboard()
+{
+    notImplemented();
+}
+
+void EditorClientBlackBerry::willWriteSelectionToPasteboard(WebCore::Range*)
+{
+    notImplemented();
+}
+
+void EditorClientBlackBerry::getClientPasteboardDataForRange(WebCore::Range*, Vector<String>&, Vector<RefPtr<WebCore::SharedBuffer> >&)
 {
     notImplemented();
 }
@@ -393,15 +406,6 @@ static const KeyDownEntry keyDownEntries[] = {
     { 'Z',       CtrlKey,            "Undo"                                        },
     { 'Z',       CtrlKey | ShiftKey, "Redo"                                        },
     { 'Y',       CtrlKey,            "Redo"                                        },
-
-    { VK_TAB,    0,                  "InsertTab"                                   },
-    { VK_TAB,    ShiftKey,           "InsertBacktab"                               },
-    { VK_RETURN, 0,                  "InsertNewline"                               },
-    { VK_RETURN, CtrlKey,            "InsertNewline"                               },
-    { VK_RETURN, AltKey,             "InsertNewline"                               },
-    { VK_RETURN, ShiftKey,           "InsertLineBreak"                             },
-    { VK_RETURN, AltKey | ShiftKey,  "InsertNewline"                               },
-
 };
 
 static const KeyPressEntry keyPressEntries[] = {
@@ -464,17 +468,20 @@ void EditorClientBlackBerry::handleKeyboardEvent(KeyboardEvent* event)
 
     String commandName = interpretKeyEvent(event);
 
+    // Check to see we are not trying to insert text on key down.
+    ASSERT(!(event->type() == eventNames().keydownEvent && frame->editor().command(commandName).isTextInsertion()));
+
     if (!commandName.isEmpty()) {
         // Hot key handling. Cancel processing mode.
         if (commandName != "DeleteBackward")
             m_webPagePrivate->m_inputHandler->setProcessingChange(false);
 
-        if (frame->editor()->command(commandName).execute())
+        if (frame->editor().command(commandName).execute())
             event->setDefaultHandled();
         return;
     }
 
-    if (!frame->editor()->canEdit())
+    if (!frame->editor().canEdit())
         return;
 
     // Text insertion commands should only be triggered from keypressEvent.
@@ -494,7 +501,7 @@ void EditorClientBlackBerry::handleKeyboardEvent(KeyboardEvent* event)
         return;
 
     if (!platformEvent->text().isEmpty()) {
-        if (frame->editor()->insertText(platformEvent->text(), event))
+        if (frame->editor().insertText(platformEvent->text(), event))
             event->setDefaultHandled();
     }
 }
@@ -543,7 +550,8 @@ void EditorClientBlackBerry::textDidChangeInTextArea(Element*)
 
 bool EditorClientBlackBerry::shouldEraseMarkersAfterChangeSelection(TextCheckingType) const
 {
-    return true;
+    const Frame* frame = m_webPagePrivate->focusedOrMainFrame();
+    return !frame || !frame->settings() || (!frame->settings()->asynchronousSpellCheckingEnabled() && !frame->settings()->unifiedTextCheckerEnabled());
 }
 
 void EditorClientBlackBerry::ignoreWordInSpellDocument(const WTF::String&)
@@ -556,12 +564,12 @@ void EditorClientBlackBerry::learnWord(const WTF::String&)
     notImplemented();
 }
 
-void EditorClientBlackBerry::checkSpellingOfString(const UChar* text, int textLength, int* misspellLocation, int* misspellLength)
+void EditorClientBlackBerry::checkSpellingOfString(const UChar*, int, int*, int*)
 {
     notImplemented();
 }
 
-WTF::String EditorClientBlackBerry::getAutoCorrectSuggestionForMisspelledWord(const WTF::String& misspelledWord)
+WTF::String EditorClientBlackBerry::getAutoCorrectSuggestionForMisspelledWord(const WTF::String&)
 {
     notImplemented();
     return WTF::String();
@@ -572,9 +580,10 @@ void EditorClientBlackBerry::checkGrammarOfString(const UChar*, int, WTF::Vector
     notImplemented();
 }
 
-void EditorClientBlackBerry::requestCheckingOfString(PassRefPtr<TextCheckingRequest> testCheckingRequest)
+void EditorClientBlackBerry::requestCheckingOfString(PassRefPtr<TextCheckingRequest> textCheckingRequest)
 {
-    m_webPagePrivate->m_inputHandler->requestCheckingOfString(textCheckingRequest);
+    RefPtr<SpellCheckRequest> spellCheckRequest = static_cast<SpellCheckRequest*>(textCheckingRequest.get());
+    m_webPagePrivate->m_inputHandler->requestCheckingOfString(spellCheckRequest);
 }
 
 void EditorClientBlackBerry::checkTextOfParagraph(const UChar*, int, TextCheckingTypeMask, Vector<TextCheckingResult>&)

@@ -41,7 +41,7 @@ extern "C" {
 /**
  * \enum    Ewk_Context_Menu_Item_Type
  * @brief   Defines the types of the items for the context menu.
- * @info    Keep this in sync with ContextMenuItem.h
+ * @info    Keep this in sync with WKContextMenuItemTypes.h
  */
 typedef enum {
     EWK_ACTION_TYPE,
@@ -53,7 +53,6 @@ typedef enum {
 /**
  * \enum    Ewk_Context_Menu_Action
  * @brief   Provides the actions of items for the context menu.
- * @info    Keep this in sync with ContextMenuItem.h
  */
 typedef enum {
     EWK_CONTEXT_MENU_ITEM_TAG_NO_ACTION,
@@ -121,15 +120,13 @@ typedef enum {
     EWK_CONTEXT_MENU_ITEM_TAG_TEXT_DIRECTION_LEFT_TO_RIGHT,
     EWK_CONTEXT_MENU_ITEM_TAG_TEXT_DIRECTION_RIGHT_TO_LEFT,
     EWK_CONTEXT_MENU_ITEM_OPEN_MEDIA_IN_NEW_WINDOW,
+    EWK_CONTEXT_MENU_ITEM_TAG_DOWNLOAD_MEDIA_TO_DISK, 
     EWK_CONTEXT_MENU_ITEM_TAG_COPY_MEDIA_LINK_TO_CLIPBOARD,
     EWK_CONTEXT_MENU_ITEM_TAG_TOGGLE_MEDIA_CONTROLS,
     EWK_CONTEXT_MENU_ITEM_TAG_TOGGLE_MEDIA_LOOP,
     EWK_CONTEXT_MENU_ITEM_TAG_ENTER_VIDEO_FULLSCREEN,
     EWK_CONTEXT_MENU_ITEM_TAG_MEDIA_PLAY_PAUSE,
     EWK_CONTEXT_MENU_ITEM_TAG_MEDIA_MUTE,
-    EWK_CONTEXT_MENU_ITEM_BASE_CUSTOM_TAG = 5000,
-    EWK_CONTEXT_MENU_ITEM_CUSTOM_TAG_NO_ACTION = 5998,
-    EWK_CONTEXT_MENU_ITEM_LAST_CUSTOM_TAG = 5999,
     EWK_CONTEXT_MENU_ITEM_BASE_APPLICATION_TAG = 10000
 } Ewk_Context_Menu_Item_Action;
 
@@ -148,19 +145,17 @@ typedef enum {
 EAPI Ewk_Context_Menu_Item *ewk_context_menu_item_new(Ewk_Context_Menu_Item_Type type, Ewk_Context_Menu_Item_Action action, const char *title, Eina_Bool checked, Eina_Bool enabled);
 
 /**
- * Creates a new item of the context menu.
+ * Creates a new sub menu type item of the context menu.
  *
- * @param type specifies a type of the item
  * @param action specifies a action of the item
  * @param title specifies a title of the item
- * @param checked @c EINA_TRUE if the item should be toggled or @c EINA_FALSE if not
  * @param enabled @c EINA_TRUE to enable the item or @c EINA_FALSE to disable
  * @param submenu specifies a submenu of the item
  * @return the pointer to the new item
  *
  * @see ewk_context_menu_item_new
  */
-EAPI Ewk_Context_Menu_Item *ewk_context_menu_item_new_with_submenu(Ewk_Context_Menu_Item_Type type, Ewk_Context_Menu_Item_Action action, const char *title, Eina_Bool checked, Eina_Bool enabled, Ewk_Context_Menu *submenu);
+EAPI Ewk_Context_Menu_Item *ewk_context_menu_item_new_with_submenu(Ewk_Context_Menu_Item_Action action, const char *title, Eina_Bool enabled, Ewk_Context_Menu *submenu);
 
 /**
  * Gets type of the item.
@@ -262,6 +257,24 @@ EAPI Eina_Bool ewk_context_menu_item_enabled_get(const Ewk_Context_Menu_Item *o)
  * @see ewk_context_menu_item_enabled_get
  */
 EAPI Eina_Bool ewk_context_menu_item_enabled_set(Ewk_Context_Menu_Item *o, Eina_Bool enabled);
+
+/**
+ * Gets the parent menu for the item.
+ *
+ * @param o item to get the parent
+ *
+ * @return the pointer to parent menu on success or @c NULL on failure
+ */
+EAPI Ewk_Context_Menu *ewk_context_menu_item_parent_menu_get(const Ewk_Context_Menu_Item *o);
+
+/**
+ * Gets the submenu for the item.
+ *
+ * @param o item to get the submenu
+ *
+ * @return the pointer to submenu on success or @c NULL on failure
+ */
+EAPI Ewk_Context_Menu *ewk_context_menu_item_submenu_get(const Ewk_Context_Menu_Item *o);
 
 #ifdef __cplusplus
 }

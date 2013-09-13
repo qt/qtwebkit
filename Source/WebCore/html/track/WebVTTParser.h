@@ -35,7 +35,7 @@
 
 #include "DocumentFragment.h"
 #include "HTMLNames.h"
-#include "TextTrackCue.h"
+#include "TextTrackRegion.h"
 #include "WebVTTTokenizer.h"
 #include <wtf/PassOwnPtr.h>
 #include <wtf/text/StringBuilder.h>
@@ -49,16 +49,64 @@ class Document;
 class WebVTTParserClient {
 public:
     virtual ~WebVTTParserClient() { }
-    
+
     virtual void newCuesParsed() = 0;
+#if ENABLE(WEBVTT_REGIONS)
+    virtual void newRegionsParsed() = 0;
+#endif
     virtual void fileFailedToParse() = 0;
+};
+
+class WebVTTCueData : public RefCounted<WebVTTCueData> {
+public:
+
+    static PassRefPtr<WebVTTCueData> create() { return adoptRef(new WebVTTCueData()); }
+    virtual ~WebVTTCueData() { }
+
+    double startTime() const { return m_startTime; }
+    void setStartTime(double startTime) { m_startTime = startTime; }
+
+    double endTime() const { return m_endTime; }
+    void setEndTime(double endTime) { m_endTime = endTime; }
+
+    String id() const { return m_id; }
+    void setId(String id) { m_id = id; }
+
+    String content() const { return m_content; }
+    void setContent(String content) { m_content = content; }
+
+    String settings() const { return m_settings; }
+    void setSettings(String settings) { m_settings = settings; }
+
+private:
+    WebVTTCueData()
+        : m_startTime(0)
+        , m_endTime(0)
+    {
+    }
+
+    double m_startTime;
+    double m_endTime;
+    String m_id;
+    String m_content;
+    String m_settings;
 };
 
 class WebVTTParser {
 public:
     virtual ~WebVTTParser() { }
-    
-    enum ParseState { Initial, Header, Id, TimingsAndSettings, CueText, BadCue };
+
+    enum ParseState {
+        Initial,
+        Header,
+#if ENABLE(WEBVTT_REGIONS)
+        Metadata,
+#endif
+        Id,
+        TimingsAndSettings,
+        CueText,
+        BadCue
+    };
 
     static PassOwnPtr<WebVTTParser> create(WebVTTParserClient* client, ScriptExecutionContext* context)
     {
@@ -88,18 +136,27 @@ public:
     static String collectDigits(const String&, unsigned*);
     static String collectWord(const String&, unsigned*);
 
+#if ENABLE(WEBVTT_REGIONS)
+    // Useful functions for parsing percentage settings.
+    static float parseFloatPercentageValue(const String&, bool&);
+    static FloatPoint parseFloatPercentageValuePair(const String&, char, bool&);
+#endif
+
     // Input data to the parser to parse.
     void parseBytes(const char* data, unsigned length);
 
     // Transfers ownership of last parsed cues to caller.
-    void getNewCues(Vector<RefPtr<TextTrackCue> >&);
+    void getNewCues(Vector<RefPtr<WebVTTCueData> >&);
+#if ENABLE(WEBVTT_REGIONS)
+    void getNewRegions(Vector<RefPtr<TextTrackRegion> >&);
+#endif
 
     PassRefPtr<DocumentFragment> createDocumentFragmentFromCueText(const String&);
     double collectTimeStamp(const String&, unsigned*);
 
 protected:
     WebVTTParser(WebVTTParserClient*, ScriptExecutionContext*);
-    
+
     ScriptExecutionContext* m_scriptExecutionContext;
     ParseState m_state;
 
@@ -113,11 +170,19 @@ private:
     void createNewCue();
     void resetCueValues();
 
+#if ENABLE(WEBVTT_REGIONS)
+    void collectHeader(const String&);
+    void createNewRegion();
+#endif
+
     void skipWhiteSpace(const String&, unsigned*);
     static void skipLineTerminator(const char* data, unsigned length, unsigned*);
     static String collectNextLine(const char* data, unsigned length, unsigned*);
-    
+
     void constructTreeFromToken(Document*);
+
+    String m_currentHeaderName;
+    String m_currentHeaderValue;
 
     Vector<char> m_identifierData;
     String m_currentId;
@@ -133,7 +198,12 @@ private:
 
     WebVTTParserClient* m_client;
 
-    Vector<RefPtr<TextTrackCue> > m_cuelist;
+    Vector<AtomicString> m_languageStack;
+    Vector<RefPtr<WebVTTCueData> > m_cuelist;
+
+#if ENABLE(WEBVTT_REGIONS)
+    Vector<RefPtr<TextTrackRegion> > m_regionList;
+#endif
 };
 
 } // namespace WebCore

@@ -42,7 +42,7 @@ bool CSSParser::parseSVGValue(CSSPropertyID propId, bool important)
     if (!value)
         return false;
 
-    int id = value->id;
+    CSSValueID id = value->id;
 
     bool valid_primitive = false;
     RefPtr<CSSValue> parsedValue;
@@ -131,10 +131,14 @@ bool CSSParser::parseSVGValue(CSSPropertyID propId, bool important)
             valid_primitive = true;
         break;
 
-    case CSSPropertyImageRendering:  // auto | optimizeSpeed |
-    case CSSPropertyColorRendering:  // optimizeQuality | inherit
+    case CSSPropertyColorRendering: // auto | optimizeSpeed | optimizeQuality | inherit
         if (id == CSSValueAuto || id == CSSValueOptimizespeed ||
             id == CSSValueOptimizequality)
+            valid_primitive = true;
+        break;
+
+    case CSSPropertyBufferedRendering: // auto | dynamic | static
+        if (id == CSSValueAuto || id == CSSValueDynamic || id == CSSValueStatic)
             valid_primitive = true;
         break;
 

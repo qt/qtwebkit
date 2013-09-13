@@ -39,7 +39,7 @@ public:
 
     String customCssText() const;
 
-    void reportDescendantMemoryUsage(MemoryObjectInfo*) const;
+    bool equals(const FontValue&) const;
 
     RefPtr<CSSPrimitiveValue> style;
     RefPtr<CSSPrimitiveValue> variant;

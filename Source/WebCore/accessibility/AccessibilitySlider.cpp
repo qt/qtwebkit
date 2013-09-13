@@ -47,9 +47,7 @@ AccessibilitySlider::AccessibilitySlider(RenderObject* renderer)
 
 PassRefPtr<AccessibilitySlider> AccessibilitySlider::create(RenderObject* renderer)
 {
-    AccessibilitySlider* obj = new AccessibilitySlider(renderer);
-    obj->init();
-    return adoptRef(obj);
+    return adoptRef(new AccessibilitySlider(renderer));
 }
 
 AccessibilityOrientation AccessibilitySlider::orientation() const
@@ -115,17 +113,6 @@ AccessibilityObject* AccessibilitySlider::elementAccessibilityHitTest(const IntP
     return axObjectCache()->getOrCreate(m_renderer);
 }
 
-bool AccessibilitySlider::accessibilityIsIgnored() const
-{
-    AccessibilityObjectInclusion decision = accessibilityIsIgnoredBase();
-    if (decision == IncludeObject)
-        return false;
-    if (decision == IgnoreObject)
-        return true;
-    
-    return false;
-}
-    
 float AccessibilitySlider::valueForRange() const
 {
     return element()->value().toFloat();
@@ -156,7 +143,7 @@ void AccessibilitySlider::setValue(const String& value)
 
 HTMLInputElement* AccessibilitySlider::element() const
 {
-    return static_cast<HTMLInputElement*>(m_renderer->node());
+    return toHTMLInputElement(m_renderer->node());
 }
 
 
@@ -180,15 +167,9 @@ LayoutRect AccessibilitySliderThumb::elementRect() const
     return sliderThumbElementOf(sliderRenderer->node())->boundingBox();
 }
 
-bool AccessibilitySliderThumb::accessibilityIsIgnored() const
+bool AccessibilitySliderThumb::computeAccessibilityIsIgnored() const
 {
-    AccessibilityObjectInclusion decision = accessibilityPlatformIncludesObject();
-    if (decision == IncludeObject)
-        return false;
-    if (decision == IgnoreObject)
-        return true;
-
-    return false;
+    return accessibilityIsIgnoredByDefault();
 }
 
 } // namespace WebCore

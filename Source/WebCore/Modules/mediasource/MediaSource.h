@@ -35,7 +35,7 @@
 
 #include "ActiveDOMObject.h"
 #include "GenericEventQueue.h"
-#include "MediaPlayer.h"
+#include "MediaSourcePrivate.h"
 #include "SourceBuffer.h"
 #include "SourceBufferList.h"
 #include <wtf/RefCounted.h>
@@ -51,26 +51,19 @@ public:
     static PassRefPtr<MediaSource> create(ScriptExecutionContext*);
     virtual ~MediaSource() { }
 
+    // MediaSource.idl methods
     SourceBufferList* sourceBuffers();
     SourceBufferList* activeSourceBuffers();
-
     double duration() const;
     void setDuration(double, ExceptionCode&);
-
     SourceBuffer* addSourceBuffer(const String& type, ExceptionCode&);
     void removeSourceBuffer(SourceBuffer*, ExceptionCode&);
-
     const String& readyState() const;
     void setReadyState(const String&);
-
     void endOfStream(const String& error, ExceptionCode&);
+    static bool isTypeSupported(const String& type);
 
-    void setMediaPlayer(MediaPlayer* player) { m_player = player; }
-
-    PassRefPtr<TimeRanges> buffered(const String& id, ExceptionCode&) const;
-    void append(const String& id, PassRefPtr<Uint8Array> data, ExceptionCode&);
-    void abort(const String& id, ExceptionCode&);
-    bool setTimestampOffset(const String& id, double, ExceptionCode&);
+    void setPrivateAndOpen(PassOwnPtr<MediaSourcePrivate>);
 
     // EventTarget interface
     virtual const AtomicString& interfaceName() const OVERRIDE;
@@ -97,7 +90,7 @@ private:
     EventTargetData m_eventTargetData;
 
     String m_readyState;
-    MediaPlayer* m_player;
+    OwnPtr<MediaSourcePrivate> m_private;
 
     RefPtr<SourceBufferList> m_sourceBuffers;
     RefPtr<SourceBufferList> m_activeSourceBuffers;

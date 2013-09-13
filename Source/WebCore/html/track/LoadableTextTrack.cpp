@@ -71,6 +71,17 @@ void LoadableTextTrack::scheduleLoad(const KURL& url)
         m_loadTimer.startOneShot(0);
 }
 
+Element* LoadableTextTrack::element()
+{
+    return m_trackElement;
+}
+    
+void LoadableTextTrack::setTrackElement(HTMLTrackElement* element)
+{
+    ASSERT(!m_trackElement || m_trackElement == element);
+    m_trackElement = element;
+}
+
 void LoadableTextTrack::loadTimerFired(Timer<LoadableTextTrack>*)
 {
     if (m_loader)
@@ -122,6 +133,21 @@ void LoadableTextTrack::cueLoadingCompleted(TextTrackLoader* loader, bool loadin
 
     m_trackElement->didCompleteLoad(this, loadingFailed ? HTMLTrackElement::Failure : HTMLTrackElement::Success);
 }
+
+#if ENABLE(WEBVTT_REGIONS)
+void LoadableTextTrack::newRegionsAvailable(TextTrackLoader* loader)
+{
+    ASSERT_UNUSED(loader, m_loader == loader);
+
+    Vector<RefPtr<TextTrackRegion> > newRegions;
+    m_loader->getNewRegions(newRegions);
+
+    for (size_t i = 0; i < newRegions.size(); ++i) {
+        newRegions[i]->setTrack(this);
+        regionList()->add(newRegions[i]);
+    }
+}
+#endif
 
 size_t LoadableTextTrack::trackElementIndex()
 {

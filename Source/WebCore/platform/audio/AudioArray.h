@@ -60,7 +60,7 @@ public:
       
         unsigned initialSize = sizeof(T) * n;
 
-#if USE(WEBAUDIO_FFMPEG)
+#if USE(WEBAUDIO_FFMPEG) || USE(WEBAUDIO_OPENMAX_DL_FFT)
         const size_t alignment = 32;
 #else
         const size_t alignment = 16;
@@ -106,7 +106,7 @@ public:
     {
         // Note that although it is a size_t, m_size is now guaranteed to be
         // no greater than max unsigned. This guarantee is enforced in allocate().
-        ASSERT(i < size());
+        ASSERT_WITH_SECURITY_IMPLICATION(i < size());
         return data()[i];
     }
 
@@ -140,13 +140,6 @@ public:
         // This expression cannot overflow because end - start cannot be
         // greater than m_size, which is safe due to the check in allocate().
         memcpy(this->data() + start, sourceData, sizeof(T) * (end - start));
-    }
-
-    template<typename MemoryObjectInfo>
-    void reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-    {
-        typename MemoryObjectInfo::ClassInfo info(memoryObjectInfo, this);
-        info.addRawBuffer(m_allocation, m_size * sizeof(T));
     }
 
 private:

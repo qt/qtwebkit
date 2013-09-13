@@ -54,12 +54,14 @@ public:
     CSSValue* itemWithoutBoundsCheck(size_t index) { return m_values[index].get(); }
 
     void append(PassRefPtr<CSSValue> value) { m_values.append(value); }
-    void prepend(PassRefPtr<CSSValue> value) { m_values.prepend(value); }
+    void prepend(PassRefPtr<CSSValue> value) { m_values.insert(0, value); }
     bool removeAll(CSSValue*);
     bool hasValue(CSSValue*) const;
     PassRefPtr<CSSValueList> copy();
 
     String customCssText() const;
+    bool equals(const CSSValueList&) const;
+    bool equals(const CSSValue&) const;
 #if ENABLE(CSS_VARIABLES)
     String customSerializeResolvingVariables(const HashMap<AtomicString, String>&) const;
 #endif
@@ -69,8 +71,6 @@ public:
     bool hasFailedOrCanceledSubresources() const;
     
     PassRefPtr<CSSValueList> cloneForCSSOM() const;
-
-    void reportDescendantMemoryUsage(MemoryObjectInfo*) const;
 
 protected:
     CSSValueList(ClassType, ValueListSeparator);
@@ -88,7 +88,7 @@ private:
 class CSSValueListInspector {
 public:
     CSSValueListInspector(CSSValue* value) : m_list((value && value->isValueList()) ? static_cast<CSSValueList*>(value) : 0) { }
-    CSSValue* item(size_t index) const { ASSERT(index < length()); return m_list->itemWithoutBoundsCheck(index); }
+    CSSValue* item(size_t index) const { ASSERT_WITH_SECURITY_IMPLICATION(index < length()); return m_list->itemWithoutBoundsCheck(index); }
     CSSValue* first() const { return item(0); }
     CSSValue* second() const { return item(1); }
     size_t length() const { return m_list ? m_list->length() : 0; }

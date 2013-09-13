@@ -22,9 +22,9 @@
 #include "ArgList.h"
 
 #include "HeapRootVisitor.h"
-#include "JSValue.h"
+#include "JSCJSValue.h"
 #include "JSObject.h"
-
+#include "Operations.h"
 
 using std::min;
 

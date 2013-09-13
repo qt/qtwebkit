@@ -39,16 +39,15 @@
 #include "RenderStyle.h"
 #include "SVGClipPathElement.h"
 #include "SVGElement.h"
+#include "SVGGraphicsElement.h"
 #include "SVGNames.h"
 #include "SVGRenderSupport.h"
 #include "SVGRenderingContext.h"
 #include "SVGResources.h"
 #include "SVGResourcesCache.h"
 #include "SVGStyledElement.h"
-#include "SVGStyledTransformableElement.h"
 #include "SVGUnitTypes.h"
 #include "SVGUseElement.h"
-#include <wtf/UnusedParam.h>
 
 namespace WebCore {
 
@@ -117,9 +116,9 @@ bool RenderSVGResourceClipper::pathOnlyClipping(GraphicsContext* context, const 
         // Only shapes or paths are supported for direct clipping. We need to fallback to masking for texts.
         if (renderer->isSVGText())
             return false;
-        if (!childNode->isSVGElement() || !static_cast<SVGElement*>(childNode)->isStyledTransformable())
+        if (!childNode->isSVGElement() || !toSVGElement(childNode)->isSVGGraphicsElement())
             continue;
-        SVGStyledTransformableElement* styled = static_cast<SVGStyledTransformableElement*>(childNode);
+        SVGGraphicsElement* styled = toSVGGraphicsElement(childNode);
         RenderStyle* style = renderer->style();
         if (!style || style->display() == NONE || style->visibility() != VISIBLE)
              continue;
@@ -169,7 +168,7 @@ bool RenderSVGResourceClipper::applyClippingToContext(RenderObject* object, cons
     }
 
     AffineTransform absoluteTransform;
-    SVGRenderingContext::calculateTransformationToOutermostSVGCoordinateSystem(object, absoluteTransform);
+    SVGRenderingContext::calculateTransformationToOutermostCoordinateSystem(object, absoluteTransform);
 
     if (shouldCreateClipData && !repaintRect.isEmpty()) {
         if (!SVGRenderingContext::createImageBuffer(repaintRect, absoluteTransform, clipperData->clipMaskImage, ColorSpaceDeviceRGB, Unaccelerated))
@@ -234,7 +233,7 @@ bool RenderSVGResourceClipper::drawContentIntoMaskImage(ClipperData* clipperData
     // Draw all clipPath children into a global mask.
     for (Node* childNode = node()->firstChild(); childNode; childNode = childNode->nextSibling()) {
         RenderObject* renderer = childNode->renderer();
-        if (!childNode->isSVGElement() || !static_cast<SVGElement*>(childNode)->isStyled() || !renderer)
+        if (!childNode->isSVGElement() || !toSVGElement(childNode)->isSVGStyledElement() || !renderer)
             continue;
         if (renderer->needsLayout()) {
             frame()->view()->setPaintBehavior(oldBehavior);
@@ -247,7 +246,7 @@ bool RenderSVGResourceClipper::drawContentIntoMaskImage(ClipperData* clipperData
         WindRule newClipRule = style->svgStyle()->clipRule();
         bool isUseElement = childNode->hasTagName(SVGNames::useTag);
         if (isUseElement) {
-            SVGUseElement* useElement = static_cast<SVGUseElement*>(childNode);
+            SVGUseElement* useElement = toSVGUseElement(childNode);
             renderer = useElement->rendererClipChild();
             if (!renderer)
                 continue;
@@ -276,7 +275,7 @@ void RenderSVGResourceClipper::calculateClipContentRepaintRect()
     // This is a rough heuristic to appraise the clip size and doesn't consider clip on clip.
     for (Node* childNode = node()->firstChild(); childNode; childNode = childNode->nextSibling()) {
         RenderObject* renderer = childNode->renderer();
-        if (!childNode->isSVGElement() || !static_cast<SVGElement*>(childNode)->isStyled() || !renderer)
+        if (!childNode->isSVGElement() || !toSVGElement(childNode)->isSVGStyledElement() || !renderer)
             continue;
         if (!renderer->isSVGShape() && !renderer->isSVGText() && !childNode->hasTagName(SVGNames::useTag))
             continue;
@@ -306,13 +305,13 @@ bool RenderSVGResourceClipper::hitTestClipContent(const FloatRect& objectBoundin
 
     for (Node* childNode = node()->firstChild(); childNode; childNode = childNode->nextSibling()) {
         RenderObject* renderer = childNode->renderer();
-        if (!childNode->isSVGElement() || !static_cast<SVGElement*>(childNode)->isStyled() || !renderer)
+        if (!childNode->isSVGElement() || !toSVGElement(childNode)->isSVGStyledElement() || !renderer)
             continue;
         if (!renderer->isSVGShape() && !renderer->isSVGText() && !childNode->hasTagName(SVGNames::useTag))
             continue;
         IntPoint hitPoint;
         HitTestResult result(hitPoint);
-        if (renderer->nodeAtFloatPoint(HitTestRequest(HitTestRequest::SVGClipContent), result, point, HitTestForeground))
+        if (renderer->nodeAtFloatPoint(HitTestRequest(HitTestRequest::SVGClipContent | HitTestRequest::DisallowShadowContent), result, point, HitTestForeground))
             return true;
     }
 

@@ -114,7 +114,7 @@ def lex(str, fileName)
             end
             result << Token.new(CodeOrigin.new(fileName, lineNumber), $&)
             lineNumber += 1
-        when /\A[a-zA-Z]([a-zA-Z0-9_]*)/
+        when /\A[a-zA-Z]([a-zA-Z0-9_.]*)/
             result << Token.new(CodeOrigin.new(fileName, lineNumber), $&)
         when /\A\.([a-zA-Z0-9_]*)/
             result << Token.new(CodeOrigin.new(fileName, lineNumber), $&)
@@ -163,7 +163,7 @@ def isKeyword(token)
 end
 
 def isIdentifier(token)
-    token =~ /\A[a-zA-Z]([a-zA-Z0-9_]*)\Z/ and not isKeyword(token)
+    token =~ /\A[a-zA-Z]([a-zA-Z0-9_.]*)\Z/ and not isKeyword(token)
 end
 
 def isLabel(token)
@@ -223,8 +223,9 @@ class Parser
     
     def parsePredicateAtom
         if @tokens[@idx] == "not"
+            codeOrigin = @tokens[@idx].codeOrigin
             @idx += 1
-            parsePredicateAtom
+            Not.new(codeOrigin, parsePredicateAtom)
         elsif @tokens[@idx] == "("
             @idx += 1
             skipNewLine

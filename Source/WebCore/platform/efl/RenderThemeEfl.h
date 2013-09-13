@@ -39,9 +39,6 @@
 #include <cairo.h>
 #include <wtf/efl/RefPtrEfl.h>
 
-typedef struct _Ecore_Evas Ecore_Evas;
-typedef struct _Evas_Object Evas_Object;
-
 namespace WebCore {
 
 enum FormType { // KEEP IN SYNC WITH edjeGroupFromFormType()
@@ -121,7 +118,7 @@ public:
     void adjustSizeConstraints(RenderStyle*, FormType) const;
 
     // System fonts.
-    virtual void systemFont(int propId, FontDescription&) const;
+    virtual void systemFont(CSSValueID, FontDescription&) const;
 
     virtual void adjustCheckboxStyle(StyleResolver*, RenderStyle*, Element*) const;
     virtual bool paintCheckbox(RenderObject*, const PaintInfo&, const IntRect&);

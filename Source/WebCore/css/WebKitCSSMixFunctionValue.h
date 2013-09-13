@@ -48,7 +48,7 @@ public:
 
     PassRefPtr<WebKitCSSMixFunctionValue> cloneForCSSOM() const;
 
-    void reportDescendantMemoryUsage(MemoryObjectInfo*) const;
+    bool equals(const WebKitCSSMixFunctionValue&) const;
 
 private:
     WebKitCSSMixFunctionValue();

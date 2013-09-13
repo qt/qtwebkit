@@ -27,9 +27,7 @@
 #define ewk_security_origin_private_h
 
 #include "WKEinaSharedString.h"
-#include "WKSecurityOrigin.h"
 #include "ewk_object_private.h"
-#include <WebCore/KURL.h>
 #include <WebKit2/WKBase.h>
 #include <wtf/PassRefPtr.h>
 
@@ -42,7 +40,7 @@ public:
         return adoptRef(new EwkSecurityOrigin(originRef));
     }
 
-    static PassRefPtr<EwkSecurityOrigin> create(const WebCore::KURL& url)
+    static PassRefPtr<EwkSecurityOrigin> create(const char* url)
     {
         return adoptRef(new EwkSecurityOrigin(url));
     }
@@ -53,7 +51,7 @@ public:
 
 private:
     explicit EwkSecurityOrigin(WKSecurityOriginRef originRef);
-    explicit EwkSecurityOrigin(const WebCore::KURL& url);
+    explicit EwkSecurityOrigin(const char* url);
 
     WKRetainPtr<WKSecurityOriginRef> m_wkOrigin;
     WKEinaSharedString m_host;

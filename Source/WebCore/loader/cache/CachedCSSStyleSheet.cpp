@@ -35,7 +35,6 @@
 #include "ResourceBuffer.h"
 #include "StyleSheetContents.h"
 #include "TextResourceDecoder.h"
-#include "WebCoreMemoryInstrumentation.h"
 #include <wtf/CurrentTime.h>
 #include <wtf/Vector.h>
 
@@ -94,11 +93,8 @@ const String CachedCSSStyleSheet::sheetText(bool enforceMIMEType, bool* hasValid
     return sheetText;
 }
 
-void CachedCSSStyleSheet::data(PassRefPtr<ResourceBuffer> data, bool allDataReceived)
+void CachedCSSStyleSheet::finishLoading(ResourceBuffer* data)
 {
-    if (!allDataReceived)
-        return;
-
     m_data = data;
     setEncodedSize(m_data.get() ? m_data->size() : 0);
     // Decode the data to find out the encoding and keep the sheet text around during checkNotify()
@@ -192,15 +188,6 @@ void CachedCSSStyleSheet::saveParsedStyleSheet(PassRefPtr<StyleSheetContents> sh
     m_parsedStyleSheetCache->addedToMemoryCache();
 
     setDecodedSize(m_parsedStyleSheetCache->estimatedSizeInBytes());
-}
-
-void CachedCSSStyleSheet::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CachedResourceCSS);
-    CachedResource::reportMemoryUsage(memoryObjectInfo);
-    info.addMember(m_decoder);
-    info.addMember(m_parsedStyleSheetCache);
-    info.addMember(m_decodedSheetText);
 }
 
 }

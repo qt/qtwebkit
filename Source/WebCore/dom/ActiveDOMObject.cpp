@@ -28,13 +28,12 @@
 #include "ActiveDOMObject.h"
 
 #include "ScriptExecutionContext.h"
-#include "WebCoreMemoryInstrumentation.h"
-#include "WorkerContext.h"
+#include "WorkerGlobalScope.h"
 #include "WorkerThread.h"
 
 namespace WebCore {
 
-ActiveDOMObject::ActiveDOMObject(ScriptExecutionContext* scriptExecutionContext, void* upcastPointer)
+ActiveDOMObject::ActiveDOMObject(ScriptExecutionContext* scriptExecutionContext)
     : ContextDestructionObserver(scriptExecutionContext)
     , m_pendingActivityCount(0)
 #if !ASSERT_DISABLED
@@ -45,7 +44,7 @@ ActiveDOMObject::ActiveDOMObject(ScriptExecutionContext* scriptExecutionContext,
         return;
 
     ASSERT(m_scriptExecutionContext->isContextThread());
-    m_scriptExecutionContext->didCreateActiveDOMObject(this, upcastPointer);
+    m_scriptExecutionContext->didCreateActiveDOMObject(this);
 }
 
 ActiveDOMObject::~ActiveDOMObject()
@@ -54,8 +53,17 @@ ActiveDOMObject::~ActiveDOMObject()
         return;
 
     ASSERT(m_suspendIfNeededCalled);
-    ASSERT(m_scriptExecutionContext->isContextThread());
-    m_scriptExecutionContext->willDestroyActiveDOMObject(this);
+
+    // ActiveDOMObject may be inherited by a sub-class whose life-cycle
+    // exceeds that of the associated ScriptExecutionContext. In those cases,
+    // m_scriptExecutionContext would/should have been nullified by
+    // ContextDestructionObserver::contextDestroyed() (which we implement /
+    // inherit). Hence, we should ensure that this is not 0 before use it
+    // here.
+    if (m_scriptExecutionContext) {
+        ASSERT(m_scriptExecutionContext->isContextThread());
+        m_scriptExecutionContext->willDestroyActiveDOMObject(this);
+    }
 }
 
 void ActiveDOMObject::suspendIfNeeded()
@@ -91,11 +99,5 @@ void ActiveDOMObject::resume()
 void ActiveDOMObject::stop()
 {
 }
-
-void ActiveDOMObject::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::DOM);
-}
-
 
 } // namespace WebCore

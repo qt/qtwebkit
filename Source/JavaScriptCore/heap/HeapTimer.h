@@ -38,11 +38,13 @@
 #include <QMutex>
 #include <QObject>
 #include <QThread>
+#elif PLATFORM(EFL)
+typedef struct _Ecore_Timer Ecore_Timer;
 #endif
 
 namespace JSC {
 
-class JSGlobalData;
+class VM;
 
 #if PLATFORM(QT) && !USE(CF)
 class HeapTimer : public QObject {
@@ -51,20 +53,17 @@ class HeapTimer {
 #endif
 public:
 #if USE(CF)
-    HeapTimer(JSGlobalData*, CFRunLoopRef);
+    HeapTimer(VM*, CFRunLoopRef);
     static void timerDidFire(CFRunLoopTimerRef, void*);
 #else
-    HeapTimer(JSGlobalData*);
+    HeapTimer(VM*);
 #endif
     
     virtual ~HeapTimer();
-
-    void didStartVMShutdown();
-    virtual void synchronize();
     virtual void doWork() = 0;
     
 protected:
-    JSGlobalData* m_globalData;
+    VM* m_vm;
 
 #if USE(CF)
     static const CFTimeInterval s_decade;
@@ -84,6 +83,11 @@ protected:
     QBasicTimer m_timer;
     QThread* m_newThread;
     QMutex m_mutex;
+#elif PLATFORM(EFL)
+    static bool timerEvent(void*);
+    Ecore_Timer* add(double delay, void* agent);
+    void stop();
+    Ecore_Timer* m_timer;
 #endif
     
 private:

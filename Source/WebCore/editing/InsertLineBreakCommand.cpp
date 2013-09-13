@@ -27,15 +27,18 @@
 #include "InsertLineBreakCommand.h"
 
 #include "Document.h"
+#include "EditingStyle.h"
 #include "Frame.h"
+#include "FrameSelection.h"
 #include "HTMLElement.h"
 #include "HTMLNames.h"
+#include "HTMLTableElement.h"
 #include "Range.h"
 #include "RenderObject.h"
 #include "Text.h"
 #include "VisiblePosition.h"
+#include "VisibleUnits.h"
 #include "htmlediting.h"
-#include "visible_units.h"
 
 namespace WebCore {
 
@@ -56,7 +59,7 @@ void InsertLineBreakCommand::insertNodeAfterPosition(Node* node, const Position&
     // Insert the BR after the caret position. In the case the
     // position is a block, do an append. We don't want to insert
     // the BR *after* the block.
-    Element* cb = pos.deprecatedNode()->enclosingBlockFlowElement();
+    Element* cb = deprecatedEnclosingBlockFlowElement(pos.deprecatedNode());
     if (cb == pos.deprecatedNode())
         appendNode(node, cb);
     else
@@ -68,7 +71,7 @@ void InsertLineBreakCommand::insertNodeBeforePosition(Node* node, const Position
     // Insert the BR after the caret position. In the case the
     // position is a block, do an append. We don't want to insert
     // the BR *before* the block.
-    Element* cb = pos.deprecatedNode()->enclosingBlockFlowElement();
+    Element* cb = deprecatedEnclosingBlockFlowElement(pos.deprecatedNode());
     if (cb == pos.deprecatedNode())
         appendNode(node, cb);
     else
@@ -113,7 +116,7 @@ void InsertLineBreakCommand::doApply()
     // FIXME: Need to merge text nodes when inserting just after or before text.
     
     if (isEndOfParagraph(caret) && !lineBreakExistsAtVisiblePosition(caret)) {
-        bool needExtraLineBreak = !pos.deprecatedNode()->hasTagName(hrTag) && !pos.deprecatedNode()->hasTagName(tableTag);
+        bool needExtraLineBreak = !pos.deprecatedNode()->hasTagName(hrTag) && !isHTMLTableElement(pos.deprecatedNode());
         
         insertNodeAt(nodeToInsert.get(), pos);
         

@@ -105,15 +105,14 @@ PassRefPtr<SerializedScriptValue> ScriptValue::serialize(ScriptState* scriptStat
 
 PassRefPtr<SerializedScriptValue> ScriptValue::serialize(ScriptState* scriptState, MessagePortArray* messagePorts, ArrayBufferArray* arrayBuffers, bool& didThrow)
 {
-    JSValueRef exception = 0;
-    RefPtr<SerializedScriptValue> serializedValue = SerializedScriptValue::create(toRef(scriptState), toRef(scriptState, jsValue()), messagePorts, arrayBuffers, &exception);
-    didThrow = exception ? true : false;
+    RefPtr<SerializedScriptValue> serializedValue = SerializedScriptValue::create(scriptState, jsValue(), messagePorts, arrayBuffers);
+    didThrow = scriptState->hadException();
     return serializedValue.release();
 }
 
 ScriptValue ScriptValue::deserialize(ScriptState* scriptState, SerializedScriptValue* value, SerializationErrorMode throwExceptions)
 {
-    return ScriptValue(scriptState->globalData(), value->deserialize(scriptState, scriptState->lexicalGlobalObject(), 0, throwExceptions));
+    return ScriptValue(scriptState->vm(), value->deserialize(scriptState, scriptState->lexicalGlobalObject(), 0, throwExceptions));
 }
 
 #if ENABLE(INSPECTOR)

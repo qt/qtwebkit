@@ -22,6 +22,8 @@
 #ifndef WebKitAccessibleUtil_h
 #define WebKitAccessibleUtil_h
 
+#if HAVE(ACCESSIBILITY)
+
 #include <atk/atk.h>
 #include <wtf/text/WTFString.h>
 
@@ -35,12 +37,11 @@ AtkAttributeSet* addToAtkAttributeSet(AtkAttributeSet*, const char* name, const 
 
 void contentsRelativeToAtkCoordinateType(WebCore::AccessibilityObject*, AtkCoordType, WebCore::IntRect, gint* x, gint* y, gint* width = 0, gint* height = 0);
 
-const char* returnString(const String&);
-
 String accessibilityTitle(WebCore::AccessibilityObject*);
 
 String accessibilityDescription(WebCore::AccessibilityObject*);
 
 bool selectionBelongsToObject(WebCore::AccessibilityObject*, WebCore::VisibleSelection&);
 
+#endif
 #endif // WebKitAccessibleUtil_h

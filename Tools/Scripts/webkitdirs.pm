@@ -80,6 +80,7 @@ my $numberOfCPUs;
 my $baseProductDir;
 my @baseProductDirOption;
 my $configuration;
+my $xcodeSDK;
 my $configurationForVisualStudio;
 my $configurationProductDir;
 my $sourceDir;
@@ -93,15 +94,8 @@ my $qmakebin = "qmake"; # Allow override of the qmake binary from $PATH
 my $isGtk;
 my $isWinCE;
 my $isWinCairo;
-my $isWx;
 my $isEfl;
-my @wxArgs;
 my $isBlackBerry;
-my $isChromium;
-my $isChromiumAndroid;
-my $isChromiumMacMake;
-my $isChromiumNinja;
-my $forceChromiumUpdate;
 my $isInspectorFrontend;
 my $isWK2;
 my $shouldTargetWebProcess;
@@ -110,7 +104,10 @@ my $shouldUseGuardMalloc;
 my $xcodeVersion;
 
 # Variables for Win32 support
+my $programFilesPath;
 my $vcBuildPath;
+my $vsInstallDir;
+my $vsVersion;
 my $windowsSourceDir;
 my $winVersion;
 my $willUseVCExpressWhenBuilding = 0;
@@ -186,7 +183,7 @@ sub determineBaseProductDir
     determineSourceDir();
 
     my $setSharedPrecompsDir;
-    $baseProductDir = $ENV{"WEBKITOUTPUTDIR"};
+    $baseProductDir = $ENV{"WEBKIT_OUTPUTDIR"};
 
     if (!defined($baseProductDir) and isAppleMacWebKit()) {
         # Silently remove ~/Library/Preferences/xcodebuild.plist which can
@@ -221,14 +218,6 @@ sub determineBaseProductDir
         }
 
         undef $baseProductDir unless $baseProductDir =~ /^\//;
-    } elsif (isChromium()) {
-        if (isLinux() || isChromiumAndroid() || isChromiumMacMake()) {
-            $baseProductDir = "$sourceDir/out";
-        } elsif (isDarwin()) {
-            $baseProductDir = "$sourceDir/Source/WebKit/chromium/xcodebuild";
-        } elsif (isWindows() || isCygwin()) {
-            $baseProductDir = "$sourceDir/Source/WebKit/chromium/build";
-        }
     }
 
     if (!defined($baseProductDir)) { # Port-specific checks failed, use default
@@ -240,7 +229,7 @@ sub determineBaseProductDir
         $baseProductDir = "$baseProductDir/" . $archInfo{"cpuDir"};
     }
 
-    if (isGit() && isGitBranchBuild() && !isChromium()) {
+    if (isGit() && isGitBranchBuild()) {
         my $branch = gitBranch();
         $baseProductDir = "$baseProductDir/$branch";
     }
@@ -258,7 +247,7 @@ sub determineBaseProductDir
     if (isCygwin()) {
         my $dosBuildPath = `cygpath --windows \"$baseProductDir\"`;
         chomp $dosBuildPath;
-        $ENV{"WEBKITOUTPUTDIR"} = $dosBuildPath;
+        $ENV{"WEBKIT_OUTPUTDIR"} = $dosBuildPath;
         my $unixBuildPath = `cygpath --unix \"$baseProductDir\"`;
         chomp $unixBuildPath;
         $baseProductDir = $unixBuildPath;
@@ -288,8 +277,8 @@ sub determineConfiguration
     }
 
     if ($configuration && isWinCairo()) {
-        unless ($configuration =~ /_Cairo_CFLite$/) {
-            $configuration .= "_Cairo_CFLite";
+        unless ($configuration =~ /_WinCairo$/) {
+            $configuration .= "_WinCairo";
         }
     }
 }
@@ -301,10 +290,11 @@ sub determineArchitecture
     $architecture = "";
 
     determineBaseProductDir();
+    determineXcodeSDK();
 
     if (isGtk()) {
         determineConfigurationProductDir();
-        my $host_triple = `grep -E '^host = ' $configurationProductDir/GNUmakefile`;
+        my $host_triple = `grep -E '^host = ' $configurationProductDir/GNUmakefile 2> /dev/null`;
         if ($host_triple =~ m/^host = ([^-]+)-/) {
             # We have a configured build tree; use it.
             $architecture = $1;
@@ -317,9 +307,15 @@ sub determineArchitecture
         if ($architecture) {
             chomp $architecture;
         } else {
-            my $supports64Bit = `sysctl -n hw.optional.x86_64`;
-            chomp $supports64Bit;
-            $architecture = 'x86_64' if $supports64Bit;
+            if (not defined $xcodeSDK or $xcodeSDK =~ /^(\/$|macosx)/) {
+                my $supports64Bit = `sysctl -n hw.optional.x86_64`;
+                chomp $supports64Bit;
+                $architecture = 'x86_64' if $supports64Bit;
+            } elsif ($xcodeSDK =~ /^iphonesimulator/) {
+                $architecture = 'i386';
+            } elsif ($xcodeSDK =~ /^iphoneos/) {
+                $architecture = 'armv7';
+            }
         }
     } elsif (isEfl()) {
         my $host_processor = "";
@@ -388,12 +384,68 @@ sub argumentsForConfiguration()
     push(@args, '--efl') if isEfl();
     push(@args, '--wincairo') if isWinCairo();
     push(@args, '--wince') if isWinCE();
-    push(@args, '--wx') if isWx();
     push(@args, '--blackberry') if isBlackBerry();
-    push(@args, '--chromium') if isChromium() && !isChromiumAndroid();
-    push(@args, '--chromium-android') if isChromiumAndroid();
     push(@args, '--inspector-frontend') if isInspectorFrontend();
     return @args;
+}
+
+sub determineXcodeSDK
+{
+    return if defined $xcodeSDK;
+    for (my $i = 0; $i <= $#ARGV; $i++) {
+        my $opt = $ARGV[$i];
+        if ($opt =~ /^--sdk$/i) {
+            splice(@ARGV, $i, 1);
+            $xcodeSDK = splice(@ARGV, $i, 1);
+        } elsif ($opt =~ /^--device$/i) {
+            splice(@ARGV, $i, 1);
+            $xcodeSDK = 'iphoneos.internal';
+        } elsif ($opt =~ /^--sim(ulator)?/i) {
+            splice(@ARGV, $i, 1);
+            $xcodeSDK = 'iphonesimulator';
+        }
+    }
+}
+
+sub xcodeSDK
+{
+    determineXcodeSDK();
+    return $xcodeSDK;
+}
+
+sub programFilesPath
+{
+    return $programFilesPath if defined $programFilesPath;
+
+    $programFilesPath = $ENV{'PROGRAMFILES(X86)'} || $ENV{'PROGRAMFILES'} || "C:\\Program Files";
+
+    return $programFilesPath;
+}
+
+sub visualStudioInstallDir
+{
+    return $vsInstallDir if defined $vsInstallDir;
+
+    if ($ENV{'VSINSTALLDIR'}) {
+        $vsInstallDir = $ENV{'VSINSTALLDIR'};
+        $vsInstallDir =~ s|[\\/]$||;
+    } else {
+        $vsInstallDir = File::Spec->catdir(programFilesPath(), "Microsoft Visual Studio 10.0");
+    }
+    chomp($vsInstallDir = `cygpath "$vsInstallDir"`) if isCygwin();
+
+    return $vsInstallDir;
+}
+
+sub visualStudioVersion
+{
+    return $vsVersion if defined $vsVersion;
+
+    my $installDir = visualStudioInstallDir();
+
+    $vsVersion = ($installDir =~ /Microsoft Visual Studio ([0-9]+\.[0-9]*)/) ? $1 : "8";
+
+    return $vsVersion;
 }
 
 sub determineConfigurationForVisualStudio
@@ -408,9 +460,9 @@ sub usesPerConfigurationBuildDirectory
 {
     # [Gtk] We don't have Release/Debug configurations in straight
     # autotool builds (non build-webkit). In this case and if
-    # WEBKITOUTPUTDIR exist, use that as our configuration dir. This will
+    # WEBKIT_OUTPUTDIR exist, use that as our configuration dir. This will
     # allows us to run run-webkit-tests without using build-webkit.
-    return ($ENV{"WEBKITOUTPUTDIR"} && isGtk()) || isAppleWinWebKit();
+    return ($ENV{"WEBKIT_OUTPUTDIR"} && isGtk()) || isAppleWinWebKit();
 }
 
 sub determineConfigurationProductDir
@@ -418,8 +470,9 @@ sub determineConfigurationProductDir
     return if defined $configurationProductDir;
     determineBaseProductDir();
     determineConfiguration();
-    if (isAppleWinWebKit() && !isWx()) {
-        $configurationProductDir = File::Spec->catdir($baseProductDir, configurationForVisualStudio(), "bin");
+    if (isAppleWinWebKit()) {
+        my $binDir = "bin32";
+        $configurationProductDir = File::Spec->catdir($baseProductDir, configurationForVisualStudio(), $binDir);
     } else {
         if (usesPerConfigurationBuildDirectory()) {
             $configurationProductDir = "$baseProductDir";
@@ -520,7 +573,12 @@ sub XcodeOptions
     determineBaseProductDir();
     determineConfiguration();
     determineArchitecture();
-    return (@baseProductDirOption, "-configuration", $configuration, "ARCHS=$architecture", argumentsForXcode());
+    determineXcodeSDK();
+
+    my @sdkOption = ($xcodeSDK ? "SDKROOT=$xcodeSDK" : ());
+    my @architectureOption = ($architecture ? "ARCHS=$architecture" : ());
+
+    return (@baseProductDirOption, "-configuration", $configuration, @architectureOption, @sdkOption, argumentsForXcode());
 }
 
 sub XcodeOptionString
@@ -538,9 +596,6 @@ sub XcodeCoverageSupportOptions()
     my @coverageSupportOptions = ();
     push @coverageSupportOptions, "GCC_GENERATE_TEST_COVERAGE_FILES=YES";
     push @coverageSupportOptions, "GCC_INSTRUMENT_PROGRAM_FLOW_ARCS=YES";
-    push @coverageSupportOptions, "EXTRA_LINK= \$(EXTRA_LINK) -ftest-coverage -fprofile-arcs";
-    push @coverageSupportOptions, "OTHER_CFLAGS= \$(OTHER_CFLAGS) -DCOVERAGE -MD";
-    push @coverageSupportOptions, "OTHER_LDFLAGS=\$(OTHER_LDFLAGS) -ftest-coverage -fprofile-arcs -lgcov";
     return @coverageSupportOptions;
 }
 
@@ -553,22 +608,22 @@ sub determinePassedConfiguration
 
     for my $i (0 .. $#ARGV) {
         my $opt = $ARGV[$i];
-        if ($opt =~ /^--debug$/i || $opt =~ /^--devel/i) {
+        if ($opt =~ /^--debug$/i) {
             splice(@ARGV, $i, 1);
             $passedConfiguration = "Debug";
-            $passedConfiguration .= "_Cairo_CFLite" if (isWinCairo() && isCygwin());
+            $passedConfiguration .= "_WinCairo" if (isWinCairo() && isCygwin());
             return;
         }
-        if ($opt =~ /^--release$/i || $opt =~ /^--deploy/i) {
+        if ($opt =~ /^--release$/i) {
             splice(@ARGV, $i, 1);
             $passedConfiguration = "Release";
-            $passedConfiguration .= "_Cairo_CFLite" if (isWinCairo() && isCygwin());
+            $passedConfiguration .= "_WinCairo" if (isWinCairo() && isCygwin());
             return;
         }
         if ($opt =~ /^--profil(e|ing)$/i) {
             splice(@ARGV, $i, 1);
             $passedConfiguration = "Profiling";
-            $passedConfiguration .= "_Cairo_CFLite" if (isWinCairo() && isCygwin());
+            $passedConfiguration .= "_WinCairo" if (isWinCairo() && isCygwin());
             return;
         }
     }
@@ -606,7 +661,7 @@ sub determinePassedArchitecture
         my $opt = $ARGV[$i];
         if ($opt =~ /^--32-bit$/i) {
             splice(@ARGV, $i, 1);
-            if (isAppleMacWebKit() || isWx()) {
+            if (isAppleMacWebKit()) {
                 $passedArchitecture = `arch`;
                 chomp $passedArchitecture;
             }
@@ -645,6 +700,11 @@ sub setArchitecture
     $architecture = $passedArchitecture if $passedArchitecture;
 }
 
+sub skipSafariExecutableEntitlementChecks
+{
+    return `defaults read /Library/Preferences/org.webkit.BuildConfiguration SkipSafariExecutableEntitlementChecks 2>/dev/null` eq "1\n";
+}
+
 sub executableHasEntitlements
 {
     my $executablePath = shift;
@@ -657,8 +717,11 @@ sub safariPathFromSafariBundle
 
     if (isAppleMacWebKit()) {
         my $safariPath = "$safariBundle/Contents/MacOS/Safari";
+        return $safariPath if skipSafariExecutableEntitlementChecks();
+
         my $safariForWebKitDevelopmentPath = "$safariBundle/Contents/MacOS/SafariForWebKitDevelopment";
         return $safariForWebKitDevelopmentPath if -f $safariForWebKitDevelopmentPath && executableHasEntitlements($safariPath);
+
         return $safariPath;
     }
     return $safariBundle if isAppleWinWebKit();
@@ -714,16 +777,18 @@ sub builtDylibPathForName
 {
     my $libraryName = shift;
     determineConfigurationProductDir();
-    if (isChromium()) {
-        return "$configurationProductDir/$libraryName";
-    }
+
     if (isBlackBerry()) {
         my $libraryExtension = $libraryName =~ /^WebKit$/i ? ".so" : ".a";
         return "$configurationProductDir/$libraryName/lib" . lc($libraryName) . $libraryExtension;
     }
     if (isQt()) {
         my $isSearchingForWebCore = $libraryName =~ "WebCore";
-        $libraryName = "QtWebKitWidgets";
+        if (isDarwin()) {
+            $libraryName = "QtWebKitWidgets";
+        } else {
+            $libraryName = "Qt5WebKitWidgets";
+        }
         my $result;
         if (isDarwin() and -d "$configurationProductDir/lib/$libraryName.framework") {
             $result = "$configurationProductDir/lib/$libraryName.framework/$libraryName";
@@ -759,12 +824,9 @@ sub builtDylibPathForName
 
         return $result;
     }
-    if (isWx()) {
-        return "$configurationProductDir/libwxwebkit.dylib";
-    }
     if (isGtk()) {
         # WebKitGTK+ for GTK2, WebKitGTK+ for GTK3, and WebKit2 respectively.
-        my @libraries = ("libwebkitgtk-1.0", "libwebkitgtk-3.0", "libwebkit2gtk-1.0");
+        my @libraries = ("libwebkitgtk-1.0", "libwebkitgtk-3.0", "libwebkit2gtk-3.0");
         my $extension = isDarwin() ? ".dylib" : ".so";
 
         foreach $libraryName (@libraries) {
@@ -774,6 +836,9 @@ sub builtDylibPathForName
         return "NotFound";
     }
     if (isEfl()) {
+        if (isWK2()) {
+            return "$configurationProductDir/lib/libewebkit2.so";
+        }
         return "$configurationProductDir/lib/libewebkit.so";
     }
     if (isWinCE()) {
@@ -919,8 +984,8 @@ sub determineIsQt()
         return;
     }
 
-    # The presence of QTDIR only means Qt if --gtk or --wx or --efl or --blackberry or --chromium or --wincairo are not on the command-line
-    if (isGtk() || isWx() || isEfl() || isBlackBerry() || isChromium() || isWinCairo()) {
+    # The presence of QTDIR only means Qt if --gtk or --efl or --blackberry or --wincairo are not on the command-line
+    if (isGtk() || isEfl() || isBlackBerry() || isWinCairo()) {
         $isQt = 0;
         return;
     }
@@ -1001,14 +1066,17 @@ sub blackberryCMakeArguments()
     push @cmakeExtraOptions, "-DENABLE_GLES2=1" unless $ENV{"DISABLE_GLES2"};
 
     my @includeSystemDirectories;
-    push @includeSystemDirectories, File::Spec->catdir($stageInc, "grskia", "skia");
-    push @includeSystemDirectories, File::Spec->catdir($stageInc, "grskia");
-    push @includeSystemDirectories, File::Spec->catdir($stageInc, "harfbuzz");
+    push @includeSystemDirectories, File::Spec->catdir($stageInc, "harfbuzzng");
     push @includeSystemDirectories, File::Spec->catdir($stageInc, "imf");
+    # We only use jpeg-turbo for device build
+    push @includeSystemDirectories, File::Spec->catdir($stageInc, "jpeg-turbo") if $arch=~/arm/;
     push @includeSystemDirectories, $stageInc;
     push @includeSystemDirectories, File::Spec->catdir($stageInc, "browser", "platform");
+    push @includeSystemDirectories, File::Spec->catdir($stageInc, "browser", "platform", "graphics");
     push @includeSystemDirectories, File::Spec->catdir($stageInc, "browser", "qsk");
     push @includeSystemDirectories, File::Spec->catdir($stageInc, "ots");
+    push @includeSystemDirectories, File::Spec->catdir($stageInc, "iType", "common");
+    push @includeSystemDirectories, File::Spec->catdir($stageInc, "iType", "port", "nto");
 
     my @cxxFlags;
     push @cxxFlags, "-Wl,-rpath-link,$stageLib";
@@ -1092,35 +1160,6 @@ sub determineIsWinCE()
     $isWinCE = checkForArgumentAndRemoveFromARGV("--wince");
 }
 
-sub isWx()
-{
-    determineIsWx();
-    return $isWx;
-}
-
-sub determineIsWx()
-{
-    return if defined($isWx);
-    $isWx = checkForArgumentAndRemoveFromARGV("--wx");
-}
-
-sub getWxArgs()
-{
-    if (!@wxArgs) {
-        @wxArgs = ("");
-        my $rawWxArgs = "";
-        foreach my $opt (@ARGV) {
-            if ($opt =~ /^--wx-args/i ) {
-                @ARGV = grep(!/^--wx-args/i, @ARGV);
-                $rawWxArgs = $opt;
-                $rawWxArgs =~ s/--wx-args=//i;
-            }
-        }
-        @wxArgs = split(/,/, $rawWxArgs);
-    }
-    return @wxArgs;
-}
-
 # Determine if this is debian, ubuntu, linspire, or something similar.
 sub isDebianBased()
 {
@@ -1130,92 +1169,6 @@ sub isDebianBased()
 sub isFedoraBased()
 {
     return -e "/etc/fedora-release";
-}
-
-sub isChromium()
-{
-    determineIsChromium();
-    determineIsChromiumAndroid();
-    return $isChromium || $isChromiumAndroid;
-}
-
-sub determineIsChromium()
-{
-    return if defined($isChromium);
-    $isChromium = checkForArgumentAndRemoveFromARGV("--chromium");
-    if ($isChromium) {
-        $forceChromiumUpdate = checkForArgumentAndRemoveFromARGV("--force-update");
-    }
-}
-
-sub isChromiumAndroid()
-{
-    determineIsChromiumAndroid();
-    return $isChromiumAndroid;
-}
-
-sub determineIsChromiumAndroid()
-{
-    return if defined($isChromiumAndroid);
-    $isChromiumAndroid = checkForArgumentAndRemoveFromARGV("--chromium-android");
-}
-
-sub isChromiumMacMake()
-{
-    determineIsChromiumMacMake();
-    return $isChromiumMacMake;
-}
-
-sub determineIsChromiumMacMake()
-{
-    return if defined($isChromiumMacMake);
-
-    my $hasUpToDateMakefile = 0;
-    if (-e 'Makefile.chromium') {
-        unless (-e 'Source/WebKit/chromium/WebKit.xcodeproj') {
-            $hasUpToDateMakefile = 1;
-        } else {
-            $hasUpToDateMakefile = stat('Makefile.chromium')->mtime > stat('Source/WebKit/chromium/WebKit.xcodeproj')->mtime;
-        }
-    }
-    $isChromiumMacMake = isDarwin() && $hasUpToDateMakefile;
-}
-
-sub isChromiumNinja()
-{
-    determineIsChromiumNinja();
-    return $isChromiumNinja;
-}
-
-sub determineIsChromiumNinja()
-{
-    return if defined($isChromiumNinja);
-
-    my $config = configuration();
-
-    my $hasUpToDateNinjabuild = 0;
-    if (-e "out/$config/build.ninja") {
-        my $statNinja = stat("out/$config/build.ninja")->mtime;
-
-        my $statXcode = 0;
-        if (-e 'Source/WebKit/chromium/WebKit.xcodeproj') {
-          $statXcode = stat('Source/WebKit/chromium/WebKit.xcodeproj')->mtime;
-        }
-
-        my $statMake = 0;
-        if (-e 'Makefile.chromium') {
-          $statMake = stat('Makefile.chromium')->mtime;
-        }
-
-        $hasUpToDateNinjabuild = $statNinja > $statXcode && $statNinja > $statMake;
-    }
-    $isChromiumNinja = $hasUpToDateNinjabuild;
-}
-
-sub forceChromiumUpdate()
-{
-    determineIsChromium();
-    return $forceChromiumUpdate;
 }
 
 sub isWinCairo()
@@ -1302,7 +1255,7 @@ sub isFreeBSD()
 
 sub isARM()
 {
-    return $Config{archname} =~ /^arm-/;
+    return $Config{archname} =~ /^arm[v\-]/;
 }
 
 sub isCrossCompilation()
@@ -1321,7 +1274,7 @@ sub isCrossCompilation()
 
 sub isAppleWebKit()
 {
-    return !(isQt() or isGtk() or isWx() or isChromium() or isEfl() or isWinCE() or isBlackBerry());
+    return !(isQt() or isGtk() or isEfl() or isWinCE() or isBlackBerry());
 }
 
 sub isAppleMacWebKit()
@@ -1496,7 +1449,7 @@ sub relativeScriptsDir()
 sub launcherPath()
 {
     my $relativeScriptsPath = relativeScriptsDir();
-    if (isGtk() || isQt() || isWx() || isEfl() || isWinCE()) {
+    if (isGtk() || isQt() || isEfl() || isWinCE()) {
         return "$relativeScriptsPath/run-launcher";
     } elsif (isAppleWebKit()) {
         return "$relativeScriptsPath/run-safari";
@@ -1509,8 +1462,6 @@ sub launcherName()
         return "GtkLauncher";
     } elsif (isQt()) {
         return "QtTestBrowser";
-    } elsif (isWx()) {
-        return "wxBrowser";
     } elsif (isAppleWebKit()) {
         return "Safari";
     } elsif (isEfl()) {
@@ -1543,7 +1494,7 @@ sub checkRequiredSystemConfig
             print "http://developer.apple.com/tools/xcode\n";
             print "*************************************************************\n";
         }
-    } elsif (isGtk() or isQt() or isWx() or isEfl()) {
+    } elsif (isGtk() or isQt() or isEfl()) {
         my @cmds = qw(bison gperf);
         if (isQt() and isWindows()) {
             push @cmds, "win_flex";
@@ -1587,6 +1538,11 @@ sub windowsSourceDir()
     return $windowsSourceDir;
 }
 
+sub windowsSourceSourceDir()
+{
+    return windowsSourceDir() . "\\Source";
+}
+
 sub windowsLibrariesDir()
 {
     return windowsSourceDir() . "\\WebKitLibraries\\win";
@@ -1616,28 +1572,32 @@ sub setupAppleWinEnv()
         }
         
         # Those environment variables must be set to be able to build inside Visual Studio.
-        $variablesToSet{WEBKITLIBRARIESDIR} = windowsLibrariesDir() unless $ENV{WEBKITLIBRARIESDIR};
-        $variablesToSet{WEBKITOUTPUTDIR} = windowsOutputDir() unless $ENV{WEBKITOUTPUTDIR};
+        $variablesToSet{WEBKIT_LIBRARIES} = windowsLibrariesDir() unless $ENV{WEBKIT_LIBRARIES};
+        $variablesToSet{WEBKIT_OUTPUTDIR} = windowsOutputDir() unless $ENV{WEBKIT_OUTPUTDIR};
 
         foreach my $variable (keys %variablesToSet) {
             print "Setting the Environment Variable '" . $variable . "' to '" . $variablesToSet{$variable} . "'\n\n";
             system qw(regtool -s set), '\\HKEY_CURRENT_USER\\Environment\\' . $variable, $variablesToSet{$variable};
-            $restartNeeded ||= $variable eq "WEBKITLIBRARIESDIR" || $variable eq "WEBKITOUTPUTDIR";
+            $restartNeeded ||=  $variable eq "WEBKIT_LIBRARIES" || $variable eq "WEBKIT_OUTPUTDIR";
         }
 
         if ($restartNeeded) {
             print "Please restart your computer before attempting to build inside Visual Studio.\n\n";
         }
     } else {
-        if (!$ENV{'WEBKITLIBRARIESDIR'}) {
-            print "Warning: You must set the 'WebKitLibrariesDir' environment variable\n";
-            print "         to be able build WebKit from within Visual Studio.\n";
-            print "         Make sure that 'WebKitLibrariesDir' points to the\n";
+        if (!$ENV{'WEBKIT_LIBRARIES'}) {
+            # VS2010 (and newer) version. This will replace the VS2005 version as part of
+            # https://bugs.webkit.org/show_bug.cgi?id=109472. 
+            print "Warning: You must set the 'WebKit_Libraries' environment variable\n";
+            print "         to be able build WebKit from within Visual Studio 2010 and newer.\n";
+            print "         Make sure that 'WebKit_Libraries' points to the\n";
             print "         'WebKitLibraries/win' directory, not the 'WebKitLibraries/' directory.\n\n";
         }
-        if (!$ENV{'WEBKITOUTPUTDIR'}) {
-            print "Warning: You must set the 'WebKitOutputDir' environment variable\n";
-            print "         to be able build WebKit from within Visual Studio.\n\n";
+        if (!$ENV{'WEBKIT_OUTPUTDIR'}) {
+            # VS2010 (and newer) version. This will replace the VS2005 version as part of
+            # https://bugs.webkit.org/show_bug.cgi?id=109472. 
+            print "Warning: You must set the 'WebKit_OutputDir' environment variable\n";
+            print "         to be able build WebKit from within Visual Studio 2010 and newer.\n\n";
         }
     }
 }
@@ -1647,22 +1607,16 @@ sub setupCygwinEnv()
     return if !isCygwin() && !isWindows();
     return if $vcBuildPath;
 
-    my $vsInstallDir;
-    my $programFilesPath = $ENV{'PROGRAMFILES(X86)'} || $ENV{'PROGRAMFILES'} || "C:\\Program Files";
-    if ($ENV{'VSINSTALLDIR'}) {
-        $vsInstallDir = $ENV{'VSINSTALLDIR'};
-    } else {
-        $vsInstallDir = File::Spec->catdir($programFilesPath, "Microsoft Visual Studio 8");
-    }
-    chomp($vsInstallDir = `cygpath "$vsInstallDir"`) if isCygwin();
-    $vcBuildPath = File::Spec->catfile($vsInstallDir, qw(Common7 IDE devenv.com));
+    my $programFilesPath = programFilesPath();
+    $vcBuildPath = File::Spec->catfile(visualStudioInstallDir(), qw(Common7 IDE devenv.com));
     if (-e $vcBuildPath) {
-        # Visual Studio is installed; we can use pdevenv to build.
-        # FIXME: Make pdevenv work with non-Cygwin Perl.
-        $vcBuildPath = File::Spec->catfile(sourceDir(), qw(Tools Scripts pdevenv)) if isCygwin();
+        # Visual Studio is installed;
+        if (visualStudioVersion() eq "10") {
+            $vcBuildPath = File::Spec->catfile(visualStudioInstallDir(), qw(Common7 IDE devenv.exe));
+        }
     } else {
         # Visual Studio not found, try VC++ Express
-        $vcBuildPath = File::Spec->catfile($vsInstallDir, qw(Common7 IDE VCExpress.exe));
+        $vcBuildPath = File::Spec->catfile(visualStudioInstallDir(), qw(Common7 IDE VCExpress.exe));
         if (! -e $vcBuildPath) {
             print "*************************************************************\n";
             print "Cannot find '$vcBuildPath'\n";
@@ -1684,32 +1638,37 @@ sub setupCygwinEnv()
         print "*************************************************************\n";
         die;
     }
-    
-    unless ($ENV{WEBKITLIBRARIESDIR}) {
-        $ENV{'WEBKITLIBRARIESDIR'} = File::Spec->catdir($sourceDir, "WebKitLibraries", "win");
-        chomp($ENV{WEBKITLIBRARIESDIR} = `cygpath -wa '$ENV{WEBKITLIBRARIESDIR}'`) if isCygwin();
-    }
 
     print "Building results into: ", baseProductDir(), "\n";
-    print "WEBKITOUTPUTDIR is set to: ", $ENV{"WEBKITOUTPUTDIR"}, "\n";
-    print "WEBKITLIBRARIESDIR is set to: ", $ENV{"WEBKITLIBRARIESDIR"}, "\n";
+    print "WEBKIT_OUTPUTDIR is set to: ", $ENV{"WEBKIT_OUTPUTDIR"}, "\n";
+    print "WEBKIT_LIBRARIES is set to: ", $ENV{"WEBKIT_LIBRARIES"}, "\n";
 }
 
 sub dieIfWindowsPlatformSDKNotInstalled
 {
     my $registry32Path = "/proc/registry/";
     my $registry64Path = "/proc/registry64/";
-    my $windowsPlatformSDKRegistryEntry = "HKEY_LOCAL_MACHINE/SOFTWARE/Microsoft/MicrosoftSDK/InstalledSDKs/D2FF9F89-8AA2-4373-8A31-C838BF4DBBE1";
+    my @windowsPlatformSDKRegistryEntries = (
+        "HKEY_LOCAL_MACHINE/SOFTWARE/Microsoft/Microsoft SDKs/Windows/v8.0A",
+        "HKEY_LOCAL_MACHINE/SOFTWARE/Microsoft/Microsoft SDKs/Windows/v8.0",
+        "HKEY_LOCAL_MACHINE/SOFTWARE/Microsoft/Microsoft SDKs/Windows/v7.1A",
+        "HKEY_LOCAL_MACHINE/SOFTWARE/Microsoft/Microsoft SDKs/Windows/v7.0A",
+        "HKEY_LOCAL_MACHINE/SOFTWARE/Microsoft/MicrosoftSDK/InstalledSDKs/D2FF9F89-8AA2-4373-8A31-C838BF4DBBE1",
+    );
 
     # FIXME: It would be better to detect whether we are using 32- or 64-bit Windows
     # and only check the appropriate entry. But for now we just blindly check both.
-    return if (-e $registry32Path . $windowsPlatformSDKRegistryEntry) || (-e $registry64Path . $windowsPlatformSDKRegistryEntry);
+    my $recommendedPlatformSDK = $windowsPlatformSDKRegistryEntries[0];
+
+    while (@windowsPlatformSDKRegistryEntries) {
+        my $windowsPlatformSDKRegistryEntry = shift @windowsPlatformSDKRegistryEntries;
+        return if (-e $registry32Path . $windowsPlatformSDKRegistryEntry) || (-e $registry64Path . $windowsPlatformSDKRegistryEntry);
+    }
 
     print "*************************************************************\n";
-    print "Cannot find registry entry '$windowsPlatformSDKRegistryEntry'.\n";
-    print "Please download and install the Microsoft Windows Server 2003 R2\n";
-    print "Platform SDK from <http://www.microsoft.com/downloads/details.aspx?\n";
-    print "familyid=0baf2b35-c656-4969-ace8-e4c0c0716adb&displaylang=en>.\n\n";
+    print "Cannot find registry entry '$recommendedPlatformSDK'.\n";
+    print "Please download and install the Microsoft Windows SDK\n";
+    print "from <http://www.microsoft.com/en-us/download/details.aspx?id=8279>.\n\n";
     print "Then follow step 2 in the Windows section of the \"Installing Developer\n";
     print "Tools\" instructions at <http://www.webkit.org/building/tools.html>.\n";
     print "*************************************************************\n";
@@ -1798,50 +1757,6 @@ sub buildVisualStudioProject
     return system @command;
 }
 
-sub downloadWafIfNeeded
-{
-    # get / update waf if needed
-    my $waf = "$sourceDir/Tools/waf/waf";
-    my $wafURL = 'http://wxwebkit.kosoftworks.com/downloads/deps/waf';
-    if (!-f $waf) {
-        my $result = system "curl -o $waf $wafURL";
-        chmod 0755, $waf;
-    }
-}
-
-sub buildWafProject
-{
-    my ($project, $shouldClean, @options) = @_;
-    
-    # set the PYTHONPATH for waf
-    my $pythonPath = $ENV{'PYTHONPATH'};
-    if (!defined($pythonPath)) {
-        $pythonPath = '';
-    }
-    my $sourceDir = sourceDir();
-    my $newPythonPath = "$sourceDir/Tools/waf/build:$pythonPath";
-    if (isCygwin()) {
-        $newPythonPath = `cygpath --mixed --path $newPythonPath`;
-    }
-    $ENV{'PYTHONPATH'} = $newPythonPath;
-    
-    print "Building $project\n";
-
-    my $wafCommand = "$sourceDir/Tools/waf/waf";
-    if ($ENV{'WXWEBKIT_WAF'}) {
-        $wafCommand = $ENV{'WXWEBKIT_WAF'};
-    }
-    if (isCygwin()) {
-        $wafCommand = `cygpath --windows "$wafCommand"`;
-        chomp($wafCommand);
-    }
-    if ($shouldClean) {
-        return system $wafCommand, "uninstall", "clean", "distclean";
-    }
-    
-    return system $wafCommand, 'configure', 'build', 'install', @options;
-}
-
 sub retrieveQMakespecVar
 {
     my $mkspec = $_[0];
@@ -1901,9 +1816,13 @@ sub autotoolsFlag($$)
 
 sub runAutogenForAutotoolsProjectIfNecessary($@)
 {
-    my ($dir, $prefix, $sourceDir, $project, @buildArgs) = @_;
+    my ($dir, $prefix, $sourceDir, $project, $joinedOverridableFeatures, @buildArgs) = @_;
 
-    my $argumentsFile = "previous-autogen-arguments.txt";
+    # Always enable introspection when building WebKitGTK+.
+    unshift(@buildArgs, "--enable-introspection");
+
+    my $joinedBuildArgs = join(" ", @buildArgs);
+
     if (-e "GNUmakefile") {
         # Just assume that build-jsc will never be used to reconfigure JSC. Later
         # we can go back and make this more complicated if the demand is there.
@@ -1911,8 +1830,9 @@ sub runAutogenForAutotoolsProjectIfNecessary($@)
             return;
         }
 
-        # We only run autogen.sh again if the arguments passed have changed.
-        if (!mustReRunAutogen($sourceDir, $argumentsFile, @buildArgs)) {
+        # Run autogen.sh again if either the features overrided by build-webkit or build arguments have changed.
+        if (!mustReRunAutogen($sourceDir, "WebKitFeatureOverrides.txt", $joinedOverridableFeatures)
+            && !mustReRunAutogen($sourceDir, "previous-autogen-arguments.txt", $joinedBuildArgs)) {
             return;
         }
     }
@@ -1923,8 +1843,12 @@ sub runAutogenForAutotoolsProjectIfNecessary($@)
     # Only for WebKit, write the autogen.sh arguments to a file so that we can detect
     # when they change and automatically re-run it.
     if ($project eq 'WebKit') {
-        open(AUTOTOOLS_ARGUMENTS, ">$argumentsFile");
-        print AUTOTOOLS_ARGUMENTS join(" ", @buildArgs);
+        open(OVERRIDABLE_FEATURES, ">WebKitFeatureOverrides.txt");
+        print OVERRIDABLE_FEATURES $joinedOverridableFeatures;
+        close(OVERRIDABLE_FEATURES);
+
+        open(AUTOTOOLS_ARGUMENTS, ">previous-autogen-arguments.txt");
+        print AUTOTOOLS_ARGUMENTS $joinedBuildArgs;
         close(AUTOTOOLS_ARGUMENTS);
     }
 
@@ -1942,10 +1866,7 @@ sub runAutogenForAutotoolsProjectIfNecessary($@)
 
     # Prefix the command with jhbuild run.
     unshift(@buildArgs, "$relSourceDir/autogen.sh");
-    my $jhbuildWrapperPrefix = jhbuildWrapperPrefixIfNeeded();
-    if ($jhbuildWrapperPrefix) {
-        unshift(@buildArgs, $jhbuildWrapperPrefix);
-    }
+    unshift(@buildArgs, jhbuildWrapperPrefixIfNeeded());
     if (system(@buildArgs) ne 0) {
         die "Calling autogen.sh failed!\n";
     }
@@ -1953,29 +1874,34 @@ sub runAutogenForAutotoolsProjectIfNecessary($@)
 
 sub getJhbuildPath()
 {
-    return join('/', baseProductDir(), "Dependencies");
+    my @jhbuildPath = File::Spec->splitdir(baseProductDir());
+    if (isGit() && isGitBranchBuild() && gitBranch()) {
+        pop(@jhbuildPath);
+    }
+    push(@jhbuildPath, "Dependencies");
+    return File::Spec->catdir(@jhbuildPath);
 }
 
 sub mustReRunAutogen($@)
 {
-    my ($sourceDir, $filename, @currentArguments) = @_;
+    my ($sourceDir, $filename, $currentContents) = @_;
 
     if (! -e $filename) {
         return 1;
     }
 
-    open(AUTOTOOLS_ARGUMENTS, $filename);
-    chomp(my $previousArguments = <AUTOTOOLS_ARGUMENTS>);
-    close(AUTOTOOLS_ARGUMENTS);
+    open(CONTENTS_FILE, $filename);
+    chomp(my $previousContents = <CONTENTS_FILE>);
+    close(CONTENTS_FILE);
 
     # We only care about the WebKit2 argument when we are building WebKit itself.
     # build-jsc never passes --enable-webkit2, so if we didn't do this, autogen.sh
     # would run for every single build on the bots, since it runs both build-webkit
     # and build-jsc.
-    my $joinedCurrentArguments = join(" ", @currentArguments);
-    if ($previousArguments ne $joinedCurrentArguments) {
-        print "Previous autogen arguments were: $previousArguments\n\n";
-        print "New autogen arguments are: $joinedCurrentArguments\n";
+    if ($previousContents ne $currentContents) {
+        print "Contents for file $filename have changed.\n";
+        print "Previous contents were: $previousContents\n\n";
+        print "New contents are: $currentContents\n";
         return 1;
     }
 
@@ -1984,12 +1910,11 @@ sub mustReRunAutogen($@)
 
 sub buildAutotoolsProject($@)
 {
-    my ($project, $clean, @buildParams) = @_;
+    my ($project, $clean, $prefix, $makeArgs, $noWebKit1, $noWebKit2, @features) = @_;
 
     my $make = 'make';
     my $dir = productDir();
     my $config = passedConfiguration() || configuration();
-    my $prefix;
 
     # Use rm to clean the build directory since distclean may miss files
     if ($clean && -d $dir) {
@@ -2005,18 +1930,44 @@ sub buildAutotoolsProject($@)
         return 0;
     }
 
-    my @buildArgs = ();
-    my $makeArgs = $ENV{"WebKitMakeArguments"} || "";
-    for my $i (0 .. $#buildParams) {
-        my $opt = $buildParams[$i];
-        if ($opt =~ /^--makeargs=(.*)/i ) {
-            $makeArgs = $makeArgs . " " . $1;
-        } elsif ($opt =~ /^--prefix=(.*)/i ) {
-            $prefix = $1;
-        } else {
-            push @buildArgs, $opt;
+    my @buildArgs = @ARGV;
+    if ($noWebKit1) {
+        unshift(@buildArgs, "--disable-webkit1");
+    }
+    if ($noWebKit2) {
+        unshift(@buildArgs, "--disable-webkit2");
+    }
+
+    # Configurable features listed here should be kept in sync with the
+    # features for which there exists a configuration option in configure.ac.
+    my %configurableFeatures = (
+        "battery-status" => 1,
+        "gamepad" => 1,
+        "geolocation" => 1,
+        "svg" => 1,
+        "svg-fonts" => 1,
+        "video" => 1,
+        "webgl" => 1,
+        "web-audio" => 1,
+    );
+
+    # These features are ones which build-webkit cannot control, typically because
+    # they can only be active when we have the proper dependencies.
+    my %unsetFeatures = (
+        "accelerated-2d-canvas" => 1,
+    );
+
+    my @overridableFeatures = ();
+    foreach (@features) {
+        if ($configurableFeatures{$_->{option}}) {
+            push @buildArgs, autotoolsFlag(${$_->{value}}, $_->{option});;
+        } elsif (!$unsetFeatures{$_->{option}}) {
+            push @overridableFeatures, $_->{define} . "=" . (${$_->{value}} ? "1" : "0");
         }
     }
+
+    $makeArgs = $makeArgs || "";
+    $makeArgs = $makeArgs . " " . $ENV{"WebKitMakeArguments"} if $ENV{"WebKitMakeArguments"};
 
     # Automatically determine the number of CPUs for make only
     # if make arguments haven't already been specified.
@@ -2042,9 +1993,6 @@ sub buildAutotoolsProject($@)
         push @buildArgs, "--disable-debug";
     }
 
-    # Enable unstable features when building through build-webkit.
-    push @buildArgs, "--enable-unstable-features";
-
     if (checkForArgumentAndRemoveFromArrayRef("--update-gtk", \@buildArgs)) {
         # Force autogen to run, to catch the possibly updated libraries.
         system("rm -f previous-autogen-arguments.txt");
@@ -2055,22 +2003,21 @@ sub buildAutotoolsProject($@)
     # If GNUmakefile exists, don't run autogen.sh unless its arguments
     # have changed. The makefile should be smart enough to track autotools
     # dependencies and re-run autogen.sh when build files change.
-    runAutogenForAutotoolsProjectIfNecessary($dir, $prefix, $sourceDir, $project, @buildArgs);
+    my $joinedOverridableFeatures = join(" ", @overridableFeatures);
+    runAutogenForAutotoolsProjectIfNecessary($dir, $prefix, $sourceDir, $project, $joinedOverridableFeatures, @buildArgs);
 
-    my $runWithJhbuild = jhbuildWrapperPrefixIfNeeded();
+    my $runWithJhbuild = join(" ", jhbuildWrapperPrefixIfNeeded());
     if (system("$runWithJhbuild $make $makeArgs") ne 0) {
         die "\nFailed to build WebKit using '$make'!\n";
     }
 
     chdir ".." or die;
 
-    if ($project eq 'WebKit' && !isCrossCompilation()) {
+    if ($project eq 'WebKit' && !isCrossCompilation() && !($noWebKit1 && $noWebKit2)) {
         my @docGenerationOptions = ("$sourceDir/Tools/gtk/generate-gtkdoc", "--skip-html");
         push(@docGenerationOptions, productDir());
 
-        if ($runWithJhbuild) {
-            unshift(@docGenerationOptions, $runWithJhbuild);
-        }
+        unshift(@docGenerationOptions, jhbuildWrapperPrefixIfNeeded());
 
         if (system(@docGenerationOptions)) {
             die "\n gtkdoc did not build without warnings\n";
@@ -2083,14 +2030,18 @@ sub buildAutotoolsProject($@)
 sub jhbuildWrapperPrefixIfNeeded()
 {
     if (-e getJhbuildPath()) {
+        my @prefix = (File::Spec->catfile(sourceDir(), "Tools", "jhbuild", "jhbuild-wrapper"));
         if (isEfl()) {
-            return File::Spec->catfile(sourceDir(), "Tools", "efl", "run-with-jhbuild");
+            push(@prefix, "--efl");
         } elsif (isGtk()) {
-            return File::Spec->catfile(sourceDir(), "Tools", "gtk", "run-with-jhbuild");
+            push(@prefix, "--gtk");
         }
+        push(@prefix, "run");
+
+        return @prefix;
     }
 
-    return "";
+    return ();
 }
 
 sub removeCMakeCache()
@@ -2117,6 +2068,8 @@ sub generateBuildSystemFromCMakeProject
     } elsif ($config =~ /debug/i) {
         push @args, "-DCMAKE_BUILD_TYPE=Debug";
     }
+    # Don't warn variables which aren't used by cmake ports.
+    push @args, "--no-warn-unused-cli";
     push @args, @cmakeArgs if @cmakeArgs;
     push @args, $additionalCMakeArgs if $additionalCMakeArgs;
 
@@ -2131,7 +2084,7 @@ sub generateBuildSystemFromCMakeProject
 
     # We call system("cmake @args") instead of system("cmake", @args) so that @args is
     # parsed for shell metacharacters.
-    my $wrapper = jhbuildWrapperPrefixIfNeeded() . " ";
+    my $wrapper = join(" ", jhbuildWrapperPrefixIfNeeded()) . " ";
     my $returnCode = system($wrapper . "cmake @args");
 
     chdir($originalWorkingDirectory);
@@ -2151,7 +2104,7 @@ sub buildCMakeGeneratedProject($)
 
     # We call system("cmake @args") instead of system("cmake", @args) so that @args is
     # parsed for shell metacharacters. In particular, $makeArgs may contain such metacharacters.
-    my $wrapper = jhbuildWrapperPrefixIfNeeded() . " ";
+    my $wrapper = join(" ", jhbuildWrapperPrefixIfNeeded()) . " ";
     return system($wrapper . "cmake @args");
 }
 
@@ -2190,7 +2143,7 @@ sub buildCMakeProjectOrExit($$$$@)
 sub cmakeBasedPortArguments()
 {
     return blackberryCMakeArguments() if isBlackBerry();
-    return ('-DCMAKE_WINCE_SDK="STANDARDSDK_500 (ARMV4I)"') if isWinCE();
+    return ('-G "Visual Studio 8 2005 STANDARDSDK_500 (ARMV4I)"') if isWinCE();
     return ();
 }
 
@@ -2241,7 +2194,7 @@ sub buildQMakeProjects
     }
 
     # Automatically determine the number of CPUs for make only if this make argument haven't already been specified.
-    if ($make eq "make" && $makeargs !~ /-j\s*\d+/i && (!defined $ENV{"MAKEFLAGS"} || ($ENV{"MAKEFLAGS"} !~ /-j\s*\d+/i ))) {
+    if ($make eq "make" && $makeargs !~ /-[^\s]*?j\s*\d+/i && (!defined $ENV{"MAKEFLAGS"} || ($ENV{"MAKEFLAGS"} !~ /-[^\s]*?j\s*\d+/i ))) {
         $makeargs .= " -j" . numberOfCPUs();
     }
 
@@ -2324,6 +2277,11 @@ sub buildQMakeProjects
     my $maybeNeedsCleanBuild = 0;
     my $needsIncrementalBuild = 0;
 
+    # Full incremental build (run qmake) needed on buildbots and EWS bots always.
+    if (grep(/CONFIG\+=buildbot/,@buildParams)) {
+        $needsIncrementalBuild = 1;
+    }
+
     if ($svnRevision ne $previousSvnRevision) {
         print "Last built revision was " . $previousSvnRevision .
             ", now at revision $svnRevision. Full incremental build needed.\n";
@@ -2401,129 +2359,13 @@ EOF
 
 sub buildGtkProject
 {
-    my ($project, $clean, @buildArgs) = @_;
+    my ($project, $clean, $prefix, $makeArgs, $noWebKit1, $noWebKit2, @features) = @_;
 
     if ($project ne "WebKit" and $project ne "JavaScriptCore" and $project ne "WTF") {
         die "Unsupported project: $project. Supported projects: WebKit, JavaScriptCore, WTF\n";
     }
 
-    return buildAutotoolsProject($project, $clean, @buildArgs);
-}
-
-sub buildChromiumMakefile($$@)
-{
-    my ($target, $clean, @options) = @_;
-    if ($clean) {
-        return system qw(rm -rf out);
-    }
-    my $config = configuration();
-    my $numCpus = numberOfCPUs();
-    my $makeArgs;
-    for (@options) {
-        $makeArgs = $1 if /^--makeargs=(.*)/i;
-    }
-    $makeArgs = "-j$numCpus" if not $makeArgs;
-    my $command .= "make -fMakefile.chromium $makeArgs BUILDTYPE=$config $target";
-
-    print "$command\n";
-    return system $command;
-}
-
-sub buildChromiumNinja($$@)
-{
-    # rm -rf out requires rerunning gyp, so don't support --clean for now.
-    my ($target, @options) = @_;
-    my $config = configuration();
-    my $makeArgs = "";
-    for (@options) {
-        $makeArgs = $1 if /^--makeargs=(.*)/i;
-    }
-    my $command = "";
-
-    # Find ninja.
-    my $ninjaPath;
-    if (commandExists('ninja')) {
-        $ninjaPath = 'ninja';
-    } elsif (-e 'Source/WebKit/chromium/depot_tools/ninja') {
-        $ninjaPath = 'Source/WebKit/chromium/depot_tools/ninja';
-    } else {
-        die "ninja not found. Install chromium's depot_tools by running update-webkit first\n";
-    }
-
-    $command .= "$ninjaPath -C out/$config $target $makeArgs";
-
-    print "$command\n";
-    return system $command;
-}
-
-sub buildChromiumVisualStudioProject($$)
-{
-    my ($projectPath, $clean) = @_;
-
-    my $config = configuration();
-    my $action = "/build";
-    $action = "/clean" if $clean;
-
-    # Find Visual Studio installation.
-    my $vsInstallDir;
-    my $programFilesPath = $ENV{'PROGRAMFILES'} || "C:\\Program Files";
-    if ($ENV{'VSINSTALLDIR'}) {
-        $vsInstallDir = $ENV{'VSINSTALLDIR'};
-    } else {
-        $vsInstallDir = "$programFilesPath/Microsoft Visual Studio 8";
-    }
-    $vsInstallDir =~ s,\\,/,g;
-    $vsInstallDir = `cygpath "$vsInstallDir"` if isCygwin();
-    chomp $vsInstallDir;
-    $vcBuildPath = "$vsInstallDir/Common7/IDE/devenv.com";
-    if (! -e $vcBuildPath) {
-        # Visual Studio not found, try VC++ Express
-        $vcBuildPath = "$vsInstallDir/Common7/IDE/VCExpress.exe";
-        if (! -e $vcBuildPath) {
-            print "*************************************************************\n";
-            print "Cannot find '$vcBuildPath'\n";
-            print "Please execute the file 'vcvars32.bat' from\n";
-            print "'$programFilesPath\\Microsoft Visual Studio 8\\VC\\bin\\'\n";
-            print "to setup the necessary environment variables.\n";
-            print "*************************************************************\n";
-            die;
-        }
-    }
-
-    # Create command line and execute it.
-    my @command = ($vcBuildPath, $projectPath, $action, $config);
-    print "Building results into: ", baseProductDir(), "\n";
-    print join(" ", @command), "\n";
-    return system @command;
-}
-
-sub buildChromium($@)
-{
-    my ($clean, @options) = @_;
-
-    # We might need to update DEPS or re-run GYP if things have changed.
-    if (checkForArgumentAndRemoveFromArrayRef("--update-chromium", \@options)) {
-        my @updateCommand = ("perl", "Tools/Scripts/update-webkit-chromium", "--force");
-        push @updateCommand, "--chromium-android" if isChromiumAndroid();
-        system(@updateCommand) == 0 or die $!;
-    }
-
-    my $result = 1;
-    if (isDarwin() && !isChromiumAndroid() && !isChromiumMacMake() && !isChromiumNinja()) {
-        # Mac build - builds the root xcode project.
-        $result = buildXCodeProject("Source/WebKit/chromium/All", $clean, "-configuration", configuration(), @options);
-    } elsif (isCygwin() || isWindows()) {
-        # Windows build - builds the root visual studio solution.
-        $result = buildChromiumVisualStudioProject("Source/WebKit/chromium/All.sln", $clean);
-    } elsif (isChromiumNinja() && !isChromiumAndroid()) {
-        $result = buildChromiumNinja("all", $clean, @options);
-    } elsif (isLinux() || isChromiumAndroid() || isChromiumMacMake()) {
-        # Linux build - build using make.
-        $result = buildChromiumMakefile("all", $clean, @options);
-    } else {
-        print STDERR "This platform is not supported by chromium.\n";
-    }
-    return $result;
+    return buildAutotoolsProject($project, $clean, $prefix, $makeArgs, $noWebKit1, $noWebKit2, @features);
 }
 
 sub appleApplicationSupportPath
@@ -2640,7 +2482,7 @@ sub execMacWebKitAppForDebugging($)
             die "Targetting the Web Process is not compatible with using an XPC Service for the Web Process at this time.";
         }
         
-        my $webProcessShimPath = File::Spec->catfile($productDir, "WebProcessShim.dylib");
+        my $webProcessShimPath = File::Spec->catfile($productDir, "SecItemShim.dylib");
         my $webProcessPath = File::Spec->catdir($productDir, "WebProcess.app");
         my $webKit2ExecutablePath = File::Spec->catfile($productDir, "WebKit2.framework", "WebKit2");
 
@@ -2658,15 +2500,6 @@ sub debugSafari
         execMacWebKitAppForDebugging(safariPath());
     }
 
-    if (isAppleWinWebKit()) {
-        setupCygwinEnv();
-        my $productDir = productDir();
-        chomp($ENV{WEBKITNIGHTLY} = `cygpath -wa "$productDir"`);
-        my $safariPath = safariPath();
-        chomp($safariPath = `cygpath -wa "$safariPath"`);
-        return system { $vcBuildPath } $vcBuildPath, "/debugexe", "\"$safariPath\"", @ARGV;
-    }
-
     return 1; # Unsupported platform; can't debug Safari on this platform.
 }
 
@@ -2680,7 +2513,7 @@ sub runSafari
     if (isAppleWinWebKit()) {
         my $result;
         my $productDir = productDir();
-        my $webKitLauncherPath = File::Spec->catfile(productDir(), "WebKit.exe");
+        my $webKitLauncherPath = File::Spec->catfile(productDir(), "WinLauncher.exe");
         return system { $webKitLauncherPath } $webKitLauncherPath, @ARGV;
     }
 

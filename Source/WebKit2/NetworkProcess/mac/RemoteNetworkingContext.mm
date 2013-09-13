@@ -26,16 +26,33 @@
 #import "config.h"
 #import "RemoteNetworkingContext.h"
 
-#import "WebCore/ResourceError.h"
 #import "WebErrors.h"
+#import <WebCore/ResourceError.h>
+#import <WebKitSystemInterface.h>
+#import <wtf/MainThread.h>
+#import <wtf/PassOwnPtr.h>
 
 using namespace WebCore;
 
 namespace WebKit {
 
-RemoteNetworkingContext::RemoteNetworkingContext(bool needsSiteSpecificQuirks, bool localFileContentSniffingEnabled)
+static OwnPtr<NetworkStorageSession>& privateBrowsingStorageSession()
+{
+    ASSERT(isMainThread());
+    DEFINE_STATIC_LOCAL(OwnPtr<NetworkStorageSession>, session, ());
+    return session;
+}
+
+bool RemoteNetworkingContext::shouldClearReferrerOnHTTPSToHTTPRedirect() const
+{
+    return m_shouldClearReferrerOnHTTPSToHTTPRedirect;
+}
+
+RemoteNetworkingContext::RemoteNetworkingContext(bool needsSiteSpecificQuirks, bool localFileContentSniffingEnabled, bool privateBrowsingEnabled, bool shouldClearReferrerOnHTTPSToHTTPRedirect)
     : m_needsSiteSpecificQuirks(needsSiteSpecificQuirks)
     , m_localFileContentSniffingEnabled(localFileContentSniffingEnabled)
+    , m_privateBrowsingEnabled(privateBrowsingEnabled)
+    , m_shouldClearReferrerOnHTTPSToHTTPRedirect(shouldClearReferrerOnHTTPSToHTTPRedirect)
 {
 }
 
@@ -58,26 +75,61 @@ bool RemoteNetworkingContext::localFileContentSniffingEnabled() const
     return m_localFileContentSniffingEnabled;
 }
 
-CFURLStorageSessionRef RemoteNetworkingContext::storageSession() const
+NetworkStorageSession& RemoteNetworkingContext::storageSession() const
 {
-    // FIXME (NetworkProcess): Implement.
-    return 0;
+    if (m_privateBrowsingEnabled) {
+        NetworkStorageSession* privateSession = privateBrowsingStorageSession().get();
+        if (privateSession)
+            return *privateSession;
+        // Some requests with private browsing mode requested may still be coming shortly after NetworkProcess was told to destroy its session.
+        // FIXME: Find a way to track private browsing sessions more rigorously.
+        LOG_ERROR("Private browsing was requested, but there was no session for it. Please file a bug unless you just disabled private browsing, in which case it's an expected race.");
+    }
+
+    return NetworkStorageSession::defaultStorageSession();
 }
 
-NSOperationQueue *RemoteNetworkingContext::scheduledOperationQueue() const
+NetworkStorageSession* RemoteNetworkingContext::privateBrowsingSession()
 {
-    static NSOperationQueue *queue;
-    if (!queue) {
-        queue = [[NSOperationQueue alloc] init];
-        // Default concurrent operation count depends on current system workload, but delegate methods are mostly idling in IPC, so we can run as many as needed.
-        [queue setMaxConcurrentOperationCount:NSIntegerMax];
-    }
-    return queue;
+    return privateBrowsingStorageSession().get();
+}
+
+RetainPtr<CFDataRef> RemoteNetworkingContext::sourceApplicationAuditData() const
+{
+    return nil;
 }
 
 ResourceError RemoteNetworkingContext::blockedError(const ResourceRequest& request) const
 {
     return WebKit::blockedError(request);
+}
+
+static String& privateBrowsingStorageSessionIdentifierBase()
+{
+    ASSERT(isMainThread());
+    DEFINE_STATIC_LOCAL(String, base, ());
+    return base;
+}
+
+void RemoteNetworkingContext::setPrivateBrowsingStorageSessionIdentifierBase(const String& identifier)
+{
+    privateBrowsingStorageSessionIdentifierBase() = identifier;
+}
+
+void RemoteNetworkingContext::ensurePrivateBrowsingSession()
+{
+    if (privateBrowsingStorageSession())
+        return;
+
+    ASSERT(!privateBrowsingStorageSessionIdentifierBase().isNull());
+    RetainPtr<CFStringRef> cfIdentifier = String(privateBrowsingStorageSessionIdentifierBase() + ".PrivateBrowsing").createCFString();
+
+    privateBrowsingStorageSession() = NetworkStorageSession::createPrivateBrowsingSession(privateBrowsingStorageSessionIdentifierBase());
+}
+
+void RemoteNetworkingContext::destroyPrivateBrowsingSession()
+{
+    privateBrowsingStorageSession() = nullptr;
 }
 
 }

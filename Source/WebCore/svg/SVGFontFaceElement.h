@@ -30,7 +30,7 @@ namespace WebCore {
 class SVGFontElement;
 class StyleRuleFontFace;
 
-class SVGFontFaceElement : public SVGElement {
+class SVGFontFaceElement FINAL : public SVGElement {
 public:
     static PassRefPtr<SVGFontFaceElement> create(const QualifiedName&, Document*);
 
@@ -61,7 +61,7 @@ private:
     virtual void removedFrom(ContainerNode*) OVERRIDE;
 
     RefPtr<StyleRuleFontFace> m_fontFaceRule;
-    RefPtr<SVGFontElement> m_fontElement;
+    SVGFontElement* m_fontElement;
 };
 
 } // namespace WebCore

@@ -10,18 +10,25 @@
 #ifndef LIBGLESV2_PROGRAM_H_
 #define LIBGLESV2_PROGRAM_H_
 
-#include <d3dx9.h>
 #include <string>
 #include <set>
 
-#include "libGLESv2/Shader.h"
-#include "libGLESv2/Context.h"
+#include "common/angleutils.h"
+#include "common/RefCountObject.h"
+#include "libGLESv2/Constants.h"
+
+namespace rx
+{
+class Renderer;
+}
 
 namespace gl
 {
 class ResourceManager;
 class FragmentShader;
 class VertexShader;
+class ProgramBinary;
+class Shader;
 
 extern const char * const g_fakepath;
 
@@ -58,7 +65,7 @@ class InfoLog
 class Program
 {
   public:
-    Program(ResourceManager *manager, GLuint handle);
+    Program(rx::Renderer *renderer, ResourceManager *manager, GLuint handle);
 
     ~Program();
 
@@ -68,8 +75,9 @@ class Program
 
     void bindAttributeLocation(GLuint index, const char *name);
 
-    void link();
-    void setProgramBinary(ProgramBinary *programBinary);
+    bool link();
+    bool isLinked();
+    bool setProgramBinary(const void *binary, GLsizei length);
     ProgramBinary *getProgramBinary();
 
     int getInfoLogLength() const;
@@ -93,30 +101,26 @@ class Program
     void validate();
     bool isValidated() const;
 
-    unsigned int getSerial() const;
+    GLint getProgramBinaryLength() const;
 
   private:
     DISALLOW_COPY_AND_ASSIGN(Program);
 
     void unlink(bool destroy = false);
 
-    static unsigned int issueSerial();
-
     FragmentShader *mFragmentShader;
     VertexShader *mVertexShader;
 
     AttributeBindings mAttributeBindings;
 
-    ProgramBinary* mProgramBinary;
+    BindingPointer<ProgramBinary> mProgramBinary;
+    bool mLinked;
     bool mDeleteStatus;   // Flag to indicate that the program can be deleted when no longer in use
 
     unsigned int mRefCount;
 
-    const unsigned int mSerial;
-
-    static unsigned int mCurrentSerial;
-
     ResourceManager *mResourceManager;
+    rx::Renderer *mRenderer;
     const GLuint mHandle;
 
     InfoLog mInfoLog;

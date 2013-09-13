@@ -45,7 +45,18 @@ WKPageRef WKInspectorGetPage(WKInspectorRef inspectorRef)
 #if ENABLE(INSPECTOR)
     return toAPI(toImpl(inspectorRef)->page());
 #else
+    UNUSED_PARAM(inspectorRef);
     return 0;
+#endif
+}
+
+bool WKInspectorIsConnected(WKInspectorRef inspectorRef)
+{
+#if ENABLE(INSPECTOR)
+    return toImpl(inspectorRef)->isConnected();
+#else
+    UNUSED_PARAM(inspectorRef);
+    return false;
 #endif
 }
 
@@ -54,6 +65,7 @@ bool WKInspectorIsVisible(WKInspectorRef inspectorRef)
 #if ENABLE(INSPECTOR)
     return toImpl(inspectorRef)->isVisible();
 #else
+    UNUSED_PARAM(inspectorRef);
     return false;
 #endif
 }
@@ -63,7 +75,17 @@ bool WKInspectorIsFront(WKInspectorRef inspectorRef)
 #if ENABLE(INSPECTOR)
     return toImpl(inspectorRef)->isFront();
 #else
+    UNUSED_PARAM(inspectorRef);
     return false;
+#endif
+}
+
+void WKInspectorConnect(WKInspectorRef inspectorRef)
+{
+#if ENABLE(INSPECTOR)
+    toImpl(inspectorRef)->connect();
+#else
+    UNUSED_PARAM(inspectorRef);
 #endif
 }
 
@@ -71,6 +93,17 @@ void WKInspectorShow(WKInspectorRef inspectorRef)
 {
 #if ENABLE(INSPECTOR)
     toImpl(inspectorRef)->show();
+#else
+    UNUSED_PARAM(inspectorRef);
+#endif
+}
+
+void WKInspectorHide(WKInspectorRef inspectorRef)
+{
+#if ENABLE(INSPECTOR)
+    toImpl(inspectorRef)->hide();
+#else
+    UNUSED_PARAM(inspectorRef);
 #endif
 }
 
@@ -78,6 +111,8 @@ void WKInspectorClose(WKInspectorRef inspectorRef)
 {
 #if ENABLE(INSPECTOR)
     toImpl(inspectorRef)->close();
+#else
+    UNUSED_PARAM(inspectorRef);
 #endif
 }
 
@@ -85,6 +120,8 @@ void WKInspectorShowConsole(WKInspectorRef inspectorRef)
 {
 #if ENABLE(INSPECTOR)
     toImpl(inspectorRef)->showConsole();
+#else
+    UNUSED_PARAM(inspectorRef);
 #endif
 }
 
@@ -92,6 +129,8 @@ void WKInspectorShowResources(WKInspectorRef inspectorRef)
 {
 #if ENABLE(INSPECTOR)
     toImpl(inspectorRef)->showResources();
+#else
+    UNUSED_PARAM(inspectorRef);
 #endif
 }
 
@@ -99,6 +138,9 @@ void WKInspectorShowMainResourceForFrame(WKInspectorRef inspectorRef, WKFrameRef
 {
 #if ENABLE(INSPECTOR)
     toImpl(inspectorRef)->showMainResourceForFrame(toImpl(frameRef));
+#else
+    UNUSED_PARAM(inspectorRef);
+    UNUSED_PARAM(frameRef);
 #endif
 }
 
@@ -107,6 +149,7 @@ bool WKInspectorIsAttached(WKInspectorRef inspectorRef)
 #if ENABLE(INSPECTOR)
     return toImpl(inspectorRef)->isAttached();
 #else
+    UNUSED_PARAM(inspectorRef);
     return false;
 #endif
 }
@@ -115,6 +158,8 @@ void WKInspectorAttach(WKInspectorRef inspectorRef)
 {
 #if ENABLE(INSPECTOR)
     toImpl(inspectorRef)->attach();
+#else
+    UNUSED_PARAM(inspectorRef);
 #endif
 }
 
@@ -122,6 +167,8 @@ void WKInspectorDetach(WKInspectorRef inspectorRef)
 {
 #if ENABLE(INSPECTOR)
     toImpl(inspectorRef)->detach();
+#else
+    UNUSED_PARAM(inspectorRef);
 #endif
 }
 
@@ -130,6 +177,7 @@ bool WKInspectorIsDebuggingJavaScript(WKInspectorRef inspectorRef)
 #if ENABLE(INSPECTOR)
     return toImpl(inspectorRef)->isDebuggingJavaScript();
 #else
+    UNUSED_PARAM(inspectorRef);
     return false;
 #endif
 }
@@ -138,6 +186,8 @@ void WKInspectorToggleJavaScriptDebugging(WKInspectorRef inspectorRef)
 {
 #if ENABLE(INSPECTOR)
     toImpl(inspectorRef)->toggleJavaScriptDebugging();
+#else
+    UNUSED_PARAM(inspectorRef);
 #endif
 }
 
@@ -146,6 +196,7 @@ bool WKInspectorIsProfilingJavaScript(WKInspectorRef inspectorRef)
 #if ENABLE(INSPECTOR)
     return toImpl(inspectorRef)->isProfilingJavaScript();
 #else
+    UNUSED_PARAM(inspectorRef);
     return false;
 #endif
 }
@@ -154,6 +205,8 @@ void WKInspectorToggleJavaScriptProfiling(WKInspectorRef inspectorRef)
 {
 #if ENABLE(INSPECTOR)
     toImpl(inspectorRef)->toggleJavaScriptProfiling();
+#else
+    UNUSED_PARAM(inspectorRef);
 #endif
 }
 
@@ -162,6 +215,7 @@ bool WKInspectorIsProfilingPage(WKInspectorRef inspectorRef)
 #if ENABLE(INSPECTOR)
     return toImpl(inspectorRef)->isProfilingPage();
 #else
+    UNUSED_PARAM(inspectorRef);
     return false;
 #endif
 }
@@ -170,5 +224,7 @@ void WKInspectorTogglePageProfiling(WKInspectorRef inspectorRef)
 {
 #if ENABLE(INSPECTOR)
     toImpl(inspectorRef)->togglePageProfiling();
+#else
+    UNUSED_PARAM(inspectorRef);
 #endif
 }

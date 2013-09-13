@@ -44,8 +44,8 @@ PassRefPtr<MediaStreamAudioDestinationNode> MediaStreamAudioDestinationNode::cre
 }
 
 MediaStreamAudioDestinationNode::MediaStreamAudioDestinationNode(AudioContext* context, size_t numberOfChannels)
-    : AudioBasicInspectorNode(context, context->sampleRate())
-    , m_mixBus(numberOfChannels, ProcessingSizeInFrames)
+    : AudioBasicInspectorNode(context, context->sampleRate(), numberOfChannels)
+    , m_mixBus(AudioBus::create(numberOfChannels, ProcessingSizeInFrames))
 {
     setNodeType(NodeTypeMediaStreamAudioDestination);
 
@@ -55,6 +55,8 @@ MediaStreamAudioDestinationNode::MediaStreamAudioDestinationNode(AudioContext* c
     MediaStreamSourceVector videoSources;
     m_stream = LocalMediaStream::create(context->scriptExecutionContext(), audioSources, videoSources);
     MediaStreamCenter::instance().didCreateMediaStream(m_stream->descriptor());
+
+    m_source->setAudioFormat(numberOfChannels, context->sampleRate());
 
     initialize();
 }
@@ -71,8 +73,8 @@ MediaStreamAudioDestinationNode::~MediaStreamAudioDestinationNode()
 
 void MediaStreamAudioDestinationNode::process(size_t numberOfFrames)
 {
-    m_mixBus.copyFrom(*input(0)->bus());
-    m_source->consumeAudio(&m_mixBus, numberOfFrames);
+    m_mixBus->copyFrom(*input(0)->bus());
+    m_source->consumeAudio(m_mixBus.get(), numberOfFrames);
 }
 
 void MediaStreamAudioDestinationNode::reset()

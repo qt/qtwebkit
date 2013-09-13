@@ -80,6 +80,7 @@ public:
     enum ResultCondition {
         Overflow,
         Signed,
+        PositiveOrZero,
         Zero,
         NonZero
     };
@@ -233,20 +234,44 @@ public:
         /*
            li   addrTemp, address
            li   immTemp, imm
-           lw   dataTemp, 0(addrTemp)
-           addu dataTemp, dataTemp, immTemp
+           lw   cmpTemp, 0(addrTemp)
+           addu dataTemp, cmpTemp, immTemp
            sw   dataTemp, 0(addrTemp)
         */
         move(TrustedImmPtr(address.m_ptr), addrTempRegister);
-        m_assembler.lw(dataTempRegister, addrTempRegister, 0);
-        if (imm.m_value >= -32768 && imm.m_value <= 32767
-            && !m_fixedWidth)
-            m_assembler.addiu(dataTempRegister, dataTempRegister, imm.m_value);
+        m_assembler.lw(cmpTempRegister, addrTempRegister, 0);
+        if (imm.m_value >= -32768 && imm.m_value <= 32767 && !m_fixedWidth)
+            m_assembler.addiu(dataTempRegister, cmpTempRegister, imm.m_value);
         else {
             move(imm, immTempRegister);
-            m_assembler.addu(dataTempRegister, dataTempRegister, immTempRegister);
+            m_assembler.addu(dataTempRegister, cmpTempRegister, immTempRegister);
         }
         m_assembler.sw(dataTempRegister, addrTempRegister, 0);
+    }
+
+    void add64(TrustedImm32 imm, AbsoluteAddress address)
+    {
+        /*
+            add32(imm, address)
+            sltu  immTemp, dataTemp, cmpTemp    # set carry-in bit
+            lw    dataTemp, 4(addrTemp)
+            addiu dataTemp, imm.m_value >> 31 ? -1 : 0
+            addu  dataTemp, dataTemp, immTemp
+            sw    dataTemp, 4(addrTemp)
+        */
+        add32(imm, address);
+        m_assembler.sltu(immTempRegister, dataTempRegister, cmpTempRegister);
+        m_assembler.lw(dataTempRegister, addrTempRegister, 4);
+        if (imm.m_value >> 31)
+            m_assembler.addiu(dataTempRegister, dataTempRegister, -1);
+        m_assembler.addu(dataTempRegister, dataTempRegister, immTempRegister);
+        m_assembler.sw(dataTempRegister, addrTempRegister, 4);
+    }
+
+    void and32(Address src, RegisterID dest)
+    {
+        load32(src, dataTempRegister);
+        and32(dataTempRegister, dest);
     }
 
     void and32(RegisterID src, RegisterID dest)
@@ -596,7 +621,7 @@ public:
     
     void absDouble(FPRegisterID, FPRegisterID)
     {
-        ASSERT_NOT_REACHED();
+        RELEASE_ASSERT_NOT_REACHED();
     }
 
     ConvertibleLoadLabel convertibleLoadPtr(Address address, RegisterID dest)
@@ -1485,7 +1510,7 @@ public:
 
     Jump branchAdd32(ResultCondition cond, RegisterID src, RegisterID dest)
     {
-        ASSERT((cond == Overflow) || (cond == Signed) || (cond == Zero) || (cond == NonZero));
+        ASSERT((cond == Overflow) || (cond == Signed) || (cond == PositiveOrZero) || (cond == Zero) || (cond == NonZero));
         if (cond == Overflow) {
             /*
                 move    dest, dataTemp
@@ -1518,6 +1543,12 @@ public:
             m_assembler.slt(cmpTempRegister, dest, MIPSRegisters::zero);
             return branchNotEqual(cmpTempRegister, MIPSRegisters::zero);
         }
+        if (cond == PositiveOrZero) {
+            add32(src, dest);
+            // Check if dest is not negative.
+            m_assembler.slt(cmpTempRegister, dest, MIPSRegisters::zero);
+            return branchEqual(cmpTempRegister, MIPSRegisters::zero);
+        }
         if (cond == Zero) {
             add32(src, dest);
             return branchEqual(dest, MIPSRegisters::zero);
@@ -1532,7 +1563,7 @@ public:
 
     Jump branchAdd32(ResultCondition cond, RegisterID op1, RegisterID op2, RegisterID dest)
     {
-        ASSERT((cond == Overflow) || (cond == Signed) || (cond == Zero) || (cond == NonZero));
+        ASSERT((cond == Overflow) || (cond == Signed) || (cond == PositiveOrZero) || (cond == Zero) || (cond == NonZero));
         if (cond == Overflow) {
             /*
                 move    dataTemp, op1
@@ -1565,6 +1596,12 @@ public:
             m_assembler.slt(cmpTempRegister, dest, MIPSRegisters::zero);
             return branchNotEqual(cmpTempRegister, MIPSRegisters::zero);
         }
+        if (cond == PositiveOrZero) {
+            add32(op1, op2, dest);
+            // Check if dest is not negative.
+            m_assembler.slt(cmpTempRegister, dest, MIPSRegisters::zero);
+            return branchEqual(cmpTempRegister, MIPSRegisters::zero);
+        }
         if (cond == Zero) {
             add32(op1, op2, dest);
             return branchEqual(dest, MIPSRegisters::zero);
@@ -1592,7 +1629,7 @@ public:
 
     Jump branchAdd32(ResultCondition cond, TrustedImm32 imm, AbsoluteAddress dest)
     {
-        ASSERT((cond == Overflow) || (cond == Signed) || (cond == Zero) || (cond == NonZero));
+        ASSERT((cond == Overflow) || (cond == Signed) || (cond == PositiveOrZero) || (cond == Zero) || (cond == NonZero));
         if (cond == Overflow) {
             /*
                 move    dataTemp, dest
@@ -1641,6 +1678,11 @@ public:
             // Check if dest is negative.
             m_assembler.slt(cmpTempRegister, dataTempRegister, MIPSRegisters::zero);
             return branchNotEqual(cmpTempRegister, MIPSRegisters::zero);
+        }
+        if (cond == PositiveOrZero) {
+            // Check if dest is not negative.
+            m_assembler.slt(cmpTempRegister, dataTempRegister, MIPSRegisters::zero);
+            return branchEqual(cmpTempRegister, MIPSRegisters::zero);
         }
         if (cond == Zero)
             return branchEqual(dataTempRegister, MIPSRegisters::zero);
@@ -2598,13 +2640,14 @@ public:
     // If the result is not representable as a 32 bit value, branch.
     // May also branch for some values that are representable in 32 bits
     // (specifically, in this case, 0).
-    void branchConvertDoubleToInt32(FPRegisterID src, RegisterID dest, JumpList& failureCases, FPRegisterID fpTemp)
+    void branchConvertDoubleToInt32(FPRegisterID src, RegisterID dest, JumpList& failureCases, FPRegisterID fpTemp, bool negZeroCheck = true)
     {
         m_assembler.cvtwd(fpTempRegister, src);
         m_assembler.mfc1(dest, fpTempRegister);
 
         // If the result is zero, it might have been -0.0, and the double comparison won't catch this!
-        failureCases.append(branch32(Equal, dest, MIPSRegisters::zero));
+        if (negZeroCheck)
+            failureCases.append(branch32(Equal, dest, MIPSRegisters::zero));
 
         // Convert the integer result back to float & compare to the original value - if not equal or unordered (NaN) then jump.
         convertInt32ToDouble(dest, fpTemp);

@@ -27,13 +27,13 @@
 
 #include "QualifiedName.h"
 #include "HTMLNames.h"
-#include "WebCoreMemoryInstrumentation.h"
 #include "XLinkNames.h"
 #include "XMLNSNames.h"
 #include "XMLNames.h"
 #include <wtf/Assertions.h>
 #include <wtf/HashSet.h>
 #include <wtf/StaticConstructors.h>
+#include <wtf/text/StringBuilder.h>
 
 #if ENABLE(MATHML)
 #include "MathMLNames.h"
@@ -77,14 +77,16 @@ struct QNameComponentsTranslator {
     }
 };
 
-static QNameSet* gNameCache;
+static inline QNameSet& qualifiedNameCache()
+{
+    DEFINE_STATIC_LOCAL(QNameSet, nameCache, ());
+    return nameCache;
+}
 
 QualifiedName::QualifiedName(const AtomicString& p, const AtomicString& l, const AtomicString& n)
 {
-    if (!gNameCache)
-        gNameCache = new QNameSet;
     QualifiedNameComponents components = { p.impl(), l.impl(), n.isEmpty() ? nullAtom.impl() : n.impl() };
-    QNameSet::AddResult addResult = gNameCache->add<QualifiedNameComponents, QNameComponentsTranslator>(components);
+    QNameSet::AddResult addResult = qualifiedNameCache().add<QNameComponentsTranslator>(components);
     m_impl = *addResult.iterator;
     if (!addResult.isNewEntry)
         m_impl->ref();
@@ -102,22 +104,20 @@ void QualifiedName::deref()
         return;
 #endif
     ASSERT(!isHashTableDeletedValue());
-
-    if (m_impl->hasOneRef())
-        gNameCache->remove(m_impl);
     m_impl->deref();
+}
+
+QualifiedName::QualifiedNameImpl::~QualifiedNameImpl()
+{
+    qualifiedNameCache().remove(this);
 }
 
 String QualifiedName::toString() const
 {
-    String local = localName();
-    if (hasPrefix()) {
-        String result = prefix().string();
-        result.append(":");
-        result.append(local);
-        return result;
-    }
-    return local;
+    if (!hasPrefix())
+        return localName();
+
+    return prefix().string() + ':' + localName().string();
 }
 
 // Global init routines
@@ -125,14 +125,14 @@ DEFINE_GLOBAL(QualifiedName, anyName, nullAtom, starAtom, starAtom)
 
 void QualifiedName::init()
 {
-    static bool initialized;
-    if (!initialized) {
-        // Use placement new to initialize the globals.
-        
-        AtomicString::init();
-        new ((void*)&anyName) QualifiedName(nullAtom, starAtom, starAtom);
-        initialized = true;
-    }
+    static bool initialized = false;
+    if (initialized)
+        return;
+
+    // Use placement new to initialize the globals.
+    AtomicString::init();
+    new (NotNull, (void*)&anyName) QualifiedName(nullAtom, starAtom, starAtom);
+    initialized = true;
 }
 
 const QualifiedName& nullQName()
@@ -148,38 +148,20 @@ const AtomicString& QualifiedName::localNameUpper() const
     return m_impl->m_localNameUpper;
 }
 
-void QualifiedName::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::DOM);
-    info.addMember(m_impl);
-}
-
-
-void QualifiedName::QualifiedNameImpl::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::DOM);
-    info.addMember(m_prefix);
-    info.addMember(m_localName);
-    info.addMember(m_namespace);
-    info.addMember(m_localNameUpper);
-}
-
 unsigned QualifiedName::QualifiedNameImpl::computeHash() const
 {
     QualifiedNameComponents components = { m_prefix.impl(), m_localName.impl(), m_namespace.impl() };
     return hashComponents(components);
 }
 
-void createQualifiedName(void* targetAddress, const char* name, unsigned nameLength, const AtomicString& nameNamespace)
+void createQualifiedName(void* targetAddress, StringImpl* name, const AtomicString& nameNamespace)
 {
-    AtomicString atomicName(name, nameLength, AtomicString::ConstructFromLiteral);
-    new (reinterpret_cast<void*>(targetAddress)) QualifiedName(nullAtom, atomicName, nameNamespace);
+    new (NotNull, reinterpret_cast<void*>(targetAddress)) QualifiedName(nullAtom, AtomicString(name), nameNamespace);
 }
 
-void createQualifiedName(void* targetAddress, const char* name, unsigned nameLength)
+void createQualifiedName(void* targetAddress, StringImpl* name)
 {
-    AtomicString atomicName(name, nameLength, AtomicString::ConstructFromLiteral);
-    new (reinterpret_cast<void*>(targetAddress)) QualifiedName(nullAtom, atomicName, nullAtom);
+    new (NotNull, reinterpret_cast<void*>(targetAddress)) QualifiedName(nullAtom, AtomicString(name), nullAtom);
 }
 
 }

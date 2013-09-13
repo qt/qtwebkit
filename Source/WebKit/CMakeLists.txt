@@ -1,7 +1,9 @@
-SET(WebKit_INCLUDE_DIRECTORIES
+set(WebKit_INCLUDE_DIRECTORIES
+    "${CMAKE_SOURCE_DIR}/Source"
+    "${JAVASCRIPTCORE_DIR}/ForwardingHeaders"
     "${WEBKIT_DIR}"
     "${WEBCORE_DIR}"
-    "${WEBCORE_DIR}/Modules/intents"
+    "${WEBCORE_DIR}/Modules/filesystem"
     "${WEBCORE_DIR}/Modules/networkinfo"
     "${WEBCORE_DIR}/Modules/webdatabase"
     "${WEBCORE_DIR}/accessibility"
@@ -17,6 +19,7 @@ SET(WebKit_INCLUDE_DIRECTORIES
     "${WEBCORE_DIR}/editing"
     "${WEBCORE_DIR}/history"
     "${WEBCORE_DIR}/html"
+    "${WEBCORE_DIR}/html/forms"
     "${WEBCORE_DIR}/html/shadow"
     "${WEBCORE_DIR}/inspector"
     "${WEBCORE_DIR}/loader"
@@ -38,6 +41,7 @@ SET(WebKit_INCLUDE_DIRECTORIES
     "${WEBCORE_DIR}/platform/text"
     "${WEBCORE_DIR}/plugins"
     "${WEBCORE_DIR}/rendering"
+    "${WEBCORE_DIR}/rendering/shapes"
     "${WEBCORE_DIR}/rendering/style"
     "${WEBCORE_DIR}/storage"
     "${WEBCORE_DIR}/svg"
@@ -65,35 +69,41 @@ SET(WebKit_INCLUDE_DIRECTORIES
     "${CMAKE_BINARY_DIR}"
 )
 
-IF (WTF_USE_SOUP)
-  LIST(APPEND WebKit_INCLUDE_DIRECTORIES "${WEBCORE_DIR}/platform/network/soup")
-ENDIF ()
+if (WTF_USE_SOUP)
+  list(APPEND WebKit_INCLUDE_DIRECTORIES "${WEBCORE_DIR}/platform/network/soup")
+endif ()
 
-IF (WTF_USE_CURL)
-  LIST(APPEND WebKit_INCLUDE_DIRECTORIES "${WEBCORE_DIR}/platform/network/curl")
-ENDIF ()
+if (WTF_USE_CURL)
+  list(APPEND WebKit_INCLUDE_DIRECTORIES "${WEBCORE_DIR}/platform/network/curl")
+endif ()
 
-SET(WebKit_LIBRARIES
-    ${WebCore_LIBRARY_NAME}
+set(WebKit_LIBRARIES
+    JavaScriptCore
+    WTF
+    WebCore
 )
 
 WEBKIT_INCLUDE_CONFIG_FILES_IF_EXISTS()
 
-ADD_DEFINITIONS(-DBUILDING_WebKit)
-INCLUDE_DIRECTORIES(${WebKit_INCLUDE_DIRECTORIES})
-ADD_LIBRARY(${WebKit_LIBRARY_NAME} ${WebKit_LIBRARY_TYPE} ${WebKit_SOURCES})
-ADD_DEPENDENCIES(${WebKit_LIBRARY_NAME} ${WebCore_LIBRARY_NAME})
-TARGET_LINK_LIBRARIES(${WebKit_LIBRARY_NAME} ${WebKit_LIBRARIES})
-SET_TARGET_PROPERTIES(${WebKit_LIBRARY_NAME} PROPERTIES FOLDER "WebKit")
-SET_TARGET_PROPERTIES(${WebKit_LIBRARY_NAME} PROPERTIES LINK_INTERFACE_LIBRARIES "")
+add_definitions(-DBUILDING_WebKit)
+include_directories(${WebKit_INCLUDE_DIRECTORIES})
+add_library(WebKit ${WebKit_LIBRARY_TYPE} ${WebKit_SOURCES})
+add_dependencies(WebKit WebCore)
+target_link_libraries(WebKit ${WebKit_LIBRARIES})
+set_target_properties(WebKit PROPERTIES FOLDER "WebKit")
+set_target_properties(WebKit PROPERTIES LINK_INTERFACE_LIBRARIES "")
 
-IF (WebKit_LINK_FLAGS)
-    ADD_TARGET_PROPERTIES(${WebKit_LIBRARY_NAME} LINK_FLAGS "${WebKit_LINK_FLAGS}")
-ENDIF ()
+if (WebKit_LINK_FLAGS)
+    ADD_TARGET_PROPERTIES(WebKit LINK_FLAGS "${WebKit_LINK_FLAGS}")
+endif ()
 
-IF (VERSION_SCRIPT)
-    ADD_TARGET_PROPERTIES(${WebKit_LIBRARY_NAME} LINK_FLAGS "${VERSION_SCRIPT}")
-ENDIF ()
+if (VERSION_SCRIPT)
+    ADD_TARGET_PROPERTIES(WebKit LINK_FLAGS "${VERSION_SCRIPT}")
+endif ()
 
-SET_TARGET_PROPERTIES(${WebKit_LIBRARY_NAME} PROPERTIES VERSION ${PROJECT_VERSION} SOVERSION ${PROJECT_VERSION_MAJOR})
-INSTALL(TARGETS ${WebKit_LIBRARY_NAME} DESTINATION "${LIB_INSTALL_DIR}")
+if (WebKit_OUTPUT_NAME)
+    set_target_properties(WebKit PROPERTIES OUTPUT_NAME ${WebKit_OUTPUT_NAME})
+endif ()
+
+set_target_properties(WebKit PROPERTIES VERSION ${PROJECT_VERSION} SOVERSION ${PROJECT_VERSION_MAJOR})
+install(TARGETS WebKit DESTINATION "${LIB_INSTALL_DIR}")

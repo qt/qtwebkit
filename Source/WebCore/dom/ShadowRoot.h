@@ -33,138 +33,80 @@
 #include "Element.h"
 #include "ExceptionCode.h"
 #include "TreeScope.h"
-#include <wtf/DoublyLinkedList.h>
 
 namespace WebCore {
 
-class Document;
-class DOMSelection;
 class ElementShadow;
-class InsertionPoint;
-class ShadowRootContentDistributionData;
 
-class ShadowRoot : public DocumentFragment, public TreeScope, public DoublyLinkedListNode<ShadowRoot> {
-    friend class WTF::DoublyLinkedListNode<ShadowRoot>;
+class ShadowRoot FINAL : public DocumentFragment, public TreeScope {
 public:
-    static PassRefPtr<ShadowRoot> create(Element*, ExceptionCode&);
-
     // FIXME: We will support multiple shadow subtrees, however current implementation does not work well
     // if a shadow root is dynamically created. So we prohibit multiple shadow subtrees
     // in several elements for a while.
     // See https://bugs.webkit.org/show_bug.cgi?id=77503 and related bugs.
     enum ShadowRootType {
-        UserAgentShadowRoot,
+        UserAgentShadowRoot = 0,
         AuthorShadowRoot
     };
-    static PassRefPtr<ShadowRoot> create(Element*, ShadowRootType, ExceptionCode& = ASSERT_NO_EXCEPTION);
 
-    void recalcShadowTreeStyle(StyleChange);
+    static PassRefPtr<ShadowRoot> create(Document* document, ShadowRootType type)
+    {
+        return adoptRef(new ShadowRoot(document, type));
+    }
 
-    virtual bool applyAuthorStyles() const OVERRIDE;
+    virtual ~ShadowRoot();
+
+    void recalcStyle(StyleChange);
+
+    virtual bool applyAuthorStyles() const OVERRIDE { return m_applyAuthorStyles; }
     void setApplyAuthorStyles(bool);
-    virtual bool resetStyleInheritance() const OVERRIDE;
+    virtual bool resetStyleInheritance() const OVERRIDE { return m_resetStyleInheritance; }
     void setResetStyleInheritance(bool);
 
-    Element* host() const;
-    void setHost(Element*);
-    ElementShadow* owner() const;
+    Element* host() const { return toElement(parentOrShadowHostNode()); }
+    ElementShadow* owner() const { return host() ? host()->shadow() : 0; }
 
     String innerHTML() const;
     void setInnerHTML(const String&, ExceptionCode&);
 
     Element* activeElement() const;
 
-    ShadowRoot* youngerShadowRoot() const { return prev(); }
-    ShadowRoot* olderShadowRoot() const { return next(); }
-
-    bool isYoungest() const { return !youngerShadowRoot(); }
-    bool isOldest() const { return !olderShadowRoot(); }
-
-    bool hasInsertionPoint() const;
-
-    virtual void attach();
-
-    virtual InsertionNotificationRequest insertedInto(ContainerNode*) OVERRIDE;
-    virtual void removedFrom(ContainerNode*) OVERRIDE;
-
-    bool isUsedForRendering() const;
-    InsertionPoint* assignedTo() const;
-    void setAssignedTo(InsertionPoint*);
-
-    void registerShadowElement();
-    void unregisterShadowElement();
-    bool hasShadowInsertionPoint() const;
-
-    void registerContentElement();
-    void unregisterContentElement();
-    bool hasContentElement() const;
-
-    void registerElementShadow();
-    void unregisterElementShadow();
-    bool hasElementShadow() const;
-    unsigned countElementShadow() const;
-
-    const Vector<InsertionPoint*>& insertionPointList();
+    virtual void attach(const AttachContext& = AttachContext()) OVERRIDE;
 
     virtual void registerScopedHTMLStyleChild() OVERRIDE;
     virtual void unregisterScopedHTMLStyleChild() OVERRIDE;
 
-    ShadowRootType type() const { return m_isAuthorShadowRoot ? AuthorShadowRoot : UserAgentShadowRoot; }
+    ShadowRootType type() const { return static_cast<ShadowRootType>(m_type); }
 
     PassRefPtr<Node> cloneNode(bool, ExceptionCode&);
 
-    virtual void reportMemoryUsage(MemoryObjectInfo*) const OVERRIDE;
-
 private:
-    explicit ShadowRoot(Document*);
-    virtual ~ShadowRoot();
-    virtual String nodeName() const;
-    virtual PassRefPtr<Node> cloneNode(bool deep);
-    virtual bool childTypeAllowed(NodeType) const;
+    ShadowRoot(Document*, ShadowRootType);
+
+    virtual void dispose() OVERRIDE;
+    virtual bool childTypeAllowed(NodeType) const OVERRIDE;
     virtual void childrenChanged(bool changedByParser, Node* beforeChange, Node* afterChange, int childCountDelta) OVERRIDE;
-    virtual bool documentFragmentIsShadowRoot() const OVERRIDE { return true; }
 
-    void setType(ShadowRootType type) { m_isAuthorShadowRoot = type == AuthorShadowRoot; }
+    // ShadowRoots should never be cloned.
+    virtual PassRefPtr<Node> cloneNode(bool) OVERRIDE { return 0; }
 
-    ShadowRootContentDistributionData* distributionData() { return m_distributionData.get(); }
-    const ShadowRootContentDistributionData* distributionData() const { return m_distributionData.get(); }
-    ShadowRootContentDistributionData* ensureDistributionData();
+    // FIXME: This shouldn't happen. https://bugs.webkit.org/show_bug.cgi?id=88834
+    bool isOrphan() const { return !host(); }
 
-    ShadowRoot* m_prev;
-    ShadowRoot* m_next;
-    OwnPtr<ShadowRootContentDistributionData> m_distributionData;
     unsigned m_numberOfStyles : 28;
     unsigned m_applyAuthorStyles : 1;
     unsigned m_resetStyleInheritance : 1;
-    unsigned m_isAuthorShadowRoot : 1;
-    unsigned m_registeredWithParentShadowRoot : 1;
+    unsigned m_type : 1;
 };
-
-inline Element* ShadowRoot::host() const
-{
-    return toElement(parentOrHostNode());
-}
-
-inline void ShadowRoot::setHost(Element* host)
-{
-    setParentOrHostNode(host);
-}
-
-inline bool ShadowRoot::isUsedForRendering() const
-{
-    return isYoungest() || assignedTo();
-}
 
 inline Element* ShadowRoot::activeElement() const
 {
-    if (Node* node = treeScope()->focusedNode())
-        return node->isElementNode() ? toElement(node) : 0;
-    return 0;
+    return treeScope()->focusedElement();
 }
 
 inline const ShadowRoot* toShadowRoot(const Node* node)
 {
-    ASSERT(!node || node->isShadowRoot());
+    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->isShadowRoot());
     return static_cast<const ShadowRoot*>(node);
 }
 

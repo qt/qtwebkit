@@ -33,7 +33,7 @@
  */
 WebInspector.CSSNamedFlowCollectionsView = function()
 {
-    WebInspector.SidebarView.call(this, WebInspector.SidebarView.SidebarPosition.Left);
+    WebInspector.SidebarView.call(this, WebInspector.SidebarView.SidebarPosition.Start);
     this.registerRequiredCSS("cssNamedFlows.css");
 
     this._namedFlows = {};
@@ -46,11 +46,11 @@ WebInspector.CSSNamedFlowCollectionsView = function()
     this._statusElement = document.createElement("span");
     this._statusElement.textContent = WebInspector.UIString("CSS Named Flows");
 
-    var sidebarHeader = this._leftElement.createChild("div", "tabbed-pane-header selected sidebar-header")
+    var sidebarHeader = this.firstElement().createChild("div", "tabbed-pane-header selected sidebar-header");
     var tab = sidebarHeader.createChild("div", "tabbed-pane-header-tab");
     tab.createChild("span", "tabbed-pane-header-tab-title").textContent = WebInspector.UIString("CSS Named Flows");
 
-    this._sidebarContentElement = this._leftElement.createChild("div", "sidebar-content outline-disclosure");
+    this._sidebarContentElement = this.firstElement().createChild("div", "sidebar-content outline-disclosure");
     this._flowListElement = this._sidebarContentElement.createChild("ol");
     this._flowTree = new TreeOutline(this._flowListElement);
 
@@ -60,7 +60,7 @@ WebInspector.CSSNamedFlowCollectionsView = function()
 
     this._tabbedPane = new WebInspector.TabbedPane();
     this._tabbedPane.closeableTabs = true;
-    this._tabbedPane.show(this._rightElement);
+    this._tabbedPane.show(this.secondElement());
 }
 
 WebInspector.CSSNamedFlowCollectionsView.prototype = {
@@ -247,6 +247,19 @@ WebInspector.CSSNamedFlowCollectionsView.prototype = {
         var flow = /** @type {WebInspector.NamedFlow} */ (event.data);
         this._updateNamedFlow(flow);
     },
+    
+    /**
+     * @param {WebInspector.Event} event
+     */
+    _regionOversetChanged: function(event)
+    {
+        // FIXME: We only have support for Named Flows in the main document.
+        if (event.data.documentNodeId !== this._document.id)
+            return;
+        
+        var flow = /** @type {WebInspector.NamedFlow} */ (event.data);
+        this._updateNamedFlow(flow);
+    },
 
     /**
      * @param {DOMAgent.NodeId} documentNodeId
@@ -352,6 +365,7 @@ WebInspector.CSSNamedFlowCollectionsView.prototype = {
         WebInspector.cssModel.addEventListener(WebInspector.CSSStyleModel.Events.NamedFlowCreated, this._namedFlowCreated, this);
         WebInspector.cssModel.addEventListener(WebInspector.CSSStyleModel.Events.NamedFlowRemoved, this._namedFlowRemoved, this);
         WebInspector.cssModel.addEventListener(WebInspector.CSSStyleModel.Events.RegionLayoutUpdated, this._regionLayoutUpdated, this);
+        WebInspector.cssModel.addEventListener(WebInspector.CSSStyleModel.Events.RegionOversetChanged, this._regionOversetChanged, this);
 
         WebInspector.panel("elements").treeOutline.addEventListener(WebInspector.ElementsTreeOutline.Events.SelectedNodeChanged, this._selectedNodeChanged, this);
 
@@ -366,6 +380,7 @@ WebInspector.CSSNamedFlowCollectionsView.prototype = {
         WebInspector.cssModel.removeEventListener(WebInspector.CSSStyleModel.Events.NamedFlowCreated, this._namedFlowCreated, this);
         WebInspector.cssModel.removeEventListener(WebInspector.CSSStyleModel.Events.NamedFlowRemoved, this._namedFlowRemoved, this);
         WebInspector.cssModel.removeEventListener(WebInspector.CSSStyleModel.Events.RegionLayoutUpdated, this._regionLayoutUpdated, this);
+        WebInspector.cssModel.removeEventListener(WebInspector.CSSStyleModel.Events.RegionOversetChanged, this._regionOversetChanged, this);
 
         WebInspector.panel("elements").treeOutline.removeEventListener(WebInspector.ElementsTreeOutline.Events.SelectedNodeChanged, this._selectedNodeChanged, this);
 

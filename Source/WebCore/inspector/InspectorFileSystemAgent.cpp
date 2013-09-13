@@ -43,6 +43,7 @@
 #include "EntryArray.h"
 #include "EntryCallback.h"
 #include "ErrorCallback.h"
+#include "Event.h"
 #include "File.h"
 #include "FileCallback.h"
 #include "FileEntry.h"
@@ -498,8 +499,7 @@ bool FileContentRequest::didGetFile(File* file)
     m_reader->setOnload(this);
     m_reader->setOnerror(this);
 
-    ExceptionCode ec = 0;
-    m_reader->readAsArrayBuffer(blob.get(), ec);
+    m_reader->readAsArrayBuffer(blob.get(), IGNORE_EXCEPTION);
     return true;
 }
 
@@ -605,7 +605,7 @@ bool DeleteEntryRequest::didDeleteEntry()
 } // anonymous namespace
 
 // static
-PassOwnPtr<InspectorFileSystemAgent> InspectorFileSystemAgent::create(InstrumentingAgents* instrumentingAgents, InspectorPageAgent* pageAgent, InspectorState* state)
+PassOwnPtr<InspectorFileSystemAgent> InspectorFileSystemAgent::create(InstrumentingAgents* instrumentingAgents, InspectorPageAgent* pageAgent, InspectorCompositeState* state)
 {
     return adoptPtr(new InspectorFileSystemAgent(instrumentingAgents, pageAgent, state));
 }
@@ -706,7 +706,7 @@ void InspectorFileSystemAgent::restore()
     m_enabled = m_state->getBoolean(FileSystemAgentState::fileSystemAgentEnabled);
 }
 
-InspectorFileSystemAgent::InspectorFileSystemAgent(InstrumentingAgents* instrumentingAgents, InspectorPageAgent* pageAgent, InspectorState* state)
+InspectorFileSystemAgent::InspectorFileSystemAgent(InstrumentingAgents* instrumentingAgents, InspectorPageAgent* pageAgent, InspectorCompositeState* state)
     : InspectorBaseAgent<InspectorFileSystemAgent>("FileSystem", instrumentingAgents, state)
     , m_pageAgent(pageAgent)
     , m_enabled(false)

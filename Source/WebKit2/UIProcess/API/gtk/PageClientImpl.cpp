@@ -212,6 +212,8 @@ void PageClientImpl::doneWithKeyEvent(const NativeWebKeyboardEvent& event, bool 
 {
     if (wasEventHandled)
         return;
+    if (event.isFakeEventForComposition())
+        return;
 
     WebKitWebViewBase* webkitWebViewBase = WEBKIT_WEB_VIEW_BASE(m_viewWidget);
     webkitWebViewBaseForwardNextKeyEvent(webkitWebViewBase);
@@ -229,7 +231,7 @@ PassRefPtr<WebContextMenuProxy> PageClientImpl::createContextMenuProxy(WebPagePr
 }
 
 #if ENABLE(INPUT_TYPE_COLOR)
-PassRefPtr<WebColorChooserProxy> PageClientImpl::createColorChooserProxy(WebPageProxy*, const WebCore::Color&, const WebCore::IntRect&)
+PassRefPtr<WebColorPicker> PageClientImpl::createColorPicker(WebPageProxy*, const WebCore::Color&, const WebCore::IntRect&)
 {
     notImplemented();
     return 0;
@@ -258,32 +260,14 @@ void PageClientImpl::updateAcceleratedCompositingMode(const LayerTreeContext&)
 }
 #endif // USE(ACCELERATED_COMPOSITING)
 
-void PageClientImpl::didCommitLoadForMainFrame(bool useCustomRepresentation)
-{
-}
-
-void PageClientImpl::didFinishLoadingDataForCustomRepresentation(const String& suggestedFilename, const CoreIPC::DataReference&)
-{
-}
-
-double PageClientImpl::customRepresentationZoomFactor()
-{
-    notImplemented();
-    return 0;
-}
-
-void PageClientImpl::setCustomRepresentationZoomFactor(double)
-{
-    notImplemented();
-}
-
 void PageClientImpl::pageClosed()
 {
     notImplemented();
 }
 
-void PageClientImpl::didChangeScrollbarsForMainFrame() const
+void PageClientImpl::preferencesDidChange()
 {
+    notImplemented();
 }
 
 void PageClientImpl::flashBackingStoreUpdates(const Vector<IntRect>&)
@@ -291,14 +275,9 @@ void PageClientImpl::flashBackingStoreUpdates(const Vector<IntRect>&)
     notImplemented();
 }
 
-void PageClientImpl::findStringInCustomRepresentation(const String&, FindOptions, unsigned)
+void PageClientImpl::updateTextInputState()
 {
-    notImplemented();
-}
-
-void PageClientImpl::countStringMatchesInCustomRepresentation(const String&, FindOptions, unsigned)
-{
-    notImplemented();
+    webkitWebViewBaseUpdateTextInputState(WEBKIT_WEB_VIEW_BASE(m_viewWidget));
 }
 
 void PageClientImpl::startDrag(const WebCore::DragData& dragData, PassRefPtr<ShareableBitmap> dragImage)

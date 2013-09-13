@@ -31,6 +31,10 @@
 #include "config.h"
 #include "BlobData.h"
 
+#include "Blob.h"
+#include "BlobURL.h"
+#include "ThreadableBlobRegistry.h"
+
 #include <wtf/OwnPtr.h>
 #include <wtf/PassOwnPtr.h>
 #include <wtf/PassRefPtr.h>
@@ -69,6 +73,12 @@ void BlobData::detachFromCurrentThread()
         m_items.at(i).detachFromCurrentThread();
 }
 
+void BlobData::setContentType(const String& contentType)
+{
+    ASSERT(Blob::isNormalizedContentType(contentType));
+    m_contentType = contentType;
+}
+
 void BlobData::appendData(PassRefPtr<RawData> data, long long offset, long long length)
 {
     m_items.append(BlobDataItem(data, offset, length));
@@ -99,6 +109,19 @@ void BlobData::appendURL(const KURL& url, long long offset, long long length, do
 void BlobData::swapItems(BlobDataItemList& items)
 {
     m_items.swap(items);
+}
+
+
+BlobDataHandle::BlobDataHandle(PassOwnPtr<BlobData> data, long long size)
+{
+    UNUSED_PARAM(size);
+    m_internalURL = BlobURL::createInternalURL();
+    ThreadableBlobRegistry::registerBlobURL(m_internalURL, data);
+}
+
+BlobDataHandle::~BlobDataHandle()
+{
+    ThreadableBlobRegistry::unregisterBlobURL(m_internalURL);
 }
 
 } // namespace WebCore

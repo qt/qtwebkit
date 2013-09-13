@@ -2,6 +2,7 @@
  * Copyright (C) 2008 Nuanti Ltd.
  * Copyright (C) 2009 Jan Alonzo
  * Copyright (C) 2012 Igalia S.L.
+ * Copyright (C) 2013 Samsung Electronics
  *
  * Portions from Mozilla a11y, copyright as follows:
  *
@@ -31,6 +32,8 @@
 #include "config.h"
 #include "WebKitAccessibleInterfaceDocument.h"
 
+#if HAVE(ACCESSIBILITY)
+
 #include "AccessibilityObject.h"
 #include "Document.h"
 #include "DocumentType.h"
@@ -54,15 +57,21 @@ static const gchar* documentAttributeValue(AtkDocument* document, const gchar* a
         return 0;
 
     String value = String();
-    if (!g_ascii_strcasecmp(attribute, "DocType") && coreDocument->doctype())
+    AtkCachedProperty atkCachedProperty;
+
+    if (!g_ascii_strcasecmp(attribute, "DocType") && coreDocument->doctype()) {
         value = coreDocument->doctype()->name();
-    else if (!g_ascii_strcasecmp(attribute, "Encoding"))
+        atkCachedProperty = AtkCachedDocumentType;
+    } else if (!g_ascii_strcasecmp(attribute, "Encoding")) {
         value = coreDocument->charset();
-    else if (!g_ascii_strcasecmp(attribute, "URI"))
+        atkCachedProperty = AtkCachedDocumentEncoding;
+    } else if (!g_ascii_strcasecmp(attribute, "URI")) {
         value = coreDocument->documentURI();
+        atkCachedProperty = AtkCachedDocumentURI;
+    }
 
     if (!value.isEmpty())
-        return returnString(value);
+        return cacheAndReturnAtkProperty(ATK_OBJECT(document), atkCachedProperty, value);
 
     return 0;
 }
@@ -88,12 +97,12 @@ static AtkAttributeSet* webkitAccessibleDocumentGetAttributes(AtkDocument* docum
 
 static const gchar* webkitAccessibleDocumentGetLocale(AtkDocument* document)
 {
-    // TODO: Should we fall back on lang xml:lang when the following comes up empty?
-    String language = core(document)->language();
-    if (!language.isEmpty())
-        return returnString(language);
-
-    return 0;
+    // The logic to resolve locale has been moved to
+    // AtkObject::get_object_locale() virtual method. However, to avoid breaking
+    // clients expecting the deprecated AtkDocumentIface::get_document_locale()
+    // to be overriden, method is kept and chained up to
+    // AtkObject::get_object_locale(). <https://bugs.webkit.org/show_bug.cgi?id=115647>
+    return atk_object_get_object_locale(ATK_OBJECT(document));
 }
 
 void webkitAccessibleDocumentInterfaceInit(AtkDocumentIface* iface)
@@ -102,3 +111,5 @@ void webkitAccessibleDocumentInterfaceInit(AtkDocumentIface* iface)
     iface->get_document_attributes = webkitAccessibleDocumentGetAttributes;
     iface->get_document_locale = webkitAccessibleDocumentGetLocale;
 }
+
+#endif

@@ -23,10 +23,10 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#if ENABLE(PDFKIT_PLUGIN)
-
 #import "config.h"
 #import "PDFPluginAnnotation.h"
+
+#if ENABLE(PDFKIT_PLUGIN)
 
 #import "PDFKitImports.h"
 #import "PDFLayerControllerDetails.h"
@@ -69,8 +69,8 @@ void PDFPluginAnnotation::attach(Element* parent)
     m_element = createAnnotationElement();
 
     m_element->setAttribute(classAttr, "annotation");
-    m_element->addEventListener("change", m_eventListener, false);
-    m_element->addEventListener("blur", m_eventListener, false);
+    m_element->addEventListener(eventNames().changeEvent, m_eventListener, false);
+    m_element->addEventListener(eventNames().blurEvent, m_eventListener, false);
 
     updateGeometry();
 
@@ -80,10 +80,17 @@ void PDFPluginAnnotation::attach(Element* parent)
     m_element->focus();
 }
 
+void PDFPluginAnnotation::commit()
+{
+    m_plugin->didMutatePDFDocument();
+}
+
 PDFPluginAnnotation::~PDFPluginAnnotation()
 {
     m_element->removeEventListener(eventNames().changeEvent, m_eventListener.get(), false);
     m_element->removeEventListener(eventNames().blurEvent, m_eventListener.get(), false);
+
+    m_eventListener->setAnnotation(0);
 
     m_parent->removeChild(element());
 }
@@ -101,10 +108,20 @@ void PDFPluginAnnotation::updateGeometry()
     styledElement->setInlineStyleProperty(CSSPropertyTop, documentSize.height() - annotationRect.origin.y - annotationRect.size.height - scrollPosition.y(), CSSPrimitiveValue::CSS_PX);
 }
 
+bool PDFPluginAnnotation::handleEvent(Event* event)
+{
+    if (event->type() == eventNames().blurEvent || event->type() == eventNames().changeEvent) {
+        m_plugin->setActiveAnnotation(0);
+        return true;
+    }
+
+    return false;
+}
+
 void PDFPluginAnnotation::PDFPluginAnnotationEventListener::handleEvent(ScriptExecutionContext*, Event* event)
 {
-    if (event->type() == eventNames().blurEvent || event->type() == eventNames().changeEvent)
-        m_annotation->plugin()->setActiveAnnotation(0);
+    if (m_annotation)
+        m_annotation->handleEvent(event);
 }
 
 } // namespace WebKit

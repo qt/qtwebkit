@@ -39,7 +39,7 @@ WebInspector.Panel = function(name)
     this.element.addStyleClass(name);
     this._panelName = name;
 
-    this._shortcuts = {};
+    this._shortcuts = /** !Object.<number, function(Event=):boolean> */ ({});
 
     WebInspector.settings[this._sidebarWidthSettingName()] = WebInspector.settings.createSetting(this._sidebarWidthSettingName(), undefined);
 }
@@ -60,12 +60,19 @@ WebInspector.Panel.prototype = {
 
     wasShown: function()
     {
-        var statusBarItems = this.statusBarItems;
+        var panelStatusBar = document.getElementById("panel-status-bar")
+        var drawerViewAnchor = document.getElementById("drawer-view-anchor");
+        var statusBarItems = this.statusBarItems();
         if (statusBarItems) {
             this._statusBarItemContainer = document.createElement("div");
             for (var i = 0; i < statusBarItems.length; ++i)
                 this._statusBarItemContainer.appendChild(statusBarItems[i]);
-            document.getElementById("panel-status-bar").appendChild(this._statusBarItemContainer);
+            panelStatusBar.insertBefore(this._statusBarItemContainer, drawerViewAnchor);
+        }
+        var statusBarText = this.statusBarText();
+        if (statusBarText) {
+            this._statusBarTextElement = statusBarText;
+            panelStatusBar.appendChild(statusBarText);
         }
 
         this.focus();
@@ -76,6 +83,10 @@ WebInspector.Panel.prototype = {
         if (this._statusBarItemContainer && this._statusBarItemContainer.parentNode)
             this._statusBarItemContainer.parentNode.removeChild(this._statusBarItemContainer);
         delete this._statusBarItemContainer;
+
+        if (this._statusBarTextElement && this._statusBarTextElement.parentNode)
+            this._statusBarTextElement.parentNode.removeChild(this._statusBarTextElement);
+        delete this._statusBarTextElement;
     },
 
     reset: function()
@@ -152,8 +163,9 @@ WebInspector.Panel.prototype = {
      * @param {Element=} parentElement
      * @param {string=} position
      * @param {number=} defaultWidth
+     * @param {number=} defaultHeight
      */
-    createSidebarView: function(parentElement, position, defaultWidth)
+    createSidebarView: function(parentElement, position, defaultWidth, defaultHeight)
     {
         if (this.splitView)
             return;
@@ -161,7 +173,7 @@ WebInspector.Panel.prototype = {
         if (!parentElement)
             parentElement = this.element;
 
-        this.splitView = new WebInspector.SidebarView(position || WebInspector.SidebarView.SidebarPosition.Left, this._sidebarWidthSettingName(), defaultWidth);
+        this.splitView = new WebInspector.SidebarView(position, this._sidebarWidthSettingName(), defaultWidth, defaultHeight);
         this.splitView.show(parentElement);
         this.splitView.addEventListener(WebInspector.SidebarView.EventTypes.Resized, this.sidebarResized.bind(this));
 
@@ -194,13 +206,10 @@ WebInspector.Panel.prototype = {
         return this._panelName + "SidebarWidth";
     },
 
-    // Should be implemented by ancestors.
-
-    get statusBarItems()
-    {
-    },
-
-    sidebarResized: function(width)
+    /**
+     * @param {WebInspector.Event} event
+     */
+    sidebarResized: function(event)
     {
     },
 
@@ -236,15 +245,13 @@ WebInspector.Panel.prototype = {
     {
         var shortcutKey = WebInspector.KeyboardShortcut.makeKeyFromEvent(event);
         var handler = this._shortcuts[shortcutKey];
-        if (handler) {
-            handler(event);
+        if (handler && handler(event))
             event.handled = true;
-        }
     },
 
     /**
      * @param {!Array.<!WebInspector.KeyboardShortcut.Descriptor>} keys
-     * @param {function(KeyboardEvent)} handler
+     * @param {function(Event=):boolean} handler
      */
     registerShortcuts: function(keys, handler)
     {
@@ -313,7 +320,7 @@ WebInspector.PanelDescriptor.prototype = {
         if (this._panel)
             return this._panel;
         if (this._scriptName)
-            importScript(this._scriptName);
+            loadScript(this._scriptName);
         this._panel = new WebInspector[this._className];
         return this._panel;
     },

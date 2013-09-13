@@ -45,8 +45,9 @@ typedef ListHashSet<Node*> NamedFlowContentNodes;
 
 class RenderNamedFlowThread : public RenderFlowThread {
 public:
-    RenderNamedFlowThread(Node*, PassRefPtr<WebKitNamedFlow>);
     virtual ~RenderNamedFlowThread();
+
+    static RenderNamedFlowThread* createAnonymous(Document*, PassRefPtr<WebKitNamedFlow>);
 
     const AtomicString& flowThreadName() const;
 
@@ -67,6 +68,9 @@ public:
     virtual void addRegionToThread(RenderRegion*) OVERRIDE;
     virtual void removeRegionFromThread(RenderRegion*) OVERRIDE;
 
+    bool overset() const { return m_overset; }
+    void computeOversetStateForRegions(LayoutUnit oldClientAfterEdge);
+
     void registerNamedFlowContentNode(Node*);
     void unregisterNamedFlowContentNode(Node*);
     const NamedFlowContentNodes& contentNodes() const { return m_contentNodes; }
@@ -79,17 +83,26 @@ protected:
     void resetMarkForDestruction();
 
 private:
+    RenderNamedFlowThread(PassRefPtr<WebKitNamedFlow>);
+
     virtual const char* renderName() const OVERRIDE;
     virtual bool isRenderNamedFlowThread() const OVERRIDE { return true; }
+    virtual bool isChildAllowed(RenderObject*, RenderStyle*) const OVERRIDE;
 
     virtual void dispatchRegionLayoutUpdateEvent() OVERRIDE;
+    virtual void dispatchRegionOversetChangeEvent() OVERRIDE;
 
     bool dependsOn(RenderNamedFlowThread* otherRenderFlowThread) const;
     void addDependencyOnFlowThread(RenderNamedFlowThread*);
     void removeDependencyOnFlowThread(RenderNamedFlowThread*);
+
+    void addRegionToNamedFlowThread(RenderRegion*);
+
     void checkInvalidRegions();
+
     bool canBeDestroyed() const { return m_invalidRegionList.isEmpty() && m_regionList.isEmpty() && m_contentNodes.isEmpty(); }
     void regionLayoutUpdateEventTimerFired(Timer<RenderNamedFlowThread>*);
+    void regionOversetChangeEventTimerFired(Timer<RenderNamedFlowThread>*);
     void clearContentNodes();
 
 private:
@@ -111,21 +124,24 @@ private:
 
     RenderRegionList m_invalidRegionList;
 
+    bool m_overset : 1;
+
     // The DOM Object that represents a named flow.
     RefPtr<WebKitNamedFlow> m_namedFlow;
 
     Timer<RenderNamedFlowThread> m_regionLayoutUpdateEventTimer;
+    Timer<RenderNamedFlowThread> m_regionOversetChangeEventTimer;
 };
 
 inline RenderNamedFlowThread* toRenderNamedFlowThread(RenderObject* object)
 {
-    ASSERT(!object || object->isRenderNamedFlowThread());
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isRenderNamedFlowThread());
     return static_cast<RenderNamedFlowThread*>(object);
 }
 
 inline const RenderNamedFlowThread* toRenderNamedFlowThread(const RenderObject* object)
 {
-    ASSERT(!object || object->isRenderNamedFlowThread());
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isRenderNamedFlowThread());
     return static_cast<const RenderNamedFlowThread*>(object);
 }
 

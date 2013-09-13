@@ -52,14 +52,13 @@
 #include "OfflineAudioCompletionEvent.h"
 #include "OfflineAudioDestinationNode.h"
 #include "OscillatorNode.h"
+#include "Page.h"
 #include "PannerNode.h"
+#include "PeriodicWave.h"
 #include "ScriptCallStack.h"
+#include "ScriptController.h"
 #include "ScriptProcessorNode.h"
 #include "WaveShaperNode.h"
-#include "WaveTable.h"
-#include "WebCoreMemoryInstrumentation.h"
-#include <wtf/MemoryInstrumentationHashSet.h>
-#include <wtf/MemoryInstrumentationVector.h>
 
 #if ENABLE(MEDIA_STREAM)
 #include "MediaStream.h"
@@ -92,18 +91,15 @@
 const int UndefinedThreadIdentifier = 0xffffffff;
 
 const unsigned MaxNodesToDeletePerQuantum = 10;
+const unsigned MaxPeriodicWaveLength = 4096;
 
 namespace WebCore {
     
-namespace {
-    
-bool isSampleRateRangeGood(float sampleRate)
+bool AudioContext::isSampleRateRangeGood(float sampleRate)
 {
     // FIXME: It would be nice if the minimum sample-rate could be less than 44.1KHz,
     // but that will require some fixes in HRTFPanner::fftSizeForSampleRate(), and some testing there.
     return sampleRate >= 44100 && sampleRate <= 96000;
-}
-
 }
 
 // Don't allow more than this number of simultaneous AudioContexts talking to hardware.
@@ -124,26 +120,9 @@ PassRefPtr<AudioContext> AudioContext::create(Document* document, ExceptionCode&
     return audioContext.release();
 }
 
-PassRefPtr<AudioContext> AudioContext::createOfflineContext(Document* document, unsigned numberOfChannels, size_t numberOfFrames, float sampleRate, ExceptionCode& ec)
-{
-    ASSERT(document);
-
-    // FIXME: offline contexts have limitations on supported sample-rates.
-    // Currently all AudioContexts must have the same sample-rate.
-    HRTFDatabaseLoader* loader = HRTFDatabaseLoader::loader();
-    if (numberOfChannels > 10 || !isSampleRateRangeGood(sampleRate) || (loader && loader->databaseSampleRate() != sampleRate)) {
-        ec = SYNTAX_ERR;
-        return 0;
-    }
-
-    RefPtr<AudioContext> audioContext(adoptRef(new AudioContext(document, numberOfChannels, numberOfFrames, sampleRate)));
-    audioContext->suspendIfNeeded();
-    return audioContext.release();
-}
-
 // Constructor for rendering to the audio hardware.
 AudioContext::AudioContext(Document* document)
-    : ActiveDOMObject(document, this)
+    : ActiveDOMObject(document)
     , m_isStopScheduled(false)
     , m_isInitialized(false)
     , m_isAudioThreadFinished(false)
@@ -155,6 +134,7 @@ AudioContext::AudioContext(Document* document)
     , m_graphOwnerThread(UndefinedThreadIdentifier)
     , m_isOfflineContext(false)
     , m_activeSourceCount(0)
+    , m_restrictions(NoRestrictions)
 {
     constructCommon();
 
@@ -169,7 +149,7 @@ AudioContext::AudioContext(Document* document)
 
 // Constructor for offline (non-realtime) rendering.
 AudioContext::AudioContext(Document* document, unsigned numberOfChannels, size_t numberOfFrames, float sampleRate)
-    : ActiveDOMObject(document, this)
+    : ActiveDOMObject(document)
     , m_isStopScheduled(false)
     , m_isInitialized(false)
     , m_isAudioThreadFinished(false)
@@ -180,6 +160,7 @@ AudioContext::AudioContext(Document* document, unsigned numberOfChannels, size_t
     , m_graphOwnerThread(UndefinedThreadIdentifier)
     , m_isOfflineContext(true)
     , m_activeSourceCount(0)
+    , m_restrictions(NoRestrictions)
 {
     constructCommon();
 
@@ -204,6 +185,17 @@ void AudioContext::constructCommon()
     FFTFrame::initialize();
     
     m_listener = AudioListener::create();
+
+#if PLATFORM(IOS)
+    if (!document()->settings() || document()->settings()->mediaPlaybackRequiresUserGesture())
+        addBehaviorRestriction(RequireUserGestureForAudioStartRestriction);
+    else
+        m_restrictions = NoRestrictions;
+#endif
+
+#if PLATFORM(MAC)
+    addBehaviorRestriction(RequirePageConsentForAudioStartRestriction);
+#endif
 }
 
 AudioContext::~AudioContext()
@@ -218,6 +210,8 @@ AudioContext::~AudioContext()
     ASSERT(!m_referencedNodes.size());
     ASSERT(!m_finishedNodes.size());
     ASSERT(!m_automaticPullNodes.size());
+    if (m_automaticPullNodesNeedUpdating)
+        m_renderingAutomaticPullNodes.resize(m_automaticPullNodes.size());
     ASSERT(!m_renderingAutomaticPullNodes.size());
 }
 
@@ -235,7 +229,7 @@ void AudioContext::lazyInitialize()
                     // Each time provideInput() is called, a portion of the audio stream is rendered. Let's call this time period a "render quantum".
                     // NOTE: for now default AudioContext does not need an explicit startRendering() call from JavaScript.
                     // We may want to consider requiring it for symmetry with OfflineAudioContext.
-                    m_destinationNode->startRendering();                    
+                    startRendering();
                     ++s_hardwareContextCount;
                 }
 
@@ -254,7 +248,7 @@ void AudioContext::clear()
     // Audio thread is dead. Nobody will schedule node deletion action. Let's do it ourselves.
     do {
         deleteMarkedNodes();
-        m_nodesToDelete.append(m_nodesMarkedForDeletion);
+        m_nodesToDelete.appendVector(m_nodesMarkedForDeletion);
         m_nodesMarkedForDeletion.clear();
     } while (m_nodesToDelete.size());
 
@@ -325,11 +319,17 @@ void AudioContext::stop()
     callOnMainThread(stopDispatch, this);
 }
 
+Document* AudioContext::document() const
+{
+    ASSERT(m_scriptExecutionContext && m_scriptExecutionContext->isDocument());
+    return static_cast<Document*>(m_scriptExecutionContext);
+}
+
 PassRefPtr<AudioBuffer> AudioContext::createBuffer(unsigned numberOfChannels, size_t numberOfFrames, float sampleRate, ExceptionCode& ec)
 {
     RefPtr<AudioBuffer> audioBuffer = AudioBuffer::create(numberOfChannels, numberOfFrames, sampleRate);
     if (!audioBuffer.get()) {
-        ec = SYNTAX_ERR;
+        ec = NOT_SUPPORTED_ERR;
         return 0;
     }
 
@@ -416,9 +416,14 @@ PassRefPtr<MediaStreamAudioSourceNode> AudioContext::createMediaStreamSource(Med
 
     AudioSourceProvider* provider = 0;
 
-    if (mediaStream->isLocal() && mediaStream->audioTracks()->length())
+    MediaStreamTrackVector audioTracks = mediaStream->getAudioTracks();
+    if (mediaStream->isLocal() && audioTracks.size()) {
+        // Enable input for the specific local audio device specified in the MediaStreamSource.
+        RefPtr<MediaStreamTrack> localAudio = audioTracks[0];
+        MediaStreamSource* source = localAudio->component()->source();
+        destination()->enableInput(source->deviceId());
         provider = destination()->localAudioInputProvider();
-    else {
+    } else {
         // FIXME: get a provider for non-local MediaStreams (like from a remote peer).
         provider = 0;
     }
@@ -460,7 +465,7 @@ PassRefPtr<ScriptProcessorNode> AudioContext::createScriptProcessor(size_t buffe
     RefPtr<ScriptProcessorNode> node = ScriptProcessorNode::create(this, m_destinationNode->sampleRate(), bufferSize, numberOfInputChannels, numberOfOutputChannels);
 
     if (!node.get()) {
-        ec = SYNTAX_ERR;
+        ec = INDEX_SIZE_ERR;
         return 0;
     }
 
@@ -589,17 +594,17 @@ PassRefPtr<OscillatorNode> AudioContext::createOscillator()
     return node;
 }
 
-PassRefPtr<WaveTable> AudioContext::createWaveTable(Float32Array* real, Float32Array* imag, ExceptionCode& ec)
+PassRefPtr<PeriodicWave> AudioContext::createPeriodicWave(Float32Array* real, Float32Array* imag, ExceptionCode& ec)
 {
     ASSERT(isMainThread());
     
-    if (!real || !imag || (real->length() != imag->length())) {
+    if (!real || !imag || (real->length() != imag->length() || (real->length() > MaxPeriodicWaveLength) || (real->length() <= 0))) {
         ec = SYNTAX_ERR;
         return 0;
     }
     
     lazyInitialize();
-    return WaveTable::create(sampleRate(), real, imag);
+    return PeriodicWave::create(sampleRate(), real, imag);
 }
 
 void AudioContext::notifyNodeFinishedProcessing(AudioNode* node)
@@ -810,7 +815,7 @@ void AudioContext::scheduleNodeDeletion()
 
     // Make sure to call deleteMarkedNodes() on main thread.    
     if (m_nodesMarkedForDeletion.size() && !m_isDeletionScheduled) {
-        m_nodesToDelete.append(m_nodesMarkedForDeletion);
+        m_nodesToDelete.appendVector(m_nodesMarkedForDeletion);
         m_nodesMarkedForDeletion.clear();
 
         m_isDeletionScheduled = true;
@@ -960,7 +965,22 @@ ScriptExecutionContext* AudioContext::scriptExecutionContext() const
 
 void AudioContext::startRendering()
 {
+    if (ScriptController::processingUserGesture())
+        removeBehaviorRestriction(AudioContext::RequireUserGestureForAudioStartRestriction);
+
+    if (pageConsentRequiredForAudioStart()) {
+        Page* page = document()->page();
+        if (page && !page->canStartMedia())
+            document()->addMediaCanStartListener(this);
+        else
+            removeBehaviorRestriction(AudioContext::RequirePageConsentForAudioStartRestriction);
+    }
     destination()->startRendering();
+}
+
+void AudioContext::mediaCanStart()
+{
+    removeBehaviorRestriction(AudioContext::RequirePageConsentForAudioStartRestriction);
 }
 
 void AudioContext::fireCompletionEvent()
@@ -990,30 +1010,6 @@ void AudioContext::incrementActiveSourceCount()
 void AudioContext::decrementActiveSourceCount()
 {
     atomicDecrement(&m_activeSourceCount);
-}
-
-void AudioContext::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    AutoLocker locker(const_cast<AudioContext*>(this));
-
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::Audio);
-    ActiveDOMObject::reportMemoryUsage(memoryObjectInfo);
-    info.addMember(m_destinationNode);
-    info.addMember(m_listener);
-    info.addMember(m_finishedNodes);
-    info.addMember(m_referencedNodes);
-    info.addMember(m_nodesMarkedForDeletion);
-    info.addMember(m_nodesToDelete);
-    info.addMember(m_dirtySummingJunctions);
-    info.addMember(m_dirtyAudioNodeOutputs);
-    info.addMember(m_automaticPullNodes);
-    info.addMember(m_renderingAutomaticPullNodes);
-    info.addMember(m_contextGraphMutex);
-    info.addMember(m_deferredFinishDerefList);
-    info.addMember(m_hrtfDatabaseLoader);
-    info.addMember(m_eventTargetData);
-    info.addMember(m_renderTarget);
-    info.addMember(m_audioDecoder);
 }
 
 } // namespace WebCore

@@ -43,8 +43,10 @@ public:
 
     // IDBDatabaseCallbacks
     virtual void onForcedClose();
-    virtual void onVersionChange(const String& version);
     virtual void onVersionChange(int64_t oldVersion, int64_t newVersion);
+
+    virtual void onAbort(int64_t transactionId, PassRefPtr<IDBDatabaseError>);
+    virtual void onComplete(int64_t transactionId);
 
     void connect(IDBDatabase*);
 

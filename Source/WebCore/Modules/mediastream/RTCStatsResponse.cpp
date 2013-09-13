@@ -39,22 +39,24 @@ RTCStatsResponse::RTCStatsResponse()
 {
 }
 
-size_t RTCStatsResponse::addReport()
+PassRefPtr<RTCStatsReport> RTCStatsResponse::namedItem(const AtomicString& name)
 {
-    m_result.append(RTCStatsReport::create());
+    if (m_idmap.find(name) != m_idmap.end())
+        return m_result[m_idmap.get(name)];
+    return 0;
+}
+
+size_t RTCStatsResponse::addReport(String id, String type, double timestamp)
+{
+    m_result.append(RTCStatsReport::create(id, type, timestamp));
+    m_idmap.add(id, m_result.size() - 1);
     return m_result.size() - 1;
 }
 
-void RTCStatsResponse::addElement(size_t report, bool isLocal, double timestamp)
+void RTCStatsResponse::addStatistic(size_t report, String name, String value)
 {
-    ASSERT(report >= 0 && report < m_result.size());
-    m_result[report]->addElement(isLocal, timestamp);
-}
-
-void RTCStatsResponse::addStatistic(size_t report, bool isLocal, String name, String value)
-{
-    ASSERT(report >= 0 && report < m_result.size());
-    m_result[report]->addStatistic(isLocal, name, value);
+    ASSERT_WITH_SECURITY_IMPLICATION(report < m_result.size());
+    m_result[report]->addStatistic(name, value);
 }
 
 } // namespace WebCore

@@ -44,7 +44,7 @@ public:
 
     String customCssText() const;
 
-    void reportDescendantMemoryUsage(MemoryObjectInfo*) const;
+    bool equals(const ShadowValue&) const;
 
     RefPtr<CSSPrimitiveValue> x;
     RefPtr<CSSPrimitiveValue> y;

@@ -1,5 +1,6 @@
+#include "precompiled.h"
 //
-// Copyright (c) 2002-2012 The ANGLE Project Authors. All rights reserved.
+// Copyright (c) 2002-2013 The ANGLE Project Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 //
@@ -9,20 +10,11 @@
 
 #include "libGLESv2/Program.h"
 #include "libGLESv2/ProgramBinary.h"
-
-#include "common/debug.h"
-
-#include "libGLESv2/main.h"
-#include "libGLESv2/Shader.h"
-#include "libGLESv2/utilities.h"
-
-#include <string>
+#include "libGLESv2/ResourceManager.h"
 
 namespace gl
 {
 const char * const g_fakepath = "C:\\fakepath";
-
-unsigned int Program::mCurrentSerial = 1;
 
 AttributeBindings::AttributeBindings()
 {
@@ -93,7 +85,7 @@ void InfoLog::appendSanitized(const char *message)
     }
     while (found != std::string::npos);
 
-    append("%s\n", msg.c_str());
+    append("%s", msg.c_str());
 }
 
 void InfoLog::append(const char *format, ...)
@@ -114,15 +106,17 @@ void InfoLog::append(const char *format, ...)
 
     if (!mInfoLog)
     {
-        mInfoLog = new char[infoLength + 1];
+        mInfoLog = new char[infoLength + 2];
         strcpy(mInfoLog, info);
+        strcpy(mInfoLog + infoLength, "\n");
     }
     else
     {
         size_t logLength = strlen(mInfoLog);
-        char *newLog = new char[logLength + infoLength + 1];
+        char *newLog = new char[logLength + infoLength + 2];
         strcpy(newLog, mInfoLog);
         strcpy(newLog + logLength, info);
+        strcpy(newLog + logLength + infoLength, "\n");
 
         delete[] mInfoLog;
         mInfoLog = newLog;
@@ -138,13 +132,15 @@ void InfoLog::reset()
     }
 }
 
-Program::Program(ResourceManager *manager, GLuint handle) : mResourceManager(manager), mHandle(handle), mSerial(issueSerial())
+Program::Program(rx::Renderer *renderer, ResourceManager *manager, GLuint handle) : mResourceManager(manager), mHandle(handle)
 {
     mFragmentShader = NULL;
     mVertexShader = NULL;
-    mProgramBinary = NULL;
+    mProgramBinary.set(NULL);
     mDeleteStatus = false;
+    mLinked = false;
     mRefCount = 0;
+    mRenderer = renderer;
 }
 
 Program::~Program()
@@ -242,17 +238,16 @@ void Program::bindAttributeLocation(GLuint index, const char *name)
 // Links the HLSL code of the vertex and pixel shader by matching up their varyings,
 // compiling them into binaries, determining the attribute mappings, and collecting
 // a list of uniforms
-void Program::link()
+bool Program::link()
 {
     unlink(false);
 
     mInfoLog.reset();
 
-    mProgramBinary = new ProgramBinary;
-    if (!mProgramBinary->link(mInfoLog, mAttributeBindings, mFragmentShader, mVertexShader))
-    {
-        unlink(false);
-    }
+    mProgramBinary.set(new ProgramBinary(mRenderer));
+    mLinked = mProgramBinary->link(mInfoLog, mAttributeBindings, mFragmentShader, mVertexShader);
+
+    return mLinked;
 }
 
 int AttributeBindings::getAttributeBinding(const std::string &name) const
@@ -286,22 +281,34 @@ void Program::unlink(bool destroy)
         }
     }
 
-    if (mProgramBinary)
-    {
-        delete mProgramBinary;
-        mProgramBinary = NULL;
-    }
+    mProgramBinary.set(NULL);
+    mLinked = false;
+}
+
+bool Program::isLinked()
+{
+    return mLinked;
 }
 
 ProgramBinary* Program::getProgramBinary()
 {
-    return mProgramBinary;
+    return mProgramBinary.get();
 }
 
-void Program::setProgramBinary(ProgramBinary *programBinary)
+bool Program::setProgramBinary(const void *binary, GLsizei length)
 {
     unlink(false);
-    mProgramBinary = programBinary;
+
+    mInfoLog.reset();
+
+    mProgramBinary.set(new ProgramBinary(mRenderer));
+    mLinked = mProgramBinary->load(mInfoLog, binary, length);
+    if (!mLinked)
+    {
+        mProgramBinary.set(NULL);
+    }
+
+    return mLinked;
 }
 
 void Program::release()
@@ -324,14 +331,17 @@ unsigned int Program::getRefCount() const
     return mRefCount;
 }
 
-unsigned int Program::getSerial() const
+GLint Program::getProgramBinaryLength() const
 {
-    return mSerial;
-}
-
-unsigned int Program::issueSerial()
-{
-    return mCurrentSerial++;
+    ProgramBinary *programBinary = mProgramBinary.get();
+    if (programBinary)
+    {
+        return programBinary->getLength();
+    }
+    else
+    {
+        return 0;
+    }
 }
 
 int Program::getInfoLogLength() const
@@ -376,9 +386,10 @@ void Program::getAttachedShaders(GLsizei maxCount, GLsizei *count, GLuint *shade
 
 void Program::getActiveAttribute(GLuint index, GLsizei bufsize, GLsizei *length, GLint *size, GLenum *type, GLchar *name)
 {
-    if (mProgramBinary)
+    ProgramBinary *programBinary = getProgramBinary();
+    if (programBinary)
     {
-        mProgramBinary->getActiveAttribute(index, bufsize, length, size, type, name);
+        programBinary->getActiveAttribute(index, bufsize, length, size, type, name);
     }
     else
     {
@@ -399,9 +410,10 @@ void Program::getActiveAttribute(GLuint index, GLsizei bufsize, GLsizei *length,
 
 GLint Program::getActiveAttributeCount()
 {
-    if (mProgramBinary)
+    ProgramBinary *programBinary = getProgramBinary();
+    if (programBinary)
     {
-        return mProgramBinary->getActiveAttributeCount();
+        return programBinary->getActiveAttributeCount();
     }
     else
     {
@@ -411,9 +423,10 @@ GLint Program::getActiveAttributeCount()
 
 GLint Program::getActiveAttributeMaxLength()
 {
-    if (mProgramBinary)
+    ProgramBinary *programBinary = getProgramBinary();
+    if (programBinary)
     {
-        return mProgramBinary->getActiveAttributeMaxLength();
+        return programBinary->getActiveAttributeMaxLength();
     }
     else
     {
@@ -423,9 +436,10 @@ GLint Program::getActiveAttributeMaxLength()
 
 void Program::getActiveUniform(GLuint index, GLsizei bufsize, GLsizei *length, GLint *size, GLenum *type, GLchar *name)
 {
-    if (mProgramBinary)
+    ProgramBinary *programBinary = getProgramBinary();
+    if (programBinary)
     {
-        return mProgramBinary->getActiveUniform(index, bufsize, length, size, type, name);
+        return programBinary->getActiveUniform(index, bufsize, length, size, type, name);
     }
     else
     {
@@ -446,9 +460,10 @@ void Program::getActiveUniform(GLuint index, GLsizei bufsize, GLsizei *length, G
 
 GLint Program::getActiveUniformCount()
 {
-    if (mProgramBinary)
+    ProgramBinary *programBinary = getProgramBinary();
+    if (programBinary)
     {
-        return mProgramBinary->getActiveUniformCount();
+        return programBinary->getActiveUniformCount();
     }
     else
     {
@@ -458,9 +473,10 @@ GLint Program::getActiveUniformCount()
 
 GLint Program::getActiveUniformMaxLength()
 {
-    if (mProgramBinary)
+    ProgramBinary *programBinary = getProgramBinary();
+    if (programBinary)
     {
-        return mProgramBinary->getActiveUniformMaxLength();
+        return programBinary->getActiveUniformMaxLength();
     }
     else
     {
@@ -482,9 +498,10 @@ void Program::validate()
 {
     mInfoLog.reset();
 
-    if (mProgramBinary)
+    ProgramBinary *programBinary = getProgramBinary();
+    if (isLinked() && programBinary)
     {
-        mProgramBinary->validate(mInfoLog);
+        programBinary->validate(mInfoLog);
     }
     else
     {
@@ -494,9 +511,10 @@ void Program::validate()
 
 bool Program::isValidated() const
 {
-    if (mProgramBinary)
+    ProgramBinary *programBinary = mProgramBinary.get();
+    if (programBinary)
     {
-        return mProgramBinary->isValidated();
+        return programBinary->isValidated();
     }
     else
     {

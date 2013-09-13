@@ -27,7 +27,6 @@
 #include "NotificationPermissionRequestManager.h"
 
 #include "WebCoreArgumentCoders.h"
-#include "WebNotificationManagerProxyMessages.h"
 #include "WebPage.h"
 #include "WebPageProxyMessages.h"
 #include "WebProcess.h"
@@ -36,6 +35,10 @@
 #include <WebCore/ScriptExecutionContext.h>
 #include <WebCore/SecurityOrigin.h>
 #include <WebCore/Settings.h>
+
+#if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
+#include "WebNotificationManager.h"
+#endif
 
 using namespace WebCore;
 
@@ -67,7 +70,8 @@ void NotificationPermissionRequestManager::startRequest(SecurityOrigin* origin, 
 {
     NotificationClient::Permission permission = permissionLevel(origin);
     if (permission != NotificationClient::PermissionNotAllowed) {
-        callback->handleEvent(Notification::permissionString(permission));
+        if (callback)
+            callback->handleEvent(Notification::permissionString(permission));
         return;
     }
 
@@ -122,7 +126,7 @@ NotificationClient::Permission NotificationPermissionRequestManager::permissionL
     if (!m_page->corePage()->settings()->notificationsEnabled())
         return NotificationClient::PermissionDenied;
     
-    return WebProcess::shared().notificationManager().policyForOrigin(securityOrigin);
+    return WebProcess::shared().supplement<WebNotificationManager>()->policyForOrigin(securityOrigin);
 #else
     UNUSED_PARAM(securityOrigin);
     return NotificationClient::PermissionDenied;
@@ -132,7 +136,7 @@ NotificationClient::Permission NotificationPermissionRequestManager::permissionL
 void NotificationPermissionRequestManager::setPermissionLevelForTesting(const String& originString, bool allowed)
 {
 #if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
-    WebProcess::shared().notificationManager().didUpdateNotificationDecision(originString, allowed);
+    WebProcess::shared().supplement<WebNotificationManager>()->didUpdateNotificationDecision(originString, allowed);
 #else
     UNUSED_PARAM(originString);
     UNUSED_PARAM(allowed);
@@ -142,7 +146,7 @@ void NotificationPermissionRequestManager::setPermissionLevelForTesting(const St
 void NotificationPermissionRequestManager::removeAllPermissionsForTesting()
 {
 #if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
-    WebProcess::shared().notificationManager().removeAllPermissionsForTesting();
+    WebProcess::shared().supplement<WebNotificationManager>()->removeAllPermissionsForTesting();
 #endif
 }
 
@@ -155,7 +159,7 @@ void NotificationPermissionRequestManager::didReceiveNotificationPermissionDecis
     RefPtr<WebCore::SecurityOrigin> origin = m_idToOriginMap.take(requestID);
     m_originToIDMap.remove(origin);
 
-    WebProcess::shared().notificationManager().didUpdateNotificationDecision(origin->toString(), allowed);
+    WebProcess::shared().supplement<WebNotificationManager>()->didUpdateNotificationDecision(origin->toString(), allowed);
 
 #if ENABLE(LEGACY_NOTIFICATIONS)
     RefPtr<VoidCallback> voidCallback = m_idToVoidCallbackMap.take(requestID);

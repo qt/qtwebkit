@@ -116,6 +116,36 @@ void InjectedScript::restartFrame(ErrorString* errorString, const ScriptValue& c
     *errorString = "Internal error";
 }
 
+void InjectedScript::setVariableValue(ErrorString* errorString, const ScriptValue& callFrames, const String* callFrameIdOpt, const String* functionObjectIdOpt, int scopeNumber, const String& variableName, const String& newValueStr)
+{
+    ScriptFunctionCall function(injectedScriptObject(), "setVariableValue");
+    if (callFrameIdOpt) {
+        function.appendArgument(callFrames);
+        function.appendArgument(*callFrameIdOpt);
+    } else {
+        function.appendArgument(false);
+        function.appendArgument(false);
+    }
+    if (functionObjectIdOpt)
+        function.appendArgument(*functionObjectIdOpt);
+    else
+        function.appendArgument(false);
+    function.appendArgument(scopeNumber);
+    function.appendArgument(variableName);
+    function.appendArgument(newValueStr);
+    RefPtr<InspectorValue> resultValue;
+    makeCall(function, &resultValue);
+    if (!resultValue) {
+        *errorString = "Internal error";
+        return;
+    }
+    if (resultValue->type() == InspectorValue::TypeString) {
+        resultValue->asString(errorString);
+        return;
+    }
+    // Normal return.
+}
+
 void InjectedScript::getFunctionDetails(ErrorString* errorString, const String& functionId, RefPtr<FunctionDetails>* result)
 {
     ScriptFunctionCall function(injectedScriptObject(), "getFunctionDetails");
@@ -210,9 +240,26 @@ PassRefPtr<TypeBuilder::Runtime::RemoteObject> InjectedScript::wrapObject(const 
     wrapFunction.appendArgument(generatePreview);
     bool hadException = false;
     ScriptValue r = callFunctionWithEvalEnabled(wrapFunction, hadException);
-    if (hadException) {
+    if (hadException)
         return 0;
-    }
+    RefPtr<InspectorObject> rawResult = r.toInspectorValue(scriptState())->asObject();
+    return TypeBuilder::Runtime::RemoteObject::runtimeCast(rawResult);
+}
+
+PassRefPtr<TypeBuilder::Runtime::RemoteObject> InjectedScript::wrapTable(const ScriptValue& table, const ScriptValue& columns) const
+{
+    ASSERT(!hasNoValue());
+    ScriptFunctionCall wrapFunction(injectedScriptObject(), "wrapTable");
+    wrapFunction.appendArgument(canAccessInspectedWindow());
+    wrapFunction.appendArgument(table);
+    if (columns.hasNoValue())
+        wrapFunction.appendArgument(false);
+    else
+        wrapFunction.appendArgument(columns);
+    bool hadException = false;
+    ScriptValue r = callFunctionWithEvalEnabled(wrapFunction, hadException);
+    if (hadException)
+        return 0;
     RefPtr<InspectorObject> rawResult = r.toInspectorValue(scriptState())->asObject();
     return TypeBuilder::Runtime::RemoteObject::runtimeCast(rawResult);
 }
@@ -220,12 +267,6 @@ PassRefPtr<TypeBuilder::Runtime::RemoteObject> InjectedScript::wrapObject(const 
 PassRefPtr<TypeBuilder::Runtime::RemoteObject> InjectedScript::wrapNode(Node* node, const String& groupName)
 {
     return wrapObject(nodeAsScriptValue(node), groupName);
-}
-
-PassRefPtr<TypeBuilder::Runtime::RemoteObject> InjectedScript::wrapSerializedObject(SerializedScriptValue* serializedScriptValue, const String& groupName) const
-{
-    ScriptValue scriptValue = serializedScriptValue->deserializeForInspector(scriptState());
-    return scriptValue.hasNoValue() ? 0 : wrapObject(scriptValue, groupName);
 }
 
 ScriptValue InjectedScript::findObjectById(const String& objectId) const

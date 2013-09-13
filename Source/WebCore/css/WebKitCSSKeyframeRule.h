@@ -27,10 +27,12 @@
 #define WebKitCSSKeyframeRule_h
 
 #include "CSSRule.h"
-#include "StylePropertySet.h"
 
 namespace WebCore {
 
+class CSSStyleDeclaration;
+class MutableStylePropertySet;
+class StylePropertySet;
 class StyleRuleCSSStyleDeclaration;
 class WebKitCSSKeyframesRule;
 
@@ -41,6 +43,7 @@ public:
     {
         return adoptRef(new StyleKeyframe());
     }
+    ~StyleKeyframe();
 
     String keyText() const { return m_key; }
     void setKeyText(const String& s) { m_key = s; }
@@ -48,15 +51,13 @@ public:
     void getKeys(Vector<float>& keys) const   { parseKeyString(m_key, keys); }
     
     const StylePropertySet* properties() const { return m_properties.get(); }
-    StylePropertySet* mutableProperties();
+    MutableStylePropertySet* mutableProperties();
     void setProperties(PassRefPtr<StylePropertySet>);
     
     String cssText() const;
 
-    void reportMemoryUsage(MemoryObjectInfo*) const;
-
-private:    
-    StyleKeyframe() { }
+private:
+    StyleKeyframe();
     
     static void parseKeyString(const String&, Vector<float>& keys);
     
@@ -73,12 +74,11 @@ public:
     virtual CSSRule::Type type() const OVERRIDE { return WEBKIT_KEYFRAME_RULE; }
     virtual String cssText() const OVERRIDE { return m_keyframe->cssText(); }
     virtual void reattach(StyleRuleBase*) OVERRIDE;
-    virtual void reportMemoryUsage(MemoryObjectInfo*) const OVERRIDE;
 
     String keyText() const { return m_keyframe->keyText(); }
     void setKeyText(const String& s) { m_keyframe->setKeyText(s); }
 
-    CSSStyleDeclaration* style() const;
+    CSSStyleDeclaration* style();
 
 private:
     WebKitCSSKeyframeRule(StyleKeyframe*, WebKitCSSKeyframesRule* parent);

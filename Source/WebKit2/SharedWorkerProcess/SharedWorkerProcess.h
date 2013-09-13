@@ -31,22 +31,16 @@
 #include "ChildProcess.h"
 #include <wtf/Forward.h>
 
-namespace WebCore {
-class RunLoop;
-}
-
 namespace WebKit {
 
-class NetscapePluginModule;
 class WebProcessConnection;
 struct SharedWorkerProcessCreationParameters;
 
-class SharedWorkerProcess : ChildProcess {
+class SharedWorkerProcess : public ChildProcess {
     WTF_MAKE_NONCOPYABLE(SharedWorkerProcess);
 public:
     static SharedWorkerProcess& shared();
 
-    void initialize(CoreIPC::Connection::Identifier, WebCore::RunLoop*);
     void removeWebProcessConnection(WebProcessConnection*);
 
 private:
@@ -54,28 +48,25 @@ private:
     ~SharedWorkerProcess();
 
     // ChildProcess
-    virtual bool shouldTerminate();
+    virtual void initializeProcess(const ChildProcessInitializationParameters&) OVERRIDE;
+    virtual void initializeProcessName(const ChildProcessInitializationParameters&) OVERRIDE;
+    virtual bool shouldTerminate() OVERRIDE;
 
     // CoreIPC::Connection::Client
-    virtual void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::MessageDecoder&);
+    virtual void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&);
     virtual void didClose(CoreIPC::Connection*);
     virtual void didReceiveInvalidMessage(CoreIPC::Connection*, CoreIPC::StringReference messageReceiverName, CoreIPC::StringReference messageName) OVERRIDE;
 
     // Message handlers.
-    void didReceiveSharedWorkerProcessMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::MessageDecoder&);
+    void didReceiveSharedWorkerProcessMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&);
     void initializeSharedWorkerProcess(const SharedWorkerProcessCreationParameters&);
     void createWebProcessConnection();
 
-    void platformInitialize(const SharedWorkerProcessCreationParameters&);
-    
     void setMinimumLifetime(double);
     void minimumLifetimeTimerFired();
 
-    // The connection to the UI process.
-    RefPtr<CoreIPC::Connection> m_connection;
-
     // Our web process connections.
-    Vector<RefPtr<WebProcessConnection> > m_webProcessConnections;
+    Vector<RefPtr<WebProcessConnection>> m_webProcessConnections;
 
     WebCore::RunLoop::Timer<SharedWorkerProcess> m_minimumLifetimeTimer;
 };

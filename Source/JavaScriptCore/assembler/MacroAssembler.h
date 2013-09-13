@@ -121,7 +121,7 @@ public:
         case DoubleLessThanOrEqualOrUnordered:
             return DoubleGreaterThan;
         default:
-            ASSERT_NOT_REACHED();
+            RELEASE_ASSERT_NOT_REACHED();
             return DoubleEqual; // make compiler happy
         }
     }
@@ -145,7 +145,7 @@ public:
         case NonZero:
             return Zero;
         default:
-            ASSERT_NOT_REACHED();
+            RELEASE_ASSERT_NOT_REACHED();
             return Zero; // Make compiler happy for release builds.
         }
     }
@@ -854,7 +854,7 @@ public:
     bool shouldBlindDouble(double value)
     {
         // Don't trust NaN or +/-Infinity
-        if (!isfinite(value))
+        if (!std::isfinite(value))
             return shouldConsiderBlinding();
 
         // Try to force normalisation, and check that there's no change
@@ -876,7 +876,7 @@ public:
     
     bool shouldBlind(ImmPtr imm)
     { 
-#if !defined(NDEBUG)
+#if ENABLE(FORCED_JIT_BLINDING)
         UNUSED_PARAM(imm);
         // Debug always blind all constants, if only so we know
         // if we've broken blinding during patch development.
@@ -934,8 +934,8 @@ public:
     }
 
     bool shouldBlind(Imm64 imm)
-    { 
-#if !defined(NDEBUG)
+    {
+#if ENABLE(FORCED_JIT_BLINDING)
         UNUSED_PARAM(imm);
         // Debug always blind all constants, if only so we know
         // if we've broken blinding during patch development.
@@ -1073,8 +1073,8 @@ public:
 
 #if ENABLE(JIT_CONSTANT_BLINDING)
     bool shouldBlind(Imm32 imm)
-    { 
-#if !defined(NDEBUG)
+    {
+#if ENABLE(FORCED_JIT_BLINDING)
         UNUSED_PARAM(imm);
         // Debug always blind all constants, if only so we know
         // if we've broken blinding during patch development.
@@ -1357,12 +1357,9 @@ public:
 
     Jump branchAdd32(ResultCondition cond, RegisterID src, Imm32 imm, RegisterID dest)
     {
-        if (src == dest) {
-            if (!scratchRegisterForBlinding()) {
-                // Release mode ASSERT, if this fails we will perform incorrect codegen.
-                CRASH();
-            }
-        }
+        if (src == dest)
+            ASSERT(scratchRegisterForBlinding());
+
         if (shouldBlind(imm)) {
             if (src == dest) {
                 if (RegisterID scratchRegister = (RegisterID)scratchRegisterForBlinding()) {
@@ -1378,12 +1375,9 @@ public:
     
     Jump branchMul32(ResultCondition cond, Imm32 imm, RegisterID src, RegisterID dest)
     {
-        if (src == dest) {
-            if (!scratchRegisterForBlinding()) {
-                // Release mode ASSERT, if this fails we will perform incorrect codegen.
-                CRASH();
-            }
-        }
+        if (src == dest)
+            ASSERT(scratchRegisterForBlinding());
+
         if (shouldBlind(imm)) {
             if (src == dest) {
                 if (RegisterID scratchRegister = (RegisterID)scratchRegisterForBlinding()) {

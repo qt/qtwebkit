@@ -30,8 +30,10 @@
 
 #include "PluginModuleInfo.h"
 #include "PluginProcess.h"
+#include "PluginProcessAttributes.h"
 #include "WebProcessProxyMessages.h"
 #include <wtf/Forward.h>
+#include <wtf/HashSet.h>
 #include <wtf/Noncopyable.h>
 #include <wtf/Vector.h>
 
@@ -51,23 +53,27 @@ class PluginProcessManager {
 public:
     static PluginProcessManager& shared();
 
-    void getPluginProcessConnection(const PluginInfoStore&, const String& pluginPath, PluginProcess::Type, PassRefPtr<Messages::WebProcessProxy::GetPluginProcessConnection::DelayedReply>);
+    uint64_t pluginProcessToken(const PluginModuleInfo&, PluginProcessType, PluginProcessSandboxPolicy);
+
+    void getPluginProcessConnection(uint64_t pluginProcessToken, PassRefPtr<Messages::WebProcessProxy::GetPluginProcessConnection::DelayedReply>);
     void removePluginProcessProxy(PluginProcessProxy*);
 
     void getSitesWithData(const PluginModuleInfo&, WebPluginSiteDataManager*, uint64_t callbackID);
     void clearSiteData(const PluginModuleInfo&, WebPluginSiteDataManager*, const Vector<String>& sites, uint64_t flags, uint64_t maxAgeInSeconds, uint64_t callbackID);
 
 #if PLATFORM(MAC)
-    void setApplicationIsOccluded(bool);
+    void setProcessSuppressionEnabled(bool);
 #endif
 
 private:
     PluginProcessManager();
 
-    PluginProcessProxy* getOrCreatePluginProcess(const PluginModuleInfo&, PluginProcess::Type);
-    PluginProcessProxy* pluginProcessWithPath(const String& pluginPath, PluginProcess::Type);
+    PluginProcessProxy* getOrCreatePluginProcess(uint64_t pluginProcessToken);
 
-    Vector<RefPtr<PluginProcessProxy> > m_pluginProcesses;
+    Vector<std::pair<PluginProcessAttributes, uint64_t>> m_pluginProcessTokens;
+    HashSet<uint64_t> m_knownTokens;
+
+    Vector<RefPtr<PluginProcessProxy>> m_pluginProcesses;
 };
 
 } // namespace WebKit

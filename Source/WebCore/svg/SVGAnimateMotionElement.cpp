@@ -24,10 +24,12 @@
 #if ENABLE(SVG)
 #include "SVGAnimateMotionElement.h"
 
+#include "AffineTransform.h"
 #include "Attribute.h"
 #include "RenderObject.h"
 #include "RenderSVGResource.h"
 #include "SVGElementInstance.h"
+#include "SVGImageElement.h"
 #include "SVGMPathElement.h"
 #include "SVGNames.h"
 #include "SVGParserUtilities.h"
@@ -62,14 +64,14 @@ bool SVGAnimateMotionElement::hasValidAttributeType()
         return false;
 
     // We don't have a special attribute name to verify the animation type. Check the element name instead.
-    if (!targetElement->isStyledTransformable() && !targetElement->hasTagName(SVGNames::textTag))
+    if (!targetElement->isSVGGraphicsElement())
         return false;
     // Spec: SVG 1.1 section 19.2.15
     // FIXME: svgTag is missing. Needs to be checked, if transforming <svg> could cause problems.
     if (targetElement->hasTagName(gTag)
         || targetElement->hasTagName(defsTag)
         || targetElement->hasTagName(useTag)
-        || targetElement->hasTagName(imageTag)
+        || isSVGImageElement(targetElement)
         || targetElement->hasTagName(switchTag)
         || targetElement->hasTagName(pathTag)
         || targetElement->hasTagName(rectTag)
@@ -81,7 +83,7 @@ bool SVGAnimateMotionElement::hasValidAttributeType()
         || targetElement->hasTagName(textTag)
         || targetElement->hasTagName(clipPathTag)
         || targetElement->hasTagName(maskTag)
-        || targetElement->hasTagName(aTag)
+        || targetElement->hasTagName(SVGNames::aTag)
         || targetElement->hasTagName(foreignObjectTag)
         )
         return true;
@@ -99,7 +101,7 @@ bool SVGAnimateMotionElement::isSupportedAttribute(const QualifiedName& attrName
     DEFINE_STATIC_LOCAL(HashSet<QualifiedName>, supportedAttributes, ());
     if (supportedAttributes.isEmpty())
         supportedAttributes.add(SVGNames::pathAttr);
-    return supportedAttributes.contains<QualifiedName, SVGAttributeHashTranslator>(attrName);
+    return supportedAttributes.contains<SVGAttributeHashTranslator>(attrName);
 }
 
 void SVGAnimateMotionElement::parseAttribute(const QualifiedName& name, const AtomicString& value)

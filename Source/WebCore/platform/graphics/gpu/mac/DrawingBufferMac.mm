@@ -70,7 +70,7 @@ DrawingBuffer::DrawingBuffer(GraphicsContext3D* context,
         
     // Create the WebGLLayer
     BEGIN_BLOCK_OBJC_EXCEPTIONS
-        m_platformLayer.adoptNS([[WebGLLayer alloc] initWithGraphicsContext3D:m_context.get()]);
+        m_platformLayer = adoptNS([[WebGLLayer alloc] initWithGraphicsContext3D:m_context.get()]);
 #ifndef NDEBUG
         [m_platformLayer.get() setName:@"DrawingBuffer Layer"];
 #endif    
@@ -98,15 +98,6 @@ DrawingBuffer::~DrawingBuffer()
 PlatformLayer* DrawingBuffer::platformLayer()
 {
     return m_platformLayer.get();
-}
-
-void DrawingBuffer::prepareBackBuffer()
-{
-}
-
-bool DrawingBuffer::requiresCopyFromBackToFrontBuffer() const
-{
-    return false;
 }
 
 unsigned DrawingBuffer::frontColorBuffer() const

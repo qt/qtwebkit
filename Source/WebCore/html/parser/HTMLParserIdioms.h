@@ -25,8 +25,10 @@
 #ifndef HTMLParserIdioms_h
 #define HTMLParserIdioms_h
 
+#include "HTMLIdentifier.h"
+#include "QualifiedName.h"
 #include <wtf/Forward.h>
-#include <wtf/unicode/Unicode.h>
+#include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
@@ -39,6 +41,11 @@ bool isNotHTMLSpace(UChar);
 
 // Strip leading and trailing whitespace as defined by the HTML specification. 
 String stripLeadingAndTrailingHTMLSpaces(const String&);
+template<size_t inlineCapacity>
+String stripLeadingAndTrailingHTMLSpaces(const Vector<UChar, inlineCapacity>& vector)
+{
+    return stripLeadingAndTrailingHTMLSpaces(StringImpl::create8BitIfPossible(vector));
+}
 
 // An implementation of the HTML specification's algorithm to convert a number to a string for number and range types.
 String serializeForNumberType(const Decimal&);
@@ -84,6 +91,18 @@ inline bool isNotHTMLSpace(UChar character)
 {
     return !isHTMLSpace(character);
 }
+
+bool threadSafeMatch(const QualifiedName&, const QualifiedName&);
+#if ENABLE(THREADED_HTML_PARSER)
+bool threadSafeMatch(const HTMLIdentifier&, const QualifiedName&);
+inline bool threadSafeHTMLNamesMatch(const HTMLIdentifier& tagName, const QualifiedName& qName)
+{
+    // When the QualifiedName is known to HTMLIdentifier,
+    // all we have to do is a pointer compare.
+    ASSERT(HTMLIdentifier::hasIndex(qName.localName().impl()));
+    return tagName.asStringImpl() == qName.localName().impl();
+}
+#endif
 
 }
 

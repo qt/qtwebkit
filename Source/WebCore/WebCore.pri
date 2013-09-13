@@ -18,6 +18,7 @@ INCLUDEPATH += \
     $$SOURCE_DIR/Modules/indexeddb \
     $$SOURCE_DIR/Modules/navigatorcontentutils \
     $$SOURCE_DIR/Modules/notifications \
+    $$SOURCE_DIR/Modules/proximity \
     $$SOURCE_DIR/Modules/quota \
     $$SOURCE_DIR/Modules/webaudio \
     $$SOURCE_DIR/Modules/webdatabase \
@@ -35,6 +36,7 @@ INCLUDEPATH += \
     $$SOURCE_DIR/history \
     $$SOURCE_DIR/html \
     $$SOURCE_DIR/html/canvas \
+    $$SOURCE_DIR/html/forms \
     $$SOURCE_DIR/html/parser \
     $$SOURCE_DIR/html/shadow \
     $$SOURCE_DIR/html/track \
@@ -49,6 +51,7 @@ INCLUDEPATH += \
     $$SOURCE_DIR/page/animation \
     $$SOURCE_DIR/page/qt \
     $$SOURCE_DIR/page/scrolling \
+    $$SOURCE_DIR/page/scrolling/coordinatedgraphics \
     $$SOURCE_DIR/platform \
     $$SOURCE_DIR/platform/animation \
     $$SOURCE_DIR/platform/audio \
@@ -62,6 +65,7 @@ INCLUDEPATH += \
     $$SOURCE_DIR/platform/graphics/qt \
     $$SOURCE_DIR/platform/graphics/surfaces \
     $$SOURCE_DIR/platform/graphics/texmap \
+    $$SOURCE_DIR/platform/graphics/texmap/coordinated \
     $$SOURCE_DIR/platform/graphics/transforms \
     $$SOURCE_DIR/platform/image-decoders \
     $$SOURCE_DIR/platform/image-decoders/bmp \
@@ -81,6 +85,7 @@ INCLUDEPATH += \
     $$SOURCE_DIR/plugins \
     $$SOURCE_DIR/rendering \
     $$SOURCE_DIR/rendering/mathml \
+    $$SOURCE_DIR/rendering/shapes \
     $$SOURCE_DIR/rendering/style \
     $$SOURCE_DIR/rendering/svg \
     $$SOURCE_DIR/storage \
@@ -149,9 +154,7 @@ enable?(NETSCAPE_PLUGIN_API) {
     }
 }
 
-enable?(ORIENTATION_EVENTS)|enable?(DEVICE_ORIENTATION) {
-    QT += sensors
-}
+have?(qtsensors):if(enable?(ORIENTATION_EVENTS)|enable?(DEVICE_ORIENTATION)): QT += sensors
 
 use?(QT_MOBILITY_SYSTEMINFO) {
      CONFIG *= mobility
@@ -166,7 +169,7 @@ enable?(GAMEPAD) {
 }
 
 use?(GSTREAMER) {
-    DEFINES += ENABLE_GLIB_SUPPORT=1
+    DEFINES += WTF_USE_GLIB=1
     use?(GSTREAMER010) {
         PKGCONFIG += glib-2.0 gio-2.0 gstreamer-0.10 gstreamer-app-0.10 gstreamer-base-0.10 gstreamer-interfaces-0.10 gstreamer-pbutils-0.10 gstreamer-plugins-base-0.10 gstreamer-video-0.10
     } else {
@@ -245,6 +248,11 @@ use?(libjpeg): LIBS += -ljpeg
 use?(libpng): LIBS += -lpng
 use?(webp): LIBS += -lwebp
 
+enable?(opencl) {
+    LIBS += -lOpenCL
+    INCLUDEPATH += $$SOURCE_DIR/platform/graphics/gpu/opencl
+}
+
 mac {
     LIBS += -framework Carbon -framework AppKit -framework IOKit
 }
@@ -291,15 +299,6 @@ mac {
 unix:!mac:*-g++*:QMAKE_CXXFLAGS += -fdata-sections
 unix:!mac:*-g++*:QMAKE_LFLAGS += -Wl,--gc-sections
 linux*-g++*:QMAKE_LFLAGS += $$QMAKE_LFLAGS_NOUNDEF
-
-contains(DEFINES, ENABLE_OPENCL=1) {
-    LIBS += -lOpenCL
-
-    INCLUDEPATH += $$SOURCE_DIR/platform/graphics/gpu/opencl
-}
-
-# Disable C++0x mode in WebCore for those who enabled it in their Qt's mkspec
-*-g++*:QMAKE_CXXFLAGS -= -std=c++0x -std=gnu++0x
 
 enable_fast_mobile_scrolling: DEFINES += ENABLE_FAST_MOBILE_SCROLLING=1
 

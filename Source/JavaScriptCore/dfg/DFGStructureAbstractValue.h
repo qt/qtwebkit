@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2012, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -307,12 +307,14 @@ public:
         
         out.print("[");
         if (m_structure)
-            out.print(RawPointer(m_structure));
+            out.print(RawPointer(m_structure), "(", m_structure->classInfo()->className, ")");
         out.print("]");
     }
 
 private:
     static Structure* topValue() { return reinterpret_cast<Structure*>(1); }
+    
+    // NB. This must have a trivial destructor.
     
     // This can only remember one structure at a time.
     Structure* m_structure;

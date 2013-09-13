@@ -28,7 +28,6 @@
 #include "HTMLCollection.h"
 #include "HTMLPropertiesCollection.h"
 #include "PropertyNodeList.h"
-#include "WebCoreMemoryInstrumentation.h"
 
 namespace WebCore {
 
@@ -50,6 +49,14 @@ Node* LiveNodeListBase::rootNode() const
 #endif
 
     return m_ownerNode.get();
+}
+
+ContainerNode* LiveNodeListBase::rootContainerNode() const
+{
+    Node* rootNode = this->rootNode();
+    if (!rootNode->isContainerNode())
+        return 0;
+    return toContainerNode(rootNode);
 }
 
 void LiveNodeListBase::invalidateCache() const
@@ -82,14 +89,6 @@ void LiveNodeListBase::invalidateIdNameCacheMaps() const
     cacheBase->m_nameCache.clear();
 }
 
-void LiveNodeListBase::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::DOM);
-    NodeList::reportMemoryUsage(memoryObjectInfo);
-    info.addMember(m_ownerNode);
-    info.addWeakPointer(m_cachedItem);
-}
-
 Node* LiveNodeList::namedItem(const AtomicString& elementId) const
 {
     Node* rootNode = this->rootNode();
@@ -111,8 +110,11 @@ Node* LiveNodeList::namedItem(const AtomicString& elementId) const
     unsigned length = this->length();
     for (unsigned i = 0; i < length; i++) {
         Node* node = item(i);
+        if (!node->isElementNode())
+            continue;
+        Element* element = toElement(node);
         // FIXME: This should probably be using getIdAttribute instead of idForStyleResolution.
-        if (node->hasID() && static_cast<Element*>(node)->idForStyleResolution() == elementId)
+        if (element->hasID() && element->idForStyleResolution() == elementId)
             return node;
     }
 

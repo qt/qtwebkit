@@ -31,39 +31,34 @@
 
 #include "DumpRenderTreeQt.h"
 #include "DumpRenderTreeSupportQt.h"
+#include "NotificationPresenterClientQt.h"
 #include "WorkQueue.h"
 #include "WorkQueueItemQt.h"
+#include <JSStringRefQt.h>
 #include <QCoreApplication>
 #include <QDir>
 #include <QLocale>
 #include <qwebsettings.h>
 
-TestRunner::TestRunner(WebCore::DumpRenderTree* drt)
+TestRunnerQt::TestRunnerQt(DumpRenderTree* drt)
     : QObject()
     , m_drt(drt)
     , m_shouldTimeout(true)
     , m_timeout(30000)
 {
     reset();
-    DumpRenderTreeSupportQt::dumpNotification(true);
 }
 
-void TestRunner::reset()
+TestRunner::~TestRunner()
+{
+}
+
+void TestRunnerQt::reset()
 {
     m_hasDumped = false;
     m_loadFinished = false;
-    m_textDump = false;
-    m_shouldDumpPixels = true;
-    m_dumpBackForwardList = false;
-    m_dumpChildrenAsText = false;
-    m_dumpChildFrameScrollPositions = false;
-    m_canOpenWindows = false;
+    m_audioDump = false;
     m_waitForDone = false;
-    m_disallowIncreaseForApplicationCacheQuota = false;
-    m_dumpTitleChanges = false;
-    m_dumpDatabaseCallbacks = false;
-    m_dumpApplicationCacheDelegateCallbacks = false;
-    m_dumpStatusCallbacks = false;
     m_timeoutTimer.stop();
     m_topLoadingFrame = 0;
     m_waitForPolicy = false;
@@ -71,11 +66,10 @@ void TestRunner::reset()
     m_webHistory = 0;
     m_globalFlag = false;
     m_userStyleSheetEnabled = false;
-    m_desktopNotificationAllowedOrigins.clear();
     m_ignoreDesktopNotification = false;
     m_isGeolocationPermissionSet = false;
-    m_isPrinting = false;
     m_geolocationPermission = false;
+    m_audioData.clear();
 
     DumpRenderTreeSupportQt::dumpEditingCallbacks(false);
     DumpRenderTreeSupportQt::dumpFrameLoader(false);
@@ -93,16 +87,23 @@ void TestRunner::reset()
     DumpRenderTreeSupportQt::dumpHistoryCallbacks(false);
     DumpRenderTreeSupportQt::dumpVisitedLinksCallbacks(false);
     DumpRenderTreeSupportQt::resetGeolocationMock(m_drt->pageAdapter());
+    DumpRenderTreeSupportQt::dumpNotification(false);
     DumpRenderTreeSupportQt::setShouldUseFontSmoothing(false);
     DumpRenderTreeSupportQt::disableDefaultTypesettingFeatures();
     setIconDatabaseEnabled(false);
     clearAllDatabases();
+    removeAllWebNotificationPermissions();
     // The default state for DRT is to block third-party cookies, mimicing the Mac port
     setAlwaysAcceptCookies(false);
     emit hidePage();
 }
 
-void TestRunner::processWork()
+void TestRunnerQt::dumpNotifications()
+{
+    DumpRenderTreeSupportQt::dumpNotification(true);
+}
+
+void TestRunnerQt::processWork()
 {
     // qDebug() << ">>>processWork";
 
@@ -114,7 +115,7 @@ void TestRunner::processWork()
 }
 
 // Called on loadFinished on WebPage
-void TestRunner::maybeDump(bool /*success*/)
+void TestRunnerQt::maybeDump(bool /*success*/)
 {
 
     // This can happen on any of the http/tests/security/window-events-*.html tests, where the test opens
@@ -145,13 +146,7 @@ void TestRunner::maybeDump(bool /*success*/)
     }
 }
 
-void TestRunner::dumpAsText(bool shouldDumpPixels)
-{
-    m_textDump = true;
-    m_shouldDumpPixels = shouldDumpPixels;
-}
-
-void TestRunner::waitUntilDone()
+void TestRunnerQt::waitUntilDone()
 {
     //qDebug() << ">>>>waitForDone";
     m_waitForDone = true;
@@ -162,12 +157,12 @@ void TestRunner::waitUntilDone()
     m_timeoutTimer.start(m_timeout, this);
 }
 
-void TestRunner::setViewModeMediaFeature(const QString& mode)
+void TestRunnerQt::setViewModeMediaFeature(const QString& mode)
 {
     m_drt->webPage()->setProperty("_q_viewMode", mode);
 }
 
-int TestRunner::webHistoryItemCount()
+int TestRunnerQt::webHistoryItemCount()
 {
     if (!m_webHistory)
         return -1;
@@ -177,12 +172,12 @@ int TestRunner::webHistoryItemCount()
     return m_webHistory->count() - 1;
 }
 
-void TestRunner::keepWebHistory()
+void TestRunnerQt::keepWebHistory()
 {
     m_webHistory = m_drt->webPage()->history();
 }
 
-void TestRunner::notifyDone()
+void TestRunnerQt::notifyDone()
 {
     qDebug() << ">>>>notifyDone";
 
@@ -206,60 +201,55 @@ void TestRunner::notifyDone()
     m_waitForPolicy = false;
 }
 
-int TestRunner::windowCount()
+int TestRunnerQt::windowCount()
 {
     return m_drt->windowCount();
 }
 
-void TestRunner::grantWebNotificationPermission(const QString& origin)
+void TestRunnerQt::grantWebNotificationPermission(const QString& origin)
 {
     QWebFrame* frame = m_drt->webPage()->mainFrame();
     m_drt->webPage()->setFeaturePermission(frame, QWebPage::Notifications, QWebPage::PermissionGrantedByUser);
-    m_desktopNotificationAllowedOrigins.append(origin);
 }
 
-void TestRunner::ignoreLegacyWebNotificationPermissionRequests()
+void TestRunnerQt::ignoreLegacyWebNotificationPermissionRequests()
 {
     m_ignoreDesktopNotification = true;
 }
 
-void TestRunner::denyWebNotificationPermission(const QString& origin)
+void TestRunnerQt::denyWebNotificationPermission(const QString& origin)
 {
-    // FIXME: implement.
+    QWebFrame* frame = m_drt->webPage()->mainFrame();
+    m_drt->webPage()->setFeaturePermission(frame, QWebPage::Notifications, QWebPage::PermissionDeniedByUser);
 }
 
-void TestRunner::removeAllWebNotificationPermissions()
+void TestRunnerQt::removeAllWebNotificationPermissions()
 {
-    // FIXME: implement.
+    DumpRenderTreeSupportQt::clearNotificationPermissions();
 }
 
-void TestRunner::simulateWebNotificationClick(const QWebElement& notification)
-{
-    // FIXME: implement.
-}
-
-void TestRunner::simulateLegacyWebNotificationClick(const QString& title)
+void TestRunnerQt::simulateLegacyWebNotificationClick(const QString& title)
 {
     DumpRenderTreeSupportQt::simulateDesktopNotificationClick(title);
 }
 
-void TestRunner::display()
+void TestRunnerQt::display()
 {
     DumpRenderTreeSupportQt::setTrackRepaintRects(m_topLoadingFrame->handle(), true);
     emit showPage();
 }
 
-void TestRunner::displayInvalidatedRegion()
+void TestRunnerQt::displayInvalidatedRegion()
 {
     display();
 }
 
-void TestRunner::clearBackForwardList()
+void TestRunnerQt::clearBackForwardList()
 {
     m_drt->webPage()->history()->clear();
 }
 
-QString TestRunner::pathToLocalResource(const QString& url)
+QString TestRunnerQt::pathToLocalResource(const QString& url)
 {
     QString localTmpUrl(QLatin1String("file:///tmp/LayoutTests"));
 
@@ -276,123 +266,115 @@ QString TestRunner::pathToLocalResource(const QString& url)
     return url;
 }
 
-void TestRunner::dumpEditingCallbacks()
+void TestRunnerQt::dumpEditingCallbacks()
 {
     qDebug() << ">>>dumpEditingCallbacks";
     DumpRenderTreeSupportQt::dumpEditingCallbacks(true);
 }
 
-void TestRunner::dumpFrameLoadCallbacks()
+void TestRunnerQt::dumpFrameLoadCallbacks()
 {
     DumpRenderTreeSupportQt::dumpFrameLoader(true);
 }
 
-void TestRunner::dumpProgressFinishedCallback()
+void TestRunnerQt::dumpProgressFinishedCallback()
 {
     DumpRenderTreeSupportQt::dumpProgressFinishedCallback(true);
 }
 
-void TestRunner::dumpUserGestureInFrameLoadCallbacks()
+void TestRunnerQt::dumpUserGestureInFrameLoadCallbacks()
 {
     DumpRenderTreeSupportQt::dumpUserGestureInFrameLoader(true);
 }
 
-void TestRunner::dumpResourceLoadCallbacks()
+void TestRunnerQt::dumpResourceLoadCallbacks()
 {
     DumpRenderTreeSupportQt::dumpResourceLoadCallbacks(true);
 }
 
-void TestRunner::dumpResourceResponseMIMETypes()
+void TestRunnerQt::dumpResourceResponseMIMETypes()
 {
     DumpRenderTreeSupportQt::dumpResourceResponseMIMETypes(true);
 }
 
-void TestRunner::dumpWillCacheResponse()
+void TestRunnerQt::dumpWillCacheResponse()
 {
     DumpRenderTreeSupportQt::dumpWillCacheResponseCallbacks(true);
 }
 
-void TestRunner::dumpHistoryCallbacks()
+void TestRunnerQt::dumpHistoryCallbacks()
 {
     DumpRenderTreeSupportQt::dumpHistoryCallbacks(true);
 }
 
-void TestRunner::setWillSendRequestReturnsNullOnRedirect(bool enabled)
+void TestRunnerQt::setWillSendRequestReturnsNullOnRedirect(bool enabled)
 {
     DumpRenderTreeSupportQt::setWillSendRequestReturnsNullOnRedirect(enabled);
 }
 
-void TestRunner::setWillSendRequestReturnsNull(bool enabled)
+void TestRunnerQt::setWillSendRequestReturnsNull(bool enabled)
 {
     DumpRenderTreeSupportQt::setWillSendRequestReturnsNull(enabled);
 }
 
-void TestRunner::setWillSendRequestClearHeader(const QStringList& headers)
+void TestRunnerQt::setWillSendRequestClearHeader(const QStringList& headers)
 {
     DumpRenderTreeSupportQt::setWillSendRequestClearHeaders(headers);
 }
 
-void TestRunner::setDeferMainResourceDataLoad(bool defer)
+void TestRunnerQt::setDeferMainResourceDataLoad(bool defer)
 {
     DumpRenderTreeSupportQt::setDeferMainResourceDataLoad(defer);
 }
 
-void TestRunner::queueBackNavigation(int howFarBackward)
+void TestRunnerQt::queueBackNavigation(int howFarBackward)
 {
     //qDebug() << ">>>queueBackNavigation" << howFarBackward;
     for (int i = 0; i != howFarBackward; ++i)
-        WorkQueue::shared()->queue(new BackItem(1, m_drt->webPage()));
+        WorkQueue::shared()->queue(new BackItem(1));
 }
 
-void TestRunner::queueForwardNavigation(int howFarForward)
+void TestRunnerQt::queueForwardNavigation(int howFarForward)
 {
     //qDebug() << ">>>queueForwardNavigation" << howFarForward;
     for (int i = 0; i != howFarForward; ++i)
-        WorkQueue::shared()->queue(new ForwardItem(1, m_drt->webPage()));
+        WorkQueue::shared()->queue(new ForwardItem(1));
 }
 
-void TestRunner::queueLoad(const QString& url, const QString& target)
-{
-    //qDebug() << ">>>queueLoad" << url << target;
-    QUrl mainResourceUrl = m_drt->webPage()->mainFrame()->url();
-    QString absoluteUrl = mainResourceUrl.resolved(QUrl(url)).toEncoded();
-    WorkQueue::shared()->queue(new LoadItem(absoluteUrl, target, m_drt->webPage()));
-}
-
-void TestRunner::queueLoadHTMLString(const QString& content, const QString& baseURL, const QString& failingURL)
+void TestRunnerQt::queueLoadHTMLString(const QString& content, const QString& baseURL, const QString& failingURL)
 {
     if (failingURL.isEmpty())
-        WorkQueue::shared()->queue(new LoadHTMLStringItem(content, baseURL, m_drt->webPage()));
+        WorkQueue::shared()->queue(new LoadHTMLStringItem(JSStringCreateWithQString(content).get(), JSStringCreateWithQString(baseURL).get()));
     else
-        WorkQueue::shared()->queue(new LoadAlternateHTMLStringItem(content, baseURL, failingURL, m_drt->webPage()));
+        WorkQueue::shared()->queue(new LoadAlternateHTMLStringItem(JSStringCreateWithQString(content), JSStringCreateWithQString(baseURL), JSStringCreateWithQString(failingURL)));
 }
 
-void TestRunner::queueReload()
+void TestRunnerQt::queueReload()
 {
     //qDebug() << ">>>queueReload";
-    WorkQueue::shared()->queue(new ReloadItem(m_drt->webPage()));
+    WorkQueue::shared()->queue(new ReloadItem());
 }
 
-void TestRunner::queueLoadingScript(const QString& script)
+void TestRunnerQt::queueLoadingScript(const QString& script)
 {
     //qDebug() << ">>>queueLoadingScript" << script;
-    WorkQueue::shared()->queue(new LoadingScriptItem(script, m_drt->webPage()));
+    WorkQueue::shared()->queue(new LoadingScriptItem(JSStringCreateWithQString(script).get()));
 }
 
-void TestRunner::queueNonLoadingScript(const QString& script)
+void TestRunnerQt::queueNonLoadingScript(const QString& script)
 {
     //qDebug() << ">>>queueNonLoadingScript" << script;
-    WorkQueue::shared()->queue(new NonLoadingScriptItem(script, m_drt->webPage()));
+    WorkQueue::shared()->queue(new NonLoadingScriptItem(JSStringCreateWithQString(script).get()));
 }
 
-void TestRunner::provisionalLoad()
+void TestRunnerQt::provisionalLoad()
 {
     QWebFrame* frame = qobject_cast<QWebFrame*>(sender());
     if (!m_topLoadingFrame && !m_hasDumped)
         m_topLoadingFrame = frame;
 }
 
-void TestRunner::timerEvent(QTimerEvent *ev)
+void TestRunnerQt::timerEvent(QTimerEvent *ev)
 {
     if (ev->timerId() == m_timeoutTimer.timerId()) {
         const char* message = "FAIL: Timed out waiting for notifyDone to be called\n";
@@ -403,134 +385,99 @@ void TestRunner::timerEvent(QTimerEvent *ev)
         QObject::timerEvent(ev);
 }
 
-QString TestRunner::encodeHostName(const QString& host)
+QString TestRunnerQt::encodeHostName(const QString& host)
 {
     QString encoded = QString::fromLatin1(QUrl::toAce(host + QLatin1String(".no")));
     encoded.truncate(encoded.length() - 3); // strip .no
     return encoded;
 }
 
-QString TestRunner::decodeHostName(const QString& host)
+QString TestRunnerQt::decodeHostName(const QString& host)
 {
     QString decoded = QUrl::fromAce(host.toLatin1() + QByteArray(".no"));
     decoded.truncate(decoded.length() - 3);
     return decoded;
 }
 
-void TestRunner::closeWebInspector()
+void TestRunnerQt::closeWebInspector()
 {
     DumpRenderTreeSupportQt::webInspectorClose(m_drt->pageAdapter());
     m_drt->webPage()->settings()->setAttribute(QWebSettings::DeveloperExtrasEnabled, false);
 }
 
-void TestRunner::setDeveloperExtrasEnabled(bool enabled)
+void TestRunnerQt::setDeveloperExtrasEnabled(bool enabled)
 {
     m_drt->webPage()->settings()->setAttribute(QWebSettings::DeveloperExtrasEnabled, enabled);
 }
 
-void TestRunner::setAsynchronousSpellCheckingEnabled(bool)
-{
-    // FIXME: Implement this.
-}
-
-void TestRunner::showWebInspector()
+void TestRunnerQt::showWebInspector()
 {
     m_drt->webPage()->settings()->setAttribute(QWebSettings::DeveloperExtrasEnabled, true);
     DumpRenderTreeSupportQt::webInspectorShow(m_drt->pageAdapter());
 }
 
-void TestRunner::evaluateInWebInspector(long callId, const QString& script)
+void TestRunnerQt::evaluateInWebInspector(long callId, const QString& script)
 {
     DumpRenderTreeSupportQt::webInspectorExecuteScript(m_drt->pageAdapter(), callId, script);
 }
 
-void TestRunner::setFrameFlatteningEnabled(bool enabled)
-{
-    DumpRenderTreeSupportQt::setFrameFlatteningEnabled(m_drt->pageAdapter(), enabled);
-}
-
-void TestRunner::goBack()
-{
-    DumpRenderTreeSupportQt::goBack(m_drt->pageAdapter());
-}
-
-void TestRunner::setDefersLoading(bool flag)
-{
-    DumpRenderTreeSupportQt::setDefersLoading(m_drt->pageAdapter(), flag);
-}
-
-void TestRunner::setAllowUniversalAccessFromFileURLs(bool enabled)
+void TestRunnerQt::setAllowUniversalAccessFromFileURLs(bool enabled)
 {
     m_drt->webPage()->settings()->setAttribute(QWebSettings::LocalContentCanAccessRemoteUrls, enabled);
 }
 
-void TestRunner::setAllowFileAccessFromFileURLs(bool enabled)
+void TestRunnerQt::setAllowFileAccessFromFileURLs(bool enabled)
 {
     m_drt->webPage()->settings()->setAttribute(QWebSettings::LocalContentCanAccessFileUrls, enabled);
 }
 
-void TestRunner::setAppCacheMaximumSize(unsigned long long quota)
+void TestRunnerQt::setAppCacheMaximumSize(unsigned long long quota)
 {
     m_drt->webPage()->settings()->setOfflineWebApplicationCacheQuota(quota);
 }
 
-void TestRunner::setAutofilled(const QWebElement& element, bool isAutofilled)
-{
-    return DumpRenderTreeSupportQt::setAutofilled(element, isAutofilled);
-}
-
-void TestRunner::setValueForUser(const QWebElement& element, const QString& value)
+void TestRunnerQt::setValueForUser(const QWebElement& element, const QString& value)
 {
     DumpRenderTreeSupportQt::setValueForUser(element, value);
 }
 
-void TestRunner::setFixedContentsSize(int width, int height)
+void TestRunnerQt::setFixedContentsSize(int width, int height)
 {
     m_topLoadingFrame->page()->setPreferredContentsSize(QSize(width, height));
 }
 
-void TestRunner::setPrivateBrowsingEnabled(bool enable)
+void TestRunnerQt::setPrivateBrowsingEnabled(bool enable)
 {
     m_drt->webPage()->settings()->setAttribute(QWebSettings::PrivateBrowsingEnabled, enable);
 }
 
-void TestRunner::setSpatialNavigationEnabled(bool enable)
+void TestRunnerQt::setSpatialNavigationEnabled(bool enable)
 {
     m_drt->webPage()->settings()->setAttribute(QWebSettings::SpatialNavigationEnabled, enable);
 }
 
-void TestRunner::setPopupBlockingEnabled(bool enable)
+void TestRunnerQt::setPopupBlockingEnabled(bool enable)
 {
     m_drt->webPage()->settings()->setAttribute(QWebSettings::JavascriptCanOpenWindows, !enable);
 }
 
-void TestRunner::setPluginsEnabled(bool flag)
-{
-    // FIXME: Implement
-}
-
-void TestRunner::setPOSIXLocale(const QString& locale)
+void TestRunnerQt::setPOSIXLocale(const QString& locale)
 {
     QLocale qlocale(locale);
     QLocale::setDefault(qlocale);
 } 
 
-void TestRunner::setWindowIsKey(bool isKey)
+void TestRunnerQt::setWindowIsKey(bool isKey)
 {
     m_drt->switchFocus(isKey);
 }
 
-void TestRunner::setMainFrameIsFirstResponder(bool isFirst)
-{
-    //FIXME: only need this for the moment: https://bugs.webkit.org/show_bug.cgi?id=32990
-}
-
-void TestRunner::setJavaScriptCanAccessClipboard(bool enable)
+void TestRunnerQt::setJavaScriptCanAccessClipboard(bool enable)
 {
     m_drt->webPage()->settings()->setAttribute(QWebSettings::JavascriptCanAccessClipboard, enable);
 }
 
-void TestRunner::setXSSAuditorEnabled(bool enable)
+void TestRunnerQt::setXSSAuditorEnabled(bool enable)
 {
     // Set XSSAuditingEnabled globally so that windows created by the test inherit it too.
     // resetSettings() will call this to reset the page and global setting to false again.
@@ -540,121 +487,59 @@ void TestRunner::setXSSAuditorEnabled(bool enable)
     m_drt->webPage()->settings()->setAttribute(QWebSettings::XSSAuditingEnabled, enable);
 }
 
-bool TestRunner::pauseAnimationAtTimeOnElementWithId(const QString& animationName,
-                                                               double time,
-                                                               const QString& elementId)
-{
-    QWebFrame* frame = m_drt->webPage()->mainFrame();
-    Q_ASSERT(frame);
-    return DumpRenderTreeSupportQt::pauseAnimation(frame->handle(), animationName, time, elementId);
-}
-
-bool TestRunner::pauseTransitionAtTimeOnElementWithId(const QString& propertyName,
-                                                                double time,
-                                                                const QString& elementId)
-{
-    QWebFrame* frame = m_drt->webPage()->mainFrame();
-    Q_ASSERT(frame);
-    return DumpRenderTreeSupportQt::pauseTransitionOfProperty(frame->handle(), propertyName, time, elementId);
-}
-
-unsigned TestRunner::numberOfActiveAnimations() const
-{
-    QWebFrame* frame = m_drt->webPage()->mainFrame();
-    Q_ASSERT(frame);
-    return DumpRenderTreeSupportQt::numberOfActiveAnimations(frame->handle());
-}
-
-void TestRunner::disableImageLoading()
-{
-    m_drt->webPage()->settings()->setAttribute(QWebSettings::AutoLoadImages, false);
-}
-
-void TestRunner::dispatchPendingLoadRequests()
-{
-    // FIXME: Implement for testing fix for 6727495
-}
-
-void TestRunner::clearAllApplicationCaches()
+void TestRunnerQt::clearAllApplicationCaches()
 {
     DumpRenderTreeSupportQt::clearAllApplicationCaches();
 }
 
-void TestRunner::clearApplicationCacheForOrigin(const QString& url)
-{
-    // FIXME: Implement to support deleting all application caches for an origin.
-}
-
-long long TestRunner::localStorageDiskUsageForOrigin(const QString& originIdentifier)
-{
-    // FIXME: Implement to support getting disk usage in bytes for an origin.
-    return 0;
-}
-
-void TestRunner::setApplicationCacheOriginQuota(unsigned long long quota)
+void TestRunnerQt::setApplicationCacheOriginQuota(unsigned long long quota)
 {
     if (!m_topLoadingFrame)
         return;
     m_topLoadingFrame->securityOrigin().setApplicationCacheQuota(quota);
 }
 
-long long TestRunner::applicationCacheDiskUsageForOrigin(const QString& origin)
-{
-    // FIXME: Implement to support getting disk usage by all application caches for an origin.
-    return 0;
-}
-
-QStringList TestRunner::originsWithApplicationCache()
+QStringList TestRunnerQt::originsWithApplicationCache()
 {
     // FIXME: Implement to get origins that have application caches.
     return QStringList();
 }
 
-void TestRunner::setCacheModel(int model)
-{
-    // qwebsetting doesn't have matched setting yet :
-    // WEBKIT_CACHE_MODEL_DOCUMENT_VIEWER
-    // WEBKIT_CACHE_MODEL_DOCUMENT_BROWSER
-    // WEBKIT_CACHE_MODEL_WEB_BROWSER
-
-    // FIXME: Implement.
-}
-
-void TestRunner::setDatabaseQuota(int size)
+void TestRunnerQt::setDatabaseQuota(int size)
 {
     if (!m_topLoadingFrame)
         return;
     m_topLoadingFrame->securityOrigin().setDatabaseQuota(size);
 }
 
-void TestRunner::clearAllDatabases()
+void TestRunnerQt::clearAllDatabases()
 {
     QWebDatabase::removeAllDatabases();
 }
 
-void TestRunner::addOriginAccessWhitelistEntry(const QString& sourceOrigin, const QString& destinationProtocol, const QString& destinationHost, bool allowDestinationSubdomains)
+void TestRunnerQt::addOriginAccessWhitelistEntry(const QString& sourceOrigin, const QString& destinationProtocol, const QString& destinationHost, bool allowDestinationSubdomains)
 {
     DumpRenderTreeSupportQt::whiteListAccessFromOrigin(sourceOrigin, destinationProtocol, destinationHost, allowDestinationSubdomains);
 }
 
-void TestRunner::removeOriginAccessWhitelistEntry(const QString& sourceOrigin, const QString& destinationProtocol, const QString& destinationHost, bool allowDestinationSubdomains)
+void TestRunnerQt::removeOriginAccessWhitelistEntry(const QString& sourceOrigin, const QString& destinationProtocol, const QString& destinationHost, bool allowDestinationSubdomains)
 {
     DumpRenderTreeSupportQt::removeWhiteListAccessFromOrigin(sourceOrigin, destinationProtocol, destinationHost, allowDestinationSubdomains);
 }
 
-void TestRunner::setCustomPolicyDelegate(bool enabled, bool permissive)
+void TestRunnerQt::setCustomPolicyDelegate(bool enabled, bool permissive)
 {
     DumpRenderTreeSupportQt::setCustomPolicyDelegate(enabled, permissive);
 }
 
-void TestRunner::waitForPolicyDelegate()
+void TestRunnerQt::waitForPolicyDelegate()
 {
     setCustomPolicyDelegate(true);
     m_waitForPolicy = true;
     waitUntilDone();
 }
 
-void TestRunner::overridePreference(const QString& name, const QVariant& value)
+void TestRunnerQt::overridePreference(const QString& name, const QVariant& value)
 {
     QWebSettings* settings = m_topLoadingFrame->page()->settings();
 
@@ -684,12 +569,14 @@ void TestRunner::overridePreference(const QString& name, const QVariant& value)
         settings->setAttribute(QWebSettings::AcceleratedCompositingEnabled, value.toBool());
     else if (name == "WebKitDisplayImagesKey")
         settings->setAttribute(QWebSettings::AutoLoadImages, value.toBool());
+    else if (name == "WebKitWebAudioEnabled")
+        settings->setAttribute(QWebSettings::WebAudioEnabled, value.toBool());
     else
         printf("ERROR: TestRunner::overridePreference() does not support the '%s' preference\n",
             name.toLatin1().data());
 }
 
-void TestRunner::setUserStyleSheetLocation(const QString& url)
+void TestRunnerQt::setUserStyleSheetLocation(const QString& url)
 {
     QByteArray urlData = pathToLocalResource(url).toLatin1();
     m_userStyleSheetLocation = QUrl::fromEncoded(urlData, QUrl::StrictMode);
@@ -698,17 +585,17 @@ void TestRunner::setUserStyleSheetLocation(const QString& url)
         setUserStyleSheetEnabled(true);
 }
 
-void TestRunner::setCaretBrowsingEnabled(bool value)
+void TestRunnerQt::setCaretBrowsingEnabled(bool value)
 {
     DumpRenderTreeSupportQt::setCaretBrowsingEnabled(m_drt->pageAdapter(), value);
 }
 
-void TestRunner::setAuthorAndUserStylesEnabled(bool value)
+void TestRunnerQt::setAuthorAndUserStylesEnabled(bool value)
 {
     DumpRenderTreeSupportQt::setAuthorAndUserStylesEnabled(m_drt->pageAdapter(), value);
 }
 
-void TestRunner::setUserStyleSheetEnabled(bool enabled)
+void TestRunnerQt::setUserStyleSheetEnabled(bool enabled)
 {
     m_userStyleSheetEnabled = enabled;
 
@@ -718,22 +605,17 @@ void TestRunner::setUserStyleSheetEnabled(bool enabled)
         m_drt->webPage()->settings()->setUserStyleSheetUrl(QUrl());
 }
 
-void TestRunner::setDomainRelaxationForbiddenForURLScheme(bool forbidden, const QString& scheme)
+void TestRunnerQt::setDomainRelaxationForbiddenForURLScheme(bool forbidden, const QString& scheme)
 {
     DumpRenderTreeSupportQt::setDomainRelaxationForbiddenForURLScheme(forbidden, scheme);
 }
 
-int TestRunner::workerThreadCount()
-{
-    return DumpRenderTreeSupportQt::workerThreadCount();
-}
-
-bool TestRunner::callShouldCloseOnWebView()
+bool TestRunnerQt::callShouldCloseOnWebView()
 {
     return DumpRenderTreeSupportQt::shouldClose(m_drt->mainFrameAdapter());
 }
 
-void TestRunner::setScrollbarPolicy(const QString& orientation, const QString& policy)
+void TestRunnerQt::setScrollbarPolicy(const QString& orientation, const QString& policy)
 {
     Qt::Orientation o;
     Qt::ScrollBarPolicy p;
@@ -757,52 +639,51 @@ void TestRunner::setScrollbarPolicy(const QString& orientation, const QString& p
     m_drt->webPage()->mainFrame()->setScrollBarPolicy(o, p);
 }
 
-void TestRunner::setSmartInsertDeleteEnabled(bool enable)
-{
-    DumpRenderTreeSupportQt::setSmartInsertDeleteEnabled(m_drt->pageAdapter(), enable);
-}
-
-void TestRunner::setSelectTrailingWhitespaceEnabled(bool enable)
-{
-    DumpRenderTreeSupportQt::setSelectTrailingWhitespaceEnabled(m_drt->pageAdapter(), enable);
-}
-
-void TestRunner::execCommand(const QString& name, const QString& value)
+void TestRunnerQt::execCommand(const QString& name, const QString& value)
 {
     DumpRenderTreeSupportQt::executeCoreCommandByName(m_drt->pageAdapter(), name, value);
 }
 
-bool TestRunner::isCommandEnabled(const QString& name) const
+bool TestRunnerQt::isCommandEnabled(const QString& name) const
 {
     return DumpRenderTreeSupportQt::isCommandEnabled(m_drt->pageAdapter(), name);
 }
 
-bool TestRunner::findString(const QString& string, const QStringList& optionArray)
+bool TestRunner::findString(JSContextRef context, JSStringRef string, JSObjectRef optionsArray)
 {
-    return DumpRenderTreeSupportQt::findString(m_drt->pageAdapter(), string, optionArray);
+    JSRetainPtr<JSStringRef> lengthPropertyName(Adopt, JSStringCreateWithUTF8CString("length"));
+    JSValueRef lengthValue = JSObjectGetProperty(context, optionsArray, lengthPropertyName.get(), 0);
+    if (!JSValueIsNumber(context, lengthValue))
+        return false;
+
+    QWebPage::FindFlags findFlags = QWebPage::FindCaseSensitively;
+
+    int length = static_cast<int>(JSValueToNumber(context, lengthValue, 0));
+    for (int i = 0; i < length; ++i) {
+        JSValueRef value = JSObjectGetPropertyAtIndex(context, optionsArray, i, 0);
+        if (!JSValueIsString(context, value))
+            continue;
+
+        JSRetainPtr<JSStringRef> optionName(Adopt, JSValueToStringCopy(context, value, 0));
+        if (JSStringIsEqualToUTF8CString(optionName.get(), "CaseInsensitive"))
+            findFlags &= ~QWebPage::FindCaseSensitively;
+        else if (JSStringIsEqualToUTF8CString(optionName.get(), "AtWordStarts"))
+            findFlags |= QWebPage::FindAtWordBeginningsOnly;
+        else if (JSStringIsEqualToUTF8CString(optionName.get(), "TreatMedialCapitalAsWordStart"))
+            findFlags |=  QWebPage::TreatMedialCapitalAsWordBeginning;
+        else if (JSStringIsEqualToUTF8CString(optionName.get(), "Backwards"))
+            findFlags |=  QWebPage::FindBackward;
+        else if (JSStringIsEqualToUTF8CString(optionName.get(), "WrapAround"))
+            findFlags |=  QWebPage::FindWrapsAroundDocument;
+        else if (JSStringIsEqualToUTF8CString(optionName.get(), "StartInSelection"))
+            findFlags |=  QWebPage::FindBeginsInSelection;
+    }
+
+    DumpRenderTree* drt = DumpRenderTree::instance();
+    return drt->webPage()->findText(JSStringCopyQString(string), findFlags);
 }
 
-QString TestRunner::markerTextForListItem(const QWebElement& listItem)
-{
-    return DumpRenderTreeSupportQt::markerTextForListItem(listItem);
-}
-
-QVariantMap TestRunner::computedStyleIncludingVisitedInfo(const QWebElement& element) const
-{
-    return DumpRenderTreeSupportQt::computedStyleIncludingVisitedInfo(element);
-}
-
-bool TestRunner::elementDoesAutoCompleteForElementWithId(const QString& elementId)
-{
-    return DumpRenderTreeSupportQt::elementDoesAutoCompleteForElementWithId(m_drt->mainFrameAdapter(), elementId);
-}
-
-void TestRunner::authenticateSession(const QString&, const QString&, const QString&)
-{
-    // FIXME: If there is a concept per-session (per-process) credential storage, the credentials should be added to it for later use.
-}
-
-void TestRunner::setIconDatabaseEnabled(bool enable)
+void TestRunnerQt::setIconDatabaseEnabled(bool enable)
 {
     if (enable && !m_drt->persistentStoragePath().isEmpty())
         QWebSettings::setIconDatabasePath(m_drt->persistentStoragePath());
@@ -810,152 +691,64 @@ void TestRunner::setIconDatabaseEnabled(bool enable)
         QWebSettings::setIconDatabasePath(QString());
 }
 
-void TestRunner::setMockDeviceOrientation(bool canProvideAlpha, double alpha, bool canProvideBeta, double beta, bool canProvideGamma, double gamma)
+void TestRunnerQt::setMockDeviceOrientation(bool canProvideAlpha, double alpha, bool canProvideBeta, double beta, bool canProvideGamma, double gamma)
 {
-    QList<WebCore::WebPage*> pages = m_drt->getAllPages();
-    foreach (WebCore::WebPage* page, pages)
+    QList<WebPage*> pages = m_drt->getAllPages();
+    foreach (WebPage* page, pages)
         DumpRenderTreeSupportQt::setMockDeviceOrientation(page->handle(), canProvideAlpha, alpha, canProvideBeta, beta, canProvideGamma, gamma);
 }
 
-void TestRunner::setGeolocationPermission(bool allow)
+void TestRunnerQt::setGeolocationPermission(bool allow)
 {
     setGeolocationPermissionCommon(allow);
-    QList<WebCore::WebPage*> pages = m_drt->getAllPages();
-    foreach (WebCore::WebPage* page, pages)
+    QList<WebPage*> pages = m_drt->getAllPages();
+    foreach (WebPage* page, pages)
         DumpRenderTreeSupportQt::setMockGeolocationPermission(page->handle(), allow);
 }
 
-int TestRunner::numberOfPendingGeolocationPermissionRequests()
+int TestRunnerQt::numberOfPendingGeolocationPermissionRequests()
 {
     int pendingPermissionCount = 0;
-    QList<WebCore::WebPage*> pages = m_drt->getAllPages();
-    foreach (WebCore::WebPage* page, pages)
+    QList<WebPage*> pages = m_drt->getAllPages();
+    foreach (WebPage* page, pages)
         pendingPermissionCount += DumpRenderTreeSupportQt::numberOfPendingGeolocationPermissionRequests(page->handle());
 
     return pendingPermissionCount;
 }
 
-void TestRunner::setGeolocationPermissionCommon(bool allow)
+void TestRunnerQt::setGeolocationPermissionCommon(bool allow)
 {
      m_isGeolocationPermissionSet = true;
      m_geolocationPermission = allow;
 }
 
-void TestRunner::setMockGeolocationPositionUnavailableError(const QString& message)
+void TestRunnerQt::setMockGeolocationPositionUnavailableError(const QString& message)
 {
-    QList<WebCore::WebPage*> pages = m_drt->getAllPages();
-    foreach (WebCore::WebPage* page, pages)
+    QList<WebPage*> pages = m_drt->getAllPages();
+    foreach (WebPage* page, pages)
         DumpRenderTreeSupportQt::setMockGeolocationPositionUnavailableError(page->handle(), message);
 }
 
-void TestRunner::setMockGeolocationPosition(double latitude, double longitude, double accuracy)
+void TestRunnerQt::setMockGeolocationPosition(double latitude, double longitude, double accuracy)
 {
-    QList<WebCore::WebPage*> pages = m_drt->getAllPages();
-    foreach (WebCore::WebPage* page, pages)
+    QList<WebPage*> pages = m_drt->getAllPages();
+    foreach (WebPage* page, pages)
         DumpRenderTreeSupportQt::setMockGeolocationPosition(page->handle(), latitude, longitude, accuracy);
 }
 
-void TestRunner::addMockSpeechInputResult(const QString& result, double confidence, const QString& language)
-{
-    // FIXME: Implement for speech input layout tests.
-    // See https://bugs.webkit.org/show_bug.cgi?id=39485.
-}
-
-void TestRunner::setMockSpeechInputDumpRect(bool flag)
-{
-    // FIXME: Implement for speech input layout tests.
-    // See https://bugs.webkit.org/show_bug.cgi?id=39485.
-}
-
-void TestRunner::startSpeechInput(const QString& inputElement)
-{
-    // FIXME: Implement for speech input layout tests.
-    // See https://bugs.webkit.org/show_bug.cgi?id=39485.
-}
-
-void TestRunner::evaluateScriptInIsolatedWorldAndReturnValue(int worldID, const QString& script)
-{
-    // FIXME: Implement.
-}
-
-void TestRunner::evaluateScriptInIsolatedWorld(int worldID, const QString& script)
-{
-    DumpRenderTreeSupportQt::evaluateScriptInIsolatedWorld(m_drt->mainFrameAdapter(), worldID, script);
-}
-
-void TestRunner::addUserStyleSheet(const QString& sourceCode)
-{
-    DumpRenderTreeSupportQt::addUserStyleSheet(m_drt->pageAdapter(), sourceCode);
-}
-
-void TestRunner::removeAllVisitedLinks()
+void TestRunnerQt::removeAllVisitedLinks()
 {
     QWebHistory* history = m_drt->webPage()->history();
     history->clear();
     DumpRenderTreeSupportQt::dumpVisitedLinksCallbacks(true);
 }
 
-void TestRunner::addURLToRedirect(const QString& origin, const QString& destination)
+void TestRunnerQt::addURLToRedirect(const QString& origin, const QString& destination)
 {
     DumpRenderTreeSupportQt::addURLToRedirect(origin, destination);
 }
 
-void TestRunner::setMinimumTimerInterval(double minimumTimerInterval)
-{
-    DumpRenderTreeSupportQt::setMinimumTimerInterval(m_drt->pageAdapter(), minimumTimerInterval);
-}
-
-void TestRunner::originsWithLocalStorage()
-{
-    // FIXME: Implement.
-}
-
-void TestRunner::deleteAllLocalStorage()
-{
-    // FIXME: Implement.
-}
-
-void TestRunner::deleteLocalStorageForOrigin(const QString& originIdentifier)
-{
-    // FIXME: Implement.
-}
-
-void TestRunner::observeStorageTrackerNotifications(unsigned number)
-{
-    // FIXME: Implement.
-}
-
-void TestRunner::syncLocalStorage()
-{
-    // FIXME: Implement.
-}
-
-void TestRunner::resetPageVisibility()
-{
-    // FIXME: Implement this.
-}
-
-void TestRunner::setPageVisibility(const char*)
-{
-    // FIXME: Implement this.
-}
-
-void TestRunner::setAutomaticLinkDetectionEnabled(bool)
-{
-    // FIXME: Implement this.
-}
-
-void TestRunner::setTextDirection(const QString& directionName)
-{
-    if (directionName == "auto")
-        m_drt->webPage()->triggerAction(QWebPage::SetTextDirectionDefault);
-    else if (directionName == "rtl")
-        m_drt->webPage()->triggerAction(QWebPage::SetTextDirectionRightToLeft);
-    else if (directionName == "ltr")
-        m_drt->webPage()->triggerAction(QWebPage::SetTextDirectionLeftToRight);
-}
-
-void TestRunner::setAlwaysAcceptCookies(bool accept)
+void TestRunnerQt::setAlwaysAcceptCookies(bool accept)
 {
     QWebSettings* globalSettings = QWebSettings::globalSettings();
     if (accept)
@@ -966,7 +759,7 @@ void TestRunner::setAlwaysAcceptCookies(bool accept)
     }
 }
 
-void TestRunner::setAlwaysBlockCookies(bool block)
+void TestRunnerQt::setAlwaysBlockCookies(bool block)
 {
     QWebSettings* globalSettings = QWebSettings::globalSettings();
     if (block)
@@ -975,5 +768,440 @@ void TestRunner::setAlwaysBlockCookies(bool block)
         globalSettings->setThirdPartyCookiePolicy(QWebSettings::AlwaysAllowThirdPartyCookies);
 }
 
-const unsigned TestRunner::maxViewWidth = 800;
-const unsigned TestRunner::maxViewHeight = 600;
+void TestRunnerQt::setAudioResult(const QByteArray& audioData)
+{
+    m_audioData = audioData;
+    m_audioDump = true;
+}
+
+// --- JSC C API stubs
+
+void TestRunner::addDisallowedURL(JSStringRef url)
+{
+}
+
+void TestRunner::queueLoad(JSStringRef url, JSStringRef target)
+{
+    DumpRenderTree* drt = DumpRenderTree::instance();
+    QUrl mainResourceUrl = drt->webPage()->mainFrame()->url();
+    QString absoluteUrl = mainResourceUrl.resolved(QUrl(JSStringCopyQString(url))).toEncoded();
+    WorkQueue::shared()->queue(new LoadItem(JSStringCreateWithQString(absoluteUrl).get(), target));
+}
+
+void TestRunner::removeAllVisitedLinks()
+{
+}
+
+void TestRunner::setAcceptsEditing(bool)
+{
+}
+
+void TestRunner::simulateLegacyWebNotificationClick(JSStringRef title)
+{
+}
+
+void TestRunner::setWindowIsKey(bool)
+{
+}
+
+void TestRunner::setAlwaysAcceptCookies(bool)
+{
+}
+
+void TestRunner::addOriginAccessWhitelistEntry(JSStringRef sourceOrigin, JSStringRef destinationProtocol, JSStringRef destinationHost, bool allowDestinationSubdomains)
+{
+}
+
+void TestRunner::setWebViewEditable(bool)
+{
+}
+
+void TestRunner::clearAllApplicationCaches()
+{
+}
+
+void TestRunner::setTextDirection(JSStringRef directionName)
+{
+    QWebPage* webPage = DumpRenderTree::instance()->webPage();
+    if (JSStringIsEqualToUTF8CString(directionName, "auto"))
+        webPage->triggerAction(QWebPage::SetTextDirectionDefault);
+    else if (JSStringIsEqualToUTF8CString(directionName, "rtl"))
+        webPage->triggerAction(QWebPage::SetTextDirectionRightToLeft);
+    else if (JSStringIsEqualToUTF8CString(directionName, "ltr"))
+        webPage->triggerAction(QWebPage::SetTextDirectionLeftToRight);
+}
+
+void TestRunner::notifyDone()
+{
+}
+
+int TestRunner::numberOfPendingGeolocationPermissionRequests()
+{
+    return 0;
+}
+
+void TestRunner::overridePreference(JSStringRef key, JSStringRef value)
+{
+}
+
+JSStringRef TestRunner::pathToLocalResource(JSContextRef, JSStringRef url)
+{
+    return JSStringCreateWithUTF8CString(0); // ### Take impl from WTR
+}
+
+void TestRunner::removeAllWebNotificationPermissions()
+{
+}
+
+void TestRunner::simulateWebNotificationClick(JSValueRef notification)
+{
+}
+
+void TestRunner::closeIdleLocalStorageDatabases()
+{
+}
+
+void TestRunner::focusWebView()
+{
+}
+
+void TestRunner::setBackingScaleFactor(double)
+{
+}
+
+void TestRunner::removeChromeInputField()
+{
+}
+
+void TestRunner::addChromeInputField()
+{
+}
+
+JSValueRef TestRunner::originsWithLocalStorage(JSContextRef context)
+{
+    return JSValueMakeNull(context);
+}
+
+void TestRunner::deleteAllLocalStorage()
+{
+}
+
+void TestRunner::deleteLocalStorageForOrigin(JSStringRef originIdentifier)
+{
+}
+
+void TestRunner::observeStorageTrackerNotifications(unsigned number)
+{
+}
+
+void TestRunner::syncLocalStorage()
+{
+}
+
+int TestRunner::windowCount()
+{
+    return 0;
+}
+
+void TestRunner::setWaitToDump(bool)
+{
+}
+
+void TestRunner::waitForPolicyDelegate()
+{
+}
+
+size_t TestRunner::webHistoryItemCount()
+{
+    return 0;
+}
+
+void TestRunner::showWebInspector()
+{
+}
+
+void TestRunner::closeWebInspector()
+{
+}
+
+void TestRunner::evaluateInWebInspector(long callId, JSStringRef script)
+{
+}
+
+void TestRunner::setSerializeHTTPLoads(bool)
+{
+}
+
+void TestRunner::apiTestNewWindowDataLoadBaseURL(JSStringRef utf8Data, JSStringRef baseURL)
+{
+}
+
+void TestRunner::setCustomPolicyDelegate(bool setDelegate, bool permissive)
+{
+}
+
+void TestRunner::setDatabaseQuota(unsigned long long quota)
+{
+}
+
+void TestRunner::setDomainRelaxationForbiddenForURLScheme(bool forbidden, JSStringRef scheme)
+{
+}
+
+void TestRunner::resetPageVisibility()
+{
+    DumpRenderTreeSupportQt::resetPageVisibility(DumpRenderTree::instance()->pageAdapter());
+}
+
+void TestRunner::setPageVisibility(const char* visibility)
+{
+    QLatin1String newVisibility = QLatin1String(visibility);
+    if (newVisibility == QStringLiteral("visible"))
+        DumpRenderTree::instance()->webPage()->setVisibilityState(QWebPage::VisibilityStateVisible);
+    else if (newVisibility == QStringLiteral("hidden"))
+        DumpRenderTree::instance()->webPage()->setVisibilityState(QWebPage::VisibilityStateHidden);
+    else if (newVisibility == QStringLiteral("prerender"))
+        DumpRenderTree::instance()->webPage()->setVisibilityState(QWebPage::VisibilityStatePrerender);
+    else if (newVisibility == QStringLiteral("unloaded"))
+        DumpRenderTree::instance()->webPage()->setVisibilityState(QWebPage::VisibilityStateUnloaded);
+}
+
+void TestRunner::keepWebHistory()
+{
+}
+
+void TestRunner::goBack()
+{
+    DumpRenderTreeSupportQt::goBack(DumpRenderTree::instance()->pageAdapter());
+}
+
+JSValueRef TestRunner::originsWithApplicationCache(JSContextRef context)
+{
+    return JSValueMakeNull(context);
+}
+
+long long TestRunner::applicationCacheDiskUsageForOrigin(JSStringRef name)
+{
+    return 0;
+}
+
+void TestRunner::display()
+{
+}
+
+void TestRunner::dispatchPendingLoadRequests()
+{
+}
+
+void TestRunner::clearPersistentUserStyleSheet()
+{
+}
+
+bool TestRunner::callShouldCloseOnWebView()
+{
+    return false;
+}
+
+JSStringRef TestRunner::copyDecodedHostName(JSStringRef name)
+{
+    return JSStringCreateWithUTF8CString(0);
+}
+
+void TestRunner::clearBackForwardList()
+{
+}
+
+void TestRunner::clearAllDatabases()
+{
+}
+
+void TestRunner::clearApplicationCacheForOrigin(JSStringRef name)
+{
+}
+
+void TestRunner::apiTestGoToCurrentBackForwardItem()
+{
+}
+
+void TestRunner::authenticateSession(JSStringRef url, JSStringRef username, JSStringRef password)
+{
+}
+
+void TestRunner::abortModal()
+{
+}
+
+void TestRunner::setStorageDatabaseIdleInterval(double)
+{
+}
+
+void TestRunner::setXSSAuditorEnabled(bool flag)
+{
+}
+
+void TestRunner::setSpatialNavigationEnabled(bool)
+{
+}
+
+void TestRunner::setScrollbarPolicy(JSStringRef orientation, JSStringRef policy)
+{
+}
+
+void TestRunner::setJavaScriptCanAccessClipboard(bool flag)
+{
+}
+
+void TestRunner::setAutomaticLinkDetectionEnabled(bool flag)
+{
+}
+
+void TestRunner::setUserStyleSheetEnabled(bool flag)
+{
+}
+
+void TestRunner::setUserStyleSheetLocation(JSStringRef path)
+{
+}
+
+void TestRunner::setUseDashboardCompatibilityMode(bool flag)
+{
+}
+
+void TestRunner::setTabKeyCyclesThroughElements(bool)
+{
+}
+
+void TestRunner::setPrivateBrowsingEnabled(bool)
+{
+}
+
+void TestRunner::setPluginsEnabled(bool)
+{
+}
+
+void TestRunner::setPopupBlockingEnabled(bool)
+{
+}
+
+void TestRunner::setMockSpeechInputDumpRect(bool flag)
+{
+}
+
+void TestRunner::setPersistentUserStyleSheetLocation(JSStringRef path)
+{
+}
+
+void TestRunner::setMockGeolocationPosition(double latitude, double longitude, double accuracy, bool providesAltitude, double altitude, bool providesAltitudeAccuracy, double altitudeAccuracy, bool providesHeading, double heading, bool providesSpeed, double speed)
+{
+}
+
+void TestRunner::setMockGeolocationPositionUnavailableError(JSStringRef message)
+{
+}
+
+void TestRunner::setMockDeviceOrientation(bool canProvideAlpha, double alpha, bool canProvideBeta, double beta, bool canProvideGamma, double gamma)
+{
+}
+
+void TestRunner::setMainFrameIsFirstResponder(bool flag)
+{
+}
+
+void TestRunner::setIconDatabaseEnabled(bool)
+{
+}
+
+void TestRunner::setGeolocationPermission(bool allow)
+{
+}
+
+void TestRunner::setDefersLoading(bool flag)
+{
+    DumpRenderTreeSupportQt::setDefersLoading(DumpRenderTree::instance()->pageAdapter(), flag);
+}
+
+void TestRunner::setCacheModel(int)
+{
+}
+
+void TestRunner::setAuthorAndUserStylesEnabled(bool)
+{
+}
+
+void TestRunner::setAllowFileAccessFromFileURLs(bool)
+{
+}
+
+void TestRunner::setAppCacheMaximumSize(unsigned long long quota)
+{
+}
+
+void TestRunner::setAllowUniversalAccessFromFileURLs(bool)
+{
+}
+
+void TestRunner::setApplicationCacheOriginQuota(unsigned long long)
+{
+}
+
+void TestRunner::denyWebNotificationPermission(JSStringRef origin)
+{
+}
+
+void TestRunner::grantWebNotificationPermission(JSStringRef origin)
+{
+}
+
+void TestRunner::setValueForUser(JSContextRef, JSValueRef nodeObject, JSStringRef value)
+{
+}
+
+void TestRunner::setViewModeMediaFeature(JSStringRef)
+{
+}
+
+void TestRunner::addMockSpeechInputResult(JSStringRef result, double confidence, JSStringRef language)
+{
+}
+
+void TestRunner::removeOriginAccessWhitelistEntry(JSStringRef sourceOrigin, JSStringRef destinationProtocol, JSStringRef destinationHost, bool allowDestinationSubdomains)
+{
+}
+
+void TestRunner::addUserScript(JSStringRef source, bool runAtStart, bool allFrames)
+{
+}
+
+bool TestRunner::isCommandEnabled(JSStringRef name)
+{
+    return false;
+}
+
+void TestRunner::evaluateScriptInIsolatedWorld(unsigned worldID, JSObjectRef globalObject, JSStringRef script)
+{
+    DumpRenderTreeSupportQt::evaluateScriptInIsolatedWorld(DumpRenderTree::instance()->mainFrameAdapter(), worldID, JSStringCopyQString(script));
+}
+
+void TestRunner::evaluateScriptInIsolatedWorldAndReturnValue(unsigned worldID, JSObjectRef globalObject, JSStringRef script)
+{
+}
+
+JSStringRef TestRunner::copyEncodedHostName(JSStringRef name)
+{
+    return JSStringCreateWithUTF8CString(0);
+}
+
+void TestRunner::addUserStyleSheet(JSStringRef source, bool allFrames)
+{
+    DumpRenderTreeSupportQt::addUserStyleSheet(DumpRenderTree::instance()->pageAdapter(), JSStringCopyQString(source));
+}
+
+void TestRunner::execCommand(JSStringRef name, JSStringRef value)
+{
+}
+
+long long TestRunner::localStorageDiskUsageForOrigin(JSStringRef originIdentifier)
+{
+    return 0;
+}
+

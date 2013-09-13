@@ -61,11 +61,8 @@
 #include "WheelEvent.h"
 #include "npruntime_impl.h"
 #include "runtime_root.h"
-#include <AppKit/NSEvent.h>
-#include <AppKit/NSMenu.h>
-#include <AppKit/NSWindow.h>
 #include <runtime/JSLock.h>
-#include <runtime/JSValue.h>
+#include <runtime/JSCJSValue.h>
 #include <wtf/RetainPtr.h>
 
 
@@ -77,11 +74,6 @@ using JSC::JSValue;
 
 #if PLATFORM(QT)
 #include <QPainter>
-#endif
-
-#if PLATFORM(WX)
-#include <wx/defs.h>
-#include <wx/wx.h>
 #endif
 
 using namespace WTF;
@@ -303,7 +295,7 @@ void PluginView::setNPWindowIfNeeded()
             m_npWindow.clipRect.right - m_npWindow.clipRect.left, m_npWindow.clipRect.bottom - m_npWindow.clipRect.top);
 
     PluginView::setCurrentPluginView(this);
-    JSC::JSLock::DropAllLocks dropAllLocks(JSDOMWindowBase::commonJSGlobalData());
+    JSC::JSLock::DropAllLocks dropAllLocks(JSDOMWindowBase::commonVM());
     setCallingPlugin(true);
     m_plugin->pluginFuncs()->setwindow(m_instance, &m_npWindow);
     setCallingPlugin(false);
@@ -316,7 +308,7 @@ void PluginView::updatePluginWidget()
        return;
 
     ASSERT(parent()->isFrameView());
-    FrameView* frameView = static_cast<FrameView*>(parent());
+    FrameView* frameView = toFrameView(parent());
 
     IntRect oldWindowRect = m_windowRect;
     m_windowRect = frameView->contentsToWindow(frameRect());
@@ -473,7 +465,7 @@ void PluginView::handleMouseEvent(MouseEvent* event)
             // The plugin needs focus to receive keyboard events
             if (Page* page = m_parentFrame->page())
                 page->focusController()->setFocusedFrame(m_parentFrame);
-            m_parentFrame->document()->setFocusedNode(m_element);
+            m_parentFrame->document()->setFocusedElement(m_element);
             break;
 
         case NSLeftMouseUp:
@@ -609,7 +601,7 @@ void PluginView::handleKeyboardEvent(KeyboardEvent* event)
 int16_t PluginView::dispatchNPCocoaEvent(NPCocoaEvent& cocoaEvent)
 {
     PluginView::setCurrentPluginView(this);
-    JSC::JSLock::DropAllLocks dropAllLocks(JSDOMWindowBase::commonJSGlobalData());
+    JSC::JSLock::DropAllLocks dropAllLocks(JSDOMWindowBase::commonVM());
     setCallingPlugin(true);
 
     int16_t response = m_plugin->pluginFuncs()->event(m_instance, &cocoaEvent);

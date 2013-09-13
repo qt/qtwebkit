@@ -31,11 +31,9 @@
 #include "config.h"
 #include "WebKitSettings.h"
 
+#include "ExperimentalFeatures.h"
 #include "WebKitPrivate.h"
 #include "WebKitSettingsPrivate.h"
-#include "WebPageGroup.h"
-#include "WebPageProxy.h"
-#include "WebPreferences.h"
 #include <WebCore/UserAgentGtk.h>
 #include <glib/gi18n-lib.h>
 #include <wtf/text/CString.h>
@@ -72,18 +70,19 @@ struct _WebKitSettingsPrivate {
 
 /**
  * SECTION:WebKitSettings
- * @short_description: Control the behaviour of a #WebKitWebView
+ * @short_description: Control the behaviour of #WebKitWebView<!-- -->s
+ * @see_also: #WebKitWebViewGroup, #WebKitWebView
  *
- * #WebKitSettings can be applied to a #WebKitWebView to control text charset,
- * color, font sizes, printing mode, script support, loading of images and various other things.
+ * #WebKitSettings can be applied to a #WebKitWebViewGroup to control text charset,
+ * color, font sizes, printing mode, script support, loading of images and various
+ * other things on the #WebKitWebView<!-- -->s of the group.
  * After creation, a #WebKitSettings object contains default settings.
  *
  * <informalexample><programlisting>
- * /<!-- -->* Create a new #WebKitSettings and disable JavaScript. *<!-- -->/
- * WebKitSettings *settings = webkit_settings_new ();
- * g_object_set (G_OBJECT (settings), "enable-javascript", FALSE, NULL);
+ * /<!-- -->* Disable JavaScript. *<!-- -->/
+ * WebKitSettings *settings = webkit_web_view_group_get_settings (my_view_group);
+ * webkit_settings_set_enable_javascript (settings, FALSE);
  *
- * webkit_web_view_set_settings (WEBKIT_WEB_VIEW (my_webview), settings);
  * </programlisting></informalexample>
  */
 
@@ -134,8 +133,21 @@ enum {
     PROP_ENABLE_SITE_SPECIFIC_QUIRKS,
     PROP_ENABLE_PAGE_CACHE,
     PROP_USER_AGENT,
-    PROP_ENABLE_SMOOTH_SCROLLING
+    PROP_ENABLE_SMOOTH_SCROLLING,
+    PROP_ENABLE_ACCELERATED_2D_CANVAS,
+    PROP_ENABLE_WRITE_CONSOLE_MESSAGES_TO_STDOUT
 };
+
+static void webKitSettingsConstructed(GObject* object)
+{
+    G_OBJECT_CLASS(webkit_settings_parent_class)->constructed(object);
+
+    WebPreferences* prefs = WEBKIT_SETTINGS(object)->priv->preferences.get();
+    ExperimentalFeatures features;
+    bool regionBasedColumnsEnabled = features.isEnabled(ExperimentalFeatures::RegionBasedColumns);
+    if (prefs->regionBasedColumnsEnabled() != regionBasedColumnsEnabled)
+        prefs->setRegionBasedColumnsEnabled(regionBasedColumnsEnabled);
+}
 
 static void webKitSettingsSetProperty(GObject* object, guint propId, const GValue* value, GParamSpec* paramSpec)
 {
@@ -257,7 +269,13 @@ static void webKitSettingsSetProperty(GObject* object, guint propId, const GValu
         webkit_settings_set_media_playback_allows_inline(settings, g_value_get_boolean(value));
         break;
     case PROP_DRAW_COMPOSITING_INDICATORS:
-        webkit_settings_set_draw_compositing_indicators(settings, g_value_get_boolean(value));
+        if (g_value_get_boolean(value))
+            webkit_settings_set_draw_compositing_indicators(settings, g_value_get_boolean(value));
+        else {
+            char* debugVisualsEnvironment = getenv("WEBKIT_SHOW_COMPOSITING_DEBUG_VISUALS");
+            bool showDebugVisuals = debugVisualsEnvironment && !strcmp(debugVisualsEnvironment, "1");
+            webkit_settings_set_draw_compositing_indicators(settings, showDebugVisuals);
+        }
         break;
     case PROP_ENABLE_SITE_SPECIFIC_QUIRKS:
         webkit_settings_set_enable_site_specific_quirks(settings, g_value_get_boolean(value));
@@ -270,6 +288,12 @@ static void webKitSettingsSetProperty(GObject* object, guint propId, const GValu
         break;
     case PROP_ENABLE_SMOOTH_SCROLLING:
         webkit_settings_set_enable_smooth_scrolling(settings, g_value_get_boolean(value));
+        break;
+    case PROP_ENABLE_ACCELERATED_2D_CANVAS:
+        webkit_settings_set_enable_accelerated_2d_canvas(settings, g_value_get_boolean(value));
+        break;
+    case PROP_ENABLE_WRITE_CONSOLE_MESSAGES_TO_STDOUT:
+        webkit_settings_set_enable_write_console_messages_to_stdout(settings, g_value_get_boolean(value));
         break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID(object, propId, paramSpec);
@@ -411,6 +435,12 @@ static void webKitSettingsGetProperty(GObject* object, guint propId, GValue* val
     case PROP_ENABLE_SMOOTH_SCROLLING:
         g_value_set_boolean(value, webkit_settings_get_enable_smooth_scrolling(settings));
         break;
+    case PROP_ENABLE_ACCELERATED_2D_CANVAS:
+        g_value_set_boolean(value, webkit_settings_get_enable_accelerated_2d_canvas(settings));
+        break;
+    case PROP_ENABLE_WRITE_CONSOLE_MESSAGES_TO_STDOUT:
+        g_value_set_boolean(value, webkit_settings_get_enable_write_console_messages_to_stdout(settings));
+        break;
     default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID(object, propId, paramSpec);
         break;
@@ -420,6 +450,7 @@ static void webKitSettingsGetProperty(GObject* object, guint propId, GValue* val
 static void webkit_settings_class_init(WebKitSettingsClass* klass)
 {
     GObjectClass* gObjectClass = G_OBJECT_CLASS(klass);
+    gObjectClass->constructed = webKitSettingsConstructed;
     gObjectClass->set_property = webKitSettingsSetProperty;
     gObjectClass->get_property = webKitSettingsGetProperty;
 
@@ -1067,20 +1098,53 @@ static void webkit_settings_class_init(WebKitSettingsClass* klass)
                                                          _("Whether to enable smooth scrolling"),
                                                          FALSE,
                                                          readWriteConstructParamFlags));
+
+    /**
+     * WebKitSettings:enable-accelerated-2d-canvas:
+     *
+     * Enable or disable accelerated 2D canvas. Accelerated 2D canvas is only available
+     * if WebKitGTK+ was compiled with a version of Cairo including the unstable CairoGL API.
+     * When accelerated 2D canvas is enabled, WebKit may render some 2D canvas content
+     * using hardware accelerated drawing operations.
+     *
+     * Since: 2.2
+     */
+    g_object_class_install_property(gObjectClass,
+        PROP_ENABLE_ACCELERATED_2D_CANVAS,
+        g_param_spec_boolean("enable-accelerated-2d-canvas",
+            _("Enable accelerated 2D canvas"),
+            _("Whether to enable accelerated 2D canvas"),
+            FALSE,
+            readWriteConstructParamFlags));
+
+    /**
+     * WebKitSettings:enable-write-console-messages-to-stdout:
+     *
+     * Enable or disable writing console messages to stdout. These are messages
+     * sent to the console with console.log and related methods.
+     *
+     * Since: 2.2
+     */
+    g_object_class_install_property(gObjectClass,
+        PROP_ENABLE_WRITE_CONSOLE_MESSAGES_TO_STDOUT,
+        g_param_spec_boolean("enable-write-console-messages-to-stdout",
+            _("Write console messages on stdout"),
+            _("Whether to write console messages on stdout"),
+            FALSE,
+            readWriteConstructParamFlags));
+
 }
 
-void webkitSettingsAttachSettingsToPage(WebKitSettings* settings, WebPageProxy* page)
+WebPreferences* webkitSettingsGetPreferences(WebKitSettings* settings)
 {
-    page->pageGroup()->setPreferences(settings->priv->preferences.get());
-    page->setCanRunModal(settings->priv->allowModalDialogs);
-    page->setCustomUserAgent(String::fromUTF8(settings->priv->userAgent.data()));
+    return settings->priv->preferences.get();
 }
 
 /**
  * webkit_settings_new:
  *
  * Creates a new #WebKitSettings instance with default values. It must
- * be manually attached to a #WebKitWebView.
+ * be manually attached to a #WebKitWebViewGroup.
  * See also webkit_settings_new_with_settings().
  *
  * Returns: a new #WebKitSettings instance.
@@ -1097,7 +1161,7 @@ WebKitSettings* webkit_settings_new()
  *    %NULL-terminated
  *
  * Creates a new #WebKitSettings instance with the given settings. It must
- * be manually attached to a #WebKitWebView.
+ * be manually attached to a #WebKitWebViewGroup.
  *
  * Returns: a new #WebKitSettings instance.
  */
@@ -2653,4 +2717,82 @@ void webkit_settings_set_enable_smooth_scrolling(WebKitSettings* settings, gbool
 
     priv->preferences->setScrollAnimatorEnabled(enabled);
     g_object_notify(G_OBJECT(settings), "enable-smooth-scrolling");
+}
+
+/**
+ * webkit_settings_get_enable_accelerated_2d_canvas:
+ * @settings: a #WebKitSettings
+ *
+ * Get the #WebKitSettings:enable-accelerated-2d-canvas property.
+ *
+ * Returns: %TRUE if accelerated 2D canvas is enabled or %FALSE otherwise.
+ *
+ * Since: 2.2
+ */
+gboolean webkit_settings_get_enable_accelerated_2d_canvas(WebKitSettings* settings)
+{
+    g_return_val_if_fail(WEBKIT_IS_SETTINGS(settings), FALSE);
+
+    return settings->priv->preferences->accelerated2dCanvasEnabled();
+}
+
+/**
+ * webkit_settings_set_enable_accelerated_2d_canvas:
+ * @settings: a #WebKitSettings
+ * @enabled: Value to be set
+ *
+ * Set the #WebKitSettings:enable-accelerated-2d-canvas property.
+ *
+ * Since: 2.2
+ */
+void webkit_settings_set_enable_accelerated_2d_canvas(WebKitSettings* settings, gboolean enabled)
+{
+    g_return_if_fail(WEBKIT_IS_SETTINGS(settings));
+
+    WebKitSettingsPrivate* priv = settings->priv;
+    if (priv->preferences->accelerated2dCanvasEnabled() == enabled)
+        return;
+
+    priv->preferences->setAccelerated2dCanvasEnabled(enabled);
+    g_object_notify(G_OBJECT(settings), "enable-accelerated-2d-canvas");
+}
+
+/**
+ * webkit_settings_get_enable_write_console_messages_to_stdout:
+ * @settings: a #WebKitSettings
+ *
+ * Get the #WebKitSettings:enable-write-console-messages-to-stdout property.
+ *
+ * Returns: %TRUE if writing console messages to stdout is enabled or %FALSE
+ * otherwise.
+ *
+ * Since: 2.2
+ */
+gboolean webkit_settings_get_enable_write_console_messages_to_stdout(WebKitSettings* settings)
+{
+    g_return_val_if_fail(WEBKIT_IS_SETTINGS(settings), FALSE);
+
+    return settings->priv->preferences->logsPageMessagesToSystemConsoleEnabled();
+}
+
+/**
+ * webkit_settings_set_enable_write_console_messages_to_stdout:
+ * @settings: a #WebKitSettings
+ * @enabled: Value to be set
+ *
+ * Set the #WebKitSettings:enable-write-console-messages-to-stdout property.
+ *
+ * Since: 2.2
+ */
+void webkit_settings_set_enable_write_console_messages_to_stdout(WebKitSettings* settings, gboolean enabled)
+{
+    g_return_if_fail(WEBKIT_IS_SETTINGS(settings));
+
+    WebKitSettingsPrivate* priv = settings->priv;
+    bool currentValue = priv->preferences->logsPageMessagesToSystemConsoleEnabled();
+    if (currentValue == enabled)
+        return;
+
+    priv->preferences->setLogsPageMessagesToSystemConsoleEnabled(enabled);
+    g_object_notify(G_OBJECT(settings), "enable-write-console-messages-to-stdout");
 }

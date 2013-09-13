@@ -27,6 +27,7 @@
 #include "SimplifyMarkupCommand.h"
 
 #include "NodeRenderStyle.h"
+#include "NodeTraversal.h"
 #include "RenderInline.h"
 #include "RenderObject.h"
 #include "RenderStyle.h"
@@ -43,11 +44,13 @@ void SimplifyMarkupCommand::doApply()
     Node* rootNode = m_firstNode->parentNode();
     Vector<RefPtr<Node> > nodesToRemove;
     
+    document()->updateLayoutIgnorePendingStylesheets();
+
     // Walk through the inserted nodes, to see if there are elements that could be removed
     // without affecting the style. The goal is to produce leaner markup even when starting
     // from a verbose fragment.
     // We look at inline elements as well as non top level divs that don't have attributes. 
-    for (Node* node = m_firstNode.get(); node && node != m_nodeAfterLast; node = node->traverseNextNode()) {
+    for (Node* node = m_firstNode.get(); node && node != m_nodeAfterLast; node = NodeTraversal::next(node)) {
         if (node->firstChild() || (node->isTextNode() && node->nextSibling()))
             continue;
         
@@ -101,18 +104,17 @@ int SimplifyMarkupCommand::pruneSubsequentAncestorsToRemove(Vector<RefPtr<Node> 
     for (; pastLastNodeToRemove < nodesToRemove.size(); ++pastLastNodeToRemove) {
         if (nodesToRemove[pastLastNodeToRemove - 1]->parentNode() != nodesToRemove[pastLastNodeToRemove])
             break;
-        ASSERT(nodesToRemove[pastLastNodeToRemove]->firstChild() == nodesToRemove[pastLastNodeToRemove]->lastChild());
+        if (nodesToRemove[pastLastNodeToRemove]->firstChild() != nodesToRemove[pastLastNodeToRemove]->lastChild())
+            break;
     }
 
-    if (pastLastNodeToRemove == startNodeIndex + 1)
-        return 0;
-
     Node* highestAncestorToRemove = nodesToRemove[pastLastNodeToRemove - 1].get();
-
-    RefPtr<Node> nodeAfterHighestAncestorToRemove = highestAncestorToRemove->nextSibling();
     RefPtr<ContainerNode> parent = highestAncestorToRemove->parentNode();
     if (!parent) // Parent has already been removed.
         return -1;
+    
+    if (pastLastNodeToRemove == startNodeIndex + 1)
+        return 0;
 
     removeNode(nodesToRemove[startNodeIndex], AssumeContentIsAlwaysEditable);
     insertNodeBefore(nodesToRemove[startNodeIndex], highestAncestorToRemove, AssumeContentIsAlwaysEditable);

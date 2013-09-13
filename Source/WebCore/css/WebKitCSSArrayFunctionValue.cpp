@@ -30,8 +30,6 @@
 #include "config.h"
 #include "WebKitCSSArrayFunctionValue.h"
 
-#include "WebCoreMemoryInstrumentation.h"
-
 #if ENABLE(CSS_SHADERS)
 
 namespace WebCore {
@@ -56,10 +54,9 @@ PassRefPtr<WebKitCSSArrayFunctionValue> WebKitCSSArrayFunctionValue::cloneForCSS
     return adoptRef(new WebKitCSSArrayFunctionValue(*this));
 }
 
-void WebKitCSSArrayFunctionValue::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+bool WebKitCSSArrayFunctionValue::equals(const WebKitCSSArrayFunctionValue& other) const
 {
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
-    CSSValueList::reportDescendantMemoryUsage(memoryObjectInfo);
+    return CSSValueList::equals(other);
 }
 
 } // namespace WebCore

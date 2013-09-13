@@ -28,7 +28,9 @@
 
 #import "CustomProtocolManager.h"
 #import "SandboxExtension.h"
+#import "SandboxInitializationParameters.h"
 #import "WKFullKeyboardAccessWatcher.h"
+#import "WebFrame.h"
 #import "WebInspector.h"
 #import "WebPage.h"
 #import "WebProcessCreationParameters.h"
@@ -38,6 +40,7 @@
 #import <WebCore/LocalizedStrings.h>
 #import <WebCore/MemoryCache.h>
 #import <WebCore/PageCache.h>
+#import <WebCore/WebCoreNSURLExtras.h>
 #import <WebKitSystemInterface.h>
 #import <algorithm>
 #import <dispatch/dispatch.h>
@@ -47,31 +50,13 @@
 #import <objc/runtime.h>
 #import <stdio.h>
 
-#if __MAC_OS_X_VERSION_MIN_REQUIRED == 1060
-#import "KeychainItemShimMethods.h"
-#else
-#import "SecItemShimMethods.h"
-#endif
-
-#if ENABLE(WEB_PROCESS_SANDBOX)
-#import <pwd.h>
-#import <stdlib.h>
-#import <sysexits.h>
-
-// We have to #undef __APPLE_API_PRIVATE to prevent sandbox.h from looking for a header file that does not exist (<rdar://problem/9679211>). 
-#undef __APPLE_API_PRIVATE
-#import <sandbox.h>
-
-#define SANDBOX_NAMED_EXTERNAL 0x0003
-extern "C" int sandbox_init_with_parameters(const char *profile, uint64_t flags, const char *const parameters[], char **errorbuf);
-
-// Define this to 1 to bypass the sandbox for debugging purposes.
-#define DEBUG_BYPASS_SANDBOX 0
-
+#if USE(SECURITY_FRAMEWORK)
+#import "SecItemShim.h"
 #endif
 
 using namespace WebCore;
-using namespace std;
+
+const CFStringRef kLSActivePageUserVisibleOriginsKey = CFSTR("LSActivePageUserVisibleOriginsKey");
 
 namespace WebKit {
 
@@ -101,7 +86,7 @@ static uint64_t volumeFreeSize(NSString *path)
 
 void WebProcess::platformSetCacheModel(CacheModel cacheModel)
 {
-    RetainPtr<NSString> nsurlCacheDirectory(AdoptNS, (NSString *)WKCopyFoundationCacheDirectory());
+    RetainPtr<NSString> nsurlCacheDirectory = adoptNS((NSString *)WKCopyFoundationCacheDirectory());
     if (!nsurlCacheDirectory)
         nsurlCacheDirectory = NSHomeDirectory();
 
@@ -128,6 +113,17 @@ void WebProcess::platformSetCacheModel(CacheModel cacheModel)
     pageCache()->setCapacity(pageCacheCapacity);
 
     NSURLCache *nsurlCache = [NSURLCache sharedURLCache];
+
+#if ENABLE(NETWORK_PROCESS)
+    // FIXME: Once there is no loading being done in the WebProcess, we should remove this,
+    // as calling [NSURLCache sharedURLCache] initializes the cache, which we would rather not do.
+    if (m_usesNetworkProcess) {
+        [nsurlCache setMemoryCapacity:0];
+        [nsurlCache setDiskCapacity:0];
+        return;
+    }
+#endif
+
     [nsurlCache setMemoryCapacity:urlCacheMemoryCapacity];
     [nsurlCache setDiskCapacity:max<unsigned long>(urlCacheDiskCapacity, [nsurlCache diskCapacity])]; // Don't shrink a big disk cache, since that would cause churn.
 }
@@ -135,6 +131,10 @@ void WebProcess::platformSetCacheModel(CacheModel cacheModel)
 void WebProcess::platformClearResourceCaches(ResourceCachesToClear cachesToClear)
 {
     if (cachesToClear == InMemoryResourceCachesOnly)
+        return;
+
+    // If we're using the network process then it is the only one that needs to clear the disk cache.
+    if (usesNetworkProcess())
         return;
 
     if (!m_clearResourceCachesDispatchGroup)
@@ -145,108 +145,6 @@ void WebProcess::platformClearResourceCaches(ResourceCachesToClear cachesToClear
     });
 }
 
-#if ENABLE(WEB_PROCESS_SANDBOX)
-static void appendSandboxParameterPathInternal(Vector<const char*>& vector, const char* name, const char* path)
-{
-    char normalizedPath[PATH_MAX];
-    if (!realpath(path, normalizedPath))
-        normalizedPath[0] = '\0';
-
-    vector.append(name);
-    vector.append(fastStrDup(normalizedPath));
-}
-
-static void appendReadwriteConfDirectory(Vector<const char*>& vector, const char* name, int confID)
-{
-    char path[PATH_MAX];
-    if (confstr(confID, path, PATH_MAX) <= 0)
-        path[0] = '\0';
-
-    appendSandboxParameterPathInternal(vector, name, path);
-}
-
-static void appendReadonlySandboxDirectory(Vector<const char*>& vector, const char* name, NSString *path)
-{
-    appendSandboxParameterPathInternal(vector, name, [path length] ? [(NSString *)path fileSystemRepresentation] : "");
-}
-
-static void appendReadwriteSandboxDirectory(Vector<const char*>& vector, const char* name, const char* path)
-{
-    appendSandboxParameterPathInternal(vector, name, path);
-}
-
-#endif
-
-void WebProcess::initializeSandbox(const String& clientIdentifier)
-{
-    [[NSFileManager defaultManager] changeCurrentDirectoryPath:[[NSBundle mainBundle] bundlePath]];
-
-#if ENABLE(WEB_PROCESS_SANDBOX)
-
-#if DEBUG_BYPASS_SANDBOX
-    WTFLogAlways("Bypassing web process sandbox.\n");
-    return;
-#endif
-
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1080
-    // Use private temporary and cache directories.
-    String systemDirectorySuffix = "com.apple.WebProcess+" + clientIdentifier;
-    setenv("DIRHELPER_USER_DIR_SUFFIX", fileSystemRepresentation(systemDirectorySuffix).data(), 0);
-    char temporaryDirectory[PATH_MAX];
-    if (!confstr(_CS_DARWIN_USER_TEMP_DIR, temporaryDirectory, sizeof(temporaryDirectory))) {
-        WTFLogAlways("WebProcess: couldn't retrieve private temporary directory path: %d\n", errno);
-        exit(EX_NOPERM);
-    }
-    setenv("TMPDIR", temporaryDirectory, 1);
-#endif
-
-    NSBundle *webkit2Bundle = [NSBundle bundleForClass:NSClassFromString(@"WKView")];
-
-    Vector<const char*> sandboxParameters;
-
-    // These are read-only.
-    appendReadonlySandboxDirectory(sandboxParameters, "WEBKIT2_FRAMEWORK_DIR", [[webkit2Bundle bundlePath] stringByDeletingLastPathComponent]);
-
-    // These are read-write getconf paths.
-    appendReadwriteConfDirectory(sandboxParameters, "DARWIN_USER_TEMP_DIR", _CS_DARWIN_USER_TEMP_DIR);
-    appendReadwriteConfDirectory(sandboxParameters, "DARWIN_USER_CACHE_DIR", _CS_DARWIN_USER_CACHE_DIR);
-
-    char buffer[4096];
-    int bufferSize = sizeof(buffer);
-    struct passwd pwd;
-    struct passwd* result = 0;
-    if (getpwuid_r(getuid(), &pwd, buffer, bufferSize, &result) || !result) {
-        WTFLogAlways("WebProcess: Couldn't find home directory\n");
-        exit(EX_NOPERM);
-    }
-
-    // These are read-write paths.
-    appendReadwriteSandboxDirectory(sandboxParameters, "HOME_DIR", pwd.pw_dir);
-
-    sandboxParameters.append(static_cast<const char*>(0));
-
-    const char* profilePath = [[webkit2Bundle pathForResource:@"com.apple.WebProcess" ofType:@"sb"] fileSystemRepresentation];
-
-    char* errorBuf;
-    if (sandbox_init_with_parameters(profilePath, SANDBOX_NAMED_EXTERNAL, sandboxParameters.data(), &errorBuf)) {
-        WTFLogAlways("WebProcess: Couldn't initialize sandbox profile [%s] error '%s'\n", profilePath, errorBuf);
-        for (size_t i = 0; sandboxParameters[i]; i += 2)
-            WTFLogAlways("%s=%s\n", sandboxParameters[i], sandboxParameters[i + 1]);
-        exit(EX_NOPERM);
-    }
-
-    for (size_t i = 0; sandboxParameters[i]; i += 2)
-        fastFree(const_cast<char*>(sandboxParameters[i + 1]));
-
-    // This will override LSFileQuarantineEnabled from Info.plist unless sandbox quarantine is globally disabled.
-    OSStatus error = WKEnableSandboxStyleFileQuarantine();
-    if (error) {
-        WTFLogAlways("WebProcess: Couldn't enable sandbox style file quarantine: %ld\n", (long)error);
-        exit(EX_NOPERM);
-    }
-#endif
-}
-
 static id NSApplicationAccessibilityFocusedUIElement(NSApplication*, SEL)
 {
     WebPage* page = WebProcess::shared().focusedWebPage();
@@ -255,7 +153,7 @@ static id NSApplicationAccessibilityFocusedUIElement(NSApplication*, SEL)
 
     return [page->accessibilityRemoteObject() accessibilityFocusedUIElement];
 }
-    
+
 void WebProcess::platformInitializeWebProcess(const WebProcessCreationParameters& parameters, CoreIPC::MessageDecoder&)
 {
     SandboxExtension::consumePermanently(parameters.uiProcessBundleResourcePathExtensionHandle);
@@ -264,27 +162,25 @@ void WebProcess::platformInitializeWebProcess(const WebProcessCreationParameters
     SandboxExtension::consumePermanently(parameters.applicationCacheDirectoryExtensionHandle);
     SandboxExtension::consumePermanently(parameters.diskCacheDirectoryExtensionHandle);
 
-    if (!parameters.parentProcessName.isNull()) {
-        NSString *applicationName = [NSString stringWithFormat:WEB_UI_STRING("%@ Web Content", "Visible name of the web process. The argument is the application name."), (NSString *)parameters.parentProcessName];
-        WKSetVisibleApplicationName((CFStringRef)applicationName);
+    // When the network process is enabled, each web process wants a stand-alone
+    // NSURLCache, which it can disable to save memory.
+#if ENABLE(NETWORK_PROCESS)
+    if (!m_usesNetworkProcess) {
+#endif
+        if (!parameters.diskCacheDirectory.isNull()) {
+            [NSURLCache setSharedURLCache:adoptNS([[NSURLCache alloc]
+                initWithMemoryCapacity:parameters.nsURLCacheMemoryCapacity
+                diskCapacity:parameters.nsURLCacheDiskCapacity
+                diskPath:parameters.diskCacheDirectory]).get()];
+        }
+#if ENABLE(NETWORK_PROCESS)
     }
-
-    if (!parameters.diskCacheDirectory.isNull()) {
-        NSUInteger cacheMemoryCapacity = parameters.nsURLCacheMemoryCapacity;
-        NSUInteger cacheDiskCapacity = parameters.nsURLCacheDiskCapacity;
-
-        RetainPtr<NSURLCache> parentProcessURLCache(AdoptNS, [[NSURLCache alloc] initWithMemoryCapacity:cacheMemoryCapacity diskCapacity:cacheDiskCapacity diskPath:parameters.diskCacheDirectory]);
-        [NSURLCache setSharedURLCache:parentProcessURLCache.get()];
-    }
+#endif
 
     m_shouldForceScreenFontSubstitution = parameters.shouldForceScreenFontSubstitution;
     Font::setDefaultTypesettingFeatures(parameters.shouldEnableKerningAndLigaturesByDefault ? Kerning | Ligatures : 0);
 
     m_compositingRenderServerPort = parameters.acceleratedCompositingPort.port();
-
-#if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
-    m_notificationManager.initialize(parameters.notificationPermissions);
-#endif
 
     m_presenterApplicationPid = parameters.presenterApplicationPid;
 
@@ -292,19 +188,20 @@ void WebProcess::platformInitializeWebProcess(const WebProcessCreationParameters
     // no window in WK2, NSApplication needs to use the focused page's focused element.
     Method methodToPatch = class_getInstanceMethod([NSApplication class], @selector(accessibilityFocusedUIElement));
     method_setImplementation(methodToPatch, (IMP)NSApplicationAccessibilityFocusedUIElement);
-    
-    for (size_t i = 0; i < parameters.urlSchemesRegisteredForCustomProtocols.size(); ++i)
-        CustomProtocolManager::shared().registerScheme(parameters.urlSchemesRegisteredForCustomProtocols[i]);
-    
-    CustomProtocolManager::registerCustomProtocolClass();
 }
 
-void WebProcess::initializeShim()
+void WebProcess::initializeProcessName(const ChildProcessInitializationParameters& parameters)
 {
-#if __MAC_OS_X_VERSION_MIN_REQUIRED == 1060
-    initializeKeychainItemShim();
-#else
-    initializeSecItemShim();
+    NSString *applicationName = [NSString stringWithFormat:WEB_UI_STRING("%@ Web Content", "Visible name of the web process. The argument is the application name."), (NSString *)parameters.uiProcessName];
+    WKSetVisibleApplicationName((CFStringRef)applicationName);
+}
+
+void WebProcess::platformInitializeProcess(const ChildProcessInitializationParameters&)
+{
+    WKAXRegisterRemoteApp();
+
+#if USE(SECURITY_FRAMEWORK)
+    SecItemShim::shared().initialize(this);
 #endif
 }
 
@@ -317,17 +214,40 @@ void WebProcess::platformTerminate()
     }
 }
 
-void WebProcess::secItemResponse(CoreIPC::Connection*, uint64_t requestID, const SecItemResponseData& response)
+void WebProcess::initializeSandbox(const ChildProcessInitializationParameters& parameters, SandboxInitializationParameters& sandboxParameters)
 {
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1070
-    didReceiveSecItemResponse(requestID, response);
-#endif
+    // Need to overide the default, because service has a different bundle ID.
+    NSBundle *webkit2Bundle = [NSBundle bundleForClass:NSClassFromString(@"WKView")];
+    sandboxParameters.setOverrideSandboxProfilePath([webkit2Bundle pathForResource:@"com.apple.WebProcess" ofType:@"sb"]);
+
+    ChildProcess::initializeSandbox(parameters, sandboxParameters);
 }
 
-void WebProcess::secKeychainItemResponse(CoreIPC::Connection*, uint64_t requestID, const SecKeychainItemResponseData& response)
+void WebProcess::updateActivePages()
 {
-#if __MAC_OS_X_VERSION_MIN_REQUIRED == 1060
-    didReceiveSecKeychainItemResponse(requestID, response);
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
+    RetainPtr<CFMutableArrayRef> activePageURLs = adoptCF(CFArrayCreateMutable(0, 0, &kCFTypeArrayCallBacks));
+    for (const auto& iter: m_pageMap) {
+        WebPage* page = iter.value.get();
+        WebFrame* mainFrame = page->mainWebFrame();
+        if (!mainFrame)
+            continue;
+        String mainFrameOriginString;
+        RefPtr<SecurityOrigin> mainFrameOrigin = SecurityOrigin::createFromString(mainFrame->url());
+        if (!mainFrameOrigin->isUnique())
+            mainFrameOriginString = mainFrameOrigin->toRawString();
+        else
+            mainFrameOriginString = KURL(KURL(), mainFrame->url()).protocol() + ':'; // toRawString() is not supposed to work with unique origins, and would just return "://".
+
+        NSURL *originAsNSURL = [NSURL URLWithString:mainFrameOriginString];
+        // +[NSURL URLWithString:] returns nil when its argument is malformed. It's unclear how we can possibly have a malformed URL here,
+        // but it happens in practice according to <rdar://problem/14173389>. Leaving an assertion in to catch a reproducible case.
+        ASSERT(originAsNSURL);
+        NSString *userVisibleOriginString = originAsNSURL ? userVisibleString(originAsNSURL) : @"(null)";
+
+        CFArrayAppendValue(activePageURLs.get(), userVisibleOriginString);
+    }
+    WKSetApplicationInformationItem(kLSActivePageUserVisibleOriginsKey, activePageURLs.get());
 #endif
 }
 

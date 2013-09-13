@@ -111,8 +111,8 @@ PassRefPtr<SimpleFontData> CSSFontFaceSource::getFontData(const FontDescription&
     }
 
     // See if we have a mapping in our FontData cache.
-    unsigned hashKey = (fontDescription.computedPixelSize() + 1) << 6 | fontDescription.widthVariant() << 4
-                       | (fontDescription.textOrientation() == TextOrientationUpright ? 8 : 0) | (fontDescription.orientation() == Vertical ? 4 : 0) | (syntheticBold ? 2 : 0) | (syntheticItalic ? 1 : 0);
+    unsigned hashKey = (fontDescription.computedPixelSize() + 1) << 5 | fontDescription.widthVariant() << 3
+                       | (fontDescription.orientation() == Vertical ? 4 : 0) | (syntheticBold ? 2 : 0) | (syntheticItalic ? 1 : 0);
 
     RefPtr<SimpleFontData>& fontData = m_fontDataTable.add(hashKey, 0).iterator->value;
     if (fontData)
@@ -165,7 +165,7 @@ PassRefPtr<SimpleFontData> CSSFontFaceSource::getFontData(const FontDescription&
                     return 0;
 
                 fontData = SimpleFontData::create(m_font->platformDataFromCustomData(fontDescription.computedPixelSize(), syntheticBold, syntheticItalic,
-                    fontDescription.orientation(), fontDescription.textOrientation(), fontDescription.widthVariant(), fontDescription.renderingMode()), true, false);
+                    fontDescription.orientation(), fontDescription.widthVariant(), fontDescription.renderingMode()), true, false);
             }
         } else {
 #if ENABLE(SVG_FONTS)
@@ -202,6 +202,26 @@ void CSSFontFaceSource::setSVGFontFaceElement(PassRefPtr<SVGFontFaceElement> ele
 bool CSSFontFaceSource::isSVGFontFaceSource() const
 {
     return m_svgFontFaceElement || m_hasExternalSVGFont;
+}
+#endif
+
+#if ENABLE(FONT_LOAD_EVENTS)
+bool CSSFontFaceSource::isDecodeError() const
+{
+    if (m_font)
+        return m_font->status() == CachedResource::DecodeError;
+    return false;
+}
+
+bool CSSFontFaceSource::ensureFontData()
+{
+    if (!m_font)
+        return false;
+#if ENABLE(SVG_FONTS)
+    if (m_hasExternalSVGFont)
+        return m_font->ensureSVGFontData();
+#endif
+    return m_font->ensureCustomFontData();
 }
 #endif
 

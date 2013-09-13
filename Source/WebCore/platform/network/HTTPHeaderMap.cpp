@@ -51,9 +51,9 @@ PassOwnPtr<CrossThreadHTTPHeaderMapData> HTTPHeaderMap::copyData() const
     data->reserveInitialCapacity(size());
 
     HTTPHeaderMap::const_iterator end_it = end();
-    for (HTTPHeaderMap::const_iterator it = begin(); it != end_it; ++it) {
-        data->append(make_pair(it->key.string().isolatedCopy(), it->value.isolatedCopy()));
-    }
+    for (HTTPHeaderMap::const_iterator it = begin(); it != end_it; ++it)
+        data->uncheckedAppend(make_pair(it->key.string().isolatedCopy(), it->value.isolatedCopy()));
+
     return data.release();
 }
 
@@ -97,7 +97,7 @@ struct CaseFoldingCStringTranslator {
 
 String HTTPHeaderMap::get(const char* name) const
 {
-    const_iterator i = find<const char*, CaseFoldingCStringTranslator>(name);
+    const_iterator i = find<CaseFoldingCStringTranslator>(name);
     if (i == end())
         return String();
     return i->value;
@@ -105,12 +105,12 @@ String HTTPHeaderMap::get(const char* name) const
     
 bool HTTPHeaderMap::contains(const char* name) const
 {
-    return find<const char*, CaseFoldingCStringTranslator>(name) != end();
+    return find<CaseFoldingCStringTranslator>(name) != end();
 }
 
 HTTPHeaderMap::AddResult HTTPHeaderMap::add(const char* name, const String& value)
 {
-    return HashMap<AtomicString, String, CaseFoldingHash>::add<const char*, CaseFoldingCStringTranslator>(name, value);
+    return HashMap<AtomicString, String, CaseFoldingHash>::add<CaseFoldingCStringTranslator>(name, value);
 }
 
 } // namespace WebCore

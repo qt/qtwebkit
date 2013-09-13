@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006, 2008 Apple Inc. All rights reserved.
+ * Copyright (C) 2006, 2008, 2013 Apple Inc. All rights reserved.
  * Copyright (C) 2007 Nicholas Shanks <webkit@nickshanks.com>
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,16 +31,19 @@
 #include "FontCache.h"
 
 #include "Font.h"
-#include "FontFallbackList.h"
+#include "FontGlyphs.h"
 #include "FontPlatformData.h"
 #include "FontSelector.h"
-#include "OpenTypeVerticalData.h"
 #include "WebKitFontFamilyNames.h"
 #include <wtf/HashMap.h>
 #include <wtf/ListHashSet.h>
 #include <wtf/StdLibExtras.h>
 #include <wtf/text/AtomicStringHash.h>
 #include <wtf/text/StringHash.h>
+
+#if ENABLE(OPENTYPE_VERTICAL)
+#include "OpenTypeVerticalData.h"
+#endif
 
 using namespace WTF;
 
@@ -60,40 +63,22 @@ FontCache::FontCache()
 struct FontPlatformDataCacheKey {
     WTF_MAKE_FAST_ALLOCATED;
 public:
-    FontPlatformDataCacheKey(const AtomicString& family = AtomicString(), unsigned size = 0, unsigned weight = 0, bool italic = false,
-                             bool isPrinterFont = false, FontRenderingMode renderingMode = NormalRenderingMode, FontOrientation orientation = Horizontal,
-                             TextOrientation textOrientation = TextOrientationVerticalRight, FontWidthVariant widthVariant = RegularWidth)
-        : m_size(size)
-        , m_weight(weight)
+    FontPlatformDataCacheKey() { }
+    FontPlatformDataCacheKey(const AtomicString& family, const FontDescription& description)
+        : m_fontDescriptionKey(description)
         , m_family(family)
-        , m_italic(italic)
-        , m_printerFont(isPrinterFont)
-        , m_renderingMode(renderingMode)
-        , m_orientation(orientation)
-        , m_textOrientation(textOrientation)
-        , m_widthVariant(widthVariant)
-    {
-    }
+    { }
 
-    FontPlatformDataCacheKey(HashTableDeletedValueType) : m_size(hashTableDeletedSize()) { }
-    bool isHashTableDeletedValue() const { return m_size == hashTableDeletedSize(); }
+    FontPlatformDataCacheKey(HashTableDeletedValueType) : m_fontDescriptionKey(hashTableDeletedSize()) { }
+    bool isHashTableDeletedValue() const { return m_fontDescriptionKey.size == hashTableDeletedSize(); }
 
     bool operator==(const FontPlatformDataCacheKey& other) const
     {
-        return equalIgnoringCase(m_family, other.m_family) && m_size == other.m_size && 
-               m_weight == other.m_weight && m_italic == other.m_italic && m_printerFont == other.m_printerFont &&
-               m_renderingMode == other.m_renderingMode && m_orientation == other.m_orientation && m_textOrientation == other.m_textOrientation && m_widthVariant == other.m_widthVariant;
+        return equalIgnoringCase(m_family, other.m_family) && m_fontDescriptionKey == other.m_fontDescriptionKey;
     }
 
-    unsigned m_size;
-    unsigned m_weight;
+    FontDescriptionFontDataCacheKey m_fontDescriptionKey;
     AtomicString m_family;
-    bool m_italic;
-    bool m_printerFont;
-    FontRenderingMode m_renderingMode;
-    FontOrientation m_orientation;
-    TextOrientation m_textOrientation;
-    FontWidthVariant m_widthVariant;
 
 private:
     static unsigned hashTableDeletedSize() { return 0xFFFFFFFFU; }
@@ -101,14 +86,7 @@ private:
 
 inline unsigned computeHash(const FontPlatformDataCacheKey& fontKey)
 {
-    unsigned hashCodes[5] = {
-        CaseFoldingHash::hash(fontKey.m_family),
-        fontKey.m_size,
-        fontKey.m_weight,
-        fontKey.m_widthVariant,
-        static_cast<unsigned>(fontKey.m_textOrientation) << 4 | static_cast<unsigned>(fontKey.m_orientation) << 3 | static_cast<unsigned>(fontKey.m_italic) << 2 | static_cast<unsigned>(fontKey.m_printerFont) << 1 | static_cast<unsigned>(fontKey.m_renderingMode)
-    };
-    return StringHasher::hashMemory<sizeof(hashCodes)>(hashCodes);
+    return pairIntHash(CaseFoldingHash::hash(fontKey.m_family), fontKey.m_fontDescriptionKey.computeHash());
 }
 
 struct FontPlatformDataCacheKeyHash {
@@ -127,57 +105,79 @@ struct FontPlatformDataCacheKeyHash {
 
 struct FontPlatformDataCacheKeyTraits : WTF::SimpleClassHashTraits<FontPlatformDataCacheKey> { };
 
-typedef HashMap<FontPlatformDataCacheKey, FontPlatformData*, FontPlatformDataCacheKeyHash, FontPlatformDataCacheKeyTraits> FontPlatformDataCache;
+typedef HashMap<FontPlatformDataCacheKey, OwnPtr<FontPlatformData>, FontPlatformDataCacheKeyHash, FontPlatformDataCacheKeyTraits> FontPlatformDataCache;
 
 static FontPlatformDataCache* gFontPlatformDataCache = 0;
 
-static const AtomicString& alternateFamilyName(const AtomicString& familyName)
+static bool familyNameEqualIgnoringCase(const AtomicString& familyName, const char* reference, unsigned length)
 {
-    // Alias Courier <-> Courier New
-    DEFINE_STATIC_LOCAL(AtomicString, courier, ("Courier", AtomicString::ConstructFromLiteral));
-    DEFINE_STATIC_LOCAL(AtomicString, courierNew, ("Courier New", AtomicString::ConstructFromLiteral));
-    if (equalIgnoringCase(familyName, courier))
-        return courierNew;
+    ASSERT(length > 0);
+    ASSERT(familyName.length() == length);
+    ASSERT(strlen(reference) == length);
+    const AtomicStringImpl* familyNameImpl = familyName.impl();
+    if (familyNameImpl->is8Bit())
+        return equalIgnoringCase(familyNameImpl->characters8(), reinterpret_cast<const LChar*>(reference), length);
+    return equalIgnoringCase(familyNameImpl->characters16(), reinterpret_cast<const LChar*>(reference), length);
+}
+
+template<size_t length>
+static inline bool familyNameEqualIgnoringCase(const AtomicString& familyName, const char (&reference)[length])
+{
+    return familyNameEqualIgnoringCase(familyName, reference, length - 1);
+}
+
+static const AtomicString alternateFamilyName(const AtomicString& familyName)
+{
+    // Alias Courier and Courier New.
+    // Alias Times and Times New Roman.
+    // Alias Arial and Helvetica.
+    switch (familyName.length()) {
+    case 5:
+        if (familyNameEqualIgnoringCase(familyName, "Arial"))
+            return AtomicString("Helvetica", AtomicString::ConstructFromLiteral);
+        if (familyNameEqualIgnoringCase(familyName, "Times"))
+            return AtomicString("Times New Roman", AtomicString::ConstructFromLiteral);
+        break;
+    case 7:
+        if (familyNameEqualIgnoringCase(familyName, "Courier"))
+            return AtomicString("Courier New", AtomicString::ConstructFromLiteral);
+        break;
+    case 9:
+        if (familyNameEqualIgnoringCase(familyName, "Helvetica"))
+            return AtomicString("Arial", AtomicString::ConstructFromLiteral);
+        break;
 #if !OS(WINDOWS)
     // On Windows, Courier New (truetype font) is always present and
     // Courier is a bitmap font. So, we don't want to map Courier New to
     // Courier.
-    if (equalIgnoringCase(familyName, courierNew))
-        return courier;
-#endif
-
-    // Alias Times and Times New Roman.
-    DEFINE_STATIC_LOCAL(AtomicString, times, ("Times", AtomicString::ConstructFromLiteral));
-    DEFINE_STATIC_LOCAL(AtomicString, timesNewRoman, ("Times New Roman", AtomicString::ConstructFromLiteral));
-    if (equalIgnoringCase(familyName, times))
-        return timesNewRoman;
-    if (equalIgnoringCase(familyName, timesNewRoman))
-        return times;
-    
-    // Alias Arial and Helvetica
-    DEFINE_STATIC_LOCAL(AtomicString, arial, ("Arial", AtomicString::ConstructFromLiteral));
-    DEFINE_STATIC_LOCAL(AtomicString, helvetica, ("Helvetica", AtomicString::ConstructFromLiteral));
-    if (equalIgnoringCase(familyName, arial))
-        return helvetica;
-    if (equalIgnoringCase(familyName, helvetica))
-        return arial;
-
+    case 11:
+        if (familyNameEqualIgnoringCase(familyName, "Courier New"))
+            return AtomicString("Courier", AtomicString::ConstructFromLiteral);
+        break;
+#endif // !OS(WINDOWS)
+    case 15:
+        if (familyNameEqualIgnoringCase(familyName, "Times New Roman"))
+            return AtomicString("Times", AtomicString::ConstructFromLiteral);
+        break;
 #if OS(WINDOWS)
     // On Windows, bitmap fonts are blocked altogether so that we have to 
     // alias MS Sans Serif (bitmap font) -> Microsoft Sans Serif (truetype font)
-    DEFINE_STATIC_LOCAL(AtomicString, msSans, ("MS Sans Serif", AtomicString::ConstructFromLiteral));
-    DEFINE_STATIC_LOCAL(AtomicString, microsoftSans, ("Microsoft Sans Serif", AtomicString::ConstructFromLiteral));
-    if (equalIgnoringCase(familyName, msSans))
-        return microsoftSans;
+    case 13:
+        if (familyNameEqualIgnoringCase(familyName, "MS Sans Serif"))
+            return AtomicString("Microsoft Sans Serif", AtomicString::ConstructFromLiteral);
+        break;
 
     // Alias MS Serif (bitmap) -> Times New Roman (truetype font). There's no 
     // 'Microsoft Sans Serif-equivalent' for Serif.
-    DEFINE_STATIC_LOCAL(AtomicString, msSerif, ("MS Serif", AtomicString::ConstructFromLiteral));
-    if (equalIgnoringCase(familyName, msSerif))
-        return timesNewRoman;
-#endif
+    case 8:
+        if (familyNameEqualIgnoringCase(familyName, "MS Serif"))
+            return AtomicString("Times New Roman", AtomicString::ConstructFromLiteral);
+        break;
+#endif // OS(WINDOWS)
 
-    return emptyAtom;
+    }
+
+    return nullAtom;
 }
 
 FontPlatformData* FontCache::getCachedFontPlatformData(const FontDescription& fontDescription,
@@ -199,32 +199,30 @@ FontPlatformData* FontCache::getCachedFontPlatformData(const FontDescription& fo
         platformInit();
     }
 
-    FontPlatformDataCacheKey key(familyName, fontDescription.computedPixelSize(), fontDescription.weight(), fontDescription.italic(),
-                                 fontDescription.usePrinterFont(), fontDescription.renderingMode(), fontDescription.orientation(),
-                                 fontDescription.textOrientation(), fontDescription.widthVariant());
-    FontPlatformData* result = 0;
-    bool foundResult;
-    FontPlatformDataCache::iterator it = gFontPlatformDataCache->find(key);
-    if (it == gFontPlatformDataCache->end()) {
-        result = createFontPlatformData(fontDescription, familyName);
-        gFontPlatformDataCache->set(key, result);
-        foundResult = result;
-    } else {
-        result = it->value;
-        foundResult = true;
+    FontPlatformDataCacheKey key(familyName, fontDescription);
+
+    FontPlatformDataCache::AddResult result = gFontPlatformDataCache->add(key, nullptr);
+    FontPlatformDataCache::iterator it = result.iterator;
+    if (result.isNewEntry) {
+        it->value = createFontPlatformData(fontDescription, familyName);
+
+        if (!it->value && !checkingAlternateName) {
+            // We were unable to find a font.  We have a small set of fonts that we alias to other names,
+            // e.g., Arial/Helvetica, Courier/Courier New, etc.  Try looking up the font under the aliased name.
+            const AtomicString alternateName = alternateFamilyName(familyName);
+            if (!alternateName.isNull()) {
+                FontPlatformData* fontPlatformDataForAlternateName = getCachedFontPlatformData(fontDescription, alternateName, true);
+                // Lookup the key in the hash table again as the previous iterator may have
+                // been invalidated by the recursive call to getCachedFontPlatformData().
+                it = gFontPlatformDataCache->find(key);
+                ASSERT(it != gFontPlatformDataCache->end());
+                if (fontPlatformDataForAlternateName)
+                    it->value = adoptPtr(new FontPlatformData(*fontPlatformDataForAlternateName));
+            }
+        }
     }
 
-    if (!foundResult && !checkingAlternateName) {
-        // We were unable to find a font.  We have a small set of fonts that we alias to other names, 
-        // e.g., Arial/Helvetica, Courier/Courier New, etc.  Try looking up the font under the aliased name.
-        const AtomicString& alternateName = alternateFamilyName(familyName);
-        if (!alternateName.isEmpty())
-            result = getCachedFontPlatformData(fontDescription, alternateName, true);
-        if (result)
-            gFontPlatformDataCache->set(key, new FontPlatformData(*result)); // Cache the result under the old name.
-    }
-
-    return result;
+    return it->value.get();
 }
 
 #if ENABLE(OPENTYPE_VERTICAL)
@@ -287,13 +285,8 @@ typedef HashMap<FontPlatformData, pair<RefPtr<SimpleFontData>, unsigned>, FontDa
 
 static FontDataCache* gFontDataCache = 0;
 
-#if PLATFORM(CHROMIUM) && !OS(ANDROID)
-const int cMaxInactiveFontData = 250;
-const int cTargetInactiveFontData = 200;
-#else
 const int cMaxInactiveFontData = 225;
 const int cTargetInactiveFontData = 200;
-#endif
 static ListHashSet<RefPtr<SimpleFontData> >* gInactiveFontData = 0;
 
 PassRefPtr<SimpleFontData> FontCache::getCachedFontData(const FontDescription& fontDescription, const AtomicString& family, bool checkingAlternateName, ShouldRetain shouldRetain)
@@ -373,6 +366,8 @@ void FontCache::purgeInactiveFontDataIfNeeded()
 
 void FontCache::purgeInactiveFontData(int count)
 {
+    pruneUnreferencedEntriesFromFontGlyphsCache();
+
     if (!gInactiveFontData || m_purgePreventCount)
         return;
 
@@ -413,7 +408,7 @@ void FontCache::purgeInactiveFontData(int count)
         
         size_t keysToRemoveCount = keysToRemove.size();
         for (size_t i = 0; i < keysToRemoveCount; ++i)
-            delete gFontPlatformDataCache->take(keysToRemove[i]);
+            gFontPlatformDataCache->remove(keysToRemove[i]);
     }
 
 #if ENABLE(OPENTYPE_VERTICAL)
@@ -459,48 +454,44 @@ size_t FontCache::inactiveFontDataCount()
     return 0;
 }
 
-PassRefPtr<FontData> FontCache::getFontData(const Font& font, int& familyIndex, FontSelector* fontSelector)
+PassRefPtr<FontData> FontCache::getFontData(const FontDescription& description, int& familyIndex, FontSelector* fontSelector)
 {
+    ASSERT(familyIndex != cAllFamiliesScanned);
     RefPtr<FontData> result;
 
-    int startIndex = familyIndex;
-    const FontFamily* startFamily = &font.fontDescription().family();
-    for (int i = 0; startFamily && i < startIndex; i++)
-        startFamily = startFamily->next();
-    const FontFamily* currFamily = startFamily;
-    while (currFamily && !result) {
-        familyIndex++;
-        if (currFamily->family().length()) {
-            if (fontSelector)
-                result = fontSelector->getFontData(font.fontDescription(), currFamily->family());
-
-            if (!result)
-                result = getCachedFontData(font.fontDescription(), currFamily->family());
-        }
-        currFamily = currFamily->next();
+    bool isFirst = !familyIndex;
+    int familyCount = description.familyCount();
+    for (;familyIndex < familyCount && !result; ++familyIndex) {
+        const AtomicString& family = description.familyAt(familyIndex);
+        if (family.isEmpty())
+            continue;
+        if (fontSelector)
+            result = fontSelector->getFontData(description, family);
+        if (!result)
+            result = getCachedFontData(description, family);
     }
-
-    if (!currFamily)
+    if (familyIndex == familyCount)
         familyIndex = cAllFamiliesScanned;
 
-    if (!result)
+#if PLATFORM(MAC)
+    if (!result) {
         // We didn't find a font. Try to find a similar font using our own specific knowledge about our platform.
         // For example on OS X, we know to map any families containing the words Arabic, Pashto, or Urdu to the
         // Geeza Pro font.
-        result = getSimilarFontPlatformData(font);
+        result = similarFontPlatformData(description);
+    }
+#endif
 
-    if (!result && startIndex == 0) {
+    if (!result && isFirst) {
         // If it's the primary font that we couldn't find, we try the following. In all other cases, we will
         // just use per-character system fallback.
-
         if (fontSelector) {
             // Try the user's preferred standard font.
-            if (RefPtr<FontData> data = fontSelector->getFontData(font.fontDescription(), standardFamily))
+            if (RefPtr<FontData> data = fontSelector->getFontData(description, standardFamily))
                 return data.release();
         }
-
         // Still no result.  Hand back our last resort fallback font.
-        result = getLastResortFallbackFont(font.fontDescription());
+        result = getLastResortFallbackFont(description);
     }
     return result.release();
 }
@@ -538,11 +529,9 @@ void FontCache::invalidate()
         return;
     }
 
-    if (gFontPlatformDataCache) {
-        deleteAllValues(*gFontPlatformDataCache);
-        delete gFontPlatformDataCache;
-        gFontPlatformDataCache = new FontPlatformDataCache;
-    }
+    if (gFontPlatformDataCache)
+        gFontPlatformDataCache->clear();
+    invalidateFontGlyphsCache();
 
     gGeneration++;
 

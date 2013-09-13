@@ -28,27 +28,36 @@
 #define HTMLAudioElement_h
 
 #if ENABLE(VIDEO)
-
 #include "HTMLMediaElement.h"
 
 namespace WebCore {
 
 class Document;
 
-class HTMLAudioElement : public HTMLMediaElement {
+class HTMLAudioElement FINAL : public HTMLMediaElement {
 public:
     static PassRefPtr<HTMLAudioElement> create(const QualifiedName&, Document*, bool);
     static PassRefPtr<HTMLAudioElement> createForJSConstructor(Document*, const String& src);
 
-    virtual bool hasPendingActivity() const { return isPlaying() || HTMLMediaElement::hasPendingActivity(); }
-
-    virtual bool isActiveNode() const { return true; }
-
 private:
     HTMLAudioElement(const QualifiedName&, Document*, bool);
-
-    virtual bool isVideo() const { return false; }
 };
+
+inline bool isHTMLAudioElement(Node* node)
+{
+    return node->hasTagName(HTMLNames::audioTag);
+}
+
+inline bool isHTMLAudioElement(Element* element)
+{
+    return element->hasTagName(HTMLNames::audioTag);
+}
+
+inline HTMLAudioElement* toHTMLAudioElement(Node* node)
+{
+    ASSERT_WITH_SECURITY_IMPLICATION(!node || isHTMLAudioElement(node));
+    return static_cast<HTMLAudioElement*>(node);
+}
 
 } //namespace
 

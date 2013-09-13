@@ -56,6 +56,7 @@ WebInspector.TimelineModel.RecordType = {
     InvalidateLayout: "InvalidateLayout",
     Layout: "Layout",
     Paint: "Paint",
+    Rasterize: "Rasterize",
     ScrollLayer: "ScrollLayer",
     DecodeImage: "DecodeImage",
     ResizeImage: "ResizeImage",
@@ -89,7 +90,12 @@ WebInspector.TimelineModel.RecordType = {
 
     RequestAnimationFrame: "RequestAnimationFrame",
     CancelAnimationFrame: "CancelAnimationFrame",
-    FireAnimationFrame: "FireAnimationFrame"
+    FireAnimationFrame: "FireAnimationFrame",
+
+    WebSocketCreate : "WebSocketCreate",
+    WebSocketSendHandshakeRequest : "WebSocketSendHandshakeRequest",
+    WebSocketReceiveHandshakeResponse : "WebSocketReceiveHandshakeResponse",
+    WebSocketDestroy : "WebSocketDestroy",
 }
 
 WebInspector.TimelineModel.Events = {
@@ -140,12 +146,17 @@ WebInspector.TimelineModel.aggregateTimeByCategory = function(total, addend)
 }
 
 WebInspector.TimelineModel.prototype = {
-    startRecord: function()
+    /**
+     * @param {boolean=} includeDomCounters
+     * @param {boolean=} includeNativeMemoryStatistics
+     */
+    startRecord: function(includeDomCounters, includeNativeMemoryStatistics)
     {
         if (this._collectionEnabled)
             return;
         this.reset();
-        WebInspector.timelineManager.start(30);
+        var maxStackFrames = WebInspector.settings.timelineLimitStackFramesFlag.get() ? WebInspector.settings.timelineStackFramesToCapture.get() : 30;
+        WebInspector.timelineManager.start(maxStackFrames, includeDomCounters, includeNativeMemoryStatistics);
         this._collectionEnabled = true;
     },
 

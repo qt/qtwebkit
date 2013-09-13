@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2012 Samsung Electronics. All rights reserved.
+ * Copyright (C) 2013 Intel Corporation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -24,83 +25,50 @@
  */
 
 #include "config.h"
+
+#if USE(ACCELERATED_COMPOSITING)
+
 #include "PageViewportControllerClientEfl.h"
 
-#if USE(TILED_BACKING_STORE)
-
-#include "EwkViewImpl.h"
-#include "LayerTreeCoordinatorProxy.h"
-#include "LayerTreeRenderer.h"
+#include "EwkView.h"
 #include "PageViewportController.h"
-#include "TransformationMatrix.h"
 
 using namespace WebCore;
 
 namespace WebKit {
 
-PageViewportControllerClientEfl::PageViewportControllerClientEfl(EwkViewImpl* viewImpl)
-    : m_viewImpl(viewImpl)
+PageViewportControllerClientEfl::PageViewportControllerClientEfl(EwkView* view)
+    : m_view(view)
     , m_controller(0)
 {
-    ASSERT(m_viewImpl);
+    ASSERT(m_view);
 }
 
-PageViewportControllerClientEfl::~PageViewportControllerClientEfl()
+void PageViewportControllerClientEfl::didChangeContentsSize(const WebCore::IntSize&)
 {
-}
-
-DrawingAreaProxy* PageViewportControllerClientEfl::drawingArea() const
-{
-    return m_viewImpl->page()->drawingArea();
-}
-
-void PageViewportControllerClientEfl::setRendererActive(bool active)
-{
-    drawingArea()->layerTreeCoordinatorProxy()->layerTreeRenderer()->setActive(active);
-}
-
-void PageViewportControllerClientEfl::updateViewportSize(const IntSize& viewportSize)
-{
-    m_viewportSize = viewportSize;
-
-    ASSERT(m_controller);
-    m_controller->didChangeViewportSize(viewportSize);
-}
-
-void PageViewportControllerClientEfl::didChangeContentsSize(const WebCore::IntSize& contentsSize)
-{
-    drawingArea()->layerTreeCoordinatorProxy()->setContentsSize(contentsSize);
-    m_viewImpl->update();
+    m_view->scheduleUpdateDisplay();
 }
 
 void PageViewportControllerClientEfl::setViewportPosition(const WebCore::FloatPoint& contentsPoint)
 {
-    m_contentPosition = roundedIntPoint(contentsPoint);
+    m_contentPosition = contentsPoint;
 
     FloatPoint pos(contentsPoint);
-    pos.scale(scaleFactor(), scaleFactor());
-    m_viewImpl->setPagePosition(pos);
+    float scaleFactor = WKViewGetContentScaleFactor(m_view->wkView());
+    pos.scale(scaleFactor, scaleFactor);
+    WKViewSetContentPosition(m_view->wkView(), WKPointMake(pos.x(), pos.y()));
 
-    m_controller->didChangeContentsVisibility(m_contentPosition, scaleFactor());
+    m_controller->didChangeContentsVisibility(m_contentPosition, scaleFactor);
 }
 
-void PageViewportControllerClientEfl::setContentsScale(float newScale, bool treatAsInitialValue)
+void PageViewportControllerClientEfl::setPageScaleFactor(float newScale)
 {
-    if (treatAsInitialValue)
-        setViewportPosition(FloatPoint(0, 0));
-
-    m_viewImpl->setScaleFactor(newScale);
-}
-
-void PageViewportControllerClientEfl::didResumeContent()
-{
-    ASSERT(m_controller);
-    m_controller->didChangeContentsVisibility(m_contentPosition, scaleFactor());
+    WKViewSetContentScaleFactor(m_view->wkView(), newScale);
 }
 
 void PageViewportControllerClientEfl::didChangeVisibleContents()
 {
-    m_viewImpl->update();
+    m_view->scheduleUpdateDisplay();
 }
 
 void PageViewportControllerClientEfl::didChangeViewportAttributes()
@@ -113,5 +81,4 @@ void PageViewportControllerClientEfl::setController(PageViewportController* cont
 }
 
 } // namespace WebKit
-#endif // USE(TILED_BACKING_STORE)
-
+#endif // USE(ACCELERATED_COMPOSITING)

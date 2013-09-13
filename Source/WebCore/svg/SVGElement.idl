@@ -22,12 +22,14 @@
 
 [
     JSGenerateToNativeObject,
-    Conditional=SVG,
-    V8CustomToJSObject
+    Conditional=SVG
 ] interface SVGElement : Element {
     [Reflect] attribute DOMString id;
-    [TreatNullAs=NullString] attribute DOMString xmlbase setter raises(DOMException);
+    [TreatNullAs=NullString, SetterRaisesException] attribute DOMString xmlbase;
     readonly attribute SVGSVGElement ownerSVGElement;
     readonly attribute SVGElement viewportElement;
+
+    attribute DOMString xmllang;
+    attribute DOMString xmlspace;
 };
 

@@ -47,7 +47,7 @@
 #include "npruntime_internal.h"
 #endif
 
-#if OS(WINDOWS) && (PLATFORM(GTK) || PLATFORM(QT) || PLATFORM(WX))
+#if OS(WINDOWS) && (PLATFORM(GTK) || PLATFORM(QT))
 typedef struct HWND__* HWND;
 typedef HWND PlatformPluginWidget;
 #else
@@ -72,13 +72,11 @@ QT_END_NAMESPACE
 typedef struct _GtkSocket GtkSocket;
 #endif
 
-#if USE(JSC)
 namespace JSC {
     namespace Bindings {
         class Instance;
     }
 }
-#endif
 
 namespace WebCore {
     class Frame;
@@ -153,9 +151,7 @@ namespace WebCore {
 #if ENABLE(NETSCAPE_PLUGIN_API)
         NPObject* npObject();
 #endif
-#if USE(JSC)
         PassRefPtr<JSC::Bindings::Instance> bindingInstance();
-#endif
 
         PluginStatus status() const { return m_status; }
 
@@ -207,6 +203,7 @@ namespace WebCore {
         virtual void show();
         virtual void hide();
         virtual void paint(GraphicsContext*, const IntRect&);
+        virtual void clipRectChanged() OVERRIDE;
 
         // This method is used by plugins on all platforms to obtain a clip rect that includes clips set by WebCore,
         // e.g., in overflow:auto sections.  The clip rects coordinates are in the containing window's coordinate space.
@@ -217,7 +214,7 @@ namespace WebCore {
         virtual void setParent(ScrollView*);
         virtual void setParentVisible(bool);
 
-        virtual bool isPluginView() const { return true; }
+        virtual bool isPluginView() const OVERRIDE { return true; }
 
         Frame* parentFrame() const { return m_parentFrame.get(); }
 
@@ -308,7 +305,7 @@ namespace WebCore {
         Vector<IntRect> m_invalidRects;
 
         void performRequest(PluginRequest*);
-        void scheduleRequest(PluginRequest*);
+        void scheduleRequest(PassOwnPtr<PluginRequest>);
         void requestTimerFired(Timer<PluginView>*);
         void invalidateTimerFired(Timer<PluginView>*);
         Timer<PluginView> m_requestTimer;
@@ -366,7 +363,7 @@ namespace WebCore {
         Vector<bool, 4> m_popupStateStack;
 
         HashSet<RefPtr<PluginStream> > m_streams;
-        Vector<PluginRequest*> m_requests;
+        Vector<OwnPtr<PluginRequest> > m_requests;
 
         bool m_isWindowed;
         bool m_isTransparent;
@@ -386,7 +383,7 @@ namespace WebCore {
         bool m_haveUpdatedPluginWidget;
 #endif
 
-#if ((PLATFORM(GTK) || PLATFORM(QT) || PLATFORM(WX)) && OS(WINDOWS)) || PLATFORM(EFL)
+#if ((PLATFORM(GTK) || PLATFORM(QT)) && OS(WINDOWS)) || PLATFORM(EFL)
         // On Mac OSX and Qt/Windows the plugin does not have its own native widget,
         // but is using the containing window as its reference for positioning/painting.
         PlatformPluginWidget m_window;
@@ -453,6 +450,21 @@ private:
 
         static PluginView* s_currentPluginView;
     };
+
+inline PluginView* toPluginView(Widget* widget)
+{
+    ASSERT(!widget || widget->isPluginView());
+    return static_cast<PluginView*>(widget);
+}
+
+inline const PluginView* toPluginView(const Widget* widget)
+{
+    ASSERT(!widget || widget->isPluginView());
+    return static_cast<const PluginView*>(widget);
+}
+
+// This will catch anyone doing an unnecessary cast.
+void toPluginView(const PluginView*);
 
 } // namespace WebCore
 

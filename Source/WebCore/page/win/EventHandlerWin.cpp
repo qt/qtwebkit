@@ -27,6 +27,8 @@
 #include "config.h"
 #include "EventHandler.h"
 
+#include "COMPtr.h"
+#include "Clipboard.h"
 #include "Cursor.h"
 #include "FloatPoint.h"
 #include "FocusController.h"
@@ -42,12 +44,6 @@
 #include "Scrollbar.h"
 #include "WCDataObject.h"
 #include "NotImplemented.h"
-
-#if OS(WINCE)
-#include "Clipboard.h"
-#else
-#include "ClipboardWin.h"
-#endif
 
 namespace WebCore {
 
@@ -82,7 +78,7 @@ bool EventHandler::passWheelEventToWidget(const PlatformWheelEvent& wheelEvent, 
     if (!widget->isFrameView())
         return false;
 
-    return static_cast<FrameView*>(widget)->frame()->eventHandler()->handleWheelEvent(wheelEvent);
+    return toFrameView(widget)->frame()->eventHandler()->handleWheelEvent(wheelEvent);
 }
 
 bool EventHandler::tabsToAllFormControls(KeyboardEvent*) const
@@ -101,9 +97,7 @@ PassRefPtr<Clipboard> EventHandler::createDraggingClipboard() const
 #if OS(WINCE)
     return 0;
 #else
-    COMPtr<WCDataObject> dataObject;
-    WCDataObject::createInstance(&dataObject);
-    return ClipboardWin::create(Clipboard::DragAndDrop, dataObject.get(), ClipboardWritable, m_frame);
+    return Clipboard::createForDragAndDrop();
 #endif
 }
 #endif

@@ -30,10 +30,11 @@
  */
 
 [
+    GlobalContext=DOMWindow&WorkerGlobalScope,
     Conditional=BLOB,
     ActiveDOMObject,
     Constructor,
-    CallWith=ScriptExecutionContext,
+    ConstructorCallWith=ScriptExecutionContext,
     EventTarget,
     JSNoStaticTables
 ] interface FileReader {
@@ -44,31 +45,26 @@
     readonly attribute unsigned short readyState;
 
     // async read methods
-    void readAsArrayBuffer(in Blob blob)
-        raises(DOMException);
-    void readAsBinaryString(in Blob blob)
-        raises(DOMException);
-    void readAsText(in Blob blob, in [Optional] DOMString encoding)
-        raises(DOMException);
-    void readAsDataURL(in Blob blob)
-        raises(DOMException);
+    [RaisesException] void readAsArrayBuffer(Blob blob);
+    [RaisesException] void readAsBinaryString(Blob blob);
+    [RaisesException] void readAsText(Blob blob, optional DOMString encoding);
+    [RaisesException] void readAsDataURL(Blob blob);
 
     void abort();
 
     // file data
-    [Custom] readonly attribute DOMObject result;
+    [Custom] readonly attribute any result;
 
     readonly attribute FileError error;
 
     // EventTarget interface
-    void addEventListener(in DOMString type,
-                          in EventListener listener,
-                          in [Optional] boolean useCapture);
-    void removeEventListener(in DOMString type,
-                             in EventListener listener,
-                             in [Optional] boolean useCapture);
-    boolean dispatchEvent(in Event evt)
-        raises(EventException);
+    void addEventListener(DOMString type,
+                          EventListener listener,
+                          optional boolean useCapture);
+    void removeEventListener(DOMString type,
+                             EventListener listener,
+                             optional boolean useCapture);
+    [RaisesException] boolean dispatchEvent(Event evt);
 
     attribute EventListener onloadstart;
     attribute EventListener onprogress;

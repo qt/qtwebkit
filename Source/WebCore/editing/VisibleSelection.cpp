@@ -28,11 +28,11 @@
 
 #include "Document.h"
 #include "Element.h"
-#include "htmlediting.h"
+#include "Range.h"
 #include "TextIterator.h"
 #include "VisiblePosition.h"
-#include "visible_units.h"
-#include "Range.h"
+#include "VisibleUnits.h"
+#include "htmlediting.h"
 #include <stdio.h>
 #include <wtf/Assertions.h>
 #include <wtf/text/CString.h>
@@ -207,7 +207,7 @@ static PassRefPtr<Range> makeSearchRange(const Position& pos)
     Node* de = d->documentElement();
     if (!de)
         return 0;
-    Node* boundary = n->enclosingBlockFlowElement();
+    Element* boundary = deprecatedEnclosingBlockFlowElement(n);
     if (!boundary)
         return 0;
 

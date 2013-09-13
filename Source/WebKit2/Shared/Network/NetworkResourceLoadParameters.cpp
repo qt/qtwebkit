@@ -27,6 +27,9 @@
 #include "NetworkResourceLoadParameters.h"
 
 #include "ArgumentCoders.h"
+#include "DataReference.h"
+#include "DecoderAdapter.h"
+#include "EncoderAdapter.h"
 #include "WebCoreArgumentCoders.h"
 
 #if ENABLE(NETWORK_PROCESS)
@@ -35,37 +38,114 @@ using namespace WebCore;
 
 namespace WebKit {
 NetworkResourceLoadParameters::NetworkResourceLoadParameters()
-    : m_priority(ResourceLoadPriorityVeryLow)
-    , m_contentSniffingPolicy(SniffContent)
-    , m_allowStoredCredentials(DoNotAllowStoredCredentials)
-{
-}
-
-NetworkResourceLoadParameters::NetworkResourceLoadParameters(const ResourceRequest& request, ResourceLoadPriority priority, ContentSniffingPolicy contentSniffingPolicy, StoredCredentials allowStoredCredentials)
-    : m_request(request)
-    , m_priority(priority)
-    , m_contentSniffingPolicy(contentSniffingPolicy)
-    , m_allowStoredCredentials(allowStoredCredentials)
+    : identifier(0)
+    , webPageID(0)
+    , webFrameID(0)
+    , priority(ResourceLoadPriorityVeryLow)
+    , contentSniffingPolicy(SniffContent)
+    , allowStoredCredentials(DoNotAllowStoredCredentials)
+    , clientCredentialPolicy(DoNotAskClientForAnyCredentials)
+    , inPrivateBrowsingMode(false)
+    , shouldClearReferrerOnHTTPSToHTTPRedirect(true)
+    , isMainResource(false)
 {
 }
 
 void NetworkResourceLoadParameters::encode(CoreIPC::ArgumentEncoder& encoder) const
 {
-    encoder.encode(m_request);
-    encoder.encodeEnum(m_priority);
-    encoder.encodeEnum(m_contentSniffingPolicy);
-    encoder.encodeEnum(m_allowStoredCredentials);
+    encoder << identifier;
+    encoder << webPageID;
+    encoder << webFrameID;
+    encoder << request;
+
+    encoder << static_cast<bool>(request.httpBody());
+    if (request.httpBody()) {
+        EncoderAdapter httpBodyEncoderAdapter;
+        request.httpBody()->encode(httpBodyEncoderAdapter);
+        encoder << httpBodyEncoderAdapter.dataReference();
+
+        const Vector<FormDataElement>& elements = request.httpBody()->elements();
+        size_t fileCount = 0;
+        for (size_t i = 0, count = elements.size(); i < count; ++i) {
+            if (elements[i].m_type == FormDataElement::encodedFile)
+                ++fileCount;
+        }
+
+        SandboxExtension::HandleArray requestBodySandboxExtensions;
+        requestBodySandboxExtensions.allocate(fileCount);
+        size_t extensionIndex = 0;
+        for (size_t i = 0, count = elements.size(); i < count; ++i) {
+            const FormDataElement& element = elements[i];
+            if (element.m_type == FormDataElement::encodedFile) {
+                const String& path = element.m_shouldGenerateFile ? element.m_generatedFilename : element.m_filename;
+                SandboxExtension::createHandle(path, SandboxExtension::ReadOnly, requestBodySandboxExtensions[extensionIndex++]);
+            }
+        }
+        encoder << requestBodySandboxExtensions;
+    }
+
+    if (request.url().isLocalFile()) {
+        SandboxExtension::Handle requestSandboxExtension;
+        SandboxExtension::createHandle(request.url().fileSystemPath(), SandboxExtension::ReadOnly, requestSandboxExtension);
+        encoder << requestSandboxExtension;
+    }
+
+    encoder.encodeEnum(priority);
+    encoder.encodeEnum(contentSniffingPolicy);
+    encoder.encodeEnum(allowStoredCredentials);
+    encoder.encodeEnum(clientCredentialPolicy);
+    encoder << inPrivateBrowsingMode;
+    encoder << shouldClearReferrerOnHTTPSToHTTPRedirect;
+    encoder << isMainResource;
 }
 
-bool NetworkResourceLoadParameters::decode(CoreIPC::ArgumentDecoder* decoder, NetworkResourceLoadParameters& result)
+bool NetworkResourceLoadParameters::decode(CoreIPC::ArgumentDecoder& decoder, NetworkResourceLoadParameters& result)
 {
-    if (!decoder->decode(result.m_request))
+    if (!decoder.decode(result.identifier))
         return false;
-    if (!decoder->decodeEnum(result.m_priority))
+
+    if (!decoder.decode(result.webPageID))
         return false;
-    if (!decoder->decodeEnum(result.m_contentSniffingPolicy))
+
+    if (!decoder.decode(result.webFrameID))
         return false;
-    if (!decoder->decodeEnum(result.m_allowStoredCredentials))
+
+    if (!decoder.decode(result.request))
+        return false;
+
+    bool hasHTTPBody;
+    if (!decoder.decode(hasHTTPBody))
+        return false;
+
+    if (hasHTTPBody) {
+        CoreIPC::DataReference formData;
+        if (!decoder.decode(formData))
+            return false;
+        DecoderAdapter httpBodyDecoderAdapter(formData.data(), formData.size());
+        result.request.setHTTPBody(FormData::decode(httpBodyDecoderAdapter));
+
+        if (!decoder.decode(result.requestBodySandboxExtensions))
+            return false;
+    }
+
+    if (result.request.url().isLocalFile()) {
+        if (!decoder.decode(result.resourceSandboxExtension))
+            return false;
+    }
+
+    if (!decoder.decodeEnum(result.priority))
+        return false;
+    if (!decoder.decodeEnum(result.contentSniffingPolicy))
+        return false;
+    if (!decoder.decodeEnum(result.allowStoredCredentials))
+        return false;
+    if (!decoder.decodeEnum(result.clientCredentialPolicy))
+        return false;
+    if (!decoder.decode(result.inPrivateBrowsingMode))
+        return false;
+    if (!decoder.decode(result.shouldClearReferrerOnHTTPSToHTTPRedirect))
+        return false;
+    if (!decoder.decode(result.isMainResource))
         return false;
 
     return true;

@@ -38,6 +38,7 @@
 #include "Page.h"
 #include "PaintInfo.h"
 #include "RenderView.h"
+#include <wtf/StackStats.h>
 
 #if ENABLE(FULLSCREEN_API)
 #include "RenderFullScreen.h"
@@ -229,8 +230,7 @@ void RenderVideo::layout()
     
 HTMLVideoElement* RenderVideo::videoElement() const
 {
-    ASSERT(node()->hasTagName(videoTag));
-    return static_cast<HTMLVideoElement*>(node()); 
+    return toHTMLVideoElement(node()); 
 }
 
 void RenderVideo::updateFromElement()
@@ -262,9 +262,9 @@ void RenderVideo::updatePlayer()
     mediaPlayer->setVisible(true);
 }
 
-LayoutUnit RenderVideo::computeReplacedLogicalWidth(bool includeMaxWidth) const
+LayoutUnit RenderVideo::computeReplacedLogicalWidth(ShouldComputePreferred shouldComputePreferred) const
 {
-    return RenderReplaced::computeReplacedLogicalWidth(includeMaxWidth);
+    return RenderReplaced::computeReplacedLogicalWidth(shouldComputePreferred);
 }
 
 LayoutUnit RenderVideo::computeReplacedLogicalHeight() const
@@ -337,6 +337,14 @@ LayoutUnit RenderVideo::offsetHeight() const
     return RenderMedia::offsetHeight();
 }
 #endif
+
+bool RenderVideo::foregroundIsKnownToBeOpaqueInRect(const LayoutRect& localRect, unsigned maxDepthToTest) const
+{
+    if (videoElement()->shouldDisplayPosterImage())
+        return RenderImage::foregroundIsKnownToBeOpaqueInRect(localRect, maxDepthToTest);
+
+    return videoBox().contains(enclosingIntRect(localRect));
+}
 
 } // namespace WebCore
 

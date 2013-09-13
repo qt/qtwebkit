@@ -28,16 +28,17 @@
 
 #if ENABLE(JIT) || ENABLE(LLINT)
 #include "CallFrame.h"
-#include "JSValue.h"
 #include "Disassembler.h"
+#include "JITStubs.h"
+#include "JSCJSValue.h"
+#include "LegacyProfiler.h"
 #include "MacroAssemblerCodeRef.h"
-#include "Profiler.h"
 #endif
 
 namespace JSC {
 
 #if ENABLE(JIT)
-    class JSGlobalData;
+    class VM;
     class JSStack;
 #endif
     
@@ -129,10 +130,10 @@ namespace JSC {
 
 #if ENABLE(JIT)
         // Execute the code!
-        inline JSValue execute(JSStack* stack, CallFrame* callFrame, JSGlobalData* globalData)
+        inline JSValue execute(JSStack* stack, CallFrame* callFrame, VM* vm)
         {
-            JSValue result = JSValue::decode(ctiTrampoline(m_ref.code().executableAddress(), stack, callFrame, 0, 0, globalData));
-            return globalData->exception ? jsNull() : result;
+            JSValue result = JSValue::decode(ctiTrampoline(m_ref.code().executableAddress(), stack, callFrame, 0, 0, vm));
+            return vm->exception ? jsNull() : result;
         }
 #endif
 

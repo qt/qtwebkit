@@ -31,30 +31,37 @@
 #include "IDBBackingStore.h"
 #include "IDBCursorBackendImpl.h"
 #include "IDBDatabaseBackendImpl.h"
+#include "IDBDatabaseCallbacks.h"
 #include "IDBDatabaseException.h"
-#include "IDBObjectStoreBackendImpl.h"
 #include "IDBTracing.h"
 #include "IDBTransactionCoordinator.h"
-#include "ScriptExecutionContext.h"
 
 namespace WebCore {
 
-PassRefPtr<IDBTransactionBackendImpl> IDBTransactionBackendImpl::create(int64_t id, const Vector<int64_t>& objectStoreIds, unsigned short mode, IDBDatabaseBackendImpl* database)
+PassRefPtr<IDBTransactionBackendImpl> IDBTransactionBackendImpl::create(int64_t id, PassRefPtr<IDBDatabaseCallbacks> callbacks, const Vector<int64_t>& objectStoreIds, IndexedDB::TransactionMode mode, IDBDatabaseBackendImpl* database)
 {
-    return adoptRef(new IDBTransactionBackendImpl(id, objectStoreIds, mode, database));
+    HashSet<int64_t> objectStoreHashSet;
+    for (size_t i = 0; i < objectStoreIds.size(); ++i)
+        objectStoreHashSet.add(objectStoreIds[i]);
+
+    return adoptRef(new IDBTransactionBackendImpl(id, callbacks, objectStoreHashSet, mode, database));
 }
 
-IDBTransactionBackendImpl::IDBTransactionBackendImpl(int64_t id, const Vector<int64_t>& objectStoreIds, unsigned short mode, IDBDatabaseBackendImpl* database)
+IDBTransactionBackendImpl::IDBTransactionBackendImpl(int64_t id, PassRefPtr<IDBDatabaseCallbacks> callbacks, const HashSet<int64_t>& objectStoreIds, IndexedDB::TransactionMode mode, IDBDatabaseBackendImpl* database)
     : m_id(id)
     , m_objectStoreIds(objectStoreIds)
     , m_mode(mode)
     , m_state(Unused)
     , m_commitPending(false)
+    , m_callbacks(callbacks)
     , m_database(database)
     , m_transaction(database->backingStore().get())
     , m_taskTimer(this, &IDBTransactionBackendImpl::taskTimerFired)
     , m_pendingPreemptiveEvents(0)
 {
+    // We pass a reference of this object before it can be adopted.
+    relaxAdoptionRequirement();
+
     m_database->transactionCoordinator()->didCreateTransaction(this);
 }
 
@@ -64,24 +71,12 @@ IDBTransactionBackendImpl::~IDBTransactionBackendImpl()
     ASSERT(m_state == Finished);
 }
 
-PassRefPtr<IDBObjectStoreBackendInterface> IDBTransactionBackendImpl::objectStore(int64_t id, ExceptionCode& ec)
-{
-    if (m_state == Finished) {
-        ec = IDBDatabaseException::IDB_INVALID_STATE_ERR;
-        return 0;
-    }
-
-    RefPtr<IDBObjectStoreBackendImpl> objectStore = m_database->objectStore(id);
-    ASSERT(objectStore);
-    return objectStore.release();
-}
-
-bool IDBTransactionBackendImpl::scheduleTask(TaskType type, PassOwnPtr<ScriptExecutionContext::Task> task, PassOwnPtr<ScriptExecutionContext::Task> abortTask)
+void IDBTransactionBackendImpl::scheduleTask(IDBDatabaseBackendInterface::TaskType type, PassOwnPtr<Operation> task, PassOwnPtr<Operation> abortTask)
 {
     if (m_state == Finished)
-        return false;
+        return;
 
-    if (type == NormalTask)
+    if (type == IDBDatabaseBackendInterface::NormalTask)
         m_taskQueue.append(task);
     else
         m_preemptiveTaskQueue.append(task);
@@ -93,13 +88,11 @@ bool IDBTransactionBackendImpl::scheduleTask(TaskType type, PassOwnPtr<ScriptExe
         start();
     else if (m_state == Running && !m_taskTimer.isActive())
         m_taskTimer.startOneShot(0);
-
-    return true;
 }
 
 void IDBTransactionBackendImpl::abort()
 {
-    abort(IDBDatabaseError::create(IDBDatabaseException::UNKNOWN_ERR, "Internal error."));
+    abort(IDBDatabaseError::create(IDBDatabaseException::UnknownError, "Internal error (unknown cause)"));
 }
 
 void IDBTransactionBackendImpl::abort(PassRefPtr<IDBDatabaseError> error)
@@ -123,8 +116,8 @@ void IDBTransactionBackendImpl::abort(PassRefPtr<IDBDatabaseError> error)
 
     // Run the abort tasks, if any.
     while (!m_abortTaskQueue.isEmpty()) {
-        OwnPtr<ScriptExecutionContext::Task> task(m_abortTaskQueue.takeFirst());
-        task->performTask(0);
+        OwnPtr<Operation> task(m_abortTaskQueue.takeFirst());
+        task->perform(0);
     }
 
     // Backing store resources (held via cursors) must be released before script callbacks
@@ -140,7 +133,7 @@ void IDBTransactionBackendImpl::abort(PassRefPtr<IDBDatabaseError> error)
     m_database->transactionFinished(this);
 
     if (m_callbacks)
-        m_callbacks->onAbort(error);
+        m_callbacks->onAbort(m_id, error);
 
     m_database->transactionFinishedAndAbortFired(this);
 
@@ -226,10 +219,10 @@ void IDBTransactionBackendImpl::commit()
     m_database->transactionFinished(this);
 
     if (committed) {
-        m_callbacks->onComplete();
+        m_callbacks->onComplete(m_id);
         m_database->transactionFinishedAndCompleteFired(this);
     } else {
-        m_callbacks->onAbort(IDBDatabaseError::create(IDBDatabaseException::UNKNOWN_ERR, "Internal error."));
+        m_callbacks->onAbort(m_id, IDBDatabaseError::create(IDBDatabaseException::UnknownError, "Internal error committing transaction."));
         m_database->transactionFinishedAndAbortFired(this);
     }
 
@@ -254,8 +247,8 @@ void IDBTransactionBackendImpl::taskTimerFired(Timer<IDBTransactionBackendImpl>*
     TaskQueue* taskQueue = m_pendingPreemptiveEvents ? &m_preemptiveTaskQueue : &m_taskQueue;
     while (!taskQueue->isEmpty() && m_state != Finished) {
         ASSERT(m_state == Running);
-        OwnPtr<ScriptExecutionContext::Task> task(taskQueue->takeFirst());
-        task->performTask(0);
+        OwnPtr<Operation> task(taskQueue->takeFirst());
+        task->perform(this);
 
         // Event itself may change which queue should be processed next.
         taskQueue = m_pendingPreemptiveEvents ? &m_preemptiveTaskQueue : &m_taskQueue;

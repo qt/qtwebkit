@@ -155,7 +155,7 @@ class WTFStringPrinter(StringPrinter):
 class JSCIdentifierPrinter(StringPrinter):
     "Print a JSC::Identifier"
     def to_string(self):
-        return WTFStringImplPrinter(self.val['m_string']).to_string()
+        return WTFStringPrinter(self.val['m_string']).to_string()
 
 
 class JSCJSStringPrinter(StringPrinter):
@@ -261,12 +261,12 @@ class WTFVectorPrinter:
         self.val = val
 
     def children(self):
-        start = self.val['m_buffer']['m_buffer']
+        start = self.val['m_buffer']
         return self.Iterator(start, start + self.val['m_size'])
 
     def to_string(self):
         return ('%s of length %d, capacity %d'
-                % ('WTF::Vector', self.val['m_size'], self.val['m_buffer']['m_capacity']))
+                % ('WTF::Vector', self.val['m_size'], self.val['m_capacity']))
 
     def display_hint(self):
         return 'array'

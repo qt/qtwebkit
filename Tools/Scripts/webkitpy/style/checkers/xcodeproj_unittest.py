@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-#
 # Copyright (C) 2011 Google Inc. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -26,7 +24,7 @@
 """Unit test for xcodeproj.py."""
 
 import xcodeproj
-import unittest
+import unittest2 as unittest
 
 
 class TestErrorHandler(object):
@@ -69,6 +67,3 @@ class XcodeProjectFileCheckerTest(unittest.TestCase):
         self.assert_error([''], 'Missing "developmentRegion = English".')
         self.assert_error(['developmentRegion = Japanese;'],
                           'developmentRegion is not English.')
-
-if __name__ == '__main__':
-    unittest.main()

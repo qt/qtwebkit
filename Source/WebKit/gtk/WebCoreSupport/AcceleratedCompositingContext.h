@@ -34,6 +34,7 @@
 #if USE(TEXTURE_MAPPER_GL)
 #include "GLContext.h"
 #include "RedirectedXCompositeWindow.h"
+#include "TextureMapperFPSCounter.h"
 #endif
 
 #if USE(ACCELERATED_COMPOSITING)
@@ -74,10 +75,7 @@ private:
     WebKitWebView* m_webView;
     unsigned int m_layerFlushTimerCallbackId;
 
-#if USE(CLUTTER)
-    WebCore::GraphicsLayer* m_rootGraphicsLayer;
-    GtkWidget* m_rootLayerEmbedder;
-#elif USE(TEXTURE_MAPPER_GL)
+#if USE(TEXTURE_MAPPER_GL)
     OwnPtr<WebCore::RedirectedXCompositeWindow> m_redirectedWindow;
     OwnPtr<WebCore::GraphicsLayer> m_rootLayer;
     OwnPtr<WebCore::GraphicsLayer> m_nonCompositedContentLayer;
@@ -85,6 +83,7 @@ private:
     double m_lastFlushTime;
     double m_redrawPendingTime;
     bool m_needsExtraFlush;
+    WebCore::TextureMapperFPSCounter m_fpsCounter;
 
     void layerFlushTimerFired();
     void stopAnyPendingLayerFlush();

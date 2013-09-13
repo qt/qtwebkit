@@ -27,8 +27,6 @@
 #include "ResourceError.h"
 
 #include "LocalizedStrings.h"
-#define LIBSOUP_USE_UNSTABLE_REQUEST_API
-#include <libsoup/soup-request.h>
 #include <libsoup/soup.h>
 #include <wtf/gobject/GOwnPtr.h>
 #include <wtf/text/CString.h>
@@ -48,12 +46,19 @@ static String failingURI(SoupRequest* request)
     return failingURI(soup_request_get_uri(request));
 }
 
+ResourceError ResourceError::transportError(SoupRequest* request, int statusCode, const String& reasonPhrase)
+{
+    return ResourceError(g_quark_to_string(SOUP_HTTP_ERROR), statusCode,
+        failingURI(request), reasonPhrase);
+}
+
 ResourceError ResourceError::httpError(SoupMessage* message, GError* error, SoupRequest* request)
 {
-    if (!message || !SOUP_STATUS_IS_TRANSPORT_ERROR(message->status_code))
-        return genericIOError(error, request);
-    return ResourceError(g_quark_to_string(SOUP_HTTP_ERROR), message->status_code,
-        failingURI(request), String::fromUTF8(message->reason_phrase));
+    if (message && SOUP_STATUS_IS_TRANSPORT_ERROR(message->status_code))
+        return transportError(request, message->status_code,
+            String::fromUTF8(message->reason_phrase));
+    else
+        return genericGError(error, request);
 }
 
 ResourceError ResourceError::authenticationError(SoupMessage* message)
@@ -63,16 +68,19 @@ ResourceError ResourceError::authenticationError(SoupMessage* message)
         failingURI(soup_message_get_uri(message)), String::fromUTF8(message->reason_phrase));
 }
 
-ResourceError ResourceError::genericIOError(GError* error, SoupRequest* request)
+ResourceError ResourceError::genericGError(GError* error, SoupRequest* request)
 {
-    return ResourceError(g_quark_to_string(G_IO_ERROR), error->code,
+    return ResourceError(g_quark_to_string(error->domain), error->code,
         failingURI(request), String::fromUTF8(error->message));
 }
 
-ResourceError ResourceError::tlsError(SoupRequest* request, unsigned /* tlsErrors */, GTlsCertificate*)
+ResourceError ResourceError::tlsError(SoupRequest* request, unsigned tlsErrors, GTlsCertificate* certificate)
 {
-    return ResourceError(g_quark_to_string(SOUP_HTTP_ERROR), SOUP_STATUS_SSL_FAILED,
+    ResourceError resourceError(g_quark_to_string(SOUP_HTTP_ERROR), SOUP_STATUS_SSL_FAILED,
         failingURI(request), unacceptableTLSCertificate());
+    resourceError.setTLSErrors(tlsErrors);
+    resourceError.setCertificate(certificate);
+    return resourceError;
 }
 
 ResourceError ResourceError::timeoutError(const String& failingURL)
@@ -86,6 +94,17 @@ ResourceError ResourceError::timeoutError(const String& failingURL)
     ResourceError error = ResourceError(errorDomain, timeoutError, failingURL, "Request timed out");
     error.setIsTimeout(true);
     return error;
+}
+
+void ResourceError::platformCopy(ResourceError& errorCopy) const
+{
+    errorCopy.m_certificate = m_certificate;
+    errorCopy.m_tlsErrors = m_tlsErrors;
+}
+
+bool ResourceError::platformCompare(const ResourceError& a, const ResourceError& b)
+{
+    return a.tlsErrors() == b.tlsErrors();
 }
 
 } // namespace WebCore

@@ -26,10 +26,9 @@
 #ifndef JSClassRef_h
 #define JSClassRef_h
 
-#include "JSObjectRef.h"
+#include <JavaScriptCore/JSObjectRef.h>
 
 #include "Weak.h"
-#include "JSObject.h"
 #include "Protect.h"
 #include <wtf/HashMap.h>
 #include <wtf/text/WTFString.h>
@@ -69,14 +68,14 @@ struct OpaqueJSClass;
 struct OpaqueJSClassContextData {
     WTF_MAKE_NONCOPYABLE(OpaqueJSClassContextData); WTF_MAKE_FAST_ALLOCATED;
 public:
-    OpaqueJSClassContextData(JSC::JSGlobalData&, OpaqueJSClass*);
+    OpaqueJSClassContextData(JSC::VM&, OpaqueJSClass*);
 
     // It is necessary to keep OpaqueJSClass alive because of the following rare scenario:
-    // 1. A class is created and used, so its context data is stored in JSGlobalData hash map.
+    // 1. A class is created and used, so its context data is stored in VM hash map.
     // 2. The class is released, and when all JS objects that use it are collected, OpaqueJSClass
     // is deleted (that's the part prevented by this RefPtr).
     // 3. Another class is created at the same address.
-    // 4. When it is used, the old context data is found in JSGlobalData and used.
+    // 4. When it is used, the old context data is found in VM and used.
     RefPtr<OpaqueJSClass> m_class;
 
     OwnPtr<OpaqueJSClassStaticValuesTable> staticValues;
@@ -87,7 +86,7 @@ public:
 struct OpaqueJSClass : public ThreadSafeRefCounted<OpaqueJSClass> {
     static PassRefPtr<OpaqueJSClass> create(const JSClassDefinition*);
     static PassRefPtr<OpaqueJSClass> createNoAutomaticPrototype(const JSClassDefinition*);
-    ~OpaqueJSClass();
+    JS_EXPORT_PRIVATE ~OpaqueJSClass();
     
     String className();
     OpaqueJSClassStaticValuesTable* staticValues(JSC::ExecState*);

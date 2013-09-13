@@ -30,13 +30,12 @@
 #include "ContentSecurityPolicy.h"
 #include "HTMLParserIdioms.h"
 #include "SecurityOrigin.h"
-#include "WebCoreMemoryInstrumentation.h"
 #include <wtf/text/StringBuilder.h>
 
 namespace WebCore {
 
 SecurityContext::SecurityContext()
-    : m_mayDisplaySeamlessWithParent(false)
+    : m_mayDisplaySeamlesslyWithParent(false)
     , m_haveInitializedSecurityOrigin(false)
     , m_sandboxFlags(SandboxNone)
 {
@@ -74,15 +73,8 @@ void SecurityContext::enforceSandboxFlags(SandboxFlags mask)
     m_sandboxFlags |= mask;
 
     // The SandboxOrigin is stored redundantly in the security origin.
-    if (isSandboxed(SandboxOrigin) && securityOrigin() && !securityOrigin()->isUnique()) {
+    if (isSandboxed(SandboxOrigin) && securityOrigin() && !securityOrigin()->isUnique())
         setSecurityOrigin(SecurityOrigin::createUnique());
-        didUpdateSecurityOrigin();
-    }
-}
-
-void SecurityContext::didUpdateSecurityOrigin()
-{
-    // Subclasses can override this function if the need to do extra work when the security origin changes.
 }
 
 SandboxFlags SecurityContext::parseSandboxPolicy(const String& policy, String& invalidTokensErrorMessage)
@@ -90,18 +82,17 @@ SandboxFlags SecurityContext::parseSandboxPolicy(const String& policy, String& i
     // http://www.w3.org/TR/html5/the-iframe-element.html#attr-iframe-sandbox
     // Parse the unordered set of unique space-separated tokens.
     SandboxFlags flags = SandboxAll;
-    const UChar* characters = policy.characters();
     unsigned length = policy.length();
     unsigned start = 0;
     unsigned numberOfTokenErrors = 0;
     StringBuilder tokenErrors;
     while (true) {
-        while (start < length && isHTMLSpace(characters[start]))
+        while (start < length && isHTMLSpace(policy[start]))
             ++start;
         if (start >= length)
             break;
         unsigned end = start + 1;
-        while (end < length && !isHTMLSpace(characters[end]))
+        while (end < length && !isHTMLSpace(policy[end]))
             ++end;
 
         // Turn off the corresponding sandbox flag if it's set as "allowed".
@@ -141,13 +132,6 @@ SandboxFlags SecurityContext::parseSandboxPolicy(const String& policy, String& i
     }
 
     return flags;
-}
-
-void SecurityContext::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::DOM);
-    info.addMember(m_securityOrigin);
-    info.addMember(m_contentSecurityPolicy);
 }
 
 }

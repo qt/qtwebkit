@@ -126,7 +126,7 @@ void SVGTextRunRenderingContext::drawSVGGlyphs(GraphicsContext* context, const T
         if (!glyph)
             continue;
 
-        float advance = glyphBuffer.advanceAt(from + i);
+        float advance = glyphBuffer.advanceAt(from + i).width();
         SVGGlyph svgGlyph = fontElement->svgGlyphForGlyph(glyph);
         ASSERT(!svgGlyph.isPartOfLigature);
         ASSERT(svgGlyph.tableEntry == glyph);
@@ -174,7 +174,7 @@ GlyphData SVGTextRunRenderingContext::glyphDataForCharacter(const Font& font, co
     const SimpleFontData* primaryFont = font.primaryFont();
     ASSERT(primaryFont);
 
-    pair<GlyphData, GlyphPage*> pair = font.glyphDataAndPageForCharacter(character, mirror);
+    pair<GlyphData, GlyphPage*> pair = font.glyphDataAndPageForCharacter(character, mirror, AutoVariant);
     GlyphData glyphData = pair.first;
 
     // Check if we have the missing glyph data, in which case we can just return.
@@ -186,9 +186,9 @@ GlyphData SVGTextRunRenderingContext::glyphDataForCharacter(const Font& font, co
 
     // Save data fromt he font fallback list because we may modify it later. Do this before the
     // potential change to glyphData.fontData below.
-    FontFallbackList* fontList = font.fontList();
-    ASSERT(fontList);
-    FontFallbackList::GlyphPagesStateSaver glyphPagesSaver(*fontList);
+    FontGlyphs* glyph = font.glyphs();
+    ASSERT(glyph);
+    FontGlyphs::GlyphPagesStateSaver glyphPagesSaver(*glyph);
 
     // Characters enclosed by an <altGlyph> element, may not be registered in the GlyphPage.
     const SimpleFontData* originalFontData = glyphData.fontData;
@@ -230,7 +230,7 @@ GlyphData SVGTextRunRenderingContext::glyphDataForCharacter(const Font& font, co
     // No suitable glyph found that is compatible with the requirments (same language, arabic-form, orientation etc.)
     // Even though our GlyphPage contains an entry for eg. glyph "a", it's not compatible. So we have to temporarily
     // remove the glyph data information from the GlyphPage, and retry the lookup, which handles font fallbacks correctly.
-    page->setGlyphDataForCharacter(character, glyphData.glyph, 0);
+    page->setGlyphDataForCharacter(character, 0, 0);
 
     // Assure that the font fallback glyph selection worked, aka. the fallbackGlyphData font data is not the same as before.
     GlyphData fallbackGlyphData = font.glyphDataForCharacter(character, mirror);

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2012, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,7 +26,10 @@
 #include "config.h"
 #include "CodeOrigin.h"
 
+#include "CallFrame.h"
+#include "CodeBlock.h"
 #include "Executable.h"
+#include "Operations.h"
 
 namespace JSC {
 
@@ -50,12 +53,65 @@ Vector<CodeOrigin> CodeOrigin::inlineStack() const
     unsigned index = result.size() - 2;
     for (InlineCallFrame* current = inlineCallFrame; current; current = current->caller.inlineCallFrame)
         result[index--] = current->caller;
+    RELEASE_ASSERT(!result[0].inlineCallFrame);
     return result;
+}
+
+void CodeOrigin::dump(PrintStream& out) const
+{
+    Vector<CodeOrigin> stack = inlineStack();
+    for (unsigned i = 0; i < stack.size(); ++i) {
+        if (i)
+            out.print(" --> ");
+        
+        if (InlineCallFrame* frame = stack[i].inlineCallFrame) {
+            out.print(frame->briefFunctionInformation(), ":<", RawPointer(frame->executable.get()), "> ");
+            if (frame->isClosureCall())
+                out.print("(closure) ");
+        }
+        
+        out.print("bc#", stack[i].bytecodeIndex);
+    }
+}
+
+JSFunction* InlineCallFrame::calleeForCallFrame(ExecState* exec) const
+{
+    if (!isClosureCall())
+        return callee.get();
+    
+    return jsCast<JSFunction*>((exec + stackOffset)->callee());
 }
 
 CodeBlockHash InlineCallFrame::hash() const
 {
     return executable->hashFor(specializationKind());
+}
+
+String InlineCallFrame::inferredName() const
+{
+    return jsCast<FunctionExecutable*>(executable.get())->inferredName().string();
+}
+
+CodeBlock* InlineCallFrame::baselineCodeBlock() const
+{
+    return jsCast<FunctionExecutable*>(executable.get())->baselineCodeBlockFor(specializationKind());
+}
+
+void InlineCallFrame::dumpBriefFunctionInformation(PrintStream& out) const
+{
+    out.print(inferredName(), "#", hash());
+}
+
+void InlineCallFrame::dump(PrintStream& out) const
+{
+    out.print(briefFunctionInformation(), ":<", RawPointer(executable.get()), ", bc#", caller.bytecodeIndex, ", ", specializationKind());
+    if (callee)
+        out.print(", known callee: ", JSValue(callee.get()));
+    else
+        out.print(", closure call");
+    out.print(", numArgs+this = ", arguments.size());
+    out.print(", stack >= r", stackOffset);
+    out.print(">");
 }
 
 } // namespace JSC

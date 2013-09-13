@@ -62,12 +62,13 @@ SocketStreamHandle::SocketStreamHandle(const String& groupName, const KURL& url,
     int playerId = static_cast<FrameLoaderClientBlackBerry*>(page->mainFrame()->loader()->client())->playerId();
 
     // Create a platform socket stream
-    BlackBerry::Platform::NetworkStreamFactory* factory = page->chrome()->platformPageClient()->networkStreamFactory();
+    BlackBerry::Platform::NetworkStreamFactory* factory = page->chrome().platformPageClient()->networkStreamFactory();
     ASSERT(factory);
 
     // Open the socket
     BlackBerry::Platform::NetworkRequest request;
-    request.setRequestUrl(url.string(), "CONNECT");
+    STATIC_LOCAL_STRING(s_connect, "CONNECT");
+    request.setRequestUrl(url.string(), s_connect);
     m_socketStream = adoptPtr(factory->createNetworkStream(request, playerId));
     ASSERT(m_socketStream);
 
@@ -97,7 +98,7 @@ void SocketStreamHandle::platformClose()
 
 // FilterStream interface
 
-void SocketStreamHandle::notifyStatusReceived(int status, const BlackBerry::Platform::String& message)
+void SocketStreamHandle::notifyStatusReceived(int status, const BlackBerry::Platform::String&)
 {
     ASSERT(m_client);
 
@@ -105,7 +106,7 @@ void SocketStreamHandle::notifyStatusReceived(int status, const BlackBerry::Plat
     RefPtr<SocketStreamHandle> protect(this);
     m_status = status;
     if (FilterStream::StatusSuccess != status)
-        m_client->didFailSocketStream(this, SocketStreamError(status));
+        m_client->didFailSocketStream(this, SocketStreamError(status, message));
     else {
         m_state = Open;
         m_client->didOpenSocketStream(this);

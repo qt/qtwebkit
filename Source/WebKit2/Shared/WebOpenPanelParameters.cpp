@@ -53,7 +53,7 @@ PassRefPtr<ImmutableArray> WebOpenPanelParameters::acceptMIMETypes() const
 {
     size_t size = m_settings.acceptMIMETypes.size();
 
-    Vector<RefPtr<APIObject> > vector;
+    Vector<RefPtr<APIObject>> vector;
     vector.reserveInitialCapacity(size);
     
     for (size_t i = 0; i < size; ++i)
@@ -67,6 +67,18 @@ String WebOpenPanelParameters::capture() const
     return m_settings.capture;
 }
 #endif
+
+PassRefPtr<ImmutableArray> WebOpenPanelParameters::selectedFileNames() const
+{    
+    size_t size = m_settings.selectedFiles.size();
+
+    Vector<RefPtr<APIObject>> vector;
+    vector.reserveInitialCapacity(size);
+
+    for (size_t i = 0; i < size; ++i)
+        vector.uncheckedAppend(WebString::create(m_settings.selectedFiles[i]));
+    return ImmutableArray::adopt(vector);
+}
 
 
 } // namespace WebCore

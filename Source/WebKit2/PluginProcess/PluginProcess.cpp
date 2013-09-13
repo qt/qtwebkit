@@ -36,6 +36,7 @@
 #include "PluginProcessCreationParameters.h"
 #include "PluginProcessProxyMessages.h"
 #include "WebProcessConnection.h"
+#include <WebCore/MemoryPressureHandler.h>
 #include <WebCore/NotImplemented.h>
 #include <WebCore/RunLoop.h>
 
@@ -49,6 +50,7 @@
 #include <sys/resource.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <wtf/UniStdExtras.h>
 
 #ifdef SOCK_SEQPACKET
 #define SOCKET_TYPE SOCK_SEQPACKET
@@ -78,21 +80,27 @@ PluginProcess::PluginProcess()
     , m_compositingRenderServerPort(MACH_PORT_NULL)
 #endif
 {
+    NetscapePlugin::setSetExceptionFunction(WebProcessConnection::setGlobalException);
 }
 
 PluginProcess::~PluginProcess()
 {
 }
 
-void PluginProcess::initialize(CoreIPC::Connection::Identifier serverIdentifier, RunLoop* runLoop)
+void PluginProcess::lowMemoryHandler(bool critical)
 {
-    ASSERT(!m_connection);
+    UNUSED_PARAM(critical);
+    if (shared().shouldTerminate())
+        shared().terminate();
+}
 
-    m_connection = CoreIPC::Connection::createClientConnection(serverIdentifier, this, runLoop);
-    m_connection->setDidCloseOnConnectionWorkQueueCallback(didCloseOnConnectionWorkQueue);
-    m_connection->open();
+void PluginProcess::initializeProcess(const ChildProcessInitializationParameters& parameters)
+{
+    m_pluginPath = parameters.extraInitializationData.get("plugin-path");
+    platformInitializeProcess(parameters);
 
-    NetscapePlugin::setSetExceptionFunction(WebProcessConnection::setGlobalException);
+    memoryPressureHandler().setLowMemoryHandler(lowMemoryHandler);
+    memoryPressureHandler().install();
 }
 
 void PluginProcess::removeWebProcessConnection(WebProcessConnection* webProcessConnection)
@@ -129,14 +137,12 @@ NetscapePluginModule* PluginProcess::netscapePluginModule()
 
 bool PluginProcess::shouldTerminate()
 {
-    ASSERT(m_webProcessConnections.isEmpty());
-
-    return true;
+    return m_webProcessConnections.isEmpty();
 }
 
-void PluginProcess::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::MessageDecoder& decoder)
+void PluginProcess::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::MessageDecoder& decoder)
 {
-    didReceivePluginProcessMessage(connection, messageID, decoder);
+    didReceivePluginProcessMessage(connection, decoder);
 }
 
 void PluginProcess::didClose(CoreIPC::Connection*)
@@ -154,12 +160,11 @@ void PluginProcess::initializePluginProcess(const PluginProcessCreationParameter
 {
     ASSERT(!m_pluginModule);
 
-    m_pluginPath = parameters.pluginPath;
     m_supportsAsynchronousPluginInitialization = parameters.supportsAsynchronousPluginInitialization;
     setMinimumLifetime(parameters.minimumLifetime);
     setTerminationTimeout(parameters.terminationTimeout);
 
-    platformInitialize(parameters);
+    platformInitializePluginProcess(parameters);
 }
 
 void PluginProcess::createWebProcessConnection()
@@ -176,7 +181,7 @@ void PluginProcess::createWebProcessConnection()
     m_webProcessConnections.append(connection.release());
 
     CoreIPC::Attachment clientPort(listeningPort, MACH_MSG_TYPE_MAKE_SEND);
-    m_connection->send(Messages::PluginProcessProxy::DidCreateWebProcessConnection(clientPort, m_supportsAsynchronousPluginInitialization), 0);
+    parentProcessConnection()->send(Messages::PluginProcessProxy::DidCreateWebProcessConnection(clientPort, m_supportsAsynchronousPluginInitialization), 0);
 #elif USE(UNIX_DOMAIN_SOCKETS)
     int sockets[2];
     if (socketpair(AF_UNIX, SOCKET_TYPE, 0, sockets) == -1) {
@@ -188,8 +193,8 @@ void PluginProcess::createWebProcessConnection()
     while (fcntl(sockets[1], F_SETFD, FD_CLOEXEC)  == -1) {
         if (errno != EINTR) {
             ASSERT_NOT_REACHED();
-            while (close(sockets[0]) == -1 && errno == EINTR) { }
-            while (close(sockets[1]) == -1 && errno == EINTR) { }
+            closeWithRetry(sockets[0]);
+            closeWithRetry(sockets[1]);
             return;
         }
     }
@@ -198,8 +203,8 @@ void PluginProcess::createWebProcessConnection()
     while (fcntl(sockets[0], F_SETFD, FD_CLOEXEC) == -1) {
         if (errno != EINTR) {
             ASSERT_NOT_REACHED();
-            while (close(sockets[0]) == -1 && errno == EINTR) { }
-            while (close(sockets[1]) == -1 && errno == EINTR) { }
+            closeWithRetry(sockets[0]);
+            closeWithRetry(sockets[1]);
             return;
         }
     }
@@ -208,7 +213,7 @@ void PluginProcess::createWebProcessConnection()
     m_webProcessConnections.append(connection.release());
 
     CoreIPC::Attachment clientSocket(sockets[0]);
-    m_connection->send(Messages::PluginProcessProxy::DidCreateWebProcessConnection(clientSocket, m_supportsAsynchronousPluginInitialization), 0);
+    parentProcessConnection()->send(Messages::PluginProcessProxy::DidCreateWebProcessConnection(clientSocket, m_supportsAsynchronousPluginInitialization), 0);
 #else
     notImplemented();
 #endif
@@ -226,19 +231,15 @@ void PluginProcess::createWebProcessConnection()
 
 void PluginProcess::getSitesWithData(uint64_t callbackID)
 {
-    LocalTerminationDisabler terminationDisabler(*this);
-
     Vector<String> sites;
     if (NetscapePluginModule* module = netscapePluginModule())
         sites = module->sitesWithData();
 
-    m_connection->send(Messages::PluginProcessProxy::DidGetSitesWithData(sites, callbackID), 0);
+    parentProcessConnection()->send(Messages::PluginProcessProxy::DidGetSitesWithData(sites, callbackID), 0);
 }
 
 void PluginProcess::clearSiteData(const Vector<String>& sites, uint64_t flags, uint64_t maxAgeInSeconds, uint64_t callbackID)
 {
-    LocalTerminationDisabler terminationDisabler(*this);
-
     if (NetscapePluginModule* module = netscapePluginModule()) {
         if (sites.isEmpty()) {
             // Clear everything.
@@ -249,7 +250,7 @@ void PluginProcess::clearSiteData(const Vector<String>& sites, uint64_t flags, u
         }
     }
 
-    m_connection->send(Messages::PluginProcessProxy::DidClearSiteData(callbackID), 0);
+    parentProcessConnection()->send(Messages::PluginProcessProxy::DidClearSiteData(callbackID), 0);
 }
 
 void PluginProcess::setMinimumLifetime(double lifetime)
@@ -266,6 +267,16 @@ void PluginProcess::minimumLifetimeTimerFired()
 {
     enableTermination();
 }
+
+#if !PLATFORM(MAC)
+void PluginProcess::initializeProcessName(const ChildProcessInitializationParameters&)
+{
+}
+
+void PluginProcess::initializeSandbox(const ChildProcessInitializationParameters&, SandboxInitializationParameters&)
+{
+}
+#endif
 
 } // namespace WebKit
 

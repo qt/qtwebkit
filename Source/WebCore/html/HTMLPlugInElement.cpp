@@ -24,10 +24,13 @@
 #include "HTMLPlugInElement.h"
 
 #include "Attribute.h"
+#include "BridgeJSC.h"
 #include "Chrome.h"
 #include "ChromeClient.h"
 #include "CSSPropertyNames.h"
 #include "Document.h"
+#include "Event.h"
+#include "EventHandler.h"
 #include "Frame.h"
 #include "FrameLoader.h"
 #include "FrameTree.h"
@@ -37,9 +40,9 @@
 #include "RenderEmbeddedObject.h"
 #include "RenderSnapshottedPlugIn.h"
 #include "RenderWidget.h"
+#include "ScriptController.h"
 #include "Settings.h"
 #include "Widget.h"
-#include <wtf/UnusedParam.h>
 
 #if ENABLE(NETSCAPE_PLUGIN_API)
 #include "npruntime_impl.h"
@@ -80,7 +83,7 @@ bool HTMLPlugInElement::canProcessDrag() const
 
 bool HTMLPlugInElement::willRespondToMouseClickEvents()
 {
-    if (disabled())
+    if (isDisabledFormControl())
         return false;
     RenderObject* r = renderer();
     if (!r)
@@ -90,7 +93,7 @@ bool HTMLPlugInElement::willRespondToMouseClickEvents()
     return true;
 }
 
-void HTMLPlugInElement::detach()
+void HTMLPlugInElement::detach(const AttachContext& context)
 {
     m_instance.clear();
 
@@ -107,7 +110,7 @@ void HTMLPlugInElement::detach()
     }
 #endif
 
-    HTMLFrameOwnerElement::detach();
+    HTMLFrameOwnerElement::detach(context);
 }
 
 void HTMLPlugInElement::resetInstance()
@@ -115,7 +118,7 @@ void HTMLPlugInElement::resetInstance()
     m_instance.clear();
 }
 
-PassScriptInstance HTMLPlugInElement::getInstance()
+PassRefPtr<JSC::Bindings::Instance> HTMLPlugInElement::getInstance()
 {
     Frame* frame = document()->frame();
     if (!frame)
@@ -169,22 +172,22 @@ bool HTMLPlugInElement::isPresentationAttribute(const QualifiedName& name) const
     return HTMLFrameOwnerElement::isPresentationAttribute(name);
 }
 
-void HTMLPlugInElement::collectStyleForPresentationAttribute(const Attribute& attribute, StylePropertySet* style)
+void HTMLPlugInElement::collectStyleForPresentationAttribute(const QualifiedName& name, const AtomicString& value, MutableStylePropertySet* style)
 {
-    if (attribute.name() == widthAttr)
-        addHTMLLengthToStyle(style, CSSPropertyWidth, attribute.value());
-    else if (attribute.name() == heightAttr)
-        addHTMLLengthToStyle(style, CSSPropertyHeight, attribute.value());
-    else if (attribute.name() == vspaceAttr) {
-        addHTMLLengthToStyle(style, CSSPropertyMarginTop, attribute.value());
-        addHTMLLengthToStyle(style, CSSPropertyMarginBottom, attribute.value());
-    } else if (attribute.name() == hspaceAttr) {
-        addHTMLLengthToStyle(style, CSSPropertyMarginLeft, attribute.value());
-        addHTMLLengthToStyle(style, CSSPropertyMarginRight, attribute.value());
-    } else if (attribute.name() == alignAttr)
-        applyAlignmentAttributeToStyle(attribute, style);
+    if (name == widthAttr)
+        addHTMLLengthToStyle(style, CSSPropertyWidth, value);
+    else if (name == heightAttr)
+        addHTMLLengthToStyle(style, CSSPropertyHeight, value);
+    else if (name == vspaceAttr) {
+        addHTMLLengthToStyle(style, CSSPropertyMarginTop, value);
+        addHTMLLengthToStyle(style, CSSPropertyMarginBottom, value);
+    } else if (name == hspaceAttr) {
+        addHTMLLengthToStyle(style, CSSPropertyMarginLeft, value);
+        addHTMLLengthToStyle(style, CSSPropertyMarginRight, value);
+    } else if (name == alignAttr)
+        applyAlignmentAttributeToStyle(value, style);
     else
-        HTMLFrameOwnerElement::collectStyleForPresentationAttribute(attribute, style);
+        HTMLFrameOwnerElement::collectStyleForPresentationAttribute(name, value, style);
 }
 
 void HTMLPlugInElement::defaultEventHandler(Event* event)
@@ -197,14 +200,19 @@ void HTMLPlugInElement::defaultEventHandler(Event* event)
 
     RenderObject* r = renderer();
     if (r && r->isEmbeddedObject()) {
-        if (toRenderEmbeddedObject(r)->showsUnavailablePluginIndicator()) {
+        if (toRenderEmbeddedObject(r)->isPluginUnavailable()) {
             toRenderEmbeddedObject(r)->handleUnavailablePluginIndicatorEvent(event);
             return;
         }
-        if (r->isSnapshottedPlugIn() && displayState() < PlayingWithPendingMouseClick) {
+
+        if (r->isSnapshottedPlugIn() && displayState() < Restarting) {
             toRenderSnapshottedPlugIn(r)->handleEvent(event);
+            HTMLFrameOwnerElement::defaultEventHandler(event);
             return;
         }
+
+        if (displayState() < Playing)
+            return;
     }
 
     if (!r || !r->isWidget())
@@ -234,6 +242,16 @@ bool HTMLPlugInElement::isKeyboardFocusable(KeyboardEvent* event) const
 bool HTMLPlugInElement::isPluginElement() const
 {
     return true;
+}
+
+bool HTMLPlugInElement::supportsFocus() const
+{
+    if (HTMLFrameOwnerElement::supportsFocus())
+        return true;
+
+    if (useFallbackContent() || !renderer() || !renderer()->isEmbeddedObject())
+        return false;
+    return !toRenderEmbeddedObject(renderer())->isPluginUnavailable();
 }
 
 #if ENABLE(NETSCAPE_PLUGIN_API)

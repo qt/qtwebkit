@@ -37,9 +37,7 @@ void InitWebCoreSystemInterface(void)
     
     dispatch_once(&initOnce, ^{
         INIT(AdvanceDefaultButtonPulseAnimation);
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1070
         INIT(CALayerEnumerateRectsBeingDrawnWithBlock);
-#endif
         INIT(CopyCFLocalizationPreferredName);
         INIT(CGContextGetShouldSmoothFonts);
         INIT(CGPatternCreateWithImageAndTransform);
@@ -52,9 +50,9 @@ void InitWebCoreSystemInterface(void)
 #endif
         INIT(CopyCONNECTProxyResponse);
         INIT(CopyNSURLResponseStatusLine);
+        INIT(CopyNSURLResponseCertificateChain);
         INIT(CreateCTLineWithUniCharProvider);
         INIT(CreateCustomCFReadStream);
-        INIT(CreateNSURLConnectionDelegateProxy);
         INIT(DrawBezeledTextArea);
         INIT(DrawBezeledTextFieldCell);
         INIT(DrawCapsLockIndicator);
@@ -124,20 +122,17 @@ void InitWebCoreSystemInterface(void)
 
         INIT(SetMetadataURL);
         
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1070
         INIT(IOSurfaceContextCreate);
         INIT(IOSurfaceContextCreateImage);
         INIT(CreateCTTypesetterWithUniCharProviderAndOptions);
+        INIT(CTRunGetInitialAdvance);
         INIT(RecommendedScrollerStyle);
         INIT(ExecutableWasLinkedOnOrBeforeSnowLeopard);
         INIT(CopyDefaultSearchProviderDisplayName);
         INIT(SetCrashReportApplicationSpecificInformation);
         INIT(AVAssetResolvedURL);
         INIT(Cursor);
-#else
-        INIT(GetHyphenationLocationBeforeIndex);
-        INIT(GetNSEventMomentumPhase);
-#endif
+
 #if USE(CFNETWORK)
         INIT(GetDefaultHTTPCookieStorage);
         INIT(CopyCredentialFromCFPersistentStorage);
@@ -147,6 +142,10 @@ void InitWebCoreSystemInterface(void)
         INIT(SetRequestStorageSession);
 #endif
 
+#if PLATFORM(MAC)
+        INIT(SpeechSynthesisGetVoiceIdentifiers);
+        INIT(SpeechSynthesisGetDefaultVoiceIdentifierForLocale);
+#endif
         INIT(GetAXTextMarkerTypeID);
         INIT(GetAXTextMarkerRangeTypeID);
         INIT(CreateAXTextMarker);
@@ -164,46 +163,42 @@ void InitWebCoreSystemInterface(void)
         INIT(CopyCFURLResponseSuggestedFilename);
         INIT(SetCFURLResponseMIMEType);
 
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1070
         INIT(CreateVMPressureDispatchOnMainQueue);
-#endif
+
+        INIT(DestroyRenderingResources);
 
 #if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1080
-        INIT(GetMacOSXVersionString);
         INIT(ExecutableWasLinkedOnOrBeforeLion);
 #endif
+        
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
+        INIT(CreateMemoryStatusPressureCriticalDispatchOnMainQueue);
+#endif
 
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1070
         INIT(CGPathAddRoundedRect);
-#endif
-
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1070
         INIT(CFURLRequestAllowAllPostCaching);
-#endif
-#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1080 && !PLATFORM(IOS)
+
+#if USE(CONTENT_FILTERING)
         INIT(FilterIsManagedSession);
         INIT(FilterCreateInstance);
-        INIT(FilterRelease);
         INIT(FilterWasBlocked);
+        INIT(FilterIsBuffering);
         INIT(FilterAddData);
         INIT(FilterDataComplete);
+#endif
 
+#if !PLATFORM(IOS) && PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1080
         INIT(NSElasticDeltaForTimeDelta);
         INIT(NSElasticDeltaForReboundDelta);
         INIT(NSReboundDeltaForElasticDelta);
 #endif
 
-        INIT(CaptionAppearanceHasUserPreferences);
-        INIT(CaptionAppearanceShowCaptionsWhenAvailable);
-        INIT(CaptionAppearanceCopyForegroundColor);
-        INIT(CaptionAppearanceCopyBackgroundColor);
-        INIT(CaptionAppearanceCopyWindowColor);
-        INIT(CaptionAppearanceGetForegroundOpacity);
-        INIT(CaptionAppearanceGetBackgroundOpacity);
-        INIT(CaptionAppearanceGetWindowOpacity);
-        INIT(CaptionAppearanceCopyFontForStyle);
-        INIT(CaptionAppearanceGetRelativeCharacterSize);
-        INIT(CaptionAppearanceGetTextEdgeStyle);
-        INIT(CaptionAppearanceGetSettingsChangedNotification);
+#if ENABLE(PUBLIC_SUFFIX_LIST)
+        INIT(IsPublicSuffix);
+#endif
+
+#if ENABLE(CACHE_PARTITIONING)
+        INIT(CachePartitionKey);
+#endif
     });
 }

@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2012 Adobe Systems Incorporated. All rights reserved.
+ * Copyright (C) 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,8 +31,6 @@
 #include "config.h"
 #include "WebKitCSSMixFunctionValue.h"
 
-#include "WebCoreMemoryInstrumentation.h"
-
 #if ENABLE(CSS_SHADERS)
 
 namespace WebCore {
@@ -48,7 +47,7 @@ WebKitCSSMixFunctionValue::WebKitCSSMixFunctionValue(const WebKitCSSMixFunctionV
 
 String WebKitCSSMixFunctionValue::customCssText() const
 {
-    return "mix(" + CSSValueList::customCssText() + ")";
+    return "mix(" + CSSValueList::customCssText() + ')';
 }
 
 PassRefPtr<WebKitCSSMixFunctionValue> WebKitCSSMixFunctionValue::cloneForCSSOM() const
@@ -56,10 +55,9 @@ PassRefPtr<WebKitCSSMixFunctionValue> WebKitCSSMixFunctionValue::cloneForCSSOM()
     return adoptRef(new WebKitCSSMixFunctionValue(*this));
 }
 
-void WebKitCSSMixFunctionValue::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+bool WebKitCSSMixFunctionValue::equals(const WebKitCSSMixFunctionValue& other) const
 {
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
-    CSSValueList::reportDescendantMemoryUsage(memoryObjectInfo);
+    return CSSValueList::equals(other);
 }
 
 } // namespace WebCore

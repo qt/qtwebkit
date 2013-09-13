@@ -257,7 +257,7 @@ bool RenderThemeWinCE::paintMenuListButton(RenderObject* o, const PaintInfo& i, 
     return true;
 }
 
-void RenderThemeWinCE::systemFont(int propId, FontDescription& fontDescription) const
+void RenderThemeWinCE::systemFont(CSSValueID, FontDescription& fontDescription) const
 {
     notImplemented();
 }
@@ -284,7 +284,7 @@ bool RenderThemeWinCE::supportsHover(const RenderStyle*) const
 }
 
 // Map a CSSValue* system color to an index understood by GetSysColor
-static int cssValueIdToSysColorIndex(int cssValueId)
+static int cssValueIdToSysColorIndex(CSSValueID cssValueId)
 {
     switch (cssValueId) {
     case CSSValueActiveborder: return COLOR_ACTIVEBORDER;
@@ -319,7 +319,7 @@ static int cssValueIdToSysColorIndex(int cssValueId)
     }
 }
 
-Color RenderThemeWinCE::systemColor(int cssValueId) const
+Color RenderThemeWinCE::systemColor(CSSValueID cssValueId) const
 {
     int sysColorIndex = cssValueIdToSysColorIndex(cssValueId);
     if (sysColorIndex == -1)
@@ -371,7 +371,7 @@ bool RenderThemeWinCE::paintSearchField(RenderObject* o, const PaintInfo& i, con
 
 bool RenderThemeWinCE::paintSearchFieldCancelButton(RenderObject* o, const PaintInfo& paintInfo, const IntRect& r)
 {
-    Color buttonColor = (o->node() && o->node()->active()) ? Color(138, 138, 138) : Color(186, 186, 186);
+    Color buttonColor = (o->node() && o->node()->isElementNode() && toElement(o->node())->active()) ? Color(138, 138, 138) : Color(186, 186, 186);
 
     IntSize cancelSize(10, 10);
     IntSize cancelRadius(cancelSize.width() / 2, cancelSize.height() / 2);
@@ -379,7 +379,7 @@ bool RenderThemeWinCE::paintSearchFieldCancelButton(RenderObject* o, const Paint
     int y = r.y() + (r.height() - cancelSize.height()) / 2 + 1;
     IntRect cancelBounds(IntPoint(x, y), cancelSize);
     paintInfo.context->save();
-    paintInfo.context->addRoundedRectClip(RoundedRect(cancelBounds, cancelRadius, cancelRadius, cancelRadius, cancelRadius));
+    paintInfo.context->clipRoundedRect(RoundedRect(cancelBounds, cancelRadius, cancelRadius, cancelRadius, cancelRadius));
     paintInfo.context->fillRect(cancelBounds, buttonColor, ColorSpaceDeviceRGB);
 
     // Draw the 'x'
@@ -482,10 +482,10 @@ static HTMLMediaElement* mediaElementParent(Node* node)
     Node* mediaNode = node->shadowHost();
     if (!mediaNode)
         mediaNode = node;
-    if (!mediaNode || !mediaNode->isElementNode() || !static_cast<Element*>(mediaNode)->isMediaElement())
+    if (!mediaNode || !mediaNode->isElementNode() || !toElement(mediaNode)->isMediaElement())
         return 0;
 
-    return static_cast<HTMLMediaElement*>(mediaNode);
+    return toHTMLMediaElement(mediaNode);
 }
 #endif
 

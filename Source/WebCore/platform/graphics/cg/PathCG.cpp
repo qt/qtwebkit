@@ -39,7 +39,7 @@
 #include <wtf/RetainPtr.h>
 #include <wtf/text/WTFString.h>
 
-#if PLATFORM(MAC) || PLATFORM(CHROMIUM)
+#if PLATFORM(MAC)
 #include "WebCoreSystemInterface.h"
 #endif
 
@@ -57,7 +57,7 @@ static size_t putBytesNowhere(void*, const void*, size_t count)
 static CGContextRef createScratchContext()
 {
     CGDataConsumerCallbacks callbacks = { putBytesNowhere, 0 };
-    RetainPtr<CGDataConsumerRef> consumer(AdoptCF, CGDataConsumerCreate(0, &callbacks));
+    RetainPtr<CGDataConsumerRef> consumer = adoptCF(CGDataConsumerCreate(0, &callbacks));
     CGContextRef context = CGPDFContextCreate(consumer.get(), 0, 0);
 
     CGFloat black[4] = { 0, 0, 0, 1 };
@@ -148,7 +148,7 @@ bool Path::contains(const FloatPoint &point, WindRule rule) const
         return false;
 
     // CGPathContainsPoint returns false for non-closed paths, as a work-around, we copy and close the path first.  Radar 4758998 asks for a better CG API to use
-    RetainPtr<CGMutablePathRef> path(AdoptCF, copyCGPathClosingSubpaths(m_path));
+    RetainPtr<CGMutablePathRef> path = adoptCF(copyCGPathClosingSubpaths(m_path));
     bool ret = CGPathContainsPoint(path.get(), 0, point, rule == RULE_EVENODD ? true : false);
     return ret;
 }
@@ -193,12 +193,7 @@ FloatRect Path::boundingRect() const
     // CGPathGetBoundingBox includes the path's control points, CGPathGetPathBoundingBox
     // does not, but only exists on 10.6 and above.
 
-    CGRect bound = CGRectZero;
-#if !PLATFORM(MAC) || __MAC_OS_X_VERSION_MIN_REQUIRED >= 1060
-    bound = CGPathGetPathBoundingBox(m_path);
-#else
-    bound = CGPathGetBoundingBox(m_path);
-#endif
+    CGRect bound = CGPathGetPathBoundingBox(m_path);
     return CGRectIsNull(bound) ? CGRectZero : bound;
 }
 
@@ -285,7 +280,7 @@ void Path::closeSubpath()
 void Path::addArc(const FloatPoint& p, float r, float sa, float ea, bool clockwise)
 {
     // Workaround for <rdar://problem/5189233> CGPathAddArc hangs or crashes when passed inf as start or end angle
-    if (isfinite(sa) && isfinite(ea))
+    if (std::isfinite(sa) && std::isfinite(ea))
         CGPathAddArc(ensurePlatformPath(), 0, p.x(), p.y(), r, sa, ea, clockwise);
 }
 

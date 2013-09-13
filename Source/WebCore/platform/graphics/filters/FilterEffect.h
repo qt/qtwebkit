@@ -39,20 +39,12 @@
 
 static const float kMaxFilterSize = 5000.0f;
 
-#if USE(SKIA)
-class SkImageFilter;
-#endif
-
 namespace WebCore {
 
 class Filter;
 class FilterEffect;
 class ImageBuffer;
 class TextStream;
-
-#if USE(SKIA)
-class SkiaImageFilterBuilder;
-#endif
 
 typedef Vector<RefPtr<FilterEffect> > FilterEffectVector;
 
@@ -68,6 +60,8 @@ public:
     virtual ~FilterEffect();
 
     void clearResult();
+    void clearResultsRecursive();
+
     ImageBuffer* asImageBuffer();
     PassRefPtr<Uint8ClampedArray> asUnmultipliedImage(const IntRect&);
     PassRefPtr<Uint8ClampedArray> asPremultipliedImage(const IntRect&);
@@ -109,7 +103,12 @@ public:
     void setMaxEffectRect(const FloatRect& maxEffectRect) { m_maxEffectRect = maxEffectRect; } 
 
     void apply();
-    
+#if ENABLE(OPENCL)
+    void applyAll();
+#else
+    inline void applyAll() { apply(); }
+#endif
+
     // Correct any invalid pixels, if necessary, in the result of a filter operation.
     // This method is used to ensure valid pixel values on filter inputs and the final result.
     // Only the arithmetic composite filter ever needs to perform correction.
@@ -118,10 +117,6 @@ public:
     virtual void platformApplySoftware() = 0;
 #if ENABLE(OPENCL)
     virtual bool platformApplyOpenCL();
-#endif
-#if USE(SKIA)
-    virtual bool platformApplySkia() { return false; }
-    virtual SkImageFilter* createImageFilter(SkiaImageFilterBuilder*) { return 0; }
 #endif
     virtual void dump() = 0;
 
@@ -157,8 +152,12 @@ public:
     bool clipsToBounds() const { return m_clipsToBounds; }
     void setClipsToBounds(bool value) { m_clipsToBounds = value; }
 
-    ColorSpace colorSpace() const { return m_colorSpace; }
-    void setColorSpace(ColorSpace colorSpace) { m_colorSpace = colorSpace; }
+    ColorSpace operatingColorSpace() const { return m_operatingColorSpace; }
+    virtual void setOperatingColorSpace(ColorSpace colorSpace) { m_operatingColorSpace = colorSpace; }
+    ColorSpace resultColorSpace() const { return m_resultColorSpace; }
+    virtual void setResultColorSpace(ColorSpace colorSpace) { m_resultColorSpace = colorSpace; }
+
+    virtual void transformResultColorSpace(FilterEffect* in, const int) { in->transformResultColorSpace(m_operatingColorSpace); }
     void transformResultColorSpace(ColorSpace);
 
 protected:
@@ -217,7 +216,7 @@ private:
     // Should the effect clip to its primitive region, or expand to use the combined region of its inputs.
     bool m_clipsToBounds;
 
-    ColorSpace m_colorSpace;
+    ColorSpace m_operatingColorSpace;
     ColorSpace m_resultColorSpace;
 };
 

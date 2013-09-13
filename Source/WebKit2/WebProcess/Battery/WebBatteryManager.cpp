@@ -40,6 +40,11 @@ using namespace WebCore;
 
 namespace WebKit {
 
+const char* WebBatteryManager::supplementName()
+{
+    return "WebBatteryManager";
+}
+
 WebBatteryManager::WebBatteryManager(WebProcess* process)
     : m_process(process)
 {
@@ -50,11 +55,6 @@ WebBatteryManager::~WebBatteryManager()
 {
 }
 
-void WebBatteryManager::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::MessageDecoder& decoder)
-{
-    didReceiveWebBatteryManagerMessage(connection, messageID, decoder);
-}
-
 void WebBatteryManager::registerWebPage(WebPage* page)
 {
     bool wasEmpty = m_pageSet.isEmpty();
@@ -62,7 +62,7 @@ void WebBatteryManager::registerWebPage(WebPage* page)
     m_pageSet.add(page);
 
     if (wasEmpty)
-        m_process->connection()->send(Messages::WebBatteryManagerProxy::StartUpdating(), 0);
+        m_process->parentProcessConnection()->send(Messages::WebBatteryManagerProxy::StartUpdating(), 0);
 }
 
 void WebBatteryManager::unregisterWebPage(WebPage* page)
@@ -70,7 +70,7 @@ void WebBatteryManager::unregisterWebPage(WebPage* page)
     m_pageSet.remove(page);
 
     if (m_pageSet.isEmpty())
-        m_process->connection()->send(Messages::WebBatteryManagerProxy::StopUpdating(), 0);
+        m_process->parentProcessConnection()->send(Messages::WebBatteryManagerProxy::StopUpdating(), 0);
 }
 
 void WebBatteryManager::didChangeBatteryStatus(const WTF::AtomicString& eventType, const WebBatteryStatus::Data& data)

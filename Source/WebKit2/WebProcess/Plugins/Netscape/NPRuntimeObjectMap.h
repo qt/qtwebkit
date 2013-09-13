@@ -30,6 +30,7 @@
 
 #include <WebCore/RunLoop.h>
 #include <heap/Weak.h>
+#include <heap/WeakInlines.h>
 #include <wtf/Forward.h>
 #include <wtf/HashMap.h>
 
@@ -38,7 +39,7 @@ typedef struct _NPVariant NPVariant;
 
 namespace JSC {
     class ExecState;
-    class JSGlobalData;
+    class VM;
     class JSGlobalObject;
     class JSObject;
     class JSValue;
@@ -66,7 +67,7 @@ public:
 
     // Returns an NPObject that wraps the given JSObject object. If there is already an NPObject that wraps this JSObject, it will
     // retain it and return it.
-    NPObject* getOrCreateNPObject(JSC::JSGlobalData&, JSC::JSObject*);
+    NPObject* getOrCreateNPObject(JSC::VM&, JSC::JSObject*);
     void npJSObjectDestroyed(NPJSObject*);
 
     // Returns a JSObject object that wraps the given NPObject.
@@ -94,9 +95,8 @@ private:
     void invalidateQueuedObjects();
 
     PluginView* m_pluginView;
-
     HashMap<JSC::JSObject*, NPJSObject*> m_npJSObjects;
-    HashMap<NPObject*, JSC::Weak<JSNPObject> > m_jsNPObjects;
+    HashMap<NPObject*, JSC::Weak<JSNPObject>> m_jsNPObjects;
     Vector<NPObject*> m_npObjectsToFinalize;
     WebCore::RunLoop::Timer<NPRuntimeObjectMap> m_finalizationTimer;
 };

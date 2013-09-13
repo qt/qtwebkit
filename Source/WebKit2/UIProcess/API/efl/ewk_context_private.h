@@ -20,12 +20,13 @@
 #ifndef ewk_context_private_h
 #define ewk_context_private_h
 
-#include "DownloadManagerEfl.h"
-#include "WKAPICast.h"
-#include "WKRetainPtr.h"
-#include "WebContext.h"
 #include "ewk_context.h"
 #include "ewk_object_private.h"
+#include <WebKit2/WKBase.h>
+#include <WebKit2/WKRetainPtr.h>
+#include <wtf/PassOwnPtr.h>
+#include <wtf/RefPtr.h>
+#include <wtf/text/WTFString.h>
 
 using namespace WebKit;
 
@@ -34,6 +35,7 @@ class EwkFaviconDatabase;
 
 namespace WebKit {
 class ContextHistoryClientEfl;
+class DownloadManagerEfl;
 class RequestManagerClientEfl;
 #if ENABLE(BATTERY_STATUS)
 class BatteryProvider;
@@ -47,22 +49,22 @@ class EwkContext : public EwkObject {
 public:
     EWK_OBJECT_DECLARE(EwkContext)
 
-    static PassRefPtr<EwkContext> create(PassRefPtr<WebContext> context);
+    static PassRefPtr<EwkContext> findOrCreateWrapper(WKContextRef context);
     static PassRefPtr<EwkContext> create();
     static PassRefPtr<EwkContext> create(const String& injectedBundlePath);
 
-    static PassRefPtr<EwkContext> defaultContext();
+    static EwkContext* defaultContext();
 
     ~EwkContext();
 
-    Ewk_Cookie_Manager* cookieManager();
+    EwkCookieManager* cookieManager();
 
-    Ewk_Database_Manager* databaseManager();
+    EwkDatabaseManager* databaseManager();
 
     bool setFaviconDatabaseDirectoryPath(const String& databaseDirectory);
-    Ewk_Favicon_Database* faviconDatabase();
+    EwkFaviconDatabase* faviconDatabase();
 
-    Ewk_Storage_Manager* storageManager() const;
+    EwkStorageManager* storageManager() const;
 
     WebKit::RequestManagerClientEfl* requestManager();
 
@@ -72,7 +74,7 @@ public:
 
     Ewk_Cache_Model cacheModel() const;
 
-    PassRefPtr<WebContext> webContext() { return m_context; }
+    WKContextRef wkContext() const { return m_context.get(); }
 
     WebKit::DownloadManagerEfl* downloadManager() const;
 
@@ -82,17 +84,19 @@ public:
     void setAdditionalPluginPath(const String&);
 #endif
 
+    void clearResourceCache();
+
 private:
-    explicit EwkContext(PassRefPtr<WebContext>);
+    explicit EwkContext(WKContextRef);
 
     void ensureFaviconDatabase();
 
-    RefPtr<WebContext> m_context;
+    WKRetainPtr<WKContextRef> m_context;
 
-    OwnPtr<Ewk_Cookie_Manager> m_cookieManager;
-    OwnPtr<Ewk_Database_Manager> m_databaseManager;
-    OwnPtr<Ewk_Favicon_Database> m_faviconDatabase;
-    OwnPtr<Ewk_Storage_Manager> m_storageManager;
+    OwnPtr<EwkCookieManager> m_cookieManager;
+    OwnPtr<EwkDatabaseManager> m_databaseManager;
+    OwnPtr<EwkFaviconDatabase> m_faviconDatabase;
+    OwnPtr<EwkStorageManager> m_storageManager;
 #if ENABLE(BATTERY_STATUS)
     RefPtr<WebKit::BatteryProvider> m_batteryProvider;
 #endif

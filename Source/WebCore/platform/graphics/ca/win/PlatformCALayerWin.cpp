@@ -116,7 +116,7 @@ PlatformCALayer::PlatformCALayer(LayerType layerType, PlatformLayer* layer, Plat
         m_layer = layer;
     } else {
         m_layerType = layerType;
-        m_layer.adoptCF(CACFLayerCreate(toCACFLayerType(layerType)));
+        m_layer = adoptCF(CACFLayerCreate(toCACFLayerType(layerType)));
 
         // Create the PlatformCALayerWinInternal object and point to it in the userdata.
         PlatformCALayerWinInternal* intern = new PlatformCALayerWinInternal(this);
@@ -147,6 +147,30 @@ PlatformCALayer* PlatformCALayer::platformCALayer(void* platformLayer)
     
     PlatformCALayerWinInternal* layerIntern = intern(platformLayer);
     return layerIntern ? layerIntern->owner() : 0;
+}
+
+PassRefPtr<PlatformCALayer> PlatformCALayer::clone(PlatformCALayerClient* owner) const
+{
+    PlatformCALayer::LayerType type = (layerType() == PlatformCALayer::LayerTypeTransformLayer) ?
+        PlatformCALayer::LayerTypeTransformLayer : PlatformCALayer::LayerTypeLayer;
+    RefPtr<PlatformCALayer> newLayer = PlatformCALayer::create(type, owner);
+
+    newLayer->setPosition(position());
+    newLayer->setBounds(bounds());
+    newLayer->setAnchorPoint(anchorPoint());
+    newLayer->setTransform(transform());
+    newLayer->setSublayerTransform(sublayerTransform());
+    newLayer->setContents(contents());
+    newLayer->setMasksToBounds(masksToBounds());
+    newLayer->setDoubleSided(isDoubleSided());
+    newLayer->setOpaque(isOpaque());
+    newLayer->setBackgroundColor(backgroundColor());
+    newLayer->setContentsScale(contentsScale());
+#if ENABLE(CSS_FILTERS)
+    newLayer->copyFiltersFrom(this);
+#endif
+
+    return newLayer;
 }
 
 PlatformLayer* PlatformCALayer::platformLayer() const
@@ -516,8 +540,8 @@ void PlatformCALayer::setBackgroundColor(const Color& value)
     CGFloat components[4];
     value.getRGBA(components[0], components[1], components[2], components[3]);
 
-    RetainPtr<CGColorSpaceRef> colorSpace(AdoptCF, CGColorSpaceCreateDeviceRGB());
-    RetainPtr<CGColorRef> color(AdoptCF, CGColorCreate(colorSpace.get(), components));
+    RetainPtr<CGColorSpaceRef> colorSpace = adoptCF(CGColorSpaceCreateDeviceRGB());
+    RetainPtr<CGColorRef> color = adoptCF(CGColorCreate(colorSpace.get(), components));
 
     CACFLayerSetBackgroundColor(m_layer.get(), color.get());
     setNeedsCommit();
@@ -544,8 +568,8 @@ void PlatformCALayer::setBorderColor(const Color& value)
     CGFloat components[4];
     value.getRGBA(components[0], components[1], components[2], components[3]);
 
-    RetainPtr<CGColorSpaceRef> colorSpace(AdoptCF, CGColorSpaceCreateDeviceRGB());
-    RetainPtr<CGColorRef> color(AdoptCF, CGColorCreate(colorSpace.get(), components));
+    RetainPtr<CGColorSpaceRef> colorSpace = adoptCF(CGColorSpaceCreateDeviceRGB());
+    RetainPtr<CGColorRef> color = adoptCF(CGColorCreate(colorSpace.get(), components));
 
     CACFLayerSetBorderColor(m_layer.get(), color.get());
     setNeedsCommit();

@@ -54,7 +54,7 @@ public:
     void removeSharedWorkerProcessProxy(SharedWorkerProcessProxy*);
 
 #if PLATFORM(MAC)
-    void setApplicationIsOccluded(bool);
+    void setProcessSuppressionEnabled(bool);
 #endif
 
 private:
@@ -62,7 +62,7 @@ private:
 
     SharedWorkerProcessProxy* getOrCreateSharedWorkerProcess(const String& url, const String& name);
 
-    Vector<RefPtr<SharedWorkerProcessProxy> > m_sharedWorkerProcesses;
+    Vector<RefPtr<SharedWorkerProcessProxy>> m_sharedWorkerProcesses;
 };
 
 } // namespace WebKit

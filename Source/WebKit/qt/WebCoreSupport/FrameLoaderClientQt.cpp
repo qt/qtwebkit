@@ -36,6 +36,7 @@
 #include "CSSComputedStyleDeclaration.h"
 #include "CSSPropertyNames.h"
 #include "DocumentLoader.h"
+#include "EventHandler.h"
 #include "FormState.h"
 #include "FrameLoadRequest.h"
 #include "FrameNetworkingContextQt.h"
@@ -56,8 +57,10 @@
 #include "MouseEvent.h"
 #include "NotImplemented.h"
 #include "Page.h"
+#include "PlatformMouseEvent.h"
 #include "PluginData.h"
 #include "PluginDatabase.h"
+#include "PolicyChecker.h"
 #include "ProgressTracker.h"
 #include "QNetworkReplyHandler.h"
 #include "QWebFrameAdapter.h"
@@ -67,6 +70,7 @@
 #include "RenderPart.h"
 #include "ResourceHandle.h"
 #include "ResourceHandleInternal.h"
+#include "ResourceLoader.h"
 #include "ResourceRequest.h"
 #include "ResourceResponse.h"
 #include "ScriptController.h"
@@ -971,24 +975,19 @@ bool FrameLoaderClientQt::shouldFallBack(const WebCore::ResourceError& error)
 WTF::PassRefPtr<WebCore::DocumentLoader> FrameLoaderClientQt::createDocumentLoader(const WebCore::ResourceRequest& request, const SubstituteData& substituteData)
 {
     RefPtr<DocumentLoader> loader = DocumentLoader::create(request, substituteData);
-    if (!deferMainResourceDataLoad || substituteData.isValid()) {
+    if (!deferMainResourceDataLoad || substituteData.isValid())
         loader->setDeferMainResourceDataLoad(false);
-        // Use the default timeout interval for JS as the HTML tokenizer delay. This ensures
-        // that long-running JavaScript will still allow setHtml() to be synchronous, while
-        // still giving a reasonable timeout to prevent deadlock.
-        double delay = JSDOMWindowBase::commonJSGlobalData()->timeoutChecker.timeoutInterval() / 1000.0f;
-        m_frame->page()->setCustomHTMLTokenizerTimeDelay(delay);
-    } else
+    else
         m_frame->page()->setCustomHTMLTokenizerTimeDelay(-1);
     return loader.release();
 }
 
-void FrameLoaderClientQt::download(WebCore::ResourceHandle* handle, const WebCore::ResourceRequest&, const WebCore::ResourceResponse&)
+void FrameLoaderClientQt::convertMainResourceLoadToDownload(WebCore::DocumentLoader* documentLoader, const WebCore::ResourceRequest&, const WebCore::ResourceResponse&)
 {
     if (!m_webFrame)
         return;
 
-    QNetworkReplyHandler* handler = handle->getInternal()->m_job;
+    QNetworkReplyHandler* handler = documentLoader->mainResourceLoader()->handle()->getInternal()->m_job;
     QNetworkReply* reply = handler->release();
     if (reply) {
         if (m_webFrame->pageAdapter->forwardUnsupportedContent)
@@ -1250,7 +1249,7 @@ void FrameLoaderClientQt::dispatchDecidePolicyForNavigationAction(FramePolicyFun
             if (event->isMouseEvent()) {
                 const MouseEvent* mouseEvent =  static_cast<const MouseEvent*>(event);
                 node = m_webFrame->frame->eventHandler()->hitTestResultAtPoint(
-                    mouseEvent->absoluteLocation(), false).innerNonSharedNode();
+                    mouseEvent->absoluteLocation()).innerNonSharedNode();
                 break;
             }
         }
@@ -1350,18 +1349,23 @@ ObjectContentType FrameLoaderClientQt::objectContentType(const KURL& url, const 
     if (!mimeType.length())
         mimeType = MIMETypeRegistry::getMIMETypeForExtension(extension);
 
-    if (!mimeType.length())
+    bool arePluginsEnabled = (m_frame && m_frame->settings() && m_frame->settings()->arePluginsEnabled());
+    if (arePluginsEnabled && !mimeType.length())
         mimeType = PluginDatabase::installedPlugins()->MIMETypeForExtension(extension);
 
     if (!mimeType.length())
         return ObjectContentFrame;
 
     ObjectContentType plugInType = ObjectContentNone;
-    if (PluginDatabase::installedPlugins()->isMIMETypeRegistered(mimeType))
+    if (arePluginsEnabled && PluginDatabase::installedPlugins()->isMIMETypeRegistered(mimeType))
         plugInType = ObjectContentNetscapePlugin;
-    else if (m_frame->page() && m_frame->page()->pluginData() && m_frame->page()->pluginData()->supportsMimeType(mimeType))
-        plugInType = ObjectContentOtherPlugin;
-        
+    else if (m_frame->page() && m_frame->page()->pluginData()) {
+        bool allowPlugins = m_frame->loader()->subframeLoader()->allowPlugins(NotAboutToInstantiatePlugin);
+        if ((m_frame->page()->pluginData()->supportsMimeType(mimeType, PluginData::AllPlugins) && allowPlugins)
+            || m_frame->page()->pluginData()->supportsMimeType(mimeType, PluginData::OnlyApplicationPlugins))
+                plugInType = ObjectContentOtherPlugin;
+    }
+
     if (MIMETypeRegistry::isSupportedImageMIMEType(mimeType))
         return shouldPreferPlugInsForImages && plugInType != ObjectContentNone ? plugInType : ObjectContentImage;
     
@@ -1421,8 +1425,8 @@ public:
         ScrollView* parentScrollView = parent();
         QRect clipRect;
         if (parentScrollView) {
-            ASSERT(parentScrollView->isFrameView());
-            clipRect = static_cast<FrameView*>(parentScrollView)->windowClipRect();
+            ASSERT_WITH_SECURITY_IMPLICATION(parentScrollView->isFrameView());
+            clipRect = toFrameView(parentScrollView)->windowClipRect();
             clipRect.translate(-windowRect.x(), -windowRect.y());
         }
         widget->setGeometryAndClip(windowRect, clipRect, isVisible());
@@ -1435,6 +1439,7 @@ public:
     }
     virtual void hide()
     {
+        Widget::hide();
         if (platformWidget())
             widgetAdapter()->setVisible(false);
     }
@@ -1549,7 +1554,7 @@ PassRefPtr<Widget> FrameLoaderClientQt::createPlugin(const IntSize& pluginSize, 
 
 void FrameLoaderClientQt::redirectDataToPlugin(Widget* pluginWidget)
 {
-    m_pluginView = static_cast<PluginView*>(pluginWidget);
+    m_pluginView = toPluginView(pluginWidget);
     if (pluginWidget)
         m_hasSentResponseToPlugin = false;
 }

@@ -33,13 +33,12 @@
 #include "HRTFDatabaseLoader.h"
 
 #include "HRTFDatabase.h"
-#include "PlatformMemoryInstrumentation.h"
 #include <wtf/MainThread.h>
 
 namespace WebCore {
 
 // Singleton
-HRTFDatabaseLoader* HRTFDatabaseLoader::s_loader = 0;
+HRTFDatabaseLoader::LoaderMap* HRTFDatabaseLoader::s_loaderMap = 0;
 
 PassRefPtr<HRTFDatabaseLoader> HRTFDatabaseLoader::createAndLoadAsynchronouslyIfNecessary(float sampleRate)
 {
@@ -47,16 +46,20 @@ PassRefPtr<HRTFDatabaseLoader> HRTFDatabaseLoader::createAndLoadAsynchronouslyIf
 
     RefPtr<HRTFDatabaseLoader> loader;
     
-    if (!s_loader) {
-        // Lazily create and load.
-        loader = adoptRef(new HRTFDatabaseLoader(sampleRate));
-        s_loader = loader.get();
-        loader->loadAsynchronously();
-    } else {
-        loader = s_loader;
+    if (!s_loaderMap)
+        s_loaderMap = adoptPtr(new LoaderMap()).leakPtr();
+
+    loader = s_loaderMap->get(sampleRate);
+    if (loader) {
         ASSERT(sampleRate == loader->databaseSampleRate());
+        return loader;
     }
-    
+
+    loader = adoptRef(new HRTFDatabaseLoader(sampleRate));
+    s_loaderMap->add(sampleRate, loader.get());
+
+    loader->loadAsynchronously();
+
     return loader;
 }
 
@@ -73,12 +76,11 @@ HRTFDatabaseLoader::~HRTFDatabaseLoader()
 
     waitForLoaderThreadCompletion();
     m_hrtfDatabase.clear();
-    
-    // Clear out singleton.
-    ASSERT(this == s_loader);
-    s_loader = 0;
-}
 
+    // Remove ourself from the map.
+    if (s_loaderMap)
+        s_loaderMap->remove(m_databaseSampleRate);
+}
 
 // Asynchronously load the database in this thread.
 static void databaseLoaderEntry(void* threadData)
@@ -122,20 +124,6 @@ void HRTFDatabaseLoader::waitForLoaderThreadCompletion()
     if (m_databaseLoaderThread)
         waitForThreadCompletion(m_databaseLoaderThread);
     m_databaseLoaderThread = 0;
-}
-
-HRTFDatabase* HRTFDatabaseLoader::defaultHRTFDatabase()
-{
-    if (!s_loader)
-        return 0;
-    
-    return s_loader->database();
-}
-
-void HRTFDatabaseLoader::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, PlatformMemoryTypes::AudioSharedData);
-    info.addMember(m_hrtfDatabase);
 }
 
 } // namespace WebCore

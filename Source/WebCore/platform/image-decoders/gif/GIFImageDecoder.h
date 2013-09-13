@@ -29,7 +29,7 @@
 #include "ImageDecoder.h"
 #include <wtf/OwnPtr.h>
 
-struct GIFImageReader;
+class GIFImageReader;
 
 namespace WebCore {
 
@@ -49,6 +49,8 @@ namespace WebCore {
         virtual size_t frameCount();
         virtual int repetitionCount() const;
         virtual ImageFrame* frameBufferAtIndex(size_t index);
+        virtual bool frameIsCompleteAtIndex(size_t) const;
+        virtual float frameDurationAtIndex(size_t) const;
         // CAUTION: setFailed() deletes |m_reader|.  Be careful to avoid
         // accessing deleted memory, especially when calling this from inside
         // GIFImageReader!
@@ -56,8 +58,7 @@ namespace WebCore {
         virtual void clearFrameBufferCache(size_t clearBeforeFrame);
 
         // Callbacks from the GIF reader.
-        void decodingHalted(unsigned bytesLeft);
-        bool haveDecodedRow(unsigned frameIndex, unsigned char* rowBuffer, unsigned char* rowEnd, unsigned rowNumber, unsigned repeatCount, bool writeTransparentPixels);
+        bool haveDecodedRow(unsigned frameIndex, const Vector<unsigned char>& rowBuffer, size_t width, size_t rowNumber, unsigned repeatCount, bool writeTransparentPixels);
         bool frameComplete(unsigned frameIndex, unsigned frameDuration, ImageFrame::FrameDisposalMethod disposalMethod);
         void gifComplete();
 
@@ -73,11 +74,9 @@ namespace WebCore {
         // failure, this will mark the image as failed.
         bool initFrameBuffer(unsigned frameIndex);
 
-        bool m_alreadyScannedThisDataForFrameCount;
         bool m_currentBufferSawAlpha;
         mutable int m_repetitionCount;
         OwnPtr<GIFImageReader> m_reader;
-        unsigned m_readOffset;
     };
 
 } // namespace WebCore

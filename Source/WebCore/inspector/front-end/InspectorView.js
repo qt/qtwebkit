@@ -91,6 +91,9 @@ WebInspector.InspectorView.prototype = {
         return panel;
     },
 
+    /**
+     * @return {WebInspector.Panel}
+     */
     currentPanel: function()
     {
         return this._currentPanel;
@@ -124,8 +127,20 @@ WebInspector.InspectorView.prototype = {
         }
     },
 
+    /**
+     * @return {Element}
+     */
+    defaultFocusedElement: function()
+    {
+        return this._currentPanel ? this._currentPanel.defaultFocusedElement() : null;
+    },
+
     _keyPress: function(event)
     {
+        // BUG 104250: Windows 7 posts a WM_CHAR message upon the Ctrl+']' keypress.
+        // Any charCode < 32 is not going to be a valid keypress.
+        if (event.charCode < 32 && WebInspector.isWin())
+            return;
         clearTimeout(this._keyDownTimer);
         delete this._keyDownTimer;
     },

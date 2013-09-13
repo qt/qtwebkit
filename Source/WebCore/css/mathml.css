@@ -3,6 +3,7 @@
 math {
     -webkit-line-box-contain: glyphs replaced;
     line-height: 0;
+    text-indent: 0;
 }
 mtext {
     line-height: 1.0;
@@ -33,6 +34,14 @@ math[display="block"] {
 
 mo, mrow, mfenced, mfrac, msub, msup, msubsup, munder, mover, munderover, msqrt, mroot {
     display: -webkit-inline-flex !important;
+}
+
+msup {
+    -webkit-align-items: flex-start;
+}
+
+msub {
+    -webkit-align-items: flex-end;
 }
 
 math, mrow, mfenced, msqrt, mroot {
@@ -227,8 +236,4 @@ mtable[columnlines="solid"] > mtr > mtd + mtd {
 
 mtable[columnlines="dashed"] > mtr > mtd + mtd {
     border-left: dashed thin;
-}
-
-mspace[linebreak="newline"] {
-    display: block;
 }

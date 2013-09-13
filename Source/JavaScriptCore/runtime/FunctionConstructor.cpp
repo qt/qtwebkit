@@ -29,6 +29,7 @@
 #include "JSString.h"
 #include "Lexer.h"
 #include "Nodes.h"
+#include "Operations.h"
 #include "Parser.h"
 #include <wtf/text/StringBuilder.h>
 
@@ -45,11 +46,11 @@ FunctionConstructor::FunctionConstructor(JSGlobalObject* globalObject, Structure
 
 void FunctionConstructor::finishCreation(ExecState* exec, FunctionPrototype* functionPrototype)
 {
-    Base::finishCreation(exec->globalData(), functionPrototype->classInfo()->className);
-    putDirectWithoutTransition(exec->globalData(), exec->propertyNames().prototype, functionPrototype, DontEnum | DontDelete | ReadOnly);
+    Base::finishCreation(exec->vm(), functionPrototype->classInfo()->className);
+    putDirectWithoutTransition(exec->vm(), exec->propertyNames().prototype, functionPrototype, DontEnum | DontDelete | ReadOnly);
 
     // Number of arguments for constructor
-    putDirectWithoutTransition(exec->globalData(), exec->propertyNames().length, jsNumber(1), ReadOnly | DontDelete | DontEnum);
+    putDirectWithoutTransition(exec->vm(), exec->propertyNames().length, jsNumber(1), ReadOnly | DontDelete | DontEnum);
 }
 
 static EncodedJSValue JSC_HOST_CALL constructWithFunctionConstructor(ExecState* exec)
@@ -123,7 +124,7 @@ JSObject* constructFunctionSkippingEvalEnabledCheck(ExecState* exec, JSGlobalObj
 // ECMA 15.3.2 The Function Constructor
 JSObject* constructFunction(ExecState* exec, JSGlobalObject* globalObject, const ArgList& args)
 {
-    return constructFunction(exec, globalObject, args, Identifier(exec, "anonymous"), String(), TextPosition::minimumPosition());
+    return constructFunction(exec, globalObject, args, exec->propertyNames().anonymous, String(), TextPosition::minimumPosition());
 }
 
 } // namespace JSC

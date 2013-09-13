@@ -29,6 +29,7 @@
 #include "ArgumentDecoder.h"
 #include "ArgumentEncoder.h"
 #include "DataReference.h"
+#include <WebCore/ResourceError.h>
 #include <WebCore/ResourceResponse.h>
 #include <libsoup/soup.h>
 
@@ -47,6 +48,12 @@ PlatformCertificateInfo::PlatformCertificateInfo(const ResourceResponse& respons
 {
 }
 
+PlatformCertificateInfo::PlatformCertificateInfo(const ResourceError& resourceError)
+    : m_certificate(resourceError.certificate())
+    , m_tlsErrors(static_cast<GTlsCertificateFlags>(resourceError.tlsErrors()))
+{
+}
+
 PlatformCertificateInfo::~PlatformCertificateInfo()
 {
 }
@@ -54,34 +61,34 @@ PlatformCertificateInfo::~PlatformCertificateInfo()
 void PlatformCertificateInfo::encode(CoreIPC::ArgumentEncoder& encoder) const
 {
     if (!m_certificate) {
-        encoder.encode(false);
+        encoder << false;
         return;
     }
 
     GByteArray* certificateData = 0;
     g_object_get(G_OBJECT(m_certificate.get()), "certificate", &certificateData, NULL);
     if (!certificateData) {
-        encoder.encode(false);
+        encoder << false;
         return;
     }
 
-    encoder.encode(true);
+    encoder << true;
     GRefPtr<GByteArray> certificate = adoptGRef(certificateData);
     encoder.encodeVariableLengthByteArray(CoreIPC::DataReference(certificate->data, certificate->len));
-    encoder.encode(static_cast<uint32_t>(m_tlsErrors));
+    encoder << static_cast<uint32_t>(m_tlsErrors);
 }
 
-bool PlatformCertificateInfo::decode(CoreIPC::ArgumentDecoder* decoder, PlatformCertificateInfo& certificateInfo)
+bool PlatformCertificateInfo::decode(CoreIPC::ArgumentDecoder& decoder, PlatformCertificateInfo& certificateInfo)
 {
     bool hasCertificate;
-    if (!decoder->decode(hasCertificate))
+    if (!decoder.decode(hasCertificate))
         return false;
 
     if (!hasCertificate)
         return true;
 
     CoreIPC::DataReference certificateDataReference;
-    if (!decoder->decodeVariableLengthByteArray(certificateDataReference))
+    if (!decoder.decodeVariableLengthByteArray(certificateDataReference))
         return false;
 
     GByteArray* certificateData = g_byte_array_sized_new(certificateDataReference.size());
@@ -93,7 +100,7 @@ bool PlatformCertificateInfo::decode(CoreIPC::ArgumentDecoder* decoder, Platform
                                                                                "certificate", certificate.get(), NULL)));
 
     uint32_t tlsErrors;
-    if (!decoder->decode(tlsErrors))
+    if (!decoder.decode(tlsErrors))
         return false;
     certificateInfo.m_tlsErrors = static_cast<GTlsCertificateFlags>(tlsErrors);
 

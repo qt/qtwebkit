@@ -50,6 +50,7 @@ namespace BlackBerry {
 namespace Platform {
 namespace Graphics {
 class Buffer;
+class GLES2Program;
 }
 }
 }
@@ -119,6 +120,7 @@ class LayerCompositingThread : public ThreadSafeRefCounted<LayerCompositingThrea
 public:
     static PassRefPtr<LayerCompositingThread> create(LayerType, LayerCompositingThreadClient*);
 
+    LayerCompositingThreadClient* client() const { return m_client; }
     void setClient(LayerCompositingThreadClient* client) { m_client = client; }
 
     // Thread safe
@@ -142,21 +144,27 @@ public:
     void removeFromSuperlayer();
     void setNeedsTexture(bool needsTexture) { m_needsTexture = needsTexture; }
 
+    void commitPendingTextureUploads();
+
     // Returns true if we have an animation
     bool updateAnimations(double currentTime);
     void updateTextureContentsIfNeeded();
-    void bindContentsTexture();
+    LayerTexture* contentsTexture();
 
     const LayerCompositingThread* rootLayer() const;
     void setSublayers(const Vector<RefPtr<LayerCompositingThread> >&);
-    const Vector<RefPtr<LayerCompositingThread> >& getSublayers() const { return m_sublayers; }
+    const Vector<RefPtr<LayerCompositingThread> >& sublayers() const { return m_sublayers; }
     void setSuperlayer(LayerCompositingThread* superlayer) { m_superlayer = superlayer; }
     LayerCompositingThread* superlayer() const { return m_superlayer; }
 
     // The layer renderer must be set if the layer has been rendered
+    LayerRenderer* layerRenderer() const { return m_layerRenderer; }
     void setLayerRenderer(LayerRenderer*);
 
-    void setDrawTransform(double scale, const TransformationMatrix&);
+    // The draw transform expects the origin to be located at the center of the layer.
+    FloatPoint origin() const { return FloatPoint(m_bounds.width() / 2.0f, m_bounds.height() / 2.0f); }
+
+    void setDrawTransform(double scale, const TransformationMatrix& modelViewMatrix, const TransformationMatrix& projectionMatrix);
     const TransformationMatrix& drawTransform() const { return m_drawTransform; }
 
     void setDrawOpacity(float opacity) { m_drawOpacity = opacity; }
@@ -172,16 +180,25 @@ public:
     void setReplicaLayer(LayerCompositingThread* layer) { m_replicaLayer = layer; }
     LayerCompositingThread* replicaLayer() const { return m_replicaLayer.get(); }
 
-    FloatRect getDrawRect() const { return m_drawRect; }
-    const FloatQuad& getTransformedBounds() const { return m_transformedBounds; }
-    FloatQuad getTransformedHolePunchRect() const;
+    // These use normalized device coordinates
+    FloatRect boundingBox() const { return m_boundingBox; }
+    // The bounds are processed according to http://www.w3.org/TR/css3-transforms paragraph 6.2, which can result in a polygon with more than 4 sides.
+    const Vector<FloatPoint, 4>& transformedBounds() const { return m_transformedBounds; }
+    const Vector<float, 4>& ws() const { return m_ws; }
+
+    enum TextureCoordinateOrientation {
+        RightSideUp = 0,
+        UpsideDown
+    };
+
+    const Vector<FloatPoint>& textureCoordinates(TextureCoordinateOrientation = RightSideUp) const;
+    FloatQuad transformedHolePunchRect() const;
+    float centerW() const { return m_centerW; }
 
     void deleteTextures();
 
-    void drawTextures(double scale, int positionLocation, int texCoordLocation, const FloatRect& visibleRect);
-    bool hasMissingTextures() const;
-    void drawMissingTextures(double scale, int positionLocation, int texCoordLocation, const FloatRect& visibleRect);
-    void drawSurface(const TransformationMatrix&, LayerCompositingThread* mask, int positionLocation, int texCoordLocation);
+    void drawTextures(const BlackBerry::Platform::Graphics::GLES2Program&, double scale, const FloatRect& visibleRect, const FloatRect& clipRect);
+    void drawSurface(const BlackBerry::Platform::Graphics::GLES2Program&, const TransformationMatrix&, LayerCompositingThread* mask);
 
     void releaseTextureResources();
 
@@ -242,9 +259,11 @@ private:
     LayerCompositingThread* m_superlayer;
 
     // Vertex data for the bounds of this layer
-    FloatQuad m_transformedBounds;
-    // The bounding rectangle of the transformed layer
-    FloatRect m_drawRect;
+    Vector<FloatPoint, 4> m_transformedBounds;
+    Vector<float, 4> m_ws;
+    Vector<FloatPoint> m_textureCoordinates; // Only used when a 3D layer is clipped against z = 0
+    float m_centerW;
+    FloatRect m_boundingBox;
 
     OwnPtr<LayerRendererSurface> m_layerRendererSurface;
 
@@ -287,8 +306,8 @@ inline void ThreadSafeRefCounted<WebCore::LayerCompositingThread>::deref()
     if (derefBase()) {
         // Delete on the compositing thread.
         BlackBerry::Platform::GuardedPointerDeleter::deleteOnThread(
-                BlackBerry::Platform::userInterfaceThreadMessageClient(),
-                static_cast<WebCore::LayerCompositingThread*>(this));
+            BlackBerry::Platform::userInterfaceThreadMessageClient(),
+            static_cast<WebCore::LayerCompositingThread*>(this));
     }
 }
 

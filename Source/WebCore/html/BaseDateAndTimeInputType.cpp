@@ -40,7 +40,6 @@
 #include <wtf/CurrentTime.h>
 #include <wtf/DateMath.h>
 #include <wtf/MathExtras.h>
-#include <wtf/PassOwnPtr.h>
 #include <wtf/text/WTFString.h>
 
 namespace WebCore {
@@ -96,21 +95,13 @@ bool BaseDateAndTimeInputType::isSteppable() const
     return true;
 }
 
-void BaseDateAndTimeInputType::handleKeydownEvent(KeyboardEvent* event)
-{
-    if (shouldHaveSpinButton())
-        handleKeydownEventForSpinButton(event);
-    if (!event->defaultHandled())
-        TextFieldInputType::handleKeydownEvent(event);
-}
-
 Decimal BaseDateAndTimeInputType::parseToNumber(const String& source, const Decimal& defaultValue) const
 {
     DateComponents date;
     if (!parseToDateComponents(source, &date))
         return defaultValue;
     double msec = date.millisecondsSinceEpoch();
-    ASSERT(isfinite(msec));
+    ASSERT(std::isfinite(msec));
     return Decimal::fromDouble(msec);
 }
 
@@ -166,15 +157,6 @@ String BaseDateAndTimeInputType::visibleValue() const
     return localizeValue(element()->value());
 }
 
-String BaseDateAndTimeInputType::convertFromVisibleValue(const String& visibleValue) const
-{
-    // convertFromVisibleValue is used in the textfield UI. Though this class
-    // inherits TextFieldInputType, users are unable to edit visible values, and
-    // this function is never called.
-    ASSERT_NOT_REACHED();
-    return visibleValue;
-}
-
 String BaseDateAndTimeInputType::sanitizeValue(const String& proposedValue) const
 {
     return typeMismatchFor(proposedValue) ? String() : proposedValue;
@@ -183,6 +165,16 @@ String BaseDateAndTimeInputType::sanitizeValue(const String& proposedValue) cons
 bool BaseDateAndTimeInputType::supportsReadOnly() const
 {
     return true;
+}
+
+bool BaseDateAndTimeInputType::shouldRespectListAttribute()
+{
+    return InputType::themeSupportsDataListUI(this);
+}
+
+bool BaseDateAndTimeInputType::valueMissing(const String& value) const
+{
+    return element()->isRequired() && value.isEmpty();
 }
 
 } // namespace WebCore

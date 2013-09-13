@@ -34,25 +34,25 @@
 
 namespace WebKit {
 
+const char* WebBatteryManagerProxy::supplementName()
+{
+    return "WebBatteryManagerProxy";
+}
+
 PassRefPtr<WebBatteryManagerProxy> WebBatteryManagerProxy::create(WebContext* context)
 {
     return adoptRef(new WebBatteryManagerProxy(context));
 }
 
 WebBatteryManagerProxy::WebBatteryManagerProxy(WebContext* context)
-    : m_isUpdating(false)
-    , m_context(context)
+    : WebContextSupplement(context)
+    , m_isUpdating(false)
 {
-    m_context->addMessageReceiver(Messages::WebBatteryManagerProxy::messageReceiverName(), this);
+    WebContextSupplement::context()->addMessageReceiver(Messages::WebBatteryManagerProxy::messageReceiverName(), this);
 }
 
 WebBatteryManagerProxy::~WebBatteryManagerProxy()
 {
-}
-
-void WebBatteryManagerProxy::invalidate()
-{
-    stopUpdating();
 }
 
 void WebBatteryManagerProxy::initializeProvider(const WKBatteryProvider* provider)
@@ -60,9 +60,43 @@ void WebBatteryManagerProxy::initializeProvider(const WKBatteryProvider* provide
     m_provider.initialize(provider);
 }
 
-void WebBatteryManagerProxy::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::MessageDecoder& decoder)
+
+void WebBatteryManagerProxy::providerDidChangeBatteryStatus(const WTF::AtomicString& eventType, WebBatteryStatus* status)
 {
-    didReceiveWebBatteryManagerProxyMessage(connection, messageID, decoder);
+    if (!context())
+        return;
+
+    context()->sendToAllProcesses(Messages::WebBatteryManager::DidChangeBatteryStatus(eventType, status->data()));
+}
+
+void WebBatteryManagerProxy::providerUpdateBatteryStatus(WebBatteryStatus* status)
+{
+    if (!context())
+        return;
+
+    context()->sendToAllProcesses(Messages::WebBatteryManager::UpdateBatteryStatus(status->data()));
+}
+
+// WebContextSupplement
+
+void WebBatteryManagerProxy::contextDestroyed()
+{
+    stopUpdating();
+}
+
+void WebBatteryManagerProxy::processDidClose(WebProcessProxy*)
+{
+    stopUpdating();
+}
+
+void WebBatteryManagerProxy::refWebContextSupplement()
+{
+    APIObject::ref();
+}
+
+void WebBatteryManagerProxy::derefWebContextSupplement()
+{
+    APIObject::deref();
 }
 
 void WebBatteryManagerProxy::startUpdating()
@@ -81,22 +115,6 @@ void WebBatteryManagerProxy::stopUpdating()
 
     m_provider.stopUpdating(this);
     m_isUpdating = false;
-}
-
-void WebBatteryManagerProxy::providerDidChangeBatteryStatus(const WTF::AtomicString& eventType, WebBatteryStatus* status)
-{
-    if (!m_context)
-        return;
-
-    m_context->sendToAllProcesses(Messages::WebBatteryManager::DidChangeBatteryStatus(eventType, status->data()));
-}
-
-void WebBatteryManagerProxy::providerUpdateBatteryStatus(WebBatteryStatus* status)
-{
-    if (!m_context)
-        return;
-
-    m_context->sendToAllProcesses(Messages::WebBatteryManager::UpdateBatteryStatus(status->data()));
 }
 
 } // namespace WebKit

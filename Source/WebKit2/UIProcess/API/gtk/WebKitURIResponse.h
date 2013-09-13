@@ -17,7 +17,7 @@
  * Boston, MA 02110-1301, USA.
  */
 
-#if !defined(__WEBKIT2_H_INSIDE__) && !defined(WEBKIT2_COMPILATION)
+#if !defined(__WEBKIT2_H_INSIDE__) && !defined(WEBKIT2_COMPILATION) && !defined(__WEBKIT_WEB_EXTENSION_H_INSIDE__)
 #error "Only <webkit2/webkit2.h> can be included directly."
 #endif
 
@@ -50,6 +50,10 @@ struct _WebKitURIResponse {
 struct _WebKitURIResponseClass {
     GObjectClass parent_class;
 
+    void (*_webkit_reserved0) (void);
+    void (*_webkit_reserved1) (void);
+    void (*_webkit_reserved2) (void);
+    void (*_webkit_reserved3) (void);
 };
 
 WEBKIT_API GType
@@ -67,10 +71,6 @@ webkit_uri_response_get_content_length     (WebKitURIResponse    *response);
 WEBKIT_API const gchar *
 webkit_uri_response_get_mime_type          (WebKitURIResponse    *response);
 
-WEBKIT_API gboolean
-webkit_uri_response_get_https_status       (WebKitURIResponse    *response,
-                                            GTlsCertificate     **certificate,
-                                            GTlsCertificateFlags *errors);
 WEBKIT_API const gchar *
 webkit_uri_response_get_suggested_filename (WebKitURIResponse    *response);
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,6 +31,7 @@
 #include "DFGAbstractState.h"
 #include "DFGGraph.h"
 #include "DFGPhase.h"
+#include "Operations.h"
 
 namespace JSC { namespace DFG {
 
@@ -44,6 +45,10 @@ public:
     
     bool run()
     {
+        ASSERT(m_graph.m_form == ThreadedCPS);
+        ASSERT(m_graph.m_unificationState == GloballyUnified);
+        ASSERT(m_graph.m_refCountState == EverythingIsLive);
+        
 #if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
         m_count = 0;
 #endif
@@ -87,11 +92,9 @@ private:
         dataLogF("\n");
 #endif
         for (unsigned i = 0; i < block->size(); ++i) {
-            NodeIndex nodeIndex = block->at(i);
-            if (!m_graph[nodeIndex].shouldGenerate())
-                continue;
 #if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
-            dataLogF("      %s @%u: ", Graph::opName(m_graph[nodeIndex].op()), nodeIndex);
+            Node* node = block->at(i);
+            dataLogF("      %s @%u: ", Graph::opName(node->op()), node->index());
             m_state.dump(WTF::dataFile());
             dataLogF("\n");
 #endif

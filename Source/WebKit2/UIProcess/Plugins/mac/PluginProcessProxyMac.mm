@@ -28,17 +28,20 @@
 
 #if ENABLE(PLUGIN_PROCESS)
 
+#import "DynamicLinkerEnvironmentExtractor.h"
 #import "EnvironmentVariables.h"
 #import "PluginProcessCreationParameters.h"
 #import "PluginProcessMessages.h"
 #import "WebKitSystemInterface.h"
 #import <WebCore/FileSystem.h>
+#import <WebCore/KURL.h>
+#import <WebCore/RuntimeApplicationChecks.h>
+#import <crt_externs.h>
+#import <mach-o/dyld.h>
 #import <spawn.h>
 #import <wtf/text/CString.h>
 
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1070
 #import <QuartzCore/CARemoteLayerServer.h>
-#endif
 
 @interface WKPlaceholderModalWindow : NSWindow 
 @end
@@ -53,8 +56,6 @@
 }
 
 @end
-
-NSString * const WebKit2PlugInSandboxProfileDirectoryPathKey = @"WebKit2PlugInSandboxProfileDirectoryPath";
 
 using namespace WebCore;
 
@@ -91,6 +92,9 @@ bool PluginProcessProxy::createPropertyListFile(const PluginModuleInfo& plugin)
     posix_spawnattr_setbinpref_np(&attr, 1, cpuTypes, &outCount);
 
     EnvironmentVariables environmentVariables;
+
+    DynamicLinkerEnvironmentExtractor environmentExtractor([[NSBundle mainBundle] executablePath], _NSGetMachExecuteHeader()->cputype);
+    environmentExtractor.getExtractedEnvironmentVariables(environmentVariables);
     
     // To make engineering builds work, if the path is outside of /System set up
     // DYLD_FRAMEWORK_PATH to pick up other frameworks, but don't do it for the
@@ -119,42 +123,54 @@ bool PluginProcessProxy::createPropertyListFile(const PluginModuleInfo& plugin)
     return true;
 }
 
-void PluginProcessProxy::platformInitializeLaunchOptions(ProcessLauncher::LaunchOptions& launchOptions, const PluginModuleInfo& pluginInfo)
-{
-    launchOptions.architecture = pluginInfo.pluginArchitecture;
-    launchOptions.executableHeap = PluginProcessProxy::pluginNeedsExecutableHeap(pluginInfo);
 #if HAVE(XPC)
-    launchOptions.useXPC = false;
+static bool shouldUseXPC()
+{
+    if (id value = [[NSUserDefaults standardUserDefaults] objectForKey:@"WebKit2UseXPCServiceForWebProcess"])
+        return [value boolValue];
+
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
+    // FIXME: Temporary workaround for <rdar://problem/13236883>
+    if (applicationIsSafari())
+        return false;
+
+    return true;
+#else
+    return false;
+#endif
+}
+#endif
+
+void PluginProcessProxy::platformGetLaunchOptions(ProcessLauncher::LaunchOptions& launchOptions, const PluginProcessAttributes& pluginProcessAttributes)
+{
+    launchOptions.architecture = pluginProcessAttributes.moduleInfo.pluginArchitecture;
+    launchOptions.executableHeap = PluginProcessProxy::pluginNeedsExecutableHeap(pluginProcessAttributes.moduleInfo);
+    launchOptions.extraInitializationData.add("plugin-path", pluginProcessAttributes.moduleInfo.path);
+
+    // FIXME: Don't allow this if the UI process is sandboxed.
+    if (pluginProcessAttributes.sandboxPolicy == PluginProcessSandboxPolicyUnsandboxed)
+        launchOptions.extraInitializationData.add("disable-sandbox", "1");
+
+#if HAVE(XPC)
+    launchOptions.useXPC = shouldUseXPC();
 #endif
 }
 
 void PluginProcessProxy::platformInitializePluginProcess(PluginProcessCreationParameters& parameters)
 {
-    // For know only Flash is known to behave with asynchronous plug-in initialization.
-    parameters.supportsAsynchronousPluginInitialization = m_pluginInfo.bundleIdentifier == "com.macromedia.Flash Player.plugin";
+    // For now only Flash is known to behave with asynchronous plug-in initialization.
+    parameters.supportsAsynchronousPluginInitialization = m_pluginProcessAttributes.moduleInfo.bundleIdentifier == "com.macromedia.Flash Player.plugin";
 
 #if USE(ACCELERATED_COMPOSITING) && HAVE(HOSTED_CORE_ANIMATION)
-    parameters.parentProcessName = [[NSProcessInfo processInfo] processName];
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1070
     mach_port_t renderServerPort = [[CARemoteLayerServer sharedServer] serverPort];
-#else
-    mach_port_t renderServerPort = WKInitializeRenderServer();
-#endif
-
     if (renderServerPort != MACH_PORT_NULL)
         parameters.acceleratedCompositingPort = CoreIPC::MachPort(renderServerPort, MACH_MSG_TYPE_COPY_SEND);
 #endif
-
-    // FIXME: We should rip this out once we have a good place to install plug-in
-    // sandbox profiles.
-    NSString* sandboxProfileDirectoryPath = [[NSUserDefaults standardUserDefaults] stringForKey:WebKit2PlugInSandboxProfileDirectoryPathKey];
-    if (sandboxProfileDirectoryPath)
-        parameters.sandboxProfileDirectoryPath = String(sandboxProfileDirectoryPath);
 }
 
 bool PluginProcessProxy::getPluginProcessSerialNumber(ProcessSerialNumber& pluginProcessSerialNumber)
 {
-    pid_t pluginProcessPID = m_processLauncher->processIdentifier();
+    pid_t pluginProcessPID = processIdentifier();
 #if COMPILER(CLANG)
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
@@ -282,7 +298,7 @@ void PluginProcessProxy::beginModal()
     ASSERT(!m_placeholderWindow);
     ASSERT(!m_activationObserver);
     
-    m_placeholderWindow.adoptNS([[WKPlaceholderModalWindow alloc] initWithContentRect:NSMakeRect(0, 0, 1, 1) styleMask:NSBorderlessWindowMask backing:NSBackingStoreBuffered defer:YES]);
+    m_placeholderWindow = adoptNS([[WKPlaceholderModalWindow alloc] initWithContentRect:NSMakeRect(0, 0, 1, 1) styleMask:NSBorderlessWindowMask backing:NSBackingStoreBuffered defer:YES]);
     [m_placeholderWindow.get() setReleasedWhenClosed:NO];
     
     m_activationObserver = [[NSNotificationCenter defaultCenter] addObserverForName:NSApplicationWillBecomeActiveNotification object:NSApp queue:nil
@@ -316,12 +332,144 @@ void PluginProcessProxy::applicationDidBecomeActive()
     makePluginProcessTheFrontProcess();
 }
 
-void PluginProcessProxy::setApplicationIsOccluded(bool applicationIsOccluded)
+void PluginProcessProxy::setProcessSuppressionEnabled(bool processSuppressionEnabled)
 {
     if (!isValid())
         return;
 
-    m_connection->send(Messages::PluginProcess::SetApplicationIsOccluded(applicationIsOccluded), 0);
+    m_connection->send(Messages::PluginProcess::SetProcessSuppressionEnabled(processSuppressionEnabled), 0);
+}
+
+void PluginProcessProxy::openPluginPreferencePane()
+{
+    if (!m_pluginProcessAttributes.moduleInfo.preferencePanePath)
+        return;
+
+    NSURL *preferenceURL = [NSURL fileURLWithPath:m_pluginProcessAttributes.moduleInfo.preferencePanePath];
+    if (!preferenceURL) {
+        LOG_ERROR("Creating URL for preference pane path \"%@\" failed.", (NSString *)m_pluginProcessAttributes.moduleInfo.preferencePanePath);
+        return;
+    }
+
+    NSArray *preferenceURLs = [NSArray arrayWithObject:preferenceURL];
+
+    LSLaunchURLSpec prefSpec;
+    prefSpec.appURL = 0;
+    prefSpec.itemURLs = reinterpret_cast<CFArrayRef>(preferenceURLs);
+    prefSpec.passThruParams = 0;
+    prefSpec.launchFlags = kLSLaunchAsync | kLSLaunchDontAddToRecents;
+    prefSpec.asyncRefCon = 0;
+
+    OSStatus error = LSOpenFromURLSpec(&prefSpec, 0);
+    if (error != noErr)
+        LOG_ERROR("LSOpenFromURLSpec to open \"%@\" failed with error %d.", (NSString *)m_pluginProcessAttributes.moduleInfo.preferencePanePath, error);
+}
+
+static bool isFlashUpdater(const String& launchPath, const Vector<String>& arguments)
+{
+    if (launchPath != "/Applications/Utilities/Adobe Flash Player Install Manager.app/Contents/MacOS/Adobe Flash Player Install Manager")
+        return false;
+
+    if (arguments.size() != 1)
+        return false;
+
+    if (arguments[0] != "-update")
+        return false;
+
+    return true;
+}
+
+static bool shouldLaunchProcess(const PluginProcessAttributes& pluginProcessAttributes, const String& launchPath, const Vector<String>& arguments)
+{
+    if (pluginProcessAttributes.moduleInfo.bundleIdentifier == "com.macromedia.Flash Player.plugin")
+        return isFlashUpdater(launchPath, arguments);
+
+    return false;
+}
+
+void PluginProcessProxy::launchProcess(const String& launchPath, const Vector<String>& arguments, bool& result)
+{
+    if (!shouldLaunchProcess(m_pluginProcessAttributes, launchPath, arguments)) {
+        result = false;
+        return;
+    }
+
+    result = true;
+
+    RetainPtr<NSMutableArray> argumentsArray = adoptNS([[NSMutableArray alloc] initWithCapacity:arguments.size()]);
+    for (size_t i = 0; i < arguments.size(); ++i)
+        [argumentsArray addObject:(NSString *)arguments[i]];
+
+    [NSTask launchedTaskWithLaunchPath:launchPath arguments:argumentsArray.get()];
+}
+
+static bool isJavaUpdaterURL(const PluginProcessAttributes& pluginProcessAttributes, const String& urlString)
+{
+    NSURL *url = [NSURL URLWithString:urlString];
+    if (![url isFileURL])
+        return false;
+
+    NSString *javaUpdaterPath = [NSString pathWithComponents:[NSArray arrayWithObjects:(NSString *)pluginProcessAttributes.moduleInfo.path, @"Contents/Resources/Java Updater.app", nil]];
+    return [url.path isEqualToString:javaUpdaterPath];
+}
+
+static bool shouldLaunchApplicationAtURL(const PluginProcessAttributes& pluginProcessAttributes, const String& urlString)
+{
+    if (pluginProcessAttributes.moduleInfo.bundleIdentifier == "com.oracle.java.JavaAppletPlugin")
+        return isJavaUpdaterURL(pluginProcessAttributes, urlString);
+
+    return false;
+}
+
+void PluginProcessProxy::launchApplicationAtURL(const String& urlString, const Vector<String>& arguments, bool& result)
+{
+    if (!shouldLaunchApplicationAtURL(m_pluginProcessAttributes, urlString)) {
+        result = false;
+        return;
+    }
+
+    result = true;
+
+    RetainPtr<NSMutableArray> argumentsArray = adoptNS([[NSMutableArray alloc] initWithCapacity:arguments.size()]);
+    for (size_t i = 0; i < arguments.size(); ++i)
+        [argumentsArray addObject:(NSString *)arguments[i]];
+
+    NSDictionary *configuration = [NSDictionary dictionaryWithObject:argumentsArray.get() forKey:NSWorkspaceLaunchConfigurationArguments];
+    [[NSWorkspace sharedWorkspace] launchApplicationAtURL:[NSURL URLWithString:urlString] options:NSWorkspaceLaunchAsync configuration:configuration error:nullptr];
+}
+
+static bool isSilverlightPreferencesURL(const PluginProcessAttributes& pluginProcessAttributes, const String& urlString)
+{
+    NSURL *silverlightPreferencesURL = [NSURL fileURLWithPathComponents:[NSArray arrayWithObjects:(NSString *)pluginProcessAttributes.moduleInfo.path, @"Contents/Resources/Silverlight Preferences.app", nil]];
+
+    return [[NSURL URLWithString:urlString] isEqual:silverlightPreferencesURL];
+}
+
+static bool shouldOpenURL(const PluginProcessAttributes& pluginProcessAttributes, const String& urlString)
+{
+    if (pluginProcessAttributes.moduleInfo.bundleIdentifier == "com.microsoft.SilverlightPlugin")
+        return isSilverlightPreferencesURL(pluginProcessAttributes, urlString);
+
+    return false;
+}
+
+void PluginProcessProxy::openURL(const String& urlString, bool& result, int32_t& status, String& launchedURLString)
+{
+    if (!shouldOpenURL(m_pluginProcessAttributes, urlString)) {
+        result = false;
+        return;
+    }
+
+    result = true;
+    CFURLRef launchedURL;
+    status = LSOpenCFURLRef(KURL(ParsedURLString, urlString).createCFURL().get(), &launchedURL);
+
+    if (launchedURL) {
+        launchedURLString = KURL(launchedURL).string();
+        CFRelease(launchedURL);
+    }
+
+    result = false;
 }
 
 } // namespace WebKit

@@ -27,36 +27,35 @@
 #include "config.h"
 #include "WTFThreadData.h"
 
+#include <wtf/text/AtomicStringTable.h>
+
 namespace WTF {
 
 ThreadSpecific<WTFThreadData>* WTFThreadData::staticData;
 
 WTFThreadData::WTFThreadData()
-    : m_atomicStringTable(0)
+    : m_apiData(0)
+    , m_atomicStringTable(0)
     , m_atomicStringTableDestructor(0)
-#if USE(JSC)
     , m_defaultIdentifierTable(new JSC::IdentifierTable())
     , m_currentIdentifierTable(m_defaultIdentifierTable)
     , m_stackBounds(StackBounds::currentThreadStackBounds())
 #if ENABLE(STACK_STATS)
     , m_stackStats()
 #endif
-#endif // USE(JSC)
 {
+    AtomicStringTable::create(*this);
 }
 
 WTFThreadData::~WTFThreadData()
 {
     if (m_atomicStringTableDestructor)
         m_atomicStringTableDestructor(m_atomicStringTable);
-#if USE(JSC)
     delete m_defaultIdentifierTable;
-#endif
 }
 
 } // namespace WTF
 
-#if USE(JSC)
 namespace JSC {
 
 IdentifierTable::~IdentifierTable()
@@ -74,5 +73,3 @@ HashSet<StringImpl*>::AddResult IdentifierTable::add(StringImpl* value)
 }
 
 } // namespace JSC
-#endif
-

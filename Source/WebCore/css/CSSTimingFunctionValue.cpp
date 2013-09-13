@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007 Apple Computer, Inc.  All rights reserved.
+ * Copyright (C) 2007, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,20 +26,15 @@
 #include "config.h"
 #include "CSSTimingFunctionValue.h"
 
-#include "WebCoreMemoryInstrumentation.h"
 #include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
 String CSSLinearTimingFunctionValue::customCssText() const
 {
-    return "linear";
+    return ASCIILiteral("linear");
 }
 
-void CSSLinearTimingFunctionValue::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
-}
 
 String CSSCubicBezierTimingFunctionValue::customCssText() const
 {
@@ -47,22 +42,23 @@ String CSSCubicBezierTimingFunctionValue::customCssText() const
         + String::number(m_x1) + ", "
         + String::number(m_y1) + ", "
         + String::number(m_x2) + ", "
-        + String::number(m_y2) + ")";
+        + String::number(m_y2) + ')';
 }
 
-void CSSCubicBezierTimingFunctionValue::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+bool CSSCubicBezierTimingFunctionValue::equals(const CSSCubicBezierTimingFunctionValue& other) const
 {
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
+    return m_x1 == other.m_x1 && m_x2 == other.m_x2 && m_y1 == other.m_y1 && m_y2 == other.m_y2;
 }
+
 
 String CSSStepsTimingFunctionValue::customCssText() const
 {
     return "steps(" + String::number(m_steps) + ", " + (m_stepAtStart ? "start" : "end") + ')';
 }
 
-void CSSStepsTimingFunctionValue::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+bool CSSStepsTimingFunctionValue::equals(const CSSStepsTimingFunctionValue& other) const
 {
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
+    return m_steps == other.m_steps && m_stepAtStart == other.m_stepAtStart;
 }
 
 } // namespace WebCore

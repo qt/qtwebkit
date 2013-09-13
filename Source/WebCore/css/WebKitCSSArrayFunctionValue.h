@@ -48,7 +48,7 @@ public:
 
     PassRefPtr<WebKitCSSArrayFunctionValue> cloneForCSSOM() const;
 
-    void reportDescendantMemoryUsage(MemoryObjectInfo*) const;
+    bool equals(const WebKitCSSArrayFunctionValue&) const;
 
 private:
     WebKitCSSArrayFunctionValue();

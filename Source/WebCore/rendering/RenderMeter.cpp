@@ -19,9 +19,9 @@
  */
 
 #include "config.h"
+#if ENABLE(METER_ELEMENT)
 #include "RenderMeter.h"
 
-#if ENABLE(METER_ELEMENT)
 #include "HTMLMeterElement.h"
 #include "HTMLNames.h"
 #include "RenderTheme.h"
@@ -71,11 +71,6 @@ void RenderMeter::computeLogicalHeight(LayoutUnit logicalHeight, LayoutUnit logi
         frame.setWidth(computedValues.m_extent);
     IntSize frameSize = theme()->meterSizeForBounds(this, pixelSnappedIntRect(frame));
     computedValues.m_extent = isHorizontalWritingMode() ? frameSize.height() : frameSize.width();
-}
-
-double RenderMeter::valueRatio() const
-{
-    return meterElement()->valueRatio();
 }
 
 void RenderMeter::updateFromElement()

@@ -24,14 +24,15 @@
 #include "config.h"
 #include "ewk_frame.h"
 
-#include "DOMWindowIntents.h"
-#include "DeliveredIntent.h"
 #include "DocumentLoader.h"
 #include "DocumentMarkerController.h"
+#include "Editor.h"
 #include "EventHandler.h"
 #include "FocusController.h"
 #include "FrameLoadRequest.h"
+#include "FrameLoader.h"
 #include "FrameLoaderClientEfl.h"
+#include "FrameSelection.h"
 #include "FrameView.h"
 #include "HTMLCollection.h"
 #include "HTMLHeadElement.h"
@@ -39,6 +40,7 @@
 #include "HTMLNames.h"
 #include "HTMLPlugInElement.h"
 #include "HistoryItem.h"
+#include "HitTestRequest.h"
 #include "HitTestResult.h"
 #include "IntSize.h"
 #include "KURL.h"
@@ -50,12 +52,12 @@
 #include "PlatformWheelEvent.h"
 #include "ProgressTracker.h"
 #include "ResourceRequest.h"
+#include "ScriptController.h"
 #include "ScriptValue.h"
 #include "SharedBuffer.h"
 #include "SubstituteData.h"
 #include "WindowsKeyboardCodes.h"
 #include "ewk_frame_private.h"
-#include "ewk_intent_private.h"
 #include "ewk_private.h"
 #include "ewk_security_origin_private.h"
 #include "ewk_touch_event_private.h"
@@ -137,13 +139,13 @@ static inline void _ewk_frame_debug(Evas_Object* ewkFrame)
     evas_object_color_get(clip, &contentRed, &contentGreen, &contentBlue, &contentAlpha);
     evas_object_geometry_get(clip, &contentX, &contentY, &contentWidth, &contentHeight);
 
-    fprintf(stderr, "%p: type=%s name=%s, visible=%d, color=%02x%02x%02x%02x, %d,%d+%dx%d, clipper=%p (%d, %02x%02x%02x%02x, %d,%d+%dx%d)\n",
+    EINA_LOG_DBG("%p: type=%s name=%s, visible=%d, color=%02x%02x%02x%02x, %d,%d+%dx%d, clipper=%p (%d, %02x%02x%02x%02x, %d,%d+%dx%d)\n",
             ewkFrame, evas_object_type_get(ewkFrame), evas_object_name_get(ewkFrame), evas_object_visible_get(ewkFrame),
             red, green, blue, alpha, x, y, width, height,
             clip, evas_object_visible_get(clip), contentRed, contentGreen, contentBlue, contentAlpha, contentX, contentY, contentWidth, contentHeight);
     parent = evas_object_smart_parent_get(ewkFrame);
     if (!parent)
-        fprintf(stderr, "\n");
+        EINA_LOG_ERR("could not get parent object.\n");
     else
         _ewk_frame_debug(parent);
 }
@@ -447,7 +449,6 @@ const char* ewk_frame_script_execute(Evas_Object* ewkFrame, const char* script)
     EINA_SAFETY_ON_NULL_RETURN_VAL(smartData->frame, 0);
     EINA_SAFETY_ON_NULL_RETURN_VAL(script, 0);
 
-#if USE(JSC)
     WTF::String resultString;
     JSC::JSValue result = smartData->frame->script()->executeScript(WTF::String::fromUTF8(script), true).jsValue();
 
@@ -461,10 +462,6 @@ const char* ewk_frame_script_execute(Evas_Object* ewkFrame, const char* script)
     JSC::JSLockHolder lock(exec);
     resultString = result.toString(exec)->value(exec);
     return eina_stringshare_add(resultString.utf8().data());
-#else
-    notImplemented();
-    return 0;
-#endif
 }
 
 Eina_Bool ewk_frame_editable_get(const Evas_Object* ewkFrame)
@@ -483,7 +480,7 @@ Eina_Bool ewk_frame_editable_set(Evas_Object* ewkFrame, Eina_Bool editable)
         return true;
     smartData->editable = editable;
     if (editable)
-        smartData->frame->editor()->applyEditingStyleToBodyElement();
+        smartData->frame->editor().applyEditingStyleToBodyElement();
     return true;
 }
 
@@ -491,7 +488,7 @@ const char* ewk_frame_selection_get(const Evas_Object* ewkFrame)
 {
     EWK_FRAME_SD_GET_OR_RETURN(ewkFrame, smartData, 0);
     EINA_SAFETY_ON_NULL_RETURN_VAL(smartData->frame, 0);
-    WTF::CString selectedText = smartData->frame->editor()->selectedText().utf8();
+    WTF::CString selectedText = smartData->frame->editor().selectedText().utf8();
     if (selectedText.isNull())
         return 0;
     return eina_stringshare_add(selectedText.data());
@@ -503,7 +500,7 @@ Eina_Bool ewk_frame_text_search(const Evas_Object* ewkFrame, const char* text, E
     EINA_SAFETY_ON_NULL_RETURN_VAL(smartData->frame, false);
     EINA_SAFETY_ON_NULL_RETURN_VAL(text, false);
 
-    return smartData->frame->editor()->findString(WTF::String::fromUTF8(text), forward, caseSensitive, wrap, true);
+    return smartData->frame->editor().findString(WTF::String::fromUTF8(text), forward, caseSensitive, wrap, true);
 }
 
 unsigned int ewk_frame_text_matches_mark(Evas_Object* ewkFrame, const char* string, Eina_Bool caseSensitive, Eina_Bool highlight, unsigned int limit)
@@ -512,8 +509,8 @@ unsigned int ewk_frame_text_matches_mark(Evas_Object* ewkFrame, const char* stri
     EINA_SAFETY_ON_NULL_RETURN_VAL(smartData->frame, 0);
     EINA_SAFETY_ON_NULL_RETURN_VAL(string, 0);
 
-    smartData->frame->editor()->setMarkedTextMatchesAreHighlighted(highlight);
-    return smartData->frame->editor()->countMatchesForText(WTF::String::fromUTF8(string), caseSensitive, limit, true);
+    smartData->frame->editor().setMarkedTextMatchesAreHighlighted(highlight);
+    return smartData->frame->editor().countMatchesForText(WTF::String::fromUTF8(string), 0, caseSensitive, limit, true, 0);
 }
 
 Eina_Bool ewk_frame_text_matches_unmark_all(Evas_Object* ewkFrame)
@@ -529,7 +526,7 @@ Eina_Bool ewk_frame_text_matches_highlight_set(Evas_Object* ewkFrame, Eina_Bool 
 {
     EWK_FRAME_SD_GET_OR_RETURN(ewkFrame, smartData, false);
     EINA_SAFETY_ON_NULL_RETURN_VAL(smartData->frame, false);
-    smartData->frame->editor()->setMarkedTextMatchesAreHighlighted(highlight);
+    smartData->frame->editor().setMarkedTextMatchesAreHighlighted(highlight);
     return true;
 }
 
@@ -537,7 +534,7 @@ Eina_Bool ewk_frame_text_matches_highlight_get(const Evas_Object* ewkFrame)
 {
     EWK_FRAME_SD_GET_OR_RETURN(ewkFrame, smartData, false);
     EINA_SAFETY_ON_NULL_RETURN_VAL(smartData->frame, false);
-    return smartData->frame->editor()->markedTextMatchesAreHighlighted();
+    return smartData->frame->editor().markedTextMatchesAreHighlighted();
 }
 
 /**
@@ -694,8 +691,8 @@ Ewk_Hit_Test* ewk_frame_hit_test_new(const Evas_Object* ewkFrame, int x, int y)
     EINA_SAFETY_ON_NULL_RETURN_VAL(smartData->frame->contentRenderer(), 0);
 
     WebCore::HitTestResult result = smartData->frame->eventHandler()->hitTestResultAtPoint
-                                        (view->windowToContents(WebCore::IntPoint(x, y)),
-                                        /*allowShadowContent*/ false, /*ignoreClipping*/ true);
+                                        (view->windowToContents(WebCore::IntPoint(x, y)), 
+                                        WebCore::HitTestRequest::ReadOnly | WebCore::HitTestRequest::Active | WebCore::HitTestRequest::IgnoreClipping | WebCore::HitTestRequest::DisallowShadowContent);
 
     if (result.scrollbar())
         return 0;
@@ -751,30 +748,6 @@ Ewk_Hit_Test* ewk_frame_hit_test_new(const Evas_Object* ewkFrame, int x, int y)
     hitTest->context = static_cast<Ewk_Hit_Test_Result_Context>(context);
 
     return hitTest;
-}
-
-void ewk_frame_intent_deliver(const Evas_Object* ewkFrame, Ewk_Intent* ewk_intent)
-{
-#if ENABLE(WEB_INTENTS)
-    EWK_FRAME_SD_GET_OR_RETURN(ewkFrame, smartData);
-    EINA_SAFETY_ON_NULL_RETURN(smartData->frame);
-
-    WebCore::Intent* intent = EWKPrivate::coreIntent(ewk_intent);
-
-    OwnPtr<WebCore::MessagePortChannelArray> channels;
-    WebCore::MessagePortChannelArray* origChannels = intent->messagePorts();
-    if (origChannels && origChannels->size()) {
-        channels = adoptPtr(new WebCore::MessagePortChannelArray(origChannels->size()));
-        for (size_t i = 0; i < origChannels->size(); ++i)
-            (*channels)[i] = origChannels->at(i).release();
-    }
-    OwnPtr<WebCore::MessagePortArray> ports = WebCore::MessagePort::entanglePorts(*(smartData->frame->document()), channels.release());
-
-    OwnPtr<WebCore::DeliveredIntentClient> dummyClient;
-    RefPtr<WebCore::DeliveredIntent> deliveredIntent = WebCore::DeliveredIntent::create(smartData->frame, dummyClient.release(), intent->action(), intent->type(), intent->data(), ports.release(), intent->extras());
-
-    WebCore::DOMWindowIntents::from(smartData->frame->document()->domWindow())->deliver(deliveredIntent.release());
-#endif
 }
 
 Eina_Bool
@@ -846,7 +819,7 @@ Eina_Bool ewk_frame_visible_content_geometry_get(const Evas_Object* ewkFrame, Ei
     EWK_FRAME_SD_GET_OR_RETURN(ewkFrame, smartData, false);
     EINA_SAFETY_ON_NULL_RETURN_VAL(smartData->frame, false);
     EINA_SAFETY_ON_NULL_RETURN_VAL(smartData->frame->view(), false);
-    WebCore::IntRect rect = smartData->frame->view()->visibleContentRect(includeScrollbars);
+    WebCore::IntRect rect = smartData->frame->view()->visibleContentRect(includeScrollbars ? WebCore::ScrollableArea::IncludeScrollbars : WebCore::ScrollableArea::ExcludeScrollbars);
     if (x)
         *x = rect.x();
     if (y)
@@ -896,7 +869,7 @@ Eina_Bool ewk_frame_focused_element_geometry_get(const Evas_Object *ewkFrame, in
     WebCore::Document* document = smartData->frame->document();
     if (!document)
         return false;
-    WebCore::Node* focusedNode = document->focusedNode();
+    WebCore::Node* focusedNode = document->focusedElement();
     if (!focusedNode)
         return false;
     WebCore::IntRect nodeRect = focusedNode->pixelSnappedBoundingBox();
@@ -995,6 +968,10 @@ Eina_Bool ewk_frame_feed_touch_event(Evas_Object* ewkFrame, Ewk_Touch_Event_Type
 
     return smartData->frame->eventHandler()->handleTouchEvent(EWKPrivate::platformTouchEvent(x, y, points, action, modifiers));
 #else
+    UNUSED_PARAM(ewkFrame);
+    UNUSED_PARAM(action);
+    UNUSED_PARAM(points);
+    UNUSED_PARAM(modifiers);
     return false;
 #endif
 }
@@ -1543,32 +1520,6 @@ void ewk_frame_load_progress_changed(Evas_Object* ewkFrame)
 
     evas_object_smart_callback_call(ewkFrame, "load,progress", &progress);
     ewk_view_load_progress_changed(smartData->view);
-}
-
-/**
- * @internal
- * Reports new intent.
- *
- * Emits signal: "intent,new" with pointer to a Ewk_Intent_Request.
- */
-void ewk_frame_intent_new(Evas_Object* ewkFrame, Ewk_Intent_Request* request)
-{
-#if ENABLE(WEB_INTENTS)
-    evas_object_smart_callback_call(ewkFrame, "intent,new", request);
-#endif
-}
-
-/**
- * @internal
- * Reports an intent service registration.
- *
- * Emits signal: "intent,service,register" with pointer to a Ewk_Intent_Service_Info.
- */
-void ewk_frame_intent_service_register(Evas_Object* ewkFrame, Ewk_Intent_Service_Info* info)
-{
-#if ENABLE(WEB_INTENTS_TAG)
-    evas_object_smart_callback_call(ewkFrame, "intent,service,register", info);
-#endif
 }
 
 /**

@@ -38,7 +38,7 @@ from webkitpy.tool.commands.abstractsequencedcommand import AbstractSequencedCom
 from webkitpy.tool.commands.stepsequence import StepSequence
 from webkitpy.tool.comments import bug_comment_from_commit_text
 from webkitpy.tool.grammar import pluralize
-from webkitpy.tool.multicommandtool import AbstractDeclarativeCommand
+from webkitpy.tool.multicommandtool import Command
 
 _log = logging.getLogger(__name__)
 
@@ -47,7 +47,7 @@ class Clean(AbstractSequencedCommand):
     name = "clean"
     help_text = "Clean the working copy"
     steps = [
-        steps.CleanWorkingDirectory,
+        steps.DiscardLocalChanges,
     ]
 
     def _prepare_state(self, options, args, tool):
@@ -58,7 +58,7 @@ class Update(AbstractSequencedCommand):
     name = "update"
     help_text = "Update working copy (used internally)"
     steps = [
-        steps.CleanWorkingDirectory,
+        steps.DiscardLocalChanges,
         steps.Update,
     ]
 
@@ -67,7 +67,7 @@ class Build(AbstractSequencedCommand):
     name = "build"
     help_text = "Update working copy and build"
     steps = [
-        steps.CleanWorkingDirectory,
+        steps.DiscardLocalChanges,
         steps.Update,
         steps.Build,
     ]
@@ -80,7 +80,7 @@ class BuildAndTest(AbstractSequencedCommand):
     name = "build-and-test"
     help_text = "Update working copy, build, and run the tests"
     steps = [
-        steps.CleanWorkingDirectory,
+        steps.DiscardLocalChanges,
         steps.Update,
         steps.Build,
         steps.RunTests,
@@ -114,8 +114,9 @@ If a bug id is provided, or one can be found in the ChangeLog land will update t
         }
 
 
-class LandCowboy(AbstractSequencedCommand):
-    name = "land-cowboy"
+class LandCowhand(AbstractSequencedCommand):
+    # Gender-blind term for cowboy, see: http://en.wiktionary.org/wiki/cowhand
+    name = "land-cowhand"
     help_text = "Prepares a ChangeLog and lands the current working directory diff."
     steps = [
         steps.PrepareChangeLog,
@@ -132,9 +133,12 @@ class LandCowboy(AbstractSequencedCommand):
         options.check_style_filter = "-changelog"
 
 
-class LandCowhand(LandCowboy):
-    # Gender-blind term for cowboy, see: http://en.wiktionary.org/wiki/cowhand
-    name = "land-cowhand"
+class LandCowboy(LandCowhand):
+    name = "land-cowboy"
+
+    def _prepare_state(self, options, args, tool):
+        _log.warning("land-cowboy is deprecated, use land-cowhand instead.")
+        LandCowhand._prepare_state(self, options, args, tool)
 
 
 class CheckStyleLocal(AbstractSequencedCommand):
@@ -145,11 +149,11 @@ class CheckStyleLocal(AbstractSequencedCommand):
     ]
 
 
-class AbstractPatchProcessingCommand(AbstractDeclarativeCommand):
+class AbstractPatchProcessingCommand(Command):
     # Subclasses must implement the methods below.  We don't declare them here
     # because we want to be able to implement them with mix-ins.
     #
-    # pylint: disable-msg=E1101
+    # pylint: disable=E1101
     # def _fetch_list_of_patches_to_process(self, options, args, tool):
     # def _prepare_to_process(self, options, args, tool):
     # def _process_patch(self, options, args, tool):
@@ -185,11 +189,21 @@ class AbstractPatchSequencingCommand(AbstractPatchProcessingCommand):
         AbstractPatchProcessingCommand.__init__(self, options)
 
     def _prepare_to_process(self, options, args, tool):
-        self._prepare_sequence.run_and_handle_errors(tool, options)
+        try:
+            self.state = self._prepare_state(options, args, tool)
+        except ScriptError, e:
+            _log.error(e.message_with_output())
+            self._exit(e.exit_code or 2)
+        self._prepare_sequence.run_and_handle_errors(tool, options, self.state)
 
     def _process_patch(self, patch, options, args, tool):
-        state = { "patch" : patch }
+        state = {}
+        state.update(self.state or {})
+        state["patch"] = patch
         self._main_sequence.run_and_handle_errors(tool, options, state)
+
+    def _prepare_state(self, options, args, tool):
+        return None
 
 
 class ProcessAttachmentsMixin(object):
@@ -235,7 +249,7 @@ class CheckStyle(AbstractPatchSequencingCommand, ProcessAttachmentsMixin):
     help_text = "Run check-webkit-style on the specified attachments"
     argument_names = "ATTACHMENT_ID [ATTACHMENT_IDS]"
     main_steps = [
-        steps.CleanWorkingDirectory,
+        steps.DiscardLocalChanges,
         steps.Update,
         steps.ApplyPatch,
         steps.CheckStyle,
@@ -247,7 +261,7 @@ class BuildAttachment(AbstractPatchSequencingCommand, ProcessAttachmentsMixin):
     help_text = "Apply and build patches from bugzilla"
     argument_names = "ATTACHMENT_ID [ATTACHMENT_IDS]"
     main_steps = [
-        steps.CleanWorkingDirectory,
+        steps.DiscardLocalChanges,
         steps.Update,
         steps.ApplyPatch,
         steps.Build,
@@ -259,7 +273,7 @@ class BuildAndTestAttachment(AbstractPatchSequencingCommand, ProcessAttachmentsM
     help_text = "Apply, build, and test patches from bugzilla"
     argument_names = "ATTACHMENT_ID [ATTACHMENT_IDS]"
     main_steps = [
-        steps.CleanWorkingDirectory,
+        steps.DiscardLocalChanges,
         steps.Update,
         steps.ApplyPatch,
         steps.Build,
@@ -270,7 +284,7 @@ class BuildAndTestAttachment(AbstractPatchSequencingCommand, ProcessAttachmentsM
 class AbstractPatchApplyingCommand(AbstractPatchSequencingCommand):
     prepare_steps = [
         steps.EnsureLocalCommitIfNeeded,
-        steps.CleanWorkingDirectoryWithLocalCommits,
+        steps.CleanWorkingDirectory,
         steps.Update,
     ]
     main_steps = [
@@ -299,7 +313,7 @@ class ApplyWatchList(AbstractPatchSequencingCommand, ProcessAttachmentsMixin):
     help_text = "Applies the watchlist to the specified attachments"
     argument_names = "ATTACHMENT_ID [ATTACHMENT_IDS]"
     main_steps = [
-        steps.CleanWorkingDirectory,
+        steps.DiscardLocalChanges,
         steps.Update,
         steps.ApplyPatch,
         steps.ApplyWatchList,
@@ -310,7 +324,7 @@ Downloads the attachment, applies it locally, runs the watchlist against it, and
 
 class AbstractPatchLandingCommand(AbstractPatchSequencingCommand):
     main_steps = [
-        steps.CleanWorkingDirectory,
+        steps.DiscardLocalChanges,
         steps.Update,
         steps.ApplyPatch,
         steps.ValidateChangeLogs,
@@ -413,7 +427,7 @@ Applies the inverse diff for the provided revision(s).
 Creates an appropriate rollout ChangeLog, including a trac link and bug link.
 """
     steps = [
-        steps.CleanWorkingDirectory,
+        steps.DiscardLocalChanges,
         steps.Update,
         steps.RevertRevision,
         steps.PrepareChangeLogForRevert,
@@ -424,7 +438,7 @@ class CreateRollout(AbstractRolloutPrepCommand):
     name = "create-rollout"
     help_text = "Creates a bug to track the broken SVN revision(s) and uploads a rollout patch."
     steps = [
-        steps.CleanWorkingDirectory,
+        steps.DiscardLocalChanges,
         steps.Update,
         steps.RevertRevision,
         steps.CreateBug,
@@ -470,7 +484,7 @@ Opens the generated ChangeLogs in $EDITOR.
 Shows the prepared diff for confirmation.
 Commits the revert and updates the bug (including re-opening the bug if necessary)."""
     steps = [
-        steps.CleanWorkingDirectory,
+        steps.DiscardLocalChanges,
         steps.Update,
         steps.RevertRevision,
         steps.PrepareChangeLogForRevert,

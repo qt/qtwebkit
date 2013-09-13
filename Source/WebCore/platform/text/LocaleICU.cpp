@@ -55,9 +55,6 @@ LocaleICU::LocaleICU(const char* locale)
     , m_shortDateFormat(0)
     , m_didCreateDecimalFormat(false)
     , m_didCreateShortDateFormat(false)
-#if ENABLE(CALENDAR_PICKER)
-    , m_firstDayOfWeek(0)
-#endif
 #if ENABLE(DATE_AND_TIME_INPUT_TYPES)
     , m_mediumTimeFormat(0)
     , m_shortTimeFormat(0)
@@ -198,39 +195,6 @@ PassOwnPtr<Vector<String> > LocaleICU::createLabelVector(const UDateFormat* date
 }
 #endif
 
-#if ENABLE(CALENDAR_PICKER)
-static PassOwnPtr<Vector<String> > createFallbackWeekDayShortLabels()
-{
-    OwnPtr<Vector<String> > labels = adoptPtr(new Vector<String>());
-    labels->reserveCapacity(7);
-    labels->append("Sun");
-    labels->append("Mon");
-    labels->append("Tue");
-    labels->append("Wed");
-    labels->append("Thu");
-    labels->append("Fri");
-    labels->append("Sat");
-    return labels.release();
-}
-
-void LocaleICU::initializeCalendar()
-{
-    if (m_weekDayShortLabels)
-        return;
-
-    if (!initializeShortDateFormat()) {
-        m_firstDayOfWeek = 0;
-        m_weekDayShortLabels = createFallbackWeekDayShortLabels();
-        return;
-    }
-    m_firstDayOfWeek = ucal_getAttribute(udat_getCalendar(m_shortDateFormat), UCAL_FIRST_DAY_OF_WEEK) - UCAL_SUNDAY;
-
-    m_weekDayShortLabels = createLabelVector(m_shortDateFormat, UDAT_SHORT_WEEKDAYS, UCAL_SUNDAY, 7);
-    if (!m_weekDayShortLabels)
-        m_weekDayShortLabels = createFallbackWeekDayShortLabels();
-}
-#endif
-
 #if ENABLE(DATE_AND_TIME_INPUT_TYPES)
 static PassOwnPtr<Vector<String> > createFallbackMonthLabels()
 {
@@ -252,26 +216,6 @@ const Vector<String>& LocaleICU::monthLabels()
     }
     m_monthLabels = createFallbackMonthLabels();
     return *m_monthLabels;
-}
-#endif
-
-#if ENABLE(CALENDAR_PICKER)
-const Vector<String>& LocaleICU::weekDayShortLabels()
-{
-    initializeCalendar();
-    return *m_weekDayShortLabels;
-}
-
-unsigned LocaleICU::firstDayOfWeek()
-{
-    initializeCalendar();
-    return m_firstDayOfWeek;
-}
-
-bool LocaleICU::isRTL()
-{
-    UErrorCode status = U_ZERO_ERROR;
-    return uloc_getCharacterOrientation(m_locale.data(), &status) == ULOC_LAYOUT_RTL;
 }
 #endif
 
@@ -320,7 +264,7 @@ String LocaleICU::dateFormat()
     if (!m_dateFormat.isNull())
         return m_dateFormat;
     if (!initializeShortDateFormat())
-        return ASCIILiteral("dd/MM/yyyy");
+        return ASCIILiteral("yyyy-MM-dd");
     m_dateFormat = getDateFormatPattern(m_shortDateFormat);
     return m_dateFormat;
 }
@@ -353,6 +297,14 @@ String LocaleICU::monthFormat()
     // "MMMM" in some locales.
     m_monthFormat = getFormatForSkeleton(m_locale.data(), ASCIILiteral("yyyyMMMM"));
     return m_monthFormat;
+}
+
+String LocaleICU::shortMonthFormat()
+{
+    if (!m_shortMonthFormat.isNull())
+        return m_shortMonthFormat;
+    m_shortMonthFormat = getFormatForSkeleton(m_locale.data(), ASCIILiteral("yyyyMMM"));
+    return m_shortMonthFormat;
 }
 
 String LocaleICU::timeFormat()

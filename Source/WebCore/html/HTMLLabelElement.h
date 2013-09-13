@@ -29,7 +29,7 @@
 
 namespace WebCore {
 
-class HTMLLabelElement : public HTMLElement {
+class HTMLLabelElement FINAL : public HTMLElement {
 public:
     static PassRefPtr<HTMLLabelElement> create(const QualifiedName&, Document*);
 
@@ -41,19 +41,35 @@ public:
 private:
     HTMLLabelElement(const QualifiedName&, Document*);
 
-    virtual bool isFocusable() const;
+    virtual bool isFocusable() const OVERRIDE;
 
     virtual void accessKeyAction(bool sendMouseEvents);
 
     // Overridden to update the hover/active state of the corresponding control.
-    virtual void setActive(bool = true, bool pause = false);
-    virtual void setHovered(bool = true);
+    virtual void setActive(bool = true, bool pause = false) OVERRIDE;
+    virtual void setHovered(bool = true) OVERRIDE;
 
     // Overridden to either click() or focus() the corresponding control.
     virtual void defaultEventHandler(Event*);
 
-    void focus(bool restorePreviousSelection = true);
+    virtual void focus(bool restorePreviousSelection, FocusDirection) OVERRIDE;
 };
+
+inline bool isHTMLLabelElement(Node* node)
+{
+    return node->hasTagName(HTMLNames::labelTag);
+}
+
+inline bool isHTMLLabelElement(Element* element)
+{
+    return element->hasTagName(HTMLNames::labelTag);
+}
+
+inline HTMLLabelElement* toHTMLLabelElement(Node* node)
+{
+    ASSERT_WITH_SECURITY_IMPLICATION(!node || isHTMLLabelElement(node));
+    return static_cast<HTMLLabelElement*>(node);
+}
 
 } //namespace
 

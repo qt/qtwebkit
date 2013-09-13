@@ -25,13 +25,9 @@
 
 [
     Conditional=SVG
-] interface SVGAElement : SVGElement,
-                                          SVGURIReference,
-                                          SVGTests,
-                                          SVGLangSpace,
-                                          SVGExternalResourcesRequired,
-                                          SVGStylable,
-                                          SVGTransformable {
-    readonly attribute SVGAnimatedString target;
+] interface SVGAElement : SVGGraphicsElement {
+    [ImplementedAs=svgTarget] readonly attribute SVGAnimatedString target;
 };
 
+SVGAElement implements SVGExternalResourcesRequired;
+SVGAElement implements SVGURIReference;

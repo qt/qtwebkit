@@ -20,12 +20,12 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-messages -> WebContext {
+messages -> WebContext LegacyReceiver {
 
     # Visited link provider messages.
     AddVisitedLinkHash(uint64_t linkHash)
 
-    DidGetWebCoreStatistics(WebKit::StatisticsData statisticsData, uint64_t callbackID)
+    DidGetStatistics(WebKit::StatisticsData statisticsData, uint64_t callbackID)
 
 #if PLATFORM(MAC)
     # Pasteboard messages.
@@ -51,4 +51,8 @@ messages -> WebContext {
     // any synchronous messages, and should be removed when <rdar://problem/8775115> is fixed.
     Dummy() -> (bool dummyReturn)
 #endif
+
+    # Plug-in messages.
+    void AddPlugInAutoStartOriginHash(WTF::String pageOrigin, uint32_t hash)
+    void PlugInDidReceiveUserInteraction(uint32_t hash)
 }

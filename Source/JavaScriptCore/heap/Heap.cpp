@@ -31,10 +31,11 @@
 #include "HeapStatistics.h"
 #include "IncrementalSweeper.h"
 #include "Interpreter.h"
-#include "JSGlobalData.h"
+#include "VM.h"
 #include "JSGlobalObject.h"
 #include "JSLock.h"
 #include "JSONObject.h"
+#include "Operations.h"
 #include "Tracing.h"
 #include "UnlinkedCodeBlock.h"
 #include "WeakSetInlines.h"
@@ -163,17 +164,17 @@ static inline size_t proportionalHeapSize(size_t heapSize, size_t ramSize)
     return 1.25 * heapSize;
 }
 
-static inline bool isValidSharedInstanceThreadState(JSGlobalData* globalData)
+static inline bool isValidSharedInstanceThreadState(VM* vm)
 {
-    return globalData->apiLock().currentThreadIsHoldingLock();
+    return vm->apiLock().currentThreadIsHoldingLock();
 }
 
-static inline bool isValidThreadState(JSGlobalData* globalData)
+static inline bool isValidThreadState(VM* vm)
 {
-    if (globalData->identifierTable != wtfThreadData().currentIdentifierTable())
+    if (vm->identifierTable != wtfThreadData().currentIdentifierTable())
         return false;
 
-    if (globalData->isSharedInstance() && !isValidSharedInstanceThreadState(globalData))
+    if (vm->isSharedInstance() && !isValidSharedInstanceThreadState(vm))
         return false;
 
     return true;
@@ -240,7 +241,7 @@ inline PassOwnPtr<TypeCountSet> RecordType::returnValue()
 
 } // anonymous namespace
 
-Heap::Heap(JSGlobalData* globalData, HeapType heapType)
+Heap::Heap(VM* vm, HeapType heapType)
     : m_heapType(heapType)
     , m_ramSize(ramSize())
     , m_minBytesPerCycle(minHeapSize(m_heapType, m_ramSize))
@@ -249,15 +250,16 @@ Heap::Heap(JSGlobalData* globalData, HeapType heapType)
     , m_bytesAllocated(0)
     , m_bytesAbandoned(0)
     , m_operationInProgress(NoOperation)
+    , m_blockAllocator()
     , m_objectSpace(this)
     , m_storageSpace(this)
     , m_machineThreads(this)
-    , m_sharedData(globalData)
+    , m_sharedData(vm)
     , m_slotVisitor(m_sharedData)
     , m_copyVisitor(m_sharedData)
-    , m_handleSet(globalData)
+    , m_handleSet(vm)
     , m_isSafeToCollect(false)
-    , m_globalData(globalData)
+    , m_vm(vm)
     , m_lastGCLength(0)
     , m_lastCodeDiscardTime(WTF::currentTime())
     , m_activityCallback(DefaultGCActivityCallback::create(this))
@@ -275,12 +277,12 @@ bool Heap::isPagedOut(double deadline)
     return m_objectSpace.isPagedOut(deadline) || m_storageSpace.isPagedOut(deadline);
 }
 
-// The JSGlobalData is being destroyed and the collector will never run again.
+// The VM is being destroyed and the collector will never run again.
 // Run all pending finalizers now because we won't get another chance.
 void Heap::lastChanceToFinalize()
 {
-    ASSERT(!m_globalData->dynamicGlobalObject);
-    ASSERT(m_operationInProgress == NoOperation);
+    RELEASE_ASSERT(!m_vm->dynamicGlobalObject);
+    RELEASE_ASSERT(m_operationInProgress == NoOperation);
 
     m_objectSpace.lastChanceToFinalize();
 
@@ -330,7 +332,7 @@ void Heap::didAbandon(size_t bytes)
 void Heap::protect(JSValue k)
 {
     ASSERT(k);
-    ASSERT(m_globalData->apiLock().currentThreadIsHoldingLock());
+    ASSERT(m_vm->apiLock().currentThreadIsHoldingLock());
 
     if (!k.isCell())
         return;
@@ -341,7 +343,7 @@ void Heap::protect(JSValue k)
 bool Heap::unprotect(JSValue k)
 {
     ASSERT(k);
-    ASSERT(m_globalData->apiLock().currentThreadIsHoldingLock());
+    ASSERT(m_vm->apiLock().currentThreadIsHoldingLock());
 
     if (!k.isCell())
         return false;
@@ -361,12 +363,12 @@ void Heap::markProtectedObjects(HeapRootVisitor& heapRootVisitor)
         heapRootVisitor.visit(&it->key);
 }
 
-void Heap::pushTempSortVector(Vector<ValueStringPair>* tempVector)
+void Heap::pushTempSortVector(Vector<ValueStringPair, 0, UnsafeVectorOverflow>* tempVector)
 {
     m_tempSortingVectors.append(tempVector);
 }
 
-void Heap::popTempSortVector(Vector<ValueStringPair>* tempVector)
+void Heap::popTempSortVector(Vector<ValueStringPair, 0, UnsafeVectorOverflow>* tempVector)
 {
     ASSERT_UNUSED(tempVector, tempVector == m_tempSortingVectors.last());
     m_tempSortingVectors.removeLast();
@@ -374,11 +376,11 @@ void Heap::popTempSortVector(Vector<ValueStringPair>* tempVector)
 
 void Heap::markTempSortVectors(HeapRootVisitor& heapRootVisitor)
 {
-    typedef Vector<Vector<ValueStringPair>* > VectorOfValueStringVectors;
+    typedef Vector<Vector<ValueStringPair, 0, UnsafeVectorOverflow>* > VectorOfValueStringVectors;
 
     VectorOfValueStringVectors::iterator end = m_tempSortingVectors.end();
     for (VectorOfValueStringVectors::iterator it = m_tempSortingVectors.begin(); it != end; ++it) {
-        Vector<ValueStringPair>* tempSortingVector = *it;
+        Vector<ValueStringPair, 0, UnsafeVectorOverflow>* tempSortingVector = *it;
 
         Vector<ValueStringPair>::iterator vectorEnd = tempSortingVector->end();
         for (Vector<ValueStringPair>::iterator vectorIt = tempSortingVector->begin(); vectorIt != vectorEnd; ++vectorIt) {
@@ -400,12 +402,17 @@ void Heap::finalizeUnconditionalFinalizers()
 
 inline JSStack& Heap::stack()
 {
-    return m_globalData->interpreter->stack();
+    return m_vm->interpreter->stack();
+}
+
+void Heap::canonicalizeCellLivenessData()
+{
+    m_objectSpace.canonicalizeCellLivenessData();
 }
 
 void Heap::getConservativeRegisterRoots(HashSet<JSCell*>& roots)
 {
-    ASSERT(isValidThreadState(m_globalData));
+    ASSERT(isValidThreadState(m_vm));
     ConservativeRoots stackRoots(&m_objectSpace.blocks(), &m_storageSpace);
     stack().gatherConservativeRoots(stackRoots);
     size_t stackRootCount = stackRoots.size();
@@ -416,13 +423,12 @@ void Heap::getConservativeRegisterRoots(HashSet<JSCell*>& roots)
     }
 }
 
-void Heap::markRoots(bool fullGC)
+void Heap::markRoots()
 {
     SamplingRegion samplingRegion("Garbage Collection: Tracing");
 
-    COND_GCPHASE(fullGC, MarkFullRoots, MarkYoungRoots);
-    UNUSED_PARAM(fullGC);
-    ASSERT(isValidThreadState(m_globalData));
+    GCPHASE(MarkRoots);
+    ASSERT(isValidThreadState(m_vm));
 
 #if ENABLE(OBJECT_MARK_LOGGING)
     double gcStartTime = WTF::currentTime();
@@ -451,17 +457,10 @@ void Heap::markRoots(bool fullGC)
     ConservativeRoots scratchBufferRoots(&m_objectSpace.blocks(), &m_storageSpace);
     {
         GCPHASE(GatherScratchBufferRoots);
-        m_globalData->gatherConservativeRoots(scratchBufferRoots);
+        m_vm->gatherConservativeRoots(scratchBufferRoots);
     }
 #endif
 
-#if ENABLE(GGC)
-    MarkedBlock::DirtyCellVector dirtyCells;
-    if (!fullGC) {
-        GCPHASE(GatheringDirtyCells);
-        m_objectSpace.gatherDirtyCells(dirtyCells);
-    } else
-#endif
     {
         GCPHASE(clearMarks);
         m_objectSpace.clearMarks();
@@ -474,23 +473,14 @@ void Heap::markRoots(bool fullGC)
 
     {
         ParallelModeEnabler enabler(visitor);
-#if ENABLE(GGC)
-        {
-            size_t dirtyCellCount = dirtyCells.size();
-            GCPHASE(VisitDirtyCells);
-            GCCOUNTER(DirtyCellCount, dirtyCellCount);
-            for (size_t i = 0; i < dirtyCellCount; i++) {
-                heapRootVisitor.visitChildren(dirtyCells[i]);
-                visitor.donateAndDrain();
-            }
-        }
-#endif
 
-        if (m_globalData->codeBlocksBeingCompiled.size()) {
+        if (m_vm->codeBlocksBeingCompiled.size()) {
             GCPHASE(VisitActiveCodeBlock);
-            for (size_t i = 0; i < m_globalData->codeBlocksBeingCompiled.size(); i++)
-                m_globalData->codeBlocksBeingCompiled[i]->visitAggregate(visitor);
+            for (size_t i = 0; i < m_vm->codeBlocksBeingCompiled.size(); i++)
+                m_vm->codeBlocksBeingCompiled[i]->visitAggregate(visitor);
         }
+
+        m_vm->smallStrings.visitStrongReferences(visitor);
 
         {
             GCPHASE(VisitMachineRoots);
@@ -533,10 +523,10 @@ void Heap::markRoots(bool fullGC)
                 visitor.donateAndDrain();
             }
         }
-        if (m_globalData->exception) {
+        if (m_vm->exception) {
             GCPHASE(MarkingException);
             MARK_LOG_ROOT(visitor, "Exceptions");
-            heapRootVisitor.visit(&m_globalData->exception);
+            heapRootVisitor.visit(&m_vm->exception);
             visitor.donateAndDrain();
         }
     
@@ -668,7 +658,7 @@ void Heap::deleteAllCompiledCode()
 {
     // If JavaScript is running, it's not safe to delete code, since we'll end
     // up deleting code that is live on the stack.
-    if (m_globalData->dynamicGlobalObject)
+    if (m_vm->dynamicGlobalObject)
         return;
 
     for (ExecutableBase* current = m_compiledCode.head(); current; current = current->next()) {
@@ -714,12 +704,11 @@ void Heap::collect(SweepToggle sweepToggle)
     SamplingRegion samplingRegion("Garbage Collection");
     
     GCPHASE(Collect);
-    ASSERT(globalData()->apiLock().currentThreadIsHoldingLock());
-    ASSERT(globalData()->identifierTable == wtfThreadData().currentIdentifierTable());
+    ASSERT(vm()->apiLock().currentThreadIsHoldingLock());
+    RELEASE_ASSERT(vm()->identifierTable == wtfThreadData().currentIdentifierTable());
     ASSERT(m_isSafeToCollect);
     JAVASCRIPTCORE_GC_BEGIN();
-    if (m_operationInProgress != NoOperation)
-        CRASH();
+    RELEASE_ASSERT(m_operationInProgress == NoOperation);
     m_operationInProgress = Collection;
 
     m_activityCallback->willCollect();
@@ -730,19 +719,12 @@ void Heap::collect(SweepToggle sweepToggle)
         m_lastCodeDiscardTime = WTF::currentTime();
     }
 
-#if ENABLE(GGC)
-    bool fullGC = sweepToggle == DoSweep;
-    if (!fullGC)
-        fullGC = (capacity() > 4 * m_sizeAfterLastCollect);  
-#else
-    bool fullGC = true;
-#endif
     {
         GCPHASE(Canonicalize);
         m_objectSpace.canonicalizeCellLivenessData();
     }
 
-    markRoots(fullGC);
+    markRoots();
     
     {
         GCPHASE(ReapingWeakHandles);
@@ -766,12 +748,17 @@ void Heap::collect(SweepToggle sweepToggle)
 
     {
         GCPHASE(finalizeSmallStrings);
-        m_globalData->smallStrings.finalizeSmallStrings();
+        m_vm->smallStrings.finalizeSmallStrings();
     }
 
     {
         GCPHASE(DeleteCodeBlocks);
         deleteUnmarkedCompiledCode();
+    }
+
+    {
+        GCPHASE(DeleteSourceProviderCaches);
+        m_vm->clearSourceProviderCaches();
     }
 
     if (sweepToggle == DoSweep) {
@@ -793,23 +780,22 @@ void Heap::collect(SweepToggle sweepToggle)
     if (Options::gcMaxHeapSize() && currentHeapSize > Options::gcMaxHeapSize())
         HeapStatistics::exitWithFailure();
 
-    if (fullGC) {
-        m_sizeAfterLastCollect = currentHeapSize;
+    m_sizeAfterLastCollect = currentHeapSize;
 
-        // To avoid pathological GC churn in very small and very large heaps, we set
-        // the new allocation limit based on the current size of the heap, with a
-        // fixed minimum.
-        size_t maxHeapSize = max(minHeapSize(m_heapType, m_ramSize), proportionalHeapSize(currentHeapSize, m_ramSize));
-        m_bytesAllocatedLimit = maxHeapSize - currentHeapSize;
-    }
+    // To avoid pathological GC churn in very small and very large heaps, we set
+    // the new allocation limit based on the current size of the heap, with a
+    // fixed minimum.
+    size_t maxHeapSize = max(minHeapSize(m_heapType, m_ramSize), proportionalHeapSize(currentHeapSize, m_ramSize));
+    m_bytesAllocatedLimit = maxHeapSize - currentHeapSize;
+
     m_bytesAllocated = 0;
     double lastGCEndTime = WTF::currentTime();
     m_lastGCLength = lastGCEndTime - lastGCStartTime;
 
     if (Options::recordGCPauseTimes())
         HeapStatistics::recordGCPauseTime(lastGCStartTime, lastGCEndTime);
-    if (m_operationInProgress != Collection)
-        CRASH();
+    RELEASE_ASSERT(m_operationInProgress == Collection);
+
     m_operationInProgress = NoOperation;
     JAVASCRIPTCORE_GC_END();
 
@@ -828,19 +814,19 @@ void Heap::markDeadObjects()
     m_objectSpace.forEachDeadCell<MarkObject>();
 }
 
-void Heap::setActivityCallback(GCActivityCallback* activityCallback)
+void Heap::setActivityCallback(PassOwnPtr<GCActivityCallback> activityCallback)
 {
     m_activityCallback = activityCallback;
 }
 
 GCActivityCallback* Heap::activityCallback()
 {
-    return m_activityCallback;
+    return m_activityCallback.get();
 }
 
 IncrementalSweeper* Heap::sweeper()
 {
-    return m_sweeper;
+    return m_sweeper.get();
 }
 
 void Heap::setGarbageCollectionTimerEnabled(bool enable)
@@ -856,7 +842,7 @@ void Heap::didAllocate(size_t bytes)
 
 bool Heap::isValidAllocation(size_t)
 {
-    if (!isValidThreadState(m_globalData))
+    if (!isValidThreadState(m_vm))
         return false;
 
     if (m_operationInProgress != NoOperation)
@@ -881,15 +867,6 @@ void Heap::FinalizerOwner::finalize(Handle<Unknown> handle, void* context)
 void Heap::addCompiledCode(ExecutableBase* executable)
 {
     m_compiledCode.append(executable);
-}
-
-void Heap::didStartVMShutdown()
-{
-    m_activityCallback->didStartVMShutdown();
-    m_activityCallback = 0;
-    m_sweeper->didStartVMShutdown();
-    m_sweeper = 0;
-    lastChanceToFinalize();
 }
 
 class Zombify : public MarkedBlock::VoidFunctor {

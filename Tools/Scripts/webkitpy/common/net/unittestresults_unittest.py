@@ -26,7 +26,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import unittest
+import unittest2 as unittest
 
 from unittestresults import UnitTestResults
 
@@ -34,10 +34,10 @@ from unittestresults import UnitTestResults
 class UnitTestResultsTest(unittest.TestCase):
 
     def test_nostring(self):
-        self.assertEqual(None, UnitTestResults.results_from_string(None))
+        self.assertIsNone(UnitTestResults.results_from_string(None))
 
     def test_emptystring(self):
-        self.assertEqual(None, UnitTestResults.results_from_string(""))
+        self.assertIsNone(UnitTestResults.results_from_string(""))
 
     def test_nofailures(self):
         no_failures_xml = """<?xml version="1.0" encoding="UTF-8"?>
@@ -92,7 +92,3 @@ Expected: 6.28]]></failure>
 </testsuites>"""
         expected = ["ClassOne.TestOne", "ClassTwo.TestTwo"]
         self.assertEqual(expected, UnitTestResults.results_from_string(multiple_failures_per_test_xml))
-
-
-if __name__ == '__main__':
-    unittest.main()

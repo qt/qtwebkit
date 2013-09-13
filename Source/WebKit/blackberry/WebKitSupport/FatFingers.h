@@ -72,45 +72,36 @@ private:
 
     typedef std::pair<WebCore::Node*, Platform::IntRectRegion> IntersectingRegion;
 
-    enum CachedResultsStrategy { GetFromRenderTree = 0, GetFromCache };
-    CachedResultsStrategy cachingStrategy() const;
-    typedef HashMap<RefPtr<WebCore::Document>, ListHashSet<RefPtr<WebCore::Node> > > CachedRectHitTestResults;
-
     bool checkFingerIntersection(const Platform::IntRectRegion&,
-                                 const Platform::IntRectRegion& remainingFingerRegion,
-                                 WebCore::Node*,
-                                 Vector<IntersectingRegion>& intersectingRegions);
+        const Platform::IntRectRegion& remainingFingerRegion,
+        WebCore::Node*,
+        Vector<IntersectingRegion>& intersectingRegions);
 
     bool findIntersectingRegions(WebCore::Document*,
-                                 Vector<IntersectingRegion>& intersectingRegions,
-                                 Platform::IntRectRegion& remainingFingerRegion);
+        Vector<IntersectingRegion>& intersectingRegions,
+        Platform::IntRectRegion& remainingFingerRegion);
 
     bool checkForClickableElement(WebCore::Element*,
-                                  Vector<IntersectingRegion>& intersectingRegions,
-                                  Platform::IntRectRegion& remainingFingerRegion,
-                                  WebCore::RenderLayer*& lowestPositionedEnclosingLayerSoFar);
+        Vector<IntersectingRegion>& intersectingRegions,
+        Platform::IntRectRegion& remainingFingerRegion,
+        WebCore::RenderLayer*& lowestPositionedEnclosingLayerSoFar);
 
     bool checkForText(WebCore::Node*,
-                      Vector<IntersectingRegion>& intersectingRegions,
-                      Platform::IntRectRegion& fingerRegion);
+        Vector<IntersectingRegion>& intersectingRegions,
+        Platform::IntRectRegion& fingerRegion);
 
     void setSuccessfulFatFingersResult(FatFingersResult&, WebCore::Node*, const WebCore::IntPoint&);
 
     void getNodesFromRect(WebCore::Document*, const WebCore::IntPoint&, ListHashSet<RefPtr<WebCore::Node> >&);
 
-    // It mimics Document::elementFromPoint, but recursively hit-tests in case an inner frame is found.
-    void getRelevantInfoFromCachedHitTest(WebCore::Element*& elementUnderPoint, WebCore::Element*& clickableElementUnderPoint) const;
-
     bool isElementClickable(WebCore::Element*) const;
 
     inline WebCore::IntRect fingerRectForPoint(const WebCore::IntPoint&) const;
-    void getPaddings(unsigned& top, unsigned& right, unsigned& bottom, unsigned& left) const;
+    void getAdjustedPaddings(const WebCore::IntPoint&, unsigned& top, unsigned& right, unsigned& bottom, unsigned& left) const;
 
     WebPagePrivate* m_webPage;
     WebCore::IntPoint m_contentPos;
     TargetType m_targetType;
-    MatchingApproachForClickable m_matchingApproach;
-    CachedRectHitTestResults m_cachedRectHitTestResults;
 };
 
 class FatFingersResult {
@@ -161,7 +152,7 @@ public:
 
         // Shadow trees can be nested.
         while (result->isInShadowTree())
-            result = toElement(result->shadowAncestorNode());
+            result = toElement(result->deprecatedShadowAncestorNode());
 
         if (!shouldUseRootEditableElement || !result->isElementNode())
             return result;
@@ -194,8 +185,7 @@ private:
     WebCore::IntPoint m_adjustedPosition; // Main frame contents coordinates.
     FatFingers::TargetType m_targetType;
     bool m_positionWasAdjusted;
-    bool m_isTextInput; // Check if the element under the touch point will require a VKB be displayed so that
-                        // the touch down can be suppressed.
+    bool m_isTextInput; // Check if the element under the touch point will require a VKB be displayed so that the touch down can be suppressed.
     bool m_isValid;
     RefPtr<WebCore::Node> m_nodeUnderFatFinger;
 };

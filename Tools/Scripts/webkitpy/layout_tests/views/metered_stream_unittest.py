@@ -1,4 +1,3 @@
-#!/usr/bin/python
 # Copyright (C) 2010, 2012 Google Inc. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -30,7 +29,7 @@
 import logging
 import re
 import StringIO
-import unittest
+import unittest2 as unittest
 
 from webkitpy.layout_tests.views.metered_stream import MeteredStream
 
@@ -152,7 +151,3 @@ class VerboseTest(RegularTest):
         self.logger.info('foo %s %d', 'bar', 2)
         self.assertEqual(len(self.buflist), 1)
         self.assertTrue(self.buflist[0].endswith('foo bar 2\n'))
-
-
-if __name__ == '__main__':
-    unittest.main()

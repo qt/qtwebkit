@@ -30,36 +30,73 @@ namespace WebCore {
 
 class HTMLImageLoader;
 class FrameLoader;
+class Image;
 class MouseEvent;
+class Widget;
 
 enum PluginCreationOption {
     CreateAnyWidgetType,
     CreateOnlyNonNetscapePlugins,
 };
-    
+
 enum PreferPlugInsForImagesOption {
     ShouldPreferPlugInsForImages,
     ShouldNotPreferPlugInsForImages
 };
 
 // Base class for HTMLObjectElement and HTMLEmbedElement
-class HTMLPlugInImageElement : public HTMLPlugInElement, public ImageLoaderClientBase<HTMLPlugInImageElement> {
+class HTMLPlugInImageElement : public HTMLPlugInElement {
 public:
     virtual ~HTMLPlugInImageElement();
 
     RenderEmbeddedObject* renderEmbeddedObject() const;
 
+    virtual void setDisplayState(DisplayState) OVERRIDE;
+
     virtual void updateWidget(PluginCreationOption) = 0;
 
     const String& serviceType() const { return m_serviceType; }
     const String& url() const { return m_url; }
+    const KURL& loadedUrl() const { return m_loadedUrl; }
+
+    const String loadedMimeType() const
+    {
+        String mimeType = serviceType();
+        if (mimeType.isEmpty())
+            mimeType = mimeTypeFromURL(m_loadedUrl);
+        return mimeType;
+    }
+
     bool shouldPreferPlugInsForImages() const { return m_shouldPreferPlugInsForImages; }
 
     // Public for FrameView::addWidgetToUpdate()
     bool needsWidgetUpdate() const { return m_needsWidgetUpdate; }
     void setNeedsWidgetUpdate(bool needsWidgetUpdate) { m_needsWidgetUpdate = needsWidgetUpdate; }
 
-    void setPendingClickEvent(PassRefPtr<MouseEvent>);
+    void userDidClickSnapshot(PassRefPtr<MouseEvent>, bool forwardEvent);
+    void checkSnapshotStatus();
+    Image* snapshotImage() const { return m_snapshotImage.get(); }
+    void restartSnapshottedPlugIn();
+
+    // Plug-in URL might not be the same as url() with overriding parameters.
+    void subframeLoaderWillCreatePlugIn(const KURL& plugInURL);
+    void subframeLoaderDidCreatePlugIn(const Widget*);
+
+    void setIsPrimarySnapshottedPlugIn(bool);
+    bool partOfSnapshotOverlay(Node*);
+
+    bool needsCheckForSizeChange() const { return m_needsCheckForSizeChange; }
+    void setNeedsCheckForSizeChange() { m_needsCheckForSizeChange = true; }
+    void checkSizeChangeForSnapshotting();
+
+    enum SnapshotDecision {
+        SnapshotNotYetDecided,
+        NeverSnapshot,
+        Snapshotted,
+        MaySnapshotWhenResized,
+        MaySnapshotWhenContentIsSet
+    };
+    SnapshotDecision snapshotDecision() const { return m_snapshotDecision; }
 
 protected:
     HTMLPlugInImageElement(const QualifiedName& tagName, Document*, bool createdByParser, PreferPlugInsForImagesOption);
@@ -69,33 +106,47 @@ protected:
     OwnPtr<HTMLImageLoader> m_imageLoader;
     String m_serviceType;
     String m_url;
-    
+    KURL m_loadedUrl;
+
     static void updateWidgetCallback(Node*, unsigned = 0);
-    virtual void attach();
-    virtual void detach();
+    virtual void attach(const AttachContext& = AttachContext()) OVERRIDE;
+    virtual void detach(const AttachContext& = AttachContext()) OVERRIDE;
 
     bool allowedToLoadFrameURL(const String& url);
     bool wouldLoadAsNetscapePlugin(const String& url, const String& serviceType);
 
     virtual void didMoveToNewDocument(Document* oldDocument) OVERRIDE;
-    
+
     virtual void documentWillSuspendForPageCache() OVERRIDE;
     virtual void documentDidResumeFromPageCache() OVERRIDE;
 
     virtual PassRefPtr<RenderStyle> customStyleForRenderer() OVERRIDE;
 
+    virtual bool isRestartedPlugin() const OVERRIDE { return m_isRestartedPlugin; }
+
 private:
-    virtual RenderObject* createRenderer(RenderArena*, RenderStyle*);
-    virtual bool willRecalcStyle(StyleChange);
-    
-    virtual void finishParsingChildren();
+    virtual RenderObject* createRenderer(RenderArena*, RenderStyle*) OVERRIDE;
+    virtual bool willRecalcStyle(StyleChange) OVERRIDE;
+
+    void didAddUserAgentShadowRoot(ShadowRoot*) OVERRIDE;
+
+    virtual void finishParsingChildren() OVERRIDE;
 
     void updateWidgetIfNecessary();
-    virtual bool useFallbackContent() const { return false; }
-    
+
     virtual void updateSnapshot(PassRefPtr<Image>) OVERRIDE;
     virtual void dispatchPendingMouseClick() OVERRIDE;
     void simulatedMouseClickTimerFired(DeferrableOneShotTimer<HTMLPlugInImageElement>*);
+
+    void swapRendererTimerFired(Timer<HTMLPlugInImageElement>*);
+
+    void restartSimilarPlugIns();
+
+    virtual bool isPlugInImageElement() const OVERRIDE { return true; }
+
+    void removeSnapshotTimerFired(Timer<HTMLPlugInImageElement>*);
+
+    virtual void defaultEventHandler(Event*) OVERRIDE;
 
     bool m_needsWidgetUpdate;
     bool m_shouldPreferPlugInsForImages;
@@ -103,7 +154,36 @@ private:
     RefPtr<RenderStyle> m_customStyleForPageCache;
     RefPtr<MouseEvent> m_pendingClickEventFromSnapshot;
     DeferrableOneShotTimer<HTMLPlugInImageElement> m_simulatedMouseClickTimer;
+    Timer<HTMLPlugInImageElement> m_swapRendererTimer;
+    Timer<HTMLPlugInImageElement> m_removeSnapshotTimer;
+    RefPtr<Image> m_snapshotImage;
+    bool m_createdDuringUserGesture;
+    bool m_isRestartedPlugin;
+    bool m_needsCheckForSizeChange;
+    bool m_plugInWasCreated;
+    bool m_deferredPromotionToPrimaryPlugIn;
+    IntSize m_sizeWhenSnapshotted;
+    SnapshotDecision m_snapshotDecision;
 };
+
+inline HTMLPlugInImageElement* toHTMLPlugInImageElement(Node* node)
+{
+    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->isPluginElement());
+    HTMLPlugInElement* plugInElement = static_cast<HTMLPlugInElement*>(node);
+    ASSERT_WITH_SECURITY_IMPLICATION(plugInElement->isPlugInImageElement());
+    return static_cast<HTMLPlugInImageElement*>(plugInElement);
+}
+
+inline const HTMLPlugInImageElement* toHTMLPlugInImageElement(const Node* node)
+{
+    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->isPluginElement());
+    const HTMLPlugInElement* plugInElement = static_cast<const HTMLPlugInElement*>(node);
+    ASSERT_WITH_SECURITY_IMPLICATION(plugInElement->isPlugInImageElement());
+    return static_cast<const HTMLPlugInImageElement*>(plugInElement);
+}
+
+// This will catch anyone doing an unnecessary cast.
+void toHTMLPlugInImageElement(const HTMLPlugInImageElement*);
 
 } // namespace WebCore
 

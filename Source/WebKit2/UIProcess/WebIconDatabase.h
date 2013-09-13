@@ -42,7 +42,6 @@
 namespace CoreIPC {
 class ArgumentDecoder;
 class DataReference;
-class MessageID;
 }
 
 namespace WebCore {
@@ -54,10 +53,8 @@ namespace WebKit {
 
 class WebContext;
 
-class WebIconDatabase : public APIObject, public WebCore::IconDatabaseClient, private CoreIPC::MessageReceiver {
+class WebIconDatabase : public TypedAPIObject<APIObject::TypeIconDatabase>, public WebCore::IconDatabaseClient, private CoreIPC::MessageReceiver {
 public:
-    static const Type APIType = TypeIconDatabase;
-
     static PassRefPtr<WebIconDatabase> create(WebContext*);
     virtual ~WebIconDatabase();
 
@@ -93,8 +90,6 @@ public:
 private:
     WebIconDatabase(WebContext*);
 
-    virtual Type type() const { return APIType; }
-
     // WebCore::IconDatabaseClient
     virtual void didImportIconURLForPageURL(const String&);
     virtual void didImportIconDataForPageURL(const String&);
@@ -103,11 +98,8 @@ private:
     virtual void didFinishURLImport();
 
     // CoreIPC::MessageReceiver
-    virtual void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::MessageDecoder&) OVERRIDE;
-    virtual void didReceiveSyncMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::MessageDecoder&, OwnPtr<CoreIPC::MessageEncoder>&) OVERRIDE;
-
-    void didReceiveWebIconDatabaseMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::MessageDecoder&);
-    void didReceiveSyncWebIconDatabaseMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::MessageDecoder&, OwnPtr<CoreIPC::MessageEncoder>&);
+    virtual void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&) OVERRIDE;
+    virtual void didReceiveSyncMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&, OwnPtr<CoreIPC::MessageEncoder>&) OVERRIDE;
 
     void notifyIconDataReadyForPageURL(const String&);
 

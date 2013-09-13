@@ -23,7 +23,7 @@
 
 import shutil
 import tempfile
-import unittest
+import unittest2 as unittest
 import zipfile
 
 from webkitpy.common.system.filesystem_mock import MockFileSystem
@@ -92,7 +92,3 @@ class ZipFileSetTest(unittest.TestCase):
 
     def test_namelist(self):
         self.assertTrue('some-file' in self._zip.namelist())
-
-
-if __name__ == '__main__':
-    unittest.main()

@@ -39,10 +39,9 @@ ContextFeaturesClient* ContextFeaturesClient::empty()
     return &empty;
 }
 
-const AtomicString& ContextFeatures::supplementName()
+const char* ContextFeatures::supplementName()
 {
-    DEFINE_STATIC_LOCAL(AtomicString, name, ("ContextFeatures", AtomicString::ConstructFromLiteral));
-    return name;
+    return "ContextFeatures";
 }
 
 ContextFeatures* ContextFeatures::defaultSwitch()
@@ -69,18 +68,6 @@ bool ContextFeatures::styleScopedEnabled(Document* document)
     if (!document)
         return RuntimeEnabledFeatures::styleScopedEnabled();
     return document->contextFeatures()->isEnabled(document, StyleScoped, RuntimeEnabledFeatures::styleScopedEnabled());
-#else
-    UNUSED_PARAM(document);
-    return false;
-#endif
-}
-
-bool ContextFeatures::pagePopupEnabled(Document* document)
-{
-#if ENABLE(PAGE_POPUP)
-    if (!document)
-        return false;
-    return document->contextFeatures()->isEnabled(document, PagePopup, false);
 #else
     UNUSED_PARAM(document);
     return false;

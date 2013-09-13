@@ -26,6 +26,8 @@
 #include "config.h"
 #include "StorageMap.h"
 
+#include <wtf/TemporaryChange.h>
+
 namespace WebCore {
 
 PassRefPtr<StorageMap> StorageMap::create(unsigned quota)
@@ -140,6 +142,19 @@ PassRefPtr<StorageMap> StorageMap::setItem(const String& key, const String& valu
     return 0;
 }
 
+PassRefPtr<StorageMap> StorageMap::setItemIgnoringQuota(const String& key, const String& value)
+{
+    TemporaryChange<unsigned> quotaSizeChange(m_quotaSize, noQuota);
+
+    String oldValue;
+    bool quotaException;
+
+    RefPtr<StorageMap> map = setItem(key, value, oldValue, quotaException);
+    ASSERT(!quotaException);
+
+    return map.release();
+}
+
 PassRefPtr<StorageMap> StorageMap::removeItem(const String& key, String& oldValue)
 {
     // Implement copy-on-write semantics here.  We're guaranteed that the only refs of StorageMaps belong to Storage objects
@@ -167,17 +182,20 @@ bool StorageMap::contains(const String& key) const
     return m_map.contains(key);
 }
 
-void StorageMap::importItem(const String& key, const String& value)
+void StorageMap::importItems(const HashMap<String, String>& items)
 {
-    // Be sure to copy the keys/values as items imported on a background thread are destined
-    // to cross a thread boundary
-    HashMap<String, String>::AddResult result = m_map.add(key.isolatedCopy(), value.isolatedCopy());
-    ASSERT_UNUSED(result, result.isNewEntry); // True if the key didn't exist previously.
+    for (HashMap<String, String>::const_iterator it = items.begin(), end = items.end(); it != end; ++it) {
+        const String& key = it->key;
+        const String& value = it->value;
 
-    ASSERT(m_currentLength + key.length() >= m_currentLength);
-    m_currentLength += key.length();
-    ASSERT(m_currentLength + value.length() >= m_currentLength);
-    m_currentLength += value.length();
+        HashMap<String, String>::AddResult result = m_map.add(key, value);
+        ASSERT_UNUSED(result, result.isNewEntry); // True if the key didn't exist previously.
+
+        ASSERT(m_currentLength + key.length() >= m_currentLength);
+        m_currentLength += key.length();
+        ASSERT(m_currentLength + value.length() >= m_currentLength);
+        m_currentLength += value.length();
+    }
 }
 
 }

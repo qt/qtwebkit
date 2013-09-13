@@ -20,10 +20,9 @@
 #include "config.h"
 #include "qrawwebview_p.h"
 
+#include "CoordinatedLayerTreeHostProxy.h"
 #include "Cursor.h"
 #include "DrawingAreaProxyImpl.h"
-#include "LayerTreeCoordinatorProxy.h"
-#include "LayerTreeRenderer.h"
 #include "NativeWebKeyboardEvent.h"
 #include "NativeWebMouseEvent.h"
 #if ENABLE(TOUCH_EVENTS)
@@ -35,12 +34,8 @@
 #include "WebPageGroup.h"
 #include "WebPreferences.h"
 #include "qrawwebview_p_p.h"
+#include <WebCore/CoordinatedGraphicsScene.h>
 #include <WebKit2/qrawwebview_p.h>
-
-void QRawWebViewPrivate::didReceiveMessageFromNavigatorQtObject(const String& message)
-{
-    notImplemented();
-}
 
 void QRawWebViewPrivate::didChangeViewportProperties(const WebCore::ViewportAttributes& attr)
 {
@@ -195,10 +190,10 @@ PassRefPtr<WebKit::WebContextMenuProxy> QRawWebViewPrivate::createContextMenuPro
 }
 
 #if ENABLE(INPUT_TYPE_COLOR)
-PassRefPtr<WebKit::WebColorChooserProxy> QRawWebViewPrivate::createColorChooserProxy(WebKit::WebPageProxy*, const WebCore::Color& intialColor, const WebCore::IntRect&)
+PassRefPtr<WebKit::WebColorPicker> QRawWebViewPrivate::createColorPicker(WebKit::WebPageProxy*, const WebCore::Color& intialColor, const WebCore::IntRect&)
 {
     notImplemented();
-    return PassRefPtr<WebKit::WebColorChooserProxy>();
+    return PassRefPtr<WebKit::WebColorPicker>();
 }
 #endif
 
@@ -329,7 +324,7 @@ void QRawWebView::setActive(bool active)
 {
     d->m_active = active;
     d->m_webPageProxy->viewStateDidChange(WebKit::WebPageProxy::ViewWindowIsActive);
-    layerTreeRenderer()->setActive(active);
+    coordinatedGraphicsScene()->setActive(active);
 }
 
 QSize QRawWebView::size() const
@@ -344,18 +339,12 @@ void QRawWebView::setSize(const QSize& size)
         return;
 
     if (d->m_webPageProxy->useFixedLayout())
-        d->m_webPageProxy->setViewportSize(size);
-    else {
-        WebKit::LayerTreeCoordinatorProxy* coordinator = drawingArea->layerTreeCoordinatorProxy();
-        if (!coordinator)
-            return;
-        coordinator->setContentsSize(WebCore::FloatSize(size.width(), size.height()));
-    }
+        drawingArea->setSize(size, WebCore::IntSize(), WebCore::IntSize());
 
     d->m_size = size;
 
-    drawingArea->setSize(d->m_size, WebCore::IntSize());
-    drawingArea->setVisibleContentsRect(WebCore::IntRect(WebCore::IntPoint(), d->m_size), 1 /*scale*/, WebCore::FloatPoint());
+    drawingArea->setSize(d->m_size, WebCore::IntSize(), WebCore::IntSize());
+    drawingArea->setVisibleContentsRect(WebCore::IntRect(WebCore::IntPoint(), d->m_size), WebCore::FloatPoint());
 }
 
 WKPageRef QRawWebView::pageRef()
@@ -363,28 +352,28 @@ WKPageRef QRawWebView::pageRef()
     return toAPI(d->m_webPageProxy.get());
 }
 
-WebKit::LayerTreeRenderer* QRawWebView::layerTreeRenderer() const
+WebCore::CoordinatedGraphicsScene* QRawWebView::coordinatedGraphicsScene() const
 {
     WebKit::DrawingAreaProxy* drawingArea = d->m_webPageProxy->drawingArea();
     if (!drawingArea)
         return 0;
-    WebKit::LayerTreeCoordinatorProxy* layerTreeCoordinatorProxy = drawingArea->layerTreeCoordinatorProxy();
-    if (!layerTreeCoordinatorProxy)
+    WebKit::CoordinatedLayerTreeHostProxy* coordinatedLayerTreeHostProxy = drawingArea->coordinatedLayerTreeHostProxy();
+    if (!coordinatedLayerTreeHostProxy)
         return 0;
-    return layerTreeCoordinatorProxy->layerTreeRenderer();
+    return coordinatedLayerTreeHostProxy->coordinatedGraphicsScene();
 }
 
 void QRawWebView::paint(const QMatrix4x4& transform, float opacity, unsigned paintFlags)
 {
-    WebKit::LayerTreeRenderer* renderer = layerTreeRenderer();
-    if (!renderer)
+    WebCore::CoordinatedGraphicsScene* scene = coordinatedGraphicsScene();
+    if (!scene)
         return;
 
-    renderer->setActive(true);
+    scene->setActive(true);
 
     WebCore::FloatRect rect(0, 0, d->m_size.width(), d->m_size.height());
 
-    renderer->paintToCurrentGLContext(transform, opacity, transform.mapRect(rect), paintFlags);
+    scene->paintToCurrentGLContext(transform, opacity, transform.mapRect(rect), paintFlags);
 }
 
 void QRawWebView::sendKeyEvent(QKeyEvent* event)

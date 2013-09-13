@@ -32,21 +32,34 @@
 namespace CoreIPC {
 
 class DataReference;
+class ImportanceAssertion;
 
 class MessageDecoder : public ArgumentDecoder {
 public:
     static PassOwnPtr<MessageDecoder> create(const DataReference& buffer);
-    static PassOwnPtr<MessageDecoder> create(const DataReference& buffer, Deque<Attachment>&);
+    static PassOwnPtr<MessageDecoder> create(const DataReference& buffer, Vector<Attachment>&);
     virtual ~MessageDecoder();
 
     StringReference messageReceiverName() const { return m_messageReceiverName; }
     StringReference messageName() const { return m_messageName; }
 
-private:
-    MessageDecoder(const DataReference& buffer, Deque<Attachment>&);
+    bool isSyncMessage() const;
+    bool shouldDispatchMessageWhenWaitingForSyncReply() const;
 
+#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
+    void setImportanceAssertion(PassOwnPtr<ImportanceAssertion>);
+#endif
+
+private:
+    MessageDecoder(const DataReference& buffer, Vector<Attachment>&);
+
+    uint8_t m_messageFlags;
     StringReference m_messageReceiverName;
     StringReference m_messageName;
+
+#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
+    OwnPtr<ImportanceAssertion> m_importanceAssertion;
+#endif
 };
 
 } // namespace CoreIPC

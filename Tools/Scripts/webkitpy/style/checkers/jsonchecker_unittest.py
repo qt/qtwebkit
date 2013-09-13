@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-#
 # Copyright (C) 2010 Apple Inc. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -24,7 +22,7 @@
 
 """Unit test for jsonchecker.py."""
 
-import unittest
+import unittest2 as unittest
 
 import jsonchecker
 
@@ -69,7 +67,7 @@ class JSONCheckerTest(unittest.TestCase):
             mock_error_handler.had_error = True
             self.assertEqual(expected_line_number, line_number)
             self.assertEqual(expected_category, category)
-            self.assertTrue(category in jsonchecker.JSONChecker.categories)
+            self.assertIn(category, jsonchecker.JSONChecker.categories)
 
         error_handler = MockErrorHandler(handle_style_error)
         error_handler.had_error = False
@@ -111,6 +109,3 @@ class JSONCheckerTest(unittest.TestCase):
                   ]
 }
 """)
-
-if __name__ == '__main__':
-    unittest.main()

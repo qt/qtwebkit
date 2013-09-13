@@ -28,7 +28,6 @@
 
 #include "CSSParserValues.h"
 #include "CSSValueList.h"
-#include "WebCoreMemoryInstrumentation.h"
 #include <wtf/PassOwnPtr.h>
 #include <wtf/text/StringBuilder.h>
 
@@ -42,6 +41,13 @@ CSSFunctionValue::CSSFunctionValue(CSSParserFunction* function)
         m_args = CSSValueList::createFromParserValueList(function->args.get());
 }
 
+CSSFunctionValue::CSSFunctionValue(String name, PassRefPtr<CSSValueList> args)
+    : CSSValue(FunctionClass)
+    , m_name(name)
+    , m_args(args)
+{
+}
+
 String CSSFunctionValue::customCssText() const
 {
     StringBuilder result;
@@ -52,11 +58,9 @@ String CSSFunctionValue::customCssText() const
     return result.toString();
 }
 
-void CSSFunctionValue::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+bool CSSFunctionValue::equals(const CSSFunctionValue& other) const
 {
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
-    info.addMember(m_name);
-    info.addMember(m_args);
+    return m_name == other.m_name && compareCSSValuePtr(m_args, other.m_args);
 }
 
 }

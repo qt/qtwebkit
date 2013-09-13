@@ -44,7 +44,7 @@ public:
 
     String customCssText() const;
 
-    void reportDescendantMemoryUsage(MemoryObjectInfo*) const;
+    bool equals(const CSSUnicodeRangeValue&) const;
 
 private:
     CSSUnicodeRangeValue(UChar32 from, UChar32 to)

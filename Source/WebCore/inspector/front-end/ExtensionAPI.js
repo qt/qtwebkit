@@ -41,7 +41,6 @@ function defineCommonExtensionSymbols(apiPrivate)
     if (!apiPrivate.console)
         apiPrivate.console = {};
     apiPrivate.console.Severity = {
-        Tip: "tip",
         Debug: "debug",
         Log: "log",
         Warning: "warning",
@@ -63,7 +62,6 @@ function defineCommonExtensionSymbols(apiPrivate)
         ConsoleMessageAdded: "console-message-added",
         ElementsPanelObjectSelected: "panel-objectSelected-elements",
         NetworkRequestFinished: "network-request-finished",
-        Reset: "reset",
         OpenResource: "open-resource",
         PanelSearch: "panel-search-",
         Reload: "Reload",
@@ -183,8 +181,6 @@ function InspectorExtensionAPI()
     defineDeprecatedProperty(this, "webInspector", "resources", "network");
     this.timeline = new Timeline();
     this.console = new ConsoleAPI();
-
-    this.onReset = new EventSink(events.Reset);
 }
 
 /**
@@ -452,7 +448,6 @@ ExtensionSidebarPaneImpl.prototype = {
 
     setExpression: function(expression, rootTitle, evaluateOptions)
     {
-        var callback = extractCallbackArgument(arguments);
         var request = {
             command: commands.SetSidebarContent,
             id: this._id,
@@ -462,7 +457,7 @@ ExtensionSidebarPaneImpl.prototype = {
         };
         if (typeof evaluateOptions === "object")
             request.evaluateOptions = evaluateOptions;
-        extensionServer.sendRequest(request, callback);
+        extensionServer.sendRequest(request, extractCallbackArgument(arguments));
     },
 
     setObject: function(jsonObject, rootTitle, callback)
@@ -660,7 +655,10 @@ InspectedWindow.prototype = {
         var callback = extractCallbackArgument(arguments);
         function callbackWrapper(result)
         {
-            callback(result.value, result.isException);
+            if (result.isError || result.isException)
+                callback(undefined, result);
+            else
+                callback(result.value);
         }
         var request = {
             command: commands.EvaluateOnInspectedPage,
@@ -866,7 +864,9 @@ var Request = declareInterfaceClass(RequestImpl);
 var Resource = declareInterfaceClass(ResourceImpl);
 var Timeline = declareInterfaceClass(TimelineImpl);
 
-var extensionServer = new ExtensionServerClient();
+// extensionServer is a closure variable defined by the glue below -- make sure we fail if it's not there.
+if (!extensionServer)
+    extensionServer = new ExtensionServerClient();
 
 return new InspectorExtensionAPI();
 }
@@ -884,7 +884,8 @@ function buildPlatformExtensionAPI(extensionInfo)
 
 function buildExtensionAPIInjectedScript(extensionInfo)
 {
-    return "(function(injectedScriptHost, inspectedWindow, injectedScriptId){ " +
+    return "(function(injectedScriptId){ " +
+        "var extensionServer;" +
         defineCommonExtensionSymbols.toString() + ";" +
         injectedExtensionAPI.toString() + ";" +
         buildPlatformExtensionAPI(extensionInfo) + ";" +

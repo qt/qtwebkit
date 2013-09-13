@@ -28,7 +28,7 @@
 
 #if ENABLE(PLUGIN_PROCESS)
 
-#include <runtime/JSObject.h>
+#include "NPObjectMessageReceiverMessages.h"
 #include "NPRemoteObjectMap.h"
 #include "NPRuntimeObjectMap.h"
 #include "PluginProcessConnectionManager.h"
@@ -36,18 +36,18 @@
 #include "WebProcess.h"
 #include "WebProcessProxyMessages.h"
 #include <WebCore/FileSystem.h>
+#include <runtime/JSObject.h>
 
 using namespace WebCore;
 
 namespace WebKit {
 
-PluginProcessConnection::PluginProcessConnection(PluginProcessConnectionManager* pluginProcessConnectionManager, const String& pluginPath, PluginProcess::Type processType, CoreIPC::Connection::Identifier connectionIdentifier, bool supportsAsynchronousPluginInitialization)
+PluginProcessConnection::PluginProcessConnection(PluginProcessConnectionManager* pluginProcessConnectionManager, uint64_t pluginProcessToken, CoreIPC::Connection::Identifier connectionIdentifier, bool supportsAsynchronousPluginInitialization)
     : m_pluginProcessConnectionManager(pluginProcessConnectionManager)
-    , m_pluginPath(pluginPath)
+    , m_pluginProcessToken(pluginProcessToken)
     , m_supportsAsynchronousPluginInitialization(supportsAsynchronousPluginInitialization)
-    , m_processType(processType)
 {
-    m_connection = CoreIPC::Connection::createClientConnection(connectionIdentifier, this, WebProcess::shared().runLoop());
+    m_connection = CoreIPC::Connection::createClientConnection(connectionIdentifier, this, RunLoop::main());
 
     m_npRemoteObjectMap = NPRemoteObjectMap::create(m_connection.get());
 
@@ -88,7 +88,7 @@ void PluginProcessConnection::removePluginProxy(PluginProxy* plugin)
     m_pluginProcessConnectionManager->removePluginProcessConnection(this);
 }
 
-void PluginProcessConnection::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::MessageDecoder& decoder)
+void PluginProcessConnection::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::MessageDecoder& decoder)
 {
     ASSERT(decoder.destinationID());
 
@@ -96,20 +96,20 @@ void PluginProcessConnection::didReceiveMessage(CoreIPC::Connection* connection,
     if (!pluginProxy)
         return;
 
-    pluginProxy->didReceivePluginProxyMessage(connection, messageID, decoder);
+    pluginProxy->didReceivePluginProxyMessage(connection, decoder);
 }
 
-void PluginProcessConnection::didReceiveSyncMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::MessageDecoder& decoder, OwnPtr<CoreIPC::MessageEncoder>& replyEncoder)
+void PluginProcessConnection::didReceiveSyncMessage(CoreIPC::Connection* connection, CoreIPC::MessageDecoder& decoder, OwnPtr<CoreIPC::MessageEncoder>& replyEncoder)
 {
-    if (messageID.is<CoreIPC::MessageClassNPObjectMessageReceiver>()) {
-        m_npRemoteObjectMap->didReceiveSyncMessage(connection, messageID, decoder, replyEncoder);
+    if (decoder.messageReceiverName() == Messages::NPObjectMessageReceiver::messageReceiverName()) {
+        m_npRemoteObjectMap->didReceiveSyncMessage(connection, decoder, replyEncoder);
         return;
     }
 
     uint64_t destinationID = decoder.destinationID();
 
     if (!destinationID) {
-        didReceiveSyncPluginProcessConnectionMessage(connection, messageID, decoder, replyEncoder);
+        didReceiveSyncPluginProcessConnectionMessage(connection, decoder, replyEncoder);
         return;
     }
 
@@ -117,7 +117,7 @@ void PluginProcessConnection::didReceiveSyncMessage(CoreIPC::Connection* connect
     if (!pluginProxy)
         return;
 
-    pluginProxy->didReceiveSyncPluginProxyMessage(connection, messageID, decoder, replyEncoder);
+    pluginProxy->didReceiveSyncPluginProxyMessage(connection, decoder, replyEncoder);
 }
 
 void PluginProcessConnection::didClose(CoreIPC::Connection*)

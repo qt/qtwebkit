@@ -32,13 +32,16 @@
 #include <JavaScriptCore/JSBase.h>
 #include <WebCore/LayoutMilestones.h>
 #include <wtf/Forward.h>
+#include <wtf/Vector.h>
 
 namespace WebCore {
 class DOMWindowExtension;
 class DOMWrapperWorld;
+class KURL;
 class ResourceError;
 class ResourceRequest;
 class ResourceResponse;
+class SharedBuffer;
 }
 
 namespace WebKit {
@@ -47,15 +50,12 @@ class APIObject;
 class InjectedBundleBackForwardListItem;
 class WebPage;
 class WebFrame;
-#if ENABLE(WEB_INTENTS)
-class InjectedBundleIntentRequest;
-#endif
-#if ENABLE(WEB_INTENTS_TAG)
-class WebIntentServiceInfo;
-#endif
 
 class InjectedBundlePageLoaderClient : public APIClient<WKBundlePageLoaderClient, kWKBundlePageLoaderClientCurrentVersion> {
 public:
+    void willLoadURLRequest(WebPage*, const WebCore::ResourceRequest&, APIObject*);
+    void willLoadDataRequest(WebPage*, const WebCore::ResourceRequest&, const WebCore::SharedBuffer*, const String&, const String&, const WebCore::KURL&, APIObject*);
+
     bool shouldGoToBackForwardListItem(WebPage*, InjectedBundleBackForwardListItem*, RefPtr<APIObject>& userData);
     void didStartProvisionalLoadForFrame(WebPage*, WebFrame*, RefPtr<APIObject>& userData);
     void didReceiveServerRedirectForProvisionalLoadForFrame(WebPage*, WebFrame*, RefPtr<APIObject>& userData);
@@ -71,13 +71,6 @@ public:
     void didDisplayInsecureContentForFrame(WebPage*, WebFrame*, RefPtr<APIObject>& userData);
     void didRunInsecureContentForFrame(WebPage*, WebFrame*, RefPtr<APIObject>& userData);
     void didDetectXSSForFrame(WebPage*, WebFrame*, RefPtr<APIObject>& userData);
-
-#if ENABLE(WEB_INTENTS)
-    void didReceiveIntentForFrame(WebPage*, WebFrame*, InjectedBundleIntentRequest*, RefPtr<APIObject>& userData);
-#endif
-#if ENABLE(WEB_INTENTS_TAG)
-    void registerIntentServiceForFrame(WebPage*, WebFrame*, WebIntentServiceInfo*, RefPtr<APIObject>& userData);
-#endif
 
     void didFirstLayoutForFrame(WebPage*, WebFrame*, RefPtr<APIObject>& userData);
     void didFirstVisuallyNonEmptyLayoutForFrame(WebPage*, WebFrame*, RefPtr<APIObject>& userData);
@@ -96,6 +89,8 @@ public:
     void willDestroyGlobalObjectForDOMWindowExtension(WebPage*, WebCore::DOMWindowExtension*);
 
     bool shouldForceUniversalAccessFromLocalURL(WebPage*, const String& url);
+
+    void featuresUsedInPage(WebPage*, const Vector<String>&);
 };
 
 } // namespace WebKit

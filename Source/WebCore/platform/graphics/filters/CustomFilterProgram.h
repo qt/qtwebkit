@@ -41,8 +41,8 @@
 namespace WebCore {
 
 class GraphicsContext3D;
-class CustomFilterCompiledProgram;
 class CustomFilterProgramClient;
+class CustomFilterValidatedProgram;
 
 // This is the base class for the StyleCustomFilterProgram class which knows how to keep
 // references to the cached shaders.
@@ -63,8 +63,9 @@ public:
     CustomFilterProgramMixSettings mixSettings() const { return m_mixSettings; }
     CustomFilterMeshType meshType() const { return m_meshType; }
 
-    virtual bool operator==(const CustomFilterProgram&) const;
-    bool operator!=(const CustomFilterProgram& o) const { return !(*this == o); }
+    PassRefPtr<CustomFilterValidatedProgram> validatedProgram();
+    void setValidatedProgram(PassRefPtr<CustomFilterValidatedProgram>);
+
 protected:
     // StyleCustomFilterProgram can notify the clients that the cached resources are
     // loaded and it is ready to create CustomFilterCompiledProgram objects.
@@ -77,11 +78,18 @@ protected:
     CustomFilterProgram(CustomFilterProgramType, const CustomFilterProgramMixSettings&, CustomFilterMeshType);
 
 private:
+    // CustomFilterPrograms are unique combinations of shaders and can be 
+    // compared using just the pointer value instead.
+    // These will catch anyone doing a value equal comparison.
+    bool operator==(const CustomFilterProgram&) const;
+    bool operator!=(const CustomFilterProgram&) const;
+
     typedef HashCountedSet<CustomFilterProgramClient*> CustomFilterProgramClientList;
     CustomFilterProgramClientList m_clients;
     CustomFilterProgramType m_programType;
     CustomFilterProgramMixSettings m_mixSettings;
     CustomFilterMeshType m_meshType;
+    RefPtr<CustomFilterValidatedProgram> m_validatedProgram;
 };
 
 }

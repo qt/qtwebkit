@@ -38,7 +38,7 @@ PlatformLayer* ScrollingStateNode::platformScrollLayer() const
     return m_platformScrollLayer.get();
 }
 
-void ScrollingStateNode::setScrollLayer(PlatformLayer* platformLayer)
+void ScrollingStateNode::setScrollPlatformLayer(PlatformLayer* platformLayer)
 {
     m_platformScrollLayer = platformLayer;
 }
@@ -53,10 +53,10 @@ void ScrollingStateNode::setScrollLayer(GraphicsLayer* graphicsLayer)
     m_platformScrollLayer = platformScrollLayer;
     m_graphicsLayer = graphicsLayer;
 
-    m_scrollLayerDidChange = true;
+    setPropertyChanged(ScrollLayer);
     m_scrollingStateTree->setHasChangedProperties(true);
 }
 
 } // namespace WebCore
 
-#endif // ENABLE(THREADED_SCROLLING)
+#endif

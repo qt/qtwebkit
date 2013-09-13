@@ -27,18 +27,15 @@
 #include "config.h"
 
 #if ENABLE(PLUGIN_PROCESS)
-#include "PluginProcessMain.h"
 
 #include "NetscapePluginModule.h"
 #include "PluginProcess.h"
+#include "WebKit2Initialize.h"
 #include <QDebug>
 #include <QGuiApplication>
 #include <QStringList>
 #include <QtGlobal>
 #include <WebCore/RunLoop.h>
-#include <runtime/InitializeThreading.h>
-#include <wtf/MainThread.h>
-#include <wtf/Threading.h>
 
 using namespace WebCore;
 
@@ -79,8 +76,7 @@ Q_DECL_EXPORT int PluginProcessMain(int argc, char** argv)
     if (!initializeGtk())
         return EXIT_FAILURE;
 
-    JSC::initializeThreading();
-    WTF::initializeMainThread();
+    InitializeWebKit2();
 
     if (argc <= 1)
         return EXIT_FAILURE;
@@ -94,14 +90,17 @@ Q_DECL_EXPORT int PluginProcessMain(int argc, char** argv)
         return EXIT_SUCCESS;
     }
 
-    RunLoop::initializeMainRunLoop();
-
     // Create the connection.
     bool isNumber = false;
     int identifier = app.arguments().at(1).toInt(&isNumber, 10);
     if (!isNumber)
         return EXIT_FAILURE;
-    WebKit::PluginProcess::shared().initialize(identifier, RunLoop::main());
+
+    WebKit::ChildProcessInitializationParameters parameters;
+    parameters.connectionIdentifier = identifier;
+    parameters.extraInitializationData.add("plugin-path", app.arguments().at(2));
+
+    WebKit::PluginProcess::shared().initialize(parameters);
 
     RunLoop::run();
 

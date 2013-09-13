@@ -19,15 +19,15 @@
 
 [
     Conditional=SVG&FILTERS
-] interface SVGFEDropShadowElement : SVGElement,
-                                                       SVGFilterPrimitiveStandardAttributes { 
+] interface SVGFEDropShadowElement : SVGStyledElement {
     readonly attribute SVGAnimatedString in1;
     readonly attribute SVGAnimatedNumber dx;
     readonly attribute SVGAnimatedNumber dy;
     readonly attribute SVGAnimatedNumber stdDeviationX;
     readonly attribute SVGAnimatedNumber stdDeviationY;
 
-    void setStdDeviation(in [Optional=DefaultIsUndefined] float stdDeviationX, 
-                         in [Optional=DefaultIsUndefined] float stdDeviationY);
+    void setStdDeviation([Default=Undefined] optional float stdDeviationX, 
+                         [Default=Undefined] optional float stdDeviationY);
 };
 
+SVGFEDropShadowElement implements SVGFilterPrimitiveStandardAttributes;

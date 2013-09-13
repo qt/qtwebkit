@@ -47,7 +47,6 @@ PassOwnPtr<TiledCoreAnimationDrawingAreaProxy> TiledCoreAnimationDrawingAreaProx
 TiledCoreAnimationDrawingAreaProxy::TiledCoreAnimationDrawingAreaProxy(WebPageProxy* webPageProxy)
     : DrawingAreaProxy(DrawingAreaTypeTiledCoreAnimation, webPageProxy)
     , m_isWaitingForDidUpdateGeometry(false)
-    , m_lastSentMinimumLayoutWidth(0)
 {
 }
 
@@ -86,7 +85,7 @@ void TiledCoreAnimationDrawingAreaProxy::sizeDidChange()
     sendUpdateGeometry();
 }
 
-void TiledCoreAnimationDrawingAreaProxy::waitForPossibleGeometryUpdate()
+void TiledCoreAnimationDrawingAreaProxy::waitForPossibleGeometryUpdate(double timeout)
 {
     if (!m_isWaitingForDidUpdateGeometry)
         return;
@@ -94,9 +93,7 @@ void TiledCoreAnimationDrawingAreaProxy::waitForPossibleGeometryUpdate()
     if (m_webPageProxy->process()->isLaunching())
         return;
 
-    // The timeout, in seconds, we use when waiting for a DidUpdateGeometry message.
-    static const double didUpdateBackingStoreStateTimeout = 0.5;
-    m_webPageProxy->process()->connection()->waitForAndDispatchImmediately<Messages::DrawingAreaProxy::DidUpdateGeometry>(m_webPageProxy->pageID(), didUpdateBackingStoreStateTimeout);
+    m_webPageProxy->process()->connection()->waitForAndDispatchImmediately<Messages::DrawingAreaProxy::DidUpdateGeometry>(m_webPageProxy->pageID(), timeout);
 }
 
 void TiledCoreAnimationDrawingAreaProxy::colorSpaceDidChange()
@@ -104,7 +101,7 @@ void TiledCoreAnimationDrawingAreaProxy::colorSpaceDidChange()
     m_webPageProxy->process()->send(Messages::DrawingArea::SetColorSpace(m_webPageProxy->colorSpace()), m_webPageProxy->pageID());
 }
 
-void TiledCoreAnimationDrawingAreaProxy::minimumLayoutWidthDidChange()
+void TiledCoreAnimationDrawingAreaProxy::minimumLayoutSizeDidChange()
 {
     if (!m_webPageProxy->isValid())
         return;
@@ -133,26 +130,23 @@ void TiledCoreAnimationDrawingAreaProxy::updateAcceleratedCompositingMode(uint64
     m_webPageProxy->updateAcceleratedCompositingMode(layerTreeContext);
 }
 
-void TiledCoreAnimationDrawingAreaProxy::didUpdateGeometry(const IntSize& newIntrinsicContentSize)
+void TiledCoreAnimationDrawingAreaProxy::didUpdateGeometry()
 {
     ASSERT(m_isWaitingForDidUpdateGeometry);
 
     m_isWaitingForDidUpdateGeometry = false;
 
-    double minimumLayoutWidth = m_webPageProxy->minimumLayoutWidth();
+    IntSize minimumLayoutSize = m_webPageProxy->minimumLayoutSize();
 
     // If the WKView was resized while we were waiting for a DidUpdateGeometry reply from the web process,
     // we need to resend the new size here.
-    if (m_lastSentSize != m_size || m_lastSentMinimumLayoutWidth != minimumLayoutWidth)
+    if (m_lastSentSize != m_size || m_lastSentLayerPosition != m_layerPosition || m_lastSentMinimumLayoutSize != minimumLayoutSize)
         sendUpdateGeometry();
-
-    if (minimumLayoutWidth > 0)
-        m_webPageProxy->intrinsicContentSizeDidChange(newIntrinsicContentSize);
 }
 
 void TiledCoreAnimationDrawingAreaProxy::intrinsicContentSizeDidChange(const IntSize& newIntrinsicContentSize)
 {
-    if (m_webPageProxy->minimumLayoutWidth() > 0)
+    if (m_webPageProxy->minimumLayoutSize().width() > 0)
         m_webPageProxy->intrinsicContentSizeDidChange(newIntrinsicContentSize);
 }
 
@@ -160,9 +154,10 @@ void TiledCoreAnimationDrawingAreaProxy::sendUpdateGeometry()
 {
     ASSERT(!m_isWaitingForDidUpdateGeometry);
 
-    m_lastSentMinimumLayoutWidth = m_webPageProxy->minimumLayoutWidth();
+    m_lastSentMinimumLayoutSize = m_webPageProxy->minimumLayoutSize();
     m_lastSentSize = m_size;
-    m_webPageProxy->process()->send(Messages::DrawingArea::UpdateGeometry(m_size, m_lastSentMinimumLayoutWidth), m_webPageProxy->pageID());
+    m_lastSentLayerPosition = m_layerPosition;
+    m_webPageProxy->process()->send(Messages::DrawingArea::UpdateGeometry(m_size, m_layerPosition), m_webPageProxy->pageID());
     m_isWaitingForDidUpdateGeometry = true;
 }
 

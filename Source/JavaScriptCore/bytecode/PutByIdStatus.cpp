@@ -49,7 +49,7 @@ PutByIdStatus PutByIdStatus::computeFromLLInt(CodeBlock* profiledBlock, unsigned
     
     if (instruction[0].u.opcode == LLInt::getOpcode(llint_op_put_by_id)
         || instruction[0].u.opcode == LLInt::getOpcode(llint_op_put_by_id_out_of_line)) {
-        PropertyOffset offset = structure->get(*profiledBlock->globalData(), ident);
+        PropertyOffset offset = structure->get(*profiledBlock->vm(), ident);
         if (!isValidOffset(offset))
             return PutByIdStatus(NoInformation, 0, 0, 0, invalidOffset);
         
@@ -68,7 +68,7 @@ PutByIdStatus PutByIdStatus::computeFromLLInt(CodeBlock* profiledBlock, unsigned
     ASSERT(newStructure);
     ASSERT(chain);
     
-    PropertyOffset offset = newStructure->get(*profiledBlock->globalData(), ident);
+    PropertyOffset offset = newStructure->get(*profiledBlock->vm(), ident);
     if (!isValidOffset(offset))
         return PutByIdStatus(NoInformation, 0, 0, 0, invalidOffset);
     
@@ -94,13 +94,17 @@ PutByIdStatus PutByIdStatus::computeFor(CodeBlock* profiledBlock, unsigned bytec
     if (!stubInfo.seen)
         return computeFromLLInt(profiledBlock, bytecodeIndex, ident);
     
+    if (stubInfo.resetByGC)
+        return PutByIdStatus(TakesSlowPath, 0, 0, 0, invalidOffset);
+
     switch (stubInfo.accessType) {
     case access_unset:
-        return computeFromLLInt(profiledBlock, bytecodeIndex, ident);
+        // If the JIT saw it but didn't optimize it, then assume that this takes slow path.
+        return PutByIdStatus(TakesSlowPath, 0, 0, 0, invalidOffset);
         
     case access_put_by_id_replace: {
         PropertyOffset offset = stubInfo.u.putByIdReplace.baseObjectStructure->get(
-            *profiledBlock->globalData(), ident);
+            *profiledBlock->vm(), ident);
         if (isValidOffset(offset)) {
             return PutByIdStatus(
                 SimpleReplace,
@@ -115,7 +119,7 @@ PutByIdStatus PutByIdStatus::computeFor(CodeBlock* profiledBlock, unsigned bytec
     case access_put_by_id_transition_direct: {
         ASSERT(stubInfo.u.putByIdTransition.previousStructure->transitionWatchpointSetHasBeenInvalidated());
         PropertyOffset offset = stubInfo.u.putByIdTransition.structure->get(
-            *profiledBlock->globalData(), ident);
+            *profiledBlock->vm(), ident);
         if (isValidOffset(offset)) {
             return PutByIdStatus(
                 SimpleTransition,
@@ -135,7 +139,7 @@ PutByIdStatus PutByIdStatus::computeFor(CodeBlock* profiledBlock, unsigned bytec
 #endif // ENABLE(JIT)
 }
 
-PutByIdStatus PutByIdStatus::computeFor(JSGlobalData& globalData, JSGlobalObject* globalObject, Structure* structure, Identifier& ident, bool isDirect)
+PutByIdStatus PutByIdStatus::computeFor(VM& vm, JSGlobalObject* globalObject, Structure* structure, Identifier& ident, bool isDirect)
 {
     if (PropertyName(ident).asIndex() != PropertyName::NotAnIndex)
         return PutByIdStatus(TakesSlowPath);
@@ -147,11 +151,16 @@ PutByIdStatus PutByIdStatus::computeFor(JSGlobalData& globalData, JSGlobalObject
         return PutByIdStatus(TakesSlowPath);
     
     unsigned attributes;
-    JSCell* specificValueIgnored;
-    PropertyOffset offset = structure->get(globalData, ident, attributes, specificValueIgnored);
+    JSCell* specificValue;
+    PropertyOffset offset = structure->get(vm, ident, attributes, specificValue);
     if (isValidOffset(offset)) {
         if (attributes & (Accessor | ReadOnly))
             return PutByIdStatus(TakesSlowPath);
+        if (specificValue) {
+            // We need the PutById slow path to verify that we're storing the right value into
+            // the specialized slot.
+            return PutByIdStatus(TakesSlowPath);
+        }
         return PutByIdStatus(SimpleReplace, structure, 0, 0, offset);
     }
     
@@ -169,7 +178,7 @@ PutByIdStatus PutByIdStatus::computeFor(JSGlobalData& globalData, JSGlobalObject
     
     if (!isDirect) {
         // If the prototype chain has setters or read-only properties, then give up.
-        if (structure->prototypeChainMayInterceptStoreTo(globalData, ident))
+        if (structure->prototypeChainMayInterceptStoreTo(vm, ident))
             return PutByIdStatus(TakesSlowPath);
         
         // If the prototype chain hasn't been normalized (i.e. there are proxies or dictionaries)
@@ -204,7 +213,7 @@ PutByIdStatus PutByIdStatus::computeFor(JSGlobalData& globalData, JSGlobalObject
     
     return PutByIdStatus(
         SimpleTransition, structure, transition,
-        structure->prototypeChain(globalData, globalObject), offset);
+        structure->prototypeChain(vm, globalObject), offset);
 }
 
 } // namespace JSC

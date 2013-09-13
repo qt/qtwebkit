@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2012, 2013  Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,39 +28,83 @@
 
 #if ENABLE(VIDEO_TRACK)
 
+#include "Language.h"
+#include "LocalizedStrings.h"
+#include "TextTrack.h"
+#include "Timer.h"
 #include <wtf/PassOwnPtr.h>
 #include <wtf/text/AtomicString.h>
 
 namespace WebCore {
 
+class HTMLMediaElement;
 class PageGroup;
-
-class CaptionPreferencesChangedListener {
-public:
-    virtual void captionPreferencesChanged() = 0;
-protected:
-    virtual ~CaptionPreferencesChangedListener() { }
-};
+class TextTrackList;
 
 class CaptionUserPreferences {
 public:
     static PassOwnPtr<CaptionUserPreferences> create(PageGroup* group) { return adoptPtr(new CaptionUserPreferences(group)); }
-    virtual ~CaptionUserPreferences() { }
+    virtual ~CaptionUserPreferences();
 
-    virtual bool userPrefersCaptions() const { return false; }
-    virtual bool userHasCaptionPreferences() const { return false; }
-    virtual float captionFontSizeScale() const { return 0.05f; }
-    virtual String captionsStyleSheetOverride() const { return emptyString(); }
-    virtual void registerForCaptionPreferencesChangedCallbacks(CaptionPreferencesChangedListener*) { }
-    virtual void unregisterForCaptionPreferencesChangedCallbacks(CaptionPreferencesChangedListener*) { }
+    enum CaptionDisplayMode {
+        Automatic,
+        ForcedOnly,
+        AlwaysOn
+    };
+    virtual CaptionDisplayMode captionDisplayMode() const;
+    virtual void setCaptionDisplayMode(CaptionDisplayMode);
 
-    PageGroup* pageGroup() { return m_pageGroup; }
+    virtual int textTrackSelectionScore(TextTrack*, HTMLMediaElement*) const;
+    virtual int textTrackLanguageSelectionScore(TextTrack*, const Vector<String>&) const;
+
+    virtual bool userPrefersCaptions() const;
+    virtual void setUserPrefersCaptions(bool);
+
+    virtual bool userPrefersSubtitles() const;
+    virtual void setUserPrefersSubtitles(bool preference);
+    
+    virtual bool userPrefersTextDescriptions() const;
+    virtual void setUserPrefersTextDescriptions(bool preference);
+
+    virtual float captionFontSizeScaleAndImportance(bool& important) const { important = false; return 0.05f; }
+
+    virtual String captionsStyleSheetOverride() const { return m_captionsStyleSheetOverride; }
+    virtual void setCaptionsStyleSheetOverride(const String&);
+
+    virtual void setInterestedInCaptionPreferenceChanges() { }
+
+    virtual void captionPreferencesChanged();
+
+    virtual void setPreferredLanguage(const String&);
+    virtual Vector<String> preferredLanguages() const;
+
+    virtual String displayNameForTrack(TextTrack*) const;
+    virtual Vector<RefPtr<TextTrack> > sortedTrackListForMenu(TextTrackList*);
+
+    void setPrimaryAudioTrackLanguageOverride(const String& language) { m_primaryAudioTrackLanguageOverride = language;  }
+    String primaryAudioTrackLanguageOverride() const;
+
+    virtual bool testingMode() const { return m_testingMode; }
+    virtual void setTestingMode(bool override) { m_testingMode = override; }
+    
+    PageGroup* pageGroup() const { return m_pageGroup; }
 
 protected:
-    CaptionUserPreferences(PageGroup* group) : m_pageGroup(group) { }
+    CaptionUserPreferences(PageGroup*);
+    void updateCaptionStyleSheetOveride();
 
 private:
+    void timerFired(Timer<CaptionUserPreferences>*);
+    void notify();
+
     PageGroup* m_pageGroup;
+    CaptionDisplayMode m_displayMode;
+    Timer<CaptionUserPreferences> m_timer;
+    String m_userPreferredLanguage;
+    String m_captionsStyleSheetOverride;
+    String m_primaryAudioTrackLanguageOverride;
+    bool m_testingMode;
+    bool m_havePreferences;
 };
     
 }

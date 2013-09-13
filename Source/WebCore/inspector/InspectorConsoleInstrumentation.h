@@ -44,6 +44,14 @@ inline void InspectorInstrumentation::addMessageToConsole(Page* page, MessageSou
 #if ENABLE(INSPECTOR)
     if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForPage(page))
         addMessageToConsoleImpl(instrumentingAgents, source, type, level, message, callStack, requestIdentifier);
+#else
+    UNUSED_PARAM(page);
+    UNUSED_PARAM(source);
+    UNUSED_PARAM(type);
+    UNUSED_PARAM(level);
+    UNUSED_PARAM(message);
+    UNUSED_PARAM(callStack);
+    UNUSED_PARAM(requestIdentifier);
 #endif
 }
 
@@ -52,31 +60,69 @@ inline void InspectorInstrumentation::addMessageToConsole(Page* page, MessageSou
 #if ENABLE(INSPECTOR)
     if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForPage(page))
         addMessageToConsoleImpl(instrumentingAgents, source, type, level, message, state, arguments, requestIdentifier);
+#else
+    UNUSED_PARAM(page);
+    UNUSED_PARAM(source);
+    UNUSED_PARAM(type);
+    UNUSED_PARAM(level);
+    UNUSED_PARAM(message);
+    UNUSED_PARAM(state);
+    UNUSED_PARAM(arguments);
+    UNUSED_PARAM(requestIdentifier);
 #endif
 }
 
-inline void InspectorInstrumentation::addMessageToConsole(Page* page, MessageSource source, MessageType type, MessageLevel level, const String& message, const String& scriptId, unsigned lineNumber, unsigned long requestIdentifier)
+inline void InspectorInstrumentation::addMessageToConsole(Page* page, MessageSource source, MessageType type, MessageLevel level, const String& message, const String& scriptId, unsigned lineNumber, unsigned columnNumber, ScriptState* state, unsigned long requestIdentifier)
 {
 #if ENABLE(INSPECTOR)
     if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForPage(page))
-        addMessageToConsoleImpl(instrumentingAgents, source, type, level, message, scriptId, lineNumber, requestIdentifier);
+        addMessageToConsoleImpl(instrumentingAgents, source, type, level, message, scriptId, lineNumber, columnNumber, state, requestIdentifier);
+#else
+    UNUSED_PARAM(page);
+    UNUSED_PARAM(source);
+    UNUSED_PARAM(type);
+    UNUSED_PARAM(level);
+    UNUSED_PARAM(message);
+    UNUSED_PARAM(scriptId);
+    UNUSED_PARAM(lineNumber);
+    UNUSED_PARAM(state);
+    UNUSED_PARAM(requestIdentifier);
 #endif
 }
 
 #if ENABLE(WORKERS)
-inline void InspectorInstrumentation::addMessageToConsole(WorkerContext* workerContext, MessageSource source, MessageType type, MessageLevel level, const String& message, PassRefPtr<ScriptCallStack> callStack, unsigned long requestIdentifier)
+inline void InspectorInstrumentation::addMessageToConsole(WorkerGlobalScope* workerGlobalScope, MessageSource source, MessageType type, MessageLevel level, const String& message, PassRefPtr<ScriptCallStack> callStack, unsigned long requestIdentifier)
 {
 #if ENABLE(INSPECTOR)
-    if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForWorkerContext(workerContext))
+    if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForWorkerGlobalScope(workerGlobalScope))
         addMessageToConsoleImpl(instrumentingAgents, source, type, level, message, callStack, requestIdentifier);
+#else
+    UNUSED_PARAM(workerGlobalScope);
+    UNUSED_PARAM(source);
+    UNUSED_PARAM(type);
+    UNUSED_PARAM(level);
+    UNUSED_PARAM(message);
+    UNUSED_PARAM(callStack);
+    UNUSED_PARAM(requestIdentifier);
 #endif
 }
 
-inline void InspectorInstrumentation::addMessageToConsole(WorkerContext* workerContext, MessageSource source, MessageType type, MessageLevel level, const String& message, const String& scriptId, unsigned lineNumber, unsigned long requestIdentifier)
+inline void InspectorInstrumentation::addMessageToConsole(WorkerGlobalScope* workerGlobalScope, MessageSource source, MessageType type, MessageLevel level, const String& message, const String& scriptId, unsigned lineNumber, unsigned columnNumber, ScriptState* state, unsigned long requestIdentifier)
 {
 #if ENABLE(INSPECTOR)
-    if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForWorkerContext(workerContext))
-        addMessageToConsoleImpl(instrumentingAgents, source, type, level, message, scriptId, lineNumber, requestIdentifier);
+    if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForWorkerGlobalScope(workerGlobalScope))
+        addMessageToConsoleImpl(instrumentingAgents, source, type, level, message, scriptId, lineNumber, columnNumber, state, requestIdentifier);
+#else
+    UNUSED_PARAM(workerGlobalScope);
+    UNUSED_PARAM(source);
+    UNUSED_PARAM(type);
+    UNUSED_PARAM(level);
+    UNUSED_PARAM(message);
+    UNUSED_PARAM(scriptId);
+    UNUSED_PARAM(lineNumber);
+    UNUSED_PARAM(columnNumber);
+    UNUSED_PARAM(state);
+    UNUSED_PARAM(requestIdentifier);
 #endif
 }
 #endif
@@ -86,6 +132,10 @@ inline void InspectorInstrumentation::consoleCount(Page* page, ScriptState* stat
 #if ENABLE(INSPECTOR)
     if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForPage(page))
         consoleCountImpl(instrumentingAgents, state, arguments);
+#else
+    UNUSED_PARAM(page);
+    UNUSED_PARAM(state);
+    UNUSED_PARAM(arguments);
 #endif
 }
 
@@ -94,6 +144,9 @@ inline void InspectorInstrumentation::startConsoleTiming(Frame* frame, const Str
 #if ENABLE(INSPECTOR)
     if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForFrame(frame))
         startConsoleTimingImpl(instrumentingAgents, frame, title);
+#else
+    UNUSED_PARAM(frame);
+    UNUSED_PARAM(title);
 #endif
 }
 
@@ -102,6 +155,10 @@ inline void InspectorInstrumentation::stopConsoleTiming(Frame* frame, const Stri
 #if ENABLE(INSPECTOR)
     if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForFrame(frame))
         stopConsoleTimingImpl(instrumentingAgents, frame, title, stack);
+#else
+    UNUSED_PARAM(frame);
+    UNUSED_PARAM(title);
+    UNUSED_PARAM(stack);
 #endif
 }
 
@@ -111,15 +168,24 @@ inline void InspectorInstrumentation::consoleTimeStamp(Frame* frame, PassRefPtr<
     FAST_RETURN_IF_NO_FRONTENDS(void());
     if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForFrame(frame))
         consoleTimeStampImpl(instrumentingAgents, frame, arguments);
+#else
+    UNUSED_PARAM(frame);
+    UNUSED_PARAM(arguments);
 #endif
 }
 
 #if ENABLE(JAVASCRIPT_DEBUGGER)
-inline void InspectorInstrumentation::addStartProfilingMessageToConsole(Page* page, const String& title, unsigned lineNumber, const String& sourceURL)
+inline void InspectorInstrumentation::addStartProfilingMessageToConsole(Page* page, const String& title, unsigned lineNumber, unsigned columnNumber, const String& sourceURL)
 {
 #if ENABLE(INSPECTOR)
     if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForPage(page))
-        addStartProfilingMessageToConsoleImpl(instrumentingAgents, title, lineNumber, sourceURL);
+        addStartProfilingMessageToConsoleImpl(instrumentingAgents, title, lineNumber, columnNumber, sourceURL);
+#else
+    UNUSED_PARAM(page);
+    UNUSED_PARAM(title);
+    UNUSED_PARAM(lineNumber);
+    UNUSED_PARAM(columnNumber);
+    UNUSED_PARAM(sourceURL);
 #endif
 }
 
@@ -128,6 +194,10 @@ inline void InspectorInstrumentation::addProfile(Page* page, RefPtr<ScriptProfil
 #if ENABLE(INSPECTOR)
     if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForPage(page))
         addProfileImpl(instrumentingAgents, profile, callStack);
+#else
+    UNUSED_PARAM(page);
+    UNUSED_PARAM(profile);
+    UNUSED_PARAM(callStack);
 #endif
 }
 
@@ -136,6 +206,8 @@ inline bool InspectorInstrumentation::profilerEnabled(Page* page)
 #if ENABLE(INSPECTOR)
     if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForPage(page))
         return profilerEnabledImpl(instrumentingAgents);
+#else
+    UNUSED_PARAM(page);
 #endif
     return false;
 }
@@ -145,6 +217,9 @@ inline String InspectorInstrumentation::getCurrentUserInitiatedProfileName(Page*
 #if ENABLE(INSPECTOR)
     if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForPage(page))
         return InspectorInstrumentation::getCurrentUserInitiatedProfileNameImpl(instrumentingAgents, incrementProfileNumber);
+#else
+    UNUSED_PARAM(page);
+    UNUSED_PARAM(incrementProfileNumber);
 #endif
     return "";
 }

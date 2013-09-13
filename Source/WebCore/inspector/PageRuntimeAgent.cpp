@@ -34,7 +34,6 @@
 
 #include "PageRuntimeAgent.h"
 
-#include "Console.h"
 #include "Document.h"
 #include "InjectedScript.h"
 #include "InjectedScriptManager.h"
@@ -42,6 +41,8 @@
 #include "InspectorState.h"
 #include "InstrumentingAgents.h"
 #include "Page.h"
+#include "PageConsole.h"
+#include "ScriptController.h"
 #include "SecurityOrigin.h"
 
 using WebCore::TypeBuilder::Runtime::ExecutionContextDescription;
@@ -52,7 +53,7 @@ namespace PageRuntimeAgentState {
 static const char runtimeEnabled[] = "runtimeEnabled";
 };
 
-PageRuntimeAgent::PageRuntimeAgent(InstrumentingAgents* instrumentingAgents, InspectorState* state, InjectedScriptManager* injectedScriptManager, Page* page, InspectorPageAgent* pageAgent)
+PageRuntimeAgent::PageRuntimeAgent(InstrumentingAgents* instrumentingAgents, InspectorCompositeState* state, InjectedScriptManager* injectedScriptManager, Page* page, InspectorPageAgent* pageAgent)
     : InspectorRuntimeAgent(instrumentingAgents, state, injectedScriptManager)
     , m_inspectedPage(page)
     , m_pageAgent(pageAgent)
@@ -135,7 +136,10 @@ InjectedScript PageRuntimeAgent::injectedScriptForEval(ErrorString* errorString,
 {
     if (!executionContextId) {
         ScriptState* scriptState = mainWorldScriptState(m_inspectedPage->mainFrame());
-        return injectedScriptManager()->injectedScriptFor(scriptState);
+        InjectedScript result = injectedScriptManager()->injectedScriptFor(scriptState);
+        if (result.hasNoValue())
+            *errorString = "Internal error: main world execution context not found.";
+        return result;
     }
     InjectedScript injectedScript = injectedScriptManager()->injectedScriptForId(*executionContextId);
     if (injectedScript.hasNoValue())
@@ -145,12 +149,12 @@ InjectedScript PageRuntimeAgent::injectedScriptForEval(ErrorString* errorString,
 
 void PageRuntimeAgent::muteConsole()
 {
-    Console::mute();
+    PageConsole::mute();
 }
 
 void PageRuntimeAgent::unmuteConsole()
 {
-    Console::unmute();
+    PageConsole::unmute();
 }
 
 void PageRuntimeAgent::reportExecutionContextCreation()
@@ -176,7 +180,7 @@ void PageRuntimeAgent::notifyContextCreated(const String& frameId, ScriptState* 
 {
     ASSERT(securityOrigin || isPageContext);
     int executionContextId = injectedScriptManager()->injectedScriptIdFor(scriptState);
-    String name = securityOrigin ? securityOrigin->toString() : "";
+    String name = securityOrigin ? securityOrigin->toRawString() : "";
     m_frontend->executionContextCreated(ExecutionContextDescription::create()
         .setId(executionContextId)
         .setIsPageContext(isPageContext)

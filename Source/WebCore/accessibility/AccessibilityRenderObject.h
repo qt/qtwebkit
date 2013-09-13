@@ -93,8 +93,7 @@ public:
     virtual void setAccessibleName(const AtomicString&);
     
     // Provides common logic used by all elements when determining isIgnored.
-    AccessibilityObjectInclusion accessibilityIsIgnoredBase() const;
-    virtual bool accessibilityIsIgnored() const;
+    virtual AccessibilityObjectInclusion defaultObjectInclusion() const;
     
     virtual int layoutCount() const;
     virtual double estimatedLoadingProgress() const;
@@ -145,7 +144,7 @@ public:
     virtual VisibleSelection selection() const;
     virtual String stringValue() const;
     virtual String helpText() const;
-    virtual String textUnderElement() const;
+    virtual String textUnderElement(AccessibilityTextUnderElementMode = TextUnderElementModeSkipIgnoredChildren) const;
     virtual String text() const;
     virtual int textLength() const;
     virtual String selectedText() const;
@@ -173,6 +172,7 @@ public:
     virtual void visibleChildren(AccessibilityChildrenVector&);
     virtual void tabChildren(AccessibilityChildrenVector&);
     virtual bool shouldFocusActiveDescendant() const;
+    bool shouldNotifyActiveDescendant() const;
     virtual AccessibilityObject* activeDescendant() const;
     virtual void handleActiveDescendantChanged();
     virtual void handleAriaExpandedChanged();
@@ -223,11 +223,11 @@ protected:
     virtual bool isDetached() const { return !m_renderer; }
 
     virtual AccessibilityRole determineAccessibilityRole();
+    virtual bool computeAccessibilityIsIgnored() const;
 
 private:
     void ariaListboxSelectedChildren(AccessibilityChildrenVector&);
     void ariaListboxVisibleChildren(AccessibilityChildrenVector&);
-    bool ariaIsHidden() const;
     bool isAllowedChildOfTree() const;
     bool hasTextAlternative() const;
     String positionalDescriptionForMSAA() const;
@@ -235,7 +235,8 @@ private:
     Element* rootEditableElementForPosition(const Position&) const;
     bool nodeIsTextControl(const Node*) const;
     virtual void setNeedsToUpdateChildren() { m_childrenDirty = true; }
-
+    virtual Path elementPath() const;
+    
     bool isTabItemSelected() const;
     LayoutRect checkboxOrRadioRect() const;
     void addRadioButtonGroupMembers(AccessibilityChildrenVector& linkedUIElements) const;
@@ -253,7 +254,8 @@ private:
     AccessibilitySVGRoot* remoteSVGRootElement() const;
     AccessibilityObject* remoteSVGElementHitTest(const IntPoint&) const;
     void offsetBoundingBoxForRemoteSVGElement(LayoutRect&) const;
-    
+    virtual bool supportsPath() const;
+
     void addHiddenChildren();
     void addTextFieldChildren();
     void addImageMapChildren();
@@ -275,9 +277,9 @@ private:
     virtual const AtomicString& ariaLiveRegionRelevant() const;
     virtual bool ariaLiveRegionAtomic() const;
     virtual bool ariaLiveRegionBusy() const;    
-    
+
     bool inheritsPresentationalRole() const;
-    
+
 #if ENABLE(MATHML)
     // All math elements return true for isMathElement().
     virtual bool isMathElement() const;
@@ -297,6 +299,7 @@ private:
     virtual bool isMathTable() const;
     virtual bool isMathTableRow() const;
     virtual bool isMathTableCell() const;
+    virtual bool isMathMultiscript() const;
     
     // Generic components.
     virtual AccessibilityObject* mathBaseObject();
@@ -320,20 +323,25 @@ private:
     // Fenced components.
     virtual String mathFencedOpenString() const;
     virtual String mathFencedCloseString() const;
+    virtual int mathLineThickness() const;
 
+    // Multiscripts components.
+    virtual void mathPrescripts(AccessibilityMathMultiscriptPairs&);
+    virtual void mathPostscripts(AccessibilityMathMultiscriptPairs&);
+    
     bool isIgnoredElementWithinMathTree() const;
 #endif
 };
 
 inline AccessibilityRenderObject* toAccessibilityRenderObject(AccessibilityObject* object)
 {
-    ASSERT(!object || object->isAccessibilityRenderObject());
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isAccessibilityRenderObject());
     return static_cast<AccessibilityRenderObject*>(object);
 }
 
 inline const AccessibilityRenderObject* toAccessibilityRenderObject(const AccessibilityObject* object)
 {
-    ASSERT(!object || object->isAccessibilityRenderObject());
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isAccessibilityRenderObject());
     return static_cast<const AccessibilityRenderObject*>(object);
 }
 

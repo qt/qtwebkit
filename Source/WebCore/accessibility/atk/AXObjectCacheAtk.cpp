@@ -20,6 +20,8 @@
 #include "config.h"
 #include "AXObjectCache.h"
 
+#if HAVE(ACCESSIBILITY)
+
 #include "AccessibilityObject.h"
 #include "AccessibilityRenderObject.h"
 #include "Document.h"
@@ -29,6 +31,7 @@
 #include "TextIterator.h"
 #include "WebKitAccessibleWrapperAtk.h"
 #include <wtf/gobject/GOwnPtr.h>
+#include <wtf/text/CString.h>
 
 namespace WebCore {
 
@@ -262,3 +265,5 @@ void AXObjectCache::handleScrolledToAnchor(const Node*)
 }
 
 } // namespace WebCore
+
+#endif

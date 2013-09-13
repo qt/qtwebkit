@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2004, 2005, 2006, 2007, 2008 Apple Inc. All rights reserved.
+ * Copyright (C) 2004, 2005, 2006, 2007, 2008, 2013 Apple Inc. All rights reserved.
  * Copyright (C) 2010 Patrick Gansterer <paroga@paroga.com>
  * Copyright (C) 2012 Google Inc. All rights reserved.
  *
@@ -24,11 +24,17 @@
 
 #include "AtomicString.h"
 
+#include "AtomicStringTable.h"
 #include "StringHash.h"
 #include <wtf/HashSet.h>
 #include <wtf/Threading.h>
 #include <wtf/WTFThreadData.h>
 #include <wtf/unicode/UTF8.h>
+
+#if USE(WEB_THREAD)
+#include <wtf/MainThread.h>
+#include <wtf/TCSpinLock.h>
+#endif
 
 namespace WTF {
 
@@ -36,50 +42,40 @@ using namespace Unicode;
 
 COMPILE_ASSERT(sizeof(AtomicString) == sizeof(String), atomic_string_and_string_must_be_same_size);
 
-class AtomicStringTable {
-    WTF_MAKE_FAST_ALLOCATED;
+#if USE(WEB_THREAD)
+class AtomicStringTableLocker : public SpinLockHolder {
+    WTF_MAKE_NONCOPYABLE(AtomicStringTableLocker);
+
+    static SpinLock s_stringTableLock;
 public:
-    static AtomicStringTable* create()
+    AtomicStringTableLocker()
+        : SpinLockHolder(&s_stringTableLock)
     {
-        AtomicStringTable* table = new AtomicStringTable;
-
-        WTFThreadData& data = wtfThreadData();
-        data.m_atomicStringTable = table;
-        data.m_atomicStringTableDestructor = AtomicStringTable::destroy;
-
-        return table;
     }
-
-    HashSet<StringImpl*>& table()
-    {
-        return m_table;
-    }
-
-private:
-    static void destroy(AtomicStringTable* table)
-    {
-        HashSet<StringImpl*>::iterator end = table->m_table.end();
-        for (HashSet<StringImpl*>::iterator iter = table->m_table.begin(); iter != end; ++iter)
-            (*iter)->setIsAtomic(false);
-        delete table;
-    }
-
-    HashSet<StringImpl*> m_table;
 };
 
-static inline HashSet<StringImpl*>& stringTable()
+SpinLock AtomicStringTableLocker::s_stringTableLock = SPINLOCK_INITIALIZER;
+#else
+
+class AtomicStringTableLocker {
+    WTF_MAKE_NONCOPYABLE(AtomicStringTableLocker);
+public:
+    AtomicStringTableLocker() { }
+    ~AtomicStringTableLocker() { }
+};
+#endif // USE(WEB_THREAD)
+
+static ALWAYS_INLINE HashSet<StringImpl*>& stringTable()
 {
-    // Once possible we should make this non-lazy (constructed in WTFThreadData's constructor).
-    AtomicStringTable* table = wtfThreadData().atomicStringTable();
-    if (UNLIKELY(!table))
-        table = AtomicStringTable::create();
-    return table->table();
+    return wtfThreadData().atomicStringTable()->table();
 }
 
 template<typename T, typename HashTranslator>
 static inline PassRefPtr<StringImpl> addToStringTable(const T& value)
 {
-    HashSet<StringImpl*>::AddResult addResult = stringTable().add<T, HashTranslator>(value);
+    AtomicStringTableLocker locker;
+
+    HashSet<StringImpl*>::AddResult addResult = stringTable().add<HashTranslator>(value);
 
     // If the string is newly-translated, then we need to adopt it.
     // The boolean in the pair tells us if that is so.
@@ -381,22 +377,29 @@ PassRefPtr<StringImpl> AtomicString::addFromLiteralData(const char* characters, 
     return addToStringTable<CharBuffer, CharBufferFromLiteralDataTranslator>(buffer);
 }
 
-PassRefPtr<StringImpl> AtomicString::addSlowCase(StringImpl* r)
+PassRefPtr<StringImpl> AtomicString::addSlowCase(StringImpl* string)
 {
-    if (!r->length())
+    if (!string->length())
         return StringImpl::empty();
 
-    StringImpl* result = *stringTable().add(r).iterator;
-    if (result == r)
-        r->setIsAtomic(true);
-    return result;
+    ASSERT_WITH_MESSAGE(!string->isAtomic(), "AtomicString should not hit the slow case if the string is already atomic.");
+
+    AtomicStringTableLocker locker;
+    HashSet<StringImpl*>::AddResult addResult = stringTable().add(string);
+
+    if (addResult.isNewEntry) {
+        ASSERT(*addResult.iterator == string);
+        string->setIsAtomic(true);
+    }
+
+    return *addResult.iterator;
 }
 
 template<typename CharacterType>
 static inline HashSet<StringImpl*>::iterator findString(const StringImpl* stringImpl)
 {
     HashAndCharacters<CharacterType> buffer = { stringImpl->existingHash(), stringImpl->getCharacters<CharacterType>(), stringImpl->length() };
-    return stringTable().find<HashAndCharacters<CharacterType>, HashAndCharactersTranslator<CharacterType> >(buffer);
+    return stringTable().find<HashAndCharactersTranslator<CharacterType> >(buffer);
 }
 
 AtomicStringImpl* AtomicString::find(const StringImpl* stringImpl)
@@ -407,6 +410,7 @@ AtomicStringImpl* AtomicString::find(const StringImpl* stringImpl)
     if (!stringImpl->length())
         return static_cast<AtomicStringImpl*>(StringImpl::empty());
 
+    AtomicStringTableLocker locker;
     HashSet<StringImpl*>::iterator iterator;
     if (stringImpl->is8Bit())
         iterator = findString<LChar>(stringImpl);
@@ -417,9 +421,14 @@ AtomicStringImpl* AtomicString::find(const StringImpl* stringImpl)
     return static_cast<AtomicStringImpl*>(*iterator);
 }
 
-void AtomicString::remove(StringImpl* r)
+void AtomicString::remove(StringImpl* string)
 {
-    stringTable().remove(r);
+    ASSERT(string->isAtomic());
+    AtomicStringTableLocker locker;
+    HashSet<StringImpl*>& atomicStringTable = stringTable();
+    HashSet<StringImpl*>::iterator iterator = atomicStringTable.find(string);
+    ASSERT_WITH_MESSAGE(iterator != atomicStringTable.end(), "The string being removed is atomic in the string table of an other thread!");
+    atomicStringTable.remove(iterator);
 }
 
 AtomicString AtomicString::lower() const
@@ -427,11 +436,15 @@ AtomicString AtomicString::lower() const
     // Note: This is a hot function in the Dromaeo benchmark.
     StringImpl* impl = this->impl();
     if (UNLIKELY(!impl))
-        return *this;
-    RefPtr<StringImpl> newImpl = impl->lower();
-    if (LIKELY(newImpl == impl))
-        return *this;
-    return AtomicString(newImpl);
+        return AtomicString();
+
+    RefPtr<StringImpl> lowerImpl = impl->lower();
+    AtomicString returnValue;
+    if (LIKELY(lowerImpl == impl))
+        returnValue.m_string = lowerImpl.release();
+    else
+        returnValue.m_string = addSlowCase(lowerImpl.get());
+    return returnValue;
 }
 
 AtomicString AtomicString::fromUTF8Internal(const char* charactersStart, const char* charactersEnd)
@@ -447,6 +460,14 @@ AtomicString AtomicString::fromUTF8Internal(const char* charactersStart, const c
     atomicString.m_string = addToStringTable<HashAndUTF8Characters, HashAndUTF8CharactersTranslator>(buffer);
     return atomicString;
 }
+
+#if !ASSERT_DISABLED
+bool AtomicString::isInAtomicStringTable(StringImpl* string)
+{
+    AtomicStringTableLocker locker;
+    return stringTable().contains(string);
+}
+#endif
 
 #ifndef NDEBUG
 void AtomicString::show() const

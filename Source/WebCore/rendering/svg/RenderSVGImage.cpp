@@ -44,6 +44,7 @@
 #include "SVGRenderingContext.h"
 #include "SVGResources.h"
 #include "SVGResourcesCache.h"
+#include <wtf/StackStats.h>
 
 namespace WebCore {
 
@@ -63,7 +64,7 @@ RenderSVGImage::~RenderSVGImage()
 
 bool RenderSVGImage::updateImageViewport()
 {
-    SVGImageElement* image = static_cast<SVGImageElement*>(node());
+    SVGImageElement* image = toSVGImageElement(node());
     FloatRect oldBoundaries = m_objectBoundingBox;
 
     SVGLengthContext lengthContext(image);
@@ -87,7 +88,7 @@ void RenderSVGImage::layout()
 
     bool transformOrBoundariesUpdate = m_needsTransformUpdate || m_needsBoundariesUpdate;
     if (m_needsTransformUpdate) {
-        m_localTransform = static_cast<SVGImageElement*>(node())->animatedLocalTransform();
+        m_localTransform = toSVGImageElement(node())->animatedLocalTransform();
         m_needsTransformUpdate = false;
     }
 
@@ -132,20 +133,33 @@ void RenderSVGImage::paint(PaintInfo& paintInfo, const LayoutPoint&)
             SVGRenderingContext renderingContext(this, childPaintInfo);
 
             if (renderingContext.isRenderingPrepared()) {
-                RefPtr<Image> image = m_imageResource->image();
-                FloatRect destRect = m_objectBoundingBox;
-                FloatRect srcRect(0, 0, image->width(), image->height());
+                if (style()->svgStyle()->bufferedRendering() == BR_STATIC  && renderingContext.bufferForeground(m_bufferedForeground))
+                    return;
 
-                SVGImageElement* imageElement = static_cast<SVGImageElement*>(node());
-                imageElement->preserveAspectRatio().transformRect(destRect, srcRect);
-
-                childPaintInfo.context->drawImage(image.get(), ColorSpaceDeviceRGB, destRect, srcRect);
+                paintForeground(childPaintInfo);
             }
         }
 
         if (drawsOutline)
-            paintOutline(childPaintInfo.context, IntRect(boundingBox));
+            paintOutline(childPaintInfo, IntRect(boundingBox));
     }
+}
+
+void RenderSVGImage::paintForeground(PaintInfo& paintInfo)
+{
+    RefPtr<Image> image = m_imageResource->image();
+    FloatRect destRect = m_objectBoundingBox;
+    FloatRect srcRect(0, 0, image->width(), image->height());
+
+    SVGImageElement* imageElement = toSVGImageElement(node());
+    imageElement->preserveAspectRatio().transformRect(destRect, srcRect);
+
+    paintInfo.context->drawImage(image.get(), ColorSpaceDeviceRGB, destRect, srcRect);
+}
+
+void RenderSVGImage::invalidateBufferedForeground()
+{
+    m_bufferedForeground.clear();
 }
 
 bool RenderSVGImage::nodeAtFloatPoint(const HitTestRequest& request, HitTestResult& result, const FloatPoint& pointInParent, HitTestAction hitTestAction)
@@ -188,10 +202,12 @@ void RenderSVGImage::imageChanged(WrappedImagePtr, const IntRect*)
     m_objectBoundingBox = FloatRect();
     updateImageViewport();
 
+    invalidateBufferedForeground();
+
     repaint();
 }
 
-void RenderSVGImage::addFocusRingRects(Vector<IntRect>& rects, const LayoutPoint&)
+void RenderSVGImage::addFocusRingRects(Vector<IntRect>& rects, const LayoutPoint&, const RenderLayerModelObject*)
 {
     // this is called from paint() after the localTransform has already been applied
     IntRect contentRect = enclosingIntRect(repaintRectInLocalCoordinates());

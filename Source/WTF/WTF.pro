@@ -21,7 +21,6 @@ wince* {
 
 HEADERS += \
     Alignment.h \
-    AlwaysInline.h \
     ArrayBuffer.h \
     ArrayBufferView.h \
     ASCIICType.h \
@@ -58,14 +57,17 @@ HEADERS += \
     dtoa/utils.h \
     DynamicAnnotations.h \
     Encoder.h \
+    EnumClass.h \
     ExportMacros.h \
     FastAllocBase.h \
     FastMalloc.h \
+    FeatureDefines.h \
     FilePrintStream.h \
     FixedArray.h \
     Float32Array.h \
     Float64Array.h \
     Forward.h \
+    FunctionDispatcher.h \
     Functional.h \
     GetPtr.h \
     GregorianDateTime.h \
@@ -81,24 +83,11 @@ HEADERS += \
     Int32Array.h \
     Int8Array.h \
     ListHashSet.h \
-    ListRefPtr.h \
     Locker.h \
     MainThread.h \
-    MallocZoneSupport.h \
     MathExtras.h \
     MD5.h \
     MediaTime.h \
-    MemoryInstrumentation.h \
-    MemoryInstrumentationArrayBufferView.h \
-    MemoryInstrumentationHashCountedSet.h \
-    MemoryInstrumentationHashMap.h \
-    MemoryInstrumentationHashSet.h \
-    MemoryInstrumentationListHashSet.h \
-    MemoryInstrumentationParsedURL.h \
-    MemoryInstrumentationSequence.h \
-    MemoryInstrumentationString.h \
-    MemoryInstrumentationVector.h \
-    MemoryObjectInfo.h \
     MessageQueue.h \
     MetaAllocator.h \
     MetaAllocatorHandle.h \
@@ -129,6 +118,7 @@ HEADERS += \
     Platform.h \
     PossiblyNull.h \
     PrintStream.h \
+    ProcessID.h \
     RandomNumber.h \
     RandomNumberSeed.h \
     RawPointer.h \
@@ -154,6 +144,7 @@ HEADERS += \
     text/AtomicString.h \
     text/AtomicStringHash.h \
     text/AtomicStringImpl.h \
+    text/AtomicStringTable.h \
     text/Base64.h \
     text/CString.h \
     text/IntegerToStringConversion.h \
@@ -165,6 +156,7 @@ HEADERS += \
     text/StringOperators.h \
     text/TextPosition.h \
     text/WTFString.h \
+    threads/BinarySemaphore.h \
     Threading.h \
     ThreadingPrimitives.h \
     ThreadRestrictionVerifier.h \
@@ -178,17 +170,16 @@ HEADERS += \
     unicode/CharacterNames.h \
     unicode/Collator.h \
     unicode/icu/UnicodeIcu.h \
-    unicode/qt4/UnicodeQt4.h \
     unicode/ScriptCodesFromICU.h \
     unicode/Unicode.h \
     unicode/UnicodeMacrosFromICU.h \
     unicode/UTF8.h \
-    UnusedParam.h \
     ValueCheck.h \
     Vector.h \
     VectorTraits.h \
     VMTags.h \
-    WTFThreadData.h
+    WTFThreadData.h \
+    WeakPtr.h
 
 unix: HEADERS += ThreadIdentifierDataPthreads.h
 
@@ -214,6 +205,7 @@ SOURCES += \
     dtoa/strtod.cc \
     FastMalloc.cpp \
     FilePrintStream.cpp \
+    FunctionDispatcher.cpp \
     GregorianDateTime.cpp \
     gobject/GOwnPtr.cpp \
     gobject/GRefPtr.cpp \
@@ -221,7 +213,6 @@ SOURCES += \
     MD5.cpp \
     MainThread.cpp \
     MediaTime.cpp \
-    MemoryInstrumentation.cpp \
     MetaAllocator.cpp \
     NullPtr.cpp \
     NumberOfCores.cpp \
@@ -243,6 +234,7 @@ SOURCES += \
     TypeTraits.cpp \
     WTFThreadData.cpp \
     text/AtomicString.cpp \
+    text/AtomicStringTable.cpp \
     text/Base64.cpp \
     text/CString.cpp \
     text/StringBuilder.cpp \
@@ -264,6 +256,14 @@ win*|wince*: SOURCES += \
     ThreadSpecificWin.cpp \
     ThreadingWin.cpp
 
+win32 {
+    SOURCES += \
+        threads/win/BinarySemaphoreWin.cpp
+    INCLUDEPATH += $$PWD/wtf/threads
+} else {
+    SOURCES += \
+        threads/BinarySemaphore.cpp
+}
 
 QT += core
 QT -= gui

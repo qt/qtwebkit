@@ -29,9 +29,9 @@
 #ifndef NetworkResourcesData_h
 #define NetworkResourcesData_h
 
+#include "HTTPHeaderMap.h"
 #include "InspectorPageAgent.h"
 #include "TextResourceDecoder.h"
-
 #include <wtf/Deque.h>
 #include <wtf/HashMap.h>
 #include <wtf/RefCounted.h>
@@ -43,6 +43,7 @@
 namespace WebCore {
 
 class CachedResource;
+class FormData;
 class SharedBuffer;
 class TextResourceDecoder;
 
@@ -57,7 +58,6 @@ public:
     PassRefPtr<FormData> formData() const { return m_formData; }
     const HTTPHeaderMap& headers() const { return m_headers; }
     bool includeCredentials() const { return m_includeCredentials; }
-    void reportMemoryUsage(MemoryObjectInfo*) const;
 private:
     XHRReplayData(const String &method, const KURL&, bool async, PassRefPtr<FormData>, bool includeCredentials);
 
@@ -118,8 +118,6 @@ public:
         XHRReplayData* xhrReplayData() const { return m_xhrReplayData.get(); }
         void setXHRReplayData(XHRReplayData* xhrReplayData) { m_xhrReplayData = xhrReplayData; }
 
-        void reportMemoryUsage(MemoryObjectInfo*) const;
-
     private:
         bool hasData() const { return m_dataBuffer; }
         size_t dataLength() const;
@@ -167,9 +165,8 @@ public:
     void reuseXHRReplayData(const String& requestId, const String& reusedRequestId);
     XHRReplayData* xhrReplayData(const String& requestId);
 
-    void reportMemoryUsage(MemoryObjectInfo*) const;
-
 private:
+    ResourceData* resourceDataForRequestId(const String& requestId);
     void ensureNoDataForRequestId(const String& requestId);
     bool ensureFreeSpace(size_t);
 

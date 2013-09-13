@@ -22,46 +22,41 @@
 #define SVGImageElement_h
 
 #if ENABLE(SVG)
-#include "ImageLoaderClient.h"
 #include "SVGAnimatedBoolean.h"
 #include "SVGAnimatedLength.h"
 #include "SVGAnimatedPreserveAspectRatio.h"
 #include "SVGExternalResourcesRequired.h"
+#include "SVGGraphicsElement.h"
 #include "SVGImageLoader.h"
-#include "SVGLangSpace.h"
-#include "SVGStyledTransformableElement.h"
-#include "SVGTests.h"
+#include "SVGNames.h"
 #include "SVGURIReference.h"
 
 namespace WebCore {
 
-class SVGImageElement : public SVGStyledTransformableElement,
-                        public SVGTests,
-                        public SVGLangSpace,
-                        public SVGExternalResourcesRequired,
-                        public SVGURIReference,
-                        public ImageLoaderClientBase<SVGImageElement> {
+class SVGImageElement FINAL : public SVGGraphicsElement,
+                              public SVGExternalResourcesRequired,
+                              public SVGURIReference {
 public:
     static PassRefPtr<SVGImageElement> create(const QualifiedName&, Document*);
 
 private:
     SVGImageElement(const QualifiedName&, Document*);
-
+    
     virtual bool isValid() const { return SVGTests::isValid(); }
-    virtual bool supportsFocus() const { return true; }
+    virtual bool supportsFocus() const OVERRIDE { return true; }
 
     bool isSupportedAttribute(const QualifiedName&);
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
     virtual bool isPresentationAttribute(const QualifiedName&) const OVERRIDE;
-    virtual void collectStyleForPresentationAttribute(const Attribute&, StylePropertySet*) OVERRIDE;
+    virtual void collectStyleForPresentationAttribute(const QualifiedName&, const AtomicString&, MutableStylePropertySet*) OVERRIDE;
     virtual void svgAttributeChanged(const QualifiedName&);
 
-    virtual void attach();
+    virtual void attach(const AttachContext& = AttachContext()) OVERRIDE;
     virtual InsertionNotificationRequest insertedInto(ContainerNode*) OVERRIDE;
 
     virtual RenderObject* createRenderer(RenderArena*, RenderStyle*);
- 
-    virtual const QualifiedName& imageSourceAttributeName() const;       
+
+    virtual const AtomicString& imageSourceURL() const OVERRIDE;
     virtual void addSubresourceAttributeURLs(ListHashSet<KURL>&) const;
 
     virtual bool haveLoadedRequiredResources();
@@ -79,13 +74,19 @@ private:
         DECLARE_ANIMATED_BOOLEAN(ExternalResourcesRequired, externalResourcesRequired)
     END_DECLARE_ANIMATED_PROPERTIES
 
-    // SVGTests
-    virtual void synchronizeRequiredFeatures() { SVGTests::synchronizeRequiredFeatures(this); }
-    virtual void synchronizeRequiredExtensions() { SVGTests::synchronizeRequiredExtensions(this); }
-    virtual void synchronizeSystemLanguage() { SVGTests::synchronizeSystemLanguage(this); }
-
     SVGImageLoader m_imageLoader;
 };
+
+inline bool isSVGImageElement(const Node* node)
+{
+    return node->hasTagName(SVGNames::imageTag);
+}
+
+inline SVGImageElement* toSVGImageElement(Node* node)
+{
+    ASSERT_WITH_SECURITY_IMPLICATION(!node || isSVGImageElement(node));
+    return static_cast<SVGImageElement*>(node);
+}
 
 } // namespace WebCore
 

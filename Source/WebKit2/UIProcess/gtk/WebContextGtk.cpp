@@ -29,7 +29,11 @@
 #include "WebContext.h"
 
 #include "Logging.h"
+#include "WebCookieManagerProxy.h"
 #include "WebInspectorServer.h"
+#include "WebProcessCreationParameters.h"
+#include "WebProcessMessages.h"
+#include "WebSoupRequestManagerProxy.h"
 #include <WebCore/FileSystem.h>
 #include <WebCore/NotImplemented.h>
 #include <wtf/gobject/GOwnPtr.h>
@@ -74,15 +78,21 @@ static void initInspectorServer()
 #endif
 }
 
-WTF::String WebContext::applicationCacheDirectory()
+WTF::String WebContext::platformDefaultApplicationCacheDirectory() const
 {
     GOwnPtr<gchar> cacheDirectory(g_build_filename(g_get_user_cache_dir(), "webkitgtk", "applications", NULL));
     return WebCore::filenameToString(cacheDirectory.get());
 }
 
-void WebContext::platformInitializeWebProcess(WebProcessCreationParameters&)
+void WebContext::platformInitializeWebProcess(WebProcessCreationParameters& parameters)
 {
     initInspectorServer();
+
+    parameters.urlSchemesRegistered = supplement<WebSoupRequestManagerProxy>()->registeredURISchemes();
+    supplement<WebCookieManagerProxy>()->getCookiePersistentStorage(parameters.cookiePersistentStoragePath, parameters.cookiePersistentStorageType);
+    parameters.cookieAcceptPolicy = m_initialHTTPCookieAcceptPolicy;
+    parameters.ignoreTLSErrors = m_ignoreTLSErrors;
+    parameters.shouldTrackVisitedLinks = true;
 }
 
 void WebContext::platformInvalidateContext()
@@ -109,14 +119,20 @@ String WebContext::platformDefaultLocalStorageDirectory() const
 
 String WebContext::platformDefaultDiskCacheDirectory() const
 {
-    notImplemented();
-    return String();
+    GOwnPtr<char> diskCacheDirectory(g_build_filename(g_get_user_cache_dir(), g_get_prgname(), NULL));
+    return WebCore::filenameToString(diskCacheDirectory.get());
 }
 
 String WebContext::platformDefaultCookieStorageDirectory() const
 {
     notImplemented();
     return String();
+}
+
+void WebContext::setIgnoreTLSErrors(bool ignoreTLSErrors)
+{
+    m_ignoreTLSErrors = ignoreTLSErrors;
+    sendToAllProcesses(Messages::WebProcess::SetIgnoreTLSErrors(m_ignoreTLSErrors));
 }
 
 } // namespace WebKit

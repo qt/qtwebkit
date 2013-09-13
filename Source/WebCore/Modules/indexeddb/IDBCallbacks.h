@@ -33,19 +33,16 @@
 #include "IDBDatabaseError.h"
 #include "IDBKey.h"
 #include "IDBKeyPath.h"
-#include "IDBTransactionBackendInterface.h"
-#include "SerializedScriptValue.h"
-#include <wtf/Threading.h>
+#include "SharedBuffer.h"
+#include <wtf/RefCounted.h>
 
 #if ENABLE(INDEXED_DATABASE)
 
 namespace WebCore {
 class DOMStringList;
 class IDBCursorBackendInterface;
-class IDBObjectStoreBackendInterface;
 
-// FIXME: All child classes need to be made threadsafe.
-class IDBCallbacks : public ThreadSafeRefCounted<IDBCallbacks> {
+class IDBCallbacks : public RefCounted<IDBCallbacks> {
 public:
     virtual ~IDBCallbacks() { }
 
@@ -53,13 +50,13 @@ public:
     // From IDBFactory.webkitGetDatabaseNames()
     virtual void onSuccess(PassRefPtr<DOMStringList>) = 0;
     // From IDBObjectStore/IDBIndex.openCursor(), IDBIndex.openKeyCursor()
-    virtual void onSuccess(PassRefPtr<IDBCursorBackendInterface>, PassRefPtr<IDBKey>, PassRefPtr<IDBKey> primaryKey, PassRefPtr<SerializedScriptValue>) = 0;
+    virtual void onSuccess(PassRefPtr<IDBCursorBackendInterface>, PassRefPtr<IDBKey>, PassRefPtr<IDBKey> primaryKey, PassRefPtr<SharedBuffer>) = 0;
     // From IDBObjectStore.add()/put(), IDBIndex.getKey()
     virtual void onSuccess(PassRefPtr<IDBKey>) = 0;
     // From IDBObjectStore/IDBIndex.get()/count(), and various methods that yield null/undefined.
-    virtual void onSuccess(PassRefPtr<SerializedScriptValue>) = 0;
+    virtual void onSuccess(PassRefPtr<SharedBuffer>) = 0;
     // From IDBObjectStore/IDBIndex.get() (with key injection)
-    virtual void onSuccess(PassRefPtr<SerializedScriptValue>, PassRefPtr<IDBKey>, const IDBKeyPath&) = 0;
+    virtual void onSuccess(PassRefPtr<SharedBuffer>, PassRefPtr<IDBKey>, const IDBKeyPath&) = 0;
     // From IDBObjectStore/IDBIndex.count()
     virtual void onSuccess(int64_t value) = 0;
 
@@ -67,15 +64,14 @@ public:
     virtual void onSuccess() = 0;
 
     // From IDBCursor.advance()/continue()
-    virtual void onSuccess(PassRefPtr<IDBKey>, PassRefPtr<IDBKey> primaryKey, PassRefPtr<SerializedScriptValue>) = 0;
+    virtual void onSuccess(PassRefPtr<IDBKey>, PassRefPtr<IDBKey> primaryKey, PassRefPtr<SharedBuffer>) = 0;
     // From IDBCursor.advance()/continue()
-    virtual void onSuccessWithPrefetch(const Vector<RefPtr<IDBKey> >& keys, const Vector<RefPtr<IDBKey> >& primaryKeys, const Vector<RefPtr<SerializedScriptValue> >& values) = 0;
+    virtual void onSuccessWithPrefetch(const Vector<RefPtr<IDBKey> >& keys, const Vector<RefPtr<IDBKey> >& primaryKeys, const Vector<RefPtr<SharedBuffer> >& values) = 0;
     // From IDBFactory.open()/deleteDatabase()
-    virtual void onBlocked() { ASSERT_NOT_REACHED(); }
-    virtual void onBlocked(int64_t existingVersion) { ASSERT_NOT_REACHED(); }
+    virtual void onBlocked(int64_t /* existingVersion */) { ASSERT_NOT_REACHED(); }
     // From IDBFactory.open()
-    virtual void onUpgradeNeeded(int64_t oldVersion, PassRefPtr<IDBTransactionBackendInterface>, PassRefPtr<IDBDatabaseBackendInterface>) { ASSERT_NOT_REACHED(); }
-    virtual void onSuccess(PassRefPtr<IDBDatabaseBackendInterface>) { ASSERT_NOT_REACHED(); }
+    virtual void onUpgradeNeeded(int64_t /* oldVersion */, PassRefPtr<IDBDatabaseBackendInterface>, const IDBDatabaseMetadata&) { ASSERT_NOT_REACHED(); }
+    virtual void onSuccess(PassRefPtr<IDBDatabaseBackendInterface>, const IDBDatabaseMetadata&) { ASSERT_NOT_REACHED(); }
 };
 
 } // namespace WebCore

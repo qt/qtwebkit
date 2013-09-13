@@ -44,9 +44,9 @@
  * SECTION:webkitwebsettings
  * @short_description: Control the behaviour of a #WebKitWebView
  *
- * #WebKitWebSettings can be applied to a #WebKitWebView to control text encoding, 
- * color, font sizes, printing mode, script support, loading of images and various other things. 
- * After creation, a #WebKitWebSettings object contains default settings. 
+ * #WebKitWebSettings can be applied to a #WebKitWebView to control text encoding,
+ * color, font sizes, printing mode, script support, loading of images and various other things.
+ * After creation, a #WebKitWebSettings object contains default settings.
  *
  * <informalexample><programlisting>
  * /<!-- -->* Create a new websettings and disable java script *<!-- -->/
@@ -79,6 +79,7 @@ enum {
     PROP_ENFORCE_96_DPI,
     PROP_AUTO_LOAD_IMAGES,
     PROP_AUTO_SHRINK_IMAGES,
+    PROP_RESPECT_IMAGE_ORIENTATION,
     PROP_PRINT_BACKGROUNDS,
     PROP_ENABLE_SCRIPTS,
     PROP_ENABLE_PLUGINS,
@@ -277,6 +278,15 @@ static void webkit_web_settings_class_init(WebKitWebSettingsClass* klass)
                                     _("Auto Shrink Images"),
                                     _("Automatically shrink standalone images to fit."),
                                     TRUE,
+                                    flags));
+
+    g_object_class_install_property(gobject_class,
+                                    PROP_RESPECT_IMAGE_ORIENTATION,
+                                    g_param_spec_boolean(
+                                    "respect-image-orientation",
+                                    _("Respect Image Orientation"),
+                                    _("Whether WebKit should respect image orientation."),
+                                    FALSE,
                                     flags));
 
     g_object_class_install_property(gobject_class,
@@ -482,7 +492,7 @@ static void webkit_web_settings_class_init(WebKitWebSettingsClass* klass)
                                                         localStoragePath.get(),
                                                         flags));
     /**
-    * WebKitWebSettings:enable-xss-auditor
+    * WebKitWebSettings:enable-xss-auditor:
     *
     * Whether to enable the XSS Auditor. This feature filters some kinds of
     * reflective XSS attacks on vulnerable web sites.
@@ -497,7 +507,7 @@ static void webkit_web_settings_class_init(WebKitWebSettingsClass* klass)
                                                          TRUE,
                                                          flags));
     /**
-    * WebKitWebSettings:enable-spatial-navigation
+    * WebKitWebSettings:enable-spatial-navigation:
     *
     * Whether to enable the Spatial Navigation. This feature consists in the ability
     * to navigate between focusable elements in a Web page, such as hyperlinks and
@@ -516,7 +526,7 @@ static void webkit_web_settings_class_init(WebKitWebSettingsClass* klass)
                                                          FALSE,
                                                          flags));
     /**
-    * WebKitWebSettings:enable-frame-flattening
+    * WebKitWebSettings:enable-frame-flattening:
     *
     * Whether to enable the Frame Flattening. With this setting each subframe is expanded
     * to its contents, which will flatten all the frames to become one scrollable page.
@@ -554,7 +564,7 @@ static void webkit_web_settings_class_init(WebKitWebSettingsClass* klass)
                                                         flags));
 
     /**
-    * WebKitWebSettings:javascript-can-open-windows-automatically
+    * WebKitWebSettings:javascript-can-open-windows-automatically:
     *
     * Whether JavaScript can open popup windows automatically without user
     * intervention.
@@ -570,7 +580,7 @@ static void webkit_web_settings_class_init(WebKitWebSettingsClass* klass)
                                                          flags));
 
     /**
-    * WebKitWebSettings:javascript-can-access-clipboard
+    * WebKitWebSettings:javascript-can-access-clipboard:
     *
     * Whether JavaScript can access Clipboard.
     *
@@ -585,7 +595,7 @@ static void webkit_web_settings_class_init(WebKitWebSettingsClass* klass)
                                                          flags));
 
     /**
-    * WebKitWebSettings:enable-offline-web-application-cache
+    * WebKitWebSettings:enable-offline-web-application-cache:
     *
     * Whether to enable HTML5 offline web application cache support. Offline
     * Web Application Cache ensures web applications are available even when
@@ -603,12 +613,12 @@ static void webkit_web_settings_class_init(WebKitWebSettingsClass* klass)
 
 
     /**
-    * WebKitWebSettings:editing-behavior
+    * WebKitWebSettings:editing-behavior:
     *
     * This setting controls various editing behaviors that differ
     * between platforms and that have been combined in two groups,
     * 'Mac' and 'Windows'. Some examples:
-    * 
+    *
     *  1) Clicking below the last line of an editable area puts the
     * caret at the end of the last line on Mac, but in the middle of
     * the last line on Windows.
@@ -629,7 +639,7 @@ static void webkit_web_settings_class_init(WebKitWebSettingsClass* klass)
                                                       flags));
 
     /**
-     * WebKitWebSettings:enable-universal-access-from-file-uris
+     * WebKitWebSettings:enable-universal-access-from-file-uris:
      *
      * Whether to allow files loaded through file:// URIs universal access to
      * all pages.
@@ -645,7 +655,7 @@ static void webkit_web_settings_class_init(WebKitWebSettingsClass* klass)
                                                          flags));
 
     /**
-     * WebKitWebSettings:enable-dom-paste
+     * WebKitWebSettings:enable-dom-paste:
      *
      * Whether to enable DOM paste. If set to %TRUE, document.execCommand("Paste")
      * will correctly execute and paste content of the clipboard.
@@ -703,7 +713,7 @@ static void webkit_web_settings_class_init(WebKitWebSettingsClass* klass)
                                     flags));
 
     /**
-     * WebKitWebSettings::enable-site-specific-quirks
+     * WebKitWebSettings::enable-site-specific-quirks:
      *
      * Whether to turn on site-specific hacks.  Turning this on will
      * tell WebKitGTK+ to use some site-specific workarounds for
@@ -756,7 +766,7 @@ static void webkit_web_settings_class_init(WebKitWebSettingsClass* klass)
     * you'd like it to do so. If you wish to handle this manually, you
     * can connect to the notify signal for the
     * #WebKitWebWindowFeatures of your #WebKitWebView.
-    * 
+    *
     * Since: 1.1.22
     */
     g_object_class_install_property(gobject_class,
@@ -878,7 +888,7 @@ static void webkit_web_settings_class_init(WebKitWebSettingsClass* klass)
 
 
     /**
-    * WebKitWebSettings:enable-dns-prefetching
+    * WebKitWebSettings:enable-dns-prefetching:
     *
     * Whether webkit prefetches domain names.  This is a separate knob from private browsing.
     * Whether private browsing should set this or not is up for debate, for now it doesn't.
@@ -913,7 +923,7 @@ static void webkit_web_settings_class_init(WebKitWebSettingsClass* klass)
                                                          flags));
 
     /**
-    * WebKitWebSettings:enable-smooth-scrolling
+    * WebKitWebSettings:enable-smooth-scrolling:
     *
     * Enable or disable support for smooth scrolling. The current implementation relies upon
     * CPU work to produce a smooth scrolling experience.
@@ -929,7 +939,7 @@ static void webkit_web_settings_class_init(WebKitWebSettingsClass* klass)
                                                          flags));
 
     /**
-    * WebKitWebSettings:media-playback-requires-user-gesture
+    * WebKitWebSettings:media-playback-requires-user-gesture:
     *
     * Whether a user gesture (such as clicking the play button) would
     * be required to start media playback or load media. This is off
@@ -948,7 +958,7 @@ static void webkit_web_settings_class_init(WebKitWebSettingsClass* klass)
                                                          flags));
 
     /**
-    * WebKitWebSettings:media-playback-allows-inline
+    * WebKitWebSettings:media-playback-allows-inline:
     *
     * Whether media playback is full-screen only or inline playback is allowed.
     * This is true by default, so media playback can be inline. Setting it to
@@ -965,7 +975,7 @@ static void webkit_web_settings_class_init(WebKitWebSettingsClass* klass)
                                                          flags));
 
     /**
-    * WebKitWebSettings:enable-css-shaders
+    * WebKitWebSettings:enable-css-shaders:
     *
     * Enable or disable support for css shaders (css custom filters).
     * Accelerated compositing needs to be enabled at compile time, but needs
@@ -984,10 +994,10 @@ static void webkit_web_settings_class_init(WebKitWebSettingsClass* klass)
                                                          flags));
 
     /**
-    * WebKitWebSettings:enable-display-of-insecure-content
+    * WebKitWebSettings:enable-display-of-insecure-content:
     *
     * Whether pages loaded via HTTPS should load subresources such as
-    * images and frames from non-HTTPS URLs. 
+    * images and frames from non-HTTPS URLs.
     *
     * Since: 2.0
     */
@@ -1000,10 +1010,10 @@ static void webkit_web_settings_class_init(WebKitWebSettingsClass* klass)
             flags));
 
     /**
-    * WebKitWebSettings:enable-running-of-insecure-content
+    * WebKitWebSettings:enable-running-of-insecure-content:
     *
     * Whether pages loaded via HTTPS should run subresources such as
-    * CSS, scripts, and plugins from non-HTTPS URLs. 
+    * CSS, scripts, and plugins from non-HTTPS URLs.
     *
     * Since: 2.0
     */
@@ -1074,6 +1084,9 @@ static void webkit_web_settings_set_property(GObject* object, guint prop_id, con
         break;
     case PROP_AUTO_SHRINK_IMAGES:
         priv->autoShrinkImages = g_value_get_boolean(value);
+        break;
+    case PROP_RESPECT_IMAGE_ORIENTATION:
+        priv->respectImageOrientation = g_value_get_boolean(value);
         break;
     case PROP_PRINT_BACKGROUNDS:
         priv->printBackgrounds = g_value_get_boolean(value);
@@ -1263,6 +1276,9 @@ static void webkit_web_settings_get_property(GObject* object, guint prop_id, GVa
         break;
     case PROP_AUTO_SHRINK_IMAGES:
         g_value_set_boolean(value, priv->autoShrinkImages);
+        break;
+    case PROP_RESPECT_IMAGE_ORIENTATION:
+        g_value_set_boolean(value, priv->respectImageOrientation);
         break;
     case PROP_PRINT_BACKGROUNDS:
         g_value_set_boolean(value, priv->printBackgrounds);

@@ -37,26 +37,28 @@
 #include "InspectorFrontend.h"
 #include "InspectorTypeBuilder.h"
 #include "ScriptState.h"
+#include <wtf/HashMap.h>
 #include <wtf/PassOwnPtr.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
+class Frame;
 class InjectedScriptCanvasModule;
 class InjectedScriptManager;
+class InspectorPageAgent;
 class InspectorState;
 class InstrumentingAgents;
-class Page;
 class ScriptObject;
 
 typedef String ErrorString;
 
 class InspectorCanvasAgent : public InspectorBaseAgent<InspectorCanvasAgent>, public InspectorBackendDispatcher::CanvasCommandHandler {
 public:
-    static PassOwnPtr<InspectorCanvasAgent> create(InstrumentingAgents* instrumentingAgents, InspectorState* state, Page* page, InjectedScriptManager* injectedScriptManager)
+    static PassOwnPtr<InspectorCanvasAgent> create(InstrumentingAgents* instrumentingAgents, InspectorCompositeState* state, InspectorPageAgent* pageAgent, InjectedScriptManager* injectedScriptManager)
     {
-        return adoptPtr(new InspectorCanvasAgent(instrumentingAgents, state, page, injectedScriptManager));
+        return adoptPtr(new InspectorCanvasAgent(instrumentingAgents, state, pageAgent, injectedScriptManager));
     }
     ~InspectorCanvasAgent();
 
@@ -64,7 +66,11 @@ public:
     virtual void clearFrontend();
     virtual void restore();
 
-    // Called from InspectorCanvasInstrumentation
+    void frameNavigated(Frame*);
+    void frameDetached(Frame*);
+    void didBeginFrame();
+
+    // Called from InspectorCanvasInstrumentation.
     ScriptObject wrapCanvas2DRenderingContextForInstrumentation(const ScriptObject&);
 #if ENABLE(WEBGL)
     ScriptObject wrapWebGLRenderingContextForInstrumentation(const ScriptObject&);
@@ -73,21 +79,34 @@ public:
     // Called from the front-end.
     virtual void enable(ErrorString*);
     virtual void disable(ErrorString*);
-    virtual void dropTraceLog(ErrorString*, const String&);
-    virtual void captureFrame(ErrorString*, String*);
-    virtual void startCapturing(ErrorString*, String*);
-    virtual void stopCapturing(ErrorString*, const String&);
-    virtual void getTraceLog(ErrorString*, const String&, const int*, RefPtr<TypeBuilder::Canvas::TraceLog>&);
-    virtual void replayTraceLog(ErrorString*, const String&, int, String*);
+    virtual void dropTraceLog(ErrorString*, const TypeBuilder::Canvas::TraceLogId&);
+    virtual void hasUninstrumentedCanvases(ErrorString*, bool*);
+    virtual void captureFrame(ErrorString*, const TypeBuilder::Network::FrameId*, TypeBuilder::Canvas::TraceLogId*);
+    virtual void startCapturing(ErrorString*, const TypeBuilder::Network::FrameId*, TypeBuilder::Canvas::TraceLogId*);
+    virtual void stopCapturing(ErrorString*, const TypeBuilder::Canvas::TraceLogId&);
+    virtual void getTraceLog(ErrorString*, const TypeBuilder::Canvas::TraceLogId&, const int*, const int*, RefPtr<TypeBuilder::Canvas::TraceLog>&);
+    virtual void replayTraceLog(ErrorString*, const TypeBuilder::Canvas::TraceLogId&, int, RefPtr<TypeBuilder::Canvas::ResourceState>&);
+    virtual void getResourceInfo(ErrorString*, const TypeBuilder::Canvas::ResourceId&, RefPtr<TypeBuilder::Canvas::ResourceInfo>&);
+    virtual void getResourceState(ErrorString*, const TypeBuilder::Canvas::TraceLogId&, const TypeBuilder::Canvas::ResourceId&, RefPtr<TypeBuilder::Canvas::ResourceState>&);
 
 private:
-    InspectorCanvasAgent(InstrumentingAgents*, InspectorState*, Page*, InjectedScriptManager*);
+    InspectorCanvasAgent(InstrumentingAgents*, InspectorCompositeState*, InspectorPageAgent*, InjectedScriptManager*);
 
-    InjectedScriptCanvasModule injectedScriptCanvasModuleForTraceLogId(ErrorString*, const String&);
+    InjectedScriptCanvasModule injectedScriptCanvasModule(ErrorString*, ScriptState*);
+    InjectedScriptCanvasModule injectedScriptCanvasModule(ErrorString*, const ScriptObject&);
+    InjectedScriptCanvasModule injectedScriptCanvasModule(ErrorString*, const String&);
 
-    Page* m_inspectedPage;
+    void findFramesWithUninstrumentedCanvases();
+    bool checkIsEnabled(ErrorString*) const;
+    ScriptObject notifyRenderingContextWasWrapped(const ScriptObject&);
+
+    InspectorPageAgent* m_pageAgent;
     InjectedScriptManager* m_injectedScriptManager;
     InspectorFrontend::Canvas* m_frontend;
+    bool m_enabled;
+    // Contains all frames with canvases, value is true only for frames that have an uninstrumented canvas.
+    typedef HashMap<Frame*, bool> FramesWithUninstrumentedCanvases;
+    FramesWithUninstrumentedCanvases m_framesWithUninstrumentedCanvases;
 };
 
 } // namespace WebCore

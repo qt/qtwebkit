@@ -91,7 +91,6 @@ public:
     virtual bool isProgressIndicator() const;
     virtual bool isSearchField() const;
     virtual bool isSlider() const;
-    virtual bool isWebArea() const;
 
     virtual bool isChecked() const;
     virtual bool isEnabled() const;
@@ -99,6 +98,9 @@ public:
     virtual bool isPressed() const;
     virtual bool isReadOnly() const;
     virtual bool isRequired() const;
+    virtual bool supportsRequiredAttribute() const;
+
+    virtual bool canSetSelectedAttribute() const OVERRIDE;
 
     void setNode(Node*);
     virtual Node* node() const { return m_node; }
@@ -118,12 +120,13 @@ public:
     virtual AccessibilityButtonState checkboxOrRadioValue() const;
 
     virtual unsigned hierarchicalLevel() const;
-    virtual String textUnderElement() const;
+    virtual String textUnderElement(AccessibilityTextUnderElementMode = TextUnderElementModeSkipIgnoredChildren) const;
     virtual String accessibilityDescription() const;
     virtual String helpText() const;
     virtual String title() const;
     virtual String text() const;
     virtual String stringValue() const;
+    virtual void colorValue(int& r, int& g, int& b) const;
     virtual String ariaLabeledByAttribute() const;
 
     virtual Element* actionElement() const;
@@ -153,6 +156,9 @@ protected:
     AccessibilityRole m_ariaRole;
     bool m_childrenDirty;
     mutable AccessibilityRole m_roleForMSAA;
+#ifndef NDEBUG
+    bool m_initialized;
+#endif
 
     virtual bool isDetached() const { return !m_node; }
 
@@ -162,15 +168,13 @@ protected:
     virtual void insertChild(AccessibilityObject*, unsigned index);
 
     virtual bool canHaveChildren() const;
-    virtual bool accessibilityIsIgnored() const;
     AccessibilityRole ariaRoleAttribute() const;
     AccessibilityRole determineAriaRoleAttribute() const;
     AccessibilityRole remapAriaRoleDueToParent(AccessibilityRole) const;
     bool hasContentEditableAttributeSet() const;
-    bool isDescendantOfBarrenParent() const;
+    virtual bool isDescendantOfBarrenParent() const;
     void alterSliderValue(bool increase);
     void changeValueByStep(bool increase);
-    bool isARIARange() const;
     // This returns true if it's focusable but it's not content editable and it's not a control or ARIA control.
     bool isGenericFocusableElement() const;
     HTMLLabelElement* labelForElement(Element*) const;
@@ -195,17 +199,18 @@ private:
     void helpText(Vector<AccessibilityText>&) const;
     String alternativeTextForWebArea() const;
     void ariaLabeledByText(Vector<AccessibilityText>&) const;
+    virtual bool computeAccessibilityIsIgnored() const;
 };
 
 inline AccessibilityNodeObject* toAccessibilityNodeObject(AccessibilityObject* object)
 {
-    ASSERT(!object || object->isAccessibilityNodeObject());
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isAccessibilityNodeObject());
     return static_cast<AccessibilityNodeObject*>(object);
 }
 
 inline const AccessibilityNodeObject* toAccessibilityNodeObject(const AccessibilityObject* object)
 {
-    ASSERT(!object || object->isAccessibilityNodeObject());
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isAccessibilityNodeObject());
     return static_cast<const AccessibilityNodeObject*>(object);
 }
 

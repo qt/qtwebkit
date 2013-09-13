@@ -26,13 +26,13 @@
 #ifndef LLIntData_h
 #define LLIntData_h
 
-#include "JSValue.h"
+#include "JSCJSValue.h"
 #include "Opcode.h"
 #include <wtf/Platform.h>
 
 namespace JSC {
 
-class JSGlobalData;
+class VM;
 struct Instruction;
 
 #if ENABLE(LLINT_C_LOOP)
@@ -47,7 +47,7 @@ namespace LLInt {
 
 class Data {
 public:
-    static void performAssertions(JSGlobalData&);
+    static void performAssertions(VM&);
 
 private:
     static Instruction* s_exceptionInstructions;
@@ -96,7 +96,7 @@ ALWAYS_INLINE void* getCodePtr(OpcodeID id)
 
 class Data {
 public:
-    static void performAssertions(JSGlobalData&) { }
+    static void performAssertions(VM&) { }
 };
 
 #if COMPILER(CLANG)

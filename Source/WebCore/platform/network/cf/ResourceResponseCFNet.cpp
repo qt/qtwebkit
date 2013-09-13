@@ -50,8 +50,11 @@ static const int numCommonHeaderFields = sizeof(commonHeaderFields) / sizeof(CFS
 CFURLResponseRef ResourceResponse::cfURLResponse() const
 {
     if (!m_cfResponse && !m_isNull) {
-        RetainPtr<CFURLRef> url(AdoptCF, m_url.createCFURL());
-        m_cfResponse.adoptCF(CFURLResponseCreate(0, url.get(), m_mimeType.createCFString().get(), m_expectedContentLength, m_textEncodingName.createCFString().get(), kCFURLCacheStorageAllowed));
+        RetainPtr<CFURLRef> url = m_url.createCFURL();
+
+        // FIXME: This creates a very incomplete CFURLResponse, which does not even have a status code.
+
+        m_cfResponse = adoptCF(CFURLResponseCreate(0, url.get(), m_mimeType.createCFString().get(), m_expectedContentLength, m_textEncodingName.createCFString().get(), kCFURLCacheStorageAllowed));
     }
 
     return m_cfResponse.get();
@@ -98,7 +101,7 @@ void ResourceResponse::platformLazyInit(InitLevel initLevel)
         if (httpResponse) {
             m_httpStatusCode = CFHTTPMessageGetResponseStatusCode(httpResponse);
             
-            RetainPtr<CFDictionaryRef> headers(AdoptCF, CFHTTPMessageCopyAllHeaderFields(httpResponse));
+            RetainPtr<CFDictionaryRef> headers = adoptCF(CFHTTPMessageCopyAllHeaderFields(httpResponse));
             
             for (int i = 0; i < numCommonHeaderFields; i++) {
                 CFStringRef value;
@@ -112,10 +115,10 @@ void ResourceResponse::platformLazyInit(InitLevel initLevel)
     if (m_initLevel < CommonAndUncommonFields && initLevel >= CommonAndUncommonFields) {
         CFHTTPMessageRef httpResponse = CFURLResponseGetHTTPResponse(m_cfResponse.get());
         if (httpResponse) {
-            RetainPtr<CFStringRef> statusLine(AdoptCF, CFHTTPMessageCopyResponseStatusLine(httpResponse));
+            RetainPtr<CFStringRef> statusLine = adoptCF(CFHTTPMessageCopyResponseStatusLine(httpResponse));
             m_httpStatusText = extractReasonPhraseFromHTTPStatusLine(statusLine.get());
 
-            RetainPtr<CFDictionaryRef> headers(AdoptCF, CFHTTPMessageCopyAllHeaderFields(httpResponse));
+            RetainPtr<CFDictionaryRef> headers = adoptCF(CFHTTPMessageCopyAllHeaderFields(httpResponse));
             CFIndex headerCount = CFDictionaryGetCount(headers.get());
             Vector<const void*, 128> keys(headerCount);
             Vector<const void*, 128> values(headerCount);
@@ -126,7 +129,7 @@ void ResourceResponse::platformLazyInit(InitLevel initLevel)
     }
     
     if (m_initLevel < AllFields && initLevel >= AllFields) {
-        RetainPtr<CFStringRef> suggestedFilename(AdoptCF, CFURLResponseCopySuggestedFilename(m_cfResponse.get()));
+        RetainPtr<CFStringRef> suggestedFilename = adoptCF(CFURLResponseCopySuggestedFilename(m_cfResponse.get()));
         m_suggestedFilename = suggestedFilename.get();
     }
 

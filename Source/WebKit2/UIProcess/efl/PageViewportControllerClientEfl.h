@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2012 Samsung Electronics. All rights reserved.
+ * Copyright (C) 2013 Intel Corporation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,52 +27,39 @@
 #ifndef PageViewportControllerClientEfl_h
 #define PageViewportControllerClientEfl_h
 
-#if USE(TILED_BACKING_STORE)
-
-#include "EwkViewImpl.h"
-#include "PageClientBase.h"
 #include "PageViewportControllerClient.h"
+#include <WebCore/FloatPoint.h>
 #include <wtf/PassOwnPtr.h>
+
+class EwkView;
 
 namespace WebKit {
 
 class PageViewportControllerClientEfl : public PageViewportControllerClient {
 public:
-    static PassOwnPtr<PageViewportControllerClientEfl> create(EwkViewImpl* viewImpl)
+    static PassOwnPtr<PageViewportControllerClientEfl> create(EwkView* viewImpl)
     {
         return adoptPtr(new PageViewportControllerClientEfl(viewImpl));
     }
-    ~PageViewportControllerClientEfl();
+    virtual ~PageViewportControllerClientEfl() { }
 
-    DrawingAreaProxy* drawingArea() const;
-    WebCore::IntSize viewSize() { return m_viewportSize; }
-    float scaleFactor() const { return m_viewImpl->scaleFactor(); }
-    WebCore::IntPoint contentPosition() const { return m_contentPosition; }
+    virtual void setViewportPosition(const WebCore::FloatPoint&) OVERRIDE;
+    virtual void setPageScaleFactor(float) OVERRIDE;
 
-    void updateViewportSize(const WebCore::IntSize& viewportSize);
-    void setRendererActive(bool);
+    virtual void didChangeContentsSize(const WebCore::IntSize&) OVERRIDE;
+    virtual void didChangeVisibleContents() OVERRIDE;
+    virtual void didChangeViewportAttributes() OVERRIDE;
 
-    virtual void setViewportPosition(const WebCore::FloatPoint& contentsPoint);
-    virtual void setContentsScale(float, bool treatAsInitialValue);
-
-    virtual void didResumeContent();
-    virtual void didChangeContentsSize(const WebCore::IntSize&);
-    virtual void didChangeVisibleContents();
-    virtual void didChangeViewportAttributes();
-
-    virtual void setController(PageViewportController*);
+    virtual void setController(PageViewportController*) OVERRIDE;
 
 private:
-    explicit PageViewportControllerClientEfl(EwkViewImpl*);
+    explicit PageViewportControllerClientEfl(EwkView*);
 
-    EwkViewImpl* m_viewImpl;
-    WebCore::IntSize m_viewportSize;
-    WebCore::IntPoint m_contentPosition;
+    EwkView* m_view;
+    WebCore::FloatPoint m_contentPosition;
     PageViewportController* m_controller;
 };
 
 } // namespace WebKit
-
-#endif
 
 #endif // PageViewportControllerClientEfl_h

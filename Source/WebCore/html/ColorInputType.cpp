@@ -29,6 +29,7 @@
  */
 
 #include "config.h"
+#if ENABLE(INPUT_TYPE_COLOR)
 #include "ColorInputType.h"
 
 #include "CSSPropertyNames.h"
@@ -45,11 +46,8 @@
 #include "RenderView.h"
 #include "ScriptController.h"
 #include "ShadowRoot.h"
-
 #include <wtf/PassOwnPtr.h>
 #include <wtf/text/WTFString.h>
-
-#if ENABLE(INPUT_TYPE_COLOR)
 
 namespace WebCore {
 
@@ -77,6 +75,11 @@ PassOwnPtr<InputType> ColorInputType::create(HTMLInputElement* element)
 ColorInputType::~ColorInputType()
 {
     endColorChooser();
+}
+
+void ColorInputType::attach()
+{
+    observeFeatureIfVisible(FeatureObserver::InputTypeColor);
 }
 
 bool ColorInputType::isColorControl() const
@@ -121,11 +124,8 @@ void ColorInputType::createShadowSubtree()
     wrapperElement->setPseudo(AtomicString("-webkit-color-swatch-wrapper", AtomicString::ConstructFromLiteral));
     RefPtr<HTMLDivElement> colorSwatch = HTMLDivElement::create(document);
     colorSwatch->setPseudo(AtomicString("-webkit-color-swatch", AtomicString::ConstructFromLiteral));
-    ExceptionCode ec = 0;
-    wrapperElement->appendChild(colorSwatch.release(), ec);
-    ASSERT(!ec);
-    element()->userAgentShadowRoot()->appendChild(wrapperElement.release(), ec);
-    ASSERT(!ec);
+    wrapperElement->appendChild(colorSwatch.release(), ASSERT_NO_EXCEPTION);
+    element()->userAgentShadowRoot()->appendChild(wrapperElement.release(), ASSERT_NO_EXCEPTION);
     
     updateColorSwatch();
 }
@@ -144,7 +144,7 @@ void ColorInputType::setValue(const String& value, bool valueChanged, TextFieldE
 
 void ColorInputType::handleDOMActivateEvent(Event* event)
 {
-    if (element()->disabled() || element()->readOnly() || !element()->renderer())
+    if (element()->isDisabledOrReadOnly() || !element()->renderer())
         return;
 
     if (!ScriptController::processingUserGesture())
@@ -174,7 +174,7 @@ bool ColorInputType::typeMismatchFor(const String& value) const
 
 void ColorInputType::didChooseColor(const Color& color)
 {
-    if (element()->disabled() || element()->readOnly() || color == valueAsColor())
+    if (element()->isDisabledOrReadOnly() || color == valueAsColor())
         return;
     element()->setValueFromRenderer(color.serialized());
     updateColorSwatch();
@@ -233,7 +233,7 @@ Vector<Color> ColorInputType::suggestions() const
     HTMLDataListElement* dataList = element()->dataList();
     if (dataList) {
         RefPtr<HTMLCollection> options = dataList->options();
-        for (unsigned i = 0; HTMLOptionElement* option = static_cast<HTMLOptionElement*>(options->item(i)); i++) {
+        for (unsigned i = 0; HTMLOptionElement* option = toHTMLOptionElement(options->item(i)); i++) {
             if (!element()->isValidValue(option->value()))
                 continue;
             Color color(option->value());

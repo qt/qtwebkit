@@ -26,11 +26,11 @@
 #include "config.h"
 #include "ScrollingStateScrollingNode.h"
 
+#if ENABLE(THREADED_SCROLLING) || USE(COORDINATED_GRAPHICS)
+
 #include "ScrollingStateTree.h"
 #include "TextStream.h"
 #include <wtf/OwnPtr.h>
-
-#if ENABLE(THREADED_SCROLLING)
 
 namespace WebCore {
 
@@ -41,7 +41,10 @@ PassOwnPtr<ScrollingStateScrollingNode> ScrollingStateScrollingNode::create(Scro
 
 ScrollingStateScrollingNode::ScrollingStateScrollingNode(ScrollingStateTree* stateTree, ScrollingNodeID nodeID)
     : ScrollingStateNode(stateTree, nodeID)
-    , m_changedProperties(0)
+    , m_counterScrollingLayer(0)
+    , m_headerLayer(0)
+    , m_footerLayer(0)
+    , m_frameScaleFactor(1)
     , m_wheelEventHandlerCount(0)
     , m_shouldUpdateScrollLayerPositionOnMainThread(0)
     , m_horizontalScrollElasticity(ScrollElasticityNone)
@@ -51,14 +54,16 @@ ScrollingStateScrollingNode::ScrollingStateScrollingNode(ScrollingStateTree* sta
     , m_requestedScrollPositionRepresentsProgrammaticScroll(false)
     , m_horizontalScrollbarMode(ScrollbarAuto)
     , m_verticalScrollbarMode(ScrollbarAuto)
+    , m_headerHeight(0)
+    , m_footerHeight(0)
 {
 }
 
 ScrollingStateScrollingNode::ScrollingStateScrollingNode(const ScrollingStateScrollingNode& stateNode)
     : ScrollingStateNode(stateNode)
-    , m_changedProperties(stateNode.changedProperties())
     , m_viewportRect(stateNode.viewportRect())
-    , m_contentsSize(stateNode.contentsSize())
+    , m_totalContentsSize(stateNode.totalContentsSize())
+    , m_frameScaleFactor(stateNode.frameScaleFactor())
     , m_nonFastScrollableRegion(stateNode.nonFastScrollableRegion())
     , m_wheelEventHandlerCount(stateNode.wheelEventHandlerCount())
     , m_shouldUpdateScrollLayerPositionOnMainThread(stateNode.shouldUpdateScrollLayerPositionOnMainThread())
@@ -71,7 +76,12 @@ ScrollingStateScrollingNode::ScrollingStateScrollingNode(const ScrollingStateScr
     , m_verticalScrollbarMode(stateNode.verticalScrollbarMode())
     , m_requestedScrollPosition(stateNode.requestedScrollPosition())
     , m_scrollOrigin(stateNode.scrollOrigin())
+    , m_headerHeight(stateNode.headerHeight())
+    , m_footerHeight(stateNode.footerHeight())
 {
+    setCounterScrollingLayer(stateNode.counterScrollingLayer());
+    setHeaderLayer(stateNode.headerLayer());
+    setFooterLayer(stateNode.footerLayer());
 }
 
 ScrollingStateScrollingNode::~ScrollingStateScrollingNode()
@@ -89,17 +99,28 @@ void ScrollingStateScrollingNode::setViewportRect(const IntRect& viewportRect)
         return;
 
     m_viewportRect = viewportRect;
-    m_changedProperties |= ViewportRect;
+    setPropertyChanged(ViewportRect);
     m_scrollingStateTree->setHasChangedProperties(true);
 }
 
-void ScrollingStateScrollingNode::setContentsSize(const IntSize& contentsSize)
+void ScrollingStateScrollingNode::setTotalContentsSize(const IntSize& totalContentsSize)
 {
-    if (m_contentsSize == contentsSize)
+    if (m_totalContentsSize == totalContentsSize)
         return;
 
-    m_contentsSize = contentsSize;
-    m_changedProperties |= ContentsSize;
+    m_totalContentsSize = totalContentsSize;
+    setPropertyChanged(TotalContentsSize);
+    m_scrollingStateTree->setHasChangedProperties(true);
+}
+
+void ScrollingStateScrollingNode::setFrameScaleFactor(float scaleFactor)
+{
+    if (m_frameScaleFactor == scaleFactor)
+        return;
+
+    m_frameScaleFactor = scaleFactor;
+
+    setPropertyChanged(FrameScaleFactor);
     m_scrollingStateTree->setHasChangedProperties(true);
 }
 
@@ -109,7 +130,7 @@ void ScrollingStateScrollingNode::setNonFastScrollableRegion(const Region& nonFa
         return;
 
     m_nonFastScrollableRegion = nonFastScrollableRegion;
-    m_changedProperties |= NonFastScrollableRegion;
+    setPropertyChanged(NonFastScrollableRegion);
     m_scrollingStateTree->setHasChangedProperties(true);
 }
 
@@ -119,7 +140,7 @@ void ScrollingStateScrollingNode::setWheelEventHandlerCount(unsigned wheelEventH
         return;
 
     m_wheelEventHandlerCount = wheelEventHandlerCount;
-    m_changedProperties |= WheelEventHandlerCount;
+    setPropertyChanged(WheelEventHandlerCount);
     m_scrollingStateTree->setHasChangedProperties(true);
 }
 
@@ -129,7 +150,7 @@ void ScrollingStateScrollingNode::setShouldUpdateScrollLayerPositionOnMainThread
         return;
 
     m_shouldUpdateScrollLayerPositionOnMainThread = reasons;
-    m_changedProperties |= ShouldUpdateScrollLayerPositionOnMainThread;
+    setPropertyChanged(ShouldUpdateScrollLayerPositionOnMainThread);
     m_scrollingStateTree->setHasChangedProperties(true);
 }
 
@@ -139,7 +160,7 @@ void ScrollingStateScrollingNode::setHorizontalScrollElasticity(ScrollElasticity
         return;
 
     m_horizontalScrollElasticity = horizontalScrollElasticity;
-    m_changedProperties |= HorizontalScrollElasticity;
+    setPropertyChanged(HorizontalScrollElasticity);
     m_scrollingStateTree->setHasChangedProperties(true);
 }
 
@@ -149,7 +170,7 @@ void ScrollingStateScrollingNode::setVerticalScrollElasticity(ScrollElasticity v
         return;
 
     m_verticalScrollElasticity = verticalScrollElasticity;
-    m_changedProperties |= VerticalScrollElasticity;
+    setPropertyChanged(VerticalScrollElasticity);
     m_scrollingStateTree->setHasChangedProperties(true);
 }
 
@@ -159,7 +180,7 @@ void ScrollingStateScrollingNode::setHasEnabledHorizontalScrollbar(bool hasEnabl
         return;
 
     m_hasEnabledHorizontalScrollbar = hasEnabledHorizontalScrollbar;
-    m_changedProperties |= HasEnabledHorizontalScrollbar;
+    setPropertyChanged(HasEnabledHorizontalScrollbar);
     m_scrollingStateTree->setHasChangedProperties(true);
 }
 
@@ -169,7 +190,7 @@ void ScrollingStateScrollingNode::setHasEnabledVerticalScrollbar(bool hasEnabled
         return;
 
     m_hasEnabledVerticalScrollbar = hasEnabledVerticalScrollbar;
-    m_changedProperties |= HasEnabledVerticalScrollbar;
+    setPropertyChanged(HasEnabledVerticalScrollbar);
     m_scrollingStateTree->setHasChangedProperties(true);
 }
 
@@ -179,7 +200,7 @@ void ScrollingStateScrollingNode::setHorizontalScrollbarMode(ScrollbarMode horiz
         return;
 
     m_horizontalScrollbarMode = horizontalScrollbarMode;
-    m_changedProperties |= HorizontalScrollbarMode;
+    setPropertyChanged(HorizontalScrollbarMode);
     m_scrollingStateTree->setHasChangedProperties(true);
 }
 
@@ -189,7 +210,7 @@ void ScrollingStateScrollingNode::setVerticalScrollbarMode(ScrollbarMode vertica
         return;
 
     m_verticalScrollbarMode = verticalScrollbarMode;
-    m_changedProperties |= VerticalScrollbarMode;
+    setPropertyChanged(VerticalScrollbarMode);
     m_scrollingStateTree->setHasChangedProperties(true);
 }
 
@@ -197,7 +218,7 @@ void ScrollingStateScrollingNode::setRequestedScrollPosition(const IntPoint& req
 {
     m_requestedScrollPosition = requestedScrollPosition;
     m_requestedScrollPositionRepresentsProgrammaticScroll = representsProgrammaticScroll;
-    m_changedProperties |= RequestedScrollPosition;
+    setPropertyChanged(RequestedScrollPosition);
     m_scrollingStateTree->setHasChangedProperties(true);
 }
 
@@ -207,7 +228,27 @@ void ScrollingStateScrollingNode::setScrollOrigin(const IntPoint& scrollOrigin)
         return;
 
     m_scrollOrigin = scrollOrigin;
-    m_changedProperties |= ScrollOrigin;
+    setPropertyChanged(ScrollOrigin);
+    m_scrollingStateTree->setHasChangedProperties(true);
+}
+
+void ScrollingStateScrollingNode::setHeaderHeight(int headerHeight)
+{
+    if (m_headerHeight == headerHeight)
+        return;
+
+    m_headerHeight = headerHeight;
+    setPropertyChanged(HeaderHeight);
+    m_scrollingStateTree->setHasChangedProperties(true);
+}
+
+void ScrollingStateScrollingNode::setFooterHeight(int footerHeight)
+{
+    if (m_footerHeight == footerHeight)
+        return;
+
+    m_footerHeight = footerHeight;
+    setPropertyChanged(FooterHeight);
     m_scrollingStateTree->setHasChangedProperties(true);
 }
 
@@ -220,25 +261,19 @@ void ScrollingStateScrollingNode::dumpProperties(TextStream& ts, int indent) con
         ts << "(viewport rect " << m_viewportRect.x() << " " << m_viewportRect.y() << " " << m_viewportRect.width() << " " << m_viewportRect.height() << ")\n";
     }
 
-    if (!m_contentsSize.isEmpty()) {
+    if (!m_totalContentsSize.isEmpty()) {
         writeIndent(ts, indent + 1);
-        ts << "(contents size " << m_contentsSize.width() << " " << m_contentsSize.height() << ")\n";
+        ts << "(contents size " << m_totalContentsSize.width() << " " << m_totalContentsSize.height() << ")\n";
+    }
+
+    if (m_frameScaleFactor != 1) {
+        writeIndent(ts, indent + 1);
+        ts << "(frame scale factor " << m_frameScaleFactor << ")\n";
     }
 
     if (m_shouldUpdateScrollLayerPositionOnMainThread) {
         writeIndent(ts, indent + 1);
-        ts << "(Scrolling on main thread because: ";
-        if (m_shouldUpdateScrollLayerPositionOnMainThread & ScrollingCoordinator::ForcedOnMainThread)
-            ts << "Forced on main thread, ";
-        if (m_shouldUpdateScrollLayerPositionOnMainThread & ScrollingCoordinator::HasSlowRepaintObjects)
-            ts << "Has slow repaint objects, ";
-        if (m_shouldUpdateScrollLayerPositionOnMainThread & ScrollingCoordinator::HasViewportConstrainedObjectsWithoutSupportingFixedLayers)
-            ts << "Has viewport constrained objects without supporting fixed layers, ";
-        if (m_shouldUpdateScrollLayerPositionOnMainThread & ScrollingCoordinator::HasNonLayerFixedObjects)
-            ts << "Has non-layer fixed objects, ";
-        if (m_shouldUpdateScrollLayerPositionOnMainThread & ScrollingCoordinator::IsImageDocument)
-            ts << "Is image document";
-        ts << ")\n";
+        ts << "(Scrolling on main thread because: " << ScrollingCoordinator::mainThreadScrollingReasonsAsText(m_shouldUpdateScrollLayerPositionOnMainThread) << ")\n";
     }
 
     if (m_requestedScrollPosition != IntPoint()) {
@@ -250,9 +285,8 @@ void ScrollingStateScrollingNode::dumpProperties(TextStream& ts, int indent) con
         writeIndent(ts, indent + 1);
         ts << "(scroll origin " << m_scrollOrigin.x() << " " << m_scrollOrigin.y() << ")\n";
     }
-
 }
 
 } // namespace WebCore
 
-#endif // ENABLE(THREADED_SCROLLING)
+#endif // ENABLE(THREADED_SCROLLING) || USE(COORDINATED_GRAPHICS)

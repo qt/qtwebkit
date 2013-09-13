@@ -26,6 +26,7 @@
 #include "config.h"
 #include "ScrollbarThemeMac.h"
 
+#include "ColorMac.h"
 #include "ImageBuffer.h"
 #include "GraphicsLayer.h"
 #include "LocalCurrentGraphicsContext.h"
@@ -38,7 +39,6 @@
 #include <wtf/HashMap.h>
 #include <wtf/StdLibExtras.h>
 #include <wtf/TemporaryChange.h>
-#include <wtf/UnusedParam.h>
 
 // FIXME: There are repainting problems due to Aqua scroll bar buttons' visual overflow.
 
@@ -112,13 +112,11 @@ static ScrollbarPainterMap* scrollbarMap()
 
 namespace WebCore {
 
-#if !PLATFORM(CHROMIUM)
 ScrollbarTheme* ScrollbarTheme::nativeTheme()
 {
     DEFINE_STATIC_LOCAL(ScrollbarThemeMac, theme, ());
     return &theme;
 }
-#endif
 
 // FIXME: Get these numbers from CoreUI.
 static int cRealButtonLength[] = { 28, 21 };
@@ -135,6 +133,7 @@ static int cOuterButtonOverlap = 2;
 static float gInitialButtonDelay = 0.5f;
 static float gAutoscrollButtonDelay = 0.05f;
 static bool gJumpOnTrackClick = false;
+static bool gUsesOverlayScrollbars = false;
 
 static ScrollbarButtonsPlacement gButtonPlacement = ScrollbarButtonsDoubleEnd;
 
@@ -228,6 +227,7 @@ void ScrollbarThemeMac::preferencesChanged()
     gInitialButtonDelay = [defaults floatForKey:@"NSScrollerButtonDelay"];
     gAutoscrollButtonDelay = [defaults floatForKey:@"NSScrollerButtonPeriod"];
     gJumpOnTrackClick = [defaults boolForKey:@"AppleScrollerPagingBehavior"];
+    usesOverlayScrollbarsChanged();
 }
 
 int ScrollbarThemeMac::scrollbarThickness(ScrollbarControlSize controlSize)
@@ -243,10 +243,15 @@ int ScrollbarThemeMac::scrollbarThickness(ScrollbarControlSize controlSize)
 
 bool ScrollbarThemeMac::usesOverlayScrollbars() const
 {
+    return gUsesOverlayScrollbars;
+}
+
+void ScrollbarThemeMac::usesOverlayScrollbarsChanged()
+{
     if (isScrollbarOverlayAPIAvailable())
-        return recommendedScrollerStyle() == NSScrollerStyleOverlay;
+        gUsesOverlayScrollbars = recommendedScrollerStyle() == NSScrollerStyleOverlay;
     else
-        return false;
+        gUsesOverlayScrollbars = false;
 }
 
 void ScrollbarThemeMac::updateScrollbarOverlayStyle(ScrollbarThemeClient* scrollbar)
@@ -477,7 +482,6 @@ void ScrollbarThemeMac::updateEnabledState(ScrollbarThemeClient* scrollbar)
         [scrollbarMap()->get(scrollbar).get() setEnabled:scrollbar->enabled()];
 }
 
-#if !PLATFORM(CHROMIUM)
 static void scrollbarPainterPaint(ScrollbarPainter scrollbarPainter, bool enabled, double value, CGFloat proportion, CGRect frameRect)
 {
     [scrollbarPainter setEnabled:enabled];
@@ -596,9 +600,8 @@ bool ScrollbarThemeMac::paint(ScrollbarThemeClient* scrollbar, GraphicsContext* 
 
     return true;
 }
-#endif
 
-#if !PLATFORM(CHROMIUM) && USE(ACCELERATED_COMPOSITING) && ENABLE(RUBBER_BANDING)
+#if USE(ACCELERATED_COMPOSITING) && ENABLE(RUBBER_BANDING)
 static RetainPtr<CGColorRef> linenBackgroundColor()
 {
     NSImage *image = [NSColor _linenPatternImage];
@@ -611,13 +614,12 @@ static RetainPtr<CGColorRef> linenBackgroundColor()
     return adoptCF(CGColorCreateWithPattern(colorSpace.get(), pattern.get(), &alpha));
 }
 
-void ScrollbarThemeMac::setUpOverhangAreasLayerContents(GraphicsLayer* graphicsLayer)
+void ScrollbarThemeMac::setUpOverhangAreasLayerContents(GraphicsLayer* graphicsLayer, const Color& backgroundColor)
 {
     static CGColorRef cachedLinenBackgroundColor = linenBackgroundColor().leakRef();
-
     // We operate on the CALayer directly here, since GraphicsLayer doesn't have the concept
     // of pattern images, and we know that WebCore won't touch this layer.
-    graphicsLayer->platformLayer().backgroundColor = cachedLinenBackgroundColor;
+    graphicsLayer->platformLayer().backgroundColor = backgroundColor.isValid() ? cachedCGColor(backgroundColor, ColorSpaceDeviceRGB) : cachedLinenBackgroundColor;
 }
 
 void ScrollbarThemeMac::setUpContentShadowLayer(GraphicsLayer* graphicsLayer)

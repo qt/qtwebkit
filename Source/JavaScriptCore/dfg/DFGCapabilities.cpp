@@ -33,6 +33,41 @@
 namespace JSC { namespace DFG {
 
 #if ENABLE(DFG_JIT)
+bool mightCompileEval(CodeBlock* codeBlock)
+{
+    return codeBlock->instructionCount() <= Options::maximumOptimizationCandidateInstructionCount();
+}
+bool mightCompileProgram(CodeBlock* codeBlock)
+{
+    return codeBlock->instructionCount() <= Options::maximumOptimizationCandidateInstructionCount();
+}
+bool mightCompileFunctionForCall(CodeBlock* codeBlock)
+{
+    return codeBlock->instructionCount() <= Options::maximumOptimizationCandidateInstructionCount();
+}
+bool mightCompileFunctionForConstruct(CodeBlock* codeBlock)
+{
+    return codeBlock->instructionCount() <= Options::maximumOptimizationCandidateInstructionCount();
+}
+
+bool mightInlineFunctionForCall(CodeBlock* codeBlock)
+{
+    return codeBlock->instructionCount() <= Options::maximumFunctionForCallInlineCandidateInstructionCount()
+        && !codeBlock->ownerExecutable()->needsActivation()
+        && codeBlock->ownerExecutable()->isInliningCandidate();
+}
+bool mightInlineFunctionForClosureCall(CodeBlock* codeBlock)
+{
+    return codeBlock->instructionCount() <= Options::maximumFunctionForClosureCallInlineCandidateInstructionCount()
+        && !codeBlock->ownerExecutable()->needsActivation()
+        && codeBlock->ownerExecutable()->isInliningCandidate();
+}
+bool mightInlineFunctionForConstruct(CodeBlock* codeBlock)
+{
+    return codeBlock->instructionCount() <= Options::maximumFunctionForConstructInlineCandidateInstructionCount()
+        && !codeBlock->ownerExecutable()->needsActivation()
+        && codeBlock->ownerExecutable()->isInliningCandidate();
+}
 
 static inline void debugFail(CodeBlock* codeBlock, OpcodeID opcodeID, bool result)
 {
@@ -53,7 +88,6 @@ static inline void debugFail(CodeBlock* codeBlock, OpcodeID opcodeID, Capability
     if (result == CannotCompile)
         dataLogF("Cannot handle code block %p because of opcode %s.\n", codeBlock, opcodeNames[opcodeID]);
     else {
-        ASSERT(result == ShouldProfile);
         dataLogF("Cannot compile code block %p because of opcode %s, but inlining might be possible.\n", codeBlock, opcodeNames[opcodeID]);
     }
 #else
@@ -66,7 +100,7 @@ static inline void debugFail(CodeBlock* codeBlock, OpcodeID opcodeID, Capability
 template<typename ReturnType, ReturnType (*canHandleOpcode)(OpcodeID, CodeBlock*, Instruction*)>
 ReturnType canHandleOpcodes(CodeBlock* codeBlock, ReturnType initialValue)
 {
-    Interpreter* interpreter = codeBlock->globalData()->interpreter;
+    Interpreter* interpreter = codeBlock->vm()->interpreter;
     Instruction* instructionsBegin = codeBlock->instructions().begin();
     unsigned instructionCount = codeBlock->instructions().size();
     ReturnType result = initialValue;
@@ -87,7 +121,7 @@ ReturnType canHandleOpcodes(CodeBlock* codeBlock, ReturnType initialValue)
             FOR_EACH_OPCODE_ID(DEFINE_OP)
 #undef DEFINE_OP
         default:
-            ASSERT_NOT_REACHED();
+            RELEASE_ASSERT_NOT_REACHED();
             break;
         }
     }

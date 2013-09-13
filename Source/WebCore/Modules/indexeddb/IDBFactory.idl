@@ -25,17 +25,14 @@
 
 [
     Conditional=INDEXED_DATABASE,
-    JSNoStaticTables
+    JSNoStaticTables,
+    ImplementationLacksVTable
 ] interface IDBFactory {
-    [CallWith=ScriptExecutionContext, ImplementedAs=getDatabaseNames] IDBRequest webkitGetDatabaseNames();
+    [CallWith=ScriptExecutionContext, ImplementedAs=getDatabaseNames, RaisesException] IDBRequest webkitGetDatabaseNames();
 
-    // FIXME: Make this [EnforceRange] unsigned long long once webkit.org/b/96798 lands.
-    [CallWith=ScriptExecutionContext] IDBOpenDBRequest open(in DOMString name, in [Optional] long long version)
-        raises (DOMException);
-    [CallWith=ScriptExecutionContext] IDBVersionChangeRequest deleteDatabase(in DOMString name)
-        raises (DOMException);
+    [CallWith=ScriptExecutionContext, RaisesException] IDBOpenDBRequest open(DOMString name, [EnforceRange] optional unsigned long long version);
+    [CallWith=ScriptExecutionContext, RaisesException] IDBOpenDBRequest deleteDatabase(DOMString name);
 
-    short cmp(in IDBKey first, in IDBKey second)
-        raises (DOMException);
+    [CallWith=ScriptExecutionContext, RaisesException] short cmp(any first, any second);
 };
 

@@ -50,7 +50,7 @@ WebInspector.ExtensionPanel.prototype = {
         return WebInspector.View.prototype.defaultFocusedElement.call(this);
     },
 
-    get statusBarItems()
+    statusBarItems: function()
     {
         return this._statusBarItems;
     },
@@ -140,6 +140,7 @@ WebInspector.ExtensionButton.prototype = {
 WebInspector.ExtensionSidebarPane = function(title, id)
 {
     WebInspector.SidebarPane.call(this, title);
+    this.setHideOnDetach();
     this._id = id;
 }
 

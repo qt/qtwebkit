@@ -44,12 +44,11 @@ class InjectedBundleBackForwardList;
 class InjectedBundleBackForwardListItem;
 class InjectedBundleDOMWindowExtension;
 class InjectedBundleHitTestResult;
-class InjectedBundleIntent;
-class InjectedBundleIntentRequest;
 class InjectedBundleNavigationAction;
 class InjectedBundleNodeHandle;
 class InjectedBundleRangeHandle;
 class InjectedBundleScriptWorld;
+class PageBanner;
 class PageOverlay;
 class WebFrame;
 class WebInspector;
@@ -63,10 +62,9 @@ WK_ADD_API_MAPPING(WKBundleDOMWindowExtensionRef, InjectedBundleDOMWindowExtensi
 WK_ADD_API_MAPPING(WKBundleFrameRef, WebFrame)
 WK_ADD_API_MAPPING(WKBundleHitTestResultRef, InjectedBundleHitTestResult)
 WK_ADD_API_MAPPING(WKBundleInspectorRef, WebInspector)
-WK_ADD_API_MAPPING(WKBundleIntentRef, InjectedBundleIntent)
-WK_ADD_API_MAPPING(WKBundleIntentRequestRef, InjectedBundleIntentRequest)
 WK_ADD_API_MAPPING(WKBundleNavigationActionRef, InjectedBundleNavigationAction)
 WK_ADD_API_MAPPING(WKBundleNodeHandleRef, InjectedBundleNodeHandle)
+WK_ADD_API_MAPPING(WKBundlePageBannerRef, PageBanner)
 WK_ADD_API_MAPPING(WKBundlePageGroupRef, WebPageGroupProxy)
 WK_ADD_API_MAPPING(WKBundlePageOverlayRef, PageOverlay)
 WK_ADD_API_MAPPING(WKBundlePageRef, WebPage)

@@ -29,8 +29,8 @@ namespace WebCore {
 
 class SVGTRefTargetEventListener;
 
-class SVGTRefElement : public SVGTextPositioningElement,
-                       public SVGURIReference {
+class SVGTRefElement FINAL : public SVGTextPositioningElement,
+                             public SVGURIReference {
 public:
     static PassRefPtr<SVGTRefElement> create(const QualifiedName&, Document*);
 
@@ -39,8 +39,6 @@ private:
 
     SVGTRefElement(const QualifiedName&, Document*);
     virtual ~SVGTRefElement();
-
-    void createShadowSubtree();
 
     bool isSupportedAttribute(const QualifiedName&);
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;

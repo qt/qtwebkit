@@ -33,10 +33,9 @@
 #import "GraphicsLayerCA.h"
 #import "PlatformCALayer.h"
 #import "ThemeMac.h"
+#import "WebCoreSystemInterface.h"
 #import <objc/runtime.h>
 #import <QuartzCore/QuartzCore.h>
-#import <wtf/UnusedParam.h>
-#import "WebCoreSystemInterface.h"
 
 @interface CALayer(WebCoreCALayerPrivate)
 - (void)reloadValueForKeyPath:(NSString *)keyPath;
@@ -80,9 +79,13 @@ void drawLayerContents(CGContextRef context, CALayer *layer, WebCore::PlatformCA
     // smaller than the layer bounds (e.g. tiled layers)
     FloatRect clipBounds = CGContextGetClipBoundingBox(context);
 
+    FloatRect focusRingClipRect = clipBounds;
+#if __MAC_OS_X_VERSION_MIN_REQUIRED < 1090
     // Set the focus ring clip rect which needs to be in base coordinates.
     AffineTransform transform = CGContextGetCTM(context);
-    ThemeMac::setFocusRingClipRect(transform.mapRect(clipBounds));
+    focusRingClipRect = transform.mapRect(clipBounds);
+#endif
+    ThemeMac::setFocusRingClipRect(focusRingClipRect);
 
 #if PLATFORM(IOS) || __MAC_OS_X_VERSION_MIN_REQUIRED >= 1070
     const float wastedSpaceThreshold = 0.75f;
@@ -128,11 +131,16 @@ void drawLayerContents(CGContextRef context, CALayer *layer, WebCore::PlatformCA
     // Re-fetch the layer owner, since <rdar://problem/9125151> indicates that it might have been destroyed during painting.
     layerContents = platformLayer->owner();
     ASSERT(layerContents);
-    if (!platformLayer->usesTileCacheLayer() && layerContents && layerContents->platformCALayerShowRepaintCounter(platformLayer)) {
+
+    // Always update the repain count so that it's accurate even if the count itself is not shown. This will be useful
+    // for the Web Inspector feeding this information through the LayerTreeAgent. 
+    int repaintCount = layerContents->platformCALayerIncrementRepaintCount();
+
+    if (!platformLayer->usesTiledBackingLayer() && layerContents && layerContents->platformCALayerShowRepaintCounter(platformLayer)) {
         bool isTiledLayer = [layer isKindOfClass:[CATiledLayer class]];
 
         char text[16]; // that's a lot of repaints
-        snprintf(text, sizeof(text), "%d", layerContents->platformCALayerIncrementRepaintCount());
+        snprintf(text, sizeof(text), "%d", repaintCount);
 
         CGRect indicatorBox = layerBounds;
         indicatorBox.size.width = 12 + 10 * strlen(text);

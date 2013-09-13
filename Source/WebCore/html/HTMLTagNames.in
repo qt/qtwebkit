@@ -66,11 +66,9 @@ hr interfaceName=HTMLHRElement
 html
 i interfaceName=HTMLElement
 iframe interfaceName=HTMLIFrameElement
-image mapToTagName=img
+image interfaceName=HTMLElement
 img interfaceName=HTMLImageElement, constructorNeedsFormElement
-webkitInnerImage interfaceName=HTMLElement, noConstructor
 input constructorNeedsFormElement, constructorNeedsCreatedByParser
-intent conditional=WEB_INTENTS_TAG
 ins interfaceName=HTMLModElement
 isindex interfaceName=HTMLUnknownElement
 kbd interfaceName=HTMLElement
@@ -81,6 +79,7 @@ legend
 li interfaceName=HTMLLIElement
 link constructorNeedsCreatedByParser
 listing interfaceName=HTMLPreElement
+main interfaceName=HTMLElement
 map
 mark interfaceName=HTMLElement
 marquee
@@ -97,7 +96,6 @@ ol interfaceName=HTMLOListElement
 optgroup interfaceName=HTMLOptGroupElement
 option
 output constructorNeedsFormElement
-shadow interfaceName=HTMLShadowElement, conditional=SHADOW_DOM, runtimeConditional=shadowDOM
 p interfaceName=HTMLParagraphElement
 param
 plaintext interfaceName=HTMLElement
@@ -124,6 +122,7 @@ sup interfaceName=HTMLElement
 table
 tbody interfaceName=HTMLTableSectionElement
 td interfaceName=HTMLTableCellElement
+template conditional=TEMPLATE_ELEMENT
 textarea interfaceName=HTMLTextAreaElement, constructorNeedsFormElement
 tfoot interfaceName=HTMLTableSectionElement
 th interfaceName=HTMLTableCellElement

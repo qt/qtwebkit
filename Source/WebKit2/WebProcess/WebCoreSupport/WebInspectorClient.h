@@ -34,8 +34,8 @@
 #include <WebCore/InspectorFrontendChannel.h>
 
 namespace WebCore {
-    class GraphicsContext;
-    class IntRect;
+class GraphicsContext;
+class IntRect;
 }
 
 namespace WebKit {
@@ -62,6 +62,8 @@ private:
     virtual void hideHighlight() OVERRIDE;
 
     virtual bool sendMessageToFrontend(const String&) OVERRIDE;
+
+    virtual bool supportsFrameInstrumentation();
 
     // PageOverlay::Client
     virtual void pageOverlayDestroyed(PageOverlay*) OVERRIDE;

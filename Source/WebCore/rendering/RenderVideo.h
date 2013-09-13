@@ -70,7 +70,7 @@ private:
 
     virtual void layout();
 
-    virtual LayoutUnit computeReplacedLogicalWidth(bool includeMaxWidth = true) const;
+    virtual LayoutUnit computeReplacedLogicalWidth(ShouldComputePreferred  = ComputeActual) const OVERRIDE;
     virtual LayoutUnit computeReplacedLogicalHeight() const;
     virtual LayoutUnit minimumReplacedHeight() const OVERRIDE;
 
@@ -83,12 +83,14 @@ private:
 
     void updatePlayer();
 
+    virtual bool foregroundIsKnownToBeOpaqueInRect(const LayoutRect& localRect, unsigned maxDepthToTest) const OVERRIDE;
+
     LayoutSize m_cachedImageSize;
 };
 
 inline RenderVideo* toRenderVideo(RenderObject* object)
 {
-    ASSERT(!object || object->isVideo());
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isVideo());
     return static_cast<RenderVideo*>(object);
 }
 

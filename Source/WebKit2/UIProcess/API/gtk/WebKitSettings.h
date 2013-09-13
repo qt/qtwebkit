@@ -60,11 +60,10 @@ struct _WebKitSettings {
 struct _WebKitSettingsClass {
     GObjectClass parent_class;
 
-    /* Padding for future expansion */
+    void (*_webkit_reserved0) (void);
     void (*_webkit_reserved1) (void);
     void (*_webkit_reserved2) (void);
     void (*_webkit_reserved3) (void);
-    void (*_webkit_reserved4) (void);
 };
 
 WEBKIT_API GType
@@ -378,6 +377,20 @@ webkit_settings_get_enable_smooth_scrolling                    (WebKitSettings *
 
 WEBKIT_API void
 webkit_settings_set_enable_smooth_scrolling                    (WebKitSettings *settings,
+                                                                gboolean        enabled);
+
+WEBKIT_API gboolean
+webkit_settings_get_enable_accelerated_2d_canvas               (WebKitSettings *settings);
+
+WEBKIT_API void
+webkit_settings_set_enable_accelerated_2d_canvas               (WebKitSettings *settings,
+                                                                gboolean        enabled);
+
+WEBKIT_API gboolean
+webkit_settings_get_enable_write_console_messages_to_stdout    (WebKitSettings *settings);
+
+WEBKIT_API void
+webkit_settings_set_enable_write_console_messages_to_stdout    (WebKitSettings *settings,
                                                                 gboolean        enabled);
 
 G_END_DECLS

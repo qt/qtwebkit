@@ -62,7 +62,7 @@ public:
 
     void parseAuthorStyleSheet(const CachedCSSStyleSheet*, const SecurityOrigin*);
     bool parseString(const String&);
-    bool parseStringAtLine(const String&, int startLineNumber);
+    bool parseStringAtLine(const String&, int startLineNumber, bool);
 
     bool isCacheable() const;
 
@@ -135,8 +135,6 @@ public:
     bool isInMemoryCache() const { return m_isInMemoryCache; }
     void addedToMemoryCache();
     void removedFromMemoryCache();
-
-    void reportMemoryUsage(MemoryObjectInfo*) const;
 
     void shrinkToFit();
 

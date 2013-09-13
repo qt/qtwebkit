@@ -62,6 +62,7 @@
 using namespace WebCore;
 
 static const char* inspectorStartsAttachedSetting = "inspectorStartsAttached";
+static const char* inspectorAttachDisabledSetting = "inspectorAttachDisabled";
 
 static inline RetainPtr<CFStringRef> createKeyForPreferences(const String& key)
 {
@@ -71,7 +72,7 @@ static inline RetainPtr<CFStringRef> createKeyForPreferences(const String& key)
 static void populateSetting(const String& key, String* setting)
 {
     RetainPtr<CFStringRef> preferencesKey = createKeyForPreferences(key);
-    RetainPtr<CFPropertyListRef> value(AdoptCF, CFPreferencesCopyAppValue(preferencesKey.get(), kCFPreferencesCurrentApplication));
+    RetainPtr<CFPropertyListRef> value = adoptCF(CFPreferencesCopyAppValue(preferencesKey.get(), kCFPreferencesCurrentApplication));
 
     if (!value)
         return;
@@ -93,6 +94,20 @@ static void storeSetting(const String& key, const String& setting)
 bool WebInspectorClient::sendMessageToFrontend(const String& message)
 {
     return doDispatchMessageOnFrontendPage(m_frontendPage, message);
+}
+
+bool WebInspectorClient::inspectorAttachDisabled()
+{
+    String value;
+    populateSetting(inspectorAttachDisabledSetting, &value);
+    if (value.isEmpty())
+        return false;
+    return value == "true";
+}
+
+void WebInspectorClient::setInspectorAttachDisabled(bool disabled)
+{
+    storeSetting(inspectorAttachDisabledSetting, disabled ? "true" : "false");
 }
 
 bool WebInspectorClient::inspectorStartsAttached()

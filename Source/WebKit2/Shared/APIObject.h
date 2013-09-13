@@ -57,6 +57,8 @@ public:
         TypeURLRequest,
         TypeURLResponse,
         TypeUserContentURLPattern,
+        TypeWebArchive,
+        TypeWebArchiveResource,
 
         // Base numeric types
         TypeBoolean,
@@ -91,8 +93,6 @@ public:
         TypeGrammarDetail,
         TypeIconDatabase,
         TypeInspector,
-        TypeIntentData,
-        TypeIntentServiceInfo,
         TypeKeyValueStorageManager,
         TypeMediaCacheManager,
         TypeNavigationData,
@@ -109,6 +109,7 @@ public:
         TypePreferences,
         TypeTextChecker,
         TypeVibration,
+        TypeViewportAttributes,
 
         // Bundle types
         TypeBundle,
@@ -118,11 +119,10 @@ public:
         TypeBundleFrame,
         TypeBundleHitTestResult,
         TypeBundleInspector,
-        TypeBundleIntent,
-        TypeBundleIntentRequest,
         TypeBundleNavigationAction,
         TypeBundleNodeHandle,
         TypeBundlePage,
+        TypeBundlePageBanner,
         TypeBundlePageGroup,
         TypeBundlePageOverlay,
         TypeBundleRangeHandle,
@@ -135,6 +135,13 @@ public:
 #if USE(SOUP)
         TypeSoupRequestManager,
 #endif
+#if PLATFORM(EFL)
+        TypePopupMenuItem,
+#if ENABLE(TOUCH_EVENTS)
+        TypeTouchPoint,
+        TypeTouchEvent,
+#endif
+#endif
     };
 
     virtual ~APIObject()
@@ -145,6 +152,23 @@ public:
 
 protected:
     APIObject();
+};
+
+template <APIObject::Type ArgumentType>
+class TypedAPIObject : public APIObject {
+public:
+    static const Type APIType = ArgumentType;
+
+    virtual ~TypedAPIObject()
+    {
+    }
+
+protected:
+    TypedAPIObject()
+    {
+    }
+
+    virtual Type type() const OVERRIDE { return APIType; }
 };
 
 } // namespace WebKit

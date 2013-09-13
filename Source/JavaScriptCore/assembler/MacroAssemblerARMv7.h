@@ -59,7 +59,7 @@ public:
         return value >= -255 && value <= 255;
     }
 
-    Vector<LinkRecord>& jumpsToLink() { return m_assembler.jumpsToLink(); }
+    Vector<LinkRecord, 0, UnsafeVectorOverflow>& jumpsToLink() { return m_assembler.jumpsToLink(); }
     void* unlinkedCode() { return m_assembler.unlinkedCode(); }
     bool canCompact(JumpType jumpType) { return m_assembler.canCompact(jumpType); }
     JumpLinkType computeJumpType(JumpType jumpType, const uint8_t* from, const uint8_t* to) { return m_assembler.computeJumpType(jumpType, from, to); }
@@ -119,6 +119,7 @@ public:
     enum ResultCondition {
         Overflow = ARMv7Assembler::ConditionVS,
         Signed = ARMv7Assembler::ConditionMI,
+        PositiveOrZero = ARMv7Assembler::ConditionPL,
         Zero = ARMv7Assembler::ConditionEQ,
         NonZero = ARMv7Assembler::ConditionNE
     };
@@ -261,6 +262,12 @@ public:
     void and32(TrustedImm32 imm, RegisterID dest)
     {
         and32(imm, dest, dest);
+    }
+
+    void and32(Address src, RegisterID dest)
+    {
+        load32(src, dataTempRegister);
+        and32(dataTempRegister, dest);
     }
 
     void countLeadingZeros32(RegisterID src, RegisterID dest)
@@ -1097,7 +1104,7 @@ public:
     // If the result is not representable as a 32 bit value, branch.
     // May also branch for some values that are representable in 32 bits
     // (specifically, in this case, 0).
-    void branchConvertDoubleToInt32(FPRegisterID src, RegisterID dest, JumpList& failureCases, FPRegisterID)
+    void branchConvertDoubleToInt32(FPRegisterID src, RegisterID dest, JumpList& failureCases, FPRegisterID, bool negZeroCheck = true)
     {
         m_assembler.vcvt_floatingPointToSigned(fpTempRegisterAsSingle(), src);
         m_assembler.vmov(dest, fpTempRegisterAsSingle());
@@ -1107,7 +1114,8 @@ public:
         failureCases.append(branchDouble(DoubleNotEqualOrUnordered, src, fpTempRegister));
 
         // If the result is zero, it might have been -0.0, and the double comparison won't catch this!
-        failureCases.append(branchTest32(Zero, dest));
+        if (negZeroCheck)
+            failureCases.append(branchTest32(Zero, dest));
     }
 
     Jump branchDoubleNonZero(FPRegisterID reg, FPRegisterID)

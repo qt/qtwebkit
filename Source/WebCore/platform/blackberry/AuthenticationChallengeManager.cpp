@@ -140,10 +140,10 @@ void AuthenticationChallengeManager::pageVisibilityChanged(PageClientBlackBerry*
         return;
     }
 
-    if (iter->second == visible)
+    if (iter->value == visible)
         return;
 
-    iter->second = visible;
+    iter->value = visible;
     if (!visible)
         return;
 
@@ -196,7 +196,7 @@ void AuthenticationChallengeManager::cancelAuthenticationChallenge(Authenticatio
         d->startAuthenticationChallenge(next);
 }
 
-void AuthenticationChallengeManager::notifyChallengeResult(const KURL& url, const ProtectionSpace& space,
+void AuthenticationChallengeManager::notifyChallengeResult(const KURL&, const ProtectionSpace& space,
     AuthenticationChallengeResult result, const Credential& credential)
 {
     d->m_activeChallenge = 0;

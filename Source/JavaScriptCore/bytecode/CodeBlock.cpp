@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, 2009, 2010 Apple Inc. All rights reserved.
+ * Copyright (C) 2008, 2009, 2010, 2012, 2013 Apple Inc. All rights reserved.
  * Copyright (C) 2008 Cameron Zwarich <cwzwarich@uwaterloo.ca>
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,6 +31,7 @@
 #include "CodeBlock.h"
 
 #include "BytecodeGenerator.h"
+#include "CallLinkStatus.h"
 #include "DFGCapabilities.h"
 #include "DFGCommon.h"
 #include "DFGNode.h"
@@ -40,15 +41,18 @@
 #include "JIT.h"
 #include "JITStubs.h"
 #include "JSActivation.h"
+#include "JSCJSValue.h"
 #include "JSFunction.h"
 #include "JSNameScope.h"
-#include "JSValue.h"
 #include "LowLevelInterpreter.h"
+#include "Operations.h"
+#include "ReduceWhitespace.h"
 #include "RepatchBuffer.h"
 #include "SlotVisitorInlines.h"
 #include <stdio.h>
+#include <wtf/CommaPrinter.h>
 #include <wtf/StringExtras.h>
-#include <wtf/UnusedParam.h>
+#include <wtf/StringPrintStream.h>
 
 #if ENABLE(DFG_JIT)
 #include "DFGOperations.h"
@@ -62,16 +66,57 @@ namespace JSC {
 using namespace DFG;
 #endif
 
+String CodeBlock::inferredName() const
+{
+    switch (codeType()) {
+    case GlobalCode:
+        return "<global>";
+    case EvalCode:
+        return "<eval>";
+    case FunctionCode:
+        return jsCast<FunctionExecutable*>(ownerExecutable())->inferredName().string();
+    default:
+        CRASH();
+        return String();
+    }
+}
+
 CodeBlockHash CodeBlock::hash() const
 {
     return CodeBlockHash(ownerExecutable()->source(), specializationKind());
 }
 
+String CodeBlock::sourceCodeForTools() const
+{
+    if (codeType() != FunctionCode)
+        return ownerExecutable()->source().toString();
+    
+    SourceProvider* provider = source();
+    FunctionExecutable* executable = jsCast<FunctionExecutable*>(ownerExecutable());
+    UnlinkedFunctionExecutable* unlinked = executable->unlinkedExecutable();
+    unsigned unlinkedStartOffset = unlinked->startOffset();
+    unsigned linkedStartOffset = executable->source().startOffset();
+    int delta = linkedStartOffset - unlinkedStartOffset;
+    StringBuilder builder;
+    builder.append("function ");
+    builder.append(provider->getRange(
+        delta + unlinked->functionStartOffset(),
+        delta + unlinked->startOffset() + unlinked->sourceLength()));
+    return builder.toString();
+}
+
+String CodeBlock::sourceCodeOnOneLine() const
+{
+    return reduceWhitespace(sourceCodeForTools());
+}
+
 void CodeBlock::dumpAssumingJITType(PrintStream& out, JITCode::JITType jitType) const
 {
-    out.print("#", hash(), ":[", RawPointer(this), ", ", jitType, codeType());
+    out.print(inferredName(), "#", hash(), ":[", RawPointer(this), "->", RawPointer(ownerExecutable()), ", ", jitType, codeType());
     if (codeType() == FunctionCode)
         out.print(specializationKind());
+    if (ownerExecutable()->neverInline())
+        out.print(" (NeverInline)");
     out.print("]");
 }
 
@@ -99,7 +144,7 @@ static String valueToSourceString(ExecState* exec, JSValue val)
     if (val.isString())
         return makeString("\"", escapeQuotes(val.toString(exec)->value(exec)), "\"");
 
-    return val.description();
+    return toString(val);
 }
 
 static CString constantName(ExecState* exec, int k, JSValue value)
@@ -110,18 +155,6 @@ static CString constantName(ExecState* exec, int k, JSValue value)
 static CString idName(int id0, const Identifier& ident)
 {
     return makeString(ident.string(), "(@id", String::number(id0), ")").utf8();
-}
-
-void CodeBlock::dumpBytecodeCommentAndNewLine(int location)
-{
-#if ENABLE(BYTECODE_COMMENTS)
-    const char* comment = commentForBytecodeOffset(location);
-    if (comment)
-        dataLogF("\t\t ; %s", comment);
-#else
-    UNUSED_PARAM(location);
-#endif
-    dataLogF("\n");
 }
 
 CString CodeBlock::registerName(ExecState* exec, int r) const
@@ -178,37 +211,34 @@ NEVER_INLINE static const char* debugHookName(int debugHookID)
             return "didReachBreakpoint";
     }
 
-    ASSERT_NOT_REACHED();
+    RELEASE_ASSERT_NOT_REACHED();
     return "";
 }
 
-void CodeBlock::printUnaryOp(ExecState* exec, int location, const Instruction*& it, const char* op)
+void CodeBlock::printUnaryOp(PrintStream& out, ExecState* exec, int location, const Instruction*& it, const char* op)
 {
     int r0 = (++it)->u.operand;
     int r1 = (++it)->u.operand;
 
-    dataLogF("[%4d] %s\t\t %s, %s", location, op, registerName(exec, r0).data(), registerName(exec, r1).data());
-    dumpBytecodeCommentAndNewLine(location);
+    out.printf("[%4d] %s\t\t %s, %s", location, op, registerName(exec, r0).data(), registerName(exec, r1).data());
 }
 
-void CodeBlock::printBinaryOp(ExecState* exec, int location, const Instruction*& it, const char* op)
+void CodeBlock::printBinaryOp(PrintStream& out, ExecState* exec, int location, const Instruction*& it, const char* op)
 {
     int r0 = (++it)->u.operand;
     int r1 = (++it)->u.operand;
     int r2 = (++it)->u.operand;
-    dataLogF("[%4d] %s\t\t %s, %s, %s", location, op, registerName(exec, r0).data(), registerName(exec, r1).data(), registerName(exec, r2).data());
-    dumpBytecodeCommentAndNewLine(location);
+    out.printf("[%4d] %s\t\t %s, %s, %s", location, op, registerName(exec, r0).data(), registerName(exec, r1).data(), registerName(exec, r2).data());
 }
 
-void CodeBlock::printConditionalJump(ExecState* exec, const Instruction*, const Instruction*& it, int location, const char* op)
+void CodeBlock::printConditionalJump(PrintStream& out, ExecState* exec, const Instruction*, const Instruction*& it, int location, const char* op)
 {
     int r0 = (++it)->u.operand;
     int offset = (++it)->u.operand;
-    dataLogF("[%4d] %s\t\t %s, %d(->%d)", location, op, registerName(exec, r0).data(), offset, location + offset);
-    dumpBytecodeCommentAndNewLine(location);
+    out.printf("[%4d] %s\t\t %s, %d(->%d)", location, op, registerName(exec, r0).data(), offset, location + offset);
 }
 
-void CodeBlock::printGetByIdOp(ExecState* exec, int location, const Instruction*& it)
+void CodeBlock::printGetByIdOp(PrintStream& out, ExecState* exec, int location, const Instruction*& it)
 {
     const char* op;
     switch (exec->interpreter()->getOpcodeID(it->u.opcode)) {
@@ -255,34 +285,34 @@ void CodeBlock::printGetByIdOp(ExecState* exec, int location, const Instruction*
         op = "string_length";
         break;
     default:
-        ASSERT_NOT_REACHED();
+        RELEASE_ASSERT_NOT_REACHED();
         op = 0;
     }
     int r0 = (++it)->u.operand;
     int r1 = (++it)->u.operand;
     int id0 = (++it)->u.operand;
-    dataLogF("[%4d] %s\t %s, %s, %s", location, op, registerName(exec, r0).data(), registerName(exec, r1).data(), idName(id0, m_identifiers[id0]).data());
-    it += 5;
+    out.printf("[%4d] %s\t %s, %s, %s", location, op, registerName(exec, r0).data(), registerName(exec, r1).data(), idName(id0, m_identifiers[id0]).data());
+    it += 4; // Increment up to the value profiler.
 }
 
 #if ENABLE(JIT) || ENABLE(LLINT) // unused in some configurations
-static void dumpStructure(const char* name, ExecState* exec, Structure* structure, Identifier& ident)
+static void dumpStructure(PrintStream& out, const char* name, ExecState* exec, Structure* structure, Identifier& ident)
 {
     if (!structure)
         return;
     
-    dataLogF("%s = %p", name, structure);
+    out.printf("%s = %p", name, structure);
     
-    PropertyOffset offset = structure->get(exec->globalData(), ident);
+    PropertyOffset offset = structure->get(exec->vm(), ident);
     if (offset != invalidOffset)
-        dataLogF(" (offset = %d)", offset);
+        out.printf(" (offset = %d)", offset);
 }
 #endif
 
 #if ENABLE(JIT) // unused when not ENABLE(JIT), leading to silly warnings
-static void dumpChain(ExecState* exec, StructureChain* chain, Identifier& ident)
+static void dumpChain(PrintStream& out, ExecState* exec, StructureChain* chain, Identifier& ident)
 {
-    dataLogF("chain = %p: [", chain);
+    out.printf("chain = %p: [", chain);
     bool first = true;
     for (WriteBarrier<Structure>* currentStructure = chain->head();
          *currentStructure;
@@ -290,14 +320,14 @@ static void dumpChain(ExecState* exec, StructureChain* chain, Identifier& ident)
         if (first)
             first = false;
         else
-            dataLogF(", ");
-        dumpStructure("struct", exec, currentStructure->get(), ident);
+            out.printf(", ");
+        dumpStructure(out, "struct", exec, currentStructure->get(), ident);
     }
-    dataLogF("]");
+    out.printf("]");
 }
 #endif
 
-void CodeBlock::printGetByIdCacheStatus(ExecState* exec, int location)
+void CodeBlock::printGetByIdCacheStatus(PrintStream& out, ExecState* exec, int location)
 {
     Instruction* instruction = instructions().begin() + location;
 
@@ -307,22 +337,20 @@ void CodeBlock::printGetByIdCacheStatus(ExecState* exec, int location)
     
 #if ENABLE(LLINT)
     if (exec->interpreter()->getOpcodeID(instruction[0].u.opcode) == op_get_array_length)
-        dataLogF(" llint(array_length)");
-    else {
-        Structure* structure = instruction[4].u.structure.get();
-        dataLogF(" llint(");
-        dumpStructure("struct", exec, structure, ident);
-        dataLogF(")");
+        out.printf(" llint(array_length)");
+    else if (Structure* structure = instruction[4].u.structure.get()) {
+        out.printf(" llint(");
+        dumpStructure(out, "struct", exec, structure, ident);
+        out.printf(")");
     }
 #endif
 
 #if ENABLE(JIT)
     if (numberOfStructureStubInfos()) {
-        dataLogF(" jit(");
         StructureStubInfo& stubInfo = getStubInfo(location);
-        if (!stubInfo.seen)
-            dataLogF("not seen");
-        else {
+        if (stubInfo.seen) {
+            out.printf(" jit(");
+            
             Structure* baseStructure = 0;
             Structure* prototypeStructure = 0;
             StructureChain* chain = 0;
@@ -331,166 +359,163 @@ void CodeBlock::printGetByIdCacheStatus(ExecState* exec, int location)
             
             switch (stubInfo.accessType) {
             case access_get_by_id_self:
-                dataLogF("self");
+                out.printf("self");
                 baseStructure = stubInfo.u.getByIdSelf.baseObjectStructure.get();
                 break;
             case access_get_by_id_proto:
-                dataLogF("proto");
+                out.printf("proto");
                 baseStructure = stubInfo.u.getByIdProto.baseObjectStructure.get();
                 prototypeStructure = stubInfo.u.getByIdProto.prototypeStructure.get();
                 break;
             case access_get_by_id_chain:
-                dataLogF("chain");
+                out.printf("chain");
                 baseStructure = stubInfo.u.getByIdChain.baseObjectStructure.get();
                 chain = stubInfo.u.getByIdChain.chain.get();
                 break;
             case access_get_by_id_self_list:
-                dataLogF("self_list");
+                out.printf("self_list");
                 structureList = stubInfo.u.getByIdSelfList.structureList;
                 listSize = stubInfo.u.getByIdSelfList.listSize;
                 break;
             case access_get_by_id_proto_list:
-                dataLogF("proto_list");
+                out.printf("proto_list");
                 structureList = stubInfo.u.getByIdProtoList.structureList;
                 listSize = stubInfo.u.getByIdProtoList.listSize;
                 break;
             case access_unset:
-                dataLogF("unset");
+                out.printf("unset");
                 break;
             case access_get_by_id_generic:
-                dataLogF("generic");
+                out.printf("generic");
                 break;
             case access_get_array_length:
-                dataLogF("array_length");
+                out.printf("array_length");
                 break;
             case access_get_string_length:
-                dataLogF("string_length");
+                out.printf("string_length");
                 break;
             default:
-                ASSERT_NOT_REACHED();
+                RELEASE_ASSERT_NOT_REACHED();
                 break;
             }
             
             if (baseStructure) {
-                dataLogF(", ");
-                dumpStructure("struct", exec, baseStructure, ident);
+                out.printf(", ");
+                dumpStructure(out, "struct", exec, baseStructure, ident);
             }
             
             if (prototypeStructure) {
-                dataLogF(", ");
-                dumpStructure("prototypeStruct", exec, baseStructure, ident);
+                out.printf(", ");
+                dumpStructure(out, "prototypeStruct", exec, baseStructure, ident);
             }
             
             if (chain) {
-                dataLogF(", ");
-                dumpChain(exec, chain, ident);
+                out.printf(", ");
+                dumpChain(out, exec, chain, ident);
             }
             
             if (structureList) {
-                dataLogF(", list = %p: [", structureList);
+                out.printf(", list = %p: [", structureList);
                 for (int i = 0; i < listSize; ++i) {
                     if (i)
-                        dataLogF(", ");
-                    dataLogF("(");
-                    dumpStructure("base", exec, structureList->list[i].base.get(), ident);
+                        out.printf(", ");
+                    out.printf("(");
+                    dumpStructure(out, "base", exec, structureList->list[i].base.get(), ident);
                     if (structureList->list[i].isChain) {
                         if (structureList->list[i].u.chain.get()) {
-                            dataLogF(", ");
-                            dumpChain(exec, structureList->list[i].u.chain.get(), ident);
+                            out.printf(", ");
+                            dumpChain(out, exec, structureList->list[i].u.chain.get(), ident);
                         }
                     } else {
                         if (structureList->list[i].u.proto.get()) {
-                            dataLogF(", ");
-                            dumpStructure("proto", exec, structureList->list[i].u.proto.get(), ident);
+                            out.printf(", ");
+                            dumpStructure(out, "proto", exec, structureList->list[i].u.proto.get(), ident);
                         }
                     }
-                    dataLogF(")");
+                    out.printf(")");
                 }
-                dataLogF("]");
+                out.printf("]");
             }
+            out.printf(")");
         }
-        dataLogF(")");
     }
 #endif
 }
 
-void CodeBlock::printCallOp(ExecState* exec, int location, const Instruction*& it, const char* op, CacheDumpMode cacheDumpMode)
+void CodeBlock::printCallOp(PrintStream& out, ExecState* exec, int location, const Instruction*& it, const char* op, CacheDumpMode cacheDumpMode)
 {
     int func = (++it)->u.operand;
     int argCount = (++it)->u.operand;
     int registerOffset = (++it)->u.operand;
-    dataLogF("[%4d] %s\t %s, %d, %d", location, op, registerName(exec, func).data(), argCount, registerOffset);
+    out.printf("[%4d] %s\t %s, %d, %d", location, op, registerName(exec, func).data(), argCount, registerOffset);
     if (cacheDumpMode == DumpCaches) {
 #if ENABLE(LLINT)
         LLIntCallLinkInfo* callLinkInfo = it[1].u.callLinkInfo;
         if (callLinkInfo->lastSeenCallee) {
-            dataLogF(" llint(%p, exec %p)",
-                    callLinkInfo->lastSeenCallee.get(),
-                    callLinkInfo->lastSeenCallee->executable());
-        } else
-            dataLogF(" llint(not set)");
+            out.printf(
+                " llint(%p, exec %p)",
+                callLinkInfo->lastSeenCallee.get(),
+                callLinkInfo->lastSeenCallee->executable());
+        }
 #endif
 #if ENABLE(JIT)
         if (numberOfCallLinkInfos()) {
             JSFunction* target = getCallLinkInfo(location).lastSeenCallee.get();
             if (target)
-                dataLogF(" jit(%p, exec %p)", target, target->executable());
-            else
-                dataLogF(" jit(not set)");
+                out.printf(" jit(%p, exec %p)", target, target->executable());
         }
 #endif
+        out.print(" status(", CallLinkStatus::computeFor(this, location), ")");
     }
-    dumpBytecodeCommentAndNewLine(location);
     it += 2;
 }
 
-void CodeBlock::printPutByIdOp(ExecState* exec, int location, const Instruction*& it, const char* op)
+void CodeBlock::printPutByIdOp(PrintStream& out, ExecState* exec, int location, const Instruction*& it, const char* op)
 {
     int r0 = (++it)->u.operand;
     int id0 = (++it)->u.operand;
     int r1 = (++it)->u.operand;
-    dataLogF("[%4d] %s\t %s, %s, %s", location, op, registerName(exec, r0).data(), idName(id0, m_identifiers[id0]).data(), registerName(exec, r1).data());
-    dumpBytecodeCommentAndNewLine(location);
+    out.printf("[%4d] %s\t %s, %s, %s", location, op, registerName(exec, r0).data(), idName(id0, m_identifiers[id0]).data(), registerName(exec, r1).data());
     it += 5;
 }
 
-void CodeBlock::printStructure(const char* name, const Instruction* vPC, int operand)
+void CodeBlock::printStructure(PrintStream& out, const char* name, const Instruction* vPC, int operand)
 {
     unsigned instructionOffset = vPC - instructions().begin();
-    dataLogF("  [%4d] %s: %s\n", instructionOffset, name, pointerToSourceString(vPC[operand].u.structure).utf8().data());
+    out.printf("  [%4d] %s: %s\n", instructionOffset, name, pointerToSourceString(vPC[operand].u.structure).utf8().data());
 }
 
-void CodeBlock::printStructures(const Instruction* vPC)
+void CodeBlock::printStructures(PrintStream& out, const Instruction* vPC)
 {
-    Interpreter* interpreter = m_globalData->interpreter;
+    Interpreter* interpreter = m_vm->interpreter;
     unsigned instructionOffset = vPC - instructions().begin();
 
     if (vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id)) {
-        printStructure("get_by_id", vPC, 4);
+        printStructure(out, "get_by_id", vPC, 4);
         return;
     }
     if (vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_self)) {
-        printStructure("get_by_id_self", vPC, 4);
+        printStructure(out, "get_by_id_self", vPC, 4);
         return;
     }
     if (vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_proto)) {
-        dataLogF("  [%4d] %s: %s, %s\n", instructionOffset, "get_by_id_proto", pointerToSourceString(vPC[4].u.structure).utf8().data(), pointerToSourceString(vPC[5].u.structure).utf8().data());
+        out.printf("  [%4d] %s: %s, %s\n", instructionOffset, "get_by_id_proto", pointerToSourceString(vPC[4].u.structure).utf8().data(), pointerToSourceString(vPC[5].u.structure).utf8().data());
         return;
     }
     if (vPC[0].u.opcode == interpreter->getOpcode(op_put_by_id_transition)) {
-        dataLogF("  [%4d] %s: %s, %s, %s\n", instructionOffset, "put_by_id_transition", pointerToSourceString(vPC[4].u.structure).utf8().data(), pointerToSourceString(vPC[5].u.structure).utf8().data(), pointerToSourceString(vPC[6].u.structureChain).utf8().data());
+        out.printf("  [%4d] %s: %s, %s, %s\n", instructionOffset, "put_by_id_transition", pointerToSourceString(vPC[4].u.structure).utf8().data(), pointerToSourceString(vPC[5].u.structure).utf8().data(), pointerToSourceString(vPC[6].u.structureChain).utf8().data());
         return;
     }
     if (vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_chain)) {
-        dataLogF("  [%4d] %s: %s, %s\n", instructionOffset, "get_by_id_chain", pointerToSourceString(vPC[4].u.structure).utf8().data(), pointerToSourceString(vPC[5].u.structureChain).utf8().data());
+        out.printf("  [%4d] %s: %s, %s\n", instructionOffset, "get_by_id_chain", pointerToSourceString(vPC[4].u.structure).utf8().data(), pointerToSourceString(vPC[5].u.structureChain).utf8().data());
         return;
     }
     if (vPC[0].u.opcode == interpreter->getOpcode(op_put_by_id)) {
-        printStructure("put_by_id", vPC, 4);
+        printStructure(out, "put_by_id", vPC, 4);
         return;
     }
     if (vPC[0].u.opcode == interpreter->getOpcode(op_put_by_id_replace)) {
-        printStructure("put_by_id_replace", vPC, 4);
+        printStructure(out, "put_by_id_replace", vPC, 4);
         return;
     }
 
@@ -498,7 +523,7 @@ void CodeBlock::printStructures(const Instruction* vPC)
     ASSERT(vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_generic) || vPC[0].u.opcode == interpreter->getOpcode(op_put_by_id_generic) || vPC[0].u.opcode == interpreter->getOpcode(op_call) || vPC[0].u.opcode == interpreter->getOpcode(op_call_eval) || vPC[0].u.opcode == interpreter->getOpcode(op_construct));
 }
 
-void CodeBlock::dumpBytecode()
+void CodeBlock::dumpBytecode(PrintStream& out)
 {
     // We only use the ExecState* for things that don't actually lead to JS execution,
     // like converting a JSString to a String. Hence the globalExec is appropriate.
@@ -509,92 +534,95 @@ void CodeBlock::dumpBytecode()
     for (size_t i = 0; i < instructions().size(); i += opcodeLengths[exec->interpreter()->getOpcodeID(instructions()[i].u.opcode)])
         ++instructionCount;
 
-    dataLog(*this);
-    dataLogF(
+    out.print(*this);
+    out.printf(
         ": %lu m_instructions; %lu bytes; %d parameter(s); %d callee register(s); %d variable(s)",
         static_cast<unsigned long>(instructions().size()),
         static_cast<unsigned long>(instructions().size() * sizeof(Instruction)),
         m_numParameters, m_numCalleeRegisters, m_numVars);
-    if (symbolTable() && symbolTable()->captureCount())
-        dataLogF("; %d captured var(s)", symbolTable()->captureCount());
+    if (symbolTable() && symbolTable()->captureCount()) {
+        out.printf(
+            "; %d captured var(s) (from r%d to r%d, inclusive)",
+            symbolTable()->captureCount(), symbolTable()->captureStart(), symbolTable()->captureEnd() - 1);
+    }
     if (usesArguments()) {
-        dataLogF(
+        out.printf(
             "; uses arguments, in r%d, r%d",
             argumentsRegister(),
             unmodifiedArgumentsRegister(argumentsRegister()));
     }
     if (needsFullScopeChain() && codeType() == FunctionCode)
-        dataLogF("; activation in r%d", activationRegister());
-    dataLogF("\n\n");
+        out.printf("; activation in r%d", activationRegister());
+    out.print("\n\nSource: ", sourceCodeOnOneLine(), "\n\n");
 
     const Instruction* begin = instructions().begin();
     const Instruction* end = instructions().end();
     for (const Instruction* it = begin; it != end; ++it)
-        dumpBytecode(exec, begin, it);
+        dumpBytecode(out, exec, begin, it);
 
     if (!m_identifiers.isEmpty()) {
-        dataLogF("\nIdentifiers:\n");
+        out.printf("\nIdentifiers:\n");
         size_t i = 0;
         do {
-            dataLogF("  id%u = %s\n", static_cast<unsigned>(i), m_identifiers[i].string().utf8().data());
+            out.printf("  id%u = %s\n", static_cast<unsigned>(i), m_identifiers[i].string().utf8().data());
             ++i;
         } while (i != m_identifiers.size());
     }
 
     if (!m_constantRegisters.isEmpty()) {
-        dataLogF("\nConstants:\n");
+        out.printf("\nConstants:\n");
         size_t i = 0;
         do {
-            dataLogF("   k%u = %s\n", static_cast<unsigned>(i), valueToSourceString(exec, m_constantRegisters[i].get()).utf8().data());
+            out.printf("   k%u = %s\n", static_cast<unsigned>(i), valueToSourceString(exec, m_constantRegisters[i].get()).utf8().data());
             ++i;
         } while (i < m_constantRegisters.size());
     }
 
     if (size_t count = m_unlinkedCode->numberOfRegExps()) {
-        dataLogF("\nm_regexps:\n");
+        out.printf("\nm_regexps:\n");
         size_t i = 0;
         do {
-            dataLogF("  re%u = %s\n", static_cast<unsigned>(i), regexpToSourceString(m_unlinkedCode->regexp(i)).utf8().data());
+            out.printf("  re%u = %s\n", static_cast<unsigned>(i), regexpToSourceString(m_unlinkedCode->regexp(i)).utf8().data());
             ++i;
         } while (i < count);
     }
 
 #if ENABLE(JIT)
     if (!m_structureStubInfos.isEmpty())
-        dataLogF("\nStructures:\n");
+        out.printf("\nStructures:\n");
 #endif
 
     if (m_rareData && !m_rareData->m_exceptionHandlers.isEmpty()) {
-        dataLogF("\nException Handlers:\n");
+        out.printf("\nException Handlers:\n");
         unsigned i = 0;
         do {
-            dataLogF("\t %d: { start: [%4d] end: [%4d] target: [%4d] depth: [%4d] }\n", i + 1, m_rareData->m_exceptionHandlers[i].start, m_rareData->m_exceptionHandlers[i].end, m_rareData->m_exceptionHandlers[i].target, m_rareData->m_exceptionHandlers[i].scopeDepth);
+            out.printf("\t %d: { start: [%4d] end: [%4d] target: [%4d] depth: [%4d] }\n", i + 1, m_rareData->m_exceptionHandlers[i].start, m_rareData->m_exceptionHandlers[i].end, m_rareData->m_exceptionHandlers[i].target, m_rareData->m_exceptionHandlers[i].scopeDepth);
             ++i;
         } while (i < m_rareData->m_exceptionHandlers.size());
     }
     
     if (m_rareData && !m_rareData->m_immediateSwitchJumpTables.isEmpty()) {
-        dataLogF("Immediate Switch Jump Tables:\n");
+        out.printf("Immediate Switch Jump Tables:\n");
         unsigned i = 0;
         do {
-            dataLogF("  %1d = {\n", i);
+            out.printf("  %1d = {\n", i);
             int entry = 0;
             Vector<int32_t>::const_iterator end = m_rareData->m_immediateSwitchJumpTables[i].branchOffsets.end();
             for (Vector<int32_t>::const_iterator iter = m_rareData->m_immediateSwitchJumpTables[i].branchOffsets.begin(); iter != end; ++iter, ++entry) {
                 if (!*iter)
                     continue;
-                dataLogF("\t\t%4d => %04d\n", entry + m_rareData->m_immediateSwitchJumpTables[i].min, *iter);
+                out.printf("\t\t%4d => %04d\n", entry + m_rareData->m_immediateSwitchJumpTables[i].min, *iter);
             }
-            dataLogF("      }\n");
+            out.printf("      }\n");
             ++i;
         } while (i < m_rareData->m_immediateSwitchJumpTables.size());
     }
     
     if (m_rareData && !m_rareData->m_characterSwitchJumpTables.isEmpty()) {
-        dataLogF("\nCharacter Switch Jump Tables:\n");
+        out.printf("\nCharacter Switch Jump Tables:\n");
         unsigned i = 0;
         do {
-            dataLogF("  %1d = {\n", i);
+            out.printf("  %1d = {\n", i);
             int entry = 0;
             Vector<int32_t>::const_iterator end = m_rareData->m_characterSwitchJumpTables[i].branchOffsets.end();
             for (Vector<int32_t>::const_iterator iter = m_rareData->m_characterSwitchJumpTables[i].branchOffsets.begin(); iter != end; ++iter, ++entry) {
@@ -602,96 +630,143 @@ void CodeBlock::dumpBytecode()
                     continue;
                 ASSERT(!((i + m_rareData->m_characterSwitchJumpTables[i].min) & ~0xFFFF));
                 UChar ch = static_cast<UChar>(entry + m_rareData->m_characterSwitchJumpTables[i].min);
-                dataLogF("\t\t\"%s\" => %04d\n", String(&ch, 1).utf8().data(), *iter);
-        }
-            dataLogF("      }\n");
+                out.printf("\t\t\"%s\" => %04d\n", String(&ch, 1).utf8().data(), *iter);
+            }
+            out.printf("      }\n");
             ++i;
         } while (i < m_rareData->m_characterSwitchJumpTables.size());
     }
     
     if (m_rareData && !m_rareData->m_stringSwitchJumpTables.isEmpty()) {
-        dataLogF("\nString Switch Jump Tables:\n");
+        out.printf("\nString Switch Jump Tables:\n");
         unsigned i = 0;
         do {
-            dataLogF("  %1d = {\n", i);
+            out.printf("  %1d = {\n", i);
             StringJumpTable::StringOffsetTable::const_iterator end = m_rareData->m_stringSwitchJumpTables[i].offsetTable.end();
             for (StringJumpTable::StringOffsetTable::const_iterator iter = m_rareData->m_stringSwitchJumpTables[i].offsetTable.begin(); iter != end; ++iter)
-                dataLogF("\t\t\"%s\" => %04d\n", String(iter->key).utf8().data(), iter->value.branchOffset);
-            dataLogF("      }\n");
+                out.printf("\t\t\"%s\" => %04d\n", String(iter->key).utf8().data(), iter->value.branchOffset);
+            out.printf("      }\n");
             ++i;
         } while (i < m_rareData->m_stringSwitchJumpTables.size());
     }
 
-    dataLogF("\n");
+    out.printf("\n");
 }
 
-void CodeBlock::dumpBytecode(ExecState* exec, const Instruction* begin, const Instruction*& it)
+void CodeBlock::beginDumpProfiling(PrintStream& out, bool& hasPrintedProfiling)
+{
+    if (hasPrintedProfiling) {
+        out.print("; ");
+        return;
+    }
+    
+    out.print("    ");
+    hasPrintedProfiling = true;
+}
+
+void CodeBlock::dumpValueProfiling(PrintStream& out, const Instruction*& it, bool& hasPrintedProfiling)
+{
+    ++it;
+#if ENABLE(VALUE_PROFILER)
+    CString description = it->u.profile->briefDescription();
+    if (!description.length())
+        return;
+    beginDumpProfiling(out, hasPrintedProfiling);
+    out.print(description);
+#else
+    UNUSED_PARAM(out);
+    UNUSED_PARAM(hasPrintedProfiling);
+#endif
+}
+
+void CodeBlock::dumpArrayProfiling(PrintStream& out, const Instruction*& it, bool& hasPrintedProfiling)
+{
+    ++it;
+#if ENABLE(VALUE_PROFILER)
+    CString description = it->u.arrayProfile->briefDescription(this);
+    if (!description.length())
+        return;
+    beginDumpProfiling(out, hasPrintedProfiling);
+    out.print(description);
+#else
+    UNUSED_PARAM(out);
+    UNUSED_PARAM(hasPrintedProfiling);
+#endif
+}
+
+#if ENABLE(VALUE_PROFILER)
+void CodeBlock::dumpRareCaseProfile(PrintStream& out, const char* name, RareCaseProfile* profile, bool& hasPrintedProfiling)
+{
+    if (!profile || !profile->m_counter)
+        return;
+
+    beginDumpProfiling(out, hasPrintedProfiling);
+    out.print(name, profile->m_counter);
+}
+#endif
+
+void CodeBlock::dumpBytecode(PrintStream& out, ExecState* exec, const Instruction* begin, const Instruction*& it)
 {
     int location = it - begin;
+    bool hasPrintedProfiling = false;
     switch (exec->interpreter()->getOpcodeID(it->u.opcode)) {
         case op_enter: {
-            dataLogF("[%4d] enter", location);
-            dumpBytecodeCommentAndNewLine(location);
+            out.printf("[%4d] enter", location);
             break;
         }
         case op_create_activation: {
             int r0 = (++it)->u.operand;
-            dataLogF("[%4d] create_activation %s", location, registerName(exec, r0).data());
-            dumpBytecodeCommentAndNewLine(location);
+            out.printf("[%4d] create_activation %s", location, registerName(exec, r0).data());
             break;
         }
         case op_create_arguments: {
             int r0 = (++it)->u.operand;
-            dataLogF("[%4d] create_arguments\t %s", location, registerName(exec, r0).data());
-            dumpBytecodeCommentAndNewLine(location);
+            out.printf("[%4d] create_arguments\t %s", location, registerName(exec, r0).data());
             break;
         }
         case op_init_lazy_reg: {
             int r0 = (++it)->u.operand;
-            dataLogF("[%4d] init_lazy_reg\t %s", location, registerName(exec, r0).data());
-            dumpBytecodeCommentAndNewLine(location);
+            out.printf("[%4d] init_lazy_reg\t %s", location, registerName(exec, r0).data());
             break;
         }
         case op_get_callee: {
             int r0 = (++it)->u.operand;
-            dataLogF("[%4d] op_get_callee %s\n", location, registerName(exec, r0).data());
+            out.printf("[%4d] op_get_callee %s\n", location, registerName(exec, r0).data());
             ++it;
             break;
         }
         case op_create_this: {
             int r0 = (++it)->u.operand;
             int r1 = (++it)->u.operand;
-            dataLogF("[%4d] create_this %s, %s", location, registerName(exec, r0).data(), registerName(exec, r1).data());
-            dumpBytecodeCommentAndNewLine(location);
+            unsigned inferredInlineCapacity = (++it)->u.operand;
+            out.printf("[%4d] create_this %s, %s, %u", location, registerName(exec, r0).data(), registerName(exec, r1).data(), inferredInlineCapacity);
             break;
         }
         case op_convert_this: {
             int r0 = (++it)->u.operand;
-            dataLogF("[%4d] convert_this\t %s", location, registerName(exec, r0).data());
-            dumpBytecodeCommentAndNewLine(location);
+            out.printf("[%4d] convert_this\t %s", location, registerName(exec, r0).data());
             ++it; // Skip value profile.
             break;
         }
         case op_new_object: {
             int r0 = (++it)->u.operand;
-            dataLogF("[%4d] new_object\t %s", location, registerName(exec, r0).data());
-            dumpBytecodeCommentAndNewLine(location);
+            unsigned inferredInlineCapacity = (++it)->u.operand;
+            out.printf("[%4d] new_object\t %s, %u", location, registerName(exec, r0).data(), inferredInlineCapacity);
+            ++it; // Skip object allocation profile.
             break;
         }
         case op_new_array: {
             int dst = (++it)->u.operand;
             int argv = (++it)->u.operand;
             int argc = (++it)->u.operand;
-            dataLogF("[%4d] new_array\t %s, %s, %d", location, registerName(exec, dst).data(), registerName(exec, argv).data(), argc);
-            dumpBytecodeCommentAndNewLine(location);
+            out.printf("[%4d] new_array\t %s, %s, %d", location, registerName(exec, dst).data(), registerName(exec, argv).data(), argc);
             ++it; // Skip array allocation profile.
             break;
         }
         case op_new_array_with_size: {
             int dst = (++it)->u.operand;
             int length = (++it)->u.operand;
-            dataLogF("[%4d] new_array_with_size\t %s, %s", location, registerName(exec, dst).data(), registerName(exec, length).data());
-            dumpBytecodeCommentAndNewLine(location);
+            out.printf("[%4d] new_array_with_size\t %s, %s", location, registerName(exec, dst).data(), registerName(exec, length).data());
             ++it; // Skip array allocation profile.
             break;
         }
@@ -699,149 +774,136 @@ void CodeBlock::dumpBytecode(ExecState* exec, const Instruction* begin, const In
             int dst = (++it)->u.operand;
             int argv = (++it)->u.operand;
             int argc = (++it)->u.operand;
-            dataLogF("[%4d] new_array_buffer\t %s, %d, %d", location, registerName(exec, dst).data(), argv, argc);
-            dumpBytecodeCommentAndNewLine(location);
+            out.printf("[%4d] new_array_buffer\t %s, %d, %d", location, registerName(exec, dst).data(), argv, argc);
             ++it; // Skip array allocation profile.
             break;
         }
         case op_new_regexp: {
             int r0 = (++it)->u.operand;
             int re0 = (++it)->u.operand;
-            dataLogF("[%4d] new_regexp\t %s, ", location, registerName(exec, r0).data());
+            out.printf("[%4d] new_regexp\t %s, ", location, registerName(exec, r0).data());
             if (r0 >=0 && r0 < (int)m_unlinkedCode->numberOfRegExps())
-                dataLogF("%s", regexpName(re0, regexp(re0)).data());
+                out.printf("%s", regexpName(re0, regexp(re0)).data());
             else
-                dataLogF("bad_regexp(%d)", re0);
-            dumpBytecodeCommentAndNewLine(location);
+                out.printf("bad_regexp(%d)", re0);
             break;
         }
         case op_mov: {
             int r0 = (++it)->u.operand;
             int r1 = (++it)->u.operand;
-            dataLogF("[%4d] mov\t\t %s, %s", location, registerName(exec, r0).data(), registerName(exec, r1).data());
-            dumpBytecodeCommentAndNewLine(location);
+            out.printf("[%4d] mov\t\t %s, %s", location, registerName(exec, r0).data(), registerName(exec, r1).data());
             break;
         }
         case op_not: {
-            printUnaryOp(exec, location, it, "not");
+            printUnaryOp(out, exec, location, it, "not");
             break;
         }
         case op_eq: {
-            printBinaryOp(exec, location, it, "eq");
+            printBinaryOp(out, exec, location, it, "eq");
             break;
         }
         case op_eq_null: {
-            printUnaryOp(exec, location, it, "eq_null");
+            printUnaryOp(out, exec, location, it, "eq_null");
             break;
         }
         case op_neq: {
-            printBinaryOp(exec, location, it, "neq");
+            printBinaryOp(out, exec, location, it, "neq");
             break;
         }
         case op_neq_null: {
-            printUnaryOp(exec, location, it, "neq_null");
+            printUnaryOp(out, exec, location, it, "neq_null");
             break;
         }
         case op_stricteq: {
-            printBinaryOp(exec, location, it, "stricteq");
+            printBinaryOp(out, exec, location, it, "stricteq");
             break;
         }
         case op_nstricteq: {
-            printBinaryOp(exec, location, it, "nstricteq");
+            printBinaryOp(out, exec, location, it, "nstricteq");
             break;
         }
         case op_less: {
-            printBinaryOp(exec, location, it, "less");
+            printBinaryOp(out, exec, location, it, "less");
             break;
         }
         case op_lesseq: {
-            printBinaryOp(exec, location, it, "lesseq");
+            printBinaryOp(out, exec, location, it, "lesseq");
             break;
         }
         case op_greater: {
-            printBinaryOp(exec, location, it, "greater");
+            printBinaryOp(out, exec, location, it, "greater");
             break;
         }
         case op_greatereq: {
-            printBinaryOp(exec, location, it, "greatereq");
+            printBinaryOp(out, exec, location, it, "greatereq");
             break;
         }
-        case op_pre_inc: {
+        case op_inc: {
             int r0 = (++it)->u.operand;
-            dataLogF("[%4d] pre_inc\t\t %s", location, registerName(exec, r0).data());
-            dumpBytecodeCommentAndNewLine(location);
+            out.printf("[%4d] pre_inc\t\t %s", location, registerName(exec, r0).data());
             break;
         }
-        case op_pre_dec: {
+        case op_dec: {
             int r0 = (++it)->u.operand;
-            dataLogF("[%4d] pre_dec\t\t %s", location, registerName(exec, r0).data());
-            dumpBytecodeCommentAndNewLine(location);
+            out.printf("[%4d] pre_dec\t\t %s", location, registerName(exec, r0).data());
             break;
         }
-        case op_post_inc: {
-            printUnaryOp(exec, location, it, "post_inc");
-            break;
-        }
-        case op_post_dec: {
-            printUnaryOp(exec, location, it, "post_dec");
-            break;
-        }
-        case op_to_jsnumber: {
-            printUnaryOp(exec, location, it, "to_jsnumber");
+        case op_to_number: {
+            printUnaryOp(out, exec, location, it, "to_number");
             break;
         }
         case op_negate: {
-            printUnaryOp(exec, location, it, "negate");
+            printUnaryOp(out, exec, location, it, "negate");
             break;
         }
         case op_add: {
-            printBinaryOp(exec, location, it, "add");
+            printBinaryOp(out, exec, location, it, "add");
             ++it;
             break;
         }
         case op_mul: {
-            printBinaryOp(exec, location, it, "mul");
+            printBinaryOp(out, exec, location, it, "mul");
             ++it;
             break;
         }
         case op_div: {
-            printBinaryOp(exec, location, it, "div");
+            printBinaryOp(out, exec, location, it, "div");
             ++it;
             break;
         }
         case op_mod: {
-            printBinaryOp(exec, location, it, "mod");
+            printBinaryOp(out, exec, location, it, "mod");
             break;
         }
         case op_sub: {
-            printBinaryOp(exec, location, it, "sub");
+            printBinaryOp(out, exec, location, it, "sub");
             ++it;
             break;
         }
         case op_lshift: {
-            printBinaryOp(exec, location, it, "lshift");
+            printBinaryOp(out, exec, location, it, "lshift");
             break;            
         }
         case op_rshift: {
-            printBinaryOp(exec, location, it, "rshift");
+            printBinaryOp(out, exec, location, it, "rshift");
             break;
         }
         case op_urshift: {
-            printBinaryOp(exec, location, it, "urshift");
+            printBinaryOp(out, exec, location, it, "urshift");
             break;
         }
         case op_bitand: {
-            printBinaryOp(exec, location, it, "bitand");
+            printBinaryOp(out, exec, location, it, "bitand");
             ++it;
             break;
         }
         case op_bitxor: {
-            printBinaryOp(exec, location, it, "bitxor");
+            printBinaryOp(out, exec, location, it, "bitxor");
             ++it;
             break;
         }
         case op_bitor: {
-            printBinaryOp(exec, location, it, "bitor");
+            printBinaryOp(out, exec, location, it, "bitor");
             ++it;
             break;
         }
@@ -850,48 +912,46 @@ void CodeBlock::dumpBytecode(ExecState* exec, const Instruction* begin, const In
             int r1 = (++it)->u.operand;
             int r2 = (++it)->u.operand;
             int offset = (++it)->u.operand;
-            dataLogF("[%4d] check_has_instance\t\t %s, %s, %s, %d(->%d)", location, registerName(exec, r0).data(), registerName(exec, r1).data(), registerName(exec, r2).data(), offset, location + offset);
-            dumpBytecodeCommentAndNewLine(location);
+            out.printf("[%4d] check_has_instance\t\t %s, %s, %s, %d(->%d)", location, registerName(exec, r0).data(), registerName(exec, r1).data(), registerName(exec, r2).data(), offset, location + offset);
             break;
         }
         case op_instanceof: {
             int r0 = (++it)->u.operand;
             int r1 = (++it)->u.operand;
             int r2 = (++it)->u.operand;
-            dataLogF("[%4d] instanceof\t\t %s, %s, %s", location, registerName(exec, r0).data(), registerName(exec, r1).data(), registerName(exec, r2).data());
-            dumpBytecodeCommentAndNewLine(location);
+            out.printf("[%4d] instanceof\t\t %s, %s, %s", location, registerName(exec, r0).data(), registerName(exec, r1).data(), registerName(exec, r2).data());
             break;
         }
         case op_typeof: {
-            printUnaryOp(exec, location, it, "typeof");
+            printUnaryOp(out, exec, location, it, "typeof");
             break;
         }
         case op_is_undefined: {
-            printUnaryOp(exec, location, it, "is_undefined");
+            printUnaryOp(out, exec, location, it, "is_undefined");
             break;
         }
         case op_is_boolean: {
-            printUnaryOp(exec, location, it, "is_boolean");
+            printUnaryOp(out, exec, location, it, "is_boolean");
             break;
         }
         case op_is_number: {
-            printUnaryOp(exec, location, it, "is_number");
+            printUnaryOp(out, exec, location, it, "is_number");
             break;
         }
         case op_is_string: {
-            printUnaryOp(exec, location, it, "is_string");
+            printUnaryOp(out, exec, location, it, "is_string");
             break;
         }
         case op_is_object: {
-            printUnaryOp(exec, location, it, "is_object");
+            printUnaryOp(out, exec, location, it, "is_object");
             break;
         }
         case op_is_function: {
-            printUnaryOp(exec, location, it, "is_function");
+            printUnaryOp(out, exec, location, it, "is_function");
             break;
         }
         case op_in: {
-            printBinaryOp(exec, location, it, "in");
+            printBinaryOp(out, exec, location, it, "in");
             break;
         }
         case op_put_to_base_variable:
@@ -900,8 +960,7 @@ void CodeBlock::dumpBytecode(ExecState* exec, const Instruction* begin, const In
             int id0 = (++it)->u.operand;
             int value = (++it)->u.operand;
             int resolveInfo = (++it)->u.operand;
-            dataLogF("[%4d] put_to_base\t %s, %s, %s, %d", location, registerName(exec, base).data(), idName(id0, m_identifiers[id0]).data(), registerName(exec, value).data(), resolveInfo);
-            dumpBytecodeCommentAndNewLine(location);
+            out.printf("[%4d] put_to_base\t %s, %s, %s, %d", location, registerName(exec, base).data(), idName(id0, m_identifiers[id0]).data(), registerName(exec, value).data(), resolveInfo);
             break;
         }
         case op_resolve:
@@ -913,14 +972,27 @@ void CodeBlock::dumpBytecode(ExecState* exec, const Instruction* begin, const In
             int r0 = (++it)->u.operand;
             int id0 = (++it)->u.operand;
             int resolveInfo = (++it)->u.operand;
-            dataLogF("[%4d] resolve\t\t %s, %s, %d", location, registerName(exec, r0).data(), idName(id0, m_identifiers[id0]).data(), resolveInfo);
-            dumpBytecodeCommentAndNewLine(location);
-            it++;
+            out.printf("[%4d] resolve\t\t %s, %s, %d", location, registerName(exec, r0).data(), idName(id0, m_identifiers[id0]).data(), resolveInfo);
+            dumpValueProfiling(out, it, hasPrintedProfiling);
+            break;
+        }
+        case op_get_scoped_var: {
+            int r0 = (++it)->u.operand;
+            int index = (++it)->u.operand;
+            int skipLevels = (++it)->u.operand;
+            out.printf("[%4d] get_scoped_var\t %s, %d, %d", location, registerName(exec, r0).data(), index, skipLevels);
+            dumpValueProfiling(out, it, hasPrintedProfiling);
+            break;
+        }
+        case op_put_scoped_var: {
+            int index = (++it)->u.operand;
+            int skipLevels = (++it)->u.operand;
+            int r0 = (++it)->u.operand;
+            out.printf("[%4d] put_scoped_var\t %d, %d, %s", location, index, skipLevels, registerName(exec, r0).data());
             break;
         }
         case op_init_global_const_nop: {
-            dataLogF("[%4d] init_global_const_nop\t", location);
-            dumpBytecodeCommentAndNewLine(location);
+            out.printf("[%4d] init_global_const_nop\t", location);
             it++;
             it++;
             it++;
@@ -930,8 +1002,7 @@ void CodeBlock::dumpBytecode(ExecState* exec, const Instruction* begin, const In
         case op_init_global_const: {
             WriteBarrier<Unknown>* registerPointer = (++it)->u.registerPointer;
             int r0 = (++it)->u.operand;
-            dataLogF("[%4d] init_global_const\t g%d(%p), %s", location, m_globalObject->findRegisterIndex(registerPointer), registerPointer, registerName(exec, r0).data());
-            dumpBytecodeCommentAndNewLine(location);
+            out.printf("[%4d] init_global_const\t g%d(%p), %s", location, m_globalObject->findRegisterIndex(registerPointer), registerPointer, registerName(exec, r0).data());
             it++;
             it++;
             break;
@@ -939,8 +1010,7 @@ void CodeBlock::dumpBytecode(ExecState* exec, const Instruction* begin, const In
         case op_init_global_const_check: {
             WriteBarrier<Unknown>* registerPointer = (++it)->u.registerPointer;
             int r0 = (++it)->u.operand;
-            dataLogF("[%4d] init_global_const_check\t g%d(%p), %s", location, m_globalObject->findRegisterIndex(registerPointer), registerPointer, registerName(exec, r0).data());
-            dumpBytecodeCommentAndNewLine(location);
+            out.printf("[%4d] init_global_const_check\t g%d(%p), %s", location, m_globalObject->findRegisterIndex(registerPointer), registerPointer, registerName(exec, r0).data());
             it++;
             it++;
             break;
@@ -955,16 +1025,8 @@ void CodeBlock::dumpBytecode(ExecState* exec, const Instruction* begin, const In
             int isStrict = (++it)->u.operand;
             int resolveInfo = (++it)->u.operand;
             int putToBaseInfo = (++it)->u.operand;
-            dataLogF("[%4d] resolve_base%s\t %s, %s, %d, %d", location, isStrict ? "_strict" : "", registerName(exec, r0).data(), idName(id0, m_identifiers[id0]).data(), resolveInfo, putToBaseInfo);
-            dumpBytecodeCommentAndNewLine(location);
-            it++;
-            break;
-        }
-        case op_ensure_property_exists: {
-            int r0 = (++it)->u.operand;
-            int id0 = (++it)->u.operand;
-            dataLogF("[%4d] ensure_property_exists\t %s, %s", location, registerName(exec, r0).data(), idName(id0, m_identifiers[id0]).data());
-            dumpBytecodeCommentAndNewLine(location);
+            out.printf("[%4d] resolve_base%s\t %s, %s, %d, %d", location, isStrict ? "_strict" : "", registerName(exec, r0).data(), idName(id0, m_identifiers[id0]).data(), resolveInfo, putToBaseInfo);
+            dumpValueProfiling(out, it, hasPrintedProfiling);
             break;
         }
         case op_resolve_with_base: {
@@ -973,9 +1035,8 @@ void CodeBlock::dumpBytecode(ExecState* exec, const Instruction* begin, const In
             int id0 = (++it)->u.operand;
             int resolveInfo = (++it)->u.operand;
             int putToBaseInfo = (++it)->u.operand;
-            dataLogF("[%4d] resolve_with_base %s, %s, %s, %d, %d", location, registerName(exec, r0).data(), registerName(exec, r1).data(), idName(id0, m_identifiers[id0]).data(), resolveInfo, putToBaseInfo);
-            dumpBytecodeCommentAndNewLine(location);
-            it++;
+            out.printf("[%4d] resolve_with_base %s, %s, %s, %d, %d", location, registerName(exec, r0).data(), registerName(exec, r1).data(), idName(id0, m_identifiers[id0]).data(), resolveInfo, putToBaseInfo);
+            dumpValueProfiling(out, it, hasPrintedProfiling);
             break;
         }
         case op_resolve_with_this: {
@@ -983,9 +1044,8 @@ void CodeBlock::dumpBytecode(ExecState* exec, const Instruction* begin, const In
             int r1 = (++it)->u.operand;
             int id0 = (++it)->u.operand;
             int resolveInfo = (++it)->u.operand;
-            dataLogF("[%4d] resolve_with_this %s, %s, %s, %d", location, registerName(exec, r0).data(), registerName(exec, r1).data(), idName(id0, m_identifiers[id0]).data(), resolveInfo);
-            dumpBytecodeCommentAndNewLine(location);
-            it++;
+            out.printf("[%4d] resolve_with_this %s, %s, %s, %d", location, registerName(exec, r0).data(), registerName(exec, r1).data(), idName(id0, m_identifiers[id0]).data(), resolveInfo);
+            dumpValueProfiling(out, it, hasPrintedProfiling);
             break;
         }
         case op_get_by_id:
@@ -1002,50 +1062,50 @@ void CodeBlock::dumpBytecode(ExecState* exec, const Instruction* begin, const In
         case op_get_by_id_generic:
         case op_get_array_length:
         case op_get_string_length: {
-            printGetByIdOp(exec, location, it);
-            printGetByIdCacheStatus(exec, location);
-            dumpBytecodeCommentAndNewLine(location);
+            printGetByIdOp(out, exec, location, it);
+            printGetByIdCacheStatus(out, exec, location);
+            dumpValueProfiling(out, it, hasPrintedProfiling);
             break;
         }
         case op_get_arguments_length: {
-            printUnaryOp(exec, location, it, "get_arguments_length");
+            printUnaryOp(out, exec, location, it, "get_arguments_length");
             it++;
             break;
         }
         case op_put_by_id: {
-            printPutByIdOp(exec, location, it, "put_by_id");
+            printPutByIdOp(out, exec, location, it, "put_by_id");
             break;
         }
         case op_put_by_id_out_of_line: {
-            printPutByIdOp(exec, location, it, "put_by_id_out_of_line");
+            printPutByIdOp(out, exec, location, it, "put_by_id_out_of_line");
             break;
         }
         case op_put_by_id_replace: {
-            printPutByIdOp(exec, location, it, "put_by_id_replace");
+            printPutByIdOp(out, exec, location, it, "put_by_id_replace");
             break;
         }
         case op_put_by_id_transition: {
-            printPutByIdOp(exec, location, it, "put_by_id_transition");
+            printPutByIdOp(out, exec, location, it, "put_by_id_transition");
             break;
         }
         case op_put_by_id_transition_direct: {
-            printPutByIdOp(exec, location, it, "put_by_id_transition_direct");
+            printPutByIdOp(out, exec, location, it, "put_by_id_transition_direct");
             break;
         }
         case op_put_by_id_transition_direct_out_of_line: {
-            printPutByIdOp(exec, location, it, "put_by_id_transition_direct_out_of_line");
+            printPutByIdOp(out, exec, location, it, "put_by_id_transition_direct_out_of_line");
             break;
         }
         case op_put_by_id_transition_normal: {
-            printPutByIdOp(exec, location, it, "put_by_id_transition_normal");
+            printPutByIdOp(out, exec, location, it, "put_by_id_transition_normal");
             break;
         }
         case op_put_by_id_transition_normal_out_of_line: {
-            printPutByIdOp(exec, location, it, "put_by_id_transition_normal_out_of_line");
+            printPutByIdOp(out, exec, location, it, "put_by_id_transition_normal_out_of_line");
             break;
         }
         case op_put_by_id_generic: {
-            printPutByIdOp(exec, location, it, "put_by_id_generic");
+            printPutByIdOp(out, exec, location, it, "put_by_id_generic");
             break;
         }
         case op_put_getter_setter: {
@@ -1053,36 +1113,32 @@ void CodeBlock::dumpBytecode(ExecState* exec, const Instruction* begin, const In
             int id0 = (++it)->u.operand;
             int r1 = (++it)->u.operand;
             int r2 = (++it)->u.operand;
-            dataLogF("[%4d] put_getter_setter\t %s, %s, %s, %s", location, registerName(exec, r0).data(), idName(id0, m_identifiers[id0]).data(), registerName(exec, r1).data(), registerName(exec, r2).data());
-            dumpBytecodeCommentAndNewLine(location);
+            out.printf("[%4d] put_getter_setter\t %s, %s, %s, %s", location, registerName(exec, r0).data(), idName(id0, m_identifiers[id0]).data(), registerName(exec, r1).data(), registerName(exec, r2).data());
             break;
         }
         case op_del_by_id: {
             int r0 = (++it)->u.operand;
             int r1 = (++it)->u.operand;
             int id0 = (++it)->u.operand;
-            dataLogF("[%4d] del_by_id\t %s, %s, %s", location, registerName(exec, r0).data(), registerName(exec, r1).data(), idName(id0, m_identifiers[id0]).data());
-            dumpBytecodeCommentAndNewLine(location);
+            out.printf("[%4d] del_by_id\t %s, %s, %s", location, registerName(exec, r0).data(), registerName(exec, r1).data(), idName(id0, m_identifiers[id0]).data());
             break;
         }
         case op_get_by_val: {
             int r0 = (++it)->u.operand;
             int r1 = (++it)->u.operand;
             int r2 = (++it)->u.operand;
-            dataLogF("[%4d] get_by_val\t %s, %s, %s", location, registerName(exec, r0).data(), registerName(exec, r1).data(), registerName(exec, r2).data());
-            dumpBytecodeCommentAndNewLine(location);
-            it++;
-            it++;
+            out.printf("[%4d] get_by_val\t %s, %s, %s", location, registerName(exec, r0).data(), registerName(exec, r1).data(), registerName(exec, r2).data());
+            dumpArrayProfiling(out, it, hasPrintedProfiling);
+            dumpValueProfiling(out, it, hasPrintedProfiling);
             break;
         }
         case op_get_argument_by_val: {
             int r0 = (++it)->u.operand;
             int r1 = (++it)->u.operand;
             int r2 = (++it)->u.operand;
-            dataLogF("[%4d] get_argument_by_val\t %s, %s, %s", location, registerName(exec, r0).data(), registerName(exec, r1).data(), registerName(exec, r2).data());
-            dumpBytecodeCommentAndNewLine(location);
+            out.printf("[%4d] get_argument_by_val\t %s, %s, %s", location, registerName(exec, r0).data(), registerName(exec, r1).data(), registerName(exec, r2).data());
             ++it;
-            ++it;
+            dumpValueProfiling(out, it, hasPrintedProfiling);
             break;
         }
         case op_get_by_pname: {
@@ -1092,225 +1148,159 @@ void CodeBlock::dumpBytecode(ExecState* exec, const Instruction* begin, const In
             int r3 = (++it)->u.operand;
             int r4 = (++it)->u.operand;
             int r5 = (++it)->u.operand;
-            dataLogF("[%4d] get_by_pname\t %s, %s, %s, %s, %s, %s", location, registerName(exec, r0).data(), registerName(exec, r1).data(), registerName(exec, r2).data(), registerName(exec, r3).data(), registerName(exec, r4).data(), registerName(exec, r5).data());
-            dumpBytecodeCommentAndNewLine(location);
+            out.printf("[%4d] get_by_pname\t %s, %s, %s, %s, %s, %s", location, registerName(exec, r0).data(), registerName(exec, r1).data(), registerName(exec, r2).data(), registerName(exec, r3).data(), registerName(exec, r4).data(), registerName(exec, r5).data());
             break;
         }
         case op_put_by_val: {
             int r0 = (++it)->u.operand;
             int r1 = (++it)->u.operand;
             int r2 = (++it)->u.operand;
-            dataLogF("[%4d] put_by_val\t %s, %s, %s", location, registerName(exec, r0).data(), registerName(exec, r1).data(), registerName(exec, r2).data());
-            dumpBytecodeCommentAndNewLine(location);
-            ++it;
+            out.printf("[%4d] put_by_val\t %s, %s, %s", location, registerName(exec, r0).data(), registerName(exec, r1).data(), registerName(exec, r2).data());
+            dumpArrayProfiling(out, it, hasPrintedProfiling);
             break;
         }
         case op_del_by_val: {
             int r0 = (++it)->u.operand;
             int r1 = (++it)->u.operand;
             int r2 = (++it)->u.operand;
-            dataLogF("[%4d] del_by_val\t %s, %s, %s", location, registerName(exec, r0).data(), registerName(exec, r1).data(), registerName(exec, r2).data());
-            dumpBytecodeCommentAndNewLine(location);
+            out.printf("[%4d] del_by_val\t %s, %s, %s", location, registerName(exec, r0).data(), registerName(exec, r1).data(), registerName(exec, r2).data());
             break;
         }
         case op_put_by_index: {
             int r0 = (++it)->u.operand;
             unsigned n0 = (++it)->u.operand;
             int r1 = (++it)->u.operand;
-            dataLogF("[%4d] put_by_index\t %s, %u, %s", location, registerName(exec, r0).data(), n0, registerName(exec, r1).data());
-            dumpBytecodeCommentAndNewLine(location);
+            out.printf("[%4d] put_by_index\t %s, %u, %s", location, registerName(exec, r0).data(), n0, registerName(exec, r1).data());
             break;
         }
         case op_jmp: {
             int offset = (++it)->u.operand;
-            dataLogF("[%4d] jmp\t\t %d(->%d)", location, offset, location + offset);
-            dumpBytecodeCommentAndNewLine(location);
-            break;
-        }
-        case op_loop: {
-            int offset = (++it)->u.operand;
-            dataLogF("[%4d] loop\t\t %d(->%d)", location, offset, location + offset);
-            dumpBytecodeCommentAndNewLine(location);
+            out.printf("[%4d] jmp\t\t %d(->%d)", location, offset, location + offset);
             break;
         }
         case op_jtrue: {
-            printConditionalJump(exec, begin, it, location, "jtrue");
-            break;
-        }
-        case op_loop_if_true: {
-            printConditionalJump(exec, begin, it, location, "loop_if_true");
-            break;
-        }
-        case op_loop_if_false: {
-            printConditionalJump(exec, begin, it, location, "loop_if_false");
+            printConditionalJump(out, exec, begin, it, location, "jtrue");
             break;
         }
         case op_jfalse: {
-            printConditionalJump(exec, begin, it, location, "jfalse");
+            printConditionalJump(out, exec, begin, it, location, "jfalse");
             break;
         }
         case op_jeq_null: {
-            printConditionalJump(exec, begin, it, location, "jeq_null");
+            printConditionalJump(out, exec, begin, it, location, "jeq_null");
             break;
         }
         case op_jneq_null: {
-            printConditionalJump(exec, begin, it, location, "jneq_null");
+            printConditionalJump(out, exec, begin, it, location, "jneq_null");
             break;
         }
         case op_jneq_ptr: {
             int r0 = (++it)->u.operand;
             Special::Pointer pointer = (++it)->u.specialPointer;
             int offset = (++it)->u.operand;
-            dataLogF("[%4d] jneq_ptr\t\t %s, %d (%p), %d(->%d)", location, registerName(exec, r0).data(), pointer, m_globalObject->actualPointerFor(pointer), offset, location + offset);
-            dumpBytecodeCommentAndNewLine(location);
+            out.printf("[%4d] jneq_ptr\t\t %s, %d (%p), %d(->%d)", location, registerName(exec, r0).data(), pointer, m_globalObject->actualPointerFor(pointer), offset, location + offset);
             break;
         }
         case op_jless: {
             int r0 = (++it)->u.operand;
             int r1 = (++it)->u.operand;
             int offset = (++it)->u.operand;
-            dataLogF("[%4d] jless\t\t %s, %s, %d(->%d)", location, registerName(exec, r0).data(), registerName(exec, r1).data(), offset, location + offset);
-            dumpBytecodeCommentAndNewLine(location);
+            out.printf("[%4d] jless\t\t %s, %s, %d(->%d)", location, registerName(exec, r0).data(), registerName(exec, r1).data(), offset, location + offset);
             break;
         }
         case op_jlesseq: {
             int r0 = (++it)->u.operand;
             int r1 = (++it)->u.operand;
             int offset = (++it)->u.operand;
-            dataLogF("[%4d] jlesseq\t\t %s, %s, %d(->%d)", location, registerName(exec, r0).data(), registerName(exec, r1).data(), offset, location + offset);
-            dumpBytecodeCommentAndNewLine(location);
+            out.printf("[%4d] jlesseq\t\t %s, %s, %d(->%d)", location, registerName(exec, r0).data(), registerName(exec, r1).data(), offset, location + offset);
             break;
         }
         case op_jgreater: {
             int r0 = (++it)->u.operand;
             int r1 = (++it)->u.operand;
             int offset = (++it)->u.operand;
-            dataLogF("[%4d] jgreater\t\t %s, %s, %d(->%d)", location, registerName(exec, r0).data(), registerName(exec, r1).data(), offset, location + offset);
-            dumpBytecodeCommentAndNewLine(location);
+            out.printf("[%4d] jgreater\t\t %s, %s, %d(->%d)", location, registerName(exec, r0).data(), registerName(exec, r1).data(), offset, location + offset);
             break;
         }
         case op_jgreatereq: {
             int r0 = (++it)->u.operand;
             int r1 = (++it)->u.operand;
             int offset = (++it)->u.operand;
-            dataLogF("[%4d] jgreatereq\t\t %s, %s, %d(->%d)", location, registerName(exec, r0).data(), registerName(exec, r1).data(), offset, location + offset);
-            dumpBytecodeCommentAndNewLine(location);
+            out.printf("[%4d] jgreatereq\t\t %s, %s, %d(->%d)", location, registerName(exec, r0).data(), registerName(exec, r1).data(), offset, location + offset);
             break;
         }
         case op_jnless: {
             int r0 = (++it)->u.operand;
             int r1 = (++it)->u.operand;
             int offset = (++it)->u.operand;
-            dataLogF("[%4d] jnless\t\t %s, %s, %d(->%d)", location, registerName(exec, r0).data(), registerName(exec, r1).data(), offset, location + offset);
-            dumpBytecodeCommentAndNewLine(location);
+            out.printf("[%4d] jnless\t\t %s, %s, %d(->%d)", location, registerName(exec, r0).data(), registerName(exec, r1).data(), offset, location + offset);
             break;
         }
         case op_jnlesseq: {
             int r0 = (++it)->u.operand;
             int r1 = (++it)->u.operand;
             int offset = (++it)->u.operand;
-            dataLogF("[%4d] jnlesseq\t\t %s, %s, %d(->%d)", location, registerName(exec, r0).data(), registerName(exec, r1).data(), offset, location + offset);
-            dumpBytecodeCommentAndNewLine(location);
+            out.printf("[%4d] jnlesseq\t\t %s, %s, %d(->%d)", location, registerName(exec, r0).data(), registerName(exec, r1).data(), offset, location + offset);
             break;
         }
         case op_jngreater: {
             int r0 = (++it)->u.operand;
             int r1 = (++it)->u.operand;
             int offset = (++it)->u.operand;
-            dataLogF("[%4d] jngreater\t\t %s, %s, %d(->%d)", location, registerName(exec, r0).data(), registerName(exec, r1).data(), offset, location + offset);
-            dumpBytecodeCommentAndNewLine(location);
+            out.printf("[%4d] jngreater\t\t %s, %s, %d(->%d)", location, registerName(exec, r0).data(), registerName(exec, r1).data(), offset, location + offset);
             break;
         }
         case op_jngreatereq: {
             int r0 = (++it)->u.operand;
             int r1 = (++it)->u.operand;
             int offset = (++it)->u.operand;
-            dataLogF("[%4d] jngreatereq\t\t %s, %s, %d(->%d)", location, registerName(exec, r0).data(), registerName(exec, r1).data(), offset, location + offset);
-            dumpBytecodeCommentAndNewLine(location);
-            break;
-        }
-        case op_loop_if_less: {
-            int r0 = (++it)->u.operand;
-            int r1 = (++it)->u.operand;
-            int offset = (++it)->u.operand;
-            dataLogF("[%4d] loop_if_less\t %s, %s, %d(->%d)", location, registerName(exec, r0).data(), registerName(exec, r1).data(), offset, location + offset);
-            dumpBytecodeCommentAndNewLine(location);
-            break;
-        }
-        case op_loop_if_lesseq: {
-            int r0 = (++it)->u.operand;
-            int r1 = (++it)->u.operand;
-            int offset = (++it)->u.operand;
-            dataLogF("[%4d] loop_if_lesseq\t %s, %s, %d(->%d)", location, registerName(exec, r0).data(), registerName(exec, r1).data(), offset, location + offset);
-            dumpBytecodeCommentAndNewLine(location);
-            break;
-        }
-        case op_loop_if_greater: {
-            int r0 = (++it)->u.operand;
-            int r1 = (++it)->u.operand;
-            int offset = (++it)->u.operand;
-            dataLogF("[%4d] loop_if_greater\t %s, %s, %d(->%d)", location, registerName(exec, r0).data(), registerName(exec, r1).data(), offset, location + offset);
-            dumpBytecodeCommentAndNewLine(location);
-            break;
-        }
-        case op_loop_if_greatereq: {
-            int r0 = (++it)->u.operand;
-            int r1 = (++it)->u.operand;
-            int offset = (++it)->u.operand;
-            dataLogF("[%4d] loop_if_greatereq\t %s, %s, %d(->%d)", location, registerName(exec, r0).data(), registerName(exec, r1).data(), offset, location + offset);
-            dumpBytecodeCommentAndNewLine(location);
+            out.printf("[%4d] jngreatereq\t\t %s, %s, %d(->%d)", location, registerName(exec, r0).data(), registerName(exec, r1).data(), offset, location + offset);
             break;
         }
         case op_loop_hint: {
-            dataLogF("[%4d] loop_hint", location);
-            dumpBytecodeCommentAndNewLine(location);
+            out.printf("[%4d] loop_hint", location);
             break;
         }
         case op_switch_imm: {
             int tableIndex = (++it)->u.operand;
             int defaultTarget = (++it)->u.operand;
             int scrutineeRegister = (++it)->u.operand;
-            dataLogF("[%4d] switch_imm\t %d, %d(->%d), %s", location, tableIndex, defaultTarget, location + defaultTarget, registerName(exec, scrutineeRegister).data());
-            dumpBytecodeCommentAndNewLine(location);
+            out.printf("[%4d] switch_imm\t %d, %d(->%d), %s", location, tableIndex, defaultTarget, location + defaultTarget, registerName(exec, scrutineeRegister).data());
             break;
         }
         case op_switch_char: {
             int tableIndex = (++it)->u.operand;
             int defaultTarget = (++it)->u.operand;
             int scrutineeRegister = (++it)->u.operand;
-            dataLogF("[%4d] switch_char\t %d, %d(->%d), %s", location, tableIndex, defaultTarget, location + defaultTarget, registerName(exec, scrutineeRegister).data());
-            dumpBytecodeCommentAndNewLine(location);
+            out.printf("[%4d] switch_char\t %d, %d(->%d), %s", location, tableIndex, defaultTarget, location + defaultTarget, registerName(exec, scrutineeRegister).data());
             break;
         }
         case op_switch_string: {
             int tableIndex = (++it)->u.operand;
             int defaultTarget = (++it)->u.operand;
             int scrutineeRegister = (++it)->u.operand;
-            dataLogF("[%4d] switch_string\t %d, %d(->%d), %s", location, tableIndex, defaultTarget, location + defaultTarget, registerName(exec, scrutineeRegister).data());
-            dumpBytecodeCommentAndNewLine(location);
+            out.printf("[%4d] switch_string\t %d, %d(->%d), %s", location, tableIndex, defaultTarget, location + defaultTarget, registerName(exec, scrutineeRegister).data());
             break;
         }
         case op_new_func: {
             int r0 = (++it)->u.operand;
             int f0 = (++it)->u.operand;
             int shouldCheck = (++it)->u.operand;
-            dataLogF("[%4d] new_func\t\t %s, f%d, %s", location, registerName(exec, r0).data(), f0, shouldCheck ? "<Checked>" : "<Unchecked>");
-            dumpBytecodeCommentAndNewLine(location);
+            out.printf("[%4d] new_func\t\t %s, f%d, %s", location, registerName(exec, r0).data(), f0, shouldCheck ? "<Checked>" : "<Unchecked>");
             break;
         }
         case op_new_func_exp: {
             int r0 = (++it)->u.operand;
             int f0 = (++it)->u.operand;
-            dataLogF("[%4d] new_func_exp\t %s, f%d", location, registerName(exec, r0).data(), f0);
-            dumpBytecodeCommentAndNewLine(location);
+            out.printf("[%4d] new_func_exp\t %s, f%d", location, registerName(exec, r0).data(), f0);
             break;
         }
         case op_call: {
-            printCallOp(exec, location, it, "call", DumpCaches);
+            printCallOp(out, exec, location, it, "call", DumpCaches);
             break;
         }
         case op_call_eval: {
-            printCallOp(exec, location, it, "call_eval", DontDumpCaches);
+            printCallOp(out, exec, location, it, "call_eval", DontDumpCaches);
             break;
         }
         case op_call_varargs: {
@@ -1318,60 +1308,52 @@ void CodeBlock::dumpBytecode(ExecState* exec, const Instruction* begin, const In
             int thisValue = (++it)->u.operand;
             int arguments = (++it)->u.operand;
             int firstFreeRegister = (++it)->u.operand;
-            dataLogF("[%4d] call_varargs\t %s, %s, %s, %d", location, registerName(exec, callee).data(), registerName(exec, thisValue).data(), registerName(exec, arguments).data(), firstFreeRegister);
-            dumpBytecodeCommentAndNewLine(location);
+            out.printf("[%4d] call_varargs\t %s, %s, %s, %d", location, registerName(exec, callee).data(), registerName(exec, thisValue).data(), registerName(exec, arguments).data(), firstFreeRegister);
             break;
         }
         case op_tear_off_activation: {
             int r0 = (++it)->u.operand;
-            dataLogF("[%4d] tear_off_activation\t %s", location, registerName(exec, r0).data());
-            dumpBytecodeCommentAndNewLine(location);
+            out.printf("[%4d] tear_off_activation\t %s", location, registerName(exec, r0).data());
             break;
         }
         case op_tear_off_arguments: {
             int r0 = (++it)->u.operand;
             int r1 = (++it)->u.operand;
-            dataLogF("[%4d] tear_off_arguments %s, %s", location, registerName(exec, r0).data(), registerName(exec, r1).data());
-            dumpBytecodeCommentAndNewLine(location);
+            out.printf("[%4d] tear_off_arguments %s, %s", location, registerName(exec, r0).data(), registerName(exec, r1).data());
             break;
         }
         case op_ret: {
             int r0 = (++it)->u.operand;
-            dataLogF("[%4d] ret\t\t %s", location, registerName(exec, r0).data());
-            dumpBytecodeCommentAndNewLine(location);
+            out.printf("[%4d] ret\t\t %s", location, registerName(exec, r0).data());
             break;
         }
         case op_call_put_result: {
             int r0 = (++it)->u.operand;
-            dataLogF("[%4d] call_put_result\t\t %s", location, registerName(exec, r0).data());
-            dumpBytecodeCommentAndNewLine(location);
-            it++;
+            out.printf("[%4d] call_put_result\t\t %s", location, registerName(exec, r0).data());
+            dumpValueProfiling(out, it, hasPrintedProfiling);
             break;
         }
         case op_ret_object_or_this: {
             int r0 = (++it)->u.operand;
             int r1 = (++it)->u.operand;
-            dataLogF("[%4d] constructor_ret\t\t %s %s", location, registerName(exec, r0).data(), registerName(exec, r1).data());
-            dumpBytecodeCommentAndNewLine(location);
+            out.printf("[%4d] constructor_ret\t\t %s %s", location, registerName(exec, r0).data(), registerName(exec, r1).data());
             break;
         }
         case op_construct: {
-            printCallOp(exec, location, it, "construct", DumpCaches);
+            printCallOp(out, exec, location, it, "construct", DumpCaches);
             break;
         }
         case op_strcat: {
             int r0 = (++it)->u.operand;
             int r1 = (++it)->u.operand;
             int count = (++it)->u.operand;
-            dataLogF("[%4d] strcat\t\t %s, %s, %d", location, registerName(exec, r0).data(), registerName(exec, r1).data(), count);
-            dumpBytecodeCommentAndNewLine(location);
+            out.printf("[%4d] strcat\t\t %s, %s, %d", location, registerName(exec, r0).data(), registerName(exec, r1).data(), count);
             break;
         }
         case op_to_primitive: {
             int r0 = (++it)->u.operand;
             int r1 = (++it)->u.operand;
-            dataLogF("[%4d] to_primitive\t %s, %s", location, registerName(exec, r0).data(), registerName(exec, r1).data());
-            dumpBytecodeCommentAndNewLine(location);
+            out.printf("[%4d] to_primitive\t %s, %s", location, registerName(exec, r0).data(), registerName(exec, r1).data());
             break;
         }
         case op_get_pnames: {
@@ -1380,8 +1362,7 @@ void CodeBlock::dumpBytecode(ExecState* exec, const Instruction* begin, const In
             int r2 = it[3].u.operand;
             int r3 = it[4].u.operand;
             int offset = it[5].u.operand;
-            dataLogF("[%4d] get_pnames\t %s, %s, %s, %s, %d(->%d)", location, registerName(exec, r0).data(), registerName(exec, r1).data(), registerName(exec, r2).data(), registerName(exec, r3).data(), offset, location + offset);
-            dumpBytecodeCommentAndNewLine(location);
+            out.printf("[%4d] get_pnames\t %s, %s, %s, %s, %d(->%d)", location, registerName(exec, r0).data(), registerName(exec, r1).data(), registerName(exec, r2).data(), registerName(exec, r3).data(), offset, location + offset);
             it += OPCODE_LENGTH(op_get_pnames) - 1;
             break;
         }
@@ -1392,54 +1373,40 @@ void CodeBlock::dumpBytecode(ExecState* exec, const Instruction* begin, const In
             int size = it[4].u.operand;
             int iter = it[5].u.operand;
             int offset = it[6].u.operand;
-            dataLogF("[%4d] next_pname\t %s, %s, %s, %s, %s, %d(->%d)", location, registerName(exec, dest).data(), registerName(exec, base).data(), registerName(exec, i).data(), registerName(exec, size).data(), registerName(exec, iter).data(), offset, location + offset);
-            dumpBytecodeCommentAndNewLine(location);
+            out.printf("[%4d] next_pname\t %s, %s, %s, %s, %s, %d(->%d)", location, registerName(exec, dest).data(), registerName(exec, base).data(), registerName(exec, i).data(), registerName(exec, size).data(), registerName(exec, iter).data(), offset, location + offset);
             it += OPCODE_LENGTH(op_next_pname) - 1;
             break;
         }
         case op_push_with_scope: {
             int r0 = (++it)->u.operand;
-            dataLogF("[%4d] push_with_scope\t %s", location, registerName(exec, r0).data());
-            dumpBytecodeCommentAndNewLine(location);
+            out.printf("[%4d] push_with_scope\t %s", location, registerName(exec, r0).data());
             break;
         }
         case op_pop_scope: {
-            dataLogF("[%4d] pop_scope", location);
-            dumpBytecodeCommentAndNewLine(location);
+            out.printf("[%4d] pop_scope", location);
             break;
         }
         case op_push_name_scope: {
             int id0 = (++it)->u.operand;
             int r1 = (++it)->u.operand;
             unsigned attributes = (++it)->u.operand;
-            dataLogF("[%4d] push_name_scope \t%s, %s, %u", location, idName(id0, m_identifiers[id0]).data(), registerName(exec, r1).data(), attributes);
-            dumpBytecodeCommentAndNewLine(location);
-            break;
-        }
-        case op_jmp_scopes: {
-            int scopeDelta = (++it)->u.operand;
-            int offset = (++it)->u.operand;
-            dataLogF("[%4d] jmp_scopes\t^%d, %d(->%d)", location, scopeDelta, offset, location + offset);
-            dumpBytecodeCommentAndNewLine(location);
+            out.printf("[%4d] push_name_scope \t%s, %s, %u", location, idName(id0, m_identifiers[id0]).data(), registerName(exec, r1).data(), attributes);
             break;
         }
         case op_catch: {
             int r0 = (++it)->u.operand;
-            dataLogF("[%4d] catch\t\t %s", location, registerName(exec, r0).data());
-            dumpBytecodeCommentAndNewLine(location);
+            out.printf("[%4d] catch\t\t %s", location, registerName(exec, r0).data());
             break;
         }
         case op_throw: {
             int r0 = (++it)->u.operand;
-            dataLogF("[%4d] throw\t\t %s", location, registerName(exec, r0).data());
-            dumpBytecodeCommentAndNewLine(location);
+            out.printf("[%4d] throw\t\t %s", location, registerName(exec, r0).data());
             break;
         }
         case op_throw_static_error: {
             int k0 = (++it)->u.operand;
             int k1 = (++it)->u.operand;
-            dataLogF("[%4d] throw_static_error\t %s, %s", location, constantName(exec, k0, getConstant(k0)).data(), k1 ? "true" : "false");
-            dumpBytecodeCommentAndNewLine(location);
+            out.printf("[%4d] throw_static_error\t %s, %s", location, constantName(exec, k0, getConstant(k0)).data(), k1 ? "true" : "false");
             break;
         }
         case op_debug: {
@@ -1447,40 +1414,54 @@ void CodeBlock::dumpBytecode(ExecState* exec, const Instruction* begin, const In
             int firstLine = (++it)->u.operand;
             int lastLine = (++it)->u.operand;
             int column = (++it)->u.operand;
-            dataLogF("[%4d] debug\t\t %s, %d, %d, %d", location, debugHookName(debugHookID), firstLine, lastLine, column);
-            dumpBytecodeCommentAndNewLine(location);
+            out.printf("[%4d] debug\t\t %s, %d, %d, %d", location, debugHookName(debugHookID), firstLine, lastLine, column);
             break;
         }
         case op_profile_will_call: {
             int function = (++it)->u.operand;
-            dataLogF("[%4d] profile_will_call %s", location, registerName(exec, function).data());
-            dumpBytecodeCommentAndNewLine(location);
+            out.printf("[%4d] profile_will_call %s", location, registerName(exec, function).data());
             break;
         }
         case op_profile_did_call: {
             int function = (++it)->u.operand;
-            dataLogF("[%4d] profile_did_call\t %s", location, registerName(exec, function).data());
-            dumpBytecodeCommentAndNewLine(location);
+            out.printf("[%4d] profile_did_call\t %s", location, registerName(exec, function).data());
             break;
         }
         case op_end: {
             int r0 = (++it)->u.operand;
-            dataLogF("[%4d] end\t\t %s", location, registerName(exec, r0).data());
-            dumpBytecodeCommentAndNewLine(location);
+            out.printf("[%4d] end\t\t %s", location, registerName(exec, r0).data());
             break;
         }
 #if ENABLE(LLINT_C_LOOP)
         default:
-            ASSERT(false); // We should never get here.
+            RELEASE_ASSERT_NOT_REACHED();
 #endif
     }
+
+#if ENABLE(VALUE_PROFILER)
+    dumpRareCaseProfile(out, "rare case: ", rareCaseProfileForBytecodeOffset(location), hasPrintedProfiling);
+    dumpRareCaseProfile(out, "special fast case: ", specialFastCaseProfileForBytecodeOffset(location), hasPrintedProfiling);
+#endif
+    
+#if ENABLE(DFG_JIT)
+    Vector<FrequentExitSite> exitSites = exitProfile().exitSitesFor(location);
+    if (!exitSites.isEmpty()) {
+        out.print(" !! frequent exits: ");
+        CommaPrinter comma;
+        for (unsigned i = 0; i < exitSites.size(); ++i)
+            out.print(comma, exitSites[i].kind());
+    }
+#else // ENABLE(DFG_JIT)
+    UNUSED_PARAM(location);
+#endif // ENABLE(DFG_JIT)
+    out.print("\n");
 }
 
-void CodeBlock::dumpBytecode(unsigned bytecodeOffset)
+void CodeBlock::dumpBytecode(PrintStream& out, unsigned bytecodeOffset)
 {
     ExecState* exec = m_globalObject->globalExec();
     const Instruction* it = instructions().begin() + bytecodeOffset;
-    dumpBytecode(exec, instructions().begin(), it);
+    dumpBytecode(out, exec, instructions().begin(), it);
 }
 
 #if DUMP_CODE_BLOCK_STATISTICS
@@ -1613,19 +1594,19 @@ CodeBlock::CodeBlock(CopyParsedBlockTag, CodeBlock& other)
     , m_numCalleeRegisters(other.m_numCalleeRegisters)
     , m_numVars(other.m_numVars)
     , m_isConstructor(other.m_isConstructor)
-    , m_unlinkedCode(*other.m_globalData, other.m_ownerExecutable.get(), other.m_unlinkedCode.get())
-    , m_ownerExecutable(*other.m_globalData, other.m_ownerExecutable.get(), other.m_ownerExecutable.get())
-    , m_globalData(other.m_globalData)
+    , m_unlinkedCode(*other.m_vm, other.m_ownerExecutable.get(), other.m_unlinkedCode.get())
+    , m_ownerExecutable(*other.m_vm, other.m_ownerExecutable.get(), other.m_ownerExecutable.get())
+    , m_vm(other.m_vm)
     , m_instructions(other.m_instructions)
     , m_thisRegister(other.m_thisRegister)
     , m_argumentsRegister(other.m_argumentsRegister)
     , m_activationRegister(other.m_activationRegister)
     , m_isStrictMode(other.m_isStrictMode)
+    , m_needsActivation(other.m_needsActivation)
     , m_source(other.m_source)
     , m_sourceOffset(other.m_sourceOffset)
-#if ENABLE(VALUE_PROFILER)
-    , m_executionEntryCount(0)
-#endif
+    , m_firstLineColumnOffset(other.m_firstLineColumnOffset)
+    , m_codeType(other.m_codeType)
     , m_identifiers(other.m_identifiers)
     , m_constantRegisters(other.m_constantRegisters)
     , m_functionDecls(other.m_functionDecls)
@@ -1635,9 +1616,6 @@ CodeBlock::CodeBlock(CopyParsedBlockTag, CodeBlock& other)
     , m_reoptimizationRetryCounter(0)
     , m_resolveOperations(other.m_resolveOperations)
     , m_putToBaseOperations(other.m_putToBaseOperations)
-#if ENABLE(BYTECODE_COMMENTS)
-    , m_bytecodeCommentIterator(0)
-#endif
 #if ENABLE(JIT)
     , m_canCompileWithDFGState(DFG::CapabilityLevelNotSet)
 #endif
@@ -1657,56 +1635,53 @@ CodeBlock::CodeBlock(CopyParsedBlockTag, CodeBlock& other)
     }
 }
 
-CodeBlock::CodeBlock(ScriptExecutable* ownerExecutable, UnlinkedCodeBlock* unlinkedCodeBlock, JSGlobalObject* globalObject, unsigned baseScopeDepth, PassRefPtr<SourceProvider> sourceProvider, unsigned sourceOffset, PassOwnPtr<CodeBlock> alternative)
-    : m_globalObject(globalObject->globalData(), ownerExecutable, globalObject)
-    , m_heap(&m_globalObject->globalData().heap)
+CodeBlock::CodeBlock(ScriptExecutable* ownerExecutable, UnlinkedCodeBlock* unlinkedCodeBlock, JSGlobalObject* globalObject, unsigned baseScopeDepth, PassRefPtr<SourceProvider> sourceProvider, unsigned sourceOffset, unsigned firstLineColumnOffset, PassOwnPtr<CodeBlock> alternative)
+    : m_globalObject(globalObject->vm(), ownerExecutable, globalObject)
+    , m_heap(&m_globalObject->vm().heap)
     , m_numCalleeRegisters(unlinkedCodeBlock->m_numCalleeRegisters)
     , m_numVars(unlinkedCodeBlock->m_numVars)
     , m_isConstructor(unlinkedCodeBlock->isConstructor())
-    , m_unlinkedCode(globalObject->globalData(), ownerExecutable, unlinkedCodeBlock)
-    , m_ownerExecutable(globalObject->globalData(), ownerExecutable, ownerExecutable)
-    , m_globalData(unlinkedCodeBlock->globalData())
+    , m_unlinkedCode(globalObject->vm(), ownerExecutable, unlinkedCodeBlock)
+    , m_ownerExecutable(globalObject->vm(), ownerExecutable, ownerExecutable)
+    , m_vm(unlinkedCodeBlock->vm())
     , m_thisRegister(unlinkedCodeBlock->thisRegister())
     , m_argumentsRegister(unlinkedCodeBlock->argumentsRegister())
     , m_activationRegister(unlinkedCodeBlock->activationRegister())
     , m_isStrictMode(unlinkedCodeBlock->isStrictMode())
+    , m_needsActivation(unlinkedCodeBlock->needsFullScopeChain())
     , m_source(sourceProvider)
     , m_sourceOffset(sourceOffset)
-#if ENABLE(VALUE_PROFILER)
-    , m_executionEntryCount(0)
-#endif
+    , m_firstLineColumnOffset(firstLineColumnOffset)
+    , m_codeType(unlinkedCodeBlock->codeType())
     , m_alternative(alternative)
     , m_osrExitCounter(0)
     , m_optimizationDelayCounter(0)
     , m_reoptimizationRetryCounter(0)
-#if ENABLE(BYTECODE_COMMENTS)
-    , m_bytecodeCommentIterator(0)
-#endif
 {
-    m_globalData->startedCompiling(this);
+    m_vm->startedCompiling(this);
 
     ASSERT(m_source);
     setNumParameters(unlinkedCodeBlock->numParameters());
-
-    optimizeAfterWarmUp();
-    jitAfterWarmUp();
 
 #if DUMP_CODE_BLOCK_STATISTICS
     liveCodeBlockSet.add(this);
 #endif
     setIdentifiers(unlinkedCodeBlock->identifiers());
     setConstantRegisters(unlinkedCodeBlock->constantRegisters());
-
+    if (unlinkedCodeBlock->usesGlobalObject())
+        m_constantRegisters[unlinkedCodeBlock->globalObjectRegister()].set(*m_vm, ownerExecutable, globalObject);
     m_functionDecls.grow(unlinkedCodeBlock->numberOfFunctionDecls());
     for (size_t count = unlinkedCodeBlock->numberOfFunctionDecls(), i = 0; i < count; ++i) {
         UnlinkedFunctionExecutable* unlinkedExecutable = unlinkedCodeBlock->functionDecl(i);
         unsigned lineCount = unlinkedExecutable->lineCount();
         unsigned firstLine = ownerExecutable->lineNo() + unlinkedExecutable->firstLineOffset();
+        unsigned startColumn = unlinkedExecutable->functionStartColumn();
+        startColumn += (unlinkedExecutable->firstLineOffset() ? 1 : ownerExecutable->startColumn());
         unsigned startOffset = sourceOffset + unlinkedExecutable->startOffset();
         unsigned sourceLength = unlinkedExecutable->sourceLength();
-        SourceCode code(m_source, startOffset, startOffset + sourceLength, firstLine);
-        FunctionExecutable* executable = FunctionExecutable::create(*m_globalData, code, unlinkedExecutable, firstLine, firstLine + lineCount);
-        m_functionDecls[i].set(*m_globalData, ownerExecutable, executable);
+        SourceCode code(m_source, startOffset, startOffset + sourceLength, firstLine, startColumn);
+        FunctionExecutable* executable = FunctionExecutable::create(*m_vm, code, unlinkedExecutable, firstLine, firstLine + lineCount, startColumn);
+        m_functionDecls[i].set(*m_vm, ownerExecutable, executable);
     }
 
     m_functionExprs.grow(unlinkedCodeBlock->numberOfFunctionExprs());
@@ -1714,11 +1689,13 @@ CodeBlock::CodeBlock(ScriptExecutable* ownerExecutable, UnlinkedCodeBlock* unlin
         UnlinkedFunctionExecutable* unlinkedExecutable = unlinkedCodeBlock->functionExpr(i);
         unsigned lineCount = unlinkedExecutable->lineCount();
         unsigned firstLine = ownerExecutable->lineNo() + unlinkedExecutable->firstLineOffset();
+        unsigned startColumn = unlinkedExecutable->functionStartColumn();
+        startColumn += (unlinkedExecutable->firstLineOffset() ? 1 : ownerExecutable->startColumn());
         unsigned startOffset = sourceOffset + unlinkedExecutable->startOffset();
         unsigned sourceLength = unlinkedExecutable->sourceLength();
-        SourceCode code(m_source, startOffset, startOffset + sourceLength, firstLine);
-        FunctionExecutable* executable = FunctionExecutable::create(*m_globalData, code, unlinkedExecutable, firstLine, firstLine + lineCount);
-        m_functionExprs[i].set(*m_globalData, ownerExecutable, executable);
+        SourceCode code(m_source, startOffset, startOffset + sourceLength, firstLine, startColumn);
+        FunctionExecutable* executable = FunctionExecutable::create(*m_vm, code, unlinkedExecutable, firstLine, firstLine + lineCount, startColumn);
+        m_functionExprs[i].set(*m_vm, ownerExecutable, executable);
     }
 
     if (unlinkedCodeBlock->hasRareData()) {
@@ -1791,22 +1768,23 @@ CodeBlock::CodeBlock(ScriptExecutable* ownerExecutable, UnlinkedCodeBlock* unlin
     if (size_t size = unlinkedCodeBlock->numberOfValueProfiles())
         m_valueProfiles.grow(size);
 #endif
+    if (size_t size = unlinkedCodeBlock->numberOfObjectAllocationProfiles())
+        m_objectAllocationProfiles.grow(size);
     if (size_t size = unlinkedCodeBlock->numberOfResolveOperations())
         m_resolveOperations.grow(size);
-    size_t putToBaseCount = unlinkedCodeBlock->numberOfPutToBaseOperations();
-    m_putToBaseOperations.reserveCapacity(putToBaseCount);
-    for (size_t i = 0; i < putToBaseCount; ++i)
-        m_putToBaseOperations.append(PutToBaseOperation(isStrictMode()));
-
-    ASSERT(m_putToBaseOperations.capacity() == putToBaseCount);
+    if (size_t putToBaseCount = unlinkedCodeBlock->numberOfPutToBaseOperations()) {
+        m_putToBaseOperations.reserveInitialCapacity(putToBaseCount);
+        for (size_t i = 0; i < putToBaseCount; ++i)
+            m_putToBaseOperations.uncheckedAppend(PutToBaseOperation(isStrictMode()));
+    }
 
     // Copy and translate the UnlinkedInstructions
     size_t instructionCount = unlinkedCodeBlock->instructions().size();
     UnlinkedInstruction* pc = unlinkedCodeBlock->instructions().data();
-    Vector<Instruction> instructions(instructionCount);
+    Vector<Instruction, 0, UnsafeVectorOverflow> instructions(instructionCount);
     for (size_t i = 0; i < unlinkedCodeBlock->instructions().size(); ) {
         unsigned opLength = opcodeLength(pc[i].u.opcode);
-        instructions[i] = globalData()->interpreter->getOpcode(pc[i].u.opcode);
+        instructions[i] = vm()->interpreter->getOpcode(pc[i].u.opcode);
         for (size_t j = 1; j < opLength; ++j) {
             if (sizeof(int32_t) != sizeof(intptr_t))
                 instructions[i + j].u.pointer = 0;
@@ -1823,10 +1801,6 @@ CodeBlock::CodeBlock(ScriptExecutable* ownerExecutable, UnlinkedCodeBlock* unlin
             // fallthrough
         }
         case op_convert_this:
-        case op_resolve:
-        case op_resolve_base:
-        case op_resolve_with_base:
-        case op_resolve_with_this:
         case op_get_by_id:
         case op_call_put_result:
         case op_get_callee: {
@@ -1851,6 +1825,79 @@ CodeBlock::CodeBlock(ScriptExecutable* ownerExecutable, UnlinkedCodeBlock* unlin
             break;
         }
 #endif
+        case op_resolve_base:
+        case op_resolve_base_to_global:
+        case op_resolve_base_to_global_dynamic:
+        case op_resolve_base_to_scope:
+        case op_resolve_base_to_scope_with_top_scope_check: {
+            instructions[i + 4].u.resolveOperations = &m_resolveOperations[pc[i + 4].u.operand];
+            instructions[i + 5].u.putToBaseOperation = &m_putToBaseOperations[pc[i + 5].u.operand];
+#if ENABLE(DFG_JIT)
+            ValueProfile* profile = &m_valueProfiles[pc[i + opLength - 1].u.operand];
+            ASSERT(profile->m_bytecodeOffset == -1);
+            profile->m_bytecodeOffset = i;
+            ASSERT((opLength - 1) > 5);
+            instructions[i + opLength - 1] = profile;
+#endif
+            break;
+        }
+        case op_resolve_global_property:
+        case op_resolve_global_var:
+        case op_resolve_scoped_var:
+        case op_resolve_scoped_var_on_top_scope:
+        case op_resolve_scoped_var_with_top_scope_check: {
+            instructions[i + 3].u.resolveOperations = &m_resolveOperations[pc[i + 3].u.operand];
+            break;
+        }
+        case op_put_to_base:
+        case op_put_to_base_variable: {
+            instructions[i + 4].u.putToBaseOperation = &m_putToBaseOperations[pc[i + 4].u.operand];
+            break;
+        }
+        case op_resolve: {
+#if ENABLE(DFG_JIT)
+            ValueProfile* profile = &m_valueProfiles[pc[i + opLength - 1].u.operand];
+            ASSERT(profile->m_bytecodeOffset == -1);
+            profile->m_bytecodeOffset = i;
+            ASSERT((opLength - 1) > 3);
+            instructions[i + opLength - 1] = profile;
+#endif
+            instructions[i + 3].u.resolveOperations = &m_resolveOperations[pc[i + 3].u.operand];
+            break;
+        }
+        case op_resolve_with_base:
+        case op_resolve_with_this: {
+            instructions[i + 4].u.resolveOperations = &m_resolveOperations[pc[i + 4].u.operand];
+            if (pc[i].u.opcode != op_resolve_with_this)
+                instructions[i + 5].u.putToBaseOperation = &m_putToBaseOperations[pc[i + 5].u.operand];
+#if ENABLE(DFG_JIT)
+            ValueProfile* profile = &m_valueProfiles[pc[i + opLength - 1].u.operand];
+            ASSERT(profile->m_bytecodeOffset == -1);
+            profile->m_bytecodeOffset = i;
+            instructions[i + opLength - 1] = profile;
+#endif
+            break;
+        }
+        case op_new_object: {
+            int objectAllocationProfileIndex = pc[i + opLength - 1].u.operand;
+            ObjectAllocationProfile* objectAllocationProfile = &m_objectAllocationProfiles[objectAllocationProfileIndex];
+            int inferredInlineCapacity = pc[i + opLength - 2].u.operand;
+
+            instructions[i + opLength - 1] = objectAllocationProfile;
+            objectAllocationProfile->initialize(*vm(),
+                m_ownerExecutable.get(), m_globalObject->objectPrototype(), inferredInlineCapacity);
+            break;
+        }
+
+        case op_get_scoped_var: {
+#if ENABLE(DFG_JIT)
+            ValueProfile* profile = &m_valueProfiles[pc[i + opLength - 1].u.operand];
+            ASSERT(profile->m_bytecodeOffset == -1);
+            profile->m_bytecodeOffset = i;
+            instructions[i + opLength - 1] = profile;
+#endif
+            break;
+        }
 
         case op_call:
         case op_call_eval: {
@@ -1892,16 +1939,22 @@ CodeBlock::CodeBlock(ScriptExecutable* ownerExecutable, UnlinkedCodeBlock* unlin
                 break;
 
             if (entry.couldBeWatched()) {
-                instructions[i + 0] = globalData()->interpreter->getOpcode(op_init_global_const_check);
+                instructions[i + 0] = vm()->interpreter->getOpcode(op_init_global_const_check);
                 instructions[i + 1] = &globalObject->registerAt(entry.getIndex());
                 instructions[i + 3] = entry.addressOfIsWatched();
                 break;
             }
 
-            instructions[i + 0] = globalData()->interpreter->getOpcode(op_init_global_const);
+            instructions[i + 0] = vm()->interpreter->getOpcode(op_init_global_const);
             instructions[i + 1] = &globalObject->registerAt(entry.getIndex());
             break;
         }
+
+        case op_debug: {
+            instructions[i + 4] = columnNumberForBytecodeOffset(i);
+            break;
+        }
+
         default:
             break;
         }
@@ -1909,17 +1962,26 @@ CodeBlock::CodeBlock(ScriptExecutable* ownerExecutable, UnlinkedCodeBlock* unlin
     }
     m_instructions = WTF::RefCountedArray<Instruction>(instructions);
 
+    // Set optimization thresholds only after m_instructions is initialized, since these
+    // rely on the instruction count (and are in theory permitted to also inspect the
+    // instruction stream to more accurate assess the cost of tier-up).
+    optimizeAfterWarmUp();
+    jitAfterWarmUp();
+
     if (Options::dumpGeneratedBytecodes())
         dumpBytecode();
-    m_globalData->finishedCompiling(this);
+    m_vm->finishedCompiling(this);
 }
 
 CodeBlock::~CodeBlock()
 {
+    if (m_vm->m_perBytecodeProfiler)
+        m_vm->m_perBytecodeProfiler->notifyDestruction(this);
+    
 #if ENABLE(DFG_JIT)
     // Remove myself from the set of DFG code blocks. Note that I may not be in this set
     // (because I'm not a DFG code block), in which case this is a no-op anyway.
-    m_globalData->heap.m_dfgCodeBlocks.m_set.remove(this);
+    m_vm->heap.m_dfgCodeBlocks.m_set.remove(this);
 #endif
     
 #if ENABLE(VERBOSE_VALUE_PROFILE)
@@ -1958,13 +2020,13 @@ void CodeBlock::setNumParameters(int newValue)
     m_numParameters = newValue;
 
 #if ENABLE(VALUE_PROFILER)
-    m_argumentValueProfiles.resize(newValue);
+    m_argumentValueProfiles.resizeToFit(newValue);
 #endif
 }
 
 void CodeBlock::visitStructures(SlotVisitor& visitor, Instruction* vPC)
 {
-    Interpreter* interpreter = m_globalData->interpreter;
+    Interpreter* interpreter = m_vm->interpreter;
 
     if (vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id) && vPC[4].u.structure) {
         visitor.append(&vPC[4].u.structure);
@@ -2081,7 +2143,7 @@ void CodeBlock::visitAggregate(SlotVisitor& visitor)
         visitor.addWeakReferenceHarvester(this);
     
 #else // ENABLE(DFG_JIT)
-    ASSERT_NOT_REACHED();
+    RELEASE_ASSERT_NOT_REACHED();
 #endif // ENABLE(DFG_JIT)
 }
 
@@ -2158,7 +2220,7 @@ static const bool verboseUnlinking = false;
 void CodeBlock::finalizeUnconditionally()
 {
 #if ENABLE(LLINT)
-    Interpreter* interpreter = m_globalData->interpreter;
+    Interpreter* interpreter = m_vm->interpreter;
     if (!!numberOfInstructions()) {
         const Vector<unsigned>& propertyAccessInstructions = m_unlinkedCode->propertyAccessInstructions();
         for (size_t size = propertyAccessInstructions.size(), i = 0; i < size; ++i) {
@@ -2197,7 +2259,7 @@ void CodeBlock::finalizeUnconditionally()
             case op_get_array_length:
                 break;
             default:
-                ASSERT_NOT_REACHED();
+                RELEASE_ASSERT_NOT_REACHED();
             }
         }
 
@@ -2219,12 +2281,8 @@ void CodeBlock::finalizeUnconditionally()
         if (verboseUnlinking)
             dataLog(*this, " has dead weak references, jettisoning during GC.\n");
 
-        // Make sure that the baseline JIT knows that it should re-warm-up before
-        // optimizing.
-        alternative()->optimizeAfterWarmUp();
-        
         if (DFG::shouldShowDisassembly()) {
-            dataLog(*this, "will be jettisoned because of the following dead references:\n");
+            dataLog(*this, " will be jettisoned because of the following dead references:\n");
             for (unsigned i = 0; i < m_dfgData->transitions.size(); ++i) {
                 WeakReferenceTransition& transition = m_dfgData->transitions[i];
                 JSCell* origin = transition.m_codeOrigin.get();
@@ -2232,15 +2290,13 @@ void CodeBlock::finalizeUnconditionally()
                 JSCell* to = transition.m_to.get();
                 if ((!origin || Heap::isMarked(origin)) && Heap::isMarked(from))
                     continue;
-                dataLogF("    Transition under %s, ", JSValue(origin).description());
-                dataLogF("%s -> ", JSValue(from).description());
-                dataLogF("%s.\n", JSValue(to).description());
+                dataLog("    Transition under ", JSValue(origin), ", ", JSValue(from), " -> ", JSValue(to), ".\n");
             }
             for (unsigned i = 0; i < m_dfgData->weakReferences.size(); ++i) {
                 JSCell* weak = m_dfgData->weakReferences[i].get();
                 if (Heap::isMarked(weak))
                     continue;
-                dataLogF("    Weak reference %s.\n", JSValue(weak).description());
+                dataLog("    Weak reference ", JSValue(weak), ".\n");
             }
         }
         
@@ -2286,7 +2342,7 @@ void CodeBlock::finalizeUnconditionally()
                                 stub->executable()->hashFor(callLinkInfo(i).specializationKind()),
                                 ", stub routine ", RawPointer(stub), ".\n");
                         }
-                        callLinkInfo(i).unlink(*m_globalData, repatchBuffer);
+                        callLinkInfo(i).unlink(*m_vm, repatchBuffer);
                     }
                 } else if (!Heap::isMarked(callLinkInfo(i).callee.get())) {
                     if (verboseUnlinking) {
@@ -2297,7 +2353,7 @@ void CodeBlock::finalizeUnconditionally()
                                 callLinkInfo(i).specializationKind()),
                             ").\n");
                     }
-                    callLinkInfo(i).unlink(*m_globalData, repatchBuffer);
+                    callLinkInfo(i).unlink(*m_vm, repatchBuffer);
                 }
             }
             if (!!callLinkInfo(i).lastSeenCallee
@@ -2310,7 +2366,7 @@ void CodeBlock::finalizeUnconditionally()
             if (stubInfo.visitWeakReferences())
                 continue;
             
-            resetStubInternal(repatchBuffer, stubInfo);
+            resetStubDuringGCInternal(repatchBuffer, stubInfo);
         }
     }
 #endif
@@ -2348,6 +2404,12 @@ void CodeBlock::resetStubInternal(RepatchBuffer& repatchBuffer, StructureStubInf
     
     stubInfo.reset();
 }
+
+void CodeBlock::resetStubDuringGCInternal(RepatchBuffer& repatchBuffer, StructureStubInfo& stubInfo)
+{
+    resetStubInternal(repatchBuffer, stubInfo);
+    stubInfo.resetByGC = true;
+}
 #endif
 
 void CodeBlock::stronglyVisitStrongReferences(SlotVisitor& visitor)
@@ -2362,6 +2424,8 @@ void CodeBlock::stronglyVisitStrongReferences(SlotVisitor& visitor)
         visitor.append(&m_functionExprs[i]);
     for (size_t i = 0; i < m_functionDecls.size(); ++i)
         visitor.append(&m_functionDecls[i]);
+    for (unsigned i = 0; i < m_objectAllocationProfiles.size(); ++i)
+        m_objectAllocationProfiles[i].visitAggregate(visitor);
 
     updateAllPredictions(Collection);
 }
@@ -2386,85 +2450,9 @@ void CodeBlock::stronglyVisitWeakReferences(SlotVisitor& visitor)
 #endif    
 }
 
-#if ENABLE(BYTECODE_COMMENTS)
-// Finds the comment string for the specified bytecode offset/PC is available. 
-const char* CodeBlock::commentForBytecodeOffset(unsigned bytecodeOffset)
-{
-    ASSERT(bytecodeOffset < instructions().size());
-
-    Vector<Comment>& comments = m_bytecodeComments;
-    size_t numberOfComments = comments.size();
-    const char* result = 0;
-
-    if (!numberOfComments)
-        return 0; // No comments to match with.
-
-    // The next match is most likely the next comment in the list.
-    // Do a quick check to see if that is a match first.
-    // m_bytecodeCommentIterator should already be pointing to the
-    // next comment we should check.
-
-    ASSERT(m_bytecodeCommentIterator < comments.size());
-
-    size_t i = m_bytecodeCommentIterator;
-    size_t commentPC = comments[i].pc;
-    if (commentPC == bytecodeOffset) {
-        // We've got a match. All done!
-        m_bytecodeCommentIterator = i;
-        result = comments[i].string;
-    } else if (commentPC > bytecodeOffset) {
-        // The current comment is already greater than the requested PC.
-        // Start searching from the first comment.
-        i = 0;
-    } else {
-        // Otherwise, the current comment's PC is less than the requested PC.
-        // Hence, we can just start searching from the next comment in the
-        // list.
-        i++;
-    }
-
-    // If the result is still not found, do a linear search in the range
-    // that we've determined above.
-    if (!result) {
-        for (; i < comments.size(); ++i) {
-            commentPC = comments[i].pc;
-            if (commentPC == bytecodeOffset) {
-                result = comments[i].string;
-                break;
-            }
-            if (comments[i].pc > bytecodeOffset) {
-                // The current comment PC is already past the requested
-                // bytecodeOffset. Hence, there are no more possible
-                // matches. Just fail.
-                break;
-            }
-        }
-    }
-
-    // Update the iterator to point to the next comment.
-    if (++i >= numberOfComments) {
-        // At most point to the last comment entry. This ensures that the
-        // next time we call this function, the quick checks will at least
-        // have one entry to check and can fail fast if appropriate.
-        i = numberOfComments - 1;
-    }
-    m_bytecodeCommentIterator = i;
-    return result;
-}
-
-void CodeBlock::dumpBytecodeComments()
-{
-    Vector<Comment>& comments = m_bytecodeComments;
-    printf("Comments for codeblock %p: size %lu\n", this, comments.size());
-    for (size_t i = 0; i < comments.size(); ++i)
-        printf("     pc %lu : '%s'\n", comments[i].pc, comments[i].string);
-    printf("End of comments for codeblock %p\n", this);
-}
-#endif // ENABLE_BYTECODE_COMMENTS
-
 HandlerInfo* CodeBlock::handlerForBytecodeOffset(unsigned bytecodeOffset)
 {
-    ASSERT(bytecodeOffset < instructions().size());
+    RELEASE_ASSERT(bytecodeOffset < instructions().size());
 
     if (!m_rareData)
         return 0;
@@ -2480,16 +2468,29 @@ HandlerInfo* CodeBlock::handlerForBytecodeOffset(unsigned bytecodeOffset)
     return 0;
 }
 
-int CodeBlock::lineNumberForBytecodeOffset(unsigned bytecodeOffset)
+unsigned CodeBlock::lineNumberForBytecodeOffset(unsigned bytecodeOffset)
 {
-    ASSERT(bytecodeOffset < instructions().size());
+    RELEASE_ASSERT(bytecodeOffset < instructions().size());
     return m_ownerExecutable->lineNo() + m_unlinkedCode->lineNumberForBytecodeOffset(bytecodeOffset);
 }
 
-void CodeBlock::expressionRangeForBytecodeOffset(unsigned bytecodeOffset, int& divot, int& startOffset, int& endOffset)
+unsigned CodeBlock::columnNumberForBytecodeOffset(unsigned bytecodeOffset)
 {
-    m_unlinkedCode->expressionRangeForBytecodeOffset(bytecodeOffset, divot, startOffset, endOffset);
+    int divot;
+    int startOffset;
+    int endOffset;
+    unsigned line;
+    unsigned column;
+    expressionRangeForBytecodeOffset(bytecodeOffset, divot, startOffset, endOffset, line, column);
+    return column;
+}
+
+void CodeBlock::expressionRangeForBytecodeOffset(unsigned bytecodeOffset, int& divot, int& startOffset, int& endOffset, unsigned& line, unsigned& column)
+{
+    m_unlinkedCode->expressionRangeForBytecodeOffset(bytecodeOffset, divot, startOffset, endOffset, line, column);
     divot += m_sourceOffset;
+    column += line ? 1 : firstLineColumnOffset();
+    line += m_ownerExecutable->lineNo();
 }
 
 void CodeBlock::shrinkToFit(ShrinkMode shrinkMode)
@@ -2502,8 +2503,6 @@ void CodeBlock::shrinkToFit(ShrinkMode shrinkMode)
     m_callLinkInfos.shrinkToFit();
 #endif
 #if ENABLE(VALUE_PROFILER)
-    if (shrinkMode == EarlyShrink)
-        m_argumentValueProfiles.shrinkToFit();
     m_rareCaseProfiles.shrinkToFit();
     m_specialFastCaseProfiles.shrinkToFit();
 #endif
@@ -2547,7 +2546,7 @@ void CodeBlock::createActivation(CallFrame* callFrame)
     ASSERT(codeType() == FunctionCode);
     ASSERT(needsFullScopeChain());
     ASSERT(!callFrame->uncheckedR(activationRegister()).jsValue());
-    JSActivation* activation = JSActivation::create(callFrame->globalData(), callFrame, this);
+    JSActivation* activation = JSActivation::create(callFrame->vm(), callFrame, this);
     callFrame->uncheckedR(activationRegister()) = JSValue(activation);
     callFrame->setScope(activation);
 }
@@ -2575,13 +2574,13 @@ void CodeBlock::unlinkCalls()
 #endif
     if (!m_callLinkInfos.size())
         return;
-    if (!m_globalData->canUseJIT())
+    if (!m_vm->canUseJIT())
         return;
     RepatchBuffer repatchBuffer(this);
     for (size_t i = 0; i < m_callLinkInfos.size(); i++) {
         if (!m_callLinkInfos[i].isLinked())
             continue;
-        m_callLinkInfos[i].unlink(*m_globalData, repatchBuffer);
+        m_callLinkInfos[i].unlink(*m_vm, repatchBuffer);
     }
 }
 
@@ -2595,7 +2594,7 @@ void CodeBlock::unlinkIncomingCalls()
         return;
     RepatchBuffer repatchBuffer(this);
     while (m_incomingCalls.begin() != m_incomingCalls.end())
-        m_incomingCalls.begin()->unlink(*m_globalData, repatchBuffer);
+        m_incomingCalls.begin()->unlink(*m_vm, repatchBuffer);
 }
 #endif // ENABLE(JIT)
 
@@ -2662,12 +2661,13 @@ ClosureCallStubRoutine* CodeBlock::findClosureCallForReturnPC(ReturnAddressPtr r
             continue;
         if (!info.stub->code().executableMemory()->contains(returnAddress.value()))
             continue;
-        
+
+        RELEASE_ASSERT(info.stub->codeOrigin().bytecodeIndex < CodeOrigin::maximumBytecodeIndex);
         return info.stub.get();
     }
     
     // The stub routine may have been jettisoned. This is rare, but we have to handle it.
-    const JITStubRoutineSet& set = m_globalData->heap.jitStubRoutines();
+    const JITStubRoutineSet& set = m_vm->heap.jitStubRoutines();
     for (unsigned i = set.size(); i--;) {
         GCAwareJITStubRoutine* genericStub = set.at(i);
         if (!genericStub->isClosureCall())
@@ -2675,6 +2675,7 @@ ClosureCallStubRoutine* CodeBlock::findClosureCallForReturnPC(ReturnAddressPtr r
         ClosureCallStubRoutine* stub = static_cast<ClosureCallStubRoutine*>(genericStub);
         if (!stub->code().executableMemory()->contains(returnAddress.value()))
             continue;
+        RELEASE_ASSERT(stub->codeOrigin().bytecodeIndex < CodeOrigin::maximumBytecodeIndex);
         return stub;
     }
     
@@ -2702,11 +2703,11 @@ unsigned CodeBlock::bytecodeOffset(ExecState* exec, ReturnAddressPtr returnAddre
         && returnAddress.value() <= LLInt::getCodePtr(llint_end))
 #endif
     {
-        ASSERT(exec->codeBlock());
-        ASSERT(exec->codeBlock() == this);
-        ASSERT(JITCode::isBaselineCode(getJITType()));
+        RELEASE_ASSERT(exec->codeBlock());
+        RELEASE_ASSERT(exec->codeBlock() == this);
+        RELEASE_ASSERT(JITCode::isBaselineCode(getJITType()));
         Instruction* instruction = exec->currentVPC();
-        ASSERT(instruction);
+        RELEASE_ASSERT(instruction);
 
         instruction = adjustPCIfAtCallSite(instruction);
         return bytecodeOffset(instruction);
@@ -2716,19 +2717,31 @@ unsigned CodeBlock::bytecodeOffset(ExecState* exec, ReturnAddressPtr returnAddre
 #if ENABLE(JIT)
     if (!m_rareData)
         return 1;
-    Vector<CallReturnOffsetToBytecodeOffset>& callIndices = m_rareData->m_callReturnIndexVector;
+    Vector<CallReturnOffsetToBytecodeOffset, 0, UnsafeVectorOverflow>& callIndices = m_rareData->m_callReturnIndexVector;
     if (!callIndices.size())
         return 1;
     
     if (getJITCode().getExecutableMemory()->contains(returnAddress.value())) {
         unsigned callReturnOffset = getJITCode().offsetOf(returnAddress.value());
         CallReturnOffsetToBytecodeOffset* result =
-            binarySearch<CallReturnOffsetToBytecodeOffset, unsigned, getCallReturnOffset>(callIndices.begin(), callIndices.size(), callReturnOffset);
-        ASSERT(result->callReturnOffset == callReturnOffset);
+            binarySearch<CallReturnOffsetToBytecodeOffset, unsigned>(
+                callIndices, callIndices.size(), callReturnOffset, getCallReturnOffset);
+        RELEASE_ASSERT(result->callReturnOffset == callReturnOffset);
+        RELEASE_ASSERT(result->bytecodeOffset < instructionCount());
         return result->bytecodeOffset;
     }
-
-    return findClosureCallForReturnPC(returnAddress)->codeOrigin().bytecodeIndex;
+    ClosureCallStubRoutine* closureInfo = findClosureCallForReturnPC(returnAddress);
+    CodeOrigin origin = closureInfo->codeOrigin();
+    while (InlineCallFrame* inlineCallFrame = origin.inlineCallFrame) {
+        if (inlineCallFrame->baselineCodeBlock() == this)
+            break;
+        origin = inlineCallFrame->caller;
+        RELEASE_ASSERT(origin.bytecodeIndex < CodeOrigin::maximumBytecodeIndex);
+    }
+    RELEASE_ASSERT(origin.bytecodeIndex < CodeOrigin::maximumBytecodeIndex);
+    unsigned bytecodeIndex = origin.bytecodeIndex;
+    RELEASE_ASSERT(bytecodeIndex < instructionCount());
+    return bytecodeIndex;
 #endif // ENABLE(JIT)
 
 #if !ENABLE(LLINT) && !ENABLE(JIT)
@@ -2743,13 +2756,20 @@ bool CodeBlock::codeOriginForReturn(ReturnAddressPtr returnAddress, CodeOrigin& 
         return false;
 
     if (!getJITCode().getExecutableMemory()->contains(returnAddress.value())) {
-        codeOrigin = findClosureCallForReturnPC(returnAddress)->codeOrigin();
+        ClosureCallStubRoutine* stub = findClosureCallForReturnPC(returnAddress);
+        ASSERT(stub);
+        if (!stub)
+            return false;
+        codeOrigin = stub->codeOrigin();
         return true;
     }
     
     unsigned offset = getJITCode().offsetOf(returnAddress.value());
-    CodeOriginAtCallReturnOffset* entry = binarySearch<CodeOriginAtCallReturnOffset, unsigned, getCallReturnOffsetForCodeOrigin>(codeOrigins().begin(), codeOrigins().size(), offset, WTF::KeyMustNotBePresentInArray);
-    if (entry->callReturnOffset != offset)
+    CodeOriginAtCallReturnOffset* entry =
+        tryBinarySearch<CodeOriginAtCallReturnOffset, unsigned>(
+            codeOrigins(), codeOrigins().size(), offset,
+            getCallReturnOffsetForCodeOrigin);
+    if (!entry)
         return false;
     codeOrigin = entry->codeOrigin;
     return true;
@@ -2765,8 +2785,8 @@ void CodeBlock::clearEvalCache()
     m_rareData->m_evalCodeCache.clear();
 }
 
-template<typename T>
-inline void replaceExistingEntries(Vector<T>& target, Vector<T>& source)
+template<typename T, size_t inlineCapacity, typename U, typename V>
+inline void replaceExistingEntries(Vector<T, inlineCapacity, U>& target, Vector<T, inlineCapacity, V>& source)
 {
     ASSERT(target.size() <= source.size());
     for (size_t i = 0; i < target.size(); ++i)
@@ -2795,12 +2815,10 @@ void CodeBlock::reoptimize()
 {
     ASSERT(replacement() != this);
     ASSERT(replacement()->alternative() == this);
-    replacement()->tallyFrequentExitSites();
     if (DFG::shouldShowDisassembly())
         dataLog(*replacement(), " will be jettisoned due to reoptimization of ", *this, ".\n");
     replacement()->jettison();
     countReoptimization();
-    optimizeAfterWarmUp();
 }
 
 CodeBlock* ProgramCodeBlock::replacement()
@@ -2859,31 +2877,30 @@ DFG::CapabilityLevel FunctionCodeBlock::canCompileWithDFGInternal()
     return DFG::canCompileFunctionForCall(this);
 }
 
-void ProgramCodeBlock::jettison()
+void CodeBlock::jettison()
 {
     ASSERT(JITCode::isOptimizingJIT(getJITType()));
     ASSERT(this == replacement());
+    alternative()->optimizeAfterWarmUp();
+    tallyFrequentExitSites();
     if (DFG::shouldShowDisassembly())
         dataLog("Jettisoning ", *this, ".\n");
-    static_cast<ProgramExecutable*>(ownerExecutable())->jettisonOptimizedCode(*globalData());
+    jettisonImpl();
 }
 
-void EvalCodeBlock::jettison()
+void ProgramCodeBlock::jettisonImpl()
 {
-    ASSERT(JITCode::isOptimizingJIT(getJITType()));
-    ASSERT(this == replacement());
-    if (DFG::shouldShowDisassembly())
-        dataLog("Jettisoning ", *this, ".\n");
-    static_cast<EvalExecutable*>(ownerExecutable())->jettisonOptimizedCode(*globalData());
+    static_cast<ProgramExecutable*>(ownerExecutable())->jettisonOptimizedCode(*vm());
 }
 
-void FunctionCodeBlock::jettison()
+void EvalCodeBlock::jettisonImpl()
 {
-    ASSERT(JITCode::isOptimizingJIT(getJITType()));
-    ASSERT(this == replacement());
-    if (DFG::shouldShowDisassembly())
-        dataLog("Jettisoning ", *this, ".\n");
-    static_cast<FunctionExecutable*>(ownerExecutable())->jettisonOptimizedCodeFor(*globalData(), m_isConstructor ? CodeForConstruct : CodeForCall);
+    static_cast<EvalExecutable*>(ownerExecutable())->jettisonOptimizedCode(*vm());
+}
+
+void FunctionCodeBlock::jettisonImpl()
+{
+    static_cast<FunctionExecutable*>(ownerExecutable())->jettisonOptimizedCodeFor(*vm(), m_isConstructor ? CodeForConstruct : CodeForCall);
 }
 
 bool ProgramCodeBlock::jitCompileImpl(ExecState* exec)
@@ -2905,6 +2922,217 @@ bool FunctionCodeBlock::jitCompileImpl(ExecState* exec)
     ASSERT(getJITType() == JITCode::InterpreterThunk);
     ASSERT(this == replacement());
     return static_cast<FunctionExecutable*>(ownerExecutable())->jitCompileFor(exec, m_isConstructor ? CodeForConstruct : CodeForCall);
+}
+#endif
+
+JSGlobalObject* CodeBlock::globalObjectFor(CodeOrigin codeOrigin)
+{
+    if (!codeOrigin.inlineCallFrame)
+        return globalObject();
+    return jsCast<FunctionExecutable*>(codeOrigin.inlineCallFrame->executable.get())->generatedBytecode().globalObject();
+}
+
+unsigned CodeBlock::reoptimizationRetryCounter() const
+{
+    ASSERT(m_reoptimizationRetryCounter <= Options::reoptimizationRetryCounterMax());
+    return m_reoptimizationRetryCounter;
+}
+
+void CodeBlock::countReoptimization()
+{
+    m_reoptimizationRetryCounter++;
+    if (m_reoptimizationRetryCounter > Options::reoptimizationRetryCounterMax())
+        m_reoptimizationRetryCounter = Options::reoptimizationRetryCounterMax();
+}
+
+unsigned CodeBlock::numberOfDFGCompiles()
+{
+    ASSERT(JITCode::isBaselineCode(getJITType()));
+    return (JITCode::isOptimizingJIT(replacement()->getJITType()) ? 1 : 0) + m_reoptimizationRetryCounter;
+}
+
+int32_t CodeBlock::codeTypeThresholdMultiplier() const
+{
+    if (codeType() == EvalCode)
+        return Options::evalThresholdMultiplier();
+    
+    return 1;
+}
+
+double CodeBlock::optimizationThresholdScalingFactor()
+{
+    // This expression arises from doing a least-squares fit of
+    //
+    // F[x_] =: a * Sqrt[x + b] + Abs[c * x] + d
+    //
+    // against the data points:
+    //
+    //    x       F[x_]
+    //    10       0.9          (smallest reasonable code block)
+    //   200       1.0          (typical small-ish code block)
+    //   320       1.2          (something I saw in 3d-cube that I wanted to optimize)
+    //  1268       5.0          (something I saw in 3d-cube that I didn't want to optimize)
+    //  4000       5.5          (random large size, used to cause the function to converge to a shallow curve of some sort)
+    // 10000       6.0          (similar to above)
+    //
+    // I achieve the minimization using the following Mathematica code:
+    //
+    // MyFunctionTemplate[x_, a_, b_, c_, d_] := a*Sqrt[x + b] + Abs[c*x] + d
+    //
+    // samples = {{10, 0.9}, {200, 1}, {320, 1.2}, {1268, 5}, {4000, 5.5}, {10000, 6}}
+    //
+    // solution = 
+    //     Minimize[Plus @@ ((MyFunctionTemplate[#[[1]], a, b, c, d] - #[[2]])^2 & /@ samples),
+    //         {a, b, c, d}][[2]]
+    //
+    // And the code below (to initialize a, b, c, d) is generated by:
+    //
+    // Print["const double " <> ToString[#[[1]]] <> " = " <>
+    //     If[#[[2]] < 0.00001, "0.0", ToString[#[[2]]]] <> ";"] & /@ solution
+    //
+    // We've long known the following to be true:
+    // - Small code blocks are cheap to optimize and so we should do it sooner rather
+    //   than later.
+    // - Large code blocks are expensive to optimize and so we should postpone doing so,
+    //   and sometimes have a large enough threshold that we never optimize them.
+    // - The difference in cost is not totally linear because (a) just invoking the
+    //   DFG incurs some base cost and (b) for large code blocks there is enough slop
+    //   in the correlation between instruction count and the actual compilation cost
+    //   that for those large blocks, the instruction count should not have a strong
+    //   influence on our threshold.
+    //
+    // I knew the goals but I didn't know how to achieve them; so I picked an interesting
+    // example where the heuristics were right (code block in 3d-cube with instruction
+    // count 320, which got compiled early as it should have been) and one where they were
+    // totally wrong (code block in 3d-cube with instruction count 1268, which was expensive
+    // to compile and didn't run often enough to warrant compilation in my opinion), and
+    // then threw in additional data points that represented my own guess of what our
+    // heuristics should do for some round-numbered examples.
+    //
+    // The expression to which I decided to fit the data arose because I started with an
+    // affine function, and then did two things: put the linear part in an Abs to ensure
+    // that the fit didn't end up choosing a negative value of c (which would result in
+    // the function turning over and going negative for large x) and I threw in a Sqrt
+    // term because Sqrt represents my intution that the function should be more sensitive
+    // to small changes in small values of x, but less sensitive when x gets large.
+    
+    // Note that the current fit essentially eliminates the linear portion of the
+    // expression (c == 0.0).
+    const double a = 0.061504;
+    const double b = 1.02406;
+    const double c = 0.0;
+    const double d = 0.825914;
+    
+    double instructionCount = this->instructionCount();
+    
+    ASSERT(instructionCount); // Make sure this is called only after we have an instruction stream; otherwise it'll just return the value of d, which makes no sense.
+    
+    double result = d + a * sqrt(instructionCount + b) + c * instructionCount;
+#if ENABLE(JIT_VERBOSE_OSR)
+    dataLog(*this, ": instruction count is ", instructionCount, ", scaling execution counter by ", result, " * ", codeTypeThresholdMultiplier(), "\n");
+#endif
+    return result * codeTypeThresholdMultiplier();
+}
+
+static int32_t clipThreshold(double threshold)
+{
+    if (threshold < 1.0)
+        return 1;
+    
+    if (threshold > static_cast<double>(std::numeric_limits<int32_t>::max()))
+        return std::numeric_limits<int32_t>::max();
+    
+    return static_cast<int32_t>(threshold);
+}
+
+int32_t CodeBlock::counterValueForOptimizeAfterWarmUp()
+{
+    return clipThreshold(
+        Options::thresholdForOptimizeAfterWarmUp() *
+        optimizationThresholdScalingFactor() *
+        (1 << reoptimizationRetryCounter()));
+}
+
+int32_t CodeBlock::counterValueForOptimizeAfterLongWarmUp()
+{
+    return clipThreshold(
+        Options::thresholdForOptimizeAfterLongWarmUp() *
+        optimizationThresholdScalingFactor() *
+        (1 << reoptimizationRetryCounter()));
+}
+
+int32_t CodeBlock::counterValueForOptimizeSoon()
+{
+    return clipThreshold(
+        Options::thresholdForOptimizeSoon() *
+        optimizationThresholdScalingFactor() *
+        (1 << reoptimizationRetryCounter()));
+}
+
+bool CodeBlock::checkIfOptimizationThresholdReached()
+{
+    return m_jitExecuteCounter.checkIfThresholdCrossedAndSet(this);
+}
+
+void CodeBlock::optimizeNextInvocation()
+{
+    m_jitExecuteCounter.setNewThreshold(0, this);
+}
+
+void CodeBlock::dontOptimizeAnytimeSoon()
+{
+    m_jitExecuteCounter.deferIndefinitely();
+}
+
+void CodeBlock::optimizeAfterWarmUp()
+{
+    m_jitExecuteCounter.setNewThreshold(counterValueForOptimizeAfterWarmUp(), this);
+}
+
+void CodeBlock::optimizeAfterLongWarmUp()
+{
+    m_jitExecuteCounter.setNewThreshold(counterValueForOptimizeAfterLongWarmUp(), this);
+}
+
+void CodeBlock::optimizeSoon()
+{
+    m_jitExecuteCounter.setNewThreshold(counterValueForOptimizeSoon(), this);
+}
+
+#if ENABLE(JIT)
+uint32_t CodeBlock::adjustedExitCountThreshold(uint32_t desiredThreshold)
+{
+    ASSERT(getJITType() == JITCode::DFGJIT);
+    // Compute this the lame way so we don't saturate. This is called infrequently
+    // enough that this loop won't hurt us.
+    unsigned result = desiredThreshold;
+    for (unsigned n = baselineVersion()->reoptimizationRetryCounter(); n--;) {
+        unsigned newResult = result << 1;
+        if (newResult < result)
+            return std::numeric_limits<uint32_t>::max();
+        result = newResult;
+    }
+    return result;
+}
+
+uint32_t CodeBlock::exitCountThresholdForReoptimization()
+{
+    return adjustedExitCountThreshold(Options::osrExitCountForReoptimization() * codeTypeThresholdMultiplier());
+}
+
+uint32_t CodeBlock::exitCountThresholdForReoptimizationFromLoop()
+{
+    return adjustedExitCountThreshold(Options::osrExitCountForReoptimizationFromLoop() * codeTypeThresholdMultiplier());
+}
+
+bool CodeBlock::shouldReoptimizeNow()
+{
+    return osrExitCounter() >= exitCountThresholdForReoptimization();
+}
+
+bool CodeBlock::shouldReoptimizeFromLoopNow()
+{
+    return osrExitCounter() >= exitCountThresholdForReoptimizationFromLoop();
 }
 #endif
 
@@ -3020,11 +3248,11 @@ void CodeBlock::tallyFrequentExitSites()
     for (unsigned i = 0; i < m_dfgData->osrExit.size(); ++i) {
         DFG::OSRExit& exit = m_dfgData->osrExit[i];
         
-        if (!exit.considerAddingAsFrequentExitSite(this, profiledBlock))
+        if (!exit.considerAddingAsFrequentExitSite(profiledBlock))
             continue;
         
 #if DFG_ENABLE(DEBUG_VERBOSE)
-        dataLog("OSR exit #", i, " (bc#", exit.m_codeOrigin.bytecodeIndex, ", @", exit.m_nodeIndex, ", ", DFG::exitKindToString(exit.m_kind), ") for ", *this, " occurred frequently: counting as frequent exit site.\n");
+        dataLog("OSR exit #", i, " (bc#", exit.m_codeOrigin.bytecodeIndex, ", ", exit.m_kind, ") for ", *this, " occurred frequently: counting as frequent exit site.\n");
 #endif
     }
 }
@@ -3063,18 +3291,18 @@ void CodeBlock::dumpValueProfiles()
 
 size_t CodeBlock::predictedMachineCodeSize()
 {
-    // This will be called from CodeBlock::CodeBlock before either m_globalData or the
+    // This will be called from CodeBlock::CodeBlock before either m_vm or the
     // instructions have been initialized. It's OK to return 0 because what will really
     // matter is the recomputation of this value when the slow path is triggered.
-    if (!m_globalData)
+    if (!m_vm)
         return 0;
     
-    if (!m_globalData->machineCodeBytesPerBytecodeWordForBaselineJIT)
+    if (!m_vm->machineCodeBytesPerBytecodeWordForBaselineJIT)
         return 0; // It's as good of a prediction as we'll get.
     
     // Be conservative: return a size that will be an overestimation 84% of the time.
-    double multiplier = m_globalData->machineCodeBytesPerBytecodeWordForBaselineJIT.mean() +
-        m_globalData->machineCodeBytesPerBytecodeWordForBaselineJIT.standardDeviation();
+    double multiplier = m_vm->machineCodeBytesPerBytecodeWordForBaselineJIT.mean() +
+        m_vm->machineCodeBytesPerBytecodeWordForBaselineJIT.standardDeviation();
     
     // Be paranoid: silently reject bogus multipiers. Silently doing the "wrong" thing
     // here is OK, since this whole method is just a heuristic.
@@ -3095,7 +3323,7 @@ size_t CodeBlock::predictedMachineCodeSize()
 
 bool CodeBlock::usesOpcode(OpcodeID opcodeID)
 {
-    Interpreter* interpreter = globalData()->interpreter;
+    Interpreter* interpreter = vm()->interpreter;
     Instruction* instructionsBegin = instructions().begin();
     unsigned instructionCount = instructions().size();
     
@@ -3110,7 +3338,7 @@ bool CodeBlock::usesOpcode(OpcodeID opcodeID)
             FOR_EACH_OPCODE_ID(DEFINE_OP)
 #undef DEFINE_OP
         default:
-            ASSERT_NOT_REACHED();
+            RELEASE_ASSERT_NOT_REACHED();
             break;
         }
     }

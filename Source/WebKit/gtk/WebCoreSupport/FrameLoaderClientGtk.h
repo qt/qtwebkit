@@ -184,7 +184,7 @@ namespace WebKit {
         virtual void dispatchDidBecomeFrameset(bool);
 
         virtual bool canCachePage() const;
-        virtual void download(WebCore::ResourceHandle*, const WebCore::ResourceRequest&, const WebCore::ResourceResponse&);
+        virtual void convertMainResourceLoadToDownload(WebCore::DocumentLoader*, const WebCore::ResourceRequest&, const WebCore::ResourceResponse&);
 
         virtual PassRefPtr<WebCore::FrameNetworkingContext> createNetworkingContext();
 
@@ -198,6 +198,8 @@ namespace WebKit {
         // Plugin view to redirect data to
         WebCore::PluginView* m_pluginView;
         bool m_hasSentResponseToPlugin;
+
+        virtual void dispatchDidCommitLoad(bool isNavigatingWithinPage);
     };
 
 }

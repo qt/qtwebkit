@@ -19,7 +19,6 @@
  */
 
 [
-    IndexedGetter,
     CustomNamedGetter
 ] interface HTMLFormElement : HTMLElement {
     [Reflect=accept_charset] attribute DOMString acceptCharset;
@@ -35,6 +34,8 @@
     readonly attribute HTMLCollection elements;
     readonly attribute long length;
 
+    getter Element (unsigned long index);
+
 #if defined(LANGUAGE_JAVASCRIPT) && LANGUAGE_JAVASCRIPT
     [ImplementedAs=submitFromJavaScript] void submit();
 #else
@@ -42,10 +43,4 @@
 #endif
     void reset();
     boolean checkValidity();
-
-#if defined(ENABLE_REQUEST_AUTOCOMPLETE) && ENABLE_REQUEST_AUTOCOMPLETE
-    [V8EnabledAtRuntime=requestAutocomplete] void requestAutocomplete();
-    [V8EnabledAtRuntime=requestAutocomplete,NotEnumerable] attribute EventListener onautocomplete;
-    [V8EnabledAtRuntime=requestAutocomplete,NotEnumerable] attribute EventListener onautocompleteerror;
-#endif
 };

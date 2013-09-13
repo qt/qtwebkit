@@ -35,6 +35,7 @@
 #include "CodeBlock.h"
 #include "LLIntCLoop.h"
 #include "LLIntSlowPaths.h"
+#include "Operations.h"
 #include "VMInspector.h"
 #include <wtf/Assertions.h>
 #include <wtf/MathExtras.h>
@@ -264,7 +265,7 @@ JSValue CLoop::execute(CallFrame* callFrame, OpcodeID bootstrapOpcodeId,
         return JSValue();
     }
 
-    ASSERT(callFrame->globalData().topCallFrame == callFrame);
+    ASSERT(callFrame->vm().topCallFrame == callFrame);
 
     // Define the pseudo registers used by the LLINT C Loop backend:
     ASSERT(sizeof(CLoopRegister) == sizeof(intptr_t));
@@ -307,12 +308,10 @@ JSValue CLoop::execute(CallFrame* callFrame, OpcodeID bootstrapOpcodeId,
     CLoopRegister rRetVPC;
     CLoopDoubleRegister d0, d1;
 
-#if COMPILER(MSVC)
     // Keep the compiler happy. We don't really need this, but the compiler
     // will complain. This makes the warning go away.
     t0.i = 0;
     t1.i = 0;
-#endif
 
     // Instantiate the pseudo JIT stack frame used by the LLINT C Loop backend:
     JITStackFrame jitStackFrame;
@@ -320,10 +319,10 @@ JSValue CLoop::execute(CallFrame* callFrame, OpcodeID bootstrapOpcodeId,
     // The llint expects the native stack pointer, sp, to be pointing to the
     // jitStackFrame (which is the simulation of the native stack frame):
     JITStackFrame* const sp = &jitStackFrame;
-    sp->globalData = &callFrame->globalData();
+    sp->vm = &callFrame->vm();
 
-    // Set up an alias for the globalData ptr in the JITStackFrame:
-    JSGlobalData* &globalData = sp->globalData;
+    // Set up an alias for the vm ptr in the JITStackFrame:
+    VM* &vm = sp->vm;
 
     CodeBlock* codeBlock = callFrame->codeBlock();
     Instruction* vPC;
@@ -424,7 +423,7 @@ JSValue CLoop::execute(CallFrame* callFrame, OpcodeID bootstrapOpcodeId,
             callFrame = callFrame->callerFrame();
 
             // The part in getHostCallReturnValueWithExecState():
-            JSValue result = globalData->hostCallReturnValue;
+            JSValue result = vm->hostCallReturnValue;
 #if USE(JSVALUE32_64)
             t1.i = result.tag();
             t0.i = result.payload();
@@ -436,7 +435,7 @@ JSValue CLoop::execute(CallFrame* callFrame, OpcodeID bootstrapOpcodeId,
 
         OFFLINE_ASM_GLUE_LABEL(ctiOpThrowNotCaught)
         {
-            return globalData->exception;
+            return vm->exception;
         }
 
 #if !ENABLE(COMPUTED_GOTO_OPCODES)

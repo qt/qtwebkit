@@ -55,7 +55,7 @@ RenderMathMLFenced::RenderMathMLFenced(Element* element)
 
 void RenderMathMLFenced::updateFromElement()
 {
-    Element* fenced = static_cast<Element*>(node());
+    Element* fenced = toElement(node());
  
     // FIXME: Handle open/close values with more than one character (they should be treated like text).
     AtomicString openValue = fenced->getAttribute(MathMLNames::openAttr);
@@ -89,7 +89,7 @@ RenderMathMLOperator* RenderMathMLFenced::createMathMLOperator(UChar uChar, Rend
     newStyle->setMarginEnd(Length((operatorType == RenderMathMLOperator::Fence ? gFenceMarginEms : gSeparatorMarginEndEms) * style()->fontSize(), Fixed));
     if (operatorType == RenderMathMLOperator::Fence)
         newStyle->setMarginStart(Length(gFenceMarginEms * style()->fontSize(), Fixed));
-    RenderMathMLOperator* newOperator = new (renderArena()) RenderMathMLOperator(node() /* "almost anonymous" */, uChar);
+    RenderMathMLOperator* newOperator = new (renderArena()) RenderMathMLOperator(toElement(node()), uChar);
     newOperator->setOperatorType(operatorType);
     newOperator->setStyle(newStyle.release());
     return newOperator;

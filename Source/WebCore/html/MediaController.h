@@ -28,9 +28,7 @@
 
 #if ENABLE(VIDEO)
 
-#include "ActiveDOMObject.h"
 #include "Event.h"
-#include "EventListener.h"
 #include "EventTarget.h"
 #include "MediaControllerInterface.h"
 #include "Timer.h"
@@ -60,22 +58,23 @@ public:
     virtual PassRefPtr<TimeRanges> seekable() const;
     virtual PassRefPtr<TimeRanges> played();
     
-    virtual float duration() const;
-    virtual float currentTime() const;
-    virtual void setCurrentTime(float, ExceptionCode&);
+    virtual double duration() const;
+    virtual double currentTime() const;
+    virtual void setCurrentTime(double, ExceptionCode&);
     
     virtual bool paused() const { return m_paused; }
     virtual void play();
     virtual void pause();
+    void unpause();
     
-    virtual float defaultPlaybackRate() const { return m_defaultPlaybackRate; }
-    virtual void setDefaultPlaybackRate(float);
+    virtual double defaultPlaybackRate() const { return m_defaultPlaybackRate; }
+    virtual void setDefaultPlaybackRate(double);
     
-    virtual float playbackRate() const;
-    virtual void setPlaybackRate(float);
+    virtual double playbackRate() const;
+    virtual void setPlaybackRate(double);
     
-    virtual float volume() const { return m_volume; }
-    virtual void setVolume(float, ExceptionCode&);
+    virtual double volume() const { return m_volume; }
+    virtual void setVolume(double, ExceptionCode&);
     
     virtual bool muted() const { return m_muted; }
     virtual void setMuted(bool);
@@ -83,7 +82,7 @@ public:
     virtual ReadyState readyState() const { return m_readyState; }
 
     enum PlaybackState { WAITING, PLAYING, ENDED };
-    virtual PlaybackState playbackState() const { return m_playbackState; }
+    const AtomicString& playbackState() const;
 
     virtual bool supportsFullscreen() const { return false; }
     virtual bool isFullscreen() const { return false; }
@@ -142,9 +141,9 @@ private:
     friend class MediaControllerEventListener;
     Vector<HTMLMediaElement*> m_mediaElements;
     bool m_paused;
-    float m_defaultPlaybackRate;
-    float m_volume;
-    mutable float m_position;
+    double m_defaultPlaybackRate;
+    double m_volume;
+    mutable double m_position;
     bool m_muted;
     ReadyState m_readyState;
     PlaybackState m_playbackState;

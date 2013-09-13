@@ -1,3 +1,4 @@
+
 /*
  * Copyright (C) 2012 Google Inc. All rights reserved.
  *
@@ -28,36 +29,44 @@
 
 #include "RTCStatsReport.h"
 
+#include <wtf/text/StringHash.h>
+
 namespace WebCore {
 
-PassRefPtr<RTCStatsReport> RTCStatsReport::create()
+PassRefPtr<RTCStatsReport> RTCStatsReport::create(const String& id, const String& type, double timestamp)
 {
-    return adoptRef(new RTCStatsReport());
+    return adoptRef(new RTCStatsReport(id, type, timestamp));
 }
 
-RTCStatsReport::RTCStatsReport()
+RTCStatsReport::RTCStatsReport(const String& id, const String& type, double timestamp)
+    : m_id(id)
+    , m_type(type)
+    , m_timestamp(timestamp)
 {
 }
 
-void RTCStatsReport::addElement(bool isLocal, double timestamp)
+Vector<String> RTCStatsReport::names() const
 {
-    if (isLocal) {
-        ASSERT(!m_local);
-        m_local = RTCStatsElement::create(timestamp);
+    Vector<String> result;
+    for (HashMap<String, String>::const_iterator it = m_stats.begin(); it != m_stats.end(); ++it) {
+        result.append(it->key);
     }
-    ASSERT(!m_remote);
-    m_remote = RTCStatsElement::create(timestamp);
+    return result;
 }
 
-void RTCStatsReport::addStatistic(bool isLocal, String name, String value)
+const PassRefPtr<RTCStatsReport> RTCStatsReport::local()
 {
-    if (isLocal) {
-        ASSERT(m_local);
-        m_local->addStatistic(name, value);
-    } else {
-        ASSERT(m_remote);
-        m_remote->addStatistic(name, value);
-    }
+    return this;
+}
+
+const PassRefPtr<RTCStatsReport> RTCStatsReport::remote()
+{
+    return this;
+}
+
+void RTCStatsReport::addStatistic(const String& name, const String& value)
+{
+    m_stats.add(name, value);
 }
 
 } // namespace WebCore

@@ -62,7 +62,7 @@ class RenderTableRow;
 
 class RenderTableSection : public RenderBox {
 public:
-    RenderTableSection(Node*);
+    RenderTableSection(Element*);
     virtual ~RenderTableSection();
 
     RenderObject* firstChild() const { ASSERT(children() == virtualChildren()); return children()->firstChild(); }
@@ -79,6 +79,7 @@ public:
 
     int calcRowLogicalHeight();
     void layoutRows();
+    void computeOverflowFromCells();
 
     RenderTable* table() const { return toRenderTable(parent()); }
 
@@ -149,6 +150,8 @@ public:
         return c.primaryCell();
     }
 
+    RenderTableRow* rowRendererAt(unsigned row) const { return m_grid[row].rowRenderer; }
+
     void appendColumn(unsigned pos);
     void splitColumn(unsigned pos, unsigned first);
 
@@ -202,7 +205,7 @@ private:
     virtual RenderObjectChildList* virtualChildren() { return children(); }
     virtual const RenderObjectChildList* virtualChildren() const { return children(); }
 
-    virtual const char* renderName() const { return isAnonymous() ? "RenderTableSection (anonymous)" : "RenderTableSection"; }
+    virtual const char* renderName() const { return (isAnonymous() || isPseudoElement()) ? "RenderTableSection (anonymous)" : "RenderTableSection"; }
 
     virtual bool isTableSection() const { return true; }
 
@@ -224,6 +227,7 @@ private:
     void distributeRemainingExtraLogicalHeight(int& extraLogicalHeight);
 
     bool hasOverflowingCell() const { return m_overflowingCells.size() || m_forceSlowPaintPathWithOverflowingCell; }
+    void computeOverflowFromCells(unsigned totalRows, unsigned nEffCols);
 
     CellSpan fullTableRowSpan() const { return CellSpan(0, m_grid.size()); }
     CellSpan fullTableColumnSpan() const { return CellSpan(0, table()->columns().size()); }
@@ -272,13 +276,13 @@ private:
 
 inline RenderTableSection* toRenderTableSection(RenderObject* object)
 {
-    ASSERT(!object || object->isTableSection());
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isTableSection());
     return static_cast<RenderTableSection*>(object);
 }
 
 inline const RenderTableSection* toRenderTableSection(const RenderObject* object)
 {
-    ASSERT(!object || object->isTableSection());
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isTableSection());
     return static_cast<const RenderTableSection*>(object);
 }
 

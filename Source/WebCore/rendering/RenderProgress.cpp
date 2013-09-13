@@ -19,9 +19,9 @@
  */
 
 #include "config.h"
+#if ENABLE(PROGRESS_ELEMENT)
 #include "RenderProgress.h"
 
-#if ENABLE(PROGRESS_ELEMENT)
 #include "HTMLNames.h"
 #include "HTMLProgressElement.h"
 #include "PaintInfo.h"
@@ -56,6 +56,7 @@ void RenderProgress::updateFromElement()
     m_position = element->position();
 
     updateAnimationState();
+    repaint();
     RenderBlock::updateFromElement();
 }
 
@@ -91,7 +92,6 @@ void RenderProgress::updateAnimationState()
     if (animating == m_animating)
         return;
 
-    repaint();
     m_animating = animating;
     if (m_animating) {
         m_animationStartTime = currentTime();

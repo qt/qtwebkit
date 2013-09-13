@@ -36,13 +36,11 @@
 #include "ScriptExecutionContext.h"
 #include "SecurityOrigin.h"
 #include "TextResourceDecoder.h"
-#include "WorkerContext.h"
+#include "WorkerGlobalScope.h"
 #include "WorkerScriptLoaderClient.h"
 #include "WorkerThreadableLoader.h"
-
 #include <wtf/OwnPtr.h>
 #include <wtf/RefPtr.h>
-#include <wtf/UnusedParam.h>
 
 namespace WebCore {
 
@@ -51,9 +49,6 @@ WorkerScriptLoader::WorkerScriptLoader()
     , m_failed(false)
     , m_identifier(0)
     , m_finishing(false)
-#if PLATFORM(CHROMIUM)
-    , m_targetType(ResourceRequest::TargetIsWorker)
-#endif
 {
 }
 
@@ -69,14 +64,14 @@ void WorkerScriptLoader::loadSynchronously(ScriptExecutionContext* scriptExecuti
     if (!request)
         return;
 
-    ASSERT(scriptExecutionContext->isWorkerContext());
+    ASSERT_WITH_SECURITY_IMPLICATION(scriptExecutionContext->isWorkerGlobalScope());
 
     ThreadableLoaderOptions options;
     options.allowCredentials = AllowStoredCredentials;
     options.crossOriginRequestPolicy = crossOriginRequestPolicy;
     options.sendLoadCallbacks = SendCallbacks;
 
-    WorkerThreadableLoader::loadResourceSynchronously(static_cast<WorkerContext*>(scriptExecutionContext), *request, *this, options);
+    WorkerThreadableLoader::loadResourceSynchronously(static_cast<WorkerGlobalScope*>(scriptExecutionContext), *request, *this, options);
 }
     
 void WorkerScriptLoader::loadAsynchronously(ScriptExecutionContext* scriptExecutionContext, const KURL& url, CrossOriginRequestPolicy crossOriginRequestPolicy, WorkerScriptLoaderClient* client)
@@ -109,7 +104,7 @@ PassOwnPtr<ResourceRequest> WorkerScriptLoader::createResourceRequest()
 {
     OwnPtr<ResourceRequest> request = adoptPtr(new ResourceRequest(m_url));
     request->setHTTPMethod("GET");
-#if PLATFORM(CHROMIUM) || PLATFORM(BLACKBERRY)
+#if PLATFORM(BLACKBERRY)
     request->setTargetType(m_targetType);
 #endif
     return request.release();

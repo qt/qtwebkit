@@ -104,117 +104,67 @@ StorageAreaImpl::StorageAreaImpl(StorageAreaImpl* area)
     ASSERT(!m_isShutdown);
 }
 
-bool StorageAreaImpl::canAccessStorage(Frame* frame) const
+bool StorageAreaImpl::canAccessStorage(Frame* frame)
 {
     return frame && frame->page();
 }
 
-bool StorageAreaImpl::disabledByPrivateBrowsingInFrame(const Frame* frame) const
+StorageType StorageAreaImpl::storageType() const
 {
-    if (!frame->page()->settings()->privateBrowsingEnabled())
-        return false;
-    if (m_storageType != LocalStorage)
-        return true;
-    return !SchemeRegistry::allowsLocalStorageAccessInPrivateBrowsing(frame->document()->securityOrigin()->protocol());
+    return m_storageType;
 }
 
-unsigned StorageAreaImpl::length(ExceptionCode& ec, Frame* frame) const
+unsigned StorageAreaImpl::length()
 {
-    ec = 0;
-    if (!canAccessStorage(frame)) {
-        ec = SECURITY_ERR;
-        return 0;
-    }
-    if (disabledByPrivateBrowsingInFrame(frame))
-        return 0;
-
     ASSERT(!m_isShutdown);
     blockUntilImportComplete();
 
     return m_storageMap->length();
 }
 
-String StorageAreaImpl::key(unsigned index, ExceptionCode& ec, Frame* frame) const
+String StorageAreaImpl::key(unsigned index)
 {
-    ec = 0;
-    if (!canAccessStorage(frame)) {
-        ec = SECURITY_ERR;
-        return String();
-    }
-    if (disabledByPrivateBrowsingInFrame(frame))
-        return String();
-
     ASSERT(!m_isShutdown);
     blockUntilImportComplete();
 
     return m_storageMap->key(index);
 }
 
-String StorageAreaImpl::getItem(const String& key, ExceptionCode& ec, Frame* frame) const
+String StorageAreaImpl::item(const String& key)
 {
-    ec = 0;
-    if (!canAccessStorage(frame)) {
-        ec = SECURITY_ERR;
-        return String();
-    }
-    if (disabledByPrivateBrowsingInFrame(frame))
-        return String();
-
     ASSERT(!m_isShutdown);
     blockUntilImportComplete();
 
     return m_storageMap->getItem(key);
 }
 
-void StorageAreaImpl::setItem(const String& key, const String& value, ExceptionCode& ec, Frame* frame)
+void StorageAreaImpl::setItem(Frame* sourceFrame, const String& key, const String& value, bool& quotaException)
 {
-    ec = 0;
-    if (!canAccessStorage(frame)) {
-        ec = SECURITY_ERR;
-        return;
-    }
-
     ASSERT(!m_isShutdown);
     ASSERT(!value.isNull());
     blockUntilImportComplete();
 
-    if (disabledByPrivateBrowsingInFrame(frame)) {
-        ec = QUOTA_EXCEEDED_ERR;
-        return;
-    }
-
     String oldValue;
-    bool quotaException;
     RefPtr<StorageMap> newMap = m_storageMap->setItem(key, value, oldValue, quotaException);
     if (newMap)
         m_storageMap = newMap.release();
 
-    if (quotaException) {
-        ec = QUOTA_EXCEEDED_ERR;
+    if (quotaException)
         return;
-    }
 
     if (oldValue == value)
         return;
 
     if (m_storageAreaSync)
         m_storageAreaSync->scheduleItemForSync(key, value);
-    StorageEventDispatcher::dispatch(key, oldValue, value, m_storageType, m_securityOrigin.get(), frame);
+
+    dispatchStorageEvent(key, oldValue, value, sourceFrame);
 }
 
-void StorageAreaImpl::removeItem(const String& key, ExceptionCode& ec, Frame* frame)
+void StorageAreaImpl::removeItem(Frame* sourceFrame, const String& key)
 {
-    ec = 0;
-    if (!canAccessStorage(frame)) {
-        ec = SECURITY_ERR;
-        return;
-    }
-
     ASSERT(!m_isShutdown);
     blockUntilImportComplete();
-
-    if (disabledByPrivateBrowsingInFrame(frame))
-        return;
 
     String oldValue;
     RefPtr<StorageMap> newMap = m_storageMap->removeItem(key, oldValue);
@@ -226,22 +176,14 @@ void StorageAreaImpl::removeItem(const String& key, ExceptionCode& ec, Frame* fr
 
     if (m_storageAreaSync)
         m_storageAreaSync->scheduleItemForSync(key, String());
-    StorageEventDispatcher::dispatch(key, oldValue, String(), m_storageType, m_securityOrigin.get(), frame);
+
+    dispatchStorageEvent(key, oldValue, String(), sourceFrame);
 }
 
-void StorageAreaImpl::clear(ExceptionCode& ec, Frame* frame)
+void StorageAreaImpl::clear(Frame* sourceFrame)
 {
-    ec = 0;
-    if (!canAccessStorage(frame)) {
-        ec = SECURITY_ERR;
-        return;
-    }
-
     ASSERT(!m_isShutdown);
     blockUntilImportComplete();
-
-    if (disabledByPrivateBrowsingInFrame(frame))
-        return;
 
     if (!m_storageMap->length())
         return;
@@ -251,29 +193,23 @@ void StorageAreaImpl::clear(ExceptionCode& ec, Frame* frame)
 
     if (m_storageAreaSync)
         m_storageAreaSync->scheduleClear();
-    StorageEventDispatcher::dispatch(String(), String(), String(), m_storageType, m_securityOrigin.get(), frame);
+
+    dispatchStorageEvent(String(), String(), String(), sourceFrame);
 }
 
-bool StorageAreaImpl::contains(const String& key, ExceptionCode& ec, Frame* frame) const
+bool StorageAreaImpl::contains(const String& key)
 {
-    ec = 0;
-    if (!canAccessStorage(frame)) {
-        ec = SECURITY_ERR;
-        return false;
-    }
-    if (disabledByPrivateBrowsingInFrame(frame))
-        return false;
-
     ASSERT(!m_isShutdown);
     blockUntilImportComplete();
 
     return m_storageMap->contains(key);
 }
 
-void StorageAreaImpl::importItem(const String& key, const String& value)
+void StorageAreaImpl::importItems(const HashMap<String, String>& items)
 {
     ASSERT(!m_isShutdown);
-    m_storageMap->importItem(key, value);
+
+    m_storageMap->importItems(items);
 }
 
 void StorageAreaImpl::close()
@@ -317,7 +253,7 @@ void StorageAreaImpl::blockUntilImportComplete() const
         m_storageAreaSync->blockUntilImportComplete();
 }
 
-size_t StorageAreaImpl::memoryBytesUsedByCache() const
+size_t StorageAreaImpl::memoryBytesUsedByCache()
 {
     return 0;
 }
@@ -349,4 +285,22 @@ void StorageAreaImpl::closeDatabaseTimerFired(Timer<StorageAreaImpl> *)
         m_storageAreaSync->scheduleCloseDatabase();
 }
 
+void StorageAreaImpl::closeDatabaseIfIdle()
+{
+    if (m_closeDatabaseTimer.isActive()) {
+        ASSERT(!m_accessCount);
+        m_closeDatabaseTimer.stop();
+
+        closeDatabaseTimerFired(&m_closeDatabaseTimer);
+    }
 }
+
+void StorageAreaImpl::dispatchStorageEvent(const String& key, const String& oldValue, const String& newValue, Frame* sourceFrame)
+{
+    if (m_storageType == LocalStorage)
+        StorageEventDispatcher::dispatchLocalStorageEvents(key, oldValue, newValue, m_securityOrigin.get(), sourceFrame);
+    else
+        StorageEventDispatcher::dispatchSessionStorageEvents(key, oldValue, newValue, m_securityOrigin.get(), sourceFrame);
+}
+
+} // namespace WebCore

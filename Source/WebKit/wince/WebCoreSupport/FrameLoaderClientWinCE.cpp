@@ -35,6 +35,7 @@
 #include "NotImplemented.h"
 #include "Page.h"
 #include "PluginDatabase.h"
+#include "PolicyChecker.h"
 #include "RenderPart.h"
 #include "SystemInfo.h"
 #include "WebKitVersion.h"
@@ -174,7 +175,7 @@ PassRefPtr<Frame> FrameLoaderClientWinCE::createFrame(const KURL& url, const Str
 
 void FrameLoaderClientWinCE::redirectDataToPlugin(Widget* pluginWidget)
 {
-    m_pluginView = static_cast<PluginView*>(pluginWidget);
+    m_pluginView = toPluginView(pluginWidget);
     if (pluginWidget)
         m_hasSentResponseToPlugin = false;
 }
@@ -497,7 +498,7 @@ void FrameLoaderClientWinCE::dispatchDidFailLoad(const ResourceError&)
     notImplemented();
 }
 
-void FrameLoaderClientWinCE::download(ResourceHandle*, const WebCore::ResourceRequest&, const WebCore::ResourceResponse&)
+void FrameLoaderClientWinCE::convertMainResourceLoadToDownload(WebCore::DocumentLoader*, const WebCore::ResourceRequest&, const WebCore::ResourceResponse&)
 {
     notImplemented();
 }

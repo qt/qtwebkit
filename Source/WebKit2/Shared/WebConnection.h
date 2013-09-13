@@ -34,32 +34,25 @@
 
 namespace WebKit {
 
-class WebConnection : public APIObject, public CoreIPC::MessageReceiver, public CoreIPC::MessageSender<WebConnection> {
+class WebConnection : public TypedAPIObject<APIObject::TypeConnection>, public CoreIPC::MessageReceiver, public CoreIPC::MessageSender {
 public:
-    static const Type APIType = TypeConnection;
     virtual ~WebConnection();
 
     void initializeConnectionClient(const WKConnectionClient*);
     void postMessage(const String&, APIObject*);
     void didClose();
 
-    // Used by CoreIPC::MessageSender
-    virtual CoreIPC::Connection* connection() const = 0;
-    virtual uint64_t destinationID() const = 0;
-
 protected:
     explicit WebConnection();
-
-    virtual Type type() const { return APIType; }
 
     virtual void encodeMessageBody(CoreIPC::ArgumentEncoder&, APIObject*) = 0;
     virtual bool decodeMessageBody(CoreIPC::ArgumentDecoder&, RefPtr<APIObject>&) = 0;
 
     // CoreIPC::MessageReceiver
-    void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::MessageDecoder&) OVERRIDE;
+    void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&) OVERRIDE;
 
     // Implemented in generated WebConnectionMessageReceiver.cpp
-    void didReceiveWebConnectionMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::MessageDecoder&);
+    void didReceiveWebConnectionMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&);
 
     // Mesage handling implementation functions.
     void handleMessage(CoreIPC::MessageDecoder&);

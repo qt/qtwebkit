@@ -24,9 +24,8 @@
  */
 
 #include "config.h"
-#include "HTMLDialogElement.h"
-
 #if ENABLE(DIALOG_ELEMENT)
+#include "HTMLDialogElement.h"
 
 #include "ExceptionCode.h"
 #include "RenderDialog.h"
@@ -53,7 +52,7 @@ void HTMLDialogElement::close(ExceptionCode& ec)
         return;
     }
     setBooleanAttribute(openAttr, false);
-    setIsInTopLayer(false);
+    document()->removeFromTopLayer(this);
 }
 
 void HTMLDialogElement::show()
@@ -70,7 +69,7 @@ void HTMLDialogElement::showModal(ExceptionCode& ec)
         return;
     }
     setBooleanAttribute(openAttr, true);
-    setIsInTopLayer(true);
+    document()->addToTopLayer(this);
 }
 
 bool HTMLDialogElement::isPresentationAttribute(const QualifiedName& name) const

@@ -27,7 +27,6 @@ text-rendering
 -webkit-locale
 -webkit-text-orientation
 -epub-text-orientation = -webkit-text-orientation
--webkit-text-size-adjust
 -webkit-writing-mode
 -epub-writing-mode = -webkit-writing-mode
 zoom
@@ -100,9 +99,15 @@ content
 counter-increment
 counter-reset
 cursor
+#if defined(ENABLE_CURSOR_VISIBILITY) && ENABLE_CURSOR_VISIBILITY
+-webkit-cursor-visibility
+#endif
 empty-cells
 float
 font-stretch
+#if defined(ENABLE_CSS_SHADERS) && ENABLE_CSS_SHADERS
+geometry
+#endif
 height
 #if defined(ENABLE_CSS_IMAGE_ORIENTATION) && ENABLE_CSS_IMAGE_ORIENTATION
 image-orientation
@@ -126,6 +131,10 @@ max-height
 max-width
 min-height
 min-width
+#if defined(ENABLE_CSS_SHADERS) && ENABLE_CSS_SHADERS
+mix
+parameters
+#endif
 opacity
 // Honor -webkit-opacity as a synonym for opacity. This was the only syntax that worked in Safari 1.1,
 // and may be in use on some websites and widgets.
@@ -182,6 +191,12 @@ text-underline-mode
 text-underline-style
 text-underline-width
 top
+transition
+transition-delay
+transition-duration
+transition-property
+transition-timing-function
+
 unicode-bidi
 unicode-range
 vertical-align
@@ -206,6 +221,7 @@ z-index
 -webkit-appearance
 -webkit-aspect-ratio
 -webkit-backface-visibility
+-webkit-background-blend-mode
 -webkit-background-clip
 -webkit-background-composite
 -webkit-background-origin
@@ -283,10 +299,17 @@ z-index
 -webkit-flex-wrap
 -webkit-justify-content
 -webkit-font-size-delta
--webkit-grid-columns
--webkit-grid-rows
+-webkit-grid-auto-columns
+-webkit-grid-auto-rows
+-webkit-grid-definition-columns
+-webkit-grid-definition-rows
+-webkit-grid-start
+-webkit-grid-end
+-webkit-grid-before
+-webkit-grid-after
 -webkit-grid-column
 -webkit-grid-row
+-webkit-grid-auto-flow
 -webkit-highlight
 -webkit-hyphenate-character
 -webkit-hyphenate-limit-after
@@ -357,7 +380,10 @@ z-index
 #if defined(ENABLE_CSS3_TEXT) && ENABLE_CSS3_TEXT
 -webkit-text-decoration-line
 -webkit-text-decoration-style
+-webkit-text-decoration-color
 -webkit-text-align-last
+-webkit-text-justify
+-webkit-text-underline-position
 #endif
 -webkit-text-decorations-in-effect
 -webkit-text-emphasis
@@ -389,19 +415,20 @@ z-index
 #if defined(ENABLE_CSS_REGIONS) && ENABLE_CSS_REGIONS
 -webkit-flow-into
 -webkit-flow-from
--webkit-region-overflow
+-webkit-region-fragment
 -webkit-region-break-after
 -webkit-region-break-before
 -webkit-region-break-inside
 #endif
-#if defined(ENABLE_CSS_EXCLUSIONS) && ENABLE_CSS_EXCLUSIONS
+#if defined(ENABLE_CSS_SHAPES) && ENABLE_CSS_SHAPES
 -webkit-shape-inside
 -webkit-shape-outside
 -webkit-shape-margin
 -webkit-shape-padding
+#endif
+#if defined(ENABLE_CSS_EXCLUSIONS) && ENABLE_CSS_EXCLUSIONS
 -webkit-wrap-flow
 -webkit-wrap-through
--webkit-wrap
 #endif
 #if defined(ENABLE_CSS_DEVICE_ADAPTATION) && ENABLE_CSS_DEVICE_ADAPTATION
 max-zoom

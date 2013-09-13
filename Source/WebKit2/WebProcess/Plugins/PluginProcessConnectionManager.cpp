@@ -31,6 +31,7 @@
 #include "ArgumentDecoder.h"
 #include "ArgumentEncoder.h"
 #include "PluginProcessConnection.h"
+#include "PluginProcessConnectionManagerMessages.h"
 #include "WebCoreArgumentCoders.h"
 #include "WebProcess.h"
 #include "WebProcessProxyMessages.h"
@@ -41,7 +42,13 @@
 
 namespace WebKit {
 
+PassRefPtr<PluginProcessConnectionManager> PluginProcessConnectionManager::create()
+{
+    return adoptRef(new PluginProcessConnectionManager);
+}
+
 PluginProcessConnectionManager::PluginProcessConnectionManager()
+    : m_queue(WorkQueue::create("com.apple.WebKit.PluginProcessConnectionManager"))
 {
 }
 
@@ -49,17 +56,21 @@ PluginProcessConnectionManager::~PluginProcessConnectionManager()
 {
 }
 
-PluginProcessConnection* PluginProcessConnectionManager::getPluginProcessConnection(const String& pluginPath, PluginProcess::Type processType)
+void PluginProcessConnectionManager::initializeConnection(CoreIPC::Connection* connection)
+{
+    connection->addWorkQueueMessageReceiver(Messages::PluginProcessConnectionManager::messageReceiverName(), m_queue.get(), this);
+}
+
+PluginProcessConnection* PluginProcessConnectionManager::getPluginProcessConnection(uint64_t pluginProcessToken)
 {
     for (size_t i = 0; i < m_pluginProcessConnections.size(); ++i) {
-        RefPtr<PluginProcessConnection>& pluginProcessConnection = m_pluginProcessConnections[i];
-        if (pluginProcessConnection->pluginPath() == pluginPath && pluginProcessConnection->processType() == processType)
-            return pluginProcessConnection.get();
+        if (m_pluginProcessConnections[i]->pluginProcessToken() == pluginProcessToken)
+            return m_pluginProcessConnections[i].get();
     }
 
     CoreIPC::Attachment encodedConnectionIdentifier;
     bool supportsAsynchronousInitialization;
-    if (!WebProcess::shared().connection()->sendSync(Messages::WebProcessProxy::GetPluginProcessConnection(pluginPath, processType),
+    if (!WebProcess::shared().parentProcessConnection()->sendSync(Messages::WebProcessProxy::GetPluginProcessConnection(pluginProcessToken),
                                                      Messages::WebProcessProxy::GetPluginProcessConnection::Reply(encodedConnectionIdentifier, supportsAsynchronousInitialization), 0))
         return 0;
 
@@ -73,14 +84,14 @@ PluginProcessConnection* PluginProcessConnectionManager::getPluginProcessConnect
         return 0;
 #endif
 
-    RefPtr<PluginProcessConnection> pluginProcessConnection = PluginProcessConnection::create(this, pluginPath, processType, connectionIdentifier, supportsAsynchronousInitialization);
+    RefPtr<PluginProcessConnection> pluginProcessConnection = PluginProcessConnection::create(this, pluginProcessToken, connectionIdentifier, supportsAsynchronousInitialization);
     m_pluginProcessConnections.append(pluginProcessConnection);
 
     {
-        MutexLocker locker(m_pathsAndConnectionsMutex);
-        ASSERT(!m_pathsAndConnections.contains(std::make_pair(pluginProcessConnection->pluginPath(), processType)));
+        MutexLocker locker(m_tokensAndConnectionsMutex);
+        ASSERT(!m_tokensAndConnections.contains(pluginProcessToken));
 
-        m_pathsAndConnections.set(std::make_pair(pluginPath, processType), pluginProcessConnection->connection());
+        m_tokensAndConnections.set(pluginProcessToken, pluginProcessConnection->connection());
     }
 
     return pluginProcessConnection.get();
@@ -92,19 +103,19 @@ void PluginProcessConnectionManager::removePluginProcessConnection(PluginProcess
     ASSERT(vectorIndex != notFound);
 
     {
-        MutexLocker locker(m_pathsAndConnectionsMutex);
-        ASSERT(m_pathsAndConnections.contains(std::make_pair(pluginProcessConnection->pluginPath(), pluginProcessConnection->processType())));
+        MutexLocker locker(m_tokensAndConnectionsMutex);
+        ASSERT(m_tokensAndConnections.contains(pluginProcessConnection->pluginProcessToken()));
         
-        m_pathsAndConnections.remove(std::make_pair(pluginProcessConnection->pluginPath(), pluginProcessConnection->processType()));
+        m_tokensAndConnections.remove(pluginProcessConnection->pluginProcessToken());
     }
 
     m_pluginProcessConnections.remove(vectorIndex);
 }
 
-void PluginProcessConnectionManager::pluginProcessCrashed(const String& pluginPath, PluginProcess::Type processType)
+void PluginProcessConnectionManager::pluginProcessCrashed(uint64_t pluginProcessToken)
 {
-    MutexLocker locker(m_pathsAndConnectionsMutex);
-    CoreIPC::Connection* connection = m_pathsAndConnections.get(std::make_pair(pluginPath, processType)).get();
+    MutexLocker locker(m_tokensAndConnectionsMutex);
+    CoreIPC::Connection* connection = m_tokensAndConnections.get(pluginProcessToken);
 
     // It's OK for connection to be null here; it will happen if this web process doesn't know
     // anything about the plug-in process.

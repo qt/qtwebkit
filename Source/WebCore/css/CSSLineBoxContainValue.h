@@ -47,10 +47,8 @@ public:
     }
 
     String customCssText() const;
-
+    bool equals(const CSSLineBoxContainValue& other) const { return m_value == other.m_value; }
     LineBoxContain value() const { return m_value; }
-
-    void reportDescendantMemoryUsage(MemoryObjectInfo*) const;
 
 private:
     LineBoxContain m_value;

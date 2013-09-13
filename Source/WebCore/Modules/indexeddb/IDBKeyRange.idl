@@ -25,20 +25,17 @@
 
 [
     Conditional=INDEXED_DATABASE,
-    JSNoStaticTables
+    JSNoStaticTables,
+    ImplementationLacksVTable
 ] interface IDBKeyRange {
-    readonly attribute IDBKey lower;
-    readonly attribute IDBKey upper;
+    [ImplementedAs=lowerValue,CallWith=ScriptExecutionContext] readonly attribute any lower;
+    [ImplementedAs=upperValue,CallWith=ScriptExecutionContext] readonly attribute any upper;
     readonly attribute boolean lowerOpen;
     readonly attribute boolean upperOpen;
 
-    static IDBKeyRange only(in IDBKey value)
-        raises (DOMException);
-    static IDBKeyRange lowerBound(in IDBKey bound, in [Optional] boolean open)
-        raises (DOMException);
-    static IDBKeyRange upperBound(in IDBKey bound, in [Optional] boolean open)
-        raises (DOMException);
-    static IDBKeyRange bound(in IDBKey lower, in IDBKey upper, in [Optional] boolean lowerOpen, in [Optional] boolean upperOpen)
-        raises (DOMException);
+    [CallWith=ScriptExecutionContext, RaisesException] static IDBKeyRange only(any value);
+    [CallWith=ScriptExecutionContext, RaisesException] static IDBKeyRange lowerBound(any bound, optional boolean open);
+    [CallWith=ScriptExecutionContext, RaisesException] static IDBKeyRange upperBound(any bound, optional boolean open);
+    [CallWith=ScriptExecutionContext, RaisesException] static IDBKeyRange bound(any lower, any upper, optional boolean lowerOpen, optional boolean upperOpen);
 };
 

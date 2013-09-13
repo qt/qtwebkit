@@ -26,7 +26,7 @@
 #ifndef ScrollingStateScrollingNode_h
 #define ScrollingStateScrollingNode_h
 
-#if ENABLE(THREADED_SCROLLING)
+#if ENABLE(THREADED_SCROLLING) || USE(COORDINATED_GRAPHICS)
 
 #include "IntRect.h"
 #include "Region.h"
@@ -46,32 +46,37 @@ public:
     virtual ~ScrollingStateScrollingNode();
 
     enum ChangedProperty {
-        ViewportRect = 1 << 0,
-        ContentsSize = 1 << 1,
-        NonFastScrollableRegion = 1 << 2,
-        WheelEventHandlerCount = 1 << 3,
-        ShouldUpdateScrollLayerPositionOnMainThread = 1 << 4,
-        HorizontalScrollElasticity = 1 << 5,
-        VerticalScrollElasticity = 1 << 6,
-        HasEnabledHorizontalScrollbar = 1 << 7,
-        HasEnabledVerticalScrollbar = 1 << 8,
-        HorizontalScrollbarMode = 1 << 9,
-        VerticalScrollbarMode = 1 << 10,
-        ScrollOrigin = 1 << 11,
-        RequestedScrollPosition = 1 << 12,
+        ViewportRect = NumStateNodeBits,
+        TotalContentsSize,
+        FrameScaleFactor,
+        NonFastScrollableRegion,
+        WheelEventHandlerCount,
+        ShouldUpdateScrollLayerPositionOnMainThread,
+        HorizontalScrollElasticity,
+        VerticalScrollElasticity,
+        HasEnabledHorizontalScrollbar,
+        HasEnabledVerticalScrollbar,
+        HorizontalScrollbarMode,
+        VerticalScrollbarMode,
+        ScrollOrigin,
+        RequestedScrollPosition,
+        CounterScrollingLayer,
+        HeaderHeight,
+        FooterHeight,
+        HeaderLayer,
+        FooterLayer
     };
 
     virtual bool isScrollingNode() OVERRIDE { return true; }
 
-    virtual bool hasChangedProperties() const OVERRIDE { return m_changedProperties; }
-    virtual unsigned changedProperties() const OVERRIDE { return m_changedProperties; }
-    virtual void resetChangedProperties() OVERRIDE { m_changedProperties = 0; }
-
     const IntRect& viewportRect() const { return m_viewportRect; }
     void setViewportRect(const IntRect&);
 
-    const IntSize& contentsSize() const { return m_contentsSize; }
-    void setContentsSize(const IntSize&);
+    const IntSize& totalContentsSize() const { return m_totalContentsSize; }
+    void setTotalContentsSize(const IntSize&);
+
+    float frameScaleFactor() const { return m_frameScaleFactor; }
+    void setFrameScaleFactor(float);
 
     const Region& nonFastScrollableRegion() const { return m_nonFastScrollableRegion; }
     void setNonFastScrollableRegion(const Region&);
@@ -106,6 +111,27 @@ public:
     const IntPoint& scrollOrigin() const { return m_scrollOrigin; }
     void setScrollOrigin(const IntPoint&);
 
+    int headerHeight() const { return m_headerHeight; }
+    void setHeaderHeight(int);
+
+    int footerHeight() const { return m_footerHeight; }
+    void setFooterHeight(int);
+
+    // This is a layer moved in the opposite direction to scrolling, for example for background-attachment:fixed
+    GraphicsLayer* counterScrollingLayer() const { return m_counterScrollingLayer; }
+    void setCounterScrollingLayer(GraphicsLayer*);
+    PlatformLayer* counterScrollingPlatformLayer() const;
+
+    // The header and footer layers scroll vertically with the page, they should remain fixed when scrolling horizontally.
+    GraphicsLayer* headerLayer() const { return m_headerLayer; }
+    void setHeaderLayer(GraphicsLayer*);
+    PlatformLayer* headerPlatformLayer() const;
+
+    // The header and footer layers scroll vertically with the page, they should remain fixed when scrolling horizontally.
+    GraphicsLayer* footerLayer() const { return m_footerLayer; }
+    void setFooterLayer(GraphicsLayer*);
+    PlatformLayer* footerPlatformLayer() const;
+
     bool requestedScrollPositionRepresentsProgrammaticScroll() const { return m_requestedScrollPositionRepresentsProgrammaticScroll; }
 
     virtual void dumpProperties(TextStream&, int indent) const OVERRIDE;
@@ -114,10 +140,19 @@ private:
     ScrollingStateScrollingNode(ScrollingStateTree*, ScrollingNodeID);
     ScrollingStateScrollingNode(const ScrollingStateScrollingNode&);
 
-    unsigned m_changedProperties;
-
+    GraphicsLayer* m_counterScrollingLayer;
+    GraphicsLayer* m_headerLayer;
+    GraphicsLayer* m_footerLayer;
+#if PLATFORM(MAC)
+    RetainPtr<PlatformLayer> m_counterScrollingPlatformLayer;
+    RetainPtr<PlatformLayer> m_headerPlatformLayer;
+    RetainPtr<PlatformLayer> m_footerPlatformLayer;
+#endif
+    
     IntRect m_viewportRect;
-    IntSize m_contentsSize;
+    IntSize m_totalContentsSize;
+    
+    float m_frameScaleFactor;
 
     Region m_nonFastScrollableRegion;
 
@@ -137,11 +172,14 @@ private:
 
     IntPoint m_requestedScrollPosition;
     IntPoint m_scrollOrigin;
+
+    int m_headerHeight;
+    int m_footerHeight;
 };
 
 inline ScrollingStateScrollingNode* toScrollingStateScrollingNode(ScrollingStateNode* node)
 {
-    ASSERT(!node || node->isScrollingNode());
+    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->isScrollingNode());
     return static_cast<ScrollingStateScrollingNode*>(node);
 }
     
@@ -150,6 +188,6 @@ void toScrollingStateScrollingNode(const ScrollingStateScrollingNode*);
 
 } // namespace WebCore
 
-#endif // ENABLE(THREADED_SCROLLING)
+#endif // ENABLE(THREADED_SCROLLING) || USE(COORDINATED_GRAPHICS)
 
 #endif // ScrollingStateScrollingNode_h

@@ -28,12 +28,17 @@
 #ifndef IDBFactoryBackendImpl_h
 #define IDBFactoryBackendImpl_h
 
+#if ENABLE(INDEXED_DATABASE)
+
+#include "IDBCallbacks.h"
+#include "IDBDatabaseCallbacks.h"
 #include "IDBFactoryBackendInterface.h"
 #include "SecurityOrigin.h"
 #include <wtf/HashMap.h>
+#include <wtf/HashSet.h>
+#include <wtf/RefCounted.h>
+#include <wtf/WeakPtr.h>
 #include <wtf/text/StringHash.h>
-
-#if ENABLE(INDEXED_DATABASE)
 
 namespace WebCore {
 
@@ -52,11 +57,10 @@ public:
 
     // Notifications from weak pointers.
     virtual void removeIDBDatabaseBackend(const String& uniqueIdentifier);
-    void addIDBBackingStore(const String& fileIdentifier, IDBBackingStore*);
-    virtual void removeIDBBackingStore(const String& fileIdentifier);
 
     virtual void getDatabaseNames(PassRefPtr<IDBCallbacks>, PassRefPtr<SecurityOrigin>, ScriptExecutionContext*, const String& dataDir);
-    virtual void open(const String& name, int64_t version, PassRefPtr<IDBCallbacks>, PassRefPtr<IDBDatabaseCallbacks>, PassRefPtr<SecurityOrigin>, ScriptExecutionContext*, const String& dataDir);
+    virtual void open(const String& name, int64_t version, int64_t transactionId, PassRefPtr<IDBCallbacks>, PassRefPtr<IDBDatabaseCallbacks>, PassRefPtr<SecurityOrigin>, ScriptExecutionContext*, const String& dataDir);
+
     virtual void deleteDatabase(const String& name, PassRefPtr<IDBCallbacks>, PassRefPtr<SecurityOrigin>, ScriptExecutionContext*, const String& dataDir);
 
 protected:
@@ -67,8 +71,10 @@ private:
     typedef HashMap<String, RefPtr<IDBDatabaseBackendImpl> > IDBDatabaseBackendMap;
     IDBDatabaseBackendMap m_databaseBackendMap;
 
-    typedef HashMap<String, IDBBackingStore*> IDBBackingStoreMap;
+    typedef HashMap<String, WeakPtr<IDBBackingStore> > IDBBackingStoreMap;
     IDBBackingStoreMap m_backingStoreMap;
+
+    HashSet<RefPtr<IDBBackingStore> > m_sessionOnlyBackingStores;
 
     // Only one instance of the factory should exist at any given time.
     static IDBFactoryBackendImpl* idbFactoryBackendImpl;

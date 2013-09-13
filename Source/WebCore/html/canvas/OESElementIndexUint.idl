@@ -24,8 +24,8 @@
  */
 
 [
+    NoInterfaceObject,
     Conditional=WEBGL,
-    JSGenerateIsReachable=ImplContext,
-    OmitConstructor
+    GenerateIsReachable=ImplContext,
 ] interface OESElementIndexUint {
 };

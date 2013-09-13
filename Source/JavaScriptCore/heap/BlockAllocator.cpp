@@ -35,16 +35,17 @@
 namespace JSC {
 
 BlockAllocator::BlockAllocator()
-    : m_copiedRegionSet(CopiedBlock::blockSize)
+    : m_superRegion()
+    , m_copiedRegionSet(CopiedBlock::blockSize)
     , m_markedRegionSet(MarkedBlock::blockSize)
-    , m_weakAndMarkStackRegionSet(WeakBlock::blockSize)
+    , m_fourKBBlockRegionSet(WeakBlock::blockSize)
     , m_workListRegionSet(CopyWorkListSegment::blockSize)
     , m_numberOfEmptyRegions(0)
     , m_isCurrentlyAllocating(false)
     , m_blockFreeingThreadShouldQuit(false)
     , m_blockFreeingThread(createThread(blockFreeingThreadStartFunc, this, "JavaScriptCore::BlockFree"))
 {
-    ASSERT(m_blockFreeingThread);
+    RELEASE_ASSERT(m_blockFreeingThread);
     m_regionLock.Init();
 }
 
@@ -57,6 +58,16 @@ BlockAllocator::~BlockAllocator()
         m_emptyRegionCondition.broadcast();
     }
     waitForThreadCompletion(m_blockFreeingThread);
+    ASSERT(allRegionSetsAreEmpty());
+    ASSERT(m_emptyRegions.isEmpty());
+}
+
+bool BlockAllocator::allRegionSetsAreEmpty() const
+{
+    return m_copiedRegionSet.isEmpty()
+        && m_markedRegionSet.isEmpty()
+        && m_fourKBBlockRegionSet.isEmpty()
+        && m_workListRegionSet.isEmpty();
 }
 
 void BlockAllocator::releaseFreeRegions()
@@ -69,7 +80,7 @@ void BlockAllocator::releaseFreeRegions()
                 region = 0;
             else {
                 region = m_emptyRegions.removeHead();
-                ASSERT(region);
+                RELEASE_ASSERT(region);
                 m_numberOfEmptyRegions--;
             }
         }
@@ -77,7 +88,7 @@ void BlockAllocator::releaseFreeRegions()
         if (!region)
             break;
 
-        delete region;
+        region->destroy();
     }
 }
 
@@ -141,7 +152,7 @@ void BlockAllocator::blockFreeingThreadMain()
                     region = 0;
                 else {
                     region = m_emptyRegions.removeHead();
-                    ASSERT(region);
+                    RELEASE_ASSERT(region);
                     m_numberOfEmptyRegions--;
                 }
             }
@@ -149,7 +160,7 @@ void BlockAllocator::blockFreeingThreadMain()
             if (!region)
                 break;
             
-            delete region;
+            region->destroy();
         }
     }
 }

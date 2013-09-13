@@ -30,20 +30,18 @@
 
 @class DOMDictionary;
 @class DOMDocument;
-@class DOMIDBKey;
 @class DOMNode;
 @class DOMSVGDocument;
 @class DOMSVGPoint;
+@class DOMTestEnumType;
+@class DOMTestNode;
 @class DOMTestObj;
 @class DOMTestObjectAConstructor;
 @class DOMTestObjectBConstructor;
 @class DOMTestObjectCConstructor;
-@class DOMa;
+@class DOMTestSubObjConstructor;
 @class DOMany;
-@class DOMb;
 @class DOMbool;
-@class DOMd;
-@class DOMe;
 @class NSString;
 @protocol DOMEventListener;
 
@@ -69,6 +67,9 @@ enum {
 @property(readonly) int readOnlyLongAttr;
 @property(readonly, copy) NSString *readOnlyStringAttr;
 @property(readonly, retain) DOMTestObj *readOnlyTestObjAttr;
+@property(retain) DOMTestSubObjConstructor *TestSubObjEnabledBySetting;
+@property char byteAttr;
+@property unsigned char octetAttr;
 @property short shortAttr;
 @property unsigned short unsignedShortAttr;
 @property int longAttr;
@@ -116,16 +117,26 @@ enum {
 @property int idName;
 @property(readonly, copy) NSString *hashName;
 @property(readonly) int replaceableAttribute;
+@property(readonly) double nullableDoubleAttribute;
+@property(readonly) int nullableLongAttribute;
+@property(readonly) BOOL nullableBooleanAttribute;
+@property(readonly, copy) NSString *nullableStringAttribute;
+@property int nullableLongSettableAttribute;
+@property int nullableStringValue;
 
 - (void)voidMethod;
 - (void)voidMethodWithArgs:(int)longArg strArg:(NSString *)strArg objArg:(DOMTestObj *)objArg;
+- (char)byteMethod;
+- (char)byteMethodWithArgs:(char)byteArg strArg:(NSString *)strArg objArg:(DOMTestObj *)objArg;
+- (unsigned char)octetMethod;
+- (unsigned char)octetMethodWithArgs:(unsigned char)octetArg strArg:(NSString *)strArg objArg:(DOMTestObj *)objArg;
 - (int)longMethod;
 - (int)longMethodWithArgs:(int)longArg strArg:(NSString *)strArg objArg:(DOMTestObj *)objArg;
 - (DOMTestObj *)objMethod;
 - (DOMTestObj *)objMethodWithArgs:(int)longArg strArg:(NSString *)strArg objArg:(DOMTestObj *)objArg;
+- (void)methodWithEnumArg:(DOMTestEnumType *)enumArg;
 - (DOMTestObj *)methodThatRequiresAllArgsAndThrows:(NSString *)strArg objArg:(DOMTestObj *)objArg;
 - (void)serializedValue:(NSString *)serializedArg;
-- (void)idbKey:(DOMIDBKey *)key;
 - (void)optionsObject:(DOMDictionary *)oo ooo:(DOMDictionary *)ooo;
 - (void)methodWithException;
 - (void)customMethod;
@@ -166,10 +177,10 @@ enum {
 - (void)overloadedMethod1:(NSString *)type;
 #endif
 - (DOMSVGDocument *)getSVGDocument;
-- (void)convert1:(DOMa *)value;
-- (void)convert2:(DOMb *)value;
-- (void)convert4:(DOMd *)value;
-- (void)convert5:(DOMe *)value;
+- (void)convert1:(DOMTestNode *)value;
+- (void)convert2:(DOMTestNode *)value;
+- (void)convert4:(DOMTestNode *)value;
+- (void)convert5:(DOMTestNode *)value;
 - (DOMSVGPoint *)mutablePointFunction;
 - (DOMSVGPoint *)immutablePointFunction;
 - (void)orange;

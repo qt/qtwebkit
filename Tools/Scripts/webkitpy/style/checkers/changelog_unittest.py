@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-#
 # Copyright (C) 2010 Apple Inc. All rights reserved.
 # Copyright (C) 2011 Patrick Gansterer <paroga@paroga.com>
 #
@@ -26,7 +24,7 @@
 """Unit test for changelog.py."""
 
 import changelog
-import unittest
+import unittest2 as unittest
 
 
 class ChangeLogCheckerTest(unittest.TestCase):
@@ -182,6 +180,3 @@ class ChangeLogCheckerTest(unittest.TestCase):
                              '        * Source/WebKit/foo.cpp:    \n'
                              '        * Source/WebKit/bar.cpp:\n'
                              '        * Source/WebKit/foobar.cpp: Description\n')
-
-if __name__ == '__main__':
-    unittest.main()

@@ -40,10 +40,6 @@
 #include "ScrollbarTheme.h"
 #include <wtf/PassOwnPtr.h>
 
-#if PLATFORM(CHROMIUM)
-#include "TraceEvent.h"
-#endif
-
 namespace WebCore {
 
 struct SameSizeAsScrollableArea {
@@ -144,10 +140,6 @@ void ScrollableArea::notifyScrollPositionChanged(const IntPoint& position)
 
 void ScrollableArea::scrollPositionChanged(const IntPoint& position)
 {
-#if PLATFORM(CHROMIUM)
-    TRACE_EVENT0("webkit", "ScrollableArea::scrollPositionChanged");
-#endif
-
     IntPoint oldPosition = scrollPosition();
     // Tell the derived class to scroll its contents.
     setScrollOffset(position);
@@ -176,7 +168,7 @@ void ScrollableArea::scrollPositionChanged(const IntPoint& position)
     }
 
     if (scrollPosition() != oldPosition)
-        scrollAnimator()->notifyContentAreaScrolled();
+        scrollAnimator()->notifyContentAreaScrolled(scrollPosition() - oldPosition);
 }
 
 bool ScrollableArea::handleWheelEvent(const PlatformWheelEvent& wheelEvent)
@@ -268,30 +260,23 @@ void ScrollableArea::finishCurrentScrollAnimations() const
         scrollAnimator->finishCurrentScrollAnimations();
 }
 
-void ScrollableArea::didAddVerticalScrollbar(Scrollbar* scrollbar)
+void ScrollableArea::didAddScrollbar(Scrollbar* scrollbar, ScrollbarOrientation orientation)
 {
-    scrollAnimator()->didAddVerticalScrollbar(scrollbar);
+    if (orientation == VerticalScrollbar)
+        scrollAnimator()->didAddVerticalScrollbar(scrollbar);
+    else
+        scrollAnimator()->didAddHorizontalScrollbar(scrollbar);
 
     // <rdar://problem/9797253> AppKit resets the scrollbar's style when you attach a scrollbar
     setScrollbarOverlayStyle(scrollbarOverlayStyle());
 }
 
-void ScrollableArea::willRemoveVerticalScrollbar(Scrollbar* scrollbar)
+void ScrollableArea::willRemoveScrollbar(Scrollbar* scrollbar, ScrollbarOrientation orientation)
 {
-    scrollAnimator()->willRemoveVerticalScrollbar(scrollbar);
-}
-
-void ScrollableArea::didAddHorizontalScrollbar(Scrollbar* scrollbar)
-{
-    scrollAnimator()->didAddHorizontalScrollbar(scrollbar);
-
-    // <rdar://problem/9797253> AppKit resets the scrollbar's style when you attach a scrollbar
-    setScrollbarOverlayStyle(scrollbarOverlayStyle());
-}
-
-void ScrollableArea::willRemoveHorizontalScrollbar(Scrollbar* scrollbar)
-{
-    scrollAnimator()->willRemoveHorizontalScrollbar(scrollbar);
+    if (orientation == VerticalScrollbar)
+        scrollAnimator()->willRemoveVerticalScrollbar(scrollbar);
+    else
+        scrollAnimator()->willRemoveHorizontalScrollbar(scrollbar);
 }
 
 void ScrollableArea::contentsResized()
@@ -399,15 +384,22 @@ IntPoint ScrollableArea::minimumScrollPosition() const
 
 IntPoint ScrollableArea::maximumScrollPosition() const
 {
-    return IntPoint(contentsSize().width() - visibleWidth(), contentsSize().height() - visibleHeight());
+    return IntPoint(totalContentsSize().width() - visibleWidth(), totalContentsSize().height() - visibleHeight());
 }
 
-IntRect ScrollableArea::visibleContentRect(bool includeScrollbars) const
+IntSize ScrollableArea::totalContentsSize() const
+{
+    IntSize totalContentsSize = contentsSize();
+    totalContentsSize.setHeight(totalContentsSize.height() + headerHeight() + footerHeight());
+    return totalContentsSize;
+}
+
+IntRect ScrollableArea::visibleContentRect(VisibleContentRectIncludesScrollbars scrollbarInclusion) const
 {
     int verticalScrollbarWidth = 0;
     int horizontalScrollbarHeight = 0;
 
-    if (includeScrollbars) {
+    if (scrollbarInclusion == IncludeScrollbars) {
         if (Scrollbar* verticalBar = verticalScrollbar())
             verticalScrollbarWidth = !verticalBar->isOverlayScrollbar() ? verticalBar->width() : 0;
         if (Scrollbar* horizontalBar = horizontalScrollbar())
@@ -418,6 +410,37 @@ IntRect ScrollableArea::visibleContentRect(bool includeScrollbars) const
                    scrollPosition().y(),
                    std::max(0, visibleWidth() + verticalScrollbarWidth),
                    std::max(0, visibleHeight() + horizontalScrollbarHeight));
+}
+
+IntPoint ScrollableArea::constrainScrollPositionForOverhang(const IntRect& visibleContentRect, const IntSize& totalContentsSize, const IntPoint& scrollPosition, const IntPoint& scrollOrigin, int headerHeight, int footerHeight)
+{
+    // The viewport rect that we're scrolling shouldn't be larger than our document.
+    IntSize idealScrollRectSize(std::min(visibleContentRect.width(), totalContentsSize.width()), std::min(visibleContentRect.height(), totalContentsSize.height()));
+    
+    IntRect scrollRect(scrollPosition + scrollOrigin - IntSize(0, headerHeight), idealScrollRectSize);
+    IntRect documentRect(IntPoint(), IntSize(totalContentsSize.width(), totalContentsSize.height() - headerHeight - footerHeight));
+
+    // Use intersection to constrain our ideal scroll rect by the document rect.
+    scrollRect.intersect(documentRect);
+
+    if (scrollRect.size() != idealScrollRectSize) {
+        // If the rect was clipped, restore its size, effectively pushing it "down" from the top left.
+        scrollRect.setSize(idealScrollRectSize);
+
+        // If we still clip, push our rect "up" from the bottom right.
+        scrollRect.intersect(documentRect);
+        if (scrollRect.width() < idealScrollRectSize.width())
+            scrollRect.move(-(idealScrollRectSize.width() - scrollRect.width()), 0);
+        if (scrollRect.height() < idealScrollRectSize.height())
+            scrollRect.move(0, -(idealScrollRectSize.height() - scrollRect.height()));
+    }
+
+    return scrollRect.location() - toIntSize(scrollOrigin);
+}
+
+IntPoint ScrollableArea::constrainScrollPositionForOverhang(const IntPoint& scrollPosition)
+{
+    return constrainScrollPositionForOverhang(visibleContentRect(), totalContentsSize(), scrollPosition, scrollOrigin(), headerHeight(), footerHeight());
 }
 
 } // namespace WebCore

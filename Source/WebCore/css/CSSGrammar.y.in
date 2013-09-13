@@ -1,6 +1,6 @@
 /*
  *  Copyright (C) 2002-2003 Lars Knoll (knoll@kde.org)
- *  Copyright (C) 2004, 2005, 2006, 2007, 2008, 2009, 2010 Apple Inc. All rights reserved.
+ *  Copyright (C) 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013 Apple Inc. All rights reserved.
  *  Copyright (C) 2006 Alexey Proskuryakov (ap@nypop.com)
  *  Copyright (C) 2008 Eric Seidel <eric@webkit.org>
  *  Copyright (C) 2012 Intel Corporation. All rights reserved.
@@ -50,6 +50,7 @@
     Vector<RefPtr<StyleKeyframe> >* keyframeRuleList;
     float val;
     CSSPropertyID id;
+    CSSParser::Location location;
 }
 
 %{
@@ -59,9 +60,38 @@ static inline int cssyyerror(void*, const char*)
     return 1;
 }
 
+static inline bool isCSSTokenAString(int yytype)
+{
+    switch (yytype) {
+    case IDENT:
+    case STRING:
+    case NTH:
+    case HEX:
+    case IDSEL:
+    case DIMEN:
+    case INVALIDDIMEN:
+    case URI:
+    case FUNCTION:
+    case ANYFUNCTION:
+    case NOTFUNCTION:
+    case CALCFUNCTION:
+    case MINFUNCTION:
+    case MAXFUNCTION:
+    case VAR_DEFINITION:
+    case UNICODERANGE:
+        return true;
+    default:
+        return false;
+    }
+}
+
 %}
 
-%expect 65
+#if ENABLE_SHADOW_DOM
+%expect 32
+#else
+%expect 31
+#endif
 
 %nonassoc LOWEST_PREC
 
@@ -111,6 +141,12 @@ static inline int cssyyerror(void*, const char*)
 %token WEBKIT_SELECTOR_SYM
 %token WEBKIT_REGION_RULE_SYM
 %token WEBKIT_VIEWPORT_RULE_SYM
+#if ENABLE_CSS3_CONDITIONAL_RULES
+%token WEBKIT_SUPPORTS_CONDITION_SYM
+#endif
+#if ENABLE_CSS_SHADERS
+%token WEBKIT_FILTER_RULE_SYM
+#endif
 %token <marginBox> TOPLEFTCORNER_SYM
 %token <marginBox> TOPLEFT_SYM
 %token <marginBox> TOPCENTER_SYM
@@ -141,6 +177,7 @@ static inline int cssyyerror(void*, const char*)
 #endif
 
 %token <number> REMS
+%token <number> CHS
 %token <number> QEMS
 %token <number> EMS
 %token <number> EXS
@@ -166,6 +203,7 @@ static inline int cssyyerror(void*, const char*)
 %token <number> VW
 %token <number> VH
 %token <number> VMIN
+%token <number> VMAX
 %token <number> DPPX
 %token <number> DPI
 %token <number> DPCM
@@ -173,6 +211,9 @@ static inline int cssyyerror(void*, const char*)
 %token <string> URI
 %token <string> FUNCTION
 %token <string> ANYFUNCTION
+#if ENABLE_VIDEO_TRACK
+%token <string> CUEFUNCTION
+#endif
 %token <string> NOTFUNCTION
 %token <string> CALCFUNCTION
 %token <string> MINFUNCTION
@@ -202,6 +243,7 @@ static inline int cssyyerror(void*, const char*)
 %type <rule> rule
 %type <rule> valid_rule
 %type <ruleList> block_rule_list 
+%type <ruleList> region_block_rule_list
 %type <rule> block_rule
 %type <rule> block_valid_rule
 %type <rule> region
@@ -210,6 +252,9 @@ static inline int cssyyerror(void*, const char*)
 #endif
 #if ENABLE_CSS_DEVICE_ADAPTATION
 %type <rule> viewport
+#endif
+#if ENABLE_CSS_SHADERS
+%type <rule> filter
 #endif
 
 %type <string> maybe_ns_prefix
@@ -238,6 +283,7 @@ static inline int cssyyerror(void*, const char*)
 %type <boolean> supports_conjunction
 %type <boolean> supports_disjunction
 %type <boolean> supports_declaration_condition
+%type <boolean> supports_error
 #endif
 
 %type <string> keyframe_name
@@ -275,12 +321,14 @@ static inline int cssyyerror(void*, const char*)
 %type <character> operator
 
 %type <valueList> expr
+%type <valueList> valid_expr
 %type <value> term
 %type <value> unary_term
 %type <value> function
 %type <value> calc_func_term
 %type <character> calc_func_operator
 %type <valueList> calc_func_expr
+%type <valueList> valid_calc_func_expr
 %type <valueList> calc_func_expr_list
 %type <valueList> calc_func_paren_expr
 %type <value> calc_function
@@ -289,6 +337,8 @@ static inline int cssyyerror(void*, const char*)
 
 %type <string> element_name
 %type <string> attr_name
+
+%type <location> error_location
 
 %%
 
@@ -300,6 +350,9 @@ stylesheet:
   | webkit_mediaquery maybe_space
   | webkit_selector maybe_space
   | webkit_keyframe_rule maybe_space
+#if ENABLE_CSS3_CONDITIONAL_RULES
+  | webkit_supports_condition maybe_space
+#endif
   ;
 
 webkit_rule:
@@ -347,6 +400,14 @@ webkit_selector:
     }
 ;
 
+#if ENABLE_CSS3_CONDITIONAL_RULES
+webkit_supports_condition:
+    WEBKIT_SUPPORTS_CONDITION_SYM '{' maybe_space supports_condition '}' {
+        parser->m_supportsCondition = $4;
+    }
+;
+#endif
+
 maybe_space:
     /* empty */ %prec UNIMPORTANT_TOK
   | maybe_space WHITESPACE
@@ -366,6 +427,11 @@ maybe_charset:
 
 closing_brace:
     '}'
+  | %prec LOWEST_PREC TOKEN_EOF
+  ;
+
+closing_parenthesis:
+    ')'
   | %prec LOWEST_PREC TOKEN_EOF
   ;
 
@@ -419,6 +485,9 @@ valid_rule:
 #if ENABLE_CSS_DEVICE_ADAPTATION
   | viewport
 #endif
+#if ENABLE_CSS_SHADERS
+  | filter
+#endif
   ;
 
 rule:
@@ -442,13 +511,32 @@ block_rule_list:
   }
   ;
 
+region_block_rule_list:
+    /* empty */ { $$ = 0; }
+  | region_block_rule_list block_valid_rule maybe_sgml {
+      $$ = $1;
+      if ($2) {
+          if (!$$)
+              $$ = parser->createRuleList();
+          $$->append($2);
+      }
+  }
+  ;
+
 block_valid_rule:
     ruleset
   | page
   | font_face
+  | media
   | keyframes
+#if ENABLE_CSS3_CONDITIONAL_RULES
+  | supports
+#endif
 #if ENABLE_CSS_DEVICE_ADAPTATION
   | viewport
+#endif
+#if ENABLE_CSS_SHADERS
+  | filter
 #endif
   ;
 
@@ -458,10 +546,7 @@ block_rule:
   | invalid_at
   | namespace
   | import
-  | media
-#if ENABLE_CSS3_CONDITIONAL_RULES
-  | supports
-#endif
+  | region
   ;
 
 at_import_header_end_maybe_space:
@@ -643,7 +728,7 @@ media:
         $$ = parser->createMediaRule($4, $9);
     }
     | before_media_rule MEDIA_SYM at_rule_header_end_maybe_space '{' at_rule_body_start maybe_space block_rule_list save_block {
-        $$ = parser->createMediaRule(0, $7);
+        $$ = parser->createEmptyMediaRule($7);
     }
     | before_media_rule MEDIA_SYM at_rule_header_end_maybe_space ';' {
         $$ = 0;
@@ -659,13 +744,31 @@ medium:
 
 #if ENABLE_CSS3_CONDITIONAL_RULES
 supports:
-    SUPPORTS_SYM maybe_space supports_condition '{' maybe_space block_rule_list save_block {
-        CSSParser* p = static_cast<CSSParser*>(parser);
-        if ($3 && $6 && p->m_styleSheet) {
-            for (unsigned i = 0; i < $6->size(); i++)
-                p->m_styleSheet->parserAppendRule($6->at(i).release());
-        }
+    before_supports_rule SUPPORTS_SYM maybe_space supports_condition at_supports_rule_header_end '{' at_rule_body_start maybe_space block_rule_list save_block {
+        $$ = parser->createSupportsRule($4, $9);
+    }
+    | before_supports_rule SUPPORTS_SYM supports_error {
         $$ = 0;
+        parser->popRuleData();
+        parser->popSupportsRuleData();
+    }
+    ;
+
+supports_error:
+    error ';'
+    | error invalid_block
+
+before_supports_rule:
+    /* empty */ {
+        parser->markRuleHeaderStart(CSSRuleSourceData::SUPPORTS_RULE);
+        parser->markSupportsRuleHeaderStart();
+    }
+    ;
+
+at_supports_rule_header_end:
+    /* empty */ {
+        parser->markRuleHeaderEnd();
+        parser->markSupportsRuleHeaderEnd();
     }
     ;
 
@@ -705,6 +808,7 @@ supports_condition_in_parens:
         $$ = $3;
     }
     | supports_declaration_condition
+    | '(' error ')'
     ;
 
 supports_declaration_condition:
@@ -752,7 +856,7 @@ keyframes_rule:
     ;
 
 keyframe_rule:
-    key_list maybe_space '{' maybe_space declaration_list '}' {
+    key_list maybe_space '{' maybe_space declaration_list closing_brace {
         $$ = parser->createKeyframe($1);
     }
     ;
@@ -770,16 +874,21 @@ key_list:
     ;
 
 key:
-    maybe_unary_operator PERCENTAGE { $$.id = 0; $$.isInt = false; $$.fValue = $1 * $2; $$.unit = CSSPrimitiveValue::CSS_NUMBER; }
+    maybe_unary_operator PERCENTAGE { $$.id = CSSValueInvalid; $$.isInt = false; $$.fValue = $1 * $2; $$.unit = CSSPrimitiveValue::CSS_NUMBER; }
     | IDENT {
-        $$.id = 0; $$.isInt = false; $$.unit = CSSPrimitiveValue::CSS_NUMBER;
+        $$.id = CSSValueInvalid; $$.isInt = false; $$.unit = CSSPrimitiveValue::CSS_NUMBER;
         CSSParserString& str = $1;
         if (str.equalIgnoringCase("from"))
             $$.fValue = 0;
         else if (str.equalIgnoringCase("to"))
             $$.fValue = 100;
-        else
+        else {
+            $$.unit = 0;
             YYERROR;
+        }
+    }
+    | error {
+        $$.unit = 0;
     }
     ;
 
@@ -814,14 +923,13 @@ page:
 
 page_selector:
     IDENT {
-        $$ = parser->createFloatingSelector();
-        $$->setTag(QualifiedName(nullAtom, $1, parser->m_defaultNamespace));
+        $$ = parser->createFloatingSelectorWithTagName(QualifiedName(nullAtom, $1, parser->m_defaultNamespace));
         $$->setForPage();
     }
     | IDENT pseudo_page {
         $$ = $2;
         if ($$) {
-            $$->setTag(QualifiedName(nullAtom, $1, parser->m_defaultNamespace));
+            $$->prependTagSelector(QualifiedName(nullAtom, $1, parser->m_defaultNamespace));
             $$->setForPage();
         }
     }
@@ -985,7 +1093,7 @@ before_region_rule:
     ;
 
 region:
-    before_region_rule WEBKIT_REGION_RULE_SYM WHITESPACE region_selector at_rule_header_end '{' at_rule_body_start maybe_space block_rule_list save_block {
+    before_region_rule WEBKIT_REGION_RULE_SYM WHITESPACE region_selector at_rule_header_end '{' at_rule_body_start maybe_space region_block_rule_list save_block {
         if ($4)
             $$ = parser->createRegionRule($4, $9);
         else {
@@ -994,6 +1102,23 @@ region:
         }
     }
 ;
+
+#if ENABLE_CSS_SHADERS
+before_filter_rule:
+    /* empty */ {
+        parser->markRuleHeaderStart(CSSRuleSourceData::FILTER_RULE);
+        parser->m_inFilterRule = true;
+    }
+    ;
+
+filter:
+    before_filter_rule WEBKIT_FILTER_RULE_SYM WHITESPACE IDENT at_rule_header_end_maybe_space
+    '{' at_rule_body_start maybe_space_before_declaration declaration_list closing_brace {
+        parser->m_inFilterRule = false;
+        $$ = parser->createFilterRule($4);
+    }
+    ;
+#endif
 
 combinator:
     '+' maybe_space { $$ = CSSSelector::DirectAdjacent; }
@@ -1020,6 +1145,7 @@ maybe_space_before_declaration:
 before_selector_list:
     /* empty */ {
         parser->markRuleHeaderStart(CSSRuleSourceData::STYLE_RULE);
+        parser->markSelectorStart();
     }
   ;
 
@@ -1029,11 +1155,22 @@ at_rule_header_end:
     }
   ;
 
+at_selector_end:
+    /* empty */ {
+        parser->markSelectorEnd();
+    }
+  ;
+
 ruleset:
-    before_selector_list selector_list at_rule_header_end '{' at_rule_body_start maybe_space_before_declaration declaration_list closing_brace {
+    before_selector_list selector_list at_selector_end at_rule_header_end '{' at_rule_body_start maybe_space_before_declaration declaration_list closing_brace {
         $$ = parser->createStyleRule($2);
     }
   ;
+
+before_selector_group_item:
+    /* empty */ {
+        parser->markSelectorStart();
+    }
 
 selector_list:
     selector %prec UNIMPORTANT_TOK {
@@ -1044,10 +1181,10 @@ selector_list:
             parser->updateLastSelectorLineAndPosition();
         }
     }
-    | selector_list ',' maybe_space selector %prec UNIMPORTANT_TOK {
-        if ($1 && $4) {
+    | selector_list at_selector_end ',' maybe_space before_selector_group_item selector %prec UNIMPORTANT_TOK {
+        if ($1 && $6) {
             $$ = $1;
-            $$->append(parser->sinkFloatingSelector($4));
+            $$->append(parser->sinkFloatingSelector($6));
             parser->updateLastSelectorLineAndPosition();
         } else
             $$ = 0;
@@ -1076,25 +1213,15 @@ selector:
         $$ = $2;
         if (!$1)
             $$ = 0;
-        else if ($$) {
-            CSSParserSelector* end = $$;
-            while (end->tagHistory())
-                end = end->tagHistory();
-            end->setRelation(CSSSelector::Descendant);
-            end->setTagHistory(parser->sinkFloatingSelector($1));
-        }
+        else if ($$)
+            $$->appendTagHistory(CSSSelector::Descendant, parser->sinkFloatingSelector($1));
     }
     | selector combinator simple_selector {
         $$ = $3;
         if (!$1)
             $$ = 0;
-        else if ($$) {
-            CSSParserSelector* end = $$;
-            while (end->tagHistory())
-                end = end->tagHistory();
-            end->setRelation($2);
-            end->setTagHistory(parser->sinkFloatingSelector($1));
-        }
+        else if ($$)
+            $$->appendTagHistory($2, parser->sinkFloatingSelector($1));
     }
     | selector error {
         $$ = 0;
@@ -1109,32 +1236,30 @@ namespace_selector:
     
 simple_selector:
     element_name {
-        $$ = parser->createFloatingSelector();
-        $$->setTag(QualifiedName(nullAtom, $1, parser->m_defaultNamespace));
+        $$ = parser->createFloatingSelectorWithTagName(QualifiedName(nullAtom, $1, parser->m_defaultNamespace));
     }
     | element_name specifier_list {
         $$ = $2;
         if ($$)
-            parser->updateSpecifiersWithElementName(nullAtom, $1, $$);
+            $$ = parser->rewriteSpecifiersWithElementName(nullAtom, $1, $$);
     }
     | specifier_list {
         $$ = $1;
         if ($$)
-            parser->updateSpecifiersWithElementName(nullAtom, starAtom, $$);
+            $$ = parser->rewriteSpecifiersWithNamespaceIfNeeded($$);
     }
     | namespace_selector element_name {
-        $$ = parser->createFloatingSelector();
-        $$->setTag(parser->determineNameInNamespace($1, $2));
+        $$ = parser->createFloatingSelectorWithTagName(parser->determineNameInNamespace($1, $2));
     }
     | namespace_selector element_name specifier_list {
         $$ = $3;
         if ($$)
-            parser->updateSpecifiersWithElementName($1, $2, $$);
+            $$ = parser->rewriteSpecifiersWithElementName($1, $2, $$);
     }
     | namespace_selector specifier_list {
         $$ = $2;
         if ($$)
-            parser->updateSpecifiersWithElementName($1, starAtom, $$);
+            $$ = parser->rewriteSpecifiersWithElementName($1, starAtom, $$);
     }
   ;
 
@@ -1179,7 +1304,7 @@ specifier_list:
         if (!$2)
             $$ = 0;
         else if ($1)
-            $$ = parser->updateSpecifiers($1, $2);
+            $$ = parser->rewriteSpecifiers($1, $2);
     }
     | specifier_list error {
         $$ = 0;
@@ -1222,33 +1347,30 @@ class:
 
 attr_name:
     IDENT maybe_space {
-        CSSParserString& str = $1;
-        if (parser->m_context.isHTMLDocument)
-            str.lower();
-        $$ = str;
+        $$ = $1;
     }
     ;
 
 attrib:
     '[' maybe_space attr_name ']' {
         $$ = parser->createFloatingSelector();
-        $$->setAttribute(QualifiedName(nullAtom, $3, nullAtom));
+        $$->setAttribute(QualifiedName(nullAtom, $3, nullAtom), parser->m_context.isHTMLDocument);
         $$->setMatch(CSSSelector::Set);
     }
     | '[' maybe_space attr_name match maybe_space ident_or_string maybe_space ']' {
         $$ = parser->createFloatingSelector();
-        $$->setAttribute(QualifiedName(nullAtom, $3, nullAtom));
+        $$->setAttribute(QualifiedName(nullAtom, $3, nullAtom), parser->m_context.isHTMLDocument);
         $$->setMatch((CSSSelector::Match)$4);
         $$->setValue($6);
     }
     | '[' maybe_space namespace_selector attr_name ']' {
         $$ = parser->createFloatingSelector();
-        $$->setAttribute(parser->determineNameInNamespace($3, $4));
+        $$->setAttribute(parser->determineNameInNamespace($3, $4), parser->m_context.isHTMLDocument);
         $$->setMatch(CSSSelector::Set);
     }
     | '[' maybe_space namespace_selector attr_name match maybe_space ident_or_string maybe_space ']' {
         $$ = parser->createFloatingSelector();
-        $$->setAttribute(parser->determineNameInNamespace($3, $4));
+        $$->setAttribute(parser->determineNameInNamespace($3, $4), parser->m_context.isHTMLDocument);
         $$->setMatch((CSSSelector::Match)$5);
         $$->setValue($7);
     }
@@ -1311,6 +1433,21 @@ pseudo:
         if (type == CSSSelector::PseudoUnknown)
             $$ = 0;
     }
+#if ENABLE_VIDEO_TRACK
+    // used by ::cue(:past/:future)
+    | ':' ':' CUEFUNCTION maybe_space simple_selector_list maybe_space ')' {
+        if ($5) {
+            $$ = parser->createFloatingSelector();
+            $$->setMatch(CSSSelector::PseudoClass);
+            $$->adoptSelectorVector(*parser->sinkFloatingSelectorVector($5));
+            $$->setValue($3);
+            CSSSelector::PseudoType type = $$->pseudoType();
+            if (type != CSSSelector::PseudoCue)
+                $$ = 0;
+        } else
+            $$ = 0;
+    }
+#endif
     // use by :-webkit-any.
     // FIXME: should we support generic selectors here or just simple_selectors?
     // Use simple_selector_list for now to match -moz-any.
@@ -1386,7 +1523,8 @@ pseudo:
   ;
 
 declaration_list:
-    declaration {
+    /* empty */ { $$ = false; }
+    | declaration {
         $$ = $1;
     }
     | decl_list declaration {
@@ -1397,16 +1535,10 @@ declaration_list:
     | decl_list {
         $$ = $1;
     }
-    | error invalid_block_list error {
+    | decl_list_recovery {
         $$ = false;
     }
-    | error {
-        $$ = false;
-    }
-    | decl_list error {
-        $$ = $1;
-    }
-    | decl_list invalid_block_list {
+    | decl_list decl_list_recovery {
         $$ = $1;
     }
     ;
@@ -1416,17 +1548,8 @@ decl_list:
         parser->markPropertyStart();
         $$ = $1;
     }
-    | declaration invalid_block_list maybe_space {
-        $$ = false;
-    }
-    | declaration invalid_block_list ';' maybe_space {
-        $$ = false;
-    }
-    | error ';' maybe_space {
+    | decl_list_recovery ';' maybe_space {
         parser->markPropertyStart();
-        $$ = false;
-    }
-    | error invalid_block_list error ';' maybe_space {
         $$ = false;
     }
     | decl_list declaration ';' maybe_space {
@@ -1435,22 +1558,24 @@ decl_list:
         if ($2)
             $$ = $2;
     }
-    | decl_list error ';' maybe_space {
-        parser->markPropertyStart();
-        $$ = $1;
-    }
-    | decl_list error invalid_block_list error ';' maybe_space {
+    | decl_list decl_list_recovery ';' maybe_space {
         parser->markPropertyStart();
         $$ = $1;
     }
     ;
 
+decl_list_recovery:
+    error error_location error_recovery {
+        parser->syntaxError($2, CSSParser::PropertyDeclarationError);
+    }
+    ;
+
 declaration:
-    VAR_DEFINITION ':' maybe_space expr prio {
+    VAR_DEFINITION maybe_space ':' maybe_space expr prio {
 #if ENABLE_CSS_VARIABLES
-        parser->storeVariableDeclaration($1, parser->sinkFloatingValueList($4), $5);
+        parser->storeVariableDeclaration($1, parser->sinkFloatingValueList($5), $6);
         $$ = true;
-        parser->markPropertyEnd($5, true);
+        parser->markPropertyEnd($6, true);
 #else
         $$ = false;
 #endif
@@ -1472,44 +1597,31 @@ declaration:
         parser->markPropertyEnd($5, isPropertyParsed);
     }
     |
-    property error {
+    property declaration_recovery {
         $$ = false;
     }
     |
-    property ':' maybe_space error expr prio {
-        /* The default movable type template has letter-spacing: .none;  Handle this by looking for
-        error tokens at the start of an expr, recover the expr and then treat as an error, cleaning
-        up and deleting the shifted expr.  */
-        parser->markPropertyEnd(false, false);
-        $$ = false;
-    }
-    |
-    property ':' maybe_space expr prio error {
+    property ':' maybe_space expr prio declaration_recovery {
         /* When we encounter something like p {color: red !important fail;} we should drop the declaration */
         parser->markPropertyEnd(false, false);
         $$ = false;
     }
     |
-    IMPORTANT_SYM maybe_space {
+    IMPORTANT_SYM maybe_space declaration_recovery {
         /* Handle this case: div { text-align: center; !important } Just reduce away the stray !important. */
         $$ = false;
     }
     |
-    property ':' maybe_space {
-        /* div { font-family: } Just reduce away this property with no value. */
-        parser->markPropertyEnd(false, false);
-        $$ = false;
-    }
-    |
-    property ':' maybe_space error {
+    property ':' maybe_space declaration_recovery {
         /* if we come across rules with invalid values like this case: p { weight: *; }, just discard the rule */
         parser->markPropertyEnd(false, false);
         $$ = false;
     }
-    |
-    property invalid_block {
-        /* if we come across: div { color{;color:maroon} }, ignore everything within curly brackets */
-        $$ = false;
+  ;
+
+declaration_recovery:
+    error error_location error_recovery {
+        parser->syntaxError($2);
     }
   ;
 
@@ -1525,16 +1637,21 @@ prio:
   ;
 
 expr:
+    valid_expr
+    | valid_expr expr_recovery { $$ = 0; }
+  ;
+
+valid_expr:
     term {
         $$ = parser->createFloatingValueList();
         $$->addValue(parser->sinkFloatingValue($1));
     }
-    | expr operator term {
+    | valid_expr operator term {
         $$ = $1;
         if ($$) {
             if ($2) {
                 CSSParserValue v;
-                v.id = 0;
+                v.id = CSSValueInvalid;
                 v.unit = CSSParserValue::Operator;
                 v.iValue = $2;
                 $$->addValue(v);
@@ -1542,15 +1659,10 @@ expr:
             $$->addValue(parser->sinkFloatingValue($3));
         }
     }
-    | expr invalid_block_list {
-        $$ = 0;
-    }
-    | expr invalid_block_list error {
-        $$ = 0;
-    }
-    | expr error {
-        $$ = 0;
-    }
+  ;
+
+expr_recovery:
+    error error_location error_recovery
   ;
 
 operator:
@@ -1566,120 +1678,114 @@ operator:
   ;
 
 term:
-  unary_term { $$ = $1; }
-  | unary_operator unary_term { $$ = $2; $$.fValue *= $1; }
-  | STRING maybe_space { $$.id = 0; $$.string = $1; $$.unit = CSSPrimitiveValue::CSS_STRING; }
+  unary_term maybe_space { $$ = $1; }
+  | unary_operator unary_term maybe_space { $$ = $2; $$.fValue *= $1; }
+  | STRING maybe_space { $$.id = CSSValueInvalid; $$.string = $1; $$.unit = CSSPrimitiveValue::CSS_STRING; }
   | IDENT maybe_space {
       $$.id = cssValueKeywordID($1);
       $$.unit = CSSPrimitiveValue::CSS_IDENT;
       $$.string = $1;
   }
   /* We might need to actually parse the number from a dimension, but we can't just put something that uses $$.string into unary_term. */
-  | DIMEN maybe_space { $$.id = 0; $$.string = $1; $$.unit = CSSPrimitiveValue::CSS_DIMENSION; }
-  | unary_operator DIMEN maybe_space { $$.id = 0; $$.string = $2; $$.unit = CSSPrimitiveValue::CSS_DIMENSION; }
-  | URI maybe_space { $$.id = 0; $$.string = $1; $$.unit = CSSPrimitiveValue::CSS_URI; }
-  | UNICODERANGE maybe_space { $$.id = 0; $$.string = $1; $$.unit = CSSPrimitiveValue::CSS_UNICODE_RANGE; }
-  | HEX maybe_space { $$.id = 0; $$.string = $1; $$.unit = CSSPrimitiveValue::CSS_PARSER_HEXCOLOR; }
-  | '#' maybe_space { $$.id = 0; $$.string = CSSParserString(); $$.unit = CSSPrimitiveValue::CSS_PARSER_HEXCOLOR; } /* Handle error case: "color: #;" */
-  | VARFUNCTION maybe_space IDENT ')' maybe_space {
+  | DIMEN maybe_space { $$.id = CSSValueInvalid; $$.string = $1; $$.unit = CSSPrimitiveValue::CSS_DIMENSION; }
+  | unary_operator DIMEN maybe_space { $$.id = CSSValueInvalid; $$.string = $2; $$.unit = CSSPrimitiveValue::CSS_DIMENSION; }
+  | URI maybe_space { $$.id = CSSValueInvalid; $$.string = $1; $$.unit = CSSPrimitiveValue::CSS_URI; }
+  | UNICODERANGE maybe_space { $$.id = CSSValueInvalid; $$.string = $1; $$.unit = CSSPrimitiveValue::CSS_UNICODE_RANGE; }
+  | HEX maybe_space { $$.id = CSSValueInvalid; $$.string = $1; $$.unit = CSSPrimitiveValue::CSS_PARSER_HEXCOLOR; }
+  | '#' maybe_space { $$.id = CSSValueInvalid; $$.string = CSSParserString(); $$.unit = CSSPrimitiveValue::CSS_PARSER_HEXCOLOR; } /* Handle error case: "color: #;" */
+  | VARFUNCTION maybe_space IDENT closing_parenthesis maybe_space {
 #if ENABLE_CSS_VARIABLES
-      $$.id = 0;
+      $$.id = CSSValueInvalid;
       $$.string = $3;
       $$.unit = CSSPrimitiveValue::CSS_VARIABLE_NAME;
 #endif
   }
   /* FIXME: according to the specs a function can have a unary_operator in front. I know no case where this makes sense */
-  | function {
+  | function maybe_space {
       $$ = $1;
   }
-  | calc_function {
+  | calc_function maybe_space {
       $$ = $1;
   }
-  | min_or_max_function {
+  | min_or_max_function maybe_space {
       $$ = $1;
   }
   | '%' maybe_space { /* Handle width: %; */
-      $$.id = 0; $$.unit = 0;
+      $$.id = CSSValueInvalid; $$.unit = 0;
   }
   ;
 
 unary_term:
-  INTEGER maybe_space { $$.id = 0; $$.isInt = true; $$.fValue = $1; $$.unit = CSSPrimitiveValue::CSS_NUMBER; }
-  | FLOATTOKEN maybe_space { $$.id = 0; $$.isInt = false; $$.fValue = $1; $$.unit = CSSPrimitiveValue::CSS_NUMBER; }
-  | PERCENTAGE maybe_space { $$.id = 0; $$.fValue = $1; $$.unit = CSSPrimitiveValue::CSS_PERCENTAGE; }
-  | PXS maybe_space { $$.id = 0; $$.fValue = $1; $$.unit = CSSPrimitiveValue::CSS_PX; }
-  | CMS maybe_space { $$.id = 0; $$.fValue = $1; $$.unit = CSSPrimitiveValue::CSS_CM; }
-  | MMS maybe_space { $$.id = 0; $$.fValue = $1; $$.unit = CSSPrimitiveValue::CSS_MM; }
-  | INS maybe_space { $$.id = 0; $$.fValue = $1; $$.unit = CSSPrimitiveValue::CSS_IN; }
-  | PTS maybe_space { $$.id = 0; $$.fValue = $1; $$.unit = CSSPrimitiveValue::CSS_PT; }
-  | PCS maybe_space { $$.id = 0; $$.fValue = $1; $$.unit = CSSPrimitiveValue::CSS_PC; }
-  | DEGS maybe_space { $$.id = 0; $$.fValue = $1; $$.unit = CSSPrimitiveValue::CSS_DEG; }
-  | RADS maybe_space { $$.id = 0; $$.fValue = $1; $$.unit = CSSPrimitiveValue::CSS_RAD; }
-  | GRADS maybe_space { $$.id = 0; $$.fValue = $1; $$.unit = CSSPrimitiveValue::CSS_GRAD; }
-  | TURNS maybe_space { $$.id = 0; $$.fValue = $1; $$.unit = CSSPrimitiveValue::CSS_TURN; }
-  | MSECS maybe_space { $$.id = 0; $$.fValue = $1; $$.unit = CSSPrimitiveValue::CSS_MS; }
-  | SECS maybe_space { $$.id = 0; $$.fValue = $1; $$.unit = CSSPrimitiveValue::CSS_S; }
-  | HERTZ maybe_space { $$.id = 0; $$.fValue = $1; $$.unit = CSSPrimitiveValue::CSS_HZ; }
-  | KHERTZ maybe_space { $$.id = 0; $$.fValue = $1; $$.unit = CSSPrimitiveValue::CSS_KHZ; }
-  | EMS maybe_space { $$.id = 0; $$.fValue = $1; $$.unit = CSSPrimitiveValue::CSS_EMS; }
-  | QEMS maybe_space { $$.id = 0; $$.fValue = $1; $$.unit = CSSParserValue::Q_EMS; }
-  | EXS maybe_space { $$.id = 0; $$.fValue = $1; $$.unit = CSSPrimitiveValue::CSS_EXS; }
-  | REMS maybe_space {
-      $$.id = 0;
+  INTEGER { $$.id = CSSValueInvalid; $$.isInt = true; $$.fValue = $1; $$.unit = CSSPrimitiveValue::CSS_NUMBER; }
+  | FLOATTOKEN { $$.id = CSSValueInvalid; $$.isInt = false; $$.fValue = $1; $$.unit = CSSPrimitiveValue::CSS_NUMBER; }
+  | PERCENTAGE { $$.id = CSSValueInvalid; $$.fValue = $1; $$.unit = CSSPrimitiveValue::CSS_PERCENTAGE; }
+  | PXS { $$.id = CSSValueInvalid; $$.fValue = $1; $$.unit = CSSPrimitiveValue::CSS_PX; }
+  | CMS { $$.id = CSSValueInvalid; $$.fValue = $1; $$.unit = CSSPrimitiveValue::CSS_CM; }
+  | MMS { $$.id = CSSValueInvalid; $$.fValue = $1; $$.unit = CSSPrimitiveValue::CSS_MM; }
+  | INS { $$.id = CSSValueInvalid; $$.fValue = $1; $$.unit = CSSPrimitiveValue::CSS_IN; }
+  | PTS { $$.id = CSSValueInvalid; $$.fValue = $1; $$.unit = CSSPrimitiveValue::CSS_PT; }
+  | PCS { $$.id = CSSValueInvalid; $$.fValue = $1; $$.unit = CSSPrimitiveValue::CSS_PC; }
+  | DEGS { $$.id = CSSValueInvalid; $$.fValue = $1; $$.unit = CSSPrimitiveValue::CSS_DEG; }
+  | RADS { $$.id = CSSValueInvalid; $$.fValue = $1; $$.unit = CSSPrimitiveValue::CSS_RAD; }
+  | GRADS { $$.id = CSSValueInvalid; $$.fValue = $1; $$.unit = CSSPrimitiveValue::CSS_GRAD; }
+  | TURNS { $$.id = CSSValueInvalid; $$.fValue = $1; $$.unit = CSSPrimitiveValue::CSS_TURN; }
+  | MSECS { $$.id = CSSValueInvalid; $$.fValue = $1; $$.unit = CSSPrimitiveValue::CSS_MS; }
+  | SECS { $$.id = CSSValueInvalid; $$.fValue = $1; $$.unit = CSSPrimitiveValue::CSS_S; }
+  | HERTZ { $$.id = CSSValueInvalid; $$.fValue = $1; $$.unit = CSSPrimitiveValue::CSS_HZ; }
+  | KHERTZ { $$.id = CSSValueInvalid; $$.fValue = $1; $$.unit = CSSPrimitiveValue::CSS_KHZ; }
+  | EMS { $$.id = CSSValueInvalid; $$.fValue = $1; $$.unit = CSSPrimitiveValue::CSS_EMS; }
+  | QEMS { $$.id = CSSValueInvalid; $$.fValue = $1; $$.unit = CSSParserValue::Q_EMS; }
+  | EXS { $$.id = CSSValueInvalid; $$.fValue = $1; $$.unit = CSSPrimitiveValue::CSS_EXS; }
+  | REMS {
+      $$.id = CSSValueInvalid;
       $$.fValue = $1;
       $$.unit = CSSPrimitiveValue::CSS_REMS;
       if (parser->m_styleSheet)
           parser->m_styleSheet->parserSetUsesRemUnits(true);
   }
-  | VW maybe_space { $$.id = 0; $$.fValue = $1; $$.unit = CSSPrimitiveValue::CSS_VW; }
-  | VH maybe_space { $$.id = 0; $$.fValue = $1; $$.unit = CSSPrimitiveValue::CSS_VH; }
-  | VMIN maybe_space { $$.id = 0; $$.fValue = $1; $$.unit = CSSPrimitiveValue::CSS_VMIN; }
-  | DPPX maybe_space { $$.id = 0; $$.fValue = $1; $$.unit = CSSPrimitiveValue::CSS_DPPX; }
-  | DPI maybe_space { $$.id = 0; $$.fValue = $1; $$.unit = CSSPrimitiveValue::CSS_DPI; }
-  | DPCM maybe_space { $$.id = 0; $$.fValue = $1; $$.unit = CSSPrimitiveValue::CSS_DPCM; }
+  | CHS { $$.id = CSSValueInvalid; $$.fValue = $1; $$.unit = CSSPrimitiveValue::CSS_CHS; }
+  | VW { $$.id = CSSValueInvalid; $$.fValue = $1; $$.unit = CSSPrimitiveValue::CSS_VW; }
+  | VH { $$.id = CSSValueInvalid; $$.fValue = $1; $$.unit = CSSPrimitiveValue::CSS_VH; }
+  | VMIN { $$.id = CSSValueInvalid; $$.fValue = $1; $$.unit = CSSPrimitiveValue::CSS_VMIN; }
+  | VMAX { $$.id = CSSValueInvalid; $$.fValue = $1; $$.unit = CSSPrimitiveValue::CSS_VMAX; }
+  | DPPX { $$.id = CSSValueInvalid; $$.fValue = $1; $$.unit = CSSPrimitiveValue::CSS_DPPX; }
+  | DPI { $$.id = CSSValueInvalid; $$.fValue = $1; $$.unit = CSSPrimitiveValue::CSS_DPI; }
+  | DPCM { $$.id = CSSValueInvalid; $$.fValue = $1; $$.unit = CSSPrimitiveValue::CSS_DPCM; }
   ;
 
 function:
-    FUNCTION maybe_space expr ')' maybe_space {
+    FUNCTION maybe_space expr closing_parenthesis {
         CSSParserFunction* f = parser->createFloatingFunction();
         f->name = $1;
         f->args = parser->sinkFloatingValueList($3);
-        $$.id = 0;
+        $$.id = CSSValueInvalid;
         $$.unit = CSSParserValue::Function;
         $$.function = f;
     } |
-    FUNCTION maybe_space expr TOKEN_EOF {
-        CSSParserFunction* f = parser->createFloatingFunction();
-        f->name = $1;
-        f->args = parser->sinkFloatingValueList($3);
-        $$.id = 0;
-        $$.unit = CSSParserValue::Function;
-        $$.function = f;
-    } |
-    FUNCTION maybe_space ')' maybe_space {
+    FUNCTION maybe_space closing_parenthesis {
         CSSParserFunction* f = parser->createFloatingFunction();
         f->name = $1;
         CSSParserValueList* valueList = parser->createFloatingValueList();
         f->args = parser->sinkFloatingValueList(valueList);
-        $$.id = 0;
+        $$.id = CSSValueInvalid;
         $$.unit = CSSParserValue::Function;
         $$.function = f;
     } |
-    FUNCTION maybe_space error {
+    FUNCTION maybe_space expr_recovery closing_parenthesis {
         CSSParserFunction* f = parser->createFloatingFunction();
         f->name = $1;
         f->args = nullptr;
-        $$.id = 0;
+        $$.id = CSSValueInvalid;
         $$.unit = CSSParserValue::Function;
         $$.function = f;
   }
   ;
- 
+
 calc_func_term:
   unary_term { $$ = $1; }
-  | VARFUNCTION maybe_space IDENT ')' maybe_space {
+  | VARFUNCTION maybe_space IDENT closing_parenthesis {
 #if ENABLE_CSS_VARIABLES
-      $$.id = 0;
+      $$.id = CSSValueInvalid;
       $$.string = $3;
       $$.unit = CSSPrimitiveValue::CSS_VARIABLE_NAME;
 #endif
@@ -1688,26 +1794,31 @@ calc_func_term:
   ;
 
 calc_func_operator:
-    '+' WHITESPACE {
+    WHITESPACE '+' WHITESPACE {
         $$ = '+';
     }
-    | '-' WHITESPACE {
+    | WHITESPACE '-' WHITESPACE {
         $$ = '-';
     }
-    | '*' maybe_space {
+    | calc_maybe_space '*' maybe_space {
         $$ = '*';
     }
-    | '/' maybe_space {
+    | calc_maybe_space '/' maybe_space {
         $$ = '/';
     }
   ;
 
+calc_maybe_space:
+    /* empty */
+    | WHITESPACE
+  ;
+
 calc_func_paren_expr:
-    '(' maybe_space calc_func_expr maybe_space ')' maybe_space {
+    '(' maybe_space calc_func_expr calc_maybe_space closing_parenthesis {
         if ($3) {
             $$ = $3;
             CSSParserValue v;
-            v.id = 0;
+            v.id = CSSValueInvalid;
             v.unit = CSSParserValue::Operator;
             v.iValue = '(';
             $$->insertValueAt(0, v);
@@ -1716,9 +1827,15 @@ calc_func_paren_expr:
         } else
             $$ = 0;
     }
+  ;
 
 calc_func_expr:
-    calc_func_term maybe_space {
+    valid_calc_func_expr
+    | valid_calc_func_expr expr_recovery { $$ = 0; }
+  ;
+
+valid_calc_func_expr:
+    calc_func_term {
         $$ = parser->createFloatingValueList();
         $$->addValue(parser->sinkFloatingValue($1));
     }
@@ -1726,7 +1843,7 @@ calc_func_expr:
         if ($1 && $2) {
             $$ = $1;
             CSSParserValue v;
-            v.id = 0;
+            v.id = CSSValueInvalid;
             v.unit = CSSParserValue::Operator;
             v.iValue = $2;
             $$->addValue(v);
@@ -1739,7 +1856,7 @@ calc_func_expr:
         if ($1 && $2 && $3) {
             $$ = $1;
             CSSParserValue v;
-            v.id = 0;
+            v.id = CSSValueInvalid;
             v.unit = CSSParserValue::Operator;
             v.iValue = $2;
             $$->addValue(v);
@@ -1748,20 +1865,17 @@ calc_func_expr:
             $$ = 0;
     }
     | calc_func_paren_expr
-    | calc_func_expr error {
-        $$ = 0;
-    }
   ;
 
 calc_func_expr_list:
-    calc_func_expr  {
+    calc_func_expr calc_maybe_space {
         $$ = $1;
-    }    
-    | calc_func_expr_list ',' maybe_space calc_func_expr {
+    }
+    | calc_func_expr_list ',' maybe_space calc_func_expr calc_maybe_space {
         if ($1 && $4) {
             $$ = $1;
             CSSParserValue v;
-            v.id = 0;
+            v.id = CSSValueInvalid;
             v.unit = CSSParserValue::Operator;
             v.iValue = ',';
             $$->addValue(v);
@@ -1769,18 +1883,18 @@ calc_func_expr_list:
         } else
             $$ = 0;
     }
-    
+  ;
 
 calc_function:
-    CALCFUNCTION maybe_space calc_func_expr ')' maybe_space {
+    CALCFUNCTION maybe_space calc_func_expr calc_maybe_space closing_parenthesis {
         CSSParserFunction* f = parser->createFloatingFunction();
         f->name = $1;
         f->args = parser->sinkFloatingValueList($3);
-        $$.id = 0;
+        $$.id = CSSValueInvalid;
         $$.unit = CSSParserValue::Function;
         $$.function = f;
     }
-    | CALCFUNCTION maybe_space error {
+    | CALCFUNCTION maybe_space expr_recovery closing_parenthesis {
         YYERROR;
     }
     ;
@@ -1796,15 +1910,15 @@ min_or_max:
     ;
 
 min_or_max_function:
-    min_or_max maybe_space calc_func_expr_list ')' maybe_space {
+    min_or_max maybe_space calc_func_expr_list closing_parenthesis {
         CSSParserFunction* f = parser->createFloatingFunction();
         f->name = $1;
         f->args = parser->sinkFloatingValueList($3);
-        $$.id = 0;
+        $$.id = CSSValueInvalid;
         $$.unit = CSSParserValue::Function;
         $$.function = f;
     } 
-    | min_or_max maybe_space error {
+    | min_or_max maybe_space expr_recovery closing_parenthesis {
         YYERROR;
     }
     ;
@@ -1848,18 +1962,38 @@ invalid_rule:
     ;
 
 invalid_block:
-    '{' error invalid_block_list error closing_brace {
-        parser->invalidBlockHit();
-    }
-  | '{' error closing_brace {
+    '{' error_recovery closing_brace {
         parser->invalidBlockHit();
     }
     ;
 
-invalid_block_list:
-    invalid_block
-  | invalid_block_list error invalid_block
-;
+invalid_square_brackets_block:
+    '[' error_recovery ']'
+  | '[' error_recovery TOKEN_EOF
+    ;
+
+invalid_parentheses_block:
+    opening_parenthesis error_recovery closing_parenthesis;
+
+opening_parenthesis:
+    '(' | FUNCTION | CALCFUNCTION | VARFUNCTION | MINFUNCTION | MAXFUNCTION | ANYFUNCTION | NOTFUNCTION
+#if ENABLE_VIDEO_TRACK
+    | CUEFUNCTION
+#endif
+    ;
+
+error_location: {
+        $$ = parser->currentLocation();
+    }
+    ;
+
+error_recovery:
+    /* empty */
+  | error_recovery error
+  | error_recovery invalid_block
+  | error_recovery invalid_square_brackets_block
+  | error_recovery invalid_parentheses_block
+    ;
 
 %%
 

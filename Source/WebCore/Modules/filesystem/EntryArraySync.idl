@@ -29,10 +29,11 @@
  */
 
 [
+    NoInterfaceObject,
     Conditional=FILE_SYSTEM,
-    IndexedGetter,
-    JSNoStaticTables
+    JSNoStaticTables,
+    ImplementationLacksVTable
 ] interface EntryArraySync {
     readonly attribute unsigned long length;
-    EntrySync item(in [IsIndex] unsigned long index);
+    getter EntrySync item([IsIndex] unsigned long index);
 };

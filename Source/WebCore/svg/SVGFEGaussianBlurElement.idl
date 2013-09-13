@@ -25,13 +25,13 @@
 
 [
     Conditional=SVG&FILTERS
-] interface SVGFEGaussianBlurElement : SVGElement,
-                                                       SVGFilterPrimitiveStandardAttributes { 
+] interface SVGFEGaussianBlurElement : SVGStyledElement {
     readonly attribute SVGAnimatedString in1;
     readonly attribute SVGAnimatedNumber stdDeviationX;
     readonly attribute SVGAnimatedNumber stdDeviationY;
 
-    void setStdDeviation(in [Optional=DefaultIsUndefined] float stdDeviationX, 
-                         in [Optional=DefaultIsUndefined] float stdDeviationY);
+    void setStdDeviation([Default=Undefined] optional float stdDeviationX, 
+                         [Default=Undefined] optional float stdDeviationY);
 };
 
+SVGFEGaussianBlurElement implements SVGFilterPrimitiveStandardAttributes;

@@ -49,7 +49,7 @@ private:
     ArrayStorage() { } // Not directly instantiable. Can only be created as part of a Butterfly.
 public:
     
-    static ArrayStorage* from(Butterfly* butterfly) { return reinterpret_cast<ArrayStorage*>(butterfly); }
+    static ArrayStorage* from(Butterfly* butterfly) { return reinterpret_cast_ptr<ArrayStorage*>(butterfly); }
     static ArrayStorage* from(IndexingHeader* indexingHeader) { return indexingHeader->arrayStorage(); }
     
     Butterfly* butterfly() { return reinterpret_cast<Butterfly*>(this); }
@@ -72,7 +72,9 @@ public:
     {
         return m_sparseMap && m_sparseMap->sparseMode();
     }
-    
+
+    ContiguousJSValues vector() { return ContiguousJSValues(m_vector, vectorLength()); }
+
     WriteBarrier<SparseArrayValueMap> m_sparseMap;
     unsigned m_indexBias;
     unsigned m_numValuesInVector;

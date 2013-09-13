@@ -25,10 +25,9 @@
  */
 
 [
+    NoInterfaceObject,
     Conditional=JAVASCRIPT_DEBUGGER,
-    OmitConstructor,
-    V8CustomToJSObject,
-    V8NoWrapperCache
+    ImplementationLacksVTable
 ] interface ScriptProfileNode {
     readonly attribute DOMString functionName;
     readonly attribute DOMString url;

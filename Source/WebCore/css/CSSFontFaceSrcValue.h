@@ -71,7 +71,7 @@ public:
 
     CachedFont* cachedFont(Document*);
 
-    void reportDescendantMemoryUsage(MemoryObjectInfo*) const;
+    bool equals(const CSSFontFaceSrcValue&) const;
 
 private:
     CSSFontFaceSrcValue(const String& resource, bool local)

@@ -57,6 +57,7 @@ struct CallLinkInfo : public BasicRawSentinelNode<CallLinkInfo> {
     CallLinkInfo()
         : hasSeenShouldRepatch(false)
         , isDFG(false)
+        , hasSeenClosure(false)
         , callType(None)
     {
     }
@@ -80,12 +81,13 @@ struct CallLinkInfo : public BasicRawSentinelNode<CallLinkInfo> {
     RefPtr<ClosureCallStubRoutine> stub;
     bool hasSeenShouldRepatch : 1;
     bool isDFG : 1;
-    CallType callType : 6;
+    bool hasSeenClosure : 1;
+    CallType callType : 5;
     unsigned calleeGPR : 8;
     CodeOrigin codeOrigin;
 
     bool isLinked() { return stub || callee; }
-    void unlink(JSGlobalData&, RepatchBuffer&);
+    void unlink(VM&, RepatchBuffer&);
 
     bool seenOnce()
     {

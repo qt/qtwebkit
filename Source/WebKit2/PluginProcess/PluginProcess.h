@@ -32,45 +32,35 @@
 #include <wtf/Forward.h>
 #include <wtf/text/WTFString.h>
 
-namespace WebCore {
-class RunLoop;
-}
-
 namespace WebKit {
 
 class NetscapePluginModule;
 class WebProcessConnection;
 struct PluginProcessCreationParameters;
         
-class PluginProcess : ChildProcess {
+class PluginProcess : public ChildProcess {
     WTF_MAKE_NONCOPYABLE(PluginProcess);
 public:
-
-    enum Type {
-        // Start with value one since default HashTraits<> disallows zero as key.
-        TypeRegularProcess = 1,
-        TypeSnapshotProcess
-    };
-
     static PluginProcess& shared();
 
-    void initialize(CoreIPC::Connection::Identifier, WebCore::RunLoop*);
-    void removeWebProcessConnection(WebProcessConnection* webProcessConnection);
+    void removeWebProcessConnection(WebProcessConnection*);
 
     NetscapePluginModule* netscapePluginModule();
 
     const String& pluginPath() const { return m_pluginPath; }
 
 #if PLATFORM(MAC)
-    void initializeShim();
-    void initializeCocoaOverrides();
-
     void setModalWindowIsShowing(bool);
     void setFullscreenWindowIsShowing(bool);
 
 #if USE(ACCELERATED_COMPOSITING)
     mach_port_t compositingRenderServerPort() const { return m_compositingRenderServerPort; }
 #endif
+
+    bool launchProcess(const String& launchPath, const Vector<String>& arguments);
+    bool launchApplicationAtURL(const String& urlString, const Vector<String>& arguments);
+    bool openURL(const String& urlString, int32_t& status, String& launchedURLString);
+
 #endif
 
 private:
@@ -78,33 +68,37 @@ private:
     ~PluginProcess();
 
     // ChildProcess
-    virtual bool shouldTerminate();
+    virtual void initializeProcess(const ChildProcessInitializationParameters&) OVERRIDE;
+    virtual void initializeProcessName(const ChildProcessInitializationParameters&) OVERRIDE;
+    virtual void initializeSandbox(const ChildProcessInitializationParameters&, SandboxInitializationParameters&) OVERRIDE;
+    virtual bool shouldTerminate() OVERRIDE;
+    void platformInitializeProcess(const ChildProcessInitializationParameters&);
 
     // CoreIPC::Connection::Client
-    virtual void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::MessageDecoder&) OVERRIDE;
+    virtual void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&) OVERRIDE;
     virtual void didClose(CoreIPC::Connection*) OVERRIDE;
     virtual void didReceiveInvalidMessage(CoreIPC::Connection*, CoreIPC::StringReference messageReceiverName, CoreIPC::StringReference messageName) OVERRIDE;
 
     // Message handlers.
-    void didReceivePluginProcessMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::MessageDecoder&);
+    void didReceivePluginProcessMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&);
     void initializePluginProcess(const PluginProcessCreationParameters&);
     void createWebProcessConnection();
     void getSitesWithData(uint64_t callbackID);
     void clearSiteData(const Vector<String>& sites, uint64_t flags, uint64_t maxAgeInSeconds, uint64_t callbackID);
 
-    void platformInitialize(const PluginProcessCreationParameters&);
+    void platformInitializePluginProcess(const PluginProcessCreationParameters&);
     
     void setMinimumLifetime(double);
     void minimumLifetimeTimerFired();
-
-    // The connection to the UI process.
-    RefPtr<CoreIPC::Connection> m_connection;
-
     // Our web process connections.
-    Vector<RefPtr<WebProcessConnection> > m_webProcessConnections;
+    Vector<RefPtr<WebProcessConnection>> m_webProcessConnections;
 
     // The plug-in path.
     String m_pluginPath;
+
+#if PLATFORM(MAC)
+    String m_pluginBundleIdentifier;
+#endif
 
     // The plug-in module.
     RefPtr<NetscapePluginModule> m_pluginModule;
@@ -112,22 +106,16 @@ private:
     bool m_supportsAsynchronousPluginInitialization;
 
     WebCore::RunLoop::Timer<PluginProcess> m_minimumLifetimeTimer;
-    
+
 #if USE(ACCELERATED_COMPOSITING) && PLATFORM(MAC)
     // The Mach port used for accelerated compositing.
     mach_port_t m_compositingRenderServerPort;
 #endif
 
+    static void lowMemoryHandler(bool critical);
 };
 
 } // namespace WebKit
-
-namespace WTF {
-
-template<> struct DefaultHash<WebKit::PluginProcess::Type> { typedef DefaultHash<uint32_t>::Hash Hash; };
-template<> struct IsInteger<WebKit::PluginProcess::Type> { static const bool value = true; };
-
-} // namespace WTF
 
 #endif // ENABLE(PLUGIN_PROCESS)
 

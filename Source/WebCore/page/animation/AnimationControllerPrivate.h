@@ -49,7 +49,6 @@ class Frame;
 class Node;
 class RenderObject;
 class RenderStyle;
-class WebKitAnimationList;
 
 enum SetChanged {
     DoNotCallSetChanged = 0,
@@ -66,7 +65,7 @@ public:
     double updateAnimations(SetChanged callSetChanged = DoNotCallSetChanged);
     void updateAnimationTimer(SetChanged callSetChanged = DoNotCallSetChanged);
 
-    PassRefPtr<CompositeAnimation> accessCompositeAnimation(RenderObject*);
+    CompositeAnimation* ensureCompositeAnimation(RenderObject*);
     bool clear(RenderObject*);
 
     void updateStyleIfNeededDispatcherFired(Timer<AnimationControllerPrivate>*);
@@ -76,6 +75,7 @@ public:
 
     bool hasAnimations() const { return !m_compositeAnimations.isEmpty(); }
 
+    bool isSuspended() const { return m_isSuspended; }
     void suspendAnimations();
     void resumeAnimations();
 #if ENABLE(REQUEST_ANIMATION_FRAME)
@@ -84,11 +84,12 @@ public:
 
     void suspendAnimationsForDocument(Document*);
     void resumeAnimationsForDocument(Document*);
+    void startAnimationsIfNotSuspended(Document*);
 
     bool isRunningAnimationOnRenderer(RenderObject*, CSSPropertyID, bool isRunningNow) const;
     bool isRunningAcceleratedAnimationOnRenderer(RenderObject*, CSSPropertyID, bool isRunningNow) const;
 
-    bool pauseAnimationAtTime(RenderObject*, const String& name, double t);
+    bool pauseAnimationAtTime(RenderObject*, const AtomicString& name, double t);
     bool pauseTransitionAtTime(RenderObject*, const String& property, double t);
     unsigned numberOfActiveAnimations(Document*) const;
 
@@ -106,8 +107,6 @@ public:
     void removeFromAnimationsWaitingForStartTimeResponse(AnimationBase*);
 
     void animationWillBeRemoved(AnimationBase*);
-
-    PassRefPtr<WebKitAnimationList> animationsForRenderer(RenderObject*) const;
 
     void updateAnimationTimerForRenderer(RenderObject*);
     
@@ -142,7 +141,7 @@ private:
     WaitingAnimationsSet m_animationsWaitingForStyle;
     WaitingAnimationsSet m_animationsWaitingForStartTimeResponse;
     bool m_waitingForAsyncStartNotification;
-    double m_previousTimeToNextService;
+    bool m_isSuspended;
 };
 
 } // namespace WebCore

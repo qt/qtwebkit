@@ -43,22 +43,27 @@ static HashSet<String>* protocolWhitelist;
 static void initProtocolHandlerWhitelist()
 {
     protocolWhitelist = new HashSet<String>;
-    static const char* protocols[] = {
 #if !PLATFORM(BLACKBERRY)
+    static const char* protocols[] = {
         "irc",
+        "geo",
         "mailto",
+        "magnet",
         "mms",
         "news",
         "nntp",
+        "sip",
         "sms",
         "smsto",
+        "ssh",
         "tel",
         "urn",
         "webcal",
-#endif
+        "xmpp"
     };
     for (size_t i = 0; i < WTF_ARRAY_LENGTH(protocols); ++i)
         protocolWhitelist->add(protocols[i]);
+#endif
 }
 
 static bool verifyCustomHandlerURL(const String& baseURL, const String& url, ExceptionCode& ec)
@@ -201,10 +206,9 @@ void NavigatorContentUtils::unregisterProtocolHandler(Navigator* navigator, cons
 }
 #endif
 
-const AtomicString& NavigatorContentUtils::supplementName()
+const char* NavigatorContentUtils::supplementName()
 {
-    DEFINE_STATIC_LOCAL(AtomicString, name, ("NavigatorContentUtils", AtomicString::ConstructFromLiteral));
-    return name;
+    return "NavigatorContentUtils";
 }
 
 void provideNavigatorContentUtilsTo(Page* page, NavigatorContentUtilsClient* client)

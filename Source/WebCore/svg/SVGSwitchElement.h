@@ -24,16 +24,12 @@
 #if ENABLE(SVG)
 #include "SVGAnimatedBoolean.h"
 #include "SVGExternalResourcesRequired.h"
-#include "SVGLangSpace.h"
-#include "SVGStyledTransformableElement.h"
-#include "SVGTests.h"
+#include "SVGGraphicsElement.h"
 
 namespace WebCore {
 
-class SVGSwitchElement : public SVGStyledTransformableElement,
-                         public SVGTests,
-                         public SVGLangSpace,
-                         public SVGExternalResourcesRequired {
+class SVGSwitchElement FINAL : public SVGGraphicsElement,
+                               public SVGExternalResourcesRequired {
 public:
     static PassRefPtr<SVGSwitchElement> create(const QualifiedName&, Document*);
 
@@ -41,7 +37,7 @@ private:
     SVGSwitchElement(const QualifiedName&, Document*);
     
     virtual bool isValid() const { return SVGTests::isValid(); }
-    virtual bool supportsFocus() const { return true; }
+    virtual bool supportsFocus() const OVERRIDE { return true; }
 
     virtual bool childShouldCreateRenderer(const NodeRenderingContext&) const;
 
@@ -50,11 +46,6 @@ private:
     BEGIN_DECLARE_ANIMATED_PROPERTIES(SVGSwitchElement)
         DECLARE_ANIMATED_BOOLEAN(ExternalResourcesRequired, externalResourcesRequired)
     END_DECLARE_ANIMATED_PROPERTIES
-
-    // SVGTests
-    virtual void synchronizeRequiredFeatures() { SVGTests::synchronizeRequiredFeatures(this); }
-    virtual void synchronizeRequiredExtensions() { SVGTests::synchronizeRequiredExtensions(this); }
-    virtual void synchronizeSystemLanguage() { SVGTests::synchronizeSystemLanguage(this); }
 };
 
 } // namespace WebCore

@@ -57,7 +57,7 @@ defineReplace(computeSubdirVariables) {
     }
 
     # Make directory relative
-    !isEmpty(subdirectory):subdirectory = $$replace(subdirectory, ^$${_PRO_FILE_PWD_}/,)
+    !isEmpty(subdirectory):subdirectory = $$replace(subdirectory, ^$$re_escape($${_PRO_FILE_PWD_})/,)
 
     !isEmpty(subdirectory) {
         subdir_command = cd $$toSystemPath($${subdirectory}$${QMAKE_DIR_SEP}) &&
@@ -133,8 +133,8 @@ defineTest(addStrictSubdirOrderBetween) {
     }
 
     # Make sure the order is right
-    SUBDIRS -= $$firstSubdir $$secondSubdir
-    SUBDIRS += $$firstSubdir $$secondSubdir
+    SUBDIRS -= $$secondSubdir
+    SUBDIRS += $$secondSubdir
     NO_RECURSIVE_QMAKE_SUBDIRS += $$firstSubdir $$secondSubdir
     CONFIG *= ordered
 
@@ -260,7 +260,7 @@ defineTest(linkAgainstLibrary) {
 
     target = $$resolveFinalLibraryName($$target)
 
-    path = $$replace(source_dir, $${ROOT_WEBKIT_DIR}, $${ROOT_BUILD_DIR})/$$targetSubDir()
+    path = $$replace(source_dir, $$re_escape($${ROOT_WEBKIT_DIR}), $${ROOT_BUILD_DIR})/$$targetSubDir()
 
     force_static_libs_as_shared {
             LIBS += -L$${ROOT_BUILD_DIR}/lib -l$$target

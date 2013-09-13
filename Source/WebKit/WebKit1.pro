@@ -12,6 +12,10 @@ include(WebKit1.pri)
 WEBKIT += wtf javascriptcore webcore
 QT += gui
 
+# This is relied upon by our export macros and seems not to be properly
+# defined by the logic in qt_module.prf as it should
+DEFINES += QT_BUILD_WEBKIT_LIB
+
 CONFIG += staticlib
 
 SOURCES += \
@@ -94,7 +98,7 @@ INCLUDEPATH += \
 
 use?(3D_GRAPHICS): WEBKIT += angle
 
-enable?(GEOLOCATION) {
+have?(qtlocation):enable?(GEOLOCATION) {
      HEADERS += \
         $$PWD/qt/WebCoreSupport/GeolocationClientQt.h
      SOURCES += \
@@ -111,29 +115,9 @@ enable?(ICONDATABASE) {
 }
 
 enable?(VIDEO) {
-    use?(QTKIT) | use?(GSTREAMER) | use?(QT_MULTIMEDIA) {
+    use?(GSTREAMER) | use?(QT_MULTIMEDIA) {
         HEADERS += $$PWD/qt/WebCoreSupport/FullScreenVideoQt.h
         SOURCES += $$PWD/qt/WebCoreSupport/FullScreenVideoQt.cpp
-    }
-
-    use?(QTKIT) {
-        INCLUDEPATH += \
-            $$PWD/../WebCore/platform/qt/ \
-            $$PWD/../WebCore/platform/mac/ \
-            $$PWD/../../WebKitLibraries/
-
-        DEFINES += NSGEOMETRY_TYPES_SAME_AS_CGGEOMETRY_TYPES
-        isEqual(QT_ARCH, "i386") {
-            DEFINES+=NS_BUILD_32_LIKE_64
-        }
-
-        HEADERS += \
-            $$PWD/qt/WebCoreSupport/WebSystemInterface.h \
-            $$PWD/qt/WebCoreSupport/QTKitFullScreenVideoHandler.h
-
-        OBJECTIVE_SOURCES += \
-            $$PWD/qt/WebCoreSupport/WebSystemInterface.mm \
-            $$PWD/qt/WebCoreSupport/QTKitFullScreenVideoHandler.mm
     }
 }
 

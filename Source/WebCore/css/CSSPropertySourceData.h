@@ -52,8 +52,6 @@ struct SourceRange {
 };
 
 struct CSSPropertySourceData {
-    static void init();
-
     CSSPropertySourceData(const String& name, const String& value, bool important, bool parsedOk, const SourceRange& range);
     CSSPropertySourceData(const CSSPropertySourceData& other);
     CSSPropertySourceData();
@@ -68,10 +66,6 @@ struct CSSPropertySourceData {
     SourceRange range;
 };
 
-#ifndef CSSPROPERTYSOURCEDATA_HIDE_GLOBALS
-extern const CSSPropertySourceData emptyCSSPropertySourceData;
-#endif
-
 struct CSSStyleSourceData : public RefCounted<CSSStyleSourceData> {
     static PassRefPtr<CSSStyleSourceData> create()
     {
@@ -83,6 +77,7 @@ struct CSSStyleSourceData : public RefCounted<CSSStyleSourceData> {
 
 struct CSSRuleSourceData;
 typedef Vector<RefPtr<CSSRuleSourceData> > RuleSourceDataList;
+typedef Vector<SourceRange> SelectorRangeList;
 
 struct CSSRuleSourceData : public RefCounted<CSSRuleSourceData> {
     enum Type {
@@ -96,7 +91,11 @@ struct CSSRuleSourceData : public RefCounted<CSSRuleSourceData> {
         KEYFRAMES_RULE,
         REGION_RULE,
         HOST_RULE,
-        VIEWPORT_RULE
+        VIEWPORT_RULE,
+        SUPPORTS_RULE,
+#if ENABLE(CSS_SHADERS)
+        FILTER_RULE
+#endif
     };
 
     static PassRefPtr<CSSRuleSourceData> create(Type type)
@@ -123,6 +122,9 @@ struct CSSRuleSourceData : public RefCounted<CSSRuleSourceData> {
 
     // Range of the rule body (e.g. style text for style rules) in the enclosing source.
     SourceRange ruleBodyRange;
+
+    // Only for CSSStyleRules.
+    SelectorRangeList selectorRanges;
 
     // Only for CSSStyleRules, CSSFontFaceRules, and CSSPageRules.
     RefPtr<CSSStyleSourceData> styleSourceData;

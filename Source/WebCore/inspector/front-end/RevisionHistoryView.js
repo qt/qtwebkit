@@ -56,8 +56,7 @@ WebInspector.RevisionHistoryView = function()
     WebInspector.workspace.uiSourceCodes().forEach(populateRevisions.bind(this));
     WebInspector.workspace.addEventListener(WebInspector.Workspace.Events.UISourceCodeContentCommitted, this._revisionAdded, this);
     WebInspector.workspace.addEventListener(WebInspector.UISourceCodeProvider.Events.UISourceCodeRemoved, this._uiSourceCodeRemoved, this);
-    WebInspector.workspace.addEventListener(WebInspector.UISourceCodeProvider.Events.TemporaryUISourceCodeRemoved, this._uiSourceCodeRemoved, this);
-    WebInspector.workspace.addEventListener(WebInspector.Workspace.Events.ProjectWillReset, this._reset, this);
+    WebInspector.workspace.addEventListener(WebInspector.Workspace.Events.ProjectWillReset, this._projectWillReset, this);
 
     this._statusElement = document.createElement("span");
     this._statusElement.textContent = WebInspector.UIString("Local modifications");
@@ -82,12 +81,12 @@ WebInspector.RevisionHistoryView.prototype = {
      */
     _createUISourceCodeItem: function(uiSourceCode)
     {
-        var uiSourceCodeItem = new TreeElement(uiSourceCode.parsedURL.displayName, null, true);
+        var uiSourceCodeItem = new TreeElement(uiSourceCode.displayName(), null, true);
         uiSourceCodeItem.selectable = false;
 
         // Insert in sorted order
         for (var i = 0; i < this._treeOutline.children.length; ++i) {
-            if (this._treeOutline.children[i].title.localeCompare(uiSourceCode.parsedURL.displayName) > 0) {
+            if (this._treeOutline.children[i].title.localeCompare(uiSourceCode.displayName()) > 0) {
                 this._treeOutline.insertChild(uiSourceCodeItem, i);
                 break;
             }
@@ -172,10 +171,10 @@ WebInspector.RevisionHistoryView.prototype = {
         this._uiSourceCodeItems.remove(uiSourceCode);
     },
 
-    _reset: function()
+    _projectWillReset: function(event)
     {
-        this._treeOutline.removeChildren();
-        this._uiSourceCodeItems.clear();
+        var project = event.data;
+        project.uiSourceCodes().forEach(this._removeUISourceCode.bind(this));
     },
 
     __proto__: WebInspector.View.prototype

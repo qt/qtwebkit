@@ -28,6 +28,7 @@
 
 #include "CSSSelectorList.h"
 #include "Document.h"
+#include "NodeTraversal.h"
 #include "StyleRuleImport.h"
 #include "StyleSheetContents.h"
 #include "StyledElement.h"
@@ -43,10 +44,10 @@ StyleInvalidationAnalysis::StyleInvalidationAnalysis(const Vector<StyleSheetCont
 
 static bool determineSelectorScopes(const CSSSelectorList& selectorList, HashSet<AtomicStringImpl*>& idScopes, HashSet<AtomicStringImpl*>& classScopes)
 {
-    for (CSSSelector* selector = selectorList.first(); selector; selector = CSSSelectorList::next(selector)) {
-        CSSSelector* scopeSelector = 0;
+    for (const CSSSelector* selector = selectorList.first(); selector; selector = CSSSelectorList::next(selector)) {
+        const CSSSelector* scopeSelector = 0;
         // This picks the widest scope, not the narrowest, to minimize the number of found scopes.
-        for (CSSSelector* current = selector; current; current = current->tagHistory()) {
+        for (const CSSSelector* current = selector; current; current = current->tagHistory()) {
             // Prefer ids over classes.
             if (current->m_match == CSSSelector::Id)
                 scopeSelector = current;
@@ -97,7 +98,7 @@ void StyleInvalidationAnalysis::analyzeStyleSheet(StyleSheetContents* styleSheet
     }
 }
 
-static bool elementMatchesSelectorScopes(const StyledElement* element, const HashSet<AtomicStringImpl*>& idScopes, const HashSet<AtomicStringImpl*>& classScopes)
+static bool elementMatchesSelectorScopes(const Element* element, const HashSet<AtomicStringImpl*>& idScopes, const HashSet<AtomicStringImpl*>& classScopes)
 {
     if (!idScopes.isEmpty() && element->hasID() && idScopes.contains(element->idForStyleResolution().impl()))
         return true;
@@ -116,20 +117,15 @@ void StyleInvalidationAnalysis::invalidateStyle(Document* document)
     ASSERT(!m_dirtiesAllStyle);
     if (m_idScopes.isEmpty() && m_classScopes.isEmpty())
         return;
-    Node* node = document->firstChild();
-    while (node) {
-        if (!node->isStyledElement()) {
-            node = node->traverseNextNode();
-            continue;
-        }
-        StyledElement* element = static_cast<StyledElement*>(node);
+    Element* element = ElementTraversal::firstWithin(document);
+    while (element) {
         if (elementMatchesSelectorScopes(element, m_idScopes, m_classScopes)) {
             element->setNeedsStyleRecalc();
             // The whole subtree is now invalidated, we can skip to the next sibling.
-            node = node->traverseNextSibling();
+            element = ElementTraversal::nextSkippingChildren(element);
             continue;
         }
-        node = node->traverseNextNode();
+        element = ElementTraversal::next(element);
     }
 }
 

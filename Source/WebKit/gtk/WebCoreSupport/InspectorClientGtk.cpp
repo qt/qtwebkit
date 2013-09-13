@@ -160,7 +160,7 @@ bool InspectorClient::sendMessageToFrontend(const String& message)
 const char* InspectorClient::inspectorFilesPath()
 {
     if (m_inspectorFilesPath)
-        m_inspectorFilesPath.get();
+        return m_inspectorFilesPath.get();
 
     const char* environmentPath = getenv("WEBKIT_INSPECTOR_PATH");
     if (environmentPath && g_file_test(environmentPath, G_FILE_TEST_IS_DIR))
@@ -227,12 +227,6 @@ String InspectorFrontendClient::localizedStringsURL()
     return String::fromUTF8(stringsURI.get());
 }
 
-String InspectorFrontendClient::hiddenPanels()
-{
-    notImplemented();
-    return String();
-}
-
 void InspectorFrontendClient::bringToFront()
 {
     if (!m_inspectorWebView)
@@ -247,7 +241,7 @@ void InspectorFrontendClient::closeWindow()
     destroyInspectorWindow(true);
 }
 
-void InspectorFrontendClient::attachWindow()
+void InspectorFrontendClient::attachWindow(DockSide)
 {
     if (!m_inspectorWebView)
         return;
@@ -266,6 +260,16 @@ void InspectorFrontendClient::detachWindow()
 }
 
 void InspectorFrontendClient::setAttachedWindowHeight(unsigned height)
+{
+    notImplemented();
+}
+
+void InspectorFrontendClient::setAttachedWindowWidth(unsigned width)
+{
+    notImplemented();
+}
+
+void InspectorFrontendClient::setToolbarHeight(unsigned height)
 {
     notImplemented();
 }

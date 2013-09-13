@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2012, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,12 +31,14 @@
 #include "ValueRecovery.h"
 #include "WriteBarrier.h"
 #include <wtf/BitVector.h>
+#include <wtf/PrintStream.h>
 #include <wtf/StdLibExtras.h>
 #include <wtf/Vector.h>
 
 namespace JSC {
 
 struct InlineCallFrame;
+class ExecState;
 class ExecutableBase;
 class JSFunction;
 
@@ -63,8 +65,8 @@ struct CodeOrigin {
         , valueProfileOffset(valueProfileOffset)
         , inlineCallFrame(inlineCallFrame)
     {
-        ASSERT(bytecodeIndex <= maximumBytecodeIndex);
-        ASSERT(valueProfileOffset < (1u << 3));
+        RELEASE_ASSERT(bytecodeIndex <= maximumBytecodeIndex);
+        RELEASE_ASSERT(valueProfileOffset < (1u << 3));
     }
     
     bool isSet() const { return bytecodeIndex != maximumBytecodeIndex; }
@@ -82,6 +84,8 @@ struct CodeOrigin {
     // would have owned the code if it had not been inlined. Otherwise returns 0.
     ExecutableBase* codeOriginOwner() const;
     
+    unsigned stackOffset() const;
+    
     static unsigned inlineDepthForCallFrame(InlineCallFrame*);
     
     bool operator==(const CodeOrigin& other) const;
@@ -90,12 +94,14 @@ struct CodeOrigin {
     
     // Get the inline stack. This is slow, and is intended for debugging only.
     Vector<CodeOrigin> inlineStack() const;
+    
+    void dump(PrintStream&) const;
 };
 
 struct InlineCallFrame {
     Vector<ValueRecovery> arguments;
     WriteBarrier<ExecutableBase> executable;
-    WriteBarrier<JSFunction> callee;
+    WriteBarrier<JSFunction> callee; // This may be null, indicating that this is a closure call and that the JSFunction and JSScope are already on the stack.
     CodeOrigin caller;
     BitVector capturedVars; // Indexed by the machine call frame's variable numbering.
     unsigned stackOffset : 31;
@@ -103,13 +109,34 @@ struct InlineCallFrame {
     
     CodeSpecializationKind specializationKind() const { return specializationFromIsCall(isCall); }
     
+    bool isClosureCall() const { return !callee; }
+    
+    // Get the callee given a machine call frame to which this InlineCallFrame belongs.
+    JSFunction* calleeForCallFrame(ExecState*) const;
+    
+    String inferredName() const;
     CodeBlockHash hash() const;
+    
+    CodeBlock* baselineCodeBlock() const;
+    
+    void dumpBriefFunctionInformation(PrintStream&) const;
+    void dump(PrintStream&) const;
+
+    MAKE_PRINT_METHOD(InlineCallFrame, dumpBriefFunctionInformation, briefFunctionInformation);
 };
 
 struct CodeOriginAtCallReturnOffset {
     CodeOrigin codeOrigin;
     unsigned callReturnOffset;
 };
+
+inline unsigned CodeOrigin::stackOffset() const
+{
+    if (!inlineCallFrame)
+        return 0;
+    
+    return inlineCallFrame->stackOffset;
+}
 
 inline bool CodeOrigin::operator==(const CodeOrigin& other) const
 {

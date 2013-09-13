@@ -45,12 +45,6 @@
 #if PLATFORM(MAC)
 #include "TextCodecMac.h"
 #endif
-#if USE(QT4_UNICODE)
-#include "qt/TextCodecQt.h"
-#endif
-#if USE(GLIB_UNICODE)
-#include "gtk/TextCodecGtk.h"
-#endif
 #if OS(WINDOWS) && USE(WCHAR_UNICODE)
 #include "win/TextCodecWin.h"
 #endif
@@ -237,12 +231,6 @@ static void buildBaseTextCodecMaps()
 
     TextCodecUserDefined::registerEncodingNames(addToTextEncodingNameMap);
     TextCodecUserDefined::registerCodecs(addToTextCodecMap);
-
-#if USE(GLIB_UNICODE)
-    // FIXME: This is not needed. The code above covers all the base codecs.
-    TextCodecGtk::registerBaseEncodingNames(addToTextEncodingNameMap);
-    TextCodecGtk::registerBaseCodecs(addToTextCodecMap);
-#endif
 }
 
 static void addEncodingName(HashSet<const char*>* set, const char* name)
@@ -305,19 +293,9 @@ static void extendTextCodecMaps()
     TextCodecICU::registerCodecs(addToTextCodecMap);
 #endif
 
-#if USE(QT4_UNICODE)
-    TextCodecQt::registerEncodingNames(addToTextEncodingNameMap);
-    TextCodecQt::registerCodecs(addToTextCodecMap);
-#endif
-
 #if PLATFORM(MAC)
     TextCodecMac::registerEncodingNames(addToTextEncodingNameMap);
     TextCodecMac::registerCodecs(addToTextCodecMap);
-#endif
-
-#if USE(GLIB_UNICODE)
-    TextCodecGtk::registerExtendedEncodingNames(addToTextEncodingNameMap);
-    TextCodecGtk::registerExtendedCodecs(addToTextCodecMap);
 #endif
 
 #if OS(WINDOWS) && USE(WCHAR_UNICODE)

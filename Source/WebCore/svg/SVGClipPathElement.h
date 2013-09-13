@@ -25,19 +25,15 @@
 #include "SVGAnimatedBoolean.h"
 #include "SVGAnimatedEnumeration.h"
 #include "SVGExternalResourcesRequired.h"
-#include "SVGLangSpace.h"
-#include "SVGStyledTransformableElement.h"
-#include "SVGTests.h"
+#include "SVGGraphicsElement.h"
 #include "SVGUnitTypes.h"
 
 namespace WebCore {
 
 class RenderObject;
 
-class SVGClipPathElement : public SVGStyledTransformableElement,
-                           public SVGTests,
-                           public SVGLangSpace,
-                           public SVGExternalResourcesRequired {
+class SVGClipPathElement FINAL : public SVGGraphicsElement,
+                                 public SVGExternalResourcesRequired {
 public:
     static PassRefPtr<SVGClipPathElement> create(const QualifiedName&, Document*);
 
@@ -58,11 +54,6 @@ private:
         DECLARE_ANIMATED_ENUMERATION(ClipPathUnits, clipPathUnits, SVGUnitTypes::SVGUnitType)
         DECLARE_ANIMATED_BOOLEAN(ExternalResourcesRequired, externalResourcesRequired)
     END_DECLARE_ANIMATED_PROPERTIES
-
-    // SVGTests
-    virtual void synchronizeRequiredFeatures() { SVGTests::synchronizeRequiredFeatures(this); }
-    virtual void synchronizeRequiredExtensions() { SVGTests::synchronizeRequiredExtensions(this); }
-    virtual void synchronizeSystemLanguage() { SVGTests::synchronizeSystemLanguage(this); }
 };
 
 }

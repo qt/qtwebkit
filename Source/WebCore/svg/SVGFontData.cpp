@@ -25,7 +25,9 @@
 #include "RenderObject.h"
 #include "SVGAltGlyphElement.h"
 #include "SVGFontElement.h"
+#include "SVGFontFaceElement.h"
 #include "SVGGlyph.h"
+#include "SVGGlyphElement.h"
 #include "SVGNames.h"
 #include "SVGTextRunRenderingContext.h"
 #include "TextRun.h"
@@ -189,6 +191,16 @@ bool SVGFontData::applySVGGlyphSelection(WidthIterator& iterator, GlyphData& gly
         size_t glyphsSize = glyphs.size();
         for (size_t i = 0; i < glyphsSize; ++i)
             glyphs[i].unicodeStringLength = run.length();
+
+        // Do not check alt glyphs for compatibility. Just return the first one.
+        // Later code will fail if we do not do this and the glyph is incompatible.
+        if (glyphsSize) {
+            SVGGlyph& svgGlyph = glyphs[0];
+            iterator.setLastGlyphName(svgGlyph.glyphName);
+            glyphData.glyph = svgGlyph.tableEntry;
+            advanceLength = svgGlyph.unicodeStringLength;
+            return true;
+        }
     } else
         associatedFontElement->collectGlyphsForString(remainingTextInRun, glyphs);
 
@@ -281,18 +293,11 @@ String SVGFontData::createStringWithMirroredCharacters(const UChar* characters, 
     StringBuilder mirroredCharacters;
     mirroredCharacters.reserveCapacity(length);
 
-    UChar32 character;
     unsigned i = 0;
     while (i < length) {
+        UChar32 character;
         U16_NEXT(characters, i, length, character);
-        character = mirroredChar(character);
-
-        if (U16_LENGTH(character) == 1)
-            mirroredCharacters.append(static_cast<UChar>(character));
-        else {
-            mirroredCharacters.append(U16_LEAD(character));
-            mirroredCharacters.append(U16_TRAIL(character));
-        }
+        mirroredCharacters.append(mirroredChar(character));
     }
 
     return mirroredCharacters.toString();

@@ -114,6 +114,7 @@ private Q_SLOTS:
     void contextMenuCopy();
     void contextMenuPopulatedOnce();
     void acceptNavigationRequest();
+    void domainSpecificKeyEvent();
     void geolocationRequestJS();
     void loadFinished();
     void actionStates();
@@ -283,6 +284,58 @@ void tst_QWebPage::acceptNavigationRequest()
     m_view->setPage(0);
 }
 
+void tst_QWebPage::domainSpecificKeyEvent()
+{
+    QWebView webView;
+    webView.show();
+    QTest::qWaitForWindowExposed(&webView);
+
+    webView.setHtml(QLatin1String("<html><head>"
+        "<script>"
+        "var receivedKeyArray = new Array();"
+        "function keyEvent(e) {"
+        "receivedKeyArray.push(e.type+':'+e.keyCode+':'+e.charCode);"
+        "};"
+        "window.onkeyup = keyEvent; window.onkeypress = keyEvent; window.onkeydown = keyEvent;"
+        "</script></head><body>test</body></html>"));
+
+    // Enable settings to use nativeVirtualKey as DOM key value.
+    webView.page()->setProperty("_q_useNativeVirtualKeyAsDOMKey", true);
+    // Simulate domain specific keyevent to WebKit by passing it as nativeVirtualKey in QKeyEvent.
+    // Qt::Key_Pause --> 0x51
+    QKeyEvent keyEvent(QEvent::KeyPress, Qt::Key_Pause, Qt::NoModifier, 0, 81, 0);
+    QApplication::sendEvent(&webView, &keyEvent);
+    keyEvent = QKeyEvent(QEvent::KeyRelease, Qt::Key_Pause, Qt::NoModifier, 0, 81, 0);
+    QApplication::sendEvent(&webView, &keyEvent);
+    const QLatin1String expectedReceivedKeyArray1("keydown:81:0,keyup:81:0");
+    QString receivedKeyArray = webView.page()->mainFrame()->evaluateJavaScript(QLatin1String("receivedKeyArray")).toStringList().join(",");
+    QVERIFY(receivedKeyArray == expectedReceivedKeyArray1);
+
+    // Normal PC keyboard key converstion flow shouldn't be affected when sending nativeVirtual key as 0.
+    // Qt::Key_Pause --> VK_PAUSE(0x13)
+    webView.page()->mainFrame()->evaluateJavaScript(QLatin1String("receivedKeyArray = new Array()")); // Reset
+    keyEvent = QKeyEvent(QEvent::KeyPress, Qt::Key_Pause, Qt::NoModifier, 0, 0, 0);
+    QApplication::sendEvent(&webView, &keyEvent);
+    keyEvent = QKeyEvent(QEvent::KeyRelease, Qt::Key_Pause, Qt::NoModifier, 0, 0, 0);
+    QApplication::sendEvent(&webView, &keyEvent);
+    const QLatin1String expectedReceivedKeyArray2("keydown:19:0,keyup:19:0");
+    receivedKeyArray = webView.page()->mainFrame()->evaluateJavaScript(QLatin1String("receivedKeyArray")).toStringList().join(",");
+    QVERIFY(receivedKeyArray == expectedReceivedKeyArray2);
+
+    // Negative case.
+    // Disable settings to use nativeVirtualKey as DOM key value.
+    webView.page()->setProperty("_q_useNativeVirtualKeyAsDOMKey", false);
+    // Qt::Key_Pause --> VK_PAUSE(0x13)
+    webView.page()->mainFrame()->evaluateJavaScript(QLatin1String("receivedKeyArray = new Array()")); // Reset
+    keyEvent = QKeyEvent(QEvent::KeyPress, Qt::Key_Pause, Qt::NoModifier, 0, 81, 0);
+    QApplication::sendEvent(&webView, &keyEvent);
+    keyEvent = QKeyEvent(QEvent::KeyRelease, Qt::Key_Pause, Qt::NoModifier, 0, 81, 0);
+    QApplication::sendEvent(&webView, &keyEvent);
+    const QLatin1String expectedReceivedKeyArray3("keydown:19:0,keyup:19:0");
+    receivedKeyArray = webView.page()->mainFrame()->evaluateJavaScript(QLatin1String("receivedKeyArray")).toStringList().join(",");
+    QVERIFY(receivedKeyArray == expectedReceivedKeyArray3);
+}
+
 class JSTestPage : public QWebPage
 {
 Q_OBJECT
@@ -345,6 +398,7 @@ void tst_QWebPage::geolocationRequestJS()
     QTest::qWait(2000);
     QVariant empty = m_view->page()->mainFrame()->evaluateJavaScript("errorCode");
 
+    QEXPECT_FAIL("", "https://bugs.webkit.org/show_bug.cgi?id=102235", Continue);
     QVERIFY(empty.type() == QVariant::Double && empty.toInt() != 0);
 
     newPage->setGeolocationPermission(true);
@@ -473,6 +527,7 @@ void tst_QWebPage::popupFormSubmission()
 
     QString url = page.createdWindows.takeFirst()->mainFrame()->url().toString();
     // Check if the form submission was OK.
+    QEXPECT_FAIL("", "https://bugs.webkit.org/show_bug.cgi?id=118597", Continue);
     QVERIFY(url.contains("?foo=bar"));
 }
 
@@ -2859,6 +2914,7 @@ void tst_QWebPage::originatingObjectInNetworkRequests()
     QCOMPARE(networkManager->requests.count(), 2);
 
     QList<QWebFrame*> childFrames = m_page->mainFrame()->childFrames();
+    QEXPECT_FAIL("", "https://bugs.webkit.org/show_bug.cgi?id=118660", Continue);
     QCOMPARE(childFrames.count(), 2);
 
     for (int i = 0; i < 2; ++i)
@@ -3002,6 +3058,7 @@ void tst_QWebPage::testStopScheduledPageRefresh()
                                "</body></html>");
     page2.triggerAction(QWebPage::StopScheduledPageRefresh);
     QTest::qWait(1500);
+    QEXPECT_FAIL("", "https://bugs.webkit.org/show_bug.cgi?id=118673", Continue);
     QCOMPARE(page2.mainFrame()->url().toString(), QLatin1String("about:blank"));
 }
 
@@ -3266,8 +3323,7 @@ void tst_QWebPage::deleteQWebViewTwice()
         mainWindow.setCentralWidget(webView);
         webView->load(QUrl("qrc:///resources/frame_a.html"));
         mainWindow.show();
-        connect(webView, SIGNAL(loadFinished(bool)), &mainWindow, SLOT(close()));
-        QApplication::instance()->exec();
+        QVERIFY(::waitForSignal(webView, SIGNAL(loadFinished(bool))));
     }
 }
 

@@ -1,6 +1,6 @@
 /*
  * (C) 1999 Lars Knoll (knoll@kde.org)
- * Copyright (C) 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2012, 2013 Apple Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -38,10 +38,6 @@ class QString;
 QT_END_NAMESPACE
 #endif
 
-#if PLATFORM(WX)
-class wxString;
-#endif
-
 #if PLATFORM(BLACKBERRY)
 namespace BlackBerry {
 namespace Platform {
@@ -53,7 +49,6 @@ class String;
 namespace WTF {
 
 class CString;
-class MemoryObjectInfo;
 struct StringHash;
 
 // Declarations of string operations
@@ -110,8 +105,14 @@ public:
 
     // Construct a string by copying the contents of a vector.  To avoid
     // copying, consider using String::adopt instead.
-    template<size_t inlineCapacity>
-    explicit String(const Vector<UChar, inlineCapacity>&);
+    // This method will never create a null string. Vectors with size() == 0
+    // will return the empty string.
+    // NOTE: This is different from String(vector.data(), vector.size())
+    // which will sometimes return a null string when vector.data() is null
+    // which can only occur for vectors without inline capacity.
+    // See: https://bugs.webkit.org/show_bug.cgi?id=109792
+    template<size_t inlineCapacity, typename OverflowHandler>
+    explicit String(const Vector<UChar, inlineCapacity, OverflowHandler>&);
 
     // Construct a string with UTF-16 data, from a null-terminated source.
     WTF_EXPORT_STRING_API String(const UChar*);
@@ -154,13 +155,14 @@ public:
 
     static String adopt(StringBuffer<LChar>& buffer) { return StringImpl::adopt(buffer); }
     static String adopt(StringBuffer<UChar>& buffer) { return StringImpl::adopt(buffer); }
-    template<typename CharacterType, size_t inlineCapacity>
-    static String adopt(Vector<CharacterType, inlineCapacity>& vector) { return StringImpl::adopt(vector); }
+    template<typename CharacterType, size_t inlineCapacity, typename OverflowHandler>
+    static String adopt(Vector<CharacterType, inlineCapacity, OverflowHandler>& vector) { return StringImpl::adopt(vector); }
 
     bool isNull() const { return !m_impl; }
     bool isEmpty() const { return !m_impl || !m_impl->length(); }
 
     StringImpl* impl() const { return m_impl.get(); }
+    PassRefPtr<StringImpl> releaseImpl() { return m_impl.release(); }
 
     unsigned length() const
     {
@@ -254,6 +256,9 @@ public:
     size_t find(const LChar* str, unsigned start = 0) const
         { return m_impl ? m_impl->find(str, start) : notFound; }
 
+    size_t findNextLineStart(unsigned start = 0) const
+        { return m_impl ? m_impl->findNextLineStart(start) : notFound; }
+
     // Find the last instance of a single character or string.
     size_t reverseFind(UChar c, unsigned start = UINT_MAX) const
         { return m_impl ? m_impl->reverseFind(c, start) : notFound; }
@@ -276,7 +281,7 @@ public:
     size_t reverseFind(const String& str, unsigned start, bool caseSensitive) const
         { return caseSensitive ? reverseFind(str, start) : reverseFindIgnoringCase(str, start); }
 
-    WTF_EXPORT_STRING_API const UChar* charactersWithNullTermination();
+    WTF_EXPORT_STRING_API Vector<UChar> charactersWithNullTermination() const;
     
     WTF_EXPORT_STRING_API UChar32 characterStartingAt(unsigned) const; // Ditto.
     
@@ -284,7 +289,9 @@ public:
     bool contains(const LChar* str, bool caseSensitive = true) const { return find(str, 0, caseSensitive) != notFound; }
     bool contains(const String& str, bool caseSensitive = true) const { return find(str, 0, caseSensitive) != notFound; }
 
-    bool startsWith(const String& s, bool caseSensitive = true) const
+    bool startsWith(const String& s) const
+        { return m_impl ? m_impl->startsWith(s.impl()) : s.isEmpty(); }
+    bool startsWith(const String& s, bool caseSensitive) const
         { return m_impl ? m_impl->startsWith(s.impl(), caseSensitive) : s.isEmpty(); }
     bool startsWith(UChar character) const
         { return m_impl ? m_impl->startsWith(character) : false; }
@@ -393,7 +400,14 @@ public:
 
     bool percentage(int& percentage) const;
 
+#if COMPILER_SUPPORTS(CXX_REFERENCE_QUALIFIED_FUNCTIONS)
+    WTF_EXPORT_STRING_API String isolatedCopy() const &;
+    WTF_EXPORT_STRING_API String isolatedCopy() const &&;
+#else
     WTF_EXPORT_STRING_API String isolatedCopy() const;
+#endif
+
+    WTF_EXPORT_STRING_API bool isSafeToSendToAnotherThread() const;
 
     // Prevent Strings from being implicitly convertable to bool as it will be ambiguous on any platform that
     // allows implicit conversion to another pointer type (e.g., Mac allows implicit conversion to NSString*).
@@ -421,17 +435,18 @@ public:
     WTF_EXPORT_STRING_API operator QString() const;
 #endif
 
-#if PLATFORM(WX)
-    WTF_EXPORT_PRIVATE String(const wxString&);
-    WTF_EXPORT_PRIVATE operator wxString() const;
-#endif
-
 #if PLATFORM(BLACKBERRY)
     String(const BlackBerry::Platform::String&);
     operator BlackBerry::Platform::String() const;
 #endif
 
     WTF_EXPORT_STRING_API static String make8BitFrom16BitSource(const UChar*, size_t);
+    template<size_t inlineCapacity>
+    static String make8BitFrom16BitSource(const Vector<UChar, inlineCapacity>& buffer)
+    {
+        return make8BitFrom16BitSource(buffer.data(), buffer.size());
+    }
+
     WTF_EXPORT_STRING_API static String make16BitFrom8BitSource(const LChar*, size_t);
 
     // String::fromUTF8 will return a null string if
@@ -440,6 +455,7 @@ public:
     WTF_EXPORT_STRING_API static String fromUTF8(const LChar*);
     static String fromUTF8(const char* s, size_t length) { return fromUTF8(reinterpret_cast<const LChar*>(s), length); };
     static String fromUTF8(const char* s) { return fromUTF8(reinterpret_cast<const LChar*>(s)); };
+    WTF_EXPORT_STRING_API static String fromUTF8(const CString&);
 
     // Tries to convert the passed in string to UTF-8, but will fall back to Latin-1 if the string is not valid UTF-8.
     WTF_EXPORT_STRING_API static String fromUTF8WithLatin1Fallback(const LChar*, size_t);
@@ -478,6 +494,9 @@ public:
 private:
     template <typename CharacterType>
     void removeInternal(const CharacterType*, unsigned, int);
+
+    template <typename CharacterType>
+    void appendInternal(CharacterType);
 
     RefPtr<StringImpl> m_impl;
 };
@@ -525,9 +544,9 @@ inline void swap(String& a, String& b) { a.swap(b); }
 
 // Definitions of string operations
 
-template<size_t inlineCapacity>
-String::String(const Vector<UChar, inlineCapacity>& vector)
-    : m_impl(vector.size() ? StringImpl::create(vector.data(), vector.size()) : 0)
+template<size_t inlineCapacity, typename OverflowHandler>
+String::String(const Vector<UChar, inlineCapacity, OverflowHandler>& vector)
+    : m_impl(vector.size() ? StringImpl::create(vector.data(), vector.size()) : StringImpl::empty())
 {
 }
 
@@ -599,7 +618,8 @@ inline bool codePointCompareLessThan(const String& a, const String& b)
     return codePointCompare(a.impl(), b.impl()) < 0;
 }
 
-inline void append(Vector<UChar>& vector, const String& string)
+template<size_t inlineCapacity>
+inline void append(Vector<UChar, inlineCapacity>& vector, const String& string)
 {
     vector.append(string.characters(), string.length());
 }

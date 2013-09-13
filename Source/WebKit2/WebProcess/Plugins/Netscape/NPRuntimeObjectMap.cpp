@@ -39,7 +39,11 @@
 #include <JavaScriptCore/SourceCode.h>
 #include <JavaScriptCore/Strong.h>
 #include <JavaScriptCore/StrongInlines.h>
+#include <WebCore/DOMWrapperWorld.h>
 #include <WebCore/Frame.h>
+#include <WebCore/Page.h>
+#include <WebCore/PageThrottler.h>
+#include <WebCore/ScriptController.h>
 
 using namespace JSC;
 using namespace WebCore;
@@ -49,7 +53,7 @@ namespace WebKit {
 
 NPRuntimeObjectMap::NPRuntimeObjectMap(PluginView* pluginView)
     : m_pluginView(pluginView)
-    , m_finalizationTimer(WebProcess::shared().runLoop(), this, &NPRuntimeObjectMap::invalidateQueuedObjects)
+    , m_finalizationTimer(RunLoop::main(), this, &NPRuntimeObjectMap::invalidateQueuedObjects)
 {
 }
 
@@ -64,7 +68,7 @@ NPRuntimeObjectMap::PluginProtector::~PluginProtector()
 {
 }
 
-NPObject* NPRuntimeObjectMap::getOrCreateNPObject(JSGlobalData& globalData, JSObject* jsObject)
+NPObject* NPRuntimeObjectMap::getOrCreateNPObject(VM& vm, JSObject* jsObject)
 {
     // If this is a JSNPObject, we can just get its underlying NPObject.
     if (jsObject->classInfo() == &JSNPObject::s_info) {
@@ -81,7 +85,7 @@ NPObject* NPRuntimeObjectMap::getOrCreateNPObject(JSGlobalData& globalData, JSOb
         return npJSObject;
     }
 
-    NPJSObject* npJSObject = NPJSObject::create(globalData, this, jsObject);
+    NPJSObject* npJSObject = NPJSObject::create(vm, this, jsObject);
     m_npJSObjects.set(jsObject, npJSObject);
 
     return npJSObject;
@@ -170,7 +174,7 @@ void NPRuntimeObjectMap::convertJSValueToNPVariant(ExecState* exec, JSValue valu
     }
 
     if (value.isObject()) {
-        NPObject* npObject = getOrCreateNPObject(exec->globalData(), asObject(value));
+        NPObject* npObject = getOrCreateNPObject(exec->vm(), asObject(value));
         OBJECT_TO_NPVARIANT(npObject, variant);
         return;
     }
@@ -180,18 +184,21 @@ void NPRuntimeObjectMap::convertJSValueToNPVariant(ExecState* exec, JSValue valu
 
 bool NPRuntimeObjectMap::evaluate(NPObject* npObject, const String& scriptString, NPVariant* result)
 {
-    Strong<JSGlobalObject> globalObject(this->globalObject()->globalData(), this->globalObject());
+    Strong<JSGlobalObject> globalObject(this->globalObject()->vm(), this->globalObject());
     if (!globalObject)
         return false;
+
+    if (m_pluginView && !m_pluginView->isBeingDestroyed()) {
+        if (Page* page = m_pluginView->frame()->page())
+            page->pageThrottler()->reportInterestingEvent();
+    }
 
     ExecState* exec = globalObject->globalExec();
     
     JSLockHolder lock(exec);
     JSValue thisValue = getOrCreateJSObject(globalObject.get(), npObject);
 
-    globalObject->globalData().timeoutChecker.start();
     JSValue resultValue = JSC::evaluate(exec, makeSource(scriptString), thisValue);
-    globalObject->globalData().timeoutChecker.stop();
 
     convertJSValueToNPVariant(exec, resultValue, *result);
     return true;
@@ -211,7 +218,7 @@ void NPRuntimeObjectMap::invalidate()
 
     Vector<NPObject*> objects;
 
-    for (HashMap<NPObject*, JSC::Weak<JSNPObject> >::iterator ptr = m_jsNPObjects.begin(), end = m_jsNPObjects.end(); ptr != end; ++ptr) {
+    for (HashMap<NPObject*, JSC::Weak<JSNPObject>>::iterator ptr = m_jsNPObjects.begin(), end = m_jsNPObjects.end(); ptr != end; ++ptr) {
         JSNPObject* jsNPObject = ptr->value.get();
         if (!jsNPObject) // Skip zombies.
             continue;

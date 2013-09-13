@@ -33,7 +33,6 @@
 
 #include "InputType.h"
 #include "SpinButtonElement.h"
-#include "TextControlInnerElements.h"
 
 namespace WebCore {
 
@@ -58,10 +57,12 @@ protected:
 #endif
 
 protected:
+    virtual void attach() OVERRIDE;
     virtual bool needsContainer() const;
     virtual bool shouldHaveSpinButton() const;
     virtual void createShadowSubtree() OVERRIDE;
     virtual void destroyShadowSubtree() OVERRIDE;
+    virtual void attributeChanged() OVERRIDE;
     virtual void disabledAttributeChanged() OVERRIDE;
     virtual void readonlyAttributeChanged() OVERRIDE;
     virtual bool supportsReadOnly() const OVERRIDE;
@@ -91,7 +92,6 @@ private:
     virtual HTMLElement* placeholderElement() const OVERRIDE;
     virtual void updatePlaceholderText() OVERRIDE;
     virtual bool appendFormData(FormDataList&, bool multipart) const OVERRIDE;
-    virtual void attach() OVERRIDE;
     virtual void subtreeHasChanged() OVERRIDE;
 
     // SpinButtonElement::SpinButtonOwner functions.

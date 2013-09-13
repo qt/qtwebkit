@@ -46,24 +46,17 @@
 #include "Page.h"
 #include "PageCache.h"
 #include "PageGroup.h"
+#include "PlatformStrategies.h"
 #include "ScrollingCoordinator.h"
 #include "Settings.h"
-#include <wtf/text/CString.h>
-
-#if USE(PLATFORM_STRATEGIES)
-#include "PlatformStrategies.h"
 #include "VisitedLinkStrategy.h"
-#endif
+#include <wtf/text/CString.h>
 
 namespace WebCore {
 
 static inline void addVisitedLink(Page* page, const KURL& url)
 {
-#if USE(PLATFORM_STRATEGIES)
     platformStrategies()->visitedLinkStrategy()->addVisitedLink(page, visitedLinkHash(url.string()));
-#else
-    page->group().addVisitedLink(url);
-#endif
 }
 
 HistoryController::HistoryController(Frame* frame)
@@ -87,10 +80,21 @@ void HistoryController::saveScrollPositionAndViewStateToItem(HistoryItem* item)
     else
         item->setScrollPoint(m_frame->view()->scrollPosition());
 
-    item->setPageScaleFactor(m_frame->frameScaleFactor());
-    
+    Page* page = m_frame->page();
+    if (page && page->mainFrame() == m_frame)
+        item->setPageScaleFactor(page->pageScaleFactor());
+
     // FIXME: It would be great to work out a way to put this code in WebCore instead of calling through to the client.
     m_frame->loader()->client()->saveViewStateToItem(item);
+}
+
+void HistoryController::clearScrollPositionAndViewState()
+{
+    if (!m_currentItem)
+        return;
+
+    m_currentItem->clearScrollPoint();
+    m_currentItem->setPageScaleFactor(0);
 }
 
 /*

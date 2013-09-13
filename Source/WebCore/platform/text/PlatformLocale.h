@@ -53,11 +53,6 @@ public:
     // resultant string.
     String convertFromLocalizedNumber(const String&);
 
-#if ENABLE(INPUT_MULTIPLE_FIELDS_UI)
-    // Returns localized decimal separator, e.g. "." for English, "," for French.
-    String localizedDecimalSeparator();
-#endif
-
 #if ENABLE(DATE_AND_TIME_INPUT_TYPES)
     // Returns date format in Unicode TR35 LDML[1] containing day of month,
     // month, and year, e.g. "dd/mm/yyyy"
@@ -66,6 +61,9 @@ public:
 
     // Returns a year-month format in Unicode TR35 LDML.
     virtual String monthFormat() = 0;
+
+    // Returns a year-month format using short month lanel in Unicode TR35 LDML.
+    virtual String shortMonthFormat() = 0;
 
     // Returns time format in Unicode TR35 LDML[1] containing hour, minute, and
     // second with optional period(AM/PM), e.g. "h:mm:ss a"
@@ -108,26 +106,13 @@ public:
     virtual const Vector<String>& monthLabels() = 0;
 #endif
 
-#if ENABLE(CALENDAR_PICKER)
-    // Returns a vector of string of which size is 7. The first item is a
-    // localized short string of Monday, and the last item is a localized
-    // short string of Saturday. These strings should be short.
-    virtual const Vector<String>& weekDayShortLabels() = 0;
-
-    // The first day of a week. 0 is Sunday, and 6 is Saturday.
-    virtual unsigned firstDayOfWeek() = 0;
-
-    // Returns true if people use right-to-left writing in the locale for this
-    // object.
-    virtual bool isRTL() = 0;
-#endif
-
 #if ENABLE(DATE_AND_TIME_INPUT_TYPES)
     enum FormatType { FormatTypeUnspecified, FormatTypeShort, FormatTypeMedium };
 
     // Serializes the specified date into a formatted date string to
     // display to the user. If an implementation doesn't support
     // localized dates the function should return an empty string.
+    // FormatType can be used to specify if you want the short format. 
     String formatDateTime(const DateComponents&, FormatType = FormatTypeUnspecified);
 #endif
 

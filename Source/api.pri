@@ -15,7 +15,10 @@ WEBKIT_DESTDIR = $${ROOT_BUILD_DIR}/lib
 WEBKIT += wtf javascriptcore webcore
 
 build?(webkit1): WEBKIT += webkit1
-build?(webkit2): WEBKIT += webkit2
+build?(webkit2) {
+    WEBKIT += webkit2
+    have?(QTQUICK): WEBKIT += webkit2qml
+}
 
 # Ensure that changes to the WebKit1 and WebKit2 API will trigger a qmake of this
 # file, which in turn runs syncqt to update the forwarding headers.
@@ -33,7 +36,9 @@ CONFIG += creating_module
 # the QtWebKit library, and will end up in the library's prl file.
 QT_API_DEPENDS = core gui network
 
-MODULE_SYNCQT_DIR = $$_PRO_FILE_PWD_
+# We want the QtWebKit API forwarding includes to live in the root build dir.
+MODULE_BASE_DIR = $$_PRO_FILE_PWD_
+MODULE_BASE_OUTDIR = $$ROOT_BUILD_DIR
 
 QMAKE_DOCS = $$PWD/qtwebkit.qdocconf
 
@@ -41,15 +46,17 @@ QMAKE_DOCS = $$PWD/qtwebkit.qdocconf
 # on the QT variable can be picked up when we later load(qt_module).
 load(webkit_modules)
 
-# Resources have to be included directly in the final binary.
-# MSVC's linker won't pick them from a static library since they aren't referenced.
-RESOURCES += $$PWD/WebCore/WebCore.qrc
-include_webinspector {
-    # WEBCORE_GENERATED_SOURCES_DIR is defined in WebCore.pri, included by
-    # load(webkit_modules) if WEBKIT contains webcore.
-    RESOURCES += \
-        $$PWD/WebCore/inspector/front-end/WebKit.qrc \
-        $${WEBCORE_GENERATED_SOURCES_DIR}/InspectorBackendCommands.qrc
+# Resources have to be included directly in the final binary for MSVC.
+# The linker won't pick them from a static library since they aren't referenced.
+win* {
+    RESOURCES += $$PWD/WebCore/WebCore.qrc
+    include_webinspector {
+        # WEBCORE_GENERATED_SOURCES_DIR is defined in WebCore.pri, included by
+        # load(webkit_modules) if WEBKIT contains webcore.
+        RESOURCES += \
+            $$PWD/WebCore/inspector/front-end/WebKit.qrc \
+            $${WEBCORE_GENERATED_SOURCES_DIR}/InspectorBackendCommands.qrc
+    }
 }
 
 # ---------------- Custom developer-build handling -------------------

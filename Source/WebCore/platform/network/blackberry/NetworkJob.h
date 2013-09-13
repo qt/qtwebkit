@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009, 2010, 2011 Research In Motion Limited. All rights reserved.
+ * Copyright (C) 2009, 2010, 2011, 2012, 2013 Research In Motion Limited. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -52,15 +52,15 @@ public:
     NetworkJob();
     ~NetworkJob();
 
-    bool initialize(int playerId,
-                    const String& pageGroupName,
-                    const KURL&,
-                    const BlackBerry::Platform::NetworkRequest&,
-                    PassRefPtr<ResourceHandle>,
-                    BlackBerry::Platform::NetworkStreamFactory*,
-                    Frame*,
-                    int deferLoadingCount,
-                    int redirectCount);
+    void initialize(int playerId,
+        const String& pageGroupName,
+        const KURL&,
+        const BlackBerry::Platform::NetworkRequest&,
+        PassRefPtr<ResourceHandle>,
+        BlackBerry::Platform::NetworkStreamFactory*,
+        Frame*,
+        int deferLoadingCount,
+        int redirectCount);
     PassRefPtr<ResourceHandle> handle() const { return m_handle; }
 #ifndef NDEBUG
     bool isRunning() const { return m_isRunning; }
@@ -73,7 +73,11 @@ public:
     void handleNotifyStatusReceived(int status, const String& message);
     virtual void notifyHeadersReceived(const BlackBerry::Platform::NetworkRequest::HeaderList& headers);
     virtual void notifyMultipartHeaderReceived(const char* key, const char* value);
-    virtual void notifyAuthReceived(BlackBerry::Platform::NetworkRequest::AuthType, const char* realm, bool success, bool requireCredentials);
+    virtual void notifyAuthReceived(BlackBerry::Platform::NetworkRequest::AuthType,
+        BlackBerry::Platform::NetworkRequest::AuthProtocol,
+        BlackBerry::Platform::NetworkRequest::AuthScheme,
+        const char* realm,
+        AuthResult);
     // notifyStringHeaderReceived exists only to resolve ambiguity between char* and String parameters
     void notifyStringHeaderReceived(const String& key, const String& value);
     void handleNotifyHeaderReceived(const String& key, const String& value);
@@ -86,6 +90,7 @@ public:
     virtual void notifyClose(int status);
     void handleNotifyClose(int status);
     virtual int status() const { return m_extendedStatusCode; }
+    virtual const BlackBerry::Platform::String mimeType() const;
 
     virtual void notifyChallengeResult(const KURL&, const ProtectionSpace&, AuthenticationChallengeResult, const Credential&);
 
@@ -118,7 +123,7 @@ private:
 
     bool retryAsFTPDirectory();
 
-    bool startNewJobWithRequest(ResourceRequest& newRequest, bool increasRedirectCount = false);
+    bool startNewJobWithRequest(ResourceRequest& newRequest, bool increasRedirectCount = false, bool rereadCookies = false);
 
     bool handleRedirect();
 
@@ -132,16 +137,24 @@ private:
 
     // The server needs authentication credentials. Search in the CredentialStorage
     // or prompt the user via dialog, then resend the request with the credentials.
-    bool sendRequestWithCredentials(ProtectionSpaceServerType, ProtectionSpaceAuthenticationScheme, const String& realm, bool requireCredentials = true);
+    enum SendRequestResult {
+        SendRequestSucceeded,
+        SendRequestCancelled,
+        SendRequestWaiting
+    };
+    SendRequestResult sendRequestWithCredentials(ProtectionSpaceServerType, ProtectionSpaceAuthenticationScheme, const String& realm, bool requireCredentials = true);
 
     void storeCredentials();
-
+    void storeCredentials(AuthenticationChallenge&);
     void purgeCredentials();
+    void purgeCredentials(AuthenticationChallenge&);
 
     bool isError(int statusCode) const
     {
         return statusCode < 0 || (400 <= statusCode && statusCode < 600);
     }
+
+    void updateCurrentWebChallenge(const AuthenticationChallenge&, bool allowOverwrite = true);
 
 private:
     int m_playerId;

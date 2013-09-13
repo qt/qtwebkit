@@ -32,7 +32,7 @@ import urllib
 
 from webkitpy.common.memoized import memoized
 from webkitpy.tool.servers.reflectionhandler import ReflectionHandler
-from webkitpy.layout_tests.port import builders
+from webkitpy.port import builders
 
 
 _log = logging.getLogger(__name__)
@@ -54,7 +54,7 @@ class GardeningHTTPServer(SocketServer.ThreadingMixIn, BaseHTTPServer.HTTPServer
 class GardeningHTTPRequestHandler(ReflectionHandler):
     STATIC_FILE_NAMES = frozenset()
 
-    STATIC_FILE_EXTENSIONS = ('.js', '.css', '.html', '.gif', '.png')
+    STATIC_FILE_EXTENSIONS = ('.js', '.css', '.html', '.gif', '.png', '.ico')
 
     STATIC_FILE_DIRECTORY = os.path.join(
         os.path.dirname(__file__),

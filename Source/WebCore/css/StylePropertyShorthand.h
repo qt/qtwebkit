@@ -80,6 +80,7 @@ const StylePropertyShorthand& marginShorthand();
 const StylePropertyShorthand& outlineShorthand();
 const StylePropertyShorthand& overflowShorthand();
 const StylePropertyShorthand& paddingShorthand();
+const StylePropertyShorthand& transitionShorthand();
 const StylePropertyShorthand& webkitAnimationShorthand();
 const StylePropertyShorthand& webkitAnimationShorthandForParsing();
 const StylePropertyShorthand& webkitBorderAfterShorthand();
@@ -90,6 +91,8 @@ const StylePropertyShorthand& webkitColumnsShorthand();
 const StylePropertyShorthand& webkitColumnRuleShorthand();
 const StylePropertyShorthand& webkitFlexFlowShorthand();
 const StylePropertyShorthand& webkitFlexShorthand();
+const StylePropertyShorthand& webkitGridColumnShorthand();
+const StylePropertyShorthand& webkitGridRowShorthand();
 const StylePropertyShorthand& webkitMarginCollapseShorthand();
 const StylePropertyShorthand& webkitMarqueeShorthand();
 const StylePropertyShorthand& webkitMaskShorthand();
@@ -99,12 +102,11 @@ const StylePropertyShorthand& webkitTextEmphasisShorthand();
 const StylePropertyShorthand& webkitTextStrokeShorthand();
 const StylePropertyShorthand& webkitTransitionShorthand();
 const StylePropertyShorthand& webkitTransformOriginShorthand();
-#if ENABLE(CSS_EXCLUSIONS)
-const StylePropertyShorthand& webkitWrapShorthand();
-#endif
 
 // Returns an empty list if the property is not a shorthand
 const StylePropertyShorthand& shorthandForProperty(CSSPropertyID);
+
+bool isExpandedShorthand(CSSPropertyID);
 
 } // namespace WebCore
 

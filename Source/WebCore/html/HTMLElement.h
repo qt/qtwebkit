@@ -48,9 +48,9 @@ public:
 
     PassRefPtr<HTMLCollection> children();
 
-    virtual String title() const;
+    virtual String title() const OVERRIDE FINAL;
 
-    virtual short tabIndex() const;
+    virtual short tabIndex() const OVERRIDE;
     void setTabIndex(int);
 
     String innerHTML() const;
@@ -65,7 +65,7 @@ public:
     void insertAdjacentText(const String& where, const String& text, ExceptionCode&);
 
     virtual bool hasCustomFocusLogic() const;
-    virtual bool supportsFocus() const;
+    virtual bool supportsFocus() const OVERRIDE;
 
     String contentEditable() const;
     void setContentEditable(const String&, ExceptionCode&);
@@ -102,24 +102,23 @@ public:
     void getItemRefElements(Vector<HTMLElement*>&);
 #endif
 
-#ifndef NDEBUG
     virtual bool isHTMLUnknownElement() const { return false; }
-#endif
 
     virtual bool isLabelable() const { return false; }
 
 protected:
     HTMLElement(const QualifiedName& tagName, Document*, ConstructionType);
 
-    void addHTMLLengthToStyle(StylePropertySet*, CSSPropertyID, const String& value);
-    void addHTMLColorToStyle(StylePropertySet*, CSSPropertyID, const String& color);
+    void addHTMLLengthToStyle(MutableStylePropertySet*, CSSPropertyID, const String& value);
+    void addHTMLColorToStyle(MutableStylePropertySet*, CSSPropertyID, const String& color);
 
-    void applyAlignmentAttributeToStyle(const Attribute&, StylePropertySet*);
-    void applyBorderAttributeToStyle(const Attribute&, StylePropertySet*);
+    void applyAlignmentAttributeToStyle(const AtomicString&, MutableStylePropertySet*);
+    void applyBorderAttributeToStyle(const AtomicString&, MutableStylePropertySet*);
 
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
     virtual bool isPresentationAttribute(const QualifiedName&) const OVERRIDE;
-    virtual void collectStyleForPresentationAttribute(const Attribute&, StylePropertySet*) OVERRIDE;
+    virtual void collectStyleForPresentationAttribute(const QualifiedName&, const AtomicString&, MutableStylePropertySet*) OVERRIDE;
+    unsigned parseBorderWidthAttribute(const AtomicString&) const;
 
     virtual void childrenChanged(bool changedByParser = false, Node* beforeChange = 0, Node* afterChange = 0, int childCountDelta = 0);
     void calculateAndAdjustDirectionality();
@@ -127,9 +126,9 @@ protected:
     virtual bool isURLAttribute(const Attribute&) const OVERRIDE;
 
 private:
-    virtual String nodeName() const;
+    virtual String nodeName() const OVERRIDE FINAL;
 
-    void mapLanguageAttributeToLocale(const Attribute&, StylePropertySet*);
+    void mapLanguageAttributeToLocale(const AtomicString&, MutableStylePropertySet*);
 
     virtual HTMLFormElement* virtualForm() const;
 
@@ -143,6 +142,8 @@ private:
 
     TranslateAttributeMode translateAttributeMode() const;
 
+    AtomicString eventNameForAttributeName(const QualifiedName& attrName) const;
+
 #if ENABLE(MICRODATA)
     virtual String itemValueText() const;
     virtual void setItemValueText(const String&, ExceptionCode&);
@@ -151,13 +152,13 @@ private:
 
 inline HTMLElement* toHTMLElement(Node* node)
 {
-    ASSERT(!node || node->isHTMLElement());
+    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->isHTMLElement());
     return static_cast<HTMLElement*>(node);
 }
 
 inline const HTMLElement* toHTMLElement(const Node* node)
 {
-    ASSERT(!node || node->isHTMLElement());
+    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->isHTMLElement());
     return static_cast<const HTMLElement*>(node);
 }
 

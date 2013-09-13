@@ -39,7 +39,7 @@ class Region;
 
 namespace WebKit {
 
-class LayerTreeCoordinatorProxy;
+class CoordinatedLayerTreeHostProxy;
 
 class DrawingAreaProxyImpl : public DrawingAreaProxy {
 public:
@@ -51,6 +51,8 @@ public:
 #if USE(ACCELERATED_COMPOSITING)
     bool isInAcceleratedCompositingMode() const { return !m_layerTreeContext.isEmpty(); }
 #endif
+
+    bool hasReceivedFirstUpdate() const { return m_hasReceivedFirstUpdate; }
 
 private:
     explicit DrawingAreaProxyImpl(WebPageProxy*);
@@ -83,14 +85,11 @@ private:
     void exitAcceleratedCompositingMode();
     void updateAcceleratedCompositingMode(const LayerTreeContext&);
 #if USE(COORDINATED_GRAPHICS)
-    virtual void setVisibleContentsRect(const WebCore::FloatRect& visibleContentsRect, float scale, const WebCore::FloatPoint& trajectory);
-    void didReceiveLayerTreeCoordinatorProxyMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::MessageDecoder&);
+    virtual void setVisibleContentsRect(const WebCore::FloatRect& visibleContentsRect, const WebCore::FloatPoint& trajectory) OVERRIDE;
 #endif
 #else
     bool isInAcceleratedCompositingMode() const { return false; }
 #endif
-
-    virtual void pageCustomRepresentationChanged();
 
     void discardBackingStoreSoon();
     void discardBackingStore();

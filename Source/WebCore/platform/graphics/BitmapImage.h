@@ -43,10 +43,6 @@ OBJC_CLASS NSImage;
 typedef struct HBITMAP__ *HBITMAP;
 #endif
 
-#if PLATFORM(WX)
-class wxBitmap;
-#endif
-
 namespace WebCore {
     struct FrameData;
 }
@@ -88,8 +84,6 @@ public:
     // Returns whether there was cached image data to clear.
     bool clear(bool clearMetadata);
 
-    void reportMemoryUsage(MemoryObjectInfo*) const;
-
     NativeImagePtr m_frame;
     ImageOrientation m_orientation;
     float m_duration;
@@ -109,7 +103,7 @@ class BitmapImage : public Image {
     friend class GeneratorGeneratedImage;
     friend class GraphicsContext;
 public:
-    static PassRefPtr<BitmapImage> create(NativeImagePtr nativeImage, ImageObserver* observer = 0)
+    static PassRefPtr<BitmapImage> create(PassNativeImagePtr nativeImage, ImageObserver* observer = 0)
     {
         return adoptRef(new BitmapImage(nativeImage, observer));
     }
@@ -154,19 +148,9 @@ public:
 #if PLATFORM(WIN) || (PLATFORM(QT) && OS(WINDOWS))
     static PassRefPtr<BitmapImage> create(HBITMAP);
 #endif
-#if PLATFORM(WX)
-    static PassRefPtr<BitmapImage> create(const wxBitmap& bitmap)
-    {
-        return adoptRef(new BitmapImage(bitmap));
-    }
-#endif
 #if PLATFORM(WIN)
     virtual bool getHBITMAP(HBITMAP);
     virtual bool getHBITMAPOfSize(HBITMAP, LPSIZE);
-#endif
-
-#if USE(CAIRO)
-    static PassRefPtr<BitmapImage> create(cairo_surface_t*);
 #endif
 
 #if PLATFORM(GTK)
@@ -177,16 +161,17 @@ public:
     virtual Evas_Object* getEvasObject(Evas*);
 #endif
 
-    virtual NativeImagePtr nativeImageForCurrentFrame();
-    virtual bool currentFrameHasAlpha();
+    virtual PassNativeImagePtr nativeImageForCurrentFrame() OVERRIDE;
+
+    virtual bool currentFrameKnownToBeOpaque() OVERRIDE;
 
     ImageOrientation currentFrameOrientation();
 
 #if !ASSERT_DISABLED
     virtual bool notSolidColor();
 #endif
-
-    void reportMemoryUsage(MemoryObjectInfo*) const OVERRIDE;
+    
+    bool canAnimate();
 
 private:
     void updateSize() const;
@@ -198,28 +183,25 @@ protected:
       Certain     // The repetition count is known to be correct.
     };
 
-    BitmapImage(NativeImagePtr, ImageObserver* = 0);
+    BitmapImage(PassNativeImagePtr, ImageObserver* = 0);
     BitmapImage(ImageObserver* = 0);
-#if PLATFORM(WX)
-    BitmapImage(const wxBitmap&);
-#endif
 
 #if PLATFORM(WIN)
     virtual void drawFrameMatchingSourceSize(GraphicsContext*, const FloatRect& dstRect, const IntSize& srcSize, ColorSpace styleColorSpace, CompositeOperator);
 #endif
-    virtual void draw(GraphicsContext*, const FloatRect& dstRect, const FloatRect& srcRect, ColorSpace styleColorSpace, CompositeOperator);
-#if USE(CG) || PLATFORM(CHROMIUM) || USE(CAIRO)
-    virtual void draw(GraphicsContext*, const FloatRect& dstRect, const FloatRect& srcRect, ColorSpace styleColorSpace, CompositeOperator, RespectImageOrientationEnum) OVERRIDE;
+    virtual void draw(GraphicsContext*, const FloatRect& dstRect, const FloatRect& srcRect, ColorSpace styleColorSpace, CompositeOperator, BlendMode);
+#if USE(CG) || USE(CAIRO) || PLATFORM(BLACKBERRY)
+    virtual void draw(GraphicsContext*, const FloatRect& dstRect, const FloatRect& srcRect, ColorSpace styleColorSpace, CompositeOperator, BlendMode, RespectImageOrientationEnum) OVERRIDE;
 #endif
 
-#if (OS(WINCE) && !PLATFORM(QT))
+#if USE(WINGDI)
     virtual void drawPattern(GraphicsContext*, const FloatRect& srcRect, const AffineTransform& patternTransform,
                              const FloatPoint& phase, ColorSpace styleColorSpace, CompositeOperator, const FloatRect& destRect);
 #endif
 
     size_t currentFrame() const { return m_currentFrame; }
     virtual size_t frameCount();
-    NativeImagePtr frameAtIndex(size_t);
+    PassNativeImagePtr frameAtIndex(size_t);
     bool frameIsCompleteAtIndex(size_t);
     float frameDurationAtIndex(size_t);
     bool frameHasAlphaAtIndex(size_t);

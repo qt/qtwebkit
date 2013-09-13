@@ -44,7 +44,7 @@
 namespace WebCore {
 
     class ScriptExecutionContext;
-    class WorkerContextProxy;
+    class WorkerGlobalScopeProxy;
     class WorkerScriptLoader;
 
     typedef int ExceptionCode;
@@ -54,33 +54,36 @@ namespace WebCore {
         static PassRefPtr<Worker> create(ScriptExecutionContext*, const String& url, ExceptionCode&);
         virtual ~Worker();
 
-        virtual const AtomicString& interfaceName() const;
+        virtual const AtomicString& interfaceName() const OVERRIDE;
 
-        void postMessage(PassRefPtr<SerializedScriptValue> message, ExceptionCode&);
         void postMessage(PassRefPtr<SerializedScriptValue> message, const MessagePortArray*, ExceptionCode&);
-        // FIXME: remove this when we update the ObjC bindings (bug #28774).
+        // Needed for Objective-C bindings (see bug 28774).
         void postMessage(PassRefPtr<SerializedScriptValue> message, MessagePort*, ExceptionCode&);
 
         void terminate();
 
-        virtual bool canSuspend() const;
-        virtual void stop();
-        virtual bool hasPendingActivity() const;
+        virtual bool canSuspend() const OVERRIDE;
+        virtual void stop() OVERRIDE;
+        virtual bool hasPendingActivity() const OVERRIDE;
     
         DEFINE_ATTRIBUTE_EVENT_LISTENER(message);
 
     private:
         explicit Worker(ScriptExecutionContext*);
 
-        // WorkerScriptLoaderClient callbacks
-        virtual void didReceiveResponse(unsigned long identifier, const ResourceResponse&);
-        virtual void notifyFinished();
+        void notifyNetworkStateChange(bool isOnline);
 
-        virtual void refEventTarget() { ref(); }
-        virtual void derefEventTarget() { deref(); }
+        // WorkerScriptLoaderClient callbacks
+        virtual void didReceiveResponse(unsigned long identifier, const ResourceResponse&) OVERRIDE;
+        virtual void notifyFinished() OVERRIDE;
+
+        virtual void refEventTarget() OVERRIDE { ref(); }
+        virtual void derefEventTarget() OVERRIDE { deref(); }
+
+        friend void networkStateChanged(bool isOnLine);
 
         RefPtr<WorkerScriptLoader> m_scriptLoader;
-        WorkerContextProxy* m_contextProxy; // The proxy outlives the worker to perform thread shutdown.
+        WorkerGlobalScopeProxy* m_contextProxy; // The proxy outlives the worker to perform thread shutdown.
     };
 
 } // namespace WebCore

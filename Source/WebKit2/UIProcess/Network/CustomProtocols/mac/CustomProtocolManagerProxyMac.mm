@@ -28,11 +28,14 @@
 
 #if ENABLE(CUSTOM_PROTOCOLS)
 
+#import "ChildProcessProxy.h"
 #import "Connection.h"
 #import "CustomProtocolManagerMessages.h"
+#import "CustomProtocolManagerProxyMessages.h"
 #import "DataReference.h"
-#import "WebProcessProxy.h"
+#import "WebCoreArgumentCoders.h"
 #import <WebCore/ResourceError.h>
+#import <WebCore/ResourceRequest.h>
 #import <WebCore/ResourceResponse.h>
 
 using namespace CoreIPC;
@@ -119,24 +122,20 @@ using namespace WebKit;
 
 namespace WebKit {
 
-CustomProtocolManagerProxy::CustomProtocolManagerProxy(WebProcessProxy* webProcessProxy)
-    : m_webProcessProxy(webProcessProxy)
+CustomProtocolManagerProxy::CustomProtocolManagerProxy(ChildProcessProxy* childProcessProxy)
+    : m_childProcessProxy(childProcessProxy)
 {
-    ASSERT(m_webProcessProxy);
-}
-
-void CustomProtocolManagerProxy::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::MessageDecoder& decoder)
-{
-    didReceiveCustomProtocolManagerProxyMessage(connection, messageID, decoder);
+    ASSERT(m_childProcessProxy);
+    m_childProcessProxy->addMessageReceiver(Messages::CustomProtocolManagerProxy::messageReceiverName(), this);
 }
 
 void CustomProtocolManagerProxy::startLoading(uint64_t customProtocolID, const ResourceRequest& coreRequest)
 {
-    NSURLRequest *request = coreRequest.nsURLRequest();
+    NSURLRequest *request = coreRequest.nsURLRequest(DoNotUpdateHTTPBody);
     if (!request)
         return;
 
-    WKCustomProtocolLoader *loader = [[WKCustomProtocolLoader alloc] initWithCustomProtocolManagerProxy:this customProtocolID:customProtocolID request:request connection:m_webProcessProxy->connection()];
+    WKCustomProtocolLoader *loader = [[WKCustomProtocolLoader alloc] initWithCustomProtocolManagerProxy:this customProtocolID:customProtocolID request:request connection:m_childProcessProxy->connection()];
     ASSERT(loader);
     ASSERT(!m_loaderMap.contains(customProtocolID));
     m_loaderMap.add(customProtocolID, loader);

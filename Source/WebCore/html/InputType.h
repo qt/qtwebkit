@@ -33,13 +33,13 @@
 #ifndef InputType_h
 #define InputType_h
 
+#include "FeatureObserver.h"
 #include "HTMLTextFormControlElement.h"
 #include "StepRange.h"
 #include <wtf/Forward.h>
 #include <wtf/FastAllocBase.h>
 #include <wtf/Noncopyable.h>
 #include <wtf/RefPtr.h>
-#include <wtf/Vector.h>
 
 namespace WebCore {
 
@@ -82,7 +82,7 @@ class InputType {
     WTF_MAKE_FAST_ALLOCATED;
 
 public:
-    static PassOwnPtr<InputType> create(HTMLInputElement*, const String&);
+    static PassOwnPtr<InputType> create(HTMLInputElement*, const AtomicString&);
     static PassOwnPtr<InputType> createText(HTMLInputElement*);
     virtual ~InputType();
 
@@ -203,7 +203,7 @@ public:
     virtual bool isKeyboardFocusable(KeyboardEvent*) const;
     virtual bool isMouseFocusable() const;
     virtual bool shouldUseInputMethod() const;
-    virtual void handleFocusEvent();
+    virtual void handleFocusEvent(Node* oldFocusedNode, FocusDirection);
     virtual void handleBlurEvent();
     virtual void accessKeyAction(bool sendMouseEvents);
     virtual bool canBeSuccessfulSubmitButton();
@@ -213,7 +213,6 @@ public:
 #endif
 
     virtual void blur();
-    virtual void focus(bool restorePreviousSelection);
 
     // Shadow tree handling
 
@@ -244,7 +243,6 @@ public:
     virtual void stepAttributeChanged();
     virtual void altAttributeChanged();
     virtual void srcAttributeChanged();
-    virtual void willMoveToNewOwnerDocument();
     virtual bool shouldRespectAlignAttribute();
     virtual FileList* files();
     virtual void setFiles(PassRefPtr<FileList>);
@@ -271,14 +269,18 @@ public:
     virtual bool supportsReadOnly() const;
     virtual void updateInnerTextValue();
     virtual void updatePlaceholderText();
+    virtual void attributeChanged();
     virtual void multipleAttributeChanged();
     virtual void disabledAttributeChanged();
     virtual void readonlyAttributeChanged();
+    virtual void requiredAttributeChanged();
+    virtual void valueAttributeChanged();
     virtual String defaultToolTip() const;
 #if ENABLE(DATALIST_ELEMENT)
     virtual void listAttributeTargetChanged();
     virtual Decimal findClosestTickMarkValue(const Decimal&);
 #endif
+    virtual void updateClearButtonVisibility();
 
     // Parses the specified string for the type, and return
     // the Decimal value for the parsing result if the parsing
@@ -313,6 +315,7 @@ protected:
     HTMLInputElement* element() const { return m_element; }
     Chrome* chrome() const;
     Decimal parseToNumberOrNaN(const String&) const;
+    void observeFeatureIfVisible(FeatureObserver::Feature) const;
 
 private:
     // Helper for stepUp()/stepDown(). Adds step value * count to the current value.
@@ -323,5 +326,4 @@ private:
 };
 
 } // namespace WebCore
-
 #endif

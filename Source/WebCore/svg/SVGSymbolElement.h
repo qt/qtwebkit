@@ -27,22 +27,20 @@
 #include "SVGAnimatedRect.h"
 #include "SVGExternalResourcesRequired.h"
 #include "SVGFitToViewBox.h"
-#include "SVGLangSpace.h"
 #include "SVGStyledElement.h"
 
 namespace WebCore {
 
-class SVGSymbolElement : public SVGStyledElement,
-                         public SVGLangSpace,
-                         public SVGExternalResourcesRequired,
-                         public SVGFitToViewBox {
+class SVGSymbolElement FINAL : public SVGStyledElement,
+                               public SVGExternalResourcesRequired,
+                               public SVGFitToViewBox {
 public:
     static PassRefPtr<SVGSymbolElement> create(const QualifiedName&, Document*);
 
 private:
     SVGSymbolElement(const QualifiedName&, Document*);
 
-    virtual bool supportsFocus() const { return true; }
+    virtual bool supportsFocus() const OVERRIDE { return true; }
 
     bool isSupportedAttribute(const QualifiedName&);
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;

@@ -30,7 +30,6 @@
 #include "FragmentScriptingPermission.h"
 #include "HTMLElementStack.h"
 #include "HTMLFormattingElementList.h"
-#include "NotImplemented.h"
 #include <wtf/Noncopyable.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefPtr.h>
@@ -72,12 +71,15 @@ class HTMLFormElement;
 class HTMLConstructionSite {
     WTF_MAKE_NONCOPYABLE(HTMLConstructionSite);
 public:
-    HTMLConstructionSite(Document*, unsigned maximumDOMTreeDepth);
-    HTMLConstructionSite(DocumentFragment*, FragmentScriptingPermission, unsigned maximumDOMTreeDepth);
+    HTMLConstructionSite(Document*, ParserContentPolicy, unsigned maximumDOMTreeDepth);
+    HTMLConstructionSite(DocumentFragment*, ParserContentPolicy, unsigned maximumDOMTreeDepth);
     ~HTMLConstructionSite();
 
     void detach();
     void executeQueuedTasks();
+
+    void setDefaultCompatibilityMode();
+    void finishedParsing();
 
     void insertDoctype(AtomicHTMLToken*);
     void insertComment(AtomicHTMLToken*);
@@ -108,15 +110,18 @@ public:
     void generateImpliedEndTags();
     void generateImpliedEndTagsWithExclusion(const AtomicString& tagName);
 
+    bool inQuirksMode();
+
     bool isEmpty() const { return !m_openElements.stackDepth(); }
     HTMLElementStack::ElementRecord* currentElementRecord() const { return m_openElements.topRecord(); }
     Element* currentElement() const { return m_openElements.top(); }
     ContainerNode* currentNode() const { return m_openElements.topNode(); }
     HTMLStackItem* currentStackItem() const { return m_openElements.topStackItem(); }
     HTMLStackItem* oneBelowTop() const { return m_openElements.oneBelowTop(); }
-
+    Document* ownerDocumentForCurrentNode();
     HTMLElementStack* openElements() const { return &m_openElements; }
     HTMLFormattingElementList* activeFormattingElements() const { return &m_activeFormattingElements; }
+    bool currentIsRootNode() { return m_openElements.topNode() == m_openElements.rootNode(); }
 
     Element* head() const { return m_head->element(); }
     HTMLStackItem* headStackItem() const { return m_head.get(); }
@@ -124,6 +129,8 @@ public:
     void setForm(HTMLFormElement*);
     HTMLFormElement* form() const { return m_form.get(); }
     PassRefPtr<HTMLFormElement> takeForm();
+
+    ParserContentPolicy parserContentPolicy() { return m_parserContentPolicy; }
 
     class RedirectToFosterParentGuard {
         WTF_MAKE_NONCOPYABLE(RedirectToFosterParentGuard);
@@ -150,6 +157,9 @@ private:
     // tokens produce only one DOM mutation.
     typedef Vector<HTMLConstructionSiteTask, 1> AttachmentQueue;
 
+    void setCompatibilityMode(Document::CompatibilityMode);
+    void setCompatibilityModeFromDoctype(const String& name, const String& publicId, const String& systemId);
+
     void attachLater(ContainerNode* parent, PassRefPtr<Node> child, bool selfClosing = false);
 
     void findFosterSite(HTMLConstructionSiteTask&);
@@ -174,7 +184,7 @@ private:
 
     AttachmentQueue m_attachmentQueue;
 
-    FragmentScriptingPermission m_fragmentScriptingPermission;
+    ParserContentPolicy m_parserContentPolicy;
     bool m_isParsingFragment;
 
     // http://www.whatwg.org/specs/web-apps/current-work/multipage/tokenization.html#parsing-main-intable
@@ -184,6 +194,8 @@ private:
     bool m_redirectAttachToFosterParent;
 
     unsigned m_maximumDOMTreeDepth;
+
+    bool m_inQuirksMode;
 };
 
 } // namespace WebCore

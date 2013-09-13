@@ -27,7 +27,8 @@
 #include "config.h"
 #include "RedirectedXCompositeWindow.h"
 
-#if PLATFORM(X11)
+#if USE(OPENGL) && PLATFORM(X11)
+
 #include <X11/extensions/Xcomposite.h>
 #include <X11/extensions/Xdamage.h>
 #include <cairo-xlib.h>
@@ -192,7 +193,7 @@ void RedirectedXCompositeWindow::resize(const IntSize& size)
 
 GLContext* RedirectedXCompositeWindow::context()
 {
-    ASSERT(m_needsContext);
+    ASSERT(m_needsContext == CreateGLContext);
 
     if (m_context)
         return m_context.get();
@@ -266,4 +267,4 @@ void RedirectedXCompositeWindow::callDamageNotifyCallback()
 
 } // namespace WebCore
 
-#endif // PLATFORM(X11)
+#endif // USE(OPENGL) && PLATFORM(X11)

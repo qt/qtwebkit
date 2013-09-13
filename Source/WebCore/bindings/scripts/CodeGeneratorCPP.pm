@@ -123,7 +123,7 @@ sub GetClassName
 
     # special cases
     return "WebDOMString" if $codeGenerator->IsStringType($name) or $name eq "SerializedScriptValue";
-    return "WebDOMObject" if $name eq "DOMObject";
+    return "WebDOMObject" if $name eq "any";
     return "bool" if $name eq "boolean";
     return $name if $codeGenerator->IsPrimitiveType($name);
 
@@ -139,30 +139,25 @@ sub GetParentImplClassName
 {
     my $interface = shift;
 
-    if (@{$interface->parents} eq 0) {
+    unless ($interface->parent) {
         return "EventTarget" if $interface->extendedAttributes->{"EventTarget"};
         return "Object";
     }
 
-    return $interface->parents(0);
+    return $interface->parent;
 }
 
 sub GetParent
 {
     my $interface = shift;
-    my $numParents = @{$interface->parents};
 
-    my $parent = "";
-    if ($numParents eq 0) {
+    my $parent;
+    if (!$interface->parent) {
         $parent = "WebDOMObject";
         $parent = "WebDOMEventTarget" if $interface->extendedAttributes->{"EventTarget"};
-    } elsif ($numParents eq 1) {
-        my $parentName = $interface->parents(0);
-        $parent = "WebDOM" . $parentName;
     } else {
-        my @parents = @{$interface->parents};
-        my $firstParent = shift(@parents);
-        $parent = "WebDOM" . $firstParent;
+        my $parentName = $interface->parent;
+        $parent = "WebDOM" . $parentName;
     }
 
     return $parent;
@@ -199,23 +194,28 @@ sub SkipFunction
 sub SkipAttribute
 {
     my $attribute = shift;
+    my $type = $attribute->signature->type;
 
     return 1 if $attribute->signature->extendedAttributes->{"Custom"}
                 or $attribute->signature->extendedAttributes->{"CustomGetter"};
 
-    return 1 if $attribute->signature->type =~ /Constructor$/;
+    return 1 if $type =~ /Constructor$/;
+    return 1 if $attribute->isStatic;
+    return 1 if $codeGenerator->IsTypedArrayType($type);
 
-    return 1 if $codeGenerator->IsTypedArrayType($attribute->signature->type);
-
-    if ($codeGenerator->GetArrayType($attribute->signature->type)) {
+    if ($codeGenerator->GetArrayType($type)) {
         return 1;
     }
 
-    if ($codeGenerator->GetSequenceType($attribute->signature->type)) {
+    if ($codeGenerator->GetSequenceType($type)) {
         return 1;
     }
 
-    $codeGenerator->AssertNotSequenceType($attribute->signature->type);
+    if ($codeGenerator->IsEnumType($type)) {
+        return 1;
+    }
+
+    $codeGenerator->AssertNotSequenceType($type);
 
     # FIXME: This is typically used to add script execution state arguments to the method.
     # These functions will not compile with the C++ bindings as is, so disable them
@@ -231,6 +231,8 @@ sub GetCPPType
     my $useConstReference = shift;
     my $name = GetClassName($type);
 
+    return "char" if $type eq "byte";
+    return "unsigned char" if $type eq "octet";
     return "int" if $type eq "long";
     return "unsigned" if $name eq "unsigned long";
     return "unsigned short" if $type eq "CompareHow";
@@ -293,7 +295,7 @@ sub AddIncludesForType
         return;
     }
 
-    if ($type eq "DOMObject") {
+    if ($type eq "any") {
         $implIncludes{"WebDOMObject.h"} = 1;
         return;
     }
@@ -317,7 +319,7 @@ sub AddIncludesForType
     $implIncludes{"StylePropertySet.h"} = 1 if $type eq "CSSStyleDeclaration";
 
     # Default, include the same named file (the implementation) and the same name prefixed with "WebDOM". 
-    $implIncludes{"$type.h"} = 1 unless $type eq "DOMObject";
+    $implIncludes{"$type.h"} = 1 unless $type eq "any";
     $implIncludes{"WebDOM$type.h"} = 1;
 }
 
@@ -434,7 +436,6 @@ sub GenerateHeader
             my $attributeConditionalString = $codeGenerator->GenerateConditionalString($attribute->signature);
             my $attributeName = $attribute->signature->name;
             my $attributeType = GetCPPType($attribute->signature->type, 0);
-            my $attributeIsReadonly = ($attribute->type =~ /^readonly/);
             my $property = "";
             
             $property .= "#if ${attributeConditionalString}\n" if $attributeConditionalString;
@@ -450,7 +451,7 @@ sub GenerateHeader
 
             $property .= $declarationSuffix;
             push(@headerAttributes, $property);
-            if (!$attributeIsReadonly and !$attribute->signature->extendedAttributes->{"Replaceable"}) {
+            if (!$attribute->isReadOnly and !$attribute->signature->extendedAttributes->{"Replaceable"}) {
                 $property = "    void $setterName($attributeType)";
                 $property .= $declarationSuffix;
                 push(@headerAttributes, $property); 
@@ -585,12 +586,6 @@ sub GenerateImplementation
     my $object = shift;
     my $interface = shift;
 
-    my @ancestorInterfaceNames = ();
-
-    if (@{$interface->parents} > 1) {
-        $codeGenerator->AddMethodsConstantsAndAttributesFromParentInterfaces($interface, \@ancestorInterfaceNames);
-    }
-
     my $interfaceName = $interface->name;
     my $className = GetClassName($interfaceName);
     my $implClassName = GetImplClassName($interfaceName);
@@ -613,10 +608,10 @@ sub GenerateImplementation
 
     $implIncludes{"WebExceptionHandler.h"} = 1;
     $implIncludes{"$implClassName.h"} = 1;
-    @implContent = ();
+    $implIncludes{"wtf/GetPtr.h"} = 1;
+    $implIncludes{"wtf/RefPtr.h"} = 1;
 
-    push(@implContent, "#include <wtf/GetPtr.h>\n");
-    push(@implContent, "#include <wtf/RefPtr.h>\n\n");
+    @implContent = ();
 
     # Private datastructure, encapsulating WebCore types
     if ($baseClass eq "WebDOMObject") {
@@ -691,14 +686,15 @@ sub GenerateImplementation
 
             my $attributeName = $attribute->signature->name;
             my $attributeType = GetCPPType($attribute->signature->type, 0);
-            my $attributeIsReadonly = ($attribute->type =~ /^readonly/);
+            my $attributeIsNullable = $attribute->signature->isNullable;
 
             $attributeNames{$attributeName} = 1;
 
             # - GETTER
             my $getterSig = "$attributeType $className\:\:$attributeName() const\n";
-            my $hasGetterException = @{$attribute->getterExceptions};
+            my $hasGetterException = $attribute->signature->extendedAttributes->{"GetterRaisesException"};
             my ($functionName, @arguments) = $codeGenerator->GetterExpression(\%implIncludes, $interfaceName, $attribute);
+            push(@arguments, "isNull") if $attributeIsNullable;
             push(@arguments, "ec") if $hasGetterException;
             if ($attribute->signature->extendedAttributes->{"ImplementedBy"}) {
                 my $implementedBy = $attribute->signature->extendedAttributes->{"ImplementedBy"};
@@ -731,6 +727,12 @@ sub GenerateImplementation
             push(@implContent, "{\n");
             push(@implContent, AddEarlyReturnStatement($attributeType));
             push(@implContent, @customGetterContent);
+
+            # FIXME: Should we return a default value when isNull == true?
+            if ($attributeIsNullable) {
+                push(@implContent, "    bool isNull = false;\n");
+            }
+
             if ($hasGetterException) {
                 # Differentiated between when the return type is a pointer and
                 # not for white space issue (ie. Foo *result vs. int result).
@@ -750,9 +752,9 @@ sub GenerateImplementation
             push(@implContent, "}\n\n");
 
             # - SETTER
-            if (!$attributeIsReadonly and !$attribute->signature->extendedAttributes->{"Replaceable"}) {
+            if (!$attribute->isReadOnly and !$attribute->signature->extendedAttributes->{"Replaceable"}) {
                 # Exception handling
-                my $hasSetterException = @{$attribute->setterExceptions};
+                my $hasSetterException = $attribute->signature->extendedAttributes->{"SetterRaisesException"};
 
                 my $coreSetterName = "set" . $codeGenerator->WK_ucfirst($attributeName);
                 my $setterName = "set" . ucfirst($attributeName);
@@ -797,7 +799,7 @@ sub GenerateImplementation
             my $functionName = $function->signature->name;
             my $returnType = GetCPPType($function->signature->type, 0);
             my $hasParameters = @{$function->parameters};
-            my $raisesExceptions = @{$function->raisesExceptions};
+            my $raisesExceptions = $function->signature->extendedAttributes->{"RaisesException"};
 
             my @parameterNames = ();
             my @needsAssert = ();
@@ -969,11 +971,21 @@ sub WriteData
     # Update a .cpp file if the contents are changed.
     $contents = join "", @implContentHeader;
 
-    foreach my $include (sort keys(%implIncludes)) {
-        # "className.h" is already included right after config.h, silence check-webkit-style
-        next if $include eq "$name.h";
-        $contents .= "#include \"$include\"\n";
+    my @includes;
+    foreach my $include (keys(%implIncludes)) {
+        if ($include =~ /^wtf\//) {
+            push(@includes, "<$include>");
+        } else {
+            push(@includes, "\"$include\"");
+        }
     }
+
+    foreach my $include (sort @includes) {
+        # "className.h" is already included right after config.h, silence check-webkit-style
+        next if $include eq "\"$prefix$name.h\"";
+        $contents .= "#include $include\n";
+    }
+    $contents .= "\n";
 
     $contents .= join "", @implContent;
     $codeGenerator->UpdateFile($implFileName, $contents);

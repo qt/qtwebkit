@@ -26,7 +26,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import unittest
+import unittest2 as unittest
 
 from webkitpy.common.config.committers import Committer
 from webkitpy.common.system.filesystem_mock import MockFileSystem
@@ -46,7 +46,7 @@ class MockCommitInfo(object):
 
     def author(self):
         # It's definitely possible to have commits with authors who
-        # are not in our committers.py list.
+        # are not in our contributors.json list.
         if not self._author_email:
             return None
         return Committer("Mock Committer", self._author_email)

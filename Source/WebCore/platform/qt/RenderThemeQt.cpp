@@ -34,6 +34,7 @@
 #include "Chrome.h"
 #include "ChromeClient.h"
 #include "Color.h"
+#include "ExceptionCodePlaceholder.h"
 #include "FileList.h"
 #include "Font.h"
 #include "FontSelector.h"
@@ -255,12 +256,12 @@ Color RenderThemeQt::platformFocusRingColor() const
     return colorPalette().brush(QPalette::Active, QPalette::Highlight).color();
 }
 
-void RenderThemeQt::systemFont(int, FontDescription&) const
+void RenderThemeQt::systemFont(CSSValueID, FontDescription&) const
 {
     // no-op
 }
 
-Color RenderThemeQt::systemColor(int cssValueId) const
+Color RenderThemeQt::systemColor(CSSValueID cssValueId) const
 {
     QPalette pal = colorPalette();
     switch (cssValueId) {
@@ -538,7 +539,7 @@ String RenderThemeQt::extraMediaControlsStyleSheet()
 {
     String result = String(mediaControlsQtUserAgentStyleSheet, sizeof(mediaControlsQtUserAgentStyleSheet));
 
-    if (m_page && m_page->chrome()->requiresFullscreenForVideoPlayback())
+    if (m_page && m_page->chrome().requiresFullscreenForVideoPlayback())
         result.append(String(mediaControlsQtFullscreenUserAgentStyleSheet, sizeof(mediaControlsQtFullscreenUserAgentStyleSheet)));
 
     return result;
@@ -593,7 +594,7 @@ QColor RenderThemeQt::getMediaControlForegroundColor(RenderObject* o) const
     if (!o)
         return fgColor;
 
-    if (o->node()->active())
+    if (o->node() && o->node()->isElementNode() && toElement(o->node())->active())
         fgColor = fgColor.lighter();
 
     if (!mediaElementCanPlay(o))
@@ -740,10 +741,10 @@ bool RenderThemeQt::paintMediaVolumeSliderTrack(RenderObject *o, const PaintInfo
     p->painter->setBrush(scaleColor);
     p->painter->drawRect(left, top, width, height);
 
-    if (!o->node() || !o->node()->hasTagName(inputTag))
+    if (!o->node() || !isHTMLInputElement(o->node()))
         return false;
 
-    HTMLInputElement* slider = static_cast<HTMLInputElement*>(o->node());
+    HTMLInputElement* slider = toHTMLInputElement(o->node());
 
     // Position the inner rectangle
     height = height * slider->valueAsNumber();
@@ -790,10 +791,9 @@ bool RenderThemeQt::paintMediaSliderTrack(RenderObject* o, const PaintInfo& pain
             p->painter->setBrush(getMediaControlForegroundColor());
 
             // Paint each buffered section
-            ExceptionCode ex;
             for (int i = 0; i < buffered->length(); i++) {
-                float startX = (buffered->start(i, ex) / player->duration()) * 100;
-                float width = ((buffered->end(i, ex) / player->duration()) * 100) - startX;
+                float startX = (buffered->start(i, IGNORE_EXCEPTION) / player->duration()) * 100;
+                float width = ((buffered->end(i, IGNORE_EXCEPTION) / player->duration()) * 100) - startX;
                 p->painter->drawRect(startX, 37, width, 26);
             }
         }

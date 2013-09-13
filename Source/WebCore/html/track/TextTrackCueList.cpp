@@ -85,8 +85,8 @@ bool TextTrackCueList::add(PassRefPtr<TextTrackCue> cue)
 
 bool TextTrackCueList::add(PassRefPtr<TextTrackCue> prpCue, size_t start, size_t end)
 {
-    ASSERT(start <= m_list.size());
-    ASSERT(end <= m_list.size());
+    ASSERT_WITH_SECURITY_IMPLICATION(start <= m_list.size());
+    ASSERT_WITH_SECURITY_IMPLICATION(end <= m_list.size());
 
     // Maintain text track cue order:
     // http://www.whatwg.org/specs/web-apps/current-work/#text-track-cue-order
@@ -101,7 +101,7 @@ bool TextTrackCueList::add(PassRefPtr<TextTrackCue> prpCue, size_t start, size_t
     }
 
     size_t index = (start + end) / 2;
-    if (cue->startTime() < m_list[index]->startTime() || (cue->startTime() == m_list[index]->startTime() && cue->endTime() > m_list[index]->endTime()))
+    if (cue->isOrderedBefore(m_list[index].get()))
         return add(cue.release(), start, index);
 
     return add(cue.release(), index + 1, end);
@@ -121,6 +121,15 @@ bool TextTrackCueList::remove(TextTrackCue* cue)
 bool TextTrackCueList::contains(TextTrackCue* cue) const
 {
     return m_list.contains(cue);
+}
+
+bool TextTrackCueList::updateCueIndex(TextTrackCue* cue)
+{
+    if (!contains(cue))
+        return false;
+    
+    remove(cue);
+    return add(cue);
 }
 
 void TextTrackCueList::clear()

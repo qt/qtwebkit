@@ -42,37 +42,41 @@
 #include <JavaScriptCore/JSContextRef.h>
 #include <JavaScriptCore/JSLock.h>
 #include <JavaScriptCore/JSValueRef.h>
-#include <WebCore/AnimationController.h>
 #include <WebCore/ArchiveResource.h>
-#include <WebCore/CSSComputedStyleDeclaration.h>
 #include <WebCore/Chrome.h>
 #include <WebCore/DocumentLoader.h>
+#include <WebCore/EventHandler.h>
 #include <WebCore/Frame.h>
 #include <WebCore/FrameView.h>
+#include <WebCore/HTMLFormElement.h>
 #include <WebCore/HTMLFrameOwnerElement.h>
+#include <WebCore/HTMLInputElement.h>
 #include <WebCore/HTMLNames.h>
+#include <WebCore/HTMLTextAreaElement.h>
 #include <WebCore/JSCSSStyleDeclaration.h>
 #include <WebCore/JSElement.h>
 #include <WebCore/JSRange.h>
+#include <WebCore/NetworkingContext.h>
+#include <WebCore/NodeTraversal.h>
 #include <WebCore/Page.h>
 #include <WebCore/PluginDocument.h>
 #include <WebCore/RenderTreeAsText.h>
 #include <WebCore/ResourceBuffer.h>
+#include <WebCore/ResourceLoader.h>
+#include <WebCore/ScriptController.h>
 #include <WebCore/SecurityOrigin.h>
 #include <WebCore/TextIterator.h>
 #include <WebCore/TextResourceDecoder.h>
 #include <wtf/text/StringBuilder.h>
 
-#if ENABLE(WEB_INTENTS)
-#include "IntentData.h"
-#include <WebCore/DOMWindowIntents.h>
-#include <WebCore/DeliveredIntent.h>
-#include <WebCore/Intent.h>
-#include <WebCore/PlatformMessagePortChannel.h>
+#if PLATFORM(MAC)
+#include <WebCore/LegacyWebArchive.h>
 #endif
 
-#if PLATFORM(MAC) || PLATFORM(WIN)
-#include <WebCore/LegacyWebArchive.h>
+#if ENABLE(NETWORK_PROCESS)
+#include "NetworkConnectionToWebProcessMessages.h"
+#include "NetworkProcessConnection.h"
+#include "WebCoreArgumentCoders.h"
 #endif
 
 #ifndef NDEBUG
@@ -113,8 +117,7 @@ PassRefPtr<WebFrame> WebFrame::createSubframe(WebPage* page, const String& frame
 {
     RefPtr<WebFrame> frame = create();
 
-    WebFrame* parentFrame = static_cast<WebFrameLoaderClient*>(ownerElement->document()->frame()->loader()->client())->webFrame();
-    page->send(Messages::WebPageProxy::DidCreateSubframe(frame->frameID(), parentFrame->frameID()));
+    page->send(Messages::WebPageProxy::DidCreateSubframe(frame->frameID()));
 
     frame->init(page, frameName, ownerElement);
 
@@ -176,8 +179,8 @@ WebPage* WebFrame::page() const
     if (!m_coreFrame)
         return 0;
     
-    if (WebCore::Page* page = m_coreFrame->page())
-        return static_cast<WebChromeClient*>(page->chrome()->client())->page();
+    if (Page* page = m_coreFrame->page())
+        return WebPage::fromCorePage(page);
 
     return 0;
 }
@@ -235,57 +238,52 @@ void WebFrame::startDownload(const WebCore::ResourceRequest& request)
 {
     ASSERT(m_policyDownloadID);
 
-    DownloadManager::shared().startDownload(m_policyDownloadID, page(), request);
-
+    uint64_t policyDownloadID = m_policyDownloadID;
     m_policyDownloadID = 0;
+
+#if ENABLE(NETWORK_PROCESS)
+    if (WebProcess::shared().usesNetworkProcess()) {
+        bool privateBrowsingEnabled = m_coreFrame->loader()->networkingContext()->storageSession().isPrivateBrowsingSession();
+        WebProcess::shared().networkConnection()->connection()->send(Messages::NetworkConnectionToWebProcess::StartDownload(privateBrowsingEnabled, policyDownloadID, request), 0);
+        return;
+    }
+#endif
+
+    WebProcess::shared().downloadManager().startDownload(policyDownloadID, request);
 }
 
-void WebFrame::convertHandleToDownload(ResourceHandle* handle, const ResourceRequest& request, const ResourceResponse& response)
+void WebFrame::convertMainResourceLoadToDownload(DocumentLoader* documentLoader, const ResourceRequest& request, const ResourceResponse& response)
 {
     ASSERT(m_policyDownloadID);
 
-    DownloadManager::shared().convertHandleToDownload(m_policyDownloadID, page(), handle, request, response);
+    uint64_t policyDownloadID = m_policyDownloadID;
     m_policyDownloadID = 0;
-}
 
-#if ENABLE(WEB_INTENTS)
-void WebFrame::deliverIntent(const IntentData& intentData)
-{
-    OwnPtr<DeliveredIntentClient> dummyClient;
-    Vector<uint8_t> dataCopy = intentData.data;
+    ResourceLoader* mainResourceLoader = documentLoader->mainResourceLoader();
 
-    OwnPtr<WebCore::MessagePortChannelArray> channels;
-    if (!intentData.messagePorts.isEmpty()) {
-        channels = adoptPtr(new WebCore::MessagePortChannelArray(intentData.messagePorts.size()));
-        for (size_t i = 0; i < intentData.messagePorts.size(); ++i)
-            (*channels)[i] = MessagePortChannel::create(WebProcess::shared().messagePortChannel(intentData.messagePorts.at(i)));
+#if ENABLE(NETWORK_PROCESS)
+    if (WebProcess::shared().usesNetworkProcess()) {
+        // Use 0 to indicate that there is no main resource loader.
+        // This can happen if the main resource is in the WebCore memory cache.
+        uint64_t mainResourceLoadIdentifier;
+        if (mainResourceLoader)
+            mainResourceLoadIdentifier = mainResourceLoader->identifier();
+        else
+            mainResourceLoadIdentifier = 0;
+
+        WebProcess::shared().networkConnection()->connection()->send(Messages::NetworkConnectionToWebProcess::ConvertMainResourceLoadToDownload(mainResourceLoadIdentifier, policyDownloadID, request, response), 0);
+        return;
     }
-    OwnPtr<WebCore::MessagePortArray> messagePorts = WebCore::MessagePort::entanglePorts(*m_coreFrame->document()->domWindow()->scriptExecutionContext(), channels.release());
-
-    RefPtr<DeliveredIntent> deliveredIntent = DeliveredIntent::create(m_coreFrame, dummyClient.release(), intentData.action, intentData.type,
-                                                                      SerializedScriptValue::adopt(dataCopy), messagePorts.release(),
-                                                                      intentData.extras);
-    WebCore::DOMWindowIntents::from(m_coreFrame->document()->domWindow())->deliver(deliveredIntent.release());
-}
-
-void WebFrame::deliverIntent(WebCore::Intent* intent)
-{
-    OwnPtr<DeliveredIntentClient> dummyClient;
-
-    OwnPtr<WebCore::MessagePortChannelArray> channels;
-    WebCore::MessagePortChannelArray* origChannels = intent->messagePorts();
-    if (origChannels && origChannels->size()) {
-        channels = adoptPtr(new WebCore::MessagePortChannelArray(origChannels->size()));
-        for (size_t i = 0; i < origChannels->size(); ++i)
-            (*channels)[i] = origChannels->at(i).release();
-    }
-    OwnPtr<WebCore::MessagePortArray> messagePorts = WebCore::MessagePort::entanglePorts(*m_coreFrame->document()->domWindow()->scriptExecutionContext(), channels.release());
-
-    RefPtr<DeliveredIntent> deliveredIntent = DeliveredIntent::create(m_coreFrame, dummyClient.release(), intent->action(), intent->type(),
-                                                                      intent->data(), messagePorts.release(), intent->extras());
-    WebCore::DOMWindowIntents::from(m_coreFrame->document()->domWindow())->deliver(deliveredIntent.release());
-}
 #endif
+
+    if (!mainResourceLoader) {
+        // The main resource has already been loaded. Start a new download instead.
+        WebProcess::shared().downloadManager().startDownload(policyDownloadID, request);
+        return;
+    }
+
+    WebProcess::shared().downloadManager().convertHandleToDownload(policyDownloadID, documentLoader->mainResourceLoader()->handle(), request, response);
+}
 
 String WebFrame::source() const 
 {
@@ -316,7 +314,12 @@ String WebFrame::contentsAsString() const
         for (Frame* child = m_coreFrame->tree()->firstChild(); child; child = child->tree()->nextSibling()) {
             if (!builder.isEmpty())
                 builder.append(' ');
-            builder.append(static_cast<WebFrameLoaderClient*>(child->loader()->client())->webFrame()->contentsAsString());
+
+            WebFrameLoaderClient* webFrameLoaderClient = toWebFrameLoaderClient(child->loader()->client());
+            WebFrame* webFrame = webFrameLoaderClient ? webFrameLoaderClient->webFrame() : 0;
+            ASSERT(webFrame);
+
+            builder.append(webFrame->contentsAsString());
         }
         // FIXME: It may make sense to use toStringPreserveCapacity() here.
         return builder.toString();
@@ -345,7 +348,7 @@ String WebFrame::selectionAsString() const
     if (!m_coreFrame)
         return String();
 
-    return m_coreFrame->displayStringModifiedByEncoding(m_coreFrame->editor()->selectedText());
+    return m_coreFrame->displayStringModifiedByEncoding(m_coreFrame->editor().selectedText());
 }
 
 IntSize WebFrame::size() const
@@ -415,7 +418,8 @@ WebFrame* WebFrame::parentFrame() const
     if (!m_coreFrame || !m_coreFrame->ownerElement() || !m_coreFrame->ownerElement()->document())
         return 0;
 
-    return static_cast<WebFrameLoaderClient*>(m_coreFrame->ownerElement()->document()->frame()->loader()->client())->webFrame();
+    WebFrameLoaderClient* webFrameLoaderClient = toWebFrameLoaderClient(m_coreFrame->ownerElement()->document()->frame()->loader()->client());
+    return webFrameLoaderClient ? webFrameLoaderClient->webFrame() : 0;
 }
 
 PassRefPtr<ImmutableArray> WebFrame::childFrames()
@@ -427,89 +431,17 @@ PassRefPtr<ImmutableArray> WebFrame::childFrames()
     if (!size)
         return ImmutableArray::create();
 
-    Vector<RefPtr<APIObject> > vector;
+    Vector<RefPtr<APIObject>> vector;
     vector.reserveInitialCapacity(size);
 
     for (Frame* child = m_coreFrame->tree()->firstChild(); child; child = child->tree()->nextSibling()) {
-        WebFrame* webFrame = static_cast<WebFrameLoaderClient*>(child->loader()->client())->webFrame();
+        WebFrameLoaderClient* webFrameLoaderClient = toWebFrameLoaderClient(child->loader()->client());
+        WebFrame* webFrame = webFrameLoaderClient ? webFrameLoaderClient->webFrame() : 0;
+        ASSERT(webFrame);
         vector.uncheckedAppend(webFrame);
     }
 
     return ImmutableArray::adopt(vector);
-}
-
-unsigned WebFrame::numberOfActiveAnimations() const
-{
-    if (!m_coreFrame)
-        return 0;
-
-    AnimationController* controller = m_coreFrame->animation();
-    if (!controller)
-        return 0;
-
-    return controller->numberOfActiveAnimations(m_coreFrame->document());
-}
-
-bool WebFrame::pauseAnimationOnElementWithId(const String& animationName, const String& elementID, double time)
-{
-    if (!m_coreFrame)
-        return false;
-
-    AnimationController* controller = m_coreFrame->animation();
-    if (!controller)
-        return false;
-
-    if (!m_coreFrame->document())
-        return false;
-
-    Node* coreNode = m_coreFrame->document()->getElementById(elementID);
-    if (!coreNode || !coreNode->renderer())
-        return false;
-
-    return controller->pauseAnimationAtTime(coreNode->renderer(), animationName, time);
-}
-
-bool WebFrame::pauseTransitionOnElementWithId(const String& propertyName, const String& elementID, double time)
-{
-    if (!m_coreFrame)
-        return false;
-
-    AnimationController* controller = m_coreFrame->animation();
-    if (!controller)
-        return false;
-
-    if (!m_coreFrame->document())
-        return false;
-
-    Node* coreNode = m_coreFrame->document()->getElementById(elementID);
-    if (!coreNode || !coreNode->renderer())
-        return false;
-
-    return controller->pauseTransitionAtTime(coreNode->renderer(), propertyName, time);
-}
-
-void WebFrame::suspendAnimations()
-{
-    if (!m_coreFrame)
-        return;
-
-    AnimationController* controller = m_coreFrame->animation();
-    if (!controller)
-        return;
-
-    controller->suspendAnimations();
-}
-
-void WebFrame::resumeAnimations()
-{
-    if (!m_coreFrame)
-        return;
-
-    AnimationController* controller = m_coreFrame->animation();
-    if (!controller)
-        return;
-
-    controller->resumeAnimations();
 }
 
 String WebFrame::layerTreeAsText() const
@@ -553,8 +485,7 @@ bool WebFrame::handlesPageScaleGesture() const
 
     PluginDocument* pluginDocument = static_cast<PluginDocument*>(m_coreFrame->document());
     PluginView* pluginView = static_cast<PluginView*>(pluginDocument->pluginWidget());
-
-    return pluginView->handlesPageScaleFactor();
+    return pluginView && pluginView->handlesPageScaleFactor();
 }
 
 IntRect WebFrame::contentBounds() const
@@ -578,7 +509,7 @@ IntRect WebFrame::visibleContentBounds() const
     if (!view)
         return IntRect();
     
-    IntRect contentRect = view->visibleContentRect(true);
+    IntRect contentRect = view->visibleContentRect(ScrollableArea::IncludeScrollbars);
     return IntRect(0, 0, contentRect.width(), contentRect.height());
 }
 
@@ -591,7 +522,7 @@ IntRect WebFrame::visibleContentBoundsExcludingScrollbars() const
     if (!view)
         return IntRect();
     
-    IntRect contentRect = view->visibleContentRect(false);
+    IntRect contentRect = view->visibleContentRect();
     return IntRect(0, 0, contentRect.width(), contentRect.height());
 }
 
@@ -636,7 +567,7 @@ PassRefPtr<InjectedBundleHitTestResult> WebFrame::hitTest(const IntPoint point) 
     if (!m_coreFrame)
         return 0;
 
-    return InjectedBundleHitTestResult::create(m_coreFrame->eventHandler()->hitTestResultAtPoint(point, false, true));
+    return InjectedBundleHitTestResult::create(m_coreFrame->eventHandler()->hitTestResultAtPoint(point, HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::IgnoreClipping | HitTestRequest::DisallowShadowContent));
 }
 
 bool WebFrame::getDocumentBackgroundColor(double* red, double* green, double* blue, double* alpha)
@@ -665,10 +596,28 @@ bool WebFrame::containsAnyFormElements() const
     if (!document)
         return false;
 
-    for (Node* node = document->documentElement(); node; node = node->traverseNextNode()) {
+    for (Node* node = document->documentElement(); node; node = NodeTraversal::next(node)) {
         if (!node->isElementNode())
             continue;
-        if (static_cast<Element*>(node)->hasTagName(HTMLNames::formTag))
+        if (isHTMLFormElement(node))
+            return true;
+    }
+    return false;
+}
+
+bool WebFrame::containsAnyFormControls() const
+{
+    if (!m_coreFrame)
+        return false;
+    
+    Document* document = m_coreFrame->document();
+    if (!document)
+        return false;
+
+    for (Node* node = document->documentElement(); node; node = NodeTraversal::next(node)) {
+        if (!node->isElementNode())
+            continue;
+        if (isHTMLInputElement(node) || toElement(node)->hasTagName(HTMLNames::selectTag) || isHTMLTextAreaElement(node))
             return true;
     }
     return false;
@@ -690,7 +639,9 @@ WebFrame* WebFrame::frameForContext(JSContextRef context)
         return 0;
 
     Frame* coreFrame = static_cast<JSDOMWindowShell*>(globalObjectObj)->window()->impl()->frame();
-    return static_cast<WebFrameLoaderClient*>(coreFrame->loader()->client())->webFrame();
+
+    WebFrameLoaderClient* webFrameLoaderClient = toWebFrameLoaderClient(coreFrame->loader()->client());
+    return webFrameLoaderClient ? webFrameLoaderClient->webFrame() : 0;
 }
 
 JSValueRef WebFrame::jsWrapperForWorld(InjectedBundleNodeHandle* nodeHandle, InjectedBundleScriptWorld* world)
@@ -717,37 +668,12 @@ JSValueRef WebFrame::jsWrapperForWorld(InjectedBundleRangeHandle* rangeHandle, I
     return toRef(exec, toJS(exec, globalObject, rangeHandle->coreRange()));
 }
 
-JSValueRef WebFrame::computedStyleIncludingVisitedInfo(JSObjectRef element)
-{
-    if (!m_coreFrame)
-        return 0;
-
-    JSDOMWindow* globalObject = m_coreFrame->script()->globalObject(mainThreadNormalWorld());
-    ExecState* exec = globalObject->globalExec();
-
-    if (!toJS(element)->inherits(&JSElement::s_info))
-        return JSValueMakeUndefined(toRef(exec));
-
-    RefPtr<CSSComputedStyleDeclaration> style = CSSComputedStyleDeclaration::create(static_cast<JSElement*>(toJS(element))->impl(), true);
-
-    JSLockHolder lock(exec);
-    return toRef(exec, toJS(exec, globalObject, style.get()));
-}
-
 String WebFrame::counterValue(JSObjectRef element)
 {
     if (!toJS(element)->inherits(&JSElement::s_info))
         return String();
 
     return counterValueForElement(static_cast<JSElement*>(toJS(element))->impl());
-}
-
-String WebFrame::markerText(JSObjectRef element)
-{
-    if (!toJS(element)->inherits(&JSElement::s_info))
-        return String();
-
-    return markerTextForListItem(static_cast<JSElement*>(toJS(element))->impl());
 }
 
 String WebFrame::provisionalURL() const
@@ -802,18 +728,18 @@ String WebFrame::mimeTypeForResourceWithURL(const KURL& url) const
 
 void WebFrame::setTextDirection(const String& direction)
 {
-    if (!m_coreFrame || !m_coreFrame->editor())
+    if (!m_coreFrame)
         return;
 
     if (direction == "auto")
-        m_coreFrame->editor()->setBaseWritingDirection(NaturalWritingDirection);
+        m_coreFrame->editor().setBaseWritingDirection(NaturalWritingDirection);
     else if (direction == "ltr")
-        m_coreFrame->editor()->setBaseWritingDirection(LeftToRightWritingDirection);
+        m_coreFrame->editor().setBaseWritingDirection(LeftToRightWritingDirection);
     else if (direction == "rtl")
-        m_coreFrame->editor()->setBaseWritingDirection(RightToLeftWritingDirection);
+        m_coreFrame->editor().setBaseWritingDirection(RightToLeftWritingDirection);
 }
 
-#if PLATFORM(MAC) || PLATFORM(WIN)
+#if PLATFORM(MAC)
 
 class WebFrameFilter : public FrameFilter {
 public:
@@ -838,8 +764,11 @@ bool WebFrameFilter::shouldIncludeSubframe(Frame* frame) const
 {
     if (!m_callback)
         return true;
-        
-    WebFrame* webFrame = static_cast<WebFrameLoaderClient*>(frame->loader()->client())->webFrame();
+
+    WebFrameLoaderClient* webFrameLoaderClient = toWebFrameLoaderClient(frame->loader()->client());
+    WebFrame* webFrame = webFrameLoaderClient ? webFrameLoaderClient->webFrame() : 0;
+    ASSERT(webFrame);
+
     return m_callback(toAPI(m_topLevelWebFrame), toAPI(webFrame), m_context);
 }
 

@@ -16,16 +16,18 @@
 
 #include "GLSLANG/ShaderLang.h"
 
-#include "compiler/ArrayBoundsClamper.h"
 #include "compiler/BuiltInFunctionEmulator.h"
 #include "compiler/ExtensionBehavior.h"
+#include "compiler/HashNames.h"
 #include "compiler/InfoSink.h"
 #include "compiler/SymbolTable.h"
 #include "compiler/VariableInfo.h"
+#include "third_party/compiler/ArrayBoundsClamper.h"
 
 class LongNameMap;
 class TCompiler;
 class TDependencyGraph;
+class TranslatorHLSL;
 
 //
 // Helper function to identify specs that are based on the WebGL spec,
@@ -41,6 +43,7 @@ public:
     TShHandleBase();
     virtual ~TShHandleBase();
     virtual TCompiler* getAsCompiler() { return 0; }
+    virtual TranslatorHLSL* getAsTranslatorHLSL() { return 0; }
 
 protected:
     // Memory allocator. Allocates and tracks memory required by the compiler.
@@ -60,7 +63,7 @@ public:
 
     bool Init(const ShBuiltInResources& resources);
     bool compile(const char* const shaderStrings[],
-                 const int numStrings,
+                 size_t numStrings,
                  int compileOptions);
 
     // Get results of the last compilation.
@@ -69,6 +72,10 @@ public:
     const TVariableInfoList& getUniforms() const { return uniforms; }
     int getMappedNameMaxLength() const;
 
+    ShHashFunction64 getHashFunction() const { return hashFunction; }
+    NameMap& getNameMap() { return nameMap; }
+    TSymbolTable& getSymbolTable() { return symbolTable; }
+
 protected:
     ShShaderType getShaderType() const { return shaderType; }
     ShShaderSpec getShaderSpec() const { return shaderSpec; }
@@ -76,8 +83,8 @@ protected:
     bool InitBuiltInSymbolTable(const ShBuiltInResources& resources);
     // Clears the results from the previous compilation.
     void clearResults();
-    // Return true if function recursion is detected.
-    bool detectRecursion(TIntermNode* root);
+    // Return true if function recursion is detected or call depth exceeded.
+    bool detectCallDepth(TIntermNode* root, TInfoSink& infoSink, bool limitCallStackDepth);
     // Rewrites a shader's intermediate tree according to the CSS Shaders spec.
     void rewriteCSSShader(TIntermNode* root);
     // Returns true if the given shader does not exceed the minimum
@@ -89,6 +96,9 @@ protected:
     void mapLongVariableNames(TIntermNode* root);
     // Translate to object code.
     virtual void translate(TIntermNode* root) = 0;
+    // Returns true if, after applying the packing rules in the GLSL 1.017 spec
+    // Appendix A, section 7, the shader does not use too many uniforms.
+    bool enforcePackingRestrictions();
     // Returns true if the shader passes the restrictions that aim to prevent timing attacks.
     bool enforceTimingRestrictions(TIntermNode* root, bool outputGraph);
     // Returns true if the shader does not use samplers.
@@ -96,23 +106,36 @@ protected:
     // Returns true if the shader does not use sampler dependent values to affect control 
     // flow or in operations whose time can depend on the input values.
     bool enforceFragmentShaderTimingRestrictions(const TDependencyGraph& graph);
+    // Return true if the maximum expression complexity below the limit.
+    bool limitExpressionComplexity(TIntermNode* root);
     // Get built-in extensions with default behavior.
     const TExtensionBehavior& getExtensionBehavior() const;
+    // Get the resources set by InitBuiltInSymbolTable
+    const ShBuiltInResources& getResources() const;
 
     const ArrayBoundsClamper& getArrayBoundsClamper() const;
+    ShArrayIndexClampingStrategy getArrayIndexClampingStrategy() const;
     const BuiltInFunctionEmulator& getBuiltInFunctionEmulator() const;
 
 private:
     ShShaderType shaderType;
     ShShaderSpec shaderSpec;
 
+    int maxUniformVectors;
+    int maxExpressionComplexity;
+    int maxCallStackDepth;
+
+    ShBuiltInResources compileResources;
+
     // Built-in symbol table for the given language, spec, and resources.
     // It is preserved from compile-to-compile.
     TSymbolTable symbolTable;
     // Built-in extensions with default behavior.
     TExtensionBehavior extensionBehavior;
+    bool fragmentPrecisionHigh;
 
     ArrayBoundsClamper arrayBoundsClamper;
+    ShArrayIndexClampingStrategy clampingStrategy;
     BuiltInFunctionEmulator builtInFunctionEmulator;
 
     // Results of compilation.
@@ -122,6 +145,10 @@ private:
 
     // Cached copy of the ref-counted singleton.
     LongNameMap* longNameMap;
+
+    // name hashing.
+    ShHashFunction64 hashFunction;
+    NameMap nameMap;
 };
 
 //

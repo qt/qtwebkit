@@ -26,15 +26,15 @@
 #ifndef PlatformStrategies_h
 #define PlatformStrategies_h
 
-#if USE(PLATFORM_STRATEGIES)
-
 namespace WebCore {
 
 class CookiesStrategy;
+class DatabaseStrategy;
 class LoaderStrategy;
 class PasteboardStrategy;
 class PluginStrategy;
 class SharedWorkerStrategy;
+class StorageStrategy;
 class VisitedLinkStrategy;
 
 class PlatformStrategies {
@@ -44,6 +44,13 @@ public:
         if (!m_cookiesStrategy)
             m_cookiesStrategy = createCookiesStrategy();
         return m_cookiesStrategy;
+    }
+
+    DatabaseStrategy* databaseStrategy()
+    {
+        if (!m_databaseStrategy)
+            m_databaseStrategy = createDatabaseStrategy();
+        return m_databaseStrategy;
     }
 
     LoaderStrategy* loaderStrategy()
@@ -81,13 +88,22 @@ public:
         return m_visitedLinkStrategy;
     }
 
+    StorageStrategy* storageStrategy()
+    {
+        if (!m_storageStrategy)
+            m_storageStrategy = createStorageStrategy();
+        return m_storageStrategy;
+    }
+
 protected:
     PlatformStrategies()
         : m_cookiesStrategy(0)
+        , m_databaseStrategy(0)
         , m_loaderStrategy(0)
         , m_pasteboardStrategy(0)
         , m_pluginStrategy(0)
         , m_sharedWorkerStrategy(0)
+        , m_storageStrategy(0)
         , m_visitedLinkStrategy(0)
     {
     }
@@ -98,17 +114,21 @@ protected:
 
 private:
     virtual CookiesStrategy* createCookiesStrategy() = 0;
+    virtual DatabaseStrategy* createDatabaseStrategy() = 0;
     virtual LoaderStrategy* createLoaderStrategy() = 0;
     virtual PasteboardStrategy* createPasteboardStrategy() = 0;
     virtual PluginStrategy* createPluginStrategy() = 0;
     virtual SharedWorkerStrategy* createSharedWorkerStrategy() = 0;
+    virtual StorageStrategy* createStorageStrategy() = 0;
     virtual VisitedLinkStrategy* createVisitedLinkStrategy() = 0;
 
     CookiesStrategy* m_cookiesStrategy;
+    DatabaseStrategy* m_databaseStrategy;
     LoaderStrategy* m_loaderStrategy;
     PasteboardStrategy* m_pasteboardStrategy;
     PluginStrategy* m_pluginStrategy;
     SharedWorkerStrategy* m_sharedWorkerStrategy;
+    StorageStrategy* m_storageStrategy;
     VisitedLinkStrategy* m_visitedLinkStrategy;
 };
 
@@ -117,7 +137,5 @@ void setPlatformStrategies(PlatformStrategies*);
 bool hasPlatformStrategies();
     
 } // namespace WebCore
-
-#endif // USE(PLATFORM_STRATEGIES)
 
 #endif // PlatformStrategies_h

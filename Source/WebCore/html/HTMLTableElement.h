@@ -35,7 +35,7 @@ class HTMLTableCaptionElement;
 class HTMLTableRowsCollection;
 class HTMLTableSectionElement;
 
-class HTMLTableElement : public HTMLElement {
+class HTMLTableElement FINAL : public HTMLElement {
 public:
     static PassRefPtr<HTMLTableElement> create(Document*);
     static PassRefPtr<HTMLTableElement> create(const QualifiedName&, Document*);
@@ -73,7 +73,7 @@ private:
 
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
     virtual bool isPresentationAttribute(const QualifiedName&) const OVERRIDE;
-    virtual void collectStyleForPresentationAttribute(const Attribute&, StylePropertySet*) OVERRIDE;
+    virtual void collectStyleForPresentationAttribute(const QualifiedName&, const AtomicString&, MutableStylePropertySet*) OVERRIDE;
     virtual bool isURLAttribute(const Attribute&) const OVERRIDE;
 
     // Used to obtain either a solid or outset border decl and to deal with the frame and rules attributes.
@@ -99,6 +99,22 @@ private:
     unsigned short m_padding;
     RefPtr<StylePropertySet> m_sharedCellStyle;
 };
+
+inline bool isHTMLTableElement(const Node* node)
+{
+    return node->hasTagName(HTMLNames::tableTag);
+}
+
+inline bool isHTMLTableElement(const Element* element)
+{
+    return element->hasTagName(HTMLNames::tableTag);
+}
+
+inline HTMLTableElement* toHTMLTableElement(Node* node)
+{
+    ASSERT_WITH_SECURITY_IMPLICATION(!node || isHTMLTableElement(node));
+    return static_cast<HTMLTableElement*>(node);
+}
 
 } //namespace
 

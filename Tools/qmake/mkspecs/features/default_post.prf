@@ -11,7 +11,13 @@
 CONFIG += config_step
 
 # Enable dynamic instead of static libraries for development
-!production_build:!buildbot:!win*: CONFIG += force_static_libs_as_shared
+# Avoid it with debug_and_release, it can cause the application to load both the debug and release
+# dependent libraries when using frameworks on Mac.
+!production_build:!debug_and_release:!buildbot:!win*:!build?(webkit2): CONFIG += force_static_libs_as_shared
+
+# Don't create .prl files for intermediate libraries because their contents get used when linking against
+# them, breaking "-Wl,-whole-archive -lMyIntermediateLib --Wl,-no-whole-archive"
+staticlib: CONFIG -= create_prl
 
 root_project_file: finalizeConfigure()
 
@@ -20,7 +26,11 @@ root_project_file: finalizeConfigure()
     # Removing debug_and_release causes issues with lib suffixes when building debug on Windows.
     # Work around it by only removing build_all, and still create the Makefiles for both configurations.
     win32*: CONFIG -= build_all
-    else: CONFIG -= debug_and_release
+    else: {
+        CONFIG -= debug_and_release
+        # Default to release
+        !debug:!release: CONFIG += release
+    }
 } else:debug_and_release {
     # Only build a single instance of each application
     contains(TEMPLATE, app):!force_build_all {
@@ -43,7 +53,7 @@ INCLUDEPATH += \
 
 CONFIG -= warn_on
 
-*-g++*: QMAKE_CXXFLAGS = \
+!compiling_thirdparty_code:*-g++*: QMAKE_CXXFLAGS = \
     -Wall \
     -Wextra \
     -Wreturn-type \
@@ -117,6 +127,9 @@ contains(TEMPLATE, derived) {
 } else {
     # Make sure the generated sources are compiled as well
     for(generator, GENERATORS) {
+        prependEach($${generator}.extra_sources, $${GENERATED_SOURCES_DESTDIR}/)
+        SOURCES += $$eval($${generator}.extra_sources)
+
         isEqual($${generator}.add_output_to_sources, false): next()
 
         output = $$eval($${generator}.output)
@@ -142,37 +155,6 @@ contains(TEMPLATE, derived) {
                 eval($$output_variable += $$output_file)
             }
         }
-
-        prependEach($${generator}.extra_sources, $${GENERATED_SOURCES_DESTDIR}/)
-        SOURCES += $$eval($${generator}.extra_sources)
-    }
-}
-
-contains(TEMPLATE, lib) {
-    # Triggers the right export macros for WebKit internals
-    DEFINES += BUILDING_$${TARGET}
-
-    # Triggers the right export macro for the QtWebKit API (see qwebkitglobal.h)
-    !contains(QT, webkit)|equals(MODULE, webkitwidgets): DEFINES += BUILDING_WEBKIT
-
-    # Prevent name clashes when building both debug and release. Qt5's module
-    # system already takes care of this for the top level QtWebKit library.
-    !qt_install_module:debug_and_release: TARGET = $$qtLibraryTarget($$TARGET)
-
-    gnu_thin_archives {
-        # Replace the hardcoded archiver command line
-        # options to use GNU ar's thin archive format.
-        AR_COMMAND = $$split(QMAKE_AR, " ")
-        QMAKE_AR = $$member(AR_COMMAND, 0) cruT
-    }
-
-    isEmpty(DESTDIR): DESTDIR = $$targetSubDir()
-
-    DEFINES += QT_ASCII_CAST_WARNINGS
-
-    !plugin {
-        contains(QT_CONFIG, reduce_exports):CONFIG += hide_symbols
-        unix:contains(QT_CONFIG, reduce_relocations):CONFIG += bsymbolic_functions
     }
 }
 
@@ -278,10 +260,32 @@ incremental.target = incremental
 incremental.commands = $(MAKE) -f $(MAKEFILE) qmake_all && $(MAKE) -f $(MAKEFILE)
 QMAKE_EXTRA_TARGETS += incremental
 
-# Don't set OBJECTS_DIR for subdirs, as that will unconditionally
-# create the directory, even if we're not using it.
-contains(TEMPLATE, subdirs) {
-    unset(OBJECTS_DIR)
+contains(TEMPLATE, lib) {
+    # Triggers the right export macros for WebKit internals
+    DEFINES += BUILDING_$${TARGET}
+
+    # Triggers the right export macro for the QtWebKit API (see qwebkitglobal.h)
+    !contains(QT, webkit)|equals(MODULE, webkitwidgets): DEFINES += BUILDING_WEBKIT
+
+    # Prevent name clashes when building both debug and release. Qt5's module
+    # system already takes care of this for the top level QtWebKit library.
+    !qt_install_module:debug_and_release: TARGET = $$qtLibraryTarget($$TARGET)
+
+    gnu_thin_archives {
+        # Replace the hardcoded archiver command line
+        # options to use GNU ar's thin archive format.
+        AR_COMMAND = $$split(QMAKE_AR, " ")
+        QMAKE_AR = $$member(AR_COMMAND, 0) cruT
+    }
+
+    isEmpty(DESTDIR): DESTDIR = $$targetSubDir()
+
+    DEFINES += QT_ASCII_CAST_WARNINGS
+
+    !plugin {
+        contains(QT_CONFIG, reduce_exports):CONFIG += hide_symbols
+        unix:contains(QT_CONFIG, reduce_relocations):CONFIG += bsymbolic_functions
+    }
 }
 
 # Remove duplicated sources
@@ -309,6 +313,6 @@ for(target, $$list($$unique(DEFAULT_TARGETS))) {
 # desination dir is absolute and contains a static path component
 # that also contains either of those two words, so we make DESTDIR
 # relative.
-DESTDIR = $$replace(DESTDIR, ^$${ROOT_BUILD_DIR}, $${BUILD_ROOT_RELATIVE_TO_OUT_PWD})
+DESTDIR = $$replace(DESTDIR, ^$$re_escape($${ROOT_BUILD_DIR}), $${BUILD_ROOT_RELATIVE_TO_OUT_PWD})
 
 load(default_post) # Load Qt's defaults

@@ -36,7 +36,7 @@
 
 namespace WTF {
 
-class WTF_EXPORT_PRIVATE_RTTI ArrayBufferView : public RefCounted<ArrayBufferView> {
+class ArrayBufferView : public RefCounted<ArrayBufferView> {
   public:
     enum ViewType {
         TypeInt8,
@@ -69,10 +69,13 @@ class WTF_EXPORT_PRIVATE_RTTI ArrayBufferView : public RefCounted<ArrayBufferVie
 
     virtual unsigned byteLength() const = 0;
 
-    WTF_EXPORT_PRIVATE_NO_RTTI virtual ~ArrayBufferView();
+    void setNeuterable(bool flag) { m_isNeuterable = flag; }
+    bool isNeuterable() const { return m_isNeuterable; }
+
+    WTF_EXPORT_PRIVATE virtual ~ArrayBufferView();
 
   protected:
-    WTF_EXPORT_PRIVATE_NO_RTTI ArrayBufferView(PassRefPtr<ArrayBuffer>, unsigned byteOffset);
+    WTF_EXPORT_PRIVATE ArrayBufferView(PassRefPtr<ArrayBuffer>, unsigned byteOffset);
 
     inline bool setImpl(ArrayBufferView*, unsigned byteOffset);
 
@@ -122,12 +125,13 @@ class WTF_EXPORT_PRIVATE_RTTI ArrayBufferView : public RefCounted<ArrayBufferVie
         *numElements = std::min(remainingElements, *numElements);
     }
 
-    WTF_EXPORT_PRIVATE_NO_RTTI virtual void neuter();
+    WTF_EXPORT_PRIVATE virtual void neuter();
 
     // This is the address of the ArrayBuffer's storage, plus the byte offset.
     void* m_baseAddress;
 
-    unsigned m_byteOffset;
+    unsigned m_byteOffset : 31;
+    bool m_isNeuterable : 1;
 
   private:
     friend class ArrayBuffer;

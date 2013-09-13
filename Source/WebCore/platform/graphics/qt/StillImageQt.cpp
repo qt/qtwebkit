@@ -52,9 +52,9 @@ StillImage::~StillImage()
         delete m_pixmap;
 }
 
-bool StillImage::currentFrameHasAlpha()
+bool StillImage::currentFrameKnownToBeOpaque()
 {
-    return m_pixmap->hasAlpha();
+    return !m_pixmap->hasAlpha();
 }
 
 IntSize StillImage::size() const
@@ -62,13 +62,13 @@ IntSize StillImage::size() const
     return IntSize(m_pixmap->width(), m_pixmap->height());
 }
 
-NativeImagePtr StillImage::nativeImageForCurrentFrame()
+PassNativeImagePtr StillImage::nativeImageForCurrentFrame()
 {
-    return const_cast<NativeImagePtr>(m_pixmap);
+    return const_cast<PassNativeImagePtr>(m_pixmap);
 }
 
 void StillImage::draw(GraphicsContext* ctxt, const FloatRect& dst,
-                      const FloatRect& src, ColorSpace, CompositeOperator op)
+    const FloatRect& src, ColorSpace, CompositeOperator op, BlendMode blendMode)
 {
     if (m_pixmap->isNull())
         return;
@@ -77,20 +77,21 @@ void StillImage::draw(GraphicsContext* ctxt, const FloatRect& dst,
     FloatRect normalizedDst = dst.normalized();
 
     CompositeOperator previousOperator = ctxt->compositeOperation();
-    ctxt->setCompositeOperation(op);
+    BlendMode previousBlendMode = ctxt->blendModeOperation();
+    ctxt->setCompositeOperation(op, blendMode);
 
     if (ctxt->hasShadow()) {
-        ShadowBlur* shadow = ctxt->shadowBlur();
-        GraphicsContext* shadowContext = shadow->beginShadowLayer(ctxt, normalizedDst);
+        ShadowBlur shadow(ctxt->state());
+        GraphicsContext* shadowContext = shadow.beginShadowLayer(ctxt, normalizedDst);
         if (shadowContext) {
             QPainter* shadowPainter = shadowContext->platformContext();
             shadowPainter->drawPixmap(normalizedDst, *m_pixmap, normalizedSrc);
-            shadow->endShadowLayer(ctxt);
+            shadow.endShadowLayer(ctxt);
         }
     }
 
     ctxt->platformContext()->drawPixmap(normalizedDst, *m_pixmap, normalizedSrc);
-    ctxt->setCompositeOperation(previousOperator);
+    ctxt->setCompositeOperation(previousOperator, previousBlendMode);
 }
 
 }

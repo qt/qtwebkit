@@ -31,6 +31,7 @@
 #if ENABLE(DFG_JIT)
 
 #include "ArrayProfile.h"
+#include "DFGNodeFlags.h"
 #include "SpeculatedType.h"
 
 namespace JSC {
@@ -93,7 +94,8 @@ enum Speculation {
 };
 enum Conversion {
     AsIs,
-    Convert
+    Convert,
+    RageConvert
 };
 } // namespace Array
 
@@ -183,16 +185,21 @@ public:
         return ArrayMode(type, arrayClass(), speculation(), conversion());
     }
     
+    ArrayMode withConversion(Array::Conversion conversion) const
+    {
+        return ArrayMode(type(), arrayClass(), speculation(), conversion);
+    }
+    
     ArrayMode withTypeAndConversion(Array::Type type, Array::Conversion conversion) const
     {
         return ArrayMode(type, arrayClass(), speculation(), conversion);
     }
     
-    ArrayMode refine(SpeculatedType base, SpeculatedType index, SpeculatedType value = SpecNone) const;
+    ArrayMode refine(SpeculatedType base, SpeculatedType index, SpeculatedType value = SpecNone, NodeFlags = 0) const;
     
-    bool alreadyChecked(Graph&, Node&, AbstractValue&) const;
+    bool alreadyChecked(Graph&, Node*, AbstractValue&) const;
     
-    const char* toString() const;
+    void dump(PrintStream&) const;
     
     bool usesButterfly() const
     {
@@ -336,12 +343,17 @@ public:
     
     // Returns 0 if this is not OriginalArray.
     Structure* originalArrayStructure(Graph&, const CodeOrigin&) const;
-    Structure* originalArrayStructure(Graph&, Node&) const;
+    Structure* originalArrayStructure(Graph&, Node*) const;
     
     bool benefitsFromStructureCheck() const
     {
         switch (type()) {
         case Array::SelectUsingPredictions:
+            // It might benefit from structure checks! If it ends up not benefiting, we can just
+            // remove it. The FixupPhase does this: if it finds a CheckStructure just before an
+            // array op and it had turned that array op into either generic or conversion mode,
+            // it will remove the CheckStructure.
+            return true;
         case Array::Unprofiled:
         case Array::ForceExit:
         case Array::Generic:
@@ -353,7 +365,7 @@ public:
     
     bool doesConversion() const
     {
-        return conversion() == Array::Convert;
+        return conversion() != Array::AsIs;
     }
     
     ArrayModes arrayModesThatPassFiltering() const
@@ -374,6 +386,11 @@ public:
         default:
             return asArrayModes(NonArray);
         }
+    }
+    
+    bool getIndexedPropertyStorageMayTriggerGC() const
+    {
+        return type() == Array::String;
     }
     
     bool operator==(const ArrayMode& other) const
@@ -410,7 +427,7 @@ private:
         }
     }
     
-    bool alreadyChecked(Graph&, Node&, AbstractValue&, IndexingType shape) const;
+    bool alreadyChecked(Graph&, Node*, AbstractValue&, IndexingType shape) const;
     
     union {
         struct {
@@ -434,6 +451,16 @@ static inline bool lengthNeedsStorage(const ArrayMode& arrayMode)
 }
 
 } } // namespace JSC::DFG
+
+namespace WTF {
+
+class PrintStream;
+void printInternal(PrintStream&, JSC::DFG::Array::Type);
+void printInternal(PrintStream&, JSC::DFG::Array::Class);
+void printInternal(PrintStream&, JSC::DFG::Array::Speculation);
+void printInternal(PrintStream&, JSC::DFG::Array::Conversion);
+
+} // namespace WTF
 
 #endif // ENABLE(DFG_JIT)
 

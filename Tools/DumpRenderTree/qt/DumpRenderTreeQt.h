@@ -41,12 +41,14 @@
 #endif
 
 #include "DumpRenderTreeSupportQt.h"
+#include "TestRunner.h"
 #include <qgraphicsview.h>
 #include <qgraphicswebview.h>
 #include <qwebframe.h>
 #include <qwebinspector.h>
 #include <qwebpage.h>
 #include <qwebview.h>
+#include <wtf/RefPtr.h>
 
 QT_BEGIN_NAMESPACE
 class QUrl;
@@ -56,13 +58,11 @@ QT_END_NAMESPACE
 class QWebFrameAdapter;
 class QWebPageAdapter;
 
-class TestRunner;
+class TestRunnerQt;
 class DumpRenderTreeSupportQt;
 class EventSender;
 class TextInputController;
 class GCController;
-
-namespace WebCore {
 
 class WebPage;
 class NetworkAccessManager;
@@ -73,6 +73,8 @@ Q_OBJECT
 public:
     DumpRenderTree();
     virtual ~DumpRenderTree();
+
+    static DumpRenderTree* instance();
 
     // Initialize in single-file mode.
     void open(const QUrl& url);
@@ -86,7 +88,8 @@ public:
     void closeRemainingWindows();
     void resetToConsistentStateBeforeTesting(const QUrl&);
 
-    TestRunner *testRunner() const { return m_controller; }
+    TestRunnerQt *testRunner() const { return m_controller; }
+    TestRunner *jscTestRunner() const { return m_jscController.get(); }
     EventSender *eventSender() const { return m_eventSender; }
     TextInputController *textInputController() const { return m_textInputController; }
     QString persistentStoragePath() const { return m_persistentStoragePath; }
@@ -143,7 +146,8 @@ private:
     QString dumpFramesAsText(QWebFrame* frame);
     QString dumpBackForwardList(QWebPage* page);
     QString dumpFrameScrollPosition(QWebFrame* frame);
-    TestRunner *m_controller;
+    TestRunnerQt *m_controller;
+    RefPtr<TestRunner> m_jscController;
 
     bool m_dumpPixelsForCurrentTest;
     bool m_dumpPixelsForAllTests;
@@ -155,7 +159,7 @@ private:
 
     EventSender *m_eventSender;
     TextInputController *m_textInputController;
-    GCController* m_gcController;
+    QScopedPointer<GCController> m_gcController;
     NetworkAccessManager* m_networkAccessManager;
 
     QFile *m_stdin;
@@ -234,7 +238,5 @@ public:
 private:
     QGraphicsWebView* m_item;
 };
-
-}
 
 #endif

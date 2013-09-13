@@ -36,6 +36,7 @@
 #include "CSSImageValue.h"
 #include "CSSPrimitiveValue.h"
 #include "CSSPropertyNames.h"
+#include "CachedImage.h"
 #include "ClipPathOperation.h"
 #include "FloatConversion.h"
 #include "IdentityTransformOperation.h"
@@ -113,7 +114,7 @@ static inline PassOwnPtr<ShadowData> blendFunc(const AnimationBase* anim, const 
         return adoptPtr(new ShadowData(*to));
 
     return adoptPtr(new ShadowData(blend(from->location(), to->location(), progress),
-                                   blend(from->blur(), to->blur(), progress),
+                                   blend(from->radius(), to->radius(), progress),
                                    blend(from->spread(), to->spread(), progress),
                                    blendFunc(anim, from->style(), to->style(), progress),
                                    from->isWebkitBoxShadow(),
@@ -142,11 +143,11 @@ static inline PassRefPtr<ClipPathOperation> blendFunc(const AnimationBase*, Clip
     return ShapeClipPathOperation::create(toShape->blend(fromShape, progress));
 }
 
-#if ENABLE(CSS_EXCLUSIONS)
-static inline PassRefPtr<ExclusionShapeValue> blendFunc(const AnimationBase*, ExclusionShapeValue* from, ExclusionShapeValue* to, double progress)
+#if ENABLE(CSS_SHAPES)
+static inline PassRefPtr<ShapeValue> blendFunc(const AnimationBase*, ShapeValue* from, ShapeValue* to, double progress)
 {
     // FIXME Bug 102723: Shape-inside should be able to animate a value of 'outside-shape' when shape-outside is set to a BasicShape
-    if (from->type() != ExclusionShapeValue::SHAPE || to->type() != ExclusionShapeValue::SHAPE)
+    if (from->type() != ShapeValue::Shape || to->type() != ShapeValue::Shape)
         return to;
 
     const BasicShape* fromShape = from->shape();
@@ -155,7 +156,7 @@ static inline PassRefPtr<ExclusionShapeValue> blendFunc(const AnimationBase*, Ex
     if (!fromShape->canBlend(toShape))
         return to;
 
-    return ExclusionShapeValue::createShapeValue(toShape->blend(fromShape, progress));
+    return ShapeValue::createShapeValue(toShape->blend(fromShape, progress));
 }
 #endif
 
@@ -217,13 +218,6 @@ static inline EVisibility blendFunc(const AnimationBase* anim, EVisibility from,
 
 static inline LengthBox blendFunc(const AnimationBase* anim, const LengthBox& from, const LengthBox& to, double progress)
 {
-    // Length types have to match to animate
-    if (from.top().type() != to.top().type()
-        || from.right().type() != to.right().type()
-        || from.bottom().type() != to.bottom().type()
-        || from.left().type() != to.left().type())
-        return to;
-
     LengthBox result(blendFunc(anim, from.top(), to.top(), progress),
                      blendFunc(anim, from.right(), to.right(), progress),
                      blendFunc(anim, from.bottom(), to.bottom(), progress),
@@ -410,11 +404,11 @@ public:
     }
 };
 
-#if ENABLE(CSS_EXCLUSIONS)
-class PropertyWrapperExclusionShape : public RefCountedPropertyWrapper<ExclusionShapeValue> {
+#if ENABLE(CSS_SHAPES)
+class PropertyWrapperShape : public RefCountedPropertyWrapper<ShapeValue> {
 public:
-    PropertyWrapperExclusionShape(CSSPropertyID prop, ExclusionShapeValue* (RenderStyle::*getter)() const, void (RenderStyle::*setter)(PassRefPtr<ExclusionShapeValue>))
-        : RefCountedPropertyWrapper<ExclusionShapeValue>(prop, getter, setter)
+    PropertyWrapperShape(CSSPropertyID prop, ShapeValue* (RenderStyle::*getter)() const, void (RenderStyle::*setter)(PassRefPtr<ShapeValue>))
+        : RefCountedPropertyWrapper<ShapeValue>(prop, getter, setter)
     {
     }
 };
@@ -1130,6 +1124,8 @@ void CSSPropertyAnimation::ensurePropertyMap()
     gPropertyWrappers->append(new PropertyWrapper<short>(CSSPropertyWebkitBorderHorizontalSpacing, &RenderStyle::horizontalBorderSpacing, &RenderStyle::setHorizontalBorderSpacing));
     gPropertyWrappers->append(new PropertyWrapper<short>(CSSPropertyWebkitBorderVerticalSpacing, &RenderStyle::verticalBorderSpacing, &RenderStyle::setVerticalBorderSpacing));
     gPropertyWrappers->append(new PropertyWrapper<int>(CSSPropertyZIndex, &RenderStyle::zIndex, &RenderStyle::setZIndex));
+    gPropertyWrappers->append(new PropertyWrapper<short>(CSSPropertyOrphans, &RenderStyle::orphans, &RenderStyle::setOrphans));
+    gPropertyWrappers->append(new PropertyWrapper<short>(CSSPropertyWidows, &RenderStyle::widows, &RenderStyle::setWidows));
     gPropertyWrappers->append(new PropertyWrapper<Length>(CSSPropertyLineHeight, &RenderStyle::specifiedLineHeight, &RenderStyle::setLineHeight));
     gPropertyWrappers->append(new PropertyWrapper<int>(CSSPropertyOutlineOffset, &RenderStyle::outlineOffset, &RenderStyle::setOutlineOffset));
     gPropertyWrappers->append(new PropertyWrapper<unsigned short>(CSSPropertyOutlineWidth, &RenderStyle::outlineWidth, &RenderStyle::setOutlineWidth));
@@ -1168,8 +1164,8 @@ void CSSPropertyAnimation::ensurePropertyMap()
 
     gPropertyWrappers->append(new PropertyWrapperClipPath(CSSPropertyWebkitClipPath, &RenderStyle::clipPath, &RenderStyle::setClipPath));
 
-#if ENABLE(CSS_EXCLUSIONS)
-    gPropertyWrappers->append(new PropertyWrapperExclusionShape(CSSPropertyWebkitShapeInside, &RenderStyle::shapeInside, &RenderStyle::setShapeInside));
+#if ENABLE(CSS_SHAPES)
+    gPropertyWrappers->append(new PropertyWrapperShape(CSSPropertyWebkitShapeInside, &RenderStyle::shapeInside, &RenderStyle::setShapeInside));
 #endif
 
     gPropertyWrappers->append(new PropertyWrapperVisitedAffectedColor(CSSPropertyWebkitColumnRuleColor, MaybeInvalidColor, &RenderStyle::columnRuleColor, &RenderStyle::setColumnRuleColor, &RenderStyle::visitedLinkColumnRuleColor, &RenderStyle::setVisitedLinkColumnRuleColor));

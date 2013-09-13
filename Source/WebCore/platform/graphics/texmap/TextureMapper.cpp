@@ -20,6 +20,7 @@
 #include "config.h"
 #include "TextureMapper.h"
 
+#include "FilterOperations.h"
 #include "GraphicsLayer.h"
 #include "TextureMapperImageBuffer.h"
 #include "Timer.h"
@@ -136,10 +137,13 @@ PassOwnPtr<TextureMapper> TextureMapper::create(AccelerationMode mode)
 }
 
 TextureMapper::TextureMapper(AccelerationMode accelerationMode)
-    : m_interpolationQuality(InterpolationDefault)
+    : m_context(0)
+    , m_interpolationQuality(InterpolationDefault)
     , m_textDrawingMode(TextModeFill)
     , m_texturePool(adoptPtr(new BitmapTexturePool()))
     , m_accelerationMode(accelerationMode)
+    , m_isMaskMode(false)
+    , m_wrapMode(StretchWrap)
 { }
 
 TextureMapper::~TextureMapper()

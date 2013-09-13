@@ -63,10 +63,10 @@ const AtomicString& SpinButtonElement::shadowPseudoId() const
     return innerPseudoId;
 }
 
-void SpinButtonElement::detach()
+void SpinButtonElement::detach(const AttachContext& context)
 {
     releaseCapture();
-    HTMLDivElement::detach();
+    HTMLDivElement::detach(context);
 }
 
 void SpinButtonElement::defaultEventHandler(Event* event)
@@ -91,7 +91,7 @@ void SpinButtonElement::defaultEventHandler(Event* event)
     }
 
     MouseEvent* mouseEvent = static_cast<MouseEvent*>(event);
-    IntPoint local = roundedIntPoint(box->absoluteToLocal(mouseEvent->absoluteLocation(), UseTransforms | SnapOffsetForTransforms));
+    IntPoint local = roundedIntPoint(box->absoluteToLocal(mouseEvent->absoluteLocation(), UseTransforms));
     if (mouseEvent->type() == eventNames().mousedownEvent && mouseEvent->button() == LeftButton) {
         if (box->pixelSnappedBorderBoxRect().contains(local)) {
             // The following functions of HTMLInputElement may run JavaScript
@@ -121,10 +121,8 @@ void SpinButtonElement::defaultEventHandler(Event* event)
                 if (Frame* frame = document()->frame()) {
                     frame->eventHandler()->setCapturingMouseEventsNode(this);
                     m_capturing = true;
-                    if (Page* page = document()->page()) {
-                        if (page->chrome())
-                            page->chrome()->registerPopupOpeningObserver(this);
-                    }
+                    if (Page* page = document()->page())
+                        page->chrome().registerPopupOpeningObserver(this);
                 }
             }
             UpDownState oldUpDownState = m_upDownState;
@@ -199,22 +197,20 @@ void SpinButtonElement::releaseCapture()
         if (Frame* frame = document()->frame()) {
             frame->eventHandler()->setCapturingMouseEventsNode(0);
             m_capturing = false;
-            if (Page* page = document()->page()) {
-                if (page->chrome())
-                    page->chrome()->unregisterPopupOpeningObserver(this);
-            }
+            if (Page* page = document()->page())
+                page->chrome().unregisterPopupOpeningObserver(this);
         }
     }
 }
 
-bool SpinButtonElement::shouldMatchReadOnlySelector() const
+bool SpinButtonElement::matchesReadOnlyPseudoClass() const
 {
-    return shadowHost()->shouldMatchReadOnlySelector();
+    return shadowHost()->matchesReadOnlyPseudoClass();
 }
 
-bool SpinButtonElement::shouldMatchReadWriteSelector() const
+bool SpinButtonElement::matchesReadWritePseudoClass() const
 {
-    return shadowHost()->shouldMatchReadWriteSelector();
+    return shadowHost()->matchesReadWritePseudoClass();
 }
 
 void SpinButtonElement::startRepeatingTimer()

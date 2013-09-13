@@ -107,7 +107,23 @@ var InspectorFrontendAPI = {
 
     enterInspectElementMode: function()
     {
-        WebInspector.toggleSearchingForNode();
+        if (WebInspector.inspectElementModeController)
+            WebInspector.inspectElementModeController.toggleSearch();
+    },
+
+    fileSystemsLoaded: function(fileSystems)
+    {
+        WebInspector.isolatedFileSystemDispatcher.fileSystemsLoaded(fileSystems);
+    },
+
+    fileSystemRemoved: function(fileSystemPath)
+    {
+        WebInspector.isolatedFileSystemDispatcher.fileSystemRemoved(fileSystemPath);
+    },
+
+    fileSystemAdded: function(errorMessage, fileSystem)
+    {
+        WebInspector.isolatedFileSystemDispatcher.fileSystemAdded(errorMessage, fileSystem);
     },
 
     savedURL: function(url)
@@ -150,7 +166,7 @@ var InspectorFrontendAPI = {
      */
     loadTimelineFromURL: function(url) 
     {
-        WebInspector.showPanel("timeline").loadFromURL(url);
+        /** @type {WebInspector.TimelinePanel} */ (WebInspector.showPanel("timeline")).loadFromURL(url);
     },
 
     loadCompleted: function()
@@ -184,7 +200,7 @@ var InspectorFrontendAPI = {
     }
 }
 
-if (window.opener) {
+if (window.opener && window.dispatchStandaloneTestRunnerMessages) {
     function onMessageFromOpener(event)
     {
         if (event.source === window.opener)

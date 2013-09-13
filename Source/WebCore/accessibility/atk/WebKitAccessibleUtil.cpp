@@ -31,6 +31,8 @@
 #include "config.h"
 #include "WebKitAccessibleUtil.h"
 
+#if HAVE(ACCESSIBILITY)
+
 #include "AccessibilityObject.h"
 #include "FrameView.h"
 #include "IntRect.h"
@@ -75,14 +77,6 @@ void contentsRelativeToAtkCoordinateType(AccessibilityObject* coreObject, AtkCoo
         *width = rect.width();
     if (height)
         *height = rect.height();
-}
-
-// Used to provide const char* returns.
-const char* returnString(const String& str)
-{
-    static CString returnedString;
-    returnedString = str.utf8();
-    return returnedString.data();
 }
 
 // FIXME: Different kinds of elements are putting the title tag to use
@@ -162,8 +156,9 @@ bool selectionBelongsToObject(AccessibilityObject* coreObject, VisibleSelection&
     // node is actually inside the region, at least partially.
     Node* node = coreObject->node();
     Node* lastDescendant = node->lastDescendant();
-    ExceptionCode ec = 0;
-    return (range->intersectsNode(node, ec)
+    return (range->intersectsNode(node, IGNORE_EXCEPTION)
         && (range->endContainer() != node || range->endOffset())
         && (range->startContainer() != lastDescendant || range->startOffset() != lastOffsetInNode(lastDescendant)));
 }
+
+#endif

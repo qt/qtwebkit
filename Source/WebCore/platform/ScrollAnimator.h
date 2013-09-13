@@ -31,6 +31,7 @@
 #ifndef ScrollAnimator_h
 #define ScrollAnimator_h
 
+#include "FloatSize.h"
 #include "PlatformWheelEvent.h"
 #include "ScrollTypes.h"
 #include <wtf/FastAllocBase.h>
@@ -63,7 +64,7 @@ public:
 
     virtual bool handleWheelEvent(const PlatformWheelEvent&);
 
-#if PLATFORM(MAC) || (PLATFORM(CHROMIUM) && OS(DARWIN))
+#if PLATFORM(MAC)
     virtual void handleWheelEventPhase(PlatformWheelEventPhase) { }
 #endif
 
@@ -94,14 +95,14 @@ public:
 
     virtual bool shouldScrollbarParticipateInHitTesting(Scrollbar*) { return true; }
 
-    virtual void notifyContentAreaScrolled() { }
+    virtual void notifyContentAreaScrolled(const FloatSize& delta) { UNUSED_PARAM(delta); }
 
     virtual bool isRubberBandInProgress() const { return false; }
 
 protected:
     explicit ScrollAnimator(ScrollableArea*);
 
-    virtual void notifyPositionChanged();
+    virtual void notifyPositionChanged(const FloatSize& delta);
 
     ScrollableArea* m_scrollableArea;
     float m_currentPosX; // We avoid using a FloatPoint in order to reduce

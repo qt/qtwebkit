@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2012, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -35,7 +35,10 @@
 #include "DFGAssemblyHelpers.h"
 #include "DFGBasicBlock.h"
 #include "DFGDominators.h"
+#include "DFGLongLivedState.h"
 #include "DFGNode.h"
+#include "DFGNodeAllocator.h"
+#include "DFGVariadicFunction.h"
 #include "JSStack.h"
 #include "MethodOfGettingAValueProfile.h"
 #include <wtf/BitVector.h>
@@ -57,142 +60,126 @@ struct StorageAccessData {
 
 struct ResolveGlobalData {
     unsigned identifierNumber;
-    unsigned resolveOperationsIndex;
-    unsigned putToBaseOperationIndex;
+    ResolveOperations* resolveOperations;
+    PutToBaseOperation* putToBaseOperation;
     unsigned resolvePropertyIndex;
 };
 
 struct ResolveOperationData {
     unsigned identifierNumber;
-    unsigned resolveOperationsIndex;
-    unsigned putToBaseOperationIndex;
+    ResolveOperations* resolveOperations;
+    PutToBaseOperation* putToBaseOperation;
 };
 
 struct PutToBaseOperationData {
-    unsigned putToBaseOperationIndex;
+    PutToBaseOperation* putToBaseOperation;
 };
 
 enum AddSpeculationMode {
     DontSpeculateInteger,
-    SpeculateIntegerButAlwaysWatchOverflow,
+    SpeculateIntegerAndTruncateConstants,
     SpeculateInteger
 };
-    
+
 
 //
 // === Graph ===
 //
-// The dataflow graph is an ordered vector of nodes.
 // The order may be significant for nodes with side-effects (property accesses, value conversions).
 // Nodes that are 'dead' remain in the vector with refCount 0.
-class Graph : public Vector<Node, 64> {
+class Graph {
 public:
-    Graph(JSGlobalData&, CodeBlock*, unsigned osrEntryBytecodeIndex, const Operands<JSValue>& mustHandleValues);
+    Graph(VM&, CodeBlock*, unsigned osrEntryBytecodeIndex, const Operands<JSValue>& mustHandleValues);
+    ~Graph();
     
-    using Vector<Node, 64>::operator[];
-    using Vector<Node, 64>::at;
-    
-    Node& operator[](Edge nodeUse) { return at(nodeUse.index()); }
-    const Node& operator[](Edge nodeUse) const { return at(nodeUse.index()); }
-    
-    Node& at(Edge nodeUse) { return at(nodeUse.index()); }
-    const Node& at(Edge nodeUse) const { return at(nodeUse.index()); }
-    
-    // Mark a node as being referenced.
-    void ref(NodeIndex nodeIndex)
+    void changeChild(Edge& edge, Node* newNode)
     {
-        Node& node = at(nodeIndex);
-        // If the value (before incrementing) was at refCount zero then we need to ref its children.
-        if (node.ref())
-            refChildren(nodeIndex);
-    }
-    void ref(Edge nodeUse)
-    {
-        ref(nodeUse.index());
+        edge.setNode(newNode);
     }
     
-    void deref(NodeIndex nodeIndex)
+    void changeEdge(Edge& edge, Edge newEdge)
     {
-        if (!at(nodeIndex).refCount())
-            dump();
-        if (at(nodeIndex).deref())
-            derefChildren(nodeIndex);
-    }
-    void deref(Edge nodeUse)
-    {
-        deref(nodeUse.index());
-    }
-    
-    void changeIndex(Edge& edge, NodeIndex newIndex, bool changeRef = true)
-    {
-        if (changeRef) {
-            ref(newIndex);
-            deref(edge.index());
-        }
-        edge.setIndex(newIndex);
-    }
-    
-    void changeEdge(Edge& edge, Edge newEdge, bool changeRef = true)
-    {
-        if (changeRef) {
-            ref(newEdge);
-            deref(edge);
-        }
         edge = newEdge;
     }
     
-    void compareAndSwap(Edge& edge, NodeIndex oldIndex, NodeIndex newIndex, bool changeRef)
+    void compareAndSwap(Edge& edge, Node* oldNode, Node* newNode)
     {
-        if (edge.index() != oldIndex)
+        if (edge.node() != oldNode)
             return;
-        changeIndex(edge, newIndex, changeRef);
+        changeChild(edge, newNode);
     }
     
-    void compareAndSwap(Edge& edge, Edge oldEdge, Edge newEdge, bool changeRef)
+    void compareAndSwap(Edge& edge, Edge oldEdge, Edge newEdge)
     {
         if (edge != oldEdge)
             return;
-        changeEdge(edge, newEdge, changeRef);
+        changeEdge(edge, newEdge);
     }
     
-    void clearAndDerefChild1(Node& node)
+    void clearAndDerefChild(Node* node, unsigned index)
     {
-        if (!node.child1())
+        if (!node->children.child(index))
             return;
-        deref(node.child1());
-        node.children.child1() = Edge();
+        node->children.setChild(index, Edge());
     }
+    void clearAndDerefChild1(Node* node) { clearAndDerefChild(node, 0); }
+    void clearAndDerefChild2(Node* node) { clearAndDerefChild(node, 1); }
+    void clearAndDerefChild3(Node* node) { clearAndDerefChild(node, 2); }
+    
+    void performSubstitution(Node* node)
+    {
+        if (node->flags() & NodeHasVarArgs) {
+            for (unsigned childIdx = node->firstChild(); childIdx < node->firstChild() + node->numChildren(); childIdx++)
+                performSubstitutionForEdge(m_varArgChildren[childIdx]);
+        } else {
+            performSubstitutionForEdge(node->child1());
+            performSubstitutionForEdge(node->child2());
+            performSubstitutionForEdge(node->child3());
+        }
+    }
+    
+    void performSubstitutionForEdge(Edge& child)
+    {
+        // Check if this operand is actually unused.
+        if (!child)
+            return;
+        
+        // Check if there is any replacement.
+        Node* replacement = child->replacement;
+        if (!replacement)
+            return;
+        
+        child.setNode(replacement);
+        
+        // There is definitely a replacement. Assert that the replacement does not
+        // have a replacement.
+        ASSERT(!child->replacement);
+    }
+    
+#define DFG_DEFINE_ADD_NODE(templatePre, templatePost, typeParams, valueParamsComma, valueParams, valueArgs) \
+    templatePre typeParams templatePost Node* addNode(SpeculatedType type valueParamsComma valueParams) \
+    { \
+        Node* node = new (m_allocator) Node(valueArgs); \
+        node->predict(type); \
+        return node; \
+    }
+    DFG_VARIADIC_TEMPLATE_FUNCTION(DFG_DEFINE_ADD_NODE)
+#undef DFG_DEFINE_ADD_NODE
 
-    void clearAndDerefChild2(Node& node)
+    void dethread();
+    
+    void convertToConstant(Node* node, unsigned constantNumber)
     {
-        if (!node.child2())
-            return;
-        deref(node.child2());
-        node.children.child2() = Edge();
-    }
-
-    void clearAndDerefChild3(Node& node)
-    {
-        if (!node.child3())
-            return;
-        deref(node.child3());
-        node.children.child3() = Edge();
+        if (node->op() == GetLocal)
+            dethread();
+        else
+            ASSERT(!node->hasVariableAccessData());
+        node->convertToConstant(constantNumber);
     }
     
-    // Call this if you've modified the reference counts of nodes that deal with
-    // local variables. This is necessary because local variable references can form
-    // cycles, and hence reference counting is not enough. This will reset the
-    // reference counts according to reachability.
-    void collectGarbage();
-    
-    void convertToConstant(NodeIndex nodeIndex, unsigned constantNumber)
+    void convertToConstant(Node* node, JSValue value)
     {
-        at(nodeIndex).convertToConstant(constantNumber);
-    }
-    
-    void convertToConstant(NodeIndex nodeIndex, JSValue value)
-    {
-        convertToConstant(nodeIndex, m_codeBlock->addOrFindConstant(value));
+        convertToConstant(node, m_codeBlock->addOrFindConstant(value));
     }
 
     // CodeBlock is optional, but may allow additional information to be dumped (e.g. Identifier names).
@@ -200,107 +187,120 @@ public:
     enum PhiNodeDumpMode { DumpLivePhisOnly, DumpAllPhis };
     void dumpBlockHeader(PrintStream&, const char* prefix, BlockIndex, PhiNodeDumpMode);
     void dump(PrintStream&, Edge);
-    void dump(PrintStream&, const char* prefix, NodeIndex);
-    static int amountOfNodeWhiteSpace(Node&);
-    static void printNodeWhiteSpace(PrintStream&, Node&);
+    void dump(PrintStream&, const char* prefix, Node*);
+    static int amountOfNodeWhiteSpace(Node*);
+    static void printNodeWhiteSpace(PrintStream&, Node*);
 
     // Dump the code origin of the given node as a diff from the code origin of the
-    // preceding node.
-    void dumpCodeOrigin(PrintStream&, const char* prefix, NodeIndex, NodeIndex);
+    // preceding node. Returns true if anything was printed.
+    bool dumpCodeOrigin(PrintStream&, const char* prefix, Node* previousNode, Node* currentNode);
 
     BlockIndex blockIndexForBytecodeOffset(Vector<BlockIndex>& blocks, unsigned bytecodeBegin);
 
-    SpeculatedType getJSConstantSpeculation(Node& node)
+    SpeculatedType getJSConstantSpeculation(Node* node)
     {
-        return speculationFromValue(node.valueOfJSConstant(m_codeBlock));
+        return speculationFromValue(node->valueOfJSConstant(m_codeBlock));
     }
     
-    AddSpeculationMode addSpeculationMode(Node& add)
+    AddSpeculationMode addSpeculationMode(Node* add, bool leftShouldSpeculateInteger, bool rightShouldSpeculateInteger)
     {
-        ASSERT(add.op() == ValueAdd || add.op() == ArithAdd || add.op() == ArithSub);
+        ASSERT(add->op() == ValueAdd || add->op() == ArithAdd || add->op() == ArithSub);
         
-        Node& left = at(add.child1());
-        Node& right = at(add.child2());
+        Node* left = add->child1().node();
+        Node* right = add->child2().node();
         
-        if (left.hasConstant())
-            return addImmediateShouldSpeculateInteger(add, right, left);
-        if (right.hasConstant())
-            return addImmediateShouldSpeculateInteger(add, left, right);
+        if (left->hasConstant())
+            return addImmediateShouldSpeculateInteger(add, rightShouldSpeculateInteger, left);
+        if (right->hasConstant())
+            return addImmediateShouldSpeculateInteger(add, leftShouldSpeculateInteger, right);
         
-        return (Node::shouldSpeculateIntegerExpectingDefined(left, right) && add.canSpeculateInteger()) ? SpeculateInteger : DontSpeculateInteger;
+        return (leftShouldSpeculateInteger && rightShouldSpeculateInteger && add->canSpeculateInteger()) ? SpeculateInteger : DontSpeculateInteger;
     }
     
-    bool addShouldSpeculateInteger(Node& add)
+    AddSpeculationMode valueAddSpeculationMode(Node* add)
+    {
+        return addSpeculationMode(add, add->child1()->shouldSpeculateIntegerExpectingDefined(), add->child2()->shouldSpeculateIntegerExpectingDefined());
+    }
+    
+    AddSpeculationMode arithAddSpeculationMode(Node* add)
+    {
+        return addSpeculationMode(add, add->child1()->shouldSpeculateIntegerForArithmetic(), add->child2()->shouldSpeculateIntegerForArithmetic());
+    }
+    
+    AddSpeculationMode addSpeculationMode(Node* add)
+    {
+        if (add->op() == ValueAdd)
+            return valueAddSpeculationMode(add);
+        
+        return arithAddSpeculationMode(add);
+    }
+    
+    bool addShouldSpeculateInteger(Node* add)
     {
         return addSpeculationMode(add) != DontSpeculateInteger;
     }
     
-    bool mulShouldSpeculateInteger(Node& mul)
+    bool mulShouldSpeculateInteger(Node* mul)
     {
-        ASSERT(mul.op() == ArithMul);
+        ASSERT(mul->op() == ArithMul);
         
-        Node& left = at(mul.child1());
-        Node& right = at(mul.child2());
+        Node* left = mul->child1().node();
+        Node* right = mul->child2().node();
         
-        return Node::shouldSpeculateIntegerForArithmetic(left, right) && mul.canSpeculateInteger();
+        return Node::shouldSpeculateIntegerForArithmetic(left, right) && mul->canSpeculateInteger();
     }
     
-    bool negateShouldSpeculateInteger(Node& negate)
+    bool negateShouldSpeculateInteger(Node* negate)
     {
-        ASSERT(negate.op() == ArithNegate);
-        return at(negate.child1()).shouldSpeculateIntegerForArithmetic() && negate.canSpeculateInteger();
-    }
-    
-    bool addShouldSpeculateInteger(NodeIndex nodeIndex)
-    {
-        return addShouldSpeculateInteger(at(nodeIndex));
+        ASSERT(negate->op() == ArithNegate);
+        return negate->child1()->shouldSpeculateIntegerForArithmetic() && negate->canSpeculateInteger();
     }
     
     // Helper methods to check nodes for constants.
-    bool isConstant(NodeIndex nodeIndex)
+    bool isConstant(Node* node)
     {
-        return at(nodeIndex).hasConstant();
+        return node->hasConstant();
     }
-    bool isJSConstant(NodeIndex nodeIndex)
+    bool isJSConstant(Node* node)
     {
-        return at(nodeIndex).hasConstant();
+        return node->hasConstant();
     }
-    bool isInt32Constant(NodeIndex nodeIndex)
+    bool isInt32Constant(Node* node)
     {
-        return at(nodeIndex).isInt32Constant(m_codeBlock);
+        return node->isInt32Constant(m_codeBlock);
     }
-    bool isDoubleConstant(NodeIndex nodeIndex)
+    bool isDoubleConstant(Node* node)
     {
-        return at(nodeIndex).isDoubleConstant(m_codeBlock);
+        return node->isDoubleConstant(m_codeBlock);
     }
-    bool isNumberConstant(NodeIndex nodeIndex)
+    bool isNumberConstant(Node* node)
     {
-        return at(nodeIndex).isNumberConstant(m_codeBlock);
+        return node->isNumberConstant(m_codeBlock);
     }
-    bool isBooleanConstant(NodeIndex nodeIndex)
+    bool isBooleanConstant(Node* node)
     {
-        return at(nodeIndex).isBooleanConstant(m_codeBlock);
+        return node->isBooleanConstant(m_codeBlock);
     }
-    bool isCellConstant(NodeIndex nodeIndex)
+    bool isCellConstant(Node* node)
     {
-        if (!isJSConstant(nodeIndex))
+        if (!isJSConstant(node))
             return false;
-        JSValue value = valueOfJSConstant(nodeIndex);
+        JSValue value = valueOfJSConstant(node);
         return value.isCell() && !!value;
     }
-    bool isFunctionConstant(NodeIndex nodeIndex)
+    bool isFunctionConstant(Node* node)
     {
-        if (!isJSConstant(nodeIndex))
+        if (!isJSConstant(node))
             return false;
-        if (!getJSFunction(valueOfJSConstant(nodeIndex)))
+        if (!getJSFunction(valueOfJSConstant(node)))
             return false;
         return true;
     }
-    bool isInternalFunctionConstant(NodeIndex nodeIndex)
+    bool isInternalFunctionConstant(Node* node)
     {
-        if (!isJSConstant(nodeIndex))
+        if (!isJSConstant(node))
             return false;
-        JSValue value = valueOfJSConstant(nodeIndex);
+        JSValue value = valueOfJSConstant(node);
         if (!value.isCell() || !value)
             return false;
         JSCell* cell = value.asCell();
@@ -309,36 +309,30 @@ public:
         return true;
     }
     // Helper methods get constant values from nodes.
-    JSValue valueOfJSConstant(NodeIndex nodeIndex)
+    JSValue valueOfJSConstant(Node* node)
     {
-        return at(nodeIndex).valueOfJSConstant(m_codeBlock);
+        return node->valueOfJSConstant(m_codeBlock);
     }
-    int32_t valueOfInt32Constant(NodeIndex nodeIndex)
+    int32_t valueOfInt32Constant(Node* node)
     {
-        return valueOfJSConstant(nodeIndex).asInt32();
+        return valueOfJSConstant(node).asInt32();
     }
-    double valueOfNumberConstant(NodeIndex nodeIndex)
+    double valueOfNumberConstant(Node* node)
     {
-        return valueOfJSConstant(nodeIndex).asNumber();
+        return valueOfJSConstant(node).asNumber();
     }
-    bool valueOfBooleanConstant(NodeIndex nodeIndex)
+    bool valueOfBooleanConstant(Node* node)
     {
-        return valueOfJSConstant(nodeIndex).asBoolean();
+        return valueOfJSConstant(node).asBoolean();
     }
-    JSFunction* valueOfFunctionConstant(NodeIndex nodeIndex)
+    JSFunction* valueOfFunctionConstant(Node* node)
     {
-        JSCell* function = getJSFunction(valueOfJSConstant(nodeIndex));
+        JSCell* function = getJSFunction(valueOfJSConstant(node));
         ASSERT(function);
         return jsCast<JSFunction*>(function);
     }
-    InternalFunction* valueOfInternalFunctionConstant(NodeIndex nodeIndex)
-    {
-        return jsCast<InternalFunction*>(valueOfJSConstant(nodeIndex).asCell());
-    }
 
     static const char *opName(NodeType);
-    
-    void predictArgumentTypes();
     
     StructureSet* addStructureSet(const StructureSet& structureSet)
     {
@@ -358,6 +352,12 @@ public:
         return m_codeBlock->globalObjectFor(codeOrigin);
     }
     
+    JSObject* globalThisObjectFor(CodeOrigin codeOrigin)
+    {
+        JSGlobalObject* object = globalObjectFor(codeOrigin);
+        return object->methodTable()->toThisObject(object, 0);
+    }
+    
     ExecutableBase* executableFor(InlineCallFrame* inlineCallFrame)
     {
         if (!inlineCallFrame)
@@ -374,6 +374,16 @@ public:
     CodeBlock* baselineCodeBlockFor(const CodeOrigin& codeOrigin)
     {
         return baselineCodeBlockForOriginAndBaselineCodeBlock(codeOrigin, m_profiledBlock);
+    }
+    
+    bool hasGlobalExitSite(const CodeOrigin& codeOrigin, ExitKind exitKind)
+    {
+        return baselineCodeBlockFor(codeOrigin)->hasExitSite(FrequentExitSite(exitKind));
+    }
+    
+    bool hasExitSite(const CodeOrigin& codeOrigin, ExitKind exitKind)
+    {
+        return baselineCodeBlockFor(codeOrigin)->hasExitSite(FrequentExitSite(codeOrigin.bytecodeIndex, exitKind));
     }
     
     int argumentsRegisterFor(const CodeOrigin& codeOrigin)
@@ -400,51 +410,54 @@ public:
             codeOrigin.inlineCallFrame->stackOffset;
     }
     
-    int uncheckedActivationRegisterFor(const CodeOrigin& codeOrigin)
+    int uncheckedActivationRegisterFor(const CodeOrigin&)
     {
-        ASSERT_UNUSED(codeOrigin, !codeOrigin.inlineCallFrame);
+        // This will ignore CodeOrigin because we don't inline code that uses activations.
+        // Hence for inlined call frames it will return the outermost code block's
+        // activation register. This method is only used to compare the result to a local
+        // to see if we're mucking with the activation register. Hence if we return the
+        // "wrong" activation register for the frame then it will compare false, which is
+        // what we wanted.
         return m_codeBlock->uncheckedActivationRegister();
     }
     
-    ValueProfile* valueProfileFor(NodeIndex nodeIndex)
+    ValueProfile* valueProfileFor(Node* node)
     {
-        if (nodeIndex == NoNode)
+        if (!node)
             return 0;
         
-        Node& node = at(nodeIndex);
-        CodeBlock* profiledBlock = baselineCodeBlockFor(node.codeOrigin);
+        CodeBlock* profiledBlock = baselineCodeBlockFor(node->codeOrigin);
         
-        if (node.hasLocal()) {
-            if (!operandIsArgument(node.local()))
+        if (node->hasLocal()) {
+            if (!operandIsArgument(node->local()))
                 return 0;
-            int argument = operandToArgument(node.local());
-            if (node.variableAccessData() != at(m_arguments[argument]).variableAccessData())
+            int argument = operandToArgument(node->local());
+            if (node->variableAccessData() != m_arguments[argument]->variableAccessData())
                 return 0;
             return profiledBlock->valueProfileForArgument(argument);
         }
         
-        if (node.hasHeapPrediction())
-            return profiledBlock->valueProfileForBytecodeOffset(node.codeOrigin.bytecodeIndexForValueProfile());
+        if (node->hasHeapPrediction())
+            return profiledBlock->valueProfileForBytecodeOffset(node->codeOrigin.bytecodeIndexForValueProfile());
         
         return 0;
     }
     
-    MethodOfGettingAValueProfile methodOfGettingAValueProfileFor(NodeIndex nodeIndex)
+    MethodOfGettingAValueProfile methodOfGettingAValueProfileFor(Node* node)
     {
-        if (nodeIndex == NoNode)
+        if (!node)
             return MethodOfGettingAValueProfile();
         
-        Node& node = at(nodeIndex);
-        CodeBlock* profiledBlock = baselineCodeBlockFor(node.codeOrigin);
+        CodeBlock* profiledBlock = baselineCodeBlockFor(node->codeOrigin);
         
-        if (node.op() == GetLocal) {
+        if (node->op() == GetLocal) {
             return MethodOfGettingAValueProfile::fromLazyOperand(
                 profiledBlock,
                 LazyOperandValueProfileKey(
-                    node.codeOrigin.bytecodeIndex, node.local()));
+                    node->codeOrigin.bytecodeIndex, node->local()));
         }
         
-        return MethodOfGettingAValueProfile(valueProfileFor(nodeIndex));
+        return MethodOfGettingAValueProfile(valueProfileFor(node));
     }
     
     bool needsActivation() const
@@ -457,33 +470,22 @@ public:
         return m_codeBlock->usesArguments();
     }
     
-    bool isCreatedThisArgument(int operand)
-    {
-        if (!operandIsArgument(operand))
-            return false;
-        if (operandToArgument(operand))
-            return false;
-        return m_codeBlock->specializationKind() == CodeForConstruct;
-    }
-    
     unsigned numSuccessors(BasicBlock* block)
     {
-        return at(block->last()).numSuccessors();
+        return block->last()->numSuccessors();
     }
     BlockIndex successor(BasicBlock* block, unsigned index)
     {
-        return at(block->last()).successor(index);
+        return block->last()->successor(index);
     }
     BlockIndex successorForCondition(BasicBlock* block, bool condition)
     {
-        return at(block->last()).successorForCondition(condition);
+        return block->last()->successorForCondition(condition);
     }
     
-    bool isPredictedNumerical(Node& node)
+    bool isPredictedNumerical(Node* node)
     {
-        SpeculatedType left = at(node.child1()).prediction();
-        SpeculatedType right = at(node.child2()).prediction();
-        return isNumberSpeculation(left) && isNumberSpeculation(right);
+        return isNumerical(node->child1().useKind()) && isNumerical(node->child2().useKind());
     }
     
     // Note that a 'true' return does not actually mean that the ByVal access clobbers nothing.
@@ -492,23 +494,23 @@ public:
     // - PutByVal definitely changes the array it stores to, and may even change its length.
     // - PutByOffset definitely changes the object it stores to.
     // - and so on.
-    bool byValIsPure(Node& node)
+    bool byValIsPure(Node* node)
     {
-        switch (node.arrayMode().type()) {
+        switch (node->arrayMode().type()) {
         case Array::Generic:
             return false;
         case Array::Int32:
         case Array::Double:
         case Array::Contiguous:
         case Array::ArrayStorage:
-            return !node.arrayMode().isOutOfBounds();
+            return !node->arrayMode().isOutOfBounds();
         case Array::SlowPutArrayStorage:
-            return !node.arrayMode().mayStoreToHole();
+            return !node->arrayMode().mayStoreToHole();
         case Array::String:
-            return node.op() == GetByVal;
+            return node->op() == GetByVal;
 #if USE(JSVALUE32_64)
         case Array::Arguments:
-            if (node.op() == GetByVal)
+            if (node->op() == GetByVal)
                 return true;
             return false;
 #endif // USE(JSVALUE32_64)
@@ -517,13 +519,13 @@ public:
         }
     }
     
-    bool clobbersWorld(Node& node)
+    bool clobbersWorld(Node* node)
     {
-        if (node.flags() & NodeClobbersWorld)
+        if (node->flags() & NodeClobbersWorld)
             return true;
-        if (!(node.flags() & NodeMightClobber))
+        if (!(node->flags() & NodeMightClobber))
             return false;
-        switch (node.op()) {
+        switch (node->op()) {
         case ValueAdd:
         case CompareLess:
         case CompareLessEq:
@@ -535,15 +537,22 @@ public:
         case PutByVal:
         case PutByValAlias:
             return !byValIsPure(node);
+        case ToString:
+            switch (node->child1().useKind()) {
+            case StringObjectUse:
+            case StringOrStringObjectUse:
+                return false;
+            case CellUse:
+            case UntypedUse:
+                return true;
+            default:
+                RELEASE_ASSERT_NOT_REACHED();
+                return true;
+            }
         default:
-            ASSERT_NOT_REACHED();
+            RELEASE_ASSERT_NOT_REACHED();
             return true; // If by some oddity we hit this case in release build it's safer to have CSE assume the worst.
         }
-    }
-    
-    bool clobbersWorld(NodeIndex nodeIndex)
-    {
-        return clobbersWorld(at(nodeIndex));
     }
     
     void determineReachability();
@@ -551,92 +560,96 @@ public:
     
     void resetExitStates();
     
-    unsigned varArgNumChildren(Node& node)
+    unsigned varArgNumChildren(Node* node)
     {
-        ASSERT(node.flags() & NodeHasVarArgs);
-        return node.numChildren();
+        ASSERT(node->flags() & NodeHasVarArgs);
+        return node->numChildren();
     }
     
-    unsigned numChildren(Node& node)
+    unsigned numChildren(Node* node)
     {
-        if (node.flags() & NodeHasVarArgs)
+        if (node->flags() & NodeHasVarArgs)
             return varArgNumChildren(node);
         return AdjacencyList::Size;
     }
     
-    Edge& varArgChild(Node& node, unsigned index)
+    Edge& varArgChild(Node* node, unsigned index)
     {
-        ASSERT(node.flags() & NodeHasVarArgs);
-        return m_varArgChildren[node.firstChild() + index];
+        ASSERT(node->flags() & NodeHasVarArgs);
+        return m_varArgChildren[node->firstChild() + index];
     }
     
-    Edge& child(Node& node, unsigned index)
+    Edge& child(Node* node, unsigned index)
     {
-        if (node.flags() & NodeHasVarArgs)
+        if (node->flags() & NodeHasVarArgs)
             return varArgChild(node, index);
-        return node.children.child(index);
+        return node->children.child(index);
     }
     
-    void vote(Edge edge, unsigned ballot)
+    void voteNode(Node* node, unsigned ballot)
     {
-        switch (at(edge).op()) {
+        switch (node->op()) {
         case ValueToInt32:
         case UInt32ToNumber:
-            edge = at(edge).child1();
+            node = node->child1().node();
             break;
         default:
             break;
         }
         
-        if (at(edge).op() == GetLocal)
-            at(edge).variableAccessData()->vote(ballot);
+        if (node->op() == GetLocal)
+            node->variableAccessData()->vote(ballot);
     }
     
-    void vote(Node& node, unsigned ballot)
+    void voteNode(Edge edge, unsigned ballot)
     {
-        if (node.flags() & NodeHasVarArgs) {
-            for (unsigned childIdx = node.firstChild();
-                 childIdx < node.firstChild() + node.numChildren();
-                 childIdx++) {
+        voteNode(edge.node(), ballot);
+    }
+    
+    void voteChildren(Node* node, unsigned ballot)
+    {
+        if (node->flags() & NodeHasVarArgs) {
+            for (unsigned childIdx = node->firstChild();
+                childIdx < node->firstChild() + node->numChildren();
+                childIdx++) {
                 if (!!m_varArgChildren[childIdx])
-                    vote(m_varArgChildren[childIdx], ballot);
+                    voteNode(m_varArgChildren[childIdx], ballot);
             }
             return;
         }
         
-        if (!node.child1())
+        if (!node->child1())
             return;
-        vote(node.child1(), ballot);
-        if (!node.child2())
+        voteNode(node->child1(), ballot);
+        if (!node->child2())
             return;
-        vote(node.child2(), ballot);
-        if (!node.child3())
+        voteNode(node->child2(), ballot);
+        if (!node->child3())
             return;
-        vote(node.child3(), ballot);
+        voteNode(node->child3(), ballot);
     }
     
-    template<typename T> // T = NodeIndex or Edge
+    template<typename T> // T = Node* or Edge
     void substitute(BasicBlock& block, unsigned startIndexInBlock, T oldThing, T newThing)
     {
         for (unsigned indexInBlock = startIndexInBlock; indexInBlock < block.size(); ++indexInBlock) {
-            NodeIndex nodeIndex = block[indexInBlock];
-            Node& node = at(nodeIndex);
-            if (node.flags() & NodeHasVarArgs) {
-                for (unsigned childIdx = node.firstChild(); childIdx < node.firstChild() + node.numChildren(); ++childIdx) {
+            Node* node = block[indexInBlock];
+            if (node->flags() & NodeHasVarArgs) {
+                for (unsigned childIdx = node->firstChild(); childIdx < node->firstChild() + node->numChildren(); ++childIdx) {
                     if (!!m_varArgChildren[childIdx])
-                        compareAndSwap(m_varArgChildren[childIdx], oldThing, newThing, node.shouldGenerate());
+                        compareAndSwap(m_varArgChildren[childIdx], oldThing, newThing);
                 }
                 continue;
             }
-            if (!node.child1())
+            if (!node->child1())
                 continue;
-            compareAndSwap(node.children.child1(), oldThing, newThing, node.shouldGenerate());
-            if (!node.child2())
+            compareAndSwap(node->children.child1(), oldThing, newThing);
+            if (!node->child2())
                 continue;
-            compareAndSwap(node.children.child2(), oldThing, newThing, node.shouldGenerate());
-            if (!node.child3())
+            compareAndSwap(node->children.child2(), oldThing, newThing);
+            if (!node->child3())
                 continue;
-            compareAndSwap(node.children.child3(), oldThing, newThing, node.shouldGenerate());
+            compareAndSwap(node->children.child3(), oldThing, newThing);
         }
     }
     
@@ -644,29 +657,28 @@ public:
     // any GetLocals in the basic block.
     // FIXME: it may be appropriate, in the future, to generalize this to handle GetLocals
     // introduced anywhere in the basic block.
-    void substituteGetLocal(BasicBlock& block, unsigned startIndexInBlock, VariableAccessData* variableAccessData, NodeIndex newGetLocal)
+    void substituteGetLocal(BasicBlock& block, unsigned startIndexInBlock, VariableAccessData* variableAccessData, Node* newGetLocal)
     {
         if (variableAccessData->isCaptured()) {
             // Let CSE worry about this one.
             return;
         }
         for (unsigned indexInBlock = startIndexInBlock; indexInBlock < block.size(); ++indexInBlock) {
-            NodeIndex nodeIndex = block[indexInBlock];
-            Node& node = at(nodeIndex);
+            Node* node = block[indexInBlock];
             bool shouldContinue = true;
-            switch (node.op()) {
+            switch (node->op()) {
             case SetLocal: {
-                if (node.local() == variableAccessData->local())
+                if (node->local() == variableAccessData->local())
                     shouldContinue = false;
                 break;
             }
                 
             case GetLocal: {
-                if (node.variableAccessData() != variableAccessData)
+                if (node->variableAccessData() != variableAccessData)
                     continue;
-                substitute(block, indexInBlock, nodeIndex, newGetLocal);
-                NodeIndex oldTailIndex = block.variablesAtTail.operand(variableAccessData->local());
-                if (oldTailIndex == nodeIndex)
+                substitute(block, indexInBlock, node, newGetLocal);
+                Node* oldTailNode = block.variablesAtTail.operand(variableAccessData->local());
+                if (oldTailNode == node)
                     block.variablesAtTail.operand(variableAccessData->local()) = newGetLocal;
                 shouldContinue = false;
                 break;
@@ -680,9 +692,12 @@ public:
         }
     }
     
-    JSGlobalData& m_globalData;
+    VM& m_vm;
     CodeBlock* m_codeBlock;
+    RefPtr<Profiler::Compilation> m_compilation;
     CodeBlock* m_profiledBlock;
+    
+    NodeAllocator& m_allocator;
 
     Vector< OwnPtr<BasicBlock> , 8> m_blocks;
     Vector<Edge, 16> m_varArgChildren;
@@ -690,7 +705,7 @@ public:
     Vector<ResolveGlobalData> m_resolveGlobalData;
     Vector<ResolveOperationData> m_resolveOperationsData;
     Vector<PutToBaseOperationData> m_putToBaseOperationData;
-    Vector<NodeIndex, 8> m_arguments;
+    Vector<Node*, 8> m_arguments;
     SegmentedVector<VariableAccessData, 16> m_variableAccessData;
     SegmentedVector<ArgumentPosition, 8> m_argumentPositions;
     SegmentedVector<StructureSet, 16> m_structureSet;
@@ -706,41 +721,44 @@ public:
     Operands<JSValue> m_mustHandleValues;
     
     OptimizationFixpointState m_fixpointState;
+    GraphForm m_form;
+    UnificationState m_unificationState;
+    RefCountState m_refCountState;
 private:
     
     void handleSuccessor(Vector<BlockIndex, 16>& worklist, BlockIndex blockIndex, BlockIndex successorIndex);
     
-    AddSpeculationMode addImmediateShouldSpeculateInteger(Node& add, Node& variable, Node& immediate)
+    AddSpeculationMode addImmediateShouldSpeculateInteger(Node* add, bool variableShouldSpeculateInteger, Node* immediate)
     {
-        ASSERT(immediate.hasConstant());
+        ASSERT(immediate->hasConstant());
         
-        JSValue immediateValue = immediate.valueOfJSConstant(m_codeBlock);
+        JSValue immediateValue = immediate->valueOfJSConstant(m_codeBlock);
         if (!immediateValue.isNumber())
             return DontSpeculateInteger;
         
-        if (!variable.shouldSpeculateIntegerExpectingDefined())
+        if (!variableShouldSpeculateInteger)
             return DontSpeculateInteger;
         
         if (immediateValue.isInt32())
-            return add.canSpeculateInteger() ? SpeculateInteger : DontSpeculateInteger;
+            return add->canSpeculateInteger() ? SpeculateInteger : DontSpeculateInteger;
         
         double doubleImmediate = immediateValue.asDouble();
         const double twoToThe48 = 281474976710656.0;
         if (doubleImmediate < -twoToThe48 || doubleImmediate > twoToThe48)
             return DontSpeculateInteger;
         
-        return nodeCanTruncateInteger(add.arithNodeFlags()) ? SpeculateIntegerButAlwaysWatchOverflow : DontSpeculateInteger;
+        return nodeCanTruncateInteger(add->arithNodeFlags()) ? SpeculateIntegerAndTruncateConstants : DontSpeculateInteger;
     }
     
-    bool mulImmediateShouldSpeculateInteger(Node& mul, Node& variable, Node& immediate)
+    bool mulImmediateShouldSpeculateInteger(Node* mul, Node* variable, Node* immediate)
     {
-        ASSERT(immediate.hasConstant());
+        ASSERT(immediate->hasConstant());
         
-        JSValue immediateValue = immediate.valueOfJSConstant(m_codeBlock);
+        JSValue immediateValue = immediate->valueOfJSConstant(m_codeBlock);
         if (!immediateValue.isInt32())
             return false;
         
-        if (!variable.shouldSpeculateIntegerForArithmetic())
+        if (!variable->shouldSpeculateIntegerForArithmetic())
             return false;
         
         int32_t intImmediate = immediateValue.asInt32();
@@ -751,14 +769,10 @@ private:
         // canSpeculateInteger() implies).
         const int32_t twoToThe22 = 1 << 22;
         if (intImmediate <= -twoToThe22 || intImmediate >= twoToThe22)
-            return mul.canSpeculateInteger() && !nodeMayOverflow(mul.arithNodeFlags());
+            return mul->canSpeculateInteger() && !nodeMayOverflow(mul->arithNodeFlags());
 
-        return mul.canSpeculateInteger();
+        return mul->canSpeculateInteger();
     }
-    
-    // When a node's refCount goes from 0 to 1, it must (logically) recursively ref all of its children, and vice versa.
-    void refChildren(NodeIndex);
-    void derefChildren(NodeIndex);
 };
 
 class GetBytecodeBeginForBlock {
@@ -779,8 +793,38 @@ private:
 
 inline BlockIndex Graph::blockIndexForBytecodeOffset(Vector<BlockIndex>& linkingTargets, unsigned bytecodeBegin)
 {
-    return *WTF::binarySearchWithFunctor<BlockIndex, unsigned>(linkingTargets.begin(), linkingTargets.size(), bytecodeBegin, WTF::KeyMustBePresentInArray, GetBytecodeBeginForBlock(*this));
+    return *binarySearch<BlockIndex, unsigned>(linkingTargets, linkingTargets.size(), bytecodeBegin, GetBytecodeBeginForBlock(*this));
 }
+
+#define DFG_NODE_DO_TO_CHILDREN(graph, node, thingToDo) do {            \
+        Node* _node = (node);                                           \
+        if (_node->flags() & NodeHasVarArgs) {                          \
+            for (unsigned _childIdx = _node->firstChild();              \
+                _childIdx < _node->firstChild() + _node->numChildren(); \
+                _childIdx++) {                                          \
+                if (!!(graph).m_varArgChildren[_childIdx])              \
+                    thingToDo(_node, (graph).m_varArgChildren[_childIdx]); \
+            }                                                           \
+        } else {                                                        \
+            if (!_node->child1()) {                                     \
+                ASSERT(                                                 \
+                    !_node->child2()                                    \
+                    && !_node->child3());                               \
+                break;                                                  \
+            }                                                           \
+            thingToDo(_node, _node->child1());                          \
+                                                                        \
+            if (!_node->child2()) {                                     \
+                ASSERT(!_node->child3());                               \
+                break;                                                  \
+            }                                                           \
+            thingToDo(_node, _node->child2());                          \
+                                                                        \
+            if (!_node->child3())                                       \
+                break;                                                  \
+            thingToDo(_node, _node->child3());                          \
+        }                                                               \
+    } while (false)
 
 } } // namespace JSC::DFG
 

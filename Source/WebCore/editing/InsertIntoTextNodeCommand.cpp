@@ -28,6 +28,7 @@
 
 #include "AXObjectCache.h"
 #include "Document.h"
+#include "ExceptionCodePlaceholder.h"
 #include "RenderText.h"
 #include "Settings.h"
 #include "Text.h"
@@ -60,11 +61,10 @@ void InsertIntoTextNodeCommand::doApply()
             renderText->momentarilyRevealLastTypedCharacter(m_offset + m_text.length() - 1);
     }
 
-    ExceptionCode ec;
-    m_node->insertData(m_offset, m_text, ec);
+    m_node->insertData(m_offset, m_text, IGNORE_EXCEPTION);
 
-    if (AXObjectCache::accessibilityEnabled())
-        document()->axObjectCache()->nodeTextChangeNotification(m_node.get(), AXObjectCache::AXTextInserted, m_offset, m_text);
+    if (AXObjectCache* cache = document()->existingAXObjectCache())
+        cache->nodeTextChangeNotification(m_node.get(), AXObjectCache::AXTextInserted, m_offset, m_text);
 }
 
 void InsertIntoTextNodeCommand::doUnapply()
@@ -73,11 +73,10 @@ void InsertIntoTextNodeCommand::doUnapply()
         return;
         
     // Need to notify this before actually deleting the text
-    if (AXObjectCache::accessibilityEnabled())
-        document()->axObjectCache()->nodeTextChangeNotification(m_node.get(), AXObjectCache::AXTextDeleted, m_offset, m_text);
+    if (AXObjectCache* cache = document()->existingAXObjectCache())
+        cache->nodeTextChangeNotification(m_node.get(), AXObjectCache::AXTextDeleted, m_offset, m_text);
 
-    ExceptionCode ec;
-    m_node->deleteData(m_offset, m_text.length(), ec);
+    m_node->deleteData(m_offset, m_text.length(), IGNORE_EXCEPTION);
 }
 
 #ifndef NDEBUG

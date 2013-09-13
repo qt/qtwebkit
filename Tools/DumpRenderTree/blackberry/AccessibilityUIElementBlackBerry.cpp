@@ -235,7 +235,19 @@ int AccessibilityUIElement::insertionPointLineNumber()
     return 0;
 }
 
-bool AccessibilityUIElement::isActionSupported(JSStringRef)
+bool AccessibilityUIElement::isPressActionSupported()
+{
+    notImplemented();
+    return 0;
+}
+
+bool AccessibilityUIElement::isIncrementActionSupported()
+{
+    notImplemented();
+    return 0;
+}
+
+bool AccessibilityUIElement::isDecrementActionSupported()
 {
     notImplemented();
     return 0;
@@ -349,7 +361,7 @@ JSStringRef AccessibilityUIElement::stringForRange(unsigned, unsigned)
     return 0;
 }
 
-AccessibilityUIElement AccessibilityUIElement::uiElementForSearchPredicate(AccessibilityUIElement*, bool, JSStringRef, JSStringRef)
+AccessibilityUIElement AccessibilityUIElement::uiElementForSearchPredicate(JSContextRef, AccessibilityUIElement*, bool, JSValueRef, JSStringRef)
 {
     notImplemented();
     return 0;
@@ -542,6 +554,21 @@ bool AccessibilityUIElement::hasPopup() const
 {
     notImplemented();
     return false;
+}
+
+void AccessibilityUIElement::scrollToMakeVisible()
+{
+    notImplemented();
+}
+
+void AccessibilityUIElement::scrollToMakeVisibleWithSubFocus(int, int, int, int)
+{
+    notImplemented();
+}
+
+void AccessibilityUIElement::scrollToGlobalPoint(int, int)
+{
+    notImplemented();
 }
 
 void AccessibilityUIElement::takeFocus()

@@ -228,7 +228,8 @@ void WebIconDatabase::checkIntegrityBeforeOpening()
 
 void WebIconDatabase::close()
 {
-    m_iconDatabaseImpl->close();
+    if (m_iconDatabaseImpl)
+        m_iconDatabaseImpl->close();
 }
 
 void WebIconDatabase::initializeIconDatabaseClient(const WKIconDatabaseClient* client)
@@ -284,16 +285,6 @@ void WebIconDatabase::didFinishURLImport()
     m_pendingLoadDecisionURLMap.clear();
     
     m_urlImportCompleted = true;
-}
-
-void WebIconDatabase::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::MessageDecoder& decoder)
-{
-    didReceiveWebIconDatabaseMessage(connection, messageID, decoder);
-}
-
-void WebIconDatabase::didReceiveSyncMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::MessageDecoder& decoder, OwnPtr<CoreIPC::MessageEncoder>& replyEncoder)
-{
-    didReceiveSyncWebIconDatabaseMessage(connection, messageID, decoder, replyEncoder);
 }
 
 void WebIconDatabase::notifyIconDataReadyForPageURL(const String& pageURL)

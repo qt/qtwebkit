@@ -36,10 +36,10 @@ namespace BlackBerry {
 namespace WebKit {
 
 DEFINE_STATIC_LOCAL(String, BlackBerryAllowCrossSiteRequests, (ASCIILiteral("BlackBerryAllowCrossSiteRequests")));
+DEFINE_STATIC_LOCAL(String, BlackBerryApplyDeviceScaleFactorInCompositor, (ASCIILiteral("BlackBerryApplyDeviceScaleFactorInCompositor")));
 DEFINE_STATIC_LOCAL(String, BlackBerryAsynchronousSpellChecking, (ASCIILiteral("BlackBerryAsynchronousSpellChecking")));
 DEFINE_STATIC_LOCAL(String, BlackBerryBackgroundColor, (ASCIILiteral("BlackBerryBackgroundColor")));
 DEFINE_STATIC_LOCAL(String, BlackBerryCookiesEnabled, (ASCIILiteral("BlackBerryCookiesEnabled")));
-DEFINE_STATIC_LOCAL(String, BlackBerryDirectRenderingToWindowEnabled, (ASCIILiteral("BlackBerryDirectRenderingToWindowEnabled")));
 DEFINE_STATIC_LOCAL(String, BlackBerryDrawBorderWhileLoadingImages, (ASCIILiteral("BlackBerryDrawBorderWhileLoadingImages")));
 DEFINE_STATIC_LOCAL(String, BlackBerryEmailModeEnabled, (ASCIIliteral("BlackBerryEmailModeEnabled")));
 DEFINE_STATIC_LOCAL(String, BlackBerryGetFocusNodeContextEnabled, (ASCIILiteral("BlackBerryGetFocusNodeContextEnabled")));
@@ -61,7 +61,8 @@ DEFINE_STATIC_LOCAL(String, BlackBerryZoomToFitOnLoadEnabled, (ASCIILiteral("Bla
 DEFINE_STATIC_LOCAL(String, BlackBerryFullScreenVideoCapable, (ASCIILiteral("BlackBerryFullScreenVideoCapable")));
 DEFINE_STATIC_LOCAL(String, BlackBerryCredentialAutofillEnabled, (ASCIILiteral("BlackBerryCredentialAutofillEnabled")));
 DEFINE_STATIC_LOCAL(String, BlackBerryFormAutofillEnabled, (ASCIILiteral("BlackBerryFormAutofillEnabled")));
-DEFINE_STATIC_LOCAL(String, BlackBerryDevicePixelRatio, (ASCCIILiteral("BlackBerryDevicePixelRatio")));
+DEFINE_STATIC_LOCAL(String, BlackBerryDevicePixelRatio, (ASCIILiteral("BlackBerryDevicePixelRatio")));
+DEFINE_STATIC_LOCAL(String, BlackBerryBackingStoreEnabled, (ASCIILiteral("BlackBerryBackingStoreEnabled")));
 DEFINE_STATIC_LOCAL(String, SpatialNavigationEnabled, (ASCIILiteral("SpatialNavigationEnabled")));
 DEFINE_STATIC_LOCAL(String, WebKitDatabasePath, (ASCIILiteral("WebKitDatabasePath")));
 DEFINE_STATIC_LOCAL(String, WebKitDatabasesEnabled, (ASCIILiteral("WebKitDatabasesEnabled")));
@@ -95,6 +96,7 @@ DEFINE_STATIC_LOCAL(String, WebKitStandardFontFamily, (ASCIILiteral("WebKitStand
 DEFINE_STATIC_LOCAL(String, WebKitUserStyleSheetLocation, (ASCIILiteral("WebKitUserStyleSheetLocation")));
 DEFINE_STATIC_LOCAL(String, WebKitWebSocketsEnabled, (ASCIILiteral("WebKitWebSocketsEnabled")));
 DEFINE_STATIC_LOCAL(String, WebKitXSSAuditorEnabled, (ASCIILiteral("WebKitXSSAuditorEnabled")));
+DEFINE_STATIC_LOCAL(String, WebKitTextAutosizingEnabled, (ASCIILiteral("WebKitTextAutosizingEnabled")));
 
 static HashSet<String>* s_supportedObjectMIMETypes;
 
@@ -161,6 +163,7 @@ WebSettings* WebSettings::standardSettings()
     settings->m_private->setBoolean(BlackBerryAllowCrossSiteRequests, false);
     settings->m_private->setUnsigned(BlackBerryBackgroundColor, WebCore::Color::white);
     settings->m_private->setBoolean(BlackBerryCookiesEnabled, true);
+    settings->m_private->setBoolean(BlackBerryBackingStoreEnabled, true);
     settings->m_private->setDouble(BlackBerryInitialScale, -1);
     settings->m_private->setUnsigned(BlackBerryMaxPluginInstances, 1);
     settings->m_private->setUnsigned(BlackBerryOverScrollColor, WebCore::Color::white);
@@ -177,6 +180,7 @@ WebSettings* WebSettings::standardSettings()
     settings->m_private->setBoolean(BlackBerryCredentialAutofillEnabled, false);
     settings->m_private->setBoolean(BlackBerryFormAutofillEnabled, false);
     settings->m_private->setBoolean(BlackBerryAsynchronousSpellChecking, true);
+    settings->m_private->setBoolean(BlackBerryApplyDeviceScaleFactorInCompositor, false);
 
     if (BlackBerry::Platform::DeviceInfo::instance()->isMobile()) {
         WebCore::FloatSize currentPPI = Platform::Graphics::Screen::primaryScreen()->pixelsPerInch(-1);
@@ -197,11 +201,12 @@ WebSettings* WebSettings::standardSettings()
     settings->m_private->setInteger(WebKitMaximumPagesInCache, 0);
     settings->m_private->setInteger(WebKitMinimumFontSize, 8);
     settings->m_private->setBoolean(WebKitWebSocketsEnabled, true);
+    settings->m_private->setBoolean(WebKitTextAutosizingEnabled, false);
 
-    settings->m_private->setString(WebKitFixedFontFamily, BlackBerry::Platform::FontInfo::instance()->fontFamily("-webkit-monospace", ""));
-    settings->m_private->setString(WebKitSansSeriffFontFamily, BlackBerry::Platform::FontInfo::instance()->fontFamily("-webkit-sans-serif", ""));
-    settings->m_private->setString(WebKitSeriffFontFamily, BlackBerry::Platform::FontInfo::instance()->fontFamily("-webkit-serif", ""));
-    settings->m_private->setString(WebKitStandardFontFamily, BlackBerry::Platform::FontInfo::instance()->fontFamily("-webkit-standard", ""));
+    settings->m_private->setString(WebKitFixedFontFamily, BlackBerry::Platform::FontInfo::instance()->fontFamily(BlackBerry::Platform::String::fromAscii("-webkit-monospace"), BlackBerry::Platform::String::emptyString()));
+    settings->m_private->setString(WebKitSansSeriffFontFamily, BlackBerry::Platform::FontInfo::instance()->fontFamily(BlackBerry::Platform::String::fromAscii("-webkit-sans-serif"), BlackBerry::Platform::String::emptyString()));
+    settings->m_private->setString(WebKitSeriffFontFamily, BlackBerry::Platform::FontInfo::instance()->fontFamily(BlackBerry::Platform::String::fromAscii("-webkit-serif"), BlackBerry::Platform::String::emptyString()));
+    settings->m_private->setString(WebKitStandardFontFamily, BlackBerry::Platform::FontInfo::instance()->fontFamily(BlackBerry::Platform::String::fromAscii("-webkit-standard"), BlackBerry::Platform::String::emptyString()));
 
     return settings;
 }
@@ -740,14 +745,14 @@ void WebSettings::setFrameFlatteningEnabled(bool enable)
     m_private->setBoolean(WebKitFrameFlatteningEnabled, enable);
 }
 
-bool WebSettings::isDirectRenderingToWindowEnabled() const
+bool WebSettings::isBackingStoreEnabled() const
 {
-    return m_private->getBoolean(BlackBerryDirectRenderingToWindowEnabled);
+    return m_private->getBoolean(BlackBerryBackingStoreEnabled);
 }
 
-void WebSettings::setDirectRenderingToWindowEnabled(bool enable)
+void WebSettings::setBackingStoreEnabled(bool enable)
 {
-    m_private->setBoolean(BlackBerryDirectRenderingToWindowEnabled, enable);
+    m_private->setBoolean(BlackBerryBackingStoreEnabled, enable);
 }
 
 unsigned WebSettings::maxPluginInstances() const
@@ -828,6 +833,26 @@ double WebSettings::devicePixelRatio() const
 void WebSettings::setDevicePixelRatio(double ratio)
 {
     m_private->setDouble(BlackBerryDevicePixelRatio, ratio);
+}
+
+bool WebSettings::applyDeviceScaleFactorInCompositor() const
+{
+    return m_private->getBoolean(BlackBerryApplyDeviceScaleFactorInCompositor);
+}
+
+void WebSettings::setApplyDeviceScaleFactorInCompositor(bool applyDeviceScaleFactorInCompositor)
+{
+    m_private->setBoolean(BlackBerryApplyDeviceScaleFactorInCompositor, applyDeviceScaleFactorInCompositor);
+}
+
+bool WebSettings::isTextAutosizingEnabled() const
+{
+    return m_private->getBoolean(WebKitTextAutosizingEnabled);
+}
+
+void WebSettings::setTextAutosizingEnabled(bool textAutosizingEnabled)
+{
+    m_private->setBoolean(WebKitTextAutosizingEnabled, textAutosizingEnabled);
 }
 
 } // namespace WebKit

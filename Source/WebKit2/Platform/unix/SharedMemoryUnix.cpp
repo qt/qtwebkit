@@ -31,7 +31,6 @@
 
 #include "ArgumentDecoder.h"
 #include "ArgumentEncoder.h"
-#include "WebCoreArgumentCoders.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <stdlib.h>
@@ -42,6 +41,7 @@
 #include <wtf/Assertions.h>
 #include <wtf/CurrentTime.h>
 #include <wtf/RandomNumber.h>
+#include <wtf/UniStdExtras.h>
 #include <wtf/text/CString.h>
 
 namespace WebKit {
@@ -55,7 +55,7 @@ SharedMemory::Handle::Handle()
 SharedMemory::Handle::~Handle()
 {
     if (!isNull())
-        while (close(m_fileDescriptor) == -1 && errno == EINTR) { }
+        closeWithRetry(m_fileDescriptor);
 }
 
 bool SharedMemory::Handle::isNull() const
@@ -65,16 +65,16 @@ bool SharedMemory::Handle::isNull() const
 
 void SharedMemory::Handle::encode(CoreIPC::ArgumentEncoder& encoder) const
 {
-    encoder.encode(releaseToAttachment());
+    encoder << releaseToAttachment();
 }
 
-bool SharedMemory::Handle::decode(CoreIPC::ArgumentDecoder* decoder, Handle& handle)
+bool SharedMemory::Handle::decode(CoreIPC::ArgumentDecoder& decoder, Handle& handle)
 {
     ASSERT_ARG(handle, !handle.m_size);
     ASSERT_ARG(handle, handle.isNull());
 
     CoreIPC::Attachment attachment;
-    if (!decoder->decode(attachment))
+    if (!decoder.decode(attachment))
         return false;
 
     handle.adoptFromAttachment(attachment.releaseFileDescriptor(), attachment.size());
@@ -110,12 +110,14 @@ PassRefPtr<SharedMemory> SharedMemory::create(size_t size)
             fileDescriptor = shm_open(tempName.data(), O_CREAT | O_CLOEXEC | O_RDWR, S_IRUSR | S_IWUSR);
         } while (fileDescriptor == -1 && errno == EINTR);
     }
-    if (fileDescriptor == -1)
+    if (fileDescriptor == -1) {
+        WTFLogAlways("Failed to create shared memory file %s", tempName.data());
         return 0;
+    }
 
     while (ftruncate(fileDescriptor, size) == -1) {
         if (errno != EINTR) {
-            while (close(fileDescriptor) == -1 && errno == EINTR) { }
+            closeWithRetry(fileDescriptor);
             shm_unlink(tempName.data());
             return 0;
         }
@@ -123,7 +125,7 @@ PassRefPtr<SharedMemory> SharedMemory::create(size_t size)
 
     void* data = mmap(0, size, PROT_READ | PROT_WRITE, MAP_SHARED, fileDescriptor, 0);
     if (data == MAP_FAILED) {
-        while (close(fileDescriptor) == -1 && errno == EINTR) { }
+        closeWithRetry(fileDescriptor);
         shm_unlink(tempName.data());
         return 0;
     }
@@ -169,7 +171,7 @@ PassRefPtr<SharedMemory> SharedMemory::create(const Handle& handle, Protection p
 SharedMemory::~SharedMemory()
 {
     munmap(m_data, m_size);
-    while (close(m_fileDescriptor) == -1 && errno == EINTR) { }
+    closeWithRetry(m_fileDescriptor);
 }
 
 static inline int accessModeFile(SharedMemory::Protection protection)
@@ -201,7 +203,7 @@ bool SharedMemory::createHandle(Handle& handle, Protection protection)
     while ((fcntl(duplicatedHandle, F_SETFD, FD_CLOEXEC | accessModeFile(protection)) == -1)) {
         if (errno != EINTR) {
             ASSERT_NOT_REACHED();
-            while (close(duplicatedHandle) == -1 && errno == EINTR) { }
+            closeWithRetry(duplicatedHandle);
             return false;
         }
     }

@@ -26,12 +26,12 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import unittest
+import unittest2 as unittest
 
 from webkitpy.common.net.buildbot import Builder
 from webkitpy.common.system.executive import ScriptError
 from webkitpy.common.system.outputcapture import OutputCapture
-from webkitpy.layout_tests.port.test import TestPort
+from webkitpy.port.test import TestPort
 from webkitpy.tool.commands.perfalizer import PerfalizerTask
 from webkitpy.tool.mocktool import MockTool
 

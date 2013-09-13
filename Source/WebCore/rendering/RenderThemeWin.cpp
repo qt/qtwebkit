@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006, 2007 Apple Inc.
+ * Copyright (C) 2006, 2007, 2013 Apple Inc.
  * Copyright (C) 2009 Kenneth Rohde Christiansen
  *
  * This library is free software; you can redistribute it and/or
@@ -26,6 +26,7 @@
 #include "Element.h"
 #include "FontMetrics.h"
 #include "Frame.h"
+#include "FrameSelection.h"
 #include "GraphicsContext.h"
 #include "LocalWindowsContext.h"
 #include "PaintInfo.h"
@@ -108,6 +109,36 @@
 #define UPS_PRESSED     3
 #define UPS_DISABLED    4
 
+// Progress bar parts
+#define PP_BAR          1
+#define PP_BARVERT      2
+#define PP_CHUNK        3
+#define PP_CHUNKVERT    4
+#define PP_FILL         5
+#define PP_FILLVERT     6
+#define PP_PULSEOVERLAY 7
+#define PP_MOVEOVERLAY  8
+#define PP_PULSEOVERLAYVERT 9
+#define PP_MOVEOVERLAYVERT  10
+#define PP_TRANSPARENTBAR   11
+#define PP_TRANSPARENTBARVERT 12
+
+// Progress bar states
+#define PBBS_NORMAL     1
+#define PBBS_PARTIAL    2
+#define PBBVS_NORMAL    1 // Vertical
+#define PBBVS_PARTIAL   2
+
+// Progress bar fill states
+#define PBFS_NORMAL     1
+#define PBFS_ERROR      2
+#define PBFS_PAUSED     3
+#define PBFS_PARTIAL    4
+#define PBFVS_NORMAL    1 // Vertical
+#define PBFVS_ERROR     2
+#define PBFVS_PAUSED    3
+#define PBFVS_PARTIAL   4
+
 
 SOFT_LINK_LIBRARY(uxtheme)
 SOFT_LINK(uxtheme, OpenThemeData, HANDLE, WINAPI, (HWND hwnd, LPCWSTR pszClassList), (hwnd, pszClassList))
@@ -145,7 +176,7 @@ static bool gWebKitIsBeingUnloaded;
 static bool documentIsInApplicationChromeMode(const Document* document)
 {
     Settings* settings = document->settings();
-    return settings && settings->inApplicationChromeMode();
+    return settings && settings->applicationChromeMode();
 }
 
 void RenderThemeWin::setWebKitIsBeingUnloaded()
@@ -172,6 +203,7 @@ RenderThemeWin::RenderThemeWin()
     , m_menuListTheme(0)
     , m_sliderTheme(0)
     , m_spinButtonTheme(0)
+    , m_progressBarTheme(0)
 {
     haveTheme = uxthemeLibrary() && IsThemeActive();
 }
@@ -219,6 +251,13 @@ HANDLE RenderThemeWin::spinButtonTheme() const
     return m_spinButtonTheme;
 }
 
+HANDLE RenderThemeWin::progressBarTheme() const
+{
+    if (haveTheme && !m_progressBarTheme)
+        m_progressBarTheme = OpenThemeData(0, L"Progress");
+    return m_progressBarTheme;
+}
+
 void RenderThemeWin::close()
 {
     // This method will need to be called when the OS theme changes to flush our cached themes.
@@ -232,7 +271,9 @@ void RenderThemeWin::close()
         CloseThemeData(m_sliderTheme);
     if (m_spinButtonTheme)
         CloseThemeData(m_spinButtonTheme);
-    m_buttonTheme = m_textFieldTheme = m_menuListTheme = m_sliderTheme = m_spinButtonTheme = 0;
+    if (m_progressBarTheme)
+        CloseThemeData(m_progressBarTheme);
+    m_buttonTheme = m_textFieldTheme = m_menuListTheme = m_sliderTheme = m_spinButtonTheme = m_progressBarTheme = 0;
 
     haveTheme = uxthemeLibrary() && IsThemeActive();
 }
@@ -285,7 +326,7 @@ static void fillFontDescription(FontDescription& fontDescription, LOGFONT& logFo
 {    
     fontDescription.setIsAbsoluteSize(true);
     fontDescription.setGenericFamily(FontDescription::NoFamily);
-    fontDescription.firstFamily().setFamily(String(logFont.lfFaceName));
+    fontDescription.setOneFamily(String(logFont.lfFaceName));
     fontDescription.setSpecifiedSize(fontSize);
     fontDescription.setWeight(logFont.lfWeight >= 700 ? FontWeightBold : FontWeightNormal); // FIXME: Use real weight.
     fontDescription.setItalic(logFont.lfItalic);
@@ -296,7 +337,7 @@ static void fillFontDescription(FontDescription& fontDescription, LOGFONT& logFo
     fillFontDescription(fontDescription, logFont, abs(logFont.lfHeight));
 }
 
-void RenderThemeWin::systemFont(int propId, FontDescription& fontDescription) const
+void RenderThemeWin::systemFont(CSSValueID valueID, FontDescription& fontDescription) const
 {
     static FontDescription captionFont;
     static FontDescription controlFont;
@@ -316,65 +357,65 @@ void RenderThemeWin::systemFont(int propId, FontDescription& fontDescription) co
         ::SystemParametersInfo(SPI_GETNONCLIENTMETRICS, sizeof(ncm), &ncm, 0);
     }
  
-    switch (propId) {
-        case CSSValueIcon: {
-            if (!iconFont.isAbsoluteSize()) {
+    switch (valueID) {
+    case CSSValueIcon: {
+        if (!iconFont.isAbsoluteSize()) {
+            LOGFONT logFont;
+            ::SystemParametersInfo(SPI_GETICONTITLELOGFONT, sizeof(logFont), &logFont, 0);
+            fillFontDescription(iconFont, logFont);
+        }
+        fontDescription = iconFont;
+        break;
+    }
+    case CSSValueMenu:
+        if (!menuFont.isAbsoluteSize())
+            fillFontDescription(menuFont, ncm.lfMenuFont);
+        fontDescription = menuFont;
+        break;
+    case CSSValueMessageBox:
+        if (!messageBoxFont.isAbsoluteSize())
+            fillFontDescription(messageBoxFont, ncm.lfMessageFont);
+        fontDescription = messageBoxFont;
+        break;
+    case CSSValueStatusBar:
+        if (!statusBarFont.isAbsoluteSize())
+            fillFontDescription(statusBarFont, ncm.lfStatusFont);
+        fontDescription = statusBarFont;
+        break;
+    case CSSValueCaption:
+        if (!captionFont.isAbsoluteSize())
+            fillFontDescription(captionFont, ncm.lfCaptionFont);
+        fontDescription = captionFont;
+        break;
+    case CSSValueSmallCaption:
+        if (!smallCaptionFont.isAbsoluteSize())
+            fillFontDescription(smallCaptionFont, ncm.lfSmCaptionFont);
+        fontDescription = smallCaptionFont;
+        break;
+    case CSSValueWebkitSmallControl:
+    case CSSValueWebkitMiniControl: // Just map to small.
+    case CSSValueWebkitControl: // Just map to small.
+        if (!controlFont.isAbsoluteSize()) {
+            HGDIOBJ hGDI = ::GetStockObject(DEFAULT_GUI_FONT);
+            if (hGDI) {
                 LOGFONT logFont;
-                ::SystemParametersInfo(SPI_GETICONTITLELOGFONT, sizeof(logFont), &logFont, 0);
-                fillFontDescription(iconFont, logFont);
+                if (::GetObject(hGDI, sizeof(logFont), &logFont) > 0)
+                    fillFontDescription(controlFont, logFont, defaultControlFontPixelSize);
             }
-            fontDescription = iconFont;
-            break;
         }
-        case CSSValueMenu:
-            if (!menuFont.isAbsoluteSize())
-                fillFontDescription(menuFont, ncm.lfMenuFont);
-            fontDescription = menuFont;
-            break;
-        case CSSValueMessageBox:
-            if (!messageBoxFont.isAbsoluteSize())
-                fillFontDescription(messageBoxFont, ncm.lfMessageFont);
-            fontDescription = messageBoxFont;
-            break;
-        case CSSValueStatusBar:
-            if (!statusBarFont.isAbsoluteSize())
-                fillFontDescription(statusBarFont, ncm.lfStatusFont);
-            fontDescription = statusBarFont;
-            break;
-        case CSSValueCaption:
-            if (!captionFont.isAbsoluteSize())
-                fillFontDescription(captionFont, ncm.lfCaptionFont);
-            fontDescription = captionFont;
-            break;
-        case CSSValueSmallCaption:
-            if (!smallCaptionFont.isAbsoluteSize())
-                fillFontDescription(smallCaptionFont, ncm.lfSmCaptionFont);
-            fontDescription = smallCaptionFont;
-            break;
-        case CSSValueWebkitSmallControl:
-        case CSSValueWebkitMiniControl: // Just map to small.
-        case CSSValueWebkitControl: // Just map to small.
-            if (!controlFont.isAbsoluteSize()) {
-                HGDIOBJ hGDI = ::GetStockObject(DEFAULT_GUI_FONT);
-                if (hGDI) {
-                    LOGFONT logFont;
-                    if (::GetObject(hGDI, sizeof(logFont), &logFont) > 0)
-                        fillFontDescription(controlFont, logFont, defaultControlFontPixelSize);
-                }
+        fontDescription = controlFont;
+        break;
+    default: { // Everything else uses the stock GUI font.
+        if (!systemFont.isAbsoluteSize()) {
+            HGDIOBJ hGDI = ::GetStockObject(DEFAULT_GUI_FONT);
+            if (hGDI) {
+                LOGFONT logFont;
+                if (::GetObject(hGDI, sizeof(logFont), &logFont) > 0)
+                    fillFontDescription(systemFont, logFont);
             }
-            fontDescription = controlFont;
-            break;
-        default: { // Everything else uses the stock GUI font.
-            if (!systemFont.isAbsoluteSize()) {
-                HGDIOBJ hGDI = ::GetStockObject(DEFAULT_GUI_FONT);
-                if (hGDI) {
-                    LOGFONT logFont;
-                    if (::GetObject(hGDI, sizeof(logFont), &logFont) > 0)
-                        fillFontDescription(systemFont, logFont);
-                }
-            }
-            fontDescription = systemFont;
         }
+        fontDescription = systemFont;
+    }
     }
 }
 
@@ -522,6 +563,10 @@ ThemeData RenderThemeWin::getClassicThemeData(RenderObject* o, ControlSubPart su
             result.m_part = DFC_SCROLL;
             result.m_state = determineClassicState(o);
             break;
+        case MeterPart:
+            result.m_part = PP_BAR;
+            result.m_state = determineState(o);
+            break;
         case SearchFieldPart:
         case TextFieldPart:
         case TextAreaPart:
@@ -583,6 +628,10 @@ ThemeData RenderThemeWin::getThemeData(RenderObject* o, ControlSubPart subPart)
                 result.m_state = determineState(o);
             break;
         }
+        case MeterPart:
+            result.m_part = PP_BAR;
+            result.m_state = determineState(o);
+            break;
         case RadioPart:
             result.m_part = BP_RADIO;
             result.m_state = determineState(o);
@@ -675,11 +724,8 @@ static void drawControl(GraphicsContext* context, RenderObject* o, HANDLE theme,
         }
     }
 
-
-#if !OS(WINCE)
     if (!alphaBlend && !context->isInTransparencyLayer())
         DIBPixelData::setRGBABitmapAlpha(windowsContext.hdc(), r, 255);
-#endif
 }
 
 bool RenderThemeWin::paintButton(RenderObject* o, const PaintInfo& i, const IntRect& r)
@@ -988,42 +1034,42 @@ bool RenderThemeWin::paintSearchFieldResultsButton(RenderObject* o, const PaintI
 }
 
 // Map a CSSValue* system color to an index understood by GetSysColor
-static int cssValueIdToSysColorIndex(int cssValueId)
+static int cssValueIdToSysColorIndex(CSSValueID cssValueId)
 {
     switch (cssValueId) {
-        case CSSValueActiveborder: return COLOR_ACTIVEBORDER;
-        case CSSValueActivecaption: return COLOR_ACTIVECAPTION;
-        case CSSValueAppworkspace: return COLOR_APPWORKSPACE;
-        case CSSValueBackground: return COLOR_BACKGROUND;
-        case CSSValueButtonface: return COLOR_BTNFACE;
-        case CSSValueButtonhighlight: return COLOR_BTNHIGHLIGHT;
-        case CSSValueButtonshadow: return COLOR_BTNSHADOW;
-        case CSSValueButtontext: return COLOR_BTNTEXT;
-        case CSSValueCaptiontext: return COLOR_CAPTIONTEXT;
-        case CSSValueGraytext: return COLOR_GRAYTEXT;
-        case CSSValueHighlight: return COLOR_HIGHLIGHT;
-        case CSSValueHighlighttext: return COLOR_HIGHLIGHTTEXT;
-        case CSSValueInactiveborder: return COLOR_INACTIVEBORDER;
-        case CSSValueInactivecaption: return COLOR_INACTIVECAPTION;
-        case CSSValueInactivecaptiontext: return COLOR_INACTIVECAPTIONTEXT;
-        case CSSValueInfobackground: return COLOR_INFOBK;
-        case CSSValueInfotext: return COLOR_INFOTEXT;
-        case CSSValueMenu: return COLOR_MENU;
-        case CSSValueMenutext: return COLOR_MENUTEXT;
-        case CSSValueScrollbar: return COLOR_SCROLLBAR;
-        case CSSValueThreeddarkshadow: return COLOR_3DDKSHADOW;
-        case CSSValueThreedface: return COLOR_3DFACE;
-        case CSSValueThreedhighlight: return COLOR_3DHIGHLIGHT;
-        case CSSValueThreedlightshadow: return COLOR_3DLIGHT;
-        case CSSValueThreedshadow: return COLOR_3DSHADOW;
-        case CSSValueWindow: return COLOR_WINDOW;
-        case CSSValueWindowframe: return COLOR_WINDOWFRAME;
-        case CSSValueWindowtext: return COLOR_WINDOWTEXT;
-        default: return -1; // Unsupported CSSValue
+    case CSSValueActiveborder: return COLOR_ACTIVEBORDER;
+    case CSSValueActivecaption: return COLOR_ACTIVECAPTION;
+    case CSSValueAppworkspace: return COLOR_APPWORKSPACE;
+    case CSSValueBackground: return COLOR_BACKGROUND;
+    case CSSValueButtonface: return COLOR_BTNFACE;
+    case CSSValueButtonhighlight: return COLOR_BTNHIGHLIGHT;
+    case CSSValueButtonshadow: return COLOR_BTNSHADOW;
+    case CSSValueButtontext: return COLOR_BTNTEXT;
+    case CSSValueCaptiontext: return COLOR_CAPTIONTEXT;
+    case CSSValueGraytext: return COLOR_GRAYTEXT;
+    case CSSValueHighlight: return COLOR_HIGHLIGHT;
+    case CSSValueHighlighttext: return COLOR_HIGHLIGHTTEXT;
+    case CSSValueInactiveborder: return COLOR_INACTIVEBORDER;
+    case CSSValueInactivecaption: return COLOR_INACTIVECAPTION;
+    case CSSValueInactivecaptiontext: return COLOR_INACTIVECAPTIONTEXT;
+    case CSSValueInfobackground: return COLOR_INFOBK;
+    case CSSValueInfotext: return COLOR_INFOTEXT;
+    case CSSValueMenu: return COLOR_MENU;
+    case CSSValueMenutext: return COLOR_MENUTEXT;
+    case CSSValueScrollbar: return COLOR_SCROLLBAR;
+    case CSSValueThreeddarkshadow: return COLOR_3DDKSHADOW;
+    case CSSValueThreedface: return COLOR_3DFACE;
+    case CSSValueThreedhighlight: return COLOR_3DHIGHLIGHT;
+    case CSSValueThreedlightshadow: return COLOR_3DLIGHT;
+    case CSSValueThreedshadow: return COLOR_3DSHADOW;
+    case CSSValueWindow: return COLOR_WINDOW;
+    case CSSValueWindowframe: return COLOR_WINDOWFRAME;
+    case CSSValueWindowtext: return COLOR_WINDOWTEXT;
+    default: return -1; // Unsupported CSSValue
     }
 }
 
-Color RenderThemeWin::systemColor(int cssValueId) const
+Color RenderThemeWin::systemColor(CSSValueID cssValueId) const
 {
     int sysColorIndex = cssValueIdToSysColorIndex(cssValueId);
     if (sysColorIndex == -1)
@@ -1049,12 +1095,7 @@ String RenderThemeWin::extraFullScreenStyleSheet()
 
 bool RenderThemeWin::supportsClosedCaptioning() const
 {
-        // We rely on QuickTime to render captions so only enable the button for a video element.
-#if SAFARI_THEME_VERSION >= 4
     return true;
-#else
-    return false;
-#endif
 }
 
 bool RenderThemeWin::paintMediaFullscreenButton(RenderObject* o, const PaintInfo& paintInfo, const IntRect& r)
@@ -1127,7 +1168,54 @@ IntPoint RenderThemeWin::volumeSliderOffsetFromMuteButton(RenderBox* muteButtonB
     return RenderMediaControls::volumeSliderOffsetFromMuteButton(muteButtonBox, size);
 }
 
+#endif
+
+#if ENABLE(METER_ELEMENT)
+void RenderThemeWin::adjustMeterStyle(StyleResolver*, RenderStyle* style, Element*) const
+{
+    style->setBoxShadow(nullptr);
+}
+
+bool RenderThemeWin::supportsMeter(ControlPart part) const
+{
+    switch (part) {
+    case MeterPart:
+        return true;
+    default:
+        return false;
+    }
+}
+
+IntSize RenderThemeWin::meterSizeForBounds(const RenderMeter*, const IntRect& bounds) const
+{
+    return bounds.size();
+}
+
+bool RenderThemeWin::paintMeter(RenderObject* renderObject, const PaintInfo& paintInfo, const IntRect& rect)
+{
+    if (!renderObject->isMeter())
+        return true;
+
+    HTMLMeterElement* element = toRenderMeter(renderObject)->meterElement();
+
+    ThemeData theme = getThemeData(renderObject);
+
+    int remaining = static_cast<int>((1.0 - element->valueRatio()) * static_cast<double>(rect.size().width()));
+
+    // Draw the background
+    drawControl(paintInfo.context, renderObject, progressBarTheme(), theme, rect);
+
+    // Draw the progress portion
+    IntRect completedRect(rect);
+    completedRect.contract(remaining, 0);
+
+    theme.m_part = PP_FILL;
+    drawControl(paintInfo.context, renderObject, progressBarTheme(), theme, completedRect);
+
+    return true;
+}
 
 #endif
+
 
 }

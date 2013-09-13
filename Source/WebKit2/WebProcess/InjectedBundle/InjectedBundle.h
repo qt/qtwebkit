@@ -54,15 +54,12 @@ OBJC_CLASS NSBundle;
 namespace CoreIPC {
     class ArgumentDecoder;
     class Connection;
-    class MessageID;
 }
 
 namespace WebKit {
 
 #if PLATFORM(MAC)
 typedef NSBundle *PlatformBundle;
-#elif PLATFORM(WIN)
-typedef HMODULE PlatformBundle;
 #elif PLATFORM(QT)
 typedef QLibrary PlatformBundle;
 #elif PLATFORM(GTK)
@@ -75,14 +72,13 @@ class ImmutableArray;
 class InjectedBundleScriptWorld;
 class WebCertificateInfo;
 class WebConnection;
+class WebData;
 class WebFrame;
 class WebPage;
 class WebPageGroupProxy;
 
-class InjectedBundle : public APIObject {
+class InjectedBundle : public TypedAPIObject<APIObject::TypeBundle> {
 public:
-    static const Type APIType = TypeBundle;
-
     static PassRefPtr<InjectedBundle> create(const String& path)
     {
         return adoptRef(new InjectedBundle(path));
@@ -96,10 +92,6 @@ public:
     void initializeClient(WKBundleClient*);
     void postMessage(const String&, APIObject*);
     void postSynchronousMessage(const String&, APIObject*, RefPtr<APIObject>& returnData);
-#if PLATFORM(WIN)
-    void setHostAllowsAnyHTTPSCertificate(const String&);
-    void setClientCertificate(const String& host, const String& certificateSystemStoreName, const WebCertificateInfo*);
-#endif
 
     WebConnection* webConnectionToUIProcess() const;
 
@@ -125,15 +117,16 @@ public:
     void addOriginAccessWhitelistEntry(const String&, const String&, const String&, bool);
     void removeOriginAccessWhitelistEntry(const String&, const String&, const String&, bool);
     void resetOriginAccessWhitelists();
+    void setAsynchronousSpellCheckingEnabled(WebPageGroupProxy*, bool);
     int numberOfPages(WebFrame*, double, double);
     int pageNumberForElementById(WebFrame*, const String&, double, double);
     String pageSizeAndMarginsInPixels(WebFrame*, int, int, int, int, int, int, int);
     bool isPageBoxVisible(WebFrame*, int);
     void setUserStyleSheetLocation(WebPageGroupProxy*, const String&);
-    void setMinimumTimerInterval(WebPageGroupProxy*, double seconds);
     void setWebNotificationPermission(WebPage*, const String& originString, bool allowed);
     void removeAllWebNotificationPermissions(WebPage*);
     uint64_t webNotificationID(JSContextRef, JSValueRef);
+    PassRefPtr<WebData> createWebDataFromUint8Array(JSContextRef, JSValueRef);
 
     // UserContent API
     void addUserScript(WebPageGroupProxy*, InjectedBundleScriptWorld*, const String& source, const String& url, ImmutableArray* whitelist, ImmutableArray* blacklist, WebCore::UserScriptInjectionTime, WebCore::UserContentInjectedFrames);
@@ -173,18 +166,16 @@ public:
 
     static bool isProcessingUserGesture();
 
-    static size_t workerThreadCount();
-
     void setTabKeyCyclesThroughElements(WebPage*, bool enabled);
     void setSerialLoadingEnabled(bool);
     void setShadowDOMEnabled(bool);
     void setCSSRegionsEnabled(bool);
+    void setCSSCompositingEnabled(bool);
+    void setSeamlessIFramesEnabled(bool);
     void dispatchPendingLoadRequests();
 
 private:
     explicit InjectedBundle(const String&);
-
-    virtual Type type() const { return APIType; }
 
     String m_path;
     PlatformBundle m_platformBundle; // This is leaked right now, since we never unload the bundle/module.

@@ -39,6 +39,33 @@ WebInspector.TextEditor.Events = {
 };
 
 WebInspector.TextEditor.prototype = {
+    /**
+     * @return {boolean}
+     */
+    isClean: function() { },
+
+    markClean: function() { },
+
+    /*
+     * @param {number} lineNumber
+     * @param {number} column
+     * @return {?{x: number, y: number, height: number}}
+     */
+    cursorPositionToCoordinates: function(lineNumber, column) { },
+
+    /**
+     * @param {number} x
+     * @param {number} y
+     * @return {?WebInspector.TextRange}
+     */
+    coordinatesToCursorPosition: function(x, y) { },
+
+    /**
+     * @param {number} lineNumber
+     * @param {number} column
+     * @return {?{startColumn: number, endColumn: number, type: string}}
+     */
+    tokenAtTextPosition: function(lineNumber, column) { },
 
     /**
      * @param {string} mimeType
@@ -59,6 +86,25 @@ WebInspector.TextEditor.prototype = {
      * @return {Element}
      */
     defaultFocusedElement: function() { },
+
+    /**
+     * @param {string} regex
+     * @param {string} cssClass
+     * @return {Object}
+     */
+    highlightRegex: function(regex, cssClass) { },
+
+    /**
+     * @param {WebInspector.TextRange} range
+     * @param {string} cssClass
+     * @return {Object}
+     */
+    highlightRange: function(range, cssClass) { },
+
+    /**
+     * @param {Object} highlightDescriptor
+     */
+    removeHighlight: function(highlightDescriptor) { },
 
     /**
      * @param {number} lineNumber
@@ -139,7 +185,7 @@ WebInspector.TextEditor.prototype = {
     /**
      * @return {WebInspector.TextRange}
      */
-    selection: function(textRange) { },
+    selection: function() { },
 
     /**
      * @return {WebInspector.TextRange?}
@@ -150,6 +196,12 @@ WebInspector.TextEditor.prototype = {
      * @param {WebInspector.TextRange} textRange
      */
     setSelection: function(textRange) { },
+
+    /**
+     * @param {WebInspector.TextRange} range
+     * @return {string}
+     */
+    copyRange: function(range) { },
 
     /**
      * @param {string} text 

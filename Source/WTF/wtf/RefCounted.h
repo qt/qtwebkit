@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006, 2007, 2008, 2009, 2010 Apple Inc. All rights reserved.
+ * Copyright (C) 2006, 2007, 2008, 2009, 2010, 2013 Apple Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -26,7 +26,6 @@
 #include <wtf/Noncopyable.h>
 #include <wtf/OwnPtr.h>
 #include <wtf/ThreadRestrictionVerifier.h>
-#include <wtf/UnusedParam.h>
 
 namespace WTF {
 
@@ -71,7 +70,7 @@ public:
         return m_refCount == 1;
     }
 
-    int refCount() const
+    unsigned refCount() const
     {
 #if CHECK_REF_COUNTED_LIFECYCLE
         ASSERT(m_verifier.isSafeToUse());
@@ -111,12 +110,6 @@ public:
 #endif
     }
 
-    // Helper for generating JIT code. Please do not use for non-JIT purposes.
-    const int* addressOfCount() const
-    {
-        return &m_refCount;
-    }
-
 protected:
     RefCountedBase()
         : m_refCount(1)
@@ -144,15 +137,16 @@ protected:
         ASSERT(!m_adoptionIsRequired);
 #endif
 
-        ASSERT(m_refCount > 0);
-        if (m_refCount == 1) {
+        ASSERT(m_refCount);
+        unsigned tempRefCount = m_refCount - 1;
+        if (!tempRefCount) {
 #if CHECK_REF_COUNTED_LIFECYCLE
             m_deletionHasBegun = true;
 #endif
             return true;
         }
+        m_refCount = tempRefCount;
 
-        --m_refCount;
 #if CHECK_REF_COUNTED_LIFECYCLE
         // Stop thread verification when the ref goes to 1 because it
         // is safe to be passed to another thread at this point.
@@ -175,7 +169,7 @@ private:
     friend void adopted(RefCountedBase*);
 #endif
 
-    int m_refCount;
+    unsigned m_refCount;
 #if CHECK_REF_COUNTED_LIFECYCLE
     bool m_deletionHasBegun;
     bool m_adoptionIsRequired;

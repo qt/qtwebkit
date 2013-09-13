@@ -22,47 +22,23 @@
 #define SVGTextElement_h
 
 #if ENABLE(SVG)
-#include "SVGAnimatedTransformList.h"
 #include "SVGTextPositioningElement.h"
-#include "SVGTransformable.h"
 
 namespace WebCore {
 
-class SVGTextElement : public SVGTextPositioningElement,
-                       public SVGTransformable {
+class SVGTextElement FINAL : public SVGTextPositioningElement {
 public:
     static PassRefPtr<SVGTextElement> create(const QualifiedName&, Document*);
 
-    virtual SVGElement* nearestViewportElement() const;
-    virtual SVGElement* farthestViewportElement() const;
-
-    virtual FloatRect getBBox(StyleUpdateStrategy = AllowStyleUpdate);
-    virtual AffineTransform getCTM(StyleUpdateStrategy = AllowStyleUpdate);
-    virtual AffineTransform getScreenCTM(StyleUpdateStrategy = AllowStyleUpdate);
     virtual AffineTransform animatedLocalTransform() const;
 
 private:
     SVGTextElement(const QualifiedName&, Document*);
 
-    virtual bool supportsFocus() const { return true; }
-
-    bool isSupportedAttribute(const QualifiedName&);
-    virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
-
-    virtual AffineTransform* supplementalTransform();
-    virtual AffineTransform localCoordinateSpaceTransform(SVGLocatable::CTMScope mode) const { return SVGTransformable::localCoordinateSpaceTransform(mode); }
+    virtual bool supportsFocus() const OVERRIDE { return true; }
 
     virtual RenderObject* createRenderer(RenderArena*, RenderStyle*);
     virtual bool childShouldCreateRenderer(const NodeRenderingContext&) const;
-            
-    virtual void svgAttributeChanged(const QualifiedName&);
-
-    BEGIN_DECLARE_ANIMATED_PROPERTIES(SVGTextElement)
-        DECLARE_ANIMATED_TRANSFORM_LIST(Transform, transform)
-    END_DECLARE_ANIMATED_PROPERTIES
-
-    // Used by <animateMotion>
-    OwnPtr<AffineTransform> m_supplementalTransform;
 };
 
 } // namespace WebCore

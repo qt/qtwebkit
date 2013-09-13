@@ -40,8 +40,10 @@
 namespace WebCore {
 
 class MediaConstraints;
+class MediaStreamComponent;
 class RTCConfiguration;
-class RTCDataChannelDescriptor;
+class RTCDTMFSenderHandler;
+class RTCDataChannelHandler;
 class RTCIceCandidateDescriptor;
 class RTCPeerConnectionHandlerClient;
 class RTCSessionDescriptionDescriptor;
@@ -67,13 +69,9 @@ public:
     virtual bool addStream(PassRefPtr<MediaStreamDescriptor>, PassRefPtr<MediaConstraints>) = 0;
     virtual void removeStream(PassRefPtr<MediaStreamDescriptor>) = 0;
     virtual void getStats(PassRefPtr<RTCStatsRequest>) = 0;
+    virtual PassOwnPtr<RTCDataChannelHandler> createDataChannel(const String& label, bool reliable) = 0;
+    virtual PassOwnPtr<RTCDTMFSenderHandler> createDTMFSender(PassRefPtr<MediaStreamComponent>) = 0;
     virtual void stop() = 0;
-
-    // RTCDataChannel.
-    virtual bool openDataChannel(PassRefPtr<RTCDataChannelDescriptor>) = 0;
-    virtual bool sendStringData(PassRefPtr<RTCDataChannelDescriptor>, const String&) = 0;
-    virtual bool sendRawData(PassRefPtr<RTCDataChannelDescriptor>, const char*, size_t) = 0;
-    virtual void closeDataChannel(PassRefPtr<RTCDataChannelDescriptor>) = 0;
 
 protected:
     RTCPeerConnectionHandler() { }

@@ -45,11 +45,6 @@
 #include "Settings.h"
 #include "StyleResolver.h"
 
-#if ENABLE(LINK_PRERENDER)
-#include "PrerenderHandle.h"
-#include "Prerenderer.h"
-#endif
-
 namespace WebCore {
 
 LinkLoader::LinkLoader(LinkLoaderClient* client)
@@ -132,25 +127,11 @@ bool LinkLoader::loadLink(const LinkRelAttribute& relAttribute, const String& ty
     }
 #endif
 
-#if ENABLE(LINK_PRERENDER)
-    if (relAttribute.m_isLinkPrerender) {
-        ASSERT(!m_prerenderHandle);
-        m_prerenderHandle = document->prerenderer()->render(href);
-    }
-#endif
     return true;
 }
 
 void LinkLoader::released()
 {
-    // Only prerenders need treatment here; other links either use the CachedResource interface, or are notionally
-    // atomic (dns prefetch).
-#if ENABLE(LINK_PRERENDER)
-    if (m_prerenderHandle) {
-        m_prerenderHandle->cancel();
-        m_prerenderHandle.clear();
-    }
-#endif
 }
 
 }

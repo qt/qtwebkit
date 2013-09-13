@@ -100,25 +100,25 @@ WebInspector.StyleSheetOutlineDialog.prototype = {
     },
 
     /**
-     * @param {function(number, number, number, number)} callback
+     * @param {function(number, number)} callback
      */
     requestItems: function(callback)
     {
         function didGetAllStyleSheets(error, infos)
         {
             if (error) {
-                callback(0, 0, 0, 0);
+                callback(0, 0);
                 return;
             }
   
             for (var i = 0; i < infos.length; ++i) {
                 var info = infos[i];
-                if (info.sourceURL === this._uiSourceCode.contentURL()) {
+                if (info.sourceURL === this._uiSourceCode.url) {
                     WebInspector.CSSStyleSheet.createForId(info.styleSheetId, didGetStyleSheet.bind(this));
                     return;
                 }
             }
-            callback(0, 0, 0, 0);
+            callback(0, 0);
         }
 
         CSSAgent.getAllStyleSheets(didGetAllStyleSheets.bind(this));
@@ -129,12 +129,12 @@ WebInspector.StyleSheetOutlineDialog.prototype = {
         function didGetStyleSheet(styleSheet)
         {
             if (!styleSheet) {
-                callback(0, 0, 0, 0);
+                callback(0, 0);
                 return;
             }
 
             this._rules = styleSheet.rules;
-            callback(0, this._rules.length, 0, 1);
+            callback(0, 1);
         }
     },
 
@@ -159,5 +159,7 @@ WebInspector.StyleSheetOutlineDialog.prototype = {
         return query;
     },
 
-    __proto__: WebInspector.SelectionDialogContentProvider.prototype
+    dispose: function()
+    {
+    }
 }

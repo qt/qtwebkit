@@ -32,7 +32,7 @@
 #include <WebCore/ContextMenu.h>
 #include <WebCore/IntPoint.h>
 
-class EwkViewImpl;
+class EwkView;
 
 namespace WebKit {
 
@@ -41,7 +41,7 @@ class WebPageProxy;
 
 class WebContextMenuProxyEfl : public WebContextMenuProxy {
 public:
-    static PassRefPtr<WebContextMenuProxyEfl> create(EwkViewImpl* viewImpl, WebPageProxy* page)
+    static PassRefPtr<WebContextMenuProxyEfl> create(EwkView* viewImpl, WebPageProxy* page)
     {
         return adoptRef(new WebContextMenuProxyEfl(viewImpl, page));
     }
@@ -51,12 +51,10 @@ public:
     void showContextMenu(const WebCore::IntPoint&, const Vector<WebContextMenuItemData>&);
     void hideContextMenu();
 
-    void contextMenuItemSelected(const WebContextMenuItemData&);
-
 private:
-    WebContextMenuProxyEfl(EwkViewImpl*, WebPageProxy*);
+    WebContextMenuProxyEfl(EwkView*, WebPageProxy*);
 
-    EwkViewImpl* m_viewImpl;
+    EwkView* m_view;
     WebPageProxy* m_page;
 };
 

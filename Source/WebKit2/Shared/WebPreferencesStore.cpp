@@ -68,17 +68,17 @@ void WebPreferencesStore::encode(CoreIPC::ArgumentEncoder& encoder) const
     encoder << m_floatValues;
 }
 
-bool WebPreferencesStore::decode(CoreIPC::ArgumentDecoder* decoder, WebPreferencesStore& result)
+bool WebPreferencesStore::decode(CoreIPC::ArgumentDecoder& decoder, WebPreferencesStore& result)
 {
-    if (!decoder->decode(result.m_stringValues))
+    if (!decoder.decode(result.m_stringValues))
         return false;
-    if (!decoder->decode(result.m_boolValues))
+    if (!decoder.decode(result.m_boolValues))
         return false;
-    if (!decoder->decode(result.m_uint32Values))
+    if (!decoder.decode(result.m_uint32Values))
         return false;
-    if (!decoder->decode(result.m_doubleValues))
+    if (!decoder.decode(result.m_doubleValues))
         return false;
-    if (!decoder->decode(result.m_floatValues))
+    if (!decoder.decode(result.m_floatValues))
         return false;
     return true;
 }
@@ -104,6 +104,7 @@ String defaultValueForKey(const String& key)
     if (defaults.isEmpty()) {
 #define DEFINE_STRING_DEFAULTS(KeyUpper, KeyLower, TypeName, Type, DefaultValue) defaults.set(WebPreferencesKey::KeyLower##Key(), DefaultValue);
         FOR_EACH_WEBKIT_STRING_PREFERENCE(DEFINE_STRING_DEFAULTS)
+        FOR_EACH_WEBKIT_STRING_PREFERENCE_NOT_IN_WEBCORE(DEFINE_STRING_DEFAULTS)
 #undef DEFINE_STRING_DEFAULTS
     }
 

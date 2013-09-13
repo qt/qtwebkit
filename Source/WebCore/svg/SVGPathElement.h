@@ -25,11 +25,10 @@
 #include "SVGAnimatedBoolean.h"
 #include "SVGAnimatedNumber.h"
 #include "SVGExternalResourcesRequired.h"
-#include "SVGLangSpace.h"
+#include "SVGGraphicsElement.h"
+#include "SVGNames.h"
 #include "SVGPathByteStream.h"
 #include "SVGPathSegList.h"
-#include "SVGStyledTransformableElement.h"
-#include "SVGTests.h"
 
 namespace WebCore {
 
@@ -54,15 +53,13 @@ class SVGPathSegCurvetoQuadraticSmoothAbs;
 class SVGPathSegCurvetoQuadraticSmoothRel;
 class SVGPathSegListPropertyTearOff;
 
-class SVGPathElement : public SVGStyledTransformableElement,
-                       public SVGTests,
-                       public SVGLangSpace,
-                       public SVGExternalResourcesRequired {
+class SVGPathElement FINAL : public SVGGraphicsElement,
+                             public SVGExternalResourcesRequired {
 public:
     static PassRefPtr<SVGPathElement> create(const QualifiedName&, Document*);
     
     float getTotalLength();
-    FloatPoint getPointAtLength(float distance);
+    SVGPoint getPointAtLength(float distance);
     unsigned getPathSegAtLength(float distance);
 
     PassRefPtr<SVGPathSegClosePath> createSVGPathSegClosePath(SVGPathSegRole role = PathSegUndefinedRole);
@@ -105,7 +102,7 @@ private:
     SVGPathElement(const QualifiedName&, Document*);
 
     virtual bool isValid() const { return SVGTests::isValid(); }
-    virtual bool supportsFocus() const { return true; }
+    virtual bool supportsFocus() const OVERRIDE { return true; }
 
     bool isSupportedAttribute(const QualifiedName&);
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
@@ -113,20 +110,15 @@ private:
     virtual bool supportsMarkers() const { return true; }
 
     // Custom 'd' property
-    static void synchronizeD(void* contextElement);
-    static PassRefPtr<SVGAnimatedProperty> lookupOrCreateDWrapper(void* contextElement);
+    static void synchronizeD(SVGElement* contextElement);
+    static PassRefPtr<SVGAnimatedProperty> lookupOrCreateDWrapper(SVGElement* contextElement);
 
     BEGIN_DECLARE_ANIMATED_PROPERTIES(SVGPathElement)
         DECLARE_ANIMATED_NUMBER(PathLength, pathLength)
         DECLARE_ANIMATED_BOOLEAN(ExternalResourcesRequired, externalResourcesRequired)
     END_DECLARE_ANIMATED_PROPERTIES
 
-    // SVGTests
-    virtual void synchronizeRequiredFeatures() { SVGTests::synchronizeRequiredFeatures(this); }
-    virtual void synchronizeRequiredExtensions() { SVGTests::synchronizeRequiredExtensions(this); }
-    virtual void synchronizeSystemLanguage() { SVGTests::synchronizeSystemLanguage(this); }
-
-    RenderObject* createRenderer(RenderArena*, RenderStyle*);
+    virtual RenderObject* createRenderer(RenderArena*, RenderStyle*) OVERRIDE;
 
     virtual Node::InsertionNotificationRequest insertedInto(ContainerNode*) OVERRIDE;
     virtual void removedFrom(ContainerNode*) OVERRIDE;
@@ -138,6 +130,12 @@ private:
     mutable SVGSynchronizableAnimatedProperty<SVGPathSegList> m_pathSegList;
     bool m_isAnimValObserved;
 };
+
+inline SVGPathElement* toSVGPathElement(Element* element)
+{
+    ASSERT_WITH_SECURITY_IMPLICATION(!element || element->hasTagName(SVGNames::pathTag));
+    return static_cast<SVGPathElement*>(element);
+}
 
 } // namespace WebCore
 

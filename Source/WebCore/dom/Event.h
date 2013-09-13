@@ -2,7 +2,7 @@
  * Copyright (C) 2001 Peter Kelly (pmk@post.com)
  * Copyright (C) 2001 Tobias Anton (anton@stud.fbi.fh-darmstadt.de)
  * Copyright (C) 2006 Samuel Weinig (sam.weinig@gmail.com)
- * Copyright (C) 2003, 2004, 2005, 2006, 2007, 2008 Apple Inc. All rights reserved.
+ * Copyright (C) 2003, 2004, 2005, 2006, 2007, 2008, 2013 Apple Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -41,7 +41,8 @@ class HTMLIFrameElement;
 
 struct EventInit {
     EventInit();
-     
+    EventInit(bool bubbles, bool cancelable);
+
     bool bubbles;
     bool cancelable;
 };
@@ -93,6 +94,7 @@ public:
     void initEvent(const AtomicString& type, bool canBubble, bool cancelable);
 
     const AtomicString& type() const { return m_type; }
+    void setType(const AtomicString& type) { m_type = type; }
     
     EventTarget* target() const { return m_target.get(); }
     void setTarget(PassRefPtr<EventTarget>);
@@ -124,6 +126,7 @@ public:
     // These events are general classes of events.
     virtual bool isUIEvent() const;
     virtual bool isMouseEvent() const;
+    virtual bool isFocusEvent() const;
     virtual bool isKeyboardEvent() const;
     virtual bool isTouchEvent() const;
 
@@ -161,13 +164,12 @@ public:
 
     bool isBeingDispatched() const { return eventPhase(); }
 
-    virtual void reportMemoryUsage(MemoryObjectInfo*) const;
-
     virtual PassRefPtr<Event> cloneFor(HTMLIFrameElement*) const;
 
 protected:
     Event();
     Event(const AtomicString& type, bool canBubble, bool cancelable);
+    Event(const AtomicString& type, bool canBubble, bool cancelable, double timestamp);
     Event(const AtomicString& type, const EventInit&);
 
     virtual void receivedTarget();

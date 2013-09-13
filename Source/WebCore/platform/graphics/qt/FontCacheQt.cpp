@@ -63,24 +63,19 @@ static QRawFont rawFontForCharacters(const QString& string, const QRawFont& font
     return glyphs.rawFont();
 }
 
-PassRefPtr<SimpleFontData> FontCache::getFontDataForCharacters(const Font& font, const UChar* characters, int length)
+PassRefPtr<SimpleFontData> FontCache::systemFallbackForCharacters(const FontDescription&, const SimpleFontData* originalFontData, bool, const UChar* characters, int length)
 {
     QString qstring = QString::fromRawData(reinterpret_cast<const QChar*>(characters), length);
-    QRawFont computedFont = rawFontForCharacters(qstring, font.rawFont());
+    QRawFont computedFont = rawFontForCharacters(qstring, originalFontData->getQtRawFont());
     if (!computedFont.isValid())
         return 0;
     FontPlatformData alternateFont(computedFont);
     return getCachedFontData(&alternateFont, DoNotRetain);
 }
 
-PassRefPtr<SimpleFontData> FontCache::getSimilarFontPlatformData(const Font& font)
-{
-    return 0;
-}
-
 PassRefPtr<SimpleFontData> FontCache::getLastResortFallbackFont(const FontDescription& fontDescription, ShouldRetain shouldRetain)
 {
-    const AtomicString fallbackFamily = QFont(fontDescription.family().family()).lastResortFamily();
+    const AtomicString fallbackFamily = QFont(fontDescription.firstFamily()).lastResortFamily();
     FontPlatformData platformData(fontDescription, fallbackFamily);
     return getCachedFontData(&platformData, shouldRetain);
 }
@@ -89,12 +84,12 @@ void FontCache::getTraitsInFamily(const AtomicString&, Vector<unsigned>&)
 {
 }
 
-FontPlatformData* FontCache::createFontPlatformData(const FontDescription& fontDescription, const AtomicString& familyName)
+PassOwnPtr<FontPlatformData> FontCache::createFontPlatformData(const FontDescription& fontDescription, const AtomicString& familyName)
 {
     QFontDatabase db;
     if (!db.hasFamily(familyName))
-        return 0;
-    return new FontPlatformData(fontDescription, familyName);
+        return nullptr;
+    return adoptPtr(new FontPlatformData(fontDescription, familyName));
 }
 
 } // namespace WebCore

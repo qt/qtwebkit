@@ -63,6 +63,7 @@ public:
     bool loadFinished() const { return m_loadFinished; }
 
     // FrameLoaderClient delegates
+    bool willSendRequestForFrame(WebCore::Frame*, WebCore::ResourceRequest&, const WebCore::ResourceResponse&);
     void didStartProvisionalLoadForFrame(WebCore::Frame*);
     void didCommitLoadForFrame(WebCore::Frame*);
     void didFailProvisionalLoadForFrame(WebCore::Frame*);
@@ -71,10 +72,13 @@ public:
     void didFinishDocumentLoadForFrame(WebCore::Frame*);
     void didClearWindowObjectInWorld(WebCore::DOMWrapperWorld*, JSGlobalContextRef, JSObjectRef windowObject);
     void didReceiveTitleForFrame(const String& title, WebCore::Frame*);
-    void didDecidePolicyForNavigationAction(const WebCore::NavigationAction&, const WebCore::ResourceRequest&);
+    void didDecidePolicyForNavigationAction(const WebCore::NavigationAction&, const WebCore::ResourceRequest&, WebCore::Frame*);
+    void didDecidePolicyForResponse(const WebCore::ResourceResponse&);
     void didDispatchWillPerformClientRedirect();
     void didHandleOnloadEventsForFrame(WebCore::Frame*);
     void didReceiveResponseForFrame(WebCore::Frame*, const WebCore::ResourceResponse&);
+    bool policyDelegateEnabled() const { return m_policyDelegateEnabled; }
+    bool policyDelegateIsPermissive() const { return m_policyDelegateIsPermissive; }
 
     // ChromeClient delegates
     void addMessageToConsole(const String& message, unsigned lineNumber, const String& sourceID);
@@ -101,12 +105,11 @@ public:
     bool shouldInsertNode(WebCore::Node*, WebCore::Range*, int insertAction);
     bool shouldInsertText(const String&, WebCore::Range*, int insertAction);
 
-    bool isSelectTrailingWhitespaceEnabled() const { return s_selectTrailingWhitespaceEnabled; }
-    void setSelectTrailingWhitespaceEnabled(bool enabled) { s_selectTrailingWhitespaceEnabled = enabled; }
     bool didReceiveAuthenticationChallenge(WebCore::Credential&);
 
     // BlackBerry::Platform::BlackBerryPlatformLayoutTestClient method
     virtual void addTest(const char* testFile);
+    void setCustomPolicyDelegate(bool setDelegate, bool permissive);
 private:
     void runTest(const String& url, const String& imageHash);
     void runTests();
@@ -146,7 +149,8 @@ private:
 
     bool m_acceptsEditing;
     bool m_loadFinished;
-    static bool s_selectTrailingWhitespaceEnabled;
+    bool m_policyDelegateEnabled;
+    bool m_policyDelegateIsPermissive;
 };
 }
 }

@@ -74,10 +74,6 @@ void HTMLStyleElement::parseAttribute(const QualifiedName& name, const AtomicStr
 {
     if (name == titleAttr && m_sheet)
         m_sheet->setTitle(value);
-    else if (name == onloadAttr)
-        setAttributeEventListener(eventNames().loadEvent, createAttributeEventListener(this, name, value));
-    else if (name == onerrorAttr)
-        setAttributeEventListener(eventNames().errorEvent, createAttributeEventListener(this, name, value));
     else if (name == scopedAttr && ContextFeatures::styleScopedEnabled(document()))
         scopedAttributeChanged(!value.isNull());
     else if (name == mediaAttr && inDocument() && document()->renderer() && m_sheet) {
@@ -98,7 +94,7 @@ void HTMLStyleElement::scopedAttributeChanged(bool scoped)
         // As any <style> in a shadow tree is treated as "scoped",
         // need to remove the <style> from its shadow root.
         if (m_scopedStyleRegistrationState == RegisteredInShadowRoot)
-            unregisterWithScopingNode(shadowRoot());
+            unregisterWithScopingNode(containingShadowRoot());
 
         if (m_scopedStyleRegistrationState != RegisteredAsScoped)
             registerWithScopingNode(true);
@@ -131,7 +127,7 @@ void HTMLStyleElement::registerWithScopingNode(bool scoped)
     if (m_scopedStyleRegistrationState != NotRegistered)
         return;
 
-    ContainerNode* scope = scoped ? parentNode() : shadowRoot();
+    ContainerNode* scope = scoped ? parentNode() : containingShadowRoot();
     if (!scope)
         return;
     if (!scope->isElementNode() && !scope->isShadowRoot()) {
@@ -140,9 +136,11 @@ void HTMLStyleElement::registerWithScopingNode(bool scoped)
         ASSERT_NOT_REACHED();
         return;
     }
-
     scope->registerScopedHTMLStyleChild();
-    scope->setNeedsStyleRecalc();
+    if (scope->isShadowRoot())
+        scope->shadowHost()->setNeedsStyleRecalc();
+    else
+        scope->setNeedsStyleRecalc();
     if (inDocument() && !document()->parsing() && document()->renderer())
         document()->styleResolverChanged(DeferRecalcStyle);
 
@@ -190,9 +188,9 @@ void HTMLStyleElement::removedFrom(ContainerNode* insertionPoint)
     if (m_scopedStyleRegistrationState != NotRegistered) {
         ContainerNode* scope;
         if (m_scopedStyleRegistrationState == RegisteredInShadowRoot) {
-            scope = shadowRoot();
+            scope = containingShadowRoot();
             if (!scope)
-                scope = insertionPoint->shadowRoot();
+                scope = insertionPoint->containingShadowRoot();
         } else
             scope = parentNode() ? parentNode() : insertionPoint;
         unregisterWithScopingNode(scope);
@@ -236,11 +234,11 @@ Element* HTMLStyleElement::scopingElement() const
     // FIXME: This probably needs to be refined for scoped stylesheets within shadow DOM.
     // As written, such a stylesheet could style the host element, as well as children of the host.
     // OTOH, this paves the way for a :bound-element implementation.
-    ContainerNode* parentOrHost = parentOrHostNode();
-    if (!parentOrHost || !parentOrHost->isElementNode())
+    ContainerNode* parentOrShadowHost = parentOrShadowHostNode();
+    if (!parentOrShadowHost || !parentOrShadowHost->isElementNode())
         return 0;
 
-    return toElement(parentOrHost);
+    return toElement(parentOrShadowHost);
 }
 
 void HTMLStyleElement::dispatchPendingLoadEvents()

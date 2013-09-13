@@ -141,6 +141,7 @@ my $guardMalloc = '';
 # an IPv6 environment.  See https://bugs.webkit.org/show_bug.cgi?id=37104.
 my $httpdPort = 8000;
 my $httpdSSLPort = 8443;
+my $httpdAuxiliaryPort = 8080; # Port used by various tests in http/tests/security.
 my $ignoreMetrics = 0;
 my $webSocketPort = 8880;
 # wss is disabled until all platforms support pyOpenSSL.
@@ -194,13 +195,12 @@ if (isWindows()) {
     exit 1;
 }
 
-# Default to --no-http for wx for now.
-$testHTTP = 0 if (isWx());
-
 my $perlInterpreter = "perl";
 
 my $expectedTag = "expected";
 my $mismatchTag = "mismatch";
+my $refTag = "ref";
+my $notrefTag = "notref";
 my $actualTag = "actual";
 my $prettyDiffTag = "pretty-diff";
 my $diffsTag = "diffs";
@@ -234,8 +234,6 @@ if (isAppleMacWebKit()) {
     $platform = "qt";
 } elsif (isGtk()) {
     $platform = "gtk";
-} elsif (isWx()) {
-    $platform = "wx";
 } elsif (isWinCairo()) {
     $platform = "wincairo";
 } elsif (isCygwin() || isWindows()) {
@@ -293,6 +291,7 @@ Usage: $programName [options] [testdir|testpath ...]
   -i|--ignore-tests               Comma-separated list of directories or tests to ignore
   --iterations n                  Number of times to run the set of tests (e.g. ABCABCABC)
   --[no-]launch-safari            Launch (or do not launch) Safari to display test results (default: $launchSafariDefault)
+  --[no-]show-results             Same as --[no-]launch-safari
   -l|--leaks                      Enable leaks checking
   --[no-]new-test-results         Generate results for new tests
   --nthly n                       Restart DumpRenderTree every n tests (default: $testsPerDumpTool)
@@ -358,6 +357,7 @@ my $getOptionsResult = GetOptions(
     'reverse' => \$reverseTests,
     'root=s' => \$root,
     'sample-on-timeout!' => \$runSample,
+    'show-results!' => \$launchSafari,
     'singly|1' => sub { $testsPerDumpTool = 1; },
     'skipped=s' => \&validateSkippedArg,
     'slowest' => \$report10Slowest,
@@ -1581,12 +1581,17 @@ sub configureAndOpenHTTPDIfNeeded()
 {
     return if $isHttpdOpen;
     my $absTestResultsDirectory = resolveAndMakeTestResultsDirectory();
-    my $listen = "127.0.0.1:$httpdPort";
     my @args = (
         "-c", "CustomLog \"$absTestResultsDirectory/access_log.txt\" common",
         "-c", "ErrorLog \"$absTestResultsDirectory/error_log.txt\"",
-        "-C", "Listen $listen"
     );
+    foreach ($httpdPort, $httpdAuxiliaryPort, $httpdSSLPort) {
+        # We listen to both IPv4 and IPv6 loop-back addresses, but
+        # ignore requests to 8000 from random users on network.
+        # See <https://bugs.webkit.org/show_bug.cgi?id=37104>.
+        push @args, ("-C", "Listen 127.0.0.1:$_");
+        push @args, ("-C", "Listen [::1]:$_");
+    }
 
     my @defaultArgs = getDefaultConfigForTestDirectory($testDirectory);
     @args = (@defaultArgs, @args);
@@ -2630,15 +2635,18 @@ sub isUsedInReftest($)
     my $filename = $_[0];
     my @extensions = ('html','shtml','xml','xhtml','htm','php','svg','mht','pl');
     my $extensionsJoined = join("|", @extensions);
-    my $extensionExpression = "-$expectedTag(-$mismatchTag)?\\.(".$extensionsJoined.")\$";
-    
-    if ($filename =~ /$extensionExpression/) {
+    my $suffixExtensionExpression = "-($expectedTag|$refTag|$notrefTag)(-$mismatchTag)?\\.(".$extensionsJoined.")\$";
+    my $prefixExtensionExpression = "^($refTag|$notrefTag)-";
+    if ($filename =~ /$suffixExtensionExpression/ || $filename =~ /$prefixExtensionExpression/) {
         return 1;
     }
     my $base = stripExtension($filename);
-    
+
     foreach my $extension (@extensions) {
-        if (-f "$base-$expectedTag.$extension" || -f "$base-$expectedTag-$mismatchTag.$extension") {
+        if (-f "$base-$expectedTag.$extension" || 
+            -f "$base-$refTag.$extension" || -f "$base-$notrefTag.$extension" ||
+            -f "$base-$expectedTag-$mismatchTag.$extension" ||
+            -f "$refTag-$base.$extension" || -f "$notrefTag-$base.$extension") {
             return 1;
         }
     }
@@ -2825,16 +2833,23 @@ sub setUpWindowsCrashLogSaving()
         return;
     }
 
-    my $ntsdPath = File::Spec->catfile(toCygwinPath($ENV{PROGRAMFILES}), "Debugging Tools for Windows (x86)", "ntsd.exe");
-    unless (-f $ntsdPath) {
-        $ntsdPath = File::Spec->catfile(toCygwinPath($ENV{ProgramW6432}), "Debugging Tools for Windows (x64)", "ntsd.exe");
-        unless (-f $ntsdPath) {
-            $ntsdPath = File::Spec->catfile(toCygwinPath($ENV{SYSTEMROOT}), "system32", "ntsd.exe");
-            unless (-f $ntsdPath) {
-                print STDERR "Can't find ntsd.exe. Crash logs will not be saved.\nSee <http://trac.webkit.org/wiki/BuildingOnWindows#GettingCrashLogs>.\n";
-                return;
-            }
+    my @possiblePaths = (
+        File::Spec->catfile(toCygwinPath($ENV{PROGRAMFILES}), "Windows Kits", "8.0", "Debuggers", "x64", "ntsd.exe"),
+        File::Spec->catfile(toCygwinPath($ENV{PROGRAMFILES}), "Windows Kits", "8.0", "Debuggers", "x86", "ntsd.exe"),
+        File::Spec->catfile(toCygwinPath($ENV{PROGRAMFILES}), "Debugging Tools for Windows (x86)", "ntsd.exe"),
+        File::Spec->catfile(toCygwinPath($ENV{ProgramW6432}), "Debugging Tools for Windows (x64)", "ntsd.exe"),
+        File::Spec->catfile(toCygwinPath($ENV{SYSTEMROOT}), "system32", "ntsd.exe"),
+    );
+
+    my $ntsdPath = shift @possiblePaths;
+
+    while (not -f $ntsdPath) {
+        if (!@possiblePaths) {
+            print STDERR "Can't find ntsd.exe. Crash logs will not be saved.\nSee <http://trac.webkit.org/wiki/BuildingOnWindows#GettingCrashLogs>.\n";
+            return;
         }
+
+        $ntsdPath = shift @possiblePaths;
     }
 
     # If we used -c (instead of -cf) we could pass the commands directly on the command line. But

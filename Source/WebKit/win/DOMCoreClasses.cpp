@@ -1216,7 +1216,7 @@ HRESULT STDMETHODCALLTYPE DOMElement::isFocused(
     if (!m_element)
         return E_FAIL;
 
-    if (m_element->document()->focusedNode() == m_element)
+    if (m_element->document()->focusedElement() == m_element)
         *result = TRUE;
     else
         *result = FALSE;
@@ -1255,7 +1255,7 @@ HRESULT STDMETHODCALLTYPE DOMElement::font(WebFontDescription* webFontDescriptio
         return E_FAIL;
 
     FontDescription fontDescription = renderer->style()->font().fontDescription();
-    AtomicString family = fontDescription.family().family();
+    AtomicString family = fontDescription.firstFamily();
     webFontDescription->family = family.characters();
     webFontDescription->familyLength = family.length();
     webFontDescription->size = fontDescription.computedSize();
@@ -1494,22 +1494,22 @@ IDOMElement* DOMElement::createInstance(WebCore::Element* e)
     HRESULT hr;
     IDOMElement* domElement = 0;
 
-    if (e->hasTagName(formTag)) {
+    if (isHTMLFormElement(e)) {
         DOMHTMLFormElement* newElement = new DOMHTMLFormElement(e);
         hr = newElement->QueryInterface(IID_IDOMElement, (void**)&domElement);
     } else if (e->hasTagName(iframeTag)) {
         DOMHTMLIFrameElement* newElement = new DOMHTMLIFrameElement(e);
         hr = newElement->QueryInterface(IID_IDOMElement, (void**)&domElement);
-    } else if (e->hasTagName(inputTag)) {
+    } else if (isHTMLInputElement(e)) {
         DOMHTMLInputElement* newElement = new DOMHTMLInputElement(e);
         hr = newElement->QueryInterface(IID_IDOMElement, (void**)&domElement);
-    } else if (e->hasTagName(optionTag)) {
+    } else if (isHTMLOptionElement(e)) {
         DOMHTMLOptionElement* newElement = new DOMHTMLOptionElement(e);
         hr = newElement->QueryInterface(IID_IDOMElement, (void**)&domElement);
     } else if (e->hasTagName(selectTag)) {
         DOMHTMLSelectElement* newElement = new DOMHTMLSelectElement(e);
         hr = newElement->QueryInterface(IID_IDOMElement, (void**)&domElement);
-    } else if (e->hasTagName(textareaTag)) {
+    } else if (isHTMLTextAreaElement(e)) {
         DOMHTMLTextAreaElement* newElement = new DOMHTMLTextAreaElement(e);
         hr = newElement->QueryInterface(IID_IDOMElement, (void**)&domElement);
     } else if (e->isHTMLElement()) {

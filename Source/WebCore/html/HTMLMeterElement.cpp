@@ -19,9 +19,9 @@
  */
 
 #include "config.h"
+#if ENABLE(METER_ELEMENT)
 #include "HTMLMeterElement.h"
 
-#if ENABLE(METER_ELEMENT)
 #include "Attribute.h"
 #include "EventNames.h"
 #include "ExceptionCode.h"
@@ -35,7 +35,6 @@
 #include "RenderMeter.h"
 #include "RenderTheme.h"
 #include "ShadowRoot.h"
-#include <wtf/StdLibExtras.h>
 
 namespace WebCore {
 
@@ -43,7 +42,6 @@ using namespace HTMLNames;
 
 HTMLMeterElement::HTMLMeterElement(const QualifiedName& tagName, Document* document)
     : LabelableElement(tagName, document)
-    , m_hasAuthorShadowRoot(false)
 {
     ASSERT(hasTagName(meterTag));
 }
@@ -55,7 +53,7 @@ HTMLMeterElement::~HTMLMeterElement()
 PassRefPtr<HTMLMeterElement> HTMLMeterElement::create(const QualifiedName& tagName, Document* document)
 {
     RefPtr<HTMLMeterElement> meter = adoptRef(new HTMLMeterElement(tagName, document));
-    meter->createShadowSubtree();
+    meter->ensureUserAgentShadowRoot();
     return meter;
 }
 
@@ -70,11 +68,6 @@ RenderObject* HTMLMeterElement::createRenderer(RenderArena* arena, RenderStyle* 
 bool HTMLMeterElement::childShouldCreateRenderer(const NodeRenderingContext& childContext) const
 {
     return childContext.isOnUpperEncapsulationBoundary() && HTMLElement::childShouldCreateRenderer(childContext);
-}
-
-bool HTMLMeterElement::supportsFocus() const
-{
-    return Node::supportsFocus() && !disabled();
 }
 
 void HTMLMeterElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
@@ -92,7 +85,7 @@ double HTMLMeterElement::min() const
 
 void HTMLMeterElement::setMin(double min, ExceptionCode& ec)
 {
-    if (!isfinite(min)) {
+    if (!std::isfinite(min)) {
         ec = NOT_SUPPORTED_ERR;
         return;
     }
@@ -106,7 +99,7 @@ double HTMLMeterElement::max() const
 
 void HTMLMeterElement::setMax(double max, ExceptionCode& ec)
 {
-    if (!isfinite(max)) {
+    if (!std::isfinite(max)) {
         ec = NOT_SUPPORTED_ERR;
         return;
     }
@@ -121,7 +114,7 @@ double HTMLMeterElement::value() const
 
 void HTMLMeterElement::setValue(double value, ExceptionCode& ec)
 {
-    if (!isfinite(value)) {
+    if (!std::isfinite(value)) {
         ec = NOT_SUPPORTED_ERR;
         return;
     }
@@ -136,7 +129,7 @@ double HTMLMeterElement::low() const
 
 void HTMLMeterElement::setLow(double low, ExceptionCode& ec)
 {
-    if (!isfinite(low)) {
+    if (!std::isfinite(low)) {
         ec = NOT_SUPPORTED_ERR;
         return;
     }
@@ -151,7 +144,7 @@ double HTMLMeterElement::high() const
 
 void HTMLMeterElement::setHigh(double high, ExceptionCode& ec)
 {
-    if (!isfinite(high)) {
+    if (!std::isfinite(high)) {
         ec = NOT_SUPPORTED_ERR;
         return;
     }
@@ -166,7 +159,7 @@ double HTMLMeterElement::optimum() const
 
 void HTMLMeterElement::setOptimum(double optimum, ExceptionCode& ec)
 {
-    if (!isfinite(optimum)) {
+    if (!std::isfinite(optimum)) {
         ec = NOT_SUPPORTED_ERR;
         return;
     }
@@ -225,11 +218,6 @@ void HTMLMeterElement::didElementStateChange()
         render->updateFromElement();
 }
 
-void HTMLMeterElement::willAddAuthorShadowRoot()
-{
-    m_hasAuthorShadowRoot = true;
-}
-
 RenderMeter* HTMLMeterElement::renderMeter() const
 {
     if (renderer() && renderer()->isMeter())
@@ -240,11 +228,9 @@ RenderMeter* HTMLMeterElement::renderMeter() const
     return static_cast<RenderMeter*>(renderObject);
 }
 
-void HTMLMeterElement::createShadowSubtree()
+void HTMLMeterElement::didAddUserAgentShadowRoot(ShadowRoot* root)
 {
-    ASSERT(!userAgentShadowRoot());
-           
-    RefPtr<ShadowRoot> root = ShadowRoot::create(this, ShadowRoot::UserAgentShadowRoot, ASSERT_NO_EXCEPTION);
+    ASSERT(!m_value);
 
     RefPtr<MeterInnerElement> inner = MeterInnerElement::create(document());
     root->appendChild(inner);

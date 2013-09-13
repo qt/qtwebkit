@@ -28,6 +28,7 @@
 
 #include "Chrome.h"
 #include "ChromeClient.h"
+#include "DOMWrapperWorld.h"
 #include "Document.h"
 #include "DocumentStyleSheetCollection.h"
 #include "Frame.h"
@@ -39,15 +40,11 @@
 #include "StorageNamespace.h"
 
 #if ENABLE(VIDEO_TRACK)
-#if PLATFORM(MAC)
-#include "CaptionUserPreferencesMac.h"
+#if (PLATFORM(MAC) && !PLATFORM(IOS)) || HAVE(MEDIA_ACCESSIBILITY_FRAMEWORK)
+#include "CaptionUserPreferencesMediaAF.h"
 #else
 #include "CaptionUserPreferences.h"
 #endif
-#endif
-
-#if PLATFORM(CHROMIUM)
-#include "VisitedLinks.h"
 #endif
 
 namespace WebCore {
@@ -144,9 +141,21 @@ void PageGroup::clearLocalStorageForOrigin(SecurityOrigin* origin)
     for (PageGroupMap::iterator it = pageGroups->begin(); it != end; ++it) {
         if (it->value->hasLocalStorage())
             it->value->localStorage()->clearOriginForDeletion(origin);
-    }    
+    }
 }
-    
+
+void PageGroup::closeIdleLocalStorageDatabases()
+{
+    if (!pageGroups)
+        return;
+
+    PageGroupMap::iterator end = pageGroups->end();
+    for (PageGroupMap::iterator it = pageGroups->begin(); it != end; ++it) {
+        if (it->value->hasLocalStorage())
+            it->value->localStorage()->closeIdleLocalStorageDatabases();
+    }
+}
+
 void PageGroup::syncLocalStorage()
 {
     if (!pageGroups)
@@ -183,17 +192,12 @@ void PageGroup::removePage(Page* page)
 
 bool PageGroup::isLinkVisited(LinkHash visitedLinkHash)
 {
-#if PLATFORM(CHROMIUM)
-    // Use Chromium's built-in visited link database.
-    return VisitedLinks::isLinkVisited(visitedLinkHash);
-#else
     if (!m_visitedLinksPopulated) {
         m_visitedLinksPopulated = true;
         ASSERT(!m_pages.isEmpty());
-        (*m_pages.begin())->chrome()->client()->populateVisitedLinks();
+        (*m_pages.begin())->chrome().client()->populateVisitedLinks();
     }
     return m_visitedLinkHashes.contains(visitedLinkHash);
-#endif
 }
 
 void PageGroup::addVisitedLinkHash(LinkHash hash)
@@ -205,10 +209,8 @@ void PageGroup::addVisitedLinkHash(LinkHash hash)
 inline void PageGroup::addVisitedLink(LinkHash hash)
 {
     ASSERT(shouldTrackVisitedLinks);
-#if !PLATFORM(CHROMIUM)
     if (!m_visitedLinkHashes.add(hash).isNewEntry)
         return;
-#endif
     Page::visitedStateChanged(this, hash);
     pageCache()->markPagesForVistedLinkStyleRecalc();
 }
@@ -255,18 +257,20 @@ void PageGroup::setShouldTrackVisitedLinks(bool shouldTrack)
 
 StorageNamespace* PageGroup::localStorage()
 {
-    if (!m_localStorage) {
-        // Need a page in this page group to query the settings for the local storage database path.
-        // Having these parameters attached to the page settings is unfortunate since these settings are
-        // not per-page (and, in fact, we simply grab the settings from some page at random), but
-        // at this point we're stuck with it.
-        Page* page = *m_pages.begin();
-        const String& path = page->settings()->localStorageDatabasePath();
-        unsigned quota = m_groupSettings->localStorageQuotaBytes();
-        m_localStorage = StorageNamespace::localStorageNamespace(path, quota);
-    }
+    if (!m_localStorage)
+        m_localStorage = StorageNamespace::localStorageNamespace(this);
 
     return m_localStorage.get();
+}
+
+StorageNamespace* PageGroup::transientLocalStorage(SecurityOrigin* topOrigin)
+{
+    HashMap<RefPtr<SecurityOrigin>, RefPtr<StorageNamespace> >::AddResult result = m_transientLocalStorageMap.add(topOrigin, 0);
+
+    if (result.isNewEntry)
+        result.iterator->value = StorageNamespace::transientLocalStorageNamespace(this, topOrigin);
+
+    return result.iterator->value.get();
 }
 
 void PageGroup::addUserScriptToWorld(DOMWrapperWorld* world, const String& source, const KURL& url,
@@ -405,43 +409,23 @@ void PageGroup::invalidatedInjectedStyleSheetCacheInAllFrames()
 }
 
 #if ENABLE(VIDEO_TRACK)
+void PageGroup::captionPreferencesChanged()
+{
+    for (HashSet<Page*>::iterator i = m_pages.begin(); i != m_pages.end(); ++i)
+        (*i)->captionPreferencesChanged();
+    pageCache()->markPagesForCaptionPreferencesChanged();
+}
+
 CaptionUserPreferences* PageGroup::captionPreferences()
 {
     if (!m_captionPreferences)
-#if PLATFORM(MAC)
-        m_captionPreferences = CaptionUserPreferencesMac::create(this);
+#if (PLATFORM(MAC) && !PLATFORM(IOS)) || HAVE(MEDIA_ACCESSIBILITY_FRAMEWORK)
+        m_captionPreferences = CaptionUserPreferencesMediaAF::create(this);
 #else
         m_captionPreferences = CaptionUserPreferences::create(this);
 #endif
 
     return m_captionPreferences.get();
-}
-    
-void PageGroup::registerForCaptionPreferencesChangedCallbacks(CaptionPreferencesChangedListener* listener)
-{
-    captionPreferences()->registerForCaptionPreferencesChangedCallbacks(listener);
-}
-
-void PageGroup::unregisterForCaptionPreferencesChangedCallbacks(CaptionPreferencesChangedListener* listener)
-{
-    if (!m_captionPreferences)
-        return;
-    captionPreferences()->unregisterForCaptionPreferencesChangedCallbacks(listener);
-}
-    
-bool PageGroup::userPrefersCaptions()
-{
-    return captionPreferences()->userPrefersCaptions();
-}
-
-bool PageGroup::userHasCaptionPreferences()
-{
-    return captionPreferences()->userPrefersCaptions();
-}
-
-float PageGroup::captionFontSizeScale()
-{
-    return captionPreferences()->captionFontSizeScale();
 }
 
 #endif

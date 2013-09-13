@@ -44,7 +44,7 @@ public:
     PrintStream();
     virtual ~PrintStream();
 
-    void printf(const char* format, ...) WTF_ATTRIBUTE_PRINTF(2, 3);
+    WTF_EXPORT_PRIVATE void printf(const char* format, ...) WTF_ATTRIBUTE_PRINTF(2, 3);
     virtual void vprintf(const char* format, va_list) WTF_ATTRIBUTE_PRINTF(2, 0) = 0;
 
     // Typically a no-op for many subclasses of PrintStream, this is a hint that
@@ -155,24 +155,75 @@ public:
         print(value9);
         print(value10);
     }
+    
+    template<typename T1, typename T2, typename T3, typename T4, typename T5, typename T6, typename T7, typename T8, typename T9, typename T10, typename T11>
+    void print(const T1& value1, const T2& value2, const T3& value3, const T4& value4, const T5& value5, const T6& value6, const T7& value7, const T8& value8, const T9& value9, const T10& value10, const T11& value11)
+    {
+        print(value1);
+        print(value2);
+        print(value3);
+        print(value4);
+        print(value5);
+        print(value6);
+        print(value7);
+        print(value8);
+        print(value9);
+        print(value10);
+        print(value11);
+    }
+    
+    template<typename T1, typename T2, typename T3, typename T4, typename T5, typename T6, typename T7, typename T8, typename T9, typename T10, typename T11, typename T12>
+    void print(const T1& value1, const T2& value2, const T3& value3, const T4& value4, const T5& value5, const T6& value6, const T7& value7, const T8& value8, const T9& value9, const T10& value10, const T11& value11, const T12& value12)
+    {
+        print(value1);
+        print(value2);
+        print(value3);
+        print(value4);
+        print(value5);
+        print(value6);
+        print(value7);
+        print(value8);
+        print(value9);
+        print(value10);
+        print(value11);
+        print(value12);
+    }
+    
+    template<typename T1, typename T2, typename T3, typename T4, typename T5, typename T6, typename T7, typename T8, typename T9, typename T10, typename T11, typename T12, typename T13>
+    void print(const T1& value1, const T2& value2, const T3& value3, const T4& value4, const T5& value5, const T6& value6, const T7& value7, const T8& value8, const T9& value9, const T10& value10, const T11& value11, const T12& value12, const T13& value13)
+    {
+        print(value1);
+        print(value2);
+        print(value3);
+        print(value4);
+        print(value5);
+        print(value6);
+        print(value7);
+        print(value8);
+        print(value9);
+        print(value10);
+        print(value11);
+        print(value12);
+        print(value13);
+    }
 };
 
-void printInternal(PrintStream&, const char*);
-void printInternal(PrintStream&, const CString&);
-void printInternal(PrintStream&, const String&);
+WTF_EXPORT_PRIVATE void printInternal(PrintStream&, const char*);
+WTF_EXPORT_PRIVATE void printInternal(PrintStream&, const CString&);
+WTF_EXPORT_PRIVATE void printInternal(PrintStream&, const String&);
 inline void printInternal(PrintStream& out, char* value) { printInternal(out, static_cast<const char*>(value)); }
 inline void printInternal(PrintStream& out, CString& value) { printInternal(out, static_cast<const CString&>(value)); }
 inline void printInternal(PrintStream& out, String& value) { printInternal(out, static_cast<const String&>(value)); }
-void printInternal(PrintStream&, bool);
-void printInternal(PrintStream&, int);
-void printInternal(PrintStream&, unsigned);
-void printInternal(PrintStream&, long);
-void printInternal(PrintStream&, unsigned long);
-void printInternal(PrintStream&, long long);
-void printInternal(PrintStream&, unsigned long long);
-void printInternal(PrintStream&, float);
-void printInternal(PrintStream&, double);
-void printInternal(PrintStream&, RawPointer);
+WTF_EXPORT_PRIVATE void printInternal(PrintStream&, bool);
+WTF_EXPORT_PRIVATE void printInternal(PrintStream&, int);
+WTF_EXPORT_PRIVATE void printInternal(PrintStream&, unsigned);
+WTF_EXPORT_PRIVATE void printInternal(PrintStream&, long);
+WTF_EXPORT_PRIVATE void printInternal(PrintStream&, unsigned long);
+WTF_EXPORT_PRIVATE void printInternal(PrintStream&, long long);
+WTF_EXPORT_PRIVATE void printInternal(PrintStream&, unsigned long long);
+WTF_EXPORT_PRIVATE void printInternal(PrintStream&, float);
+WTF_EXPORT_PRIVATE void printInternal(PrintStream&, double);
+WTF_EXPORT_PRIVATE void printInternal(PrintStream&, RawPointer);
 
 template<typename T>
 void printInternal(PrintStream& out, const T& value)
@@ -207,8 +258,12 @@ void printInternal(PrintStream& out, const T& value)
             m_value.method(out);                 \
         }                                        \
     private:                                     \
-        Type m_value;                            \
+        const Type& m_value;                     \
     }
+
+#define MAKE_PRINT_METHOD(Type, dumpMethod, method) \
+    MAKE_PRINT_METHOD_ADAPTOR(DumperFor_##method, Type, dumpMethod);    \
+    DumperFor_##method method() const { return DumperFor_##method(*this); }
 
 // Use an adaptor-based dumper for characters to avoid situations where
 // you've "compressed" an integer to a character and it ends up printing
@@ -216,10 +271,34 @@ void printInternal(PrintStream& out, const T& value)
 void dumpCharacter(PrintStream&, char);
 MAKE_PRINT_ADAPTOR(CharacterDump, char, dumpCharacter);
 
+template<typename T>
+class PointerDump {
+public:
+    PointerDump(const T* ptr)
+        : m_ptr(ptr)
+    {
+    }
+    
+    void dump(PrintStream& out) const
+    {
+        if (m_ptr)
+            printInternal(out, *m_ptr);
+        else
+            out.print("(null)");
+    }
+private:
+    const T* m_ptr;
+};
+
+template<typename T>
+PointerDump<T> pointerDump(const T* ptr) { return PointerDump<T>(ptr); }
+
 } // namespace WTF
 
 using WTF::CharacterDump;
+using WTF::PointerDump;
 using WTF::PrintStream;
+using WTF::pointerDump;
 
 #endif // PrintStream_h
 

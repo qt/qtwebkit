@@ -33,22 +33,24 @@
 namespace WebCore {
 
 class Page;
+class PageGroup;
 class SecurityOrigin;
 class StorageArea;
 
-// This interface is required for Chromium since these actions need to be proxied between processes.
 class StorageNamespace : public RefCounted<StorageNamespace> {
 public:
-    static PassRefPtr<StorageNamespace> localStorageNamespace(const String& path, unsigned quota);
-    static PassRefPtr<StorageNamespace> sessionStorageNamespace(Page*, unsigned quota);
+    static PassRefPtr<StorageNamespace> localStorageNamespace(PageGroup*);
+    static PassRefPtr<StorageNamespace> transientLocalStorageNamespace(PageGroup*, SecurityOrigin*);
+    static PassRefPtr<StorageNamespace> sessionStorageNamespace(Page*);
 
     virtual ~StorageNamespace() { }
     virtual PassRefPtr<StorageArea> storageArea(PassRefPtr<SecurityOrigin>) = 0;
-    virtual PassRefPtr<StorageNamespace> copy() = 0;
+    virtual PassRefPtr<StorageNamespace> copy(Page* newPage) = 0;
     virtual void close() = 0;
     virtual void clearOriginForDeletion(SecurityOrigin*) = 0;
     virtual void clearAllOriginsForDeletion() = 0;
     virtual void sync() = 0;
+    virtual void closeIdleLocalStorageDatabases()  { }
 };
 
 } // namespace WebCore

@@ -35,7 +35,7 @@ public:
 
     String customCssText() const;
 
-    void reportDescendantMemoryUsage(MemoryObjectInfo*) const;
+    bool equals(const CSSInheritedValue&) const { return true; }
 
 private:
     CSSInheritedValue()

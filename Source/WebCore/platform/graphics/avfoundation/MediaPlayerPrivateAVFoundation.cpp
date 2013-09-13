@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2012 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -33,6 +33,8 @@
 #include "Frame.h"
 #include "FrameView.h"
 #include "GraphicsContext.h"
+#include "InbandTextTrackPrivateAVF.h"
+#include "InbandTextTrackPrivateClient.h"
 #include "KURL.h"
 #include "Logging.h"
 #include "PlatformLayer.h"
@@ -40,7 +42,6 @@
 #include "TimeRanges.h"
 #include <CoreMedia/CoreMedia.h>
 #include <wtf/MainThread.h>
-#include <wtf/UnusedParam.h>
 
 using namespace std;
 
@@ -55,6 +56,7 @@ MediaPlayerPrivateAVFoundation::MediaPlayerPrivateAVFoundation(MediaPlayer* play
     , m_preload(MediaPlayer::Auto)
     , m_cachedMaxTimeLoaded(0)
     , m_cachedMaxTimeSeekable(0)
+    , m_cachedMinTimeSeekable(0)
     , m_cachedDuration(MediaPlayer::invalidTime())
     , m_reportedDuration(MediaPlayer::invalidTime())
     , m_maxTimeLoadedAtLastDidLoadingProgress(MediaPlayer::invalidTime())
@@ -72,6 +74,8 @@ MediaPlayerPrivateAVFoundation::MediaPlayerPrivateAVFoundation(MediaPlayer* play
     , m_ignoreLoadStateChanges(false)
     , m_haveReportedFirstVideoFrame(false)
     , m_playWhenFramesAvailable(false)
+    , m_inbandTrackConfigurationPending(false)
+    , m_seekCount(0)
 {
     LOG(Media, "MediaPlayerPrivateAVFoundation::MediaPlayerPrivateAVFoundation(%p)", this);
 }
@@ -261,9 +265,13 @@ void MediaPlayerPrivateAVFoundation::seek(float time)
     if (currentTime() == time)
         return;
 
+    if (currentTrack())
+        currentTrack()->beginSeeking();
+    
     LOG(Media, "MediaPlayerPrivateAVFoundation::seek(%p) - seeking to %f", this, time);
     m_seekTo = time;
 
+    ++m_seekCount;
     seekToTime(time);
 }
 
@@ -348,7 +356,7 @@ PassRefPtr<TimeRanges> MediaPlayerPrivateAVFoundation::buffered() const
     return m_cachedLoadedTimeRanges->copy();
 }
 
-float MediaPlayerPrivateAVFoundation::maxTimeSeekable() const
+double MediaPlayerPrivateAVFoundation::maxTimeSeekableDouble() const
 {
     if (!metaDataAvailable())
         return 0;
@@ -358,6 +366,18 @@ float MediaPlayerPrivateAVFoundation::maxTimeSeekable() const
 
     LOG(Media, "MediaPlayerPrivateAVFoundation::maxTimeSeekable(%p) - returning %f", this, m_cachedMaxTimeSeekable);
     return m_cachedMaxTimeSeekable;   
+}
+
+double MediaPlayerPrivateAVFoundation::minTimeSeekable() const
+{
+    if (!metaDataAvailable())
+        return 0;
+
+    if (!m_cachedMinTimeSeekable)
+        m_cachedMinTimeSeekable = platformMinTimeSeekable();
+
+    LOG(Media, "MediaPlayerPrivateAVFoundation::minTimeSeekable(%p) - returning %f", this, m_cachedMinTimeSeekable);
+    return m_cachedMinTimeSeekable;
 }
 
 float MediaPlayerPrivateAVFoundation::maxTimeLoaded() const
@@ -378,7 +398,7 @@ bool MediaPlayerPrivateAVFoundation::didLoadingProgress() const
     float currentMaxTimeLoaded = maxTimeLoaded();
     bool didLoadingProgress = currentMaxTimeLoaded != m_maxTimeLoadedAtLastDidLoadingProgress;
     m_maxTimeLoadedAtLastDidLoadingProgress = currentMaxTimeLoaded;
-    LOG(Media, "MediaPlayerPrivateAVFoundation::didLoadingProgress(%p) - returning %d", this, didLoadingProgress);
+
     return didLoadingProgress;
 }
 
@@ -419,9 +439,6 @@ void MediaPlayerPrivateAVFoundation::updateStates()
 
     MediaPlayer::NetworkState oldNetworkState = m_networkState;
     MediaPlayer::ReadyState oldReadyState = m_readyState;
-
-    LOG(Media, "MediaPlayerPrivateAVFoundation::updateStates(%p) - entering with networkState = %i, readyState = %i", 
-        this, static_cast<int>(m_networkState), static_cast<int>(m_readyState));
 
     if (m_loadingMetadata)
         m_networkState = MediaPlayer::Loading;
@@ -509,8 +526,12 @@ void MediaPlayerPrivateAVFoundation::updateStates()
         platformPlay();
     }
 
-    LOG(Media, "MediaPlayerPrivateAVFoundation::updateStates(%p) - exiting with networkState = %i, readyState = %i", 
-        this, static_cast<int>(m_networkState), static_cast<int>(m_readyState));
+#if !LOG_DISABLED
+    if (m_networkState != oldNetworkState || oldReadyState != m_readyState) {
+        LOG(Media, "MediaPlayerPrivateAVFoundation::updateStates(%p) - entered with networkState = %i, readyState = %i,  exiting with networkState = %i, readyState = %i",
+            this, static_cast<int>(oldNetworkState), static_cast<int>(oldReadyState), static_cast<int>(m_networkState), static_cast<int>(m_readyState));
+    }
+#endif
 }
 
 void MediaPlayerPrivateAVFoundation::setSize(const IntSize&) 
@@ -556,6 +577,7 @@ void MediaPlayerPrivateAVFoundation::loadedTimeRangesChanged()
 void MediaPlayerPrivateAVFoundation::seekableTimeRangesChanged()
 {
     m_cachedMaxTimeSeekable = 0;
+    m_cachedMinTimeSeekable = 0;
 }
 
 void MediaPlayerPrivateAVFoundation::timeChanged(double time)
@@ -568,7 +590,14 @@ void MediaPlayerPrivateAVFoundation::seekCompleted(bool finished)
 {
     LOG(Media, "MediaPlayerPrivateAVFoundation::seekCompleted(%p) - finished = %d", this, finished);
     UNUSED_PARAM(finished);
-    
+
+    ASSERT(m_seekCount);
+    if (--m_seekCount)
+        return;
+
+    if (currentTrack())
+        currentTrack()->endSeeking();
+
     m_seekTo = MediaPlayer::invalidTime();
     updateStates();
     m_player->timeChanged();
@@ -677,9 +706,22 @@ void MediaPlayerPrivateAVFoundation::scheduleMainThreadNotification(Notification
     scheduleMainThreadNotification(Notification(type, finished));
 }
 
+#if !LOG_DISABLED
+static const char* notificationName(MediaPlayerPrivateAVFoundation::Notification& notification)
+{
+#define DEFINE_TYPE_STRING_CASE(type) case MediaPlayerPrivateAVFoundation::Notification::type: return #type;
+    switch (notification.type()) {
+        FOR_EACH_MEDIAPLAYERPRIVATEAVFOUNDATION_NOTIFICATION_TYPE(DEFINE_TYPE_STRING_CASE)
+        default: return "";
+    }
+#undef DEFINE_TYPE_STRING_CASE
+}
+#endif // !LOG_DISABLED
+    
+
 void MediaPlayerPrivateAVFoundation::scheduleMainThreadNotification(Notification notification)
 {
-    LOG(Media, "MediaPlayerPrivateAVFoundation::scheduleMainThreadNotification(%p) - notification %d", this, static_cast<int>(notification.type()));
+    LOG(Media, "MediaPlayerPrivateAVFoundation::scheduleMainThreadNotification(%p) - notification %s", this, notificationName(notification));
     m_queueMutex.lock();
 
     // It is important to always process the properties in the order that we are notified, 
@@ -726,7 +768,7 @@ void MediaPlayerPrivateAVFoundation::dispatchNotification()
             return;
     }
 
-    LOG(Media, "MediaPlayerPrivateAVFoundation::dispatchNotification(%p) - dispatching %d", this, static_cast<int>(notification.type()));
+    LOG(Media, "MediaPlayerPrivateAVFoundation::dispatchNotification(%p) - dispatching %s", this, notificationName(notification));
 
     switch (notification.type()) {
     case Notification::ItemDidPlayToEndTime:
@@ -784,11 +826,86 @@ void MediaPlayerPrivateAVFoundation::dispatchNotification()
     case Notification::ContentsNeedsDisplay:
         contentsNeedsDisplay();
         break;
+    case Notification::InbandTracksNeedConfiguration:
+        m_inbandTrackConfigurationPending = false;
+        configureInbandTracks();
+        break;
 
     case Notification::None:
         ASSERT_NOT_REACHED();
         break;
     }
+}
+
+void MediaPlayerPrivateAVFoundation::configureInbandTracks()
+{
+    RefPtr<InbandTextTrackPrivateAVF> trackToEnable;
+
+    // AVFoundation can only emit cues for one track at a time, so enable the first track that is showing, or the first that
+    // is hidden if none are showing. Otherwise disable all tracks.
+    for (unsigned i = 0; i < m_textTracks.size(); ++i) {
+        RefPtr<InbandTextTrackPrivateAVF> track = m_textTracks[i];
+        if (track->mode() == InbandTextTrackPrivate::Showing) {
+            trackToEnable = track;
+            break;
+        }
+        if (track->mode() == InbandTextTrackPrivate::Hidden)
+            trackToEnable = track;
+    }
+
+    setCurrentTrack(trackToEnable.get());
+}
+
+void MediaPlayerPrivateAVFoundation::trackModeChanged()
+{
+    if (m_inbandTrackConfigurationPending)
+        return;
+    m_inbandTrackConfigurationPending = true;
+    scheduleMainThreadNotification(Notification::InbandTracksNeedConfiguration);
+}
+
+size_t MediaPlayerPrivateAVFoundation::extraMemoryCost() const
+{
+    double duration = this->duration();
+    if (!duration)
+        return 0;
+
+    return totalBytes() * buffered()->totalDuration() / duration;
+}
+
+void MediaPlayerPrivateAVFoundation::clearTextTracks()
+{
+    for (unsigned i = 0; i < m_textTracks.size(); ++i) {
+        RefPtr<InbandTextTrackPrivateAVF> track = m_textTracks[i];
+        player()->removeTextTrack(track);
+        track->disconnect();
+    }
+    m_textTracks.clear();
+}
+
+void MediaPlayerPrivateAVFoundation::processNewAndRemovedTextTracks(const Vector<RefPtr<InbandTextTrackPrivateAVF> >& removedTextTracks)
+{
+    if (removedTextTracks.size()) {
+        for (unsigned i = 0; i < m_textTracks.size(); ++i) {
+            if (!removedTextTracks.contains(m_textTracks[i]))
+                continue;
+            
+            player()->removeTextTrack(removedTextTracks[i].get());
+            m_textTracks.remove(i);
+        }
+    }
+    
+    for (unsigned i = 0; i < m_textTracks.size(); ++i) {
+        RefPtr<InbandTextTrackPrivateAVF> track = m_textTracks[i];
+        
+        track->setTextTrackIndex(i);
+        if (track->hasBeenReported())
+            continue;
+        
+        track->setHasBeenReported(true);
+        player()->addTextTrack(track.get());
+    }
+    LOG(Media, "MediaPlayerPrivateAVFoundation::processNewAndRemovedTextTracks(%p) - found %lu text tracks", this, m_textTracks.size());
 }
 
 } // namespace WebCore

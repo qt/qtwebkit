@@ -30,6 +30,7 @@
 
 #import "WebFrameInternal.h"
 #import <WebCore/Frame.h>
+#import <WebCore/FrameLoader.h>
 #import <WebCore/FrameLoaderClient.h>
 #import <WebCore/RenderText.h>
 #import <WebCore/RenderWidget.h>
@@ -95,7 +96,7 @@ static WebRenderNode *copyRenderNode(RenderObject* node)
     
     RenderWidget* renderWidget = node->isWidget() ? toRenderWidget(node) : 0;
     Widget* widget = renderWidget ? renderWidget->widget() : 0;
-    FrameView* frameView = widget && widget->isFrameView() ? static_cast<FrameView*>(widget) : 0;
+    FrameView* frameView = widget && widget->isFrameView() ? toFrameView(widget) : 0;
     Frame* frame = frameView ? frameView->frame() : 0;
 
     // FIXME: broken with transforms

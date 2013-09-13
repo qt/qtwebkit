@@ -24,8 +24,8 @@
 
 namespace WebCore {
 
-RenderTableCaption::RenderTableCaption(Node* node)
-    : RenderBlock(node)
+RenderTableCaption::RenderTableCaption(Element* element)
+    : RenderBlock(element)
 {
 }
 

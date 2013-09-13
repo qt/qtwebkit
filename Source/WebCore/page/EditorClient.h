@@ -52,6 +52,7 @@ class HTMLElement;
 class KeyboardEvent;
 class Node;
 class Range;
+class SharedBuffer;
 class SpellChecker;
 class StylePropertySet;
 class TextCheckerClient;
@@ -67,7 +68,6 @@ public:
     virtual void frameWillDetachPage(Frame*) = 0;
 
     virtual bool shouldDeleteRange(Range*) = 0;
-    virtual bool shouldShowDeleteInterface(HTMLElement*) = 0;
     virtual bool smartInsertDeleteEnabled() = 0; 
     virtual bool isSelectTrailingWhitespaceEnabled() = 0;
     virtual bool isContinuousSpellCheckingEnabled() = 0;
@@ -89,7 +89,9 @@ public:
     virtual void respondToChangedContents() = 0;
     virtual void respondToChangedSelection(Frame*) = 0;
     virtual void didEndEditing() = 0;
+    virtual void willWriteSelectionToPasteboard(Range*) = 0;
     virtual void didWriteSelectionToPasteboard() = 0;
+    virtual void getClientPasteboardDataForRange(Range*, Vector<String>& pasteboardTypes, Vector<RefPtr<SharedBuffer> >& pasteboardData) = 0;
     virtual void didSetSelectionTypesForPasteboard() = 0;
     
     virtual void registerUndoStep(PassRefPtr<UndoStep>) = 0;
@@ -127,6 +129,7 @@ public:
     virtual void lowercaseWord() = 0;
     virtual void capitalizeWord() = 0;
 #endif
+
 #if USE(AUTOMATIC_TEXT_REPLACEMENT)
     virtual void showSubstitutionsPanel(bool show) = 0;
     virtual bool substitutionsPanelIsShowing() = 0;
@@ -141,6 +144,10 @@ public:
     virtual void toggleAutomaticTextReplacement() = 0;
     virtual bool isAutomaticSpellingCorrectionEnabled() = 0;
     virtual void toggleAutomaticSpellingCorrection() = 0;
+#endif
+    
+#if ENABLE(DELETION_UI)
+    virtual bool shouldShowDeleteInterface(HTMLElement*) = 0;
 #endif
 
 #if PLATFORM(GTK)
