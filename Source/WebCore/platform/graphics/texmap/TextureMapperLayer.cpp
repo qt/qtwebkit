@@ -400,6 +400,9 @@ void TextureMapperLayer::flushCompositingStateSelf(GraphicsLayerTextureMapper* g
 
     m_size = graphicsLayer->size();
 
+    if ((changeMask & DrawsContentChange) && graphicsLayer->drawsContent())
+        graphicsLayer->setNeedsDisplay();
+
     if (changeMask & MaskLayerChange) {
        if (TextureMapperLayer* layer = toTextureMapperLayer(graphicsLayer->maskLayer()))
            layer->m_effectTarget = this;
