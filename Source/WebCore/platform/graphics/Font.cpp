@@ -595,7 +595,22 @@ bool Font::isCJKIdeographOrSymbol(UChar32 c)
         return true;
 
     // Emoji.
-    if (c >= 0x1F200 && c <= 0x1F6F)
+    if (c == 0x1F100)
+        return true;
+
+    if (c >= 0x1F110 && c <= 0x1F129)
+        return true;
+
+    if (c >= 0x1F130 && c <= 0x1F149)
+        return true;
+
+    if (c >= 0x1F150 && c <= 0x1F169)
+        return true;
+
+    if (c >= 0x1F170 && c <= 0x1F189)
+        return true;
+
+    if (c >= 0x1F200 && c <= 0x1F6C5)
         return true;
 
     return isCJKIdeograph(c);
