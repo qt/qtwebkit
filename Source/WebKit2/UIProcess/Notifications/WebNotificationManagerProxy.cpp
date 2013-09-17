@@ -118,7 +118,7 @@ void WebNotificationManagerProxy::cancel(WebPageProxy* webPage, uint64_t pageNot
     
 void WebNotificationManagerProxy::didDestroyNotification(WebPageProxy* webPage, uint64_t pageNotificationID)
 {
-    auto globalIDNotificationPair = m_notifications.take(make_pair(webPage->pageID(), pageNotificationID));
+    pair<uint64_t, RefPtr<WebNotification> > globalIDNotificationPair = m_notifications.take(make_pair(webPage->pageID(), pageNotificationID));
     if (uint64_t globalNotificationID = globalIDNotificationPair.first) {
         WebNotification* notification = globalIDNotificationPair.second.get();
         m_globalNotificationMap.remove(globalNotificationID);
@@ -153,19 +153,28 @@ void WebNotificationManagerProxy::clearNotifications(WebPageProxy* webPage, cons
     Vector<uint64_t> globalNotificationIDs;
     globalNotificationIDs.reserveCapacity(m_globalNotificationMap.size());
 
-    for (auto it = m_notifications.begin(), end = m_notifications.end(); it != end; ++it) {
-        uint64_t webPageID = it->key.first;
-        uint64_t pageNotificationID = it->key.second;
-        if (!filterFunction(webPageID, pageNotificationID, targetPageID, pageNotificationIDs))
-            continue;
+    {
+        HashMap<pair<uint64_t, uint64_t>, pair<uint64_t, RefPtr<WebNotification> > >::iterator it  = m_notifications.begin();
+        HashMap<pair<uint64_t, uint64_t>, pair<uint64_t, RefPtr<WebNotification> > >::iterator end  = m_notifications.end();
+        for (; it != end; ++it) {
+            uint64_t webPageID = it->key.first;
+            uint64_t pageNotificationID = it->key.second;
+            if (!filterFunction(webPageID, pageNotificationID, targetPageID, pageNotificationIDs))
+                continue;
 
-        uint64_t globalNotificationID = it->value.first;
-        globalNotificationIDs.append(globalNotificationID);
+            uint64_t globalNotificationID = it->value.first;
+            globalNotificationIDs.append(globalNotificationID);
+        }
     }
 
-    for (auto it = globalNotificationIDs.begin(), end = globalNotificationIDs.end(); it != end; ++it) {
-        auto pageNotification = m_globalNotificationMap.take(*it);
-        m_notifications.remove(pageNotification);
+
+    {
+        Vector<uint64_t>::iterator it = globalNotificationIDs.begin();
+        Vector<uint64_t>::iterator end = globalNotificationIDs.end();
+        for (; it != end; ++it) {
+            pair<uint64_t, uint64_t> pageNotification = m_globalNotificationMap.take(*it);
+            m_notifications.remove(pageNotification);
+        }
     }
 
     m_provider.clearNotifications(globalNotificationIDs);
@@ -173,7 +182,7 @@ void WebNotificationManagerProxy::clearNotifications(WebPageProxy* webPage, cons
 
 void WebNotificationManagerProxy::providerDidShowNotification(uint64_t globalNotificationID)
 {
-    auto it = m_globalNotificationMap.find(globalNotificationID);
+    HashMap<uint64_t, pair<uint64_t, uint64_t> >::iterator it = m_globalNotificationMap.find(globalNotificationID);
     if (it == m_globalNotificationMap.end())
         return;
 
@@ -188,7 +197,7 @@ void WebNotificationManagerProxy::providerDidShowNotification(uint64_t globalNot
 
 void WebNotificationManagerProxy::providerDidClickNotification(uint64_t globalNotificationID)
 {
-    auto it = m_globalNotificationMap.find(globalNotificationID);
+    HashMap<uint64_t, pair<uint64_t, uint64_t> >::iterator it = m_globalNotificationMap.find(globalNotificationID);
     if (it == m_globalNotificationMap.end())
         return;
     
@@ -204,16 +213,16 @@ void WebNotificationManagerProxy::providerDidClickNotification(uint64_t globalNo
 
 void WebNotificationManagerProxy::providerDidCloseNotifications(ImmutableArray* globalNotificationIDs)
 {
-    HashMap<WebPageProxy*, Vector<uint64_t>> pageNotificationIDs;
+    HashMap<WebPageProxy*, Vector<uint64_t> > pageNotificationIDs;
     
     size_t size = globalNotificationIDs->size();
     for (size_t i = 0; i < size; ++i) {
-        auto it = m_globalNotificationMap.find(globalNotificationIDs->at<WebUInt64>(i)->value());
+        HashMap<uint64_t, pair<uint64_t, uint64_t> >::iterator it = m_globalNotificationMap.find(globalNotificationIDs->at<WebUInt64>(i)->value());
         if (it == m_globalNotificationMap.end())
             continue;
 
         if (WebPageProxy* webPage = WebProcessProxy::webPage(it->value.first)) {
-            auto pageIt = pageNotificationIDs.find(webPage);
+            HashMap<WebPageProxy*, Vector<uint64_t> >::iterator pageIt = pageNotificationIDs.find(webPage);
             if (pageIt == pageNotificationIDs.end()) {
                 Vector<uint64_t> newVector;
                 newVector.reserveInitialCapacity(size);
@@ -228,7 +237,7 @@ void WebNotificationManagerProxy::providerDidCloseNotifications(ImmutableArray* 
         m_globalNotificationMap.remove(it);
     }
 
-    for (auto it = pageNotificationIDs.begin(), end = pageNotificationIDs.end(); it != end; ++it)
+    for (HashMap<WebPageProxy*, Vector<uint64_t> >::iterator it = pageNotificationIDs.begin(), end = pageNotificationIDs.end(); it != end; ++it)
         it->key->process()->send(Messages::WebNotificationManager::DidCloseNotifications(it->value), 0);
 }
 

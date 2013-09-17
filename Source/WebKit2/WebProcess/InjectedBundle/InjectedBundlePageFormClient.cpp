@@ -93,7 +93,7 @@ bool InjectedBundlePageFormClient::shouldPerformActionInTextField(WebPage* page,
     return m_client.shouldPerformActionInTextField(toAPI(page), toAPI(nodeHandle.get()), actionType, toAPI(frame), m_client.clientInfo);
 }
 
-void InjectedBundlePageFormClient::willSendSubmitEvent(WebPage* page, HTMLFormElement* formElement, WebFrame* frame, WebFrame* sourceFrame, const Vector<std::pair<String, String>>& values)
+void InjectedBundlePageFormClient::willSendSubmitEvent(WebPage* page, HTMLFormElement* formElement, WebFrame* frame, WebFrame* sourceFrame, const Vector<std::pair<String, String> >& values)
 {
     if (!m_client.willSendSubmitEvent)
         return;
@@ -108,7 +108,7 @@ void InjectedBundlePageFormClient::willSendSubmitEvent(WebPage* page, HTMLFormEl
     m_client.willSendSubmitEvent(toAPI(page), toAPI(nodeHandle.get()), toAPI(frame), toAPI(sourceFrame), toAPI(textFieldsMap.get()), m_client.clientInfo);
 }
 
-void InjectedBundlePageFormClient::willSubmitForm(WebPage* page, HTMLFormElement* formElement, WebFrame* frame, WebFrame* sourceFrame, const Vector<std::pair<String, String>>& values, RefPtr<APIObject>& userData)
+void InjectedBundlePageFormClient::willSubmitForm(WebPage* page, HTMLFormElement* formElement, WebFrame* frame, WebFrame* sourceFrame, const Vector<std::pair<String, String> >& values, RefPtr<APIObject>& userData)
 {
     if (!m_client.willSubmitForm)
         return;
@@ -125,14 +125,14 @@ void InjectedBundlePageFormClient::willSubmitForm(WebPage* page, HTMLFormElement
     userData = adoptRef(toImpl(userDataToPass));
 }
 
-void InjectedBundlePageFormClient::didAssociateFormControls(WebPage* page, const Vector<RefPtr<WebCore::Element>>& elements)
+void InjectedBundlePageFormClient::didAssociateFormControls(WebPage* page, const Vector<RefPtr<WebCore::Element> >& elements)
 {
     if (!m_client.didAssociateFormControls)
         return;
 
     size_t size = elements.size();
 
-    Vector<RefPtr<APIObject>> elementHandles;
+    Vector<RefPtr<APIObject> > elementHandles;
     elementHandles.reserveCapacity(size);
 
     for (size_t i = 0; i < size; ++i)

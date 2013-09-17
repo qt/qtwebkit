@@ -70,10 +70,10 @@ private:
 
     PluginProcessProxy* getOrCreatePluginProcess(uint64_t pluginProcessToken);
 
-    Vector<std::pair<PluginProcessAttributes, uint64_t>> m_pluginProcessTokens;
+    Vector<std::pair<PluginProcessAttributes, uint64_t> > m_pluginProcessTokens;
     HashSet<uint64_t> m_knownTokens;
 
-    Vector<RefPtr<PluginProcessProxy>> m_pluginProcesses;
+    Vector<RefPtr<PluginProcessProxy> > m_pluginProcesses;
 };
 
 } // namespace WebKit

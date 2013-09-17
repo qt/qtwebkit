@@ -81,9 +81,9 @@ private:
 
     WebNotificationProvider m_provider;
     // Pair comprised of web page ID and the web process's notification ID
-    HashMap<uint64_t, pair<uint64_t, uint64_t>> m_globalNotificationMap;
+    HashMap<uint64_t, pair<uint64_t, uint64_t> > m_globalNotificationMap;
     // Key pair comprised of web page ID and the web process's notification ID; value pair comprised of global notification ID, and notification object
-    HashMap<pair<uint64_t, uint64_t>, pair<uint64_t, RefPtr<WebNotification>>> m_notifications;
+    HashMap<pair<uint64_t, uint64_t>, pair<uint64_t, RefPtr<WebNotification> > > m_notifications;
 };
 
 } // namespace WebKit

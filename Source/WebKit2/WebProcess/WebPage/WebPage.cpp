@@ -731,7 +731,7 @@ PassRefPtr<ImmutableArray> WebPage::trackedRepaintRects()
     if (!size)
         return ImmutableArray::create();
 
-    Vector<RefPtr<APIObject>> vector;
+    Vector<RefPtr<APIObject> > vector;
     vector.reserveInitialCapacity(size);
 
     for (size_t i = 0; i < size; ++i)

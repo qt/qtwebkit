@@ -765,7 +765,7 @@ void WebFrameLoaderClient::dispatchWillSubmitForm(FramePolicyFunction function, 
     WebFrame* sourceFrame = webFrameLoaderClient ? webFrameLoaderClient->webFrame() : 0;
     ASSERT(sourceFrame);
 
-    const Vector<std::pair<String, String>>& values = formState->textFieldValues();
+    const Vector<std::pair<String, String> >& values = formState->textFieldValues();
 
     RefPtr<APIObject> userData;
     webPage->injectedBundleFormClient().willSubmitForm(webPage, form, m_frame, sourceFrame, values, userData);

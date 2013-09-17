@@ -71,7 +71,11 @@ uint64_t PluginProcessManager::pluginProcessToken(const PluginModuleInfo& plugin
     attributes.processType = pluginProcessType;
     attributes.sandboxPolicy = pluginProcessSandboxPolicy;
 
+#if COMPILER_SUPPORTS(CXX_RVALUE_REFERENCES)
     m_pluginProcessTokens.append(std::make_pair(std::move(attributes), token));
+#else
+    m_pluginProcessTokens.append(std::make_pair(attributes, token));
+#endif
     m_knownTokens.add(token);
 
     return token;
@@ -113,7 +117,7 @@ PluginProcessProxy* PluginProcessManager::getOrCreatePluginProcess(uint64_t plug
     }
 
     for (size_t i = 0; i < m_pluginProcessTokens.size(); ++i) {
-        auto& attributesAndToken = m_pluginProcessTokens[i];
+        std::pair<PluginProcessAttributes, uint64_t>& attributesAndToken = m_pluginProcessTokens[i];
         if (attributesAndToken.second == pluginProcessToken) {
             RefPtr<PluginProcessProxy> pluginProcess = PluginProcessProxy::create(this, attributesAndToken.first, attributesAndToken.second);
             PluginProcessProxy* pluginProcessPtr = pluginProcess.get();

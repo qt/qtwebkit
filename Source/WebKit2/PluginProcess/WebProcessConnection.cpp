@@ -171,7 +171,10 @@ void WebProcessConnection::didClose(CoreIPC::Connection*)
     // The web process crashed. Destroy all the plug-in controllers. Destroying the last plug-in controller
     // will cause the web process connection itself to be destroyed.
     Vector<PluginControllerProxy*> pluginControllers;
-    for (auto it = m_pluginControllers.values().begin(), end = m_pluginControllers.values().end(); it != end; ++it)
+    HashMap<uint64_t, OwnPtr<PluginControllerProxy> >::iterator::Values it = m_pluginControllers.values().begin();
+    HashMap<uint64_t, OwnPtr<PluginControllerProxy> >::iterator::Values end = m_pluginControllers.values().end();
+
+    for (; it != end; ++it)
         pluginControllers.append(it->get());
 
     for (size_t i = 0; i < pluginControllers.size(); ++i)

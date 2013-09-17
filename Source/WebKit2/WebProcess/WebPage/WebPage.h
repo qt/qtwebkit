@@ -165,7 +165,7 @@ class WebGestureEvent;
 class WebTouchEvent;
 #endif
 
-typedef Vector<RefPtr<PageOverlay>> PageOverlayList;
+typedef Vector<RefPtr<PageOverlay> > PageOverlayList;
 
 class WebPage : public TypedAPIObject<APIObject::TypeBundlePage>, public CoreIPC::MessageReceiver, public CoreIPC::MessageSender {
 public:
@@ -857,7 +857,7 @@ private:
 
     HashSet<PluginView*> m_pluginViews;
 
-    HashMap<uint64_t, RefPtr<WebCore::TextCheckingRequest>> m_pendingTextCheckingRequestMap;
+    HashMap<uint64_t, RefPtr<WebCore::TextCheckingRequest> > m_pendingTextCheckingRequestMap;
 
     bool m_useFixedLayout;
 
@@ -931,7 +931,7 @@ private:
     WebCore::RunLoop::Timer<WebPage> m_sendDidUpdateInWindowStateTimer;
     bool m_mayStartMediaWhenInWindow;
 
-    HashMap<uint64_t, RefPtr<WebUndoStep>> m_undoStepMap;
+    HashMap<uint64_t, RefPtr<WebUndoStep> > m_undoStepMap;
 
     WebCore::IntSize m_windowResizerSize;
 
@@ -986,7 +986,7 @@ private:
     uint64_t m_pageID;
 
     RefPtr<SandboxExtension> m_pendingDropSandboxExtension;
-    Vector<RefPtr<SandboxExtension>> m_pendingDropExtensionsForFileUpload;
+    Vector<RefPtr<SandboxExtension> > m_pendingDropExtensionsForFileUpload;
 
     bool m_canRunBeforeUnloadConfirmPanel;
 

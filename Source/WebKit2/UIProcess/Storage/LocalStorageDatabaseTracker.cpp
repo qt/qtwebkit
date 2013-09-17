@@ -121,9 +121,9 @@ void LocalStorageDatabaseTracker::deleteAllDatabases()
     deleteEmptyDirectory(m_localStorageDirectory);
 }
 
-Vector<RefPtr<WebCore::SecurityOrigin>> LocalStorageDatabaseTracker::origins() const
+Vector<RefPtr<WebCore::SecurityOrigin> > LocalStorageDatabaseTracker::origins() const
 {
-    Vector<RefPtr<SecurityOrigin>> origins;
+    Vector<RefPtr<SecurityOrigin> > origins;
     origins.reserveInitialCapacity(m_origins.size());
 
     for (HashSet<String>::const_iterator it = m_origins.begin(), end = m_origins.end(); it != end; ++it)
@@ -232,7 +232,7 @@ void LocalStorageDatabaseTracker::updateTrackerDatabaseFromLocalStorageDatabaseF
         originsFromLocalStorageDatabaseFiles.add(originIdentifier);
     }
 
-    for (auto it = origins.begin(), end = origins.end(); it != end; ++it) {
+    for (HashSet<String>::iterator it = origins.begin(), end = origins.end(); it != end; ++it) {
         const String& originIdentifier = *it;
         if (origins.contains(originIdentifier))
             continue;

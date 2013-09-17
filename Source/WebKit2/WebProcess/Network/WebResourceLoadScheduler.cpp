@@ -148,7 +148,7 @@ void WebResourceLoadScheduler::scheduleInternallyFailedLoad(WebCore::ResourceLoa
 
 void WebResourceLoadScheduler::internallyFailedLoadTimerFired()
 {
-    Vector<RefPtr<ResourceLoader>> internallyFailedResourceLoaders;
+    Vector<RefPtr<ResourceLoader> > internallyFailedResourceLoaders;
     copyToVector(m_internallyFailedResourceLoaders, internallyFailedResourceLoaders);
     
     for (size_t i = 0; i < internallyFailedResourceLoaders.size(); ++i)

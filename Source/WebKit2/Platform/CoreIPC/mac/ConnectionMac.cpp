@@ -97,9 +97,9 @@ void Connection::platformInitialize(Identifier identifier)
         m_sendPort = identifier.port;
     }
 
-    m_deadNameSource = nullptr;
-    m_receivePortDataAvailableSource = nullptr;
-    m_exceptionPortDataAvailableSource = nullptr;
+    m_deadNameSource = 0;
+    m_receivePortDataAvailableSource = 0;
+    m_exceptionPortDataAvailableSource = 0;
 
 #if HAVE(XPC)
     m_xpcConnection = identifier.xpcConnection;

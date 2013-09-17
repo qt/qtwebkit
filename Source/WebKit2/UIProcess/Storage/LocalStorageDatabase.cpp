@@ -258,7 +258,7 @@ void LocalStorageDatabase::updateDatabase()
         m_changedItems.swap(changedItems);
     } else {
         for (int i = 0; i < maximumItemsToUpdate; ++i) {
-            auto it = m_changedItems.begin();
+            HashMap<String, String>::iterator it = m_changedItems.begin();
             changedItems.add(it->key, it->value);
 
             m_changedItems.remove(it);
@@ -311,7 +311,9 @@ void LocalStorageDatabase::updateDatabaseWithChangedItems(const HashMap<String, 
     SQLiteTransaction transaction(m_database);
     transaction.begin();
 
-    for (auto it = changedItems.begin(), end = changedItems.end(); it != end; ++it) {
+    HashMap<String, String>::const_iterator it = changedItems.begin();
+    const HashMap<String, String>::const_iterator end = changedItems.end();
+    for (; it != end; ++it) {
         // A null value means that the key/value pair should be deleted.
         SQLiteStatement& statement = it->value.isNull() ? deleteStatement : insertStatement;
 

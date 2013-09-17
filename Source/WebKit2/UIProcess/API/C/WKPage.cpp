@@ -884,11 +884,11 @@ WKScrollPinningBehavior WKPageGetScrollPinningBehavior(WKPageRef page)
     ScrollPinningBehavior pinning = toImpl(page)->scrollPinningBehavior();
     
     switch (pinning) {
-    case WebCore::ScrollPinningBehavior::DoNotPin:
+    case DoNotPin:
         return kWKScrollPinningBehaviorDoNotPin;
-    case WebCore::ScrollPinningBehavior::PinToTop:
+    case PinToTop:
         return kWKScrollPinningBehaviorPinToTop;
-    case WebCore::ScrollPinningBehavior::PinToBottom:
+    case PinToBottom:
         return kWKScrollPinningBehaviorPinToBottom;
     }
     
@@ -898,17 +898,17 @@ WKScrollPinningBehavior WKPageGetScrollPinningBehavior(WKPageRef page)
 
 void WKPageSetScrollPinningBehavior(WKPageRef page, WKScrollPinningBehavior pinning)
 {
-    ScrollPinningBehavior corePinning = ScrollPinningBehavior::DoNotPin;
+    ScrollPinningBehavior corePinning = DoNotPin;
 
     switch (pinning) {
     case kWKScrollPinningBehaviorDoNotPin:
-        corePinning = ScrollPinningBehavior::DoNotPin;
+        corePinning = DoNotPin;
         break;
     case kWKScrollPinningBehaviorPinToTop:
-        corePinning = ScrollPinningBehavior::PinToTop;
+        corePinning = PinToTop;
         break;
     case kWKScrollPinningBehaviorPinToBottom:
-        corePinning = ScrollPinningBehavior::PinToBottom;
+        corePinning = PinToBottom;
         break;
     default:
         ASSERT_NOT_REACHED();

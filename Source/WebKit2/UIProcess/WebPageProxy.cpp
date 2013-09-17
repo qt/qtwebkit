@@ -164,7 +164,7 @@ private:
     ExceededDatabaseQuotaRecords() { }
     ~ExceededDatabaseQuotaRecords() { }
 
-    Deque<OwnPtr<Record>> m_records;
+    Deque<OwnPtr<Record> > m_records;
     OwnPtr<Record> m_currentRecord;
 };
 
@@ -395,7 +395,7 @@ PassRefPtr<ImmutableArray> WebPageProxy::relatedPages() const
     // pages() returns a list of pages in WebProcess, so this page may or may not be among them - a client can use a reference to WebPageProxy after the page has closed.
     Vector<WebPageProxy*> pages = m_process->pages();
 
-    Vector<RefPtr<APIObject>> result;
+    Vector<RefPtr<APIObject> > result;
     result.reserveCapacity(pages.size());
     for (size_t i = 0; i < pages.size(); ++i) {
         if (pages[i] != this)
@@ -888,7 +888,7 @@ void WebPageProxy::tryRestoreScrollPosition()
     m_process->send(Messages::WebPage::TryRestoreScrollPosition(), m_pageID);
 }
 
-void WebPageProxy::didChangeBackForwardList(WebBackForwardListItem* added, Vector<RefPtr<APIObject>>* removed)
+void WebPageProxy::didChangeBackForwardList(WebBackForwardListItem* added, Vector<RefPtr<APIObject> >* removed)
 {
     m_loaderClient.didChangeBackForwardList(this, added, removed);
 }
@@ -1362,7 +1362,7 @@ void WebPageProxy::handleWheelEvent(const NativeWebWheelEvent& event)
         return;
     }
 
-    OwnPtr<Vector<NativeWebWheelEvent>> coalescedWheelEvent = adoptPtr(new Vector<NativeWebWheelEvent>);
+    OwnPtr<Vector<NativeWebWheelEvent> > coalescedWheelEvent = adoptPtr(new Vector<NativeWebWheelEvent>);
     coalescedWheelEvent->append(event);
     m_currentlyProcessedWheelEvents.append(coalescedWheelEvent.release());
     sendWheelEvent(event);
@@ -1370,7 +1370,7 @@ void WebPageProxy::handleWheelEvent(const NativeWebWheelEvent& event)
 
 void WebPageProxy::processNextQueuedWheelEvent()
 {
-    OwnPtr<Vector<NativeWebWheelEvent>> nextCoalescedEvent = adoptPtr(new Vector<NativeWebWheelEvent>);
+    OwnPtr<Vector<NativeWebWheelEvent> > nextCoalescedEvent = adoptPtr(new Vector<NativeWebWheelEvent>);
     WebWheelEvent nextWheelEvent = coalescedWheelEvent(m_wheelEventQueue, *nextCoalescedEvent.get());
     m_currentlyProcessedWheelEvents.append(nextCoalescedEvent.release());
     sendWheelEvent(nextWheelEvent);
@@ -1925,7 +1925,7 @@ void WebPageProxy::setMemoryCacheClientCallsEnabled(bool memoryCacheClientCallsE
 void WebPageProxy::findStringMatches(const String& string, FindOptions options, unsigned maxMatchCount)
 {
     if (string.isEmpty()) {
-        didFindStringMatches(string, Vector<Vector<WebCore::IntRect>> (), 0);
+        didFindStringMatches(string, Vector<Vector<WebCore::IntRect> > (), 0);
         return;
     }
 
@@ -2578,7 +2578,7 @@ void WebPageProxy::unableToImplementPolicy(uint64_t frameID, const ResourceError
 
 // FormClient
 
-void WebPageProxy::willSubmitForm(uint64_t frameID, uint64_t sourceFrameID, const Vector<std::pair<String, String>>& textFieldValues, uint64_t listenerID, CoreIPC::MessageDecoder& decoder)
+void WebPageProxy::willSubmitForm(uint64_t frameID, uint64_t sourceFrameID, const Vector<std::pair<String, String> >& textFieldValues, uint64_t listenerID, CoreIPC::MessageDecoder& decoder)
 {
     RefPtr<APIObject> userData;
     WebContextUserMessageDecoder messageDecoder(userData, m_process.get());
@@ -3114,15 +3114,15 @@ void WebPageProxy::didFindString(const String& string, uint32_t matchCount)
     m_findClient.didFindString(this, string, matchCount);
 }
 
-void WebPageProxy::didFindStringMatches(const String& string, Vector<Vector<WebCore::IntRect>> matchRects, int32_t firstIndexAfterSelection)
+void WebPageProxy::didFindStringMatches(const String& string, Vector<Vector<WebCore::IntRect> > matchRects, int32_t firstIndexAfterSelection)
 {
-    Vector<RefPtr<APIObject>> matches;
+    Vector<RefPtr<APIObject> > matches;
     matches.reserveInitialCapacity(matchRects.size());
 
     for (size_t i = 0; i < matchRects.size(); ++i) {
         const Vector<WebCore::IntRect>& rects = matchRects[i];
         size_t numRects = matchRects[i].size();
-        Vector<RefPtr<APIObject>> apiRects;
+        Vector<RefPtr<APIObject> > apiRects;
         apiRects.reserveInitialCapacity(numRects);
 
         for (size_t i = 0; i < numRects; ++i)
@@ -3576,7 +3576,7 @@ void WebPageProxy::didReceiveEvent(uint32_t opaqueType, bool handled)
     case WebEvent::Wheel: {
         ASSERT(!m_currentlyProcessedWheelEvents.isEmpty());
 
-        OwnPtr<Vector<NativeWebWheelEvent>> oldestCoalescedEvent = m_currentlyProcessedWheelEvents.takeFirst();
+        OwnPtr<Vector<NativeWebWheelEvent> > oldestCoalescedEvent = m_currentlyProcessedWheelEvents.takeFirst();
 
         // FIXME: Dispatch additional events to the didNotHandleWheelEvent client function.
         if (!handled && m_uiClient.implementsDidNotHandleWheelEvent())

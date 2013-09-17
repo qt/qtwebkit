@@ -65,11 +65,11 @@ void WebKeyValueStorageManager::derefWebContextSupplement()
     APIObject::deref();
 }
 
-static void didGetKeyValueStorageOrigins(const Vector<RefPtr<WebCore::SecurityOrigin>>& securityOrigins, void* context)
+static void didGetKeyValueStorageOrigins(const Vector<RefPtr<WebCore::SecurityOrigin> >& securityOrigins, void* context)
 {
     RefPtr<ArrayCallback> callback = adoptRef(static_cast<ArrayCallback*>(context));
 
-    Vector<RefPtr<APIObject>> webSecurityOrigins;
+    Vector<RefPtr<APIObject> > webSecurityOrigins;
     webSecurityOrigins.reserveInitialCapacity(securityOrigins.size());
 
     for (unsigned i = 0; i < securityOrigins.size(); ++i)
