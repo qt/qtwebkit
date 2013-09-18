@@ -54,8 +54,8 @@ public:
     // This version of didFire() is a more efficient version for when we want
     // to know if the watchdog has fired in the past, and not whether it should
     // fire right now.
-    JS_EXPORT_PRIVATE bool didFire() { return m_didFire; }
-    JS_EXPORT_PRIVATE void fire();
+    bool didFire() { return m_didFire; }
+    void fire();
 
     void* timerDidFireAddress() { return &m_timerDidFire; }
 

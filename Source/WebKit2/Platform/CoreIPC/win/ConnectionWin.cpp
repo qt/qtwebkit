@@ -32,8 +32,6 @@
 #include <wtf/text/WTFString.h>
 #include <wtf/threads/BinarySemaphore.h>
 
-using namespace std;
-
 namespace CoreIPC {
 
 // FIXME: Rename this or use a different constant on windows.
