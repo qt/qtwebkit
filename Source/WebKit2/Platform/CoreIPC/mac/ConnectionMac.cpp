@@ -113,7 +113,13 @@ void Connection::platformInitialize(Identifier identifier)
 static dispatch_source_t createDataAvailableSource(mach_port_t receivePort, WorkQueue* workQueue, const Function<void()>& function)
 {
     dispatch_source_t source = dispatch_source_create(DISPATCH_SOURCE_TYPE_MACH_RECV, receivePort, 0, workQueue->dispatchQueue());
+#if COMPILER(GCC)
+    dispatch_source_set_event_handler(source, ^{
+        function();
+    });
+#else
     dispatch_source_set_event_handler(source, function);
+#endif
     dispatch_source_set_cancel_handler(source, ^{
         mach_port_mod_refs(mach_task_self(), receivePort, MACH_PORT_RIGHT_RECEIVE, -1);
     });
@@ -290,7 +296,13 @@ bool Connection::sendOutgoingMessage(PassOwnPtr<MessageEncoder> encoder)
 void Connection::initializeDeadNameSource()
 {
     m_deadNameSource = dispatch_source_create(DISPATCH_SOURCE_TYPE_MACH_SEND, m_sendPort, 0, m_connectionQueue->dispatchQueue());
+#if COMPILER(GCC)
+    dispatch_source_set_event_handler(m_deadNameSource, ^{
+        connectionDidClose();
+    });
+#else
     dispatch_source_set_event_handler(m_deadNameSource, bind(&Connection::connectionDidClose, this));
+#endif
 
     mach_port_t sendPort = m_sendPort;
     dispatch_source_set_cancel_handler(m_deadNameSource, ^{
