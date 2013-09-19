@@ -116,6 +116,12 @@ defineTest(finalizeConfigure) {
     production_build:blackberry {
         addReasonForSkippingBuild("Build not supported on BB10 yet.")
     }
+    production_build:macx-g++ {
+        addReasonForSkippingBuild("Build not supported on Mac using GCC currently.")
+    }
+    production_build:win32-g++ {
+        addReasonForSkippingBuild("Build not supported on Windows using GCC currently.")
+    }
     requiredPrograms = gperf python perl bison ruby flex
     for(program, requiredPrograms): \
         !programExistsInPath($$program): \
