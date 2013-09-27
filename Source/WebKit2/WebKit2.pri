@@ -82,6 +82,6 @@ linux-*: {
 
 have?(QTQUICK): QT += qml quick
 
-have?(qtlocation):enable?(GEOLOCATION): QT += location
+have?(qtpositioning):enable?(GEOLOCATION): QT += positioning
 
 enable?(SECCOMP_FILTERS): PKGCONFIG += libseccomp
