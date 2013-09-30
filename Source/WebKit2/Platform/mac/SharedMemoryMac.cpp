@@ -36,6 +36,11 @@
 #include <mach/vm_map.h>
 #include <wtf/RefPtr.h>
 
+// Define this when building on older versions of Mac OS X.
+#ifndef VM_PROT_IS_MASK
+#define VM_PROT_IS_MASK ((vm_prot_t) 0x40)
+#endif
+
 namespace WebKit {
 
 SharedMemory::Handle::Handle()
