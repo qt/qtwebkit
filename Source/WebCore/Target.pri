@@ -4297,16 +4297,13 @@ ALL_IN_ONE_SOURCES += \
     rendering/style/StyleAllInOne.cpp \
     html/HTMLElementsAllInOne.cpp \
     editing/EditingAllInOne.cpp \
-    rendering/RenderingAllInOne.cpp
-
-enable?(XSLT):use?(LIBXML2) {
-    ALL_IN_ONE_SOURCES += \
-        dom/DOMAllInOne.cpp
-}
+    rendering/RenderingAllInOne.cpp \
+    css/CSSAllInOne.cpp \
+    dom/DOMAllInOne.cpp
 
 # These do not compile at the moment:
-#    css/MediaAllInOne.cpp
-#    css/CSSAllInOne.cpp
+# css/MediaAllInOne.cpp 
+# bindings/js/JSBindingsAllInOne.cpp
 
 # Make sure the derived sources are built
 include(DerivedSources.pri)
