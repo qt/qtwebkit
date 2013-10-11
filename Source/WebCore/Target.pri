@@ -4299,11 +4299,9 @@ ALL_IN_ONE_SOURCES += \
     editing/EditingAllInOne.cpp \
     rendering/RenderingAllInOne.cpp \
     css/CSSAllInOne.cpp \
-    dom/DOMAllInOne.cpp
-
-# These do not compile at the moment:
-# css/MediaAllInOne.cpp 
-# bindings/js/JSBindingsAllInOne.cpp
+    css/MediaAllInOne.cpp \
+    dom/DOMAllInOne.cpp \
+    bindings/js/JSBindingsAllInOne.cpp
 
 # Make sure the derived sources are built
 include(DerivedSources.pri)

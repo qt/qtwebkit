@@ -25,7 +25,6 @@
 
 // This all-in-one cpp file cuts down on template bloat to allow us to build our Windows release build.
 
-#include "MediaFeatureNames.cpp"
 #include "MediaList.cpp"
 #include "MediaQuery.cpp"
 #include "MediaQueryEvaluator.cpp"
