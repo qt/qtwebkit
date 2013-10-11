@@ -197,7 +197,9 @@ WebContext::WebContext(ProcessModel processModel, const String& injectedBundlePa
     webContextCounter.increment();
 #endif
 
-    m_storageManager->setLocalStorageDirectory(localStorageDirectory());
+    String localStorageDirectory = this->localStorageDirectory();
+    if (!localStorageDirectory.isEmpty())
+        m_storageManager->setLocalStorageDirectory(localStorageDirectory);
 }
 
 #if !PLATFORM(MAC)

@@ -98,7 +98,7 @@ INCLUDEPATH += \
 
 use?(3D_GRAPHICS): WEBKIT += angle
 
-have?(qtlocation):enable?(GEOLOCATION) {
+have?(qtpositioning):enable?(GEOLOCATION) {
      HEADERS += \
         $$PWD/qt/WebCoreSupport/GeolocationClientQt.h
      SOURCES += \
