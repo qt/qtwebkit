@@ -20,9 +20,8 @@ mac {
     }
 }
 
-use?(GSTREAMER) {
-    DEFINES += WTF_USE_GLIB=1
-    PKGCONFIG += glib-2.0 gio-2.0
+use?(GLIB) {
+    PKGCONFIG *= glib-2.0 gio-2.0
 }
 
 win32-* {
