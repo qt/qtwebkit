@@ -61,6 +61,7 @@
 #include "GeolocationPermissionClientQt.h"
 #include "HTMLFrameOwnerElement.h"
 #include "HTMLInputElement.h"
+#include "HTMLMediaElement.h"
 #include "HitTestResult.h"
 #include "InitWebCoreQt.h"
 #include "InspectorClientQt.h"
@@ -887,6 +888,7 @@ QList<MenuItem> descriptionForPlatformMenu(const Vector<ContextMenuItem>& items,
                     if (it.checked())
                         description.traits |= MenuItem::Checked;
                 }
+                description.title = item.title();
             }
             break;
         }
@@ -896,7 +898,7 @@ QList<MenuItem> descriptionForPlatformMenu(const Vector<ContextMenuItem>& items,
         case WebCore::SubmenuType: {
             description.type = MenuItem::SubMenu;
             description.subMenu = descriptionForPlatformMenu(item.subMenuItems(), page);
-            description.subMenuTitle = item.title();
+            description.title = item.title();
             // Don't append empty submenu descriptions.
             if (description.subMenu.isEmpty())
                 continue;
@@ -1049,6 +1051,19 @@ void QWebPageAdapter::updateActionInternal(QWebPageAdapter::MenuAction action, c
     }
 }
 
+static WebCore::HTMLMediaElement* mediaElement(WebCore::Node* innerNonSharedNode)
+{
+    if (!(innerNonSharedNode && innerNonSharedNode->document()))
+        return 0;
+
+    if (!(innerNonSharedNode->renderer() && innerNonSharedNode->renderer()->isMedia()))
+        return 0;
+
+    if (innerNonSharedNode->hasTagName(WebCore::HTMLNames::videoTag) || innerNonSharedNode->hasTagName(WebCore::HTMLNames::audioTag))
+        return WebCore::toHTMLMediaElement(innerNonSharedNode);
+    return 0;
+}
+
 void QWebPageAdapter::triggerAction(QWebPageAdapter::MenuAction action, QWebHitTestResultPrivate* hitTestResult, const char* commandName, bool endToEndReload)
 {
     Frame* frame = page->focusController()->focusedOrMainFrame();
@@ -1100,6 +1115,9 @@ void QWebPageAdapter::triggerAction(QWebPageAdapter::MenuAction action, QWebHitT
     case DownloadLinkToDisk:
         frame->loader()->client()->startDownload(WebCore::ResourceRequest(hitTestResult->linkUrl, frame->loader()->outgoingReferrer()));
         break;
+    case DownloadMediaToDisk:
+        frame->loader()->client()->startDownload(WebCore::ResourceRequest(hitTestResult->mediaUrl, frame->loader()->outgoingReferrer()));
+        break;
     case Back:
         page->goBack();
         break;
@@ -1123,6 +1141,23 @@ void QWebPageAdapter::triggerAction(QWebPageAdapter::MenuAction action, QWebHitT
     case SetTextDirectionRightToLeft:
         editor.setBaseWritingDirection(RightToLeftWritingDirection);
         break;
+#if ENABLE(VIDEO)
+    case ToggleMediaControls:
+        if (HTMLMediaElement* mediaElt = mediaElement(hitTestResult->innerNonSharedNode))
+            mediaElt->setControls(!mediaElt->controls());
+        break;
+    case ToggleMediaLoop:
+        if (HTMLMediaElement* mediaElt = mediaElement(hitTestResult->innerNonSharedNode))
+            mediaElt->setLoop(!mediaElt->loop());
+        break;
+    case ToggleMediaPlayPause:
+        if (HTMLMediaElement* mediaElt = mediaElement(hitTestResult->innerNonSharedNode))
+            mediaElt->togglePlayState();
+    case ToggleMediaMute:
+        if (HTMLMediaElement* mediaElt = mediaElement(hitTestResult->innerNonSharedNode))
+            mediaElt->setMuted(!mediaElt->muted());
+        break;
+#endif
 #if ENABLE(INSPECTOR)
     case InspectElement: {
         ASSERT(hitTestResult != &hitTest);
@@ -1201,6 +1236,21 @@ QString QWebPageAdapter::contextMenuItemTagForAction(QWebPageAdapter::MenuAction
     case ToggleUnderline:
         *checkable = true;
         return contextMenuItemTagUnderline();
+    case DownloadMediaToDisk:
+        return contextMenuItemTagDownloadMediaToDisk();
+    case CopyMediaUrlToClipboard:
+        return contextMenuItemTagCopyMediaLinkToClipboard();
+    case ToggleMediaControls:
+        *checkable = true;
+        return contextMenuItemTagShowMediaControls();
+    case ToggleMediaLoop:
+        *checkable = true;
+        return contextMenuItemTagToggleMediaLoop();
+    case ToggleMediaPlayPause:
+        return contextMenuItemTagMediaPlayPause();
+    case ToggleMediaMute:
+        *checkable = true;
+        return contextMenuItemTagMediaMute();
 
 #if ENABLE(INSPECTOR)
     case InspectElement:
