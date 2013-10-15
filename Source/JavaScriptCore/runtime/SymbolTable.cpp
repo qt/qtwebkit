@@ -27,6 +27,8 @@
  */
 
 #include "config.h"
+#include "JSDestructibleObject.h"
+#include "JSCellInlines.h"
 #include "SymbolTable.h"
 
 namespace JSC {

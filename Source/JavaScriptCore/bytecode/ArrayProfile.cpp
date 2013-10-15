@@ -24,6 +24,7 @@
  */
 
 #include "config.h"
+#include "JSCellInlines.h"
 #include "ArrayProfile.h"
 
 #include "CodeBlock.h"

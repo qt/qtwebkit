@@ -30,6 +30,7 @@
 #include "CopyWorkList.h"
 #include "GCThreadSharedData.h"
 #include "JSCell.h"
+#include "JSCellInlines.h"
 #include "JSObject.h"
 #include <wtf/Threading.h>
 

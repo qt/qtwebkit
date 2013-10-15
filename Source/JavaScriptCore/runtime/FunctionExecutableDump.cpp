@@ -24,6 +24,7 @@
  */
 
 #include "config.h"
+#include "JSCellInlines.h"
 #include "FunctionExecutableDump.h"
 
 namespace JSC {

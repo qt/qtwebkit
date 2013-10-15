@@ -32,6 +32,7 @@
 #include "JSObject.h"
 #include "JSString.h"
 #include "Structure.h"
+#include "StructureInlines.h"
 
 namespace JSC {
 
