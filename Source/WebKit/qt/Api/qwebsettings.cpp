@@ -177,6 +177,10 @@ void QWebSettingsPrivate::apply()
         value = attributes.value(QWebSettings::CSSCompositingEnabled,
                                  global->attributes.value(QWebSettings::CSSCompositingEnabled));
         WebCore::RuntimeEnabledFeatures::setCSSCompositingEnabled(value);
+        value = attributes.value(QWebSettings::CanvasPathEnabled,
+                                 global->attributes.value(QWebSettings::CanvasPathEnabled));
+        WebCore::RuntimeEnabledFeatures::setCanvasPathEnabled(value);
+
         value = attributes.value(QWebSettings::CSSGridLayoutEnabled,
                                  global->attributes.value(QWebSettings::CSSGridLayoutEnabled));
         settings->setCSSGridLayoutEnabled(value);
@@ -497,10 +501,14 @@ QWebSettings* QWebSettings::globalSettings()
         This is disabled by default.
     \value SiteSpecificQuirksEnabled This setting enables WebKit's workaround for broken sites. It is
         enabled by default.
+    \value CSSGridLayoutEnabled This setting enables support for the CSS 3 Grid Layout module. This
+        CSS module is currently only a draft and support for it is disabled by default.
     \value ScrollAnimatorEnabled This setting enables animated scrolling. It is disabled by default.
     \value CaretBrowsingEnabled This setting enables caret browsing. It is disabled by default.
     \value NotificationsEnabled Specifies whether support for the HTML 5 web notifications is enabled
         or not. This is enabled by default.
+    \value CanvasPathEnabled Specifies whether support for the HTML 5 Canvas Path object is enabled
+        or not. This is disabled by default.
 */
 
 /*!
@@ -557,6 +565,7 @@ QWebSettings::QWebSettings()
     d->attributes.insert(QWebSettings::ScrollAnimatorEnabled, false);
     d->attributes.insert(QWebSettings::CaretBrowsingEnabled, false);
     d->attributes.insert(QWebSettings::NotificationsEnabled, true);
+    d->attributes.insert(QWebSettings::CanvasPathEnabled, false);
     d->offlineStorageDefaultQuota = 5 * 1024 * 1024;
     d->defaultTextEncoding = QLatin1String("iso-8859-1");
     d->thirdPartyCookiePolicy = AlwaysAllowThirdPartyCookies;
