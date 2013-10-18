@@ -384,6 +384,8 @@ public:
     // Adds a compressed texture format.
     void addCompressedTextureFormat(GC3Denum);
 
+    PassRefPtr<Image> drawImageIntoBuffer(Image*, int width, int height, int deviceScaleFactor);
+
 #if ENABLE(VIDEO)
     PassRefPtr<Image> videoFrameToImage(HTMLVideoElement*, BackingStoreCopy, ExceptionCode&);
 #endif
@@ -471,7 +473,7 @@ public:
         OwnArrayPtr<OwnPtr<ImageBuffer> > m_buffers;
         int m_capacity;
     };
-    LRUImageBufferCache m_videoCache;
+    LRUImageBufferCache m_generatedImageCache;
 
     GC3Dint m_maxTextureSize;
     GC3Dint m_maxCubeMapTextureSize;
