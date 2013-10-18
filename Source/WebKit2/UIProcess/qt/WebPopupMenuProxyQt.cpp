@@ -250,7 +250,7 @@ void PopupMenuItemModel::buildItems(const Vector<WebPopupItem>& webPopupItems)
 {
     QString currentGroup;
     m_items.reserveInitialCapacity(webPopupItems.size());
-    for (int i = 0; i < webPopupItems.size(); i++) {
+    for (size_t i = 0; i < webPopupItems.size(); i++) {
         const WebPopupItem& webPopupItem = webPopupItems[i];
         if (webPopupItem.m_isLabel) {
             currentGroup = webPopupItem.m_text;

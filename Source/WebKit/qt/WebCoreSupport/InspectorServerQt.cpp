@@ -282,7 +282,7 @@ int InspectorServerRequestHandlerQt::webSocketSend(const char* data, size_t leng
     m_tcpConnection->putChar(0x81);
     if (length <= 125)
         m_tcpConnection->putChar(static_cast<uint8_t>(length));
-    else if (length <= pow(2, 16)) {
+    else if (length <= (1<<16)) {
         m_tcpConnection->putChar(126);
         quint16 length16 = qToBigEndian<quint16>(static_cast<quint16>(length));
         m_tcpConnection->write(reinterpret_cast<char*>(&length16), 2);

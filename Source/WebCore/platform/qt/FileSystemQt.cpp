@@ -42,7 +42,9 @@
 #include <wtf/text/CString.h>
 #include <wtf/text/WTFString.h>
 
-#if !defined(Q_OS_WIN)
+#if OS(ANDROID)
+#include <sys/vfs.h>
+#elif !defined(Q_OS_WIN)
 #include <sys/statvfs.h>
 #endif
 
@@ -215,9 +217,15 @@ uint64_t getVolumeFreeSizeForPath(const char* path)
         return 0;
     return static_cast<uint64_t>(freeBytesToCaller.QuadPart);
 #else
+#if OS(ANDROID)
+    struct statfs volumeInfo;
+    if (statfs(path, &volumeInfo))
+        return 0;
+#else
     struct statvfs volumeInfo;
     if (statvfs(path, &volumeInfo))
         return 0;
+#endif
 
     return static_cast<uint64_t>(volumeInfo.f_bavail) * static_cast<uint64_t>(volumeInfo.f_frsize);
 #endif

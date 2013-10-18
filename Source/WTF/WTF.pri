@@ -16,6 +16,7 @@ mac {
 } else {
     contains(QT_CONFIG,icu) {
         win32: LIBS += -licuin -licuuc -licudt
+        else:android: LIBS += -licui18n -licuuc
         else: LIBS += -licui18n -licuuc -licudata
     }
 }
