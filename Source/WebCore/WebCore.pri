@@ -165,7 +165,8 @@ enable?(GAMEPAD) {
     INCLUDEPATH += \
         $$SOURCE_DIR/platform/linux \
         $$SOURCE_DIR/Modules/gamepad
-    PKGCONFIG += libudev
+    INCLUDEPATH += $$QMAKE_INCDIR_LIBUDEV
+    LIBS += $$QMAKE_LIBS_LIBUDEV
 }
 
 use?(GLIB) {
