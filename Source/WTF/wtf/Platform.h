@@ -440,6 +440,33 @@
 #define WTF_OS_UNIX 1
 #endif
 
+#if OS(WINDOWS)
+// Minimum supported windows is Windows XP.
+// The original WinXP was NT 5.1, but Win XP 64bit was NT 5.2
+#if CPU(X86_64)
+#ifndef _WIN32_WINNT
+#define _WIN32_WINNT 0x0502
+#endif
+
+#ifndef WINVER
+#define WINVER 0x0502
+#endif
+
+#else /* !CPU(X86_64) */
+
+#ifndef _WIN32_WINNT
+#define _WIN32_WINNT 0x0501
+#endif
+
+#ifndef WINVER
+#define WINVER 0x0501
+#endif
+
+#endif
+
+#endif
+
+
 /* Operating environments */
 
 /* FIXME: these are all mixes of OS, operating environment and policy choices. */
@@ -1020,6 +1047,11 @@
 #define WTF_USE_CONTENT_FILTERING 1
 #endif
 
+#if COMPILER(GCC) && defined(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_8)
+#define HAVE_ATOMICS_64BIT 1
+#elif OS(WINDOWS) && (_WIN32_WINNT >= 0x0502)
+#define HAVE_ATOMICS_64BIT 1
+#endif
 
 #define WTF_USE_GRAMMAR_CHECKING 1
 

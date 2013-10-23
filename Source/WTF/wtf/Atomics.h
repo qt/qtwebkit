@@ -78,24 +78,16 @@ extern "C" void _ReadWriteBarrier(void);
 
 namespace WTF {
 
+// 32bit atomicIncrement/atomicDecrement
 #if OS(WINDOWS)
 #define WTF_USE_LOCKFREE_THREADSAFEREFCOUNTED 1
 
-#if OS(WINCE)
+#if OS(WINCE) || COMPILER(MINGW)
 inline int atomicIncrement(int* addend) { return InterlockedIncrement(reinterpret_cast<long*>(addend)); }
 inline int atomicDecrement(int* addend) { return InterlockedDecrement(reinterpret_cast<long*>(addend)); }
-#elif COMPILER(MINGW)
-inline int atomicIncrement(int* addend) { return InterlockedIncrement(reinterpret_cast<long*>(addend)); }
-inline int atomicDecrement(int* addend) { return InterlockedDecrement(reinterpret_cast<long*>(addend)); }
-
-inline int64_t atomicIncrement(int64_t* addend) { return InterlockedIncrement64(reinterpret_cast<long long*>(addend)); }
-inline int64_t atomicDecrement(int64_t* addend) { return InterlockedDecrement64(reinterpret_cast<long long*>(addend)); }
 #else
 inline int atomicIncrement(int volatile* addend) { return InterlockedIncrement(reinterpret_cast<long volatile*>(addend)); }
 inline int atomicDecrement(int volatile* addend) { return InterlockedDecrement(reinterpret_cast<long volatile*>(addend)); }
-
-inline int64_t atomicIncrement(int64_t volatile* addend) { return InterlockedIncrement64(reinterpret_cast<long long volatile*>(addend)); }
-inline int64_t atomicDecrement(int64_t volatile* addend) { return InterlockedDecrement64(reinterpret_cast<long long volatile*>(addend)); }
 #endif
 
 #elif OS(QNX)
@@ -115,16 +107,25 @@ inline int atomicDecrement(int volatile* addend) { return __atomic_dec(addend) -
 inline int64_t atomicIncrement(int64_t volatile* addend) { return __sync_add_and_fetch(addend, 1); }
 inline int64_t atomicDecrement(int64_t volatile* addend) { return __sync_sub_and_fetch(addend, 1); }
 
-#elif COMPILER(GCC) && !CPU(SPARC64) // sizeof(_Atomic_word) != sizeof(int) on sparc64 gcc
+#elif COMPILER(GCC)
 #define WTF_USE_LOCKFREE_THREADSAFEREFCOUNTED 1
 
 inline int atomicIncrement(int volatile* addend) { return __sync_add_and_fetch(addend, 1); }
 inline int atomicDecrement(int volatile* addend) { return __sync_sub_and_fetch(addend, 1); }
 
+#endif
+
+// 64bit atomicIncrement/atomicDecrement
+#if HAVE(ATOMICS_64BIT)
+#if COMPILER(GCC)
 inline int64_t atomicIncrement(int64_t volatile* addend) { return __sync_add_and_fetch(addend, 1); }
 inline int64_t atomicDecrement(int64_t volatile* addend) { return __sync_sub_and_fetch(addend, 1); }
-
+#elif OS(WINDOWS)
+inline int64_t atomicIncrement(int64_t volatile* addend) { return InterlockedIncrement64(reinterpret_cast<long long volatile*>(addend)); }
+inline int64_t atomicDecrement(int64_t volatile* addend) { return InterlockedDecrement64(reinterpret_cast<long long volatile*>(addend)); }
 #endif
+#endif
+
 
 #if OS(WINDOWS)
 inline bool weakCompareAndSwap(volatile unsigned* location, unsigned expected, unsigned newValue)

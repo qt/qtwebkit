@@ -28,7 +28,7 @@
 
 #include "ImmutableArray.h"
 #include "MutableDictionary.h"
-#include <wtf/Atomics.h>
+#include <wtf/Threading.h>
 
 namespace WebKit {
 
@@ -47,7 +47,15 @@ uint64_t StatisticsRequest::addOutstandingRequest()
 {
     static int64_t uniqueRequestID;
 
+#if HAVE(ATOMICS_64BIT)
     uint64_t requestID = atomicIncrement(&uniqueRequestID);
+#else
+    static Mutex uniqueRequestMutex;
+    uniqueRequestMutex.lock();
+    uint64_t requestID = ++uniqueRequestID;
+    uniqueRequestMutex.unlock();
+#endif
+
     m_outstandingRequests.add(requestID);
     return requestID;
 }
