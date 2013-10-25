@@ -124,9 +124,8 @@ defineTest(detectFeatures) {
         isEmpty(SQLITE3SRCDIR):isEmpty(_QMAKE_SUPER_CACHE_): error("WebKit requires SQLite. Either make it available via pkg-config, set $SQLITE3SRCDIR or build WebKit under qt5.git.")
     }
 
-    # Gamepad API Support
-    contains(QT_CONFIG, libudev): WEBKIT_CONFIG += gamepad
-    else:unix: CONFIGURE_WARNINGS += "Qt configured without libudev, gamepad API will not be built"
+    # Gamepad API Support (depends on udev)
+    linux: WEBKIT_CONFIG += gamepad
 
     # Support for Graphics Surface
     # GraphicsSurface requires GraphicsContext3D and hence use_3d_graphics
