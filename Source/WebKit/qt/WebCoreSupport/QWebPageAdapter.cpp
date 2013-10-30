@@ -1051,6 +1051,7 @@ void QWebPageAdapter::updateActionInternal(QWebPageAdapter::MenuAction action, c
     }
 }
 
+#if ENABLE(VIDEO)
 static WebCore::HTMLMediaElement* mediaElement(WebCore::Node* innerNonSharedNode)
 {
     if (!(innerNonSharedNode && innerNonSharedNode->document()))
@@ -1063,6 +1064,7 @@ static WebCore::HTMLMediaElement* mediaElement(WebCore::Node* innerNonSharedNode
         return WebCore::toHTMLMediaElement(innerNonSharedNode);
     return 0;
 }
+#endif
 
 void QWebPageAdapter::triggerAction(QWebPageAdapter::MenuAction action, QWebHitTestResultPrivate* hitTestResult, const char* commandName, bool endToEndReload)
 {
