@@ -177,9 +177,6 @@ void QWebSettingsPrivate::apply()
         value = attributes.value(QWebSettings::CSSCompositingEnabled,
                                  global->attributes.value(QWebSettings::CSSCompositingEnabled));
         WebCore::RuntimeEnabledFeatures::setCSSCompositingEnabled(value);
-        value = attributes.value(QWebSettings::CanvasPathEnabled,
-                                 global->attributes.value(QWebSettings::CanvasPathEnabled));
-        WebCore::RuntimeEnabledFeatures::setCanvasPathEnabled(value);
 
         value = attributes.value(QWebSettings::CSSGridLayoutEnabled,
                                  global->attributes.value(QWebSettings::CSSGridLayoutEnabled));
@@ -507,8 +504,6 @@ QWebSettings* QWebSettings::globalSettings()
     \value CaretBrowsingEnabled This setting enables caret browsing. It is disabled by default.
     \value NotificationsEnabled Specifies whether support for the HTML 5 web notifications is enabled
         or not. This is enabled by default.
-    \value CanvasPathEnabled Specifies whether support for the HTML 5 Canvas Path object is enabled
-        or not. This is disabled by default.
 */
 
 /*!
@@ -565,7 +560,6 @@ QWebSettings::QWebSettings()
     d->attributes.insert(QWebSettings::ScrollAnimatorEnabled, false);
     d->attributes.insert(QWebSettings::CaretBrowsingEnabled, false);
     d->attributes.insert(QWebSettings::NotificationsEnabled, true);
-    d->attributes.insert(QWebSettings::CanvasPathEnabled, false);
     d->offlineStorageDefaultQuota = 5 * 1024 * 1024;
     d->defaultTextEncoding = QLatin1String("iso-8859-1");
     d->thirdPartyCookiePolicy = AlwaysAllowThirdPartyCookies;
