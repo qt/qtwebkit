@@ -97,15 +97,14 @@ defineTest(detectFeatures) {
     # Enable CSS shaders when CSS filters and WebGL are enabled
     enable?(css_filters):enable?(webgl): WEBKIT_CONFIG += css_shaders
 
-    # HTML5 Media Support for non-Mac builds
-    !mac {
-        !contains(QT_CONFIG, no-pkg-config) {
-            packagesExist("glib-2.0 gio-2.0 gstreamer-1.0 gstreamer-plugins-base-1.0") {
-                WEBKIT_CONFIG += video use_gstreamer
-            } else: packagesExist("glib-2.0 gio-2.0 \'gstreamer-0.10 >= 0.10.30\' \'gstreamer-plugins-base-0.10 >= 0.10.30\'") {
-                WEBKIT_CONFIG += video use_gstreamer use_gstreamer010
-            }
+    # HTML5 Media Support for builds with GStreamer
+    unix:!mac:!contains(QT_CONFIG, no-pkg-config) {
+        packagesExist("glib-2.0 gio-2.0 gstreamer-1.0 gstreamer-plugins-base-1.0") {
+            WEBKIT_CONFIG += video use_gstreamer
+        } else: packagesExist("glib-2.0 gio-2.0 \'gstreamer-0.10 >= 0.10.30\' \'gstreamer-plugins-base-0.10 >= 0.10.30\'") {
+            WEBKIT_CONFIG += video use_gstreamer use_gstreamer010
         }
+        use?(gstreamer): WEBKIT_CONFIG += use_native_fullscreen_video
     }
 
     !enable?(video):qtHaveModule(multimediawidgets) {
@@ -161,9 +160,6 @@ defineTest(santizeFeatures) {
 
     # Disable animated smooth scrolling if request-animation-frame is disabled
     !enable?(request_animation_frame): WEBKIT_CONFIG -= smooth_scrolling
-
-    # Fullscreen API relies on WebKit2
-    !build?(webkit2): WEBKIT_CONFIG -= fullscreen_api
 
     # WK2's plugin process code requires NPAPI
     !enable?(netscape_plugin_api): WEBKIT_CONFIG -= plugin_process

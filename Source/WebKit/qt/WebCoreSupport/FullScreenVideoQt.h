@@ -32,7 +32,6 @@ QT_END_NAMESPACE
 namespace WebCore {
 
 class ChromeClientQt;
-class FullScreenVideoWidget;
 class HTMLVideoElement;
 class Node;
 #if USE(QT_MULTIMEDIA)
@@ -46,7 +45,7 @@ class FullScreenVideoWindow;
 class GStreamerFullScreenVideoHandler : public QObject {
     Q_OBJECT
 public:
-    GStreamerFullScreenVideoHandler();
+    GStreamerFullScreenVideoHandler(ChromeClientQt*);
     ~GStreamerFullScreenVideoHandler() { }
     void setVideoElement(HTMLVideoElement*);
 
@@ -59,6 +58,7 @@ public Q_SLOTS:
 private:
     HTMLVideoElement* m_videoElement;
     FullScreenVideoWindow* m_fullScreenWidget;
+    ChromeClientQt* m_chromeClient;
 };
 #endif
 

@@ -3335,9 +3335,11 @@ enable?(VIDEO) {
 
         use?(NATIVE_FULLSCREEN_VIDEO) {
             HEADERS += \
+                platform/graphics/gstreamer/FullscreenVideoControllerGStreamer.h \
                 platform/graphics/gstreamer/PlatformVideoWindow.h \
                 platform/graphics/gstreamer/PlatformVideoWindowPrivate.h
             SOURCES += \
+                platform/graphics/gstreamer/FullscreenVideoControllerGStreamer.cpp \
                 platform/graphics/gstreamer/PlatformVideoWindowQt.cpp
         }
 
