@@ -22,7 +22,7 @@
 
 #if USE(GRAPHICS_SURFACE) && OS(DARWIN)
 #include "TextureMapperGL.h"
-#include <CFNumber.h>
+#include <CoreFoundation/CFNumber.h>
 #include <CGLContext.h>
 #include <CGLCurrent.h>
 #include <CGLIOSurface.h>

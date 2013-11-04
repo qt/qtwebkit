@@ -4269,7 +4269,6 @@ enable?(opencl) {
 use?(GRAPHICS_SURFACE) {
     mac {
         SOURCES += platform/graphics/surfaces/mac/GraphicsSurfaceMac.cpp
-        INCLUDEPATH += /System/Library/Frameworks/CoreFoundation.framework/Headers
     }
     win32 {
         SOURCES += platform/graphics/surfaces/win/GraphicsSurfaceWin.cpp
