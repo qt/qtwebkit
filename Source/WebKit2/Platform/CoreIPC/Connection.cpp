@@ -348,9 +348,15 @@ PassOwnPtr<MessageEncoder> Connection::createSyncMessageEncoder(StringReference 
     OwnPtr<MessageEncoder> encoder = MessageEncoder::create(messageReceiverName, messageName, destinationID);
     encoder->setIsSyncMessage(true);
 
+#if HAVE(ATOMICS_64BIT)
     // Encode the sync request ID.
     COMPILE_ASSERT(sizeof(m_syncRequestID) == sizeof(int64_t), CanUseAtomicIncrement);
     syncRequestID = atomicIncrement(reinterpret_cast<int64_t*>(&m_syncRequestID));
+#else
+    m_syncRequestLock.lock();
+    syncRequestID = ++m_syncRequestID;
+    m_syncRequestLock.unlock();
+#endif
     *encoder << syncRequestID;
 
     return encoder.release();

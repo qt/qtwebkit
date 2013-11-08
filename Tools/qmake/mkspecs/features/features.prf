@@ -48,10 +48,10 @@ defineTest(detectFeatures) {
     # We can't use Qt's 3rdparty sources for libjpeg and libpng outside of qtbase, but if Qt
     # is using the system libraries, use them to take advantage of the WebCore image decoders as well.
     contains(QT_CONFIG, system-jpeg): WEBKIT_CONFIG += use_libjpeg
-    else: CONFIGURE_WARNINGS += "JPEG library not found, QImageDecoder will decode JPEG images"
+    else: CONFIGURE_WARNINGS += "Qt not configured to use system libjpeg, QImageDecoder will decode JPEG images"
 
     contains(QT_CONFIG, system-png): WEBKIT_CONFIG += use_libpng
-    else: CONFIGURE_WARNINGS += "PNG library not found, QImageDecoder will decode PNG images"
+    else: CONFIGURE_WARNINGS += "Qt not configured to use system libpng, QImageDecoder will decode PNG images"
 
     linux-* {
         config_libXcomposite: WEBKIT_CONFIG += have_xcomposite
@@ -97,15 +97,14 @@ defineTest(detectFeatures) {
     # Enable CSS shaders when CSS filters and WebGL are enabled
     enable?(css_filters):enable?(webgl): WEBKIT_CONFIG += css_shaders
 
-    # HTML5 Media Support for non-Mac builds
-    !mac {
-        !contains(QT_CONFIG, no-pkg-config) {
-            packagesExist("glib-2.0 gio-2.0 gstreamer-1.0 gstreamer-plugins-base-1.0") {
-                WEBKIT_CONFIG += video use_gstreamer
-            } else: packagesExist("glib-2.0 gio-2.0 \'gstreamer-0.10 >= 0.10.30\' \'gstreamer-plugins-base-0.10 >= 0.10.30\'") {
-                WEBKIT_CONFIG += video use_gstreamer use_gstreamer010
-            }
+    # HTML5 Media Support for builds with GStreamer
+    unix:!mac:!contains(QT_CONFIG, no-pkg-config) {
+        packagesExist("glib-2.0 gio-2.0 gstreamer-1.0 gstreamer-plugins-base-1.0") {
+            WEBKIT_CONFIG += video use_gstreamer
+        } else: packagesExist("glib-2.0 gio-2.0 \'gstreamer-0.10 >= 0.10.30\' \'gstreamer-plugins-base-0.10 >= 0.10.30\'") {
+            WEBKIT_CONFIG += video use_gstreamer use_gstreamer010
         }
+        use?(gstreamer): WEBKIT_CONFIG += use_native_fullscreen_video
     }
 
     !enable?(video):qtHaveModule(multimediawidgets) {
@@ -113,7 +112,7 @@ defineTest(detectFeatures) {
     }
 
     !enable?(video) {
-        CONFIGURE_WARNINGS += "Missing GStreamer, QTKit or QtMultimedia, disabling media element support"
+        CONFIGURE_WARNINGS += "Missing GStreamer or QtMultimedia, disabling HTML5 media element support"
     }
 
     # Try to use an system wide SQlite installation
@@ -124,8 +123,8 @@ defineTest(detectFeatures) {
         isEmpty(SQLITE3SRCDIR):isEmpty(_QMAKE_SUPER_CACHE_): error("WebKit requires SQLite. Either make it available via pkg-config, set $SQLITE3SRCDIR or build WebKit under qt5.git.")
     }
 
-    # Gamepad API Support
-    packagesExist(libudev): WEBKIT_CONFIG += gamepad
+    # Gamepad API Support (depends on udev)
+    linux: WEBKIT_CONFIG += gamepad
 
     # Support for Graphics Surface
     # GraphicsSurface requires GraphicsContext3D and hence use_3d_graphics
@@ -162,14 +161,14 @@ defineTest(santizeFeatures) {
     # Disable animated smooth scrolling if request-animation-frame is disabled
     !enable?(request_animation_frame): WEBKIT_CONFIG -= smooth_scrolling
 
-    # Fullscreen API relies on WebKit2
-    !build?(webkit2): WEBKIT_CONFIG -= fullscreen_api
-
     # WK2's plugin process code requires NPAPI
     !enable?(netscape_plugin_api): WEBKIT_CONFIG -= plugin_process
 
     # Web Audio requires GStreamer.
     !use?(gstreamer): WEBKIT_CONFIG -= web_audio
+
+    # GStreamer uses Glib
+    use?(gstreamer): WEBKIT_CONFIG += use_glib
 
     # Minibrowser must be able to query for QtTestSupport
     build?(qttestsupport): WEBKIT_CONFIG += have_qttestsupport

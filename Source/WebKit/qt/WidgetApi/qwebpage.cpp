@@ -497,6 +497,7 @@ QMenu *createContextMenu(QWebPage* page, const QList<MenuItem>& items, QBitArray
             QWebPage::WebAction action = webActionForAdapterMenuAction(item.action);
             QAction *a = page->action(action);
             if (a) {
+                a->setText(item.title);
                 a->setEnabled(item.traits & MenuItem::Enabled);
                 a->setCheckable(item.traits & MenuItem::Checkable);
                 a->setChecked(item.traits & MenuItem::Checked);
@@ -523,7 +524,7 @@ QMenu *createContextMenu(QWebPage* page, const QList<MenuItem>& items, QBitArray
 
             // don't show sub-menus with just disabled actions
             if (anyEnabledAction) {
-                subMenu->setTitle(item.subMenuTitle);
+                subMenu->setTitle(item.title);
                 menu->addAction(subMenu->menuAction());
             } else
                 delete subMenu;
@@ -1182,7 +1183,13 @@ QWebInspector* QWebPagePrivate::getOrCreateInspector()
     \value AlignJustified Applies full justification to content. (Added in Qt 4.6)
     \value AlignLeft Applies left justification to content. (Added in Qt 4.6)
     \value AlignRight Applies right justification to content. (Added in Qt 4.6)
-
+    \value DownloadMediaToDisk Download the hovered audio or video to the disk. (Added in Qt 5.2)
+    \value CopyMediaUrlToClipboard Copy the hovered audio or video's URL to the clipboard. (Added in Qt 5.2)
+    \value ToggleMediaControls Toggles between showing and hiding the controls for the hovered audio or video element. (Added in Qt 5.2)
+    \value ToggleMediaLoop Toggles whether the hovered audio or video should loop on completetion or not. (Added in Qt 5.2)
+    \value ToggleMediaPlayPause Toggles the play/pause state of the hovered audio or video element. (Added in Qt 5.2)
+    \value ToggleMediaMute Mutes or unmutes the hovered audio or video element. (Added in Qt 5.2)
+    \value ToggleVideoFullscreen Switches the hovered video element into or out of fullscreen mode. (Added in Qt 5.2)
 
     \omitvalue WebActionCount
 
@@ -1721,6 +1728,12 @@ void QWebPage::triggerAction(WebAction action, bool)
     case SetTextDirectionDefault:
     case SetTextDirectionLeftToRight:
     case SetTextDirectionRightToLeft:
+    case DownloadMediaToDisk:
+    case ToggleMediaControls:
+    case ToggleMediaLoop:
+    case ToggleMediaPlayPause:
+    case ToggleMediaMute:
+    case ToggleVideoFullscreen:
         mappedAction = adapterMenuActionForWebAction(action);
         break;
     case ReloadAndBypassCache: // Manual mapping
@@ -1732,6 +1745,9 @@ void QWebPage::triggerAction(WebAction action, bool)
         break;
     case CopyImageUrlToClipboard:
         QApplication::clipboard()->setText(d->hitTestResult.imageUrl().toString());
+        break;
+    case CopyMediaUrlToClipboard:
+        QApplication::clipboard()->setText(d->hitTestResult.mediaUrl().toString());
         break;
 #endif
     case InspectElement: {
@@ -2204,6 +2220,13 @@ QAction *QWebPage::action(WebAction action) const
     case ToggleBold:
     case ToggleItalic:
     case ToggleUnderline:
+    case DownloadMediaToDisk:
+    case CopyMediaUrlToClipboard:
+    case ToggleMediaControls:
+    case ToggleMediaLoop:
+    case ToggleMediaPlayPause:
+    case ToggleMediaMute:
+    case ToggleVideoFullscreen:
         mappedAction = adapterMenuActionForWebAction(action);
         break;
     case InspectElement:

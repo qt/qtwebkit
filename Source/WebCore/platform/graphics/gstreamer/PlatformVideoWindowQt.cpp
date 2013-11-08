@@ -25,9 +25,7 @@
 #include "PlatformVideoWindowPrivate.h"
 
 #include <QCursor>
-#include <QGuiApplication>
 #include <QKeyEvent>
-#include <QPalette>
 
 using namespace WebCore;
 
@@ -77,35 +75,36 @@ bool FullScreenVideoWindow::event(QEvent* ev)
     case QEvent::Close:
 #ifndef QT_NO_CURSOR
         m_cursorTimer.stop();
-#endif
-#ifndef QT_NO_CURSOR
-        QGuiApplication::restoreOverrideCursor();
+        unsetCursor();
 #endif
         break;
     default:
         break;
     }
+
     return QWindow::event(ev);
 }
 
 void FullScreenVideoWindow::showFullScreen()
 {
-    QWindow::showFullScreen();
+    setWindowState(Qt::WindowFullScreen);
+    requestActivate();
     raise();
+    setVisible(true);
     hideCursor();
 }
 
 void FullScreenVideoWindow::hideCursor()
 {
 #ifndef QT_NO_CURSOR
-    QGuiApplication::setOverrideCursor(QCursor(Qt::BlankCursor));
+    setCursor(QCursor(Qt::BlankCursor));
 #endif
 }
 
 void FullScreenVideoWindow::showCursor()
 {
 #ifndef QT_NO_CURSOR
-    QGuiApplication::restoreOverrideCursor();
+    unsetCursor();
     m_cursorTimer.start(gHideMouseCursorDelay);
 #endif
 }
@@ -116,8 +115,6 @@ PlatformVideoWindow::PlatformVideoWindow()
     QWindow* win = new FullScreenVideoWindow();
     m_window = win;
     win->setFlags(win->flags() | Qt::FramelessWindowHint);
-    // FIXME: Port to Qt 5.
-    win->showFullScreen();
     m_videoWindowId = win->winId();
 }
 

@@ -47,15 +47,6 @@
 #endif /* __APPLE__ */
 
 #if OS(WINDOWS)
-
-#ifndef _WIN32_WINNT
-#define _WIN32_WINNT 0x0502
-#endif
-
-#ifndef WINVER
-#define WINVER 0x0502
-#endif
-
 // If we don't define these, they get defined in windef.h.
 // We want to use std::min and std::max.
 #ifndef max

@@ -61,10 +61,14 @@
 #include <windows.h>
 #endif
 
-#if OS(DARWIN) || (OS(LINUX) && !defined(__UCLIBC__))
+#if (OS(DARWIN) || (OS(LINUX) && !defined(__UCLIBC__))) && !OS(ANDROID)
 #include <cxxabi.h>
 #include <dlfcn.h>
 #include <execinfo.h>
+#endif
+
+#if HAVE(ANDROID_SDK)
+#include <android/log.h>
 #endif
 
 #if PLATFORM(BLACKBERRY)
@@ -115,6 +119,8 @@ static void vprintf_stderr_common(const char* format, va_list args)
 
 #elif PLATFORM(BLACKBERRY)
     BBLOGV(BlackBerry::Platform::LogLevelCritical, format, args);
+#elif HAVE(ANDROID_SDK)
+    __android_log_vprint(ANDROID_LOG_WARN, "WebKit", format, args);
 #elif HAVE(ISDEBUGGERPRESENT)
     if (IsDebuggerPresent()) {
         size_t size = 1024;
@@ -239,7 +245,7 @@ void WTFReportArgumentAssertionFailure(const char* file, int line, const char* f
 
 void WTFGetBacktrace(void** stack, int* size)
 {
-#if OS(DARWIN) || (OS(LINUX) && !defined(__UCLIBC__))
+#if (OS(DARWIN) || (OS(LINUX) && !defined(__UCLIBC__))) && !OS(ANDROID)
     *size = backtrace(stack, *size);
 #elif OS(WINDOWS) && !OS(WINCE)
     // The CaptureStackBackTrace function is available in XP, but it is not defined
@@ -278,7 +284,7 @@ void WTFReportBacktrace()
 #    if defined(__GLIBC__) && !defined(__UCLIBC__)
 #      define WTF_USE_BACKTRACE_SYMBOLS 1
 #    endif
-#  else
+#  elif !OS(ANDROID)
 #    define WTF_USE_DLADDR 1
 #  endif
 #endif

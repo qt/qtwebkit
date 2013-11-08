@@ -139,7 +139,9 @@
 #include "Touch.cpp"
 #include "TouchEvent.cpp"
 #include "TouchList.cpp"
+#if ENABLE(XSLT) && USE(LIBXML2)
 #include "TransformSourceLibxslt.cpp"
+#endif
 #include "TransitionEvent.cpp"
 #include "Traversal.cpp"
 #include "TreeScope.cpp"
@@ -158,5 +160,6 @@
 #include "WheelEvent.cpp"
 #include "WindowEventContext.cpp"
 #include "XMLDocumentParser.cpp"
+#if USE(LIBXML2)
 #include "XMLDocumentParserScope.cpp"
-
+#endif

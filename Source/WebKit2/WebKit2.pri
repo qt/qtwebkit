@@ -75,7 +75,7 @@ INCLUDEPATH += $${ROOT_WEBKIT_DIR}/Source/WTF/wtf/qt
 
 INCLUDEPATH += $$WEBKIT2_GENERATED_SOURCES_DIR
 
-linux-*: {
+linux-*:!android {
     # -lrt is required for shm_open and shm_unlink.
     LIBS += -lrt
 }

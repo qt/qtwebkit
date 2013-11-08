@@ -132,19 +132,25 @@ namespace WebCore {
 #endif
     String contextMenuItemTagOpenVideoInNewWindow();
     String contextMenuItemTagOpenAudioInNewWindow();
+    String contextMenuItemTagOpenMediaInNewWindow();
     String contextMenuItemTagDownloadVideoToDisk();
     String contextMenuItemTagDownloadAudioToDisk();
+    String contextMenuItemTagDownloadMediaToDisk();
     String contextMenuItemTagCopyVideoLinkToClipboard();
     String contextMenuItemTagCopyAudioLinkToClipboard();
+    String contextMenuItemTagCopyMediaLinkToClipboard();
     String contextMenuItemTagToggleMediaControls();
     String contextMenuItemTagShowMediaControls();
     String contextMenuItemTagHideMediaControls();
     String contextMenuItemTagToggleMediaLoop();
     String contextMenuItemTagEnterVideoFullscreen();
     String contextMenuItemTagExitVideoFullscreen();
+    String contextMenuItemTagToggleVideoFullscreen();
+    String contextMenuItemTagMediaPlayPause();
     String contextMenuItemTagMediaPlay();
     String contextMenuItemTagMediaPause();
     String contextMenuItemTagMediaMute();
+    String contextMenuItemTagMediaUnmute();
     String contextMenuItemTagInspectElement();
 #endif // ENABLE(CONTEXT_MENUS)
 

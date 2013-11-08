@@ -254,6 +254,10 @@ private:
     Mutex m_waitForMessageMutex;
     HashMap<std::pair<std::pair<StringReference, StringReference>, uint64_t>, OwnPtr<MessageDecoder> > m_waitForMessageMap;
 
+#if !HAVE(ATOMICS_64BIT)
+    Mutex m_syncRequestLock;
+#endif
+
     // Represents a sync request for which we're waiting on a reply.
     struct PendingSyncReply {
         // The request ID.

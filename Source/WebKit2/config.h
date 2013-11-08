@@ -55,16 +55,7 @@ static const type& name() \
     return name##Value; \
 }
 
-#if defined(WIN32) || defined(_WIN32)
-
-#ifndef _WIN32_WINNT
-#define _WIN32_WINNT 0x0502
-#endif
-
-#ifndef WINVER
-#define WINVER 0x0502
-#endif
-
+#if OS(WINDOWS)
 /* If we don't define these, they get defined in windef.h. */
 /* We want to use std::min and std::max. */
 #ifndef max
@@ -87,7 +78,7 @@ static const type& name() \
 #include <CoreGraphics/CoreGraphics.h>
 #endif
 
-#endif /* defined(WIN32) || defined(_WIN32) */
+#endif /* OS(WINDOWS) */
 
 #ifdef __cplusplus
 

@@ -63,14 +63,6 @@ public:
     static bool webkitIndexedDBEnabled() { return isIndexedDBEnabled; }
     static bool indexedDBEnabled() { return isIndexedDBEnabled; }
 
-#if ENABLE(CANVAS_PATH)
-    static void setCanvasPathEnabled(bool isEnabled) { isCanvasPathEnabled = isEnabled; }
-    static bool canvasPathEnabled() { return isCanvasPathEnabled; }
-#else
-    static void setCanvasPathEnabled(bool) { }
-    static bool canvasPathEnabled() { return false; }
-#endif
-
 #if ENABLE(CSS_EXCLUSIONS)
     static void setCSSExclusionsEnabled(bool isEnabled) { isCSSExclusionsEnabled = isEnabled; }
     static bool cssExclusionsEnabled() { return isCSSExclusionsEnabled; }
@@ -106,23 +98,6 @@ public:
     static bool fontLoadEventsEnabled() { return false; }
 #endif
 
-#if ENABLE(FULLSCREEN_API)
-    // Mozilla version
-    static bool webkitFullScreenAPIEnabled() { return isFullScreenAPIEnabled; }
-    static void setWebkitFullScreenAPIEnabled(bool isEnabled) { isFullScreenAPIEnabled = isEnabled; }
-    static bool webkitRequestFullScreenEnabled() { return isFullScreenAPIEnabled; }
-    static bool webkitIsFullScreenEnabled() { return isFullScreenAPIEnabled; }
-    static bool webkitFullScreenKeyboardInputAllowedEnabled() { return isFullScreenAPIEnabled; }
-    static bool webkitCurrentFullScreenElementEnabled() { return isFullScreenAPIEnabled; }
-    static bool webkitCancelFullScreenEnabled() { return isFullScreenAPIEnabled; }
-
-    // W3C version
-    static bool webkitFullscreenEnabledEnabled() { return isFullScreenAPIEnabled; }
-    static bool webkitFullscreenElementEnabled() { return isFullScreenAPIEnabled; }
-    static bool webkitExitFullscreenEnabled() { return isFullScreenAPIEnabled; }
-    static bool webkitRequestFullscreenEnabled() { return isFullScreenAPIEnabled; }
-#endif
-
 #if ENABLE(VIDEO)
     static bool audioEnabled();
     static bool htmlMediaElementEnabled();
@@ -140,11 +115,6 @@ public:
 
 #if ENABLE(WEB_SOCKETS)
     static bool webSocketEnabled();
-#endif
-
-#if ENABLE(SQL_DATABASE)
-    static bool openDatabaseEnabled();
-    static bool openDatabaseSyncEnabled();
 #endif
 
 #if ENABLE(TOUCH_EVENTS)
@@ -201,26 +171,6 @@ public:
 #if ENABLE(LEGACY_CSS_VENDOR_PREFIXES)
     static void setLegacyCSSVendorPrefixesEnabled(bool isEnabled) { isLegacyCSSVendorPrefixesEnabled = isEnabled; }
     static bool legacyCSSVendorPrefixesEnabled() { return isLegacyCSSVendorPrefixesEnabled; }
-#endif
-
-#if ENABLE(GAMEPAD)
-    static void setWebkitGetGamepadsEnabled(bool isEnabled) { isGamepadEnabled = isEnabled; }
-    static bool webkitGetGamepadsEnabled() { return isGamepadEnabled; }
-#endif
-
-#if ENABLE(QUOTA)
-    static bool quotaEnabled() { return isQuotaEnabled; }
-    static void setQuotaEnabled(bool isEnabled) { isQuotaEnabled = isEnabled; }
-#endif
-
-#if ENABLE(MEDIA_SOURCE)
-    static bool mediaSourceEnabled() { return isMediaSourceEnabled; }
-    static void setMediaSourceEnabled(bool isEnabled) { isMediaSourceEnabled = isEnabled; }
-#endif
-
-#if ENABLE(ENCRYPTED_MEDIA)
-    static bool encryptedMediaEnabled() { return isEncryptedMediaEnabled; }
-    static void setEncryptedMediaEnabled(bool isEnabled) { isEncryptedMediaEnabled = isEnabled; }
 #endif
 
 #if ENABLE(VIDEO_TRACK)
@@ -310,7 +260,6 @@ private:
     static bool isDeviceMotionEnabled;
     static bool isDeviceOrientationEnabled;
     static bool isSpeechInputEnabled;
-    static bool isCanvasPathEnabled;
     static bool isCSSExclusionsEnabled;
     static bool isCSSShapesEnabled;
     static bool isCSSRegionsEnabled;
@@ -332,28 +281,8 @@ private:
     static bool isPeerConnectionEnabled;
 #endif
 
-#if ENABLE(GAMEPAD)
-    static bool isGamepadEnabled;
-#endif
-
 #if ENABLE(LEGACY_CSS_VENDOR_PREFIXES)
     static bool isLegacyCSSVendorPrefixesEnabled;
-#endif
-
-#if ENABLE(QUOTA)
-    static bool isQuotaEnabled;
-#endif
-
-#if ENABLE(FULLSCREEN_API)
-    static bool isFullScreenAPIEnabled;
-#endif
-
-#if ENABLE(MEDIA_SOURCE)
-    static bool isMediaSourceEnabled;
-#endif
-
-#if ENABLE(ENCRYPTED_MEDIA)
-    static bool isEncryptedMediaEnabled;
 #endif
 
 #if ENABLE(VIDEO_TRACK)

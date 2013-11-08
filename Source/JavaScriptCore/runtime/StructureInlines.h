@@ -26,6 +26,7 @@
 #ifndef StructureInlines_h
 #define StructureInlines_h
 
+#include "JSGlobalObject.h"
 #include "PropertyMapHashTable.h"
 #include "Structure.h"
 

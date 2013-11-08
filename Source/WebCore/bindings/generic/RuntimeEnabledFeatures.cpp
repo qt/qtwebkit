@@ -53,7 +53,6 @@ bool RuntimeEnabledFeatures::isTouchEnabled = true;
 bool RuntimeEnabledFeatures::isDeviceMotionEnabled = true;
 bool RuntimeEnabledFeatures::isDeviceOrientationEnabled = true;
 bool RuntimeEnabledFeatures::isSpeechInputEnabled = true;
-bool RuntimeEnabledFeatures::isCanvasPathEnabled = false;
 bool RuntimeEnabledFeatures::isCSSExclusionsEnabled = true;
 bool RuntimeEnabledFeatures::isCSSShapesEnabled = true;
 bool RuntimeEnabledFeatures::isCSSRegionsEnabled = false;
@@ -71,10 +70,6 @@ bool RuntimeEnabledFeatures::isPeerConnectionEnabled = true;
 
 #if ENABLE(LEGACY_CSS_VENDOR_PREFIXES)
 bool RuntimeEnabledFeatures::isLegacyCSSVendorPrefixesEnabled = false;
-#endif
-
-#if ENABLE(GAMEPAD)
-bool RuntimeEnabledFeatures::isGamepadEnabled = false;
 #endif
 
 #if ENABLE(FILE_SYSTEM)
@@ -153,40 +148,12 @@ bool RuntimeEnabledFeatures::webSocketEnabled()
 }
 #endif
 
-#if ENABLE(SQL_DATABASE)
-bool RuntimeEnabledFeatures::openDatabaseEnabled()
-{
-    return DatabaseManager::manager().isAvailable();
-}
-
-bool RuntimeEnabledFeatures::openDatabaseSyncEnabled()
-{
-    return DatabaseManager::manager().isAvailable();
-}
-#endif
-
-#if ENABLE(QUOTA)
-bool RuntimeEnabledFeatures::isQuotaEnabled = false;
-#endif
-
-#if ENABLE(FULLSCREEN_API)
-bool RuntimeEnabledFeatures::isFullScreenAPIEnabled = true;
-#endif
-
-#if ENABLE(MEDIA_SOURCE)
-bool RuntimeEnabledFeatures::isMediaSourceEnabled = false;
-#endif
-
 #if ENABLE(VIDEO_TRACK)
 #if PLATFORM(MAC) || PLATFORM(GTK) || PLATFORM(EFL) || PLATFORM(BLACKBERRY) || PLATFORM(WIN) || PLATFORM(QT)
     bool RuntimeEnabledFeatures::isVideoTrackEnabled = true;
 #else
     bool RuntimeEnabledFeatures::isVideoTrackEnabled = false;
 #endif
-#endif
-
-#if ENABLE(ENCRYPTED_MEDIA)
-bool RuntimeEnabledFeatures::isEncryptedMediaEnabled = false;
 #endif
 
 #if ENABLE(SHADOW_DOM)

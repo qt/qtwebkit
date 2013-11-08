@@ -165,17 +165,19 @@ enable?(GAMEPAD) {
     INCLUDEPATH += \
         $$SOURCE_DIR/platform/linux \
         $$SOURCE_DIR/Modules/gamepad
-    PKGCONFIG += libudev
+}
+
+use?(GLIB) {
+    PKGCONFIG *= glib-2.0 gio-2.0
 }
 
 use?(GSTREAMER) {
-    DEFINES += WTF_USE_GLIB=1
     use?(GSTREAMER010) {
-        PKGCONFIG += glib-2.0 gio-2.0 gstreamer-0.10 gstreamer-app-0.10 gstreamer-base-0.10 gstreamer-interfaces-0.10 gstreamer-pbutils-0.10 gstreamer-plugins-base-0.10 gstreamer-video-0.10
+        PKGCONFIG += gstreamer-0.10 gstreamer-app-0.10 gstreamer-base-0.10 gstreamer-interfaces-0.10 gstreamer-pbutils-0.10 gstreamer-plugins-base-0.10 gstreamer-video-0.10
     } else {
         DEFINES += GST_API_VERSION=1.0
         DEFINES += GST_API_VERSION_1
-        PKGCONFIG += glib-2.0 gio-2.0 gstreamer-1.0 gstreamer-app-1.0 gstreamer-base-1.0 gstreamer-pbutils-1.0 gstreamer-plugins-base-1.0 gstreamer-video-1.0 gstreamer-audio-1.0
+        PKGCONFIG += gstreamer-1.0 gstreamer-app-1.0 gstreamer-base-1.0 gstreamer-pbutils-1.0 gstreamer-plugins-base-1.0 gstreamer-video-1.0 gstreamer-audio-1.0
     }
 }
 

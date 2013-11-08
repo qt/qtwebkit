@@ -1675,13 +1675,15 @@ public:
     JITCompiler::Call appendCallWithExceptionCheckSetResult(const FunctionPtr& function, FPRReg result)
     {
         JITCompiler::Call call = appendCallWithExceptionCheck(function);
-        m_jit.moveDouble(result, FPRInfo::argumentFPR0);
+        if (result != InvalidFPRReg)
+            m_jit.moveDouble(FPRInfo::argumentFPR0, result);
         return call;
     }
     JITCompiler::Call appendCallSetResult(const FunctionPtr& function, FPRReg result)
     {
         JITCompiler::Call call = m_jit.appendCall(function);
-        m_jit.moveDouble(result, FPRInfo::argumentFPR0);
+        if (result != InvalidFPRReg)
+            m_jit.moveDouble(FPRInfo::argumentFPR0, result);
         return call;
     }
 #else

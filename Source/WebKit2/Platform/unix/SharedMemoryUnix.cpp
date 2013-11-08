@@ -44,6 +44,10 @@
 #include <wtf/UniStdExtras.h>
 #include <wtf/text/CString.h>
 
+#if OS(ANDROID)
+#include <linux/ashmem.h>
+#endif
+
 namespace WebKit {
 
 SharedMemory::Handle::Handle()
@@ -97,6 +101,41 @@ void SharedMemory::Handle::adoptFromAttachment(int fileDescriptor, size_t size)
     m_size = size;
 }
 
+#if OS(ANDROID)
+PassRefPtr<SharedMemory> SharedMemory::create(size_t size)
+{
+    int fileDescriptor = open("/dev/ashmem", O_RDWR);
+    if (fileDescriptor < 0) {
+        WTFLogAlways("Failed to open ashmem device");
+        return 0;
+    }
+
+    String name = String("/WK2SharedMemory.") + String::number(static_cast<unsigned>(WTF::randomNumber() * (std::numeric_limits<unsigned>::max() + 1.0)));
+    char buf[ASHMEM_NAME_LEN];
+    strlcpy(buf,name.utf8().data(), sizeof(buf));
+    // Ashmem names does not need to be unique.
+    ioctl(fileDescriptor, ASHMEM_SET_NAME, buf);
+
+    int ret = ioctl(fileDescriptor, ASHMEM_SET_SIZE, size);
+    if (ret < 0) {
+        closeWithRetry(fileDescriptor);
+        WTFLogAlways("Failed to create shared memory of size %d", size);
+        return 0;
+    }
+
+    void* data = mmap(0, size, PROT_READ | PROT_WRITE, MAP_SHARED, fileDescriptor, 0);
+    if (data == MAP_FAILED) {
+        closeWithRetry(fileDescriptor);
+        return 0;
+    }
+
+    RefPtr<SharedMemory> instance = adoptRef(new SharedMemory());
+    instance->m_data = data;
+    instance->m_fileDescriptor = fileDescriptor;
+    instance->m_size = size;
+    return instance.release();
+}
+#else
 PassRefPtr<SharedMemory> SharedMemory::create(size_t size)
 {
     CString tempName;
@@ -138,6 +177,7 @@ PassRefPtr<SharedMemory> SharedMemory::create(size_t size)
     instance->m_size = size;
     return instance.release();
 }
+#endif
 
 static inline int accessModeMMap(SharedMemory::Protection protection)
 {

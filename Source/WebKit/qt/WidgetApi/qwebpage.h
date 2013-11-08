@@ -181,6 +181,14 @@ public:
 
         OpenLinkInThisWindow,
 
+        DownloadMediaToDisk,
+        CopyMediaUrlToClipboard,
+        ToggleMediaControls,
+        ToggleMediaLoop,
+        ToggleMediaPlayPause,
+        ToggleMediaMute,
+        ToggleVideoFullscreen,
+
         WebActionCount
     };
 

@@ -158,7 +158,6 @@ SOURCES += \
      bindings/js/JSMessageChannelCustom.cpp \
      bindings/js/JSMessageEventCustom.cpp \
      bindings/js/JSMessagePortCustom.cpp \
-     bindings/js/JSMessagePortCustom.h \
      bindings/js/JSMicroDataItemValueCustom.cpp \
      bindings/js/JSMutationCallback.cpp \
      bindings/js/JSMutationObserverCustom.cpp \
@@ -1365,6 +1364,7 @@ HEADERS += \
     bindings/js/JSHTMLSelectElementCustom.h \
     bindings/js/JSImageConstructor.h \
     bindings/js/JSLazyEventListener.h \
+    bindings/js/JSMessagePortCustom.h \
     bindings/js/JSMutationCallback.h \
     bindings/js/JSNodeCustom.h \
     bindings/js/JSNodeFilterCondition.h \
@@ -3335,9 +3335,11 @@ enable?(VIDEO) {
 
         use?(NATIVE_FULLSCREEN_VIDEO) {
             HEADERS += \
+                platform/graphics/gstreamer/FullscreenVideoControllerGStreamer.h \
                 platform/graphics/gstreamer/PlatformVideoWindow.h \
                 platform/graphics/gstreamer/PlatformVideoWindowPrivate.h
             SOURCES += \
+                platform/graphics/gstreamer/FullscreenVideoControllerGStreamer.cpp \
                 platform/graphics/gstreamer/PlatformVideoWindowQt.cpp
         }
 
@@ -4269,7 +4271,6 @@ enable?(opencl) {
 use?(GRAPHICS_SURFACE) {
     mac {
         SOURCES += platform/graphics/surfaces/mac/GraphicsSurfaceMac.cpp
-        INCLUDEPATH += /System/Library/Frameworks/CoreFoundation.framework/Headers
     }
     win32 {
         SOURCES += platform/graphics/surfaces/win/GraphicsSurfaceWin.cpp
@@ -4297,16 +4298,11 @@ ALL_IN_ONE_SOURCES += \
     rendering/style/StyleAllInOne.cpp \
     html/HTMLElementsAllInOne.cpp \
     editing/EditingAllInOne.cpp \
-    rendering/RenderingAllInOne.cpp
-
-enable?(XSLT):use?(LIBXML2) {
-    ALL_IN_ONE_SOURCES += \
-        dom/DOMAllInOne.cpp
-}
-
-# These do not compile at the moment:
-#    css/MediaAllInOne.cpp
-#    css/CSSAllInOne.cpp
+    rendering/RenderingAllInOne.cpp \
+    css/CSSAllInOne.cpp \
+    css/MediaAllInOne.cpp \
+    dom/DOMAllInOne.cpp \
+    bindings/js/JSBindingsAllInOne.cpp
 
 # Make sure the derived sources are built
 include(DerivedSources.pri)

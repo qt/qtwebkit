@@ -186,7 +186,8 @@
 #elif !defined(__ARM_EABI__) \
     && !defined(__EABI__) \
     && !defined(__VFP_FP__) \
-    && !defined(_WIN32_WCE)
+    && !defined(_WIN32_WCE) \
+    && !defined(ANDROID)
 #define WTF_CPU_MIDDLE_ENDIAN 1
 
 #endif
@@ -328,6 +329,15 @@
 /* ==== OS() - underlying operating system; only to be used for mandated low-level services like 
    virtual memory, not to choose a GUI toolkit ==== */
 
+/* OS(ANDROID) - Android */
+#ifdef ANDROID
+#define WTF_OS_ANDROID 1
+#endif
+
+#if OS(ANDROID) && !defined(Q_OS_ANDROID_NO_SDK)
+#define WTF_HAVE_ANDROID_SDK 1
+#endif
+
 /* OS(AIX) - AIX */
 #ifdef _AIX
 #define WTF_OS_AIX 1
@@ -414,7 +424,8 @@
 #define WTF_OS_MAC ERROR "USE MAC_OS_X WITH OS NOT MAC"
 
 /* OS(UNIX) - Any Unix-like system */
-#if    OS(AIX)              \
+#if   OS(AIX)              \
+    || OS(ANDROID)          \
     || OS(DARWIN)           \
     || OS(FREEBSD)          \
     || OS(HURD)             \
@@ -428,6 +439,33 @@
     || defined(__unix__)
 #define WTF_OS_UNIX 1
 #endif
+
+#if OS(WINDOWS)
+// Minimum supported windows is Windows XP.
+// The original WinXP was NT 5.1, but Win XP 64bit was NT 5.2
+#if CPU(X86_64)
+#ifndef _WIN32_WINNT
+#define _WIN32_WINNT 0x0502
+#endif
+
+#ifndef WINVER
+#define WINVER 0x0502
+#endif
+
+#else /* !CPU(X86_64) */
+
+#ifndef _WIN32_WINNT
+#define _WIN32_WINNT 0x0501
+#endif
+
+#ifndef WINVER
+#define WINVER 0x0501
+#endif
+
+#endif
+
+#endif
+
 
 /* Operating environments */
 
@@ -579,7 +617,7 @@
 #define WTF_USE_PTHREADS 1
 #endif /* OS(UNIX) */
 
-#if OS(UNIX) && !OS(QNX)
+#if OS(UNIX) && !OS(ANDROID) && !OS(QNX)
 #define HAVE_LANGINFO_H 1
 #endif
 
@@ -599,7 +637,7 @@
 #endif
 #endif
 
-#if !OS(WINDOWS) && !OS(SOLARIS)
+#if !OS(WINDOWS) && !OS(SOLARIS) && !OS(ANDROID)
 #define HAVE_TM_GMTOFF 1
 #define HAVE_TM_ZONE 1
 #define HAVE_TIMEGM 1
@@ -1009,6 +1047,11 @@
 #define WTF_USE_CONTENT_FILTERING 1
 #endif
 
+#if COMPILER(GCC) && defined(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_8)
+#define HAVE_ATOMICS_64BIT 1
+#elif OS(WINDOWS) && (_WIN32_WINNT >= 0x0502)
+#define HAVE_ATOMICS_64BIT 1
+#endif
 
 #define WTF_USE_GRAMMAR_CHECKING 1
 

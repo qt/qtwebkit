@@ -174,9 +174,7 @@ void QWebSettingsPrivate::apply()
         value = attributes.value(QWebSettings::CSSRegionsEnabled,
                                  global->attributes.value(QWebSettings::CSSRegionsEnabled));
         WebCore::RuntimeEnabledFeatures::setCSSRegionsEnabled(value);
-        value = attributes.value(QWebSettings::CSSCompositingEnabled,
-                                 global->attributes.value(QWebSettings::CSSCompositingEnabled));
-        WebCore::RuntimeEnabledFeatures::setCSSCompositingEnabled(value);
+
         value = attributes.value(QWebSettings::CSSGridLayoutEnabled,
                                  global->attributes.value(QWebSettings::CSSGridLayoutEnabled));
         settings->setCSSGridLayoutEnabled(value);
@@ -497,6 +495,8 @@ QWebSettings* QWebSettings::globalSettings()
         This is disabled by default.
     \value SiteSpecificQuirksEnabled This setting enables WebKit's workaround for broken sites. It is
         enabled by default.
+    \value CSSGridLayoutEnabled This setting enables support for the CSS 3 Grid Layout module. This
+        CSS module is currently only a draft and support for it is disabled by default.
     \value ScrollAnimatorEnabled This setting enables animated scrolling. It is disabled by default.
     \value CaretBrowsingEnabled This setting enables caret browsing. It is disabled by default.
     \value NotificationsEnabled Specifies whether support for the HTML 5 web notifications is enabled
@@ -548,7 +548,6 @@ QWebSettings::QWebSettings()
     d->attributes.insert(QWebSettings::WebGLEnabled, true);
     d->attributes.insert(QWebSettings::WebAudioEnabled, false);
     d->attributes.insert(QWebSettings::CSSRegionsEnabled, true);
-    d->attributes.insert(QWebSettings::CSSCompositingEnabled, true);
     d->attributes.insert(QWebSettings::CSSGridLayoutEnabled, false);
     d->attributes.insert(QWebSettings::HyperlinkAuditingEnabled, false);
     d->attributes.insert(QWebSettings::TiledBackingStoreEnabled, false);
