@@ -26,9 +26,7 @@
 #include "HTMLFrameOwnerElement.h"
 #include "Image.h"
 
-#if ENABLE(NETSCAPE_PLUGIN_API)
 struct NPObject;
-#endif
 
 namespace JSC {
 namespace Bindings {
@@ -109,9 +107,7 @@ private:
     virtual bool isPluginElement() const OVERRIDE;
 
     RefPtr<JSC::Bindings::Instance> m_instance;
-#if ENABLE(NETSCAPE_PLUGIN_API)
     NPObject* m_NPObject;
-#endif
     bool m_isCapturingMouseEvents;
 
     DisplayState m_displayState;
