@@ -27,7 +27,7 @@ INCLUDEPATH += \
 
 have?(qtsensors):if(enable?(DEVICE_ORIENTATION)|enable?(ORIENTATION_EVENTS)): QT += sensors
 
-have?(qtlocation):enable?(GEOLOCATION): QT += location
+have?(qtpositioning):enable?(GEOLOCATION): QT += positioning
 
 use?(QT_MULTIMEDIA): QT *= multimediawidgets
 
