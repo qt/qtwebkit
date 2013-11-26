@@ -1202,11 +1202,9 @@ void WebFrameLoaderClient::transitionToCommittedForNewPage()
 
     m_frameCameFromPageCache = false;
 
-    ScrollbarMode defaultScrollbarMode = shouldHideScrollbars ? ScrollbarAlwaysOff : ScrollbarAuto;
-
     m_frame->coreFrame()->createView(webPage->size(), backgroundColor, isTransparent,
         IntSize(), currentFixedVisibleContentRect, shouldUseFixedLayout,
-        defaultScrollbarMode, /* lock */ shouldHideScrollbars, defaultScrollbarMode, /* lock */ shouldHideScrollbars);
+        ScrollbarAuto, /* lock */ shouldHideScrollbars, ScrollbarAuto, /* lock */ shouldHideScrollbars);
 
     if (int minimumLayoutWidth = webPage->minimumLayoutSize().width()) {
         int minimumLayoutHeight = std::max(webPage->minimumLayoutSize().height(), 1);

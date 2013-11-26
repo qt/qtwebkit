@@ -4147,24 +4147,6 @@ void FrameView::removeChild(Widget* widget)
 
 bool FrameView::wheelEvent(const PlatformWheelEvent& wheelEvent)
 {
-    // Note that to allow for rubber-band over-scroll behavior, even non-scrollable views
-    // should handle wheel events.
-#if !ENABLE(RUBBER_BANDING)
-    if (!isScrollable())
-        return false;
-#endif
-
-    if (delegatesScrolling()) {
-        IntSize offset = scrollOffset();
-        IntSize newOffset = IntSize(offset.width() - wheelEvent.deltaX(), offset.height() - wheelEvent.deltaY());
-        if (offset != newOffset) {
-            ScrollView::scrollTo(newOffset);
-            scrollPositionChanged();
-            frame()->loader()->client()->didChangeScrollOffset();
-        }
-        return true;
-    }
-
     // We don't allow mouse wheeling to happen in a ScrollView that has had its scrollbars explicitly disabled.
     if (!canHaveScrollbars())
         return false;
