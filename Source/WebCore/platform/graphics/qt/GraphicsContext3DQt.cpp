@@ -221,6 +221,10 @@ void GraphicsContext3DPrivate::initializeANGLE()
 
 GraphicsContext3DPrivate::~GraphicsContext3DPrivate()
 {
+#if USE(ACCELERATED_COMPOSITING)
+    if (TextureMapperPlatformLayer::Client* client = TextureMapperPlatformLayer::client())
+        client->platformLayerWasDestroyed();
+#endif
     delete m_surfaceOwner;
     m_surfaceOwner = 0;
 }
