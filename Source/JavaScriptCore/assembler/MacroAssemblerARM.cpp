@@ -36,9 +36,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <elf.h>
-#if !OS(ANDROID) && !PLATFORM(QT)
-# include <asm/hwcap.h>
-# else
+# if OS(ANDROID) && PLATFORM(QT)
 # include <asm/procinfo.h>
 typedef struct
 {
@@ -48,6 +46,8 @@ typedef struct
         uint32_t a_val;
     } a_un;
 } Elf32_auxv_t;
+# else
+# include <asm/hwcap.h>
 # endif
 #endif
 

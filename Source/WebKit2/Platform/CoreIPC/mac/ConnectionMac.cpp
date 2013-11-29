@@ -113,9 +113,10 @@ void Connection::platformInitialize(Identifier identifier)
 static dispatch_source_t createDataAvailableSource(mach_port_t receivePort, WorkQueue* workQueue, const Function<void()>& function)
 {
     dispatch_source_t source = dispatch_source_create(DISPATCH_SOURCE_TYPE_MACH_RECV, receivePort, 0, workQueue->dispatchQueue());
-#if COMPILER(GCC)
+#if COMPILER(GCC) && !COMPILER(CLANG)
+    Function<void()> functionCopy = function;
     dispatch_source_set_event_handler(source, ^{
-        function();
+        functionCopy();
     });
 #else
     dispatch_source_set_event_handler(source, function);
@@ -296,7 +297,7 @@ bool Connection::sendOutgoingMessage(PassOwnPtr<MessageEncoder> encoder)
 void Connection::initializeDeadNameSource()
 {
     m_deadNameSource = dispatch_source_create(DISPATCH_SOURCE_TYPE_MACH_SEND, m_sendPort, 0, m_connectionQueue->dispatchQueue());
-#if COMPILER(GCC)
+#if COMPILER(GCC) && !COMPILER(CLANG)
     dispatch_source_set_event_handler(m_deadNameSource, ^{
         connectionDidClose();
     });
