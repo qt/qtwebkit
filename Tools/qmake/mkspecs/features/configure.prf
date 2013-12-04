@@ -116,6 +116,9 @@ defineTest(finalizeConfigure) {
     production_build:blackberry|qnx {
         addReasonForSkippingBuild("Build not supported on BB10/QNX yet.")
     }
+    !gnu_thin_archives:contains(QT_CONFIG, static) {
+        addReasonForSkippingBuild("QtWebKit cannot be built as a static library on this platform. Check your configuration in qtbase/config.summary.")
+    }
     requiredPrograms = gperf python perl bison ruby flex
     for(program, requiredPrograms): \
         !programExistsInPath($$program): \
