@@ -112,7 +112,9 @@ private:
     void prepareBackingStoreIfNeeded();
     bool shouldHaveBackingStore() const;
 
+    // TextureMapperPlatformLayer::Client methods:
     virtual void setPlatformLayerNeedsDisplay() OVERRIDE { setContentsNeedsDisplay(); }
+    virtual void platformLayerWasDestroyed() OVERRIDE { m_contentsLayer = 0; }
 
     // This set of flags help us defer which properties of the layer have been
     // modified by the compositor, so we can know what to look for in the next flush.
