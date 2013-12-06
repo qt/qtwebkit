@@ -112,7 +112,7 @@ INCLUDEPATH += $$WEBCORE_GENERATED_SOURCES_DIR
 enable?(XSLT) {
     use?(LIBXML2) {
         mac {
-            INCLUDEPATH += /usr/include/libxslt /usr/include/libxml2
+            QMAKE_CXXFLAGS += -iwithsysroot /usr/include/libxslt -iwithsysroot /usr/include/libxml2
             LIBS += -lxml2 -lxslt
         } else {
             PKGCONFIG += libxslt libxml-2.0
