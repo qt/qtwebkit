@@ -771,6 +771,11 @@
 #define ENABLE_LLINT 0
 #endif
 
+/* LLINT on ARM depends on an FPU */
+#if !defined(ENABLE_LLINT) && CPU(ARM) && !CPU(ARM_HARDFP)
+#define ENABLE_LLINT 0
+#endif
+
 /* On some of the platforms where we have a JIT, we want to also have the 
    low-level interpreter. */
 #if !defined(ENABLE_LLINT) \
