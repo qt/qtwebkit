@@ -453,6 +453,11 @@ void QWebPageAdapter::adjustPointForClicking(QMouseEvent* ev)
     if (!topPadding && !rightPadding && !bottomPadding && !leftPadding)
         return;
 
+    FrameView* view = page->mainFrame()->view();
+    ASSERT(view);
+    if (view->scrollbarAtPoint(ev->pos()))
+        return;
+
     EventHandler* eventHandler = page->mainFrame()->eventHandler();
     ASSERT(eventHandler);
 
@@ -1468,7 +1473,12 @@ bool QWebPageAdapter::touchEvent(QTouchEvent* event)
 {
 #if ENABLE(TOUCH_EVENTS)
     Frame* frame = mainFrameAdapter()->frame;
-    if (!frame->view())
+    if (!frame->view() || !frame->document())
+        return false;
+
+    // If the document doesn't have touch-event handles, we just ignore it
+    // and let QGuiApplication convert it to a mouse event.
+    if (!frame->document()->hasTouchEventHandlers())
         return false;
 
     // Always accept the QTouchEvent so that we'll receive also TouchUpdate and TouchEnd events

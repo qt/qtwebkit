@@ -18,7 +18,6 @@ debug_and_release {
 INCLUDEPATH += $$QT.core.includes
 CONFIG += console
 CONFIG -= qt
-LIBS =
 
 defineTest(addIncludePaths) {
     # Just needed for include paths
