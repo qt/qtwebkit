@@ -277,7 +277,7 @@ win32 {
 }
 
 # Remove whole program optimizations due to miscompilations
-win32-msvc2005|win32-msvc2008|win32-msvc2010|win32-msvc2012|wince*:{
+win32-msvc2005|win32-msvc2008|win32-msvc2010|win32-msvc2012|win32-msvc2013|wince*:{
     QMAKE_CFLAGS_LTCG -= -GL
     QMAKE_CXXFLAGS_LTCG -= -GL
 
