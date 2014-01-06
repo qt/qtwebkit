@@ -112,7 +112,7 @@ INCLUDEPATH += $$WEBCORE_GENERATED_SOURCES_DIR
 enable?(XSLT) {
     use?(LIBXML2) {
         mac {
-            INCLUDEPATH += /usr/include/libxslt /usr/include/libxml2
+            QMAKE_CXXFLAGS += -iwithsysroot /usr/include/libxslt -iwithsysroot /usr/include/libxml2
             LIBS += -lxml2 -lxslt
         } else {
             PKGCONFIG += libxslt libxml-2.0
@@ -277,7 +277,7 @@ win32 {
 }
 
 # Remove whole program optimizations due to miscompilations
-win32-msvc2005|win32-msvc2008|win32-msvc2010|win32-msvc2012|wince*:{
+win32-msvc2005|win32-msvc2008|win32-msvc2010|win32-msvc2012|win32-msvc2013|wince*:{
     QMAKE_CFLAGS_LTCG -= -GL
     QMAKE_CXXFLAGS_LTCG -= -GL
 

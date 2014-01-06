@@ -77,7 +77,7 @@ namespace WTF {
         RetainPtr(AdoptCFTag, PtrType ptr)
             : m_ptr(ptr)
         {
-#ifdef __OBJC__
+#if defined(__OBJC__) && defined(__cplusplus) && __cplusplus >= 201103L
             static_assert((!std::is_convertible<T, id>::value), "Don't use adoptCF with Objective-C pointer types, use adoptNS.");
 #endif
         }
