@@ -3068,6 +3068,7 @@ enable?(INDEXED_DATABASE) {
 
     HEADERS += \
         Modules/indexeddb/IDBAny.h \
+        Modules/indexeddb/IDBBackingStore.h \
         Modules/indexeddb/IDBCallbacks.h \
         Modules/indexeddb/IDBCursor.h \
         Modules/indexeddb/IDBCursorBackendImpl.h \
@@ -3084,24 +3085,37 @@ enable?(INDEXED_DATABASE) {
         Modules/indexeddb/IDBHistograms.h \
         Modules/indexeddb/IDBIndex.h \
         Modules/indexeddb/IDBKey.h \
+        Modules/indexeddb/IDBKeyPath.h \
         Modules/indexeddb/IDBKeyRange.h \
         Modules/indexeddb/IDBObjectStore.h \
         Modules/indexeddb/IDBObjectStoreBackendImpl.h \
+        Modules/indexeddb/IDBOpenDBRequest.h \
         Modules/indexeddb/IDBRequest.h \
         Modules/indexeddb/IDBTransaction.h \
+        Modules/indexeddb/IDBTransactionBackendImpl.h \
+        Modules/indexeddb/IDBTransactionCoordinator.h \
+        Modules/indexeddb/IDBVersionChangeEvent.h \
         Modules/indexeddb/IndexedDB.h
 
     SOURCES += \
         bindings/js/IDBBindingUtilities.cpp \
-        bindings/js/JSIDBAnyCustom.cpp
+        bindings/js/JSIDBAnyCustom.cpp \
+        bindings/js/JSIDBDatabaseCustom.cpp \
+        bindings/js/JSIDBObjectStoreCustom.cpp
+
+    SOURCES += \
+        inspector/InspectorIndexedDBAgent.cpp
 
     SOURCES += \
         Modules/indexeddb/DOMWindowIndexedDatabase.cpp \
         Modules/indexeddb/IDBAny.cpp \
+        Modules/indexeddb/IDBBackingStore.cpp \
         Modules/indexeddb/IDBCursor.cpp \
         Modules/indexeddb/IDBCursorBackendImpl.cpp \
+        Modules/indexeddb/IDBCursorWithValue.cpp \
         Modules/indexeddb/IDBDatabase.cpp \
         Modules/indexeddb/IDBDatabaseBackendImpl.cpp \
+        Modules/indexeddb/IDBDatabaseCallbacksImpl.cpp \
         Modules/indexeddb/IDBDatabaseException.cpp \
         Modules/indexeddb/IDBEventDispatcher.cpp \
         Modules/indexeddb/IDBFactory.cpp \
@@ -3109,11 +3123,18 @@ enable?(INDEXED_DATABASE) {
         Modules/indexeddb/IDBFactoryBackendImpl.cpp \
         Modules/indexeddb/IDBIndex.cpp \
         Modules/indexeddb/IDBKey.cpp \
+        Modules/indexeddb/IDBKeyPath.cpp \
         Modules/indexeddb/IDBKeyRange.cpp \
+        Modules/indexeddb/IDBLevelDBCoding.cpp \
         Modules/indexeddb/IDBObjectStore.cpp \
         Modules/indexeddb/IDBObjectStoreBackendImpl.cpp \
+        Modules/indexeddb/IDBOpenDBRequest.cpp \
+        Modules/indexeddb/IDBPendingTransactionMonitor.cpp \
         Modules/indexeddb/IDBRequest.cpp \
         Modules/indexeddb/IDBTransaction.cpp \
+        Modules/indexeddb/IDBTransactionBackendImpl.cpp \
+        Modules/indexeddb/IDBTransactionCoordinator.cpp \
+        Modules/indexeddb/IDBVersionChangeEvent.cpp \
         Modules/indexeddb/PageGroupIndexedDatabase.cpp \
         Modules/indexeddb/WorkerGlobalScopeIndexedDatabase.cpp
 }

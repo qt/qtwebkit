@@ -170,6 +170,9 @@ defineTest(santizeFeatures) {
     # GStreamer uses Glib
     use?(gstreamer): WEBKIT_CONFIG += use_glib
 
+    # IndexedDB used leveldb.
+    enable?(indexed_database): WEBKIT_CONFIG += use_leveldb
+
     # Minibrowser must be able to query for QtTestSupport
     build?(qttestsupport): WEBKIT_CONFIG += have_qttestsupport
 

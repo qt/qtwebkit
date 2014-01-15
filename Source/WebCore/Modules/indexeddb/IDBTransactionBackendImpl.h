@@ -60,8 +60,8 @@ public:
     void run();
     IndexedDB::TransactionMode mode() const { return m_mode; }
     const HashSet<int64_t>& scope() const { return m_objectStoreIds; }
-    void scheduleTask(PassOwnPtr<Operation> task, PassOwnPtr<Operation> abortTask = nullptr) { scheduleTask(IDBDatabaseBackendInterface::NormalTask, task, abortTask); }
-    void scheduleTask(IDBDatabaseBackendInterface::TaskType, PassOwnPtr<Operation>, PassOwnPtr<Operation> abortTask = nullptr);
+    void scheduleTask(PassOwnPtr<Operation> task, PassOwnPtr<Operation> abortTask = PassOwnPtr<Operation>()) { scheduleTask(IDBDatabaseBackendInterface::NormalTask, task, abortTask); }
+    void scheduleTask(IDBDatabaseBackendInterface::TaskType, PassOwnPtr<Operation>, PassOwnPtr<Operation> abortTask = PassOwnPtr<Operation>());
     void registerOpenCursor(IDBCursorBackendImpl*);
     void unregisterOpenCursor(IDBCursorBackendImpl*);
     void addPreemptiveEvent() { m_pendingPreemptiveEvents++; }

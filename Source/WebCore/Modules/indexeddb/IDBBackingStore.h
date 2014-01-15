@@ -40,6 +40,7 @@ namespace WebCore {
 
 class LevelDBComparator;
 class LevelDBDatabase;
+class LevelDBIterator;
 class LevelDBTransaction;
 class IDBKey;
 class IDBKeyRange;

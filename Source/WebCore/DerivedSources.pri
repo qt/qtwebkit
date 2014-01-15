@@ -123,13 +123,16 @@ IDL_BINDINGS += \
     $$PWD/Modules/indexeddb/DOMWindowIndexedDatabase.idl \
     $$PWD/Modules/indexeddb/IDBAny.idl \
     $$PWD/Modules/indexeddb/IDBCursor.idl \
+    $$PWD/Modules/indexeddb/IDBCursorWithValue.idl \
     $$PWD/Modules/indexeddb/IDBDatabase.idl \
     $$PWD/Modules/indexeddb/IDBFactory.idl \
     $$PWD/Modules/indexeddb/IDBIndex.idl \
     $$PWD/Modules/indexeddb/IDBKeyRange.idl \
     $$PWD/Modules/indexeddb/IDBObjectStore.idl \
+    $$PWD/Modules/indexeddb/IDBOpenDBRequest.idl \
     $$PWD/Modules/indexeddb/IDBRequest.idl \
     $$PWD/Modules/indexeddb/IDBTransaction.idl \
+    $$PWD/Modules/indexeddb/IDBVersionChangeEvent.idl \
     $$PWD/Modules/indexeddb/WorkerGlobalScopeIndexedDatabase.idl \
     $$PWD/Modules/notifications/DOMWindowNotifications.idl \
     $$PWD/Modules/notifications/Notification.idl \
