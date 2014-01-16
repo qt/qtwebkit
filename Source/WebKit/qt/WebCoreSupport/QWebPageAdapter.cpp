@@ -270,7 +270,7 @@ void QWebPageAdapter::initializeWebCorePage()
 
     page->addLayoutMilestones(DidFirstVisuallyNonEmptyLayout);
 
-    settings = new QWebSettings(page->settings());
+    settings = new QWebSettings(page->settings(), page->group().groupSettings());
 
 #if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
     WebCore::provideNotification(page, NotificationPresenterClientQt::notificationPresenter());

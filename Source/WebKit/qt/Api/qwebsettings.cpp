@@ -28,6 +28,7 @@
 #include "FileSystem.h"
 #include "FontCache.h"
 #include "GCController.h"
+#include "GroupSettings.h"
 #include "IconDatabase.h"
 #include "Image.h"
 #if ENABLE(ICONDATABASE)
@@ -67,8 +68,10 @@ QWEBKIT_EXPORT void qt_networkAccessAllowed(bool isAllowed)
 
 class QWebSettingsPrivate {
 public:
-    QWebSettingsPrivate(WebCore::Settings* wcSettings = 0)
-        : settings(wcSettings)
+    QWebSettingsPrivate(WebCore::Settings* wcSettings = 0, WebCore::GroupSettings* wcGroupSettings = 0)
+        : offlineStorageDefaultQuota(0)
+        , settings(wcSettings)
+        , groupSettings(wcGroupSettings)
     {
     }
 
@@ -79,11 +82,13 @@ public:
     QString defaultTextEncoding;
     QString localStoragePath;
     QString offlineWebApplicationCachePath;
+    QString offlineDatabasePath;
     QString mediaType;
     qint64 offlineStorageDefaultQuota;
     QWebSettings::ThirdPartyCookiePolicy thirdPartyCookiePolicy;
     void apply();
     WebCore::Settings* settings;
+    WebCore::GroupSettings* groupSettings;
 };
 
 Q_GLOBAL_STATIC(QList<QWebSettingsPrivate*>, allSettings);
@@ -237,10 +242,21 @@ void QWebSettingsPrivate::apply()
                                       global->attributes.value(QWebSettings::PrintElementBackgrounds));
         settings->setShouldPrintBackgrounds(value);
 
-#if ENABLE(SQL_DATABASE)
         value = attributes.value(QWebSettings::OfflineStorageDatabaseEnabled,
                                       global->attributes.value(QWebSettings::OfflineStorageDatabaseEnabled));
+#if ENABLE(SQL_DATABASE)
         WebCore::DatabaseManager::manager().setIsAvailable(value);
+#endif
+
+#if ENABLE(INDEXED_DATABASE)
+        QString path = !offlineDatabasePath.isEmpty() ? offlineDatabasePath : global->offlineDatabasePath;
+        Q_ASSERT(groupSettings);
+        // Setting the path to empty string disables persistent storage of the indexed database.
+        if (!value)
+            path = QString();
+        groupSettings->setIndexedDBDatabasePath(path);
+        qint64 quota = offlineStorageDefaultQuota ? offlineStorageDefaultQuota : global->offlineStorageDefaultQuota;
+        groupSettings->setIndexedDBQuotaBytes(quota);
 #endif
 
         value = attributes.value(QWebSettings::OfflineWebApplicationCacheEnabled,
@@ -564,10 +580,9 @@ QWebSettings::QWebSettings()
 /*!
     \internal
 */
-QWebSettings::QWebSettings(WebCore::Settings* settings)
-    : d(new QWebSettingsPrivate(settings))
+QWebSettings::QWebSettings(WebCore::Settings* settings, WebCore::GroupSettings* groupSettings)
+    : d(new QWebSettingsPrivate(settings, groupSettings))
 {
-    d->settings = settings;
     d->apply();
     allSettings()->append(d);
 }
@@ -1050,6 +1065,7 @@ void QWebSettings::resetAttribute(WebAttribute attr)
 void QWebSettings::setOfflineStoragePath(const QString& path)
 {
     WebCore::initializeWebCoreQt();
+    QWebSettings::globalSettings()->d->offlineDatabasePath = path;
 #if ENABLE(SQL_DATABASE)
     WebCore::DatabaseManager::manager().setDatabaseDirectoryPath(path);
 #endif
@@ -1066,11 +1082,7 @@ void QWebSettings::setOfflineStoragePath(const QString& path)
 QString QWebSettings::offlineStoragePath()
 {
     WebCore::initializeWebCoreQt();
-#if ENABLE(SQL_DATABASE)
-    return WebCore::DatabaseManager::manager().databaseDirectoryPath();
-#else
-    return QString();
-#endif
+    return QWebSettings::globalSettings()->d->offlineDatabasePath;
 }
 
 /*!
@@ -1184,7 +1196,7 @@ void QWebSettings::setLocalStoragePath(const QString& path)
     \since 4.6
 
     Returns the path for HTML5 local storage.
-    
+
     \sa setLocalStoragePath()
 */
 QString QWebSettings::localStoragePath() const

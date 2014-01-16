@@ -28,6 +28,7 @@
 #include <QtCore/qshareddata.h>
 
 namespace WebCore {
+    class GroupSettings;
     class Settings;
 }
 
@@ -176,7 +177,7 @@ private:
     Q_DISABLE_COPY(QWebSettings)
 
     QWebSettings();
-    QWebSettings(WebCore::Settings *settings);
+    QWebSettings(WebCore::Settings *settings, WebCore::GroupSettings *groupSettings);
     ~QWebSettings();
 
     QWebSettingsPrivate *d;

@@ -3087,6 +3087,7 @@ enable?(INDEXED_DATABASE) {
         Modules/indexeddb/IDBKey.h \
         Modules/indexeddb/IDBKeyPath.h \
         Modules/indexeddb/IDBKeyRange.h \
+        Modules/indexeddb/IDBLevelDBCoding.h \
         Modules/indexeddb/IDBObjectStore.h \
         Modules/indexeddb/IDBObjectStoreBackendImpl.h \
         Modules/indexeddb/IDBOpenDBRequest.h \
