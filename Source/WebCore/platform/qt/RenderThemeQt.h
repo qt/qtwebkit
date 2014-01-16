@@ -146,6 +146,7 @@ protected:
     virtual bool paintMediaMuteButton(RenderObject*, const PaintInfo&, const IntRect&);
     virtual bool paintMediaSeekBackButton(RenderObject*, const PaintInfo&, const IntRect&);
     virtual bool paintMediaSeekForwardButton(RenderObject*, const PaintInfo&, const IntRect&);
+    virtual bool paintMediaToggleClosedCaptionsButton(RenderObject*, const PaintInfo&, const IntRect&);
     virtual bool paintMediaSliderTrack(RenderObject*, const PaintInfo&, const IntRect&);
     virtual bool paintMediaSliderThumb(RenderObject*, const PaintInfo&, const IntRect&);
     virtual bool paintMediaCurrentTime(RenderObject*, const PaintInfo&, const IntRect&);
@@ -154,6 +155,9 @@ protected:
     virtual String formatMediaControlsCurrentTime(float currentTime, float duration) const;
     virtual String formatMediaControlsRemainingTime(float currentTime, float duration) const;
     virtual bool hasOwnDisabledStateHandlingFor(ControlPart) const { return true; }
+#if ENABLE(VIDEO_TRACK)
+    virtual bool supportsClosedCaptioning() const { return true; }
+#endif
 
     void paintMediaBackground(QPainter*, const IntRect&) const;
     double mediaControlsBaselineOpacity() const;

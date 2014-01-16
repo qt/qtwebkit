@@ -787,20 +787,22 @@ String validationMessageBadInputForNumberText()
 #if ENABLE(VIDEO_TRACK)
 String textTrackSubtitlesText()
 {
-    notImplemented();
-    return String();
+    return QCoreApplication::translate("QWebPage", "Subtitles", "Menu section heading for subtitles");
 }
 
-String textTrackOffText()
+String textTrackOffMenuItemText()
 {
-    notImplemented();
-    return String();
+    return QCoreApplication::translate("QWebPage", "Off", "Menu item label for the track that represents disabling closed captions");
+}
+
+String textTrackAutomaticMenuItemText()
+{
+    return QCoreApplication::translate("QWebPage", "Auto", "Menu item label for the track that represents automatic closed captions selection");
 }
 
 String textTrackNoLabelText()
 {
-    notImplemented();
-    return String();
+    return QCoreApplication::translate("QWebPage", "No label", "Menu item label for a closed captions track that has no other name");
 }
 #endif
 

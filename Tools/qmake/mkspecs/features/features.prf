@@ -173,6 +173,9 @@ defineTest(santizeFeatures) {
     # IndexedDB used leveldb.
     enable?(indexed_database): WEBKIT_CONFIG += use_leveldb
 
+    # VideoTrack requires video
+    !enable?(video): WEBKIT_CONFIG -= video_track
+
     # Minibrowser must be able to query for QtTestSupport
     build?(qttestsupport): WEBKIT_CONFIG += have_qttestsupport
 

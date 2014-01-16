@@ -678,6 +678,37 @@ bool RenderThemeQt::paintMediaPlayButton(RenderObject* o, const PaintInfo& paint
     return false;
 }
 
+bool RenderThemeQt::paintMediaToggleClosedCaptionsButton(RenderObject* o, const PaintInfo& paintInfo, const IntRect& r)
+{
+    HTMLMediaElement* mediaElement = toParentMediaElement(o);
+    if (!mediaElement)
+        return false;
+
+    QSharedPointer<StylePainter> p = getStylePainter(paintInfo);
+    if (p.isNull() || !p->isValid())
+        return true;
+
+    p->painter->setRenderHint(QPainter::Antialiasing, true);
+
+    paintMediaBackground(p->painter, r);
+
+    WorldMatrixTransformer transformer(p->painter, o, r);
+    p->painter->setBrush(getMediaControlForegroundColor(o));
+
+    QPainterPath captionBubble;
+    captionBubble.moveTo(98.766, 43.244);
+    captionBubble.cubicTo(captionBubble.currentPosition() + QPointF(0, -23.163), captionBubble.currentPosition() + QPointF(-21.775, -41.94), captionBubble.currentPosition() + QPointF(-48.637, -41.94));
+    captionBubble.cubicTo(captionBubble.currentPosition() + QPointF(-26.859, 0), captionBubble.currentPosition() + QPointF(-48.635, 18.777), captionBubble.currentPosition() + QPointF(-48.635, 41.94));
+    captionBubble.cubicTo(captionBubble.currentPosition() + QPointF(0, 18.266), captionBubble.currentPosition() + QPointF(13.546, 33.796), captionBubble.currentPosition() + QPointF(32.444, 39.549));
+    captionBubble.cubicTo(captionBubble.currentPosition() + QPointF(1.131, 8.356), captionBubble.currentPosition() + QPointF(26.037, 24.255), captionBubble.currentPosition() + QPointF(22.864, 19.921));
+    captionBubble.cubicTo(captionBubble.currentPosition() + QPointF(-4.462, -6.096), captionBubble.currentPosition() + QPointF(-5.159, -13.183), captionBubble.currentPosition() + QPointF(-5.07, -17.566));
+    captionBubble.cubicTo(QPointF(77.85, 84.397), QPointF(98.766, 65.923), QPointF(98.766, 43.224));
+    captionBubble.closeSubpath();
+
+    p->painter->drawPath(captionBubble);
+    return false;
+}
+
 bool RenderThemeQt::paintMediaSeekBackButton(RenderObject*, const PaintInfo&, const IntRect&)
 {
     // We don't want to paint this at the moment.
