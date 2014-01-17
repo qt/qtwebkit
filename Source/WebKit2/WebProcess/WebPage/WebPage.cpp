@@ -663,8 +663,20 @@ EditorState WebPage::editorState() const
         result.selectedText = range->text();
     }
 
-    if (range)
+    if (range) {
         result.cursorRect = frame->view()->contentsToWindow(frame->editor().firstRectForRange(range.get()));
+        // Check that at least one dimension is valid
+        if (result.cursorRect.width() != 0 || result.cursorRect.height() != 0)
+        {
+            if (result.cursorRect.width() == 0)
+                result.cursorRect.setWidth(1);
+            if (result.cursorRect.height() == 0)
+                result.cursorRect.setHeight(1);
+        }
+        // now adjust the cursor coordinates to take scrolling into account
+        result.cursorRect.moveBy(-frame->view()->visibleContentRect().location());
+    }
+
 
     // FIXME: We should only transfer innerText when it changes and do this on the UI side.
     if (result.isContentEditable && !result.isInPasswordField) {
