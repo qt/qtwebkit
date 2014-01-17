@@ -5,7 +5,7 @@
 # -------------------------------------------------------------------
 
 # Pick up 3rdparty libraries from INCLUDE/LIB just like with MSVC
-win32-g++* {
+mingw {
     TMPPATH            = $$quote($$(INCLUDE))
     QMAKE_INCDIR_POST += $$split(TMPPATH,";")
     TMPPATH            = $$quote($$(LIB))
