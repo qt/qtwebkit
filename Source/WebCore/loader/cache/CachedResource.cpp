@@ -514,11 +514,14 @@ bool CachedResource::addClientToSet(CachedResourceClient* client)
     if (!hasClients() && inCache())
         memoryCache()->addToLiveResourcesSize(this);
 
-    if ((m_type == RawResource || m_type == MainResource) && !m_response.isNull() && !m_proxyResource) {
+    if (((m_type == RawResource || m_type == MainResource) && !m_response.isNull() && !m_proxyResource)
+        || (m_proxyResource && m_proxyResource->m_switchingClientsToRevalidatedResource)) {
         // Certain resources (especially XHRs and main resources) do crazy things if an asynchronous load returns
         // synchronously (e.g., scripts may not have set all the state they need to handle the load).
         // Therefore, rather than immediately sending callbacks on a cache hit like other CachedResources,
         // we schedule the callbacks and ensure we never finish synchronously.
+        // Revalidated sources are handled async to avoid loaded scripts from changing the our
+        // data-structures while we are still processing them.
         ASSERT(!m_clientsAwaitingCallback.contains(client));
         m_clientsAwaitingCallback.add(client, CachedResourceCallback::schedule(this, client));
         return false;
@@ -689,6 +692,7 @@ void CachedResource::clearResourceToRevalidate()
         return;
 
     // A resource may start revalidation before this method has been called, so check that this resource is still the proxy resource before clearing it out.
+    ASSERT(m_resourceToRevalidate->m_proxyResource == this);
     if (m_resourceToRevalidate->m_proxyResource == this) {
         m_resourceToRevalidate->m_proxyResource = 0;
         m_resourceToRevalidate->deleteIfPossible();
@@ -735,14 +739,7 @@ void CachedResource::switchClientsToRevalidatedResource()
 
     for (unsigned n = 0; n < moveCount; ++n)
         m_resourceToRevalidate->addClientToSet(clientsToMove[n]);
-    for (unsigned n = 0; n < moveCount; ++n) {
-        // Calling didAddClient may do anything, including trying to cancel revalidation.
-        // Assert that it didn't succeed.
-        ASSERT(m_resourceToRevalidate);
-        // Calling didAddClient for a client may end up removing another client. In that case it won't be in the set anymore.
-        if (m_resourceToRevalidate->m_clients.contains(clientsToMove[n]))
-            m_resourceToRevalidate->didAddClient(clientsToMove[n]);
-    }
+
     m_switchingClientsToRevalidatedResource = false;
 }
 
