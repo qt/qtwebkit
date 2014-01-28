@@ -49,6 +49,7 @@ use?(3D_GRAPHICS): WEBKIT += ANGLE
 WEBKIT += javascriptcore wtf webcore
 
 MODULE = webkitwidgets
+CONFIG += creating_module
 
 # We want the QtWebKit API forwarding includes to live in the root build dir.
 MODULE_BASE_DIR = $$_PRO_FILE_PWD_
