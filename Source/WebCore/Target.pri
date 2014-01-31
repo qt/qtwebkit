@@ -3138,6 +3138,9 @@ enable?(INDEXED_DATABASE) {
         Modules/indexeddb/IDBVersionChangeEvent.cpp \
         Modules/indexeddb/PageGroupIndexedDatabase.cpp \
         Modules/indexeddb/WorkerGlobalScopeIndexedDatabase.cpp
+
+    use?(leveldb):!use?(system_leveldb): WEBKIT += leveldb
+
 }
 
 enable?(DATA_TRANSFER_ITEMS) {

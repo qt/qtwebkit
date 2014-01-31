@@ -246,7 +246,7 @@ have?(sqlite3) {
     }
 }
 
-use?(leveldb): LIBS += -lleveldb -lmemenv
+use?(system_leveldb): LIBS += -lleveldb -lmemenv
 
 use?(libjpeg): LIBS += -ljpeg
 use?(libpng): LIBS += -lpng

@@ -24,6 +24,12 @@ use?(3D_GRAPHICS) {
     SUBDIRS += ANGLE
 }
 
+use?(leveldb):!use?(system_leveldb) {
+    leveldb.file = Source/ThirdParty/leveldb/leveldb.pro
+    leveldb.makefile = Makefile.leveldb
+    SUBDIRS += leveldb
+}
+
 WebCore.file = Source/WebCore/WebCore.pro
 WebCore.makefile = Makefile.WebCore
 SUBDIRS += WebCore

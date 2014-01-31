@@ -19,7 +19,7 @@
 
 #include <leveldb/db.h>
 #include <leveldb/env.h>
-#include <leveldb/helpers/memenv.h>
+#include <helpers/memenv/memenv.h>
 
 int main(int, char**)
 {

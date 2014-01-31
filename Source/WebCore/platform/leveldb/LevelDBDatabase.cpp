@@ -38,7 +38,7 @@
 #include <leveldb/comparator.h>
 #include <leveldb/db.h>
 #include <leveldb/env.h>
-#include <leveldb/helpers/memenv.h>
+#include <helpers/memenv/memenv.h>
 #include <leveldb/slice.h>
 #include <string>
 #include <wtf/PassOwnPtr.h>
