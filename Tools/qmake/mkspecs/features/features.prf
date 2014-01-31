@@ -95,9 +95,6 @@ defineTest(detectFeatures) {
     # WebGL support - only enabled if we can use 3D graphics
     use?(3d_graphics): WEBKIT_CONFIG += webgl
 
-    # Enable CSS shaders when CSS filters and WebGL are enabled
-    enable?(css_filters):enable?(webgl): WEBKIT_CONFIG += css_shaders
-
     # HTML5 Media Support for builds with GStreamer
     unix:!mac:!contains(QT_CONFIG, no-pkg-config) {
         packagesExist("glib-2.0 gio-2.0 gstreamer-1.0 gstreamer-plugins-base-1.0") {
