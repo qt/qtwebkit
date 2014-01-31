@@ -352,6 +352,7 @@ public:
     };
 
     ViewportAttributes viewportAttributesForSize(const QSize& availableSize, const QSize& deviceSize) const;
+    void setDevicePixelRatio(int devicePixelRatio);
 
     QWebSettings *settings;
 
