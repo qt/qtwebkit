@@ -306,5 +306,5 @@ linux*-g++*:QMAKE_LFLAGS += $$QMAKE_LFLAGS_NOUNDEF
 
 enable_fast_mobile_scrolling: DEFINES += ENABLE_FAST_MOBILE_SCROLLING=1
 
-!production_build:have?(FONTCONFIG): PKGCONFIG += fontconfig
+build?(qttestsupport):have?(FONTCONFIG): PKGCONFIG += fontconfig
 
