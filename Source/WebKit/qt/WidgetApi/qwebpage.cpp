@@ -438,8 +438,10 @@ QtPluginWidgetAdapter *QWebPagePrivate::adapterForWidget(QObject *object) const
 {
     if (QWidget *widget = qobject_cast<QWidget*>(object))
         return new QWidgetPluginImpl(widget);
+#ifndef QT_NO_GRAPHICSVIEW
     if (QGraphicsWidget *widget = qobject_cast<QGraphicsWidget*>(object))
         return new QGraphicsWidgetPluginImpl(widget);
+#endif
     return 0;
 }
 
