@@ -127,7 +127,6 @@ HEADERS += \
     $$PWD/WebKit/qt/WidgetApi/qwebview.h \
     $$PWD/WebKit/qt/WidgetApi/qwebinspector.h \
     $$PWD/WebKit/qt/WidgetApi/qwebinspector_p.h \
-    $$PWD/WebKit/qt/Api/qwebkitplatformplugin.h \
     $$PWD/WebKit/qt/WidgetSupport/InitWebKitQt.h \
     $$PWD/WebKit/qt/WidgetSupport/InspectorClientWebPage.h \
     $$PWD/WebKit/qt/WidgetSupport/QtFallbackWebPopup.h \
@@ -137,6 +136,10 @@ HEADERS += \
     $$PWD/WebKit/qt/WidgetSupport/QGraphicsWidgetPluginImpl.h \
     $$PWD/WebKit/qt/WidgetSupport/QStyleFacadeImp.h \
     $$PWD/WebKit/qt/WidgetSupport/QWidgetPluginImpl.h \
+
+!contains(QT_CONFIG, static) {
+    HEADERS += $$PWD/WebKit/qt/Api/qwebkitplatformplugin.h
+}
 
 contains(QT_CONFIG, accessibility) {
     SOURCES += $$PWD/WebKit/qt/WidgetApi/qwebviewaccessible.cpp
