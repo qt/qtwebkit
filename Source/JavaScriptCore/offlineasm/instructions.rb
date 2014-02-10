@@ -267,12 +267,12 @@ ARM_INSTRUCTIONS =
 
 MIPS_INSTRUCTIONS =
     [
+    "la",
     "movz",
     "movn",
     "slt",
     "sltu",
-    "pichdr",
-    "pichdrra"
+    "pichdr"
     ]
 
 SH4_INSTRUCTIONS =
