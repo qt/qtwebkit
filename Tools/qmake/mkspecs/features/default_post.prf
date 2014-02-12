@@ -171,8 +171,8 @@ contains(QT, webkit)|contains(QT, webkitwidgets) {
 }
 
 defineTest(needToLink) {
-    # The main dynamic library always needs to link in the intermediate libraries
-    creating_module: return(true)
+    # The main module dynamic library always needs to link in the intermediate libraries
+    isEqual(MODULE, webkit): return(true)
 
     force_static_libs_as_shared {
         # So do the individual libraries if they are dynamic

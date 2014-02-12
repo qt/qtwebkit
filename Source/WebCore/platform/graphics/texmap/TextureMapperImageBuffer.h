@@ -59,7 +59,7 @@ public:
     virtual void drawSolidColor(const FloatRect&, const TransformationMatrix&, const Color&) OVERRIDE;
     virtual void beginClip(const TransformationMatrix&, const FloatRect&) OVERRIDE;
     virtual void bindSurface(BitmapTexture* surface) OVERRIDE { m_currentSurface = surface;}
-    virtual void endClip() OVERRIDE { graphicsContext()->restore(); }
+    virtual void endClip() OVERRIDE;
     virtual IntRect clipBounds() OVERRIDE { return currentContext()->clipBounds(); }
     virtual IntSize maxTextureSize() const;
     virtual PassRefPtr<BitmapTexture> createTexture() OVERRIDE { return BitmapTextureImageBuffer::create(); }

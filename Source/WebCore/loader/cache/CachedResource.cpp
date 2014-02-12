@@ -361,7 +361,7 @@ void CachedResource::load(CachedResourceLoader* cachedResourceLoader, const Reso
 
 void CachedResource::checkNotify()
 {
-    if (isLoading())
+    if (isLoading() || stillNeedsLoad())
         return;
 
     CachedResourceClientWalker<CachedResourceClient> w(m_clients);
