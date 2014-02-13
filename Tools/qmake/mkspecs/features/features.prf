@@ -135,6 +135,10 @@ defineTest(detectFeatures) {
     # Slider Touch is sensible to use when compiling WebKit2
     enable?(touch_events): WEBKIT_CONFIG += touch_slider
 
+    # IndexedDB requires leveldb and leveldb currently requires posix
+    !posix:WEBKIT_CONFIG -= indexed_database
+    enable?(indexed_database): WEBKIT_CONFIG += use_leveldb
+
     export(WEBKIT_CONFIG)
     export(CONFIGURE_WARNINGS)
 }
@@ -165,9 +169,6 @@ defineTest(santizeFeatures) {
 
     # GStreamer uses Glib
     use?(gstreamer): WEBKIT_CONFIG += use_glib
-
-    # IndexedDB requires leveldb
-    enable?(indexed_database): WEBKIT_CONFIG += use_leveldb
 
     # VideoTrack requires video
     !enable?(video): WEBKIT_CONFIG -= video_track

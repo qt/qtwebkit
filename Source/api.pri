@@ -25,6 +25,7 @@ build?(webkit1): {
 build?(webkit2): QMAKE_INTERNAL_INCLUDED_FILES *= WebKit2/Target.pri
 
 use?(3D_GRAPHICS): WEBKIT += angle
+use?(leveldb):!use?(system_leveldb) WEBKIT += leveldb
 
 MODULE = webkit
 CONFIG += creating_module
