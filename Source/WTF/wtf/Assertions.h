@@ -200,7 +200,7 @@ WTF_EXPORT_PRIVATE void WTFCrash() NO_RETURN_DUE_TO_CRASH;
 #define ASSERT_NOT_REACHED() ((void)0)
 #define NO_RETURN_DUE_TO_ASSERT
 
-#if COMPILER(INTEL) && !OS(WINDOWS) || COMPILER(RVCT)
+#if defined(__cplusplus) && COMPILER(RVCT)
 template<typename T>
 inline void assertUnused(T& x) { (void)x; }
 #define ASSERT_UNUSED(variable, assertion) (assertUnused(variable))
@@ -271,7 +271,7 @@ while (0)
 /* ASSERT_WITH_MESSAGE_UNUSED */
 
 #if ASSERT_MSG_DISABLED
-#if COMPILER(INTEL) && !OS(WINDOWS) || COMPILER(RVCT)
+#if defined(__cplusplus) || COMPILER(RVCT)
 template<typename T>
 inline void assertWithMessageUnused(T& x) { (void)x; }
 #define ASSERT_WITH_MESSAGE_UNUSED(variable, assertion, ...) (assertWithMessageUnused(variable))
