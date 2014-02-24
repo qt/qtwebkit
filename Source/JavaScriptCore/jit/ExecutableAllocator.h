@@ -104,7 +104,7 @@ class DemandExecutableAllocator;
 #if ENABLE(EXECUTABLE_ALLOCATOR_FIXED)
 #if CPU(ARM)
 static const size_t fixedExecutableMemoryPoolSize = 16 * 1024 * 1024;
-#elif CPU(X86_64)
+#elif CPU(X86_64) && !CPU(X32)
 static const size_t fixedExecutableMemoryPoolSize = 1024 * 1024 * 1024;
 #else
 static const size_t fixedExecutableMemoryPoolSize = 32 * 1024 * 1024;
