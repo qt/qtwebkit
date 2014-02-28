@@ -185,6 +185,11 @@ void StackBounds::initialize()
 
     MEMORY_BASIC_INFORMATION uncommittedMemory;
     VirtualQuery(stackOrigin.AllocationBase, &uncommittedMemory, sizeof(uncommittedMemory));
+    SIZE_T extraGuardPageRegionSize = 0;
+    if (uncommittedMemory.Protect & PAGE_GUARD) {
+        extraGuardPageRegionSize = uncommittedMemory.RegionSize;
+        VirtualQuery(static_cast<char*>(uncommittedMemory.BaseAddress) + uncommittedMemory.RegionSize, &uncommittedMemory, sizeof(uncommittedMemory));
+    }
     ASSERT(uncommittedMemory.State == MEM_RESERVE);
 
     MEMORY_BASIC_INFORMATION guardPage;
@@ -198,12 +203,12 @@ void StackBounds::initialize()
     VirtualQuery(static_cast<char*>(guardPage.BaseAddress) + guardPage.RegionSize, &committedMemory, sizeof(committedMemory));
     ASSERT(committedMemory.State == MEM_COMMIT);
 
-    void* computedEnd = static_cast<char*>(m_origin) - (uncommittedMemory.RegionSize + guardPage.RegionSize + committedMemory.RegionSize);
+    void* computedEnd = static_cast<char*>(m_origin) - (uncommittedMemory.RegionSize + extraGuardPageRegionSize + guardPage.RegionSize + committedMemory.RegionSize);
 
     ASSERT(stackOrigin.AllocationBase == uncommittedMemory.AllocationBase);
     ASSERT(stackOrigin.AllocationBase == guardPage.AllocationBase);
     ASSERT(stackOrigin.AllocationBase == committedMemory.AllocationBase);
-    ASSERT(stackOrigin.AllocationBase == uncommittedMemory.BaseAddress);
+    ASSERT(stackOrigin.AllocationBase == static_cast<char*>(uncommittedMemory.BaseAddress) - extraGuardPageRegionSize);
     ASSERT(endOfStack == computedEnd);
 #endif // NDEBUG
     m_bound = static_cast<char*>(endOfStack) + guardPage.RegionSize;
