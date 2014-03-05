@@ -124,7 +124,7 @@ static const char* vertexTemplate =
         attribute vec4 a_vertex;
         uniform mat4 u_modelViewMatrix;
         uniform mat4 u_projectionMatrix;
-        uniform mat4 u_textureSpaceMatrix;
+        uniform highp mat4 u_textureSpaceMatrix;
 
         varying vec2 v_texCoord;
         varying vec2 v_transformedTexCoord;
@@ -220,7 +220,7 @@ static const char* fragmentTemplate =
         uniform vec2 u_shadowOffset;
         uniform vec4 u_color;
         uniform float u_gaussianKernel[GAUSSIAN_KERNEL_HALF_WIDTH];
-        uniform mat4 u_textureSpaceMatrix;
+        uniform highp mat4 u_textureSpaceMatrix;
 
         void noop(inout vec4 dummyParameter) { }
         void noop(inout vec4 dummyParameter, vec2 texCoord) { }
