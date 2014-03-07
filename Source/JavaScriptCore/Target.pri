@@ -13,10 +13,7 @@ WEBKIT += wtf
 QT += core
 QT -= gui
 
-CONFIG += staticlib
-
-*-g++*:QMAKE_CXXFLAGS_RELEASE -= -O2
-*-g++*:QMAKE_CXXFLAGS_RELEASE += -O3
+CONFIG += staticlib optimize_full
 
 # Rules when JIT enabled (not disabled)
 !contains(DEFINES, ENABLE_JIT=0) {
