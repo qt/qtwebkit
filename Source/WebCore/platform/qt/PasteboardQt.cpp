@@ -115,24 +115,26 @@ Pasteboard* Pasteboard::generalPasteboard()
 
 void Pasteboard::writeSelection(Range* selectedRange, bool canSmartCopyOrDelete, Frame* frame, ShouldSerializeSelectedTextForClipboard shouldSerializeSelectedTextForClipboard)
 {
-    QMimeData* md = new QMimeData;
+    if (!m_writableData)
+        m_writableData = new QMimeData;
     QString text = shouldSerializeSelectedTextForClipboard == IncludeImageAltTextForClipboard ? frame->editor().selectedTextForClipboard() : frame->editor().selectedText();
     text.replace(QChar(0xa0), QLatin1Char(' '));
-    md->setText(text);
+    m_writableData->setText(text);
 
     QString markup = createMarkup(selectedRange, 0, AnnotateForInterchange, false, ResolveNonLocalURLs);
 #ifdef Q_OS_MAC
     markup.prepend(QLatin1String("<html><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\" /></head><body>"));
     markup.append(QLatin1String("</body></html>"));
-    md->setData(QLatin1String("text/html"), markup.toUtf8());
+    m_writableData->setData(QLatin1String("text/html"), markup.toUtf8());
 #else
-    md->setHtml(markup);
+    m_writableData->setHtml(markup);
 #endif
 
     if (canSmartCopyOrDelete)
-        md->setData(QLatin1String("application/vnd.qtwebkit.smartpaste"), QByteArray());
+        m_writableData->setData(QLatin1String("application/vnd.qtwebkit.smartpaste"), QByteArray());
 #ifndef QT_NO_CLIPBOARD
-    QGuiApplication::clipboard()->setMimeData(md, m_selectionMode ? QClipboard::Selection : QClipboard::Clipboard);
+    if (isForCopyAndPaste())
+        QGuiApplication::clipboard()->setMimeData(m_writableData, m_selectionMode ? QClipboard::Selection : QClipboard::Clipboard);
 #endif
 }
 
@@ -148,10 +150,12 @@ bool Pasteboard::canSmartReplace()
 String Pasteboard::plainText(Frame*)
 {
 #ifndef QT_NO_CLIPBOARD
-    return QGuiApplication::clipboard()->text(m_selectionMode ? QClipboard::Selection : QClipboard::Clipboard);
-#else
-    return String();
+    if (isForCopyAndPaste())
+        return QGuiApplication::clipboard()->text(m_selectionMode ? QClipboard::Selection : QClipboard::Clipboard);
 #endif
+    if (const QMimeData* data = readData())
+        return data->text();
+    return String();
 }
 
 PassRefPtr<DocumentFragment> Pasteboard::documentFragment(Frame* frame, PassRefPtr<Range> context,
@@ -184,14 +188,16 @@ PassRefPtr<DocumentFragment> Pasteboard::documentFragment(Frame* frame, PassRefP
 
 void Pasteboard::writePlainText(const String& text, SmartReplaceOption smartReplaceOption)
 {
-#ifndef QT_NO_CLIPBOARD
-    QMimeData* md = new QMimeData;
+    if (!m_writableData)
+        m_writableData = new QMimeData;
     QString qtext = text;
     qtext.replace(QChar(0xa0), QLatin1Char(' '));
-    md->setText(qtext);
+    m_writableData->setText(qtext);
     if (smartReplaceOption == CanSmartReplace)
-        md->setData(QLatin1String("application/vnd.qtwebkit.smartpaste"), QByteArray());
-    QGuiApplication::clipboard()->setMimeData(md, m_selectionMode ? QClipboard::Selection : QClipboard::Clipboard);
+        m_writableData->setData(QLatin1String("application/vnd.qtwebkit.smartpaste"), QByteArray());
+#ifndef QT_NO_CLIPBOARD
+    if (isForCopyAndPaste())
+        QGuiApplication::clipboard()->setMimeData(m_writableData, m_selectionMode ? QClipboard::Selection : QClipboard::Clipboard);
 #endif
 }
 
@@ -199,12 +205,14 @@ void Pasteboard::writeURL(const KURL& url, const String&, Frame*)
 {
     ASSERT(!url.isEmpty());
 
-#ifndef QT_NO_CLIPBOARD
-    QMimeData* md = new QMimeData;
+    if (!m_writableData)
+        m_writableData = new QMimeData;
     QString urlString = url.string();
-    md->setText(urlString);
-    md->setUrls(QList<QUrl>() << url);
-    QGuiApplication::clipboard()->setMimeData(md, m_selectionMode ? QClipboard::Selection : QClipboard::Clipboard);
+    m_writableData->setText(urlString);
+    m_writableData->setUrls(QList<QUrl>() << url);
+#ifndef QT_NO_CLIPBOARD
+    if (isForCopyAndPaste())
+        QGuiApplication::clipboard()->setMimeData(m_writableData, m_selectionMode ? QClipboard::Selection : QClipboard::Clipboard);
 #endif
 }
 
