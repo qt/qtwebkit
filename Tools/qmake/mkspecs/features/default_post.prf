@@ -179,7 +179,7 @@ defineTest(needToLink) {
         contains(libraries, $$TARGET): return(true)
 
         # Or anything that uses QtWebKit in this special config
-        contains(QT, webkit): return(true)
+        contains(QT, webkit)|contains(QT, webkitwidgets): return(true)
     }
 
     # Lastly, we allow apps (jsc) to link directly to the intermediate
