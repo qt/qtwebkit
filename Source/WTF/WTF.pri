@@ -11,7 +11,7 @@ INCLUDEPATH += $$PWD
 mac {
     # Mac OS does ship libicu but not the associated header files.
     # Therefore WebKit provides adequate header files.
-    INCLUDEPATH += $${ROOT_WEBKIT_DIR}/Source/WTF/icu
+    INCLUDEPATH = $${ROOT_WEBKIT_DIR}/Source/WTF/icu $$INCLUDEPATH
     LIBS += -licucore
 } else {
     contains(QT_CONFIG,icu) {

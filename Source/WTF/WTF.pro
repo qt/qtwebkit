@@ -8,7 +8,7 @@ TARGET = WTF
 
 include(WTF.pri)
 
-CONFIG += staticlib
+CONFIG += staticlib optimize_full
 
 VPATH += $$PWD/wtf
 
@@ -266,9 +266,6 @@ win32 {
 
 QT += core
 QT -= gui
-
-*-g++*:QMAKE_CXXFLAGS_RELEASE -= -O2
-*-g++*:QMAKE_CXXFLAGS_RELEASE += -O3
 
 *sh4* {
     QMAKE_CXXFLAGS += -mieee -w

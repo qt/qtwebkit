@@ -27,10 +27,8 @@ HEADERS += \
     db/version_edit.h \
     db/version_set.h \
     db/write_batch_internal.h \
-    port/atomic_pointer.h \
-    port/port_example.h \
     port/port.h \
-    port/port_posix.h \
+    port/port_qt.h \
     port/thread_annotations.h \
     port/win/stdint.h \
     helpers/memenv/memenv.h \
@@ -61,7 +59,7 @@ HEADERS += \
     util/histogram.h \
     util/logging.h \
     util/mutexlock.h \
-    util/posix_logger.h \
+    util/qt_logger.h \
     util/random.h
 
 SOURCES += \
@@ -80,7 +78,6 @@ SOURCES += \
     db/version_set.cc \
     db/write_batch.cc \
     helpers/memenv/memenv.cc \
-    port/port_posix.cc \
     table/block_builder.cc \
     table/block.cc \
     table/filter_block.cc \
@@ -97,7 +94,7 @@ SOURCES += \
     util/comparator.cc \
     util/crc32c.cc \
     util/env.cc \
-    util/env_posix.cc \
+    util/env_qt.cc \
     util/filter_policy.cc \
     util/hash.cc \
     util/histogram.cc \
@@ -105,11 +102,10 @@ SOURCES += \
     util/options.cc \
     util/status.cc
 
-posix: DEFINES += LEVELDB_PLATFORM_POSIX
+DEFINES += LEVELDB_PLATFORM_QT
 win: DEFINES += OS_WIN
 mac: DEFINES += OS_MACOSX
 linux: DEFINES += OS_LINUX
 freebsd*: DEFINES += OS_FREEBSD
 
-# We do not need anything from Qt
-QT =
+QT += core
