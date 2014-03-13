@@ -3471,9 +3471,4 @@ QWebPage::VisibilityState QWebPage::visibilityState() const
   This signal is emitted when the load of \a frame is finished and the application may now update its state accordingly.
 */
 
-/*!
-  \fn QWebPagePrivate* QWebPage::handle() const
-  \internal
-*/
-
 #include "moc_qwebpage.cpp"
