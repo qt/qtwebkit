@@ -340,7 +340,7 @@ asm volatile (
 ".globl " SYMBOL_STRING(ctiVMThrowTrampoline) "\n"
 HIDE_SYMBOL(ctiVMThrowTrampoline) "\n"
 SYMBOL_STRING(ctiVMThrowTrampoline) ":" "\n"
-    "mov.l .L2"SYMBOL_STRING(cti_vm_throw)",r0" "\n"
+    "mov.l .L2" SYMBOL_STRING(cti_vm_throw) ",r0" "\n"
     "mov r15, r4" "\n"
     "mov.l @(r0,r12),r11" "\n"
     "jsr @r11" "\n"
@@ -357,7 +357,7 @@ SYMBOL_STRING(ctiVMThrowTrampoline) ":" "\n"
     "rts" "\n"
     "nop" "\n"
     ".align 2" "\n"
-    ".L2"SYMBOL_STRING(cti_vm_throw)":.long " SYMBOL_STRING(cti_vm_throw)"@GOT \n"
+    ".L2" SYMBOL_STRING(cti_vm_throw) ":.long " SYMBOL_STRING(cti_vm_throw) "@GOT \n"
 );
 
 asm volatile (
@@ -1433,7 +1433,7 @@ MSVC_END(    END)
     SYMBOL_STRING(cti_##op) ":" "\n" \
     "sts pr, r11" "\n" \
     "mov.l r11, @(" STRINGIZE_VALUE_OF(THUNK_RETURN_ADDRESS_OFFSET) ", r15)" "\n" \
-    "mov.l .L2"SYMBOL_STRING(JITStubThunked_##op)",r0" "\n" \
+    "mov.l .L2" SYMBOL_STRING(JITStubThunked_##op) ",r0" "\n" \
     "mov.l @(r0,r12),r11" "\n" \
     "jsr @r11" "\n" \
     "nop" "\n" \
@@ -1442,7 +1442,7 @@ MSVC_END(    END)
     "rts" "\n" \
     "nop" "\n" \
     ".align 2" "\n" \
-    ".L2"SYMBOL_STRING(JITStubThunked_##op)":.long " SYMBOL_STRING(JITStubThunked_##op)"@GOT \n" \
+    ".L2" SYMBOL_STRING(JITStubThunked_##op) ":.long " SYMBOL_STRING(JITStubThunked_##op)"@GOT \n" \
     ); \
     rtype JITStubThunked_##op(STUB_ARGS_DECLARATION)
 #else

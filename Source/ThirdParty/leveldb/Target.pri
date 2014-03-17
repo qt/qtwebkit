@@ -108,4 +108,9 @@ mac: DEFINES += OS_MACOSX
 linux: DEFINES += OS_LINUX
 freebsd*: DEFINES += OS_FREEBSD
 
+gcc {
+    QMAKE_CXXFLAGS_WARN_ON += -Wno-error=unused-but-set-variable
+    QMAKE_CXXFLAGS += -Wno-error=unused-but-set-variable
+}
+
 QT += core
