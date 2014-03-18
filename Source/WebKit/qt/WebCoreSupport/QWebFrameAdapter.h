@@ -22,6 +22,8 @@
 
 #include "FrameLoaderClientQt.h"
 #include "PlatformEvent.h"
+#include "PlatformExportMacros.h"
+
 #if ENABLE(ORIENTATION_EVENTS) && HAVE(QTSENSORS)
 #include "qorientationsensor.h"
 #endif // ENABLE(ORIENTATION_EVENTS).

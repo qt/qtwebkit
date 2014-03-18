@@ -104,6 +104,11 @@ defineTest(finalizeConfigure) {
         WEBKIT_CONFIG -= $$WEBKIT_TOOLS_CONFIG build_tests
     }
 
+    static {
+        CONFIGURE_WARNINGS += "QtWebKitQml will not be build. It is not supported with static linking"
+        WEBKIT_CONFIG -= build_webkit2 build_minibrowser build_wtr
+    }
+
     print_defaults {
         log(DEFINES: $$configDefines()$${EOL})
         error(Done computing defaults)
