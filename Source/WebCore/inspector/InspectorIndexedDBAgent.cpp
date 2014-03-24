@@ -553,6 +553,88 @@ public:
     unsigned m_pageSize;
 };
 
+class ClearObjectStoreListener : public EventListener {
+    WTF_MAKE_NONCOPYABLE(ClearObjectStoreListener);
+public:
+    static PassRefPtr<ClearObjectStoreListener> create(PassRefPtr<ClearObjectStoreCallback> requestCallback)
+    {
+        return adoptRef(new ClearObjectStoreListener(requestCallback));
+    }
+
+    virtual ~ClearObjectStoreListener() { }
+
+    virtual bool operator==(const EventListener& other) OVERRIDE
+    {
+        return this == &other;
+    }
+
+    virtual void handleEvent(ScriptExecutionContext*, Event* event) OVERRIDE
+    {
+        if (!m_requestCallback->isActive())
+            return;
+        if (event->type() != eventNames().completeEvent) {
+            m_requestCallback->sendFailure("Unexpected event type.");
+            return;
+        }
+
+        m_requestCallback->sendSuccess();
+    }
+private:
+    ClearObjectStoreListener(PassRefPtr<ClearObjectStoreCallback> requestCallback)
+        : EventListener(EventListener::CPPEventListenerType)
+        , m_requestCallback(requestCallback)
+    {
+    }
+
+    RefPtr<ClearObjectStoreCallback> m_requestCallback;
+};
+
+class ClearObjectStore : public ExecutableWithDatabase {
+public:
+    static PassRefPtr<ClearObjectStore> create(ScriptExecutionContext* context, const String& objectStoreName, PassRefPtr<ClearObjectStoreCallback> requestCallback)
+    {
+        return adoptRef(new ClearObjectStore(context, objectStoreName, requestCallback));
+    }
+
+    ClearObjectStore(ScriptExecutionContext* context, const String& objectStoreName, PassRefPtr<ClearObjectStoreCallback> requestCallback)
+        : ExecutableWithDatabase(context)
+        , m_objectStoreName(objectStoreName)
+        , m_requestCallback(requestCallback)
+    {
+    }
+
+    virtual void execute(PassRefPtr<IDBDatabase> prpDatabase)
+    {
+        RefPtr<IDBDatabase> idbDatabase = prpDatabase;
+        if (!requestCallback()->isActive())
+            return;
+        RefPtr<IDBTransaction> idbTransaction = transactionForDatabase(context(), idbDatabase.get(), m_objectStoreName, IDBTransaction::modeReadWrite());
+        if (!idbTransaction) {
+            m_requestCallback->sendFailure("Could not get transaction");
+            return;
+        }
+        RefPtr<IDBObjectStore> idbObjectStore = objectStoreForTransaction(idbTransaction.get(), m_objectStoreName);
+        if (!idbObjectStore) {
+            m_requestCallback->sendFailure("Could not get object store");
+            return;
+        }
+
+        ExceptionCode ec = 0;
+        RefPtr<IDBRequest> idbRequest = idbObjectStore->clear(context(), ec);
+        ASSERT(!ec);
+        if (ec) {
+            m_requestCallback->sendFailure(String::format("Could not clear object store '%s': %d", m_objectStoreName.utf8().data(), ec));
+            return;
+        }
+        idbTransaction->addEventListener(eventNames().completeEvent, ClearObjectStoreListener::create(m_requestCallback), false);
+    }
+
+    virtual RequestCallback* requestCallback() { return m_requestCallback.get(); }
+private:
+    const String m_objectStoreName;
+    RefPtr<ClearObjectStoreCallback> m_requestCallback;
+};
+
 } // namespace
 
 InspectorIndexedDBAgent::InspectorIndexedDBAgent(InstrumentingAgents* instrumentingAgents, InspectorCompositeState* state, InjectedScriptManager* injectedScriptManager, InspectorPageAgent* pageAgent)
@@ -668,89 +750,6 @@ void InspectorIndexedDBAgent::requestData(ErrorString* errorString, const String
     RefPtr<DataLoader> dataLoader = DataLoader::create(document, requestCallback, injectedScript, objectStoreName, indexName, idbKeyRange, skipCount, pageSize);
     dataLoader->start(idbFactory, document->securityOrigin(), databaseName);
 }
-
-class ClearObjectStoreListener : public EventListener {
-    WTF_MAKE_NONCOPYABLE(ClearObjectStoreListener);
-public:
-    static PassRefPtr<ClearObjectStoreListener> create(PassRefPtr<ClearObjectStoreCallback> requestCallback)
-    {
-        return adoptRef(new ClearObjectStoreListener(requestCallback));
-    }
-
-    virtual ~ClearObjectStoreListener() { }
-
-    virtual bool operator==(const EventListener& other) OVERRIDE
-    {
-        return this == &other;
-    }
-
-    virtual void handleEvent(ScriptExecutionContext*, Event* event) OVERRIDE
-    {
-        if (!m_requestCallback->isActive())
-            return;
-        if (event->type() != eventNames().completeEvent) {
-            m_requestCallback->sendFailure("Unexpected event type.");
-            return;
-        }
-
-        m_requestCallback->sendSuccess();
-    }
-private:
-    ClearObjectStoreListener(PassRefPtr<ClearObjectStoreCallback> requestCallback)
-        : EventListener(EventListener::CPPEventListenerType)
-        , m_requestCallback(requestCallback)
-    {
-    }
-
-    RefPtr<ClearObjectStoreCallback> m_requestCallback;
-};
-
-
-class ClearObjectStore : public ExecutableWithDatabase {
-public:
-    static PassRefPtr<ClearObjectStore> create(ScriptExecutionContext* context, const String& objectStoreName, PassRefPtr<ClearObjectStoreCallback> requestCallback)
-    {
-        return adoptRef(new ClearObjectStore(context, objectStoreName, requestCallback));
-    }
-
-    ClearObjectStore(ScriptExecutionContext* context, const String& objectStoreName, PassRefPtr<ClearObjectStoreCallback> requestCallback)
-        : ExecutableWithDatabase(context)
-        , m_objectStoreName(objectStoreName)
-        , m_requestCallback(requestCallback)
-    {
-    }
-
-    virtual void execute(PassRefPtr<IDBDatabase> prpDatabase)
-    {
-        RefPtr<IDBDatabase> idbDatabase = prpDatabase;
-        if (!requestCallback()->isActive())
-            return;
-        RefPtr<IDBTransaction> idbTransaction = transactionForDatabase(context(), idbDatabase.get(), m_objectStoreName, IDBTransaction::modeReadWrite());
-        if (!idbTransaction) {
-            m_requestCallback->sendFailure("Could not get transaction");
-            return;
-        }
-        RefPtr<IDBObjectStore> idbObjectStore = objectStoreForTransaction(idbTransaction.get(), m_objectStoreName);
-        if (!idbObjectStore) {
-            m_requestCallback->sendFailure("Could not get object store");
-            return;
-        }
-
-        ExceptionCode ec = 0;
-        RefPtr<IDBRequest> idbRequest = idbObjectStore->clear(context(), ec);
-        ASSERT(!ec);
-        if (ec) {
-            m_requestCallback->sendFailure(String::format("Could not clear object store '%s': %d", m_objectStoreName.utf8().data(), ec));
-            return;
-        }
-        idbTransaction->addEventListener(eventNames().completeEvent, ClearObjectStoreListener::create(m_requestCallback), false);
-    }
-
-    virtual RequestCallback* requestCallback() { return m_requestCallback.get(); }
-private:
-    const String m_objectStoreName;
-    RefPtr<ClearObjectStoreCallback> m_requestCallback;
-};
 
 void InspectorIndexedDBAgent::clearObjectStore(ErrorString* errorString, const String& securityOrigin, const String& databaseName, const String& objectStoreName, PassRefPtr<ClearObjectStoreCallback> requestCallback)
 {
