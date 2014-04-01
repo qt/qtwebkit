@@ -110,6 +110,7 @@ public:
     void invalidateWritableData() const { m_writableData = 0; }
     bool isForDragAndDrop() const { return m_isForDragAndDrop; }
     bool isForCopyAndPaste() const { return !m_isForDragAndDrop; }
+    void updateSystemPasteboard();
 #endif
 
     // Deprecated. Use createForCopyAndPaste instead.

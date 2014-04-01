@@ -27,6 +27,7 @@
 #include "CachedResourceHandle.h"
 #include "CachedResourceLoader.h"
 #include "CachedResourceRequest.h"
+#include "Frame.h"
 #include "GRefPtrGStreamer.h"
 #include "GStreamerVersioning.h"
 #include "MediaPlayer.h"
@@ -45,6 +46,8 @@
 #include <wtf/text/CString.h>
 
 using namespace WebCore;
+
+static CachedResourceLoader* s_cachedResourceLoader = 0;
 
 class StreamingClient {
     public:
@@ -326,7 +329,10 @@ static void webKitWebSrcDispose(GObject* object)
     WebKitWebSrc* src = WEBKIT_WEB_SRC(object);
     WebKitWebSrcPrivate* priv = src->priv;
 
-    priv->player = 0;
+    if (priv->player) {
+        priv->player = 0;
+        s_cachedResourceLoader = 0;
+    }
 
     GST_CALL_PARENT(G_OBJECT_CLASS, dispose, (object));
 }
@@ -462,7 +468,10 @@ static gboolean webKitWebSrcStop(WebKitWebSrc* src)
     if (!seeking) {
         priv->size = 0;
         priv->requestedOffset = 0;
-        priv->player = 0;
+        if (priv->player) {
+            priv->player = 0;
+            s_cachedResourceLoader = 0;
+        }
     }
 
     locker.unlock();
@@ -524,10 +533,14 @@ static gboolean webKitWebSrcStart(WebKitWebSrc* src)
     // Needed to use DLNA streaming servers
     request.setHTTPHeaderField("transferMode.dlna", "Streaming");
 
-    if (priv->player) {
-        if (CachedResourceLoader* loader = priv->player->cachedResourceLoader())
-            priv->client = new CachedResourceStreamingClient(src, loader, request);
-    }
+    CachedResourceLoader* loader = 0;
+    if (priv->player)
+        loader = priv->player->cachedResourceLoader();
+    else
+        loader = s_cachedResourceLoader;
+
+    if (loader)
+        priv->client = new CachedResourceStreamingClient(src, loader, request);
 
     if (!priv->client)
         priv->client = new ResourceHandleStreamingClient(src, request);
@@ -868,6 +881,7 @@ void webKitWebSrcSetMediaPlayer(WebKitWebSrc* src, WebCore::MediaPlayer* player)
     ASSERT(player);
     GMutexLocker locker(GST_OBJECT_GET_LOCK(src));
     src->priv->player = player;
+    s_cachedResourceLoader = player->cachedResourceLoader();
 }
 
 StreamingClient::StreamingClient(WebKitWebSrc* src)
@@ -1130,7 +1144,10 @@ void CachedResourceStreamingClient::notifyFinished(CachedResource* resource)
 ResourceHandleStreamingClient::ResourceHandleStreamingClient(WebKitWebSrc* src, const ResourceRequest& request)
     : StreamingClient(src)
 {
-    m_resource = ResourceHandle::create(0 /*context*/, request, this, false, false);
+    NetworkingContext* context = 0;
+    if (s_cachedResourceLoader)
+        context = s_cachedResourceLoader->frame()->loader()->networkingContext();
+    m_resource = ResourceHandle::create(context, request, this, false, false);
 }
 
 ResourceHandleStreamingClient::~ResourceHandleStreamingClient()
