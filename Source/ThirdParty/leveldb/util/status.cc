@@ -3,6 +3,7 @@
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
 
 #include <stdio.h>
+#include <stdint.h>    // C99 header, available as an extension in C++98
 #include "port/port.h"
 #include "leveldb/status.h"
 
