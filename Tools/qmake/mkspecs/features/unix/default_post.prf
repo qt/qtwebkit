@@ -42,7 +42,7 @@ linux-*g++* {
     }
 }
 
-*-g++* {
+*-g++*:!intel_icc {
     greaterThan(QT_GCC_MAJOR_VERSION, 3):greaterThan(QT_GCC_MINOR_VERSION, 5) {
         !contains(QMAKE_CXXFLAGS, -std=(c|gnu)\\+\\+(0x|11)) {
             # We need to deactivate those warnings because some names conflicts with upcoming c++0x types (e.g.nullptr).
@@ -53,7 +53,7 @@ linux-*g++* {
 }
 
 # Don't warn about OVERRIDE and FINAL, since they are feature-checked anyways
-*clang:!contains(QMAKE_CXXFLAGS, -std=c++11) {
+*clang:!intel_icc:!contains(QMAKE_CXXFLAGS, -std=c++11) {
     QMAKE_CXXFLAGS += -Wno-c++11-extensions -Wno-c++0x-extensions
     QMAKE_OBJECTIVE_CFLAGS += -Wno-c++11-extensions -Wno-c++0x-extensions
 }
