@@ -30,6 +30,10 @@
 #include "Filter.h"
 #include <wtf/Vector.h>
 
+namespace WTF {
+template<typename Type> class ParallelJobs;
+}
+
 namespace WebCore {
 
 enum EdgeModeType {
@@ -105,7 +109,7 @@ private:
     static const int s_minimalRectDimension = (100 * 100); // Empirical data limit for parallel jobs
 
     template<typename Type>
-    friend class ParallelJobs;
+    friend class WTF::ParallelJobs;
 
     struct InteriorPixelParameters {
         FEConvolveMatrix* filter;

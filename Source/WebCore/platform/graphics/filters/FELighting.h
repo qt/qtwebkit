@@ -36,6 +36,10 @@
 #include "SpotLightSource.h"
 #include <wtf/Uint8ClampedArray.h>
 
+namespace WTF {
+template<typename Type> class ParallelJobs;
+}
+
 // Common base class for FEDiffuseLighting and FESpecularLighting
 
 namespace WebCore {
@@ -76,7 +80,7 @@ protected:
     };
 
     template<typename Type>
-    friend class ParallelJobs;
+    friend class WTF::ParallelJobs;
 
     struct PlatformApplyGenericParameters {
         FELighting* filter;

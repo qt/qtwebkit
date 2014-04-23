@@ -34,8 +34,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <ciso646>
 
 #if COMPILER_SUPPORTS(CXX_NULLPTR) || defined(_LIBCPP_VERSION)
-
-#include <cstddef>
+#include <stddef.h>
 
 // libstdc++ supports nullptr_t starting with gcc 4.6.
 #if defined(__GLIBCXX__) && __GLIBCXX__ < 20110325
