@@ -104,9 +104,6 @@ inline int atomicDecrement(int volatile* addend) { return static_cast<int>(atomi
 inline int atomicIncrement(int volatile* addend) { return __atomic_inc(addend) + 1; }
 inline int atomicDecrement(int volatile* addend) { return __atomic_dec(addend) - 1; }
 
-inline int64_t atomicIncrement(int64_t volatile* addend) { return __sync_add_and_fetch(addend, 1); }
-inline int64_t atomicDecrement(int64_t volatile* addend) { return __sync_sub_and_fetch(addend, 1); }
-
 #elif COMPILER(GCC)
 #define WTF_USE_LOCKFREE_THREADSAFEREFCOUNTED 1
 
