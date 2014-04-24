@@ -171,7 +171,7 @@ PassRefPtr<DocumentFragment> Pasteboard::documentFragment(Frame* frame, PassRefP
             if (!title.isEmpty())
                 title = QStringLiteral(" title=\"") + title + QStringLiteral("\"");
             if (urls.count() == 1) {
-                QString html = QStringLiteral("<img src=\"") + urls.first().toEncoded() + QStringLiteral("\"") + title + QStringLiteral(">");
+                QString html = QStringLiteral("<img src=\"") + urls.first().toString(QUrl::FullyEncoded) + QStringLiteral("\"") + title + QStringLiteral(">");
                 RefPtr<DocumentFragment> fragment = createFragmentFromMarkup(frame->document(), html, "", DisallowScriptingAndPluginContent);
                 if (fragment)
                     return fragment.release();
