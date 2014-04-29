@@ -163,7 +163,7 @@ void Image::drawPattern(GraphicsContext* ctxt, const FloatRect& tileRect, const 
     QTransform transform(patternTransform);
 
     // If this would draw more than one scaled tile, we scale the pixmap first and then use the result to draw.
-    if (transform.type() == QTransform::TxScale) {
+    if (transform.type() == QTransform::TxScale && p->transform().type() < QTransform::TxScale) {
         QRectF tileRectInTargetCoords = (transform * QTransform().translate(phase.x(), phase.y())).mapRect(tr);
 
         bool tileWillBePaintedOnlyOnce = tileRectInTargetCoords.contains(dr);
