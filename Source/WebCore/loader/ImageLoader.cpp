@@ -173,7 +173,7 @@ void ImageLoader::updateFromElement()
 
     AtomicString attr = m_element->imageSourceURL();
 
-    if (attr == m_failedLoadURL)
+    if (!m_failedLoadURL.isEmpty() && attr == m_failedLoadURL)
         return;
 
     // Do not load any image if the 'src' attribute is missing or if it is
@@ -254,7 +254,10 @@ void ImageLoader::updateFromElement()
             // being queued to fire. Ensure this happens after beforeload is
             // dispatched.
             newImage->addClient(this);
+        } else {
+            updateRenderer();
         }
+
         if (oldImage)
             oldImage->removeClient(this);
     }
