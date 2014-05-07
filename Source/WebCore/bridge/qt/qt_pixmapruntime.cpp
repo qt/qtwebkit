@@ -20,6 +20,7 @@
 #include "qt_pixmapruntime.h"
 
 #include "APICast.h"
+#include "APIShims.h"
 #include "CachedImage.h"
 #include "HTMLImageElement.h"
 #include "ImageData.h"
@@ -149,10 +150,13 @@ static JSValueRef pixmapToImageData(JSContextRef context, JSObjectRef function, 
     int width = image.width();
     int height = image.height();
 
+    JSC::ExecState* exec = ::toJS(context);
+    APIEntryShim entryShim(exec);
+
     RefPtr<ImageData> imageData = ImageData::create(IntSize(width, height));
     copyPixelsInto(image, width, height, imageData->data()->data());
-    JSDOMGlobalObject* globalObject = static_cast<JSDOMGlobalObject*>(::toJS(JSContextGetGlobalObject(context)));
-    JSC::ExecState* exec = ::toJS(context);
+
+    JSDOMGlobalObject* globalObject = static_cast<JSDOMGlobalObject*>(exec->lexicalGlobalObject());
     return ::toRef(exec, toJS(exec, globalObject, imageData.get()));
 }
 
