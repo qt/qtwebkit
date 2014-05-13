@@ -54,6 +54,9 @@ enum CalculationCategory {
     CalcPercent,
     CalcPercentNumber,
     CalcPercentLength,
+    CalcAngle,
+    CalcTime,
+    CalcFrequency,
 #if ENABLE(CSS_VARIABLES)
     CalcVariable,
 #endif
