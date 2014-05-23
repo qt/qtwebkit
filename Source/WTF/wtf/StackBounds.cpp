@@ -186,6 +186,7 @@ void StackBounds::initialize()
     MEMORY_BASIC_INFORMATION uncommittedMemory;
     VirtualQuery(stackOrigin.AllocationBase, &uncommittedMemory, sizeof(uncommittedMemory));
     SIZE_T extraGuardPageRegionSize = 0;
+    SIZE_T extraUncommittedMemoryRegionSize = 0;
     if (uncommittedMemory.Protect & PAGE_GUARD) {
         extraGuardPageRegionSize = uncommittedMemory.RegionSize;
         VirtualQuery(static_cast<char*>(uncommittedMemory.BaseAddress) + uncommittedMemory.RegionSize, &uncommittedMemory, sizeof(uncommittedMemory));
@@ -199,6 +200,7 @@ void StackBounds::initialize()
         // Within a .NET application the stack layout will sometimes be different. It will contain 2 blocks of uncommited memory instead of one.
         // This can be reproduced always on WindowsXP and sometimes on Windows 7
         // So search one block further if we didn't find the guard page yet.
+        extraUncommittedMemoryRegionSize = guardPage.RegionSize;
         VirtualQuery(static_cast<char*>(guardPage.BaseAddress) + guardPage.RegionSize, &guardPage, sizeof(guardPage));
     }
 
@@ -210,7 +212,7 @@ void StackBounds::initialize()
     VirtualQuery(static_cast<char*>(guardPage.BaseAddress) + guardPage.RegionSize, &committedMemory, sizeof(committedMemory));
     ASSERT(committedMemory.State == MEM_COMMIT);
 
-    void* computedEnd = static_cast<char*>(m_origin) - (uncommittedMemory.RegionSize + extraGuardPageRegionSize + guardPage.RegionSize + committedMemory.RegionSize);
+    void* computedEnd = static_cast<char*>(m_origin) - (uncommittedMemory.RegionSize + extraUncommittedMemoryRegionSize + extraGuardPageRegionSize + guardPage.RegionSize + committedMemory.RegionSize);
 
     ASSERT(stackOrigin.AllocationBase == uncommittedMemory.AllocationBase);
     ASSERT(stackOrigin.AllocationBase == guardPage.AllocationBase);
