@@ -3051,7 +3051,13 @@ void SpeculativeJIT::compileSoftModulo(Node* node)
     FPRResult result(this);
     
     flushRegisters();
-    callOperation(operationFModOnInts, result.fpr(), op1GPR, op2GPR);
+    if (!nodeCanIgnoreNegativeZero(node->arithNodeFlags())) {
+        // NegativeZero check will need op1GPR and fmod call is likely to clobber it.
+        m_jit.push(op1GPR);
+        callOperation(operationFModOnInts, result.fpr(), op1GPR, op2GPR);
+        m_jit.pop(op1GPR);
+    } else
+        callOperation(operationFModOnInts, result.fpr(), op1GPR, op2GPR);
     
     FPRTemporary scratch(this);
     GPRTemporary intResult(this);
