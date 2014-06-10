@@ -621,9 +621,9 @@ public:
         m_assembler.sqrtd(dst, src);
     }
     
-    void absDouble(FPRegisterID, FPRegisterID)
+    void absDouble(FPRegisterID src, FPRegisterID dst)
     {
-        RELEASE_ASSERT_NOT_REACHED();
+        m_assembler.absd(dst, src);
     }
 
     ConvertibleLoadLabel convertibleLoadPtr(Address address, RegisterID dest)
@@ -1188,7 +1188,15 @@ public:
         return false;
 #endif
     }
-    static bool supportsFloatingPointAbs() { return false; }
+
+    static bool supportsFloatingPointAbs()
+    {
+#if WTF_MIPS_DOUBLE_FLOAT
+        return true;
+#else
+        return false;
+#endif
+    }
 
     // Stack manipulation operations:
     //
