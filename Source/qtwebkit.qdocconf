@@ -27,7 +27,7 @@ qhp.QtWebKit.subprojects.classes.selectors = class fake:headerfile
 qhp.QtWebKit.subprojects.classes.sortPages = true
 qhp.QtWebKit.subprojects.qmltypes.title = QML Types
 qhp.QtWebKit.subprojects.qmltypes.indexTitle = Qt WebKit QML Types
-qhp.QtWebKit.subprojects.qmltypes.selectors = fake:qmlclass
+qhp.QtWebKit.subprojects.qmltypes.selectors = qmlclass
 qhp.QtWebKit.subprojects.qmltypes.sortPages = true
 
 headerdirs = WebKit/qt/Api WebKit/qt/WidgetApi WebKit2/UIProcess/API/qt
