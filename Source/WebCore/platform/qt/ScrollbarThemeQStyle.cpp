@@ -204,7 +204,7 @@ int ScrollbarThemeQStyle::trackPosition(ScrollbarThemeClient* scrollbar)
 {
     QStyleFacadeOption opt = initSliderStyleOption(scrollbar);
     QRect track = m_qStyle->scrollBarSubControlRect(opt, QStyleFacade::SC_ScrollBarGroove);
-    return scrollbar->orientation() == HorizontalScrollbar ? track.x() - scrollbar->x() : track.y() - scrollbar->y();
+    return scrollbar->orientation() == HorizontalScrollbar ? track.x() : track.y();
 }
 
 int ScrollbarThemeQStyle::trackLength(ScrollbarThemeClient* scrollbar)

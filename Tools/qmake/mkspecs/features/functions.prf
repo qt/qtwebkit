@@ -379,6 +379,14 @@ defineReplace(configDefines) {
 
 defineReplace(javascriptFeatureDefines) {
     defines = LANGUAGE_JAVASCRIPT=1 $$configDefines(enable)
+
+    # Omit disabled features when generating bindings to shrink the
+    # generator's command line on Windows.
+    disabledFeatures = $$find(defines, ^.+=0$)
+    for (disabledFeature, disabledFeatures) {
+        defines -= $$disabledFeature
+    }
+
     return($$defines)
 }
 

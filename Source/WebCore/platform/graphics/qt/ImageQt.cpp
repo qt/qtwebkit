@@ -45,6 +45,7 @@
 #include <QImage>
 #include <QImageReader>
 #include <QPainter>
+#include <QPaintEngine>
 #include <QPixmap>
 #include <QPixmapCache>
 #include <QTransform>
@@ -163,7 +164,7 @@ void Image::drawPattern(GraphicsContext* ctxt, const FloatRect& tileRect, const 
     QTransform transform(patternTransform);
 
     // If this would draw more than one scaled tile, we scale the pixmap first and then use the result to draw.
-    if (transform.type() == QTransform::TxScale) {
+    if (transform.type() == QTransform::TxScale && p->transform().type() < QTransform::TxScale) {
         QRectF tileRectInTargetCoords = (transform * QTransform().translate(phase.x(), phase.y())).mapRect(tr);
 
         bool tileWillBePaintedOnlyOnce = tileRectInTargetCoords.contains(dr);
@@ -239,6 +240,9 @@ QPixmap* prescaleImageIfRequired(QPainter* painter, QPixmap* image, QPixmap* buf
     ASSERT(image);
     ASSERT(painter);
     if (!(painter->renderHints() & QPainter::SmoothPixmapTransform))
+        return image;
+
+    if (painter->paintEngine()->type() != QPaintEngine::Raster)
         return image;
 
     QTransform transform = painter->combinedTransform();

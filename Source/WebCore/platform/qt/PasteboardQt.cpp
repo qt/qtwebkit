@@ -171,7 +171,7 @@ PassRefPtr<DocumentFragment> Pasteboard::documentFragment(Frame* frame, PassRefP
             if (!title.isEmpty())
                 title = QStringLiteral(" title=\"") + title + QStringLiteral("\"");
             if (urls.count() == 1) {
-                QString html = QStringLiteral("<img src=\"") + urls.first().toEncoded() + QStringLiteral("\"") + title + QStringLiteral(">");
+                QString html = QStringLiteral("<img src=\"") + urls.first().toString(QUrl::FullyEncoded) + QStringLiteral("\"") + title + QStringLiteral(">");
                 RefPtr<DocumentFragment> fragment = createFragmentFromMarkup(frame->document(), html, "", DisallowScriptingAndPluginContent);
                 if (fragment)
                     return fragment.release();
@@ -208,7 +208,8 @@ void Pasteboard::writeURL(const KURL& url, const String& title, Frame*)
 
     if (!m_writableData)
         m_writableData = new QMimeData;
-    m_writableData->setText(title);
+    if (!title.isEmpty())
+        m_writableData->setText(title);
     m_writableData->setUrls(QList<QUrl>() << url);
     if (isForCopyAndPaste())
         updateSystemPasteboard();

@@ -48,7 +48,7 @@ isEmpty(importPath): importPath = $$[QT_INSTALL_IMPORTS]
 target.path = $${importPath}/$${TARGET.module_name}
 
 
-qmldir.files += $$PWD/qmldir
+qmldir.files += $$PWD/qmldir $$PWD/plugins.qmltypes
 qmldir.path +=  $${importPath}/$${TARGET.module_name}
 
 INSTALLS += target qmldir

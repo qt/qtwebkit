@@ -48,7 +48,7 @@ public:
 
 private:
     TextureMapperTiledBackingStore();
-    void createOrDestroyTilesIfNeeded(const FloatSize& backingStoreSize, const IntSize& tileSize, bool hasAlpha);
+    void createOrDestroyTilesIfNeeded(const FloatSize& backingStoreSize, const IntSize& tileSize, bool hasAlpha, IntRect&);
     void updateContentsFromImageIfNeeded(TextureMapper*);
     TransformationMatrix adjustedTransformForRect(const FloatRect&);
     inline FloatRect rect() const { return FloatRect(FloatPoint::zero(), m_size); }

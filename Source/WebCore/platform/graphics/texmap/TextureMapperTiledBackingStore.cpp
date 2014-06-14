@@ -69,11 +69,10 @@ void TextureMapperTiledBackingStore::drawRepaintCounter(TextureMapper* textureMa
         textureMapper->drawNumber(repaintCount, borderColor, m_tiles[i].rect().location(), adjustedTransform);
 }
 
-void TextureMapperTiledBackingStore::createOrDestroyTilesIfNeeded(const FloatSize& size, const IntSize& tileSize, bool hasAlpha)
+void TextureMapperTiledBackingStore::createOrDestroyTilesIfNeeded(const FloatSize& size, const IntSize& tileSize, bool hasAlpha, IntRect& repaintRect)
 {
     if (size == m_size)
         return;
-
     m_size = size;
 
     Vector<FloatRect> tileRectsToAdd;
@@ -107,8 +106,12 @@ void TextureMapperTiledBackingStore::createOrDestroyTilesIfNeeded(const FloatSiz
         }
 
         // This tile is not needed.
-        if (!existsAlready)
+        if (!existsAlready) {
             tileIndicesToRemove.append(i);
+            // If the removed tile was painted ensure the area it covered is repainted.
+            if (m_tiles[i].texture())
+                repaintRect.unite(enclosingIntRect(oldTile));
+        }
     }
 
     // Recycle removable tiles to be used for newly requested tiles.
@@ -135,16 +138,18 @@ void TextureMapperTiledBackingStore::createOrDestroyTilesIfNeeded(const FloatSiz
 
 void TextureMapperTiledBackingStore::updateContents(TextureMapper* textureMapper, Image* image, const FloatSize& totalSize, const IntRect& dirtyRect, BitmapTexture::UpdateContentsFlag updateContentsFlag)
 {
-    createOrDestroyTilesIfNeeded(totalSize, textureMapper->maxTextureSize(), !image->currentFrameKnownToBeOpaque());
+    IntRect repaintRect(dirtyRect);
+    createOrDestroyTilesIfNeeded(totalSize, textureMapper->maxTextureSize(), !image->currentFrameKnownToBeOpaque(), repaintRect);
     for (size_t i = 0; i < m_tiles.size(); ++i)
-        m_tiles[i].updateContents(textureMapper, image, dirtyRect, updateContentsFlag);
+        m_tiles[i].updateContents(textureMapper, image, repaintRect, updateContentsFlag);
 }
 
 void TextureMapperTiledBackingStore::updateContents(TextureMapper* textureMapper, GraphicsLayer* sourceLayer, const FloatSize& totalSize, const IntRect& dirtyRect, BitmapTexture::UpdateContentsFlag updateContentsFlag)
 {
-    createOrDestroyTilesIfNeeded(totalSize, textureMapper->maxTextureSize(), true);
+    IntRect repaintRect(dirtyRect);
+    createOrDestroyTilesIfNeeded(totalSize, textureMapper->maxTextureSize(), true, repaintRect);
     for (size_t i = 0; i < m_tiles.size(); ++i)
-        m_tiles[i].updateContents(textureMapper, sourceLayer, dirtyRect, updateContentsFlag);
+        m_tiles[i].updateContents(textureMapper, sourceLayer, repaintRect, updateContentsFlag);
 }
 
 PassRefPtr<BitmapTexture> TextureMapperTiledBackingStore::texture() const

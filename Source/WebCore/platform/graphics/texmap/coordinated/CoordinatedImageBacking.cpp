@@ -92,8 +92,10 @@ void CoordinatedImageBacking::removeHost(Host* host)
     ASSERT(position != notFound);
     m_hosts.remove(position);
 
-    if (m_hosts.isEmpty())
+    if (m_hosts.isEmpty()) {
         m_client->removeImageBacking(id());
+        m_clearContentsTimer.stop();
+    }
 }
 
 void CoordinatedImageBacking::markDirty()

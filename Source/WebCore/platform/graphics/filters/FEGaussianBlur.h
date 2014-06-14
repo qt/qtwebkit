@@ -26,6 +26,10 @@
 #include "FilterEffect.h"
 #include "Filter.h"
 
+namespace WTF {
+template<typename Type> class ParallelJobs;
+}
+
 namespace WebCore {
 
 class FEGaussianBlur : public FilterEffect {
@@ -53,7 +57,7 @@ private:
     static const int s_minimalRectDimension = 100 * 100; // Empirical data limit for parallel jobs
 
     template<typename Type>
-    friend class ParallelJobs;
+    friend class WTF::ParallelJobs;
 
     struct PlatformApplyParameters {
         FEGaussianBlur* filter;

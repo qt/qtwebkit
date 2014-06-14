@@ -28,6 +28,10 @@
 #include "FilterEffect.h"
 #include "Filter.h"
 
+namespace WTF {
+template<typename Type> class ParallelJobs;
+}
+
 namespace WebCore {
 
 enum TurbulenceType {
@@ -107,7 +111,7 @@ private:
     };
 
     template<typename Type>
-    friend class ParallelJobs;
+    friend class WTF::ParallelJobs;
 
     struct FillRegionParameters {
         FETurbulence* filter;
