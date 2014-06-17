@@ -95,7 +95,7 @@ CONFIG += include_webinspector
 contains(QT_CONFIG, c++11): CONFIG += c++11
 
 # Limit the creation of thin archives to Linux, since only GNU's ar supports it.
-!debug_and_release:linux-g++*: CONFIG += gnu_thin_archives
+!debug_and_release:linux: CONFIG += gnu_thin_archives
 
 # Pick up Qt's defaults for debug/release/debug_and_release
 if(win32|mac):!macx-xcode {
