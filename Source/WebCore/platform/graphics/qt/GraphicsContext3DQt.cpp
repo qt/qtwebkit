@@ -121,8 +121,8 @@ GraphicsContext3DPrivate::GraphicsContext3DPrivate(GraphicsContext3D* context, H
     }
 
     QOpenGLContext* shareContext = 0;
-    if (hostWindow && hostWindow->platformPageClient() && hostWindow->platformPageClient()->makeOpenGLContextCurrentIfAvailable())
-        shareContext = QOpenGLContext::currentContext();
+    if (hostWindow && hostWindow->platformPageClient())
+        shareContext = hostWindow->platformPageClient()->openGLContextIfAvailable();
 
 #if QT_VERSION >= 0x050100
     QOffscreenSurface* surface = new QOffscreenSurface;

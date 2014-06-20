@@ -175,5 +175,8 @@ defineTest(santizeFeatures) {
     # Minibrowser must be able to query for QtTestSupport
     build?(qttestsupport): WEBKIT_CONFIG += have_qttestsupport
 
+    # Accelerated 2D canvas uses 3D graphics support.
+    !use?(3d_graphics): WEBKIT_CONFIG -= accelerated_2d_canvas
+
     export(WEBKIT_CONFIG)
 }
