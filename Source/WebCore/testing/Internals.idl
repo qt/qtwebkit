@@ -258,6 +258,7 @@
     [Conditional=ENCRYPTED_MEDIA_V2] void initializeMockCDM();
 
     [Conditional=SPEECH_SYNTHESIS] void enableMockSpeechSynthesizer();
+    void setDelegatesMenuListRendering(in boolean forceOn);
 
     [RaisesException] DOMString getImageSourceURL(Element element);
 
