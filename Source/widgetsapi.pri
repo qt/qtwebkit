@@ -36,7 +36,6 @@ contains(CONFIG, texmap): DEFINES += WTF_USE_TEXTURE_MAPPER=1
 use?(PLUGIN_BACKEND_XLIB): PKGCONFIG += x11
 
 QT += network widgets widgets-private
-have?(QTQUICK): QT += quick
 have?(QTPRINTSUPPORT): QT += printsupport
 
 use?(TEXTURE_MAPPER_GL)|enable?(WEBGL) {
