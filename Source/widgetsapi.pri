@@ -36,7 +36,6 @@ contains(CONFIG, texmap): DEFINES += WTF_USE_TEXTURE_MAPPER=1
 use?(PLUGIN_BACKEND_XLIB): PKGCONFIG += x11
 
 QT += network widgets widgets-private
-have?(QTQUICK): QT += quick
 have?(QTPRINTSUPPORT): QT += printsupport
 
 use?(TEXTURE_MAPPER_GL)|enable?(WEBGL) {
@@ -59,6 +58,10 @@ MODULE_BASE_OUTDIR = $$ROOT_BUILD_DIR
 # the QtWebKitWidgets library, and will end up in the library's prl file.
 QT_API_DEPENDS = core gui widgets network webkit
 
+# We load the relevant modules here, so that the effects of each module
+# on the QT variable can be picked up when we later load(qt_module).
+load(webkit_modules)
+
 # ---------------- Custom developer-build handling -------------------
 #
 # The assumption for Qt developer builds is that the module file
@@ -71,6 +74,8 @@ QT_API_DEPENDS = core gui widgets network webkit
 !production_build: CONFIG += force_independent
 
 BASE_TARGET = $$TARGET
+
+CMAKE_MODULE_TESTS = $$ROOT_WEBKIT_DIR/Source/WebKit/qt/tests/cmake
 
 load(qt_module)
 

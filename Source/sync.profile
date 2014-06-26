@@ -19,6 +19,7 @@
 #
 %dependencies = (
     "qtbase" => "",
+    "qtxmlpatterns" => "",
     "qtdeclarative" => "",
     "qtlocation" => "",
     "qtmultimedia" => "",

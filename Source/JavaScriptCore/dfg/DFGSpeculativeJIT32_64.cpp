@@ -3870,7 +3870,8 @@ void SpeculativeJIT::compile(Node* node)
             break;
         }
         
-        if (isCellSpeculation(node->child1()->prediction())) {
+        switch (node->child1().useKind()) {
+        case CellUse: {
             SpeculateCellOperand base(this, node->child1());
             GPRTemporary resultTag(this, base);
             GPRTemporary resultPayload(this);
@@ -3886,23 +3887,31 @@ void SpeculativeJIT::compile(Node* node)
             jsValueResult(resultTagGPR, resultPayloadGPR, node, UseChildrenCalledExplicitly);
             break;
         }
-        
-        JSValueOperand base(this, node->child1());
-        GPRTemporary resultTag(this, base);
-        GPRTemporary resultPayload(this);
-        
-        GPRReg baseTagGPR = base.tagGPR();
-        GPRReg basePayloadGPR = base.payloadGPR();
-        GPRReg resultTagGPR = resultTag.gpr();
-        GPRReg resultPayloadGPR = resultPayload.gpr();
-        
-        base.use();
-        
-        JITCompiler::Jump notCell = m_jit.branch32(JITCompiler::NotEqual, baseTagGPR, TrustedImm32(JSValue::CellTag));
-        
-        cachedGetById(node->codeOrigin, baseTagGPR, basePayloadGPR, resultTagGPR, resultPayloadGPR, node->identifierNumber(), notCell);
-        
-        jsValueResult(resultTagGPR, resultPayloadGPR, node, UseChildrenCalledExplicitly);
+
+        case UntypedUse: {
+            JSValueOperand base(this, node->child1());
+            GPRTemporary resultTag(this, base);
+            GPRTemporary resultPayload(this);
+
+            GPRReg baseTagGPR = base.tagGPR();
+            GPRReg basePayloadGPR = base.payloadGPR();
+            GPRReg resultTagGPR = resultTag.gpr();
+            GPRReg resultPayloadGPR = resultPayload.gpr();
+
+            base.use();
+
+            JITCompiler::Jump notCell = m_jit.branch32(JITCompiler::NotEqual, baseTagGPR, TrustedImm32(JSValue::CellTag));
+
+            cachedGetById(node->codeOrigin, baseTagGPR, basePayloadGPR, resultTagGPR, resultPayloadGPR, node->identifierNumber(), notCell);
+
+            jsValueResult(resultTagGPR, resultPayloadGPR, node, UseChildrenCalledExplicitly);
+            break;
+        }
+
+        default:
+            RELEASE_ASSERT_NOT_REACHED();
+            break;
+        }
         break;
     }
 
