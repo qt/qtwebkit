@@ -24,4 +24,5 @@
     "qtlocation" => "",
     "qtmultimedia" => "",
     "qtsensors" => "",
+    "qtwebchannel" => "",
 );
