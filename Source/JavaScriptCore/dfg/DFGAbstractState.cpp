@@ -1567,7 +1567,11 @@ bool AbstractState::executeEffects(unsigned indexInBlock, Node* node)
     case Nop:
     case CountExecution:
         break;
-        
+
+    case Unreachable:
+        RELEASE_ASSERT_NOT_REACHED();
+        break;
+
     case LastNodeType:
         RELEASE_ASSERT_NOT_REACHED();
         break;
@@ -1778,11 +1782,10 @@ inline bool AbstractState::mergeToSuccessors(Graph& graph, BasicBlock* basicBloc
     }
         
     case Return:
-    case Throw:
-    case ThrowReferenceError:
+    case Unreachable:
         ASSERT(basicBlock->cfaBranchDirection == InvalidBranchDirection);
         return false;
-        
+
     default:
         RELEASE_ASSERT_NOT_REACHED();
         return false;
