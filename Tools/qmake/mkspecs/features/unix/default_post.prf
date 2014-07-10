@@ -4,6 +4,10 @@
 # See 'Tools/qmake/README' for an overview of the build system
 # -------------------------------------------------------------------
 
+# Disable a few warnings. The same warnings are also disabled
+# in WebKitLibraries/win/tools/vsprops/common.vsprops
+intel_icc: load(icc)
+
 # Use SSE2 floating point math on 32 bit instead of the default
 # 387 to make layout test results same on 32 and on 64 bit builds.
 # See https://bugs.webkit.org/show_bug.cgi?id=52810#c39 for details.
