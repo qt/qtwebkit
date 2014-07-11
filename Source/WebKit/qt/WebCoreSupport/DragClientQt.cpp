@@ -95,7 +95,8 @@ void DragClientQt::startDrag(DragImageRef dragImage, const IntPoint& dragImageOr
 #ifndef QT_NO_DRAGANDDROP
     QMimeData* clipboardData = clipboard->pasteboard().clipboardData();
     clipboard->pasteboard().invalidateWritableData();
-    QObject* view = m_chromeClient->platformPageClient()->ownerWidget();
+    PlatformPageClient pageClient = m_chromeClient->platformPageClient();
+    QObject* view = pageClient ? pageClient->ownerWidget() : 0;
     if (view) {
         QDrag* drag = new QDrag(view);
         if (dragImage) {
