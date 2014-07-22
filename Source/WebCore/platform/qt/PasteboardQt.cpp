@@ -208,8 +208,13 @@ void Pasteboard::writeURL(const KURL& url, const String& title, Frame*)
 
     if (!m_writableData)
         m_writableData = new QMimeData;
-    if (!title.isEmpty())
-        m_writableData->setText(title);
+
+    QString urlString = url.string();
+    m_writableData->setText(urlString);
+
+    QString html = QStringLiteral("<a href=\"") + urlString + QStringLiteral("\">") + QString(title) + QStringLiteral("</a>");
+    m_writableData->setHtml(html);
+
     m_writableData->setUrls(QList<QUrl>() << url);
     if (isForCopyAndPaste())
         updateSystemPasteboard();
