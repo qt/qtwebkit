@@ -74,9 +74,20 @@ FontPlatformData::FontPlatformData(const FontDescription& description, const Ato
     font.setWeight(toQFontWeight(description.weight()));
     font.setWordSpacing(wordSpacing);
     font.setLetterSpacing(QFont::AbsoluteSpacing, letterSpacing);
-    if (description.fontSmoothing() == NoSmoothing
-        || (description.fontSmoothing() == AutoSmoothing && !Font::shouldUseSmoothing()))
-        font.setStyleStrategy(QFont::NoAntialias);
+    switch (description.fontSmoothing()) {
+        case AutoSmoothing:
+            if (Font::shouldUseSmoothing())
+                break;
+            // no break
+        case NoSmoothing:
+            font.setStyleStrategy(QFont::NoAntialias);
+            break;
+        case Antialiased:
+            font.setStyleStrategy(QFont::NoSubpixelAntialias);
+            break;
+        case SubpixelAntialiased:
+            break;
+    }
 
     m_data->bold = font.bold();
     // WebKit allows font size zero but QFont does not. We will return
