@@ -1113,10 +1113,10 @@ void QWebPageAdapter::triggerAction(QWebPageAdapter::MenuAction action, QWebHitT
 #if defined(Q_WS_X11)
         bool oldSelectionMode = Pasteboard::generalPasteboard()->isSelectionMode();
         Pasteboard::generalPasteboard()->setSelectionMode(true);
-        editor.copyURL(hitTestResult->linkUrl, WTF::String());
+        editor.copyURL(hitTestResult->linkUrl, hitTestResult->linkText);
         Pasteboard::generalPasteboard()->setSelectionMode(oldSelectionMode);
 #endif
-        editor.copyURL(hitTestResult->linkUrl, WTF::String());
+        editor.copyURL(hitTestResult->linkUrl, hitTestResult->linkText);
         break;
     }
     case OpenImageInNewWindow:

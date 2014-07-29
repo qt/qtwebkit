@@ -315,7 +315,6 @@ void RenderThemeQt::adjustTextFieldStyle(StyleResolver*, RenderStyle* style, Ele
     // padding. Just worth keeping in mind!
     style->setBackgroundColor(Color::transparent);
     style->resetBorder();
-    style->resetPadding();
     computeSizeBasedOnStyle(style);
 }
 
