@@ -83,8 +83,10 @@ FontPlatformData::FontPlatformData(const FontDescription& description, const Ato
             font.setStyleStrategy(QFont::NoAntialias);
             break;
         case Antialiased:
+#if QT_VERSION >= QT_VERSION_CHECK(5, 4, 0)
             font.setStyleStrategy(QFont::NoSubpixelAntialias);
             break;
+#endif
         case SubpixelAntialiased:
             break;
     }
