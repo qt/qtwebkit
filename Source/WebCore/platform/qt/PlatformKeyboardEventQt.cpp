@@ -312,7 +312,6 @@ String keyIdentifierForQtKeyCode(int keyCode)
         return ASCIILiteral("MediaRewind");
     case Qt::Key_Subtitle:
         return ASCIILiteral("Subtitle");
-#if QT_VERSION >= QT_VERSION_CHECK(5, 2, 0)
     case Qt::Key_Blue:
         return ASCIILiteral("Blue");
     case Qt::Key_ChannelDown:
@@ -325,7 +324,6 @@ String keyIdentifierForQtKeyCode(int keyCode)
         return ASCIILiteral("Red");
     case Qt::Key_Yellow:
         return ASCIILiteral("Yellow");
-#endif
     // Keys we have returned U+charcode for in the past.
     // FIXME: Change them to correct standard values if others do.
     case Qt::Key_Tab:
