@@ -45,7 +45,7 @@ QT += webkit
 
 use?(3D_GRAPHICS): WEBKIT += ANGLE
 
-WEBKIT += javascriptcore wtf webcore
+WEBKIT += javascriptcore wtf webcore webkit1
 
 MODULE = webkitwidgets
 CONFIG += creating_module
