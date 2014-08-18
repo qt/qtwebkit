@@ -252,22 +252,11 @@ static void initializeSupportedImageMIMETypes()
 #endif
 
 #if PLATFORM(QT)
-#if QT_VERSION >= QT_VERSION_CHECK(5, 1, 0)
     QList<QByteArray> mimeTypes = QImageReader::supportedMimeTypes();
     Q_FOREACH(const QByteArray& mimeType, mimeTypes) {
         supportedImageMIMETypes->add(mimeType.constData());
         supportedImageResourceMIMETypes->add(mimeType.constData());
     }
-#else
-    QList<QByteArray> formats = QImageReader::supportedImageFormats();
-    for (int i = 0; i < formats.size(); ++i) {
-        String mimeType = MIMETypeRegistry::getMIMETypeForExtension(formats.at(i).constData());
-        if (!mimeType.isEmpty()) {
-            supportedImageMIMETypes->add(mimeType);
-            supportedImageResourceMIMETypes->add(mimeType);
-        }
-    }
-#endif // QT_VERSION
 #if ENABLE(SVG)
     // Do not treat SVG as images directly if WebKit can handle them.
     supportedImageMIMETypes->remove("image/svg+xml");
@@ -299,19 +288,10 @@ static void initializeSupportedImageMIMETypesForEncoding()
     supportedImageMIMETypesForEncoding->add("image/gif");
 #endif
 #elif PLATFORM(QT)
-#if QT_VERSION >= QT_VERSION_CHECK(5, 1, 0)
     QList<QByteArray> mimeTypes = QImageWriter::supportedMimeTypes();
     Q_FOREACH(const QByteArray& mimeType, mimeTypes) {
         supportedImageMIMETypesForEncoding->add(mimeType.constData());
     }
-#else
-    QList<QByteArray> formats = QImageWriter::supportedImageFormats();
-    for (int i = 0; i < formats.size(); ++i) {
-        String mimeType = MIMETypeRegistry::getMIMETypeForExtension(formats.at(i).constData());
-        if (!mimeType.isEmpty())
-            supportedImageMIMETypesForEncoding->add(mimeType);
-    }
-#endif // QT_VERSION
 #elif PLATFORM(GTK)
     supportedImageMIMETypesForEncoding->add("image/png");
     supportedImageMIMETypesForEncoding->add("image/jpeg");

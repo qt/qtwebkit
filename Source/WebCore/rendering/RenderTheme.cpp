@@ -74,6 +74,8 @@ static Color& customFocusRingColor()
     return color;
 }
 
+static bool forceMenuListDelegation = false;
+
 RenderTheme::RenderTheme()
 #if USE(NEW_THEME)
     : m_theme(platformTheme())
@@ -1069,6 +1071,16 @@ void RenderTheme::adjustProgressBarStyle(StyleResolver*, RenderStyle*, Element*)
 bool RenderTheme::shouldHaveSpinButton(HTMLInputElement* inputElement) const
 {
     return inputElement->isSteppable() && !inputElement->isRangeControl();
+}
+
+bool RenderTheme::delegatesMenuListRendering() const
+{
+    return forceMenuListDelegation;
+}
+
+void RenderTheme::setDelegatesMenuListRendering(bool on)
+{
+    forceMenuListDelegation = on;
 }
 
 void RenderTheme::adjustMenuListButtonStyle(StyleResolver*, RenderStyle*, Element*) const

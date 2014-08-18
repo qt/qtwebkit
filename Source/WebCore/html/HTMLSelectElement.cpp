@@ -182,6 +182,8 @@ void HTMLSelectElement::listBoxSelectItem(int listIndex, bool allowMultiplySelec
         if (fireOnChangeNow)
             listBoxOnChange();
     }
+    if (usesMenuList() && renderer())
+        toRenderMenuList(renderer())->setTextFromOption(selectedIndex());
 }
 
 bool HTMLSelectElement::usesMenuList() const
@@ -826,6 +828,8 @@ void HTMLSelectElement::optionSelectionStateChanged(HTMLOptionElement* option, b
         selectOption(option->index());
     else if (!usesMenuList())
         selectOption(-1);
+    else if (m_multiple)
+        selectOption(selectedIndex());
     else
         selectOption(nextSelectableListIndex(-1));
 }
@@ -862,12 +866,12 @@ void HTMLSelectElement::selectOption(int optionIndex, SelectOptionFlags flags)
         m_isProcessingUserDrivenChange = flags & UserDriven;
         if (flags & DispatchChangeEvent)
             dispatchChangeEventForMenuList();
-        if (RenderObject* renderer = this->renderer()) {
-            if (usesMenuList())
-                toRenderMenuList(renderer)->didSetSelectedIndex(listIndex);
-            else if (renderer->isListBox())
-                toRenderListBox(renderer)->selectionChanged();
-        }
+    }
+    if (RenderObject* renderer = this->renderer()) {
+        if (usesMenuList())
+            toRenderMenuList(renderer)->didSetSelectedIndex(listIndex);
+        else if (renderer->isListBox())
+            toRenderListBox(renderer)->selectionChanged();
     }
 
     setNeedsValidityCheck();
