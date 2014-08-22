@@ -1994,6 +1994,8 @@ public:
     void compileIntegerArithDivForX86(Node*);
 #elif CPU(APPLE_ARMV7S)
     void compileIntegerArithDivForARMv7s(Node*);
+#elif CPU(MIPS)
+    void compileIntegerArithDivForMIPS(Node*);
 #endif
     void compileArithMod(Node*);
     void compileSoftModulo(Node*);

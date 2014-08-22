@@ -2255,6 +2255,8 @@ void SpeculativeJIT::compile(Node* node)
             compileIntegerArithDivForX86(node);
 #elif CPU(APPLE_ARMV7S)
             compileIntegerArithDivForARMv7s(node);
+#elif CPU(MIPS)
+            compileIntegerArithDivForMIPS(node);
 #else // CPU type without integer divide
             RELEASE_ASSERT_NOT_REACHED(); // should have been coverted into a double divide.
 #endif
