@@ -265,7 +265,7 @@ inline unsigned WidthIterator::advanceInternal(TextIterator& textIterator, Glyph
                 m_isAfterExpansion = false;
         }
 
-        if (shouldApplyFontTransforms() && glyphBuffer && Font::treatAsSpace(character))
+        if (shouldApplyFontTransforms() && glyphBuffer && (Font::treatAsSpace(character) || Font::treatAsZeroWidthSpace(character)))
             charactersTreatedAsSpace.append(make_pair(glyphBuffer->size(),
                 OriginalAdvancesForCharacterTreatedAsSpace(character == ' ', glyphBuffer->size() ? glyphBuffer->advanceAt(glyphBuffer->size() - 1).width() : 0, width)));
 
