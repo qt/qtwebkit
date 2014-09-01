@@ -212,6 +212,7 @@ private:
 
     friend struct WidthIterator;
     friend class SVGTextRunRenderingContext;
+    friend class TextLayout;
 
 public:
     // Useful for debugging the different font rendering code paths.
