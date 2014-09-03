@@ -62,11 +62,6 @@
 #define WTF_COMPILER_SUPPORTS_CXX_STRONG_ENUMS __has_feature(cxx_strong_enums)
 #define WTF_COMPILER_SUPPORTS_CXX_REFERENCE_QUALIFIED_FUNCTIONS __has_feature(cxx_reference_qualified_functions)
 
-#if defined(__APPLE__) && COMPILER_SUPPORTS(CXX_RVALUE_REFERENCES) && defined(_GLIBCXX_VERSION) && (_GLIBCXX_VERSION <= 20070719)
-/* WTF expects the standard library to have std::move when the compiler supports rvalue references, but some old versions of stdc++11 shipped by Apple does not. */
-#define WTF_COMPILER_SUPPORTS_CXX_RVALUE_REFERENCES 0
-#endif
-
 #endif
 
 #ifndef CLANG_PRAGMA
@@ -183,6 +178,20 @@
 /* ABI */
 #if defined(__ARM_EABI__) || defined(__EABI__)
 #define WTF_COMPILER_SUPPORTS_EABI 1
+#endif
+
+/* Library C++11 support */
+#if COMPILER_SUPPORTS(CXX_RVALUE_REFERENCES)
+/* WTF expects the standard library to have std::move when the compiler supports rvalue references */
+#if defined(__APPLE__) && defined(_GLIBCXX_VERSION) && (_GLIBCXX_VERSION <= 20070719)
+/* Some old versions of stdc++11 shipped by Apple does not have std::move. */
+#undef WTF_COMPILER_SUPPORTS_CXX_RVALUE_REFERENCES
+#define WTF_COMPILER_SUPPORTS_CXX_RVALUE_REFERENCES 0
+#elif defined(__QNXNTO__) && (defined(_YVALS) || defined(_LIBCPP_VER))
+/* libcpp (Dinkumware) does not support std::move */
+#undef WTF_COMPILER_SUPPORTS_CXX_RVALUE_REFERENCES
+#define WTF_COMPILER_SUPPORTS_CXX_RVALUE_REFERENCES 0
+#endif
 #endif
 
 /* ==== Compiler features ==== */

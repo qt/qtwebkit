@@ -694,11 +694,6 @@
 #define HAVE_VIRTUALALLOC 1
 #endif
 
-#if OS(QNX)
-#define HAVE_MADV_FREE_REUSE 1
-#define HAVE_MADV_FREE 1
-#endif
-
 /* ENABLE macro defaults */
 
 /* FIXME: move out all ENABLE() defines from here to FeatureDefines.h */

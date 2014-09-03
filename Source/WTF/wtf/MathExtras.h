@@ -148,8 +148,8 @@ inline double trunc(double num) { return num > 0 ? floor(num) : ceil(num); }
 
 #endif
 
-#if COMPILER(GCC) && OS(QNX)
-// The stdlib on QNX doesn't contain long abs(long). See PR #104666.
+#if COMPILER(GCC) && OS(QNX) && _CPPLIB_VER < 640
+// The stdlib on QNX < 6.6 doesn't contain long abs(long). See PR #104666.
 inline long long abs(long num) { return labs(num); }
 #endif
 
