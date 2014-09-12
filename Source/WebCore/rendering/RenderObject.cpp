@@ -230,6 +230,8 @@ RenderObject* RenderObject::createObject(Element* element, RenderStyle* style)
         return new (arena) RenderDeprecatedFlexibleBox(element);
     case FLEX:
     case INLINE_FLEX:
+    case WEBKIT_FLEX:
+    case WEBKIT_INLINE_FLEX:
         return new (arena) RenderFlexibleBox(element);
     case GRID:
     case INLINE_GRID:
