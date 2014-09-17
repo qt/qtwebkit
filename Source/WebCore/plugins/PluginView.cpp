@@ -383,6 +383,11 @@ void PluginView::stop()
     LOG_NPERROR(npErr);
     PluginView::setCurrentPluginView(0);
 
+    Vector<String>::iterator e = m_streamTempFilePaths.end();
+    for (Vector<String>::iterator it = m_streamTempFilePaths.begin(); it != e; ++it)
+        deleteFile(*it);
+    m_streamTempFilePaths.clear();
+
 #if ENABLE(NETSCAPE_PLUGIN_API)
     if (savedData) {
         // TODO: Actually save this data instead of just discarding it
