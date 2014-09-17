@@ -162,6 +162,12 @@ void PluginPackage::determineQuirks(const String& mimeType)
         if (compareFileVersion(lastKnownUnloadableRealPlayerVersion) > 0)
             m_quirks.add(PluginQuirkDontUnloadPlugin);
     }
+
+    // The Adobe Acrobat plugin only displays the pdf correctly on the first load if set window is
+    // called on it twice in a row.
+    if (name() == "Adobe Acrobat")
+        m_quirks.add(PluginQuirkNeedsSetWindowTwice);
+
 }
 
 bool PluginPackage::fetchInfo()

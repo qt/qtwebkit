@@ -865,6 +865,8 @@ void PluginView::setNPWindowRect(const IntRect& rect)
         JSC::JSLock::DropAllLocks dropAllLocks(JSDOMWindowBase::commonVM());
         setCallingPlugin(true);
         m_plugin->pluginFuncs()->setwindow(m_instance, &m_npWindow);
+        if (m_plugin->quirks().contains(PluginQuirkNeedsSetWindowTwice))
+            m_plugin->pluginFuncs()->setwindow(m_instance, &m_npWindow);
         setCallingPlugin(false);
 
         m_haveCalledSetWindow = true;
