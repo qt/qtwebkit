@@ -196,7 +196,7 @@ defineTest(haveQt) {
 }
 
 defineTest(programExistsInPath) {
-    win32: program = $${1}.exe
+    equals(QMAKE_HOST.os, Windows): program = $${1}.exe
     else: program = $$1
 
     PATH = "$$(PATH)"

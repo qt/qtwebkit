@@ -307,8 +307,12 @@ void PluginStream::destroyStream()
     if (!m_loadManually && m_client)
         m_client->streamDidFinishLoading(this);
 
-    if (!m_path.isNull())
-        deleteFile(m_path);
+    if (!m_path.isNull()) {
+        if (m_client)
+            m_client->streamDidSaveTempFile(m_path);
+        else
+            deleteFile(m_path);
+    }
 }
 
 void PluginStream::delayDeliveryTimerFired(Timer<PluginStream>* timer)

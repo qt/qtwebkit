@@ -147,9 +147,7 @@ else: SOURCES += src/compiler/ossource_posix.cpp
 # Make sure the derived sources are built
 include(DerivedSources.pri)
 
-*g++* {
-    QMAKE_CXXFLAGS += -Wno-unused-variable -Wno-missing-noreturn -Wno-unused-function -Wno-reorder -Wno-error -Wno-unknown-pragmas -Wno-undef
-}
+CONFIG += compiling_thirdparty_code
 
 # We do not need anything from Qt
 QT =

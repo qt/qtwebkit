@@ -140,7 +140,7 @@ struct JITStackFrame {
     ReturnAddressPtr* returnAddressSlot() { return reinterpret_cast<ReturnAddressPtr*>(this) - 1; }
 };
 #elif CPU(X86)
-#if COMPILER(MSVC) || (OS(WINDOWS) && COMPILER(GCC))
+#if COMPILER(MSVC) || (OS(WINDOWS) && COMPILER(GCC)) || OS(QNX)
 #pragma pack(push)
 #pragma pack(4)
 #endif // COMPILER(MSVC) || (OS(WINDOWS) && COMPILER(GCC))
