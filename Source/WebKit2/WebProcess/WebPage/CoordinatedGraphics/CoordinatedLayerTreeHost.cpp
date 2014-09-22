@@ -212,6 +212,8 @@ void CoordinatedLayerTreeHost::renderNextFrame()
 
 void CoordinatedLayerTreeHost::purgeBackingStores()
 {
+    // Wait for CoordinatedGraphicsScene::setActive(true) to be called.
+    m_isWaitingForRenderer = true;
     m_coordinator->purgeBackingStores();
 }
 

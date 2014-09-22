@@ -690,8 +690,6 @@ void CoordinatedGraphicsScene::purgeGLResources()
 
     m_rootLayer.clear();
     m_rootLayerID = InvalidCoordinatedLayerID;
-    m_layers.clear();
-    m_fixedLayers.clear();
     m_textureMapper.clear();
     m_backingStores.clear();
     m_backingStoresWithPendingBuffers.clear();
