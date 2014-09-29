@@ -1104,6 +1104,10 @@ GPRReg SpeculativeJIT::fillSpeculateCell(Edge edge)
 
     switch (info.registerFormat()) {
     case DataFormatNone: {
+        if (info.spillFormat() == DataFormatInteger || info.spillFormat() == DataFormatDouble) {
+            terminateSpeculativeExecution(Uncountable, JSValueRegs(), 0);
+            return allocate();
+        }
 
         if (edge->hasConstant()) {
             JSValue jsValue = valueOfJSConstant(edge.node());
