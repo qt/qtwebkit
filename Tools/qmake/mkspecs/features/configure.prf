@@ -115,8 +115,8 @@ defineTest(finalizeConfigure) {
     }
 
     # Sanity checks that would prevent us from building the whole project altogether.
-    !mac:!contains(QT_CONFIG,icu) {
-        addReasonForSkippingBuild("ICU is required. To build QtWebKit with Qt 5 you need to build Qt 5 with libICU support. Check for ICU support being mentioned in qtbase/config.summary.")
+    !mac:!config_icu {
+       addReasonForSkippingBuild("ICU is required.")
     }
     production_build:blackberry|qnx {
         addReasonForSkippingBuild("Build not supported on BB10/QNX yet.")
