@@ -95,6 +95,9 @@ defineTest(detectFeatures) {
     # WebGL support - only enabled if we can use 3D graphics
     use?(3d_graphics): WEBKIT_CONFIG += webgl
 
+    # Both desktop and GLES2 support (only on Windows at this point)
+    contains(QT_CONFIG, dynamicgl): WEBKIT_CONFIG += have_dynamicgl
+
     # HTML5 Media Support for builds with GStreamer
     unix:!mac:!contains(QT_CONFIG, no-pkg-config) {
         packagesExist("glib-2.0 gio-2.0 gstreamer-1.0 gstreamer-plugins-base-1.0") {
@@ -126,7 +129,8 @@ defineTest(detectFeatures) {
 
     # Support for Graphics Surface
     # GraphicsSurface requires GraphicsContext3D and hence use_3d_graphics
-    use?(3d_graphics) {
+    # FIXME: GraphicsSurface do not work with dynamicgl at this point.
+    use?(3d_graphics):!have?(dynamicgl) {
         mac: WEBKIT_CONFIG += use_graphics_surface
         win32:contains(QT_CONFIG, opengles2): WEBKIT_CONFIG += use_graphics_surface
         have?(glx):have?(xcomposite):have?(xrender): WEBKIT_CONFIG += use_graphics_surface use_glx
