@@ -2981,6 +2981,12 @@ mac {
 }
 
 contains(QT_CONFIG,icu)|mac: SOURCES += platform/text/TextBreakIteratorICU.cpp
+use?(wchar_unicode): {
+    SOURCES += platform/text/wchar/TextBreakIteratorWchar.cpp \
+               platform/text/TextEncodingDetectorNone.cpp
+    SOURCES -= platform/text/TextEncodingDetectorICU.cpp
+}
+
 mac {
     # For Mac we use the same SmartReplace implementation as the Apple port.
     SOURCES += editing/SmartReplaceCF.cpp

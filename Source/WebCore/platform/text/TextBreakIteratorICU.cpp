@@ -20,6 +20,7 @@
  */
 
 #include "config.h"
+#if USE(ICU_UNICODE)
 #include "TextBreakIterator.h"
 
 #include "LineBreakIteratorPoolICU.h"
@@ -687,3 +688,4 @@ TextBreakIterator* cursorMovementIterator(const UChar* string, int length)
 }
 
 }
+#endif // #if USE(ICU_UNICODE)

@@ -572,6 +572,10 @@
 
 #endif  /* OS(WINCE) && !PLATFORM(QT) */
 
+#if OS(ANDROID) && PLATFORM(QT)
+# define WTF_USE_WCHAR_UNICODE 1
+#endif
+
 #if !USE(WCHAR_UNICODE)
 #define WTF_USE_ICU_UNICODE 1
 #endif

@@ -26,11 +26,16 @@
 #define WTF_UnicodeWchar_h
 
 #include <stdint.h>
-#include <wchar.h>
 #include <wtf/unicode/ScriptCodesFromICU.h>
 #include <wtf/unicode/UnicodeMacrosFromICU.h>
 
-typedef wchar_t UChar;
+#ifndef ANDROID
+# include <wchar.h>
+ typedef wchar_t UChar;
+#else
+ typedef unsigned short int UChar;
+#endif
+
 typedef uint32_t UChar32;
 
 namespace WTF {

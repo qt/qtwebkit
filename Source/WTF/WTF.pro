@@ -264,6 +264,8 @@ win32 {
         threads/BinarySemaphore.cpp
 }
 
+use?(wchar_unicode): SOURCES += wtf/unicode/wchar/UnicodeWchar.cpp
+
 QT += core
 QT -= gui
 
@@ -276,4 +278,3 @@ QT -= gui
     # For GCC 4.5 and before we disable C++0x mode in JSC for if enabled in Qt's mkspec
     QMAKE_CXXFLAGS -= -std=c++0x -std=gnu++0x -std=c++11 -std=gnu++11
 }
-
