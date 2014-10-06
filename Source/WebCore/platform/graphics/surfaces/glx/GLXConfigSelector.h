@@ -40,7 +40,7 @@ static int clientAttributes[] = {
     static_cast<int>(GLX_VISUAL_ID),    0,
     GLX_DRAWABLE_TYPE,                  GLX_PIXMAP_BIT,
     GLX_BIND_TO_TEXTURE_TARGETS_EXT,    GLX_TEXTURE_2D_BIT_EXT,
-    GLX_BIND_TO_TEXTURE_RGBA_EXT,       TRUE,
+    GLX_BIND_TO_TEXTURE_RGBA_EXT,       GL_TRUE,
     0
 };
 
