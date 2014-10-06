@@ -85,9 +85,6 @@ defineReplace(configEnabled) {
 # command line options
 defineTest(finalizeConfigure) {
 
-    # Sanitize clashing options
-    santizeFeatures()
-
     # Sanitize build options
     !qtHaveModule(testlib) {
         CONFIGURE_WARNINGS += "Missing QtTest module, disabling DumpRenderTree, WebKitTestRunner and tests"
@@ -108,6 +105,9 @@ defineTest(finalizeConfigure) {
         CONFIGURE_WARNINGS += "QtWebKitQml will not be build. It is not supported with static linking"
         WEBKIT_CONFIG -= build_webkit2 build_minibrowser build_wtr
     }
+
+    # Sanitize clashing options
+    santizeFeatures()
 
     print_defaults {
         log(DEFINES: $$configDefines()$${EOL})
