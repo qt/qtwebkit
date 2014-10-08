@@ -192,7 +192,8 @@ private:
             VideoTrigger |
             PluginTrigger| 
             CanvasTrigger |
-            AnimationTrigger);
+            AnimationTrigger |
+            LargeAreaTrigger);
     }
 
     virtual bool layerTreeStateIsFrozen() const OVERRIDE;
