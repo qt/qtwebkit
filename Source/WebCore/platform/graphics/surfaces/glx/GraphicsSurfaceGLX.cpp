@@ -31,6 +31,7 @@
 #include <QGuiApplication>
 #include <QOpenGLContext>
 #include <qpa/qplatformnativeinterface.h>
+#include <GL/gl.h>
 #include <GL/glext.h>
 #include <GL/glx.h>
 #else

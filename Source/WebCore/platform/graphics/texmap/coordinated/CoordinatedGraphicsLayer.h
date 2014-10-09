@@ -218,9 +218,7 @@ private:
     FloatPoint m_adjustedPosition;
     FloatPoint3D m_adjustedAnchorPoint;
 
-#ifndef NDEBUG
     bool m_isPurging;
-#endif
     bool m_shouldUpdateVisibleRect: 1;
     bool m_shouldSyncLayerState: 1;
     bool m_shouldSyncChildren: 1;

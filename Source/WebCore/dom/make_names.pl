@@ -390,6 +390,10 @@ sub printConstructorInterior
     my ($F, $tagName, $interfaceName, $constructorTagName) = @_;
 
     # Handle media elements.
+    # Note that wrapperOnlyIfMediaIsAvailable is a misnomer, because media availability
+    # does not just control the wrapper; it controls the element object that is created.
+    # FIXME: Could we instead do this entirely in the wrapper, and use custom wrappers
+    # instead of having all the support for this here in this script?
     if ($enabledTags{$tagName}{wrapperOnlyIfMediaIsAvailable}) {
         print F <<END
     Settings* settings = document->settings();
@@ -1042,14 +1046,11 @@ sub printWrapperFunctions
             print F "#if ${conditionalString}\n\n";
         }
 
-        # Hack for the media tags
-        # FIXME: This should have been done via a CustomWrapper attribute and a separate *Custom file.
         if ($enabledTags{$tagName}{wrapperOnlyIfMediaIsAvailable}) {
             print F <<END
 static JSDOMWrapper* create${JSInterfaceName}Wrapper(ExecState* exec, JSDOMGlobalObject* globalObject, PassRefPtr<$parameters{namespace}Element> element)
 {
-    Settings* settings = element->document()->settings();
-    if (!MediaPlayer::isAvailable() || (settings && !settings->mediaEnabled()))
+    if (element->isHTMLUnknownElement())
         return CREATE_DOM_WRAPPER(exec, globalObject, $parameters{namespace}Element, element.get());
     return CREATE_DOM_WRAPPER(exec, globalObject, ${JSInterfaceName}, element.get());
 }

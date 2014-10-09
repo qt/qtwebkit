@@ -115,14 +115,18 @@
     || defined(_M_PPC)      \
     || defined(__PPC)
 #define WTF_CPU_PPC 1
+#ifndef __LITTLE_ENDIAN__
 #define WTF_CPU_BIG_ENDIAN 1
+#endif
 #endif
 
 /* CPU(PPC64) - PowerPC 64-bit */
 #if   defined(__ppc64__) \
     || defined(__PPC64__)
 #define WTF_CPU_PPC64 1
+#ifndef __LITTLE_ENDIAN__
 #define WTF_CPU_BIG_ENDIAN 1
+#endif
 #endif
 
 /* CPU(SH4) - SuperH SH-4 */
