@@ -132,6 +132,9 @@
 /* CPU(SH4) - SuperH SH-4 */
 #if defined(__SH4__)
 #define WTF_CPU_SH4 1
+#ifdef __BIG_ENDIAN__
+#define WTF_CPU_BIG_ENDIAN 1
+#endif
 #endif
 
 /* CPU(SPARC32) - SPARC 32-bit */
@@ -755,6 +758,11 @@
 
 /* Disable the JIT on versions of GCC prior to 4.1 */
 #if !defined(ENABLE_JIT) && COMPILER(GCC) && !GCC_VERSION_AT_LEAST(4, 1, 0)
+#define ENABLE_JIT 0
+#endif
+
+/* All the current JIT implementations target little-endian */
+#if CPU(BIG_ENDIAN)
 #define ENABLE_JIT 0
 #endif
 
