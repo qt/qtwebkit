@@ -161,7 +161,9 @@ end
 
 # This must match wtf/Vector.h
 const VectorBufferOffset = 0
-if JSVALUE64
+if WIN64
+    const VectorSizeOffset = 16
+elsif JSVALUE64
     const VectorSizeOffset = 12
 else
     const VectorSizeOffset = 8
