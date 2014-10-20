@@ -805,6 +805,7 @@ void RenderTable::splitColumn(unsigned position, unsigned firstSpan)
     }
 
     m_columnPos.grow(numEffCols() + 1);
+    m_columnPos[numEffCols()] = m_columnPos[numEffCols() - 1];
 }
 
 void RenderTable::appendColumn(unsigned span)
@@ -826,6 +827,7 @@ void RenderTable::appendColumn(unsigned span)
     }
 
     m_columnPos.grow(numEffCols() + 1);
+    m_columnPos[numEffCols()] = m_columnPos[numEffCols() - 1];
 }
 
 RenderTableCol* RenderTable::firstColumn() const

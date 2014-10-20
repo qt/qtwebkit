@@ -48,8 +48,7 @@ DEFINES += $$configDefines()
 
 INCLUDEPATH += \
     $${ROOT_WEBKIT_DIR}/Source \
-    $${ROOT_BUILD_DIR}/Source/include \
-    $${QT.script.includes}
+    $${ROOT_BUILD_DIR}/Source/include
 
 CONFIG -= warn_on
 

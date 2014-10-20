@@ -85,9 +85,6 @@ defineReplace(configEnabled) {
 # command line options
 defineTest(finalizeConfigure) {
 
-    # Sanitize clashing options
-    santizeFeatures()
-
     # Sanitize build options
     !qtHaveModule(testlib) {
         CONFIGURE_WARNINGS += "Missing QtTest module, disabling DumpRenderTree, WebKitTestRunner and tests"
@@ -114,13 +111,16 @@ defineTest(finalizeConfigure) {
         WEBKIT_CONFIG -= build_webkit2 build_minibrowser build_wtr
     }
 
+    # Sanitize clashing options
+    santizeFeatures()
+
     print_defaults {
         log(DEFINES: $$configDefines()$${EOL})
         error(Done computing defaults)
     }
 
     # Sanity checks that would prevent us from building the whole project altogether.
-    !mac:!config_icu {
+    !android:!mac:!config_icu {
        addReasonForSkippingBuild("ICU is required.")
     }
     production_build:blackberry {

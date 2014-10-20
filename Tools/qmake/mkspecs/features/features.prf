@@ -142,6 +142,8 @@ defineTest(detectFeatures) {
     # IndexedDB requires leveldb
     enable?(indexed_database): WEBKIT_CONFIG += use_leveldb
 
+    !config_icu:!mac: WEBKIT_CONFIG += use_wchar_unicode
+
     export(WEBKIT_CONFIG)
     export(CONFIGURE_WARNINGS)
 }
@@ -176,7 +178,7 @@ defineTest(santizeFeatures) {
     # VideoTrack requires video
     !enable?(video): WEBKIT_CONFIG -= video_track
 
-    # Minibrowser must be able to query for QtTestSupport
+    # QtTestBrowser and MiniBrowser must be able to query for QtTestSupport
     build?(qttestsupport): WEBKIT_CONFIG += have_qttestsupport
 
     # Accelerated 2D canvas uses 3D graphics support.

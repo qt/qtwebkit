@@ -13,7 +13,7 @@ mac {
     # Therefore WebKit provides adequate header files.
     INCLUDEPATH = $${ROOT_WEBKIT_DIR}/Source/WTF/icu $$INCLUDEPATH
     LIBS += -licucore
-} else {
+} else:!use?(wchar_unicode): {
     win32: LIBS += -licuin -licuuc -licudt
     else:!contains(QT_CONFIG,no-pkg-config):packagesExist("icu-i18n"): PKGCONFIG *= icu-i18n
     else:android: LIBS += -licui18n -licuuc

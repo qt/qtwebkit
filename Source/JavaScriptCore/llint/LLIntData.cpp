@@ -116,7 +116,11 @@ void Data::performAssertions(VM& vm)
 #if !ASSERT_DISABLED
     Vector<int> testVector;
     testVector.resize(42);
+#if USE(JSVALUE64) && OS(WINDOWS)
+    ASSERT(bitwise_cast<uint32_t*>(&testVector)[4] == 42);
+#else
     ASSERT(bitwise_cast<uint32_t*>(&testVector)[sizeof(void*)/sizeof(uint32_t) + 1] == 42);
+#endif
     ASSERT(bitwise_cast<int**>(&testVector)[0] == testVector.begin());
 #endif
 
