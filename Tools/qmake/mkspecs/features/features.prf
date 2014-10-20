@@ -150,7 +150,7 @@ defineTest(detectFeatures) {
 
 # ---------------- Sanitize features -------------------
 
-defineTest(santizeFeatures) {
+defineTest(sanitizeFeatures) {
     # If we are doing a production_build we should only enable Geolocation support if QtPositioning exists. In developer builds we can use Mock implementations.
     production_build:!have?(qtpositioning): WEBKIT_CONFIG -= geolocation
 

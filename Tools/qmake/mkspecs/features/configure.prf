@@ -112,7 +112,7 @@ defineTest(finalizeConfigure) {
     }
 
     # Sanitize clashing options
-    santizeFeatures()
+    sanitizeFeatures()
 
     print_defaults {
         log(DEFINES: $$configDefines()$${EOL})
