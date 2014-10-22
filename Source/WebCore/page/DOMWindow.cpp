@@ -1811,7 +1811,7 @@ void DOMWindow::setLocation(const String& urlString, DOMWindow* activeWindow, DO
         return;
 
     KURL completedURL = firstFrame->document()->completeURL(urlString);
-    if (completedURL.isNull())
+    if (completedURL.isNull() || !completedURL.isValid())
         return;
 
     if (isInsecureScriptAccess(activeWindow, completedURL))
