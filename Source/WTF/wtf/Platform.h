@@ -810,7 +810,7 @@
 #endif
 
 /* LLINT on ARM depends on an FPU */
-#if !defined(ENABLE_LLINT) && CPU(ARM) && !CPU(ARM_HARDFP)
+#if !defined(ENABLE_LLINT) && CPU(ARM) && (!CPU(ARM_VFP) || OS(ANDROID))
 #define ENABLE_LLINT 0
 #endif
 
