@@ -47,6 +47,10 @@ namespace JSC {
 
 static bool isVFPPresent()
 {
+#if defined(__SOFTFP__)
+    return false;
+#endif
+
 #if OS(LINUX)
     int fd = open("/proc/self/auxv", O_RDONLY);
     if (fd > 0) {
