@@ -31,20 +31,12 @@
 
 #include "CodeProfiling.h"
 #include <errno.h>
-#include <unistd.h>
 #include <wtf/MetaAllocator.h>
 #include <wtf/PageReservation.h>
 #include <wtf/VMTags.h>
 
-#if OS(DARWIN)
-#include <sys/mman.h>
-#endif
-
-#if OS(LINUX)
-#include <stdio.h>
-#endif
-
 #if !PLATFORM(IOS) && PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED < 1090
+#include <sys/mman.h>
 // MADV_FREE_REUSABLE does not work for JIT memory on older OSes so use MADV_FREE in that case.
 #define WTF_USE_MADV_FREE_FOR_JIT_MEMORY 1
 #endif
