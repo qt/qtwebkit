@@ -248,6 +248,9 @@ void PluginView::setFocus(bool focused)
 
     Widget::setFocus(focused);
 
+    if (!m_plugin || !m_isStarted || m_status != PluginStatusLoadedSuccessfully)
+        return;
+
     NPCocoaEvent cocoaEvent;
     initializeNPCocoaEvent(&cocoaEvent);
     cocoaEvent.type = NPCocoaEventFocusChanged;

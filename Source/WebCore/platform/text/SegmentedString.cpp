@@ -181,7 +181,7 @@ void SegmentedString::append(const SegmentedString& s)
         for (; it != e; ++it)
             append(*it);
     }
-    m_currentChar = m_currentString.m_length ? m_currentString.getCurrentChar() : 0;
+    m_currentChar = m_pushedChar1 ? m_pushedChar1 : (m_currentString.m_length ? m_currentString.getCurrentChar() : 0);
 }
 
 void SegmentedString::prepend(const SegmentedString& s)
@@ -195,7 +195,7 @@ void SegmentedString::prepend(const SegmentedString& s)
             prepend(*it);
     }
     prepend(s.m_currentString);
-    m_currentChar = m_pushedChar1 ? m_pushedChar1 : (m_currentString.m_length ? m_currentString.getCurrentChar() : 0);
+    m_currentChar = m_currentString.m_length ? m_currentString.getCurrentChar() : 0;
 }
 
 void SegmentedString::advanceSubstring()

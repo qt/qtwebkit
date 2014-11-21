@@ -74,7 +74,7 @@ static bool isVFPPresent()
 
 const bool MacroAssemblerARM::s_isVFPPresent = isVFPPresent();
 
-#if CPU(ARMV5_OR_LOWER)
+#if !CPU(ARM_FEATURE_UNALIGNED)
 /* On ARMv5 and below, natural alignment is required. */
 void MacroAssemblerARM::load32WithUnalignedHalfWords(BaseIndex address, RegisterID dest)
 {

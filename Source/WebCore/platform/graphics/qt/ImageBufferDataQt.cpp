@@ -60,16 +60,10 @@ namespace WebCore {
 class QOpenGLContextThreadStorage
 {
 public:
-    QOpenGLContext *context(QOpenGLContext* sharedContext, const QSurfaceFormat& format) {
+    QOpenGLContext *context() {
         QOpenGLContext *&context = storage.localData();
-        if (context && context->shareContext() != sharedContext) {
-            delete context;
-            context = 0;
-        }
         if (!context) {
             context = new QOpenGLContext;
-            context->setShareContext(sharedContext);
-            context->setFormat(format);
             context->create();
         }
         return context;
@@ -86,33 +80,47 @@ Q_GLOBAL_STATIC(QOpenGLContextThreadStorage, imagebuffer_opengl_context)
 class ImageBufferContext {
 public:
     ImageBufferContext(QOpenGLContext* sharedContext)
+        : m_ownSurface(0)
     {
-        // Make a format compatible with the host QOpenGLContext, but only singlebuffered.
-        QSurfaceFormat format;
         if (sharedContext)
-            format = sharedContext->format();
-        format.setSwapBehavior(QSurfaceFormat::SingleBuffer);
-        format.setAlphaBufferSize(8);
-        m_context = imagebuffer_opengl_context->context(sharedContext, format);
-        m_surface = new QOffscreenSurface;
-        m_surface->setFormat(format);
-        m_surface->create();
+            m_format = sharedContext->format();
+
+        m_context = sharedContext ? sharedContext : imagebuffer_opengl_context->context();
+
+        m_surface = m_context->surface();
     }
     ~ImageBufferContext()
     {
-        if (QOpenGLContext::currentContext() == m_context && m_context->surface() == m_surface)
+        if (QOpenGLContext::currentContext() == m_context && m_context->surface() == m_ownSurface)
             m_context->doneCurrent();
-        delete m_surface;
+        delete m_ownSurface;
     }
-    void makeCurrentIfNeeded() {
-        if (QOpenGLContext::currentContext() != m_context || m_context->surface() != m_surface)
+    void createSurfaceIfNeeded()
+    {
+        if (m_surface)
+            return;
+
+        m_ownSurface = new QOffscreenSurface;
+        m_ownSurface->setFormat(m_format);
+        m_ownSurface->create();
+
+        m_surface = m_ownSurface;
+    }
+    void makeCurrentIfNeeded()
+    {
+        if (QOpenGLContext::currentContext() != m_context) {
+            createSurfaceIfNeeded();
+
             m_context->makeCurrent(m_surface);
+        }
     }
     QOpenGLContext* context() { return m_context; }
 
 private:
-    QOffscreenSurface *m_surface;
+    QSurface *m_surface;
+    QOffscreenSurface *m_ownSurface;
     QOpenGLContext *m_context;
+    QSurfaceFormat m_format;
 };
 
 // ---------------------- ImageBufferDataPrivateAccelerated
@@ -200,7 +208,35 @@ void ImageBufferDataPrivateAccelerated::draw(GraphicsContext* destContext, Color
         // If accelerated compositing is disabled, this may be the painter of the QGLWidget, which is a QGL2PaintEngineEx.
         QOpenGL2PaintEngineEx* acceleratedPaintEngine = dynamic_cast<QOpenGL2PaintEngineEx*>(destContext->platformContext()->paintEngine());
         if (acceleratedPaintEngine) {
-            acceleratedPaintEngine->drawTexture(destRect, m_paintDevice->texture(), m_paintDevice->size(), srcRect);
+            QPaintDevice* targetPaintDevice = acceleratedPaintEngine->paintDevice();
+
+            QRect rect(QPoint(), m_paintDevice->size());
+
+            // drawTexture's rendering is flipped relative to QtWebKit's convention, so we need to compensate
+            FloatRect srcRectFlipped = m_paintDevice->paintFlipped()
+                ? FloatRect(srcRect.x(), srcRect.maxY(), srcRect.width(), -srcRect.height())
+                : FloatRect(srcRect.x(), rect.height() - srcRect.maxY(), srcRect.width(), srcRect.height());
+
+            // Using the same texture as source and target of a rendering operation is undefined in OpenGL,
+            // so if that's the case we need to use a temporary intermediate buffer.
+            if (m_paintDevice == targetPaintDevice) {
+                m_context->makeCurrentIfNeeded();
+
+                QFramebufferPaintDevice device(rect.size(), QOpenGLFramebufferObject::NoAttachment, false);
+
+                // We disable flipping in order to do a pure blit into the intermediate buffer
+                device.setPaintFlipped(false);
+
+                QPainter painter(&device);
+                QOpenGL2PaintEngineEx* pe = static_cast<QOpenGL2PaintEngineEx*>(painter.paintEngine());
+                pe->drawTexture(rect, m_paintDevice->texture(), rect.size(), rect);
+                painter.end();
+
+                acceleratedPaintEngine->drawTexture(destRect, device.texture(), rect.size(), srcRectFlipped);
+            } else {
+                acceleratedPaintEngine->drawTexture(destRect, m_paintDevice->texture(), rect.size(), srcRectFlipped);
+            }
+
             return;
         }
     }

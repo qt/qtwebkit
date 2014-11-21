@@ -40,15 +40,16 @@ build?(webkit2): {
     QT += network
 }
 
-# The fallback to QT_INSTALL_IMPORTS can be removed once we
-# depend on Qt 5 RC1.
+
 importPath = $$[QT_INSTALL_QML]
-isEmpty(importPath): importPath = $$[QT_INSTALL_IMPORTS]
-
-target.path = $${importPath}/$${TARGET.module_name}
-
+isEmpty(importPath){
+    importPath = $$[QT_INSTALL_IMPORTS]
+} else {
+    target.path = $${importPath}/$${TARGET.module_name}
+    INSTALLS += target
+}
 
 qmldir.files += $$PWD/qmldir $$PWD/plugins.qmltypes
 qmldir.path +=  $${importPath}/$${TARGET.module_name}
 
-INSTALLS += target qmldir
+INSTALLS += qmldir

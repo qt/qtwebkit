@@ -211,6 +211,7 @@ QWebPageAdapter::QWebPageAdapter()
     , forwardUnsupportedContent(false)
     , insideOpenCall(false)
     , clickCausedFocus(false)
+    , mousePressed(false)
     , m_useNativeVirtualKeyAsDOMKey(false)
     , m_totalBytes(0)
     , m_bytesReceived()
@@ -475,9 +476,7 @@ void QWebPageAdapter::adjustPointForClicking(QMouseEvent* ev)
     if (!foundClickableNode)
         return;
 
-    QMouseEvent* ret = new QMouseEvent(ev->type(), QPoint(adjustedPoint), ev->globalPos(), ev->button(), ev->buttons(), ev->modifiers());
-    delete ev;
-    ev = ret;
+    *ev = QMouseEvent(ev->type(), QPoint(adjustedPoint), ev->globalPos(), ev->button(), ev->buttons(), ev->modifiers());
 #else
     Q_UNUSED(ev);
 #endif
@@ -488,6 +487,8 @@ void QWebPageAdapter::mouseMoveEvent(QMouseEvent* ev)
     WebCore::Frame* frame = mainFrameAdapter()->frame;
     if (!frame->view())
         return;
+    if (ev->buttons() == Qt::NoButton)
+        mousePressed = false;
 
     bool accepted = frame->eventHandler()->mouseMoved(convertMouseEvent(ev, 0));
     ev->setAccepted(accepted);
@@ -514,7 +515,7 @@ void QWebPageAdapter::mousePressEvent(QMouseEvent* ev)
     PlatformMouseEvent mev = convertMouseEvent(ev, 1);
     // ignore the event if we can't map Qt's mouse buttons to WebCore::MouseButton
     if (mev.button() != NoButton)
-        accepted = frame->eventHandler()->handleMousePressEvent(mev);
+        mousePressed = accepted = frame->eventHandler()->handleMousePressEvent(mev);
     ev->setAccepted(accepted);
 
     RefPtr<WebCore::Node> newNode;
@@ -569,6 +570,9 @@ void QWebPageAdapter::mouseReleaseEvent(QMouseEvent *ev)
     if (mev.button() != NoButton)
         accepted = frame->eventHandler()->handleMouseReleaseEvent(mev);
     ev->setAccepted(accepted);
+
+    if (ev->buttons() == Qt::NoButton)
+        mousePressed = false;
 
     handleSoftwareInputPanel(ev->button(), QPointF(ev->pos()).toPoint());
 }

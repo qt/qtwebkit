@@ -194,10 +194,10 @@ public:
     }
 
     void waitUntilStarted() {
-        if (m_started)
+        if (m_started.loadAcquire() != 0)
             return;
         m_mutex.lock();
-        if (!m_started)
+        if (m_started.loadAcquire() == 0)
             m_startCond.wait(&m_mutex);
         m_mutex.unlock();
     }
