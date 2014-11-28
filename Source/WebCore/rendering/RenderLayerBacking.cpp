@@ -315,7 +315,8 @@ void RenderLayerBacking::createPrimaryGraphicsLayer()
         m_childContainmentLayer = createGraphicsLayer("TiledBacking Flattening Layer");
 
     if (m_isMainFrameRenderViewLayer) {
-        m_graphicsLayer->setContentsOpaque(true);
+        bool viewIsTransparent = compositor()->viewHasTransparentBackground(0);
+        m_graphicsLayer->setContentsOpaque(!viewIsTransparent);
         m_graphicsLayer->setAppliesPageScale();
     }
 
