@@ -64,6 +64,9 @@ sub applyPreprocessor
     my @macros = grep { $_ } split(/\s+/, $defines); # grep skips empty macros.
     @macros = map { "-D$_" } @macros;
 
+    # Remove double quotation from $preprocessor
+    $preprocessor =~ s/\'//g;
+
     my $pid = 0;
     if ($Config{osname} eq "cygwin" || $Config{osname} eq 'MSWin32') {
         # This call can fail if Windows rebases cygwin, so retry a few times until it succeeds.
