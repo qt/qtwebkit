@@ -274,6 +274,7 @@ public:
         case CalcOther:
             ASSERT_NOT_REACHED();
         }
+        ASSERT_NOT_REACHED();
         return nullptr;
     }
 
@@ -346,9 +347,8 @@ static CalculationCategory determineCategory(const CSSCalcExpressionNode& leftSi
 {
     CalculationCategory leftCategory = leftSide.category();
     CalculationCategory rightCategory = rightSide.category();
-
-    if (leftCategory == CalcOther || rightCategory == CalcOther)
-        return CalcOther;
+    ASSERT(leftCategory < CalcOther);
+    ASSERT(rightCategory < CalcOther);
 
 #if ENABLE(CSS_VARIABLES)
     if (leftCategory == CalcVariable || rightCategory == CalcVariable)
@@ -358,7 +358,7 @@ static CalculationCategory determineCategory(const CSSCalcExpressionNode& leftSi
     switch (op) {
     case CalcAdd:
     case CalcSubtract:
-        if (leftCategory < CalcAngle || rightCategory < CalcAngle)
+        if (leftCategory < CalcAngle && rightCategory < CalcAngle)
             return addSubtractResult[leftCategory][rightCategory];
         if (leftCategory == rightCategory)
             return leftCategory;
@@ -389,7 +389,8 @@ class CSSCalcBinaryOperation : public CSSCalcExpressionNode {
 public:
     static PassRefPtr<CSSCalcExpressionNode> create(PassRefPtr<CSSCalcExpressionNode> leftSide, PassRefPtr<CSSCalcExpressionNode> rightSide, CalcOperator op)
     {
-        ASSERT(leftSide->category() != CalcOther && rightSide->category() != CalcOther);
+        ASSERT(leftSide->category() < CalcOther);
+        ASSERT(rightSide->category() < CalcOther);
 
         CalculationCategory newCategory = determineCategory(*leftSide, *rightSide, op);
 
@@ -403,7 +404,8 @@ public:
     {
         CalculationCategory leftCategory = leftSide->category();
         CalculationCategory rightCategory = rightSide->category();
-        ASSERT(leftCategory != CalcOther && rightCategory != CalcOther);
+        ASSERT(leftCategory < CalcOther);
+        ASSERT(rightCategory < CalcOther);
 
         bool isInteger = isIntegerResult(leftSide.get(), rightSide.get(), op);
 
