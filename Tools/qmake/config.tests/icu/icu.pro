@@ -4,6 +4,7 @@ CONFIG -= qt dylib
 
 win32 {
     CONFIG(static, static|shared) {
+        LIBS += $$QMAKE_LIBS_CORE
         CONFIG(debug, debug|release) {
             LIBS += -lsicuind -lsicuucd -lsicudtd
         } else {
