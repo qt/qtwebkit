@@ -225,10 +225,9 @@ defineTest(finalizeConfigure) {
 
         log($${EOL}Final configuration:$${EOL}$${EOL})
 
-        debug: buildConfig += debug
-        release: buildConfig += release
-        buildConfig = $$join(buildConfig,/,,)
-        debug:release:debug_and_release:buildConfig += (combined)
+        debug:release:debug_and_release: buildConfig = debug+release
+        else: CONFIG(debug, debug|release): buildConfig = debug
+        else: buildConfig = release
 
         log(Build ......................... $$build$${EOL})
         log(Configuration ................. $$buildConfig$${EOL})

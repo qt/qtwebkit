@@ -31,6 +31,8 @@ linux-g++*:isEqual(QT_ARCH,i386) {
         QMAKE_CXXFLAGS_DEBUG += -gstabs
         QMAKE_CXXFLAGS_RELEASE_WITH_DEBUGINFO -= -g
         QMAKE_CXXFLAGS_RELEASE_WITH_DEBUGINFO += -gstabs
+        # Don't use the gold linker with stabs, it uses more memory and produces larger debug binaries.
+        CONFIG -= use_gold_linker
     }
 }
 
