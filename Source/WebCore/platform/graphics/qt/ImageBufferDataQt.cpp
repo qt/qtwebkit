@@ -202,6 +202,7 @@ void ImageBufferDataPrivateAccelerated::draw(GraphicsContext* destContext, Color
                                              const FloatRect& srcRect, CompositeOperator op, BlendMode blendMode,
                                              bool useLowQualityScale, bool /*ownContext*/)
 {
+#if !defined(QT_NO_DYNAMIC_CAST)
     if (destContext->isAcceleratedContext()) {
         invalidateState();
 
@@ -240,6 +241,7 @@ void ImageBufferDataPrivateAccelerated::draw(GraphicsContext* destContext, Color
             return;
         }
     }
+#endif
     RefPtr<Image> image = StillImage::create(QPixmap::fromImage(toQImage()));
     destContext->drawImage(image.get(), styleColorSpace, destRect, srcRect, op, blendMode,
                            DoNotRespectImageOrientation, useLowQualityScale);
