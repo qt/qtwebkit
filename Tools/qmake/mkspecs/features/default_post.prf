@@ -52,11 +52,12 @@ INCLUDEPATH += \
 
 CONFIG -= warn_on
 
+gcc: QMAKE_CXXFLAGS += -fno-strict-aliasing
+
 !compiling_thirdparty_code:*-g++*: QMAKE_CXXFLAGS = \
     -Wall \
     -Wextra \
     -Wreturn-type \
-    -fno-strict-aliasing \
     -Wchar-subscripts \
     -Wformat-security \
     -Wreturn-type \
