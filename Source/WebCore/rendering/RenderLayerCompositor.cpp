@@ -325,7 +325,13 @@ void RenderLayerCompositor::cacheAcceleratedCompositingFlags()
 
 bool RenderLayerCompositor::canRender3DTransforms() const
 {
+#if !ENABLE(3D_RENDERING)
+    return false;
+#elif PLATFORM(QT)
+    return true;
+#else
     return hasAcceleratedCompositing() && (m_compositingTriggers & ChromeClient::ThreeDTransformTrigger);
+#endif
 }
 
 void RenderLayerCompositor::setCompositingLayersNeedRebuild(bool needRebuild)

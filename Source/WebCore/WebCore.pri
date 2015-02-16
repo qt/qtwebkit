@@ -125,7 +125,11 @@ enable?(XSLT) {
 }
 
 use?(ZLIB) {
-    LIBS += -lz
+    if(unix|mingw):LIBS += -lz
+    else {
+        isEmpty(ZLIB_LIBS): LIBS += zdll.lib
+        else: LIBS += $$ZLIB_LIBS
+    }
 }
 
 enable?(NETSCAPE_PLUGIN_API) {
@@ -248,8 +252,14 @@ have?(sqlite3) {
 
 use?(system_leveldb): LIBS += -lleveldb -lmemenv
 
-use?(libjpeg): LIBS += -ljpeg
-use?(libpng): LIBS += -lpng
+use?(libjpeg) {
+    msvc: LIBS += libjpeg.lib
+    else: LIBS += -ljpeg
+}
+use?(libpng) {
+    if(unix|mingw): LIBS += -lpng
+    else:win32:     LIBS += libpng.lib
+}
 use?(webp): LIBS += -lwebp
 
 enable?(opencl) {
