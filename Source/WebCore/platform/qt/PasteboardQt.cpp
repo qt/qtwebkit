@@ -58,6 +58,19 @@ static bool isHtmlMimeType(const String& type)
     return type == "text/html" || type.startsWith("text/html;");
 }
 
+static String normalizeMimeType(const String& type)
+{
+    // http://www.whatwg.org/specs/web-apps/current-work/multipage/dnd.html#dom-datatransfer-setdata
+    String qType = type.lower();
+
+    if (qType == "text")
+        qType = ASCIILiteral("text/plain");
+    else if (qType == "url")
+        qType = ASCIILiteral("text/uri-list");
+
+    return qType;
+}
+
 PassOwnPtr<Pasteboard> Pasteboard::create(const QMimeData* readableClipboard, bool isForDragAndDrop)
 {
     return adoptPtr(new Pasteboard(readableClipboard, isForDragAndDrop));
@@ -313,13 +326,15 @@ String Pasteboard::readString(const String& type)
     if (!data)
         return String();
 
-    if (isHtmlMimeType(type) && data->hasHtml())
+    String mimeType = normalizeMimeType(type);
+
+    if (isHtmlMimeType(mimeType) && data->hasHtml())
         return data->html();
 
-    if (isTextMimeType(type) && data->hasText())
+    if (isTextMimeType(mimeType) && data->hasText())
         return data->text();
 
-    QByteArray rawData = data->data(type);
+    QByteArray rawData = data->data(mimeType);
     QString stringData = QTextCodec::codecForName("UTF-16")->toUnicode(rawData);
     return stringData;
 }
@@ -329,13 +344,15 @@ bool Pasteboard::writeString(const String& type, const String& data)
     if (!m_writableData)
         m_writableData = new QMimeData;
 
-    if (isTextMimeType(type))
+    String mimeType = normalizeMimeType(type);
+
+    if (isTextMimeType(mimeType))
         m_writableData->setText(QString(data));
-    else if (isHtmlMimeType(type))
+    else if (isHtmlMimeType(mimeType))
         m_writableData->setHtml(QString(data));
     else {
         QByteArray array(reinterpret_cast<const char*>(data.characters()), data.length() * 2);
-        m_writableData->setData(QString(type), array);
+        m_writableData->setData(QString(mimeType), array);
     }
 
     return true;

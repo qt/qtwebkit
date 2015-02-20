@@ -30,11 +30,12 @@
 
 #include <wtf/gobject/GOwnPtr.h>
 
-using namespace std;
 using namespace WebCore;
 
 ImageGStreamer::ImageGStreamer(GstBuffer* buffer, GstCaps* caps)
-    : m_image(0)
+#ifdef GST_API_VERSION_1
+    : m_buffer(buffer)
+#endif
 {
     GstVideoFormat format;
     IntSize size;
@@ -42,40 +43,26 @@ ImageGStreamer::ImageGStreamer(GstBuffer* buffer, GstCaps* caps)
     getVideoSizeAndFormatFromCaps(caps, size, format, pixelAspectRatioNumerator, pixelAspectRatioDenominator, stride);
 
 #ifdef GST_API_VERSION_1
-    GstMapInfo info;
-    gst_buffer_map(buffer, &info, GST_MAP_READ);
-    uchar* bufferData = reinterpret_cast<uchar*>(info.data);
+    gst_buffer_map(buffer, &m_mapInfo, GST_MAP_READ);
+    uchar* bufferData = reinterpret_cast<uchar*>(m_mapInfo.data);
 #else
     uchar* bufferData = reinterpret_cast<uchar*>(GST_BUFFER_DATA(buffer));
 #endif
     QImage::Format imageFormat;
-    QImage::InvertMode invertMode;
 #if G_BYTE_ORDER == G_LITTLE_ENDIAN
-    if (format == GST_VIDEO_FORMAT_BGRA) {
-        imageFormat = QImage::Format_ARGB32;
-        invertMode = QImage::InvertRgba;
-    } else {
-        imageFormat = QImage::Format_RGB32;
-        invertMode = QImage::InvertRgb;
-    }
+    imageFormat = (format == GST_VIDEO_FORMAT_BGRA) ? QImage::Format_ARGB32_Premultiplied : QImage::Format_RGB32;
 #else
-    imageFormat = (format == GST_VIDEO_FORMAT_ARGB) ? QImage::Format_ARGB32 : QImage::Format_RGB32;
+    imageFormat = (format == GST_VIDEO_FORMAT_ARGB) ? QImage::Format_ARGB32_Premultiplied : QImage::Format_RGB32;
 #endif
 
     QImage image(bufferData, size.width(), size.height(), imageFormat);
 
-#if G_BYTE_ORDER == G_LITTLE_ENDIAN
-    image.invertPixels(invertMode);
-#endif
-    QPixmap* surface = new QPixmap;
-    surface->convertFromImage(image);
+    QPixmap *surface = new QPixmap(QPixmap::fromImage(qMove(image), Qt::NoFormatConversion));
     m_image = BitmapImage::create(surface);
 
 #ifdef GST_API_VERSION_1
     if (GstVideoCropMeta* cropMeta = gst_buffer_get_video_crop_meta(buffer))
         setCropRect(FloatRect(cropMeta->x, cropMeta->y, cropMeta->width, cropMeta->height));
-
-    gst_buffer_unmap(buffer, &info);
 #endif
 }
 
@@ -85,6 +72,12 @@ ImageGStreamer::~ImageGStreamer()
         m_image.clear();
 
     m_image = 0;
+
+#ifdef GST_API_VERSION_1
+    // We keep the buffer memory mapped until the image is destroyed because the internal
+    // QImage/QPixmap was created using the buffer data directly.
+    gst_buffer_unmap(m_buffer.get(), &m_mapInfo);
+#endif
 }
 #endif // USE(GSTREAMER)
 

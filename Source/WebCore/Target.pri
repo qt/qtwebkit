@@ -2232,7 +2232,6 @@ HEADERS += \
     platform/graphics/RoundedRect.h \
     platform/graphics/qt/FontCustomPlatformData.h \
     platform/graphics/qt/NativeImageQt.h \
-    platform/graphics/qt/QFramebufferPaintDevice.h \
     platform/graphics/qt/StillImageQt.h \
     platform/graphics/qt/TransparencyLayer.h \
     platform/graphics/SegmentedFontData.h \
@@ -2886,7 +2885,6 @@ SOURCES += \
     platform/graphics/qt/IntPointQt.cpp \
     platform/graphics/qt/IntRectQt.cpp \
     platform/graphics/qt/IntSizeQt.cpp \
-    platform/graphics/qt/QFramebufferPaintDevice.cpp \
     platform/graphics/qt/PathQt.cpp \
     platform/graphics/qt/PatternQt.cpp \
     platform/graphics/qt/StillImageQt.cpp \
@@ -4146,6 +4144,7 @@ use?(3D_GRAPHICS) {
         platform/graphics/gpu/Texture.h \
         platform/graphics/gpu/TilingData.h \
         platform/graphics/opengl/Extensions3DOpenGL.h \
+        platform/graphics/qt/QFramebufferPaintDevice.h \
         platform/graphics/texmap/TextureMapperGL.h \
         platform/graphics/texmap/TextureMapperShaderProgram.h \
         platform/graphics/texmap/coordinated/AreaAllocator.h \
@@ -4182,6 +4181,7 @@ use?(3D_GRAPHICS) {
         platform/graphics/opengl/GraphicsContext3DOpenGLCommon.cpp \
         platform/graphics/opengl/Extensions3DOpenGLCommon.cpp \
         platform/graphics/qt/GraphicsContext3DQt.cpp \
+        platform/graphics/qt/QFramebufferPaintDevice.cpp \
         platform/graphics/texmap/TextureMapperGL.cpp \
         platform/graphics/texmap/TextureMapperShaderProgram.cpp \
         platform/graphics/texmap/coordinated/AreaAllocator.cpp \

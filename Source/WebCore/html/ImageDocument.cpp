@@ -152,8 +152,8 @@ void ImageDocumentParser::finish()
         if (document()->frame()->loader()->documentLoader()->isLoadingMultipartContent())
             data = data->copy();
 
-        cachedImage->finishLoading(data.get());
         cachedImage->finish();
+        cachedImage->finishLoading(data.get());
 
         cachedImage->setResponse(document()->frame()->loader()->documentLoader()->response());
 
