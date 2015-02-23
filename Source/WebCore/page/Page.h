@@ -353,6 +353,10 @@ public:
     void setVisibilityState(PageVisibilityState, bool);
 #endif
 
+#if PLATFORM(QT)
+    void pluginVisibilityChanged(bool visible);
+#endif // PLATFORM(QT)
+
     void addLayoutMilestones(LayoutMilestones);
     void removeLayoutMilestones(LayoutMilestones);
     LayoutMilestones requestedLayoutMilestones() const { return m_requestedLayoutMilestones; }
