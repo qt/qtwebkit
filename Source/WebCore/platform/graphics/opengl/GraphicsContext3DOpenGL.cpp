@@ -3,7 +3,7 @@
  * Copyright (C) 2011 Google Inc. All rights reserved.
  * Copyright (C) 2012 ChangSeok Oh <shivamidow@gmail.com>
  * Copyright (C) 2012 Research In Motion Limited. All rights reserved.
- * Copyright (C) 2014 Digia Plc. and/or its subsidiary(-ies).
+ * Copyright (C) 2015 The Qt Company Ltd.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions

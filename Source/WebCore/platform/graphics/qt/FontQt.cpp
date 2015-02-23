@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2012, 2014 Digia Plc. and/or its subsidiary(-ies)
+    Copyright (C) 2015 The Qt Company Ltd
     Copyright (C) 2008, 2010 Holger Hans Peter Freyther
     Copyright (C) 2009 Dirk Schulze <krit@webkit.org>
 
