@@ -440,13 +440,13 @@ void MediaPlayerPrivateGStreamerBase::paint(GraphicsContext* context, const IntR
     }
 
     RefPtr<ImageGStreamer> gstImage = ImageGStreamer::createImage(m_buffer, caps.get());
-    if (!gstImage) {
+    if (!gstImage || !gstImage->image().get()) {
         g_mutex_unlock(m_bufferMutex);
         return;
     }
 
     context->drawImage(reinterpret_cast<Image*>(gstImage->image().get()), ColorSpaceSRGB,
-        rect, gstImage->rect(), CompositeCopy, DoNotRespectImageOrientation, false);
+        rect, gstImage->rect(), CompositeCopy, DoNotRespectImageOrientation, true);
     g_mutex_unlock(m_bufferMutex);
 }
 
