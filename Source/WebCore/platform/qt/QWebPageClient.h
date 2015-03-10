@@ -62,6 +62,7 @@ public:
     virtual QOpenGLContext* openGLContextIfAvailable() { return 0; }
 
     virtual void setInputMethodHints(Qt::InputMethodHints hint) = 0;
+    virtual bool isViewVisible() = 0;
 
 #ifndef QT_NO_CURSOR
     inline void resetCursor()

@@ -345,6 +345,13 @@ QWebPageAdapter::VisibilityState QWebPageAdapter::visibilityState() const
 #endif
 }
 
+void QWebPageAdapter::setPluginsVisible(bool visible)
+{
+    if (!page)
+        return;
+    page->pluginVisibilityChanged(visible);
+}
+
 void QWebPageAdapter::setNetworkAccessManager(QNetworkAccessManager *manager)
 {
     if (manager == networkManager)
