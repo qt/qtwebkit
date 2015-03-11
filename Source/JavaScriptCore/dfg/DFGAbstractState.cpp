@@ -1079,10 +1079,8 @@ bool AbstractState::executeEffects(unsigned indexInBlock, Node* node)
         clobberWorld(node->codeOrigin, indexInBlock);
         
         SpeculatedType type = source.m_type;
-        if (type & ~(SpecNumber | SpecString | SpecBoolean)) {
-            type &= (SpecNumber | SpecString | SpecBoolean);
-            type |= SpecString;
-        }
+        if (type & ~(SpecNumber | SpecString | SpecBoolean))
+            type = (SpecTop & ~SpecCell) | SpecString;
         destination.set(type);
         break;
     }
