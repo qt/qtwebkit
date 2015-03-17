@@ -627,7 +627,7 @@ void GraphicsLayerTextureMapper::updateBackingStoreIfNeeded()
 
 bool GraphicsLayerTextureMapper::shouldHaveBackingStore() const
 {
-    return drawsContent() && contentsAreVisible() && !m_size.isEmpty();
+    return drawsContent() && contentsAreVisible() && !m_size.isEmpty() && (m_size.width() * m_size.height() <= 8192*8192);
 }
 
 bool GraphicsLayerTextureMapper::addAnimation(const KeyframeValueList& valueList, const IntSize& boxSize, const Animation* anim, const String& keyframesName, double timeOffset)
