@@ -44,6 +44,7 @@
 #include "ScriptController.h"
 #include "ScrollbarThemeQStyle.h"
 #include "SecurityPolicy.h"
+#include "Settings.h"
 
 #include "qwebelement_p.h"
 #include <JavaScriptCore/runtime/InitializeThreading.h>
@@ -104,6 +105,7 @@ Q_DECL_EXPORT void initializeWebCoreQt()
     if (!WebCore::memoryCache()->disabled())
         WebCore::memoryCache()->setDeadDecodedDataDeletionInterval(60);
     WebCore::RuntimeEnabledFeatures::setCSSCompositingEnabled(true);
+    WebCore::Settings::setDefaultMinDOMTimerInterval(0.004);
 
     initialized = true;
 }
