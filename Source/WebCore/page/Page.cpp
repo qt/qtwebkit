@@ -1242,6 +1242,21 @@ void Page::privateBrowsingStateChanged()
         pluginViewBases[i]->privateBrowsingStateChanged(privateBrowsingEnabled);
 }
 
+#if PLATFORM(QT)
+void Page::pluginVisibilityChanged(bool visible)
+{
+    Vector<RefPtr<PluginViewBase>, 32> pluginViewBases;
+    collectPluginViews(pluginViewBases);
+
+    for (size_t i = 0; i < pluginViewBases.size(); ++i) {
+        if (visible)
+            pluginViewBases[i]->show();
+        else
+            pluginViewBases[i]->hide();
+    }
+}
+#endif // PLATFORM(QT)
+
 #if !ASSERT_DISABLED
 void Page::checkSubframeCountConsistency() const
 {

@@ -74,7 +74,7 @@ JIT::JIT(VM* vm, CodeBlock* codeBlock)
     : m_interpreter(vm->interpreter)
     , m_vm(vm)
     , m_codeBlock(codeBlock)
-    , m_labels(codeBlock ? codeBlock->numberOfInstructions() : 0)
+    , m_labels(0)
     , m_bytecodeOffset((unsigned)-1)
     , m_propertyAccessInstructionIndex(UINT_MAX)
     , m_byValInstructionIndex(UINT_MAX)
@@ -96,6 +96,7 @@ JIT::JIT(VM* vm, CodeBlock* codeBlock)
     , m_shouldEmitProfiling(false)
 #endif
 {
+    m_labels.reserveCapacity(codeBlock ? codeBlock->numberOfInstructions() : 0);
 }
 
 #if ENABLE(DFG_JIT)
@@ -174,6 +175,7 @@ void JIT::privateCompileMainPass()
 
     m_globalResolveInfoIndex = 0;
     m_callLinkInfoIndex = 0;
+    m_labels.resize(instructionCount);
 
     for (m_bytecodeOffset = 0; m_bytecodeOffset < instructionCount; ) {
         if (m_disassembler)
@@ -694,6 +696,7 @@ JITCode JIT::privateCompile(CodePtr* functionEntryArityCheck, JITCompilationEffo
     if (patchBuffer.didFailToAllocate())
         return JITCode();
 
+    ASSERT(m_labels.size() >= m_codeBlock->instructionCount());
     // Translate vPC offsets into addresses in JIT generated code, for switch tables.
     for (unsigned i = 0; i < m_switches.size(); ++i) {
         SwitchRecord record = m_switches[i];

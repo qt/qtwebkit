@@ -97,6 +97,9 @@ contains(QT_CONFIG, c++11): CONFIG += c++11
 # Limit the creation of thin archives to Linux, since only GNU's ar supports it.
 !debug_and_release:linux: CONFIG += gnu_thin_archives
 
+# The Gold linker breaks transition between JIT and LLInt due to thumb-state mismatch.
+gcc:isEqual(QT_ARCH, "arm"): CONFIG -= use_gold_linker
+
 # Pick up Qt's defaults for debug/release/debug_and_release
 if(win32|mac):!macx-xcode {
     contains(QT_CONFIG, debug_and_release): CONFIG += debug_and_release

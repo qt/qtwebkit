@@ -1003,7 +1003,7 @@ bool QWebPagePrivate::gestureEvent(QGestureEvent* event)
 
   \a property specifies which property is queried.
 
-  \sa QWidget::inputMethodEvent(), QInputMethodEvent, QInputContext
+  \sa QWidget::inputMethodEvent(), QInputMethodEvent
 */
 QVariant QWebPage::inputMethodQuery(Qt::InputMethodQuery property) const
 {
@@ -2690,6 +2690,12 @@ bool QWebPage::event(QEvent *ev)
         d->dynamicPropertyChangeEvent(this, static_cast<QDynamicPropertyChangeEvent*>(ev));
         break;
 #endif
+    case QEvent::Show:
+        d->setPluginsVisible(true);
+        break;
+    case QEvent::Hide:
+        d->setPluginsVisible(false);
+        break;
     default:
         return QObject::event(ev);
     }
