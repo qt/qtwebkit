@@ -784,7 +784,7 @@ void XMLHttpRequest::createRequest(ExceptionCode& ec)
     options.sniffContent = DoNotSniffContent;
     options.preflightPolicy = uploadEvents ? ForcePreflight : ConsiderPreflight;
     options.allowCredentials = (m_sameOriginRequest || m_includeCredentials) ? AllowStoredCredentials : DoNotAllowStoredCredentials;
-    options.crossOriginRequestPolicy = UseAccessControl;
+    options.crossOriginRequestPolicy = securityOrigin()->allowsCrossOriginRequests() ? UseAccessControl : DenyCrossOriginRequests;
     options.securityOrigin = securityOrigin();
 #if ENABLE(RESOURCE_TIMING)
     options.initiator = cachedResourceRequestInitiators().xmlhttprequest;

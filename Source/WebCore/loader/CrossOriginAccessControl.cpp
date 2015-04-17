@@ -138,6 +138,11 @@ bool passesAccessControlCheck(const ResourceResponse& response, StoredCredential
     AtomicallyInitializedStatic(AtomicString&, accessControlAllowOrigin = *new AtomicString("access-control-allow-origin", AtomicString::ConstructFromLiteral));
     AtomicallyInitializedStatic(AtomicString&, accessControlAllowCredentials = *new AtomicString("access-control-allow-credentials", AtomicString::ConstructFromLiteral));
 
+    if (!securityOrigin->allowsCrossOriginRequests()) {
+        errorDescription = "Cannot make any cross origin requests from " + securityOrigin->toString() + ".";
+        return false;
+    }
+
     // A wildcard Access-Control-Allow-Origin can not be used if credentials are to be sent,
     // even with Access-Control-Allow-Credentials set to true.
     const String& accessControlOriginString = response.httpHeaderField(accessControlAllowOrigin);

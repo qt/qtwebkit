@@ -49,6 +49,7 @@ caretBrowsingEnabled initial=false
 localStorageEnabled initial=false
 allowUniversalAccessFromFileURLs initial=true
 allowFileAccessFromFileURLs initial=true
+allowRemoteAccessFromFileURLs initial=true
 javaScriptCanOpenWindowsAutomatically initial=false
 supportsMultipleWindows initial=true
 javaScriptCanAccessClipboard initial=false

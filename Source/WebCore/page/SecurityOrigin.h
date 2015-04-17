@@ -139,6 +139,11 @@ public:
     // WARNING: This is an extremely powerful ability. Use with caution!
     void grantUniversalAccess();
 
+    // Explicitly deny the ability to issue cross origin requests.
+    //
+    void denyCrossOriginRequests();
+    bool allowsCrossOriginRequests() const { return !m_deniedCORS; }
+
     void setStorageBlockingPolicy(StorageBlockingPolicy policy) { m_storageBlockingPolicy = policy; }
 
 #if ENABLE(CACHE_PARTITIONING)
@@ -173,6 +178,7 @@ public:
     // FIXME 81578: The naming of this is confusing. Files with restricted access to other local files
     // still can have other privileges that can be remembered, thereby not making them unique.
     void enforceFilePathSeparation();
+    bool enforcesFilePathSeparation() const { return m_enforceFilePathSeparation; }
 
     // Convert this SecurityOrigin into a string. The string
     // representation of a SecurityOrigin is similar to a URL, except it
@@ -231,6 +237,7 @@ private:
     StorageBlockingPolicy m_storageBlockingPolicy;
     bool m_enforceFilePathSeparation;
     bool m_needsDatabaseIdentifierQuirkForFiles;
+    bool m_deniedCORS;
 };
 
 } // namespace WebCore
