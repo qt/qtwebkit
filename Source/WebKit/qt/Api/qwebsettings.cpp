@@ -272,9 +272,10 @@ void QWebSettingsPrivate::apply()
                                       global->attributes.value(QWebSettings::LocalStorageEnabled));
         settings->setLocalStorageEnabled(value);
 
-        value = attributes.value(QWebSettings::LocalContentCanAccessRemoteUrls,
+        bool remoteAccess = attributes.value(QWebSettings::LocalContentCanAccessRemoteUrls,
                                       global->attributes.value(QWebSettings::LocalContentCanAccessRemoteUrls));
-        settings->setAllowUniversalAccessFromFileURLs(value);
+        settings->setAllowUniversalAccessFromFileURLs(remoteAccess);
+        settings->setAllowRemoteAccessFromFileURLs(remoteAccess);
 
         value = attributes.value(QWebSettings::LocalContentCanAccessFileUrls,
                                       global->attributes.value(QWebSettings::LocalContentCanAccessFileUrls));
