@@ -127,6 +127,11 @@ void DocumentThreadableLoader::makeSimpleCrossOriginAccessRequest(const Resource
         return;
     }
 
+    if (!securityOrigin()->allowsCrossOriginRequests()) {
+        m_client->didFailAccessControlCheck(ResourceError(errorDomainWebKitInternal, 0, request.url().string(), "Cross origin requests are not allowed from " + securityOrigin()->toString() + "."));
+        return;
+    }
+
     loadRequest(request, DoSecurityCheck);
 }
 
