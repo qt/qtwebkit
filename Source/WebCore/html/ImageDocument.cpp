@@ -135,6 +135,8 @@ void ImageDocumentParser::appendBytes(DocumentWriter*, const char*, size_t)
         return;
 
     CachedImage* cachedImage = document()->cachedImage();
+    if (!cachedImage)
+        return;
     RefPtr<ResourceBuffer> resourceData = frame->loader()->documentLoader()->mainResourceData();
     cachedImage->addDataBuffer(resourceData.get());
 
@@ -143,8 +145,8 @@ void ImageDocumentParser::appendBytes(DocumentWriter*, const char*, size_t)
 
 void ImageDocumentParser::finish()
 {
-    if (!isStopped() && document()->imageElement()) {
-        CachedImage* cachedImage = document()->cachedImage();
+    CachedImage* cachedImage = 0;
+    if (!isStopped() && document()->imageElement() && (cachedImage = document()->cachedImage())) {
         RefPtr<ResourceBuffer> data = document()->frame()->loader()->documentLoader()->mainResourceData();
 
         // If this is a multipart image, make a copy of the current part, since the resource data
