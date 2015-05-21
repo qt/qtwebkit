@@ -49,6 +49,7 @@
 #include "Font.h"
 #include "ImageBuffer.h"
 #include "NotImplemented.h"
+#include "KURL.h"
 #include "Path.h"
 #include "Pattern.h"
 #include "ShadowBlur.h"
@@ -65,8 +66,11 @@
 #include <QPixmap>
 #include <QPolygonF>
 #include <QStack>
+#include <QUrl>
 #include <QVector>
 #include <wtf/MathExtras.h>
+
+#include <private/qpdf_p.h>
 
 #if OS(WINDOWS)
 QT_BEGIN_NAMESPACE
@@ -1558,9 +1562,18 @@ void GraphicsContext::set3DTransform(const TransformationMatrix& transform)
 }
 #endif
 
-void GraphicsContext::setURLForRect(const KURL&, const IntRect&)
+void GraphicsContext::setURLForRect(const KURL& url, const IntRect& rect)
 {
+#if QT_VERSION >= QT_VERSION_CHECK(5, 6, 0)
+    if (paintingDisabled())
+        return;
+
+    QPainter* p = m_data->p();
+    if (p->paintEngine()->type() == QPaintEngine::Pdf)
+        static_cast<QPdfEngine *>(p->paintEngine())->drawHyperlink(p->worldTransform().mapRect(QRectF(rect.x(), rect.y(), rect.width(), rect.height())), QUrl(url.string()));
+#else
     notImplemented();
+#endif
 }
 
 void GraphicsContext::setPlatformStrokeColor(const Color& color, ColorSpace colorSpace)
