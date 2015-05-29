@@ -115,6 +115,8 @@ public:
     void setNeedsLayout();
     void setViewportConstrainedObjectsNeedLayout();
 
+    bool needsStyleRecalcOrLayout(bool includeSubframes = true) const;
+
     bool needsFullRepaint() const { return m_doFullRepaint; }
 
 #if ENABLE(REQUEST_ANIMATION_FRAME)
