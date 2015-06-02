@@ -111,6 +111,18 @@ public:
     GraphicsSurface::Flags m_surfaceFlags;
     RefPtr<GraphicsSurface> m_graphicsSurface;
 #endif
+
+    // Register as a child of a Qt context to make the necessary when it may be destroyed before the GraphicsContext3D instance
+    class QtContextWatcher : public QObject
+    {
+        public:
+            QtContextWatcher(QObject* ctx, GraphicsContext3DPrivate* watcher): QObject(ctx), m_watcher(watcher) { }
+            ~QtContextWatcher() { m_watcher->m_platformContext = 0; m_watcher->m_platformContextWatcher = 0; }
+
+        private:
+            GraphicsContext3DPrivate* m_watcher;
+    };
+    QtContextWatcher* m_platformContextWatcher;
 };
 
 bool GraphicsContext3DPrivate::isOpenGLES() const
@@ -149,11 +161,16 @@ GraphicsContext3DPrivate::GraphicsContext3DPrivate(GraphicsContext3D* context, H
     , m_surface(0)
     , m_platformContext(0)
     , m_surfaceOwner(0)
+    , m_platformContextWatcher(0)
 {
     if (renderStyle == GraphicsContext3D::RenderToCurrentGLContext) {
         m_platformContext = QOpenGLContext::currentContext();
         if (m_platformContext)
             m_surface = m_platformContext->surface();
+
+        // Watcher needed to invalidate the GL context if destroyed before this instance
+        m_platformContextWatcher = new QtContextWatcher(m_platformContext, this);
+
         initializeOpenGLFunctions();
         return;
     }
@@ -260,6 +277,9 @@ GraphicsContext3DPrivate::~GraphicsContext3DPrivate()
 #endif
     delete m_surfaceOwner;
     m_surfaceOwner = 0;
+
+    delete m_platformContextWatcher;
+    m_platformContextWatcher = 0;
 }
 
 #if USE(ACCELERATED_COMPOSITING)
@@ -363,6 +383,8 @@ void GraphicsContext3DPrivate::blitMultisampleFramebufferAndRestoreContext()
 
 bool GraphicsContext3DPrivate::makeCurrentIfNeeded() const
 {
+    if (!m_platformContext)
+        return false;
     const QOpenGLContext* currentContext = QOpenGLContext::currentContext();
     if (currentContext == m_platformContext)
         return true;
@@ -404,6 +426,7 @@ GraphicsContext3D::GraphicsContext3D(GraphicsContext3D::Attributes attrs, HostWi
     , m_multisampleFBO(0)
     , m_multisampleDepthStencilBuffer(0)
     , m_multisampleColorBuffer(0)
+    , m_functions(0)
     , m_private(adoptPtr(new GraphicsContext3DPrivate(this, hostWindow, renderStyle)))
     , m_compiler(isGLES2Compliant() ? SH_ESSL_OUTPUT : SH_GLSL_OUTPUT)
 {
@@ -441,22 +464,23 @@ GraphicsContext3D::~GraphicsContext3D()
     if (!m_private)
         return;
 
-    makeContextCurrent();
-    m_functions->glDeleteTextures(1, &m_texture);
-    m_functions->glDeleteFramebuffers(1, &m_fbo);
-    if (m_attrs.antialias) {
-        m_functions->glDeleteRenderbuffers(1, &m_multisampleColorBuffer);
-        m_functions->glDeleteFramebuffers(1, &m_multisampleFBO);
-        if (m_attrs.stencil || m_attrs.depth)
-            m_functions->glDeleteRenderbuffers(1, &m_multisampleDepthStencilBuffer);
-    } else if (m_attrs.stencil || m_attrs.depth) {
-        if (isGLES2Compliant()) {
-            if (m_attrs.depth)
-                m_functions->glDeleteRenderbuffers(1, &m_depthBuffer);
-            if (m_attrs.stencil)
-                m_functions->glDeleteRenderbuffers(1, &m_stencilBuffer);
+    if (makeContextCurrent()) {
+        m_functions->glDeleteTextures(1, &m_texture);
+        m_functions->glDeleteFramebuffers(1, &m_fbo);
+        if (m_attrs.antialias) {
+            m_functions->glDeleteRenderbuffers(1, &m_multisampleColorBuffer);
+            m_functions->glDeleteFramebuffers(1, &m_multisampleFBO);
+            if (m_attrs.stencil || m_attrs.depth)
+                m_functions->glDeleteRenderbuffers(1, &m_multisampleDepthStencilBuffer);
+        } else if (m_attrs.stencil || m_attrs.depth) {
+            if (isGLES2Compliant()) {
+                if (m_attrs.depth)
+                    m_functions->glDeleteRenderbuffers(1, &m_depthBuffer);
+                if (m_attrs.stencil)
+                    m_functions->glDeleteRenderbuffers(1, &m_stencilBuffer);
+            }
+            m_functions->glDeleteRenderbuffers(1, &m_depthStencilBuffer);
         }
-        m_functions->glDeleteRenderbuffers(1, &m_depthStencilBuffer);
     }
 
     m_functions = 0;

@@ -1,0 +1,54 @@
+Qt 5.4.2 is a bug-fix release. It maintains both forward and backward
+compatibility (source and binary) with Qt 5.4.1.
+
+For more details, refer to the online documentation included in this
+distribution. The documentation is also available online:
+
+  http://doc.qt.io/qt-5.4
+
+The Qt version 5.4 series is binary compatible with the 5.3.x series.
+Applications compiled for 5.3 will continue to run with 5.4.
+
+Some of the changes listed in this file include issue tracking numbers
+corresponding to tasks in the Qt Bug Tracker:
+
+  http://bugreports.qt.io/
+
+Each of these identifiers can be entered in the bug tracker to obtain more
+information about a particular change.
+
+****************************************************************************
+*                          Library                                         *
+****************************************************************************
+
+QtWebkit
+--------
+ - Fixed privacy breaking icon database usage in private browsing mode.
+ - Fixed possible OpenGL crashes on exit.
+ - [QTBUG-44475] Improved performance of initializing large JSON objects.
+ - [QTBUG-44829] Fixed g++5 builds.
+ - [QTBUG-44912] Fixed crash on loading svg.js
+ - [QTBUG-44524] Fixed possible out-of-memory crash and performance issues
+ on some pages caused by very large accelerated layers.
+ - [QTBUG-45299] Fixed segmentation fault in JSC::DFG::prepareOSREntry.
+
+
+****************************************************************************
+*                      Platform Specific Changes                           *
+****************************************************************************
+
+Windows
+-------
+ - [QTBUG-44401,QTBUG-42588,QTBUG-43024] Forwarding show and hide events so
+ videos in non-visible widgets are hidden.
+
+ARM
+-------
+ - [QTBUG-44700] Fixed JavaScript crash caused by misbehaving gold linker.
+ - [QTBUG-44740] Fixed alignment issue in WebKit2 IPC.
+
+Linux
+-------
+ - [QTBUG-44245] Fixed crash on some HTML5 videos caused by invalid
+ frame-data from GStreamer.
+ - [QTBUG-44714] Fixed linking with glib 2.43 and newer.
