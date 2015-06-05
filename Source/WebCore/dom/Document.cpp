@@ -4572,12 +4572,22 @@ void Document::initSecurityContext()
             if (settings->allowUniversalAccessFromFileURLs() || m_frame->loader()->client()->shouldForceUniversalAccessFromLocalURL(m_url)) {
                 // Some clients want local URLs to have universal access, but that setting is dangerous for other clients.
                 securityOrigin()->grantUniversalAccess();
-            } else if (!settings->allowFileAccessFromFileURLs()) {
-                // Some clients want local URLs to have even tighter restrictions by default, and not be able to access other local files.
-                // FIXME 81578: The naming of this is confusing. Files with restricted access to other local files
-                // still can have other privileges that can be remembered, thereby not making them unique origins.
-                securityOrigin()->enforceFilePathSeparation();
+            } else {
+                if (!settings->allowRemoteAccessFromFileURLs())
+                    securityOrigin()->denyCrossOriginRequests();
+                if (!settings->allowFileAccessFromFileURLs()) {
+                    // Some clients want local URLs to have even tighter restrictions by default, and not be able to access other local files.
+                    // FIXME 81578: The naming of this is confusing. Files with restricted access to other local files
+                    // still can have other privileges that can be remembered, thereby not making them unique origins.
+                    securityOrigin()->enforceFilePathSeparation();
+                }
             }
+        } else if (securityOrigin()->isUnique()) {
+            Frame* ownerFrame = m_frame->tree()->parent();
+            if (!ownerFrame)
+                ownerFrame = m_frame->loader()->opener();
+            if (ownerFrame && !ownerFrame->document()->securityOrigin()->allowsCrossOriginRequests())
+                securityOrigin()->denyCrossOriginRequests();
         }
         securityOrigin()->setStorageBlockingPolicy(settings->storageBlockingPolicy());
     }
@@ -4612,7 +4622,8 @@ void Document::initSecurityContext()
         // but we're also sandboxed, the only thing we inherit is the ability
         // to load local resources. This lets about:blank iframes in file://
         // URL documents load images and other resources from the file system.
-        if (ownerFrame->document()->securityOrigin()->canLoadLocalResources())
+        if (ownerFrame->document()->securityOrigin()->canLoadLocalResources() &&
+            !ownerFrame->document()->securityOrigin()->enforcesFilePathSeparation())
             securityOrigin()->grantLoadLocalResources();
         return;
     }
