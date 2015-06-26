@@ -1,0 +1,53 @@
+Qt 5.5 introduces many new features and improvements as well as bugfixes
+over the 5.4.x series.
+
+For more details, refer to the online documentation included in this
+distribution. The documentation is also available online:
+
+  http://doc.qt.io/qt-5.5
+
+The Qt version 5.5 series is binary compatible with the 5.4.x series.
+Applications compiled for 5.4 will continue to run with 5.5.
+
+Some of the changes listed in this file include issue tracking numbers
+corresponding to tasks in the Qt Bug Tracker:
+
+  http://bugreports.qt.io/
+
+Each of these identifiers can be entered in the bug tracker to obtain more
+information about a particular change.
+
+****************************************************************************
+*                          Important                                       *
+****************************************************************************
+
+- QtWebKit is now deprecated. It will continue to be supported in Qt 5, but
+it is recommended new projects switch to the QtWebEngine APIs.
+
+
+****************************************************************************
+*                          Library                                         *
+****************************************************************************
+
+QtWebkit
+--------
+ - [QTBUG-45556] Fixed case where local pages could request remote content
+ when remote access was disabled.
+ - Support for more font-weight using new weight in QFont.
+ - [QTBUG-43628] Support authentication of POST requests.
+
+
+****************************************************************************
+*                      Platform Specific Changes                           *
+****************************************************************************
+
+Windows
+-------
+ - [QTBUG-46344] Support building with MSVC 2015
+
+Linux
+-------
+  - NS plugins are now linking using RTLD_DEEPBIND, making it possible to
+  load plugins using conflicting symbols such as Qt4 libraries.
+  - Plugins loading Qt4-using plugins of their own without using deepbind
+  are blacklisted.
