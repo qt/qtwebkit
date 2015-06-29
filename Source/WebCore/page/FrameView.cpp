@@ -925,7 +925,7 @@ bool FrameView::flushCompositingStateForThisFrame(Frame* rootFrameForFlush)
 
     // If we sync compositing layers when a layout is pending, we may cause painting of compositing
     // layer content to occur before layout has happened, which will cause paintContents() to bail.
-    if (needsLayout())
+    if (needsStyleRecalcOrLayout())
         return false;
 
     // If we sync compositing layers and allow the repaint to be deferred, there is time for a
@@ -1088,7 +1088,7 @@ RenderObject* FrameView::layoutRoot(bool onlyDuringLayout) const
     return onlyDuringLayout && layoutPending() ? 0 : m_layoutRoot;
 }
 
-static inline void collectFrameViewChildren(FrameView* frameView, Vector<RefPtr<FrameView> >& frameViews)
+static inline void collectFrameViewChildren(const FrameView* frameView, Vector<RefPtr<FrameView> >& frameViews)
 {
     const HashSet<RefPtr<Widget> >* viewChildren = frameView->children();
     ASSERT(viewChildren);
@@ -2534,6 +2534,29 @@ bool FrameView::layoutPending() const
     return m_layoutTimer.isActive();
 }
 
+bool FrameView::needsStyleRecalcOrLayout(bool includeSubframes) const
+{
+    if (frame()->document() && frame()->document()->childNeedsStyleRecalc())
+        return true;
+
+    if (needsLayout())
+        return true;
+
+    if (!includeSubframes)
+        return false;
+
+    // Find child frames via the Widget tree, as updateLayoutAndStyleIfNeededRecursive() does.
+    Vector<RefPtr<FrameView> > childViews;
+    collectFrameViewChildren(this, childViews);
+
+    for (unsigned i = 0; i < childViews.size(); ++i) {
+        if (childViews[i]->needsStyleRecalcOrLayout())
+            return true;
+    }
+
+    return false;
+}
+
 bool FrameView::needsLayout() const
 {
     // This can return true in cases where the document does not have a body yet.
@@ -3772,10 +3795,12 @@ void FrameView::updateLayoutAndStyleIfNeededRecursive()
     // painting, so we need to flush out any deferred repaints too.
     flushDeferredRepaints();
 
-    // When frame flattening is on, child frame can mark parent frame dirty. In such case, child frame
-    // needs to call layout on parent frame recursively.
-    // This assert ensures that parent frames are clean, when child frames finished updating layout and style.
-    ASSERT(!needsLayout());
+    // A child frame may have dirtied us during its layout.
+    frame()->document()->updateStyleIfNeeded();
+    if (needsLayout())
+        layout();
+
+    ASSERT(!(m_frame->page() && m_frame->page()->mainFrame() == m_frame) || !needsStyleRecalcOrLayout());
 }
 
 bool FrameView::qualifiesAsVisuallyNonEmpty() const
