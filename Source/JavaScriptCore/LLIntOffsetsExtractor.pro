@@ -16,6 +16,7 @@ debug_and_release {
 # Don't try to link against any Qt libraries, but at least
 # pull in include paths as we include qglobal.h.
 INCLUDEPATH += $$QT.core.includes
+DEFINES += QT_NO_VERSION_TAGGING
 CONFIG += console
 CONFIG -= qt
 
