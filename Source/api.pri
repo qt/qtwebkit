@@ -28,7 +28,7 @@ use?(3D_GRAPHICS): WEBKIT += angle
 use?(leveldb):!use?(system_leveldb) WEBKIT += leveldb
 
 MODULE = webkit
-CONFIG += creating_module
+CONFIG += creating_module no_linker_version_script
 
 # This is the canonical list of dependencies for the public API of
 # the QtWebKit library, and will end up in the library's prl file.
