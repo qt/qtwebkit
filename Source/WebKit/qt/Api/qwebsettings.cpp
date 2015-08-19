@@ -519,12 +519,18 @@ QWebSettings* QWebSettings::globalSettings()
         enabled by default.
     \value CSSGridLayoutEnabled This setting enables support for the CSS 3 Grid Layout module. This
         CSS module is currently only a draft and support for it is disabled by default.
+    \value CSSRegionsEnabled This setting enables support for the CSS 3 Regions module. This
+        CSS module is currently only a draft and support for it is enabled by default.
     \value ScrollAnimatorEnabled This setting enables animated scrolling. It is disabled by default.
     \value CaretBrowsingEnabled This setting enables caret browsing. It is disabled by default.
     \value NotificationsEnabled Specifies whether support for the HTML 5 web notifications is enabled
         or not. This is enabled by default.
     \value Accelerated2dCanvasEnabled Specifies whether the HTML5 2D canvas should be a OpenGL framebuffer.
         This makes many painting operations faster, but slows down pixel access. This is disabled by default.
+    \value WebGLEnabled This setting enables support for WebGL.
+        It is enabled by default.
+    \value HyperlinkAuditingEnabled This setting enables support for hyperlink auditing (<a ping>).
+        It is disabled by default.
 */
 
 /*!
