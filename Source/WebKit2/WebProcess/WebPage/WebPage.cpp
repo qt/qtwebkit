@@ -680,7 +680,11 @@ EditorState WebPage::editorState() const
 
     // FIXME: We should only transfer innerText when it changes and do this on the UI side.
     if (result.isContentEditable && !result.isInPasswordField) {
-        result.surroundingText = scope->innerText();
+        if (isHTMLTextFormControlElement(scope))
+            result.surroundingText = toHTMLTextFormControlElement(scope)->innerTextValue();
+        else
+            result.surroundingText = scope->innerText();
+
         if (result.hasComposition) {
             // The anchor is always the left position when they represent a composition.
             result.surroundingText.remove(result.anchorPosition, result.cursorPosition - result.anchorPosition);
