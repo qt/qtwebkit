@@ -161,6 +161,7 @@ namespace WebKit {
     macro(HiddenPageDOMTimerThrottlingEnabled, hiddenPageDOMTimerThrottlingEnabled, Bool, bool, DEFAULT_HIDDEN_PAGE_DOM_TIMER_THROTTLING_ENABLED) \
     macro(HiddenPageCSSAnimationSuspensionEnabled, hiddenPageCSSAnimationSuspensionEnabled, Bool, bool, DEFAULT_HIDDEN_PAGE_CSS_ANIMATION_SUSPENSION_ENABLED) \
     macro(LowPowerVideoAudioBufferSizeEnabled, lowPowerVideoAudioBufferSizeEnabled, Bool, bool, false) \
+    macro(SpatialNavigationEnabled, spatialNavigationEnabled, Bool, bool, false) \
     \
 
 #define FOR_EACH_WEBKIT_DOUBLE_PREFERENCE(macro) \
@@ -176,7 +177,6 @@ namespace WebKit {
     macro(MinimumFontSize, minimumFontSize, UInt32, uint32_t, 0) \
     macro(MinimumLogicalFontSize, minimumLogicalFontSize, UInt32, uint32_t, 9) \
     macro(DefaultFontSize, defaultFontSize, UInt32, uint32_t, 16) \
-    macro(SpatialNavigationEnabled, spatialNavigationEnabled, Bool, bool, false) \
     macro(DefaultFixedFontSize, defaultFixedFontSize, UInt32, uint32_t, 13) \
     macro(LayoutFallbackWidth, layoutFallbackWidth, UInt32, uint32_t, 980) \
     macro(DeviceWidth, deviceWidth, UInt32, uint32_t, 0) \
