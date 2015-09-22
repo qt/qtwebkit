@@ -351,6 +351,10 @@ defineReplace(configDefines) {
             plugin_architecture: defines += $$upper($$config)=1
             next()
         }
+        equals(config, "use_system_malloc") {
+            use: defines += $$upper($$config)=1
+            next()
+        }
         match = $$find(config, "^use_")
         !isEmpty(match) {
             use: defines += WTF_$$upper($$config)=1
