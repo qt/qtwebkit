@@ -11,6 +11,13 @@
 sanitizedFile = $$toSanitizedPath($$_FILE_)
 equals(sanitizedFile, $$toSanitizedPath($$_PRO_FILE_)):TEMPLATE = derived
 
+INCLUDEPATH += \
+    $$PWD/include \
+    $$PWD/include/GLSLANG \
+    $$PWD/include/KHR \
+    $$PWD/src \
+    $$PWD/src/compiler/preprocessor
+
 ANGLE_FLEX_SOURCES = \
     $$PWD/src/compiler/glslang.l \
     $$PWD/src/compiler/preprocessor/Tokenizer.l
