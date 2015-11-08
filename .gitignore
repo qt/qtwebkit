@@ -8,6 +8,8 @@ Makefile.*
 .obj
 .rcc
 .qmake.cache
+.qmake.stash
+Source/.pch/
 
 Source/JavaScriptCore/LLIntDesiredOffsets.h
 Source/JavaScriptCore/LLIntOffsetsExtractor
@@ -24,4 +26,5 @@ Source/JavaScriptCore/release/
 Source/WTF/release/
 Source/WebCore/release/
 Source/WebKit/release/
+Source/ThirdParty/leveldb/release/
 config.log
