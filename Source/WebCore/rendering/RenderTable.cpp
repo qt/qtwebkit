@@ -431,22 +431,14 @@ void RenderTable::layout()
         oldTableLogicalTop += m_captions[i]->logicalHeight() + m_captions[i]->marginBefore() + m_captions[i]->marginAfter();
 
     bool collapsing = collapseBorders();
-    // repeat header and footer on each page
-    int headHeight = 0;
-    int footHeight = 0;
+
     for (RenderObject* child = firstChild(); child; child = child->nextSibling()) {
         if (child->isTableSection()) {
             RenderTableSection* section = toRenderTableSection(child);
             if (m_columnLogicalWidthChanged)
                 section->setChildNeedsLayout(true, MarkOnlyThis);
             section->layoutIfNeeded();
-            int rowHeight = section->calcRowLogicalHeight();
-            if (child == m_head) {
-                headHeight = rowHeight;
-            } else if (child == m_foot) {
-                footHeight = rowHeight;
-            }
-            totalSectionLogicalHeight += rowHeight;
+            totalSectionLogicalHeight += section->calcRowLogicalHeight();
             if (collapsing)
                 section->recalcOuterBorder();
             ASSERT(!section->needsLayout());
@@ -504,7 +496,7 @@ void RenderTable::layout()
     distributeExtraLogicalHeight(floorToInt(computedLogicalHeight - totalSectionLogicalHeight));
 
     for (RenderTableSection* section = topSection(); section; section = sectionBelow(section))
-        section->layoutRows(headHeight, footHeight);
+        section->layoutRows();
 
     if (!topSection() && computedLogicalHeight > totalSectionLogicalHeight && !document()->inQuirksMode()) {
         // Completely empty tables (with no sections or anything) should at least honor specified height
@@ -813,6 +805,7 @@ void RenderTable::splitColumn(unsigned position, unsigned firstSpan)
     }
 
     m_columnPos.grow(numEffCols() + 1);
+    m_columnPos[numEffCols()] = m_columnPos[numEffCols() - 1];
 }
 
 void RenderTable::appendColumn(unsigned span)
@@ -834,6 +827,7 @@ void RenderTable::appendColumn(unsigned span)
     }
 
     m_columnPos.grow(numEffCols() + 1);
+    m_columnPos[numEffCols()] = m_columnPos[numEffCols() - 1];
 }
 
 RenderTableCol* RenderTable::firstColumn() const

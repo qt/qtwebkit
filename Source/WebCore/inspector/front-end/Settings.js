@@ -76,7 +76,7 @@ WebInspector.Settings = function()
 
     this.colorFormat = this.createSetting("colorFormat", "original");
     this.consoleHistory = this.createSetting("consoleHistory", []);
-    this.debuggerEnabled = this.createSetting("debuggerEnabled", true);
+    this.debuggerEnabled = this.createSetting("debuggerEnabled", false);
     this.domWordWrap = this.createSetting("domWordWrap", true);
     this.profilerEnabled = this.createSetting("profilerEnabled", false);
     this.eventListenersFilter = this.createSetting("eventListenersFilter", "all");

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Digia Plc and/or its subsidiary(-ies).
+ * Copyright (C) 2015 The Qt Company Ltd.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -839,7 +839,7 @@ QWebHitTestResultPrivate::QWebHitTestResultPrivate(const WebCore::HitTestResult 
     innerNode->ref();
     innerNonSharedNode = hitTest.innerNonSharedNode();
     innerNonSharedNode->ref();
-    boundingRect = innerNonSharedNode ? innerNonSharedNode->renderer()->absoluteBoundingBoxRect() : IntRect();
+    boundingRect = (innerNonSharedNode && innerNonSharedNode->renderer())? innerNonSharedNode->renderer()->absoluteBoundingBoxRect() : IntRect();
     WebCore::Image *img = hitTest.image();
     if (img) {
         QPixmap* pix = img->nativeImageForCurrentFrame();
@@ -926,9 +926,13 @@ QWebHitTestResultPrivate::~QWebHitTestResultPrivate()
 
 QWebElement QWebHitTestResultPrivate::elementForInnerNode() const
 {
-    if (!innerNonSharedNode || !innerNonSharedNode->isElementNode())
-        return QWebElement();
-    return QWebElement(toElement(innerNonSharedNode));
+    // Uses the similar logic as HitTestResult::innerElement().
+    for (Node* node = innerNonSharedNode; node; node = node->parentNode()) {
+        if (node->isElementNode())
+            return QWebElement(toElement(node));
+    }
+
+    return QWebElement();
 }
 
 // ======================================================

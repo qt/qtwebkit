@@ -57,6 +57,7 @@ IDBTransactionBackendImpl::IDBTransactionBackendImpl(int64_t id, PassRefPtr<IDBD
     , m_database(database)
     , m_transaction(database->backingStore().get())
     , m_taskTimer(this, &IDBTransactionBackendImpl::taskTimerFired)
+    , m_asyncDerefTimer(this, &IDBTransactionBackendImpl::asyncDerefTimerFired)
     , m_pendingPreemptiveEvents(0)
 {
     // We pass a reference of this object before it can be adopted.
@@ -106,7 +107,7 @@ void IDBTransactionBackendImpl::abort(PassRefPtr<IDBDatabaseError> error)
     // The last reference to this object may be released while performing the
     // abort steps below. We therefore take a self reference to keep ourselves
     // alive while executing this method.
-    RefPtr<IDBTransactionBackendImpl> protect(this);
+    this->ref();
 
     m_state = Finished;
     m_taskTimer.stop();
@@ -138,6 +139,18 @@ void IDBTransactionBackendImpl::abort(PassRefPtr<IDBDatabaseError> error)
     m_database->transactionFinishedAndAbortFired(this);
 
     m_database = 0;
+
+    if (this->refCount() == 1) {
+        // We may already be iterating over active DOM Objects which would make it illegal
+        // to cause ourselves to be deleted here.
+        m_asyncDerefTimer.startOneShot(0);
+    } else
+        this->deref();
+}
+
+void IDBTransactionBackendImpl::asyncDerefTimerFired(Timer<IDBTransactionBackendImpl>*)
+{
+    this->deref();
 }
 
 bool IDBTransactionBackendImpl::isTaskQueueEmpty() const

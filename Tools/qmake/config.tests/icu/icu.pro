@@ -4,6 +4,7 @@ CONFIG -= qt dylib
 
 win32 {
     CONFIG(static, static|shared) {
+        LIBS += $$QMAKE_LIBS_CORE
         CONFIG(debug, debug|release) {
             LIBS += -lsicuind -lsicuucd -lsicudtd
         } else {
@@ -12,7 +13,6 @@ win32 {
     } else {
         LIBS += -licuin -licuuc -licudt
     }
-    LIBS += -ladvapi32
 } else:!contains(QT_CONFIG,no-pkg-config):packagesExist("icu-i18n") {
     PKGCONFIG += icu-i18n
 } else {

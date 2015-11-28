@@ -476,6 +476,7 @@ bool AbstractState::executeEffects(unsigned indexInBlock, Node* node)
     }
         
     case MakeRope: {
+        node->setCanExit(true);
         forNode(node).set(m_graph.m_vm.stringStructure.get());
         break;
     }
@@ -1078,10 +1079,8 @@ bool AbstractState::executeEffects(unsigned indexInBlock, Node* node)
         clobberWorld(node->codeOrigin, indexInBlock);
         
         SpeculatedType type = source.m_type;
-        if (type & ~(SpecNumber | SpecString | SpecBoolean)) {
-            type &= (SpecNumber | SpecString | SpecBoolean);
-            type |= SpecString;
-        }
+        if (type & ~(SpecNumber | SpecString | SpecBoolean))
+            type = (SpecTop & ~SpecCell) | SpecString;
         destination.set(type);
         break;
     }
@@ -1255,7 +1254,7 @@ bool AbstractState::executeEffects(unsigned indexInBlock, Node* node)
     case GetScope: // FIXME: We could get rid of these if we know that the JSFunction is a constant. https://bugs.webkit.org/show_bug.cgi?id=106202
     case GetMyScope:
     case SkipTopScope:
-        forNode(node).set(SpecCellOther);
+        forNode(node).set(SpecObjectOther);
         break;
 
     case SkipScope: {
@@ -1264,7 +1263,7 @@ bool AbstractState::executeEffects(unsigned indexInBlock, Node* node)
             m_foundConstants = true;
             break;
         }
-        forNode(node).set(SpecCellOther);
+        forNode(node).set(SpecObjectOther);
         break;
     }
 
@@ -1567,7 +1566,11 @@ bool AbstractState::executeEffects(unsigned indexInBlock, Node* node)
     case Nop:
     case CountExecution:
         break;
-        
+
+    case Unreachable:
+        RELEASE_ASSERT_NOT_REACHED();
+        break;
+
     case LastNodeType:
         RELEASE_ASSERT_NOT_REACHED();
         break;
@@ -1778,11 +1781,10 @@ inline bool AbstractState::mergeToSuccessors(Graph& graph, BasicBlock* basicBloc
     }
         
     case Return:
-    case Throw:
-    case ThrowReferenceError:
+    case Unreachable:
         ASSERT(basicBlock->cfaBranchDirection == InvalidBranchDirection);
         return false;
-        
+
     default:
         RELEASE_ASSERT_NOT_REACHED();
         return false;

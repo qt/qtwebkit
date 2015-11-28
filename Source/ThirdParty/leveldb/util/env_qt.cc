@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2014 Digia Plc. and/or its subsidiary(-ies)
+    Copyright (C) 2015 The Qt Company Ltd
 
     This library is free software; you can redistribute it and/or
     modify it under the terms of the GNU Library General Public
@@ -194,10 +194,10 @@ public:
     }
 
     void waitUntilStarted() {
-        if (m_started)
+        if (m_started.loadAcquire() != 0)
             return;
         m_mutex.lock();
-        if (!m_started)
+        if (m_started.loadAcquire() == 0)
             m_startCond.wait(&m_mutex);
         m_mutex.unlock();
     }

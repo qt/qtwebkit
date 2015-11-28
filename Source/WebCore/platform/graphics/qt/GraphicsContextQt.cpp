@@ -10,7 +10,7 @@
  * Copyright (C) 2008 Dirk Schulze <vbs85@gmx.de>
  * Copyright (C) 2010, 2011 Sencha, Inc.
  * Copyright (C) 2011 Andreas Kling <kling@webkit.org>
- * Copyright (C) 2013 Digia Plc. and/or its subsidiary(-ies).
+ * Copyright (C) 2015 The Qt Company Ltd.
  *
  * All rights reserved.
  *
@@ -391,7 +391,7 @@ void GraphicsContext::restorePlatformState()
 {
     if (!m_data->layers.isEmpty() && !m_data->layers.top()->alphaMask.isNull())
         if (!--m_data->layers.top()->saveCounter)
-            endPlatformTransparencyLayer();
+            popTransparencyLayerInternal();
 
     m_data->p()->restore();
 }
@@ -660,6 +660,9 @@ void GraphicsContext::fillPath(const Path& path)
     if (paintingDisabled())
         return;
 
+    if (!(m_state.fillPattern || m_state.fillGradient || m_state.fillColor.isValid()))
+        return;
+
     QPainter* p = m_data->p();
     QPainterPath platformPath = path.platformPath();
     platformPath.setFillRule(toQtFillRule(fillRule()));
@@ -822,6 +825,9 @@ static inline void drawRepeatPattern(QPainter* p, PassRefPtr<Pattern> pattern, c
 void GraphicsContext::fillRect(const FloatRect& rect)
 {
     if (paintingDisabled())
+        return;
+
+    if (!(m_state.fillPattern || m_state.fillGradient || m_state.fillColor.isValid()))
         return;
 
     QPainter* p = m_data->p();
@@ -1269,18 +1275,37 @@ void GraphicsContext::beginPlatformTransparencyLayer(float opacity)
     ++m_data->layerCount;
 }
 
+void GraphicsContext::popTransparencyLayerInternal()
+{
+    TransparencyLayer* layer = m_data->layers.pop();
+    ASSERT(!layer->alphaMask.isNull());
+    ASSERT(layer->saveCounter == 0);
+    layer->painter.resetTransform();
+    layer->painter.setCompositionMode(QPainter::CompositionMode_DestinationIn);
+    layer->painter.drawPixmap(QPoint(), layer->alphaMask);
+    layer->painter.end();
+
+    QPainter* p = m_data->p();
+    p->save();
+    p->resetTransform();
+    p->setOpacity(layer->opacity);
+    p->drawPixmap(layer->offset, layer->pixmap);
+    p->restore();
+
+    delete layer;
+}
+
 void GraphicsContext::endPlatformTransparencyLayer()
 {
     if (paintingDisabled())
         return;
 
+    while ( ! m_data->layers.top()->alphaMask.isNull() ){
+        --m_data->layers.top()->saveCounter;
+        popTransparencyLayerInternal();
+    }
     TransparencyLayer* layer = m_data->layers.pop();
-    if (!layer->alphaMask.isNull()) {
-        layer->painter.resetTransform();
-        layer->painter.setCompositionMode(QPainter::CompositionMode_DestinationIn);
-        layer->painter.drawPixmap(QPoint(), layer->alphaMask);
-    } else
-        --m_data->layerCount; // see the comment for layerCount
+    --m_data->layerCount; // see the comment for layerCount
     layer->painter.end();
 
     QPainter* p = m_data->p();
@@ -1706,6 +1731,10 @@ void GraphicsContext::takeOwnershipOfPlatformContext()
     m_data->takeOwnershipOfPlatformContext();
 }
 
+bool GraphicsContext::isAcceleratedContext() const
+{
+    return (platformContext()->paintEngine()->type() == QPaintEngine::OpenGL2);
 }
 
+}
 // vim: ts=4 sw=4 et

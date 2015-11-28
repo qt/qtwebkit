@@ -118,7 +118,7 @@ void* prepareOSREntry(ExecState* exec, CodeBlock* codeBlock, unsigned bytecodeIn
             }
             continue;
         }
-        if (!entry->m_expectedValues.local(local).validate(exec->registers()[local].jsValue())) {
+        if (!entry->m_expectedValues.local(local).isTop() && !entry->m_expectedValues.local(local).validate(exec->registers()[local].jsValue())) {
 #if ENABLE(JIT_VERBOSE_OSR)
             dataLog("    OSR failed because variable ", local, " is ", exec->registers()[local].jsValue(), ", expected ", entry->m_expectedValues.local(local), ".\n");
 #endif

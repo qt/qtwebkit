@@ -29,6 +29,7 @@
  */
 
 #include "config.h"
+#if USE(ICU_UNICODE)
 #include "TextEncodingDetector.h"
 
 #include "TextEncoding.h"
@@ -115,3 +116,4 @@ bool detectTextEncoding(const char* data, size_t len,
 }
 
 }
+#endif // #if USE(ICU_UNICODE)

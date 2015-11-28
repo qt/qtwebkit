@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Digia Plc and/or its subsidiary(-ies).
+ * Copyright (C) 2015 The Qt Company Ltd.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -211,6 +211,7 @@ QWebPageAdapter::QWebPageAdapter()
     , forwardUnsupportedContent(false)
     , insideOpenCall(false)
     , clickCausedFocus(false)
+    , mousePressed(false)
     , m_useNativeVirtualKeyAsDOMKey(false)
     , m_totalBytes(0)
     , m_bytesReceived()
@@ -258,8 +259,10 @@ void QWebPageAdapter::initializeWebCorePage()
         m_deviceMotionClient = new DeviceMotionClientQt;
     }
 #endif
-    WebCore::provideDeviceOrientationTo(page, m_deviceOrientationClient);
-    WebCore::provideDeviceMotionTo(page, m_deviceMotionClient);
+    if (m_deviceOrientationClient)
+        WebCore::provideDeviceOrientationTo(page, m_deviceOrientationClient);
+    if (m_deviceMotionClient)
+        WebCore::provideDeviceMotionTo(page, m_deviceMotionClient);
 #endif
 
     // By default each page is put into their own unique page group, which affects popup windows
@@ -340,6 +343,13 @@ QWebPageAdapter::VisibilityState QWebPageAdapter::visibilityState() const
 #else
     return QWebPageAdapter::VisibilityStateVisible;
 #endif
+}
+
+void QWebPageAdapter::setPluginsVisible(bool visible)
+{
+    if (!page)
+        return;
+    page->pluginVisibilityChanged(visible);
 }
 
 void QWebPageAdapter::setNetworkAccessManager(QNetworkAccessManager *manager)
@@ -473,9 +483,7 @@ void QWebPageAdapter::adjustPointForClicking(QMouseEvent* ev)
     if (!foundClickableNode)
         return;
 
-    QMouseEvent* ret = new QMouseEvent(ev->type(), QPoint(adjustedPoint), ev->globalPos(), ev->button(), ev->buttons(), ev->modifiers());
-    delete ev;
-    ev = ret;
+    *ev = QMouseEvent(ev->type(), QPoint(adjustedPoint), ev->globalPos(), ev->button(), ev->buttons(), ev->modifiers());
 #else
     Q_UNUSED(ev);
 #endif
@@ -486,6 +494,8 @@ void QWebPageAdapter::mouseMoveEvent(QMouseEvent* ev)
     WebCore::Frame* frame = mainFrameAdapter()->frame;
     if (!frame->view())
         return;
+    if (ev->buttons() == Qt::NoButton)
+        mousePressed = false;
 
     bool accepted = frame->eventHandler()->mouseMoved(convertMouseEvent(ev, 0));
     ev->setAccepted(accepted);
@@ -512,7 +522,7 @@ void QWebPageAdapter::mousePressEvent(QMouseEvent* ev)
     PlatformMouseEvent mev = convertMouseEvent(ev, 1);
     // ignore the event if we can't map Qt's mouse buttons to WebCore::MouseButton
     if (mev.button() != NoButton)
-        accepted = frame->eventHandler()->handleMousePressEvent(mev);
+        mousePressed = accepted = frame->eventHandler()->handleMousePressEvent(mev);
     ev->setAccepted(accepted);
 
     RefPtr<WebCore::Node> newNode;
@@ -567,6 +577,9 @@ void QWebPageAdapter::mouseReleaseEvent(QMouseEvent *ev)
     if (mev.button() != NoButton)
         accepted = frame->eventHandler()->handleMouseReleaseEvent(mev);
     ev->setAccepted(accepted);
+
+    if (ev->buttons() == Qt::NoButton)
+        mousePressed = false;
 
     handleSoftwareInputPanel(ev->button(), QPointF(ev->pos()).toPoint());
 }
@@ -1113,10 +1126,10 @@ void QWebPageAdapter::triggerAction(QWebPageAdapter::MenuAction action, QWebHitT
 #if defined(Q_WS_X11)
         bool oldSelectionMode = Pasteboard::generalPasteboard()->isSelectionMode();
         Pasteboard::generalPasteboard()->setSelectionMode(true);
-        editor.copyURL(hitTestResult->linkUrl, WTF::String());
+        editor.copyURL(hitTestResult->linkUrl, hitTestResult->linkText);
         Pasteboard::generalPasteboard()->setSelectionMode(oldSelectionMode);
 #endif
-        editor.copyURL(hitTestResult->linkUrl, WTF::String());
+        editor.copyURL(hitTestResult->linkUrl, hitTestResult->linkText);
         break;
     }
     case OpenImageInNewWindow:

@@ -2879,6 +2879,7 @@ SOURCES += \
     platform/graphics/qt/GraphicsContextQt.cpp \
     platform/graphics/qt/IconQt.cpp \
     platform/graphics/qt/ImageBufferQt.cpp \
+    platform/graphics/qt/ImageBufferDataQt.cpp \
     platform/graphics/qt/ImageDecoderQt.cpp \
     platform/graphics/qt/ImageQt.cpp \
     platform/graphics/qt/IntPointQt.cpp \
@@ -2978,6 +2979,12 @@ mac {
 }
 
 contains(QT_CONFIG,icu)|mac: SOURCES += platform/text/TextBreakIteratorICU.cpp
+use?(wchar_unicode): {
+    SOURCES += platform/text/wchar/TextBreakIteratorWchar.cpp \
+               platform/text/TextEncodingDetectorNone.cpp
+    SOURCES -= platform/text/TextEncodingDetectorICU.cpp
+}
+
 mac {
     # For Mac we use the same SmartReplace implementation as the Apple port.
     SOURCES += editing/SmartReplaceCF.cpp
@@ -4137,6 +4144,7 @@ use?(3D_GRAPHICS) {
         platform/graphics/gpu/Texture.h \
         platform/graphics/gpu/TilingData.h \
         platform/graphics/opengl/Extensions3DOpenGL.h \
+        platform/graphics/qt/QFramebufferPaintDevice.h \
         platform/graphics/texmap/TextureMapperGL.h \
         platform/graphics/texmap/TextureMapperShaderProgram.h \
         platform/graphics/texmap/coordinated/AreaAllocator.h \
@@ -4173,6 +4181,7 @@ use?(3D_GRAPHICS) {
         platform/graphics/opengl/GraphicsContext3DOpenGLCommon.cpp \
         platform/graphics/opengl/Extensions3DOpenGLCommon.cpp \
         platform/graphics/qt/GraphicsContext3DQt.cpp \
+        platform/graphics/qt/QFramebufferPaintDevice.cpp \
         platform/graphics/texmap/TextureMapperGL.cpp \
         platform/graphics/texmap/TextureMapperShaderProgram.cpp \
         platform/graphics/texmap/coordinated/AreaAllocator.cpp \
@@ -4187,15 +4196,15 @@ use?(3D_GRAPHICS) {
 
     INCLUDEPATH += $$PWD/platform/graphics/gpu
 
-    contains(QT_CONFIG, opengl) | contains(QT_CONFIG, opengles2) {
-        !contains(QT_CONFIG, opengles2) {
-            SOURCES += \
-               platform/graphics/opengl/GraphicsContext3DOpenGL.cpp \
-               platform/graphics/opengl/Extensions3DOpenGL.cpp
-        } else {
+    contains(QT_CONFIG, opengl) {
+        contains(QT_CONFIG, opengles2) {
             SOURCES += \
                platform/graphics/opengl/GraphicsContext3DOpenGLES.cpp \
                platform/graphics/opengl/Extensions3DOpenGLES.cpp
+        } else {
+            SOURCES += \
+               platform/graphics/opengl/GraphicsContext3DOpenGL.cpp \
+               platform/graphics/opengl/Extensions3DOpenGL.cpp
         }
 
         HEADERS += platform/graphics/opengl/Extensions3DOpenGL.h
@@ -4207,7 +4216,6 @@ use?(3D_GRAPHICS) {
 
     WEBKIT += angle
 
-    CONFIG += opengl-shims
     INCLUDEPATH += platform/graphics/gpu
 }
 

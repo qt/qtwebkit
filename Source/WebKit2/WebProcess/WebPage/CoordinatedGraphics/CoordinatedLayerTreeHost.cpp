@@ -212,6 +212,8 @@ void CoordinatedLayerTreeHost::renderNextFrame()
 
 void CoordinatedLayerTreeHost::purgeBackingStores()
 {
+    // Wait for CoordinatedGraphicsScene::setActive(true) to be called.
+    m_isWaitingForRenderer = true;
     m_coordinator->purgeBackingStores();
 }
 
@@ -401,8 +403,8 @@ void CoordinatedLayerTreeHost::scheduleAnimation()
     if (m_layerFlushTimer.isActive())
         return;
 
-    m_layerFlushTimer.startOneShot(m_coordinator->nextAnimationServiceTime());
     scheduleLayerFlush();
+    m_layerFlushTimer.startOneShot(m_coordinator->nextAnimationServiceTime());
 }
 #endif
 

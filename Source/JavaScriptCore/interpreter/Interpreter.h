@@ -225,7 +225,6 @@ namespace JSC {
         static const String getTraceLine(CallFrame*, StackFrameCodeType, const String&, int);
         JS_EXPORT_PRIVATE static void getStackTrace(VM*, Vector<StackFrame>& results, size_t maxStackSize = std::numeric_limits<size_t>::max());
         static void addStackTraceIfNecessary(CallFrame*, JSValue error);
-        JSString* stackTraceAsString(ExecState* exec, Vector<StackFrame> stackTrace);
 
         void dumpSampleData(ExecState* exec);
         void startSampling();

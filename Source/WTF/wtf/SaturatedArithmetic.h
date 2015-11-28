@@ -43,7 +43,7 @@ inline int32_t saturatedAddition(int32_t a, int32_t b)
 
     // Can only overflow if the signed bit of the two values match. If the signed
     // bit of the result and one of the values differ it did overflow.
-    if (!((ua ^ ub) >> 31) & (result ^ ua) >> 31)
+    if (~((ua ^ ub) >> 31) & (result ^ ua) >> 31)
         result = std::numeric_limits<int>::max() + (ua >> 31);
 
     return result;

@@ -129,7 +129,11 @@ enable?(XSLT) {
 }
 
 use?(ZLIB) {
-    LIBS += -lz
+    if(unix|mingw):LIBS += -lz
+    else {
+        isEmpty(ZLIB_LIBS): LIBS += zdll.lib
+        else: LIBS += $$ZLIB_LIBS
+    }
 }
 
 enable?(NETSCAPE_PLUGIN_API) {
@@ -252,8 +256,14 @@ have?(sqlite3) {
 
 use?(system_leveldb): LIBS += -lleveldb -lmemenv
 
-use?(libjpeg): LIBS += -ljpeg
-use?(libpng): LIBS += -lpng
+use?(libjpeg) {
+    msvc: LIBS += libjpeg.lib
+    else: LIBS += -ljpeg
+}
+use?(libpng) {
+    if(unix|mingw): LIBS += -lpng
+    else:win32:     LIBS += libpng.lib
+}
 use?(webp): LIBS += -lwebp
 
 enable?(opencl) {
@@ -283,10 +293,12 @@ win32 {
 }
 
 # Remove whole program optimizations due to miscompilations
-win32-msvc2005|win32-msvc2008|win32-msvc2010|win32-msvc2012|win32-msvc2013|wince*:{
+win32-msvc*|wince* {
     QMAKE_CFLAGS_LTCG -= -GL
     QMAKE_CXXFLAGS_LTCG -= -GL
+}
 
+win32-msvc*|wince* {
     # Disable incremental linking for windows 32bit OS debug build as WebKit is so big
     # that linker failes to link incrementally in debug mode.
     ARCH = $$(PROCESSOR_ARCHITECTURE)

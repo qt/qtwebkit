@@ -78,7 +78,7 @@ public:
     void addCell(RenderTableCell*, RenderTableRow* row);
 
     int calcRowLogicalHeight();
-    void layoutRows(int headHeight, int footHeight);
+    void layoutRows();
     void computeOverflowFromCells();
 
     RenderTable* table() const { return toRenderTable(parent()); }

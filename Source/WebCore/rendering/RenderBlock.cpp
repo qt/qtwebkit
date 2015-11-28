@@ -1754,15 +1754,6 @@ void RenderBlock::layoutBlock(bool relayoutChildren, LayoutUnit pageLogicalHeigh
     }
 
     setNeedsLayout(false);
-
-    if (document()->printing()) {
-        // PHANTOMJS CUSTOM: reset pagination counter for printing
-        StyledElement* elem = dynamic_cast<StyledElement*>(generatingNode());
-        if (elem && elem->hasClass() && elem->classNames().contains("phantomjs_reset_pagination")) {
-            frame()->addResetPage(y() / view()->layoutState()->m_pageLogicalHeight);
-        }
-    }
-
 }
 
 void RenderBlock::addOverflowFromChildren()

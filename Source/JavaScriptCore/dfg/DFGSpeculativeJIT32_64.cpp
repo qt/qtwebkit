@@ -421,8 +421,7 @@ void SpeculativeJIT::nonSpeculativeNonPeepholeCompareNull(Edge operand, bool inv
         notCell.link(&m_jit);
         // null or undefined?
         COMPILE_ASSERT((JSValue::UndefinedTag | 1) == JSValue::NullTag, UndefinedTag_OR_1_EQUALS_NullTag);
-        m_jit.move(argTagGPR, resultPayloadGPR);
-        m_jit.or32(TrustedImm32(1), resultPayloadGPR);
+        m_jit.or32(TrustedImm32(1), argTagGPR, resultPayloadGPR);
         m_jit.compare32(invert ? JITCompiler::NotEqual : JITCompiler::Equal, resultPayloadGPR, TrustedImm32(JSValue::NullTag), resultPayloadGPR);
 
         done.link(&m_jit);
@@ -483,8 +482,7 @@ void SpeculativeJIT::nonSpeculativePeepholeBranchNull(Edge operand, Node* branch
         notCell.link(&m_jit);
         // null or undefined?
         COMPILE_ASSERT((JSValue::UndefinedTag | 1) == JSValue::NullTag, UndefinedTag_OR_1_EQUALS_NullTag);
-        m_jit.move(argTagGPR, resultGPR);
-        m_jit.or32(TrustedImm32(1), resultGPR);
+        m_jit.or32(TrustedImm32(1), argTagGPR, resultGPR);
         branch32(invert ? JITCompiler::NotEqual : JITCompiler::Equal, resultGPR, JITCompiler::TrustedImm32(JSValue::NullTag), taken);
     }
     
@@ -1106,6 +1104,10 @@ GPRReg SpeculativeJIT::fillSpeculateCell(Edge edge)
 
     switch (info.registerFormat()) {
     case DataFormatNone: {
+        if (info.spillFormat() == DataFormatInteger || info.spillFormat() == DataFormatDouble) {
+            terminateSpeculativeExecution(Uncountable, JSValueRegs(), 0);
+            return allocate();
+        }
 
         if (edge->hasConstant()) {
             JSValue jsValue = valueOfJSConstant(edge.node());
@@ -1422,8 +1424,7 @@ void SpeculativeJIT::compileObjectToObjectOrOtherEquality(Edge leftChild, Edge r
     // We know that within this branch, rightChild must not be a cell. Check if that is enough to
     // prove that it is either null or undefined.
     if (needsTypeCheck(rightChild, SpecCell | SpecOther)) {
-        m_jit.move(op2TagGPR, resultGPR);
-        m_jit.or32(TrustedImm32(1), resultGPR);
+        m_jit.or32(TrustedImm32(1), op2TagGPR, resultGPR);
         
         typeCheck(
             JSValueRegs(op2TagGPR, op2PayloadGPR), rightChild, SpecCell | SpecOther,
@@ -1531,8 +1532,7 @@ void SpeculativeJIT::compilePeepHoleObjectToObjectOrOtherEquality(Edge leftChild
         jump(notTaken, ForceJump);
         
         rightNotCell.link(&m_jit);
-        m_jit.move(op2TagGPR, resultGPR);
-        m_jit.or32(TrustedImm32(1), resultGPR);
+        m_jit.or32(TrustedImm32(1), op2TagGPR, resultGPR);
         
         typeCheck(
             JSValueRegs(op2TagGPR, op2PayloadGPR), rightChild, SpecCell | SpecOther,
@@ -1653,8 +1653,7 @@ void SpeculativeJIT::compileObjectOrOtherLogicalNot(Edge nodeUse)
  
     COMPILE_ASSERT((JSValue::UndefinedTag | 1) == JSValue::NullTag, UndefinedTag_OR_1_EQUALS_NullTag);
     if (needsTypeCheck(nodeUse, SpecCell | SpecOther)) {
-        m_jit.move(valueTagGPR, resultPayloadGPR);
-        m_jit.or32(TrustedImm32(1), resultPayloadGPR);
+        m_jit.or32(TrustedImm32(1), valueTagGPR, resultPayloadGPR);
         typeCheck(
             JSValueRegs(valueTagGPR, valuePayloadGPR), nodeUse, SpecCell | SpecOther,
             m_jit.branch32(
@@ -1778,8 +1777,7 @@ void SpeculativeJIT::emitObjectOrOtherBranch(Edge nodeUse, BlockIndex taken, Blo
     
     COMPILE_ASSERT((JSValue::UndefinedTag | 1) == JSValue::NullTag, UndefinedTag_OR_1_EQUALS_NullTag);
     if (needsTypeCheck(nodeUse, SpecCell | SpecOther)) {
-        m_jit.move(valueTagGPR, scratchGPR);
-        m_jit.or32(TrustedImm32(1), scratchGPR);
+        m_jit.or32(TrustedImm32(1), valueTagGPR, scratchGPR);
         typeCheck(
             JSValueRegs(valueTagGPR, valuePayloadGPR), nodeUse, SpecCell | SpecOther,
             m_jit.branch32(MacroAssembler::NotEqual, scratchGPR, TrustedImm32(JSValue::NullTag)));
@@ -2255,6 +2253,8 @@ void SpeculativeJIT::compile(Node* node)
             compileIntegerArithDivForX86(node);
 #elif CPU(APPLE_ARMV7S)
             compileIntegerArithDivForARMv7s(node);
+#elif CPU(MIPS)
+            compileIntegerArithDivForMIPS(node);
 #else // CPU type without integer divide
             RELEASE_ASSERT_NOT_REACHED(); // should have been coverted into a double divide.
 #endif
@@ -3870,7 +3870,8 @@ void SpeculativeJIT::compile(Node* node)
             break;
         }
         
-        if (isCellSpeculation(node->child1()->prediction())) {
+        switch (node->child1().useKind()) {
+        case CellUse: {
             SpeculateCellOperand base(this, node->child1());
             GPRTemporary resultTag(this, base);
             GPRTemporary resultPayload(this);
@@ -3886,23 +3887,31 @@ void SpeculativeJIT::compile(Node* node)
             jsValueResult(resultTagGPR, resultPayloadGPR, node, UseChildrenCalledExplicitly);
             break;
         }
-        
-        JSValueOperand base(this, node->child1());
-        GPRTemporary resultTag(this, base);
-        GPRTemporary resultPayload(this);
-        
-        GPRReg baseTagGPR = base.tagGPR();
-        GPRReg basePayloadGPR = base.payloadGPR();
-        GPRReg resultTagGPR = resultTag.gpr();
-        GPRReg resultPayloadGPR = resultPayload.gpr();
-        
-        base.use();
-        
-        JITCompiler::Jump notCell = m_jit.branch32(JITCompiler::NotEqual, baseTagGPR, TrustedImm32(JSValue::CellTag));
-        
-        cachedGetById(node->codeOrigin, baseTagGPR, basePayloadGPR, resultTagGPR, resultPayloadGPR, node->identifierNumber(), notCell);
-        
-        jsValueResult(resultTagGPR, resultPayloadGPR, node, UseChildrenCalledExplicitly);
+
+        case UntypedUse: {
+            JSValueOperand base(this, node->child1());
+            GPRTemporary resultTag(this, base);
+            GPRTemporary resultPayload(this);
+
+            GPRReg baseTagGPR = base.tagGPR();
+            GPRReg basePayloadGPR = base.payloadGPR();
+            GPRReg resultTagGPR = resultTag.gpr();
+            GPRReg resultPayloadGPR = resultPayload.gpr();
+
+            base.use();
+
+            JITCompiler::Jump notCell = m_jit.branch32(JITCompiler::NotEqual, baseTagGPR, TrustedImm32(JSValue::CellTag));
+
+            cachedGetById(node->codeOrigin, baseTagGPR, basePayloadGPR, resultTagGPR, resultPayloadGPR, node->identifierNumber(), notCell);
+
+            jsValueResult(resultTagGPR, resultPayloadGPR, node, UseChildrenCalledExplicitly);
+            break;
+        }
+
+        default:
+            RELEASE_ASSERT_NOT_REACHED();
+            break;
+        }
         break;
     }
 
@@ -4953,6 +4962,10 @@ void SpeculativeJIT::compile(Node* node)
     case PhantomLocal:
         // This is a no-op.
         noResult(node);
+        break;
+
+    case Unreachable:
+        RELEASE_ASSERT_NOT_REACHED();
         break;
 
     case Nop:

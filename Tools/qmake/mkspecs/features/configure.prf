@@ -85,9 +85,6 @@ defineReplace(configEnabled) {
 # command line options
 defineTest(finalizeConfigure) {
 
-    # Sanitize clashing options
-    santizeFeatures()
-
     # Sanitize build options
     !qtHaveModule(testlib) {
         CONFIGURE_WARNINGS += "Missing QtTest module, disabling DumpRenderTree, WebKitTestRunner and tests"
@@ -109,19 +106,28 @@ defineTest(finalizeConfigure) {
         WEBKIT_CONFIG -= build_webkit2 build_minibrowser build_wtr
     }
 
+    production_build:qnx {
+        CONFIGURE_WARNINGS += "QtWebKitQml will not be build. It is not supported on QNX."
+        WEBKIT_CONFIG -= build_webkit2 build_minibrowser build_wtr
+    }
+
+    # Sanitize clashing options
+    sanitizeFeatures()
+
     print_defaults {
         log(DEFINES: $$configDefines()$${EOL})
         error(Done computing defaults)
     }
 
     # Sanity checks that would prevent us from building the whole project altogether.
-    !mac:!contains(QT_CONFIG,icu) {
-        addReasonForSkippingBuild("ICU is required. To build QtWebKit with Qt 5 you need to build Qt 5 with libICU support. Check for ICU support being mentioned in qtbase/config.summary.")
+    !android:!mac:!config_icu {
+       addReasonForSkippingBuild("ICU is required.")
     }
-    production_build:blackberry|qnx {
-        addReasonForSkippingBuild("Build not supported on BB10/QNX yet.")
+    production_build:blackberry {
+        addReasonForSkippingBuild("Build not supported on BB10 yet.")
     }
 
+    winrt: addReasonForSkippingBuild("QtWebKit is not supported on Windows Phone/Windows RT")
     requiredPrograms = gperf python perl bison ruby flex
     for(program, requiredPrograms): \
         !programExistsInPath($$program): \
@@ -217,10 +223,9 @@ defineTest(finalizeConfigure) {
 
         log($${EOL}Final configuration:$${EOL}$${EOL})
 
-        debug: buildConfig += debug
-        release: buildConfig += release
-        buildConfig = $$join(buildConfig,/,,)
-        debug:release:debug_and_release:buildConfig += (combined)
+        debug:release:debug_and_release: buildConfig = debug+release
+        else: CONFIG(debug, debug|release): buildConfig = debug
+        else: buildConfig = release
 
         log(Build ......................... $$build$${EOL})
         log(Configuration ................. $$buildConfig$${EOL})

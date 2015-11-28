@@ -62,9 +62,12 @@ public:
     void parserSetName(const QualifiedName& name) { m_name = name; }
 
 #if COMPILER(MSVC) || COMPILER(CLANG)
-    // NOTE: This constructor is not actually implemented, it's just defined so MSVC (or clang)
+    // NOTE: This constructor is not actually used, it's just defined so MSVC (or clang)
     // will let us use a zero-length array of Attributes.
-    Attribute();
+    Attribute() : m_name(WTF::HashTableDeletedValue)
+    {
+        ASSERT_NOT_REACHED();
+    }
 #endif
 
 private:

@@ -35,11 +35,8 @@
 namespace JSC {
 
 class MacroAssemblerARMv7 : public AbstractMacroAssembler<ARMv7Assembler> {
-    // FIXME: switch dataTempRegister & addressTempRegister, or possibly use r7?
-    //        - dTR is likely used more than aTR, and we'll get better instruction
-    //        encoding if it's in the low 8 registers.
     static const RegisterID dataTempRegister = ARMRegisters::ip;
-    static const RegisterID addressTempRegister = ARMRegisters::r3;
+    static const RegisterID addressTempRegister = ARMRegisters::r6;
 
     static const ARMRegisters::FPDoubleRegisterID fpTempRegister = ARMRegisters::d7;
     inline ARMRegisters::FPSingleRegisterID fpTempRegisterAsSingle() { return ARMRegisters::asSingle(fpTempRegister); }
@@ -1471,6 +1468,12 @@ public:
     Jump branchAdd32(ResultCondition cond, RegisterID src, RegisterID dest)
     {
         return branchAdd32(cond, dest, src, dest);
+    }
+
+    Jump branchAdd32(ResultCondition cond, Address src, RegisterID dest)
+    {
+        load32(src, dataTempRegister);
+        return branchAdd32(cond, dest, dataTempRegister, dest);
     }
 
     Jump branchAdd32(ResultCondition cond, TrustedImm32 imm, RegisterID dest)

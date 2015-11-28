@@ -214,7 +214,7 @@ private:
         case ArithDiv: {
             if (Node::shouldSpeculateIntegerForArithmetic(node->child1().node(), node->child2().node())
                 && node->canSpeculateInteger()) {
-                if (isX86() || isARMv7s()) {
+                if (isX86() || isARMv7s() || isMIPS()) {
                     setUseKindAndUnboxIfProfitable<Int32Use>(node->child1());
                     setUseKindAndUnboxIfProfitable<Int32Use>(node->child2());
                     break;
@@ -873,6 +873,7 @@ private:
         case CountExecution:
         case ForceOSRExit:
         case CheckWatchdogTimer:
+        case Unreachable:
             break;
 #else
         default:

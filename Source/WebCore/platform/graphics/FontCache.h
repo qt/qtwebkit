@@ -76,7 +76,13 @@ struct FontDescriptionFontDataCacheKey {
     { }
     static unsigned makeFlagKey(const FontDescription& description)
     {
-        return static_cast<unsigned>(description.widthVariant()) << 4
+        unsigned extraFlagKey = 0;
+#if PLATFORM(QT)
+        // For Qt font-smoothing is set on the font, not during painting like for Mac.
+        extraFlagKey = static_cast<unsigned>(description.fontSmoothing()) << 16;
+#endif
+        return extraFlagKey
+            | static_cast<unsigned>(description.widthVariant()) << 4
             | static_cast<unsigned>(description.orientation()) << 3
             | static_cast<unsigned>(description.italic()) << 2
             | static_cast<unsigned>(description.usePrinterFont()) << 1

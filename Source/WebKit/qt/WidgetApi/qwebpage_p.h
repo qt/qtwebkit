@@ -201,7 +201,7 @@ public:
 
     QAction *actions[QWebPage::WebActionCount];
 
-    QWindow* window;
+    QPointer <QWindow> window;
     QWidget* inspectorFrontend;
     QWebInspector* inspector;
     bool inspectorIsInternalOnly; // True if created through the Inspect context menu action

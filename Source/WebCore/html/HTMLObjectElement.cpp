@@ -81,6 +81,11 @@ RenderWidget* HTMLObjectElement::renderWidgetForJSBindings() const
     return renderPart(); // This will return 0 if the renderer is not a RenderPart.
 }
 
+static bool isQtPluginServiceType(const String& serviceType)
+{
+    return equalIgnoringCase(serviceType, "application/x-qt-plugin") || equalIgnoringCase(serviceType, "application/x-qt-styled-widget");
+}
+
 bool HTMLObjectElement::isPresentationAttribute(const QualifiedName& name) const
 {
     if (name == borderAttr)
@@ -167,7 +172,7 @@ void HTMLObjectElement::parametersForPlugin(Vector<String>& paramNames, Vector<S
         paramValues.append(p->value());
 
         // FIXME: url adjustment does not belong in this function.
-        if (url.isEmpty() && urlParameter.isEmpty() && (equalIgnoringCase(name, "src") || equalIgnoringCase(name, "movie") || equalIgnoringCase(name, "code") || equalIgnoringCase(name, "url")))
+        if (url.isEmpty() && urlParameter.isEmpty() && !isQtPluginServiceType(serviceType) && (equalIgnoringCase(name, "src") || equalIgnoringCase(name, "movie") || equalIgnoringCase(name, "code") || equalIgnoringCase(name, "url")))
             urlParameter = stripLeadingAndTrailingHTMLSpaces(p->value());
         // FIXME: serviceType calculation does not belong in this function.
         if (serviceType.isEmpty() && equalIgnoringCase(name, "type")) {
@@ -207,7 +212,7 @@ void HTMLObjectElement::parametersForPlugin(Vector<String>& paramNames, Vector<S
     // attribute, not by a param element. However, for compatibility, allow the
     // resource's URL to be given by a param named "src", "movie", "code" or "url"
     // if we know that resource points to a plug-in.
-    if (url.isEmpty() && !urlParameter.isEmpty()) {
+    if (url.isEmpty() && !urlParameter.isEmpty() && !isQtPluginServiceType(serviceType)) {
         SubframeLoader* loader = document()->frame()->loader()->subframeLoader();
         if (loader->resourceWillUsePlugin(urlParameter, serviceType, shouldPreferPlugInsForImages()))
             url = urlParameter;
@@ -257,7 +262,7 @@ bool HTMLObjectElement::shouldAllowQuickTimeClassIdQuirk()
 bool HTMLObjectElement::hasValidClassId()
 {
 #if PLATFORM(QT)
-    if (equalIgnoringCase(serviceType(), "application/x-qt-plugin") || equalIgnoringCase(serviceType(), "application/x-qt-styled-widget"))
+    if (isQtPluginServiceType(serviceType()))
         return true;
 #endif
 

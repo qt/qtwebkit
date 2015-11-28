@@ -48,6 +48,31 @@ PassOwnPtr<GraphicsLayer> GraphicsLayer::create(GraphicsLayerClient* client)
     return adoptPtr(new GraphicsLayerTextureMapper(client));
 }
 
+// A fallback layer to handle painting when we decide dynamically to avoid compositing due to layer size.
+class DirectPaintLayer : public TextureMapperPlatformLayer {
+public:
+    DirectPaintLayer(GraphicsLayer* sourceLayer) : m_sourceLayer(sourceLayer)
+    { }
+    void paintToTextureMapper(TextureMapper*, const FloatRect&, const TransformationMatrix& modelViewMatrix, float opacity) OVERRIDE;
+
+private:
+    GraphicsLayer* m_sourceLayer;
+};
+
+void DirectPaintLayer::paintToTextureMapper(TextureMapper* textureMapper, const FloatRect& targetRect, const TransformationMatrix& matrix, float opacity)
+{
+    GraphicsContext* context = textureMapper->graphicsContext();
+    context->save();
+    context->setAlpha(opacity);
+#if ENABLE(3D_RENDERING)
+    context->concat3DTransform(matrix);
+#else
+    context->concatCTM(matrix.toAffineTransform());
+#endif
+    m_sourceLayer->paintGraphicsLayerContents(*context, enclosingIntRect(targetRect));
+    context->restore();
+}
+
 GraphicsLayerTextureMapper::GraphicsLayerTextureMapper(GraphicsLayerClient* client)
     : GraphicsLayer(client)
     , m_layer(adoptPtr(new TextureMapperLayer()))
@@ -57,6 +82,7 @@ GraphicsLayerTextureMapper::GraphicsLayerTextureMapper(GraphicsLayerClient* clie
     , m_fixedToViewport(false)
     , m_debugBorderWidth(0)
     , m_contentsLayer(0)
+    , m_directLayer(0)
     , m_animationStartTime(0)
     , m_isScrollable(false)
 {
@@ -79,7 +105,8 @@ GraphicsLayerTextureMapper::~GraphicsLayerTextureMapper()
 {
     if (m_contentsLayer)
         m_contentsLayer->setClient(0);
-
+    delete m_directLayer;
+    m_directLayer = 0;
     willBeDestroyed();
 }
 
@@ -233,6 +260,15 @@ void GraphicsLayerTextureMapper::setSize(const FloatSize& value)
     if (maskLayer())
         maskLayer()->setSize(value);
     notifyChange(SizeChange);
+
+    if (m_size.width() * m_size.height() <= 8192*8192) {
+        if (m_contentsLayer == m_directLayer)
+            setContentsToMedia(0);
+    } else if (!m_contentsLayer) {
+        if (!m_directLayer)
+            m_directLayer = new DirectPaintLayer(this);
+        setContentsToMedia(m_directLayer);
+    }
 }
 
 /* \reimp (GraphicsLayer.h)
@@ -627,7 +663,7 @@ void GraphicsLayerTextureMapper::updateBackingStoreIfNeeded()
 
 bool GraphicsLayerTextureMapper::shouldHaveBackingStore() const
 {
-    return drawsContent() && contentsAreVisible() && !m_size.isEmpty();
+    return drawsContent() && contentsAreVisible() && !m_size.isEmpty() && !m_contentsLayer;
 }
 
 bool GraphicsLayerTextureMapper::addAnimation(const KeyframeValueList& valueList, const IntSize& boxSize, const Animation* anim, const String& keyframesName, double timeOffset)

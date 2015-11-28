@@ -194,6 +194,7 @@ namespace WebCore {
         void privateBrowsingStateChanged(bool);
 
         void disconnectStream(PluginStream*);
+        void streamDidSaveTempFile(const String &path) { m_streamTempFilePaths.append(path); }
         void streamDidFinishLoading(PluginStream* stream) { disconnectStream(stream); }
 
         // Widget functions
@@ -364,6 +365,7 @@ namespace WebCore {
 
         HashSet<RefPtr<PluginStream> > m_streams;
         Vector<OwnPtr<PluginRequest> > m_requests;
+        Vector<String> m_streamTempFilePaths;
 
         bool m_isWindowed;
         bool m_isTransparent;

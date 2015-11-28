@@ -330,6 +330,8 @@ bool RenderLayer::canRender3DTransforms() const
 {
 #if USE(ACCELERATED_COMPOSITING)
     return compositor()->canRender3DTransforms();
+#elif PLATFORM(QT) && ENABLE(3D_RENDERING)
+    return true;
 #else
     return false;
 #endif
@@ -3999,7 +4001,11 @@ void RenderLayer::paintLayerByApplyingTransform(GraphicsContext* context, const 
 
     // Apply the transform.
     GraphicsContextStateSaver stateSaver(*context);
+#if PLATFORM(QT) && ENABLE(3D_RENDERING)
+    context->concat3DTransform(transform);
+#else
     context->concatCTM(transform.toAffineTransform());
+#endif
 
     // Now do a paint with the root layer shifted to be us.
     LayerPaintingInfo transformedPaintingInfo(this, enclosingIntRect(transform.inverse().mapRect(paintingInfo.paintDirtyRect)), paintingInfo.paintBehavior,
@@ -4373,7 +4379,11 @@ void RenderLayer::paintChildLayerIntoColumns(RenderLayer* childLayer, GraphicsCo
                 transform.translateRight(roundToInt(childOffset.x() + offset.width()), roundToInt(childOffset.y() + offset.height()));
                 
                 // Apply the transform.
+#if PLATFORM(QT) && ENABLE(3D_RENDERING)
+                context->concat3DTransform(transform);
+#else
                 context->concatCTM(transform.toAffineTransform());
+#endif
 
                 // Now do a paint with the root layer shifted to be the next multicol block.
                 LayerPaintingInfo columnPaintingInfo(paintingInfo);

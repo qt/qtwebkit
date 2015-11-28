@@ -140,10 +140,10 @@ struct JITStackFrame {
     ReturnAddressPtr* returnAddressSlot() { return reinterpret_cast<ReturnAddressPtr*>(this) - 1; }
 };
 #elif CPU(X86)
-#if COMPILER(MSVC) || (OS(WINDOWS) && COMPILER(GCC))
+#if COMPILER(MSVC) || (OS(WINDOWS) && COMPILER(GCC)) || OS(QNX)
 #pragma pack(push)
 #pragma pack(4)
-#endif // COMPILER(MSVC) || (OS(WINDOWS) && COMPILER(GCC))
+#endif // COMPILER(MSVC) || (OS(WINDOWS) && COMPILER(GCC)) || OS(QNX)
 struct JITStackFrame {
     void* reserved; // Unused
     JITStubArg args[6];
@@ -167,9 +167,9 @@ struct JITStackFrame {
     // When JIT code makes a call, it pushes its return address just below the rest of the stack.
     ReturnAddressPtr* returnAddressSlot() { return reinterpret_cast<ReturnAddressPtr*>(this) - 1; }
 };
-#if COMPILER(MSVC) || (OS(WINDOWS) && COMPILER(GCC))
+#if COMPILER(MSVC) || (OS(WINDOWS) && COMPILER(GCC)) || OS(QNX)
 #pragma pack(pop)
-#endif // COMPILER(MSVC) || (OS(WINDOWS) && COMPILER(GCC))
+#endif // COMPILER(MSVC) || (OS(WINDOWS) && COMPILER(GCC)) || OS(QNX)
 #elif CPU(ARM_THUMB2)
 struct JITStackFrame {
     JITStubArg reserved; // Unused

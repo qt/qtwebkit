@@ -42,8 +42,4 @@ INCLUDEPATH += \
     $${ROOT_WEBKIT_DIR}/Source/WebCore/platform/qt \
     $${ROOT_WEBKIT_DIR}/Tools/DumpRenderTree/qt
 
-PREFIX_HEADER = WebKitTestRunnerPrefix.h
-*-g++*:QMAKE_CXXFLAGS += "-include $$PREFIX_HEADER"
-*-clang*:QMAKE_CXXFLAGS += "-include $$PREFIX_HEADER"
-
 RESOURCES = qt/WebKitTestRunner.qrc

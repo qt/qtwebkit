@@ -690,11 +690,13 @@ void CoordinatedGraphicsScene::purgeGLResources()
 
     m_rootLayer.clear();
     m_rootLayerID = InvalidCoordinatedLayerID;
-    m_layers.clear();
-    m_fixedLayers.clear();
     m_textureMapper.clear();
     m_backingStores.clear();
     m_backingStoresWithPendingBuffers.clear();
+
+    LayerMap::iterator end = m_layers.end();
+    for (LayerMap::iterator it = m_layers.begin(); it != end; ++it)
+        it->value->setBackingStore(0);
 
     setActive(false);
     dispatchOnMainThread(bind(&CoordinatedGraphicsScene::purgeBackingStores, this));

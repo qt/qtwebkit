@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2014 Digia Plc. and/or its subsidiary(-ies)
+    Copyright (C) 2015 The Qt Company Ltd
 
     This library is free software; you can redistribute it and/or
     modify it under the terms of the GNU Library General Public
@@ -20,8 +20,7 @@
 #ifndef STORAGE_LEVELDB_PORT_PORT_QT_H_
 #define STORAGE_LEVELDB_PORT_PORT_QT_H_
 
-#include <QAtomicInteger>
-#include <QAtomicPointer>
+#include <QtCore/qatomic.h>
 #include <QMutex>
 #include <QWaitCondition>
 
@@ -34,6 +33,8 @@
 #ifdef Q_CC_MSVC
 #include "win/stdint.h"
 #define snprintf _snprintf
+#else
+#include <stdint.h>
 #endif
 
 namespace leveldb {
@@ -61,7 +62,12 @@ private:
     Mutex* m_mutex;
 };
 
+#if QT_VERSION >= QT_VERSION_CHECK(5, 3, 0)
 typedef QAtomicInteger<int> OnceType;
+#else
+typedef QAtomicInt OnceType;
+#endif
+
 #define LEVELDB_ONCE_INIT 0
 inline void InitOnce(port::OnceType* once, void (*initializer)())
 {

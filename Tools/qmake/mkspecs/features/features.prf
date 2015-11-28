@@ -76,7 +76,7 @@ defineTest(detectFeatures) {
             plugin_process
 
     } else: mac|win32 {
-        # WEBKIT_CONFIG += netscape_plugin_api
+        WEBKIT_CONFIG += netscape_plugin_api
         # WebKit2
         WEBKIT_CONFIG += plugin_architecture_unsupported
     } else {
@@ -94,6 +94,9 @@ defineTest(detectFeatures) {
 
     # WebGL support - only enabled if we can use 3D graphics
     use?(3d_graphics): WEBKIT_CONFIG += webgl
+
+    # Both desktop and GLES2 support (only on Windows at this point)
+    contains(QT_CONFIG, dynamicgl): WEBKIT_CONFIG += have_dynamicgl
 
     # HTML5 Media Support for builds with GStreamer
     unix:!mac:!contains(QT_CONFIG, no-pkg-config) {
@@ -126,7 +129,8 @@ defineTest(detectFeatures) {
 
     # Support for Graphics Surface
     # GraphicsSurface requires GraphicsContext3D and hence use_3d_graphics
-    use?(3d_graphics) {
+    # FIXME: GraphicsSurface do not work with dynamicgl at this point.
+    use?(3d_graphics):!have?(dynamicgl) {
         mac: WEBKIT_CONFIG += use_graphics_surface
         win32:contains(QT_CONFIG, opengles2): WEBKIT_CONFIG += use_graphics_surface
         have?(glx):have?(xcomposite):have?(xrender): WEBKIT_CONFIG += use_graphics_surface use_glx
@@ -138,13 +142,15 @@ defineTest(detectFeatures) {
     # IndexedDB requires leveldb
     enable?(indexed_database): WEBKIT_CONFIG += use_leveldb
 
+    !config_icu:!mac: WEBKIT_CONFIG += use_wchar_unicode
+
     export(WEBKIT_CONFIG)
     export(CONFIGURE_WARNINGS)
 }
 
 # ---------------- Sanitize features -------------------
 
-defineTest(santizeFeatures) {
+defineTest(sanitizeFeatures) {
     # If we are doing a production_build we should only enable Geolocation support if QtPositioning exists. In developer builds we can use Mock implementations.
     production_build:!have?(qtpositioning): WEBKIT_CONFIG -= geolocation
 
@@ -172,8 +178,11 @@ defineTest(santizeFeatures) {
     # VideoTrack requires video
     !enable?(video): WEBKIT_CONFIG -= video_track
 
-    # Minibrowser must be able to query for QtTestSupport
+    # QtTestBrowser and MiniBrowser must be able to query for QtTestSupport
     build?(qttestsupport): WEBKIT_CONFIG += have_qttestsupport
+
+    # Accelerated 2D canvas uses 3D graphics support.
+    !use?(3d_graphics): WEBKIT_CONFIG -= accelerated_2d_canvas
 
     export(WEBKIT_CONFIG)
 }

@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2012 Nokia Corporation and/or its subsidiary(-ies)
+    Copyright (C) 2015 The Qt Company Ltd
     Copyright (C) 2008, 2010 Holger Hans Peter Freyther
     Copyright (C) 2009 Dirk Schulze <krit@webkit.org>
 
@@ -31,6 +31,8 @@
 #include "GraphicsContext.h"
 #include "NotImplemented.h"
 #include "Pattern.h"
+#include "RenderBlock.h"
+#include "RenderText.h"
 #include "ShadowBlur.h"
 #include "TextRun.h"
 
@@ -57,11 +59,14 @@ static const QString fromRawDataWithoutRef(const String& string, int start = 0, 
     return QString::fromRawData(reinterpret_cast<const QChar*>(string.characters() + start), len);
 }
 
-static QTextLine setupLayout(QTextLayout* layout, const TextRun& style)
+static QTextLine setupLayout(QTextLayout* layout, const TextRun& style, bool shouldSetDirection)
 {
-    int flags = style.rtl() ? Qt::TextForceRightToLeft : Qt::TextForceLeftToRight;
+    int flags = 0;
+    if (shouldSetDirection || style.directionalOverride())
+        flags |= style.rtl() ? Qt::TextForceRightToLeft : Qt::TextForceLeftToRight;
     if (style.expansion())
         flags |= Qt::TextJustificationForced;
+    layout->setCacheEnabled(true);
     layout->setFlags(flags);
     layout->beginLayout();
     QTextLine line = layout->createLine();
@@ -168,6 +173,67 @@ static void drawQtGlyphRun(GraphicsContext* context, const QGlyphRun& qtGlyphRun
     }
 }
 
+class TextLayout {
+public:
+    static bool isNeeded(RenderText* text, const Font& font)
+    {
+        TextRun run = RenderBlock::constructTextRun(text, font, text, text->style());
+        return font.codePath(run) == Font::Complex;
+    }
+
+    TextLayout(RenderText* text, const Font& font, float xPos)
+    {
+        const TextRun run(constructTextRun(text, font, xPos));
+        const String sanitized = Font::normalizeSpaces(run.characters16(), run.length());
+        const QString string(sanitized);
+        m_layout.setText(string);
+        m_layout.setRawFont(font.rawFont());
+        font.initFormatForTextLayout(&m_layout, run);
+        m_line = setupLayout(&m_layout, run, false);
+    }
+
+    float width(unsigned from, unsigned len, HashSet<const SimpleFontData*>* fallbackFonts)
+    {
+        Q_UNUSED(fallbackFonts);
+        float x1 = m_line.cursorToX(from);
+        float x2 = m_line.cursorToX(from + len);
+        float width = qAbs(x2 - x1);
+
+        return width;
+    }
+
+private:
+    static TextRun constructTextRun(RenderText* text, const Font& font, float xPos)
+    {
+        TextRun run = RenderBlock::constructTextRun(text, font, text, text->style());
+        run.setCharactersLength(text->textLength());
+        ASSERT(run.charactersLength() >= run.length());
+
+        run.setXPos(xPos);
+        return run;
+    }
+
+    QTextLayout m_layout;
+    QTextLine m_line;
+};
+
+PassOwnPtr<TextLayout> Font::createLayout(RenderText* text, float xPos, bool collapseWhiteSpace) const
+{
+    if (!collapseWhiteSpace || !TextLayout::isNeeded(text, *this))
+        return PassOwnPtr<TextLayout>();
+    return adoptPtr(new TextLayout(text, *this, xPos));
+}
+
+void Font::deleteLayout(TextLayout* layout)
+{
+    delete layout;
+}
+
+float Font::width(TextLayout& layout, unsigned from, unsigned len, HashSet<const SimpleFontData*>* fallbackFonts)
+{
+    return layout.width(from, len, fallbackFonts);
+}
+
 void Font::drawComplexText(GraphicsContext* ctx, const TextRun& run, const FloatPoint& point, int from, int to) const
 {
     String sanitized = Font::normalizeSpaces(run.characters16(), run.length());
@@ -175,7 +241,7 @@ void Font::drawComplexText(GraphicsContext* ctx, const TextRun& run, const Float
     QTextLayout layout(string);
     layout.setRawFont(rawFont());
     initFormatForTextLayout(&layout, run);
-    QTextLine line = setupLayout(&layout, run);
+    QTextLine line = setupLayout(&layout, run, true);
     const QPointF adjustedPoint(point.x(), point.y() - line.ascent());
 
     QList<QGlyphRun> runs = line.glyphRuns(from, to - from);
@@ -199,7 +265,7 @@ float Font::floatWidthForComplexText(const TextRun& run, HashSet<const SimpleFon
     QTextLayout layout(string);
     layout.setRawFont(rawFont());
     initFormatForTextLayout(&layout, run);
-    QTextLine line = setupLayout(&layout, run);
+    QTextLine line = setupLayout(&layout, run, false);
     float x1 = line.cursorToX(0);
     float x2 = line.cursorToX(run.length());
     float width = qAbs(x2 - x1);
@@ -215,7 +281,7 @@ int Font::offsetForPositionForComplexText(const TextRun& run, float position, bo
     QTextLayout layout(string);
     layout.setRawFont(rawFont());
     initFormatForTextLayout(&layout, run);
-    QTextLine line = setupLayout(&layout, run);
+    QTextLine line = setupLayout(&layout, run, false);
     return line.xToCursor(position);
 }
 
@@ -227,7 +293,7 @@ FloatRect Font::selectionRectForComplexText(const TextRun& run, const FloatPoint
     QTextLayout layout(string);
     layout.setRawFont(rawFont());
     initFormatForTextLayout(&layout, run);
-    QTextLine line = setupLayout(&layout, run);
+    QTextLine line = setupLayout(&layout, run, false);
 
     float x1 = line.cursorToX(from);
     float x2 = line.cursorToX(to);
@@ -248,9 +314,9 @@ void Font::initFormatForTextLayout(QTextLayout* layout, const TextRun& run) cons
     for (range.start = 0; range.start < length && treatAsSpace(run[range.start]); ++range.start) { }
     range.length = length - range.start;
 
-    if (m_wordSpacing)
+    if (m_wordSpacing && !run.spacingDisabled())
         range.format.setFontWordSpacing(m_wordSpacing);
-    if (m_letterSpacing)
+    if (m_letterSpacing && !run.spacingDisabled())
         range.format.setFontLetterSpacing(m_letterSpacing);
     if (typesettingFeatures() & Kerning)
         range.format.setFontKerning(true);

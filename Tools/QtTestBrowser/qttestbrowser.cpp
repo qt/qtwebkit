@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Digia Plc and/or its subsidiary(-ies).
+ * Copyright (C) 2015 The Qt Company Ltd.
  * Copyright (C) 2009 Nokia Corporation and/or its subsidiary(-ies)
  * Copyright (C) 2009 Girish Ramakrishnan <girish@forwardbias.in>
  * Copyright (C) 2006 George Staikos <staikos@kde.org>
@@ -31,10 +31,15 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "config.h"
+
 #include "DumpRenderTreeSupportQt.h"
-#include "QtTestSupport.h"
 #include "launcherwindow.h"
 #include "urlloader.h"
+
+#if HAVE(QTTESTSUPPORT)
+#include "QtTestSupport.h"
+#endif
 
 WindowOptions windowOptions;
 
@@ -128,8 +133,9 @@ void LauncherApplication::handleUserOptions()
              << "[-no-compositing]"
 #if defined(QT_CONFIGURED_WITH_OPENGL)
              << "[-gl-viewport]"
-             << "[-webgl]"
 #endif
+             << "[-opengl-viewport]"
+             << "[-webgl]"
              << QString("[-viewport-update-mode %1]").arg(formatKeys(updateModes)).toLatin1().data()
 #if !defined(QT_NO_NETWORKDISKCACHE) && !defined(QT_NO_DESKTOPSERVICES)
              << "[-disk-cache]"
@@ -148,7 +154,9 @@ void LauncherApplication::handleUserOptions()
              << "[-offline-storage-database-enabled]"
              << "[-offline-web-application-cache-enabled]"
              << "[-set-offline-storage-default-quota maxSize]"
+#if HAVE(QTTESTSUPPORT)
              << "[-use-test-fonts]"
+#endif
              << "[-print-loaded-urls]"
              << "URLs";
         appQuit(0);
@@ -159,7 +167,6 @@ void LauncherApplication::handleUserOptions()
         windowOptions.useGraphicsView = true;
 
     if (args.contains("-no-compositing")) {
-        requiresGraphicsView("-no-compositing");
         windowOptions.useCompositing = false;
     }
 
@@ -235,14 +242,20 @@ void LauncherApplication::handleUserOptions()
         windowOptions.useQGLWidgetViewport = true;
     }
 
+#endif
     if (args.contains("-webgl")) {
-        requiresGraphicsView("-webgl");
         windowOptions.useWebGL = true;
     }
-#endif
 
+    if (args.contains("-opengl-viewport")) {
+        requiresGraphicsView("-opengl-viewport");
+        windowOptions.useQOpenGLWidgetViewport = true;
+    }
+
+#if HAVE(QTTESTSUPPORT)
     if (args.contains("-use-test-fonts"))
         WebKit::QtTestSupport::initializeTestFonts();
+#endif
 
     if (args.contains("-print-loaded-urls"))
         windowOptions.printLoadedUrls = true;

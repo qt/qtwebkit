@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Digia Plc and/or its subsidiary(-ies).
+ * Copyright (C) 2015 The Qt Company Ltd.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -268,6 +268,8 @@ public:
     void setVisibilityState(VisibilityState);
     VisibilityState visibilityState() const;
 
+    void setPluginsVisible(bool visible);
+
     static QWebPageAdapter* kit(WebCore::Page*);
     WebCore::ViewportArguments viewportArguments() const;
     void registerUndoStep(WTF::PassRefPtr<WebCore::UndoStep>);
@@ -370,6 +372,7 @@ public:
     QBasicTimer tripleClickTimer;
 
     bool clickCausedFocus;
+    bool mousePressed;
     bool m_useNativeVirtualKeyAsDOMKey;
     quint64 m_totalBytes;
     quint64 m_bytesReceived;

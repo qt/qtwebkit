@@ -70,6 +70,8 @@ win* {
 
 BASE_TARGET = $$TARGET
 
+CMAKE_MODULE_TESTS = $$ROOT_WEBKIT_DIR/Source/WebKit/qt/tests/cmake
+
 load(qt_module)
 
 # Make sure the install_name of the QtWebKit library point to webkit
@@ -100,7 +102,7 @@ load(qt_module)
     }
 }
 
-qnx|contains(QT_CONFIG, static):mac {
+qnx {
     # see: https://bugs.webkit.org/show_bug.cgi?id=93460
     # the gcc 4.4.2 used in the qnx bbndk cannot cope with
     # the linkage step of libQtWebKit, adding a dummy .cpp

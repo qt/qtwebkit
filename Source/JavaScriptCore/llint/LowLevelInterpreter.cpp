@@ -530,19 +530,11 @@ JSValue CLoop::execute(CallFrame* callFrame, OpcodeID bootstrapOpcodeId,
 #define OFFLINE_ASM_OPCODE_LABEL(__opcode) OFFLINE_ASM_GLOBAL_LABEL(llint_##__opcode)
 #define OFFLINE_ASM_GLUE_LABEL(__opcode)   OFFLINE_ASM_GLOBAL_LABEL(__opcode)
 
-#if CPU(ARM_THUMB2)
-#define OFFLINE_ASM_GLOBAL_LABEL(label)          \
-    ".globl " SYMBOL_STRING(label) "\n"          \
-    HIDE_SYMBOL(label) "\n"                      \
-    ".thumb\n"                                   \
-    ".thumb_func " THUMB_FUNC_PARAM(label) "\n"  \
-    SYMBOL_STRING(label) ":\n"
-#else
 #define OFFLINE_ASM_GLOBAL_LABEL(label)         \
     ".globl " SYMBOL_STRING(label) "\n"         \
     HIDE_SYMBOL(label) "\n"                     \
+    INLINE_ARM_FUNCTION(label)                  \
     SYMBOL_STRING(label) ":\n"
-#endif
 
 #define OFFLINE_ASM_LOCAL_LABEL(label)   LOCAL_LABEL_STRING(label) ":\n"
 

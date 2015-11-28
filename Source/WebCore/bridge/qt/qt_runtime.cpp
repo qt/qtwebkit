@@ -638,7 +638,7 @@ QVariant convertValueToQVariant(JSContextRef context, JSValueRef value, QMetaTyp
                         *distance = 1;
                     return QVariant();
                 }
-                if (type == Object) {
+                if (JSValueIsObject(context, value)) {
                     // Since we haven't really visited this object yet, we remove it
                     visitedObjects->remove(object);
                 }
@@ -742,7 +742,7 @@ JSValueRef convertQVariantToValue(JSContextRef context, PassRefPtr<RootObject> r
             return JSValueMakeNull(context);
         ExecState* exec = toJS(context);
         APIEntryShim entryShim(exec);
-        return toRef(exec, QtInstance::getQtInstance(obj, root.get(), QtInstance::QtOwnership)->createRuntimeObject(exec));
+        return toRef(exec, QtInstance::getQtInstance(obj, root, QtInstance::QtOwnership)->createRuntimeObject(exec));
     }
 
     if (QtPixmapRuntime::canHandle(static_cast<QMetaType::Type>(variant.type())))
@@ -1574,7 +1574,7 @@ void QtConnectionObject::execute(void** argv)
 
     for (int i = 0; i < argc; i++) {
         int argType = method.parameterType(i);
-        args[i] = convertQVariantToValue(m_context, m_rootObject.get(), QVariant(argType, argv[i+1]), ignoredException);
+        args[i] = convertQVariantToValue(m_context, m_rootObject, QVariant(argType, argv[i+1]), ignoredException);
     }
 
     JSObjectCallAsFunction(m_context, m_receiverFunction, m_receiver, argc, args.data(), 0);

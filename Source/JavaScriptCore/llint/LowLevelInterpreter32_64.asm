@@ -1692,7 +1692,7 @@ _llint_op_next_pname:
     loadi 20[PC], t2
     loadi PayloadOffset[cfr, t2, 8], t2
     loadp JSPropertyNameIterator::m_jsStrings[t2], t3
-    loadi [t3, t0, 8], t3
+    loadi PayloadOffset[t3, t0, 8], t3
     addi 1, t0
     storei t0, PayloadOffset[cfr, t1, 8]
     loadi 4[PC], t1

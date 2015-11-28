@@ -44,6 +44,7 @@
 #include "ScriptController.h"
 #include "ScrollbarThemeQStyle.h"
 #include "SecurityPolicy.h"
+#include "Settings.h"
 
 #include "qwebelement_p.h"
 #include <JavaScriptCore/runtime/InitializeThreading.h>
@@ -72,11 +73,7 @@ Q_DECL_EXPORT void initializeWebKitQt()
     if (initCallback) {
         WebCore::RenderThemeQStyle::setStyleFactoryFunction(createStyleForPage);
         WebCore::RenderThemeQt::setCustomTheme(WebCore::RenderThemeQStyle::create, new WebCore::ScrollbarThemeQStyle);
-#if QT_VERSION >= QT_VERSION_CHECK(5, 1, 0)
-        // Only enable kerning by default in Qt 5.1 where it can use the fast font path.
-        // In Qt 5.0 this would have forced the complex font path.
         WebCore::Font::setDefaultTypesettingFeatures(WebCore::Kerning);
-#endif
     }
 }
 
@@ -108,6 +105,7 @@ Q_DECL_EXPORT void initializeWebCoreQt()
     if (!WebCore::memoryCache()->disabled())
         WebCore::memoryCache()->setDeadDecodedDataDeletionInterval(60);
     WebCore::RuntimeEnabledFeatures::setCSSCompositingEnabled(true);
+    WebCore::Settings::setDefaultMinDOMTimerInterval(0.004);
 
     initialized = true;
 }

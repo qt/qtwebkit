@@ -393,7 +393,7 @@ public:
         m_assembler.baseIndexTransfer32(ARMAssembler::LoadUint32, dest, address.base, address.index, static_cast<int>(address.scale), address.offset);
     }
 
-#if CPU(ARMV5_OR_LOWER)
+#if !CPU(ARM_FEATURE_UNALIGNED)
     void load32WithUnalignedHalfWords(BaseIndex address, RegisterID dest);
 #else
     void load32WithUnalignedHalfWords(BaseIndex address, RegisterID dest)
@@ -725,6 +725,11 @@ public:
         return Jump(m_assembler.jmp(ARMCondition(cond)));
     }
 
+    Jump branchAdd32(ResultCondition cond, Address src, RegisterID dest)
+    {
+        load32(src, ARMRegisters::S0);
+        return branchAdd32(cond, dest, ARMRegisters::S0, dest);
+    }
     void mull32(RegisterID op1, RegisterID op2, RegisterID dest)
     {
         if (op2 == dest) {

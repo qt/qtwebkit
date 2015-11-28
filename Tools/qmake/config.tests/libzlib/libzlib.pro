@@ -1,5 +1,10 @@
 SOURCES = libzlib.cpp
 OBJECTS_DIR = obj
 CONFIG += console
-win32: LIBS += -lzlib
-else: LIBS += -lz
+if(unix|mingw):LIBS += -lz
+else {
+    isEmpty(ZLIB_LIBS): LIBS += zdll.lib
+    else: LIBS += $$ZLIB_LIBS
+}
+
+load(qt_build_config)

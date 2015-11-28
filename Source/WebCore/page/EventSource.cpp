@@ -132,7 +132,7 @@ void EventSource::connect()
     options.sniffContent = DoNotSniffContent;
     options.allowCredentials = (origin->canRequest(m_url) || m_withCredentials) ? AllowStoredCredentials : DoNotAllowStoredCredentials;
     options.preflightPolicy = PreventPreflight;
-    options.crossOriginRequestPolicy = UseAccessControl;
+    options.crossOriginRequestPolicy = origin->allowsCrossOriginRequests() ? UseAccessControl : DenyCrossOriginRequests;
     options.dataBufferingPolicy = DoNotBufferData;
     options.securityOrigin = origin;
 

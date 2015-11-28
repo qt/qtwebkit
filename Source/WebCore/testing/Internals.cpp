@@ -81,6 +81,7 @@
 #include "RenderEmbeddedObject.h"
 #include "RenderMenuList.h"
 #include "RenderObject.h"
+#include "RenderTheme.h"
 #include "RenderTreeAsText.h"
 #include "RenderView.h"
 #include "RuntimeEnabledFeatures.h"
@@ -263,6 +264,7 @@ void Internals::resetToConsistentState(Page* page)
     page->setPagination(Pagination());
 
 #if USE(ACCELERATED_COMPOSITING)
+    RenderTheme::setDelegatesMenuListRendering(false);
     FrameView* mainFrameView = page->mainFrame()->view();
     if (mainFrameView) {
         mainFrameView->setHeaderHeight(0);
@@ -2203,6 +2205,11 @@ bool Internals::isPluginUnavailabilityIndicatorObscured(Element* element, Except
 
     RenderEmbeddedObject* embed = toRenderEmbeddedObject(renderer);
     return embed->isReplacementObscured();
+}
+
+void Internals::setDelegatesMenuListRendering(bool forceOn)
+{
+    RenderTheme::setDelegatesMenuListRendering(forceOn);
 }
 
 }

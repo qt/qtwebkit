@@ -2,7 +2,6 @@ include($QT_INSTALL_DOCS/global/qt-module-defaults.qdocconf)
 
 project     = QtWebKit
 description = Qt WebKit Reference Documentation
-url         = http://qt-project.org/doc/qt-$QT_VER
 version     = $QT_VERSION
 
 # Defines the name of the project. You cannot use operators (+, =, -) in
@@ -27,7 +26,7 @@ qhp.QtWebKit.subprojects.classes.selectors = class fake:headerfile
 qhp.QtWebKit.subprojects.classes.sortPages = true
 qhp.QtWebKit.subprojects.qmltypes.title = QML Types
 qhp.QtWebKit.subprojects.qmltypes.indexTitle = Qt WebKit QML Types
-qhp.QtWebKit.subprojects.qmltypes.selectors = fake:qmlclass
+qhp.QtWebKit.subprojects.qmltypes.selectors = qmlclass
 qhp.QtWebKit.subprojects.qmltypes.sortPages = true
 
 headerdirs = WebKit/qt/Api WebKit/qt/WidgetApi WebKit2/UIProcess/API/qt

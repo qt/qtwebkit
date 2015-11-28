@@ -204,7 +204,7 @@ public:
 #if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED > 1080
         wkCTFontTransformOptions options = (typesettingFeatures & Kerning ? wkCTFontTransformApplyPositioning : 0) | (typesettingFeatures & Ligatures ? wkCTFontTransformApplyShaping : 0);
         return wkCTFontTransformGlyphs(m_platformData.ctFont(), glyphs, reinterpret_cast<CGSize*>(advances), glyphCount, options);
-#elif PLATFORM(QT) && QT_VERSION >= 0x050100
+#elif PLATFORM(QT)
         QRawFont::LayoutFlags flags = (typesettingFeatures & Kerning) ? QRawFont::KernedAdvances : QRawFont::SeparateAdvances;
         return m_platformData.rawFont().advancesForGlyphIndexes(glyphs, advances, glyphCount, flags);
 #else
