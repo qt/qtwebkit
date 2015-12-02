@@ -78,14 +78,16 @@ InspectorServerQt::~InspectorServerQt()
     close();
 }
 
-void InspectorServerQt::listen(quint16 port)
+int InspectorServerQt::listen(quint16 port)
 {
     if (m_tcpServer)
-        return;
+        return m_tcpServer->serverPort();
 
     m_tcpServer = new QTcpServer();
     m_tcpServer->listen(QHostAddress::Any, port);
     connect(m_tcpServer, SIGNAL(newConnection()), SLOT(newConnection()));
+
+    return port;
 }
 
 void InspectorServerQt::close()
@@ -135,7 +137,7 @@ InspectorServerRequestHandlerQt::InspectorServerRequestHandlerQt(QTcpSocket* tcp
     , m_server(server)
     , m_inspectorClient(0)
 {
-    m_endOfHeaders = false;    
+    m_endOfHeaders = false;
     m_contentLength = 0;
 
     connect(m_tcpConnection, SIGNAL(readyRead()), SLOT(tcpReadyRead()));
@@ -314,7 +316,7 @@ void InspectorServerRequestHandlerQt::webSocketReadyRead()
         return;
     QByteArray content = m_tcpConnection->read(m_tcpConnection->bytesAvailable());
     m_data.append(content);
-    while (m_data.size() > 0) {        
+    while (m_data.size() > 0) {
         const bool isMasked = m_data[1] & 0x80;
         quint64 payloadLen = m_data[1] & 0x7F;
         int pos = 2;
@@ -337,13 +339,13 @@ void InspectorServerRequestHandlerQt::webSocketReadyRead()
         
         // Handle fragmentation
         if (!(m_data[0] & 0x80)) { // Non-last fragmented payload
-            m_fragmentedPayload.append(payload);                 
+            m_fragmentedPayload.append(payload);
             m_data = m_data.mid(pos + payloadLen);
             continue;
         }
         
         if (!(m_data[0] & 0x0F)) { // Last fragment
-            m_fragmentedPayload.append(payload);   
+            m_fragmentedPayload.append(payload);
             payload = m_fragmentedPayload;
             m_fragmentedPayload.clear();
         }
