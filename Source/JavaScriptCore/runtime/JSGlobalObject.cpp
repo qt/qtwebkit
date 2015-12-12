@@ -579,13 +579,14 @@ DynamicGlobalObjectScope::DynamicGlobalObjectScope(VM& vm, JSGlobalObject* dynam
     : m_dynamicGlobalObjectSlot(vm.dynamicGlobalObject)
     , m_savedDynamicGlobalObject(m_dynamicGlobalObjectSlot)
 {
-    if (!m_dynamicGlobalObjectSlot) {
+    bool slotWasEmpty = !m_dynamicGlobalObjectSlot;
+    m_dynamicGlobalObjectSlot = dynamicGlobalObject;
+
+    if (slotWasEmpty) {
 #if ENABLE(ASSEMBLER)
         if (ExecutableAllocator::underMemoryPressure())
             vm.heap.deleteAllCompiledCode();
 #endif
-
-        m_dynamicGlobalObjectSlot = dynamicGlobalObject;
 
         // Reset the date cache between JS invocations to force the VM
         // to observe time zone changes.
