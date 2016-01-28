@@ -93,6 +93,7 @@ ImageLoader::ImageLoader(Element* element)
     : m_element(element)
     , m_image(0)
     , m_derefElementTimer(this, &ImageLoader::timerFired)
+    , m_postponeLoadImage(false)
     , m_hasPendingBeforeLoadEvent(false)
     , m_hasPendingLoadEvent(false)
     , m_hasPendingErrorEvent(false)
@@ -111,8 +112,8 @@ ImageLoader::~ImageLoader()
     if (m_hasPendingBeforeLoadEvent)
         beforeLoadEventSender().cancelEvent(this);
 
-    ASSERT(m_hasPendingLoadEvent || !loadEventSender().hasPendingEvents(this));
-    if (m_hasPendingLoadEvent)
+    ASSERT(m_hasPendingLoadEvent || !m_postponeLoadImage || !loadEventSender().hasPendingEvents(this));
+    if (m_hasPendingLoadEvent && !m_postponeLoadImage)
         loadEventSender().cancelEvent(this);
 
     ASSERT(m_hasPendingErrorEvent || !errorEventSender().hasPendingEvents(this));
@@ -144,7 +145,7 @@ void ImageLoader::setImageWithoutConsideringPendingLoadEvent(CachedImage* newIma
             beforeLoadEventSender().cancelEvent(this);
             m_hasPendingBeforeLoadEvent = false;
         }
-        if (m_hasPendingLoadEvent) {
+        if (m_hasPendingLoadEvent && !m_postponeLoadImage) {
             loadEventSender().cancelEvent(this);
             m_hasPendingLoadEvent = false;
         }
@@ -223,7 +224,7 @@ void ImageLoader::updateFromElement()
             beforeLoadEventSender().cancelEvent(this);
             m_hasPendingBeforeLoadEvent = false;
         }
-        if (m_hasPendingLoadEvent) {
+        if (m_hasPendingLoadEvent && !m_postponeLoadImage) {
             loadEventSender().cancelEvent(this);
             m_hasPendingLoadEvent = false;
         }
@@ -238,7 +239,10 @@ void ImageLoader::updateFromElement()
         }
 
         m_image = newImage;
-        m_hasPendingBeforeLoadEvent = !m_element->document()->isImageDocument() && newImage;
+
+        // Remember if we're (auto) loading the image right away. See updatedHasPendingEvent().
+        m_postponeLoadImage = !document->cachedResourceLoader()->autoLoadImages();
+        m_hasPendingBeforeLoadEvent = !document->isImageDocument() && newImage;
         m_hasPendingLoadEvent = newImage;
         m_imageComplete = !newImage;
 
@@ -282,6 +286,11 @@ void ImageLoader::notifyFinished(CachedResource* resource)
     ASSERT(m_failedLoadURL.isEmpty());
     ASSERT(resource == m_image.get());
 
+    if (m_postponeLoadImage) {
+        m_postponeLoadImage = false;
+        updatedHasPendingEvent();
+    }
+    
     m_imageComplete = true;
     if (!hasPendingBeforeLoadEvent())
         updateRenderer();
@@ -366,8 +375,17 @@ void ImageLoader::updatedHasPendingEvent()
     // As long as the ImageLoader is actively loading, the Element itself needs to be ref'ed to keep it from being
     // destroyed by DOM manipulation or garbage collection.
     // If such an Element wishes for the load to stop when removed from the DOM it needs to stop the ImageLoader explicitly.
+    //
+    // Don't protect the element if we're not loading the image right away, otherwise there won't be a load event and the
+    // protection never gets removed. This results in both the HTMLImageElement and its never-loaded CachedImage to leak.
+    //
+    // https://bugs.webkit.org/show_bug.cgi?id=17469 (maybe)
+    // https://bugs.webkit.org/show_bug.cgi?id=146538
+    // https://bugreports.qt.io/browse/QTBUG-38857
+    // https://github.com/ariya/phantomjs/issues/12903
+
     bool wasProtected = m_elementIsProtected;
-    m_elementIsProtected = m_hasPendingLoadEvent || m_hasPendingErrorEvent;
+    m_elementIsProtected = (m_hasPendingLoadEvent && !m_postponeLoadImage) || m_hasPendingErrorEvent;
     if (wasProtected == m_elementIsProtected)
         return;
 

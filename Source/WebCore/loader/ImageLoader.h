@@ -61,7 +61,7 @@ public:
     void setLoadManually(bool loadManually) { m_loadManually = loadManually; }
 
     bool hasPendingBeforeLoadEvent() const { return m_hasPendingBeforeLoadEvent; }
-    bool hasPendingActivity() const { return m_hasPendingLoadEvent || m_hasPendingErrorEvent; }
+    bool hasPendingActivity() const { return (m_hasPendingLoadEvent && !m_postponeLoadImage) || m_hasPendingErrorEvent; }
 
     void dispatchPendingEvent(ImageEventSender*);
 
@@ -94,6 +94,7 @@ private:
     CachedResourceHandle<CachedImage> m_image;
     Timer<ImageLoader> m_derefElementTimer;
     AtomicString m_failedLoadURL;
+    bool m_postponeLoadImage : 1;
     bool m_hasPendingBeforeLoadEvent : 1;
     bool m_hasPendingLoadEvent : 1;
     bool m_hasPendingErrorEvent : 1;
