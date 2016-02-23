@@ -129,6 +129,9 @@ defineTest(finalizeConfigure) {
     production_build:android {
         addReasonForSkippingBuild("Build not supported on Android.")
     }
+    production_build:contains(QT_CONFIG, mirclient) {
+        addReasonForSkippingBuild("Build not supported on Ubuntu Touch.")
+    }
     !gnu_thin_archives:!win32-msvc2013:!mingw:contains(QT_CONFIG, static) {
         addReasonForSkippingBuild("QtWebKit cannot be built as a static library on this platform. Check your configuration in qtbase/config.summary.")
     }
