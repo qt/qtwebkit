@@ -269,7 +269,8 @@ defineTest(linkAgainstLibrary) {
         mac {
             LIBS += -Wl,-force_load,$${path}$${QMAKE_DIR_SEP}lib$${target}.a
         } else:win32-msvc*|wince*|win32-icc {
-            LIBS += /OPT:REF -l$$target
+            LIBS += -l$$target
+            QMAKE_LFLAGS += /OPT:REF
         } else {
             CONFIG *= no_smart_library_merge
             LIBS += -Wl,-whole-archive -l$$target -Wl,-no-whole-archive
