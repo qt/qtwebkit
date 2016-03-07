@@ -118,7 +118,7 @@ public: \
     static const SVGPropertyInfo* LowerProperty##PropertyInfo(); \
     PropertyType& LowerProperty() const \
     { \
-        if (TearOffType* wrapper = SVGAnimatedProperty::lookupWrapper<UseOwnerType, TearOffType>(this, LowerProperty##PropertyInfo())) { \
+        if (RefPtr<TearOffType> wrapper = SVGAnimatedProperty::lookupWrapper<UseOwnerType, TearOffType>(this, LowerProperty##PropertyInfo())) { \
             if (wrapper->isAnimating()) \
                 return wrapper->currentAnimatedValue(); \
         } \
@@ -179,7 +179,7 @@ private: \
 DECLARE_ANIMATED_PROPERTY(TearOffType, PropertyType, UpperProperty, LowerProperty) \
 void detachAnimated##UpperProperty##ListWrappers(unsigned newListSize) \
 { \
-    if (TearOffType* wrapper = SVGAnimatedProperty::lookupWrapper<UseOwnerType, TearOffType>(this, LowerProperty##PropertyInfo())) \
+    if (RefPtr<TearOffType> wrapper = SVGAnimatedProperty::lookupWrapper<UseOwnerType, TearOffType>(this, LowerProperty##PropertyInfo())) \
         wrapper->detachListWrappers(newListSize); \
 }
 
