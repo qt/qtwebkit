@@ -329,11 +329,20 @@ PassRefPtr<SVGAnimatedProperty> SVGPathElement::lookupOrCreateDWrapper(SVGElemen
     if (RefPtr<SVGAnimatedProperty> property = SVGAnimatedProperty::lookupWrapper<SVGPathElement, SVGAnimatedPathSegListPropertyTearOff>(ownerType, dPropertyInfo()))
         return property;
 
-    // Build initial SVGPathSegList.
-    buildSVGPathSegListFromByteStream(ownerType->m_pathByteStream.get(), ownerType, ownerType->m_pathSegList.value, UnalteredParsing);
+    if (ownerType->m_pathSegList.value.isEmpty())
+        buildSVGPathSegListFromByteStream(ownerType->m_pathByteStream.get(), ownerType, ownerType->m_pathSegList.value, UnalteredParsing);
 
     return SVGAnimatedProperty::lookupOrCreateWrapper<SVGPathElement, SVGAnimatedPathSegListPropertyTearOff, SVGPathSegList>
            (ownerType, dPropertyInfo(), ownerType->m_pathSegList.value);
+}
+
+void SVGPathElement::animatedPropertyWillBeDeleted()
+{
+    // m_pathSegList.shouldSynchronize is set to true when the 'd' wrapper for m_pathSegList
+    // is created and cached. We need to reset it back to false when this wrapper is deleted
+    // so we can be sure if shouldSynchronize is true, SVGAnimatedProperty::lookupWrapper()
+    // will return a valid cached 'd' wrapper for the m_pathSegList.
+    m_pathSegList.shouldSynchronize = false;
 }
 
 void SVGPathElement::synchronizeD(SVGElement* contextElement)

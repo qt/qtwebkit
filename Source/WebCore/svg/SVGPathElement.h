@@ -98,7 +98,9 @@ public:
 
     bool isAnimValObserved() const { return m_isAnimValObserved; }
 
-private:
+    void animatedPropertyWillBeDeleted();
+
+ private:
     SVGPathElement(const QualifiedName&, Document*);
 
     virtual bool isValid() const { return SVGTests::isValid(); }
