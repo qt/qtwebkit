@@ -111,6 +111,12 @@ public:
         return Base::appendItemValues(newItem, ec);
     }
 
+    virtual ~SVGPathSegListPropertyTearOff()
+    {
+        if (m_animatedProperty)
+            m_animatedProperty->propertyWillBeDeleted(*this);
+    }
+
 private:
     SVGPathSegListPropertyTearOff(AnimatedListPropertyTearOff* animatedProperty, SVGPropertyRole role, SVGPathSegRole pathSegRole, SVGPathSegList& values, ListWrapperCache& wrappers)
         : SVGListProperty<SVGPathSegList>(role, values, &wrappers)
