@@ -117,7 +117,7 @@ defineTest(detectFeatures) {
     }
 
     # Try to use an system wide SQlite installation
-    if(!contains(QT_CONFIG, no-pkg-config):packagesExist("sqlite3"))|mac {
+    if(!contains(QT_CONFIG, no-pkg-config):packagesExist("sqlite3"))|config_libsqlite3 {
         WEBKIT_CONFIG += have_sqlite3
     } else {
         SQLITE3SRCDIR = $$(SQLITE3SRCDIR)
