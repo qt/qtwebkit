@@ -173,6 +173,9 @@ defineTest(sanitizeFeatures) {
     # GStreamer uses Glib
     use?(gstreamer): WEBKIT_CONFIG += use_glib
 
+    # LevelDB is not needed without indexed_database
+    !enable?(indexed_database): WEBKIT_CONFIG -= use_leveldb
+
     # VideoTrack requires video
     !enable?(video): WEBKIT_CONFIG -= video_track
 
