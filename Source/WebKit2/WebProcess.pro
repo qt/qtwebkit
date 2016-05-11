@@ -5,7 +5,7 @@
 # -------------------------------------------------------------------
 
 TEMPLATE = app
-!build_pass:contains(QT_CONFIG, debug_and_release):contains(QT_CONFIG, build_all): CONFIG += release
+!build_pass:contains(QT_CONFIG, debug_and_release): CONFIG += release
 TARGET = QtWebProcess
 DESTDIR = $${ROOT_BUILD_DIR}/bin
 
