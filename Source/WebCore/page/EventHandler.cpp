@@ -2811,9 +2811,8 @@ bool EventHandler::isScrollbarHandlingGestures() const
     return m_scrollbarHandlingScrollGesture.get();
 }
 #endif // ENABLE(GESTURE_EVENTS)
-#if ENABLE(TOUCH_ADJUSTMENT)
 
-#if ENABLE(GESTURE_EVENTS)
+#if ENABLE(TOUCH_ADJUSTMENT)
 bool EventHandler::shouldApplyTouchAdjustment(const PlatformGestureEvent& event) const
 {
     if (m_frame->settings() && !m_frame->settings()->touchAdjustmentEnabled())
@@ -2821,29 +2820,6 @@ bool EventHandler::shouldApplyTouchAdjustment(const PlatformGestureEvent& event)
     return !event.area().isEmpty();
 }
 
-bool EventHandler::adjustGesturePosition(const PlatformGestureEvent& gestureEvent, IntPoint& adjustedPoint)
-{
-    if (!shouldApplyTouchAdjustment(gestureEvent))
-        return false;
-
-    Node* targetNode = 0;
-    switch (gestureEvent.type()) {
-    case PlatformEvent::GestureTap:
-    case PlatformEvent::GestureTapDown:
-        bestClickableNodeForTouchPoint(gestureEvent.position(), IntSize(gestureEvent.area().width() / 2, gestureEvent.area().height() / 2), adjustedPoint, targetNode);
-        break;
-    case PlatformEvent::GestureLongPress:
-    case PlatformEvent::GestureLongTap:
-    case PlatformEvent::GestureTwoFingerTap:
-        bestContextMenuNodeForTouchPoint(gestureEvent.position(), IntSize(gestureEvent.area().width() / 2, gestureEvent.area().height() / 2), adjustedPoint, targetNode);
-        break;
-    default:
-        // FIXME: Implement handling for other types as needed.
-        ASSERT_NOT_REACHED();
-    }
-    return targetNode;
-}
-#endif // ENABLE(GESTURE_EVENTS)
 
 bool EventHandler::bestClickableNodeForTouchPoint(const IntPoint& touchCenter, const IntSize& touchRadius, IntPoint& targetPoint, Node*& targetNode)
 {
@@ -2880,6 +2856,28 @@ bool EventHandler::bestZoomableAreaForTouchPoint(const IntPoint& touchCenter, co
     return findBestZoomableArea(targetNode, targetArea, touchCenter, touchRect, result.rectBasedTestResult());
 }
 
+bool EventHandler::adjustGesturePosition(const PlatformGestureEvent& gestureEvent, IntPoint& adjustedPoint)
+{
+    if (!shouldApplyTouchAdjustment(gestureEvent))
+        return false;
+
+    Node* targetNode = 0;
+    switch (gestureEvent.type()) {
+    case PlatformEvent::GestureTap:
+    case PlatformEvent::GestureTapDown:
+        bestClickableNodeForTouchPoint(gestureEvent.position(), IntSize(gestureEvent.area().width() / 2, gestureEvent.area().height() / 2), adjustedPoint, targetNode);
+        break;
+    case PlatformEvent::GestureLongPress:
+    case PlatformEvent::GestureLongTap:
+    case PlatformEvent::GestureTwoFingerTap:
+        bestContextMenuNodeForTouchPoint(gestureEvent.position(), IntSize(gestureEvent.area().width() / 2, gestureEvent.area().height() / 2), adjustedPoint, targetNode);
+        break;
+    default:
+        // FIXME: Implement handling for other types as needed.
+        ASSERT_NOT_REACHED();
+    }
+    return targetNode;
+}
 #endif
 
 #if ENABLE(CONTEXT_MENUS)

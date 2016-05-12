@@ -60,13 +60,8 @@ namespace WebCore {
         const MIMEToDescriptionsMap& mimeToDescriptions() const { return m_mimeToDescriptions; }
         const MIMEToExtensionsMap& mimeToExtensions() const { return m_mimeToExtensions; }
 
-#if !ENABLE(NETSCAPE_PLUGIN_API) && OS(WINDOWS) && PLATFORM(QT)
-        unsigned int hash() const { return 0; }
-        static bool equal(const PluginPackage &a, const PluginPackage &b) { return false ;}
-#else
         unsigned hash() const;
         static bool equal(const PluginPackage& a, const PluginPackage& b);
-#endif
 
         bool load();
         void unload();

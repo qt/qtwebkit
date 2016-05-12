@@ -37,7 +37,7 @@ equals(OUT_PWD, $${ROOT_BUILD_DIR}) {
 }
 
 # Try to detect if we're running under Windows cmd.exe or not
-win32:isEmpty(MINGW_IN_SHELL): CONFIG += win_cmd_shell
+equals(QMAKE_DIR_SEP, \\): CONFIG += win_cmd_shell
 
 # Default location of generated sources
 GENERATED_SOURCES_DESTDIR = generated

@@ -121,11 +121,7 @@ enable?(XSLT) {
         QT *= xmlpatterns
     }
 } else:!mac:use?(LIBXML2) {
-    win32-msvc* {
-        LIBS += -llibxml2
-    } else {
-        PKGCONFIG += libxml-2.0
-    }
+    PKGCONFIG += libxml-2.0
 }
 
 use?(ZLIB) {
@@ -237,7 +233,7 @@ use?(GRAPHICS_SURFACE) {
 }
 
 have?(sqlite3) {
-    mac {
+    osx|contains(QT_CONFIG, no-pkg-config) {
         LIBS += -lsqlite3
     } else {
         PKGCONFIG += sqlite3

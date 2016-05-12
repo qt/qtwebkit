@@ -117,7 +117,7 @@ defineTest(detectFeatures) {
     }
 
     # Try to use an system wide SQlite installation
-    if(!contains(QT_CONFIG, no-pkg-config):packagesExist("sqlite3"))|mac {
+    if(!contains(QT_CONFIG, no-pkg-config):packagesExist("sqlite3"))|config_libsqlite3 {
         WEBKIT_CONFIG += have_sqlite3
     } else {
         SQLITE3SRCDIR = $$(SQLITE3SRCDIR)
@@ -141,8 +141,6 @@ defineTest(detectFeatures) {
 
     # IndexedDB requires leveldb
     enable?(indexed_database): WEBKIT_CONFIG += use_leveldb
-
-    !config_icu:!mac: WEBKIT_CONFIG += use_wchar_unicode
 
     export(WEBKIT_CONFIG)
     export(CONFIGURE_WARNINGS)

@@ -120,13 +120,18 @@ defineTest(finalizeConfigure) {
     }
 
     # Sanity checks that would prevent us from building the whole project altogether.
-    !android:!mac:!config_icu {
+    !config_icu:!osx:!use?(wchar_unicode) {
        addReasonForSkippingBuild("ICU is required.")
     }
     production_build:blackberry {
-        addReasonForSkippingBuild("Build not supported on BB10 yet.")
+        addReasonForSkippingBuild("Build not supported on BB10.")
     }
-
+    production_build:android {
+        addReasonForSkippingBuild("Build not supported on Android.")
+    }
+    !gnu_thin_archives:!win32-msvc2013:!mingw:contains(QT_CONFIG, static) {
+        addReasonForSkippingBuild("QtWebKit cannot be built as a static library on this platform. Check your configuration in qtbase/config.summary.")
+    }
     winrt: addReasonForSkippingBuild("QtWebKit is not supported on Windows Phone/Windows RT")
     requiredPrograms = gperf python perl bison ruby flex
     for(program, requiredPrograms): \

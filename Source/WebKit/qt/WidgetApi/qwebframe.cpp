@@ -927,11 +927,25 @@ void QWebFrame::print(QPrinter *printer, PrintCallback *callback) const
     Evaluates the JavaScript defined by \a scriptSource using this frame as context
     and returns the result of the last executed statement.
 
-    \sa addToJavaScriptWindowObject(), javaScriptWindowObjectCleared()
+    \note This method may be very inefficient if \a scriptSource returns a DOM element
+    as a result. For example, evaluation of the next innocuously looking code may take
+    a lot of CPU and memory to execute:
+
+    \code
+        var img = document.createElement('img');
+        document.getElementById(\"foo\").appendChild(img);
+    \endcode
+
+    This code returns appended DOM element, which is converted to QVariantMap
+    containing all its properties. To avoid this issue you can add "true" after
+    the last statement.
+
+    \sa addToJavaScriptWindowObject(), javaScriptWindowObjectCleared(),
+    QWebElement::evaluateJavaScript()
 */
-QVariant QWebFrame::evaluateJavaScript(const QString& scriptSource, const QUrl& location)
+QVariant QWebFrame::evaluateJavaScript(const QString& scriptSource)
 {
-    return d->evaluateJavaScript(scriptSource, location);
+    return d->evaluateJavaScript(scriptSource);
 }
 
 /*!
