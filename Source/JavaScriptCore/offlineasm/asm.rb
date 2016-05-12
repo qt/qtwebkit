@@ -28,6 +28,7 @@ $: << File.dirname(__FILE__)
 require "config"
 require "backends"
 require "digest/sha1"
+require "fileutils"
 require "offsets"
 require "parser"
 require "self_hash"
@@ -244,6 +245,7 @@ if FileTest.exist? outputFlnm
         firstLine = inp.gets
         if firstLine and firstLine.chomp == inputHash
             $stderr.puts "offlineasm: Nothing changed."
+            FileUtils.touch(outputFlnm)
             exit 0
         end
     }

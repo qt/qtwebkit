@@ -17,9 +17,6 @@ win32 {
     PKGCONFIG += icu-i18n
 } else {
     LIBS += -licui18n -licuuc -licudata
-    CONFIG(static) {
-        LIBS += -ldl
-    }
 }
 
 load(qt_build_config)

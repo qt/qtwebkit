@@ -190,14 +190,13 @@ public:
 #endif
 
 #if ENABLE(TOUCH_ADJUSTMENT)
-#if ENABLE(GESTURE_EVENTS)
     bool shouldApplyTouchAdjustment(const PlatformGestureEvent&) const;
-    bool adjustGesturePosition(const PlatformGestureEvent&, IntPoint& adjustedPoint);
-#endif // ENABLE(GESTURE_EVENTS)
 
     bool bestClickableNodeForTouchPoint(const IntPoint& touchCenter, const IntSize& touchRadius, IntPoint& targetPoint, Node*& targetNode);
     bool bestContextMenuNodeForTouchPoint(const IntPoint& touchCenter, const IntSize& touchRadius, IntPoint& targetPoint, Node*& targetNode);
     bool bestZoomableAreaForTouchPoint(const IntPoint& touchCenter, const IntSize& touchRadius, IntRect& targetArea, Node*& targetNode);
+
+    bool adjustGesturePosition(const PlatformGestureEvent&, IntPoint& adjustedPoint);
 #endif
 
 #if ENABLE(CONTEXT_MENUS)

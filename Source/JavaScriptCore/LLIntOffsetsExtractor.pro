@@ -16,6 +16,7 @@ debug_and_release {
 # Don't try to link against any Qt libraries, but at least
 # pull in include paths as we include qglobal.h.
 INCLUDEPATH += $$QT.core.includes
+DEFINES += QT_NO_VERSION_TAGGING
 CONFIG += console
 CONFIG -= qt
 
@@ -61,6 +62,12 @@ macx {
     DESTDIR = $$targetSubDir()
     llint.output = $$targetSubDir()/$$llint.output
     INCLUDEPATH += $$targetSubDir()
+    contains(QT_CONFIG, qt_framework) {
+        # Add framework headers directly to make #include <qglobal.h> work
+        INCLUDEPATH += $$QT.core.libs/QtCore.framework/Headers
+        # Extend framework search path to make #include <QtCore/qconfig.h> work
+        QMAKE_CXXFLAGS += -F$$QT.core.libs
+    }
 }
 
 # Compilation of this file will automatically depend on LLIntDesiredOffsets.h

@@ -40,6 +40,9 @@
 #define XMD_H
 #endif
 
+// ICU defines TRUE and FALSE macros, breaking libjpeg v9 headers
+#undef TRUE
+#undef FALSE
 extern "C" {
 #include "jpeglib.h"
 }
