@@ -20,7 +20,7 @@
  * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
  * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #ifndef WTF_MathExtras_h
@@ -140,11 +140,16 @@ static float roundf(float num)
     return integer - num >= 0.5f ? integer - 1.0f : integer;
 }
 #endif
+
+#if COMPILER(MSVC12_OR_LOWER)
+
 inline long long llround(double num) { return static_cast<long long>(round(num)); }
 inline long long llroundf(float num) { return static_cast<long long>(roundf(num)); }
 inline long lround(double num) { return static_cast<long>(round(num)); }
 inline long lroundf(float num) { return static_cast<long>(roundf(num)); }
 inline double trunc(double num) { return num > 0 ? floor(num) : ceil(num); }
+
+#endif // COMPILER(MSVC12_OR_LOWER)
 
 #endif
 
@@ -153,7 +158,7 @@ inline double trunc(double num) { return num > 0 ? floor(num) : ceil(num); }
 inline long long abs(long num) { return labs(num); }
 #endif
 
-#if OS(ANDROID) || COMPILER(MSVC)
+#if OS(ANDROID) || COMPILER(MSVC12_OR_LOWER)
 // ANDROID and MSVC's math.h does not currently supply log2 or log2f.
 inline double log2(double num)
 {
@@ -174,6 +179,7 @@ inline float log2f(float num)
 inline long long abs(long long num) { return _abs64(num); }
 #endif
 
+#if COMPILER(MSVC12_OR_LOWER)
 namespace std {
 
 inline bool isinf(double num) { return !_finite(num) && !_isnan(num); }
@@ -244,6 +250,8 @@ inline long int lrint(double flt)
 #endif
     return static_cast<long int>(intgr);
 }
+
+#endif // COMPILER(MSVC12_OR_LOWER)
 
 #endif // COMPILER(MSVC)
 
