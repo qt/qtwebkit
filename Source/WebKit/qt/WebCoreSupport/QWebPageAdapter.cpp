@@ -1179,6 +1179,7 @@ void QWebPageAdapter::triggerAction(QWebPageAdapter::MenuAction action, QWebHitT
     case ToggleMediaPlayPause:
         if (HTMLMediaElement* mediaElt = mediaElement(hitTestResult->innerNonSharedNode))
             mediaElt->togglePlayState();
+        break;
     case ToggleMediaMute:
         if (HTMLMediaElement* mediaElt = mediaElement(hitTestResult->innerNonSharedNode))
             mediaElt->setMuted(!mediaElt->muted());
