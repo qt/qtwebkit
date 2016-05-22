@@ -102,7 +102,7 @@ load(qt_module)
     }
 }
 
-qnx {
+qnx|contains(QT_CONFIG, static):mac {
     # see: https://bugs.webkit.org/show_bug.cgi?id=93460
     # the gcc 4.4.2 used in the qnx bbndk cannot cope with
     # the linkage step of libQtWebKit, adding a dummy .cpp
