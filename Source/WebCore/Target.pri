@@ -1122,7 +1122,6 @@ SOURCES += \
     platform/text/TextCodecUTF8.cpp \
     platform/text/TextCodecICU.cpp \
     platform/text/TextEncoding.cpp \
-    platform/text/TextEncodingDetectorICU.cpp \
     platform/text/TextEncodingRegistry.cpp \
     platform/text/TextStream.cpp \
     platform/ThreadGlobalData.cpp \
@@ -2978,11 +2977,12 @@ mac {
         platform/text/cf/StringImplCF.cpp
 }
 
-contains(QT_CONFIG,icu)|mac: SOURCES += platform/text/TextBreakIteratorICU.cpp
 use?(wchar_unicode): {
     SOURCES += platform/text/wchar/TextBreakIteratorWchar.cpp \
                platform/text/TextEncodingDetectorNone.cpp
-    SOURCES -= platform/text/TextEncodingDetectorICU.cpp
+} else {
+    SOURCES += platform/text/TextBreakIteratorICU.cpp \
+               platform/text/TextEncodingDetectorICU.cpp
 }
 
 mac {

@@ -33,7 +33,7 @@ public:
     {
     }
 
-    SVGAnimatedProperty* animatedProperty() const
+    RefPtr<SVGAnimatedProperty> animatedProperty() const
     {
         switch (m_role) {
         case PathSegUndefinedRole:

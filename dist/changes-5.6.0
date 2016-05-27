@@ -19,12 +19,21 @@ information about a particular change.
 
 
 ****************************************************************************
-*                          Library                                         *
+*                      Important Behavior Changes                          *
+****************************************************************************
+
+ - The quality parameter in canvas.toDataURL only applies to JPEG images
+   now, in accordance with section 4.12.4.4 of the HTML5 spec.
+
+****************************************************************************
+*                              Library                                     *
 ****************************************************************************
 
 QtWebkit
 --------
  - [QTBUG-44563] Render anchors as clickable links in PDF documents
+ - % unit heights didn't work if parent block height was set in vh
+ - Fixed regression: some errors were not reported to ErrorPageExtension
 
 QtWebkitQML
 -----------
