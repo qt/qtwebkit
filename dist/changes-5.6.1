@@ -1,0 +1,49 @@
+Qt 5.6.1 is a bug-fix release. It maintains both forward and backward
+compatibility (source and binary) with Qt 5.6.0.
+
+For more details, refer to the online documentation included in this
+distribution. The documentation is also available online:
+
+  http://doc.qt.io/qt-5.6
+
+The Qt version 5.6 series is binary compatible with the 5.5.x series.
+Applications compiled for 5.5 will continue to run with 5.6.
+
+Some of the changes listed in this file include issue tracking numbers
+corresponding to tasks in the Qt Bug Tracker:
+
+  http://bugreports.qt.io/
+
+Each of these identifiers can be entered in the bug tracker to obtain more
+information about a particular change.
+
+
+****************************************************************************
+*                      Important Behavior Changes                          *
+****************************************************************************
+
+ - QtWebKit will no longer support any QImageIO plugin with the Size option,
+   but instead only decode formats that have been whitelisted. If you are
+   using QtWebKit for controlled content and wish to override the white list
+   it can now be done with the environment variable
+   QTWEBKIT_IMAGEFORMAT_WHITELIST which takes a comma-separated list of
+   QImageIO formats.
+
+****************************************************************************
+*                              Library                                     *
+****************************************************************************
+
+QtWebkit
+--------
+ - Fixed memory leaks and crashes related to SVG animated properties.
+ - Fixed compilation with libjpeg v9.
+
+
+****************************************************************************
+*                      Platform Specific Changes                           *
+****************************************************************************
+
+Windows
+-------
+- QtWebKit does not require Qt configured with ICU support anymore to be
+  built.
