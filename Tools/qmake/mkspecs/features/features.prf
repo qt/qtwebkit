@@ -136,9 +136,6 @@ defineTest(detectFeatures) {
         have?(glx):have?(xcomposite):have?(xrender): WEBKIT_CONFIG += use_graphics_surface use_glx
     }
 
-    # Slider Touch is sensible to use when compiling WebKit2
-    enable?(touch_events): WEBKIT_CONFIG += touch_slider
-
     # IndexedDB requires leveldb
     enable?(indexed_database): WEBKIT_CONFIG += use_leveldb
 
@@ -173,6 +170,9 @@ defineTest(sanitizeFeatures) {
     # GStreamer uses Glib
     use?(gstreamer): WEBKIT_CONFIG += use_glib
 
+    # LevelDB is not needed without indexed_database
+    !enable?(indexed_database): WEBKIT_CONFIG -= use_leveldb
+
     # VideoTrack requires video
     !enable?(video): WEBKIT_CONFIG -= video_track
 
@@ -181,6 +181,9 @@ defineTest(sanitizeFeatures) {
 
     # Accelerated 2D canvas uses 3D graphics support.
     !use?(3d_graphics): WEBKIT_CONFIG -= accelerated_2d_canvas
+
+    # Touch slider requires touch events
+    !enable?(touch_events): WEBKIT_CONFIG -= touch_slider
 
     export(WEBKIT_CONFIG)
 }
