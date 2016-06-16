@@ -200,14 +200,14 @@ bool PlatformStrategiesQt::isLinkVisited(Page* page, LinkHash hash, const KURL& 
 {
     ASSERT(hash);
 
-    Vector<UChar, 512> url;
-    visitedURL(baseURL, attributeURL, url);
-
     // If the Qt4.4 interface for the history is used, we will have to fallback
     // to the old global history.
     QWebHistoryInterface* iface = QWebHistoryInterface::defaultInterface();
-    if (iface)
+    if (iface) {
+        Vector<UChar, 512> url;
+        visitedURL(baseURL, attributeURL, url);
         return iface->historyContains(QString(reinterpret_cast<QChar*>(url.data()), url.size()));
+    }
 
     return page->group().isLinkVisited(hash);
 }

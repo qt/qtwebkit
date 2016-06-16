@@ -102,6 +102,7 @@ gcc:isEqual(QT_ARCH, "arm"): CONFIG -= use_gold_linker
 
 # Pick up Qt's defaults for debug/release/debug_and_release
 if(win32|mac):!macx-xcode {
+    contains(QT_CONFIG, simulator_and_device): CONFIG += iphonesimulator_and_iphoneos
     contains(QT_CONFIG, debug_and_release): CONFIG += debug_and_release
     contains(QT_CONFIG, build_all): CONFIG += build_all
 }

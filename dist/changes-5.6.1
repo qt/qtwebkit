@@ -1,5 +1,5 @@
-Qt 5.6 introduces many new features and improvements as well as bugfixes
-over the 5.5.x series.
+Qt 5.6.1 is a bug-fix release. It maintains both forward and backward
+compatibility (source and binary) with Qt 5.6.0.
 
 For more details, refer to the online documentation included in this
 distribution. The documentation is also available online:
@@ -22,8 +22,12 @@ information about a particular change.
 *                      Important Behavior Changes                          *
 ****************************************************************************
 
- - The quality parameter in canvas.toDataURL only applies to JPEG images
-   now, in accordance with section 4.12.4.4 of the HTML5 spec.
+ - QtWebKit will no longer support any QImageIO plugin with the Size option,
+   but instead only decode formats that have been whitelisted. If you are
+   using QtWebKit for controlled content and wish to override the white list
+   it can now be done with the environment variable
+   QTWEBKIT_IMAGEFORMAT_WHITELIST which takes a comma-separated list of
+   QImageIO formats.
 
 ****************************************************************************
 *                              Library                                     *
@@ -31,21 +35,15 @@ information about a particular change.
 
 QtWebkit
 --------
- - [QTBUG-44563] Render anchors as clickable links in PDF documents
- - % unit heights didn't work if parent block height was set in vh
- - Fixed regression: some errors were not reported to ErrorPageExtension
-
-QtWebkitQML
------------
- - WebView.experimental got several features which were previously available
-   only via widgets API: spatial navigation, links included in focus chain,
-   and user style sheets
- - Fixed missing text in QQuickItem::inputMethodQuery when text element is
-   focused in WebView
+ - Fixed memory leaks and crashes related to SVG animated properties.
+ - Fixed compilation with libjpeg v9.
 
 
 ****************************************************************************
 *                      Platform Specific Changes                           *
 ****************************************************************************
 
-- Various build fixes
+Windows
+-------
+- QtWebKit does not require Qt configured with ICU support anymore to be
+  built.

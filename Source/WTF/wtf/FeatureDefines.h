@@ -188,6 +188,15 @@
 
 #endif /* PLATFORM(MAC) && !PLATFORM(IOS) */
 
+#if !PLATFORM(MAC)
+
+#if !defined(JSC_OBJC_API_ENABLED)
+#define JSC_OBJC_API_ENABLED 0
+#endif
+
+#endif /* !PLATFORM(MAC) */
+
+
 /* --------- Apple Windows port --------- */
 #if PLATFORM(WIN) && !OS(WINCE) && !PLATFORM(WIN_CAIRO)
 
