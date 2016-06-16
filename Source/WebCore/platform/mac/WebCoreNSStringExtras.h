@@ -32,7 +32,7 @@
 #include <Foundation/Foundation.h>
 @class NSString;
 #else
-typedef struct NSString NSString;
+typedef struct objc_object NSString;
 #endif
 
 #ifdef __cplusplus
