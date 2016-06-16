@@ -53,18 +53,22 @@ public:
     {
         ASSERT(info);
         SVGAnimatedPropertyDescription key(element, info->propertyIdentifier);
-        RefPtr<SVGAnimatedProperty> wrapper = animatedPropertyCache()->get(key);
-        if (!wrapper) {
-            wrapper = TearOffType::create(element, info->attributeName, info->animatedPropertyType, property);
-            if (info->animatedPropertyState == PropertyIsReadOnly)
-                wrapper->setIsReadOnly();
-            animatedPropertyCache()->set(key, wrapper.get());
-        }
+        Cache::AddResult result = animatedPropertyCache()->add(key, 0);
+        if (!result.isNewEntry)
+            return static_cast<TearOffType*>(result.iterator->value);
+
+        RefPtr<SVGAnimatedProperty> wrapper = TearOffType::create(element, info->attributeName, info->animatedPropertyType, property);
+        if (info->animatedPropertyState == PropertyIsReadOnly)
+            wrapper->setIsReadOnly();
+
+        // Cache the raw pointer but return a RefPtr<>. This will break the cyclic reference
+        // between SVGAnimatedProperty and SVGElement once the property pointer is not needed.
+        result.iterator->value = wrapper.get();
         return static_pointer_cast<TearOffType>(wrapper);
     }
 
     template<typename OwnerType, typename TearOffType>
-    static TearOffType* lookupWrapper(OwnerType* element, const SVGPropertyInfo* info)
+    static PassRefPtr<TearOffType> lookupWrapper(OwnerType* element, const SVGPropertyInfo* info)
     {
         ASSERT(info);
         SVGAnimatedPropertyDescription key(element, info->propertyIdentifier);
@@ -72,7 +76,7 @@ public:
     }
 
     template<typename OwnerType, typename TearOffType>
-    static TearOffType* lookupWrapper(const OwnerType* element, const SVGPropertyInfo* info)
+    static PassRefPtr<TearOffType> lookupWrapper(const OwnerType* element, const SVGPropertyInfo* info)
     {
         return lookupWrapper<OwnerType, TearOffType>(const_cast<OwnerType*>(element), info);
     }

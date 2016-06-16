@@ -88,8 +88,8 @@ void SVGPolyElement::parseAttribute(const QualifiedName& name, const AtomicStrin
         if (!pointsListFromSVGData(newList, value))
             document()->accessSVGExtensions()->reportError("Problem parsing points=\"" + value + "\"");
 
-        if (SVGAnimatedProperty* wrapper = SVGAnimatedProperty::lookupWrapper<SVGPolyElement, SVGAnimatedPointList>(this, pointsPropertyInfo()))
-            static_cast<SVGAnimatedPointList*>(wrapper)->detachListWrappers(newList.size());
+        if (RefPtr<SVGAnimatedProperty> wrapper = SVGAnimatedProperty::lookupWrapper<SVGPolyElement, SVGAnimatedPointList>(this, pointsPropertyInfo()))
+            static_pointer_cast<SVGAnimatedPointList>(wrapper)->detachListWrappers(newList.size());
 
         m_points.value = newList;
         return;
@@ -147,16 +147,16 @@ PassRefPtr<SVGAnimatedProperty> SVGPolyElement::lookupOrCreatePointsWrapper(SVGE
            (ownerType, pointsPropertyInfo(), ownerType->m_points.value);
 }
 
-SVGListPropertyTearOff<SVGPointList>* SVGPolyElement::points()
+RefPtr<SVGListPropertyTearOff<SVGPointList> > SVGPolyElement::points()
 {
     m_points.shouldSynchronize = true;
-    return static_cast<SVGListPropertyTearOff<SVGPointList>*>(static_pointer_cast<SVGAnimatedPointList>(lookupOrCreatePointsWrapper(this))->baseVal());
+    return static_cast<SVGListPropertyTearOff<SVGPointList>*>(static_pointer_cast<SVGAnimatedPointList>(lookupOrCreatePointsWrapper(this))->baseVal().get());
 }
 
-SVGListPropertyTearOff<SVGPointList>* SVGPolyElement::animatedPoints()
+RefPtr<SVGListPropertyTearOff<SVGPointList> > SVGPolyElement::animatedPoints()
 {
     m_points.shouldSynchronize = true;
-    return static_cast<SVGListPropertyTearOff<SVGPointList>*>(static_pointer_cast<SVGAnimatedPointList>(lookupOrCreatePointsWrapper(this))->animVal());
+    return static_cast<SVGListPropertyTearOff<SVGPointList>*>(static_pointer_cast<SVGAnimatedPointList>(lookupOrCreatePointsWrapper(this))->animVal().get());
 }
 
 }

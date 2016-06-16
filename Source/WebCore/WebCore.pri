@@ -234,7 +234,7 @@ use?(GRAPHICS_SURFACE) {
 }
 
 have?(sqlite3) {
-    mac {
+    osx|contains(QT_CONFIG, no-pkg-config) {
         LIBS += -lsqlite3
     } else {
         PKGCONFIG += sqlite3
