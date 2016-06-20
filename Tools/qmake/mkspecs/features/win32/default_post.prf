@@ -12,6 +12,10 @@ mingw {
     QMAKE_LIBDIR_POST += $$split(TMPPATH,";")
 }
 
+# Make sure windows.h doesn't define max() macro
+# (it screws up use like std::max and std::numeric_limits::max)
+DEFINES += NOMINMAX
+
 # Disable a few warnings. The same warnings are also disabled
 # in WebKitLibraries/win/tools/vsprops/common.vsprops
 win32-msvc*|wince*: QMAKE_CXXFLAGS += -wd4291 -wd4344 -wd4396 -wd4503 -wd4800 -wd4819 -wd4996
