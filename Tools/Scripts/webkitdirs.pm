@@ -2231,7 +2231,7 @@ sub buildQMakeProjects
     }
 
     # Using build-webkit to build assumes you want a developer-build
-    push @buildArgs, "CONFIG-=production_build";
+    push @buildArgs, "CONFIG-=production_build" unless grep { $_ eq "CONFIG+=production_build" } @buildArgs;
 
     my $svnRevision = currentSVNRevision();
     my $previousSvnRevision = "unknown";
