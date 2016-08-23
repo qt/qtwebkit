@@ -25,7 +25,7 @@ mac {
             LIBS += -licuin -licuuc -licudt
         }
     }
-    else:!contains(QT_CONFIG,no-pkg-config):packagesExist("icu-i18n"): PKGCONFIG *= icu-i18n
+    else:qtConfig(pkg-config):packagesExist("icu-i18n"): PKGCONFIG *= icu-i18n
     else:android: LIBS += -licui18n -licuuc
     else: LIBS += -licui18n -licuuc -licudata
 }

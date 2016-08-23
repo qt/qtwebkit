@@ -15,7 +15,7 @@ cpqmldir.files = $${_PRO_FILE_PWD_}/qmldir
 cpqmldir.path = $${ROOT_BUILD_DIR}/imports/$${TARGET.module_name}
 COPIES += cpqmldir
 
-contains(QT_CONFIG, reduce_exports):CONFIG += hide_symbols
+qtConfig(reduce_exports):CONFIG += hide_symbols
 
 wince*:LIBS += $$QMAKE_LIBS_GUI
 

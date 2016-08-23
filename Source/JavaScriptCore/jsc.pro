@@ -28,6 +28,6 @@ wince* {
 }
 
 # Prevent warnings about difference in visibility on Mac OS X
-contains(QT_CONFIG, reduce_exports):CONFIG += hide_symbols
-unix:contains(QT_CONFIG, reduce_relocations):CONFIG += bsymbolic_functions
+qtConfig(reduce_exports):CONFIG += hide_symbols
+unix:qtConfig(reduce_relocations):CONFIG += bsymbolic_functions
 

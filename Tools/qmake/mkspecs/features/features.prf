@@ -48,17 +48,17 @@ defineTest(detectFeatures) {
 
     # We can't use Qt's 3rdparty sources for libjpeg and libpng outside of qtbase, but if Qt
     # is using the system libraries, use them to take advantage of the WebCore image decoders as well.
-    contains(QT_CONFIG, system-jpeg): WEBKIT_CONFIG += use_libjpeg
+    qtConfig(system-jpeg): WEBKIT_CONFIG += use_libjpeg
     else: CONFIGURE_WARNINGS += "Qt not configured to use system libjpeg, QImageDecoder will decode JPEG images"
 
-    contains(QT_CONFIG, system-png): WEBKIT_CONFIG += use_libpng
+    qtConfig(system-png): WEBKIT_CONFIG += use_libpng
     else: CONFIGURE_WARNINGS += "Qt not configured to use system libpng, QImageDecoder will decode PNG images"
 
     linux-* {
         config_libXcomposite: WEBKIT_CONFIG += have_xcomposite
         config_libXrender: WEBKIT_CONFIG += have_xrender
 
-        config_glx:!contains(QT_CONFIG, opengles2): WEBKIT_CONFIG += have_glx
+        config_glx:!qtConfig(opengles2): WEBKIT_CONFIG += have_glx
 
         # We need fontconfig to set up the test fonts for DumpRenderTree and WebKitTestRunner.
         config_fontconfig: WEBKIT_CONFIG += have_fontconfig
@@ -85,7 +85,7 @@ defineTest(detectFeatures) {
 
     # Enable the USE(3D_GRAPHICS) flag when QtOpenGL is enabled.
     # Disable on Windows CE for now, as ANGLE won't compile.
-    !wince*:contains(QT_CONFIG, opengl): WEBKIT_CONFIG += use_3d_graphics
+    !wince*:qtConfig(opengl): WEBKIT_CONFIG += use_3d_graphics
 
     # Temporarily disable FTPDIR on Windows CE (missing functions from time.h)
     wince* {
@@ -96,10 +96,10 @@ defineTest(detectFeatures) {
     use?(3d_graphics): WEBKIT_CONFIG += webgl
 
     # Both desktop and GLES2 support (only on Windows at this point)
-    contains(QT_CONFIG, dynamicgl): WEBKIT_CONFIG += have_dynamicgl
+    qtConfig(dynamicgl): WEBKIT_CONFIG += have_dynamicgl
 
     # HTML5 Media Support for builds with GStreamer
-    unix:!mac:!contains(QT_CONFIG, no-pkg-config) {
+    unix:!mac:qtConfig(pkg-config) {
         packagesExist("glib-2.0 gio-2.0 gstreamer-1.0 gstreamer-plugins-base-1.0") {
             WEBKIT_CONFIG += video use_gstreamer
         } else: packagesExist("glib-2.0 gio-2.0 \'gstreamer-0.10 >= 0.10.30\' \'gstreamer-plugins-base-0.10 >= 0.10.30\'") {
@@ -117,7 +117,7 @@ defineTest(detectFeatures) {
     }
 
     # Try to use an system wide SQlite installation
-    if(!contains(QT_CONFIG, no-pkg-config):packagesExist("sqlite3"))|config_libsqlite3 {
+    if(qtConfig(pkg-config):packagesExist("sqlite3"))|config_libsqlite3 {
         WEBKIT_CONFIG += have_sqlite3
     } else {
         SQLITE3SRCDIR = $$(SQLITE3SRCDIR)
@@ -132,7 +132,7 @@ defineTest(detectFeatures) {
     # FIXME: GraphicsSurface do not work with dynamicgl at this point.
     use?(3d_graphics):!have?(dynamicgl) {
         mac: WEBKIT_CONFIG += use_graphics_surface
-        win32:contains(QT_CONFIG, opengles2): WEBKIT_CONFIG += use_graphics_surface
+        win32:qtConfig(opengles2): WEBKIT_CONFIG += use_graphics_surface
         have?(glx):have?(xcomposite):have?(xrender): WEBKIT_CONFIG += use_graphics_surface use_glx
     }
 

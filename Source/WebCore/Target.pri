@@ -4196,8 +4196,8 @@ use?(3D_GRAPHICS) {
 
     INCLUDEPATH += $$PWD/platform/graphics/gpu
 
-    contains(QT_CONFIG, opengl) {
-        contains(QT_CONFIG, opengles2) {
+    qtConfig(opengl) {
+        qtConfig(opengles2) {
             SOURCES += \
                platform/graphics/opengl/GraphicsContext3DOpenGLES.cpp \
                platform/graphics/opengl/Extensions3DOpenGLES.cpp

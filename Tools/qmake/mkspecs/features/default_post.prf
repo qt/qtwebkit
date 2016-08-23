@@ -285,8 +285,8 @@ contains(TEMPLATE, lib) {
     DEFINES += QT_ASCII_CAST_WARNINGS
 
     !plugin {
-        contains(QT_CONFIG, reduce_exports):CONFIG += hide_symbols
-        unix:contains(QT_CONFIG, reduce_relocations):CONFIG += bsymbolic_functions
+        qtConfig(reduce_exports):CONFIG += hide_symbols
+        unix:qtConfig(reduce_relocations):CONFIG += bsymbolic_functions
     }
 }
 

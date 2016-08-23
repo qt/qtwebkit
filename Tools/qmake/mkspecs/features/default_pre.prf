@@ -64,7 +64,7 @@ else: PYTHON = python
 
 # We use private_tests to detect developer build, since the destdir will
 # always be our webkit build dir. This might change as configure changes.
-contains(QT_CONFIG, private_tests): CONFIG += qt_developer_build
+qtConfig(private_tests): CONFIG += qt_developer_build
 
 # By default we enable "production build", and build-webkit, which is
 # used by bots and developers, will disable it, to enable warnings etc.
@@ -92,7 +92,7 @@ CONFIG += include_webinspector
 # as the module will be linked with. This is particular important on mac
 # since otherwise the libraries can be compiled against libstdc++, but
 # linked against libc++.
-contains(QT_CONFIG, c++11): CONFIG += c++11
+qtConfig(c++11): CONFIG += c++11
 
 # Limit the creation of thin archives to Linux, since only GNU's ar supports it.
 !debug_and_release:linux: CONFIG += gnu_thin_archives
@@ -102,9 +102,9 @@ gcc:isEqual(QT_ARCH, "arm"): CONFIG -= use_gold_linker
 
 # Pick up Qt's defaults for debug/release/debug_and_release
 if(win32|mac):!macx-xcode {
-    contains(QT_CONFIG, simulator_and_device): CONFIG += simulator_and_device
-    contains(QT_CONFIG, debug_and_release): CONFIG += debug_and_release
-    contains(QT_CONFIG, build_all): CONFIG += build_all
+    qtConfig(simulator_and_device): CONFIG += simulator_and_device
+    qtConfig(debug_and_release): CONFIG += debug_and_release
+    qtConfig(build_all): CONFIG += build_all
 }
 
 FLEX = flex

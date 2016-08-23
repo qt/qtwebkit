@@ -62,7 +62,7 @@ macx {
     DESTDIR = $$targetSubDir()
     llint.output = $$targetSubDir()/$$llint.output
     INCLUDEPATH += $$targetSubDir()
-    contains(QT_CONFIG, qt_framework) {
+    qtConfig(framework) {
         # Add framework headers directly to make #include <qglobal.h> work
         INCLUDEPATH += $$QT.core.libs/QtCore.framework/Headers
         # Extend framework search path to make #include <QtCore/qconfig.h> work
