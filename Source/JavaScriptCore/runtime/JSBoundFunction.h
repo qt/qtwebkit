@@ -32,38 +32,39 @@ namespace JSC {
 
 EncodedJSValue JSC_HOST_CALL boundFunctionCall(ExecState*);
 EncodedJSValue JSC_HOST_CALL boundFunctionConstruct(ExecState*);
+EncodedJSValue JSC_HOST_CALL isBoundFunction(ExecState*);
+EncodedJSValue JSC_HOST_CALL hasInstanceBoundFunction(ExecState*);
 
 class JSBoundFunction : public JSFunction {
 public:
     typedef JSFunction Base;
+    const static unsigned StructureFlags = ~ImplementsDefaultHasInstance & Base::StructureFlags;
 
-    static JSBoundFunction* create(ExecState*, JSGlobalObject*, JSObject* targetFunction, JSValue boundThis, JSValue boundArgs, int, const String&);
+    static JSBoundFunction* create(VM&, JSGlobalObject*, JSObject* targetFunction, JSValue boundThis, JSValue boundArgs, int, const String&);
     
-    static void destroy(JSCell*);
-
     static bool customHasInstance(JSObject*, ExecState*, JSValue);
 
     JSObject* targetFunction() { return m_targetFunction.get(); }
     JSValue boundThis() { return m_boundThis.get(); }
     JSValue boundArgs() { return m_boundArgs.get(); }
 
+    String toStringName(ExecState*);
+
     static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype) 
     {
         ASSERT(globalObject);
-        return Structure::create(vm, globalObject, prototype, TypeInfo(JSFunctionType, StructureFlags), &s_info); 
+        return Structure::create(vm, globalObject, prototype, TypeInfo(JSFunctionType, StructureFlags), info()); 
     }
 
-    static const ClassInfo s_info;
+    DECLARE_INFO;
 
 protected:
-    const static unsigned StructureFlags = OverridesHasInstance | OverridesVisitChildren | Base::StructureFlags;
-
     static void visitChildren(JSCell*, SlotVisitor&);
 
 private:
-    JSBoundFunction(ExecState*, JSGlobalObject*, Structure*, JSObject* targetFunction, JSValue boundThis, JSValue boundArgs);
+    JSBoundFunction(VM&, JSGlobalObject*, Structure*, JSObject* targetFunction, JSValue boundThis, JSValue boundArgs);
     
-    void finishCreation(ExecState*, NativeExecutable*, int, const String&);
+    void finishCreation(VM&, NativeExecutable*, int, const String&);
 
     WriteBarrier<JSObject> m_targetFunction;
     WriteBarrier<Unknown> m_boundThis;

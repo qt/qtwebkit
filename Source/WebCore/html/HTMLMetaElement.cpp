@@ -31,15 +31,15 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-inline HTMLMetaElement::HTMLMetaElement(const QualifiedName& tagName, Document* document)
+inline HTMLMetaElement::HTMLMetaElement(const QualifiedName& tagName, Document& document)
     : HTMLElement(tagName, document)
 {
     ASSERT(hasTagName(metaTag));
 }
 
-PassRefPtr<HTMLMetaElement> HTMLMetaElement::create(const QualifiedName& tagName, Document* document)
+Ref<HTMLMetaElement> HTMLMetaElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new HTMLMetaElement(tagName, document));
+    return adoptRef(*new HTMLMetaElement(tagName, document));
 }
 
 void HTMLMetaElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
@@ -54,10 +54,10 @@ void HTMLMetaElement::parseAttribute(const QualifiedName& name, const AtomicStri
         HTMLElement::parseAttribute(name, value);
 }
 
-Node::InsertionNotificationRequest HTMLMetaElement::insertedInto(ContainerNode* insertionPoint)
+Node::InsertionNotificationRequest HTMLMetaElement::insertedInto(ContainerNode& insertionPoint)
 {
     HTMLElement::insertedInto(insertionPoint);
-    if (insertionPoint->inDocument())
+    if (insertionPoint.inDocument())
         process();
     return InsertionDone;
 }
@@ -71,49 +71,37 @@ void HTMLMetaElement::process()
     if (contentValue.isNull())
         return;
 
-    if (equalIgnoringCase(name(), "viewport"))
-        document()->processViewport(contentValue, ViewportArguments::ViewportMeta);
-    else if (equalIgnoringCase(name(), "referrer"))
-        document()->processReferrerPolicy(contentValue);
-#if ENABLE(LEGACY_VIEWPORT_ADAPTION)
-    else if (equalIgnoringCase(name(), "handheldfriendly") && equalIgnoringCase(contentValue, "true"))
-        document()->processViewport("width=device-width", ViewportArguments::HandheldFriendlyMeta);
-    else if (equalIgnoringCase(name(), "mobileoptimized"))
-        document()->processViewport("width=device-width, initial-scale=1", ViewportArguments::MobileOptimizedMeta);
+    if (equalLettersIgnoringASCIICase(name(), "viewport"))
+        document().processViewport(contentValue, ViewportArguments::ViewportMeta);
+#if PLATFORM(IOS)
+    else if (equalLettersIgnoringASCIICase(name(), "format-detection"))
+        document().processFormatDetection(contentValue);
+    else if (equalLettersIgnoringASCIICase(name(), "apple-mobile-web-app-orientations"))
+        document().processWebAppOrientations();
 #endif
+    else if (equalLettersIgnoringASCIICase(name(), "referrer"))
+        document().processReferrerPolicy(contentValue);
 
     // Get the document to process the tag, but only if we're actually part of DOM tree (changing a meta tag while
     // it's not in the tree shouldn't have any effect on the document)
     const AtomicString& httpEquivValue = fastGetAttribute(http_equivAttr);
     if (!httpEquivValue.isNull())
-        document()->processHttpEquiv(httpEquivValue, contentValue);
+        document().processHttpEquiv(httpEquivValue, contentValue);
 }
 
-String HTMLMetaElement::content() const
+const AtomicString& HTMLMetaElement::content() const
 {
-    return getAttribute(contentAttr);
+    return fastGetAttribute(contentAttr);
 }
 
-String HTMLMetaElement::httpEquiv() const
+const AtomicString& HTMLMetaElement::httpEquiv() const
 {
-    return getAttribute(http_equivAttr);
+    return fastGetAttribute(http_equivAttr);
 }
 
-String HTMLMetaElement::name() const
+const AtomicString& HTMLMetaElement::name() const
 {
     return getNameAttribute();
 }
-
-#if ENABLE(MICRODATA)
-String HTMLMetaElement::itemValueText() const
-{
-    return getAttribute(contentAttr);
-}
-
-void HTMLMetaElement::setItemValueText(const String& value, ExceptionCode&)
-{
-    setAttribute(contentAttr, value);
-}
-#endif
 
 }

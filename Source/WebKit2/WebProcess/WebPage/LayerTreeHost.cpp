@@ -24,17 +24,16 @@
  */
 
 #include "config.h"
+
+#if USE(COORDINATED_GRAPHICS) || USE(TEXTURE_MAPPER)
+
 #include "LayerTreeHost.h"
 
-#if PLATFORM(MAC)
-#include "LayerTreeHostMac.h"
-#endif
-
-#if USE(COORDINATED_GRAPHICS)
+#if USE(COORDINATED_GRAPHICS_MULTIPROCESS)
 #include "CoordinatedLayerTreeHost.h"
-#endif
-
-#if PLATFORM(GTK) && USE(TEXTURE_MAPPER_GL)
+#elif USE(COORDINATED_GRAPHICS_THREADED)
+#include "ThreadedCoordinatedLayerTreeHost.h"
+#elif PLATFORM(GTK) && USE(TEXTURE_MAPPER_GL)
 #include "LayerTreeHostGtk.h"
 #endif
 
@@ -44,9 +43,9 @@ namespace WebKit {
 
 PassRefPtr<LayerTreeHost> LayerTreeHost::create(WebPage* webPage)
 {
-#if PLATFORM(MAC)
-    return LayerTreeHostMac::create(webPage);
-#elif USE(COORDINATED_GRAPHICS)
+#if USE(COORDINATED_GRAPHICS_THREADED)
+    return ThreadedCoordinatedLayerTreeHost::create(webPage);
+#elif USE(COORDINATED_GRAPHICS_MULTIPROCESS)
     return CoordinatedLayerTreeHost::create(webPage);
 #elif PLATFORM(GTK) && USE(TEXTURE_MAPPER_GL)
     return LayerTreeHostGtk::create(webPage);
@@ -66,3 +65,5 @@ LayerTreeHost::~LayerTreeHost()
 }
 
 } // namespace WebKit
+
+#endif // USE(COORDINATED_GRAPHICS) || USE(TEXTURE_MAPPER)

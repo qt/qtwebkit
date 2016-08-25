@@ -21,7 +21,7 @@
 #include "config.h"
 #include "ConvertToUTF8String.h"
 
-#include "KURL.h"
+#include "URL.h"
 #include <wtf/text/CString.h>
 #include <wtf/text/WTFString.h>
 
@@ -29,11 +29,14 @@
 
 gchar* convertToUTF8String(WTF::String const& s)
 {
+    if (s.isNull())
+        return nullptr;
+
     return g_strdup(s.utf8().data());
 }
 
-gchar* convertToUTF8String(WebCore::KURL const& s)
+gchar* convertToUTF8String(WebCore::URL const& s)
 {
-    return g_strdup(s.string().utf8().data());
+    return convertToUTF8String(s.string());
 }
 

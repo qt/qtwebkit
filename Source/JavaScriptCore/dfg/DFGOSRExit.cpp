@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,26 +28,28 @@
 
 #if ENABLE(DFG_JIT)
 
-#include "DFGAssemblyHelpers.h"
+#include "AssemblyHelpers.h"
+#include "DFGGraph.h"
+#include "DFGMayExit.h"
 #include "DFGSpeculativeJIT.h"
-#include "JSCellInlines.h"
+#include "JSCInlines.h"
 
 namespace JSC { namespace DFG {
 
 OSRExit::OSRExit(ExitKind kind, JSValueSource jsValueSource, MethodOfGettingAValueProfile valueProfile, SpeculativeJIT* jit, unsigned streamIndex, unsigned recoveryIndex)
-    : m_jsValueSource(jsValueSource)
+    : OSRExitBase(kind, jit->m_origin.forExit, jit->m_origin.semantic)
+    , m_jsValueSource(jsValueSource)
     , m_valueProfile(valueProfile)
     , m_patchableCodeOffset(0)
-    , m_codeOrigin(jit->m_codeOriginForOSR)
-    , m_codeOriginForExitProfile(m_codeOrigin)
     , m_recoveryIndex(recoveryIndex)
-    , m_watchpointIndex(std::numeric_limits<unsigned>::max())
-    , m_kind(kind)
-    , m_count(0)
     , m_streamIndex(streamIndex)
-    , m_lastSetOperand(jit->m_lastSetOperand)
 {
-    ASSERT(m_codeOrigin.isSet());
+    bool canExit = jit->m_origin.exitOK;
+    if (!canExit && jit->m_currentNode) {
+        ExitMode exitMode = mayExit(jit->m_jit.graph(), jit->m_currentNode);
+        canExit = exitMode == ExitMode::Exits || exitMode == ExitMode::ExitsForExceptions;
+    }
+    DFG_ASSERT(jit->m_jit.graph(), jit->m_currentNode, canExit);
 }
 
 void OSRExit::setPatchableCodeOffset(MacroAssembler::PatchableJump check)
@@ -62,7 +64,7 @@ MacroAssembler::Jump OSRExit::getPatchableCodeOffsetAsJump() const
 
 CodeLocationJump OSRExit::codeLocationForRepatch(CodeBlock* dfgCodeBlock) const
 {
-    return CodeLocationJump(dfgCodeBlock->getJITCode().dataAddressAtOffset(m_patchableCodeOffset));
+    return CodeLocationJump(dfgCodeBlock->jitCode()->dataAddressAtOffset(m_patchableCodeOffset));
 }
 
 void OSRExit::correctJump(LinkBuffer& linkBuffer)
@@ -70,20 +72,6 @@ void OSRExit::correctJump(LinkBuffer& linkBuffer)
     MacroAssembler::Label label;
     label.m_label.m_offset = m_patchableCodeOffset;
     m_patchableCodeOffset = linkBuffer.offsetOf(label);
-}
-
-bool OSRExit::considerAddingAsFrequentExitSiteSlow(CodeBlock* profiledCodeBlock)
-{
-    FrequentExitSite exitSite;
-    
-    if (m_kind == ArgumentsEscaped) {
-        // Count this one globally. It doesn't matter where in the code block the arguments excaped;
-        // the fact that they did is not associated with any particular instruction.
-        exitSite = FrequentExitSite(m_kind);
-    } else
-        exitSite = FrequentExitSite(m_codeOriginForExitProfile.bytecodeIndex, m_kind);
-    
-    return baselineCodeBlockForOriginAndBaselineCodeBlock(m_codeOriginForExitProfile, profiledCodeBlock)->addFrequentExitSite(exitSite);
 }
 
 } } // namespace JSC::DFG

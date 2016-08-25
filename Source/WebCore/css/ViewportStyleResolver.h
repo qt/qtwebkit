@@ -41,14 +41,14 @@ namespace WebCore {
 
 class CSSPrimitiveValue;
 class Document;
-class MutableStylePropertySet;
+class MutableStyleProperties;
 class StyleRuleViewport;
 
 class ViewportStyleResolver : public RefCounted<ViewportStyleResolver> {
 public:
-    static PassRefPtr<ViewportStyleResolver> create(Document* document)
+    static Ref<ViewportStyleResolver> create(Document* document)
     {
-        return adoptRef(new ViewportStyleResolver(document));
+        return adoptRef(*new ViewportStyleResolver(document));
     }
 
     ~ViewportStyleResolver();
@@ -64,7 +64,7 @@ private:
     float getViewportArgumentValue(CSSPropertyID) const;
 
     Document* m_document;
-    RefPtr<MutableStylePropertySet> m_propertySet;
+    RefPtr<MutableStyleProperties> m_propertySet;
 };
 
 } // namespace WebCore

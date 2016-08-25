@@ -23,8 +23,11 @@
 #if USE(EGL)
 
 #include "GLContext.h"
-
 #include <EGL/egl.h>
+
+#if PLATFORM(X11)
+#include "XUniqueResource.h"
+#endif
 
 namespace WebCore {
 
@@ -32,34 +35,46 @@ class GLContextEGL : public GLContext {
     WTF_MAKE_NONCOPYABLE(GLContextEGL);
 public:
     enum EGLSurfaceType { PbufferSurface, WindowSurface, PixmapSurface };
-    static PassOwnPtr<GLContextEGL> createContext(EGLNativeWindowType, GLContext* sharingContext = 0);
-    static PassOwnPtr<GLContextEGL> createWindowContext(EGLNativeWindowType, GLContext* sharingContext);
+    static std::unique_ptr<GLContextEGL> createContext(EGLNativeWindowType, GLContext* sharingContext = 0);
+    static std::unique_ptr<GLContextEGL> createWindowContext(EGLNativeWindowType, GLContext* sharingContext, std::unique_ptr<GLContext::Data>&& = nullptr);
 
+    GLContextEGL(EGLContext, EGLSurface, EGLSurfaceType);
+#if PLATFORM(X11)
+    GLContextEGL(EGLContext, EGLSurface, XUniquePixmap&&);
+#endif
     virtual ~GLContextEGL();
     virtual bool makeContextCurrent();
     virtual void swapBuffers();
     virtual void waitNative();
     virtual bool canRenderToDefaultFramebuffer();
     virtual IntSize defaultFrameBufferSize();
+#if USE(CAIRO)
     virtual cairo_device_t* cairoDevice();
+#endif
+    virtual bool isEGLContext() const { return true; }
 
-#if ENABLE(WEBGL)
+#if ENABLE(GRAPHICS_CONTEXT_3D)
     virtual PlatformGraphicsContext3D platformContext();
 #endif
 
 private:
-    static PassOwnPtr<GLContextEGL> createPbufferContext(EGLContext sharingContext);
-    static PassOwnPtr<GLContextEGL> createPixmapContext(EGLContext sharingContext);
+    static std::unique_ptr<GLContextEGL> createPbufferContext(EGLContext sharingContext);
+#if PLATFORM(X11)
+    static std::unique_ptr<GLContextEGL> createPixmapContext(EGLContext sharingContext);
+#endif
 
     static void addActiveContext(GLContextEGL*);
     static void cleanupSharedEGLDisplay(void);
 
-    GLContextEGL(EGLContext, EGLSurface, EGLSurfaceType);
-
     EGLContext m_context;
     EGLSurface m_surface;
     EGLSurfaceType m_type;
-    cairo_device_t* m_cairoDevice;
+#if PLATFORM(X11)
+    XUniquePixmap m_pixmap;
+#endif
+#if USE(CAIRO)
+    cairo_device_t* m_cairoDevice { nullptr };
+#endif
 };
 
 } // namespace WebCore

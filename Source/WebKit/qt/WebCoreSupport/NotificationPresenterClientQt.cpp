@@ -35,13 +35,14 @@
 #include "Document.h"
 #include "Event.h"
 #include "EventNames.h"
-#include "KURL.h"
+#include "MainFrame.h"
 #include "Page.h"
 #include "QWebFrameAdapter.h"
 #include "QWebPageAdapter.h"
 #include "QtPlatformPlugin.h"
 #include "ScriptExecutionContext.h"
 #include "SecurityOrigin.h"
+#include "URL.h"
 #include "UserGestureIndicator.h"
 #include "qwebkitglobal.h"
 
@@ -67,22 +68,22 @@ NotificationPresenterClientQt* NotificationPresenterClientQt::notificationPresen
 #endif
 
 NotificationWrapper::NotificationWrapper()
-    : m_closeTimer(this, &NotificationWrapper::close)
-    , m_displayEventTimer(this, &NotificationWrapper::sendDisplayEvent)
+    : m_closeTimer(*this, &NotificationWrapper::close)
+    , m_displayEventTimer(*this, &NotificationWrapper::sendDisplayEvent)
 {
 #if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
     m_presenter = nullptr;
 #endif
 }
 
-void NotificationWrapper::close(Timer<NotificationWrapper>*)
+void NotificationWrapper::close()
 {
 #if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
     NotificationPresenterClientQt::notificationPresenter()->cancel(this);
 #endif
 }
 
-void NotificationWrapper::sendDisplayEvent(Timer<NotificationWrapper>*)
+void NotificationWrapper::sendDisplayEvent()
 {
 #if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
     NotificationPresenterClientQt::notificationPresenter()->sendDisplayEvent(this);
@@ -126,7 +127,7 @@ const QUrl NotificationWrapper::openerPageUrl() const
     Notification* notification = NotificationPresenterClientQt::notificationPresenter()->notificationForWrapper(this);
     if (notification) {
         if (notification->scriptExecutionContext()) 
-            url = static_cast<Document*>(notification->scriptExecutionContext())->page()->mainFrame()->document()->url();
+            url = static_cast<Document*>(notification->scriptExecutionContext())->page()->mainFrame().document()->url();
     }
 #endif
     return url;
@@ -350,6 +351,11 @@ void NotificationPresenterClientQt::requestPermission(ScriptExecutionContext* co
 }
 #endif
 
+bool NotificationPresenterClientQt::hasPendingPermissionRequests(ScriptExecutionContext* context) const
+{
+    return m_pendingPermissionRequests.contains(context);
+}
+
 NotificationClient::Permission NotificationPresenterClientQt::checkPermission(ScriptExecutionContext* context)
 {
     return m_cachedPermissions.value(context, NotificationClient::PermissionNotAllowed);
@@ -483,7 +489,7 @@ QWebPageAdapter* NotificationPresenterClientQt::toPage(ScriptExecutionContext* c
     Document* document = static_cast<Document*>(context);
 
     Page* page = document->page();
-    if (!page || !page->mainFrame())
+    if (!page)
         return 0;
 
     return QWebPageAdapter::kit(page);

@@ -29,18 +29,19 @@
 
 #include "CachedResourceClient.h"
 #include "CachedResourceClientWalker.h"
+#include "HTTPHeaderNames.h"
 #include "HTTPParsers.h"
 #include "MIMETypeRegistry.h"
 #include "MemoryCache.h"
-#include "ResourceBuffer.h"
 #include "RuntimeApplicationChecks.h"
+#include "SharedBuffer.h"
 #include "TextResourceDecoder.h"
 #include <wtf/Vector.h>
 
 namespace WebCore {
 
-CachedScript::CachedScript(const ResourceRequest& resourceRequest, const String& charset)
-    : CachedResource(resourceRequest, Script)
+CachedScript::CachedScript(const ResourceRequest& resourceRequest, const String& charset, SessionID sessionID)
+    : CachedResource(resourceRequest, Script, sessionID)
     , m_decoder(TextResourceDecoder::create(ASCIILiteral("application/javascript"), charset))
 {
     // It's javascript we want.
@@ -65,27 +66,53 @@ String CachedScript::encoding() const
 
 String CachedScript::mimeType() const
 {
-    return extractMIMETypeFromMediaType(m_response.httpHeaderField("Content-Type")).lower();
+    return extractMIMETypeFromMediaType(m_response.httpHeaderField(HTTPHeaderName::ContentType)).convertToASCIILowercase();
 }
 
-const String& CachedScript::script()
+StringView CachedScript::script()
 {
-    ASSERT(!isPurgeable());
+    if (!m_data)
+        return { };
 
-    if (!m_script && m_data) {
-        m_script = m_decoder->decode(m_data->data(), encodedSize());
-        m_script.append(m_decoder->flush());
+    if (m_decodingState == NeverDecoded
+        && TextEncoding(encoding()).isByteBasedEncoding()
+        && m_data->size()
+        && charactersAreAllASCII(reinterpret_cast<const LChar*>(m_data->data()), m_data->size())) {
+
+        m_decodingState = DataAndDecodedStringHaveSameBytes;
+
+        // If the encoded and decoded data are the same, there is no decoded data cost!
+        setDecodedSize(0);
+        m_decodedDataDeletionTimer.stop();
+
+        m_scriptHash = StringHasher::computeHashAndMaskTop8Bits(reinterpret_cast<const LChar*>(m_data->data()), m_data->size());
+    }
+
+    if (m_decodingState == DataAndDecodedStringHaveSameBytes)
+        return { reinterpret_cast<const LChar*>(m_data->data()), m_data->size() };
+
+    if (!m_script) {
+        m_script = m_decoder->decodeAndFlush(m_data->data(), encodedSize());
+        m_scriptHash = m_script.impl()->hash();
+        m_decodingState = DataAndDecodedStringHaveDifferentBytes;
         setDecodedSize(m_script.sizeInBytes());
     }
+
     m_decodedDataDeletionTimer.restart();
-    
     return m_script;
 }
 
-void CachedScript::finishLoading(ResourceBuffer* data)
+unsigned CachedScript::scriptHash()
+{
+    if (m_decodingState == NeverDecoded)
+        script();
+    return m_scriptHash;
+}
+
+void CachedScript::finishLoading(SharedBuffer* data)
 {
     m_data = data;
-    setEncodedSize(m_data.get() ? m_data->size() : 0);
+    setEncodedSize(data ? data->size() : 0);
     CachedResource::finishLoading(data);
 }
 
@@ -93,14 +120,12 @@ void CachedScript::destroyDecodedData()
 {
     m_script = String();
     setDecodedSize(0);
-    if (!MemoryCache::shouldMakeResourcePurgeableOnEviction() && isSafeToMakePurgeable())
-        makePurgeable(true);
 }
 
 #if ENABLE(NOSNIFF)
 bool CachedScript::mimeTypeAllowedByNosniff() const
 {
-    return !parseContentTypeOptionsHeader(m_response.httpHeaderField("X-Content-Type-Options")) == ContentTypeOptionsNosniff || MIMETypeRegistry::isSupportedJavaScriptMIMEType(mimeType());
+    return parseContentTypeOptionsHeader(m_response.httpHeaderField(HTTPHeaderName::XContentTypeOptions)) != ContentTypeOptionsNosniff || MIMETypeRegistry::isSupportedJavaScriptMIMEType(mimeType());
 }
 #endif
 

@@ -29,28 +29,25 @@ namespace WebCore {
 
 class CounterNode;
 
-class RenderCounter : public RenderText {
+class RenderCounter final : public RenderText {
 public:
-    RenderCounter(Document*, const CounterContent&);
+    RenderCounter(Document&, const CounterContent&);
     virtual ~RenderCounter();
 
-    static void destroyCounterNodes(RenderObject*);
-    static void destroyCounterNode(RenderObject*, const AtomicString& identifier);
-    static void rendererSubtreeAttached(RenderObject*);
-    static void rendererRemovedFromTree(RenderObject*);
-    static void rendererStyleChanged(RenderObject*, const RenderStyle* oldStyle, const RenderStyle* newStyle);
+    static void destroyCounterNodes(RenderElement&);
+    static void destroyCounterNode(RenderElement&, const AtomicString& identifier);
+    static void rendererSubtreeAttached(RenderElement&);
+    static void rendererRemovedFromTree(RenderElement&);
+    static void rendererStyleChanged(RenderElement&, const RenderStyle* oldStyle, const RenderStyle* newStyle);
 
     void updateCounter();
 
-protected:
-    virtual void willBeDestroyed();
-
 private:
-    virtual const char* renderName() const;
-    virtual bool isCounter() const;
-    virtual PassRefPtr<StringImpl> originalText() const;
+    virtual const char* renderName() const override;
+    virtual bool isCounter() const override;
+    virtual String originalText() const override;
     
-    virtual void computePreferredLogicalWidths(float leadWidth) OVERRIDE;
+    virtual void computePreferredLogicalWidths(float leadWidth) override;
 
     // Removes the reference to the CounterNode associated with this renderer.
     // This is used to cause a counter display update when the CounterNode tree changes.
@@ -62,18 +59,11 @@ private:
     friend class CounterNode;
 };
 
-inline RenderCounter* toRenderCounter(RenderObject* object)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isCounter());
-    return static_cast<RenderCounter*>(object);
-}
-
-// This will catch anyone doing an unnecessary cast.
-void toRenderCounter(const RenderCounter*);
-
 } // namespace WebCore
 
-#ifndef NDEBUG
+SPECIALIZE_TYPE_TRAITS_RENDER_OBJECT(RenderCounter, isCounter())
+
+#if ENABLE(TREE_DEBUGGING)
 // Outside the WebCore namespace for ease of invocation from gdb.
 void showCounterRendererTree(const WebCore::RenderObject*, const char* counterName = 0);
 #endif

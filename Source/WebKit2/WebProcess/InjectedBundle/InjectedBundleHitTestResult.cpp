@@ -34,16 +34,16 @@
 #include <WebCore/Frame.h>
 #include <WebCore/FrameLoader.h>
 #include <WebCore/FrameView.h>
-#include <WebCore/KURL.h>
+#include <WebCore/URL.h>
 #include <wtf/text/WTFString.h>
 
 using namespace WebCore;
 
 namespace WebKit {
 
-PassRefPtr<InjectedBundleHitTestResult> InjectedBundleHitTestResult::create(const WebCore::HitTestResult& hitTestResult)
+Ref<InjectedBundleHitTestResult> InjectedBundleHitTestResult::create(const WebCore::HitTestResult& hitTestResult)
 {
-    return adoptRef(new InjectedBundleHitTestResult(hitTestResult));
+    return adoptRef(*new InjectedBundleHitTestResult(hitTestResult));
 }
 
 PassRefPtr<InjectedBundleNodeHandle> InjectedBundleHitTestResult::nodeHandle() const
@@ -51,32 +51,31 @@ PassRefPtr<InjectedBundleNodeHandle> InjectedBundleHitTestResult::nodeHandle() c
     return InjectedBundleNodeHandle::getOrCreate(m_hitTestResult.innerNonSharedNode());
 }
 
+PassRefPtr<InjectedBundleNodeHandle> InjectedBundleHitTestResult::urlElementHandle() const
+{
+    return InjectedBundleNodeHandle::getOrCreate(m_hitTestResult.URLElement());
+}
+
 WebFrame* InjectedBundleHitTestResult::frame() const
 {
     Node* node = m_hitTestResult.innerNonSharedNode();
     if (!node)
-        return 0;
+        return nullptr;
 
-    Document* document = node->document();
-    if (!document)
-        return 0;
-
-    Frame* frame = document->frame();
+    Frame* frame = node->document().frame();
     if (!frame)
-        return 0;
+        return nullptr;
 
-    WebFrameLoaderClient* webFrameLoaderClient = toWebFrameLoaderClient(frame->loader()->client());
-    return webFrameLoaderClient ? webFrameLoaderClient->webFrame() : 0;
+    return WebFrame::fromCoreFrame(*frame);
 }
 
 WebFrame* InjectedBundleHitTestResult::targetFrame() const
 {
     Frame* frame = m_hitTestResult.targetFrame();
     if (!frame)
-        return 0;
+        return nullptr;
 
-    WebFrameLoaderClient* webFrameLoaderClient = toWebFrameLoaderClient(frame->loader()->client());
-    return webFrameLoaderClient ? webFrameLoaderClient->webFrame() : 0;
+    return WebFrame::fromCoreFrame(*frame);
 }
 
 String InjectedBundleHitTestResult::absoluteImageURL() const
@@ -109,16 +108,21 @@ bool InjectedBundleHitTestResult::mediaHasAudio() const
     return m_hitTestResult.mediaHasAudio();
 }
 
+bool InjectedBundleHitTestResult::isDownloadableMedia() const
+{
+    return m_hitTestResult.isDownloadableMedia();
+}
+
 BundleHitTestResultMediaType InjectedBundleHitTestResult::mediaType() const
 {
 #if !ENABLE(VIDEO)
     return BundleHitTestResultMediaTypeNone;
 #else
     WebCore::Node* node = m_hitTestResult.innerNonSharedNode();
-    if (!node->isElementNode())
+    if (!is<Element>(*node))
         return BundleHitTestResultMediaTypeNone;
     
-    if (!toElement(node)->isMediaElement())
+    if (!downcast<Element>(*node).isMediaElement())
         return BundleHitTestResultMediaTypeNone;
     
     return m_hitTestResult.mediaIsVideo() ? BundleHitTestResultMediaTypeVideo : BundleHitTestResultMediaTypeAudio;    

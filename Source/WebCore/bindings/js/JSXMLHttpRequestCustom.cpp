@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -38,8 +38,6 @@
 #include "FrameLoader.h"
 #include "HTMLDocument.h"
 #include "InspectorInstrumentation.h"
-#include "JSArrayBuffer.h"
-#include "JSArrayBufferView.h"
 #include "JSBlob.h"
 #include "JSDOMFormData.h"
 #include "JSDOMWindowCustom.h"
@@ -47,154 +45,180 @@
 #include "JSEvent.h"
 #include "JSEventListener.h"
 #include "XMLHttpRequest.h"
+#include <interpreter/StackVisitor.h>
+#include <runtime/ArrayBuffer.h>
 #include <runtime/Error.h>
-#include <interpreter/Interpreter.h>
-#include <wtf/ArrayBuffer.h>
+#include <runtime/JSArrayBuffer.h>
+#include <runtime/JSArrayBufferView.h>
+#include <runtime/JSONObject.h>
 
 using namespace JSC;
 
 namespace WebCore {
 
-void JSXMLHttpRequest::visitChildren(JSCell* cell, SlotVisitor& visitor)
+void JSXMLHttpRequest::visitAdditionalChildren(SlotVisitor& visitor)
 {
-    JSXMLHttpRequest* thisObject = jsCast<JSXMLHttpRequest*>(cell);
-    ASSERT_GC_OBJECT_INHERITS(thisObject, &s_info);
-    COMPILE_ASSERT(StructureFlags & OverridesVisitChildren, OverridesVisitChildrenWithoutSettingFlag);
-    ASSERT(thisObject->structure()->typeInfo().overridesVisitChildren());
-    Base::visitChildren(thisObject, visitor);
-
-    if (XMLHttpRequestUpload* upload = thisObject->m_impl->optionalUpload())
+    if (XMLHttpRequestUpload* upload = wrapped().optionalUpload())
         visitor.addOpaqueRoot(upload);
 
-    if (Document* responseDocument = thisObject->m_impl->optionalResponseXML())
+    if (Document* responseDocument = wrapped().optionalResponseXML())
         visitor.addOpaqueRoot(responseDocument);
 
-    if (ArrayBuffer* responseArrayBuffer = thisObject->m_impl->optionalResponseArrayBuffer())
+    if (ArrayBuffer* responseArrayBuffer = wrapped().optionalResponseArrayBuffer())
         visitor.addOpaqueRoot(responseArrayBuffer);
 
-    if (Blob* responseBlob = thisObject->m_impl->optionalResponseBlob())
+    if (Blob* responseBlob = wrapped().optionalResponseBlob())
         visitor.addOpaqueRoot(responseBlob);
-
-    thisObject->m_impl->visitJSEventListeners(visitor);
 }
 
 // Custom functions
-JSValue JSXMLHttpRequest::open(ExecState* exec)
+JSValue JSXMLHttpRequest::open(ExecState& state)
 {
-    if (exec->argumentCount() < 2)
-        return throwError(exec, createNotEnoughArgumentsError(exec));
+    if (state.argumentCount() < 2)
+        return state.vm().throwException(&state, createNotEnoughArgumentsError(&state));
 
-    const KURL& url = impl()->scriptExecutionContext()->completeURL(exec->argument(1).toString(exec)->value(exec));
-    String method = exec->argument(0).toString(exec)->value(exec);
+    const URL& url = wrapped().scriptExecutionContext()->completeURL(state.uncheckedArgument(1).toString(&state)->value(&state));
+    String method = state.uncheckedArgument(0).toString(&state)->value(&state);
 
     ExceptionCode ec = 0;
-    if (exec->argumentCount() >= 3) {
-        bool async = exec->argument(2).toBoolean(exec);
+    if (state.argumentCount() >= 3) {
+        bool async = state.uncheckedArgument(2).toBoolean(&state);
+        if (!state.argument(3).isUndefined()) {
+            String user = valueToStringWithNullCheck(&state, state.uncheckedArgument(3));
 
-        if (exec->argumentCount() >= 4 && !exec->argument(3).isUndefined()) {
-            String user = valueToStringWithNullCheck(exec, exec->argument(3));
-
-            if (exec->argumentCount() >= 5 && !exec->argument(4).isUndefined()) {
-                String password = valueToStringWithNullCheck(exec, exec->argument(4));
-                impl()->open(method, url, async, user, password, ec);
+            if (!state.argument(4).isUndefined()) {
+                String password = valueToStringWithNullCheck(&state, state.uncheckedArgument(4));
+                wrapped().open(method, url, async, user, password, ec);
             } else
-                impl()->open(method, url, async, user, ec);
+                wrapped().open(method, url, async, user, ec);
         } else
-            impl()->open(method, url, async, ec);
+            wrapped().open(method, url, async, ec);
     } else
-        impl()->open(method, url, ec);
+        wrapped().open(method, url, ec);
 
-    setDOMException(exec, ec);
+    setDOMException(&state, ec);
     return jsUndefined();
 }
 
-JSValue JSXMLHttpRequest::send(ExecState* exec)
-{
-    InspectorInstrumentation::willSendXMLHttpRequest(impl()->scriptExecutionContext(), impl()->url());
-
-    ExceptionCode ec = 0;
-    if (!exec->argumentCount())
-        impl()->send(ec);
-    else {
-        JSValue val = exec->argument(0);
-        if (val.isUndefinedOrNull())
-            impl()->send(ec);
-        else if (val.inherits(&JSDocument::s_info))
-            impl()->send(toDocument(val), ec);
-        else if (val.inherits(&JSBlob::s_info))
-            impl()->send(toBlob(val), ec);
-        else if (val.inherits(&JSDOMFormData::s_info))
-            impl()->send(toDOMFormData(val), ec);
-        else if (val.inherits(&JSArrayBuffer::s_info))
-            impl()->send(toArrayBuffer(val), ec);
-        else if (val.inherits(&JSArrayBufferView::s_info))
-            impl()->send(toArrayBufferView(val), ec);
-        else
-            impl()->send(val.toString(exec)->value(exec), ec);
+class SendFunctor {
+public:
+    SendFunctor()
+        : m_hasSkippedFirstFrame(false)
+        , m_line(0)
+        , m_column(0)
+    {
     }
 
-    int signedLineNumber;
-    intptr_t sourceID;
-    String sourceURL;
-    JSValue function;
-    exec->interpreter()->retrieveLastCaller(exec, signedLineNumber, sourceID, sourceURL, function);
-    impl()->setLastSendLineNumber(signedLineNumber >= 0 ? signedLineNumber : 0);
-    impl()->setLastSendURL(sourceURL);
+    unsigned line() const { return m_line; }
+    unsigned column() const { return m_column; }
+    String url() const { return m_url; }
 
-    setDOMException(exec, ec);
+    StackVisitor::Status operator()(StackVisitor& visitor)
+    {
+        if (!m_hasSkippedFirstFrame) {
+            m_hasSkippedFirstFrame = true;
+            return StackVisitor::Continue;
+        }
+
+        unsigned line = 0;
+        unsigned column = 0;
+        visitor->computeLineAndColumn(line, column);
+        m_line = line;
+        m_column = column;
+        m_url = visitor->sourceURL();
+        return StackVisitor::Done;
+    }
+
+private:
+    bool m_hasSkippedFirstFrame;
+    unsigned m_line;
+    unsigned m_column;
+    String m_url;
+};
+
+JSValue JSXMLHttpRequest::send(ExecState& state)
+{
+    InspectorInstrumentation::willSendXMLHttpRequest(wrapped().scriptExecutionContext(), wrapped().url());
+
+    ExceptionCode ec = 0;
+    JSValue val = state.argument(0);
+    if (val.isUndefinedOrNull())
+        wrapped().send(ec);
+    else if (val.inherits(JSDocument::info()))
+        wrapped().send(JSDocument::toWrapped(val), ec);
+    else if (val.inherits(JSBlob::info()))
+        wrapped().send(JSBlob::toWrapped(val), ec);
+    else if (val.inherits(JSDOMFormData::info()))
+        wrapped().send(JSDOMFormData::toWrapped(val), ec);
+    else if (val.inherits(JSArrayBuffer::info()))
+        wrapped().send(toArrayBuffer(val), ec);
+    else if (val.inherits(JSArrayBufferView::info())) {
+        RefPtr<ArrayBufferView> view = toArrayBufferView(val);
+        wrapped().send(view.get(), ec);
+    } else
+        wrapped().send(val.toString(&state)->value(&state), ec);
+
+    SendFunctor functor;
+    state.iterate(functor);
+    wrapped().setLastSendLineAndColumnNumber(functor.line(), functor.column());
+    wrapped().setLastSendURL(functor.url());
+    setDOMException(&state, ec);
     return jsUndefined();
 }
 
-JSValue JSXMLHttpRequest::responseText(ExecState* exec) const
+JSValue JSXMLHttpRequest::responseText(ExecState& state) const
 {
     ExceptionCode ec = 0;
-    String text = impl()->responseText(ec);
+    String text = wrapped().responseText(ec);
     if (ec) {
-        setDOMException(exec, ec);
+        setDOMException(&state, ec);
         return jsUndefined();
     }
-    return jsOwnedStringOrNull(exec, text);
+    return jsOwnedStringOrNull(&state, text);
 }
 
-JSValue JSXMLHttpRequest::response(ExecState* exec) const
+JSValue JSXMLHttpRequest::response(ExecState& state) const
 {
-    switch (impl()->responseTypeCode()) {
+    // FIXME: Use CachedAttribute for other types than JSON as well.
+    if (m_response && wrapped().responseCacheIsValid())
+        return m_response.get();
+
+    if (!wrapped().doneWithoutErrors() && wrapped().responseTypeCode() > XMLHttpRequest::ResponseTypeText)
+        return jsNull();
+
+    switch (wrapped().responseTypeCode()) {
     case XMLHttpRequest::ResponseTypeDefault:
     case XMLHttpRequest::ResponseTypeText:
-        return responseText(exec);
+        return responseText(state);
+
+    case XMLHttpRequest::ResponseTypeJSON:
+        {
+            JSValue value = JSONParse(&state, wrapped().responseTextIgnoringResponseType());
+            if (!value)
+                value = jsNull();
+            m_response.set(state.vm(), this, value);
+
+            wrapped().didCacheResponseJSON();
+
+            return value;
+        }
 
     case XMLHttpRequest::ResponseTypeDocument:
         {
             ExceptionCode ec = 0;
-            Document* document = impl()->responseXML(ec);
+            Document* document = wrapped().responseXML(ec);
             if (ec) {
-                setDOMException(exec, ec);
+                setDOMException(&state, ec);
                 return jsUndefined();
             }
-            return toJS(exec, globalObject(), document);
+            return toJS(&state, globalObject(), document);
         }
 
     case XMLHttpRequest::ResponseTypeBlob:
-        {
-            ExceptionCode ec = 0;
-            Blob* blob = impl()->responseBlob(ec);
-            if (ec) {
-                setDOMException(exec, ec);
-                return jsUndefined();
-            }
-            return toJS(exec, globalObject(), blob);
-        }
+        return toJS(&state, globalObject(), wrapped().responseBlob());
 
     case XMLHttpRequest::ResponseTypeArrayBuffer:
-        {
-            ExceptionCode ec = 0;
-            ArrayBuffer* arrayBuffer = impl()->responseArrayBuffer(ec);
-            if (ec) {
-                setDOMException(exec, ec);
-                return jsUndefined();
-            }
-            return toJS(exec, globalObject(), arrayBuffer);
-        }
+        return toJS(&state, globalObject(), wrapped().responseArrayBuffer());
     }
 
     return jsUndefined();

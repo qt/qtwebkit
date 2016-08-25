@@ -26,7 +26,6 @@
 #ifndef DOMStringList_h
 #define DOMStringList_h
 
-#include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
 #include <wtf/Vector.h>
 #include <wtf/text/WTFString.h>
@@ -37,9 +36,9 @@ namespace WebCore {
 //        than creating the list statically as is currently the only option.
 class DOMStringList : public RefCounted<DOMStringList> {
 public:
-    static PassRefPtr<DOMStringList> create()
+    static Ref<DOMStringList> create()
     {
-        return adoptRef(new DOMStringList());
+        return adoptRef(*new DOMStringList);
     }
 
     bool isEmpty() const { return m_strings.isEmpty(); }

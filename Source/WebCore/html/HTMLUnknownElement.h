@@ -34,27 +34,27 @@
 
 namespace WebCore {
 
-class HTMLUnknownElement FINAL : public HTMLElement {
+class HTMLUnknownElement final : public HTMLElement {
 public:
-    static PassRefPtr<HTMLUnknownElement> create(const QualifiedName& tagName, Document* document)
+    static Ref<HTMLUnknownElement> create(const QualifiedName& tagName, Document& document)
     {
-        return adoptRef(new HTMLUnknownElement(tagName, document));
+        return adoptRef(*new HTMLUnknownElement(tagName, document));
     }
-
-    virtual bool isHTMLUnknownElement() const OVERRIDE { return true; }
 
 private:
-    HTMLUnknownElement(const QualifiedName& tagName, Document* document)
-        : HTMLElement(tagName, document)
+    HTMLUnknownElement(const QualifiedName& tagName, Document& document)
+        : HTMLElement(tagName, document, CreateHTMLElement)
     {
     }
-};
 
-inline HTMLUnknownElement* toHTMLUnknownElement(HTMLElement* element)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!element || element->isHTMLUnknownElement());
-    return static_cast<HTMLUnknownElement*>(element);
-}
+#if ENABLE(METER_ELEMENT)
+    virtual bool canHaveUserAgentShadowRoot() const override final { return false; }
+#else
+    virtual bool canHaveUserAgentShadowRoot() const override final { return localName() == "meter"; }
+#endif
+
+    virtual bool isHTMLUnknownElement() const override { return true; }
+};
 
 } // namespace
 

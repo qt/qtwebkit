@@ -74,16 +74,16 @@ inline void FormControlState::append(const String& value)
 class FormController {
     WTF_MAKE_FAST_ALLOCATED;
 public:
-    static PassOwnPtr<FormController> create()
-    {
-        return adoptPtr(new FormController);
-    }
+    FormController();
     ~FormController();
 
     CheckedRadioButtons& checkedRadioButtons() { return m_checkedRadioButtons; }
 
     void registerFormElementWithState(HTMLFormControlElementWithState*);
     void unregisterFormElementWithState(HTMLFormControlElementWithState*);
+
+    unsigned formElementsCharacterCount() const;
+
     // This should be callled only by Document::formElementsState().
     Vector<String> formElementsState() const;
     // This should be callled only by Document::setStateForNewFormElements().
@@ -92,21 +92,20 @@ public:
     void restoreControlStateFor(HTMLFormControlElementWithState&);
     void restoreControlStateIn(HTMLFormElement&);
 
-    static Vector<String> getReferencedFilePaths(const Vector<String>& stateVector);
+    WEBCORE_EXPORT static Vector<String> getReferencedFilePaths(const Vector<String>& stateVector);
 
 private:
-    typedef ListHashSet<RefPtr<HTMLFormControlElementWithState>, 64> FormElementListHashSet;
-    typedef HashMap<RefPtr<AtomicStringImpl>, OwnPtr<SavedFormState> > SavedFormStateMap;
+    typedef ListHashSet<RefPtr<HTMLFormControlElementWithState>> FormElementListHashSet;
+    typedef HashMap<RefPtr<AtomicStringImpl>, std::unique_ptr<SavedFormState>> SavedFormStateMap;
 
-    FormController();
-    static PassOwnPtr<SavedFormStateMap> createSavedFormStateMap(const FormElementListHashSet&);
+    static std::unique_ptr<SavedFormStateMap> createSavedFormStateMap(const FormElementListHashSet&);
     FormControlState takeStateForFormElement(const HTMLFormControlElementWithState&);
     static void formStatesFromStateVector(const Vector<String>&, SavedFormStateMap&);
 
     CheckedRadioButtons m_checkedRadioButtons;
     FormElementListHashSet m_formElementsWithState;
     SavedFormStateMap m_savedFormStateMap;
-    OwnPtr<FormKeyGenerator> m_formKeyGenerator;
+    std::unique_ptr<FormKeyGenerator> m_formKeyGenerator;
 };
 
 } // namespace WebCore

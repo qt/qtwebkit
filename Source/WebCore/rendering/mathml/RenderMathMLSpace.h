@@ -28,49 +28,35 @@
 
 #if ENABLE(MATHML)
 
+#include "MathMLTextElement.h"
 #include "RenderMathMLBlock.h"
 
 namespace WebCore {
     
-class RenderMathMLSpace : public RenderMathMLBlock {
+class RenderMathMLSpace final : public RenderMathMLBlock {
 public:
-    explicit RenderMathMLSpace(Element*);
-
-    virtual int firstLineBoxBaseline() const OVERRIDE;
-    virtual void updateLogicalWidth() OVERRIDE;
-    virtual void updateLogicalHeight() OVERRIDE;
+    RenderMathMLSpace(MathMLTextElement&, Ref<RenderStyle>&&);
+    MathMLTextElement& element() { return static_cast<MathMLTextElement&>(nodeForNonAnonymous()); }
 
 private:
-    virtual void styleDidChange(StyleDifference, const RenderStyle* oldStyle) OVERRIDE;
-    virtual const char* renderName() const OVERRIDE { return isAnonymous() ? "RenderMathMLSpace (anonymous)" : "RenderMathMLSpace"; }
-
-    virtual bool isRenderMathMLSpace() const OVERRIDE { return true; }
-
-    virtual bool isChildAllowed(RenderObject*, RenderStyle*) const OVERRIDE { return false; } 
-    virtual void computeIntrinsicLogicalWidths(LayoutUnit& minLogicalWidth, LayoutUnit& maxLogicalWidth) const OVERRIDE;
-
-    virtual void updateFromElement() OVERRIDE;
+    virtual const char* renderName() const override { return isAnonymous() ? "RenderMathMLSpace (anonymous)" : "RenderMathMLSpace"; }
+    virtual bool isRenderMathMLSpace() const override { return true; }
+    virtual void styleDidChange(StyleDifference, const RenderStyle* oldStyle) override;
+    virtual bool isChildAllowed(const RenderObject&, const RenderStyle&) const override { return false; }
+    virtual void computeIntrinsicLogicalWidths(LayoutUnit& minLogicalWidth, LayoutUnit& maxLogicalWidth) const override;
+    virtual void updateFromElement() override;
+    virtual Optional<int> firstLineBaseline() const override;
+    virtual void updateLogicalWidth() override;
+    virtual void updateLogicalHeight() override;
 
     LayoutUnit m_width;
     LayoutUnit m_height;
     LayoutUnit m_depth;
 };
 
-inline RenderMathMLSpace* toRenderMathMLSpace(RenderMathMLBlock* block)
-{ 
-    ASSERT_WITH_SECURITY_IMPLICATION(!block || block->isRenderMathMLSpace());
-    return static_cast<RenderMathMLSpace*>(block);
-}
+} // namespace WebCore
 
-inline const RenderMathMLSpace* toRenderMathMLSpace(const RenderMathMLBlock* block)
-{ 
-    ASSERT_WITH_SECURITY_IMPLICATION(!block || block->isRenderMathMLSpace());
-    return static_cast<const RenderMathMLSpace*>(block);
-}
-
-// This will catch anyone doing an unnecessary cast.
-void toRenderMathMLSpace(const RenderMathMLSpace*);
-}
+SPECIALIZE_TYPE_TRAITS_RENDER_OBJECT(RenderMathMLSpace, isRenderMathMLSpace())
 
 #endif // ENABLE(MATHML)
 #endif // RenderMathMLSpace_h

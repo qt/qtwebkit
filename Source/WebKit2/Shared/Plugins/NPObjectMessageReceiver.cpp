@@ -26,19 +26,16 @@
 #include "config.h"
 #include "NPObjectMessageReceiver.h"
 
-#if ENABLE(PLUGIN_PROCESS)
+#if ENABLE(NETSCAPE_PLUGIN_API)
 
 #include "NPIdentifierData.h"
 #include "NPRemoteObjectMap.h"
 #include "NPRuntimeUtilities.h"
 #include "NPVariantData.h"
+#include "Plugin.h"
+#include "PluginController.h"
 
 namespace WebKit {
-
-PassOwnPtr<NPObjectMessageReceiver> NPObjectMessageReceiver::create(NPRemoteObjectMap* npRemoteObjectMap, Plugin* plugin, uint64_t npObjectID, NPObject* npObject)
-{
-    return adoptPtr(new NPObjectMessageReceiver(npRemoteObjectMap, plugin, npObjectID, npObject));
-}
 
 NPObjectMessageReceiver::NPObjectMessageReceiver(NPRemoteObjectMap* npRemoteObjectMap, Plugin* plugin, uint64_t npObjectID, NPObject* npObject)
     : m_npRemoteObjectMap(npRemoteObjectMap)
@@ -85,6 +82,8 @@ void NPObjectMessageReceiver::invoke(const NPIdentifierData& methodNameData, con
     NPVariant result;
     VOID_TO_NPVARIANT(result);
 
+    PluginController::PluginDestructionProtector protector(m_plugin->controller());
+
     returnValue = m_npObject->_class->invoke(m_npObject, methodNameData.createNPIdentifier(), arguments.data(), arguments.size(), &result);
     if (returnValue) {
         // Convert the NPVariant to an NPVariantData.
@@ -112,6 +111,8 @@ void NPObjectMessageReceiver::invokeDefault(const Vector<NPVariantData>& argumen
 
     NPVariant result;
     VOID_TO_NPVARIANT(result);
+
+    PluginController::PluginDestructionProtector protector(m_plugin->controller());
 
     returnValue = m_npObject->_class->invokeDefault(m_npObject, arguments.data(), arguments.size(), &result);
     if (returnValue) {
@@ -147,14 +148,15 @@ void NPObjectMessageReceiver::getProperty(const NPIdentifierData& propertyNameDa
     NPVariant result;
     VOID_TO_NPVARIANT(result);
 
+    PluginController::PluginDestructionProtector protector(m_plugin->controller());
+
     returnValue = m_npObject->_class->getProperty(m_npObject, propertyNameData.createNPIdentifier(), &result);
     if (!returnValue)
         return;
 
-    // Convert the NPVariant to an NPVariantData.
+
     resultData = m_npRemoteObjectMap->npVariantToNPVariantData(result, m_plugin);
 
-    // And release the result.
     releaseNPVariantValue(&result);
 }
 
@@ -167,10 +169,10 @@ void NPObjectMessageReceiver::setProperty(const NPIdentifierData& propertyNameDa
 
     NPVariant propertyValue = m_npRemoteObjectMap->npVariantDataToNPVariant(propertyValueData, m_plugin);
 
-    // Set the property.
+    PluginController::PluginDestructionProtector protector(m_plugin->controller());
+
     returnValue = m_npObject->_class->setProperty(m_npObject, propertyNameData.createNPIdentifier(), &propertyValue);
 
-    // And release the value.
     releaseNPVariantValue(&propertyValue);
 }
 
@@ -218,21 +220,19 @@ void NPObjectMessageReceiver::construct(const Vector<NPVariantData>& argumentsDa
     NPVariant result;
     VOID_TO_NPVARIANT(result);
 
-    returnValue = m_npObject->_class->construct(m_npObject, arguments.data(), arguments.size(), &result);
-    if (returnValue) {
-        // Convert the NPVariant to an NPVariantData.
-        resultData = m_npRemoteObjectMap->npVariantToNPVariantData(result, m_plugin);
-    }
+    PluginController::PluginDestructionProtector protector(m_plugin->controller());
 
-    // Release all arguments.
+    returnValue = m_npObject->_class->construct(m_npObject, arguments.data(), arguments.size(), &result);
+    if (returnValue)
+        resultData = m_npRemoteObjectMap->npVariantToNPVariantData(result, m_plugin);
+
     for (size_t i = 0; i < argumentsData.size(); ++i)
         releaseNPVariantValue(&arguments[i]);
     
-    // And release the result.
     releaseNPVariantValue(&result);
 }
 
 } // namespace WebKit
 
-#endif // ENABLE(PLUGIN_PROCESS)
+#endif // ENABLE(NETSCAPE_PLUGIN_API)
 

@@ -1,7 +1,7 @@
 /*
  * This file is part of the render object implementation for KHTML.
  *
- * Copyright (C) 2003 Apple Computer, Inc.
+ * Copyright (C) 2003 Apple Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -29,45 +29,47 @@ namespace WebCore {
 
 class FlexBoxIterator;
 
-class RenderDeprecatedFlexibleBox : public RenderBlock {
+class RenderDeprecatedFlexibleBox final : public RenderBlock {
 public:
-    RenderDeprecatedFlexibleBox(Element*);
+    RenderDeprecatedFlexibleBox(Element&, Ref<RenderStyle>&&);
     virtual ~RenderDeprecatedFlexibleBox();
 
-    static RenderDeprecatedFlexibleBox* createAnonymous(Document*);
+    Element& element() const { return downcast<Element>(nodeForNonAnonymous()); }
 
-    virtual const char* renderName() const;
+    virtual const char* renderName() const override;
 
-    virtual void styleWillChange(StyleDifference, const RenderStyle* newStyle) OVERRIDE;
+    virtual void styleWillChange(StyleDifference, const RenderStyle& newStyle) override;
 
-    virtual void layoutBlock(bool relayoutChildren, LayoutUnit pageHeight = 0);
+    virtual void layoutBlock(bool relayoutChildren, LayoutUnit pageHeight = 0) override;
     void layoutHorizontalBox(bool relayoutChildren);
     void layoutVerticalBox(bool relayoutChildren);
 
-    virtual bool avoidsFloats() const { return true; }
-    virtual bool isDeprecatedFlexibleBox() const { return true; }
-    virtual bool isStretchingChildren() const { return m_stretchingChildren; }
-    virtual bool canCollapseAnonymousBlockChild() const OVERRIDE { return false; }
+    bool isStretchingChildren() const { return m_stretchingChildren; }
 
-    void placeChild(RenderBox* child, const LayoutPoint& location, LayoutSize* childLayoutDelta = 0);
+    virtual bool avoidsFloats() const override { return true; }
+    virtual bool canDropAnonymousBlockChild() const override { return false; }
 
-protected:
-    virtual void computeIntrinsicLogicalWidths(LayoutUnit& minLogicalWidth, LayoutUnit& maxLogicalWidth) const OVERRIDE;
-    virtual void computePreferredLogicalWidths() OVERRIDE;
+    void placeChild(RenderBox* child, const LayoutPoint& location, LayoutSize* childLayoutDelta = nullptr);
+
+private:
+    virtual bool isDeprecatedFlexibleBox() const override { return true; }
+    virtual void computeIntrinsicLogicalWidths(LayoutUnit& minLogicalWidth, LayoutUnit& maxLogicalWidth) const override;
+    virtual void computePreferredLogicalWidths() override;
 
     LayoutUnit allowedChildFlex(RenderBox* child, bool expanding, unsigned group);
 
-    bool hasMultipleLines() const { return style()->boxLines() == MULTIPLE; }
-    bool isVertical() const { return style()->boxOrient() == VERTICAL; }
-    bool isHorizontal() const { return style()->boxOrient() == HORIZONTAL; }
+    bool hasMultipleLines() const { return style().boxLines() == MULTIPLE; }
+    bool isVertical() const { return style().boxOrient() == VERTICAL; }
+    bool isHorizontal() const { return style().boxOrient() == HORIZONTAL; }
 
-    bool m_stretchingChildren;
-
-private:
     void applyLineClamp(FlexBoxIterator&, bool relayoutChildren);
     void clearLineClamp();
+
+    bool m_stretchingChildren;
 };
 
 } // namespace WebCore
+
+SPECIALIZE_TYPE_TRAITS_RENDER_OBJECT(RenderDeprecatedFlexibleBox, isDeprecatedFlexibleBox())
 
 #endif // RenderDeprecatedFlexibleBox_h

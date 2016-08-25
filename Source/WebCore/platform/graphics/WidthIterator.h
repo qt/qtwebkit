@@ -22,27 +22,30 @@
 #ifndef WidthIterator_h
 #define WidthIterator_h
 
-#include "Font.h"
+#include "FontCascade.h"
 #include "SVGGlyph.h"
 #include "TextRun.h"
 #include <wtf/HashSet.h>
 #include <wtf/Vector.h>
-#include <wtf/unicode/Unicode.h>
 
 namespace WebCore {
 
-class Font;
+class FontCascade;
 class GlyphBuffer;
-class SimpleFontData;
+class Font;
 class TextRun;
 struct GlyphData;
+struct OriginalAdvancesForCharacterTreatedAsSpace;
+
+typedef Vector<std::pair<int, OriginalAdvancesForCharacterTreatedAsSpace>, 64> CharactersTreatedAsSpace;
 
 struct WidthIterator {
     WTF_MAKE_FAST_ALLOCATED;
 public:
-    WidthIterator(const Font*, const TextRun&, HashSet<const SimpleFontData*>* fallbackFonts = 0, bool accountForGlyphBounds = false, bool forTextEmphasis = false);
+    WidthIterator(const FontCascade*, const TextRun&, HashSet<const Font*>* fallbackFonts = 0, bool accountForGlyphBounds = false, bool forTextEmphasis = false);
 
     unsigned advance(int to, GlyphBuffer*);
+    bool advanceOneCharacter(float& width, GlyphBuffer&);
 
     float maxGlyphBoundingBoxY() const { ASSERT(m_accountForGlyphBounds); return m_maxGlyphBoundingBoxY; }
     float minGlyphBoundingBoxY() const { ASSERT(m_accountForGlyphBounds); return m_minGlyphBoundingBoxY; }
@@ -58,21 +61,7 @@ public:
     Vector<SVGGlyph::ArabicForm>& arabicForms() { return m_arabicForms; }
 #endif
 
-    static bool supportsTypesettingFeatures(const Font& font)
-    {
-#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED > 1080
-        if (!font.isPrinterFont())
-            return !font.typesettingFeatures();
-
-        return !(font.typesettingFeatures() & ~(Kerning | Ligatures));
-#elif PLATFORM(QT)
-        return !(font.typesettingFeatures() & ~Kerning) && !font.isSmallCaps() && !font.letterSpacing();
-#else
-        return !font.typesettingFeatures();
-#endif
-    }
-
-    const Font* m_font;
+    const FontCascade* m_font;
 
     const TextRun& m_run;
 
@@ -82,8 +71,6 @@ public:
     float m_expansionPerOpportunity;
     bool m_isAfterExpansion;
     float m_finalRoundingWidth;
-    // An inline capacity of 10 catches around 2/3 of the cases. To catch 90% we would need 32.
-    Vector<int, 10> m_characterIndexOfGlyph;
 
 #if ENABLE(SVG_FONTS)
     String m_lastGlyphName;
@@ -91,20 +78,23 @@ public:
 #endif
 
 private:
-    GlyphData glyphDataForCharacter(UChar32, bool mirror, int currentCharacter, unsigned& advanceLength);
+    GlyphData glyphDataForCharacter(UChar32, bool mirror, int currentCharacter, unsigned& advanceLength, String& normalizedSpacesStringCache);
     template <typename TextIterator>
     inline unsigned advanceInternal(TextIterator&, GlyphBuffer*);
 
-    bool shouldApplyFontTransforms() const { return m_run.length() > 1 && (m_typesettingFeatures & (Kerning | Ligatures)); }
+    enum class TransformsType { None, Forced, NotForced };
+    TransformsType shouldApplyFontTransforms(const GlyphBuffer*, int lastGlyphCount, UChar32 previousCharacter) const;
+    float applyFontTransforms(GlyphBuffer*, bool ltr, int& lastGlyphCount, const Font*, UChar32 previousCharacter, bool force, CharactersTreatedAsSpace&);
 
-    TypesettingFeatures m_typesettingFeatures;
-    HashSet<const SimpleFontData*>* m_fallbackFonts;
-    bool m_accountForGlyphBounds;
-    float m_maxGlyphBoundingBoxY;
-    float m_minGlyphBoundingBoxY;
-    float m_firstGlyphOverflow;
-    float m_lastGlyphOverflow;
-    bool m_forTextEmphasis;
+    HashSet<const Font*>* m_fallbackFonts { nullptr };
+    bool m_accountForGlyphBounds { false };
+    bool m_enableKerning { false };
+    bool m_requiresShaping { false };
+    bool m_forTextEmphasis { false };
+    float m_maxGlyphBoundingBoxY { std::numeric_limits<float>::min() };
+    float m_minGlyphBoundingBoxY { std::numeric_limits<float>::max() };
+    float m_firstGlyphOverflow { 0 };
+    float m_lastGlyphOverflow { 0 };
 };
 
 }

@@ -1,6 +1,6 @@
 /*
  *  Copyright (C) 1999-2001 Harri Porten (porten@kde.org)
- *  Copyright (C) 2003, 2007, 2008, 2009 Apple Inc. All rights reserved.
+ *  Copyright (C) 2003, 2007, 2008, 2009, 2016 Apple Inc. All rights reserved.
  *
  *  This library is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU Library General Public
@@ -46,7 +46,7 @@ public:
     MarkedArgumentBuffer()
         : m_size(0)
         , m_capacity(inlineCapacity)
-        , m_buffer(&m_inlineBuffer[m_capacity - 1])
+        , m_buffer(m_inlineBuffer)
         , m_markSet(0)
     {
     }
@@ -57,7 +57,7 @@ public:
             m_markSet->remove(this);
 
         if (EncodedJSValue* base = mallocBase())
-            delete [] base;
+            fastFree(base);
     }
 
     size_t size() const { return m_size; }
@@ -104,14 +104,14 @@ private:
         
     EncodedJSValue& slotFor(int item) const
     {
-        return m_buffer[-item];
+        return m_buffer[item];
     }
         
     EncodedJSValue* mallocBase()
     {
         if (m_capacity == static_cast<int>(inlineCapacity))
             return 0;
-        return &slotFor(m_capacity - 1);
+        return &slotFor(0);
     }
         
     int m_size;
@@ -119,26 +119,10 @@ private:
     EncodedJSValue m_inlineBuffer[inlineCapacity];
     EncodedJSValue* m_buffer;
     ListSet* m_markSet;
-
-private:
-    // Prohibits new / delete, which would break GC.
-    void* operator new(size_t size)
-    {
-        return fastMalloc(size);
-    }
-    void operator delete(void* p)
-    {
-        fastFree(p);
-    }
-
-    void* operator new[](size_t);
-    void operator delete[](void*);
-
-    void* operator new(size_t, void*);
-    void operator delete(void*, size_t);
 };
 
 class ArgList {
+    friend class Interpreter;
     friend class JIT;
 public:
     ArgList()
@@ -163,7 +147,7 @@ public:
     {
         if (i >= m_argCount)
             return jsUndefined();
-        return m_args[-i];
+        return m_args[i];
     }
 
     bool isEmpty() const { return !m_argCount; }
@@ -172,6 +156,8 @@ public:
     JS_EXPORT_PRIVATE void getSlice(int startIndex, ArgList& result) const;
 
 private:
+    JSValue* data() const { return m_args; }
+
     JSValue* m_args;
     int m_argCount;
 };

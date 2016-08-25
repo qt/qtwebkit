@@ -31,40 +31,54 @@
 #ifndef RenderRubyBase_h
 #define RenderRubyBase_h
 
-#include "RenderBlock.h"
+#include "RenderBlockFlow.h"
 
 namespace WebCore {
 
 class RenderRubyRun;
 
-class RenderRubyBase : public RenderBlock {
+class RenderRubyBase final : public RenderBlockFlow {
 public:
+    RenderRubyBase(Document&, Ref<RenderStyle>&&);
     virtual ~RenderRubyBase();
     
-    static RenderRubyBase* createAnonymous(Document*);
+    virtual const char* renderName() const override { return "RenderRubyBase (anonymous)"; }
+    
+    RenderRubyRun* rubyRun() const;
 
-    virtual const char* renderName() const { return "RenderRubyBase (anonymous)"; }
+    void setIsAfterExpansion(bool isAfterExpansion) { m_isAfterExpansion = isAfterExpansion; }
+    bool isAfterExpansion() { return m_isAfterExpansion; }
 
-    virtual bool isRubyBase() const { return true; }
+    void setInitialOffset(float initialOffset) { m_initialOffset = initialOffset; }
 
-    virtual bool isChildAllowed(RenderObject*, RenderStyle*) const;
+    void reset()
+    {
+        m_initialOffset = 0;
+        m_isAfterExpansion = true;
+    }
+    
+    virtual void cachePriorCharactersIfNeeded(const LazyLineBreakIterator&) override;
 
 private:
-    RenderRubyBase();
-
-    virtual ETextAlign textAlignmentForLine(bool endsWithSoftBreak) const;
-    virtual void adjustInlineDirectionLineBounds(int expansionOpportunityCount, float& logicalLeft, float& logicalWidth) const;
+    virtual bool isRubyBase() const override { return true; }
+    virtual bool isChildAllowed(const RenderObject&, const RenderStyle&) const override;
+    virtual ETextAlign textAlignmentForLine(bool endsWithSoftBreak) const override;
+    virtual void adjustInlineDirectionLineBounds(int expansionOpportunityCount, float& logicalLeft, float& logicalWidth) const override;
+    void mergeChildrenWithBase(RenderRubyBase* toBlock);
 
     void moveChildren(RenderRubyBase* toBase, RenderObject* beforeChild = 0);
     void moveInlineChildren(RenderRubyBase* toBase, RenderObject* beforeChild = 0);
     void moveBlockChildren(RenderRubyBase* toBase, RenderObject* beforeChild = 0);
 
-    RenderRubyRun* rubyRun() const;
-
     // Allow RenderRubyRun to manipulate the children within ruby bases.
     friend class RenderRubyRun;
+
+    float m_initialOffset;
+    unsigned m_isAfterExpansion : 1;
 };
 
 } // namespace WebCore
+
+SPECIALIZE_TYPE_TRAITS_RENDER_OBJECT(RenderRubyBase, isRubyBase())
 
 #endif // RenderRubyBase_h

@@ -27,14 +27,14 @@
 #include "config.h"
 #include "WKHitTestResult.h"
 
+#include "APIHitTestResult.h"
 #include "WKAPICast.h"
-#include "WebHitTestResult.h"
 
 using namespace WebKit;
 
 WKTypeID WKHitTestResultGetTypeID()
 {
-    return toAPI(WebHitTestResult::APIType);
+    return toAPI(API::HitTestResult::APIType);
 }
 
 WKURLRef WKHitTestResultCopyAbsoluteImageURL(WKHitTestResultRef hitTestResultRef)
@@ -67,7 +67,17 @@ WKStringRef WKHitTestResultCopyLinkTitle(WKHitTestResultRef hitTestResultRef)
     return toCopiedAPI(toImpl(hitTestResultRef)->linkTitle());
 }
 
+WKStringRef WKHitTestResultCopyLookupText(WKHitTestResultRef hitTestResult)
+{
+    return toCopiedAPI(toImpl(hitTestResult)->lookupText());
+}
+
 bool WKHitTestResultIsContentEditable(WKHitTestResultRef hitTestResultRef)
 {
     return toImpl(hitTestResultRef)->isContentEditable();
+}
+
+WKRect WKHitTestResultGetElementBoundingBox(WKHitTestResultRef hitTestResultRef)
+{
+    return toAPI(toImpl(hitTestResultRef)->elementBoundingBox());
 }

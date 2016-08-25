@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2013-2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,50 +29,106 @@
 #if ENABLE(DFG_JIT)
 
 #include "DFGAbstractValue.h"
+#include "DFGAvailability.h"
+#include "DFGAvailabilityMap.h"
 #include "DFGBranchDirection.h"
+#include "DFGFlushedAt.h"
 #include "DFGNode.h"
-#include "DFGVariadicFunction.h"
+#include "DFGNodeOrigin.h"
+#include "DFGStructureClobberState.h"
 #include "Operands.h"
-#include <wtf/OwnPtr.h>
+#include <wtf/HashMap.h>
+#include <wtf/HashSet.h>
 #include <wtf/Vector.h>
 
 namespace JSC { namespace DFG {
 
 class Graph;
+class InsertionSet;
 
-typedef Vector <BlockIndex, 2> PredecessorList;
+typedef Vector<BasicBlock*, 2> PredecessorList;
+typedef Vector<Node*, 8> BlockNodeList;
 
-struct BasicBlock : Vector<Node*, 8> {
-    BasicBlock(unsigned bytecodeBegin, unsigned numArguments, unsigned numLocals)
-        : bytecodeBegin(bytecodeBegin)
-        , isOSRTarget(false)
-        , cfaHasVisited(false)
-        , cfaShouldRevisit(false)
-        , cfaFoundConstants(false)
-        , cfaDidFinish(true)
-        , cfaBranchDirection(InvalidBranchDirection)
-#if !ASSERT_DISABLED
-        , isLinked(false)
-#endif
-        , isReachable(false)
-        , variablesAtHead(numArguments, numLocals)
-        , variablesAtTail(numArguments, numLocals)
-        , valuesAtHead(numArguments, numLocals)
-        , valuesAtTail(numArguments, numLocals)
+struct BasicBlock : RefCounted<BasicBlock> {
+    BasicBlock(
+        unsigned bytecodeBegin, unsigned numArguments, unsigned numLocals,
+        float executionCount);
+    ~BasicBlock();
+    
+    void ensureLocals(unsigned newNumLocals);
+    
+    size_t size() const { return m_nodes.size(); }
+    bool isEmpty() const { return !size(); }
+    Node*& at(size_t i) { return m_nodes[i]; }
+    Node* at(size_t i) const { return m_nodes[i]; }
+    Node* tryAt(size_t i) const
     {
+        if (i >= size())
+            return nullptr;
+        return at(i);
+    }
+    Node*& operator[](size_t i) { return at(i); }
+    Node* operator[](size_t i) const { return at(i); }
+    
+    // Use this to find both the index of the terminal and the terminal itself in one go. May
+    // return a clear NodeAndIndex if the basic block currently lacks a terminal. That may happen
+    // in the middle of IR transformations within a phase but should never be the case in between
+    // phases.
+    //
+    // The reason why this is more than just "at(size() - 1)" is that we may place non-terminal
+    // liveness marking instructions after the terminal. This is supposed to happen infrequently
+    // but some basic blocks - most notably return blocks - will have liveness markers for all of
+    // the flushed variables right after the return.
+    //
+    // It turns out that doing this linear search is basically perf-neutral, so long as we force
+    // the method to be inlined. Hence the ALWAYS_INLINE.
+    ALWAYS_INLINE NodeAndIndex findTerminal() const
+    {
+        size_t i = size();
+        while (i--) {
+            Node* node = at(i);
+            switch (node->op()) {
+            case Jump:
+            case Branch:
+            case Switch:
+            case Return:
+            case TailCall:
+            case TailCallVarargs:
+            case TailCallForwardVarargs:
+            case Unreachable:
+                return NodeAndIndex(node, i);
+            // The bitter end can contain Phantoms and the like. There will probably only be one or two nodes after the terminal. They are all no-ops and will not have any checked children.
+            case Check: // This is here because it's our universal no-op.
+            case Phantom:
+            case PhantomLocal:
+            case Flush:
+                break;
+            default:
+                return NodeAndIndex();
+            }
+        }
+        return NodeAndIndex();
     }
     
-    ~BasicBlock()
+    ALWAYS_INLINE Node* terminal() const
     {
+        return findTerminal().node;
     }
     
-    void ensureLocals(unsigned newNumLocals)
+    void resize(size_t size) { m_nodes.resize(size); }
+    void grow(size_t size) { m_nodes.grow(size); }
+    
+    void append(Node* node) { m_nodes.append(node); }
+    void insertBeforeTerminal(Node* node)
     {
-        variablesAtHead.ensureLocals(newNumLocals);
-        variablesAtTail.ensureLocals(newNumLocals);
-        valuesAtHead.ensureLocals(newNumLocals);
-        valuesAtTail.ensureLocals(newNumLocals);
+        NodeAndIndex result = findTerminal();
+        if (!result)
+            append(node);
+        else
+            m_nodes.insert(result.index, node);
     }
+    
+    void replaceTerminal(Node*);
     
     size_t numNodes() const { return phis.size() + size(); }
     Node* node(size_t i) const
@@ -83,38 +139,62 @@ struct BasicBlock : Vector<Node*, 8> {
     }
     bool isPhiIndex(size_t i) const { return i < phis.size(); }
     
-    bool isInPhis(Node* node) const
+    bool isInPhis(Node* node) const;
+    bool isInBlock(Node* myNode) const;
+    
+    BlockNodeList::iterator begin() { return m_nodes.begin(); }
+    BlockNodeList::iterator end() { return m_nodes.end(); }
+
+    unsigned numSuccessors() { return terminal()->numSuccessors(); }
+    
+    BasicBlock*& successor(unsigned index)
     {
-        for (size_t i = 0; i < phis.size(); ++i) {
-            if (phis[i] == node)
-                return true;
-        }
-        return false;
+        return terminal()->successor(index);
+    }
+    BasicBlock*& successorForCondition(bool condition)
+    {
+        return terminal()->successorForCondition(condition);
+    }
+
+    Node::SuccessorsIterable successors()
+    {
+        return terminal()->successors();
     }
     
-    bool isInBlock(Node* myNode) const
-    {
-        for (size_t i = 0; i < numNodes(); ++i) {
-            if (node(i) == myNode)
-                return true;
-        }
-        return false;
-    }
+    void removePredecessor(BasicBlock* block);
+    void replacePredecessor(BasicBlock* from, BasicBlock* to);
+
+    template<typename... Params>
+    Node* appendNode(Graph&, SpeculatedType, Params...);
     
-#define DFG_DEFINE_APPEND_NODE(templatePre, templatePost, typeParams, valueParamsComma, valueParams, valueArgs) \
-    templatePre typeParams templatePost Node* appendNode(Graph&, SpeculatedType valueParamsComma valueParams);
-    DFG_VARIADIC_TEMPLATE_FUNCTION(DFG_DEFINE_APPEND_NODE)
-#undef DFG_DEFINE_APPEND_NODE
+    template<typename... Params>
+    Node* appendNonTerminal(Graph&, SpeculatedType, Params...);
+    
+    template<typename... Params>
+    Node* replaceTerminal(Graph&, SpeculatedType, Params...);
+    
+    void dump(PrintStream& out) const;
+    
+    void didLink()
+    {
+#if !ASSERT_DISABLED
+        isLinked = true;
+#endif
+    }
     
     // This value is used internally for block linking and OSR entry. It is mostly meaningless
     // for other purposes due to inlining.
     unsigned bytecodeBegin;
+    
+    BlockIndex index;
     
     bool isOSRTarget;
     bool cfaHasVisited;
     bool cfaShouldRevisit;
     bool cfaFoundConstants;
     bool cfaDidFinish;
+    StructureClobberState cfaStructureClobberStateAtHead;
+    StructureClobberState cfaStructureClobberStateAtTail;
     BranchDirection cfaBranchDirection;
 #if !ASSERT_DISABLED
     bool isLinked;
@@ -122,30 +202,89 @@ struct BasicBlock : Vector<Node*, 8> {
     bool isReachable;
     
     Vector<Node*> phis;
-    PredecessorList m_predecessors;
+    PredecessorList predecessors;
     
-    Operands<Node*, NodePointerTraits> variablesAtHead;
-    Operands<Node*, NodePointerTraits> variablesAtTail;
+    Operands<Node*> variablesAtHead;
+    Operands<Node*> variablesAtTail;
     
     Operands<AbstractValue> valuesAtHead;
     Operands<AbstractValue> valuesAtTail;
+    
+    // The intersection of assumptions we have made previously at the head of this block. Note
+    // that under normal circumstances, each time we run the CFA, we will get strictly more precise
+    // results. But we don't actually require this to be the case. It's fine for the CFA to loosen
+    // up for any odd reason. It's fine when this happens, because anything that the CFA proves
+    // must be true from that point forward, except if some registered watchpoint fires, in which
+    // case the code won't ever run. So, the CFA proving something less precise later on is just an
+    // outcome of the CFA being imperfect; the more precise thing that it had proved earlier is no
+    // less true.
+    //
+    // But for the purpose of OSR entry, we need to make sure that we remember what assumptions we
+    // had used for optimizing any given basic block. That's what this is for.
+    //
+    // It's interesting that we could use this to make the CFA more precise: all future CFAs could
+    // filter their results with this thing to sort of maintain maximal precision. Because we
+    // expect CFA to usually be monotonically more precise each time we run it to fixpoint, this
+    // would not be a productive optimization: it would make setting up a basic block more
+    // expensive and would only benefit bizarre pathological cases.
+    Operands<AbstractValue> intersectionOfPastValuesAtHead;
+    bool intersectionOfCFAHasVisited;
+    
+    float executionCount;
+    
+    // These fields are reserved for NaturalLoops.
+    static const unsigned numberOfInnerMostLoopIndices = 2;
+    unsigned innerMostLoopIndices[numberOfInnerMostLoopIndices];
+
+    struct SSAData {
+        WTF_MAKE_FAST_ALLOCATED;
+    public:
+        AvailabilityMap availabilityAtHead;
+        AvailabilityMap availabilityAtTail;
+        
+        bool liveAtTailIsDirty { false };
+        HashSet<Node*> liveAtTail;
+        HashSet<Node*> liveAtHead;
+        HashMap<Node*, AbstractValue> valuesAtHead;
+        HashMap<Node*, AbstractValue> valuesAtTail;
+        
+        SSAData(BasicBlock*);
+        ~SSAData();
+    };
+    std::unique_ptr<SSAData> ssa;
+    
+private:
+    friend class InsertionSet;
+    BlockNodeList m_nodes;
 };
 
+typedef Vector<BasicBlock*, 5> BlockList;
+
 struct UnlinkedBlock {
-    BlockIndex m_blockIndex;
+    BasicBlock* m_block;
     bool m_needsNormalLinking;
     bool m_needsEarlyReturnLinking;
     
     UnlinkedBlock() { }
     
-    explicit UnlinkedBlock(BlockIndex blockIndex)
-        : m_blockIndex(blockIndex)
+    explicit UnlinkedBlock(BasicBlock* block)
+        : m_block(block)
         , m_needsNormalLinking(true)
         , m_needsEarlyReturnLinking(false)
     {
     }
 };
     
+static inline unsigned getBytecodeBeginForBlock(BasicBlock** basicBlock)
+{
+    return (*basicBlock)->bytecodeBegin;
+}
+
+static inline BasicBlock* blockForBytecodeOffset(Vector<BasicBlock*>& linkingTargets, unsigned bytecodeBegin)
+{
+    return *binarySearch<BasicBlock*, unsigned>(linkingTargets, linkingTargets.size(), bytecodeBegin, getBytecodeBeginForBlock);
+}
+
 } } // namespace JSC::DFG
 
 #endif // ENABLE(DFG_JIT)

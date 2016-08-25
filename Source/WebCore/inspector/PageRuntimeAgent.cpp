@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2011 Google Inc. All rights reserved.
+ * Copyright (C) 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -29,72 +30,57 @@
  */
 
 #include "config.h"
-
-#if ENABLE(INSPECTOR)
-
 #include "PageRuntimeAgent.h"
 
 #include "Document.h"
-#include "InjectedScript.h"
-#include "InjectedScriptManager.h"
+#include "Frame.h"
 #include "InspectorPageAgent.h"
-#include "InspectorState.h"
 #include "InstrumentingAgents.h"
+#include "JSDOMWindowBase.h"
+#include "MainFrame.h"
 #include "Page.h"
-#include "PageConsole.h"
+#include "PageConsoleClient.h"
 #include "ScriptController.h"
+#include "ScriptState.h"
 #include "SecurityOrigin.h"
+#include <inspector/InjectedScript.h>
+#include <inspector/InjectedScriptManager.h>
+#include <profiler/Profile.h>
 
-using WebCore::TypeBuilder::Runtime::ExecutionContextDescription;
+using Inspector::Protocol::Runtime::ExecutionContextDescription;
+
+using namespace Inspector;
 
 namespace WebCore {
 
-namespace PageRuntimeAgentState {
-static const char runtimeEnabled[] = "runtimeEnabled";
-};
-
-PageRuntimeAgent::PageRuntimeAgent(InstrumentingAgents* instrumentingAgents, InspectorCompositeState* state, InjectedScriptManager* injectedScriptManager, Page* page, InspectorPageAgent* pageAgent)
-    : InspectorRuntimeAgent(instrumentingAgents, state, injectedScriptManager)
-    , m_inspectedPage(page)
+PageRuntimeAgent::PageRuntimeAgent(PageAgentContext& context, InspectorPageAgent* pageAgent)
+    : InspectorRuntimeAgent(context)
+    , m_frontendDispatcher(std::make_unique<Inspector::RuntimeFrontendDispatcher>(context.frontendRouter))
+    , m_backendDispatcher(Inspector::RuntimeBackendDispatcher::create(context.backendDispatcher, this))
     , m_pageAgent(pageAgent)
-    , m_frontend(0)
-    , m_mainWorldContextCreated(false)
+    , m_inspectedPage(context.inspectedPage)
 {
-    m_instrumentingAgents->setPageRuntimeAgent(this);
 }
 
-PageRuntimeAgent::~PageRuntimeAgent()
+void PageRuntimeAgent::didCreateFrontendAndBackend(Inspector::FrontendRouter*, Inspector::BackendDispatcher*)
 {
-    m_instrumentingAgents->setPageRuntimeAgent(0);
 }
 
-void PageRuntimeAgent::setFrontend(InspectorFrontend* frontend)
+void PageRuntimeAgent::willDestroyFrontendAndBackend(Inspector::DisconnectReason reason)
 {
-    m_frontend = frontend->runtime();
+    String unused;
+    disable(unused);
+
+    InspectorRuntimeAgent::willDestroyFrontendAndBackend(reason);
 }
 
-void PageRuntimeAgent::clearFrontend()
+void PageRuntimeAgent::enable(ErrorString& errorString)
 {
-    m_frontend = 0;
-    String errorString;
-    disable(&errorString);
-}
-
-void PageRuntimeAgent::restore()
-{
-    if (m_state->getBoolean(PageRuntimeAgentState::runtimeEnabled)) {
-        String error;
-        enable(&error);
-    }
-}
-
-void PageRuntimeAgent::enable(ErrorString* errorString)
-{
-    if (m_enabled)
+    if (enabled())
         return;
 
     InspectorRuntimeAgent::enable(errorString);
-    m_state->setBoolean(PageRuntimeAgentState::runtimeEnabled, true);
+
     // Only report existing contexts if the page did commit load, otherwise we may
     // unintentionally initialize contexts in the frames which may trigger some listeners
     // that are expected to be triggered only after the load is committed, see http://crbug.com/131623
@@ -102,86 +88,82 @@ void PageRuntimeAgent::enable(ErrorString* errorString)
         reportExecutionContextCreation();
 }
 
-void PageRuntimeAgent::disable(ErrorString* errorString)
+void PageRuntimeAgent::disable(ErrorString& errorString)
 {
-    if (!m_enabled)
+    if (!enabled())
         return;
 
     InspectorRuntimeAgent::disable(errorString);
-    m_state->setBoolean(PageRuntimeAgentState::runtimeEnabled, false);
 }
 
-void PageRuntimeAgent::didCreateMainWorldContext(Frame* frame)
+void PageRuntimeAgent::didCreateMainWorldContext(Frame& frame)
 {
     m_mainWorldContextCreated = true;
 
-    if (!m_enabled)
+    if (!enabled())
         return;
-    ASSERT(m_frontend);
-    String frameId = m_pageAgent->frameId(frame);
-    ScriptState* scriptState = mainWorldScriptState(frame);
-    notifyContextCreated(frameId, scriptState, 0, true);
+
+    String frameId = m_pageAgent->frameId(&frame);
+    JSC::ExecState* scriptState = mainWorldExecState(&frame);
+    notifyContextCreated(frameId, scriptState, nullptr, true);
 }
 
-void PageRuntimeAgent::didCreateIsolatedContext(Frame* frame, ScriptState* scriptState, SecurityOrigin* origin)
-{
-    if (!m_enabled)
-        return;
-    ASSERT(m_frontend);
-    String frameId = m_pageAgent->frameId(frame);
-    notifyContextCreated(frameId, scriptState, origin, false);
-}
-
-InjectedScript PageRuntimeAgent::injectedScriptForEval(ErrorString* errorString, const int* executionContextId)
+InjectedScript PageRuntimeAgent::injectedScriptForEval(ErrorString& errorString, const int* executionContextId)
 {
     if (!executionContextId) {
-        ScriptState* scriptState = mainWorldScriptState(m_inspectedPage->mainFrame());
-        InjectedScript result = injectedScriptManager()->injectedScriptFor(scriptState);
+        JSC::ExecState* scriptState = mainWorldExecState(&m_inspectedPage.mainFrame());
+        InjectedScript result = injectedScriptManager().injectedScriptFor(scriptState);
         if (result.hasNoValue())
-            *errorString = "Internal error: main world execution context not found.";
+            errorString = ASCIILiteral("Internal error: main world execution context not found.");
         return result;
     }
-    InjectedScript injectedScript = injectedScriptManager()->injectedScriptForId(*executionContextId);
+
+    InjectedScript injectedScript = injectedScriptManager().injectedScriptForId(*executionContextId);
     if (injectedScript.hasNoValue())
-        *errorString = "Execution context with given id not found.";
+        errorString = ASCIILiteral("Execution context with given id not found.");
     return injectedScript;
 }
 
 void PageRuntimeAgent::muteConsole()
 {
-    PageConsole::mute();
+    PageConsoleClient::mute();
 }
 
 void PageRuntimeAgent::unmuteConsole()
 {
-    PageConsole::unmute();
+    PageConsoleClient::unmute();
 }
 
 void PageRuntimeAgent::reportExecutionContextCreation()
 {
-    Vector<std::pair<ScriptState*, SecurityOrigin*> > isolatedContexts;
-    for (Frame* frame = m_inspectedPage->mainFrame(); frame; frame = frame->tree()->traverseNext()) {
-        if (!frame->script()->canExecuteScripts(NotAboutToExecuteScript))
+    Vector<std::pair<JSC::ExecState*, SecurityOrigin*>> isolatedContexts;
+    for (Frame* frame = &m_inspectedPage.mainFrame(); frame; frame = frame->tree().traverseNext()) {
+        if (!frame->script().canExecuteScripts(NotAboutToExecuteScript))
             continue;
         String frameId = m_pageAgent->frameId(frame);
 
-        ScriptState* scriptState = mainWorldScriptState(frame);
-        notifyContextCreated(frameId, scriptState, 0, true);
-        frame->script()->collectIsolatedContexts(isolatedContexts);
+        JSC::ExecState* scriptState = mainWorldExecState(frame);
+        notifyContextCreated(frameId, scriptState, nullptr, true);
+        frame->script().collectIsolatedContexts(isolatedContexts);
         if (isolatedContexts.isEmpty())
             continue;
-        for (size_t i = 0; i< isolatedContexts.size(); i++)
-            notifyContextCreated(frameId, isolatedContexts[i].first, isolatedContexts[i].second, false);
+        for (auto& context : isolatedContexts)
+            notifyContextCreated(frameId, context.first, context.second, false);
         isolatedContexts.clear();
     }
 }
 
-void PageRuntimeAgent::notifyContextCreated(const String& frameId, ScriptState* scriptState, SecurityOrigin* securityOrigin, bool isPageContext)
+void PageRuntimeAgent::notifyContextCreated(const String& frameId, JSC::ExecState* scriptState, SecurityOrigin* securityOrigin, bool isPageContext)
 {
     ASSERT(securityOrigin || isPageContext);
-    int executionContextId = injectedScriptManager()->injectedScriptIdFor(scriptState);
-    String name = securityOrigin ? securityOrigin->toRawString() : "";
-    m_frontend->executionContextCreated(ExecutionContextDescription::create()
+
+    InjectedScript result = injectedScriptManager().injectedScriptFor(scriptState);
+    if (result.hasNoValue())
+        return;
+
+    int executionContextId = injectedScriptManager().injectedScriptIdFor(scriptState);
+    String name = securityOrigin ? securityOrigin->toRawString() : String();
+    m_frontendDispatcher->executionContextCreated(ExecutionContextDescription::create()
         .setId(executionContextId)
         .setIsPageContext(isPageContext)
         .setName(name)
@@ -190,5 +172,3 @@ void PageRuntimeAgent::notifyContextCreated(const String& frameId, ScriptState* 
 }
 
 } // namespace WebCore
-
-#endif // ENABLE(INSPECTOR)

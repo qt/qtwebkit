@@ -41,7 +41,7 @@ typedef int ExceptionCode;
 
 class Navigator : public NavigatorBase, public ScriptWrappable, public RefCounted<Navigator>, public DOMWindowProperty, public Supplementable<Navigator> {
 public:
-    static PassRefPtr<Navigator> create(Frame* frame) { return adoptRef(new Navigator(frame)); }
+    static Ref<Navigator> create(Frame* frame) { return adoptRef(*new Navigator(frame)); }
     virtual ~Navigator();
 
     String appVersion() const;
@@ -50,8 +50,14 @@ public:
     DOMMimeTypeArray* mimeTypes() const;
     bool cookieEnabled() const;
     bool javaEnabled() const;
-
+#if defined(ENABLE_NAVIGATOR_HWCONCURRENCY)
+    int hardwareConcurrency() const;
+#endif
     virtual String userAgent() const;
+
+#if PLATFORM(IOS)
+    bool standalone() const;
+#endif
 
     // Relinquishes the storage lock, if one exists.
     void getStorageUpdates();

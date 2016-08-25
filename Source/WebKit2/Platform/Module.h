@@ -29,7 +29,7 @@
 #include <wtf/Noncopyable.h>
 #include <wtf/text/WTFString.h>
 
-#if PLATFORM(MAC)
+#if USE(CF)
 #include <wtf/RetainPtr.h>
 #endif
 
@@ -43,6 +43,7 @@ typedef struct _GModule GModule;
 
 #if PLATFORM(EFL)
 #include <Eina.h>
+#include <wtf/efl/UniquePtrEfl.h>
 #endif
 
 namespace WebKit {
@@ -58,13 +59,13 @@ public:
     // live Objective-C objects whose methods come from that bundle.
     void unload();
 
-#if PLATFORM(MAC)
+#if USE(CF)
     String bundleIdentifier() const;
 #endif
 
     template<typename FunctionType> FunctionType functionPointer(const char* functionName) const;
 
-#if PLATFORM(MAC) && !defined(__LP64__)
+#if USE(CF) && !defined(__LP64__)
     CFBundleRefNum bundleResourceMap();
 #endif
 
@@ -72,7 +73,7 @@ private:
     void* platformFunctionPointer(const char* functionName) const;
 
     String m_path;
-#if PLATFORM(MAC)
+#if USE(CF)
     RetainPtr<CFBundleRef> m_bundle;
 #if !defined(__LP64__)
     CFBundleRefNum m_bundleResourceMap;
@@ -82,7 +83,7 @@ private:
 #elif PLATFORM(GTK)
     GModule* m_handle;
 #elif PLATFORM(EFL)
-    OwnPtr<Eina_Module> m_module;
+    EflUniquePtr<Eina_Module> m_module;
 #endif
 };
 

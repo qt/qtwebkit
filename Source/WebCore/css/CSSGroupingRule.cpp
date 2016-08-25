@@ -41,10 +41,10 @@
 
 namespace WebCore {
 
-CSSGroupingRule::CSSGroupingRule(StyleRuleGroup* groupRule, CSSStyleSheet* parent)
+CSSGroupingRule::CSSGroupingRule(StyleRuleGroup& groupRule, CSSStyleSheet* parent)
     : CSSRule(parent)
     , m_groupRule(groupRule)
-    , m_childRuleCSSOMWrappers(groupRule->childRules().size())
+    , m_childRuleCSSOMWrappers(groupRule.childRules().size())
 {
 }
 
@@ -69,7 +69,7 @@ unsigned CSSGroupingRule::insertRule(const String& ruleString, unsigned index, E
 
     CSSParser parser(parserContext());
     CSSStyleSheet* styleSheet = parentStyleSheet();
-    RefPtr<StyleRuleBase> newRule = parser.parseRule(styleSheet ? styleSheet->contents() : 0, ruleString);
+    RefPtr<StyleRuleBase> newRule = parser.parseRule(styleSheet ? &styleSheet->contents() : nullptr, ruleString);
     if (!newRule) {
         // SYNTAX_ERR: Raised if the specified rule has a syntax error and is unparsable.
         ec = SYNTAX_ERR;
@@ -89,7 +89,7 @@ unsigned CSSGroupingRule::insertRule(const String& ruleString, unsigned index, E
     }
     CSSStyleSheet::RuleMutationScope mutationScope(this);
 
-    m_groupRule->wrapperInsertRule(index, newRule);
+    m_groupRule->wrapperInsertRule(index, newRule.releaseNonNull());
 
     m_childRuleCSSOMWrappers.insert(index, RefPtr<CSSRule>());
     return index;
@@ -141,20 +141,19 @@ CSSRule* CSSGroupingRule::item(unsigned index) const
     return rule.get();
 }
 
-CSSRuleList* CSSGroupingRule::cssRules() const
+CSSRuleList& CSSGroupingRule::cssRules() const
 {
     if (!m_ruleListCSSOMWrapper)
-        m_ruleListCSSOMWrapper = adoptPtr(new LiveCSSRuleList<CSSGroupingRule>(const_cast<CSSGroupingRule*>(this)));
-    return m_ruleListCSSOMWrapper.get();
+        m_ruleListCSSOMWrapper = std::make_unique<LiveCSSRuleList<CSSGroupingRule>>(const_cast<CSSGroupingRule*>(this));
+    return *m_ruleListCSSOMWrapper;
 }
 
-void CSSGroupingRule::reattach(StyleRuleBase* rule)
+void CSSGroupingRule::reattach(StyleRuleBase& rule)
 {
-    ASSERT(rule);
-    m_groupRule = static_cast<StyleRuleGroup*>(rule);
+    m_groupRule = static_cast<StyleRuleGroup&>(rule);
     for (unsigned i = 0; i < m_childRuleCSSOMWrappers.size(); ++i) {
         if (m_childRuleCSSOMWrappers[i])
-            m_childRuleCSSOMWrappers[i]->reattach(m_groupRule->childRules()[i].get());
+            m_childRuleCSSOMWrappers[i]->reattach(*m_groupRule.get().childRules()[i]);
     }
 }
 

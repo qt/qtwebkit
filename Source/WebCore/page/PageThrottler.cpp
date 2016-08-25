@@ -26,148 +26,42 @@
 #include "config.h"
 #include "PageThrottler.h"
 
-#include "Chrome.h"
-#include "ChromeClient.h"
-#include "Frame.h"
 #include "Page.h"
-#include "PageActivityAssertionToken.h"
 
 namespace WebCore {
 
-static const double kThrottleHysteresisSeconds = 2.0;
-
-PageThrottler::PageThrottler(Page* page)
+PageThrottler::PageThrottler(Page& page)
     : m_page(page)
-    , m_throttleState(PageNotThrottledState)
-    , m_throttleHysteresisTimer(this, &PageThrottler::throttleHysteresisTimerFired)
+    , m_userInputHysteresis([this](HysteresisState state) { setActivityFlag(PageActivityState::UserInputActivity, state == HysteresisState::Started); })
+    , m_audiblePluginHysteresis([this](HysteresisState state) { setActivityFlag(PageActivityState::AudiblePlugin, state == HysteresisState::Started); })
+    , m_mediaActivityCounter([this](bool value) { setActivityFlag(PageActivityState::MediaActivity, value); })
+    , m_pageLoadActivityCounter([this](bool value) { setActivityFlag(PageActivityState::PageLoadActivity, value); })
 {
-    if (ChromeClient* chromeClient = m_page->chrome().client())
-        chromeClient->incrementActivePageCount();
 }
 
-PageThrottler::~PageThrottler()
+PageActivityAssertionToken PageThrottler::mediaActivityToken()
 {
-    setThrottled(false);
-
-    for (HashSet<PageActivityAssertionToken*>::iterator i = m_activityTokens.begin(); i != m_activityTokens.end(); ++i)
-        (*i)->invalidate();
-
-    if (m_throttleState != PageThrottledState) {
-        if (ChromeClient* chromeClient = m_page->chrome().client())
-            chromeClient->decrementActivePageCount();
-    }
+    return m_mediaActivityCounter.token<PageActivityAssertionTokenType>();
 }
 
-void PageThrottler::throttlePage()
+PageActivityAssertionToken PageThrottler::pageLoadActivityToken()
 {
-    m_throttleState = PageThrottledState;
-
-    if (ChromeClient* chromeClient = m_page->chrome().client())
-        chromeClient->decrementActivePageCount();
-
-    for (Frame* frame = m_page->mainFrame(); frame; frame = frame->tree()->traverseNext()) {
-        if (frame->document())
-            frame->document()->scriptedAnimationControllerSetThrottled(true);
-    }
-
-    m_page->throttleTimers();
+    return m_pageLoadActivityCounter.token<PageActivityAssertionTokenType>();
 }
 
-void PageThrottler::unthrottlePage()
+void PageThrottler::setActivityFlag(PageActivityState::Flags flag, bool value)
 {
-    PageThrottleState oldState = m_throttleState;
-    m_throttleState = PageNotThrottledState;
+    PageActivityState::Flags activityState = m_activityState;
+    if (value)
+        activityState |= flag;
+    else
+        activityState &= ~flag;
 
-    if (oldState == PageNotThrottledState)
+    if (m_activityState == activityState)
         return;
+    m_activityState = activityState;
 
-    if (oldState == PageThrottledState) {
-        if (ChromeClient* chromeClient = m_page->chrome().client())
-            chromeClient->incrementActivePageCount();
-    }
-    
-    for (Frame* frame = m_page->mainFrame(); frame; frame = frame->tree()->traverseNext()) {
-        if (frame->document())
-            frame->document()->scriptedAnimationControllerSetThrottled(false);
-    }
-
-    m_page->unthrottleTimers();
-}
-
-void PageThrottler::setThrottled(bool isThrottled)
-{
-    if (isThrottled) {
-        m_throttleState = PageWaitingToThrottleState;
-        startThrottleHysteresisTimer();
-    } else {
-        unthrottlePage();
-        stopThrottleHysteresisTimer();
-    }
-}
-
-void PageThrottler::stopThrottleHysteresisTimer()
-{
-    m_throttleHysteresisTimer.stop();
-}
-
-void PageThrottler::reportInterestingEvent()
-{
-    if (m_throttleState == PageNotThrottledState)
-        return;
-    if (m_throttleState == PageThrottledState)
-        unthrottlePage();
-    m_throttleState = PageWaitingToThrottleState;
-    startThrottleHysteresisTimer();
-}
-
-void PageThrottler::startThrottleHysteresisTimer()
-{
-    if (m_throttleHysteresisTimer.isActive())
-        m_throttleHysteresisTimer.stop();
-    if (!m_activityTokens.size())
-        m_throttleHysteresisTimer.startOneShot(kThrottleHysteresisSeconds);
-}
-
-void PageThrottler::throttleHysteresisTimerFired(Timer<PageThrottler>*)
-{
-    ASSERT(!m_activityTokens.size());
-    throttlePage();
-}
-
-void PageThrottler::addActivityToken(PageActivityAssertionToken* token)
-{
-    ASSERT(token && !m_activityTokens.contains(token));
-
-    m_activityTokens.add(token);
-
-    // If we've already got events that block throttling we can return early
-    if (m_activityTokens.size() > 1)
-        return;
-
-    if (m_throttleState == PageNotThrottledState)
-        return;
-
-    if (m_throttleState == PageThrottledState)
-        unthrottlePage();
-
-    m_throttleState = PageWaitingToThrottleState;
-    stopThrottleHysteresisTimer();
-}
-
-void PageThrottler::removeActivityToken(PageActivityAssertionToken* token)
-{
-    ASSERT(token && m_activityTokens.contains(token));
-
-    m_activityTokens.remove(token);
-
-    if (m_activityTokens.size())
-        return;
-
-    if (m_throttleState == PageNotThrottledState)
-        return;
-
-    ASSERT(m_throttleState == PageWaitingToThrottleState);
-    startThrottleHysteresisTimer();
+    m_page.setPageActivityState(m_activityState);
 }
 
 }

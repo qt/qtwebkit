@@ -24,10 +24,13 @@
  */
 
 #include "config.h"
+
+#if WK_HAVE_C_SPI
+
 #include "PlatformUtilities.h"
 #include "PlatformWebView.h"
 #include "Test.h"
-#include <WebKit2/WKRetainPtr.h>
+#include <WebKit/WKRetainPtr.h>
 
 namespace TestWebKitAPI {
 
@@ -50,12 +53,13 @@ TEST(WebKit2, DocumentStartUserScriptAlertCrashTest)
     WKRetainPtr<WKContextRef> context(AdoptWK, Util::createContextForInjectedBundleTest("DocumentStartUserScriptAlertCrashTest", pageGroup.get()));
     PlatformWebView webView(context.get(), pageGroup.get());
 
-    WKPageUIClient uiClient;
+    WKPageUIClientV0 uiClient;
     memset(&uiClient, 0, sizeof(uiClient));
-    uiClient.version = 0;
-    uiClient.clientInfo = 0;
+
+    uiClient.base.version = 0;
     uiClient.runJavaScriptAlert = runJavaScriptAlert;
-    WKPageSetPageUIClient(webView.page(), &uiClient);
+
+    WKPageSetPageUIClient(webView.page(), &uiClient.base);
 
     WKRetainPtr<WKURLRef> url(AdoptWK, Util::createURLForResource("simple", "html"));
     WKPageLoadURL(webView.page(), url.get());
@@ -64,3 +68,5 @@ TEST(WebKit2, DocumentStartUserScriptAlertCrashTest)
 }
 
 } // namespace TestWebKitAPI
+
+#endif

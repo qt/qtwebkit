@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -32,19 +32,30 @@
 #include "Color.h"
 #include "FloatQuad.h"
 #include "LayoutRect.h"
-
-#include <wtf/OwnPtr.h>
-#include <wtf/PassOwnPtr.h>
+#include "NodeList.h"
+#include "Timer.h"
+#include <inspector/InspectorProtocolObjects.h>
+#include <wtf/Deque.h>
 #include <wtf/RefPtr.h>
 #include <wtf/Vector.h>
 #include <wtf/text/WTFString.h>
+
+namespace Inspector {
+class InspectorObject;
+class InspectorValue;
+
+namespace Protocol {
+namespace OverlayTypes {
+class NodeHighlightData;
+}
+}
+}
 
 namespace WebCore {
 
 class Color;
 class GraphicsContext;
 class InspectorClient;
-class InspectorValue;
 class IntRect;
 class Node;
 class Page;
@@ -58,21 +69,17 @@ public:
     Color border;
     Color margin;
     bool showInfo;
-    bool showRulers;
     bool usePageCoordinates;
 };
 
-enum HighlightType {
-    HighlightTypeNode,
-    HighlightTypeRects,
+enum class HighlightType {
+    Node, // Provides 4 quads: margin, border, padding, content.
+    NodeList, // Provides a list of nodes.
+    Rects, // Provides a list of quads.
 };
 
 struct Highlight {
-    Highlight()
-        : type(HighlightTypeNode)
-        , showRulers(false)
-    {
-    }
+    Highlight() { }
 
     void setDataFromConfig(const HighlightConfig& highlightConfig)
     {
@@ -81,7 +88,6 @@ struct Highlight {
         paddingColor = highlightConfig.padding;
         borderColor = highlightConfig.border;
         marginColor = highlightConfig.margin;
-        showRulers = highlightConfig.showRulers;
         usePageCoordinates = highlightConfig.usePageCoordinates;
     }
 
@@ -91,59 +97,78 @@ struct Highlight {
     Color borderColor;
     Color marginColor;
 
-    // When the type is Node, there are 4 quads (margin, border, padding, content).
-    // When the type is Rects, this is just a list of quads.
-    HighlightType type;
+    HighlightType type {HighlightType::Node};
     Vector<FloatQuad> quads;
-    bool showRulers;
-    bool usePageCoordinates;
+    bool usePageCoordinates {true};
 };
 
 class InspectorOverlay {
     WTF_MAKE_FAST_ALLOCATED;
 public:
-    static PassOwnPtr<InspectorOverlay> create(Page* page, InspectorClient* client)
-    {
-        return adoptPtr(new InspectorOverlay(page, client));
-    }
+    InspectorOverlay(Page&, InspectorClient*);
     ~InspectorOverlay();
+
+    enum class CoordinateSystem {
+        View, // Adjusts for the main frame's scroll offset.
+        Document, // Does not adjust for the main frame's scroll offset.
+    };
 
     void update();
     void paint(GraphicsContext&);
-    void drawOutline(GraphicsContext*, const LayoutRect&, const Color&);
-    void getHighlight(Highlight*) const;
-    void resize(const IntSize&);
+    void getHighlight(Highlight&, CoordinateSystem) const;
 
     void setPausedInDebuggerMessage(const String*);
 
     void hideHighlight();
+    void highlightNodeList(RefPtr<NodeList>&&, const HighlightConfig&);
     void highlightNode(Node*, const HighlightConfig&);
-    void highlightQuad(PassOwnPtr<FloatQuad>, const HighlightConfig&);
-
+    void highlightQuad(std::unique_ptr<FloatQuad>, const HighlightConfig&);
+    
+    void setShowingPaintRects(bool);
+    void showPaintRect(const FloatRect&);
+    
     Node* highlightedNode() const;
+
+    void didSetSearchingForNode(bool enabled);
+
+    void setIndicating(bool indicating);
+
+    RefPtr<Inspector::Protocol::OverlayTypes::NodeHighlightData> buildHighlightObjectForNode(Node*, HighlightType) const;
+    Ref<Inspector::Protocol::Array<Inspector::Protocol::OverlayTypes::NodeHighlightData>> buildObjectForHighlightedNodes() const;
 
     void freePage();
 private:
-    InspectorOverlay(Page*, InspectorClient*);
-
+    bool shouldShowOverlay() const;
     void drawGutter();
     void drawNodeHighlight();
     void drawQuadHighlight();
     void drawPausedInDebuggerMessage();
-    Page* overlayPage();
-    void reset(const IntSize& viewportSize, const IntSize& frameViewFullSize);
-    void evaluateInOverlay(const String& method, const String& argument);
-    void evaluateInOverlay(const String& method, PassRefPtr<InspectorValue> argument);
+    void drawPaintRects();
+    void updatePaintRectsTimerFired();
 
-    Page* m_page;
+    Page* overlayPage();
+
+    void forcePaint();
+    void reset(const IntSize& viewportSize, const IntSize& frameViewFullSize);
+    void evaluateInOverlay(const String& method);
+    void evaluateInOverlay(const String& method, const String& argument);
+    void evaluateInOverlay(const String& method, RefPtr<Inspector::InspectorValue>&& argument);
+
+    Page& m_page;
     InspectorClient* m_client;
     String m_pausedInDebuggerMessage;
     RefPtr<Node> m_highlightNode;
+    RefPtr<NodeList> m_highlightNodeList;
     HighlightConfig m_nodeHighlightConfig;
-    OwnPtr<FloatQuad> m_highlightQuad;
-    OwnPtr<Page> m_overlayPage;
+    std::unique_ptr<FloatQuad> m_highlightQuad;
+    std::unique_ptr<Page> m_overlayPage;
     HighlightConfig m_quadHighlightConfig;
-    IntSize m_size;
+    
+    typedef std::pair<std::chrono::steady_clock::time_point, FloatRect> TimeRectPair;
+    Deque<TimeRectPair> m_paintRects;
+    Timer m_paintRectUpdateTimer;
+    bool m_indicating {false};
+    bool m_showingPaintRects {false};
 };
 
 } // namespace WebCore

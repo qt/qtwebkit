@@ -12,7 +12,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -29,9 +29,9 @@
  */
 
 #include "config.h"
-#include "GlyphPageTreeNode.h"
+#include "GlyphPage.h"
 
-#include "SimpleFontData.h"
+#include "Font.h"
 #include "UTF16UChar32Iterator.h"
 #include <cairo-ft.h>
 #include <cairo.h>
@@ -39,9 +39,10 @@
 
 namespace WebCore {
 
-bool GlyphPage::fill(unsigned offset, unsigned length, UChar* buffer, unsigned bufferLength, const SimpleFontData* fontData)
+bool GlyphPage::fill(UChar* buffer, unsigned bufferLength)
 {
-    cairo_scaled_font_t* scaledFont = fontData->platformData().scaledFont();
+    const Font& font = this->font();
+    cairo_scaled_font_t* scaledFont = font.platformData().scaledFont();
     ASSERT(scaledFont);
 
     FT_Face face = cairo_ft_scaled_font_lock_face(scaledFont);
@@ -50,16 +51,16 @@ bool GlyphPage::fill(unsigned offset, unsigned length, UChar* buffer, unsigned b
 
     bool haveGlyphs = false;
     UTF16UChar32Iterator iterator(buffer, bufferLength);
-    for (unsigned i = 0; i < length; i++) {
+    for (unsigned i = 0; i < GlyphPage::size; i++) {
         UChar32 character = iterator.next();
         if (character == iterator.end())
             break;
 
         Glyph glyph = FcFreeTypeCharIndex(face, character);
         if (!glyph)
-            setGlyphDataForIndex(offset + i, 0, 0);
+            setGlyphForIndex(i, 0);
         else {
-            setGlyphDataForIndex(offset + i, glyph, fontData);
+            setGlyphForIndex(i, glyph);
             haveGlyphs = true;
         }
     }

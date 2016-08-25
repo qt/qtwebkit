@@ -37,19 +37,13 @@
 #include "HTMLNames.h"
 #include "HTMLParamElement.h"
 #include "HTMLParserIdioms.h"
-#include "InspectorValues.h"
-#include "KURL.h"
+#include "SVGNames.h"
 #include "Settings.h"
-#include "TextEncoding.h"
 #include "TextResourceDecoder.h"
 #include "XLinkNames.h"
-#include "XSSAuditorDelegate.h"
-
-#if ENABLE(SVG)
-#include "SVGNames.h"
-#endif
-
+#include <wtf/ASCIICType.h>
 #include <wtf/MainThread.h>
+#include <wtf/NeverDestroyed.h>
 
 namespace WebCore {
 
@@ -62,14 +56,11 @@ static bool isNonCanonicalCharacter(UChar c)
     // Note, we don't remove backslashes like PHP stripslashes(), which among other things converts "\\0" to the \0 character.
     // Instead, we remove backslashes and zeros (since the string "\\0" =(remove backslashes)=> "0"). However, this has the
     // adverse effect that we remove any legitimate zeros from a string.
+    // We also remove forward-slash, because it is common for some servers to collapse successive path components, eg,
+    // a//b becomes a/b.
     //
-    // For instance: new String("http://localhost:8000") => new String("http://localhost:8").
-    return (c == '\\' || c == '0' || c == '\0' || c >= 127);
-}
-
-static String canonicalize(const String& string)
-{
-    return string.removeCharacters(&isNonCanonicalCharacter);
+    // For instance: new String("http://localhost:8000") => new String("http:localhost:8").
+    return (c == '\\' || c == '0' || c == '\0' || c == '/' || c >= 127);
 }
 
 static bool isRequiredForInjection(UChar c)
@@ -95,17 +86,28 @@ static bool isJSNewline(UChar c)
 
 static bool startsHTMLCommentAt(const String& string, size_t start)
 {
-    return (start + 3 < string.length() && string[start] == '<' && string[start+1] == '!' && string[start+2] == '-' && string[start+3] == '-');
+    return (start + 3 < string.length() && string[start] == '<' && string[start + 1] == '!' && string[start + 2] == '-' && string[start + 3] == '-');
 }
 
 static bool startsSingleLineCommentAt(const String& string, size_t start)
 {
-    return (start + 1 < string.length() && string[start] == '/' && string[start+1] == '/');
+    return (start + 1 < string.length() && string[start] == '/' && string[start + 1] == '/');
 }
 
 static bool startsMultiLineCommentAt(const String& string, size_t start)
 {
-    return (start + 1 < string.length() && string[start] == '/' && string[start+1] == '*');
+    return (start + 1 < string.length() && string[start] == '/' && string[start + 1] == '*');
+}
+
+static bool startsOpeningScriptTagAt(const String& string, size_t start)
+{
+    return start + 6 < string.length() && string[start] == '<'
+        && WTF::toASCIILowerUnchecked(string[start + 1]) == 's'
+        && WTF::toASCIILowerUnchecked(string[start + 2]) == 'c'
+        && WTF::toASCIILowerUnchecked(string[start + 3]) == 'r'
+        && WTF::toASCIILowerUnchecked(string[start + 4]) == 'i'
+        && WTF::toASCIILowerUnchecked(string[start + 5]) == 'p'
+        && WTF::toASCIILowerUnchecked(string[start + 6]) == 't';
 }
 
 // If other files need this, we should move this to HTMLParserIdioms.h
@@ -145,7 +147,7 @@ static bool isNameOfInlineEventHandler(const Vector<UChar, 32>& name)
 static bool isDangerousHTTPEquiv(const String& value)
 {
     String equiv = value.stripWhiteSpace();
-    return equalIgnoringCase(equiv, "refresh") || equalIgnoringCase(equiv, "set-cookie");
+    return equalLettersIgnoringASCIICase(equiv, "refresh") || equalLettersIgnoringASCIICase(equiv, "set-cookie");
 }
 
 static inline String decode16BitUnicodeEscapeSequences(const String& string)
@@ -156,8 +158,8 @@ static inline String decode16BitUnicodeEscapeSequences(const String& string)
 
 static inline String decodeStandardURLEscapeSequences(const String& string, const TextEncoding& encoding)
 {
-    // We use decodeEscapeSequences() instead of decodeURLEscapeSequences() (declared in KURL.h) to
-    // avoid platform-specific URL decoding differences (e.g. KURLGoogle).
+    // We use decodeEscapeSequences() instead of decodeURLEscapeSequences() (declared in URL.h) to
+    // avoid platform-specific URL decoding differences (e.g. URLGoogle).
     return decodeEscapeSequences<URLEscapeSequence>(string, encoding);
 }
 
@@ -170,8 +172,58 @@ static String fullyDecodeString(const String& string, const TextEncoding& encodi
         workingString = decode16BitUnicodeEscapeSequences(decodeStandardURLEscapeSequences(workingString, encoding));
     } while (workingString.length() < oldWorkingStringLength);
     workingString.replace('+', ' ');
-    workingString = canonicalize(workingString);
     return workingString;
+}
+
+static void truncateForSrcLikeAttribute(String& decodedSnippet)
+{
+    // In HTTP URLs, characters following the first ?, #, or third slash may come from
+    // the page itself and can be merely ignored by an attacker's server when a remote
+    // script or script-like resource is requested. In DATA URLS, the payload starts at
+    // the first comma, and the the first /*, //, or <!-- may introduce a comment. Characters
+    // following this may come from the page itself and may be ignored when the script is
+    // executed. For simplicity, we don't differentiate based on URL scheme, and stop at
+    // the first # or ?, the third slash, or the first slash or < once a comma is seen.
+    int slashCount = 0;
+    bool commaSeen = false;
+    for (size_t currentLength = 0; currentLength < decodedSnippet.length(); ++currentLength) {
+        UChar currentChar = decodedSnippet[currentLength];
+        if (currentChar == '?'
+            || currentChar == '#'
+            || ((currentChar == '/' || currentChar == '\\') && (commaSeen || ++slashCount > 2))
+            || (currentChar == '<' && commaSeen)) {
+            decodedSnippet.truncate(currentLength);
+            return;
+        }
+        if (currentChar == ',')
+            commaSeen = true;
+    }
+}
+
+static void truncateForScriptLikeAttribute(String& decodedSnippet)
+{
+    // Beware of trailing characters which came from the page itself, not the
+    // injected vector. Excluding the terminating character covers common cases
+    // where the page immediately ends the attribute, but doesn't cover more
+    // complex cases where there is other page data following the injection.
+    // Generally, these won't parse as JavaScript, so the injected vector
+    // typically excludes them from consideration via a single-line comment or
+    // by enclosing them in a string literal terminated later by the page's own
+    // closing punctuation. Since the snippet has not been parsed, the vector
+    // may also try to introduce these via entities. As a result, we'd like to
+    // stop before the first "//", the first <!--, the first entity, or the first
+    // quote not immediately following the first equals sign (taking whitespace
+    // into consideration). To keep things simpler, we don't try to distinguish
+    // between entity-introducing ampersands vs. other uses, nor do we bother to
+    // check for a second slash for a comment, nor do we bother to check for
+    // !-- following a less-than sign. We stop instead on any ampersand
+    // slash, or less-than sign.
+    size_t position = 0;
+    if ((position = decodedSnippet.find('=')) != notFound
+        && (position = decodedSnippet.find(isNotHTMLSpace, position + 1)) != notFound
+        && (position = decodedSnippet.find(isTerminatingCharacter, isHTMLQuote(decodedSnippet[position]) ? position + 1 : position)) != notFound) {
+        decodedSnippet.truncate(position);
+    }
 }
 
 static ContentSecurityPolicy::ReflectedXSSDisposition combineXSSProtectionHeaderAndCSP(ContentSecurityPolicy::ReflectedXSSDisposition xssProtection, ContentSecurityPolicy::ReflectedXSSDisposition reflectedXSS)
@@ -186,19 +238,15 @@ static ContentSecurityPolicy::ReflectedXSSDisposition combineXSSProtectionHeader
 
 static bool isSemicolonSeparatedAttribute(const HTMLToken::Attribute& attribute)
 {
-#if ENABLE(SVG)
     return threadSafeMatch(attribute.name, SVGNames::valuesAttr);
-#else
-    return false;
-#endif
 }
 
 static bool semicolonSeparatedValueContainsJavaScriptURL(const String& value)
 {
     Vector<String> valueList;
     value.split(';', valueList);
-    for (size_t i = 0; i < valueList.size(); ++i) {
-        if (protocolIsJavaScript(valueList[i]))
+    for (auto& value : valueList) {
+        if (protocolIsJavaScript(value))
             return true;
     }
     return false;
@@ -229,7 +277,7 @@ void XSSAuditor::initForFragment()
 
 void XSSAuditor::init(Document* document, XSSAuditorDelegate* auditorDelegate)
 {
-    const size_t miniumLengthForSuffixTree = 512; // FIXME: Tune this parameter.
+    const size_t minimumLengthForSuffixTree = 512; // FIXME: Tune this parameter.
     const int suffixTreeDepth = 5;
 
     ASSERT(isMainThread());
@@ -239,13 +287,12 @@ void XSSAuditor::init(Document* document, XSSAuditorDelegate* auditorDelegate)
     m_state = Initialized;
 
     if (Frame* frame = document->frame())
-        if (Settings* settings = frame->settings())
-            m_isEnabled = settings->xssAuditorEnabled();
+        m_isEnabled = frame->settings().xssAuditorEnabled();
 
     if (!m_isEnabled)
         return;
 
-    m_documentURL = document->url().copy();
+    m_documentURL = document->url().isolatedCopy();
 
     // In theory, the Document could have detached from the Frame after the
     // XSSAuditor was constructed.
@@ -268,18 +315,18 @@ void XSSAuditor::init(Document* document, XSSAuditorDelegate* auditorDelegate)
     if (document->decoder())
         m_encoding = document->decoder()->encoding();
 
-    m_decodedURL = fullyDecodeString(m_documentURL.string(), m_encoding);
+    m_decodedURL = canonicalize(m_documentURL.string(), TruncationStyle::None);
     if (m_decodedURL.find(isRequiredForInjection) == notFound)
         m_decodedURL = String();
 
     String httpBodyAsString;
-    if (DocumentLoader* documentLoader = document->frame()->loader()->documentLoader()) {
-        DEFINE_STATIC_LOCAL(String, XSSProtectionHeader, (ASCIILiteral("X-XSS-Protection")));
+    if (DocumentLoader* documentLoader = document->frame()->loader().documentLoader()) {
+        static NeverDestroyed<String> XSSProtectionHeader(ASCIILiteral("X-XSS-Protection"));
         String headerValue = documentLoader->response().httpHeaderField(XSSProtectionHeader);
         String errorDetails;
         unsigned errorPosition = 0;
         String reportURL;
-        KURL xssProtectionReportURL;
+        URL xssProtectionReportURL;
 
         // Process the X-XSS-Protection header, then mix in the CSP header's value.
         ContentSecurityPolicy::ReflectedXSSDisposition xssProtectionHeader = parseXSSProtectionHeader(headerValue, errorDetails, errorPosition, reportURL);
@@ -289,11 +336,11 @@ void XSSAuditor::init(Document* document, XSSAuditorDelegate* auditorDelegate)
             if (MixedContentChecker::isMixedContent(document->securityOrigin(), xssProtectionReportURL)) {
                 errorDetails = "insecure reporting URL for secure page";
                 xssProtectionHeader = ContentSecurityPolicy::ReflectedXSSInvalid;
-                xssProtectionReportURL = KURL();
+                xssProtectionReportURL = URL();
             }
         }
         if (xssProtectionHeader == ContentSecurityPolicy::ReflectedXSSInvalid)
-            document->addConsoleMessage(SecurityMessageSource, ErrorMessageLevel, "Error parsing header X-XSS-Protection: " + headerValue + ": "  + errorDetails + " at character position " + String::format("%u", errorPosition) + ". The default protections will be applied.");
+            document->addConsoleMessage(MessageSource::Security, MessageLevel::Error, "Error parsing header X-XSS-Protection: " + headerValue + ": "  + errorDetails + " at character position " + String::format("%u", errorPosition) + ". The default protections will be applied.");
 
         ContentSecurityPolicy::ReflectedXSSDisposition cspHeader = document->contentSecurityPolicy()->reflectedXSSDisposition();
         m_didSendValidCSPHeader = cspHeader != ContentSecurityPolicy::ReflectedXSSUnset && cspHeader != ContentSecurityPolicy::ReflectedXSSInvalid;
@@ -301,16 +348,16 @@ void XSSAuditor::init(Document* document, XSSAuditorDelegate* auditorDelegate)
         m_xssProtection = combineXSSProtectionHeaderAndCSP(xssProtectionHeader, cspHeader);
         // FIXME: Combine the two report URLs in some reasonable way.
         if (auditorDelegate)
-            auditorDelegate->setReportURL(xssProtectionReportURL.copy());
+            auditorDelegate->setReportURL(xssProtectionReportURL.isolatedCopy());
         FormData* httpBody = documentLoader->originalRequest().httpBody();
         if (httpBody && !httpBody->isEmpty()) {
             httpBodyAsString = httpBody->flattenToString();
             if (!httpBodyAsString.isEmpty()) {
-                m_decodedHTTPBody = fullyDecodeString(httpBodyAsString, m_encoding);
+                m_decodedHTTPBody = canonicalize(httpBodyAsString, TruncationStyle::None);
                 if (m_decodedHTTPBody.find(isRequiredForInjection) == notFound)
                     m_decodedHTTPBody = String();
-                if (m_decodedHTTPBody.length() >= miniumLengthForSuffixTree)
-                    m_decodedHTTPBodySuffixTree = adoptPtr(new SuffixTree<ASCIICodebook>(m_decodedHTTPBody, suffixTreeDepth));
+                if (m_decodedHTTPBody.length() >= minimumLengthForSuffixTree)
+                    m_decodedHTTPBodySuffixTree = std::make_unique<SuffixTree<ASCIICodebook>>(m_decodedHTTPBody, suffixTreeDepth);
             }
         }
     }
@@ -321,7 +368,7 @@ void XSSAuditor::init(Document* document, XSSAuditorDelegate* auditorDelegate)
     }
 }
 
-PassOwnPtr<XSSInfo> XSSAuditor::filterToken(const FilterTokenRequest& request)
+std::unique_ptr<XSSInfo> XSSAuditor::filterToken(const FilterTokenRequest& request)
 {
     ASSERT(m_state == Initialized);
     if (!m_isEnabled || m_xssProtection == ContentSecurityPolicy::AllowReflectedXSS)
@@ -337,12 +384,11 @@ PassOwnPtr<XSSInfo> XSSAuditor::filterToken(const FilterTokenRequest& request)
             filterEndToken(request);
     }
 
-    if (didBlockScript) {
-        bool didBlockEntirePage = (m_xssProtection == ContentSecurityPolicy::BlockReflectedXSS);
-        OwnPtr<XSSInfo> xssInfo = XSSInfo::create(didBlockEntirePage, m_didSendValidXSSProtectionHeader, m_didSendValidCSPHeader);
-        return xssInfo.release();
-    }
-    return nullptr;
+    if (!didBlockScript)
+        return nullptr;
+
+    bool didBlockEntirePage = (m_xssProtection == ContentSecurityPolicy::BlockReflectedXSS);
+    return std::make_unique<XSSInfo>(m_documentURL, didBlockEntirePage, m_didSendValidXSSProtectionHeader, m_didSendValidCSPHeader);
 }
 
 bool XSSAuditor::filterStartToken(const FilterTokenRequest& request)
@@ -361,8 +407,8 @@ bool XSSAuditor::filterStartToken(const FilterTokenRequest& request)
         didBlockScript |= filterEmbedToken(request);
     else if (hasName(request.token, appletTag))
         didBlockScript |= filterAppletToken(request);
-    else if (hasName(request.token, iframeTag))
-        didBlockScript |= filterIframeToken(request);
+    else if (hasName(request.token, iframeTag) || hasName(request.token, frameTag))
+        didBlockScript |= filterFrameToken(request);
     else if (hasName(request.token, metaTag))
         didBlockScript |= filterMetaToken(request);
     else if (hasName(request.token, baseTag))
@@ -389,9 +435,10 @@ void XSSAuditor::filterEndToken(const FilterTokenRequest& request)
 bool XSSAuditor::filterCharacterToken(const FilterTokenRequest& request)
 {
     ASSERT(m_scriptTagNestingLevel);
-    if (isContainedInRequest(m_cachedDecodedSnippet) && isContainedInRequest(decodedSnippetForJavaScript(request))) {
-        request.token.eraseCharacters();
-        request.token.appendToCharacter(' '); // Technically, character tokens can't be empty.
+    if (m_wasScriptTagFoundInRequest && isContainedInRequest(canonicalizedSnippetForJavaScript(request))) {
+        request.token.clear();
+        LChar space = ' ';
+        request.token.appendToCharacter(space); // Technically, character tokens can't be empty.
         return true;
     }
     return false;
@@ -402,12 +449,12 @@ bool XSSAuditor::filterScriptToken(const FilterTokenRequest& request)
     ASSERT(request.token.type() == HTMLToken::StartTag);
     ASSERT(hasName(request.token, scriptTag));
 
-    m_cachedDecodedSnippet = decodedSnippetForName(request);
+    m_wasScriptTagFoundInRequest = isContainedInRequest(canonicalizedSnippetForTagName(request));
 
     bool didBlockScript = false;
-    if (isContainedInRequest(decodedSnippetForName(request))) {
-        didBlockScript |= eraseAttributeIfInjected(request, srcAttr, blankURL().string(), SrcLikeAttribute);
-        didBlockScript |= eraseAttributeIfInjected(request, XLinkNames::hrefAttr, blankURL().string(), SrcLikeAttribute);
+    if (m_wasScriptTagFoundInRequest) {
+        didBlockScript |= eraseAttributeIfInjected(request, srcAttr, blankURL().string(), TruncationStyle::SrcLikeAttribute);
+        didBlockScript |= eraseAttributeIfInjected(request, XLinkNames::hrefAttr, blankURL().string(), TruncationStyle::SrcLikeAttribute);
     }
 
     return didBlockScript;
@@ -419,8 +466,8 @@ bool XSSAuditor::filterObjectToken(const FilterTokenRequest& request)
     ASSERT(hasName(request.token, objectTag));
 
     bool didBlockScript = false;
-    if (isContainedInRequest(decodedSnippetForName(request))) {
-        didBlockScript |= eraseAttributeIfInjected(request, dataAttr, blankURL().string(), SrcLikeAttribute);
+    if (isContainedInRequest(canonicalizedSnippetForTagName(request))) {
+        didBlockScript |= eraseAttributeIfInjected(request, dataAttr, blankURL().string(), TruncationStyle::SrcLikeAttribute);
         didBlockScript |= eraseAttributeIfInjected(request, typeAttr);
         didBlockScript |= eraseAttributeIfInjected(request, classidAttr);
     }
@@ -440,7 +487,7 @@ bool XSSAuditor::filterParamToken(const FilterTokenRequest& request)
     if (!HTMLParamElement::isURLParameter(String(nameAttribute.value)))
         return false;
 
-    return eraseAttributeIfInjected(request, valueAttr, blankURL().string(), SrcLikeAttribute);
+    return eraseAttributeIfInjected(request, valueAttr, blankURL().string(), TruncationStyle::SrcLikeAttribute);
 }
 
 bool XSSAuditor::filterEmbedToken(const FilterTokenRequest& request)
@@ -449,9 +496,9 @@ bool XSSAuditor::filterEmbedToken(const FilterTokenRequest& request)
     ASSERT(hasName(request.token, embedTag));
 
     bool didBlockScript = false;
-    if (isContainedInRequest(decodedSnippetForName(request))) {
-        didBlockScript |= eraseAttributeIfInjected(request, codeAttr, String(), SrcLikeAttribute);
-        didBlockScript |= eraseAttributeIfInjected(request, srcAttr, blankURL().string(), SrcLikeAttribute);
+    if (isContainedInRequest(canonicalizedSnippetForTagName(request))) {
+        didBlockScript |= eraseAttributeIfInjected(request, codeAttr, String(), TruncationStyle::SrcLikeAttribute);
+        didBlockScript |= eraseAttributeIfInjected(request, srcAttr, blankURL().string(), TruncationStyle::SrcLikeAttribute);
         didBlockScript |= eraseAttributeIfInjected(request, typeAttr);
     }
     return didBlockScript;
@@ -463,23 +510,22 @@ bool XSSAuditor::filterAppletToken(const FilterTokenRequest& request)
     ASSERT(hasName(request.token, appletTag));
 
     bool didBlockScript = false;
-    if (isContainedInRequest(decodedSnippetForName(request))) {
-        didBlockScript |= eraseAttributeIfInjected(request, codeAttr, String(), SrcLikeAttribute);
+    if (isContainedInRequest(canonicalizedSnippetForTagName(request))) {
+        didBlockScript |= eraseAttributeIfInjected(request, codeAttr, String(), TruncationStyle::SrcLikeAttribute);
         didBlockScript |= eraseAttributeIfInjected(request, objectAttr);
     }
     return didBlockScript;
 }
 
-bool XSSAuditor::filterIframeToken(const FilterTokenRequest& request)
+bool XSSAuditor::filterFrameToken(const FilterTokenRequest& request)
 {
     ASSERT(request.token.type() == HTMLToken::StartTag);
-    ASSERT(hasName(request.token, iframeTag));
+    ASSERT(hasName(request.token, iframeTag) || hasName(request.token, frameTag));
 
-    bool didBlockScript = false;
-    if (isContainedInRequest(decodedSnippetForName(request))) {
-        didBlockScript |= eraseAttributeIfInjected(request, srcAttr, String(), SrcLikeAttribute);
-        didBlockScript |= eraseAttributeIfInjected(request, srcdocAttr, String(), ScriptLikeAttribute);
-    }
+    bool didBlockScript = eraseAttributeIfInjected(request, srcdocAttr, String(), TruncationStyle::ScriptLikeAttribute);
+    if (isContainedInRequest(canonicalizedSnippetForTagName(request)))
+        didBlockScript |= eraseAttributeIfInjected(request, srcAttr, String(), TruncationStyle::SrcLikeAttribute);
+
     return didBlockScript;
 }
 
@@ -512,7 +558,7 @@ bool XSSAuditor::filterInputToken(const FilterTokenRequest& request)
     ASSERT(request.token.type() == HTMLToken::StartTag);
     ASSERT(hasName(request.token, inputTag));
 
-    return eraseAttributeIfInjected(request, formactionAttr, blankURL().string(), SrcLikeAttribute);
+    return eraseAttributeIfInjected(request, formactionAttr, blankURL().string(), TruncationStyle::SrcLikeAttribute);
 }
 
 bool XSSAuditor::filterButtonToken(const FilterTokenRequest& request)
@@ -520,12 +566,12 @@ bool XSSAuditor::filterButtonToken(const FilterTokenRequest& request)
     ASSERT(request.token.type() == HTMLToken::StartTag);
     ASSERT(hasName(request.token, buttonTag));
 
-    return eraseAttributeIfInjected(request, formactionAttr, blankURL().string(), SrcLikeAttribute);
+    return eraseAttributeIfInjected(request, formactionAttr, blankURL().string(), TruncationStyle::SrcLikeAttribute);
 }
 
 bool XSSAuditor::eraseDangerousAttributesIfInjected(const FilterTokenRequest& request)
 {
-    DEFINE_STATIC_LOCAL(String, safeJavaScriptURL, (ASCIILiteral("javascript:void(0)")));
+    static NeverDestroyed<String> safeJavaScriptURL(ASCIILiteral("javascript:void(0)"));
 
     bool didBlockScript = false;
     for (size_t i = 0; i < request.token.attributes().size(); ++i) {
@@ -536,106 +582,75 @@ bool XSSAuditor::eraseDangerousAttributesIfInjected(const FilterTokenRequest& re
         bool valueContainsJavaScriptURL = (!isInlineEventHandler && protocolIsJavaScript(strippedValue)) || (isSemicolonSeparatedAttribute(attribute) && semicolonSeparatedValueContainsJavaScriptURL(strippedValue));
         if (!isInlineEventHandler && !valueContainsJavaScriptURL)
             continue;
-        if (!isContainedInRequest(decodedSnippetForAttribute(request, attribute, ScriptLikeAttribute)))
+        if (!isContainedInRequest(canonicalize(snippetFromAttribute(request, attribute), TruncationStyle::ScriptLikeAttribute)))
             continue;
         request.token.eraseValueOfAttribute(i);
         if (valueContainsJavaScriptURL)
-            request.token.appendToAttributeValue(i, safeJavaScriptURL);
+            request.token.appendToAttributeValue(i, safeJavaScriptURL.get());
         didBlockScript = true;
     }
     return didBlockScript;
 }
 
-bool XSSAuditor::eraseAttributeIfInjected(const FilterTokenRequest& request, const QualifiedName& attributeName, const String& replacementValue, AttributeKind treatment)
+bool XSSAuditor::eraseAttributeIfInjected(const FilterTokenRequest& request, const QualifiedName& attributeName, const String& replacementValue, TruncationStyle truncationStyle)
 {
     size_t indexOfAttribute = 0;
-    if (findAttributeWithName(request.token, attributeName, indexOfAttribute)) {
-        const HTMLToken::Attribute& attribute = request.token.attributes().at(indexOfAttribute);
-        if (isContainedInRequest(decodedSnippetForAttribute(request, attribute, treatment))) {
-            if (threadSafeMatch(attributeName, srcAttr) && isLikelySafeResource(String(attribute.value)))
-                return false;
-            if (threadSafeMatch(attributeName, http_equivAttr) && !isDangerousHTTPEquiv(String(attribute.value)))
-                return false;
-            request.token.eraseValueOfAttribute(indexOfAttribute);
-            if (!replacementValue.isEmpty())
-                request.token.appendToAttributeValue(indexOfAttribute, replacementValue);
-            return true;
-        }
+    if (!findAttributeWithName(request.token, attributeName, indexOfAttribute))
+        return false;
+
+    const HTMLToken::Attribute& attribute = request.token.attributes().at(indexOfAttribute);
+    if (!isContainedInRequest(canonicalize(snippetFromAttribute(request, attribute), truncationStyle)))
+        return false;
+
+    if (threadSafeMatch(attributeName, srcAttr)) {
+        if (isLikelySafeResource(String(attribute.value)))
+            return false;
+    } else if (threadSafeMatch(attributeName, http_equivAttr)) {
+        if (!isDangerousHTTPEquiv(String(attribute.value)))
+            return false;
     }
-    return false;
+
+    request.token.eraseValueOfAttribute(indexOfAttribute);
+    if (!replacementValue.isEmpty())
+        request.token.appendToAttributeValue(indexOfAttribute, replacementValue);
+    return true;
 }
 
-String XSSAuditor::decodedSnippetForName(const FilterTokenRequest& request)
+String XSSAuditor::canonicalizedSnippetForTagName(const FilterTokenRequest& request)
 {
     // Grab a fixed number of characters equal to the length of the token's name plus one (to account for the "<").
-    return fullyDecodeString(request.sourceTracker.sourceForToken(request.token), m_encoding).substring(0, request.token.name().size() + 1);
+    return canonicalize(request.sourceTracker.source(request.token).substring(0, request.token.name().size() + 1), TruncationStyle::None);
 }
 
-String XSSAuditor::decodedSnippetForAttribute(const FilterTokenRequest& request, const HTMLToken::Attribute& attribute, AttributeKind treatment)
+String XSSAuditor::snippetFromAttribute(const FilterTokenRequest& request, const HTMLToken::Attribute& attribute)
 {
-    // The range doesn't inlcude the character which terminates the value. So,
+    // The range doesn't include the character which terminates the value. So,
     // for an input of |name="value"|, the snippet is |name="value|. For an
     // unquoted input of |name=value |, the snippet is |name=value|.
     // FIXME: We should grab one character before the name also.
-    int start = attribute.nameRange.start - request.token.startIndex();
-    int end = attribute.valueRange.end - request.token.startIndex();
-    String decodedSnippet = fullyDecodeString(request.sourceTracker.sourceForToken(request.token).substring(start, end - start), m_encoding);
-    decodedSnippet.truncate(kMaximumFragmentLengthTarget);
-    if (treatment == SrcLikeAttribute) {
-        int slashCount = 0;
-        bool commaSeen = false;
-        // In HTTP URLs, characters following the first ?, #, or third slash may come from 
-        // the page itself and can be merely ignored by an attacker's server when a remote
-        // script or script-like resource is requested. In DATA URLS, the payload starts at
-        // the first comma, and the the first /*, //, or <!-- may introduce a comment. Characters
-        // following this may come from the page itself and may be ignored when the script is
-        // executed. For simplicity, we don't differentiate based on URL scheme, and stop at
-        // the first # or ?, the third slash, or the first slash or < once a comma is seen.
-        for (size_t currentLength = 0; currentLength < decodedSnippet.length(); ++currentLength) {
-            UChar currentChar = decodedSnippet[currentLength];
-            if (currentChar == '?'
-                || currentChar == '#'
-                || ((currentChar == '/' || currentChar == '\\') && (commaSeen || ++slashCount > 2))
-                || (currentChar == '<' && commaSeen)) {
-                decodedSnippet.truncate(currentLength);
-                break;
-            }
-            if (currentChar == ',')
-                commaSeen = true;
-        }
-    } else if (treatment == ScriptLikeAttribute) {
-        // Beware of trailing characters which came from the page itself, not the 
-        // injected vector. Excluding the terminating character covers common cases
-        // where the page immediately ends the attribute, but doesn't cover more
-        // complex cases where there is other page data following the injection. 
-        // Generally, these won't parse as javascript, so the injected vector
-        // typically excludes them from consideration via a single-line comment or
-        // by enclosing them in a string literal terminated later by the page's own
-        // closing punctuation. Since the snippet has not been parsed, the vector
-        // may also try to introduce these via entities. As a result, we'd like to
-        // stop before the first "//", the first <!--, the first entity, or the first
-        // quote not immediately following the first equals sign (taking whitespace
-        // into consideration). To keep things simpler, we don't try to distinguish
-        // between entity-introducing amperands vs. other uses, nor do we bother to
-        // check for a second slash for a comment, nor do we bother to check for
-        // !-- following a less-than sign. We stop instead on any ampersand
-        // slash, or less-than sign.
-        size_t position = 0;
-        if ((position = decodedSnippet.find("=")) != notFound
-            && (position = decodedSnippet.find(isNotHTMLSpace, position + 1)) != notFound
-            && (position = decodedSnippet.find(isTerminatingCharacter, isHTMLQuote(decodedSnippet[position]) ? position + 1 : position)) != notFound) {
-            decodedSnippet.truncate(position);
-        }
-    }
-    return decodedSnippet;
+    return request.sourceTracker.source(request.token, attribute.startOffset, attribute.endOffset);
 }
 
-String XSSAuditor::decodedSnippetForJavaScript(const FilterTokenRequest& request)
+String XSSAuditor::canonicalize(const String& snippet, TruncationStyle truncationStyle)
 {
-    String string = request.sourceTracker.sourceForToken(request.token);
+    String decodedSnippet = fullyDecodeString(snippet, m_encoding);
+    if (truncationStyle != TruncationStyle::None) {
+        decodedSnippet.truncate(kMaximumFragmentLengthTarget);
+        if (truncationStyle == TruncationStyle::SrcLikeAttribute)
+            truncateForSrcLikeAttribute(decodedSnippet);
+        else if (truncationStyle == TruncationStyle::ScriptLikeAttribute)
+            truncateForScriptLikeAttribute(decodedSnippet);
+    }
+    return decodedSnippet.removeCharacters(&isNonCanonicalCharacter);
+}
+
+String XSSAuditor::canonicalizedSnippetForJavaScript(const FilterTokenRequest& request)
+{
+    String string = request.sourceTracker.source(request.token);
     size_t startPosition = 0;
     size_t endPosition = string.length();
     size_t foundPosition = notFound;
+    size_t lastNonSpacePosition = notFound;
 
     // Skip over initial comments to find start of code.
     while (startPosition < endPosition) {
@@ -664,30 +679,39 @@ String XSSAuditor::decodedSnippetForJavaScript(const FilterTokenRequest& request
 
     String result;
     while (startPosition < endPosition && !result.length()) {
-        // Stop at next comment (using the same rules as above for SVG/XML vs HTML), when we 
-        // encounter a comma, or when we  exceed the maximum length target. The comma rule
-        // covers a common parameter concatenation case performed by some webservers.
-        // After hitting the length target, we can only stop at a point where we know we are
-        // not in the middle of a %-escape sequence. For the sake of simplicity, approximate
-        // not stopping inside a (possibly multiply encoded) %-esacpe sequence by breaking on
-        // whitespace only. We should have enough text in these cases to avoid false positives.
+        // Stop at next comment (using the same rules as above for SVG/XML vs HTML), when we encounter a comma,
+        // when we hit an opening <script> tag, or when we exceed the maximum length target. The comma rule
+        // covers a common parameter concatenation case performed by some web servers.
+        lastNonSpacePosition = notFound;
         for (foundPosition = startPosition; foundPosition < endPosition; foundPosition++) {
             if (!request.shouldAllowCDATA) {
-                if (startsSingleLineCommentAt(string, foundPosition) || startsMultiLineCommentAt(string, foundPosition)) {
-                    foundPosition += 2;
-                    break;
-                }
-                if (startsHTMLCommentAt(string, foundPosition)) {
-                    foundPosition += 4;
+                if (startsSingleLineCommentAt(string, foundPosition)
+                    || startsMultiLineCommentAt(string, foundPosition)
+                    || startsHTMLCommentAt(string, foundPosition)) {
                     break;
                 }
             }
-            if (string[foundPosition] == ',' || (foundPosition > startPosition + kMaximumFragmentLengthTarget && isHTMLSpace(string[foundPosition]))) {
+            if (string[foundPosition] == ',')
+                break;
+
+            if (lastNonSpacePosition != notFound && startsOpeningScriptTagAt(string, foundPosition)) {
+                foundPosition = lastNonSpacePosition + 1;
                 break;
             }
+            if (foundPosition > startPosition + kMaximumFragmentLengthTarget) {
+                // After hitting the length target, we can only stop at a point where we know we are
+                // not in the middle of a %-escape sequence. For the sake of simplicity, approximate
+                // not stopping inside a (possibly multiply encoded) %-escape sequence by breaking on
+                // whitespace only. We should have enough text in these cases to avoid false positives.
+                if (isHTMLSpace(string[foundPosition]))
+                    break;
+            }
+
+            if (!isHTMLSpace(string[foundPosition]))
+                lastNonSpacePosition = foundPosition;
         }
 
-        result = fullyDecodeString(string.substring(startPosition, foundPosition - startPosition), m_encoding);
+        result = canonicalize(string.substring(startPosition, foundPosition - startPosition), TruncationStyle::None);
         startPosition = foundPosition + 1;
     }
     return result;
@@ -721,16 +745,8 @@ bool XSSAuditor::isLikelySafeResource(const String& url)
     if (m_documentURL.host().isEmpty())
         return false;
 
-    KURL resourceURL(m_documentURL, url);
+    URL resourceURL(m_documentURL, url);
     return (m_documentURL.host() == resourceURL.host() && resourceURL.query().isEmpty());
-}
-
-bool XSSAuditor::isSafeToSendToAnotherThread() const
-{
-    return m_documentURL.isSafeToSendToAnotherThread()
-        && m_decodedURL.isSafeToSendToAnotherThread()
-        && m_decodedHTTPBody.isSafeToSendToAnotherThread()
-        && m_cachedDecodedSnippet.isSafeToSendToAnotherThread();
 }
 
 } // namespace WebCore

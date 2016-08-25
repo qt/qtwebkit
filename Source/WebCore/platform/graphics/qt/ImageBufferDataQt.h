@@ -23,18 +23,10 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ImageBufferDataQt_h
-#define ImageBufferDataQt_h
-
 #include "Image.h"
 
-#include <QImage>
 #include <QPainter>
-#include <QPaintDevice>
-
-#if ENABLE(ACCELERATED_2D_CANVAS)
-#include <QOpenGLContext>
-#endif
+#include <QPixmap>
 
 #include <wtf/RefPtr.h>
 
@@ -42,38 +34,16 @@ namespace WebCore {
 
 class IntSize;
 
-struct ImageBufferDataPrivate {
-    virtual ~ImageBufferDataPrivate() { }
-    virtual QPaintDevice* paintDevice() = 0;
-    virtual QImage toQImage() const = 0;
-    virtual PassRefPtr<Image> image() const = 0;
-    virtual PassRefPtr<Image> copyImage() const = 0;
-    virtual bool isAccelerated() const = 0;
-    virtual PlatformLayer* platformLayer() = 0;
-    virtual void draw(GraphicsContext* destContext, ColorSpace styleColorSpace, const FloatRect& destRect,
-                      const FloatRect& srcRect, CompositeOperator op, BlendMode blendMode, bool useLowQualityScale,
-                      bool ownContext) = 0;
-    virtual void drawPattern(GraphicsContext* destContext, const FloatRect& srcRect, const AffineTransform& patternTransform,
-                             const FloatPoint& phase, ColorSpace styleColorSpace, CompositeOperator op,
-                             const FloatRect& destRect, bool ownContext) = 0;
-    virtual void clip(GraphicsContext* context, const FloatRect& floatRect) const = 0;
-    virtual void platformTransformColorSpace(const Vector<int>& lookUpTable) = 0;
-};
-
-class ImageBufferData
-{
+class ImageBufferData {
 public:
     ImageBufferData(const IntSize&);
-#if ENABLE(ACCELERATED_2D_CANVAS)
-    ImageBufferData(const IntSize&, QOpenGLContext*);
-#endif
-    ~ImageBufferData();
-    QPainter* m_painter;
-    ImageBufferDataPrivate* m_impl;
-protected:
-    void initPainter();
+
+    QImage toQImage() const;
+
+    QPixmap m_pixmap;
+    std::unique_ptr<QPainter> m_painter;
+    RefPtr<Image> m_image;
+    std::unique_ptr<GraphicsContext> m_context;
 };
 
 } // namespace WebCore
-
-#endif

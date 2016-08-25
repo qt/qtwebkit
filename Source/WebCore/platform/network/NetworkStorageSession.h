@@ -26,37 +26,40 @@
 #ifndef NetworkStorageSession_h
 #define NetworkStorageSession_h
 
+#include "CredentialStorage.h"
+
 #include <wtf/RetainPtr.h>
 #include <wtf/text/WTFString.h>
 
-#if PLATFORM(MAC) || USE(CFNETWORK)
-typedef const struct __CFURLStorageSession* CFURLStorageSessionRef;
-typedef struct OpaqueCFHTTPCookieStorage*  CFHTTPCookieStorageRef;
-#elif USE(SOUP)
-typedef struct _SoupCookieJar SoupCookieJar;
-typedef struct _SoupSession SoupSession;
+#if PLATFORM(COCOA) || USE(CFNETWORK)
+#include "CFNetworkSPI.h"
 #endif
 
 namespace WebCore {
 
 class NetworkingContext;
+class SoupNetworkSession;
 
 class NetworkStorageSession {
     WTF_MAKE_NONCOPYABLE(NetworkStorageSession); WTF_MAKE_FAST_ALLOCATED;
 public:
-    static NetworkStorageSession& defaultStorageSession();
-    static PassOwnPtr<NetworkStorageSession> createPrivateBrowsingSession(const String& identifierBase);
+    WEBCORE_EXPORT static NetworkStorageSession& defaultStorageSession();
+    WEBCORE_EXPORT static std::unique_ptr<NetworkStorageSession> createPrivateBrowsingSession(const String& identifierBase = String());
 
-    static void switchToNewTestingSession();
+    WEBCORE_EXPORT static void switchToNewTestingSession();
 
-#if PLATFORM(MAC) || USE(CFNETWORK)
+    CredentialStorage& credentialStorage() { return m_credentialStorage; }
+
+#if PLATFORM(COCOA) || USE(CFNETWORK)
+    NetworkStorageSession(RetainPtr<CFURLStorageSessionRef>);
     // May be null, in which case a Foundation default should be used.
     CFURLStorageSessionRef platformSession() { return m_platformSession.get(); }
-    RetainPtr<CFHTTPCookieStorageRef> cookieStorage() const;
-    bool isPrivateBrowsingSession() const { return m_isPrivate; }
+    WEBCORE_EXPORT RetainPtr<CFHTTPCookieStorageRef> cookieStorage() const;
 #elif USE(SOUP)
-    void setSoupSession(SoupSession* session) { m_session = session; }
-    SoupSession* soupSession() const { return m_session; }
+    NetworkStorageSession(std::unique_ptr<SoupNetworkSession>);
+    ~NetworkStorageSession();
+    SoupNetworkSession& soupNetworkSession() const;
+    void setSoupNetworkSession(std::unique_ptr<SoupNetworkSession>);
 #else
     NetworkStorageSession(NetworkingContext*);
     ~NetworkStorageSession();
@@ -64,24 +67,17 @@ public:
 #endif
 
 private:
-#if PLATFORM(MAC) || USE(CFNETWORK)
-    NetworkStorageSession(RetainPtr<CFURLStorageSessionRef>);
+#if PLATFORM(COCOA) || USE(CFNETWORK)
     NetworkStorageSession();
     RetainPtr<CFURLStorageSessionRef> m_platformSession;
-    bool m_isPrivate;
 #elif USE(SOUP)
-    NetworkStorageSession(SoupSession*);
-    SoupSession* m_session;
+    std::unique_ptr<SoupNetworkSession> m_session;
 #else
     RefPtr<NetworkingContext> m_context;
 #endif
-};
 
-#if PLATFORM(WIN) && USE(CFNETWORK)
-// Needed for WebKit1 API only.
-void overrideCookieStorage(CFHTTPCookieStorageRef);
-CFHTTPCookieStorageRef overridenCookieStorage();
-#endif
+    CredentialStorage m_credentialStorage;
+};
 
 }
 

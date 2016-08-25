@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,30 +29,16 @@
 namespace WebCore {
 
 struct ExpectedTextRunSize {
-    const void* pointer;
-    int integers[2];
+    void* renderingContext;
+    StringView text;
+    unsigned integer1;
+    unsigned integer2;
     float float1;
-#if ENABLE(SVG)
     float float2;
-#endif
     float float3;
-    uint32_t bitfields : 10;
-    unsigned anUnsigned;
-    RefPtr<TextRun::RenderingContext> renderingContext;
+    unsigned bitfields : 9;
 };
 
 COMPILE_ASSERT(sizeof(TextRun) == sizeof(ExpectedTextRunSize), TextRun_is_not_of_expected_size);
-
-bool TextRun::s_allowsRoundingHacks = false;
-
-void TextRun::setAllowsRoundingHacks(bool allowsRoundingHacks)
-{
-    s_allowsRoundingHacks = allowsRoundingHacks;
-}
-
-bool TextRun::allowsRoundingHacks()
-{
-    return s_allowsRoundingHacks;
-}
 
 }

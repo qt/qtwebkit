@@ -32,7 +32,6 @@
 #include "JSStringRef.h"
 #include "OpaqueJSString.h"
 #include <runtime/JSCJSValue.h>
-#include <wtf/OwnArrayPtr.h>
 
 QString JSStringCopyQString(JSStringRef string)
 {
@@ -46,5 +45,5 @@ JSRetainPtr<JSStringRef> JSStringCreateWithQString(const QString& qString)
     if (jsString)
         return JSRetainPtr<JSStringRef>(Adopt, jsString.release().leakRef());
 
-    return JSRetainPtr<JSStringRef>(Adopt, OpaqueJSString::create().leakRef());
+    return JSRetainPtr<JSStringRef>(Adopt, &OpaqueJSString::create().leakRef());
 }

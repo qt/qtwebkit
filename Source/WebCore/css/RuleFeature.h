@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 1999 Lars Knoll (knoll@kde.org)
- * Copyright (C) 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2003-2011, 2014 Apple Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -22,6 +22,7 @@
 #ifndef RuleFeature_h
 #define RuleFeature_h
 
+#include "CSSSelector.h"
 #include <wtf/Forward.h>
 #include <wtf/HashMap.h>
 #include <wtf/HashSet.h>
@@ -29,8 +30,8 @@
 
 namespace WebCore {
 
+class RuleData;
 class StyleRule;
-class CSSSelector;
 
 struct RuleFeature {
     RuleFeature(StyleRule* rule, unsigned selectorIndex, bool hasDocumentSecurityOrigin)
@@ -45,23 +46,36 @@ struct RuleFeature {
 };
 
 struct RuleFeatureSet {
-    RuleFeatureSet()
-        : usesFirstLineRules(false)
-        , usesBeforeAfterRules(false)
-    { }
-
     void add(const RuleFeatureSet&);
     void clear();
-
-    void collectFeaturesFromSelector(const CSSSelector*);
+    void shrinkToFit();
+    void collectFeatures(const RuleData&);
 
     HashSet<AtomicStringImpl*> idsInRules;
+    HashSet<AtomicStringImpl*> idsMatchingAncestorsInRules;
     HashSet<AtomicStringImpl*> classesInRules;
-    HashSet<AtomicStringImpl*> attrsInRules;
+    HashSet<AtomicStringImpl*> attributeCanonicalLocalNamesInRules;
+    HashSet<AtomicStringImpl*> attributeLocalNamesInRules;
     Vector<RuleFeature> siblingRules;
     Vector<RuleFeature> uncommonAttributeRules;
-    bool usesFirstLineRules;
-    bool usesBeforeAfterRules;
+    HashMap<AtomicStringImpl*, std::unique_ptr<Vector<RuleFeature>>> ancestorClassRules;
+
+    struct AttributeRules {
+        using SelectorKey = std::pair<AtomicStringImpl*, std::pair<AtomicStringImpl*, unsigned>>;
+        HashMap<SelectorKey, const CSSSelector*> selectors;
+        Vector<RuleFeature> features;
+    };
+    HashMap<AtomicStringImpl*, std::unique_ptr<AttributeRules>> ancestorAttributeRulesForHTML;
+    bool usesFirstLineRules { false };
+    bool usesFirstLetterRules { false };
+
+private:
+    struct SelectorFeatures {
+        bool hasSiblingSelector { false };
+        Vector<AtomicStringImpl*> classesMatchingAncestors;
+        Vector<const CSSSelector*> attributeSelectorsMatchingAncestors;
+    };
+    void recursivelyCollectFeaturesFromSelector(SelectorFeatures&, const CSSSelector&, bool matchesAncestor = false);
 };
 
 } // namespace WebCore

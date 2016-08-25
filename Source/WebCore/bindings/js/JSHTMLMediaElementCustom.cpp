@@ -34,14 +34,13 @@ namespace WebCore {
 
 using namespace JSC;
 
-void JSHTMLMediaElement::setController(ExecState*, JSValue value)
+void JSHTMLMediaElement::setController(ExecState&, JSValue value)
 {
-    HTMLMediaElement* imp = toHTMLMediaElement(impl());
     // 4.8.10.11.2 Media controllers: controller attribute.
     // On setting, it must first remove the element's mediagroup attribute, if any, 
-    imp->setMediaGroup(String());
+    wrapped().setMediaGroup(String());
     // and then set the current media controller to the given value.
-    imp->setController(toMediaController(value));
+    wrapped().setController(JSMediaController::toWrapped(value));
 }
 
 }

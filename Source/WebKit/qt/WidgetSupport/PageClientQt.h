@@ -21,18 +21,12 @@
 #ifndef PageClientQt_h
 #define PageClientQt_h
 
-#include "FrameView.h"
-#include "GraphicsContext.h"
-#include "IntRect.h"
 #include "QWebPageClient.h"
-#include "TextureMapperLayerClientQt.h"
-#include "TiledBackingStore.h"
 #include "qgraphicswebview.h"
 #include "qwebframe.h"
 #include "qwebframe_p.h"
 #include "qwebpage.h"
 #include "qwebpage_p.h"
-#include <Settings.h>
 #include <qgraphicsscene.h>
 #include <qgraphicsview.h>
 #include <qgraphicswidget.h>
@@ -133,11 +127,9 @@ public:
         , overlay(0)
     {
         Q_ASSERT(view);
-#if USE(ACCELERATED_COMPOSITING)
         // the overlay and stays alive for the lifetime of
         // this QGraphicsWebView as the scrollbars are needed when there's no compositing
         view->setFlag(QGraphicsItem::ItemUsesExtendedStyleOption);
-#endif
     }
 
     virtual ~PageClientQGraphicsWidget();
@@ -176,7 +168,6 @@ public:
 #endif
 
     virtual bool makeOpenGLContextCurrentIfAvailable();
-    virtual QOpenGLContext* openGLContextIfAvailable();
 
     virtual QRectF windowRect() const;
 

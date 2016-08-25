@@ -28,7 +28,6 @@
 
 #include "SharedMemory.h"
 #include <WebCore/IntRect.h>
-#include <wtf/PassOwnPtr.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
 #include <wtf/RefPtr.h>
@@ -43,11 +42,6 @@
 
 #if PLATFORM(QT)
 #include <QImage>
-#ifdef Q_WS_X11
-// Avoid ambiguity caused by the Region typedef from qwindowdefs.h.
-namespace WebCore { class Region; }
-namespace WebKit { using WebCore::Region; }
-#endif
 #endif
 
 namespace WebCore {
@@ -72,8 +66,10 @@ public:
 
         bool isNull() const { return m_handle.isNull(); }
 
-        void encode(CoreIPC::ArgumentEncoder&) const;
-        static bool decode(CoreIPC::ArgumentDecoder&, Handle&);
+        void clear();
+
+        void encode(IPC::ArgumentEncoder&) const;
+        static bool decode(IPC::ArgumentDecoder&, Handle&);
 
     private:
         friend class ShareableBitmap;
@@ -93,20 +89,18 @@ public:
     static PassRefPtr<ShareableBitmap> create(const WebCore::IntSize&, Flags, PassRefPtr<SharedMemory>);
 
     // Create a shareable bitmap from a handle.
-    static PassRefPtr<ShareableBitmap> create(const Handle&, SharedMemory::Protection = SharedMemory::ReadWrite);
+    static PassRefPtr<ShareableBitmap> create(const Handle&, SharedMemory::Protection = SharedMemory::Protection::ReadWrite);
 
     // Create a handle.
-    bool createHandle(Handle&, SharedMemory::Protection = SharedMemory::ReadWrite);
+    bool createHandle(Handle&, SharedMemory::Protection = SharedMemory::Protection::ReadWrite);
 
     ~ShareableBitmap();
 
     const WebCore::IntSize& size() const { return m_size; }
     WebCore::IntRect bounds() const { return WebCore::IntRect(WebCore::IntPoint(), size()); }
 
-    bool resize(const WebCore::IntSize& size);
-
     // Create a graphics context that can be used to paint into the backing store.
-    PassOwnPtr<WebCore::GraphicsContext> createGraphicsContext();
+    std::unique_ptr<WebCore::GraphicsContext> createGraphicsContext();
 
     // Paint the backing store into the given context.
     void paint(WebCore::GraphicsContext&, const WebCore::IntPoint& destination, const WebCore::IntRect& source);

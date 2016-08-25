@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Apple Inc. All rights reserved.
+ * Copyright (C) 2009, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -28,30 +28,32 @@
 
 #include "WebGLSharedObject.h"
 
-#include <wtf/PassRefPtr.h>
-
 namespace WebCore {
 
-class WebGLShader : public WebGLSharedObject {
+class WebGLShader final : public WebGLSharedObject {
 public:
     virtual ~WebGLShader();
 
-    static PassRefPtr<WebGLShader> create(WebGLRenderingContext*, GC3Denum);
+    static Ref<WebGLShader> create(WebGLRenderingContextBase*, GC3Denum);
 
     GC3Denum getType() const { return m_type; }
     const String& getSource() const { return m_source; }
 
     void setSource(const String& source) { m_source = source; }
 
+    bool isValid() const { return m_isValid; }
+    void setValid(bool valid) { m_isValid = valid; }
+
 private:
-    WebGLShader(WebGLRenderingContext*, GC3Denum);
+    WebGLShader(WebGLRenderingContextBase*, GC3Denum);
 
-    virtual void deleteObjectImpl(GraphicsContext3D*, Platform3DObject);
+    virtual void deleteObjectImpl(GraphicsContext3D*, Platform3DObject) override;
 
-    virtual bool isShader() const { return true; }
+    virtual bool isShader() const override { return true; }
 
     GC3Denum m_type;
     String m_source;
+    bool m_isValid;
 };
 
 } // namespace WebCore

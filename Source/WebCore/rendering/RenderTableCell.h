@@ -25,228 +25,149 @@
 #ifndef RenderTableCell_h
 #define RenderTableCell_h
 
+#include "RenderBlockFlow.h"
 #include "RenderTableRow.h"
 #include "RenderTableSection.h"
 
 namespace WebCore {
 
-static const unsigned unsetColumnIndex = 0x1FFFFFFF;
-static const unsigned maxColumnIndex = 0x1FFFFFFE; // 536,870,910
+// These is limited by the size of RenderTableCell::m_column bitfield.
+static const unsigned unsetColumnIndex = 0x1FFFFFF;
+static const unsigned maxColumnIndex = 0x1FFFFFE; // 33554430
 
 enum IncludeBorderColorOrNot { DoNotIncludeBorderColor, IncludeBorderColor };
 
-class RenderTableCell : public RenderBlock {
+class RenderTableCell final : public RenderBlockFlow {
 public:
-    explicit RenderTableCell(Element*);
+    RenderTableCell(Element&, Ref<RenderStyle>&&);
+    RenderTableCell(Document&, Ref<RenderStyle>&&);
     
-    unsigned colSpan() const
-    {
-        if (!m_hasColSpan)
-            return 1;
-        return parseColSpanFromDOM();
-    }
-    unsigned rowSpan() const
-    {
-        if (!m_hasRowSpan)
-            return 1;
-        return parseRowSpanFromDOM();
-    }
+    unsigned colSpan() const;
+    unsigned rowSpan() const;
 
     // Called from HTMLTableCellElement.
     void colSpanOrRowSpanChanged();
 
-    void setCol(unsigned column)
-    {
-        if (UNLIKELY(column > maxColumnIndex))
-            CRASH();
+    void setCol(unsigned column);
+    unsigned col() const;
 
-        m_column = column;
-    }
+    RenderTableCell* nextCell() const;
+    RenderTableCell* previousCell() const;
 
-    unsigned col() const
-    {
-        ASSERT(m_column != unsetColumnIndex);
-        return m_column;
-    }
+    RenderTableRow* row() const { return downcast<RenderTableRow>(parent()); }
+    RenderTableSection* section() const;
+    RenderTable* table() const;
+    unsigned rowIndex() const;
+    Length styleOrColLogicalWidth() const;
+    LayoutUnit logicalHeightForRowSizing() const;
 
-    RenderTableRow* row() const { return toRenderTableRow(parent()); }
-    RenderTableSection* section() const { return toRenderTableSection(parent()->parent()); }
-    RenderTable* table() const { return toRenderTable(parent()->parent()->parent()); }
+    void setCellLogicalWidth(LayoutUnit constrainedLogicalWidth);
 
-    unsigned rowIndex() const
-    {
-        // This function shouldn't be called on a detached cell.
-        ASSERT(row());
-        return row()->rowIndex();
-    }
-
-    Length styleOrColLogicalWidth() const
-    {
-        Length styleWidth = style()->logicalWidth();
-        if (!styleWidth.isAuto())
-            return styleWidth;
-        if (RenderTableCol* firstColumn = table()->colElement(col()))
-            return logicalWidthFromColumns(firstColumn, styleWidth);
-        return styleWidth;
-    }
-
-    int logicalHeightForRowSizing() const
-    {
-        // FIXME: This function does too much work, and is very hot during table layout!
-        int adjustedLogicalHeight = pixelSnappedLogicalHeight() - (intrinsicPaddingBefore() + intrinsicPaddingAfter());
-        int styleLogicalHeight = valueForLength(style()->logicalHeight(), 0, view());
-        // In strict mode, box-sizing: content-box do the right thing and actually add in the border and padding.
-        // Call computedCSSPadding* directly to avoid including implicitPadding.
-        if (!document()->inQuirksMode() && style()->boxSizing() != BORDER_BOX)
-            styleLogicalHeight += (computedCSSPaddingBefore() + computedCSSPaddingAfter()).floor() + borderBefore() + borderAfter();
-        return max(styleLogicalHeight, adjustedLogicalHeight);
-    }
-
-
-    void setCellLogicalWidth(int constrainedLogicalWidth);
-
-    virtual int borderLeft() const;
-    virtual int borderRight() const;
-    virtual int borderTop() const;
-    virtual int borderBottom() const;
-    virtual int borderStart() const;
-    virtual int borderEnd() const;
-    virtual int borderBefore() const;
-    virtual int borderAfter() const;
+    virtual LayoutUnit borderLeft() const override;
+    virtual LayoutUnit borderRight() const override;
+    virtual LayoutUnit borderTop() const override;
+    virtual LayoutUnit borderBottom() const override;
+    virtual LayoutUnit borderStart() const override;
+    virtual LayoutUnit borderEnd() const override;
+    virtual LayoutUnit borderBefore() const override;
+    virtual LayoutUnit borderAfter() const override;
 
     void collectBorderValues(RenderTable::CollapsedBorderValues&) const;
     static void sortBorderValues(RenderTable::CollapsedBorderValues&);
 
-    virtual void layout();
+    virtual void layout() override;
 
-    virtual void paint(PaintInfo&, const LayoutPoint&);
+    virtual void paint(PaintInfo&, const LayoutPoint&) override;
 
-    bool alignLeftRightBorderPaintRect(int& leftXOffset, int& rightXOffset);
-    bool alignTopBottomBorderPaintRect(int& topYOffset, int& bottomYOffset);
     void paintCollapsedBorders(PaintInfo&, const LayoutPoint&);
-    void paintBackgroundsBehindCell(PaintInfo&, const LayoutPoint&, RenderObject* backgroundObject);
+    void paintBackgroundsBehindCell(PaintInfo&, const LayoutPoint&, RenderElement* backgroundObject);
 
     LayoutUnit cellBaselinePosition() const;
-    bool isBaselineAligned() const 
-    { 
-        EVerticalAlign va = style()->verticalAlign();
-        return va == BASELINE || va == TEXT_BOTTOM || va == TEXT_TOP || va == SUPER || va == SUB || va == LENGTH; 
-    }
+    bool isBaselineAligned() const;
 
-    void computeIntrinsicPadding(int rowHeight);
+    void computeIntrinsicPadding(LayoutUnit rowHeight);
     void clearIntrinsicPadding() { setIntrinsicPadding(0, 0); }
 
-    int intrinsicPaddingBefore() const { return m_intrinsicPaddingBefore; }
-    int intrinsicPaddingAfter() const { return m_intrinsicPaddingAfter; }
+    LayoutUnit intrinsicPaddingBefore() const { return m_intrinsicPaddingBefore; }
+    LayoutUnit intrinsicPaddingAfter() const { return m_intrinsicPaddingAfter; }
 
-    virtual LayoutUnit paddingTop() const OVERRIDE;
-    virtual LayoutUnit paddingBottom() const OVERRIDE;
-    virtual LayoutUnit paddingLeft() const OVERRIDE;
-    virtual LayoutUnit paddingRight() const OVERRIDE;
+    virtual LayoutUnit paddingTop() const override;
+    virtual LayoutUnit paddingBottom() const override;
+    virtual LayoutUnit paddingLeft() const override;
+    virtual LayoutUnit paddingRight() const override;
     
     // FIXME: For now we just assume the cell has the same block flow direction as the table. It's likely we'll
     // create an extra anonymous RenderBlock to handle mixing directionality anyway, in which case we can lock
     // the block flow directionality of the cells to the table's directionality.
-    virtual LayoutUnit paddingBefore() const OVERRIDE;
-    virtual LayoutUnit paddingAfter() const OVERRIDE;
+    virtual LayoutUnit paddingBefore() const override;
+    virtual LayoutUnit paddingAfter() const override;
 
     void setOverrideLogicalContentHeightFromRowHeight(LayoutUnit);
 
-    virtual void scrollbarsChanged(bool horizontalScrollbarChanged, bool verticalScrollbarChanged);
+    virtual void scrollbarsChanged(bool horizontalScrollbarChanged, bool verticalScrollbarChanged) override;
 
     bool cellWidthChanged() const { return m_cellWidthChanged; }
     void setCellWidthChanged(bool b = true) { m_cellWidthChanged = b; }
 
-    static RenderTableCell* createAnonymous(Document*);
     static RenderTableCell* createAnonymousWithParentRenderer(const RenderObject*);
-    virtual RenderBox* createAnonymousBoxWithSameTypeAs(const RenderObject* parent) const OVERRIDE
-    {
-        return createAnonymousWithParentRenderer(parent);
-    }
+    virtual RenderBox* createAnonymousBoxWithSameTypeAs(const RenderObject* parent) const override { return createAnonymousWithParentRenderer(parent); }
 
     // This function is used to unify which table part's style we use for computing direction and
     // writing mode. Writing modes are not allowed on row group and row but direction is.
     // This means we can safely use the same style in all cases to simplify our code.
     // FIXME: Eventually this function should replaced by style() once we support direction
     // on all table parts and writing-mode on cells.
-    const RenderStyle* styleForCellFlow() const
-    {
-        return row()->style();
-    }
+    const RenderStyle& styleForCellFlow() const { return row()->style(); }
 
-    const BorderValue& borderAdjoiningTableStart() const
-    {
-        ASSERT(isFirstOrLastCellInRow());
-        if (section()->hasSameDirectionAs(table()))
-            return style()->borderStart();
+    const BorderValue& borderAdjoiningTableStart() const;
+    const BorderValue& borderAdjoiningTableEnd() const;
+    const BorderValue& borderAdjoiningCellBefore(const RenderTableCell*);
+    const BorderValue& borderAdjoiningCellAfter(const RenderTableCell*);
 
-        return style()->borderEnd();
-    }
-
-    const BorderValue& borderAdjoiningTableEnd() const
-    {
-        ASSERT(isFirstOrLastCellInRow());
-        if (section()->hasSameDirectionAs(table()))
-            return style()->borderEnd();
-
-        return style()->borderStart();
-    }
-
-    const BorderValue& borderAdjoiningCellBefore(const RenderTableCell* cell)
-    {
-        ASSERT_UNUSED(cell, table()->cellAfter(cell) == this);
-        // FIXME: https://webkit.org/b/79272 - Add support for mixed directionality at the cell level.
-        return style()->borderStart();
-    }
-
-    const BorderValue& borderAdjoiningCellAfter(const RenderTableCell* cell)
-    {
-        ASSERT_UNUSED(cell, table()->cellBefore(cell) == this);
-        // FIXME: https://webkit.org/b/79272 - Add support for mixed directionality at the cell level.
-        return style()->borderEnd();
-    }
-
+    using RenderBlockFlow::nodeAtPoint;
 #ifndef NDEBUG
-    bool isFirstOrLastCellInRow() const
-    {
-        return !table()->cellAfter(this) || !table()->cellBefore(this);
-    }
+    bool isFirstOrLastCellInRow() const { return !table()->cellAfter(this) || !table()->cellBefore(this); }
 #endif
+    
+    virtual LayoutRect clippedOverflowRectForRepaint(const RenderLayerModelObject* repaintContainer) const override;
+
+    void invalidateHasEmptyCollapsedBorders();
+    void setHasEmptyCollapsedBorder(CollapsedBorderSide, bool empty) const;
+
 protected:
-    virtual void styleDidChange(StyleDifference, const RenderStyle* oldStyle);
-    virtual void computePreferredLogicalWidths();
+    virtual void styleDidChange(StyleDifference, const RenderStyle* oldStyle) override;
+    virtual void computePreferredLogicalWidths() override;
 
 private:
-    virtual const char* renderName() const { return (isAnonymous() || isPseudoElement()) ? "RenderTableCell (anonymous)" : "RenderTableCell"; }
+    virtual const char* renderName() const override { return (isAnonymous() || isPseudoElement()) ? "RenderTableCell (anonymous)" : "RenderTableCell"; }
 
-    virtual bool isTableCell() const { return true; }
+    virtual bool isTableCell() const override { return true; }
 
-    virtual void willBeRemovedFromTree() OVERRIDE;
+    virtual void willBeRemovedFromTree() override;
 
-    virtual void updateLogicalWidth() OVERRIDE;
+    virtual void updateLogicalWidth() override;
 
-    virtual void paintBoxDecorations(PaintInfo&, const LayoutPoint&);
-    virtual void paintMask(PaintInfo&, const LayoutPoint&);
+    virtual void paintBoxDecorations(PaintInfo&, const LayoutPoint&) override;
+    virtual void paintMask(PaintInfo&, const LayoutPoint&) override;
 
-    virtual bool boxShadowShouldBeAppliedToBackground(BackgroundBleedAvoidance, InlineFlowBox*) const OVERRIDE;
+    virtual bool boxShadowShouldBeAppliedToBackground(const LayoutPoint& paintOffset, BackgroundBleedAvoidance, InlineFlowBox*) const override;
 
-    virtual LayoutSize offsetFromContainer(RenderObject*, const LayoutPoint&, bool* offsetDependsOnPoint = 0) const;
-    virtual LayoutRect clippedOverflowRectForRepaint(const RenderLayerModelObject* repaintContainer) const OVERRIDE;
-    virtual void computeRectForRepaint(const RenderLayerModelObject* repaintContainer, LayoutRect&, bool fixed = false) const OVERRIDE;
+    virtual LayoutSize offsetFromContainer(RenderElement&, const LayoutPoint&, bool* offsetDependsOnPoint = 0) const override;
+    virtual LayoutRect computeRectForRepaint(const LayoutRect&, const RenderLayerModelObject* repaintContainer, bool fixed = false) const override;
 
-    int borderHalfLeft(bool outer) const;
-    int borderHalfRight(bool outer) const;
-    int borderHalfTop(bool outer) const;
-    int borderHalfBottom(bool outer) const;
+    LayoutUnit borderHalfLeft(bool outer) const;
+    LayoutUnit borderHalfRight(bool outer) const;
+    LayoutUnit borderHalfTop(bool outer) const;
+    LayoutUnit borderHalfBottom(bool outer) const;
 
-    int borderHalfStart(bool outer) const;
-    int borderHalfEnd(bool outer) const;
-    int borderHalfBefore(bool outer) const;
-    int borderHalfAfter(bool outer) const;
+    LayoutUnit borderHalfStart(bool outer) const;
+    LayoutUnit borderHalfEnd(bool outer) const;
+    LayoutUnit borderHalfBefore(bool outer) const;
+    LayoutUnit borderHalfAfter(bool outer) const;
 
-    void setIntrinsicPaddingBefore(int p) { m_intrinsicPaddingBefore = p; }
-    void setIntrinsicPaddingAfter(int p) { m_intrinsicPaddingAfter = p; }
-    void setIntrinsicPadding(int before, int after) { setIntrinsicPaddingBefore(before); setIntrinsicPaddingAfter(after); }
+    void setIntrinsicPaddingBefore(LayoutUnit p) { m_intrinsicPaddingBefore = p; }
+    void setIntrinsicPaddingAfter(LayoutUnit p) { m_intrinsicPaddingAfter = p; }
+    void setIntrinsicPadding(LayoutUnit before, LayoutUnit after) { setIntrinsicPaddingBefore(before); setIntrinsicPaddingAfter(after); }
 
     bool hasStartBorderAdjoiningTable() const;
     bool hasEndBorderAdjoiningTable() const;
@@ -256,10 +177,10 @@ private:
     CollapsedBorderValue collapsedBeforeBorder(IncludeBorderColorOrNot = IncludeBorderColor) const;
     CollapsedBorderValue collapsedAfterBorder(IncludeBorderColorOrNot = IncludeBorderColor) const;
 
-    CollapsedBorderValue cachedCollapsedLeftBorder(const RenderStyle*) const;
-    CollapsedBorderValue cachedCollapsedRightBorder(const RenderStyle*) const;
-    CollapsedBorderValue cachedCollapsedTopBorder(const RenderStyle*) const;
-    CollapsedBorderValue cachedCollapsedBottomBorder(const RenderStyle*) const;
+    CollapsedBorderValue cachedCollapsedLeftBorder(const RenderStyle&) const;
+    CollapsedBorderValue cachedCollapsedRightBorder(const RenderStyle&) const;
+    CollapsedBorderValue cachedCollapsedTopBorder(const RenderStyle&) const;
+    CollapsedBorderValue cachedCollapsedBottomBorder(const RenderStyle&) const;
 
     CollapsedBorderValue computeCollapsedStartBorder(IncludeBorderColorOrNot = IncludeBorderColor) const;
     CollapsedBorderValue computeCollapsedEndBorder(IncludeBorderColorOrNot = IncludeBorderColor) const;
@@ -273,30 +194,186 @@ private:
     unsigned parseRowSpanFromDOM() const;
     unsigned parseColSpanFromDOM() const;
 
+    void nextSibling() const = delete;
+    void previousSibling() const = delete;
+
     // Note MSVC will only pack members if they have identical types, hence we use unsigned instead of bool here.
-    unsigned m_column : 29;
+    unsigned m_column : 25;
     unsigned m_cellWidthChanged : 1;
     unsigned m_hasColSpan: 1;
     unsigned m_hasRowSpan: 1;
-    int m_intrinsicPaddingBefore;
-    int m_intrinsicPaddingAfter;
+    mutable unsigned m_hasEmptyCollapsedBeforeBorder: 1;
+    mutable unsigned m_hasEmptyCollapsedAfterBorder: 1;
+    mutable unsigned m_hasEmptyCollapsedStartBorder: 1;
+    mutable unsigned m_hasEmptyCollapsedEndBorder: 1;
+    LayoutUnit m_intrinsicPaddingBefore { 0 };
+    LayoutUnit m_intrinsicPaddingAfter { 0 };
 };
 
-inline RenderTableCell* toRenderTableCell(RenderObject* object)
+inline RenderTableCell* RenderTableCell::nextCell() const
 {
-    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isTableCell());
-    return static_cast<RenderTableCell*>(object);
+    return downcast<RenderTableCell>(RenderBlockFlow::nextSibling());
 }
 
-inline const RenderTableCell* toRenderTableCell(const RenderObject* object)
+inline RenderTableCell* RenderTableCell::previousCell() const
 {
-    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isTableCell());
-    return static_cast<const RenderTableCell*>(object);
+    return downcast<RenderTableCell>(RenderBlockFlow::previousSibling());
 }
 
-// This will catch anyone doing an unnecessary cast.
-void toRenderTableCell(const RenderTableCell*);
+inline unsigned RenderTableCell::colSpan() const
+{
+    if (!m_hasColSpan)
+        return 1;
+    return parseColSpanFromDOM();
+}
+
+inline unsigned RenderTableCell::rowSpan() const
+{
+    if (!m_hasRowSpan)
+        return 1;
+    return parseRowSpanFromDOM();
+}
+
+inline void RenderTableCell::setCol(unsigned column)
+{
+    if (UNLIKELY(column > maxColumnIndex))
+        column = maxColumnIndex;
+    m_column = column;
+}
+
+inline unsigned RenderTableCell::col() const
+{
+    ASSERT(m_column != unsetColumnIndex);
+    return m_column;
+}
+
+inline RenderTableSection* RenderTableCell::section() const
+{
+    RenderTableRow* row = this->row();
+    if (!row)
+        return nullptr;
+    return downcast<RenderTableSection>(row->parent());
+}
+
+inline RenderTable* RenderTableCell::table() const
+{
+    RenderTableSection* section = this->section();
+    if (!section)
+        return nullptr;
+    return downcast<RenderTable>(section->parent());
+}
+
+inline unsigned RenderTableCell::rowIndex() const
+{
+    // This function shouldn't be called on a detached cell.
+    ASSERT(row());
+    return row()->rowIndex();
+}
+
+inline Length RenderTableCell::styleOrColLogicalWidth() const
+{
+    Length styleWidth = style().logicalWidth();
+    if (!styleWidth.isAuto())
+        return styleWidth;
+    if (RenderTableCol* firstColumn = table()->colElement(col()))
+        return logicalWidthFromColumns(firstColumn, styleWidth);
+    return styleWidth;
+}
+
+inline LayoutUnit RenderTableCell::logicalHeightForRowSizing() const
+{
+    // FIXME: This function does too much work, and is very hot during table layout!
+    LayoutUnit adjustedLogicalHeight = logicalHeight() - (intrinsicPaddingBefore() + intrinsicPaddingAfter());
+    LayoutUnit styleLogicalHeight = valueForLength(style().logicalHeight(), 0);
+    // In strict mode, box-sizing: content-box do the right thing and actually add in the border and padding.
+    // Call computedCSSPadding* directly to avoid including implicitPadding.
+    if (!document().inQuirksMode() && style().boxSizing() != BORDER_BOX)
+        styleLogicalHeight += computedCSSPaddingBefore() + computedCSSPaddingAfter() + borderBefore() + borderAfter();
+    return std::max(styleLogicalHeight, adjustedLogicalHeight);
+}
+
+inline bool RenderTableCell::isBaselineAligned() const
+{
+    EVerticalAlign va = style().verticalAlign();
+    return va == BASELINE || va == TEXT_BOTTOM || va == TEXT_TOP || va == SUPER || va == SUB || va == LENGTH;
+}
+
+inline const BorderValue& RenderTableCell::borderAdjoiningTableStart() const
+{
+    ASSERT(isFirstOrLastCellInRow());
+    if (section()->hasSameDirectionAs(table()))
+        return style().borderStart();
+
+    return style().borderEnd();
+}
+
+inline const BorderValue& RenderTableCell::borderAdjoiningTableEnd() const
+{
+    ASSERT(isFirstOrLastCellInRow());
+    if (section()->hasSameDirectionAs(table()))
+        return style().borderEnd();
+
+    return style().borderStart();
+}
+
+inline const BorderValue& RenderTableCell::borderAdjoiningCellBefore(const RenderTableCell* cell)
+{
+    ASSERT_UNUSED(cell, table()->cellAfter(cell) == this);
+    // FIXME: https://webkit.org/b/79272 - Add support for mixed directionality at the cell level.
+    return style().borderStart();
+}
+
+inline const BorderValue& RenderTableCell::borderAdjoiningCellAfter(const RenderTableCell* cell)
+{
+    ASSERT_UNUSED(cell, table()->cellBefore(cell) == this);
+    // FIXME: https://webkit.org/b/79272 - Add support for mixed directionality at the cell level.
+    return style().borderEnd();
+}
+
+inline RenderTableCell* RenderTableRow::firstCell() const
+{
+    return downcast<RenderTableCell>(RenderBox::firstChild());
+}
+
+inline RenderTableCell* RenderTableRow::lastCell() const
+{
+    return downcast<RenderTableCell>(RenderBox::lastChild());
+}
+
+inline void RenderTableCell::setHasEmptyCollapsedBorder(CollapsedBorderSide side, bool empty) const
+{
+    switch (side) {
+    case CBSAfter: {
+        m_hasEmptyCollapsedAfterBorder = empty;
+        break;
+    }
+    case CBSBefore: {
+        m_hasEmptyCollapsedBeforeBorder = empty;
+        break;
+    }
+    case CBSStart: {
+        m_hasEmptyCollapsedStartBorder = empty;
+        break;
+    }
+    case CBSEnd: {
+        m_hasEmptyCollapsedEndBorder = empty;
+        break;
+    }
+    }
+    if (empty)
+        table()->collapsedEmptyBorderIsPresent();
+}
+
+inline void RenderTableCell::invalidateHasEmptyCollapsedBorders()
+{
+    m_hasEmptyCollapsedBeforeBorder = false;
+    m_hasEmptyCollapsedAfterBorder = false;
+    m_hasEmptyCollapsedStartBorder = false;
+    m_hasEmptyCollapsedEndBorder = false;
+}
 
 } // namespace WebCore
+
+SPECIALIZE_TYPE_TRAITS_RENDER_OBJECT(RenderTableCell, isTableCell())
 
 #endif // RenderTableCell_h

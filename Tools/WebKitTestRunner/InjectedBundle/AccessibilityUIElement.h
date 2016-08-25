@@ -35,29 +35,22 @@
 #include <wtf/Platform.h>
 #include <wtf/Vector.h>
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
 #ifdef __OBJC__
 typedef id PlatformUIElement;
 #else
 typedef struct objc_object* PlatformUIElement;
 #endif
-#elif PLATFORM(WIN)
-#undef _WINSOCKAPI_
-#define _WINSOCKAPI_ // Prevent inclusion of winsock.h in windows.h
-
-#include <WebCore/COMPtr.h>
-#include <oleacc.h>
-
-typedef COMPtr<IAccessible> PlatformUIElement;
-#elif PLATFORM(GTK) || (PLATFORM(EFL) && HAVE(ACCESSIBILITY))
+#elif HAVE(ACCESSIBILITY) && (PLATFORM(GTK) || PLATFORM(EFL))
+#include "AccessibilityNotificationHandlerAtk.h"
 #include <atk/atk.h>
-#include <wtf/gobject/GRefPtr.h>
+#include <wtf/glib/GRefPtr.h>
 typedef GRefPtr<AtkObject> PlatformUIElement;
 #else
 typedef void* PlatformUIElement;
 #endif
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
 #ifdef __OBJC__
 typedef id NotificationHandler;
 #else
@@ -109,8 +102,10 @@ public:
     // Attributes - platform-independent implementations
     JSRetainPtr<JSStringRef> stringAttributeValue(JSStringRef attribute);
     double numberAttributeValue(JSStringRef attribute);
+    JSValueRef uiElementArrayAttributeValue(JSStringRef attribute) const;
     PassRefPtr<AccessibilityUIElement> uiElementAttributeValue(JSStringRef attribute) const;
     bool boolAttributeValue(JSStringRef attribute);
+    void setBoolAttributeValue(JSStringRef attribute, bool value);
     bool isAttributeSupported(JSStringRef attribute);
     bool isAttributeSettable(JSStringRef attribute);
     bool isPressActionSupported();
@@ -119,6 +114,7 @@ public:
     JSRetainPtr<JSStringRef> role();
     JSRetainPtr<JSStringRef> subrole();
     JSRetainPtr<JSStringRef> roleDescription();
+    JSRetainPtr<JSStringRef> computedRoleString();
     JSRetainPtr<JSStringRef> title();
     JSRetainPtr<JSStringRef> description();
     JSRetainPtr<JSStringRef> language();
@@ -142,15 +138,19 @@ public:
     bool isFocused() const;
     bool isFocusable() const;
     bool isSelected() const;
+    bool isSelectedOptionActive() const;
     bool isSelectable() const;
     bool isMultiSelectable() const;
     void setSelectedChild(AccessibilityUIElement*) const;
+    void setSelectedChildAtIndex(unsigned) const;
+    void removeSelectionAtIndex(unsigned) const;
     unsigned selectedChildrenCount() const;
     PassRefPtr<AccessibilityUIElement> selectedChildAtIndex(unsigned) const;
     
     bool isValid() const;
     bool isExpanded() const;
     bool isChecked() const;
+    bool isIndeterminate() const;
     bool isVisible() const;
     bool isOffScreen() const;
     bool isCollapsed() const;
@@ -162,6 +162,7 @@ public:
     JSRetainPtr<JSStringRef> documentEncoding();
     JSRetainPtr<JSStringRef> documentURI();
     JSRetainPtr<JSStringRef> url();
+    JSRetainPtr<JSStringRef> classList() const;
 
     // CSS3-speech properties.
     JSRetainPtr<JSStringRef> speak();
@@ -178,7 +179,9 @@ public:
     JSRetainPtr<JSStringRef> columnIndexRange();
     int rowCount();
     int columnCount();
-    
+    JSValueRef rowHeaders() const;
+    JSValueRef columnHeaders() const;
+
     // Tree/Outline specific attributes
     PassRefPtr<AccessibilityUIElement> selectedRowAtIndex(unsigned);
     PassRefPtr<AccessibilityUIElement> disclosedByRow();
@@ -188,6 +191,7 @@ public:
     // ARIA specific
     PassRefPtr<AccessibilityUIElement> ariaOwnsElementAtIndex(unsigned);
     PassRefPtr<AccessibilityUIElement> ariaFlowToElementAtIndex(unsigned);
+    PassRefPtr<AccessibilityUIElement> ariaControlsElementAtIndex(unsigned);
 
     // ARIA Drag and Drop
     bool ariaIsGrabbed() const;
@@ -199,11 +203,19 @@ public:
     JSRetainPtr<JSStringRef> rangeForLine(int);
     JSRetainPtr<JSStringRef> rangeForPosition(int x, int y);
     JSRetainPtr<JSStringRef> boundsForRange(unsigned location, unsigned length);
-    void setSelectedTextRange(unsigned location, unsigned length);
+    bool setSelectedTextRange(unsigned location, unsigned length);
     JSRetainPtr<JSStringRef> stringForRange(unsigned location, unsigned length);
     JSRetainPtr<JSStringRef> attributedStringForRange(unsigned location, unsigned length);
     bool attributedStringRangeIsMisspelled(unsigned location, unsigned length);
-    PassRefPtr<AccessibilityUIElement> uiElementForSearchPredicate(JSContextRef, AccessibilityUIElement* startElement, bool isDirectionNext, JSValueRef searchKey, JSStringRef searchText, bool visibleOnly);
+    unsigned uiElementCountForSearchPredicate(JSContextRef, AccessibilityUIElement* startElement, bool isDirectionNext, JSValueRef searchKey, JSStringRef searchText, bool visibleOnly, bool immediateDescendantsOnly);
+    PassRefPtr<AccessibilityUIElement> uiElementForSearchPredicate(JSContextRef, AccessibilityUIElement* startElement, bool isDirectionNext, JSValueRef searchKey, JSStringRef searchText, bool visibleOnly, bool immediateDescendantsOnly);
+    JSRetainPtr<JSStringRef> selectTextWithCriteria(JSContextRef, JSStringRef ambiguityResolution, JSValueRef searchStrings, JSStringRef replacementString, JSStringRef activity);
+
+    // Text-specific
+    JSRetainPtr<JSStringRef> characterAtOffset(int offset);
+    JSRetainPtr<JSStringRef> wordAtOffset(int offset);
+    JSRetainPtr<JSStringRef> lineAtOffset(int offset);
+    JSRetainPtr<JSStringRef> sentenceAtOffset(int offset);
     
     // Table-specific
     PassRefPtr<AccessibilityUIElement> cellForColumnAndRow(unsigned column, unsigned row);
@@ -213,12 +225,19 @@ public:
     PassRefPtr<AccessibilityUIElement> verticalScrollbar() const;
 
     void scrollToMakeVisible();
+    void scrollToGlobalPoint(int x, int y);
+    void scrollToMakeVisibleWithSubFocus(int x, int y, int width, int height);
     
     // Text markers.
+    PassRefPtr<AccessibilityTextMarkerRange> lineTextMarkerRangeForTextMarker(AccessibilityTextMarker*);
     PassRefPtr<AccessibilityTextMarkerRange> textMarkerRangeForElement(AccessibilityUIElement*);    
     PassRefPtr<AccessibilityTextMarkerRange> textMarkerRangeForMarkers(AccessibilityTextMarker* startMarker, AccessibilityTextMarker* endMarker);
+    PassRefPtr<AccessibilityTextMarkerRange> selectedTextMarkerRange();
+    void resetSelectedTextMarkerRange();
     PassRefPtr<AccessibilityTextMarker> startTextMarkerForTextMarkerRange(AccessibilityTextMarkerRange*);
     PassRefPtr<AccessibilityTextMarker> endTextMarkerForTextMarkerRange(AccessibilityTextMarkerRange*);
+    PassRefPtr<AccessibilityTextMarker> endTextMarkerForBounds(int x, int y, int width, int height);
+    PassRefPtr<AccessibilityTextMarker> startTextMarkerForBounds(int x, int y, int width, int height);
     PassRefPtr<AccessibilityTextMarker> textMarkerForPoint(int x, int y);
     PassRefPtr<AccessibilityTextMarker> previousTextMarker(AccessibilityTextMarker*);
     PassRefPtr<AccessibilityTextMarker> nextTextMarker(AccessibilityTextMarker*);
@@ -229,6 +248,19 @@ public:
     int indexForTextMarker(AccessibilityTextMarker*);
     bool isTextMarkerValid(AccessibilityTextMarker*);
     PassRefPtr<AccessibilityTextMarker> textMarkerForIndex(int);
+    PassRefPtr<AccessibilityTextMarker> startTextMarker();
+    PassRefPtr<AccessibilityTextMarker> endTextMarker();
+    bool setSelectedVisibleTextRange(AccessibilityTextMarkerRange*);
+    PassRefPtr<AccessibilityTextMarkerRange> leftWordTextMarkerRangeForTextMarker(AccessibilityTextMarker*);
+    PassRefPtr<AccessibilityTextMarkerRange> rightWordTextMarkerRangeForTextMarker(AccessibilityTextMarker*);
+    PassRefPtr<AccessibilityTextMarker> previousWordStartTextMarkerForTextMarker(AccessibilityTextMarker*);
+    PassRefPtr<AccessibilityTextMarker> nextWordEndTextMarkerForTextMarker(AccessibilityTextMarker*);
+    PassRefPtr<AccessibilityTextMarkerRange> paragraphTextMarkerRangeForTextMarker(AccessibilityTextMarker*);
+    PassRefPtr<AccessibilityTextMarker> nextParagraphEndTextMarkerForTextMarker(AccessibilityTextMarker*);
+    PassRefPtr<AccessibilityTextMarker> previousParagraphStartTextMarkerForTextMarker(AccessibilityTextMarker*);
+    PassRefPtr<AccessibilityTextMarkerRange> sentenceTextMarkerRangeForTextMarker(AccessibilityTextMarker*);
+    PassRefPtr<AccessibilityTextMarker> nextSentenceEndTextMarkerForTextMarker(AccessibilityTextMarker*);
+    PassRefPtr<AccessibilityTextMarker> previousSentenceStartTextMarkerForTextMarker(AccessibilityTextMarker*);
 
     // Returns an ordered list of supported actions for an element.
     JSRetainPtr<JSStringRef> supportedActions() const;
@@ -243,6 +275,29 @@ public:
     // Make sure you call remove, because you can't rely on objects being deallocated in a timely fashion.
     bool removeNotificationListener();
     
+    JSRetainPtr<JSStringRef> identifier();
+    JSRetainPtr<JSStringRef> traits();
+    int elementTextPosition();
+    int elementTextLength();
+    JSRetainPtr<JSStringRef> stringForSelection();
+    JSValueRef elementsForRange(unsigned location, unsigned length);
+    void increaseTextSelection();
+    void decreaseTextSelection();
+    PassRefPtr<AccessibilityUIElement> linkedElement();
+    PassRefPtr<AccessibilityUIElement> headerElementAtIndex(unsigned index);
+    void assistiveTechnologySimulatedFocus();
+    bool isSearchField() const;
+    bool isTextArea() const;
+    
+    bool scrollPageUp();
+    bool scrollPageDown();
+    bool scrollPageLeft();
+    bool scrollPageRight();
+    
+    // Fieldset
+    bool hasContainedByFieldsetTrait();
+    PassRefPtr<AccessibilityUIElement> fieldsetAncestorElement();
+    
 private:
     AccessibilityUIElement(PlatformUIElement);
     AccessibilityUIElement(const AccessibilityUIElement&);
@@ -250,16 +305,24 @@ private:
     PlatformUIElement m_element;
     
     // A retained, platform specific object used to help manage notifications for this object.
-#if PLATFORM(MAC)
+#if HAVE(ACCESSIBILITY)
+#if PLATFORM(COCOA)
     NotificationHandler m_notificationHandler;
 
     void getLinkedUIElements(Vector<RefPtr<AccessibilityUIElement> >&);
     void getDocumentLinks(Vector<RefPtr<AccessibilityUIElement> >&);
+    
+    void getUIElementsWithAttribute(JSStringRef, Vector<RefPtr<AccessibilityUIElement> >&) const;
 #endif
 
-#if PLATFORM(MAC) || PLATFORM(GTK) || (PLATFORM(EFL) && HAVE(ACCESSIBILITY))
+#if PLATFORM(COCOA) || PLATFORM(GTK) || PLATFORM(EFL)
     void getChildren(Vector<RefPtr<AccessibilityUIElement> >&);
     void getChildrenWithRange(Vector<RefPtr<AccessibilityUIElement> >&, unsigned location, unsigned length);
+#endif
+
+#if PLATFORM(GTK) || PLATFORM(EFL)
+    RefPtr<AccessibilityNotificationHandler> m_notificationHandler;
+#endif
 #endif
 };
     

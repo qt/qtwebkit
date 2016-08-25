@@ -21,7 +21,6 @@
 #ifndef SVGCircleElement_h
 #define SVGCircleElement_h
 
-#if ENABLE(SVG)
 #include "SVGAnimatedBoolean.h"
 #include "SVGAnimatedLength.h"
 #include "SVGExternalResourcesRequired.h"
@@ -29,34 +28,31 @@
 
 namespace WebCore {
 
-class SVGCircleElement FINAL : public SVGGraphicsElement,
+class SVGCircleElement final : public SVGGraphicsElement,
                                public SVGExternalResourcesRequired {
 public:
-    static PassRefPtr<SVGCircleElement> create(const QualifiedName&, Document*);
+    static Ref<SVGCircleElement> create(const QualifiedName&, Document&);
 
 private:
-    SVGCircleElement(const QualifiedName&, Document*);
+    SVGCircleElement(const QualifiedName&, Document&);
 
-    virtual bool isValid() const { return SVGTests::isValid(); }
-    virtual bool supportsFocus() const OVERRIDE { return true; }
+    virtual bool isValid() const override { return SVGTests::isValid(); }
 
-    bool isSupportedAttribute(const QualifiedName&);
-    virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
-    virtual void svgAttributeChanged(const QualifiedName&);
+    virtual void parseAttribute(const QualifiedName&, const AtomicString&) override;
+    virtual void svgAttributeChanged(const QualifiedName&) override;
 
-    virtual bool selfHasRelativeLengths() const;
+    virtual bool selfHasRelativeLengths() const override { return true; }
 
-    virtual RenderObject* createRenderer(RenderArena*, RenderStyle*) OVERRIDE;
+    virtual RenderPtr<RenderElement> createElementRenderer(Ref<RenderStyle>&&, const RenderTreePosition&) override;
 
     BEGIN_DECLARE_ANIMATED_PROPERTIES(SVGCircleElement)
         DECLARE_ANIMATED_LENGTH(Cx, cx)
         DECLARE_ANIMATED_LENGTH(Cy, cy)
         DECLARE_ANIMATED_LENGTH(R, r)
-        DECLARE_ANIMATED_BOOLEAN(ExternalResourcesRequired, externalResourcesRequired)
+        DECLARE_ANIMATED_BOOLEAN_OVERRIDE(ExternalResourcesRequired, externalResourcesRequired)
     END_DECLARE_ANIMATED_PROPERTIES
 };
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif // SVGCircleElement_h

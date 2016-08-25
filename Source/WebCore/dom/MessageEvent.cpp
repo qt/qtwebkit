@@ -11,30 +11,30 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
  * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
  * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
 
 #include "config.h"
 #include "MessageEvent.h"
 
-#include "DOMWindow.h"
-#include "EventNames.h"
+#include <runtime/JSCInlines.h>
 
 namespace WebCore {
 
-MessageEventInit::MessageEventInit()
+static inline bool isValidSource(EventTarget* source)
 {
+    return !source || source->toDOMWindow() || source->isMessagePort();
 }
 
 MessageEvent::MessageEvent()
@@ -48,30 +48,41 @@ MessageEvent::MessageEvent(const AtomicString& type, const MessageEventInit& ini
     , m_dataAsScriptValue(initializer.data)
     , m_origin(initializer.origin)
     , m_lastEventId(initializer.lastEventId)
-    , m_source(initializer.source)
-    , m_ports(adoptPtr(new MessagePortArray(initializer.ports)))
+    , m_source(isValidSource(initializer.source.get()) ? initializer.source : nullptr)
+    , m_ports(std::make_unique<MessagePortArray>(initializer.ports))
 {
 }
 
-MessageEvent::MessageEvent(const ScriptValue& data, const String& origin, const String& lastEventId, PassRefPtr<DOMWindow> source, PassOwnPtr<MessagePortArray> ports)
+MessageEvent::MessageEvent(const Deprecated::ScriptValue& data, const String& origin, const String& lastEventId, PassRefPtr<EventTarget> source, std::unique_ptr<MessagePortArray> ports)
     : Event(eventNames().messageEvent, false, false)
     , m_dataType(DataTypeScriptValue)
     , m_dataAsScriptValue(data)
     , m_origin(origin)
     , m_lastEventId(lastEventId)
     , m_source(source)
-    , m_ports(ports)
+    , m_ports(WTFMove(ports))
 {
+    ASSERT(isValidSource(m_source.get()));
 }
 
-MessageEvent::MessageEvent(PassRefPtr<SerializedScriptValue> data, const String& origin, const String& lastEventId, PassRefPtr<DOMWindow> source, PassOwnPtr<MessagePortArray> ports)
+MessageEvent::MessageEvent(PassRefPtr<SerializedScriptValue> data, const String& origin, const String& lastEventId, PassRefPtr<EventTarget> source, std::unique_ptr<MessagePortArray> ports)
     : Event(eventNames().messageEvent, false, false)
     , m_dataType(DataTypeSerializedScriptValue)
     , m_dataAsSerializedScriptValue(data)
     , m_origin(origin)
     , m_lastEventId(lastEventId)
     , m_source(source)
-    , m_ports(ports)
+    , m_ports(WTFMove(ports))
+{
+    ASSERT(isValidSource(m_source.get()));
+}
+
+MessageEvent::MessageEvent(const AtomicString& type, bool canBubble, bool cancelable, PassRefPtr<SerializedScriptValue> data, const String& origin, const String& lastEventId)
+    : Event(type, canBubble, cancelable)
+    , m_dataType(DataTypeSerializedScriptValue)
+    , m_dataAsSerializedScriptValue(data)
+    , m_origin(origin)
+    , m_lastEventId(lastEventId)
 {
 }
 
@@ -80,7 +91,6 @@ MessageEvent::MessageEvent(const String& data, const String& origin)
     , m_dataType(DataTypeString)
     , m_dataAsString(data)
     , m_origin(origin)
-    , m_lastEventId("")
 {
 }
 
@@ -89,7 +99,6 @@ MessageEvent::MessageEvent(PassRefPtr<Blob> data, const String& origin)
     , m_dataType(DataTypeBlob)
     , m_dataAsBlob(data)
     , m_origin(origin)
-    , m_lastEventId("")
 {
 }
 
@@ -98,7 +107,6 @@ MessageEvent::MessageEvent(PassRefPtr<ArrayBuffer> data, const String& origin)
     , m_dataType(DataTypeArrayBuffer)
     , m_dataAsArrayBuffer(data)
     , m_origin(origin)
-    , m_lastEventId("")
 {
 }
 
@@ -106,7 +114,7 @@ MessageEvent::~MessageEvent()
 {
 }
 
-void MessageEvent::initMessageEvent(const AtomicString& type, bool canBubble, bool cancelable, const ScriptValue& data, const String& origin, const String& lastEventId, DOMWindow* source, PassOwnPtr<MessagePortArray> ports)
+void MessageEvent::initMessageEvent(const AtomicString& type, bool canBubble, bool cancelable, const Deprecated::ScriptValue& data, const String& origin, const String& lastEventId, DOMWindow* source, std::unique_ptr<MessagePortArray> ports)
 {
     if (dispatched())
         return;
@@ -115,13 +123,15 @@ void MessageEvent::initMessageEvent(const AtomicString& type, bool canBubble, bo
 
     m_dataType = DataTypeScriptValue;
     m_dataAsScriptValue = data;
+    m_dataAsSerializedScriptValue = nullptr;
+    m_triedToSerialize = false;
     m_origin = origin;
     m_lastEventId = lastEventId;
     m_source = source;
-    m_ports = ports;
+    m_ports = WTFMove(ports);
 }
 
-void MessageEvent::initMessageEvent(const AtomicString& type, bool canBubble, bool cancelable, PassRefPtr<SerializedScriptValue> data, const String& origin, const String& lastEventId, DOMWindow* source, PassOwnPtr<MessagePortArray> ports)
+void MessageEvent::initMessageEvent(const AtomicString& type, bool canBubble, bool cancelable, PassRefPtr<SerializedScriptValue> data, const String& origin, const String& lastEventId, DOMWindow* source, std::unique_ptr<MessagePortArray> ports)
 {
     if (dispatched())
         return;
@@ -133,7 +143,19 @@ void MessageEvent::initMessageEvent(const AtomicString& type, bool canBubble, bo
     m_origin = origin;
     m_lastEventId = lastEventId;
     m_source = source;
-    m_ports = ports;
+    m_ports = WTFMove(ports);
+}
+    
+RefPtr<SerializedScriptValue> MessageEvent::trySerializeData(JSC::ExecState* exec)
+{
+    ASSERT(!m_dataAsScriptValue.hasNoValue());
+    
+    if (!m_dataAsSerializedScriptValue && !m_triedToSerialize) {
+        m_dataAsSerializedScriptValue = SerializedScriptValue::create(exec, m_dataAsScriptValue.jsValue(), nullptr, nullptr, NonThrowing);
+        m_triedToSerialize = true;
+    }
+    
+    return m_dataAsSerializedScriptValue;
 }
 
 // FIXME: Remove this when we have custom ObjC binding support.
@@ -154,17 +176,17 @@ MessagePort* MessageEvent::messagePort()
 
 void MessageEvent::initMessageEvent(const AtomicString& type, bool canBubble, bool cancelable, PassRefPtr<SerializedScriptValue> data, const String& origin, const String& lastEventId, DOMWindow* source, MessagePort* port)
 {
-    OwnPtr<MessagePortArray> ports;
+    std::unique_ptr<MessagePortArray> ports;
     if (port) {
-        ports = adoptPtr(new MessagePortArray);
+        ports = std::make_unique<MessagePortArray>();
         ports->append(port);
     }
-    initMessageEvent(type, canBubble, cancelable, data, origin, lastEventId, source, ports.release());
+    initMessageEvent(type, canBubble, cancelable, data, origin, lastEventId, source, WTFMove(ports));
 }
 
-const AtomicString& MessageEvent::interfaceName() const
+EventInterface MessageEvent::eventInterface() const
 {
-    return eventNames().interfaceForMessageEvent;
+    return MessageEventInterfaceType;
 }
 
 } // namespace WebCore

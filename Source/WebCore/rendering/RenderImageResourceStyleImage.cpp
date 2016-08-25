@@ -29,27 +29,26 @@
 #include "RenderImageResourceStyleImage.h"
 
 #include "CachedImage.h"
-#include "RenderObject.h"
+#include "RenderElement.h"
 #include "StyleCachedImage.h"
 
 namespace WebCore {
 
-RenderImageResourceStyleImage::RenderImageResourceStyleImage(StyleImage* styleImage)
+RenderImageResourceStyleImage::RenderImageResourceStyleImage(StyleImage& styleImage)
     : m_styleImage(styleImage)
 {
-    ASSERT(m_styleImage);
 }
 
 RenderImageResourceStyleImage::~RenderImageResourceStyleImage()
 {
 }
 
-void RenderImageResourceStyleImage::initialize(RenderObject* renderer)
+void RenderImageResourceStyleImage::initialize(RenderElement* renderer)
 {
     RenderImageResource::initialize(renderer);
 
     if (m_styleImage->isCachedImage())
-        m_cachedImage = static_cast<StyleCachedImage*>(m_styleImage.get())->cachedImage();
+        m_cachedImage = m_styleImage.get().cachedImage();
 
     m_styleImage->addClient(m_renderer);
 }
@@ -58,21 +57,21 @@ void RenderImageResourceStyleImage::shutdown()
 {
     ASSERT(m_renderer);
     m_styleImage->removeClient(m_renderer);
-    m_cachedImage = 0;
+    m_cachedImage = nullptr;
 }
 
-PassRefPtr<Image> RenderImageResourceStyleImage::image(int width, int height) const
+RefPtr<Image> RenderImageResourceStyleImage::image(int width, int height) const
 {
     // Generated content may trigger calls to image() while we're still pending, don't assert but gracefully exit.
     if (m_styleImage->isPendingImage())
-        return 0;
+        return nullptr;
     return m_styleImage->image(m_renderer, IntSize(width, height));
 }
 
 void RenderImageResourceStyleImage::setContainerSizeForRenderer(const IntSize& size)
 {
     ASSERT(m_renderer);
-    m_styleImage->setContainerSizeForRenderer(m_renderer, size, m_renderer->style()->effectiveZoom());
+    m_styleImage->setContainerSizeForRenderer(m_renderer, size, m_renderer->style().effectiveZoom());
 }
 
 } // namespace WebCore

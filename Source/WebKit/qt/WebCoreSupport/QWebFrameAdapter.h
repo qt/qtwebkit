@@ -23,7 +23,6 @@
 #include "FrameLoaderClientQt.h"
 #include "PlatformEvent.h"
 #include "PlatformExportMacros.h"
-
 #if ENABLE(ORIENTATION_EVENTS) && HAVE(QTSENSORS)
 #include "qorientationsensor.h"
 #endif // ENABLE(ORIENTATION_EVENTS).
@@ -31,6 +30,8 @@
 
 #include <QList>
 #include <QNetworkAccessManager>
+#include <QPixmap>
+#include <QPointer>
 #include <QRect>
 #include <QSize>
 #include <QUrl>
@@ -42,6 +43,7 @@ namespace WebCore {
 class Frame;
 class GraphicsContext;
 class IntRect;
+class Scrollbar;
 class TextureMapperLayer;
 }
 
@@ -56,7 +58,7 @@ class QWebFrame;
 class QWebPageAdapter;
 class QWebSecurityOrigin;
 
-class WEBKIT_EXPORTDATA QWebHitTestResultPrivate {
+class QWEBKIT_EXPORT QWebHitTestResultPrivate {
 public:
     QWebHitTestResultPrivate()
         : isContentEditable(false)
@@ -113,7 +115,7 @@ public:
     int marginHeight;
 };
 
-class WEBKIT_EXPORTDATA QWebFrameAdapter {
+class QWEBKIT_EXPORT QWebFrameAdapter {
 public:
     enum ValueOwnership {
         QtOwnership,
@@ -177,10 +179,8 @@ public:
     QString uniqueName() const;
 
     void renderRelativeCoords(QPainter*, int layers, const QRegion& clip);
-    void renderFrameExtras(WebCore::GraphicsContext*, int layers, const QRegion& clip);
-#if USE(ACCELERATED_COMPOSITING)
-    void renderCompositedLayers(WebCore::GraphicsContext*, const WebCore::IntRect& clip);
-#endif
+    void renderFrameExtras(WebCore::GraphicsContext&, int layers, const QRegion& clip);
+    void renderCompositedLayers(WebCore::GraphicsContext&, const WebCore::IntRect& clip);
 #if USE(TILED_BACKING_STORE)
     void setTiledBackingStoreFrozen(bool);
     bool tiledBackingStoreFrozen() const;

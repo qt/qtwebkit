@@ -35,28 +35,29 @@ namespace WebCore {
 class CSSPrimitiveValue;
 
 enum LineBoxContainFlags { LineBoxContainNone = 0x0, LineBoxContainBlock = 0x1, LineBoxContainInline = 0x2, LineBoxContainFont = 0x4, LineBoxContainGlyphs = 0x8,
-                           LineBoxContainReplaced = 0x10, LineBoxContainInlineBox = 0x20 };
+                           LineBoxContainReplaced = 0x10, LineBoxContainInlineBox = 0x20, LineBoxContainInitialLetter = 0x40 };
 typedef unsigned LineBoxContain;
 
 // Used for text-CSSLineBoxContain and box-CSSLineBoxContain
 class CSSLineBoxContainValue : public CSSValue {
 public:
-    static PassRefPtr<CSSLineBoxContainValue> create(LineBoxContain value)
+    static Ref<CSSLineBoxContainValue> create(LineBoxContain value)
     {
-        return adoptRef(new CSSLineBoxContainValue(value));
+        return adoptRef(*new CSSLineBoxContainValue(value));
     }
 
-    String customCssText() const;
+    String customCSSText() const;
     bool equals(const CSSLineBoxContainValue& other) const { return m_value == other.m_value; }
     LineBoxContain value() const { return m_value; }
 
 private:
-    LineBoxContain m_value;
+    explicit CSSLineBoxContainValue(LineBoxContain);
 
-private:
-    CSSLineBoxContainValue(LineBoxContain);
+    LineBoxContain m_value;
 };
 
-} // namespace
+} // namespace WebCore
 
-#endif
+SPECIALIZE_TYPE_TRAITS_CSS_VALUE(CSSLineBoxContainValue, isLineBoxContainValue())
+
+#endif // CSSLineBoxContainValue_h

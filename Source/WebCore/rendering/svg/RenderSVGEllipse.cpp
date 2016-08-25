@@ -25,19 +25,16 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "RenderSVGEllipse.h"
 
 #include "SVGCircleElement.h"
 #include "SVGEllipseElement.h"
-#include "SVGGraphicsElement.h"
 #include "SVGNames.h"
 
 namespace WebCore {
 
-RenderSVGEllipse::RenderSVGEllipse(SVGGraphicsElement* node)
-    : RenderSVGShape(node)
+RenderSVGEllipse::RenderSVGEllipse(SVGGraphicsElement& element, Ref<RenderStyle>&& style)
+    : RenderSVGShape(element, WTFMove(style))
     , m_usePathFallback(false)
 {
 }
@@ -55,66 +52,65 @@ void RenderSVGEllipse::updateShapeFromElement()
     m_center = FloatPoint();
     m_radii = FloatSize();
 
-    // Fallback to RenderSVGShape if shape has a non-scaling stroke.
-    if (hasNonScalingStroke()) {
-        RenderSVGShape::updateShapeFromElement();
-        m_usePathFallback = true;
-        return;
-    } else
-        m_usePathFallback = false;
-
     calculateRadiiAndCenter();
 
-    // Spec: "A value of zero disables rendering of the element."
-    if (m_radii.width() <= 0 || m_radii.height() <= 0)
+    // Element is invalid if either dimension is negative.
+    if (m_radii.width() < 0 || m_radii.height() < 0)
         return;
+
+    // Spec: "A value of zero disables rendering of the element."
+    if (!m_radii.isEmpty()) {
+        if (hasNonScalingStroke()) {
+            // Fallback to RenderSVGShape if shape has a non-scaling stroke.
+            RenderSVGShape::updateShapeFromElement();
+            m_usePathFallback = true;
+            return;
+        }
+        m_usePathFallback = false;
+    }
 
     m_fillBoundingBox = FloatRect(m_center.x() - m_radii.width(), m_center.y() - m_radii.height(), 2 * m_radii.width(), 2 * m_radii.height());
     m_strokeBoundingBox = m_fillBoundingBox;
-    if (style()->svgStyle()->hasStroke())
+    if (style().svgStyle().hasStroke())
         m_strokeBoundingBox.inflate(strokeWidth() / 2);
 }
 
 void RenderSVGEllipse::calculateRadiiAndCenter()
 {
-    ASSERT(node());
-    if (node()->hasTagName(SVGNames::circleTag)) {
-
-        SVGCircleElement* circle = static_cast<SVGCircleElement*>(node());
-
-        SVGLengthContext lengthContext(circle);
-        float radius = circle->r().value(lengthContext);
+    SVGLengthContext lengthContext(&graphicsElement());
+    m_center = FloatPoint(
+        lengthContext.valueForLength(style().svgStyle().cx(), LengthModeWidth),
+        lengthContext.valueForLength(style().svgStyle().cy(), LengthModeHeight));
+    if (is<SVGCircleElement>(graphicsElement())) {
+        float radius = lengthContext.valueForLength(style().svgStyle().r());
         m_radii = FloatSize(radius, radius);
-        m_center = FloatPoint(circle->cx().value(lengthContext), circle->cy().value(lengthContext));
         return;
     }
 
-    ASSERT(node()->hasTagName(SVGNames::ellipseTag));
-    SVGEllipseElement* ellipse = static_cast<SVGEllipseElement*>(node());
-
-    SVGLengthContext lengthContext(ellipse);
-    m_radii = FloatSize(ellipse->rx().value(lengthContext), ellipse->ry().value(lengthContext));
-    m_center = FloatPoint(ellipse->cx().value(lengthContext), ellipse->cy().value(lengthContext));
+    ASSERT(is<SVGEllipseElement>(graphicsElement()));
+    m_radii = FloatSize(
+        lengthContext.valueForLength(style().svgStyle().rx(), LengthModeWidth),
+        lengthContext.valueForLength(style().svgStyle().ry(), LengthModeHeight));
 }
 
-void RenderSVGEllipse::fillShape(GraphicsContext* context) const
+void RenderSVGEllipse::fillShape(GraphicsContext& context) const
 {
     if (m_usePathFallback) {
         RenderSVGShape::fillShape(context);
         return;
     }
-    context->fillEllipse(m_fillBoundingBox);
+    context.fillEllipse(m_fillBoundingBox);
 }
 
-void RenderSVGEllipse::strokeShape(GraphicsContext* context) const
+void RenderSVGEllipse::strokeShape(GraphicsContext& context) const
 {
-    if (!style()->svgStyle()->hasVisibleStroke())
+    if (!style().svgStyle().hasVisibleStroke())
         return;
     if (m_usePathFallback) {
         RenderSVGShape::strokeShape(context);
         return;
     }
-    context->strokeEllipse(m_fillBoundingBox);
+    context.strokeEllipse(m_fillBoundingBox);
 }
 
 bool RenderSVGEllipse::shapeDependentStrokeContains(const FloatPoint& point)
@@ -156,6 +152,10 @@ bool RenderSVGEllipse::shapeDependentFillContains(const FloatPoint& point, const
     return xrX * xrX + yrY * yrY <= 1.0;
 }
 
+bool RenderSVGEllipse::isRenderingDisabled() const
+{
+    // A radius of zero disables rendering of the element, and results in an empty bounding box.
+    return m_fillBoundingBox.isEmpty();
 }
 
-#endif // ENABLE(SVG)
+}

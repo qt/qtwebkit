@@ -11,10 +11,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -27,23 +27,21 @@
 
 #include "config.h"
 
-#if ENABLE(WORKERS)
-
 #include "Worker.h"
 
 #include "DOMWindow.h"
 #include "CachedResourceLoader.h"
+#include "ContentSecurityPolicy.h"
 #include "Document.h"
-#include "EventException.h"
 #include "EventListener.h"
 #include "EventNames.h"
 #include "ExceptionCode.h"
-#include "FeatureObserver.h"
 #include "Frame.h"
 #include "FrameLoader.h"
 #include "InspectorInstrumentation.h"
 #include "MessageEvent.h"
 #include "NetworkStateNotifier.h"
+#include "SecurityOrigin.h"
 #include "TextEncoding.h"
 #include "WorkerGlobalScopeProxy.h"
 #include "WorkerScriptLoader.h"
@@ -57,13 +55,12 @@ static HashSet<Worker*>* allWorkers;
 
 void networkStateChanged(bool isOnLine)
 {
-    HashSet<Worker*>::iterator end = allWorkers->end();
-    for (HashSet<Worker*>::iterator it = allWorkers->begin(); it != end; ++it)
-        (*it)->notifyNetworkStateChange(isOnLine);
+    for (auto& worker : *allWorkers)
+        worker->notifyNetworkStateChange(isOnLine);
 }
 
-inline Worker::Worker(ScriptExecutionContext* context)
-    : AbstractWorker(context)
+inline Worker::Worker(ScriptExecutionContext& context)
+    : ActiveDOMObject(&context)
     , m_contextProxy(WorkerGlobalScopeProxy::create(this))
 {
     if (!allWorkers) {
@@ -75,29 +72,31 @@ inline Worker::Worker(ScriptExecutionContext* context)
     ASSERT_UNUSED(addResult, addResult.isNewEntry);
 }
 
-PassRefPtr<Worker> Worker::create(ScriptExecutionContext* context, const String& url, ExceptionCode& ec)
+RefPtr<Worker> Worker::create(ScriptExecutionContext& context, const String& url, ExceptionCode& ec)
 {
     ASSERT(isMainThread());
-    FeatureObserver::observe(static_cast<Document*>(context)->domWindow(), FeatureObserver::WorkerStart);
 
-    RefPtr<Worker> worker = adoptRef(new Worker(context));
+    // We don't currently support nested workers, so workers can only be created from documents.
+    ASSERT_WITH_SECURITY_IMPLICATION(context.isDocument());
+
+    Ref<Worker> worker = adoptRef(*new Worker(context));
 
     worker->suspendIfNeeded();
 
-    KURL scriptURL = worker->resolveURL(url, ec);
+    bool shouldBypassMainWorldContentSecurityPolicy = context.shouldBypassMainWorldContentSecurityPolicy();
+    URL scriptURL = worker->resolveURL(url, shouldBypassMainWorldContentSecurityPolicy, ec);
     if (scriptURL.isEmpty())
-        return 0;
+        return nullptr;
+
+    worker->m_shouldBypassMainWorldContentSecurityPolicy = shouldBypassMainWorldContentSecurityPolicy;
 
     // The worker context does not exist while loading, so we must ensure that the worker object is not collected, nor are its event listeners.
-    worker->setPendingActivity(worker.get());
+    worker->setPendingActivity(worker.ptr());
 
     worker->m_scriptLoader = WorkerScriptLoader::create();
-#if PLATFORM(BLACKBERRY)
-    worker->m_scriptLoader->setTargetType(ResourceRequest::TargetIsWorker);
-#endif
-    worker->m_scriptLoader->loadAsynchronously(context, scriptURL, DenyCrossOriginRequests, worker.get());
-
-    return worker.release();
+    auto contentSecurityPolicyEnforcement = shouldBypassMainWorldContentSecurityPolicy ? ContentSecurityPolicyEnforcement::DoNotEnforce : ContentSecurityPolicyEnforcement::EnforceChildSrcDirective;
+    worker->m_scriptLoader->loadAsynchronously(&context, scriptURL, DenyCrossOriginRequests, contentSecurityPolicyEnforcement, worker.ptr());
+    return WTFMove(worker);
 }
 
 Worker::~Worker()
@@ -106,11 +105,6 @@ Worker::~Worker()
     ASSERT(scriptExecutionContext()); // The context is protected by worker context proxy, so it cannot be destroyed while a Worker exists.
     allWorkers->remove(this);
     m_contextProxy->workerObjectDestroyed();
-}
-
-const AtomicString& Worker::interfaceName() const
-{
-    return eventNames().interfaceForWorker;
 }
 
 void Worker::postMessage(PassRefPtr<SerializedScriptValue> message, MessagePort* port, ExceptionCode& ec)
@@ -124,10 +118,10 @@ void Worker::postMessage(PassRefPtr<SerializedScriptValue> message, MessagePort*
 void Worker::postMessage(PassRefPtr<SerializedScriptValue> message, const MessagePortArray* ports, ExceptionCode& ec)
 {
     // Disentangle the port in preparation for sending it to the remote context.
-    OwnPtr<MessagePortChannelArray> channels = MessagePort::disentanglePorts(ports, ec);
+    std::unique_ptr<MessagePortChannelArray> channels = MessagePort::disentanglePorts(ports, ec);
     if (ec)
         return;
-    m_contextProxy->postMessageToWorkerGlobalScope(message, channels.release());
+    m_contextProxy->postMessageToWorkerGlobalScope(message, WTFMove(channels));
 }
 
 void Worker::terminate()
@@ -135,10 +129,15 @@ void Worker::terminate()
     m_contextProxy->terminateWorkerGlobalScope();
 }
 
-bool Worker::canSuspend() const
+bool Worker::canSuspendForDocumentSuspension() const
 {
     // FIXME: It is not currently possible to suspend a worker, so pages with workers can not go into page cache.
     return false;
+}
+
+const char* Worker::activeDOMObjectName() const
+{
+    return "Worker";
 }
 
 void Worker::stop()
@@ -156,8 +155,11 @@ void Worker::notifyNetworkStateChange(bool isOnLine)
     m_contextProxy->notifyNetworkStateChange(isOnLine);
 }
 
-void Worker::didReceiveResponse(unsigned long identifier, const ResourceResponse&)
+void Worker::didReceiveResponse(unsigned long identifier, const ResourceResponse& response)
 {
+    const URL& responseURL = response.url();
+    if (!responseURL.protocolIsBlob() && !responseURL.protocolIs("file") && !SecurityOrigin::create(responseURL)->isUnique())
+        m_contentSecurityPolicyResponseHeaders = ContentSecurityPolicyResponseHeaders(response);
     InspectorInstrumentation::didReceiveScriptResponse(scriptExecutionContext(), identifier);
 }
 
@@ -166,10 +168,8 @@ void Worker::notifyFinished()
     if (m_scriptLoader->failed())
         dispatchEvent(Event::create(eventNames().errorEvent, false, true));
     else {
-        WorkerThreadStartMode startMode = DontPauseWorkerGlobalScopeOnStart;
-        if (InspectorInstrumentation::shouldPauseDedicatedWorkerOnStart(scriptExecutionContext()))
-            startMode = PauseWorkerGlobalScopeOnStart;
-        m_contextProxy->startWorkerGlobalScope(m_scriptLoader->url(), scriptExecutionContext()->userAgent(m_scriptLoader->url()), m_scriptLoader->script(), startMode);
+        const ContentSecurityPolicyResponseHeaders& contentSecurityPolicyResponseHeaders = m_contentSecurityPolicyResponseHeaders ? m_contentSecurityPolicyResponseHeaders.value() : scriptExecutionContext()->contentSecurityPolicy()->responseHeaders();
+        m_contextProxy->startWorkerGlobalScope(m_scriptLoader->url(), scriptExecutionContext()->userAgent(m_scriptLoader->url()), m_scriptLoader->script(), contentSecurityPolicyResponseHeaders, m_shouldBypassMainWorldContentSecurityPolicy, DontPauseWorkerGlobalScopeOnStart);
         InspectorInstrumentation::scriptImported(scriptExecutionContext(), m_scriptLoader->identifier(), m_scriptLoader->script());
     }
     m_scriptLoader = nullptr;
@@ -178,5 +178,3 @@ void Worker::notifyFinished()
 }
 
 } // namespace WebCore
-
-#endif // ENABLE(WORKERS)

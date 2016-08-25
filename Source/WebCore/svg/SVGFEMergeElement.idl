@@ -23,9 +23,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
-[
-    Conditional=SVG&FILTERS
-] interface SVGFEMergeElement : SVGStyledElement {
+interface SVGFEMergeElement : SVGElement {
 };
 
 SVGFEMergeElement implements SVGFilterPrimitiveStandardAttributes;

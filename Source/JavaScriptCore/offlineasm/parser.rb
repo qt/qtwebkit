@@ -1,4 +1,4 @@
-# Copyright (C) 2011 Apple Inc. All rights reserved.
+# Copyright (C) 2011, 2016 Apple Inc. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -28,16 +28,80 @@ require "pathname"
 require "registers"
 require "self_hash"
 
-class CodeOrigin
-    attr_reader :fileName, :lineNumber
+class SourceFile
+    @@fileNames = []
     
-    def initialize(fileName, lineNumber)
-        @fileName = fileName
+    attr_reader :name, :fileNumber
+
+    def SourceFile.outputDotFileList(outp)
+        @@fileNames.each_index {
+            | index |
+            outp.puts "\".file #{index+1} \\\"#{@@fileNames[index]}\\\"\\n\""
+        }
+    end
+
+    def initialize(fileName)
+        @name = Pathname.new(fileName)
+        pathName = "#{@name.realpath}"
+        fileNumber = @@fileNames.index(pathName)
+        if not fileNumber
+            @@fileNames << pathName
+            fileNumber = @@fileNames.length
+        else
+            fileNumber += 1 # File numbers are 1 based
+        end
+        @fileNumber = fileNumber
+    end
+end
+
+class CodeOrigin
+    attr_reader :lineNumber
+    
+    def initialize(sourceFile, lineNumber)
+        @sourceFile = sourceFile
         @lineNumber = lineNumber
     end
-    
+
+    def fileName
+        @sourceFile.name
+    end
+
+    def debugDirective
+        $emitWinAsm ? nil : "\".loc #{@sourceFile.fileNumber} #{lineNumber}\\n\""
+    end
+
     def to_s
         "#{fileName}:#{lineNumber}"
+    end
+end
+
+class IncludeFile
+    @@includeDirs = []
+
+    attr_reader :fileName
+
+    def initialize(moduleName, defaultDir)
+        directory = nil
+        @@includeDirs.each {
+            | includePath |
+            fileName = includePath + (moduleName + ".asm")
+            directory = includePath unless not File.file?(fileName)
+        }
+        if not directory
+            directory = defaultDir
+        end
+
+        @fileName = directory + (moduleName + ".asm")
+    end
+
+    def self.processIncludeOptions()
+        while ARGV[0][/^-I/]
+            path = ARGV.shift[2..-1]
+            if not path
+                path = ARGV.shift
+            end
+            @@includeDirs << (path + "/")
+        end
     end
 end
 
@@ -87,8 +151,7 @@ end
 # The lexer. Takes a string and returns an array of tokens.
 #
 
-def lex(str, fileName)
-    fileName = Pathname.new(fileName)
+def lex(str, file)
     result = []
     lineNumber = 1
     annotation = nil
@@ -108,35 +171,37 @@ def lex(str, fileName)
             # use of this for its cloopDo debugging utility even if
             # enableInstrAnnotations is not enabled.
             if annotation
-                result << Annotation.new(CodeOrigin.new(fileName, lineNumber),
+                result << Annotation.new(CodeOrigin.new(file, lineNumber),
                                          annotationType, annotation)
                 annotation = nil
             end
-            result << Token.new(CodeOrigin.new(fileName, lineNumber), $&)
+            result << Token.new(CodeOrigin.new(file, lineNumber), $&)
             lineNumber += 1
         when /\A[a-zA-Z]([a-zA-Z0-9_.]*)/
-            result << Token.new(CodeOrigin.new(fileName, lineNumber), $&)
+            result << Token.new(CodeOrigin.new(file, lineNumber), $&)
         when /\A\.([a-zA-Z0-9_]*)/
-            result << Token.new(CodeOrigin.new(fileName, lineNumber), $&)
+            result << Token.new(CodeOrigin.new(file, lineNumber), $&)
         when /\A_([a-zA-Z0-9_]*)/
-            result << Token.new(CodeOrigin.new(fileName, lineNumber), $&)
+            result << Token.new(CodeOrigin.new(file, lineNumber), $&)
         when /\A([ \t]+)/
             # whitespace, ignore
             whitespaceFound = true
             str = $~.post_match
             next
         when /\A0x([0-9a-fA-F]+)/
-            result << Token.new(CodeOrigin.new(fileName, lineNumber), $&.hex.to_s)
+            result << Token.new(CodeOrigin.new(file, lineNumber), $&.hex.to_s)
         when /\A0([0-7]+)/
-            result << Token.new(CodeOrigin.new(fileName, lineNumber), $&.oct.to_s)
+            result << Token.new(CodeOrigin.new(file, lineNumber), $&.oct.to_s)
         when /\A([0-9]+)/
-            result << Token.new(CodeOrigin.new(fileName, lineNumber), $&)
+            result << Token.new(CodeOrigin.new(file, lineNumber), $&)
         when /\A::/
-            result << Token.new(CodeOrigin.new(fileName, lineNumber), $&)
+            result << Token.new(CodeOrigin.new(file, lineNumber), $&)
         when /\A[:,\(\)\[\]=\+\-~\|&^*]/
-            result << Token.new(CodeOrigin.new(fileName, lineNumber), $&)
+            result << Token.new(CodeOrigin.new(file, lineNumber), $&)
+        when /\A".*"/
+            result << Token.new(CodeOrigin.new(file, lineNumber), $&)
         else
-            raise "Lexer error at #{CodeOrigin.new(fileName, lineNumber).to_s}, unexpected sequence #{str[0..20].inspect}"
+            raise "Lexer error at #{CodeOrigin.new(file, lineNumber).to_s}, unexpected sequence #{str[0..20].inspect}"
         end
         whitespaceFound = false
         str = $~.post_match
@@ -153,13 +218,13 @@ def isRegister(token)
 end
 
 def isInstruction(token)
-    token =~ INSTRUCTION_PATTERN
+    INSTRUCTION_SET.member? token.string
 end
 
 def isKeyword(token)
-    token =~ /\A((true)|(false)|(if)|(then)|(else)|(elsif)|(end)|(and)|(or)|(not)|(macro)|(const)|(sizeof)|(error)|(include))\Z/ or
+    token =~ /\A((true)|(false)|(if)|(then)|(else)|(elsif)|(end)|(and)|(or)|(not)|(global)|(macro)|(const)|(sizeof)|(error)|(include))\Z/ or
         token =~ REGISTER_PATTERN or
-        token =~ INSTRUCTION_PATTERN
+        isInstruction(token)
 end
 
 def isIdentifier(token)
@@ -180,6 +245,10 @@ end
 
 def isInteger(token)
     token =~ /\A[0-9]/
+end
+
+def isString(token)
+    token =~ /\A".*"/
 end
 
 #
@@ -367,6 +436,10 @@ class Parser
             result = Immediate.new(@tokens[@idx].codeOrigin, @tokens[@idx].string.to_i)
             @idx += 1
             result
+        elsif isString @tokens[@idx]
+            result = StringLiteral.new(@tokens[@idx].codeOrigin, @tokens[@idx].string)
+            @idx += 1
+            result
         elsif isIdentifier @tokens[@idx]
             codeOrigin, names = parseColonColon
             if names.size > 1
@@ -380,6 +453,14 @@ class Parser
             @idx += 1
             codeOrigin, names = parseColonColon
             Sizeof.forName(codeOrigin, names.join('::'))
+        elsif isLabel @tokens[@idx]
+            result = LabelReference.new(@tokens[@idx].codeOrigin, Label.forName(@tokens[@idx].codeOrigin, @tokens[@idx].string))
+            @idx += 1
+            result
+        elsif isLocalLabel @tokens[@idx]
+            result = LocalLabelReference.new(@tokens[@idx].codeOrigin, LocalLabel.forName(@tokens[@idx].codeOrigin, @tokens[@idx].string))
+            @idx += 1
+            result
         else
             parseError
         end
@@ -400,7 +481,7 @@ class Parser
     end
     
     def couldBeExpression
-        @tokens[@idx] == "-" or @tokens[@idx] == "~" or @tokens[@idx] == "sizeof" or isInteger(@tokens[@idx]) or isVariable(@tokens[@idx]) or @tokens[@idx] == "("
+        @tokens[@idx] == "-" or @tokens[@idx] == "~" or @tokens[@idx] == "sizeof" or isInteger(@tokens[@idx]) or isString(@tokens[@idx]) or isVariable(@tokens[@idx]) or @tokens[@idx] == "("
     end
     
     def parseExpressionAdd
@@ -573,6 +654,14 @@ class Parser
                 body = parseSequence(/\Aend\Z/, "while inside of macro #{name}")
                 @idx += 1
                 list << Macro.new(codeOrigin, name, variables, body)
+            elsif @tokens[@idx] == "global"
+                codeOrigin = @tokens[@idx].codeOrigin
+                @idx += 1
+                skipNewLine
+                parseError unless isLabel(@tokens[@idx])
+                name = @tokens[@idx].string
+                @idx += 1
+                Label.setAsGlobal(codeOrigin, name)
             elsif isInstruction @tokens[@idx]
                 codeOrigin = @tokens[@idx].codeOrigin
                 name = @tokens[@idx].string
@@ -677,7 +766,7 @@ class Parser
                 parseError unless @tokens[@idx] == ":"
                 # It's a label.
                 if isLabel name
-                    list << Label.forName(codeOrigin, name)
+                    list << Label.forName(codeOrigin, name, true)
                 else
                     list << LocalLabel.forName(codeOrigin, name)
                 end
@@ -686,9 +775,8 @@ class Parser
                 @idx += 1
                 parseError unless isIdentifier(@tokens[@idx])
                 moduleName = @tokens[@idx].string
-                fileName = @tokens[@idx].codeOrigin.fileName.dirname + (moduleName + ".asm")
+                fileName = IncludeFile.new(moduleName, @tokens[@idx].codeOrigin.fileName.dirname).fileName
                 @idx += 1
-                $stderr.puts "offlineasm: Including file #{fileName}"
                 list << parse(fileName)
             else
                 parseError "Expecting terminal #{final} #{comment}"
@@ -696,10 +784,33 @@ class Parser
         }
         Sequence.new(firstCodeOrigin, list)
     end
+
+    def parseIncludes(final, comment)
+        firstCodeOrigin = @tokens[@idx].codeOrigin
+        fileList = []
+        fileList << @tokens[@idx].codeOrigin.fileName
+        loop {
+            if (@idx == @tokens.length and not final) or (final and @tokens[@idx] =~ final)
+                break
+            elsif @tokens[@idx] == "include"
+                @idx += 1
+                parseError unless isIdentifier(@tokens[@idx])
+                moduleName = @tokens[@idx].string
+                fileName = IncludeFile.new(moduleName, @tokens[@idx].codeOrigin.fileName.dirname).fileName
+                @idx += 1
+                
+                fileList << fileName
+            else
+                @idx += 1
+            end
+        }
+
+        return fileList
+    end
 end
 
 def parseData(data, fileName)
-    parser = Parser.new(data, fileName)
+    parser = Parser.new(data, SourceFile.new(fileName))
     parser.parseSequence(nil, "")
 end
 
@@ -708,6 +819,8 @@ def parse(fileName)
 end
 
 def parseHash(fileName)
-    dirHash(Pathname.new(fileName).dirname, /\.asm$/)
+    parser = Parser.new(IO::read(fileName), SourceFile.new(fileName))
+    fileList = parser.parseIncludes(nil, "")
+    fileListHash(fileList)
 end
 

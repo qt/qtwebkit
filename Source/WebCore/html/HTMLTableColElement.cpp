@@ -25,9 +25,9 @@
 #include "config.h"
 #include "HTMLTableColElement.h"
 
-#include "Attribute.h"
 #include "CSSPropertyNames.h"
 #include "HTMLNames.h"
+#include "HTMLParserIdioms.h"
 #include "HTMLTableElement.h"
 #include "RenderTableCol.h"
 #include "Text.h"
@@ -36,15 +36,15 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-inline HTMLTableColElement::HTMLTableColElement(const QualifiedName& tagName, Document* document)
+inline HTMLTableColElement::HTMLTableColElement(const QualifiedName& tagName, Document& document)
     : HTMLTablePartElement(tagName, document)
     , m_span(1)
 {
 }
 
-PassRefPtr<HTMLTableColElement> HTMLTableColElement::create(const QualifiedName& tagName, Document* document)
+Ref<HTMLTableColElement> HTMLTableColElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new HTMLTableColElement(tagName, document));
+    return adoptRef(*new HTMLTableColElement(tagName, document));
 }
 
 bool HTMLTableColElement::isPresentationAttribute(const QualifiedName& name) const
@@ -54,7 +54,7 @@ bool HTMLTableColElement::isPresentationAttribute(const QualifiedName& name) con
     return HTMLTablePartElement::isPresentationAttribute(name);
 }
 
-void HTMLTableColElement::collectStyleForPresentationAttribute(const QualifiedName& name, const AtomicString& value, MutableStylePropertySet* style)
+void HTMLTableColElement::collectStyleForPresentationAttribute(const QualifiedName& name, const AtomicString& value, MutableStyleProperties& style)
 {
     if (name == widthAttr)
         addHTMLLengthToStyle(style, CSSPropertyWidth, value);
@@ -65,39 +65,39 @@ void HTMLTableColElement::collectStyleForPresentationAttribute(const QualifiedNa
 void HTMLTableColElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
     if (name == spanAttr) {
-        m_span = !value.isNull() ? value.toInt() : 1;
-        if (renderer() && renderer()->isRenderTableCol())
-            renderer()->updateFromElement();
+        m_span = limitToOnlyNonNegativeNumbersGreaterThanZero(value.string().toUInt());
+        if (is<RenderTableCol>(renderer()))
+            downcast<RenderTableCol>(*renderer()).updateFromElement();
     } else if (name == widthAttr) {
         if (!value.isEmpty()) {
-            if (renderer() && renderer()->isRenderTableCol()) {
-                RenderTableCol* col = toRenderTableCol(renderer());
+            if (is<RenderTableCol>(renderer())) {
+                RenderTableCol& col = downcast<RenderTableCol>(*renderer());
                 int newWidth = width().toInt();
-                if (newWidth != col->width())
-                    col->setNeedsLayoutAndPrefWidthsRecalc();
+                if (newWidth != col.width())
+                    col.setNeedsLayoutAndPrefWidthsRecalc();
             }
         }
     } else
         HTMLTablePartElement::parseAttribute(name, value);
 }
 
-const StylePropertySet* HTMLTableColElement::additionalPresentationAttributeStyle()
+const StyleProperties* HTMLTableColElement::additionalPresentationAttributeStyle()
 {
-    if (!hasLocalName(colgroupTag))
-        return 0;
+    if (!hasTagName(colgroupTag))
+        return nullptr;
     if (HTMLTableElement* table = findParentTable())
         return table->additionalGroupStyle(false);
-    return 0;
+    return nullptr;
 }
 
-void HTMLTableColElement::setSpan(int n)
+void HTMLTableColElement::setSpan(unsigned n)
 {
-    setAttribute(spanAttr, String::number(n));
+    setUnsignedIntegralAttribute(spanAttr, limitToOnlyNonNegativeNumbersGreaterThanZero(n));
 }
 
 String HTMLTableColElement::width() const
 {
-    return getAttribute(widthAttr);
+    return fastGetAttribute(widthAttr);
 }
 
 }

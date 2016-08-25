@@ -34,7 +34,7 @@ public:
     static RuleSet* defaultStyle;
     static RuleSet* defaultQuirksStyle;
     static RuleSet* defaultPrintStyle;
-    static RuleSet* defaultViewSourceStyle;
+    static unsigned defaultStyleVersion;
 
     static StyleSheetContents* simpleDefaultStyleSheet;
     static StyleSheetContents* defaultStyleSheet;
@@ -44,12 +44,12 @@ public:
     static StyleSheetContents* mediaControlsStyleSheet;
     static StyleSheetContents* fullscreenStyleSheet;
     static StyleSheetContents* plugInsStyleSheet;
+    static StyleSheetContents* imageControlsStyleSheet;
 
-    static void ensureDefaultStyleSheetsForElement(Element*, bool& changedDefaultStyle);
+    static void ensureDefaultStyleSheetsForElement(Element&);
     static void loadFullDefaultStyle();
     static void loadSimpleDefaultStyle();
     static void initDefaultStyle(Element*);
-    static RuleSet* viewSourceStyle();
 };
 
 } // namespace WebCore

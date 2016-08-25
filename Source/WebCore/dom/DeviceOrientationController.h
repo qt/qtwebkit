@@ -29,32 +29,36 @@
 
 #include "DeviceController.h"
 #include <wtf/HashCountedSet.h>
+#include <wtf/Noncopyable.h>
 
 namespace WebCore {
 
 class DeviceOrientationClient;
 class DeviceOrientationData;
+class Page;
 
-class DeviceOrientationController : public DeviceController {
+class DeviceOrientationController final : public DeviceController {
+    WTF_MAKE_NONCOPYABLE(DeviceOrientationController);
 public:
-    ~DeviceOrientationController() { };
-
-    static PassOwnPtr<DeviceOrientationController> create(Page*, DeviceOrientationClient*);
+    explicit DeviceOrientationController(DeviceOrientationClient*);
+    virtual ~DeviceOrientationController() { }
 
     void didChangeDeviceOrientation(DeviceOrientationData*);
     DeviceOrientationClient* deviceOrientationClient();
 
-    virtual bool hasLastData() OVERRIDE;
-    virtual PassRefPtr<Event> getLastEvent() OVERRIDE;
+#if PLATFORM(IOS)
+    // FIXME: We should look to reconcile the iOS and OpenSource differences with this class
+    // so that we can either remove these methods or remove the PLATFORM(IOS)-guard.
+    void suspendUpdates();
+    void resumeUpdates();
+#else
+    virtual bool hasLastData() override;
+    virtual RefPtr<Event> getLastEvent() override;
+#endif
 
     static const char* supplementName();
     static DeviceOrientationController* from(Page*);
     static bool isActiveAt(Page*);
-
-private:
-    DeviceOrientationController(Page*, DeviceOrientationClient*);
-
-    Page* m_page;
 };
 
 } // namespace WebCore

@@ -33,7 +33,7 @@ namespace WebCore {
 
 class RangeBoundaryPoint {
 public:
-    explicit RangeBoundaryPoint(PassRefPtr<Node> container);
+    explicit RangeBoundaryPoint(Node* container);
 
     explicit RangeBoundaryPoint(const RangeBoundaryPoint&);
 
@@ -48,7 +48,8 @@ public:
     void set(PassRefPtr<Node> container, int offset, Node* childBefore);
     void setOffset(int offset);
 
-    void setToBeforeChild(Node*);
+    void setToBeforeChild(Node&);
+    void setToAfterChild(Node&);
     void setToStartOfNode(PassRefPtr<Node>);
     void setToEndOfNode(PassRefPtr<Node>);
 
@@ -60,14 +61,12 @@ private:
     static const int invalidOffset = -1;
 
     RefPtr<Node> m_containerNode;
-    mutable int m_offsetInContainer;
+    mutable int m_offsetInContainer { 0 };
     RefPtr<Node> m_childBeforeBoundary;
 };
 
-inline RangeBoundaryPoint::RangeBoundaryPoint(PassRefPtr<Node> container)
+inline RangeBoundaryPoint::RangeBoundaryPoint(Node* container)
     : m_containerNode(container)
-    , m_offsetInContainer(0)
-    , m_childBeforeBoundary(0)
 {
     ASSERT(m_containerNode);
 }
@@ -95,7 +94,7 @@ inline void RangeBoundaryPoint::ensureOffsetIsValid() const
         return;
 
     ASSERT(m_childBeforeBoundary);
-    m_offsetInContainer = m_childBeforeBoundary->nodeIndex() + 1;
+    m_offsetInContainer = m_childBeforeBoundary->computeNodeIndex() + 1;
 }
 
 inline const Position RangeBoundaryPoint::toPosition() const
@@ -112,16 +111,16 @@ inline int RangeBoundaryPoint::offset() const
 
 inline void RangeBoundaryPoint::clear()
 {
-    m_containerNode.clear();
+    m_containerNode = nullptr;
     m_offsetInContainer = 0;
-    m_childBeforeBoundary = 0;
+    m_childBeforeBoundary = nullptr;
 }
 
 inline void RangeBoundaryPoint::set(PassRefPtr<Node> container, int offset, Node* childBefore)
 {
     ASSERT(container);
     ASSERT(offset >= 0);
-    ASSERT(childBefore == (offset ? container->childNode(offset - 1) : 0));
+    ASSERT(childBefore == (offset ? container->traverseToChildAt(offset - 1) : 0));
     m_containerNode = container;
     m_offsetInContainer = offset;
     m_childBeforeBoundary = childBefore;
@@ -136,12 +135,19 @@ inline void RangeBoundaryPoint::setOffset(int offset)
     m_offsetInContainer = offset;
 }
 
-inline void RangeBoundaryPoint::setToBeforeChild(Node* child)
+inline void RangeBoundaryPoint::setToBeforeChild(Node& child)
 {
-    ASSERT(child);
-    ASSERT(child->parentNode());
-    m_childBeforeBoundary = child->previousSibling();
-    m_containerNode = child->parentNode();
+    ASSERT(child.parentNode());
+    m_childBeforeBoundary = child.previousSibling();
+    m_containerNode = child.parentNode();
+    m_offsetInContainer = m_childBeforeBoundary ? invalidOffset : 0;
+}
+
+inline void RangeBoundaryPoint::setToAfterChild(Node& child)
+{
+    ASSERT(child.parentNode());
+    m_childBeforeBoundary = &child;
+    m_containerNode = child.parentNode();
     m_offsetInContainer = m_childBeforeBoundary ? invalidOffset : 0;
 }
 
@@ -150,7 +156,7 @@ inline void RangeBoundaryPoint::setToStartOfNode(PassRefPtr<Node> container)
     ASSERT(container);
     m_containerNode = container;
     m_offsetInContainer = 0;
-    m_childBeforeBoundary = 0;
+    m_childBeforeBoundary = nullptr;
 }
 
 inline void RangeBoundaryPoint::setToEndOfNode(PassRefPtr<Node> container)
@@ -159,7 +165,7 @@ inline void RangeBoundaryPoint::setToEndOfNode(PassRefPtr<Node> container)
     m_containerNode = container;
     if (m_containerNode->offsetInCharacters()) {
         m_offsetInContainer = m_containerNode->maxCharacterOffset();
-        m_childBeforeBoundary = 0;
+        m_childBeforeBoundary = nullptr;
     } else {
         m_childBeforeBoundary = m_containerNode->lastChild();
         m_offsetInContainer = m_childBeforeBoundary ? invalidOffset : 0;

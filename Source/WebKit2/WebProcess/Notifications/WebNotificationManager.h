@@ -45,7 +45,7 @@ namespace WebKit {
 class WebPage;
 class WebProcess;
 
-class WebNotificationManager : public WebProcessSupplement, public CoreIPC::MessageReceiver {
+class WebNotificationManager : public WebProcessSupplement, public IPC::MessageReceiver {
     WTF_MAKE_NONCOPYABLE(WebNotificationManager);
 public:
     explicit WebNotificationManager(WebProcess*);
@@ -69,11 +69,11 @@ public:
 
 private:
     // WebProcessSupplement
-    virtual void initialize(const WebProcessCreationParameters&) OVERRIDE;
+    virtual void initialize(const WebProcessCreationParameters&) override;
 
-    // CoreIPC::MessageReceiver
+    // IPC::MessageReceiver
     // Implemented in generated WebNotificationManagerMessageReceiver.cpp
-    virtual void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&) OVERRIDE;
+    virtual void didReceiveMessage(IPC::Connection&, IPC::MessageDecoder&) override;
     
     void didShowNotification(uint64_t notificationID);
     void didClickNotification(uint64_t notificationID);
@@ -90,10 +90,10 @@ private:
     typedef HashMap<RefPtr<WebCore::Notification>, uint64_t> NotificationMap;
     NotificationMap m_notificationMap;
     
-    typedef HashMap<uint64_t, RefPtr<WebCore::Notification> > NotificationIDMap;
+    typedef HashMap<uint64_t, RefPtr<WebCore::Notification>> NotificationIDMap;
     NotificationIDMap m_notificationIDMap;
     
-    typedef HashMap<RefPtr<WebCore::ScriptExecutionContext>, Vector<uint64_t> > NotificationContextMap;
+    typedef HashMap<RefPtr<WebCore::ScriptExecutionContext>, Vector<uint64_t>> NotificationContextMap;
     NotificationContextMap m_notificationContextMap;
     
     HashMap<String, bool> m_permissionsMap;

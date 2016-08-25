@@ -24,7 +24,7 @@
 #include "config.h"
 #include "FontPlatformData.h"
 
-#include "Font.h"
+#include "FontCascade.h"
 #include <wtf/text/WTFString.h>
 
 namespace WebCore {
@@ -102,22 +102,9 @@ FontPlatformData::FontPlatformData(const FontDescription& description, const Ato
     font.setWeight(toQFontWeight(description.weight()));
     font.setWordSpacing(wordSpacing);
     font.setLetterSpacing(QFont::AbsoluteSpacing, letterSpacing);
-    switch (description.fontSmoothing()) {
-        case AutoSmoothing:
-            if (Font::shouldUseSmoothing())
-                break;
-            // no break
-        case NoSmoothing:
-            font.setStyleStrategy(QFont::NoAntialias);
-            break;
-        case Antialiased:
-#if QT_VERSION >= QT_VERSION_CHECK(5, 4, 0)
-            font.setStyleStrategy(QFont::NoSubpixelAntialias);
-            break;
-#endif
-        case SubpixelAntialiased:
-            break;
-    }
+
+    if (!FontCascade::shouldUseSmoothing())
+        font.setStyleStrategy(QFont::NoAntialias);
 
     m_data->bold = font.bold();
     // WebKit allows font size zero but QFont does not. We will return

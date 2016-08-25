@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 Apple Inc. All rights reserved.
+ * Copyright (C) 2008, 2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -43,6 +43,7 @@ public:
     using MacroAssemblerX86Common::sub32;
     using MacroAssemblerX86Common::or32;
     using MacroAssemblerX86Common::load32;
+    using MacroAssemblerX86Common::load8;
     using MacroAssemblerX86Common::store32;
     using MacroAssemblerX86Common::store8;
     using MacroAssemblerX86Common::branch32;
@@ -52,6 +53,7 @@ public:
     using MacroAssemblerX86Common::loadDouble;
     using MacroAssemblerX86Common::storeDouble;
     using MacroAssemblerX86Common::convertInt32ToDouble;
+    using MacroAssemblerX86Common::branch8;
     using MacroAssemblerX86Common::branchTest8;
 
     void add32(TrustedImm32 imm, RegisterID src, RegisterID dest)
@@ -99,6 +101,23 @@ public:
     {
         m_assembler.movl_mr(address, dest);
     }
+    
+    void load8(const void* address, RegisterID dest)
+    {
+        m_assembler.movzbl_mr(address, dest);
+    }
+
+    void abortWithReason(AbortReason reason)
+    {
+        move(TrustedImm32(reason), X86Registers::eax);
+        breakpoint();
+    }
+
+    void abortWithReason(AbortReason reason, intptr_t misc)
+    {
+        move(TrustedImm32(misc), X86Registers::edx);
+        abortWithReason(reason);
+    }
 
     ConvertibleLoadLabel convertibleLoadPtr(Address address, RegisterID dest)
     {
@@ -112,10 +131,11 @@ public:
         m_assembler.addsd_mr(address.m_ptr, dest);
     }
 
-    void storeDouble(FPRegisterID src, const void* address)
+    void storeDouble(FPRegisterID src, TrustedImmPtr address)
     {
         ASSERT(isSSE2Present());
-        m_assembler.movsd_rm(src, address);
+        ASSERT(address.m_value);
+        m_assembler.movsd_rm(src, address.m_value);
     }
 
     void convertInt32ToDouble(AbsoluteAddress src, FPRegisterID dest)
@@ -132,6 +152,11 @@ public:
     {
         m_assembler.movl_rm(src, address);
     }
+    
+    void store8(RegisterID src, void* address)
+    {
+        m_assembler.movb_rm(src, address);
+    }
 
     void store8(TrustedImm32 imm, void* address)
     {
@@ -139,18 +164,20 @@ public:
         m_assembler.movb_i8m(imm.m_value, address);
     }
     
-    // Possibly clobbers src.
     void moveDoubleToInts(FPRegisterID src, RegisterID dest1, RegisterID dest2)
     {
-        movePackedToInt32(src, dest1);
-        rshiftPacked(TrustedImm32(32), src);
-        movePackedToInt32(src, dest2);
+        ASSERT(isSSE2Present());
+        m_assembler.pextrw_irr(3, src, dest1);
+        m_assembler.pextrw_irr(2, src, dest2);
+        lshift32(TrustedImm32(16), dest1);
+        or32(dest1, dest2);
+        moveFloatTo32(src, dest1);
     }
 
     void moveIntsToDouble(RegisterID src1, RegisterID src2, FPRegisterID dest, FPRegisterID scratch)
     {
-        moveInt32ToPacked(src1, dest);
-        moveInt32ToPacked(src2, scratch);
+        move32ToFloat(src1, dest);
+        move32ToFloat(src2, scratch);
         lshiftPacked(TrustedImm32(32), scratch);
         orPacked(scratch, dest);
     }
@@ -208,6 +235,12 @@ public:
         return DataLabelPtr(this);
     }
     
+    Jump branch8(RelationalCondition cond, AbsoluteAddress left, TrustedImm32 right)
+    {
+        m_assembler.cmpb_im(right.m_value, left.m_ptr);
+        return Jump(m_assembler.jCC(x86Condition(cond)));
+    }
+
     Jump branchTest8(ResultCondition cond, AbsoluteAddress address, TrustedImm32 mask = TrustedImm32(-1))
     {
         ASSERT(mask.m_value >= -128 && mask.m_value <= 255);
@@ -234,6 +267,14 @@ public:
         return Jump(m_assembler.jCC(x86Condition(cond)));
     }
 
+    Jump branch32WithPatch(RelationalCondition cond, Address left, DataLabel32& dataLabel, TrustedImm32 initialRightValue = TrustedImm32(0))
+    {
+        padBeforePatch();
+        m_assembler.cmpl_im_force32(initialRightValue.m_value, left.offset, left.base);
+        dataLabel = DataLabel32(this);
+        return Jump(m_assembler.jCC(x86Condition(cond)));
+    }
+
     DataLabelPtr storePtrWithPatch(TrustedImmPtr initialValue, ImplicitAddress address)
     {
         padBeforePatch();
@@ -242,7 +283,6 @@ public:
     }
 
     static bool supportsFloatingPoint() { return isSSE2Present(); }
-    // See comment on MacroAssemblerARMv7::supportsFloatingPointTruncate()
     static bool supportsFloatingPointTruncate() { return isSSE2Present(); }
     static bool supportsFloatingPointSqrt() { return isSSE2Present(); }
     static bool supportsFloatingPointAbs() { return isSSE2Present(); }
@@ -254,6 +294,7 @@ public:
     }
 
     static bool canJumpReplacePatchableBranchPtrWithPatch() { return true; }
+    static bool canJumpReplacePatchableBranch32WithPatch() { return true; }
     
     static CodeLocationLabel startOfBranchPtrWithPatchOnRegister(CodeLocationDataLabelPtr label)
     {
@@ -276,6 +317,17 @@ public:
         return label.labelAtOffset(-totalBytes);
     }
     
+    static CodeLocationLabel startOfPatchableBranch32WithPatchOnAddress(CodeLocationDataLabel32 label)
+    {
+        const int opcodeBytes = 1;
+        const int modRMBytes = 1;
+        const int offsetBytes = 0;
+        const int immediateBytes = 4;
+        const int totalBytes = opcodeBytes + modRMBytes + offsetBytes + immediateBytes;
+        ASSERT(totalBytes >= maxJumpReplacementSize());
+        return label.labelAtOffset(-totalBytes);
+    }
+    
     static void revertJumpReplacementToBranchPtrWithPatch(CodeLocationLabel instructionStart, RegisterID reg, void* initialValue)
     {
         X86Assembler::revertJumpTo_cmpl_ir_force32(instructionStart.executableAddress(), reinterpret_cast<intptr_t>(initialValue), reg);
@@ -287,13 +339,10 @@ public:
         X86Assembler::revertJumpTo_cmpl_im_force32(instructionStart.executableAddress(), reinterpret_cast<intptr_t>(initialValue), 0, address.base);
     }
 
-private:
-    friend class LinkBuffer;
-    friend class RepatchBuffer;
-
-    static void linkCall(void* code, Call call, FunctionPtr function)
+    static void revertJumpReplacementToPatchableBranch32WithPatch(CodeLocationLabel instructionStart, Address address, int32_t initialValue)
     {
-        X86Assembler::linkCall(code, call.m_label, function.value());
+        ASSERT(!address.offset);
+        X86Assembler::revertJumpTo_cmpl_im_force32(instructionStart.executableAddress(), initialValue, 0, address.base);
     }
 
     static void repatchCall(CodeLocationCall call, CodeLocationLabel destination)
@@ -304,6 +353,17 @@ private:
     static void repatchCall(CodeLocationCall call, FunctionPtr destination)
     {
         X86Assembler::relinkCall(call.dataLocation(), destination.executableAddress());
+    }
+
+private:
+    friend class LinkBuffer;
+
+    static void linkCall(void* code, Call call, FunctionPtr function)
+    {
+        if (call.isFlagSet(Call::Tail))
+            X86Assembler::linkJump(code, call.m_label, function.value());
+        else
+            X86Assembler::linkCall(code, call.m_label, function.value());
     }
 };
 

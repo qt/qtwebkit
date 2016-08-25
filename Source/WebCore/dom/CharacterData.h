@@ -30,25 +30,25 @@ namespace WebCore {
 
 class CharacterData : public Node {
 public:
-    String data() const { return m_data; }
-    void setData(const String&, ExceptionCode&);
+    const String& data() const { return m_data; }
+    static ptrdiff_t dataMemoryOffset() { return OBJECT_OFFSETOF(CharacterData, m_data); }
+
+    WEBCORE_EXPORT void setData(const String&);
     unsigned length() const { return m_data.length(); }
     String substringData(unsigned offset, unsigned count, ExceptionCode&);
-    void appendData(const String&, ExceptionCode&);
+    void appendData(const String&);
     void insertData(unsigned offset, const String&, ExceptionCode&);
     void deleteData(unsigned offset, unsigned count, ExceptionCode&);
     void replaceData(unsigned offset, unsigned count, const String&, ExceptionCode&);
 
     bool containsOnlyWhitespace() const;
 
-    StringImpl* dataImpl() { return m_data.impl(); }
-
     // Like appendData, but optimized for the parser (e.g., no mutation events).
     // Returns how much could be added before length limit was met.
     unsigned parserAppendData(const String& string, unsigned offset, unsigned lengthLimit);
 
 protected:
-    CharacterData(Document* document, const String& text, ConstructionType type)
+    CharacterData(Document& document, const String& text, ConstructionType type)
         : Node(document, type)
         , m_data(!text.isNull() ? text : emptyString())
     {
@@ -63,11 +63,11 @@ protected:
     void dispatchModifiedEvent(const String& oldValue);
 
 private:
-    virtual String nodeValue() const OVERRIDE FINAL;
-    virtual void setNodeValue(const String&, ExceptionCode&) OVERRIDE FINAL;
-    virtual bool isCharacterDataNode() const OVERRIDE FINAL { return true; }
-    virtual int maxCharacterOffset() const OVERRIDE FINAL;
-    virtual bool offsetInCharacters() const OVERRIDE FINAL;
+    virtual String nodeValue() const override final;
+    virtual void setNodeValue(const String&, ExceptionCode&) override final;
+    virtual bool isCharacterDataNode() const override final { return true; }
+    virtual int maxCharacterOffset() const override final;
+    virtual bool offsetInCharacters() const override final;
     void setDataAndUpdate(const String&, unsigned offsetOfReplacedData, unsigned oldLength, unsigned newLength);
     void checkCharDataOperation(unsigned offset, ExceptionCode&);
 
@@ -75,5 +75,9 @@ private:
 };
 
 } // namespace WebCore
+
+SPECIALIZE_TYPE_TRAITS_BEGIN(WebCore::CharacterData)
+    static bool isType(const WebCore::Node& node) { return node.isCharacterDataNode(); }
+SPECIALIZE_TYPE_TRAITS_END()
 
 #endif // CharacterData_h

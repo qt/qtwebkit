@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2010 Google Inc. All rights reserved.
+ * Copyright (C) 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -10,7 +11,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -29,61 +30,58 @@
 #ifndef InspectorDOMStorageAgent_h
 #define InspectorDOMStorageAgent_h
 
-#include "InspectorBaseAgent.h"
+#include "InspectorWebAgentBase.h"
 #include "StorageArea.h"
+#include <inspector/InspectorBackendDispatchers.h>
 #include <wtf/HashMap.h>
-#include <wtf/PassOwnPtr.h>
 #include <wtf/text/WTFString.h>
+
+namespace Inspector {
+class DOMStorageFrontendDispatcher;
+class InspectorArray;
+}
 
 namespace WebCore {
 
 class Frame;
-class InspectorArray;
-class InspectorFrontend;
 class InspectorPageAgent;
-class InspectorState;
-class InstrumentingAgents;
 class Page;
 class SecurityOrigin;
 class Storage;
-class StorageArea;
 
 typedef String ErrorString;
 
-class InspectorDOMStorageAgent : public InspectorBaseAgent<InspectorDOMStorageAgent>, public InspectorBackendDispatcher::DOMStorageCommandHandler {
+class InspectorDOMStorageAgent final : public InspectorAgentBase, public Inspector::DOMStorageBackendDispatcherHandler {
+    WTF_MAKE_FAST_ALLOCATED;
 public:
-    static PassOwnPtr<InspectorDOMStorageAgent> create(InstrumentingAgents* instrumentingAgents, InspectorPageAgent* pageAgent, InspectorCompositeState* state)
-    {
-        return adoptPtr(new InspectorDOMStorageAgent(instrumentingAgents, pageAgent, state));
-    }
-    ~InspectorDOMStorageAgent();
+    InspectorDOMStorageAgent(WebAgentContext&, InspectorPageAgent*);
+    virtual ~InspectorDOMStorageAgent();
 
-    virtual void setFrontend(InspectorFrontend*);
-    virtual void clearFrontend();
+    virtual void didCreateFrontendAndBackend(Inspector::FrontendRouter*, Inspector::BackendDispatcher*) override;
+    virtual void willDestroyFrontendAndBackend(Inspector::DisconnectReason) override;
 
     // Called from the front-end.
-    virtual void enable(ErrorString*);
-    virtual void disable(ErrorString*);
-    virtual void getDOMStorageItems(ErrorString*, const RefPtr<InspectorObject>& storageId, RefPtr<TypeBuilder::Array<TypeBuilder::Array<String> > >& items);
-    virtual void setDOMStorageItem(ErrorString*, const RefPtr<InspectorObject>& storageId, const String& key, const String& value);
-    virtual void removeDOMStorageItem(ErrorString*, const RefPtr<InspectorObject>& storageId, const String& key);
+    virtual void enable(ErrorString&) override;
+    virtual void disable(ErrorString&) override;
+    virtual void getDOMStorageItems(ErrorString&, const Inspector::InspectorObject& storageId, RefPtr<Inspector::Protocol::Array<Inspector::Protocol::Array<String>>>& items) override;
+    virtual void setDOMStorageItem(ErrorString&, const Inspector::InspectorObject& storageId, const String& key, const String& value) override;
+    virtual void removeDOMStorageItem(ErrorString&, const Inspector::InspectorObject& storageId, const String& key) override;
 
     // Called from the injected script.
     String storageId(Storage*);
-    PassRefPtr<TypeBuilder::DOMStorage::StorageId> storageId(SecurityOrigin*, bool isLocalStorage);
+    RefPtr<Inspector::Protocol::DOMStorage::StorageId> storageId(SecurityOrigin*, bool isLocalStorage);
 
     // Called from InspectorInstrumentation
     void didDispatchDOMStorageEvent(const String& key, const String& oldValue, const String& newValue, StorageType, SecurityOrigin*, Page*);
 
 private:
+    RefPtr<StorageArea> findStorageArea(ErrorString&, const Inspector::InspectorObject&, Frame*&);
 
-    InspectorDOMStorageAgent(InstrumentingAgents*, InspectorPageAgent*, InspectorCompositeState*);
+    std::unique_ptr<Inspector::DOMStorageFrontendDispatcher> m_frontendDispatcher;
+    RefPtr<Inspector::DOMStorageBackendDispatcher> m_backendDispatcher;
+    InspectorPageAgent* m_pageAgent { nullptr };
 
-    bool isEnabled() const;
-    PassRefPtr<StorageArea> findStorageArea(ErrorString*, const RefPtr<InspectorObject>&, Frame*&);
-
-    InspectorPageAgent* m_pageAgent;
-    InspectorFrontend* m_frontend;
+    bool m_enabled { false };
 };
 
 } // namespace WebCore

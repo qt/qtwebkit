@@ -25,27 +25,24 @@
 #ifndef HTMLParserIdioms_h
 #define HTMLParserIdioms_h
 
-#include "HTMLIdentifier.h"
-#include "QualifiedName.h"
+#include <unicode/uchar.h>
 #include <wtf/Forward.h>
-#include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
 class Decimal;
+class QualifiedName;
 
 // Space characters as defined by the HTML specification.
-bool isHTMLSpace(UChar);
+template<typename CharacterType> bool isHTMLSpace(CharacterType);
+template<typename CharacterType> bool isComma(CharacterType);
+template<typename CharacterType> bool isHTMLSpaceOrComma(CharacterType);
 bool isHTMLLineBreak(UChar);
 bool isNotHTMLSpace(UChar);
+bool isHTMLSpaceButNotLineBreak(UChar);
 
 // Strip leading and trailing whitespace as defined by the HTML specification. 
-String stripLeadingAndTrailingHTMLSpaces(const String&);
-template<size_t inlineCapacity>
-String stripLeadingAndTrailingHTMLSpaces(const Vector<UChar, inlineCapacity>& vector)
-{
-    return stripLeadingAndTrailingHTMLSpaces(StringImpl::create8BitIfPossible(vector));
-}
+WEBCORE_EXPORT String stripLeadingAndTrailingHTMLSpaces(const String&);
 
 // An implementation of the HTML specification's algorithm to convert a number to a string for number and range types.
 String serializeForNumberType(const Decimal&);
@@ -65,9 +62,11 @@ bool parseHTMLInteger(const String&, int&);
 // http://www.whatwg.org/specs/web-apps/current-work/#rules-for-parsing-non-negative-integers
 bool parseHTMLNonNegativeInteger(const String&, unsigned int&);
 
+bool threadSafeMatch(const QualifiedName&, const QualifiedName&);
+
 // Inline implementations of some of the functions declared above.
 
-inline bool isHTMLSpace(UChar character)
+template<typename CharacterType> inline bool isHTMLSpace(CharacterType character)
 {
     // Histogram from Apple's page load test combined with some ad hoc browsing some other test suites.
     //
@@ -87,22 +86,31 @@ inline bool isHTMLLineBreak(UChar character)
     return character <= '\r' && (character == '\n' || character == '\r');
 }
 
+template<typename CharacterType> inline bool isComma(CharacterType character)
+{
+    return character == ',';
+}
+
+template<typename CharacterType> inline bool isHTMLSpaceOrComma(CharacterType character)
+{
+    return isComma(character) || isHTMLSpace(character);
+}
+
 inline bool isNotHTMLSpace(UChar character)
 {
     return !isHTMLSpace(character);
 }
 
-bool threadSafeMatch(const QualifiedName&, const QualifiedName&);
-#if ENABLE(THREADED_HTML_PARSER)
-bool threadSafeMatch(const HTMLIdentifier&, const QualifiedName&);
-inline bool threadSafeHTMLNamesMatch(const HTMLIdentifier& tagName, const QualifiedName& qName)
+inline bool isHTMLSpaceButNotLineBreak(UChar character)
 {
-    // When the QualifiedName is known to HTMLIdentifier,
-    // all we have to do is a pointer compare.
-    ASSERT(HTMLIdentifier::hasIndex(qName.localName().impl()));
-    return tagName.asStringImpl() == qName.localName().impl();
+    return isHTMLSpace(character) && !isHTMLLineBreak(character);
 }
-#endif
+
+// https://html.spec.whatwg.org/multipage/infrastructure.html#limited-to-only-non-negative-numbers-greater-than-zero
+inline unsigned limitToOnlyNonNegativeNumbersGreaterThanZero(unsigned value, unsigned defaultValue = 1)
+{
+    return (value > 0 && value <= 2147483647) ? value : defaultValue;
+}
 
 }
 

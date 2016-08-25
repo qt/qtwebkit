@@ -71,7 +71,7 @@ struct WebMemoryStatistics {
 class WebMemorySampler {
     WTF_MAKE_NONCOPYABLE(WebMemorySampler);
 public:
-    static WebMemorySampler* shared();
+    static WebMemorySampler* singleton();
     void start(const double interval = 0);
     void start(const SandboxExtension::Handle&, const String&, const double interval = 0);
     void stop();
@@ -85,8 +85,8 @@ private:
     void initializeSandboxedLogFile(const SandboxExtension::Handle&, const String&);
     void writeHeaders();
     void initializeTimers(double);
-    void sampleTimerFired(WebCore::Timer<WebMemorySampler>*);
-    void stopTimerFired(WebCore::Timer<WebMemorySampler>*);
+    void sampleTimerFired();
+    void stopTimerFired();
     void appendCurrentMemoryUsageToFile(WebCore::PlatformFileHandle&);
     void sendMemoryPressureEvent();
     
@@ -95,10 +95,10 @@ private:
     WebMemoryStatistics sampleWebKit() const;
     String processName() const;
     
-    WebCore::PlatformFileHandle m_sampleLogFile;
+    WebCore::PlatformFileHandle m_sampleLogFile { WebCore::invalidPlatformFileHandle };
     String m_sampleLogFilePath;
-    WebCore::Timer<WebMemorySampler> m_sampleTimer;
-    WebCore::Timer<WebMemorySampler> m_stopTimer;
+    WebCore::Timer m_sampleTimer;
+    WebCore::Timer m_stopTimer;
     bool m_isRunning;
     double m_runningTime;
     RefPtr<SandboxExtension> m_sampleLogSandboxExtension;

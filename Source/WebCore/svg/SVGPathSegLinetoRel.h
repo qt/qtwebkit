@@ -22,29 +22,27 @@
 #ifndef SVGPathSegLinetoRel_h
 #define SVGPathSegLinetoRel_h
 
-#if ENABLE(SVG)
 #include "SVGPathSegWithContext.h"
 
 namespace WebCore {
 
 class SVGPathSegLinetoRel : public SVGPathSegSingleCoordinate {
 public:
-    static PassRefPtr<SVGPathSegLinetoRel> create(SVGPathElement* element, SVGPathSegRole role, float x, float y)
+    static Ref<SVGPathSegLinetoRel> create(const SVGPathElement& element, SVGPathSegRole role, float x, float y)
     {
-        return adoptRef(new SVGPathSegLinetoRel(element, role, x, y));
+        return adoptRef(*new SVGPathSegLinetoRel(element, role, x, y));
     }
 
 private:
-    SVGPathSegLinetoRel(SVGPathElement* element, SVGPathSegRole role, float x, float y)
+    SVGPathSegLinetoRel(const SVGPathElement& element, SVGPathSegRole role, float x, float y)
         : SVGPathSegSingleCoordinate(element, role, x, y)
     {
     }
 
-    virtual unsigned short pathSegType() const { return PATHSEG_LINETO_REL; }
-    virtual String pathSegTypeAsLetter() const { return "l"; }
+    virtual unsigned short pathSegType() const override { return PATHSEG_LINETO_REL; }
+    virtual String pathSegTypeAsLetter() const override { return "l"; }
 };
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif

@@ -26,17 +26,15 @@
 #include "config.h"
 #include "WebNotificationManagerProxy.h"
 
-#include "ImmutableArray.h"
-#include "ImmutableDictionary.h"
-#include "WebContext.h"
+#include "APIArray.h"
+#include "APIDictionary.h"
+#include "APISecurityOrigin.h"
 #include "WebNotification.h"
 #include "WebNotificationManagerMessages.h"
 #include "WebPageProxy.h"
+#include "WebProcessPool.h"
 #include "WebProcessProxy.h"
-#include "WebSecurityOrigin.h"
 
-using namespace std;
-using namespace WTF;
 using namespace WebCore;
 
 namespace WebKit {
@@ -52,17 +50,17 @@ const char* WebNotificationManagerProxy::supplementName()
     return "WebNotificationManagerProxy";
 }
 
-PassRefPtr<WebNotificationManagerProxy> WebNotificationManagerProxy::create(WebContext* context)
+Ref<WebNotificationManagerProxy> WebNotificationManagerProxy::create(WebProcessPool* processPool)
 {
-    return adoptRef(new WebNotificationManagerProxy(context));
+    return adoptRef(*new WebNotificationManagerProxy(processPool));
 }
 
-WebNotificationManagerProxy::WebNotificationManagerProxy(WebContext* context)
-    : WebContextSupplement(context)
+WebNotificationManagerProxy::WebNotificationManagerProxy(WebProcessPool* processPool)
+    : WebContextSupplement(processPool)
 {
 }
 
-void WebNotificationManagerProxy::initializeProvider(const WKNotificationProvider *provider)
+void WebNotificationManagerProxy::initializeProvider(const WKNotificationProviderBase* provider)
 {
     m_provider.initialize(provider);
     m_provider.addNotificationManager(this);
@@ -70,33 +68,33 @@ void WebNotificationManagerProxy::initializeProvider(const WKNotificationProvide
 
 // WebContextSupplement
 
-void WebNotificationManagerProxy::contextDestroyed()
+void WebNotificationManagerProxy::processPoolDestroyed()
 {
     m_provider.removeNotificationManager(this);
 }
 
 void WebNotificationManagerProxy::refWebContextSupplement()
 {
-    APIObject::ref();
+    API::Object::ref();
 }
 
 void WebNotificationManagerProxy::derefWebContextSupplement()
 {
-    APIObject::deref();
+    API::Object::deref();
 }
 
 void WebNotificationManagerProxy::populateCopyOfNotificationPermissions(HashMap<String, bool>& permissions)
 {
-    RefPtr<ImmutableDictionary> knownPermissions = m_provider.notificationPermissions();
+    RefPtr<API::Dictionary> knownPermissions = m_provider.notificationPermissions();
 
     if (!knownPermissions)
         return;
 
     permissions.clear();
-    RefPtr<ImmutableArray> knownOrigins = knownPermissions->keys();
+    Ref<API::Array> knownOrigins = knownPermissions->keys();
     for (size_t i = 0; i < knownOrigins->size(); ++i) {
-        WebString* origin = knownOrigins->at<WebString>(i);
-        permissions.set(origin->string(), knownPermissions->get<WebBoolean>(origin->string())->value());
+        API::String* origin = knownOrigins->at<API::String>(i);
+        permissions.set(origin->string(), knownPermissions->get<API::Boolean>(origin->string())->value());
     }
 }
 
@@ -104,21 +102,21 @@ void WebNotificationManagerProxy::show(WebPageProxy* webPage, const String& titl
 {
     uint64_t globalNotificationID = generateGlobalNotificationID();
     RefPtr<WebNotification> notification = WebNotification::create(title, body, iconURL, tag, lang, dir, originString, globalNotificationID);
-    pair<uint64_t, uint64_t> notificationIDPair = make_pair(webPage->pageID(), pageNotificationID);
+    std::pair<uint64_t, uint64_t> notificationIDPair = std::make_pair(webPage->pageID(), pageNotificationID);
     m_globalNotificationMap.set(globalNotificationID, notificationIDPair);
-    m_notifications.set(notificationIDPair, make_pair(globalNotificationID, notification));
+    m_notifications.set(notificationIDPair, std::make_pair(globalNotificationID, notification));
     m_provider.show(webPage, notification.get());
 }
 
 void WebNotificationManagerProxy::cancel(WebPageProxy* webPage, uint64_t pageNotificationID)
 {
-    if (WebNotification* notification = m_notifications.get(make_pair(webPage->pageID(), pageNotificationID)).second.get())
+    if (WebNotification* notification = m_notifications.get(std::make_pair(webPage->pageID(), pageNotificationID)).second.get())
         m_provider.cancel(notification);
 }
     
 void WebNotificationManagerProxy::didDestroyNotification(WebPageProxy* webPage, uint64_t pageNotificationID)
 {
-    pair<uint64_t, RefPtr<WebNotification> > globalIDNotificationPair = m_notifications.take(make_pair(webPage->pageID(), pageNotificationID));
+    auto globalIDNotificationPair = m_notifications.take(std::make_pair(webPage->pageID(), pageNotificationID));
     if (uint64_t globalNotificationID = globalIDNotificationPair.first) {
         WebNotification* notification = globalIDNotificationPair.second.get();
         m_globalNotificationMap.remove(globalNotificationID);
@@ -153,28 +151,19 @@ void WebNotificationManagerProxy::clearNotifications(WebPageProxy* webPage, cons
     Vector<uint64_t> globalNotificationIDs;
     globalNotificationIDs.reserveCapacity(m_globalNotificationMap.size());
 
-    {
-        HashMap<pair<uint64_t, uint64_t>, pair<uint64_t, RefPtr<WebNotification> > >::iterator it  = m_notifications.begin();
-        HashMap<pair<uint64_t, uint64_t>, pair<uint64_t, RefPtr<WebNotification> > >::iterator end  = m_notifications.end();
-        for (; it != end; ++it) {
-            uint64_t webPageID = it->key.first;
-            uint64_t pageNotificationID = it->key.second;
-            if (!filterFunction(webPageID, pageNotificationID, targetPageID, pageNotificationIDs))
-                continue;
+    for (auto it = m_notifications.begin(), end = m_notifications.end(); it != end; ++it) {
+        uint64_t webPageID = it->key.first;
+        uint64_t pageNotificationID = it->key.second;
+        if (!filterFunction(webPageID, pageNotificationID, targetPageID, pageNotificationIDs))
+            continue;
 
-            uint64_t globalNotificationID = it->value.first;
-            globalNotificationIDs.append(globalNotificationID);
-        }
+        uint64_t globalNotificationID = it->value.first;
+        globalNotificationIDs.append(globalNotificationID);
     }
 
-
-    {
-        Vector<uint64_t>::iterator it = globalNotificationIDs.begin();
-        Vector<uint64_t>::iterator end = globalNotificationIDs.end();
-        for (; it != end; ++it) {
-            pair<uint64_t, uint64_t> pageNotification = m_globalNotificationMap.take(*it);
-            m_notifications.remove(pageNotification);
-        }
+    for (auto it = globalNotificationIDs.begin(), end = globalNotificationIDs.end(); it != end; ++it) {
+        auto pageNotification = m_globalNotificationMap.take(*it);
+        m_notifications.remove(pageNotification);
     }
 
     m_provider.clearNotifications(globalNotificationIDs);
@@ -182,7 +171,7 @@ void WebNotificationManagerProxy::clearNotifications(WebPageProxy* webPage, cons
 
 void WebNotificationManagerProxy::providerDidShowNotification(uint64_t globalNotificationID)
 {
-    HashMap<uint64_t, pair<uint64_t, uint64_t> >::iterator it = m_globalNotificationMap.find(globalNotificationID);
+    auto it = m_globalNotificationMap.find(globalNotificationID);
     if (it == m_globalNotificationMap.end())
         return;
 
@@ -192,12 +181,12 @@ void WebNotificationManagerProxy::providerDidShowNotification(uint64_t globalNot
         return;
 
     uint64_t pageNotificationID = it->value.second;
-    webPage->process()->send(Messages::WebNotificationManager::DidShowNotification(pageNotificationID), 0);
+    webPage->process().send(Messages::WebNotificationManager::DidShowNotification(pageNotificationID), 0);
 }
 
 void WebNotificationManagerProxy::providerDidClickNotification(uint64_t globalNotificationID)
 {
-    HashMap<uint64_t, pair<uint64_t, uint64_t> >::iterator it = m_globalNotificationMap.find(globalNotificationID);
+    auto it = m_globalNotificationMap.find(globalNotificationID);
     if (it == m_globalNotificationMap.end())
         return;
     
@@ -207,26 +196,26 @@ void WebNotificationManagerProxy::providerDidClickNotification(uint64_t globalNo
         return;
 
     uint64_t pageNotificationID = it->value.second;
-    webPage->process()->send(Messages::WebNotificationManager::DidClickNotification(pageNotificationID), 0);
+    webPage->process().send(Messages::WebNotificationManager::DidClickNotification(pageNotificationID), 0);
 }
 
 
-void WebNotificationManagerProxy::providerDidCloseNotifications(ImmutableArray* globalNotificationIDs)
+void WebNotificationManagerProxy::providerDidCloseNotifications(API::Array* globalNotificationIDs)
 {
-    HashMap<WebPageProxy*, Vector<uint64_t> > pageNotificationIDs;
+    HashMap<WebPageProxy*, Vector<uint64_t>> pageNotificationIDs;
     
     size_t size = globalNotificationIDs->size();
     for (size_t i = 0; i < size; ++i) {
-        HashMap<uint64_t, pair<uint64_t, uint64_t> >::iterator it = m_globalNotificationMap.find(globalNotificationIDs->at<WebUInt64>(i)->value());
+        auto it = m_globalNotificationMap.find(globalNotificationIDs->at<API::UInt64>(i)->value());
         if (it == m_globalNotificationMap.end())
             continue;
 
         if (WebPageProxy* webPage = WebProcessProxy::webPage(it->value.first)) {
-            HashMap<WebPageProxy*, Vector<uint64_t> >::iterator pageIt = pageNotificationIDs.find(webPage);
+            auto pageIt = pageNotificationIDs.find(webPage);
             if (pageIt == pageNotificationIDs.end()) {
                 Vector<uint64_t> newVector;
                 newVector.reserveInitialCapacity(size);
-                pageIt = pageNotificationIDs.add(webPage, newVector).iterator;
+                pageIt = pageNotificationIDs.add(webPage, WTFMove(newVector)).iterator;
             }
 
             uint64_t pageNotificationID = it->value.second;
@@ -237,21 +226,21 @@ void WebNotificationManagerProxy::providerDidCloseNotifications(ImmutableArray* 
         m_globalNotificationMap.remove(it);
     }
 
-    for (HashMap<WebPageProxy*, Vector<uint64_t> >::iterator it = pageNotificationIDs.begin(), end = pageNotificationIDs.end(); it != end; ++it)
-        it->key->process()->send(Messages::WebNotificationManager::DidCloseNotifications(it->value), 0);
+    for (auto it = pageNotificationIDs.begin(), end = pageNotificationIDs.end(); it != end; ++it)
+        it->key->process().send(Messages::WebNotificationManager::DidCloseNotifications(it->value), 0);
 }
 
-void WebNotificationManagerProxy::providerDidUpdateNotificationPolicy(const WebSecurityOrigin* origin, bool allowed)
+void WebNotificationManagerProxy::providerDidUpdateNotificationPolicy(const API::SecurityOrigin* origin, bool allowed)
 {
-    if (!context())
+    if (!processPool())
         return;
 
-    context()->sendToAllProcesses(Messages::WebNotificationManager::DidUpdateNotificationDecision(origin->toString(), allowed));
+    processPool()->sendToAllProcesses(Messages::WebNotificationManager::DidUpdateNotificationDecision(origin->securityOrigin().toString(), allowed));
 }
 
-void WebNotificationManagerProxy::providerDidRemoveNotificationPolicies(ImmutableArray* origins)
+void WebNotificationManagerProxy::providerDidRemoveNotificationPolicies(API::Array* origins)
 {
-    if (!context())
+    if (!processPool())
         return;
 
     size_t size = origins->size();
@@ -262,9 +251,9 @@ void WebNotificationManagerProxy::providerDidRemoveNotificationPolicies(Immutabl
     originStrings.reserveInitialCapacity(size);
     
     for (size_t i = 0; i < size; ++i)
-        originStrings.append(origins->at<WebSecurityOrigin>(i)->toString());
+        originStrings.append(origins->at<API::SecurityOrigin>(i)->securityOrigin().toString());
     
-    context()->sendToAllProcesses(Messages::WebNotificationManager::DidRemoveNotificationDecisions(originStrings));
+    processPool()->sendToAllProcesses(Messages::WebNotificationManager::DidRemoveNotificationDecisions(originStrings));
 }
 
 } // namespace WebKit

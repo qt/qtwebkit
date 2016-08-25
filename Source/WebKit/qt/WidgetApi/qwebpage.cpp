@@ -22,7 +22,6 @@
 #include "config.h"
 #include "qwebpage.h"
 
-#include "DefaultFullScreenVideoHandler.h"
 #include "InitWebKitQt.h"
 #include "InspectorClientQt.h"
 #include "InspectorClientWebPage.h"
@@ -34,7 +33,6 @@
 #include "QtFallbackWebPopup.h"
 #include "QtPlatformPlugin.h"
 #include "UndoStepQt.h"
-#include "WebEventConversion.h"
 
 #include "qwebframe.h"
 #include "qwebframe_p.h"
@@ -84,6 +82,10 @@
 #include <QWindow>
 #if defined(Q_WS_X11)
 #include <QX11Info>
+#endif
+
+#if USE(QT_MULTIMEDIA)
+#include "DefaultFullScreenVideoHandler.h"
 #endif
 
 using namespace WebCore;
@@ -216,30 +218,6 @@ QWebPagePrivate::QWebPagePrivate(QWebPage *qq)
 #endif // ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
 }
 
-QWebPagePrivate::~QWebPagePrivate()
-{
-#ifndef QT_NO_CONTEXTMENU
-    delete currentContextMenu.data();
-#endif
-#ifndef QT_NO_UNDOSTACK
-    delete undoStack;
-    undoStack = 0;
-#endif
-    
-    if (inspector) {
-        // If the inspector is ours, delete it, otherwise just detach from it.
-        if (inspectorIsInternalOnly)
-            delete inspector;
-        else
-            inspector->setPage(0);
-    }
-    // Explicitly destruct the WebCore page at this point when the
-    // QWebPagePrivate / QWebPageAdapater vtables are still intact,
-    // in order for various destruction callbacks out of WebCore to
-    // work.
-    deletePage();
-}
-
 void QWebPagePrivate::show()
 {
     if (!view)
@@ -281,9 +259,10 @@ QWebPageAdapter *QWebPagePrivate::createWindow(bool dialog)
     return newPage->d;
 }
 
-void QWebPagePrivate::javaScriptConsoleMessage(const QString &message, int lineNumber, const QString &sourceID)
+void QWebPagePrivate::consoleMessageReceived(MessageSource source, MessageLevel level, const QString& message, int lineNumber, const QString& sourceID)
 {
     q->javaScriptConsoleMessage(message, lineNumber, sourceID);
+    emit q->consoleMessageReceived(QWebPage::MessageSource(source), QWebPage::MessageLevel(level), message, lineNumber, sourceID);
 }
 
 void QWebPagePrivate::javaScriptAlert(QWebFrameAdapter* frame, const QString& msg)
@@ -460,11 +439,9 @@ static QWebPage::WebAction webActionForAdapterMenuAction(QWebPageAdapter::MenuAc
 {
     switch (action) {
         FOR_EACH_MAPPED_MENU_ACTION(MAP_WEB_ACTION_FROM_ADAPTER_EQUIVALENT, SEMICOLON_SEPARATOR);
-#if ENABLE(INSPECTOR)
     case QWebPageAdapter::InspectElement: return QWebPage::InspectElement;
-#endif
     default:
-        ASSERT_NOT_REACHED();
+        Q_UNREACHABLE();
         break;
     }
     return QWebPage::NoWebAction;
@@ -477,11 +454,9 @@ static QWebPageAdapter::MenuAction adapterMenuActionForWebAction(QWebPage::WebAc
 {
     switch (action) {
         FOR_EACH_MAPPED_MENU_ACTION(MAP_ADAPTER_ACTION_FROM_WEBACTION_EQUIVALENT, SEMICOLON_SEPARATOR);
-#if ENABLE(INSPECTOR)
     case QWebPage::InspectElement: return QWebPageAdapter::InspectElement;
-#endif
     default:
-        ASSERT_NOT_REACHED();
+        Q_UNREACHABLE();
         break;
     }
     return QWebPageAdapter::NoAction;
@@ -648,6 +623,16 @@ void QWebPagePrivate::createWebInspector(QObject** inspectorView, QWebPageAdapte
     QWebPage* page = new WebKit::InspectorClientWebPage;
     *inspectorView = page->view();
     *inspectorPage = page->d;
+
+    // FIXME: Find out what's going on with Settings
+    page->settings()->setAttribute(QWebSettings::AcceleratedCompositingEnabled, false);
+
+    // We treat "qrc:" scheme as local, but by default local content is not allowed to use
+    // LocalStorage which is required for Inspector to work.
+    // See https://bugs.webkit.org/show_bug.cgi?id=155265
+    // Alternatively we can make "qrc:" scheme non-local like GTK port does:
+    // https://bugs.webkit.org/show_bug.cgi?id=155497
+    page->settings()->setAttribute(QWebSettings::LocalContentCanAccessRemoteUrls, true);
 }
 
 #ifndef QT_NO_MENU
@@ -881,7 +866,7 @@ void QWebPagePrivate::keyReleaseEvent(QKeyEvent *ev)
 template<class T>
 void QWebPagePrivate::dragEnterEvent(T* ev)
 {
-#ifndef QT_NO_DRAGANDDROP
+#if ENABLE(DRAG_SUPPORT)
     Qt::DropAction action = dragEntered(ev->mimeData(), QPointF(ev->pos()).toPoint(), ev->possibleActions());
     ev->setDropAction(action);
     ev->acceptProposedAction();
@@ -891,7 +876,7 @@ void QWebPagePrivate::dragEnterEvent(T* ev)
 template<class T>
 void QWebPagePrivate::dragMoveEvent(T *ev)
 {
-#ifndef QT_NO_DRAGANDDROP
+#if ENABLE(DRAG_SUPPORT)
     m_lastDropAction = dragUpdated(ev->mimeData(), QPointF(ev->pos()).toPoint(), ev->possibleActions());
     ev->setDropAction(m_lastDropAction);
     if (m_lastDropAction != Qt::IgnoreAction)
@@ -902,7 +887,7 @@ void QWebPagePrivate::dragMoveEvent(T *ev)
 template<class T>
 void QWebPagePrivate::dropEvent(T *ev)
 {
-#ifndef QT_NO_DRAGANDDROP
+#if ENABLE(DRAG_SUPPORT)
     if (performDrag(ev->mimeData(), QPointF(ev->pos()).toPoint(), ev->possibleActions())) {
         ev->setDropAction(m_lastDropAction);
         ev->accept();
@@ -1032,7 +1017,6 @@ void QWebPagePrivate::setInspector(QWebInspector* insp)
 */
 QWebInspector* QWebPagePrivate::getOrCreateInspector()
 {
-#if ENABLE(INSPECTOR)
     if (!inspector) {
         QWebInspector* insp = new QWebInspector;
         insp->setPage(q);
@@ -1040,7 +1024,6 @@ QWebInspector* QWebPagePrivate::getOrCreateInspector()
 
         Q_ASSERT(inspector); // Associated through QWebInspector::setPage(q)
     }
-#endif
     return inspector;
 }
 
@@ -1214,48 +1197,6 @@ QWebInspector* QWebPagePrivate::getOrCreateInspector()
     \value WebModalDialog The window acts as modal dialog.
 */
 
-/*!
-    \enum QWebPage::PermissionPolicy
-
-    This enum describes the permission policies that the user may set for data or device access.
-
-    \value PermissionUnknown It is unknown whether the user grants or denies permission.
-    \value PermissionGrantedByUser The user has granted permission.
-    \value PermissionDeniedByUser The user has denied permission.
-
-    \sa featurePermissionRequested(), featurePermissionRequestCanceled(), setFeaturePermission(), Feature
-*/
-
-/*!
-    \enum QWebPage::Feature
-
-    This enum describes the platform feature access categories that the user may be asked to grant or deny access to.
-
-    \value Notifications Access to notifications
-    \value Geolocation Access to location hardware or service
-
-    \sa featurePermissionRequested(), featurePermissionRequestCanceled(), setFeaturePermission(), PermissionPolicy
-
-*/
-
-/*!
-    \fn void QWebPage::featurePermissionRequested(QWebFrame* frame, QWebPage::Feature feature);
-
-    This is signal is emitted when the given \a frame requests to make use of
-    the resource or device identified by \a feature.
-
-    \sa featurePermissionRequestCanceled(), setFeaturePermission()
-*/
-
-/*!
-    \fn void QWebPage::featurePermissionRequestCanceled(QWebFrame* frame, QWebPage::Feature feature);
-
-    This is signal is emitted when the given \a frame cancels a previously issued
-    request to make use of \a feature.
-
-    \sa featurePermissionRequested(), setFeaturePermission()
-
-*/
 
 /*!
     \class QWebPage::ViewportAttributes
@@ -1657,13 +1598,6 @@ bool QWebPage::shouldInterruptJavaScript()
 #endif
 }
 
-/*!
-    \fn void QWebPage::setFeaturePermission(QWebFrame* frame, Feature feature, PermissionPolicy policy)
-
-    Sets the permission for the given \a frame to use \a feature to \a policy.
-
-    \sa featurePermissionRequested(), featurePermissionRequestCanceled()
-*/
 void QWebPage::setFeaturePermission(QWebFrame* frame, Feature feature, PermissionPolicy policy)
 {
 #if !ENABLE(NOTIFICATIONS) && !ENABLE(LEGACY_NOTIFICATIONS) && !ENABLE(GEOLOCATION)
@@ -1810,13 +1744,11 @@ void QWebPage::triggerAction(WebAction action, bool)
         break;
 #endif
     case InspectElement: {
-#if ENABLE(INSPECTOR)
         if (!d->hitTestResult.isNull()) {
             d->getOrCreateInspector(); // Make sure the inspector is created
             d->inspector->show(); // The inspector is expected to be shown on inspection
             mappedAction = QWebPageAdapter::InspectElement;
         }
-#endif
         break;
     }
     case StopScheduledPageRefresh: {
@@ -1849,9 +1781,9 @@ QColor QWebPagePrivate::colorSelectionRequested(const QColor &selectedColor)
     return ret;
 }
 
-QWebSelectMethod *QWebPagePrivate::createSelectPopup()
+std::unique_ptr<QWebSelectMethod> QWebPagePrivate::createSelectPopup()
 {
-    return new QtFallbackWebPopup(this);
+    return std::make_unique<QtFallbackWebPopup>(this);
 }
 
 QRect QWebPagePrivate::viewRectRelativeToWindow()
@@ -2204,8 +2136,7 @@ bool QWebPage::acceptNavigationRequest(QWebFrame *frame, const QNetworkRequest &
             return true;
 
         case DelegateExternalLinks:
-            if (request.url().scheme().isEmpty() &&
-              QWebPageAdapter::treatSchemeAsLocal(frame->baseUrl().scheme()))
+            if (request.url().scheme().isEmpty() && QWebPageAdapter::treatSchemeAsLocal(frame->baseUrl().scheme()))
                 return true;
             if (QWebPageAdapter::treatSchemeAsLocal(request.url().scheme()))
                 return true;
@@ -2318,9 +2249,7 @@ QAction *QWebPage::action(WebAction action) const
         mappedAction = adapterMenuActionForWebAction(action);
         break;
     case InspectElement:
-#if ENABLE(INSPECTOR)
         mappedAction = QWebPageAdapter::InspectElement;
-#endif
         break;
 
         // icon needed as well, map by hand.
@@ -2634,7 +2563,7 @@ bool QWebPage::event(QEvent *ev)
     case QEvent::FocusOut:
         d->focusOutEvent(static_cast<QFocusEvent*>(ev));
         break;
-#ifndef QT_NO_DRAGANDDROP
+#if ENABLE(DRAG_SUPPORT)
     case QEvent::DragEnter:
         d->dragEnterEvent(static_cast<QDragEnterEvent*>(ev));
         break;

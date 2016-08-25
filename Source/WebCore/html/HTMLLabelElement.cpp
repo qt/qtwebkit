@@ -26,41 +26,35 @@
 #include "HTMLLabelElement.h"
 
 #include "Document.h"
+#include "ElementIterator.h"
 #include "Event.h"
 #include "EventNames.h"
 #include "FormAssociatedElement.h"
 #include "HTMLNames.h"
-#include "NodeTraversal.h"
 
 namespace WebCore {
 
 using namespace HTMLNames;
 
-static LabelableElement* nodeAsLabelableElement(Node* node)
+static LabelableElement* firstElementWithIdIfLabelable(TreeScope& treeScope, const AtomicString& id)
 {
-    if (!node || !node->isHTMLElement())
-        return 0;
-    
-    HTMLElement* element = static_cast<HTMLElement*>(node);
-    if (!element->isLabelable())
-        return 0;
+    auto* element = treeScope.getElementById(id);
+    if (!is<LabelableElement>(element))
+        return nullptr;
 
-    LabelableElement* labelableElement = static_cast<LabelableElement*>(element);
-    if (!labelableElement->supportLabels())
-        return 0;
-
-    return labelableElement;
+    auto& labelableElement = downcast<LabelableElement>(*element);
+    return labelableElement.supportLabels() ? &labelableElement : nullptr;
 }
 
-inline HTMLLabelElement::HTMLLabelElement(const QualifiedName& tagName, Document* document)
+inline HTMLLabelElement::HTMLLabelElement(const QualifiedName& tagName, Document& document)
     : HTMLElement(tagName, document)
 {
     ASSERT(hasTagName(labelTag));
 }
 
-PassRefPtr<HTMLLabelElement> HTMLLabelElement::create(const QualifiedName& tagName, Document* document)
+Ref<HTMLLabelElement> HTMLLabelElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new HTMLLabelElement(tagName, document));
+    return adoptRef(*new HTMLLabelElement(tagName, document));
 }
 
 bool HTMLLabelElement::isFocusable() const
@@ -70,22 +64,19 @@ bool HTMLLabelElement::isFocusable() const
 
 LabelableElement* HTMLLabelElement::control()
 {
-    const AtomicString& controlId = getAttribute(forAttr);
+    const AtomicString& controlId = fastGetAttribute(forAttr);
     if (controlId.isNull()) {
         // Search the children and descendants of the label element for a form element.
         // per http://dev.w3.org/html5/spec/Overview.html#the-label-element
         // the form element must be "labelable form-associated element".
-        Element* element = this;
-        while ((element = ElementTraversal::next(element, this))) {
-            if (LabelableElement* labelableElement = nodeAsLabelableElement(element))
-                return labelableElement;
+        for (auto& labelableElement : descendantsOfType<LabelableElement>(*this)) {
+            if (labelableElement.supportLabels())
+                return &labelableElement;
         }
-        return 0;
+        return nullptr;
     }
     
-    // Find the first element whose id is controlId. If it is found and it is a labelable form control,
-    // return it, otherwise return 0.
-    return nodeAsLabelableElement(treeScope()->getElementById(controlId));
+    return inDocument() ? firstElementWithIdIfLabelable(treeScope(), controlId) : nullptr;
 }
 
 HTMLFormElement* HTMLLabelElement::form() const
@@ -136,7 +127,7 @@ void HTMLLabelElement::defaultEventHandler(Event* evt)
         // Click the corresponding control.
         element->dispatchSimulatedClick(evt);
 
-        document()->updateLayoutIgnorePendingStylesheets();
+        document().updateLayoutIgnorePendingStylesheets();
         if (element->isMouseFocusable())
             element->focus();
 
@@ -150,10 +141,7 @@ void HTMLLabelElement::defaultEventHandler(Event* evt)
 
 bool HTMLLabelElement::willRespondToMouseClickEvents()
 {
-    if (control() && control()->willRespondToMouseClickEvents())
-        return true;
-
-    return HTMLElement::willRespondToMouseClickEvents();
+    return (control() && control()->willRespondToMouseClickEvents()) || HTMLElement::willRespondToMouseClickEvents();
 }
 
 void HTMLLabelElement::focus(bool, FocusDirection direction)

@@ -37,24 +37,24 @@ namespace WebCore {
 
 class JSErrorHandler : public JSEventListener {
 public:
-    static PassRefPtr<JSErrorHandler> create(JSC::JSObject* listener, JSC::JSObject* wrapper, bool isAttribute, DOMWrapperWorld* isolatedWorld)
+    static Ref<JSErrorHandler> create(JSC::JSObject* listener, JSC::JSObject* wrapper, bool isAttribute, DOMWrapperWorld& world)
     {
-        return adoptRef(new JSErrorHandler(listener, wrapper, isAttribute, isolatedWorld));
+        return adoptRef(*new JSErrorHandler(listener, wrapper, isAttribute, world));
     }
 
     virtual ~JSErrorHandler();
 
 private:
-    JSErrorHandler(JSC::JSObject* function, JSC::JSObject* wrapper, bool isAttribute, DOMWrapperWorld* isolatedWorld);
+    JSErrorHandler(JSC::JSObject* function, JSC::JSObject* wrapper, bool isAttribute, DOMWrapperWorld&);
     virtual void handleEvent(ScriptExecutionContext*, Event*);
 };
 
 // Creates a JS EventListener for "onerror" event handler in worker context. It has custom implementation because
 // unlike other event listeners it accepts three parameters.
-inline PassRefPtr<JSErrorHandler> createJSErrorHandler(JSC::ExecState* exec, JSC::JSValue listener, JSC::JSObject* wrapper)
+inline RefPtr<JSErrorHandler> createJSErrorHandler(JSC::ExecState* exec, JSC::JSValue listener, JSC::JSObject* wrapper)
 {
     if (!listener.isObject())
-        return 0;
+        return nullptr;
 
     return JSErrorHandler::create(asObject(listener), wrapper, true, currentWorld(exec));
 }

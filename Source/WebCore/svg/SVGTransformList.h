@@ -21,14 +21,13 @@
 #ifndef SVGTransformList_h
 #define SVGTransformList_h
 
-#if ENABLE(SVG)
 #include "SVGPropertyTraits.h"
 #include "SVGTransform.h"
 #include <wtf/Vector.h>
 
 namespace WebCore {
 
-class SVGTransformList : public Vector<SVGTransform> {
+class SVGTransformList : public Vector<SVGTransform, 1> {
 public:
     SVGTransformList() { }
 
@@ -51,5 +50,4 @@ struct SVGPropertyTraits<SVGTransformList> {
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif // SVGTransformList_h

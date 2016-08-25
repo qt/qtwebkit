@@ -27,10 +27,11 @@
 #include "Language.h"
 
 #include <wtf/HashMap.h>
+#include <wtf/NeverDestroyed.h>
 #include <wtf/RetainPtr.h>
 #include <wtf/text/WTFString.h>
 
-#if PLATFORM(MAC)
+#if USE(CF) && !PLATFORM(WIN)
 #include <CoreFoundation/CoreFoundation.h>
 #endif
 
@@ -39,8 +40,8 @@ namespace WebCore {
 typedef HashMap<void*, LanguageChangeObserverFunction> ObserverMap;
 static ObserverMap& observerMap()
 {
-    DEFINE_STATIC_LOCAL(ObserverMap, map, ());
-    return map;
+    static NeverDestroyed<ObserverMap> map;
+    return map.get();
 }
 
 void addLanguageChangeObserver(void* context, LanguageChangeObserverFunction customObserver)
@@ -72,7 +73,7 @@ String defaultLanguage()
 
 static Vector<String>& preferredLanguagesOverride()
 {
-    DEFINE_STATIC_LOCAL(Vector<String>, override, ());
+    static NeverDestroyed<Vector<String>> override;
     return override;
 }
 
@@ -84,6 +85,7 @@ Vector<String> userPreferredLanguagesOverride()
 void overrideUserPreferredLanguages(const Vector<String>& override)
 {
     preferredLanguagesOverride() = override;
+    languageDidChange();
 }
     
 Vector<String> userPreferredLanguages()
@@ -97,7 +99,7 @@ Vector<String> userPreferredLanguages()
 
 static String canonicalLanguageIdentifier(const String& languageCode)
 {
-    String lowercaseLanguageCode = languageCode.lower();
+    String lowercaseLanguageCode = languageCode.convertToASCIILowercase();
     
     if (lowercaseLanguageCode.length() >= 3 && lowercaseLanguageCode[2] == '_')
         lowercaseLanguageCode.replace(2, 1, "-");
@@ -105,22 +107,25 @@ static String canonicalLanguageIdentifier(const String& languageCode)
     return lowercaseLanguageCode;
 }
 
-size_t indexOfBestMatchingLanguageInList(const String& language, const Vector<String>& languageList)
+size_t indexOfBestMatchingLanguageInList(const String& language, const Vector<String>& languageList, bool& exactMatch)
 {
+    String lowercaseLanguage = language.convertToASCIILowercase();
     String languageWithoutLocaleMatch;
     String languageMatchButNotLocale;
     size_t languageWithoutLocaleMatchIndex = 0;
     size_t languageMatchButNotLocaleMatchIndex = 0;
-    bool canMatchLanguageOnly = (language.length() == 2 || (language.length() >= 3 && language[2] == '-'));
+    bool canMatchLanguageOnly = (lowercaseLanguage.length() == 2 || (lowercaseLanguage.length() >= 3 && lowercaseLanguage[2] == '-'));
 
     for (size_t i = 0; i < languageList.size(); ++i) {
         String canonicalizedLanguageFromList = canonicalLanguageIdentifier(languageList[i]);
 
-        if (language == canonicalizedLanguageFromList)
+        if (lowercaseLanguage == canonicalizedLanguageFromList) {
+            exactMatch = true;
             return i;
+        }
 
         if (canMatchLanguageOnly && canonicalizedLanguageFromList.length() >= 2) {
-            if (language[0] == canonicalizedLanguageFromList[0] && language[1] == canonicalizedLanguageFromList[1]) {
+            if (lowercaseLanguage[0] == canonicalizedLanguageFromList[0] && lowercaseLanguage[1] == canonicalizedLanguageFromList[1]) {
                 if (!languageWithoutLocaleMatch.length() && canonicalizedLanguageFromList.length() == 2) {
                     languageWithoutLocaleMatch = languageList[i];
                     languageWithoutLocaleMatchIndex = i;
@@ -132,6 +137,8 @@ size_t indexOfBestMatchingLanguageInList(const String& language, const Vector<St
             }
         }
     }
+
+    exactMatch = false;
 
     // If we have both a language-only match and a languge-but-not-locale match, return the
     // languge-only match as is considered a "better" match. For example, if the list
@@ -147,11 +154,9 @@ size_t indexOfBestMatchingLanguageInList(const String& language, const Vector<St
 
 String displayNameForLanguageLocale(const String& localeName)
 {
-#if PLATFORM(MAC)
-    if (!localeName.isNull() && !localeName.isEmpty()) {
-        RetainPtr<CFLocaleRef> currentLocale = adoptCF(CFLocaleCopyCurrent());
-        return CFLocaleCopyDisplayNameForPropertyValue(currentLocale.get(), kCFLocaleIdentifier, localeName.createCFString().get());
-    }
+#if USE(CF) && !PLATFORM(WIN)
+    if (!localeName.isEmpty())
+        return adoptCF(CFLocaleCopyDisplayNameForPropertyValue(adoptCF(CFLocaleCopyCurrent()).get(), kCFLocaleIdentifier, localeName.createCFString().get())).get();
 #endif
     return localeName;
 }

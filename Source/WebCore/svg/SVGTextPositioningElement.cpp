@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2004, 2005, 2008 Nikolas Zimmermann <zimmermann@kde.org>
  * Copyright (C) 2004, 2005, 2006, 2007, 2008 Rob Buis <buis@kde.org>
+ * Copyright (C) 2014 Adobe Systems Incorporated. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -19,14 +20,12 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "SVGTextPositioningElement.h"
 
-#include "Attribute.h"
+#include "RenderSVGInline.h"
 #include "RenderSVGResource.h"
 #include "RenderSVGText.h"
-#include "SVGElementInstance.h"
+#include "SVGAltGlyphElement.h"
 #include "SVGLengthList.h"
 #include "SVGNames.h"
 #include "SVGNumberList.h"
@@ -49,32 +48,14 @@ BEGIN_REGISTER_ANIMATED_PROPERTIES(SVGTextPositioningElement)
     REGISTER_PARENT_ANIMATED_PROPERTIES(SVGTextContentElement)
 END_REGISTER_ANIMATED_PROPERTIES
 
-SVGTextPositioningElement::SVGTextPositioningElement(const QualifiedName& tagName, Document* document)
+SVGTextPositioningElement::SVGTextPositioningElement(const QualifiedName& tagName, Document& document)
     : SVGTextContentElement(tagName, document)
 {
     registerAnimatedPropertiesForSVGTextPositioningElement();
 }
 
-bool SVGTextPositioningElement::isSupportedAttribute(const QualifiedName& attrName)
-{
-    DEFINE_STATIC_LOCAL(HashSet<QualifiedName>, supportedAttributes, ());
-    if (supportedAttributes.isEmpty()) {
-        supportedAttributes.add(SVGNames::xAttr);
-        supportedAttributes.add(SVGNames::yAttr);
-        supportedAttributes.add(SVGNames::dxAttr);
-        supportedAttributes.add(SVGNames::dyAttr);
-        supportedAttributes.add(SVGNames::rotateAttr);
-    }
-    return supportedAttributes.contains<SVGAttributeHashTranslator>(attrName);
-}
-
 void SVGTextPositioningElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
-    if (!isSupportedAttribute(name)) {
-        SVGTextContentElement::parseAttribute(name, value);
-        return;
-    }
-
     if (name == SVGNames::xAttr) {
         SVGLengthList newList;
         newList.parse(value, LengthModeWidth);
@@ -115,63 +96,61 @@ void SVGTextPositioningElement::parseAttribute(const QualifiedName& name, const 
         return;
     }
 
-    ASSERT_NOT_REACHED();
+    SVGTextContentElement::parseAttribute(name, value);
+}
+
+void SVGTextPositioningElement::collectStyleForPresentationAttribute(const QualifiedName& name, const AtomicString& value, MutableStyleProperties& style)
+{
+    if (name == SVGNames::xAttr || name == SVGNames::yAttr)
+        return;
+    SVGTextContentElement::collectStyleForPresentationAttribute(name, value, style);
+}
+
+bool SVGTextPositioningElement::isPresentationAttribute(const QualifiedName& name) const
+{
+    if (name == SVGNames::xAttr || name == SVGNames::yAttr)
+        return false;
+    return SVGTextContentElement::isPresentationAttribute(name);
 }
 
 void SVGTextPositioningElement::svgAttributeChanged(const QualifiedName& attrName)
 {
-    if (!isSupportedAttribute(attrName)) {
-        SVGTextContentElement::svgAttributeChanged(attrName);
+    if (attrName == SVGNames::xAttr || attrName == SVGNames::yAttr || attrName == SVGNames::dxAttr || attrName == SVGNames::dyAttr || attrName == SVGNames::rotateAttr) {
+        InstanceInvalidationGuard guard(*this);
+
+        if (attrName != SVGNames::rotateAttr)
+            updateRelativeLengthsInformation();
+
+        if (auto renderer = this->renderer()) {
+            if (auto* textAncestor = RenderSVGText::locateRenderSVGTextAncestor(*renderer))
+                textAncestor->setNeedsPositioningValuesUpdate();
+            RenderSVGResource::markForLayoutAndParentResourceInvalidation(*renderer);
+        }
+
         return;
     }
 
-    SVGElementInstance::InvalidationGuard invalidationGuard(this);
-
-    bool updateRelativeLengths = attrName == SVGNames::xAttr
-                              || attrName == SVGNames::yAttr
-                              || attrName == SVGNames::dxAttr
-                              || attrName == SVGNames::dyAttr;
-
-    if (updateRelativeLengths)
-        updateRelativeLengthsInformation();
-
-    RenderObject* renderer = this->renderer();
-    if (!renderer)
-        return;
-
-    if (updateRelativeLengths || attrName == SVGNames::rotateAttr) {
-        if (RenderSVGText* textRenderer = RenderSVGText::locateRenderSVGTextAncestor(renderer))
-            textRenderer->setNeedsPositioningValuesUpdate();
-        RenderSVGResource::markForLayoutAndParentResourceInvalidation(renderer);
-        return;
-    }
-
-    ASSERT_NOT_REACHED();
+    SVGTextContentElement::svgAttributeChanged(attrName);
 }
 
-SVGTextPositioningElement* SVGTextPositioningElement::elementFromRenderer(RenderObject* renderer)
+SVGTextPositioningElement* SVGTextPositioningElement::elementFromRenderer(RenderBoxModelObject& renderer)
 {
-    if (!renderer)
-        return 0;
+    if (!is<RenderSVGText>(renderer) && !is<RenderSVGInline>(renderer))
+        return nullptr;
 
-    if (!renderer->isSVGText() && !renderer->isSVGInline())
-        return 0;
+    ASSERT(renderer.element());
+    SVGElement& element = downcast<SVGElement>(*renderer.element());
 
-    Node* node = renderer->node();
-    ASSERT(node);
-    ASSERT(node->isSVGElement());
-
-    if (!node->hasTagName(SVGNames::textTag)
-        && !node->hasTagName(SVGNames::tspanTag)
+    if (!is<SVGTextElement>(element)
+        && !is<SVGTSpanElement>(element)
 #if ENABLE(SVG_FONTS)
-        && !node->hasTagName(SVGNames::altGlyphTag)
+        && !is<SVGAltGlyphElement>(element)
 #endif
-        && !node->hasTagName(SVGNames::trefTag))
-        return 0;
+        && !is<SVGTRefElement>(element))
+        return nullptr;
 
-    return static_cast<SVGTextPositioningElement*>(node);
+    // FIXME: This should use downcast<>().
+    return &static_cast<SVGTextPositioningElement&>(element);
 }
 
 }
-
-#endif // ENABLE(SVG)

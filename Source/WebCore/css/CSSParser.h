@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2003 Lars Knoll (knoll@kde.org)
- * Copyright (C) 2004, 2005, 2006, 2008, 2009, 2010 Apple Inc. All rights reserved.
+ * Copyright (C) 2004-2010, 2015 Apple Inc. All rights reserved.
  * Copyright (C) 2008 Eric Seidel <eric@webkit.org>
  * Copyright (C) 2009 - 2010  Torch Mobile (Beijing) Co. Ltd. All rights reserved.
  *
@@ -33,14 +33,17 @@
 #include "CSSValueKeywords.h"
 #include "Color.h"
 #include "MediaQuery.h"
+#include "SourceSizeList.h"
+#include "WebKitCSSFilterValue.h"
+#include <memory>
 #include <wtf/HashMap.h>
 #include <wtf/HashSet.h>
-#include <wtf/OwnArrayPtr.h>
 #include <wtf/Vector.h>
 #include <wtf/text/AtomicString.h>
+#include <wtf/text/TextPosition.h>
 
-#if ENABLE(CSS_FILTERS)
-#include "WebKitCSSFilterValue.h"
+#if ENABLE(CSS_GRID_LAYOUT)
+#include "GridCoordinate.h"
 #endif
 
 namespace WebCore {
@@ -52,12 +55,15 @@ class CSSSelectorList;
 class CSSValue;
 class CSSValueList;
 class CSSBasicShape;
+class CSSBasicShapeInset;
+class CSSGridLineNamesValue;
+class CSSVariableDependentValue;
 class Document;
 class Element;
-class ImmutableStylePropertySet;
+class ImmutableStyleProperties;
 class MediaQueryExp;
 class MediaQuerySet;
-class MutableStylePropertySet;
+class MutableStyleProperties;
 class StyleKeyframe;
 class StylePropertyShorthand;
 class StyleRuleBase;
@@ -65,13 +71,6 @@ class StyleRuleKeyframes;
 class StyleKeyframe;
 class StyleSheetContents;
 class StyledElement;
-
-#if ENABLE(CSS_SHADERS)
-class WebKitCSSArrayFunctionValue;
-class WebKitCSSMatFunctionValue;
-class WebKitCSSMixFunctionValue;
-class WebKitCSSShaderValue;
-#endif
 
 class CSSParser {
     friend inline int cssyylex(void*, CSSParser*);
@@ -83,24 +82,55 @@ public:
         GeneralSyntaxError
     };
 
-    CSSParser(const CSSParserContext&);
+    enum class ParseResult {
+        Changed,
+        Unchanged,
+        Error
+    };
 
-    ~CSSParser();
+    using ParsedPropertyVector = Vector<CSSProperty, 256>;
 
-    void parseSheet(StyleSheetContents*, const String&, int startLineNumber = 0, RuleSourceDataList* = 0, bool = false);
-    PassRefPtr<StyleRuleBase> parseRule(StyleSheetContents*, const String&);
-    PassRefPtr<StyleKeyframe> parseKeyframeRule(StyleSheetContents*, const String&);
-#if ENABLE(CSS3_CONDITIONAL_RULES)
+    class ValueWithCalculation {
+    public:
+        explicit ValueWithCalculation(CSSParserValue& value)
+            : m_value(value)
+        { }
+
+        CSSParserValue& value() const { return m_value; }
+        operator CSSParserValue&() { return m_value; }
+
+        RefPtr<CSSCalcValue> calculation() const { return m_calculation; }
+        void setCalculation(RefPtr<CSSCalcValue>&& calculation)
+        {
+            ASSERT(isCalculation(m_value));
+            m_calculation = calculation;
+        }
+
+    private:
+        CSSParserValue& m_value;
+        RefPtr<CSSCalcValue> m_calculation;
+    };
+
+    WEBCORE_EXPORT CSSParser(const CSSParserContext&);
+    WEBCORE_EXPORT ~CSSParser();
+
+    void parseSheet(StyleSheetContents*, const String&, const TextPosition&, RuleSourceDataList*, bool logErrors);
+    RefPtr<StyleRuleBase> parseRule(StyleSheetContents*, const String&);
+    RefPtr<StyleKeyframe> parseKeyframeRule(StyleSheetContents*, const String&);
     bool parseSupportsCondition(const String&);
-#endif
-    static bool parseValue(MutableStylePropertySet*, CSSPropertyID, const String&, bool important, CSSParserMode, StyleSheetContents*);
+
+    static ParseResult parseValue(MutableStyleProperties*, CSSPropertyID, const String&, bool important, CSSParserMode, StyleSheetContents*);
+    static ParseResult parseCustomPropertyValue(MutableStyleProperties*, const AtomicString& propertyName, const String&, bool important, CSSParserMode, StyleSheetContents* contextStyleSheet);
+
     static bool parseColor(RGBA32& color, const String&, bool strict = false);
+    static bool isValidSystemColorValue(CSSValueID);
     static bool parseSystemColor(RGBA32& color, const String&, Document*);
-    static PassRefPtr<CSSValueList> parseFontFaceValue(const AtomicString&);
-    PassRefPtr<CSSPrimitiveValue> parseValidPrimitive(CSSValueID ident, CSSParserValue*);
-    bool parseDeclaration(MutableStylePropertySet*, const String&, PassRefPtr<CSSRuleSourceData>, StyleSheetContents* contextStyleSheet);
-    static PassRefPtr<ImmutableStylePropertySet> parseInlineStyleDeclaration(const String&, Element*);
-    PassOwnPtr<MediaQuery> parseMediaQuery(const String&);
+    static RefPtr<CSSValueList> parseFontFaceValue(const AtomicString&);
+    RefPtr<CSSPrimitiveValue> parseValidPrimitive(CSSValueID ident, ValueWithCalculation&);
+
+    WEBCORE_EXPORT bool parseDeclaration(MutableStyleProperties*, const String&, PassRefPtr<CSSRuleSourceData>, StyleSheetContents* contextStyleSheet);
+    static Ref<ImmutableStyleProperties> parseInlineStyleDeclaration(const String&, Element*);
+    std::unique_ptr<MediaQuery> parseMediaQuery(const String&);
 
     void addPropertyWithPrefixingVariant(CSSPropertyID, PassRefPtr<CSSValue>, bool important, bool implicit = false);
     void addProperty(CSSPropertyID, PassRefPtr<CSSValue>, bool important, bool implicit = false);
@@ -113,83 +143,121 @@ public:
     bool parse4Values(CSSPropertyID, const CSSPropertyID* properties, bool important);
     bool parseContent(CSSPropertyID, bool important);
     bool parseQuotes(CSSPropertyID, bool important);
+    bool parseAlt(CSSPropertyID, bool important);
+    
+    bool parseCustomPropertyDeclaration(bool important, CSSValueID);
+    
+    RefPtr<CSSValue> parseAttr(CSSParserValueList& args);
 
-#if ENABLE(CSS_VARIABLES)
-    static bool parseValue(MutableStylePropertySet*, CSSPropertyID, const String&, bool important, Document*);
-    bool cssVariablesEnabled() const;
-    void storeVariableDeclaration(const CSSParserString&, PassOwnPtr<CSSParserValueList>, bool important);
-#endif
+    RefPtr<CSSValue> parseBackgroundColor();
 
-    PassRefPtr<CSSValue> parseAttr(CSSParserValueList* args);
+    struct SourceSize {
+        std::unique_ptr<MediaQueryExp> expression;
+        RefPtr<CSSValue> length;
 
-    PassRefPtr<CSSValue> parseBackgroundColor();
+        SourceSize(SourceSize&&);
+        SourceSize(std::unique_ptr<MediaQueryExp>&&, RefPtr<CSSValue>);
+    };
+    Vector<SourceSize> parseSizesAttribute(StringView);
+    SourceSize sourceSize(std::unique_ptr<MediaQueryExp>&&, CSSParserValue&);
 
-    bool parseFillImage(CSSParserValueList*, RefPtr<CSSValue>&);
+    bool parseFillImage(CSSParserValueList&, RefPtr<CSSValue>&);
 
     enum FillPositionFlag { InvalidFillPosition = 0, AmbiguousFillPosition = 1, XFillPosition = 2, YFillPosition = 4 };
     enum FillPositionParsingMode { ResolveValuesAsPercent = 0, ResolveValuesAsKeyword = 1 };
-    PassRefPtr<CSSPrimitiveValue> parseFillPositionComponent(CSSParserValueList*, unsigned& cumulativeFlags, FillPositionFlag& individualFlag, FillPositionParsingMode = ResolveValuesAsPercent);
-    PassRefPtr<CSSValue> parseFillPositionX(CSSParserValueList*);
-    PassRefPtr<CSSValue> parseFillPositionY(CSSParserValueList*);
-    void parse2ValuesFillPosition(CSSParserValueList*, RefPtr<CSSValue>&, RefPtr<CSSValue>&);
-    bool isPotentialPositionValue(CSSParserValue*);
-    void parseFillPosition(CSSParserValueList*, RefPtr<CSSValue>&, RefPtr<CSSValue>&);
-    void parse3ValuesFillPosition(CSSParserValueList*, RefPtr<CSSValue>&, RefPtr<CSSValue>&, PassRefPtr<CSSPrimitiveValue>, PassRefPtr<CSSPrimitiveValue>);
-    void parse4ValuesFillPosition(CSSParserValueList*, RefPtr<CSSValue>&, RefPtr<CSSValue>&, PassRefPtr<CSSPrimitiveValue>, PassRefPtr<CSSPrimitiveValue>);
+    RefPtr<CSSPrimitiveValue> parseFillPositionComponent(CSSParserValueList&, unsigned& cumulativeFlags, FillPositionFlag& individualFlag, FillPositionParsingMode = ResolveValuesAsPercent);
+    RefPtr<CSSPrimitiveValue> parsePositionX(CSSParserValueList&);
+    RefPtr<CSSPrimitiveValue> parsePositionY(CSSParserValueList&);
+    void parse2ValuesFillPosition(CSSParserValueList&, RefPtr<CSSPrimitiveValue>&, RefPtr<CSSPrimitiveValue>&);
+    bool isPotentialPositionValue(CSSParserValue&);
+    void parseFillPosition(CSSParserValueList&, RefPtr<CSSPrimitiveValue>&, RefPtr<CSSPrimitiveValue>&);
+    void parse3ValuesFillPosition(CSSParserValueList&, RefPtr<CSSPrimitiveValue>&, RefPtr<CSSPrimitiveValue>&, RefPtr<CSSPrimitiveValue>&&, RefPtr<CSSPrimitiveValue>&&);
+    void parse4ValuesFillPosition(CSSParserValueList&, RefPtr<CSSPrimitiveValue>&, RefPtr<CSSPrimitiveValue>&, RefPtr<CSSPrimitiveValue>&&, RefPtr<CSSPrimitiveValue>&&);
 
     void parseFillRepeat(RefPtr<CSSValue>&, RefPtr<CSSValue>&);
-    PassRefPtr<CSSValue> parseFillSize(CSSPropertyID, bool &allowComma);
+    RefPtr<CSSValue> parseFillSize(CSSPropertyID, bool &allowComma);
 
     bool parseFillProperty(CSSPropertyID propId, CSSPropertyID& propId1, CSSPropertyID& propId2, RefPtr<CSSValue>&, RefPtr<CSSValue>&);
     bool parseFillShorthand(CSSPropertyID, const CSSPropertyID* properties, int numProperties, bool important);
 
-    void addFillValue(RefPtr<CSSValue>& lval, PassRefPtr<CSSValue> rval);
+    void addFillValue(RefPtr<CSSValue>& lval, Ref<CSSValue>&& rval);
+    void addAnimationValue(RefPtr<CSSValue>& lval, Ref<CSSValue>&& rval);
 
-    void addAnimationValue(RefPtr<CSSValue>& lval, PassRefPtr<CSSValue> rval);
+    RefPtr<CSSValue> parseAnimationDelay();
+    RefPtr<CSSValue> parseAnimationDirection();
+    RefPtr<CSSValue> parseAnimationDuration();
+    RefPtr<CSSValue> parseAnimationFillMode();
+    RefPtr<CSSValue> parseAnimationIterationCount();
+    RefPtr<CSSValue> parseAnimationName();
+    RefPtr<CSSValue> parseAnimationPlayState();
+    RefPtr<CSSValue> parseAnimationProperty(AnimationParseContext&);
+    RefPtr<CSSValue> parseAnimationTimingFunction();
+#if ENABLE(CSS_ANIMATIONS_LEVEL_2)
+    RefPtr<CSSValue> parseAnimationTrigger();
+#endif
+    static Vector<double> parseKeyframeSelector(const String&);
 
-    PassRefPtr<CSSValue> parseAnimationDelay();
-    PassRefPtr<CSSValue> parseAnimationDirection();
-    PassRefPtr<CSSValue> parseAnimationDuration();
-    PassRefPtr<CSSValue> parseAnimationFillMode();
-    PassRefPtr<CSSValue> parseAnimationIterationCount();
-    PassRefPtr<CSSValue> parseAnimationName();
-    PassRefPtr<CSSValue> parseAnimationPlayState();
-    PassRefPtr<CSSValue> parseAnimationProperty(AnimationParseContext&);
-    PassRefPtr<CSSValue> parseAnimationTimingFunction();
-
-    bool parseTransformOriginShorthand(RefPtr<CSSValue>&, RefPtr<CSSValue>&, RefPtr<CSSValue>&);
-    bool parseCubicBezierTimingFunctionValue(CSSParserValueList*& args, double& result);
+    bool parseTransformOriginShorthand(RefPtr<CSSPrimitiveValue>&, RefPtr<CSSPrimitiveValue>&, RefPtr<CSSValue>&);
+    bool parseCubicBezierTimingFunctionValue(CSSParserValueList& args, double& result);
     bool parseAnimationProperty(CSSPropertyID, RefPtr<CSSValue>&, AnimationParseContext&);
     bool parseTransitionShorthand(CSSPropertyID, bool important);
-    bool parseAnimationShorthand(bool important);
+    bool parseAnimationShorthand(CSSPropertyID, bool important);
 
-    bool cssGridLayoutEnabled() const;
+    RefPtr<CSSValue> parseColumnWidth();
+    RefPtr<CSSValue> parseColumnCount();
+    bool parseColumnsShorthand(bool important);
+
+#if ENABLE(CSS_GRID_LAYOUT)
+    RefPtr<CSSValue> parseGridPosition();
     bool parseGridItemPositionShorthand(CSSPropertyID, bool important);
-    bool parseGridTrackList(CSSPropertyID, bool important);
-    PassRefPtr<CSSPrimitiveValue> parseGridTrackSize();
-    PassRefPtr<CSSPrimitiveValue> parseGridBreadth(CSSParserValue*);
+    bool parseGridTemplateRowsAndAreas(PassRefPtr<CSSValue>, bool important);
+    bool parseGridTemplateShorthand(bool important);
+    bool parseGridShorthand(bool important);
+    bool parseGridAreaShorthand(bool important);
+    bool parseGridGapShorthand(bool important);
+    bool parseSingleGridAreaLonghand(RefPtr<CSSValue>&);
+    RefPtr<CSSValue> parseGridTrackList();
+    bool parseGridTrackRepeatFunction(CSSValueList&);
+    RefPtr<CSSValue> parseGridTrackSize(CSSParserValueList& inputList);
+    RefPtr<CSSPrimitiveValue> parseGridBreadth(CSSParserValue&);
+    bool parseGridTemplateAreasRow(NamedGridAreaMap&, const unsigned, unsigned&);
+    RefPtr<CSSValue> parseGridTemplateAreas();
+    bool parseGridLineNames(CSSParserValueList&, CSSValueList&, CSSGridLineNamesValue* = nullptr);
+    RefPtr<CSSValue> parseGridAutoFlow(CSSParserValueList&);
+#endif
 
     bool parseDashboardRegions(CSSPropertyID, bool important);
 
     bool parseClipShape(CSSPropertyID, bool important);
 
-    bool parseBasicShape(CSSPropertyID, bool important);
-    PassRefPtr<CSSBasicShape> parseBasicShapeRectangle(CSSParserValueList* args);
-    PassRefPtr<CSSBasicShape> parseBasicShapeCircle(CSSParserValueList* args);
-    PassRefPtr<CSSBasicShape> parseBasicShapeEllipse(CSSParserValueList* args);
-    PassRefPtr<CSSBasicShape> parseBasicShapePolygon(CSSParserValueList* args);
-    PassRefPtr<CSSBasicShape> parseBasicShapeInsetRectangle(CSSParserValueList* args);
+    bool parseLegacyPosition(CSSPropertyID, bool important);
+    bool parseItemPositionOverflowPosition(CSSPropertyID, bool important);
+    RefPtr<CSSValue> parseContentDistributionOverflowPosition();
+
+#if ENABLE(CSS_SHAPES)
+    RefPtr<CSSValue> parseShapeProperty(CSSPropertyID);
+#endif
+
+    RefPtr<CSSValue> parseBasicShapeAndOrBox(CSSPropertyID propId);
+    RefPtr<CSSPrimitiveValue> parseBasicShape();
+    RefPtr<CSSPrimitiveValue> parseShapeRadius(CSSParserValue&);
+    RefPtr<CSSBasicShape> parseBasicShapeCircle(CSSParserValueList&);
+    RefPtr<CSSBasicShape> parseBasicShapeEllipse(CSSParserValueList&);
+    RefPtr<CSSBasicShape> parseBasicShapePolygon(CSSParserValueList&);
+    RefPtr<CSSBasicShape> parseBasicShapePath(CSSParserValueList&);
+    RefPtr<CSSBasicShape> parseBasicShapeInset(CSSParserValueList&);
 
     bool parseFont(bool important);
-    PassRefPtr<CSSValueList> parseFontFamily();
+    void parseSystemFont(bool important);
+    RefPtr<CSSValueList> parseFontFamily();
 
     bool parseCounter(CSSPropertyID, int defaultValue, bool important);
-    PassRefPtr<CSSValue> parseCounterContent(CSSParserValueList* args, bool counters);
+    RefPtr<CSSValue> parseCounterContent(CSSParserValueList& args, bool counters);
 
-    bool parseColorParameters(CSSParserValue*, int* colorValues, bool parseAlpha);
-    bool parseHSLParameters(CSSParserValue*, double* colorValues, bool parseAlpha);
-    PassRefPtr<CSSPrimitiveValue> parseColor(CSSParserValue* = 0);
-    bool parseColorFromValue(CSSParserValue*, RGBA32&);
+    bool parseColorParameters(CSSParserValue&, int* colorValues, bool parseAlpha);
+    bool parseHSLParameters(CSSParserValue&, double* colorValues, bool parseAlpha);
+    RefPtr<CSSPrimitiveValue> parseColor(CSSParserValue* = nullptr);
+    bool parseColorFromValue(CSSParserValue&, RGBA32&);
     void parseSelector(const String&, CSSSelectorList&);
 
     template<typename StringType>
@@ -197,20 +265,19 @@ public:
 
     bool parseLineHeight(bool important);
     bool parseFontSize(bool important);
-    bool parseFontVariant(bool important);
     bool parseFontWeight(bool important);
+    bool parseFontSynthesis(bool important);
     bool parseFontFaceSrc();
     bool parseFontFaceUnicodeRange();
 
-#if ENABLE(SVG)
     bool parseSVGValue(CSSPropertyID propId, bool important);
-    PassRefPtr<CSSValue> parseSVGPaint();
-    PassRefPtr<CSSValue> parseSVGColor();
-    PassRefPtr<CSSValue> parseSVGStrokeDasharray();
-#endif
+    RefPtr<CSSValue> parseSVGPaint();
+    RefPtr<CSSValue> parseSVGColor();
+    RefPtr<CSSValue> parseSVGStrokeDasharray();
+    RefPtr<CSSValue> parsePaintOrder();
 
     // CSS3 Parsing Routines (for properties specific to CSS3)
-    PassRefPtr<CSSValueList> parseShadow(CSSParserValueList*, CSSPropertyID);
+    RefPtr<CSSValueList> parseShadow(CSSParserValueList&, CSSPropertyID);
     bool parseBorderImage(CSSPropertyID, RefPtr<CSSValue>&, bool important = false);
     bool parseBorderImageRepeat(RefPtr<CSSValue>&);
     bool parseBorderImageSlice(CSSPropertyID, RefPtr<CSSBorderImageSliceValue>&);
@@ -222,172 +289,127 @@ public:
 
     bool parseReflect(CSSPropertyID, bool important);
 
-    bool parseFlex(CSSParserValueList* args, bool important);
+    bool parseFlex(CSSParserValueList& args, bool important);
 
     // Image generators
-    bool parseCanvas(CSSParserValueList*, RefPtr<CSSValue>&);
+    bool parseCanvas(CSSParserValueList&, RefPtr<CSSValue>&);
+    bool parseNamedImage(CSSParserValueList&, RefPtr<CSSValue>&);
 
-    bool parseDeprecatedGradient(CSSParserValueList*, RefPtr<CSSValue>&);
-    bool parseDeprecatedLinearGradient(CSSParserValueList*, RefPtr<CSSValue>&, CSSGradientRepeat repeating);
-    bool parseDeprecatedRadialGradient(CSSParserValueList*, RefPtr<CSSValue>&, CSSGradientRepeat repeating);
-    bool parseLinearGradient(CSSParserValueList*, RefPtr<CSSValue>&, CSSGradientRepeat repeating);
-    bool parseRadialGradient(CSSParserValueList*, RefPtr<CSSValue>&, CSSGradientRepeat repeating);
-    bool parseGradientColorStops(CSSParserValueList*, CSSGradientValue*, bool expectComma);
+    bool parseDeprecatedGradient(CSSParserValueList&, RefPtr<CSSValue>&);
+    bool parseDeprecatedLinearGradient(CSSParserValueList&, RefPtr<CSSValue>&, CSSGradientRepeat repeating);
+    bool parseDeprecatedRadialGradient(CSSParserValueList&, RefPtr<CSSValue>&, CSSGradientRepeat repeating);
+    bool parseLinearGradient(CSSParserValueList&, RefPtr<CSSValue>&, CSSGradientRepeat repeating);
+    bool parseRadialGradient(CSSParserValueList&, RefPtr<CSSValue>&, CSSGradientRepeat repeating);
+    bool parseGradientColorStops(CSSParserValueList&, CSSGradientValue&, bool expectComma);
 
-    bool parseCrossfade(CSSParserValueList*, RefPtr<CSSValue>&);
+    bool parseCrossfade(CSSParserValueList&, RefPtr<CSSValue>&);
 
 #if ENABLE(CSS_IMAGE_RESOLUTION)
-    PassRefPtr<CSSValue> parseImageResolution();
+    RefPtr<CSSValue> parseImageResolution();
 #endif
 
 #if ENABLE(CSS_IMAGE_SET)
-    PassRefPtr<CSSValue> parseImageSet();
+    RefPtr<CSSValue> parseImageSet();
 #endif
 
-#if ENABLE(CSS_FILTERS)
-    PassRefPtr<CSSValueList> parseFilter();
-    PassRefPtr<WebKitCSSFilterValue> parseBuiltinFilterArguments(CSSParserValueList*, WebKitCSSFilterValue::FilterOperationType);
-#if ENABLE(CSS_SHADERS)
-    PassRefPtr<WebKitCSSMatFunctionValue> parseMatValue(CSSParserValue*);
-    PassRefPtr<WebKitCSSMixFunctionValue> parseMixFunction(CSSParserValue*);
-    PassRefPtr<WebKitCSSArrayFunctionValue> parseCustomFilterArrayFunction(CSSParserValue*);
-    PassRefPtr<CSSValueList> parseCustomFilterTransform(CSSParserValueList*);
-    PassRefPtr<CSSValueList> parseCustomFilterParameters(CSSParserValueList*);
-    PassRefPtr<WebKitCSSFilterValue> parseCustomFilterFunctionWithAtRuleReferenceSyntax(CSSParserValue*);
-    PassRefPtr<WebKitCSSFilterValue> parseCustomFilterFunctionWithInlineSyntax(CSSParserValue*);
-    PassRefPtr<WebKitCSSFilterValue> parseCustomFilterFunction(CSSParserValue*);
-    bool parseFilterRuleSrc();
-    bool parseFilterRuleMix();
-    bool parseGeometry(CSSPropertyID, CSSParserValue*, bool);
-    bool parseGridDimensions(CSSParserValueList*, RefPtr<CSSValueList>&); 
-    bool parseFilterRuleParameters();
-    PassRefPtr<WebKitCSSShaderValue> parseFilterRuleSrcUriAndFormat(CSSParserValueList*);
-#endif
-#endif
+    bool parseFilterImage(CSSParserValueList&, RefPtr<CSSValue>&);
+
+    bool parseFilter(CSSParserValueList&, RefPtr<CSSValue>&);
+    RefPtr<WebKitCSSFilterValue> parseBuiltinFilterArguments(CSSParserValueList&, WebKitCSSFilterValue::FilterOperationType);
+
+    RefPtr<CSSValue> parseClipPath();
 
     static bool isBlendMode(CSSValueID);
     static bool isCompositeOperator(CSSValueID);
 
-    PassRefPtr<CSSValueList> parseTransform();
-    PassRefPtr<CSSValue> parseTransformValue(CSSParserValue*);
-    bool parseTransformOrigin(CSSPropertyID propId, CSSPropertyID& propId1, CSSPropertyID& propId2, CSSPropertyID& propId3, RefPtr<CSSValue>&, RefPtr<CSSValue>&, RefPtr<CSSValue>&);
-    bool parsePerspectiveOrigin(CSSPropertyID propId, CSSPropertyID& propId1, CSSPropertyID& propId2,  RefPtr<CSSValue>&, RefPtr<CSSValue>&);
+    RefPtr<CSSValueList> parseTransform();
+    RefPtr<CSSValue> parseTransformValue(CSSParserValue&);
+    bool parseTransformOrigin(CSSPropertyID propId, CSSPropertyID& propId1, CSSPropertyID& propId2, CSSPropertyID& propId3, RefPtr<CSSPrimitiveValue>&, RefPtr<CSSPrimitiveValue>&, RefPtr<CSSValue>&);
+    bool parsePerspectiveOrigin(CSSPropertyID propId, CSSPropertyID& propId1, CSSPropertyID& propId2,  RefPtr<CSSPrimitiveValue>&, RefPtr<CSSPrimitiveValue>&);
 
     bool parseTextEmphasisStyle(bool important);
+    bool parseTextEmphasisPosition(bool important);
 
     void addTextDecorationProperty(CSSPropertyID, PassRefPtr<CSSValue>, bool important);
     bool parseTextDecoration(CSSPropertyID propId, bool important);
-#if ENABLE(CSS3_TEXT)
+    bool parseTextDecorationSkip(bool important);
     bool parseTextUnderlinePosition(bool important);
-#endif // CSS3_TEXT
 
-    PassRefPtr<CSSValue> parseTextIndent();
+    RefPtr<CSSValue> parseTextIndent();
     
-    bool parseLineBoxContain(bool important);
-    bool parseCalculation(CSSParserValue*, CalculationPermittedValueRange);
+    bool parseHangingPunctuation(bool important);
 
-    bool parseFontFeatureTag(CSSValueList*);
+    bool parseLineBoxContain(bool important);
+    RefPtr<CSSCalcValue> parseCalculation(CSSParserValue&, CalculationPermittedValueRange);
+
+    bool parseFontFeatureTag(CSSValueList&);
     bool parseFontFeatureSettings(bool important);
 
     bool cssRegionsEnabled() const;
     bool cssCompositingEnabled() const;
-    bool parseFlowThread(const String& flowName);
     bool parseFlowThread(CSSPropertyID, bool important);
     bool parseRegionThread(CSSPropertyID, bool important);
 
-    bool parseFontVariantLigatures(bool important);
+    bool parseFontVariantLigatures(bool important, bool unknownIsFailure, bool implicit);
+    bool parseFontVariantNumeric(bool important, bool unknownIsFailure, bool implicit);
+    bool parseFontVariantEastAsian(bool important, bool unknownIsFailure, bool implicit);
+    bool parseFontVariant(bool important);
 
-    CSSParserSelector* createFloatingSelector();
-    CSSParserSelector* createFloatingSelectorWithTagName(const QualifiedName&);
-    PassOwnPtr<CSSParserSelector> sinkFloatingSelector(CSSParserSelector*);
+    bool parseWillChange(bool important);
 
-    Vector<OwnPtr<CSSParserSelector> >* createFloatingSelectorVector();
-    PassOwnPtr<Vector<OwnPtr<CSSParserSelector> > > sinkFloatingSelectorVector(Vector<OwnPtr<CSSParserSelector> >*);
+    // Faster than doing a new/delete each time since it keeps one vector.
+    std::unique_ptr<Vector<std::unique_ptr<CSSParserSelector>>> createSelectorVector();
+    void recycleSelectorVector(std::unique_ptr<Vector<std::unique_ptr<CSSParserSelector>>>);
 
-    CSSParserValueList* createFloatingValueList();
-    PassOwnPtr<CSSParserValueList> sinkFloatingValueList(CSSParserValueList*);
+    RefPtr<StyleRuleBase> createImportRule(const CSSParserString&, PassRefPtr<MediaQuerySet>);
+    RefPtr<StyleKeyframe> createKeyframe(CSSParserValueList&);
+    RefPtr<StyleRuleKeyframes> createKeyframesRule(const String&, std::unique_ptr<Vector<RefPtr<StyleKeyframe>>>);
 
-    CSSParserFunction* createFloatingFunction();
-    PassOwnPtr<CSSParserFunction> sinkFloatingFunction(CSSParserFunction*);
-
-    CSSParserValue& sinkFloatingValue(CSSParserValue&);
-
-    MediaQuerySet* createMediaQuerySet();
-    StyleRuleBase* createImportRule(const CSSParserString&, MediaQuerySet*);
-    StyleKeyframe* createKeyframe(CSSParserValueList*);
-    StyleRuleKeyframes* createKeyframesRule(const String&, PassOwnPtr<Vector<RefPtr<StyleKeyframe> > >);
-
-    typedef Vector<RefPtr<StyleRuleBase> > RuleList;
-    StyleRuleBase* createMediaRule(MediaQuerySet*, RuleList*);
-    StyleRuleBase* createEmptyMediaRule(RuleList*);
-    RuleList* createRuleList();
-    StyleRuleBase* createStyleRule(Vector<OwnPtr<CSSParserSelector> >* selectors);
-    StyleRuleBase* createFontFaceRule();
-    StyleRuleBase* createPageRule(PassOwnPtr<CSSParserSelector> pageSelector);
-    StyleRuleBase* createRegionRule(Vector<OwnPtr<CSSParserSelector> >* regionSelector, RuleList* rules);
-    StyleRuleBase* createMarginAtRule(CSSSelector::MarginBoxType);
-#if ENABLE(CSS3_CONDITIONAL_RULES)
-    StyleRuleBase* createSupportsRule(bool conditionIsSupported, RuleList*);
+    typedef Vector<RefPtr<StyleRuleBase>> RuleList;
+    RefPtr<StyleRuleBase> createMediaRule(PassRefPtr<MediaQuerySet>, RuleList*);
+    RefPtr<StyleRuleBase> createEmptyMediaRule(RuleList*);
+    RefPtr<StyleRuleBase> createStyleRule(Vector<std::unique_ptr<CSSParserSelector>>* selectors);
+    RefPtr<StyleRuleBase> createFontFaceRule();
+    RefPtr<StyleRuleBase> createPageRule(std::unique_ptr<CSSParserSelector> pageSelector);
+    RefPtr<StyleRuleBase> createRegionRule(Vector<std::unique_ptr<CSSParserSelector>>* regionSelector, RuleList* rules);
+    void createMarginAtRule(CSSSelector::MarginBoxType);
+    RefPtr<StyleRuleBase> createSupportsRule(bool conditionIsSupported, RuleList*);
     void markSupportsRuleHeaderStart();
     void markSupportsRuleHeaderEnd();
-    PassRefPtr<CSSRuleSourceData> popSupportsRuleData();
-#endif
-#if ENABLE(SHADOW_DOM)
-    StyleRuleBase* createHostRule(RuleList* rules);
-#endif
-#if ENABLE(CSS_SHADERS)
-    StyleRuleBase* createFilterRule(const CSSParserString&);
-#endif
+    RefPtr<CSSRuleSourceData> popSupportsRuleData();
 
     void startDeclarationsForMarginBox();
     void endDeclarationsForMarginBox();
 
-    MediaQueryExp* createFloatingMediaQueryExp(const AtomicString&, CSSParserValueList*);
-    PassOwnPtr<MediaQueryExp> sinkFloatingMediaQueryExp(MediaQueryExp*);
-    Vector<OwnPtr<MediaQueryExp> >* createFloatingMediaQueryExpList();
-    PassOwnPtr<Vector<OwnPtr<MediaQueryExp> > > sinkFloatingMediaQueryExpList(Vector<OwnPtr<MediaQueryExp> >*);
-    MediaQuery* createFloatingMediaQuery(MediaQuery::Restrictor, const String&, PassOwnPtr<Vector<OwnPtr<MediaQueryExp> > >);
-    MediaQuery* createFloatingMediaQuery(PassOwnPtr<Vector<OwnPtr<MediaQueryExp> > >);
-    PassOwnPtr<MediaQuery> sinkFloatingMediaQuery(MediaQuery*);
-
-    Vector<RefPtr<StyleKeyframe> >* createFloatingKeyframeVector();
-    PassOwnPtr<Vector<RefPtr<StyleKeyframe> > > sinkFloatingKeyframeVector(Vector<RefPtr<StyleKeyframe> >*);
-
     void addNamespace(const AtomicString& prefix, const AtomicString& uri);
     QualifiedName determineNameInNamespace(const AtomicString& prefix, const AtomicString& localName);
 
-    CSSParserSelector* rewriteSpecifiersWithElementName(const AtomicString& namespacePrefix, const AtomicString& elementName, CSSParserSelector*, bool isNamespacePlaceholder = false);
-    CSSParserSelector* rewriteSpecifiersWithNamespaceIfNeeded(CSSParserSelector*);
-    CSSParserSelector* rewriteSpecifiers(CSSParserSelector*, CSSParserSelector*);
+    void rewriteSpecifiersWithElementName(const AtomicString& namespacePrefix, const AtomicString& elementName, CSSParserSelector&, bool isNamespacePlaceholder = false);
+    void rewriteSpecifiersWithNamespaceIfNeeded(CSSParserSelector&);
+    std::unique_ptr<CSSParserSelector> rewriteSpecifiers(std::unique_ptr<CSSParserSelector>, std::unique_ptr<CSSParserSelector>);
 
     void invalidBlockHit();
-
-    Vector<OwnPtr<CSSParserSelector> >* reusableSelectorVector() { return &m_reusableSelectorVector; }
-
-    void setReusableRegionSelectorVector(Vector<OwnPtr<CSSParserSelector> >* selectors);
-    Vector<OwnPtr<CSSParserSelector> >* reusableRegionSelectorVector() { return &m_reusableRegionSelectorVector; }
 
     void updateLastSelectorLineAndPosition();
     void updateLastMediaLine(MediaQuerySet*);
 
     void clearProperties();
 
-    PassRefPtr<ImmutableStylePropertySet> createStylePropertySet();
+    Ref<ImmutableStyleProperties> createStyleProperties();
 
     CSSParserContext m_context;
 
     bool m_important;
     CSSPropertyID m_id;
+    AtomicString m_customPropertyName;
     StyleSheetContents* m_styleSheet;
     RefPtr<StyleRuleBase> m_rule;
     RefPtr<StyleKeyframe> m_keyframe;
-    OwnPtr<MediaQuery> m_mediaQuery;
-    OwnPtr<CSSParserValueList> m_valueList;
-#if ENABLE(CSS3_CONDITIONAL_RULES)
+    std::unique_ptr<MediaQuery> m_mediaQuery;
+    std::unique_ptr<Vector<SourceSize>> m_sourceSizeList;
+    std::unique_ptr<CSSParserValueList> m_valueList;
     bool m_supportsCondition;
-#endif
 
-    typedef Vector<CSSProperty, 256> ParsedPropertyVector;
     ParsedPropertyVector m_parsedProperties;
     CSSSelectorList* m_selectorListForParseSelector;
 
@@ -397,30 +419,30 @@ public:
     CSSPropertyID m_currentShorthand;
     bool m_implicitShorthand;
 
-    bool m_hasFontFaceOnlyValues;
     bool m_hadSyntacticallyValidCSSRule;
     bool m_logErrors;
     bool m_ignoreErrorsInDeclaration;
-
-#if ENABLE(CSS_SHADERS)
-    bool m_inFilterRule;
-#endif
 
     AtomicString m_defaultNamespace;
 
     // tokenizer methods and data
     size_t m_parsedTextPrefixLength;
+    unsigned m_nestedSelectorLevel;
     SourceRange m_selectorRange;
     SourceRange m_propertyRange;
-    OwnPtr<RuleSourceDataList> m_currentRuleDataStack;
+    std::unique_ptr<RuleSourceDataList> m_currentRuleDataStack;
     RefPtr<CSSRuleSourceData> m_currentRuleData;
     RuleSourceDataList* m_ruleSourceDataResult;
 
     void fixUnparsedPropertyRanges(CSSRuleSourceData*);
     void markRuleHeaderStart(CSSRuleSourceData::Type);
     void markRuleHeaderEnd();
+
+    void startNestedSelectorList() { ++m_nestedSelectorLevel; }
+    void endNestedSelectorList() { --m_nestedSelectorLevel; }
     void markSelectorStart();
     void markSelectorEnd();
+
     void markRuleBodyStart();
     void markRuleBodyEnd();
     void markPropertyStart();
@@ -439,18 +461,20 @@ public:
 #if ENABLE(CSS_DEVICE_ADAPTATION)
     void markViewportRuleBodyStart() { m_inViewport = true; }
     void markViewportRuleBodyEnd() { m_inViewport = false; }
-    StyleRuleBase* createViewportRule();
+    PassRefPtr<StyleRuleBase> createViewportRule();
 #endif
 
-    PassRefPtr<CSSPrimitiveValue> createPrimitiveNumericValue(CSSParserValue*);
-    PassRefPtr<CSSPrimitiveValue> createPrimitiveStringValue(CSSParserValue*);
-#if ENABLE(CSS_VARIABLES)
-    PassRefPtr<CSSPrimitiveValue> createPrimitiveVariableNameValue(CSSParserValue*);
-#endif
+    Ref<CSSPrimitiveValue> createPrimitiveNumericValue(ValueWithCalculation&);
+    Ref<CSSPrimitiveValue> createPrimitiveStringValue(CSSParserValue&);
 
-    static KURL completeURL(const CSSParserContext&, const String& url);
+    static URL completeURL(const CSSParserContext&, const String& url);
 
     Location currentLocation();
+    static bool isCalculation(CSSParserValue&);
+
+    void setCustomPropertyName(const AtomicString& propertyName) { m_customPropertyName = propertyName; }
+
+    RefPtr<CSSValue> parseVariableDependentValue(CSSPropertyID, const CSSVariableDependentValue&, const CustomPropertyValueMap& customProperties);
 
 private:
     bool is8BitSource() { return m_is8BitSource; }
@@ -471,6 +495,8 @@ private:
 
     inline unsigned tokenStartOffset();
     inline UChar tokenStartChar();
+
+    inline unsigned currentCharacterOffset();
 
     template <typename CharacterType>
     inline bool isIdentifierStart();
@@ -515,10 +541,8 @@ private:
     inline void detectDashToken(int);
     template <typename CharacterType>
     inline void detectAtToken(int, bool);
-#if ENABLE(CSS3_CONDITIONAL_RULES)
     template <typename CharacterType>
     inline void detectSupportsToken(int);
-#endif
 
     template <typename CharacterType>
     inline void setRuleHeaderEnd(const CharacterType*);
@@ -528,28 +552,27 @@ private:
     inline bool inStrictMode() const { return m_context.mode == CSSStrictMode || m_context.mode == SVGAttributeMode; }
     inline bool inQuirksMode() const { return m_context.mode == CSSQuirksMode; }
     
-    KURL completeURL(const String& url) const;
+    URL completeURL(const String& url) const;
 
     void recheckAtKeyword(const UChar* str, int len);
 
     template<unsigned prefixLength, unsigned suffixLength>
-    inline void setupParser(const char (&prefix)[prefixLength], const String& string, const char (&suffix)[suffixLength])
+    void setupParser(const char (&prefix)[prefixLength], StringView string, const char (&suffix)[suffixLength])
     {
         setupParser(prefix, prefixLength - 1, string, suffix, suffixLength - 1);
     }
-    void setupParser(const char* prefix, unsigned prefixLength, const String&, const char* suffix, unsigned suffixLength);
+    void setupParser(const char* prefix, unsigned prefixLength, StringView, const char* suffix, unsigned suffixLength);
     bool inShorthand() const { return m_inParseShorthand; }
 
-    bool validWidth(CSSParserValue*);
-    bool validHeight(CSSParserValue*);
+    bool isValidSize(ValueWithCalculation&);
 
-    void deleteFontFaceOnlyValues();
+    bool isGeneratedImageValue(CSSParserValue&) const;
+    bool parseGeneratedImage(CSSParserValueList&, RefPtr<CSSValue>&);
 
-    bool isGeneratedImageValue(CSSParserValue*) const;
-    bool parseGeneratedImage(CSSParserValueList*, RefPtr<CSSValue>&);
+    ParseResult parseValue(MutableStyleProperties*, CSSPropertyID, const String&, bool important, StyleSheetContents* contextStyleSheet);
+    Ref<ImmutableStyleProperties> parseDeclaration(const String&, StyleSheetContents* contextStyleSheet);
 
-    bool parseValue(MutableStylePropertySet*, CSSPropertyID, const String&, bool important, StyleSheetContents* contextStyleSheet);
-    PassRefPtr<ImmutableStylePropertySet> parseDeclaration(const String&, StyleSheetContents* contextStyleSheet);
+    RefPtr<CSSBasicShape> parseInsetRoundedCorners(PassRefPtr<CSSBasicShapeInset>, CSSParserValueList&);
 
     enum SizeParameterType {
         None,
@@ -561,26 +584,35 @@ private:
 
     bool parsePage(CSSPropertyID propId, bool important);
     bool parseSize(CSSPropertyID propId, bool important);
-    SizeParameterType parseSizeParameter(CSSValueList* parsedValues, CSSParserValue* value, SizeParameterType prevParamType);
+    SizeParameterType parseSizeParameter(CSSValueList& parsedValues, CSSParserValue&, SizeParameterType prevParamType);
 
-    bool parseFontFaceSrcURI(CSSValueList*);
-    bool parseFontFaceSrcLocal(CSSValueList*);
+#if ENABLE(CSS_SCROLL_SNAP)
+    bool parseNonElementSnapPoints(CSSPropertyID propId, bool important);
+    bool parseScrollSnapDestination(CSSPropertyID propId, bool important);
+    bool parseScrollSnapCoordinate(CSSPropertyID propId, bool important);
+    bool parseScrollSnapPositions(RefPtr<CSSValue>& cssValueX, RefPtr<CSSValue>& cssValueY);
+#endif
+
+    bool parseFontFaceSrcURI(CSSValueList&);
+    bool parseFontFaceSrcLocal(CSSValueList&);
 
     bool parseColor(const String&);
+
+#if ENABLE(CSS_GRID_LAYOUT)
+    bool parseIntegerOrCustomIdentFromGridPosition(RefPtr<CSSPrimitiveValue>& numericValue, RefPtr<CSSPrimitiveValue>& gridLineName);
+#endif
 
     enum ParsingMode {
         NormalMode,
         MediaQueryMode,
-#if ENABLE(CSS3_CONDITIONAL_RULES)
         SupportsMode,
-#endif
         NthChildMode
     };
 
     ParsingMode m_parsingMode;
     bool m_is8BitSource;
-    OwnArrayPtr<LChar> m_dataStart8;
-    OwnArrayPtr<UChar> m_dataStart16;
+    std::unique_ptr<LChar[]> m_dataStart8;
+    std::unique_ptr<UChar[]> m_dataStart16;
     LChar* m_currentCharacter8;
     UChar* m_currentCharacter16;
     union {
@@ -591,7 +623,12 @@ private:
     int m_token;
     int m_lineNumber;
     int m_tokenStartLineNumber;
+    int m_tokenStartColumnNumber;
     int m_lastSelectorLineNumber;
+    int m_columnOffsetForLine;
+
+    int m_sheetStartLineNumber;
+    int m_sheetStartColumnNumber;
 
     bool m_allowImportRules;
     bool m_allowNamespaceDeclarations;
@@ -608,29 +645,9 @@ private:
 
     int (CSSParser::*m_lexFunc)(void*);
 
-    Vector<RefPtr<StyleRuleBase> > m_parsedRules;
-    Vector<RefPtr<StyleKeyframe> > m_parsedKeyframes;
-    Vector<RefPtr<MediaQuerySet> > m_parsedMediaQuerySets;
-    Vector<OwnPtr<RuleList> > m_parsedRuleLists;
-    HashSet<CSSParserSelector*> m_floatingSelectors;
-    HashSet<Vector<OwnPtr<CSSParserSelector> >*> m_floatingSelectorVectors;
-    HashSet<CSSParserValueList*> m_floatingValueLists;
-    HashSet<CSSParserFunction*> m_floatingFunctions;
+    std::unique_ptr<Vector<std::unique_ptr<CSSParserSelector>>> m_recycledSelectorVector;
 
-    OwnPtr<MediaQuery> m_floatingMediaQuery;
-    OwnPtr<MediaQueryExp> m_floatingMediaQueryExp;
-    OwnPtr<Vector<OwnPtr<MediaQueryExp> > > m_floatingMediaQueryExpList;
-
-    OwnPtr<Vector<RefPtr<StyleKeyframe> > > m_floatingKeyframeVector;
-
-    Vector<OwnPtr<CSSParserSelector> > m_reusableSelectorVector;
-    Vector<OwnPtr<CSSParserSelector> > m_reusableRegionSelectorVector;
-
-    RefPtr<CSSCalcValue> m_parsedCalculation;
-
-#if ENABLE(CSS3_CONDITIONAL_RULES)
-    OwnPtr<RuleSourceDataList> m_supportsRuleDataStack;
-#endif
+    std::unique_ptr<RuleSourceDataList> m_supportsRuleDataStack;
 
     // defines units allowed for a certain property, used in parseUnit
     enum Units {
@@ -661,24 +678,21 @@ private:
     };
 
     bool isLoggingErrors();
-    void logError(const String& message, int lineNumber);
+    void logError(const String& message, int lineNumber, int columnNumber);
 
-    bool validCalculationUnit(CSSParserValue*, Units, ReleaseParsedCalcValueCondition releaseCalc = DoNotReleaseParsedCalcValue);
+    bool validateCalculationUnit(ValueWithCalculation&, Units);
 
-    bool shouldAcceptUnitLessValues(CSSParserValue*, Units, CSSParserMode);
+    bool shouldAcceptUnitLessValues(CSSParserValue&, Units, CSSParserMode);
 
-    inline bool validUnit(CSSParserValue* value, Units unitflags, ReleaseParsedCalcValueCondition releaseCalc = DoNotReleaseParsedCalcValue) { return validUnit(value, unitflags, m_context.mode, releaseCalc); }
-    bool validUnit(CSSParserValue*, Units, CSSParserMode, ReleaseParsedCalcValueCondition releaseCalc = DoNotReleaseParsedCalcValue);
+    inline bool validateUnit(ValueWithCalculation& value, Units unitFlags) { return validateUnit(value, unitFlags, m_context.mode); }
+    bool validateUnit(ValueWithCalculation&, Units, CSSParserMode);
 
     bool parseBorderImageQuad(Units, RefPtr<CSSPrimitiveValue>&);
-    int colorIntFromValue(CSSParserValue*);
-    double parsedDouble(CSSParserValue*, ReleaseParsedCalcValueCondition releaseCalc = DoNotReleaseParsedCalcValue);
-    bool isCalculation(CSSParserValue*);
+    int colorIntFromValue(ValueWithCalculation&);
+    double parsedDouble(ValueWithCalculation&);
     
     friend class TransformOperationInfo;
-#if ENABLE(CSS_FILTERS)
     friend class FilterOperationInfo;
-#endif
 };
 
 CSSPropertyID cssPropertyID(const CSSParserString&);
@@ -708,6 +722,7 @@ private:
 
 struct CSSParser::Location {
     int lineNumber;
+    int columnNumber;
     CSSParserString token;
 };
 
@@ -736,11 +751,23 @@ inline unsigned CSSParser::tokenStartOffset()
     return m_tokenStart.ptr16 - m_dataStart16.get();
 }
 
+unsigned CSSParser::currentCharacterOffset()
+{
+    if (is8BitSource())
+        return m_currentCharacter8 - m_dataStart8.get();
+    return m_currentCharacter16 - m_dataStart16.get();
+}
+
 inline UChar CSSParser::tokenStartChar()
 {
     if (is8BitSource())
         return *m_tokenStart.ptr8;
     return *m_tokenStart.ptr16;
+}
+
+inline bool isCustomPropertyName(const String& propertyName)
+{
+    return propertyName.length() > 2 && propertyName.characterAt(0) == '-' && propertyName.characterAt(1) == '-';
 }
 
 inline int cssyylex(void* yylval, CSSParser* parser)

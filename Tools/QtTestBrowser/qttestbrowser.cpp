@@ -33,7 +33,6 @@
 
 #include "config.h"
 
-#include "DumpRenderTreeSupportQt.h"
 #include "launcherwindow.h"
 #include "urlloader.h"
 
@@ -53,7 +52,11 @@ int launcherMain(const QApplication& app)
 {
 #ifndef NDEBUG
     int retVal = app.exec();
-    DumpRenderTreeSupportQt::garbageCollectorCollect();
+
+#if HAVE(QTTESTSUPPORT)
+    WebKit::QtTestSupport::garbageCollectorCollect();
+#endif
+
     QWebSettings::clearMemoryCaches();
     return retVal;
 #else
@@ -133,9 +136,8 @@ void LauncherApplication::handleUserOptions()
              << "[-no-compositing]"
 #if defined(QT_CONFIGURED_WITH_OPENGL)
              << "[-gl-viewport]"
-#endif
-             << "[-opengl-viewport]"
              << "[-webgl]"
+#endif
              << QString("[-viewport-update-mode %1]").arg(formatKeys(updateModes)).toLatin1().data()
 #if !defined(QT_NO_NETWORKDISKCACHE) && !defined(QT_NO_DESKTOPSERVICES)
              << "[-disk-cache]"
@@ -167,6 +169,7 @@ void LauncherApplication::handleUserOptions()
         windowOptions.useGraphicsView = true;
 
     if (args.contains("-no-compositing")) {
+        requiresGraphicsView("-no-compositing");
         windowOptions.useCompositing = false;
     }
 
@@ -242,15 +245,11 @@ void LauncherApplication::handleUserOptions()
         windowOptions.useQGLWidgetViewport = true;
     }
 
-#endif
     if (args.contains("-webgl")) {
+        requiresGraphicsView("-webgl");
         windowOptions.useWebGL = true;
     }
-
-    if (args.contains("-opengl-viewport")) {
-        requiresGraphicsView("-opengl-viewport");
-        windowOptions.useQOpenGLWidgetViewport = true;
-    }
+#endif
 
 #if HAVE(QTTESTSUPPORT)
     if (args.contains("-use-test-fonts"))

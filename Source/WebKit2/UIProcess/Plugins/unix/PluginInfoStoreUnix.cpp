@@ -32,8 +32,12 @@
 #include "PluginInfoStore.h"
 
 #include "NetscapePluginModule.h"
-#include "PluginDatabase.h"
+#include "PluginSearchPath.h"
 #include <WebCore/FileSystem.h>
+
+#if PLATFORM(GTK)
+#include "PluginInfoCache.h"
+#endif
 
 using namespace WebCore;
 
@@ -41,41 +45,7 @@ namespace WebKit {
 
 Vector<String> PluginInfoStore::pluginsDirectories()
 {
-    Vector<String> result;
-
-    result.append(homeDirectoryPath() + "/.mozilla/plugins");
-    result.append(homeDirectoryPath() + "/.netscape/plugins");
-    result.append("/usr/lib/browser/plugins");
-    result.append("/usr/local/lib/mozilla/plugins");
-    result.append("/usr/lib/firefox/plugins");
-    result.append("/usr/lib64/browser-plugins");
-    result.append("/usr/lib/browser-plugins");
-    result.append("/usr/lib/mozilla/plugins");
-    result.append("/usr/local/netscape/plugins");
-    result.append("/opt/mozilla/plugins");
-    result.append("/opt/mozilla/lib/plugins");
-    result.append("/opt/netscape/plugins");
-    result.append("/opt/netscape/communicator/plugins");
-    result.append("/usr/lib/netscape/plugins");
-    result.append("/usr/lib/netscape/plugins-libc5");
-    result.append("/usr/lib/netscape/plugins-libc6");
-    result.append("/usr/lib64/netscape/plugins");
-    result.append("/usr/lib64/mozilla/plugins");
-    result.append("/usr/lib/nsbrowser/plugins");
-    result.append("/usr/lib64/nsbrowser/plugins");
-
-    String mozillaHome(getenv("MOZILLA_HOME"));
-    if (!mozillaHome.isEmpty())
-        result.append(mozillaHome + "/plugins");
-
-    String mozillaPaths(getenv("MOZ_PLUGIN_PATH"));
-    if (!mozillaPaths.isEmpty()) {
-        Vector<String> paths;
-        mozillaPaths.split(UChar(':'), /* allowEmptyEntries */ false, paths);
-        result.appendVector(paths);
-    }
-
-    return result;
+    return WebKit::pluginsDirectories();
 }
 
 Vector<String> PluginInfoStore::pluginPathsInDirectory(const String& directory)
@@ -98,7 +68,18 @@ Vector<String> PluginInfoStore::individualPluginPaths()
 
 bool PluginInfoStore::getPluginInfo(const String& pluginPath, PluginModuleInfo& plugin)
 {
+#if PLATFORM(GTK)
+    if (PluginInfoCache::singleton().getPluginInfo(pluginPath, plugin))
+        return true;
+
+    if (NetscapePluginModule::getPluginInfo(pluginPath, plugin)) {
+        PluginInfoCache::singleton().updatePluginInfo(pluginPath, plugin);
+        return true;
+    }
+    return false;
+#else
     return NetscapePluginModule::getPluginInfo(pluginPath, plugin);
+#endif
 }
 
 bool PluginInfoStore::shouldUsePlugin(Vector<PluginModuleInfo>& /*alreadyLoadedPlugins*/, const PluginModuleInfo& /*plugin*/)

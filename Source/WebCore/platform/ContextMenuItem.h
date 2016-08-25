@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006 Apple Computer, Inc.  All rights reserved.
+ * Copyright (C) 2006 Apple Inc.  All rights reserved.
  * Copyright (C) 2010 Igalia S.L
  *
  * Redistribution and use in source and binary forms, with or without
@@ -11,10 +11,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -27,235 +27,181 @@
 #ifndef ContextMenuItem_h
 #define ContextMenuItem_h
 
-#if ENABLE(CONTEXT_MENUS)
-
-#include "PlatformMenuDescription.h"
-#include <wtf/OwnPtr.h>
 #include <wtf/text/WTFString.h>
-
-#if PLATFORM(MAC)
-#include <wtf/RetainPtr.h>
-OBJC_CLASS NSMenuItem;
-#elif PLATFORM(GTK)
-typedef struct _GtkMenuItem GtkMenuItem;
-typedef struct _GtkAction GtkAction;
-#endif
-#endif // ENABLE(CONTEXT_MENUS)
 
 namespace WebCore {
 
-    class ContextMenu;
+class ContextMenu;
+class Image;
+class URL;
 
-    // This enum needs to be in sync with the WebMenuItemTag enum in WebUIDelegate.h and the
-    // extra values in WebUIDelegatePrivate.h
-    enum ContextMenuAction {
-        ContextMenuItemTagNoAction=0, // This item is not actually in WebUIDelegate.h
-        ContextMenuItemTagOpenLinkInNewWindow=1,
-        ContextMenuItemTagDownloadLinkToDisk,
-        ContextMenuItemTagCopyLinkToClipboard,
-        ContextMenuItemTagOpenImageInNewWindow,
-        ContextMenuItemTagDownloadImageToDisk,
-        ContextMenuItemTagCopyImageToClipboard,
-#if PLATFORM(QT) || PLATFORM(GTK) || PLATFORM(EFL)
-        ContextMenuItemTagCopyImageUrlToClipboard,
+enum ContextMenuAction {
+    ContextMenuItemTagNoAction,
+    ContextMenuItemTagOpenLinkInNewWindow,
+    ContextMenuItemTagDownloadLinkToDisk,
+    ContextMenuItemTagCopyLinkToClipboard,
+    ContextMenuItemTagOpenImageInNewWindow,
+    ContextMenuItemTagDownloadImageToDisk,
+    ContextMenuItemTagCopyImageToClipboard,
+#if PLATFORM(GTK) || PLATFORM(EFL) || PLATFORM(QT)
+    ContextMenuItemTagCopyImageUrlToClipboard,
 #endif
-        ContextMenuItemTagOpenFrameInNewWindow,
-        ContextMenuItemTagCopy,
-        ContextMenuItemTagGoBack,
-        ContextMenuItemTagGoForward,
-        ContextMenuItemTagStop,
-        ContextMenuItemTagReload,
-        ContextMenuItemTagCut,
-        ContextMenuItemTagPaste,
+    ContextMenuItemTagOpenFrameInNewWindow,
+    ContextMenuItemTagCopy,
+    ContextMenuItemTagGoBack,
+    ContextMenuItemTagGoForward,
+    ContextMenuItemTagStop,
+    ContextMenuItemTagReload,
+    ContextMenuItemTagCut,
+    ContextMenuItemTagPaste,
 #if PLATFORM(GTK)
-        ContextMenuItemTagDelete,
+    ContextMenuItemTagDelete,
 #endif
-#if PLATFORM(GTK) || PLATFORM(QT) || PLATFORM (EFL)
-        ContextMenuItemTagSelectAll,
+#if PLATFORM(GTK) || PLATFORM (EFL) || PLATFORM(QT)
+    ContextMenuItemTagSelectAll,
 #endif
 #if PLATFORM(GTK)
-        ContextMenuItemTagInputMethods,
-        ContextMenuItemTagUnicode,
-        ContextMenuItemTagUnicodeInsertLRMMark,
-        ContextMenuItemTagUnicodeInsertRLMMark,
-        ContextMenuItemTagUnicodeInsertLREMark,
-        ContextMenuItemTagUnicodeInsertRLEMark,
-        ContextMenuItemTagUnicodeInsertLROMark,
-        ContextMenuItemTagUnicodeInsertRLOMark,
-        ContextMenuItemTagUnicodeInsertPDFMark,
-        ContextMenuItemTagUnicodeInsertZWSMark,
-        ContextMenuItemTagUnicodeInsertZWJMark,
-        ContextMenuItemTagUnicodeInsertZWNJMark,
+    ContextMenuItemTagInputMethods,
+    ContextMenuItemTagUnicode,
+    ContextMenuItemTagUnicodeInsertLRMMark,
+    ContextMenuItemTagUnicodeInsertRLMMark,
+    ContextMenuItemTagUnicodeInsertLREMark,
+    ContextMenuItemTagUnicodeInsertRLEMark,
+    ContextMenuItemTagUnicodeInsertLROMark,
+    ContextMenuItemTagUnicodeInsertRLOMark,
+    ContextMenuItemTagUnicodeInsertPDFMark,
+    ContextMenuItemTagUnicodeInsertZWSMark,
+    ContextMenuItemTagUnicodeInsertZWJMark,
+    ContextMenuItemTagUnicodeInsertZWNJMark,
 #endif
-        ContextMenuItemTagSpellingGuess,
-        ContextMenuItemTagNoGuessesFound,
-        ContextMenuItemTagIgnoreSpelling,
-        ContextMenuItemTagLearnSpelling,
-        ContextMenuItemTagOther,
-        ContextMenuItemTagSearchInSpotlight,
-        ContextMenuItemTagSearchWeb,
-        ContextMenuItemTagLookUpInDictionary,
-        ContextMenuItemTagOpenWithDefaultApplication,
-        ContextMenuItemPDFActualSize,
-        ContextMenuItemPDFZoomIn,
-        ContextMenuItemPDFZoomOut,
-        ContextMenuItemPDFAutoSize,
-        ContextMenuItemPDFSinglePage,
-        ContextMenuItemPDFFacingPages,
-        ContextMenuItemPDFContinuous,
-        ContextMenuItemPDFNextPage,
-        ContextMenuItemPDFPreviousPage,
-        // These are new tags! Not a part of API!!!!
-        ContextMenuItemTagOpenLink = 2000,
-        ContextMenuItemTagIgnoreGrammar,
-        ContextMenuItemTagSpellingMenu, // Spelling or Spelling/Grammar sub-menu
-        ContextMenuItemTagShowSpellingPanel,
-        ContextMenuItemTagCheckSpelling,
-        ContextMenuItemTagCheckSpellingWhileTyping,
-        ContextMenuItemTagCheckGrammarWithSpelling,
-        ContextMenuItemTagFontMenu, // Font sub-menu
-        ContextMenuItemTagShowFonts,
-        ContextMenuItemTagBold,
-        ContextMenuItemTagItalic,
-        ContextMenuItemTagUnderline,
-        ContextMenuItemTagOutline,
-        ContextMenuItemTagStyles,
-        ContextMenuItemTagShowColors,
-        ContextMenuItemTagSpeechMenu, // Speech sub-menu
-        ContextMenuItemTagStartSpeaking,
-        ContextMenuItemTagStopSpeaking,
-        ContextMenuItemTagWritingDirectionMenu, // Writing Direction sub-menu
-        ContextMenuItemTagDefaultDirection,
-        ContextMenuItemTagLeftToRight,
-        ContextMenuItemTagRightToLeft,
-        ContextMenuItemTagPDFSinglePageScrolling,
-        ContextMenuItemTagPDFFacingPagesScrolling,
-#if ENABLE(INSPECTOR)
-        ContextMenuItemTagInspectElement,
+    ContextMenuItemTagSpellingGuess,
+    ContextMenuItemTagNoGuessesFound,
+    ContextMenuItemTagIgnoreSpelling,
+    ContextMenuItemTagLearnSpelling,
+    ContextMenuItemTagOther,
+    ContextMenuItemTagSearchInSpotlight,
+    ContextMenuItemTagSearchWeb,
+    ContextMenuItemTagLookUpInDictionary,
+    ContextMenuItemTagOpenWithDefaultApplication,
+    ContextMenuItemPDFActualSize,
+    ContextMenuItemPDFZoomIn,
+    ContextMenuItemPDFZoomOut,
+    ContextMenuItemPDFAutoSize,
+    ContextMenuItemPDFSinglePage,
+    ContextMenuItemPDFFacingPages,
+    ContextMenuItemPDFContinuous,
+    ContextMenuItemPDFNextPage,
+    ContextMenuItemPDFPreviousPage,
+    ContextMenuItemTagOpenLink,
+    ContextMenuItemTagIgnoreGrammar,
+    ContextMenuItemTagSpellingMenu, // Spelling or Spelling/Grammar sub-menu
+    ContextMenuItemTagShowSpellingPanel,
+    ContextMenuItemTagCheckSpelling,
+    ContextMenuItemTagCheckSpellingWhileTyping,
+    ContextMenuItemTagCheckGrammarWithSpelling,
+    ContextMenuItemTagFontMenu, // Font sub-menu
+    ContextMenuItemTagShowFonts,
+    ContextMenuItemTagBold,
+    ContextMenuItemTagItalic,
+    ContextMenuItemTagUnderline,
+    ContextMenuItemTagOutline,
+    ContextMenuItemTagStyles,
+    ContextMenuItemTagShowColors,
+    ContextMenuItemTagSpeechMenu, // Speech sub-menu
+    ContextMenuItemTagStartSpeaking,
+    ContextMenuItemTagStopSpeaking,
+    ContextMenuItemTagWritingDirectionMenu, // Writing Direction sub-menu
+    ContextMenuItemTagDefaultDirection,
+    ContextMenuItemTagLeftToRight,
+    ContextMenuItemTagRightToLeft,
+    ContextMenuItemTagPDFSinglePageScrolling,
+    ContextMenuItemTagPDFFacingPagesScrolling,
+    ContextMenuItemTagInspectElement,
+    ContextMenuItemTagTextDirectionMenu, // Text Direction sub-menu
+    ContextMenuItemTagTextDirectionDefault,
+    ContextMenuItemTagTextDirectionLeftToRight,
+    ContextMenuItemTagTextDirectionRightToLeft,
+#if PLATFORM(COCOA)
+    ContextMenuItemTagCorrectSpellingAutomatically,
+    ContextMenuItemTagSubstitutionsMenu,
+    ContextMenuItemTagShowSubstitutions,
+    ContextMenuItemTagSmartCopyPaste,
+    ContextMenuItemTagSmartQuotes,
+    ContextMenuItemTagSmartDashes,
+    ContextMenuItemTagSmartLinks,
+    ContextMenuItemTagTextReplacement,
+    ContextMenuItemTagTransformationsMenu,
+    ContextMenuItemTagMakeUpperCase,
+    ContextMenuItemTagMakeLowerCase,
+    ContextMenuItemTagCapitalize,
+    ContextMenuItemTagChangeBack,
 #endif
-        ContextMenuItemTagTextDirectionMenu, // Text Direction sub-menu
-        ContextMenuItemTagTextDirectionDefault,
-        ContextMenuItemTagTextDirectionLeftToRight,
-        ContextMenuItemTagTextDirectionRightToLeft,
-#if PLATFORM(MAC)
-        ContextMenuItemTagCorrectSpellingAutomatically,
-        ContextMenuItemTagSubstitutionsMenu,
-        ContextMenuItemTagShowSubstitutions,
-        ContextMenuItemTagSmartCopyPaste,
-        ContextMenuItemTagSmartQuotes,
-        ContextMenuItemTagSmartDashes,
-        ContextMenuItemTagSmartLinks,
-        ContextMenuItemTagTextReplacement,
-        ContextMenuItemTagTransformationsMenu,
-        ContextMenuItemTagMakeUpperCase,
-        ContextMenuItemTagMakeLowerCase,
-        ContextMenuItemTagCapitalize,
-        ContextMenuItemTagChangeBack,
+    ContextMenuItemTagOpenMediaInNewWindow,
+    ContextMenuItemTagDownloadMediaToDisk,
+    ContextMenuItemTagCopyMediaLinkToClipboard,
+    ContextMenuItemTagToggleMediaControls,
+    ContextMenuItemTagToggleMediaLoop,
+    ContextMenuItemTagEnterVideoFullscreen,
+    ContextMenuItemTagMediaPlayPause,
+    ContextMenuItemTagMediaMute,
+    ContextMenuItemTagDictationAlternative,
+#if PLATFORM(QT)
+    ContextMenuItemTagOpenLinkInThisWindow,
 #endif
-        ContextMenuItemTagOpenMediaInNewWindow,
-        ContextMenuItemTagDownloadMediaToDisk,
-        ContextMenuItemTagCopyMediaLinkToClipboard,
-        ContextMenuItemTagToggleMediaControls,
-        ContextMenuItemTagToggleMediaLoop,
-        ContextMenuItemTagEnterVideoFullscreen,
-        ContextMenuItemTagMediaPlayPause,
-        ContextMenuItemTagMediaMute,
-        ContextMenuItemTagDictationAlternative,
-        ContextMenuItemTagOpenLinkInThisWindow,
-        ContextMenuItemTagToggleVideoFullscreen,
-        ContextMenuItemBaseCustomTag = 5000,
-        ContextMenuItemCustomTagNoAction = 5998,
-        ContextMenuItemLastCustomTag = 5999,
-        ContextMenuItemBaseApplicationTag = 10000
-    };
+    ContextMenuItemTagToggleVideoFullscreen,
+    ContextMenuItemTagShareMenu, 
+    ContextMenuItemBaseCustomTag = 5000,
+    ContextMenuItemLastCustomTag = 5999,
+    ContextMenuItemBaseApplicationTag = 10000
+};
 
-    enum ContextMenuItemType {
-        ActionType,
-        CheckableActionType,
-        SeparatorType,
-        SubmenuType
-    };
+enum ContextMenuItemType {
+    ActionType,
+    CheckableActionType,
+    SeparatorType,
+    SubmenuType
+};
 
-#if ENABLE(CONTEXT_MENUS)
-#if PLATFORM(MAC)
-    typedef NSMenuItem* PlatformMenuItemDescription;
-#elif PLATFORM(GTK)
-    typedef GtkMenuItem* PlatformMenuItemDescription;
-#else
-    typedef void* PlatformMenuItemDescription;
-#endif
+class ContextMenuItem {
+    WTF_MAKE_FAST_ALLOCATED;
+public:
+    WEBCORE_EXPORT ContextMenuItem(ContextMenuItemType, ContextMenuAction, const String&, ContextMenu* subMenu = 0);
+    WEBCORE_EXPORT ContextMenuItem(ContextMenuItemType, ContextMenuAction, const String&, bool enabled, bool checked);
 
-    class ContextMenuItem {
-        WTF_MAKE_FAST_ALLOCATED;
-    public:
-        ContextMenuItem(ContextMenuItemType, ContextMenuAction, const String&, ContextMenu* subMenu = 0);
-        ContextMenuItem(ContextMenuItemType, ContextMenuAction, const String&, bool enabled, bool checked);
+    WEBCORE_EXPORT ~ContextMenuItem();
 
-        ~ContextMenuItem();
+    void setType(ContextMenuItemType);
+    WEBCORE_EXPORT ContextMenuItemType type() const;
 
-        void setType(ContextMenuItemType);
-        ContextMenuItemType type() const;
+    void setAction(ContextMenuAction);
+    WEBCORE_EXPORT ContextMenuAction action() const;
 
-        void setAction(ContextMenuAction);
-        ContextMenuAction action() const;
+    void setChecked(bool = true);
+    WEBCORE_EXPORT bool checked() const;
 
-        void setChecked(bool = true);
-        bool checked() const;
+    void setEnabled(bool = true);
+    WEBCORE_EXPORT bool enabled() const;
 
-        void setEnabled(bool = true);
-        bool enabled() const;
+    void setSubMenu(ContextMenu*);
 
-        void setSubMenu(ContextMenu*);
+    ContextMenuItem(ContextMenuAction, const String&, bool enabled, bool checked, const Vector<ContextMenuItem>& subMenuItems);
+    ContextMenuItem();
 
-#if PLATFORM(GTK)
-        GtkAction* gtkAction() const;
-#endif
+    bool isNull() const;
 
-#if USE(CROSS_PLATFORM_CONTEXT_MENUS)
-        ContextMenuItem(ContextMenuAction, const String&, bool enabled, bool checked, const Vector<ContextMenuItem>& subMenuItems);
-        explicit ContextMenuItem(const PlatformContextMenuItem&);
+    void setTitle(const String& title) { m_title = title; }
+    const String& title() const { return m_title; }
 
-        // On Windows, the title (dwTypeData of the MENUITEMINFO) is not set in this function. Callers can set the title themselves,
-        // and handle the lifetime of the title, if they need it.
-        PlatformContextMenuItem platformContextMenuItem() const;
+    const Vector<ContextMenuItem>& subMenuItems() const { return m_subMenuItems; }
+private:
+    ContextMenuItemType m_type;
+    ContextMenuAction m_action;
+    String m_title;
+    bool m_enabled;
+    bool m_checked;
+    Vector<ContextMenuItem> m_subMenuItems;
+};
 
-        void setTitle(const String& title) { m_title = title; }
-        const String& title() const { return m_title; }
-
-        const Vector<ContextMenuItem>& subMenuItems() const { return m_subMenuItems; }
-#else
-    public:
-        explicit ContextMenuItem(PlatformMenuItemDescription);
-        explicit ContextMenuItem(ContextMenu* subMenu = 0);
-        ContextMenuItem(ContextMenuAction, const String&, bool enabled, bool checked, Vector<ContextMenuItem>& submenuItems);
-
-        PlatformMenuItemDescription releasePlatformDescription();
-
-        String title() const;
-        void setTitle(const String&);
-
-        PlatformMenuDescription platformSubMenu() const;
-        void setSubMenu(Vector<ContextMenuItem>&);
-
-#endif // USE(CROSS_PLATFORM_CONTEXT_MENUS)
-    private:
-#if USE(CROSS_PLATFORM_CONTEXT_MENUS)
-        ContextMenuItemType m_type;
-        ContextMenuAction m_action;
-        String m_title;
-        bool m_enabled;
-        bool m_checked;
-        Vector<ContextMenuItem> m_subMenuItems;
-#else
-#if PLATFORM(MAC)
-        RetainPtr<NSMenuItem> m_platformDescription;
-#else
-        PlatformMenuItemDescription m_platformDescription;
-#endif
-#endif // USE(CROSS_PLATFORM_CONTEXT_MENUS)
-    };
-
-#endif // ENABLE(CONTEXT_MENUS)
 }
 
 #endif // ContextMenuItem_h

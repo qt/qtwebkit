@@ -24,7 +24,6 @@
 #include "HTMLCollection.h"
 #include "HTMLFormControlsCollection.h"
 #include "HTMLOptionsCollection.h"
-#include "HTMLPropertiesCollection.h"
 #include "JSDOMBinding.h"
 #include "JSHTMLAllCollection.h"
 #include "JSHTMLFormControlsCollection.h"
@@ -33,9 +32,7 @@
 #include "JSNodeList.h"
 #include "JSRadioNodeList.h"
 #include "Node.h"
-#include "PropertyNodeList.h"
 #include "RadioNodeList.h"
-#include "StaticNodeList.h"
 #include <wtf/Vector.h>
 #include <wtf/text/AtomicString.h>
 
@@ -43,45 +40,41 @@ using namespace JSC;
 
 namespace WebCore {
 
-bool JSHTMLCollection::canGetItemsForName(ExecState*, HTMLCollection* collection, PropertyName propertyName)
+bool JSHTMLCollection::nameGetter(ExecState* exec, PropertyName propertyName, JSValue& value)
 {
-    return collection->hasNamedItem(propertyNameToAtomicString(propertyName));
+    ASSERT_WITH_MESSAGE(wrapped().type() != FormControls, "Should call the subclass' nameGetter");
+    ASSERT_WITH_MESSAGE(wrapped().type() != SelectOptions, "Should call the subclass' nameGetter");
+
+    auto item = wrapped().namedItem(propertyNameToAtomicString(propertyName));
+    if (!item)
+        return false;
+
+    value = toJS(exec, globalObject(), item);
+    return true;
 }
 
-JSValue JSHTMLCollection::nameGetter(ExecState* exec, JSValue slotBase, PropertyName propertyName)
-{
-    JSHTMLCollection* collection = jsCast<JSHTMLCollection*>(asObject(slotBase));
-    const AtomicString& name = propertyNameToAtomicString(propertyName);
-    HTMLCollection* impl = collection->impl();
-#if ENABLE(MICRODATA)
-    if (impl->type() == ItemProperties)
-        return toJS(exec, collection->globalObject(), static_cast<HTMLPropertiesCollection*>(impl)->propertyNodeList(name));
-#endif
-    return toJS(exec, collection->globalObject(), impl->namedItem(name));
-}
-
-JSValue toJS(ExecState* exec, JSDOMGlobalObject* globalObject, HTMLCollection* collection)
+JSValue toJS(ExecState*, JSDOMGlobalObject* globalObject, HTMLCollection* collection)
 {
     if (!collection)
         return jsNull();
 
-    JSDOMWrapper* wrapper = getCachedWrapper(currentWorld(exec), collection);
+    JSObject* wrapper = getCachedWrapper(globalObject->world(), collection);
 
     if (wrapper)
         return wrapper;
 
     switch (collection->type()) {
     case FormControls:
-        return CREATE_DOM_WRAPPER(exec, globalObject, HTMLFormControlsCollection, collection);
+        return CREATE_DOM_WRAPPER(globalObject, HTMLFormControlsCollection, collection);
     case SelectOptions:
-        return CREATE_DOM_WRAPPER(exec, globalObject, HTMLOptionsCollection, collection);
+        return CREATE_DOM_WRAPPER(globalObject, HTMLOptionsCollection, collection);
     case DocAll:
-        return CREATE_DOM_WRAPPER(exec, globalObject, HTMLAllCollection, collection);
+        return CREATE_DOM_WRAPPER(globalObject, HTMLAllCollection, collection);
     default:
         break;
     }
 
-    return CREATE_DOM_WRAPPER(exec, globalObject, HTMLCollection, collection);
+    return CREATE_DOM_WRAPPER(globalObject, HTMLCollection, collection);
 }
 
 } // namespace WebCore

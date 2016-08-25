@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -27,22 +27,21 @@
 #define HTMLVideoElement_h
 
 #if ENABLE(VIDEO)
+
 #include "HTMLMediaElement.h"
+#include <memory>
 
 namespace WebCore {
 
 class HTMLImageLoader;
 
-class HTMLVideoElement FINAL : public HTMLMediaElement {
+class HTMLVideoElement final : public HTMLMediaElement {
 public:
-    static PassRefPtr<HTMLVideoElement> create(const QualifiedName&, Document*, bool);
+    static Ref<HTMLVideoElement> create(const QualifiedName&, Document&, bool);
 
-    unsigned width() const;
-    unsigned height() const;
-    
-    unsigned videoWidth() const;
-    unsigned videoHeight() const;
-    
+    WEBCORE_EXPORT unsigned videoWidth() const;
+    WEBCORE_EXPORT unsigned videoHeight() const;
+
     // Fullscreen
     void webkitEnterFullscreen(ExceptionCode&);
     void webkitExitFullscreen();
@@ -54,6 +53,11 @@ public:
     void webkitEnterFullScreen(ExceptionCode& ec) { webkitEnterFullscreen(ec); }
     void webkitExitFullScreen() { webkitExitFullscreen(); }
 
+#if ENABLE(WIRELESS_PLAYBACK_TARGET)
+    bool webkitWirelessVideoPlaybackDisabled() const;
+    void setWebkitWirelessVideoPlaybackDisabled(bool);
+#endif
+
 #if ENABLE(MEDIA_STATISTICS)
     // Statistics
     unsigned webkitDecodedFrameCount() const;
@@ -61,50 +65,65 @@ public:
 #endif
 
     // Used by canvas to gain raw pixel access
-    void paintCurrentFrameInContext(GraphicsContext*, const IntRect&);
+    void paintCurrentFrameInContext(GraphicsContext&, const FloatRect&);
+
+    PassNativeImagePtr nativeImageForCurrentTime();
 
     // Used by WebGL to do GPU-GPU textures copy if possible.
     // See more details at MediaPlayer::copyVideoTextureToPlatformTexture() defined in Source/WebCore/platform/graphics/MediaPlayer.h.
-    bool copyVideoTextureToPlatformTexture(GraphicsContext3D*, Platform3DObject texture, GC3Dint level, GC3Denum type, GC3Denum internalFormat, bool premultiplyAlpha, bool flipY);
+    bool copyVideoTextureToPlatformTexture(GraphicsContext3D*, Platform3DObject texture, GC3Denum target, GC3Dint level, GC3Denum internalFormat, GC3Denum format, GC3Denum type, bool premultiplyAlpha, bool flipY);
 
     bool shouldDisplayPosterImage() const { return displayMode() == Poster || displayMode() == PosterWaitingForVideo; }
 
-    KURL posterImageURL() const;
+    URL posterImageURL() const;
+    virtual RenderPtr<RenderElement> createElementRenderer(Ref<RenderStyle>&&, const RenderTreePosition&) override;
+
+#if ENABLE(VIDEO_PRESENTATION_MODE)
+    bool webkitSupportsPresentationMode(const String&) const;
+    void webkitSetPresentationMode(const String&);
+    String webkitPresentationMode() const;
+    void setFullscreenMode(VideoFullscreenMode);
+    virtual void fullscreenModeChanged(VideoFullscreenMode) override;
+#endif
 
 private:
-    HTMLVideoElement(const QualifiedName&, Document*, bool);
+    HTMLVideoElement(const QualifiedName&, Document&, bool);
 
-    virtual bool rendererIsNeeded(const NodeRenderingContext&);
-#if !ENABLE(PLUGIN_PROXY_FOR_VIDEO)
-    virtual RenderObject* createRenderer(RenderArena*, RenderStyle*);
-#endif
-    virtual void attach(const AttachContext& = AttachContext()) OVERRIDE;
-    virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
-    virtual bool isPresentationAttribute(const QualifiedName&) const OVERRIDE;
-    virtual void collectStyleForPresentationAttribute(const QualifiedName&, const AtomicString&, MutableStylePropertySet*) OVERRIDE;
-    virtual bool isVideo() const { return true; }
-    virtual bool hasVideo() const { return player() && player()->hasVideo(); }
-    virtual bool supportsFullscreen() const;
-    virtual bool isURLAttribute(const Attribute&) const OVERRIDE;
-    virtual const AtomicString& imageSourceURL() const OVERRIDE;
+    virtual void scheduleResizeEvent() override;
+    virtual void scheduleResizeEventIfSizeChanged() override;
+    virtual bool rendererIsNeeded(const RenderStyle&) override;
+    virtual void didAttachRenderers() override;
+    virtual void parseAttribute(const QualifiedName&, const AtomicString&) override;
+    virtual bool isPresentationAttribute(const QualifiedName&) const override;
+    virtual void collectStyleForPresentationAttribute(const QualifiedName&, const AtomicString&, MutableStyleProperties&) override;
+    virtual bool isVideo() const override { return true; }
+    virtual bool hasVideo() const override { return player() && player()->hasVideo(); }
+    virtual bool supportsFullscreen(HTMLMediaElementEnums::VideoFullscreenMode) const override;
+    virtual bool isURLAttribute(const Attribute&) const override;
+    virtual const AtomicString& imageSourceURL() const override;
 
-    virtual bool hasAvailableVideoFrame() const;
-    virtual void updateDisplayState();
-    virtual void didMoveToNewDocument(Document* oldDocument) OVERRIDE;
-    virtual void setDisplayMode(DisplayMode);
+    bool hasAvailableVideoFrame() const;
+    virtual void updateDisplayState() override;
+    virtual void didMoveToNewDocument(Document* oldDocument) override;
+    virtual void setDisplayMode(DisplayMode) override;
 
-    OwnPtr<HTMLImageLoader> m_imageLoader;
+    virtual PlatformMediaSession::MediaType presentationType() const override { return PlatformMediaSession::Video; }
+
+    std::unique_ptr<HTMLImageLoader> m_imageLoader;
 
     AtomicString m_defaultPosterURL;
+
+    unsigned m_lastReportedVideoWidth { 0 };
+    unsigned m_lastReportedVideoHeight { 0 };
 };
 
-inline HTMLVideoElement* toHTMLVideoElement(Node* node)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->hasTagName(HTMLNames::videoTag));
-    return static_cast<HTMLVideoElement*>(node);
-}
+} // namespace WebCore
 
-} //namespace
+SPECIALIZE_TYPE_TRAITS_BEGIN(WebCore::HTMLVideoElement)
+    static bool isType(const WebCore::HTMLMediaElement& element) { return element.hasTagName(WebCore::HTMLNames::videoTag); }
+    static bool isType(const WebCore::Element& element) { return is<WebCore::HTMLMediaElement>(element) && isType(downcast<WebCore::HTMLMediaElement>(element)); }
+    static bool isType(const WebCore::Node& node) { return is<WebCore::HTMLMediaElement>(node) && isType(downcast<WebCore::HTMLMediaElement>(node)); }
+SPECIALIZE_TYPE_TRAITS_END()
 
-#endif
-#endif
+#endif // ENABLE(VIDEO)
+#endif // HTMLVideoElement_h

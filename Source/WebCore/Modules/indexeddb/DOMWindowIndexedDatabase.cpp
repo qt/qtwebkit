@@ -29,10 +29,10 @@
 #if ENABLE(INDEXED_DATABASE)
 
 #include "DOMWindow.h"
+#include "DatabaseProvider.h"
 #include "Document.h"
-#include "IDBFactory.h"
+#include "IDBFactoryImpl.h"
 #include "Page.h"
-#include "PageGroupIndexedDatabase.h"
 #include "SecurityOrigin.h"
 
 namespace WebCore {
@@ -56,21 +56,22 @@ DOMWindowIndexedDatabase* DOMWindowIndexedDatabase::from(DOMWindow* window)
 {
     DOMWindowIndexedDatabase* supplement = static_cast<DOMWindowIndexedDatabase*>(Supplement<DOMWindow>::from(window, supplementName()));
     if (!supplement) {
-        supplement = new DOMWindowIndexedDatabase(window);
-        provideTo(window, supplementName(), adoptPtr(supplement));
+        auto newSupplement = std::make_unique<DOMWindowIndexedDatabase>(window);
+        supplement = newSupplement.get();
+        provideTo(window, supplementName(), WTFMove(newSupplement));
     }
     return supplement;
 }
 
-void DOMWindowIndexedDatabase::disconnectFrameForPageCache()
+void DOMWindowIndexedDatabase::disconnectFrameForDocumentSuspension()
 {
     m_suspendedIDBFactory = m_idbFactory.release();
-    DOMWindowProperty::disconnectFrameForPageCache();
+    DOMWindowProperty::disconnectFrameForDocumentSuspension();
 }
 
-void DOMWindowIndexedDatabase::reconnectFrameFromPageCache(Frame* frame)
+void DOMWindowIndexedDatabase::reconnectFrameFromDocumentSuspension(Frame* frame)
 {
-    DOMWindowProperty::reconnectFrameFromPageCache(frame);
+    DOMWindowProperty::reconnectFrameFromDocumentSuspension(frame);
     m_idbFactory = m_suspendedIDBFactory.release();
 }
 
@@ -101,17 +102,18 @@ IDBFactory* DOMWindowIndexedDatabase::indexedDB()
 {
     Document* document = m_window->document();
     if (!document)
-        return 0;
+        return nullptr;
 
     Page* page = document->page();
     if (!page)
-        return 0;
+        return nullptr;
 
     if (!m_window->isCurrentlyDisplayedInFrame())
-        return 0;
+        return nullptr;
 
     if (!m_idbFactory)
-        m_idbFactory = IDBFactory::create(PageGroupIndexedDatabase::from(page->group())->factoryBackend());
+        m_idbFactory = IDBClient::IDBFactory::create(page->idbConnection());
+
     return m_idbFactory.get();
 }
 

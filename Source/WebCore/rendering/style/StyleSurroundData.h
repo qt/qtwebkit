@@ -34,8 +34,8 @@ namespace WebCore {
 
 class StyleSurroundData : public RefCounted<StyleSurroundData> {
 public:
-    static PassRefPtr<StyleSurroundData> create() { return adoptRef(new StyleSurroundData); }
-    PassRefPtr<StyleSurroundData> copy() const { return adoptRef(new StyleSurroundData(*this)); }
+    static Ref<StyleSurroundData> create() { return adoptRef(*new StyleSurroundData); }
+    Ref<StyleSurroundData> copy() const;
     
     bool operator==(const StyleSurroundData& o) const;
     bool operator!=(const StyleSurroundData& o) const

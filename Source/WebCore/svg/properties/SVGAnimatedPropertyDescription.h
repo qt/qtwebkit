@@ -22,7 +22,6 @@
 #ifndef SVGAnimatedPropertyDescription_h
 #define SVGAnimatedPropertyDescription_h
 
-#if ENABLE(SVG)
 #include <wtf/HashMap.h>
 #include <wtf/text/AtomicString.h>
 
@@ -33,8 +32,8 @@ class SVGElement;
 struct SVGAnimatedPropertyDescription {            
     // Empty value
     SVGAnimatedPropertyDescription()
-        : m_element(0)
-        , m_attributeName(0)
+        : m_element(nullptr)
+        , m_attributeName(nullptr)
     {
     }
 
@@ -84,5 +83,4 @@ struct SVGAnimatedPropertyDescriptionHashTraits : WTF::SimpleClassHashTraits<SVG
  
 }
 
-#endif // ENABLE(SVG)
 #endif // SVGAnimatedPropertyDescription_h

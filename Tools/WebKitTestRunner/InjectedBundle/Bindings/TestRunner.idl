@@ -48,6 +48,7 @@ interface TestRunner {
     void dumpApplicationCacheDelegateCallbacks();
     void dumpDatabaseCallbacks();
     void dumpDOMAsWebArchive();
+    void dumpPolicyDelegateCallbacks();
 
     // Special options.
     void keepWebHistory();
@@ -74,6 +75,8 @@ interface TestRunner {
     void setCacheModel(int model);
     void setAsynchronousSpellCheckingEnabled(boolean value);
     void setPrinting();
+    void setShouldDecideNavigationPolicyAfterDelay(boolean value);
+    void setNavigationGesturesEnabled(boolean value);
 
     // Special DOM functions.
     void clearBackForwardList();
@@ -103,12 +106,14 @@ interface TestRunner {
     void setDatabaseQuota(unsigned long long quota);
     DOMString pathToLocalResource(DOMString url);
 
+    attribute double databaseDefaultQuota;
+    attribute double databaseMaxQuota;
+
     // Application Cache API
     void clearAllApplicationCaches();
     void setAppCacheMaximumSize(unsigned long long size);
     long long applicationCacheDiskUsageForOrigin(DOMString origin);
     void clearApplicationCacheForOrigin(DOMString name);
-    void setApplicationCacheOriginQuota(unsigned long long bytes);
     void disallowIncreaseForApplicationCacheQuota();
     object originsWithApplicationCache();
 
@@ -121,7 +126,8 @@ interface TestRunner {
     // For Web Inspector tests
     void showWebInspector();
     void closeWebInspector();
-    void evaluateInWebInspector(long callID, DOMString script);
+    void evaluateInWebInspector(DOMString script);
+    readonly attribute DOMString inspectorTestStubURL;
 
     void setPOSIXLocale(DOMString locale);
 
@@ -129,6 +135,7 @@ interface TestRunner {
 
     void setWillSendRequestReturnsNull(boolean flag);
     void setWillSendRequestReturnsNullOnRedirect(boolean flag);
+    void setWillSendRequestAddsHTTPBody(DOMString body);
     
     void setShouldStayOnPageAfterHandlingBeforeUnload(boolean flag);
 
@@ -139,6 +146,8 @@ interface TestRunner {
     void addChromeInputField(object callback);
     void removeChromeInputField(object callback);
     void focusWebView(object callback);
+
+    void clearTestRunnerCallbacks();
 
     void setBackingScaleFactor(double backingScaleFactor, object callback);
 
@@ -153,8 +162,6 @@ interface TestRunner {
     void setPageVisibility(DOMString state);
     void resetPageVisibility();
 
-    readonly attribute DOMString platformName;
-
     // Control full screen behavior.
     void setHasCustomFullScreenBehavior(boolean value);
 
@@ -168,6 +175,11 @@ interface TestRunner {
     void setGeolocationPermission(boolean value);
     void setMockGeolocationPosition(double latitude, double longitude, double accuracy, [Default=Undefined] optional object altitude, optional object altitudeAccuracy, optional object heading, optional object speed);
     void setMockGeolocationPositionUnavailableError(DOMString errorMessage);
+    boolean isGeolocationProviderActive();
+
+    // MediaStream
+    void setUserMediaPermission(boolean value);
+    void setUserMediaPermissionForOrigin(boolean permission, DOMString url);
 
     // Audio testing.
     [PassContext] void setAudioResult(object data);
@@ -177,7 +189,7 @@ interface TestRunner {
     // Work queue.
     void queueBackNavigation(unsigned long howFarBackward);
     void queueForwardNavigation(unsigned long howFarForward);
-    void queueLoad(DOMString url, DOMString target);
+    void queueLoad(DOMString url, DOMString target, optional boolean shouldOpenExternalURLs);
     void queueLoadHTMLString(DOMString content, optional DOMString baseURL, optional DOMString unreachableURL);
     void queueReload();
     void queueLoadingScript(DOMString script);
@@ -193,5 +205,19 @@ interface TestRunner {
     
     // Override plugin load policy.
     void setBlockAllPlugins(boolean shouldBlock);
+    
+    // Hooks to the JSC compiler.
+    object failNextNewCodeBlock();
+    object numberOfDFGCompiles(object function);
+    object neverInlineFunction(object function);
+
+    // Swipe gestures
+    void installDidBeginSwipeCallback(object callback);
+    void installWillEndSwipeCallback(object callback);
+    void installDidEndSwipeCallback(object callback);
+    void installDidRemoveSwipeSnapshotCallback(object callback);
+
+    // UI Process Testing
+    void runUIScript(DOMString script, object callback);
 };
 

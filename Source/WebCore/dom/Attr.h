@@ -31,22 +31,22 @@
 namespace WebCore {
 
 class CSSStyleDeclaration;
-class MutableStylePropertySet;
+class MutableStyleProperties;
 
-// Attr can have Text and EntityReference children
+// Attr can have Text children
 // therefore it has to be a fullblown Node. The plan
 // is to dynamically allocate a textchild and store the
 // resulting nodevalue in the attribute upon
 // destruction. however, this is not yet implemented.
 
-class Attr FINAL : public ContainerNode {
+class Attr final : public ContainerNode {
 public:
-    static PassRefPtr<Attr> create(Element*, const QualifiedName&);
-    static PassRefPtr<Attr> create(Document*, const QualifiedName&, const AtomicString& value);
+    static RefPtr<Attr> create(Element*, const QualifiedName&);
+    static RefPtr<Attr> create(Document&, const QualifiedName&, const AtomicString& value);
     virtual ~Attr();
 
     String name() const { return qualifiedName().toString(); }
-    bool specified() const { return m_specified; }
+    bool specified() const { return true; }
     Element* ownerElement() const { return m_element; }
 
     const AtomicString& value() const;
@@ -59,48 +59,50 @@ public:
 
     CSSStyleDeclaration* style();
 
-    void setSpecified(bool specified) { m_specified = specified; }
-
     void attachToElement(Element*);
     void detachFromElementWithValue(const AtomicString&);
 
+    virtual const AtomicString& namespaceURI() const override { return m_name.namespaceURI(); }
+
 private:
     Attr(Element*, const QualifiedName&);
-    Attr(Document*, const QualifiedName&, const AtomicString& value);
+    Attr(Document&, const QualifiedName&, const AtomicString& value);
 
     void createTextChild();
 
-    virtual String nodeName() const OVERRIDE { return name(); }
-    virtual NodeType nodeType() const OVERRIDE { return ATTRIBUTE_NODE; }
+    virtual String nodeName() const override { return name(); }
+    virtual NodeType nodeType() const override { return ATTRIBUTE_NODE; }
 
-    virtual const AtomicString& localName() const OVERRIDE { return m_name.localName(); }
-    virtual const AtomicString& namespaceURI() const OVERRIDE { return m_name.namespaceURI(); }
-    virtual const AtomicString& prefix() const OVERRIDE { return m_name.prefix(); }
+    virtual const AtomicString& localName() const override { return m_name.localName(); }
+    virtual const AtomicString& prefix() const override { return m_name.prefix(); }
 
-    virtual void setPrefix(const AtomicString&, ExceptionCode&);
+    virtual void setPrefix(const AtomicString&, ExceptionCode&) override;
 
-    virtual String nodeValue() const OVERRIDE { return value(); }
-    virtual void setNodeValue(const String&, ExceptionCode&);
-    virtual PassRefPtr<Node> cloneNode(bool deep);
+    virtual String nodeValue() const override { return value(); }
+    virtual void setNodeValue(const String&, ExceptionCode&) override;
+    virtual Ref<Node> cloneNodeInternal(Document&, CloningOperation) override;
 
-    virtual bool isAttributeNode() const { return true; }
-    virtual bool childTypeAllowed(NodeType) const;
+    virtual bool isAttributeNode() const override { return true; }
+    virtual bool childTypeAllowed(NodeType) const override;
 
-    virtual void childrenChanged(bool changedByParser = false, Node* beforeChange = 0, Node* afterChange = 0, int childCountDelta = 0);
+    virtual void childrenChanged(const ChildChange&) override;
 
     Attribute& elementAttribute();
 
     // Attr wraps either an element/name, or a name/value pair (when it's a standalone Node.)
     // Note that m_name is always set, but m_element/m_standaloneValue may be null.
-    Element* m_element;
+    Element* m_element { nullptr };
     QualifiedName m_name;
     AtomicString m_standaloneValue;
 
-    RefPtr<MutableStylePropertySet> m_style;
-    unsigned m_ignoreChildrenChanged : 31;
-    bool m_specified : 1;
+    RefPtr<MutableStyleProperties> m_style;
+    unsigned m_ignoreChildrenChanged { 0 };
 };
 
 } // namespace WebCore
+
+SPECIALIZE_TYPE_TRAITS_BEGIN(WebCore::Attr)
+    static bool isType(const WebCore::Node& node) { return node.isAttributeNode(); }
+SPECIALIZE_TYPE_TRAITS_END()
 
 #endif // Attr_h

@@ -22,9 +22,8 @@
 #if ENABLE(WEB_AUDIO)
 
 #include "AudioFileReader.h"
-
 #include "AudioBus.h"
-#include "GStreamerVersioning.h"
+#include "GRefPtrGStreamer.h"
 
 #if PLATFORM(QT)
 // Clear out offending Qt macro so the following header, gio.h, can be included.
@@ -34,24 +33,15 @@
 
 #include <gio/gio.h>
 #include <gst/app/gstappsink.h>
+#include <gst/audio/audio-info.h>
 #include <gst/gst.h>
-#include <gst/pbutils/pbutils.h>
+#include <wtf/MainThread.h>
 #include <wtf/Noncopyable.h>
-#include <wtf/PassOwnPtr.h>
-#include <wtf/gobject/GOwnPtr.h>
-#include <wtf/gobject/GRefPtr.h>
-
-#ifdef GST_API_VERSION_1
-#include <gst/audio/audio.h>
-#else
-#include <gst/audio/multichannel.h>
-#endif
-
-#ifdef GST_API_VERSION_1
-static const char* gDecodebinName = "decodebin";
-#else
-static const char* gDecodebinName = "decodebin2";
-#endif
+#include <wtf/RunLoop.h>
+#include <wtf/Threading.h>
+#include <wtf/WeakPtr.h>
+#include <wtf/glib/GRefPtr.h>
+#include <wtf/glib/GUniquePtr.h>
 
 namespace WebCore {
 
@@ -64,42 +54,40 @@ public:
 
     PassRefPtr<AudioBus> createBus(float sampleRate, bool mixToMono);
 
-#ifdef GST_API_VERSION_1
-    GstFlowReturn handleSample(GstAppSink*);
-#else
-    GstFlowReturn handleBuffer(GstAppSink*);
-#endif
-    gboolean handleMessage(GstMessage*);
+private:
+    WeakPtr<AudioFileReader> createWeakPtr() { return m_weakPtrFactory.createWeakPtr(); }
+
+    static void deinterleavePadAddedCallback(AudioFileReader*, GstPad*);
+    static void deinterleaveReadyCallback(AudioFileReader*);
+    static void decodebinPadAddedCallback(AudioFileReader*, GstPad*);
+
+    void handleMessage(GstMessage*);
     void handleNewDeinterleavePad(GstPad*);
     void deinterleavePadsConfigured();
     void plugDeinterleave(GstPad*);
     void decodeAudioForBusCreation();
+    GstFlowReturn handleSample(GstAppSink*);
 
-private:
-    const void* m_data;
-    size_t m_dataSize;
-    const char* m_filePath;
+    WeakPtrFactory<AudioFileReader> m_weakPtrFactory;
+    RunLoop& m_runLoop;
+    const void* m_data { nullptr };
+    size_t m_dataSize { 0 };
+    const char* m_filePath { nullptr };
 
-    float m_sampleRate;
-    GstBufferList* m_frontLeftBuffers;
-    GstBufferList* m_frontRightBuffers;
+    float m_sampleRate { 0 };
+    int m_channels { 0 };
+    GRefPtr<GstBufferList> m_frontLeftBuffers;
+    GRefPtr<GstBufferList> m_frontRightBuffers;
 
-#ifndef GST_API_VERSION_1
-    GstBufferListIterator* m_frontLeftBuffersIterator;
-    GstBufferListIterator* m_frontRightBuffersIterator;
-#endif
-
-    GstElement* m_pipeline;
-    unsigned m_channelSize;
+    GRefPtr<GstElement> m_pipeline;
+    unsigned m_channelSize { 0 };
     GRefPtr<GstElement> m_decodebin;
     GRefPtr<GstElement> m_deInterleave;
-    GRefPtr<GMainLoop> m_loop;
-    bool m_errorOccurred;
+    bool m_errorOccurred { false };
 };
 
 static void copyGstreamerBuffersToAudioChannel(GstBufferList* buffers, AudioChannel* audioChannel)
 {
-#ifdef GST_API_VERSION_1
     float* destination = audioChannel->mutableData();
     unsigned bufferCount = gst_buffer_list_length(buffers);
     for (unsigned i = 0; i < bufferCount; ++i) {
@@ -109,211 +97,106 @@ static void copyGstreamerBuffersToAudioChannel(GstBufferList* buffers, AudioChan
         gst_buffer_extract(buffer, 0, destination, bufferSize);
         destination += bufferSize / sizeof(float);
     }
-#else
-    GstBufferListIterator* iter = gst_buffer_list_iterate(buffers);
-    gst_buffer_list_iterator_next_group(iter);
-    GstBuffer* buffer = gst_buffer_list_iterator_merge_group(iter);
-    if (buffer) {
-        memcpy(audioChannel->mutableData(), reinterpret_cast<float*>(GST_BUFFER_DATA(buffer)), GST_BUFFER_SIZE(buffer));
-        gst_buffer_unref(buffer);
-    }
-
-    gst_buffer_list_iterator_free(iter);
-#endif
 }
 
-static GstFlowReturn onAppsinkPullRequiredCallback(GstAppSink* sink, gpointer userData)
-{
-#ifdef GST_API_VERSION_1
-    return static_cast<AudioFileReader*>(userData)->handleSample(sink);
-#else
-    return static_cast<AudioFileReader*>(userData)->handleBuffer(sink);
-#endif
-}
-
-gboolean messageCallback(GstBus*, GstMessage* message, AudioFileReader* reader)
-{
-    return reader->handleMessage(message);
-}
-
-static void onGStreamerDeinterleavePadAddedCallback(GstElement*, GstPad* pad, AudioFileReader* reader)
+void AudioFileReader::deinterleavePadAddedCallback(AudioFileReader* reader, GstPad* pad)
 {
     reader->handleNewDeinterleavePad(pad);
 }
 
-static void onGStreamerDeinterleaveReadyCallback(GstElement*, AudioFileReader* reader)
+void AudioFileReader::deinterleaveReadyCallback(AudioFileReader* reader)
 {
     reader->deinterleavePadsConfigured();
 }
 
-static void onGStreamerDecodebinPadAddedCallback(GstElement*, GstPad* pad, AudioFileReader* reader)
+void AudioFileReader::decodebinPadAddedCallback(AudioFileReader* reader, GstPad* pad)
 {
     reader->plugDeinterleave(pad);
 }
 
-gboolean enteredMainLoopCallback(gpointer userData)
-{
-    AudioFileReader* reader = reinterpret_cast<AudioFileReader*>(userData);
-    reader->decodeAudioForBusCreation();
-    return FALSE;
-}
-
 AudioFileReader::AudioFileReader(const char* filePath)
-    : m_data(0)
-    , m_dataSize(0)
+    : m_weakPtrFactory(this)
+    , m_runLoop(RunLoop::current())
     , m_filePath(filePath)
-    , m_channelSize(0)
-    , m_errorOccurred(false)
 {
 }
 
 AudioFileReader::AudioFileReader(const void* data, size_t dataSize)
-    : m_data(data)
+    : m_weakPtrFactory(this)
+    , m_runLoop(RunLoop::current())
+    , m_data(data)
     , m_dataSize(dataSize)
-    , m_filePath(0)
-    , m_channelSize(0)
-    , m_errorOccurred(false)
 {
 }
 
 AudioFileReader::~AudioFileReader()
 {
     if (m_pipeline) {
-        GRefPtr<GstBus> bus = webkitGstPipelineGetBus(GST_PIPELINE(m_pipeline));
+        GRefPtr<GstBus> bus = adoptGRef(gst_pipeline_get_bus(GST_PIPELINE(m_pipeline.get())));
         ASSERT(bus);
-        g_signal_handlers_disconnect_by_func(bus.get(), reinterpret_cast<gpointer>(messageCallback), this);
-        gst_bus_remove_signal_watch(bus.get());
+        gst_bus_set_sync_handler(bus.get(), nullptr, nullptr, nullptr);
 
-        gst_element_set_state(m_pipeline, GST_STATE_NULL);
-        gst_object_unref(GST_OBJECT(m_pipeline));
+        gst_element_set_state(m_pipeline.get(), GST_STATE_NULL);
+        m_pipeline = nullptr;
     }
 
     if (m_decodebin) {
-        g_signal_handlers_disconnect_by_func(m_decodebin.get(), reinterpret_cast<gpointer>(onGStreamerDecodebinPadAddedCallback), this);
-        m_decodebin.clear();
+        g_signal_handlers_disconnect_matched(m_decodebin.get(), G_SIGNAL_MATCH_DATA, 0, 0, nullptr, nullptr, this);
+        m_decodebin = nullptr;
     }
 
     if (m_deInterleave) {
-        g_signal_handlers_disconnect_by_func(m_deInterleave.get(), reinterpret_cast<gpointer>(onGStreamerDeinterleavePadAddedCallback), this);
-        g_signal_handlers_disconnect_by_func(m_deInterleave.get(), reinterpret_cast<gpointer>(onGStreamerDeinterleaveReadyCallback), this);
-        m_deInterleave.clear();
+        g_signal_handlers_disconnect_matched(m_deInterleave.get(), G_SIGNAL_MATCH_DATA, 0, 0, nullptr, nullptr, this);
+        m_deInterleave = nullptr;
     }
-
-#ifndef GST_API_VERSION_1
-    gst_buffer_list_iterator_free(m_frontLeftBuffersIterator);
-    gst_buffer_list_iterator_free(m_frontRightBuffersIterator);
-#endif
-    gst_buffer_list_unref(m_frontLeftBuffers);
-    gst_buffer_list_unref(m_frontRightBuffers);
 }
 
-#ifdef GST_API_VERSION_1
 GstFlowReturn AudioFileReader::handleSample(GstAppSink* sink)
 {
-    GstSample* sample = gst_app_sink_pull_sample(sink);
+    GRefPtr<GstSample> sample = adoptGRef(gst_app_sink_pull_sample(sink));
     if (!sample)
         return GST_FLOW_ERROR;
 
-    GstBuffer* buffer = gst_sample_get_buffer(sample);
-    if (!buffer) {
-        gst_sample_unref(sample);
+    GstBuffer* buffer = gst_sample_get_buffer(sample.get());
+    if (!buffer)
         return GST_FLOW_ERROR;
-    }
 
-    GstCaps* caps = gst_sample_get_caps(sample);
-    if (!caps) {
-        gst_sample_unref(sample);
+    GstCaps* caps = gst_sample_get_caps(sample.get());
+    if (!caps)
         return GST_FLOW_ERROR;
-    }
 
     GstAudioInfo info;
     gst_audio_info_from_caps(&info, caps);
-    int frames = GST_CLOCK_TIME_TO_FRAMES(GST_BUFFER_DURATION(buffer), GST_AUDIO_INFO_RATE(&info));
+    int frames = gst_buffer_get_size(buffer) / info.bpf;
 
     // Check the first audio channel. The buffer is supposed to store
     // data of a single channel anyway.
     switch (GST_AUDIO_INFO_POSITION(&info, 0)) {
     case GST_AUDIO_CHANNEL_POSITION_FRONT_LEFT:
-        gst_buffer_list_add(m_frontLeftBuffers, gst_buffer_ref(buffer));
+    case GST_AUDIO_CHANNEL_POSITION_MONO:
+        gst_buffer_list_add(m_frontLeftBuffers.get(), gst_buffer_ref(buffer));
         m_channelSize += frames;
         break;
     case GST_AUDIO_CHANNEL_POSITION_FRONT_RIGHT:
-        gst_buffer_list_add(m_frontRightBuffers, gst_buffer_ref(buffer));
+        gst_buffer_list_add(m_frontRightBuffers.get(), gst_buffer_ref(buffer));
         break;
     default:
         break;
     }
 
-    gst_sample_unref(sample);
-    return GST_FLOW_OK;
-
-}
-#endif
-
-#ifndef GST_API_VERSION_1
-GstFlowReturn AudioFileReader::handleBuffer(GstAppSink* sink)
-{
-    GstBuffer* buffer = gst_app_sink_pull_buffer(sink);
-    if (!buffer)
-        return GST_FLOW_ERROR;
-
-    GstCaps* caps = gst_buffer_get_caps(buffer);
-    GstStructure* structure = gst_caps_get_structure(caps, 0);
-
-    gint channels = 0;
-    if (!gst_structure_get_int(structure, "channels", &channels) || !channels) {
-        gst_caps_unref(caps);
-        gst_buffer_unref(buffer);
-        return GST_FLOW_ERROR;
-    }
-
-    gint sampleRate = 0;
-    if (!gst_structure_get_int(structure, "rate", &sampleRate) || !sampleRate) {
-        gst_caps_unref(caps);
-        gst_buffer_unref(buffer);
-        return GST_FLOW_ERROR;
-    }
-
-    gint width = 0;
-    if (!gst_structure_get_int(structure, "width", &width) || !width) {
-        gst_caps_unref(caps);
-        gst_buffer_unref(buffer);
-        return GST_FLOW_ERROR;
-    }
-
-    GstClockTime duration = (static_cast<guint64>(GST_BUFFER_SIZE(buffer)) * 8 * GST_SECOND) / (sampleRate * channels * width);
-    int frames = GST_CLOCK_TIME_TO_FRAMES(duration, sampleRate);
-
-    // Check the first audio channel. The buffer is supposed to store
-    // data of a single channel anyway.
-    GstAudioChannelPosition* positions = gst_audio_get_channel_positions(structure);
-    switch (positions[0]) {
-    case GST_AUDIO_CHANNEL_POSITION_FRONT_LEFT:
-        gst_buffer_list_iterator_add(m_frontLeftBuffersIterator, buffer);
-        m_channelSize += frames;
-        break;
-    case GST_AUDIO_CHANNEL_POSITION_FRONT_RIGHT:
-        gst_buffer_list_iterator_add(m_frontRightBuffersIterator, buffer);
-        break;
-    default:
-        gst_buffer_unref(buffer);
-        break;
-    }
-
-    g_free(positions);
-    gst_caps_unref(caps);
     return GST_FLOW_OK;
 }
-#endif
 
-gboolean AudioFileReader::handleMessage(GstMessage* message)
+void AudioFileReader::handleMessage(GstMessage* message)
 {
-    GOwnPtr<GError> error;
-    GOwnPtr<gchar> debug;
+    ASSERT(&m_runLoop == &RunLoop::current());
+
+    GUniqueOutPtr<GError> error;
+    GUniqueOutPtr<gchar> debug;
 
     switch (GST_MESSAGE_TYPE(message)) {
     case GST_MESSAGE_EOS:
-        g_main_loop_quit(m_loop.get());
+        m_runLoop.stop();
         break;
     case GST_MESSAGE_WARNING:
         gst_message_parse_warning(message, &error.outPtr(), &debug.outPtr());
@@ -323,12 +206,12 @@ gboolean AudioFileReader::handleMessage(GstMessage* message)
         gst_message_parse_error(message, &error.outPtr(), &debug.outPtr());
         g_warning("Error: %d, %s. Debug output: %s", error->code,  error->message, debug.get());
         m_errorOccurred = true;
-        g_main_loop_quit(m_loop.get());
+        gst_element_set_state(m_pipeline.get(), GST_STATE_NULL);
+        m_runLoop.stop();
         break;
     default:
         break;
     }
-    return TRUE;
 }
 
 void AudioFileReader::handleNewDeinterleavePad(GstPad* pad)
@@ -340,40 +223,43 @@ void AudioFileReader::handleNewDeinterleavePad(GstPad* pad)
     GstElement* queue = gst_element_factory_make("queue", 0);
     GstElement* sink = gst_element_factory_make("appsink", 0);
 
-    GstAppSinkCallbacks callbacks;
-    callbacks.eos = 0;
-    callbacks.new_preroll = 0;
-#ifdef GST_API_VERSION_1
-    callbacks.new_sample = onAppsinkPullRequiredCallback;
-#else
-    callbacks.new_buffer_list = 0;
-    callbacks.new_buffer = onAppsinkPullRequiredCallback;
-#endif
+    static GstAppSinkCallbacks callbacks = {
+        nullptr, // eos
+        nullptr, // new_preroll
+        // new_sample
+        [](GstAppSink* sink, gpointer userData) -> GstFlowReturn {
+            return static_cast<AudioFileReader*>(userData)->handleSample(sink);
+        },
+        { nullptr }
+    };
     gst_app_sink_set_callbacks(GST_APP_SINK(sink), &callbacks, this, 0);
 
     g_object_set(sink, "sync", FALSE, NULL);
 
-    gst_bin_add_many(GST_BIN(m_pipeline), queue, sink, NULL);
+    gst_bin_add_many(GST_BIN(m_pipeline.get()), queue, sink, nullptr);
 
-    GstPad* sinkPad = gst_element_get_static_pad(queue, "sink");
-    gst_pad_link_full(pad, sinkPad, GST_PAD_LINK_CHECK_NOTHING);
-    gst_object_unref(GST_OBJECT(sinkPad));
+    GRefPtr<GstPad> sinkPad = adoptGRef(gst_element_get_static_pad(queue, "sink"));
+    gst_pad_link_full(pad, sinkPad.get(), GST_PAD_LINK_CHECK_NOTHING);
 
     gst_element_link_pads_full(queue, "src", sink, "sink", GST_PAD_LINK_CHECK_NOTHING);
 
-    gst_element_set_state(queue, GST_STATE_READY);
-    gst_element_set_state(sink, GST_STATE_READY);
+    gst_element_sync_state_with_parent(queue);
+    gst_element_sync_state_with_parent(sink);
 }
 
 void AudioFileReader::deinterleavePadsConfigured()
 {
     // All deinterleave src pads are now available, let's roll to
     // PLAYING so data flows towards the sinks and it can be retrieved.
-    gst_element_set_state(m_pipeline, GST_STATE_PLAYING);
+    gst_element_set_state(m_pipeline.get(), GST_STATE_PLAYING);
 }
 
 void AudioFileReader::plugDeinterleave(GstPad* pad)
 {
+    // Ignore any additional source pads just in case.
+    if (m_deInterleave)
+        return;
+
     // A decodebin pad was added, plug in a deinterleave element to
     // separate each planar channel. Sub pipeline looks like
     // ... decodebin2 ! audioconvert ! audioresample ! capsfilter ! deinterleave.
@@ -383,18 +269,20 @@ void AudioFileReader::plugDeinterleave(GstPad* pad)
     m_deInterleave = gst_element_factory_make("deinterleave", "deinterleave");
 
     g_object_set(m_deInterleave.get(), "keep-positions", TRUE, NULL);
-    g_signal_connect(m_deInterleave.get(), "pad-added", G_CALLBACK(onGStreamerDeinterleavePadAddedCallback), this);
-    g_signal_connect(m_deInterleave.get(), "no-more-pads", G_CALLBACK(onGStreamerDeinterleaveReadyCallback), this);
+    g_signal_connect_swapped(m_deInterleave.get(), "pad-added", G_CALLBACK(deinterleavePadAddedCallback), this);
+    g_signal_connect_swapped(m_deInterleave.get(), "no-more-pads", G_CALLBACK(deinterleaveReadyCallback), this);
 
-    GstCaps* caps = getGstAudioCaps(2, m_sampleRate);
-    g_object_set(capsFilter, "caps", caps, NULL);
-    gst_caps_unref(caps);
+    GRefPtr<GstCaps> caps = adoptGRef(gst_caps_new_simple("audio/x-raw",
+        "rate", G_TYPE_INT, static_cast<int>(m_sampleRate),
+        "channels", G_TYPE_INT, m_channels,
+        "format", G_TYPE_STRING, GST_AUDIO_NE(F32),
+        "layout", G_TYPE_STRING, "interleaved", nullptr));
+    g_object_set(capsFilter, "caps", caps.get(), nullptr);
 
-    gst_bin_add_many(GST_BIN(m_pipeline), audioConvert, audioResample, capsFilter, m_deInterleave.get(), NULL);
+    gst_bin_add_many(GST_BIN(m_pipeline.get()), audioConvert, audioResample, capsFilter, m_deInterleave.get(), nullptr);
 
-    GstPad* sinkPad = gst_element_get_static_pad(audioConvert, "sink");
-    gst_pad_link_full(pad, sinkPad, GST_PAD_LINK_CHECK_NOTHING);
-    gst_object_unref(GST_OBJECT(sinkPad));
+    GRefPtr<GstPad> sinkPad = adoptGRef(gst_element_get_static_pad(audioConvert, "sink"));
+    gst_pad_link_full(pad, sinkPad.get(), GST_PAD_LINK_CHECK_NOTHING);
 
     gst_element_link_pads_full(audioConvert, "src", audioResample, "sink", GST_PAD_LINK_CHECK_NOTHING);
     gst_element_link_pads_full(audioResample, "src", capsFilter, "sink", GST_PAD_LINK_CHECK_NOTHING);
@@ -408,14 +296,29 @@ void AudioFileReader::plugDeinterleave(GstPad* pad)
 
 void AudioFileReader::decodeAudioForBusCreation()
 {
+    ASSERT(&m_runLoop == &RunLoop::current());
+
     // Build the pipeline (giostreamsrc | filesrc) ! decodebin2
     // A deinterleave element is added once a src pad becomes available in decodebin.
-    m_pipeline = gst_pipeline_new(0);
+    m_pipeline = gst_pipeline_new(nullptr);
 
-    GRefPtr<GstBus> bus = webkitGstPipelineGetBus(GST_PIPELINE(m_pipeline));
+    GRefPtr<GstBus> bus = adoptGRef(gst_pipeline_get_bus(GST_PIPELINE(m_pipeline.get())));
     ASSERT(bus);
-    gst_bus_add_signal_watch(bus.get());
-    g_signal_connect(bus.get(), "message", G_CALLBACK(messageCallback), this);
+    gst_bus_set_sync_handler(bus.get(), [](GstBus*, GstMessage* message, gpointer userData) {
+        auto& reader = *static_cast<AudioFileReader*>(userData);
+        if (&reader.m_runLoop == &RunLoop::current())
+            reader.handleMessage(message);
+        else {
+            GRefPtr<GstMessage> protectMessage(message);
+            auto weakThis = reader.createWeakPtr();
+            reader.m_runLoop.dispatch([weakThis, protectMessage] {
+                if (weakThis)
+                    weakThis->handleMessage(protectMessage.get());
+            });
+        }
+        gst_message_unref(message);
+        return GST_BUS_DROP;
+    }, this, nullptr);
 
     GstElement* source;
     if (m_data) {
@@ -428,63 +331,67 @@ void AudioFileReader::decodeAudioForBusCreation()
         g_object_set(source, "location", m_filePath, NULL);
     }
 
-    m_decodebin = gst_element_factory_make(gDecodebinName, "decodebin");
-    g_signal_connect(m_decodebin.get(), "pad-added", G_CALLBACK(onGStreamerDecodebinPadAddedCallback), this);
+    m_decodebin = gst_element_factory_make("decodebin", "decodebin");
+    g_signal_connect_swapped(m_decodebin.get(), "pad-added", G_CALLBACK(decodebinPadAddedCallback), this);
 
-    gst_bin_add_many(GST_BIN(m_pipeline), source, m_decodebin.get(), NULL);
+    gst_bin_add_many(GST_BIN(m_pipeline.get()), source, m_decodebin.get(), NULL);
     gst_element_link_pads_full(source, "src", m_decodebin.get(), "sink", GST_PAD_LINK_CHECK_NOTHING);
-    gst_element_set_state(m_pipeline, GST_STATE_PAUSED);
+
+    // Catch errors here immediately, there might not be an error message if we're unlucky.
+    if (gst_element_set_state(m_pipeline.get(), GST_STATE_PAUSED) == GST_STATE_CHANGE_FAILURE) {
+        g_warning("Error: Failed to set pipeline to PAUSED");
+        m_errorOccurred = true;
+        m_runLoop.stop();
+    }
 }
 
 PassRefPtr<AudioBus> AudioFileReader::createBus(float sampleRate, bool mixToMono)
 {
     m_sampleRate = sampleRate;
+    m_channels = mixToMono ? 1 : 2;
 
-    m_frontLeftBuffers = gst_buffer_list_new();
-    m_frontRightBuffers = gst_buffer_list_new();
-
-#ifndef GST_API_VERSION_1
-    m_frontLeftBuffersIterator = gst_buffer_list_iterate(m_frontLeftBuffers);
-    gst_buffer_list_iterator_add_group(m_frontLeftBuffersIterator);
-
-    m_frontRightBuffersIterator = gst_buffer_list_iterate(m_frontRightBuffers);
-    gst_buffer_list_iterator_add_group(m_frontRightBuffersIterator);
-#endif
-
-    GRefPtr<GMainContext> context = adoptGRef(g_main_context_new());
-    g_main_context_push_thread_default(context.get());
-    m_loop = adoptGRef(g_main_loop_new(context.get(), FALSE));
+    m_frontLeftBuffers = adoptGRef(gst_buffer_list_new());
+    m_frontRightBuffers = adoptGRef(gst_buffer_list_new());
 
     // Start the pipeline processing just after the loop is started.
-    GRefPtr<GSource> timeoutSource = adoptGRef(g_timeout_source_new(0));
-    g_source_attach(timeoutSource.get(), context.get());
-    g_source_set_callback(timeoutSource.get(), reinterpret_cast<GSourceFunc>(enteredMainLoopCallback), this, 0);
+    m_runLoop.dispatch([this] { decodeAudioForBusCreation(); });
+    m_runLoop.run();
 
-    g_main_loop_run(m_loop.get());
-    g_main_context_pop_thread_default(context.get());
+    // Set pipeline to GST_STATE_NULL state here already ASAP to
+    // release any resources that might still be used.
+    gst_element_set_state(m_pipeline.get(), GST_STATE_NULL);
 
     if (m_errorOccurred)
-        return 0;
+        return nullptr;
 
-    unsigned channels = mixToMono ? 1 : 2;
-    RefPtr<AudioBus> audioBus = AudioBus::create(channels, m_channelSize, true);
+    RefPtr<AudioBus> audioBus = AudioBus::create(m_channels, m_channelSize, true);
     audioBus->setSampleRate(m_sampleRate);
 
-    copyGstreamerBuffersToAudioChannel(m_frontLeftBuffers, audioBus->channel(0));
+    copyGstreamerBuffersToAudioChannel(m_frontLeftBuffers.get(), audioBus->channel(0));
     if (!mixToMono)
-        copyGstreamerBuffersToAudioChannel(m_frontRightBuffers, audioBus->channel(1));
+        copyGstreamerBuffersToAudioChannel(m_frontRightBuffers.get(), audioBus->channel(1));
 
     return audioBus;
 }
 
 PassRefPtr<AudioBus> createBusFromAudioFile(const char* filePath, bool mixToMono, float sampleRate)
 {
-    return AudioFileReader(filePath).createBus(sampleRate, mixToMono);
+    RefPtr<AudioBus> returnValue;
+    auto threadID = createThread("AudioFileReader", [&returnValue, filePath, mixToMono, sampleRate] {
+        returnValue = AudioFileReader(filePath).createBus(sampleRate, mixToMono);
+    });
+    waitForThreadCompletion(threadID);
+    return returnValue;
 }
 
 PassRefPtr<AudioBus> createBusFromInMemoryAudioFile(const void* data, size_t dataSize, bool mixToMono, float sampleRate)
 {
-    return AudioFileReader(data, dataSize).createBus(sampleRate, mixToMono);
+    RefPtr<AudioBus> returnValue;
+    auto threadID = createThread("AudioFileReader", [&returnValue, data, dataSize, mixToMono, sampleRate] {
+        returnValue = AudioFileReader(data, dataSize).createBus(sampleRate, mixToMono);
+    });
+    waitForThreadCompletion(threadID);
+    return returnValue;
 }
 
 } // WebCore

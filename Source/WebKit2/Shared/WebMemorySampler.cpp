@@ -39,7 +39,13 @@ namespace WebKit {
 
 static const char separator = '\t';
 
-WebMemorySampler* WebMemorySampler::shared()
+static void appendSpaces(StringBuilder& string, int count)
+{
+    for (int i = 0; i < count; ++i)
+        string.append(' ');
+}
+
+WebMemorySampler* WebMemorySampler::singleton()
 {
     static WebMemorySampler* sharedMemorySampler;
     if (!sharedMemorySampler)
@@ -48,8 +54,8 @@ WebMemorySampler* WebMemorySampler::shared()
 }
 
 WebMemorySampler::WebMemorySampler() 
-    : m_sampleTimer(this, &WebMemorySampler::sampleTimerFired)
-    , m_stopTimer(this, &WebMemorySampler::stopTimerFired)
+    : m_sampleTimer(*this, &WebMemorySampler::sampleTimerFired)
+    , m_stopTimer(*this, &WebMemorySampler::stopTimerFired)
     , m_isRunning(false)
     , m_runningTime(0)
 {
@@ -98,7 +104,8 @@ void WebMemorySampler::stop()
     if (!m_isRunning) 
         return;
     m_sampleTimer.stop();
-    m_sampleLogFile = 0;
+    closeFile(m_sampleLogFile);
+
     printf("Stopped memory sampler for process %s %d\n", processName().utf8().data(), getpid());
     // Flush stdout buffer so python script can be guaranteed to read up to this point.
     fflush(stdout);
@@ -140,27 +147,15 @@ void WebMemorySampler::writeHeaders()
 
     CString utf8String = processDetails.utf8();
     writeToFile(m_sampleLogFile, utf8String.data(), utf8String.length());
-    
-    StringBuilder header; 
-    WebMemoryStatistics stats = sampleWebKit();
-    if (!stats.keys.isEmpty()) {
-        for (size_t i = 0; i < stats.keys.size(); ++i) {
-            header.append(separator);
-            header.append(stats.keys[i]);
-        }
-    }
-    header.append('\n');
-    utf8String = header.toString().utf8();
-    writeToFile(m_sampleLogFile, utf8String.data(), utf8String.length());
 }
 
-void WebMemorySampler::sampleTimerFired(Timer<WebMemorySampler>*)
+void WebMemorySampler::sampleTimerFired()
 {
     sendMemoryPressureEvent();
     appendCurrentMemoryUsageToFile(m_sampleLogFile);
 }
 
-void WebMemorySampler::stopTimerFired(Timer<WebMemorySampler>*)
+void WebMemorySampler::stopTimerFired()
 {
     if (!m_isRunning)
         return;
@@ -177,7 +172,10 @@ void WebMemorySampler::appendCurrentMemoryUsageToFile(PlatformFileHandle&)
     if (!memoryStats.values.isEmpty()) {
         statString.append(separator);
         for (size_t i = 0; i < memoryStats.values.size(); ++i) {
+            statString.append('\n');
             statString.append(separator);
+            statString.append(memoryStats.keys[i]);
+            appendSpaces(statString, 35 - memoryStats.keys[i].length());
             statString.appendNumber(memoryStats.values[i]);
         }
     }

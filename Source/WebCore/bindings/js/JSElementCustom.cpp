@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution. 
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission. 
  *
@@ -38,12 +38,10 @@
 #include "JSDOMBinding.h"
 #include "JSHTMLElementWrapperFactory.h"
 #include "JSNodeList.h"
-#include "NodeList.h"
-
-#if ENABLE(SVG)
+#include "JSNodeOrString.h"
 #include "JSSVGElementWrapperFactory.h"
+#include "NodeList.h"
 #include "SVGElement.h"
-#endif
 
 using namespace JSC;
 
@@ -51,24 +49,71 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-JSValue toJSNewlyCreated(ExecState* exec, JSDOMGlobalObject* globalObject, Element* element)
+JSValue toJSNewlyCreated(ExecState*, JSDOMGlobalObject* globalObject, Element* element)
 {
     if (!element)
         return jsNull();
 
-    ASSERT(!getCachedWrapper(currentWorld(exec), element));
-
-    JSDOMWrapper* wrapper;        
-    if (element->isHTMLElement())
-        wrapper = createJSHTMLWrapper(exec, globalObject, toHTMLElement(element));
-#if ENABLE(SVG)
-    else if (element->isSVGElement())
-        wrapper = createJSSVGWrapper(exec, globalObject, toSVGElement(element));
+#if ENABLE(CUSTOM_ELEMENTS)
+    if (element->isCustomElement())
+        return getCachedWrapper(globalObject->world(), element);
 #endif
+    ASSERT(!getCachedWrapper(globalObject->world(), element));
+
+    JSDOMObject* wrapper;        
+    if (is<HTMLElement>(*element))
+        wrapper = createJSHTMLWrapper(globalObject, downcast<HTMLElement>(element));
+    else if (is<SVGElement>(*element))
+        wrapper = createJSSVGWrapper(globalObject, downcast<SVGElement>(element));
     else
-        wrapper = CREATE_DOM_WRAPPER(exec, globalObject, Element, element);
+        wrapper = CREATE_DOM_WRAPPER(globalObject, Element, element);
 
     return wrapper;    
+}
+
+JSValue JSElement::before(ExecState& state)
+{
+    ExceptionCode ec = 0;
+    wrapped().before(toNodeOrStringVector(state), ec);
+    setDOMException(&state, ec);
+
+    return jsUndefined();
+}
+
+JSValue JSElement::after(ExecState& state)
+{
+    ExceptionCode ec = 0;
+    wrapped().after(toNodeOrStringVector(state), ec);
+    setDOMException(&state, ec);
+
+    return jsUndefined();
+}
+
+JSValue JSElement::replaceWith(ExecState& state)
+{
+    ExceptionCode ec = 0;
+    wrapped().replaceWith(toNodeOrStringVector(state), ec);
+    setDOMException(&state, ec);
+
+    return jsUndefined();
+}
+
+JSValue JSElement::prepend(ExecState& state)
+{
+    ExceptionCode ec = 0;
+    wrapped().prepend(toNodeOrStringVector(state), ec);
+    setDOMException(&state, ec);
+
+    return jsUndefined();
+}
+
+JSValue JSElement::append(ExecState& state)
+{
+    ExceptionCode ec = 0;
+    wrapped().append(toNodeOrStringVector(state), ec);
+    setDOMException(&state, ec);
+
+    return jsUndefined();
 }
 
 } // namespace WebCore

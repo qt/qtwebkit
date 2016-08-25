@@ -26,7 +26,7 @@
 #include "Navigator.h"
 #include "Page.h"
 #include "Vibration.h"
-#include <wtf/Uint32Array.h>
+#include <runtime/Uint32Array.h>
 
 namespace WebCore {
 
@@ -38,22 +38,20 @@ NavigatorVibration::~NavigatorVibration()
 {
 }
 
-bool NavigatorVibration::vibrate(Navigator* navigator, unsigned time)
+bool NavigatorVibration::vibrate(Navigator& navigator, unsigned time)
 {
-    return NavigatorVibration::vibrate(navigator, VibrationPattern(time));
+    return NavigatorVibration::vibrate(navigator, VibrationPattern(1, time));
 }
 
-bool NavigatorVibration::vibrate(Navigator* navigator, const VibrationPattern& pattern)
+bool NavigatorVibration::vibrate(Navigator& navigator, const VibrationPattern& pattern)
 {
-    if (!navigator->frame()->page())
+    if (!navigator.frame()->page())
         return false;
 
-#if ENABLE(PAGE_VISIBILITY_API)
-    if (navigator->frame()->page()->visibilityState() == PageVisibilityStateHidden)
+    if (navigator.frame()->page()->visibilityState() == PageVisibilityStateHidden)
         return false;
-#endif
 
-    return Vibration::from(navigator->frame()->page())->vibrate(pattern);
+    return Vibration::from(navigator.frame()->page())->vibrate(pattern);
 }
 
 } // namespace WebCore

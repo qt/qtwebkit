@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,13 +27,22 @@
 #define EventDispatcher_h
 
 #include "Connection.h"
+
+#include "WebEvent.h"
+#include <WebCore/WheelEventDeltaFilter.h>
+#include <memory>
 #include <wtf/HashMap.h>
+#include <wtf/Lock.h>
 #include <wtf/Noncopyable.h>
 #include <wtf/RefPtr.h>
 #include <wtf/ThreadingPrimitives.h>
 
+#if ENABLE(MAC_GESTURE_EVENTS)
+#include "WebGestureEvent.h"
+#endif
+
 namespace WebCore {
-    class ScrollingTree;
+class ThreadedScrollingTree;
 }
 
 namespace WebKit {
@@ -42,49 +51,64 @@ class WebEvent;
 class WebPage;
 class WebWheelEvent;
 
-#if ENABLE(GESTURE_EVENTS)
-class WebGestureEvent;
-#endif
-
-class EventDispatcher : public CoreIPC::Connection::WorkQueueMessageReceiver {
+class EventDispatcher : public IPC::Connection::WorkQueueMessageReceiver {
 public:
-    static PassRefPtr<EventDispatcher> create();
+    static Ref<EventDispatcher> create();
     ~EventDispatcher();
 
-#if ENABLE(THREADED_SCROLLING)
+#if ENABLE(ASYNC_SCROLLING)
     void addScrollingTreeForPage(WebPage*);
     void removeScrollingTreeForPage(WebPage*);
 #endif
 
-    void initializeConnection(CoreIPC::Connection*);
+#if ENABLE(IOS_TOUCH_EVENTS)
+    typedef Vector<WebTouchEvent, 1> TouchEventQueue;
+
+    void clearQueuedTouchEventsForPage(const WebPage&);
+    void getQueuedTouchEventsForPage(const WebPage&, TouchEventQueue&);
+#endif
+
+    void initializeConnection(IPC::Connection*);
 
 private:
     EventDispatcher();
 
-    // CoreIPC::Connection::WorkQueueMessageReceiver.
-    virtual void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&) OVERRIDE;
+    // IPC::Connection::WorkQueueMessageReceiver.
+    virtual void didReceiveMessage(IPC::Connection&, IPC::MessageDecoder&) override;
 
     // Message handlers
-    void wheelEvent(uint64_t pageID, const WebWheelEvent&, bool canGoBack, bool canGoForward);
-#if ENABLE(GESTURE_EVENTS)
+    void wheelEvent(uint64_t pageID, const WebWheelEvent&, bool canRubberBandAtLeft, bool canRubberBandAtRight, bool canRubberBandAtTop, bool canRubberBandAtBottom);
+#if ENABLE(IOS_TOUCH_EVENTS)
+    void touchEvent(uint64_t pageID, const WebTouchEvent&);
+#endif
+#if ENABLE(MAC_GESTURE_EVENTS)
     void gestureEvent(uint64_t pageID, const WebGestureEvent&);
 #endif
 
+
     // This is called on the main thread.
     void dispatchWheelEvent(uint64_t pageID, const WebWheelEvent&);
-#if ENABLE(GESTURE_EVENTS)
+#if ENABLE(IOS_TOUCH_EVENTS)
+    void dispatchTouchEvents();
+#endif
+#if ENABLE(MAC_GESTURE_EVENTS)
     void dispatchGestureEvent(uint64_t pageID, const WebGestureEvent&);
 #endif
 
-#if ENABLE(THREADED_SCROLLING)
+#if ENABLE(ASYNC_SCROLLING)
     void sendDidReceiveEvent(uint64_t pageID, const WebEvent&, bool didHandleEvent);
 #endif
 
-    RefPtr<WorkQueue> m_queue;
+    Ref<WorkQueue> m_queue;
 
-#if ENABLE(THREADED_SCROLLING)
-    Mutex m_scrollingTreesMutex;
-    HashMap<uint64_t, RefPtr<WebCore::ScrollingTree> > m_scrollingTrees;
+#if ENABLE(ASYNC_SCROLLING)
+    Lock m_scrollingTreesMutex;
+    HashMap<uint64_t, RefPtr<WebCore::ThreadedScrollingTree>> m_scrollingTrees;
+#endif
+    std::unique_ptr<WebCore::WheelEventDeltaFilter> m_recentWheelEventDeltaFilter;
+#if ENABLE(IOS_TOUCH_EVENTS)
+    Lock m_touchEventsLock;
+    HashMap<uint64_t, TouchEventQueue> m_touchEvents;
 #endif
 };
 

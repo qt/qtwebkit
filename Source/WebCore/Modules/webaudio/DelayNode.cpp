@@ -32,14 +32,14 @@ namespace WebCore {
 
 const double maximumAllowedDelayTime = 180;
 
-DelayNode::DelayNode(AudioContext* context, float sampleRate, double maxDelayTime, ExceptionCode& ec)
+DelayNode::DelayNode(AudioContext& context, float sampleRate, double maxDelayTime, ExceptionCode& ec)
     : AudioBasicProcessorNode(context, sampleRate)
 {
     if (maxDelayTime <= 0 || maxDelayTime >= maximumAllowedDelayTime) {
         ec = NOT_SUPPORTED_ERR;
         return;
     }
-    m_processor = adoptPtr(new DelayProcessor(context, sampleRate, 1, maxDelayTime));
+    m_processor = std::make_unique<DelayProcessor>(context, sampleRate, 1, maxDelayTime);
     setNodeType(NodeTypeDelay);
 }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, 2009 Apple Inc. All rights reserved.
+ * Copyright (C) 2008, 2009, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -32,6 +32,7 @@
 #include "CodeBlock.h"
 #include "Interpreter.h"
 #include "Opcode.h"
+#include "JSCInlines.h"
 
 #if !OS(WINDOWS)
 #include <unistd.h>
@@ -284,7 +285,7 @@ void SamplingTool::doRun()
 
 #if ENABLE(CODEBLOCK_SAMPLING)
     if (CodeBlock* codeBlock = sample.codeBlock()) {
-        MutexLocker locker(m_scriptSampleMapMutex);
+        LockHolder locker(m_scriptSampleMapMutex);
         ScriptSampleRecord* record = m_scopeSampleMap->get(codeBlock->ownerExecutable());
         ASSERT(record);
         record->sample(codeBlock, sample.vPC());
@@ -300,7 +301,7 @@ void SamplingTool::sample()
 void SamplingTool::notifyOfScope(VM& vm, ScriptExecutable* script)
 {
 #if ENABLE(CODEBLOCK_SAMPLING)
-    MutexLocker locker(m_scriptSampleMapMutex);
+    LockHolder locker(m_scriptSampleMapMutex);
     m_scopeSampleMap->set(script, adoptPtr(new ScriptSampleRecord(vm, script)));
 #else
     UNUSED_PARAM(vm);

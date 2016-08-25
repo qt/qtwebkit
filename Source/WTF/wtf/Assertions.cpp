@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2003, 2006, 2007 Apple Inc.  All rights reserved.
+ * Copyright (C) 2003, 2006, 2007, 2013 Apple Inc.  All rights reserved.
  * Copyright (C) 2007-2009 Torch Mobile, Inc.
  * Copyright (C) 2011 University of Szeged. All rights reserved.
  *
@@ -12,10 +12,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -35,10 +35,12 @@
 #include "Assertions.h"
 
 #include "Compiler.h"
-#include "OwnArrayPtr.h"
+#include <wtf/StdLibExtras.h>
+#include <wtf/StringExtras.h>
+#include <wtf/text/CString.h>
+#include <wtf/text/WTFString.h>
 
 #include <stdio.h>
-#include <stdarg.h>
 #include <string.h>
 
 #if HAVE(SIGNAL_H)
@@ -47,13 +49,13 @@
 
 #if USE(CF)
 #include <CoreFoundation/CFString.h>
-#if PLATFORM(IOS) || __MAC_OS_X_VERSION_MIN_REQUIRED >= 1080
-#define WTF_USE_APPLE_SYSTEM_LOG 1
+#if PLATFORM(COCOA)
+#define USE_APPLE_SYSTEM_LOG 1
 #include <asl.h>
 #endif
 #endif // USE(CF)
 
-#if COMPILER(MSVC) && !OS(WINCE)
+#if COMPILER(MSVC)
 #include <crtdbg.h>
 #endif
 
@@ -61,18 +63,15 @@
 #include <windows.h>
 #endif
 
-#if (OS(DARWIN) || (OS(LINUX) && !defined(__UCLIBC__))) && !OS(ANDROID)
+#if OS(DARWIN)
+#include <sys/sysctl.h>
+#include <unistd.h>
+#endif
+
+#if OS(DARWIN) || (OS(LINUX) && defined(__GLIBC__) && !defined(__UCLIBC__))
 #include <cxxabi.h>
 #include <dlfcn.h>
 #include <execinfo.h>
-#endif
-
-#if HAVE(ANDROID_SDK)
-#include <android/log.h>
-#endif
-
-#if PLATFORM(BLACKBERRY)
-#include <BlackBerryPlatformLog.h>
 #endif
 
 extern "C" {
@@ -117,10 +116,6 @@ static void vprintf_stderr_common(const char* format, va_list args)
 
     // Fall through to write to stderr in the same manner as other platforms.
 
-#elif PLATFORM(BLACKBERRY)
-    BBLOGV(BlackBerry::Platform::LogLevelCritical, format, args);
-#elif HAVE(ANDROID_SDK)
-    __android_log_vprint(ANDROID_LOG_WARN, "WebKit", format, args);
 #elif HAVE(ISDEBUGGERPRESENT)
     if (IsDebuggerPresent()) {
         size_t size = 1024;
@@ -131,21 +126,8 @@ static void vprintf_stderr_common(const char* format, va_list args)
             if (buffer == NULL)
                 break;
 
-            if (_vsnprintf(buffer, size, format, args) != -1) {
-#if OS(WINCE)
-                // WinCE only supports wide chars
-                wchar_t* wideBuffer = (wchar_t*)malloc(size * sizeof(wchar_t));
-                if (wideBuffer == NULL)
-                    break;
-                for (unsigned int i = 0; i < size; ++i) {
-                    if (!(wideBuffer[i] = buffer[i]))
-                        break;
-                }
-                OutputDebugStringW(wideBuffer);
-                free(wideBuffer);
-#else
+            if (vsnprintf(buffer, size, format, args) != -1) {
                 OutputDebugStringA(buffer);
-#endif
                 free(buffer);
                 break;
             }
@@ -155,12 +137,10 @@ static void vprintf_stderr_common(const char* format, va_list args)
         } while (size > 1024);
     }
 #endif
-#if !PLATFORM(BLACKBERRY)
     vfprintf(stderr, format, args);
-#endif
 }
 
-#if COMPILER(CLANG) || (COMPILER(GCC) && GCC_VERSION_AT_LEAST(4, 6, 0))
+#if COMPILER(GCC_OR_CLANG)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wformat-nonliteral"
 #endif
@@ -169,7 +149,7 @@ static void vprintf_stderr_with_prefix(const char* prefix, const char* format, v
 {
     size_t prefixLength = strlen(prefix);
     size_t formatLength = strlen(format);
-    OwnArrayPtr<char> formatWithPrefix = adoptArrayPtr(new char[prefixLength + formatLength + 1]);
+    auto formatWithPrefix = std::make_unique<char[]>(prefixLength + formatLength + 1);
     memcpy(formatWithPrefix.get(), prefix, prefixLength);
     memcpy(formatWithPrefix.get() + prefixLength, format, formatLength);
     formatWithPrefix[prefixLength + formatLength] = 0;
@@ -185,7 +165,7 @@ static void vprintf_stderr_with_trailing_newline(const char* format, va_list arg
         return;
     }
 
-    OwnArrayPtr<char> formatWithNewline = adoptArrayPtr(new char[formatLength + 2]);
+    auto formatWithNewline = std::make_unique<char[]>(formatLength + 2);
     memcpy(formatWithNewline.get(), format, formatLength);
     formatWithNewline[formatLength] = '\n';
     formatWithNewline[formatLength + 1] = 0;
@@ -193,7 +173,7 @@ static void vprintf_stderr_with_trailing_newline(const char* format, va_list arg
     vprintf_stderr_common(formatWithNewline.get(), args);
 }
 
-#if COMPILER(CLANG) || (COMPILER(GCC) && GCC_VERSION_AT_LEAST(4, 6, 0))
+#if COMPILER(GCC_OR_CLANG)
 #pragma GCC diagnostic pop
 #endif
 
@@ -208,7 +188,7 @@ static void printf_stderr_common(const char* format, ...)
 
 static void printCallSite(const char* file, int line, const char* function)
 {
-#if OS(WINDOWS) && !OS(WINCE) && defined(_DEBUG)
+#if OS(WINDOWS) && defined(_DEBUG)
     _CrtDbgReport(_CRT_WARN, file, line, NULL, "%s\n", function);
 #else
     // By using this format, which matches the format used by MSVC for compiler errors, developers
@@ -245,9 +225,9 @@ void WTFReportArgumentAssertionFailure(const char* file, int line, const char* f
 
 void WTFGetBacktrace(void** stack, int* size)
 {
-#if (OS(DARWIN) || (OS(LINUX) && !defined(__UCLIBC__))) && !OS(ANDROID)
+#if OS(DARWIN) || (OS(LINUX) && defined(__GLIBC__) && !defined(__UCLIBC__))
     *size = backtrace(stack, *size);
-#elif OS(WINDOWS) && !OS(WINCE)
+#elif OS(WINDOWS)
     // The CaptureStackBackTrace function is available in XP, but it is not defined
     // in the Windows Server 2003 R2 Platform SDK. So, we'll grab the function
     // through GetProcAddress.
@@ -282,10 +262,10 @@ void WTFReportBacktrace()
 #if OS(DARWIN) || OS(LINUX)
 #  if PLATFORM(QT) || PLATFORM(GTK)
 #    if defined(__GLIBC__) && !defined(__UCLIBC__)
-#      define WTF_USE_BACKTRACE_SYMBOLS 1
+#      define USE_BACKTRACE_SYMBOLS 1
 #    endif
-#  elif !OS(ANDROID)
-#    define WTF_USE_DLADDR 1
+#  else
+#    define USE_DLADDR 1
 #  endif
 #endif
 
@@ -322,8 +302,8 @@ void WTFPrintBacktrace(void** stack, int size)
 #endif
 }
 
-#undef WTF_USE_BACKTRACE_SYMBOLS
-#undef WTF_USE_DLADDR
+#undef USE_BACKTRACE_SYMBOLS
+#undef USE_DLADDR
 
 static WTFCrashHookFunction globalHook = 0;
 
@@ -332,10 +312,7 @@ void WTFSetCrashHook(WTFCrashHookFunction function)
     globalHook = function;
 }
 
-void WTFInvokeCrashHook()
-{
-}
-
+#if !defined(NDEBUG) || !OS(DARWIN)
 void WTFCrash()
 {
     if (globalHook)
@@ -344,11 +321,25 @@ void WTFCrash()
     WTFReportBacktrace();
     *(int *)(uintptr_t)0xbbadbeef = 0;
     // More reliable, but doesn't say BBADBEEF.
-#if COMPILER(CLANG)
+#if COMPILER(GCC_OR_CLANG)
     __builtin_trap();
 #else
     ((void(*)())0)();
 #endif
+}
+#else
+// We need to keep WTFCrash() around (even on non-debug OS(DARWIN) builds) as a workaround
+// for presently shipping (circa early 2016) SafariForWebKitDevelopment binaries which still
+// expects to link to it.
+void WTFCrash()
+{
+    CRASH();
+}
+#endif // !defined(NDEBUG) || !OS(DARWIN)
+
+void WTFCrashWithSecurityImplication()
+{
+    CRASH();
 }
 
 #if HAVE(SIGNAL_H)
@@ -384,6 +375,20 @@ void WTFInstallReportBacktraceOnCrashHook()
     // in case we hit an assertion.
     WTFSetCrashHook(&resetSignalHandlersForFatalErrors);
     installSignalHandlersForFatalErrors(&dumpBacktraceSignalHandler);
+#endif
+}
+
+bool WTFIsDebuggerAttached()
+{
+#if OS(DARWIN)
+    struct kinfo_proc info;
+    int mib[] = { CTL_KERN, KERN_PROC, KERN_PROC_PID, getpid() };
+    size_t size = sizeof(info);
+    if (sysctl(mib, sizeof(mib) / sizeof(mib[0]), &info, &size, nullptr, 0) == -1)
+        return false;
+    return info.kp_proc.p_flag & P_TRACED;
+#else
+    return false;
 #endif
 }
 
@@ -431,12 +436,70 @@ void WTFLogVerbose(const char* file, int line, const char* function, WTFLogChann
     printCallSite(file, line, function);
 }
 
+void WTFLogAlwaysV(const char* format, va_list args)
+{
+    vprintf_stderr_with_trailing_newline(format, args);
+}
+
 void WTFLogAlways(const char* format, ...)
 {
     va_list args;
     va_start(args, format);
-    vprintf_stderr_with_trailing_newline(format, args);
+    WTFLogAlwaysV(format, args);
     va_end(args);
+}
+
+void WTFLogAlwaysAndCrash(const char* format, ...)
+{
+    va_list args;
+    va_start(args, format);
+    WTFLogAlwaysV(format, args);
+    va_end(args);
+    CRASH();
+}
+
+WTFLogChannel* WTFLogChannelByName(WTFLogChannel* channels[], size_t count, const char* name)
+{
+    for (size_t i = 0; i < count; ++i) {
+        WTFLogChannel* channel = channels[i];
+        if (!strcasecmp(name, channel->name))
+            return channel;
+    }
+
+    return 0;
+}
+
+static void setStateOfAllChannels(WTFLogChannel* channels[], size_t channelCount, WTFLogChannelState state)
+{
+    for (size_t i = 0; i < channelCount; ++i)
+        channels[i]->state = state;
+}
+
+void WTFInitializeLogChannelStatesFromString(WTFLogChannel* channels[], size_t count, const char* logLevel)
+{
+    String logLevelString = logLevel;
+    Vector<String> components;
+    logLevelString.split(',', components);
+
+    for (size_t i = 0; i < components.size(); ++i) {
+        String component = components[i];
+
+        WTFLogChannelState logChannelState = WTFLogChannelOn;
+        if (component.startsWith('-')) {
+            logChannelState = WTFLogChannelOff;
+            component = component.substring(1);
+        }
+
+        if (equalLettersIgnoringASCIICase(component, "all")) {
+            setStateOfAllChannels(channels, count, logChannelState);
+            continue;
+        }
+
+        if (WTFLogChannel* channel = WTFLogChannelByName(channels, count, component.utf8().data()))
+            channel->state = logChannelState;
+        else
+            WTFLogAlways("Unknown logging channel: %s", component.utf8().data());
+    }
 }
 
 } // extern "C"

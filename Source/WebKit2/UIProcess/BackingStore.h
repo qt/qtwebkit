@@ -28,11 +28,6 @@
 
 #include <WebCore/IntRect.h>
 #include <wtf/Noncopyable.h>
-#include <wtf/PassOwnPtr.h>
-
-#if PLATFORM(MAC)
-#include <wtf/RetainPtr.h>
-#endif
 
 #if PLATFORM(QT)
 #include <QtGui/QPainter>
@@ -40,8 +35,7 @@
 #endif
 
 #if USE(CAIRO)
-#include <RefPtrCairo.h>
-#include <WebCore/WidgetBackingStore.h>
+#include <WebCore/BackingStoreBackendCairo.h>
 #endif
 
 namespace WebKit {
@@ -54,15 +48,13 @@ class BackingStore {
     WTF_MAKE_NONCOPYABLE(BackingStore);
 
 public:
-    static PassOwnPtr<BackingStore> create(const WebCore::IntSize&, float deviceScaleFactor, WebPageProxy*);
+    BackingStore(const WebCore::IntSize&, float deviceScaleFactor, WebPageProxy&);
     ~BackingStore();
 
     const WebCore::IntSize& size() const { return m_size; }
     float deviceScaleFactor() const { return m_deviceScaleFactor; }
 
-#if PLATFORM(MAC)
-    typedef CGContextRef PlatformGraphicsContext;
-#elif PLATFORM(QT)
+#if PLATFORM(QT)
     typedef QPainter* PlatformGraphicsContext;
 #elif USE(CAIRO)
     typedef cairo_t* PlatformGraphicsContext;
@@ -72,34 +64,20 @@ public:
     void incorporateUpdate(const UpdateInfo&);
 
 private:
-    BackingStore(const WebCore::IntSize&, float deviceScaleFactor, WebPageProxy*);
-
     void incorporateUpdate(ShareableBitmap*, const UpdateInfo&);
     void scroll(const WebCore::IntRect& scrollRect, const WebCore::IntSize& scrollOffset);
 
+#if USE(CAIRO)
+    std::unique_ptr<WebCore::BackingStoreBackendCairo> createBackend();
+#endif
+
     WebCore::IntSize m_size;
     float m_deviceScaleFactor;
-    WebPageProxy* m_webPageProxy;
-
-#if PLATFORM(MAC)
-    CGContextRef backingStoreContext();
-
-    void performWithScrolledRectTransform(const WebCore::IntRect&, void (^)(const WebCore::IntRect&, const WebCore::IntSize&));
-    void resetScrolledRect();
-
-    RetainPtr<CGLayerRef> m_cgLayer;
-    RetainPtr<CGContextRef> m_bitmapContext;
-
-    // The rectange that was scrolled most recently.
-    WebCore::IntRect m_scrolledRect;
-
-    // Contents of m_scrolledRect are offset by this amount (and wrapped around) with respect to
-    // their original location.
-    WebCore::IntSize m_scrolledRectOffset;
+    WebPageProxy& m_webPageProxy;
+#if USE(CAIRO)
+    std::unique_ptr<WebCore::BackingStoreBackendCairo> m_backend;
 #elif PLATFORM(QT)
     QPixmap m_pixmap;
-#elif USE(CAIRO)
-    OwnPtr<WebCore::WidgetBackingStore> m_backingStore;
 #endif
 };
 

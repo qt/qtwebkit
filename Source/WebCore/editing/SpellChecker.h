@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -45,7 +45,7 @@ class SpellChecker;
 
 class SpellCheckRequest : public TextCheckingRequest {
 public:
-    static PassRefPtr<SpellCheckRequest> create(TextCheckingTypeMask, TextCheckingProcessType, PassRefPtr<Range> checkingRange, PassRefPtr<Range> paragraphRange);
+    static RefPtr<SpellCheckRequest> create(TextCheckingTypeMask, TextCheckingProcessType, PassRefPtr<Range> checkingRange, PassRefPtr<Range> paragraphRange);
     virtual ~SpellCheckRequest();
 
     PassRefPtr<Range> checkingRange() const { return m_checkingRange; }
@@ -56,14 +56,14 @@ public:
     void requesterDestroyed();
     bool isStarted() const { return m_checker; }
 
-    virtual const TextCheckingRequestData& data() const OVERRIDE;
-    virtual void didSucceed(const Vector<TextCheckingResult>&) OVERRIDE;
-    virtual void didCancel() OVERRIDE;
+    virtual const TextCheckingRequestData& data() const override;
+    virtual void didSucceed(const Vector<TextCheckingResult>&) override;
+    virtual void didCancel() override;
 
 private:
     SpellCheckRequest(PassRefPtr<Range> checkingRange, PassRefPtr<Range> paragraphRange, const String&, TextCheckingTypeMask, TextCheckingProcessType);
 
-    SpellChecker* m_checker;
+    SpellChecker* m_checker { nullptr };
     RefPtr<Range> m_checkingRange;
     RefPtr<Range> m_paragraphRange;
     RefPtr<Element> m_rootEditableElement;
@@ -75,7 +75,7 @@ class SpellChecker {
 public:
     friend class SpellCheckRequest;
 
-    explicit SpellChecker(Frame*);
+    explicit SpellChecker(Frame&);
     ~SpellChecker();
 
     bool isAsynchronousEnabled() const;
@@ -94,22 +94,22 @@ public:
     }
 
 private:
-    typedef Deque<RefPtr<SpellCheckRequest> > RequestQueue;
+    typedef Deque<RefPtr<SpellCheckRequest>> RequestQueue;
 
     bool canCheckAsynchronously(Range*) const;
     TextCheckerClient* client() const;
-    void timerFiredToProcessQueuedRequest(Timer<SpellChecker>*);
+    void timerFiredToProcessQueuedRequest();
     void invokeRequest(PassRefPtr<SpellCheckRequest>);
     void enqueueRequest(PassRefPtr<SpellCheckRequest>);
     void didCheckSucceed(int sequence, const Vector<TextCheckingResult>&);
     void didCheckCancel(int sequence);
     void didCheck(int sequence, const Vector<TextCheckingResult>&);
 
-    Frame* m_frame;
+    Frame& m_frame;
     int m_lastRequestSequence;
     int m_lastProcessedSequence;
 
-    Timer<SpellChecker> m_timerToProcessQueuedRequest;
+    Timer m_timerToProcessQueuedRequest;
 
     RefPtr<SpellCheckRequest> m_processingRequest;
     RequestQueue m_requestQueue;

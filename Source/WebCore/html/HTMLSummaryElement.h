@@ -27,23 +27,27 @@ namespace WebCore {
 
 class HTMLDetailsElement;
 
-class HTMLSummaryElement FINAL : public HTMLElement {
+class HTMLSummaryElement final : public HTMLElement {
 public:
-    static PassRefPtr<HTMLSummaryElement> create(const QualifiedName&, Document*);
-    bool isMainSummary() const;
-    virtual bool willRespondToMouseClickEvents() OVERRIDE;
+    static Ref<HTMLSummaryElement> create(const QualifiedName&, Document&);
+
+    bool isActiveSummary() const;
+    virtual bool willRespondToMouseClickEvents() override;
 
 private:
-    HTMLSummaryElement(const QualifiedName&, Document*);
+    HTMLSummaryElement(const QualifiedName&, Document&);
 
-    virtual RenderObject* createRenderer(RenderArena*, RenderStyle*);
-    virtual bool childShouldCreateRenderer(const NodeRenderingContext&) const OVERRIDE;
-    virtual void defaultEventHandler(Event*);
+    virtual RenderPtr<RenderElement> createElementRenderer(Ref<RenderStyle>&&, const RenderTreePosition&) override;
+    virtual void defaultEventHandler(Event*) override;
 
-    virtual void didAddUserAgentShadowRoot(ShadowRoot*) OVERRIDE;
+    virtual void didAddUserAgentShadowRoot(ShadowRoot*) override;
+
+    // FIXME: Shadow DOM spec says we should be able to create shadow root on this element
+    virtual bool canHaveUserAgentShadowRoot() const override final { return true; }
+
     HTMLDetailsElement* detailsElement() const;
 
-    bool supportsFocus() const OVERRIDE;
+    virtual bool supportsFocus() const override;
 };
 
 }

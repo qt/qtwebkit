@@ -1,67 +1,71 @@
 /*
- * Copyright (C) 2012 Google Inc. All rights reserved.
+ * Copyright (C) 2015 Apple Inc. All Rights Reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
  *
- * 1.  Redistributions of source code must retain the above copyright
- *     notice, this list of conditions and the following disclaimer.
- * 2.  Redistributions in binary form must reproduce the above copyright
- *     notice, this list of conditions and the following disclaimer in the
- *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
- *     its contributors may be used to endorse or promote products derived
- *     from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY APPLE AND ITS CONTRIBUTORS "AS IS" AND ANY
- * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL APPLE OR ITS CONTRIBUTORS BE LIABLE FOR ANY
- * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
- * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
+ * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+ * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #ifndef CSSVariableValue_h
 #define CSSVariableValue_h
 
-#if ENABLE(CSS_VARIABLES)
-
-#include "CSSParserValues.h"
-#include "CSSPropertyNames.h"
 #include "CSSValue.h"
 
 namespace WebCore {
 
+class CSSValueList;
+class CSSParserValueList;
+struct CSSParserVariable;
+
 class CSSVariableValue : public CSSValue {
 public:
-    static PassRefPtr<CSSVariableValue> create(const AtomicString& name, const String& value)
+    static Ref<CSSVariableValue> create(CSSParserVariable* Variable)
     {
-        return adoptRef(new CSSVariableValue(name, value));
+        return adoptRef(*new CSSVariableValue(Variable));
     }
 
-    const AtomicString& name() const { return m_name; }
-    const String& value() const { return m_value; }
+    static Ref<CSSVariableValue> create(const String& name, PassRefPtr<CSSValueList> fallbackArguments)
+    {
+        return adoptRef(*new CSSVariableValue(name, fallbackArguments));
+    }
 
-    bool equals(const CSSVariableValue& other) const { return m_name == other.m_name && m_value == other.m_value; }
+    String customCSSText() const;
+
+    bool equals(const CSSVariableValue&) const;
+    
+    const String& name() const { return m_name; }
+    CSSValueList* fallbackArguments() const { return m_fallbackArguments.get(); }
+
+    bool buildParserValueListSubstitutingVariables(CSSParserValueList*, const CustomPropertyValueMap& customProperties) const;
 
 private:
-    CSSVariableValue(const AtomicString& name, const String& value)
-        : CSSValue(VariableClass)
-        , m_name(name)
-        , m_value(value)
-    {
-    }
+    explicit CSSVariableValue(CSSParserVariable*);
+    CSSVariableValue(const String&, PassRefPtr<CSSValueList>);
 
-    const AtomicString m_name;
-    const String m_value;
+    String m_name;
+    RefPtr<CSSValueList> m_fallbackArguments;
 };
 
-}
+} // namespace WebCore
 
-#endif /* ENABLE(CSS_VARIABLES) */
-#endif /* CSSVariableValue_h */
+SPECIALIZE_TYPE_TRAITS_CSS_VALUE(CSSVariableValue, isVariableValue())
+
+#endif
+

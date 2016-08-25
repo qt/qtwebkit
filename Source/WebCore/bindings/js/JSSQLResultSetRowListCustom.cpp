@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -28,60 +28,56 @@
 
 #include "config.h"
 
-#if ENABLE(SQL_DATABASE)
-
 #include "JSSQLResultSetRowList.h"
-
 #include "ExceptionCode.h"
+#include "JSDOMBinding.h"
 #include "SQLValue.h"
-#include "SQLResultSetRowList.h"
+#include <runtime/IdentifierInlines.h>
 #include <runtime/ObjectConstructor.h>
 
 using namespace JSC;
 
 namespace WebCore {
 
-JSValue JSSQLResultSetRowList::item(ExecState* exec)
+JSValue JSSQLResultSetRowList::item(ExecState& state)
 {
     bool indexOk;
-    int index = finiteInt32Value(exec->argument(0), exec, indexOk);
+    int index = finiteInt32Value(state.argument(0), &state, indexOk);
     if (!indexOk) {
-        setDOMException(exec, TYPE_MISMATCH_ERR);
+        setDOMException(&state, TYPE_MISMATCH_ERR);
         return jsUndefined();
     }
-    if (index < 0 || (unsigned)index >= m_impl->length()) {
-        setDOMException(exec, INDEX_SIZE_ERR);
+    if (index < 0 || (unsigned)index >= wrapped().length()) {
+        setDOMException(&state, INDEX_SIZE_ERR);
         return jsUndefined();
     }
 
-    JSObject* object = constructEmptyObject(exec);
+    JSObject* object = constructEmptyObject(&state);
 
-    unsigned numColumns = m_impl->columnNames().size();
+    unsigned numColumns = wrapped().columnNames().size();
     unsigned valuesIndex = index * numColumns;
     for (unsigned i = 0; i < numColumns; i++) {
-        const SQLValue& value = m_impl->values()[valuesIndex + i];
+        const SQLValue& value = wrapped().values()[valuesIndex + i];
         JSValue jsValue;
 
         switch (value.type()) {
-            case SQLValue::StringValue:
-              jsValue = jsStringWithCache(exec, value.string());
-              break;
-          case SQLValue::NullValue:
-              jsValue = jsNull();
-              break;
-          case SQLValue::NumberValue:
-              jsValue = jsNumber(value.number());
-              break;
-          default:
-              ASSERT_NOT_REACHED();
+        case SQLValue::StringValue:
+            jsValue = jsStringWithCache(&state, value.string());
+            break;
+        case SQLValue::NullValue:
+            jsValue = jsNull();
+            break;
+        case SQLValue::NumberValue:
+            jsValue = jsNumber(value.number());
+            break;
+        default:
+            ASSERT_NOT_REACHED();
         }
 
-        object->putDirect(exec->vm(), Identifier(exec, m_impl->columnNames()[i]), jsValue, DontDelete | ReadOnly);
+        object->putDirect(state.vm(), Identifier::fromString(&state, wrapped().columnNames()[i]), jsValue, DontDelete | ReadOnly);
     }
 
     return object;
 }
 
 } // namespace WebCore
-
-#endif // ENABLE(SQL_DATABASE)

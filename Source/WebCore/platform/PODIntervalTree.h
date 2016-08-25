@@ -26,19 +26,14 @@
 #ifndef PODIntervalTree_h
 #define PODIntervalTree_h
 
-#include "PODArena.h"
 #include "PODInterval.h"
 #include "PODRedBlackTree.h"
+#include "ValueToString.h"
 #include <wtf/Assertions.h>
 #include <wtf/Noncopyable.h>
 #include <wtf/Vector.h>
 
 namespace WebCore {
-
-#ifndef NDEBUG
-template<class T>
-struct ValueToString;
-#endif
 
 template <class T, class UserData = void*>
 class PODIntervalSearchAdapter {
@@ -70,7 +65,8 @@ private:
 // supports efficient (O(lg n)) insertion, removal and querying of
 // intervals in the tree.
 template<class T, class UserData = void*>
-class PODIntervalTree : public PODRedBlackTree<PODInterval<T, UserData> > {
+class PODIntervalTree : public PODRedBlackTree<PODInterval<T, UserData>> {
+    WTF_MAKE_FAST_ALLOCATED;
     WTF_MAKE_NONCOPYABLE(PODIntervalTree);
 public:
     // Typedef to reduce typing when declaring intervals to be stored in
@@ -78,20 +74,8 @@ public:
     typedef PODInterval<T, UserData> IntervalType;
     typedef PODIntervalSearchAdapter<T, UserData> IntervalSearchAdapterType;
 
-    PODIntervalTree(UninitializedTreeEnum unitializedTree)
-        : PODRedBlackTree<IntervalType>(unitializedTree)
-    {
-        init();
-    }
-    
     PODIntervalTree()
         : PODRedBlackTree<IntervalType>()
-    {
-        init();
-    }
-
-    explicit PODIntervalTree(PassRefPtr<PODArena> arena)
-        : PODRedBlackTree<IntervalType>(arena)
     {
         init();
     }
@@ -131,7 +115,7 @@ public:
         return IntervalType(low, high, data);
     }
 
-    virtual bool checkInvariants() const
+    virtual bool checkInvariants() const override
     {
         if (!PODRedBlackTree<IntervalType>::checkInvariants())
             return false;
@@ -181,7 +165,7 @@ private:
             searchForOverlapsFrom<AdapterType>(node->right(), adapter);
     }
 
-    virtual bool updateNode(IntervalNode* node)
+    virtual bool updateNode(IntervalNode* node) override
     {
         // Would use const T&, but need to reassign this reference in this
         // function.
@@ -253,7 +237,7 @@ private:
 #ifndef NDEBUG
 // Support for printing PODIntervals at the PODRedBlackTree level.
 template<class T, class UserData>
-struct ValueToString<PODInterval<T, UserData> > {
+struct ValueToString<PODInterval<T, UserData>> {
     static String string(const PODInterval<T, UserData>& interval)
     {
         return interval.toString();

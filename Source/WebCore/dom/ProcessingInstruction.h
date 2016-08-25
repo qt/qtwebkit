@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2000 Peter Kelly (pmk@post.com)
  * Copyright (C) 2006 Apple Inc. All rights reserved.
+ * Copyright (C) 2013 Samsung Electronics. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -24,29 +25,26 @@
 
 #include "CachedResourceHandle.h"
 #include "CachedStyleSheetClient.h"
-#include "Node.h"
+#include "CharacterData.h"
 
 namespace WebCore {
 
 class StyleSheet;
 class CSSStyleSheet;
 
-class ProcessingInstruction FINAL : public Node, private CachedStyleSheetClient {
+class ProcessingInstruction final : public CharacterData, private CachedStyleSheetClient {
 public:
-    static PassRefPtr<ProcessingInstruction> create(Document*, const String& target, const String& data);
+    static Ref<ProcessingInstruction> create(Document&, const String& target, const String& data);
     virtual ~ProcessingInstruction();
 
     const String& target() const { return m_target; }
-    const String& data() const { return m_data; }
-    void setData(const String&, ExceptionCode&);
 
     void setCreatedByParser(bool createdByParser) { m_createdByParser = createdByParser; }
 
-    virtual void finishParsingChildren();
+    virtual void finishParsingChildren() override;
 
     const String& localHref() const { return m_localHref; }
     StyleSheet* sheet() const { return m_sheet.get(); }
-    void setCSSStyleSheet(PassRefPtr<CSSStyleSheet>);
 
     bool isCSS() const { return m_isCSS; }
 #if ENABLE(XSLT)
@@ -54,48 +52,48 @@ public:
 #endif
 
 private:
-    ProcessingInstruction(Document*, const String& target, const String& data);
+    friend class CharacterData;
+    ProcessingInstruction(Document&, const String& target, const String& data);
 
-    virtual String nodeName() const;
-    virtual NodeType nodeType() const;
-    virtual String nodeValue() const;
-    virtual void setNodeValue(const String&, ExceptionCode&);
-    virtual PassRefPtr<Node> cloneNode(bool deep);
-    virtual bool offsetInCharacters() const;
-    virtual int maxCharacterOffset() const;
+    virtual String nodeName() const override;
+    virtual NodeType nodeType() const override;
+    virtual Ref<Node> cloneNodeInternal(Document&, CloningOperation) override;
 
-    virtual InsertionNotificationRequest insertedInto(ContainerNode*) OVERRIDE;
-    virtual void removedFrom(ContainerNode*) OVERRIDE;
+    virtual InsertionNotificationRequest insertedInto(ContainerNode&) override;
+    virtual void removedFrom(ContainerNode&) override;
 
     void checkStyleSheet();
-    virtual void setCSSStyleSheet(const String& href, const KURL& baseURL, const String& charset, const CachedCSSStyleSheet*);
+    virtual void setCSSStyleSheet(const String& href, const URL& baseURL, const String& charset, const CachedCSSStyleSheet*) override;
 #if ENABLE(XSLT)
-    virtual void setXSLStyleSheet(const String& href, const KURL& baseURL, const String& sheet);
+    virtual void setXSLStyleSheet(const String& href, const URL& baseURL, const String& sheet) override;
 #endif
 
     bool isLoading() const;
-    virtual bool sheetLoaded();
+    virtual bool sheetLoaded() override;
 
-    virtual void addSubresourceAttributeURLs(ListHashSet<KURL>&) const;
+    virtual void addSubresourceAttributeURLs(ListHashSet<URL>&) const override;
 
     void parseStyleSheet(const String& sheet);
 
     String m_target;
-    String m_data;
     String m_localHref;
     String m_title;
     String m_media;
-    CachedResourceHandle<CachedResource> m_cachedSheet;
+    CachedResourceHandle<CachedResource> m_cachedSheet { nullptr };
     RefPtr<StyleSheet> m_sheet;
-    bool m_loading;
-    bool m_alternate;
-    bool m_createdByParser;
-    bool m_isCSS;
+    bool m_loading { false };
+    bool m_alternate { false };
+    bool m_createdByParser { false };
+    bool m_isCSS { false };
 #if ENABLE(XSLT)
-    bool m_isXSL;
+    bool m_isXSL { false };
 #endif
 };
 
-} //namespace
+} // namespace WebCore
+
+SPECIALIZE_TYPE_TRAITS_BEGIN(WebCore::ProcessingInstruction)
+    static bool isType(const WebCore::Node& node) { return node.nodeType() == WebCore::Node::PROCESSING_INSTRUCTION_NODE; }
+SPECIALIZE_TYPE_TRAITS_END()
 
 #endif

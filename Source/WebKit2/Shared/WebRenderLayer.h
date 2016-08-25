@@ -36,20 +36,17 @@ namespace WebKit {
 
 class WebPage;
 
-class WebRenderLayer : public TypedAPIObject<APIObject::TypeRenderLayer> {
+class WebRenderLayer : public API::ObjectImpl<API::Object::Type::RenderLayer> {
 public:
     enum CompositingLayerType { None, Normal, Tiled, Media, Container };
 
     static PassRefPtr<WebRenderLayer> create(WebPage*);
-    static PassRefPtr<WebRenderLayer> create(PassRefPtr<WebRenderObject> renderer, bool isReflection, bool isClipping, bool isClipped, CompositingLayerType type,
-        WebCore::IntRect absoluteBoundingBox, PassRefPtr<MutableArray> negativeZOrderList, PassRefPtr<MutableArray> normalFlowList, PassRefPtr<MutableArray> positiveZOrderList)
-    {
-        return adoptRef(new WebRenderLayer(renderer, isReflection, isClipping, isClipped, type, absoluteBoundingBox, negativeZOrderList, normalFlowList, positiveZOrderList));
-    }
+    static PassRefPtr<WebRenderLayer> create(PassRefPtr<WebRenderObject> renderer, bool isReflection, bool isClipping, bool isClipped, CompositingLayerType, WebCore::IntRect absoluteBoundingBox, double backingStoreMemoryEstimate, PassRefPtr<API::Array> negativeZOrderList, PassRefPtr<API::Array> normalFlowList, PassRefPtr<API::Array> positiveZOrderList, PassRefPtr<WebRenderLayer> frameContentsLayer);
 
-    ImmutableArray* negativeZOrderList() const { return m_negativeZOrderList.get(); }
-    ImmutableArray* normalFlowList() const { return m_normalFlowList.get(); }
-    ImmutableArray* positiveZOrderList() const { return m_positiveZOrderList.get(); }
+    API::Array* negativeZOrderList() const { return m_negativeZOrderList.get(); }
+    API::Array* normalFlowList() const { return m_normalFlowList.get(); }
+    API::Array* positiveZOrderList() const { return m_positiveZOrderList.get(); }
+    WebRenderLayer* frameContentsLayer() const { return m_frameContentsLayer.get(); }
 
     WebRenderObject* renderer() const { return m_renderer.get(); }
     bool isReflection() const { return m_isReflection; }
@@ -57,24 +54,13 @@ public:
     bool isClipped() const { return m_isClipped; }
     CompositingLayerType compositingLayerType() const { return m_compositingLayerType; } 
     WebCore::IntRect absoluteBoundingBox() const { return m_absoluteBoundingBox; }
+    double backingStoreMemoryEstimate() const { return m_backingStoreMemoryEstimate; }
 
 private:
-    WebRenderLayer(WebCore::RenderLayer*);
-    WebRenderLayer(PassRefPtr<WebRenderObject> renderer, bool isReflection, bool isClipping, bool isClipped, CompositingLayerType type, WebCore::IntRect absoluteBoundingBox,
-        PassRefPtr<MutableArray> negativeZOrderList, PassRefPtr<MutableArray> normalFlowList, PassRefPtr<MutableArray> positiveZOrderList)
-        : m_renderer(renderer)
-        , m_isReflection(isReflection)
-        , m_isClipping(isClipping)
-        , m_isClipped(isClipped)
-        , m_compositingLayerType(type)
-        , m_absoluteBoundingBox(absoluteBoundingBox)
-        , m_negativeZOrderList(negativeZOrderList)
-        , m_normalFlowList(normalFlowList)
-        , m_positiveZOrderList(positiveZOrderList)
-    {
-    }
+    explicit WebRenderLayer(WebCore::RenderLayer*);
+    WebRenderLayer(PassRefPtr<WebRenderObject> renderer, bool isReflection, bool isClipping, bool isClipped, CompositingLayerType, WebCore::IntRect absoluteBoundingBox, double backingStoreMemoryEstimate, PassRefPtr<API::Array> negativeZOrderList, PassRefPtr<API::Array> normalFlowList, PassRefPtr<API::Array> positiveZOrderList, PassRefPtr<WebRenderLayer> frameContentsLayer);
 
-    static PassRefPtr<MutableArray> createArrayFromLayerList(Vector<WebCore::RenderLayer*>*);
+    static PassRefPtr<API::Array> createArrayFromLayerList(Vector<WebCore::RenderLayer*>*);
 
     RefPtr<WebRenderObject> m_renderer;
     bool m_isReflection;
@@ -82,10 +68,13 @@ private:
     bool m_isClipped;
     CompositingLayerType m_compositingLayerType;
     WebCore::IntRect m_absoluteBoundingBox;
+    double m_backingStoreMemoryEstimate;
 
-    RefPtr<MutableArray> m_negativeZOrderList;
-    RefPtr<MutableArray> m_normalFlowList;
-    RefPtr<MutableArray> m_positiveZOrderList;
+    RefPtr<API::Array> m_negativeZOrderList;
+    RefPtr<API::Array> m_normalFlowList;
+    RefPtr<API::Array> m_positiveZOrderList;
+
+    RefPtr<WebRenderLayer> m_frameContentsLayer;
 };
 
 } // namespace WebKit

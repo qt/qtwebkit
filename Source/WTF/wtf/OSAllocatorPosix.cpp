@@ -35,73 +35,28 @@
 
 namespace WTF {
 
-#if CPU(MIPS)
-static bool isWithin256MB(const void* ptr, size_t length)
-{
-    const intptr_t start = reinterpret_cast<intptr_t>(ptr);
-    const intptr_t end = start + length - 1;
-    return (start & 0xf0000000) == (end & 0xf0000000);
-}
-#endif // CPU(MIPS)
-
 void* OSAllocator::reserveUncommitted(size_t bytes, Usage usage, bool writable, bool executable, bool includesGuardPages)
 {
-#if OS(QNX)
+#if OS(LINUX)
     UNUSED_PARAM(usage);
     UNUSED_PARAM(writable);
     UNUSED_PARAM(executable);
-    UNUSED_PARAM(includesGuardPages);
-
-    // Reserve memory with PROT_NONE and MAP_LAZY so it isn't committed now.
-    void* result = mmap(0, bytes, PROT_NONE, MAP_LAZY | MAP_PRIVATE | MAP_ANON, -1, 0);
-    if (result == MAP_FAILED)
-        CRASH();
-#elif OS(LINUX)
-    UNUSED_PARAM(usage);
-    UNUSED_PARAM(writable);
-#if !CPU(MIPS)
-    UNUSED_PARAM(executable);
-#endif
     UNUSED_PARAM(includesGuardPages);
 
     void* result = mmap(0, bytes, PROT_NONE, MAP_NORESERVE | MAP_PRIVATE | MAP_ANON, -1, 0);
     if (result == MAP_FAILED)
         CRASH();
-#if CPU(MIPS)
-    // On MIPS we can use shorter j <address> jump instructions if the executable
-    // memory resides entirely within a single 256MB page (e.g. 0x3000.0000 to 0x3fff.ffff).
-    // Usually this is true for the small buffers we allocate, but we test, and upon failure
-    // we reallocate a double-size region, choose a valid region, and unmap the remainder.
-    if (executable && UNLIKELY(!isWithin256MB(result, bytes))) {
-        // Not in 256MB region, try to map double size.
-        if (munmap(result, bytes))
-            CRASH();
-        result = mmap(0, 2 * bytes, PROT_NONE, MAP_NORESERVE | MAP_PRIVATE | MAP_ANON, -1, 0);
-        if (result == MAP_FAILED)
-            CRASH();
-        if (isWithin256MB(result, bytes)) {
-            // 1st half is good, release 2nd half.
-            if (munmap(reinterpret_cast<int8_t*>(result) + bytes, bytes))
-                CRASH();
-        } else if (isWithin256MB(reinterpret_cast<int8_t*>(result) + bytes, bytes)) {
-            // 2nd half is good, release 1st half.
-            if (munmap(result, bytes))
-                CRASH();
-            result = reinterpret_cast<int8_t*>(result) + bytes;
-        } else
-            ASSERT_NOT_REACHED();
-    }
-#endif // CPU(MIPS)
-
     madvise(result, bytes, MADV_DONTNEED);
 #else
     void* result = reserveAndCommit(bytes, usage, writable, executable, includesGuardPages);
 #if HAVE(MADV_FREE_REUSE)
-    // To support the "reserve then commit" model, we have to initially decommit.
-    while (madvise(result, bytes, MADV_FREE_REUSABLE) == -1 && errno == EAGAIN) { }
+    if (result) {
+        // To support the "reserve then commit" model, we have to initially decommit.
+        while (madvise(result, bytes, MADV_FREE_REUSABLE) == -1 && errno == EAGAIN) { }
+    }
 #endif
 
-#endif // OS(QNX)
+#endif
 
     return result;
 }
@@ -151,11 +106,9 @@ void* OSAllocator::reserveAndCommit(size_t bytes, Usage usage, bool writable, bo
 
     result = mmap(result, bytes, protection, flags, fd, 0);
     if (result == MAP_FAILED) {
-#if ENABLE(LLINT)
         if (executable)
             result = 0;
         else
-#endif
             CRASH();
     }
     if (result && includesGuardPages) {
@@ -171,15 +124,7 @@ void* OSAllocator::reserveAndCommit(size_t bytes, Usage usage, bool writable, bo
 
 void OSAllocator::commit(void* address, size_t bytes, bool writable, bool executable)
 {
-#if OS(QNX)
-    int protection = PROT_READ;
-    if (writable)
-        protection |= PROT_WRITE;
-    if (executable)
-        protection |= PROT_EXEC;
-    if (MAP_FAILED == mmap(address, bytes, protection, MAP_FIXED | MAP_PRIVATE | MAP_ANON, -1, 0))
-        CRASH();
-#elif OS(LINUX)
+#if OS(LINUX)
     int protection = PROT_READ;
     if (writable)
         protection |= PROT_WRITE;
@@ -203,10 +148,7 @@ void OSAllocator::commit(void* address, size_t bytes, bool writable, bool execut
 
 void OSAllocator::decommit(void* address, size_t bytes)
 {
-#if OS(QNX)
-    // Use PROT_NONE and MAP_LAZY to decommit the pages.
-    mmap(address, bytes, PROT_NONE, MAP_FIXED | MAP_LAZY | MAP_PRIVATE | MAP_ANON, -1, 0);
-#elif OS(LINUX)
+#if OS(LINUX)
     madvise(address, bytes, MADV_DONTNEED);
     if (mprotect(address, bytes, PROT_NONE))
         CRASH();
@@ -215,6 +157,16 @@ void OSAllocator::decommit(void* address, size_t bytes)
 #elif HAVE(MADV_FREE)
     while (madvise(address, bytes, MADV_FREE) == -1 && errno == EAGAIN) { }
 #elif HAVE(MADV_DONTNEED)
+    while (madvise(address, bytes, MADV_DONTNEED) == -1 && errno == EAGAIN) { }
+#else
+    UNUSED_PARAM(address);
+    UNUSED_PARAM(bytes);
+#endif
+}
+
+void OSAllocator::hintMemoryNotNeededSoon(void* address, size_t bytes)
+{
+#if HAVE(MADV_DONTNEED)
     while (madvise(address, bytes, MADV_DONTNEED) == -1 && errno == EAGAIN) { }
 #else
     UNUSED_PARAM(address);

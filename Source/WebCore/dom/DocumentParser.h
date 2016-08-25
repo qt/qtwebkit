@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2000 Peter Kelly (pmk@post.com)
- * Copyright (C) 2005, 2006 Apple Computer, Inc.
+ * Copyright (C) 2005, 2006 Apple Inc.
  * Copyright (C) 2007 Samuel Weinig (sam@webkit.org)
  * Copyright (C) 2010 Google, Inc.
  *
@@ -47,15 +47,13 @@ public:
     virtual void insert(const SegmentedString&) = 0;
 
     // appendBytes and flush are used by DocumentWriter (the loader).
-    virtual void appendBytes(DocumentWriter*, const char* bytes, size_t length) = 0;
-    virtual void flush(DocumentWriter*) = 0;
-
-    virtual void pinToMainThread() { }
+    virtual void appendBytes(DocumentWriter&, const char* bytes, size_t length) = 0;
+    virtual void flush(DocumentWriter&) = 0;
 
     // FIXME: append() should be private, but DocumentWriter::replaceDocument uses it for now.
-    // FIXME: This really should take a PassOwnPtr to signify that it expects to take
+    // FIXME: This really should take a std::unique_ptr to signify that it expects to take
     // ownership of the buffer. The parser expects the PassRefPtr to hold the only ref of the StringImpl.
-    virtual void append(PassRefPtr<StringImpl>) = 0;
+    virtual void append(RefPtr<StringImpl>&&) = 0;
 
     virtual void finish() = 0;
 
@@ -100,7 +98,7 @@ public:
     virtual void resumeScheduledTasks();
 
 protected:
-    explicit DocumentParser(Document*);
+    explicit DocumentParser(Document&);
 
 private:
     enum ParserState {

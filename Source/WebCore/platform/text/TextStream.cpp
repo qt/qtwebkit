@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -26,11 +26,13 @@
 #include "config.h"
 #include "TextStream.h"
 
+#include "FloatPoint.h"
+#include "IntPoint.h"
+#include "LayoutRect.h"
+#include "LayoutUnit.h"
 #include <wtf/MathExtras.h>
 #include <wtf/StringExtras.h>
 #include <wtf/text/WTFString.h>
-
-using namespace std;
 
 namespace WebCore {
 
@@ -87,13 +89,13 @@ TextStream& TextStream::operator<<(unsigned long long i)
 
 TextStream& TextStream::operator<<(float f)
 {
-    m_text.append(String::numberToStringFixedWidth(f, 2));
+    m_text.appendFixedWidthNumber(f, 2);
     return *this;
 }
 
 TextStream& TextStream::operator<<(double d)
 {
-    m_text.append(String::numberToStringFixedWidth(d, 2));
+    m_text.appendFixedWidthNumber(d, 2);
     return *this;
 }
 
@@ -125,11 +127,59 @@ TextStream& TextStream::operator<<(const FormatNumberRespectingIntegers& numberT
     return *this;
 }
 
+TextStream& TextStream::operator<<(LayoutUnit v)
+{
+    return *this << TextStream::FormatNumberRespectingIntegers(v.toFloat());
+}
+
 String TextStream::release()
 {
     String result = m_text.toString();
     m_text.clear();
     return result;
+}
+
+void TextStream::startGroup()
+{
+    TextStream& ts = *this;
+
+    if (m_multiLineMode) {
+        ts << "\n";
+        ts.writeIndent();
+        ts << "(";
+        ts.increaseIndent();
+    } else
+        ts << " (";
+}
+
+void TextStream::endGroup()
+{
+    TextStream& ts = *this;
+    ts << ")";
+    if (m_multiLineMode)
+        ts.decreaseIndent();
+}
+
+void TextStream::nextLine()
+{
+    TextStream& ts = *this;
+    if (m_multiLineMode) {
+        ts << "\n";
+        ts.writeIndent();
+    } else
+        ts << " ";
+}
+
+void TextStream::writeIndent()
+{
+    if (m_multiLineMode)
+        WebCore::writeIndent(*this, m_indent);
+}
+
+void writeIndent(TextStream& ts, int indent)
+{
+    for (int i = 0; i != indent; ++i)
+        ts << "  ";
 }
 
 }

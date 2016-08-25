@@ -27,26 +27,25 @@
 #ifndef RenderSVGEllipse_h
 #define RenderSVGEllipse_h
 
-#if ENABLE(SVG)
 #include "RenderSVGShape.h"
-#include "SVGGraphicsElement.h"
 
 namespace WebCore {
 
-class RenderSVGEllipse : public RenderSVGShape {
+class RenderSVGEllipse final : public RenderSVGShape {
 public:
-    explicit RenderSVGEllipse(SVGGraphicsElement*);
+    RenderSVGEllipse(SVGGraphicsElement&, Ref<RenderStyle>&&);
     virtual ~RenderSVGEllipse();
 
 private:
-    virtual const char* renderName() const { return "RenderSVGEllipse"; }
+    virtual const char* renderName() const override { return "RenderSVGEllipse"; }
 
-    virtual void updateShapeFromElement();
-    virtual bool isEmpty() const { return m_usePathFallback ? RenderSVGShape::isEmpty() : m_fillBoundingBox.isEmpty(); };
-    virtual void fillShape(GraphicsContext*) const;
-    virtual void strokeShape(GraphicsContext*) const;
-    virtual bool shapeDependentStrokeContains(const FloatPoint&);
-    virtual bool shapeDependentFillContains(const FloatPoint&, const WindRule) const;
+    virtual void updateShapeFromElement() override;
+    virtual bool isEmpty() const override { return m_usePathFallback ? RenderSVGShape::isEmpty() : m_fillBoundingBox.isEmpty(); }
+    virtual bool isRenderingDisabled() const override;
+    virtual void fillShape(GraphicsContext&) const override;
+    virtual void strokeShape(GraphicsContext&) const override;
+    virtual bool shapeDependentStrokeContains(const FloatPoint&) override;
+    virtual bool shapeDependentFillContains(const FloatPoint&, const WindRule) const override;
     void calculateRadiiAndCenter();
 
 private:
@@ -57,5 +56,4 @@ private:
 
 }
 
-#endif // ENABLE(SVG)
 #endif

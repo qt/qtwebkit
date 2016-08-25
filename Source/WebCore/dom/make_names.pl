@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# Copyright (C) 2005, 2006, 2007, 2009 Apple Inc. All rights reserved.
+# Copyright (C) 2005-2007, 2009, 2013-2014 Apple Inc. All rights reserved.
 # Copyright (C) 2009, Julien Chaffraix <jchaffraix@webkit.org>
 # Copyright (C) 2009 Torch Mobile Inc. All rights reserved. (http://www.torchmobile.com/)
 # Copyright (C) 2011 Ericsson AB. All rights reserved.
@@ -14,7 +14,7 @@
 # 2.  Redistributions in binary form must reproduce the above copyright
 #     notice, this list of conditions and the following disclaimer in the
 #     documentation and/or other materials provided with the distribution. 
-# 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+# 3.  Neither the name of Apple Inc. ("Apple") nor the names of
 #     its contributors may be used to endorse or promote products derived
 #     from this software without specific prior written permission. 
 #
@@ -62,15 +62,23 @@ my %extensionAttrs = ();
 
 require Config;
 
-my $gccLocation = "";
+my $ccLocation = "";
 if ($ENV{CC}) {
-    $gccLocation = $ENV{CC};
-} elsif (($Config::Config{'osname'}) =~ /solaris/i) {
-    $gccLocation = "/usr/sfw/bin/gcc";
+    $ccLocation = $ENV{CC};
+} elsif (($Config::Config{"osname"}) =~ /solaris/i) {
+    $ccLocation = "/usr/sfw/bin/gcc";
+} elsif ($Config::Config{"osname"} eq "darwin" && $ENV{SDKROOT}) {
+    chomp($ccLocation = `xcrun -find cc -sdk '$ENV{SDKROOT}'`);
 } else {
-    $gccLocation = "/usr/bin/gcc";
+    $ccLocation = "/usr/bin/cc";
 }
-my $preprocessor = $gccLocation . " -E -x c++";
+
+my $preprocessor = "";
+if ($Config::Config{"osname"} eq "MSWin32") {
+    $preprocessor = "\"$ccLocation\" /EP";
+} else {
+    $preprocessor = $ccLocation . " -E -x c++";
+}
 
 GetOptions(
     'tags=s' => \$tagsFile, 
@@ -101,7 +109,7 @@ if (length($fontNamesIn)) {
     open F, ">$header" or die "Unable to open $header for writing.";
 
     printLicenseHeader($F);
-    printHeaderHead($F, "CSS", $familyNamesFileBase, "#include <wtf/text/AtomicString.h>");
+    printHeaderHead($F, "CSS", $familyNamesFileBase, "#include <wtf/text/AtomicString.h>", "");
 
     printMacros($F, "extern const WTF::AtomicString", "", \%parameters);
     print F "#endif\n\n";
@@ -117,7 +125,7 @@ if (length($fontNamesIn)) {
 
     print F StaticString::GenerateStrings(\%parameters);
 
-    while ( my ($name, $identifier) = each %parameters ) {
+    for my $name (sort keys %parameters) {
         print F "DEFINE_GLOBAL(AtomicString, $name)\n";
     }
 
@@ -126,8 +134,11 @@ if (length($fontNamesIn)) {
     print F "\n";
     print F StaticString::GenerateStringAsserts(\%parameters);
 
-    while ( my ($name, $identifier) = each %parameters ) {
-        print F "    new (NotNull, (void*)&$name) AtomicString(${name}Impl);\n";
+    for my $name (sort keys %parameters) {
+        # FIXME: Would like to use static_cast here, but there are differences in const
+        # depending on whether SKIP_STATIC_CONSTRUCTORS_ON_GCC is used, so stick with a
+        # C-style cast for now.
+        print F "    new (NotNull, (void*)&$name) AtomicString(reinterpret_cast<StringImpl*>(&${name}Data));\n";
     }
 
     print F "}\n}\n}\n";
@@ -153,13 +164,16 @@ die "You must specify a namespace (e.g. SVG) for <namespace>Names.h" unless $par
 die "You must specify a namespaceURI (e.g. http://www.w3.org/2000/svg)" unless $parameters{namespaceURI};
 
 $parameters{namespacePrefix} = $parameters{namespace} unless $parameters{namespacePrefix};
+$parameters{fallbackJSInterfaceName} = $parameters{fallbackInterfaceName} unless $parameters{fallbackJSInterfaceName};
 
+my $typeHelpersBasePath = "$outputDir/$parameters{namespace}ElementTypeHelpers";
 my $namesBasePath = "$outputDir/$parameters{namespace}Names";
 my $factoryBasePath = "$outputDir/$parameters{namespace}ElementFactory";
 my $wrapperFactoryFileName = "$parameters{namespace}ElementWrapperFactory";
 
 printNamesHeaderFile("$namesBasePath.h");
 printNamesCppFile("$namesBasePath.cpp");
+printTypeHelpersHeaderFile("$typeHelpersBasePath.h");
 
 if ($printFactory) {
     printFactoryCppFile("$factoryBasePath.cpp");
@@ -184,9 +198,10 @@ sub defaultTagPropertyHash
         'JSInterfaceName' => defaultInterfaceName($_[0]),
         'mapToTagName' => '',
         'wrapperOnlyIfMediaIsAvailable' => 0,
+        'settingsConditional' => 0,
         'conditional' => 0,
-        'contextConditional' => 0,
-        'runtimeConditional' => 0
+        'runtimeConditional' => 0,
+        'customTypeHelper' => 0,
     );
 }
 
@@ -199,7 +214,8 @@ sub defaultParametersHash
         'guardFactoryWith' => '',
         'tagsNullNamespace' => 0,
         'attrsNullNamespace' => 0,
-        'fallbackInterfaceName' => ''
+        'fallbackInterfaceName' => '',
+        'fallbackJSInterfaceName' => '',
     );
 }
 
@@ -372,7 +388,7 @@ sub printConstructorSignature
 {
     my ($F, $tagName, $constructorName, $constructorTagName) = @_;
 
-    print F "static PassRefPtr<$parameters{namespace}Element> ${constructorName}Constructor(const QualifiedName& $constructorTagName, Document* document";
+    print F "static Ref<$parameters{namespace}Element> ${constructorName}Constructor(const QualifiedName& $constructorTagName, Document& document";
     if ($parameters{namespace} eq "HTML") {
         print F ", HTMLFormElement*";
         print F " formElement" if $enabledTags{$tagName}{constructorNeedsFormElement};
@@ -396,19 +412,10 @@ sub printConstructorInterior
     # instead of having all the support for this here in this script?
     if ($enabledTags{$tagName}{wrapperOnlyIfMediaIsAvailable}) {
         print F <<END
-    Settings* settings = document->settings();
+    Settings* settings = document.settings();
     if (!MediaPlayer::isAvailable() || (settings && !settings->mediaEnabled()))
-        return 0;
+        return $parameters{fallbackInterfaceName}::create($constructorTagName, document);
     
-END
-;
-    }
-
-    my $contextConditional = $enabledTags{$tagName}{contextConditional};
-    if ($contextConditional) {
-        print F <<END
-    if (!ContextFeatures::${contextConditional}Enabled(document))
-        return 0;
 END
 ;
     }
@@ -416,8 +423,18 @@ END
     my $runtimeConditional = $enabledTags{$tagName}{runtimeConditional};
     if ($runtimeConditional) {
         print F <<END
-    if (!RuntimeEnabledFeatures::${runtimeConditional}Enabled())
+    if (!RuntimeEnabledFeatures::sharedFeatures().${runtimeConditional}Enabled())
         return 0;
+END
+;
+    }
+
+    my $settingsConditional = $enabledTags{$tagName}{settingsConditional};
+    if ($settingsConditional) {
+        print F <<END
+    Settings* settings = document.settings();
+    if (!settings || !settings->${settingsConditional}())
+        return $parameters{fallbackInterfaceName}::create($constructorTagName, document);
 END
 ;
     }
@@ -426,7 +443,7 @@ END
     print F "    return ${interfaceName}::create($constructorTagName, document";
     print F ", formElement" if $enabledTags{$tagName}{constructorNeedsFormElement};
     print F ", createdByParser" if $enabledTags{$tagName}{constructorNeedsCreatedByParser};
-    print F ");\n}\n\n";
+    print F ");\n}\n";
 }
 
 sub printConstructors
@@ -452,7 +469,7 @@ sub printConstructors
         my $conditional = $enabledTags{$tagName}{conditional};
         if ($conditional) {
             my $conditionalString = "ENABLE(" . join(") && ENABLE(", split(/&/, $conditional)) . ")";
-            print F "#if ${conditionalString}\n\n";
+            print F "#if ${conditionalString}\n";
         }
 
         printConstructorSignature($F, $tagName, $tagConstructorMap{$tagName}, "tagName");
@@ -461,6 +478,8 @@ sub printConstructors
         if ($conditional) {
             print F "#endif\n";
         }
+
+        print F "\n";
     }
 
     # Mapped tag name uses a special wrapper to keep their prefix and namespaceURI while using the mapped localname.
@@ -473,7 +492,7 @@ sub printConstructors
     }
 }
 
-sub printFunctionInits
+sub printFunctionTable
 {
     my ($F, $tagConstructorMap) = @_;
     my %tagConstructorMap = %$tagConstructorMap;
@@ -488,13 +507,13 @@ sub printFunctionInits
         }
 
         if ($enabledTags{$tagName}{mapToTagName}) {
-            print F "    addTag(${tagName}Tag, $enabledTags{$tagName}{mapToTagName}To${tagName}Constructor);\n";
+            print F "        { ${tagName}Tag, $enabledTags{$tagName}{mapToTagName}To${tagName}Constructor },\n";
         } else {
-            print F "    addTag(${tagName}Tag, $tagConstructorMap{$tagName}Constructor);\n";
+            print F "        { ${tagName}Tag, $tagConstructorMap{$tagName}Constructor },\n";
         }
 
         if ($conditional) {
-            print F "#endif\n\n";
+            print F "#endif\n";
         }
     }
 }
@@ -523,34 +542,41 @@ sub upperCaseName
 
 sub printHeaderHead
 {
-    my ($F, $prefix, $nsName, $includes) = @_;
+    my ($F, $prefix, $namespace, $includes, $definitions) = @_;
 
-    print F "#ifndef ${prefix}_${nsName}Names_h\n";
-    print F "#define ${prefix}_${nsName}Names_h\n\n";
-    print F "$includes\n\n";
+    print F<<END
+#ifndef ${prefix}_${namespace}Names_h
 
-    print F "namespace WebCore {\n\n";
-    print F "namespace ${nsName}Names {\n\n";
+#define ${prefix}_${namespace}Names_h
 
-    print F "#ifndef ${prefix}_${nsName}NAMES_HIDE_GLOBALS\n";
+$includes
+
+namespace WebCore {
+
+${definitions}namespace ${namespace}Names {
+
+#ifndef ${prefix}_${namespace}_NAMES_HIDE_GLOBALS
+
+END
+    ;
 }
 
 sub printCppHead
 {
-    my ($F, $prefix, $nsName, $usedNamespace) = @_;
+    my ($F, $prefix, $namespace, $usedNamespace) = @_;
 
     print F "#include \"config.h\"\n\n";
     print F "#ifdef SKIP_STATIC_CONSTRUCTORS_ON_GCC\n";
-    print F "#define ${prefix}_${nsName}NAMES_HIDE_GLOBALS 1\n";
+    print F "#define ${prefix}_${namespace}_NAMES_HIDE_GLOBALS 1\n";
     print F "#else\n";
     print F "#define QNAME_DEFAULT_CONSTRUCTOR 1\n";
     print F "#endif\n\n";
 
-    print F "#include \"${nsName}Names.h\"\n\n";
+    print F "#include \"${namespace}Names.h\"\n\n";
     print F "#include <wtf/StaticConstructors.h>\n";
 
     print F "namespace WebCore {\n\n";
-    print F "namespace ${nsName}Names {\n\n";
+    print F "namespace ${namespace}Names {\n\n";
     print F "using namespace $usedNamespace;\n\n";
 }
 
@@ -559,7 +585,7 @@ sub printInit
     my ($F, $isDefinition) = @_;
 
     if ($isDefinition) {
-        print F "\nvoid init();\n\n";
+        print F "\nWEBCORE_EXPORT void init();\n\n";
         print F "} }\n\n";
         print F "#endif\n\n";
         return;
@@ -586,7 +612,7 @@ sub printLicenseHeader
  *
  * This file was generated by the dom/make_names.pl script.
  *
- * Copyright (C) 2005, 2006, 2007, 2008, 2009 Apple Inc.  All rights reserved.
+ * Copyright (C) 2005, 2006, 2007, 2008, 2009, 2013 Apple Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -597,10 +623,10 @@ sub printLicenseHeader
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -613,6 +639,77 @@ sub printLicenseHeader
 ";
 }
 
+sub printTypeHelpers
+{
+    my ($F, $namesRef) = @_;
+    my %names = %$namesRef;
+
+    # Do a first pass to discard classes that map to several tags.
+    my %classToTags = ();
+    for my $name (keys %names) {
+        my $class = $parsedTags{$name}{interfaceName};
+        push(@{$classToTags{$class}}, $name) if defined $class;
+    }
+
+    for my $class (sort keys %classToTags) {
+        my $name = $classToTags{$class}[0];
+        next if $parsedTags{$name}{customTypeHelper};
+        # Skip classes that map to more than 1 tag.
+        my $tagCount = scalar @{$classToTags{$class}};
+        next if $tagCount > 1;
+
+        print F <<END
+namespace WebCore {
+class $class;
+}
+namespace WTF {
+template <typename ArgType>
+class TypeCastTraits<const WebCore::$class, ArgType, false /* isBaseType */> {
+public:
+    static bool isOfType(ArgType& node) { return checkTagName(node); }
+private:
+END
+       ;
+       if ($parameters{namespace} eq "HTML" && ($parsedTags{$name}{wrapperOnlyIfMediaIsAvailable} || $parsedTags{$name}{settingsConditional})) {
+           print F <<END
+    static bool checkTagName(const WebCore::HTMLElement& element) { return !element.isHTMLUnknownElement() && element.hasTagName(WebCore::$parameters{namespace}Names::${name}Tag); }
+    static bool checkTagName(const WebCore::Node& node) { return is<WebCore::HTMLElement>(node) && checkTagName(downcast<WebCore::HTMLElement>(node)); }
+END
+           ;
+       } else {
+           print F <<END
+    static bool checkTagName(const WebCore::$parameters{namespace}Element& element) { return element.hasTagName(WebCore::$parameters{namespace}Names::${name}Tag); }
+    static bool checkTagName(const WebCore::Node& node) { return node.hasTagName(WebCore::$parameters{namespace}Names::${name}Tag); }
+END
+           ;
+       }
+       print F <<END
+};
+}
+END
+       ;
+       print F "\n";
+    }
+}
+
+sub printTypeHelpersHeaderFile
+{
+    my ($headerPath) = shift;
+    my $F;
+    open F, ">$headerPath";
+    printLicenseHeader($F);
+
+    print F "#ifndef ".$parameters{namespace}."ElementTypeHelpers_h\n";
+    print F "#define ".$parameters{namespace}."ElementTypeHelpers_h\n\n";
+    print F "#include \"".$parameters{namespace}."Names.h\"\n\n";
+
+    printTypeHelpers($F, \%allTags);
+
+    print F "#endif\n";
+
+    close F;
+}
+
 sub printNamesHeaderFile
 {
     my ($headerPath) = shift;
@@ -620,31 +717,32 @@ sub printNamesHeaderFile
     open F, ">$headerPath";
 
     printLicenseHeader($F);
-    printHeaderHead($F, "DOM", $parameters{namespace}, "#include \"QualifiedName.h\"");
+    printHeaderHead($F, "DOM", $parameters{namespace}, '#include "QualifiedName.h"', "class $parameters{namespace}QualifiedName : public QualifiedName { };\n\n");
 
-    my $lowerNamespace = lc($parameters{namespacePrefix});
+    my $lowercaseNamespacePrefix = lc($parameters{namespacePrefix});
+
     print F "// Namespace\n";
-    print F "extern const WTF::AtomicString ${lowerNamespace}NamespaceURI;\n\n";
+    print F "WEBCORE_EXPORT extern const WTF::AtomicString ${lowercaseNamespacePrefix}NamespaceURI;\n\n";
 
     if (keys %allTags) {
         print F "// Tags\n";
-        printMacros($F, "extern const WebCore::QualifiedName", "Tag", \%allTags);
+        printMacros($F, "WEBCORE_EXPORT extern const WebCore::$parameters{namespace}QualifiedName", "Tag", \%allTags);
     }
 
     if (keys %allAttrs) {
         print F "// Attributes\n";
-        printMacros($F, "extern const WebCore::QualifiedName", "Attr", \%allAttrs);
+        printMacros($F, "WEBCORE_EXPORT extern const WebCore::QualifiedName", "Attr", \%allAttrs);
     }
     print F "#endif\n\n";
 
     if (keys %allTags) {
         print F "const unsigned $parameters{namespace}TagsCount = ", scalar(keys %allTags), ";\n";
-        print F "WebCore::QualifiedName** get$parameters{namespace}Tags();\n";
+        print F "const WebCore::$parameters{namespace}QualifiedName* const* get$parameters{namespace}Tags();\n";
     }
 
     if (keys %allAttrs) {
         print F "const unsigned $parameters{namespace}AttrsCount = ", scalar(keys %allAttrs), ";\n";
-        print F "WebCore::QualifiedName** get$parameters{namespace}Attrs();\n";
+        print F "const WebCore::QualifiedName* const* get$parameters{namespace}Attrs();\n";
     }
 
     printInit($F, 1);
@@ -660,22 +758,22 @@ sub printNamesCppFile
     printLicenseHeader($F);
     printCppHead($F, "DOM", $parameters{namespace}, "WebCore");
     
-    my $lowerNamespace = lc($parameters{namespacePrefix});
+    my $lowercaseNamespacePrefix = lc($parameters{namespacePrefix});
 
-    print F "DEFINE_GLOBAL(AtomicString, ${lowerNamespace}NamespaceURI)\n\n";
+    print F "WEBCORE_EXPORT DEFINE_GLOBAL(AtomicString, ${lowercaseNamespacePrefix}NamespaceURI)\n\n";
 
     print F StaticString::GenerateStrings(\%allStrings);
 
     if (keys %allTags) {
         print F "// Tags\n";
         for my $name (sort keys %allTags) {
-            print F "DEFINE_GLOBAL(QualifiedName, ", $name, "Tag)\n";
+            print F "WEBCORE_EXPORT DEFINE_GLOBAL($parameters{namespace}QualifiedName, ", $name, "Tag)\n";
         }
         
-        print F "\n\nWebCore::QualifiedName** get$parameters{namespace}Tags()\n";
-        print F "{\n    static WebCore::QualifiedName* $parameters{namespace}Tags[] = {\n";
+        print F "\n\nconst WebCore::$parameters{namespace}QualifiedName* const* get$parameters{namespace}Tags()\n";
+        print F "{\n    static const WebCore::$parameters{namespace}QualifiedName* const $parameters{namespace}Tags[] = {\n";
         for my $name (sort keys %allTags) {
-            print F "        (WebCore::QualifiedName*)&${name}Tag,\n";
+            print F "        reinterpret_cast<const WebCore::$parameters{namespace}QualifiedName*>(&${name}Tag),\n";
         }
         print F "    };\n";
         print F "    return $parameters{namespace}Tags;\n";
@@ -685,33 +783,33 @@ sub printNamesCppFile
     if (keys %allAttrs) {
         print F "\n// Attributes\n";
         for my $name (sort keys %allAttrs) {
-            print F "DEFINE_GLOBAL(QualifiedName, ", $name, "Attr)\n";
+            print F "WEBCORE_EXPORT DEFINE_GLOBAL(QualifiedName, ", $name, "Attr)\n";
         }
-        print F "\n\nWebCore::QualifiedName** get$parameters{namespace}Attrs()\n";
-        print F "{\n    static WebCore::QualifiedName* $parameters{namespace}Attr[] = {\n";
+        print F "\n\nconst WebCore::QualifiedName* const* get$parameters{namespace}Attrs()\n";
+        print F "{\n    static const WebCore::QualifiedName* const $parameters{namespace}Attrs[] = {\n";
         for my $name (sort keys %allAttrs) {
-            print F "        (WebCore::QualifiedName*)&${name}Attr,\n";
+            print F "        reinterpret_cast<const WebCore::QualifiedName*>(&${name}Attr),\n";
         }
         print F "    };\n";
-        print F "    return $parameters{namespace}Attr;\n";
+        print F "    return $parameters{namespace}Attrs;\n";
         print F "}\n";
     }
 
     printInit($F, 0);
 
-    print(F "    AtomicString ${lowerNamespace}NS(\"$parameters{namespaceURI}\", AtomicString::ConstructFromLiteral);\n\n");
+    print(F "    AtomicString ${lowercaseNamespacePrefix}NS(\"$parameters{namespaceURI}\", AtomicString::ConstructFromLiteral);\n\n");
 
     print(F "    // Namespace\n");
-    print(F "    new (NotNull, (void*)&${lowerNamespace}NamespaceURI) AtomicString(${lowerNamespace}NS);\n");
+    print(F "    new (NotNull, (void*)&${lowercaseNamespacePrefix}NamespaceURI) AtomicString(${lowercaseNamespacePrefix}NS);\n");
     print(F "\n");
     print F StaticString::GenerateStringAsserts(\%allStrings);
 
     if (keys %allTags) {
-        my $tagsNamespace = $parameters{tagsNullNamespace} ? "nullAtom" : "${lowerNamespace}NS";
+        my $tagsNamespace = $parameters{tagsNullNamespace} ? "nullAtom" : "${lowercaseNamespacePrefix}NS";
         printDefinitions($F, \%allTags, "tags", $tagsNamespace);
     }
     if (keys %allAttrs) {
-        my $attrsNamespace = $parameters{attrsNullNamespace} ? "nullAtom" : "${lowerNamespace}NS";
+        my $attrsNamespace = $parameters{attrsNullNamespace} ? "nullAtom" : "${lowercaseNamespacePrefix}NS";
         printDefinitions($F, \%allAttrs, "attributes", $attrsNamespace);
     }
 
@@ -735,7 +833,7 @@ sub printJSElementIncludes
 
         print F "#include \"JS${JSInterfaceName}.h\"\n";
     }
-    print F "#include \"JS$parameters{fallbackInterfaceName}.h\"\n";
+    print F "#include \"JS$parameters{fallbackJSInterfaceName}.h\"\n";
 }
 
 sub printElementIncludes
@@ -798,20 +896,34 @@ sub printConditionalElementIncludes
 sub printDefinitions
 {
     my ($F, $namesRef, $type, $namespaceURI) = @_;
-    my $singularType = substr($type, 0, -1);
-    my $shortType = substr($singularType, 0, 4);
-    my $shortCamelType = ucfirst($shortType);
-    my $shortUpperType = uc($shortType);
-    
-    print F "    // " . ucfirst($type) . "\n";
 
+    my $shortCamelType = ucfirst(substr(substr($type, 0, -1), 0, 4));
+    my $capitalizedType = ucfirst($type);
+    
+print F <<END
+
+    struct ${capitalizedType}TableEntry {
+        void* targetAddress;
+        StringImpl& name;
+    };
+
+    static const ${capitalizedType}TableEntry ${type}Table[] = {
+END
+;
     for my $name (sort keys %$namesRef) {
-        # To generate less code in init(), the common case of nullAtom for the namespace, we call createQualifiedName() without passing $namespaceURI.
-        if ($namespaceURI eq "nullAtom") {
-            print F "    createQualifiedName((void*)&$name","${shortCamelType}, ${name}Impl);\n";
-        } else {
-            print F "    createQualifiedName((void*)&$name","${shortCamelType}, ${name}Impl, $namespaceURI);\n";
-        }
+        print F "        { (void*)&$name$shortCamelType, *reinterpret_cast<StringImpl*>(&${name}Data) },\n";
+    }
+
+print F <<END
+    };
+
+    for (unsigned i = 0; i < WTF_ARRAY_LENGTH(${type}Table); ++i)
+END
+;
+    if ($namespaceURI eq "nullAtom") {
+        print F "        createQualifiedName(${type}Table[i].targetAddress, &${type}Table[i].name);\n";
+    } else {
+        print F "        createQualifiedName(${type}Table[i].targetAddress, &${type}Table[i].name, $namespaceURI);\n";
     }
 }
 
@@ -823,143 +935,103 @@ sub printFactoryCppFile
     my $F;
     open F, ">$cppPath";
 
-printLicenseHeader($F);
+    my $formElementArgumentForDeclaration = "";
+    my $formElementArgumentForDefinition = "";
+    $formElementArgumentForDeclaration = ", HTMLFormElement*" if $parameters{namespace} eq "HTML";
+    $formElementArgumentForDefinition = ", HTMLFormElement* formElement" if $parameters{namespace} eq "HTML";
 
-print F <<END
+    printLicenseHeader($F);
+
+    print F <<END
 #include "config.h"
 END
-;
+    ;
 
-print F "\n#if $parameters{guardFactoryWith}\n\n" if $parameters{guardFactoryWith};
+    print F "\n#if $parameters{guardFactoryWith}\n\n" if $parameters{guardFactoryWith};
 
-print F <<END
+    print F <<END
 #include "$parameters{namespace}ElementFactory.h"
+
 #include "$parameters{namespace}Names.h"
+
 END
-;
+    ;
 
-printElementIncludes($F);
+    printElementIncludes($F);
+    printConditionalElementIncludes($F, 0);
 
-print F "\n#include <wtf/HashMap.h>\n";
+    print F <<END
 
-printConditionalElementIncludes($F, 0);
-
-print F <<END
-
-#include "ContextFeatures.h"
-#include "RuntimeEnabledFeatures.h"
-
-#if ENABLE(CUSTOM_ELEMENTS)
-#include "CustomElementConstructor.h"
-#include "CustomElementRegistry.h"
-#endif
-
-#if ENABLE(DASHBOARD_SUPPORT) || ENABLE(VIDEO)
 #include "Document.h"
+#include "RuntimeEnabledFeatures.h"
 #include "Settings.h"
-#endif
+#include <wtf/HashMap.h>
+#include <wtf/NeverDestroyed.h>
 
 namespace WebCore {
 
 using namespace $parameters{namespace}Names;
 
-END
-;
-
-print F "typedef PassRefPtr<$parameters{namespace}Element> (*ConstructorFunction)(const QualifiedName&, Document*";
-print F ", HTMLFormElement*" if $parameters{namespace} eq "HTML";
-print F ", bool createdByParser);\n";
-print F <<END
-typedef HashMap<AtomicStringImpl*, ConstructorFunction> FunctionMap;
-
-static FunctionMap* gFunctionMap = 0;
+typedef Ref<$parameters{namespace}Element> (*$parameters{namespace}ConstructorFunction)(const QualifiedName&, Document&$formElementArgumentForDeclaration, bool createdByParser);
 
 END
-;
+    ;
 
-my %tagConstructorMap = buildConstructorMap();
+    my %tagConstructorMap = buildConstructorMap();
+    my $argumentList;
 
-printConstructors($F, \%tagConstructorMap);
-
-print F <<END
-static void addTag(const QualifiedName& tag, ConstructorFunction func)
-{
-    gFunctionMap->set(tag.localName().impl(), func);
-}
-
-static void createFunctionMap()
-{
-    ASSERT(!gFunctionMap);
-
-    // Create the table.
-    gFunctionMap = new FunctionMap;
-    
-    // Populate it with constructor functions.
-END
-;
-
-printFunctionInits($F, \%tagConstructorMap);
-
-print F "}\n";
-
-
-print F "\nPassRefPtr<$parameters{namespace}Element> $parameters{namespace}ElementFactory::create$parameters{namespace}Element(const QualifiedName& qName, Document* document";
-print F ", HTMLFormElement* formElement" if $parameters{namespace} eq "HTML";
-print F ", bool createdByParser)\n{\n";
-
-print F <<END
-    if (!document)
-        return 0;
-
-END
-;
-
-if ($parameters{namespace} ne "HTML" and $parameters{namespace} ne "SVG") {
-print F <<END
-#if ENABLE(DASHBOARD_SUPPORT)
-    Settings* settings = document->settings();
-    if (settings && settings->usesDashboardBackwardCompatibilityMode())
-        return 0;
-#endif
-END
-;
-
-}
-
-print F <<END
-#if ENABLE(CUSTOM_ELEMENTS)
-    if (document->registry()) {
-        if (RefPtr<CustomElementConstructor> constructor = document->registry()->find(nullQName(), qName)) {
-            RefPtr<Element> element = constructor->createElement();
-            ASSERT(element->is$parameters{namespace}Element());
-            return static_pointer_cast<$parameters{namespace}Element>(element.release());
-        }
-    }
-#endif
-
-    if (!gFunctionMap)
-        createFunctionMap();
-    if (ConstructorFunction function = gFunctionMap->get(qName.localName().impl())) {
-END
-;
-
-if ($parameters{namespace} eq "HTML") {
-    print F "        if (PassRefPtr<$parameters{namespace}Element> element = function(qName, document, formElement, createdByParser))\n";
-    print F "            return element;\n";
-} else {
-    print F "        if (PassRefPtr<$parameters{namespace}Element> element = function(qName, document, createdByParser))\n";
-    print F "            return element;\n";
-}
-print F <<END
+    if ($parameters{namespace} eq "HTML") {
+        $argumentList = "name, document, formElement, createdByParser";
+    } else {
+        $argumentList = "name, document, createdByParser";
     }
 
-    return $parameters{fallbackInterfaceName}::create(qName, document);
+    printConstructors($F, \%tagConstructorMap);
+
+    print F <<END
+static NEVER_INLINE void populate$parameters{namespace}FactoryMap(HashMap<AtomicStringImpl*, $parameters{namespace}ConstructorFunction>& map)
+{
+    struct TableEntry {
+        const QualifiedName& name;
+        $parameters{namespace}ConstructorFunction function;
+    };
+
+    static const TableEntry table[] = {
+END
+    ;
+
+    printFunctionTable($F, \%tagConstructorMap);
+
+    print F <<END
+    };
+
+    for (unsigned i = 0; i < WTF_ARRAY_LENGTH(table); ++i)
+        map.add(table[i].name.localName().impl(), table[i].function);
+}
+
+RefPtr<$parameters{namespace}Element> $parameters{namespace}ElementFactory::createKnownElement(const QualifiedName& name, Document& document$formElementArgumentForDefinition, bool createdByParser)
+{
+    static NeverDestroyed<HashMap<AtomicStringImpl*, $parameters{namespace}ConstructorFunction>> functions;
+    if (functions.get().isEmpty())
+        populate$parameters{namespace}FactoryMap(functions);
+    $parameters{namespace}ConstructorFunction function = functions.get().get(name.localName().impl());
+    if (LIKELY(function))
+        return function($argumentList);
+    return nullptr;
+}
+
+Ref<$parameters{namespace}Element> $parameters{namespace}ElementFactory::createElement(const QualifiedName& name, Document& document$formElementArgumentForDefinition, bool createdByParser)
+{
+    RefPtr<$parameters{namespace}Element> element = $parameters{namespace}ElementFactory::createKnownElement($argumentList);
+    if (LIKELY(element))
+        return element.releaseNonNull();
+    return $parameters{fallbackInterfaceName}::create(name, document);
 }
 
 } // namespace WebCore
 
 END
-;
+    ;
 
     print F "#endif\n" if $parameters{guardFactoryWith};
 
@@ -979,33 +1051,26 @@ sub printFactoryHeaderFile
 #define $parameters{namespace}ElementFactory_h
 
 #include <wtf/Forward.h>
-#include <wtf/PassRefPtr.h>
 
 namespace WebCore {
-    class Element;
+
     class Document;
+    class HTMLFormElement;
     class QualifiedName;
-}
-
-namespace WebCore {
 
     class $parameters{namespace}Element;
-END
-;
 
-print F "     class HTMLFormElement;\n" if $parameters{namespace} eq "HTML";
-
-print F<<END
-    // The idea behind this class is that there will eventually be a mapping from namespace URIs to ElementFactories that can dispense
-    // elements. In a compound document world, the generic createElement function (will end up being virtual) will be called.
     class $parameters{namespace}ElementFactory {
     public:
-        PassRefPtr<Element> createElement(const WebCore::QualifiedName&, WebCore::Document*, bool createdByParser = true);
 END
 ;
-print F "        static PassRefPtr<$parameters{namespace}Element> create$parameters{namespace}Element(const WebCore::QualifiedName&, WebCore::Document*";
-print F ", HTMLFormElement* = 0" if $parameters{namespace} eq "HTML";
-print F ", bool createdByParser = true);\n";
+
+print F "        static RefPtr<$parameters{namespace}Element> createKnownElement(const QualifiedName&, Document&";
+print F ", HTMLFormElement* = nullptr" if $parameters{namespace} eq "HTML";
+print F ", bool createdByParser = false);\n\n";
+print F "        static Ref<$parameters{namespace}Element> createElement(const QualifiedName&, Document&";
+print F ", HTMLFormElement* = nullptr" if $parameters{namespace} eq "HTML";
+print F ", bool createdByParser = false);\n";
 
 printf F<<END
     };
@@ -1037,7 +1102,7 @@ sub printWrapperFunctions
     for my $tagName (sort keys %enabledTags) {
         # Avoid defining the same wrapper method twice.
         my $JSInterfaceName = $enabledTags{$tagName}{JSInterfaceName};
-        next if defined($tagsSeen{$JSInterfaceName}) || (usesDefaultJSWrapper($tagName) && ($parameters{fallbackInterfaceName} eq $parameters{namespace} . "Element"));
+        next if (defined($tagsSeen{$JSInterfaceName}) || (usesDefaultJSWrapper($tagName) && ($parameters{fallbackJSInterfaceName} eq $parameters{namespace} . "Element"))) && !$enabledTags{$tagName}{settingsConditional};
         $tagsSeen{$JSInterfaceName} = 1;
 
         my $conditional = $enabledTags{$tagName}{conditional};
@@ -1048,48 +1113,45 @@ sub printWrapperFunctions
 
         if ($enabledTags{$tagName}{wrapperOnlyIfMediaIsAvailable}) {
             print F <<END
-static JSDOMWrapper* create${JSInterfaceName}Wrapper(ExecState* exec, JSDOMGlobalObject* globalObject, PassRefPtr<$parameters{namespace}Element> element)
+static JSDOMObject* create${JSInterfaceName}Wrapper(JSDOMGlobalObject* globalObject, PassRefPtr<$parameters{namespace}Element> element)
 {
-    if (element->isHTMLUnknownElement())
-        return CREATE_DOM_WRAPPER(exec, globalObject, $parameters{namespace}Element, element.get());
-    return CREATE_DOM_WRAPPER(exec, globalObject, ${JSInterfaceName}, element.get());
+    if (element->is$parameters{fallbackInterfaceName}())
+        return CREATE_DOM_WRAPPER(globalObject, $parameters{fallbackInterfaceName}, element.get());
+    return CREATE_DOM_WRAPPER(globalObject, ${JSInterfaceName}, element.get());
 }
 
 END
-    ;
-        } elsif ($enabledTags{$tagName}{contextConditional}) {
-            my $contextConditional = $enabledTags{$tagName}{contextConditional};
+            ;
+        } elsif ($enabledTags{$tagName}{settingsConditional}) {
             print F <<END
-static JSDOMWrapper* create${JSInterfaceName}Wrapper(ExecState* exec, JSDOMGlobalObject* globalObject, PassRefPtr<$parameters{namespace}Element> element)
+static JSDOMObject* create$enabledTags{$tagName}{interfaceName}Wrapper(JSDOMGlobalObject* globalObject, PassRefPtr<$parameters{namespace}Element> element)
 {
-    if (!ContextFeatures::${contextConditional}Enabled(element->document())) {
-        ASSERT(!element || element->is$parameters{fallbackInterfaceName}());
-        return CREATE_DOM_WRAPPER(exec, globalObject, $parameters{fallbackInterfaceName}, element.get());
-    }
-
-    return CREATE_DOM_WRAPPER(exec, globalObject, ${JSInterfaceName}, element.get());
+    if (element->is$parameters{fallbackInterfaceName}())
+        return CREATE_DOM_WRAPPER(globalObject, $parameters{fallbackInterfaceName}, element.get());
+    return CREATE_DOM_WRAPPER(globalObject, ${JSInterfaceName}, element.get());
 }
+
 END
-    ;
+            ;
         } elsif ($enabledTags{$tagName}{runtimeConditional}) {
             my $runtimeConditional = $enabledTags{$tagName}{runtimeConditional};
             print F <<END
-static JSDOMWrapper* create${JSInterfaceName}Wrapper(ExecState* exec, JSDOMGlobalObject* globalObject, PassRefPtr<$parameters{namespace}Element> element)
+static JSDOMObject* create${JSInterfaceName}Wrapper(JSDOMGlobalObject* globalObject, PassRefPtr<$parameters{namespace}Element> element)
 {
-    if (!RuntimeEnabledFeatures::${runtimeConditional}Enabled()) {
+    if (!RuntimeEnabledFeatures::sharedFeatures().${runtimeConditional}Enabled()) {
         ASSERT(!element || element->is$parameters{fallbackInterfaceName}());
-        return CREATE_DOM_WRAPPER(exec, globalObject, $parameters{fallbackInterfaceName}, element.get());
+        return CREATE_DOM_WRAPPER(globalObject, $parameters{fallbackJSInterfaceName}, element.get());
     }
 
-    return CREATE_DOM_WRAPPER(exec, globalObject, ${JSInterfaceName}, element.get());
+    return CREATE_DOM_WRAPPER(globalObject, ${JSInterfaceName}, element.get());
 }
 END
     ;
         } else {
             print F <<END
-static JSDOMWrapper* create${JSInterfaceName}Wrapper(ExecState* exec, JSDOMGlobalObject* globalObject, PassRefPtr<$parameters{namespace}Element> element)
+static JSDOMObject* create${JSInterfaceName}Wrapper(JSDOMGlobalObject* globalObject, PassRefPtr<$parameters{namespace}Element> element)
 {
-    return CREATE_DOM_WRAPPER(exec, globalObject, ${JSInterfaceName}, element.get());
+    return CREATE_DOM_WRAPPER(globalObject, ${JSInterfaceName}, element.get());
 }
 
 END
@@ -1112,48 +1174,35 @@ sub printWrapperFactoryCppFile
     printLicenseHeader($F);
 
     print F "#include \"config.h\"\n";
-    print F "#include \"JS$parameters{namespace}ElementWrapperFactory.h\"\n";
+    print F "#include \"JS$parameters{namespace}ElementWrapperFactory.h\"\n\n";
 
     print F "\n#if $parameters{guardFactoryWith}\n\n" if $parameters{guardFactoryWith};
 
     printJSElementIncludes($F);
-
-    print F "\n#include \"$parameters{namespace}Names.h\"\n\n";
-
     printElementIncludes($F);
 
-    print F "\n#include <wtf/StdLibExtras.h>\n";
+    print F "\n#include \"$parameters{namespace}Names.h\"\n";
+    print F <<END
+
+#include "Document.h"
+#include "RuntimeEnabledFeatures.h"
+#include "Settings.h"
+#include <wtf/NeverDestroyed.h>
+#include <wtf/StdLibExtras.h>
+END
+;
 
     printConditionalElementIncludes($F, 1);
 
     print F <<END
 
-#include "ContextFeatures.h"
-#include "RuntimeEnabledFeatures.h"
-
-#if ENABLE(VIDEO)
-#include "Document.h"
-#include "Settings.h"
-#endif
-
-END
-;
-
-    print F <<END
 using namespace JSC;
-END
-;
-
-    print F <<END
 
 namespace WebCore {
 
 using namespace $parameters{namespace}Names;
 
-END
-;
-print F <<END
-typedef JSDOMWrapper* (*Create$parameters{namespace}ElementWrapperFunction)(ExecState*, JSDOMGlobalObject*, PassRefPtr<$parameters{namespace}Element>);
+typedef JSDOMObject* (*Create$parameters{namespace}ElementWrapperFunction)(JSDOMGlobalObject*, PassRefPtr<$parameters{namespace}Element>);
 
 END
 ;
@@ -1161,17 +1210,21 @@ END
     printWrapperFunctions($F);
 
 print F <<END
-JSDOMWrapper* createJS$parameters{namespace}Wrapper(ExecState* exec, JSDOMGlobalObject* globalObject, PassRefPtr<$parameters{namespace}Element> element)
+
+static NEVER_INLINE void populate$parameters{namespace}WrapperMap(HashMap<AtomicStringImpl*, Create$parameters{namespace}ElementWrapperFunction>& map)
 {
-    typedef HashMap<WTF::AtomicStringImpl*, Create$parameters{namespace}ElementWrapperFunction> FunctionMap;
-    DEFINE_STATIC_LOCAL(FunctionMap, map, ());
-    if (map.isEmpty()) {
+    struct TableEntry {
+        const QualifiedName& name;
+        Create$parameters{namespace}ElementWrapperFunction function;
+    };
+
+    static const TableEntry table[] = {
 END
 ;
 
     for my $tag (sort keys %enabledTags) {
         # Do not add the name to the map if it does not have a JS wrapper constructor or uses the default wrapper.
-        next if (usesDefaultJSWrapper($tag, \%enabledTags) && ($parameters{fallbackInterfaceName} eq $parameters{namespace} . "Element"));
+        next if (usesDefaultJSWrapper($tag, \%enabledTags) && ($parameters{fallbackJSInterfaceName} eq $parameters{namespace} . "Element"));
 
         my $conditional = $enabledTags{$tag}{conditional};
         if ($conditional) {
@@ -1179,8 +1232,16 @@ END
             print F "#if ${conditionalString}\n";
         }
 
-        my $ucTag = $enabledTags{$tag}{JSInterfaceName};
-        print F "       map.set(${tag}Tag.localName().impl(), create${ucTag}Wrapper);\n";
+        my $ucTag;
+        if ($enabledTags{$tag}{settingsConditional}) {
+            $ucTag = $enabledTags{$tag}{interfaceName};
+        } else {
+            $ucTag = $enabledTags{$tag}{JSInterfaceName};
+        }
+
+        # FIXME Remove unnecessary '&' from the following (print) line once we switch to a non-broken Visual Studio compiler.
+        # https://bugs.webkit.org/show_bug.cgi?id=121235:
+        print F "        { ${tag}Tag, &create${ucTag}Wrapper },\n";
 
         if ($conditional) {
             print F "#endif\n";
@@ -1188,27 +1249,27 @@ END
     }
 
     print F <<END
-    }
-END
-;
+    };
 
-    print F <<END
-    Create$parameters{namespace}ElementWrapperFunction createWrapperFunction = map.get(element->localName().impl());
-    if (createWrapperFunction)
-END
-;
-    print F <<END
-        return createWrapperFunction(exec, globalObject, element);
-    return CREATE_DOM_WRAPPER(exec, globalObject, $parameters{fallbackInterfaceName}, element.get());
-END
-;
-    print F <<END
+    for (unsigned i = 0; i < WTF_ARRAY_LENGTH(table); ++i)
+        map.add(table[i].name.localName().impl(), table[i].function);
+}
+
+JSDOMObject* createJS$parameters{namespace}Wrapper(JSDOMGlobalObject* globalObject, PassRefPtr<$parameters{namespace}Element> element)
+{
+    static NeverDestroyed<HashMap<AtomicStringImpl*, Create$parameters{namespace}ElementWrapperFunction>> functions;
+    if (functions.get().isEmpty())
+        populate$parameters{namespace}WrapperMap(functions);
+    if (auto function = functions.get().get(element->localName().impl()))
+        return function(globalObject, element);
+    return CREATE_DOM_WRAPPER(globalObject, $parameters{fallbackJSInterfaceName}, element.get());
+}
+
 }
 END
 ;
 
-    print F "}\n\n";
-    print F "#endif\n" if $parameters{guardFactoryWith};
+    print F "\n#endif\n" if $parameters{guardFactoryWith};
 
     close F;
 }
@@ -1230,17 +1291,13 @@ sub printWrapperFactoryHeaderFile
     print F <<END
 #include <wtf/Forward.h>
 
-namespace JSC {
-    class ExecState;
-}                                            
-                                             
 namespace WebCore {
 
-    class JSDOMWrapper;
+    class JSDOMObject;
     class JSDOMGlobalObject;
     class $parameters{namespace}Element;
 
-    JSDOMWrapper* createJS$parameters{namespace}Wrapper(JSC::ExecState*, JSDOMGlobalObject*, PassRefPtr<$parameters{namespace}Element>);
+    JSDOMObject* createJS$parameters{namespace}Wrapper(JSDOMGlobalObject*, PassRefPtr<$parameters{namespace}Element>);
 
 }
  

@@ -17,7 +17,7 @@
  */
 
 #include "config.h"
-#if USE(3D_GRAPHICS) || defined(QT_OPENGL_SHIMS)
+#if ENABLE(GRAPHICS_CONTEXT_3D)
 
 #define DISABLE_SHIMS
 #include "OpenGLShims.h"
@@ -37,17 +37,17 @@ OpenGLFunctionTable* openGLFunctionTable()
     return &table;
 }
 
-#if PLATFORM(QT)
+#if PLATFORM(WIN)
+static void* getProcAddress(const char* procName)
+{
+    return GetProcAddress(GetModuleHandleA("libGLESv2"), procName);
+}
+#elif PLATFORM(QT)
 static void* getProcAddress(const char* procName)
 {
     if (QOpenGLContext* context = QOpenGLContext::currentContext())
         return reinterpret_cast<void*>(context->getProcAddress(procName));
     return 0;
-}
-#elif PLATFORM(WIN)
-static void* getProcAddress(const char* procName)
-{
-    return GetProcAddress(GetModuleHandleA("libGLESv2"), procName);
 }
 #else
 typedef void* (*glGetProcAddressType) (const char* procName);
@@ -77,26 +77,19 @@ static void* lookupOpenGLFunctionAddress(const char* functionName, bool* success
     if (target)
         return target;
 
-    String fullFunctionName(functionName);
-    fullFunctionName.append("ARB");
-    target = getProcAddress(fullFunctionName.utf8().data());
+    target = getProcAddress(reinterpret_cast<const char*>(makeString(functionName, "ARB").characters8()));
     if (target)
         return target;
 
-    fullFunctionName = functionName;
-    fullFunctionName.append("EXT");
-    target = getProcAddress(fullFunctionName.utf8().data());
+    // FIXME: <https://webkit.org/b/143964> OpenGLShims appears to have a dead store if GLES2
+    target = getProcAddress(reinterpret_cast<const char*>(makeString(functionName, "EXT").characters8()));
 
 #if defined(GL_ES_VERSION_2_0)
-    fullFunctionName = functionName;
-    fullFunctionName.append("ANGLE");
-    target = getProcAddress(fullFunctionName.utf8().data());
+    target = getProcAddress(reinterpret_cast<const char*>(makeString(functionName, "ANGLE").characters8()));
     if (target)
         return target;
 
-    fullFunctionName = functionName;
-    fullFunctionName.append("APPLE");
-    target = getProcAddress(fullFunctionName.utf8().data());
+    target = getProcAddress(reinterpret_cast<const char*>(makeString(functionName, "APPLE").characters8()));
 #endif
 
     // A null address is still a failure case.
@@ -106,18 +99,8 @@ static void* lookupOpenGLFunctionAddress(const char* functionName, bool* success
     return target;
 }
 
-#if PLATFORM(QT) && defined(QT_OPENGL_ES_2)
-
-// With Angle only EGL/GLES2 extensions are available through eglGetProcAddress, not the regular standardized functions.
-#define ASSIGN_FUNCTION_TABLE_ENTRY(FunctionName, success) \
-    openGLFunctionTable()->FunctionName = reinterpret_cast<FunctionName##Type>(::FunctionName)
-
-#else
-
 #define ASSIGN_FUNCTION_TABLE_ENTRY(FunctionName, success) \
     openGLFunctionTable()->FunctionName = reinterpret_cast<FunctionName##Type>(lookupOpenGLFunctionAddress(#FunctionName, &success))
-
-#endif
 
 #define ASSIGN_FUNCTION_TABLE_ENTRY_EXT(FunctionName) \
     openGLFunctionTable()->FunctionName = reinterpret_cast<FunctionName##Type>(lookupOpenGLFunctionAddress(#FunctionName))
@@ -163,6 +146,9 @@ bool initializeOpenGLShims()
     ASSIGN_FUNCTION_TABLE_ENTRY_EXT(glDeleteVertexArrays);
     ASSIGN_FUNCTION_TABLE_ENTRY(glDetachShader, success);
     ASSIGN_FUNCTION_TABLE_ENTRY(glDisableVertexAttribArray, success);
+    ASSIGN_FUNCTION_TABLE_ENTRY(glDrawArraysInstanced, success);
+    ASSIGN_FUNCTION_TABLE_ENTRY(glDrawBuffers, success);
+    ASSIGN_FUNCTION_TABLE_ENTRY(glDrawElementsInstanced, success);
     ASSIGN_FUNCTION_TABLE_ENTRY(glEnableVertexAttribArray, success);
     ASSIGN_FUNCTION_TABLE_ENTRY(glFramebufferRenderbuffer, success);
     ASSIGN_FUNCTION_TABLE_ENTRY(glFramebufferTexture2D, success);
@@ -237,6 +223,7 @@ bool initializeOpenGLShims()
     ASSIGN_FUNCTION_TABLE_ENTRY(glVertexAttrib3fv, success);
     ASSIGN_FUNCTION_TABLE_ENTRY(glVertexAttrib4f, success);
     ASSIGN_FUNCTION_TABLE_ENTRY(glVertexAttrib4fv, success);
+    ASSIGN_FUNCTION_TABLE_ENTRY(glVertexAttribDivisor, success);
     ASSIGN_FUNCTION_TABLE_ENTRY(glVertexAttribPointer, success);
 
     if (!success)
@@ -246,4 +233,4 @@ bool initializeOpenGLShims()
 
 } // namespace WebCore
 
-#endif // USE(3D_GRAPHICS)
+#endif // ENABLE(GRAPHICS_CONTEXT_3D)

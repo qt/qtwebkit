@@ -25,12 +25,16 @@
 #ifndef AsyncAudioDecoder_h
 #define AsyncAudioDecoder_h
 
+#include <memory>
 #include <wtf/Forward.h>
 #include <wtf/MessageQueue.h>
-#include <wtf/PassOwnPtr.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefPtr.h>
 #include <wtf/Threading.h>
+
+namespace JSC {
+class ArrayBuffer;
+}
 
 namespace WebCore {
 
@@ -47,29 +51,25 @@ public:
     ~AsyncAudioDecoder();
 
     // Must be called on the main thread.
-    void decodeAsync(ArrayBuffer* audioData, float sampleRate, PassRefPtr<AudioBufferCallback> successCallback, PassRefPtr<AudioBufferCallback> errorCallback);
+    void decodeAsync(JSC::ArrayBuffer* audioData, float sampleRate, PassRefPtr<AudioBufferCallback> successCallback, PassRefPtr<AudioBufferCallback> errorCallback);
 
 private:
     class DecodingTask {
         WTF_MAKE_NONCOPYABLE(DecodingTask);
     public:
-        static PassOwnPtr<DecodingTask> create(ArrayBuffer* audioData, float sampleRate, PassRefPtr<AudioBufferCallback> successCallback, PassRefPtr<AudioBufferCallback> errorCallback);
-
+        DecodingTask(JSC::ArrayBuffer* audioData, float sampleRate, PassRefPtr<AudioBufferCallback> successCallback, PassRefPtr<AudioBufferCallback> errorCallback);
         void decode();
         
     private:
-        DecodingTask(ArrayBuffer* audioData, float sampleRate, PassRefPtr<AudioBufferCallback> successCallback, PassRefPtr<AudioBufferCallback> errorCallback);
-
-        ArrayBuffer* audioData() { return m_audioData.get(); }
+        JSC::ArrayBuffer* audioData() { return m_audioData.get(); }
         float sampleRate() const { return m_sampleRate; }
         AudioBufferCallback* successCallback() { return m_successCallback.get(); }
         AudioBufferCallback* errorCallback() { return m_errorCallback.get(); }
         AudioBuffer* audioBuffer() { return m_audioBuffer.get(); }
 
-        static void notifyCompleteDispatch(void* userData);
         void notifyComplete();
 
-        RefPtr<ArrayBuffer> m_audioData;
+        RefPtr<JSC::ArrayBuffer> m_audioData;
         float m_sampleRate;
         RefPtr<AudioBufferCallback> m_successCallback;
         RefPtr<AudioBufferCallback> m_errorCallback;
@@ -80,7 +80,7 @@ private:
     void runLoop();
 
     WTF::ThreadIdentifier m_threadID;
-    Mutex m_threadCreationMutex;
+    Lock m_threadCreationMutex;
     MessageQueue<DecodingTask> m_queue;
 };
 

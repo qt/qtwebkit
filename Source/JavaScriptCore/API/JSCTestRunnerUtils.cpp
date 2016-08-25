@@ -27,45 +27,38 @@
 #include "JSCTestRunnerUtils.h"
 
 #include "APICast.h"
-#include "CodeBlock.h"
-#include "Operations.h"
+#include "JSCInlines.h"
+#include "TestRunnerUtils.h"
 
 namespace JSC {
 
-static FunctionExecutable* getExecutable(JSContextRef context, JSValueRef theFunctionValueRef)
+
+JSValueRef failNextNewCodeBlock(JSContextRef context)
 {
-    ExecState* exec = toJS(context);
-    JSValue theFunctionValue = toJS(exec, theFunctionValueRef);
-    
-    JSFunction* theFunction = jsDynamicCast<JSFunction*>(theFunctionValue);
-    if (!theFunction)
-        return 0;
-    
-    FunctionExecutable* executable = jsDynamicCast<FunctionExecutable*>(
-        theFunction->executable());
-    return executable;
+    ExecState* exec= toJS(context);
+    JSLockHolder holder(exec);
+    return toRef(exec, failNextNewCodeBlock(exec));
 }
 
 JSValueRef numberOfDFGCompiles(JSContextRef context, JSValueRef theFunctionValueRef)
 {
-    if (FunctionExecutable* executable = getExecutable(context, theFunctionValueRef)) {
-        CodeBlock* baselineCodeBlock = executable->baselineCodeBlockFor(CodeForCall);
-        
-        if (!baselineCodeBlock)
-            return JSValueMakeNumber(context, 0);
-        
-        return JSValueMakeNumber(context, baselineCodeBlock->numberOfDFGCompiles());
-    }
-    
-    return JSValueMakeUndefined(context);
+    ExecState* exec= toJS(context);
+    JSLockHolder holder(exec);
+    return toRef(exec, numberOfDFGCompiles(toJS(exec, theFunctionValueRef)));
 }
 
 JSValueRef setNeverInline(JSContextRef context, JSValueRef theFunctionValueRef)
 {
-    if (FunctionExecutable* executable = getExecutable(context, theFunctionValueRef))
-        executable->setNeverInline(true);
-    
-    return JSValueMakeUndefined(context);
+    ExecState* exec= toJS(context);
+    JSLockHolder holder(exec);
+    return toRef(exec, setNeverInline(toJS(exec, theFunctionValueRef)));
+}
+
+JSValueRef setNeverOptimize(JSContextRef context, JSValueRef theFunctionValueRef)
+{
+    ExecState* exec= toJS(context);
+    JSLockHolder holder(exec);
+    return toRef(exec, setNeverOptimize(toJS(exec, theFunctionValueRef)));
 }
 
 } // namespace JSC

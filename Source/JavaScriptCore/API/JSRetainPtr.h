@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution. 
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission. 
  *
@@ -57,11 +57,8 @@ public:
     T operator->() const { return m_ptr; }
     
     bool operator!() const { return !m_ptr; }
+    explicit operator bool() const { return m_ptr; }
 
-    // This conversion operator allows implicit conversion to bool but not to other integer types.
-    typedef T JSRetainPtr::*UnspecifiedBoolType;
-    operator UnspecifiedBoolType() const { return m_ptr ? &JSRetainPtr::m_ptr : 0; }
-    
     JSRetainPtr& operator=(const JSRetainPtr&);
     template<typename U> JSRetainPtr& operator=(const JSRetainPtr<U>&);
     JSRetainPtr& operator=(T);
@@ -74,6 +71,16 @@ public:
 private:
     T m_ptr;
 };
+
+inline JSRetainPtr<JSStringRef> adopt(JSStringRef o)
+{
+    return JSRetainPtr<JSStringRef>(Adopt, o);
+}
+
+inline JSRetainPtr<JSGlobalContextRef> adopt(JSGlobalContextRef o)
+{
+    return JSRetainPtr<JSGlobalContextRef>(Adopt, o);
+}
 
 template<typename T> inline JSRetainPtr<T>::JSRetainPtr(const JSRetainPtr& o)
     : m_ptr(o.m_ptr)

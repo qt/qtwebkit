@@ -32,47 +32,28 @@
 #ifndef PingLoader_h
 #define PingLoader_h
 
-#include "ResourceHandleClient.h"
-#include "Timer.h"
-#include <wtf/Noncopyable.h>
 #include <wtf/RefPtr.h>
 
 namespace WebCore {
 
 class FormData;
 class Frame;
-class KURL;
-class ResourceError;
-class ResourceHandle;
-class ResourceResponse;
+class URL;
+class ResourceRequest;
 
-// This class triggers asynchronous loads independent of Frame staying alive (i.e., auditing pingbacks).
-// Since nothing depends on resources loaded through this class, we just want
-// to allow the load to live long enough to ensure the message was actually sent.
-// Therefore, as soon as a callback is received from the ResourceHandle, this class 
-// will cancel the load and delete itself.
-class PingLoader : private ResourceHandleClient {
-    WTF_MAKE_NONCOPYABLE(PingLoader); WTF_MAKE_FAST_ALLOCATED;
+enum class ViolationReportType {
+    ContentSecurityPolicy,
+    XSSAuditor,
+};
+
+class PingLoader {
 public:
-    static void loadImage(Frame*, const KURL& url);
-    static void sendPing(Frame*, const KURL& pingURL, const KURL& destinationURL);
-    static void sendViolationReport(Frame*, const KURL& reportURL, PassRefPtr<FormData> report);
-
-    virtual ~PingLoader();
+    static void loadImage(Frame&, const URL&);
+    static void sendPing(Frame&, const URL& pingURL, const URL& destinationURL);
+    static void sendViolationReport(Frame&, const URL& reportURL, RefPtr<FormData>&& report, ViolationReportType);
 
 private:
-    PingLoader(Frame*, ResourceRequest&);
-
-    virtual void didReceiveResponse(ResourceHandle*, const ResourceResponse&) OVERRIDE { delete this; }
-    virtual void didReceiveData(ResourceHandle*, const char*, int, int) OVERRIDE { delete this; }
-    virtual void didFinishLoading(ResourceHandle*, double) OVERRIDE { delete this; }
-    virtual void didFail(ResourceHandle*, const ResourceError&) OVERRIDE { delete this; }
-    virtual bool shouldUseCredentialStorage(ResourceHandle*)  OVERRIDE { return m_shouldUseCredentialStorage; }
-    void timeout(Timer<PingLoader>*) { delete this; }
-
-    RefPtr<ResourceHandle> m_handle;
-    Timer<PingLoader> m_timeout;
-    bool m_shouldUseCredentialStorage;
+    static void startPingLoad(Frame&, ResourceRequest&);
 };
 
 }

@@ -24,12 +24,13 @@
  */
 
 #include "config.h"
+
+#if WK_HAVE_C_SPI
+
 #include "Test.h"
 
 #include "PlatformUtilities.h"
 #include "PlatformWebView.h"
-#include <wtf/OwnPtr.h>
-#include <wtf/PassOwnPtr.h>
 
 namespace TestWebKitAPI {
 
@@ -41,7 +42,7 @@ public:
     }
 
     WKRetainPtr<WKContextRef> context;
-    OwnPtr<PlatformWebView> webView;
+    std::unique_ptr<PlatformWebView> webView;
 
     WKRetainPtr<WKStringRef> messageName;
     WKRetainPtr<WKTypeRef> messageBody;
@@ -56,13 +57,14 @@ public:
 
     static void setInjectedBundleClient(WKContextRef context, const void* clientInfo)
     {
-        WKContextInjectedBundleClient injectedBundleClient;
+        WKContextInjectedBundleClientV1 injectedBundleClient;
         memset(&injectedBundleClient, 0, sizeof(injectedBundleClient));
-        injectedBundleClient.version = kWKContextInjectedBundleClientCurrentVersion;
-        injectedBundleClient.clientInfo = clientInfo;
+
+        injectedBundleClient.base.version = 1;
+        injectedBundleClient.base.clientInfo = clientInfo;
         injectedBundleClient.didReceiveMessageFromInjectedBundle = didReceiveMessageFromInjectedBundle;
 
-        WKContextSetInjectedBundleClient(context, &injectedBundleClient);
+        WKContextSetInjectedBundleClient(context, &injectedBundleClient.base);
     }
 
     virtual void SetUp()
@@ -70,7 +72,7 @@ public:
         context = adoptWK(Util::createContextForInjectedBundleTest("WillLoadTest"));
         setInjectedBundleClient(context.get(), this);
 
-        webView = adoptPtr(new PlatformWebView(context.get()));
+        webView = std::make_unique<PlatformWebView>(context.get());
 
         didReceiveMessage = false;
     }
@@ -178,7 +180,7 @@ TEST_F(WebKit2WillLoadTest, WKPageLoadHTMLStringWithUserData)
 
     WKPageLoadHTMLStringWithUserData(webView->page(), htmlString.get(), baseURL.get(), userData.get());
 
-    testWillLoadDataRequestReturnValues(baseURL.get(), Util::toWK("text/html").get(), Util::toWK("utf-16").get(), 0, userData.get());
+    testWillLoadDataRequestReturnValues(baseURL.get(), Util::toWK("text/html").get(), Util::toWK("latin1").get(), 0, userData.get());
 }
 
 TEST_F(WebKit2WillLoadTest, WKPageLoadHTMLString)
@@ -188,7 +190,7 @@ TEST_F(WebKit2WillLoadTest, WKPageLoadHTMLString)
 
     WKPageLoadHTMLString(webView->page(), htmlString.get(), baseURL.get());
 
-    testWillLoadDataRequestReturnValues(baseURL.get(), Util::toWK("text/html").get(), Util::toWK("utf-16").get(), 0, 0);
+    testWillLoadDataRequestReturnValues(baseURL.get(), Util::toWK("text/html").get(), Util::toWK("latin1").get(), 0, 0);
 }
 
 TEST_F(WebKit2WillLoadTest, WKPageLoadAlternateHTMLStringWithUserData)
@@ -201,7 +203,7 @@ TEST_F(WebKit2WillLoadTest, WKPageLoadAlternateHTMLStringWithUserData)
 
     WKPageLoadAlternateHTMLStringWithUserData(webView->page(), htmlString.get(), baseURL.get(), unreachableURL.get(), userData.get());
 
-    testWillLoadDataRequestReturnValues(baseURL.get(), Util::toWK("text/html").get(), Util::toWK("utf-16").get(), unreachableURL.get(), userData.get());
+    testWillLoadDataRequestReturnValues(baseURL.get(), Util::toWK("text/html").get(), Util::toWK("latin1").get(), unreachableURL.get(), userData.get());
 }
 
 TEST_F(WebKit2WillLoadTest, WKPageLoadAlternateHTMLString)
@@ -213,7 +215,7 @@ TEST_F(WebKit2WillLoadTest, WKPageLoadAlternateHTMLString)
 
     WKPageLoadAlternateHTMLString(webView->page(), htmlString.get(), baseURL.get(), unreachableURL.get());
 
-    testWillLoadDataRequestReturnValues(baseURL.get(), Util::toWK("text/html").get(), Util::toWK("utf-16").get(), unreachableURL.get(), 0);
+    testWillLoadDataRequestReturnValues(baseURL.get(), Util::toWK("text/html").get(), Util::toWK("latin1").get(), unreachableURL.get(), 0);
 }
 
 TEST_F(WebKit2WillLoadTest, WKPageLoadPlainTextStringWithUserData)
@@ -224,7 +226,7 @@ TEST_F(WebKit2WillLoadTest, WKPageLoadPlainTextStringWithUserData)
     WKPageLoadPlainTextStringWithUserData(webView->page(), plaintTextString.get(), userData.get());
 
     WKRetainPtr<WKURLRef> blankURL = adoptWK(WKURLCreateWithUTF8CString("about:blank"));
-    testWillLoadDataRequestReturnValues(blankURL.get(), Util::toWK("text/plain").get(), Util::toWK("utf-16").get(), 0, userData.get());
+    testWillLoadDataRequestReturnValues(blankURL.get(), Util::toWK("text/plain").get(), Util::toWK("latin1").get(), 0, userData.get());
 }
 
 TEST_F(WebKit2WillLoadTest, WKPageLoadPlainTextString)
@@ -234,7 +236,9 @@ TEST_F(WebKit2WillLoadTest, WKPageLoadPlainTextString)
     WKPageLoadPlainTextString(webView->page(), plaintTextString.get());
 
     WKRetainPtr<WKURLRef> blankURL = adoptWK(WKURLCreateWithUTF8CString("about:blank"));
-    testWillLoadDataRequestReturnValues(blankURL.get(), Util::toWK("text/plain").get(), Util::toWK("utf-16").get(), 0, 0);
+    testWillLoadDataRequestReturnValues(blankURL.get(), Util::toWK("text/plain").get(), Util::toWK("latin1").get(), 0, 0);
 }
 
 } // namespace TestWebKitAPI
+
+#endif

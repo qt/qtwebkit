@@ -31,12 +31,12 @@
 #include <wtf/HashMap.h>
 #include <wtf/RefPtr.h>
 #include <wtf/ThreadSafeRefCounted.h>
-
-class WorkQueue;
+#include <wtf/WorkQueue.h>
 
 namespace WebCore {
 class SecurityOrigin;
 class StorageMap;
+class SuddenTerminationDisabler;
 }
 
 namespace WebKit {
@@ -45,7 +45,7 @@ class LocalStorageDatabaseTracker;
 
 class LocalStorageDatabase : public ThreadSafeRefCounted<LocalStorageDatabase> {
 public:
-    static PassRefPtr<LocalStorageDatabase> create(PassRefPtr<WorkQueue>, PassRefPtr<LocalStorageDatabaseTracker>, PassRefPtr<WebCore::SecurityOrigin>);
+    static PassRefPtr<LocalStorageDatabase> create(PassRefPtr<WorkQueue>, PassRefPtr<LocalStorageDatabaseTracker>, Ref<WebCore::SecurityOrigin>&&);
     ~LocalStorageDatabase();
 
     // Will block until the import is complete.
@@ -59,7 +59,7 @@ public:
     void close();
 
 private:
-    LocalStorageDatabase(PassRefPtr<WorkQueue>, PassRefPtr<LocalStorageDatabaseTracker>, PassRefPtr<WebCore::SecurityOrigin>);
+    LocalStorageDatabase(PassRefPtr<WorkQueue>, PassRefPtr<LocalStorageDatabaseTracker>, Ref<WebCore::SecurityOrigin>&&);
 
     enum DatabaseOpeningStrategy {
         CreateIfNonExistent,
@@ -80,7 +80,7 @@ private:
 
     RefPtr<WorkQueue> m_queue;
     RefPtr<LocalStorageDatabaseTracker> m_tracker;
-    RefPtr<WebCore::SecurityOrigin> m_securityOrigin;
+    Ref<WebCore::SecurityOrigin> m_securityOrigin;
 
     String m_databasePath;
     WebCore::SQLiteDatabase m_database;
@@ -91,6 +91,8 @@ private:
     bool m_didScheduleDatabaseUpdate;
     bool m_shouldClearItems;
     HashMap<String, String> m_changedItems;
+
+    std::unique_ptr<WebCore::SuddenTerminationDisabler> m_disableSuddenTerminationWhileWritingToLocalStorage;
 };
 
 

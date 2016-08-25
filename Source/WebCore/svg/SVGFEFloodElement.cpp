@@ -19,61 +19,53 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG) && ENABLE(FILTERS)
 #include "SVGFEFloodElement.h"
 
-#include "Attribute.h"
 #include "RenderStyle.h"
 #include "SVGNames.h"
 #include "SVGRenderStyle.h"
 
 namespace WebCore {
 
-inline SVGFEFloodElement::SVGFEFloodElement(const QualifiedName& tagName, Document* document)
+inline SVGFEFloodElement::SVGFEFloodElement(const QualifiedName& tagName, Document& document)
     : SVGFilterPrimitiveStandardAttributes(tagName, document)
 {
     ASSERT(hasTagName(SVGNames::feFloodTag));
 }
 
-PassRefPtr<SVGFEFloodElement> SVGFEFloodElement::create(const QualifiedName& tagName, Document* document)
+Ref<SVGFEFloodElement> SVGFEFloodElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new SVGFEFloodElement(tagName, document));
+    return adoptRef(*new SVGFEFloodElement(tagName, document));
 }
-
 
 bool SVGFEFloodElement::setFilterEffectAttribute(FilterEffect* effect, const QualifiedName& attrName)
 {
     RenderObject* renderer = this->renderer();
     ASSERT(renderer);
-    RenderStyle* style = renderer->style();
-    ASSERT(style);
+    const RenderStyle& style = renderer->style();
     FEFlood* flood = static_cast<FEFlood*>(effect);
 
     if (attrName == SVGNames::flood_colorAttr)
-        return flood->setFloodColor(style->svgStyle()->floodColor());
+        return flood->setFloodColor(style.svgStyle().floodColor());
     if (attrName == SVGNames::flood_opacityAttr)
-        return flood->setFloodOpacity(style->svgStyle()->floodOpacity());
+        return flood->setFloodOpacity(style.svgStyle().floodOpacity());
 
     ASSERT_NOT_REACHED();
     return false;
 }
 
-PassRefPtr<FilterEffect> SVGFEFloodElement::build(SVGFilterBuilder*, Filter* filter)
+RefPtr<FilterEffect> SVGFEFloodElement::build(SVGFilterBuilder*, Filter& filter)
 {
     RenderObject* renderer = this->renderer();
     if (!renderer)
-        return 0;
+        return nullptr;
     
-    ASSERT(renderer->style());
-    const SVGRenderStyle* svgStyle = renderer->style()->svgStyle();
+    const SVGRenderStyle& svgStyle = renderer->style().svgStyle();
 
-    Color color = svgStyle->floodColor();
-    float opacity = svgStyle->floodOpacity();
+    Color color = svgStyle.floodColor();
+    float opacity = svgStyle.floodOpacity();
 
     return FEFlood::create(filter, color, opacity);
 }
 
 }
-
-#endif // ENABLE(SVG) && ENABLE(FILTERS)

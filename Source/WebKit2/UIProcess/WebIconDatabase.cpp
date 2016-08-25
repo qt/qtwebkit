@@ -26,41 +26,40 @@
 #include "config.h"
 #include "WebIconDatabase.h"
 
-#include "DataReference.h"
 #include "Logging.h"
-#include "WebContext.h"
 #include "WebIconDatabaseMessages.h"
 #include "WebIconDatabaseProxyMessages.h"
+#include "WebProcessPool.h"
 #include <WebCore/FileSystem.h>
 #include <WebCore/IconDatabase.h>
-#include <WebCore/IconDatabaseBase.h>
-#include <wtf/text/CString.h>
-#include <wtf/text/WTFString.h>
+#include <WebCore/Image.h>
+#include <WebCore/SharedBuffer.h>
 
 using namespace WebCore;
 
 namespace WebKit {
 
-PassRefPtr<WebIconDatabase> WebIconDatabase::create(WebContext* context)
+PassRefPtr<WebIconDatabase> WebIconDatabase::create(WebProcessPool* processPool)
 {
-    return adoptRef(new WebIconDatabase(context));
+    return adoptRef(new WebIconDatabase(*processPool));
 }
 
 WebIconDatabase::~WebIconDatabase()
 {
 }
 
-WebIconDatabase::WebIconDatabase(WebContext* context)
-    : m_webContext(context)
+WebIconDatabase::WebIconDatabase(WebProcessPool& processPool)
+    : m_processPool(&processPool)
     , m_urlImportCompleted(false)
     , m_databaseCleanupDisabled(false)
+    , m_shouldDerefWhenAppropriate(false)
 {
-    m_webContext->addMessageReceiver(Messages::WebIconDatabase::messageReceiverName(), this);
+    m_processPool->addMessageReceiver(Messages::WebIconDatabase::messageReceiverName(), *this);
 }
 
 void WebIconDatabase::invalidate()
 {
-    setGlobalIconDatabase(0);
+    setGlobalIconDatabase(nullptr);
 }
 
 void WebIconDatabase::setDatabasePath(const String& path)
@@ -70,15 +69,20 @@ void WebIconDatabase::setDatabasePath(const String& path)
         return;
     }
 
-    m_iconDatabaseImpl =  IconDatabase::create();
+    m_iconDatabaseImpl = std::make_unique<IconDatabase>();
     m_iconDatabaseImpl->setClient(this);
     IconDatabase::delayDatabaseCleanup();
     m_databaseCleanupDisabled = true;
     m_iconDatabaseImpl->setEnabled(true);
+
+    // FIXME: WebIconDatabases are per-ProcessPool but ProcessPools's don't have their own notion of the current private browsing setting.
+    // As we clean up private browsing throughout the stack we need to clean it up here.
+    m_iconDatabaseImpl->setPrivateBrowsingEnabled(WebPreferences::anyPagesAreUsingPrivateBrowsing());
+
     if (!m_iconDatabaseImpl->open(directoryName(path), pathGetFileName(path))) {
         LOG_ERROR("Unable to open WebKit2 icon database on disk");
-        m_iconDatabaseImpl.clear();
-        setGlobalIconDatabase(0);
+        m_iconDatabaseImpl = nullptr;
+        setGlobalIconDatabase(nullptr);
         IconDatabase::allowDatabaseCleanup();
         m_databaseCleanupDisabled = false;
     }
@@ -97,7 +101,7 @@ void WebIconDatabase::enableDatabaseCleanup()
         ASSERT_NOT_REACHED();
         return;
     }
-    
+
     IconDatabase::allowDatabaseCleanup();
     m_databaseCleanupDisabled = false;
 }
@@ -121,19 +125,17 @@ void WebIconDatabase::setIconURLForPageURL(const String& iconURL, const String& 
         m_iconDatabaseImpl->setIconURLForPageURL(iconURL, pageURL);
 }
 
-void WebIconDatabase::setIconDataForIconURL(const CoreIPC::DataReference& iconData, const String& iconURL)
+void WebIconDatabase::setIconDataForIconURL(const IPC::DataReference& iconData, const String& iconURL)
 {
     LOG(IconDatabase, "WK2 UIProcess setting icon data (%i bytes) for page URL %s", (int)iconData.size(), iconURL.ascii().data());
     if (!m_iconDatabaseImpl)
         return;
-
-    RefPtr<SharedBuffer> buffer = SharedBuffer::create(iconData.data(), iconData.size());
-    m_iconDatabaseImpl->setIconDataForIconURL(buffer.release(), iconURL);
+    m_iconDatabaseImpl->setIconDataForIconURL(SharedBuffer::create(iconData.data(), iconData.size()), iconURL);
 }
 
-void WebIconDatabase::synchronousIconDataForPageURL(const String&, CoreIPC::DataReference& iconData)
+void WebIconDatabase::synchronousIconDataForPageURL(const String&, IPC::DataReference& iconData)
 {
-    iconData = CoreIPC::DataReference();
+    iconData = IPC::DataReference();
 }
 
 void WebIconDatabase::synchronousIconURLForPageURL(const String& pageURL, String& iconURL)
@@ -142,7 +144,6 @@ void WebIconDatabase::synchronousIconURLForPageURL(const String& pageURL, String
         iconURL = String();
         return;
     }
-
     iconURL = m_iconDatabaseImpl->synchronousIconURLForPageURL(pageURL);
 }
 
@@ -160,12 +161,12 @@ void WebIconDatabase::getLoadDecisionForIconURL(const String& iconURL, uint64_t 
 {
     LOG(IconDatabase, "WK2 UIProcess getting load decision for icon URL %s with callback ID %lli", iconURL.ascii().data(), static_cast<long long>(callbackID));
 
-    if (!m_webContext)
+    if (!m_processPool)
         return;
 
     if (!m_iconDatabaseImpl || !m_iconDatabaseImpl->isOpen() || iconURL.isEmpty()) {
         // FIXME (Multi-WebProcess): <rdar://problem/12240223> We need to know which connection to send this message to.
-        m_webContext->sendToAllProcesses(Messages::WebIconDatabaseProxy::ReceivedIconLoadDecision(static_cast<int>(IconLoadNo), callbackID));
+        m_processPool->sendToAllProcesses(Messages::WebIconDatabaseProxy::ReceivedIconLoadDecision(static_cast<int>(IconLoadNo), callbackID));
         return;
     }
     
@@ -176,11 +177,11 @@ void WebIconDatabase::getLoadDecisionForIconURL(const String& iconURL, uint64_t 
         ASSERT(!m_urlImportCompleted);
         
         m_pendingLoadDecisionURLMap.set(callbackID, iconURL);
-        return;    
+        return;
     }
 
     // FIXME (Multi-WebProcess): <rdar://problem/12240223> We need to know which connection to send this message to.
-    m_webContext->sendToAllProcesses(Messages::WebIconDatabaseProxy::ReceivedIconLoadDecision((int)decision, callbackID));
+    m_processPool->sendToAllProcesses(Messages::WebIconDatabaseProxy::ReceivedIconLoadDecision((int)decision, callbackID));
 }
 
 void WebIconDatabase::didReceiveIconForPageURL(const String& pageURL)
@@ -188,20 +189,20 @@ void WebIconDatabase::didReceiveIconForPageURL(const String& pageURL)
     notifyIconDataReadyForPageURL(pageURL);
 }
 
-Image* WebIconDatabase::imageForPageURL(const String& pageURL, const WebCore::IntSize& iconSize)
+Image* WebIconDatabase::imageForPageURL(const String& pageURL, const IntSize& iconSize)
 {
-    if (!m_webContext || !m_iconDatabaseImpl || !m_iconDatabaseImpl->isOpen() || pageURL.isEmpty())
-        return 0;    
+    if (!m_processPool || !m_iconDatabaseImpl || !m_iconDatabaseImpl->isOpen() || pageURL.isEmpty())
+        return nullptr;
 
     // The WebCore IconDatabase ignores the passed in size parameter.
     // If that changes we'll need to rethink how this API is exposed.
     return m_iconDatabaseImpl->synchronousIconForPageURL(pageURL, iconSize);
 }
 
-WebCore::NativeImagePtr WebIconDatabase::nativeImageForPageURL(const String& pageURL, const WebCore::IntSize& iconSize)
+NativeImagePtr WebIconDatabase::nativeImageForPageURL(const String& pageURL, const IntSize& iconSize)
 {
-    if (!m_webContext || !m_iconDatabaseImpl || !m_iconDatabaseImpl->isOpen() || pageURL.isEmpty())
-        return 0;
+    if (!m_processPool || !m_iconDatabaseImpl || !m_iconDatabaseImpl->isOpen() || pageURL.isEmpty())
+        return nullptr;
 
     return m_iconDatabaseImpl->synchronousNativeIconForPageURL(pageURL, iconSize);
 }
@@ -218,7 +219,7 @@ bool WebIconDatabase::isUrlImportCompleted()
 
 void WebIconDatabase::removeAllIcons()
 {
-    m_iconDatabaseImpl->removeAllIcons();   
+    m_iconDatabaseImpl->removeAllIcons();
 }
 
 void WebIconDatabase::checkIntegrityBeforeOpening()
@@ -232,7 +233,7 @@ void WebIconDatabase::close()
         m_iconDatabaseImpl->close();
 }
 
-void WebIconDatabase::initializeIconDatabaseClient(const WKIconDatabaseClient* client)
+void WebIconDatabase::initializeIconDatabaseClient(const WKIconDatabaseClientBase* client)
 {
     m_iconDatabaseClient.initialize(client);
 }
@@ -251,7 +252,7 @@ void WebIconDatabase::didImportIconDataForPageURL(const String& pageURL)
 
 void WebIconDatabase::didChangeIconForPageURL(const String& pageURL)
 {
-    m_iconDatabaseClient.didChangeIconForPageURL(this, WebURL::create(pageURL).get());
+    m_iconDatabaseClient.didChangeIconForPageURL(this, API::URL::create(pageURL).ptr());
 }
 
 void WebIconDatabase::didRemoveAllIcons()
@@ -261,36 +262,76 @@ void WebIconDatabase::didRemoveAllIcons()
 
 void WebIconDatabase::didFinishURLImport()
 {
-    if (!m_webContext)
+    if (!m_processPool)
         return;
-    
+
     ASSERT(!m_urlImportCompleted);
 
     LOG(IconDatabase, "WK2 UIProcess URL import complete, notifying all %i pending page URL load decisions", m_pendingLoadDecisionURLMap.size());
-
-    HashMap<uint64_t, String>::iterator i = m_pendingLoadDecisionURLMap.begin();
-    HashMap<uint64_t, String>::iterator end = m_pendingLoadDecisionURLMap.end();
     
-    for (; i != end; ++i) {
-        LOG(IconDatabase, "WK2 UIProcess performing delayed callback on callback ID %i for page url %s", (int)i->key, i->value.ascii().data());
-        IconLoadDecision decision = m_iconDatabaseImpl->synchronousLoadDecisionForIconURL(i->value, 0);
+    for (auto& slot : m_pendingLoadDecisionURLMap) {
+        LOG(IconDatabase, "WK2 UIProcess performing delayed callback on callback ID %i for page url %s", (int)slot.key, slot.value.ascii().data());
+        IconLoadDecision decision = m_iconDatabaseImpl->synchronousLoadDecisionForIconURL(slot.value, nullptr);
 
-        // Decisions should never be unknown after the inital import is complete
+        // Decisions should never be unknown after the inital import is complete.
         ASSERT(decision != IconLoadUnknown);
 
         // FIXME (Multi-WebProcess): <rdar://problem/12240223> We need to know which connection to send this message to.
-        m_webContext->sendToAllProcesses(Messages::WebIconDatabaseProxy::ReceivedIconLoadDecision(static_cast<int>(decision), i->key));
+        m_processPool->sendToAllProcesses(Messages::WebIconDatabaseProxy::ReceivedIconLoadDecision(static_cast<int>(decision), slot.key));
     }
-    
+
     m_pendingLoadDecisionURLMap.clear();
-    
+
     m_urlImportCompleted = true;
+}
+
+void WebIconDatabase::didClose()
+{
+    if (!m_shouldDerefWhenAppropriate)
+        return;
+
+    deref();
+}
+
+void WebIconDatabase::derefWhenAppropriate()
+{
+    if (m_iconDatabaseImpl && m_iconDatabaseImpl->isOpen()) {
+        m_shouldDerefWhenAppropriate = true;
+        return;
+    }
+
+    deref();
 }
 
 void WebIconDatabase::notifyIconDataReadyForPageURL(const String& pageURL)
 {
-    m_iconDatabaseClient.iconDataReadyForPageURL(this, WebURL::create(pageURL).get());
+    m_iconDatabaseClient.iconDataReadyForPageURL(this, API::URL::create(pageURL).ptr());
     didChangeIconForPageURL(pageURL);
+}
+
+void WebIconDatabase::setPrivateBrowsingEnabled(bool privateBrowsingEnabled)
+{
+    if (m_iconDatabaseImpl)
+        m_iconDatabaseImpl->setPrivateBrowsingEnabled(privateBrowsingEnabled);
+}
+
+PassRefPtr<API::Data> WebIconDatabase::iconDataForPageURL(const String& pageURL)
+{
+    auto* image = imageForPageURL(pageURL);
+    if (!image)
+        return nullptr;
+
+    SharedBuffer* sharedBuffer = image->data();
+    if (!sharedBuffer)
+        return nullptr;
+
+    // Balanced by deref() below.
+    sharedBuffer->ref();
+    return API::Data::createWithoutCopying(reinterpret_cast<const unsigned char*>(sharedBuffer->data()), sharedBuffer->size(),
+        [](unsigned char*, const void* untypedSharedBuffer) {
+            // Balanced by ref() above.
+            static_cast<SharedBuffer*>(const_cast<void*>(untypedSharedBuffer))->deref();
+        }, sharedBuffer);
 }
 
 } // namespace WebKit

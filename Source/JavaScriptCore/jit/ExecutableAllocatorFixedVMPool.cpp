@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Apple Inc. All rights reserved.
+ * Copyright (C) 2009, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -24,21 +24,19 @@
  */
 
 #include "config.h"
-
 #include "ExecutableAllocator.h"
+
+#include "JSCInlines.h"
 
 #if ENABLE(EXECUTABLE_ALLOCATOR_FIXED)
 
 #include "CodeProfiling.h"
-#include <errno.h>
+#include "ExecutableAllocationFuzz.h"
 #include <wtf/MetaAllocator.h>
 #include <wtf/PageReservation.h>
-#include <wtf/VMTags.h>
 
-#if !PLATFORM(IOS) && PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED < 1090
+#if OS(DARWIN)
 #include <sys/mman.h>
-// MADV_FREE_REUSABLE does not work for JIT memory on older OSes so use MADV_FREE in that case.
-#define WTF_USE_MADV_FREE_FOR_JIT_MEMORY 1
 #endif
 
 using namespace WTF;
@@ -53,12 +51,15 @@ public:
     FixedVMPoolExecutableAllocator()
         : MetaAllocator(jitAllocationGranule) // round up all allocations to 32 bytes
     {
-        m_reservation = PageReservation::reserveWithGuardPages(fixedExecutableMemoryPoolSize, OSAllocator::JSJITCodePages, EXECUTABLE_POOL_WRITABLE, true);
-#if !ENABLE(LLINT)
-        RELEASE_ASSERT(m_reservation);
-#endif
+        size_t reservationSize;
+        if (Options::jitMemoryReservationSize())
+            reservationSize = Options::jitMemoryReservationSize();
+        else
+            reservationSize = fixedExecutableMemoryPoolSize;
+        reservationSize = roundUpToMultipleOf(pageSize(), reservationSize);
+        m_reservation = PageReservation::reserveWithGuardPages(reservationSize, OSAllocator::JSJITCodePages, EXECUTABLE_POOL_WRITABLE, true);
         if (m_reservation) {
-            ASSERT(m_reservation.size() == fixedExecutableMemoryPoolSize);
+            ASSERT(m_reservation.size() == reservationSize);
             addFreshFreeSpace(m_reservation.base(), m_reservation.size());
             
             startOfFixedExecutableMemoryPool = reinterpret_cast<uintptr_t>(m_reservation.base());
@@ -68,13 +69,13 @@ public:
     virtual ~FixedVMPoolExecutableAllocator();
     
 protected:
-    virtual void* allocateNewSpace(size_t&)
+    virtual void* allocateNewSpace(size_t&) override
     {
         // We're operating in a fixed pool, so new allocation is always prohibited.
         return 0;
     }
     
-    virtual void notifyNeedPage(void* page)
+    virtual void notifyNeedPage(void* page) override
     {
 #if USE(MADV_FREE_FOR_JIT_MEMORY)
         UNUSED_PARAM(page);
@@ -83,7 +84,7 @@ protected:
 #endif
     }
     
-    virtual void notifyPageIsFree(void* page)
+    virtual void notifyPageIsFree(void* page) override
     {
 #if USE(MADV_FREE_FOR_JIT_MEMORY)
         for (;;) {
@@ -144,28 +145,59 @@ double ExecutableAllocator::memoryPressureMultiplier(size_t addedMemoryUsage)
     MetaAllocator::Statistics statistics = allocator->currentStatistics();
     ASSERT(statistics.bytesAllocated <= statistics.bytesReserved);
     size_t bytesAllocated = statistics.bytesAllocated + addedMemoryUsage;
-    if (bytesAllocated >= statistics.bytesReserved)
-        bytesAllocated = statistics.bytesReserved;
+    size_t bytesAvailable = static_cast<size_t>(
+        statistics.bytesReserved * (1 - executablePoolReservationFraction));
+    if (bytesAllocated >= bytesAvailable)
+        bytesAllocated = bytesAvailable;
     double result = 1.0;
-    size_t divisor = statistics.bytesReserved - bytesAllocated;
+    size_t divisor = bytesAvailable - bytesAllocated;
     if (divisor)
-        result = static_cast<double>(statistics.bytesReserved) / divisor;
+        result = static_cast<double>(bytesAvailable) / divisor;
     if (result < 1.0)
         result = 1.0;
     return result;
 }
 
-PassRefPtr<ExecutableMemoryHandle> ExecutableAllocator::allocate(VM& vm, size_t sizeInBytes, void* ownerUID, JITCompilationEffort effort)
+RefPtr<ExecutableMemoryHandle> ExecutableAllocator::allocate(VM&, size_t sizeInBytes, void* ownerUID, JITCompilationEffort effort)
 {
+    if (effort != JITCompilationCanFail && Options::reportMustSucceedExecutableAllocations()) {
+        dataLog("Allocating ", sizeInBytes, " bytes of executable memory with JITCompilationMustSucceed.\n");
+        WTFReportBacktrace();
+    }
+    
+    if (effort == JITCompilationCanFail
+        && doExecutableAllocationFuzzingIfEnabled() == PretendToFailExecutableAllocation)
+        return nullptr;
+    
+    if (effort == JITCompilationCanFail) {
+        // Don't allow allocations if we are down to reserve.
+        MetaAllocator::Statistics statistics = allocator->currentStatistics();
+        size_t bytesAllocated = statistics.bytesAllocated + sizeInBytes;
+        size_t bytesAvailable = static_cast<size_t>(
+            statistics.bytesReserved * (1 - executablePoolReservationFraction));
+        if (bytesAllocated > bytesAvailable)
+            return nullptr;
+    }
+    
     RefPtr<ExecutableMemoryHandle> result = allocator->allocate(sizeInBytes, ownerUID);
     if (!result) {
-        if (effort == JITCompilationCanFail)
-            return result;
-        releaseExecutableMemory(vm);
-        result = allocator->allocate(sizeInBytes, ownerUID);
-        RELEASE_ASSERT(result);
+        if (effort != JITCompilationCanFail) {
+            dataLog("Ran out of executable memory while allocating ", sizeInBytes, " bytes.\n");
+            CRASH();
+        }
+        return nullptr;
     }
-    return result.release();
+    return result;
+}
+
+bool ExecutableAllocator::isValidExecutableMemory(const LockHolder& locker, void* address)
+{
+    return allocator->isInAllocatedMemory(locker, address);
+}
+
+Lock& ExecutableAllocator::getLock() const
+{
+    return allocator->getLock();
 }
 
 size_t ExecutableAllocator::committedByteCount()

@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -34,32 +34,30 @@
 namespace WebCore {
 
 struct MediaKeyEventInit : public EventInit {
-    MediaKeyEventInit();
-
     String keySystem;
     String sessionId;
     RefPtr<Uint8Array> initData;
     RefPtr<Uint8Array> message;
     String defaultURL;
     RefPtr<MediaKeyError> errorCode;
-    unsigned short systemCode;
+    uint32_t systemCode { 0 };
 };
 
-class MediaKeyEvent : public Event {
+class MediaKeyEvent final : public Event {
 public:
     virtual ~MediaKeyEvent();
 
-    static PassRefPtr<MediaKeyEvent> create()
+    static Ref<MediaKeyEvent> create(const AtomicString& type, const String& keySystem, const String& sessionId, RefPtr<Uint8Array>&& initData, RefPtr<Uint8Array>&& message, const String& defaultURL, RefPtr<MediaKeyError>&& errorCode, uint32_t systemCode)
     {
-        return adoptRef(new MediaKeyEvent);
+        return adoptRef(*new MediaKeyEvent(type, keySystem, sessionId, WTFMove(initData), WTFMove(message), defaultURL, WTFMove(errorCode), systemCode));
     }
 
-    static PassRefPtr<MediaKeyEvent> create(const AtomicString& type, const MediaKeyEventInit& initializer)
+    static Ref<MediaKeyEvent> createForBindings(const AtomicString& type, const MediaKeyEventInit& initializer)
     {
-        return adoptRef(new MediaKeyEvent(type, initializer));
+        return adoptRef(*new MediaKeyEvent(type, initializer));
     }
 
-    virtual const AtomicString& interfaceName() const;
+    virtual EventInterface eventInterface() const override;
 
     String keySystem() const { return m_keySystem; }
     String sessionId() const { return m_sessionId; }
@@ -70,7 +68,8 @@ public:
     unsigned short systemCode() const { return m_systemCode; }
 
 private:
-    MediaKeyEvent();
+    MediaKeyEvent(const AtomicString& type, const String& keySystem, const String& sessionId, RefPtr<Uint8Array>&& initData, RefPtr<Uint8Array>&& message, const String& defaultURL, RefPtr<MediaKeyError>&& errorCode, uint32_t systemCode);
+
     MediaKeyEvent(const AtomicString& type, const MediaKeyEventInit& initializer);
 
     String m_keySystem;

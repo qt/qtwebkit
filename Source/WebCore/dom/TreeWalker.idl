@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006 Apple Computer, Inc.
+ * Copyright (C) 2006 Apple Inc.
  * Copyright (C) 2006 Samuel Weinig <sam.weinig@gmail.com>
  *
  * This library is free software; you can redistribute it and/or
@@ -21,20 +21,22 @@
 // Introduced in DOM Level 2:
 [
     JSCustomMarkFunction,
-    ImplementationLacksVTable
+    ImplementationLacksVTable,
 ] interface TreeWalker {
     readonly attribute Node root;
     readonly attribute unsigned long whatToShow;
     readonly attribute NodeFilter filter;
-    readonly attribute boolean expandEntityReferences;        
+#if defined(LANGUAGE_OBJECTIVE_C) && LANGUAGE_OBJECTIVE_C
+    readonly attribute boolean expandEntityReferences;
+#endif
     [SetterRaisesException] attribute Node currentNode;
 
-    [CallWith=ScriptState] Node parentNode();
-    [CallWith=ScriptState] Node firstChild();
-    [CallWith=ScriptState] Node lastChild();
-    [CallWith=ScriptState] Node previousSibling();
-    [CallWith=ScriptState] Node nextSibling();
-    [CallWith=ScriptState] Node previousNode();
-    [CallWith=ScriptState] Node nextNode();
+    Node parentNode();
+    Node firstChild();
+    Node lastChild();
+    Node previousSibling();
+    Node nextSibling();
+    Node previousNode();
+    Node nextNode();
 };
 

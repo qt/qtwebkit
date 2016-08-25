@@ -25,33 +25,34 @@
 
 namespace JSC {
 
-    class MathObject : public JSNonFinalObject {
-    private:
-        MathObject(JSGlobalObject*, Structure*);
+class MathObject : public JSNonFinalObject {
+private:
+    MathObject(VM&, Structure*);
 
-    public:
-        typedef JSNonFinalObject Base;
+public:
+    typedef JSNonFinalObject Base;
+    static const unsigned StructureFlags = Base::StructureFlags | OverridesGetOwnPropertySlot;
 
-        static MathObject* create(ExecState* exec, JSGlobalObject* globalObject, Structure* structure)
-        {
-            MathObject* object = new (NotNull, allocateCell<MathObject>(*exec->heap())) MathObject(globalObject, structure);
-            object->finishCreation(exec, globalObject);
-            return object;
-        }
-        static bool getOwnPropertySlot(JSCell*, ExecState*, PropertyName, PropertySlot&);
-        static bool getOwnPropertyDescriptor(JSObject*, ExecState*, PropertyName, PropertyDescriptor&);
+    static MathObject* create(VM& vm, JSGlobalObject* globalObject, Structure* structure)
+    {
+        MathObject* object = new (NotNull, allocateCell<MathObject>(vm.heap)) MathObject(vm, structure);
+        object->finishCreation(vm, globalObject);
+        return object;
+    }
 
-        static const ClassInfo s_info;
+    DECLARE_INFO;
 
-        static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype)
-        {
-            return Structure::create(vm, globalObject, prototype, TypeInfo(ObjectType, StructureFlags), &s_info);
-        }
+    static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype)
+    {
+        return Structure::create(vm, globalObject, prototype, TypeInfo(ObjectType, StructureFlags), info());
+    }
 
-    protected:
-        void finishCreation(ExecState*, JSGlobalObject*);
-        static const unsigned StructureFlags = OverridesGetOwnPropertySlot | JSObject::StructureFlags;
-    };
+protected:
+    void finishCreation(VM&, JSGlobalObject*);
+};
+
+EncodedJSValue JSC_HOST_CALL mathProtoFuncAbs(ExecState*);
+EncodedJSValue JSC_HOST_CALL mathProtoFuncFloor(ExecState*);
 
 } // namespace JSC
 

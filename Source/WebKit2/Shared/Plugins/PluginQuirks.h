@@ -89,12 +89,11 @@ public:
         // freeze when sending right click events to them in windowed mode.
         IgnoreRightClickInWindowlessMode,
 
-        // Windows specific quirks:
-#elif PLUGIN_ARCHITECTURE(WIN)
-        // Whether NPN_UserAgent should always return a Mozilla user agent.
-        // Flash on Windows prior to version 10 only requests windowless plugins 
-        // if we return a Mozilla user agent.
-        WantsMozillaUserAgent,
+        // Some ports don't support windowed plugins.
+        ForceFlashWindowlessMode,
+
+        // Flash crashes when NPP_GetValue is called for NPPVpluginCancelSrcStream in windowed mode.
+        DoNotCancelSrcStreamInWindowedMode,
 #endif
 
         // This isn't really a quirk as much as the opposite of a quirk. By default, we don't send wheel events
@@ -113,7 +112,7 @@ public:
     void add(PluginQuirk quirk)
     {
         ASSERT(quirk >= 0);
-        ASSERT(quirk < NumPluginQuirks);
+        ASSERT_WITH_SECURITY_IMPLICATION(quirk < NumPluginQuirks);
         
         m_quirks |= (1 << quirk);
     }

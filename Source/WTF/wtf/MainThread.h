@@ -11,7 +11,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution. 
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission. 
  *
@@ -30,30 +30,35 @@
 #ifndef MainThread_h
 #define MainThread_h
 
+#include <functional>
 #include <stdint.h>
 
 namespace WTF {
 
 typedef uint32_t ThreadIdentifier;
-typedef void MainThreadFunction(void*);
 
 // Must be called from the main thread.
 WTF_EXPORT_PRIVATE void initializeMainThread();
 
-WTF_EXPORT_PRIVATE void callOnMainThread(MainThreadFunction*, void* context);
-WTF_EXPORT_PRIVATE void callOnMainThreadAndWait(MainThreadFunction*, void* context);
-WTF_EXPORT_PRIVATE void cancelCallOnMainThread(MainThreadFunction*, void* context);
+WTF_EXPORT_PRIVATE void callOnMainThread(std::function<void ()>);
 
-template<typename> class Function;
-WTF_EXPORT_PRIVATE void callOnMainThread(const Function<void ()>&);
-    
+#if PLATFORM(COCOA)
+WTF_EXPORT_PRIVATE void callOnWebThreadOrDispatchAsyncOnMainThread(void (^block)());
+#endif
+
 WTF_EXPORT_PRIVATE void setMainThreadCallbacksPaused(bool paused);
 
 WTF_EXPORT_PRIVATE bool isMainThread();
 
+WTF_EXPORT_PRIVATE bool canAccessThreadLocalDataForThread(ThreadIdentifier);
+
 #if USE(WEB_THREAD)
 WTF_EXPORT_PRIVATE bool isWebThread();
 WTF_EXPORT_PRIVATE bool isUIThread();
+WTF_EXPORT_PRIVATE void initializeWebThread();
+WTF_EXPORT_PRIVATE void initializeApplicationUIThreadIdentifier();
+WTF_EXPORT_PRIVATE void initializeWebThreadIdentifier();
+void initializeWebThreadPlatform();
 #else
 inline bool isWebThread() { return isMainThread(); }
 inline bool isUIThread() { return isMainThread(); }
@@ -61,21 +66,15 @@ inline bool isUIThread() { return isMainThread(); }
 
 void initializeGCThreads();
 
-#if ENABLE(PARALLEL_GC)
-void registerGCThread();
+WTF_EXPORT_PRIVATE void registerGCThread();
 WTF_EXPORT_PRIVATE bool isMainThreadOrGCThread();
-#elif PLATFORM(MAC)
-WTF_EXPORT_PRIVATE bool isMainThreadOrGCThread();
-#else
-inline bool isMainThreadOrGCThread() { return isMainThread(); }
-#endif
 
 // NOTE: these functions are internal to the callOnMainThread implementation.
 void initializeMainThreadPlatform();
 void scheduleDispatchFunctionsOnMainThread();
 void dispatchFunctionsFromMainThread();
 
-#if PLATFORM(MAC)
+#if OS(DARWIN) && !PLATFORM(EFL) && !PLATFORM(GTK)
 #if !USE(WEB_THREAD)
 // This version of initializeMainThread sets up the main thread as corresponding
 // to the process's main thread, and not necessarily the thread that calls this
@@ -88,9 +87,19 @@ void initializeMainThreadToProcessMainThreadPlatform();
 } // namespace WTF
 
 using WTF::callOnMainThread;
-using WTF::callOnMainThreadAndWait;
-using WTF::cancelCallOnMainThread;
+#if PLATFORM(COCOA)
+using WTF::callOnWebThreadOrDispatchAsyncOnMainThread;
+#endif
 using WTF::setMainThreadCallbacksPaused;
 using WTF::isMainThread;
 using WTF::isMainThreadOrGCThread;
+using WTF::canAccessThreadLocalDataForThread;
+using WTF::isUIThread;
+using WTF::isWebThread;
+#if USE(WEB_THREAD)
+using WTF::initializeWebThread;
+using WTF::initializeApplicationUIThreadIdentifier;
+using WTF::initializeWebThreadIdentifier;
+#endif
+
 #endif // MainThread_h

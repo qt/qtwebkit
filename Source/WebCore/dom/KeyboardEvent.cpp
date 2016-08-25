@@ -24,9 +24,7 @@
 #include "KeyboardEvent.h"
 
 #include "Document.h"
-#include "DOMWindow.h"
 #include "EventDispatcher.h"
-#include "EventNames.h"
 #include "EventHandler.h"
 #include "Frame.h"
 #include "PlatformKeyboardEvent.h"
@@ -92,36 +90,47 @@ static inline KeyboardEvent::KeyLocationCode keyLocationCode(const PlatformKeybo
     }
 }
 
-KeyboardEventInit::KeyboardEventInit()
-    : location(0)
-    , ctrlKey(false)
-    , altKey(false)
-    , shiftKey(false)
-    , metaKey(false)
-{
-}
-
 KeyboardEvent::KeyboardEvent()
     : m_location(DOM_KEY_LOCATION_STANDARD)
     , m_altGraphKey(false)
+#if PLATFORM(COCOA)
+    , m_handledByInputMethod(false)
+#endif
 {
 }
 
 KeyboardEvent::KeyboardEvent(const PlatformKeyboardEvent& key, AbstractView* view)
     : UIEventWithKeyState(eventTypeForKeyboardEventType(key.type()),
                           true, true, key.timestamp(), view, 0, key.ctrlKey(), key.altKey(), key.shiftKey(), key.metaKey())
-    , m_keyEvent(adoptPtr(new PlatformKeyboardEvent(key)))
+    , m_keyEvent(std::make_unique<PlatformKeyboardEvent>(key))
     , m_keyIdentifier(key.keyIdentifier())
     , m_location(keyLocationCode(key))
     , m_altGraphKey(false)
+#if PLATFORM(COCOA)
+#if USE(APPKIT)
+    , m_handledByInputMethod(key.handledByInputMethod())
+    , m_keypressCommands(key.commands())
+#else
+    , m_handledByInputMethod(false)
+#endif
+#endif
+{
+}
+
+// FIXME: This method should be get ride of in the future.
+// DO NOT USE IT!
+KeyboardEvent::KeyboardEvent(WTF::HashTableDeletedValueType)
 {
 }
 
 KeyboardEvent::KeyboardEvent(const AtomicString& eventType, const KeyboardEventInit& initializer)
-    : UIEventWithKeyState(eventType, initializer.bubbles, initializer.cancelable, initializer.view, initializer.detail, initializer.ctrlKey, initializer.altKey, initializer.shiftKey, initializer.metaKey)
+    : UIEventWithKeyState(eventType, initializer)
     , m_keyIdentifier(initializer.keyIdentifier)
     , m_location(initializer.location)
     , m_altGraphKey(false)
+#if PLATFORM(COCOA)
+    , m_handledByInputMethod(false)
+#endif
 {
 }
 
@@ -180,7 +189,7 @@ int KeyboardEvent::charCode() const
     // We match Firefox, unless in backward compatibility mode, where we always return the character code.
     bool backwardCompatibilityMode = false;
     if (view() && view()->frame())
-        backwardCompatibilityMode = view()->frame()->eventHandler()->needsKeyboardEventDisambiguationQuirks();
+        backwardCompatibilityMode = view()->frame()->eventHandler().needsKeyboardEventDisambiguationQuirks();
 
     if (!m_keyEvent || (type() != eventNames().keypressEvent && !backwardCompatibilityMode))
         return 0;
@@ -188,9 +197,9 @@ int KeyboardEvent::charCode() const
     return static_cast<int>(text.characterStartingAt(0));
 }
 
-const AtomicString& KeyboardEvent::interfaceName() const
+EventInterface KeyboardEvent::eventInterface() const
 {
-    return eventNames().interfaceForKeyboardEvent;
+    return KeyboardEventInterfaceType;
 }
 
 bool KeyboardEvent::isKeyboardEvent() const
@@ -208,25 +217,9 @@ int KeyboardEvent::which() const
 KeyboardEvent* findKeyboardEvent(Event* event)
 {
     for (Event* e = event; e; e = e->underlyingEvent())
-        if (e->isKeyboardEvent())
-            return static_cast<KeyboardEvent*>(e);
-    return 0;
-}
-
-PassRefPtr<KeyboardEventDispatchMediator> KeyboardEventDispatchMediator::create(PassRefPtr<KeyboardEvent> event)
-{
-    return adoptRef(new KeyboardEventDispatchMediator(event));
-}
-
-KeyboardEventDispatchMediator::KeyboardEventDispatchMediator(PassRefPtr<KeyboardEvent> event)
-    : EventDispatchMediator(event)
-{
-}
-
-bool KeyboardEventDispatchMediator::dispatchEvent(EventDispatcher* dispatcher) const
-{
-    // Make sure not to return true if we already took default action while handling the event.
-    return EventDispatchMediator::dispatchEvent(dispatcher) && !event()->defaultHandled();
+        if (is<KeyboardEvent>(*e))
+            return downcast<KeyboardEvent>(e);
+    return nullptr;
 }
 
 } // namespace WebCore

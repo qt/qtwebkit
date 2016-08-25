@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -36,14 +36,14 @@ namespace WebCore {
 
 static const QualifiedName& nodeTypeToTagName(WebVTTNodeType nodeType)
 {
-    DEFINE_STATIC_LOCAL(QualifiedName, cTag, (nullAtom, "c", nullAtom));
-    DEFINE_STATIC_LOCAL(QualifiedName, vTag, (nullAtom, "v", nullAtom));
-    DEFINE_STATIC_LOCAL(QualifiedName, langTag, (nullAtom, "lang", nullAtom));
-    DEFINE_STATIC_LOCAL(QualifiedName, bTag, (nullAtom, "b", nullAtom));
-    DEFINE_STATIC_LOCAL(QualifiedName, uTag, (nullAtom, "u", nullAtom));
-    DEFINE_STATIC_LOCAL(QualifiedName, iTag, (nullAtom, "i", nullAtom));
-    DEFINE_STATIC_LOCAL(QualifiedName, rubyTag, (nullAtom, "ruby", nullAtom));
-    DEFINE_STATIC_LOCAL(QualifiedName, rtTag, (nullAtom, "rt", nullAtom));
+    static NeverDestroyed<QualifiedName> cTag(nullAtom, "c", nullAtom);
+    static NeverDestroyed<QualifiedName> vTag(nullAtom, "v", nullAtom);
+    static NeverDestroyed<QualifiedName> langTag(nullAtom, "lang", nullAtom);
+    static NeverDestroyed<QualifiedName> bTag(nullAtom, "b", nullAtom);
+    static NeverDestroyed<QualifiedName> uTag(nullAtom, "u", nullAtom);
+    static NeverDestroyed<QualifiedName> iTag(nullAtom, "i", nullAtom);
+    static NeverDestroyed<QualifiedName> rubyTag(nullAtom, "ruby", nullAtom);
+    static NeverDestroyed<QualifiedName> rtTag(nullAtom, "rt", nullAtom);
     switch (nodeType) {
     case WebVTTNodeTypeClass:
         return cTag;
@@ -68,57 +68,58 @@ static const QualifiedName& nodeTypeToTagName(WebVTTNodeType nodeType)
     }
 }
 
-WebVTTElement::WebVTTElement(WebVTTNodeType nodeType, Document* document)
+WebVTTElement::WebVTTElement(WebVTTNodeType nodeType, Document& document)
     : Element(nodeTypeToTagName(nodeType), document, CreateElement)
     , m_isPastNode(0)
     , m_webVTTNodeType(nodeType)
 {
 }
 
-PassRefPtr<WebVTTElement> WebVTTElement::create(WebVTTNodeType nodeType, Document* document)
+Ref<WebVTTElement> WebVTTElement::create(WebVTTNodeType nodeType, Document& document)
 {
-    return adoptRef(new WebVTTElement(nodeType, document));
+    return adoptRef(*new WebVTTElement(nodeType, document));
 }
 
-PassRefPtr<Element> WebVTTElement::cloneElementWithoutAttributesAndChildren()
+Ref<Element> WebVTTElement::cloneElementWithoutAttributesAndChildren(Document& targetDocument)
 {
-    RefPtr<WebVTTElement> clone = create(static_cast<WebVTTNodeType>(m_webVTTNodeType), document());
+    Ref<WebVTTElement> clone = create(static_cast<WebVTTNodeType>(m_webVTTNodeType), targetDocument);
     clone->setLanguage(m_language);
-    return clone;
+    return WTFMove(clone);
 }
 
-PassRefPtr<HTMLElement> WebVTTElement::createEquivalentHTMLElement(Document* document)
+PassRefPtr<HTMLElement> WebVTTElement::createEquivalentHTMLElement(Document& document)
 {
     RefPtr<HTMLElement> htmlElement;
+
     switch (m_webVTTNodeType) {
     case WebVTTNodeTypeClass:
     case WebVTTNodeTypeLanguage:
     case WebVTTNodeTypeVoice:
-        htmlElement = HTMLElementFactory::createHTMLElement(HTMLNames::spanTag, document);
-        htmlElement.get()->setAttribute(HTMLNames::titleAttr, getAttribute(voiceAttributeName()));
-        htmlElement.get()->setAttribute(HTMLNames::langAttr, getAttribute(langAttributeName()));
+        htmlElement = HTMLElementFactory::createElement(HTMLNames::spanTag, document);
+        htmlElement->setAttribute(HTMLNames::titleAttr, getAttribute(voiceAttributeName()));
+        htmlElement->setAttribute(HTMLNames::langAttr, getAttribute(langAttributeName()));
         break;
     case WebVTTNodeTypeItalic:
-        htmlElement = HTMLElementFactory::createHTMLElement(HTMLNames::iTag, document);
+        htmlElement = HTMLElementFactory::createElement(HTMLNames::iTag, document);
         break;
     case WebVTTNodeTypeBold:
-        htmlElement = HTMLElementFactory::createHTMLElement(HTMLNames::bTag, document);
+        htmlElement = HTMLElementFactory::createElement(HTMLNames::bTag, document);
         break;
     case WebVTTNodeTypeUnderline:
-        htmlElement = HTMLElementFactory::createHTMLElement(HTMLNames::uTag, document);
+        htmlElement = HTMLElementFactory::createElement(HTMLNames::uTag, document);
         break;
     case WebVTTNodeTypeRuby:
-        htmlElement = HTMLElementFactory::createHTMLElement(HTMLNames::rubyTag, document);
+        htmlElement = HTMLElementFactory::createElement(HTMLNames::rubyTag, document);
         break;
     case WebVTTNodeTypeRubyText:
-        htmlElement = HTMLElementFactory::createHTMLElement(HTMLNames::rtTag, document);
+        htmlElement = HTMLElementFactory::createElement(HTMLNames::rtTag, document);
         break;
-    default:
-        ASSERT_NOT_REACHED();
     }
 
-    htmlElement.get()->setAttribute(HTMLNames::classAttr, getAttribute(HTMLNames::classAttr));
-    return htmlElement;
+    ASSERT(htmlElement);
+    if (htmlElement)
+        htmlElement->setAttribute(HTMLNames::classAttr, fastGetAttribute(HTMLNames::classAttr));
+    return htmlElement.release();
 }
 
 } // namespace WebCore

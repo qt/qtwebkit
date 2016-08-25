@@ -55,7 +55,7 @@ void WebEditCommandProxy::unapply()
     if (!m_page || !m_page->isValid())
         return;
 
-    m_page->process()->send(Messages::WebPage::UnapplyEditCommand(m_commandID), m_page->pageID(), CoreIPC::DispatchMessageEvenWhenWaitingForSyncReply);
+    m_page->process().send(Messages::WebPage::UnapplyEditCommand(m_commandID), m_page->pageID(), IPC::DispatchMessageEvenWhenWaitingForSyncReply);
     m_page->registerEditCommand(this, WebPageProxy::Redo);
 }
 
@@ -64,14 +64,17 @@ void WebEditCommandProxy::reapply()
     if (!m_page || !m_page->isValid())
         return;
 
-    m_page->process()->send(Messages::WebPage::ReapplyEditCommand(m_commandID), m_page->pageID(), CoreIPC::DispatchMessageEvenWhenWaitingForSyncReply);
+    m_page->process().send(Messages::WebPage::ReapplyEditCommand(m_commandID), m_page->pageID(), IPC::DispatchMessageEvenWhenWaitingForSyncReply);
     m_page->registerEditCommand(this, WebPageProxy::Undo);
 }
 
 String WebEditCommandProxy::nameForEditAction(EditAction editAction)
 {
+    // FIXME: This is identical to code in WebKit's WebEditorClient class; would be nice to share the strings instead of having two copies.
     switch (editAction) {
     case EditActionUnspecified:
+        return String();
+    case EditActionInsert:
         return String();
     case EditActionSetColor:
         return WEB_UI_STRING_KEY("Set Color", "Set Color (Undo action name)", "Undo action name");
@@ -129,6 +132,10 @@ String WebEditCommandProxy::nameForEditAction(EditAction editAction)
         return WEB_UI_STRING_KEY("Bold", "Bold (Undo action name)", "Undo action name");
     case EditActionItalics:
         return WEB_UI_STRING_KEY("Italics", "Italics (Undo action name)", "Undo action name");
+    case EditActionDelete:
+        return WEB_UI_STRING_KEY("Delete", "Delete (Undo action name)", "Undo action name");
+    case EditActionDictation:
+        return WEB_UI_STRING_KEY("Dictation", "Dictation (Undo action name)", "Undo action name");
     case EditActionPaste:
         return WEB_UI_STRING_KEY("Paste", "Paste (Undo action name)", "Undo action name");
     case EditActionPasteFont:

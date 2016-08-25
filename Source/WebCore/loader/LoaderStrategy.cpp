@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2012, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,28 +26,24 @@
 #include "config.h"
 #include "LoaderStrategy.h"
 
-#include "BlobRegistryImpl.h"
-#include "ResourceHandle.h"
-#include "ResourceLoadScheduler.h"
+#include "PlatformStrategies.h"
 
 namespace WebCore {
 
-ResourceLoadScheduler* LoaderStrategy::resourceLoadScheduler()
+LoaderStrategy::~LoaderStrategy()
 {
-    return WebCore::resourceLoadScheduler();
 }
 
-void LoaderStrategy::loadResourceSynchronously(NetworkingContext* context, unsigned long, const ResourceRequest& request, StoredCredentials storedCredentials, ClientCredentialPolicy, ResourceError& error, ResourceResponse& response, Vector<char>& data)
+ResourceLoadSuspender::ResourceLoadSuspender()
 {
-    ResourceHandle::loadResourceSynchronously(context, request, storedCredentials, error, response, data);
+    platformStrategies()->loaderStrategy()->suspendPendingRequests();
 }
 
-#if ENABLE(BLOB)
-BlobRegistry* LoaderStrategy::createBlobRegistry()
+ResourceLoadSuspender::~ResourceLoadSuspender()
 {
-    return new BlobRegistryImpl;
+    platformStrategies()->loaderStrategy()->resumePendingRequests();
 }
-#endif
-
 
 } // namespace WebCore
+
+

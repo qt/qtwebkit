@@ -29,23 +29,33 @@
 #if ENABLE(CONTEXT_MENUS)
 
 #include "APIClient.h"
+#include "APIInjectedBundlePageContextMenuClient.h"
 #include "WKBundlePage.h"
-#include <wtf/Vector.h>
+
+namespace API {
+class Object;
+
+template<> struct ClientTraits<WKBundlePageContextMenuClientBase> {
+    typedef std::tuple<WKBundlePageContextMenuClientV0, WKBundlePageContextMenuClientV1> Versions;
+};
+}
 
 namespace WebCore {
-    class ContextMenu;
+class ContextMenuItem;
+class HitTestResult;
 }
 
 namespace WebKit {
-
-class APIObject;
-class InjectedBundleHitTestResult;
 class WebContextMenuItemData;
 class WebPage;
 
-class InjectedBundlePageContextMenuClient : public APIClient<WKBundlePageContextMenuClient, kWKBundlePageContextMenuClientCurrentVersion> {
+class InjectedBundlePageContextMenuClient : public API::Client<WKBundlePageContextMenuClientBase>, public API::InjectedBundle::PageContextMenuClient {
 public:
-    bool getCustomMenuFromDefaultItems(WebPage*, InjectedBundleHitTestResult*, const Vector<WebContextMenuItemData>& defaultMenu, Vector<WebContextMenuItemData>& newMenu, RefPtr<APIObject>& userData);
+    explicit InjectedBundlePageContextMenuClient(const WKBundlePageContextMenuClientBase*);
+
+private:
+    bool getCustomMenuFromDefaultItems(WebPage&, const WebCore::HitTestResult&, const Vector<WebCore::ContextMenuItem>& defaultMenu, Vector<WebContextMenuItemData>& newMenu, RefPtr<API::Object>& userData) override;
+    void prepareForImmediateAction(WebPage&, const WebCore::HitTestResult&, RefPtr<API::Object>& userData) override;
 };
 
 } // namespace WebKit

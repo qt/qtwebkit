@@ -67,16 +67,16 @@ struct CSSPropertySourceData {
 };
 
 struct CSSStyleSourceData : public RefCounted<CSSStyleSourceData> {
-    static PassRefPtr<CSSStyleSourceData> create()
+    static Ref<CSSStyleSourceData> create()
     {
-        return adoptRef(new CSSStyleSourceData());
+        return adoptRef(*new CSSStyleSourceData);
     }
 
     Vector<CSSPropertySourceData> propertyData;
 };
 
 struct CSSRuleSourceData;
-typedef Vector<RefPtr<CSSRuleSourceData> > RuleSourceDataList;
+typedef Vector<RefPtr<CSSRuleSourceData>> RuleSourceDataList;
 typedef Vector<SourceRange> SelectorRangeList;
 
 struct CSSRuleSourceData : public RefCounted<CSSRuleSourceData> {
@@ -93,19 +93,16 @@ struct CSSRuleSourceData : public RefCounted<CSSRuleSourceData> {
         HOST_RULE,
         VIEWPORT_RULE,
         SUPPORTS_RULE,
-#if ENABLE(CSS_SHADERS)
-        FILTER_RULE
-#endif
     };
 
-    static PassRefPtr<CSSRuleSourceData> create(Type type)
+    static Ref<CSSRuleSourceData> create(Type type)
     {
-        return adoptRef(new CSSRuleSourceData(type));
+        return adoptRef(*new CSSRuleSourceData(type));
     }
 
-    static PassRefPtr<CSSRuleSourceData> createUnknown()
+    static Ref<CSSRuleSourceData> createUnknown()
     {
-        return adoptRef(new CSSRuleSourceData(UNKNOWN_RULE));
+        return adoptRef(*new CSSRuleSourceData(UNKNOWN_RULE));
     }
 
     CSSRuleSourceData(Type type)

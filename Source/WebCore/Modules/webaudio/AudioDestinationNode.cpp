@@ -36,11 +36,14 @@
 
 namespace WebCore {
     
-AudioDestinationNode::AudioDestinationNode(AudioContext* context, float sampleRate)
+AudioDestinationNode::AudioDestinationNode(AudioContext& context, float sampleRate)
     : AudioNode(context, sampleRate)
     , m_currentSampleFrame(0)
+    , m_isSilent(true)
+    , m_isEffectivelyPlayingAudio(false)
+    , m_muted(false)
 {
-    addInput(adoptPtr(new AudioNodeInput(this)));
+    addInput(std::make_unique<AudioNodeInput>(this));
     
     setNodeType(NodeTypeDestination);
 }
@@ -50,36 +53,30 @@ AudioDestinationNode::~AudioDestinationNode()
     uninitialize();
 }
 
-void AudioDestinationNode::render(AudioBus* sourceBus, AudioBus* destinationBus, size_t numberOfFrames)
+void AudioDestinationNode::render(AudioBus*, AudioBus* destinationBus, size_t numberOfFrames)
 {
     // We don't want denormals slowing down any of the audio processing
     // since they can very seriously hurt performance.
     // This will take care of all AudioNodes because they all process within this scope.
     DenormalDisabler denormalDisabler;
     
-    context()->setAudioThread(currentThread());
+    context().setAudioThread(currentThread());
     
-    if (!context()->isRunnable()) {
+    if (!context().isInitialized()) {
         destinationBus->zero();
+        setIsSilent(true);
         return;
     }
 
-    if (context()->userGestureRequiredForAudioStart()) {
+    ASSERT(numberOfFrames);
+    if (!numberOfFrames) {
         destinationBus->zero();
-        return;
-    }
-
-    if (context()->pageConsentRequiredForAudioStart()) {
-        destinationBus->zero();
+        setIsSilent(true);
         return;
     }
 
     // Let the context take care of any business at the start of each render quantum.
-    context()->handlePreRenderTasks();
-
-    // Prepare the local audio input provider for this render quantum.
-    if (sourceBus)
-        m_localAudioInputProvider.set(sourceBus);
+    context().handlePreRenderTasks();
 
     // This will cause the node(s) connected to us to process, which in turn will pull on their input(s),
     // all the way backwards through the rendering graph.
@@ -93,13 +90,44 @@ void AudioDestinationNode::render(AudioBus* sourceBus, AudioBus* destinationBus,
     }
 
     // Process nodes which need a little extra help because they are not connected to anything, but still need to process.
-    context()->processAutomaticPullNodes(numberOfFrames);
+    context().processAutomaticPullNodes(numberOfFrames);
 
     // Let the context take care of any business at the end of each render quantum.
-    context()->handlePostRenderTasks();
+    context().handlePostRenderTasks();
     
     // Advance current sample-frame.
     m_currentSampleFrame += numberOfFrames;
+
+    setIsSilent(destinationBus->isSilent());
+
+    // The reason we are handling mute after the call to setIsSilent() is because the muted state does
+    // not affect the audio destination node's effective playing state.
+    if (m_muted)
+        destinationBus->zero();
+}
+
+void AudioDestinationNode::isPlayingDidChange()
+{
+    updateIsEffectivelyPlayingAudio();
+}
+
+void AudioDestinationNode::setIsSilent(bool isSilent)
+{
+    if (m_isSilent == isSilent)
+        return;
+
+    m_isSilent = isSilent;
+    updateIsEffectivelyPlayingAudio();
+}
+
+void AudioDestinationNode::updateIsEffectivelyPlayingAudio()
+{
+    bool isEffectivelyPlayingAudio = isPlaying() && !m_isSilent;
+    if (m_isEffectivelyPlayingAudio == isEffectivelyPlayingAudio)
+        return;
+
+    m_isEffectivelyPlayingAudio = isEffectivelyPlayingAudio;
+    context().isPlayingAudioDidChange();
 }
 
 } // namespace WebCore

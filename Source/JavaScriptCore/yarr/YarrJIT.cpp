@@ -53,6 +53,17 @@ class YarrGenerator : private MacroAssembler {
 
     static const RegisterID returnRegister = ARMRegisters::r0;
     static const RegisterID returnRegister2 = ARMRegisters::r1;
+#elif CPU(ARM64)
+    static const RegisterID input = ARM64Registers::x0;
+    static const RegisterID index = ARM64Registers::x1;
+    static const RegisterID length = ARM64Registers::x2;
+    static const RegisterID output = ARM64Registers::x3;
+
+    static const RegisterID regT0 = ARM64Registers::x4;
+    static const RegisterID regT1 = ARM64Registers::x5;
+
+    static const RegisterID returnRegister = ARM64Registers::x0;
+    static const RegisterID returnRegister2 = ARM64Registers::x1;
 #elif CPU(MIPS)
     static const RegisterID input = MIPSRegisters::a0;
     static const RegisterID index = MIPSRegisters::a1;
@@ -322,17 +333,27 @@ class YarrGenerator : private MacroAssembler {
         jump(Address(stackPointerRegister, frameLocation * sizeof(void*)));
     }
 
+    unsigned alignCallFrameSizeInBytes(unsigned callFrameSize)
+    {
+        callFrameSize *= sizeof(void*);
+        if (callFrameSize / sizeof(void*) != m_pattern.m_body->m_callFrameSize)
+            CRASH();
+        callFrameSize = (callFrameSize + 0x3f) & ~0x3f;
+        if (!callFrameSize)
+            CRASH();
+        return callFrameSize;
+    }
     void initCallFrame()
     {
         unsigned callFrameSize = m_pattern.m_body->m_callFrameSize;
         if (callFrameSize)
-            subPtr(Imm32(callFrameSize * sizeof(void*)), stackPointerRegister);
+            subPtr(Imm32(alignCallFrameSizeInBytes(callFrameSize)), stackPointerRegister);
     }
     void removeCallFrame()
     {
         unsigned callFrameSize = m_pattern.m_body->m_callFrameSize;
         if (callFrameSize)
-            addPtr(Imm32(callFrameSize * sizeof(void*)), stackPointerRegister);
+            addPtr(Imm32(alignCallFrameSizeInBytes(callFrameSize)), stackPointerRegister);
     }
 
     // Used to record subpatters, should only be called if compileMode is IncludeSubpatterns.
@@ -1605,8 +1626,7 @@ class YarrGenerator : private MacroAssembler {
                     if (term->quantityType == QuantifierFixedCount)
                         inputOffset -= term->parentheses.disjunction->m_minimumSize;
                     if (inputOffset) {
-                        move(index, indexTemporary);
-                        add32(Imm32(inputOffset), indexTemporary);
+                        add32(Imm32(inputOffset), index, indexTemporary);
                         setSubpatternStart(indexTemporary, term->parentheses.subpatternId);
                     } else
                         setSubpatternStart(index, term->parentheses.subpatternId);
@@ -1618,16 +1638,14 @@ class YarrGenerator : private MacroAssembler {
                 const RegisterID indexTemporary = regT0;
                 ASSERT(term->quantityCount == 1);
 
-#ifndef NDEBUG
                 // Runtime ASSERT to make sure that the nested alternative handled the
                 // "no input consumed" check.
-                if (term->quantityType != QuantifierFixedCount && !term->parentheses.disjunction->m_minimumSize) {
+                if (!ASSERT_DISABLED && term->quantityType != QuantifierFixedCount && !term->parentheses.disjunction->m_minimumSize) {
                     Jump pastBreakpoint;
                     pastBreakpoint = branch32(NotEqual, index, Address(stackPointerRegister, term->frameLocation * sizeof(void*)));
-                    breakpoint();
+                    abortWithReason(YARRNoInputConsumed);
                     pastBreakpoint.link(this);
                 }
-#endif
 
                 // If the parenthese are capturing, store the ending index value to the
                 // captures array, offsetting as necessary.
@@ -1638,8 +1656,7 @@ class YarrGenerator : private MacroAssembler {
                 if (term->capture() && compileMode == IncludeSubpatterns) {
                     int inputOffset = term->inputPosition - m_checked;
                     if (inputOffset) {
-                        move(index, indexTemporary);
-                        add32(Imm32(inputOffset), indexTemporary);
+                        add32(Imm32(inputOffset), index, indexTemporary);
                         setSubpatternEnd(indexTemporary, term->parentheses.subpatternId);
                     } else
                         setSubpatternEnd(index, term->parentheses.subpatternId);
@@ -1674,16 +1691,16 @@ class YarrGenerator : private MacroAssembler {
             }
             case OpParenthesesSubpatternTerminalEnd: {
                 YarrOp& beginOp = m_ops[op.m_previousOp];
-#ifndef NDEBUG
-                PatternTerm* term = op.m_term;
-
-                // Runtime ASSERT to make sure that the nested alternative handled the
-                // "no input consumed" check.
-                Jump pastBreakpoint;
-                pastBreakpoint = branch32(NotEqual, index, Address(stackPointerRegister, term->frameLocation * sizeof(void*)));
-                breakpoint();
-                pastBreakpoint.link(this);
-#endif
+                if (!ASSERT_DISABLED) {
+                    PatternTerm* term = op.m_term;
+                    
+                    // Runtime ASSERT to make sure that the nested alternative handled the
+                    // "no input consumed" check.
+                    Jump pastBreakpoint;
+                    pastBreakpoint = branch32(NotEqual, index, Address(stackPointerRegister, term->frameLocation * sizeof(void*)));
+                    abortWithReason(YARRNoInputConsumed);
+                    pastBreakpoint.link(this);
+                }
 
                 // We know that the match is non-zero, we can accept it  and
                 // loop back up to the head of the subpattern.
@@ -2325,7 +2342,7 @@ class YarrGenerator : private MacroAssembler {
         m_ops.append(alternativeBeginOpCode);
         m_ops.last().m_previousOp = notFound;
         m_ops.last().m_term = term;
-        Vector<OwnPtr<PatternAlternative> >& alternatives =  term->parentheses.disjunction->m_alternatives;
+        Vector<std::unique_ptr<PatternAlternative>>& alternatives = term->parentheses.disjunction->m_alternatives;
         for (unsigned i = 0; i < alternatives.size(); ++i) {
             size_t lastOpIndex = m_ops.size() - 1;
 
@@ -2376,7 +2393,7 @@ class YarrGenerator : private MacroAssembler {
         m_ops.append(OpSimpleNestedAlternativeBegin);
         m_ops.last().m_previousOp = notFound;
         m_ops.last().m_term = term;
-        Vector<OwnPtr<PatternAlternative> >& alternatives =  term->parentheses.disjunction->m_alternatives;
+        Vector<std::unique_ptr<PatternAlternative>>& alternatives =  term->parentheses.disjunction->m_alternatives;
         for (unsigned i = 0; i < alternatives.size(); ++i) {
             size_t lastOpIndex = m_ops.size() - 1;
 
@@ -2450,7 +2467,7 @@ class YarrGenerator : private MacroAssembler {
     // to return the failing result.
     void opCompileBody(PatternDisjunction* disjunction)
     {
-        Vector<OwnPtr<PatternAlternative> >& alternatives = disjunction->m_alternatives;
+        Vector<std::unique_ptr<PatternAlternative>>& alternatives = disjunction->m_alternatives;
         size_t currentAlternativeIndex = 0;
 
         // Emit the 'once through' alternatives.
@@ -2549,6 +2566,10 @@ class YarrGenerator : private MacroAssembler {
         if (compileMode == IncludeSubpatterns)
             loadPtr(Address(X86Registers::ebp, 2 * sizeof(void*)), output);
     #endif
+#elif CPU(ARM64)
+        // The ABI doesn't guarantee the upper bits are zero on unsigned arguments, so clear them ourselves.
+        zeroExtend32ToPtr(index, index);
+        zeroExtend32ToPtr(length, length);
 #elif CPU(ARM)
         push(ARMRegisters::r4);
         push(ARMRegisters::r5);
@@ -2559,10 +2580,14 @@ class YarrGenerator : private MacroAssembler {
 #elif CPU(MIPS)
         // Do nothing.
 #endif
+
+        store8(TrustedImm32(1), &m_vm->isExecutingInRegExpJIT);
     }
 
     void generateReturn()
     {
+        store8(TrustedImm32(0), &m_vm->isExecutingInRegExpJIT);
+
 #if CPU(X86_64)
 #if OS(WINDOWS)
         // Store the return value in the allocated space pointed by rcx.
@@ -2591,8 +2616,9 @@ class YarrGenerator : private MacroAssembler {
     }
 
 public:
-    YarrGenerator(YarrPattern& pattern, YarrCharSize charSize)
-        : m_pattern(pattern)
+    YarrGenerator(VM* vm, YarrPattern& pattern, YarrCharSize charSize)
+        : m_vm(vm)
+        , m_pattern(pattern)
         , m_charSize(charSize)
         , m_charScale(m_charSize == Char8 ? TimesOne: TimesTwo)
         , m_shouldFallBack(false)
@@ -2620,11 +2646,8 @@ public:
 
         initCallFrame();
 
-        // Compile the pattern to the internal 'YarrOp' representation.
         opCompileBody(m_pattern.m_body);
 
-        // If we encountered anything we can't handle in the JIT code
-        // (e.g. backreferences) then return early.
         if (m_shouldFallBack) {
             jitObject.setFallBack(true);
             return;
@@ -2633,8 +2656,12 @@ public:
         generate();
         backtrack();
 
-        // Link & finalize the code.
-        LinkBuffer linkBuffer(*vm, this, REGEXP_CODE_ID);
+        LinkBuffer linkBuffer(*vm, *this, REGEXP_CODE_ID, JITCompilationCanFail);
+        if (linkBuffer.didFailToAllocate()) {
+            jitObject.setFallBack(true);
+            return;
+        }
+
         m_backtrackingState.linkDataLabels(linkBuffer);
 
         if (compileMode == MatchOnly) {
@@ -2652,6 +2679,8 @@ public:
     }
 
 private:
+    VM* m_vm;
+
     YarrPattern& m_pattern;
 
     YarrCharSize m_charSize;
@@ -2684,9 +2713,9 @@ private:
 void jitCompile(YarrPattern& pattern, YarrCharSize charSize, VM* vm, YarrCodeBlock& jitObject, YarrJITCompileMode mode)
 {
     if (mode == MatchOnly)
-        YarrGenerator<MatchOnly>(pattern, charSize).compile(vm, jitObject);
+        YarrGenerator<MatchOnly>(vm, pattern, charSize).compile(vm, jitObject);
     else
-        YarrGenerator<IncludeSubpatterns>(pattern, charSize).compile(vm, jitObject);
+        YarrGenerator<IncludeSubpatterns>(vm, pattern, charSize).compile(vm, jitObject);
 }
 
 }}

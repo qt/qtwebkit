@@ -24,7 +24,6 @@
 
 #include "FontPlatformData.h"
 #include "SharedBuffer.h"
-#include "WOFFFileFormat.h"
 #include <cairo-ft.h>
 #include <cairo.h>
 
@@ -35,15 +34,26 @@ static void releaseCustomFontData(void* data)
     static_cast<SharedBuffer*>(data)->deref();
 }
 
-FontCustomPlatformData::FontCustomPlatformData(FT_Face freeTypeFace, SharedBuffer* buffer)
-    : m_freeTypeFace(freeTypeFace)
-    , m_fontFace(cairo_ft_font_face_create_for_ft_face(freeTypeFace, 0))
+FontCustomPlatformData::FontCustomPlatformData(FT_Face freeTypeFace, SharedBuffer& buffer)
+    : m_fontFace(cairo_ft_font_face_create_for_ft_face(freeTypeFace, FT_LOAD_FORCE_AUTOHINT))
 {
-    // FIXME Should we be setting some hinting options here?
+    // FT_LOAD_FORCE_AUTOHINT prohibits use of the font's native hinting. This
+    // is a safe option for custom fonts because (a) some such fonts may have
+    // broken hinting, which site admins may not notice if other browsers do not
+    // use the native hints, and (b) allowing native hints exposes the FreeType
+    // bytecode interpreter to potentially-malicious input. Treating web fonts
+    // differently than system fonts is non-ideal, but the result of autohinting
+    // is always decent, whereas native hints sometimes look terrible, and
+    // unlike system fonts where Fontconfig may change the hinting settings on a
+    // per-font basis, the same settings are used for all web fonts. Note that
+    // Chrome is considering switching from autohinting to native hinting in
+    // https://code.google.com/p/chromium/issues/detail?id=173207 but this is
+    // more risk than we want to assume for now. See
+    // https://bugs.webkit.org/show_bug.cgi?id=140994 before changing this.
 
-    buffer->ref(); // This is balanced by the buffer->deref() in releaseCustomFontData.
+    buffer.ref(); // This is balanced by the buffer->deref() in releaseCustomFontData.
     static cairo_user_data_key_t bufferKey;
-    cairo_font_face_set_user_data(m_fontFace, &bufferKey, buffer,
+    cairo_font_face_set_user_data(m_fontFace, &bufferKey, &buffer,
          static_cast<cairo_destroy_func_t>(releaseCustomFontData));
 
     // Cairo doesn't do FreeType reference counting, so we need to ensure that when
@@ -55,44 +65,33 @@ FontCustomPlatformData::FontCustomPlatformData(FT_Face freeTypeFace, SharedBuffe
 
 FontCustomPlatformData::~FontCustomPlatformData()
 {
-    // m_freeTypeFace will be destroyed along with m_fontFace. See the constructor.
     cairo_font_face_destroy(m_fontFace);
 }
 
-FontPlatformData FontCustomPlatformData::fontPlatformData(int size, bool bold, bool italic, FontOrientation, FontWidthVariant, FontRenderingMode)
+FontPlatformData FontCustomPlatformData::fontPlatformData(const FontDescription& description, bool bold, bool italic)
 {
-    return FontPlatformData(m_fontFace, size, bold, italic);
+    return FontPlatformData(m_fontFace, description, bold, italic);
 }
 
-FontCustomPlatformData* createFontCustomPlatformData(SharedBuffer* buffer)
+std::unique_ptr<FontCustomPlatformData> createFontCustomPlatformData(SharedBuffer& buffer)
 {
-    ASSERT_ARG(buffer, buffer);
-
-    RefPtr<SharedBuffer> sfntBuffer;
-    if (isWOFF(buffer)) {
-        Vector<char> sfnt;
-        if (!convertWOFFToSfnt(buffer, sfnt))
-            return 0;
-
-        sfntBuffer = SharedBuffer::adoptVector(sfnt);
-        buffer = sfntBuffer.get();
-    }
-
-    static FT_Library library = 0;
+    static FT_Library library;
     if (!library && FT_Init_FreeType(&library)) {
-        library = 0;
-        return 0;
+        library = nullptr;
+        return nullptr;
     }
 
     FT_Face freeTypeFace;
-    if (FT_New_Memory_Face(library, reinterpret_cast<const FT_Byte*>(buffer->data()), buffer->size(), 0, &freeTypeFace))
-        return 0;
-    return new FontCustomPlatformData(freeTypeFace, buffer);
+    if (FT_New_Memory_Face(library, reinterpret_cast<const FT_Byte*>(buffer.data()), buffer.size(), 0, &freeTypeFace))
+        return nullptr;
+    return std::make_unique<FontCustomPlatformData>(freeTypeFace, buffer);
 }
 
 bool FontCustomPlatformData::supportsFormat(const String& format)
 {
-    return equalIgnoringCase(format, "truetype") || equalIgnoringCase(format, "opentype") || equalIgnoringCase(format, "woff");
+    return equalLettersIgnoringASCIICase(format, "truetype")
+        || equalLettersIgnoringASCIICase(format, "opentype")
+        || equalLettersIgnoringASCIICase(format, "woff");
 }
 
 }

@@ -24,6 +24,9 @@
 */
 
 #include "config.h"
+
+#if WK_HAVE_C_SPI
+
 #include "PlatformUtilities.h"
 #include "PlatformWebView.h"
 #include "Test.h"
@@ -84,12 +87,13 @@ TEST(WebKit2, DISABLED_DOMWindowExtensionNoCache)
 
     WKRetainPtr<WKContextRef> context(AdoptWK, Util::createContextForInjectedBundleTest("DOMWindowExtensionNoCache", pageGroup.get()));
 
-    WKContextInjectedBundleClient injectedBundleClient;
+    WKContextInjectedBundleClientV1 injectedBundleClient;
     memset(&injectedBundleClient, 0, sizeof(injectedBundleClient));
-    injectedBundleClient.version = kWKContextInjectedBundleClientCurrentVersion;
-    injectedBundleClient.clientInfo = 0;
+
+    injectedBundleClient.base.version = 1;
     injectedBundleClient.didReceiveMessageFromInjectedBundle = didReceiveMessageFromInjectedBundle;
-    WKContextSetInjectedBundleClient(context.get(), &injectedBundleClient);
+
+    WKContextSetInjectedBundleClient(context.get(), &injectedBundleClient.base);
 
     // Disable the page cache.
     WKContextSetCacheModel(context.get(), kWKCacheModelDocumentViewer);
@@ -131,3 +135,5 @@ TEST(WebKit2, DISABLED_DOMWindowExtensionNoCache)
 }
 
 } // namespace TestWebKitAPI
+
+#endif

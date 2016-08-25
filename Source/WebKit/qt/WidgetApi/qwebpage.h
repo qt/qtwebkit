@@ -80,7 +80,7 @@ class QWEBKITWIDGETS_EXPORT QWebPage : public QObject {
     Q_PROPERTY(QPalette palette READ palette WRITE setPalette)
     Q_PROPERTY(bool contentEditable READ isContentEditable WRITE setContentEditable)
     Q_PROPERTY(VisibilityState visibilityState READ visibilityState WRITE setVisibilityState)
-    Q_ENUMS(LinkDelegationPolicy NavigationType VisibilityState WebAction)
+    Q_ENUMS(LinkDelegationPolicy MessageLevel MessageSource NavigationType VisibilityState WebAction)
 public:
     enum NavigationType {
         NavigationTypeLinkClicked,
@@ -231,6 +231,28 @@ public:
         VisibilityStateHidden,
         VisibilityStatePrerender,
         VisibilityStateUnloaded
+    };
+
+    enum MessageSource {
+        XmlMessageSource,
+        JSMessageSource,
+        NetworkMessageSource,
+        ConsoleAPIMessageSource,
+        StorageMessageSource,
+        AppCacheMessageSource,
+        RenderingMessageSource,
+        CSSMessageSource,
+        SecurityMessageSource,
+        ContentBlockerMessageSource,
+        OtherMessageSource,
+    };
+
+    enum MessageLevel {
+        LogMessageLevel = 1,
+        WarningMessageLevel = 2,
+        ErrorMessageLevel = 3,
+        DebugMessageLevel = 4,
+        InfoMessageLevel = 5,
     };
 
     class QWEBKITWIDGETS_EXPORT ViewportAttributes {
@@ -425,6 +447,8 @@ Q_SIGNALS:
 
     void featurePermissionRequested(QWebFrame* frame, QWebPage::Feature feature);
     void featurePermissionRequestCanceled(QWebFrame* frame, QWebPage::Feature feature);
+
+    void consoleMessageReceived(MessageSource source, MessageLevel level, const QString& message, int lineNumber, const QString& sourceID);
 
 protected:
     virtual QWebPage *createWindow(WebWindowType type);

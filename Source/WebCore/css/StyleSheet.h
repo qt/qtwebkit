@@ -22,7 +22,6 @@
 #define StyleSheet_h
 
 #include "CSSParserMode.h"
-#include "KURLHash.h"
 #include <wtf/Forward.h>
 #include <wtf/ListHashSet.h>
 #include <wtf/RefCounted.h>
@@ -49,12 +48,12 @@ public:
 
     virtual CSSImportRule* ownerRule() const { return 0; }
     virtual void clearOwnerNode() = 0;
-    virtual KURL baseURL() const = 0;
+    virtual URL baseURL() const = 0;
     virtual bool isLoading() const = 0;
     virtual bool isCSSStyleSheet() const { return false; }
     virtual bool isXSLStyleSheet() const { return false; }
 };
 
-} // namespace
+} // namespace WebCore
 
-#endif
+#endif // StyleSheet_h

@@ -20,25 +20,21 @@
 
 #ifndef SVGSetElement_h
 #define SVGSetElement_h
-#if ENABLE(SVG)
 
-#include "SVGAnimateElement.h"
+#include "SVGAnimateElementBase.h"
 
 namespace WebCore {
 
 // SVGAnimateElement implements superset of the functionality.
-class SVGSetElement FINAL : public SVGAnimateElement {
+class SVGSetElement final : public SVGAnimateElementBase {
 public:
-    static PassRefPtr<SVGSetElement> create(const QualifiedName&, Document*);
+    static Ref<SVGSetElement> create(const QualifiedName&, Document&);
 
 private:
-    SVGSetElement(const QualifiedName&, Document*);
-    virtual void updateAnimationMode() OVERRIDE;
+    SVGSetElement(const QualifiedName&, Document&);
+    virtual void updateAnimationMode() override;
 };
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif
-
-// vim:ts=4:noet

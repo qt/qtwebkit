@@ -54,7 +54,17 @@ sub applyPreprocessor
         } else {
             $preprocessor = "/usr/bin/gcc";
         }
-        push(@args, qw(-E -P -x c++));
+        if ($Config::Config{"osname"} eq "MSWin32") {
+            push(@args, qw(/EP));
+        } else {
+            push(@args, qw(-E -P -x c++));
+        }
+    }
+
+    if ($Config::Config{"osname"} eq "darwin") {
+        push(@args, "-I" . $ENV{BUILT_PRODUCTS_DIR} . "/usr/local/include") if $ENV{BUILT_PRODUCTS_DIR};
+        push(@args, "-isysroot", $ENV{SDKROOT}) if $ENV{SDKROOT};
+        $defines .= " WTF_PLATFORM_IOS" if defined $ENV{PLATFORM_NAME} && $ENV{PLATFORM_NAME} !~ /macosx/;
     }
 
     # Remove double quotations from $defines and extract macros.
@@ -64,23 +74,32 @@ sub applyPreprocessor
     my @macros = grep { $_ } split(/\s+/, $defines); # grep skips empty macros.
     @macros = map { "-D$_" } @macros;
 
-    # Remove double quotation from $preprocessor
-    $preprocessor =~ s/\'//g;
-
     my $pid = 0;
-    if ($Config{osname} eq "cygwin" || $Config{osname} eq 'MSWin32') {
+    if ($Config{osname} eq "cygwin") {
+        $ENV{PATH} = "$ENV{PATH}:/cygdrive/c/cygwin/bin";
+        my @preprocessorAndFlags;
+        if ($preprocessor eq "/usr/bin/gcc") {
+            @preprocessorAndFlags = split(' ', $preprocessor);
+        } else {        
+            $preprocessor =~ /"(.*)"/;
+            chomp(my $preprocessor = `cygpath -u '$1'`) if (defined $1);
+            chomp($fileName = `cygpath -w '$fileName'`);
+            @preprocessorAndFlags = ($preprocessor, "/nologo", "/EP");
+        }
         # This call can fail if Windows rebases cygwin, so retry a few times until it succeeds.
         for (my $tries = 0; !$pid && ($tries < 20); $tries++) {
             eval {
                 # Suppress STDERR so that if we're using cl.exe, the output
                 # name isn't needlessly echoed.
                 use Symbol 'gensym'; my $err = gensym;
-                $pid = open3(\*PP_IN, \*PP_OUT, $err, split(' ', $preprocessor), @args, @macros, $fileName);
+                $pid = open3(\*PP_IN, \*PP_OUT, $err, @preprocessorAndFlags, @args, @macros, $fileName);
                 1;
             } or do {
                 sleep 1;
             }
         };
+    } elsif ($Config::Config{"osname"} eq "MSWin32") {
+        $pid = open2(\*PP_OUT, \*PP_IN, $preprocessor, @args, @macros, $fileName);
     } else {
         $pid = open2(\*PP_OUT, \*PP_IN, split(' ', $preprocessor), @args, @macros, $fileName);
     }

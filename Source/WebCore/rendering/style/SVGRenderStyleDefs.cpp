@@ -2,12 +2,13 @@
     Copyright (C) 2004, 2005, 2007 Nikolas Zimmermann <zimmermann@kde.org>
                   2004, 2005, 2007 Rob Buis <buis@kde.org>
     Copyright (C) Research In Motion Limited 2010. All rights reserved.
+    Copyright (C) 2014 Adobe Systems Incorporated. All rights reserved.
 
     Based on khtml code by:
     Copyright (C) 1999 Antti Koivisto (koivisto@kde.org)
     Copyright (C) 1999-2003 Lars Knoll (knoll@kde.org)
     Copyright (C) 2002-2003 Dirk Mueller (mueller@kde.org)
-    Copyright (C) 2002 Apple Computer, Inc.
+    Copyright (C) 2002 Apple Inc.
 
     This library is free software; you can redistribute it and/or
     modify it under the terms of the GNU Library General Public
@@ -26,12 +27,11 @@
 */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "SVGRenderStyleDefs.h"
 
 #include "RenderStyle.h"
 #include "SVGRenderStyle.h"
+#include <wtf/PointerComparison.h>
 
 namespace WebCore {
 
@@ -46,7 +46,7 @@ StyleFillData::StyleFillData()
 {
 }
 
-StyleFillData::StyleFillData(const StyleFillData& other)
+inline StyleFillData::StyleFillData(const StyleFillData& other)
     : RefCounted<StyleFillData>()
     , opacity(other.opacity)
     , paintType(other.paintType)
@@ -56,6 +56,11 @@ StyleFillData::StyleFillData(const StyleFillData& other)
     , visitedLinkPaintColor(other.visitedLinkPaintColor)
     , visitedLinkPaintUri(other.visitedLinkPaintUri)
 {
+}
+
+Ref<StyleFillData> StyleFillData::copy() const
+{
+    return adoptRef(*new StyleFillData(*this));
 }
 
 bool StyleFillData::operator==(const StyleFillData& other) const
@@ -72,8 +77,8 @@ bool StyleFillData::operator==(const StyleFillData& other) const
 StyleStrokeData::StyleStrokeData()
     : opacity(SVGRenderStyle::initialStrokeOpacity())
     , miterLimit(SVGRenderStyle::initialStrokeMiterLimit())
-    , width(SVGRenderStyle::initialStrokeWidth())
-    , dashOffset(SVGRenderStyle::initialStrokeDashOffset())
+    , width(RenderStyle::initialOneLength())
+    , dashOffset(RenderStyle::initialZeroLength())
     , dashArray(SVGRenderStyle::initialStrokeDashArray())
     , paintType(SVGRenderStyle::initialStrokePaintType())
     , paintColor(SVGRenderStyle::initialStrokePaintColor())
@@ -84,7 +89,7 @@ StyleStrokeData::StyleStrokeData()
 {
 }
 
-StyleStrokeData::StyleStrokeData(const StyleStrokeData& other)
+inline StyleStrokeData::StyleStrokeData(const StyleStrokeData& other)
     : RefCounted<StyleStrokeData>()
     , opacity(other.opacity)
     , miterLimit(other.miterLimit)
@@ -98,6 +103,11 @@ StyleStrokeData::StyleStrokeData(const StyleStrokeData& other)
     , visitedLinkPaintColor(other.visitedLinkPaintColor)
     , visitedLinkPaintUri(other.visitedLinkPaintUri)
 {
+}
+
+Ref<StyleStrokeData> StyleStrokeData::copy() const
+{
+    return adoptRef(*new StyleStrokeData(*this));
 }
 
 bool StyleStrokeData::operator==(const StyleStrokeData& other) const
@@ -121,11 +131,16 @@ StyleStopData::StyleStopData()
 {
 }
 
-StyleStopData::StyleStopData(const StyleStopData& other)
+inline StyleStopData::StyleStopData(const StyleStopData& other)
     : RefCounted<StyleStopData>()
     , opacity(other.opacity)
     , color(other.color)
 {
+}
+
+Ref<StyleStopData> StyleStopData::copy() const
+{
+    return adoptRef(*new StyleStopData(*this));
 }
 
 bool StyleStopData::operator==(const StyleStopData& other) const
@@ -139,10 +154,15 @@ StyleTextData::StyleTextData()
 {
 }
 
-StyleTextData::StyleTextData(const StyleTextData& other)
+inline StyleTextData::StyleTextData(const StyleTextData& other)
     : RefCounted<StyleTextData>()
     , kerning(other.kerning)
 {
+}
+
+Ref<StyleTextData> StyleTextData::copy() const
+{
+    return adoptRef(*new StyleTextData(*this));
 }
 
 bool StyleTextData::operator==(const StyleTextData& other) const
@@ -158,13 +178,18 @@ StyleMiscData::StyleMiscData()
 {
 }
 
-StyleMiscData::StyleMiscData(const StyleMiscData& other)
+inline StyleMiscData::StyleMiscData(const StyleMiscData& other)
     : RefCounted<StyleMiscData>()
     , floodColor(other.floodColor)
     , floodOpacity(other.floodOpacity)
     , lightingColor(other.lightingColor)
     , baselineShiftValue(other.baselineShiftValue)
 {
+}
+
+Ref<StyleMiscData> StyleMiscData::copy() const
+{
+    return adoptRef(*new StyleMiscData(*this));
 }
 
 bool StyleMiscData::operator==(const StyleMiscData& other) const
@@ -179,40 +204,43 @@ StyleShadowSVGData::StyleShadowSVGData()
 {
 }
 
-StyleShadowSVGData::StyleShadowSVGData(const StyleShadowSVGData& other)
+inline StyleShadowSVGData::StyleShadowSVGData(const StyleShadowSVGData& other)
     : RefCounted<StyleShadowSVGData>()
-    , shadow(other.shadow ? adoptPtr(new ShadowData(*other.shadow)) : nullptr)
+    , shadow(other.shadow ? std::make_unique<ShadowData>(*other.shadow) : nullptr)
 {
+}
+
+Ref<StyleShadowSVGData> StyleShadowSVGData::copy() const
+{
+    return adoptRef(*new StyleShadowSVGData(*this));
 }
 
 bool StyleShadowSVGData::operator==(const StyleShadowSVGData& other) const
 {
-    if ((!shadow && other.shadow) || (shadow && !other.shadow))
-        return false;
-    if (shadow && other.shadow && (*shadow != *other.shadow))
-        return false;
-    return true;
+    return arePointingToEqualData(shadow, other.shadow);
 }
 
 StyleResourceData::StyleResourceData()
     : clipper(SVGRenderStyle::initialClipperResource())
-    , filter(SVGRenderStyle::initialFilterResource())
     , masker(SVGRenderStyle::initialMaskerResource())
 {
 }
 
-StyleResourceData::StyleResourceData(const StyleResourceData& other)
+inline StyleResourceData::StyleResourceData(const StyleResourceData& other)
     : RefCounted<StyleResourceData>()
     , clipper(other.clipper)
-    , filter(other.filter)
     , masker(other.masker)
 {
+}
+
+Ref<StyleResourceData> StyleResourceData::copy() const
+{
+    return adoptRef(*new StyleResourceData(*this));
 }
 
 bool StyleResourceData::operator==(const StyleResourceData& other) const
 {
     return clipper == other.clipper
-        && filter == other.filter
         && masker == other.masker;
 }
 
@@ -223,12 +251,17 @@ StyleInheritedResourceData::StyleInheritedResourceData()
 {
 }
 
-StyleInheritedResourceData::StyleInheritedResourceData(const StyleInheritedResourceData& other)
+inline StyleInheritedResourceData::StyleInheritedResourceData(const StyleInheritedResourceData& other)
     : RefCounted<StyleInheritedResourceData>()
     , markerStart(other.markerStart)
     , markerMid(other.markerMid)
     , markerEnd(other.markerEnd)
 {
+}
+
+Ref<StyleInheritedResourceData> StyleInheritedResourceData::copy() const
+{
+    return adoptRef(*new StyleInheritedResourceData(*this));
 }
 
 bool StyleInheritedResourceData::operator==(const StyleInheritedResourceData& other) const
@@ -238,6 +271,43 @@ bool StyleInheritedResourceData::operator==(const StyleInheritedResourceData& ot
         && markerEnd == other.markerEnd;
 }
 
+StyleLayoutData::StyleLayoutData()
+    : cx(RenderStyle::initialZeroLength())
+    , cy(RenderStyle::initialZeroLength())
+    , r(RenderStyle::initialZeroLength())
+    , rx(RenderStyle::initialZeroLength())
+    , ry(RenderStyle::initialZeroLength())
+    , x(RenderStyle::initialZeroLength())
+    , y(RenderStyle::initialZeroLength())
+{
 }
 
-#endif // ENABLE(SVG)
+inline StyleLayoutData::StyleLayoutData(const StyleLayoutData& other)
+    : RefCounted<StyleLayoutData>()
+    , cx(other.cx)
+    , cy(other.cy)
+    , r(other.r)
+    , rx(other.rx)
+    , ry(other.ry)
+    , x(other.x)
+    , y(other.y)
+{
+}
+
+Ref<StyleLayoutData> StyleLayoutData::copy() const
+{
+    return adoptRef(*new StyleLayoutData(*this));
+}
+
+bool StyleLayoutData::operator==(const StyleLayoutData& other) const
+{
+    return cx == other.cx
+        && cy == other.cy
+        && r == other.r
+        && rx == other.rx
+        && ry == other.ry
+        && x == other.x
+        && y == other.y;
+}
+
+}

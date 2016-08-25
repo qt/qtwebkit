@@ -26,13 +26,9 @@
 #ifndef SQLTransactionState_h
 #define SQLTransactionState_h
 
-#if ENABLE(SQL_DATABASE)
-
-#include <wtf/EnumClass.h>
-
 namespace WebCore {
 
-ENUM_CLASS(SQLTransactionState) {
+enum class SQLTransactionState {
     End = 0,
     Idle,
     AcquireLock,
@@ -47,10 +43,8 @@ ENUM_CLASS(SQLTransactionState) {
     DeliverQuotaIncreaseCallback,
     DeliverSuccessCallback,
     NumberOfStates // Always keep this at the end of the list.
-} ENUM_CLASS_END(SQLTransactionState);
+};
 
 } // namespace WebCore
-
-#endif // ENABLE(SQL_DATABASE)
 
 #endif // SQLTransactionState_h

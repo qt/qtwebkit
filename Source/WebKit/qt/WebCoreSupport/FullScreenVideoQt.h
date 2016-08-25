@@ -32,6 +32,7 @@ QT_END_NAMESPACE
 namespace WebCore {
 
 class ChromeClientQt;
+class FullScreenVideoWidget;
 class HTMLVideoElement;
 class Node;
 #if USE(QT_MULTIMEDIA)
@@ -39,13 +40,13 @@ class MediaPlayerPrivateQt;
 #endif
 
 // We do not use ENABLE or USE because moc does not expand these macros.
-#if defined(WTF_USE_GSTREAMER) && WTF_USE_GSTREAMER && defined(WTF_USE_NATIVE_FULLSCREEN_VIDEO) && WTF_USE_NATIVE_FULLSCREEN_VIDEO
+#if defined(USE_GSTREAMER) && USE_GSTREAMER && defined(USE_NATIVE_FULLSCREEN_VIDEO) && USE_NATIVE_FULLSCREEN_VIDEO
 class FullScreenVideoWindow;
 
 class GStreamerFullScreenVideoHandler : public QObject {
     Q_OBJECT
 public:
-    GStreamerFullScreenVideoHandler(ChromeClientQt*);
+    GStreamerFullScreenVideoHandler();
     ~GStreamerFullScreenVideoHandler() { }
     void setVideoElement(HTMLVideoElement*);
 
@@ -58,7 +59,6 @@ public Q_SLOTS:
 private:
     HTMLVideoElement* m_videoElement;
     FullScreenVideoWindow* m_fullScreenWidget;
-    ChromeClientQt* m_chromeClient;
 };
 #endif
 
@@ -68,8 +68,8 @@ public:
     FullScreenVideoQt(ChromeClientQt*);
     ~FullScreenVideoQt();
 
-    virtual void enterFullScreenForNode(Node*);
-    virtual void exitFullScreenForNode(Node*);
+    void enterFullScreenForNode(HTMLVideoElement*);
+    void exitVideoFullscreen(HTMLVideoElement*);
     bool requiresFullScreenForVideoPlayback();
     bool isValid() const;
 

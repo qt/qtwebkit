@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2010 Google Inc. All rights reserved.
+ * Copyright (C) 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -10,7 +11,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -27,18 +28,12 @@
  */
 
 #include "config.h"
-
-#if ENABLE(INSPECTOR) && ENABLE(SQL_DATABASE)
-
 #include "InspectorDatabaseAgent.h"
 
 #include "Database.h"
 #include "ExceptionCode.h"
 #include "ExceptionCodePlaceholder.h"
 #include "InspectorDatabaseResource.h"
-#include "InspectorFrontend.h"
-#include "InspectorState.h"
-#include "InspectorValues.h"
 #include "InstrumentingAgents.h"
 #include "SQLError.h"
 #include "SQLResultSet.h"
@@ -50,144 +45,144 @@
 #include "SQLTransactionErrorCallback.h"
 #include "SQLValue.h"
 #include "VoidCallback.h"
-
+#include <inspector/InspectorFrontendRouter.h>
+#include <inspector/InspectorValues.h>
 #include <wtf/Vector.h>
 
-typedef WebCore::InspectorBackendDispatcher::DatabaseCommandHandler::ExecuteSQLCallback ExecuteSQLCallback;
+typedef Inspector::DatabaseBackendDispatcherHandler::ExecuteSQLCallback ExecuteSQLCallback;
+
+using namespace Inspector;
 
 namespace WebCore {
 
-namespace DatabaseAgentState {
-static const char databaseAgentEnabled[] = "databaseAgentEnabled";
-};
-
 namespace {
 
-void reportTransactionFailed(ExecuteSQLCallback* requestCallback, SQLError* error)
+void reportTransactionFailed(ExecuteSQLCallback& requestCallback, SQLError* error)
 {
-    RefPtr<TypeBuilder::Database::Error> errorObject = TypeBuilder::Database::Error::create()
+    auto errorObject = Inspector::Protocol::Database::Error::create()
         .setMessage(error->message())
-        .setCode(error->code());
-    requestCallback->sendSuccess(0, 0, errorObject.release());
+        .setCode(error->code())
+        .release();
+    requestCallback.sendSuccess(nullptr, nullptr, WTFMove(errorObject));
 }
 
 class StatementCallback : public SQLStatementCallback {
 public:
-    static PassRefPtr<StatementCallback> create(PassRefPtr<ExecuteSQLCallback> requestCallback)
+    static Ref<StatementCallback> create(Ref<ExecuteSQLCallback>&& requestCallback)
     {
-        return adoptRef(new StatementCallback(requestCallback));
+        return adoptRef(*new StatementCallback(WTFMove(requestCallback)));
     }
 
     virtual ~StatementCallback() { }
 
-    virtual bool handleEvent(SQLTransaction*, SQLResultSet* resultSet)
+    virtual bool handleEvent(SQLTransaction*, SQLResultSet* resultSet) override
     {
         SQLResultSetRowList* rowList = resultSet->rows();
 
-        RefPtr<TypeBuilder::Array<String> > columnNames = TypeBuilder::Array<String>::create();
-        const Vector<String>& columns = rowList->columnNames();
-        for (size_t i = 0; i < columns.size(); ++i)
-            columnNames->addItem(columns[i]);
+        auto columnNames = Inspector::Protocol::Array<String>::create();
+        for (auto& column : rowList->columnNames())
+            columnNames->addItem(column);
 
-        RefPtr<TypeBuilder::Array<InspectorValue> > values = TypeBuilder::Array<InspectorValue>::create();
-        const Vector<SQLValue>& data = rowList->values();
-        for (size_t i = 0; i < data.size(); ++i) {
-            const SQLValue& value = rowList->values()[i];
+        auto values = Inspector::Protocol::Array<InspectorValue>::create();
+        for (auto& value : rowList->values()) {
+            RefPtr<InspectorValue> inspectorValue;
             switch (value.type()) {
-            case SQLValue::StringValue: values->addItem(InspectorString::create(value.string())); break;
-            case SQLValue::NumberValue: values->addItem(InspectorBasicValue::create(value.number())); break;
-            case SQLValue::NullValue: values->addItem(InspectorValue::null()); break;
+            case SQLValue::StringValue: inspectorValue = InspectorString::create(value.string()); break;
+            case SQLValue::NumberValue: inspectorValue = InspectorBasicValue::create(value.number()); break;
+            case SQLValue::NullValue: inspectorValue = InspectorValue::null(); break;
             }
+            
+            values->addItem(WTFMove(inspectorValue));
         }
-        m_requestCallback->sendSuccess(columnNames.release(), values.release(), 0);
+        m_requestCallback->sendSuccess(WTFMove(columnNames), WTFMove(values), nullptr);
         return true;
     }
 
 private:
-    StatementCallback(PassRefPtr<ExecuteSQLCallback> requestCallback)
-        : m_requestCallback(requestCallback) { }
-    RefPtr<ExecuteSQLCallback> m_requestCallback;
+    StatementCallback(Ref<ExecuteSQLCallback>&& requestCallback)
+        : m_requestCallback(WTFMove(requestCallback)) { }
+    Ref<ExecuteSQLCallback> m_requestCallback;
 };
 
 class StatementErrorCallback : public SQLStatementErrorCallback {
 public:
-    static PassRefPtr<StatementErrorCallback> create(PassRefPtr<ExecuteSQLCallback> requestCallback)
+    static Ref<StatementErrorCallback> create(Ref<ExecuteSQLCallback>&& requestCallback)
     {
-        return adoptRef(new StatementErrorCallback(requestCallback));
+        return adoptRef(*new StatementErrorCallback(WTFMove(requestCallback)));
     }
 
     virtual ~StatementErrorCallback() { }
 
-    virtual bool handleEvent(SQLTransaction*, SQLError* error)
+    virtual bool handleEvent(SQLTransaction*, SQLError* error) override
     {
-        reportTransactionFailed(m_requestCallback.get(), error);
+        reportTransactionFailed(m_requestCallback.copyRef(), error);
         return true;  
     }
 
 private:
-    StatementErrorCallback(PassRefPtr<ExecuteSQLCallback> requestCallback)
-        : m_requestCallback(requestCallback) { }
-    RefPtr<ExecuteSQLCallback> m_requestCallback;
+    StatementErrorCallback(Ref<ExecuteSQLCallback>&& requestCallback)
+        : m_requestCallback(WTFMove(requestCallback)) { }
+    Ref<ExecuteSQLCallback> m_requestCallback;
 };
 
 class TransactionCallback : public SQLTransactionCallback {
 public:
-    static PassRefPtr<TransactionCallback> create(const String& sqlStatement, PassRefPtr<ExecuteSQLCallback> requestCallback)
+    static Ref<TransactionCallback> create(const String& sqlStatement, Ref<ExecuteSQLCallback>&& requestCallback)
     {
-        return adoptRef(new TransactionCallback(sqlStatement, requestCallback));
+        return adoptRef(*new TransactionCallback(sqlStatement, WTFMove(requestCallback)));
     }
 
     virtual ~TransactionCallback() { }
 
-    virtual bool handleEvent(SQLTransaction* transaction)
+    virtual bool handleEvent(SQLTransaction* transaction) override
     {
         if (!m_requestCallback->isActive())
             return true;
 
         Vector<SQLValue> sqlValues;
-        RefPtr<SQLStatementCallback> callback(StatementCallback::create(m_requestCallback.get()));
-        RefPtr<SQLStatementErrorCallback> errorCallback(StatementErrorCallback::create(m_requestCallback.get()));
-        transaction->executeSQL(m_sqlStatement, sqlValues, callback.release(), errorCallback.release(), IGNORE_EXCEPTION);
+        Ref<SQLStatementCallback> callback(StatementCallback::create(m_requestCallback.copyRef()));
+        Ref<SQLStatementErrorCallback> errorCallback(StatementErrorCallback::create(m_requestCallback.copyRef()));
+        transaction->executeSQL(m_sqlStatement, sqlValues, WTFMove(callback), WTFMove(errorCallback), IGNORE_EXCEPTION);
         return true;
     }
 private:
-    TransactionCallback(const String& sqlStatement, PassRefPtr<ExecuteSQLCallback> requestCallback)
+    TransactionCallback(const String& sqlStatement, Ref<ExecuteSQLCallback>&& requestCallback)
         : m_sqlStatement(sqlStatement)
-        , m_requestCallback(requestCallback) { }
+        , m_requestCallback(WTFMove(requestCallback)) { }
     String m_sqlStatement;
-    RefPtr<ExecuteSQLCallback> m_requestCallback;
+    Ref<ExecuteSQLCallback> m_requestCallback;
 };
 
 class TransactionErrorCallback : public SQLTransactionErrorCallback {
 public:
-    static PassRefPtr<TransactionErrorCallback> create(PassRefPtr<ExecuteSQLCallback> requestCallback)
+    static Ref<TransactionErrorCallback> create(Ref<ExecuteSQLCallback>&& requestCallback)
     {
-        return adoptRef(new TransactionErrorCallback(requestCallback));
+        return adoptRef(*new TransactionErrorCallback(WTFMove(requestCallback)));
     }
 
     virtual ~TransactionErrorCallback() { }
 
-    virtual bool handleEvent(SQLError* error)
+    virtual bool handleEvent(SQLError* error) override
     {
         reportTransactionFailed(m_requestCallback.get(), error);
         return true;
     }
 private:
-    TransactionErrorCallback(PassRefPtr<ExecuteSQLCallback> requestCallback)
-        : m_requestCallback(requestCallback) { }
-    RefPtr<ExecuteSQLCallback> m_requestCallback;
+    TransactionErrorCallback(Ref<ExecuteSQLCallback>&& requestCallback)
+        : m_requestCallback(WTFMove(requestCallback)) { }
+    Ref<ExecuteSQLCallback> m_requestCallback;
 };
 
 class TransactionSuccessCallback : public VoidCallback {
 public:
-    static PassRefPtr<TransactionSuccessCallback> create()
+    static Ref<TransactionSuccessCallback> create()
     {
-        return adoptRef(new TransactionSuccessCallback());
+        return adoptRef(*new TransactionSuccessCallback());
     }
 
     virtual ~TransactionSuccessCallback() { }
 
-    virtual bool handleEvent() { return false; }
+    virtual bool handleEvent() override { return false; }
 
 private:
     TransactionSuccessCallback() { }
@@ -195,18 +190,18 @@ private:
 
 } // namespace
 
-void InspectorDatabaseAgent::didOpenDatabase(PassRefPtr<Database> database, const String& domain, const String& name, const String& version)
+void InspectorDatabaseAgent::didOpenDatabase(RefPtr<Database>&& database, const String& domain, const String& name, const String& version)
 {
     if (InspectorDatabaseResource* resource = findByFileName(database->fileName())) {
-        resource->setDatabase(database);
+        resource->setDatabase(WTFMove(database));
         return;
     }
 
-    RefPtr<InspectorDatabaseResource> resource = InspectorDatabaseResource::create(database, domain, name, version);
+    RefPtr<InspectorDatabaseResource> resource = InspectorDatabaseResource::create(WTFMove(database), domain, name, version);
     m_resources.set(resource->id(), resource);
     // Resources are only bound while visible.
-    if (m_frontend && m_enabled)
-        resource->bind(m_frontend);
+    if (m_enabled)
+        resource->bind(m_frontendDispatcher.get());
 }
 
 void InspectorDatabaseAgent::clearResources()
@@ -214,76 +209,64 @@ void InspectorDatabaseAgent::clearResources()
     m_resources.clear();
 }
 
-InspectorDatabaseAgent::InspectorDatabaseAgent(InstrumentingAgents* instrumentingAgents, InspectorCompositeState* state)
-    : InspectorBaseAgent<InspectorDatabaseAgent>("Database", instrumentingAgents, state)
-    , m_enabled(false)
+InspectorDatabaseAgent::InspectorDatabaseAgent(WebAgentContext& context)
+    : InspectorAgentBase(ASCIILiteral("Database"), context)
+    , m_frontendDispatcher(std::make_unique<Inspector::DatabaseFrontendDispatcher>(context.frontendRouter))
+    , m_backendDispatcher(Inspector::DatabaseBackendDispatcher::create(context.backendDispatcher, this))
 {
-    m_instrumentingAgents->setInspectorDatabaseAgent(this);
+    m_instrumentingAgents.setInspectorDatabaseAgent(this);
 }
 
 InspectorDatabaseAgent::~InspectorDatabaseAgent()
 {
-    m_instrumentingAgents->setInspectorDatabaseAgent(0);
+    m_instrumentingAgents.setInspectorDatabaseAgent(nullptr);
 }
 
-void InspectorDatabaseAgent::setFrontend(InspectorFrontend* frontend)
+void InspectorDatabaseAgent::didCreateFrontendAndBackend(Inspector::FrontendRouter*, Inspector::BackendDispatcher*)
 {
-    m_frontend = frontend->database();
 }
 
-void InspectorDatabaseAgent::clearFrontend()
+void InspectorDatabaseAgent::willDestroyFrontendAndBackend(Inspector::DisconnectReason)
 {
-    m_frontend = 0;
-    disable(0);
+    ErrorString unused;
+    disable(unused);
 }
 
-void InspectorDatabaseAgent::enable(ErrorString*)
+void InspectorDatabaseAgent::enable(ErrorString&)
 {
     if (m_enabled)
         return;
     m_enabled = true;
-    m_state->setBoolean(DatabaseAgentState::databaseAgentEnabled, m_enabled);
 
-    DatabaseResourcesMap::iterator databasesEnd = m_resources.end();
-    for (DatabaseResourcesMap::iterator it = m_resources.begin(); it != databasesEnd; ++it)
-        it->value->bind(m_frontend);
+    for (auto& resource : m_resources.values())
+        resource->bind(m_frontendDispatcher.get());
 }
 
-void InspectorDatabaseAgent::disable(ErrorString*)
+void InspectorDatabaseAgent::disable(ErrorString&)
 {
     if (!m_enabled)
         return;
     m_enabled = false;
-    m_state->setBoolean(DatabaseAgentState::databaseAgentEnabled, m_enabled);
 }
 
-void InspectorDatabaseAgent::restore()
-{
-    m_enabled = m_state->getBoolean(DatabaseAgentState::databaseAgentEnabled);
-}
-
-void InspectorDatabaseAgent::getDatabaseTableNames(ErrorString* error, const String& databaseId, RefPtr<TypeBuilder::Array<String> >& names)
+void InspectorDatabaseAgent::getDatabaseTableNames(ErrorString& error, const String& databaseId, RefPtr<Inspector::Protocol::Array<String>>& names)
 {
     if (!m_enabled) {
-        *error = "Database agent is not enabled";
+        error = ASCIILiteral("Database agent is not enabled");
         return;
     }
 
-    names = TypeBuilder::Array<String>::create();
+    names = Inspector::Protocol::Array<String>::create();
 
     Database* database = databaseForId(databaseId);
     if (database) {
-        Vector<String> tableNames = database->tableNames();
-        unsigned length = tableNames.size();
-        for (unsigned i = 0; i < length; ++i)
-            names->addItem(tableNames[i]);
+        for (auto& tableName : database->tableNames())
+            names->addItem(tableName);
     }
 }
 
-void InspectorDatabaseAgent::executeSQL(ErrorString*, const String& databaseId, const String& query, PassRefPtr<ExecuteSQLCallback> prpRequestCallback)
+void InspectorDatabaseAgent::executeSQL(ErrorString&, const String& databaseId, const String& query, Ref<ExecuteSQLCallback>&& requestCallback)
 {
-    RefPtr<ExecuteSQLCallback> requestCallback = prpRequestCallback;
-
     if (!m_enabled) {
         requestCallback->sendFailure("Database agent is not enabled");
         return;
@@ -295,38 +278,36 @@ void InspectorDatabaseAgent::executeSQL(ErrorString*, const String& databaseId, 
         return;
     }
 
-    RefPtr<SQLTransactionCallback> callback(TransactionCallback::create(query, requestCallback.get()));
-    RefPtr<SQLTransactionErrorCallback> errorCallback(TransactionErrorCallback::create(requestCallback.get()));
-    RefPtr<VoidCallback> successCallback(TransactionSuccessCallback::create());
-    database->transaction(callback.release(), errorCallback.release(), successCallback.release());
+    Ref<SQLTransactionCallback> callback(TransactionCallback::create(query, requestCallback.get()));
+    Ref<SQLTransactionErrorCallback> errorCallback(TransactionErrorCallback::create(requestCallback.get()));
+    Ref<VoidCallback> successCallback(TransactionSuccessCallback::create());
+    database->transaction(WTFMove(callback), WTFMove(errorCallback), WTFMove(successCallback));
 }
 
 String InspectorDatabaseAgent::databaseId(Database* database)
 {
-    for (DatabaseResourcesMap::iterator it = m_resources.begin(); it != m_resources.end(); ++it) {
-        if (it->value->database() == database)
-            return it->key;
+    for (auto& resource : m_resources) {
+        if (resource.value->database() == database)
+            return resource.key;
     }
     return String();
 }
 
 InspectorDatabaseResource* InspectorDatabaseAgent::findByFileName(const String& fileName)
 {
-    for (DatabaseResourcesMap::iterator it = m_resources.begin(); it != m_resources.end(); ++it) {
-        if (it->value->database()->fileName() == fileName)
-            return it->value.get();
+    for (auto& resource : m_resources.values()) {
+        if (resource->database()->fileName() == fileName)
+            return resource.get();
     }
-    return 0;
+    return nullptr;
 }
 
 Database* InspectorDatabaseAgent::databaseForId(const String& databaseId)
 {
     DatabaseResourcesMap::iterator it = m_resources.find(databaseId);
     if (it == m_resources.end())
-        return 0;
+        return nullptr;
     return it->value->database();
 }
 
 } // namespace WebCore
-
-#endif // ENABLE(INSPECTOR) && ENABLE(SQL_DATABASE)

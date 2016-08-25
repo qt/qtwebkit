@@ -40,8 +40,8 @@ namespace WebCore {
 // See <http://en.wikipedia.org/wiki/Percent-encoding#Non-standard_implementations>.
 struct Unicode16BitEscapeSequence {
     enum { sequenceSize = 6 }; // e.g. %u26C4
-    static size_t findInString(const String& string, size_t startPosition) { return string.find("%u", startPosition); }
-    static size_t findEndOfRun(const String& string, size_t startPosition, size_t endPosition)
+    static size_t findInString(StringView string, size_t startPosition) { return string.find(StringView("%u"), startPosition); }
+    static size_t findEndOfRun(StringView string, size_t startPosition, size_t endPosition)
     {
         size_t runEnd = startPosition;
         while (endPosition - runEnd >= sequenceSize && string[runEnd] == '%' && string[runEnd + 1] == 'u'
@@ -51,19 +51,19 @@ struct Unicode16BitEscapeSequence {
         }
         return runEnd;
     }
-    static String decodeRun(const UChar* run, size_t runLength, const TextEncoding&)
+    static String decodeRun(StringView run, const TextEncoding&)
     {
         // Each %u-escape sequence represents a UTF-16 code unit.
         // See <http://www.w3.org/International/iri-edit/draft-duerst-iri.html#anchor29>.
         // For 16-bit escape sequences, we know that findEndOfRun() has given us a contiguous run of sequences
         // without any intervening characters, so decode the run without additional checks.
-        size_t numberOfSequences = runLength / sequenceSize;
+        auto numberOfSequences = run.length() / sequenceSize;
         StringBuilder builder;
         builder.reserveCapacity(numberOfSequences);
         while (numberOfSequences--) {
             UChar codeUnit = (toASCIIHexValue(run[2]) << 12) | (toASCIIHexValue(run[3]) << 8) | (toASCIIHexValue(run[4]) << 4) | toASCIIHexValue(run[5]);
             builder.append(codeUnit);
-            run += sequenceSize;
+            run = run.substring(sequenceSize);
         }
         return builder.toString();
     }
@@ -71,8 +71,8 @@ struct Unicode16BitEscapeSequence {
 
 struct URLEscapeSequence {
     enum { sequenceSize = 3 }; // e.g. %41
-    static size_t findInString(const String& string, size_t startPosition) { return string.find('%', startPosition); }
-    static size_t findEndOfRun(const String& string, size_t startPosition, size_t endPosition)
+    static size_t findInString(StringView string, size_t startPosition) { return string.find('%', startPosition); }
+    static size_t findEndOfRun(StringView string, size_t startPosition, size_t endPosition)
     {
         // Make the simplifying assumption that supported encodings may have up to two unescaped characters
         // in the range 0x40 - 0x7F as the trailing bytes of their sequences which need to be passed into the
@@ -96,30 +96,39 @@ struct URLEscapeSequence {
         }
         return runEnd;
     }
-    static String decodeRun(const UChar* run, size_t runLength, const TextEncoding& encoding)
+
+    static Vector<char, 512> decodeRun(StringView run)
     {
         // For URL escape sequences, we know that findEndOfRun() has given us a run where every %-sign introduces
         // a valid escape sequence, but there may be characters between the sequences.
         Vector<char, 512> buffer;
-        buffer.resize(runLength); // Unescaping hex sequences only makes the length smaller.
+        buffer.resize(run.length()); // Unescaping hex sequences only makes the length smaller.
         char* p = buffer.data();
-        const UChar* runEnd = run + runLength;
-        while (run < runEnd) {
+        while (!run.isEmpty()) {
             if (run[0] == '%') {
                 *p++ = (toASCIIHexValue(run[1]) << 4) | toASCIIHexValue(run[2]);
-                run += sequenceSize;
+                run = run.substring(sequenceSize);
             } else {
                 *p++ = run[0];
-                run += 1;
+                run = run.substring(1);
             }
         }
         ASSERT(buffer.size() >= static_cast<size_t>(p - buffer.data())); // Prove buffer not overrun.
-        return (encoding.isValid() ? encoding : UTF8Encoding()).decode(buffer.data(), p - buffer.data());
+        buffer.shrink(p - buffer.data());
+        return buffer;
+    }
+
+    static String decodeRun(StringView run, const TextEncoding& encoding)
+    {
+        auto buffer = decodeRun(run);
+        if (!encoding.isValid())
+            return UTF8Encoding().decode(buffer.data(), buffer.size());
+        return encoding.decode(buffer.data(), buffer.size());
     }
 };
 
 template<typename EscapeSequence>
-String decodeEscapeSequences(const String& string, const TextEncoding& encoding)
+String decodeEscapeSequences(StringView string, const TextEncoding& encoding)
 {
     StringBuilder result;
     size_t length = string.length();
@@ -134,16 +143,51 @@ String decodeEscapeSequences(const String& string, const TextEncoding& encoding)
             continue;
         }
 
-        String decoded = EscapeSequence::decodeRun(string.characters() + encodedRunPosition, encodedRunEnd - encodedRunPosition, encoding);
+        String decoded = EscapeSequence::decodeRun(string.substring(encodedRunPosition, encodedRunEnd - encodedRunPosition), encoding);
         if (decoded.isEmpty())
             continue;
 
-        result.append(string, decodedPosition, encodedRunPosition - decodedPosition);
+        result.append(string.substring(decodedPosition, encodedRunPosition - decodedPosition));
         result.append(decoded);
         decodedPosition = encodedRunEnd;
     }
-    result.append(string, decodedPosition, length - decodedPosition);
+    result.append(string.substring(decodedPosition, length - decodedPosition));
     return result.toString();
+}
+
+inline Vector<char> decodeURLEscapeSequencesAsData(StringView string, const TextEncoding& encoding)
+{
+    ASSERT(encoding.isValid());
+
+    Vector<char> result;
+    size_t decodedPosition = 0;
+    size_t searchPosition = 0;
+    while (true) {
+        size_t encodedRunPosition = URLEscapeSequence::findInString(string, searchPosition);
+        size_t encodedRunEnd = 0;
+        if (encodedRunPosition != notFound) {
+            encodedRunEnd = URLEscapeSequence::findEndOfRun(string, encodedRunPosition, string.length());
+            searchPosition = encodedRunEnd;
+            if (encodedRunEnd == encodedRunPosition) {
+                ++searchPosition;
+                continue;
+            }
+        }
+        // Strings are encoded as requested.
+        auto stringFragment = string.substring(decodedPosition, encodedRunPosition - decodedPosition);
+        auto encodedStringFragment = encoding.encode(stringFragment, URLEncodedEntitiesForUnencodables);
+        result.append(encodedStringFragment.data(), encodedStringFragment.length());
+
+        if (encodedRunPosition == notFound)
+            return result;
+        
+        // Bytes go through as-is.
+        auto decodedEscapeSequence = URLEscapeSequence::decodeRun(string.substring(encodedRunPosition, encodedRunEnd - encodedRunPosition));
+        ASSERT(!decodedEscapeSequence.isEmpty());
+        result.appendVector(decodedEscapeSequence);
+
+        decodedPosition = encodedRunEnd;
+    }
 }
 
 } // namespace WebCore

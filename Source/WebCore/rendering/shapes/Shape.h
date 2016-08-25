@@ -12,7 +12,7 @@
  *    copyright notice, this list of conditions and the following
  *    disclaimer in the documentation and/or other materials
  *    provided with the distribution.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
  * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
@@ -30,27 +30,35 @@
 #ifndef Shape_h
 #define Shape_h
 
-#include "BasicShapes.h"
 #include "LayoutRect.h"
+#include "Path.h"
 #include "WritingMode.h"
-#include <wtf/PassOwnPtr.h>
-#include <wtf/Vector.h>
 
 namespace WebCore {
 
 struct LineSegment {
-    LineSegment(float logicalLeft, float logicalRight)
-        : logicalLeft(logicalLeft)
-        , logicalRight(logicalRight)
+    LineSegment()
+        : logicalLeft(0)
+        , logicalRight(0)
+        , isValid(false)
     {
     }
 
-    LayoutUnit logicalLeft;
-    LayoutUnit logicalRight;
+    LineSegment(float logicalLeft, float logicalRight)
+        : logicalLeft(logicalLeft)
+        , logicalRight(logicalRight)
+        , isValid(true)
+    {
+    }
+
+    float logicalLeft;
+    float logicalRight;
+    bool isValid;
 };
 
-typedef Vector<LineSegment> SegmentList;
-
+class BasicShape;
+class Image;
+class RoundedRect;
 
 // A representation of a BasicShape that enables layout code to determine how to break a line up into segments
 // that will fit within or around a shape. The line is defined by a pair of logical Y coordinates and the
@@ -58,26 +66,40 @@ typedef Vector<LineSegment> SegmentList;
 // physical coordinates.
 
 class Shape {
+    WTF_MAKE_FAST_ALLOCATED;
 public:
-    static PassOwnPtr<Shape> createShape(const BasicShape*, const LayoutSize& logicalBoxSize, WritingMode, Length margin, Length padding);
+    struct DisplayPaths {
+        Path shape;
+        Path marginShape;
+    };
+
+    static std::unique_ptr<Shape> createShape(const BasicShape&, const LayoutSize& logicalBoxSize, WritingMode, float margin);
+    static std::unique_ptr<Shape> createRasterShape(Image*, float threshold, const LayoutRect& imageRect, const LayoutRect& marginRect, WritingMode, float margin);
+    static std::unique_ptr<Shape> createBoxShape(const RoundedRect&, WritingMode, float margin);
 
     virtual ~Shape() { }
 
     virtual LayoutRect shapeMarginLogicalBoundingBox() const = 0;
-    virtual LayoutRect shapePaddingLogicalBoundingBox() const = 0;
     virtual bool isEmpty() const = 0;
-    virtual void getIncludedIntervals(LayoutUnit logicalTop, LayoutUnit logicalHeight, SegmentList&) const = 0;
-    virtual void getExcludedIntervals(LayoutUnit logicalTop, LayoutUnit logicalHeight, SegmentList&) const = 0;
-    virtual bool firstIncludedIntervalLogicalTop(LayoutUnit minLogicalIntervalTop, const LayoutSize& minLogicalIntervalSize, LayoutUnit& result) const = 0;
+    virtual LineSegment getExcludedInterval(LayoutUnit logicalTop, LayoutUnit logicalHeight) const = 0;
+
+    bool lineOverlapsShapeMarginBounds(LayoutUnit lineTop, LayoutUnit lineHeight) const { return lineOverlapsBoundingBox(lineTop, lineHeight, shapeMarginLogicalBoundingBox()); }
+
+    virtual void buildDisplayPaths(DisplayPaths&) const = 0;
 
 protected:
     float shapeMargin() const { return m_margin; }
-    float shapePadding() const { return m_padding; }
 
 private:
+    bool lineOverlapsBoundingBox(LayoutUnit lineTop, LayoutUnit lineHeight, const LayoutRect& rect) const
+    {
+        if (rect.isEmpty())
+            return false;
+        return (lineTop < rect.maxY() && lineTop + lineHeight > rect.y()) || (!lineHeight && lineTop == rect.y());
+    }
+
     WritingMode m_writingMode;
     float m_margin;
-    float m_padding;
 };
 
 } // namespace WebCore

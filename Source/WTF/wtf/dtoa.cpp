@@ -3,7 +3,7 @@
  * The author of this software is David M. Gay.
  *
  * Copyright (c) 1991, 2000, 2001 by Lucent Technologies.
- * Copyright (C) 2002, 2005, 2006, 2007, 2008, 2010, 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2002, 2005, 2006, 2007, 2008, 2010, 2012, 2015 Apple Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose without fee is hereby granted, provided that this entire notice
@@ -36,6 +36,7 @@
 #include "dtoa.h"
 
 #include <stdio.h>
+#include <wtf/Lock.h>
 #include <wtf/MathExtras.h>
 #include <wtf/Threading.h>
 #include <wtf/Vector.h>
@@ -46,9 +47,15 @@
 #pragma warning(disable: 4554)
 #endif
 
+#if CPU(PPC64) || CPU(X86_64) || CPU(ARM64)
+// FIXME: should we enable this on all 64-bit CPUs?
+// 64-bit emulation provided by the compiler is likely to be slower than dtoa own code on 32-bit hardware.
+#define USE_LONG_LONG
+#endif
+
 namespace WTF {
 
-Mutex* s_dtoaP5Mutex;
+static StaticLock s_dtoaP5Mutex;
 
 typedef union {
     double d;
@@ -64,6 +71,7 @@ typedef union {
 #endif
 #define dval(x) (x)->d
 
+#ifndef USE_LONG_LONG
 /* The following definition of Storeinc is appropriate for MIPS processors.
  * An alternative that might be better on some machines is
  *  *p++ = high << 16 | low & 0xffff;
@@ -80,6 +88,8 @@ static ALWAYS_INLINE uint32_t* storeInc(uint32_t* p, uint16_t high, uint16_t low
 #endif
     return p + 1;
 }
+
+#endif // USE_LONG_LONG
 
 #define Exp_shift  20
 #define Exp_shift1 20
@@ -111,12 +121,6 @@ static ALWAYS_INLINE uint32_t* storeInc(uint32_t* p, uint16_t high, uint16_t low
 
 #define Big0 (Frac_mask1 | Exp_msk1 * (DBL_MAX_EXP + Bias - 1))
 #define Big1 0xffffffff
-
-#if CPU(PPC64) || CPU(X86_64)
-// FIXME: should we enable this on all 64-bit CPUs?
-// 64-bit emulation provided by the compiler is likely to be slower than dtoa own code on 32-bit hardware.
-#define USE_LONG_LONG
-#endif
 
 struct BigInt {
     BigInt() : sign(0) { }
@@ -364,7 +368,7 @@ static int p5sCount;
 
 static ALWAYS_INLINE void pow5mult(BigInt& b, int k)
 {
-    static int p05[3] = { 5, 25, 125 };
+    static const int p05[3] = { 5, 25, 125 };
 
     if (int i = k & 3)
         multadd(b, p05[i - 1], 0);
@@ -372,7 +376,7 @@ static ALWAYS_INLINE void pow5mult(BigInt& b, int k)
     if (!(k >>= 2))
         return;
 
-    s_dtoaP5Mutex->lock();
+    s_dtoaP5Mutex.lock();
     P5Node* p5 = p5s;
 
     if (!p5) {
@@ -385,7 +389,7 @@ static ALWAYS_INLINE void pow5mult(BigInt& b, int k)
     }
 
     int p5sCountLocal = p5sCount;
-    s_dtoaP5Mutex->unlock();
+    s_dtoaP5Mutex.unlock();
     int p5sUsed = 0;
 
     for (;;) {
@@ -396,7 +400,7 @@ static ALWAYS_INLINE void pow5mult(BigInt& b, int k)
             break;
 
         if (++p5sUsed == p5sCountLocal) {
-            s_dtoaP5Mutex->lock();
+            s_dtoaP5Mutex.lock();
             if (p5sUsed == p5sCount) {
                 ASSERT(!p5->next);
                 p5->next = new P5Node;
@@ -407,7 +411,7 @@ static ALWAYS_INLINE void pow5mult(BigInt& b, int k)
             }
 
             p5sCountLocal = p5sCount;
-            s_dtoaP5Mutex->unlock();
+            s_dtoaP5Mutex.unlock();
         }
         p5 = p5->next;
     }
@@ -596,13 +600,7 @@ static const double tens[] = {
 };
 
 static const double bigtens[] = { 1e16, 1e32, 1e64, 1e128, 1e256 };
-static const double tinytens[] = { 1e-16, 1e-32, 1e-64, 1e-128,
-    9007199254740992. * 9007199254740992.e-256
-    /* = 2^106 * 1e-256 */
-};
 
-/* The factor of 2^53 in tinytens[4] helps us avoid setting the underflow */
-/* flag unnecessarily.  It leads to a song and dance at the end of strtod. */
 #define Scale_Bit 0x10
 #define n_bigtens 5
 

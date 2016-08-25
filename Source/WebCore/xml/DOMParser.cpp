@@ -20,19 +20,25 @@
 #include "DOMParser.h"
 
 #include "DOMImplementation.h"
-#include "Document.h"
+#include "ExceptionCode.h"
 #include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
-PassRefPtr<Document> DOMParser::parseFromString(const String& str, const String& contentType)
+RefPtr<Document> DOMParser::parseFromString(const String& str, const String& contentType, ExceptionCode& ec)
 {
-    if (!DOMImplementation::isXMLMIMEType(contentType))
-        return 0;
+    if (contentType != "text/html"
+        && contentType != "text/xml"
+        && contentType != "application/xml"
+        && contentType != "application/xhtml+xml"
+        && contentType != "image/svg+xml") {
+        ec = TypeError;
+        return nullptr;
+    }
 
-    RefPtr<Document> doc = DOMImplementation::createDocument(contentType, 0, KURL(), false);
+    Ref<Document> doc = DOMImplementation::createDocument(contentType, nullptr, URL());
     doc->setContent(str);
-    return doc.release();
+    return WTFMove(doc);
 }
 
 } // namespace WebCore

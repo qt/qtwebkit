@@ -84,9 +84,7 @@ public:
 
     bool operator!() const { return !slot() || !*slot(); }
 
-    // This conversion operator allows implicit conversion to bool but not to other integer types.
-    typedef JSValue (HandleBase::*UnspecifiedBoolType);
-    operator UnspecifiedBoolType*() const { return !!*this ? reinterpret_cast<UnspecifiedBoolType*>(1) : 0; }
+    explicit operator bool() const { return !!*this; }
 
     void swap(Strong& other)
     {
@@ -148,11 +146,11 @@ template<class T> inline void swap(Strong<T>& a, Strong<T>& b)
 
 namespace WTF {
 
-template<typename T> struct VectorTraits<JSC::Strong<T> > : SimpleClassVectorTraits {
+template<typename T> struct VectorTraits<JSC::Strong<T>> : SimpleClassVectorTraits {
     static const bool canCompareWithMemcmp = false;
 };
 
-template<typename P> struct HashTraits<JSC::Strong<P> > : SimpleClassHashTraits<JSC::Strong<P> > { };
+template<typename P> struct HashTraits<JSC::Strong<P>> : SimpleClassHashTraits<JSC::Strong<P>> { };
 
 }
 

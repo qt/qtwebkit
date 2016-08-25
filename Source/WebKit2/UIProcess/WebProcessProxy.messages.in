@@ -21,14 +21,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 messages -> WebProcessProxy LegacyReceiver {
-
-    # History client messages.
-    DidNavigateWithNavigationData(uint64_t pageID, WebKit::WebNavigationDataStore store, uint64_t frameID)
-    DidPerformClientRedirect(uint64_t pageID, WTF::String sourceURLString, WTF::String destinationURLString, uint64_t frameID)
-    DidPerformServerRedirect(uint64_t pageID, WTF::String sourceURLString, WTF::String destinationURLString, uint64_t frameID)
-    DidUpdateHistoryTitle(uint64_t pageID, WTF::String title, WTF::String url, uint64_t frameID)
-
-    AddBackForwardItem(uint64_t itemID, WTF::String originalURL, WTF::String url, WTF::String title, CoreIPC::DataReference backForwardData)
+    AddBackForwardItem(uint64_t itemID, uint64_t pageID, struct WebKit::PageState pageState)
     DidDestroyFrame(uint64_t frameID) 
 
     ShouldTerminate() -> (bool shouldTerminate)
@@ -36,22 +29,26 @@ messages -> WebProcessProxy LegacyReceiver {
     EnableSuddenTermination()
     DisableSuddenTermination()
 
+    DidFetchWebsiteData(uint64_t callbackID, struct WebKit::WebsiteData websiteData)
+    DidDeleteWebsiteData(uint64_t callbackID)
+    DidDeleteWebsiteDataForOrigins(uint64_t callbackID)
+
     # Plugin messages.
 #if ENABLE(NETSCAPE_PLUGIN_API)
-    GetPlugins(bool refresh) -> (Vector<WebCore::PluginInfo> plugins)
-#endif // ENABLE(NETSCAPE_PLUGIN_API)
-#if ENABLE(PLUGIN_PROCESS)
-    GetPluginProcessConnection(uint64_t pluginProcessToken) -> (CoreIPC::Attachment connectionHandle, bool supportsAsynchronousInitialization) Delayed
+    GetPlugins(bool refresh) -> (Vector<WebCore::PluginInfo> plugins, Vector<WebCore::PluginInfo> applicationPlugins)
+    GetPluginProcessConnection(uint64_t pluginProcessToken) -> (IPC::Attachment connectionHandle, bool supportsAsynchronousInitialization) Delayed
 #endif
-#if ENABLE(NETSCAPE_PLUGIN_API) && !ENABLE(PLUGIN_PROCESS)
-    void DidGetSitesWithPluginData(Vector<WTF::String> sites, uint64_t callbackID)
-    void DidClearPluginSiteData(uint64_t callbackID)
+    GetNetworkProcessConnection() -> (IPC::Attachment connectionHandle) Delayed
+#if ENABLE(DATABASE_PROCESS)
+    GetDatabaseProcessConnection() -> (IPC::Attachment connectionHandle) Delayed
 #endif
-#if ENABLE(NETWORK_PROCESS)
-    GetNetworkProcessConnection() -> (CoreIPC::Attachment connectionHandle) Delayed
-#endif
-#if ENABLE(SHARED_WORKER_PROCESS)
-    GetSharedWorkerProcessConnection(WTF::String url, WTF::String name) -> (CoreIPC::Attachment connectionHandle) Delayed
-#endif
+    ProcessReadyToSuspend()
+    DidCancelProcessSuspension()
 
+    SetIsHoldingLockedFiles(bool isHoldingLockedFiles)
+
+    RetainIconForPageURL(String pageURL)
+    ReleaseIconForPageURL(String pageURL)
+
+    DidReceiveMainThreadPing()
 }

@@ -33,34 +33,34 @@
 
 #if ENABLE(MEDIA_STREAM)
 
-#include "ExceptionBase.h"
-#include <wtf/PassRefPtr.h>
+#include "ExceptionCode.h"
+#include "ScriptWrappable.h"
 #include <wtf/RefCounted.h>
+#include <wtf/RefPtr.h>
 #include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
 class Dictionary;
-class RTCSessionDescriptionDescriptor;
 
-class RTCSessionDescription : public RefCounted<RTCSessionDescription> {
+class RTCSessionDescription : public RefCounted<RTCSessionDescription>, public ScriptWrappable {
 public:
-    static PassRefPtr<RTCSessionDescription> create(const Dictionary&, ExceptionCode&);
-    static PassRefPtr<RTCSessionDescription> create(PassRefPtr<RTCSessionDescriptionDescriptor>);
-    virtual ~RTCSessionDescription();
+    static RefPtr<RTCSessionDescription> create(const Dictionary&, ExceptionCode&);
+    static Ref<RTCSessionDescription> create(const RTCSessionDescription*);
+    static Ref<RTCSessionDescription> create(const String& type, const String& sdp);
+    virtual ~RTCSessionDescription() { }
 
-    const String& type() const;
+    const String& type() const { return m_type; }
     void setType(const String&, ExceptionCode&);
 
-    const String& sdp() const;
-    void setSdp(const String&, ExceptionCode&);
-
-    RTCSessionDescriptionDescriptor* descriptor();
+    const String& sdp() const { return m_sdp; }
+    void setSdp(const String& sdp) { m_sdp = sdp; }
 
 private:
-    explicit RTCSessionDescription(PassRefPtr<RTCSessionDescriptionDescriptor>);
+    explicit RTCSessionDescription(const String& type, const String& sdp);
 
-    RefPtr<RTCSessionDescriptionDescriptor> m_descriptor;
+    String m_type;
+    String m_sdp;
 };
 
 } // namespace WebCore

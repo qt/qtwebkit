@@ -26,7 +26,7 @@
 #include "Attribute.h"
 #include "CSSPropertyNames.h"
 #include "CSSValueKeywords.h"
-#include "EventPathWalker.h"
+#include "ElementAncestorIterator.h"
 #include "HTMLNames.h"
 #include "RenderListItem.h"
 
@@ -34,20 +34,21 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-HTMLLIElement::HTMLLIElement(const QualifiedName& tagName, Document* document)
+HTMLLIElement::HTMLLIElement(const QualifiedName& tagName, Document& document)
     : HTMLElement(tagName, document)
 {
     ASSERT(hasTagName(liTag));
+    setHasCustomStyleResolveCallbacks();
 }
 
-PassRefPtr<HTMLLIElement> HTMLLIElement::create(Document* document)
+Ref<HTMLLIElement> HTMLLIElement::create(Document& document)
 {
-    return adoptRef(new HTMLLIElement(liTag, document));
+    return adoptRef(*new HTMLLIElement(liTag, document));
 }
 
-PassRefPtr<HTMLLIElement> HTMLLIElement::create(const QualifiedName& tagName, Document* document)
+Ref<HTMLLIElement> HTMLLIElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new HTMLLIElement(tagName, document));
+    return adoptRef(*new HTMLLIElement(tagName, document));
 }
 
 bool HTMLLIElement::isPresentationAttribute(const QualifiedName& name) const
@@ -57,7 +58,7 @@ bool HTMLLIElement::isPresentationAttribute(const QualifiedName& name) const
     return HTMLElement::isPresentationAttribute(name);
 }
 
-void HTMLLIElement::collectStyleForPresentationAttribute(const QualifiedName& name, const AtomicString& value, MutableStylePropertySet* style)
+void HTMLLIElement::collectStyleForPresentationAttribute(const QualifiedName& name, const AtomicString& value, MutableStyleProperties& style)
 {
     if (name == typeAttr) {
         if (value == "a")
@@ -85,45 +86,39 @@ void HTMLLIElement::parseAttribute(const QualifiedName& name, const AtomicString
         HTMLElement::parseAttribute(name, value);
 }
 
-void HTMLLIElement::attach(const AttachContext& context)
+void HTMLLIElement::didAttachRenderers()
 {
-    ASSERT(!attached());
+    if (!is<RenderListItem>(renderer()))
+        return;
+    auto& listItemRenderer = downcast<RenderListItem>(*renderer());
 
-    HTMLElement::attach(context);
-
-    if (renderer() && renderer()->isListItem()) {
-        RenderListItem* listItemRenderer = toRenderListItem(renderer());
-
-        // Find the enclosing list node.
-        Element* listNode = 0;
-        Element* current = this;
-        while (!listNode) {
-            current = current->parentElement();
-            if (!current)
-                break;
-            if (current->hasTagName(ulTag) || current->hasTagName(olTag))
-                listNode = current;
+    // Check if there is an enclosing list.
+    bool isInList = false;
+    for (auto& ancestor : ancestorsOfType<HTMLElement>(*this)) {
+        if (is<HTMLUListElement>(ancestor) || is<HTMLOListElement>(ancestor)) {
+            isInList = true;
+            break;
         }
-
-        // If we are not in a list, tell the renderer so it can position us inside.
-        // We don't want to change our style to say "inside" since that would affect nested nodes.
-        if (!listNode)
-            listItemRenderer->setNotInList(true);
-
-        parseValue(fastGetAttribute(valueAttr));
     }
+
+    // If we are not in a list, tell the renderer so it can position us inside.
+    // We don't want to change our style to say "inside" since that would affect nested nodes.
+    if (!isInList)
+        listItemRenderer.setNotInList(true);
+
+    parseValue(fastGetAttribute(valueAttr));
 }
 
 inline void HTMLLIElement::parseValue(const AtomicString& value)
 {
-    ASSERT(renderer() && renderer()->isListItem());
+    ASSERT(renderer());
 
     bool valueOK;
     int requestedValue = value.toInt(&valueOK);
     if (valueOK)
-        toRenderListItem(renderer())->setExplicitValue(requestedValue);
+        downcast<RenderListItem>(*renderer()).setExplicitValue(requestedValue);
     else
-        toRenderListItem(renderer())->clearExplicitValue();
+        downcast<RenderListItem>(*renderer()).clearExplicitValue();
 }
 
 }

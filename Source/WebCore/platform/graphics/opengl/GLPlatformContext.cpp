@@ -24,9 +24,9 @@
  */
 
 #include "config.h"
-#include "GLPlatformContext.h"
 
-#if USE(ACCELERATED_COMPOSITING)
+#if ENABLE(GRAPHICS_CONTEXT_3D)
+#include "GLPlatformContext.h"
 
 #if USE(GLX)
 #include "GLXContext.h"
@@ -43,7 +43,6 @@ static PFNGLGETGRAPHICSRESETSTATUSEXTPROC glGetGraphicsResetStatus = 0;
 #else
 static PFNGLGETGRAPHICSRESETSTATUSARBPROC glGetGraphicsResetStatus = 0;
 #endif
-static GLPlatformContext* m_currentContext = 0;
 
 class GLCurrentContextWrapper : public GLPlatformContext {
 
@@ -56,19 +55,22 @@ public:
 #elif USE(EGL)
         m_contextHandle = eglGetCurrentContext();
 #endif
-        if (m_contextHandle)
-            m_currentContext = this;
     }
 
     virtual ~GLCurrentContextWrapper() { }
+
+    bool isCurrentContext() const override
+    {
+        return true;
+    }
 };
 
-static PassOwnPtr<GLPlatformContext> createOffScreenContext()
+static std::unique_ptr<GLPlatformContext> createOffScreenContext()
 {
 #if USE(GLX)
-    return adoptPtr(new GLXOffScreenContext());
+    return std::make_unique<GLXOffScreenContext>();
 #elif USE(EGL)
-    return adoptPtr(new EGLOffScreenContext());
+    return std::make_unique<EGLOffScreenContext>();
 #else
     return nullptr;
 #endif
@@ -77,7 +79,7 @@ static PassOwnPtr<GLPlatformContext> createOffScreenContext()
 static HashSet<String> parseExtensions(const String& extensionsString)
 {
     Vector<String> extNames;
-    extensionsString.split(" ", extNames);
+    extensionsString.split(' ', extNames);
     HashSet<String> splitExtNames;
     unsigned size = extNames.size();
     for (unsigned i = 0; i < size; ++i)
@@ -102,7 +104,7 @@ static void resolveResetStatusExtension()
     }
 }
 
-PassOwnPtr<GLPlatformContext> GLPlatformContext::createContext(GraphicsContext3D::RenderStyle renderStyle)
+std::unique_ptr<GLPlatformContext> GLPlatformContext::createContext(GraphicsContext3D::RenderStyle renderStyle)
 {
 #if !USE(OPENGL_ES_2)
     if (!initializeOpenGLShims())
@@ -111,13 +113,9 @@ PassOwnPtr<GLPlatformContext> GLPlatformContext::createContext(GraphicsContext3D
 
     switch (renderStyle) {
     case GraphicsContext3D::RenderOffscreen:
-        if (OwnPtr<GLPlatformContext> context = createOffScreenContext())
-            return context.release();
-        break;
+        return createOffScreenContext();
     case GraphicsContext3D::RenderToCurrentGLContext:
-        if (OwnPtr<GLPlatformContext> context = adoptPtr(new GLCurrentContextWrapper()))
-            return context.release();
-        break;
+        return std::make_unique<GLCurrentContextWrapper>();
     case GraphicsContext3D::RenderDirectlyToHostWindow:
         ASSERT_NOT_REACHED();
         break;
@@ -189,23 +187,21 @@ GLPlatformContext::GLPlatformContext()
 
 GLPlatformContext::~GLPlatformContext()
 {
-    if (this == m_currentContext)
-        m_currentContext = 0;
 }
 
 bool GLPlatformContext::makeCurrent(GLPlatformSurface* surface)
 {
     m_contextLost = false;
 
-    if (m_currentContext == this && (!surface || surface->isCurrentDrawable()))
+    if (isCurrentContext() && (!surface || surface->isCurrentDrawable()))
         return true;
 
-    m_currentContext = 0;
+    GLPlatformContext* currentContext = 0;
 
     if (!surface || (surface && !surface->drawable()))
         platformReleaseCurrent();
     else if (platformMakeCurrent(surface)) {
-        m_currentContext = this;
+        currentContext = this;
         surface->onMakeCurrent();
     }
 
@@ -232,7 +228,7 @@ bool GLPlatformContext::makeCurrent(GLPlatformSurface* surface)
         }
     }
 
-    return m_currentContext;
+    return currentContext;
 }
 
 bool GLPlatformContext::isValid() const
@@ -242,10 +238,8 @@ bool GLPlatformContext::isValid() const
 
 void GLPlatformContext::releaseCurrent()
 {
-    if (this == m_currentContext) {
-        m_currentContext = 0;
+    if (isCurrentContext())
         platformReleaseCurrent();
-    }
 }
 
 PlatformContext GLPlatformContext::handle() const
@@ -253,19 +247,9 @@ PlatformContext GLPlatformContext::handle() const
     return m_contextHandle;
 }
 
-bool GLPlatformContext::isCurrentContext() const
-{
-    return true;
-}
-
 bool GLPlatformContext::initialize(GLPlatformSurface*, PlatformContext)
 {
     return true;
-}
-
-GLPlatformContext* GLPlatformContext::getCurrent()
-{
-    return m_currentContext;
 }
 
 bool GLPlatformContext::platformMakeCurrent(GLPlatformSurface*)

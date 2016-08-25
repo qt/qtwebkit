@@ -18,46 +18,46 @@
  */
 
 #include "config.h"
-
-#if ENABLE(FILTERS)
 #include "SourceGraphic.h"
 
 #include "Filter.h"
 #include "GraphicsContext.h"
-#include "RenderTreeAsText.h"
 #include "TextStream.h"
+#include <wtf/NeverDestroyed.h>
 #include <wtf/StdLibExtras.h>
 #include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
-PassRefPtr<SourceGraphic> SourceGraphic::create(Filter* filter)
+Ref<SourceGraphic> SourceGraphic::create(Filter& filter)
 {
-    return adoptRef(new SourceGraphic(filter));
+    return adoptRef(*new SourceGraphic(filter));
 }
 
 const AtomicString& SourceGraphic::effectName()
 {
-    DEFINE_STATIC_LOCAL(const AtomicString, s_effectName, ("SourceGraphic", AtomicString::ConstructFromLiteral));
+    static NeverDestroyed<const AtomicString> s_effectName("SourceGraphic", AtomicString::ConstructFromLiteral);
     return s_effectName;
 }
 
 void SourceGraphic::determineAbsolutePaintRect()
 {
-    Filter* filter = this->filter();
-    FloatRect paintRect = filter->sourceImageRect();
-    paintRect.scale(filter->filterResolution().width(), filter->filterResolution().height());
+    Filter& filter = this->filter();
+    FloatRect paintRect = filter.sourceImageRect();
+    paintRect.scale(filter.filterResolution().width(), filter.filterResolution().height());
     setAbsolutePaintRect(enclosingIntRect(paintRect));
 }
 
 void SourceGraphic::platformApplySoftware()
 {
+    Filter& filter = this->filter();
+
     ImageBuffer* resultImage = createImageBufferResult();
-    Filter* filter = this->filter();
-    if (!resultImage || !filter->sourceImage())
+    ImageBuffer* sourceImage = filter.sourceImage();
+    if (!resultImage || !sourceImage)
         return;
 
-    resultImage->context()->drawImageBuffer(filter->sourceImage(), ColorSpaceDeviceRGB, IntPoint());
+    resultImage->context().drawImageBuffer(*sourceImage, IntPoint());
 }
 
 void SourceGraphic::dump()
@@ -72,5 +72,3 @@ TextStream& SourceGraphic::externalRepresentation(TextStream& ts, int indent) co
 }
 
 } // namespace WebCore
-
-#endif // ENABLE(FILTERS)

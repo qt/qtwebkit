@@ -29,11 +29,10 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-// See: http://dev.w3.org/2006/webapi/WebTiming/
+// See: https://dvcs.w3.org/hg/webperf/raw-file/tip/specs/NavigationTiming/Overview.html
 [
     Conditional=WEB_TIMING,
-    EventTarget,
-] interface Performance {
+] interface Performance : EventTarget {
     readonly attribute PerformanceNavigation navigation;
     readonly attribute PerformanceTiming timing;
 
@@ -47,7 +46,7 @@
     void webkitClearResourceTimings();
     void webkitSetResourceTimingBufferSize(unsigned long maxSize);
 
-    attribute EventListener onwebkitresourcetimingbufferfull;
+    attribute EventHandler onwebkitresourcetimingbufferfull;
 #endif
 
     // See http://www.w3.org/TR/2012/CR-user-timing-20120726/
@@ -60,6 +59,6 @@
 #endif
 
     // See http://www.w3.org/TR/hr-time/ for details.
-    double now();
+    unrestricted double now();
 };
 

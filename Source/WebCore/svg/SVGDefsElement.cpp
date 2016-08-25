@@ -19,8 +19,6 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "SVGDefsElement.h"
 
 #include "RenderSVGHiddenContainer.h"
@@ -36,16 +34,16 @@ BEGIN_REGISTER_ANIMATED_PROPERTIES(SVGDefsElement)
     REGISTER_PARENT_ANIMATED_PROPERTIES(SVGGraphicsElement)
 END_REGISTER_ANIMATED_PROPERTIES
 
-inline SVGDefsElement::SVGDefsElement(const QualifiedName& tagName, Document* document)
+inline SVGDefsElement::SVGDefsElement(const QualifiedName& tagName, Document& document)
     : SVGGraphicsElement(tagName, document)
 {
     ASSERT(hasTagName(SVGNames::defsTag));
     registerAnimatedPropertiesForSVGDefsElement();
 }
 
-PassRefPtr<SVGDefsElement> SVGDefsElement::create(const QualifiedName& tagName, Document* document)
+Ref<SVGDefsElement> SVGDefsElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new SVGDefsElement(tagName, document));
+    return adoptRef(*new SVGDefsElement(tagName, document));
 }
 
 bool SVGDefsElement::isValid() const
@@ -53,11 +51,9 @@ bool SVGDefsElement::isValid() const
     return SVGTests::isValid();
 }
 
-RenderObject* SVGDefsElement::createRenderer(RenderArena* arena, RenderStyle*)
+RenderPtr<RenderElement> SVGDefsElement::createElementRenderer(Ref<RenderStyle>&& style, const RenderTreePosition&)
 {
-    return new (arena) RenderSVGHiddenContainer(this);
+    return createRenderer<RenderSVGHiddenContainer>(*this, WTFMove(style));
 }
 
 }
-
-#endif // ENABLE(SVG)

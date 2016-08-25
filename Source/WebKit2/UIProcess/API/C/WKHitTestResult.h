@@ -27,7 +27,8 @@
 #ifndef WKHitTestResult_h
 #define WKHitTestResult_h
 
-#include <WebKit2/WKBase.h>
+#include <WebKit/WKBase.h>
+#include <WebKit/WKGeometry.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -42,8 +43,11 @@ WK_EXPORT WKURLRef WKHitTestResultCopyAbsoluteMediaURL(WKHitTestResultRef hitTes
 
 WK_EXPORT WKStringRef WKHitTestResultCopyLinkLabel(WKHitTestResultRef hitTestResult);
 WK_EXPORT WKStringRef WKHitTestResultCopyLinkTitle(WKHitTestResultRef hitTestResult);
+WK_EXPORT WKStringRef WKHitTestResultCopyLookupText(WKHitTestResultRef hitTestResult);
 
 WK_EXPORT bool WKHitTestResultIsContentEditable(WKHitTestResultRef hitTestResult);
+
+WK_EXPORT WKRect WKHitTestResultGetElementBoundingBox(WKHitTestResultRef hitTestResultRef);
 
 #ifdef __cplusplus
 }

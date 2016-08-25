@@ -22,8 +22,6 @@
 
 #include "GraphicsContext.h"
 #include "IntRect.h"
-#include <wtf/OwnPtr.h>
-#include <wtf/PassOwnPtr.h>
 #include <wtf/RefCounted.h>
 #include <wtf/RefPtr.h>
 
@@ -39,23 +37,6 @@ struct GraphicsSurfaceToken {
     typedef uint32_t BufferHandle;
 #elif OS(WINDOWS)
     typedef HANDLE BufferHandle;
-#endif
-
-#if HAVE(GLX)
-    GraphicsSurfaceToken(uint32_t windowID = 0)
-        : frontBufferHandle(windowID)
-    { }
-
-    bool operator!=(const GraphicsSurfaceToken &rhs) const
-    {
-        return frontBufferHandle != rhs.frontBufferHandle;
-    }
-
-    bool isValid() const
-    {
-        return frontBufferHandle;
-    }
-
 #endif
 
 #if OS(DARWIN) || OS(WINDOWS)
@@ -75,6 +56,20 @@ struct GraphicsSurfaceToken {
     }
 
     BufferHandle backBufferHandle;
+#else
+    GraphicsSurfaceToken(uint32_t windowID = 0)
+        : frontBufferHandle(windowID)
+    { }
+
+    bool operator!=(const GraphicsSurfaceToken &rhs) const
+    {
+        return frontBufferHandle != rhs.frontBufferHandle;
+    }
+
+    bool isValid() const
+    {
+        return frontBufferHandle;
+    }
 #endif
 
     BufferHandle frontBufferHandle;

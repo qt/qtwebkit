@@ -34,13 +34,16 @@ namespace WebCore {
     
 class MathMLInlineContainerElement : public MathMLElement {
 public:
-    static PassRefPtr<MathMLInlineContainerElement> create(const QualifiedName& tagName, Document*);
+    static Ref<MathMLInlineContainerElement> create(const QualifiedName& tagName, Document&);
+
+    virtual bool isPresentationMathML() const override { return true; }
 
 protected:
-    MathMLInlineContainerElement(const QualifiedName& tagName, Document*);
+    MathMLInlineContainerElement(const QualifiedName& tagName, Document&);
+    virtual void childrenChanged(const ChildChange&) override;
 
 private:
-    virtual RenderObject* createRenderer(RenderArena*, RenderStyle*);
+    virtual RenderPtr<RenderElement> createElementRenderer(Ref<RenderStyle>&&, const RenderTreePosition&) override;
 };
     
 }

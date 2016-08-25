@@ -130,6 +130,29 @@ static JSValueRef removeNotificationListenerCallback(JSContextRef context, JSObj
     return JSValueMakeUndefined(context);
 }
 
+static JSValueRef enableEnhancedAccessibilityCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
+{
+    AccessibilityController* controller = static_cast<AccessibilityController*>(JSObjectGetPrivate(thisObject));
+    if (argumentCount == 1)
+        controller->enableEnhancedAccessibility(JSValueToBoolean(context, arguments[0]));
+    return JSValueMakeUndefined(context);
+}
+
+static JSValueRef getEnhancedAccessibilityEnabledCallback(JSContextRef context, JSObjectRef thisObject, JSStringRef propertyName, JSValueRef* exception)
+{
+    AccessibilityController* controller = static_cast<AccessibilityController*>(JSObjectGetPrivate(thisObject));
+    return JSValueMakeBoolean(context, controller->enhancedAccessibilityEnabled());
+}
+
+static JSValueRef getPlatformNameCallback(JSContextRef context, JSObjectRef thisObject, JSStringRef propertyName, JSValueRef* exception)
+{
+    AccessibilityController* controller = static_cast<AccessibilityController*>(JSObjectGetPrivate(thisObject));
+    JSRetainPtr<JSStringRef> platformName(controller->platformName());
+    if (!platformName.get())
+        return JSValueMakeUndefined(context);
+    return JSValueMakeString(context, platformName.get());
+}
+
 JSClassRef AccessibilityController::getJSClass()
 {
     static JSStaticFunction staticFunctions[] = {
@@ -141,12 +164,15 @@ JSClassRef AccessibilityController::getJSClass()
         { "accessibleElementById", getAccessibleElementByIdCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "addNotificationListener", addNotificationListenerCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "removeNotificationListener", removeNotificationListenerCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
+        { "enableEnhancedAccessibility", enableEnhancedAccessibilityCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { 0, 0, 0 }
     };
 
     static JSStaticValue staticValues[] = {
         { "focusedElement", getFocusedElementCallback, 0, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "rootElement", getRootElementCallback, 0, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
+        { "enhancedAccessibilityEnabled", getEnhancedAccessibilityEnabledCallback, 0, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
+        { "platformName", getPlatformNameCallback, 0, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { 0, 0, 0, 0 }
     };
 
@@ -164,5 +190,6 @@ void AccessibilityController::resetToConsistentState()
     setLogValueChangeEvents(false);
     setLogScrollingStartEvents(false);
     setLogAccessibilityEvents(false);
+    platformResetToConsistentState();
 }
 #endif // HAVE(ACCESSIBILITY)

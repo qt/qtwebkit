@@ -27,8 +27,9 @@
 #include "ProfilerOriginStack.h"
 
 #include "CodeOrigin.h"
+#include "InlineCallFrame.h"
 #include "JSGlobalObject.h"
-#include "Operations.h"
+#include "JSCInlines.h"
 #include "ProfilerDatabase.h"
 
 namespace JSC { namespace Profiler {
@@ -51,7 +52,7 @@ OriginStack::OriginStack(Database& database, CodeBlock* codeBlock, const CodeOri
     
     for (unsigned i = 1; i < stack.size(); ++i) {
         append(Origin(
-            database.ensureBytecodesFor(stack[i].inlineCallFrame->baselineCodeBlock()),
+            database.ensureBytecodesFor(stack[i].inlineCallFrame->baselineCodeBlock.get()),
             stack[i].bytecodeIndex));
     }
 }

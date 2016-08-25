@@ -24,15 +24,18 @@
  */
 
 #include "config.h"
+
+#if WK_HAVE_C_SPI
+
 #include "PlatformUtilities.h"
 #include "PlatformWebView.h"
-#include <WebKit2/WKDownload.h>
+#include <WebKit/WKDownload.h>
 
 namespace TestWebKitAPI {
 
 static bool didDecideDestination;
 
-static void decidePolicyForNavigationAction(WKPageRef, WKFrameRef, WKFrameNavigationType, WKEventModifiers, WKEventMouseButton, WKURLRequestRef, WKFramePolicyListenerRef listener, WKTypeRef, const void*)
+static void decidePolicyForNavigationAction(WKPageRef, WKFrameRef, WKFrameNavigationType, WKEventModifiers, WKEventMouseButton, WKFrameRef, WKURLRequestRef, WKFramePolicyListenerRef listener, WKTypeRef, const void*)
 {
     WKFramePolicyListenerDownload(listener);
 }
@@ -41,25 +44,29 @@ static WKStringRef decideDestinationWithSuggestedFilename(WKContextRef, WKDownlo
 {
     didDecideDestination = true;
     WKDownloadCancel(download);
-    return Util::toWK("does not matter").leakRef();
+    return Util::toWK("/tmp/WebKitAPITest/DownloadDecideDestinationCrash").leakRef();
 }
 
 static void setContextDownloadClient(WKContextRef context)
 {
-    WKContextDownloadClient client;
+    WKContextDownloadClientV0 client;
     memset(&client, 0, sizeof(client));
+
+    client.base.version = 0;
     client.decideDestinationWithSuggestedFilename = decideDestinationWithSuggestedFilename;
 
-    WKContextSetDownloadClient(context, &client);
+    WKContextSetDownloadClient(context, &client.base);
 }
 
 static void setPagePolicyClient(WKPageRef page)
 {
-    WKPagePolicyClient policyClient;
+    WKPagePolicyClientV1 policyClient;
     memset(&policyClient, 0, sizeof(policyClient));
+
+    policyClient.base.version = 1;
     policyClient.decidePolicyForNavigationAction = decidePolicyForNavigationAction;
 
-    WKPageSetPagePolicyClient(page, &policyClient);
+    WKPageSetPagePolicyClient(page, &policyClient.base);
 }
 
 TEST(WebKit2, DownloadDecideDestinationCrash)
@@ -79,3 +86,5 @@ TEST(WebKit2, DownloadDecideDestinationCrash)
 }
 
 } // namespace TestWebKitAPI
+
+#endif

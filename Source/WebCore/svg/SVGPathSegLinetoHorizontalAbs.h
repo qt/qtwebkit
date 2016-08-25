@@ -22,29 +22,27 @@
 #ifndef SVGPathSegLinetoHorizontalAbs_h
 #define SVGPathSegLinetoHorizontalAbs_h
 
-#if ENABLE(SVG)
 #include "SVGPathSegLinetoHorizontal.h"
 
 namespace WebCore {
 
 class SVGPathSegLinetoHorizontalAbs : public SVGPathSegLinetoHorizontal {
 public:
-    static PassRefPtr<SVGPathSegLinetoHorizontalAbs> create(SVGPathElement* element, SVGPathSegRole role, float x)
+    static Ref<SVGPathSegLinetoHorizontalAbs> create(const SVGPathElement& element, SVGPathSegRole role, float x)
     {
-        return adoptRef(new SVGPathSegLinetoHorizontalAbs(element, role, x));
+        return adoptRef(*new SVGPathSegLinetoHorizontalAbs(element, role, x));
     }
 
 private:
-    SVGPathSegLinetoHorizontalAbs(SVGPathElement* element, SVGPathSegRole role, float x)
+    SVGPathSegLinetoHorizontalAbs(const SVGPathElement& element, SVGPathSegRole role, float x)
         : SVGPathSegLinetoHorizontal(element, role, x)
     {
     }
 
-    virtual unsigned short pathSegType() const { return PATHSEG_LINETO_HORIZONTAL_ABS; }
-    virtual String pathSegTypeAsLetter() const { return "H"; }
+    virtual unsigned short pathSegType() const override { return PATHSEG_LINETO_HORIZONTAL_ABS; }
+    virtual String pathSegTypeAsLetter() const override { return "H"; }
 };
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif

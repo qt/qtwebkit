@@ -18,8 +18,6 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "SVGMPathElement.h"
 
 #include "Document.h"
@@ -40,16 +38,16 @@ BEGIN_REGISTER_ANIMATED_PROPERTIES(SVGMPathElement)
     REGISTER_LOCAL_ANIMATED_PROPERTY(externalResourcesRequired)
 END_REGISTER_ANIMATED_PROPERTIES
 
-inline SVGMPathElement::SVGMPathElement(const QualifiedName& tagName, Document* document)
+inline SVGMPathElement::SVGMPathElement(const QualifiedName& tagName, Document& document)
     : SVGElement(tagName, document)
 {
     ASSERT(hasTagName(SVGNames::mpathTag));
     registerAnimatedPropertiesForSVGMPathElement();
 }
 
-PassRefPtr<SVGMPathElement> SVGMPathElement::create(const QualifiedName& tagName, Document* document)
+Ref<SVGMPathElement> SVGMPathElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new SVGMPathElement(tagName, document));
+    return adoptRef(*new SVGMPathElement(tagName, document));
 }
 
 SVGMPathElement::~SVGMPathElement()
@@ -67,17 +65,17 @@ void SVGMPathElement::buildPendingResource()
     Element* target = SVGURIReference::targetElementFromIRIString(href(), document(), &id);
     if (!target) {
         // Do not register as pending if we are already pending this resource.
-        if (document()->accessSVGExtensions()->isElementPendingResource(this, id))
+        if (document().accessSVGExtensions().isPendingResource(this, id))
             return;
 
         if (!id.isEmpty()) {
-            document()->accessSVGExtensions()->addPendingResource(id, this);
+            document().accessSVGExtensions().addPendingResource(id, this);
             ASSERT(hasPendingResources());
         }
     } else if (target->isSVGElement()) {
         // Register us with the target in the dependencies map. Any change of hrefElement
         // that leads to relayout/repainting now informs us, so we can react to it.
-        document()->accessSVGExtensions()->addElementReferencingTarget(this, toSVGElement(target));
+        document().accessSVGExtensions().addElementReferencingTarget(this, downcast<SVGElement>(target));
     }
 
     targetPathChanged();
@@ -85,77 +83,54 @@ void SVGMPathElement::buildPendingResource()
 
 void SVGMPathElement::clearResourceReferences()
 {
-    ASSERT(document());
-    document()->accessSVGExtensions()->removeAllTargetReferencesForElement(this);
+    document().accessSVGExtensions().removeAllTargetReferencesForElement(this);
 }
 
-Node::InsertionNotificationRequest SVGMPathElement::insertedInto(ContainerNode* rootParent)
+Node::InsertionNotificationRequest SVGMPathElement::insertedInto(ContainerNode& rootParent)
 {
     SVGElement::insertedInto(rootParent);
-    if (rootParent->inDocument())
-        buildPendingResource();
+    if (rootParent.inDocument())
+        return InsertionShouldCallFinishedInsertingSubtree;
     return InsertionDone;
 }
 
-void SVGMPathElement::removedFrom(ContainerNode* rootParent)
+void SVGMPathElement::finishedInsertingSubtree()
 {
-    SVGElement::removedFrom(rootParent);
-    notifyParentOfPathChange(rootParent);
-    if (rootParent->inDocument())
-        clearResourceReferences();
+    buildPendingResource();
 }
 
-bool SVGMPathElement::isSupportedAttribute(const QualifiedName& attrName)
+void SVGMPathElement::removedFrom(ContainerNode& rootParent)
 {
-    DEFINE_STATIC_LOCAL(HashSet<QualifiedName>, supportedAttributes, ());
-    if (supportedAttributes.isEmpty()) {
-        SVGURIReference::addSupportedAttributes(supportedAttributes);
-        SVGExternalResourcesRequired::addSupportedAttributes(supportedAttributes);
-    }
-    return supportedAttributes.contains<SVGAttributeHashTranslator>(attrName);
+    SVGElement::removedFrom(rootParent);
+    notifyParentOfPathChange(&rootParent);
+    if (rootParent.inDocument())
+        clearResourceReferences();
 }
 
 void SVGMPathElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
-    if (!isSupportedAttribute(name)) {
-        SVGElement::parseAttribute(name, value);
-        return;
-    }
-
-    if (SVGURIReference::parseAttribute(name, value))
-        return;
-    if (SVGExternalResourcesRequired::parseAttribute(name, value))
-        return;
-
-    ASSERT_NOT_REACHED();
+    SVGElement::parseAttribute(name, value);
+    SVGURIReference::parseAttribute(name, value);
+    SVGExternalResourcesRequired::parseAttribute(name, value);
 }
 
 void SVGMPathElement::svgAttributeChanged(const QualifiedName& attrName)
 {
-    if (!isSupportedAttribute(attrName)) {
-        SVGElement::svgAttributeChanged(attrName);
-        return;
-    }
-
-    SVGElementInstance::InvalidationGuard invalidationGuard(this);
-
     if (SVGURIReference::isKnownAttribute(attrName)) {
+        InstanceInvalidationGuard guard(*this);
         buildPendingResource();
         return;
     }
 
-    if (SVGExternalResourcesRequired::isKnownAttribute(attrName))
-        return;
-
-    ASSERT_NOT_REACHED();
+    SVGElement::svgAttributeChanged(attrName);
 }
 
 SVGPathElement* SVGMPathElement::pathElement()
 {
     Element* target = targetElementFromIRIString(href(), document());
-    if (target && target->hasTagName(SVGNames::pathTag))
-        return toSVGPathElement(target);
-    return 0;
+    if (is<SVGPathElement>(target))
+        return downcast<SVGPathElement>(target);
+    return nullptr;
 }
 
 void SVGMPathElement::targetPathChanged()
@@ -165,10 +140,8 @@ void SVGMPathElement::targetPathChanged()
 
 void SVGMPathElement::notifyParentOfPathChange(ContainerNode* parent)
 {
-    if (parent && parent->hasTagName(SVGNames::animateMotionTag))
-        static_cast<SVGAnimateMotionElement*>(parent)->updateAnimationPath();
+    if (is<SVGAnimateMotionElement>(parent))
+        downcast<SVGAnimateMotionElement>(*parent).updateAnimationPath();
 }
 
 } // namespace WebCore
-
-#endif // ENABLE(SVG)

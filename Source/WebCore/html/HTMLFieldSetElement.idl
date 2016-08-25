@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006 Apple Computer, Inc.
+ * Copyright (C) 2006 Apple Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -24,7 +24,11 @@ interface HTMLFieldSetElement : HTMLElement {
 
     readonly attribute DOMString type;
 
-    readonly attribute HTMLCollection elements;
+#if defined(LANGUAGE_OBJECTIVE_C) && LANGUAGE_OBJECTIVE_C || defined(LANGUAGE_GOBJECT) && LANGUAGE_GOBJECT
+    [ImplementedAs=elementsForNativeBindings] readonly attribute HTMLCollection elements;
+#else
+    readonly attribute HTMLFormControlsCollection elements;
+#endif
 
     readonly attribute boolean         willValidate;
     readonly attribute ValidityState   validity;

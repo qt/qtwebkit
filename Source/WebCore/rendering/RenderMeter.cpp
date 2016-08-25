@@ -26,14 +26,12 @@
 #include "HTMLNames.h"
 #include "RenderTheme.h"
 
-using namespace std;
-
 namespace WebCore {
 
 using namespace HTMLNames;
 
-RenderMeter::RenderMeter(HTMLElement* element)
-    : RenderBlock(element)
+RenderMeter::RenderMeter(HTMLElement& element, Ref<RenderStyle>&& style)
+    : RenderBlockFlow(element, WTFMove(style))
 {
 }
 
@@ -43,20 +41,20 @@ RenderMeter::~RenderMeter()
 
 HTMLMeterElement* RenderMeter::meterElement() const
 {
-    ASSERT(node());
+    ASSERT(element());
 
-    if (isHTMLMeterElement(node()))
-        return toHTMLMeterElement(node());
+    if (is<HTMLMeterElement>(*element()))
+        return downcast<HTMLMeterElement>(element());
 
-    ASSERT(node()->shadowHost());
-    return toHTMLMeterElement(node()->shadowHost());
+    ASSERT(element()->shadowHost());
+    return downcast<HTMLMeterElement>(element()->shadowHost());
 }
 
 void RenderMeter::updateLogicalWidth()
 {
     RenderBox::updateLogicalWidth();
 
-    IntSize frameSize = theme()->meterSizeForBounds(this, pixelSnappedIntRect(frameRect()));
+    IntSize frameSize = theme().meterSizeForBounds(*this, snappedIntRect(frameRect()));
     setLogicalWidth(isHorizontalWritingMode() ? frameSize.width() : frameSize.height());
 }
 
@@ -69,7 +67,7 @@ void RenderMeter::computeLogicalHeight(LayoutUnit logicalHeight, LayoutUnit logi
         frame.setHeight(computedValues.m_extent);
     else
         frame.setWidth(computedValues.m_extent);
-    IntSize frameSize = theme()->meterSizeForBounds(this, pixelSnappedIntRect(frame));
+    IntSize frameSize = theme().meterSizeForBounds(*this, snappedIntRect(frame));
     computedValues.m_extent = isHorizontalWritingMode() ? frameSize.height() : frameSize.width();
 }
 

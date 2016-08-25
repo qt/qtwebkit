@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -33,25 +33,23 @@
 
 namespace WebCore {
 
-class RenderReplica : public RenderBox {
+class RenderReplica final : public RenderBox {
 public:
-    static RenderReplica* createAnonymous(Document*);
-
+    RenderReplica(Document&, Ref<RenderStyle>&&);
     virtual ~RenderReplica();
 
-    virtual const char* renderName() const { return "RenderReplica"; }
-    
-    virtual bool requiresLayer() const { return true; }
+    virtual const char* renderName() const override { return "RenderReplica"; }
 
-    virtual void layout();
+    virtual bool requiresLayer() const override { return true; }
+
+    virtual void layout() override;
     
-    virtual void paint(PaintInfo&, const LayoutPoint&);
+    virtual void paint(PaintInfo&, const LayoutPoint&) override;
 
 private:
-    RenderReplica();
-
-    virtual bool isReplica() const { return true; }
-    virtual void computePreferredLogicalWidths();
+    virtual bool isReplica() const override { return true; }
+    virtual bool canHaveChildren() const override { return false; }
+    virtual void computePreferredLogicalWidths() override;
 
 };
 

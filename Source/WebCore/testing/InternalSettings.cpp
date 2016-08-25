@@ -30,10 +30,10 @@
 #include "CaptionUserPreferences.h"
 #include "Document.h"
 #include "ExceptionCode.h"
-#include "Frame.h"
 #include "FrameView.h"
 #include "Language.h"
 #include "LocaleToScriptMapping.h"
+#include "MainFrame.h"
 #include "Page.h"
 #include "PageGroup.h"
 #include "RuntimeEnabledFeatures.h"
@@ -65,90 +65,120 @@
 
 namespace WebCore {
 
-InternalSettings::Backup::Backup(Settings* settings)
-    : m_originalCSSExclusionsEnabled(RuntimeEnabledFeatures::cssExclusionsEnabled())
-    , m_originalCSSShapesEnabled(RuntimeEnabledFeatures::cssShapesEnabled())
-    , m_originalCSSVariablesEnabled(settings->cssVariablesEnabled())
-#if ENABLE(SHADOW_DOM)
-    , m_originalShadowDOMEnabled(RuntimeEnabledFeatures::shadowDOMEnabled())
-    , m_originalAuthorShadowDOMForAnyElementEnabled(RuntimeEnabledFeatures::authorShadowDOMForAnyElementEnabled())
-#endif
-#if ENABLE(STYLE_SCOPED)
-    , m_originalStyleScoped(RuntimeEnabledFeatures::styleScopedEnabled())
-#endif
-    , m_originalEditingBehavior(settings->editingBehaviorType())
+InternalSettings::Backup::Backup(Settings& settings)
+    : m_originalCSSShapesEnabled(RuntimeEnabledFeatures::sharedFeatures().cssShapesEnabled())
+    , m_originalEditingBehavior(settings.editingBehaviorType())
 #if ENABLE(TEXT_AUTOSIZING)
-    , m_originalTextAutosizingEnabled(settings->textAutosizingEnabled())
-    , m_originalTextAutosizingWindowSizeOverride(settings->textAutosizingWindowSizeOverride())
-    , m_originalTextAutosizingFontScaleFactor(settings->textAutosizingFontScaleFactor())
+    , m_originalTextAutosizingEnabled(settings.textAutosizingEnabled())
+    , m_originalTextAutosizingWindowSizeOverride(settings.textAutosizingWindowSizeOverride())
+    , m_originalTextAutosizingFontScaleFactor(settings.textAutosizingFontScaleFactor())
 #endif
-    , m_originalMediaTypeOverride(settings->mediaTypeOverride())
-#if ENABLE(DIALOG_ELEMENT)
-    , m_originalDialogElementEnabled(RuntimeEnabledFeatures::dialogElementEnabled())
-#endif
-    , m_originalCanvasUsesAcceleratedDrawing(settings->canvasUsesAcceleratedDrawing())
-    , m_originalMockScrollbarsEnabled(settings->mockScrollbarsEnabled())
-    , m_langAttributeAwareFormControlUIEnabled(RuntimeEnabledFeatures::langAttributeAwareFormControlUIEnabled())
-    , m_imagesEnabled(settings->areImagesEnabled())
-    , m_minimumTimerInterval(settings->minDOMTimerInterval())
+    , m_originalMediaTypeOverride(settings.mediaTypeOverride())
+    , m_originalCanvasUsesAcceleratedDrawing(settings.canvasUsesAcceleratedDrawing())
+    , m_originalMockScrollbarsEnabled(settings.mockScrollbarsEnabled())
+    , m_langAttributeAwareFormControlUIEnabled(RuntimeEnabledFeatures::sharedFeatures().langAttributeAwareFormControlUIEnabled())
+    , m_imagesEnabled(settings.areImagesEnabled())
+    , m_minimumTimerInterval(settings.minimumDOMTimerInterval())
 #if ENABLE(VIDEO_TRACK)
-    , m_shouldDisplaySubtitles(settings->shouldDisplaySubtitles())
-    , m_shouldDisplayCaptions(settings->shouldDisplayCaptions())
-    , m_shouldDisplayTextDescriptions(settings->shouldDisplayTextDescriptions())
+    , m_shouldDisplaySubtitles(settings.shouldDisplaySubtitles())
+    , m_shouldDisplayCaptions(settings.shouldDisplayCaptions())
+    , m_shouldDisplayTextDescriptions(settings.shouldDisplayTextDescriptions())
 #endif
-    , m_defaultVideoPosterURL(settings->defaultVideoPosterURL())
-    , m_originalTimeWithoutMouseMovementBeforeHidingControls(settings->timeWithoutMouseMovementBeforeHidingControls())
-    , m_useLegacyBackgroundSizeShorthandBehavior(settings->useLegacyBackgroundSizeShorthandBehavior())
+    , m_defaultVideoPosterURL(settings.defaultVideoPosterURL())
+    , m_forcePendingWebGLPolicy(settings.isForcePendingWebGLPolicy())
+    , m_originalTimeWithoutMouseMovementBeforeHidingControls(settings.timeWithoutMouseMovementBeforeHidingControls())
+    , m_useLegacyBackgroundSizeShorthandBehavior(settings.useLegacyBackgroundSizeShorthandBehavior())
+    , m_autoscrollForDragAndDropEnabled(settings.autoscrollForDragAndDropEnabled())
+    , m_pluginReplacementEnabled(RuntimeEnabledFeatures::sharedFeatures().pluginReplacementEnabled())
+    , m_shouldConvertPositionStyleOnCopy(settings.shouldConvertPositionStyleOnCopy())
+    , m_fontFallbackPrefersPictographs(settings.fontFallbackPrefersPictographs())
+    , m_backgroundShouldExtendBeyondPage(settings.backgroundShouldExtendBeyondPage())
+    , m_storageBlockingPolicy(settings.storageBlockingPolicy())
+    , m_scrollingTreeIncludesFrames(settings.scrollingTreeIncludesFrames())
+#if ENABLE(TOUCH_EVENTS)
+    , m_touchEventEmulationEnabled(settings.isTouchEventEmulationEnabled())
+#endif
+#if ENABLE(WIRELESS_PLAYBACK_TARGET)
+    , m_allowsAirPlayForMediaPlayback(settings.allowsAirPlayForMediaPlayback())
+#endif
+    , m_allowsInlineMediaPlayback(settings.allowsInlineMediaPlayback())
+    , m_inlineMediaPlaybackRequiresPlaysInlineAttribute(settings.inlineMediaPlaybackRequiresPlaysInlineAttribute())
 {
 }
 
-void InternalSettings::Backup::restoreTo(Settings* settings)
+void InternalSettings::Backup::restoreTo(Settings& settings)
 {
-    RuntimeEnabledFeatures::setCSSExclusionsEnabled(m_originalCSSExclusionsEnabled);
-    RuntimeEnabledFeatures::setCSSShapesEnabled(m_originalCSSShapesEnabled);
-    settings->setCSSVariablesEnabled(m_originalCSSVariablesEnabled);
-#if ENABLE(SHADOW_DOM)
-    RuntimeEnabledFeatures::setShadowDOMEnabled(m_originalShadowDOMEnabled);
-    RuntimeEnabledFeatures::setAuthorShadowDOMForAnyElementEnabled(m_originalAuthorShadowDOMForAnyElementEnabled);
-#endif
-#if ENABLE(STYLE_SCOPED)
-    RuntimeEnabledFeatures::setStyleScopedEnabled(m_originalStyleScoped);
-#endif
-    settings->setEditingBehaviorType(m_originalEditingBehavior);
+    RuntimeEnabledFeatures::sharedFeatures().setCSSShapesEnabled(m_originalCSSShapesEnabled);
+    settings.setEditingBehaviorType(m_originalEditingBehavior);
+
+    for (const auto& standardFont : m_standardFontFamilies)
+        settings.setStandardFontFamily(standardFont.value, static_cast<UScriptCode>(standardFont.key));
+    m_standardFontFamilies.clear();
+
+    for (const auto& fixedFont : m_fixedFontFamilies)
+        settings.setFixedFontFamily(fixedFont.value, static_cast<UScriptCode>(fixedFont.key));
+    m_fixedFontFamilies.clear();
+
+    for (const auto& serifFont : m_serifFontFamilies)
+        settings.setSerifFontFamily(serifFont.value, static_cast<UScriptCode>(serifFont.key));
+    m_serifFontFamilies.clear();
+
+    for (const auto& sansSerifFont : m_sansSerifFontFamilies)
+        settings.setSansSerifFontFamily(sansSerifFont.value, static_cast<UScriptCode>(sansSerifFont.key));
+    m_sansSerifFontFamilies.clear();
+
+    for (const auto& cursiveFont : m_cursiveFontFamilies)
+        settings.setCursiveFontFamily(cursiveFont.value, static_cast<UScriptCode>(cursiveFont.key));
+    m_cursiveFontFamilies.clear();
+
+    for (const auto& fantasyFont : m_fantasyFontFamilies)
+        settings.setFantasyFontFamily(fantasyFont.value, static_cast<UScriptCode>(fantasyFont.key));
+    m_fantasyFontFamilies.clear();
+
+    for (const auto& pictographFont : m_pictographFontFamilies)
+        settings.setPictographFontFamily(pictographFont.value, static_cast<UScriptCode>(pictographFont.key));
+    m_pictographFontFamilies.clear();
+
 #if ENABLE(TEXT_AUTOSIZING)
-    settings->setTextAutosizingEnabled(m_originalTextAutosizingEnabled);
-    settings->setTextAutosizingWindowSizeOverride(m_originalTextAutosizingWindowSizeOverride);
-    settings->setTextAutosizingFontScaleFactor(m_originalTextAutosizingFontScaleFactor);
+    settings.setTextAutosizingEnabled(m_originalTextAutosizingEnabled);
+    settings.setTextAutosizingWindowSizeOverride(m_originalTextAutosizingWindowSizeOverride);
+    settings.setTextAutosizingFontScaleFactor(m_originalTextAutosizingFontScaleFactor);
 #endif
-    settings->setMediaTypeOverride(m_originalMediaTypeOverride);
-#if ENABLE(DIALOG_ELEMENT)
-    RuntimeEnabledFeatures::setDialogElementEnabled(m_originalDialogElementEnabled);
-#endif
-    settings->setCanvasUsesAcceleratedDrawing(m_originalCanvasUsesAcceleratedDrawing);
-    settings->setMockScrollbarsEnabled(m_originalMockScrollbarsEnabled);
-    RuntimeEnabledFeatures::setLangAttributeAwareFormControlUIEnabled(m_langAttributeAwareFormControlUIEnabled);
-    settings->setImagesEnabled(m_imagesEnabled);
-    settings->setMinDOMTimerInterval(m_minimumTimerInterval);
+    settings.setMediaTypeOverride(m_originalMediaTypeOverride);
+    settings.setCanvasUsesAcceleratedDrawing(m_originalCanvasUsesAcceleratedDrawing);
+    RuntimeEnabledFeatures::sharedFeatures().setLangAttributeAwareFormControlUIEnabled(m_langAttributeAwareFormControlUIEnabled);
+    settings.setImagesEnabled(m_imagesEnabled);
+    settings.setMinimumDOMTimerInterval(m_minimumTimerInterval);
 #if ENABLE(VIDEO_TRACK)
-    settings->setShouldDisplaySubtitles(m_shouldDisplaySubtitles);
-    settings->setShouldDisplayCaptions(m_shouldDisplayCaptions);
-    settings->setShouldDisplayTextDescriptions(m_shouldDisplayTextDescriptions);
+    settings.setShouldDisplaySubtitles(m_shouldDisplaySubtitles);
+    settings.setShouldDisplayCaptions(m_shouldDisplayCaptions);
+    settings.setShouldDisplayTextDescriptions(m_shouldDisplayTextDescriptions);
 #endif
-    settings->setDefaultVideoPosterURL(m_defaultVideoPosterURL);
-    settings->setTimeWithoutMouseMovementBeforeHidingControls(m_originalTimeWithoutMouseMovementBeforeHidingControls);
-    settings->setUseLegacyBackgroundSizeShorthandBehavior(m_useLegacyBackgroundSizeShorthandBehavior);
+    settings.setDefaultVideoPosterURL(m_defaultVideoPosterURL);
+    settings.setForcePendingWebGLPolicy(m_forcePendingWebGLPolicy);
+    settings.setTimeWithoutMouseMovementBeforeHidingControls(m_originalTimeWithoutMouseMovementBeforeHidingControls);
+    settings.setUseLegacyBackgroundSizeShorthandBehavior(m_useLegacyBackgroundSizeShorthandBehavior);
+    settings.setAutoscrollForDragAndDropEnabled(m_autoscrollForDragAndDropEnabled);
+    settings.setShouldConvertPositionStyleOnCopy(m_shouldConvertPositionStyleOnCopy);
+    settings.setFontFallbackPrefersPictographs(m_fontFallbackPrefersPictographs);
+    settings.setBackgroundShouldExtendBeyondPage(m_backgroundShouldExtendBeyondPage);
+    settings.setStorageBlockingPolicy(m_storageBlockingPolicy);
+    settings.setScrollingTreeIncludesFrames(m_scrollingTreeIncludesFrames);
+#if ENABLE(TOUCH_EVENTS)
+    settings.setTouchEventEmulationEnabled(m_touchEventEmulationEnabled);
+#endif
+    settings.setAllowsInlineMediaPlayback(m_allowsInlineMediaPlayback);
+    settings.setInlineMediaPlaybackRequiresPlaysInlineAttribute(m_inlineMediaPlaybackRequiresPlaysInlineAttribute);
+    RuntimeEnabledFeatures::sharedFeatures().setPluginReplacementEnabled(m_pluginReplacementEnabled);
 }
 
-// We can't use RefCountedSupplement because that would try to make InternalSettings RefCounted
-// and InternalSettings is already RefCounted via its base class, InternalSettingsGenerated.
-// Instead, we manually make InternalSettings supplement Page.
 class InternalSettingsWrapper : public Supplement<Page> {
 public:
     explicit InternalSettingsWrapper(Page* page)
         : m_internalSettings(InternalSettings::create(page)) { }
     virtual ~InternalSettingsWrapper() { m_internalSettings->hostDestroyed(); }
 #if !ASSERT_DISABLED
-    virtual bool isRefCountedWrapper() const OVERRIDE { return true; }
+    virtual bool isRefCountedWrapper() const override { return true; }
 #endif
     InternalSettings* internalSettings() const { return m_internalSettings.get(); }
 
@@ -164,7 +194,7 @@ const char* InternalSettings::supplementName()
 InternalSettings* InternalSettings::from(Page* page)
 {
     if (!Supplement<Page>::from(page, supplementName()))
-        Supplement<Page>::provideTo(page, supplementName(), adoptPtr(new InternalSettingsWrapper(page)));
+        Supplement<Page>::provideTo(page, supplementName(), std::make_unique<InternalSettingsWrapper>(page));
     return static_cast<InternalSettingsWrapper*>(Supplement<Page>::from(page, supplementName()))->internalSettings();
 }
 
@@ -177,15 +207,22 @@ InternalSettings::InternalSettings(Page* page)
     , m_page(page)
     , m_backup(page->settings())
 {
+#if ENABLE(WIRELESS_PLAYBACK_TARGET)
+    page->settings().setAllowsAirPlayForMediaPlayback(false);
+#endif
 }
 
 void InternalSettings::resetToConsistentState()
 {
     page()->setPageScaleFactor(1, IntPoint(0, 0));
     page()->setCanStartMedia(true);
+    page()->settings().setForcePendingWebGLPolicy(false);
+#if ENABLE(WIRELESS_PLAYBACK_TARGET)
+    m_page->settings().setAllowsAirPlayForMediaPlayback(false);
+#endif
 
-    m_backup.restoreTo(settings());
-    m_backup = Backup(settings());
+    m_backup.restoreTo(*settings());
+    m_backup = Backup(*settings());
 
     InternalSettingsGenerated::resetToConsistentState();
 }
@@ -194,56 +231,7 @@ Settings* InternalSettings::settings() const
 {
     if (!page())
         return 0;
-    return page()->settings();
-}
-
-void InternalSettings::setMockScrollbarsEnabled(bool enabled, ExceptionCode& ec)
-{
-    InternalSettingsGuardForSettings();
-    settings()->setMockScrollbarsEnabled(enabled);
-}
-
-static bool urlIsWhitelistedForSetShadowDOMEnabled(const String& url)
-{
-    // This check is just for preventing fuzzers from crashing because of unintended API calls.
-    // You can list your test if needed.
-    return notFound != url.find("fast/dom/shadow/content-shadow-unknown.html")
-        || notFound != url.find("fast/dom/shadow/insertion-points-with-shadow-disabled.html");
-}
-
-void InternalSettings::setShadowDOMEnabled(bool enabled, ExceptionCode& ec)
-{
-    if (!urlIsWhitelistedForSetShadowDOMEnabled(page()->mainFrame()->document()->url().string())) {
-        ec = INVALID_ACCESS_ERR;
-        return;
-    }
-
-#if ENABLE(SHADOW_DOM)
-    RuntimeEnabledFeatures::setShadowDOMEnabled(enabled);
-#else
-    // Even SHADOW_DOM is off, InternalSettings allows setShadowDOMEnabled(false) to
-    // have broader test coverage. But it cannot be setShadowDOMEnabled(true).
-    if (enabled)
-        ec = INVALID_ACCESS_ERR;
-#endif
-}
-
-void InternalSettings::setAuthorShadowDOMForAnyElementEnabled(bool isEnabled)
-{
-#if ENABLE(SHADOW_DOM)
-    RuntimeEnabledFeatures::setAuthorShadowDOMForAnyElementEnabled(isEnabled);
-#else
-    UNUSED_PARAM(isEnabled);
-#endif
-}
-
-void InternalSettings::setStyleScopedEnabled(bool enabled)
-{
-#if ENABLE(STYLE_SCOPED)
-    RuntimeEnabledFeatures::setStyleScopedEnabled(enabled);
-#else
-    UNUSED_PARAM(enabled);
-#endif
+    return &page()->settings();
 }
 
 void InternalSettings::setTouchEventEmulationEnabled(bool enabled, ExceptionCode& ec)
@@ -257,54 +245,74 @@ void InternalSettings::setTouchEventEmulationEnabled(bool enabled, ExceptionCode
 #endif
 }
 
-typedef void (Settings::*SetFontFamilyFunction)(const AtomicString&, UScriptCode);
-static void setFontFamily(Settings* settings, const String& family, const String& script, SetFontFamilyFunction setter)
-{
-    UScriptCode code = scriptNameToCode(script);
-    if (code != USCRIPT_INVALID_CODE)
-        (settings->*setter)(family, code);
-}
-
 void InternalSettings::setStandardFontFamily(const String& family, const String& script, ExceptionCode& ec)
 {
     InternalSettingsGuardForSettings();
-    setFontFamily(settings(), family, script, &Settings::setStandardFontFamily);
+    UScriptCode code = scriptNameToCode(script);
+    if (code == USCRIPT_INVALID_CODE)
+        return;
+    m_backup.m_standardFontFamilies.add(code, settings()->standardFontFamily(code));
+    settings()->setStandardFontFamily(family, code);
 }
 
 void InternalSettings::setSerifFontFamily(const String& family, const String& script, ExceptionCode& ec)
 {
     InternalSettingsGuardForSettings();
-    setFontFamily(settings(), family, script, &Settings::setSerifFontFamily);
+    UScriptCode code = scriptNameToCode(script);
+    if (code == USCRIPT_INVALID_CODE)
+        return;
+    m_backup.m_serifFontFamilies.add(code, settings()->serifFontFamily(code));
+    settings()->setSerifFontFamily(family, code);
 }
 
 void InternalSettings::setSansSerifFontFamily(const String& family, const String& script, ExceptionCode& ec)
 {
     InternalSettingsGuardForSettings();
-    setFontFamily(settings(), family, script, &Settings::setSansSerifFontFamily);
+    UScriptCode code = scriptNameToCode(script);
+    if (code == USCRIPT_INVALID_CODE)
+        return;
+    m_backup.m_sansSerifFontFamilies.add(code, settings()->sansSerifFontFamily(code));
+    settings()->setSansSerifFontFamily(family, code);
 }
 
 void InternalSettings::setFixedFontFamily(const String& family, const String& script, ExceptionCode& ec)
 {
     InternalSettingsGuardForSettings();
-    setFontFamily(settings(), family, script, &Settings::setFixedFontFamily);
+    UScriptCode code = scriptNameToCode(script);
+    if (code == USCRIPT_INVALID_CODE)
+        return;
+    m_backup.m_fixedFontFamilies.add(code, settings()->fixedFontFamily(code));
+    settings()->setFixedFontFamily(family, code);
 }
 
 void InternalSettings::setCursiveFontFamily(const String& family, const String& script, ExceptionCode& ec)
 {
     InternalSettingsGuardForSettings();
-    setFontFamily(settings(), family, script, &Settings::setCursiveFontFamily);
+    UScriptCode code = scriptNameToCode(script);
+    if (code == USCRIPT_INVALID_CODE)
+        return;
+    m_backup.m_cursiveFontFamilies.add(code, settings()->cursiveFontFamily(code));
+    settings()->setCursiveFontFamily(family, code);
 }
 
 void InternalSettings::setFantasyFontFamily(const String& family, const String& script, ExceptionCode& ec)
 {
     InternalSettingsGuardForSettings();
-    setFontFamily(settings(), family, script, &Settings::setFantasyFontFamily);
+    UScriptCode code = scriptNameToCode(script);
+    if (code == USCRIPT_INVALID_CODE)
+        return;
+    m_backup.m_fantasyFontFamilies.add(code, settings()->fantasyFontFamily(code));
+    settings()->setFantasyFontFamily(family, code);
 }
 
 void InternalSettings::setPictographFontFamily(const String& family, const String& script, ExceptionCode& ec)
 {
     InternalSettingsGuardForSettings();
-    setFontFamily(settings(), family, script, &Settings::setPictographFontFamily);
+    UScriptCode code = scriptNameToCode(script);
+    if (code == USCRIPT_INVALID_CODE)
+        return;
+    m_backup.m_pictographFontFamilies.add(code, settings()->pictographFontFamily(code));
+    settings()->setPictographFontFamily(family, code);
 }
 
 void InternalSettings::setTextAutosizingEnabled(bool enabled, ExceptionCode& ec)
@@ -347,28 +355,10 @@ void InternalSettings::setTextAutosizingFontScaleFactor(float fontScaleFactor, E
 #endif
 }
 
-void InternalSettings::setCSSExclusionsEnabled(bool enabled, ExceptionCode& ec)
-{
-    UNUSED_PARAM(ec);
-    RuntimeEnabledFeatures::setCSSExclusionsEnabled(enabled);
-}
-
 void InternalSettings::setCSSShapesEnabled(bool enabled, ExceptionCode& ec)
 {
     UNUSED_PARAM(ec);
-    RuntimeEnabledFeatures::setCSSShapesEnabled(enabled);
-}
-
-void InternalSettings::setCSSVariablesEnabled(bool enabled, ExceptionCode& ec)
-{
-    InternalSettingsGuardForSettings();
-    settings()->setCSSVariablesEnabled(enabled);
-}
-
-bool InternalSettings::cssVariablesEnabled(ExceptionCode& ec)
-{
-    InternalSettingsGuardForSettingsReturn(false);
-    return settings()->cssVariablesEnabled();
+    RuntimeEnabledFeatures::sharedFeatures().setCSSShapesEnabled(enabled);
 }
 
 void InternalSettings::setCanStartMedia(bool enabled, ExceptionCode& ec)
@@ -377,27 +367,28 @@ void InternalSettings::setCanStartMedia(bool enabled, ExceptionCode& ec)
     m_page->setCanStartMedia(enabled);
 }
 
+void InternalSettings::setWirelessPlaybackDisabled(bool available)
+{
+#if ENABLE(WIRELESS_PLAYBACK_TARGET)
+    m_page->settings().setAllowsAirPlayForMediaPlayback(available);
+#else
+    UNUSED_PARAM(available);
+#endif
+}
+
 void InternalSettings::setEditingBehavior(const String& editingBehavior, ExceptionCode& ec)
 {
     InternalSettingsGuardForSettings();
-    if (equalIgnoringCase(editingBehavior, "win"))
+    if (equalLettersIgnoringASCIICase(editingBehavior, "win"))
         settings()->setEditingBehaviorType(EditingWindowsBehavior);
-    else if (equalIgnoringCase(editingBehavior, "mac"))
+    else if (equalLettersIgnoringASCIICase(editingBehavior, "mac"))
         settings()->setEditingBehaviorType(EditingMacBehavior);
-    else if (equalIgnoringCase(editingBehavior, "unix"))
+    else if (equalLettersIgnoringASCIICase(editingBehavior, "unix"))
         settings()->setEditingBehaviorType(EditingUnixBehavior);
+    else if (equalLettersIgnoringASCIICase(editingBehavior, "ios"))
+        settings()->setEditingBehaviorType(EditingIOSBehavior);
     else
         ec = SYNTAX_ERR;
-}
-
-void InternalSettings::setDialogElementEnabled(bool enabled, ExceptionCode& ec)
-{
-    UNUSED_PARAM(ec);
-#if ENABLE(DIALOG_ELEMENT)
-    RuntimeEnabledFeatures::setDialogElementEnabled(enabled);
-#else
-    UNUSED_PARAM(enabled);
-#endif
 }
 
 void InternalSettings::setShouldDisplayTrackKind(const String& kind, bool enabled, ExceptionCode& ec)
@@ -407,14 +398,14 @@ void InternalSettings::setShouldDisplayTrackKind(const String& kind, bool enable
 #if ENABLE(VIDEO_TRACK)
     if (!page())
         return;
-    CaptionUserPreferences* captionPreferences = page()->group().captionPreferences();
 
-    if (equalIgnoringCase(kind, "Subtitles"))
-        captionPreferences->setUserPrefersSubtitles(enabled);
-    else if (equalIgnoringCase(kind, "Captions"))
-        captionPreferences->setUserPrefersCaptions(enabled);
-    else if (equalIgnoringCase(kind, "TextDescriptions"))
-        captionPreferences->setUserPrefersTextDescriptions(enabled);
+    auto& captionPreferences = page()->group().captionPreferences();
+    if (equalLettersIgnoringASCIICase(kind, "subtitles"))
+        captionPreferences.setUserPrefersSubtitles(enabled);
+    else if (equalLettersIgnoringASCIICase(kind, "captions"))
+        captionPreferences.setUserPrefersCaptions(enabled);
+    else if (equalLettersIgnoringASCIICase(kind, "textdescriptions"))
+        captionPreferences.setUserPrefersTextDescriptions(enabled);
     else
         ec = SYNTAX_ERR;
 #else
@@ -430,14 +421,14 @@ bool InternalSettings::shouldDisplayTrackKind(const String& kind, ExceptionCode&
 #if ENABLE(VIDEO_TRACK)
     if (!page())
         return false;
-    CaptionUserPreferences* captionPreferences = page()->group().captionPreferences();
 
-    if (equalIgnoringCase(kind, "Subtitles"))
-        return captionPreferences->userPrefersSubtitles();
-    if (equalIgnoringCase(kind, "Captions"))
-        return captionPreferences->userPrefersCaptions();
-    if (equalIgnoringCase(kind, "TextDescriptions"))
-        return captionPreferences->userPrefersTextDescriptions();
+    auto& captionPreferences = page()->group().captionPreferences();
+    if (equalLettersIgnoringASCIICase(kind, "subtitles"))
+        return captionPreferences.userPrefersSubtitles();
+    if (equalLettersIgnoringASCIICase(kind, "captions"))
+        return captionPreferences.userPrefersCaptions();
+    if (equalLettersIgnoringASCIICase(kind, "textdescriptions"))
+        return captionPreferences.userPrefersTextDescriptions();
 
     ec = SYNTAX_ERR;
     return false;
@@ -463,7 +454,7 @@ void InternalSettings::setStorageBlockingPolicy(const String& mode, ExceptionCod
 
 void InternalSettings::setLangAttributeAwareFormControlUIEnabled(bool enabled)
 {
-    RuntimeEnabledFeatures::setLangAttributeAwareFormControlUIEnabled(enabled);
+    RuntimeEnabledFeatures::sharedFeatures().setLangAttributeAwareFormControlUIEnabled(enabled);
 }
 
 void InternalSettings::setImagesEnabled(bool enabled, ExceptionCode& ec)
@@ -475,13 +466,19 @@ void InternalSettings::setImagesEnabled(bool enabled, ExceptionCode& ec)
 void InternalSettings::setMinimumTimerInterval(double intervalInSeconds, ExceptionCode& ec)
 {
     InternalSettingsGuardForSettings();
-    settings()->setMinDOMTimerInterval(intervalInSeconds);
+    settings()->setMinimumDOMTimerInterval(intervalInSeconds);
 }
 
 void InternalSettings::setDefaultVideoPosterURL(const String& url, ExceptionCode& ec)
 {
     InternalSettingsGuardForSettings();
     settings()->setDefaultVideoPosterURL(url);
+}
+
+void InternalSettings::setForcePendingWebGLPolicy(bool forced, ExceptionCode& ec)
+{
+    InternalSettingsGuardForSettings();
+    settings()->setForcePendingWebGLPolicy(forced);
 }
 
 void InternalSettings::setTimeWithoutMouseMovementBeforeHidingControls(double time, ExceptionCode& ec)
@@ -495,5 +492,54 @@ void InternalSettings::setUseLegacyBackgroundSizeShorthandBehavior(bool enabled,
     InternalSettingsGuardForSettings();
     settings()->setUseLegacyBackgroundSizeShorthandBehavior(enabled);
 }
+
+void InternalSettings::setAutoscrollForDragAndDropEnabled(bool enabled, ExceptionCode& ec)
+{
+    InternalSettingsGuardForSettings();
+    settings()->setAutoscrollForDragAndDropEnabled(enabled);
+}
+
+void InternalSettings::setFontFallbackPrefersPictographs(bool preferPictographs, ExceptionCode& ec)
+{
+    InternalSettingsGuardForSettings();
+    settings()->setFontFallbackPrefersPictographs(preferPictographs);
+}
+
+void InternalSettings::setPluginReplacementEnabled(bool enabled)
+{
+    RuntimeEnabledFeatures::sharedFeatures().setPluginReplacementEnabled(enabled);
+}
+
+void InternalSettings::setBackgroundShouldExtendBeyondPage(bool hasExtendedBackground, ExceptionCode& ec)
+{
+    InternalSettingsGuardForSettings();
+    settings()->setBackgroundShouldExtendBeyondPage(hasExtendedBackground);
+}
+
+void InternalSettings::setShouldConvertPositionStyleOnCopy(bool convert, ExceptionCode& ec)
+{
+    InternalSettingsGuardForSettings();
+    settings()->setShouldConvertPositionStyleOnCopy(convert);
+}
+
+void InternalSettings::setScrollingTreeIncludesFrames(bool enabled, ExceptionCode& ec)
+{
+    InternalSettingsGuardForSettings();
+    settings()->setScrollingTreeIncludesFrames(enabled);
+}
+
+void InternalSettings::setAllowsInlineMediaPlayback(bool allows, ExceptionCode& ec)
+{
+    InternalSettingsGuardForSettings();
+    settings()->setAllowsInlineMediaPlayback(allows);
+}
+
+void InternalSettings::setInlineMediaPlaybackRequiresPlaysInlineAttribute(bool requires, ExceptionCode& ec)
+{
+    InternalSettingsGuardForSettings();
+    settings()->setInlineMediaPlaybackRequiresPlaysInlineAttribute(requires);
+}
+
+// If you add to this list, make sure that you update the Backup class for test reproducability!
 
 }

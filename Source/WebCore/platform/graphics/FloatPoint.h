@@ -11,10 +11,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -31,12 +31,8 @@
 #include "IntPoint.h"
 #include <wtf/MathExtras.h>
 
-#if PLATFORM(BLACKBERRY)
-namespace BlackBerry {
-namespace Platform {
-class FloatPoint;
-}
-}
+#if PLATFORM(MAC) && defined __OBJC__
+#import <Foundation/NSGeometry.h>
 #endif
 
 #if USE(CG)
@@ -49,7 +45,7 @@ typedef struct CGPoint NSPoint;
 #else
 typedef struct _NSPoint NSPoint;
 #endif
-#endif
+#endif // PLATFORM(MAC)
 
 #if PLATFORM(QT)
 #include "qglobal.h"
@@ -64,12 +60,13 @@ class AffineTransform;
 class TransformationMatrix;
 class IntPoint;
 class IntSize;
+class TextStream;
 
 class FloatPoint {
 public:
     FloatPoint() : m_x(0), m_y(0) { }
     FloatPoint(float x, float y) : m_x(x), m_y(y) { }
-    FloatPoint(const IntPoint&);
+    WEBCORE_EXPORT FloatPoint(const IntPoint&);
     explicit FloatPoint(const FloatSize& size) : m_x(size.width()), m_y(size.height()) { }
 
     static FloatPoint zero() { return FloatPoint(); }
@@ -131,34 +128,36 @@ public:
         return m_x * m_x + m_y * m_y;
     }
 
+    WEBCORE_EXPORT FloatPoint constrainedBetween(const FloatPoint& min, const FloatPoint& max) const;
+
+    FloatPoint shrunkTo(const FloatPoint& other) const
+    {
+        return { std::min(m_x, other.m_x), std::min(m_y, other.m_y) };
+    }
+
     FloatPoint expandedTo(const FloatPoint& other) const
     {
-        return FloatPoint(std::max(m_x, other.m_x), std::max(m_y, other.m_y));
+        return { std::max(m_x, other.m_x), std::max(m_y, other.m_y) };
     }
 
     FloatPoint transposedPoint() const
     {
-        return FloatPoint(m_y, m_x);
+        return { m_y, m_x };
     }
 
 #if USE(CG)
-    FloatPoint(const CGPoint&);
-    operator CGPoint() const;
+    WEBCORE_EXPORT FloatPoint(const CGPoint&);
+    WEBCORE_EXPORT operator CGPoint() const;
 #endif
 
 #if PLATFORM(MAC) && !defined(NSGEOMETRY_TYPES_SAME_AS_CGGEOMETRY_TYPES)
-    FloatPoint(const NSPoint&);
-    operator NSPoint() const;
+    WEBCORE_EXPORT FloatPoint(const NSPoint&);
+    WEBCORE_EXPORT operator NSPoint() const;
 #endif
 
 #if PLATFORM(QT)
     FloatPoint(const QPointF&);
     operator QPointF() const;
-#endif
-
-#if PLATFORM(BLACKBERRY)
-    FloatPoint(const BlackBerry::Platform::FloatPoint&);
-    operator BlackBerry::Platform::FloatPoint() const;
 #endif
 
     FloatPoint matrixTransform(const TransformationMatrix&) const;
@@ -228,6 +227,11 @@ inline float operator*(const FloatPoint& a, const FloatPoint& b)
     return a.dot(b);
 }
 
+inline IntSize flooredIntSize(const FloatPoint& p)
+{
+    return IntSize(clampToInteger(floorf(p.x())), clampToInteger(floorf(p.y())));
+}
+
 inline IntPoint roundedIntPoint(const FloatPoint& p)
 {
     return IntPoint(clampToInteger(roundf(p.x())), clampToInteger(roundf(p.y())));
@@ -243,9 +247,14 @@ inline IntPoint ceiledIntPoint(const FloatPoint& p)
     return IntPoint(clampToInteger(ceilf(p.x())), clampToInteger(ceilf(p.y())));
 }
 
-inline IntSize flooredIntSize(const FloatPoint& p)
+inline FloatPoint floorPointToDevicePixels(const FloatPoint& p, float deviceScaleFactor)
 {
-    return IntSize(clampToInteger(floorf(p.x())), clampToInteger(floorf(p.y())));
+    return FloatPoint(floorf(p.x() * deviceScaleFactor)  / deviceScaleFactor, floorf(p.y() * deviceScaleFactor)  / deviceScaleFactor);
+}
+
+inline FloatPoint ceilPointToDevicePixels(const FloatPoint& p, float deviceScaleFactor)
+{
+    return FloatPoint(ceilf(p.x() * deviceScaleFactor)  / deviceScaleFactor, ceilf(p.y() * deviceScaleFactor)  / deviceScaleFactor);
 }
 
 inline FloatSize toFloatSize(const FloatPoint& a)
@@ -253,10 +262,17 @@ inline FloatSize toFloatSize(const FloatPoint& a)
     return FloatSize(a.x(), a.y());
 }
 
-float findSlope(const FloatPoint& p1, const FloatPoint& p2, float& c);
+inline FloatPoint toFloatPoint(const FloatSize& a)
+{
+    return FloatPoint(a.width(), a.height());
+}
 
-// Find point where lines through the two pairs of points intersect. Returns false if the lines don't intersect.
-bool findIntersection(const FloatPoint& p1, const FloatPoint& p2, const FloatPoint& d1, const FloatPoint& d2, FloatPoint& intersection);
+inline bool areEssentiallyEqual(const FloatPoint& a, const FloatPoint& b)
+{
+    return WTF::areEssentiallyEqual(a.x(), b.x()) && WTF::areEssentiallyEqual(a.y(), b.y());
+}
+
+WEBCORE_EXPORT TextStream& operator<<(TextStream&, const FloatPoint&);
 
 }
 

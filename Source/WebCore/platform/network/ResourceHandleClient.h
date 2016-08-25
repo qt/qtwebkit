@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2006 Apple Computer, Inc.  All rights reserved.
- * Copyright (C) 2013 Apple Computer, Inc.  All rights reserved.
+ * Copyright (C) 2006 Apple Inc.  All rights reserved.
+ * Copyright (C) 2013 Apple Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -11,10 +11,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -27,6 +27,7 @@
 #ifndef ResourceHandleClient_h
 #define ResourceHandleClient_h
 
+#include "PlatformExportMacros.h"
 #include <wtf/PassRefPtr.h>
 
 #if USE(CFNETWORK)
@@ -34,20 +35,28 @@
 #include <CFNetwork/CFURLResponsePriv.h>
 #endif
 
-#if PLATFORM(MAC)
+#if PLATFORM(IOS) || USE(CFNETWORK)
+#include <wtf/RetainPtr.h>
+#endif
+
+#if PLATFORM(COCOA)
 OBJC_CLASS NSCachedURLResponse;
 #endif
 
 namespace WebCore {
     class AuthenticationChallenge;
     class Credential;
-    class KURL;
+    class URL;
     class ProtectionSpace;
     class ResourceHandle;
     class ResourceError;
     class ResourceRequest;
     class ResourceResponse;
     class SharedBuffer;
+
+#if USE(QUICK_LOOK)
+    class QuickLookHandle;
+#endif
 
     enum CacheStoragePolicy {
         StorageAllowed,
@@ -57,8 +66,8 @@ namespace WebCore {
     
     class ResourceHandleClient {
     public:
-        ResourceHandleClient();
-        virtual ~ResourceHandleClient();
+        WEBCORE_EXPORT ResourceHandleClient();
+        WEBCORE_EXPORT virtual ~ResourceHandleClient();
 
         // Request may be modified.
         virtual void willSendRequest(ResourceHandle*, ResourceRequest&, const ResourceResponse& /*redirectResponse*/) { }
@@ -66,8 +75,8 @@ namespace WebCore {
 
         virtual void didReceiveResponse(ResourceHandle*, const ResourceResponse&) { }
         
-        virtual void didReceiveData(ResourceHandle*, const char*, int, int /*encodedDataLength*/) { }
-        virtual void didReceiveBuffer(ResourceHandle*, PassRefPtr<SharedBuffer>, int encodedDataLength);
+        virtual void didReceiveData(ResourceHandle*, const char*, unsigned, int /*encodedDataLength*/) { }
+        WEBCORE_EXPORT virtual void didReceiveBuffer(ResourceHandle*, PassRefPtr<SharedBuffer>, int encodedDataLength);
         
         virtual void didFinishLoading(ResourceHandle*, double /*finishTime*/) { }
         virtual void didFail(ResourceHandle*, const ResourceError&) { }
@@ -76,21 +85,23 @@ namespace WebCore {
 
         virtual bool usesAsyncCallbacks() { return false; }
 
+        virtual bool loadingSynchronousXHR() { return false; }
+
         // Client will pass an updated request using ResourceHandle::continueWillSendRequest() when ready.
-        virtual void willSendRequestAsync(ResourceHandle*, const ResourceRequest&, const ResourceResponse& redirectResponse);
+        WEBCORE_EXPORT virtual void willSendRequestAsync(ResourceHandle*, const ResourceRequest&, const ResourceResponse& redirectResponse);
 
         // Client will call ResourceHandle::continueDidReceiveResponse() when ready.
-        virtual void didReceiveResponseAsync(ResourceHandle*, const ResourceResponse&);
+        WEBCORE_EXPORT virtual void didReceiveResponseAsync(ResourceHandle*, const ResourceResponse&);
 
-        // Client will pass an updated request using ResourceHandle::continueShouldUseCredentialStorage() when ready.
-        virtual void shouldUseCredentialStorageAsync(ResourceHandle*);
 #if USE(PROTECTION_SPACE_AUTH_CALLBACK)
         // Client will pass an updated request using ResourceHandle::continueCanAuthenticateAgainstProtectionSpace() when ready.
-        virtual void canAuthenticateAgainstProtectionSpaceAsync(ResourceHandle*, const ProtectionSpace&);
+        WEBCORE_EXPORT virtual void canAuthenticateAgainstProtectionSpaceAsync(ResourceHandle*, const ProtectionSpace&);
 #endif
-#if PLATFORM(MAC)
         // Client will pass an updated request using ResourceHandle::continueWillCacheResponse() when ready.
-        virtual void willCacheResponseAsync(ResourceHandle*, NSCachedURLResponse *);
+#if USE(CFNETWORK)
+        WEBCORE_EXPORT virtual void willCacheResponseAsync(ResourceHandle*, CFCachedURLResponseRef);
+#elif PLATFORM(COCOA)
+        WEBCORE_EXPORT virtual void willCacheResponseAsync(ResourceHandle*, NSCachedURLResponse *);
 #endif
 
 #if USE(NETWORK_CFDATA_ARRAY_CALLBACK)
@@ -110,18 +121,23 @@ namespace WebCore {
 #endif
         virtual void receivedCancellation(ResourceHandle*, const AuthenticationChallenge&) { }
 
-#if PLATFORM(MAC)
-#if USE(CFNETWORK)
-        virtual CFCachedURLResponseRef willCacheResponse(ResourceHandle*, CFCachedURLResponseRef response) { return response; }
-#else
-        virtual NSCachedURLResponse *willCacheResponse(ResourceHandle*, NSCachedURLResponse *response) { return response; }
-#endif
-        virtual void willStopBufferingData(ResourceHandle*, const char*, int) { }
-#endif // PLATFORM(MAC)
-#if PLATFORM(WIN) && USE(CFNETWORK)
-        virtual bool shouldCacheResponse(ResourceHandle*, CFCachedURLResponseRef) { return true; }
+#if PLATFORM(IOS) || USE(CFNETWORK)
+        virtual RetainPtr<CFDictionaryRef> connectionProperties(ResourceHandle*) { return nullptr; }
 #endif
 
+#if USE(CFNETWORK)
+        virtual CFCachedURLResponseRef willCacheResponse(ResourceHandle*, CFCachedURLResponseRef response) { return response; }
+#if PLATFORM(WIN)
+        virtual bool shouldCacheResponse(ResourceHandle*, CFCachedURLResponseRef) { return true; }
+#endif // PLATFORM(WIN)
+
+#elif PLATFORM(COCOA)
+        virtual NSCachedURLResponse *willCacheResponse(ResourceHandle*, NSCachedURLResponse *response) { return response; }
+#endif
+
+#if USE(QUICK_LOOK)
+        virtual void didCreateQuickLookHandle(QuickLookHandle&) { }
+#endif
     };
 
 }

@@ -37,7 +37,9 @@ namespace WebCore {
     
 static bool mainBundleIsEqualTo(const String& bundleIdentifierString)
 {
-#if USE(CF)
+    // FIXME: We should consider merging this file with RuntimeApplicationChecksIOS.mm.
+    // Then we can remove the PLATFORM(IOS)-guard.
+#if USE(CF) && !PLATFORM(IOS)
     CFBundleRef mainBundle = CFBundleGetMainBundle();
     if (!mainBundle)
         return false;
@@ -55,8 +57,7 @@ static bool mainBundleIsEqualTo(const String& bundleIdentifierString)
 
 bool applicationIsSafari()
 {
-    // FIXME: For the WebProcess case, ensure that this is Safari's WebProcess.
-    static bool isSafari = mainBundleIsEqualTo("com.apple.Safari") || mainBundleIsEqualTo("com.apple.WebProcess");
+    static bool isSafari = mainBundleIsEqualTo("com.apple.Safari");
     return isSafari;
 }
 
@@ -64,6 +65,18 @@ bool applicationIsAppleMail()
 {
     static bool isAppleMail = mainBundleIsEqualTo("com.apple.mail");
     return isAppleMail;
+}
+
+bool applicationIsIBooks()
+{
+    static bool isIBooks = mainBundleIsEqualTo("com.apple.iBooksX");
+    return isIBooks;
+}
+
+bool applicationIsITunes()
+{
+    static bool isITunes = mainBundleIsEqualTo("com.apple.iTunes");
+    return isITunes;
 }
 
 bool applicationIsMicrosoftMessenger()
@@ -94,6 +107,12 @@ bool applicationIsMicrosoftOutlook()
 {
     static bool isMicrosoftOutlook = mainBundleIsEqualTo("com.microsoft.Outlook");
     return isMicrosoftOutlook;
+}
+
+bool applicationIsQuickenEssentials()
+{
+    static bool isQuickenEssentials = mainBundleIsEqualTo("com.intuit.QuickenEssentials");
+    return isQuickenEssentials;
 }
 
 bool applicationIsAperture()

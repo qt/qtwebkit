@@ -20,7 +20,6 @@
 #ifndef SVGFEDisplacementMapElement_h
 #define SVGFEDisplacementMapElement_h
 
-#if ENABLE(SVG) && ENABLE(FILTERS)
 #include "FEDisplacementMap.h"
 #include "SVGAnimatedEnumeration.h"
 #include "SVGAnimatedNumber.h"
@@ -38,13 +37,13 @@ struct SVGPropertyTraits<ChannelSelectorType> {
         case CHANNEL_UNKNOWN:
             return emptyString();
         case CHANNEL_R:
-            return "R";
+            return ASCIILiteral("R");
         case CHANNEL_G:
-            return "G";
+            return ASCIILiteral("G");
         case CHANNEL_B:
-            return "B";
+            return ASCIILiteral("B");
         case CHANNEL_A:
-            return "A";
+            return ASCIILiteral("A");
         }
 
         ASSERT_NOT_REACHED();
@@ -65,20 +64,19 @@ struct SVGPropertyTraits<ChannelSelectorType> {
     }
 };
 
-class SVGFEDisplacementMapElement FINAL : public SVGFilterPrimitiveStandardAttributes {
+class SVGFEDisplacementMapElement final : public SVGFilterPrimitiveStandardAttributes {
 public:
-    static PassRefPtr<SVGFEDisplacementMapElement> create(const QualifiedName&, Document*);
+    static Ref<SVGFEDisplacementMapElement> create(const QualifiedName&, Document&);
 
     static ChannelSelectorType stringToChannel(const String&);
     
 private:
-    SVGFEDisplacementMapElement(const QualifiedName& tagName, Document*);
+    SVGFEDisplacementMapElement(const QualifiedName& tagName, Document&);
     
-    bool isSupportedAttribute(const QualifiedName&);
-    virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
-    virtual bool setFilterEffectAttribute(FilterEffect*, const QualifiedName& attrName);
-    virtual void svgAttributeChanged(const QualifiedName&);
-    virtual PassRefPtr<FilterEffect> build(SVGFilterBuilder*, Filter*);
+    virtual void parseAttribute(const QualifiedName&, const AtomicString&) override;
+    virtual bool setFilterEffectAttribute(FilterEffect*, const QualifiedName& attrName) override;
+    virtual void svgAttributeChanged(const QualifiedName&) override;
+    virtual RefPtr<FilterEffect> build(SVGFilterBuilder*, Filter&) override;
 
     BEGIN_DECLARE_ANIMATED_PROPERTIES(SVGFEDisplacementMapElement)
         DECLARE_ANIMATED_STRING(In1, in1)
@@ -91,5 +89,4 @@ private:
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif // SVGFEDisplacementMapElement_h

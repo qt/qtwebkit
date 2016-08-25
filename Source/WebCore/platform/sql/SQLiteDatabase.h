@@ -11,10 +11,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -27,6 +27,9 @@
 #ifndef SQLiteDatabase_h
 #define SQLiteDatabase_h
 
+#include <functional>
+#include <sqlite3.h>
+#include <wtf/Lock.h>
 #include <wtf/Threading.h>
 #include <wtf/text/CString.h>
 #include <wtf/text/WTFString.h>
@@ -43,34 +46,23 @@ class DatabaseAuthorizer;
 class SQLiteStatement;
 class SQLiteTransaction;
 
-extern const int SQLResultDone;
-extern const int SQLResultError;
-extern const int SQLResultOk;
-extern const int SQLResultRow;
-extern const int SQLResultSchema;
-extern const int SQLResultFull;
-extern const int SQLResultInterrupt;
-extern const int SQLResultConstraint;
-
 class SQLiteDatabase {
     WTF_MAKE_NONCOPYABLE(SQLiteDatabase);
     friend class SQLiteTransaction;
 public:
-    SQLiteDatabase();
-    ~SQLiteDatabase();
+    WEBCORE_EXPORT SQLiteDatabase();
+    WEBCORE_EXPORT ~SQLiteDatabase();
 
-    bool open(const String& filename, bool forWebSQLDatabase = false);
+    WEBCORE_EXPORT bool open(const String& filename, bool forWebSQLDatabase = false);
     bool isOpen() const { return m_db; }
-    void close();
-    void interrupt();
-    bool isInterrupted();
+    WEBCORE_EXPORT void close();
 
     void updateLastChangesCount();
 
-    bool executeCommand(const String&);
+    WEBCORE_EXPORT bool executeCommand(const String&);
     bool returnsAtLeastOneResult(const String&);
     
-    bool tableExists(const String&);
+    WEBCORE_EXPORT bool tableExists(const String&);
     void clearAllTables();
     int runVacuumCommand();
     int runIncrementalVacuumCommand();
@@ -103,17 +95,19 @@ public:
     enum SynchronousPragma { SyncOff = 0, SyncNormal = 1, SyncFull = 2 };
     void setSynchronous(SynchronousPragma);
     
-    int lastError();
-    const char* lastErrorMsg();
+    WEBCORE_EXPORT int lastError();
+    WEBCORE_EXPORT const char* lastErrorMsg();
     
     sqlite3* sqlite3Handle() const {
+#if !PLATFORM(IOS)
         ASSERT(m_sharable || currentThread() == m_openingThread || !m_db);
+#endif
         return m_db;
     }
     
     void setAuthorizer(PassRefPtr<DatabaseAuthorizer>);
 
-    Mutex& databaseMutex() { return m_lockingMutex; }
+    Lock& databaseMutex() { return m_lockingMutex; }
     bool isAutoCommitOn() const;
 
     // The SQLite AUTO_VACUUM pragma can be either NONE, FULL, or INCREMENTAL.
@@ -128,12 +122,15 @@ public:
     enum AutoVacuumPragma { AutoVacuumNone = 0, AutoVacuumFull = 1, AutoVacuumIncremental = 2 };
     bool turnOnIncrementalAutoVacuum();
 
+    WEBCORE_EXPORT void setCollationFunction(const String& collationName, std::function<int(int, const void*, int, const void*)>);
+    void removeCollationFunction(const String& collationName);
+
     // Set this flag to allow access from multiple threads.  Not all multi-threaded accesses are safe!
     // See http://www.sqlite.org/cvstrac/wiki?p=MultiThreading for more info.
 #ifndef NDEBUG
-    void disableThreadingChecks();
+    WEBCORE_EXPORT void disableThreadingChecks();
 #else
-    void disableThreadingChecks() {}
+    WEBCORE_EXPORT void disableThreadingChecks() {}
 #endif
 
 private:
@@ -142,21 +139,22 @@ private:
     void enableAuthorizer(bool enable);
     
     int pageSize();
-    
+
+    void overrideUnauthorizedFunctions();
+
     sqlite3* m_db;
     int m_pageSize;
     
     bool m_transactionInProgress;
     bool m_sharable;
     
-    Mutex m_authorizerLock;
+    Lock m_authorizerLock;
     RefPtr<DatabaseAuthorizer> m_authorizer;
 
-    Mutex m_lockingMutex;
+    Lock m_lockingMutex;
     ThreadIdentifier m_openingThread;
 
-    Mutex m_databaseClosingMutex;
-    bool m_interrupted;
+    Lock m_databaseClosingMutex;
 
     int m_openError;
     CString m_openErrorMessage;

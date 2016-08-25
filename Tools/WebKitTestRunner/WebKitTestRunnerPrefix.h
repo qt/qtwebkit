@@ -24,23 +24,11 @@
  */
 
 #ifdef __OBJC__
-#include <Cocoa/Cocoa.h>
+#import <Foundation/Foundation.h>
 #endif
 
-#if defined(WIN32) || defined(_WIN32)
-// If we don't define these, they get defined in windef.h. 
-// We want to use std::min and std::max
-#define max max
-#define min min
-#endif
-
-#if defined(BUILDING_GTK__)
-#include "autotoolsconfig.h"
-#endif /* defined (BUILDING_GTK__) */
-
+#include <WebKit/WebKit2_C.h>
 #include <wtf/Platform.h>
-#include <WebKit2/WebKit2_C.h>
-
 
 /* When C++ exceptions are disabled, the C++ library defines |try| and |catch|
 * to allow C++ code that expects exceptions to build. These definitions

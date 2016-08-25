@@ -29,11 +29,9 @@
 
 #include "HTMLElement.h"
 #include "HTMLNames.h"
-#include "RenderObject.h"
+#include "RenderElement.h"
 #include "RenderStyle.h"
 #include "Text.h"
-#include "TextIterator.h"
-#include "VisiblePosition.h"
 #include "VisibleUnits.h"
 #include "htmlediting.h"
 
@@ -41,14 +39,14 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-ApplyBlockElementCommand::ApplyBlockElementCommand(Document* document, const QualifiedName& tagName, const AtomicString& inlineStyle)
+ApplyBlockElementCommand::ApplyBlockElementCommand(Document& document, const QualifiedName& tagName, const AtomicString& inlineStyle)
     : CompositeEditCommand(document)
     , m_tagName(tagName)
     , m_inlineStyle(inlineStyle)
 {
 }
 
-ApplyBlockElementCommand::ApplyBlockElementCommand(Document* document, const QualifiedName& tagName)
+ApplyBlockElementCommand::ApplyBlockElementCommand(Document& document, const QualifiedName& tagName)
     : CompositeEditCommand(document)
     , m_tagName(tagName)
 {
@@ -72,8 +70,12 @@ void ApplyBlockElementCommand::doApply()
     // FIXME: We paint the gap before some paragraphs that are indented with left 
     // margin/padding, but not others.  We should make the gap painting more consistent and 
     // then use a left margin/padding rule here.
-    if (visibleEnd != visibleStart && isStartOfParagraph(visibleEnd))
-        setEndingSelection(VisibleSelection(visibleStart, visibleEnd.previous(CannotCrossEditingBoundary), endingSelection().isDirectional()));
+    if (visibleEnd != visibleStart && isStartOfParagraph(visibleEnd)) {
+        VisibleSelection newSelection(visibleStart, visibleEnd.previous(CannotCrossEditingBoundary), endingSelection().isDirectional());
+        if (newSelection.isNone())
+            return;
+        setEndingSelection(newSelection);
+    }
 
     VisibleSelection selection = selectionForParagraphIteration(endingSelection());
     VisiblePosition startOfSelection = selection.visibleStart();
@@ -87,7 +89,7 @@ void ApplyBlockElementCommand::doApply()
 
     formatSelection(startOfSelection, endOfSelection);
 
-    document()->updateLayoutIgnorePendingStylesheets();
+    document().updateLayoutIgnorePendingStylesheets();
 
     ASSERT(startScope == endScope);
     ASSERT(startIndex >= 0);
@@ -105,7 +107,7 @@ void ApplyBlockElementCommand::formatSelection(const VisiblePosition& startOfSel
     // Special case empty unsplittable elements because there's nothing to split
     // and there's nothing to move.
     Position start = startOfSelection.deepEquivalent().downstream();
-    if (isAtUnsplittableElement(start)) {
+    if (isAtUnsplittableElement(start) && startOfParagraph(start) == endOfParagraph(endOfSelection)) {
         RefPtr<Element> blockquote = createBlockElement();
         insertNodeAt(blockquote, start);
         RefPtr<Element> placeholder = createBreakElement(document());
@@ -128,16 +130,24 @@ void ApplyBlockElementCommand::formatSelection(const VisiblePosition& startOfSel
         rangeForParagraphSplittingTextNodesIfNeeded(endOfCurrentParagraph, start, end);
         endOfCurrentParagraph = end;
 
+        // FIXME: endOfParagraph can errornously return a position at the beginning of a block element
+        // when the position passed into endOfParagraph is at the beginning of a block.
+        // Work around this bug here because too much of the existing code depends on the current behavior of endOfParagraph.
+        if (start == end && startOfBlock(start) != endOfBlock(start) && !isEndOfBlock(end) && start == startOfParagraph(endOfBlock(start))) {
+            endOfCurrentParagraph = endOfBlock(end);
+            end = endOfCurrentParagraph.deepEquivalent();
+        }
+
         Position afterEnd = end.next();
         Node* enclosingCell = enclosingNodeOfType(start, &isTableCell);
-        VisiblePosition endOfNextParagraph = endOfNextParagrahSplittingTextNodesIfNeeded(endOfCurrentParagraph, start, end);
+        VisiblePosition endOfNextParagraph = endOfNextParagraphSplittingTextNodesIfNeeded(endOfCurrentParagraph, start, end);
 
         formatRange(start, end, m_endOfLastParagraph, blockquoteForNextIndent);
 
         // Don't put the next paragraph in the blockquote we just created for this paragraph unless 
         // the next paragraph is in the same cell.
         if (enclosingCell && enclosingCell != enclosingNodeOfType(endOfNextParagraph.deepEquivalent(), &isTableCell))
-            blockquoteForNextIndent = 0;
+            blockquoteForNextIndent = nullptr;
 
         // indentIntoBlockquote could move more than one paragraph if the paragraph
         // is in a list item or a table. As a result, endAfterSelection could refer to a position
@@ -158,25 +168,31 @@ static bool isNewLineAtPosition(const Position& position)
 {
     Node* textNode = position.containerNode();
     int offset = position.offsetInContainerNode();
-    if (!textNode || !textNode->isTextNode() || offset < 0 || offset >= textNode->maxCharacterOffset())
+    if (!is<Text>(textNode) || offset < 0 || offset >= textNode->maxCharacterOffset())
         return false;
 
     ExceptionCode ec = 0;
-    String textAtPosition = toText(textNode)->substringData(offset, 1, ec);
+    String textAtPosition = downcast<Text>(*textNode).substringData(offset, 1, ec);
     if (ec)
         return false;
 
     return textAtPosition[0] == '\n';
 }
 
-static RenderStyle* renderStyleOfEnclosingTextNode(const Position& position)
+RenderStyle* ApplyBlockElementCommand::renderStyleOfEnclosingTextNode(const Position& position)
 {
     if (position.anchorType() != Position::PositionIsOffsetInAnchor
         || !position.containerNode()
-        || !position.containerNode()->isTextNode()
-        || !position.containerNode()->renderer())
+        || !position.containerNode()->isTextNode())
         return 0;
-    return position.containerNode()->renderer()->style();
+
+    document().updateStyleIfNeeded();
+
+    RenderObject* renderer = position.containerNode()->renderer();
+    if (!renderer)
+        return 0;
+
+    return &renderer->style();
 }
 
 void ApplyBlockElementCommand::rangeForParagraphSplittingTextNodesIfNeeded(const VisiblePosition& endOfCurrentParagraph, Position& start, Position& end)
@@ -221,8 +237,8 @@ void ApplyBlockElementCommand::rangeForParagraphSplittingTextNodesIfNeeded(const
                 m_endOfLastParagraph = end;
         }
 
-        // If end is in the middle of a text node, split.
-        if (!endStyle->collapseWhiteSpace() && end.offsetInContainerNode() && end.offsetInContainerNode() < end.containerNode()->maxCharacterOffset()) {
+        // If end is in the middle of a text node and the text node is editable, split.
+        if (endStyle->userModify() != READ_ONLY && !endStyle->collapseWhiteSpace() && end.offsetInContainerNode() && end.offsetInContainerNode() < end.containerNode()->maxCharacterOffset()) {
             RefPtr<Text> endContainer = end.containerText();
             splitTextNode(endContainer, end.offsetInContainerNode());
             if (isStartAndEndOnSameNode)
@@ -238,7 +254,7 @@ void ApplyBlockElementCommand::rangeForParagraphSplittingTextNodesIfNeeded(const
     }
 }
 
-VisiblePosition ApplyBlockElementCommand::endOfNextParagrahSplittingTextNodesIfNeeded(VisiblePosition& endOfCurrentParagraph, Position& start, Position& end)
+VisiblePosition ApplyBlockElementCommand::endOfNextParagraphSplittingTextNodesIfNeeded(VisiblePosition& endOfCurrentParagraph, Position& start, Position& end)
 {
     VisiblePosition endOfNextParagraph = endOfParagraph(endOfCurrentParagraph.next());
     Position position = endOfNextParagraph.deepEquivalent();
@@ -255,20 +271,20 @@ VisiblePosition ApplyBlockElementCommand::endOfNextParagrahSplittingTextNodesIfN
     // Avoid this by splitting "\n"
     splitTextNode(text, 1);
 
-    if (text == start.containerNode() && text->previousSibling() && text->previousSibling()->isTextNode()) {
+    if (text == start.containerNode() && is<Text>(text->previousSibling())) {
         ASSERT(start.offsetInContainerNode() < position.offsetInContainerNode());
-        start = Position(toText(text->previousSibling()), start.offsetInContainerNode());
+        start = Position(downcast<Text>(text->previousSibling()), start.offsetInContainerNode());
     }
-    if (text == end.containerNode() && text->previousSibling() && text->previousSibling()->isTextNode()) {
+    if (text == end.containerNode() && is<Text>(text->previousSibling())) {
         ASSERT(end.offsetInContainerNode() < position.offsetInContainerNode());
-        end = Position(toText(text->previousSibling()), end.offsetInContainerNode());
+        end = Position(downcast<Text>(text->previousSibling()), end.offsetInContainerNode());
     }
     if (text == m_endOfLastParagraph.containerNode()) {
         if (m_endOfLastParagraph.offsetInContainerNode() < position.offsetInContainerNode()) {
             // We can only fix endOfLastParagraph if the previous node was still text and hasn't been modified by script.
-            if (text->previousSibling()->isTextNode()
-                && static_cast<unsigned>(m_endOfLastParagraph.offsetInContainerNode()) <= toText(text->previousSibling())->length())
-                m_endOfLastParagraph = Position(toText(text->previousSibling()), m_endOfLastParagraph.offsetInContainerNode());
+            if (is<Text>(*text->previousSibling())
+                && static_cast<unsigned>(m_endOfLastParagraph.offsetInContainerNode()) <= downcast<Text>(text->previousSibling())->length())
+                m_endOfLastParagraph = Position(downcast<Text>(text->previousSibling()), m_endOfLastParagraph.offsetInContainerNode());
         } else
             m_endOfLastParagraph = Position(text.get(), m_endOfLastParagraph.offsetInContainerNode() - 1);
     }
@@ -276,7 +292,7 @@ VisiblePosition ApplyBlockElementCommand::endOfNextParagrahSplittingTextNodesIfN
     return Position(text.get(), position.offsetInContainerNode() - 1);
 }
 
-PassRefPtr<Element> ApplyBlockElementCommand::createBlockElement() const
+PassRefPtr<Element> ApplyBlockElementCommand::createBlockElement()
 {
     RefPtr<Element> element = createHTMLElement(document(), m_tagName);
     if (m_inlineStyle.length())

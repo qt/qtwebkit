@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2004, 2006 Apple Computer, Inc.  All rights reserved.
+ * Copyright (C) 2004, 2006 Apple Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -29,12 +29,10 @@
 
 #include "NP_jsobject.h"
 
-#include "PluginView.h"
 #include "c_utility.h"
 #include "c_instance.h"
 #include "IdentifierRep.h"
 #include "JSDOMBinding.h"
-#include "npruntime_impl.h"
 #include "npruntime_priv.h"
 #include "runtime_root.h"
 #include <runtime/Error.h>
@@ -43,7 +41,12 @@
 #include <runtime/PropertyNameArray.h>
 #include <parser/SourceCode.h>
 #include <runtime/Completion.h>
+#include <wtf/NeverDestroyed.h>
 #include <wtf/text/WTFString.h>
+
+#pragma GCC visibility push(default)
+#include "npruntime_impl.h"
+#pragma GCC visibility pop
 
 using namespace JSC;
 using namespace JSC::Bindings;
@@ -70,9 +73,8 @@ public:
 
     void remove(RootObject* rootObject)
     {
-        HashMap<RootObject*, JSToNPObjectMap>::iterator iter = m_map.find(rootObject);
-        ASSERT(iter != m_map.end());
-        m_map.remove(iter);
+        ASSERT(m_map.contains(rootObject));
+        m_map.remove(rootObject);
     }
 
     void remove(RootObject* rootObject, JSObject* jsObject)
@@ -98,7 +100,7 @@ private:
 
 static ObjectMap& objectMap()
 {
-    DEFINE_STATIC_LOCAL(ObjectMap, map, ());
+    static NeverDestroyed<ObjectMap> map;
     return map;
 }
 
@@ -139,7 +141,7 @@ static NPClass noScriptClass = { 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 NPClass* NPScriptObjectClass = &javascriptClass;
 static NPClass* NPNoScriptObjectClass = &noScriptClass;
 
-NPObject* _NPN_CreateScriptObject(NPP npp, JSObject* imp, PassRefPtr<RootObject> rootObject)
+NPObject* _NPN_CreateScriptObject(NPP npp, JSObject* imp, RefPtr<RootObject>&& rootObject)
 {
     if (NPObject* object = objectMap().get(rootObject.get(), imp))
         return _NPN_RetainObject(object);
@@ -234,7 +236,7 @@ bool _NPN_Invoke(NPP npp, NPObject* o, NPIdentifier methodName, const NPVariant*
         // Call the function object.
         MarkedArgumentBuffer argList;
         getListFromVariantArgs(exec, args, argCount, rootObject, argList);
-        JSValue resultV = JSC::call(exec, function, callType, callData, obj->imp->methodTable()->toThisObject(obj->imp, exec), argList);
+        JSValue resultV = JSC::call(exec, function, callType, callData, obj->imp, argList);
 
         // Convert and return the result of the function call.
         convertValueToNPVariant(exec, resultV, result);
@@ -249,7 +251,7 @@ bool _NPN_Invoke(NPP npp, NPObject* o, NPIdentifier methodName, const NPVariant*
     return true;
 }
 
-bool _NPN_Evaluate(NPP instance, NPObject* o, NPString* s, NPVariant* variant)
+bool _NPN_Evaluate(NPP, NPObject* o, NPString* s, NPVariant* variant)
 {
     if (o->_class == NPScriptObjectClass) {
         JavaScriptObject* obj = reinterpret_cast<JavaScriptObject*>(o); 
@@ -257,10 +259,6 @@ bool _NPN_Evaluate(NPP instance, NPObject* o, NPString* s, NPVariant* variant)
         RootObject* rootObject = obj->rootObject;
         if (!rootObject || !rootObject->isValid())
             return false;
-
-        // There is a crash in Flash when evaluating a script that destroys the
-        // PluginView, so we destroy it asynchronously.
-        PluginView::keepAlive(instance);
 
         ExecState* exec = rootObject->globalObject()->globalExec();
         JSLockHolder lock(exec);
@@ -325,7 +323,7 @@ bool _NPN_SetProperty(NPP, NPObject* o, NPIdentifier propertyName, const NPVaria
         IdentifierRep* i = static_cast<IdentifierRep*>(propertyName);
 
         if (i->isString()) {
-            PutPropertySlot slot;
+            PutPropertySlot slot(obj->imp);
             obj->imp->methodTable()->put(obj->imp, exec, identifierFromNPIdentifier(exec, i->string()), convertNPVariantToValue(exec, variant, rootObject), slot);
         } else
             obj->imp->methodTable()->putByIndex(obj->imp, exec, i->number(), convertNPVariantToValue(exec, variant, rootObject), false);
@@ -447,9 +445,9 @@ bool _NPN_Enumerate(NPP, NPObject* o, NPIdentifier** identifier, uint32_t* count
         
         ExecState* exec = rootObject->globalObject()->globalExec();
         JSLockHolder lock(exec);
-        PropertyNameArray propertyNames(exec);
+        PropertyNameArray propertyNames(exec, PropertyNameMode::Strings);
 
-        obj->imp->methodTable()->getPropertyNames(obj->imp, exec, propertyNames, ExcludeDontEnumProperties);
+        obj->imp->methodTable()->getPropertyNames(obj->imp, exec, propertyNames, EnumerationMode());
         unsigned size = static_cast<unsigned>(propertyNames.size());
         // FIXME: This should really call NPN_MemAlloc but that's in WebKit
         NPIdentifier* identifiers = static_cast<NPIdentifier*>(malloc(sizeof(NPIdentifier) * size));

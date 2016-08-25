@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2008, 2012, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,32 +26,212 @@
 #include "config.h"
 #include "JITCode.h"
 
+#include "LLIntThunks.h"
+#include "JSCInlines.h"
+#include "ProtoCallFrame.h"
 #include <wtf/PrintStream.h>
+
+namespace JSC {
+
+JITCode::JITCode(JITType jitType)
+    : m_jitType(jitType)
+{
+}
+
+JITCode::~JITCode()
+{
+}
+
+const char* JITCode::typeName(JITType jitType)
+{
+    switch (jitType) {
+    case None:
+        return "None";
+    case HostCallThunk:
+        return "Host";
+    case InterpreterThunk:
+        return "LLInt";
+    case BaselineJIT:
+        return "Baseline";
+    case DFGJIT:
+        return "DFG";
+    case FTLJIT:
+        return "FTL";
+    default:
+        CRASH();
+        return "";
+    }
+}
+
+void JITCode::validateReferences(const TrackedReferences&)
+{
+}
+
+JSValue JITCode::execute(VM* vm, ProtoCallFrame* protoCallFrame)
+{
+    void* entryAddress;
+    JSFunction* function = jsDynamicCast<JSFunction*>(protoCallFrame->callee());
+
+    if (!function || !protoCallFrame->needArityCheck()) {
+        ASSERT(!protoCallFrame->needArityCheck());
+        entryAddress = executableAddress();
+    } else
+        entryAddress = addressForCall(MustCheckArity).executableAddress();
+    JSValue result = JSValue::decode(vmEntryToJavaScript(entryAddress, vm, protoCallFrame));
+    return vm->exception() ? jsNull() : result;
+}
+
+DFG::CommonData* JITCode::dfgCommon()
+{
+    RELEASE_ASSERT_NOT_REACHED();
+    return 0;
+}
+
+DFG::JITCode* JITCode::dfg()
+{
+    RELEASE_ASSERT_NOT_REACHED();
+    return 0;
+}
+
+FTL::JITCode* JITCode::ftl()
+{
+    RELEASE_ASSERT_NOT_REACHED();
+    return 0;
+}
+
+FTL::ForOSREntryJITCode* JITCode::ftlForOSREntry()
+{
+    RELEASE_ASSERT_NOT_REACHED();
+    return 0;
+}
+
+JITCodeWithCodeRef::JITCodeWithCodeRef(JITType jitType)
+    : JITCode(jitType)
+{
+}
+
+JITCodeWithCodeRef::JITCodeWithCodeRef(CodeRef ref, JITType jitType)
+    : JITCode(jitType)
+    , m_ref(ref)
+{
+}
+
+JITCodeWithCodeRef::~JITCodeWithCodeRef()
+{
+    if ((Options::dumpDisassembly() || (isOptimizingJIT(jitType()) && Options::dumpDFGDisassembly()))
+        && m_ref.executableMemory())
+        dataLog("Destroying JIT code at ", pointerDump(m_ref.executableMemory()), "\n");
+}
+
+void* JITCodeWithCodeRef::executableAddressAtOffset(size_t offset)
+{
+    RELEASE_ASSERT(m_ref);
+    return reinterpret_cast<char*>(m_ref.code().executableAddress()) + offset;
+}
+
+void* JITCodeWithCodeRef::dataAddressAtOffset(size_t offset)
+{
+    RELEASE_ASSERT(m_ref);
+    ASSERT(offset <= size()); // use <= instead of < because it is valid to ask for an address at the exclusive end of the code.
+    return reinterpret_cast<char*>(m_ref.code().dataLocation()) + offset;
+}
+
+unsigned JITCodeWithCodeRef::offsetOf(void* pointerIntoCode)
+{
+    RELEASE_ASSERT(m_ref);
+    intptr_t result = reinterpret_cast<intptr_t>(pointerIntoCode) - reinterpret_cast<intptr_t>(m_ref.code().executableAddress());
+    ASSERT(static_cast<intptr_t>(static_cast<unsigned>(result)) == result);
+    return static_cast<unsigned>(result);
+}
+
+size_t JITCodeWithCodeRef::size()
+{
+    RELEASE_ASSERT(m_ref);
+    return m_ref.size();
+}
+
+bool JITCodeWithCodeRef::contains(void* address)
+{
+    RELEASE_ASSERT(m_ref);
+    return m_ref.executableMemory()->contains(address);
+}
+
+DirectJITCode::DirectJITCode(JITType jitType)
+    : JITCodeWithCodeRef(jitType)
+{
+}
+
+DirectJITCode::DirectJITCode(JITCode::CodeRef ref, JITCode::CodePtr withArityCheck, JITType jitType)
+    : JITCodeWithCodeRef(ref, jitType)
+    , m_withArityCheck(withArityCheck)
+{
+}
+
+DirectJITCode::~DirectJITCode()
+{
+}
+
+void DirectJITCode::initializeCodeRef(JITCode::CodeRef ref, JITCode::CodePtr withArityCheck)
+{
+    RELEASE_ASSERT(!m_ref);
+    m_ref = ref;
+    m_withArityCheck = withArityCheck;
+}
+
+JITCode::CodePtr DirectJITCode::addressForCall(ArityCheckMode arity)
+{
+    switch (arity) {
+    case ArityCheckNotRequired:
+        RELEASE_ASSERT(m_ref);
+        return m_ref.code();
+    case MustCheckArity:
+        RELEASE_ASSERT(m_withArityCheck);
+        return m_withArityCheck;
+    }
+    RELEASE_ASSERT_NOT_REACHED();
+    return CodePtr();
+}
+
+NativeJITCode::NativeJITCode(JITType jitType)
+    : JITCodeWithCodeRef(jitType)
+{
+}
+
+NativeJITCode::NativeJITCode(CodeRef ref, JITType jitType)
+    : JITCodeWithCodeRef(ref, jitType)
+{
+}
+
+NativeJITCode::~NativeJITCode()
+{
+}
+
+void NativeJITCode::initializeCodeRef(CodeRef ref)
+{
+    ASSERT(!m_ref);
+    m_ref = ref;
+}
+
+JITCode::CodePtr NativeJITCode::addressForCall(ArityCheckMode)
+{
+    RELEASE_ASSERT(!!m_ref);
+    return m_ref.code();
+}
+
+#if ENABLE(JIT)
+RegisterSet JITCode::liveRegistersToPreserveAtExceptionHandlingCallSite(CodeBlock*, CallSiteIndex)
+{
+    return RegisterSet();
+}
+#endif
+
+} // namespace JSC
 
 namespace WTF {
 
 void printInternal(PrintStream& out, JSC::JITCode::JITType type)
 {
-    switch (type) {
-    case JSC::JITCode::None:
-        out.print("None");
-        return;
-    case JSC::JITCode::HostCallThunk:
-        out.print("Host");
-        return;
-    case JSC::JITCode::InterpreterThunk:
-        out.print("LLInt");
-        return;
-    case JSC::JITCode::BaselineJIT:
-        out.print("Baseline");
-        return;
-    case JSC::JITCode::DFGJIT:
-        out.print("DFG");
-        return;
-    default:
-        CRASH();
-        return;
-    }
+    out.print(JSC::JITCode::typeName(type));
 }
 
 } // namespace WTF

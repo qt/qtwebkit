@@ -49,30 +49,29 @@ namespace WebCore {
         class EventData {
             WTF_MAKE_NONCOPYABLE(EventData); WTF_MAKE_FAST_ALLOCATED;
         public:
-            static PassOwnPtr<EventData> create(PassRefPtr<SerializedScriptValue>, PassOwnPtr<MessagePortChannelArray>);
+            EventData(PassRefPtr<SerializedScriptValue> message, std::unique_ptr<MessagePortChannelArray>);
 
             PassRefPtr<SerializedScriptValue> message() { return m_message; }
-            PassOwnPtr<MessagePortChannelArray> channels() { return m_channels.release(); }
+            std::unique_ptr<MessagePortChannelArray> channels() { return WTFMove(m_channels); }
 
         private:
-            EventData(PassRefPtr<SerializedScriptValue> message, PassOwnPtr<MessagePortChannelArray>);
             RefPtr<SerializedScriptValue> m_message;
-            OwnPtr<MessagePortChannelArray> m_channels;
+            std::unique_ptr<MessagePortChannelArray> m_channels;
         };
 
         // Wrapper for MessageQueue that allows us to do thread safe sharing by two proxies.
         class MessagePortQueue : public ThreadSafeRefCounted<MessagePortQueue> {
         public:
-            static PassRefPtr<MessagePortQueue> create() { return adoptRef(new MessagePortQueue()); }
+            static Ref<MessagePortQueue> create() { return adoptRef(*new MessagePortQueue()); }
 
-            PassOwnPtr<PlatformMessagePortChannel::EventData> tryGetMessage()
+            std::unique_ptr<PlatformMessagePortChannel::EventData> tryGetMessage()
             {
                 return m_queue.tryGetMessage();
             }
 
-            bool appendAndCheckEmpty(PassOwnPtr<PlatformMessagePortChannel::EventData> message)
+            bool appendAndCheckEmpty(std::unique_ptr<PlatformMessagePortChannel::EventData> message)
             {
-                return m_queue.appendAndCheckEmpty(message);
+                return m_queue.appendAndCheckEmpty(WTFMove(message));
             }
 
             bool isEmpty()
@@ -88,16 +87,16 @@ namespace WebCore {
 
         ~PlatformMessagePortChannel();
 
-        static PassRefPtr<PlatformMessagePortChannel> create(PassRefPtr<MessagePortQueue> incoming, PassRefPtr<MessagePortQueue> outgoing);
+        static Ref<PlatformMessagePortChannel> create(PassRefPtr<MessagePortQueue> incoming, PassRefPtr<MessagePortQueue> outgoing);
         PlatformMessagePortChannel(PassRefPtr<MessagePortQueue> incoming, PassRefPtr<MessagePortQueue> outgoing);
 
-        PassRefPtr<PlatformMessagePortChannel> entangledChannel();
+        RefPtr<PlatformMessagePortChannel> entangledChannel();
 
         void setRemotePort(MessagePort*);
         void closeInternal();
 
-        // Mutex used to ensure exclusive access to the object internals.
-        Mutex m_mutex;
+        // Lock used to ensure exclusive access to the object internals.
+        Lock m_mutex;
 
         // Pointer to our entangled pair - cleared when close() is called.
         RefPtr<PlatformMessagePortChannel> m_entangledChannel;
@@ -107,7 +106,7 @@ namespace WebCore {
         RefPtr<MessagePortQueue> m_outgoingQueue;
 
         // The port we are connected to (the remote port) - this is the port that is notified when new messages arrive.
-        MessagePort* m_remotePort;
+        MessagePort* m_remotePort { nullptr };
     };
 
 } // namespace WebCore

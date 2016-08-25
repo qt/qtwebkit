@@ -21,8 +21,8 @@
 #define QtFallbackWebPopup_h
 
 #include "qwebkitplatformplugin.h"
-#include <wtf/Platform.h>
 #include <QtCore/QPointer>
+#include <wtf/Platform.h>
 
 #ifndef QT_NO_COMBOBOX
 

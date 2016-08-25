@@ -29,9 +29,6 @@
  */
 
 #include "config.h"
-
-#if ENABLE(INSPECTOR)
-
 #include "InspectorHistory.h"
 
 #include "ExceptionCodePlaceholder.h"
@@ -45,13 +42,13 @@ class UndoableStateMark : public InspectorHistory::Action {
 public:
     UndoableStateMark() : InspectorHistory::Action("[UndoableState]") { }
 
-    virtual bool perform(ExceptionCode&) { return true; }
+    virtual bool perform(ExceptionCode&) override { return true; }
 
-    virtual bool undo(ExceptionCode&) { return true; }
+    virtual bool undo(ExceptionCode&) override { return true; }
 
-    virtual bool redo(ExceptionCode&) { return true; }
+    virtual bool redo(ExceptionCode&) override { return true; }
 
-    virtual bool isUndoableStateMark() { return true; }
+    virtual bool isUndoableStateMark() override { return true; }
 };
 
 }
@@ -79,7 +76,7 @@ String InspectorHistory::Action::mergeId()
     return "";
 }
 
-void InspectorHistory::Action::merge(PassOwnPtr<Action>)
+void InspectorHistory::Action::merge(std::unique_ptr<Action>)
 {
 }
 
@@ -87,16 +84,16 @@ InspectorHistory::InspectorHistory() : m_afterLastActionIndex(0) { }
 
 InspectorHistory::~InspectorHistory() { }
 
-bool InspectorHistory::perform(PassOwnPtr<Action> action, ExceptionCode& ec)
+bool InspectorHistory::perform(std::unique_ptr<Action> action, ExceptionCode& ec)
 {
     if (!action->perform(ec))
         return false;
 
     if (!action->mergeId().isEmpty() && m_afterLastActionIndex > 0 && action->mergeId() == m_history[m_afterLastActionIndex - 1]->mergeId())
-        m_history[m_afterLastActionIndex - 1]->merge(action);
+        m_history[m_afterLastActionIndex - 1]->merge(WTFMove(action));
     else {
         m_history.resize(m_afterLastActionIndex);
-        m_history.append(action);
+        m_history.append(WTFMove(action));
         ++m_afterLastActionIndex;
     }
     return true;
@@ -104,7 +101,7 @@ bool InspectorHistory::perform(PassOwnPtr<Action> action, ExceptionCode& ec)
 
 void InspectorHistory::markUndoableState()
 {
-    perform(adoptPtr(new UndoableStateMark()), IGNORE_EXCEPTION);
+    perform(std::make_unique<UndoableStateMark>(), IGNORE_EXCEPTION);
 }
 
 bool InspectorHistory::undo(ExceptionCode& ec)
@@ -151,5 +148,3 @@ void InspectorHistory::reset()
 }
 
 } // namespace WebCore
-
-#endif // ENABLE(INSPECTOR)

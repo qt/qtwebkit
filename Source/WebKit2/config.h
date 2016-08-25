@@ -24,45 +24,25 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */ 
 
-#if defined(BUILDING_WITH_CMAKE)
+#if defined(HAVE_CONFIG_H) && HAVE_CONFIG_H && defined(BUILDING_WITH_CMAKE)
 #include "cmakeconfig.h"
-#elif defined(BUILDING_GTK__)
-#include "autotoolsconfig.h"
 #endif
 
+#include <wtf/Platform.h>
+
+#include <WebCore/PlatformExportMacros.h>
 #include <runtime/JSExportMacros.h>
 #include <wtf/DisallowCType.h>
-#include <wtf/Platform.h>
 #include <wtf/ExportMacros.h>
 
-#ifdef __cplusplus
-#ifndef EXTERN_C_BEGIN
-#define EXTERN_C_BEGIN extern "C" {
-#endif
-#ifndef EXTERN_C_END
-#define EXTERN_C_END }
-#endif
-#else
-#define EXTERN_C_BEGIN
-#define EXTERN_C_END
+#if defined(WIN32) || defined(_WIN32)
+
+#ifndef _WIN32_WINNT
+#define _WIN32_WINNT 0x0502
 #endif
 
-// For defining getters to a static value, where the getters have internal linkage
-#define DEFINE_STATIC_GETTER(type, name, arguments) \
-static const type& name() \
-{ \
-    DEFINE_STATIC_LOCAL(type, name##Value, arguments); \
-    return name##Value; \
-}
-
-#if OS(WINDOWS)
-/* If we don't define these, they get defined in windef.h. */
-/* We want to use std::min and std::max. */
-#ifndef max
-#define max max
-#endif
-#ifndef min
-#define min min
+#ifndef WINVER
+#define WINVER 0x0502
 #endif
 
 #ifndef _WINSOCKAPI_
@@ -78,7 +58,7 @@ static const type& name() \
 #include <CoreGraphics/CoreGraphics.h>
 #endif
 
-#endif /* OS(WINDOWS) */
+#endif /* defined(WIN32) || defined(_WIN32) */
 
 #ifdef __cplusplus
 
@@ -93,10 +73,8 @@ static const type& name() \
 #ifndef PLUGIN_ARCHITECTURE_UNSUPPORTED
 #if PLATFORM(MAC)
 #define PLUGIN_ARCHITECTURE_MAC 1
-#elif (PLATFORM(GTK) || PLATFORM(EFL)) && (OS(UNIX) && !OS(MAC_OS_X))
+#elif (PLATFORM(GTK) || PLATFORM(EFL)) && (OS(UNIX) && !OS(MAC_OS_X)) && PLATFORM(X11)
 #define PLUGIN_ARCHITECTURE_X11 1
-#elif PLATFORM(QT)
-// Qt handles this features.prf
 #else
 #define PLUGIN_ARCHITECTURE_UNSUPPORTED 1
 #endif
@@ -105,7 +83,66 @@ static const type& name() \
 #define PLUGIN_ARCHITECTURE(ARCH) (defined PLUGIN_ARCHITECTURE_##ARCH && PLUGIN_ARCHITECTURE_##ARCH)
 
 #ifndef ENABLE_INSPECTOR_SERVER
-#if ENABLE(INSPECTOR) && (PLATFORM(QT) || PLATFORM(GTK) || PLATFORM(EFL))
+#if ENABLE(WEB_SOCKETS) && (PLATFORM(QT) || PLATFORM(GTK) || PLATFORM(EFL))
 #define ENABLE_INSPECTOR_SERVER 1
+#endif
+#endif
+
+#ifndef ENABLE_SEC_ITEM_SHIM
+#if PLATFORM(MAC) || PLATFORM(IOS)
+#define ENABLE_SEC_ITEM_SHIM 1
+#endif
+#endif
+
+#if PLATFORM(MAC)
+#ifndef HAVE_WINDOW_SERVER_OCCLUSION_NOTIFICATIONS
+#define HAVE_WINDOW_SERVER_OCCLUSION_NOTIFICATIONS 1
+#endif
+#ifndef USE_NETWORK_SESSION
+#define USE_NETWORK_SESSION 0
+#endif
+#endif
+
+#ifndef HAVE_SEC_ACCESS_CONTROL
+#if PLATFORM(IOS) || PLATFORM(MAC)
+#define HAVE_SEC_ACCESS_CONTROL 1
+#endif
+#endif
+
+#ifndef HAVE_OS_ACTIVITY
+#if PLATFORM(IOS) || PLATFORM(MAC)
+#define HAVE_OS_ACTIVITY 1
+#endif
+#endif
+
+#ifndef ENABLE_NETWORK_CACHE
+#if PLATFORM(COCOA) || PLATFORM(GTK)
+#define ENABLE_NETWORK_CACHE 1
+#else
+#define ENABLE_NETWORK_CACHE 0
+#endif
+#endif
+
+#ifndef ENABLE_NETWORK_CACHE_SPECULATIVE_REVALIDATION
+#if ENABLE(NETWORK_CACHE) && PLATFORM(COCOA)
+#define ENABLE_NETWORK_CACHE_SPECULATIVE_REVALIDATION 1
+#else
+#define ENABLE_NETWORK_CACHE_SPECULATIVE_REVALIDATION 0
+#endif
+#endif
+
+#ifndef HAVE_SAFARI_SERVICES_FRAMEWORK
+#if PLATFORM(IOS) && (!defined TARGET_OS_IOS || TARGET_OS_IOS)
+#define HAVE_SAFARI_SERVICES_FRAMEWORK 1
+#else
+#define HAVE_SAFARI_SERVICES_FRAMEWORK 0
+#endif
+#endif
+
+#ifndef HAVE_LINK_PREVIEW
+#if defined TARGET_OS_IOS && TARGET_OS_IOS
+#define HAVE_LINK_PREVIEW 1
+#else
+#define HAVE_LINK_PREVIEW 0
 #endif
 #endif

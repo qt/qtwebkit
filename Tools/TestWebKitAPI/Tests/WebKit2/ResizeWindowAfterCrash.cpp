@@ -24,10 +24,13 @@
  */
 
 #include "config.h"
+
+#if WK_HAVE_C_SPI
+
 #include "PlatformUtilities.h"
 #include "PlatformWebView.h"
 #include "Test.h"
-#include <WebKit2/WKRetainPtr.h>
+#include <WebKit/WKRetainPtr.h>
 
 namespace TestWebKitAPI {
 
@@ -75,12 +78,15 @@ TEST(WebKit2, ResizeWindowAfterCrash)
     WKRetainPtr<WKContextRef> context(AdoptWK, WKContextCreate());
     TestStatesData states(context.get());
 
-    WKPageLoaderClient loaderClient;
+    WKPageLoaderClientV0 loaderClient;
     memset(&loaderClient, 0, sizeof(loaderClient));
-    loaderClient.clientInfo = &states;
+
+    loaderClient.base.version = 0;
+    loaderClient.base.clientInfo = &states;
     loaderClient.didFinishLoadForFrame = didFinishLoad;
     loaderClient.processDidCrash = didCrash;
-    WKPageSetPageLoaderClient(states.webView.page(), &loaderClient);
+
+    WKPageSetPageLoaderClient(states.webView.page(), &loaderClient.base);
 
     WKRetainPtr<WKURLRef> url = adoptWK(WKURLCreateWithUTF8CString("about:blank"));
     // Load a blank page and next kills WebProcess.
@@ -94,3 +100,5 @@ TEST(WebKit2, ResizeWindowAfterCrash)
 }
 
 } // namespace TestWebKitAPI
+
+#endif

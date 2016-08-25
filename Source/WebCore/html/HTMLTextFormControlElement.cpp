@@ -2,7 +2,7 @@
  * Copyright (C) 1999 Lars Knoll (knoll@kde.org)
  *           (C) 1999 Antti Koivisto (koivisto@kde.org)
  *           (C) 2001 Dirk Mueller (mueller@kde.org)
- * Copyright (C) 2004, 2005, 2006, 2007 Apple Inc. All rights reserved.
+ * Copyright (C) 2004, 2005, 2006, 2007, 2014 Apple Inc. All rights reserved.
  *           (C) 2006 Alexey Proskuryakov (ap@nypop.com)
  *
  * This library is free software; you can redistribute it and/or
@@ -26,39 +26,40 @@
 #include "HTMLTextFormControlElement.h"
 
 #include "AXObjectCache.h"
-#include "Attribute.h"
 #include "ChromeClient.h"
 #include "Document.h"
 #include "Event.h"
 #include "EventNames.h"
-#include "FeatureObserver.h"
 #include "Frame.h"
 #include "FrameSelection.h"
 #include "HTMLBRElement.h"
 #include "HTMLFormElement.h"
 #include "HTMLInputElement.h"
 #include "HTMLNames.h"
-#include "NodeRenderingContext.h"
 #include "NodeTraversal.h"
-#include "RenderBox.h"
-#include "RenderTextControl.h"
+#include "Page.h"
+#include "RenderBlockFlow.h"
+#include "RenderTextControlSingleLine.h"
 #include "RenderTheme.h"
-#include "ScriptEventListener.h"
+#include "ShadowRoot.h"
 #include "Text.h"
-#include "TextIterator.h"
+#include "TextControlInnerElements.h"
+#include "htmlediting.h"
 #include <wtf/text/StringBuilder.h>
 
 namespace WebCore {
 
 using namespace HTMLNames;
-using namespace std;
 
-HTMLTextFormControlElement::HTMLTextFormControlElement(const QualifiedName& tagName, Document* doc, HTMLFormElement* form)
-    : HTMLFormControlElementWithState(tagName, doc, form)
-    , m_lastChangeWasUserEdit(false)
+static Position positionForIndex(TextControlInnerTextElement*, unsigned);
+
+HTMLTextFormControlElement::HTMLTextFormControlElement(const QualifiedName& tagName, Document& document, HTMLFormElement* form)
+    : HTMLFormControlElementWithState(tagName, document, form)
     , m_cachedSelectionStart(-1)
     , m_cachedSelectionEnd(-1)
     , m_cachedSelectionDirection(SelectionHasNoDirection)
+    , m_lastChangeWasUserEdit(false)
+    , m_isPlaceholderVisible(false)
 {
 }
 
@@ -66,50 +67,48 @@ HTMLTextFormControlElement::~HTMLTextFormControlElement()
 {
 }
 
-bool HTMLTextFormControlElement::childShouldCreateRenderer(const NodeRenderingContext& childContext) const
+bool HTMLTextFormControlElement::childShouldCreateRenderer(const Node& child) const
 {
     // FIXME: We shouldn't force the pseudo elements down into the shadow, but
     // this perserves the current behavior of WebKit.
-    if (childContext.node()->isPseudoElement())
-        return HTMLFormControlElementWithState::childShouldCreateRenderer(childContext);
-    return childContext.isOnEncapsulationBoundary() && HTMLFormControlElementWithState::childShouldCreateRenderer(childContext);
+    if (child.isPseudoElement())
+        return HTMLFormControlElementWithState::childShouldCreateRenderer(child);
+    return hasShadowRootParent(child) && HTMLFormControlElementWithState::childShouldCreateRenderer(child);
 }
 
-Node::InsertionNotificationRequest HTMLTextFormControlElement::insertedInto(ContainerNode* insertionPoint)
+Node::InsertionNotificationRequest HTMLTextFormControlElement::insertedInto(ContainerNode& insertionPoint)
 {
-    HTMLFormControlElementWithState::insertedInto(insertionPoint);
-    if (!insertionPoint->inDocument())
-        return InsertionDone;
+    InsertionNotificationRequest insertionNotificationRequest = HTMLFormControlElementWithState::insertedInto(insertionPoint);
+    if (!insertionPoint.inDocument())
+        return insertionNotificationRequest;
     String initialValue = value();
     setTextAsOfLastFormControlChangeEvent(initialValue.isNull() ? emptyString() : initialValue);
-    return InsertionDone;
+    return insertionNotificationRequest;
 }
 
-void HTMLTextFormControlElement::dispatchFocusEvent(PassRefPtr<Element> oldFocusedElement, FocusDirection direction)
+void HTMLTextFormControlElement::dispatchFocusEvent(RefPtr<Element>&& oldFocusedElement, FocusDirection direction)
 {
     if (supportsPlaceholder())
-        updatePlaceholderVisibility(false);
+        updatePlaceholderVisibility();
     handleFocusEvent(oldFocusedElement.get(), direction);
-    HTMLFormControlElementWithState::dispatchFocusEvent(oldFocusedElement, direction);
+    HTMLFormControlElementWithState::dispatchFocusEvent(WTFMove(oldFocusedElement), direction);
 }
 
-void HTMLTextFormControlElement::dispatchBlurEvent(PassRefPtr<Element> newFocusedElement)
+void HTMLTextFormControlElement::dispatchBlurEvent(RefPtr<Element>&& newFocusedElement)
 {
     if (supportsPlaceholder())
-        updatePlaceholderVisibility(false);
+        updatePlaceholderVisibility();
     handleBlurEvent();
-    HTMLFormControlElementWithState::dispatchBlurEvent(newFocusedElement);
+    HTMLFormControlElementWithState::dispatchBlurEvent(WTFMove(newFocusedElement));
 }
 
-void HTMLTextFormControlElement::defaultEventHandler(Event* event)
+void HTMLTextFormControlElement::didEditInnerTextValue()
 {
-    if (event->type() == eventNames().webkitEditableContentChangedEvent && renderer() && renderer()->isTextControl()) {
-        m_lastChangeWasUserEdit = true;
-        subtreeHasChanged();
+    if (!isTextFormControl())
         return;
-    }
 
-    HTMLFormControlElementWithState::defaultEventHandler(event);
+    m_lastChangeWasUserEdit = true;
+    subtreeHasChanged();
 }
 
 void HTMLTextFormControlElement::forwardEvent(Event* event)
@@ -149,60 +148,33 @@ bool HTMLTextFormControlElement::isPlaceholderEmpty() const
 
 bool HTMLTextFormControlElement::placeholderShouldBeVisible() const
 {
-    return supportsPlaceholder()
-        && isEmptyValue()
-        && isEmptySuggestedValue()
-        && !isPlaceholderEmpty()
-        && (document()->focusedElement() != this || (renderer() && renderer()->theme()->shouldShowPlaceholderWhenFocused()))
-        && (!renderer() || renderer()->style()->visibility() == VISIBLE);
+    // This function is used by the style resolver to match the :placeholder-shown pseudo class.
+    // Since it is used for styling, it must not use any value depending on the style.
+    return supportsPlaceholder() && isEmptyValue() && !isPlaceholderEmpty();
 }
 
-void HTMLTextFormControlElement::updatePlaceholderVisibility(bool placeholderValueChanged)
+void HTMLTextFormControlElement::updatePlaceholderVisibility()
 {
-    if (!supportsPlaceholder())
-        return;
-    if (!placeholderElement() || placeholderValueChanged)
-        updatePlaceholderText();
-    HTMLElement* placeholder = placeholderElement();
-    if (!placeholder)
-        return;
-    placeholder->setInlineStyleProperty(CSSPropertyVisibility, placeholderShouldBeVisible() ? ASCIILiteral("visible") : ASCIILiteral("hidden"));
-}
+    bool placeHolderWasVisible = m_isPlaceholderVisible;
+    m_isPlaceholderVisible = placeholderShouldBeVisible();
 
-void HTMLTextFormControlElement::fixPlaceholderRenderer(HTMLElement* placeholder, HTMLElement* siblingElement)
-{
-    // FIXME: We should change the order of DOM nodes. But it makes an assertion
-    // failure in editing code.
-    if (!placeholder || !placeholder->renderer())
+    if (placeHolderWasVisible == m_isPlaceholderVisible)
         return;
-    RenderObject* placeholderRenderer = placeholder->renderer();
-    RenderObject* siblingRenderer = siblingElement->renderer();
-    if (!siblingRenderer)
-        return;
-    if (placeholderRenderer->nextSibling() == siblingRenderer)
-        return;
-    RenderObject* parentRenderer = placeholderRenderer->parent();
-    ASSERT(siblingRenderer->parent() == parentRenderer);
-    parentRenderer->removeChild(placeholderRenderer);
-    parentRenderer->addChild(placeholderRenderer, siblingRenderer);
-}
 
-RenderTextControl* HTMLTextFormControlElement::textRendererAfterUpdateLayout()
-{
-    if (!isTextFormControl())
-        return 0;
-    document()->updateLayoutIgnorePendingStylesheets();
-    return toRenderTextControl(renderer());
+    setNeedsStyleRecalc();
+
+    if (HTMLElement* placeholder = placeholderElement())
+        placeholder->setInlineStyleProperty(CSSPropertyDisplay, m_isPlaceholderVisible ? CSSValueBlock : CSSValueNone, true);
 }
 
 void HTMLTextFormControlElement::setSelectionStart(int start)
 {
-    setSelectionRange(start, max(start, selectionEnd()), selectionDirection());
+    setSelectionRange(start, std::max(start, selectionEnd()), selectionDirection());
 }
 
 void HTMLTextFormControlElement::setSelectionEnd(int end)
 {
-    setSelectionRange(min(end, selectionStart()), end, selectionDirection());
+    setSelectionRange(std::min(end, selectionStart()), end, selectionDirection());
 }
 
 void HTMLTextFormControlElement::setSelectionDirection(const String& direction)
@@ -210,9 +182,16 @@ void HTMLTextFormControlElement::setSelectionDirection(const String& direction)
     setSelectionRange(selectionStart(), selectionEnd(), direction);
 }
 
-void HTMLTextFormControlElement::select()
+void HTMLTextFormControlElement::select(const AXTextStateChangeIntent& intent)
 {
-    setSelectionRange(0, numeric_limits<int>::max(), SelectionHasNoDirection);
+    // FIXME: We should abstract the selection behavior into an EditingBehavior function instead
+    // of hardcoding the behavior using a macro define.
+#if PLATFORM(IOS)
+    // We don't want to select all the text on iOS. Instead use the standard textfield behavior of going to the end of the line.
+    setSelectionRange(std::numeric_limits<int>::max(), std::numeric_limits<int>::max(), SelectionHasForwardDirection, intent);
+#else
+    setSelectionRange(0, std::numeric_limits<int>::max(), SelectionHasNoDirection, intent);
+#endif
 }
 
 String HTMLTextFormControlElement::selectedText() const
@@ -230,13 +209,6 @@ void HTMLTextFormControlElement::dispatchFormControlChangeEvent()
     }
     setChangedSinceLastFormControlChangeEvent(false);
 }
-
-static inline bool hasVisibleTextArea(RenderTextControl* textControl, HTMLElement* innerText)
-{
-    ASSERT(textControl);
-    return textControl->style()->visibility() != HIDDEN && innerText && innerText->renderer() && innerText->renderBox()->height();
-}
-
 
 void HTMLTextFormControlElement::setRangeText(const String& replacement, ExceptionCode& ec)
 {
@@ -272,12 +244,12 @@ void HTMLTextFormControlElement::setRangeText(const String& replacement, unsigne
 
     subtreeHasChanged();
 
-    if (equalIgnoringCase(selectionMode, "select")) {
+    if (equalLettersIgnoringASCIICase(selectionMode, "select")) {
         newSelectionStart = start;
         newSelectionEnd = start + replacementLength;
-    } else if (equalIgnoringCase(selectionMode, "start"))
+    } else if (equalLettersIgnoringASCIICase(selectionMode, "start"))
         newSelectionStart = newSelectionEnd = start;
-    else if (equalIgnoringCase(selectionMode, "end"))
+    else if (equalLettersIgnoringASCIICase(selectionMode, "end"))
         newSelectionStart = newSelectionEnd = start + replacementLength;
     else {
         // Default is "preserve".
@@ -297,7 +269,7 @@ void HTMLTextFormControlElement::setRangeText(const String& replacement, unsigne
     setSelectionRange(newSelectionStart, newSelectionEnd, SelectionHasNoDirection);
 }
 
-void HTMLTextFormControlElement::setSelectionRange(int start, int end, const String& directionString)
+void HTMLTextFormControlElement::setSelectionRange(int start, int end, const String& directionString, const AXTextStateChangeIntent& intent)
 {
     TextFieldSelectionDirection direction = SelectionHasNoDirection;
     if (directionString == "forward")
@@ -305,64 +277,68 @@ void HTMLTextFormControlElement::setSelectionRange(int start, int end, const Str
     else if (directionString == "backward")
         direction = SelectionHasBackwardDirection;
 
-    return setSelectionRange(start, end, direction);
+    return setSelectionRange(start, end, direction, intent);
 }
 
-void HTMLTextFormControlElement::setSelectionRange(int start, int end, TextFieldSelectionDirection direction)
+void HTMLTextFormControlElement::setSelectionRange(int start, int end, TextFieldSelectionDirection direction, const AXTextStateChangeIntent& intent)
 {
-    document()->updateLayoutIgnorePendingStylesheets();
-
-    if (!renderer() || !renderer()->isTextControl())
+    if (!isTextFormControl())
         return;
 
-    end = max(end, 0);
-    start = min(max(start, 0), end);
+    end = std::max(end, 0);
+    start = std::min(std::max(start, 0), end);
 
-    RenderTextControl* control = toRenderTextControl(renderer());
-    if (!hasVisibleTextArea(control, innerTextElement())) {
-        cacheSelection(start, end, direction);
-        return;
+    TextControlInnerTextElement* innerText = innerTextElement();
+    bool hasFocus = document().focusedElement() == this;
+    if (!hasFocus && innerText) {
+        // FIXME: Removing this synchronous layout requires fixing <https://webkit.org/b/128797>
+        document().updateLayoutIgnorePendingStylesheets();
+        if (RenderElement* rendererTextControl = renderer()) {
+            if (rendererTextControl->style().visibility() == HIDDEN || !innerText->renderBox()->height()) {
+                cacheSelection(start, end, direction);
+                return;
+            }
+        }
     }
-    VisiblePosition startPosition = control->visiblePositionForIndex(start);
-    VisiblePosition endPosition;
+
+    Position startPosition = positionForIndex(innerText, start);
+    Position endPosition;
     if (start == end)
         endPosition = startPosition;
-    else
-        endPosition = control->visiblePositionForIndex(end);
-
-    // startPosition and endPosition can be null position for example when
-    // "-webkit-user-select: none" style attribute is specified.
-    if (startPosition.isNotNull() && endPosition.isNotNull()) {
-        ASSERT(startPosition.deepEquivalent().deprecatedNode()->shadowHost() == this
-            && endPosition.deepEquivalent().deprecatedNode()->shadowHost() == this);
+    else {
+        if (direction == SelectionHasBackwardDirection) {
+            endPosition = startPosition;
+            startPosition = positionForIndex(innerText, end);
+        } else
+            endPosition = positionForIndex(innerText, end);
     }
-    VisibleSelection newSelection;
-    if (direction == SelectionHasBackwardDirection)
-        newSelection = VisibleSelection(endPosition, startPosition);
-    else
-        newSelection = VisibleSelection(startPosition, endPosition);
-    newSelection.setIsDirectional(direction != SelectionHasNoDirection);
 
-    if (Frame* frame = document()->frame())
-        frame->selection()->setSelection(newSelection);
+    if (Frame* frame = document().frame())
+        frame->selection().moveWithoutValidationTo(startPosition, endPosition, direction != SelectionHasNoDirection, !hasFocus, intent);
 }
 
-int HTMLTextFormControlElement::indexForVisiblePosition(const VisiblePosition& pos) const
+int HTMLTextFormControlElement::indexForVisiblePosition(const VisiblePosition& position) const
 {
-    Position indexPosition = pos.deepEquivalent().parentAnchoredEquivalent();
-    if (enclosingTextFormControl(indexPosition) != this)
+    TextControlInnerTextElement* innerText = innerTextElement();
+    if (!innerText || !innerText->contains(position.deepEquivalent().anchorNode()))
         return 0;
-    RefPtr<Range> range = Range::create(indexPosition.document());
-    range->setStart(innerTextElement(), 0, ASSERT_NO_EXCEPTION);
-    range->setEnd(indexPosition.containerNode(), indexPosition.offsetInContainerNode(), ASSERT_NO_EXCEPTION);
-    return TextIterator::rangeLength(range.get());
+    unsigned index = indexForPosition(position.deepEquivalent());
+    ASSERT(VisiblePosition(positionForIndex(innerTextElement(), index)) == position);
+    return index;
+}
+
+VisiblePosition HTMLTextFormControlElement::visiblePositionForIndex(int index) const
+{
+    VisiblePosition position = positionForIndex(innerTextElement(), index);
+    ASSERT(indexForVisiblePosition(position) == index);
+    return position;
 }
 
 int HTMLTextFormControlElement::selectionStart() const
 {
     if (!isTextFormControl())
         return 0;
-    if (document()->focusedElement() != this && hasCachedSelection())
+    if (document().focusedElement() != this && hasCachedSelection())
         return m_cachedSelectionStart;
 
     return computeSelectionStart();
@@ -371,18 +347,18 @@ int HTMLTextFormControlElement::selectionStart() const
 int HTMLTextFormControlElement::computeSelectionStart() const
 {
     ASSERT(isTextFormControl());
-    Frame* frame = document()->frame();
+    Frame* frame = document().frame();
     if (!frame)
         return 0;
 
-    return indexForVisiblePosition(frame->selection()->start());
+    return indexForPosition(frame->selection().selection().start());
 }
 
 int HTMLTextFormControlElement::selectionEnd() const
 {
     if (!isTextFormControl())
         return 0;
-    if (document()->focusedElement() != this && hasCachedSelection())
+    if (document().focusedElement() != this && hasCachedSelection())
         return m_cachedSelectionEnd;
     return computeSelectionEnd();
 }
@@ -390,18 +366,18 @@ int HTMLTextFormControlElement::selectionEnd() const
 int HTMLTextFormControlElement::computeSelectionEnd() const
 {
     ASSERT(isTextFormControl());
-    Frame* frame = document()->frame();
+    Frame* frame = document().frame();
     if (!frame)
         return 0;
 
-    return indexForVisiblePosition(frame->selection()->end());
+    return indexForPosition(frame->selection().selection().end());
 }
 
 static const AtomicString& directionString(TextFieldSelectionDirection direction)
 {
-    DEFINE_STATIC_LOCAL(const AtomicString, none, ("none", AtomicString::ConstructFromLiteral));
-    DEFINE_STATIC_LOCAL(const AtomicString, forward, ("forward", AtomicString::ConstructFromLiteral));
-    DEFINE_STATIC_LOCAL(const AtomicString, backward, ("backward", AtomicString::ConstructFromLiteral));
+    static NeverDestroyed<const AtomicString> none("none", AtomicString::ConstructFromLiteral);
+    static NeverDestroyed<const AtomicString> forward("forward", AtomicString::ConstructFromLiteral);
+    static NeverDestroyed<const AtomicString> backward("backward", AtomicString::ConstructFromLiteral);
 
     switch (direction) {
     case SelectionHasNoDirection:
@@ -420,8 +396,8 @@ const AtomicString& HTMLTextFormControlElement::selectionDirection() const
 {
     if (!isTextFormControl())
         return directionString(SelectionHasNoDirection);
-    if (document()->focusedElement() != this && hasCachedSelection())
-        return directionString(m_cachedSelectionDirection);
+    if (document().focusedElement() != this && hasCachedSelection())
+        return directionString(cachedSelectionDirection());
 
     return directionString(computeSelectionDirection());
 }
@@ -429,11 +405,11 @@ const AtomicString& HTMLTextFormControlElement::selectionDirection() const
 TextFieldSelectionDirection HTMLTextFormControlElement::computeSelectionDirection() const
 {
     ASSERT(isTextFormControl());
-    Frame* frame = document()->frame();
+    Frame* frame = document().frame();
     if (!frame)
         return SelectionHasNoDirection;
 
-    const VisibleSelection& selection = frame->selection()->selection();
+    const VisibleSelection& selection = frame->selection().selection();
     return selection.isDirectional() ? (selection.isBaseFirst() ? SelectionHasForwardDirection : SelectionHasBackwardDirection) : SelectionHasNoDirection;
 }
 
@@ -444,30 +420,30 @@ static inline void setContainerAndOffsetForRange(Node* node, int offset, Node*& 
         offsetInContainer = offset;
     } else {
         containerNode = node->parentNode();
-        offsetInContainer = node->nodeIndex() + offset;
+        offsetInContainer = node->computeNodeIndex() + offset;
     }
 }
 
 PassRefPtr<Range> HTMLTextFormControlElement::selection() const
 {
     if (!renderer() || !isTextFormControl() || !hasCachedSelection())
-        return 0;
+        return nullptr;
 
     int start = m_cachedSelectionStart;
     int end = m_cachedSelectionEnd;
 
     ASSERT(start <= end);
-    HTMLElement* innerText = innerTextElement();
+    TextControlInnerTextElement* innerText = innerTextElement();
     if (!innerText)
-        return 0;
+        return nullptr;
 
     if (!innerText->firstChild())
         return Range::create(document(), innerText, 0, innerText, 0);
 
     int offset = 0;
-    Node* startNode = 0;
-    Node* endNode = 0;
-    for (Node* node = innerText->firstChild(); node; node = NodeTraversal::next(node, innerText)) {
+    Node* startNode = nullptr;
+    Node* endNode = nullptr;
+    for (Node* node = innerText->firstChild(); node; node = NodeTraversal::next(*node, innerText)) {
         ASSERT(!node->firstChild());
         ASSERT(node->isTextNode() || node->hasTagName(brTag));
         int length = node->isTextNode() ? lastOffsetInNode(node) : 1;
@@ -484,37 +460,54 @@ PassRefPtr<Range> HTMLTextFormControlElement::selection() const
     }
 
     if (!startNode || !endNode)
-        return 0;
+        return nullptr;
 
     return Range::create(document(), startNode, start, endNode, end);
 }
 
-void HTMLTextFormControlElement::restoreCachedSelection()
+void HTMLTextFormControlElement::restoreCachedSelection(const AXTextStateChangeIntent& intent)
 {
-    setSelectionRange(m_cachedSelectionStart, m_cachedSelectionEnd, m_cachedSelectionDirection);
+    setSelectionRange(m_cachedSelectionStart, m_cachedSelectionEnd, cachedSelectionDirection(), intent);
 }
 
-void HTMLTextFormControlElement::selectionChanged(bool userTriggered)
+void HTMLTextFormControlElement::selectionChanged(bool shouldFireSelectEvent)
 {
-    if (!renderer() || !isTextFormControl())
+    if (!isTextFormControl())
         return;
 
+    // FIXME: Don't re-compute selection start and end if this function was called inside setSelectionRange.
     // selectionStart() or selectionEnd() will return cached selection when this node doesn't have focus
     cacheSelection(computeSelectionStart(), computeSelectionEnd(), computeSelectionDirection());
-
-    if (Frame* frame = document()->frame()) {
-        if (frame->selection()->isRange() && userTriggered)
-            dispatchEvent(Event::create(eventNames().selectEvent, true, false));
-    }
+    
+    if (shouldFireSelectEvent && m_cachedSelectionStart != m_cachedSelectionEnd)
+        dispatchEvent(Event::create(eventNames().selectEvent, true, false));
 }
 
 void HTMLTextFormControlElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
     if (name == placeholderAttr) {
-        updatePlaceholderVisibility(true);
-        FeatureObserver::observe(document(), FeatureObserver::PlaceholderAttribute);
+        updatePlaceholderText();
+        updatePlaceholderVisibility();
     } else
         HTMLFormControlElementWithState::parseAttribute(name, value);
+}
+
+void HTMLTextFormControlElement::disabledStateChanged()
+{
+    HTMLFormControlElementWithState::disabledStateChanged();
+    updateInnerTextElementEditability();
+}
+
+void HTMLTextFormControlElement::readOnlyAttributeChanged()
+{
+    HTMLFormControlElementWithState::disabledAttributeChanged();
+    updateInnerTextElementEditability();
+}
+
+void HTMLTextFormControlElement::updateInnerTextElementEditability()
+{
+    if (TextControlInnerTextElement* innerText = innerTextElement())
+        innerText->setAttribute(contenteditableAttr, isDisabledOrReadOnly() ? "false" : "plaintext-only");
 }
 
 bool HTMLTextFormControlElement::lastChangeWasUserEdit() const
@@ -524,50 +517,138 @@ bool HTMLTextFormControlElement::lastChangeWasUserEdit() const
     return m_lastChangeWasUserEdit;
 }
 
+static void stripTrailingNewline(StringBuilder& result)
+{
+    // Remove one trailing newline; there's always one that's collapsed out by rendering.
+    size_t size = result.length();
+    if (size && result[size - 1] == newlineCharacter)
+        result.resize(size - 1);
+}
+
+static String innerTextValueFrom(TextControlInnerTextElement& innerText)
+{
+    StringBuilder result;
+    for (Node* node = innerText.firstChild(); node; node = NodeTraversal::next(*node, &innerText)) {
+        if (is<HTMLBRElement>(*node))
+            result.append(newlineCharacter);
+        else if (is<Text>(*node))
+            result.append(downcast<Text>(*node).data());
+    }
+    stripTrailingNewline(result);
+    return result.toString();
+}
+
 void HTMLTextFormControlElement::setInnerTextValue(const String& value)
 {
-    if (!isTextFormControl())
+    TextControlInnerTextElement* innerText = innerTextElement();
+    if (!innerText)
         return;
 
-    bool textIsChanged = value != innerTextValue();
-    if (textIsChanged || !innerTextElement()->hasChildNodes()) {
-        if (textIsChanged && document() && renderer()) {
-            if (AXObjectCache* cache = document()->existingAXObjectCache())
-                cache->postNotification(this, AXObjectCache::AXValueChanged, false);
+    ASSERT(isTextFormControl());
+    String previousValue = innerTextValueFrom(*innerText);
+    bool textIsChanged = value != previousValue;
+    if (textIsChanged || !innerText->hasChildNodes()) {
+#if HAVE(ACCESSIBILITY) && !PLATFORM(COCOA)
+        if (textIsChanged && renderer()) {
+            if (AXObjectCache* cache = document().existingAXObjectCache())
+                cache->postNotification(this, AXObjectCache::AXValueChanged, TargetObservableParent);
         }
-        innerTextElement()->setInnerText(value, ASSERT_NO_EXCEPTION);
+#endif
+        innerText->setInnerText(value, ASSERT_NO_EXCEPTION);
 
         if (value.endsWith('\n') || value.endsWith('\r'))
-            innerTextElement()->appendChild(HTMLBRElement::create(document()), ASSERT_NO_EXCEPTION);
+            innerText->appendChild(HTMLBRElement::create(document()), ASSERT_NO_EXCEPTION);
+
+#if HAVE(ACCESSIBILITY) && PLATFORM(COCOA)
+        if (textIsChanged && renderer()) {
+            if (AXObjectCache* cache = document().existingAXObjectCache())
+                cache->postTextReplacementNotification(this, AXTextEditTypeDelete, previousValue, AXTextEditTypeInsert, value, VisiblePosition(Position(this, Position::PositionIsBeforeAnchor)));
+        }
+#endif
     }
 
     setFormControlValueMatchesRenderer(true);
 }
 
-static String finishText(StringBuilder& result)
-{
-    // Remove one trailing newline; there's always one that's collapsed out by rendering.
-    size_t size = result.length();
-    if (size && result[size - 1] == '\n')
-        result.resize(--size);
-    return result.toString();
-}
-
 String HTMLTextFormControlElement::innerTextValue() const
 {
-    HTMLElement* innerText = innerTextElement();
-    if (!innerText || !isTextFormControl())
-        return emptyString();
-
-    StringBuilder result;
-    for (Node* node = innerText; node; node = NodeTraversal::next(node, innerText)) {
-        if (node->hasTagName(brTag))
-            result.append(newlineCharacter);
-        else if (node->isTextNode())
-            result.append(toText(node)->data());
-    }
-    return finishText(result);
+    TextControlInnerTextElement* innerText = innerTextElement();
+    return innerText ? innerTextValueFrom(*innerText) : emptyString();
 }
+
+static Position positionForIndex(TextControlInnerTextElement* innerText, unsigned index)
+{
+    unsigned remainingCharactersToMoveForward = index;
+    Node* lastBrOrText = innerText;
+    for (Node* node = innerText; node; node = NodeTraversal::next(*node, innerText)) {
+        if (node->hasTagName(brTag)) {
+            if (!remainingCharactersToMoveForward)
+                return positionBeforeNode(node);
+            remainingCharactersToMoveForward--;
+            lastBrOrText = node;
+        } else if (is<Text>(*node)) {
+            Text& text = downcast<Text>(*node);
+            if (remainingCharactersToMoveForward < text.length())
+                return Position(&text, remainingCharactersToMoveForward);
+            remainingCharactersToMoveForward -= text.length();
+            lastBrOrText = node;
+        }
+    }
+    return lastPositionInOrAfterNode(lastBrOrText);
+}
+
+unsigned HTMLTextFormControlElement::indexForPosition(const Position& passedPosition) const
+{
+    TextControlInnerTextElement* innerText = innerTextElement();
+    if (!innerText || !innerText->contains(passedPosition.anchorNode()) || passedPosition.isNull())
+        return 0;
+
+    if (positionBeforeNode(innerText) == passedPosition)
+        return 0;
+
+    unsigned index = 0;
+    Node* startNode = passedPosition.computeNodeBeforePosition();
+    if (!startNode)
+        startNode = passedPosition.containerNode();
+    ASSERT(startNode);
+    ASSERT(innerText->contains(startNode));
+
+    for (Node* node = startNode; node; node = NodeTraversal::previous(*node, innerText)) {
+        if (is<Text>(*node)) {
+            unsigned length = downcast<Text>(*node).length();
+            if (node == passedPosition.containerNode())
+                index += std::min<unsigned>(length, passedPosition.offsetInContainerNode());
+            else
+                index += length;
+        } else if (is<HTMLBRElement>(*node))
+            ++index;
+    }
+
+    unsigned length = innerTextValue().length();
+    index = std::min(index, length); // FIXME: We shouldn't have to call innerTextValue() just to ignore the last LF. See finishText.
+#ifndef ASSERT_DISABLED
+    VisiblePosition visiblePosition = passedPosition;
+    unsigned indexComputedByVisiblePosition = 0;
+    if (visiblePosition.isNotNull())
+        indexComputedByVisiblePosition = WebCore::indexForVisiblePosition(innerText, visiblePosition, false /* forSelectionPreservation */);
+    ASSERT(index == indexComputedByVisiblePosition);
+#endif
+    return index;
+}
+
+#if PLATFORM(IOS)
+void HTMLTextFormControlElement::hidePlaceholder()
+{
+    if (HTMLElement* placeholder = placeholderElement())
+        placeholder->setInlineStyleProperty(CSSPropertyVisibility, CSSValueHidden, true);
+}
+
+void HTMLTextFormControlElement::showPlaceholderIfNecessary()
+{
+    if (HTMLElement* placeholder = placeholderElement())
+        placeholder->setInlineStyleProperty(CSSPropertyVisibility, CSSValueVisible, true);
+}
+#endif
 
 static void getNextSoftBreak(RootInlineBox*& line, Node*& breakNode, unsigned& breakOffset)
 {
@@ -590,11 +671,14 @@ String HTMLTextFormControlElement::valueWithHardLineBreaks() const
 {
     // FIXME: It's not acceptable to ignore the HardWrap setting when there is no renderer.
     // While we have no evidence this has ever been a practical problem, it would be best to fix it some day.
-    HTMLElement* innerText = innerTextElement();
-    if (!innerText || !isTextFormControl())
+    if (!isTextFormControl())
         return value();
 
-    RenderBlock* renderer = toRenderBlock(innerText->renderer());
+    TextControlInnerTextElement* innerText = innerTextElement();
+    if (!innerText)
+        return value();
+
+    RenderTextControlInnerBlock* renderer = innerText->renderer();
     if (!renderer)
         return value();
 
@@ -607,11 +691,11 @@ String HTMLTextFormControlElement::valueWithHardLineBreaks() const
     getNextSoftBreak(line, breakNode, breakOffset);
 
     StringBuilder result;
-    for (Node* node = innerText->firstChild(); node; node = NodeTraversal::next(node, innerText)) {
-        if (node->hasTagName(brTag))
+    for (Node* node = innerText->firstChild(); node; node = NodeTraversal::next(*node, innerText)) {
+        if (is<HTMLBRElement>(*node))
             result.append(newlineCharacter);
-        else if (node->isTextNode()) {
-            String data = toText(node)->data();
+        else if (is<Text>(*node)) {
+            String data = downcast<Text>(*node).data();
             unsigned length = data.length();
             unsigned position = 0;
             while (breakNode == node && breakOffset <= length) {
@@ -627,20 +711,21 @@ String HTMLTextFormControlElement::valueWithHardLineBreaks() const
         while (breakNode == node)
             getNextSoftBreak(line, breakNode, breakOffset);
     }
-    return finishText(result);
+    stripTrailingNewline(result);
+    return result.toString();
 }
 
 HTMLTextFormControlElement* enclosingTextFormControl(const Position& position)
 {
     ASSERT(position.isNull() || position.anchorType() == Position::PositionIsOffsetInAnchor
         || position.containerNode() || !position.anchorNode()->shadowHost()
-        || (position.anchorNode()->parentNode() && position.anchorNode()->parentNode()->isShadowRoot()));
+        || hasShadowRootParent(*position.anchorNode()));
         
     Node* container = position.containerNode();
     if (!container)
-        return 0;
+        return nullptr;
     Element* ancestor = container->shadowHost();
-    return ancestor && isHTMLTextFormControlElement(ancestor) ? toHTMLTextFormControlElement(ancestor) : 0;
+    return ancestor && is<HTMLTextFormControlElement>(*ancestor) ? downcast<HTMLTextFormControlElement>(ancestor) : nullptr;
 }
 
 static const Element* parentHTMLElement(const Element* element)
@@ -660,10 +745,10 @@ String HTMLTextFormControlElement::directionForFormData() const
         if (dirAttributeValue.isNull())
             continue;
 
-        if (equalIgnoringCase(dirAttributeValue, "rtl") || equalIgnoringCase(dirAttributeValue, "ltr"))
+        if (equalLettersIgnoringASCIICase(dirAttributeValue, "rtl") || equalLettersIgnoringASCIICase(dirAttributeValue, "ltr"))
             return dirAttributeValue;
 
-        if (equalIgnoringCase(dirAttributeValue, "auto")) {
+        if (equalLettersIgnoringASCIICase(dirAttributeValue, "auto")) {
             bool isAuto;
             TextDirection textDirection = static_cast<const HTMLElement*>(element)->directionalityIfhasDirAutoAttribute(isAuto);
             return textDirection == RTL ? "rtl" : "ltr";

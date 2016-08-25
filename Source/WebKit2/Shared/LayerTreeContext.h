@@ -28,17 +28,17 @@
 
 #include <stdint.h>
 
-namespace CoreIPC {
-    class ArgumentDecoder;
-    class ArgumentEncoder;
+namespace IPC {
+class ArgumentDecoder;
+class ArgumentEncoder;
 }
 
 namespace WebKit {
 
-enum LayerHostingMode {
-    LayerHostingModeDefault,
-#if HAVE(LAYER_HOSTING_IN_WINDOW_SERVER)
-    LayerHostingModeInWindowServer
+enum class LayerHostingMode {
+    InProcess,
+#if HAVE(OUT_OF_PROCESS_LAYER_HOSTING)
+    OutOfProcess
 #endif
 };
 
@@ -47,19 +47,15 @@ public:
     LayerTreeContext();
     ~LayerTreeContext();
 
-    void encode(CoreIPC::ArgumentEncoder&) const;
-    static bool decode(CoreIPC::ArgumentDecoder&, LayerTreeContext&);
+    void encode(IPC::ArgumentEncoder&) const;
+    static bool decode(IPC::ArgumentDecoder&, LayerTreeContext&);
 
     bool isEmpty() const;
 
-#if PLATFORM(MAC)
-    uint32_t contextID;
-#elif PLATFORM(QT)
+#if PLATFORM(QT)
     uint32_t coordinatedLayerID;
-#elif PLATFORM(GTK)
-    uint64_t windowHandle;
-#elif PLATFORM(EFL)
-    uint32_t coordinatedLayerID;
+#else
+    uint64_t contextID;
 #endif
 };
 

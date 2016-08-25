@@ -23,7 +23,6 @@
 #include "config.h"
 #include "MouseRelatedEvent.h"
 
-#include "DOMWindow.h"
 #include "Document.h"
 #include "Frame.h"
 #include "FrameView.h"
@@ -48,11 +47,15 @@ static LayoutSize contentsScrollOffset(AbstractView* abstractView)
     FrameView* frameView = frame->view();
     if (!frameView)
         return LayoutSize();
+#if !PLATFORM(IOS)
     float scaleFactor = frame->pageZoomFactor() * frame->frameScaleFactor();
     return LayoutSize(frameView->scrollX() / scaleFactor, frameView->scrollY() / scaleFactor);
+#else
+    return LayoutSize(frameView->actualScrollX(), frameView->actualScrollY());
+#endif
 }
 
-MouseRelatedEvent::MouseRelatedEvent(const AtomicString& eventType, bool canBubble, bool cancelable, double timestamp, PassRefPtr<AbstractView> abstractView,
+MouseRelatedEvent::MouseRelatedEvent(const AtomicString& eventType, bool canBubble, bool cancelable, double timestamp, AbstractView* abstractView,
                                      int detail, const IntPoint& screenLocation, const IntPoint& windowLocation,
 #if ENABLE(POINTER_LOCK)
                                      const IntPoint& movementDelta,
@@ -65,13 +68,29 @@ MouseRelatedEvent::MouseRelatedEvent(const AtomicString& eventType, bool canBubb
 #endif
     , m_isSimulated(isSimulated)
 {
+    init(isSimulated, windowLocation);
+}
+
+MouseRelatedEvent::MouseRelatedEvent(const AtomicString& eventType, const MouseRelatedEventInit& initializer)
+    : UIEventWithKeyState(eventType, initializer)
+    , m_screenLocation(IntPoint(initializer.screenX, initializer.screenY))
+#if ENABLE(POINTER_LOCK)
+    , m_movementDelta(IntPoint(0, 0))
+#endif
+    , m_isSimulated(false)
+{
+    init(false, IntPoint(0, 0));
+}
+
+void MouseRelatedEvent::init(bool isSimulated, const IntPoint& windowLocation)
+{
     LayoutPoint adjustedPageLocation;
     LayoutPoint scrollPosition;
 
-    Frame* frame = view() ? view()->frame() : 0;
+    Frame* frame = view() ? view()->frame() : nullptr;
     if (frame && !isSimulated) {
         if (FrameView* frameView = frame->view()) {
-            scrollPosition = frameView->scrollPosition();
+            scrollPosition = frameView->contentsScrollPosition();
             adjustedPageLocation = frameView->windowToContents(windowLocation);
             float scaleFactor = 1 / (frame->pageZoomFactor() * frame->frameScaleFactor());
             if (scaleFactor != 1.0f) {
@@ -137,7 +156,7 @@ static float frameScaleFactor(const UIEvent* event)
 void MouseRelatedEvent::computePageLocation()
 {
     float scaleFactor = pageZoomFactor(this) * frameScaleFactor(this);
-    setAbsoluteLocation(roundedLayoutPoint(FloatPoint(pageX() * scaleFactor, pageY() * scaleFactor)));
+    setAbsoluteLocation(LayoutPoint(pageX() * scaleFactor, pageY() * scaleFactor));
 }
 
 void MouseRelatedEvent::receivedTarget()
@@ -147,7 +166,7 @@ void MouseRelatedEvent::receivedTarget()
 
 void MouseRelatedEvent::computeRelativePosition()
 {
-    Node* targetNode = target() ? target()->toNode() : 0;
+    Node* targetNode = target() ? target()->toNode() : nullptr;
     if (!targetNode)
         return;
 
@@ -156,12 +175,11 @@ void MouseRelatedEvent::computeRelativePosition()
     m_offsetLocation = m_pageLocation;
 
     // Must have an updated render tree for this math to work correctly.
-    targetNode->document()->updateLayoutIgnorePendingStylesheets();
+    targetNode->document().updateLayoutIgnorePendingStylesheets();
 
     // Adjust offsetLocation to be relative to the target's position.
     if (RenderObject* r = targetNode->renderer()) {
-        FloatPoint localPos = r->absoluteToLocal(absoluteLocation(), UseTransforms);
-        m_offsetLocation = roundedLayoutPoint(localPos);
+        m_offsetLocation = LayoutPoint(r->absoluteToLocal(absoluteLocation(), UseTransforms));
         float scaleFactor = 1 / (pageZoomFactor(this) * frameScaleFactor(this));
         if (scaleFactor != 1.0f)
             m_offsetLocation.scale(scaleFactor, scaleFactor);
@@ -201,6 +219,8 @@ int MouseRelatedEvent::layerY()
 
 int MouseRelatedEvent::offsetX()
 {
+    if (isSimulated())
+        return 0;
     if (!m_hasCachedRelativePosition)
         computeRelativePosition();
     return roundToInt(m_offsetLocation.x());
@@ -208,6 +228,8 @@ int MouseRelatedEvent::offsetX()
 
 int MouseRelatedEvent::offsetY()
 {
+    if (isSimulated())
+        return 0;
     if (!m_hasCachedRelativePosition)
         computeRelativePosition();
     return roundToInt(m_offsetLocation.y());

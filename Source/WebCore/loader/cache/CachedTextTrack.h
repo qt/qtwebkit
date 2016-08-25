@@ -29,22 +29,26 @@
 #if ENABLE(VIDEO_TRACK)
 
 #include "CachedResource.h"
-#include "FontOrientation.h"
+#include "TextFlags.h"
 
 namespace WebCore {
 
-class CachedTextTrack FINAL : public CachedResource {
+class CachedTextTrack final : public CachedResource {
 public:
-    CachedTextTrack(const ResourceRequest&);
-    virtual ~CachedTextTrack();
+    CachedTextTrack(const ResourceRequest&, SessionID);
 
 private:
-    virtual bool mayTryReplaceEncodedData() const OVERRIDE { return true; }
-    virtual void addDataBuffer(ResourceBuffer*) OVERRIDE;
-    virtual void finishLoading(ResourceBuffer*) OVERRIDE;
+    virtual bool mayTryReplaceEncodedData() const override { return true; }
+    virtual void addDataBuffer(SharedBuffer&) override;
+    virtual void finishLoading(SharedBuffer*) override;
+
+    void updateData(SharedBuffer*);
 };
 
-}
+} // namespace WebCore
 
-#endif
-#endif
+SPECIALIZE_TYPE_TRAITS_CACHED_RESOURCE(CachedTextTrack, CachedResource::TextTrackResource)
+
+#endif // ENABLE(VIDEO_TRACK)
+
+#endif // CachedTextTrack_h

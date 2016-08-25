@@ -14,7 +14,7 @@
  * THIS SOFTWARE IS PROVIDED BY APPLE AND ITS CONTRIBUTORS "AS IS" AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -28,6 +28,7 @@
 #include "DNSResolveQueue.h"
 
 #include <wtf/CurrentTime.h>
+#include <wtf/NeverDestroyed.h>
 
 namespace WebCore {
 
@@ -49,22 +50,37 @@ static const int gMaxRequestsToQueue = 64;
 // If there were queued names that couldn't be sent simultaneously, check the state of resolvers after this delay.
 static const double gRetryResolvingInSeconds = 0.1;
 
-DNSResolveQueue::DNSResolveQueue()
-    : m_requestsInFlight(0)
-    , m_cachedProxyEnabledStatus(false)
-    , m_lastProxyEnabledStatusCheckTime(0)
+DNSResolveQueue& DNSResolveQueue::singleton()
 {
+    static NeverDestroyed<DNSResolveQueue> queue;
+
+    return queue;
 }
 
+DNSResolveQueue::DNSResolveQueue()
+    : m_timer(*this, &DNSResolveQueue::timerFired)
+    , m_requestsInFlight(0)
+    , m_isUsingProxy(true)
+    , m_lastProxyEnabledStatusCheckTime(0)
+{
+    // isUsingProxy will return the initial value of m_isUsingProxy at first on
+    // platforms that have an asynchronous implementation of updateIsUsingProxy,
+    // so initialize it to true so we won't prefetch before we know if we are using a proxy.
+}
+
+// Don't do DNS prefetch if proxies are involved. For many proxy types, the user agent is never
+// exposed to the IP address during normal operation. Querying an internal DNS server may not help
+// performance, as it doesn't necessarily look up the actual external IP. Also, if DNS returns a
+// fake internal address, local caches may keep it even after re-connecting to another network.
 bool DNSResolveQueue::isUsingProxy()
 {
-    double time = currentTime();
+    double time = monotonicallyIncreasingTime();
     static const double minimumProxyCheckDelay = 5;
     if (time - m_lastProxyEnabledStatusCheckTime > minimumProxyCheckDelay) {
         m_lastProxyEnabledStatusCheckTime = time;
-        m_cachedProxyEnabledStatus = platformProxyIsEnabledInSystemPreferences();
+        updateIsUsingProxy();
     }
-    return m_cachedProxyEnabledStatus;
+    return m_isUsingProxy;
 }
 
 void DNSResolveQueue::add(const String& hostname)
@@ -73,23 +89,23 @@ void DNSResolveQueue::add(const String& hostname)
     if (!m_names.size()) {
         if (isUsingProxy())
             return;
-        if (atomicIncrement(&m_requestsInFlight) <= gNamesToResolveImmediately) {
+        if (++m_requestsInFlight <= gNamesToResolveImmediately) {
             platformResolve(hostname);
             return;
         }
-        atomicDecrement(&m_requestsInFlight);
+        --m_requestsInFlight;
     }
 
     // It's better to not prefetch some names than to clog the queue.
     // Dropping the newest names, because on a single page, these are likely to be below oldest ones.
     if (m_names.size() < gMaxRequestsToQueue) {
         m_names.add(hostname);
-        if (!isActive())
-            startOneShot(gCoalesceDelayInSeconds);
+        if (!m_timer.isActive())
+            m_timer.startOneShot(gCoalesceDelayInSeconds);
     }
 }
 
-void DNSResolveQueue::fired()
+void DNSResolveQueue::timerFired()
 {
     if (isUsingProxy()) {
         m_names.clear();
@@ -99,14 +115,14 @@ void DNSResolveQueue::fired()
     int requestsAllowed = gMaxSimultaneousRequests - m_requestsInFlight;
 
     for (; !m_names.isEmpty() && requestsAllowed > 0; --requestsAllowed) {
-        atomicIncrement(&m_requestsInFlight);
+        ++m_requestsInFlight;
         HashSet<String>::iterator currentName = m_names.begin();
         platformResolve(*currentName);
         m_names.remove(currentName);
     }
 
     if (!m_names.isEmpty())
-        startOneShot(gRetryResolvingInSeconds);
+        m_timer.startOneShot(gRetryResolvingInSeconds);
 }
 
 } // namespace WebCore

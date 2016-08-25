@@ -25,14 +25,10 @@
 #include "AXObjectCache.h"
 #include "Document.h"
 #include "Frame.h"
+#include "RenderListItem.h"
 #include "WebKitAccessibleWrapperAtk.h"
-
-#if PLATFORM(EFL)
 #include <glib.h>
-#else
-#include <gtk/gtk.h>
-#endif
-
+#include <wtf/NeverDestroyed.h>
 #include <wtf/RefPtr.h>
 
 namespace WebCore {
@@ -42,6 +38,13 @@ static void emitTextSelectionChange(AccessibilityObject* object, VisibleSelectio
     AtkObject* axObject = object->wrapper();
     if (!axObject || !ATK_IS_TEXT(axObject))
         return;
+
+    // We need to adjust the offset for the list item marker in Left-To-Right text because
+    // the list item marker is exposed through the text of the accessible list item rather
+    // than through a separate accessible object.
+    RenderObject* renderer = object->renderer();
+    if (is<RenderListItem>(renderer) && renderer->style().direction() == LTR)
+        offset += downcast<RenderListItem>(*renderer).markerTextWithSuffix().length();
 
     g_signal_emit_by_name(axObject, "text-caret-moved", offset);
     if (selection.isRange())
@@ -53,7 +56,7 @@ static void maybeEmitTextFocusChange(PassRefPtr<AccessibilityObject> prpObject)
     // This static variable is needed to keep track of the old object
     // as per previous calls to this function, in order to properly
     // decide whether to emit some signals or not.
-    DEFINE_STATIC_LOCAL(RefPtr<AccessibilityObject>, oldObject, ());
+    static NeverDestroyed<RefPtr<AccessibilityObject>> oldObject;
 
     RefPtr<AccessibilityObject> object = prpObject;
 
@@ -61,29 +64,29 @@ static void maybeEmitTextFocusChange(PassRefPtr<AccessibilityObject> prpObject)
     // current object so further comparisons make sense. Otherwise,
     // just reset oldObject to 0 so it won't be taken into account in
     // the immediately following call to this function.
-    if (object && oldObject && oldObject->document() != object->document())
-        oldObject = 0;
+    if (object && oldObject.get() && oldObject.get()->document() != object->document())
+        oldObject.get() = nullptr;
 
     AtkObject* axObject = object ? object->wrapper() : 0;
-    AtkObject* oldAxObject = oldObject ? oldObject->wrapper() : 0;
+    AtkObject* oldAxObject = oldObject.get() ? oldObject.get()->wrapper() : nullptr;
 
     if (axObject != oldAxObject) {
         if (oldAxObject && ATK_IS_TEXT(oldAxObject)) {
             g_signal_emit_by_name(oldAxObject, "focus-event", false);
-            g_signal_emit_by_name(oldAxObject, "state-change", "focused", false);
+            atk_object_notify_state_change(oldAxObject, ATK_STATE_FOCUSED, false);
         }
         if (axObject && ATK_IS_TEXT(axObject)) {
             g_signal_emit_by_name(axObject, "focus-event", true);
-            g_signal_emit_by_name(axObject, "state-change", "focused", true);
+            atk_object_notify_state_change(axObject, ATK_STATE_FOCUSED, true);
         }
     }
 
     // Update pointer to last focused object.
-    oldObject = object;
+    oldObject.get() = object;
 }
 
 
-void FrameSelection::notifyAccessibilityForSelectionChange()
+void FrameSelection::notifyAccessibilityForSelectionChange(const AXTextStateChangeIntent&)
 {
     if (!AXObjectCache::accessibilityEnabled())
         return;

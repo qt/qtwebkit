@@ -11,7 +11,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -31,16 +31,17 @@
 #include "GestureTapHighlighter.h"
 
 #include "Element.h"
-#include "Frame.h"
 #include "FrameView.h"
 #include "GraphicsContext.h"
 #include "GraphicsTypes.h"
+#include "MainFrame.h"
 #include "Node.h"
 #include "Page.h"
 #include "RenderBoxModelObject.h"
 #include "RenderInline.h"
 #include "RenderLayer.h"
 #include "RenderObject.h"
+#include "RenderView.h"
 
 namespace WebCore {
 
@@ -49,13 +50,11 @@ namespace {
 inline LayoutPoint ownerFrameToMainFrameOffset(const RenderObject* o)
 {
     ASSERT(o->node());
-    Frame* containingFrame = o->frame();
-    if (!containingFrame)
-        return LayoutPoint();
+    Frame& containingFrame = o->frame();
 
-    Frame* mainFrame = containingFrame->page()->mainFrame();
+    Frame& mainFrame = containingFrame.page()->mainFrame();
 
-    LayoutPoint mainFramePoint = mainFrame->view()->windowToContents(containingFrame->view()->contentsToWindow(IntPoint()));
+    LayoutPoint mainFramePoint = mainFrame.view()->windowToContents(containingFrame.view()->contentsToWindow(IntPoint()));
     return mainFramePoint;
 }
 
@@ -65,11 +64,11 @@ AffineTransform localToAbsoluteTransform(const RenderObject* o)
     LayoutPoint referencePoint;
 
     while (o) {
-        RenderObject* nextContainer = o->container();
+        RenderElement* nextContainer = o->container();
         if (!nextContainer)
             break;
 
-        LayoutSize containerOffset = o->offsetFromContainer(nextContainer, referencePoint);
+        LayoutSize containerOffset = o->offsetFromContainer(*nextContainer, referencePoint);
         TransformationMatrix t;
         o->getTransformFromContainer(nextContainer, containerOffset, t);
 
@@ -133,17 +132,17 @@ inline void addHighlightRect(Path& path, const LayoutRect& rect, const LayoutRec
     FloatSize squared(0, 0);
 
     path.addBeziersForRoundedRect(copy,
-            contains(prev, rect.x()) ? squared : rounded,
-            contains(prev, rect.maxX()) ? squared : rounded,
-            contains(next, rect.x()) ? squared : rounded,
-            contains(next, rect.maxX()) ? squared : rounded);
+        contains(prev, rect.x()) ? squared : rounded,
+        contains(prev, rect.maxX()) ? squared : rounded,
+        contains(next, rect.x()) ? squared : rounded,
+        contains(next, rect.maxX()) ? squared : rounded);
 }
 
 Path absolutePathForRenderer(RenderObject* const o)
 {
     ASSERT(o);
 
-    Vector<IntRect> rects;
+    Vector<LayoutRect> rects;
     LayoutPoint frameOffset = ownerFrameToMainFrameOffset(o);
     o->addFocusRingRects(rects, frameOffset);
 
@@ -211,7 +210,7 @@ Path absolutePathForRenderer(RenderObject* const o)
 
         // Check ancestor layers for overflow clip and intersect them.
         for (; layer; layer = layer->parent()) {
-            RenderLayerModelObject* layerRenderer = layer->renderer();
+            RenderLayerModelObject* layerRenderer = &layer->renderer();
 
             if (layerRenderer->hasOverflowClip() && layerRenderer != currentRenderer) {
                 bool containerSkipped = false;
@@ -227,8 +226,7 @@ Path absolutePathForRenderer(RenderObject* const o)
                     ringRect = LayoutRect();
                 currentRenderer = layerRenderer;
 
-                ASSERT(layerRenderer->isBox());
-                ringRect.intersect(toRenderBox(layerRenderer)->borderBoxRect());
+                ringRect.intersect(downcast<RenderBox>(*layerRenderer).borderBoxRect());
 
                 if (ringRect.isEmpty())
                     break;

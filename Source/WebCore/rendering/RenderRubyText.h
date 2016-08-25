@@ -31,28 +31,35 @@
 #ifndef RenderRubyText_h
 #define RenderRubyText_h
 
-#include "RenderBlock.h"
+#include "RenderBlockFlow.h"
 
 namespace WebCore {
 
-class RenderRubyText : public RenderBlock {
+class RenderRubyText final : public RenderBlockFlow {
 public:
-    RenderRubyText(Element*);
+    RenderRubyText(Element&, Ref<RenderStyle>&&);
     virtual ~RenderRubyText();
 
-    virtual const char* renderName() const { return "RenderRubyText"; }
+    Element& element() const { return downcast<Element>(nodeForNonAnonymous()); }
 
-    virtual bool isRubyText() const { return true; }
-
-    virtual bool isChildAllowed(RenderObject*, RenderStyle*) const;
-
+    virtual bool isChildAllowed(const RenderObject&, const RenderStyle&) const override;
+    
+    RenderRubyRun* rubyRun() const;
+    
+    bool canBreakBefore(const LazyLineBreakIterator&) const;
+   
 private:
-    virtual bool avoidsFloats() const;
+    virtual const char* renderName() const override { return "RenderRubyText"; }
+    virtual bool isRubyText() const override { return true; }
 
-    virtual ETextAlign textAlignmentForLine(bool endsWithSoftBreak) const;
-    virtual void adjustInlineDirectionLineBounds(int expansionOpportunityCount, float& logicalLeft, float& logicalWidth) const;
+    virtual bool avoidsFloats() const override;
+
+    virtual ETextAlign textAlignmentForLine(bool endsWithSoftBreak) const override;
+    virtual void adjustInlineDirectionLineBounds(int expansionOpportunityCount, float& logicalLeft, float& logicalWidth) const override;
 };
 
 } // namespace WebCore
+
+SPECIALIZE_TYPE_TRAITS_RENDER_OBJECT(RenderRubyText, isRubyText())
 
 #endif // RenderRubyText_h

@@ -49,7 +49,7 @@
 defined(__ARMEL__) || \
 defined(_MIPS_ARCH_MIPS32R2)
 #define DOUBLE_CONVERSION_CORRECT_DOUBLE_OPERATIONS 1
-#elif CPU(MIPS) || CPU(PPC) || CPU(PPC64) || OS(WINCE) || CPU(SH4) || CPU(S390) || CPU(S390X) || CPU(IA64) || CPU(SPARC) || CPU(ALPHA) || CPU(MIPS64) || CPU(AARCH64) || CPU(HPPA)
+#elif CPU(MIPS) || CPU(MIPS64) || CPU(PPC) || CPU(PPC64) || CPU(PPC64LE) || CPU(SH4) || CPU(S390) || CPU(S390X) || CPU(IA64) || CPU(ALPHA) || CPU(ARM64) || CPU(HPPA)
 #define DOUBLE_CONVERSION_CORRECT_DOUBLE_OPERATIONS 1
 #elif defined(_M_IX86) || defined(__i386__)
 #if defined(_WIN32)
@@ -151,7 +151,7 @@ namespace double_conversion {
         // spanning from and including 'from', to but not including 'to'.
         BufferReference<T> SubBufferReference(int from, int to) {
             ASSERT(to <= length_);
-            ASSERT(from < to);
+            ASSERT_WITH_SECURITY_IMPLICATION(from < to);
             ASSERT(0 <= from);
             return BufferReference<T>(start() + from, to - from);
         }
@@ -292,7 +292,7 @@ namespace double_conversion {
     inline Dest BitCast(const Source& source) {
         // Compile time assertion: sizeof(Dest) == sizeof(Source)
         // A compile error here means your Dest and Source have different sizes.
-        typedef char VerifySizesAreEqual[sizeof(Dest) == sizeof(Source) ? 1 : -1];
+        static_assert(sizeof(Dest) == sizeof(Source), "Source and destination sizes must be equal");
         
         Dest dest;
         memcpy(&dest, &source, sizeof(dest));

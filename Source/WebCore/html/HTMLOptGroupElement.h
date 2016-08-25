@@ -30,54 +30,29 @@ namespace WebCore {
     
 class HTMLSelectElement;
 
-class HTMLOptGroupElement FINAL : public HTMLElement {
+class HTMLOptGroupElement final : public HTMLElement {
 public:
-    static PassRefPtr<HTMLOptGroupElement> create(const QualifiedName&, Document*);
+    static Ref<HTMLOptGroupElement> create(const QualifiedName&, Document&);
 
-    virtual bool isDisabledFormControl() const OVERRIDE;
+    virtual bool isDisabledFormControl() const override;
     HTMLSelectElement* ownerSelectElement() const;
     
-    String groupLabelText() const;
+    WEBCORE_EXPORT String groupLabelText() const;
 
 private:
-    HTMLOptGroupElement(const QualifiedName&, Document*);
+    HTMLOptGroupElement(const QualifiedName&, Document&);
 
-    virtual const AtomicString& formControlType() const;
-    virtual bool isFocusable() const OVERRIDE;
-    virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
-    virtual bool rendererIsNeeded(const NodeRenderingContext&) { return false; }
-    virtual void attach(const AttachContext& = AttachContext()) OVERRIDE;
-    virtual void detach(const AttachContext& = AttachContext()) OVERRIDE;
+    const AtomicString& formControlType() const;
+    virtual bool isFocusable() const override;
+    virtual void parseAttribute(const QualifiedName&, const AtomicString&) override;
+    virtual bool rendererIsNeeded(const RenderStyle&) override { return false; }
 
-    virtual void childrenChanged(bool changedByParser = false, Node* beforeChange = 0, Node* afterChange = 0, int childCountDelta = 0);
+    virtual void childrenChanged(const ChildChange&) override;
 
-    virtual void accessKeyAction(bool sendMouseEvents);
-
-    // <optgroup> never has a renderer so we manually manage a cached style.
-    void updateNonRenderStyle();
-    virtual RenderStyle* nonRendererStyle() const OVERRIDE;
-    virtual PassRefPtr<RenderStyle> customStyleForRenderer() OVERRIDE;
+    virtual void accessKeyAction(bool sendMouseEvents) override;
 
     void recalcSelectOptions();
-
-    RefPtr<RenderStyle> m_style;
 };
-
-inline bool isHTMLOptGroupElement(Node* node)
-{
-    return node->hasTagName(HTMLNames::optgroupTag);
-}
-
-inline bool isHTMLOptGroupElement(Element* element)
-{
-    return element->hasTagName(HTMLNames::optgroupTag);
-}
-
-inline HTMLOptGroupElement* toHTMLOptGroupElement(Node* node)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!node || isHTMLOptGroupElement(node));
-    return static_cast<HTMLOptGroupElement*>(node);
-}
 
 } //namespace
 

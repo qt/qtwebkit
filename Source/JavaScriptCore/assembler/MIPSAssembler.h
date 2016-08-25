@@ -151,11 +151,19 @@ public:
     typedef MIPSRegisters::FPRegisterID FPRegisterID;
     typedef SegmentedVector<AssemblerLabel, 64> Jumps;
 
+    static constexpr RegisterID firstRegister() { return MIPSRegisters::r0; }
+    static constexpr RegisterID lastRegister() { return MIPSRegisters::r31; }
+
+    static constexpr FPRegisterID firstFPRegister() { return MIPSRegisters::f0; }
+    static constexpr FPRegisterID lastFPRegister() { return MIPSRegisters::f31; }
+
     MIPSAssembler()
         : m_indexOfLastWatchpoint(INT_MIN)
         , m_indexOfTailOfLastWatchpoint(INT_MIN)
     {
     }
+
+    AssemblerBuffer& buffer() { return m_buffer; }
 
     // MIPS instruction opcode field position
     enum {
@@ -183,6 +191,11 @@ public:
     void nop()
     {
         emitInst(0x00000000);
+    }
+
+    void sync()
+    {
+        emitInst(0x0000000f);
     }
 
     /* Need to insert one load data delay nop for mips1.  */
@@ -225,6 +238,11 @@ public:
     void lui(RegisterID rt, int imm)
     {
         emitInst(0x3c000000 | (rt << OP_SH_RT) | (imm & 0xffff));
+    }
+
+    void clz(RegisterID rd, RegisterID rs)
+    {
+        emitInst(0x70000020 | (rd << OP_SH_RD) | (rs << OP_SH_RS) | (rd << OP_SH_RT));
     }
 
     void addiu(RegisterID rt, RegisterID rs, int imm)
@@ -529,11 +547,6 @@ public:
         emitInst(0x46200004 | (fd << OP_SH_FD) | (fs << OP_SH_FS));
     }
 
-    void absd(FPRegisterID fd, FPRegisterID fs)
-    {
-        emitInst(0x46200005 | (fd << OP_SH_FD) | (fs << OP_SH_FS));
-    }
-
     void movd(FPRegisterID fd, FPRegisterID fs)
     {
         emitInst(0x46200006 | (fd << OP_SH_FD) | (fs << OP_SH_FS));
@@ -681,16 +694,6 @@ public:
         return m_buffer.codeSize();
     }
 
-    PassRefPtr<ExecutableMemoryHandle> executableCopy(VM& vm, void* ownerUID, JITCompilationEffort effort)
-    {
-        RefPtr<ExecutableMemoryHandle> result = m_buffer.executableCopy(vm, ownerUID, effort);
-        if (!result)
-            return 0;
-
-        relocateJumps(m_buffer.data(), result->start());
-        return result.release();
-    }
-
     unsigned debugOffset() { return m_buffer.debugOffset(); }
 
     // Assembly helpers for moving data between fp and registers.
@@ -729,6 +732,35 @@ public:
     // code has been finalized it is (platform support permitting) within a non-
     // writable region of memory; to modify the code in an execute-only execuable
     // pool the 'repatch' and 'relink' methods should be used.
+
+    static size_t linkDirectJump(void* code, void* to)
+    {
+        MIPSWord* insn = reinterpret_cast<MIPSWord*>(reinterpret_cast<intptr_t>(code));
+        size_t ops = 0;
+        int32_t slotAddr = reinterpret_cast<int>(insn) + 4;
+        int32_t toAddr = reinterpret_cast<int>(to);
+
+        if ((slotAddr & 0xf0000000) != (toAddr & 0xf0000000)) {
+            // lui
+            *insn = 0x3c000000 | (MIPSRegisters::t9 << OP_SH_RT) | ((toAddr >> 16) & 0xffff);
+            ++insn;
+            // ori
+            *insn = 0x34000000 | (MIPSRegisters::t9 << OP_SH_RT) | (MIPSRegisters::t9 << OP_SH_RS) | (toAddr & 0xffff);
+            ++insn;
+            // jr
+            *insn = 0x00000008 | (MIPSRegisters::t9 << OP_SH_RS);
+            ++insn;
+            ops = 4 * sizeof(MIPSWord);
+        } else {
+            // j
+            *insn = 0x08000000 | ((toAddr & 0x0fffffff) >> 2);
+            ++insn;
+            ops = 2 * sizeof(MIPSWord);
+        }
+        // nop
+        *insn = 0x00000000;
+        return ops;
+    }
 
     void linkJump(AssemblerLabel from, AssemblerLabel to)
     {
@@ -843,68 +875,40 @@ public:
 
     static void cacheFlush(void* code, size_t size)
     {
-#if GCC_VERSION_AT_LEAST(4, 3, 0)
-#if WTF_MIPS_ISA_REV(2) && !GCC_VERSION_AT_LEAST(4, 4, 3)
-        int lineSize;
-        asm("rdhwr %0, $1" : "=r" (lineSize));
-        //
-        // Modify "start" and "end" to avoid GCC 4.3.0-4.4.2 bug in
-        // mips_expand_synci_loop that may execute synci one more time.
-        // "start" points to the fisrt byte of the cache line.
-        // "end" points to the last byte of the line before the last cache line.
-        // Because size is always a multiple of 4, this is safe to set
-        // "end" to the last byte.
-        //
-        intptr_t start = reinterpret_cast<intptr_t>(code) & (-lineSize);
-        intptr_t end = ((reinterpret_cast<intptr_t>(code) + size - 1) & (-lineSize)) - 1;
-        __builtin___clear_cache(reinterpret_cast<char*>(start), reinterpret_cast<char*>(end));
-#else
         intptr_t end = reinterpret_cast<intptr_t>(code) + size;
         __builtin___clear_cache(reinterpret_cast<char*>(code), reinterpret_cast<char*>(end));
-#endif
-#else
-        _flush_cache(reinterpret_cast<char*>(code), size, BCACHE);
-#endif
     }
 
     static ptrdiff_t maxJumpReplacementSize()
     {
-        return sizeof(MIPSWord) * 2;
+        return sizeof(MIPSWord) * 4;
     }
 
     static void revertJumpToMove(void* instructionStart, RegisterID rt, int imm)
     {
         MIPSWord* insn = static_cast<MIPSWord*>(instructionStart);
+        size_t codeSize = 2 * sizeof(MIPSWord);
 
         // lui
         *insn = 0x3c000000 | (rt << OP_SH_RT) | ((imm >> 16) & 0xffff);
         ++insn;
         // ori
         *insn = 0x34000000 | (rt << OP_SH_RS) | (rt << OP_SH_RT) | (imm & 0xffff);
-        cacheFlush(insn, 2 * sizeof(MIPSWord));
-    }
-
-    static bool canJumpWithJ(void* instructionStart, void* to)
-    {
-        intptr_t slotAddr = reinterpret_cast<intptr_t>(instructionStart) + 4;
-        intptr_t toAddr = reinterpret_cast<intptr_t>(to);
-        return (slotAddr & 0xf0000000) == (toAddr & 0xf0000000);
+        ++insn;
+        // if jr $t9
+        if (*insn == 0x03200008) {
+            *insn = 0x00000000;
+            codeSize += sizeof(MIPSWord);
+        }
+        cacheFlush(insn, codeSize);
     }
 
     static void replaceWithJump(void* instructionStart, void* to)
     {
         ASSERT(!(bitwise_cast<uintptr_t>(instructionStart) & 3));
         ASSERT(!(bitwise_cast<uintptr_t>(to) & 3));
-        ASSERT(canJumpWithJ(instructionStart, to));
-        MIPSWord* insn = reinterpret_cast<MIPSWord*>(instructionStart);
-        int32_t toAddr = reinterpret_cast<int32_t>(to);
-
-        // j <to>
-        *insn = 0x08000000 | ((toAddr & 0x0fffffff) >> 2);
-        ++insn;
-        // nop
-        *insn = 0x00000000;
-        cacheFlush(instructionStart, 2 * sizeof(MIPSWord));
+        size_t ops = linkDirectJump(instructionStart, to);
+        cacheFlush(instructionStart, ops);
     }
 
     static void replaceWithLoad(void* instructionStart)
@@ -929,7 +933,6 @@ public:
         cacheFlush(insn, 4);
     }
 
-private:
     /* Update each jump in the buffer of newBase.  */
     void relocateJumps(void* oldBase, void* newBase)
     {
@@ -972,6 +975,7 @@ private:
         }
     }
 
+private:
     static int linkWithOffset(MIPSWord* insn, void* to)
     {
         ASSERT((*insn & 0xfc000000) == 0x10000000 // beq

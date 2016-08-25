@@ -20,16 +20,15 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "SVGTransformable.h"
 
 #include "AffineTransform.h"
 #include "FloatConversion.h"
+#include "SVGElement.h"
 #include "SVGNames.h"
 #include "SVGParserUtilities.h"
-#include "SVGStyledElement.h"
 #include "SVGTransformList.h"
+#include <wtf/text/StringView.h>
 
 namespace WebCore {
 
@@ -94,7 +93,7 @@ SVGTransformable::~SVGTransformable()
 {
 }
 
-bool SVGTransformable::parseTransformValue(unsigned type, const UChar*& ptr, const UChar* end, SVGTransform& transform)
+bool SVGTransformable::parseTransformValue(SVGTransform::SVGTransformType type, const UChar*& ptr, const UChar* end, SVGTransform& transform)
 {
     if (type == SVGTransform::SVG_TRANSFORM_UNKNOWN)
         return false;
@@ -105,6 +104,9 @@ bool SVGTransformable::parseTransformValue(unsigned type, const UChar*& ptr, con
         return false;
 
     switch (type) {
+    case SVGTransform::SVG_TRANSFORM_UNKNOWN:
+        ASSERT_NOT_REACHED();
+        break;
     case SVGTransform::SVG_TRANSFORM_SKEWX:
         transform.setSkewX(values[0]);
         break;
@@ -144,7 +146,7 @@ static const UChar translateDesc[] =  {'t', 'r', 'a', 'n', 's', 'l', 'a', 't', '
 static const UChar rotateDesc[] =  {'r', 'o', 't', 'a', 't', 'e'};
 static const UChar matrixDesc[] =  {'m', 'a', 't', 'r', 'i', 'x'};
 
-static inline bool parseAndSkipType(const UChar*& currTransform, const UChar* end, unsigned short& type)
+static inline bool parseAndSkipType(const UChar*& currTransform, const UChar* end, SVGTransform::SVGTransformType& type)
 {
     if (currTransform >= end)
         return false;
@@ -172,8 +174,9 @@ static inline bool parseAndSkipType(const UChar*& currTransform, const UChar* en
 
 SVGTransform::SVGTransformType SVGTransformable::parseTransformType(const String& typeString)
 {
-    unsigned short type = SVGTransform::SVG_TRANSFORM_UNKNOWN;
-    const UChar* characters = typeString.characters();
+    SVGTransform::SVGTransformType type = SVGTransform::SVG_TRANSFORM_UNKNOWN;
+    auto upconvertedCharacters = StringView(typeString).upconvertedCharacters();
+    const UChar* characters = upconvertedCharacters;
     parseAndSkipType(characters, characters + typeString.length(), type);
     return static_cast<SVGTransform::SVGTransformType>(type);
 }
@@ -186,7 +189,7 @@ bool SVGTransformable::parseTransformAttribute(SVGTransformList& list, const UCh
     bool delimParsed = false;
     while (currTransform < end) {
         delimParsed = false;
-        unsigned short type = SVGTransform::SVG_TRANSFORM_UNKNOWN;
+        SVGTransform::SVGTransformType type = SVGTransform::SVG_TRANSFORM_UNKNOWN;
         skipOptionalSVGSpaces(currTransform, end);
 
         if (!parseAndSkipType(currTransform, end, type))
@@ -209,5 +212,3 @@ bool SVGTransformable::parseTransformAttribute(SVGTransformList& list, const UCh
 }
 
 }
-
-#endif // ENABLE(SVG)

@@ -23,16 +23,11 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#if defined(HAVE_CONFIG_H) && HAVE_CONFIG_H
-#ifdef BUILDING_WITH_CMAKE
+#if defined(HAVE_CONFIG_H) && HAVE_CONFIG_H && defined(BUILDING_WITH_CMAKE)
 #include "cmakeconfig.h"
-#else
-#include "autotoolsconfig.h"
-#endif
 #endif
 
-#include <wtf/Platform.h>
-#include <wtf/ExportMacros.h>
+#include <WebCore/PlatformExportMacros.h>
 #include <runtime/JSExportMacros.h>
 
 #if defined(__APPLE__) && __APPLE__
@@ -52,24 +47,24 @@
 #endif
 
 #if PLATFORM(WIN_CAIRO)
-#undef WTF_USE_CG
-#define WTF_USE_CAIRO 1
-#define WTF_USE_CURL 1
+#undef USE_CG
+#define USE_CAIRO 1
+#define USE_CURL 1
 #ifndef _WINSOCKAPI_
 #define _WINSOCKAPI_ // Prevent inclusion of winsock.h in windows.h
 #endif
-#elif !OS(WINCE)
-#define WTF_USE_CG 1
-#undef WTF_USE_CAIRO
-#undef WTF_USE_CURL
+#else
+#define USE_CG 1
+#undef USE_CAIRO
+#undef USE_CURL
 #endif
 
 #endif // PLATFORM(WIN)
 
 #include <stdint.h>
 
-#if !PLATFORM(IOS) && !PLATFORM(WIN) && !(PLATFORM(GTK) && !defined(BUILDING_WEBKIT2__))
-#include <WebKit2/WebKit2_C.h>
+#if !PLATFORM(IOS) && !PLATFORM(WIN) && !(PLATFORM(QT) && !defined(HAVE_WEBKIT2))
+#include <WebKit/WebKit2_C.h>
 #endif
 
 #ifdef __clang__
@@ -87,6 +82,13 @@
 #pragma clang diagnostic pop
 #endif
 
-#if PLATFORM(MAC) && defined(__OBJC__)
+#if PLATFORM(COCOA) && defined(__OBJC__)
+// FIXME: Get Cocoa tests working with CMake on Mac.
+#if !defined(BUILDING_WITH_CMAKE)
 #import <WebKit/WebKit.h>
+#endif
+#endif
+
+#if !PLATFORM(IOS)
+#define WK_HAVE_C_SPI 1
 #endif

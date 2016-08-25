@@ -26,67 +26,80 @@
 #ifndef CSSValuePool_h
 #define CSSValuePool_h
 
+#include "CSSFontFamily.h"
 #include "CSSInheritedValue.h"
 #include "CSSInitialValue.h"
 #include "CSSPrimitiveValue.h"
 #include "CSSPropertyNames.h"
+#include "CSSRevertValue.h"
+#include "CSSUnsetValue.h"
 #include "CSSValueKeywords.h"
-#include <wtf/text/AtomicStringHash.h>
+#include <utility>
 #include <wtf/HashMap.h>
+#include <wtf/NeverDestroyed.h>
 #include <wtf/RefPtr.h>
+#include <wtf/text/AtomicStringHash.h>
 
 namespace WebCore {
 
 class CSSValueList;
 
+enum class FromSystemFontID { No, Yes };
+
 class CSSValuePool {
     WTF_MAKE_FAST_ALLOCATED;
 public:
+    static CSSValuePool& singleton();
+
     PassRefPtr<CSSValueList> createFontFaceValue(const AtomicString&);
-    PassRefPtr<CSSPrimitiveValue> createFontFamilyValue(const String&);
-    PassRefPtr<CSSInheritedValue> createInheritedValue() { return m_inheritedValue; }
-    PassRefPtr<CSSInitialValue> createImplicitInitialValue() { return m_implicitInitialValue; }
-    PassRefPtr<CSSInitialValue> createExplicitInitialValue() { return m_explicitInitialValue; }
-    PassRefPtr<CSSPrimitiveValue> createIdentifierValue(CSSValueID identifier);
-    PassRefPtr<CSSPrimitiveValue> createIdentifierValue(CSSPropertyID identifier);
-    PassRefPtr<CSSPrimitiveValue> createColorValue(unsigned rgbValue);
-    PassRefPtr<CSSPrimitiveValue> createValue(double value, CSSPrimitiveValue::UnitTypes);
-    PassRefPtr<CSSPrimitiveValue> createValue(const String& value, CSSPrimitiveValue::UnitTypes type) { return CSSPrimitiveValue::create(value, type); }
-    template<typename T> static PassRefPtr<CSSPrimitiveValue> createValue(T value) { return CSSPrimitiveValue::create(value); }
+    Ref<CSSPrimitiveValue> createFontFamilyValue(const String&, FromSystemFontID = FromSystemFontID::No);
+    Ref<CSSInheritedValue> createInheritedValue() { return m_inheritedValue.get(); }
+    Ref<CSSInitialValue> createImplicitInitialValue() { return m_implicitInitialValue.get(); }
+    Ref<CSSInitialValue> createExplicitInitialValue() { return m_explicitInitialValue.get(); }
+    Ref<CSSUnsetValue> createUnsetValue() { return m_unsetValue.get(); }
+    Ref<CSSRevertValue> createRevertValue() { return m_revertValue.get(); }
+    Ref<CSSPrimitiveValue> createIdentifierValue(CSSValueID identifier);
+    Ref<CSSPrimitiveValue> createIdentifierValue(CSSPropertyID identifier);
+    Ref<CSSPrimitiveValue> createColorValue(unsigned rgbValue);
+    Ref<CSSPrimitiveValue> createValue(double value, CSSPrimitiveValue::UnitTypes);
+    Ref<CSSPrimitiveValue> createValue(const String& value, CSSPrimitiveValue::UnitTypes type) { return CSSPrimitiveValue::create(value, type); }
+    Ref<CSSPrimitiveValue> createValue(const Length& value, const RenderStyle& style) { return CSSPrimitiveValue::create(value, style); }
+    Ref<CSSPrimitiveValue> createValue(const LengthSize& value, const RenderStyle& style) { return CSSPrimitiveValue::create(value, style); }
+    template<typename T> static Ref<CSSPrimitiveValue> createValue(T&& value) { return CSSPrimitiveValue::create(std::forward<T>(value)); }
 
     void drain();
 
 private:
     CSSValuePool();
 
-    RefPtr<CSSInheritedValue> m_inheritedValue;
-    RefPtr<CSSInitialValue> m_implicitInitialValue;
-    RefPtr<CSSInitialValue> m_explicitInitialValue;
-
-    RefPtr<CSSPrimitiveValue> m_identifierValueCache[numCSSValueKeywords];
-
-    typedef HashMap<unsigned, RefPtr<CSSPrimitiveValue> > ColorValueCache;
+    typedef HashMap<unsigned, RefPtr<CSSPrimitiveValue>> ColorValueCache;
     ColorValueCache m_colorValueCache;
-    RefPtr<CSSPrimitiveValue> m_colorTransparent;
-    RefPtr<CSSPrimitiveValue> m_colorWhite;
-    RefPtr<CSSPrimitiveValue> m_colorBlack;
+
+    typedef HashMap<AtomicString, RefPtr<CSSValueList>> FontFaceValueCache;
+    FontFaceValueCache m_fontFaceValueCache;
+
+    typedef HashMap<std::pair<String, bool>, RefPtr<CSSPrimitiveValue>> FontFamilyValueCache;
+    FontFamilyValueCache m_fontFamilyValueCache;
+
+    friend class WTF::NeverDestroyed<CSSValuePool>;
+
+    LazyNeverDestroyed<CSSInheritedValue> m_inheritedValue;
+    LazyNeverDestroyed<CSSInitialValue> m_implicitInitialValue;
+    LazyNeverDestroyed<CSSInitialValue> m_explicitInitialValue;
+    LazyNeverDestroyed<CSSUnsetValue> m_unsetValue;
+    LazyNeverDestroyed<CSSRevertValue> m_revertValue;
+
+    LazyNeverDestroyed<CSSPrimitiveValue> m_transparentColor;
+    LazyNeverDestroyed<CSSPrimitiveValue> m_whiteColor;
+    LazyNeverDestroyed<CSSPrimitiveValue> m_blackColor;
 
     static const int maximumCacheableIntegerValue = 255;
 
-    RefPtr<CSSPrimitiveValue> m_pixelValueCache[maximumCacheableIntegerValue + 1];
-    RefPtr<CSSPrimitiveValue> m_percentValueCache[maximumCacheableIntegerValue + 1];
-    RefPtr<CSSPrimitiveValue> m_numberValueCache[maximumCacheableIntegerValue + 1];
-
-    typedef HashMap<AtomicString, RefPtr<CSSValueList> > FontFaceValueCache;
-    FontFaceValueCache m_fontFaceValueCache;
-
-    typedef HashMap<String, RefPtr<CSSPrimitiveValue> > FontFamilyValueCache;
-    FontFamilyValueCache m_fontFamilyValueCache;
-
-    friend CSSValuePool& cssValuePool();
+    LazyNeverDestroyed<CSSPrimitiveValue> m_pixelValues[maximumCacheableIntegerValue + 1];
+    LazyNeverDestroyed<CSSPrimitiveValue> m_percentValues[maximumCacheableIntegerValue + 1];
+    LazyNeverDestroyed<CSSPrimitiveValue> m_numberValues[maximumCacheableIntegerValue + 1];
+    LazyNeverDestroyed<CSSPrimitiveValue> m_identifierValues[numCSSValueKeywords];
 };
-
-CSSValuePool& cssValuePool();
 
 }
 

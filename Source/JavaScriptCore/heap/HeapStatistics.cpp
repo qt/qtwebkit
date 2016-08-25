@@ -27,16 +27,18 @@
 #include "HeapStatistics.h"
 
 #include "Heap.h"
+#include "HeapIterationScope.h"
+#include "JSCInlines.h"
 #include "JSObject.h"
-#include "Operations.h"
 #include "Options.h"
 #include <stdlib.h>
+#include <wtf/CurrentTime.h>
+#include <wtf/DataLog.h>
+#include <wtf/StdLibExtras.h>
+
 #if OS(UNIX)
 #include <sys/resource.h>
 #endif
-#include <wtf/CurrentTime.h>
-#include <wtf/DataLog.h>
-#include <wtf/Deque.h>
 
 namespace JSC {
 
@@ -131,6 +133,7 @@ void HeapStatistics::logStatistics()
 
 void HeapStatistics::exitWithFailure()
 {
+    exit(-1);
 }
 
 void HeapStatistics::reportSuccess()
@@ -139,33 +142,11 @@ void HeapStatistics::reportSuccess()
 
 #endif // OS(UNIX)
 
-size_t HeapStatistics::parseMemoryAmount(char* s)
-{
-    size_t multiplier = 1;
-    char* afterS;
-    size_t value = strtol(s, &afterS, 10);
-    char next = afterS[0];
-    switch (next) {
-    case 'K':
-        multiplier = KB;
-        break;
-    case 'M':
-        multiplier = MB;
-        break;
-    case 'G':
-        multiplier = GB;
-        break;
-    default:
-        break;
-    }
-    return value * multiplier;
-}
-
 class StorageStatistics : public MarkedBlock::VoidFunctor {
 public:
     StorageStatistics();
 
-    void operator()(JSCell*);
+    IterationStatus operator()(JSCell*);
 
     size_t objectWithOutOfLineStorageCount();
     size_t objectCount();
@@ -174,6 +155,8 @@ public:
     size_t storageCapacity();
 
 private:
+    void visit(JSCell*);
+
     size_t m_objectWithOutOfLineStorageCount;
     size_t m_objectCount;
     size_t m_storageSize;
@@ -188,13 +171,13 @@ inline StorageStatistics::StorageStatistics()
 {
 }
 
-inline void StorageStatistics::operator()(JSCell* cell)
+inline void StorageStatistics::visit(JSCell* cell)
 {
     if (!cell->isObject())
         return;
 
     JSObject* object = jsCast<JSObject*>(cell);
-    if (hasIndexedProperties(object->structure()->indexingType()))
+    if (hasIndexedProperties(object->indexingType()))
         return;
 
     if (object->structure()->isUncacheableDictionary())
@@ -205,6 +188,12 @@ inline void StorageStatistics::operator()(JSCell* cell)
         ++m_objectWithOutOfLineStorageCount;
     m_storageSize += object->structure()->totalStorageSize() * sizeof(WriteBarrierBase<Unknown>);
     m_storageCapacity += object->structure()->totalStorageCapacity() * sizeof(WriteBarrierBase<Unknown>); 
+}
+
+inline IterationStatus StorageStatistics::operator()(JSCell* cell)
+{
+    visit(cell);
+    return IterationStatus::Continue;
 }
 
 inline size_t StorageStatistics::objectWithOutOfLineStorageCount()
@@ -227,15 +216,18 @@ inline size_t StorageStatistics::storageCapacity()
     return m_storageCapacity;
 }
 
-void HeapStatistics::showObjectStatistics(Heap* heap)
+void HeapStatistics::dumpObjectStatistics(Heap* heap)
 {
     dataLogF("\n=== Heap Statistics: ===\n");
     dataLogF("size: %ldkB\n", static_cast<long>(heap->m_sizeAfterLastCollect / KB));
     dataLogF("capacity: %ldkB\n", static_cast<long>(heap->capacity() / KB));
-    dataLogF("pause time: %lfs\n\n", heap->m_lastGCLength);
+    dataLogF("pause time: %lfs\n\n", heap->m_lastFullGCLength);
 
     StorageStatistics storageStatistics;
-    heap->m_objectSpace.forEachLiveCell(storageStatistics);
+    {
+        HeapIterationScope iterationScope(*heap);
+        heap->m_objectSpace.forEachLiveCell(iterationScope, storageStatistics);
+    }
     long wastedPropertyStorageBytes = 0;
     long wastedPropertyStoragePercent = 0;
     long objectWithOutOfLineStorageCount = 0;

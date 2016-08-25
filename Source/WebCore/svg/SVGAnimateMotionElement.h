@@ -20,7 +20,6 @@
 
 #ifndef SVGAnimateMotionElement_h
 #define SVGAnimateMotionElement_h
-#if ENABLE(SVG)
 #include "Path.h"
 #include "SVGAnimationElement.h"
 
@@ -28,28 +27,27 @@ namespace WebCore {
 
 class AffineTransform;
             
-class SVGAnimateMotionElement FINAL : public SVGAnimationElement {
+class SVGAnimateMotionElement final : public SVGAnimationElement {
 public:
-    static PassRefPtr<SVGAnimateMotionElement> create(const QualifiedName&, Document*);
+    static Ref<SVGAnimateMotionElement> create(const QualifiedName&, Document&);
     void updateAnimationPath();
 
 private:
-    SVGAnimateMotionElement(const QualifiedName&, Document*);
+    SVGAnimateMotionElement(const QualifiedName&, Document&);
 
-    virtual bool hasValidAttributeType();
-    virtual bool hasValidAttributeName();
+    virtual bool hasValidAttributeType() override;
+    virtual bool hasValidAttributeName() override;
 
-    bool isSupportedAttribute(const QualifiedName&);
-    virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
+    virtual void parseAttribute(const QualifiedName&, const AtomicString&) override;
 
-    virtual void resetAnimatedType();
-    virtual void clearAnimatedType(SVGElement* targetElement);
-    virtual bool calculateToAtEndOfDurationValue(const String& toAtEndOfDurationString);
-    virtual bool calculateFromAndToValues(const String& fromString, const String& toString);
-    virtual bool calculateFromAndByValues(const String& fromString, const String& byString);
-    virtual void calculateAnimatedValue(float percentage, unsigned repeatCount, SVGSMILElement* resultElement);
-    virtual void applyResultsToTarget();
-    virtual float calculateDistance(const String& fromString, const String& toString);
+    virtual void resetAnimatedType() override;
+    virtual void clearAnimatedType(SVGElement* targetElement) override;
+    virtual bool calculateToAtEndOfDurationValue(const String& toAtEndOfDurationString) override;
+    virtual bool calculateFromAndToValues(const String& fromString, const String& toString) override;
+    virtual bool calculateFromAndByValues(const String& fromString, const String& byString) override;
+    virtual void calculateAnimatedValue(float percentage, unsigned repeatCount, SVGSMILElement* resultElement) override;
+    virtual void applyResultsToTarget() override;
+    virtual float calculateDistance(const String& fromString, const String& toString) override;
 
     enum RotateMode {
         RotateAngle,
@@ -61,7 +59,7 @@ private:
 
     bool m_hasToPointAtEndOfDuration;
 
-    virtual void updateAnimationMode() OVERRIDE;
+    virtual void updateAnimationMode() override;
 
     // Note: we do not support percentage values for to/from coords as the spec implies we should (opera doesn't either)
     FloatPoint m_fromPoint;
@@ -74,5 +72,4 @@ private:
     
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif // SVGAnimateMotionElement_h

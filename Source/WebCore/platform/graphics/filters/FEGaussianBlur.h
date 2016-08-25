@@ -22,19 +22,15 @@
 #ifndef FEGaussianBlur_h
 #define FEGaussianBlur_h
 
-#if ENABLE(FILTERS)
-#include "FilterEffect.h"
+#include "FEConvolveMatrix.h"
 #include "Filter.h"
-
-namespace WTF {
-template<typename Type> class ParallelJobs;
-}
+#include "FilterEffect.h"
 
 namespace WebCore {
 
 class FEGaussianBlur : public FilterEffect {
 public:
-    static PassRefPtr<FEGaussianBlur> create(Filter*, float, float);
+    static Ref<FEGaussianBlur> create(Filter&, float, float, EdgeModeType);
 
     float stdDeviationX() const;
     void setStdDeviationX(float);
@@ -42,14 +38,15 @@ public:
     float stdDeviationY() const;
     void setStdDeviationY(float);
 
-    static float calculateStdDeviation(float);
+    EdgeModeType edgeMode() const;
+    void setEdgeMode(EdgeModeType);
 
     virtual void platformApplySoftware();
     virtual void dump();
-    
+
     virtual void determineAbsolutePaintRect();
-    static void calculateKernelSize(Filter*, unsigned& kernelSizeX, unsigned& kernelSizeY, float stdX, float stdY);
-    static void calculateUnscaledKernelSize(unsigned& kernelSizeX, unsigned& kernelSizeY, float stdX, float stdY);
+    static IntSize calculateKernelSize(const Filter&, const FloatPoint& stdDeviation);
+    static IntSize calculateUnscaledKernelSize(const FloatPoint& stdDeviation);
 
     virtual TextStream& externalRepresentation(TextStream&, int indention) const;
 
@@ -57,7 +54,7 @@ private:
     static const int s_minimalRectDimension = 100 * 100; // Empirical data limit for parallel jobs
 
     template<typename Type>
-    friend class WTF::ParallelJobs;
+    friend class ParallelJobs;
 
     struct PlatformApplyParameters {
         FEGaussianBlur* filter;
@@ -71,47 +68,17 @@ private:
 
     static void platformApplyWorker(PlatformApplyParameters*);
 
-    FEGaussianBlur(Filter*, float, float);
+    FEGaussianBlur(Filter&, float, float, EdgeModeType);
 
-    static inline void kernelPosition(int boxBlur, unsigned& std, int& dLeft, int& dRight);
     inline void platformApply(Uint8ClampedArray* srcPixelArray, Uint8ClampedArray* tmpPixelArray, unsigned kernelSizeX, unsigned kernelSizeY, IntSize& paintSize);
 
     inline void platformApplyGeneric(Uint8ClampedArray* srcPixelArray, Uint8ClampedArray* tmpPixelArray, unsigned kernelSizeX, unsigned kernelSizeY, IntSize& paintSize);
 
     float m_stdX;
     float m_stdY;
+    EdgeModeType m_edgeMode;
 };
 
-inline void FEGaussianBlur::kernelPosition(int boxBlur, unsigned& std, int& dLeft, int& dRight)
-{
-    // check http://www.w3.org/TR/SVG/filters.html#feGaussianBlurElement for details
-    switch (boxBlur) {
-    case 0:
-        if (!(std % 2)) {
-            dLeft = std / 2 - 1;
-            dRight = std - dLeft;
-        } else {
-            dLeft = std / 2;
-            dRight = std - dLeft;
-        }
-        break;
-    case 1:
-        if (!(std % 2)) {
-            dLeft++;
-            dRight--;
-        }
-        break;
-    case 2:
-        if (!(std % 2)) {
-            dRight++;
-            std++;
-        }
-        break;
-    }
-}
-
 } // namespace WebCore
-
-#endif // ENABLE(FILTERS)
 
 #endif // FEGaussianBlur_h

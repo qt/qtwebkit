@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution. 
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission. 
  *
@@ -41,25 +41,25 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-static inline bool allowSettingJavascriptURL(ExecState* exec, HTMLFrameElement* imp, const String& value)
+static inline bool allowSettingJavascriptURL(ExecState& state, HTMLFrameElement* imp, const String& value)
 {
     if (protocolIsJavaScript(stripLeadingAndTrailingHTMLSpaces(value))) {
         Document* contentDocument = imp->contentDocument();
-        if (contentDocument && !shouldAllowAccessToNode(exec, contentDocument))
+        if (contentDocument && !shouldAllowAccessToNode(&state, contentDocument))
             return false;
     }
     return true;
 }
 
-void JSHTMLFrameElement::setLocation(ExecState* exec, JSValue value)
+void JSHTMLFrameElement::setLocation(ExecState& state, JSValue value)
 {
-    HTMLFrameElement* imp = static_cast<HTMLFrameElement*>(impl());
-    String locationValue = valueToStringWithNullCheck(exec, value);
+    HTMLFrameElement& imp = wrapped();
+    String locationValue = valueToStringWithNullCheck(&state, value);
 
-    if (!allowSettingJavascriptURL(exec, imp, locationValue))
+    if (!allowSettingJavascriptURL(state, &imp, locationValue))
         return;
 
-    imp->setLocation(locationValue);
+    imp.setLocation(locationValue);
 }
 
 } // namespace WebCore

@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -26,8 +26,7 @@
 #ifndef SVGRenderTreeAsText_h
 #define SVGRenderTreeAsText_h
 
-#if ENABLE(SVG)
-
+#include "RenderTreeAsText.h"
 #include "TextStream.h"
 
 namespace WebCore {
@@ -38,9 +37,11 @@ class FloatSize;
 class Node;
 class RenderImage;
 class RenderObject;
+class RenderSVGContainer;
 class RenderSVGGradientStop;
 class RenderSVGImage;
 class RenderSVGInlineText;
+class RenderSVGResourceContainer;
 class RenderSVGShape;
 class RenderSVGRoot;
 class RenderSVGText;
@@ -48,20 +49,15 @@ class AffineTransform;
 class SVGUnitTypes;
 
 // functions used by the main RenderTreeAsText code
-void write(TextStream&, const RenderSVGShape&, int indent);
-void write(TextStream&, const RenderSVGRoot&, int indent);
-void writeSVGGradientStop(TextStream&, const RenderSVGGradientStop&, int indent);
-void writeSVGResourceContainer(TextStream&, const RenderObject&, int indent);
-void writeSVGContainer(TextStream&, const RenderObject&, int indent);
-void writeSVGImage(TextStream&, const RenderSVGImage&, int indent);
-void writeSVGInlineText(TextStream&, const RenderSVGInlineText&, int indent);
-void writeSVGText(TextStream&, const RenderSVGText&, int indent);
-void writeResources(TextStream&, const RenderObject&, int indent);
-
-// helper operators defined used in various classes to dump the render tree.
-TextStream& operator<<(TextStream&, const AffineTransform&);
-TextStream& operator<<(TextStream&, const Color&);
-TextStream& operator<<(TextStream&, const FloatRect&);
+void write(TextStream&, const RenderSVGShape&, int indent, RenderAsTextBehavior);
+void write(TextStream&, const RenderSVGRoot&, int indent, RenderAsTextBehavior);
+void writeSVGGradientStop(TextStream&, const RenderSVGGradientStop&, int indent, RenderAsTextBehavior);
+void writeSVGResourceContainer(TextStream&, const RenderSVGResourceContainer&, int indent, RenderAsTextBehavior);
+void writeSVGContainer(TextStream&, const RenderSVGContainer&, int indent, RenderAsTextBehavior);
+void writeSVGImage(TextStream&, const RenderSVGImage&, int indent, RenderAsTextBehavior);
+void writeSVGInlineText(TextStream&, const RenderSVGInlineText&, int indent, RenderAsTextBehavior);
+void writeSVGText(TextStream&, const RenderSVGText&, int indent, RenderAsTextBehavior);
+void writeResources(TextStream&, const RenderObject&, int indent, RenderAsTextBehavior);
 
 // helper operators specific to dumping the render tree. these are used in various classes to dump the render tree
 // these could be defined in separate namespace to avoid matching these generic signatures unintentionally.
@@ -89,7 +85,5 @@ TextStream& operator<<(TextStream& ts, Pointer* t)
 }
 
 } // namespace WebCore
-
-#endif // ENABLE(SVG)
 
 #endif // SVGRenderTreeAsText_h

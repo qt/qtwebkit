@@ -38,6 +38,12 @@
 namespace WebCore {
 
 class LayoutPoint;
+class TextStream;
+
+enum AspectRatioFit {
+    AspectRatioFitShrink,
+    AspectRatioFitGrow
+};
 
 class LayoutSize {
 public:
@@ -114,6 +120,17 @@ public:
 
     operator FloatSize() const { return FloatSize(m_width, m_height); }
 
+    LayoutSize fitToAspectRatio(const LayoutSize& aspectRatio, AspectRatioFit fit) const
+    {
+        float heightScale = height().toFloat() / aspectRatio.height().toFloat();
+        float widthScale = width().toFloat() / aspectRatio.width().toFloat();
+
+        if ((widthScale > heightScale) != (fit == AspectRatioFitGrow))
+            return LayoutSize(height() * aspectRatio.width() / aspectRatio.height(), height());
+
+        return LayoutSize(width(), width() * aspectRatio.height() / aspectRatio.width());
+    }
+
 private:
     LayoutUnit m_width, m_height;
 };
@@ -167,14 +184,12 @@ inline IntSize roundedIntSize(const LayoutSize& s)
     return IntSize(s.width().round(), s.height().round());
 }
 
-inline LayoutSize roundedLayoutSize(const FloatSize& s)
+inline FloatSize floorSizeToDevicePixels(const LayoutSize& size, float pixelSnappingFactor)
 {
-#if ENABLE(SUBPIXEL_LAYOUT)
-    return LayoutSize(s);
-#else
-    return roundedIntSize(s);
-#endif
+    return FloatSize(floorToDevicePixel(size.width(), pixelSnappingFactor), floorToDevicePixel(size.height(), pixelSnappingFactor));
 }
+
+TextStream& operator<<(TextStream&, const LayoutSize&);
 
 } // namespace WebCore
 

@@ -30,60 +30,41 @@
 
 namespace WebCore {
 
-class HTMLTableCellElement FINAL : public HTMLTablePartElement {
+class HTMLTableCellElement : public HTMLTablePartElement {
 public:
-    static PassRefPtr<HTMLTableCellElement> create(const QualifiedName&, Document*);
-
     int cellIndex() const;
-
     int colSpan() const;
     int rowSpan() const;
 
     void setCellIndex(int);
+    void setColSpan(int);
+    void setRowSpan(int);
 
     String abbr() const;
     String axis() const;
-    void setColSpan(int);
     String headers() const;
-    void setRowSpan(int);
     String scope() const;
 
-    HTMLTableCellElement* cellAbove() const;
+    WEBCORE_EXPORT HTMLTableCellElement* cellAbove() const;
 
-private:
-    HTMLTableCellElement(const QualifiedName&, Document*);
+protected:
+    HTMLTableCellElement(const QualifiedName&, Document&);
 
-    virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
-    virtual bool isPresentationAttribute(const QualifiedName&) const OVERRIDE;
-    virtual void collectStyleForPresentationAttribute(const QualifiedName&, const AtomicString&, MutableStylePropertySet*) OVERRIDE;
-    virtual const StylePropertySet* additionalPresentationAttributeStyle() OVERRIDE;
+    virtual void parseAttribute(const QualifiedName&, const AtomicString&) override;
+    virtual bool isPresentationAttribute(const QualifiedName&) const override;
+    virtual void collectStyleForPresentationAttribute(const QualifiedName&, const AtomicString&, MutableStyleProperties&) override;
+    virtual const StyleProperties* additionalPresentationAttributeStyle() override;
 
-    virtual bool isURLAttribute(const Attribute&) const OVERRIDE;
+    virtual bool isURLAttribute(const Attribute&) const override;
 
-    virtual void addSubresourceAttributeURLs(ListHashSet<KURL>&) const;
+    virtual void addSubresourceAttributeURLs(ListHashSet<URL>&) const override;
 };
 
-HTMLTableCellElement* toHTMLTableCellElement(Node* node);
-const HTMLTableCellElement* toHTMLTableCellElement(const Node* node);
+} // namespace WebCore
 
-// This will catch anyone doing an unnecessary cast.
-void toHTMLTableCellElement(const HTMLTableCellElement*);
-
-#ifdef NDEBUG
-
-// The debug versions of these, with assertions, are not inlined.
-
-inline HTMLTableCellElement* toHTMLTableCellElement(Node* node)
-{
-    return static_cast<HTMLTableCellElement*>(node);
-}
-
-inline const HTMLTableCellElement* toHTMLTableCellElement(const Node* node)
-{
-    return static_cast<const HTMLTableCellElement*>(node);
-}
-#endif
-
-} // namespace
+SPECIALIZE_TYPE_TRAITS_BEGIN(WebCore::HTMLTableCellElement)
+    static bool isType(const WebCore::HTMLElement& element) { return element.hasTagName(WebCore::HTMLNames::tdTag) || element.hasTagName(WebCore::HTMLNames::thTag); }
+    static bool isType(const WebCore::Node& node) { return is<WebCore::HTMLElement>(node) && isType(downcast<WebCore::HTMLElement>(node)); }
+SPECIALIZE_TYPE_TRAITS_END()
 
 #endif

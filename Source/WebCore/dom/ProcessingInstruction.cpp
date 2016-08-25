@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2000 Peter Kelly (pmk@post.com)
  * Copyright (C) 2006, 2008, 2009 Apple Inc. All rights reserved.
+ * Copyright (C) 2013 Samsung Electronics. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -21,13 +22,13 @@
 #include "config.h"
 #include "ProcessingInstruction.h"
 
+#include "AuthorStyleSheets.h"
 #include "CSSStyleSheet.h"
 #include "CachedCSSStyleSheet.h"
 #include "CachedResourceLoader.h"
 #include "CachedResourceRequest.h"
 #include "CachedXSLStyleSheet.h"
 #include "Document.h"
-#include "DocumentStyleSheetCollection.h"
 #include "ExceptionCode.h"
 #include "Frame.h"
 #include "FrameLoader.h"
@@ -38,24 +39,15 @@
 
 namespace WebCore {
 
-inline ProcessingInstruction::ProcessingInstruction(Document* document, const String& target, const String& data)
-    : Node(document, CreateOther)
+inline ProcessingInstruction::ProcessingInstruction(Document& document, const String& target, const String& data)
+    : CharacterData(document, data, CreateOther)
     , m_target(target)
-    , m_data(data)
-    , m_cachedSheet(0)
-    , m_loading(false)
-    , m_alternate(false)
-    , m_createdByParser(false)
-    , m_isCSS(false)
-#if ENABLE(XSLT)
-    , m_isXSL(false)
-#endif
 {
 }
 
-PassRefPtr<ProcessingInstruction> ProcessingInstruction::create(Document* document, const String& target, const String& data)
+Ref<ProcessingInstruction> ProcessingInstruction::create(Document& document, const String& target, const String& data)
 {
-    return adoptRef(new ProcessingInstruction(document, target, data));
+    return adoptRef(*new ProcessingInstruction(document, target, data));
 }
 
 ProcessingInstruction::~ProcessingInstruction()
@@ -67,15 +59,7 @@ ProcessingInstruction::~ProcessingInstruction()
         m_cachedSheet->removeClient(this);
 
     if (inDocument())
-        document()->styleSheetCollection()->removeStyleSheetCandidateNode(this);
-}
-
-void ProcessingInstruction::setData(const String& data, ExceptionCode&)
-{
-    int oldLength = m_data.length();
-    m_data = data;
-    document()->textRemoved(this, 0, oldLength);
-    checkStyleSheet();
+        document().authorStyleSheets().removeStyleSheetCandidateNode(*this);
 }
 
 String ProcessingInstruction::nodeName() const
@@ -88,32 +72,21 @@ Node::NodeType ProcessingInstruction::nodeType() const
     return PROCESSING_INSTRUCTION_NODE;
 }
 
-String ProcessingInstruction::nodeValue() const
-{
-    return m_data;
-}
-
-void ProcessingInstruction::setNodeValue(const String& nodeValue, ExceptionCode& ec)
-{
-    // NO_MODIFICATION_ALLOWED_ERR: taken care of by setData()
-    setData(nodeValue, ec);
-}
-
-PassRefPtr<Node> ProcessingInstruction::cloneNode(bool /*deep*/)
+Ref<Node> ProcessingInstruction::cloneNodeInternal(Document& targetDocument, CloningOperation)
 {
     // FIXME: Is it a problem that this does not copy m_localHref?
     // What about other data members?
-    return create(document(), m_target, m_data);
+    return create(targetDocument, m_target, data());
 }
 
 void ProcessingInstruction::checkStyleSheet()
 {
-    if (m_target == "xml-stylesheet" && document()->frame() && parentNode() == document()) {
+    if (m_target == "xml-stylesheet" && document().frame() && parentNode() == &document()) {
         // see http://www.w3.org/TR/xml-stylesheet/
         // ### support stylesheet included in a fragment of this (or another) document
         // ### make sure this gets called when adding from javascript
         bool attrsOk;
-        const HashMap<String, String> attrs = parseAttributes(m_data, attrsOk);
+        const HashMap<String, String> attrs = parseAttributes(data(), attrsOk);
         if (!attrsOk)
             return;
         HashMap<String, String>::const_iterator i = attrs.find("type");
@@ -146,7 +119,7 @@ void ProcessingInstruction::checkStyleSheet()
             // We need to make a synthetic XSLStyleSheet that is embedded.  It needs to be able
             // to kick off import/include loads that can hang off some parent sheet.
             if (m_isXSL) {
-                KURL finalURL(ParsedURLString, m_localHref);
+                URL finalURL(ParsedURLString, m_localHref);
                 m_sheet = XSLStyleSheet::createEmbedded(this, finalURL);
                 m_loading = false;
             }
@@ -154,36 +127,36 @@ void ProcessingInstruction::checkStyleSheet()
         } else {
             if (m_cachedSheet) {
                 m_cachedSheet->removeClient(this);
-                m_cachedSheet = 0;
+                m_cachedSheet = nullptr;
             }
             
-            String url = document()->completeURL(href).string();
+            String url = document().completeURL(href).string();
             if (!dispatchBeforeLoadEvent(url))
                 return;
             
             m_loading = true;
-            document()->styleSheetCollection()->addPendingSheet();
+            document().authorStyleSheets().addPendingSheet();
             
-            CachedResourceRequest request(ResourceRequest(document()->completeURL(href)));
+            CachedResourceRequest request(ResourceRequest(document().completeURL(href)));
 #if ENABLE(XSLT)
             if (m_isXSL)
-                m_cachedSheet = document()->cachedResourceLoader()->requestXSLStyleSheet(request);
+                m_cachedSheet = document().cachedResourceLoader().requestXSLStyleSheet(request);
             else
 #endif
             {
                 String charset = attrs.get("charset");
                 if (charset.isEmpty())
-                    charset = document()->charset();
+                    charset = document().charset();
                 request.setCharset(charset);
 
-                m_cachedSheet = document()->cachedResourceLoader()->requestCSSStyleSheet(request);
+                m_cachedSheet = document().cachedResourceLoader().requestCSSStyleSheet(request);
             }
             if (m_cachedSheet)
                 m_cachedSheet->addClient(this);
             else {
                 // The request may have been denied if (for example) the stylesheet is local and the document is remote.
                 m_loading = false;
-                document()->styleSheetCollection()->removePendingSheet();
+                document().authorStyleSheets().removePendingSheet();
             }
         }
     }
@@ -201,13 +174,13 @@ bool ProcessingInstruction::isLoading() const
 bool ProcessingInstruction::sheetLoaded()
 {
     if (!isLoading()) {
-        document()->styleSheetCollection()->removePendingSheet();
+        document().authorStyleSheets().removePendingSheet();
         return true;
     }
     return false;
 }
 
-void ProcessingInstruction::setCSSStyleSheet(const String& href, const KURL& baseURL, const String& charset, const CachedCSSStyleSheet* sheet)
+void ProcessingInstruction::setCSSStyleSheet(const String& href, const URL& baseURL, const String& charset, const CachedCSSStyleSheet* sheet)
 {
     if (!inDocument()) {
         ASSERT(!m_sheet);
@@ -217,26 +190,25 @@ void ProcessingInstruction::setCSSStyleSheet(const String& href, const KURL& bas
     ASSERT(m_isCSS);
     CSSParserContext parserContext(document(), baseURL, charset);
 
-    RefPtr<StyleSheetContents> newSheet = StyleSheetContents::create(href, parserContext);
+    auto cssSheet = CSSStyleSheet::create(StyleSheetContents::create(href, parserContext), this);
+    cssSheet.get().setDisabled(m_alternate);
+    cssSheet.get().setTitle(m_title);
+    cssSheet.get().setMediaQueries(MediaQuerySet::create(m_media));
 
-    RefPtr<CSSStyleSheet> cssSheet = CSSStyleSheet::create(newSheet, this);
-    cssSheet->setDisabled(m_alternate);
-    cssSheet->setTitle(m_title);
-    cssSheet->setMediaQueries(MediaQuerySet::create(m_media));
-
-    m_sheet = cssSheet.release();
+    m_sheet = WTFMove(cssSheet);
 
     // We don't need the cross-origin security check here because we are
     // getting the sheet text in "strict" mode. This enforces a valid CSS MIME
     // type.
-    parseStyleSheet(sheet->sheetText(true));
+    parseStyleSheet(sheet->sheetText());
 }
 
 #if ENABLE(XSLT)
-void ProcessingInstruction::setXSLStyleSheet(const String& href, const KURL& baseURL, const String& sheet)
+void ProcessingInstruction::setXSLStyleSheet(const String& href, const URL& baseURL, const String& sheet)
 {
     ASSERT(m_isXSL);
     m_sheet = XSLStyleSheet::create(this, href, baseURL);
+    Ref<Document> protect(document());
     parseStyleSheet(sheet);
 }
 #endif
@@ -244,46 +216,27 @@ void ProcessingInstruction::setXSLStyleSheet(const String& href, const KURL& bas
 void ProcessingInstruction::parseStyleSheet(const String& sheet)
 {
     if (m_isCSS)
-        static_cast<CSSStyleSheet*>(m_sheet.get())->contents()->parseString(sheet);
+        downcast<CSSStyleSheet>(*m_sheet).contents().parseString(sheet);
 #if ENABLE(XSLT)
     else if (m_isXSL)
-        static_cast<XSLStyleSheet*>(m_sheet.get())->parseString(sheet);
+        downcast<XSLStyleSheet>(*m_sheet).parseString(sheet);
 #endif
 
     if (m_cachedSheet)
         m_cachedSheet->removeClient(this);
-    m_cachedSheet = 0;
+    m_cachedSheet = nullptr;
 
     m_loading = false;
 
     if (m_isCSS)
-        static_cast<CSSStyleSheet*>(m_sheet.get())->contents()->checkLoaded();
+        downcast<CSSStyleSheet>(*m_sheet).contents().checkLoaded();
 #if ENABLE(XSLT)
     else if (m_isXSL)
-        static_cast<XSLStyleSheet*>(m_sheet.get())->checkLoaded();
+        downcast<XSLStyleSheet>(*m_sheet).checkLoaded();
 #endif
 }
 
-void ProcessingInstruction::setCSSStyleSheet(PassRefPtr<CSSStyleSheet> sheet)
-{
-    ASSERT(!m_cachedSheet);
-    ASSERT(!m_loading);
-    m_sheet = sheet;
-    sheet->setTitle(m_title);
-    sheet->setDisabled(m_alternate);
-}
-
-bool ProcessingInstruction::offsetInCharacters() const
-{
-    return true;
-}
-
-int ProcessingInstruction::maxCharacterOffset() const 
-{
-    return static_cast<int>(m_data.length());
-}
-
-void ProcessingInstruction::addSubresourceAttributeURLs(ListHashSet<KURL>& urls) const
+void ProcessingInstruction::addSubresourceAttributeURLs(ListHashSet<URL>& urls) const
 {
     if (!sheet())
         return;
@@ -291,39 +244,39 @@ void ProcessingInstruction::addSubresourceAttributeURLs(ListHashSet<KURL>& urls)
     addSubresourceURL(urls, sheet()->baseURL());
 }
 
-Node::InsertionNotificationRequest ProcessingInstruction::insertedInto(ContainerNode* insertionPoint)
+Node::InsertionNotificationRequest ProcessingInstruction::insertedInto(ContainerNode& insertionPoint)
 {
-    Node::insertedInto(insertionPoint);
-    if (!insertionPoint->inDocument())
+    CharacterData::insertedInto(insertionPoint);
+    if (!insertionPoint.inDocument())
         return InsertionDone;
-    document()->styleSheetCollection()->addStyleSheetCandidateNode(this, m_createdByParser);
+    document().authorStyleSheets().addStyleSheetCandidateNode(*this, m_createdByParser);
     checkStyleSheet();
     return InsertionDone;
 }
 
-void ProcessingInstruction::removedFrom(ContainerNode* insertionPoint)
+void ProcessingInstruction::removedFrom(ContainerNode& insertionPoint)
 {
-    Node::removedFrom(insertionPoint);
-    if (!insertionPoint->inDocument())
+    CharacterData::removedFrom(insertionPoint);
+    if (!insertionPoint.inDocument())
         return;
     
-    document()->styleSheetCollection()->removeStyleSheetCandidateNode(this);
+    document().authorStyleSheets().removeStyleSheetCandidateNode(*this);
 
     if (m_sheet) {
         ASSERT(m_sheet->ownerNode() == this);
         m_sheet->clearOwnerNode();
-        m_sheet = 0;
+        m_sheet = nullptr;
     }
 
     // If we're in document teardown, then we don't need to do any notification of our sheet's removal.
-    if (document()->renderer())
-        document()->styleResolverChanged(DeferRecalcStyle);
+    if (document().hasLivingRenderTree())
+        document().styleResolverChanged(DeferRecalcStyle);
 }
 
 void ProcessingInstruction::finishParsingChildren()
 {
     m_createdByParser = false;
-    Node::finishParsingChildren();
+    CharacterData::finishParsingChildren();
 }
 
 } // namespace

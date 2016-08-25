@@ -18,25 +18,19 @@
  */
 
 #include "config.h"
-
-#if ENABLE(FILTERS)
 #include "FEDropShadow.h"
 
-#include "ColorSpace.h"
 #include "FEGaussianBlur.h"
 #include "Filter.h"
 #include "GraphicsContext.h"
-#include "RenderTreeAsText.h"
 #include "ShadowBlur.h"
 #include "TextStream.h"
+#include <runtime/Uint8ClampedArray.h>
 #include <wtf/MathExtras.h>
-#include <wtf/Uint8ClampedArray.h>
-
-using namespace std;
 
 namespace WebCore {
     
-FEDropShadow::FEDropShadow(Filter* filter, float stdX, float stdY, float dx, float dy, const Color& shadowColor, float shadowOpacity)
+FEDropShadow::FEDropShadow(Filter& filter, float stdX, float stdY, float dx, float dy, const Color& shadowColor, float shadowOpacity)
     : FilterEffect(filter)
     , m_stdX(stdX)
     , m_stdY(stdY)
@@ -47,28 +41,25 @@ FEDropShadow::FEDropShadow(Filter* filter, float stdX, float stdY, float dx, flo
 {
 }
 
-PassRefPtr<FEDropShadow> FEDropShadow::create(Filter* filter, float stdX, float stdY, float dx, float dy, const Color& shadowColor, float shadowOpacity)
+Ref<FEDropShadow> FEDropShadow::create(Filter& filter, float stdX, float stdY, float dx, float dy, const Color& shadowColor, float shadowOpacity)
 {
-    return adoptRef(new FEDropShadow(filter, stdX, stdY, dx, dy, shadowColor, shadowOpacity));
+    return adoptRef(*new FEDropShadow(filter, stdX, stdY, dx, dy, shadowColor, shadowOpacity));
 }
 
 void FEDropShadow::determineAbsolutePaintRect()
 {
-    Filter* filter = this->filter();
-    ASSERT(filter);
+    Filter& filter = this->filter();
 
     FloatRect absolutePaintRect = inputEffect(0)->absolutePaintRect();
     FloatRect absoluteOffsetPaintRect(absolutePaintRect);
-    absoluteOffsetPaintRect.move(filter->applyHorizontalScale(m_dx), filter->applyVerticalScale(m_dy));
+    absoluteOffsetPaintRect.move(filter.applyHorizontalScale(m_dx), filter.applyVerticalScale(m_dy));
     absolutePaintRect.unite(absoluteOffsetPaintRect);
-    
-    unsigned kernelSizeX = 0;
-    unsigned kernelSizeY = 0;
-    FEGaussianBlur::calculateKernelSize(filter, kernelSizeX, kernelSizeY, m_stdX, m_stdY);
-    
+
+    IntSize kernelSize = FEGaussianBlur::calculateKernelSize(filter, FloatPoint(m_stdX, m_stdY));
+
     // We take the half kernel size and multiply it with three, because we run box blur three times.
-    absolutePaintRect.inflateX(3 * kernelSizeX * 0.5f);
-    absolutePaintRect.inflateY(3 * kernelSizeY * 0.5f);
+    absolutePaintRect.inflateX(3 * kernelSize.width() * 0.5f);
+    absolutePaintRect.inflateY(3 * kernelSize.height() * 0.5f);
 
     if (clipsToBounds())
         absolutePaintRect.intersect(maxEffectRect());
@@ -86,37 +77,39 @@ void FEDropShadow::platformApplySoftware()
     if (!resultImage)
         return;
 
-    Filter* filter = this->filter();
-    FloatSize blurRadius(filter->applyHorizontalScale(m_stdX), filter->applyVerticalScale(m_stdY));
-    FloatSize offset(filter->applyHorizontalScale(m_dx), filter->applyVerticalScale(m_dy));
+    Filter& filter = this->filter();
+    FloatSize blurRadius(filter.applyHorizontalScale(m_stdX), filter.applyVerticalScale(m_stdY));
+    blurRadius.scale(filter.filterScale());
+    FloatSize offset(filter.applyHorizontalScale(m_dx), filter.applyVerticalScale(m_dy));
 
     FloatRect drawingRegion = drawingRegionOfInputImage(in->absolutePaintRect());
     FloatRect drawingRegionWithOffset(drawingRegion);
     drawingRegionWithOffset.move(offset);
 
     ImageBuffer* sourceImage = in->asImageBuffer();
-    ASSERT(sourceImage);
-    GraphicsContext* resultContext = resultImage->context();
-    ASSERT(resultContext);
-    resultContext->setAlpha(m_shadowOpacity);
-    resultContext->drawImageBuffer(sourceImage, ColorSpaceDeviceRGB, drawingRegionWithOffset);
-    resultContext->setAlpha(1);
+    if (!sourceImage)
+        return;
 
-    ShadowBlur contextShadow(blurRadius, offset, m_shadowColor, ColorSpaceDeviceRGB);
+    GraphicsContext& resultContext = resultImage->context();
+    resultContext.setAlpha(m_shadowOpacity);
+    resultContext.drawImageBuffer(*sourceImage, drawingRegionWithOffset);
+    resultContext.setAlpha(1);
+
+    ShadowBlur contextShadow(blurRadius, offset, m_shadowColor);
 
     // TODO: Direct pixel access to ImageBuffer would avoid copying the ImageData.
     IntRect shadowArea(IntPoint(), resultImage->internalSize());
-    RefPtr<Uint8ClampedArray> srcPixelArray = resultImage->getPremultipliedImageData(shadowArea);
+    RefPtr<Uint8ClampedArray> srcPixelArray = resultImage->getPremultipliedImageData(shadowArea, ImageBuffer::BackingStoreCoordinateSystem);
 
     contextShadow.blurLayerImage(srcPixelArray->data(), shadowArea.size(), 4 * shadowArea.size().width());
 
-    resultImage->putByteArray(Premultiplied, srcPixelArray.get(), shadowArea.size(), shadowArea, IntPoint());
+    resultImage->putByteArray(Premultiplied, srcPixelArray.get(), shadowArea.size(), shadowArea, IntPoint(), ImageBuffer::BackingStoreCoordinateSystem);
 
-    resultContext->setCompositeOperation(CompositeSourceIn);
-    resultContext->fillRect(FloatRect(FloatPoint(), absolutePaintRect().size()), m_shadowColor, ColorSpaceDeviceRGB);
-    resultContext->setCompositeOperation(CompositeDestinationOver);
+    resultContext.setCompositeOperation(CompositeSourceIn);
+    resultContext.fillRect(FloatRect(FloatPoint(), absolutePaintRect().size()), m_shadowColor);
+    resultContext.setCompositeOperation(CompositeDestinationOver);
 
-    resultImage->context()->drawImageBuffer(sourceImage, ColorSpaceDeviceRGB, drawingRegion);
+    resultImage->context().drawImageBuffer(*sourceImage, drawingRegion);
 }
 
 void FEDropShadow::dump()
@@ -134,5 +127,3 @@ TextStream& FEDropShadow::externalRepresentation(TextStream& ts, int indent) con
 }
     
 } // namespace WebCore
-
-#endif // ENABLE(FILTERS)

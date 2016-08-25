@@ -21,9 +21,8 @@
 #ifndef SVGGraphicsElement_h
 #define SVGGraphicsElement_h
 
-#if ENABLE(SVG)
 #include "SVGAnimatedTransformList.h"
-#include "SVGStyledElement.h"
+#include "SVGElement.h"
 #include "SVGTests.h"
 #include "SVGTransformable.h"
 
@@ -32,56 +31,62 @@ namespace WebCore {
 class AffineTransform;
 class Path;
 
-class SVGGraphicsElement : public SVGStyledElement, public SVGTransformable, public SVGTests {
+class SVGGraphicsElement : public SVGElement, public SVGTransformable, public SVGTests {
 public:
     virtual ~SVGGraphicsElement();
 
-    virtual AffineTransform getCTM(StyleUpdateStrategy = AllowStyleUpdate);
-    virtual AffineTransform getScreenCTM(StyleUpdateStrategy = AllowStyleUpdate);
-    virtual SVGElement* nearestViewportElement() const;
-    virtual SVGElement* farthestViewportElement() const;
+    virtual AffineTransform getCTM(StyleUpdateStrategy = AllowStyleUpdate) override;
+    virtual AffineTransform getScreenCTM(StyleUpdateStrategy = AllowStyleUpdate) override;
+    virtual SVGElement* nearestViewportElement() const override;
+    virtual SVGElement* farthestViewportElement() const override;
 
-    virtual AffineTransform localCoordinateSpaceTransform(SVGLocatable::CTMScope mode) const { return SVGTransformable::localCoordinateSpaceTransform(mode); }
-    virtual AffineTransform animatedLocalTransform() const;
-    virtual AffineTransform* supplementalTransform();
+    virtual AffineTransform localCoordinateSpaceTransform(SVGLocatable::CTMScope mode) const override { return SVGTransformable::localCoordinateSpaceTransform(mode); }
+    virtual AffineTransform animatedLocalTransform() const override;
+    virtual AffineTransform* supplementalTransform() override;
 
-    virtual FloatRect getBBox(StyleUpdateStrategy = AllowStyleUpdate);
+    virtual FloatRect getBBox(StyleUpdateStrategy = AllowStyleUpdate) override;
+
+    bool shouldIsolateBlending() const { return m_shouldIsolateBlending; }
+    void setShouldIsolateBlending(bool isolate) { m_shouldIsolateBlending = isolate; }
 
     // "base class" methods for all the elements which render as paths
     virtual void toClipPath(Path&);
-    virtual RenderObject* createRenderer(RenderArena*, RenderStyle*);
+    virtual RenderPtr<RenderElement> createElementRenderer(Ref<RenderStyle>&&, const RenderTreePosition&) override;
 
 protected:
-    SVGGraphicsElement(const QualifiedName&, Document*, ConstructionType = CreateSVGElement);
+    SVGGraphicsElement(const QualifiedName&, Document&);
 
-    bool isSupportedAttribute(const QualifiedName&);
-    virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
-    virtual void svgAttributeChanged(const QualifiedName&);
+    virtual bool supportsFocus() const override { return Element::supportsFocus() || hasFocusEventListeners(); }
+
+    virtual void parseAttribute(const QualifiedName&, const AtomicString&) override;
+    virtual void svgAttributeChanged(const QualifiedName&) override;
 
     BEGIN_DECLARE_ANIMATED_PROPERTIES(SVGGraphicsElement)
         DECLARE_ANIMATED_TRANSFORM_LIST(Transform, transform)
     END_DECLARE_ANIMATED_PROPERTIES
 
 private:
-    virtual bool isSVGGraphicsElement() const OVERRIDE { return true; }
+    virtual bool isSVGGraphicsElement() const override { return true; }
+
+    static bool isSupportedAttribute(const QualifiedName&);
 
     // SVGTests
-    virtual void synchronizeRequiredFeatures() { SVGTests::synchronizeRequiredFeatures(this); }
-    virtual void synchronizeRequiredExtensions() { SVGTests::synchronizeRequiredExtensions(this); }
-    virtual void synchronizeSystemLanguage() { SVGTests::synchronizeSystemLanguage(this); }
+    virtual void synchronizeRequiredFeatures() override { SVGTests::synchronizeRequiredFeatures(this); }
+    virtual void synchronizeRequiredExtensions() override { SVGTests::synchronizeRequiredExtensions(this); }
+    virtual void synchronizeSystemLanguage() override { SVGTests::synchronizeSystemLanguage(this); }
 
     // Used by <animateMotion>
-    OwnPtr<AffineTransform> m_supplementalTransform;
-};
+    std::unique_ptr<AffineTransform> m_supplementalTransform;
 
-inline SVGGraphicsElement* toSVGGraphicsElement(Node* node)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->isSVGElement());
-    ASSERT_WITH_SECURITY_IMPLICATION(!node || toSVGElement(node)->isSVGGraphicsElement());
-    return static_cast<SVGGraphicsElement*>(node);
-}
+    // Used to isolate blend operations caused by masking.
+    bool m_shouldIsolateBlending;
+};
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
+SPECIALIZE_TYPE_TRAITS_BEGIN(WebCore::SVGGraphicsElement)
+    static bool isType(const WebCore::SVGElement& element) { return element.isSVGGraphicsElement(); }
+    static bool isType(const WebCore::Node& node) { return is<WebCore::SVGElement>(node) && isType(downcast<WebCore::SVGElement>(node)); }
+SPECIALIZE_TYPE_TRAITS_END()
+
 #endif // SVGGraphicsElement_h

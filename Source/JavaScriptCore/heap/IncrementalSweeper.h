@@ -27,42 +27,35 @@
 #define IncrementalSweeper_h
 
 #include "HeapTimer.h"
-#include "MarkedBlock.h"
-#include <wtf/HashSet.h>
-#include <wtf/PassOwnPtr.h>
-#include <wtf/RetainPtr.h>
 #include <wtf/Vector.h>
 
 namespace JSC {
 
 class Heap;
+class MarkedBlock;
 
 class IncrementalSweeper : public HeapTimer {
+    WTF_MAKE_FAST_ALLOCATED;
 public:
-    static PassOwnPtr<IncrementalSweeper> create(Heap*);
-    void startSweeping(Vector<MarkedBlock*>&);
-    virtual void doWork();
-    void sweepNextBlock();
+#if USE(CF)
+    JS_EXPORT_PRIVATE IncrementalSweeper(Heap*, CFRunLoopRef);
+#else
+    explicit IncrementalSweeper(Heap*);
+#endif
+
+    void startSweeping();
+
+    JS_EXPORT_PRIVATE virtual void doWork() override;
+    bool sweepNextBlock();
     void willFinishSweeping();
 
+#if USE(CF) || PLATFORM(EFL) || USE(GLIB) || PLATFORM(QT)
 private:
-#if USE(CF) || PLATFORM(BLACKBERRY) || PLATFORM(QT)
-#if USE(CF)
-    IncrementalSweeper(Heap*, CFRunLoopRef);
-#else
-    IncrementalSweeper(Heap*);
-#endif
-    
     void doSweep(double startTime);
     void scheduleTimer();
     void cancelTimer();
     
-    unsigned m_currentBlockToSweepIndex;
     Vector<MarkedBlock*>& m_blocksToSweep;
-#else
-    
-    IncrementalSweeper(VM*);
-    
 #endif
 };
 

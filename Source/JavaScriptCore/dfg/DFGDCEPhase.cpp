@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2013-2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,7 +32,7 @@
 #include "DFGGraph.h"
 #include "DFGInsertionSet.h"
 #include "DFGPhase.h"
-#include "Operations.h"
+#include "JSCInlines.h"
 
 namespace JSC { namespace DFG {
 
@@ -40,112 +40,42 @@ class DCEPhase : public Phase {
 public:
     DCEPhase(Graph& graph)
         : Phase(graph, "dead code elimination")
+        , m_insertionSet(graph)
     {
     }
     
     bool run()
     {
-        // First reset the counts to 0 for all nodes.
-        for (BlockIndex blockIndex = 0; blockIndex < m_graph.m_blocks.size(); ++blockIndex) {
-            BasicBlock* block = m_graph.m_blocks[blockIndex].get();
-            if (!block)
-                continue;
-            for (unsigned indexInBlock = block->size(); indexInBlock--;)
-                block->at(indexInBlock)->setRefCount(0);
-            for (unsigned phiIndex = block->phis.size(); phiIndex--;)
-                block->phis[phiIndex]->setRefCount(0);
-        }
-    
-        // Now find the roots:
-        // - Nodes that are must-generate.
-        // - Nodes that are reachable from type checks.
-        // Set their ref counts to 1 and put them on the worklist.
-        for (BlockIndex blockIndex = 0; blockIndex < m_graph.m_blocks.size(); ++blockIndex) {
-            BasicBlock* block = m_graph.m_blocks[blockIndex].get();
-            if (!block)
-                continue;
-            for (unsigned indexInBlock = block->size(); indexInBlock--;) {
-                Node* node = block->at(indexInBlock);
-                DFG_NODE_DO_TO_CHILDREN(m_graph, node, findTypeCheckRoot);
-                if (!(node->flags() & NodeMustGenerate))
-                    continue;
-                if (!node->postfixRef())
-                    m_worklist.append(node);
-            }
-        }
+        ASSERT(m_graph.m_form == ThreadedCPS || m_graph.m_form == SSA);
         
-        while (!m_worklist.isEmpty()) {
-            Node* node = m_worklist.last();
-            m_worklist.removeLast();
-            ASSERT(node->shouldGenerate()); // It should not be on the worklist unless it's ref'ed.
-            DFG_NODE_DO_TO_CHILDREN(m_graph, node, countEdge);
-        }
+        m_graph.computeRefCounts();
         
-        for (BlockIndex blockIndex = 0; blockIndex < m_graph.m_blocks.size(); ++blockIndex) {
-            BasicBlock* block = m_graph.m_blocks[blockIndex].get();
+        for (BasicBlock* block : m_graph.blocksInPreOrder())
+            fixupBlock(block);
+        
+        cleanVariables(m_graph.m_arguments);
+
+        // Just do a basic Phantom/Check clean-up.
+        for (BlockIndex blockIndex = m_graph.numBlocks(); blockIndex--;) {
+            BasicBlock* block = m_graph.block(blockIndex);
             if (!block)
                 continue;
-
-            InsertionSet insertionSet(m_graph);
-
-            for (unsigned indexInBlock = block->size(); indexInBlock--;) {
-                Node* node = block->at(indexInBlock);
-                if (node->shouldGenerate())
-                    continue;
-                
+            unsigned sourceIndex = 0;
+            unsigned targetIndex = 0;
+            while (sourceIndex < block->size()) {
+                Node* node = block->at(sourceIndex++);
                 switch (node->op()) {
-                case SetLocal: {
-                    if (node->child1().isProved() || node->child1().useKind() == UntypedUse) {
-                        // Consider the possibility that UInt32ToNumber is dead but its
-                        // child isn't; if so then we should MovHint the child.
-                        if (!node->child1()->shouldGenerate()
-                            && node->child1()->op() == UInt32ToNumber)
-                            node->child1() = node->child1()->child1();
-
-                        if (!node->child1()->shouldGenerate()) {
-                            node->setOpAndDefaultFlags(ZombieHint);
-                            node->child1() = Edge();
-                            break;
-                        }
-                        node->setOpAndDefaultFlags(MovHint);
-                        break;
-                    }
-                    node->setOpAndDefaultFlags(MovHintAndCheck);
-                    node->setRefCount(1);
+                case Check:
+                case Phantom:
+                    if (node->children.isEmpty())
+                        continue;
+                    break;
+                default:
                     break;
                 }
-                    
-                case GetLocal:
-                case SetArgument: {
-                    // Leave them as not shouldGenerate.
-                    break;
-                }
-
-                default: {
-                    if (node->flags() & NodeHasVarArgs) {
-                        for (unsigned childIdx = node->firstChild(); childIdx < node->firstChild() + node->numChildren(); childIdx++) {
-                            Edge edge = m_graph.m_varArgChildren[childIdx];
-
-                            if (!edge || edge.isProved() || edge.useKind() == UntypedUse)
-                                continue;
-
-                            insertionSet.insertNode(indexInBlock, SpecNone, Phantom, node->codeOrigin, edge);
-                        }
-
-                        node->convertToPhantomUnchecked();
-                        node->children.reset();
-                        node->setRefCount(1);
-                        break;
-                    }
-
-                    node->convertToPhantom();
-                    eliminateIrrelevantPhantomChildren(node);
-                    node->setRefCount(1);
-                    break;
-                } }
+                block->at(targetIndex++) = node;
             }
-
-            insertionSet.execute(block);
+            block->resize(targetIndex);
         }
         
         m_graph.m_refCountState = ExactRefCount;
@@ -154,39 +84,68 @@ public:
     }
 
 private:
-    void findTypeCheckRoot(Node*, Edge edge)
+    void fixupBlock(BasicBlock* block)
     {
-        // We may have an "unproved" untyped use for code that is unreachable. The CFA
-        // will just not have gotten around to it.
-        if (edge.isProved() || edge.useKind() == UntypedUse)
+        if (!block)
             return;
-        if (!edge->postfixRef())
-            m_worklist.append(edge.node());
-    }
-    
-    void countEdge(Node*, Edge edge)
-    {
-        // Don't count edges that are already counted for their type checks.
-        if (!(edge.isProved() || edge.useKind() == UntypedUse))
-            return;
-        
-        if (edge->postfixRef())
-            return;
-        m_worklist.append(edge.node());
-    }
-    
-    void eliminateIrrelevantPhantomChildren(Node* node)
-    {
-        for (unsigned i = 0; i < AdjacencyList::Size; ++i) {
-            Edge edge = node->children.child(i);
-            if (!edge)
+
+        if (m_graph.m_form == ThreadedCPS) {
+            for (unsigned phiIndex = 0; phiIndex < block->phis.size(); ++phiIndex) {
+                Node* phi = block->phis[phiIndex];
+                if (!phi->shouldGenerate()) {
+                    m_graph.m_allocator.free(phi);
+                    block->phis[phiIndex--] = block->phis.last();
+                    block->phis.removeLast();
+                }
+            }
+            
+            cleanVariables(block->variablesAtHead);
+            cleanVariables(block->variablesAtTail);
+        }
+
+        // This has to be a forward loop because we are using the insertion set.
+        for (unsigned indexInBlock = 0; indexInBlock < block->size(); ++indexInBlock) {
+            Node* node = block->at(indexInBlock);
+            if (node->shouldGenerate())
                 continue;
-            if (edge.isProved() || edge.useKind() == UntypedUse)
-                node->children.removeEdge(i--);
+                
+            if (node->flags() & NodeHasVarArgs) {
+                for (unsigned childIdx = node->firstChild(); childIdx < node->firstChild() + node->numChildren(); childIdx++) {
+                    Edge edge = m_graph.m_varArgChildren[childIdx];
+                    
+                    if (!edge || edge.willNotHaveCheck())
+                        continue;
+                    
+                    m_insertionSet.insertNode(indexInBlock, SpecNone, Check, node->origin, edge);
+                }
+                
+                node->setOpAndDefaultFlags(Check);
+                node->children.reset();
+                node->setRefCount(1);
+                continue;
+            }
+            
+            node->remove();
+            node->setRefCount(1);
+        }
+
+        m_insertionSet.execute(block);
+    }
+    
+    template<typename VariablesVectorType>
+    void cleanVariables(VariablesVectorType& variables)
+    {
+        for (unsigned i = variables.size(); i--;) {
+            Node* node = variables[i];
+            if (!node)
+                continue;
+            if (node->op() != Check && node->shouldGenerate())
+                continue;
+            variables[i] = nullptr;
         }
     }
     
-    Vector<Node*, 128> m_worklist;
+    InsertionSet m_insertionSet;
 };
 
 bool performDCE(Graph& graph)

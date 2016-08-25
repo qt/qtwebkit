@@ -31,42 +31,32 @@ namespace WebCore {
 class RenderTable;
 class RenderTableCell;
 
-class AutoTableLayout : public TableLayout {
+class AutoTableLayout final : public TableLayout {
 public:
-    AutoTableLayout(RenderTable*);
-    ~AutoTableLayout();
+    explicit AutoTableLayout(RenderTable*);
+    virtual ~AutoTableLayout();
 
-    virtual void computeIntrinsicLogicalWidths(LayoutUnit& minWidth, LayoutUnit& maxWidth) OVERRIDE;
-    virtual void applyPreferredLogicalWidthQuirks(LayoutUnit& minWidth, LayoutUnit& maxWidth) const OVERRIDE;
-    virtual void layout();
+    virtual void computeIntrinsicLogicalWidths(LayoutUnit& minWidth, LayoutUnit& maxWidth) override;
+    virtual void applyPreferredLogicalWidthQuirks(LayoutUnit& minWidth, LayoutUnit& maxWidth) const override;
+    virtual void layout() override;
 
 private:
     void fullRecalc();
     void recalcColumn(unsigned effCol);
 
-    int calcEffectiveLogicalWidth();
+    float calcEffectiveLogicalWidth();
 
     void insertSpanCell(RenderTableCell*);
 
     struct Layout {
-        Layout()
-            : minLogicalWidth(0)
-            , maxLogicalWidth(0)
-            , effectiveMinLogicalWidth(0)
-            , effectiveMaxLogicalWidth(0)
-            , computedLogicalWidth(0)
-            , emptyCellsOnly(true)
-        {
-        }
-
         Length logicalWidth;
         Length effectiveLogicalWidth;
-        int minLogicalWidth;
-        int maxLogicalWidth;
-        int effectiveMinLogicalWidth;
-        int effectiveMaxLogicalWidth;
-        int computedLogicalWidth;
-        bool emptyCellsOnly;
+        float minLogicalWidth { 0 };
+        float maxLogicalWidth { 0 };
+        float effectiveMinLogicalWidth { 0 };
+        float effectiveMaxLogicalWidth { 0 };
+        float computedLogicalWidth { 0 };
+        bool emptyCellsOnly { true };
     };
 
     Vector<Layout, 4> m_layoutStruct;

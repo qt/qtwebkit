@@ -29,11 +29,11 @@
 #if PLATFORM(X11) && USE(EGL) && USE(GRAPHICS_SURFACE)
 
 #include "EGLSurface.h"
+#include "XUniquePtr.h"
 #include <glx/X11Helper.h>
 
 namespace WebCore {
 
-typedef X11Helper NativeWrapper;
 typedef Pixmap NativePixmap;
 
 // Contents of the surface are backed by native window.
@@ -41,15 +41,15 @@ class EGLWindowTransportSurface : public EGLTransportSurface {
 public:
     EGLWindowTransportSurface(const IntSize&, GLPlatformSurface::SurfaceAttributes);
     virtual ~EGLWindowTransportSurface();
-    virtual void swapBuffers() OVERRIDE;
-    virtual void destroy() OVERRIDE;
+    virtual void swapBuffers() override;
+    virtual void destroy() override;
 };
 
 class EGLPixmapSurface : public EGLOffScreenSurface {
 public:
     EGLPixmapSurface(GLPlatformSurface::SurfaceAttributes);
     virtual ~EGLPixmapSurface();
-    virtual void destroy() OVERRIDE;
+    virtual void destroy() override;
 };
 
 class EGLTextureFromPixmap {
@@ -70,16 +70,16 @@ class EGLXTransportSurfaceClient : public GLTransportSurfaceClient {
 public:
     EGLXTransportSurfaceClient(const PlatformBufferHandle, const IntSize&, bool);
     virtual ~EGLXTransportSurfaceClient();
-    virtual void prepareTexture() OVERRIDE;
-    virtual void destroy() OVERRIDE;
+    virtual void prepareTexture() override;
+    virtual void destroy() override;
 
 private:
-    XImage* m_image;
+    XUniquePtr<XImage> m_image;
     IntSize m_size;
     PlatformBufferHandle m_handle;
     GLuint m_format;
     unsigned m_totalBytes;
-    OwnPtr<EGLTextureFromPixmap> m_eglImage;
+    std::unique_ptr<EGLTextureFromPixmap> m_eglImage;
 };
 
 }

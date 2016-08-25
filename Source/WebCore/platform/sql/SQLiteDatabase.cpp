@@ -11,10 +11,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -31,23 +31,23 @@
 #include "Logging.h"
 #include "SQLiteFileSystem.h"
 #include "SQLiteStatement.h"
+#include <mutex>
 #include <sqlite3.h>
+#include <thread>
 #include <wtf/Threading.h>
 #include <wtf/text/CString.h>
 #include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
-const int SQLResultDone = SQLITE_DONE;
-const int SQLResultError = SQLITE_ERROR;
-const int SQLResultOk = SQLITE_OK;
-const int SQLResultRow = SQLITE_ROW;
-const int SQLResultSchema = SQLITE_SCHEMA;
-const int SQLResultFull = SQLITE_FULL;
-const int SQLResultInterrupt = SQLITE_INTERRUPT;
-const int SQLResultConstraint = SQLITE_CONSTRAINT;
-
 static const char notOpenErrorMessage[] = "database is not open";
+
+static void unauthorizedSQLFunction(sqlite3_context *context, int, sqlite3_value **)
+{
+    const char* functionName = (const char*)sqlite3_user_data(context);
+    String errorMessage = String::format("Function %s is unauthorized", functionName);
+    sqlite3_result_error(context, errorMessage.utf8().data(), -1);
+}
 
 SQLiteDatabase::SQLiteDatabase()
     : m_db(0)
@@ -55,11 +55,26 @@ SQLiteDatabase::SQLiteDatabase()
     , m_transactionInProgress(false)
     , m_sharable(false)
     , m_openingThread(0)
-    , m_interrupted(false)
     , m_openError(SQLITE_ERROR)
     , m_openErrorMessage()
     , m_lastChangesCount(0)
 {
+    static std::once_flag flag;
+    std::call_once(flag, [] {
+        // It should be safe to call this outside of std::call_once, since it is documented to be
+        // completely threadsafe. But in the past it was not safe, and the SQLite developers still
+        // aren't confident that it really is, and we still support ancient versions of SQLite. So
+        // std::call_once is used to stay on the safe side. See bug #143245.
+        int ret = sqlite3_initialize();
+        if (ret != SQLITE_OK) {
+#if PLATFORM(MAC) || SQLITE_VERSION_NUMBER >= 3007015
+            WTFLogAlways("Failed to initialize SQLite: %s", sqlite3_errstr(ret));
+#else
+            WTFLogAlways("Failed to initialize SQLite");
+#endif
+            CRASH();
+        }
+    });
 }
 
 SQLiteDatabase::~SQLiteDatabase()
@@ -81,6 +96,8 @@ bool SQLiteDatabase::open(const String& filename, bool forWebSQLDatabase)
         return false;
     }
 
+    overrideUnauthorizedFunctions();
+
     m_openError = sqlite3_extended_result_codes(m_db, 1);
     if (m_openError != SQLITE_OK) {
         m_openErrorMessage = sqlite3_errmsg(m_db);
@@ -98,6 +115,19 @@ bool SQLiteDatabase::open(const String& filename, bool forWebSQLDatabase)
     if (!SQLiteStatement(*this, ASCIILiteral("PRAGMA temp_store = MEMORY;")).executeCommand())
         LOG_ERROR("SQLite database could not set temp_store to memory");
 
+    SQLiteStatement walStatement(*this, ASCIILiteral("PRAGMA journal_mode=WAL;"));
+    int result = walStatement.step();
+    if (result != SQLITE_OK && result != SQLITE_ROW)
+        LOG_ERROR("SQLite database failed to set journal_mode to WAL, error: %s", lastErrorMsg());
+
+#ifndef NDEBUG
+    if (result == SQLITE_ROW) {
+        String mode = walStatement.getColumnText(0);
+        if (!equalLettersIgnoringASCIICase(mode, "wal"))
+            LOG_ERROR("journal_mode of database should be 'wal', but is '%s'", mode.utf8().data());
+    }
+#endif
+
     return isOpen();
 }
 
@@ -108,7 +138,7 @@ void SQLiteDatabase::close()
         // ASSERT(currentThread() == m_openingThread);
         sqlite3* db = m_db;
         {
-            MutexLocker locker(m_databaseClosingMutex);
+            LockHolder locker(m_databaseClosingMutex);
             m_db = 0;
         }
         sqlite3_close(db);
@@ -119,27 +149,23 @@ void SQLiteDatabase::close()
     m_openErrorMessage = CString();
 }
 
-void SQLiteDatabase::interrupt()
+void SQLiteDatabase::overrideUnauthorizedFunctions()
 {
-    m_interrupted = true;
-    while (!m_lockingMutex.tryLock()) {
-        MutexLocker locker(m_databaseClosingMutex);
-        if (!m_db)
-            return;
-        sqlite3_interrupt(m_db);
-        yield();
-    }
+    static const std::pair<const char*, int> functionParameters[] = {
+        { "rtreenode", 2 },
+        { "rtreedepth", 1 },
+        { "eval", 1 },
+        { "eval", 2 },
+        { "printf", -1 },
+        { "fts3_tokenizer", 1 },
+        { "fts3_tokenizer", 2 },
+    };
 
-    m_lockingMutex.unlock();
+    for (auto& functionParameter : functionParameters)
+        sqlite3_create_function(m_db, functionParameter.first, functionParameter.second, SQLITE_UTF8, const_cast<char*>(functionParameter.first), unauthorizedSQLFunction, 0, 0);
 }
 
-bool SQLiteDatabase::isInterrupted()
-{
-    ASSERT(!m_lockingMutex.tryLock());
-    return m_interrupted;
-}
-
-void SQLiteDatabase::setFullsync(bool fsync) 
+void SQLiteDatabase::setFullsync(bool fsync)
 {
     if (fsync) 
         executeCommand(ASCIILiteral("PRAGMA fullfsync = 1;"));
@@ -152,7 +178,7 @@ int64_t SQLiteDatabase::maximumSize()
     int64_t maxPageCount = 0;
 
     {
-        MutexLocker locker(m_authorizerLock);
+        LockHolder locker(m_authorizerLock);
         enableAuthorizer(false);
         SQLiteStatement statement(*this, ASCIILiteral("PRAGMA max_page_count"));
         maxPageCount = statement.getColumnInt64(0);
@@ -172,17 +198,13 @@ void SQLiteDatabase::setMaximumSize(int64_t size)
     ASSERT(currentPageSize || !m_db);
     int64_t newMaxPageCount = currentPageSize ? size / currentPageSize : 0;
     
-    MutexLocker locker(m_authorizerLock);
+    LockHolder locker(m_authorizerLock);
     enableAuthorizer(false);
 
     SQLiteStatement statement(*this, "PRAGMA max_page_count = " + String::number(newMaxPageCount));
     statement.prepare();
-    if (statement.step() != SQLResultRow)
-#if OS(WINDOWS)
-        LOG_ERROR("Failed to set maximum size of database to %I64i bytes", static_cast<long long>(size));
-#else
+    if (statement.step() != SQLITE_ROW)
         LOG_ERROR("Failed to set maximum size of database to %lli bytes", static_cast<long long>(size));
-#endif
 
     enableAuthorizer(true);
 
@@ -193,7 +215,7 @@ int SQLiteDatabase::pageSize()
     // Since the page size of a database is locked in at creation and therefore cannot be dynamic, 
     // we can cache the value for future use
     if (m_pageSize == -1) {
-        MutexLocker locker(m_authorizerLock);
+        LockHolder locker(m_authorizerLock);
         enableAuthorizer(false);
         
         SQLiteStatement statement(*this, ASCIILiteral("PRAGMA page_size"));
@@ -210,7 +232,7 @@ int64_t SQLiteDatabase::freeSpaceSize()
     int64_t freelistCount = 0;
 
     {
-        MutexLocker locker(m_authorizerLock);
+        LockHolder locker(m_authorizerLock);
         enableAuthorizer(false);
         // Note: freelist_count was added in SQLite 3.4.1.
         SQLiteStatement statement(*this, ASCIILiteral("PRAGMA freelist_count"));
@@ -226,7 +248,7 @@ int64_t SQLiteDatabase::totalSize()
     int64_t pageCount = 0;
 
     {
-        MutexLocker locker(m_authorizerLock);
+        LockHolder locker(m_authorizerLock);
         enableAuthorizer(false);
         SQLiteStatement statement(*this, ASCIILiteral("PRAGMA page_count"));
         pageCount = statement.getColumnInt64(0);
@@ -305,7 +327,7 @@ int SQLiteDatabase::runVacuumCommand()
 
 int SQLiteDatabase::runIncrementalVacuumCommand()
 {
-    MutexLocker locker(m_authorizerLock);
+    LockHolder locker(m_authorizerLock);
     enableAuthorizer(false);
 
     if (!executeCommand(ASCIILiteral("PRAGMA incremental_vacuum")))
@@ -353,12 +375,8 @@ const char* SQLiteDatabase::lastErrorMsg()
 #ifndef NDEBUG
 void SQLiteDatabase::disableThreadingChecks()
 {
-    // This doesn't guarantee that SQList was compiled with -DTHREADSAFE, or that you haven't turned off the mutexes.
-#if SQLITE_VERSION_NUMBER >= 3003001
+    // Note that SQLite could be compiled with -DTHREADSAFE, or you may have turned off the mutexes.
     m_sharable = true;
-#else
-    ASSERT(0); // Your SQLite doesn't support sharing handles across threads.
-#endif
 }
 #endif
 
@@ -422,7 +440,6 @@ int SQLiteDatabase::authorizerFunction(void* userData, int actionCode, const cha
             return auth->allowAlterTable(parameter1, parameter2);
         case SQLITE_REINDEX:
             return auth->allowReindex(parameter1);
-#if SQLITE_VERSION_NUMBER >= 3003013 
         case SQLITE_ANALYZE:
             return auth->allowAnalyze(parameter1);
         case SQLITE_CREATE_VTABLE:
@@ -431,7 +448,6 @@ int SQLiteDatabase::authorizerFunction(void* userData, int actionCode, const cha
             return auth->dropVTable(parameter1, parameter2);
         case SQLITE_FUNCTION:
             return auth->allowFunction(parameter2);
-#endif
         default:
             ASSERT_NOT_REACHED();
             return SQLAuthDeny;
@@ -446,7 +462,7 @@ void SQLiteDatabase::setAuthorizer(PassRefPtr<DatabaseAuthorizer> auth)
         return;
     }
 
-    MutexLocker locker(m_authorizerLock);
+    LockHolder locker(m_authorizerLock);
 
     m_authorizer = auth;
     
@@ -494,6 +510,29 @@ bool SQLiteDatabase::turnOnIncrementalAutoVacuum()
         error = lastError();
         return (error == SQLITE_OK);
     }
+}
+
+static void destroyCollationFunction(void* arg)
+{
+    auto f = static_cast<std::function<int(int, const void*, int, const void*)>*>(arg);
+    delete f;
+}
+
+static int callCollationFunction(void* arg, int aLength, const void* a, int bLength, const void* b)
+{
+    auto f = static_cast<std::function<int(int, const void*, int, const void*)>*>(arg);
+    return (*f)(aLength, a, bLength, b);
+}
+
+void SQLiteDatabase::setCollationFunction(const String& collationName, std::function<int(int, const void*, int, const void*)> collationFunction)
+{
+    auto functionObject = new std::function<int(int, const void*, int, const void*)>(collationFunction);
+    sqlite3_create_collation_v2(m_db, collationName.utf8().data(), SQLITE_UTF8, functionObject, callCollationFunction, destroyCollationFunction);
+}
+
+void SQLiteDatabase::removeCollationFunction(const String& collationName)
+{
+    sqlite3_create_collation_v2(m_db, collationName.utf8().data(), SQLITE_UTF8, nullptr, nullptr, nullptr);
 }
 
 } // namespace WebCore

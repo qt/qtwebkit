@@ -25,36 +25,34 @@
 
 namespace JSC {
 
-    class ObjectPrototype;
+class ObjectPrototype;
 
-    class ErrorPrototype : public ErrorInstance {
-    public:
-        typedef ErrorInstance Base;
+class ErrorPrototype : public ErrorInstance {
+public:
+    typedef ErrorInstance Base;
+    static const unsigned StructureFlags = Base::StructureFlags | OverridesGetOwnPropertySlot;
 
-        static ErrorPrototype* create(ExecState* exec, JSGlobalObject* globalObject, Structure* structure)
-        {
-            ErrorPrototype* prototype = new (NotNull, allocateCell<ErrorPrototype>(*exec->heap())) ErrorPrototype(exec, structure);
-            prototype->finishCreation(exec, globalObject);
-            return prototype;
-        }
-        
-        static const ClassInfo s_info;
+    static ErrorPrototype* create(VM& vm, JSGlobalObject* globalObject, Structure* structure)
+    {
+        ErrorPrototype* prototype = new (NotNull, allocateCell<ErrorPrototype>(vm.heap)) ErrorPrototype(vm, structure);
+        prototype->finishCreation(vm, globalObject);
+        return prototype;
+    }
 
-        static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype)
-        {
-            return Structure::create(vm, globalObject, prototype, TypeInfo(ErrorInstanceType, StructureFlags), &s_info);
-        }
+    DECLARE_INFO;
 
-    protected:
-        ErrorPrototype(ExecState*, Structure*);
-        void finishCreation(ExecState*, JSGlobalObject*);
+    static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype)
+    {
+        return Structure::create(vm, globalObject, prototype, TypeInfo(ErrorInstanceType, StructureFlags), info());
+    }
 
-        static const unsigned StructureFlags = OverridesGetOwnPropertySlot | ErrorInstance::StructureFlags;
+protected:
+    ErrorPrototype(VM&, Structure*);
+    void finishCreation(VM&, JSGlobalObject*);
 
-    private:
-        static bool getOwnPropertySlot(JSCell*, ExecState*, PropertyName, PropertySlot&);
-        static bool getOwnPropertyDescriptor(JSObject*, ExecState*, PropertyName, PropertyDescriptor&);
-    };
+private:
+    static bool getOwnPropertySlot(JSObject*, ExecState*, PropertyName, PropertySlot&);
+};
 
 } // namespace JSC
 

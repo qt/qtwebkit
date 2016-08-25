@@ -223,12 +223,12 @@ const char* WebPage::interpretKeyEvent(const KeyboardEvent* evt)
 
 static inline void scroll(Page* page, ScrollDirection direction, ScrollGranularity granularity)
 {
-    page->focusController()->focusedOrMainFrame()->eventHandler()->scrollRecursively(direction, granularity);
+    page->focusController().focusedOrMainFrame().eventHandler().scrollRecursively(direction, granularity);
 }
 
 static inline void logicalScroll(Page* page, ScrollLogicalDirection direction, ScrollGranularity granularity)
 {
-    page->focusController()->focusedOrMainFrame()->eventHandler()->logicalScrollRecursively(direction, granularity);
+    page->focusController().focusedOrMainFrame().eventHandler().logicalScrollRecursively(direction, granularity);
 }
 
 bool WebPage::performDefaultBehaviorForKeyEvent(const WebKeyboardEvent& keyboardEvent)
@@ -268,13 +268,13 @@ bool WebPage::performDefaultBehaviorForKeyEvent(const WebKeyboardEvent& keyboard
     return true;
 }
 
-bool WebPage::platformHasLocalDataForURL(const KURL&)
+bool WebPage::platformHasLocalDataForURL(const URL&)
 {
     notImplemented();
     return false;
 }
 
-String WebPage::cachedResponseMIMETypeForURL(const KURL&)
+String WebPage::cachedResponseMIMETypeForURL(const URL&)
 {
     notImplemented();
     return String();
@@ -286,13 +286,13 @@ bool WebPage::platformCanHandleRequest(const ResourceRequest&)
     return true;
 }
 
-String WebPage::cachedSuggestedFilenameForURL(const KURL&)
+String WebPage::cachedSuggestedFilenameForURL(const URL&)
 {
     notImplemented();
     return String();
 }
 
-PassRefPtr<SharedBuffer> WebPage::cachedResponseDataForURL(const KURL&)
+PassRefPtr<SharedBuffer> WebPage::cachedResponseDataForURL(const URL&)
 {
     notImplemented();
     return 0;

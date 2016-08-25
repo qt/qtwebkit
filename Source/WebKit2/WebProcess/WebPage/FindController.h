@@ -26,24 +26,28 @@
 #ifndef FindController_h
 #define FindController_h
 
-#include "PageOverlay.h"
 #include "ShareableBitmap.h"
 #include "WebFindOptions.h"
 #include <WebCore/IntRect.h>
+#include <WebCore/PageOverlay.h>
 #include <wtf/Forward.h>
 #include <wtf/Noncopyable.h>
 #include <wtf/Vector.h>
 
+#if PLATFORM(IOS)
+#include "FindIndicatorOverlayClientIOS.h"
+#endif
+
 namespace WebCore {
-    class Frame;
-    class Range;
+class Frame;
+class Range;
 }
 
 namespace WebKit {
 
 class WebPage;
 
-class FindController : private PageOverlay::Client {
+class FindController : private WebCore::PageOverlay::Client {
     WTF_MAKE_NONCOPYABLE(FindController);
 
 public:
@@ -63,29 +67,43 @@ public:
     bool isShowingOverlay() const { return m_isShowingFindIndicator && m_findPageOverlay; }
 
     void deviceScaleFactorDidChange();
+    void didInvalidateDocumentMarkerRects();
+
+    void redraw();
 
 private:
     // PageOverlay::Client.
-    virtual void pageOverlayDestroyed(PageOverlay*);
-    virtual void willMoveToWebPage(PageOverlay*, WebPage*);
-    virtual void didMoveToWebPage(PageOverlay*, WebPage*);
-    virtual bool mouseEvent(PageOverlay*, const WebMouseEvent&);
-    virtual void drawRect(PageOverlay*, WebCore::GraphicsContext&, const WebCore::IntRect& dirtyRect);
+    virtual void pageOverlayDestroyed(WebCore::PageOverlay&);
+    virtual void willMoveToPage(WebCore::PageOverlay&, WebCore::Page*);
+    virtual void didMoveToPage(WebCore::PageOverlay&, WebCore::Page*);
+    virtual bool mouseEvent(WebCore::PageOverlay&, const WebCore::PlatformMouseEvent&);
+    virtual void drawRect(WebCore::PageOverlay&, WebCore::GraphicsContext&, const WebCore::IntRect& dirtyRect);
 
-    Vector<WebCore::IntRect> rectsForTextMatches();
-    bool getFindIndicatorBitmapAndRect(WebCore::Frame*, ShareableBitmap::Handle&, WebCore::IntRect& selectionRect);
-    bool updateFindIndicator(WebCore::Frame* selectedFrame, bool isShowingOverlay, bool shouldAnimate = true);
+    Vector<WebCore::IntRect> rectsForTextMatchesInRect(WebCore::IntRect clipRect);
+    bool updateFindIndicator(WebCore::Frame& selectedFrame, bool isShowingOverlay, bool shouldAnimate = true);
 
     void updateFindUIAfterPageScroll(bool found, const String&, FindOptions, unsigned maxMatchCount);
 
+    void willFindString();
+    void didFindString();
+    void didFailToFindString();
+    void didHideFindIndicator();
+
     WebPage* m_webPage;
-    PageOverlay* m_findPageOverlay;
+    WebCore::PageOverlay* m_findPageOverlay;
 
     // Whether the UI process is showing the find indicator. Note that this can be true even if
     // the find indicator isn't showing, but it will never be false when it is showing.
     bool m_isShowingFindIndicator;
     WebCore::IntRect m_findIndicatorRect;
-    Vector<RefPtr<WebCore::Range> > m_findMatches;
+    Vector<RefPtr<WebCore::Range>> m_findMatches;
+    // Index value is -1 if not found or if number of matches exceeds provided maximum.
+    int m_foundStringMatchIndex;
+
+#if PLATFORM(IOS)
+    RefPtr<WebCore::PageOverlay> m_findIndicatorOverlay;
+    std::unique_ptr<FindIndicatorOverlayClientIOS> m_findIndicatorOverlayClient;
+#endif
 };
 
 } // namespace WebKit

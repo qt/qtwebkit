@@ -26,10 +26,11 @@
 #include "config.h"
 #include "HeapTimer.h"
 
-#include "APIShims.h"
+#include "GCActivityCallback.h"
+#include "IncrementalSweeper.h"
 #include "JSObject.h"
 #include "JSString.h"
-
+#include "JSCInlines.h"
 #include <wtf/MainThread.h>
 #include <wtf/Threading.h>
 
@@ -40,6 +41,8 @@
 #include <QTimerEvent>
 #elif PLATFORM(EFL)
 #include <Ecore.h>
+#elif USE(GLIB)
+#include <glib.h>
 #endif
 
 namespace JSC {
@@ -67,7 +70,7 @@ HeapTimer::HeapTimer(VM* vm, CFRunLoopRef runLoop)
     m_context.info = &vm->apiLock();
     m_context.retain = retainAPILock;
     m_context.release = releaseAPILock;
-    m_timer = adoptCF(CFRunLoopTimerCreate(0, s_decade, s_decade, 0, 0, HeapTimer::timerDidFire, &m_context));
+    m_timer = adoptCF(CFRunLoopTimerCreate(kCFAllocatorDefault, s_decade, s_decade, 0, 0, HeapTimer::timerDidFire, &m_context));
     CFRunLoopAddTimer(m_runLoop.get(), m_timer.get(), kCFRunLoopCommonModes);
 }
 
@@ -90,43 +93,21 @@ void HeapTimer::timerDidFire(CFRunLoopTimerRef timer, void* context)
     }
 
     HeapTimer* heapTimer = 0;
-    if (vm->heap.activityCallback()->m_timer.get() == timer)
-        heapTimer = vm->heap.activityCallback();
+    if (vm->heap.fullActivityCallback() && vm->heap.fullActivityCallback()->m_timer.get() == timer)
+        heapTimer = vm->heap.fullActivityCallback();
+    else if (vm->heap.edenActivityCallback() && vm->heap.edenActivityCallback()->m_timer.get() == timer)
+        heapTimer = vm->heap.edenActivityCallback();
     else if (vm->heap.sweeper()->m_timer.get() == timer)
         heapTimer = vm->heap.sweeper();
     else
         RELEASE_ASSERT_NOT_REACHED();
 
     {
-        APIEntryShim shim(vm);
+        JSLockHolder locker(vm);
         heapTimer->doWork();
     }
 
     apiLock->unlock();
-}
-
-#elif PLATFORM(BLACKBERRY)
-
-HeapTimer::HeapTimer(VM* vm)
-    : m_vm(vm)
-    , m_timer(this, &HeapTimer::timerDidFire)
-{
-    // FIXME: Implement HeapTimer for other threads.
-    if (WTF::isMainThread() && !m_timer.tryCreateClient())
-        CRASH();
-}
-
-HeapTimer::~HeapTimer()
-{
-}
-
-void HeapTimer::timerDidFire()
-{
-    doWork();
-}
-
-void HeapTimer::invalidate()
-{
 }
 
 #elif PLATFORM(QT)
@@ -155,7 +136,7 @@ void HeapTimer::timerEvent(QTimerEvent*)
         return;
     }
 
-    APIEntryShim shim(m_vm);
+    JSLockHolder locker(m_vm);
     doWork();
 }
 
@@ -198,11 +179,65 @@ bool HeapTimer::timerEvent(void* info)
 {
     HeapTimer* agent = static_cast<HeapTimer*>(info);
     
-    APIEntryShim shim(agent->m_vm);
+    JSLockHolder locker(agent->m_vm);
     agent->doWork();
     agent->m_timer = 0;
     
     return ECORE_CALLBACK_CANCEL;
+}
+
+#elif USE(GLIB)
+
+static GSourceFuncs heapTimerSourceFunctions = {
+    nullptr, // prepare
+    nullptr, // check
+    // dispatch
+    [](GSource* source, GSourceFunc callback, gpointer userData) -> gboolean
+    {
+        if (g_source_get_ready_time(source) == -1)
+            return G_SOURCE_CONTINUE;
+        g_source_set_ready_time(source, -1);
+        return callback(userData);
+    },
+    nullptr, // finalize
+    nullptr, // closure_callback
+    nullptr, // closure_marshall
+};
+
+HeapTimer::HeapTimer(VM* vm)
+    : m_vm(vm)
+    , m_apiLock(&vm->apiLock())
+    , m_timer(adoptGRef(g_source_new(&heapTimerSourceFunctions, sizeof(GSource))))
+{
+    g_source_set_name(m_timer.get(), "[JavaScriptCore] HeapTimer");
+    g_source_set_callback(m_timer.get(), [](gpointer userData) -> gboolean {
+        static_cast<HeapTimer*>(userData)->timerDidFire();
+        return G_SOURCE_CONTINUE;
+    }, this, nullptr);
+    g_source_attach(m_timer.get(), g_main_context_get_thread_default());
+}
+
+HeapTimer::~HeapTimer()
+{
+    g_source_destroy(m_timer.get());
+}
+
+void HeapTimer::timerDidFire()
+{
+    m_apiLock->lock();
+
+    if (!m_apiLock->vm()) {
+        // The VM has been destroyed, so we should just give up.
+        m_apiLock->unlock();
+        return;
+    }
+
+    {
+        JSLockHolder locker(m_vm);
+        doWork();
+    }
+
+    m_apiLock->unlock();
 }
 
 #else

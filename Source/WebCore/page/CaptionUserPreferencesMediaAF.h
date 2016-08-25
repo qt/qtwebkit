@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2012-2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -36,40 +36,46 @@
 namespace WebCore {
 
 class CaptionUserPreferencesMediaAF : public CaptionUserPreferences {
+    WTF_MAKE_FAST_ALLOCATED;
 public:
-    static PassOwnPtr<CaptionUserPreferencesMediaAF> create(PageGroup* group) { return adoptPtr(new CaptionUserPreferencesMediaAF(group)); }
+    CaptionUserPreferencesMediaAF(PageGroup&);
     virtual ~CaptionUserPreferencesMediaAF();
 
 #if HAVE(MEDIA_ACCESSIBILITY_FRAMEWORK)
-    virtual CaptionDisplayMode captionDisplayMode() const OVERRIDE;
-    virtual void setCaptionDisplayMode(CaptionDisplayMode) OVERRIDE;
+    virtual CaptionDisplayMode captionDisplayMode() const override;
+    virtual void setCaptionDisplayMode(CaptionDisplayMode) override;
 
-    virtual bool userPrefersCaptions() const OVERRIDE;
-    virtual bool userPrefersSubtitles() const OVERRIDE;
+    virtual bool userPrefersCaptions() const override;
+    virtual bool userPrefersSubtitles() const override;
 
-    virtual float captionFontSizeScaleAndImportance(bool&) const OVERRIDE;
+    virtual float captionFontSizeScaleAndImportance(bool&) const override;
 
-    virtual void setInterestedInCaptionPreferenceChanges() OVERRIDE;
+    virtual void setInterestedInCaptionPreferenceChanges() override;
 
-    virtual void setPreferredLanguage(const String&) OVERRIDE;
-    virtual Vector<String> preferredLanguages() const OVERRIDE;
+    virtual void setPreferredLanguage(const String&) override;
+    virtual Vector<String> preferredLanguages() const override;
 
-    virtual void captionPreferencesChanged() OVERRIDE;
+    virtual void setPreferredAudioCharacteristic(const String&) override;
+    virtual Vector<String> preferredAudioCharacteristics() const override;
+
+    virtual void captionPreferencesChanged() override;
 
     bool shouldFilterTrackMenu() const { return true; }
 #else
     bool shouldFilterTrackMenu() const { return false; }
 #endif
 
-    virtual String captionsStyleSheetOverride() const OVERRIDE;
-    virtual int textTrackSelectionScore(TextTrack*, HTMLMediaElement*) const OVERRIDE;
-    virtual Vector<RefPtr<TextTrack> > sortedTrackListForMenu(TextTrackList*) OVERRIDE;
-    virtual String displayNameForTrack(TextTrack*) const OVERRIDE;
+    virtual String captionsStyleSheetOverride() const override;
+    virtual int textTrackSelectionScore(TextTrack*, HTMLMediaElement*) const override;
+    Vector<RefPtr<AudioTrack>> sortedTrackListForMenu(AudioTrackList*) override;
+    Vector<RefPtr<TextTrack>> sortedTrackListForMenu(TextTrackList*) override;
+    String displayNameForTrack(AudioTrack*) const override;
+    String displayNameForTrack(TextTrack*) const override;
 
 private:
-    CaptionUserPreferencesMediaAF(PageGroup*);
-
 #if HAVE(MEDIA_ACCESSIBILITY_FRAMEWORK)
+    void updateTimerFired();
+
     String captionsWindowCSS() const;
     String captionsBackgroundCSS() const;
     String captionsTextColorCSS() const;
@@ -80,8 +86,10 @@ private:
     String captionsTextEdgeCSS() const;
     String cssPropertyWithTextEdgeColor(CSSPropertyID, const String&, const Color&, bool) const;
     String colorPropertyCSS(CSSPropertyID, const Color&, bool) const;
+    Timer m_updateStyleSheetTimer;
 
     bool m_listeningForPreferenceChanges;
+    bool m_registeringForNotification { false };
 #endif
 };
 

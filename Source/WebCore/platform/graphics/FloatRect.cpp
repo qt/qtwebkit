@@ -11,10 +11,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -29,16 +29,16 @@
 
 #include "FloatConversion.h"
 #include "IntRect.h"
+#include "TextStream.h"
 #include <algorithm>
 #include <math.h>
 #include <wtf/MathExtras.h>
 
-using std::max;
-using std::min;
-
 namespace WebCore {
 
-FloatRect::FloatRect(const IntRect& r) : m_location(r.location()), m_size(r.size())
+FloatRect::FloatRect(const IntRect& r)
+    : m_location(r.location())
+    , m_size(r.size())
 {
 }
 
@@ -77,10 +77,10 @@ bool FloatRect::contains(const FloatPoint& point, ContainsMode containsMode) con
 
 void FloatRect::intersect(const FloatRect& other)
 {
-    float l = max(x(), other.x());
-    float t = max(y(), other.y());
-    float r = min(maxX(), other.maxX());
-    float b = min(maxY(), other.maxY());
+    float l = std::max(x(), other.x());
+    float t = std::max(y(), other.y());
+    float r = std::min(maxX(), other.maxX());
+    float b = std::min(maxY(), other.maxY());
 
     // Return a clean empty rectangle for non-intersecting cases.
     if (l >= r || t >= b) {
@@ -108,10 +108,10 @@ void FloatRect::unite(const FloatRect& other)
 
 void FloatRect::uniteEvenIfEmpty(const FloatRect& other)
 {
-    float minX = min(x(), other.x());
-    float minY = min(y(), other.y());
-    float maxX = max(this->maxX(), other.maxX());
-    float maxY = max(this->maxY(), other.maxY());
+    float minX = std::min(x(), other.x());
+    float minY = std::min(y(), other.y());
+    float maxX = std::max(this->maxX(), other.maxX());
+    float maxY = std::max(this->maxY(), other.maxY());
 
     setLocationAndSizeFromEdges(minX, minY, maxX, maxY);
 }
@@ -131,10 +131,10 @@ void FloatRect::uniteIfNonZero(const FloatRect& other)
 
 void FloatRect::extend(const FloatPoint& p)
 {
-    float minX = min(x(), p.x());
-    float minY = min(y(), p.y());
-    float maxX = max(this->maxX(), p.x());
-    float maxY = max(this->maxY(), p.y());
+    float minX = std::min(x(), p.x());
+    float minY = std::min(y(), p.y());
+    float maxX = std::max(this->maxX(), p.x());
+    float maxY = std::max(this->maxY(), p.y());
 
     setLocationAndSizeFromEdges(minX, minY, maxX, maxY);
 }
@@ -147,23 +147,12 @@ void FloatRect::scale(float sx, float sy)
     m_size.setHeight(height() * sy);
 }
 
-FloatRect unionRect(const Vector<FloatRect>& rects)
-{
-    FloatRect result;
-
-    size_t count = rects.size();
-    for (size_t i = 0; i < count; ++i)
-        result.unite(rects[i]);
-
-    return result;
-}
-
 void FloatRect::fitToPoints(const FloatPoint& p0, const FloatPoint& p1)
 {
-    float left = min(p0.x(), p1.x());
-    float top = min(p0.y(), p1.y());
-    float right = max(p0.x(), p1.x());
-    float bottom = max(p0.y(), p1.y());
+    float left = std::min(p0.x(), p1.x());
+    float top = std::min(p0.y(), p1.y());
+    float right = std::max(p0.x(), p1.x());
+    float bottom = std::max(p0.y(), p1.y());
 
     setLocationAndSizeFromEdges(left, top, right, bottom);
 }
@@ -174,25 +163,25 @@ namespace {
 template <typename T>
 T min3(const T& v1, const T& v2, const T& v3)
 {
-    return min(min(v1, v2), v3);
+    return std::min(std::min(v1, v2), v3);
 }
 
 template <typename T>
 T max3(const T& v1, const T& v2, const T& v3)
 {
-    return max(max(v1, v2), v3);
+    return std::max(std::max(v1, v2), v3);
 }
 
 template <typename T>
 T min4(const T& v1, const T& v2, const T& v3, const T& v4)
 {
-    return min(min(v1, v2), min(v3, v4));
+    return std::min(std::min(v1, v2), std::min(v3, v4));
 }
 
 template <typename T>
 T max4(const T& v1, const T& v2, const T& v3, const T& v4)
 {
-    return max(max(v1, v2), max(v3, v4));
+    return std::max(std::max(v1, v2), std::max(v3, v4));
 }
 
 } // anonymous namespace
@@ -217,6 +206,13 @@ void FloatRect::fitToPoints(const FloatPoint& p0, const FloatPoint& p1, const Fl
     setLocationAndSizeFromEdges(left, top, right, bottom);
 }
 
+FloatRect encloseRectToDevicePixels(const FloatRect& rect, float deviceScaleFactor)
+{
+    FloatPoint location = floorPointToDevicePixels(rect.minXMinYCorner(), deviceScaleFactor);
+    FloatPoint maxPoint = ceilPointToDevicePixels(rect.maxXMaxYCorner(), deviceScaleFactor);
+    return FloatRect(location, maxPoint - location);
+}
+
 IntRect enclosingIntRect(const FloatRect& rect)
 {
     IntPoint location = flooredIntPoint(rect.minXMinYCorner());
@@ -225,31 +221,15 @@ IntRect enclosingIntRect(const FloatRect& rect)
     return IntRect(location, maxPoint - location);
 }
 
-IntRect enclosedIntRect(const FloatRect& rect)
-{
-    IntPoint location = ceiledIntPoint(rect.minXMinYCorner());
-    IntPoint maxPoint = flooredIntPoint(rect.maxXMaxYCorner());
-    IntSize size = maxPoint - location;
-    size.clampNegativeToZero();
-
-    return IntRect(location, size);
-}
-
 IntRect roundedIntRect(const FloatRect& rect)
 {
     return IntRect(roundedIntPoint(rect.location()), roundedIntSize(rect.size()));
 }
 
-FloatRect mapRect(const FloatRect& r, const FloatRect& srcRect, const FloatRect& destRect)
+TextStream& operator<<(TextStream& ts, const FloatRect &r)
 {
-    if (srcRect.width() == 0 || srcRect.height() == 0)
-        return FloatRect();
-
-    float widthScale = destRect.width() / srcRect.width();
-    float heightScale = destRect.height() / srcRect.height();
-    return FloatRect(destRect.x() + (r.x() - srcRect.x()) * widthScale,
-                     destRect.y() + (r.y() - srcRect.y()) * heightScale,
-                     r.width() * widthScale, r.height() * heightScale);
+    return ts << "at (" << TextStream::FormatNumberRespectingIntegers(r.x()) << "," << TextStream::FormatNumberRespectingIntegers(r.y())
+        << ") size " << TextStream::FormatNumberRespectingIntegers(r.width()) << "x" << TextStream::FormatNumberRespectingIntegers(r.height());
 }
 
 }

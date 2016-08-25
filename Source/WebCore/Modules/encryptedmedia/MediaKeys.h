@@ -31,10 +31,9 @@
 #include "CDM.h"
 #include "EventTarget.h"
 #include "ExceptionCode.h"
-#include <wtf/OwnPtr.h>
+#include <runtime/Uint8Array.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
-#include <wtf/Uint8Array.h>
 #include <wtf/Vector.h>
 #include <wtf/text/WTFString.h>
 
@@ -45,10 +44,12 @@ class HTMLMediaElement;
 
 class MediaKeys : public RefCounted<MediaKeys>, public CDMClient {
 public:
-    static PassRefPtr<MediaKeys> create(const String& keySystem, ExceptionCode&);
-    ~MediaKeys();
+    static RefPtr<MediaKeys> create(const String& keySystem, ExceptionCode&);
+    virtual ~MediaKeys();
 
-    PassRefPtr<MediaKeySession> createSession(ScriptExecutionContext*, const String& mimeType, Uint8Array* initData, ExceptionCode&);
+    RefPtr<MediaKeySession> createSession(ScriptExecutionContext*, const String& mimeType, Uint8Array* initData, ExceptionCode&);
+
+    static bool isTypeSupported(const String& keySystem, const String& mimeType);
 
     const String& keySystem() const { return m_keySystem; }
     CDM* cdm() { return m_cdm.get(); }
@@ -56,17 +57,20 @@ public:
     HTMLMediaElement* mediaElement() const { return m_mediaElement; }
     void setMediaElement(HTMLMediaElement*);
 
+    void keyAdded();
+    RefPtr<ArrayBuffer> cachedKeyForKeyId(const String& keyId) const;
+
 protected:
     // CDMClient:
-    virtual MediaPlayer* cdmMediaPlayer(const CDM*) const OVERRIDE;
+    virtual MediaPlayer* cdmMediaPlayer(const CDM*) const override;
 
-    MediaKeys(const String& keySystem, PassOwnPtr<CDM>);
+    MediaKeys(const String& keySystem, std::unique_ptr<CDM>);
 
-    Vector<RefPtr<MediaKeySession> > m_sessions;
+    Vector<RefPtr<MediaKeySession>> m_sessions;
 
     HTMLMediaElement* m_mediaElement;
     String m_keySystem;
-    OwnPtr<CDM> m_cdm;
+    std::unique_ptr<CDM> m_cdm;
 };
 
 }

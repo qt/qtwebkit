@@ -21,24 +21,22 @@
 #ifndef SVGFEOffsetElement_h
 #define SVGFEOffsetElement_h
 
-#if ENABLE(SVG) && ENABLE(FILTERS)
 #include "FEOffset.h"
 #include "SVGAnimatedNumber.h"
 #include "SVGFilterPrimitiveStandardAttributes.h"
 
 namespace WebCore {
 
-class SVGFEOffsetElement FINAL : public SVGFilterPrimitiveStandardAttributes {
+class SVGFEOffsetElement final : public SVGFilterPrimitiveStandardAttributes {
 public:
-    static PassRefPtr<SVGFEOffsetElement> create(const QualifiedName&, Document*);
+    static Ref<SVGFEOffsetElement> create(const QualifiedName&, Document&);
 
 private:
-    SVGFEOffsetElement(const QualifiedName&, Document*);
+    SVGFEOffsetElement(const QualifiedName&, Document&);
 
-    bool isSupportedAttribute(const QualifiedName&);
-    virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
-    virtual void svgAttributeChanged(const QualifiedName&);
-    virtual PassRefPtr<FilterEffect> build(SVGFilterBuilder*, Filter*);
+    virtual void parseAttribute(const QualifiedName&, const AtomicString&) override;
+    virtual void svgAttributeChanged(const QualifiedName&) override;
+    virtual RefPtr<FilterEffect> build(SVGFilterBuilder*, Filter&) override;
 
     BEGIN_DECLARE_ANIMATED_PROPERTIES(SVGFEOffsetElement)
         DECLARE_ANIMATED_STRING(In1, in1)
@@ -49,5 +47,4 @@ private:
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif

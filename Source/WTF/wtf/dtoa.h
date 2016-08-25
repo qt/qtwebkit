@@ -21,15 +21,12 @@
 #ifndef WTF_dtoa_h
 #define WTF_dtoa_h
 
+#include <unicode/utypes.h>
 #include <wtf/ASCIICType.h>
 #include <wtf/dtoa/double-conversion.h>
-#include <wtf/unicode/Unicode.h>
+#include <wtf/text/StringView.h>
 
 namespace WTF {
-
-class Mutex;
-
-extern Mutex* s_dtoaP5Mutex;
 
 typedef char DtoaBuffer[80];
 
@@ -48,6 +45,7 @@ WTF_EXPORT_PRIVATE const char* numberToFixedWidthString(double, unsigned decimal
 
 double parseDouble(const LChar* string, size_t length, size_t& parsedLength);
 double parseDouble(const UChar* string, size_t length, size_t& parsedLength);
+double parseDouble(StringView, size_t& parsedLength);
 
 namespace Internal {
     WTF_EXPORT_PRIVATE double parseDoubleFromLongString(const UChar* string, size_t length, size_t& parsedLength);
@@ -67,6 +65,13 @@ inline double parseDouble(const UChar* string, size_t length, size_t& parsedLeng
     for (int i = 0; i < static_cast<int>(length); ++i)
         conversionBuffer[i] = isASCII(string[i]) ? string[i] : 0;
     return parseDouble(conversionBuffer, length, parsedLength);
+}
+
+inline double parseDouble(StringView string, size_t& parsedLength)
+{
+    if (string.is8Bit())
+        return parseDouble(string.characters8(), string.length(), parsedLength);
+    return parseDouble(string.characters16(), string.length(), parsedLength);
 }
     
 } // namespace WTF

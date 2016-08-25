@@ -57,8 +57,7 @@ public:
     ~NotificationWrapper() { }
 
     void close();
-    void close(Timer<NotificationWrapper>*);
-    void sendDisplayEvent(Timer<NotificationWrapper>*);
+    void sendDisplayEvent();
     const QString title() const;
     const QString message() const;
     const QUrl iconUrl() const;
@@ -69,9 +68,9 @@ public Q_SLOTS:
     void notificationClicked();
 
 private:
-    OwnPtr<QWebNotificationPresenter> m_presenter;
-    Timer<NotificationWrapper> m_closeTimer;
-    Timer<NotificationWrapper> m_displayEventTimer;
+    std::unique_ptr<QWebNotificationPresenter> m_presenter;
+    Timer m_closeTimer;
+    Timer m_displayEventTimer;
 
     friend class NotificationPresenterClientQt;
 };
@@ -80,24 +79,25 @@ private:
 
 typedef QHash <Notification*, NotificationWrapper*> NotificationsQueue;
 
-class NotificationPresenterClientQt : public NotificationClient {
+class NotificationPresenterClientQt final : public NotificationClient {
 public:
     NotificationPresenterClientQt();
     ~NotificationPresenterClientQt();
 
     /* WebCore::NotificationClient interface */
-    virtual bool show(Notification*);
-    virtual void cancel(Notification*);
-    virtual void notificationObjectDestroyed(Notification*);
-    virtual void notificationControllerDestroyed();
+    bool show(Notification*) override;
+    void cancel(Notification*) override;
+    void notificationObjectDestroyed(Notification*) override;
+    void notificationControllerDestroyed() override;
 #if ENABLE(LEGACY_NOTIFICATIONS)
-    virtual void requestPermission(ScriptExecutionContext*, PassRefPtr<VoidCallback>);
+    void requestPermission(ScriptExecutionContext*, PassRefPtr<VoidCallback>) override;
 #endif
 #if ENABLE(NOTIFICATIONS)
-    virtual void requestPermission(ScriptExecutionContext*, PassRefPtr<NotificationPermissionCallback>);
+    void requestPermission(ScriptExecutionContext*, PassRefPtr<NotificationPermissionCallback>) override;
 #endif
-    virtual NotificationClient::Permission checkPermission(ScriptExecutionContext*);
-    virtual void cancelRequestsForPermission(ScriptExecutionContext*);
+    bool hasPendingPermissionRequests(ScriptExecutionContext*) const override;
+    NotificationClient::Permission checkPermission(ScriptExecutionContext*) override;
+    void cancelRequestsForPermission(ScriptExecutionContext*) override;
 
     void cancel(NotificationWrapper*);
 

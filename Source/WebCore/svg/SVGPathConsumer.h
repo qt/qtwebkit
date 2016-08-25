@@ -2,7 +2,7 @@
  * Copyright (C) 2002, 2003 The Karbon Developers
  * Copyright (C) 2006 Alexander Kellett <lypanov@kde.org>
  * Copyright (C) 2006, 2007 Rob Buis <buis@kde.org>
- * Copyright (C) 2007, 2009 Apple Inc. All rights reserved.
+ * Copyright (C) 2007, 2009, 2015 Apple Inc. All rights reserved.
  * Copyright (C) Research In Motion Limited 2010. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
@@ -24,9 +24,8 @@
 #ifndef SVGPathConsumer_h
 #define SVGPathConsumer_h
 
-#if ENABLE(SVG)
 #include "FloatPoint.h"
-#include <wtf/FastAllocBase.h>
+#include <wtf/FastMalloc.h>
 #include <wtf/Noncopyable.h>
 
 namespace WebCore {
@@ -47,7 +46,6 @@ public:
     SVGPathConsumer() { }
     virtual void incrementPathSegmentCount() = 0;
     virtual bool continueConsuming() = 0;
-    virtual void cleanup() = 0;
 
     // Used in UnalteredParsing/NormalizedParsing modes.
     virtual void moveTo(const FloatPoint&, bool closed, PathCoordinateMode) = 0;
@@ -69,5 +67,4 @@ protected:
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif // SVGPathConsumer_h

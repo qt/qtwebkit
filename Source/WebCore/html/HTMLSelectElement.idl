@@ -39,16 +39,23 @@
 #else
     [SetterRaisesException] attribute unsigned long length;
 #endif
-    getter Node item([IsIndex,Default=Undefined] optional unsigned long index);
+
+#if defined(LANGUAGE_OBJECTIVE_C) && LANGUAGE_OBJECTIVE_C || defined(LANGUAGE_GOBJECT) && LANGUAGE_GOBJECT
+    getter Node item(unsigned long index);
     Node namedItem([Default=Undefined] optional DOMString name);
-    [ObjCLegacyUnnamedParameters, RaisesException] void add([Default=Undefined] optional HTMLElement element,
-                            [Default=Undefined] optional HTMLElement before);
+#else
+    getter HTMLOptionElement item(unsigned long index);
+    HTMLOptionElement namedItem([Default=Undefined] optional DOMString name);
+#endif
+
+    [ObjCLegacyUnnamedParameters, RaisesException] void add(HTMLElement element, [Default=Undefined] optional HTMLElement? before);
 #if defined(LANGUAGE_JAVASCRIPT) && LANGUAGE_JAVASCRIPT
+    [RaisesException] void add(HTMLElement element, [Default=Undefined] optional long index);
     // In JavaScript, we support both option index and option object parameters.
     // As of this writing this cannot be auto-generated.
     [Custom] void remove(/* indexOrOption */);
 #else
-    void remove(long index);
+    [ImplementedAs=removeByIndex] void remove(long index);
 #endif
     readonly attribute HTMLCollection selectedOptions;
     attribute long selectedIndex;
@@ -61,4 +68,6 @@
     void setCustomValidity([TreatNullAs=NullString, TreatUndefinedAs=NullString] DOMString error);
 
     readonly attribute NodeList labels;
+
+    attribute DOMString autocomplete;
 };

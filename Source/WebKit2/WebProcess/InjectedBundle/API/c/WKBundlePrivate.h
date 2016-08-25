@@ -26,22 +26,21 @@
 #ifndef WKBundlePrivate_h
 #define WKBundlePrivate_h
 
-#include <WebKit2/WKBase.h>
+#include <WebKit/WKBase.h>
 
 #ifndef __cplusplus
 #include <stdbool.h>
 #endif
 
+#include <JavaScriptCore/JSBase.h>
+#include <WebKit/WKUserContentInjectedFrames.h>
+#include <WebKit/WKUserScriptInjectionTime.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-// TestRunner only SPI
-WK_EXPORT void WKBundleSetShouldTrackVisitedLinks(WKBundleRef bundle, bool shouldTrackVisitedLinks);
-WK_EXPORT void WKBundleSetAlwaysAcceptCookies(WKBundleRef bundle, bool);
-WK_EXPORT void WKBundleRemoveAllVisitedLinks(WKBundleRef bundle);
-WK_EXPORT void WKBundleActivateMacFontAscentHack(WKBundleRef bundle);
-WK_EXPORT void WKBundleSetCacheModel(WKBundleRef bundle, uint32_t cacheModel);
+// TestRunner only SPIs.
 // Will make WebProcess ignore this preference until a preferences change notification, only for WebKitTestRunner use.
 WK_EXPORT void WKBundleOverrideBoolPreferenceForTestRunner(WKBundleRef bundle, WKBundlePageGroupRef pageGroup, WKStringRef preference, bool enabled);
 WK_EXPORT void WKBundleSetAllowUniversalAccessFromFileURLs(WKBundleRef bundle, WKBundlePageGroupRef pageGroup, bool enabled);
@@ -52,7 +51,6 @@ WK_EXPORT void WKBundleSetPluginsEnabled(WKBundleRef bundle, WKBundlePageGroupRe
 WK_EXPORT void WKBundleSetJavaScriptCanAccessClipboard(WKBundleRef bundle, WKBundlePageGroupRef pageGroup, bool enabled);
 WK_EXPORT void WKBundleSetPrivateBrowsingEnabled(WKBundleRef bundle, WKBundlePageGroupRef pageGroup, bool enabled);
 WK_EXPORT void WKBundleSetPopupBlockingEnabled(WKBundleRef bundle, WKBundlePageGroupRef pageGroup, bool enabled);
-WK_EXPORT void WKBundleSwitchNetworkLoaderToNewTestingSession(WKBundleRef bundle);
 WK_EXPORT void WKBundleSetAuthorAndUserStylesEnabled(WKBundleRef bundle, WKBundlePageGroupRef pageGroup, bool enabled);
 WK_EXPORT void WKBundleSetSpatialNavigationEnabled(WKBundleRef bundle, WKBundlePageGroupRef pageGroup, bool enabled);
 WK_EXPORT void WKBundleAddOriginAccessWhitelistEntry(WKBundleRef bundle, WKStringRef, WKStringRef, WKStringRef, bool);
@@ -70,7 +68,7 @@ WK_EXPORT WKDataRef WKBundleCreateWKDataFromUInt8Array(WKBundleRef bundle, JSCon
 WK_EXPORT void WKBundleSetAsynchronousSpellCheckingEnabled(WKBundleRef bundleRef, WKBundlePageGroupRef pageGroupRef, bool enabled);
 
 // UserContent API
-WK_EXPORT void WKBundleAddUserScript(WKBundleRef bundle, WKBundlePageGroupRef pageGroup, WKBundleScriptWorldRef scriptWorld, WKStringRef source, WKURLRef url, WKArrayRef whitelist, WKArrayRef blacklist, WKUserScriptInjectionTime injectionTime, WKUserContentInjectedFrames injectedFrames);
+WK_EXPORT void WKBundleAddUserScript(WKBundleRef bundle, WKBundlePageGroupRef pageGroup, WKBundleScriptWorldRef scriptWorld, WKStringRef source, WKURLRef url, WKArrayRef whitelist, WKArrayRef blacklist, _WKUserScriptInjectionTime injectionTime, WKUserContentInjectedFrames injectedFrames);
 WK_EXPORT void WKBundleAddUserStyleSheet(WKBundleRef bundle, WKBundlePageGroupRef pageGroup, WKBundleScriptWorldRef scriptWorld, WKStringRef source, WKURLRef url, WKArrayRef whitelist, WKArrayRef blacklist, WKUserContentInjectedFrames injectedFrames);
 WK_EXPORT void WKBundleRemoveUserScript(WKBundleRef bundle, WKBundlePageGroupRef pageGroup, WKBundleScriptWorldRef scriptWorld, WKURLRef url);
 WK_EXPORT void WKBundleRemoveUserStyleSheet(WKBundleRef bundle, WKBundlePageGroupRef pageGroup, WKBundleScriptWorldRef scriptWorld, WKURLRef url);
@@ -82,15 +80,6 @@ WK_EXPORT void WKBundleRemoveAllUserContent(WKBundleRef bundle, WKBundlePageGrou
 WK_EXPORT void WKBundleClearAllDatabases(WKBundleRef bundle);
 WK_EXPORT void WKBundleSetDatabaseQuota(WKBundleRef bundle, uint64_t);
 
-// Application Cache API
-WK_EXPORT void WKBundleClearApplicationCache(WKBundleRef bundle);
-WK_EXPORT void WKBundleClearApplicationCacheForOrigin(WKBundleRef bundle, WKStringRef origin);
-WK_EXPORT void WKBundleSetAppCacheMaximumSize(WKBundleRef bundle, uint64_t size);
-WK_EXPORT uint64_t WKBundleGetAppCacheUsageForOrigin(WKBundleRef bundle, WKStringRef origin);
-WK_EXPORT void WKBundleSetApplicationCacheOriginQuota(WKBundleRef bundle, WKStringRef origin, uint64_t bytes);
-WK_EXPORT void WKBundleResetApplicationCacheOriginQuota(WKBundleRef bundle, WKStringRef origin);
-WK_EXPORT WKArrayRef WKBundleCopyOriginsWithApplicationCache(WKBundleRef bundle);
-
 // Garbage collection API
 WK_EXPORT void WKBundleGarbageCollectJavaScriptObjects(WKBundleRef bundle);
 WK_EXPORT void WKBundleGarbageCollectJavaScriptObjectsOnAlternateThreadForDebugging(WKBundleRef bundle, bool waitUntilDone);
@@ -99,10 +88,6 @@ WK_EXPORT size_t WKBundleGetJavaScriptObjectsCount(WKBundleRef bundle);
 WK_EXPORT bool WKBundleIsProcessingUserGesture(WKBundleRef bundle);
 
 WK_EXPORT void WKBundleSetTabKeyCyclesThroughElements(WKBundleRef bundle, WKBundlePageRef page, bool enabled);
-WK_EXPORT void WKBundleSetSerialLoadingEnabled(WKBundleRef bundle, bool enabled);
-WK_EXPORT void WKBundleSetShadowDOMEnabled(WKBundleRef bundle, bool enabled);
-WK_EXPORT void WKBundleSetSeamlessIFramesEnabled(WKBundleRef bundle, bool enabled);
-WK_EXPORT void WKBundleDispatchPendingLoadRequests(WKBundleRef bundle);
 
 #ifdef __cplusplus
 }

@@ -29,91 +29,33 @@
 #include "CodeSpecializationKind.h"
 #include "ParserModes.h"
 #include "SourceCode.h"
+#include "SourceCodeKey.h"
 #include "Strong.h"
-#include "WeakRandom.h"
+#include "VariableEnvironment.h"
 #include <wtf/CurrentTime.h>
-#include <wtf/FixedArray.h>
 #include <wtf/Forward.h>
-#include <wtf/PassOwnPtr.h>
 #include <wtf/RandomNumber.h>
+#include <wtf/WeakRandom.h>
 #include <wtf/text/WTFString.h>
 
 namespace JSC {
 
 class EvalExecutable;
-class FunctionBodyNode;
+class FunctionMetadataNode;
 class Identifier;
 class JSScope;
+class ParserError;
 class ProgramExecutable;
+class ModuleProgramExecutable;
 class UnlinkedCodeBlock;
 class UnlinkedEvalCodeBlock;
+class UnlinkedModuleProgramCodeBlock;
 class UnlinkedFunctionCodeBlock;
 class UnlinkedFunctionExecutable;
 class UnlinkedProgramCodeBlock;
 class VM;
-struct ParserError;
 class SourceCode;
 class SourceProvider;
-
-class SourceCodeKey {
-public:
-    enum CodeType { EvalType, ProgramType, FunctionType };
-
-    SourceCodeKey()
-    {
-    }
-
-    SourceCodeKey(const SourceCode& sourceCode, const String& name, CodeType codeType, JSParserStrictness jsParserStrictness)
-        : m_sourceCode(sourceCode)
-        , m_name(name)
-        , m_flags((codeType << 1) | jsParserStrictness)
-        , m_hash(string().impl()->hash())
-    {
-    }
-
-    SourceCodeKey(WTF::HashTableDeletedValueType)
-        : m_sourceCode(WTF::HashTableDeletedValue)
-    {
-    }
-
-    bool isHashTableDeletedValue() const { return m_sourceCode.isHashTableDeletedValue(); }
-
-    unsigned hash() const { return m_hash; }
-
-    size_t length() const { return m_sourceCode.length(); }
-
-    bool isNull() const { return m_sourceCode.isNull(); }
-
-    // To save memory, we compute our string on demand. It's expected that source
-    // providers cache their strings to make this efficient.
-    String string() const { return m_sourceCode.toString(); }
-
-    bool operator==(const SourceCodeKey& other) const
-    {
-        return m_hash == other.m_hash
-            && length() == other.length()
-            && m_flags == other.m_flags
-            && m_name == other.m_name
-            && string() == other.string();
-    }
-
-private:
-    SourceCode m_sourceCode;
-    String m_name;
-    unsigned m_flags;
-    unsigned m_hash;
-};
-
-struct SourceCodeKeyHash {
-    static unsigned hash(const SourceCodeKey& key) { return key.hash(); }
-    static bool equal(const SourceCodeKey& a, const SourceCodeKey& b) { return a == b; }
-    static const bool safeToCompareToEmptyOrDeleted = false;
-};
-
-struct SourceCodeKeyHashTraits : SimpleClassHashTraits<SourceCodeKey> {
-    static const bool hasIsEmptyValueFunction = true;
-    static bool isEmptyValue(const SourceCodeKey& sourceCodeKey) { return sourceCodeKey.isNull(); }
-};
 
 struct SourceCodeValue {
     SourceCodeValue()
@@ -136,30 +78,25 @@ public:
     typedef MapType::iterator iterator;
     typedef MapType::AddResult AddResult;
 
-    CodeCacheMap(int64_t workingSetMaxBytes, size_t workingSetMaxEntries)
+    CodeCacheMap()
         : m_size(0)
         , m_sizeAtLastPrune(0)
         , m_timeAtLastPrune(monotonicallyIncreasingTime())
         , m_minCapacity(0)
         , m_capacity(0)
         , m_age(0)
-        , m_workingSetMaxBytes(workingSetMaxBytes)
-        , m_workingSetMaxEntries(workingSetMaxEntries)
     {
     }
 
-    AddResult add(const SourceCodeKey& key, const SourceCodeValue& value)
+    SourceCodeValue* findCacheAndUpdateAge(const SourceCodeKey& key)
     {
         prune();
 
-        AddResult addResult = m_map.add(key, value);
-        if (addResult.isNewEntry) {
-            m_size += key.length();
-            m_age += key.length();
-            return addResult;
-        }
+        iterator findResult = m_map.find(key);
+        if (findResult == m_map.end())
+            return nullptr;
 
-        int64_t age = m_age - addResult.iterator->value.age;
+        int64_t age = m_age - findResult->value.age;
         if (age > m_capacity) {
             // A requested object is older than the cache's capacity. We can
             // infer that requested objects are subject to high eviction probability,
@@ -174,7 +111,20 @@ public:
                 m_capacity = m_minCapacity;
         }
 
-        addResult.iterator->value.age = m_age;
+        findResult->value.age = m_age;
+        m_age += key.length();
+
+        return &findResult->value;
+    }
+
+    AddResult addCache(const SourceCodeKey& key, const SourceCodeValue& value)
+    {
+        prune();
+
+        AddResult addResult = m_map.add(key, value);
+        ASSERT(addResult.isNewEntry);
+
+        m_size += key.length();
         m_age += key.length();
         return addResult;
     }
@@ -194,20 +144,12 @@ public:
 
     int64_t age() { return m_age; }
 
-    static const int64_t globalWorkingSetMaxBytes;
-    static const size_t globalWorkingSetMaxEntries;
-
-    // We have a smaller cap for the per-codeblock CodeCache that approximates the
-    // linked EvalCodeCache limits, but still allows us to keep large string based
-    // evals at least partially cached.
-    static const unsigned nonGlobalWorkingSetScale;
-    static const int64_t nonGlobalWorkingSetMaxBytes;
-    static const size_t nonGlobalWorkingSetMaxEntries;
-
 private:
     // This constant factor biases cache capacity toward allowing a minimum
     // working set to enter the cache before it starts evicting.
     static const double workingSetTime;
+    static const int64_t workingSetMaxBytes = 16000000;
+    static const size_t workingSetMaxEntries = 2000;
 
     // This constant factor biases cache capacity toward recent activity. We
     // want to adapt to changing workloads.
@@ -219,7 +161,7 @@ private:
     static const int64_t oldObjectSamplingMultiplier = 32;
 
     size_t numberOfEntries() const { return static_cast<size_t>(m_map.size()); }
-    bool canPruneQuickly() const { return numberOfEntries() < m_workingSetMaxEntries; }
+    bool canPruneQuickly() const { return numberOfEntries() < workingSetMaxEntries; }
 
     void pruneSlowCase();
     void prune()
@@ -228,7 +170,7 @@ private:
             return;
 
         if (monotonicallyIncreasingTime() - m_timeAtLastPrune < workingSetTime
-            && m_size - m_sizeAtLastPrune < m_workingSetMaxBytes
+            && m_size - m_sizeAtLastPrune < workingSetMaxBytes
             && canPruneQuickly())
                 return;
 
@@ -242,20 +184,19 @@ private:
     int64_t m_minCapacity;
     int64_t m_capacity;
     int64_t m_age;
-    const int64_t m_workingSetMaxBytes;
-    const size_t m_workingSetMaxEntries;
 };
 
 // Caches top-level code such as <script>, eval(), new Function, and JSEvaluateScript().
-class CodeCache : public RefCounted<CodeCache> {
+class CodeCache {
+    WTF_MAKE_FAST_ALLOCATED;
 public:
-    enum CodeCacheKind { GlobalCodeCache, NonGlobalCodeCache };
-    static PassRefPtr<CodeCache> create(CodeCacheKind kind) { return adoptRef(new CodeCache(kind)); }
-
-    UnlinkedProgramCodeBlock* getProgramCodeBlock(VM&, ProgramExecutable*, const SourceCode&, JSParserStrictness, DebuggerMode, ProfilerMode, ParserError&);
-    UnlinkedEvalCodeBlock* getEvalCodeBlock(VM&, JSScope*, EvalExecutable*, const SourceCode&, JSParserStrictness, DebuggerMode, ProfilerMode, ParserError&);
-    UnlinkedFunctionExecutable* getFunctionExecutableFromGlobalCode(VM&, const Identifier&, const SourceCode&, ParserError&);
+    CodeCache();
     ~CodeCache();
+
+    UnlinkedProgramCodeBlock* getProgramCodeBlock(VM&, ProgramExecutable*, const SourceCode&, JSParserBuiltinMode, JSParserStrictMode, DebuggerMode, ProfilerMode, ParserError&);
+    UnlinkedEvalCodeBlock* getEvalCodeBlock(VM&, EvalExecutable*, const SourceCode&, JSParserBuiltinMode, JSParserStrictMode, ThisTDZMode, bool, DebuggerMode, ProfilerMode, ParserError&, const VariableEnvironment*);
+    UnlinkedModuleProgramCodeBlock* getModuleProgramCodeBlock(VM&, ModuleProgramExecutable*, const SourceCode&, JSParserBuiltinMode, DebuggerMode, ProfilerMode, ParserError&);
+    UnlinkedFunctionExecutable* getFunctionExecutableFromGlobalCode(VM&, const Identifier&, const SourceCode&, ParserError&);
 
     void clear()
     {
@@ -263,13 +204,8 @@ public:
     }
 
 private:
-    CodeCache(CodeCacheKind);
-
     template <class UnlinkedCodeBlockType, class ExecutableType> 
-    UnlinkedCodeBlockType* getCodeBlock(VM&, JSScope*, ExecutableType*, const SourceCode&, JSParserStrictness, DebuggerMode, ProfilerMode, ParserError&);
-
-    template <class UnlinkedCodeBlockType, class ExecutableType>
-    UnlinkedCodeBlockType* generateBytecode(VM&, JSScope*, ExecutableType*, const SourceCode&, JSParserStrictness, DebuggerMode, ProfilerMode, ParserError&);
+    UnlinkedCodeBlockType* getGlobalCodeBlock(VM&, ExecutableType*, const SourceCode&, JSParserBuiltinMode, JSParserStrictMode, ThisTDZMode, bool, DebuggerMode, ProfilerMode, ParserError&, const VariableEnvironment*);
 
     CodeCacheMap m_sourceCode;
 };

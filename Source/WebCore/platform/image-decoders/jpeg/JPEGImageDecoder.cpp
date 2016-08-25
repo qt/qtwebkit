@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006 Apple Computer, Inc.
+ * Copyright (C) 2006 Apple Inc.
  *
  * Portions are Copyright (C) 2001-6 mozilla.org
  *
@@ -39,15 +39,13 @@
 
 #include "config.h"
 #include "JPEGImageDecoder.h"
-#include "PlatformInstrumentation.h"
-#include <wtf/PassOwnPtr.h>
 
 extern "C" {
 #if USE(ICCJPEG)
-#include "iccjpeg.h"
+#include <iccjpeg.h>
 #endif
 #if USE(QCMSLIB)
-#include "qcms.h"
+#include <qcms.h>
 #endif
 #include <setjmp.h>
 }
@@ -468,7 +466,13 @@ public:
                     if (m_info.output_scanline == 0xffffff)
                         m_info.output_scanline = 0;
 
-                    if (!m_decoder->outputScanlines()) {
+                    // If outputScanlines() fails, it deletes |this|. Therefore,
+                    // copy the decoder pointer and use it to check for failure
+                    // to avoid member access in the failure case.
+                    JPEGImageDecoder* decoder = m_decoder;
+                    if (!decoder->outputScanlines()) {
+                        if (decoder->failed()) // Careful; |this| is deleted.
+                            return false;
                         if (!m_info.output_scanline)
                             // Didn't manage to read any lines - flag so we
                             // don't call jpeg_start_output() multiple times for
@@ -620,17 +624,14 @@ ImageFrame* JPEGImageDecoder::frameBufferAtIndex(size_t index)
     }
 
     ImageFrame& frame = m_frameBufferCache[0];
-    if (frame.status() != ImageFrame::FrameComplete) {
-        PlatformInstrumentation::willDecodeImage("JPEG");
+    if (frame.status() != ImageFrame::FrameComplete)
         decode(false);
-        PlatformInstrumentation::didDecodeImage();
-    }
     return &frame;
 }
 
 bool JPEGImageDecoder::setFailed()
 {
-    m_reader.clear();
+    m_reader = nullptr;
     return ImageDecoder::setFailed();
 }
 
@@ -769,7 +770,7 @@ void JPEGImageDecoder::decode(bool onlySize)
         return;
 
     if (!m_reader)
-        m_reader = adoptPtr(new JPEGImageReader(this));
+        m_reader = std::make_unique<JPEGImageReader>(this);
 
     // If we couldn't decode the image but we've received all the data, decoding
     // has failed.
@@ -778,7 +779,7 @@ void JPEGImageDecoder::decode(bool onlySize)
     // If we're done decoding the image, we don't need the JPEGImageReader
     // anymore.  (If we failed, |m_reader| has already been cleared.)
     else if (!m_frameBufferCache.isEmpty() && (m_frameBufferCache[0].status() == ImageFrame::FrameComplete))
-        m_reader.clear();
+        m_reader = nullptr;
 }
 
 }

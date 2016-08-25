@@ -31,14 +31,12 @@
 #define InspectorClientQt_h
 
 #include "InspectorClient.h"
-#include "InspectorFrontendChannel.h"
+#include <inspector/InspectorFrontendChannel.h>
 #include "InspectorFrontendClientLocal.h"
 
 #include <QObject>
 #include <QString>
 #include <wtf/Forward.h>
-#include <wtf/OwnPtr.h>
-#include <wtf/PassOwnPtr.h>
 
 class QWebPageAdapter;
 class QWebPage;
@@ -49,30 +47,32 @@ class InspectorFrontendClientQt;
 class InspectorServerRequestHandlerQt;
 class Page;
 
-class InspectorClientQt : public InspectorClient, public InspectorFrontendChannel {
+class InspectorClientQt : public InspectorClient, public Inspector::FrontendChannel {
 public:
     explicit InspectorClientQt(QWebPageAdapter*);
 
-    virtual void inspectorDestroyed();
+    void inspectedPageDestroyed() override;
 
-    virtual WebCore::InspectorFrontendChannel* openInspectorFrontend(WebCore::InspectorController*);
-    virtual void closeInspectorFrontend();
-    virtual void bringFrontendToFront();
+    Inspector::FrontendChannel* openLocalFrontend(InspectorController*) override;
+    void bringFrontendToFront() override;
 
-    virtual void highlight();
-    virtual void hideHighlight();
+    void highlight() override;
+    void hideHighlight() override;
 
-    virtual bool sendMessageToFrontend(const String&);
+    ConnectionType connectionType() const override;
+    bool sendMessageToFrontend(const String&) override;
 
     void releaseFrontendPage();
 
     void attachAndReplaceRemoteFrontend(InspectorServerRequestHandlerQt *channel);
     void detachRemoteFrontend();
 
+    void closeFrontendWindow();
+
 private:
     QWebPageAdapter* m_inspectedWebPage;
     QWebPageAdapter* m_frontendWebPage;
-    InspectorFrontendClientQt* m_frontendClient;
+    std::unique_ptr<InspectorFrontendClientQt> m_frontendClient;
     bool m_remoteInspector;
     InspectorServerRequestHandlerQt* m_remoteFrontEndChannel;
 
@@ -81,24 +81,24 @@ private:
 
 class InspectorFrontendClientQt : public InspectorFrontendClientLocal {
 public:
-    InspectorFrontendClientQt(QWebPageAdapter* inspectedWebPage, PassOwnPtr<QObject> inspectorView, WebCore::Page* inspectorPage, InspectorClientQt*);
-    virtual ~InspectorFrontendClientQt();
+    InspectorFrontendClientQt(QWebPageAdapter* inspectedWebPage, InspectorController* inspectedPageController,
+        std::unique_ptr<QObject> inspectorView, WebCore::Page* inspectorPage, InspectorClientQt*);
+    ~InspectorFrontendClientQt() override;
 
-    virtual void frontendLoaded();
+    void frontendLoaded() override;
 
-    virtual String localizedStringsURL();
+    String localizedStringsURL() override;
 
-    virtual void bringToFront();
-    virtual void closeWindow();
+    void bringToFront() override;
+    void closeWindow() override;
 
-    virtual void attachWindow(DockSide);
-    virtual void detachWindow();
+    void attachWindow(DockSide) override;
+    void detachWindow() override;
 
-    virtual void setAttachedWindowHeight(unsigned);
-    virtual void setAttachedWindowWidth(unsigned);
-    virtual void setToolbarHeight(unsigned) OVERRIDE;
+    void setAttachedWindowHeight(unsigned) override;
+    void setAttachedWindowWidth(unsigned) override;
 
-    virtual void inspectedURLChanged(const String& newURL);
+    void inspectedURLChanged(const String& newURL) override;
 
     void inspectorClientDestroyed();
 
@@ -106,7 +106,7 @@ private:
     void updateWindowTitle();
     void destroyInspectorView(bool notifyInspectorController);
     QWebPageAdapter* m_inspectedWebPage;
-    OwnPtr<QObject> m_inspectorView;
+    std::unique_ptr<QObject> m_inspectorView;
     QString m_inspectedURL;
     bool m_destroyingInspectorView;
     InspectorClientQt* m_inspectorClient;

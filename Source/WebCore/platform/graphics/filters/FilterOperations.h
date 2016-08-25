@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -25,8 +25,6 @@
 
 #ifndef FilterOperations_h
 #define FilterOperations_h
-
-#if ENABLE(CSS_FILTERS)
 
 #include "FilterOperation.h"
 #include "IntRectExtent.h"
@@ -40,11 +38,11 @@ typedef IntRectExtent FilterOutsets;
 class FilterOperations {
     WTF_MAKE_FAST_ALLOCATED;
 public:
-    FilterOperations();
+    WEBCORE_EXPORT FilterOperations();
     FilterOperations(const FilterOperations& other) { *this = other; }
-    
-    FilterOperations& operator=(const FilterOperations&);
-    
+
+    WEBCORE_EXPORT FilterOperations& operator=(const FilterOperations&);
+
     bool operator==(const FilterOperations&) const;
     bool operator!=(const FilterOperations& o) const
     {
@@ -56,8 +54,8 @@ public:
         m_operations.clear();
     }
     
-    Vector<RefPtr<FilterOperation> >& operations() { return m_operations; }
-    const Vector<RefPtr<FilterOperation> >& operations() const { return m_operations; }
+    Vector<RefPtr<FilterOperation>>& operations() { return m_operations; }
+    const Vector<RefPtr<FilterOperation>>& operations() const { return m_operations; }
 
     bool isEmpty() const { return !m_operations.size(); }
     size_t size() const { return m_operations.size(); }
@@ -71,16 +69,13 @@ public:
     bool hasFilterThatAffectsOpacity() const;
     bool hasFilterThatMovesPixels() const;
 
-#if ENABLE(CSS_SHADERS)
-    bool hasCustomFilter() const;
-#endif
     bool hasReferenceFilter() const;
 private:
-    Vector<RefPtr<FilterOperation> > m_operations;
+    Vector<RefPtr<FilterOperation>> m_operations;
 };
 
-} // namespace WebCore
+WEBCORE_EXPORT TextStream& operator<<(TextStream&, const FilterOperations&);
 
-#endif // ENABLE(CSS_FILTERS)
+} // namespace WebCore
 
 #endif // FilterOperations_h

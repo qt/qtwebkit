@@ -29,9 +29,8 @@
 #include "config.h"
 #include "DocumentRuleSets.h"
 
-#include "CSSDefaultStyleSheets.h"
 #include "CSSStyleSheet.h"
-#include "DocumentStyleSheetCollection.h"
+#include "ExtensionStyleSheets.h"
 #include "MediaQueryEvaluator.h"
 #include "StyleResolver.h"
 #include "StyleSheetContents.h"
@@ -46,71 +45,59 @@ DocumentRuleSets::~DocumentRuleSets()
 {
 }
 
-void DocumentRuleSets::initUserStyle(DocumentStyleSheetCollection* styleSheetCollection, const MediaQueryEvaluator& medium, StyleResolver& resolver)
+void DocumentRuleSets::initUserStyle(ExtensionStyleSheets& extensionStyleSheets, const MediaQueryEvaluator& medium, StyleResolver& resolver)
 {
-    OwnPtr<RuleSet> tempUserStyle = RuleSet::create();
-    if (CSSStyleSheet* pageUserSheet = styleSheetCollection->pageUserSheet())
+    auto tempUserStyle = std::make_unique<RuleSet>();
+    if (CSSStyleSheet* pageUserSheet = extensionStyleSheets.pageUserSheet())
         tempUserStyle->addRulesFromSheet(pageUserSheet->contents(), medium, &resolver);
-    collectRulesFromUserStyleSheets(styleSheetCollection->injectedUserStyleSheets(), *tempUserStyle, medium, resolver);
-    collectRulesFromUserStyleSheets(styleSheetCollection->documentUserStyleSheets(), *tempUserStyle, medium, resolver);
-    if (tempUserStyle->m_ruleCount > 0 || tempUserStyle->m_pageRules.size() > 0)
-        m_userStyle = tempUserStyle.release();
+    collectRulesFromUserStyleSheets(extensionStyleSheets.injectedUserStyleSheets(), *tempUserStyle, medium, resolver);
+    collectRulesFromUserStyleSheets(extensionStyleSheets.documentUserStyleSheets(), *tempUserStyle, medium, resolver);
+    if (tempUserStyle->ruleCount() > 0 || tempUserStyle->pageRules().size() > 0)
+        m_userStyle = WTFMove(tempUserStyle);
 }
 
-void DocumentRuleSets::collectRulesFromUserStyleSheets(const Vector<RefPtr<CSSStyleSheet> >& userSheets, RuleSet& userStyle, const MediaQueryEvaluator& medium, StyleResolver& resolver)
+void DocumentRuleSets::collectRulesFromUserStyleSheets(const Vector<RefPtr<CSSStyleSheet>>& userSheets, RuleSet& userStyle, const MediaQueryEvaluator& medium, StyleResolver& resolver)
 {
     for (unsigned i = 0; i < userSheets.size(); ++i) {
-        ASSERT(userSheets[i]->contents()->isUserStyleSheet());
+        ASSERT(userSheets[i]->contents().isUserStyleSheet());
         userStyle.addRulesFromSheet(userSheets[i]->contents(), medium, &resolver);
     }
 }
 
-static PassOwnPtr<RuleSet> makeRuleSet(const Vector<RuleFeature>& rules)
+static std::unique_ptr<RuleSet> makeRuleSet(const Vector<RuleFeature>& rules)
 {
     size_t size = rules.size();
     if (!size)
         return nullptr;
-    OwnPtr<RuleSet> ruleSet = RuleSet::create();
+    auto ruleSet = std::make_unique<RuleSet>();
     for (size_t i = 0; i < size; ++i)
         ruleSet->addRule(rules[i].rule, rules[i].selectorIndex, rules[i].hasDocumentSecurityOrigin ? RuleHasDocumentSecurityOrigin : RuleHasNoSpecialState);
     ruleSet->shrinkToFit();
-    return ruleSet.release();
+    return ruleSet;
 }
 
 void DocumentRuleSets::resetAuthorStyle()
 {
-    m_authorStyle = RuleSet::create();
+    m_authorStyle = std::make_unique<RuleSet>();
     m_authorStyle->disableAutoShrinkToFit();
 }
 
-void DocumentRuleSets::appendAuthorStyleSheets(unsigned firstNew, const Vector<RefPtr<CSSStyleSheet> >& styleSheets, MediaQueryEvaluator* medium, InspectorCSSOMWrappers& inspectorCSSOMWrappers, bool isViewSource, StyleResolver* resolver)
+void DocumentRuleSets::appendAuthorStyleSheets(const Vector<RefPtr<CSSStyleSheet>>& styleSheets, MediaQueryEvaluator* medium, InspectorCSSOMWrappers& inspectorCSSOMWrappers, StyleResolver* resolver)
 {
     // This handles sheets added to the end of the stylesheet list only. In other cases the style resolver
     // needs to be reconstructed. To handle insertions too the rule order numbers would need to be updated.
-    unsigned size = styleSheets.size();
-    for (unsigned i = firstNew; i < size; ++i) {
-        CSSStyleSheet* cssSheet = styleSheets[i].get();
+    for (auto& cssSheet : styleSheets) {
         ASSERT(!cssSheet->disabled());
         if (cssSheet->mediaQueries() && !medium->eval(cssSheet->mediaQueries(), resolver))
             continue;
-        StyleSheetContents* sheet = cssSheet->contents();
-#if ENABLE(STYLE_SCOPED) || ENABLE(SHADOW_DOM)
-        if (const ContainerNode* scope = StyleScopeResolver::scopeFor(cssSheet)) {
-            // FIXME: Remove a dependency to calling a StyleResolver's member function.
-            // If we can avoid calling resolver->ensureScopeResolver() here, we don't have to include "StyleResolver.h".
-            // https://bugs.webkit.org/show_bug.cgi?id=108890
-            resolver->ensureScopeResolver()->ensureRuleSetFor(scope)->addRulesFromSheet(sheet, *medium, resolver, scope);
-            continue;
-        }
-#endif
-        m_authorStyle->addRulesFromSheet(sheet, *medium, resolver);
-        inspectorCSSOMWrappers.collectFromStyleSheetIfNeeded(cssSheet);
+        m_authorStyle->addRulesFromSheet(cssSheet->contents(), *medium, resolver);
+        inspectorCSSOMWrappers.collectFromStyleSheetIfNeeded(cssSheet.get());
     }
     m_authorStyle->shrinkToFit();
-    collectFeatures(isViewSource, resolver->scopeResolver());
+    collectFeatures();
 }
 
-void DocumentRuleSets::collectFeatures(bool isViewSource, StyleScopeResolver* scopeResolver)
+void DocumentRuleSets::collectFeatures() const
 {
     m_features.clear();
     // Collect all ids and rules using sibling selectors (:first-child and similar)
@@ -118,18 +105,41 @@ void DocumentRuleSets::collectFeatures(bool isViewSource, StyleScopeResolver* sc
     // sharing candidates.
     if (CSSDefaultStyleSheets::defaultStyle)
         m_features.add(CSSDefaultStyleSheets::defaultStyle->features());
+    m_defaultStyleVersionOnFeatureCollection = CSSDefaultStyleSheets::defaultStyleVersion;
+
     if (m_authorStyle)
         m_features.add(m_authorStyle->features());
-    if (isViewSource)
-        m_features.add(CSSDefaultStyleSheets::viewSourceStyle()->features());
-
-    if (scopeResolver)
-        scopeResolver->collectFeaturesTo(m_features);
     if (m_userStyle)
         m_features.add(m_userStyle->features());
 
     m_siblingRuleSet = makeRuleSet(m_features.siblingRules);
     m_uncommonAttributeRuleSet = makeRuleSet(m_features.uncommonAttributeRules);
+}
+
+RuleSet* DocumentRuleSets::ancestorClassRules(AtomicStringImpl* className) const
+{
+    auto addResult = m_ancestorClassRuleSets.add(className, nullptr);
+    if (addResult.isNewEntry) {
+        if (auto* rules = m_features.ancestorClassRules.get(className))
+            addResult.iterator->value = makeRuleSet(*rules);
+    }
+    return addResult.iterator->value.get();
+}
+
+const DocumentRuleSets::AttributeRules* DocumentRuleSets::ancestorAttributeRulesForHTML(AtomicStringImpl* attributeName) const
+{
+    auto addResult = m_ancestorAttributeRuleSetsForHTML.add(attributeName, nullptr);
+    auto& value = addResult.iterator->value;
+    if (addResult.isNewEntry) {
+        if (auto* rules = m_features.ancestorAttributeRulesForHTML.get(attributeName)) {
+            value = std::make_unique<AttributeRules>();
+            value->attributeSelectors.reserveCapacity(rules->selectors.size());
+            for (auto* selector : rules->selectors.values())
+                value->attributeSelectors.uncheckedAppend(selector);
+            value->ruleSet = makeRuleSet(rules->features);
+        }
+    }
+    return value.get();
 }
 
 } // namespace WebCore

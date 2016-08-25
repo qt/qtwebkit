@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -40,10 +40,8 @@
 #include "HRTFPanner.h"
 #include <algorithm>
 #include <math.h>
-#include <wtf/OwnPtr.h>
+#include <wtf/NeverDestroyed.h>
 
-using namespace std;
- 
 namespace WebCore {
 
 const unsigned HRTFElevation::AzimuthSpacing = 15;
@@ -61,7 +59,7 @@ const size_t ResponseFrameSize = 256;
 // The impulse responses may be resampled to a different sample-rate (depending on the audio hardware) when they are loaded.
 const float ResponseSampleRate = 44100;
 
-#if PLATFORM(MAC) || USE(WEBAUDIO_GSTREAMER)
+#if PLATFORM(COCOA) || USE(WEBAUDIO_GSTREAMER)
 #define USE_CONCATENATED_IMPULSE_RESPONSES
 #endif
 
@@ -71,18 +69,18 @@ const float ResponseSampleRate = 44100;
 static AudioBus* getConcatenatedImpulseResponsesForSubject(const String& subjectName)
 {
     typedef HashMap<String, AudioBus*> AudioBusMap;
-    DEFINE_STATIC_LOCAL(AudioBusMap, audioBusMap, ());
+    static NeverDestroyed<AudioBusMap> audioBusMap;
 
     AudioBus* bus;
-    AudioBusMap::iterator iterator = audioBusMap.find(subjectName);
-    if (iterator == audioBusMap.end()) {
+    AudioBusMap::iterator iterator = audioBusMap.get().find(subjectName);
+    if (iterator == audioBusMap.get().end()) {
         RefPtr<AudioBus> concatenatedImpulseResponses = AudioBus::loadPlatformResource(subjectName.utf8().data(), ResponseSampleRate);
         ASSERT(concatenatedImpulseResponses);
         if (!concatenatedImpulseResponses)
             return 0;
 
         bus = concatenatedImpulseResponses.release().leakRef();
-        audioBusMap.set(subjectName, bus);
+        audioBusMap.get().set(subjectName, bus);
     } else
         bus = iterator->value;
 
@@ -210,7 +208,7 @@ bool HRTFElevation::calculateKernelsForAzimuthElevation(int azimuth, int elevati
 // The range of elevations for the IRCAM impulse responses varies depending on azimuth, but the minimum elevation appears to always be -45.
 //
 // Here's how it goes:
-static int maxElevations[] = {
+static const int maxElevations[] = {
         //  Azimuth
         //
     90, // 0  
@@ -239,22 +237,22 @@ static int maxElevations[] = {
     45 //  345 
 };
 
-PassOwnPtr<HRTFElevation> HRTFElevation::createForSubject(const String& subjectName, int elevation, float sampleRate)
+std::unique_ptr<HRTFElevation> HRTFElevation::createForSubject(const String& subjectName, int elevation, float sampleRate)
 {
     bool isElevationGood = elevation >= -45 && elevation <= 90 && (elevation / 15) * 15 == elevation;
     ASSERT(isElevationGood);
     if (!isElevationGood)
         return nullptr;
         
-    OwnPtr<HRTFKernelList> kernelListL = adoptPtr(new HRTFKernelList(NumberOfTotalAzimuths));
-    OwnPtr<HRTFKernelList> kernelListR = adoptPtr(new HRTFKernelList(NumberOfTotalAzimuths));
+    auto kernelListL = std::make_unique<HRTFKernelList>(NumberOfTotalAzimuths);
+    auto kernelListR = std::make_unique<HRTFKernelList>(NumberOfTotalAzimuths);
 
     // Load convolution kernels from HRTF files.
     int interpolatedIndex = 0;
     for (unsigned rawIndex = 0; rawIndex < NumberOfRawAzimuths; ++rawIndex) {
         // Don't let elevation exceed maximum for this azimuth.
         int maxElevation = maxElevations[rawIndex];
-        int actualElevation = min(elevation, maxElevation);
+        int actualElevation = std::min(elevation, maxElevation);
 
         bool success = calculateKernelsForAzimuthElevation(rawIndex * AzimuthSpacing, actualElevation, sampleRate, subjectName, kernelListL->at(interpolatedIndex), kernelListR->at(interpolatedIndex));
         if (!success)
@@ -276,11 +274,10 @@ PassOwnPtr<HRTFElevation> HRTFElevation::createForSubject(const String& subjectN
         }
     }
     
-    OwnPtr<HRTFElevation> hrtfElevation = adoptPtr(new HRTFElevation(kernelListL.release(), kernelListR.release(), elevation, sampleRate));
-    return hrtfElevation.release();
+    return std::make_unique<HRTFElevation>(WTFMove(kernelListL), WTFMove(kernelListR), elevation, sampleRate);
 }
 
-PassOwnPtr<HRTFElevation> HRTFElevation::createByInterpolatingSlices(HRTFElevation* hrtfElevation1, HRTFElevation* hrtfElevation2, float x, float sampleRate)
+std::unique_ptr<HRTFElevation> HRTFElevation::createByInterpolatingSlices(HRTFElevation* hrtfElevation1, HRTFElevation* hrtfElevation2, float x, float sampleRate)
 {
     ASSERT(hrtfElevation1 && hrtfElevation2);
     if (!hrtfElevation1 || !hrtfElevation2)
@@ -288,8 +285,8 @@ PassOwnPtr<HRTFElevation> HRTFElevation::createByInterpolatingSlices(HRTFElevati
         
     ASSERT(x >= 0.0 && x < 1.0);
     
-    OwnPtr<HRTFKernelList> kernelListL = adoptPtr(new HRTFKernelList(NumberOfTotalAzimuths));
-    OwnPtr<HRTFKernelList> kernelListR = adoptPtr(new HRTFKernelList(NumberOfTotalAzimuths));
+    auto kernelListL = std::make_unique<HRTFKernelList>(NumberOfTotalAzimuths);
+    auto kernelListR = std::make_unique<HRTFKernelList>(NumberOfTotalAzimuths);
 
     HRTFKernelList* kernelListL1 = hrtfElevation1->kernelListL();
     HRTFKernelList* kernelListR1 = hrtfElevation1->kernelListR();
@@ -305,8 +302,7 @@ PassOwnPtr<HRTFElevation> HRTFElevation::createByInterpolatingSlices(HRTFElevati
     // Interpolate elevation angle.
     double angle = (1.0 - x) * hrtfElevation1->elevationAngle() + x * hrtfElevation2->elevationAngle();
     
-    OwnPtr<HRTFElevation> hrtfElevation = adoptPtr(new HRTFElevation(kernelListL.release(), kernelListR.release(), static_cast<int>(angle), sampleRate));
-    return hrtfElevation.release();  
+    return std::make_unique<HRTFElevation>(WTFMove(kernelListL), WTFMove(kernelListR), static_cast<int>(angle), sampleRate);
 }
 
 void HRTFElevation::getKernelsFromAzimuth(double azimuthBlend, unsigned azimuthIndex, HRTFKernel* &kernelL, HRTFKernel* &kernelR, double& frameDelayL, double& frameDelayR)

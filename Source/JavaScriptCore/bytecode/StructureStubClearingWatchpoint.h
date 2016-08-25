@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2012, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,57 +26,53 @@
 #ifndef StructureStubClearingWatchpoint_h
 #define StructureStubClearingWatchpoint_h
 
+#include "ObjectPropertyCondition.h"
 #include "Watchpoint.h"
-#include <wtf/Platform.h>
 
 #if ENABLE(JIT)
 
-#include <wtf/FastAllocBase.h>
+#include <wtf/FastMalloc.h>
 #include <wtf/Noncopyable.h>
-#include <wtf/OwnPtr.h>
-#include <wtf/PassOwnPtr.h>
-#include <wtf/RefCounted.h>
-#include <wtf/RefPtr.h>
 
 namespace JSC {
 
 class CodeBlock;
+class StructureStubInfo;
 class WatchpointsOnStructureStubInfo;
-struct StructureStubInfo;
 
 class StructureStubClearingWatchpoint : public Watchpoint {
     WTF_MAKE_NONCOPYABLE(StructureStubClearingWatchpoint);
     WTF_MAKE_FAST_ALLOCATED;
 public:
     StructureStubClearingWatchpoint(
-        WatchpointsOnStructureStubInfo& holder)
-        : m_holder(holder)
-    {
-    }
-    
-    StructureStubClearingWatchpoint(
+        const ObjectPropertyCondition& key,
         WatchpointsOnStructureStubInfo& holder,
-        PassOwnPtr<StructureStubClearingWatchpoint> next)
-        : m_holder(holder)
-        , m_next(next)
+        std::unique_ptr<StructureStubClearingWatchpoint> next)
+        : m_key(key)
+        , m_holder(holder)
+        , m_next(WTFMove(next))
     {
     }
     
     virtual ~StructureStubClearingWatchpoint();
     
     static StructureStubClearingWatchpoint* push(
+        const ObjectPropertyCondition& key,
         WatchpointsOnStructureStubInfo& holder,
-        OwnPtr<StructureStubClearingWatchpoint>& head);
+        std::unique_ptr<StructureStubClearingWatchpoint>& head);
 
 protected:
-    void fireInternal();
+    virtual void fireInternal(const FireDetail&) override;
 
 private:
+    ObjectPropertyCondition m_key;
     WatchpointsOnStructureStubInfo& m_holder;
-    OwnPtr<StructureStubClearingWatchpoint> m_next;
+    std::unique_ptr<StructureStubClearingWatchpoint> m_next;
 };
 
-class WatchpointsOnStructureStubInfo : public RefCounted<WatchpointsOnStructureStubInfo> {
+class WatchpointsOnStructureStubInfo {
+    WTF_MAKE_NONCOPYABLE(WatchpointsOnStructureStubInfo);
+    WTF_MAKE_FAST_ALLOCATED;
 public:
     WatchpointsOnStructureStubInfo(CodeBlock* codeBlock, StructureStubInfo* stubInfo)
         : m_codeBlock(codeBlock)
@@ -86,11 +82,11 @@ public:
     
     ~WatchpointsOnStructureStubInfo();
     
-    StructureStubClearingWatchpoint* addWatchpoint();
+    StructureStubClearingWatchpoint* addWatchpoint(const ObjectPropertyCondition& key);
     
     static StructureStubClearingWatchpoint* ensureReferenceAndAddWatchpoint(
-        RefPtr<WatchpointsOnStructureStubInfo>& holderRef,
-        CodeBlock*, StructureStubInfo*);
+        std::unique_ptr<WatchpointsOnStructureStubInfo>& holderRef,
+        CodeBlock*, StructureStubInfo*, const ObjectPropertyCondition& key);
     
     CodeBlock* codeBlock() const { return m_codeBlock; }
     StructureStubInfo* stubInfo() const { return m_stubInfo; }
@@ -98,7 +94,7 @@ public:
 private:
     CodeBlock* m_codeBlock;
     StructureStubInfo* m_stubInfo;
-    OwnPtr<StructureStubClearingWatchpoint> m_head;
+    std::unique_ptr<StructureStubClearingWatchpoint> m_head;
 };
 
 } // namespace JSC

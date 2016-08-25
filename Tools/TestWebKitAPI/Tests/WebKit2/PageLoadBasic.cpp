@@ -24,10 +24,13 @@
  */
 
 #include "config.h"
+
+#if WK_HAVE_C_SPI
+
 #include "PlatformUtilities.h"
 #include "PlatformWebView.h"
 #include "Test.h"
-#include <WebKit2/WKRetainPtr.h>
+#include <WebKit/WKRetainPtr.h>
 
 namespace TestWebKitAPI {
 
@@ -85,7 +88,7 @@ static void didFinishLoadForFrame(WKPageRef page, WKFrameRef frame, WKTypeRef us
     test1Done = true;
 }
 
-static void decidePolicyForNavigationAction(WKPageRef page, WKFrameRef frame, WKFrameNavigationType navigationType, WKEventModifiers modifiers, WKEventMouseButton mouseButton, WKURLRequestRef request, WKFramePolicyListenerRef listener, WKTypeRef userData, const void* clientInfo)
+static void decidePolicyForNavigationAction(WKPageRef page, WKFrameRef frame, WKFrameNavigationType navigationType, WKEventModifiers modifiers, WKEventMouseButton mouseButton, WKFrameRef originatingFrame, WKURLRequestRef request, WKFramePolicyListenerRef listener, WKTypeRef userData, const void* clientInfo)
 {
     State* state = reinterpret_cast<State*>(const_cast<void*>(clientInfo));
     EXPECT_FALSE(state->didStartProvisionalLoadForFrame);
@@ -103,11 +106,12 @@ static void decidePolicyForNewWindowAction(WKPageRef page, WKFrameRef frame, WKF
     WKFramePolicyListenerUse(listener);
 }
 
-static void decidePolicyForResponse(WKPageRef page, WKFrameRef frame, WKURLResponseRef response, WKURLRequestRef request, WKFramePolicyListenerRef listener, WKTypeRef userData, const void* clientInfo)
+static void decidePolicyForResponse(WKPageRef page, WKFrameRef frame, WKURLResponseRef response, WKURLRequestRef request, bool canShowMIMEType, WKFramePolicyListenerRef listener, WKTypeRef userData, const void* clientInfo)
 {
     WKFramePolicyListenerUse(listener);
 }
 
+// FIXME: http://webkit.org/b/127934 REGRESSION (r163037): WebKit2.PageLoadBasic API test failing on Mountain Lion
 TEST(WebKit2, PageLoadBasic)
 {
     State state;
@@ -115,25 +119,27 @@ TEST(WebKit2, PageLoadBasic)
     WKRetainPtr<WKContextRef> context(AdoptWK, WKContextCreate());
     PlatformWebView webView(context.get());
 
-    WKPageLoaderClient loaderClient;
+    WKPageLoaderClientV0 loaderClient;
     memset(&loaderClient, 0, sizeof(loaderClient));
 
-    loaderClient.version = 0;
-    loaderClient.clientInfo = &state;
+    loaderClient.base.version = 0;
+    loaderClient.base.clientInfo = &state;
     loaderClient.didStartProvisionalLoadForFrame = didStartProvisionalLoadForFrame;
     loaderClient.didCommitLoadForFrame = didCommitLoadForFrame;
     loaderClient.didFinishLoadForFrame = didFinishLoadForFrame;
-    WKPageSetPageLoaderClient(webView.page(), &loaderClient);
 
-    WKPagePolicyClient policyClient;
+    WKPageSetPageLoaderClient(webView.page(), &loaderClient.base);
+
+    WKPagePolicyClientV1 policyClient;
     memset(&policyClient, 0, sizeof(policyClient));
 
-    policyClient.version = 0;
-    policyClient.clientInfo = &state;
+    policyClient.base.version = 1;
+    policyClient.base.clientInfo = &state;
     policyClient.decidePolicyForNavigationAction = decidePolicyForNavigationAction;
     policyClient.decidePolicyForNewWindowAction = decidePolicyForNewWindowAction;
     policyClient.decidePolicyForResponse = decidePolicyForResponse;
-    WKPageSetPagePolicyClient(webView.page(), &policyClient);
+
+    WKPageSetPagePolicyClient(webView.page(), &policyClient.base);
 
     // Before loading anything, the active url should be null
     EXPECT_NULL(WKPageCopyActiveURL(webView.page()));
@@ -149,4 +155,26 @@ TEST(WebKit2, PageLoadBasic)
     Util::run(&test1Done);
 }
 
+TEST(WebKit2, PageReload)
+{
+    WKRetainPtr<WKContextRef> context(AdoptWK, WKContextCreate());
+    PlatformWebView webView(context.get());
+
+    // Reload test before url loading.
+    WKPageReload(webView.page());
+    WKPageReload(webView.page());
+
+    WKRetainPtr<WKURLRef> url(AdoptWK, Util::createURLForResource("simple", "html"));
+    WKPageLoadURL(webView.page(), url.get());
+
+    // Reload test after url loading.
+    WKPageReload(webView.page());
+
+    WKRetainPtr<WKURLRef> activeUrl = adoptWK(WKPageCopyActiveURL(webView.page()));
+    ASSERT_NOT_NULL(activeUrl.get());
+    EXPECT_TRUE(WKURLIsEqual(activeUrl.get(), url.get()));
+}
+
 } // namespace TestWebKitAPI
+
+#endif

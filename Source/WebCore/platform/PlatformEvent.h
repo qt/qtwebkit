@@ -30,7 +30,7 @@ namespace WebCore {
 
 class PlatformEvent {
 public:
-    enum Type {
+    enum Type : uint8_t {
         NoType = 0,
 
         // PlatformKeyboardEvent
@@ -43,22 +43,13 @@ public:
         MouseMoved,
         MousePressed,
         MouseReleased,
+        MouseForceChanged,
+        MouseForceDown,
+        MouseForceUp,
         MouseScroll,
 
         // PlatformWheelEvent
         Wheel,
-
-        // PlatformGestureEvent
-        GestureScrollBegin,
-        GestureScrollEnd,
-        GestureScrollUpdate,
-        GestureScrollUpdateWithoutPropagation,
-        GestureTap,
-        GestureTapDown,
-        GestureTapDownCancel,
-        GestureTwoFingerTap,
-        GestureLongPress,
-        GestureLongTap,
 
 #if ENABLE(TOUCH_EVENTS)
         // PlatformTouchEvent
@@ -67,9 +58,16 @@ public:
         TouchEnd,
         TouchCancel,
 #endif
+
+#if ENABLE(MAC_GESTURE_EVENTS)
+        // PlatformGestureEvent
+        GestureStart,
+        GestureChange,
+        GestureEnd,
+#endif
     };
 
-    enum Modifiers {
+    enum Modifiers : uint8_t {
         AltKey      = 1 << 0,
         CtrlKey     = 1 << 1,
         MetaKey     = 1 << 2,

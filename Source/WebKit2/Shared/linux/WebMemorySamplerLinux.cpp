@@ -30,9 +30,9 @@
 
 #include "NotImplemented.h"
 #include <JavaScriptCore/MemoryStatistics.h>
+#include <runtime/JSCInlines.h>
 #include <WebCore/JSDOMWindow.h>
 #include <runtime/JSLock.h>
-#include <runtime/Operations.h>
 #include <string.h>
 #include <sys/sysinfo.h>
 #include <wtf/CurrentTime.h>
@@ -66,7 +66,7 @@ static inline String nextToken(FILE* file)
     char buffer[maxBuffer] = {0, };
     unsigned int index = 0;
     while (index < maxBuffer) {
-        char ch = fgetc(file);
+        int ch = fgetc(file);
         if (ch == EOF || (isASCIISpace(ch) && index)) // Break on non-initial ASCII space.
             break;
         if (!isASCIISpace(ch)) {
@@ -86,7 +86,7 @@ static inline void appendKeyValuePair(WebMemoryStatistics& stats, const String& 
 
 static ApplicationMemoryStats sampleMemoryAllocatedForApplication()
 {
-    ApplicationMemoryStats applicationStats;
+    ApplicationMemoryStats applicationStats = {0, 0, 0, 0, 0, 0, 0};
     char processPath[maxProcessPath];
     snprintf(processPath, maxProcessPath, "/proc/self/statm");
     FILE* statmFileDescriptor = fopen(processPath, "r");
@@ -143,7 +143,6 @@ WebMemoryStatistics WebMemorySampler::sampleWebKit() const
     size_t totalBytesInUse = 0;
     size_t totalBytesCommitted = 0;
 
-#if ENABLE(GLOBAL_FASTMALLOC_NEW)
     FastMallocStatistics fastMallocStatistics = WTF::fastMallocStatistics();
     size_t fastMallocBytesInUse = fastMallocStatistics.committedVMBytes - fastMallocStatistics.freeListBytes;
     size_t fastMallocBytesCommitted = fastMallocStatistics.committedVMBytes;
@@ -152,10 +151,9 @@ WebMemoryStatistics WebMemorySampler::sampleWebKit() const
 
     appendKeyValuePair(webKitMemoryStats, ASCIILiteral("Fast Malloc In Use"), fastMallocBytesInUse);
     appendKeyValuePair(webKitMemoryStats, ASCIILiteral("Fast Malloc Committed Memory"), fastMallocBytesCommitted);
-#endif
 
-    size_t jscHeapBytesInUse = JSDOMWindow::commonVM()->heap.size();
-    size_t jscHeapBytesCommitted = JSDOMWindow::commonVM()->heap.capacity();
+    size_t jscHeapBytesInUse = JSDOMWindow::commonVM().heap.size();
+    size_t jscHeapBytesCommitted = JSDOMWindow::commonVM().heap.capacity();
     totalBytesInUse += jscHeapBytesInUse;
     totalBytesCommitted += jscHeapBytesCommitted;
 
@@ -164,7 +162,7 @@ WebMemoryStatistics WebMemorySampler::sampleWebKit() const
     totalBytesCommitted += globalMemoryStats.stackBytes + globalMemoryStats.JITBytes;
 
     appendKeyValuePair(webKitMemoryStats, ASCIILiteral("JavaScript Heap In Use"), jscHeapBytesInUse);
-    appendKeyValuePair(webKitMemoryStats, ASCIILiteral("JavaScript Heap Commited Memory"), jscHeapBytesCommitted);
+    appendKeyValuePair(webKitMemoryStats, ASCIILiteral("JavaScript Heap Committed Memory"), jscHeapBytesCommitted);
     
     appendKeyValuePair(webKitMemoryStats, ASCIILiteral("JavaScript Stack Bytes"), globalMemoryStats.stackBytes);
     appendKeyValuePair(webKitMemoryStats, ASCIILiteral("JavaScript JIT Bytes"), globalMemoryStats.JITBytes);

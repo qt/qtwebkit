@@ -20,33 +20,32 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "SVGAnimateColorElement.h"
+
 #include "SVGNames.h"
 
 namespace WebCore {
     
-inline SVGAnimateColorElement::SVGAnimateColorElement(const QualifiedName& tagName, Document* document)
-    : SVGAnimateElement(tagName, document)
+inline SVGAnimateColorElement::SVGAnimateColorElement(const QualifiedName& tagName, Document& document)
+    : SVGAnimateElementBase(tagName, document)
 {
     ASSERT(hasTagName(SVGNames::animateColorTag));
 }
 
-PassRefPtr<SVGAnimateColorElement> SVGAnimateColorElement::create(const QualifiedName& tagName, Document* document)
+Ref<SVGAnimateColorElement> SVGAnimateColorElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new SVGAnimateColorElement(tagName, document));
+    return adoptRef(*new SVGAnimateColorElement(tagName, document));
 }
 
 static bool attributeValueIsCurrentColor(const String& value)
 {
-    DEFINE_STATIC_LOCAL(const AtomicString, currentColor, ("currentColor", AtomicString::ConstructFromLiteral));
+    static NeverDestroyed<const AtomicString> currentColor("currentColor", AtomicString::ConstructFromLiteral);
     return value == currentColor;
 }
 
 void SVGAnimateColorElement::determinePropertyValueTypes(const String& from, const String& to)
 {
-    SVGAnimateElement::determinePropertyValueTypes(from, to);
+    SVGAnimateElementBase::determinePropertyValueTypes(from, to);
     if (attributeValueIsCurrentColor(from))
         m_fromPropertyValueType = CurrentColorValue;
     if (attributeValueIsCurrentColor(to))
@@ -54,5 +53,3 @@ void SVGAnimateColorElement::determinePropertyValueTypes(const String& from, con
 }
 
 }
-
-#endif // ENABLE(SVG)

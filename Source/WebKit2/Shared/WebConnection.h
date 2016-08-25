@@ -29,33 +29,33 @@
 #include "APIObject.h"
 #include "MessageReceiver.h"
 #include "MessageSender.h"
+#include "UserData.h"
 #include "WebConnectionClient.h"
 #include <wtf/RefPtr.h>
 
 namespace WebKit {
 
-class WebConnection : public TypedAPIObject<APIObject::TypeConnection>, public CoreIPC::MessageReceiver, public CoreIPC::MessageSender {
+class UserData;
+class WebConnection : public API::ObjectImpl<API::Object::Type::Connection>, public IPC::MessageReceiver, public IPC::MessageSender {
 public:
     virtual ~WebConnection();
 
-    void initializeConnectionClient(const WKConnectionClient*);
-    void postMessage(const String&, APIObject*);
+    void initializeConnectionClient(const WKConnectionClientBase*);
+    void postMessage(const String&, API::Object*);
     void didClose();
 
 protected:
     explicit WebConnection();
 
-    virtual void encodeMessageBody(CoreIPC::ArgumentEncoder&, APIObject*) = 0;
-    virtual bool decodeMessageBody(CoreIPC::ArgumentDecoder&, RefPtr<APIObject>&) = 0;
+    virtual RefPtr<API::Object> transformHandlesToObjects(API::Object*) = 0;
+    virtual RefPtr<API::Object> transformObjectsToHandles(API::Object*) = 0;
 
-    // CoreIPC::MessageReceiver
-    void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&) OVERRIDE;
-
+    // IPC::MessageReceiver
     // Implemented in generated WebConnectionMessageReceiver.cpp
-    void didReceiveWebConnectionMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&);
+    void didReceiveMessage(IPC::Connection&, IPC::MessageDecoder&) override;
 
     // Mesage handling implementation functions.
-    void handleMessage(CoreIPC::MessageDecoder&);
+    void handleMessage(const String& messageName, const UserData& messageBody);
 
     virtual bool hasValidConnection() const = 0;
 

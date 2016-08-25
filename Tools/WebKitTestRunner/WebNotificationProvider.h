@@ -26,9 +26,10 @@
 #ifndef WebNotificationProvider_h
 #define WebNotificationProvider_h
 
-#include <WebKit2/WKNotificationManager.h>
-#include <WebKit2/WKNotificationProvider.h>
-#include <WebKit2/WKRetainPtr.h>
+#include <WebKit/WKNotificationManager.h>
+#include <WebKit/WKNotificationProvider.h>
+#include <WebKit/WKRetainPtr.h>
+#include <wtf/HashMap.h>
 #include <wtf/HashSet.h>
 
 namespace WTR {
@@ -37,7 +38,7 @@ class WebNotificationProvider {
 public:
     WebNotificationProvider();
     ~WebNotificationProvider();
-    WKNotificationProvider provider();
+    WKNotificationProviderV0 provider();
 
     void showWebNotification(WKPageRef, WKNotificationRef);
     void closeWebNotification(WKNotificationRef);
@@ -49,8 +50,9 @@ public:
     void reset();
 
 private:
-    WKRetainPtr<WKNotificationManagerRef> m_notificationManager;
-    HashSet<uint64_t> m_shownNotifications;
+    // Inverses of each other.
+    HashMap<WKRetainPtr<WKNotificationManagerRef>, HashSet<uint64_t>> m_ownedNotifications;
+    HashMap<uint64_t, WKNotificationManagerRef> m_owningManager;
 };
 
 }

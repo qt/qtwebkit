@@ -34,13 +34,12 @@
 #include "HTMLNames.h"
 #include "HTMLObjectElement.h"
 #include "HTMLParserIdioms.h"
+#include "Page.h"
 #include "RenderImage.h"
-#include "ScriptCallStack.h"
-#include "SecurityOrigin.h"
-
-#if ENABLE(SVG)
 #include "RenderSVGImage.h"
-#endif
+#include "SecurityOrigin.h"
+#include <wtf/NeverDestroyed.h>
+
 #if ENABLE(VIDEO)
 #include "RenderVideo.h"
 #endif
@@ -55,8 +54,7 @@ template<> struct ValueCheck<WebCore::ImageLoader*> {
     {
         if (!p)
             return;
-        ASSERT(p->element());
-        ValueCheck<WebCore::Element*>::checkConsistency(p->element());
+        ValueCheck<WebCore::Element*>::checkConsistency(&p->element());
     }
 };
 
@@ -67,32 +65,32 @@ namespace WebCore {
 
 static ImageEventSender& beforeLoadEventSender()
 {
-    DEFINE_STATIC_LOCAL(ImageEventSender, sender, (eventNames().beforeloadEvent));
+    static NeverDestroyed<ImageEventSender> sender(eventNames().beforeloadEvent);
     return sender;
 }
 
 static ImageEventSender& loadEventSender()
 {
-    DEFINE_STATIC_LOCAL(ImageEventSender, sender, (eventNames().loadEvent));
+    static NeverDestroyed<ImageEventSender> sender(eventNames().loadEvent);
     return sender;
 }
 
 static ImageEventSender& errorEventSender()
 {
-    DEFINE_STATIC_LOCAL(ImageEventSender, sender, (eventNames().errorEvent));
+    static NeverDestroyed<ImageEventSender> sender(eventNames().errorEvent);
     return sender;
 }
 
-static inline bool pageIsBeingDismissed(Document* document)
+static inline bool pageIsBeingDismissed(Document& document)
 {
-    Frame* frame = document->frame();
-    return frame && frame->loader()->pageDismissalEventBeingDispatched() != FrameLoader::NoDismissal;
+    Frame* frame = document.frame();
+    return frame && frame->loader().pageDismissalEventBeingDispatched() != FrameLoader::PageDismissalType::None;
 }
 
-ImageLoader::ImageLoader(Element* element)
+ImageLoader::ImageLoader(Element& element)
     : m_element(element)
-    , m_image(0)
-    , m_derefElementTimer(this, &ImageLoader::timerFired)
+    , m_image(nullptr)
+    , m_derefElementTimer(*this, &ImageLoader::timerFired)
     , m_hasPendingBeforeLoadEvent(false)
     , m_hasPendingLoadEvent(false)
     , m_hasPendingErrorEvent(false)
@@ -107,24 +105,20 @@ ImageLoader::~ImageLoader()
     if (m_image)
         m_image->removeClient(this);
 
-    ASSERT(m_hasPendingBeforeLoadEvent || !beforeLoadEventSender().hasPendingEvents(this));
+    ASSERT(m_hasPendingBeforeLoadEvent || !beforeLoadEventSender().hasPendingEvents(*this));
     if (m_hasPendingBeforeLoadEvent)
-        beforeLoadEventSender().cancelEvent(this);
+        beforeLoadEventSender().cancelEvent(*this);
 
-    ASSERT(m_hasPendingLoadEvent || !loadEventSender().hasPendingEvents(this));
+    ASSERT(m_hasPendingLoadEvent || !loadEventSender().hasPendingEvents(*this));
     if (m_hasPendingLoadEvent)
-        loadEventSender().cancelEvent(this);
+        loadEventSender().cancelEvent(*this);
 
-    ASSERT(m_hasPendingErrorEvent || !errorEventSender().hasPendingEvents(this));
+    ASSERT(m_hasPendingErrorEvent || !errorEventSender().hasPendingEvents(*this));
     if (m_hasPendingErrorEvent)
-        errorEventSender().cancelEvent(this);
-
-    // If the ImageLoader is being destroyed but it is still protecting its image-loading Element,
-    // remove that protection here.
-    if (m_elementIsProtected)
-        m_element->deref();
+        errorEventSender().cancelEvent(*this);
 }
 
+#if PLATFORM(QT)
 void ImageLoader::setImage(CachedImage* newImage)
 {
     setImageWithoutConsideringPendingLoadEvent(newImage);
@@ -141,15 +135,15 @@ void ImageLoader::setImageWithoutConsideringPendingLoadEvent(CachedImage* newIma
     if (newImage != oldImage) {
         m_image = newImage;
         if (m_hasPendingBeforeLoadEvent) {
-            beforeLoadEventSender().cancelEvent(this);
+            beforeLoadEventSender().cancelEvent(*this);
             m_hasPendingBeforeLoadEvent = false;
         }
         if (m_hasPendingLoadEvent) {
-            loadEventSender().cancelEvent(this);
+            loadEventSender().cancelEvent(*this);
             m_hasPendingLoadEvent = false;
         }
         if (m_hasPendingErrorEvent) {
-            errorEventSender().cancelEvent(this);
+            errorEventSender().cancelEvent(*this);
             m_hasPendingErrorEvent = false;
         }
         m_imageComplete = true;
@@ -162,43 +156,85 @@ void ImageLoader::setImageWithoutConsideringPendingLoadEvent(CachedImage* newIma
     if (RenderImageResource* imageResource = renderImageResource())
         imageResource->resetAnimation();
 }
+#endif
+
+void ImageLoader::clearImage()
+{
+    clearImageWithoutConsideringPendingLoadEvent();
+
+    // Only consider updating the protection ref-count of the Element immediately before returning
+    // from this function as doing so might result in the destruction of this ImageLoader.
+    updatedHasPendingEvent();
+}
+
+void ImageLoader::clearImageWithoutConsideringPendingLoadEvent()
+{
+    ASSERT(m_failedLoadURL.isEmpty());
+    CachedImage* oldImage = m_image.get();
+    if (oldImage) {
+        m_image = nullptr;
+        if (m_hasPendingBeforeLoadEvent) {
+            beforeLoadEventSender().cancelEvent(*this);
+            m_hasPendingBeforeLoadEvent = false;
+        }
+        if (m_hasPendingLoadEvent) {
+            loadEventSender().cancelEvent(*this);
+            m_hasPendingLoadEvent = false;
+        }
+        if (m_hasPendingErrorEvent) {
+            errorEventSender().cancelEvent(*this);
+            m_hasPendingErrorEvent = false;
+        }
+        m_imageComplete = true;
+        if (oldImage)
+            oldImage->removeClient(this);
+    }
+
+    if (RenderImageResource* imageResource = renderImageResource())
+        imageResource->resetAnimation();
+}
 
 void ImageLoader::updateFromElement()
 {
-    // If we're not making renderers for the page, then don't load images.  We don't want to slow
+    // If we're not making renderers for the page, then don't load images. We don't want to slow
     // down the raw HTML parsing case by loading images we don't intend to display.
-    Document* document = m_element->document();
-    if (!document->renderer())
+    Document& document = element().document();
+    if (!document.hasLivingRenderTree())
         return;
 
-    AtomicString attr = m_element->imageSourceURL();
+    AtomicString attr = element().imageSourceURL();
 
+    // Avoid loading a URL we already failed to load.
     if (!m_failedLoadURL.isEmpty() && attr == m_failedLoadURL)
         return;
 
     // Do not load any image if the 'src' attribute is missing or if it is
     // an empty string.
-    CachedResourceHandle<CachedImage> newImage = 0;
+    CachedResourceHandle<CachedImage> newImage = nullptr;
     if (!attr.isNull() && !stripLeadingAndTrailingHTMLSpaces(attr).isEmpty()) {
-        CachedResourceRequest request(ResourceRequest(document->completeURL(sourceURI(attr))));
-        request.setInitiator(element());
+        ResourceLoaderOptions options = CachedResourceLoader::defaultCachedResourceOptions();
+        options.setContentSecurityPolicyImposition(element().isInUserAgentShadowTree() ? ContentSecurityPolicyImposition::SkipPolicyCheck : ContentSecurityPolicyImposition::DoPolicyCheck);
 
-        String crossOriginMode = m_element->fastGetAttribute(HTMLNames::crossoriginAttr);
+        CachedResourceRequest request(ResourceRequest(document.completeURL(sourceURI(attr))), options);
+        request.setInitiator(&element());
+
+        String crossOriginMode = element().fastGetAttribute(HTMLNames::crossoriginAttr);
         if (!crossOriginMode.isNull()) {
-            StoredCredentials allowCredentials = equalIgnoringCase(crossOriginMode, "use-credentials") ? AllowStoredCredentials : DoNotAllowStoredCredentials;
-            updateRequestForAccessControl(request.mutableResourceRequest(), document->securityOrigin(), allowCredentials);
+            StoredCredentials allowCredentials = equalLettersIgnoringASCIICase(crossOriginMode, "use-credentials") ? AllowStoredCredentials : DoNotAllowStoredCredentials;
+            updateRequestForAccessControl(request.mutableResourceRequest(), document.securityOrigin(), allowCredentials);
         }
 
         if (m_loadManually) {
-            bool autoLoadOtherImages = document->cachedResourceLoader()->autoLoadImages();
-            document->cachedResourceLoader()->setAutoLoadImages(false);
-            newImage = new CachedImage(request.resourceRequest());
+            bool autoLoadOtherImages = document.cachedResourceLoader().autoLoadImages();
+            document.cachedResourceLoader().setAutoLoadImages(false);
+            newImage = new CachedImage(request.resourceRequest(), m_element.document().page()->sessionID());
+            newImage->setStatus(CachedResource::Pending);
             newImage->setLoading(true);
-            newImage->setOwningCachedResourceLoader(document->cachedResourceLoader());
-            document->cachedResourceLoader()->m_documentResources.set(newImage->url(), newImage.get());
-            document->cachedResourceLoader()->setAutoLoadImages(autoLoadOtherImages);
+            newImage->setOwningCachedResourceLoader(&document.cachedResourceLoader());
+            document.cachedResourceLoader().m_documentResources.set(newImage->url(), newImage.get());
+            document.cachedResourceLoader().setAutoLoadImages(autoLoadOtherImages);
         } else
-            newImage = document->cachedResourceLoader()->requestImage(request);
+            newImage = document.cachedResourceLoader().requestImage(request);
 
         // If we do not have an image here, it means that a cross-site
         // violation occurred, or that the image was blocked via Content
@@ -207,24 +243,24 @@ void ImageLoader::updateFromElement()
         if (!newImage && !pageIsBeingDismissed(document)) {
             m_failedLoadURL = attr;
             m_hasPendingErrorEvent = true;
-            errorEventSender().dispatchEventSoon(this);
+            errorEventSender().dispatchEventSoon(*this);
         } else
             clearFailedLoadURL();
     } else if (!attr.isNull()) {
         // Fire an error event if the url is empty.
         m_failedLoadURL = attr;
         m_hasPendingErrorEvent = true;
-        errorEventSender().dispatchEventSoon(this);
+        errorEventSender().dispatchEventSoon(*this);
     }
     
     CachedImage* oldImage = m_image.get();
     if (newImage != oldImage) {
         if (m_hasPendingBeforeLoadEvent) {
-            beforeLoadEventSender().cancelEvent(this);
+            beforeLoadEventSender().cancelEvent(*this);
             m_hasPendingBeforeLoadEvent = false;
         }
         if (m_hasPendingLoadEvent) {
-            loadEventSender().cancelEvent(this);
+            loadEventSender().cancelEvent(*this);
             m_hasPendingLoadEvent = false;
         }
 
@@ -233,21 +269,21 @@ void ImageLoader::updateFromElement()
         // this load and we should not cancel the event.
         // FIXME: If both previous load and this one got blocked with an error, we can receive one error event instead of two.
         if (m_hasPendingErrorEvent && newImage) {
-            errorEventSender().cancelEvent(this);
+            errorEventSender().cancelEvent(*this);
             m_hasPendingErrorEvent = false;
         }
 
         m_image = newImage;
-        m_hasPendingBeforeLoadEvent = !m_element->document()->isImageDocument() && newImage;
+        m_hasPendingBeforeLoadEvent = !document.isImageDocument() && newImage;
         m_hasPendingLoadEvent = newImage;
         m_imageComplete = !newImage;
 
         if (newImage) {
-            if (!m_element->document()->isImageDocument()) {
-                if (!m_element->document()->hasListenerType(Document::BEFORELOAD_LISTENER))
+            if (!document.isImageDocument()) {
+                if (!document.hasListenerType(Document::BEFORELOAD_LISTENER))
                     dispatchPendingBeforeLoadEvent();
                 else
-                    beforeLoadEventSender().dispatchEventSoon(this);
+                    beforeLoadEventSender().dispatchEventSoon(*this);
             } else
                 updateRenderer();
 
@@ -255,12 +291,11 @@ void ImageLoader::updateFromElement()
             // being queued to fire. Ensure this happens after beforeload is
             // dispatched.
             newImage->addClient(this);
-        } else {
+        }
+        if (oldImage) {
+            oldImage->removeClient(this);
             updateRenderer();
         }
-
-        if (oldImage)
-            oldImage->removeClient(this);
     }
 
     if (RenderImageResource* imageResource = renderImageResource())
@@ -289,17 +324,14 @@ void ImageLoader::notifyFinished(CachedResource* resource)
     if (!m_hasPendingLoadEvent)
         return;
 
-    if (m_element->fastHasAttribute(HTMLNames::crossoriginAttr)
-        && !m_element->document()->securityOrigin()->canRequest(image()->response().url())
-        && !resource->passesAccessControlCheck(m_element->document()->securityOrigin())) {
-
-        setImageWithoutConsideringPendingLoadEvent(0);
+    if (element().fastHasAttribute(HTMLNames::crossoriginAttr) && !resource->passesSameOriginPolicyCheck(*element().document().securityOrigin())) {
+        clearImageWithoutConsideringPendingLoadEvent();
 
         m_hasPendingErrorEvent = true;
-        errorEventSender().dispatchEventSoon(this);
+        errorEventSender().dispatchEventSoon(*this);
 
-        DEFINE_STATIC_LOCAL(String, consoleMessage, (ASCIILiteral("Cross-origin image load denied by Cross-Origin Resource Sharing policy.")));
-        m_element->document()->addConsoleMessage(SecurityMessageSource, ErrorMessageLevel, consoleMessage);
+        static NeverDestroyed<String> consoleMessage(ASCIILiteral("Cross-origin image load denied by Cross-Origin Resource Sharing policy."));
+        element().document().addConsoleMessage(MessageSource::Security, MessageLevel::Error, consoleMessage);
 
         ASSERT(!m_hasPendingLoadEvent);
 
@@ -317,32 +349,29 @@ void ImageLoader::notifyFinished(CachedResource* resource)
         return;
     }
 
-    loadEventSender().dispatchEventSoon(this);
+    loadEventSender().dispatchEventSoon(*this);
 }
 
 RenderImageResource* ImageLoader::renderImageResource()
 {
-    RenderObject* renderer = m_element->renderer();
-
+    auto* renderer = element().renderer();
     if (!renderer)
-        return 0;
+        return nullptr;
 
     // We don't return style generated image because it doesn't belong to the ImageLoader.
     // See <https://bugs.webkit.org/show_bug.cgi?id=42840>
-    if (renderer->isImage() && !static_cast<RenderImage*>(renderer)->isGeneratedContent())
-        return toRenderImage(renderer)->imageResource();
+    if (is<RenderImage>(*renderer) && !downcast<RenderImage>(*renderer).isGeneratedContent())
+        return &downcast<RenderImage>(*renderer).imageResource();
 
-#if ENABLE(SVG)
-    if (renderer->isSVGImage())
-        return toRenderSVGImage(renderer)->imageResource();
-#endif
+    if (is<RenderSVGImage>(*renderer))
+        return &downcast<RenderSVGImage>(*renderer).imageResource();
 
 #if ENABLE(VIDEO)
-    if (renderer->isVideo())
-        return toRenderVideo(renderer)->imageResource();
+    if (is<RenderVideo>(*renderer))
+        return &downcast<RenderVideo>(*renderer).imageResource();
 #endif
 
-    return 0;
+    return nullptr;
 }
 
 void ImageLoader::updateRenderer()
@@ -353,7 +382,7 @@ void ImageLoader::updateRenderer()
         return;
 
     // Only update the renderer if it doesn't have an image or if what we have
-    // is a complete image.  This prevents flickering in the case where a dynamic
+    // is a complete image. This prevents flickering in the case where a dynamic
     // change is happening between two images.
     CachedImage* cachedImage = imageResource->cachedImage();
     if (m_image != cachedImage && (m_imageComplete || !cachedImage))
@@ -375,16 +404,16 @@ void ImageLoader::updatedHasPendingEvent()
         if (m_derefElementTimer.isActive())
             m_derefElementTimer.stop();
         else
-            m_element->ref();
+            m_protectedElement = &element();
     } else {
         ASSERT(!m_derefElementTimer.isActive());
         m_derefElementTimer.startOneShot(0);
     }   
 }
 
-void ImageLoader::timerFired(Timer<ImageLoader>*)
+void ImageLoader::timerFired()
 {
-    m_element->deref();
+    m_protectedElement = nullptr;
 }
 
 void ImageLoader::dispatchPendingEvent(ImageEventSender* eventSender)
@@ -405,23 +434,23 @@ void ImageLoader::dispatchPendingBeforeLoadEvent()
         return;
     if (!m_image)
         return;
-    if (!m_element->document()->attached())
+    if (!element().document().hasLivingRenderTree())
         return;
     m_hasPendingBeforeLoadEvent = false;
-    if (m_element->dispatchBeforeLoadEvent(m_image->url())) {
+    if (element().dispatchBeforeLoadEvent(m_image->url())) {
         updateRenderer();
         return;
     }
     if (m_image) {
         m_image->removeClient(this);
-        m_image = 0;
+        m_image = nullptr;
     }
 
-    loadEventSender().cancelEvent(this);
+    loadEventSender().cancelEvent(*this);
     m_hasPendingLoadEvent = false;
     
-    if (m_element->hasTagName(HTMLNames::objectTag))
-        static_cast<HTMLObjectElement*>(m_element)->renderFallbackContent();
+    if (is<HTMLObjectElement>(element()))
+        downcast<HTMLObjectElement>(element()).renderFallbackContent();
 
     // Only consider updating the protection ref-count of the Element immediately before returning
     // from this function as doing so might result in the destruction of this ImageLoader.
@@ -435,7 +464,7 @@ void ImageLoader::dispatchPendingLoadEvent()
     if (!m_image)
         return;
     m_hasPendingLoadEvent = false;
-    if (element()->document()->attached())
+    if (element().document().hasLivingRenderTree())
         dispatchLoadEvent();
 
     // Only consider updating the protection ref-count of the Element immediately before returning
@@ -448,8 +477,8 @@ void ImageLoader::dispatchPendingErrorEvent()
     if (!m_hasPendingErrorEvent)
         return;
     m_hasPendingErrorEvent = false;
-    if (element()->document()->attached())
-        element()->dispatchEvent(Event::create(eventNames().errorEvent, false, false));
+    if (element().document().hasLivingRenderTree())
+        element().dispatchEvent(Event::create(eventNames().errorEvent, false, false));
 
     // Only consider updating the protection ref-count of the Element immediately before returning
     // from this function as doing so might result in the destruction of this ImageLoader.
@@ -474,7 +503,7 @@ void ImageLoader::dispatchPendingErrorEvents()
 void ImageLoader::elementDidMoveToNewDocument()
 {
     clearFailedLoadURL();
-    setImage(0);
+    clearImage();
 }
 
 inline void ImageLoader::clearFailedLoadURL()

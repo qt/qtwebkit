@@ -36,7 +36,6 @@
 #include <unicode/udat.h>
 #include <unicode/unum.h>
 #include <wtf/Forward.h>
-#include <wtf/OwnPtr.h>
 #include <wtf/text/CString.h>
 #include <wtf/text/WTFString.h>
 
@@ -46,29 +45,28 @@ namespace WebCore {
 // and LocalizedNumberICUTest.cpp.
 class LocaleICU : public Locale {
 public:
-    static PassOwnPtr<LocaleICU> create(const char* localeString);
+    explicit LocaleICU(const char*);
     virtual ~LocaleICU();
 
 #if ENABLE(DATE_AND_TIME_INPUT_TYPES)
-    virtual String dateFormat() OVERRIDE;
-    virtual String monthFormat() OVERRIDE;
-    virtual String shortMonthFormat() OVERRIDE;
-    virtual String timeFormat() OVERRIDE;
-    virtual String shortTimeFormat() OVERRIDE;
-    virtual String dateTimeFormatWithSeconds() OVERRIDE;
-    virtual String dateTimeFormatWithoutSeconds() OVERRIDE;
-    virtual const Vector<String>& monthLabels() OVERRIDE;
-    virtual const Vector<String>& shortMonthLabels() OVERRIDE;
-    virtual const Vector<String>& standAloneMonthLabels() OVERRIDE;
-    virtual const Vector<String>& shortStandAloneMonthLabels() OVERRIDE;
-    virtual const Vector<String>& timeAMPMLabels() OVERRIDE;
+    virtual String dateFormat() override;
+    virtual String monthFormat() override;
+    virtual String shortMonthFormat() override;
+    virtual String timeFormat() override;
+    virtual String shortTimeFormat() override;
+    virtual String dateTimeFormatWithSeconds() override;
+    virtual String dateTimeFormatWithoutSeconds() override;
+    virtual const Vector<String>& monthLabels() override;
+    virtual const Vector<String>& shortMonthLabels() override;
+    virtual const Vector<String>& standAloneMonthLabels() override;
+    virtual const Vector<String>& shortStandAloneMonthLabels() override;
+    virtual const Vector<String>& timeAMPMLabels() override;
 #endif
 
 private:
-    explicit LocaleICU(const char*);
     String decimalSymbol(UNumberFormatSymbol);
     String decimalTextAttribute(UNumberFormatTextAttribute);
-    virtual void initializeLocaleData() OVERRIDE;
+    virtual void initializeLocaleData() override;
 
     bool detectSignAndGetDigitRange(const String& input, bool& isNegative, unsigned& startIndex, unsigned& endIndex);
     unsigned matchedDecimalSymbolIndex(const String& input, unsigned& position);
@@ -77,7 +75,7 @@ private:
     UDateFormat* openDateFormat(UDateFormatStyle timeStyle, UDateFormatStyle dateStyle) const;
 
 #if ENABLE(DATE_AND_TIME_INPUT_TYPES)
-    PassOwnPtr<Vector<String> > createLabelVector(const UDateFormat*, UDateFormatSymbolType, int32_t startIndex, int32_t size);
+    std::unique_ptr<Vector<String>> createLabelVector(const UDateFormat*, UDateFormatSymbolType, int32_t startIndex, int32_t size);
     void initializeDateTimeFormat();
 #endif
 
@@ -88,7 +86,7 @@ private:
     bool m_didCreateShortDateFormat;
 
 #if ENABLE(DATE_AND_TIME_INPUT_TYPES)
-    OwnPtr<Vector<String> > m_monthLabels;
+    std::unique_ptr<Vector<String>> m_monthLabels;
     String m_dateFormat;
     String m_monthFormat;
     String m_shortMonthFormat;

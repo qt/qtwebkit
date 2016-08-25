@@ -27,24 +27,37 @@
 #include "WeakSet.h"
 
 #include "Heap.h"
+#include "JSCInlines.h"
 #include "VM.h"
 
 namespace JSC {
 
 WeakSet::~WeakSet()
 {
+    Heap& heap = *this->heap();
     WeakBlock* next = 0;
     for (WeakBlock* block = m_blocks.head(); block; block = next) {
         next = block->next();
-        heap()->blockAllocator().deallocate(WeakBlock::destroy(block));
+        WeakBlock::destroy(heap, block);
     }
     m_blocks.clear();
 }
 
 void WeakSet::sweep()
 {
-    for (WeakBlock* block = m_blocks.head(); block; block = block->next())
+    for (WeakBlock* block = m_blocks.head(); block;) {
+        WeakBlock* nextBlock = block->next();
         block->sweep();
+        if (block->isLogicallyEmptyButNotFree()) {
+            // If this WeakBlock is logically empty, but still has Weaks pointing into it,
+            // we can't destroy it just yet. Detach it from the WeakSet and hand ownership
+            // to the Heap so we don't pin down the entire 64kB MarkedBlock.
+            m_blocks.remove(block);
+            heap()->addLogicallyEmptyWeakBlock(block);
+            block->disconnectMarkedBlock();
+        }
+        block = nextBlock;
+    }
 
     resetAllocator();
 }
@@ -73,7 +86,7 @@ WeakBlock::FreeCell* WeakSet::tryFindAllocator()
 
 WeakBlock::FreeCell* WeakSet::addAllocator()
 {
-    WeakBlock* block = WeakBlock::create(heap()->blockAllocator().allocate<WeakBlock>());
+    WeakBlock* block = WeakBlock::create(*heap(), m_markedBlock);
     heap()->didAllocate(WeakBlock::blockSize);
     m_blocks.append(block);
     WeakBlock::SweepResult sweepResult = block->takeSweepResult();
@@ -84,7 +97,7 @@ WeakBlock::FreeCell* WeakSet::addAllocator()
 void WeakSet::removeAllocator(WeakBlock* block)
 {
     m_blocks.remove(block);
-    heap()->blockAllocator().deallocate(WeakBlock::destroy(block));
+    WeakBlock::destroy(*heap(), block);
 }
 
 } // namespace JSC

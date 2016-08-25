@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012 Motorola Mobility, Inc. All rights reserved.
+ * Copyright (C) 2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,7 +27,6 @@
 #include "config.h"
 #include "RadioNodeList.h"
 
-#include "Element.h"
 #include "HTMLFormElement.h"
 #include "HTMLInputElement.h"
 #include "HTMLNames.h"
@@ -37,31 +37,34 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-RadioNodeList::RadioNodeList(Node* rootNode, const AtomicString& name)
-    : LiveNodeList(rootNode, RadioNodeListType, InvalidateForFormControls, isHTMLFormElement(rootNode) ? NodeListIsRootedAtDocument : NodeListIsRootedAtNode)
+RadioNodeList::RadioNodeList(ContainerNode& rootNode, const AtomicString& name)
+    : CachedLiveNodeList(rootNode, InvalidateForFormControls)
     , m_name(name)
+    , m_isRootedAtDocument(is<HTMLFormElement>(ownerNode()))
 {
 }
 
 RadioNodeList::~RadioNodeList()
 {
-    ownerNode()->nodeLists()->removeCacheWithAtomicName(this, RadioNodeListType, m_name);
+    ownerNode().nodeLists()->removeCacheWithAtomicName(this, m_name);
 }
 
-static inline HTMLInputElement* toRadioButtonInputElement(Node* node)
+static inline HTMLInputElement* toRadioButtonInputElement(HTMLElement& element)
 {
-    ASSERT(node->isElementNode());
-    HTMLInputElement* inputElement = node->toInputElement();
-    if (!inputElement || !inputElement->isRadioButton() || inputElement->value().isEmpty())
-        return 0;
-    return inputElement;
+    if (!is<HTMLInputElement>(element))
+        return nullptr;
+
+    auto& inputElement = downcast<HTMLInputElement>(element);
+    if (!inputElement.isRadioButton() || inputElement.value().isEmpty())
+        return nullptr;
+    return &inputElement;
 }
 
 String RadioNodeList::value() const
 {
-    for (unsigned i = 0; i < length(); ++i) {
-        Node* node = item(i);
-        const HTMLInputElement* inputElement = toRadioButtonInputElement(node);
+    auto length = this->length();
+    for (unsigned i = 0; i < length; ++i) {
+        auto* inputElement = toRadioButtonInputElement(*item(i));
         if (!inputElement || !inputElement->checked())
             continue;
         return inputElement->value();
@@ -71,9 +74,9 @@ String RadioNodeList::value() const
 
 void RadioNodeList::setValue(const String& value)
 {
-    for (unsigned i = 0; i < length(); ++i) {
-        Node* node = item(i);
-        HTMLInputElement* inputElement = toRadioButtonInputElement(node);
+    auto length = this->length();
+    for (unsigned i = 0; i < length; ++i) {
+        auto* inputElement = toRadioButtonInputElement(*item(i));
         if (!inputElement || inputElement->value() != value)
             continue;
         inputElement->setChecked(true);
@@ -81,31 +84,29 @@ void RadioNodeList::setValue(const String& value)
     }
 }
 
-bool RadioNodeList::checkElementMatchesRadioNodeListFilter(Element* testElement) const
+bool RadioNodeList::checkElementMatchesRadioNodeListFilter(const Element& testElement) const
 {
-    ASSERT(testElement->hasTagName(objectTag) || testElement->isFormControlElement());
-    if (isHTMLFormElement(ownerNode())) {
-        HTMLFormElement* formElement = 0;
-        if (testElement->hasTagName(objectTag))
-            formElement = static_cast<HTMLObjectElement*>(testElement)->form();
+    ASSERT(is<HTMLObjectElement>(testElement) || is<HTMLFormControlElement>(testElement));
+    if (is<HTMLFormElement>(ownerNode())) {
+        HTMLFormElement* formElement = nullptr;
+        if (testElement.hasTagName(objectTag))
+            formElement = downcast<HTMLObjectElement>(testElement).form();
         else
-            formElement = static_cast<HTMLFormControlElement*>(testElement)->form();
-        if (!formElement || formElement != ownerNode())
+            formElement = downcast<HTMLFormControlElement>(testElement).form();
+        if (!formElement || formElement != &ownerNode())
             return false;
     }
 
-    return testElement->getIdAttribute() == m_name || testElement->getNameAttribute() == m_name;
+    return testElement.getIdAttribute() == m_name || testElement.getNameAttribute() == m_name;
 }
 
-bool RadioNodeList::nodeMatches(Element* testElement) const
+bool RadioNodeList::elementMatches(Element& testElement) const
 {
-    if (!testElement->hasTagName(objectTag) && !testElement->isFormControlElement())
+    if (!is<HTMLObjectElement>(testElement) && !is<HTMLFormControlElement>(testElement))
         return false;
 
-    if (HTMLInputElement* inputElement = testElement->toInputElement()) {
-        if (inputElement->isImageButton())
-            return false;
-    }
+    if (is<HTMLInputElement>(testElement) && downcast<HTMLInputElement>(testElement).isImageButton())
+        return false;
 
     return checkElementMatchesRadioNodeListFilter(testElement);
 }

@@ -33,10 +33,10 @@
 
 namespace WebCore {
 
-WaveShaperNode::WaveShaperNode(AudioContext* context)
-    : AudioBasicProcessorNode(context, context->sampleRate())
+WaveShaperNode::WaveShaperNode(AudioContext& context)
+    : AudioBasicProcessorNode(context, context.sampleRate())
 {
-    m_processor = adoptPtr(new WaveShaperProcessor(context->sampleRate(), 1));
+    m_processor = std::make_unique<WaveShaperProcessor>(context.sampleRate(), 1);
     setNodeType(NodeTypeWaveShaper);
 
     initialize();

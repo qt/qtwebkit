@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2010 Google Inc.  All rights reserved.
- * Copyright (C) 2010, 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2010 Google Inc. All rights reserved.
+ * Copyright (C) 2010, 2012, 2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -32,21 +32,18 @@
 #ifndef AsyncFileStream_h
 #define AsyncFileStream_h
 
-#if ENABLE(BLOB)
-
+#include <functional>
 #include <wtf/Forward.h>
-#include <wtf/RefCounted.h>
-#include <wtf/RefPtr.h>
 
 namespace WebCore {
 
 class FileStreamClient;
 class FileStream;
-class KURL;
+class URL;
 
-class AsyncFileStream : public RefCounted<AsyncFileStream> {
+class AsyncFileStream {
 public:
-    static PassRefPtr<AsyncFileStream> create(FileStreamClient*);
+    explicit AsyncFileStream(FileStreamClient&);
     ~AsyncFileStream();
 
     void getSize(const String& path, double expectedModificationTime);
@@ -54,37 +51,17 @@ public:
     void openForWrite(const String& path);
     void close();
     void read(char* buffer, int length);
-    void write(const KURL& blobURL, long long position, int length);
+    void write(const URL& blobURL, long long position, int length);
     void truncate(long long position);
 
-    // Stops the proxy and schedules it to be destructed. All the pending tasks will be aborted and the file stream will be closed.
-    // Note: the caller should deref the instance immediately after calling stop().
-    void stop();
-
-    FileStreamClient* client() const { return m_client; }
-    void setClient(FileStreamClient* client) { m_client = client; }
-
 private:
-    AsyncFileStream(FileStreamClient*);
+    void start();
+    void perform(std::function<std::function<void(FileStreamClient&)>(FileStream&)>);
 
-    // Called on File thread.
-    void startOnFileThread();
-    void stopOnFileThread();
-    void getSizeOnFileThread(const String& path, double expectedModificationTime);
-    void openForReadOnFileThread(const String& path, long long offset, long long length);
-    void openForWriteOnFileThread(const String& path);
-    void closeOnFileThread();
-    void readOnFileThread(char* buffer, int length);
-    void writeOnFileThread(const KURL& blobURL, long long position, int length);
-    void truncateOnFileThread(long long position);
-
-    RefPtr<FileStream> m_stream;
-
-    FileStreamClient* m_client;
+    struct Internals;
+    std::unique_ptr<Internals> m_internals;
 };
 
 } // namespace WebCore
-
-#endif // ENABLE(BLOB)
 
 #endif // AsyncFileStream_h

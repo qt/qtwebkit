@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2013, 2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,16 +29,17 @@
 #if ENABLE(DFG_JIT)
 
 #include "DFGNode.h"
+#include "JSCInlines.h"
 
 namespace JSC { namespace DFG {
 
 void Edge::dump(PrintStream& out) const
 {
-    if (useKind() != UntypedUse) {
-        if (needsCheck())
-            out.print("Check:");
-        out.print(useKind(), ":");
-    }
+    if (!isProved())
+        out.print("Check:");
+    out.print(useKind(), ":");
+    if (DFG::doesKill(killStatusUnchecked()))
+        out.print("Kill:");
     out.print(node());
 }
 

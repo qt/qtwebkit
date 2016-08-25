@@ -26,12 +26,14 @@
 #include "config.h"
 #include "PluginInformation.h"
 
+#if ENABLE(NETSCAPE_PLUGIN_API)
+
+#include "APINumber.h"
+#include "APIString.h"
+#include "APIURL.h"
 #include "PluginInfoStore.h"
 #include "PluginModuleInfo.h"
 #include "WKAPICast.h"
-#include "WebNumber.h"
-#include "WebString.h"
-#include "WebURL.h"
 #include <wtf/text/WTFString.h>
 
 namespace WebKit {
@@ -106,63 +108,68 @@ String plugInInformationReplacementObscuredKey()
     return ASCIILiteral("PlugInInformationReplacementObscured");
 }
 
-void getPluginModuleInformation(const PluginModuleInfo& plugin, ImmutableDictionary::MapType& map)
+void getPluginModuleInformation(const PluginModuleInfo& plugin, API::Dictionary::MapType& map)
 {
 #if ENABLE(NETSCAPE_PLUGIN_API)
-    map.set(pluginInformationPathKey(), WebString::create(plugin.path));
-    map.set(pluginInformationDisplayNameKey(), WebString::create(plugin.info.name));
-    map.set(pluginInformationDefaultLoadPolicyKey(), WebUInt64::create(toWKPluginLoadPolicy(PluginInfoStore::defaultLoadPolicyForPlugin(plugin))));
+    map.set(pluginInformationPathKey(), API::String::create(plugin.path));
+    map.set(pluginInformationDisplayNameKey(), API::String::create(plugin.info.name));
+    map.set(pluginInformationDefaultLoadPolicyKey(), API::UInt64::create(toWKPluginLoadPolicy(PluginInfoStore::defaultLoadPolicyForPlugin(plugin))));
 
     getPlatformPluginModuleInformation(plugin, map);
+#else
+    UNUSED_PARAM(plugin);
+    UNUSED_PARAM(map);
 #endif
 }
 
-PassRefPtr<ImmutableDictionary> createPluginInformationDictionary(const PluginModuleInfo& plugin)
+Ref<API::Dictionary> createPluginInformationDictionary(const PluginModuleInfo& plugin)
 {
-    ImmutableDictionary::MapType map;
+    API::Dictionary::MapType map;
     getPluginModuleInformation(plugin, map);
 
-    return ImmutableDictionary::adopt(map);
+    return API::Dictionary::create(WTFMove(map));
 }
 
-PassRefPtr<ImmutableDictionary> createPluginInformationDictionary(const PluginModuleInfo& plugin, const String& frameURLString, const String& mimeType, const String& pageURLString, const String& pluginspageAttributeURLString, const String& pluginURLString, bool replacementObscured)
+Ref<API::Dictionary> createPluginInformationDictionary(const PluginModuleInfo& plugin, const String& frameURLString, const String& mimeType, const String& pageURLString, const String& pluginspageAttributeURLString, const String& pluginURLString, bool replacementObscured)
 {
-    ImmutableDictionary::MapType map;
+    API::Dictionary::MapType map;
     getPluginModuleInformation(plugin, map);
 
     if (!frameURLString.isEmpty())
-        map.set(pluginInformationFrameURLKey(), WebURL::create(frameURLString));
+        map.set(pluginInformationFrameURLKey(), API::URL::create(frameURLString));
     if (!mimeType.isEmpty())
-        map.set(pluginInformationMIMETypeKey(), WebString::create(mimeType));
+        map.set(pluginInformationMIMETypeKey(), API::String::create(mimeType));
     if (!pageURLString.isEmpty())
-        map.set(pluginInformationPageURLKey(), WebURL::create(pageURLString));
+        map.set(pluginInformationPageURLKey(), API::URL::create(pageURLString));
     if (!pluginspageAttributeURLString.isEmpty())
-        map.set(pluginInformationPluginspageAttributeURLKey(), WebURL::create(pluginspageAttributeURLString));
+        map.set(pluginInformationPluginspageAttributeURLKey(), API::URL::create(pluginspageAttributeURLString));
     if (!pluginURLString.isEmpty())
-        map.set(pluginInformationPluginURLKey(), WebURL::create(pluginURLString));
-    map.set(plugInInformationReplacementObscuredKey(), WebBoolean::create(replacementObscured));
+        map.set(pluginInformationPluginURLKey(), API::URL::create(pluginURLString));
+    map.set(plugInInformationReplacementObscuredKey(), API::Boolean::create(replacementObscured));
 
-    return ImmutableDictionary::adopt(map);
+    return API::Dictionary::create(WTFMove(map));
 }
 
-PassRefPtr<ImmutableDictionary> createPluginInformationDictionary(const String& mimeType, const String& frameURLString, const String& pageURLString)
+Ref<API::Dictionary> createPluginInformationDictionary(const String& mimeType, const String& frameURLString, const String& pageURLString)
 {
-    ImmutableDictionary::MapType map;
+    API::Dictionary::MapType map;
 
     if (!frameURLString.isEmpty())
-        map.set(pluginInformationFrameURLKey(), WebURL::create(frameURLString));
+        map.set(pluginInformationFrameURLKey(), API::URL::create(frameURLString));
     if (!mimeType.isEmpty())
-        map.set(pluginInformationMIMETypeKey(), WebString::create(mimeType));
+        map.set(pluginInformationMIMETypeKey(), API::String::create(mimeType));
     if (!pageURLString.isEmpty())
-        map.set(pluginInformationPageURLKey(), WebURL::create(pageURLString));
+        map.set(pluginInformationPageURLKey(), API::URL::create(pageURLString));
 
-    return ImmutableDictionary::adopt(map);
+    return API::Dictionary::create(WTFMove(map));
 }
 
-#if !PLATFORM(MAC)
-void getPlatformPluginModuleInformation(const PluginModuleInfo&, ImmutableDictionary::MapType&)
+#if !PLATFORM(COCOA)
+void getPlatformPluginModuleInformation(const PluginModuleInfo&, API::Dictionary::MapType&)
 {
 }
 #endif
 
 } // namespace WebKit
+
+#endif // ENABLE(NETSCAPE_PLUGIN_API)

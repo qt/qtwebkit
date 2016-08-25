@@ -24,6 +24,10 @@
  */
 
 interface AccessibilityController {
+    void enableEnhancedAccessibility(boolean enable);
+    readonly attribute boolean enhancedAccessibilityEnabled;
+
+    readonly attribute DOMString platformName;
     readonly attribute AccessibilityUIElement rootElement;
     readonly attribute AccessibilityUIElement focusedElement;
     AccessibilityUIElement elementAtPoint(int x, int y);

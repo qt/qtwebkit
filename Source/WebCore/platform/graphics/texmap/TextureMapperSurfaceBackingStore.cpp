@@ -19,7 +19,7 @@
 
 #include "config.h"
 
-#if USE(ACCELERATED_COMPOSITING) && USE(GRAPHICS_SURFACE)
+#if USE(GRAPHICS_SURFACE)
 #include "TextureMapperSurfaceBackingStore.h"
 
 #include "GraphicsSurface.h"
@@ -37,14 +37,14 @@ void TextureMapperSurfaceBackingStore::swapBuffersIfNeeded(uint32_t)
         m_graphicsSurface->swapBuffers();
 }
 
-PassRefPtr<BitmapTexture> TextureMapperSurfaceBackingStore::texture() const
+RefPtr<BitmapTexture> TextureMapperSurfaceBackingStore::texture() const
 {
     // FIXME: Instead of just returning an empty texture, we should wrap the texture contents into a BitmapTexture.
     RefPtr<BitmapTexture> emptyTexture;
     return emptyTexture;
 }
 
-void TextureMapperSurfaceBackingStore::paintToTextureMapper(TextureMapper* textureMapper, const FloatRect& targetRect, const TransformationMatrix& transform, float opacity)
+void TextureMapperSurfaceBackingStore::paintToTextureMapper(TextureMapper& textureMapper, const FloatRect& targetRect, const TransformationMatrix& transform, float opacity)
 {
     if (m_graphicsSurface)
         m_graphicsSurface->paintToTextureMapper(textureMapper, targetRect, transform, opacity);

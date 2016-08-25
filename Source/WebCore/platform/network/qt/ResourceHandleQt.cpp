@@ -57,11 +57,11 @@ public:
         , m_data(data)
     {}
 
-    virtual void willSendRequest(ResourceHandle*, ResourceRequest&, const ResourceResponse&);
-    virtual void didReceiveResponse(ResourceHandle*, const ResourceResponse& response) { m_response = response; }
-    virtual void didReceiveData(ResourceHandle*, const char* data, int length, int) { m_data.append(data, length); }
-    virtual void didFinishLoading(ResourceHandle*, double /*finishTime*/) {}
-    virtual void didFail(ResourceHandle*, const ResourceError& error) { m_error = error; }
+    void willSendRequest(ResourceHandle*, ResourceRequest&, const ResourceResponse&) override;
+    void didReceiveResponse(ResourceHandle*, const ResourceResponse& response) override { m_response = response; }
+    void didReceiveData(ResourceHandle*, const char* data, unsigned length, int) override { m_data.append(data, length); }
+    void didFinishLoading(ResourceHandle*, double /*finishTime*/) override {}
+    void didFail(ResourceHandle*, const ResourceError& error) override { m_error = error; }
 private:
     ResourceError& m_error;
     ResourceResponse& m_response;
@@ -99,7 +99,7 @@ bool ResourceHandle::start()
     if (!d->m_user.isEmpty() || !d->m_pass.isEmpty()) {
         // If credentials were specified for this request, add them to the url,
         // so that they will be passed to QNetworkRequest.
-        KURL urlWithCredentials(firstRequest().url());
+        URL urlWithCredentials(firstRequest().url());
         urlWithCredentials.setUser(d->m_user);
         urlWithCredentials.setPass(d->m_pass);
         d->m_firstRequest.setURL(urlWithCredentials);
@@ -118,11 +118,6 @@ void ResourceHandle::cancel()
     }
 }
 
-bool ResourceHandle::loadsBlocked()
-{
-    return false;
-}
-
 void ResourceHandle::platformLoadResourceSynchronously(NetworkingContext* context, const ResourceRequest& request, StoredCredentials /*storedCredentials*/, ResourceError& error, ResourceResponse& response, Vector<char>& data)
 {
     WebCoreSynchronousLoader syncLoader(error, response, data);
@@ -132,7 +127,7 @@ void ResourceHandle::platformLoadResourceSynchronously(NetworkingContext* contex
     if (!d->m_user.isEmpty() || !d->m_pass.isEmpty()) {
         // If credentials were specified for this request, add them to the url,
         // so that they will be passed to QNetworkRequest.
-        KURL urlWithCredentials(d->m_firstRequest.url());
+        URL urlWithCredentials(d->m_firstRequest.url());
         urlWithCredentials.setUser(d->m_user);
         urlWithCredentials.setPass(d->m_pass);
         d->m_firstRequest.setURL(urlWithCredentials);

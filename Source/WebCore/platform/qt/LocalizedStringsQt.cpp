@@ -458,6 +458,12 @@ String AXDescriptionListDetailText()
     return String();
 }
 
+String AXSearchFieldCancelButtonText()
+{
+    notImplemented();
+    return String();
+}
+
 String AXButtonActionVerb()
 {
     notImplemented();
@@ -787,22 +793,32 @@ String validationMessageBadInputForNumberText()
 #if ENABLE(VIDEO_TRACK)
 String textTrackSubtitlesText()
 {
-    return QCoreApplication::translate("QWebPage", "Subtitles", "Menu section heading for subtitles");
+    notImplemented();
+    return String();
 }
 
 String textTrackOffMenuItemText()
 {
-    return QCoreApplication::translate("QWebPage", "Off", "Menu item label for the track that represents disabling closed captions");
+    notImplemented();
+    return String();
 }
 
 String textTrackAutomaticMenuItemText()
 {
-    return QCoreApplication::translate("QWebPage", "Auto", "Menu item label for the track that represents automatic closed captions selection");
+    notImplemented();
+    return String();
 }
 
 String textTrackNoLabelText()
 {
-    return QCoreApplication::translate("QWebPage", "No label", "Menu item label for a closed captions track that has no other name");
+    notImplemented();
+    return String();
+}
+
+String audioTrackNoLabelText()
+{
+    notImplemented();
+    return String();
 }
 #endif
 
@@ -823,4 +839,11 @@ String localizedString(const char* key)
     return String::fromUTF8(key, strlen(key));
 }
 
+#if ENABLE(INPUT_TYPE_WEEK)
+String weekFormatInLDML()
+{
+    notImplemented();
+    return String();
+}
+#endif
 }

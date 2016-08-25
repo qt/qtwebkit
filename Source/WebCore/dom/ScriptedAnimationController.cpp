@@ -28,18 +28,21 @@
 
 #if ENABLE(REQUEST_ANIMATION_FRAME)
 
+#include "DisplayRefreshMonitor.h"
+#include "DisplayRefreshMonitorManager.h"
 #include "Document.h"
 #include "DocumentLoader.h"
 #include "FrameView.h"
 #include "InspectorInstrumentation.h"
+#include "Logging.h"
+#include "MainFrame.h"
 #include "RequestAnimationFrameCallback.h"
 #include "Settings.h"
+#include <wtf/Ref.h>
 
 #if USE(REQUEST_ANIMATION_FRAME_TIMER)
 #include <algorithm>
 #include <wtf/CurrentTime.h>
-
-using namespace std;
 
 // Allow a little more than 60fps to make sure we can at least hit that frame rate.
 #define MinimumAnimationInterval 0.015
@@ -50,15 +53,8 @@ namespace WebCore {
 
 ScriptedAnimationController::ScriptedAnimationController(Document* document, PlatformDisplayID displayID)
     : m_document(document)
-    , m_nextCallbackId(0)
-    , m_suspendCount(0)
 #if USE(REQUEST_ANIMATION_FRAME_TIMER)
-    , m_animationTimer(this, &ScriptedAnimationController::animationTimerFired)
-    , m_lastAnimationFrameTimeMonotonic(0)
-#if USE(REQUEST_ANIMATION_FRAME_DISPLAY_MONITOR)
-    , m_isUsingTimer(false)
-    , m_isThrottled(false)
-#endif
+    , m_animationTimer(*this, &ScriptedAnimationController::animationTimerFired)
 #endif
 {
     windowScreenDidChange(displayID);
@@ -90,11 +86,24 @@ void ScriptedAnimationController::setThrottled(bool isThrottled)
     if (m_isThrottled == isThrottled)
         return;
 
+    LOG(Animations, "%p - Setting RequestAnimationFrame throttling state to %d in frame %p (isMainFrame: %d)", this, isThrottled, m_document->frame(), m_document->frame() ? m_document->frame()->isMainFrame() : 0);
+
     m_isThrottled = isThrottled;
     if (m_animationTimer.isActive()) {
         m_animationTimer.stop();
         scheduleAnimation();
     }
+#else
+    UNUSED_PARAM(isThrottled);
+#endif
+}
+
+bool ScriptedAnimationController::isThrottled() const
+{
+#if USE(REQUEST_ANIMATION_FRAME_TIMER) && USE(REQUEST_ANIMATION_FRAME_DISPLAY_MONITOR)
+    return m_isThrottled;
+#else
+    return false;
 #endif
 }
 
@@ -129,8 +138,8 @@ void ScriptedAnimationController::serviceScriptedAnimations(double monotonicTime
     if (!m_callbacks.size() || m_suspendCount || (m_document->settings() && !m_document->settings()->requestAnimationFrameEnabled()))
         return;
 
-    double highResNowMs = 1000.0 * m_document->loader()->timing()->monotonicTimeToZeroBasedDocumentTime(monotonicTimeNow);
-    double legacyHighResNowMs = 1000.0 * m_document->loader()->timing()->monotonicTimeToPseudoWallTime(monotonicTimeNow);
+    double highResNowMs = 1000.0 * m_document->loader()->timing().monotonicTimeToZeroBasedDocumentTime(monotonicTimeNow);
+    double legacyHighResNowMs = 1000.0 * m_document->loader()->timing().monotonicTimeToPseudoWallTime(monotonicTimeNow);
 
     // First, generate a list of callbacks to consider.  Callbacks registered from this point
     // on are considered only for the "next" frame, not this one.
@@ -138,10 +147,9 @@ void ScriptedAnimationController::serviceScriptedAnimations(double monotonicTime
 
     // Invoking callbacks may detach elements from our document, which clears the document's
     // reference to us, so take a defensive reference.
-    RefPtr<ScriptedAnimationController> protector(this);
+    Ref<ScriptedAnimationController> protect(*this);
 
-    for (size_t i = 0; i < callbacks.size(); ++i) {
-        RequestAnimationFrameCallback* callback = callbacks[i].get();
+    for (auto& callback : callbacks) {
         if (!callback->m_firedOrCancelled) {
             callback->m_firedOrCancelled = true;
             InspectorInstrumentationCookie cookie = InspectorInstrumentation::willFireAnimationFrame(m_document, callback->m_id);
@@ -170,7 +178,7 @@ void ScriptedAnimationController::windowScreenDidChange(PlatformDisplayID displa
     if (m_document->settings() && !m_document->settings()->requestAnimationFrameEnabled())
         return;
 #if USE(REQUEST_ANIMATION_FRAME_DISPLAY_MONITOR)
-    DisplayRefreshMonitorManager::sharedManager()->windowScreenDidChange(displayID, this);
+    DisplayRefreshMonitorManager::sharedManager().windowScreenDidChange(displayID, *this);
 #else
     UNUSED_PARAM(displayID);
 #endif
@@ -184,7 +192,7 @@ void ScriptedAnimationController::scheduleAnimation()
 #if USE(REQUEST_ANIMATION_FRAME_TIMER)
 #if USE(REQUEST_ANIMATION_FRAME_DISPLAY_MONITOR)
     if (!m_isUsingTimer && !m_isThrottled) {
-        if (DisplayRefreshMonitorManager::sharedManager()->scheduleAnimation(this))
+        if (DisplayRefreshMonitorManager::sharedManager().scheduleAnimation(*this))
             return;
 
         m_isUsingTimer = true;
@@ -199,7 +207,7 @@ void ScriptedAnimationController::scheduleAnimation()
         animationInterval = MinimumThrottledAnimationInterval;
 #endif
 
-    double scheduleDelay = max<double>(animationInterval - (monotonicallyIncreasingTime() - m_lastAnimationFrameTimeMonotonic), 0);
+    double scheduleDelay = std::max<double>(animationInterval - (monotonicallyIncreasingTime() - m_lastAnimationFrameTimeMonotonic), 0);
     m_animationTimer.startOneShot(scheduleDelay);
 #else
     if (FrameView* frameView = m_document->view())
@@ -208,7 +216,7 @@ void ScriptedAnimationController::scheduleAnimation()
 }
 
 #if USE(REQUEST_ANIMATION_FRAME_TIMER)
-void ScriptedAnimationController::animationTimerFired(Timer<ScriptedAnimationController>*)
+void ScriptedAnimationController::animationTimerFired()
 {
     m_lastAnimationFrameTimeMonotonic = monotonicallyIncreasingTime();
     serviceScriptedAnimations(m_lastAnimationFrameTimeMonotonic);
@@ -221,6 +229,19 @@ void ScriptedAnimationController::displayRefreshFired(double monotonicTimeNow)
 #endif
 #endif
 
+
+#if USE(REQUEST_ANIMATION_FRAME_DISPLAY_MONITOR)
+RefPtr<DisplayRefreshMonitor> ScriptedAnimationController::createDisplayRefreshMonitor(PlatformDisplayID displayID) const
+{
+    if (!m_document->page())
+        return nullptr;
+
+    if (auto monitor = m_document->page()->chrome().client().createDisplayRefreshMonitor(displayID))
+        return monitor;
+
+    return DisplayRefreshMonitor::createDefaultDisplayRefreshMonitor(displayID);
+}
+#endif
 
 
 }

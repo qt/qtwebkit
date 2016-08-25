@@ -28,12 +28,10 @@
 
 #include "ApplicationCacheHost.h"
 #include "DOMWindowProperty.h"
-#include "EventNames.h"
 #include "EventTarget.h"
 #include "ScriptWrappable.h"
 #include <wtf/Forward.h>
 #include <wtf/HashMap.h>
-#include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
 #include <wtf/Vector.h>
 #include <wtf/text/AtomicStringHash.h>
@@ -41,54 +39,37 @@
 namespace WebCore {
 
 class Frame;
-class KURL;
+class URL;
 
-class DOMApplicationCache : public ScriptWrappable, public RefCounted<DOMApplicationCache>, public EventTarget, public DOMWindowProperty {
+class DOMApplicationCache final : public RefCounted<DOMApplicationCache>, public EventTargetWithInlineData, public DOMWindowProperty {
 public:
-    static PassRefPtr<DOMApplicationCache> create(Frame* frame) { return adoptRef(new DOMApplicationCache(frame)); }
-    ~DOMApplicationCache() { ASSERT(!m_frame); }
+    static Ref<DOMApplicationCache> create(Frame* frame) { return adoptRef(*new DOMApplicationCache(frame)); }
+    virtual ~DOMApplicationCache() { ASSERT(!m_frame); }
 
-    virtual void disconnectFrameForPageCache() OVERRIDE;
-    virtual void reconnectFrameFromPageCache(Frame*) OVERRIDE;
-    virtual void willDestroyGlobalObjectInFrame() OVERRIDE;
+    virtual void disconnectFrameForDocumentSuspension() override;
+    virtual void reconnectFrameFromDocumentSuspension(Frame*) override;
+    virtual void willDestroyGlobalObjectInFrame() override;
 
     unsigned short status() const;
     void update(ExceptionCode&);
     void swapCache(ExceptionCode&);
     void abort();
 
-    // EventTarget impl
-
     using RefCounted<DOMApplicationCache>::ref;
     using RefCounted<DOMApplicationCache>::deref;
 
-    // Explicitly named attribute event listener helpers
-
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(checking);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(error);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(noupdate);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(downloading);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(progress);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(updateready);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(cached);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(obsolete);
-
-    virtual const AtomicString& interfaceName() const;
-    virtual ScriptExecutionContext* scriptExecutionContext() const;
+    virtual EventTargetInterface eventTargetInterface() const override { return DOMApplicationCacheEventTargetInterfaceType; }
+    virtual ScriptExecutionContext* scriptExecutionContext() const override;
 
     static const AtomicString& toEventType(ApplicationCacheHost::EventID id);
 
 private:
     explicit DOMApplicationCache(Frame*);
 
-    virtual void refEventTarget() { ref(); }
-    virtual void derefEventTarget() { deref(); }
-    virtual EventTargetData* eventTargetData();
-    virtual EventTargetData* ensureEventTargetData();
+    virtual void refEventTarget() override { ref(); }
+    virtual void derefEventTarget() override { deref(); }
 
     ApplicationCacheHost* applicationCacheHost() const;
-
-    EventTargetData m_eventTargetData;
 };
 
 } // namespace WebCore

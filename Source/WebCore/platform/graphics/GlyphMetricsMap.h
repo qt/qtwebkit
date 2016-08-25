@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution. 
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission. 
  *
@@ -30,34 +30,44 @@
 #define GlyphMetricsMap_h
 
 #include "Glyph.h"
-#include <wtf/FixedArray.h>
+#include <array>
 #include <wtf/HashMap.h>
-#include <wtf/OwnPtr.h>
-#include <wtf/PassOwnPtr.h>
-#include <wtf/unicode/Unicode.h>
 
 namespace WebCore {
 
 const float cGlyphSizeUnknown = -1;
 
 template<class T> class GlyphMetricsMap {
-    WTF_MAKE_NONCOPYABLE(GlyphMetricsMap);
+    WTF_MAKE_NONCOPYABLE(GlyphMetricsMap); WTF_MAKE_FAST_ALLOCATED;
 public:
     GlyphMetricsMap() : m_filledPrimaryPage(false) { }
     T metricsForGlyph(Glyph glyph)
     {
-        return locatePage(glyph / GlyphMetricsPage::size)->metricsForGlyph(glyph);
+        return locatePage(glyph / GlyphMetricsPage::size).metricsForGlyph(glyph);
     }
 
     void setMetricsForGlyph(Glyph glyph, const T& metrics)
     {
-        locatePage(glyph / GlyphMetricsPage::size)->setMetricsForGlyph(glyph, metrics);
+        locatePage(glyph / GlyphMetricsPage::size).setMetricsForGlyph(glyph, metrics);
     }
 
 private:
-    struct GlyphMetricsPage {
+    class GlyphMetricsPage {
+        WTF_MAKE_FAST_ALLOCATED;
+    public:
         static const size_t size = 256; // Usually covers Latin-1 in a single page.
-        FixedArray<T, size> m_metrics;
+        std::array<T, size> m_metrics;
+
+        GlyphMetricsPage() = default;
+        GlyphMetricsPage(const T& initialValue)
+        {
+            fill(initialValue);
+        }
+
+        void fill(const T& value)
+        {
+            m_metrics.fill(value);
+        }
 
         T metricsForGlyph(Glyph glyph) const { return m_metrics[glyph % size]; }
         void setMetricsForGlyph(Glyph glyph, const T& metrics)
@@ -70,20 +80,20 @@ private:
         }
     };
     
-    GlyphMetricsPage* locatePage(unsigned pageNumber)
+    GlyphMetricsPage& locatePage(unsigned pageNumber)
     {
         if (!pageNumber && m_filledPrimaryPage)
-            return &m_primaryPage;
+            return m_primaryPage;
         return locatePageSlowCase(pageNumber);
     }
 
-    GlyphMetricsPage* locatePageSlowCase(unsigned pageNumber);
+    GlyphMetricsPage& locatePageSlowCase(unsigned pageNumber);
     
     static T unknownMetrics();
 
     bool m_filledPrimaryPage;
     GlyphMetricsPage m_primaryPage; // We optimize for the page that contains glyph indices 0-255.
-    OwnPtr<HashMap<int, OwnPtr<GlyphMetricsPage> > > m_pages;
+    std::unique_ptr<HashMap<int, std::unique_ptr<GlyphMetricsPage>>> m_pages;
 };
 
 template<> inline float GlyphMetricsMap<float>::unknownMetrics()
@@ -96,28 +106,21 @@ template<> inline FloatRect GlyphMetricsMap<FloatRect>::unknownMetrics()
     return FloatRect(0, 0, cGlyphSizeUnknown, cGlyphSizeUnknown);
 }
 
-template<class T> typename GlyphMetricsMap<T>::GlyphMetricsPage* GlyphMetricsMap<T>::locatePageSlowCase(unsigned pageNumber)
+template<class T> typename GlyphMetricsMap<T>::GlyphMetricsPage& GlyphMetricsMap<T>::locatePageSlowCase(unsigned pageNumber)
 {
-    GlyphMetricsPage* page;
     if (!pageNumber) {
         ASSERT(!m_filledPrimaryPage);
-        page = &m_primaryPage;
+        m_primaryPage.fill(unknownMetrics());
         m_filledPrimaryPage = true;
-    } else {
-        if (m_pages) {
-            if ((page = m_pages->get(pageNumber)))
-                return page;
-        } else
-            m_pages = adoptPtr(new HashMap<int, OwnPtr<GlyphMetricsPage> >);
-        page = new GlyphMetricsPage;
-        m_pages->set(pageNumber, adoptPtr(page));
+        return m_primaryPage;
     }
 
-    // Fill in the whole page with the unknown glyph information.
-    for (unsigned i = 0; i < GlyphMetricsPage::size; i++)
-        page->setMetricsForIndex(i, unknownMetrics());
-
-    return page;
+    if (!m_pages)
+        m_pages = std::make_unique<HashMap<int, std::unique_ptr<GlyphMetricsPage>>>();
+    auto& pageInMap = m_pages->add(pageNumber, nullptr).iterator->value;
+    if (!pageInMap)
+        pageInMap = std::make_unique<GlyphMetricsPage>(unknownMetrics());
+    return *pageInMap;
 }
     
 } // namespace WebCore

@@ -20,27 +20,25 @@
 #ifndef RenderSVGResourceSolidColor_h
 #define RenderSVGResourceSolidColor_h
 
-#if ENABLE(SVG)
 #include "Color.h"
-#include "FloatRect.h"
 #include "RenderSVGResource.h"
 
 namespace WebCore {
 
-class RenderSVGResourceSolidColor : public RenderSVGResource {
+class RenderSVGResourceSolidColor final : public RenderSVGResource {
+    WTF_MAKE_FAST_ALLOCATED;
 public:
     RenderSVGResourceSolidColor();
     virtual ~RenderSVGResourceSolidColor();
 
-    virtual void removeAllClientsFromCache(bool = true) { }
-    virtual void removeClientFromCache(RenderObject*, bool = true) { }
+    virtual void removeAllClientsFromCache(bool = true) override { }
+    virtual void removeClientFromCache(RenderElement&, bool = true) override { }
 
-    virtual bool applyResource(RenderObject*, RenderStyle*, GraphicsContext*&, unsigned short resourceMode);
-    virtual void postApplyResource(RenderObject*, GraphicsContext*&, unsigned short resourceMode, const Path*, const RenderSVGShape*);
-    virtual FloatRect resourceBoundingBox(RenderObject*) { return FloatRect(); }
+    virtual bool applyResource(RenderElement&, const RenderStyle&, GraphicsContext*&, unsigned short resourceMode) override;
+    virtual void postApplyResource(RenderElement&, GraphicsContext*&, unsigned short resourceMode, const Path*, const RenderSVGShape*) override;
+    virtual FloatRect resourceBoundingBox(const RenderObject&) override { return FloatRect(); }
 
-    virtual RenderSVGResourceType resourceType() const { return s_resourceType; }
-    static RenderSVGResourceType s_resourceType;
+    virtual RenderSVGResourceType resourceType() const override { return SolidColorResourceType; }
 
     const Color& color() const { return m_color; }
     void setColor(const Color& color) { m_color = color; }
@@ -51,5 +49,6 @@ private:
 
 }
 
-#endif
+SPECIALIZE_TYPE_TRAITS_RENDER_SVG_RESOURCE(RenderSVGResourceSolidColor, SolidColorResourceType)
+
 #endif

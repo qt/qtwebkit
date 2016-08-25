@@ -30,16 +30,13 @@
 
 #include "config.h"
 
-#if ENABLE(BLOB)
-
 #include "FileReaderSync.h"
 
 #include "Blob.h"
 #include "BlobURL.h"
 #include "FileException.h"
 #include "FileReaderLoader.h"
-#include <wtf/ArrayBuffer.h>
-#include <wtf/PassRefPtr.h>
+#include <runtime/ArrayBuffer.h>
 
 namespace WebCore {
 
@@ -47,11 +44,11 @@ FileReaderSync::FileReaderSync()
 {
 }
 
-PassRefPtr<ArrayBuffer> FileReaderSync::readAsArrayBuffer(ScriptExecutionContext* scriptExecutionContext, Blob* blob, ExceptionCode& ec)
+RefPtr<ArrayBuffer> FileReaderSync::readAsArrayBuffer(ScriptExecutionContext* scriptExecutionContext, Blob* blob, ExceptionCode& ec)
 {
     if (!blob) {
         ec = NOT_FOUND_ERR;
-        return 0;
+        return nullptr;
     }
 
     FileReaderLoader loader(FileReaderLoader::ReadAsArrayBuffer, 0);
@@ -105,5 +102,3 @@ void FileReaderSync::startLoading(ScriptExecutionContext* scriptExecutionContext
 }
 
 } // namespace WebCore
- 
-#endif // ENABLE(BLOB)

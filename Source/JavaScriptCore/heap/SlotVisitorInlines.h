@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2012, 2013, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,167 +26,92 @@
 #ifndef SlotVisitorInlines_h
 #define SlotVisitorInlines_h
 
-#include "CopiedBlockInlines.h"
-#include "CopiedSpaceInlines.h"
-#include "Options.h"
 #include "SlotVisitor.h"
 #include "Weak.h"
 #include "WeakInlines.h"
 
 namespace JSC {
 
-ALWAYS_INLINE void SlotVisitor::append(JSValue* slot, size_t count)
-{
-    for (size_t i = 0; i < count; ++i) {
-        JSValue& value = slot[i];
-        internalAppend(value);
-    }
-}
-
 template<typename T>
 inline void SlotVisitor::appendUnbarrieredPointer(T** slot)
 {
     ASSERT(slot);
-    JSCell* cell = *slot;
-    internalAppend(cell);
-}
-
-ALWAYS_INLINE void SlotVisitor::append(JSValue* slot)
-{
-    ASSERT(slot);
-    internalAppend(*slot);
-}
-
-ALWAYS_INLINE void SlotVisitor::appendUnbarrieredValue(JSValue* slot)
-{
-    ASSERT(slot);
-    internalAppend(*slot);
-}
-
-ALWAYS_INLINE void SlotVisitor::append(JSCell** slot)
-{
-    ASSERT(slot);
-    internalAppend(*slot);
+    append(*slot);
 }
 
 template<typename T>
-ALWAYS_INLINE void SlotVisitor::appendUnbarrieredWeak(Weak<T>* weak)
+inline void SlotVisitor::appendUnbarrieredReadOnlyPointer(T* cell)
 {
-    ASSERT(weak);
-    if (weak->get())
-        internalAppend(weak->get());
+    append(cell);
 }
 
-ALWAYS_INLINE void SlotVisitor::internalAppend(JSValue value)
+inline void SlotVisitor::appendUnbarrieredValue(JSValue* slot)
 {
-    if (!value || !value.isCell())
-        return;
-    internalAppend(value.asCell());
+    ASSERT(slot);
+    append(*slot);
+}
+
+inline void SlotVisitor::appendUnbarrieredReadOnlyValue(JSValue value)
+{
+    append(value);
+}
+
+template<typename T>
+inline void SlotVisitor::appendUnbarrieredWeak(Weak<T>* weak)
+{
+    ASSERT(weak);
+    append(weak->get());
+}
+
+template<typename T>
+inline void SlotVisitor::append(WriteBarrierBase<T>* slot)
+{
+    append(slot->get());
+}
+
+template<typename Iterator>
+inline void SlotVisitor::append(Iterator begin, Iterator end)
+{
+    for (auto it = begin; it != end; ++it)
+        append(&*it);
+}
+
+inline void SlotVisitor::appendValues(WriteBarrierBase<Unknown>* barriers, size_t count)
+{
+    for (size_t i = 0; i < count; ++i)
+        append(&barriers[i]);
 }
 
 inline void SlotVisitor::addWeakReferenceHarvester(WeakReferenceHarvester* weakReferenceHarvester)
 {
-    m_shared.m_weakReferenceHarvesters.addThreadSafe(weakReferenceHarvester);
+    m_heap.m_weakReferenceHarvesters.addThreadSafe(weakReferenceHarvester);
 }
 
 inline void SlotVisitor::addUnconditionalFinalizer(UnconditionalFinalizer* unconditionalFinalizer)
 {
-    m_shared.m_unconditionalFinalizers.addThreadSafe(unconditionalFinalizer);
+    m_heap.m_unconditionalFinalizers.addThreadSafe(unconditionalFinalizer);
 }
 
-inline void SlotVisitor::addOpaqueRoot(void* root)
+inline void SlotVisitor::reportExtraMemoryVisited(size_t size)
 {
-#if ENABLE(PARALLEL_GC)
-    if (Options::numberOfGCMarkers() == 1) {
-        // Put directly into the shared HashSet.
-        m_shared.m_opaqueRoots.add(root);
-        return;
-    }
-    // Put into the local set, but merge with the shared one every once in
-    // a while to make sure that the local sets don't grow too large.
-    mergeOpaqueRootsIfProfitable();
-    m_opaqueRoots.add(root);
-#else
-    m_opaqueRoots.add(root);
-#endif
+    heap()->reportExtraMemoryVisited(m_currentObjectCellStateBeforeVisiting, size);
 }
 
-inline bool SlotVisitor::containsOpaqueRoot(void* root)
+inline Heap* SlotVisitor::heap() const
 {
-    ASSERT(!m_isInParallelMode);
-#if ENABLE(PARALLEL_GC)
-    ASSERT(m_opaqueRoots.isEmpty());
-    return m_shared.m_opaqueRoots.contains(root);
-#else
-    return m_opaqueRoots.contains(root);
-#endif
+    return &m_heap;
 }
 
-inline TriState SlotVisitor::containsOpaqueRootTriState(void* root)
+inline VM& SlotVisitor::vm()
 {
-    if (m_opaqueRoots.contains(root))
-        return TrueTriState;
-    MutexLocker locker(m_shared.m_opaqueRootsLock);
-    if (m_shared.m_opaqueRoots.contains(root))
-        return TrueTriState;
-    return MixedTriState;
+    return *m_heap.m_vm;
 }
 
-inline int SlotVisitor::opaqueRootCount()
+inline const VM& SlotVisitor::vm() const
 {
-    ASSERT(!m_isInParallelMode);
-#if ENABLE(PARALLEL_GC)
-    ASSERT(m_opaqueRoots.isEmpty());
-    return m_shared.m_opaqueRoots.size();
-#else
-    return m_opaqueRoots.size();
-#endif
+    return *m_heap.m_vm;
 }
 
-inline void SlotVisitor::mergeOpaqueRootsIfNecessary()
-{
-    if (m_opaqueRoots.isEmpty())
-        return;
-    mergeOpaqueRoots();
-}
-    
-inline void SlotVisitor::mergeOpaqueRootsIfProfitable()
-{
-    if (static_cast<unsigned>(m_opaqueRoots.size()) < Options::opaqueRootMergeThreshold())
-        return;
-    mergeOpaqueRoots();
-}
-    
-inline void SlotVisitor::donate()
-{
-    ASSERT(m_isInParallelMode);
-    if (Options::numberOfGCMarkers() == 1)
-        return;
-    
-    donateKnownParallel();
-}
-
-inline void SlotVisitor::donateAndDrain()
-{
-    donate();
-    drain();
-}
-
-inline void SlotVisitor::copyLater(JSCell* owner, void* ptr, size_t bytes)
-{
-    ASSERT(bytes);
-    CopiedBlock* block = CopiedSpace::blockFor(ptr);
-    if (block->isOversize()) {
-        m_shared.m_copiedSpace->pin(block);
-        return;
-    }
-
-    if (block->isPinned())
-        return;
-
-    block->reportLiveBytes(owner, bytes);
-}
-    
 } // namespace JSC
 
 #endif // SlotVisitorInlines_h

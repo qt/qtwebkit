@@ -35,14 +35,14 @@
 #include "FrameLoader.h"
 #include "FrameLoaderClient.h"
 #include "HTMLFormElement.h"
-#include "KURL.h"
+#include "PluginView.h"
+#include "ProgressTrackerClient.h"
 #include "ResourceError.h"
 #include "ResourceResponse.h"
-#include "WebCore/plugins/PluginView.h"
+#include "URL.h"
 #include <QUrl>
 #include <qobject.h>
 #include <wtf/Forward.h>
-#include <wtf/OwnPtr.h>
 #include <wtf/RefCounted.h>
 
 QT_BEGIN_NAMESPACE
@@ -72,166 +72,164 @@ class FrameLoaderClientQt : public QObject, public FrameLoaderClient {
     bool callErrorPageExtension(const ResourceError&);
 
 Q_SIGNALS:
-    void loadProgress(int d);
     void titleChanged(const QString& title);
     void unsupportedContent(QNetworkReply*);
 
 public:
     FrameLoaderClientQt();
     ~FrameLoaderClientQt();
-    virtual void frameLoaderDestroyed();
+    void frameLoaderDestroyed() override;
 
     void setFrame(QWebFrameAdapter*, Frame*);
 
-    virtual bool hasWebView() const; // mainly for assertions
+    bool hasWebView() const override; // mainly for assertions
 
-    virtual void makeRepresentation(DocumentLoader*) { }
-    virtual void forceLayout();
-    virtual void forceLayoutForNonHTML();
+    void makeRepresentation(DocumentLoader*) override { }
+    void forceLayoutForNonHTML() override;
 
-    virtual void setCopiesOnScroll();
+    void setCopiesOnScroll() override;
 
-    virtual void detachedFromParent2();
-    virtual void detachedFromParent3();
+    void detachedFromParent2() override;
+    void detachedFromParent3() override;
 
-    virtual void assignIdentifierToInitialRequest(unsigned long identifier, WebCore::DocumentLoader*, const WebCore::ResourceRequest&);
+    void assignIdentifierToInitialRequest(unsigned long identifier, WebCore::DocumentLoader*, const WebCore::ResourceRequest&) override;
 
-    virtual void dispatchWillSendRequest(WebCore::DocumentLoader*, unsigned long, WebCore::ResourceRequest&, const WebCore::ResourceResponse&);
-    virtual bool shouldUseCredentialStorage(DocumentLoader*, unsigned long identifier);
-    virtual void dispatchDidReceiveAuthenticationChallenge(DocumentLoader*, unsigned long identifier, const AuthenticationChallenge&);
-    virtual void dispatchDidCancelAuthenticationChallenge(DocumentLoader*, unsigned long identifier, const AuthenticationChallenge&);
-    virtual void dispatchDidReceiveResponse(WebCore::DocumentLoader*, unsigned long, const WebCore::ResourceResponse&);
-    virtual void dispatchDidReceiveContentLength(WebCore::DocumentLoader*, unsigned long, int);
-    virtual void dispatchDidFinishLoading(WebCore::DocumentLoader*, unsigned long);
-    virtual void dispatchDidFailLoading(WebCore::DocumentLoader*, unsigned long, const WebCore::ResourceError&);
-    virtual bool dispatchDidLoadResourceFromMemoryCache(WebCore::DocumentLoader*, const WebCore::ResourceRequest&, const WebCore::ResourceResponse&, int);
+    void dispatchWillSendRequest(WebCore::DocumentLoader*, unsigned long, WebCore::ResourceRequest&, const WebCore::ResourceResponse&) override;
+    bool shouldUseCredentialStorage(DocumentLoader*, unsigned long identifier) override;
+    void dispatchDidReceiveAuthenticationChallenge(DocumentLoader*, unsigned long identifier, const AuthenticationChallenge&) override;
+    void dispatchDidCancelAuthenticationChallenge(DocumentLoader*, unsigned long identifier, const AuthenticationChallenge&) override;
+    void dispatchDidReceiveResponse(WebCore::DocumentLoader*, unsigned long, const WebCore::ResourceResponse&) override;
+    void dispatchDidReceiveContentLength(WebCore::DocumentLoader*, unsigned long, int) override;
+    void dispatchDidFinishLoading(WebCore::DocumentLoader*, unsigned long) override;
+    void dispatchDidFailLoading(WebCore::DocumentLoader*, unsigned long, const WebCore::ResourceError&) override;
+    bool dispatchDidLoadResourceFromMemoryCache(WebCore::DocumentLoader*, const WebCore::ResourceRequest&, const WebCore::ResourceResponse&, int) override;
 
-    virtual void dispatchDidHandleOnloadEvents();
-    virtual void dispatchDidReceiveServerRedirectForProvisionalLoad();
-    virtual void dispatchDidCancelClientRedirect();
-    virtual void dispatchWillPerformClientRedirect(const KURL&, double interval, double fireDate);
-    virtual void dispatchDidNavigateWithinPage() OVERRIDE;
-    virtual void dispatchDidChangeLocationWithinPage();
-    virtual void dispatchDidPushStateWithinPage();
-    virtual void dispatchDidReplaceStateWithinPage();
-    virtual void dispatchDidPopStateWithinPage();
-    virtual void dispatchWillClose();
-    virtual void dispatchDidReceiveIcon();
-    virtual void dispatchDidStartProvisionalLoad();
-    virtual void dispatchDidReceiveTitle(const StringWithDirection&);
-    virtual void dispatchDidChangeIcons(WebCore::IconType);
-    virtual void dispatchDidCommitLoad();
-    virtual void dispatchDidFailProvisionalLoad(const ResourceError&);
-    virtual void dispatchDidFailLoad(const WebCore::ResourceError&);
-    virtual void dispatchDidFinishDocumentLoad();
-    virtual void dispatchDidFinishLoad();
-    virtual void dispatchDidLayout(WebCore::LayoutMilestones);
+    void dispatchDidDispatchOnloadEvents() override;
+    void dispatchDidReceiveServerRedirectForProvisionalLoad() override;
+    void dispatchDidCancelClientRedirect() override;
+    void dispatchWillPerformClientRedirect(const URL&, double interval, double fireDate) override;
+    void dispatchDidNavigateWithinPage() override;
+    void dispatchDidChangeLocationWithinPage() override;
+    void dispatchDidPushStateWithinPage() override;
+    void dispatchDidReplaceStateWithinPage() override;
+    void dispatchDidPopStateWithinPage() override;
+    void dispatchWillClose() override;
+    void dispatchDidReceiveIcon() override;
+    void dispatchDidStartProvisionalLoad() override;
+    void dispatchDidReceiveTitle(const StringWithDirection&) override;
+    void dispatchDidChangeIcons(WebCore::IconType) override;
+    void dispatchDidCommitLoad() override;
+    void dispatchDidFailProvisionalLoad(const ResourceError&) override;
+    void dispatchDidFailLoad(const WebCore::ResourceError&) override;
+    void dispatchDidFinishDocumentLoad() override;
+    void dispatchDidFinishLoad() override;
+    void dispatchDidLayout(WebCore::LayoutMilestones) override;
 
-    virtual WebCore::Frame* dispatchCreatePage(const WebCore::NavigationAction&);
-    virtual void dispatchShow();
+    WebCore::Frame* dispatchCreatePage(const WebCore::NavigationAction&) override;
+    void dispatchShow() override;
 
-    virtual void dispatchDecidePolicyForResponse(FramePolicyFunction, const WebCore::ResourceResponse&, const WebCore::ResourceRequest&);
-    virtual void dispatchDecidePolicyForNewWindowAction(FramePolicyFunction, const WebCore::NavigationAction&, const WebCore::ResourceRequest&, PassRefPtr<FormState>, const WTF::String&);
-    virtual void dispatchDecidePolicyForNavigationAction(FramePolicyFunction, const WebCore::NavigationAction&, const WebCore::ResourceRequest&, PassRefPtr<FormState>);
-    virtual void cancelPolicyCheck();
+    void dispatchDecidePolicyForResponse(const WebCore::ResourceResponse&, const WebCore::ResourceRequest&, FramePolicyFunction) override;
+    void dispatchDecidePolicyForNewWindowAction(const WebCore::NavigationAction&, const WebCore::ResourceRequest&, PassRefPtr<FormState>, const WTF::String&, FramePolicyFunction) override;
+    void dispatchDecidePolicyForNavigationAction(const WebCore::NavigationAction&, const WebCore::ResourceRequest&, PassRefPtr<FormState>, FramePolicyFunction) override;
+    void cancelPolicyCheck() override;
 
-    virtual void dispatchUnableToImplementPolicy(const WebCore::ResourceError&);
+    void dispatchUnableToImplementPolicy(const WebCore::ResourceError&) override;
 
-    virtual void dispatchWillSendSubmitEvent(PassRefPtr<FormState>) { }
-    virtual void dispatchWillSubmitForm(FramePolicyFunction, PassRefPtr<FormState>);
+    void dispatchWillSendSubmitEvent(PassRefPtr<FormState>) override { }
+    void dispatchWillSubmitForm(PassRefPtr<FormState>, FramePolicyFunction) override;
 
-    virtual void revertToProvisionalState(DocumentLoader*) { }
-    virtual void setMainDocumentError(DocumentLoader*, const ResourceError&);
+    void revertToProvisionalState(DocumentLoader*) override { }
+    void setMainDocumentError(DocumentLoader*, const ResourceError&) override;
 
-    virtual void postProgressStartedNotification();
-    virtual void postProgressEstimateChangedNotification();
-    virtual void postProgressFinishedNotification();
+    void setMainFrameDocumentReady(bool) override;
 
-    virtual void setMainFrameDocumentReady(bool);
+    void startDownload(const WebCore::ResourceRequest&, const String& suggestedName = String()) override;
 
-    virtual void startDownload(const WebCore::ResourceRequest&, const String& suggestedName = String());
+    void willChangeTitle(DocumentLoader*) override;
+    void didChangeTitle(DocumentLoader*) override;
 
-    virtual void willChangeTitle(DocumentLoader*);
-    virtual void didChangeTitle(DocumentLoader*);
+    void committedLoad(WebCore::DocumentLoader*, const char*, int) override;
+    void finishedLoading(DocumentLoader*) override;
 
-    virtual void committedLoad(WebCore::DocumentLoader*, const char*, int);
-    virtual void finishedLoading(DocumentLoader*);
+    void updateGlobalHistory() override;
+    void updateGlobalHistoryRedirectLinks() override;
+    bool shouldGoToHistoryItem(HistoryItem*) const override;
+    void didDisplayInsecureContent() override;
+    void didRunInsecureContent(SecurityOrigin*, const URL&) override;
+    void didDetectXSS(const URL&, bool didBlockEntirePage) override;
 
-    virtual void updateGlobalHistory();
-    virtual void updateGlobalHistoryRedirectLinks();
-    virtual bool shouldGoToHistoryItem(HistoryItem*) const;
-    virtual bool shouldStopLoadingForHistoryItem(HistoryItem*) const;
-    virtual void didDisplayInsecureContent();
-    virtual void didRunInsecureContent(SecurityOrigin*, const KURL&);
-    virtual void didDetectXSS(const KURL&, bool didBlockEntirePage);
+    ResourceError cancelledError(const ResourceRequest&) override;
+    ResourceError blockedError(const ResourceRequest&) override;
+    ResourceError cannotShowURLError(const ResourceRequest&) override;
+    ResourceError interruptedForPolicyChangeError(const ResourceRequest&) override;
 
-    virtual ResourceError cancelledError(const ResourceRequest&);
-    virtual ResourceError blockedError(const ResourceRequest&);
-    virtual ResourceError cannotShowURLError(const ResourceRequest&);
-    virtual ResourceError interruptedForPolicyChangeError(const ResourceRequest&);
+    ResourceError cannotShowMIMETypeError(const ResourceResponse&) override;
+    ResourceError fileDoesNotExistError(const ResourceResponse&) override;
+    ResourceError pluginWillHandleLoadError(const ResourceResponse&) override;
 
-    virtual ResourceError cannotShowMIMETypeError(const ResourceResponse&);
-    virtual ResourceError fileDoesNotExistError(const ResourceResponse&);
-    virtual ResourceError pluginWillHandleLoadError(const ResourceResponse&);
+    bool shouldFallBack(const ResourceError&) override;
 
-    virtual bool shouldFallBack(const ResourceError&);
+    bool canHandleRequest(const WebCore::ResourceRequest&) const override;
+    bool canShowMIMEType(const String& MIMEType) const override;
+    bool canShowMIMETypeAsHTML(const String& MIMEType) const override;
+    bool representationExistsForURLScheme(const String& URLScheme) const override;
+    String generatedMIMETypeForURLScheme(const String& URLScheme) const override;
 
-    virtual bool canHandleRequest(const WebCore::ResourceRequest&) const;
-    virtual bool canShowMIMEType(const String& MIMEType) const;
-    virtual bool canShowMIMETypeAsHTML(const String& MIMEType) const;
-    virtual bool representationExistsForURLScheme(const String& URLScheme) const;
-    virtual String generatedMIMETypeForURLScheme(const String& URLScheme) const;
+    void frameLoadCompleted() override;
+    void saveViewStateToItem(WebCore::HistoryItem*) override;
+    void restoreViewState() override;
+    void provisionalLoadStarted() override;
+    void didFinishLoad() override;
+    void prepareForDataSourceReplacement() override;
 
-    virtual void frameLoadCompleted();
-    virtual void saveViewStateToItem(WebCore::HistoryItem*);
-    virtual void restoreViewState();
-    virtual void provisionalLoadStarted();
-    virtual void didFinishLoad();
-    virtual void prepareForDataSourceReplacement();
+    Ref<WebCore::DocumentLoader> createDocumentLoader(const WebCore::ResourceRequest&, const WebCore::SubstituteData&) override;
+    void setTitle(const StringWithDirection&, const URL&) override;
 
-    virtual WTF::PassRefPtr<WebCore::DocumentLoader> createDocumentLoader(const WebCore::ResourceRequest&, const WebCore::SubstituteData&);
-    virtual void setTitle(const StringWithDirection&, const KURL&);
+    String userAgent(const WebCore::URL&) override;
 
-    virtual String userAgent(const WebCore::KURL&);
+    void savePlatformDataToCachedFrame(WebCore::CachedFrame*) override;
+    void transitionToCommittedFromCachedFrame(WebCore::CachedFrame*) override;
+    void transitionToCommittedForNewPage() override;
 
-    virtual void savePlatformDataToCachedFrame(WebCore::CachedFrame*);
-    virtual void transitionToCommittedFromCachedFrame(WebCore::CachedFrame*);
-    virtual void transitionToCommittedForNewPage();
+    void didSaveToPageCache() override;
+    void didRestoreFromPageCache() override;
 
-    virtual void didSaveToPageCache();
-    virtual void didRestoreFromPageCache();
+    void dispatchDidBecomeFrameset(bool) override;
 
-    virtual void dispatchDidBecomeFrameset(bool);
+    bool canCachePage() const override;
+    void convertMainResourceLoadToDownload(DocumentLoader*,SessionID, const ResourceRequest&, const WebCore::ResourceResponse&) override;
 
-    virtual bool canCachePage() const;
-    virtual void convertMainResourceLoadToDownload(WebCore::DocumentLoader*, const WebCore::ResourceRequest&, const WebCore::ResourceResponse&);
+    RefPtr<Frame> createFrame(const URL&, const String& name, HTMLFrameOwnerElement*, const String& referrer, bool allowsScrolling, int marginWidth, int marginHeight) override;
+    RefPtr<Widget> createPlugin(const IntSize&, HTMLPlugInElement*, const URL&, const Vector<String>&, const Vector<String>&, const String&, bool) override;
+    void recreatePlugin(Widget*) override { }
+    void redirectDataToPlugin(Widget* pluginWidget) override;
 
-    virtual PassRefPtr<Frame> createFrame(const KURL&, const String& name, HTMLFrameOwnerElement*, const String& referrer, bool allowsScrolling, int marginWidth, int marginHeight);
-    virtual PassRefPtr<Widget> createPlugin(const IntSize&, HTMLPlugInElement*, const KURL&, const Vector<String>&, const Vector<String>&, const String&, bool);
-    virtual void recreatePlugin(Widget*) { }
-    virtual void redirectDataToPlugin(Widget* pluginWidget);
+    PassRefPtr<Widget> createJavaAppletWidget(const IntSize&, HTMLAppletElement*, const URL& baseURL, const Vector<String>& paramNames, const Vector<String>& paramValues) override;
 
-    virtual PassRefPtr<Widget> createJavaAppletWidget(const IntSize&, HTMLAppletElement*, const KURL& baseURL, const Vector<String>& paramNames, const Vector<String>& paramValues);
+    ObjectContentType objectContentType(const URL&, const String& mimeTypeIn) override;
+    String overrideMediaType() const override;
 
-    virtual ObjectContentType objectContentType(const KURL&, const String& mimeTypeIn, bool shouldPreferPlugInsForImages);
-    virtual String overrideMediaType() const;
+    void dispatchDidClearWindowObjectInWorld(DOMWrapperWorld&) override;
 
-    virtual void dispatchDidClearWindowObjectInWorld(DOMWrapperWorld*);
-    virtual void documentElementAvailable();
-    virtual void didPerformFirstNavigation() const;
+    void registerForIconNotification(bool) override;
 
-    virtual void registerForIconNotification(bool);
+    void willReplaceMultipartContent() override;
+    void didReplaceMultipartContent() override;
+    ResourceError blockedByContentBlockerError(const ResourceRequest &) override;
+    void updateCachedDocumentLoader(DocumentLoader &) override;
+    void prefetchDNS(const WTF::String &) override;
 
     QString chooseFile(const QString& oldFile);
 
-    virtual PassRefPtr<FrameNetworkingContext> createNetworkingContext();
+    PassRefPtr<FrameNetworkingContext> createNetworkingContext() override;
 
-    const KURL& lastRequestedUrl() const { return m_lastRequestedUrl; }
+    const URL& lastRequestedUrl() const { return m_lastRequestedUrl; }
 
     QWebFrameAdapter* webFrame() const;
 
+    void originatingLoadStarted() { m_isOriginatingLoad = true; }
+
     static bool dumpFrameLoaderCallbacks;
-    static bool dumpProgressFinishedCallback;
     static bool dumpUserGestureInFrameLoaderCallbacks;
     static bool dumpResourceLoadCallbacks;
     static bool dumpResourceResponseMIMETypes;
@@ -261,7 +259,7 @@ private:
     WebCore::PluginView* m_pluginView;
     bool m_hasSentResponseToPlugin;
 
-    KURL m_lastRequestedUrl;
+    URL m_lastRequestedUrl;
     bool m_isOriginatingLoad;
 };
 

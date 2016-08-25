@@ -25,8 +25,6 @@
 #ifndef DatabaseManagerClient_h
 #define DatabaseManagerClient_h
 
-#if ENABLE(SQL_DATABASE)
-
 #include <wtf/Forward.h>
 
 namespace WebCore {
@@ -38,10 +36,14 @@ public:
     virtual ~DatabaseManagerClient() { }
     virtual void dispatchDidModifyOrigin(SecurityOrigin*) = 0;
     virtual void dispatchDidModifyDatabase(SecurityOrigin*, const String& databaseName) = 0;
+
+#if PLATFORM(IOS)
+    virtual void dispatchDidAddNewOrigin(SecurityOrigin*) = 0;
+    virtual void dispatchDidDeleteDatabase() = 0;
+    virtual void dispatchDidDeleteDatabaseOrigin() = 0;
+#endif
 };
 
 } // namespace WebCore
-
-#endif
 
 #endif // DatabaseManagerClient_h

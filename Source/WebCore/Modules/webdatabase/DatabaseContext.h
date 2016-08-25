@@ -11,10 +11,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -28,57 +28,60 @@
 #ifndef DatabaseContext_h
 #define DatabaseContext_h
 
-#if ENABLE(SQL_DATABASE)
-
 #include "ActiveDOMObject.h"
-#include "DatabaseDetails.h"
-#include <wtf/Assertions.h>
+#include <wtf/RefPtr.h>
 #include <wtf/ThreadSafeRefCounted.h>
+
+#if PLATFORM(IOS)
+#include <wtf/Threading.h>
+#endif
 
 namespace WebCore {
 
 class Database;
-class DatabaseBackendContext;
+class DatabaseDetails;
 class DatabaseTaskSynchronizer;
 class DatabaseThread;
-class ScriptExecutionContext;
+class SecurityOrigin;
 
-class DatabaseContext : public ThreadSafeRefCounted<DatabaseContext>, ActiveDOMObject {
+class DatabaseContext final : public ThreadSafeRefCounted<DatabaseContext>, private ActiveDOMObject {
 public:
     virtual ~DatabaseContext();
 
-    // For life-cycle management (inherited from ActiveDOMObject):
-    virtual void contextDestroyed();
-    virtual void stop();
-
-    PassRefPtr<DatabaseBackendContext> backend();
     DatabaseThread* databaseThread();
 
     void setHasOpenDatabases() { m_hasOpenDatabases = true; }
-    bool hasOpenDatabases() { return m_hasOpenDatabases; }
+    bool hasOpenDatabases() const { return m_hasOpenDatabases; }
 
-    // When the database cleanup is done, cleanupSync will be signalled.
+    // When the database cleanup is done, the sychronizer will be signalled.
     bool stopDatabases(DatabaseTaskSynchronizer*);
 
     bool allowDatabaseAccess() const;
     void databaseExceededQuota(const String& name, DatabaseDetails);
 
+    ScriptExecutionContext* scriptExecutionContext() const { return m_scriptExecutionContext; }
+    SecurityOrigin* securityOrigin() const;
+
+    bool isContextThread() const;
+
 private:
     explicit DatabaseContext(ScriptExecutionContext*);
 
-    void stopDatabases() { stopDatabases(0); }
+    void stopDatabases() { stopDatabases(nullptr); }
+
+    void contextDestroyed() override;
+    void stop() override;
+    bool canSuspendForDocumentSuspension() const override;
+    const char* activeDOMObjectName() const override { return "DatabaseContext"; }
 
     RefPtr<DatabaseThread> m_databaseThread;
     bool m_hasOpenDatabases; // This never changes back to false, even after the database thread is closed.
     bool m_isRegistered;
     bool m_hasRequestedTermination;
 
-    friend class DatabaseBackendContext;
     friend class DatabaseManager;
 };
 
 } // namespace WebCore
-
-#endif // ENABLE(SQL_DATABASE)
 
 #endif // DatabaseContext_h

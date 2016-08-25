@@ -20,7 +20,7 @@
 #ifndef QWEBHISTORY_P_H
 #define QWEBHISTORY_P_H
 
-#include "BackForwardListImpl.h"
+#include "BackForwardList.h"
 #include "HistoryItem.h"
 #include "qwebkitglobal.h"
 #include <QtCore/qglobal.h>
@@ -40,6 +40,13 @@ public:
             i->ref();
         item = i;
     }
+
+    QWebHistoryItemPrivate(WebCore::HistoryItem& i)
+    {
+        i.ref();
+        item = &i;
+    }
+
     ~QWebHistoryItemPrivate()
     {
         if (item)
@@ -53,7 +60,7 @@ public:
 
 class QWebHistoryPrivate : public QSharedData {
 public:
-    QWebHistoryPrivate(WebCore::BackForwardListImpl* l)
+    QWebHistoryPrivate(WebCore::BackForwardList* l)
     {
         l->ref();
         lst = l;
@@ -63,9 +70,11 @@ public:
         lst->deref();
     }
 
+    void goToItem(WebCore::HistoryItem* item);
+
     QWebPageAdapter* page();
 
-    WebCore::BackForwardListImpl* lst;
+    WebCore::BackForwardList* lst;
 };
 
 

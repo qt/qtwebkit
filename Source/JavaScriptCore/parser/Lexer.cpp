@@ -25,31 +25,26 @@
 #include "config.h"
 #include "Lexer.h"
 
-#include "JSFunction.h"
-
-#include "JSGlobalObjectFunctions.h"
+#include "BuiltinNames.h"
 #include "Identifier.h"
-#include "NodeInfo.h"
+#include "JSCInlines.h"
+#include "JSFunctionInlines.h"
+#include "JSGlobalObjectFunctions.h"
+#include "KeywordLookup.h"
+#include "Lexer.lut.h"
 #include "Nodes.h"
-#include <wtf/dtoa.h>
+#include "Parser.h"
 #include <ctype.h>
 #include <limits.h>
 #include <string.h>
 #include <wtf/Assertions.h>
-
-using namespace WTF;
-using namespace Unicode;
-
-#include "KeywordLookup.h"
-#include "Lexer.lut.h"
-#include "Parser.h"
+#include <wtf/dtoa.h>
 
 namespace JSC {
 
-Keywords::Keywords(VM* vm)
-    : m_vm(vm)
-    , m_keywordTable(JSC::mainTable)
+bool isLexerKeyword(const Identifier& identifier)
 {
+    return JSC::mainTable.entry(identifier);
 }
 
 enum CharacterType {
@@ -73,6 +68,7 @@ enum CharacterType {
     CharacterQuestion,
     CharacterTilde,
     CharacterQuote,
+    CharacterBackQuote,
     CharacterDot,
     CharacterSlash,
     CharacterBackSlash,
@@ -93,6 +89,7 @@ enum CharacterType {
 
     // Other types (only one so far)
     CharacterWhiteSpace,
+    CharacterPrivateIdentifierStart
 };
 
 // 256 Latin-1 codes
@@ -161,7 +158,7 @@ static const unsigned short typesOfLatin1Characters[256] = {
 /*  61 - =                  */ CharacterEqual,
 /*  62 - >                  */ CharacterGreater,
 /*  63 - ?                  */ CharacterQuestion,
-/*  64 - @                  */ CharacterInvalid,
+/*  64 - @                  */ CharacterPrivateIdentifierStart,
 /*  65 - A                  */ CharacterIdentifierStart,
 /*  66 - B                  */ CharacterIdentifierStart,
 /*  67 - C                  */ CharacterIdentifierStart,
@@ -193,7 +190,7 @@ static const unsigned short typesOfLatin1Characters[256] = {
 /*  93 - ]                  */ CharacterCloseBracket,
 /*  94 - ^                  */ CharacterXor,
 /*  95 - _                  */ CharacterIdentifierStart,
-/*  96 - `                  */ CharacterInvalid,
+/*  96 - `                  */ CharacterBackQuote,
 /*  97 - a                  */ CharacterIdentifierStart,
 /*  98 - b                  */ CharacterIdentifierStart,
 /*  99 - c                  */ CharacterIdentifierStart,
@@ -489,10 +486,18 @@ static const LChar singleCharacterEscapeValuesForASCII[128] = {
 };
 
 template <typename T>
-Lexer<T>::Lexer(VM* vm)
-    : m_isReparsing(false)
+Lexer<T>::Lexer(VM* vm, JSParserBuiltinMode builtinMode)
+    : m_isReparsingFunction(false)
     , m_vm(vm)
+    , m_parsingBuiltinFunction(builtinMode == JSParserBuiltinMode::Builtin)
 {
+}
+
+static inline JSTokenType tokenTypeForIntegerLikeToken(double doubleValue)
+{
+    if ((doubleValue || !std::signbit(doubleValue)) && static_cast<int64_t>(doubleValue) == doubleValue)
+        return INTEGER;
+    return DOUBLE;
 }
 
 template <typename T>
@@ -505,21 +510,21 @@ String Lexer<T>::invalidCharacterMessage() const
 {
     switch (m_current) {
     case 0:
-        return "Invalid character: '\\0'";
+        return ASCIILiteral("Invalid character: '\\0'");
     case 10:
-        return "Invalid character: '\\n'";
+        return ASCIILiteral("Invalid character: '\\n'");
     case 11:
-        return "Invalid character: '\\v'";
+        return ASCIILiteral("Invalid character: '\\v'");
     case 13:
-        return "Invalid character: '\\r'";
+        return ASCIILiteral("Invalid character: '\\r'");
     case 35:
-        return "Invalid character: '#'";
+        return ASCIILiteral("Invalid character: '#'");
     case 64:
-        return "Invalid character: '@'";
+        return ASCIILiteral("Invalid character: '@'");
     case 96:
-        return "Invalid character: '`'";
+        return ASCIILiteral("Invalid character: '`'");
     default:
-        return String::format("Invalid character '\\u%04u'", static_cast<unsigned>(m_current)).impl();
+        return String::format("Invalid character '\\u%04u'", static_cast<unsigned>(m_current));
     }
 }
 
@@ -538,10 +543,10 @@ void Lexer<T>::setCode(const SourceCode& source, ParserArena* arena)
     m_lineNumber = source.firstLine();
     m_lastToken = -1;
     
-    const String& sourceString = source.provider()->source();
+    StringView sourceString = source.provider()->source();
 
     if (!sourceString.isNull())
-        setCodeStart(sourceString.impl());
+        setCodeStart(sourceString);
     else
         m_codeStart = 0;
 
@@ -554,9 +559,12 @@ void Lexer<T>::setCode(const SourceCode& source, ParserArena* arena)
     m_atLineStart = true;
     m_lineStart = m_code;
     m_lexErrorMessage = String();
+    m_sourceURLDirective = String();
+    m_sourceMappingURLDirective = String();
     
     m_buffer8.reserveInitialCapacity(initialReadBufferCapacity);
     m_buffer16.reserveInitialCapacity((m_codeEnd - m_code) / 2);
+    m_bufferForRawTemplateString16.reserveInitialCapacity(initialReadBufferCapacity);
     
     if (LIKELY(m_code < m_codeEnd))
         m_current = *m_code;
@@ -598,22 +606,60 @@ ALWAYS_INLINE T Lexer<T>::peek(int offset) const
     return (code < m_codeEnd) ? *code : 0;
 }
 
-template <typename T>
-typename Lexer<T>::UnicodeHexValue Lexer<T>::parseFourDigitUnicodeHex()
+struct ParsedUnicodeEscapeValue {
+    ParsedUnicodeEscapeValue(UChar32 value)
+        : m_value(value)
+    {
+        ASSERT(isValid());
+    }
+
+    enum SpecialValueType { Incomplete = -2, Invalid = -1 };
+    ParsedUnicodeEscapeValue(SpecialValueType type)
+        : m_value(type)
+    {
+    }
+
+    bool isValid() const { return m_value >= 0; }
+    bool isIncomplete() const { return m_value == Incomplete; }
+
+    UChar32 value() const
+    {
+        ASSERT(isValid());
+        return m_value;
+    }
+
+private:
+    UChar32 m_value;
+};
+
+template<typename CharacterType> ParsedUnicodeEscapeValue Lexer<CharacterType>::parseUnicodeEscape()
 {
-    T char1 = peek(1);
-    T char2 = peek(2);
-    T char3 = peek(3);
+    if (m_current == '{') {
+        shift();
+        UChar32 codePoint = 0;
+        do {
+            if (!isASCIIHexDigit(m_current))
+                return m_current ? ParsedUnicodeEscapeValue::Invalid : ParsedUnicodeEscapeValue::Incomplete;
+            codePoint = (codePoint << 4) | toASCIIHexValue(m_current);
+            if (codePoint > UCHAR_MAX_VALUE)
+                return ParsedUnicodeEscapeValue::Invalid;
+            shift();
+        } while (m_current != '}');
+        shift();
+        return codePoint;
+    }
 
-    if (UNLIKELY(!isASCIIHexDigit(m_current) || !isASCIIHexDigit(char1) || !isASCIIHexDigit(char2) || !isASCIIHexDigit(char3)))
-        return UnicodeHexValue((m_code + 4) >= m_codeEnd ? UnicodeHexValue::IncompleteHex : UnicodeHexValue::InvalidHex);
-
-    int result = convertUnicode(m_current, char1, char2, char3);
+    auto character2 = peek(1);
+    auto character3 = peek(2);
+    auto character4 = peek(3);
+    if (UNLIKELY(!isASCIIHexDigit(m_current) || !isASCIIHexDigit(character2) || !isASCIIHexDigit(character3) || !isASCIIHexDigit(character4)))
+        return (m_code + 4) >= m_codeEnd ? ParsedUnicodeEscapeValue::Incomplete : ParsedUnicodeEscapeValue::Invalid;
+    auto result = convertUnicode(m_current, character2, character3, character4);
     shift();
     shift();
     shift();
     shift();
-    return UnicodeHexValue(result);
+    return result;
 }
 
 template <typename T>
@@ -621,6 +667,7 @@ void Lexer<T>::shiftLineTerminator()
 {
     ASSERT(isLineTerminator(m_current));
 
+    m_positionBeforeLastNewline = currentPosition();
     T prev = m_current;
     shift();
 
@@ -637,9 +684,16 @@ ALWAYS_INLINE bool Lexer<T>::lastTokenWasRestrKeyword() const
     return m_lastToken == CONTINUE || m_lastToken == BREAK || m_lastToken == RETURN || m_lastToken == THROW;
 }
 
-static NEVER_INLINE bool isNonLatin1IdentStart(int c)
+template <typename T>
+ALWAYS_INLINE void Lexer<T>::skipWhitespace()
 {
-    return category(c) & (Letter_Uppercase | Letter_Lowercase | Letter_Titlecase | Letter_Modifier | Letter_Other);
+    while (isWhiteSpace(m_current))
+        shift();
+}
+
+static NEVER_INLINE bool isNonLatin1IdentStart(UChar c)
+{
+    return U_GET_GC_MASK(c) & U_GC_L_MASK;
 }
 
 static ALWAYS_INLINE bool isLatin1(LChar)
@@ -652,20 +706,25 @@ static ALWAYS_INLINE bool isLatin1(UChar c)
     return c < 256;
 }
 
+static ALWAYS_INLINE bool isLatin1(UChar32 c)
+{
+    return !(c & ~0xFF);
+}
+
 static inline bool isIdentStart(LChar c)
 {
     return typesOfLatin1Characters[c] == CharacterIdentifierStart;
 }
 
-static inline bool isIdentStart(UChar c)
+static inline bool isIdentStart(UChar32 c)
 {
     return isLatin1(c) ? isIdentStart(static_cast<LChar>(c)) : isNonLatin1IdentStart(c);
 }
 
-static NEVER_INLINE bool isNonLatin1IdentPart(int c)
+static NEVER_INLINE bool isNonLatin1IdentPart(UChar32 c)
 {
-    return (category(c) & (Letter_Uppercase | Letter_Lowercase | Letter_Titlecase | Letter_Modifier | Letter_Other
-        | Mark_NonSpacing | Mark_SpacingCombining | Number_DecimalDigit | Punctuation_Connector)) || c == 0x200C || c == 0x200D;
+    // FIXME: ES6 says this should be based on the Unicode property ID_Continue now instead.
+    return (U_GET_GC_MASK(c) & (U_GC_L_MASK | U_GC_MN_MASK | U_GC_MC_MASK | U_GC_ND_MASK | U_GC_PC_MASK)) || c == 0x200C || c == 0x200D;
 }
 
 static ALWAYS_INLINE bool isIdentPart(LChar c)
@@ -676,9 +735,59 @@ static ALWAYS_INLINE bool isIdentPart(LChar c)
     return typesOfLatin1Characters[c] <= CharacterNumber;
 }
 
-static ALWAYS_INLINE bool isIdentPart(UChar c)
+static ALWAYS_INLINE bool isIdentPart(UChar32 c)
 {
     return isLatin1(c) ? isIdentPart(static_cast<LChar>(c)) : isNonLatin1IdentPart(c);
+}
+
+static ALWAYS_INLINE bool isIdentPart(UChar c)
+{
+    return isIdentPart(static_cast<UChar32>(c));
+}
+
+template<typename CharacterType> ALWAYS_INLINE bool isIdentPartIncludingEscapeTemplate(const CharacterType* code, const CharacterType* codeEnd)
+{
+    if (isIdentPart(code[0]))
+        return true;
+
+    // Shortest sequence handled below is \u{0}, which is 5 characters.
+    if (!(code[0] == '\\' && codeEnd - code >= 5 && code[1] == 'u'))
+        return false;
+
+    if (code[2] == '{') {
+        UChar32 codePoint = 0;
+        const CharacterType* pointer;
+        for (pointer = &code[3]; pointer < codeEnd; ++pointer) {
+            auto digit = *pointer;
+            if (!isASCIIHexDigit(digit))
+                break;
+            codePoint = (codePoint << 4) | toASCIIHexValue(digit);
+            if (codePoint > UCHAR_MAX_VALUE)
+                return false;
+        }
+        return isIdentPart(codePoint) && pointer < codeEnd && *pointer == '}';
+    }
+
+    // Shortest sequence handled below is \uXXXX, which is 6 characters.
+    if (codeEnd - code < 6)
+        return false;
+
+    auto character1 = code[2];
+    auto character2 = code[3];
+    auto character3 = code[4];
+    auto character4 = code[5];
+    return isASCIIHexDigit(character1) && isASCIIHexDigit(character2) && isASCIIHexDigit(character3) && isASCIIHexDigit(character4)
+        && isIdentPart(Lexer<LChar>::convertUnicode(character1, character2, character3, character4));
+}
+
+static ALWAYS_INLINE bool isIdentPartIncludingEscape(const LChar* code, const LChar* codeEnd)
+{
+    return isIdentPartIncludingEscapeTemplate(code, codeEnd);
+}
+
+static ALWAYS_INLINE bool isIdentPartIncludingEscape(const UChar* code, const UChar* codeEnd)
+{
+    return isIdentPartIncludingEscapeTemplate(code, codeEnd);
 }
 
 static inline LChar singleEscape(int c)
@@ -756,7 +865,40 @@ inline void Lexer<T>::record16(int c)
     ASSERT(c <= static_cast<int>(USHRT_MAX));
     m_buffer16.append(static_cast<UChar>(c));
 }
+    
+template<typename CharacterType> inline void Lexer<CharacterType>::recordUnicodeCodePoint(UChar32 codePoint)
+{
+    ASSERT(codePoint >= 0);
+    ASSERT(codePoint <= UCHAR_MAX_VALUE);
+    if (U_IS_BMP(codePoint))
+        record16(codePoint);
+    else {
+        UChar codeUnits[2] = { U16_LEAD(codePoint), U16_TRAIL(codePoint) };
+        append16(codeUnits, 2);
+    }
+}
 
+#if !ASSERT_DISABLED
+bool isSafeBuiltinIdentifier(VM& vm, const Identifier* ident)
+{
+    if (!ident)
+        return true;
+    /* Just block any use of suspicious identifiers.  This is intended to
+     * be used as a safety net while implementing builtins.
+     */
+    // FIXME: How can a debug-only assertion be a safety net?
+    if (*ident == vm.propertyNames->builtinNames().callPublicName())
+        return false;
+    if (*ident == vm.propertyNames->builtinNames().applyPublicName())
+        return false;
+    if (*ident == vm.propertyNames->eval)
+        return false;
+    if (*ident == vm.propertyNames->Function)
+        return false;
+    return true;
+}
+#endif
+    
 template <>
 template <bool shouldCreateIdentifier> ALWAYS_INLINE JSTokenType Lexer<LChar>::parseIdentifier(JSTokenData* tokenData, unsigned lexerFlags, bool strictMode)
 {
@@ -768,7 +910,11 @@ template <bool shouldCreateIdentifier> ALWAYS_INLINE JSTokenType Lexer<LChar>::p
             return keyword == RESERVED_IF_STRICT && !strictMode ? IDENT : keyword;
         }
     }
-
+    
+    bool isPrivateName = m_current == '@' && m_parsingBuiltinFunction;
+    if (isPrivateName)
+        shift();
+    
     const LChar* identifierStart = currentSourcePtr();
     unsigned identifierLineStart = currentLineStartOffset();
     
@@ -782,18 +928,29 @@ template <bool shouldCreateIdentifier> ALWAYS_INLINE JSTokenType Lexer<LChar>::p
 
     const Identifier* ident = 0;
     
-    if (shouldCreateIdentifier) {
+    if (shouldCreateIdentifier || m_parsingBuiltinFunction) {
         int identifierLength = currentSourcePtr() - identifierStart;
         ident = makeIdentifier(identifierStart, identifierLength);
-
+        if (m_parsingBuiltinFunction) {
+            if (!isSafeBuiltinIdentifier(*m_vm, ident) && !isPrivateName) {
+                m_lexErrorMessage = makeString("The use of '", ident->string(), "' is disallowed in builtin functions.");
+                return ERRORTOK;
+            }
+            if (isPrivateName)
+                ident = m_vm->propertyNames->lookUpPrivateName(*ident);
+            else if (*ident == m_vm->propertyNames->undefinedKeyword)
+                tokenData->ident = &m_vm->propertyNames->undefinedPrivateName;
+            if (!ident)
+                return INVALID_PRIVATE_NAME_ERRORTOK;
+        }
         tokenData->ident = ident;
     } else
         tokenData->ident = 0;
 
-    if (UNLIKELY((remaining < maxTokenLength) && !(lexerFlags & LexerFlagsIgnoreReservedWords))) {
+    if (UNLIKELY((remaining < maxTokenLength) && !(lexerFlags & LexerFlagsIgnoreReservedWords)) && !isPrivateName) {
         ASSERT(shouldCreateIdentifier);
         if (remaining < maxTokenLength) {
-            const HashEntry* entry = m_vm->keywords->getKeyword(*ident);
+            const HashTableValue* entry = JSC::mainTable.entry(*ident);
             ASSERT((remaining < maxTokenLength) || !entry);
             if (!entry)
                 return IDENT;
@@ -817,6 +974,10 @@ template <bool shouldCreateIdentifier> ALWAYS_INLINE JSTokenType Lexer<UChar>::p
             return keyword == RESERVED_IF_STRICT && !strictMode ? IDENT : keyword;
         }
     }
+    
+    bool isPrivateName = m_current == '@' && m_parsingBuiltinFunction;
+    if (isPrivateName)
+        shift();
 
     const UChar* identifierStart = currentSourcePtr();
     int identifierLineStart = currentLineStartOffset();
@@ -829,6 +990,7 @@ template <bool shouldCreateIdentifier> ALWAYS_INLINE JSTokenType Lexer<UChar>::p
     }
     
     if (UNLIKELY(m_current == '\\')) {
+        ASSERT(!isPrivateName);
         setOffsetFromSourcePtr(identifierStart, identifierLineStart);
         return parseIdentifierSlowCase<shouldCreateIdentifier>(tokenData, lexerFlags, strictMode);
     }
@@ -840,21 +1002,32 @@ template <bool shouldCreateIdentifier> ALWAYS_INLINE JSTokenType Lexer<UChar>::p
 
     const Identifier* ident = 0;
     
-    if (shouldCreateIdentifier) {
+    if (shouldCreateIdentifier || m_parsingBuiltinFunction) {
         int identifierLength = currentSourcePtr() - identifierStart;
         if (isAll8Bit)
             ident = makeIdentifierLCharFromUChar(identifierStart, identifierLength);
         else
             ident = makeIdentifier(identifierStart, identifierLength);
-        
+        if (m_parsingBuiltinFunction) {
+            if (!isSafeBuiltinIdentifier(*m_vm, ident) && !isPrivateName) {
+                m_lexErrorMessage = makeString("The use of '", ident->string(), "' is disallowed in builtin functions.");
+                return ERRORTOK;
+            }
+            if (isPrivateName)
+                ident = m_vm->propertyNames->lookUpPrivateName(*ident);
+            else if (*ident == m_vm->propertyNames->undefinedKeyword)
+                tokenData->ident = &m_vm->propertyNames->undefinedPrivateName;
+            if (!ident)
+                return INVALID_PRIVATE_NAME_ERRORTOK;
+        }
         tokenData->ident = ident;
     } else
         tokenData->ident = 0;
     
-    if (UNLIKELY((remaining < maxTokenLength) && !(lexerFlags & LexerFlagsIgnoreReservedWords))) {
+    if (UNLIKELY((remaining < maxTokenLength) && !(lexerFlags & LexerFlagsIgnoreReservedWords)) && !isPrivateName) {
         ASSERT(shouldCreateIdentifier);
         if (remaining < maxTokenLength) {
-            const HashEntry* entry = m_vm->keywords->getKeyword(*ident);
+            const HashTableValue* entry = JSC::mainTable.entry(*ident);
             ASSERT((remaining < maxTokenLength) || !entry);
             if (!entry)
                 return IDENT;
@@ -867,11 +1040,9 @@ template <bool shouldCreateIdentifier> ALWAYS_INLINE JSTokenType Lexer<UChar>::p
     return IDENT;
 }
 
-template <typename T>
-template <bool shouldCreateIdentifier> JSTokenType Lexer<T>::parseIdentifierSlowCase(JSTokenData* tokenData, unsigned lexerFlags, bool strictMode)
+template<typename CharacterType> template<bool shouldCreateIdentifier> JSTokenType Lexer<CharacterType>::parseIdentifierSlowCase(JSTokenData* tokenData, unsigned lexerFlags, bool strictMode)
 {
-    const ptrdiff_t remaining = m_codeEnd - m_code;
-    const T* identifierStart = currentSourcePtr();
+    auto identifierStart = currentSourcePtr();
     bool bufferRequired = false;
 
     while (true) {
@@ -890,19 +1061,18 @@ template <bool shouldCreateIdentifier> JSTokenType Lexer<T>::parseIdentifierSlow
         if (UNLIKELY(m_current != 'u'))
             return atEnd() ? UNTERMINATED_IDENTIFIER_ESCAPE_ERRORTOK : INVALID_IDENTIFIER_ESCAPE_ERRORTOK;
         shift();
-        UnicodeHexValue character = parseFourDigitUnicodeHex();
+        auto character = parseUnicodeEscape();
         if (UNLIKELY(!character.isValid()))
-            return character.valueType() == UnicodeHexValue::IncompleteHex ? UNTERMINATED_IDENTIFIER_UNICODE_ESCAPE_ERRORTOK : INVALID_IDENTIFIER_UNICODE_ESCAPE_ERRORTOK;
-        UChar ucharacter = static_cast<UChar>(character.value());
-        if (UNLIKELY(m_buffer16.size() ? !isIdentPart(ucharacter) : !isIdentStart(ucharacter)))
+            return character.isIncomplete() ? UNTERMINATED_IDENTIFIER_UNICODE_ESCAPE_ERRORTOK : INVALID_IDENTIFIER_UNICODE_ESCAPE_ERRORTOK;
+        if (UNLIKELY(m_buffer16.size() ? !isIdentPart(character.value()) : !isIdentStart(character.value())))
             return INVALID_IDENTIFIER_UNICODE_ESCAPE_ERRORTOK;
         if (shouldCreateIdentifier)
-            record16(ucharacter);
+            recordUnicodeCodePoint(character.value());
         identifierStart = currentSourcePtr();
     }
 
     int identifierLength;
-    const Identifier* ident = 0;
+    const Identifier* ident = nullptr;
     if (shouldCreateIdentifier) {
         if (!bufferRequired) {
             identifierLength = currentSourcePtr() - identifierStart;
@@ -915,23 +1085,19 @@ template <bool shouldCreateIdentifier> JSTokenType Lexer<T>::parseIdentifierSlow
 
         tokenData->ident = ident;
     } else
-        tokenData->ident = 0;
+        tokenData->ident = nullptr;
 
-    if (LIKELY(!bufferRequired && !(lexerFlags & LexerFlagsIgnoreReservedWords))) {
+    m_buffer16.shrink(0);
+
+    if (LIKELY(!(lexerFlags & LexerFlagsIgnoreReservedWords))) {
         ASSERT(shouldCreateIdentifier);
-        // Keywords must not be recognized if there was an \uXXXX in the identifier.
-        if (remaining < maxTokenLength) {
-            const HashEntry* entry = m_vm->keywords->getKeyword(*ident);
-            ASSERT((remaining < maxTokenLength) || !entry);
-            if (!entry)
-                return IDENT;
-            JSTokenType token = static_cast<JSTokenType>(entry->lexerValue());
-            return (token != RESERVED_IF_STRICT) || strictMode ? token : IDENT;
-        }
-        return IDENT;
+        const HashTableValue* entry = JSC::mainTable.entry(*ident);
+        if (!entry)
+            return IDENT;
+        JSTokenType token = static_cast<JSTokenType>(entry->lexerValue());
+        return (token != RESERVED_IF_STRICT) || strictMode ? token : IDENT;
     }
 
-    m_buffer16.resize(0);
     return IDENT;
 }
 
@@ -964,7 +1130,7 @@ template <bool shouldBuildStrings> ALWAYS_INLINE typename Lexer<T>::StringParseR
 
             LChar escape = singleEscape(m_current);
 
-            // Most common escape sequences first
+            // Most common escape sequences first.
             if (escape) {
                 if (shouldBuildStrings)
                     record8(escape);
@@ -974,7 +1140,7 @@ template <bool shouldBuildStrings> ALWAYS_INLINE typename Lexer<T>::StringParseR
             else if (m_current == 'x') {
                 shift();
                 if (!isASCIIHexDigit(m_current) || !isASCIIHexDigit(peek(1))) {
-                    m_lexErrorMessage = "\\x can only be followed by a hex character sequence";
+                    m_lexErrorMessage = ASCIILiteral("\\x can only be followed by a hex character sequence");
                     return (atEnd() || (isASCIIHexDigit(m_current) && (m_code + 1 == m_codeEnd))) ? StringUnterminated : StringCannotBeParsed;
                 }
                 T prev = m_current;
@@ -985,7 +1151,7 @@ template <bool shouldBuildStrings> ALWAYS_INLINE typename Lexer<T>::StringParseR
             } else {
                 setOffset(startingOffset, startingLineStartOffset);
                 setLineNumber(startingLineNumber);
-                m_buffer8.resize(0);
+                m_buffer8.shrink(0);
                 return parseStringSlowCase<shouldBuildStrings>(tokenData, strictMode);
             }
             stringStart = currentSourcePtr();
@@ -995,7 +1161,7 @@ template <bool shouldBuildStrings> ALWAYS_INLINE typename Lexer<T>::StringParseR
         if (UNLIKELY(characterRequiresParseStringSlowCase(m_current))) {
             setOffset(startingOffset, startingLineStartOffset);
             setLineNumber(startingLineNumber);
-            m_buffer8.resize(0);
+            m_buffer8.shrink(0);
             return parseStringSlowCase<shouldBuildStrings>(tokenData, strictMode);
         }
 
@@ -1006,7 +1172,7 @@ template <bool shouldBuildStrings> ALWAYS_INLINE typename Lexer<T>::StringParseR
         append8(stringStart, currentSourcePtr() - stringStart);
     if (shouldBuildStrings) {
         tokenData->ident = makeIdentifier(m_buffer8.data(), m_buffer8.size());
-        m_buffer8.resize(0);
+        m_buffer8.shrink(0);
     } else
         tokenData->ident = 0;
 
@@ -1014,7 +1180,93 @@ template <bool shouldBuildStrings> ALWAYS_INLINE typename Lexer<T>::StringParseR
 }
 
 template <typename T>
-template <bool shouldBuildStrings> typename Lexer<T>::StringParseResult Lexer<T>::parseStringSlowCase(JSTokenData* tokenData, bool strictMode)
+template <bool shouldBuildStrings> ALWAYS_INLINE auto Lexer<T>::parseComplexEscape(EscapeParseMode escapeParseMode, bool strictMode, T stringQuoteCharacter) -> StringParseResult
+{
+    if (m_current == 'x') {
+        shift();
+        if (!isASCIIHexDigit(m_current) || !isASCIIHexDigit(peek(1))) {
+            m_lexErrorMessage = ASCIILiteral("\\x can only be followed by a hex character sequence");
+            return StringCannotBeParsed;
+        }
+        T prev = m_current;
+        shift();
+        if (shouldBuildStrings)
+            record16(convertHex(prev, m_current));
+        shift();
+        return StringParsedSuccessfully;
+    }
+
+    if (m_current == 'u') {
+        shift();
+
+        if (escapeParseMode == EscapeParseMode::String && m_current == stringQuoteCharacter) {
+            if (shouldBuildStrings)
+                record16('u');
+            return StringParsedSuccessfully;
+        }
+
+        auto character = parseUnicodeEscape();
+        if (character.isValid()) {
+            if (shouldBuildStrings)
+                recordUnicodeCodePoint(character.value());
+            return StringParsedSuccessfully;
+        }
+
+        m_lexErrorMessage = ASCIILiteral("\\u can only be followed by a Unicode character sequence");
+        return character.isIncomplete() ? StringUnterminated : StringCannotBeParsed;
+    }
+
+    if (strictMode) {
+        if (isASCIIDigit(m_current)) {
+            // The only valid numeric escape in strict mode is '\0', and this must not be followed by a decimal digit.
+            int character1 = m_current;
+            shift();
+            if (character1 != '0' || isASCIIDigit(m_current)) {
+                m_lexErrorMessage = ASCIILiteral("The only valid numeric escape in strict mode is '\\0'");
+                return StringCannotBeParsed;
+            }
+            if (shouldBuildStrings)
+                record16(0);
+            return StringParsedSuccessfully;
+        }
+    } else {
+        if (isASCIIOctalDigit(m_current)) {
+            // Octal character sequences
+            T character1 = m_current;
+            shift();
+            if (isASCIIOctalDigit(m_current)) {
+                // Two octal characters
+                T character2 = m_current;
+                shift();
+                if (character1 >= '0' && character1 <= '3' && isASCIIOctalDigit(m_current)) {
+                    if (shouldBuildStrings)
+                        record16((character1 - '0') * 64 + (character2 - '0') * 8 + m_current - '0');
+                    shift();
+                } else {
+                    if (shouldBuildStrings)
+                        record16((character1 - '0') * 8 + character2 - '0');
+                }
+            } else {
+                if (shouldBuildStrings)
+                    record16(character1 - '0');
+            }
+            return StringParsedSuccessfully;
+        }
+    }
+
+    if (!atEnd()) {
+        if (shouldBuildStrings)
+            record16(m_current);
+        shift();
+        return StringParsedSuccessfully;
+    }
+
+    m_lexErrorMessage = ASCIILiteral("Unterminated string constant");
+    return StringUnterminated;
+}
+
+template <typename T>
+template <bool shouldBuildStrings> auto Lexer<T>::parseStringSlowCase(JSTokenData* tokenData, bool strictMode) -> StringParseResult
 {
     T stringQuoteCharacter = m_current;
     shift();
@@ -1036,67 +1288,10 @@ template <bool shouldBuildStrings> typename Lexer<T>::StringParseResult Lexer<T>
                 shift();
             } else if (UNLIKELY(isLineTerminator(m_current)))
                 shiftLineTerminator();
-            else if (m_current == 'x') {
-                shift();
-                if (!isASCIIHexDigit(m_current) || !isASCIIHexDigit(peek(1))) {
-                    m_lexErrorMessage = "\\x can only be followed by a hex character sequence";
-                    return StringCannotBeParsed;
-                }
-                T prev = m_current;
-                shift();
-                if (shouldBuildStrings)
-                    record16(convertHex(prev, m_current));
-                shift();
-            } else if (m_current == 'u') {
-                shift();
-                UnicodeHexValue character = parseFourDigitUnicodeHex();
-                if (character.isValid()) {
-                    if (shouldBuildStrings)
-                        record16(character.value());
-                } else if (m_current == stringQuoteCharacter) {
-                    if (shouldBuildStrings)
-                        record16('u');
-                } else {
-                    m_lexErrorMessage = "\\u can only be followed by a Unicode character sequence";
-                    return character.valueType() == UnicodeHexValue::IncompleteHex ? StringUnterminated : StringCannotBeParsed;
-                }
-            } else if (strictMode && isASCIIDigit(m_current)) {
-                // The only valid numeric escape in strict mode is '\0', and this must not be followed by a decimal digit.
-                int character1 = m_current;
-                shift();
-                if (character1 != '0' || isASCIIDigit(m_current)) {
-                    m_lexErrorMessage = "The only valid numeric escape in strict mode is '\\0'";
-                    return StringCannotBeParsed;
-                }
-                if (shouldBuildStrings)
-                    record16(0);
-            } else if (!strictMode && isASCIIOctalDigit(m_current)) {
-                // Octal character sequences
-                T character1 = m_current;
-                shift();
-                if (isASCIIOctalDigit(m_current)) {
-                    // Two octal characters
-                    T character2 = m_current;
-                    shift();
-                    if (character1 >= '0' && character1 <= '3' && isASCIIOctalDigit(m_current)) {
-                        if (shouldBuildStrings)
-                            record16((character1 - '0') * 64 + (character2 - '0') * 8 + m_current - '0');
-                        shift();
-                    } else {
-                        if (shouldBuildStrings)
-                            record16((character1 - '0') * 8 + character2 - '0');
-                    }
-                } else {
-                    if (shouldBuildStrings)
-                        record16(character1 - '0');
-                }
-            } else if (!atEnd()) {
-                if (shouldBuildStrings)
-                    record16(m_current);
-                shift();
-            } else {
-                m_lexErrorMessage = "Unterminated string constant";
-                return StringUnterminated;
+            else {
+                StringParseResult result = parseComplexEscape<shouldBuildStrings>(EscapeParseMode::String, strictMode, stringQuoteCharacter);
+                if (result != StringParsedSuccessfully)
+                    return result;
             }
 
             stringStart = currentSourcePtr();
@@ -1108,7 +1303,7 @@ template <bool shouldBuildStrings> typename Lexer<T>::StringParseResult Lexer<T>
         if (UNLIKELY(((static_cast<unsigned>(m_current) - 0xE) & 0x2000))) {
             // New-line or end of input is not allowed
             if (atEnd() || isLineTerminator(m_current)) {
-                m_lexErrorMessage = "Unexpected EOF";
+                m_lexErrorMessage = ASCIILiteral("Unexpected EOF");
                 return atEnd() ? StringUnterminated : StringCannotBeParsed;
             }
             // Anything else is just a normal character
@@ -1123,7 +1318,185 @@ template <bool shouldBuildStrings> typename Lexer<T>::StringParseResult Lexer<T>
     else
         tokenData->ident = 0;
 
-    m_buffer16.resize(0);
+    m_buffer16.shrink(0);
+    return StringParsedSuccessfully;
+}
+
+// While the lexer accepts <LF><CR> (not <CR><LF>) sequence
+// as one line terminator and increments one line number,
+// TemplateLiteral considers it as two line terminators <LF> and <CR>.
+//
+// TemplateLiteral normalizes line terminators as follows.
+//
+// <LF> => <LF>
+// <CR> => <LF>
+// <CR><LF> => <LF>
+// <\u2028> => <\u2028>
+// <\u2029> => <\u2029>
+//
+// So, <LF><CR> should be normalized to <LF><LF>.
+// However, the lexer should increment the line number only once for <LF><CR>.
+//
+// To achieve this, LineNumberAdder holds the current status of line terminator sequence.
+// When TemplateLiteral lexer encounters a line terminator, it notifies to LineNumberAdder.
+// LineNumberAdder maintains the status and increments the line number when it's necessary.
+// For example, LineNumberAdder increments the line number only once for <LF><CR> and <CR><LF>.
+template<typename CharacterType>
+class LineNumberAdder {
+public:
+    LineNumberAdder(int& lineNumber)
+        : m_lineNumber(lineNumber)
+    {
+    }
+
+    void clear()
+    {
+        m_previous = 0;
+    }
+
+    void add(CharacterType character)
+    {
+        ASSERT(Lexer<CharacterType>::isLineTerminator(character));
+        if ((character + m_previous) == ('\n' + '\r'))
+            m_previous = 0;
+        else {
+            ++m_lineNumber;
+            m_previous = character;
+        }
+    }
+
+private:
+    int& m_lineNumber;
+    CharacterType m_previous { 0 };
+};
+
+template <typename T>
+template <bool shouldBuildStrings> typename Lexer<T>::StringParseResult Lexer<T>::parseTemplateLiteral(JSTokenData* tokenData, RawStringsBuildMode rawStringsBuildMode)
+{
+    const T* stringStart = currentSourcePtr();
+    const T* rawStringStart = currentSourcePtr();
+
+    LineNumberAdder<T> lineNumberAdder(m_lineNumber);
+
+    while (m_current != '`') {
+        if (UNLIKELY(m_current == '\\')) {
+            lineNumberAdder.clear();
+            if (stringStart != currentSourcePtr() && shouldBuildStrings)
+                append16(stringStart, currentSourcePtr() - stringStart);
+            shift();
+
+            LChar escape = singleEscape(m_current);
+
+            // Most common escape sequences first.
+            if (escape) {
+                if (shouldBuildStrings)
+                    record16(escape);
+                shift();
+            } else if (UNLIKELY(isLineTerminator(m_current))) {
+                if (m_current == '\r') {
+                    lineNumberAdder.add(m_current);
+                    shift();
+                    if (m_current == '\n') {
+                        lineNumberAdder.add(m_current);
+                        shift();
+                    }
+                } else {
+                    lineNumberAdder.add(m_current);
+                    shift();
+                }
+            } else {
+                bool strictMode = true;
+                StringParseResult result = parseComplexEscape<shouldBuildStrings>(EscapeParseMode::Template, strictMode, '`');
+                if (result != StringParsedSuccessfully)
+                    return result;
+            }
+
+            stringStart = currentSourcePtr();
+            continue;
+        }
+
+        if (m_current == '$' && peek(1) == '{')
+            break;
+
+        // Fast check for characters that require special handling.
+        // Catches 0, \n, \r, 0x2028, and 0x2029 as efficiently
+        // as possible, and lets through all common ASCII characters.
+        if (UNLIKELY(((static_cast<unsigned>(m_current) - 0xE) & 0x2000))) {
+            // End of input is not allowed.
+            // Unlike String, line terminator is allowed.
+            if (atEnd()) {
+                m_lexErrorMessage = ASCIILiteral("Unexpected EOF");
+                return atEnd() ? StringUnterminated : StringCannotBeParsed;
+            }
+
+            if (isLineTerminator(m_current)) {
+                if (m_current == '\r') {
+                    // Normalize <CR>, <CR><LF> to <LF>.
+                    if (shouldBuildStrings) {
+                        if (stringStart != currentSourcePtr())
+                            append16(stringStart, currentSourcePtr() - stringStart);
+                        if (rawStringStart != currentSourcePtr() && rawStringsBuildMode == RawStringsBuildMode::BuildRawStrings)
+                            m_bufferForRawTemplateString16.append(rawStringStart, currentSourcePtr() - rawStringStart);
+
+                        record16('\n');
+                        if (rawStringsBuildMode == RawStringsBuildMode::BuildRawStrings)
+                            m_bufferForRawTemplateString16.append('\n');
+                    }
+                    lineNumberAdder.add(m_current);
+                    shift();
+                    if (m_current == '\n') {
+                        lineNumberAdder.add(m_current);
+                        shift();
+                    }
+                    stringStart = currentSourcePtr();
+                    rawStringStart = currentSourcePtr();
+                } else {
+                    lineNumberAdder.add(m_current);
+                    shift();
+                }
+                continue;
+            }
+            // Anything else is just a normal character
+        }
+
+        lineNumberAdder.clear();
+        shift();
+    }
+
+    bool isTail = m_current == '`';
+
+    if (shouldBuildStrings) {
+        if (currentSourcePtr() != stringStart)
+            append16(stringStart, currentSourcePtr() - stringStart);
+        if (rawStringStart != currentSourcePtr() && rawStringsBuildMode == RawStringsBuildMode::BuildRawStrings)
+            m_bufferForRawTemplateString16.append(rawStringStart, currentSourcePtr() - rawStringStart);
+    }
+
+    if (shouldBuildStrings) {
+        tokenData->cooked = makeIdentifier(m_buffer16.data(), m_buffer16.size());
+        // Line terminator normalization (e.g. <CR> => <LF>) should be applied to both the raw and cooked representations.
+        if (rawStringsBuildMode == RawStringsBuildMode::BuildRawStrings)
+            tokenData->raw = makeIdentifier(m_bufferForRawTemplateString16.data(), m_bufferForRawTemplateString16.size());
+        else
+            tokenData->raw = makeEmptyIdentifier();
+    } else {
+        tokenData->cooked = makeEmptyIdentifier();
+        tokenData->raw = makeEmptyIdentifier();
+    }
+    tokenData->isTail = isTail;
+
+    m_buffer16.shrink(0);
+    m_bufferForRawTemplateString16.shrink(0);
+
+    if (isTail) {
+        // Skip `
+        shift();
+    } else {
+        // Skip $ and {
+        shift();
+        shift();
+    }
+
     return StringParsedSuccessfully;
 }
 
@@ -1133,9 +1506,6 @@ ALWAYS_INLINE void Lexer<T>::parseHex(double& returnValue)
     // Optimization: most hexadecimal values fit into 4 bytes.
     uint32_t hexValue = 0;
     int maximumDigits = 7;
-
-    // Shift out the 'x' prefix.
-    shift();
 
     do {
         hexValue = (hexValue << 4) + toASCIIHexValue(m_current);
@@ -1168,28 +1538,67 @@ ALWAYS_INLINE void Lexer<T>::parseHex(double& returnValue)
 }
 
 template <typename T>
+ALWAYS_INLINE bool Lexer<T>::parseBinary(double& returnValue)
+{
+    // Optimization: most binary values fit into 4 bytes.
+    uint32_t binaryValue = 0;
+    const unsigned maximumDigits = 32;
+    int digit = maximumDigits - 1;
+    // Temporary buffer for the digits. Makes easier
+    // to reconstruct the input characters when needed.
+    LChar digits[maximumDigits];
+
+    do {
+        binaryValue = (binaryValue << 1) + (m_current - '0');
+        digits[digit] = m_current;
+        shift();
+        --digit;
+    } while (isASCIIBinaryDigit(m_current) && digit >= 0);
+
+    if (!isASCIIDigit(m_current) && digit >= 0) {
+        returnValue = binaryValue;
+        return true;
+    }
+
+    for (int i = maximumDigits - 1; i > digit; --i)
+        record8(digits[i]);
+
+    while (isASCIIBinaryDigit(m_current)) {
+        record8(m_current);
+        shift();
+    }
+
+    if (isASCIIDigit(m_current))
+        return false;
+
+    returnValue = parseIntOverflow(m_buffer8.data(), m_buffer8.size(), 2);
+    return true;
+}
+
+template <typename T>
 ALWAYS_INLINE bool Lexer<T>::parseOctal(double& returnValue)
 {
     // Optimization: most octal values fit into 4 bytes.
     uint32_t octalValue = 0;
-    int maximumDigits = 9;
+    const unsigned maximumDigits = 10;
+    int digit = maximumDigits - 1;
     // Temporary buffer for the digits. Makes easier
     // to reconstruct the input characters when needed.
-    LChar digits[10];
+    LChar digits[maximumDigits];
 
     do {
         octalValue = octalValue * 8 + (m_current - '0');
-        digits[maximumDigits] = m_current;
+        digits[digit] = m_current;
         shift();
-        --maximumDigits;
-    } while (isASCIIOctalDigit(m_current) && maximumDigits >= 0);
+        --digit;
+    } while (isASCIIOctalDigit(m_current) && digit >= 0);
 
-    if (!isASCIIDigit(m_current) && maximumDigits >= 0) {
+    if (!isASCIIDigit(m_current) && digit >= 0) {
         returnValue = octalValue;
         return true;
     }
 
-    for (int i = 9; i > maximumDigits; --i)
+    for (int i = maximumDigits - 1; i > digit; --i)
          record8(digits[i]);
 
     while (isASCIIOctalDigit(m_current)) {
@@ -1213,24 +1622,25 @@ ALWAYS_INLINE bool Lexer<T>::parseDecimal(double& returnValue)
     // Since parseOctal may be executed before parseDecimal,
     // the m_buffer8 may hold ascii digits.
     if (!m_buffer8.size()) {
-        int maximumDigits = 9;
+        const unsigned maximumDigits = 10;
+        int digit = maximumDigits - 1;
         // Temporary buffer for the digits. Makes easier
         // to reconstruct the input characters when needed.
-        LChar digits[10];
+        LChar digits[maximumDigits];
 
         do {
             decimalValue = decimalValue * 10 + (m_current - '0');
-            digits[maximumDigits] = m_current;
+            digits[digit] = m_current;
             shift();
-            --maximumDigits;
-        } while (isASCIIDigit(m_current) && maximumDigits >= 0);
+            --digit;
+        } while (isASCIIDigit(m_current) && digit >= 0);
 
-        if (maximumDigits >= 0 && m_current != '.' && (m_current | 0x20) != 'e') {
+        if (digit >= 0 && m_current != '.' && (m_current | 0x20) != 'e') {
             returnValue = decimalValue;
             return true;
         }
 
-        for (int i = 9; i > maximumDigits; --i)
+        for (int i = maximumDigits - 1; i > digit; --i)
             record8(digits[i]);
     }
 
@@ -1296,6 +1706,56 @@ ALWAYS_INLINE bool Lexer<T>::parseMultilineComment()
 }
 
 template <typename T>
+ALWAYS_INLINE void Lexer<T>::parseCommentDirective()
+{
+    // sourceURL and sourceMappingURL directives.
+    if (!consume("source"))
+        return;
+
+    if (consume("URL=")) {
+        m_sourceURLDirective = parseCommentDirectiveValue();
+        return;
+    }
+
+    if (consume("MappingURL=")) {
+        m_sourceMappingURLDirective = parseCommentDirectiveValue();
+        return;
+    }
+}
+
+template <typename T>
+ALWAYS_INLINE String Lexer<T>::parseCommentDirectiveValue()
+{
+    skipWhitespace();
+    const T* stringStart = currentSourcePtr();
+    while (!isWhiteSpace(m_current) && !isLineTerminator(m_current) && m_current != '"' && m_current != '\'' && !atEnd())
+        shift();
+    const T* stringEnd = currentSourcePtr();
+    skipWhitespace();
+
+    if (!isLineTerminator(m_current) && !atEnd())
+        return String();
+
+    append8(stringStart, stringEnd - stringStart);
+    String result = String(m_buffer8.data(), m_buffer8.size());
+    m_buffer8.shrink(0);
+    return result;
+}
+
+template <typename T>
+template <unsigned length>
+ALWAYS_INLINE bool Lexer<T>::consume(const char (&input)[length])
+{
+    unsigned lengthToCheck = length - 1; // Ignore the ending NULL byte in the string literal.
+
+    unsigned i = 0;
+    for (; i < lengthToCheck && m_current == input[i]; i++)
+        shift();
+
+    return i == lengthToCheck;
+}
+
+template <typename T>
 bool Lexer<T>::nextTokenIsColon()
 {
     const T* code = m_code;
@@ -1306,10 +1766,22 @@ bool Lexer<T>::nextTokenIsColon()
 }
 
 template <typename T>
+void Lexer<T>::setTokenPosition(JSToken* tokenRecord)
+{
+    JSTokenData* tokenData = &tokenRecord->m_data;
+    tokenData->line = lineNumber();
+    tokenData->offset = currentOffset();
+    tokenData->lineStartOffset = currentLineStartOffset();
+    ASSERT(tokenData->offset >= tokenData->lineStartOffset);
+}
+
+template <typename T>
 JSTokenType Lexer<T>::lex(JSToken* tokenRecord, unsigned lexerFlags, bool strictMode)
 {
     JSTokenData* tokenData = &tokenRecord->m_data;
     JSTokenLocation* tokenLocation = &tokenRecord->m_location;
+    m_lastTockenLocation = JSTokenLocation(tokenRecord->m_location);
+    
     ASSERT(!m_error);
     ASSERT(m_buffer8.isEmpty());
     ASSERT(m_buffer16.isEmpty());
@@ -1318,8 +1790,7 @@ JSTokenType Lexer<T>::lex(JSToken* tokenRecord, unsigned lexerFlags, bool strict
     m_terminator = false;
 
 start:
-    while (isWhiteSpace(m_current))
-        shift();
+    skipWhitespace();
 
     if (atEnd())
         return EOFTOK;
@@ -1368,7 +1839,18 @@ start:
         }
         token = GT;
         break;
-    case CharacterEqual:
+    case CharacterEqual: {
+        if (peek(1) == '>') {
+            token = ARROWFUNCTION;
+            tokenData->line = lineNumber();
+            tokenData->offset = currentOffset();
+            tokenData->lineStartOffset = currentLineStartOffset();
+            ASSERT(tokenData->offset >= tokenData->lineStartOffset);
+            shift();
+            shift();
+            break;
+        }
+
         shift();
         if (m_current == '=') {
             shift();
@@ -1382,6 +1864,7 @@ start:
         }
         token = EQUAL;
         break;
+    }
     case CharacterLess:
         shift();
         if (m_current == '!' && peek(1) == '-' && peek(2) == '-') {
@@ -1464,13 +1947,13 @@ start:
         shift();
         if (m_current == '/') {
             shift();
-            goto inSingleLineComment;
+            goto inSingleLineCommentCheckForDirectives;
         }
         if (m_current == '*') {
             shift();
             if (parseMultilineComment())
                 goto start;
-            m_lexErrorMessage = "Multiline comment was not closed properly";
+            m_lexErrorMessage = ASCIILiteral("Multiline comment was not closed properly");
             token = UNTERMINATED_MULTILINE_COMMENT_ERRORTOK;
             goto returnError;
         }
@@ -1582,79 +2065,160 @@ start:
     case CharacterDot:
         shift();
         if (!isASCIIDigit(m_current)) {
+            if (UNLIKELY((m_current == '.') && (peek(1) == '.'))) {
+                shift();
+                shift();
+                token = DOTDOTDOT;
+                break;
+            }
             token = DOT;
             break;
         }
         goto inNumberAfterDecimalPoint;
     case CharacterZero:
         shift();
-        if ((m_current | 0x20) == 'x' && isASCIIHexDigit(peek(1))) {
+        if ((m_current | 0x20) == 'x') {
+            if (!isASCIIHexDigit(peek(1))) {
+                m_lexErrorMessage = ASCIILiteral("No hexadecimal digits after '0x'");
+                token = UNTERMINATED_HEX_NUMBER_ERRORTOK;
+                goto returnError;
+            }
+
+            // Shift out the 'x' prefix.
+            shift();
+
             parseHex(tokenData->doubleValue);
-            token = NUMBER;
-        } else {
-            record8('0');
-            if (isASCIIOctalDigit(m_current)) {
-                if (parseOctal(tokenData->doubleValue)) {
-                    if (strictMode) {
-                        m_lexErrorMessage = "Octal escapes are forbidden in strict mode";
-                        token = INVALID_OCTAL_NUMBER_ERRORTOK;
-                        goto returnError;
-                    }
-                    token = NUMBER;
-                }
+            if (isIdentStart(m_current)) {
+                m_lexErrorMessage = ASCIILiteral("No space between hexadecimal literal and identifier");
+                token = UNTERMINATED_HEX_NUMBER_ERRORTOK;
+                goto returnError;
+            }
+            token = tokenTypeForIntegerLikeToken(tokenData->doubleValue);
+            m_buffer8.shrink(0);
+            break;
+        }
+        if ((m_current | 0x20) == 'b') {
+            if (!isASCIIBinaryDigit(peek(1))) {
+                m_lexErrorMessage = ASCIILiteral("No binary digits after '0b'");
+                token = UNTERMINATED_BINARY_NUMBER_ERRORTOK;
+                goto returnError;
+            }
+
+            // Shift out the 'b' prefix.
+            shift();
+
+            parseBinary(tokenData->doubleValue);
+            if (isIdentStart(m_current)) {
+                m_lexErrorMessage = ASCIILiteral("No space between binary literal and identifier");
+                token = UNTERMINATED_BINARY_NUMBER_ERRORTOK;
+                goto returnError;
+            }
+            token = tokenTypeForIntegerLikeToken(tokenData->doubleValue);
+            m_buffer8.shrink(0);
+            break;
+        }
+
+        if ((m_current | 0x20) == 'o') {
+            if (!isASCIIOctalDigit(peek(1))) {
+                m_lexErrorMessage = ASCIILiteral("No octal digits after '0o'");
+                token = UNTERMINATED_OCTAL_NUMBER_ERRORTOK;
+                goto returnError;
+            }
+
+            // Shift out the 'o' prefix.
+            shift();
+
+            parseOctal(tokenData->doubleValue);
+            if (isIdentStart(m_current)) {
+                m_lexErrorMessage = ASCIILiteral("No space between octal literal and identifier");
+                token = UNTERMINATED_OCTAL_NUMBER_ERRORTOK;
+                goto returnError;
+            }
+            token = tokenTypeForIntegerLikeToken(tokenData->doubleValue);
+            m_buffer8.shrink(0);
+            break;
+        }
+
+        record8('0');
+        if (strictMode && isASCIIDigit(m_current)) {
+            m_lexErrorMessage = ASCIILiteral("Decimal integer literals with a leading zero are forbidden in strict mode");
+            token = UNTERMINATED_OCTAL_NUMBER_ERRORTOK;
+            goto returnError;
+        }
+        if (isASCIIOctalDigit(m_current)) {
+            if (parseOctal(tokenData->doubleValue)) {
+                token = tokenTypeForIntegerLikeToken(tokenData->doubleValue);
             }
         }
-        // Fall through into CharacterNumber
+        FALLTHROUGH;
     case CharacterNumber:
-        if (LIKELY(token != NUMBER)) {
+        if (LIKELY(token != INTEGER && token != DOUBLE)) {
             if (!parseDecimal(tokenData->doubleValue)) {
+                token = INTEGER;
                 if (m_current == '.') {
                     shift();
 inNumberAfterDecimalPoint:
                     parseNumberAfterDecimalPoint();
+                    token = DOUBLE;
                 }
                 if ((m_current | 0x20) == 'e') {
                     if (!parseNumberAfterExponentIndicator()) {
-                        m_lexErrorMessage = "Non-number found after exponent indicator";
+                        m_lexErrorMessage = ASCIILiteral("Non-number found after exponent indicator");
                         token = atEnd() ? UNTERMINATED_NUMERIC_LITERAL_ERRORTOK : INVALID_NUMERIC_LITERAL_ERRORTOK;
                         goto returnError;
                     }
                 }
                 size_t parsedLength;
                 tokenData->doubleValue = parseDouble(m_buffer8.data(), m_buffer8.size(), parsedLength);
-            }
-            token = NUMBER;
+                if (token == INTEGER)
+                    token = tokenTypeForIntegerLikeToken(tokenData->doubleValue);
+            } else
+                token = tokenTypeForIntegerLikeToken(tokenData->doubleValue);
         }
 
-        // No identifiers allowed directly after numeric literal, e.g. "3in" is bad.
         if (UNLIKELY(isIdentStart(m_current))) {
-            m_lexErrorMessage = "At least one digit must occur after a decimal point";
+            m_lexErrorMessage = ASCIILiteral("No identifiers allowed directly after numeric literal");
             token = atEnd() ? UNTERMINATED_NUMERIC_LITERAL_ERRORTOK : INVALID_NUMERIC_LITERAL_ERRORTOK;
             goto returnError;
         }
-        m_buffer8.resize(0);
+        m_buffer8.shrink(0);
         break;
-    case CharacterQuote:
-        if (lexerFlags & LexerFlagsDontBuildStrings) {
-            StringParseResult result = parseString<false>(tokenData, strictMode);
-            if (UNLIKELY(result != StringParsedSuccessfully)) {
-                token = result == StringUnterminated ? UNTERMINATED_STRING_LITERAL_ERRORTOK : INVALID_STRING_LITERAL_ERRORTOK;
-                goto returnError;
-            }
-        } else {
-            StringParseResult result = parseString<true>(tokenData, strictMode);
-            if (UNLIKELY(result != StringParsedSuccessfully)) {
-                token = result == StringUnterminated ? UNTERMINATED_STRING_LITERAL_ERRORTOK : INVALID_STRING_LITERAL_ERRORTOK;
-                goto returnError;
-            }
+    case CharacterQuote: {
+        StringParseResult result = StringCannotBeParsed;
+        if (lexerFlags & LexerFlagsDontBuildStrings)
+            result = parseString<false>(tokenData, strictMode);
+        else
+            result = parseString<true>(tokenData, strictMode);
+
+        if (UNLIKELY(result != StringParsedSuccessfully)) {
+            token = result == StringUnterminated ? UNTERMINATED_STRING_LITERAL_ERRORTOK : INVALID_STRING_LITERAL_ERRORTOK;
+            goto returnError;
         }
         shift();
         token = STRING;
         break;
+        }
+    case CharacterBackQuote: {
+        // Skip backquote.
+        shift();
+        StringParseResult result = StringCannotBeParsed;
+        if (lexerFlags & LexerFlagsDontBuildStrings)
+            result = parseTemplateLiteral<false>(tokenData, RawStringsBuildMode::BuildRawStrings);
+        else
+            result = parseTemplateLiteral<true>(tokenData, RawStringsBuildMode::BuildRawStrings);
+
+        if (UNLIKELY(result != StringParsedSuccessfully)) {
+            token = result == StringUnterminated ? UNTERMINATED_TEMPLATE_LITERAL_ERRORTOK : INVALID_TEMPLATE_LITERAL_ERRORTOK;
+            goto returnError;
+        }
+        token = TEMPLATE;
+        break;
+        }
     case CharacterIdentifierStart:
         ASSERT(isIdentStart(m_current));
-        // Fall through into CharacterBackSlash.
+        FALLTHROUGH;
     case CharacterBackSlash:
+        parseIdent:
         if (lexerFlags & LexexFlagsDontBuildKeywords)
             token = parseIdentifier<false>(tokenData, lexerFlags, strictMode);
         else
@@ -1667,19 +2231,33 @@ inNumberAfterDecimalPoint:
         m_terminator = true;
         m_lineStart = m_code;
         goto start;
+    case CharacterPrivateIdentifierStart:
+        if (m_parsingBuiltinFunction)
+            goto parseIdent;
+
+        FALLTHROUGH;
     case CharacterInvalid:
         m_lexErrorMessage = invalidCharacterMessage();
         token = ERRORTOK;
         goto returnError;
     default:
         RELEASE_ASSERT_NOT_REACHED();
-        m_lexErrorMessage = "Internal Error";
+        m_lexErrorMessage = ASCIILiteral("Internal Error");
         token = ERRORTOK;
         goto returnError;
     }
 
     m_atLineStart = false;
     goto returnToken;
+
+inSingleLineCommentCheckForDirectives:
+    // Script comment directives like "//# sourceURL=test.js".
+    if (UNLIKELY((m_current == '#' || m_current == '@') && isWhiteSpace(peek(1)))) {
+        shift();
+        shift();
+        parseCommentDirective();
+    }
+    // Fall through to complete single line comment parsing.
 
 inSingleLineComment:
     while (!isLineTerminator(m_current)) {
@@ -1747,7 +2325,7 @@ bool Lexer<T>::scanRegExp(const Identifier*& pattern, const Identifier*& flags, 
 
     while (true) {
         if (isLineTerminator(m_current) || atEnd()) {
-            m_buffer16.resize(0);
+            m_buffer16.shrink(0);
             return false;
         }
 
@@ -1781,7 +2359,7 @@ bool Lexer<T>::scanRegExp(const Identifier*& pattern, const Identifier*& flags, 
 
     pattern = makeRightSizedIdentifier(m_buffer16.data(), m_buffer16.size(), charactersOredTogether);
 
-    m_buffer16.resize(0);
+    m_buffer16.shrink(0);
     charactersOredTogether = 0;
 
     while (isIdentPart(m_current)) {
@@ -1791,7 +2369,7 @@ bool Lexer<T>::scanRegExp(const Identifier*& pattern, const Identifier*& flags, 
     }
 
     flags = makeRightSizedIdentifier(m_buffer16.data(), m_buffer16.size(), charactersOredTogether);
-    m_buffer16.resize(0);
+    m_buffer16.shrink(0);
 
     return true;
 }
@@ -1838,6 +2416,38 @@ bool Lexer<T>::skipRegExp()
 }
 
 template <typename T>
+JSTokenType Lexer<T>::scanTrailingTemplateString(JSToken* tokenRecord, RawStringsBuildMode rawStringsBuildMode)
+{
+    JSTokenData* tokenData = &tokenRecord->m_data;
+    JSTokenLocation* tokenLocation = &tokenRecord->m_location;
+    ASSERT(!m_error);
+    ASSERT(m_buffer16.isEmpty());
+
+    // Leading closing brace } is already shifted in the previous token scan.
+    // So in this re-scan phase, shift() is not needed here.
+    StringParseResult result = parseTemplateLiteral<true>(tokenData, rawStringsBuildMode);
+    JSTokenType token = ERRORTOK;
+    if (UNLIKELY(result != StringParsedSuccessfully)) {
+        token = result == StringUnterminated ? UNTERMINATED_TEMPLATE_LITERAL_ERRORTOK : INVALID_TEMPLATE_LITERAL_ERRORTOK;
+        m_error = true;
+    } else {
+        token = TEMPLATE;
+        m_lastToken = token;
+    }
+
+    // Since TemplateString always ends with ` or }, m_atLineStart always becomes false.
+    m_atLineStart = false;
+
+    // Adjust current tokenLocation data for TemplateString.
+    tokenLocation->line = m_lineNumber;
+    tokenLocation->endOffset = currentOffset();
+    tokenLocation->lineStartOffset = currentLineStartOffset();
+    ASSERT(tokenLocation->endOffset >= tokenLocation->lineStartOffset);
+    tokenRecord->m_endPosition = currentPosition();
+    return token;
+}
+
+template <typename T>
 void Lexer<T>::clear()
 {
     m_arena = 0;
@@ -1848,15 +2458,10 @@ void Lexer<T>::clear()
     Vector<UChar> newBuffer16;
     m_buffer16.swap(newBuffer16);
 
-    m_isReparsing = false;
-}
+    Vector<UChar> newBufferForRawTemplateString16;
+    m_bufferForRawTemplateString16.swap(newBufferForRawTemplateString16);
 
-template <typename T>
-SourceCode Lexer<T>::sourceCode(int openBrace, int closeBrace, int firstLine, unsigned startColumn)
-{
-    ASSERT(m_source->provider()->source()[openBrace] == '{');
-    ASSERT(m_source->provider()->source()[closeBrace] == '}');
-    return SourceCode(m_source->provider(), openBrace, closeBrace + 1, firstLine, startColumn);
+    m_isReparsingFunction = false;
 }
 
 // Instantiate the two flavors of Lexer we need instead of putting most of this file in Lexer.h

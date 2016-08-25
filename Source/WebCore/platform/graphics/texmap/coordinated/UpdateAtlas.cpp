@@ -39,12 +39,12 @@ public:
     {
     }
 
-    virtual void paintToSurfaceContext(GraphicsContext* context) OVERRIDE
+    virtual void paintToSurfaceContext(GraphicsContext& context) override
     {
         if (m_supportsAlpha) {
-            context->setCompositeOperation(CompositeCopy);
-            context->fillRect(IntRect(IntPoint::zero(), m_size), Color::transparent, ColorSpaceDeviceRGB);
-            context->setCompositeOperation(CompositeSourceOver);
+            context.setCompositeOperation(CompositeCopy);
+            context.fillRect(IntRect(IntPoint::zero(), m_size), Color::transparent);
+            context.setCompositeOperation(CompositeSourceOver);
         }
 
         m_client->paintToSurfaceContext(context);
@@ -77,14 +77,14 @@ UpdateAtlas::~UpdateAtlas()
 void UpdateAtlas::buildLayoutIfNeeded()
 {
     if (!m_areaAllocator) {
-        m_areaAllocator = adoptPtr(new GeneralAreaAllocator(size()));
+        m_areaAllocator = std::make_unique<GeneralAreaAllocator>(size());
         m_areaAllocator->setMinimumAllocation(IntSize(32, 32));
     }
 }
 
 void UpdateAtlas::didSwapBuffers()
 {
-    m_areaAllocator.clear();
+    m_areaAllocator = nullptr;
 }
 
 

@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2010 Google Inc. All rights reserved.
  * Copyright (C) 2013 Samsung Electronics. All rights reserved.
+ * Copyright (C) 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -11,7 +12,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -28,124 +29,110 @@
  */
 
 #include "config.h"
-
-#if ENABLE(INSPECTOR)
-
 #include "InspectorDOMStorageAgent.h"
 
-#include "Database.h"
 #include "DOMWindow.h"
+#include "Database.h"
 #include "Document.h"
 #include "ExceptionCode.h"
 #include "ExceptionCodeDescription.h"
 #include "Frame.h"
-#include "InspectorFrontend.h"
 #include "InspectorPageAgent.h"
-#include "InspectorState.h"
-#include "InspectorValues.h"
 #include "InstrumentingAgents.h"
 #include "Page.h"
 #include "PageGroup.h"
 #include "SecurityOrigin.h"
 #include "Storage.h"
-#include "StorageArea.h"
 #include "StorageNamespace.h"
+#include "StorageNamespaceProvider.h"
 #include "VoidCallback.h"
-
+#include <inspector/InspectorFrontendDispatchers.h>
+#include <inspector/InspectorValues.h>
 #include <wtf/Vector.h>
+
+using namespace Inspector;
 
 namespace WebCore {
 
-namespace DOMStorageAgentState {
-static const char domStorageAgentEnabled[] = "domStorageAgentEnabled";
-};
-
-InspectorDOMStorageAgent::InspectorDOMStorageAgent(InstrumentingAgents* instrumentingAgents, InspectorPageAgent* pageAgent, InspectorCompositeState* state)
-    : InspectorBaseAgent<InspectorDOMStorageAgent>("DOMStorage", instrumentingAgents, state)
+InspectorDOMStorageAgent::InspectorDOMStorageAgent(WebAgentContext& context, InspectorPageAgent* pageAgent)
+    : InspectorAgentBase(ASCIILiteral("DOMStorage"), context)
+    , m_frontendDispatcher(std::make_unique<Inspector::DOMStorageFrontendDispatcher>(context.frontendRouter))
+    , m_backendDispatcher(Inspector::DOMStorageBackendDispatcher::create(context.backendDispatcher, this))
     , m_pageAgent(pageAgent)
-    , m_frontend(0)
 {
-    m_instrumentingAgents->setInspectorDOMStorageAgent(this);
+    m_instrumentingAgents.setInspectorDOMStorageAgent(this);
 }
 
 InspectorDOMStorageAgent::~InspectorDOMStorageAgent()
 {
-    m_instrumentingAgents->setInspectorDOMStorageAgent(0);
-    m_instrumentingAgents = 0;
+    m_instrumentingAgents.setInspectorDOMStorageAgent(nullptr);
 }
 
-void InspectorDOMStorageAgent::setFrontend(InspectorFrontend* frontend)
+void InspectorDOMStorageAgent::didCreateFrontendAndBackend(Inspector::FrontendRouter*, Inspector::BackendDispatcher*)
 {
-    m_frontend = frontend;
 }
 
-void InspectorDOMStorageAgent::clearFrontend()
+void InspectorDOMStorageAgent::willDestroyFrontendAndBackend(Inspector::DisconnectReason)
 {
-    m_frontend = 0;
-    disable(0);
+    ErrorString unused;
+    disable(unused);
 }
 
-bool InspectorDOMStorageAgent::isEnabled() const
+void InspectorDOMStorageAgent::enable(ErrorString&)
 {
-    return m_state->getBoolean(DOMStorageAgentState::domStorageAgentEnabled);
+    m_enabled = true;
 }
 
-void InspectorDOMStorageAgent::enable(ErrorString*)
+void InspectorDOMStorageAgent::disable(ErrorString&)
 {
-    m_state->setBoolean(DOMStorageAgentState::domStorageAgentEnabled, true);
+    m_enabled = false;
 }
 
-void InspectorDOMStorageAgent::disable(ErrorString*)
-{
-    m_state->setBoolean(DOMStorageAgentState::domStorageAgentEnabled, false);
-}
-
-void InspectorDOMStorageAgent::getDOMStorageItems(ErrorString* errorString, const RefPtr<InspectorObject>& storageId, RefPtr<TypeBuilder::Array<TypeBuilder::Array<String> > >& items)
+void InspectorDOMStorageAgent::getDOMStorageItems(ErrorString& errorString, const InspectorObject& storageId, RefPtr<Inspector::Protocol::Array<Inspector::Protocol::Array<String>>>& items)
 {
     Frame* frame;
     RefPtr<StorageArea> storageArea = findStorageArea(errorString, storageId, frame);
     if (!storageArea) {
-        if (errorString)
-            *errorString = "No StorageArea for given storageId";
+        errorString = ASCIILiteral("No StorageArea for given storageId");
         return;
     }
 
-    RefPtr<TypeBuilder::Array<TypeBuilder::Array<String> > > storageItems = TypeBuilder::Array<TypeBuilder::Array<String> >::create();
+    auto storageItems = Inspector::Protocol::Array<Inspector::Protocol::Array<String>>::create();
 
     for (unsigned i = 0; i < storageArea->length(); ++i) {
         String key = storageArea->key(i);
         String value = storageArea->item(key);
 
-        RefPtr<TypeBuilder::Array<String> > entry = TypeBuilder::Array<String>::create();
+        auto entry = Inspector::Protocol::Array<String>::create();
         entry->addItem(key);
         entry->addItem(value);
-        storageItems->addItem(entry.release());
+        storageItems->addItem(WTFMove(entry));
     }
 
-    items = storageItems.release();
+    items = WTFMove(storageItems);
 }
 
-void InspectorDOMStorageAgent::setDOMStorageItem(ErrorString* errorString, const RefPtr<InspectorObject>& storageId, const String& key, const String& value)
+void InspectorDOMStorageAgent::setDOMStorageItem(ErrorString& errorString, const InspectorObject& storageId, const String& key, const String& value)
 {
     Frame* frame;
-    RefPtr<StorageArea> storageArea = findStorageArea(0, storageId, frame);
+    RefPtr<StorageArea> storageArea = findStorageArea(errorString, storageId, frame);
     if (!storageArea) {
-        *errorString = "Storage not found";
+        errorString = ASCIILiteral("Storage not found");
         return;
     }
 
     bool quotaException = false;
     storageArea->setItem(frame, key, value, quotaException);
     if (quotaException)
-        *errorString = ExceptionCodeDescription(QUOTA_EXCEEDED_ERR).name;
+        errorString = ExceptionCodeDescription(QUOTA_EXCEEDED_ERR).name;
 }
 
-void InspectorDOMStorageAgent::removeDOMStorageItem(ErrorString* errorString, const RefPtr<InspectorObject>& storageId, const String& key)
+void InspectorDOMStorageAgent::removeDOMStorageItem(ErrorString& errorString, const InspectorObject& storageId, const String& key)
 {
     Frame* frame;
-    RefPtr<StorageArea> storageArea = findStorageArea(0, storageId, frame);
+    RefPtr<StorageArea> storageArea = findStorageArea(errorString, storageId, frame);
     if (!storageArea) {
-        *errorString = "Storage not found";
+        errorString = ASCIILiteral("Storage not found");
         return;
     }
 
@@ -164,57 +151,53 @@ String InspectorDOMStorageAgent::storageId(Storage* storage)
     return storageId(securityOrigin.get(), isLocalStorage)->toJSONString();
 }
 
-PassRefPtr<TypeBuilder::DOMStorage::StorageId> InspectorDOMStorageAgent::storageId(SecurityOrigin* securityOrigin, bool isLocalStorage)
+RefPtr<Inspector::Protocol::DOMStorage::StorageId> InspectorDOMStorageAgent::storageId(SecurityOrigin* securityOrigin, bool isLocalStorage)
 {
-    return TypeBuilder::DOMStorage::StorageId::create()
+    return Inspector::Protocol::DOMStorage::StorageId::create()
         .setSecurityOrigin(securityOrigin->toRawString())
-        .setIsLocalStorage(isLocalStorage).release();
+        .setIsLocalStorage(isLocalStorage)
+        .release();
 }
 
 void InspectorDOMStorageAgent::didDispatchDOMStorageEvent(const String& key, const String& oldValue, const String& newValue, StorageType storageType, SecurityOrigin* securityOrigin, Page*)
 {
-    if (!m_frontend || !isEnabled())
+    if (!m_enabled)
         return;
 
-    RefPtr<TypeBuilder::DOMStorage::StorageId> id = storageId(securityOrigin, storageType == LocalStorage);
+    RefPtr<Inspector::Protocol::DOMStorage::StorageId> id = storageId(securityOrigin, storageType == LocalStorage);
 
     if (key.isNull())
-        m_frontend->domstorage()->domStorageItemsCleared(id);
+        m_frontendDispatcher->domStorageItemsCleared(id);
     else if (newValue.isNull())
-        m_frontend->domstorage()->domStorageItemRemoved(id, key);
+        m_frontendDispatcher->domStorageItemRemoved(id, key);
     else if (oldValue.isNull())
-        m_frontend->domstorage()->domStorageItemAdded(id, key, newValue);
+        m_frontendDispatcher->domStorageItemAdded(id, key, newValue);
     else
-        m_frontend->domstorage()->domStorageItemUpdated(id, key, oldValue, newValue);
+        m_frontendDispatcher->domStorageItemUpdated(id, key, oldValue, newValue);
 }
 
-PassRefPtr<StorageArea> InspectorDOMStorageAgent::findStorageArea(ErrorString* errorString, const RefPtr<InspectorObject>& storageId, Frame*& targetFrame)
+RefPtr<StorageArea> InspectorDOMStorageAgent::findStorageArea(ErrorString& errorString, const InspectorObject& storageId, Frame*& targetFrame)
 {
     String securityOrigin;
     bool isLocalStorage = false;
-    bool success = storageId->getString("securityOrigin", &securityOrigin);
+    bool success = storageId.getString(ASCIILiteral("securityOrigin"), securityOrigin);
     if (success)
-        success = storageId->getBoolean("isLocalStorage", &isLocalStorage);
+        success = storageId.getBoolean(ASCIILiteral("isLocalStorage"), isLocalStorage);
     if (!success) {
-        if (errorString)
-            *errorString = "Invalid storageId format";
-        targetFrame = 0;
-        return 0;
+        errorString = ASCIILiteral("Invalid storageId format");
+        targetFrame = nullptr;
+        return nullptr;
     }
 
     targetFrame = m_pageAgent->findFrameWithSecurityOrigin(securityOrigin);
     if (!targetFrame) {
-        if (errorString)
-            *errorString = "Frame not found for the given security origin";
-        return 0;
+        errorString = ASCIILiteral("Frame not found for the given security origin");
+        return nullptr;
     }
 
-    Page* page = m_pageAgent->page();
-    if (isLocalStorage)
-        return page->group().localStorage()->storageArea(targetFrame->document()->securityOrigin());
-    return page->sessionStorage()->storageArea(targetFrame->document()->securityOrigin());
+    if (!isLocalStorage)
+        return m_pageAgent->page().sessionStorage()->storageArea(targetFrame->document()->securityOrigin());
+    return m_pageAgent->page().storageNamespaceProvider().localStorageArea(*targetFrame->document());
 }
 
 } // namespace WebCore
-
-#endif // ENABLE(INSPECTOR)

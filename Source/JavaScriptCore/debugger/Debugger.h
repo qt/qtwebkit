@@ -1,7 +1,7 @@
 /*
  *  Copyright (C) 1999-2001 Harri Porten (porten@kde.org)
  *  Copyright (C) 2001 Peter Kelly (pmk@post.com)
- *  Copyright (C) 2008, 2009 Apple Inc. All rights reserved.
+ *  Copyright (C) 2008, 2009, 2013, 2014 Apple Inc. All rights reserved.
  *
  *  This library is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU Lesser General Public
@@ -22,44 +22,220 @@
 #ifndef Debugger_h
 #define Debugger_h
 
+#include "Breakpoint.h"
+#include "CallData.h"
+#include "DebuggerCallFrame.h"
+#include "DebuggerPrimitives.h"
+#include "JSCJSValue.h"
+#include <wtf/HashMap.h>
 #include <wtf/HashSet.h>
+#include <wtf/RefPtr.h>
+#include <wtf/text/TextPosition.h>
 
 namespace JSC {
 
-    class DebuggerCallFrame;
-    class ExecState;
-    class VM;
-    class JSGlobalObject;
-    class JSValue;
-    class SourceProvider;
+class CodeBlock;
+class Exception;
+class ExecState;
+class JSGlobalObject;
+class SourceProvider;
+class VM;
 
-    class JS_EXPORT_PRIVATE Debugger {
+typedef ExecState CallFrame;
+
+class JS_EXPORT_PRIVATE Debugger {
+public:
+    Debugger(VM&);
+    virtual ~Debugger();
+
+    VM& vm() { return m_vm; }
+
+    JSC::DebuggerCallFrame* currentDebuggerCallFrame() const;
+    bool hasHandlerForExceptionCallback() const
+    {
+        ASSERT(m_reasonForPause == PausedForException);
+        return m_hasHandlerForExceptionCallback;
+    }
+    JSValue currentException()
+    {
+        ASSERT(m_reasonForPause == PausedForException);
+        return m_currentException;
+    }
+
+    bool needsExceptionCallbacks() const { return m_pauseOnExceptionsState != DontPauseOnExceptions; }
+
+    enum ReasonForDetach {
+        TerminatingDebuggingSession,
+        GlobalObjectIsDestructing
+    };
+    void attach(JSGlobalObject*);
+    void detach(JSGlobalObject*, ReasonForDetach);
+    bool isAttached(JSGlobalObject*);
+
+    BreakpointID setBreakpoint(Breakpoint, unsigned& actualLine, unsigned& actualColumn);
+    void removeBreakpoint(BreakpointID);
+    void clearBreakpoints();
+    void setBreakpointsActivated(bool);
+    void activateBreakpoints() { setBreakpointsActivated(true); }
+    void deactivateBreakpoints() { setBreakpointsActivated(false); }
+
+    enum PauseOnExceptionsState {
+        DontPauseOnExceptions,
+        PauseOnAllExceptions,
+        PauseOnUncaughtExceptions
+    };
+    PauseOnExceptionsState pauseOnExceptionsState() const { return m_pauseOnExceptionsState; }
+    void setPauseOnExceptionsState(PauseOnExceptionsState);
+
+    enum ReasonForPause {
+        NotPaused,
+        PausedForException,
+        PausedAtStatement,
+        PausedAfterCall,
+        PausedBeforeReturn,
+        PausedAtStartOfProgram,
+        PausedAtEndOfProgram,
+        PausedForBreakpoint,
+        PausedForDebuggerStatement,
+    };
+    ReasonForPause reasonForPause() const { return m_reasonForPause; }
+    BreakpointID pausingBreakpointID() const { return m_pausingBreakpointID; }
+
+    void setPauseOnNextStatement(bool);
+    void breakProgram();
+    void continueProgram();
+    void stepIntoStatement();
+    void stepOverStatement();
+    void stepOutOfFunction();
+
+    bool isPaused() const { return m_isPaused; }
+    bool isStepping() const { return m_steppingMode == SteppingModeEnabled; }
+
+    bool suppressAllPauses() const { return m_suppressAllPauses; }
+    void setSuppressAllPauses(bool suppress) { m_suppressAllPauses = suppress; }
+
+    virtual void sourceParsed(ExecState*, SourceProvider*, int errorLineNumber, const WTF::String& errorMessage) = 0;
+
+    void exception(CallFrame*, JSValue exceptionValue, bool hasCatchHandler);
+    void atStatement(CallFrame*);
+    void callEvent(CallFrame*);
+    void returnEvent(CallFrame*);
+    void willExecuteProgram(CallFrame*);
+    void didExecuteProgram(CallFrame*);
+    void didReachBreakpoint(CallFrame*);
+
+    virtual void recompileAllJSFunctions();
+
+    void registerCodeBlock(CodeBlock*);
+
+    class ProfilingClient {
     public:
-        virtual ~Debugger();
-
-        void attach(JSGlobalObject*);
-        virtual void detach(JSGlobalObject*);
-
-        virtual void sourceParsed(ExecState*, SourceProvider*, int errorLineNumber, const WTF::String& errorMessage) = 0;
-
-        virtual void exception(const DebuggerCallFrame&, intptr_t, int, int, bool) = 0;
-        virtual void atStatement(const DebuggerCallFrame&, intptr_t, int, int) = 0;
-        virtual void callEvent(const DebuggerCallFrame&, intptr_t, int, int) = 0;
-        virtual void returnEvent(const DebuggerCallFrame&, intptr_t, int, int) = 0;
-
-        virtual void willExecuteProgram(const DebuggerCallFrame&, intptr_t, int, int) = 0;
-        virtual void didExecuteProgram(const DebuggerCallFrame&, intptr_t, int, int) = 0;
-        virtual void didReachBreakpoint(const DebuggerCallFrame&, intptr_t, int, int) = 0;
-
-
-        void recompileAllJSFunctions(VM*);
-
-    private:
-        HashSet<JSGlobalObject*> m_globalObjects;
+        virtual ~ProfilingClient() { }
+        virtual bool isAlreadyProfiling() const = 0;
+        virtual double willEvaluateScript() = 0;
+        virtual void didEvaluateScript(double startTime, ProfilingReason) = 0;
     };
 
-    // This function exists only for backwards compatibility with existing WebScriptDebugger clients.
-    JS_EXPORT_PRIVATE JSValue evaluateInGlobalCallFrame(const WTF::String&, JSValue& exception, JSGlobalObject*);
+    void setProfilingClient(ProfilingClient*);
+    bool hasProfilingClient() const { return m_profilingClient != nullptr; }
+    bool isAlreadyProfiling() const { return m_profilingClient && m_profilingClient->isAlreadyProfiling(); }
+    double willEvaluateScript();
+    void didEvaluateScript(double startTime, ProfilingReason);
+
+protected:
+    virtual bool needPauseHandling(JSGlobalObject*) { return false; }
+    virtual void handleBreakpointHit(JSGlobalObject*, const Breakpoint&) { }
+    virtual void handleExceptionInBreakpointCondition(ExecState*, Exception*) const { }
+    virtual void handlePause(JSGlobalObject*, ReasonForPause) { }
+    virtual void notifyDoneProcessingDebuggerEvents() { }
+
+private:
+    typedef HashMap<BreakpointID, Breakpoint*> BreakpointIDToBreakpointMap;
+
+    typedef HashMap<unsigned, RefPtr<BreakpointsList>, WTF::IntHash<int>, WTF::UnsignedWithZeroKeyHashTraits<int>> LineToBreakpointsMap;
+    typedef HashMap<SourceID, LineToBreakpointsMap, WTF::IntHash<SourceID>, WTF::UnsignedWithZeroKeyHashTraits<SourceID>> SourceIDToBreakpointsMap;
+
+    class ClearCodeBlockDebuggerRequestsFunctor;
+    class ClearDebuggerRequestsFunctor;
+    class SetSteppingModeFunctor;
+    class ToggleBreakpointFunctor;
+
+    class PauseReasonDeclaration {
+    public:
+        PauseReasonDeclaration(Debugger& debugger, ReasonForPause reason)
+            : m_debugger(debugger)
+        {
+            m_debugger.m_reasonForPause = reason;
+        }
+
+        ~PauseReasonDeclaration()
+        {
+            m_debugger.m_reasonForPause = NotPaused;
+        }
+    private:
+        Debugger& m_debugger;
+    };
+
+    bool hasBreakpoint(SourceID, const TextPosition&, Breakpoint* hitBreakpoint);
+
+    void updateNeedForOpDebugCallbacks();
+
+    // These update functions are only needed because our current breakpoints are
+    // key'ed off the source position instead of the bytecode PC. This ensures
+    // that we don't break on the same line more than once. Once we switch to a
+    // bytecode PC key'ed breakpoint, we will not need these anymore and should
+    // be able to remove them.
+    void updateCallFrame(JSC::CallFrame*);
+    void updateCallFrameAndPauseIfNeeded(JSC::CallFrame*);
+    void pauseIfNeeded(JSC::CallFrame*);
+
+    enum SteppingMode {
+        SteppingModeDisabled,
+        SteppingModeEnabled
+    };
+    void setSteppingMode(SteppingMode);
+
+    enum BreakpointState {
+        BreakpointDisabled,
+        BreakpointEnabled
+    };
+    void toggleBreakpoint(CodeBlock*, Breakpoint&, BreakpointState);
+    void applyBreakpoints(CodeBlock*);
+    void toggleBreakpoint(Breakpoint&, BreakpointState);
+
+    void clearDebuggerRequests(JSGlobalObject*);
+
+    VM& m_vm;
+    HashSet<JSGlobalObject*> m_globalObjects;
+
+    PauseOnExceptionsState m_pauseOnExceptionsState;
+    bool m_pauseOnNextStatement : 1;
+    bool m_isPaused : 1;
+    bool m_breakpointsActivated : 1;
+    bool m_hasHandlerForExceptionCallback : 1;
+    bool m_suppressAllPauses : 1;
+    unsigned m_steppingMode : 1; // SteppingMode
+
+    ReasonForPause m_reasonForPause;
+    JSValue m_currentException;
+    CallFrame* m_pauseOnCallFrame;
+    CallFrame* m_currentCallFrame;
+    unsigned m_lastExecutedLine;
+    SourceID m_lastExecutedSourceID;
+
+    BreakpointID m_topBreakpointID;
+    BreakpointID m_pausingBreakpointID;
+    BreakpointIDToBreakpointMap m_breakpointIDToBreakpoint;
+    SourceIDToBreakpointsMap m_sourceIDToBreakpoints;
+
+    RefPtr<JSC::DebuggerCallFrame> m_currentDebuggerCallFrame;
+
+    ProfilingClient* m_profilingClient { nullptr };
+
+    friend class DebuggerPausedScope;
+    friend class TemporaryPausedState;
+    friend class LLIntOffsetsExtractor;
+};
 
 } // namespace JSC
 

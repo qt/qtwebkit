@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2010 Google Inc. All rights reserved.
+ * Copyright (C) 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -10,7 +11,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -29,63 +30,56 @@
 #ifndef InspectorDatabaseAgent_h
 #define InspectorDatabaseAgent_h
 
-#if ENABLE(INSPECTOR) && ENABLE(SQL_DATABASE)
-
-#include "InspectorBaseAgent.h"
-#include "InspectorFrontend.h"
+#include "InspectorWebAgentBase.h"
+#include <inspector/InspectorBackendDispatchers.h>
+#include <inspector/InspectorFrontendDispatchers.h>
 #include <wtf/HashMap.h>
-#include <wtf/PassOwnPtr.h>
 #include <wtf/text/WTFString.h>
+
+namespace Inspector {
+class InspectorArray;
+}
 
 namespace WebCore {
 
 class Database;
-class InspectorArray;
 class InspectorDatabaseResource;
-class InspectorFrontend;
-class InspectorState;
-class InstrumentingAgents;
 
 typedef String ErrorString;
 
-class InspectorDatabaseAgent : public InspectorBaseAgent<InspectorDatabaseAgent>, public InspectorBackendDispatcher::DatabaseCommandHandler {
+class InspectorDatabaseAgent final : public InspectorAgentBase, public Inspector::DatabaseBackendDispatcherHandler {
+    WTF_MAKE_FAST_ALLOCATED;
 public:
-    static PassOwnPtr<InspectorDatabaseAgent> create(InstrumentingAgents* instrumentingAgents, InspectorCompositeState* state)
-    {
-        return adoptPtr(new InspectorDatabaseAgent(instrumentingAgents, state));
-    }
-    ~InspectorDatabaseAgent();
+    explicit InspectorDatabaseAgent(WebAgentContext&);
+    virtual ~InspectorDatabaseAgent();
 
-    virtual void setFrontend(InspectorFrontend*);
-    virtual void clearFrontend();
-    virtual void restore();
+    virtual void didCreateFrontendAndBackend(Inspector::FrontendRouter*, Inspector::BackendDispatcher*) override;
+    virtual void willDestroyFrontendAndBackend(Inspector::DisconnectReason) override;
 
     void clearResources();
 
     // Called from the front-end.
-    virtual void enable(ErrorString*);
-    virtual void disable(ErrorString*);
-    virtual void getDatabaseTableNames(ErrorString*, const String& databaseId, RefPtr<TypeBuilder::Array<String> >& names);
-    virtual void executeSQL(ErrorString*, const String& databaseId, const String& query, PassRefPtr<ExecuteSQLCallback>);
+    virtual void enable(ErrorString&) override;
+    virtual void disable(ErrorString&) override;
+    virtual void getDatabaseTableNames(ErrorString&, const String& databaseId, RefPtr<Inspector::Protocol::Array<String>>& names) override;
+    virtual void executeSQL(ErrorString&, const String& databaseId, const String& query, Ref<ExecuteSQLCallback>&&) override;
 
     // Called from the injected script.
     String databaseId(Database*);
 
-    void didOpenDatabase(PassRefPtr<Database>, const String& domain, const String& name, const String& version);
+    void didOpenDatabase(RefPtr<Database>&&, const String& domain, const String& name, const String& version);
 private:
-    explicit InspectorDatabaseAgent(InstrumentingAgents*, InspectorCompositeState*);
-
     Database* databaseForId(const String& databaseId);
     InspectorDatabaseResource* findByFileName(const String& fileName);
 
-    InspectorFrontend::Database* m_frontend;
-    typedef HashMap<String, RefPtr<InspectorDatabaseResource> > DatabaseResourcesMap;
+    std::unique_ptr<Inspector::DatabaseFrontendDispatcher> m_frontendDispatcher;
+    RefPtr<Inspector::DatabaseBackendDispatcher> m_backendDispatcher;
+
+    typedef HashMap<String, RefPtr<InspectorDatabaseResource>> DatabaseResourcesMap;
     DatabaseResourcesMap m_resources;
-    bool m_enabled;
+    bool m_enabled { false };
 };
 
 } // namespace WebCore
-
-#endif // ENABLE(INSPECTOR) && ENABLE(SQL_DATABASE)
 
 #endif // !defined(InspectorDatabaseAgent_h)

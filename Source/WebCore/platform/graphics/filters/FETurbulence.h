@@ -24,13 +24,8 @@
 #ifndef FETurbulence_h
 #define FETurbulence_h
 
-#if ENABLE(FILTERS)
 #include "FilterEffect.h"
 #include "Filter.h"
-
-namespace WTF {
-template<typename Type> class ParallelJobs;
-}
 
 namespace WebCore {
 
@@ -42,7 +37,7 @@ enum TurbulenceType {
 
 class FETurbulence : public FilterEffect {
 public:
-    static PassRefPtr<FETurbulence> create(Filter*, TurbulenceType, float, float, int, float, bool);
+    static Ref<FETurbulence> create(Filter&, TurbulenceType, float, float, int, float, bool);
 
     TurbulenceType type() const;
     bool setType(TurbulenceType);
@@ -65,9 +60,6 @@ public:
     static void fillRegionWorker(void*);
 
     virtual void platformApplySoftware();
-#if ENABLE(OPENCL)
-    virtual bool platformApplyOpenCL();
-#endif
     virtual void dump();
     
     virtual void determineAbsolutePaintRect() { setAbsolutePaintRect(enclosingIntRect(maxEffectRect())); }
@@ -111,7 +103,7 @@ private:
     };
 
     template<typename Type>
-    friend class WTF::ParallelJobs;
+    friend class ParallelJobs;
 
     struct FillRegionParameters {
         FETurbulence* filter;
@@ -123,7 +115,7 @@ private:
 
     static void fillRegionWorker(FillRegionParameters*);
 
-    FETurbulence(Filter*, TurbulenceType, float, float, int, float, bool);
+    FETurbulence(Filter&, TurbulenceType, float, float, int, float, bool);
 
     inline void initPaint(PaintingData&);
     float noise2D(int channel, PaintingData&, StitchData&, const FloatPoint&);
@@ -139,7 +131,5 @@ private:
 };
 
 } // namespace WebCore
-
-#endif // ENABLE(FILTERS)
 
 #endif // FETurbulence_h

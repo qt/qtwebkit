@@ -33,16 +33,14 @@ StyleMultiColData::StyleMultiColData()
     , m_autoWidth(true)
     , m_autoCount(true)
     , m_normalGap(true)
+    , m_fill(RenderStyle::initialColumnFill())
     , m_columnSpan(false)
-    , m_breakBefore(RenderStyle::initialPageBreak())
-    , m_breakAfter(RenderStyle::initialPageBreak())
-    , m_breakInside(RenderStyle::initialPageBreak())
     , m_axis(RenderStyle::initialColumnAxis())
     , m_progression(RenderStyle::initialColumnProgression())
 {
 }
 
-StyleMultiColData::StyleMultiColData(const StyleMultiColData& o)
+inline StyleMultiColData::StyleMultiColData(const StyleMultiColData& o)
     : RefCounted<StyleMultiColData>()
     , m_width(o.m_width)
     , m_count(o.m_count)
@@ -52,22 +50,25 @@ StyleMultiColData::StyleMultiColData(const StyleMultiColData& o)
     , m_autoWidth(o.m_autoWidth)
     , m_autoCount(o.m_autoCount)
     , m_normalGap(o.m_normalGap)
+    , m_fill(o.m_fill)
     , m_columnSpan(o.m_columnSpan)
-    , m_breakBefore(o.m_breakBefore)
-    , m_breakAfter(o.m_breakAfter)
-    , m_breakInside(o.m_breakInside)
     , m_axis(o.m_axis)
     , m_progression(o.m_progression)
 {
 }
 
+Ref<StyleMultiColData> StyleMultiColData::copy() const
+{
+    return adoptRef(*new StyleMultiColData(*this));
+}
+
 bool StyleMultiColData::operator==(const StyleMultiColData& o) const
 {
     return m_width == o.m_width && m_count == o.m_count && m_gap == o.m_gap
-           && m_rule == o.m_rule && m_visitedLinkColumnRuleColor == o.m_visitedLinkColumnRuleColor && m_breakBefore == o.m_breakBefore
-           && m_autoWidth == o.m_autoWidth && m_autoCount == o.m_autoCount && m_normalGap == o.m_normalGap
-           && m_columnSpan == o.m_columnSpan && m_breakAfter == o.m_breakAfter && m_breakInside == o.m_breakInside && m_axis == o.m_axis
-           && m_progression == o.m_progression;
+        && m_rule == o.m_rule && m_visitedLinkColumnRuleColor == o.m_visitedLinkColumnRuleColor
+        && m_autoWidth == o.m_autoWidth && m_autoCount == o.m_autoCount && m_normalGap == o.m_normalGap
+        && m_fill == o.m_fill && m_columnSpan == o.m_columnSpan
+        && m_axis == o.m_axis && m_progression == o.m_progression;
 }
 
 } // namespace WebCore

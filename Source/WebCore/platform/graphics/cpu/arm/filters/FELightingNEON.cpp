@@ -27,16 +27,15 @@
 #include "config.h"
 #include "FELightingNEON.h"
 
-#if CPU(ARM_NEON) && CPU(ARM_TRADITIONAL) && COMPILER(GCC)
-
-#include <wtf/Alignment.h>
+#if CPU(ARM_NEON) && CPU(ARM_TRADITIONAL) && COMPILER(GCC_OR_CLANG)
 
 namespace WebCore {
 
 // These constants are copied to the following SIMD registers:
 //   ALPHAX_Q ALPHAY_Q REMAPX_D REMAPY_D
 
-static WTF_ALIGNED(short, s_FELightingConstantsForNeon[], 16) = {
+
+static short s_FELightingConstantsForNeon[] __attribute__((__aligned__(16))) = {
     // Alpha coefficients.
     -2, 1, 0, -1, 2, 1, 0, -1,
     0, -1, -2, -1, 0, 1, 2, 1,
@@ -501,4 +500,4 @@ int FELighting::getPowerCoefficients(float exponent)
 
 } // namespace WebCore
 
-#endif // CPU(ARM_NEON) && COMPILER(GCC)
+#endif // CPU(ARM_NEON) && COMPILER(GCC_OR_CLANG)

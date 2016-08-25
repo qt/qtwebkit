@@ -41,7 +41,7 @@ class WebInspectorProxy;
 class WebInspectorServer : public WebSocketServer, public WebSocketServerClient {
 public:
     typedef HashMap<unsigned, WebInspectorProxy*> ClientMap;
-    static WebInspectorServer& shared();
+    static WebInspectorServer& singleton();
 
     // Page registry to manage known pages.
     int registerPage(WebInspectorProxy* client);
@@ -67,10 +67,6 @@ private:
 
     void closeConnection(WebInspectorProxy*, WebSocketServerConnection*);
 
-#if PLATFORM(GTK)
-    String inspectorServerFilesPath();
-    String m_inspectorServerFilesPath;
-#endif
     unsigned m_nextAvailablePageId;
     ClientMap m_clientMap;
     HashMap<unsigned, WebSocketServerConnection*> m_connectionMap;

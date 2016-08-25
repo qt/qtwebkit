@@ -21,8 +21,11 @@
 #include "config.h"
 #include "CSSValueList.h"
 
+#include "CSSFunctionValue.h"
 #include "CSSParserValues.h"
-#include <wtf/PassOwnPtr.h>
+#include "CSSPrimitiveValue.h"
+#include "CSSVariableDependentValue.h"
+#include "CSSVariableValue.h"
 #include <wtf/text/StringBuilder.h>
 
 namespace WebCore {
@@ -39,36 +42,37 @@ CSSValueList::CSSValueList(ValueListSeparator listSeparator)
     m_valueListSeparator = listSeparator;
 }
 
-CSSValueList::CSSValueList(CSSParserValueList* parserValues)
+CSSValueList::CSSValueList(CSSParserValueList& parserValues)
     : CSSValue(ValueListClass)
 {
     m_valueListSeparator = SpaceSeparator;
-    if (parserValues) {
-        m_values.reserveInitialCapacity(parserValues->size());
-        for (unsigned i = 0; i < parserValues->size(); ++i)
-            m_values.uncheckedAppend(parserValues->valueAt(i)->createCSSValue());
+    m_values.reserveInitialCapacity(parserValues.size());
+    for (unsigned i = 0, size = parserValues.size(); i < size; ++i) {
+        RefPtr<CSSValue> value = parserValues.valueAt(i)->createCSSValue();
+        ASSERT(value);
+        m_values.uncheckedAppend(value.releaseNonNull());
     }
 }
 
-bool CSSValueList::removeAll(CSSValue* val)
+bool CSSValueList::removeAll(CSSValue* value)
 {
-    bool found = false;
-    for (size_t index = 0; index < m_values.size(); index++) {
-        RefPtr<CSSValue>& value = m_values.at(index);
-        if (value && val && value->equals(*val)) {
-            m_values.remove(index);
-            found = true;
-        }
-    }
+    // FIXME: Why even take a pointer?
+    if (!value)
+        return false;
 
-    return found;
+    return m_values.removeAllMatching([value] (const Ref<CSSValue>& current) {
+        return current->equals(*value);
+    }) > 0;
 }
 
 bool CSSValueList::hasValue(CSSValue* val) const
 {
-    for (size_t index = 0; index < m_values.size(); index++) {
-        const RefPtr<CSSValue>& value = m_values.at(index);
-        if (value && val && value->equals(*val))
+    // FIXME: Why even take a pointer?
+    if (!val)
+        return false;
+
+    for (unsigned i = 0, size = m_values.size(); i < size; ++i) {
+        if (m_values[i].get().equals(*val))
             return true;
     }
     return false;
@@ -90,12 +94,12 @@ PassRefPtr<CSSValueList> CSSValueList::copy()
     default:
         ASSERT_NOT_REACHED();
     }
-    for (size_t index = 0; index < m_values.size(); index++)
-        newList->append(m_values[index]);
+    for (auto& value : m_values)
+        newList->append(value.get());
     return newList.release();
 }
 
-String CSSValueList::customCssText() const
+String CSSValueList::customCSSText() const
 {
     StringBuilder result;
     String separator;
@@ -113,11 +117,16 @@ String CSSValueList::customCssText() const
         ASSERT_NOT_REACHED();
     }
 
-    unsigned size = m_values.size();
-    for (unsigned i = 0; i < size; i++) {
-        if (!result.isEmpty())
+    for (auto& value : m_values) {
+        bool suppressSeparator = false;
+        if (m_valueListSeparator == SpaceSeparator && value->isPrimitiveValue()) {
+            auto* primitiveValue = &downcast<CSSPrimitiveValue>(*value.ptr());
+            if (primitiveValue->parserOperator() == ',')
+                suppressSeparator = true;
+        }
+        if (!suppressSeparator && !result.isEmpty())
             result.append(separator);
-        result.append(m_values[i]->cssText());
+        result.append(value.get().cssText());
     }
 
     return result.toString();
@@ -125,7 +134,17 @@ String CSSValueList::customCssText() const
 
 bool CSSValueList::equals(const CSSValueList& other) const
 {
-    return m_valueListSeparator == other.m_valueListSeparator && compareCSSValueVector<CSSValue>(m_values, other.m_values);
+    if (m_valueListSeparator != other.m_valueListSeparator)
+        return false;
+
+    if (m_values.size() != other.m_values.size())
+        return false;
+
+    for (unsigned i = 0, size = m_values.size(); i < size; ++i) {
+        if (!m_values[i].get().equals(other.m_values[i]))
+            return false;
+    }
+    return true;
 }
 
 bool CSSValueList::equals(const CSSValue& other) const
@@ -133,51 +152,19 @@ bool CSSValueList::equals(const CSSValue& other) const
     if (m_values.size() != 1)
         return false;
 
-    const RefPtr<CSSValue>& value = m_values[0];
-    return value && value->equals(other);
+    return m_values[0].get().equals(other);
 }
 
-#if ENABLE(CSS_VARIABLES)
-String CSSValueList::customSerializeResolvingVariables(const HashMap<AtomicString, String>& variables) const
+void CSSValueList::addSubresourceStyleURLs(ListHashSet<URL>& urls, const StyleSheetContents* styleSheet) const
 {
-    StringBuilder result;
-    String separator;
-    switch (m_valueListSeparator) {
-    case SpaceSeparator:
-        separator = ASCIILiteral(" ");
-        break;
-    case CommaSeparator:
-        separator = ASCIILiteral(", ");
-        break;
-    case SlashSeparator:
-        separator = ASCIILiteral(" / ");
-        break;
-    default:
-        ASSERT_NOT_REACHED();
-    }
-
-    unsigned size = m_values.size();
-    for (unsigned i = 0; i < size; i++) {
-        if (!result.isEmpty())
-            result.append(separator);
-        result.append(m_values[i]->serializeResolvingVariables(variables));
-    }
-
-    return result.toString();
-}
-#endif
-
-void CSSValueList::addSubresourceStyleURLs(ListHashSet<KURL>& urls, const StyleSheetContents* styleSheet) const
-{
-    size_t size = m_values.size();
-    for (size_t i = 0; i < size; ++i)
-        m_values[i]->addSubresourceStyleURLs(urls, styleSheet);
+    for (unsigned i = 0, size = m_values.size(); i < size; ++i)
+        m_values[i].get().addSubresourceStyleURLs(urls, styleSheet);
 }
 
-bool CSSValueList::hasFailedOrCanceledSubresources() const
+bool CSSValueList::traverseSubresources(const std::function<bool (const CachedResource&)>& handler) const
 {
     for (unsigned i = 0; i < m_values.size(); ++i) {
-        if (m_values[i]->hasFailedOrCanceledSubresources())
+        if (m_values[i].get().traverseSubresources(handler))
             return true;
     }
     return false;
@@ -187,14 +174,110 @@ CSSValueList::CSSValueList(const CSSValueList& cloneFrom)
     : CSSValue(cloneFrom.classType(), /* isCSSOMSafe */ true)
 {
     m_valueListSeparator = cloneFrom.m_valueListSeparator;
-    m_values.resize(cloneFrom.m_values.size());
-    for (unsigned i = 0; i < m_values.size(); ++i)
-        m_values[i] = cloneFrom.m_values[i]->cloneForCSSOM();
+    m_values.reserveInitialCapacity(cloneFrom.m_values.size());
+    for (unsigned i = 0, size = cloneFrom.m_values.size(); i < size; ++i)
+        m_values.uncheckedAppend(*cloneFrom.m_values[i]->cloneForCSSOM());
 }
 
-PassRefPtr<CSSValueList> CSSValueList::cloneForCSSOM() const
+Ref<CSSValueList> CSSValueList::cloneForCSSOM() const
 {
-    return adoptRef(new CSSValueList(*this));
+    return adoptRef(*new CSSValueList(*this));
 }
 
+
+bool CSSValueList::containsVariables() const
+{
+    for (unsigned i = 0; i < m_values.size(); i++) {
+        if (m_values[i]->isVariableValue())
+            return true;
+        if (m_values[i]->isFunctionValue()) {
+            auto& functionValue = downcast<CSSFunctionValue>(*item(i));
+            CSSValueList* args = functionValue.arguments();
+            if (args && args->containsVariables())
+                return true;
+        } else if (m_values[i]->isValueList()) {
+            auto& listValue = downcast<CSSValueList>(*item(i));
+            if (listValue.containsVariables())
+                return true;
+        }
+    }
+    return false;
+}
+
+bool CSSValueList::checkVariablesForCycles(CustomPropertyValueMap& customProperties, HashSet<AtomicString>& seenProperties, HashSet<AtomicString>& invalidProperties) const
+{
+    for (unsigned i = 0; i < m_values.size(); i++) {
+        auto* value = item(i);
+        if (value->isVariableValue()) {
+            auto& variableValue = downcast<CSSVariableValue>(*value);
+            if (seenProperties.contains(variableValue.name()))
+                return false;
+            RefPtr<CSSValue> value = customProperties.get(variableValue.name());
+            if (value && value->isVariableDependentValue() && !downcast<CSSVariableDependentValue>(*value).checkVariablesForCycles(variableValue.name(), customProperties, seenProperties, invalidProperties))
+                return false;
+
+            // Have to check the fallback values.
+            auto* fallbackArgs = variableValue.fallbackArguments();
+            if (!fallbackArgs || !fallbackArgs->length())
+                continue;
+            
+            if (!fallbackArgs->checkVariablesForCycles(customProperties, seenProperties, invalidProperties))
+                return false;
+        } else if (value->isFunctionValue()) {
+            auto& functionValue = downcast<CSSFunctionValue>(*value);
+            auto* args = functionValue.arguments();
+            if (args && !args->checkVariablesForCycles(customProperties, seenProperties, invalidProperties))
+                return false;
+        } else if (value->isValueList()) {
+            auto& listValue = downcast<CSSValueList>(*value);
+            if (!listValue.checkVariablesForCycles(customProperties, seenProperties, invalidProperties))
+                return false;
+        }
+    }
+    return true;
+}
+
+bool CSSValueList::buildParserValueSubstitutingVariables(CSSParserValue* result, const CustomPropertyValueMap& customProperties) const
+{
+    result->id = CSSValueInvalid;
+    result->unit = CSSParserValue::ValueList;
+    result->valueList = new CSSParserValueList();
+    return buildParserValueListSubstitutingVariables(result->valueList, customProperties);
+}
+
+bool CSSValueList::buildParserValueListSubstitutingVariables(CSSParserValueList* parserList, const CustomPropertyValueMap& customProperties) const
+{
+    for (unsigned i = 0; i < m_values.size(); ++i) {
+        CSSParserValue result;
+        result.id = CSSValueInvalid;
+        switch (m_values[i]->classType()) {
+        case FunctionClass:
+            if (!downcast<CSSFunctionValue>(*m_values[i].ptr()).buildParserValueSubstitutingVariables(&result, customProperties))
+                return false;
+            parserList->addValue(result);
+            break;
+        case ValueListClass:
+            if (!downcast<CSSValueList>(*m_values[i].ptr()).buildParserValueSubstitutingVariables(&result, customProperties))
+                return false;
+            parserList->addValue(result);
+            break;
+        case VariableClass: {
+            if (!downcast<CSSVariableValue>(*m_values[i].ptr()).buildParserValueListSubstitutingVariables(parserList, customProperties))
+                return false;
+            break;
+        }
+        case PrimitiveClass:
+            // FIXME: Will have to change this if we start preserving invalid tokens.
+            if (downcast<CSSPrimitiveValue>(*m_values[i].ptr()).buildParserValue(&result))
+                parserList->addValue(result);
+            break;
+        default:
+            ASSERT_NOT_REACHED();
+            break;
+            return false;
+        }
+    }
+    return true;
+}
+    
 } // namespace WebCore

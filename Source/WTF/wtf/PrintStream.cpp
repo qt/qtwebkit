@@ -28,6 +28,7 @@
 
 #include <stdio.h>
 #include <wtf/text/CString.h>
+#include <wtf/text/UniquedStringImpl.h>
 #include <wtf/text/WTFString.h>
 
 namespace WTF {
@@ -52,6 +53,11 @@ void printInternal(PrintStream& out, const char* string)
     out.printf("%s", string);
 }
 
+void printInternal(PrintStream& out, const StringView& string)
+{
+    out.print(string.utf8());
+}
+
 void printInternal(PrintStream& out, const CString& string)
 {
     out.print(string.data());
@@ -60,6 +66,15 @@ void printInternal(PrintStream& out, const CString& string)
 void printInternal(PrintStream& out, const String& string)
 {
     out.print(string.utf8());
+}
+
+void printInternal(PrintStream& out, const StringImpl* string)
+{
+    if (!string) {
+        out.print("(null StringImpl*)");
+        return;
+    }
+    out.print(string->utf8());
 }
 
 void printInternal(PrintStream& out, bool value)
@@ -78,6 +93,26 @@ void printInternal(PrintStream& out, int value)
 void printInternal(PrintStream& out, unsigned value)
 {
     out.printf("%u", value);
+}
+
+void printInternal(PrintStream& out, signed char value)
+{
+    out.printf("%d", static_cast<int>(value));
+}
+
+void printInternal(PrintStream& out, unsigned char value)
+{
+    out.printf("%u", static_cast<unsigned>(value));
+}
+
+void printInternal(PrintStream& out, short value)
+{
+    out.printf("%d", static_cast<int>(value));
+}
+
+void printInternal(PrintStream& out, unsigned short value)
+{
+    out.printf("%u", static_cast<unsigned>(value));
 }
 
 void printInternal(PrintStream& out, long value)

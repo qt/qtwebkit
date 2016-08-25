@@ -27,18 +27,13 @@
 #define CopiedSpace_h
 
 #include "CopiedAllocator.h"
-#include "HeapBlock.h"
+#include "HeapOperation.h"
 #include "TinyBloomFilter.h"
 #include <wtf/Assertions.h>
 #include <wtf/CheckedBoolean.h>
 #include <wtf/DoublyLinkedList.h>
 #include <wtf/HashSet.h>
-#include <wtf/OSAllocator.h>
-#include <wtf/PageAllocationAligned.h>
-#include <wtf/PageBlock.h>
-#include <wtf/StdLibExtras.h>
-#include <wtf/TCSpinLock.h>
-#include <wtf/ThreadingPrimitives.h>
+#include <wtf/Lock.h>
 
 namespace JSC {
 
@@ -47,7 +42,7 @@ class CopiedBlock;
 
 class CopiedSpace {
     friend class CopyVisitor;
-    friend class GCThreadSharedData;
+    friend class Heap;
     friend class SlotVisitor;
     friend class JIT;
 public:
@@ -60,9 +55,12 @@ public:
     
     CopiedAllocator& allocator() { return m_allocator; }
 
+    void didStartFullCollection();
+
+    template <HeapOperation collectionType>
     void startedCopying();
     void doneCopying();
-    bool isInCopyPhase() { return m_inCopyingPhase; }
+    bool isInCopyPhase() const { return m_inCopyingPhase; }
 
     void pin(CopiedBlock*);
     bool isPinned(void*);
@@ -76,9 +74,18 @@ public:
     size_t capacity();
 
     bool isPagedOut(double deadline);
-    bool shouldDoCopyPhase() { return m_shouldDoCopyPhase; }
+    bool shouldDoCopyPhase() const { return m_shouldDoCopyPhase; }
 
     static CopiedBlock* blockFor(void*);
+
+    Heap* heap() const { return m_heap; }
+    
+    size_t takeBytesRemovedFromOldSpaceDueToReallocation()
+    {
+        size_t result = 0;
+        std::swap(m_bytesRemovedFromOldSpaceDueToReallocation, result);
+        return result;
+    }
 
 private:
     static bool isOversize(size_t);
@@ -91,34 +98,46 @@ private:
     CopiedBlock* allocateBlockForCopyingPhase();
 
     void doneFillingBlock(CopiedBlock*, CopiedBlock**);
-    void recycleEvacuatedBlock(CopiedBlock*);
+    void recycleEvacuatedBlock(CopiedBlock*, HeapOperation collectionType);
     void recycleBorrowedBlock(CopiedBlock*);
 
     Heap* m_heap;
 
     CopiedAllocator m_allocator;
 
-    TinyBloomFilter m_blockFilter;
     HashSet<CopiedBlock*> m_blockSet;
 
-    SpinLock m_toSpaceLock;
+    Lock m_toSpaceLock;
 
-    DoublyLinkedList<CopiedBlock>* m_toSpace;
-    DoublyLinkedList<CopiedBlock>* m_fromSpace;
-    
-    DoublyLinkedList<CopiedBlock> m_blocks1;
-    DoublyLinkedList<CopiedBlock> m_blocks2;
-    DoublyLinkedList<CopiedBlock> m_oversizeBlocks;
-   
+    struct CopiedGeneration {
+        CopiedGeneration()
+            : toSpace(0)
+            , fromSpace(0)
+        {
+        }
+
+        DoublyLinkedList<CopiedBlock>* toSpace;
+        DoublyLinkedList<CopiedBlock>* fromSpace;
+        
+        DoublyLinkedList<CopiedBlock> blocks1;
+        DoublyLinkedList<CopiedBlock> blocks2;
+        DoublyLinkedList<CopiedBlock> oversizeBlocks;
+
+        TinyBloomFilter blockFilter;
+    };
+
+    CopiedGeneration m_oldGen;
+    CopiedGeneration m_newGen;
+
     bool m_inCopyingPhase;
     bool m_shouldDoCopyPhase;
 
-    Mutex m_loanedBlocksLock; 
-    ThreadCondition m_loanedBlocksCondition;
+    Lock m_loanedBlocksLock;
     size_t m_numberOfLoanedBlocks;
+    
+    size_t m_bytesRemovedFromOldSpaceDueToReallocation;
 
     static const size_t s_maxAllocationSize = CopiedBlock::blockSize / 2;
-    static const size_t s_initialBlockNum = 16;
     static const size_t s_blockMask = ~(CopiedBlock::blockSize - 1);
 };
 

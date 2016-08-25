@@ -11,10 +11,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -29,28 +29,30 @@
 
 #include "WebGLProgram.h"
 
-#include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
 
 namespace WebCore {
 
-class WebGLUniformLocation : public RefCounted<WebGLUniformLocation> {
+class WebGLUniformLocation final : public RefCounted<WebGLUniformLocation> {
 public:
-    virtual ~WebGLUniformLocation() { }
+    ~WebGLUniformLocation() { }
 
-    static PassRefPtr<WebGLUniformLocation> create(WebGLProgram*, GC3Dint location);
+    static Ref<WebGLUniformLocation> create(WebGLProgram*, GC3Dint location, GC3Denum type);
 
     WebGLProgram* program() const;
 
     GC3Dint location() const;
+    
+    GC3Denum type() const;
 
 protected:
-    WebGLUniformLocation(WebGLProgram*, GC3Dint location);
+    WebGLUniformLocation(WebGLProgram*, GC3Dint location, GC3Denum type);
 
 private:
     RefPtr<WebGLProgram> m_program;
     GC3Dint m_location;
     unsigned m_linkCount;
+    GC3Denum m_type;
 };
 
 } // namespace WebCore

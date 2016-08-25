@@ -27,13 +27,13 @@
 #define StorageArea_h
 
 #include <wtf/Forward.h>
-#include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
 #include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
 class Frame;
+class SecurityOrigin;
 class StorageSyncManager;
 typedef int ExceptionCode;
 enum StorageType { LocalStorage, SessionStorage };
@@ -58,6 +58,8 @@ public:
     virtual void incrementAccessCount() { }
     virtual void decrementAccessCount() { }
     virtual void closeDatabaseIfIdle() { }
+
+    virtual SecurityOrigin& securityOrigin() = 0;
 };
 
 } // namespace WebCore

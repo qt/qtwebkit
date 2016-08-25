@@ -28,132 +28,34 @@
 #include "config.h"
 #include "AccessibilityController.h"
 
+#if HAVE(ACCESSIBILITY)
+
 #include "InjectedBundle.h"
 #include "InjectedBundlePage.h"
 
-#include <WebKit2/WKBundlePagePrivate.h>
+#include <WebKit/WKBundlePagePrivate.h>
 #include <atk/atk.h>
 #include <cstdio>
-#include <wtf/gobject/GOwnPtr.h>
+#include <wtf/glib/GUniquePtr.h>
 #include <wtf/text/StringBuilder.h>
 
 namespace WTR {
 
-static void printAccessibilityEvent(AtkObject* accessible, const gchar* signalName, const gchar* signalValue)
-{
-    // Do not handle state-change:defunct signals, as the AtkObject
-    // associated to them will not be valid at this point already.
-    if (!signalName || !g_strcmp0(signalName, "state-change:defunct"))
-        return;
-
-    if (!accessible || !ATK_IS_OBJECT(accessible))
-        return;
-
-    const gchar* objectName = atk_object_get_name(accessible);
-    AtkRole objectRole = atk_object_get_role(accessible);
-
-    // Try to always provide a name to be logged for the object.
-    if (!objectName || *objectName == '\0')
-        objectName = "(No name)";
-
-    GOwnPtr<gchar> signalNameAndValue(signalValue ? g_strdup_printf("%s = %s", signalName, signalValue) : g_strdup(signalName));
-    GOwnPtr<gchar> accessibilityEventString(g_strdup_printf("Accessibility object emitted \"%s\" / Name: \"%s\" / Role: %d\n", signalNameAndValue.get(), objectName, objectRole));
-    InjectedBundle::shared().outputText(String::fromUTF8(accessibilityEventString.get()));
-}
-
-static gboolean axObjectEventListener(GSignalInvocationHint *signalHint, guint numParamValues, const GValue *paramValues, gpointer data)
-{
-    // At least we should receive the instance emitting the signal.
-    if (numParamValues < 1)
-        return TRUE;
-
-    AtkObject* accessible = ATK_OBJECT(g_value_get_object(&paramValues[0]));
-    if (!accessible || !ATK_IS_OBJECT(accessible))
-        return TRUE;
-
-    GSignalQuery signalQuery;
-    GOwnPtr<gchar> signalName;
-    GOwnPtr<gchar> signalValue;
-
-    g_signal_query(signalHint->signal_id, &signalQuery);
-
-    if (!g_strcmp0(signalQuery.signal_name, "state-change")) {
-        signalName.set(g_strdup_printf("state-change:%s", g_value_get_string(&paramValues[1])));
-        signalValue.set(g_strdup_printf("%d", g_value_get_boolean(&paramValues[2])));
-    } else if (!g_strcmp0(signalQuery.signal_name, "focus-event")) {
-        signalName.set(g_strdup("focus-event"));
-        signalValue.set(g_strdup_printf("%d", g_value_get_boolean(&paramValues[1])));
-    } else if (!g_strcmp0(signalQuery.signal_name, "children-changed")) {
-        signalName.set(g_strdup("children-changed"));
-        signalValue.set(g_strdup_printf("%d", g_value_get_uint(&paramValues[1])));
-    } else if (!g_strcmp0(signalQuery.signal_name, "property-change"))
-        signalName.set(g_strdup_printf("property-change:%s", g_quark_to_string(signalHint->detail)));
-    else
-        signalName.set(g_strdup(signalQuery.signal_name));
-
-    printAccessibilityEvent(accessible, signalName.get(), signalValue.get());
-
-    return TRUE;
-}
-
 void AccessibilityController::logAccessibilityEvents()
 {
-    // Ensure no callbacks are connected before.
-    resetToConsistentState();
-
-    // Ensure that accessibility is initialized for the WebView by querying for
-    // the root accessible object, which will create the full hierarchy.
-    rootElement();
-
-    // Add global listeners for AtkObject's signals.
-    m_stateChangeListenerId = atk_add_global_event_listener(axObjectEventListener, "ATK:AtkObject:state-change");
-    m_focusEventListenerId = atk_add_global_event_listener(axObjectEventListener, "ATK:AtkObject:focus-event");
-    m_activeDescendantChangedListenerId = atk_add_global_event_listener(axObjectEventListener, "ATK:AtkObject:active-descendant-changed");
-    m_childrenChangedListenerId = atk_add_global_event_listener(axObjectEventListener, "ATK:AtkObject:children-changed");
-    m_propertyChangedListenerId = atk_add_global_event_listener(axObjectEventListener, "ATK:AtkObject:property-change");
-    m_visibleDataChangedListenerId = atk_add_global_event_listener(axObjectEventListener, "ATK:AtkObject:visible-data-changed");
-
-    // Ensure the Atk interface types are registered, otherwise
-    // the AtkDocument signal handlers below won't get registered.
-    GObject* dummyAxObject = G_OBJECT(g_object_new(ATK_TYPE_OBJECT, 0));
-    AtkObject* dummyNoOpAxObject = atk_no_op_object_new(dummyAxObject);
-    g_object_unref(G_OBJECT(dummyNoOpAxObject));
-    g_object_unref(dummyAxObject);
+    // No longer implemented for ATK. Use addNotificationListener() instead to
+    // check that relevant ATK signals are being emmitted in response to events.
 }
 
 void AccessibilityController::resetToConsistentState()
 {
-    // AtkObject signals.
-    if (m_stateChangeListenerId) {
-        atk_remove_global_event_listener(m_stateChangeListenerId);
-        m_stateChangeListenerId = 0;
-    }
-    if (m_focusEventListenerId) {
-        atk_remove_global_event_listener(m_focusEventListenerId);
-        m_focusEventListenerId = 0;
-    }
-    if (m_activeDescendantChangedListenerId) {
-        atk_remove_global_event_listener(m_activeDescendantChangedListenerId);
-        m_activeDescendantChangedListenerId = 0;
-    }
-    if (m_childrenChangedListenerId) {
-        atk_remove_global_event_listener(m_childrenChangedListenerId);
-        m_childrenChangedListenerId = 0;
-    }
-    if (m_propertyChangedListenerId) {
-        atk_remove_global_event_listener(m_propertyChangedListenerId);
-        m_propertyChangedListenerId = 0;
-    }
-    if (m_visibleDataChangedListenerId) {
-        atk_remove_global_event_listener(m_visibleDataChangedListenerId);
-        m_visibleDataChangedListenerId = 0;
-    }
+    m_globalNotificationHandler = nullptr;
 }
 
 static AtkObject* childElementById(AtkObject* parent, const char* id)
 {
     if (!ATK_IS_OBJECT(parent))
-        return 0;
+        return nullptr;
 
     bool parentFound = false;
     AtkAttributeSet* attributeSet = atk_object_get_attributes(parent);
@@ -177,29 +79,35 @@ static AtkObject* childElementById(AtkObject* parent, const char* id)
             return result;
     }
 
-    return 0;
+    return nullptr;
 }
 
 PassRefPtr<AccessibilityUIElement> AccessibilityController::accessibleElementById(JSStringRef id)
 {
-    AtkObject* root = ATK_OBJECT(WKAccessibilityRootObject(InjectedBundle::shared().page()->page()));
+    AtkObject* root = ATK_OBJECT(WKAccessibilityRootObject(InjectedBundle::singleton().page()->page()));
     if (!root)
-        return 0;
+        return nullptr;
 
     size_t bufferSize = JSStringGetMaximumUTF8CStringSize(id);
-    GOwnPtr<gchar> idBuffer(static_cast<gchar*>(g_malloc(bufferSize)));
+    GUniquePtr<gchar> idBuffer(static_cast<gchar*>(g_malloc(bufferSize)));
     JSStringGetUTF8CString(id, idBuffer.get(), bufferSize);
 
     AtkObject* result = childElementById(root, idBuffer.get());
     if (ATK_IS_OBJECT(result))
         return AccessibilityUIElement::create(result);
 
-    return 0;
+    return nullptr;
+}
+
+JSRetainPtr<JSStringRef> AccessibilityController::platformName()
+{
+    JSRetainPtr<JSStringRef> platformName(Adopt, JSStringCreateWithUTF8CString("atk"));
+    return platformName;
 }
 
 PassRefPtr<AccessibilityUIElement> AccessibilityController::rootElement()
 {
-    WKBundlePageRef page = InjectedBundle::shared().page()->page();
+    WKBundlePageRef page = InjectedBundle::singleton().page()->page();
     void* root = WKAccessibilityRootObject(page);
 
     return AccessibilityUIElement::create(static_cast<AtkObject*>(root));
@@ -207,10 +115,34 @@ PassRefPtr<AccessibilityUIElement> AccessibilityController::rootElement()
 
 PassRefPtr<AccessibilityUIElement> AccessibilityController::focusedElement()
 {
-    WKBundlePageRef page = InjectedBundle::shared().page()->page();
+    WKBundlePageRef page = InjectedBundle::singleton().page()->page();
     void* root = WKAccessibilityFocusedObject(page);
 
     return AccessibilityUIElement::create(static_cast<AtkObject*>(root));
 }
 
+bool AccessibilityController::addNotificationListener(JSValueRef functionCallback)
+{
+    if (!functionCallback)
+        return false;
+
+    // Only one global notification listener.
+    if (!m_globalNotificationHandler)
+        m_globalNotificationHandler = AccessibilityNotificationHandler::create();
+    m_globalNotificationHandler->setNotificationFunctionCallback(functionCallback);
+
+    return true;
+}
+
+bool AccessibilityController::removeNotificationListener()
+{
+    // Programmers should not be trying to remove a listener that's already removed.
+    ASSERT(m_globalNotificationHandler);
+
+    m_globalNotificationHandler = nullptr;
+    return false;
+}
+
 } // namespace WTR
+
+#endif // HAVE(ACCESSIBILITY)

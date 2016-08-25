@@ -29,11 +29,9 @@
  */
 
 #include "config.h"
-
-#if ENABLE(FILTERS)
 #include "DistantLightSource.h"
 
-#include "RenderTreeAsText.h"
+#include "TextStream.h"
 
 namespace WebCore {
 
@@ -76,5 +74,3 @@ TextStream& DistantLightSource::externalRepresentation(TextStream& ts) const
 }
 
 } // namespace WebCore
-
-#endif // ENABLE(FILTERS)

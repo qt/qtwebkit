@@ -30,13 +30,26 @@
 
 #include "RenderMathMLSquareRoot.h"
 
+#include "RenderMathMLMenclose.h"
+
 namespace WebCore {
     
-RenderMathMLSquareRoot::RenderMathMLSquareRoot(Element* element)
-    : RenderMathMLRoot(element)
+RenderMathMLSquareRoot::RenderMathMLSquareRoot(Element& element, Ref<RenderStyle>&& style)
+    : RenderMathMLRoot(element, WTFMove(style))
 {
 }
 
+RenderMathMLSquareRoot::RenderMathMLSquareRoot(Document& document, Ref<RenderStyle>&& style)
+    : RenderMathMLRoot(document, WTFMove(style))
+{
 }
 
+RenderPtr<RenderMathMLSquareRoot> RenderMathMLSquareRoot::createAnonymousWithParentRenderer(RenderMathMLMenclose& parent)
+{
+    RenderPtr<RenderMathMLSquareRoot> squareRoot = createRenderer<RenderMathMLSquareRoot>(parent.document(), RenderStyle::createAnonymousStyleWithDisplay(&parent.style(), FLEX));
+    squareRoot->initializeStyle();
+    return squareRoot;
+}
+
+}
 #endif // ENABLE(MATHML)

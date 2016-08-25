@@ -18,8 +18,6 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "SVGAnimatedEnumeration.h"
 
 #include "SVGAnimationElement.h"
@@ -64,7 +62,6 @@ static inline unsigned enumerationValueForTargetAttribute(SVGElement* targetElem
     if (attrName == SVGNames::spreadMethodAttr)
         return SVGPropertyTraits<SVGSpreadMethodType>::fromString(value);
 
-#if ENABLE(FILTERS)
     if (attrName == SVGNames::edgeModeAttr)
         return SVGPropertyTraits<EdgeModeType>::fromString(value);
 
@@ -88,15 +85,17 @@ static inline unsigned enumerationValueForTargetAttribute(SVGElement* targetElem
         return SVGPropertyTraits<ComponentTransferType>::fromString(value);
     }
 
-    if (attrName == SVGNames::modeAttr)
-        return SVGPropertyTraits<BlendModeType>::fromString(value);
+    if (attrName == SVGNames::modeAttr) {
+        BlendMode mode = BlendModeNormal;
+        parseBlendMode(value, mode);
+        return mode;
+    }
     if (attrName == SVGNames::stitchTilesAttr)
         return SVGPropertyTraits<SVGStitchOptions>::fromString(value);
     if (attrName == SVGNames::xChannelSelectorAttr)
         return SVGPropertyTraits<ChannelSelectorType>::fromString(value);
     if (attrName == SVGNames::yChannelSelectorAttr)
         return SVGPropertyTraits<ChannelSelectorType>::fromString(value);
-#endif
 
     ASSERT_NOT_REACHED();
     return 0;
@@ -107,15 +106,15 @@ SVGAnimatedEnumerationAnimator::SVGAnimatedEnumerationAnimator(SVGAnimationEleme
 {
 }
 
-PassOwnPtr<SVGAnimatedType> SVGAnimatedEnumerationAnimator::constructFromString(const String& string)
+std::unique_ptr<SVGAnimatedType> SVGAnimatedEnumerationAnimator::constructFromString(const String& string)
 {
     ASSERT(m_animationElement);
-    OwnPtr<SVGAnimatedType> animatedType = SVGAnimatedType::createEnumeration(new unsigned);
+    auto animatedType = SVGAnimatedType::createEnumeration(std::make_unique<unsigned>());
     animatedType->enumeration() = enumerationValueForTargetAttribute(m_animationElement->targetElement(), m_animationElement->attributeName(), string);
-    return animatedType.release();
+    return animatedType;
 }
 
-PassOwnPtr<SVGAnimatedType> SVGAnimatedEnumerationAnimator::startAnimValAnimation(const SVGElementAnimatedPropertyList& animatedTypes)
+std::unique_ptr<SVGAnimatedType> SVGAnimatedEnumerationAnimator::startAnimValAnimation(const SVGElementAnimatedPropertyList& animatedTypes)
 {
     return SVGAnimatedType::createEnumeration(constructFromBaseValue<SVGAnimatedEnumeration>(animatedTypes));
 }
@@ -125,7 +124,7 @@ void SVGAnimatedEnumerationAnimator::stopAnimValAnimation(const SVGElementAnimat
     stopAnimValAnimationForType<SVGAnimatedEnumeration>(animatedTypes);
 }
 
-void SVGAnimatedEnumerationAnimator::resetAnimValToBaseVal(const SVGElementAnimatedPropertyList& animatedTypes, SVGAnimatedType* type)
+void SVGAnimatedEnumerationAnimator::resetAnimValToBaseVal(const SVGElementAnimatedPropertyList& animatedTypes, SVGAnimatedType& type)
 {
     resetFromBaseValue<SVGAnimatedEnumeration>(animatedTypes, type, &SVGAnimatedType::enumeration);
 }
@@ -164,5 +163,3 @@ float SVGAnimatedEnumerationAnimator::calculateDistance(const String&, const Str
 }
 
 }
-
-#endif // ENABLE(SVG)

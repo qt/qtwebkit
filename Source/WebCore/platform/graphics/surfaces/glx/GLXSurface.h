@@ -26,7 +26,7 @@
 #ifndef GLXSurface_h
 #define GLXSurface_h
 
-#if USE(ACCELERATED_COMPOSITING) && USE(GLX)
+#if USE(GLX)
 
 #include "GLTransportSurface.h"
 #include "GLXConfigSelector.h"
@@ -39,14 +39,15 @@ class GLXTransportSurface : public GLTransportSurface {
 public:
     GLXTransportSurface(const IntSize&, SurfaceAttributes);
     virtual ~GLXTransportSurface();
-    virtual PlatformSurfaceConfig configuration() OVERRIDE;
-    virtual void swapBuffers() OVERRIDE;
-    virtual void setGeometry(const IntRect&) OVERRIDE;
-    virtual GLPlatformSurface::SurfaceAttributes attributes() const OVERRIDE;
-    virtual void destroy() OVERRIDE;
+    virtual PlatformSurfaceConfig configuration() override;
+    virtual void swapBuffers() override;
+    virtual void setGeometry(const IntRect&) override;
+    virtual GLPlatformSurface::SurfaceAttributes attributes() const override;
+    virtual bool isCurrentDrawable() const override;
+    virtual void destroy() override;
 
 private:
-    OwnPtr<GLXConfigSelector> m_configSelector;
+    std::unique_ptr<GLXConfigSelector> m_configSelector;
 };
 
 class GLXOffScreenSurface : public GLPlatformSurface {
@@ -54,13 +55,14 @@ class GLXOffScreenSurface : public GLPlatformSurface {
 public:
     GLXOffScreenSurface(SurfaceAttributes);
     virtual ~GLXOffScreenSurface();
-    virtual PlatformSurfaceConfig configuration() OVERRIDE;
-    virtual void destroy() OVERRIDE;
+    virtual PlatformSurfaceConfig configuration() override;
+    virtual bool isCurrentDrawable() const override;
+    virtual void destroy() override;
 
 private:
     void initialize(SurfaceAttributes);
     void freeResources();
-    OwnPtr<GLXConfigSelector> m_configSelector;
+    std::unique_ptr<GLXConfigSelector> m_configSelector;
     Pixmap m_pixmap;
     GLXPixmap m_glxPixmap;
 };
@@ -70,8 +72,8 @@ class GLXTransportSurfaceClient : public GLTransportSurfaceClient {
 public:
     GLXTransportSurfaceClient(const PlatformBufferHandle, bool);
     virtual ~GLXTransportSurfaceClient();
-    virtual void prepareTexture() OVERRIDE;
-    virtual void destroy() OVERRIDE;
+    virtual void prepareTexture() override;
+    virtual void destroy() override;
 
 private:
     Pixmap m_xPixmap;

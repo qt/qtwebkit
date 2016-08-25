@@ -21,14 +21,13 @@
 #ifndef SVGPathSegCurvetoCubicSmooth_h
 #define SVGPathSegCurvetoCubicSmooth_h
 
-#if ENABLE(SVG)
 #include "SVGPathSegWithContext.h"
 
 namespace WebCore {
 
 class SVGPathSegCurvetoCubicSmooth : public SVGPathSegWithContext {
 public:
-    SVGPathSegCurvetoCubicSmooth(SVGPathElement* element, SVGPathSegRole role, float x, float y, float x2, float y2)
+    SVGPathSegCurvetoCubicSmooth(const SVGPathElement& element, SVGPathSegRole role, float x, float y, float x2, float y2)
         : SVGPathSegWithContext(element, role)
         , m_x(x)
         , m_y(y)
@@ -74,5 +73,4 @@ private:
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif

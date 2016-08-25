@@ -25,36 +25,36 @@
 
 namespace JSC {
 
-    class ObjectPrototype;
+class ObjectPrototype;
 
-    class DatePrototype : public DateInstance {
-    private:
-        DatePrototype(ExecState*, Structure*);
+class DatePrototype : public JSNonFinalObject {
+private:
+    DatePrototype(VM&, Structure*);
 
-    public:
-        typedef DateInstance Base;
+public:
+    typedef JSNonFinalObject Base;
+    static const unsigned StructureFlags = Base::StructureFlags | OverridesGetOwnPropertySlot;
 
-        static DatePrototype* create(ExecState* exec, JSGlobalObject* globalObject, Structure* structure)
-        {
-            DatePrototype* prototype = new (NotNull, allocateCell<DatePrototype>(*exec->heap())) DatePrototype(exec, structure);
-            prototype->finishCreation(exec, globalObject);
-            return prototype;
-        }
-        static bool getOwnPropertySlot(JSCell*, ExecState*, PropertyName, PropertySlot&);
+    static DatePrototype* create(VM& vm, JSGlobalObject* globalObject, Structure* structure)
+    {
+        DatePrototype* prototype = new (NotNull, allocateCell<DatePrototype>(vm.heap)) DatePrototype(vm, structure);
+        prototype->finishCreation(vm, globalObject);
+        return prototype;
+    }
+    static bool getOwnPropertySlot(JSObject*, ExecState*, PropertyName, PropertySlot&);
 
-        static bool getOwnPropertyDescriptor(JSObject*, ExecState*, PropertyName, PropertyDescriptor&);
+    DECLARE_INFO;
 
-        static const ClassInfo s_info;
+    static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype)
+    {
+        return Structure::create(vm, globalObject, prototype, TypeInfo(ObjectType, StructureFlags), info());
+    }
 
-        static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype)
-        {
-            return Structure::create(vm, globalObject, prototype, TypeInfo(ObjectType, StructureFlags), &s_info);
-        }
+protected:
+    void finishCreation(VM&, JSGlobalObject*);
+};
 
-    protected:
-        void finishCreation(ExecState*, JSGlobalObject*);
-        static const unsigned StructureFlags = OverridesGetOwnPropertySlot | DateInstance::StructureFlags;
-    };
+EncodedJSValue JSC_HOST_CALL dateProtoFuncGetTime(ExecState*);
 
 } // namespace JSC
 

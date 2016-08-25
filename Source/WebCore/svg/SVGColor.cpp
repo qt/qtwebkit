@@ -20,8 +20,6 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "SVGColor.h"
 
 #include "CSSParser.h"
@@ -42,14 +40,17 @@ SVGColor::SVGColor(ClassType classType, const SVGColorType& colorType)
 {
 }
 
-PassRefPtr<RGBColor> SVGColor::rgbColor() const
+Ref<RGBColor> SVGColor::rgbColor() const
 {
     return RGBColor::create(m_color.rgb());
 }
 
 Color SVGColor::colorFromRGBColorString(const String& colorString)
 {
-    // FIXME: Rework css parser so it is more SVG aware.
+    // FIXME: Rename to parseSVGColor? There's already a parseSVGColor in the CSS parser. How is it different?
+    // FIXME: Rework CSS parser so it exactly matches what the SVG specification requires?
+    // FIXME: Move this out of the SVGColor class?
+    // FIXME: Is it really OK to do stripWhitespace here instead of stripLeadingAndTrailingHTMLSpaces?
     RGBA32 color;
     if (CSSParser::parseColor(color, colorString.stripWhiteSpace()))
         return color;
@@ -59,7 +60,7 @@ Color SVGColor::colorFromRGBColorString(const String& colorString)
 void SVGColor::setRGBColor(const String&, ExceptionCode& ec)
 {
     // The whole SVGColor interface is deprecated in SVG 1.1 (2nd edition).
-    // The setters are the most problematic part so we remove the support for those first.
+    // Since the setters are the most problematic part, we removed the support for those first.
     ec = NO_MODIFICATION_ALLOWED_ERR;
 }
 
@@ -73,7 +74,7 @@ void SVGColor::setColor(unsigned short, const String&, const String&, ExceptionC
     ec = NO_MODIFICATION_ALLOWED_ERR;
 }
 
-String SVGColor::customCssText() const
+String SVGColor::customCSSText() const
 {
     switch (m_colorType) {
     case SVG_COLORTYPE_UNKNOWN:
@@ -81,11 +82,11 @@ String SVGColor::customCssText() const
     case SVG_COLORTYPE_RGBCOLOR_ICCCOLOR:
     case SVG_COLORTYPE_RGBCOLOR:
         // FIXME: No ICC color support.
-        return m_color.serialized();
+        return m_color.cssText();
     case SVG_COLORTYPE_CURRENTCOLOR:
         if (m_color.isValid())
-            return m_color.serialized();
-        return "currentColor";
+            return m_color.cssText();
+        return ASCIILiteral("currentColor");
     }
 
     ASSERT_NOT_REACHED();
@@ -99,9 +100,9 @@ SVGColor::SVGColor(ClassType classType, const SVGColor& cloneFrom)
 {
 }
 
-PassRefPtr<SVGColor> SVGColor::cloneForCSSOM() const
+Ref<SVGColor> SVGColor::cloneForCSSOM() const
 {
-    return adoptRef(new SVGColor(SVGColorClass, *this));
+    return adoptRef(*new SVGColor(SVGColorClass, *this));
 }
 
 bool SVGColor::equals(const SVGColor& other) const
@@ -110,5 +111,3 @@ bool SVGColor::equals(const SVGColor& other) const
 }
 
 }
-
-#endif // ENABLE(SVG)

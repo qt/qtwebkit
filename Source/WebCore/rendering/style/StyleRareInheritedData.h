@@ -26,14 +26,15 @@
 #define StyleRareInheritedData_h
 
 #include "Color.h"
+#include "DataRef.h"
 #include "Length.h"
+#include "StyleCustomPropertyData.h"
 #include <wtf/RefCounted.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/text/AtomicString.h>
 
-#if ENABLE(CSS_VARIABLES)
-#include "DataRef.h"
-#include "StyleVariableData.h"
+#if ENABLE(IOS_TEXT_AUTOSIZING)
+#include "TextSizeAdjustment.h"
 #endif
 
 namespace WebCore {
@@ -48,8 +49,8 @@ class StyleImage;
 // actually uses one of these properties.
 class StyleRareInheritedData : public RefCounted<StyleRareInheritedData> {
 public:
-    static PassRefPtr<StyleRareInheritedData> create() { return adoptRef(new StyleRareInheritedData); }
-    PassRefPtr<StyleRareInheritedData> copy() const { return adoptRef(new StyleRareInheritedData(*this)); }
+    static Ref<StyleRareInheritedData> create() { return adoptRef(*new StyleRareInheritedData); }
+    Ref<StyleRareInheritedData> copy() const;
     ~StyleRareInheritedData();
 
     bool operator==(const StyleRareInheritedData& o) const;
@@ -57,7 +58,6 @@ public:
     {
         return !(*this == o);
     }
-    bool shadowDataEquivalent(const StyleRareInheritedData&) const;
 
     RefPtr<StyleImage> listStyleImage;
 
@@ -70,12 +70,15 @@ public:
     Color visitedLinkTextFillColor;
     Color visitedLinkTextEmphasisColor;    
 
-    OwnPtr<ShadowData> textShadow; // Our text shadow information for shadowed text drawing.
-    AtomicString highlight; // Apple-specific extension for custom highlight rendering.
+    std::unique_ptr<ShadowData> textShadow; // Our text shadow information for shadowed text drawing.
     
     RefPtr<CursorList> cursorData;
     Length indent;
     float m_effectiveZoom;
+    
+    Length wordSpacing;
+
+    DataRef<StyleCustomPropertyData> m_customProperties;
 
     // Paged media properties.
     short widows;
@@ -89,14 +92,13 @@ public:
     unsigned overflowWrap : 1; // EOverflowWrap
     unsigned nbspMode : 1; // ENBSPMode
     unsigned lineBreak : 3; // LineBreak
-    unsigned resize : 2; // EResize
     unsigned userSelect : 2; // EUserSelect
     unsigned colorSpace : 1; // ColorSpace
     unsigned speak : 3; // ESpeak
     unsigned hyphens : 2; // Hyphens
     unsigned textEmphasisFill : 1; // TextEmphasisFill
     unsigned textEmphasisMark : 3; // TextEmphasisMark
-    unsigned textEmphasisPosition : 1; // TextEmphasisPosition
+    unsigned textEmphasisPosition : 4; // TextEmphasisPosition
     unsigned m_textOrientation : 2; // TextOrientation
 #if ENABLE(CSS3_TEXT)
     unsigned m_textIndentLine : 1; // TextIndentLine
@@ -107,7 +109,7 @@ public:
 #if ENABLE(CSS_IMAGE_ORIENTATION)
     unsigned m_imageOrientation : 4; // ImageOrientationEnum
 #endif
-    unsigned m_imageRendering : 2; // EImageRendering
+    unsigned m_imageRendering : 3; // EImageRendering
     unsigned m_lineSnap : 2; // LineSnap
     unsigned m_lineAlign : 1; // LineAlign
 #if ENABLE(ACCELERATED_OVERFLOW_SCROLLING)
@@ -119,17 +121,27 @@ public:
 #endif
 #if ENABLE(CSS3_TEXT)
     unsigned m_textAlignLast : 3; // TextAlignLast
-    unsigned m_textJustify : 3; // TextJustify
-    unsigned m_textUnderlinePosition : 3; // TextUnderlinePosition
+    unsigned m_textJustify : 2; // TextJustify
 #endif // CSS3_TEXT
-    unsigned m_rubyPosition : 1; // RubyPosition
+    unsigned m_textDecorationSkip : 5; // TextDecorationSkip
+    unsigned m_textUnderlinePosition : 3; // TextUnderlinePosition
+    unsigned m_rubyPosition : 2; // RubyPosition
+    unsigned m_textZoom: 1; // TextZoom
+
+#if PLATFORM(IOS)
+    unsigned touchCalloutEnabled : 1;
+#endif
+
+#if ENABLE(CSS_TRAILING_WORD)
+    unsigned trailingWord : 1;
+#endif
+
+    unsigned m_hangingPunctuation : 4;
 
     AtomicString hyphenationString;
     short hyphenationLimitBefore;
     short hyphenationLimitAfter;
     short hyphenationLimitLines;
-
-    AtomicString locale;
 
     AtomicString textEmphasisCustomMark;
     RefPtr<QuotesData> quotes;
@@ -137,16 +149,16 @@ public:
     AtomicString m_lineGrid;
     unsigned m_tabSize;
 
+#if ENABLE(IOS_TEXT_AUTOSIZING)
+    TextSizeAdjustment textSizeAdjust;
+#endif
+
 #if ENABLE(CSS_IMAGE_RESOLUTION)
     float m_imageResolution;
 #endif
 
 #if ENABLE(TOUCH_EVENTS)
     Color tapHighlightColor;
-#endif
-
-#if ENABLE(CSS_VARIABLES)
-    DataRef<StyleVariableData> m_variables;
 #endif
 
 private:

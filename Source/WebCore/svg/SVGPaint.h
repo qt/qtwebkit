@@ -23,7 +23,6 @@
 #ifndef SVGPaint_h
 #define SVGPaint_h
 
-#if ENABLE(SVG)
 #include "SVGColor.h"
 #include <wtf/text/WTFString.h>
 
@@ -44,45 +43,38 @@ public:
         SVG_PAINTTYPE_URI = 107
     };
 
-    static PassRefPtr<SVGPaint> createUnknown()
+    static Ref<SVGPaint> createNone()
     {
-        return adoptRef(new SVGPaint(SVG_PAINTTYPE_UNKNOWN));
+        return adoptRef(*new SVGPaint(SVG_PAINTTYPE_NONE));
     }
 
-    static PassRefPtr<SVGPaint> createNone()
+    static Ref<SVGPaint> createCurrentColor()
     {
-        return adoptRef(new SVGPaint(SVG_PAINTTYPE_NONE));
+        return adoptRef(*new SVGPaint(SVG_PAINTTYPE_CURRENTCOLOR));
     }
 
-    static PassRefPtr<SVGPaint> createCurrentColor()
+    static Ref<SVGPaint> createColor(const Color& color)
     {
-        return adoptRef(new SVGPaint(SVG_PAINTTYPE_CURRENTCOLOR));
+        auto paint = adoptRef(*new SVGPaint(SVG_PAINTTYPE_RGBCOLOR));
+        paint.get().setColor(color);
+        return paint;
     }
 
-    static PassRefPtr<SVGPaint> createColor(const Color& color)
+    static Ref<SVGPaint> createURI(const String& uri)
     {
-        RefPtr<SVGPaint> paint = adoptRef(new SVGPaint(SVG_PAINTTYPE_RGBCOLOR));
-        paint->setColor(color);
-        return paint.release();
+        return adoptRef(*new SVGPaint(SVG_PAINTTYPE_URI, uri));
     }
 
-    static PassRefPtr<SVGPaint> createURI(const String& uri)
+    static Ref<SVGPaint> createURIAndColor(const String& uri, const Color& color)
     {
-        RefPtr<SVGPaint> paint = adoptRef(new SVGPaint(SVG_PAINTTYPE_URI, uri));
-        return paint.release();
+        auto paint = adoptRef(*new SVGPaint(SVG_PAINTTYPE_URI_RGBCOLOR, uri));
+        paint.get().setColor(color);
+        return paint;
     }
 
-    static PassRefPtr<SVGPaint> createURIAndColor(const String& uri, const Color& color)
+    static Ref<SVGPaint> createURIAndNone(const String& uri)
     {
-        RefPtr<SVGPaint> paint = adoptRef(new SVGPaint(SVG_PAINTTYPE_URI_RGBCOLOR, uri));
-        paint->setColor(color);
-        return paint.release();
-    }
-
-    static PassRefPtr<SVGPaint> createURIAndNone(const String& uri)
-    {
-        RefPtr<SVGPaint> paint = adoptRef(new SVGPaint(SVG_PAINTTYPE_URI_NONE, uri));
-        return paint.release();
+        return adoptRef(*new SVGPaint(SVG_PAINTTYPE_URI_NONE, uri));
     }
 
     const SVGPaintType& paintType() const { return m_paintType; }
@@ -91,20 +83,20 @@ public:
     void setUri(const String&);
     void setPaint(unsigned short paintType, const String& uri, const String& rgbColor, const String& iccColor, ExceptionCode&);
 
-    String customCssText() const;
+    String customCSSText() const;
 
-    PassRefPtr<SVGPaint> cloneForCSSOM() const;
+    Ref<SVGPaint> cloneForCSSOM() const;
 
     bool equals(const SVGPaint&) const;
 
 private:
     friend class ComputedStyleExtractor;
 
-    static PassRefPtr<SVGPaint> create(const SVGPaintType& type, const String& uri, const Color& color)
+    static Ref<SVGPaint> create(const SVGPaintType& type, const String& uri, const Color& color)
     {
-        RefPtr<SVGPaint> paint = adoptRef(new SVGPaint(type, uri));
-        paint->setColor(color);
-        return paint.release();
+        auto paint = adoptRef(*new SVGPaint(type, uri));
+        paint.get().setColor(color);
+        return paint;
     }
 
 private:
@@ -117,5 +109,6 @@ private:
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
+SPECIALIZE_TYPE_TRAITS_CSS_VALUE(SVGPaint, isSVGPaint())
+
 #endif // SVGPaint_h

@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -30,7 +30,6 @@
 #include "HTMLCollection.h"
 #include "HTMLFrameElement.h"
 #include "HTMLFrameSetElement.h"
-#include "HTMLNames.h"
 #include "JSDOMWindow.h"
 #include "JSDOMWindowShell.h"
 #include "JSDOMBinding.h"
@@ -39,23 +38,19 @@ using namespace JSC;
 
 namespace WebCore {
 
-using namespace HTMLNames;
-
-bool JSHTMLFrameSetElement::canGetItemsForName(ExecState*, HTMLFrameSetElement* frameSet, PropertyName propertyName)
+bool JSHTMLFrameSetElement::nameGetter(ExecState* exec, PropertyName propertyName, JSValue& value)
 {
-    Node* frame = frameSet->children()->namedItem(propertyNameToAtomicString(propertyName));
-    return frame && frame->hasTagName(frameTag);
-}
+    auto* frameElement = wrapped().children()->namedItem(propertyNameToAtomicString(propertyName));
+    if (!is<HTMLFrameElement>(frameElement))
+        return false;
 
-JSValue JSHTMLFrameSetElement::nameGetter(ExecState* exec, JSValue slotBase, PropertyName propertyName)
-{
-    HTMLElement* element = jsCast<JSHTMLElement*>(asObject(slotBase))->impl();
-    Node* frameElement = element->children()->namedItem(propertyNameToAtomicString(propertyName));
-    if (Document* document = static_cast<HTMLFrameElement*>(frameElement)->contentDocument()) {
-        if (JSDOMWindowShell* window = toJSDOMWindowShell(document->frame(), currentWorld(exec)))
-            return window;
+    if (auto* document = downcast<HTMLFrameElement>(*frameElement).contentDocument()) {
+        if (JSDOMWindowShell* window = toJSDOMWindowShell(document->frame(), currentWorld(exec))) {
+            value = window;
+            return true;
+        }
     }
-    return jsUndefined();
+    return false;
 }
 
 } // namespace WebCore

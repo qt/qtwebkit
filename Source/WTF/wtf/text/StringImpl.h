@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 1999 Lars Knoll (knoll@kde.org)
- * Copyright (C) 2005, 2006, 2007, 2008, 2009, 2010, 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2005-2010, 2013-2016 Apple Inc. All rights reserved.
  * Copyright (C) 2009 Google Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
@@ -24,12 +24,16 @@
 #define StringImpl_h
 
 #include <limits.h>
+#include <unicode/uchar.h>
+#include <unicode/ustring.h>
 #include <wtf/ASCIICType.h>
 #include <wtf/Forward.h>
+#include <wtf/Hasher.h>
+#include <wtf/MathExtras.h>
 #include <wtf/StdLibExtras.h>
-#include <wtf/StringHasher.h>
 #include <wtf/Vector.h>
-#include <wtf/unicode/Unicode.h>
+#include <wtf/text/ConversionMode.h>
+#include <wtf/text/StringCommon.h>
 
 #if PLATFORM(QT)
 #include <QString>
@@ -43,49 +47,40 @@ typedef const struct __CFString * CFStringRef;
 @class NSString;
 #endif
 
-#if PLATFORM(BLACKBERRY)
-#include <BlackBerryPlatformString.h>
-#endif
-
-// FIXME: This is a temporary layering violation while we move string code to WTF.
-// Landing the file moves in one patch, will follow on with patches to change the namespaces.
 namespace JSC {
-struct IdentifierASCIIStringTranslator;
 namespace LLInt { class Data; }
 class LLIntOffsetsExtractor;
-template <typename T> struct IdentifierCharBufferTranslator;
-struct IdentifierLCharFromUCharTranslator;
 }
 
 namespace WTF {
 
+class SymbolImpl;
+class SymbolRegistry;
+
 struct CStringTranslator;
-template<typename CharacterType> struct HashAndCharactersTranslator;
+struct CharBufferFromLiteralDataTranslator;
 struct HashAndUTF8CharactersTranslator;
 struct LCharBufferTranslator;
-struct CharBufferFromLiteralDataTranslator;
+struct StringHash;
 struct SubstringTranslator;
 struct UCharBufferTranslator;
+
 template<typename> class RetainPtr;
+
+template<typename> struct HashAndCharactersTranslator;
 
 enum TextCaseSensitivity {
     TextCaseSensitive,
     TextCaseInsensitive
 };
 
-enum HasTerminatingNullCharacter {
-    DoesNotHaveTerminatingNullCharacter,
-    DoesHaveTerminatingNullCharacter,
-};
-
-
 typedef bool (*CharacterMatchFunctionPtr)(UChar);
 typedef bool (*IsWhiteSpaceFunctionPtr)(UChar);
 
-// Define STRING_STATS to turn on run time statistics of string sizes and memory usage
-#undef STRING_STATS
+// Define STRING_STATS to 1 turn on run time statistics of string sizes and memory usage
+#define STRING_STATS 0
 
-#ifdef STRING_STATS
+#if STRING_STATS
 struct StringStats {
     inline void add8BitString(unsigned length, bool isSubString = false)
     {
@@ -103,33 +98,29 @@ struct StringStats {
             m_total16BitData += length;
     }
 
-    inline void addUpconvertedString(unsigned length)
-    {
-        ++m_numberUpconvertedStrings;
-        m_totalUpconvertedData += length;
-    }
-
-    void removeString(StringImpl*);
+    void removeString(StringImpl&);
     void printStats();
 
     static const unsigned s_printStringStatsFrequency = 5000;
-    static unsigned s_stringRemovesTillPrintStats;
+    static std::atomic<unsigned> s_stringRemovesTillPrintStats;
 
-    unsigned m_totalNumberStrings;
-    unsigned m_number8BitStrings;
-    unsigned m_number16BitStrings;
-    unsigned m_numberUpconvertedStrings;
-    unsigned long long m_total8BitData;
-    unsigned long long m_total16BitData;
-    unsigned long long m_totalUpconvertedData;
+    std::atomic<unsigned> m_refCalls;
+    std::atomic<unsigned> m_derefCalls;
+
+    std::atomic<unsigned> m_totalNumberStrings;
+    std::atomic<unsigned> m_number8BitStrings;
+    std::atomic<unsigned> m_number16BitStrings;
+    std::atomic<unsigned long long> m_total8BitData;
+    std::atomic<unsigned long long> m_total16BitData;
 };
 
 #define STRING_STATS_ADD_8BIT_STRING(length) StringImpl::stringStats().add8BitString(length)
 #define STRING_STATS_ADD_8BIT_STRING2(length, isSubString) StringImpl::stringStats().add8BitString(length, isSubString)
 #define STRING_STATS_ADD_16BIT_STRING(length) StringImpl::stringStats().add16BitString(length)
 #define STRING_STATS_ADD_16BIT_STRING2(length, isSubString) StringImpl::stringStats().add16BitString(length, isSubString)
-#define STRING_STATS_ADD_UPCONVERTED_STRING(length) StringImpl::stringStats().addUpconvertedString(length)
 #define STRING_STATS_REMOVE_STRING(string) StringImpl::stringStats().removeString(string)
+#define STRING_STATS_REF_STRING(string) ++StringImpl::stringStats().m_refCalls;
+#define STRING_STATS_DEREF_STRING(string) ++StringImpl::stringStats().m_derefCalls;
 #else
 #define STRING_STATS_ADD_8BIT_STRING(length) ((void)0)
 #define STRING_STATS_ADD_8BIT_STRING2(length, isSubString) ((void)0)
@@ -137,14 +128,12 @@ struct StringStats {
 #define STRING_STATS_ADD_16BIT_STRING2(length, isSubString) ((void)0)
 #define STRING_STATS_ADD_UPCONVERTED_STRING(length) ((void)0)
 #define STRING_STATS_REMOVE_STRING(string) ((void)0)
+#define STRING_STATS_REF_STRING(string) ((void)0)
+#define STRING_STATS_DEREF_STRING(string) ((void)0)
 #endif
 
 class StringImpl {
     WTF_MAKE_NONCOPYABLE(StringImpl); WTF_MAKE_FAST_ALLOCATED;
-    friend struct JSC::IdentifierASCIIStringTranslator;
-    friend struct JSC::IdentifierCharBufferTranslator<LChar>;
-    friend struct JSC::IdentifierCharBufferTranslator<UChar>;
-    friend struct JSC::IdentifierLCharFromUCharTranslator;
     friend struct WTF::CStringTranslator;
     template<typename CharacterType> friend struct WTF::HashAndCharactersTranslator;
     friend struct WTF::HashAndUTF8CharactersTranslator;
@@ -152,7 +141,6 @@ class StringImpl {
     friend struct WTF::LCharBufferTranslator;
     friend struct WTF::SubstringTranslator;
     friend struct WTF::UCharBufferTranslator;
-    friend class AtomicStringImpl;
     friend class JSC::LLInt::Data;
     friend class JSC::LLIntOffsetsExtractor;
     
@@ -161,40 +149,37 @@ private:
         BufferInternal,
         BufferOwned,
         BufferSubstring,
-#if PLATFORM(QT)
-        BufferAdoptedQString
-#endif
-        // NOTE: Adding more ownership types needs to extend m_hashAndFlags as we're at capacity
+    };
+
+    // The bottom 6 bits in the hash are flags.
+    static const unsigned s_flagCount = 6;
+    static const unsigned s_flagMask = (1u << s_flagCount) - 1;
+    COMPILE_ASSERT(s_flagCount <= StringHasher::flagCount, StringHasher_reserves_enough_bits_for_StringImpl_flags);
+    static const unsigned s_flagStringKindCount = 4;
+
+    static const unsigned s_hashFlagStringKindIsAtomic = 1u << (s_flagStringKindCount);
+    static const unsigned s_hashFlagStringKindIsSymbol = 1u << (s_flagStringKindCount + 1);
+    static const unsigned s_hashMaskStringKind = s_hashFlagStringKindIsAtomic | s_hashFlagStringKindIsSymbol;
+    static const unsigned s_hashFlag8BitBuffer = 1u << 3;
+    static const unsigned s_hashFlagDidReportCost = 1u << 2;
+    static const unsigned s_hashMaskBufferOwnership = (1u << 0) | (1u << 1);
+
+    enum StringKind {
+        StringNormal = 0u, // non-symbol, non-atomic
+        StringAtomic = s_hashFlagStringKindIsAtomic, // non-symbol, atomic
+        StringSymbol = s_hashFlagStringKindIsSymbol, // symbol, non-atomic
     };
 
     // Used to construct static strings, which have an special refCount that can never hit zero.
     // This means that the static string will never be destroyed, which is important because
     // static strings will be shared across threads & ref-counted in a non-threadsafe manner.
-    enum ConstructStaticStringTag { ConstructStaticString };
-    StringImpl(const UChar* characters, unsigned length, ConstructStaticStringTag)
+    friend class NeverDestroyed<StringImpl>;
+    enum ConstructEmptyStringTag { ConstructEmptyString };
+    StringImpl(ConstructEmptyStringTag)
         : m_refCount(s_refCountFlagIsStaticString)
-        , m_length(length)
-        , m_data16(characters)
-        , m_buffer(0)
-        , m_hashAndFlags(s_hashFlagIsIdentifier | BufferOwned)
-    {
-        // Ensure that the hash is computed so that AtomicStringHash can call existingHash()
-        // with impunity. The empty string is special because it is never entered into
-        // AtomicString's HashKey, but still needs to compare correctly.
-        STRING_STATS_ADD_16BIT_STRING(m_length);
-
-        hash();
-    }
-
-    // Used to construct static strings, which have an special refCount that can never hit zero.
-    // This means that the static string will never be destroyed, which is important because
-    // static strings will be shared across threads & ref-counted in a non-threadsafe manner.
-    StringImpl(const LChar* characters, unsigned length, ConstructStaticStringTag)
-        : m_refCount(s_refCountFlagIsStaticString)
-        , m_length(length)
-        , m_data8(characters)
-        , m_buffer(0)
-        , m_hashAndFlags(s_hashFlag8BitBuffer | s_hashFlagIsIdentifier | BufferOwned)
+        , m_length(0)
+        , m_data8(reinterpret_cast<const LChar*>(&m_length))
+        , m_hashAndFlags(s_hashFlag8BitBuffer | StringAtomic | BufferOwned)
     {
         // Ensure that the hash is computed so that AtomicStringHash can call existingHash()
         // with impunity. The empty string is special because it is never entered into
@@ -210,9 +195,8 @@ private:
     StringImpl(unsigned length, Force8Bit)
         : m_refCount(s_refCountIncrement)
         , m_length(length)
-        , m_data8(reinterpret_cast<const LChar*>(this + 1))
-        , m_buffer(0)
-        , m_hashAndFlags(s_hashFlag8BitBuffer | BufferInternal)
+        , m_data8(tailPointer<LChar>())
+        , m_hashAndFlags(s_hashFlag8BitBuffer | StringNormal | BufferInternal)
     {
         ASSERT(m_data8);
         ASSERT(m_length);
@@ -224,9 +208,8 @@ private:
     StringImpl(unsigned length)
         : m_refCount(s_refCountIncrement)
         , m_length(length)
-        , m_data16(reinterpret_cast<const UChar*>(this + 1))
-        , m_buffer(0)
-        , m_hashAndFlags(BufferInternal)
+        , m_data16(tailPointer<UChar>())
+        , m_hashAndFlags(StringNormal | BufferInternal)
     {
         ASSERT(m_data16);
         ASSERT(m_length);
@@ -235,12 +218,11 @@ private:
     }
 
     // Create a StringImpl adopting ownership of the provided buffer (BufferOwned)
-    StringImpl(const LChar* characters, unsigned length)
+    StringImpl(MallocPtr<LChar> characters, unsigned length)
         : m_refCount(s_refCountIncrement)
         , m_length(length)
-        , m_data8(characters)
-        , m_buffer(0)
-        , m_hashAndFlags(s_hashFlag8BitBuffer | BufferOwned)
+        , m_data8(characters.leakPtr())
+        , m_hashAndFlags(s_hashFlag8BitBuffer | StringNormal | BufferOwned)
     {
         ASSERT(m_data8);
         ASSERT(m_length);
@@ -249,41 +231,36 @@ private:
     }
 
     enum ConstructWithoutCopyingTag { ConstructWithoutCopying };
-    StringImpl(const UChar* characters, unsigned length, HasTerminatingNullCharacter hasTerminatingNullCharacter, ConstructWithoutCopyingTag)
+    StringImpl(const UChar* characters, unsigned length, ConstructWithoutCopyingTag)
         : m_refCount(s_refCountIncrement)
         , m_length(length)
         , m_data16(characters)
-        , m_buffer(0)
-        , m_hashAndFlags(BufferInternal | (hasTerminatingNullCharacter ? s_hashFlagHasTerminatingNullCharacter : 0))
+        , m_hashAndFlags(StringNormal | BufferInternal)
     {
         ASSERT(m_data16);
         ASSERT(m_length);
-        ASSERT(!(m_hashAndFlags & s_hashFlagHasTerminatingNullCharacter) || !characters[length]);
 
-        STRING_STATS_ADD_16BIT_STRING(0);
+        STRING_STATS_ADD_16BIT_STRING(m_length);
     }
 
-    StringImpl(const LChar* characters, unsigned length, HasTerminatingNullCharacter hasTerminatingNullCharacter, ConstructWithoutCopyingTag)
+    StringImpl(const LChar* characters, unsigned length, ConstructWithoutCopyingTag)
         : m_refCount(s_refCountIncrement)
         , m_length(length)
         , m_data8(characters)
-        , m_buffer(0)
-        , m_hashAndFlags(s_hashFlag8BitBuffer | BufferInternal | (hasTerminatingNullCharacter ? s_hashFlagHasTerminatingNullCharacter : 0))
+        , m_hashAndFlags(s_hashFlag8BitBuffer | StringNormal | BufferInternal)
     {
         ASSERT(m_data8);
         ASSERT(m_length);
-        ASSERT(!(m_hashAndFlags & s_hashFlagHasTerminatingNullCharacter) || !characters[length]);
 
-        STRING_STATS_ADD_8BIT_STRING(0);
+        STRING_STATS_ADD_8BIT_STRING(m_length);
     }
 
     // Create a StringImpl adopting ownership of the provided buffer (BufferOwned)
-    StringImpl(const UChar* characters, unsigned length)
+    StringImpl(MallocPtr<UChar> characters, unsigned length)
         : m_refCount(s_refCountIncrement)
         , m_length(length)
-        , m_data16(characters)
-        , m_buffer(0)
-        , m_hashAndFlags(BufferOwned)
+        , m_data16(characters.leakPtr())
+        , m_hashAndFlags(StringNormal | BufferOwned)
     {
         ASSERT(m_data16);
         ASSERT(m_length);
@@ -296,13 +273,14 @@ private:
         : m_refCount(s_refCountIncrement)
         , m_length(length)
         , m_data8(characters)
-        , m_substringBuffer(base.leakRef())
-        , m_hashAndFlags(s_hashFlag8BitBuffer | BufferSubstring)
+        , m_hashAndFlags(s_hashFlag8BitBuffer | StringNormal | BufferSubstring)
     {
         ASSERT(is8Bit());
         ASSERT(m_data8);
         ASSERT(m_length);
-        ASSERT(m_substringBuffer->bufferOwnership() != BufferSubstring);
+        ASSERT(base->bufferOwnership() != BufferSubstring);
+
+        substringBuffer() = base.leakRef();
 
         STRING_STATS_ADD_8BIT_STRING2(m_length, true);
     }
@@ -312,127 +290,107 @@ private:
         : m_refCount(s_refCountIncrement)
         , m_length(length)
         , m_data16(characters)
-        , m_substringBuffer(base.leakRef())
-        , m_hashAndFlags(BufferSubstring)
+        , m_hashAndFlags(StringNormal | BufferSubstring)
     {
         ASSERT(!is8Bit());
         ASSERT(m_data16);
         ASSERT(m_length);
-        ASSERT(m_substringBuffer->bufferOwnership() != BufferSubstring);
+        ASSERT(base->bufferOwnership() != BufferSubstring);
+
+        substringBuffer() = base.leakRef();
 
         STRING_STATS_ADD_16BIT_STRING2(m_length, true);
     }
 
-    enum CreateEmptyUnique_T { CreateEmptyUnique };
-    StringImpl(CreateEmptyUnique_T)
+    enum CreateSymbolTag { CreateSymbol };
+    // Used to create new symbol strings that holds existing 8-bit [[Description]] string as a substring buffer (BufferSubstring).
+    StringImpl(CreateSymbolTag, const LChar* characters, unsigned length, PassRefPtr<StringImpl> base)
         : m_refCount(s_refCountIncrement)
-        , m_length(0)
-        , m_data16(reinterpret_cast<const UChar*>(1))
-        , m_buffer(0)
+        , m_length(length)
+        , m_data8(characters)
+        , m_hashAndFlags(s_hashFlag8BitBuffer | StringSymbol | BufferSubstring)
     {
-        ASSERT(m_data16);
-        // Set the hash early, so that all empty unique StringImpls have a hash,
-        // and don't use the normal hashing algorithm - the unique nature of these
-        // keys means that we don't need them to match any other string (in fact,
-        // that's exactly the oposite of what we want!), and teh normal hash would
-        // lead to lots of conflicts.
-        unsigned hash = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(this));
-        hash <<= s_flagCount;
-        if (!hash)
-            hash = 1 << s_flagCount;
-        m_hashAndFlags = hash | BufferInternal;
+        ASSERT(is8Bit());
+        ASSERT(m_data8);
+        ASSERT(base->bufferOwnership() != BufferSubstring);
 
-        STRING_STATS_ADD_16BIT_STRING(m_length);
+        substringBuffer() = base.leakRef();
+        symbolRegistry() = nullptr;
+        hashForSymbol() = nextHashForSymbol();
+
+        STRING_STATS_ADD_8BIT_STRING2(m_length, true);
     }
 
-#if PLATFORM(QT)
-    // Used to create new strings that adopt an existing QString's data
-    enum ConstructAdoptedQStringTag { ConstructAdoptedQString };
-    StringImpl(QStringData* qStringData, ConstructAdoptedQStringTag)
+    // Used to create new symbol strings that holds existing 16-bit [[Description]] string as a substring buffer (BufferSubstring).
+    StringImpl(CreateSymbolTag, const UChar* characters, unsigned length, PassRefPtr<StringImpl> base)
         : m_refCount(s_refCountIncrement)
-        , m_length(qStringData->size)
-        , m_data16(0)
-        , m_qStringData(qStringData)
-        , m_hashAndFlags(BufferAdoptedQString)
+        , m_length(length)
+        , m_data16(characters)
+        , m_hashAndFlags(StringSymbol | BufferSubstring)
     {
-        ASSERT(m_length);
-
-        // We ref the string-data to ensure it will be valid for the lifetime of
-        // this string. We then deref it in the destructor, so that the string
-        // data can eventually be freed.
-        m_qStringData->ref.ref();
-
-        // Now that we have a ref we can safely reference the string data
-        m_data16 = reinterpret_cast_ptr<const UChar*>(qStringData->data());
+        ASSERT(!is8Bit());
         ASSERT(m_data16);
+        ASSERT(base->bufferOwnership() != BufferSubstring);
 
-        STRING_STATS_ADD_16BIT_STRING(m_length);
+        substringBuffer() = base.leakRef();
+        symbolRegistry() = nullptr;
+        hashForSymbol() = nextHashForSymbol();
+
+        STRING_STATS_ADD_16BIT_STRING2(m_length, true);
     }
-#endif
-    ~StringImpl();
 
 public:
     WTF_EXPORT_STRING_API static void destroy(StringImpl*);
 
-    WTF_EXPORT_STRING_API static PassRefPtr<StringImpl> create(const UChar*, unsigned length);
-    WTF_EXPORT_STRING_API static PassRefPtr<StringImpl> create(const LChar*, unsigned length);
-    WTF_EXPORT_STRING_API static PassRefPtr<StringImpl> create8BitIfPossible(const UChar*, unsigned length);
+    WTF_EXPORT_STRING_API static Ref<StringImpl> create(const UChar*, unsigned length);
+    WTF_EXPORT_STRING_API static Ref<StringImpl> create(const LChar*, unsigned length);
+    WTF_EXPORT_STRING_API static Ref<StringImpl> create8BitIfPossible(const UChar*, unsigned length);
     template<size_t inlineCapacity>
-    static PassRefPtr<StringImpl> create8BitIfPossible(const Vector<UChar, inlineCapacity>& vector)
+    static Ref<StringImpl> create8BitIfPossible(const Vector<UChar, inlineCapacity>& vector)
     {
         return create8BitIfPossible(vector.data(), vector.size());
     }
-    WTF_EXPORT_STRING_API static PassRefPtr<StringImpl> create8BitIfPossible(const UChar*);
+    WTF_EXPORT_STRING_API static Ref<StringImpl> create8BitIfPossible(const UChar*);
 
-    ALWAYS_INLINE static PassRefPtr<StringImpl> create(const char* s, unsigned length) { return create(reinterpret_cast<const LChar*>(s), length); }
-    WTF_EXPORT_STRING_API static PassRefPtr<StringImpl> create(const LChar*);
-    ALWAYS_INLINE static PassRefPtr<StringImpl> create(const char* s) { return create(reinterpret_cast<const LChar*>(s)); }
+    ALWAYS_INLINE static Ref<StringImpl> create(const char* s, unsigned length) { return create(reinterpret_cast<const LChar*>(s), length); }
+    WTF_EXPORT_STRING_API static Ref<StringImpl> create(const LChar*);
+    ALWAYS_INLINE static Ref<StringImpl> create(const char* s) { return create(reinterpret_cast<const LChar*>(s)); }
 
-    static ALWAYS_INLINE PassRefPtr<StringImpl> create8(PassRefPtr<StringImpl> rep, unsigned offset, unsigned length)
+    static ALWAYS_INLINE Ref<StringImpl> createSubstringSharingImpl(PassRefPtr<StringImpl> rep, unsigned offset, unsigned length)
     {
         ASSERT(rep);
         ASSERT(length <= rep->length());
 
         if (!length)
-            return empty();
+            return *empty();
 
-        ASSERT(rep->is8Bit());
-        StringImpl* ownerRep = (rep->bufferOwnership() == BufferSubstring) ? rep->m_substringBuffer : rep.get();
-        return adoptRef(new StringImpl(rep->m_data8 + offset, length, ownerRep));
-    }
+        StringImpl* ownerRep = (rep->bufferOwnership() == BufferSubstring) ? rep->substringBuffer() : rep.get();
 
-    static ALWAYS_INLINE PassRefPtr<StringImpl> create(PassRefPtr<StringImpl> rep, unsigned offset, unsigned length)
-    {
-        ASSERT(rep);
-        ASSERT(length <= rep->length());
-
-        if (!length)
-            return empty();
-
-        StringImpl* ownerRep = (rep->bufferOwnership() == BufferSubstring) ? rep->m_substringBuffer : rep.get();
+        // We allocate a buffer that contains both the StringImpl struct as well as the pointer to the owner string.
+        StringImpl* stringImpl = static_cast<StringImpl*>(fastMalloc(allocationSize<StringImpl*>(1)));
         if (rep->is8Bit())
-            return adoptRef(new StringImpl(rep->m_data8 + offset, length, ownerRep));
-        return adoptRef(new StringImpl(rep->m_data16 + offset, length, ownerRep));
+            return adoptRef(*new (NotNull, stringImpl) StringImpl(rep->m_data8 + offset, length, ownerRep));
+        return adoptRef(*new (NotNull, stringImpl) StringImpl(rep->m_data16 + offset, length, ownerRep));
     }
 
     template<unsigned charactersCount>
-    ALWAYS_INLINE static PassRefPtr<StringImpl> createFromLiteral(const char (&characters)[charactersCount])
+    ALWAYS_INLINE static Ref<StringImpl> createFromLiteral(const char (&characters)[charactersCount])
     {
         COMPILE_ASSERT(charactersCount > 1, StringImplFromLiteralNotEmpty);
         COMPILE_ASSERT((charactersCount - 1 <= ((unsigned(~0) - sizeof(StringImpl)) / sizeof(LChar))), StringImplFromLiteralCannotOverflow);
 
-        return createWithoutCopying(reinterpret_cast<const LChar*>(characters), charactersCount - 1, DoesHaveTerminatingNullCharacter);
+        return createWithoutCopying(reinterpret_cast<const LChar*>(characters), charactersCount - 1);
     }
 
     // FIXME: Transition off of these functions to createWithoutCopying instead.
-    WTF_EXPORT_STRING_API static PassRefPtr<StringImpl> createFromLiteral(const char* characters, unsigned length);
-    WTF_EXPORT_STRING_API static PassRefPtr<StringImpl> createFromLiteral(const char* characters);
+    WTF_EXPORT_STRING_API static Ref<StringImpl> createFromLiteral(const char* characters, unsigned length);
+    WTF_EXPORT_STRING_API static Ref<StringImpl> createFromLiteral(const char* characters);
 
-    WTF_EXPORT_STRING_API static PassRefPtr<StringImpl> createWithoutCopying(const UChar* characters, unsigned length, HasTerminatingNullCharacter);
-    WTF_EXPORT_STRING_API static PassRefPtr<StringImpl> createWithoutCopying(const LChar* characters, unsigned length, HasTerminatingNullCharacter);
+    WTF_EXPORT_STRING_API static Ref<StringImpl> createWithoutCopying(const UChar* characters, unsigned length);
+    WTF_EXPORT_STRING_API static Ref<StringImpl> createWithoutCopying(const LChar* characters, unsigned length);
 
-    WTF_EXPORT_STRING_API static PassRefPtr<StringImpl> createUninitialized(unsigned length, LChar*& data);
-    WTF_EXPORT_STRING_API static PassRefPtr<StringImpl> createUninitialized(unsigned length, UChar*& data);
+    WTF_EXPORT_STRING_API static Ref<StringImpl> createUninitialized(unsigned length, LChar*& data);
+    WTF_EXPORT_STRING_API static Ref<StringImpl> createUninitialized(unsigned length, UChar*& data);
     template <typename T> static ALWAYS_INLINE PassRefPtr<StringImpl> tryCreateUninitialized(unsigned length, T*& output)
     {
         if (!length) {
@@ -445,120 +403,117 @@ public:
             return 0;
         }
         StringImpl* resultImpl;
-        if (!tryFastMalloc(sizeof(T) * length + sizeof(StringImpl)).getValue(resultImpl)) {
+        if (!tryFastMalloc(allocationSize<T>(length)).getValue(resultImpl)) {
             output = 0;
             return 0;
         }
-        output = reinterpret_cast<T*>(resultImpl + 1);
+        output = resultImpl->tailPointer<T>();
 
         return constructInternal<T>(resultImpl, length);
     }
 
-    static PassRefPtr<StringImpl> createEmptyUnique()
-    {
-        return adoptRef(new StringImpl(CreateEmptyUnique));
-    }
+    WTF_EXPORT_STRING_API static Ref<SymbolImpl> createSymbolEmpty();
+    WTF_EXPORT_STRING_API static Ref<SymbolImpl> createSymbol(PassRefPtr<StringImpl> rep);
 
     // Reallocate the StringImpl. The originalString must be only owned by the PassRefPtr,
     // and the buffer ownership must be BufferInternal. Just like the input pointer of realloc(),
     // the originalString can't be used after this function.
-    static PassRefPtr<StringImpl> reallocate(PassRefPtr<StringImpl> originalString, unsigned length, LChar*& data);
-    static PassRefPtr<StringImpl> reallocate(PassRefPtr<StringImpl> originalString, unsigned length, UChar*& data);
+    static Ref<StringImpl> reallocate(PassRefPtr<StringImpl> originalString, unsigned length, LChar*& data);
+    static Ref<StringImpl> reallocate(PassRefPtr<StringImpl> originalString, unsigned length, UChar*& data);
 
     static unsigned flagsOffset() { return OBJECT_OFFSETOF(StringImpl, m_hashAndFlags); }
     static unsigned flagIs8Bit() { return s_hashFlag8BitBuffer; }
+    static unsigned flagIsAtomic() { return s_hashFlagStringKindIsAtomic; }
+    static unsigned flagIsSymbol() { return s_hashFlagStringKindIsSymbol; }
+    static unsigned maskStringKind() { return s_hashMaskStringKind; }
     static unsigned dataOffset() { return OBJECT_OFFSETOF(StringImpl, m_data8); }
-    static PassRefPtr<StringImpl> createWithTerminatingNullCharacter(const StringImpl&);
 
     template<typename CharType, size_t inlineCapacity, typename OverflowHandler>
-    static PassRefPtr<StringImpl> adopt(Vector<CharType, inlineCapacity, OverflowHandler>& vector)
+    static Ref<StringImpl> adopt(Vector<CharType, inlineCapacity, OverflowHandler>& vector)
     {
         if (size_t size = vector.size()) {
             ASSERT(vector.data());
             if (size > std::numeric_limits<unsigned>::max())
                 CRASH();
-            return adoptRef(new StringImpl(vector.releaseBuffer(), size));
+            return adoptRef(*new StringImpl(vector.releaseBuffer(), size));
         }
-        return empty();
+        return *empty();
     }
 
-    WTF_EXPORT_STRING_API static PassRefPtr<StringImpl> adopt(StringBuffer<UChar>&);
-    WTF_EXPORT_STRING_API static PassRefPtr<StringImpl> adopt(StringBuffer<LChar>&);
-
-#if PLATFORM(QT)
-    static PassRefPtr<StringImpl> adopt(QStringData*);
-#endif
+    WTF_EXPORT_STRING_API static Ref<StringImpl> adopt(StringBuffer<UChar>&);
+    WTF_EXPORT_STRING_API static Ref<StringImpl> adopt(StringBuffer<LChar>&);
 
     unsigned length() const { return m_length; }
+    static ptrdiff_t lengthMemoryOffset() { return OBJECT_OFFSETOF(StringImpl, m_length); }
     bool is8Bit() const { return m_hashAndFlags & s_hashFlag8BitBuffer; }
 
-    // FIXME: Remove all unnecessary usages of characters()
     ALWAYS_INLINE const LChar* characters8() const { ASSERT(is8Bit()); return m_data8; }
     ALWAYS_INLINE const UChar* characters16() const { ASSERT(!is8Bit()); return m_data16; }
-    ALWAYS_INLINE const UChar* characters() const
-    {
-        if (!is8Bit())
-            return m_data16;
-
-        return getData16SlowCase();
-    }
 
     template <typename CharType>
-    ALWAYS_INLINE const CharType * getCharacters() const;
+    ALWAYS_INLINE const CharType *characters() const;
 
     size_t cost() const
     {
         // For substrings, return the cost of the base string.
         if (bufferOwnership() == BufferSubstring)
-            return m_substringBuffer->cost();
+            return substringBuffer()->cost();
 
         if (m_hashAndFlags & s_hashFlagDidReportCost)
             return 0;
 
         m_hashAndFlags |= s_hashFlagDidReportCost;
-        return m_length;
+        size_t result = m_length;
+        if (!is8Bit())
+            result <<= 1;
+        return result;
+    }
+    
+    size_t costDuringGC()
+    {
+        if (isStatic())
+            return 0;
+        
+        if (bufferOwnership() == BufferSubstring)
+            return divideRoundedUp(substringBuffer()->costDuringGC(), refCount());
+        
+        size_t result = m_length;
+        if (!is8Bit())
+            result <<= 1;
+        return divideRoundedUp(result, refCount());
     }
 
     WTF_EXPORT_STRING_API size_t sizeInBytes() const;
 
-    bool has16BitShadow() const { return m_hashAndFlags & s_hashFlagHas16BitShadow; }
-    WTF_EXPORT_STRING_API void upconvertCharacters(unsigned, unsigned) const;
-    bool isIdentifier() const { return m_hashAndFlags & s_hashFlagIsIdentifier; }
-    void setIsIdentifier(bool isIdentifier)
-    {
-        ASSERT(!isStatic());
-        if (isIdentifier)
-            m_hashAndFlags |= s_hashFlagIsIdentifier;
-        else
-            m_hashAndFlags &= ~s_hashFlagIsIdentifier;
-    }
+    StringKind stringKind() const { return static_cast<StringKind>(m_hashAndFlags & s_hashMaskStringKind); }
+    bool isSymbol() const { return m_hashAndFlags & s_hashFlagStringKindIsSymbol; }
+    bool isAtomic() const { return m_hashAndFlags & s_hashFlagStringKindIsAtomic; }
 
-    bool isEmptyUnique() const
-    {
-        return !length() && !isStatic();
-    }
-
-    bool hasTerminatingNullCharacter() const { return m_hashAndFlags & s_hashFlagHasTerminatingNullCharacter; }
-
-    bool isAtomic() const { return m_hashAndFlags & s_hashFlagIsAtomic; }
     void setIsAtomic(bool isAtomic)
     {
         ASSERT(!isStatic());
-        if (isAtomic)
-            m_hashAndFlags |= s_hashFlagIsAtomic;
-        else
-            m_hashAndFlags &= ~s_hashFlagIsAtomic;
+        ASSERT(!isSymbol());
+        if (isAtomic) {
+            m_hashAndFlags |= s_hashFlagStringKindIsAtomic;
+            ASSERT(stringKind() == StringAtomic);
+        } else {
+            m_hashAndFlags &= ~s_hashFlagStringKindIsAtomic;
+            ASSERT(stringKind() == StringNormal);
+        }
     }
 
-#ifdef STRING_STATS
-    bool isSubString() const { return  bufferOwnership() == BufferSubstring; }
+#if STRING_STATS
+    bool isSubString() const { return bufferOwnership() == BufferSubstring; }
 #endif
 
-#if PLATFORM(QT)
-    QStringData* qStringData() { return bufferOwnership() == BufferAdoptedQString ? m_qStringData : 0; }
-#endif
+    static WTF_EXPORT_STRING_API CString utf8ForCharacters(const LChar* characters, unsigned length);
+    static WTF_EXPORT_STRING_API CString utf8ForCharacters(const UChar* characters, unsigned length, ConversionMode = LenientConversion);
+    WTF_EXPORT_STRING_API CString utf8ForRange(unsigned offset, unsigned length, ConversionMode = LenientConversion) const;
+    WTF_EXPORT_STRING_API CString utf8(ConversionMode = LenientConversion) const;
 
 private:
+    static WTF_EXPORT_STRING_API bool utf8Impl(const UChar* characters, unsigned length, char*& buffer, size_t bufferSize, ConversionMode);
+    
     // The high bits of 'hash' are always empty, but we prefer to store our flags
     // in the low bits because it makes them slightly more efficient to access.
     // So, we shift left and right when setting and getting our hash code.
@@ -600,18 +555,53 @@ public:
         return hashSlowCase();
     }
 
+    unsigned symbolAwareHash() const
+    {
+        if (isSymbol())
+            return hashForSymbol();
+        return hash();
+    }
+
+    unsigned existingSymbolAwareHash() const
+    {
+        if (isSymbol())
+            return hashForSymbol();
+        return existingHash();
+    }
+
+    bool isStatic() const { return m_refCount & s_refCountFlagIsStaticString; }
+
+    inline size_t refCount() const
+    {
+        return m_refCount / s_refCountIncrement;
+    }
+    
     inline bool hasOneRef() const
     {
         return m_refCount == s_refCountIncrement;
     }
+    
+    // This method is useful for assertions.
+    inline bool hasAtLeastOneRef() const
+    {
+        return !!m_refCount;
+    }
 
     inline void ref()
     {
+        ASSERT(!isCompilationThread());
+
+        STRING_STATS_REF_STRING(*this);
+
         m_refCount += s_refCountIncrement;
     }
 
     inline void deref()
     {
+        ASSERT(!isCompilationThread());
+
+        STRING_STATS_DEREF_STRING(*this);
+
         unsigned tempRefCount = m_refCount - s_refCountIncrement;
         if (!tempRefCount) {
             StringImpl::destroy(this);
@@ -659,17 +649,18 @@ public:
     // Some string features, like refcounting and the atomicity flag, are not
     // thread-safe. We achieve thread safety by isolation, giving each thread
     // its own copy of the string.
-    PassRefPtr<StringImpl> isolatedCopy() const;
+    Ref<StringImpl> isolatedCopy() const;
 
-    WTF_EXPORT_STRING_API PassRefPtr<StringImpl> substring(unsigned pos, unsigned len = UINT_MAX);
+    WTF_EXPORT_STRING_API Ref<StringImpl> substring(unsigned pos, unsigned len = UINT_MAX);
 
-    UChar operator[](unsigned i) const
+    UChar at(unsigned i) const
     {
         ASSERT_WITH_SECURITY_IMPLICATION(i < m_length);
         if (is8Bit())
             return m_data8[i];
         return m_data16[i];
     }
+    UChar operator[](unsigned i) const { return at(i); }
     WTF_EXPORT_STRING_API UChar32 characterStartingAt(unsigned);
 
     WTF_EXPORT_STRING_API bool containsOnlyWhitespace();
@@ -692,21 +683,23 @@ public:
     double toDouble(bool* ok = 0);
     float toFloat(bool* ok = 0);
 
-    WTF_EXPORT_STRING_API PassRefPtr<StringImpl> lower();
-    WTF_EXPORT_STRING_API PassRefPtr<StringImpl> upper();
+    WTF_EXPORT_STRING_API Ref<StringImpl> convertToASCIILowercase();
+    WTF_EXPORT_STRING_API Ref<StringImpl> convertToASCIIUppercase();
+    WTF_EXPORT_STRING_API Ref<StringImpl> convertToLowercaseWithoutLocale();
+    WTF_EXPORT_STRING_API Ref<StringImpl> convertToUppercaseWithoutLocale();
+    WTF_EXPORT_STRING_API Ref<StringImpl> convertToLowercaseWithLocale(const AtomicString& localeIdentifier);
+    WTF_EXPORT_STRING_API Ref<StringImpl> convertToUppercaseWithLocale(const AtomicString& localeIdentifier);
 
-    WTF_EXPORT_STRING_API PassRefPtr<StringImpl> fill(UChar);
-    // FIXME: Do we need fill(char) or can we just do the right thing if UChar is ASCII?
-    PassRefPtr<StringImpl> foldCase();
+    Ref<StringImpl> foldCase();
 
-    PassRefPtr<StringImpl> stripWhiteSpace();
-    PassRefPtr<StringImpl> stripWhiteSpace(IsWhiteSpaceFunctionPtr);
-    WTF_EXPORT_STRING_API PassRefPtr<StringImpl> simplifyWhiteSpace();
-    PassRefPtr<StringImpl> simplifyWhiteSpace(IsWhiteSpaceFunctionPtr);
+    Ref<StringImpl> stripWhiteSpace();
+    Ref<StringImpl> stripWhiteSpace(IsWhiteSpaceFunctionPtr);
+    WTF_EXPORT_STRING_API Ref<StringImpl> simplifyWhiteSpace();
+    Ref<StringImpl> simplifyWhiteSpace(IsWhiteSpaceFunctionPtr);
 
-    PassRefPtr<StringImpl> removeCharacters(CharacterMatchFunctionPtr);
+    Ref<StringImpl> removeCharacters(CharacterMatchFunctionPtr);
     template <typename CharType>
-    ALWAYS_INLINE PassRefPtr<StringImpl> removeCharacters(const CharType* characters, CharacterMatchFunctionPtr);
+    ALWAYS_INLINE Ref<StringImpl> removeCharacters(const CharType* characters, CharacterMatchFunctionPtr);
 
     size_t find(LChar character, unsigned start = 0);
     size_t find(char character, unsigned start = 0);
@@ -719,6 +712,10 @@ public:
     size_t findIgnoringCase(const LChar*, unsigned index = 0);
     ALWAYS_INLINE size_t findIgnoringCase(const char* s, unsigned index = 0) { return findIgnoringCase(reinterpret_cast<const LChar*>(s), index); }
     WTF_EXPORT_STRING_API size_t findIgnoringCase(StringImpl*, unsigned index = 0);
+    WTF_EXPORT_STRING_API size_t findIgnoringASCIICase(const StringImpl&) const;
+    WTF_EXPORT_STRING_API size_t findIgnoringASCIICase(const StringImpl&, unsigned startOffset) const;
+    WTF_EXPORT_STRING_API size_t findIgnoringASCIICase(const StringImpl*) const;
+    WTF_EXPORT_STRING_API size_t findIgnoringASCIICase(const StringImpl*, unsigned startOffset) const;
 
     WTF_EXPORT_STRING_API size_t findNextLineStart(unsigned index = UINT_MAX);
 
@@ -727,38 +724,82 @@ public:
     WTF_EXPORT_STRING_API size_t reverseFindIgnoringCase(StringImpl*, unsigned index = UINT_MAX);
 
     WTF_EXPORT_STRING_API bool startsWith(const StringImpl*) const;
+    WTF_EXPORT_STRING_API bool startsWith(const StringImpl&) const;
+    WTF_EXPORT_STRING_API bool startsWithIgnoringASCIICase(const StringImpl*) const;
+    WTF_EXPORT_STRING_API bool startsWithIgnoringASCIICase(const StringImpl&) const;
     bool startsWith(StringImpl* str, bool caseSensitive) { return caseSensitive ? startsWith(str) : (reverseFindIgnoringCase(str, 0) == 0); }
     WTF_EXPORT_STRING_API bool startsWith(UChar) const;
     WTF_EXPORT_STRING_API bool startsWith(const char*, unsigned matchLength, bool caseSensitive) const;
     template<unsigned matchLength>
     bool startsWith(const char (&prefix)[matchLength], bool caseSensitive = true) const { return startsWith(prefix, matchLength - 1, caseSensitive); }
+    WTF_EXPORT_STRING_API bool hasInfixStartingAt(const StringImpl&, unsigned startOffset) const;
 
-    WTF_EXPORT_STRING_API bool endsWith(StringImpl*, bool caseSensitive = true);
+    WTF_EXPORT_STRING_API bool endsWith(StringImpl*);
+    WTF_EXPORT_STRING_API bool endsWith(StringImpl&);
+    WTF_EXPORT_STRING_API bool endsWithIgnoringASCIICase(const StringImpl*) const;
+    WTF_EXPORT_STRING_API bool endsWithIgnoringASCIICase(const StringImpl&) const;
+    WTF_EXPORT_STRING_API bool endsWith(StringImpl*, bool caseSensitive);
     WTF_EXPORT_STRING_API bool endsWith(UChar) const;
     WTF_EXPORT_STRING_API bool endsWith(const char*, unsigned matchLength, bool caseSensitive) const;
     template<unsigned matchLength>
     bool endsWith(const char (&prefix)[matchLength], bool caseSensitive = true) const { return endsWith(prefix, matchLength - 1, caseSensitive); }
+    WTF_EXPORT_STRING_API bool hasInfixEndingAt(const StringImpl&, unsigned endOffset) const;
 
-    WTF_EXPORT_STRING_API PassRefPtr<StringImpl> replace(UChar, UChar);
-    WTF_EXPORT_STRING_API PassRefPtr<StringImpl> replace(UChar, StringImpl*);
-    ALWAYS_INLINE PassRefPtr<StringImpl> replace(UChar pattern, const char* replacement, unsigned replacementLength) { return replace(pattern, reinterpret_cast<const LChar*>(replacement), replacementLength); }
-    WTF_EXPORT_STRING_API PassRefPtr<StringImpl> replace(UChar, const LChar*, unsigned replacementLength);
-    PassRefPtr<StringImpl> replace(UChar, const UChar*, unsigned replacementLength);
-    WTF_EXPORT_STRING_API PassRefPtr<StringImpl> replace(StringImpl*, StringImpl*);
-    WTF_EXPORT_STRING_API PassRefPtr<StringImpl> replace(unsigned index, unsigned len, StringImpl*);
+    WTF_EXPORT_STRING_API Ref<StringImpl> replace(UChar, UChar);
+    WTF_EXPORT_STRING_API Ref<StringImpl> replace(UChar, StringImpl*);
+    ALWAYS_INLINE Ref<StringImpl> replace(UChar pattern, const char* replacement, unsigned replacementLength) { return replace(pattern, reinterpret_cast<const LChar*>(replacement), replacementLength); }
+    WTF_EXPORT_STRING_API Ref<StringImpl> replace(UChar, const LChar*, unsigned replacementLength);
+    Ref<StringImpl> replace(UChar, const UChar*, unsigned replacementLength);
+    WTF_EXPORT_STRING_API Ref<StringImpl> replace(StringImpl*, StringImpl*);
+    WTF_EXPORT_STRING_API Ref<StringImpl> replace(unsigned index, unsigned len, StringImpl*);
 
-    WTF_EXPORT_STRING_API WTF::Unicode::Direction defaultWritingDirection(bool* hasStrongDirectionality = 0);
+    WTF_EXPORT_STRING_API UCharDirection defaultWritingDirection(bool* hasStrongDirectionality = nullptr);
 
 #if USE(CF)
     RetainPtr<CFStringRef> createCFString();
 #endif
 #ifdef __OBJC__
-    operator NSString*();
+    WTF_EXPORT_STRING_API operator NSString *();
 #endif
 
-#ifdef STRING_STATS
+#if STRING_STATS
     ALWAYS_INLINE static StringStats& stringStats() { return m_stringStats; }
 #endif
+
+    Ref<StringImpl> extractFoldedStringInSymbol()
+    {
+        ASSERT(isSymbol());
+        ASSERT(bufferOwnership() == BufferSubstring);
+        ASSERT(substringBuffer());
+        ASSERT(!substringBuffer()->isSymbol());
+        return createSubstringSharingImpl(this, 0, length());
+    }
+
+    SymbolRegistry* const& symbolRegistry() const
+    {
+        ASSERT(isSymbol());
+        return *(tailPointer<SymbolRegistry*>() + 1);
+    }
+
+    SymbolRegistry*& symbolRegistry()
+    {
+        ASSERT(isSymbol());
+        return *(tailPointer<SymbolRegistry*>() + 1);
+    }
+
+    const unsigned& hashForSymbol() const
+    {
+        return const_cast<StringImpl*>(this)->hashForSymbol();
+    }
+
+    unsigned& hashForSymbol()
+    {
+        ASSERT(isSymbol());
+        return *reinterpret_cast<unsigned*>((tailPointer<SymbolRegistry*>() + 2));
+    }
+
+protected:
+    ~StringImpl();
 
 private:
     bool requiresCopy() const
@@ -767,42 +808,75 @@ private:
             return true;
 
         if (is8Bit())
-            return reinterpret_cast<const void*>(m_data8) == reinterpret_cast<const void*>(this + 1);
-        return reinterpret_cast<const void*>(m_data16) == reinterpret_cast<const void*>(this + 1);
+            return m_data8 == tailPointer<LChar>();
+        return m_data16 == tailPointer<UChar>();
+    }
+
+    template<typename T>
+    static size_t allocationSize(unsigned tailElementCount)
+    {
+        return tailOffset<T>() + tailElementCount * sizeof(T);
+    }
+
+    template<typename T>
+    static ptrdiff_t tailOffset()
+    {
+#if COMPILER(MSVC)
+        // MSVC doesn't support alignof yet.
+        return roundUpToMultipleOf<sizeof(T)>(sizeof(StringImpl));
+#else
+        return roundUpToMultipleOf<alignof(T)>(offsetof(StringImpl, m_hashAndFlags) + sizeof(StringImpl::m_hashAndFlags));
+#endif
+    }
+
+    template<typename T>
+    const T* tailPointer() const
+    {
+        return reinterpret_cast_ptr<const T*>(reinterpret_cast<const uint8_t*>(this) + tailOffset<T>());
+    }
+
+    template<typename T>
+    T* tailPointer()
+    {
+        return reinterpret_cast_ptr<T*>(reinterpret_cast<uint8_t*>(this) + tailOffset<T>());
+    }
+
+    StringImpl* const& substringBuffer() const
+    {
+        ASSERT(bufferOwnership() == BufferSubstring);
+
+        return *tailPointer<StringImpl*>();
+    }
+
+    StringImpl*& substringBuffer()
+    {
+        ASSERT(bufferOwnership() == BufferSubstring);
+
+        return *tailPointer<StringImpl*>();
     }
 
     // This number must be at least 2 to avoid sharing empty, null as well as 1 character strings from SmallStrings.
     static const unsigned s_copyCharsInlineCutOff = 20;
 
+    enum class CaseConvertType { Upper, Lower };
+    template<CaseConvertType type, typename CharacterType> static Ref<StringImpl> convertASCIICase(StringImpl&, const CharacterType*, unsigned);
+
     BufferOwnership bufferOwnership() const { return static_cast<BufferOwnership>(m_hashAndFlags & s_hashMaskBufferOwnership); }
-    bool isStatic() const { return m_refCount & s_refCountFlagIsStaticString; }
-    template <class UCharPredicate> PassRefPtr<StringImpl> stripMatchedCharacters(UCharPredicate);
-    template <typename CharType, class UCharPredicate> PassRefPtr<StringImpl> simplifyMatchedCharactersToSpace(UCharPredicate);
-    template <typename CharType> static PassRefPtr<StringImpl> constructInternal(StringImpl*, unsigned);
-    template <typename CharType> static PassRefPtr<StringImpl> createUninitializedInternal(unsigned, CharType*&);
-    template <typename CharType> static PassRefPtr<StringImpl> reallocateInternal(PassRefPtr<StringImpl>, unsigned, CharType*&);
-    template <typename CharType> static PassRefPtr<StringImpl> createInternal(const CharType*, unsigned);
-    WTF_EXPORT_STRING_API NEVER_INLINE const UChar* getData16SlowCase() const;
+    template <class UCharPredicate> Ref<StringImpl> stripMatchedCharacters(UCharPredicate);
+    template <typename CharType, class UCharPredicate> Ref<StringImpl> simplifyMatchedCharactersToSpace(UCharPredicate);
+    template <typename CharType> static Ref<StringImpl> constructInternal(StringImpl*, unsigned);
+    template <typename CharType> static Ref<StringImpl> createUninitializedInternal(unsigned, CharType*&);
+    template <typename CharType> static Ref<StringImpl> createUninitializedInternalNonEmpty(unsigned, CharType*&);
+    template <typename CharType> static Ref<StringImpl> reallocateInternal(PassRefPtr<StringImpl>, unsigned, CharType*&);
+    template <typename CharType> static Ref<StringImpl> createInternal(const CharType*, unsigned);
     WTF_EXPORT_PRIVATE NEVER_INLINE unsigned hashSlowCase() const;
+    WTF_EXPORT_PRIVATE static unsigned nextHashForSymbol();
 
     // The bottom bit in the ref count indicates a static (immortal) string.
     static const unsigned s_refCountFlagIsStaticString = 0x1;
     static const unsigned s_refCountIncrement = 0x2; // This allows us to ref / deref without disturbing the static string flag.
 
-    // The bottom 8 bits in the hash are flags.
-    static const unsigned s_flagCount = 8;
-    static const unsigned s_flagMask = (1u << s_flagCount) - 1;
-    COMPILE_ASSERT(s_flagCount == StringHasher::flagCount, StringHasher_reserves_enough_bits_for_StringImpl_flags);
-
-    static const unsigned s_hashFlagHas16BitShadow = 1u << 7;
-    static const unsigned s_hashFlag8BitBuffer = 1u << 6;
-    static const unsigned s_hashFlagHasTerminatingNullCharacter = 1u << 5;
-    static const unsigned s_hashFlagIsAtomic = 1u << 4;
-    static const unsigned s_hashFlagDidReportCost = 1u << 3;
-    static const unsigned s_hashFlagIsIdentifier = 1u << 2;
-    static const unsigned s_hashMaskBufferOwnership = 1u | (1u << 1);
-
-#ifdef STRING_STATS
+#if STRING_STATS
     WTF_EXPORTDATA static StringStats m_stringStats;
 #endif
 
@@ -812,12 +886,11 @@ public:
         unsigned m_refCount;
         unsigned m_length;
         const LChar* m_data8;
-        void* m_buffer;
         unsigned m_hashAndFlags;
 
         // These values mimic ConstructFromLiteral.
         static const unsigned s_initialRefCount = s_refCountIncrement;
-        static const unsigned s_initialFlags = s_hashFlag8BitBuffer | BufferInternal | s_hashFlagHasTerminatingNullCharacter;
+        static const unsigned s_initialFlags = s_hashFlag8BitBuffer | StringNormal | BufferInternal;
         static const unsigned s_hashShift = s_flagCount;
     };
 
@@ -837,18 +910,10 @@ private:
         const LChar* m_data8;
         const UChar* m_data16;
     };
-    union {
-        void* m_buffer;
-        StringImpl* m_substringBuffer;
-        mutable UChar* m_copyData16;
-#if PLATFORM(QT)
-        QStringData* m_qStringData;
-#endif
-    };
     mutable unsigned m_hashAndFlags;
 };
 
-COMPILE_ASSERT(sizeof(StringImpl) == sizeof(StringImpl::StaticASCIILiteral), StringImpl_should_match_its_StaticASCIILiteral);
+static_assert(sizeof(StringImpl) == sizeof(StringImpl::StaticASCIILiteral), "");
 
 #if !ASSERT_DISABLED
 // StringImpls created from StaticASCIILiteral will ASSERT
@@ -863,15 +928,15 @@ ValueCheck<StringImpl*> {
 #endif
 
 template <>
-ALWAYS_INLINE PassRefPtr<StringImpl> StringImpl::constructInternal<LChar>(StringImpl* impl, unsigned length) { return adoptRef(new (NotNull, impl) StringImpl(length, Force8BitConstructor)); }
+ALWAYS_INLINE Ref<StringImpl> StringImpl::constructInternal<LChar>(StringImpl* impl, unsigned length) { return adoptRef(*new (NotNull, impl) StringImpl(length, Force8BitConstructor)); }
 template <>
-ALWAYS_INLINE PassRefPtr<StringImpl> StringImpl::constructInternal<UChar>(StringImpl* impl, unsigned length) { return adoptRef(new (NotNull, impl) StringImpl(length)); }
+ALWAYS_INLINE Ref<StringImpl> StringImpl::constructInternal<UChar>(StringImpl* impl, unsigned length) { return adoptRef(*new (NotNull, impl) StringImpl(length)); }
 
 template <>
-ALWAYS_INLINE const LChar* StringImpl::getCharacters<LChar>() const { return characters8(); }
+ALWAYS_INLINE const LChar* StringImpl::characters<LChar>() const { return characters8(); }
 
 template <>
-ALWAYS_INLINE const UChar* StringImpl::getCharacters<UChar>() const { return characters(); }
+ALWAYS_INLINE const UChar* StringImpl::characters<UChar>() const { return characters16(); }
 
 WTF_EXPORT_STRING_API bool equal(const StringImpl*, const StringImpl*);
 WTF_EXPORT_STRING_API bool equal(const StringImpl*, const LChar*);
@@ -881,266 +946,20 @@ WTF_EXPORT_STRING_API bool equal(const StringImpl*, const UChar*, unsigned);
 inline bool equal(const StringImpl* a, const char* b, unsigned length) { return equal(a, reinterpret_cast<const LChar*>(b), length); }
 inline bool equal(const LChar* a, StringImpl* b) { return equal(b, a); }
 inline bool equal(const char* a, StringImpl* b) { return equal(b, reinterpret_cast<const LChar*>(a)); }
-WTF_EXPORT_STRING_API bool equalNonNull(const StringImpl* a, const StringImpl* b);
-
-// Do comparisons 8 or 4 bytes-at-a-time on architectures where it's safe.
-#if CPU(X86_64)
-ALWAYS_INLINE bool equal(const LChar* a, const LChar* b, unsigned length)
-{
-    unsigned dwordLength = length >> 3;
-
-    if (dwordLength) {
-        const uint64_t* aDWordCharacters = reinterpret_cast<const uint64_t*>(a);
-        const uint64_t* bDWordCharacters = reinterpret_cast<const uint64_t*>(b);
-
-        for (unsigned i = 0; i != dwordLength; ++i) {
-            if (*aDWordCharacters++ != *bDWordCharacters++)
-                return false;
-        }
-
-        a = reinterpret_cast<const LChar*>(aDWordCharacters);
-        b = reinterpret_cast<const LChar*>(bDWordCharacters);
-    }
-
-    if (length & 4) {
-        if (*reinterpret_cast<const uint32_t*>(a) != *reinterpret_cast<const uint32_t*>(b))
-            return false;
-
-        a += 4;
-        b += 4;
-    }
-
-    if (length & 2) {
-        if (*reinterpret_cast<const uint16_t*>(a) != *reinterpret_cast<const uint16_t*>(b))
-            return false;
-
-        a += 2;
-        b += 2;
-    }
-
-    if (length & 1 && (*a != *b))
-        return false;
-
-    return true;
-}
-
-ALWAYS_INLINE bool equal(const UChar* a, const UChar* b, unsigned length)
-{
-    unsigned dwordLength = length >> 2;
-    
-    if (dwordLength) {
-        const uint64_t* aDWordCharacters = reinterpret_cast<const uint64_t*>(a);
-        const uint64_t* bDWordCharacters = reinterpret_cast<const uint64_t*>(b);
-
-        for (unsigned i = 0; i != dwordLength; ++i) {
-            if (*aDWordCharacters++ != *bDWordCharacters++)
-                return false;
-        }
-
-        a = reinterpret_cast<const UChar*>(aDWordCharacters);
-        b = reinterpret_cast<const UChar*>(bDWordCharacters);
-    }
-
-    if (length & 2) {
-        if (*reinterpret_cast<const uint32_t*>(a) != *reinterpret_cast<const uint32_t*>(b))
-            return false;
-
-        a += 2;
-        b += 2;
-    }
-
-    if (length & 1 && (*a != *b))
-        return false;
-
-    return true;
-}
-#elif CPU(X86)
-ALWAYS_INLINE bool equal(const LChar* a, const LChar* b, unsigned length)
-{
-    const uint32_t* aCharacters = reinterpret_cast<const uint32_t*>(a);
-    const uint32_t* bCharacters = reinterpret_cast<const uint32_t*>(b);
-
-    unsigned wordLength = length >> 2;
-    for (unsigned i = 0; i != wordLength; ++i) {
-        if (*aCharacters++ != *bCharacters++)
-            return false;
-    }
-
-    length &= 3;
-
-    if (length) {
-        const LChar* aRemainder = reinterpret_cast<const LChar*>(aCharacters);
-        const LChar* bRemainder = reinterpret_cast<const LChar*>(bCharacters);
-        
-        for (unsigned i = 0; i <  length; ++i) {
-            if (aRemainder[i] != bRemainder[i])
-                return false;
-        }
-    }
-
-    return true;
-}
-
-ALWAYS_INLINE bool equal(const UChar* a, const UChar* b, unsigned length)
-{
-    const uint32_t* aCharacters = reinterpret_cast<const uint32_t*>(a);
-    const uint32_t* bCharacters = reinterpret_cast<const uint32_t*>(b);
-    
-    unsigned wordLength = length >> 1;
-    for (unsigned i = 0; i != wordLength; ++i) {
-        if (*aCharacters++ != *bCharacters++)
-            return false;
-    }
-    
-    if (length & 1 && *reinterpret_cast<const UChar*>(aCharacters) != *reinterpret_cast<const UChar*>(bCharacters))
-        return false;
-    
-    return true;
-}
-#elif PLATFORM(IOS) && WTF_ARM_ARCH_AT_LEAST(7)
-ALWAYS_INLINE bool equal(const LChar* a, const LChar* b, unsigned length)
-{
-    bool isEqual = false;
-    uint32_t aValue;
-    uint32_t bValue;
-    asm("subs   %[length], #4\n"
-        "blo    2f\n"
-
-        "0:\n" // Label 0 = Start of loop over 32 bits.
-        "ldr    %[aValue], [%[a]], #4\n"
-        "ldr    %[bValue], [%[b]], #4\n"
-        "cmp    %[aValue], %[bValue]\n"
-        "bne    66f\n"
-        "subs   %[length], #4\n"
-        "bhs    0b\n"
-
-        // At this point, length can be:
-        // -0: 00000000000000000000000000000000 (0 bytes left)
-        // -1: 11111111111111111111111111111111 (3 bytes left)
-        // -2: 11111111111111111111111111111110 (2 bytes left)
-        // -3: 11111111111111111111111111111101 (1 byte left)
-        // -4: 11111111111111111111111111111100 (length was 0)
-        // The pointers are at the correct position.
-        "2:\n" // Label 2 = End of loop over 32 bits, check for pair of characters.
-        "tst    %[length], #2\n"
-        "beq    1f\n"
-        "ldrh   %[aValue], [%[a]], #2\n"
-        "ldrh   %[bValue], [%[b]], #2\n"
-        "cmp    %[aValue], %[bValue]\n"
-        "bne    66f\n"
-
-        "1:\n" // Label 1 = Check for a single character left.
-        "tst    %[length], #1\n"
-        "beq    42f\n"
-        "ldrb   %[aValue], [%[a]]\n"
-        "ldrb   %[bValue], [%[b]]\n"
-        "cmp    %[aValue], %[bValue]\n"
-        "bne    66f\n"
-
-        "42:\n" // Label 42 = Success.
-        "mov    %[isEqual], #1\n"
-        "66:\n" // Label 66 = End without changing isEqual to 1.
-        : [length]"+r"(length), [isEqual]"+r"(isEqual), [a]"+r"(a), [b]"+r"(b), [aValue]"+r"(aValue), [bValue]"+r"(bValue)
-        :
-        :
-        );
-    return isEqual;
-}
-
-ALWAYS_INLINE bool equal(const UChar* a, const UChar* b, unsigned length)
-{
-    bool isEqual = false;
-    uint32_t aValue;
-    uint32_t bValue;
-    asm("subs   %[length], #2\n"
-        "blo    1f\n"
-
-        "0:\n" // Label 0 = Start of loop over 32 bits.
-        "ldr    %[aValue], [%[a]], #4\n"
-        "ldr    %[bValue], [%[b]], #4\n"
-        "cmp    %[aValue], %[bValue]\n"
-        "bne    66f\n"
-        "subs   %[length], #2\n"
-        "bhs    0b\n"
-
-        // At this point, length can be:
-        // -0: 00000000000000000000000000000000 (0 bytes left)
-        // -1: 11111111111111111111111111111111 (1 character left, 2 bytes)
-        // -2: 11111111111111111111111111111110 (length was zero)
-        // The pointers are at the correct position.
-        "1:\n" // Label 1 = Check for a single character left.
-        "tst    %[length], #1\n"
-        "beq    42f\n"
-        "ldrh   %[aValue], [%[a]]\n"
-        "ldrh   %[bValue], [%[b]]\n"
-        "cmp    %[aValue], %[bValue]\n"
-        "bne    66f\n"
-
-        "42:\n" // Label 42 = Success.
-        "mov    %[isEqual], #1\n"
-        "66:\n" // Label 66 = End without changing isEqual to 1.
-        : [length]"+r"(length), [isEqual]"+r"(isEqual), [a]"+r"(a), [b]"+r"(b), [aValue]"+r"(aValue), [bValue]"+r"(bValue)
-        :
-        :
-        );
-    return isEqual;
-}
-#else
-ALWAYS_INLINE bool equal(const LChar* a, const LChar* b, unsigned length) { return !memcmp(a, b, length); }
-ALWAYS_INLINE bool equal(const UChar* a, const UChar* b, unsigned length) { return !memcmp(a, b, length * sizeof(UChar)); }
-#endif
-
-ALWAYS_INLINE bool equal(const LChar* a, const UChar* b, unsigned length)
-{
-    for (unsigned i = 0; i < length; ++i) {
-        if (a[i] != b[i])
-            return false;
-    }
-    return true;
-}
-
-ALWAYS_INLINE bool equal(const UChar* a, const LChar* b, unsigned length) { return equal(b, a, length); }
-
-WTF_EXPORT_STRING_API bool equalIgnoringCase(const StringImpl*, const StringImpl*);
-WTF_EXPORT_STRING_API bool equalIgnoringCase(const StringImpl*, const LChar*);
-inline bool equalIgnoringCase(const LChar* a, const StringImpl* b) { return equalIgnoringCase(b, a); }
-WTF_EXPORT_STRING_API bool equalIgnoringCase(const LChar*, const LChar*, unsigned);
-WTF_EXPORT_STRING_API bool equalIgnoringCase(const UChar*, const LChar*, unsigned);
-inline bool equalIgnoringCase(const UChar* a, const char* b, unsigned length) { return equalIgnoringCase(a, reinterpret_cast<const LChar*>(b), length); }
-inline bool equalIgnoringCase(const LChar* a, const UChar* b, unsigned length) { return equalIgnoringCase(b, a, length); }
-inline bool equalIgnoringCase(const char* a, const UChar* b, unsigned length) { return equalIgnoringCase(b, reinterpret_cast<const LChar*>(a), length); }
-inline bool equalIgnoringCase(const char* a, const LChar* b, unsigned length) { return equalIgnoringCase(b, reinterpret_cast<const LChar*>(a), length); }
-inline bool equalIgnoringCase(const UChar* a, const UChar* b, int length)
-{
-    ASSERT(length >= 0);
-    return !Unicode::umemcasecmp(a, b, length);
-}
-WTF_EXPORT_STRING_API bool equalIgnoringCaseNonNull(const StringImpl*, const StringImpl*);
+WTF_EXPORT_STRING_API bool equal(const StringImpl& a, const StringImpl& b);
 
 WTF_EXPORT_STRING_API bool equalIgnoringNullity(StringImpl*, StringImpl*);
+WTF_EXPORT_STRING_API bool equalIgnoringNullity(const UChar*, size_t length, StringImpl*);
 
-template<typename CharacterType>
-inline size_t find(const CharacterType* characters, unsigned length, CharacterType matchCharacter, unsigned index = 0)
-{
-    while (index < length) {
-        if (characters[index] == matchCharacter)
-            return index;
-        ++index;
-    }
-    return notFound;
-}
+bool equalIgnoringASCIICase(const StringImpl&, const StringImpl&);
+WTF_EXPORT_STRING_API bool equalIgnoringASCIICase(const StringImpl*, const StringImpl*);
+WTF_EXPORT_STRING_API bool equalIgnoringASCIICase(const StringImpl&, const char*);
+WTF_EXPORT_STRING_API bool equalIgnoringASCIICase(const StringImpl*, const char*);
 
-ALWAYS_INLINE size_t find(const UChar* characters, unsigned length, LChar matchCharacter, unsigned index = 0)
-{
-    return find(characters, length, static_cast<UChar>(matchCharacter), index);
-}
+WTF_EXPORT_STRING_API bool equalIgnoringASCIICaseNonNull(const StringImpl*, const StringImpl*);
 
-inline size_t find(const LChar* characters, unsigned length, UChar matchCharacter, unsigned index = 0)
-{
-    if (matchCharacter & ~0xFF)
-        return notFound;
-    return find(characters, length, static_cast<LChar>(matchCharacter), index);
-}
+template<unsigned length> bool equalLettersIgnoringASCIICase(const StringImpl&, const char (&lowercaseLetters)[length]);
+template<unsigned length> bool equalLettersIgnoringASCIICase(const StringImpl*, const char (&lowercaseLetters)[length]);
 
 inline size_t find(const LChar* characters, unsigned length, CharacterMatchFunctionPtr matchFunction, unsigned index = 0)
 {
@@ -1254,18 +1073,13 @@ inline size_t StringImpl::find(UChar character, unsigned start)
     return WTF::find(characters16(), m_length, character, start);
 }
 
-template<size_t inlineCapacity>
-bool equalIgnoringNullity(const Vector<UChar, inlineCapacity>& a, StringImpl* b)
+template<size_t inlineCapacity> inline bool equalIgnoringNullity(const Vector<UChar, inlineCapacity>& a, StringImpl* b)
 {
-    if (!b)
-        return !a.size();
-    if (a.size() != b->length())
-        return false;
-    return !memcmp(a.data(), b->characters(), b->length() * sizeof(UChar));
+    return equalIgnoringNullity(a.data(), a.size(), b);
 }
 
 template<typename CharacterType1, typename CharacterType2>
-static inline int codePointCompare(unsigned l1, unsigned l2, const CharacterType1* c1, const CharacterType2* c2)
+inline int codePointCompare(unsigned l1, unsigned l2, const CharacterType1* c1, const CharacterType2* c2)
 {
     const unsigned lmin = l1 < l2 ? l1 : l2;
     unsigned pos = 0;
@@ -1284,22 +1098,22 @@ static inline int codePointCompare(unsigned l1, unsigned l2, const CharacterType
     return (l1 > l2) ? 1 : -1;
 }
 
-static inline int codePointCompare8(const StringImpl* string1, const StringImpl* string2)
+inline int codePointCompare8(const StringImpl* string1, const StringImpl* string2)
 {
     return codePointCompare(string1->length(), string2->length(), string1->characters8(), string2->characters8());
 }
 
-static inline int codePointCompare16(const StringImpl* string1, const StringImpl* string2)
+inline int codePointCompare16(const StringImpl* string1, const StringImpl* string2)
 {
     return codePointCompare(string1->length(), string2->length(), string1->characters16(), string2->characters16());
 }
 
-static inline int codePointCompare8To16(const StringImpl* string1, const StringImpl* string2)
+inline int codePointCompare8To16(const StringImpl* string1, const StringImpl* string2)
 {
     return codePointCompare(string1->length(), string2->length(), string1->characters8(), string2->characters16());
 }
 
-static inline int codePointCompare(const StringImpl* string1, const StringImpl* string2)
+inline int codePointCompare(const StringImpl* string1, const StringImpl* string2)
 {
     if (!string1)
         return (string2 && string2->length()) ? -1 : 0;
@@ -1319,11 +1133,11 @@ static inline int codePointCompare(const StringImpl* string1, const StringImpl* 
     return codePointCompare16(string1, string2);
 }
 
-static inline bool isSpaceOrNewline(UChar c)
+inline bool isSpaceOrNewline(UChar c)
 {
     // Use isASCIISpace() for basic Latin-1.
     // This will include newlines, which aren't included in Unicode DirWS.
-    return c <= 0x7F ? WTF::isASCIISpace(c) : WTF::Unicode::direction(c) == WTF::Unicode::WhiteSpaceNeutral;
+    return c <= 0x7F ? isASCIISpace(c) : u_charDirection(c) == U_WHITE_SPACE_NEUTRAL;
 }
 
 template<typename CharacterType>
@@ -1338,12 +1152,12 @@ inline unsigned lengthOfNullTerminatedString(const CharacterType* string)
     return static_cast<unsigned>(length);
 }
 
-inline PassRefPtr<StringImpl> StringImpl::isolatedCopy() const
+inline Ref<StringImpl> StringImpl::isolatedCopy() const
 {
     if (!requiresCopy()) {
         if (is8Bit())
-            return StringImpl::createWithoutCopying(m_data8, m_length, hasTerminatingNullCharacter() ? DoesHaveTerminatingNullCharacter : DoesNotHaveTerminatingNullCharacter);
-        return StringImpl::createWithoutCopying(m_data16, m_length, hasTerminatingNullCharacter() ? DoesHaveTerminatingNullCharacter : DoesNotHaveTerminatingNullCharacter);
+            return StringImpl::createWithoutCopying(m_data8, m_length);
+        return StringImpl::createWithoutCopying(m_data16, m_length);
     }
 
     if (is8Bit())
@@ -1351,22 +1165,44 @@ inline PassRefPtr<StringImpl> StringImpl::isolatedCopy() const
     return create(m_data16, m_length);
 }
 
-struct StringHash;
-
 // StringHash is the default hash for StringImpl* and RefPtr<StringImpl>
 template<typename T> struct DefaultHash;
 template<> struct DefaultHash<StringImpl*> {
     typedef StringHash Hash;
 };
-template<> struct DefaultHash<RefPtr<StringImpl> > {
+template<> struct DefaultHash<RefPtr<StringImpl>> {
     typedef StringHash Hash;
 };
 
+inline bool equalIgnoringASCIICase(const StringImpl& a, const StringImpl& b)
+{
+    return equalIgnoringASCIICaseCommon(a, b);
 }
+
+inline bool equalIgnoringASCIICase(const StringImpl& a, const char* b)
+{
+    return equalIgnoringASCIICaseCommon(a, b);
+}
+
+inline bool equalIgnoringASCIICase(const StringImpl* a, const char* b)
+{
+    return a && equalIgnoringASCIICase(*a, b);
+}
+
+template<unsigned length> inline bool equalLettersIgnoringASCIICase(const StringImpl& string, const char (&lowercaseLetters)[length])
+{
+    return equalLettersIgnoringASCIICaseCommon(string, lowercaseLetters);
+}
+
+template<unsigned length> inline bool equalLettersIgnoringASCIICase(const StringImpl* string, const char (&lowercaseLetters)[length])
+{
+    return string && equalLettersIgnoringASCIICase(*string, lowercaseLetters);
+}
+
+} // namespace WTF
 
 using WTF::StringImpl;
 using WTF::equal;
-using WTF::equalNonNull;
 using WTF::TextCaseSensitivity;
 using WTF::TextCaseSensitive;
 using WTF::TextCaseInsensitive;

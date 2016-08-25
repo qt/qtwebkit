@@ -26,36 +26,39 @@
 #include "config.h"
 #include "LocalStorageDatabaseTracker.h"
 
-#include "WorkQueue.h"
 #include <WebCore/FileSystem.h>
 #include <WebCore/SQLiteStatement.h>
 #include <WebCore/SecurityOrigin.h>
+#include <WebCore/TextEncoding.h>
+#include <wtf/WorkQueue.h>
 #include <wtf/text/CString.h>
 
 using namespace WebCore;
 
 namespace WebKit {
 
-PassRefPtr<LocalStorageDatabaseTracker> LocalStorageDatabaseTracker::create(PassRefPtr<WorkQueue> queue)
+PassRefPtr<LocalStorageDatabaseTracker> LocalStorageDatabaseTracker::create(PassRefPtr<WorkQueue> queue, const String& localStorageDirectory)
 {
-    return adoptRef(new LocalStorageDatabaseTracker(queue));
+    return adoptRef(new LocalStorageDatabaseTracker(queue, localStorageDirectory));
 }
 
-LocalStorageDatabaseTracker::LocalStorageDatabaseTracker(PassRefPtr<WorkQueue> queue)
+LocalStorageDatabaseTracker::LocalStorageDatabaseTracker(PassRefPtr<WorkQueue> queue, const String& localStorageDirectory)
     : m_queue(queue)
+    , m_localStorageDirectory(localStorageDirectory.isolatedCopy())
 {
+    ASSERT(!m_localStorageDirectory.isEmpty());
+
+    // Make sure the encoding is initialized before we start dispatching things to the queue.
+    UTF8Encoding();
+
+    RefPtr<LocalStorageDatabaseTracker> localStorageDatabaseTracker(this);
+    m_queue->dispatch([localStorageDatabaseTracker] {
+        localStorageDatabaseTracker->importOriginIdentifiers();
+    });
 }
 
 LocalStorageDatabaseTracker::~LocalStorageDatabaseTracker()
 {
-}
-
-void LocalStorageDatabaseTracker::setLocalStorageDirectory(const String& localStorageDirectory)
-{
-    // FIXME: We should come up with a better idiom for safely copying strings across threads.
-    RefPtr<StringImpl> copiedLocalStorageDirectory = localStorageDirectory.impl() ? localStorageDirectory.impl()->isolatedCopy() : PassRefPtr<StringImpl>();
-
-    m_queue->dispatch(bind(&LocalStorageDatabaseTracker::setLocalStorageDirectoryInternal, this, copiedLocalStorageDirectory.release()));
 }
 
 String LocalStorageDatabaseTracker::databasePath(SecurityOrigin* securityOrigin) const
@@ -82,19 +85,19 @@ void LocalStorageDatabaseTracker::deleteAllDatabases()
         return;
 
     SQLiteStatement statement(m_database, "SELECT origin, path FROM Origins");
-    if (statement.prepare() != SQLResultOk) {
+    if (statement.prepare() != SQLITE_OK) {
         LOG_ERROR("Failed to prepare statement.");
         return;
     }
 
     int result;
-    while ((result = statement.step()) == SQLResultRow) {
+    while ((result = statement.step()) == SQLITE_ROW) {
         deleteFile(statement.getColumnText(1));
 
         // FIXME: Call out to the client.
     }
 
-    if (result != SQLResultDone)
+    if (result != SQLITE_DONE)
         LOG_ERROR("Failed to read in all origins from the database.");
 
     if (m_database.isOpen())
@@ -108,7 +111,7 @@ void LocalStorageDatabaseTracker::deleteAllDatabases()
             return;
 
         SQLiteStatement deleteStatement(m_database, "DELETE FROM Origins");
-        if (deleteStatement.prepare() != SQLResultOk) {
+        if (deleteStatement.prepare() != SQLITE_OK) {
             LOG_ERROR("Unable to prepare deletion of all origins");
             return;
         }
@@ -121,32 +124,81 @@ void LocalStorageDatabaseTracker::deleteAllDatabases()
     deleteEmptyDirectory(m_localStorageDirectory);
 }
 
-Vector<RefPtr<WebCore::SecurityOrigin> > LocalStorageDatabaseTracker::origins() const
+static Optional<time_t> fileCreationTime(const String& filePath)
 {
-    Vector<RefPtr<SecurityOrigin> > origins;
+    time_t time;
+    return getFileCreationTime(filePath, time) ? time : Optional<time_t>(Nullopt);
+}
+
+static Optional<time_t> fileModificationTime(const String& filePath)
+{
+    time_t time;
+    if (!getFileModificationTime(filePath, time))
+        return Nullopt;
+
+    return time;
+}
+
+Vector<Ref<SecurityOrigin>> LocalStorageDatabaseTracker::deleteDatabasesModifiedSince(std::chrono::system_clock::time_point time)
+{
+    Vector<String> originIdentifiersToDelete;
+
+    for (const String& origin : m_origins) {
+        String filePath = pathForDatabaseWithOriginIdentifier(origin);
+
+        auto modificationTime = fileModificationTime(filePath);
+        if (!modificationTime)
+            continue;
+
+        if (modificationTime.value() >= std::chrono::system_clock::to_time_t(time))
+            originIdentifiersToDelete.append(origin);
+    }
+
+    Vector<Ref<SecurityOrigin>> deletedDatabaseOrigins;
+    deletedDatabaseOrigins.reserveInitialCapacity(originIdentifiersToDelete.size());
+
+    for (const auto& originIdentifier : originIdentifiersToDelete) {
+        removeDatabaseWithOriginIdentifier(originIdentifier);
+
+        deletedDatabaseOrigins.uncheckedAppend(SecurityOrigin::createFromDatabaseIdentifier(originIdentifier));
+    }
+
+    return deletedDatabaseOrigins;
+}
+
+Vector<Ref<WebCore::SecurityOrigin>> LocalStorageDatabaseTracker::origins() const
+{
+    Vector<Ref<SecurityOrigin>> origins;
     origins.reserveInitialCapacity(m_origins.size());
 
-    for (HashSet<String>::const_iterator it = m_origins.begin(), end = m_origins.end(); it != end; ++it)
-        origins.uncheckedAppend(SecurityOrigin::createFromDatabaseIdentifier(*it));
+    for (const String& origin : m_origins)
+        origins.uncheckedAppend(SecurityOrigin::createFromDatabaseIdentifier(origin));
 
     return origins;
 }
 
-void LocalStorageDatabaseTracker::setLocalStorageDirectoryInternal(StringImpl* localStorageDirectory)
+Vector<LocalStorageDatabaseTracker::OriginDetails> LocalStorageDatabaseTracker::originDetails()
 {
-    if (m_database.isOpen())
-        m_database.close();
+    Vector<OriginDetails> result;
+    result.reserveInitialCapacity(m_origins.size());
 
-    m_localStorageDirectory = localStorageDirectory;
-    m_origins.clear();
+    for (const String& origin : m_origins) {
+        String filePath = pathForDatabaseWithOriginIdentifier(origin);
 
-    m_queue->dispatch(bind(&LocalStorageDatabaseTracker::importOriginIdentifiers, this));
+        OriginDetails details;
+        details.originIdentifier = origin.isolatedCopy();
+        details.creationTime = fileCreationTime(filePath);
+        details.modificationTime = fileModificationTime(filePath);
+        result.uncheckedAppend(details);
+    }
+
+    return result;
 }
 
 String LocalStorageDatabaseTracker::databasePath(const String& filename) const
 {
     if (!makeAllDirectories(m_localStorageDirectory)) {
-        LOG_ERROR("Unabled to create LocalStorage database path %s", m_localStorageDirectory.utf8().data());
+        LOG_ERROR("Unable to create LocalStorage database path %s", m_localStorageDirectory.utf8().data());
         return String();
     }
 
@@ -190,17 +242,17 @@ void LocalStorageDatabaseTracker::importOriginIdentifiers()
 
     if (m_database.isOpen()) {
         SQLiteStatement statement(m_database, "SELECT origin FROM Origins");
-        if (statement.prepare() != SQLResultOk) {
+        if (statement.prepare() != SQLITE_OK) {
             LOG_ERROR("Failed to prepare statement.");
             return;
         }
 
         int result;
 
-        while ((result = statement.step()) == SQLResultRow)
+        while ((result = statement.step()) == SQLITE_ROW)
             m_origins.add(statement.getColumnText(0));
 
-        if (result != SQLResultDone) {
+        if (result != SQLITE_DONE) {
             LOG_ERROR("Failed to read in all origins from the database.");
             return;
         }
@@ -232,7 +284,7 @@ void LocalStorageDatabaseTracker::updateTrackerDatabaseFromLocalStorageDatabaseF
         originsFromLocalStorageDatabaseFiles.add(originIdentifier);
     }
 
-    for (HashSet<String>::iterator it = origins.begin(), end = origins.end(); it != end; ++it) {
+    for (auto it = origins.begin(), end = origins.end(); it != end; ++it) {
         const String& originIdentifier = *it;
         if (origins.contains(originIdentifier))
             continue;
@@ -248,7 +300,7 @@ void LocalStorageDatabaseTracker::addDatabaseWithOriginIdentifier(const String& 
         return;
 
     SQLiteStatement statement(m_database, "INSERT INTO Origins VALUES (?, ?)");
-    if (statement.prepare() != SQLResultOk) {
+    if (statement.prepare() != SQLITE_OK) {
         LOG_ERROR("Unable to establish origin '%s' in the tracker", originIdentifier.utf8().data());
         return;
     }
@@ -256,7 +308,7 @@ void LocalStorageDatabaseTracker::addDatabaseWithOriginIdentifier(const String& 
     statement.bindText(1, originIdentifier);
     statement.bindText(2, databasePath);
 
-    if (statement.step() != SQLResultDone)
+    if (statement.step() != SQLITE_DONE)
         LOG_ERROR("Unable to establish origin '%s' in the tracker", originIdentifier.utf8().data());
 
     m_origins.add(originIdentifier);
@@ -275,7 +327,7 @@ void LocalStorageDatabaseTracker::removeDatabaseWithOriginIdentifier(const Strin
         return;
 
     SQLiteStatement deleteStatement(m_database, "DELETE FROM Origins where origin=?");
-    if (deleteStatement.prepare() != SQLResultOk) {
+    if (deleteStatement.prepare() != SQLITE_OK) {
         LOG_ERROR("Unable to prepare deletion of origin '%s'", originIdentifier.ascii().data());
         return;
     }
@@ -289,7 +341,7 @@ void LocalStorageDatabaseTracker::removeDatabaseWithOriginIdentifier(const Strin
 
     m_origins.remove(originIdentifier);
     if (m_origins.isEmpty()) {
-        // There are no origins left, go ahead and delete the tracker database.
+        // There are no origins left; delete the tracker database.
         m_database.close();
         deleteFile(trackerDatabasePath());
         deleteEmptyDirectory(m_localStorageDirectory);
@@ -304,7 +356,7 @@ String LocalStorageDatabaseTracker::pathForDatabaseWithOriginIdentifier(const St
         return String();
 
     SQLiteStatement pathStatement(m_database, "SELECT path FROM Origins WHERE origin=?");
-    if (pathStatement.prepare() != SQLResultOk) {
+    if (pathStatement.prepare() != SQLITE_OK) {
         LOG_ERROR("Unable to prepare selection of path for origin '%s'", originIdentifier.utf8().data());
         return String();
     }
@@ -312,7 +364,7 @@ String LocalStorageDatabaseTracker::pathForDatabaseWithOriginIdentifier(const St
     pathStatement.bindText(1, originIdentifier);
 
     int result = pathStatement.step();
-    if (result != SQLResultRow)
+    if (result != SQLITE_ROW)
         return String();
 
     return pathStatement.getColumnText(0);

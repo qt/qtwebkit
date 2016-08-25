@@ -24,10 +24,13 @@
  */
 
 #include "config.h"
+
+#if WK_HAVE_C_SPI
+
 #include "PlatformUtilities.h"
 #include "PlatformWebView.h"
 #include "Test.h"
-#include <WebKit2/WKRetainPtr.h>
+#include <WebKit/WKRetainPtr.h>
 
 namespace TestWebKitAPI {
 
@@ -43,9 +46,12 @@ public:
         , secondSuccessfulLoad(false)
     {
         memset(&loaderClient, 0, sizeof(loaderClient));
-        loaderClient.clientInfo = this;
+
+        loaderClient.base.version = 0;
+        loaderClient.base.clientInfo = this;
         loaderClient.didFinishLoadForFrame = didFinishLoad;
-        WKPageSetPageLoaderClient(webView.page(), &loaderClient);
+
+        WKPageSetPageLoaderClient(webView.page(), &loaderClient.base);
     }
 
     void loadUrl()
@@ -59,7 +65,7 @@ public:
     }
 
     WKRetainPtr<WKContextRef> context;
-    WKPageLoaderClient loaderClient;
+    WKPageLoaderClientV0 loaderClient;
     PlatformWebView webView;
     WKRetainPtr<WKURLRef> url;
 
@@ -100,3 +106,5 @@ TEST(WebKit2, LoadPageAfterCrash)
 }
 
 } // namespace TestWebKitAPI
+
+#endif

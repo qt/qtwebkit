@@ -16,10 +16,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -34,45 +34,31 @@
 #include "EventListenerMap.h"
 
 #include "Event.h"
-#include "EventException.h"
 #include "EventTarget.h"
 #include <wtf/MainThread.h>
+#include <wtf/NeverDestroyed.h>
 #include <wtf/StdLibExtras.h>
 #include <wtf/Vector.h>
-
-#ifndef NDEBUG
-#include <wtf/Threading.h>
-#endif
 
 using namespace WTF;
 
 namespace WebCore {
 
 #ifndef NDEBUG
-static Mutex& activeIteratorCountMutex()
-{
-    DEFINE_STATIC_LOCAL(Mutex, mutex, ());
-    return mutex;
-}
-
 void EventListenerMap::assertNoActiveIterators()
 {
-    MutexLocker locker(activeIteratorCountMutex());
     ASSERT(!m_activeIteratorCount);
 }
 #endif
 
 EventListenerMap::EventListenerMap()
-#ifndef NDEBUG
-    : m_activeIteratorCount(0)
-#endif
 {
 }
 
 bool EventListenerMap::contains(const AtomicString& eventType) const
 {
-    for (unsigned i = 0; i < m_entries.size(); ++i) {
-        if (m_entries[i].first == eventType)
+    for (auto& entry : m_entries) {
+        if (entry.first == eventType)
             return true;
     }
     return false;
@@ -80,11 +66,10 @@ bool EventListenerMap::contains(const AtomicString& eventType) const
 
 bool EventListenerMap::containsCapturing(const AtomicString& eventType) const
 {
-    for (unsigned i = 0; i < m_entries.size(); ++i) {
-        if (m_entries[i].first == eventType) {
-            const EventListenerVector* vector = m_entries[i].second.get();
-            for (unsigned j = 0; j < vector->size(); ++j) {
-                if (vector->at(j).useCapture)
+    for (auto& entry : m_entries) {
+        if (entry.first == eventType) {
+            for (auto& eventListener : *entry.second) {
+                if (eventListener.useCapture)
                     return true;
             }
         }
@@ -104,8 +89,8 @@ Vector<AtomicString> EventListenerMap::eventTypes() const
     Vector<AtomicString> types;
     types.reserveInitialCapacity(m_entries.size());
 
-    for (unsigned i = 0; i < m_entries.size(); ++i)
-        types.uncheckedAppend(m_entries[i].first);
+    for (auto& entry : m_entries)
+        types.uncheckedAppend(entry.first);
 
     return types;
 }
@@ -125,12 +110,12 @@ bool EventListenerMap::add(const AtomicString& eventType, PassRefPtr<EventListen
 {
     assertNoActiveIterators();
 
-    for (unsigned i = 0; i < m_entries.size(); ++i) {
-        if (m_entries[i].first == eventType)
-            return addListenerToVector(m_entries[i].second.get(), listener, useCapture);
+    for (auto& entry : m_entries) {
+        if (entry.first == eventType)
+            return addListenerToVector(entry.second.get(), listener, useCapture);
     }
 
-    m_entries.append(std::make_pair(eventType, adoptPtr(new EventListenerVector)));
+    m_entries.append(std::make_pair(eventType, std::make_unique<EventListenerVector>()));
     return addListenerToVector(m_entries.last().second.get(), listener, useCapture);
 }
 
@@ -164,28 +149,19 @@ EventListenerVector* EventListenerMap::find(const AtomicString& eventType)
 {
     assertNoActiveIterators();
 
-    for (unsigned i = 0; i < m_entries.size(); ++i) {
-        if (m_entries[i].first == eventType)
-            return m_entries[i].second.get();
+    for (auto& entry : m_entries) {
+        if (entry.first == eventType)
+            return entry.second.get();
     }
 
-    return 0;
+    return nullptr;
 }
 
-#if ENABLE(SVG)
-
-static void removeFirstListenerCreatedFromMarkup(EventListenerVector* listenerVector)
+static void removeFirstListenerCreatedFromMarkup(EventListenerVector& listenerVector)
 {
-    bool foundListener = false;
-
-    for (size_t i = 0; i < listenerVector->size(); ++i) {
-        if (!listenerVector->at(i).listener->wasCreatedFromMarkup())
-            continue;
-        foundListener = true;
-        listenerVector->remove(i);
-        break;
-    }
-
+    bool foundListener = listenerVector.removeFirstMatching([] (const RegisteredEventListener& listener) {
+        return listener.listener->wasCreatedFromMarkup();
+    });
     ASSERT_UNUSED(foundListener, foundListener);
 }
 
@@ -195,7 +171,7 @@ void EventListenerMap::removeFirstEventListenerCreatedFromMarkup(const AtomicStr
 
     for (unsigned i = 0; i < m_entries.size(); ++i) {
         if (m_entries[i].first == eventType) {
-            removeFirstListenerCreatedFromMarkup(m_entries[i].second.get());
+            removeFirstListenerCreatedFromMarkup(*m_entries[i].second);
             if (m_entries[i].second->isEmpty())
                 m_entries.remove(i);
             return;
@@ -205,11 +181,11 @@ void EventListenerMap::removeFirstEventListenerCreatedFromMarkup(const AtomicStr
 
 static void copyListenersNotCreatedFromMarkupToTarget(const AtomicString& eventType, EventListenerVector* listenerVector, EventTarget* target)
 {
-    for (size_t i = 0; i < listenerVector->size(); ++i) {
+    for (auto& listener : *listenerVector) {
         // Event listeners created from markup have already been transfered to the shadow tree during cloning.
-        if ((*listenerVector)[i].listener->wasCreatedFromMarkup())
+        if (listener.listener->wasCreatedFromMarkup())
             continue;
-        target->addEventListener(eventType, (*listenerVector)[i].listener, (*listenerVector)[i].useCapture);
+        target->addEventListener(eventType, listener.listener.copyRef(), listener.useCapture);
     }
 }
 
@@ -217,23 +193,11 @@ void EventListenerMap::copyEventListenersNotCreatedFromMarkupToTarget(EventTarge
 {
     assertNoActiveIterators();
 
-    for (unsigned i = 0; i < m_entries.size(); ++i)
-        copyListenersNotCreatedFromMarkupToTarget(m_entries[i].first, m_entries[i].second.get(), target);
-}
-
-#endif // ENABLE(SVG)
-
-EventListenerIterator::EventListenerIterator()
-    : m_map(0)
-    , m_entryIndex(0)
-    , m_index(0)
-{
+    for (auto& entry : m_entries)
+        copyListenersNotCreatedFromMarkupToTarget(entry.first, entry.second.get(), target);
 }
 
 EventListenerIterator::EventListenerIterator(EventTarget* target)
-    : m_map(0)
-    , m_entryIndex(0)
-    , m_index(0)
 {
     ASSERT(target);
     EventTargetData* data = target->eventTargetData();
@@ -244,20 +208,15 @@ EventListenerIterator::EventListenerIterator(EventTarget* target)
     m_map = &data->eventListenerMap;
 
 #ifndef NDEBUG
-    {
-        MutexLocker locker(activeIteratorCountMutex());
-        m_map->m_activeIteratorCount++;
-    }
+    m_map->m_activeIteratorCount++;
 #endif
 }
 
 #ifndef NDEBUG
 EventListenerIterator::~EventListenerIterator()
 {
-    if (m_map) {
-        MutexLocker locker(activeIteratorCountMutex());
+    if (m_map)
         m_map->m_activeIteratorCount--;
-    }
 }
 #endif
 

@@ -31,12 +31,11 @@
 #include "JSNPObject.h"
 #include "NPRuntimeObjectMap.h"
 #include "NPRuntimeUtilities.h"
-#include <JavaScriptCore/JSCJSValueInlines.h>
+#include <JavaScriptCore/JSCInlines.h>
 #include <JavaScriptCore/JSCellInlines.h>
 #include <JavaScriptCore/JSLock.h>
 #include <JavaScriptCore/JSObject.h>
 #include <JavaScriptCore/StrongInlines.h>
-#include <JavaScriptCore/StructureInlines.h>
 #include <WebCore/Frame.h>
 #include <WebCore/IdentifierRep.h>
 #include <wtf/text/WTFString.h>
@@ -49,7 +48,7 @@ namespace WebKit {
 NPJSObject* NPJSObject::create(VM& vm, NPRuntimeObjectMap* objectMap, JSObject* jsObject)
 {
     // We should never have a JSNPObject inside an NPJSObject.
-    ASSERT(!jsObject->inherits(&JSNPObject::s_info));
+    ASSERT(!jsObject->inherits(JSNPObject::info()));
 
     NPJSObject* npJSObject = toNPJSObject(createNPObject(0, npClass()));
     npJSObject->initialize(vm, objectMap, jsObject);
@@ -88,7 +87,7 @@ static Identifier identifierFromIdentifierRep(ExecState* exec, IdentifierRep* id
     const char* string = identifierRep->string();
     int length = strlen(string);
 
-    return Identifier(exec, String::fromUTF8WithLatin1Fallback(string, length).impl());
+    return Identifier::fromString(exec, String::fromUTF8WithLatin1Fallback(string, length));
 }
 
 bool NPJSObject::hasMethod(NPIdentifier methodName)
@@ -192,7 +191,7 @@ bool NPJSObject::setProperty(NPIdentifier propertyName, const NPVariant* value)
 
     JSValue jsValue = m_objectMap->convertNPVariantToJSValue(exec, m_objectMap->globalObject(), *value);
     if (identifierRep->isString()) {
-        PutPropertySlot slot;
+        PutPropertySlot slot(m_jsObject.get());
         m_jsObject->methodTable()->put(m_jsObject.get(), exec, identifierFromIdentifierRep(exec, identifierRep), jsValue, slot);
     } else
         m_jsObject->methodTable()->putByIndex(m_jsObject.get(), exec, identifierRep->number(), jsValue, false);
@@ -240,8 +239,8 @@ bool NPJSObject::enumerate(NPIdentifier** identifiers, uint32_t* identifierCount
     
     JSLockHolder lock(exec);
 
-    PropertyNameArray propertyNames(exec);
-    m_jsObject->methodTable()->getPropertyNames(m_jsObject.get(), exec, propertyNames, ExcludeDontEnumProperties);
+    PropertyNameArray propertyNames(exec, PropertyNameMode::Strings);
+    m_jsObject->methodTable()->getPropertyNames(m_jsObject.get(), exec, propertyNames, EnumerationMode());
 
     NPIdentifier* nameIdentifiers = npnMemNewArray<NPIdentifier>(propertyNames.size());
 
@@ -293,7 +292,7 @@ bool NPJSObject::invoke(ExecState* exec, JSGlobalObject* globalObject, JSValue f
     for (uint32_t i = 0; i < argumentCount; ++i)
         argumentList.append(m_objectMap->convertNPVariantToJSValue(exec, globalObject, arguments[i]));
 
-    JSValue value = JSC::call(exec, function, callType, callData, m_jsObject->methodTable()->toThisObject(m_jsObject.get(), exec), argumentList);
+    JSValue value = JSC::call(exec, function, callType, callData, m_jsObject.get(), argumentList);
 
     // Convert and return the result of the function call.
     m_objectMap->convertJSValueToNPVariant(exec, value, *result);

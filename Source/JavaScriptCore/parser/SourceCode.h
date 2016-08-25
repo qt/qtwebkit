@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 Apple Inc. All rights reserved.
+ * Copyright (C) 2008, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -79,12 +79,20 @@ namespace JSC {
 
         bool isHashTableDeletedValue() const { return m_provider.isHashTableDeletedValue(); }
 
-        String toString() const
+        unsigned hash() const
+        {
+            ASSERT(m_provider);
+            return m_provider->hash();
+        }
+
+        StringView view() const
         {
             if (!m_provider)
-                return String();
+                return StringView();
             return m_provider->getRange(m_startChar, m_endChar);
         }
+        
+        CString toUTF8() const;
         
         intptr_t providerID() const
         {
@@ -115,11 +123,9 @@ namespace JSC {
     {
         return SourceCode(StringSourceProvider::create(source, url, startPosition), startPosition.m_line.oneBasedInt(), startPosition.m_column.oneBasedInt());
     }
-
+    
     inline SourceCode SourceCode::subExpression(unsigned openBrace, unsigned closeBrace, int firstLine, int startColumn)
     {
-        ASSERT(provider()->source()[openBrace] == '{');
-        ASSERT(provider()->source()[closeBrace] == '}');
         startColumn += 1; // Convert to base 1.
         return SourceCode(provider(), openBrace, closeBrace + 1, firstLine, startColumn);
     }

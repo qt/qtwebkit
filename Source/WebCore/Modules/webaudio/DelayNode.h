@@ -28,7 +28,7 @@
 #include "AudioBasicProcessorNode.h"
 #include "DelayProcessor.h"
 #include "ExceptionCode.h"
-#include <wtf/PassRefPtr.h>
+#include <wtf/Ref.h>
 
 namespace WebCore {
 
@@ -36,15 +36,15 @@ class AudioParam;
 
 class DelayNode : public AudioBasicProcessorNode {
 public:
-    static PassRefPtr<DelayNode> create(AudioContext* context, float sampleRate, double maxDelayTime, ExceptionCode& ec)
+    static Ref<DelayNode> create(AudioContext& context, float sampleRate, double maxDelayTime, ExceptionCode& ec)
     {
-        return adoptRef(new DelayNode(context, sampleRate, maxDelayTime, ec));      
+        return adoptRef(*new DelayNode(context, sampleRate, maxDelayTime, ec));
     }
 
     AudioParam* delayTime();
 
 private:
-    DelayNode(AudioContext*, float sampleRate, double maxDelayTime, ExceptionCode&);
+    DelayNode(AudioContext&, float sampleRate, double maxDelayTime, ExceptionCode&);
 
     DelayProcessor* delayProcessor() { return static_cast<DelayProcessor*>(processor()); }
 };

@@ -30,6 +30,8 @@
 
 namespace WebCore {
 
+class AttributeDOMTokenList;
+
 // Link relation bitmask values.
 // FIXME: Uncomment as the various link relations are implemented.
 enum {
@@ -55,12 +57,12 @@ enum {
 
 class HTMLAnchorElement : public HTMLElement {
 public:
-    static PassRefPtr<HTMLAnchorElement> create(Document*);
-    static PassRefPtr<HTMLAnchorElement> create(const QualifiedName&, Document*);
+    static Ref<HTMLAnchorElement> create(Document&);
+    static Ref<HTMLAnchorElement> create(const QualifiedName&, Document&);
 
     virtual ~HTMLAnchorElement();
 
-    KURL href() const;
+    URL href() const;
     void setHref(const AtomicString&);
 
     const AtomicString& name() const;
@@ -89,38 +91,40 @@ public:
     String origin() const;
 
     String text();
+    void setText(const String&, ExceptionCode&);
 
     String toString() const;
 
     bool isLiveLink() const;
 
-    virtual bool willRespondToMouseClickEvents() OVERRIDE;
+    virtual bool willRespondToMouseClickEvents() override final;
 
     bool hasRel(uint32_t relation) const;
-    void setRel(const String&);
     
     LinkHash visitedLinkHash() const;
     void invalidateCachedVisitedLinkHash() { m_cachedVisitedLinkHash = 0; }
 
-protected:
-    HTMLAnchorElement(const QualifiedName&, Document*);
+    DOMTokenList& relList();
 
-    virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
+protected:
+    HTMLAnchorElement(const QualifiedName&, Document&);
+
+    virtual void parseAttribute(const QualifiedName&, const AtomicString&) override;
 
 private:
-    virtual bool supportsFocus() const OVERRIDE;
-    virtual bool isMouseFocusable() const OVERRIDE;
-    virtual bool isKeyboardFocusable(KeyboardEvent*) const OVERRIDE;
-    virtual void defaultEventHandler(Event*);
-    virtual void setActive(bool active = true, bool pause = false) OVERRIDE FINAL;
-    virtual void accessKeyAction(bool sendMouseEvents);
-    virtual bool isURLAttribute(const Attribute&) const OVERRIDE;
-    virtual bool canStartSelection() const;
-    virtual String target() const;
-    virtual short tabIndex() const OVERRIDE FINAL;
-    virtual bool draggable() const;
+    virtual bool supportsFocus() const override;
+    virtual bool isMouseFocusable() const override;
+    virtual bool isKeyboardFocusable(KeyboardEvent*) const override;
+    virtual void defaultEventHandler(Event*) override final;
+    virtual void setActive(bool active = true, bool pause = false) override final;
+    virtual void accessKeyAction(bool sendMouseEvents) override final;
+    virtual bool isURLAttribute(const Attribute&) const override final;
+    virtual bool canStartSelection() const override final;
+    virtual String target() const override;
+    virtual short tabIndex() const override final;
+    virtual bool draggable() const override final;
 
-    void sendPings(const KURL& destinationURL);
+    void sendPings(const URL& destinationURL);
 
     void handleClick(Event*);
 
@@ -132,11 +136,6 @@ private:
     static EventType eventType(Event*);
     bool treatLinkAsLiveForEventType(EventType) const;
 
-#if ENABLE(MICRODATA)
-    virtual String itemValueText() const OVERRIDE;
-    virtual void setItemValueText(const String&, ExceptionCode&) OVERRIDE;
-#endif
-
     Element* rootEditableElementForSelectionOnMouseDown() const;
     void setRootEditableElementForSelectionOnMouseDown(Element*);
     void clearRootEditableElementForSelectionOnMouseDown();
@@ -145,35 +144,20 @@ private:
     bool m_wasShiftKeyDownOnMouseDown : 1;
     uint32_t m_linkRelations : 30;
     mutable LinkHash m_cachedVisitedLinkHash;
+
+    std::unique_ptr<AttributeDOMTokenList> m_relList;
 };
 
 inline LinkHash HTMLAnchorElement::visitedLinkHash() const
 {
     if (!m_cachedVisitedLinkHash)
-        m_cachedVisitedLinkHash = WebCore::visitedLinkHash(document()->baseURL(), fastGetAttribute(HTMLNames::hrefAttr));
+        m_cachedVisitedLinkHash = WebCore::visitedLinkHash(document().baseURL(), fastGetAttribute(HTMLNames::hrefAttr));
     return m_cachedVisitedLinkHash; 
-}
-
-inline bool isHTMLAnchorElement(Node* node)
-{
-    return node->hasTagName(HTMLNames::aTag);
-}
-
-inline bool isHTMLAnchorElement(Element* element)
-{
-    return element->hasTagName(HTMLNames::aTag);
-}
-
-inline HTMLAnchorElement* toHTMLAnchorElement(Node* node)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!node || isHTMLAnchorElement(node));
-    return static_cast<HTMLAnchorElement*>(node);
 }
 
 // Functions shared with the other anchor elements (i.e., SVG).
 
 bool isEnterKeyKeydownEvent(Event*);
-bool isLinkClick(Event*);
 bool shouldProhibitLinks(Element*);
 
 } // namespace WebCore

@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -30,10 +30,12 @@
 #include "AccessibilityList.h"
 
 #include "AXObjectCache.h"
+#include "HTMLElement.h"
 #include "HTMLNames.h"
+#include "PseudoElement.h"
+#include "RenderListItem.h"
 #include "RenderObject.h"
-
-using namespace std;
+#include "RenderStyle.h"
 
 namespace WebCore {
     
@@ -48,9 +50,9 @@ AccessibilityList::~AccessibilityList()
 {
 }
 
-PassRefPtr<AccessibilityList> AccessibilityList::create(RenderObject* renderer)
+Ref<AccessibilityList> AccessibilityList::create(RenderObject* renderer)
 {
-    return adoptRef(new AccessibilityList(renderer));
+    return adoptRef(*new AccessibilityList(renderer));
 }
 
 bool AccessibilityList::computeAccessibilityIsIgnored() const
@@ -93,8 +95,108 @@ bool AccessibilityList::isDescriptionList() const
         return false;
     
     Node* node = m_renderer->node();
-    return node && node->hasTagName(dlTag);    
+    return node && node->hasTagName(dlTag);
+}
+
+bool AccessibilityList::childHasPseudoVisibleListItemMarkers(RenderObject* listItem)
+{
+    // Check if the list item has a pseudo-element that should be accessible (e.g. an image or text)
+    Element* listItemElement = downcast<Element>(listItem->node());
+    if (!listItemElement || !listItemElement->beforePseudoElement())
+        return false;
+
+    AccessibilityObject* axObj = axObjectCache()->getOrCreate(listItemElement->beforePseudoElement()->renderer());
+    if (!axObj)
+        return false;
+    
+    if (!axObj->accessibilityIsIgnored())
+        return true;
+    
+    for (const auto& child : axObj->children()) {
+        if (!child->accessibilityIsIgnored())
+            return true;
+    }
+    
+    // Platforms which expose rendered text content through the parent element will treat
+    // those renderers as "ignored" objects.
+#if PLATFORM(GTK) || PLATFORM(EFL)
+    String text = axObj->textUnderElement();
+    return !text.isEmpty() && !text.containsOnlyWhitespace();
+#else
+    return false;
+#endif
 }
     
+AccessibilityRole AccessibilityList::determineAccessibilityRole()
+{
+    m_ariaRole = determineAriaRoleAttribute();
+    
+    // Directory is mapped to list for now, but does not adhere to the same heuristics.
+    if (ariaRoleAttribute() == DirectoryRole)
+        return ListRole;
+    
+    // Heuristic to determine if this list is being used for layout or for content.
+    //   1. If it's a named list, like ol or aria=list, then it's a list.
+    //      1a. Unless the list has no children, then it's not a list.
+    //   2. If it displays visible list markers, it's a list.
+    //   3. If it does not display list markers and has only one child, it's not a list.
+    //   4. If it does not have any listitem children, it's not a list.
+    //   5. Otherwise it's a list (for now).
+    
+    AccessibilityRole role = ListRole;
+    
+    // Temporarily set role so that we can query children (otherwise canHaveChildren returns false).
+    m_role = role;
+    
+    unsigned listItemCount = 0;
+    bool hasVisibleMarkers = false;
+
+    const auto& children = this->children();
+    // DescriptionLists are always semantically a description list, so do not apply heuristics.
+    if (isDescriptionList() && children.size())
+        return DescriptionListRole;
+
+    for (const auto& child : children) {
+        if (child->ariaRoleAttribute() == ListItemRole)
+            listItemCount++;
+        else if (child->roleValue() == ListItemRole) {
+            RenderObject* listItem = child->renderer();
+            if (!listItem)
+                continue;
+            
+            // Rendered list items always count.
+            if (listItem->isListItem()) {
+                if (!hasVisibleMarkers && (listItem->style().listStyleType() != NoneListStyle || listItem->style().listStyleImage() || childHasPseudoVisibleListItemMarkers(listItem)))
+                    hasVisibleMarkers = true;
+                listItemCount++;
+            } else if (listItem->node() && listItem->node()->hasTagName(liTag)) {
+                // Inline elements that are in a list with an explicit role should also count.
+                if (m_ariaRole == ListRole)
+                    listItemCount++;
+
+                if (childHasPseudoVisibleListItemMarkers(listItem)) {
+                    hasVisibleMarkers = true;
+                    listItemCount++;
+                }
+            }
+        }
+    }
+    
+    // Non <ul> lists and ARIA lists only need to have one child.
+    // <ul>, <ol> lists need to have visible markers.
+    if (ariaRoleAttribute() != UnknownRole) {
+        if (!listItemCount)
+            role = GroupRole;
+    } else if (!hasVisibleMarkers)
+        role = GroupRole;
+
+    return role;
+}
+    
+AccessibilityRole AccessibilityList::roleValue() const
+{
+    ASSERT(m_role != UnknownRole);
+    return m_role;
+}
     
 } // namespace WebCore

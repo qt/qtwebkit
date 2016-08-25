@@ -26,15 +26,20 @@
 #ifndef DownloadProxyMap_h
 #define DownloadProxyMap_h
 
+#include "DownloadID.h"
 #include <wtf/HashMap.h>
 #include <wtf/Noncopyable.h>
 #include <wtf/PassRefPtr.h>
+
+namespace WebCore {
+class ResourceRequest;
+}
 
 namespace WebKit {
 
 class ChildProcessProxy;
 class DownloadProxy;
-class WebContext;
+class WebProcessPool;
 
 class DownloadProxyMap {
     WTF_MAKE_NONCOPYABLE(DownloadProxyMap);
@@ -43,7 +48,7 @@ public:
     explicit DownloadProxyMap(ChildProcessProxy*);
     ~DownloadProxyMap();
 
-    DownloadProxy* createDownloadProxy(WebContext*);
+    DownloadProxy* createDownloadProxy(WebProcessPool&, const WebCore::ResourceRequest&);
     void downloadFinished(DownloadProxy*);
 
     bool isEmpty() const { return m_downloads.isEmpty(); }
@@ -52,7 +57,7 @@ public:
 
 private:
     ChildProcessProxy* m_process;
-    HashMap<uint64_t, RefPtr<DownloadProxy> > m_downloads;
+    HashMap<DownloadID, RefPtr<DownloadProxy>> m_downloads;
 };
 
 } // namespace WebKit

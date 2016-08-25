@@ -26,9 +26,24 @@
 #ifndef PlatformWebView_h
 #define PlatformWebView_h
 
-#include <WebKit2/WKRetainPtr.h>
+#include "TestOptions.h"
+#include <WebKit/WKRetainPtr.h>
 
-#if defined(BUILDING_QT__)
+#if PLATFORM(COCOA) && !defined(BUILDING_GTK__)
+#include <WebKit/WKFoundation.h>
+OBJC_CLASS NSView;
+OBJC_CLASS UIView;
+OBJC_CLASS TestRunnerWKWebView;
+OBJC_CLASS WKWebViewConfiguration;
+OBJC_CLASS WebKitTestRunnerWindow;
+
+#if WK_API_ENABLED
+typedef TestRunnerWKWebView *PlatformWKView;
+#else
+typedef NSView *PlatformWKView;
+#endif
+typedef WebKitTestRunnerWindow *PlatformWindow;
+#elif defined(BUILDING_QT__)
 QT_BEGIN_NAMESPACE
 class QQuickView;
 class QEventLoop;
@@ -36,30 +51,11 @@ QT_END_NAMESPACE
 class QQuickWebView;
 typedef QQuickWebView* PlatformWKView;
 typedef QQuickView* PlatformWindow;
-#elif defined(__APPLE__) && __APPLE__
-#ifdef __OBJC__
-@class WKView;
-@class WebKitTestRunnerWindow;
-#else
-class WKView;
-class WebKitTestRunnerWindow;
-#endif
-typedef WKView* PlatformWKView;
-typedef WebKitTestRunnerWindow* PlatformWindow;
-#elif defined(WIN32) || defined(_WIN32)
-typedef WKViewRef PlatformWKView;
-typedef HWND PlatformWindow;
 #elif defined(BUILDING_GTK__)
 typedef struct _GtkWidget GtkWidget;
 typedef WKViewRef PlatformWKView;
 typedef GtkWidget* PlatformWindow;
 #elif PLATFORM(EFL)
-typedef struct _Ecore_Evas Ecore_Evas;
-#if USE(EO)
-typedef struct _Eo Evas_Object;
-#else
-typedef struct _Evas_Object Evas_Object;
-#endif
 typedef Evas_Object* PlatformWKView;
 typedef Ecore_Evas* PlatformWindow;
 #endif
@@ -68,7 +64,11 @@ namespace WTR {
 
 class PlatformWebView {
 public:
-    PlatformWebView(WKContextRef, WKPageGroupRef, WKPageRef relatedPage, WKDictionaryRef options = 0);
+#if PLATFORM(COCOA)
+    PlatformWebView(WKWebViewConfiguration*, const TestOptions&);
+#else
+    PlatformWebView(WKPageConfigurationRef, const TestOptions&);
+#endif
     ~PlatformWebView();
 
     WKPageRef page();
@@ -81,7 +81,8 @@ public:
     bool sendEvent(QEvent*);
     void postEvent(QEvent*);
     void setModalEventLoop(QEventLoop* eventLoop) { m_modalEventLoop = eventLoop; }
-    static bool windowShapshotEnabled();
+    // Window snapshot can be disabled on Qt with QT_WEBKIT_DISABLE_UIPROCESS_DUMPPIXELS=1 environment variable (necessary for xvfb)
+    static bool windowSnapshotEnabled();
 #endif
 
     WKRect windowFrame();
@@ -92,23 +93,29 @@ public:
     void addChromeInputField();
     void removeChromeInputField();
     void makeWebViewFirstResponder();
-    void setWindowIsKey(bool isKey) { m_windowIsKey = isKey; }
+    void setWindowIsKey(bool);
     bool windowIsKey() const { return m_windowIsKey; }
 
-#if PLATFORM(MAC) || PLATFORM(EFL) || PLATFORM(QT)
-    bool viewSupportsOptions(WKDictionaryRef) const;
-#else
-    bool viewSupportsOptions(WKDictionaryRef) const { return true; }
-#endif
+    bool viewSupportsOptions(const TestOptions&) const;
 
     WKRetainPtr<WKImageRef> windowSnapshotImage();
-    WKDictionaryRef options() const { return m_options.get(); }
+    const TestOptions& options() const { return m_options; }
+
+    void changeWindowScaleIfNeeded(float newScale);
+    void setNavigationGesturesEnabled(bool);
+
+#if PLATFORM(GTK)
+    void dismissAllPopupMenus();
+#endif
 
 private:
+    void forceWindowFramesChanged();
+
     PlatformWKView m_view;
     PlatformWindow m_window;
     bool m_windowIsKey;
-    WKRetainPtr<WKDictionaryRef> m_options;
+    const TestOptions m_options;
+
 #if PLATFORM(EFL) || PLATFORM(QT)
     bool m_usingFixedLayout;
 #endif

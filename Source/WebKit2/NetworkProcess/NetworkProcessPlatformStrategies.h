@@ -31,27 +31,17 @@
 
 namespace WebKit {
 
-class NetworkProcessPlatformStrategies : public WebCore::PlatformStrategies, private WebCore::LoaderStrategy {
+class NetworkProcessPlatformStrategies : public WebCore::PlatformStrategies {
 public:
     static void initialize();
     
 private:
     // WebCore::PlatformStrategies
-    virtual WebCore::CookiesStrategy* createCookiesStrategy() OVERRIDE;
-    virtual WebCore::DatabaseStrategy* createDatabaseStrategy() OVERRIDE;
-    virtual WebCore::LoaderStrategy* createLoaderStrategy() OVERRIDE;
-    virtual WebCore::PasteboardStrategy* createPasteboardStrategy() OVERRIDE;
-    virtual WebCore::PluginStrategy* createPluginStrategy() OVERRIDE;
-    virtual WebCore::SharedWorkerStrategy* createSharedWorkerStrategy() OVERRIDE;
-    virtual WebCore::StorageStrategy* createStorageStrategy() OVERRIDE;
-    virtual WebCore::VisitedLinkStrategy* createVisitedLinkStrategy() OVERRIDE;
-
-    // WebCore::LoaderStrategy
-    virtual WebCore::ResourceLoadScheduler* resourceLoadScheduler() OVERRIDE;
-    virtual void loadResourceSynchronously(WebCore::NetworkingContext*, unsigned long resourceLoadIdentifier, const WebCore::ResourceRequest&, WebCore::StoredCredentials, WebCore::ClientCredentialPolicy, WebCore::ResourceError&, WebCore::ResourceResponse&, Vector<char>& data) OVERRIDE;
-#if ENABLE(BLOB)
-    virtual WebCore::BlobRegistry* createBlobRegistry() OVERRIDE;
-#endif
+    WebCore::CookiesStrategy* createCookiesStrategy() override;
+    WebCore::LoaderStrategy* createLoaderStrategy() override;
+    WebCore::PasteboardStrategy* createPasteboardStrategy() override;
+    WebCore::PluginStrategy* createPluginStrategy() override;
+    WebCore::BlobRegistry* createBlobRegistry() override;
 };
 
 } // namespace WebKit

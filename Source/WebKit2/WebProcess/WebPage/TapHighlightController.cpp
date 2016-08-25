@@ -34,9 +34,10 @@
 #include <WebCore/FrameView.h>
 #include <WebCore/GestureTapHighlighter.h>
 #include <WebCore/GraphicsContext.h>
+#include <WebCore/MainFrame.h>
 #include <WebCore/Page.h>
-
-#include <WebCore/RenderObject.h>
+#include <WebCore/PageOverlayController.h>
+#include <WebCore/RenderElement.h>
 
 using namespace std;
 using namespace WebCore;
@@ -58,12 +59,12 @@ void TapHighlightController::highlight(Node* node)
     ASSERT(node);
 
     m_path = GestureTapHighlighter::pathForNodeHighlight(node);
-    m_color = node->renderer()->style()->tapHighlightColor();
+    m_color = node->renderer()->style().tapHighlightColor();
 
     if (!m_overlay) {
-        RefPtr<PageOverlay> overlay = PageOverlay::create(this);
+        RefPtr<PageOverlay> overlay = PageOverlay::create(*this);
         m_overlay = overlay.get();
-        m_webPage->installPageOverlay(overlay.release());
+        m_webPage->mainFrame()->pageOverlayController().installPageOverlay(overlay.release(), PageOverlay::FadeMode::Fade);
     } else
         m_overlay->setNeedsDisplay();
 }
@@ -71,7 +72,7 @@ void TapHighlightController::highlight(Node* node)
 void TapHighlightController::hideHighlight()
 {
     if (m_overlay)
-        m_webPage->uninstallPageOverlay(m_overlay, /* fadeout */ true);
+        m_webPage->mainFrame()->pageOverlayController().uninstallPageOverlay(m_overlay, PageOverlay::FadeMode::Fade);
 }
 
 void TapHighlightController::pageOverlayDestroyed(PageOverlay*)
@@ -97,17 +98,14 @@ static Color highlightColor(Color baseColor, float fractionFadedIn)
     return Color(baseColor.red(), baseColor.green(), baseColor.blue(), int(baseColor.alpha() * fractionFadedIn));
 }
 
-void TapHighlightController::drawRect(PageOverlay* pageOverlay, GraphicsContext& context, const IntRect& /*dirtyRect*/)
+void TapHighlightController::drawRect(PageOverlay* /*pageOverlay*/, GraphicsContext& context, const IntRect& /*dirtyRect*/)
 {
     if (m_path.isEmpty())
         return;
 
     {
         GraphicsContextStateSaver stateSaver(context);
-        if (m_webPage->drawingArea()->pageOverlayShouldApplyFadeWhenPainting())
-            context.setFillColor(highlightColor(m_color, pageOverlay->fractionFadedIn() * 0.5f), ColorSpaceSRGB);
-        else
-            context.setFillColor(highlightColor(m_color, 0.5f), ColorSpaceSRGB);
+        context.setFillColor(highlightColor(m_color, 0.5f), ColorSpaceSRGB);
         context.fillPath(m_path);
     }
 }

@@ -34,26 +34,28 @@
 #include "ExceptionCodePlaceholder.h"
 #include "HTMLFormElement.h"
 #include "HTMLNames.h"
+#include <wtf/NeverDestroyed.h>
 
 namespace WebCore {
 
-inline HTMLOutputElement::HTMLOutputElement(const QualifiedName& tagName, Document* document, HTMLFormElement* form)
+using namespace HTMLNames;
+
+inline HTMLOutputElement::HTMLOutputElement(const QualifiedName& tagName, Document& document, HTMLFormElement* form)
     : HTMLFormControlElement(tagName, document, form)
     , m_isDefaultValueMode(true)
     , m_isSetTextContentInProgress(false)
     , m_defaultValue("")
-    , m_tokens(DOMSettableTokenList::create())
 {
 }
 
-PassRefPtr<HTMLOutputElement> HTMLOutputElement::create(const QualifiedName& tagName, Document* document, HTMLFormElement* form)
+Ref<HTMLOutputElement> HTMLOutputElement::create(const QualifiedName& tagName, Document& document, HTMLFormElement* form)
 {
-    return adoptRef(new HTMLOutputElement(tagName, document, form));
+    return adoptRef(*new HTMLOutputElement(tagName, document, form));
 }
 
 const AtomicString& HTMLOutputElement::formControlType() const
 {
-    DEFINE_STATIC_LOCAL(const AtomicString, output, ("output", AtomicString::ConstructFromLiteral));
+    static NeverDestroyed<const AtomicString> output("output", AtomicString::ConstructFromLiteral);
     return output;
 }
 
@@ -64,27 +66,18 @@ bool HTMLOutputElement::supportsFocus() const
 
 void HTMLOutputElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
-    if (name == HTMLNames::forAttr)
-        setFor(value);
-    else
+    if (name == forAttr) {
+        if (m_tokens)
+            m_tokens->attributeValueChanged(value);
+    } else
         HTMLFormControlElement::parseAttribute(name, value);
 }
 
-DOMSettableTokenList* HTMLOutputElement::htmlFor() const
+void HTMLOutputElement::childrenChanged(const ChildChange& change)
 {
-    return m_tokens.get();
-}
+    HTMLFormControlElement::childrenChanged(change);
 
-void HTMLOutputElement::setFor(const String& value)
-{
-    m_tokens->setValue(value);
-}
-
-void HTMLOutputElement::childrenChanged(bool createdByParser, Node* beforeChange, Node* afterChange, int childCountDelta)
-{
-    HTMLFormControlElement::childrenChanged(createdByParser, beforeChange, afterChange, childCountDelta);
-
-    if (createdByParser || m_isSetTextContentInProgress) {
+    if (change.source == ChildChangeSourceParser || m_isSetTextContentInProgress) {
         m_isSetTextContentInProgress = false;
         return;
     }
@@ -132,6 +125,13 @@ void HTMLOutputElement::setDefaultValue(const String& value)
     // when the element's value mode flag to "default".
     if (m_isDefaultValueMode)
         setTextContentInternal(value);
+}
+
+DOMTokenList& HTMLOutputElement::htmlFor()
+{
+    if (!m_tokens)
+        m_tokens = std::make_unique<AttributeDOMTokenList>(*this, forAttr);
+    return *m_tokens;
 }
 
 void HTMLOutputElement::setTextContentInternal(const String& value)

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2012, 2013, 2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,14 +26,16 @@
 #ifndef GetByIdStatus_h
 #define GetByIdStatus_h
 
-#include "PropertyOffset.h"
-#include "StructureSet.h"
-#include <wtf/NotFound.h>
+#include "CallLinkStatus.h"
+#include "CodeOrigin.h"
+#include "ConcurrentJITLock.h"
+#include "ExitingJITType.h"
+#include "GetByIdVariant.h"
+#include "StructureStubInfo.h"
 
 namespace JSC {
 
 class CodeBlock;
-class Identifier;
 
 class GetByIdStatus {
 public:
@@ -47,57 +49,66 @@ public:
 
     GetByIdStatus()
         : m_state(NoInformation)
-        , m_offset(invalidOffset)
     {
     }
     
     explicit GetByIdStatus(State state)
         : m_state(state)
-        , m_offset(invalidOffset)
     {
         ASSERT(state == NoInformation || state == TakesSlowPath || state == MakesCalls);
     }
     
     GetByIdStatus(
-        State state, bool wasSeenInJIT, const StructureSet& structureSet = StructureSet(),
-        PropertyOffset offset = invalidOffset, JSValue specificValue = JSValue(), Vector<Structure*> chain = Vector<Structure*>())
+        State state, bool wasSeenInJIT, const GetByIdVariant& variant = GetByIdVariant())
         : m_state(state)
-        , m_structureSet(structureSet)
-        , m_chain(chain)
-        , m_specificValue(specificValue)
-        , m_offset(offset)
         , m_wasSeenInJIT(wasSeenInJIT)
     {
-        ASSERT((state == Simple) == (offset != invalidOffset));
+        ASSERT((state == Simple) == variant.isSet());
+        m_variants.append(variant);
     }
     
-    static GetByIdStatus computeFor(CodeBlock*, unsigned bytecodeIndex, Identifier&);
-    static GetByIdStatus computeFor(VM&, Structure*, Identifier&);
+    static GetByIdStatus computeFor(CodeBlock*, StubInfoMap&, unsigned bytecodeIndex, UniquedStringImpl* uid);
+    static GetByIdStatus computeFor(const StructureSet&, UniquedStringImpl* uid);
     
+    static GetByIdStatus computeFor(CodeBlock* baselineBlock, CodeBlock* dfgBlock, StubInfoMap& baselineMap, StubInfoMap& dfgMap, CodeOrigin, UniquedStringImpl* uid);
+
+#if ENABLE(DFG_JIT)
+    static GetByIdStatus computeForStubInfo(const ConcurrentJITLocker&, CodeBlock* baselineBlock, StructureStubInfo*, CodeOrigin, UniquedStringImpl* uid);
+#endif
+
     State state() const { return m_state; }
     
     bool isSet() const { return m_state != NoInformation; }
     bool operator!() const { return !isSet(); }
     bool isSimple() const { return m_state == Simple; }
+
+    size_t numVariants() const { return m_variants.size(); }
+    const Vector<GetByIdVariant, 1>& variants() const { return m_variants; }
+    const GetByIdVariant& at(size_t index) const { return m_variants[index]; }
+    const GetByIdVariant& operator[](size_t index) const { return at(index); }
+
     bool takesSlowPath() const { return m_state == TakesSlowPath || m_state == MakesCalls; }
-    bool makesCalls() const { return m_state == MakesCalls; }
-    
-    const StructureSet& structureSet() const { return m_structureSet; }
-    const Vector<Structure*>& chain() const { return m_chain; } // Returns empty vector if this is a direct access.
-    JSValue specificValue() const { return m_specificValue; } // Returns JSValue() if there is no specific value.
-    PropertyOffset offset() const { return m_offset; }
+    bool makesCalls() const;
     
     bool wasSeenInJIT() const { return m_wasSeenInJIT; }
     
+    void dump(PrintStream&) const;
+    
 private:
-    static void computeForChain(GetByIdStatus& result, CodeBlock*, Identifier&, Structure*);
-    static GetByIdStatus computeFromLLInt(CodeBlock*, unsigned bytecodeIndex, Identifier&);
+#if ENABLE(DFG_JIT)
+    static bool hasExitSite(const ConcurrentJITLocker&, CodeBlock*, unsigned bytecodeIndex);
+#endif
+#if ENABLE(JIT)
+    static GetByIdStatus computeForStubInfoWithoutExitSiteFeedback(
+        const ConcurrentJITLocker&, CodeBlock* profiledBlock, StructureStubInfo*,
+        UniquedStringImpl* uid, CallLinkStatus::ExitSiteData);
+#endif
+    static GetByIdStatus computeFromLLInt(CodeBlock*, unsigned bytecodeIndex, UniquedStringImpl* uid);
+    
+    bool appendVariant(const GetByIdVariant&);
     
     State m_state;
-    StructureSet m_structureSet;
-    Vector<Structure*> m_chain;
-    JSValue m_specificValue;
-    PropertyOffset m_offset;
+    Vector<GetByIdVariant, 1> m_variants;
     bool m_wasSeenInJIT;
 };
 

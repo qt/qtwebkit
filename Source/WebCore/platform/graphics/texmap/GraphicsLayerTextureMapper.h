@@ -20,7 +20,7 @@
 #ifndef GraphicsLayerTextureMapper_h
 #define GraphicsLayerTextureMapper_h
 
-#if USE(TEXTURE_MAPPER)
+#if !USE(COORDINATED_GRAPHICS)
 
 #include "GraphicsLayer.h"
 #include "GraphicsLayerClient.h"
@@ -32,69 +32,67 @@
 
 namespace WebCore {
 
-class GraphicsLayerTextureMapper : public GraphicsLayer, public TextureMapperPlatformLayer::Client {
+class GraphicsLayerTextureMapper final : public GraphicsLayer, TextureMapperPlatformLayer::Client {
 public:
-    explicit GraphicsLayerTextureMapper(GraphicsLayerClient*);
+    explicit GraphicsLayerTextureMapper(Type, GraphicsLayerClient&);
     virtual ~GraphicsLayerTextureMapper();
 
-    void setScrollClient(TextureMapperLayer::ScrollingClient* client) { m_layer->setScrollClient(client); }
-    void setID(uint32_t id) { m_layer->setID(id); }
+    void setScrollClient(TextureMapperLayer::ScrollingClient* client) { m_layer.setScrollClient(client); }
+    void setID(uint32_t id) { m_layer.setID(id); }
 
-    // reimps from GraphicsLayer.h
-    virtual void setNeedsDisplay();
-    virtual void setContentsNeedsDisplay();
-    virtual void setNeedsDisplayInRect(const FloatRect&);
-    virtual bool setChildren(const Vector<GraphicsLayer*>&);
-    virtual void addChild(GraphicsLayer*);
-    virtual void addChildAtIndex(GraphicsLayer*, int index);
-    virtual void addChildAbove(GraphicsLayer* layer, GraphicsLayer* sibling);
-    virtual void addChildBelow(GraphicsLayer* layer, GraphicsLayer* sibling);
-    virtual bool replaceChild(GraphicsLayer* oldChild, GraphicsLayer* newChild);
-    virtual void setMaskLayer(GraphicsLayer* layer);
-    virtual void setPosition(const FloatPoint& p);
-    virtual void setAnchorPoint(const FloatPoint3D& p);
-    virtual void setSize(const FloatSize& size);
-    virtual void setTransform(const TransformationMatrix& t);
-    virtual void setChildrenTransform(const TransformationMatrix& t);
-    virtual void setPreserves3D(bool b);
-    virtual void setMasksToBounds(bool b);
-    virtual void setDrawsContent(bool b);
-    virtual void setContentsVisible(bool);
-    virtual void setContentsOpaque(bool b);
-    virtual void setBackfaceVisibility(bool b);
-    virtual void setOpacity(float opacity);
-    virtual void setContentsRect(const IntRect& r);
-    virtual void setReplicatedByLayer(GraphicsLayer*);
-    virtual void setContentsToImage(Image*);
-    virtual void setContentsToSolidColor(const Color&);
-    Color solidColor() const { return m_solidColor; }
-    virtual void setContentsToMedia(PlatformLayer*);
-    virtual void setContentsToCanvas(PlatformLayer* canvas) { setContentsToMedia(canvas); }
-    virtual void setShowDebugBorder(bool) OVERRIDE;
-    virtual void setDebugBorder(const Color&, float width) OVERRIDE;
-    virtual void setShowRepaintCounter(bool) OVERRIDE;
-    virtual void flushCompositingState(const FloatRect&);
-    virtual void flushCompositingStateForThisLayerOnly();
-    virtual void setName(const String& name);
-    virtual bool hasContentsLayer() const { return m_contentsLayer; }
-    virtual PlatformLayer* platformLayer() const { return m_contentsLayer; }
+    // GraphicsLayer
+    virtual bool setChildren(const Vector<GraphicsLayer*>&) override;
+    virtual void addChild(GraphicsLayer*) override;
+    virtual void addChildAtIndex(GraphicsLayer*, int index) override;
+    virtual void addChildAbove(GraphicsLayer*, GraphicsLayer* sibling) override;
+    virtual void addChildBelow(GraphicsLayer*, GraphicsLayer* sibling) override;
+    virtual bool replaceChild(GraphicsLayer* oldChild, GraphicsLayer* newChild) override;
 
-    inline int changeMask() const { return m_changeMask; }
+    virtual void setMaskLayer(GraphicsLayer*) override;
+    virtual void setReplicatedByLayer(GraphicsLayer*) override;
+    virtual void setPosition(const FloatPoint&) override;
+    virtual void setAnchorPoint(const FloatPoint3D&) override;
+    virtual void setSize(const FloatSize&) override;
+    virtual void setTransform(const TransformationMatrix&) override;
+    virtual void setChildrenTransform(const TransformationMatrix&) override;
+    virtual void setPreserves3D(bool) override;
+    virtual void setMasksToBounds(bool) override;
+    virtual void setDrawsContent(bool) override;
+    virtual void setContentsVisible(bool) override;
+    virtual void setContentsOpaque(bool) override;
+    virtual void setBackfaceVisibility(bool) override;
+    virtual void setOpacity(float) override;
+    virtual bool setFilters(const FilterOperations&) override;
 
-    virtual bool addAnimation(const KeyframeValueList&, const IntSize&, const Animation*, const String&, double);
-    virtual void pauseAnimation(const String&, double);
-    virtual void removeAnimation(const String&);
-    void setAnimations(const GraphicsLayerAnimations&);
+    virtual void setNeedsDisplay() override;
+    virtual void setNeedsDisplayInRect(const FloatRect&, ShouldClipToLayer = ClipToLayer) override;
+    virtual void setContentsNeedsDisplay() override;
+    virtual void setContentsRect(const FloatRect&) override;
 
-    TextureMapperLayer* layer() const { return m_layer.get(); }
+    virtual bool addAnimation(const KeyframeValueList&, const FloatSize&, const Animation*, const String&, double) override;
+    virtual void pauseAnimation(const String&, double) override;
+    virtual void removeAnimation(const String&) override;
+
+    virtual void setContentsToImage(Image*) override;
+    virtual void setContentsToSolidColor(const Color&) override;
+    virtual void setContentsToPlatformLayer(PlatformLayer*, ContentsLayerPurpose) override;
+    virtual bool usesContentsLayer() const override { return m_contentsLayer; }
+    virtual PlatformLayer* platformLayer() const override { return m_contentsLayer; }
+
+    virtual void setShowDebugBorder(bool) override;
+    virtual void setDebugBorder(const Color&, float width) override;
+    virtual void setShowRepaintCounter(bool) override;
+
+    virtual void flushCompositingState(const FloatRect&, bool) override;
+    virtual void flushCompositingStateForThisLayerOnly(bool) override;
+
+    void updateBackingStoreIncludingSubLayers();
+
+    TextureMapperLayer& layer() { return m_layer; }
 
     void didCommitScrollOffset(const IntSize&);
     void setIsScrollable(bool);
     bool isScrollable() const { return m_isScrollable; }
-
-#if ENABLE(CSS_FILTERS)
-    virtual bool setFilters(const FilterOperations&);
-#endif
 
     void setFixedToViewport(bool);
     bool fixedToViewport() const { return m_fixedToViewport; }
@@ -103,18 +101,21 @@ public:
     float debugBorderWidth() const { return m_debugBorderWidth; }
     void setRepaintCount(int);
 
+    void setAnimations(const TextureMapperAnimations&);
+
 private:
-    virtual void willBeDestroyed();
+    // GraphicsLayer
+    virtual bool isGraphicsLayerTextureMapper() const override { return true; }
+
+    // TextureMapperPlatformLayer::Client
+    virtual void platformLayerWillBeDestroyed() override { setContentsToPlatformLayer(0, NoContentsLayer); }
+    virtual void setPlatformLayerNeedsDisplay() override { setContentsNeedsDisplay(); }
 
     void commitLayerChanges();
     void updateDebugBorderAndRepaintCount();
     void updateBackingStoreIfNeeded();
     void prepareBackingStoreIfNeeded();
     bool shouldHaveBackingStore() const;
-
-    // TextureMapperPlatformLayer::Client methods:
-    virtual void setPlatformLayerNeedsDisplay() OVERRIDE { setContentsNeedsDisplay(); }
-    virtual void platformLayerWasDestroyed() OVERRIDE { m_contentsLayer = 0; }
 
     // This set of flags help us defer which properties of the layer have been
     // modified by the compositor, so we can know what to look for in the next flush.
@@ -161,14 +162,13 @@ private:
     };
     void notifyChange(ChangeMask);
 
-    OwnPtr<TextureMapperLayer> m_layer;
+    TextureMapperLayer m_layer;
     RefPtr<TextureMapperTiledBackingStore> m_compositedImage;
     NativeImagePtr m_compositedNativeImagePtr;
     RefPtr<TextureMapperBackingStore> m_backingStore;
 
     int m_changeMask;
     bool m_needsDisplay;
-    bool m_hasOwnBackingStore;
     bool m_fixedToViewport;
     Color m_solidColor;
 
@@ -176,23 +176,18 @@ private:
     float m_debugBorderWidth;
 
     TextureMapperPlatformLayer* m_contentsLayer;
-    TextureMapperPlatformLayer* m_directLayer;
     FloatRect m_needsDisplayRect;
-    GraphicsLayerAnimations m_animations;
+    TextureMapperAnimations m_animations;
     double m_animationStartTime;
 
     IntSize m_committedScrollOffset;
     bool m_isScrollable;
 };
 
-inline static GraphicsLayerTextureMapper* toGraphicsLayerTextureMapper(GraphicsLayer* layer)
-{
-    return static_cast<GraphicsLayerTextureMapper*>(layer);
-}
+} // namespace WebCore
 
-TextureMapperLayer* toTextureMapperLayer(GraphicsLayer*);
+SPECIALIZE_TYPE_TRAITS_GRAPHICSLAYER(WebCore::GraphicsLayerTextureMapper, isGraphicsLayerTextureMapper())
 
-}
 #endif
 
 #endif // GraphicsLayerTextureMapper_h

@@ -38,13 +38,14 @@ namespace WebKit {
 class InjectedBundleNodeHandle;
 class WebFrame;
 
-class InjectedBundleHitTestResult : public TypedAPIObject<APIObject::TypeBundleHitTestResult> {
+class InjectedBundleHitTestResult : public API::ObjectImpl<API::Object::Type::BundleHitTestResult> {
 public:
-    static PassRefPtr<InjectedBundleHitTestResult> create(const WebCore::HitTestResult&);
+    static Ref<InjectedBundleHitTestResult> create(const WebCore::HitTestResult&);
 
     const WebCore::HitTestResult& coreHitTestResult() const { return m_hitTestResult; }
 
-    PassRefPtr<InjectedBundleNodeHandle> nodeHandle() const; 
+    PassRefPtr<InjectedBundleNodeHandle> nodeHandle() const;
+    PassRefPtr<InjectedBundleNodeHandle> urlElementHandle() const;
     WebFrame* frame() const;
     WebFrame* targetFrame() const;
 
@@ -54,6 +55,7 @@ public:
     String absoluteMediaURL() const;
     bool mediaIsInFullscreen() const;
     bool mediaHasAudio() const;
+    bool isDownloadableMedia() const;
     BundleHitTestResultMediaType mediaType() const;
 
     String linkLabel() const;

@@ -26,8 +26,9 @@
 
 #include "Document.h"
 #include "MediaPlayer.h"
+#include "XMLDocument.h"
+#include <memory>
 #include <wtf/Forward.h>
-#include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
 
 namespace WebCore {
@@ -37,43 +38,40 @@ class Document;
 class DocumentType;
 class Frame;
 class HTMLDocument;
-class KURL;
-class RegularExpression;
+class URL;
 
 typedef int ExceptionCode;
 
 class DOMImplementation : public ScriptWrappable {
     WTF_MAKE_FAST_ALLOCATED;
 public:
-    static PassOwnPtr<DOMImplementation> create(Document* document) { return adoptPtr(new DOMImplementation(document)); }
-    
-    void ref() { m_document->ref(); }
-    void deref() { m_document->deref(); }
-    Document* document() { return m_document; }
+    explicit DOMImplementation(Document&);
+
+    void ref() { m_document.ref(); }
+    void deref() { m_document.deref(); }
+    Document& document() { return m_document; }
 
     // DOM methods & attributes for DOMImplementation
     static bool hasFeature(const String& feature, const String& version);
-    PassRefPtr<DocumentType> createDocumentType(const String& qualifiedName, const String& publicId, const String& systemId, ExceptionCode&);
-    PassRefPtr<Document> createDocument(const String& namespaceURI, const String& qualifiedName, DocumentType*, ExceptionCode&);
+    RefPtr<DocumentType> createDocumentType(const String& qualifiedName, const String& publicId, const String& systemId, ExceptionCode&);
+    RefPtr<XMLDocument> createDocument(const String& namespaceURI, const String& qualifiedName, DocumentType*, ExceptionCode&);
 
     DOMImplementation* getInterface(const String& feature);
 
     // From the DOMImplementationCSS interface
-    static PassRefPtr<CSSStyleSheet> createCSSStyleSheet(const String& title, const String& media, ExceptionCode&);
+    static Ref<CSSStyleSheet> createCSSStyleSheet(const String& title, const String& media, ExceptionCode&);
 
     // From the HTMLDOMImplementation interface
-    PassRefPtr<HTMLDocument> createHTMLDocument(const String& title);
+    Ref<HTMLDocument> createHTMLDocument(const String& title);
 
     // Other methods (not part of DOM)
-    static PassRefPtr<Document> createDocument(const String& MIMEType, Frame*, const KURL&, bool inViewSourceMode);
+    static Ref<Document> createDocument(const String& MIMEType, Frame*, const URL&);
 
-    static bool isXMLMIMEType(const String& MIMEType);
-    static bool isTextMIMEType(const String& MIMEType);
+    WEBCORE_EXPORT static bool isXMLMIMEType(const String& MIMEType);
+    WEBCORE_EXPORT static bool isTextMIMEType(const String& MIMEType);
 
 private:
-    explicit DOMImplementation(Document*);
-
-    Document* m_document;
+    Document& m_document;
 };
 
 } // namespace WebCore

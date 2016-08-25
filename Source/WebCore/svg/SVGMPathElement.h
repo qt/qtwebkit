@@ -20,22 +20,20 @@
 #ifndef SVGMPathElement_h
 #define SVGMPathElement_h
 
-#if ENABLE(SVG)
 #include "SVGAnimatedBoolean.h"
 #include "SVGAnimatedString.h"
 #include "SVGElement.h"
 #include "SVGExternalResourcesRequired.h"
+#include "SVGNames.h"
 #include "SVGURIReference.h"
 
 namespace WebCore {
     
 class SVGPathElement;
 
-class SVGMPathElement FINAL : public SVGElement,
-                              public SVGURIReference,
-                              public SVGExternalResourcesRequired {
+class SVGMPathElement final : public SVGElement, public SVGURIReference, public SVGExternalResourcesRequired {
 public:
-    static PassRefPtr<SVGMPathElement> create(const QualifiedName&, Document*);
+    static Ref<SVGMPathElement> create(const QualifiedName&, Document&);
 
     virtual ~SVGMPathElement();
 
@@ -44,26 +42,27 @@ public:
     void targetPathChanged();
 
 private:
-    SVGMPathElement(const QualifiedName&, Document*);
+    SVGMPathElement(const QualifiedName&, Document&);
 
-    void buildPendingResource();
+    void buildPendingResource() override;
     void clearResourceReferences();
-    virtual InsertionNotificationRequest insertedInto(ContainerNode*) OVERRIDE;
-    void removedFrom(ContainerNode*);
+    virtual InsertionNotificationRequest insertedInto(ContainerNode&) override;
+    virtual void removedFrom(ContainerNode&) override;
 
-    bool isSupportedAttribute(const QualifiedName&);
-    virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
-    virtual void svgAttributeChanged(const QualifiedName&) OVERRIDE;
+    virtual void parseAttribute(const QualifiedName&, const AtomicString&) override;
+    virtual void svgAttributeChanged(const QualifiedName&) override;
+
+    virtual bool rendererIsNeeded(const RenderStyle&) override { return false; }
+    virtual void finishedInsertingSubtree() override;
 
     void notifyParentOfPathChange(ContainerNode*);
 
     BEGIN_DECLARE_ANIMATED_PROPERTIES(SVGMPathElement)
-        DECLARE_ANIMATED_STRING(Href, href)
-        DECLARE_ANIMATED_BOOLEAN(ExternalResourcesRequired, externalResourcesRequired)
+        DECLARE_ANIMATED_STRING_OVERRIDE(Href, href)
+        DECLARE_ANIMATED_BOOLEAN_OVERRIDE(ExternalResourcesRequired, externalResourcesRequired)
     END_DECLARE_ANIMATED_PROPERTIES
 };
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif // SVGMPathElement_h

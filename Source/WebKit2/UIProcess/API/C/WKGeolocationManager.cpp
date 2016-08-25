@@ -28,6 +28,7 @@
 
 #include "WKAPICast.h"
 #include "WebGeolocationManagerProxy.h"
+#include "WebGeolocationPosition.h"
 
 using namespace WebKit;
 
@@ -36,7 +37,7 @@ WKTypeID WKGeolocationManagerGetTypeID()
     return toAPI(WebGeolocationManagerProxy::APIType);
 }
 
-void WKGeolocationManagerSetProvider(WKGeolocationManagerRef geolocationManagerRef, const WKGeolocationProvider* wkProvider)
+void WKGeolocationManagerSetProvider(WKGeolocationManagerRef geolocationManagerRef, const WKGeolocationProviderBase* wkProvider)
 {
     toImpl(geolocationManagerRef)->initializeProvider(wkProvider);
 }

@@ -23,8 +23,6 @@
 #include "FrameDestructionObserver.h"
 #include "PluginData.h"
 
-#include <wtf/Forward.h>
-#include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
 #include <wtf/RefPtr.h>
 
@@ -34,22 +32,21 @@ class DOMPlugin;
 
 class DOMMimeType : public RefCounted<DOMMimeType>, public FrameDestructionObserver {
 public:
-    static PassRefPtr<DOMMimeType> create(PassRefPtr<PluginData> pluginData, Frame* frame, unsigned index) { return adoptRef(new DOMMimeType(pluginData, frame, index)); }
+    static Ref<DOMMimeType> create(RefPtr<PluginData>&& pluginData, Frame* frame, unsigned index) { return adoptRef(*new DOMMimeType(WTFMove(pluginData), frame, index)); }
     ~DOMMimeType();
 
-    const String &type() const;
+    String type() const;
     String suffixes() const;
-    const String &description() const;
-    PassRefPtr<DOMPlugin> enabledPlugin() const;
+    String description() const;
+    RefPtr<DOMPlugin> enabledPlugin() const;
 
 private:
-    const MimeClassInfo& mimeClassInfo() const { return m_pluginData->mimes()[m_index]; }
-
-    DOMMimeType(PassRefPtr<PluginData>, Frame*, unsigned index);
+    DOMMimeType(RefPtr<PluginData>&&, Frame*, unsigned index);
+    MimeClassInfo m_mimeClassInfo;
     RefPtr<PluginData> m_pluginData;
-    unsigned m_index;
+    PluginInfo m_pluginInfo;
 };
 
-}
+} // namespace WebCore
 
-#endif
+#endif // DOMMimeType_h

@@ -20,34 +20,16 @@
 #ifndef JSImageConstructor_h
 #define JSImageConstructor_h
 
-#include "JSDOMBinding.h"
-#include "JSDocument.h"
+namespace JSC {
+class JSValue;
+class VM;
+}
 
 namespace WebCore {
 
-    class JSImageConstructor : public DOMConstructorWithDocument {
-    public:
-        typedef DOMConstructorWithDocument Base;
+class JSDOMGlobalObject;
 
-        static JSImageConstructor* create(JSC::ExecState* exec, JSC::Structure* structure, JSDOMGlobalObject* globalObject)
-        {
-            JSImageConstructor* constructor = new (NotNull, JSC::allocateCell<JSImageConstructor>(*exec->heap())) JSImageConstructor(structure, globalObject);
-            constructor->finishCreation(exec, globalObject);
-            return constructor;
-        }
-
-        static JSC::Structure* createStructure(JSC::VM& vm, JSC::JSGlobalObject* globalObject, JSC::JSValue prototype)
-        {
-            return JSC::Structure::create(vm, globalObject, prototype, JSC::TypeInfo(JSC::ObjectType, StructureFlags), &s_info);
-        }
-
-        static const JSC::ClassInfo s_info;
-
-    private:
-        JSImageConstructor(JSC::Structure*, JSDOMGlobalObject*);
-        void finishCreation(JSC::ExecState*, JSDOMGlobalObject*);
-        static JSC::ConstructType getConstructData(JSC::JSCell*, JSC::ConstructData&);
-    };
+JSC::JSValue createImageConstructor(JSC::VM&, const JSDOMGlobalObject&);
 
 } // namespace WebCore
 

@@ -27,14 +27,16 @@ namespace WebCore {
 
 class CSSFontFaceSrcValue;
 
-class SVGFontFaceNameElement FINAL : public SVGElement {
+class SVGFontFaceNameElement final : public SVGElement {
 public:
-    static PassRefPtr<SVGFontFaceNameElement> create(const QualifiedName&, Document*);
+    static Ref<SVGFontFaceNameElement> create(const QualifiedName&, Document&);
     
-    PassRefPtr<CSSFontFaceSrcValue> srcValue() const;
+    Ref<CSSFontFaceSrcValue> srcValue() const;
 
 private:
-    SVGFontFaceNameElement(const QualifiedName&, Document*);
+    SVGFontFaceNameElement(const QualifiedName&, Document&);
+
+    virtual bool rendererIsNeeded(const RenderStyle&) override { return false; }
 };
 
 } // namespace WebCore

@@ -26,7 +26,11 @@
 #ifndef WKBundlePagePrivate_h
 #define WKBundlePagePrivate_h
 
-#include <WebKit2/WKBase.h>
+#include <WebKit/WKBase.h>
+#include <WebKit/WKEvent.h>
+#include <WebKit/WKGeometry.h>
+#include <WebKit/WKUserContentInjectedFrames.h>
+#include <WebKit/WKUserScriptInjectionTime.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -78,13 +82,36 @@ WK_EXPORT bool WKBundlePageCanShowMIMEType(WKBundlePageRef, WKStringRef mimeType
 WK_EXPORT void* WKAccessibilityRootObject(WKBundlePageRef);
 WK_EXPORT void* WKAccessibilityFocusedObject(WKBundlePageRef);
 
-WK_EXPORT WKArrayRef WKBundlePageCopyContextMenuItemTitles(WKBundlePageRef);
+WK_EXPORT void WKAccessibilityEnableEnhancedAccessibility(bool);
+WK_EXPORT bool WKAccessibilityEnhancedAccessibilityEnabled();
+
+WK_EXPORT WKStringRef WKBundlePageCopyContextMenuItemTitle(WKContextMenuItemRef);
+WK_EXPORT void WKBundlePageClickMenuItem(WKBundlePageRef, WKContextMenuItemRef);
+WK_EXPORT WKArrayRef WKBundlePageCopyContextMenuItems(WKBundlePageRef);
 WK_EXPORT WKArrayRef WKBundlePageCopyContextMenuAtPointInWindow(WKBundlePageRef, WKPoint);
 
 // This only works if the SuppressesIncrementalRendering preference is set as well.
 typedef unsigned WKRenderingSuppressionToken;
 WK_EXPORT WKRenderingSuppressionToken WKBundlePageExtendIncrementalRenderingSuppression(WKBundlePageRef);
 WK_EXPORT void WKBundlePageStopExtendingIncrementalRenderingSuppression(WKBundlePageRef, WKRenderingSuppressionToken);
+
+// UserContent API (compatible with Modern API, for WKTR)
+WK_EXPORT void WKBundlePageAddUserScript(WKBundlePageRef page, WKStringRef source, _WKUserScriptInjectionTime injectionTime, WKUserContentInjectedFrames injectedFrames);
+WK_EXPORT void WKBundlePageAddUserStyleSheet(WKBundlePageRef page, WKStringRef source, WKUserContentInjectedFrames injectedFrames);
+WK_EXPORT void WKBundlePageRemoveAllUserContent(WKBundlePageRef page);
+
+// Application Cache API, for WKTR.
+WK_EXPORT void WKBundlePageClearApplicationCache(WKBundlePageRef page);
+WK_EXPORT void WKBundlePageClearApplicationCacheForOrigin(WKBundlePageRef page, WKStringRef origin);
+WK_EXPORT void WKBundlePageSetAppCacheMaximumSize(WKBundlePageRef page, uint64_t size);
+WK_EXPORT uint64_t WKBundlePageGetAppCacheUsageForOrigin(WKBundlePageRef page, WKStringRef origin);
+WK_EXPORT void WKBundlePageSetApplicationCacheOriginQuota(WKBundlePageRef page, WKStringRef origin, uint64_t bytes);
+WK_EXPORT void WKBundlePageResetApplicationCacheOriginQuota(WKBundlePageRef page, WKStringRef origin);
+WK_EXPORT WKArrayRef WKBundlePageCopyOriginsWithApplicationCache(WKBundlePageRef page);
+
+#if TARGET_OS_IPHONE
+WK_EXPORT void WKBundlePageSetUseTestingViewportConfiguration(WKBundlePageRef, bool);
+#endif
 
 #ifdef __cplusplus
 }

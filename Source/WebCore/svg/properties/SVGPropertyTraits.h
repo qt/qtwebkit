@@ -21,7 +21,6 @@
 #ifndef SVGPropertyTraits_h
 #define SVGPropertyTraits_h
 
-#if ENABLE(SVG)
 #include <wtf/text/WTFString.h>
 
 namespace WebCore {
@@ -59,7 +58,12 @@ struct SVGPropertyTraits<String> {
     static String toString(const String& type) { return type; }
 };
 
+template<typename EnumType>
+struct SVGIDLEnumLimits {
+    // Specialize this function for a particular enumeration to limit the values that are exposed through the DOM.
+    static unsigned highestExposedEnumValue() { return SVGPropertyTraits<EnumType>::highestEnumValue(); }
+};
+
 }
 
-#endif
 #endif

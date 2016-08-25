@@ -23,7 +23,6 @@
 #include "config.h"
 #include "HTMLFontElement.h"
 
-#include "Attribute.h"
 #include "CSSPropertyNames.h"
 #include "CSSStyleSheet.h"
 #include "CSSValueKeywords.h"
@@ -31,7 +30,7 @@
 #include "CSSValuePool.h"
 #include "HTMLNames.h"
 #include "HTMLParserIdioms.h"
-#include "StylePropertySet.h"
+#include "StyleProperties.h"
 #include <wtf/text/StringBuilder.h>
 
 using namespace WTF;
@@ -40,15 +39,15 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-HTMLFontElement::HTMLFontElement(const QualifiedName& tagName, Document* document)
+HTMLFontElement::HTMLFontElement(const QualifiedName& tagName, Document& document)
     : HTMLElement(tagName, document)
 {
     ASSERT(hasTagName(fontTag));
 }
 
-PassRefPtr<HTMLFontElement> HTMLFontElement::create(const QualifiedName& tagName, Document* document)
+Ref<HTMLFontElement> HTMLFontElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new HTMLFontElement(tagName, document));
+    return adoptRef(*new HTMLFontElement(tagName, document));
 }
 
 // http://www.whatwg.org/specs/web-apps/current-work/multipage/rendering.html#fonts-and-colors
@@ -71,7 +70,7 @@ static bool parseFontSize(const CharacterType* characters, unsigned length, int&
     // Step 4
     if (position == end)
         return false;
-    ASSERT(position < end);
+    ASSERT_WITH_SECURITY_IMPLICATION(position < end);
 
     // Step 5
     enum {
@@ -186,7 +185,7 @@ bool HTMLFontElement::isPresentationAttribute(const QualifiedName& name) const
     return HTMLElement::isPresentationAttribute(name);
 }
 
-void HTMLFontElement::collectStyleForPresentationAttribute(const QualifiedName& name, const AtomicString& value, MutableStylePropertySet* style)
+void HTMLFontElement::collectStyleForPresentationAttribute(const QualifiedName& name, const AtomicString& value, MutableStyleProperties& style)
 {
     if (name == sizeAttr) {
         CSSValueID size = CSSValueInvalid;
@@ -195,8 +194,8 @@ void HTMLFontElement::collectStyleForPresentationAttribute(const QualifiedName& 
     } else if (name == colorAttr)
         addHTMLColorToStyle(style, CSSPropertyColor, value);
     else if (name == faceAttr) {
-        if (RefPtr<CSSValueList> fontFaceValue = cssValuePool().createFontFaceValue(value))
-            style->setProperty(CSSProperty(CSSPropertyFontFamily, fontFaceValue.release()));
+        if (RefPtr<CSSValueList> fontFaceValue = CSSValuePool::singleton().createFontFaceValue(value))
+            style.setProperty(CSSProperty(CSSPropertyFontFamily, fontFaceValue.release()));
     } else
         HTMLElement::collectStyleForPresentationAttribute(name, value, style);
 }

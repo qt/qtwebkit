@@ -20,7 +20,6 @@
 #ifndef SVGPathSegListPropertyTearOff_h
 #define SVGPathSegListPropertyTearOff_h
 
-#if ENABLE(SVG)
 #include "SVGAnimatedListPropertyTearOff.h"
 #include "SVGPathSegList.h"
 
@@ -33,12 +32,12 @@ public:
     typedef SVGListProperty<SVGPathSegList> Base;
     typedef SVGAnimatedListPropertyTearOff<SVGPathSegList> AnimatedListPropertyTearOff;
     typedef SVGPropertyTraits<SVGPathSegList>::ListItemType ListItemType;
-    typedef PassRefPtr<SVGPathSeg> PassListItemType;
+    typedef RefPtr<SVGPathSeg> PtrListItemType;
 
-    static PassRefPtr<SVGPathSegListPropertyTearOff> create(AnimatedListPropertyTearOff* animatedProperty, SVGPropertyRole role, SVGPathSegRole pathSegRole, SVGPathSegList& values, ListWrapperCache& wrappers)
+    static Ref<SVGPathSegListPropertyTearOff> create(AnimatedListPropertyTearOff* animatedProperty, SVGPropertyRole role, SVGPathSegRole pathSegRole, SVGPathSegList& values, ListWrapperCache& wrappers)
     {
         ASSERT(animatedProperty);
-        return adoptRef(new SVGPathSegListPropertyTearOff(animatedProperty, role, pathSegRole, values, wrappers));
+        return adoptRef(*new SVGPathSegListPropertyTearOff(animatedProperty, role, pathSegRole, values, wrappers));
     }
 
     int findItem(const ListItemType& item) const
@@ -68,53 +67,44 @@ public:
     // SVGList API
     void clear(ExceptionCode&);
 
-    PassListItemType initialize(PassListItemType passNewItem, ExceptionCode& ec)
+    PtrListItemType initialize(PtrListItemType newItem, ExceptionCode& ec)
     {
         // Not specified, but FF/Opera do it this way, and it's just sane.
-        if (!passNewItem) {
+        if (!newItem) {
             ec = SVGException::SVG_WRONG_TYPE_ERR;
-            return 0;
+            return nullptr;
         }
 
         clearContextAndRoles();
-        ListItemType newItem = passNewItem;
         return Base::initializeValues(newItem, ec);
     }
 
-    PassListItemType getItem(unsigned index, ExceptionCode&);
+    PtrListItemType getItem(unsigned index, ExceptionCode&);
 
-    PassListItemType insertItemBefore(PassListItemType passNewItem, unsigned index, ExceptionCode& ec)
+    PtrListItemType insertItemBefore(PtrListItemType newItem, unsigned index, ExceptionCode& ec)
     {
         // Not specified, but FF/Opera do it this way, and it's just sane.
-        if (!passNewItem) {
+        if (!newItem) {
             ec = SVGException::SVG_WRONG_TYPE_ERR;
             return 0;
         }
 
-        ListItemType newItem = passNewItem;
         return Base::insertItemBeforeValues(newItem, index, ec);
     }
 
-    PassListItemType replaceItem(PassListItemType, unsigned index, ExceptionCode&);
+    PtrListItemType replaceItem(PtrListItemType, unsigned index, ExceptionCode&);
 
-    PassListItemType removeItem(unsigned index, ExceptionCode&);
+    PtrListItemType removeItem(unsigned index, ExceptionCode&);
 
-    PassListItemType appendItem(PassListItemType passNewItem, ExceptionCode& ec)
+    PtrListItemType appendItem(PtrListItemType newItem, ExceptionCode& ec)
     {
         // Not specified, but FF/Opera do it this way, and it's just sane.
-        if (!passNewItem) {
+        if (!newItem) {
             ec = SVGException::SVG_WRONG_TYPE_ERR;
-            return 0;
+            return nullptr;
         }
 
-        ListItemType newItem = passNewItem;
         return Base::appendItemValues(newItem, ec);
-    }
-
-    virtual ~SVGPathSegListPropertyTearOff()
-    {
-        if (m_animatedProperty)
-            m_animatedProperty->propertyWillBeDeleted(*this);
     }
 
 private:
@@ -125,13 +115,19 @@ private:
     {
     }
 
+    virtual ~SVGPathSegListPropertyTearOff()
+    {
+        if (m_animatedProperty)
+            m_animatedProperty->propertyWillBeDeleted(*this);
+    }
+
     SVGPathElement* contextElement() const;
 
     void clearContextAndRoles();
 
     using Base::m_role;
 
-    virtual bool isReadOnly() const
+    virtual bool isReadOnly() const override
     {
         if (m_role == AnimValRole)
             return true;
@@ -140,20 +136,20 @@ private:
         return false;
     }
 
-    virtual void commitChange()
+    virtual void commitChange() override
     {
         ASSERT(m_values);
         m_values->commitChange(m_animatedProperty->contextElement(), ListModificationUnknown);
     }
 
-    virtual void commitChange(ListModification listModification)
+    virtual void commitChange(ListModification listModification) override
     {
         ASSERT(m_values);
         m_values->commitChange(m_animatedProperty->contextElement(), listModification);
     }
 
-    virtual bool processIncomingListItemValue(const ListItemType& newItem, unsigned* indexToModify) OVERRIDE;
-    virtual bool processIncomingListItemWrapper(RefPtr<ListItemTearOff>&, unsigned*)
+    virtual bool processIncomingListItemValue(const ListItemType& newItem, unsigned* indexToModify) override;
+    virtual bool processIncomingListItemWrapper(RefPtr<ListItemTearOff>&, unsigned*) override
     {
         ASSERT_NOT_REACHED();
         return true;
@@ -166,5 +162,4 @@ private:
 
 }
 
-#endif // ENABLE(SVG)
 #endif // SVGListPropertyTearOff_h

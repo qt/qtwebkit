@@ -22,29 +22,27 @@
 #ifndef SVGPathSegCurvetoQuadraticSmoothRel_h
 #define SVGPathSegCurvetoQuadraticSmoothRel_h
 
-#if ENABLE(SVG)
 #include "SVGPathSegWithContext.h"
 
 namespace WebCore {
 
 class SVGPathSegCurvetoQuadraticSmoothRel : public SVGPathSegSingleCoordinate {
 public:
-    static PassRefPtr<SVGPathSegCurvetoQuadraticSmoothRel> create(SVGPathElement* element, SVGPathSegRole role, float x, float y)
+    static Ref<SVGPathSegCurvetoQuadraticSmoothRel> create(const SVGPathElement& element, SVGPathSegRole role, float x, float y)
     {
-        return adoptRef(new SVGPathSegCurvetoQuadraticSmoothRel(element, role, x, y));
+        return adoptRef(*new SVGPathSegCurvetoQuadraticSmoothRel(element, role, x, y));
     }
 
 private:
-    SVGPathSegCurvetoQuadraticSmoothRel(SVGPathElement* element, SVGPathSegRole role, float x, float y)
+    SVGPathSegCurvetoQuadraticSmoothRel(const SVGPathElement& element, SVGPathSegRole role, float x, float y)
         : SVGPathSegSingleCoordinate(element, role, x, y)
     {
     }
 
-    virtual unsigned short pathSegType() const { return PATHSEG_CURVETO_QUADRATIC_SMOOTH_REL; }
-    virtual String pathSegTypeAsLetter() const { return "t"; }
+    virtual unsigned short pathSegType() const override { return PATHSEG_CURVETO_QUADRATIC_SMOOTH_REL; }
+    virtual String pathSegTypeAsLetter() const override { return "t"; }
 };
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2010, 2011, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,55 +30,68 @@
 
 namespace WebKit {
 
-void WebPageCreationParameters::encode(CoreIPC::ArgumentEncoder& encoder) const
+void WebPageCreationParameters::encode(IPC::ArgumentEncoder& encoder) const
 {
     encoder << viewSize;
-    encoder << isActive;
-    encoder << isFocused;
-    encoder << isVisible;
-    encoder << isInWindow;
+    encoder << viewState;
 
     encoder << store;
     encoder.encodeEnum(drawingAreaType);
     encoder << pageGroupData;
     encoder << drawsBackground;
-    encoder << drawsTransparentBackground;
+    encoder << isEditable;
     encoder << underlayColor;
-    encoder << areMemoryCacheClientCallsEnabled;
     encoder << useFixedLayout;
     encoder << fixedLayoutSize;
     encoder.encodeEnum(paginationMode);
     encoder << paginationBehavesLikeColumns;
     encoder << pageLength;
     encoder << gapBetweenPages;
+    encoder << paginationLineGridEnabled;
     encoder << userAgent;
-    encoder << sessionState;
+    encoder << itemStates;
+    encoder << sessionID;
     encoder << highestUsedBackForwardItemID;
+    encoder << userContentControllerID;
+    encoder << visitedLinkTableID;
+    encoder << websiteDataStoreID;
     encoder << canRunBeforeUnloadConfirmPanel;
     encoder << canRunModal;
     encoder << deviceScaleFactor;
+    encoder << viewScaleFactor;
+    encoder << topContentInset;
     encoder << mediaVolume;
+    encoder << muted;
     encoder << mayStartMediaWhenInWindow;
     encoder << minimumLayoutSize;
+    encoder << autoSizingShouldExpandToViewHeight;
     encoder.encodeEnum(scrollPinningBehavior);
-
-#if PLATFORM(MAC)
+    encoder << scrollbarOverlayStyle;
+    encoder << backgroundExtendsBeyondPage;
     encoder.encodeEnum(layerHostingMode);
+    encoder << mimeTypesWithCustomContentProviders;
+
+#if ENABLE(REMOTE_INSPECTOR)
+    encoder << allowsRemoteInspection;
+    encoder << remoteInspectionNameOverride;
+#endif
+#if PLATFORM(MAC)
     encoder << colorSpace;
 #endif
+#if PLATFORM(IOS)
+    encoder << screenSize;
+    encoder << availableScreenSize;
+    encoder << textAutosizingWidth;
+#endif
+    encoder << appleMailPaginationQuirkEnabled;
+    encoder << shouldScaleViewToFitDocument;
 }
 
-bool WebPageCreationParameters::decode(CoreIPC::ArgumentDecoder& decoder, WebPageCreationParameters& parameters)
+bool WebPageCreationParameters::decode(IPC::ArgumentDecoder& decoder, WebPageCreationParameters& parameters)
 {
     if (!decoder.decode(parameters.viewSize))
         return false;
-    if (!decoder.decode(parameters.isActive))
-        return false;
-    if (!decoder.decode(parameters.isFocused))
-        return false;
-    if (!decoder.decode(parameters.isVisible))
-        return false;
-    if (!decoder.decode(parameters.isInWindow))
+    if (!decoder.decode(parameters.viewState))
         return false;
     if (!decoder.decode(parameters.store))
         return false;
@@ -88,11 +101,9 @@ bool WebPageCreationParameters::decode(CoreIPC::ArgumentDecoder& decoder, WebPag
         return false;
     if (!decoder.decode(parameters.drawsBackground))
         return false;
-    if (!decoder.decode(parameters.drawsTransparentBackground))
+    if (!decoder.decode(parameters.isEditable))
         return false;
     if (!decoder.decode(parameters.underlayColor))
-        return false;
-    if (!decoder.decode(parameters.areMemoryCacheClientCallsEnabled))
         return false;
     if (!decoder.decode(parameters.useFixedLayout))
         return false;
@@ -106,11 +117,21 @@ bool WebPageCreationParameters::decode(CoreIPC::ArgumentDecoder& decoder, WebPag
         return false;
     if (!decoder.decode(parameters.gapBetweenPages))
         return false;
+    if (!decoder.decode(parameters.paginationLineGridEnabled))
+        return false;
     if (!decoder.decode(parameters.userAgent))
         return false;
-    if (!decoder.decode(parameters.sessionState))
+    if (!decoder.decode(parameters.itemStates))
+        return false;
+    if (!decoder.decode(parameters.sessionID))
         return false;
     if (!decoder.decode(parameters.highestUsedBackForwardItemID))
+        return false;
+    if (!decoder.decode(parameters.userContentControllerID))
+        return false;
+    if (!decoder.decode(parameters.visitedLinkTableID))
+        return false;
+    if (!decoder.decode(parameters.websiteDataStoreID))
         return false;
     if (!decoder.decode(parameters.canRunBeforeUnloadConfirmPanel))
         return false;
@@ -118,21 +139,57 @@ bool WebPageCreationParameters::decode(CoreIPC::ArgumentDecoder& decoder, WebPag
         return false;
     if (!decoder.decode(parameters.deviceScaleFactor))
         return false;
+    if (!decoder.decode(parameters.viewScaleFactor))
+        return false;
+    if (!decoder.decode(parameters.topContentInset))
+        return false;
     if (!decoder.decode(parameters.mediaVolume))
+        return false;
+    if (!decoder.decode(parameters.muted))
         return false;
     if (!decoder.decode(parameters.mayStartMediaWhenInWindow))
         return false;
     if (!decoder.decode(parameters.minimumLayoutSize))
         return false;
+    if (!decoder.decode(parameters.autoSizingShouldExpandToViewHeight))
+        return false;
     if (!decoder.decodeEnum(parameters.scrollPinningBehavior))
         return false;
-    
-#if PLATFORM(MAC)
+    if (!decoder.decode(parameters.scrollbarOverlayStyle))
+        return false;
+    if (!decoder.decode(parameters.backgroundExtendsBeyondPage))
+        return false;
     if (!decoder.decodeEnum(parameters.layerHostingMode))
         return false;
+    if (!decoder.decode(parameters.mimeTypesWithCustomContentProviders))
+        return false;
+
+#if ENABLE(REMOTE_INSPECTOR)
+    if (!decoder.decode(parameters.allowsRemoteInspection))
+        return false;
+    if (!decoder.decode(parameters.remoteInspectionNameOverride))
+        return false;
+#endif
+
+#if PLATFORM(MAC)
     if (!decoder.decode(parameters.colorSpace))
         return false;
 #endif
+
+#if PLATFORM(IOS)
+    if (!decoder.decode(parameters.screenSize))
+        return false;
+    if (!decoder.decode(parameters.availableScreenSize))
+        return false;
+    if (!decoder.decode(parameters.textAutosizingWidth))
+        return false;
+#endif
+
+    if (!decoder.decode(parameters.appleMailPaginationQuirkEnabled))
+        return false;
+
+    if (!decoder.decode(parameters.shouldScaleViewToFitDocument))
+        return false;
 
     return true;
 }

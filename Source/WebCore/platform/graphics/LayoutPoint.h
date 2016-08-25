@@ -33,7 +33,6 @@
 
 #include "FloatPoint.h"
 #include "LayoutSize.h"
-#include <wtf/MathExtras.h>
 
 namespace WebCore {
 
@@ -61,15 +60,17 @@ public:
         m_x *= sx;
         m_y *= sy;
     }
-    
+
+    LayoutPoint constrainedBetween(const LayoutPoint& min, const LayoutPoint& max) const;
+
     LayoutPoint expandedTo(const LayoutPoint& other) const
     {
-        return LayoutPoint(std::max(m_x, other.m_x), std::max(m_y, other.m_y));
+        return { std::max(m_x, other.m_x), std::max(m_y, other.m_y) };
     }
 
     LayoutPoint shrunkTo(const LayoutPoint& other) const
     {
-        return LayoutPoint(std::min(m_x, other.m_x), std::min(m_y, other.m_y));
+        return { std::min(m_x, other.m_x), std::min(m_y, other.m_y) };
     }
 
     void clampNegativeToZero()
@@ -79,15 +80,15 @@ public:
 
     LayoutPoint transposedPoint() const
     {
-        return LayoutPoint(m_y, m_x);
+        return { m_y, m_x };
     }
 
     LayoutPoint fraction() const
     {
-        return LayoutPoint(m_x.fraction(), m_y.fraction());
+        return { m_x.fraction(), m_y.fraction() };
     }
 
-    operator FloatPoint() const { return FloatPoint(m_x, m_y); }
+    operator FloatPoint() const { return { m_x, m_y }; }
 
 private:
     LayoutUnit m_x, m_y;
@@ -140,19 +141,14 @@ inline bool operator!=(const LayoutPoint& a, const LayoutPoint& b)
     return a.x() != b.x() || a.y() != b.y();
 }
 
-inline LayoutPoint toPoint(const LayoutSize& size)
+inline LayoutPoint toLayoutPoint(const LayoutSize& size)
 {
     return LayoutPoint(size.width(), size.height());
 }
 
-inline LayoutPoint toLayoutPoint(const LayoutSize& p)
+inline LayoutSize toLayoutSize(const LayoutPoint& point)
 {
-    return LayoutPoint(p.width(), p.height());
-}
-
-inline LayoutSize toSize(const LayoutPoint& a)
-{
-    return LayoutSize(a.x(), a.y());
+    return LayoutSize(point.x(), point.y());
 }
 
 inline IntPoint flooredIntPoint(const LayoutPoint& point)
@@ -167,7 +163,7 @@ inline IntPoint roundedIntPoint(const LayoutPoint& point)
 
 inline IntPoint roundedIntPoint(const LayoutSize& size)
 {
-    return IntPoint(size.width().round(), size.height().round());
+    return roundedIntPoint(toLayoutPoint(size));
 }
 
 inline IntPoint ceiledIntPoint(const LayoutPoint& point)
@@ -185,30 +181,40 @@ inline LayoutPoint ceiledLayoutPoint(const FloatPoint& p)
     return LayoutPoint(LayoutUnit::fromFloatCeil(p.x()), LayoutUnit::fromFloatCeil(p.y()));
 }
 
-inline IntSize pixelSnappedIntSize(const LayoutSize& s, const LayoutPoint& p)
+inline IntSize snappedIntSize(const LayoutSize& size, const LayoutPoint& location)
 {
-    return IntSize(snapSizeToPixel(s.width(), p.x()), snapSizeToPixel(s.height(), p.y()));
+    auto snap = [] (LayoutUnit a, LayoutUnit b) {
+        LayoutUnit fraction = b.fraction();
+        return roundToInt(fraction + a) - roundToInt(fraction);
+    };
+    return IntSize(snap(size.width(), location.x()), snap(size.height(), location.y()));
 }
 
-inline LayoutPoint roundedLayoutPoint(const FloatPoint& p)
+inline FloatPoint roundPointToDevicePixels(const LayoutPoint& point, float pixelSnappingFactor, bool directionalRoundingToRight = true, bool directionalRoundingToBottom = true)
 {
-#if ENABLE(SUBPIXEL_LAYOUT)
-    return LayoutPoint(p);
-#else
-    return roundedIntPoint(p);
-#endif
+    return FloatPoint(roundToDevicePixel(point.x(), pixelSnappingFactor, !directionalRoundingToRight), roundToDevicePixel(point.y(), pixelSnappingFactor, !directionalRoundingToBottom));
 }
 
-inline LayoutSize toLayoutSize(const LayoutPoint& p)
+inline FloatPoint floorPointToDevicePixels(const LayoutPoint& point, float pixelSnappingFactor)
 {
-    return LayoutSize(p.x(), p.y());
+    return FloatPoint(floorToDevicePixel(point.x(), pixelSnappingFactor), floorToDevicePixel(point.y(), pixelSnappingFactor));
 }
 
-inline LayoutPoint flooredLayoutPoint(const FloatSize& s)
+inline FloatPoint ceilPointToDevicePixels(const LayoutPoint& point, float pixelSnappingFactor)
 {
-    return flooredLayoutPoint(FloatPoint(s));
+    return FloatPoint(ceilToDevicePixel(point.x(), pixelSnappingFactor), ceilToDevicePixel(point.y(), pixelSnappingFactor));
 }
 
+inline FloatSize snapSizeToDevicePixel(const LayoutSize& size, const LayoutPoint& location, float pixelSnappingFactor)
+{
+    auto snap = [&] (LayoutUnit a, LayoutUnit b) {
+        LayoutUnit fraction = b.fraction();
+        return roundToDevicePixel(fraction + a, pixelSnappingFactor) - roundToDevicePixel(fraction, pixelSnappingFactor);
+    };
+    return FloatSize(snap(size.width(), location.x()), snap(size.height(), location.y()));
+}
+
+TextStream& operator<<(TextStream&, const LayoutPoint&);
 
 } // namespace WebCore
 

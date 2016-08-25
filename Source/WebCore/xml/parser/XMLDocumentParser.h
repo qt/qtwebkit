@@ -32,16 +32,11 @@
 #include "SegmentedString.h"
 #include "XMLErrors.h"
 #include <wtf/HashMap.h>
-#include <wtf/OwnPtr.h>
 #include <wtf/text/AtomicStringHash.h>
 #include <wtf/text/CString.h>
 
-#if USE(QXMLSTREAM)
-#include <qxmlstream.h>
-#else
 #include <libxml/tree.h>
 #include <libxml/xmlstring.h>
-#endif
 
 namespace WebCore {
 
@@ -55,11 +50,10 @@ class FrameView;
 class PendingCallbacks;
 class Text;
 
-#if !USE(QXMLSTREAM)
     class XMLParserContext : public RefCounted<XMLParserContext> {
     public:
-        static PassRefPtr<XMLParserContext> createMemoryParser(xmlSAXHandlerPtr, void* userData, const CString& chunk);
-        static PassRefPtr<XMLParserContext> createStringParser(xmlSAXHandlerPtr, void* userData);
+        static RefPtr<XMLParserContext> createMemoryParser(xmlSAXHandlerPtr, void* userData, const CString& chunk);
+        static Ref<XMLParserContext> createStringParser(xmlSAXHandlerPtr, void* userData);
         ~XMLParserContext();
         xmlParserCtxtPtr context() const { return m_context; }
 
@@ -70,18 +64,17 @@ class Text;
         }
         xmlParserCtxtPtr m_context;
     };
-#endif
 
-    class XMLDocumentParser : public ScriptableDocumentParser, public CachedResourceClient {
+    class XMLDocumentParser final : public ScriptableDocumentParser, public CachedResourceClient {
         WTF_MAKE_FAST_ALLOCATED;
     public:
-        static PassRefPtr<XMLDocumentParser> create(Document* document, FrameView* view)
+        static Ref<XMLDocumentParser> create(Document& document, FrameView* view)
         {
-            return adoptRef(new XMLDocumentParser(document, view));
+            return adoptRef(*new XMLDocumentParser(document, view));
         }
-        static PassRefPtr<XMLDocumentParser> create(DocumentFragment* fragment, Element* element, ParserContentPolicy parserContentPolicy)
+        static Ref<XMLDocumentParser> create(DocumentFragment& fragment, Element* element, ParserContentPolicy parserContentPolicy)
         {
-            return adoptRef(new XMLDocumentParser(fragment, element, parserContentPolicy));
+            return adoptRef(*new XMLDocumentParser(fragment, element, parserContentPolicy));
         }
 
         ~XMLDocumentParser();
@@ -92,31 +85,30 @@ class Text;
         void setIsXHTMLDocument(bool isXHTML) { m_isXHTMLDocument = isXHTML; }
         bool isXHTMLDocument() const { return m_isXHTMLDocument; }
 
-        static bool parseDocumentFragment(const String&, DocumentFragment*, Element* parent = 0, ParserContentPolicy = AllowScriptingContent);
+        static bool parseDocumentFragment(const String&, DocumentFragment&, Element* parent = nullptr, ParserContentPolicy = AllowScriptingContent);
 
         // Used by the XMLHttpRequest to check if the responseXML was well formed.
-        virtual bool wellFormed() const { return !m_sawError; }
-
-        TextPosition textPosition() const;
+        virtual bool wellFormed() const override { return !m_sawError; }
 
         static bool supportsXMLVersion(const String&);
 
     private:
-        XMLDocumentParser(Document*, FrameView* = 0);
-        XMLDocumentParser(DocumentFragment*, Element*, ParserContentPolicy);
+        XMLDocumentParser(Document&, FrameView* = nullptr);
+        XMLDocumentParser(DocumentFragment&, Element*, ParserContentPolicy);
 
         // From DocumentParser
-        virtual void insert(const SegmentedString&);
-        virtual void append(PassRefPtr<StringImpl>);
-        virtual void finish();
-        virtual bool isWaitingForScripts() const;
-        virtual void stopParsing();
-        virtual void detach();
-        virtual OrdinalNumber lineNumber() const;
-        OrdinalNumber columnNumber() const;
+        virtual void insert(const SegmentedString&) override;
+        virtual void append(RefPtr<StringImpl>&&) override;
+        virtual void finish() override;
+        virtual bool isWaitingForScripts() const override;
+        virtual void stopParsing() override;
+        virtual void detach() override;
+
+        virtual TextPosition textPosition() const override;
+        virtual bool shouldAssociateConsoleMessagesWithTextPosition() const override;
 
         // from CachedResourceClient
-        virtual void notifyFinished(CachedResource*);
+        virtual void notifyFinished(CachedResource*) override;
 
         void end();
 
@@ -125,21 +117,7 @@ class Text;
 
         bool appendFragmentSource(const String&);
 
-#if USE(QXMLSTREAM)
-private:
-        void parse();
-        void startDocument();
-        void parseStartElement();
-        void parseEndElement();
-        void parseCharacters();
-        void parseProcessingInstruction();
-        void parseCdata();
-        void parseComment();
-        void endDocument();
-        void parseDtd();
-        bool hasError() const;
-#else
-public:
+    public:
         // callbacks from parser SAX
         void error(XMLErrors::ErrorType, const char* message, va_list args) WTF_ATTRIBUTE_PRINTF(3, 0);
         void startElementNs(const xmlChar* xmlLocalName, const xmlChar* xmlPrefix, const xmlChar* xmlURI, int nb_namespaces,
@@ -158,7 +136,7 @@ public:
 
         int depthTriggeringEntityExpansion() const { return m_depthTriggeringEntityExpansion; }
         void setDepthTriggeringEntityExpansion(int depth) { m_depthTriggeringEntityExpansion = depth; }
-#endif
+
     private:
         void initializeParserContext(const CString& chunk = CString());
 
@@ -168,8 +146,8 @@ public:
 
         void insertErrorMessageBlock();
 
-        void enterText();
-        void exitText();
+        void createLeafTextNode();
+        bool updateLeafTextNode();
 
         void doWrite(const String&);
         void doEnd();
@@ -178,17 +156,13 @@ public:
 
         SegmentedString m_originalSourceForTransform;
 
-#if USE(QXMLSTREAM)
-        QXmlStreamReader m_stream;
-        bool m_wroteText;
-#else
-        xmlParserCtxtPtr context() const { return m_context ? m_context->context() : 0; };
+        xmlParserCtxtPtr context() const { return m_context ? m_context->context() : nullptr; };
         RefPtr<XMLParserContext> m_context;
-        OwnPtr<PendingCallbacks> m_pendingCallbacks;
+        std::unique_ptr<PendingCallbacks> m_pendingCallbacks;
         Vector<xmlChar> m_bufferedText;
         int m_depthTriggeringEntityExpansion;
         bool m_isParsingEntityDeclaration;
-#endif
+
         ContainerNode* m_currentNode;
         Vector<ContainerNode*> m_currentNodeStack;
 
@@ -203,7 +177,7 @@ public:
         bool m_requestingScript;
         bool m_finishCalled;
 
-        XMLErrors m_xmlErrors;
+        std::unique_ptr<XMLErrors> m_xmlErrors;
 
         CachedResourceHandle<CachedScript> m_pendingScript;
         RefPtr<Element> m_scriptElement;
@@ -218,7 +192,7 @@ public:
     };
 
 #if ENABLE(XSLT)
-void* xmlDocPtrForString(CachedResourceLoader*, const String& source, const String& url);
+void* xmlDocPtrForString(CachedResourceLoader&, const String& source, const String& url);
 #endif
 
 HashMap<String, String> parseAttributes(const String&, bool& attrsOK);

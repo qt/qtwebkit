@@ -31,7 +31,7 @@
 namespace WebCore {
 
 class Frame;
-class KURL;
+class URL;
 
 class DocumentLoadTiming {
 public:
@@ -41,8 +41,7 @@ public:
     double monotonicTimeToPseudoWallTime(double) const;
 
     void markNavigationStart();
-    void setNavigationStart(double);
-    void addRedirect(const KURL& redirectingUrl, const KURL& redirectedUrl);
+    void addRedirect(const URL& redirectingUrl, const URL& redirectedUrl);
 
     void markUnloadEventStart() { m_unloadEventStart = monotonicallyIncreasingTime(); }
     void markUnloadEventEnd() { m_unloadEventEnd = monotonicallyIncreasingTime(); }
@@ -67,6 +66,8 @@ public:
     double loadEventEnd() const { return m_loadEventEnd; }
     bool hasCrossOriginRedirect() const { return m_hasCrossOriginRedirect; }
     bool hasSameOriginAsPreviousDocument() const { return m_hasSameOriginAsPreviousDocument; }
+
+    double referenceMonotonicTime() const { return m_referenceMonotonicTime; }
 
 private:
     double m_referenceMonotonicTime;

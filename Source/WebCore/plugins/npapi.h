@@ -64,12 +64,6 @@
 #endif
 #endif
 
-#if defined(__SYMBIAN32__)
-#ifndef XP_SYMBIAN
-#define XP_SYMBIAN 1
-#endif
-#endif
-
 #if defined(__APPLE_CC__) && !defined(XP_UNIX)
 #ifndef XP_MACOSX
 #define XP_MACOSX 1
@@ -102,7 +96,7 @@
 /*----------------------------------------------------------------------*/
 
 #define NP_VERSION_MAJOR 0
-#define NP_VERSION_MINOR 24
+#define NP_VERSION_MINOR 26
 
 
 /* The OS/2 version of Netscape uses RC_DATA to define the
@@ -385,9 +379,9 @@ typedef enum {
   , NPPVpluginCoreAnimationLayer = 1003
 #endif
 
-#if defined(MOZ_PLATFORM_MAEMO) && (MOZ_PLATFORM_MAEMO >= 5)
-  , NPPVpluginWindowlessLocalBool = 2002
-#endif
+  /* Used for figuring out whether a plug-in is playing audio. */
+  , NPPVpluginIsPlayingAudio = 4000
+
 } NPPVariable;
 
 /*
@@ -438,9 +432,9 @@ typedef enum {
   , NPNVsupportsCompositingCoreAnimationPluginsBool = 74656 /* TRUE if the browser supports
                                                                CA model compositing */
 #endif /* XP_MACOSX */
-#if defined(MOZ_PLATFORM_MAEMO) && (MOZ_PLATFORM_MAEMO >= 5)
-  , NPNVSupportsWindowlessLocal = 2002
-#endif
+
+  , NPNVmuteAudioBool = 4000
+
 } NPNVariable;
 
 typedef enum {
@@ -475,27 +469,11 @@ typedef struct _NPWindow
   uint32_t width;  /* Maximum window size */
   uint32_t height;
   NPRect   clipRect; /* Clipping rectangle in port coordinates */
-#if defined(XP_UNIX) || defined(XP_SYMBIAN)
+#if defined(XP_UNIX)
   void * ws_info; /* Platform-dependent additonal data */
-#endif /* XP_UNIX || XP_SYMBIAN */
+#endif /* XP_UNIX */
   NPWindowType type; /* Is this a window or a drawable? */
 } NPWindow;
-
-typedef struct _NPImageExpose
-{
-  char*    data;       /* image pointer */
-  int32_t  stride;     /* Stride of data image pointer */
-  int32_t  depth;      /* Depth of image pointer */
-  int32_t  x;          /* Expose x */
-  int32_t  y;          /* Expose y */
-  uint32_t width;      /* Expose width */
-  uint32_t height;     /* Expose height */
-  NPSize   dataSize;   /* Data buffer size */
-  float    translateX; /* translate X matrix value */
-  float    translateY; /* translate Y matrix value */
-  float    scaleX;     /* scale X matrix value */
-  float    scaleY;     /* scale Y matrix value */
-} NPImageExpose;
 
 typedef struct _NPFullPrint
 {
@@ -890,6 +868,9 @@ uint32_t    NP_LOADDS NPN_ScheduleTimer(NPP instance, uint32_t interval, NPBool 
 void        NP_LOADDS NPN_UnscheduleTimer(NPP instance, uint32_t timerID);
 NPError     NP_LOADDS NPN_PopUpContextMenu(NPP instance, NPMenu* menu);
 NPBool      NP_LOADDS NPN_ConvertPoint(NPP instance, double sourceX, double sourceY, NPCoordinateSpace sourceSpace, double *destX, double *destY, NPCoordinateSpace destSpace);
+NPBool      NP_LOADDS NPN_HandleEvent(NPP instance, void *event, NPBool handled);
+NPBool      NP_LOADDS NPN_UnfocusInstance(NPP instance, NPFocusDirection direction);
+void        NP_LOADDS NPN_URLRedirectResponse(NPP instance, void* notifyData, NPBool allow);
 
 #ifdef __cplusplus
 }  /* end extern "C" */

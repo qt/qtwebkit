@@ -26,10 +26,14 @@
 #ifndef JSValueInlines_h
 #define JSValueInlines_h
 
+#include "ExceptionHelpers.h"
+#include "Identifier.h"
 #include "InternalFunction.h"
 #include "JSCJSValue.h"
 #include "JSCellInlines.h"
+#include "JSObject.h"
 #include "JSFunction.h"
+#include <wtf/text/StringImpl.h>
 
 namespace JSC {
 
@@ -42,7 +46,7 @@ ALWAYS_INLINE int32_t JSValue::toInt32(ExecState* exec) const
 
 inline uint32_t JSValue::toUInt32(ExecState* exec) const
 {
-    // See comment on JSC::toUInt32, above.
+    // See comment on JSC::toUInt32, in JSCJSValue.h.
     return toInt32(exec);
 }
 
@@ -65,7 +69,7 @@ inline double JSValue::asNumber() const
 
 inline JSValue jsNaN()
 {
-    return JSValue(QNaN);
+    return JSValue(PNaN);
 }
 
 inline JSValue::JSValue(char i)
@@ -301,6 +305,7 @@ ALWAYS_INLINE JSCell* JSValue::asCell() const
 
 ALWAYS_INLINE JSValue::JSValue(EncodeAsDoubleTag, double d)
 {
+    ASSERT(!isImpureNaN(d));
     u.asDouble = d;
 }
 
@@ -310,7 +315,7 @@ inline JSValue::JSValue(int i)
     u.asBits.payload = i;
 }
 
-#if ENABLE(LLINT_C_LOOP)
+#if !ENABLE(JIT)
 inline JSValue::JSValue(int32_t tag, int32_t payload)
 {
     u.asBits.tag = tag;
@@ -325,7 +330,7 @@ inline bool JSValue::isNumber() const
 
 inline bool JSValue::isBoolean() const
 {
-    return isTrue() || isFalse();
+    return tag() == BooleanTag;
 }
 
 inline bool JSValue::asBoolean() const
@@ -467,6 +472,7 @@ inline double reinterpretInt64ToDouble(int64_t value)
 
 ALWAYS_INLINE JSValue::JSValue(EncodeAsDoubleTag, double d)
 {
+    ASSERT(!isImpureNaN(d));
     u.asInt64 = reinterpretDoubleToInt64(d) + DoubleEncodeOffset;
 }
 
@@ -494,19 +500,76 @@ ALWAYS_INLINE JSCell* JSValue::asCell() const
 
 #endif // USE(JSVALUE64)
 
+inline int64_t tryConvertToInt52(double number)
+{
+    if (number != number)
+        return JSValue::notInt52;
+#if OS(WINDOWS) && CPU(X86)
+    // The VS Compiler for 32-bit builds generates a floating point error when attempting to cast
+    // from an infinity to a 64-bit integer. We leave this routine with the floating point error
+    // left in a register, causing undefined behavior in later floating point operations.
+    //
+    // To avoid this issue, we check for infinity here, and return false in that case.
+    if (std::isinf(number))
+        return JSValue::notInt52;
+#endif
+    int64_t asInt64 = static_cast<int64_t>(number);
+    if (asInt64 != number)
+        return JSValue::notInt52;
+    if (!asInt64 && std::signbit(number))
+        return JSValue::notInt52;
+    if (asInt64 >= (static_cast<int64_t>(1) << (JSValue::numberOfInt52Bits - 1)))
+        return JSValue::notInt52;
+    if (asInt64 < -(static_cast<int64_t>(1) << (JSValue::numberOfInt52Bits - 1)))
+        return JSValue::notInt52;
+    return asInt64;
+}
+
+inline bool isInt52(double number)
+{
+    return tryConvertToInt52(number) != JSValue::notInt52;
+}
+
+inline bool JSValue::isMachineInt() const
+{
+    if (isInt32())
+        return true;
+    if (!isNumber())
+        return false;
+    return isInt52(asDouble());
+}
+
+inline int64_t JSValue::asMachineInt() const
+{
+    ASSERT(isMachineInt());
+    if (isInt32())
+        return asInt32();
+    return static_cast<int64_t>(asDouble());
+}
+
 inline bool JSValue::isString() const
 {
     return isCell() && asCell()->isString();
 }
 
+inline bool JSValue::isSymbol() const
+{
+    return isCell() && asCell()->isSymbol();
+}
+
 inline bool JSValue::isPrimitive() const
 {
-    return !isCell() || asCell()->isString();
+    return !isCell() || asCell()->isString() || asCell()->isSymbol();
 }
 
 inline bool JSValue::isGetterSetter() const
 {
     return isCell() && asCell()->isGetterSetter();
+}
+
+inline bool JSValue::isCustomGetterSetter() const
+{
+    return isCell() && asCell()->isCustomGetterSetter();
 }
 
 inline bool JSValue::isObject() const
@@ -549,6 +612,17 @@ ALWAYS_INLINE bool JSValue::getUInt32(uint32_t& v) const
     return false;
 }
 
+ALWAYS_INLINE Identifier JSValue::toPropertyKey(ExecState* exec) const
+{
+    if (isString())
+        return asString(*this)->toIdentifier(exec);
+
+    JSValue primitive = toPrimitive(exec, PreferString);
+    if (primitive.isSymbol())
+        return Identifier::fromUid(asSymbol(primitive)->privateName());
+    return primitive.toString(exec)->toIdentifier(exec);
+}
+
 inline JSValue JSValue::toPrimitive(ExecState* exec, PreferredPrimitiveType preferredType) const
 {
     return isCell() ? asCell()->toPrimitive(exec, preferredType) : asValue();
@@ -579,7 +653,7 @@ inline bool JSValue::getPrimitiveNumber(ExecState* exec, double& number, JSValue
         return true;
     }
     ASSERT(isUndefined());
-    number = QNaN;
+    number = PNaN;
     value = *this;
     return true;
 }
@@ -605,7 +679,17 @@ inline JSObject* JSValue::toObject(ExecState* exec, JSGlobalObject* globalObject
 
 inline bool JSValue::isFunction() const
 {
-    return isCell() && (asCell()->inherits(&JSFunction::s_info) || asCell()->inherits(&InternalFunction::s_info));
+    return isCell() && (asCell()->inherits(JSFunction::info()) || asCell()->inherits(InternalFunction::info()));
+}
+
+// FIXME: We could do this in a smarter way. See: https://bugs.webkit.org/show_bug.cgi?id=153670
+inline bool JSValue::isConstructor() const
+{
+    if (isFunction()) {
+        ConstructData data;
+        return getConstructData(*this, data) != ConstructTypeNone;
+    }
+    return false;
 }
 
 // this method is here to be after the inline declaration of JSCell::inherits
@@ -614,59 +698,59 @@ inline bool JSValue::inherits(const ClassInfo* classInfo) const
     return isCell() && asCell()->inherits(classInfo);
 }
 
-inline JSObject* JSValue::toThisObject(ExecState* exec) const
+inline JSValue JSValue::toThis(ExecState* exec, ECMAMode ecmaMode) const
 {
-    return isCell() ? asCell()->methodTable()->toThisObject(asCell(), exec) : toThisObjectSlowCase(exec);
+    return isCell() ? asCell()->methodTable(exec->vm())->toThis(asCell(), exec, ecmaMode) : toThisSlowCase(exec, ecmaMode);
 }
 
-inline JSValue JSValue::get(ExecState* exec, PropertyName propertyName) const
+ALWAYS_INLINE JSValue JSValue::get(ExecState* exec, PropertyName propertyName) const
 {
-    PropertySlot slot(asValue());
+    PropertySlot slot(asValue(), PropertySlot::InternalMethodType::Get);
     return get(exec, propertyName, slot);
 }
 
-inline JSValue JSValue::get(ExecState* exec, PropertyName propertyName, PropertySlot& slot) const
+ALWAYS_INLINE JSValue JSValue::get(ExecState* exec, PropertyName propertyName, PropertySlot& slot) const
 {
-    if (UNLIKELY(!isCell())) {
-        JSObject* prototype = synthesizePrototype(exec);
-        if (!prototype->getPropertySlot(exec, propertyName, slot))
-            return jsUndefined();
-        return slot.getValue(exec, propertyName);
-    }
-    JSCell* cell = asCell();
-    while (true) {
-        if (cell->fastGetOwnPropertySlot(exec, propertyName, slot))
-            return slot.getValue(exec, propertyName);
-        JSValue prototype = asObject(cell)->prototype();
-        if (!prototype.isObject())
-            return jsUndefined();
-        cell = asObject(prototype);
-    }
+    return getPropertySlot(exec, propertyName, slot) ? 
+        slot.getValue(exec, propertyName) : jsUndefined();
 }
 
-inline JSValue JSValue::get(ExecState* exec, unsigned propertyName) const
+ALWAYS_INLINE bool JSValue::getPropertySlot(ExecState* exec, PropertyName propertyName, PropertySlot& slot) const
 {
-    PropertySlot slot(asValue());
+    // If this is a primitive, we'll need to synthesize the prototype -
+    // and if it's a string there are special properties to check first.
+    JSObject* object;
+    if (UNLIKELY(!isObject())) {
+        if (isString() && asString(*this)->getStringPropertySlot(exec, propertyName, slot))
+            return true;
+        object = synthesizePrototype(exec);
+    } else
+        object = asObject(asCell());
+    
+    return object->getPropertySlot(exec, propertyName, slot);
+}
+
+ALWAYS_INLINE JSValue JSValue::get(ExecState* exec, unsigned propertyName) const
+{
+    PropertySlot slot(asValue(), PropertySlot::InternalMethodType::Get);
     return get(exec, propertyName, slot);
 }
 
-inline JSValue JSValue::get(ExecState* exec, unsigned propertyName, PropertySlot& slot) const
+ALWAYS_INLINE JSValue JSValue::get(ExecState* exec, unsigned propertyName, PropertySlot& slot) const
 {
-    if (UNLIKELY(!isCell())) {
-        JSObject* prototype = synthesizePrototype(exec);
-        if (!prototype->getPropertySlot(exec, propertyName, slot))
-            return jsUndefined();
-        return slot.getValue(exec, propertyName);
-    }
-    JSCell* cell = const_cast<JSCell*>(asCell());
-    while (true) {
-        if (cell->methodTable()->getOwnPropertySlotByIndex(cell, exec, propertyName, slot))
+    // If this is a primitive, we'll need to synthesize the prototype -
+    // and if it's a string there are special properties to check first.
+    JSObject* object;
+    if (UNLIKELY(!isObject())) {
+        if (isString() && asString(*this)->getStringPropertySlot(exec, propertyName, slot))
             return slot.getValue(exec, propertyName);
-        JSValue prototype = asObject(cell)->prototype();
-        if (!prototype.isObject())
-            return jsUndefined();
-        cell = prototype.asCell();
-    }
+        object = synthesizePrototype(exec);
+    } else
+        object = asObject(asCell());
+    
+    if (object->getPropertySlot(exec, propertyName, slot))
+        return slot.getValue(exec, propertyName);
+    return jsUndefined();
 }
 
 inline void JSValue::put(ExecState* exec, PropertyName propertyName, JSValue value, PutPropertySlot& slot)
@@ -675,7 +759,25 @@ inline void JSValue::put(ExecState* exec, PropertyName propertyName, JSValue val
         putToPrimitive(exec, propertyName, value, slot);
         return;
     }
-    asCell()->methodTable()->put(asCell(), exec, propertyName, value, slot);
+    asCell()->methodTable(exec->vm())->put(asCell(), exec, propertyName, value, slot);
+}
+
+ALWAYS_INLINE void JSValue::putInline(ExecState* exec, PropertyName propertyName, JSValue value, PutPropertySlot& slot)
+{
+    if (UNLIKELY(!isCell())) {
+        putToPrimitive(exec, propertyName, value, slot);
+        return;
+    }
+    JSCell* cell = asCell();
+    auto putMethod = cell->methodTable(exec->vm())->put;
+    if (LIKELY(putMethod == JSObject::put)) {
+        JSObject::putInline(cell, exec, propertyName, value, slot);
+        return;
+    }
+
+    PutPropertySlot otherSlot = slot;
+    putMethod(cell, exec, propertyName, value, otherSlot);
+    slot = otherSlot;
 }
 
 inline void JSValue::putByIndex(ExecState* exec, unsigned propertyName, JSValue value, bool shouldThrow)
@@ -684,7 +786,7 @@ inline void JSValue::putByIndex(ExecState* exec, unsigned propertyName, JSValue 
         putToPrimitiveByIndex(exec, propertyName, value, shouldThrow);
         return;
     }
-    asCell()->methodTable()->putByIndex(asCell(), exec, propertyName, value, shouldThrow);
+    asCell()->methodTable(exec->vm())->putByIndex(asCell(), exec, propertyName, value, shouldThrow);
 }
 
 inline JSValue JSValue::structureOrUndefined() const
@@ -705,6 +807,7 @@ inline bool JSValue::equal(ExecState* exec, JSValue v1, JSValue v2)
 
 ALWAYS_INLINE bool JSValue::equalSlowCaseInline(ExecState* exec, JSValue v1, JSValue v2)
 {
+    VM& vm = exec->vm();
     do {
         if (v1.isNumber() && v2.isNumber())
             return v1.asNumber() == v2.asNumber();
@@ -712,20 +815,20 @@ ALWAYS_INLINE bool JSValue::equalSlowCaseInline(ExecState* exec, JSValue v1, JSV
         bool s1 = v1.isString();
         bool s2 = v2.isString();
         if (s1 && s2)
-            return asString(v1)->value(exec) == asString(v2)->value(exec);
+            return WTF::equal(*asString(v1)->value(exec).impl(), *asString(v2)->value(exec).impl());
 
         if (v1.isUndefinedOrNull()) {
             if (v2.isUndefinedOrNull())
                 return true;
             if (!v2.isCell())
                 return false;
-            return v2.asCell()->structure()->masqueradesAsUndefined(exec->lexicalGlobalObject());
+            return v2.asCell()->structure(vm)->masqueradesAsUndefined(exec->lexicalGlobalObject());
         }
 
         if (v2.isUndefinedOrNull()) {
             if (!v1.isCell())
                 return false;
-            return v1.asCell()->structure()->masqueradesAsUndefined(exec->lexicalGlobalObject());
+            return v1.asCell()->structure(vm)->masqueradesAsUndefined(exec->lexicalGlobalObject());
         }
 
         if (v1.isObject()) {
@@ -748,6 +851,14 @@ ALWAYS_INLINE bool JSValue::equalSlowCaseInline(ExecState* exec, JSValue v1, JSV
             if (v1.isInt32() && v2.isInt32())
                 return v1 == v2;
             continue;
+        }
+
+        bool sym1 = v1.isSymbol();
+        bool sym2 = v2.isSymbol();
+        if (sym1 || sym2) {
+            if (sym1 && sym2)
+                return asSymbol(v1)->privateName() == asSymbol(v2)->privateName();
+            return false;
         }
 
         if (s1 || s2) {
@@ -774,7 +885,9 @@ ALWAYS_INLINE bool JSValue::strictEqualSlowCaseInline(ExecState* exec, JSValue v
     ASSERT(v1.isCell() && v2.isCell());
 
     if (v1.asCell()->isString() && v2.asCell()->isString())
-        return asString(v1)->value(exec) == asString(v2)->value(exec);
+        return WTF::equal(*asString(v1)->value(exec).impl(), *asString(v2)->value(exec).impl());
+    if (v1.asCell()->isSymbol() && v2.asCell()->isSymbol())
+        return asSymbol(v1)->privateName() == asSymbol(v2)->privateName();
 
     return v1 == v2;
 }
@@ -793,6 +906,35 @@ inline bool JSValue::strictEqual(ExecState* exec, JSValue v1, JSValue v2)
     return strictEqualSlowCaseInline(exec, v1, v2);
 }
 
+inline int32_t JSValue::asInt32ForArithmetic() const
+{
+    if (isBoolean())
+        return asBoolean();
+    return asInt32();
+}
+
+inline TriState JSValue::pureStrictEqual(JSValue v1, JSValue v2)
+{
+    if (v1.isInt32() && v2.isInt32())
+        return triState(v1 == v2);
+
+    if (v1.isNumber() && v2.isNumber())
+        return triState(v1.asNumber() == v2.asNumber());
+
+    if (!v1.isCell() || !v2.isCell())
+        return triState(v1 == v2);
+    
+    if (v1.asCell()->isString() && v2.asCell()->isString()) {
+        const StringImpl* v1String = asString(v1)->tryGetValueImpl();
+        const StringImpl* v2String = asString(v2)->tryGetValueImpl();
+        if (!v1String || !v2String)
+            return MixedTriState;
+        return triState(WTF::equal(*v1String, *v2String));
+    }
+    
+    return triState(v1 == v2);
+}
+
 inline TriState JSValue::pureToBoolean() const
 {
     if (isInt32())
@@ -802,6 +944,14 @@ inline TriState JSValue::pureToBoolean() const
     if (isCell())
         return asCell()->pureToBoolean();
     return isTrue() ? TrueTriState : FalseTriState;
+}
+
+ALWAYS_INLINE bool JSValue::requireObjectCoercible(ExecState* exec) const
+{
+    if (!isUndefinedOrNull())
+        return true;
+    exec->vm().throwException(exec, createNotAnObjectError(exec, *this));
+    return false;
 }
 
 } // namespace JSC

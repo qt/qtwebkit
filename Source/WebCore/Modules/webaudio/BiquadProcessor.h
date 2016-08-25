@@ -30,6 +30,7 @@
 #include "AudioNode.h"
 #include "AudioParam.h"
 #include "Biquad.h"
+#include <memory>
 #include <wtf/RefPtr.h>
 
 namespace WebCore {
@@ -49,13 +50,13 @@ public:
         Allpass = 7
     };
 
-    BiquadProcessor(AudioContext*, float sampleRate, size_t numberOfChannels, bool autoInitialize);
+    BiquadProcessor(AudioContext&, float sampleRate, size_t numberOfChannels, bool autoInitialize);
 
     virtual ~BiquadProcessor();
     
-    virtual PassOwnPtr<AudioDSPKernel> createKernel();
+    virtual std::unique_ptr<AudioDSPKernel> createKernel() override;
         
-    virtual void process(const AudioBus* source, AudioBus* destination, size_t framesToProcess);
+    virtual void process(const AudioBus* source, AudioBus* destination, size_t framesToProcess) override;
 
     // Get the magnitude and phase response of the filter at the given
     // set of frequencies (in Hz). The phase response is in radians.

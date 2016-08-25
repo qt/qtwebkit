@@ -25,10 +25,10 @@
 
 namespace WebCore {
 
-DOMPlugin::DOMPlugin(PluginData* pluginData, Frame* frame, unsigned index)
+DOMPlugin::DOMPlugin(PluginData* pluginData, Frame* frame, PluginInfo pluginInfo)
     : FrameDestructionObserver(frame)
     , m_pluginData(pluginData)
-    , m_index(index)
+    , m_pluginInfo(WTFMove(pluginInfo))
 {
 }
 
@@ -38,55 +38,57 @@ DOMPlugin::~DOMPlugin()
 
 String DOMPlugin::name() const
 {
-    return pluginInfo().name;
+    return m_pluginInfo.name;
 }
 
 String DOMPlugin::filename() const
 {
-    return pluginInfo().file;
+    return m_pluginInfo.file;
 }
 
 String DOMPlugin::description() const
 {
-    return pluginInfo().desc;
+    return m_pluginInfo.desc;
 }
 
 unsigned DOMPlugin::length() const
 {
-    return pluginInfo().mimes.size();
+    return m_pluginInfo.mimes.size();
 }
 
-PassRefPtr<DOMMimeType> DOMPlugin::item(unsigned index)
+RefPtr<DOMMimeType> DOMPlugin::item(unsigned index)
 {
-    if (index >= pluginInfo().mimes.size())
-        return 0;
+    if (index >= m_pluginInfo.mimes.size())
+        return nullptr;
 
-    const MimeClassInfo& mime = pluginInfo().mimes[index];
+    MimeClassInfo mime = m_pluginInfo.mimes[index];
 
-    const Vector<MimeClassInfo>& mimes = m_pluginData->mimes();
+    Vector<MimeClassInfo> mimes;
+    Vector<size_t> mimePluginIndices;
+    Vector<PluginInfo> plugins = m_pluginData->webVisiblePlugins();
+    m_pluginData->getWebVisibleMimesAndPluginIndices(mimes, mimePluginIndices);
     for (unsigned i = 0; i < mimes.size(); ++i) {
-        if (mimes[i] == mime && m_pluginData->mimePluginIndices()[i] == m_index)
-            return DOMMimeType::create(m_pluginData.get(), m_frame, i).get();
+        if (mimes[i] == mime && plugins[mimePluginIndices[i]] == m_pluginInfo)
+            return DOMMimeType::create(m_pluginData.get(), m_frame, i);
     }
-    return 0;
+    return nullptr;
 }
 
-bool DOMPlugin::canGetItemsForName(const AtomicString& propertyName)
+RefPtr<DOMMimeType> DOMPlugin::namedItem(const AtomicString& propertyName)
 {
-    const Vector<MimeClassInfo>& mimes = m_pluginData->mimes();
+    Vector<MimeClassInfo> mimes;
+    Vector<size_t> mimePluginIndices;
+    m_pluginData->getWebVisibleMimesAndPluginIndices(mimes, mimePluginIndices);
     for (unsigned i = 0; i < mimes.size(); ++i)
         if (mimes[i].type == propertyName)
-            return true;
-    return false;
+            return DOMMimeType::create(m_pluginData.get(), m_frame, i);
+    return nullptr;
 }
 
-PassRefPtr<DOMMimeType> DOMPlugin::namedItem(const AtomicString& propertyName)
+Vector<AtomicString> DOMPlugin::supportedPropertyNames()
 {
-    const Vector<MimeClassInfo>& mimes = m_pluginData->mimes();
-    for (unsigned i = 0; i < mimes.size(); ++i)
-        if (mimes[i].type == propertyName)
-            return DOMMimeType::create(m_pluginData.get(), m_frame, i).get();
-    return 0;
+    // FIXME: Should be implemented.
+    return Vector<AtomicString>();
 }
 
 } // namespace WebCore

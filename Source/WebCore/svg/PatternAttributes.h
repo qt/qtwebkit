@@ -20,7 +20,6 @@
 #ifndef PatternAttributes_h
 #define PatternAttributes_h
 
-#if ENABLE(SVG)
 #include "SVGLength.h"
 #include "SVGPreserveAspectRatio.h"
 
@@ -38,7 +37,7 @@ struct PatternAttributes {
         , m_preserveAspectRatio()
         , m_patternUnits(SVGUnitTypes::SVG_UNIT_TYPE_OBJECTBOUNDINGBOX)
         , m_patternContentUnits(SVGUnitTypes::SVG_UNIT_TYPE_USERSPACEONUSE)
-        , m_patternContentElement(0)
+        , m_patternContentElement(nullptr)
         , m_xSet(false)
         , m_ySet(false)
         , m_widthSet(false)
@@ -162,5 +161,4 @@ private:
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif

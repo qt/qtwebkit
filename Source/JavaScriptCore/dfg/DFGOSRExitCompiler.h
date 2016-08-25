@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,12 +26,10 @@
 #ifndef DFGOSRExitCompiler_h
 #define DFGOSRExitCompiler_h
 
-#include <wtf/Platform.h>
-
 #if ENABLE(DFG_JIT)
 
-#include "DFGAssemblyHelpers.h"
-#include "DFGCCallHelpers.h"
+#include "AssemblyHelpers.h"
+#include "CCallHelpers.h"
 #include "DFGOSRExit.h"
 #include "DFGOperations.h"
 
@@ -51,34 +49,13 @@ public:
     void compileExit(const OSRExit&, const Operands<ValueRecovery>&, SpeculationRecovery*);
 
 private:
-#if !ASSERT_DISABLED
-    static unsigned badIndex() { return static_cast<unsigned>(-1); };
-#endif
-    
-    void initializePoisoned(unsigned size)
-    {
-#if ASSERT_DISABLED
-        m_poisonScratchIndices.resize(size);
-#else
-        m_poisonScratchIndices.fill(badIndex(), size);
-#endif
-    }
-    
-    unsigned poisonIndex(unsigned index)
-    {
-        unsigned result = m_poisonScratchIndices[index];
-        ASSERT(result != badIndex());
-        return result;
-    }
-    
-    void handleExitCounts(const OSRExit&);
+    void emitRestoreArguments(const Operands<ValueRecovery>&);
     
     CCallHelpers& m_jit;
-    Vector<unsigned> m_poisonScratchIndices;
 };
 
 extern "C" {
-void DFG_OPERATION compileOSRExit(ExecState*) WTF_INTERNAL;
+void JIT_OPERATION compileOSRExit(ExecState*) WTF_INTERNAL;
 }
 
 } } // namespace JSC::DFG

@@ -22,20 +22,17 @@
  */
 
 #include "config.h"
-
-#if ENABLE(FILTERS)
 #include "FEDisplacementMap.h"
 
 #include "Filter.h"
 #include "GraphicsContext.h"
-#include "RenderTreeAsText.h"
 #include "TextStream.h"
 
-#include <wtf/Uint8ClampedArray.h>
+#include <runtime/Uint8ClampedArray.h>
 
 namespace WebCore {
 
-FEDisplacementMap::FEDisplacementMap(Filter* filter, ChannelSelectorType xChannelSelector, ChannelSelectorType yChannelSelector, float scale)
+FEDisplacementMap::FEDisplacementMap(Filter& filter, ChannelSelectorType xChannelSelector, ChannelSelectorType yChannelSelector, float scale)
     : FilterEffect(filter)
     , m_xChannelSelector(xChannelSelector)
     , m_yChannelSelector(yChannelSelector)
@@ -43,10 +40,10 @@ FEDisplacementMap::FEDisplacementMap(Filter* filter, ChannelSelectorType xChanne
 {
 }
 
-PassRefPtr<FEDisplacementMap> FEDisplacementMap::create(Filter* filter, ChannelSelectorType xChannelSelector,
+Ref<FEDisplacementMap> FEDisplacementMap::create(Filter& filter, ChannelSelectorType xChannelSelector,
     ChannelSelectorType yChannelSelector, float scale)
 {
-    return adoptRef(new FEDisplacementMap(filter, xChannelSelector, yChannelSelector, scale));
+    return adoptRef(*new FEDisplacementMap(filter, xChannelSelector, yChannelSelector, scale));
 }
 
 ChannelSelectorType FEDisplacementMap::xChannelSelector() const
@@ -124,10 +121,10 @@ void FEDisplacementMap::platformApplySoftware()
 
     ASSERT(srcPixelArrayA->length() == srcPixelArrayB->length());
 
-    Filter* filter = this->filter();
+    Filter& filter = this->filter();
     IntSize paintSize = absolutePaintRect().size();
-    float scaleX = filter->applyHorizontalScale(m_scale);
-    float scaleY = filter->applyVerticalScale(m_scale);
+    float scaleX = filter.applyHorizontalScale(m_scale);
+    float scaleY = filter.applyVerticalScale(m_scale);
     float scaleForColorX = scaleX / 255.0;
     float scaleForColorY = scaleY / 255.0;
     float scaledOffsetX = 0.5 - scaleX * 0.5;
@@ -191,5 +188,3 @@ TextStream& FEDisplacementMap::externalRepresentation(TextStream& ts, int indent
 }
 
 } // namespace WebCore
-
-#endif // ENABLE(FILTERS)

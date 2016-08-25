@@ -30,7 +30,7 @@
 
 #include "WebBatteryManagerMessages.h"
 #include "WebBatteryManagerProxyMessages.h"
-#include "WebContext.h"
+#include "WebProcessPool.h"
 
 namespace WebKit {
 
@@ -39,23 +39,23 @@ const char* WebBatteryManagerProxy::supplementName()
     return "WebBatteryManagerProxy";
 }
 
-PassRefPtr<WebBatteryManagerProxy> WebBatteryManagerProxy::create(WebContext* context)
+Ref<WebBatteryManagerProxy> WebBatteryManagerProxy::create(WebProcessPool* processPool)
 {
-    return adoptRef(new WebBatteryManagerProxy(context));
+    return adoptRef(*new WebBatteryManagerProxy(processPool));
 }
 
-WebBatteryManagerProxy::WebBatteryManagerProxy(WebContext* context)
-    : WebContextSupplement(context)
+WebBatteryManagerProxy::WebBatteryManagerProxy(WebProcessPool* processPool)
+    : WebContextSupplement(processPool)
     , m_isUpdating(false)
 {
-    WebContextSupplement::context()->addMessageReceiver(Messages::WebBatteryManagerProxy::messageReceiverName(), this);
+    WebContextSupplement::processPool()->addMessageReceiver(Messages::WebBatteryManagerProxy::messageReceiverName(), *this);
 }
 
 WebBatteryManagerProxy::~WebBatteryManagerProxy()
 {
 }
 
-void WebBatteryManagerProxy::initializeProvider(const WKBatteryProvider* provider)
+void WebBatteryManagerProxy::initializeProvider(const WKBatteryProviderBase* provider)
 {
     m_provider.initialize(provider);
 }
@@ -63,23 +63,23 @@ void WebBatteryManagerProxy::initializeProvider(const WKBatteryProvider* provide
 
 void WebBatteryManagerProxy::providerDidChangeBatteryStatus(const WTF::AtomicString& eventType, WebBatteryStatus* status)
 {
-    if (!context())
+    if (!processPool())
         return;
 
-    context()->sendToAllProcesses(Messages::WebBatteryManager::DidChangeBatteryStatus(eventType, status->data()));
+    processPool()->sendToAllProcesses(Messages::WebBatteryManager::DidChangeBatteryStatus(eventType, status->data()));
 }
 
 void WebBatteryManagerProxy::providerUpdateBatteryStatus(WebBatteryStatus* status)
 {
-    if (!context())
+    if (!processPool())
         return;
 
-    context()->sendToAllProcesses(Messages::WebBatteryManager::UpdateBatteryStatus(status->data()));
+    processPool()->sendToAllProcesses(Messages::WebBatteryManager::UpdateBatteryStatus(status->data()));
 }
 
 // WebContextSupplement
 
-void WebBatteryManagerProxy::contextDestroyed()
+void WebBatteryManagerProxy::processPoolDestroyed()
 {
     stopUpdating();
 }
@@ -91,12 +91,12 @@ void WebBatteryManagerProxy::processDidClose(WebProcessProxy*)
 
 void WebBatteryManagerProxy::refWebContextSupplement()
 {
-    APIObject::ref();
+    API::Object::ref();
 }
 
 void WebBatteryManagerProxy::derefWebContextSupplement()
 {
-    APIObject::deref();
+    API::Object::deref();
 }
 
 void WebBatteryManagerProxy::startUpdating()

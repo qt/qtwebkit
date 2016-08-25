@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -24,51 +24,68 @@
  */
 
 #include "config.h"
-#if ENABLE(VIDEO)
 #include "HTMLSourceElement.h"
 
 #include "Event.h"
 #include "EventNames.h"
 #include "HTMLDocument.h"
+#if ENABLE(VIDEO)
 #include "HTMLMediaElement.h"
+#endif
 #include "HTMLNames.h"
+#include "HTMLPictureElement.h"
 #include "Logging.h"
-
-using namespace std;
 
 namespace WebCore {
 
 using namespace HTMLNames;
 
-inline HTMLSourceElement::HTMLSourceElement(const QualifiedName& tagName, Document* document)
+inline HTMLSourceElement::HTMLSourceElement(const QualifiedName& tagName, Document& document)
     : HTMLElement(tagName, document)
-    , m_errorEventTimer(this, &HTMLSourceElement::errorEventTimerFired)
+    , ActiveDOMObject(&document)
+    , m_errorEventTimer(*this, &HTMLSourceElement::errorEventTimerFired)
 {
     LOG(Media, "HTMLSourceElement::HTMLSourceElement - %p", this);
     ASSERT(hasTagName(sourceTag));
 }
 
-PassRefPtr<HTMLSourceElement> HTMLSourceElement::create(const QualifiedName& tagName, Document* document)
+Ref<HTMLSourceElement> HTMLSourceElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new HTMLSourceElement(tagName, document));
+    Ref<HTMLSourceElement> sourceElement = adoptRef(*new HTMLSourceElement(tagName, document));
+    sourceElement->suspendIfNeeded();
+    return sourceElement;
 }
 
-Node::InsertionNotificationRequest HTMLSourceElement::insertedInto(ContainerNode* insertionPoint)
+Node::InsertionNotificationRequest HTMLSourceElement::insertedInto(ContainerNode& insertionPoint)
 {
     HTMLElement::insertedInto(insertionPoint);
     Element* parent = parentElement();
-    if (parent && parent->isMediaElement())
-        toHTMLMediaElement(parentNode())->sourceWasAdded(this);
+    if (parent) {
+#if ENABLE(VIDEO)
+        if (is<HTMLMediaElement>(*parent))
+            downcast<HTMLMediaElement>(*parent).sourceWasAdded(this);
+        else
+#endif
+        if (is<HTMLPictureElement>(*parent))
+            downcast<HTMLPictureElement>(*parent).sourcesChanged();
+    }
     return InsertionDone;
 }
 
-void HTMLSourceElement::removedFrom(ContainerNode* removalRoot)
+void HTMLSourceElement::removedFrom(ContainerNode& removalRoot)
 {
     Element* parent = parentElement();
-    if (!parent && removalRoot->isElementNode())
-        parent = toElement(removalRoot);
-    if (parent && parent->isMediaElement())
-        toHTMLMediaElement(parent)->sourceWasRemoved(this);
+    if (!parent && is<Element>(removalRoot))
+        parent = &downcast<Element>(removalRoot);
+    if (parent) {
+#if ENABLE(VIDEO)
+        if (is<HTMLMediaElement>(*parent))
+            downcast<HTMLMediaElement>(*parent).sourceWasRemoved(this);
+        else
+#endif
+        if (is<HTMLPictureElement>(*parent))
+            downcast<HTMLPictureElement>(*parent).sourcesChanged();
+    }
     HTMLElement::removedFrom(removalRoot);
 }
 
@@ -112,7 +129,7 @@ void HTMLSourceElement::cancelPendingErrorEvent()
     m_errorEventTimer.stop();
 }
 
-void HTMLSourceElement::errorEventTimerFired(Timer<HTMLSourceElement>*)
+void HTMLSourceElement::errorEventTimerFired()
 {
     LOG(Media, "HTMLSourceElement::errorEventTimerFired - %p", this);
     dispatchEvent(Event::create(eventNames().errorEvent, false, true));
@@ -123,18 +140,48 @@ bool HTMLSourceElement::isURLAttribute(const Attribute& attribute) const
     return attribute.name() == srcAttr || HTMLElement::isURLAttribute(attribute);
 }
 
-#if ENABLE(MICRODATA)
-String HTMLSourceElement::itemValueText() const
+const char* HTMLSourceElement::activeDOMObjectName() const
 {
-    return getURLAttribute(srcAttr);
+    return "HTMLSourceElement";
 }
 
-void HTMLSourceElement::setItemValueText(const String& value, ExceptionCode&)
+bool HTMLSourceElement::canSuspendForDocumentSuspension() const
 {
-    setAttribute(srcAttr, value);
+    return true;
 }
-#endif
+
+void HTMLSourceElement::suspend(ReasonForSuspension why)
+{
+    if (why == PageCache) {
+        m_shouldRescheduleErrorEventOnResume = m_errorEventTimer.isActive();
+        m_errorEventTimer.stop();
+    }
+}
+
+void HTMLSourceElement::resume()
+{
+    if (m_shouldRescheduleErrorEventOnResume) {
+        m_errorEventTimer.startOneShot(0);
+        m_shouldRescheduleErrorEventOnResume = false;
+    }
+}
+
+void HTMLSourceElement::stop()
+{
+    cancelPendingErrorEvent();
+}
+
+void HTMLSourceElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
+{
+    HTMLElement::parseAttribute(name, value);
+    if (name == srcsetAttr || name == sizesAttr || name == mediaAttr || name == typeAttr) {
+        if (name == mediaAttr)
+            m_mediaQuerySet = MediaQuerySet::createAllowingDescriptionSyntax(value);
+        auto* parent = parentNode();
+        if (is<HTMLPictureElement>(parent))
+            downcast<HTMLPictureElement>(*parent).sourcesChanged();
+    }
+}
 
 }
 
-#endif

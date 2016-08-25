@@ -26,9 +26,11 @@
 #include "config.h"
 #include "PluginProcessCreationParameters.h"
 
-#if ENABLE(PLUGIN_PROCESS)
-
-#include "ArgumentCoders.h"
+#if ENABLE(NETSCAPE_PLUGIN_API)
+#if PLATFORM(COCOA)
+#include "ArgumentCodersCF.h"
+#endif
+#include "WebCoreArgumentCoders.h"
 
 namespace WebKit {
 
@@ -37,18 +39,21 @@ PluginProcessCreationParameters::PluginProcessCreationParameters()
 {
 }
 
-void PluginProcessCreationParameters::encode(CoreIPC::ArgumentEncoder& encoder) const
+void PluginProcessCreationParameters::encode(IPC::ArgumentEncoder& encoder) const
 {
     encoder.encodeEnum(processType);
     encoder << supportsAsynchronousPluginInitialization;
     encoder << minimumLifetime;
     encoder << terminationTimeout;
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     encoder << acceleratedCompositingPort;
+#if TARGET_OS_IPHONE || (PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101100)
+    IPC::encode(encoder, networkATSContext.get());
+#endif
 #endif
 }
 
-bool PluginProcessCreationParameters::decode(CoreIPC::ArgumentDecoder& decoder, PluginProcessCreationParameters& result)
+bool PluginProcessCreationParameters::decode(IPC::ArgumentDecoder& decoder, PluginProcessCreationParameters& result)
 {
     if (!decoder.decodeEnum(result.processType))
         return false;
@@ -58,9 +63,13 @@ bool PluginProcessCreationParameters::decode(CoreIPC::ArgumentDecoder& decoder, 
         return false;
     if (!decoder.decode(result.terminationTimeout))
         return false;
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     if (!decoder.decode(result.acceleratedCompositingPort))
         return false;
+#if TARGET_OS_IPHONE || (PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101100)
+    if (!IPC::decode(decoder, result.networkATSContext))
+        return false;
+#endif
 #endif
 
     return true;
@@ -69,4 +78,4 @@ bool PluginProcessCreationParameters::decode(CoreIPC::ArgumentDecoder& decoder, 
 
 } // namespace WebKit
 
-#endif // ENABLE(PLUGIN_PROCESS)
+#endif // ENABLE(NETSCAPE_PLUGIN_API)

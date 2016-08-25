@@ -28,14 +28,15 @@
 
 namespace WebKit {
 
+class DatabaseProcessProxy;
 class NetworkProcessProxy;
-class WebContext;
+class WebProcessPool;
 class WebProcessProxy;
 
 class WebContextSupplement {
 public:
-    WebContextSupplement(WebContext* context)
-        : m_context(context)
+    WebContextSupplement(WebProcessPool* processPool)
+        : m_processPool(processPool)
     {
     }
 
@@ -43,7 +44,7 @@ public:
     {
     }
 
-    virtual void contextDestroyed()
+    virtual void processPoolDestroyed()
     {
     }
 
@@ -55,13 +56,12 @@ public:
     {
     }
 
-    virtual bool shouldTerminate(WebProcessProxy*) const
+    virtual void processDidClose(DatabaseProcessProxy*)
     {
-        return true;
     }
 
-    WebContext* context() const { return m_context; }
-    void clearContext() { m_context = 0; }
+    WebProcessPool* processPool() const { return m_processPool; }
+    void clearProcessPool() { m_processPool = nullptr; }
 
     void ref() { refWebContextSupplement(); }
     void deref() { derefWebContextSupplement(); }
@@ -70,7 +70,7 @@ private:
     virtual void refWebContextSupplement() = 0;
     virtual void derefWebContextSupplement() = 0;
 
-    WebContext* m_context;
+    WebProcessPool* m_processPool;
 };
 
 } // namespace WebKit

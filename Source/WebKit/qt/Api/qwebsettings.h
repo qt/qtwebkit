@@ -28,7 +28,6 @@
 #include <QtCore/qshareddata.h>
 
 namespace WebCore {
-    class GroupSettings;
     class Settings;
 }
 
@@ -87,7 +86,7 @@ public:
         CaretBrowsingEnabled,
         NotificationsEnabled,
         WebAudioEnabled,
-        Accelerated2dCanvasEnabled
+        MediaSourceEnabled,
     };
     enum WebGraphic {
         MissingImageGraphic,
@@ -178,7 +177,7 @@ private:
     Q_DISABLE_COPY(QWebSettings)
 
     QWebSettings();
-    QWebSettings(WebCore::Settings *settings, WebCore::GroupSettings *groupSettings);
+    QWebSettings(WebCore::Settings *settings);
     ~QWebSettings();
 
     QWebSettingsPrivate *d;

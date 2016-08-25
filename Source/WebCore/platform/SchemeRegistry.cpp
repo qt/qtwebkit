@@ -13,7 +13,7 @@
  * THIS SOFTWARE IS PROVIDED BY APPLE, INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -26,20 +26,25 @@
 #include "config.h"
 #include "SchemeRegistry.h"
 #include <wtf/MainThread.h>
+#include <wtf/NeverDestroyed.h>
+
+#if USE(QUICK_LOOK)
+#include "QuickLook.h"
+#endif
 
 namespace WebCore {
 
 static URLSchemesMap& localURLSchemes()
 {
-    DEFINE_STATIC_LOCAL(URLSchemesMap, localSchemes, ());
+    static NeverDestroyed<URLSchemesMap> localSchemes;
 
-    if (localSchemes.isEmpty()) {
-        localSchemes.add("file");
-#if PLATFORM(MAC)
-        localSchemes.add("applewebdata");
+    if (localSchemes.get().isEmpty()) {
+        localSchemes.get().add("file");
+#if PLATFORM(COCOA)
+        localSchemes.get().add("applewebdata");
 #endif
 #if PLATFORM(QT)
-        localSchemes.add("qrc");
+        localSchemes.get().add("qrc");
 #endif
     }
 
@@ -48,18 +53,25 @@ static URLSchemesMap& localURLSchemes()
 
 static URLSchemesMap& displayIsolatedURLSchemes()
 {
-    DEFINE_STATIC_LOCAL(URLSchemesMap, displayIsolatedSchemes, ());
+    static NeverDestroyed<URLSchemesMap> displayIsolatedSchemes;
     return displayIsolatedSchemes;
 }
 
 static URLSchemesMap& secureSchemes()
 {
-    DEFINE_STATIC_LOCAL(URLSchemesMap, secureSchemes, ());
+    static NeverDestroyed<URLSchemesMap> secureSchemes;
 
-    if (secureSchemes.isEmpty()) {
-        secureSchemes.add("https");
-        secureSchemes.add("about");
-        secureSchemes.add("data");
+    if (secureSchemes.get().isEmpty()) {
+        secureSchemes.get().add("https");
+        secureSchemes.get().add("about");
+        secureSchemes.get().add("data");
+        secureSchemes.get().add("wss");
+#if USE(QUICK_LOOK)
+        secureSchemes.get().add(QLPreviewProtocol());
+#endif
+#if PLATFORM(GTK)
+        secureSchemes.get().add("resource");
+#endif
     }
 
     return secureSchemes;
@@ -67,14 +79,14 @@ static URLSchemesMap& secureSchemes()
 
 static URLSchemesMap& schemesWithUniqueOrigins()
 {
-    DEFINE_STATIC_LOCAL(URLSchemesMap, schemesWithUniqueOrigins, ());
+    static NeverDestroyed<URLSchemesMap> schemesWithUniqueOrigins;
 
-    if (schemesWithUniqueOrigins.isEmpty()) {
-        schemesWithUniqueOrigins.add("about");
-        schemesWithUniqueOrigins.add("javascript");
+    if (schemesWithUniqueOrigins.get().isEmpty()) {
+        schemesWithUniqueOrigins.get().add("about");
+        schemesWithUniqueOrigins.get().add("javascript");
         // This is a willful violation of HTML5.
         // See https://bugs.webkit.org/show_bug.cgi?id=11885
-        schemesWithUniqueOrigins.add("data");
+        schemesWithUniqueOrigins.get().add("data");
     }
 
     return schemesWithUniqueOrigins;
@@ -82,39 +94,34 @@ static URLSchemesMap& schemesWithUniqueOrigins()
 
 static URLSchemesMap& emptyDocumentSchemes()
 {
-    DEFINE_STATIC_LOCAL(URLSchemesMap, emptyDocumentSchemes, ());
+    static NeverDestroyed<URLSchemesMap> emptyDocumentSchemes;
 
-    if (emptyDocumentSchemes.isEmpty())
-        emptyDocumentSchemes.add("about");
+    if (emptyDocumentSchemes.get().isEmpty())
+        emptyDocumentSchemes.get().add("about");
 
     return emptyDocumentSchemes;
 }
 
-static HashSet<String>& schemesForbiddenFromDomainRelaxation()
+static HashSet<String, ASCIICaseInsensitiveHash>& schemesForbiddenFromDomainRelaxation()
 {
-    DEFINE_STATIC_LOCAL(HashSet<String>, schemes, ());
+    static NeverDestroyed<HashSet<String, ASCIICaseInsensitiveHash>> schemes;
     return schemes;
 }
 
 static URLSchemesMap& canDisplayOnlyIfCanRequestSchemes()
 {
-    DEFINE_STATIC_LOCAL(URLSchemesMap, canDisplayOnlyIfCanRequestSchemes, ());
+    static NeverDestroyed<URLSchemesMap> canDisplayOnlyIfCanRequestSchemes;
 
-#if ENABLE(BLOB)
-    if (canDisplayOnlyIfCanRequestSchemes.isEmpty()) {
-        canDisplayOnlyIfCanRequestSchemes.add("blob");
-#if ENABLE(FILE_SYSTEM)
-        canDisplayOnlyIfCanRequestSchemes.add("filesystem");
-#endif
+    if (canDisplayOnlyIfCanRequestSchemes.get().isEmpty()) {
+        canDisplayOnlyIfCanRequestSchemes.get().add("blob");
     }
-#endif // ENABLE(BLOB)
 
     return canDisplayOnlyIfCanRequestSchemes;
 }
 
 static URLSchemesMap& notAllowingJavascriptURLsSchemes()
 {
-    DEFINE_STATIC_LOCAL(URLSchemesMap, notAllowingJavascriptURLsSchemes, ());
+    static NeverDestroyed<URLSchemesMap> notAllowingJavascriptURLsSchemes;
     return notAllowingJavascriptURLsSchemes;
 }
 
@@ -125,10 +132,10 @@ void SchemeRegistry::registerURLSchemeAsLocal(const String& scheme)
 
 void SchemeRegistry::removeURLSchemeRegisteredAsLocal(const String& scheme)
 {
-    if (scheme == "file")
+    if (equalLettersIgnoringASCIICase(scheme, "file"))
         return;
-#if PLATFORM(MAC)
-    if (scheme == "applewebdata")
+#if PLATFORM(COCOA)
+    if (equalLettersIgnoringASCIICase(scheme, "applewebdata"))
         return;
 #endif
     localURLSchemes().remove(scheme);
@@ -141,24 +148,24 @@ const URLSchemesMap& SchemeRegistry::localSchemes()
 
 static URLSchemesMap& schemesAllowingLocalStorageAccessInPrivateBrowsing()
 {
-    DEFINE_STATIC_LOCAL(URLSchemesMap, schemesAllowingLocalStorageAccessInPrivateBrowsing, ());
+    static NeverDestroyed<URLSchemesMap> schemesAllowingLocalStorageAccessInPrivateBrowsing;
     return schemesAllowingLocalStorageAccessInPrivateBrowsing;
 }
 
 static URLSchemesMap& schemesAllowingDatabaseAccessInPrivateBrowsing()
 {
-    DEFINE_STATIC_LOCAL(URLSchemesMap, schemesAllowingDatabaseAccessInPrivateBrowsing, ());
+    static NeverDestroyed<URLSchemesMap> schemesAllowingDatabaseAccessInPrivateBrowsing;
     return schemesAllowingDatabaseAccessInPrivateBrowsing;
 }
 
 static URLSchemesMap& CORSEnabledSchemes()
 {
     // FIXME: http://bugs.webkit.org/show_bug.cgi?id=77160
-    DEFINE_STATIC_LOCAL(URLSchemesMap, CORSEnabledSchemes, ());
+    static NeverDestroyed<URLSchemesMap> CORSEnabledSchemes;
 
-    if (CORSEnabledSchemes.isEmpty()) {
-        CORSEnabledSchemes.add("http");
-        CORSEnabledSchemes.add("https");
+    if (CORSEnabledSchemes.get().isEmpty()) {
+        CORSEnabledSchemes.get().add("http");
+        CORSEnabledSchemes.get().add("https");
     }
 
     return CORSEnabledSchemes;
@@ -166,7 +173,21 @@ static URLSchemesMap& CORSEnabledSchemes()
 
 static URLSchemesMap& ContentSecurityPolicyBypassingSchemes()
 {
-    DEFINE_STATIC_LOCAL(URLSchemesMap, schemes, ());
+    static NeverDestroyed<URLSchemesMap> schemes;
+    return schemes;
+}
+
+#if ENABLE(CACHE_PARTITIONING)
+static URLSchemesMap& cachePartitioningSchemes()
+{
+    static NeverDestroyed<URLSchemesMap> schemes;
+    return schemes;
+}
+#endif
+
+static URLSchemesMap& alwaysRevalidatedSchemes()
+{
+    static NeverDestroyed<URLSchemesMap> schemes;
     return schemes;
 }
 
@@ -320,13 +341,30 @@ bool SchemeRegistry::schemeShouldBypassContentSecurityPolicy(const String& schem
     return ContentSecurityPolicyBypassingSchemes().contains(scheme);
 }
 
-bool SchemeRegistry::shouldCacheResponsesFromURLSchemeIndefinitely(const String& scheme)
+void SchemeRegistry::registerURLSchemeAsAlwaysRevalidated(const String& scheme)
 {
-#if PLATFORM(MAC)
-    if (equalIgnoringCase(scheme, "applewebdata"))
-        return true;
-#endif
-    return equalIgnoringCase(scheme, "data");
+    alwaysRevalidatedSchemes().add(scheme);
 }
+
+bool SchemeRegistry::shouldAlwaysRevalidateURLScheme(const String& scheme)
+{
+    if (scheme.isEmpty())
+        return false;
+    return alwaysRevalidatedSchemes().contains(scheme);
+}
+
+#if ENABLE(CACHE_PARTITIONING)
+void SchemeRegistry::registerURLSchemeAsCachePartitioned(const String& scheme)
+{
+    cachePartitioningSchemes().add(scheme);
+}
+
+bool SchemeRegistry::shouldPartitionCacheForURLScheme(const String& scheme)
+{
+    if (scheme.isEmpty())
+        return false;
+    return cachePartitioningSchemes().contains(scheme);
+}
+#endif
 
 } // namespace WebCore

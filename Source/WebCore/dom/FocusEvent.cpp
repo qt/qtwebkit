@@ -26,22 +26,13 @@
 #include "config.h"
 #include "FocusEvent.h"
 
-#include "Event.h"
-#include "EventDispatcher.h"
-#include "EventNames.h"
-#include "EventRetargeter.h"
 #include "Node.h"
 
 namespace WebCore {
 
-FocusEventInit::FocusEventInit()
-    : relatedTarget(0)
+EventInterface FocusEvent::eventInterface() const
 {
-}
-
-const AtomicString& FocusEvent::interfaceName() const
-{
-    return eventNames().interfaceForFocusEvent;
+    return FocusEventInterfaceType;
 }
 
 bool FocusEvent::isFocusEvent() const
@@ -49,13 +40,9 @@ bool FocusEvent::isFocusEvent() const
     return true;
 }
 
-FocusEvent::FocusEvent()
-{
-}
-
-FocusEvent::FocusEvent(const AtomicString& type, bool canBubble, bool cancelable, PassRefPtr<AbstractView> view, int detail, PassRefPtr<EventTarget> relatedTarget)
+FocusEvent::FocusEvent(const AtomicString& type, bool canBubble, bool cancelable, AbstractView* view, int detail, RefPtr<EventTarget>&& relatedTarget)
     : UIEvent(type, canBubble, cancelable, view, detail)
-    , m_relatedTarget(relatedTarget)
+    , m_relatedTarget(WTFMove(relatedTarget))
 {
 }
 
@@ -63,70 +50,6 @@ FocusEvent::FocusEvent(const AtomicString& type, const FocusEventInit& initializ
     : UIEvent(type, initializer)
     , m_relatedTarget(initializer.relatedTarget)
 {
-}
-
-PassRefPtr<FocusEventDispatchMediator> FocusEventDispatchMediator::create(PassRefPtr<FocusEvent> focusEvent)
-{
-    return adoptRef(new FocusEventDispatchMediator(focusEvent));
-}
-
-FocusEventDispatchMediator::FocusEventDispatchMediator(PassRefPtr<FocusEvent> focusEvent)
-    : EventDispatchMediator(focusEvent)
-{
-}
-
-bool FocusEventDispatchMediator::dispatchEvent(EventDispatcher* dispatcher) const
-{
-    EventRetargeter::adjustForFocusEvent(dispatcher->node(), *event(), dispatcher->eventPath());
-    return EventDispatchMediator::dispatchEvent(dispatcher);
-}
-
-PassRefPtr<BlurEventDispatchMediator> BlurEventDispatchMediator::create(PassRefPtr<FocusEvent> focusEvent)
-{
-    return adoptRef(new BlurEventDispatchMediator(focusEvent));
-}
-
-BlurEventDispatchMediator::BlurEventDispatchMediator(PassRefPtr<FocusEvent> focusEvent)
-    : EventDispatchMediator(focusEvent)
-{
-}
-
-bool BlurEventDispatchMediator::dispatchEvent(EventDispatcher* dispatcher) const
-{
-    EventRetargeter::adjustForFocusEvent(dispatcher->node(), *event(), dispatcher->eventPath());
-    return EventDispatchMediator::dispatchEvent(dispatcher);
-}
-
-PassRefPtr<FocusInEventDispatchMediator> FocusInEventDispatchMediator::create(PassRefPtr<FocusEvent> focusEvent)
-{
-    return adoptRef(new FocusInEventDispatchMediator(focusEvent));
-}
-
-FocusInEventDispatchMediator::FocusInEventDispatchMediator(PassRefPtr<FocusEvent> focusEvent)
-    : EventDispatchMediator(focusEvent)
-{
-}
-
-bool FocusInEventDispatchMediator::dispatchEvent(EventDispatcher* dispatcher) const
-{
-    EventRetargeter::adjustForFocusEvent(dispatcher->node(), *event(), dispatcher->eventPath());
-    return EventDispatchMediator::dispatchEvent(dispatcher);
-}
-
-PassRefPtr<FocusOutEventDispatchMediator> FocusOutEventDispatchMediator::create(PassRefPtr<FocusEvent> focusEvent)
-{
-    return adoptRef(new FocusOutEventDispatchMediator(focusEvent));
-}
-
-FocusOutEventDispatchMediator::FocusOutEventDispatchMediator(PassRefPtr<FocusEvent> focusEvent)
-    : EventDispatchMediator(focusEvent)
-{
-}
-
-bool FocusOutEventDispatchMediator::dispatchEvent(EventDispatcher* dispatcher) const
-{
-    EventRetargeter::adjustForFocusEvent(dispatcher->node(), *event(), dispatcher->eventPath());
-    return EventDispatchMediator::dispatchEvent(dispatcher);
 }
 
 } // namespace WebCore

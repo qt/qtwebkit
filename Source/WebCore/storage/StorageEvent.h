@@ -34,8 +34,6 @@ namespace WebCore {
 class Storage;
 
 struct StorageEventInit : public EventInit {
-    StorageEventInit();
-
     String key;
     String oldValue;
     String newValue;
@@ -45,9 +43,9 @@ struct StorageEventInit : public EventInit {
 
 class StorageEvent : public Event {
 public:
-    static PassRefPtr<StorageEvent> create();
-    static PassRefPtr<StorageEvent> create(const AtomicString& type, const String& key, const String& oldValue, const String& newValue, const String& url, Storage* storageArea);
-    static PassRefPtr<StorageEvent> create(const AtomicString&, const StorageEventInit&);
+    static Ref<StorageEvent> create(const AtomicString& type, const String& key, const String& oldValue, const String& newValue, const String& url, Storage* storageArea);
+    static Ref<StorageEvent> createForBindings();
+    static Ref<StorageEvent> createForBindings(const AtomicString&, const StorageEventInit&);
     virtual ~StorageEvent();
 
     const String& key() const { return m_key; }
@@ -61,7 +59,7 @@ public:
     // Needed once we support init<blank>EventNS
     // void initStorageEventNS(in DOMString namespaceURI, in DOMString typeArg, in boolean canBubbleArg, in boolean cancelableArg, in DOMString keyArg, in DOMString oldValueArg, in DOMString newValueArg, in DOMString urlArg, Storage storageAreaArg);
 
-    virtual const AtomicString& interfaceName() const;
+    virtual EventInterface eventInterface() const;
 
 private:
     StorageEvent();

@@ -20,9 +20,7 @@
 #ifndef SVGPathByteStream_h
 #define SVGPathByteStream_h
 
-#if ENABLE(SVG)
 #include <wtf/Noncopyable.h>
-#include <wtf/PassOwnPtr.h>
 #include <wtf/Vector.h>
 
 namespace WebCore {
@@ -46,26 +44,35 @@ typedef union {
 class SVGPathByteStream {
     WTF_MAKE_FAST_ALLOCATED;
 public:
-    static PassOwnPtr<SVGPathByteStream> create()
-    {
-        return adoptPtr(new SVGPathByteStream);
-    }
-
-    PassOwnPtr<SVGPathByteStream> copy()
-    {
-        return adoptPtr(new SVGPathByteStream(m_data));
-    }
-
     typedef Vector<unsigned char> Data;
     typedef Data::const_iterator DataIterator;
 
-    DataIterator begin() { return m_data.begin(); }
-    DataIterator end() { return m_data.end(); }
-    void append(unsigned char byte) { m_data.append(byte); }
-    void append(SVGPathByteStream* other)
+    SVGPathByteStream() { }
+    SVGPathByteStream(const Data& data) : m_data(data) { }
+    
+    bool operator==(const SVGPathByteStream& other) const
     {
-        for (DataIterator it = other->begin(); it != other->end(); ++it)
-            append(*it);
+        return m_data == other.m_data;
+    }
+
+    bool operator!=(const SVGPathByteStream& other) const
+    {
+        return !(*this == other);
+    }
+
+    std::unique_ptr<SVGPathByteStream> copy() const
+    {
+        return std::make_unique<SVGPathByteStream>(m_data);
+    }
+
+    DataIterator begin() const { return m_data.begin(); }
+    DataIterator end() const { return m_data.end(); }
+
+    void append(unsigned char byte) { m_data.append(byte); }
+    void append(const SVGPathByteStream& other)
+    {
+        for (auto stream : other)
+            append(stream);
     }
     void clear() { m_data.clear(); }
     bool isEmpty() const { return !m_data.size(); }
@@ -75,16 +82,9 @@ public:
     void resize(unsigned) { }
 
 private:
-    SVGPathByteStream() { }
-    SVGPathByteStream(Data& data)
-        : m_data(data)
-    {
-    }
-
     Data m_data;
 };
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif // SVGPathByteStream_h

@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -35,33 +35,31 @@
 namespace WebCore {
 
 class AccessibilityTableCell;
+class HTMLTableElement;
 class RenderTableSection;
     
 class AccessibilityTable : public AccessibilityRenderObject {
-
-protected:
-    explicit AccessibilityTable(RenderObject*);
 public:
-    static PassRefPtr<AccessibilityTable> create(RenderObject*);
+    static Ref<AccessibilityTable> create(RenderObject*);
     virtual ~AccessibilityTable();
 
-    virtual void init();
+    virtual void init() override final;
 
-    virtual AccessibilityRole roleValue() const;
+    virtual AccessibilityRole roleValue() const override final;
     virtual bool isAriaTable() const { return false; }
     
-    virtual void addChildren();
-    virtual void clearChildren();
+    virtual void addChildren() override;
+    virtual void clearChildren() override final;
     
-    AccessibilityChildrenVector& columns();
-    AccessibilityChildrenVector& rows();
+    const AccessibilityChildrenVector& columns();
+    const AccessibilityChildrenVector& rows();
     
     virtual bool supportsSelectedRows() { return false; }
     unsigned columnCount();
     unsigned rowCount();
-    virtual int tableLevel() const;
+    virtual int tableLevel() const override final;
     
-    virtual String title() const;
+    virtual String title() const override final;
     
     // all the cells in the table
     void cells(AccessibilityChildrenVector&);
@@ -69,37 +67,45 @@ public:
     
     void columnHeaders(AccessibilityChildrenVector&);
     void rowHeaders(AccessibilityChildrenVector&);
-
+    void visibleRows(AccessibilityChildrenVector&);
+    
     // an object that contains, as children, all the objects that act as headers
     AccessibilityObject* headerContainer();
 
+    // isExposableThroughAccessibility() is whether it is exposed as an AccessibilityTable to the platform.
+    bool isExposableThroughAccessibility() const;
+    
+    int ariaColumnCount() const;
+    int ariaRowCount() const;
+
 protected:
+    explicit AccessibilityTable(RenderObject*);
+
     AccessibilityChildrenVector m_rows;
     AccessibilityChildrenVector m_columns;
 
     RefPtr<AccessibilityObject> m_headerContainer;
-    bool m_isAccessibilityTable;
+    bool m_isExposableThroughAccessibility;
 
     bool hasARIARole() const;
 
     // isTable is whether it's an AccessibilityTable object.
-    virtual bool isTable() const OVERRIDE { return true; }
-    // isAccessibilityTable is whether it is exposed as an AccessibilityTable to the platform.
-    virtual bool isAccessibilityTable() const OVERRIDE;
+    virtual bool isTable() const override final { return true; }
     // isDataTable is whether it is exposed as an AccessibilityTable because the heuristic
     // think this "looks" like a data-based table (instead of a table used for layout).
-    virtual bool isDataTable() const OVERRIDE;
+    virtual bool isDataTable() const override final;
+    virtual bool computeAccessibilityIsIgnored() const override final;
 
-    virtual bool isTableExposableThroughAccessibility() const;
-    virtual bool computeAccessibilityIsIgnored() const OVERRIDE;
+private:
+    virtual bool computeIsTableExposableThroughAccessibility() const;
+    virtual void titleElementText(Vector<AccessibilityText>&) const override final;
+    HTMLTableElement* tableElement() const;
+    void addChildrenFromSection(RenderTableSection*, unsigned& maxColumnCount);
+    void addTableCellChild(AccessibilityObject*, HashSet<AccessibilityObject*>& appendedRows, unsigned& columnCount);
 };
-    
-inline AccessibilityTable* toAccessibilityTable(AccessibilityObject* object)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isTable());
-    return static_cast<AccessibilityTable*>(object);
-}
-    
+
 } // namespace WebCore 
+
+SPECIALIZE_TYPE_TRAITS_ACCESSIBILITY(AccessibilityTable, isTable())
 
 #endif // AccessibilityTable_h

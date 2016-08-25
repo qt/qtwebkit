@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -27,18 +27,17 @@
 #include "config.h"
 #include "CString.h"
 
-using namespace std;
+#include <string.h>
+#include <wtf/Hasher.h>
 
 namespace WTF {
 
 PassRefPtr<CStringBuffer> CStringBuffer::createUninitialized(size_t length)
 {
-    if (length > (numeric_limits<size_t>::max() - sizeof(CStringBuffer)))
-        CRASH();
+    RELEASE_ASSERT(length < (std::numeric_limits<unsigned>::max() - sizeof(CStringBuffer)));
 
-    // CStringBuffer already has space for one character, we do not need to add +1 to the length
-    // to store the terminating zero.
-    size_t size = sizeof(CStringBuffer) + length;
+    // The +1 is for the terminating null character.
+    size_t size = sizeof(CStringBuffer) + length + 1;
     CStringBuffer* stringBuffer = static_cast<CStringBuffer*>(fastMalloc(size));
     return adoptRef(new (NotNull, stringBuffer) CStringBuffer(length));
 }
@@ -120,6 +119,34 @@ bool operator==(const CString& a, const char* b)
     if (!b)
         return true;
     return !strcmp(a.data(), b);
+}
+
+unsigned CString::hash() const
+{
+    if (isNull())
+        return 0;
+    StringHasher hasher;
+    for (const char* ptr = data(); *ptr; ++ptr)
+        hasher.addCharacter(*ptr);
+    return hasher.hash();
+}
+
+bool operator<(const CString& a, const CString& b)
+{
+    if (a.isNull())
+        return !b.isNull();
+    if (b.isNull())
+        return false;
+    return strcmp(a.data(), b.data()) < 0;
+}
+
+bool CStringHash::equal(const CString& a, const CString& b)
+{
+    if (a.isHashTableDeletedValue())
+        return b.isHashTableDeletedValue();
+    if (b.isHashTableDeletedValue())
+        return false;
+    return a == b;
 }
 
 } // namespace WTF

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, 2010, 2013 Apple Inc. All Rights Reserved.
+ * Copyright (C) 2008, 2010, 2013, 2014 Apple Inc. All Rights Reserved.
  * Copyright (C) 2009 Torch Mobile, Inc. http://www.torchmobile.com/
  * Copyright (C) 2010 Google Inc. All Rights Reserved.
  *
@@ -28,14 +28,14 @@
 #include "config.h"
 #include "CSSPreloadScanner.h"
 
-#include "HTMLIdentifier.h"
 #include "HTMLParserIdioms.h"
+#include <wtf/TemporaryChange.h>
 
 namespace WebCore {
 
 CSSPreloadScanner::CSSPreloadScanner()
     : m_state(Initial)
-    , m_requests(0)
+    , m_requests(nullptr)
 {
 }
 
@@ -50,33 +50,18 @@ void CSSPreloadScanner::reset()
     m_ruleValue.clear();
 }
 
-template<typename Char>
-void CSSPreloadScanner::scanCommon(const Char* begin, const Char* end, PreloadRequestStream& requests)
-{
-    m_requests = &requests;
-    for (const Char* it = begin; it != end && m_state != DoneParsingImportRules; ++it)
-        tokenize(*it);
-    m_requests = 0;
-}
-
 void CSSPreloadScanner::scan(const HTMLToken::DataVector& data, PreloadRequestStream& requests)
 {
-    scanCommon(data.data(), data.data() + data.size(), requests);
-}
+    ASSERT(!m_requests);
+    TemporaryChange<PreloadRequestStream*> change(m_requests, &requests);
 
-#if ENABLE(THREADED_HTML_PARSER)
-void CSSPreloadScanner::scan(const HTMLIdentifier& identifier, PreloadRequestStream& requests)
-{
-    const StringImpl* data = identifier.asStringImpl();
-    if (data->is8Bit()) {
-        const LChar* begin = data->characters8();
-        scanCommon(begin, begin + data->length(), requests);
-        return;
+    for (UChar c : data) {
+        if (m_state == DoneParsingImportRules)
+            break;
+
+        tokenize(c);
     }
-    const UChar* begin = data->characters16();
-    scanCommon(begin, begin + data->length(), requests);
 }
-#endif
 
 inline void CSSPreloadScanner::tokenize(UChar c)
 {
@@ -210,25 +195,18 @@ static String parseCSSStringOrURL(const UChar* characters, size_t length)
     return String(characters + offset, reducedLength);
 }
 
-template<unsigned referenceLength>
-static inline bool ruleEqualIgnoringCase(const Vector<UChar>& rule, const char (&reference)[referenceLength])
-{
-    unsigned referenceCharactersLength = referenceLength - 1;
-    return rule.size() == referenceCharactersLength && equalIgnoringCase(reference, rule.data(), referenceCharactersLength);
-}
-
 void CSSPreloadScanner::emitRule()
 {
-    if (ruleEqualIgnoringCase(m_rule, "import")) {
+    StringView rule(m_rule.data(), m_rule.size());
+    if (equalLettersIgnoringASCIICase(rule, "import")) {
         String url = parseCSSStringOrURL(m_ruleValue.data(), m_ruleValue.size());
         if (!url.isEmpty()) {
-            KURL baseElementURL; // FIXME: This should be passed in from the HTMLPreloadScaner via scan()!
-            OwnPtr<PreloadRequest> request = PreloadRequest::create("css", url, baseElementURL, CachedResource::CSSStyleSheet);
+            URL baseElementURL; // FIXME: This should be passed in from the HTMLPreloadScanner via scan(): without it we will get relative URLs wrong.
             // FIXME: Should this be including the charset in the preload request?
-            m_requests->append(request.release());
+            m_requests->append(std::make_unique<PreloadRequest>("css", url, baseElementURL, CachedResource::CSSStyleSheet, String()));
         }
         m_state = Initial;
-    } else if (ruleEqualIgnoringCase(m_rule, "charset"))
+    } else if (equalLettersIgnoringASCIICase(rule, "charset"))
         m_state = Initial;
     else
         m_state = DoneParsingImportRules;

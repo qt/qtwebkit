@@ -41,7 +41,6 @@
 #include <QString>
 #include <QTransform>
 #include <wtf/MathExtras.h>
-#include <wtf/OwnPtr.h>
 #include <wtf/text/WTFString.h>
 
 namespace WebCore {
@@ -262,13 +261,8 @@ void Path::closeSubpath()
     m_path.closeSubpath();
 }
 
-void Path::addArc(const FloatPoint& p, float r, float sar, float ear, bool anticlockwise)
+static void addEllipticArc(QPainterPath &path, qreal xc, qreal yc, qreal radiusX, qreal radiusY,  float sar, float ear, bool anticlockwise)
 {
-    qreal xc = p.x();
-    qreal yc = p.y();
-    qreal radius = r;
-
-
     //### HACK
     // In Qt we don't switch the coordinate system for degrees
     // and still use the 0,0 as bottom left for degrees so we need
@@ -283,10 +277,10 @@ void Path::addArc(const FloatPoint& p, float r, float sar, float ear, bool antic
 
     double span = 0;
 
-    double xs = xc - radius;
-    double ys = yc - radius;
-    double width  = radius*2;
-    double height = radius*2;
+    double xs = xc - radiusX;
+    double ys = yc - radiusY;
+    double width  = radiusX * 2;
+    double height = radiusY * 2;
 
     if ((!anticlockwise && (ea - sa >= 360)) || (anticlockwise && (sa - ea >= 360))) {
         // If the anticlockwise argument is false and endAngle-startAngle is equal to or greater than 2*PI, or, if the
@@ -313,15 +307,19 @@ void Path::addArc(const FloatPoint& p, float r, float sar, float ear, bool antic
 
     // If the path is empty, move to where the arc will start to avoid painting a line from (0,0)
     // NOTE: QPainterPath::isEmpty() won't work here since it ignores a lone MoveToElement
-    if (!m_path.elementCount())
-        m_path.arcMoveTo(xs, ys, width, height, sa);
-    else if (!radius) {
-        m_path.lineTo(xc, yc);
+    if (!path.elementCount())
+        path.arcMoveTo(xs, ys, width, height, sa);
+    else if (qFuzzyIsNull(radiusX) || qFuzzyIsNull(radiusY)) {
+        path.lineTo(xc, yc);
         return;
     }
 
-    m_path.arcTo(xs, ys, width, height, sa, span);
+    path.arcTo(xs, ys, width, height, sa, span);
+}
 
+void Path::addArc(const FloatPoint& p, float r, float sar, float ear, bool anticlockwise)
+{
+    addEllipticArc(m_path, p.x(), p.y(), r, r, sar, ear, anticlockwise);
 }
 
 void Path::addRect(const FloatRect& r)
@@ -329,9 +327,45 @@ void Path::addRect(const FloatRect& r)
     m_path.addRect(r.x(), r.y(), r.width(), r.height());
 }
 
+void Path::addEllipse(FloatPoint p, float radiusX, float radiusY, float rotation, float startAngle, float endAngle, bool anticlockwise)
+{
+    if (!qFuzzyIsNull(rotation)) {
+        QPainterPath subPath;
+        QTransform t;
+        t.translate(p.x(), p.y());
+        t.rotateRadians(rotation);
+
+        bool isEmpty = m_path.elementCount() == 0;
+        if (!isEmpty) {
+            QTransform invTransform = t.inverted(nullptr);
+            subPath.moveTo(invTransform.map(m_path.currentPosition()));
+        }
+
+        addEllipticArc(subPath, 0, 0, radiusX, radiusY, startAngle, endAngle, anticlockwise);
+        subPath = t.map(subPath);
+
+        if (isEmpty)
+            m_path = subPath;
+        else
+            m_path.connectPath(subPath);
+        return;
+    }
+
+    addEllipticArc(m_path, p.x(), p.y(), radiusX, radiusY, startAngle, endAngle, anticlockwise);
+}
+
 void Path::addEllipse(const FloatRect& r)
 {
     m_path.addEllipse(r.x(), r.y(), r.width(), r.height());
+}
+
+void Path::addPath(const Path& path, const AffineTransform& transform)
+{
+    if (!transform.isInvertible())
+        return;
+
+    QTransform qTransform(transform);
+    m_path.addPath(qTransform.map(path.platformPath()));
 }
 
 void Path::clear()
@@ -358,7 +392,7 @@ FloatPoint Path::currentPoint() const
     return m_path.currentPosition();
 }
 
-void Path::apply(void* info, PathApplierFunction function) const
+void Path::apply(const PathApplierFunction& function) const
 {
     PathElement pelement;
     FloatPoint points[3];
@@ -370,12 +404,12 @@ void Path::apply(void* info, PathApplierFunction function) const
             case QPainterPath::MoveToElement:
                 pelement.type = PathElementMoveToPoint;
                 pelement.points[0] = QPointF(cur);
-                function(info, &pelement);
+                function(pelement);
                 break;
             case QPainterPath::LineToElement:
                 pelement.type = PathElementAddLineToPoint;
                 pelement.points[0] = QPointF(cur);
-                function(info, &pelement);
+                function(pelement);
                 break;
             case QPainterPath::CurveToElement:
             {
@@ -389,7 +423,7 @@ void Path::apply(void* info, PathApplierFunction function) const
                 pelement.points[0] = QPointF(cur);
                 pelement.points[1] = QPointF(c1);
                 pelement.points[2] = QPointF(c2);
-                function(info, &pelement);
+                function(pelement);
 
                 i += 2;
                 break;

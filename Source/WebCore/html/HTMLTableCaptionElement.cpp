@@ -25,7 +25,6 @@
 #include "config.h"
 #include "HTMLTableCaptionElement.h"
 
-#include "Attribute.h"
 #include "CSSPropertyNames.h"
 #include "HTMLNames.h"
 
@@ -33,15 +32,15 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-inline HTMLTableCaptionElement::HTMLTableCaptionElement(const QualifiedName& tagName, Document* document)
+inline HTMLTableCaptionElement::HTMLTableCaptionElement(const QualifiedName& tagName, Document& document)
     : HTMLElement(tagName, document)
 {
     ASSERT(hasTagName(captionTag));
 }
 
-PassRefPtr<HTMLTableCaptionElement> HTMLTableCaptionElement::create(const QualifiedName& tagName, Document* document)
+Ref<HTMLTableCaptionElement> HTMLTableCaptionElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new HTMLTableCaptionElement(tagName, document));
+    return adoptRef(*new HTMLTableCaptionElement(tagName, document));
 }
 
 bool HTMLTableCaptionElement::isPresentationAttribute(const QualifiedName& name) const
@@ -51,7 +50,7 @@ bool HTMLTableCaptionElement::isPresentationAttribute(const QualifiedName& name)
     return HTMLElement::isPresentationAttribute(name);
 }
 
-void HTMLTableCaptionElement::collectStyleForPresentationAttribute(const QualifiedName& name, const AtomicString& value, MutableStylePropertySet* style)
+void HTMLTableCaptionElement::collectStyleForPresentationAttribute(const QualifiedName& name, const AtomicString& value, MutableStyleProperties& style)
 {
     if (name == alignAttr) {
         if (!value.isEmpty())

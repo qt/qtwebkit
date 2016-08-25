@@ -23,13 +23,13 @@
 #ifndef RenderQuote_h
 #define RenderQuote_h
 
-#include "RenderText.h"
+#include "RenderInline.h"
 
 namespace WebCore {
 
-class RenderQuote FINAL : public RenderText {
+class RenderQuote final : public RenderInline {
 public:
-    RenderQuote(Document*, QuoteType);
+    RenderQuote(Document&, Ref<RenderStyle>&&, QuoteType);
     virtual ~RenderQuote();
 
     void attachQuote();
@@ -37,31 +37,25 @@ public:
 private:
     void detachQuote();
 
-    virtual void willBeDestroyed() OVERRIDE;
-    virtual const char* renderName() const OVERRIDE { return "RenderQuote"; }
-    virtual bool isQuote() const OVERRIDE { return true; };
-    virtual PassRefPtr<StringImpl> originalText() const OVERRIDE;
-    virtual void styleDidChange(StyleDifference, const RenderStyle*) OVERRIDE;
-    virtual void willBeRemovedFromTree() OVERRIDE;
+    virtual const char* renderName() const override { return "RenderQuote"; }
+    virtual bool isQuote() const override { return true; }
+    virtual void styleDidChange(StyleDifference, const RenderStyle*) override;
+    virtual void willBeRemovedFromTree() override;
 
+    String computeText() const;
+    void updateText();
     void updateDepth();
 
-    QuoteType m_type;
-    int m_depth;
-    RenderQuote* m_next;
-    RenderQuote* m_previous;
-    bool m_isAttached;
+    const QuoteType m_type;
+    int m_depth { -1 };
+    RenderQuote* m_next { nullptr };
+    RenderQuote* m_previous { nullptr };
+    bool m_isAttached { false };
+    String m_text;
 };
 
-inline RenderQuote* toRenderQuote(RenderObject* object)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isQuote());
-    return static_cast<RenderQuote*>(object);
-}
-
-// This will catch anyone doing an unnecessary cast.
-void toRenderQuote(const RenderQuote*);
-
 } // namespace WebCore
+
+SPECIALIZE_TYPE_TRAITS_RENDER_OBJECT(RenderQuote, isQuote())
 
 #endif // RenderQuote_h

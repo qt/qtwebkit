@@ -18,8 +18,6 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "RenderSVGGradientStop.h"
 
 #include "RenderSVGResourceContainer.h"
@@ -33,8 +31,8 @@ namespace WebCore {
     
 using namespace SVGNames;
 
-RenderSVGGradientStop::RenderSVGGradientStop(SVGStopElement* element)
-    : RenderObject(element)
+RenderSVGGradientStop::RenderSVGGradientStop(SVGStopElement& element, Ref<RenderStyle>&& style)
+    : RenderElement(element, WTFMove(style), 0)
 {
 }
 
@@ -44,39 +42,34 @@ RenderSVGGradientStop::~RenderSVGGradientStop()
 
 void RenderSVGGradientStop::styleDidChange(StyleDifference diff, const RenderStyle* oldStyle)
 {
-    RenderObject::styleDidChange(diff, oldStyle);
+    RenderElement::styleDidChange(diff, oldStyle);
     if (diff == StyleDifferenceEqual)
         return;
 
     // <stop> elements should only be allowed to make renderers under gradient elements
     // but I can imagine a few cases we might not be catching, so let's not crash if our parent isn't a gradient.
-    SVGGradientElement* gradient = gradientElement();
+    const auto* gradient = gradientElement();
     if (!gradient)
         return;
 
-    RenderObject* renderer = gradient->renderer();
+    RenderElement* renderer = gradient->renderer();
     if (!renderer)
         return;
 
-    ASSERT(renderer->isSVGResourceContainer());
-    RenderSVGResourceContainer* container = renderer->toRenderSVGResourceContainer();
-    container->removeAllClientsFromCache();
+    downcast<RenderSVGResourceContainer>(*renderer).removeAllClientsFromCache();
 }
 
 void RenderSVGGradientStop::layout()
 {
     StackStats::LayoutCheckPoint layoutCheckPoint;
-    setNeedsLayout(false);
+    clearNeedsLayout();
 }
 
-SVGGradientElement* RenderSVGGradientStop::gradientElement() const
+SVGGradientElement* RenderSVGGradientStop::gradientElement()
 {
-    ContainerNode* parentNode = node()->parentNode();
-    if (parentNode->hasTagName(linearGradientTag) || parentNode->hasTagName(radialGradientTag))
-        return toSVGGradientElement(parentNode);
-    return 0;
+    if (is<SVGGradientElement>(element().parentElement()))
+        return downcast<SVGGradientElement>(element().parentElement());
+    return nullptr;
 }
 
 }
-
-#endif // ENABLE(SVG)

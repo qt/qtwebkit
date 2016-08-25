@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2012, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,15 +26,17 @@
 #ifndef LLIntThunks_h
 #define LLIntThunks_h
 
-#include <wtf/Platform.h>
-
-#if ENABLE(LLINT)
-
 #include "MacroAssemblerCodeRef.h"
 
 namespace JSC {
 
 class VM;
+struct ProtoCallFrame;
+
+extern "C" {
+    EncodedJSValue vmEntryToJavaScript(void*, VM*, ProtoCallFrame*);
+    EncodedJSValue vmEntryToNative(void*, VM*, ProtoCallFrame*);
+}
 
 namespace LLInt {
 
@@ -44,9 +46,8 @@ MacroAssemblerCodeRef functionForCallArityCheckThunkGenerator(VM*);
 MacroAssemblerCodeRef functionForConstructArityCheckThunkGenerator(VM*);
 MacroAssemblerCodeRef evalEntryThunkGenerator(VM*);
 MacroAssemblerCodeRef programEntryThunkGenerator(VM*);
+MacroAssemblerCodeRef moduleProgramEntryThunkGenerator(VM*);
 
 } } // namespace JSC::LLInt
-
-#endif // ENABLE(LLINT)
 
 #endif // LLIntThunks_h

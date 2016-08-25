@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2012, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,9 +26,11 @@
 #include "config.h"
 #include "ScrollingThread.h"
 
-#if ENABLE(THREADED_SCROLLING)
+#if ENABLE(ASYNC_SCROLLING)
 
+#include <mutex>
 #include <wtf/MainThread.h>
+#include <wtf/NeverDestroyed.h>
 
 namespace WebCore {
 
@@ -39,38 +41,34 @@ ScrollingThread::ScrollingThread()
 
 bool ScrollingThread::isCurrentThread()
 {
-    if (!shared().m_threadIdentifier)
-        return false;
-
-    return currentThread() == shared().m_threadIdentifier;
+    auto threadIdentifier = ScrollingThread::singleton().m_threadIdentifier;
+    return threadIdentifier && currentThread() == threadIdentifier;
 }
 
-void ScrollingThread::dispatch(const Function<void()>& function)
+void ScrollingThread::dispatch(std::function<void ()> function)
 {
-    shared().createThreadIfNeeded();
+    auto& scrollingThread = ScrollingThread::singleton();
+    scrollingThread.createThreadIfNeeded();
 
     {
-        MutexLocker locker(shared().m_functionsMutex);
-        shared().m_functions.append(function);
+        std::lock_guard<Lock> lock(scrollingThread.m_functionsMutex);
+        scrollingThread.m_functions.append(function);
     }
 
-    shared().wakeUpRunLoop();
+    scrollingThread.wakeUpRunLoop();
 }
 
-static void callFunctionOnMainThread(const Function<void()>* function)
+void ScrollingThread::dispatchBarrier(std::function<void ()> function)
 {
-    callOnMainThread(*function);
-    delete function;
+    dispatch([function]() mutable {
+        callOnMainThread(WTFMove(function));
+    });
 }
 
-void ScrollingThread::dispatchBarrier(const Function<void()>& function)
+ScrollingThread& ScrollingThread::singleton()
 {
-    dispatch(bind(callFunctionOnMainThread, new Function<void()>(function)));
-}
+    static NeverDestroyed<ScrollingThread> scrollingThread;
 
-ScrollingThread& ScrollingThread::shared()
-{
-    DEFINE_STATIC_LOCAL(ScrollingThread, scrollingThread, ());
     return scrollingThread;
 }
 
@@ -81,19 +79,19 @@ void ScrollingThread::createThreadIfNeeded()
 
     // Wait for the thread to initialize the run loop.
     {
-        MutexLocker locker(m_initializeRunLoopConditionMutex);
+        std::unique_lock<Lock> lock(m_initializeRunLoopMutex);
 
         m_threadIdentifier = createThread(threadCallback, this, "WebCore: Scrolling");
         
-#if PLATFORM(MAC)
-        while (!m_threadRunLoop)
-            m_initializeRunLoopCondition.wait(m_initializeRunLoopConditionMutex);
+#if PLATFORM(COCOA)
+        m_initializeRunLoopConditionVariable.wait(lock, [this]{ return m_threadRunLoop; });
 #endif
     }
 }
 
 void ScrollingThread::threadCallback(void* scrollingThread)
 {
+    WTF::setCurrentThreadIsUserInteractive();
     static_cast<ScrollingThread*>(scrollingThread)->threadBody();
 }
 
@@ -106,17 +104,17 @@ void ScrollingThread::dispatchFunctionsFromScrollingThread()
 {
     ASSERT(isCurrentThread());
 
-    Vector<Function<void()> > functions;
+    Vector<std::function<void ()>> functions;
     
     {
-        MutexLocker locker(m_functionsMutex);
-        m_functions.swap(functions);
+        std::lock_guard<Lock> lock(m_functionsMutex);
+        functions = WTFMove(m_functions);
     }
-    
-    for (size_t i = 0; i < functions.size(); ++i)
-        functions[i]();
+
+    for (auto& function : functions)
+        function();
 }
 
 } // namespace WebCore
 
-#endif // ENABLE(THREADED_SCROLLING)
+#endif // ENABLE(ASYNC_SCROLLING)

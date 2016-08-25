@@ -25,33 +25,32 @@
 
 namespace JSC {
 
-    class NumberPrototype : public NumberObject {
-    public:
-        typedef NumberObject Base;
+class NumberPrototype : public NumberObject {
+public:
+    typedef NumberObject Base;
+    static const unsigned StructureFlags = Base::StructureFlags | OverridesGetOwnPropertySlot;
 
-        static NumberPrototype* create(ExecState* exec, JSGlobalObject* globalObject, Structure* structure)
-        {
-            NumberPrototype* prototype = new (NotNull, allocateCell<NumberPrototype>(*exec->heap())) NumberPrototype(exec, structure);
-            prototype->finishCreation(exec, globalObject);
-            return prototype;
-        }
-        
-        static const ClassInfo s_info;
+    static NumberPrototype* create(VM& vm, JSGlobalObject* globalObject, Structure* structure)
+    {
+        NumberPrototype* prototype = new (NotNull, allocateCell<NumberPrototype>(vm.heap)) NumberPrototype(vm, structure);
+        prototype->finishCreation(vm, globalObject);
+        return prototype;
+    }
 
-        static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype)
-        {
-            return Structure::create(vm, globalObject, prototype, TypeInfo(NumberObjectType, StructureFlags), &s_info);
-        }
+    DECLARE_INFO;
 
-    protected:
-        void finishCreation(ExecState*, JSGlobalObject*);
-        static const unsigned StructureFlags = OverridesGetOwnPropertySlot | NumberObject::StructureFlags;
+    static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype)
+    {
+        return Structure::create(vm, globalObject, prototype, TypeInfo(NumberObjectType, StructureFlags), info());
+    }
 
-    private:
-        NumberPrototype(ExecState*, Structure*);
-        static bool getOwnPropertySlot(JSCell*, ExecState*, PropertyName, PropertySlot&);
-        static bool getOwnPropertyDescriptor(JSObject*, ExecState*, PropertyName, PropertyDescriptor&);
-    };
+protected:
+    void finishCreation(VM&, JSGlobalObject*);
+
+private:
+    NumberPrototype(VM&, Structure*);
+    static bool getOwnPropertySlot(JSObject*, ExecState*, PropertyName, PropertySlot&);
+};
 
 } // namespace JSC
 

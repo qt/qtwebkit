@@ -26,11 +26,9 @@
 #ifndef CodeType_h
 #define CodeType_h
 
-#include <wtf/Platform.h>
-
 namespace JSC {
 
-enum CodeType { GlobalCode, EvalCode, FunctionCode };
+enum CodeType { GlobalCode, EvalCode, FunctionCode, ModuleCode };
 
 } // namespace JSC
 

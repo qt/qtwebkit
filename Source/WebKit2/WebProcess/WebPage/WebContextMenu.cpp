@@ -25,12 +25,12 @@
 
 #include "WebContextMenu.h"
 
-#include "InjectedBundleHitTestResult.h"
-#include "InjectedBundleUserMessageCoders.h"
+#include "ContextMenuContextData.h"
+#include "UserData.h"
 #include "WebCoreArgumentCoders.h"
-#include "WebHitTestResult.h"
 #include "WebPage.h"
 #include "WebPageProxyMessages.h"
+#include "WebProcess.h"
 #include <WebCore/ContextMenu.h>
 #include <WebCore/ContextMenuController.h>
 #include <WebCore/Frame.h>
@@ -52,13 +52,8 @@ WebContextMenu::~WebContextMenu()
 
 void WebContextMenu::show()
 {
-    ContextMenuController* controller = m_page->corePage()->contextMenuController();
-    if (!controller)
-        return;
-    ContextMenu* menu = controller->contextMenu();
-    if (!menu)
-        return;
-    Frame* frame = controller->hitTestResult().innerNodeFrame();
+    ContextMenuController& controller = m_page->corePage()->contextMenuController();
+    Frame* frame = controller.hitTestResult().innerNodeFrame();
     if (!frame)
         return;
     FrameView* view = frame->view();
@@ -66,49 +61,43 @@ void WebContextMenu::show()
         return;
 
     Vector<WebContextMenuItemData> menuItems;
-    RefPtr<APIObject> userData;
+    RefPtr<API::Object> userData;
     menuItemsWithUserData(menuItems, userData);
-    WebHitTestResult::Data webHitTestResultData(controller->hitTestResult());
+
+    auto menuLocation = view->contentsToRootView(controller.hitTestResult().roundedPointInInnerNodeFrame());
+
+    ContextMenuContextData contextMenuContextData(menuLocation, menuItems, controller.context());
 
     // Mark the WebPage has having a shown context menu then notify the UIProcess.
     m_page->contextMenuShowing();
-    m_page->send(Messages::WebPageProxy::ShowContextMenu(view->contentsToWindow(controller->hitTestResult().roundedPointInInnerNodeFrame()), webHitTestResultData, menuItems, InjectedBundleUserMessageEncoder(userData.get())));
+    m_page->send(Messages::WebPageProxy::ShowContextMenu(contextMenuContextData, UserData(WebProcess::singleton().transformObjectsToHandles(userData.get()).get())));
 }
 
 void WebContextMenu::itemSelected(const WebContextMenuItemData& item)
 {
-    ContextMenuItem coreItem(ActionType, static_cast<ContextMenuAction>(item.action()), item.title());
-    m_page->corePage()->contextMenuController()->contextMenuItemSelected(&coreItem);
+    m_page->corePage()->contextMenuController().contextMenuItemSelected(static_cast<ContextMenuAction>(item.action()), item.title());
 }
 
-void WebContextMenu::menuItemsWithUserData(Vector<WebContextMenuItemData> &menuItems, RefPtr<APIObject>& userData) const
+void WebContextMenu::menuItemsWithUserData(Vector<WebContextMenuItemData> &menuItems, RefPtr<API::Object>& userData) const
 {
-    ContextMenuController* controller = m_page->corePage()->contextMenuController();
-    if (!controller)
-        return;
+    ContextMenuController& controller = m_page->corePage()->contextMenuController();
 
-    ContextMenu* menu = controller->contextMenu();
+    ContextMenu* menu = controller.contextMenu();
     if (!menu)
         return;
 
     // Give the bundle client a chance to process the menu.
-#if USE(CROSS_PLATFORM_CONTEXT_MENUS)
     const Vector<ContextMenuItem>& coreItems = menu->items();
-#else
-    Vector<ContextMenuItem> coreItems = contextMenuItemVector(menu->platformDescription());
-#endif
-    Vector<WebContextMenuItemData> proposedMenu = kitItems(coreItems, menu);
-    Vector<WebContextMenuItemData> newMenu;
-    RefPtr<InjectedBundleHitTestResult> hitTestResult = InjectedBundleHitTestResult::create(controller->hitTestResult());
-    if (m_page->injectedBundleContextMenuClient().getCustomMenuFromDefaultItems(m_page, hitTestResult.get(), proposedMenu, newMenu, userData))
-        proposedMenu = newMenu;
-    menuItems = proposedMenu;
+
+    if (m_page->injectedBundleContextMenuClient().getCustomMenuFromDefaultItems(*m_page, controller.hitTestResult(), coreItems, menuItems, userData))
+        return;
+    menuItems = kitItems(coreItems);
 }
 
 Vector<WebContextMenuItemData> WebContextMenu::items() const
 {
     Vector<WebContextMenuItemData> menuItems;
-    RefPtr<APIObject> userData;
+    RefPtr<API::Object> userData;
     menuItemsWithUserData(menuItems, userData);
     return menuItems;
 }

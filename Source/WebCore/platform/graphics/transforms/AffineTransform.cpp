@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005, 2006 Apple Computer, Inc.  All rights reserved.
+ * Copyright (C) 2005, 2006 Apple Inc.  All rights reserved.
  *               2010 Dirk Schulze <krit@webkit.org>
  *
  * Redistribution and use in source and binary forms, with or without
@@ -11,10 +11,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -31,21 +31,34 @@
 #include "FloatQuad.h"
 #include "FloatRect.h"
 #include "IntRect.h"
+#include "TextStream.h"
 #include "TransformationMatrix.h"
 
 #include <wtf/MathExtras.h>
 
 namespace WebCore {
 
+#if COMPILER(MSVC)
 AffineTransform::AffineTransform()
 {
-    setMatrix(1, 0, 0, 1, 0, 0);
+    m_transform = { 1, 0, 0, 1, 0, 0 };
 }
 
 AffineTransform::AffineTransform(double a, double b, double c, double d, double e, double f)
 {
-    setMatrix(a, b, c, d, e, f);
+    m_transform = { a, b, c, d, e, f };
 }
+#else
+AffineTransform::AffineTransform()
+    : m_transform { { 1, 0, 0, 1, 0, 0 } }
+{
+}
+
+AffineTransform::AffineTransform(double a, double b, double c, double d, double e, double f)
+    : m_transform{ { a, b, c, d, e, f } }
+{
+}
+#endif
 
 void AffineTransform::makeIdentity()
 {
@@ -79,21 +92,23 @@ double AffineTransform::yScale() const
     return sqrt(m_transform[2] * m_transform[2] + m_transform[3] * m_transform[3]);
 }
 
-double AffineTransform::det() const
+static double det(const std::array<double, 6>& transform)
 {
-    return m_transform[0] * m_transform[3] - m_transform[1] * m_transform[2];
+    return transform[0] * transform[3] - transform[1] * transform[2];
 }
 
 bool AffineTransform::isInvertible() const
 {
-    return det() != 0.0;
+    double determinant = det(m_transform);
+
+    return std::isfinite(determinant) && determinant != 0;
 }
 
-AffineTransform AffineTransform::inverse() const
+Optional<AffineTransform> AffineTransform::inverse() const
 {
-    double determinant = det();
-    if (determinant == 0.0)
-        return AffineTransform();
+    double determinant = det(m_transform);
+    if (!std::isfinite(determinant) || determinant == 0)
+        return Nullopt;
 
     AffineTransform result;
     if (isIdentityOrTranslation()) {
@@ -128,7 +143,7 @@ AffineTransform& AffineTransform::multiply(const AffineTransform& other)
     trans.m_transform[4] = other.m_transform[4] * m_transform[0] + other.m_transform[5] * m_transform[2] + m_transform[4];
     trans.m_transform[5] = other.m_transform[4] * m_transform[1] + other.m_transform[5] * m_transform[3] + m_transform[5];
 
-    setMatrix(trans.m_transform);
+    *this = trans;
     return *this;
 }
 
@@ -158,6 +173,16 @@ AffineTransform& AffineTransform::scale(double sx, double sy)
     return *this;
 }
 
+AffineTransform& AffineTransform::scaleNonUniform(double sx, double sy)
+{
+    return scale(sx, sy);
+}
+
+AffineTransform& AffineTransform::scale(const FloatSize& s)
+{
+    return scale(s.width(), s.height());
+}
+
 // *this = *this * translation
 AffineTransform& AffineTransform::translate(double tx, double ty)
 {
@@ -172,9 +197,9 @@ AffineTransform& AffineTransform::translate(double tx, double ty)
     return *this;
 }
 
-AffineTransform& AffineTransform::scaleNonUniform(double sx, double sy)
+AffineTransform& AffineTransform::translate(const FloatPoint& t)
 {
-    return scale(sx, sy);
+    return translate(t.x(), t.y());
 }
 
 AffineTransform& AffineTransform::rotateFromVector(double x, double y)
@@ -399,6 +424,22 @@ void AffineTransform::recompose(const DecomposedType& decomp)
     this->setF(decomp.translateY);
     this->rotate(rad2deg(decomp.angle));
     this->scale(decomp.scaleX, decomp.scaleY);
+}
+
+TextStream& operator<<(TextStream& ts, const AffineTransform& transform)
+{
+    if (transform.isIdentity())
+        ts << "identity";
+    else
+        ts << "{m=(("
+        << transform.a() << "," << transform.b()
+        << ")("
+        << transform.c() << "," << transform.d()
+        << ")) t=("
+        << transform.e() << "," << transform.f()
+        << ")}";
+
+    return ts;
 }
 
 }

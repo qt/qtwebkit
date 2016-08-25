@@ -44,36 +44,38 @@ DownloadProxyMap::~DownloadProxyMap()
     ASSERT(m_downloads.isEmpty());
 }
 
-DownloadProxy* DownloadProxyMap::createDownloadProxy(WebContext* webContext)
+DownloadProxy* DownloadProxyMap::createDownloadProxy(WebProcessPool& processPool, const WebCore::ResourceRequest& resourceRequest)
 {
-    RefPtr<DownloadProxy> downloadProxy = DownloadProxy::create(*this, webContext);
+    RefPtr<DownloadProxy> downloadProxy = DownloadProxy::create(*this, processPool, resourceRequest);
     m_downloads.set(downloadProxy->downloadID(), downloadProxy);
 
-    m_process->addMessageReceiver(Messages::DownloadProxy::messageReceiverName(), downloadProxy->downloadID(), downloadProxy.get());
+    m_process->addMessageReceiver(Messages::DownloadProxy::messageReceiverName(), downloadProxy->downloadID().downloadID(), *downloadProxy);
 
     return downloadProxy.get();
 }
 
 void DownloadProxyMap::downloadFinished(DownloadProxy* downloadProxy)
 {
-    ASSERT(m_downloads.contains(downloadProxy->downloadID()));
+    auto downloadID = downloadProxy->downloadID();
 
+    ASSERT(m_downloads.contains(downloadID));
+
+    m_process->removeMessageReceiver(Messages::DownloadProxy::messageReceiverName(), downloadID.downloadID());
     downloadProxy->invalidate();
-    m_downloads.remove(downloadProxy->downloadID());
-
-    m_process->removeMessageReceiver(Messages::DownloadProxy::messageReceiverName(), downloadProxy->downloadID());
+    m_downloads.remove(downloadID);
 }
 
 void DownloadProxyMap::processDidClose()
 {
     // Invalidate all outstanding downloads.
-    for (HashMap<uint64_t, RefPtr<DownloadProxy> >::iterator::Values it = m_downloads.begin().values(), end = m_downloads.end().values(); it != end; ++it) {
-        (*it)->processDidClose();
-        (*it)->invalidate();
+    for (const auto& download : m_downloads.values()) {
+        download->processDidClose();
+        download->invalidate();
+        m_process->removeMessageReceiver(Messages::DownloadProxy::messageReceiverName(), download->downloadID().downloadID());
     }
 
     m_downloads.clear();
-    m_process = 0;
+    m_process = nullptr;
 }
 
 } // namespace WebKit

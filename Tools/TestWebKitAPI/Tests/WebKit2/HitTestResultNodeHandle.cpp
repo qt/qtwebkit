@@ -24,9 +24,12 @@
  */
 
 #include "config.h"
+
+#if WK_HAVE_C_SPI
+
 #include "PlatformUtilities.h"
 #include "PlatformWebView.h"
-#include <WebKit2/WKRetainPtr.h>
+#include <WebKit/WKRetainPtr.h>
 
 namespace TestWebKitAPI {
 
@@ -48,22 +51,24 @@ static void didReceiveMessageFromInjectedBundle(WKContextRef context, WKStringRe
 
 static void setPageLoaderClient(WKPageRef page)
 {
-    WKPageLoaderClient loaderClient;
+    WKPageLoaderClientV0 loaderClient;
     memset(&loaderClient, 0, sizeof(loaderClient));
-    loaderClient.version = 0;
+
+    loaderClient.base.version = 0;
     loaderClient.didFinishLoadForFrame = didFinishLoadForFrame;
 
-    WKPageSetPageLoaderClient(page, &loaderClient);
+    WKPageSetPageLoaderClient(page, &loaderClient.base);
 }
 
 static void setInjectedBundleClient(WKContextRef context)
 {
-    WKContextInjectedBundleClient injectedBundleClient;
+    WKContextInjectedBundleClientV0 injectedBundleClient;
     memset(&injectedBundleClient, 0, sizeof(injectedBundleClient));
-    injectedBundleClient.version = 0;
-    injectedBundleClient.clientInfo = 0;
+
+    injectedBundleClient.base.version = 0;
     injectedBundleClient.didReceiveMessageFromInjectedBundle = didReceiveMessageFromInjectedBundle;
-    WKContextSetInjectedBundleClient(context, &injectedBundleClient);
+
+    WKContextSetInjectedBundleClient(context, &injectedBundleClient.base);
 }
 
 TEST(WebKit2, HitTestResultNodeHandle)
@@ -84,3 +89,5 @@ TEST(WebKit2, HitTestResultNodeHandle)
 }
 
 } // namespace TestWebKitAPI
+
+#endif

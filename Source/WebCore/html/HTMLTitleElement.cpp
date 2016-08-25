@@ -25,94 +25,88 @@
 
 #include "Document.h"
 #include "HTMLNames.h"
+#include "NodeRenderStyle.h"
 #include "RenderStyle.h"
 #include "StyleInheritedData.h"
+#include "StyleResolver.h"
 #include "Text.h"
+#include "TextNodeTraversal.h"
+#include <wtf/Ref.h>
 #include <wtf/text/StringBuilder.h>
 
 namespace WebCore {
 
 using namespace HTMLNames;
 
-inline HTMLTitleElement::HTMLTitleElement(const QualifiedName& tagName, Document* document)
+inline HTMLTitleElement::HTMLTitleElement(const QualifiedName& tagName, Document& document)
     : HTMLElement(tagName, document)
 {
     ASSERT(hasTagName(titleTag));
 }
 
-PassRefPtr<HTMLTitleElement> HTMLTitleElement::create(const QualifiedName& tagName, Document* document)
+Ref<HTMLTitleElement> HTMLTitleElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new HTMLTitleElement(tagName, document));
+    return adoptRef(*new HTMLTitleElement(tagName, document));
 }
 
-Node::InsertionNotificationRequest HTMLTitleElement::insertedInto(ContainerNode* insertionPoint)
+Node::InsertionNotificationRequest HTMLTitleElement::insertedInto(ContainerNode& insertionPoint)
 {
     HTMLElement::insertedInto(insertionPoint);
     if (inDocument() && !isInShadowTree())
-        document()->setTitleElement(m_title, this);
+        document().titleElementAdded(*this);
     return InsertionDone;
 }
 
-void HTMLTitleElement::removedFrom(ContainerNode* insertionPoint)
+void HTMLTitleElement::removedFrom(ContainerNode& insertionPoint)
 {
     HTMLElement::removedFrom(insertionPoint);
-    if (insertionPoint->inDocument() && !insertionPoint->isInShadowTree())
-        document()->removeTitle(this);
+    if (insertionPoint.inDocument() && !insertionPoint.isInShadowTree())
+        document().titleElementRemoved(*this);
 }
 
-void HTMLTitleElement::childrenChanged(bool changedByParser, Node* beforeChange, Node* afterChange, int childCountDelta)
+void HTMLTitleElement::childrenChanged(const ChildChange& change)
 {
-    HTMLElement::childrenChanged(changedByParser, beforeChange, afterChange, childCountDelta);
-    m_title = textWithDirection();
-    if (inDocument()) {
-        if (!isInShadowTree())
-            document()->setTitleElement(m_title, this);
-        else
-            document()->removeTitle(this);
-    }
+    HTMLElement::childrenChanged(change);
+    m_title = computedTextWithDirection();
+    document().titleElementTextChanged(*this);
 }
 
 String HTMLTitleElement::text() const
 {
-    StringBuilder result;
-
-    for (Node *n = firstChild(); n; n = n->nextSibling()) {
-        if (n->isTextNode())
-            result.append(toText(n)->data());
-    }
-
-    return result.toString();
+    return TextNodeTraversal::contentsAsString(*this);
 }
 
-StringWithDirection HTMLTitleElement::textWithDirection()
+StringWithDirection HTMLTitleElement::computedTextWithDirection()
 {
     TextDirection direction = LTR;
-    if (RenderStyle* style = computedStyle())
-        direction = style->direction();
-    else if (RefPtr<RenderStyle> style = styleForRenderer())
-        direction = style->direction();
+    if (RenderStyle* computedStyle = this->computedStyle())
+        direction = computedStyle->direction();
+    else {
+        auto style = resolveStyle(parentElement() ? parentElement()->renderStyle() : nullptr);
+        direction = style.get().direction();
+    }
     return StringWithDirection(text(), direction);
 }
 
-void HTMLTitleElement::setText(const String &value)
+void HTMLTitleElement::setText(const String& value)
 {
-    RefPtr<Node> protectFromMutationEvents(this);
-
-    int numChildren = childNodeCount();
+    Ref<HTMLTitleElement> protectFromMutationEvents(*this);
     
-    if (numChildren == 1 && firstChild()->isTextNode())
-        toText(firstChild())->setData(value, IGNORE_EXCEPTION);
-    else {
-        // We make a copy here because entity of "value" argument can be Document::m_title,
-        // which goes empty during removeChildren() invocation below,
-        // which causes HTMLTitleElement::childrenChanged(), which ends up Document::setTitle().
-        String valueCopy(value);
-
-        if (numChildren > 0)
-            removeChildren();
-
-        appendChild(document()->createTextNode(valueCopy.impl()), IGNORE_EXCEPTION);
+    if (!value.isEmpty() && hasOneChild() && is<Text>(*firstChild())) {
+        downcast<Text>(*firstChild()).setData(value);
+        return;
     }
+
+    // We make a copy here because entity of "value" argument can be Document::m_title,
+    // which goes empty during removeChildren() invocation below,
+    // which causes HTMLTitleElement::childrenChanged(), which ends up Document::setTitle().
+    String valueCopy(value);
+
+    if (hasChildNodes())
+        removeChildren();
+
+    if (!valueCopy.isEmpty())
+        appendChild(document().createTextNode(valueCopy), IGNORE_EXCEPTION);
 }
 
 }

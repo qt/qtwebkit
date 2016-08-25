@@ -24,9 +24,12 @@
 #include "CSSParserMode.h"
 #include "CSSRule.h"
 #include "StyleSheet.h"
+#include <memory>
 #include <wtf/HashMap.h>
 #include <wtf/Noncopyable.h>
+#include <wtf/TypeCasts.h>
 #include <wtf/text/AtomicStringHash.h>
+#include <wtf/text/TextPosition.h>
 
 namespace WebCore {
 
@@ -40,32 +43,33 @@ class CachedCSSStyleSheet;
 class Document;
 class MediaQuerySet;
 class SecurityOrigin;
+class StyleRuleKeyframes;
 class StyleSheetContents;
 
 typedef int ExceptionCode;
 
-class CSSStyleSheet : public StyleSheet {
+class CSSStyleSheet final : public StyleSheet {
 public:
-    static PassRefPtr<CSSStyleSheet> create(PassRefPtr<StyleSheetContents>, CSSImportRule* ownerRule = 0);
-    static PassRefPtr<CSSStyleSheet> create(PassRefPtr<StyleSheetContents>, Node* ownerNode);
-    static PassRefPtr<CSSStyleSheet> createInline(Node*, const KURL&, const String& encoding = String());
+    static Ref<CSSStyleSheet> create(Ref<StyleSheetContents>&&, CSSImportRule* ownerRule = 0);
+    static Ref<CSSStyleSheet> create(Ref<StyleSheetContents>&&, Node* ownerNode);
+    static Ref<CSSStyleSheet> createInline(Node&, const URL&, const TextPosition& startPosition = TextPosition::minimumPosition(), const String& encoding = String());
 
     virtual ~CSSStyleSheet();
 
-    virtual CSSStyleSheet* parentStyleSheet() const OVERRIDE;
-    virtual Node* ownerNode() const OVERRIDE { return m_ownerNode; }
-    virtual MediaList* media() const OVERRIDE;
-    virtual String href() const OVERRIDE;
-    virtual String title() const OVERRIDE { return m_title; }
-    virtual bool disabled() const OVERRIDE { return m_isDisabled; }
-    virtual void setDisabled(bool) OVERRIDE;
+    virtual CSSStyleSheet* parentStyleSheet() const override;
+    virtual Node* ownerNode() const override { return m_ownerNode; }
+    virtual MediaList* media() const override;
+    virtual String href() const override;
+    virtual String title() const override { return m_title; }
+    virtual bool disabled() const override { return m_isDisabled; }
+    virtual void setDisabled(bool) override;
     
-    PassRefPtr<CSSRuleList> cssRules();
+    RefPtr<CSSRuleList> cssRules();
     unsigned insertRule(const String& rule, unsigned index, ExceptionCode&);
     void deleteRule(unsigned index, ExceptionCode&);
     
     // IE Extensions
-    PassRefPtr<CSSRuleList> rules();
+    RefPtr<CSSRuleList> rules();
     int addRule(const String& selector, const String& style, int index, ExceptionCode&);
     int addRule(const String& selector, const String& style, ExceptionCode&);
     void removeRule(unsigned index, ExceptionCode& ec) { deleteRule(index, ec); }
@@ -74,10 +78,10 @@ public:
     unsigned length() const;
     CSSRule* item(unsigned index);
 
-    virtual void clearOwnerNode() OVERRIDE;
-    virtual CSSImportRule* ownerRule() const OVERRIDE { return m_ownerRule; }
-    virtual KURL baseURL() const OVERRIDE;
-    virtual bool isLoading() const OVERRIDE;
+    virtual void clearOwnerNode() override;
+    virtual CSSImportRule* ownerRule() const override { return m_ownerRule; }
+    virtual URL baseURL() const override;
+    virtual bool isLoading() const override;
     
     void clearOwnerRule() { m_ownerRule = 0; }
     Document* ownerDocument() const;
@@ -85,74 +89,71 @@ public:
     void setMediaQueries(PassRefPtr<MediaQuerySet>);
     void setTitle(const String& title) { m_title = title; }
 
-    enum RuleMutationType { OtherMutation, InsertionIntoEmptySheet };
+    bool hadRulesMutation() const { return m_mutatedRules; }
+    void clearHadRulesMutation() { m_mutatedRules = false; }
+
+    enum RuleMutationType { OtherMutation, RuleInsertion };
+    enum WhetherContentsWereClonedForMutation { ContentsWereNotClonedForMutation = 0, ContentsWereClonedForMutation };
 
     class RuleMutationScope {
         WTF_MAKE_NONCOPYABLE(RuleMutationScope);
     public:
-        RuleMutationScope(CSSStyleSheet*, RuleMutationType = OtherMutation);
+        RuleMutationScope(CSSStyleSheet*, RuleMutationType = OtherMutation, StyleRuleKeyframes* insertedKeyframesRule = nullptr);
         RuleMutationScope(CSSRule*);
         ~RuleMutationScope();
 
     private:
         CSSStyleSheet* m_styleSheet;
         RuleMutationType m_mutationType;
+        WhetherContentsWereClonedForMutation m_contentsWereClonedForMutation;
+        StyleRuleKeyframes* m_insertedKeyframesRule;
     };
 
-    void willMutateRules();
-    void didMutateRules(RuleMutationType = OtherMutation);
+    WhetherContentsWereClonedForMutation willMutateRules();
+    void didMutateRules(RuleMutationType, WhetherContentsWereClonedForMutation, StyleRuleKeyframes* insertedKeyframesRule);
+    void didMutateRuleFromCSSStyleDeclaration();
     void didMutate();
     
     void clearChildRuleCSSOMWrappers();
     void reattachChildRuleCSSOMWrappers();
 
-    StyleSheetContents* contents() const { return m_contents.get(); }
+    StyleSheetContents& contents() { return m_contents; }
+
+    bool isInline() const { return m_isInlineStylesheet; }
+    TextPosition startPosition() const { return m_startPosition; }
+
+    void detachFromDocument() { m_ownerNode = nullptr; }
 
 private:
-    CSSStyleSheet(PassRefPtr<StyleSheetContents>, CSSImportRule* ownerRule);
-    CSSStyleSheet(PassRefPtr<StyleSheetContents>, Node* ownerNode, bool isInlineStylesheet);
+    CSSStyleSheet(Ref<StyleSheetContents>&&, CSSImportRule* ownerRule);
+    CSSStyleSheet(Ref<StyleSheetContents>&&, Node* ownerNode, const TextPosition& startPosition, bool isInlineStylesheet);
 
-    virtual bool isCSSStyleSheet() const { return true; }
-    virtual String type() const { return ASCIILiteral("text/css"); }
+    virtual bool isCSSStyleSheet() const override { return true; }
+    virtual String type() const override { return ASCIILiteral("text/css"); }
 
     bool canAccessRules() const;
     
-    RefPtr<StyleSheetContents> m_contents;
+    Ref<StyleSheetContents> m_contents;
     bool m_isInlineStylesheet;
     bool m_isDisabled;
+    bool m_mutatedRules;
     String m_title;
     RefPtr<MediaQuerySet> m_mediaQueries;
 
     Node* m_ownerNode;
     CSSImportRule* m_ownerRule;
 
+    TextPosition m_startPosition;
+
     mutable RefPtr<MediaList> m_mediaCSSOMWrapper;
-    mutable Vector<RefPtr<CSSRule> > m_childRuleCSSOMWrappers;
-    mutable OwnPtr<CSSRuleList> m_ruleListCSSOMWrapper;
+    mutable Vector<RefPtr<CSSRule>> m_childRuleCSSOMWrappers;
+    mutable std::unique_ptr<CSSRuleList> m_ruleListCSSOMWrapper;
 };
 
-inline CSSStyleSheet::RuleMutationScope::RuleMutationScope(CSSStyleSheet* sheet, RuleMutationType mutationType)
-    : m_styleSheet(sheet)
-    , m_mutationType(mutationType)
-{
-    if (m_styleSheet)
-        m_styleSheet->willMutateRules();
-}
+} // namespace WebCore
 
-inline CSSStyleSheet::RuleMutationScope::RuleMutationScope(CSSRule* rule)
-    : m_styleSheet(rule ? rule->parentStyleSheet() : 0)
-    , m_mutationType(OtherMutation)
-{
-    if (m_styleSheet)
-        m_styleSheet->willMutateRules();
-}
+SPECIALIZE_TYPE_TRAITS_BEGIN(WebCore::CSSStyleSheet)
+    static bool isType(const WebCore::StyleSheet& styleSheet) { return styleSheet.isCSSStyleSheet(); }
+SPECIALIZE_TYPE_TRAITS_END()
 
-inline CSSStyleSheet::RuleMutationScope::~RuleMutationScope()
-{
-    if (m_styleSheet)
-        m_styleSheet->didMutateRules(m_mutationType);
-}
-
-} // namespace
-
-#endif
+#endif // CSSStyleSheet_h

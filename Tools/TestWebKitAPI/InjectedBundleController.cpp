@@ -24,6 +24,9 @@
  */
 
 #include "config.h"
+
+#if WK_HAVE_C_SPI
+
 #include "InjectedBundleController.h"
 
 #include "InjectedBundleTest.h"
@@ -33,7 +36,7 @@
 
 namespace TestWebKitAPI {
 
-InjectedBundleController& InjectedBundleController::shared()
+InjectedBundleController& InjectedBundleController::singleton()
 {
     static InjectedBundleController& shared = *new InjectedBundleController;
     return shared;
@@ -54,16 +57,15 @@ void InjectedBundleController::initialize(WKBundleRef bundle, WKTypeRef initiali
     if (!initializationUserData)
         return;
 
-    WKBundleClient client = {
-        0,
-        this,
+    WKBundleClientV1 client = {
+        { 0, this },
         didCreatePage,
         willDestroyPage,
         didInitializePageGroup,
         didReceiveMessage,
         didReceiveMessageToPage
     };
-    WKBundleSetClient(m_bundle, &client);
+    WKBundleSetClient(m_bundle, &client.base);
 
     // Initialize the test from the "initializationUserData".
 
@@ -139,3 +141,5 @@ void InjectedBundleController::registerCreateInjectedBundleTestFunction(const st
 }
 
 } // namespace TestWebKitAPI
+
+#endif

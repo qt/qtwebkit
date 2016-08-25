@@ -21,7 +21,6 @@
  
 #ifndef SVGZoomEvent_h
 #define SVGZoomEvent_h
-#if ENABLE(SVG)
 
 #include "FloatRect.h"
 #include "SVGPoint.h"
@@ -31,7 +30,7 @@ namespace WebCore {
 
 class SVGZoomEvent : public UIEvent {
 public:
-    static PassRefPtr<SVGZoomEvent> create() { return adoptRef(new SVGZoomEvent); }
+    static Ref<SVGZoomEvent> createForBindings() { return adoptRef(*new SVGZoomEvent); }
 
     // 'SVGZoomEvent' functions
     FloatRect zoomRectScreen() const;
@@ -46,7 +45,7 @@ public:
 
     SVGPoint newTranslate() const;
 
-    virtual const AtomicString& interfaceName() const;
+    virtual EventInterface eventInterface() const override;
 
 private:
     SVGZoomEvent();
@@ -62,7 +61,4 @@ private:
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif // SVGZoomEvent_h
-
-// vim:ts=4:noet

@@ -28,60 +28,111 @@
 
 #include "ArgumentCoders.h"
 #include <WebCore/IntRect.h>
-#include <wtf/NotFound.h>
 #include <wtf/text/WTFString.h>
+
+#if PLATFORM(IOS)
+#include <WebCore/SelectionRect.h>
+#endif
 
 namespace WebKit {
 
+enum TypingAttributes {
+    AttributeNone = 0,
+    AttributeBold = 1,
+    AttributeItalics = 2,
+    AttributeUnderline = 4,
+    AttributeStrikeThrough = 8
+};
+
 struct EditorState {
-    EditorState()
-        : shouldIgnoreCompositionSelectionChange(false)
-        , selectionIsNone(true)
-        , selectionIsRange(false)
-        , isContentEditable(false)
-        , isContentRichlyEditable(false)
-        , isInPasswordField(false)
-        , isInPlugin(false)
-        , hasComposition(false)
-#if PLATFORM(QT)
-        , cursorPosition(0)
-        , anchorPosition(0)
-        , inputMethodHints(0)
+    bool shouldIgnoreCompositionSelectionChange { false };
+
+    bool selectionIsNone { true }; // This will be false when there is a caret selection.
+    bool selectionIsRange { false };
+    bool isContentEditable { false };
+    bool isContentRichlyEditable { false };
+    bool isInPasswordField { false };
+    bool isInPlugin { false };
+    bool hasComposition { false };
+    bool isMissingPostLayoutData { false };
+
+#if PLATFORM(IOS)
+    WebCore::IntRect firstMarkedRect;
+    WebCore::IntRect lastMarkedRect;
+    String markedText;
 #endif
-    {
-    }
-
-    bool shouldIgnoreCompositionSelectionChange;
-
-    bool selectionIsNone; // This will be false when there is a caret selection.
-    bool selectionIsRange;
-    bool isContentEditable;
-    bool isContentRichlyEditable;
-    bool isInPasswordField;
-    bool isInPlugin;
-    bool hasComposition;
 #if PLATFORM(QT)
     // The anchor, cursor represent either the selection or composition, depending
     // whether a composition exists or not.
-    unsigned cursorPosition;
-    unsigned anchorPosition;
+    unsigned cursorPosition { 0 };
+    unsigned anchorPosition { 0 };
 
+    WebCore::IntRect cursorRect;
     WebCore::IntRect editorRect;
     WebCore::IntRect compositionRect;
 
-    uint64_t inputMethodHints;
+    uint64_t inputMethodHints { 0 };
 
     WTF::String selectedText;
     WTF::String surroundingText;
 #endif
 
-#if PLATFORM(QT) || PLATFORM(GTK)
-    WebCore::IntRect cursorRect;
+#if PLATFORM(IOS) || PLATFORM(GTK) || PLATFORM(MAC)
+    struct PostLayoutData {
+#if PLATFORM(IOS) || PLATFORM(GTK)
+        uint32_t typingAttributes { AttributeNone };
+        WebCore::IntRect caretRectAtStart;
+#endif
+#if PLATFORM(IOS) || PLATFORM(MAC)
+        WebCore::IntRect selectionClipRect;
+        uint64_t selectedTextLength { 0 };
+#endif
+#if PLATFORM(IOS)
+        WebCore::IntRect caretRectAtEnd;
+        Vector<WebCore::SelectionRect> selectionRects;
+        String wordAtSelection;
+        UChar32 characterAfterSelection { 0 };
+        UChar32 characterBeforeSelection { 0 };
+        UChar32 twoCharacterBeforeSelection { 0 };
+        bool isReplaceAllowed { false };
+        bool hasContent { false };
+#endif
+#if PLATFORM(MAC)
+        uint64_t candidateRequestStartPosition { 0 };
+        String paragraphContextForCandidateRequest;
+        String stringForCandidateRequest;
 #endif
 
-    void encode(CoreIPC::ArgumentEncoder&) const;
-    static bool decode(CoreIPC::ArgumentDecoder&, EditorState&);
+        void encode(IPC::ArgumentEncoder&) const;
+        static bool decode(IPC::ArgumentDecoder&, PostLayoutData&);
+    };
+
+    const PostLayoutData& postLayoutData() const;
+    PostLayoutData& postLayoutData();
+#endif // PLATFORM(IOS) || PLATFORM(GTK) || PLATFORM(MAC)
+
+    void encode(IPC::ArgumentEncoder&) const;
+    static bool decode(IPC::ArgumentDecoder&, EditorState&);
+
+#if PLATFORM(IOS) || PLATFORM(GTK) || PLATFORM(MAC)
+private:
+    PostLayoutData m_postLayoutData;
+#endif
 };
+
+#if PLATFORM(IOS) || PLATFORM(GTK) || PLATFORM(MAC)
+inline auto EditorState::postLayoutData() -> PostLayoutData&
+{
+    ASSERT_WITH_MESSAGE(!isMissingPostLayoutData, "Attempt to access post layout data before receiving it");
+    return m_postLayoutData;
+}
+
+inline auto EditorState::postLayoutData() const -> const PostLayoutData&
+{
+    ASSERT_WITH_MESSAGE(!isMissingPostLayoutData, "Attempt to access post layout data before receiving it");
+    return m_postLayoutData;
+}
+#endif
 
 }
 

@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -26,14 +26,14 @@
 #include "config.h"
 #include "Color.h"
 
+#include "AnimationUtilities.h"
 #include "HashTools.h"
+#include "TextStream.h"
 #include <wtf/Assertions.h>
 #include <wtf/DecimalNumber.h>
 #include <wtf/HexNumber.h>
 #include <wtf/MathExtras.h>
 #include <wtf/text/StringBuilder.h>
-
-using namespace std;
 
 namespace WebCore {
 
@@ -51,18 +51,18 @@ static const RGBA32 darkenedWhite = 0xFFABABAB;
 
 RGBA32 makeRGB(int r, int g, int b)
 {
-    return 0xFF000000 | max(0, min(r, 255)) << 16 | max(0, min(g, 255)) << 8 | max(0, min(b, 255));
+    return 0xFF000000 | std::max(0, std::min(r, 255)) << 16 | std::max(0, std::min(g, 255)) << 8 | std::max(0, std::min(b, 255));
 }
 
 RGBA32 makeRGBA(int r, int g, int b, int a)
 {
-    return max(0, min(a, 255)) << 24 | max(0, min(r, 255)) << 16 | max(0, min(g, 255)) << 8 | max(0, min(b, 255));
+    return std::max(0, std::min(a, 255)) << 24 | std::max(0, std::min(r, 255)) << 16 | std::max(0, std::min(g, 255)) << 8 | std::max(0, std::min(b, 255));
 }
 
 static int colorFloatToRGBAByte(float f)
 {
     // We use lroundf and 255 instead of nextafterf(256, 0) to match CG's rounding
-    return max(0, min(static_cast<int>(lroundf(255.0f * f)), 255));
+    return std::max(0, std::min(static_cast<int>(lroundf(255.0f * f)), 255));
 }
 
 RGBA32 makeRGBA32FromFloats(float r, float g, float b, float a)
@@ -128,7 +128,7 @@ RGBA32 makeRGBAFromCMYKA(float c, float m, float y, float k, float a)
 template <typename CharacterType>
 static inline bool parseHexColorInternal(const CharacterType* name, unsigned length, RGBA32& rgb)
 {
-    if (length != 3 && length != 6)
+    if (length != 3 && length != 4 && length != 6 && length != 8)
         return false;
     unsigned value = 0;
     for (unsigned i = 0; i < length; ++i) {
@@ -139,6 +139,20 @@ static inline bool parseHexColorInternal(const CharacterType* name, unsigned len
     }
     if (length == 6) {
         rgb = 0xFF000000 | value;
+        return true;
+    }
+    if (length == 8) {
+        // We parsed the values into RGBA order, but the RGBA32 type
+        // expects them to be in ARGB order, so we right rotate eight bits.
+        rgb = value << 24 | value >> 8;
+        return true;
+    }
+    if (length == 4) {
+        // #abcd converts to ddaabbcc in RGBA32.
+        rgb = (value & 0xF) << 28 | (value & 0xF) << 24
+            | (value & 0xF000) << 8 | (value & 0xF000) << 4
+            | (value & 0xF00) << 4 | (value & 0xF00)
+            | (value & 0xF0) | (value & 0xF0) >> 4;
         return true;
     }
     // #abc converts to #aabbcc
@@ -167,7 +181,7 @@ bool Color::parseHexColor(const String& name, RGBA32& rgb)
         return false;
     if (name.is8Bit())
         return parseHexColor(name.characters8(), name.length(), rgb);
-    return parseHexColor(name.characters(), name.length(), rgb);
+    return parseHexColor(name.characters16(), name.length(), rgb);
 }
 
 int differenceSquared(const Color& c1, const Color& c2)
@@ -184,7 +198,7 @@ Color::Color(const String& name)
         if (name.is8Bit())
             m_valid = parseHexColor(name.characters8() + 1, name.length() - 1, m_color);
         else
-            m_valid = parseHexColor(name.characters() + 1, name.length() - 1, m_color);
+            m_valid = parseHexColor(name.characters16() + 1, name.length() - 1, m_color);
     } else
         setNamedColor(name);
 }
@@ -212,29 +226,37 @@ String Color::serialized() const
         return builder.toString();
     }
 
-    Vector<LChar> result;
-    result.reserveInitialCapacity(28);
-    const char commaSpace[] = ", ";
-    const char rgbaParen[] = "rgba(";
+    return cssText();
+}
 
-    result.append(rgbaParen, 5);
-    appendNumber(result, red());
-    result.append(commaSpace, 2);
-    appendNumber(result, green());
-    result.append(commaSpace, 2);
-    appendNumber(result, blue());
-    result.append(commaSpace, 2);
+String Color::cssText() const
+{
+    StringBuilder builder;
+    builder.reserveCapacity(28);
+    bool colorHasAlpha = hasAlpha();
+    if (colorHasAlpha)
+        builder.appendLiteral("rgba(");
+    else
+        builder.appendLiteral("rgb(");
 
-    if (!alpha())
-        result.append('0');
-    else {
-        NumberToLStringBuffer buffer;
-        unsigned length = DecimalNumber(alpha() / 255.0).toStringDecimal(buffer, WTF::NumberToStringBufferLength);
-        result.append(buffer, length);
+    builder.appendNumber(static_cast<unsigned char>(red()));
+    builder.appendLiteral(", ");
+
+    builder.appendNumber(static_cast<unsigned char>(green()));
+    builder.appendLiteral(", ");
+
+
+    builder.appendNumber(static_cast<unsigned char>(blue()));
+    if (colorHasAlpha) {
+        builder.appendLiteral(", ");
+
+        NumberToStringBuffer buffer;
+        bool shouldTruncateTrailingZeros = true;
+        builder.append(numberToFixedPrecisionString(alpha() / 255.0f, 6, buffer, shouldTruncateTrailingZeros));
     }
-
-    result.append(')');
-    return String::adopt(result);
+        
+    builder.append(')');
+    return builder.toString();
 }
 
 String Color::nameForRenderTreeAsText() const
@@ -278,13 +300,13 @@ Color Color::light() const
     float r, g, b, a;
     getRGBA(r, g, b, a);
 
-    float v = max(r, max(g, b));
+    float v = std::max(r, std::max(g, b));
 
     if (v == 0.0f)
         // Lightened black with alpha.
         return Color(0x54, 0x54, 0x54, alpha());
 
-    float multiplier = min(1.0f, v + 0.33f) / v;
+    float multiplier = std::min(1.0f, v + 0.33f) / v;
 
     return Color(static_cast<int>(multiplier * r * scaleFactor),
                  static_cast<int>(multiplier * g * scaleFactor),
@@ -303,13 +325,24 @@ Color Color::dark() const
     float r, g, b, a;
     getRGBA(r, g, b, a);
 
-    float v = max(r, max(g, b));
-    float multiplier = max(0.0f, (v - 0.33f) / v);
+    float v = std::max(r, std::max(g, b));
+    float multiplier = std::max(0.0f, (v - 0.33f) / v);
 
     return Color(static_cast<int>(multiplier * r * scaleFactor),
                  static_cast<int>(multiplier * g * scaleFactor),
                  static_cast<int>(multiplier * b * scaleFactor),
                  alpha());
+}
+
+bool Color::isDark() const
+{
+    float red;
+    float green;
+    float blue;
+    float alpha;
+    getRGBA(red, green, blue, alpha);
+    float largestNonAlphaChannel = std::max(red, std::max(green, blue));
+    return alpha > 0.5 && largestNonAlphaChannel < 0.5;
 }
 
 static int blendComponent(int c, int a)
@@ -442,6 +475,37 @@ RGBA32 premultipliedARGBFromColor(const Color& color)
          pixelColor = color.rgb();
 
     return pixelColor;
+}
+
+Color blend(const Color& from, const Color& to, double progress, bool blendPremultiplied)
+{
+    // We need to preserve the state of the valid flag at the end of the animation
+    if (progress == 1 && !to.isValid())
+        return Color();
+
+    if (blendPremultiplied) {
+        // Contrary to the name, RGBA32 actually stores ARGB, so we can initialize Color directly from premultipliedARGBFromColor().
+        // Also, premultipliedARGBFromColor() bails on zero alpha, so special-case that.
+        Color premultFrom = from.alpha() ? premultipliedARGBFromColor(from) : 0;
+        Color premultTo = to.alpha() ? premultipliedARGBFromColor(to) : 0;
+
+        Color premultBlended(blend(premultFrom.red(), premultTo.red(), progress),
+            blend(premultFrom.green(), premultTo.green(), progress),
+            blend(premultFrom.blue(), premultTo.blue(), progress),
+            blend(premultFrom.alpha(), premultTo.alpha(), progress));
+
+        return Color(colorFromPremultipliedARGB(premultBlended.rgb()));
+    }
+
+    return Color(blend(from.red(), to.red(), progress),
+        blend(from.green(), to.green(), progress),
+        blend(from.blue(), to.blue(), progress),
+        blend(from.alpha(), to.alpha(), progress));
+}
+
+TextStream& operator<<(TextStream& ts, const Color& color)
+{
+    return ts << color.nameForRenderTreeAsText();
 }
 
 } // namespace WebCore

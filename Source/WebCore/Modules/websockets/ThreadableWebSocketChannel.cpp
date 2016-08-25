@@ -44,7 +44,7 @@
 #include "WorkerThread.h"
 #include "WorkerThreadableWebSocketChannel.h"
 #include <wtf/PassRefPtr.h>
-#include <wtf/text/WTFString.h>
+#include <wtf/text/StringBuilder.h>
 
 namespace WebCore {
 
@@ -55,17 +55,16 @@ PassRefPtr<ThreadableWebSocketChannel> ThreadableWebSocketChannel::create(Script
     ASSERT(context);
     ASSERT(client);
 
-#if ENABLE(WORKERS)
-    if (context->isWorkerGlobalScope()) {
-        WorkerGlobalScope* workerGlobalScope = static_cast<WorkerGlobalScope*>(context);
-        WorkerRunLoop& runLoop = workerGlobalScope->thread()->runLoop();
-        String mode = webSocketChannelMode;
-        mode.append(String::number(runLoop.createUniqueId()));
-        return WorkerThreadableWebSocketChannel::create(workerGlobalScope, client, mode);
+    if (is<WorkerGlobalScope>(*context)) {
+        WorkerGlobalScope& workerGlobalScope = downcast<WorkerGlobalScope>(*context);
+        WorkerRunLoop& runLoop = workerGlobalScope.thread().runLoop();
+        StringBuilder mode;
+        mode.appendLiteral(webSocketChannelMode);
+        mode.appendNumber(runLoop.createUniqueId());
+        return WorkerThreadableWebSocketChannel::create(&workerGlobalScope, client, mode.toString());
     }
-#endif // ENABLE(WORKERS)
 
-    return WebSocketChannel::create(toDocument(context), client);
+    return WebSocketChannel::create(downcast<Document>(context), client);
 }
 
 } // namespace WebCore

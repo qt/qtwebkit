@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -41,14 +41,19 @@ namespace WebCore {
 #if ENABLE(SVG_FONTS)
 bool CSSFontFaceSrcValue::isSVGFontFaceSrc() const
 {
-    return equalIgnoringCase(m_format, "svg");
+    return equalLettersIgnoringASCIICase(m_format, "svg");
+}
+
+bool CSSFontFaceSrcValue::isSVGFontTarget() const
+{
+    return isSVGFontFaceSrc() || svgFontFaceElement();
 }
 #endif
 
 bool CSSFontFaceSrcValue::isSupportedFormat() const
 {
     // Normally we would just check the format, but in order to avoid conflicts with the old WinIE style of font-face,
-    // we will also check to see if the URL ends with .eot.  If so, we'll go ahead and assume that we shouldn't load it.
+    // we will also check to see if the URL ends with .eot. If so, we'll assume that we shouldn't load it.
     if (m_format.isEmpty()) {
         // Check for .eot.
         if (!m_resource.startsWith("data:", false) && m_resource.endsWith(".eot", false))
@@ -63,7 +68,7 @@ bool CSSFontFaceSrcValue::isSupportedFormat() const
            ;
 }
 
-String CSSFontFaceSrcValue::customCssText() const
+String CSSFontFaceSrcValue::customCSSText() const
 {
     StringBuilder result;
     if (isLocal())
@@ -80,26 +85,30 @@ String CSSFontFaceSrcValue::customCssText() const
     return result.toString();
 }
 
-void CSSFontFaceSrcValue::addSubresourceStyleURLs(ListHashSet<KURL>& urls, const StyleSheetContents* styleSheet) const
+void CSSFontFaceSrcValue::addSubresourceStyleURLs(ListHashSet<URL>& urls, const StyleSheetContents* styleSheet) const
 {
     if (!isLocal())
         addSubresourceURL(urls, styleSheet->completeURL(m_resource));
 }
 
-bool CSSFontFaceSrcValue::hasFailedOrCanceledSubresources() const
+bool CSSFontFaceSrcValue::traverseSubresources(const std::function<bool (const CachedResource&)>& handler) const
 {
     if (!m_cachedFont)
         return false;
-    return m_cachedFont->loadFailedOrCanceled();
+    return handler(*m_cachedFont);
 }
 
-CachedFont* CSSFontFaceSrcValue::cachedFont(Document* document)
+CachedFont* CSSFontFaceSrcValue::cachedFont(Document* document, bool isSVG, bool isInitiatingElementInUserAgentShadowTree)
 {
-    if (!m_cachedFont) {
-        CachedResourceRequest request(ResourceRequest(document->completeURL(m_resource)));
-        request.setInitiator(cachedResourceRequestInitiators().css);
-        m_cachedFont = document->cachedResourceLoader()->requestFont(request);
-    }
+    if (m_cachedFont)
+        return m_cachedFont.get();
+
+    ResourceLoaderOptions options = CachedResourceLoader::defaultCachedResourceOptions();
+    options.setContentSecurityPolicyImposition(isInitiatingElementInUserAgentShadowTree ? ContentSecurityPolicyImposition::SkipPolicyCheck : ContentSecurityPolicyImposition::DoPolicyCheck);
+
+    CachedResourceRequest request(ResourceRequest(document->completeURL(m_resource)), options);
+    request.setInitiator(cachedResourceRequestInitiators().css);
+    m_cachedFont = document->cachedResourceLoader().requestFont(request, isSVG);
     return m_cachedFont.get();
 }
 

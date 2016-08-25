@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2012-2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,12 +26,48 @@
 #ifndef Watchpoint_h
 #define Watchpoint_h
 
-#include <wtf/RefCounted.h>
+#include <wtf/Atomics.h>
+#include <wtf/FastMalloc.h>
+#include <wtf/Noncopyable.h>
+#include <wtf/PrintStream.h>
 #include <wtf/SentinelLinkedList.h>
+#include <wtf/ThreadSafeRefCounted.h>
 
 namespace JSC {
 
+class FireDetail {
+    void* operator new(size_t) = delete;
+    
+public:
+    FireDetail()
+    {
+    }
+    
+    virtual ~FireDetail()
+    {
+    }
+    
+    virtual void dump(PrintStream&) const = 0;
+};
+
+class StringFireDetail : public FireDetail {
+public:
+    StringFireDetail(const char* string)
+        : m_string(string)
+    {
+    }
+    
+    virtual void dump(PrintStream& out) const override;
+
+private:
+    const char* m_string;
+};
+
+class WatchpointSet;
+
 class Watchpoint : public BasicRawSentinelNode<Watchpoint> {
+    WTF_MAKE_NONCOPYABLE(Watchpoint);
+    WTF_MAKE_FAST_ALLOCATED;
 public:
     Watchpoint()
     {
@@ -39,23 +75,59 @@ public:
     
     virtual ~Watchpoint();
 
-    void fire() { fireInternal(); }
-    
 protected:
-    virtual void fireInternal() = 0;
+    virtual void fireInternal(const FireDetail&) = 0;
+
+private:
+    friend class WatchpointSet;
+    void fire(const FireDetail&);
 };
 
-enum InitialWatchpointSetMode { InitializedWatching, InitializedBlind };
+enum WatchpointState {
+    ClearWatchpoint,
+    IsWatched,
+    IsInvalidated
+};
 
 class InlineWatchpointSet;
 
-class WatchpointSet : public RefCounted<WatchpointSet> {
+class WatchpointSet : public ThreadSafeRefCounted<WatchpointSet> {
+    friend class LLIntOffsetsExtractor;
 public:
-    WatchpointSet(InitialWatchpointSetMode);
-    ~WatchpointSet();
+    JS_EXPORT_PRIVATE WatchpointSet(WatchpointState);
+    JS_EXPORT_PRIVATE ~WatchpointSet(); // Note that this will not fire any of the watchpoints; if you need to know when a WatchpointSet dies then you need a separate mechanism for this.
     
-    bool isStillValid() const { return !m_isInvalidated; }
-    bool hasBeenInvalidated() const { return m_isInvalidated; }
+    // Fast way of getting the state, which only works from the main thread.
+    WatchpointState stateOnJSThread() const
+    {
+        return static_cast<WatchpointState>(m_state);
+    }
+    
+    // It is safe to call this from another thread. It may return an old
+    // state. Guarantees that if *first* read the state() of the thing being
+    // watched and it returned IsWatched and *second* you actually read its
+    // value then it's safe to assume that if the state being watched changes
+    // then also the watchpoint state() will change to IsInvalidated.
+    WatchpointState state() const
+    {
+        WTF::loadLoadFence();
+        WatchpointState result = static_cast<WatchpointState>(m_state);
+        WTF::loadLoadFence();
+        return result;
+    }
+    
+    // It is safe to call this from another thread.  It may return true
+    // even if the set actually had been invalidated, but that ought to happen
+    // only in the case of races, and should be rare. Guarantees that if you
+    // call this after observing something that must imply that the set is
+    // invalidated, then you will see this return false. This is ensured by
+    // issuing a load-load fence prior to querying the state.
+    bool isStillValid() const
+    {
+        return state() != IsInvalidated;
+    }
+    // Like isStillValid(), may be called from another thread.
+    bool hasBeenInvalidated() const { return !isStillValid(); }
     
     // As a convenience, this will ignore 0. That's because code paths in the DFG
     // that create speculation watchpoints may choose to bail out if speculation
@@ -67,27 +139,76 @@ public:
     // watchpoint would have fired. That's a pretty good indication that you
     // probably don't want to set watchpoints, since we typically don't want to
     // set watchpoints that we believe will actually be fired.
-    void startWatching() { m_isWatched = true; }
-    
-    void notifyWrite()
+    void startWatching()
     {
-        if (!m_isWatched)
+        ASSERT(m_state != IsInvalidated);
+        if (m_state == IsWatched)
             return;
-        notifyWriteSlow();
+        WTF::storeStoreFence();
+        m_state = IsWatched;
+        WTF::storeStoreFence();
     }
     
-    bool* addressOfIsWatched() { return &m_isWatched; }
+    void fireAll(const FireDetail& detail)
+    {
+        if (LIKELY(m_state != IsWatched))
+            return;
+        fireAllSlow(detail);
+    }
     
-    JS_EXPORT_PRIVATE void notifyWriteSlow(); // Call only if you've checked isWatched.
+    void fireAll(const char* reason)
+    {
+        if (LIKELY(m_state != IsWatched))
+            return;
+        fireAllSlow(reason);
+    }
+    
+    void touch(const FireDetail& detail)
+    {
+        if (state() == ClearWatchpoint)
+            startWatching();
+        else
+            fireAll(detail);
+    }
+    
+    void touch(const char* reason)
+    {
+        touch(StringFireDetail(reason));
+    }
+    
+    void invalidate(const FireDetail& detail)
+    {
+        if (state() == IsWatched)
+            fireAll(detail);
+        m_state = IsInvalidated;
+    }
+    
+    void invalidate(const char* reason)
+    {
+        invalidate(StringFireDetail(reason));
+    }
+    
+    bool isBeingWatched() const
+    {
+        return m_setIsNotEmpty;
+    }
+    
+    int8_t* addressOfState() { return &m_state; }
+    static ptrdiff_t offsetOfState() { return OBJECT_OFFSETOF(WatchpointSet, m_state); }
+    int8_t* addressOfSetIsNotEmpty() { return &m_setIsNotEmpty; }
+    
+    JS_EXPORT_PRIVATE void fireAllSlow(const FireDetail&); // Call only if you've checked isWatched.
+    JS_EXPORT_PRIVATE void fireAllSlow(const char* reason); // Ditto.
     
 private:
-    void fireAllWatchpoints();
+    void fireAllWatchpoints(const FireDetail&);
     
     friend class InlineWatchpointSet;
-    
-    SentinelLinkedList<Watchpoint, BasicRawSentinelNode<Watchpoint> > m_set;
-    bool m_isWatched;
-    bool m_isInvalidated;
+
+    int8_t m_state;
+    int8_t m_setIsNotEmpty;
+
+    SentinelLinkedList<Watchpoint, BasicRawSentinelNode<Watchpoint>> m_set;
 };
 
 // InlineWatchpointSet is a low-overhead, non-copyable watchpoint set in which
@@ -112,8 +233,8 @@ private:
 class InlineWatchpointSet {
     WTF_MAKE_NONCOPYABLE(InlineWatchpointSet);
 public:
-    InlineWatchpointSet(InitialWatchpointSetMode mode)
-        : m_data((mode == InitializedWatching ? IsWatchedFlag : 0) | IsThinFlag)
+    InlineWatchpointSet(WatchpointState state)
+        : m_data(encodeState(state))
     {
     }
     
@@ -124,13 +245,37 @@ public:
         freeFat();
     }
     
-    bool hasBeenInvalidated() const
+    // Fast way of getting the state, which only works from the main thread.
+    WatchpointState stateOnJSThread() const
     {
-        if (isFat())
-            return fat()->hasBeenInvalidated();
-        return m_data & IsInvalidatedFlag;
+        uintptr_t data = m_data;
+        if (isFat(data))
+            return fat(data)->stateOnJSThread();
+        return decodeState(data);
+    }
+
+    // It is safe to call this from another thread. It may return a prior state,
+    // but that should be fine since you should only perform actions based on the
+    // state if you also add a watchpoint.
+    WatchpointState state() const
+    {
+        WTF::loadLoadFence();
+        uintptr_t data = m_data;
+        WTF::loadLoadFence();
+        if (isFat(data))
+            return fat(data)->state();
+        return decodeState(data);
     }
     
+    // It is safe to call this from another thread.  It may return false
+    // even if the set actually had been invalidated, but that ought to happen
+    // only in the case of races, and should be rare.
+    bool hasBeenInvalidated() const
+    {
+        return state() == IsInvalidated;
+    }
+    
+    // Like hasBeenInvalidated(), may be called from another thread.
     bool isStillValid() const
     {
         return !hasBeenInvalidated();
@@ -144,38 +289,130 @@ public:
             fat()->startWatching();
             return;
         }
-        m_data |= IsWatchedFlag;
+        ASSERT(decodeState(m_data) != IsInvalidated);
+        m_data = encodeState(IsWatched);
     }
     
-    void notifyWrite()
+    void fireAll(const FireDetail& detail)
     {
         if (isFat()) {
-            fat()->notifyWrite();
+            fat()->fireAll(detail);
             return;
         }
-        if (!(m_data & IsWatchedFlag))
+        if (decodeState(m_data) == ClearWatchpoint)
             return;
-        m_data |= IsInvalidatedFlag;
+        m_data = encodeState(IsInvalidated);
+        WTF::storeStoreFence();
+    }
+    
+    void invalidate(const FireDetail& detail)
+    {
+        if (isFat())
+            fat()->invalidate(detail);
+        else
+            m_data = encodeState(IsInvalidated);
+    }
+    
+    JS_EXPORT_PRIVATE void fireAll(const char* reason);
+    
+    void touch(const FireDetail& detail)
+    {
+        if (isFat()) {
+            fat()->touch(detail);
+            return;
+        }
+        uintptr_t data = m_data;
+        if (decodeState(data) == IsInvalidated)
+            return;
+        WTF::storeStoreFence();
+        if (decodeState(data) == ClearWatchpoint)
+            m_data = encodeState(IsWatched);
+        else
+            m_data = encodeState(IsInvalidated);
+        WTF::storeStoreFence();
+    }
+    
+    void touch(const char* reason)
+    {
+        touch(StringFireDetail(reason));
+    }
+
+    // Note that for any watchpoint that is visible from the DFG, it would be incorrect to write code like:
+    //
+    // if (w.isBeingWatched())
+    //     w.fireAll()
+    //
+    // Concurrently to this, the DFG could do:
+    //
+    // if (w.isStillValid())
+    //     perform optimizations;
+    // if (!w.isStillValid())
+    //     retry compilation;
+    //
+    // Note that the DFG algorithm is widespread, and sound, because fireAll() and invalidate() will leave
+    // the watchpoint in a !isStillValid() state. Hence, if fireAll() or invalidate() interleaved between
+    // the first isStillValid() check and the second one, then it would simply cause the DFG to retry
+    // compilation later.
+    //
+    // But, if you change some piece of state that the DFG might optimize for, but invalidate the
+    // watchpoint by doing:
+    //
+    // if (w.isBeingWatched())
+    //     w.fireAll()
+    //
+    // then the DFG would never know that you invalidated state between the two checks.
+    //
+    // There are two ways to work around this:
+    //
+    // - Call fireAll() without a isBeingWatched() check. Then, the DFG will know that the watchpoint has
+    //   been invalidated when it does its second check.
+    //
+    // - Do not expose the watchpoint set to the DFG directly, and have your own way of validating whether
+    //   the assumptions that the DFG thread used are still valid when the DFG code is installed.
+    bool isBeingWatched() const
+    {
+        if (isFat())
+            return fat()->isBeingWatched();
+        return false;
     }
     
 private:
     static const uintptr_t IsThinFlag        = 1;
-    static const uintptr_t IsInvalidatedFlag = 2;
-    static const uintptr_t IsWatchedFlag     = 4;
+    static const uintptr_t StateMask         = 6;
+    static const uintptr_t StateShift        = 1;
     
-    bool isThin() const { return m_data & IsThinFlag; }
-    bool isFat() const { return !isThin(); };
+    static bool isThin(uintptr_t data) { return data & IsThinFlag; }
+    static bool isFat(uintptr_t data) { return !isThin(data); }
+    
+    static WatchpointState decodeState(uintptr_t data)
+    {
+        ASSERT(isThin(data));
+        return static_cast<WatchpointState>((data & StateMask) >> StateShift);
+    }
+    
+    static uintptr_t encodeState(WatchpointState state)
+    {
+        return (static_cast<uintptr_t>(state) << StateShift) | IsThinFlag;
+    }
+    
+    bool isThin() const { return isThin(m_data); }
+    bool isFat() const { return isFat(m_data); };
+    
+    static WatchpointSet* fat(uintptr_t data)
+    {
+        return bitwise_cast<WatchpointSet*>(data);
+    }
     
     WatchpointSet* fat()
     {
         ASSERT(isFat());
-        return bitwise_cast<WatchpointSet*>(m_data);
+        return fat(m_data);
     }
     
     const WatchpointSet* fat() const
     {
         ASSERT(isFat());
-        return bitwise_cast<WatchpointSet*>(m_data);
+        return fat(m_data);
     }
     
     WatchpointSet* inflate()

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006 Apple Computer, Inc.  All rights reserved.
+ * Copyright (C) 2006 Apple Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -27,9 +27,7 @@
 #include "GIFImageDecoder.h"
 
 #include "GIFImageReader.h"
-#include "PlatformInstrumentation.h"
 #include <limits>
-#include <wtf/PassOwnPtr.h>
 
 namespace WebCore {
 
@@ -119,30 +117,14 @@ ImageFrame* GIFImageDecoder::frameBufferAtIndex(size_t index)
         return 0;
 
     ImageFrame& frame = m_frameBufferCache[index];
-    if (frame.status() != ImageFrame::FrameComplete) {
-        PlatformInstrumentation::willDecodeImage("GIF");
+    if (frame.status() != ImageFrame::FrameComplete)
         decode(index + 1, GIFFullQuery);
-        PlatformInstrumentation::didDecodeImage();
-    }
     return &frame;
 }
 
-
-bool GIFImageDecoder::frameIsCompleteAtIndex(size_t index) const
-{
-    return m_reader && (index < m_reader->imagesCount()) && m_reader->frameContext(index)->isComplete();
-}
-
-float GIFImageDecoder::frameDurationAtIndex(size_t index) const
-{
-    return (m_reader && (index < m_reader->imagesCount()) && m_reader->frameContext(index)->isHeaderDefined())
-        ? m_reader->frameContext(index)->delayTime : 0;
-}
-
-
 bool GIFImageDecoder::setFailed()
 {
-    m_reader.clear();
+    m_reader = nullptr;
     return ImageDecoder::setFailed();
 }
 
@@ -198,7 +180,7 @@ void GIFImageDecoder::clearFrameBufferCache(size_t clearBeforeFrame)
 
 bool GIFImageDecoder::haveDecodedRow(unsigned frameIndex, const Vector<unsigned char>& rowBuffer, size_t width, size_t rowNumber, unsigned repeatCount, bool writeTransparentPixels)
 {
-    const GIFFrameContext* frameContext = m_reader->frameContext(frameIndex);
+    const GIFFrameContext* frameContext = m_reader->frameContext();
     // The pixel data and coordinates supplied to us are relative to the frame's
     // origin within the entire image size, i.e.
     // (frameContext->xOffset, frameContext->yOffset). There is no guarantee
@@ -310,6 +292,8 @@ void GIFImageDecoder::gifComplete()
     // Cache the repetition count, which is now as authoritative as it's ever
     // going to be.
     repetitionCount();
+
+    m_reader = nullptr;
 }
 
 void GIFImageDecoder::decode(unsigned haltAtFrame, GIFQuery query)
@@ -318,7 +302,7 @@ void GIFImageDecoder::decode(unsigned haltAtFrame, GIFQuery query)
         return;
 
     if (!m_reader) {
-        m_reader = adoptPtr(new GIFImageReader(this));
+        m_reader = std::make_unique<GIFImageReader>(this);
         m_reader->setData(m_data);
     }
 
@@ -346,16 +330,16 @@ void GIFImageDecoder::decode(unsigned haltAtFrame, GIFQuery query)
         return;
     }
 
-    // It is also a fatal error if all data is received and we have decoded all
-    // frames available but the file is truncated.
-    if (haltAtFrame >= m_frameBufferCache.size() && isAllDataReceived() && m_reader && !m_reader->parseCompleted())
+    // It is also a fatal error if all data is received but we failed to decode
+    // all frames completely.
+    if (isAllDataReceived() && haltAtFrame >= m_frameBufferCache.size() && m_reader)
         setFailed();
 }
 
 bool GIFImageDecoder::initFrameBuffer(unsigned frameIndex)
 {
     // Initialize the frame rect in our buffer.
-    const GIFFrameContext* frameContext = m_reader->frameContext(frameIndex);
+    const GIFFrameContext* frameContext = m_reader->frameContext();
     IntRect frameRect(frameContext->xOffset, frameContext->yOffset, frameContext->width, frameContext->height);
 
     // Make sure the frameRect doesn't extend outside the buffer.

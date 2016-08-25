@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -30,16 +30,16 @@
 #include "WebGLBuffer.h"
 
 #include "WebGLContextGroup.h"
-#include "WebGLRenderingContext.h"
+#include "WebGLRenderingContextBase.h"
 
 namespace WebCore {
 
-PassRefPtr<WebGLBuffer> WebGLBuffer::create(WebGLRenderingContext* ctx)
+Ref<WebGLBuffer> WebGLBuffer::create(WebGLRenderingContextBase* ctx)
 {
-    return adoptRef(new WebGLBuffer(ctx));
+    return adoptRef(*new WebGLBuffer(ctx));
 }
 
-WebGLBuffer::WebGLBuffer(WebGLRenderingContext* ctx)
+WebGLBuffer::WebGLBuffer(WebGLRenderingContextBase* ctx)
     : WebGLSharedObject(ctx)
     , m_target(0)
     , m_byteLength(0)
@@ -81,7 +81,7 @@ bool WebGLBuffer::associateBufferDataImpl(const void* data, GC3Dsizeiptr byteLen
                 memcpy(m_elementArrayBuffer->data(), data, byteLength);
             }
         } else
-            m_elementArrayBuffer = 0;
+            m_elementArrayBuffer = nullptr;
         return true;
     case GraphicsContext3D::ARRAY_BUFFER:
         m_byteLength = byteLength;
@@ -100,14 +100,14 @@ bool WebGLBuffer::associateBufferData(ArrayBuffer* array)
 {
     if (!array)
         return false;
-    return associateBufferDataImpl(array ? array->data() : 0, array ? array->byteLength() : 0);
+    return associateBufferDataImpl(array->data(), array->byteLength());
 }
 
 bool WebGLBuffer::associateBufferData(ArrayBufferView* array)
 {
     if (!array)
         return false;
-    return associateBufferDataImpl(array ? array->baseAddress() : 0, array ? array->byteLength() : 0);
+    return associateBufferDataImpl(array->baseAddress(), array->byteLength());
 }
 
 bool WebGLBuffer::associateBufferSubDataImpl(GC3Dintptr offset, const void* data, GC3Dsizeiptr byteLength)
@@ -153,6 +153,12 @@ bool WebGLBuffer::associateBufferSubData(GC3Dintptr offset, ArrayBufferView* arr
     return associateBufferSubDataImpl(offset, array->baseAddress(), array->byteLength());
 }
 
+void WebGLBuffer::disassociateBufferData()
+{
+    m_byteLength = 0;
+    clearCachedMaxIndices();
+}
+
 GC3Dsizeiptr WebGLBuffer::byteLength() const
 {
     return m_byteLength;
@@ -160,23 +166,24 @@ GC3Dsizeiptr WebGLBuffer::byteLength() const
 
 int WebGLBuffer::getCachedMaxIndex(GC3Denum type)
 {
-    for (size_t i = 0; i < WTF_ARRAY_LENGTH(m_maxIndexCache); ++i)
-        if (m_maxIndexCache[i].type == type)
-            return m_maxIndexCache[i].maxIndex;
+    for (auto& cache : m_maxIndexCache) {
+        if (cache.type == type)
+            return cache.maxIndex;
+    }
     return -1;
 }
 
 void WebGLBuffer::setCachedMaxIndex(GC3Denum type, int value)
 {
-    size_t numEntries = WTF_ARRAY_LENGTH(m_maxIndexCache);
-    for (size_t i = 0; i < numEntries; ++i)
-        if (m_maxIndexCache[i].type == type) {
-            m_maxIndexCache[i].maxIndex = value;
+    for (auto& cache : m_maxIndexCache) {
+        if (cache.type == type) {
+            cache.maxIndex = value;
             return;
         }
+    }
     m_maxIndexCache[m_nextAvailableCacheEntry].type = type;
     m_maxIndexCache[m_nextAvailableCacheEntry].maxIndex = value;
-    m_nextAvailableCacheEntry = (m_nextAvailableCacheEntry + 1) % numEntries;
+    m_nextAvailableCacheEntry = (m_nextAvailableCacheEntry + 1) % WTF_ARRAY_LENGTH(m_maxIndexCache);
 }
 
 void WebGLBuffer::setTarget(GC3Denum target)

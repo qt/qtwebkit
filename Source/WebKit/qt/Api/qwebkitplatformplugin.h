@@ -27,16 +27,15 @@
  *  and may be changed from version to version or even be completely removed.
 */
 
-#if defined(WTF_USE_QT_MULTIMEDIA) && WTF_USE_QT_MULTIMEDIA
-#include <QMediaPlayer>
-#endif
+#include "qwebkitglobal.h"
+
 #include <QtCore/QObject>
 #include <QtCore/QRect>
 #include <QtCore/QUrl>
 #include <QtGui/QColor>
 #include <QtGui/QFont>
 
-class QWebSelectData {
+class QWEBKIT_EXPORT QWebSelectData {
 public:
     virtual ~QWebSelectData() {}
 
@@ -55,7 +54,7 @@ public:
     virtual QColor itemForegroundColor(int index) const = 0;
 };
 
-class QWebSelectMethod : public QObject {
+class QWEBKIT_EXPORT QWebSelectMethod : public QObject {
     Q_OBJECT
 public:
     virtual ~QWebSelectMethod() {}
@@ -70,7 +69,7 @@ Q_SIGNALS:
     void didHide();
 };
 
-class QWebNotificationData {
+class QWEBKIT_EXPORT QWebNotificationData {
 public:
     virtual ~QWebNotificationData() {}
 
@@ -80,7 +79,7 @@ public:
     virtual const QUrl openerPageUrl() const = 0;
 };
 
-class QWebNotificationPresenter : public QObject {
+class QWEBKIT_EXPORT QWebNotificationPresenter : public QObject {
     Q_OBJECT
 public:
     QWebNotificationPresenter() {}
@@ -93,7 +92,7 @@ Q_SIGNALS:
     void notificationClicked();
 };
 
-class QWebHapticFeedbackPlayer: public QObject {
+class QWEBKIT_EXPORT QWebHapticFeedbackPlayer: public QObject {
     Q_OBJECT
 public:
     QWebHapticFeedbackPlayer() {}
@@ -110,7 +109,7 @@ public:
     virtual void playHapticFeedback(const HapticEvent, const QString& hapticType, const HapticStrength) = 0;
 };
 
-class QWebTouchModifier : public QObject {
+class QWEBKIT_EXPORT QWebTouchModifier : public QObject {
     Q_OBJECT
 public:
     virtual ~QWebTouchModifier() {}
@@ -122,24 +121,11 @@ public:
     virtual unsigned hitTestPaddingForTouch(const PaddingDirection) const = 0;
 };
 
-#if defined(WTF_USE_QT_MULTIMEDIA) && WTF_USE_QT_MULTIMEDIA
-class QWebFullScreenVideoHandler : public QObject {
-    Q_OBJECT
-public:
-    QWebFullScreenVideoHandler() {}
-    virtual ~QWebFullScreenVideoHandler() {}
-    virtual bool requiresFullScreenForVideoPlayback() const = 0;
-
-Q_SIGNALS:
-    void fullScreenClosed();
-
-public Q_SLOTS:
-    virtual void enterFullScreen(QMediaPlayer*) = 0;
-    virtual void exitFullScreen() = 0;
-};
+#if defined(USE_QT_MULTIMEDIA) && USE_QT_MULTIMEDIA
+#include "qwebfullscreenvideohandler.h"
 #endif
 
-class QWebSpellChecker : public QObject {
+class QWEBKIT_EXPORT QWebSpellChecker : public QObject {
     Q_OBJECT
 public:
     struct GrammarDetail {
@@ -163,7 +149,7 @@ public:
     virtual void checkGrammarOfString(const QString&, QList<GrammarDetail>&, int* badGrammarLocation, int* badGrammarLength) = 0;
 };
 
-class QWebKitPlatformPlugin {
+class QWEBKIT_EXPORT QWebKitPlatformPlugin {
 public:
     virtual ~QWebKitPlatformPlugin() {}
 

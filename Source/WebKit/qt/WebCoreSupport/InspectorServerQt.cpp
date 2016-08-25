@@ -45,7 +45,7 @@ namespace WebCore {
 static QByteArray generateWebSocketChallengeResponse(const QByteArray& key)
 {
     SHA1 sha1;
-    Vector<uint8_t, 20> digest;
+    SHA1::Digest digest;
     Vector<char> encoded;
     QByteArray toHash("258EAFA5-E914-47DA-95CA-C5AB0DC85B11");
     toHash.prepend(key);
@@ -225,7 +225,7 @@ void InspectorServerRequestHandlerQt::tcpReadyRead()
             QString indexHtml = QLatin1String("<html><head><title>Remote Web Inspector</title></head><body><ul>\n");
             for (QMap<int, InspectorClientQt* >::const_iterator it = m_server->m_inspectorClients.begin(); it != m_server->m_inspectorClients.end(); ++it) {
 
-                indexHtml.append(QString::fromLatin1("<li><a href=\"/webkit/inspector/inspector.html?page=%1\">%2</li>\n")
+                indexHtml.append(QString::fromLatin1("<li><a href=\"/webkit/inspector/UserInterface/Main.html?page=%1\">%2</li>\n")
                     .arg(it.key())
                     .arg(QUrl(it.value()->m_inspectedWebPage->mainFrameAdapter()->url).toString()));
             }
@@ -282,7 +282,7 @@ int InspectorServerRequestHandlerQt::webSocketSend(const char* data, size_t leng
     m_tcpConnection->putChar(0x81);
     if (length <= 125)
         m_tcpConnection->putChar(static_cast<uint8_t>(length));
-    else if (length <= (1<<16)) {
+    else if (length <= pow(2, 16)) {
         m_tcpConnection->putChar(126);
         quint16 length16 = qToBigEndian<quint16>(static_cast<quint16>(length));
         m_tcpConnection->write(reinterpret_cast<char*>(&length16), 2);
@@ -352,13 +352,10 @@ void InspectorServerRequestHandlerQt::webSocketReadyRead()
         // Truncate data before delivering message in case of re-entrancy.
         m_data = m_data.mid(pos + payloadLen);
         
-#if ENABLE(INSPECTOR)
         if (m_inspectorClient) {
-            InspectorController* inspectorController = m_inspectorClient->m_inspectedWebPage->page->inspectorController();
-            inspectorController->dispatchMessageFromFrontend(QString::fromUtf8(payload));
+            InspectorController& inspectorController = m_inspectorClient->m_inspectedWebPage->page->inspectorController();
+            inspectorController.dispatchMessageFromFrontend(QString::fromUtf8(payload));
         }
-#endif
-
     }
 }
 

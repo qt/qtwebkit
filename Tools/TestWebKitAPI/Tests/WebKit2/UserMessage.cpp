@@ -24,12 +24,13 @@
  */
 
 #include "config.h"
+
+#if WK_HAVE_C_SPI
+
 #include "Test.h"
 
 #include "PlatformUtilities.h"
 #include "PlatformWebView.h"
-#include <wtf/OwnPtr.h>
-#include <wtf/PassOwnPtr.h>
 
 namespace TestWebKitAPI {
 
@@ -42,7 +43,7 @@ public:
     }
 
     WKRetainPtr<WKContextRef> context;
-    OwnPtr<PlatformWebView> webView;
+    std::unique_ptr<PlatformWebView> webView;
 
     WKRetainPtr<WKTypeRef> recievedBody;
 
@@ -65,24 +66,26 @@ public:
 
     static void setInjectedBundleClient(WKContextRef context, const void* clientInfo)
     {
-        WKContextInjectedBundleClient injectedBundleClient;
+        WKContextInjectedBundleClientV1 injectedBundleClient;
         memset(&injectedBundleClient, 0, sizeof(injectedBundleClient));
-        injectedBundleClient.version = kWKContextInjectedBundleClientCurrentVersion;
-        injectedBundleClient.clientInfo = clientInfo;
+
+        injectedBundleClient.base.version = 1;
+        injectedBundleClient.base.clientInfo = clientInfo;
         injectedBundleClient.didReceiveMessageFromInjectedBundle = didReceiveMessageFromInjectedBundle;
 
-        WKContextSetInjectedBundleClient(context, &injectedBundleClient);
+        WKContextSetInjectedBundleClient(context, &injectedBundleClient.base);
     }
 
     static void setPageLoaderClient(WKPageRef page, const void* clientInfo)
     {
-        WKPageLoaderClient loaderClient;
+        WKPageLoaderClientV3 loaderClient;
         memset(&loaderClient, 0, sizeof(loaderClient));
-        loaderClient.version = kWKPageLoaderClientCurrentVersion;
-        loaderClient.clientInfo = clientInfo;
+
+        loaderClient.base.version = 3;
+        loaderClient.base.clientInfo = clientInfo;
         loaderClient.didFinishLoadForFrame = didFinishLoadForFrame;
 
-        WKPageSetPageLoaderClient(page, &loaderClient);
+        WKPageSetPageLoaderClient(page, &loaderClient.base);
     }
 
     virtual void SetUp()
@@ -90,7 +93,7 @@ public:
         context = adoptWK(Util::createContextForInjectedBundleTest("UserMessageTest"));
         setInjectedBundleClient(context.get(), this);
 
-        webView = adoptPtr(new PlatformWebView(context.get()));
+        webView = std::make_unique<PlatformWebView>(context.get());
         setPageLoaderClient(webView->page(), this);
 
         didFinishLoad = false;
@@ -155,3 +158,5 @@ TEST_F(WebKit2UserMessageRoundTripTest, WKString)
 }
 
 } // namespace TestWebKitAPI
+
+#endif

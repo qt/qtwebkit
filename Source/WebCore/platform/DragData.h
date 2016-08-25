@@ -10,17 +10,17 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
  * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
  * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #ifndef DragData_h
@@ -59,17 +59,13 @@ namespace WebCore {
 class DataObjectGtk;
 }
 typedef WebCore::DataObjectGtk* DragDataRef;
-#elif PLATFORM(EFL) || PLATFORM(BLACKBERRY)
+#elif PLATFORM(EFL) || PLATFORM(IOS)
 typedef void* DragDataRef;
 #endif
 
-
 namespace WebCore {
 
-class Frame;
-class DocumentFragment;
-class KURL;
-class Range;
+class URL;
 
 enum DragApplicationFlags {
     DragApplicationNone = 0,
@@ -80,7 +76,7 @@ enum DragApplicationFlags {
 };
 
 #if PLATFORM(WIN)
-typedef HashMap<UINT, Vector<String> > DragDataMap;
+typedef HashMap<unsigned, Vector<String>> DragDataMap;
 #endif
 
 class DragData {
@@ -88,10 +84,10 @@ public:
     enum FilenameConversionPolicy { DoNotConvertFilenames, ConvertFilenames };
 
     // clientPosition is taken to be the position of the drag event within the target window, with (0,0) at the top left
-    DragData(DragDataRef, const IntPoint& clientPosition, const IntPoint& globalPosition, DragOperation, DragApplicationFlags = DragApplicationNone);
-    DragData(const String& dragStorageName, const IntPoint& clientPosition, const IntPoint& globalPosition, DragOperation, DragApplicationFlags = DragApplicationNone);
+    WEBCORE_EXPORT DragData(DragDataRef, const IntPoint& clientPosition, const IntPoint& globalPosition, DragOperation, DragApplicationFlags = DragApplicationNone);
+    WEBCORE_EXPORT DragData(const String& dragStorageName, const IntPoint& clientPosition, const IntPoint& globalPosition, DragOperation, DragApplicationFlags = DragApplicationNone);
 #if PLATFORM(WIN)
-    DragData(const DragDataMap&, const IntPoint& clientPosition, const IntPoint& globalPosition, DragOperation sourceOperationMask, DragApplicationFlags = DragApplicationNone);
+    WEBCORE_EXPORT DragData(const DragDataMap&, const IntPoint& clientPosition, const IntPoint& globalPosition, DragOperation sourceOperationMask, DragApplicationFlags = DragApplicationNone);
     const DragDataMap& dragDataMap();
     void getDragFileDescriptorData(int& size, String& pathname);
     void getDragFileContentData(int size, void* dataBlob);
@@ -101,15 +97,13 @@ public:
     DragApplicationFlags flags() const { return m_applicationFlags; }
     DragDataRef platformData() const { return m_platformDragData; }
     DragOperation draggingSourceOperationMask() const { return m_draggingSourceOperationMask; }
-    bool containsURL(Frame*, FilenameConversionPolicy filenamePolicy = ConvertFilenames) const;
+    bool containsURL(FilenameConversionPolicy = ConvertFilenames) const;
     bool containsPlainText() const;
     bool containsCompatibleContent() const;
-    String asURL(Frame*, FilenameConversionPolicy filenamePolicy = ConvertFilenames, String* title = 0) const;
-    String asPlainText(Frame*) const;
+    String asURL(FilenameConversionPolicy = ConvertFilenames, String* title = nullptr) const;
+    String asPlainText() const;
     void asFilenames(Vector<String>&) const;
     Color asColor() const;
-    PassRefPtr<DocumentFragment> asFragment(Frame*, PassRefPtr<Range> context,
-                                            bool allowPlainText, bool& chosePlainText) const;
     bool canSmartReplace() const;
     bool containsColor() const;
     bool containsFiles() const;
@@ -117,10 +111,6 @@ public:
     int modifierKeyState() const;
 #if PLATFORM(MAC)
     const String& pasteboardName() const { return m_pasteboardName; }
-#endif
-
-#if ENABLE(FILE_SYSTEM)
-    String droppedFileSystemId() const;
 #endif
 
 #if PLATFORM(QT) || PLATFORM(GTK)

@@ -28,9 +28,11 @@
 
 #include <WebCore/SQLiteDatabase.h>
 #include <wtf/HashSet.h>
+#include <wtf/Optional.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefPtr.h>
 #include <wtf/ThreadSafeRefCounted.h>
+#include <wtf/WorkQueue.h>
 #include <wtf/text/StringHash.h>
 #include <wtf/text/WTFString.h>
 
@@ -38,28 +40,35 @@ namespace WebCore {
 class SecurityOrigin;
 }
 
-class WorkQueue;
-
 namespace WebKit {
+
+struct LocalStorageDetails;
 
 class LocalStorageDatabaseTracker : public ThreadSafeRefCounted<LocalStorageDatabaseTracker> {
 public:
-    static PassRefPtr<LocalStorageDatabaseTracker> create(PassRefPtr<WorkQueue>);
+    static PassRefPtr<LocalStorageDatabaseTracker> create(PassRefPtr<WorkQueue>, const String& localStorageDirectory);
     ~LocalStorageDatabaseTracker();
 
-    void setLocalStorageDirectory(const String&);
     String databasePath(WebCore::SecurityOrigin*) const;
 
     void didOpenDatabaseWithOrigin(WebCore::SecurityOrigin*);
     void deleteDatabaseWithOrigin(WebCore::SecurityOrigin*);
     void deleteAllDatabases();
 
-    Vector<RefPtr<WebCore::SecurityOrigin> > origins() const;
+    // Returns a vector of the origins whose databases have been deleted.
+    Vector<Ref<WebCore::SecurityOrigin>> deleteDatabasesModifiedSince(std::chrono::system_clock::time_point);
+
+    Vector<Ref<WebCore::SecurityOrigin>> origins() const;
+
+    struct OriginDetails {
+        String originIdentifier;
+        Optional<time_t> creationTime;
+        Optional<time_t> modificationTime;
+    };
+    Vector<OriginDetails> originDetails();
 
 private:
-    explicit LocalStorageDatabaseTracker(PassRefPtr<WorkQueue>);
-
-    void setLocalStorageDirectoryInternal(StringImpl*);
+    LocalStorageDatabaseTracker(PassRefPtr<WorkQueue>, const String& localStorageDirectory);
 
     String databasePath(const String& filename) const;
     String trackerDatabasePath() const;

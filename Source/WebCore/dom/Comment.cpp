@@ -26,14 +26,14 @@
 
 namespace WebCore {
 
-inline Comment::Comment(Document* document, const String& text)
+inline Comment::Comment(Document& document, const String& text)
     : CharacterData(document, text, CreateOther)
 {
 }
 
-PassRefPtr<Comment> Comment::create(Document* document, const String& text)
+Ref<Comment> Comment::create(Document& document, const String& text)
 {
-    return adoptRef(new Comment(document, text));
+    return adoptRef(*new Comment(document, text));
 }
 
 String Comment::nodeName() const
@@ -46,9 +46,9 @@ Node::NodeType Comment::nodeType() const
     return COMMENT_NODE;
 }
 
-PassRefPtr<Node> Comment::cloneNode(bool /*deep*/)
+Ref<Node> Comment::cloneNodeInternal(Document& targetDocument, CloningOperation)
 {
-    return create(document(), data());
+    return create(targetDocument, data());
 }
 
 bool Comment::childTypeAllowed(NodeType) const

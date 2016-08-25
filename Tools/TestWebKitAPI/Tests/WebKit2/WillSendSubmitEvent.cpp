@@ -24,6 +24,9 @@
  */
 
 #include "config.h"
+
+#if WK_HAVE_C_SPI
+
 #include "PlatformUtilities.h"
 #include "PlatformWebView.h"
 #include "Test.h"
@@ -57,11 +60,13 @@ static void didReceiveMessageFromInjectedBundle(WKContextRef, WKStringRef messag
 
 static void setInjectedBundleClient(WKContextRef context)
 {
-    WKContextInjectedBundleClient injectedBundleClient;
+    WKContextInjectedBundleClientV0 injectedBundleClient;
     memset(&injectedBundleClient, 0, sizeof(injectedBundleClient));
+
+    injectedBundleClient.base.version = 0;
     injectedBundleClient.didReceiveMessageFromInjectedBundle = didReceiveMessageFromInjectedBundle;
 
-    WKContextSetInjectedBundleClient(context, &injectedBundleClient);
+    WKContextSetInjectedBundleClient(context, &injectedBundleClient.base);
 }
 
 TEST(WebKit2, WillSendSubmitEvent)
@@ -75,3 +80,5 @@ TEST(WebKit2, WillSendSubmitEvent)
 }
 
 } // namespace TestWebKitAPI
+
+#endif

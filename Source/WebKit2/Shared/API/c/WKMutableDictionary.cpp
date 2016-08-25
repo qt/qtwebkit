@@ -26,25 +26,14 @@
 #include "config.h"
 #include "WKMutableDictionary.h"
 
-#include "MutableDictionary.h"
+#include "APIDictionary.h"
 #include "WKAPICast.h"
 
 using namespace WebKit;
 
 WKMutableDictionaryRef WKMutableDictionaryCreate()
 {
-    RefPtr<MutableDictionary> dictionary = MutableDictionary::create();
-    return toAPI(dictionary.release().leakRef());
-}
-
-bool WKDictionaryIsMutable(WKDictionaryRef dictionaryRef)
-{
-    return toImpl(dictionaryRef)->isMutable();
-}
-
-bool WKDictionaryAddItem(WKMutableDictionaryRef dictionaryRef, WKStringRef keyRef, WKTypeRef itemRef)
-{
-    return toImpl(dictionaryRef)->add(toImpl(keyRef)->string(), toImpl(itemRef));
+    return const_cast<WKMutableDictionaryRef>(toAPI(&API::Dictionary::create().leakRef()));
 }
 
 bool WKDictionarySetItem(WKMutableDictionaryRef dictionaryRef, WKStringRef keyRef, WKTypeRef itemRef)
@@ -52,7 +41,3 @@ bool WKDictionarySetItem(WKMutableDictionaryRef dictionaryRef, WKStringRef keyRe
     return toImpl(dictionaryRef)->set(toImpl(keyRef)->string(), toImpl(itemRef));
 }
 
-void WKDictionaryRemoveItem(WKMutableDictionaryRef dictionaryRef, WKStringRef keyRef)
-{
-    toImpl(dictionaryRef)->remove(toImpl(keyRef)->string());
-}

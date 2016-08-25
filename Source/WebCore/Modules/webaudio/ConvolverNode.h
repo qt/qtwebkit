@@ -26,9 +26,9 @@
 #define ConvolverNode_h
 
 #include "AudioNode.h"
-#include <wtf/OwnPtr.h>
+#include <memory>
+#include <wtf/Lock.h>
 #include <wtf/RefPtr.h>
-#include <wtf/Threading.h>
 
 namespace WebCore {
 
@@ -37,37 +37,37 @@ class Reverb;
     
 class ConvolverNode : public AudioNode {
 public:
-    static PassRefPtr<ConvolverNode> create(AudioContext* context, float sampleRate)
+    static Ref<ConvolverNode> create(AudioContext& context, float sampleRate)
     {
-        return adoptRef(new ConvolverNode(context, sampleRate));      
+        return adoptRef(*new ConvolverNode(context, sampleRate));
     }
     
     virtual ~ConvolverNode();
     
     // AudioNode
-    virtual void process(size_t framesToProcess);
-    virtual void reset();
-    virtual void initialize();
-    virtual void uninitialize();
+    virtual void process(size_t framesToProcess) override;
+    virtual void reset() override;
+    virtual void initialize() override;
+    virtual void uninitialize() override;
 
     // Impulse responses
-    void setBuffer(AudioBuffer*);
+    void setBuffer(AudioBuffer*, ExceptionCode&);
     AudioBuffer* buffer();
 
     bool normalize() const { return m_normalize; }
     void setNormalize(bool normalize) { m_normalize = normalize; }
 
 private:
-    ConvolverNode(AudioContext*, float sampleRate);
+    ConvolverNode(AudioContext&, float sampleRate);
 
-    virtual double tailTime() const OVERRIDE;
-    virtual double latencyTime() const OVERRIDE;
+    virtual double tailTime() const override;
+    virtual double latencyTime() const override;
 
-    OwnPtr<Reverb> m_reverb;
+    std::unique_ptr<Reverb> m_reverb;
     RefPtr<AudioBuffer> m_buffer;
 
     // This synchronizes dynamic changes to the convolution impulse response with process().
-    mutable Mutex m_processLock;
+    mutable Lock m_processMutex;
 
     // Normalize the impulse response or not. Must default to true.
     bool m_normalize;

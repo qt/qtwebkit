@@ -27,14 +27,13 @@
 #define TypeConversions_h
 
 #include <wtf/FastMalloc.h>
-#include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
 
 namespace WebCore {
 
 class TypeConversions : public RefCounted<TypeConversions> {
 public:
-    static PassRefPtr<TypeConversions> create() { return adoptRef(new TypeConversions()); }
+    static Ref<TypeConversions> create() { return adoptRef(*new TypeConversions()); }
 
     long testLong() { return m_long; }
     void setTestLong(long value) { m_long = value; }
@@ -58,11 +57,19 @@ public:
     void setTestByte(int8_t value) { m_byte = value; }
     int8_t testEnforceRangeByte() { return m_byte; }
     void setTestEnforceRangeByte(int8_t value) { m_byte = value; }
-
     uint8_t testOctet() { return m_octet; }
     void setTestOctet(uint8_t value) { m_octet = value; }
     uint8_t testEnforceRangeOctet() { return m_octet; }
     void setTestEnforceRangeOctet(uint8_t value) { m_octet = value; }
+
+    int16_t testShort() { return m_short; }
+    void setTestShort(int16_t value) { m_short = value; }
+    int16_t testEnforceRangeShort() { return m_short; }
+    void setTestEnforceRangeShort(int16_t value) { m_short = value; }
+    uint16_t testUnsignedShort() { return m_UnsignedShort; }
+    void setTestUnsignedShort(uint16_t value) { m_UnsignedShort = value; }
+    uint16_t testEnforceRangeUnsignedShort() { return m_UnsignedShort; }
+    void setTestEnforceRangeUnsignedShort(uint16_t value) { m_UnsignedShort = value; }
 private:
     TypeConversions()
     {
@@ -74,6 +81,8 @@ private:
     unsigned long long m_unsignedLongLong;
     int8_t m_byte;
     uint8_t m_octet;
+    int16_t m_short;
+    uint16_t m_UnsignedShort;
 };
 
 } // namespace WebCore

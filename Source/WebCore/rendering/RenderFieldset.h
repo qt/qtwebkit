@@ -24,39 +24,39 @@
 #ifndef RenderFieldset_h
 #define RenderFieldset_h
 
-#include "RenderBlock.h"
+#include "HTMLFieldSetElement.h"
+#include "RenderBlockFlow.h"
 
 namespace WebCore {
 
-class RenderFieldset : public RenderBlock {
+class HTMLFieldSetElement;
+
+class RenderFieldset final : public RenderBlockFlow {
 public:
-    explicit RenderFieldset(Element*);
+    RenderFieldset(HTMLFieldSetElement&, Ref<RenderStyle>&&);
 
     enum FindLegendOption { IgnoreFloatingOrOutOfFlow, IncludeFloatingOrOutOfFlow };
     RenderBox* findLegend(FindLegendOption = IgnoreFloatingOrOutOfFlow) const;
 
+    HTMLFieldSetElement& fieldSetElement() const { return downcast<HTMLFieldSetElement>(nodeForNonAnonymous()); }
+
 private:
-    virtual const char* renderName() const { return "RenderFieldSet"; }
-    virtual bool isFieldset() const { return true; }
+    void element() const = delete;
 
-    virtual RenderObject* layoutSpecialExcludedChild(bool relayoutChildren);
+    virtual const char* renderName() const override { return "RenderFieldSet"; }
+    virtual bool isFieldset() const override { return true; }
 
-    virtual void computePreferredLogicalWidths();
-    virtual bool avoidsFloats() const { return true; }
+    virtual RenderObject* layoutSpecialExcludedChild(bool relayoutChildren) override;
 
-    virtual void paintBoxDecorations(PaintInfo&, const LayoutPoint&);
-    virtual void paintMask(PaintInfo&, const LayoutPoint&);
+    virtual void computePreferredLogicalWidths() override;
+    virtual bool avoidsFloats() const override { return true; }
+
+    virtual void paintBoxDecorations(PaintInfo&, const LayoutPoint&) override;
+    virtual void paintMask(PaintInfo&, const LayoutPoint&) override;
 };
 
-inline RenderFieldset* toRenderFieldset(RenderObject* object)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isFieldset());
-    return static_cast<RenderFieldset*>(object);
-}
-
-// This will catch anyone doing an unnecessary cast.
-void toRenderFieldset(const RenderFieldset*);
-
 } // namespace WebCore
+
+SPECIALIZE_TYPE_TRAITS_RENDER_OBJECT(RenderFieldset, isFieldset())
 
 #endif // RenderFieldset_h

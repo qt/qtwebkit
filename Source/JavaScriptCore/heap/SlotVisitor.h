@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2011-2013, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,32 +26,46 @@
 #ifndef SlotVisitor_h
 #define SlotVisitor_h
 
+#include "CellState.h"
+#include "CopyToken.h"
 #include "HandleTypes.h"
-#include "MarkStackInlines.h"
-
-#include <wtf/text/StringHash.h>
+#include "MarkStack.h"
+#include "OpaqueRootSet.h"
 
 namespace JSC {
 
 class ConservativeRoots;
 class GCThreadSharedData;
 class Heap;
-template<typename T> class Weak;
-template<typename T> class WriteBarrierBase;
 template<typename T> class JITWriteBarrier;
+class UnconditionalFinalizer;
+template<typename T> class Weak;
+class WeakReferenceHarvester;
+template<typename T> class WriteBarrierBase;
 
 class SlotVisitor {
     WTF_MAKE_NONCOPYABLE(SlotVisitor);
+    WTF_MAKE_FAST_ALLOCATED;
+
     friend class HeapRootVisitor; // Allowed to mark a JSValue* or JSCell** directly.
+    friend class Heap;
 
 public:
-    SlotVisitor(GCThreadSharedData&);
+    SlotVisitor(Heap&);
     ~SlotVisitor();
+
+    MarkStackArray& markStack() { return m_stack; }
+    const MarkStackArray& markStack() const { return m_stack; }
+
+    VM& vm();
+    const VM& vm() const;
+    Heap* heap() const;
 
     void append(ConservativeRoots&);
     
     template<typename T> void append(JITWriteBarrier<T>*);
     template<typename T> void append(WriteBarrierBase<T>*);
+    template<typename Iterator> void append(Iterator begin , Iterator end);
     void appendValues(WriteBarrierBase<Unknown>*, size_t count);
     
     template<typename T>
@@ -59,18 +73,23 @@ public:
     void appendUnbarrieredValue(JSValue*);
     template<typename T>
     void appendUnbarrieredWeak(Weak<T>*);
+    template<typename T>
+    void appendUnbarrieredReadOnlyPointer(T*);
+    void appendUnbarrieredReadOnlyValue(JSValue);
     
-    void addOpaqueRoot(void*);
-    bool containsOpaqueRoot(void*);
-    TriState containsOpaqueRootTriState(void*);
+    JS_EXPORT_PRIVATE void addOpaqueRoot(void*);
+    JS_EXPORT_PRIVATE bool containsOpaqueRoot(void*) const;
+    TriState containsOpaqueRootTriState(void*) const;
     int opaqueRootCount();
 
-    GCThreadSharedData& sharedData() { return m_shared; }
     bool isEmpty() { return m_stack.isEmpty(); }
 
-    void setup();
+    void didStartMarking();
     void reset();
+    void clearMarkStack();
 
+    size_t bytesVisited() const { return m_bytesVisited; }
+    size_t bytesCopied() const { return m_bytesCopied; }
     size_t visitCount() const { return m_visitCount; }
 
     void donate();
@@ -83,55 +102,42 @@ public:
     void harvestWeakReferences();
     void finalizeUnconditionalFinalizers();
 
-    void copyLater(JSCell*, void*, size_t);
+    void copyLater(JSCell*, CopyToken, void*, size_t);
     
-#if ENABLE(SIMPLE_HEAP_PROFILING)
-    VTableSpectrum m_visitedTypeCounts;
-#endif
-
+    void reportExtraMemoryVisited(size_t);
+    
     void addWeakReferenceHarvester(WeakReferenceHarvester*);
     void addUnconditionalFinalizer(UnconditionalFinalizer*);
 
-#if ENABLE(OBJECT_MARK_LOGGING)
-    inline void resetChildCount() { m_logChildCount = 0; }
-    inline unsigned childCount() { return m_logChildCount; }
-    inline void incrementChildCount() { m_logChildCount++; }
-#endif
+    void dump(PrintStream&) const;
 
 private:
     friend class ParallelModeEnabler;
     
-    JS_EXPORT_PRIVATE static void validate(JSCell*);
+    JS_EXPORT_PRIVATE void append(JSValue); // This is private to encourage clients to use WriteBarrier<T>.
 
-    void append(JSValue*);
-    void append(JSValue*, size_t count);
-    void append(JSCell**);
-
-    void internalAppend(JSCell*);
-    void internalAppend(JSValue);
-    void internalAppend(JSValue*);
+    JS_EXPORT_PRIVATE void setMarkedAndAppendToMarkStack(JSCell*);
+    void appendToMarkStack(JSCell*);
     
     JS_EXPORT_PRIVATE void mergeOpaqueRoots();
     void mergeOpaqueRootsIfNecessary();
     void mergeOpaqueRootsIfProfitable();
+
+    void visitChildren(const JSCell*);
     
     void donateKnownParallel();
 
     MarkStackArray m_stack;
-    HashSet<void*> m_opaqueRoots; // Handle-owning data structures not visible to the garbage collector.
+    OpaqueRootSet m_opaqueRoots; // Handle-owning data structures not visible to the garbage collector.
     
+    size_t m_bytesVisited;
+    size_t m_bytesCopied;
     size_t m_visitCount;
     bool m_isInParallelMode;
     
-    GCThreadSharedData& m_shared;
+    Heap& m_heap;
 
-    bool m_shouldHashCons; // Local per-thread copy of shared flag for performance reasons
-    typedef HashMap<StringImpl*, JSValue> UniqueStringMap;
-    UniqueStringMap m_uniqueStrings;
-
-#if ENABLE(OBJECT_MARK_LOGGING)
-    unsigned m_logChildCount;
-#endif
+    CellState m_currentObjectCellStateBeforeVisiting { CellState::NewWhite };
 
 public:
 #if !ASSERT_DISABLED

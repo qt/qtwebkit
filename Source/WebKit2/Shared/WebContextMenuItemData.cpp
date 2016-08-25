@@ -67,18 +67,14 @@ WebContextMenuItemData::WebContextMenuItemData(WebCore::ContextMenuAction action
 {
 }
 
-WebContextMenuItemData::WebContextMenuItemData(const WebCore::ContextMenuItem& item, WebCore::ContextMenu* menu)
+WebContextMenuItemData::WebContextMenuItemData(const WebCore::ContextMenuItem& item)
     : m_type(item.type())
     , m_action(item.action())
     , m_title(item.title())
 {
     if (m_type == WebCore::SubmenuType) {
-#if USE(CROSS_PLATFORM_CONTEXT_MENUS)
         const Vector<WebCore::ContextMenuItem>& coreSubmenu = item.subMenuItems();
-#else
-        Vector<WebCore::ContextMenuItem> coreSubmenu = WebCore::contextMenuItemVector(item.platformSubMenu());
-#endif
-        m_submenu = kitItems(coreSubmenu, menu);
+        m_submenu = kitItems(coreSubmenu);
     }
     
     m_enabled = item.enabled();
@@ -94,17 +90,17 @@ ContextMenuItem WebContextMenuItemData::core() const
     return ContextMenuItem(m_action, m_title, m_enabled, m_checked, subMenuItems);
 }
 
-APIObject* WebContextMenuItemData::userData() const
+API::Object* WebContextMenuItemData::userData() const
 {
     return m_userData.get();
 }
 
-void WebContextMenuItemData::setUserData(APIObject* userData)
+void WebContextMenuItemData::setUserData(API::Object* userData)
 {
     m_userData = userData;
 }
     
-void WebContextMenuItemData::encode(CoreIPC::ArgumentEncoder& encoder) const
+void WebContextMenuItemData::encode(IPC::ArgumentEncoder& encoder) const
 {
     encoder.encodeEnum(m_type);
     encoder.encodeEnum(m_action);
@@ -114,7 +110,7 @@ void WebContextMenuItemData::encode(CoreIPC::ArgumentEncoder& encoder) const
     encoder << m_submenu;
 }
 
-bool WebContextMenuItemData::decode(CoreIPC::ArgumentDecoder& decoder, WebContextMenuItemData& item)
+bool WebContextMenuItemData::decode(IPC::ArgumentDecoder& decoder, WebContextMenuItemData& item)
 {
     WebCore::ContextMenuItemType type;
     if (!decoder.decodeEnum(type))
@@ -157,12 +153,12 @@ bool WebContextMenuItemData::decode(CoreIPC::ArgumentDecoder& decoder, WebContex
     return true;
 }
 
-Vector<WebContextMenuItemData> kitItems(const Vector<WebCore::ContextMenuItem>& coreItemVector, WebCore::ContextMenu* menu)
+Vector<WebContextMenuItemData> kitItems(const Vector<WebCore::ContextMenuItem>& coreItemVector)
 {
     Vector<WebContextMenuItemData> result;
     result.reserveCapacity(coreItemVector.size());
     for (unsigned i = 0; i < coreItemVector.size(); ++i)
-        result.append(WebContextMenuItemData(coreItemVector[i], menu));
+        result.append(WebContextMenuItemData(coreItemVector[i]));
     
     return result;
 }

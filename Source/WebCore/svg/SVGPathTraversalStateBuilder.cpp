@@ -2,6 +2,7 @@
  * Copyright (C) 2004, 2005, 2006, 2007, 2008 Nikolas Zimmermann <zimmermann@kde.org>
  * Copyright (C) 2004, 2005 Rob Buis <buis@kde.org>
  * Copyright (C) 2007 Eric Seidel <eric@webkit.org>
+ * Copyright (C) 2015 Apple Inc. All rights reserved.
  * Copyright (C) Research In Motion Limited 2010. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
@@ -21,80 +22,53 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "SVGPathTraversalStateBuilder.h"
 
 #include "PathTraversalState.h"
 
 namespace WebCore {
 
-SVGPathTraversalStateBuilder::SVGPathTraversalStateBuilder()
-    : m_traversalState(0)
+SVGPathTraversalStateBuilder::SVGPathTraversalStateBuilder(PathTraversalState& state, float desiredLength)
+    : m_traversalState(state)
 {
+    m_traversalState.setDesiredLength(desiredLength);
 }
 
 void SVGPathTraversalStateBuilder::moveTo(const FloatPoint& targetPoint, bool, PathCoordinateMode)
 {
-    ASSERT(m_traversalState);
-    m_traversalState->m_totalLength += m_traversalState->moveTo(targetPoint);
+    m_traversalState.processPathElement(PathElementMoveToPoint, &targetPoint);
 }
 
 void SVGPathTraversalStateBuilder::lineTo(const FloatPoint& targetPoint, PathCoordinateMode)
 {
-    ASSERT(m_traversalState);
-    m_traversalState->m_totalLength += m_traversalState->lineTo(targetPoint);
+    m_traversalState.processPathElement(PathElementAddLineToPoint, &targetPoint);
 }
 
 void SVGPathTraversalStateBuilder::curveToCubic(const FloatPoint& point1, const FloatPoint& point2, const FloatPoint& targetPoint, PathCoordinateMode)
 {
-    ASSERT(m_traversalState);
-    m_traversalState->m_totalLength += m_traversalState->cubicBezierTo(point1, point2, targetPoint);
+    FloatPoint points[] = { point1, point2, targetPoint };
+
+    m_traversalState.processPathElement(PathElementAddCurveToPoint, points);
 }
 
 void SVGPathTraversalStateBuilder::closePath()
 {
-    ASSERT(m_traversalState);
-    m_traversalState->m_totalLength += m_traversalState->closeSubpath();
-}
-
-void SVGPathTraversalStateBuilder::setDesiredLength(float desiredLength)
-{
-    ASSERT(m_traversalState);
-    m_traversalState->m_desiredLength = desiredLength;
+    m_traversalState.processPathElement(PathElementCloseSubpath, nullptr);
 }
 
 bool SVGPathTraversalStateBuilder::continueConsuming()
 {
-    ASSERT(m_traversalState);    
-    m_traversalState->processSegment();
-    return !m_traversalState->m_success;
+    return !m_traversalState.success();
 }
 
-void SVGPathTraversalStateBuilder::incrementPathSegmentCount()
+float SVGPathTraversalStateBuilder::totalLength() const
 {
-    ASSERT(m_traversalState);
-    ++m_traversalState->m_segmentIndex;
+    return m_traversalState.totalLength();
 }
 
-unsigned SVGPathTraversalStateBuilder::pathSegmentIndex()
+SVGPoint SVGPathTraversalStateBuilder::currentPoint() const
 {
-    ASSERT(m_traversalState);
-    return m_traversalState->m_segmentIndex;
-}
-
-float SVGPathTraversalStateBuilder::totalLength()
-{
-    ASSERT(m_traversalState);
-    return m_traversalState->m_totalLength;
-}
-
-SVGPoint SVGPathTraversalStateBuilder::currentPoint()
-{
-    ASSERT(m_traversalState);
-    return m_traversalState->m_current;
+    return m_traversalState.current();
 }
 
 }
-
-#endif // ENABLE(SVG)

@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -34,6 +34,7 @@
 
 #include "VectorMath.h"
 #include "AudioBus.h"
+#include <mutex>
 
 namespace WebCore {
 
@@ -102,15 +103,15 @@ ReverbConvolver::ReverbConvolver(AudioChannel* impulseResponse, size_t renderSli
 
         bool useDirectConvolver = !stageOffset;
 
-        OwnPtr<ReverbConvolverStage> stage = adoptPtr(new ReverbConvolverStage(response, totalResponseLength, reverbTotalLatency, stageOffset, stageSize, fftSize, renderPhase, renderSliceSize, &m_accumulationBuffer, useDirectConvolver));
+        auto stage = std::make_unique<ReverbConvolverStage>(response, totalResponseLength, reverbTotalLatency, stageOffset, stageSize, fftSize, renderPhase, renderSliceSize, &m_accumulationBuffer, useDirectConvolver);
 
         bool isBackgroundStage = false;
 
         if (this->useBackgroundThreads() && stageOffset > RealtimeFrameLimit) {
-            m_backgroundStages.append(stage.release());
+            m_backgroundStages.append(WTFMove(stage));
             isBackgroundStage = true;
         } else
-            m_stages.append(stage.release());
+            m_stages.append(WTFMove(stage));
 
         stageOffset += stageSize;
         ++i;
@@ -140,9 +141,9 @@ ReverbConvolver::~ReverbConvolver()
 
         // Wake up thread so it can return
         {
-            MutexLocker locker(m_backgroundThreadLock);
+            std::lock_guard<Lock> lock(m_backgroundThreadMutex);
             m_moreInputBuffered = true;
-            m_backgroundThreadCondition.signal();
+            m_backgroundThreadConditionVariable.notifyOne();
         }
 
         waitForThreadCompletion(m_backgroundThread);
@@ -155,9 +156,9 @@ void ReverbConvolver::backgroundThreadEntry()
         // Wait for realtime thread to give us more input
         m_moreInputBuffered = false;        
         {
-            MutexLocker locker(m_backgroundThreadLock);
-            while (!m_moreInputBuffered && !m_wantsToExit)
-                m_backgroundThreadCondition.wait(m_backgroundThreadLock);
+            std::unique_lock<Lock> lock(m_backgroundThreadMutex);
+
+            m_backgroundThreadConditionVariable.wait(lock, [this] { return m_moreInputBuffered || m_wantsToExit; });
         }
 
         // Process all of the stages until their read indices reach the input buffer's write index
@@ -204,16 +205,17 @@ void ReverbConvolver::process(const AudioChannel* sourceChannel, AudioChannel* d
         
     // Now that we've buffered more input, wake up our background thread.
     
-    // Not using a MutexLocker looks strange, but we use a tryLock() instead because this is run on the real-time
+    // We use use std::unique_lock with std::try_lock here because this is run on the real-time
     // thread where it is a disaster for the lock to be contended (causes audio glitching).  It's OK if we fail to
     // signal from time to time, since we'll get to it the next time we're called.  We're called repeatedly
     // and frequently (around every 3ms).  The background thread is processing well into the future and has a considerable amount of 
     // leeway here...
-    if (m_backgroundThreadLock.tryLock()) {
-        m_moreInputBuffered = true;
-        m_backgroundThreadCondition.signal();
-        m_backgroundThreadLock.unlock();
-    }
+    std::unique_lock<Lock> lock(m_backgroundThreadMutex, std::try_to_lock);
+    if (!lock.owns_lock())
+        return;
+
+    m_moreInputBuffered = true;
+    m_backgroundThreadConditionVariable.notifyOne();
 }
 
 void ReverbConvolver::reset()

@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -26,47 +26,80 @@
 #include "config.h"
 #include "JSHTMLElement.h"
 
+#include "CustomElementDefinitions.h"
 #include "Document.h"
 #include "HTMLFormElement.h"
+#include <runtime/InternalFunction.h>
 #include <runtime/JSWithScope.h>
-
-#if ENABLE(MICRODATA)
-#include "JSMicroDataItemValue.h"
-#endif
 
 namespace WebCore {
 
 using namespace JSC;
 
+#if ENABLE(CUSTOM_ELEMENTS)
+EncodedJSValue JSC_HOST_CALL constructJSHTMLElement(ExecState* state)
+{
+    auto* jsConstructor = jsCast<DOMConstructorObject*>(state->callee());
+
+    auto* context = jsConstructor->scriptExecutionContext();
+    if (!is<Document>(context))
+        return throwConstructorDocumentUnavailableError(*state, "HTMLElement");
+    auto& document = downcast<Document>(*context);
+
+    auto* definitions = document.customElementDefinitions();
+    if (!definitions)
+        return throwVMTypeError(state, "new.target is not a valid custom element constructor");
+
+    VM& vm = state->vm();
+    JSValue newTargetValue = state->thisValue();
+    JSObject* newTarget = newTargetValue.getObject();
+    QualifiedName fullName = definitions->findName(newTarget);
+    if (fullName == nullQName()) {
+        if (UNLIKELY(state->argumentCount() < 1))
+            return throwVMError(state, createNotEnoughArgumentsError(state));
+    }
+
+    if (state->argumentCount()) {
+        String name;
+        if (!state->argument(0).getString(state, name))
+            return throwVMTypeError(state, "The first argument is not a valid custom element name");
+        
+        auto* interface = definitions->findInterface(name);
+        if (!interface)
+            return throwVMTypeError(state, "The first argument is not a valid custom element name");
+        
+        if (newTarget != interface->constructor())
+            return throwVMTypeError(state, "Attempt to construct a custom element with a wrong interface");
+        
+        fullName = QualifiedName(nullAtom, name, HTMLNames::xhtmlNamespaceURI);
+    }
+
+    auto* globalObject = jsConstructor->globalObject();
+    Structure* baseStructure = getDOMStructure<JSHTMLElement>(vm, *globalObject);
+    auto* newElementStructure = InternalFunction::createSubclassStructure(state, newTargetValue, baseStructure);
+    if (UNLIKELY(state->hadException()))
+        return JSValue::encode(jsUndefined());
+
+    Ref<HTMLElement> element = HTMLElement::create(fullName, document);
+    auto* jsElement = JSHTMLElement::create(newElementStructure, globalObject, element.get());
+    cacheWrapper(globalObject->world(), element.ptr(), jsElement);
+    return JSValue::encode(jsElement);
+}
+#endif
+
 JSScope* JSHTMLElement::pushEventHandlerScope(ExecState* exec, JSScope* scope) const
 {
-    HTMLElement* element = impl();
+    HTMLElement& element = wrapped();
 
     // The document is put on first, fall back to searching it only after the element and form.
-    scope = JSWithScope::create(exec, asObject(toJS(exec, globalObject(), element->ownerDocument())), scope);
+    scope = JSWithScope::create(exec, asObject(toJS(exec, globalObject(), &element.document())), scope);
 
     // The form is next, searched before the document, but after the element itself.
-    if (HTMLFormElement* form = element->form())
+    if (HTMLFormElement* form = element.form())
         scope = JSWithScope::create(exec, asObject(toJS(exec, globalObject(), form)), scope);
 
     // The element is on top, searched first.
-    return JSWithScope::create(exec, asObject(toJS(exec, globalObject(), element)), scope);
+    return JSWithScope::create(exec, asObject(toJS(exec, globalObject(), &element)), scope);
 }
-
-#if ENABLE(MICRODATA)
-JSValue JSHTMLElement::itemValue(ExecState* exec) const
-{
-    HTMLElement* element = impl();
-    return toJS(exec, globalObject(), WTF::getPtr(element->itemValue()));
-}
-
-void JSHTMLElement::setItemValue(ExecState* exec, JSValue value)
-{
-    HTMLElement* imp = impl();
-    ExceptionCode ec = 0;
-    imp->setItemValue(valueToStringWithNullCheck(exec, value), ec);
-    setDOMException(exec, ec);
-}
-#endif
 
 } // namespace WebCore

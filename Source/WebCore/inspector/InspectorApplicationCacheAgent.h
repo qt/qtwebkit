@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Apple Inc. All rights reserved.
+ * Copyright (C) 2010, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -25,67 +25,56 @@
 #ifndef InspectorApplicationCacheAgent_h
 #define InspectorApplicationCacheAgent_h
 
-#if ENABLE(INSPECTOR)
-
 #include "ApplicationCacheHost.h"
-#include "InspectorBaseAgent.h"
-#include "InspectorFrontend.h"
+#include "InspectorWebAgentBase.h"
+#include <inspector/InspectorBackendDispatchers.h>
+#include <inspector/InspectorFrontendDispatchers.h>
 #include <wtf/Noncopyable.h>
-#include <wtf/PassOwnPtr.h>
+
+namespace Inspector {
+class ApplicationCacheFrontendDispatcher;
+class InspectorObject;
+class InspectorValue;
+}
 
 namespace WebCore {
 
 class Frame;
-class InspectorArray;
-class InspectorAgent;
-class InspectorFrontend;
-class InspectorObject;
 class InspectorPageAgent;
-class InspectorValue;
-class InspectorState;
-class InstrumentingAgents;
 class Page;
 class ResourceResponse;
 
 typedef String ErrorString;
 
-class InspectorApplicationCacheAgent : public InspectorBaseAgent<InspectorApplicationCacheAgent>, public InspectorBackendDispatcher::ApplicationCacheCommandHandler {
+class InspectorApplicationCacheAgent final : public InspectorAgentBase, public Inspector::ApplicationCacheBackendDispatcherHandler {
     WTF_MAKE_NONCOPYABLE(InspectorApplicationCacheAgent); WTF_MAKE_FAST_ALLOCATED;
 public:
-    static PassOwnPtr<InspectorApplicationCacheAgent> create(InstrumentingAgents* instrumentingAgents, InspectorCompositeState* state, InspectorPageAgent* pageAgent)
-    {
-        return adoptPtr(new InspectorApplicationCacheAgent(instrumentingAgents, state, pageAgent));
-    }
-    ~InspectorApplicationCacheAgent() { }
+    InspectorApplicationCacheAgent(WebAgentContext&, InspectorPageAgent*);
+    virtual ~InspectorApplicationCacheAgent() { }
 
-    // InspectorBaseAgent
-    virtual void setFrontend(InspectorFrontend*);
-    virtual void clearFrontend();
-    virtual void restore();
+    virtual void didCreateFrontendAndBackend(Inspector::FrontendRouter*, Inspector::BackendDispatcher*) override;
+    virtual void willDestroyFrontendAndBackend(Inspector::DisconnectReason) override;
 
-    // InspectorInstrumentation API
     void updateApplicationCacheStatus(Frame*);
     void networkStateChanged();
 
-    // ApplicationCache API for InspectorFrontend
-    virtual void enable(ErrorString*);
-    virtual void getFramesWithManifests(ErrorString*, RefPtr<TypeBuilder::Array<TypeBuilder::ApplicationCache::FrameWithManifest> >& result);
-    virtual void getManifestForFrame(ErrorString*, const String& frameId, String* manifestURL);
-    virtual void getApplicationCacheForFrame(ErrorString*, const String& frameId, RefPtr<TypeBuilder::ApplicationCache::ApplicationCache>&);
+    virtual void enable(ErrorString&) override;
+    virtual void getFramesWithManifests(ErrorString&, RefPtr<Inspector::Protocol::Array<Inspector::Protocol::ApplicationCache::FrameWithManifest>>& result) override;
+    virtual void getManifestForFrame(ErrorString&, const String& frameId, String* manifestURL) override;
+    virtual void getApplicationCacheForFrame(ErrorString&, const String& frameId, RefPtr<Inspector::Protocol::ApplicationCache::ApplicationCache>&) override;
 
 private:
-    InspectorApplicationCacheAgent(InstrumentingAgents*, InspectorCompositeState*, InspectorPageAgent*);
-    PassRefPtr<TypeBuilder::ApplicationCache::ApplicationCache> buildObjectForApplicationCache(const ApplicationCacheHost::ResourceInfoList&, const ApplicationCacheHost::CacheInfo&);
-    PassRefPtr<TypeBuilder::Array<TypeBuilder::ApplicationCache::ApplicationCacheResource> > buildArrayForApplicationCacheResources(const ApplicationCacheHost::ResourceInfoList&);
-    PassRefPtr<TypeBuilder::ApplicationCache::ApplicationCacheResource> buildObjectForApplicationCacheResource(const ApplicationCacheHost::ResourceInfo&);
+    Ref<Inspector::Protocol::ApplicationCache::ApplicationCache> buildObjectForApplicationCache(const ApplicationCacheHost::ResourceInfoList&, const ApplicationCacheHost::CacheInfo&);
+    Ref<Inspector::Protocol::Array<Inspector::Protocol::ApplicationCache::ApplicationCacheResource>> buildArrayForApplicationCacheResources(const ApplicationCacheHost::ResourceInfoList&);
+    Ref<Inspector::Protocol::ApplicationCache::ApplicationCacheResource> buildObjectForApplicationCacheResource(const ApplicationCacheHost::ResourceInfo&);
 
-    DocumentLoader* assertFrameWithDocumentLoader(ErrorString*, String frameId);
+    DocumentLoader* assertFrameWithDocumentLoader(ErrorString&, const String& frameId);
 
-    InspectorPageAgent* m_pageAgent;
-    InspectorFrontend::ApplicationCache* m_frontend;
+    std::unique_ptr<Inspector::ApplicationCacheFrontendDispatcher> m_frontendDispatcher;
+    RefPtr<Inspector::ApplicationCacheBackendDispatcher> m_backendDispatcher;
+    InspectorPageAgent* m_pageAgent { nullptr };
 };
 
 } // namespace WebCore
 
-#endif // ENABLE(INSPECTOR)
 #endif // InspectorApplicationCacheAgent_h

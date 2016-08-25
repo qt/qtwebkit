@@ -26,6 +26,8 @@
 #include "config.h"
 #include "ShareableResource.h"
 
+#if ENABLE(SHAREABLE_RESOURCE)
+
 #include "ArgumentCoders.h"
 #include <WebCore/SharedBuffer.h>
 
@@ -37,14 +39,14 @@ ShareableResource::Handle::Handle()
 {
 }
 
-void ShareableResource::Handle::encode(CoreIPC::ArgumentEncoder& encoder) const
+void ShareableResource::Handle::encode(IPC::ArgumentEncoder& encoder) const
 {
     encoder << m_handle;
     encoder << m_offset;
     encoder << m_size;
 }
 
-bool ShareableResource::Handle::decode(CoreIPC::ArgumentDecoder& decoder, Handle& handle)
+bool ShareableResource::Handle::decode(IPC::ArgumentDecoder& decoder, Handle& handle)
 {
     if (!decoder.decode(handle.m_handle))
         return false;
@@ -55,6 +57,7 @@ bool ShareableResource::Handle::decode(CoreIPC::ArgumentDecoder& decoder, Handle
     return true;
 }
 
+#if USE(CF)
 static void shareableResourceDeallocate(void *ptr, void *info)
 {
     (static_cast<ShareableResource*>(info))->deref(); // Balanced by ref() in createShareableResourceDeallocator()
@@ -62,8 +65,6 @@ static void shareableResourceDeallocate(void *ptr, void *info)
     
 static CFAllocatorRef createShareableResourceDeallocator(ShareableResource* resource)
 {
-    resource->ref(); // Balanced by deref in shareableResourceDeallocate()
-
     CFAllocatorContext context = { 0,
         resource,
         NULL, // retain
@@ -77,29 +78,43 @@ static CFAllocatorRef createShareableResourceDeallocator(ShareableResource* reso
 
     return CFAllocatorCreate(kCFAllocatorDefault, &context);
 }
+#endif
+
+PassRefPtr<SharedBuffer> ShareableResource::wrapInSharedBuffer()
+{
+    ref(); // Balanced by deref when SharedBuffer is deallocated.
+
+#if USE(CF)
+    RetainPtr<CFAllocatorRef> deallocator = adoptCF(createShareableResourceDeallocator(this));
+    RetainPtr<CFDataRef> cfData = adoptCF(CFDataCreateWithBytesNoCopy(kCFAllocatorDefault, reinterpret_cast<const UInt8*>(data()), static_cast<CFIndex>(size()), deallocator.get()));
+    return SharedBuffer::wrapCFData(cfData.get());
+#elif USE(SOUP)
+    return SharedBuffer::wrapSoupBuffer(soup_buffer_new_with_owner(data(), size(), this, [](void* data) { static_cast<ShareableResource*>(data)->deref(); }));
+#else
+    ASSERT_NOT_REACHED();
+    return nullptr;
+#endif
+}
 
 PassRefPtr<SharedBuffer> ShareableResource::Handle::tryWrapInSharedBuffer() const
 {
-    RefPtr<ShareableResource> resource = ShareableResource::create(*this);
+    RefPtr<ShareableResource> resource = ShareableResource::map(*this);
     if (!resource) {
         LOG_ERROR("Failed to recreate ShareableResource from handle.");
-        return 0;
+        return nullptr;
     }
 
-    RetainPtr<CFAllocatorRef> deallocator = adoptCF(createShareableResourceDeallocator(resource.get()));
-    RetainPtr<CFDataRef> data = adoptCF(CFDataCreateWithBytesNoCopy(kCFAllocatorDefault, reinterpret_cast<const UInt8*>(resource->data()), static_cast<CFIndex>(resource->size()), deallocator.get()));
-
-    return SharedBuffer::wrapCFData(data.get());
-}
-    
-PassRefPtr<ShareableResource> ShareableResource::create(PassRefPtr<SharedMemory> sharedMemory, unsigned offset, unsigned size)
-{
-    return adoptRef(new ShareableResource(sharedMemory, offset, size));
+    return resource->wrapInSharedBuffer();
 }
 
-PassRefPtr<ShareableResource> ShareableResource::create(const Handle& handle)
+Ref<ShareableResource> ShareableResource::create(PassRefPtr<SharedMemory> sharedMemory, unsigned offset, unsigned size)
 {
-    RefPtr<SharedMemory> sharedMemory = SharedMemory::create(handle.m_handle, SharedMemory::ReadOnly);
+    return adoptRef(*new ShareableResource(sharedMemory, offset, size));
+}
+
+PassRefPtr<ShareableResource> ShareableResource::map(const Handle& handle)
+{
+    RefPtr<SharedMemory> sharedMemory = SharedMemory::map(handle.m_handle, SharedMemory::Protection::ReadOnly);
     if (!sharedMemory)
         return 0;
 
@@ -123,7 +138,7 @@ ShareableResource::~ShareableResource()
 
 bool ShareableResource::createHandle(Handle& handle)
 {
-    if (!m_sharedMemory->createHandle(handle.m_handle, SharedMemory::ReadOnly))
+    if (!m_sharedMemory->createHandle(handle.m_handle, SharedMemory::Protection::ReadOnly))
         return false;
 
     handle.m_offset = m_offset;
@@ -143,3 +158,5 @@ unsigned ShareableResource::size() const
 }
     
 } // namespace WebKit
+
+#endif // ENABLE(SHAREABLE_RESOURCE)

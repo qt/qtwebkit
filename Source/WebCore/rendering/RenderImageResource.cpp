@@ -30,8 +30,9 @@
 
 #include "CachedImage.h"
 #include "Image.h"
+#include "RenderElement.h"
+#include "RenderImage.h"
 #include "RenderImageResourceStyleImage.h"
-#include "RenderObject.h"
 
 namespace WebCore {
 
@@ -44,7 +45,7 @@ RenderImageResource::~RenderImageResource()
 {
 }
 
-void RenderImageResource::initialize(RenderObject* renderer)
+void RenderImageResource::initialize(RenderElement* renderer)
 {
     ASSERT(!m_renderer);
     ASSERT(renderer);
@@ -73,8 +74,6 @@ void RenderImageResource::setCachedImage(CachedImage* newImage)
         m_cachedImage->addClient(m_renderer);
         if (m_cachedImage->errorOccurred())
             m_renderer->imageChanged(m_cachedImage.get());
-    } else {
-        m_renderer->imageChanged(m_cachedImage.get());
     }
 }
 
@@ -91,9 +90,9 @@ void RenderImageResource::resetAnimation()
         m_renderer->repaint();
 }
 
-PassRefPtr<Image> RenderImageResource::image(int, int) const
+RefPtr<Image> RenderImageResource::image(int, int) const
 {
-    return m_cachedImage ? m_cachedImage->imageForRenderer(m_renderer) : nullImage();
+    return m_cachedImage ? m_cachedImage->imageForRenderer(m_renderer) : Image::nullImage();
 }
 
 bool RenderImageResource::errorOccurred() const
@@ -105,17 +104,7 @@ void RenderImageResource::setContainerSizeForRenderer(const IntSize& imageContai
 {
     ASSERT(m_renderer);
     if (m_cachedImage)
-        m_cachedImage->setContainerSizeForRenderer(m_renderer, imageContainerSize, m_renderer->style()->effectiveZoom());
-}
-
-Image* RenderImageResource::nullImage()
-{
-    return Image::nullImage();
-}
-
-bool RenderImageResource::usesImageContainerSize() const
-{
-    return m_cachedImage ? m_cachedImage->usesImageContainerSize() : false;
+        m_cachedImage->setContainerSizeForRenderer(m_renderer, imageContainerSize, m_renderer->style().effectiveZoom());
 }
 
 bool RenderImageResource::imageHasRelativeWidth() const
@@ -130,7 +119,22 @@ bool RenderImageResource::imageHasRelativeHeight() const
 
 LayoutSize RenderImageResource::imageSize(float multiplier) const
 {
-    return m_cachedImage ? m_cachedImage->imageSizeForRenderer(m_renderer, multiplier) : LayoutSize();
+    return getImageSize(multiplier, CachedImage::UsedSize);
+}
+
+LayoutSize RenderImageResource::intrinsicSize(float multiplier) const
+{
+    return getImageSize(multiplier, CachedImage::IntrinsicSize);
+}
+
+LayoutSize RenderImageResource::getImageSize(float multiplier, CachedImage::SizeType type) const
+{
+    if (!m_cachedImage)
+        return LayoutSize();
+    LayoutSize size = m_cachedImage->imageSizeForRenderer(m_renderer, multiplier, type);
+    if (is<RenderImage>(m_renderer))
+        size.scale(downcast<RenderImage>(*m_renderer).imageDevicePixelRatio());
+    return size;
 }
 
 } // namespace WebCore

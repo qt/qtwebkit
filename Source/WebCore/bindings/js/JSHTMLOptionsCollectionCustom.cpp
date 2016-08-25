@@ -37,12 +37,21 @@ using namespace JSC;
 
 namespace WebCore {
 
-void JSHTMLOptionsCollection::setLength(ExecState* exec, JSValue value)
+bool JSHTMLOptionsCollection::nameGetter(ExecState* exec, PropertyName propertyName, JSValue& value)
 {
-    HTMLOptionsCollection* imp = static_cast<HTMLOptionsCollection*>(impl());
+    auto item = wrapped().namedItem(propertyNameToAtomicString(propertyName));
+    if (!item)
+        return false;
+
+    value = toJS(exec, globalObject(), item);
+    return true;
+}
+
+void JSHTMLOptionsCollection::setLength(ExecState& state, JSValue value)
+{
     ExceptionCode ec = 0;
     unsigned newLength = 0;
-    double lengthValue = value.toNumber(exec);
+    double lengthValue = value.toNumber(&state);
     if (!std::isnan(lengthValue) && !std::isinf(lengthValue)) {
         if (lengthValue < 0.0)
             ec = INDEX_SIZE_ERR;
@@ -52,39 +61,24 @@ void JSHTMLOptionsCollection::setLength(ExecState* exec, JSValue value)
             newLength = static_cast<unsigned>(lengthValue);
     }
     if (!ec)
-        imp->setLength(newLength, ec);
-    setDOMException(exec, ec);
+        wrapped().setLength(newLength, ec);
+    setDOMException(&state, ec);
 }
 
 void JSHTMLOptionsCollection::indexSetter(ExecState* exec, unsigned index, JSValue value)
 {
-    HTMLOptionsCollection* imp = static_cast<HTMLOptionsCollection*>(impl());
-    HTMLSelectElement* base = toHTMLSelectElement(imp->ownerNode());
-    selectIndexSetter(base, exec, index, value);
+    selectIndexSetter(&wrapped().selectElement(), exec, index, value);
 }
 
-JSValue JSHTMLOptionsCollection::add(ExecState* exec)
+JSValue JSHTMLOptionsCollection::remove(ExecState& state)
 {
-    HTMLOptionsCollection* imp = static_cast<HTMLOptionsCollection*>(impl());
-    HTMLOptionElement* option = toHTMLOptionElement(exec->argument(0));
-    ExceptionCode ec = 0;
-    if (exec->argumentCount() < 2)
-        imp->add(option, ec);
-    else {
-        int index = exec->argument(1).toInt32(exec);
-        if (exec->hadException())
-            return jsUndefined();
-        imp->add(option, index, ec);
-    }
-    setDOMException(exec, ec);
+    // The argument can be an HTMLOptionElement or an index.
+    JSValue argument = state.argument(0);
+    if (HTMLOptionElement* option = JSHTMLOptionElement::toWrapped(argument))
+        wrapped().remove(option);
+    else
+        wrapped().remove(argument.toInt32(&state));
     return jsUndefined();
-}
-
-JSValue JSHTMLOptionsCollection::remove(ExecState* exec)
-{
-    HTMLOptionsCollection* imp = static_cast<HTMLOptionsCollection*>(impl());
-    JSHTMLSelectElement* base = jsCast<JSHTMLSelectElement*>(asObject(toJS(exec, globalObject(), imp->ownerNode())));
-    return base->remove(exec);
 }
 
 }

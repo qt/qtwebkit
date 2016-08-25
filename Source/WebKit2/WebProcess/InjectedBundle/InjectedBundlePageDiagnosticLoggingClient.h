@@ -29,18 +29,27 @@
 #include "APIClient.h"
 #include "WKBundlePage.h"
 #include <JavaScriptCore/JSBase.h>
+#include <WebCore/DiagnosticLoggingResultType.h>
 #include <wtf/Forward.h>
 
+namespace API {
+template<> struct ClientTraits<WKBundlePageDiagnosticLoggingClientBase> {
+    typedef std::tuple<WKBundlePageDiagnosticLoggingClientV0, WKBundlePageDiagnosticLoggingClientV1> Versions;
+};
+}
+
 namespace WebKit {
-    
-class APIObject;
+
 class InjectedBundleHitTestResult;
 class WebContextMenuItemData;
 class WebPage;
 
-class InjectedBundlePageDiagnosticLoggingClient : public APIClient<WKBundlePageDiagnosticLoggingClient, kWKBundlePageDiagnosticLoggingClientCurrentVersion> {
+class InjectedBundlePageDiagnosticLoggingClient : public API::Client<WKBundlePageDiagnosticLoggingClientBase> {
 public:
-    void logDiagnosticMessage(WebPage*, const String& message, const String& description, const String& success);
+    void logDiagnosticMessageDeprecated(WebPage*, const String& message, const String& description, const String& success);
+    void logDiagnosticMessage(WebPage*, const String& message, const String& description);
+    void logDiagnosticMessageWithResult(WebPage*, const String& message, const String& description, WebCore::DiagnosticLoggingResultType);
+    void logDiagnosticMessageWithValue(WebPage*, const String& message, const String& description, const String& value);
 };
 
 } // namespace WebKit

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2004, 2006 Apple Computer, Inc.  All rights reserved.
+ * Copyright (C) 2004, 2006, 2013 Apple Inc.  All rights reserved.
  * Copyright (C) 2006 Alexey Proskuryakov (ap@nypop.com)
  *
  * Redistribution and use in source and binary forms, with or without
@@ -11,10 +11,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -31,6 +31,7 @@
 #include "c_utility.h"
 
 #include "CRuntimeObject.h"
+#include "DOMWindow.h"
 #include "JSDOMBinding.h"
 #include "JSDOMWindow.h"
 #include "NP_jsobject.h"
@@ -85,7 +86,7 @@ void convertValueToNPVariant(ExecState* exec, JSValue value, NPVariant* result)
         NULL_TO_NPVARIANT(*result);
     } else if (value.isObject()) {
         JSObject* object = asObject(value);
-        if (object->classInfo() == &CRuntimeObject::s_info) {
+        if (object->classInfo() == CRuntimeObject::info()) {
             CRuntimeObject* runtimeObject = static_cast<CRuntimeObject*>(object);
             CInstance* instance = runtimeObject->getInternalCInstance();
             if (instance) {
@@ -94,7 +95,7 @@ void convertValueToNPVariant(ExecState* exec, JSValue value, NPVariant* result)
                 OBJECT_TO_NPVARIANT(obj, *result);
             }
         } else {
-            JSGlobalObject* globalObject = exec->dynamicGlobalObject();
+            JSGlobalObject* globalObject = exec->vmEntryGlobalObject();
 
             RootObject* rootObject = findRootObject(globalObject);
             if (rootObject) {
@@ -122,7 +123,7 @@ JSValue convertNPVariantToValue(ExecState* exec, const NPVariant* variant, RootO
     if (type == NPVariantType_Double)
         return jsNumber(NPVARIANT_TO_DOUBLE(*variant));
     if (type == NPVariantType_String)
-        return WebCore::jsStringWithCache(exec, convertNPStringToUTF16(&variant->value.stringValue));
+        return jsStringWithCache(exec, convertNPStringToUTF16(&variant->value.stringValue));
     if (type == NPVariantType_Object) {
         NPObject* obj = variant->value.objectValue;
         
@@ -144,7 +145,7 @@ String convertNPStringToUTF16(const NPString* string)
 
 Identifier identifierFromNPIdentifier(ExecState* exec, const NPUTF8* name)
 {
-    return Identifier(exec, convertUTF8ToUTF16WithLatin1Fallback(name, -1));
+    return Identifier::fromString(exec, convertUTF8ToUTF16WithLatin1Fallback(name, -1));
 }
 
 } }

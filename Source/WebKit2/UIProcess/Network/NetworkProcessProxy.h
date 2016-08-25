@@ -26,80 +26,107 @@
 #ifndef NetworkProcessProxy_h
 #define NetworkProcessProxy_h
 
-#if ENABLE(NETWORK_PROCESS)
-
 #include "ChildProcessProxy.h"
-#include "ProcessLauncher.h"
-#include "WebProcessProxyMessages.h"
-#include <wtf/Deque.h>
-
-#if ENABLE(CUSTOM_PROTOCOLS)
 #include "CustomProtocolManagerProxy.h"
-#endif
+#include "ProcessLauncher.h"
+#include "ProcessThrottler.h"
+#include "ProcessThrottlerClient.h"
+#include "WebProcessProxyMessages.h"
+#include "WebsiteDataTypes.h"
+#include <memory>
+#include <wtf/Deque.h>
 
 namespace WebCore {
 class AuthenticationChallenge;
+class ResourceRequest;
+class SecurityOrigin;
+class SessionID;
 }
 
 namespace WebKit {
 
 class DownloadProxy;
 class DownloadProxyMap;
-class WebContext;
+class WebProcessPool;
 struct NetworkProcessCreationParameters;
 
-class NetworkProcessProxy : public ChildProcessProxy {
+class NetworkProcessProxy : public ChildProcessProxy, private ProcessThrottlerClient {
 public:
-    static PassRefPtr<NetworkProcessProxy> create(WebContext*);
+    static Ref<NetworkProcessProxy> create(WebProcessPool&);
     ~NetworkProcessProxy();
 
     void getNetworkProcessConnection(PassRefPtr<Messages::WebProcessProxy::GetNetworkProcessConnection::DelayedReply>);
 
-    DownloadProxy* createDownloadProxy();
+    DownloadProxy* createDownloadProxy(const WebCore::ResourceRequest&);
 
-#if PLATFORM(MAC)
+    void fetchWebsiteData(WebCore::SessionID, WebsiteDataTypes, std::function<void (WebsiteData)> completionHandler);
+    void deleteWebsiteData(WebCore::SessionID, WebsiteDataTypes, std::chrono::system_clock::time_point modifiedSince, std::function<void ()> completionHandler);
+    void deleteWebsiteDataForOrigins(WebCore::SessionID, WebsiteDataTypes, const Vector<RefPtr<WebCore::SecurityOrigin>>& origins, const Vector<String>& cookieHostNames, std::function<void ()> completionHandler);
+
+#if PLATFORM(COCOA)
     void setProcessSuppressionEnabled(bool);
 #endif
 
+    void processReadyToSuspend();
+
+    void setIsHoldingLockedFiles(bool);
+
+    ProcessThrottler& throttler() { return m_throttler; }
+
 private:
-    NetworkProcessProxy(WebContext*);
+    NetworkProcessProxy(WebProcessPool&);
 
     // ChildProcessProxy
-    virtual void getLaunchOptions(ProcessLauncher::LaunchOptions&) OVERRIDE;
-    virtual void connectionWillOpen(CoreIPC::Connection*) OVERRIDE;
-    virtual void connectionWillClose(CoreIPC::Connection*) OVERRIDE;
+    virtual void getLaunchOptions(ProcessLauncher::LaunchOptions&) override;
+    virtual void connectionWillOpen(IPC::Connection&) override;
+    virtual void processWillShutDown(IPC::Connection&) override;
 
-    void platformGetLaunchOptions(ProcessLauncher::LaunchOptions&);
     void networkProcessCrashedOrFailedToLaunch();
 
-    // CoreIPC::Connection::Client
-    virtual void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&) OVERRIDE;
-    virtual void didReceiveSyncMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&, OwnPtr<CoreIPC::MessageEncoder>&) OVERRIDE;
-    virtual void didClose(CoreIPC::Connection*) OVERRIDE;
-    virtual void didReceiveInvalidMessage(CoreIPC::Connection*, CoreIPC::StringReference messageReceiverName, CoreIPC::StringReference messageName) OVERRIDE;
+    // ProcessThrottlerClient
+    void sendProcessWillSuspendImminently() override;
+    void sendPrepareToSuspend() override;
+    void sendCancelPrepareToSuspend() override;
+    void sendProcessDidResume() override;
+    void didSetAssertionState(AssertionState) override;
+
+    // IPC::Connection::Client
+    virtual void didReceiveMessage(IPC::Connection&, IPC::MessageDecoder&) override;
+    virtual void didReceiveSyncMessage(IPC::Connection&, IPC::MessageDecoder&, std::unique_ptr<IPC::MessageEncoder>&) override;
+    virtual void didClose(IPC::Connection&) override;
+    virtual void didReceiveInvalidMessage(IPC::Connection&, IPC::StringReference messageReceiverName, IPC::StringReference messageName) override;
+    virtual IPC::ProcessType localProcessType() override { return IPC::ProcessType::UI; }
+    virtual IPC::ProcessType remoteProcessType() override { return IPC::ProcessType::Network; }
 
     // Message handlers
-    void didReceiveNetworkProcessProxyMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&);
-    void didCreateNetworkConnectionToWebProcess(const CoreIPC::Attachment&);
+    void didReceiveNetworkProcessProxyMessage(IPC::Connection&, IPC::MessageDecoder&);
+    void didCreateNetworkConnectionToWebProcess(const IPC::Attachment&);
     void didReceiveAuthenticationChallenge(uint64_t pageID, uint64_t frameID, const WebCore::AuthenticationChallenge&, uint64_t challengeID);
+    void didFetchWebsiteData(uint64_t callbackID, const WebsiteData&);
+    void didDeleteWebsiteData(uint64_t callbackID);
+    void didDeleteWebsiteDataForOrigins(uint64_t callbackID);
+    void logSampledDiagnosticMessage(uint64_t pageID, const String& message, const String& description);
+    void logSampledDiagnosticMessageWithResult(uint64_t pageID, const String& message, const String& description, uint32_t result);
+    void logSampledDiagnosticMessageWithValue(uint64_t pageID, const String& message, const String& description, const String& value);
 
     // ProcessLauncher::Client
-    virtual void didFinishLaunching(ProcessLauncher*, CoreIPC::Connection::Identifier);
+    virtual void didFinishLaunching(ProcessLauncher*, IPC::Connection::Identifier) override;
 
-    WebContext* m_webContext;
+    WebProcessPool& m_processPool;
     
     unsigned m_numPendingConnectionRequests;
     Deque<RefPtr<Messages::WebProcessProxy::GetNetworkProcessConnection::DelayedReply>> m_pendingConnectionReplies;
 
-    OwnPtr<DownloadProxyMap> m_downloadProxyMap;
+    HashMap<uint64_t, std::function<void (WebsiteData)>> m_pendingFetchWebsiteDataCallbacks;
+    HashMap<uint64_t, std::function<void ()>> m_pendingDeleteWebsiteDataCallbacks;
+    HashMap<uint64_t, std::function<void ()>> m_pendingDeleteWebsiteDataForOriginsCallbacks;
 
-#if ENABLE(CUSTOM_PROTOCOLS)
+    std::unique_ptr<DownloadProxyMap> m_downloadProxyMap;
     CustomProtocolManagerProxy m_customProtocolManagerProxy;
-#endif
+    ProcessThrottler m_throttler;
+    ProcessThrottler::BackgroundActivityToken m_tokenForHoldingLockedFiles;
 };
 
 } // namespace WebKit
-
-#endif // ENABLE(NETWORK_PROCESS)
 
 #endif // NetworkProcessProxy_h

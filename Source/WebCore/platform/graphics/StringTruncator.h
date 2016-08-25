@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution. 
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission. 
  *
@@ -33,16 +33,21 @@
 
 namespace WebCore {
     
-    class Font;
-    
-    class StringTruncator {
-    public:
-        enum EnableRoundingHacksOrNot { DisableRoundingHacks, EnableRoundingHacks };
+class FontCascade;
 
-        static String centerTruncate(const String&, float maxWidth, const Font&, EnableRoundingHacksOrNot = DisableRoundingHacks);
-        static String rightTruncate(const String&, float maxWidth, const Font&, EnableRoundingHacksOrNot = DisableRoundingHacks);
-        static float width(const String&, const Font&, EnableRoundingHacksOrNot = DisableRoundingHacks);
-    };
+class StringTruncator {
+public:
+    WEBCORE_EXPORT static String centerTruncate(const String&, float maxWidth, const FontCascade&);
+    WEBCORE_EXPORT static String rightTruncate(const String&, float maxWidth, const FontCascade&);
+
+    WEBCORE_EXPORT static String centerTruncate(const String&, float maxWidth, const FontCascade&, float& resultWidth, bool shouldInsertEllipsis = true, float customTruncationElementWidth = 0);
+    WEBCORE_EXPORT static String rightTruncate(const String&, float maxWidth, const FontCascade&, float& resultWidth, bool shouldInsertEllipsis = true, float customTruncationElementWidth = 0);
+    WEBCORE_EXPORT static String leftTruncate(const String&, float maxWidth, const FontCascade&, float& resultWidth, bool shouldInsertEllipsis = true, float customTruncationElementWidth = 0);
+    WEBCORE_EXPORT static String rightClipToCharacter(const String&, float maxWidth, const FontCascade&, float& resultWidth, bool shouldInsertEllipsis = true, float customTruncationElementWidth = 0);
+    WEBCORE_EXPORT static String rightClipToWord(const String&, float maxWidth, const FontCascade&, float& resultWidth, bool shouldInsertEllipsis = true, float customTruncationElementWidth = 0, bool alwaysTruncate = false);
+
+    WEBCORE_EXPORT static float width(const String&, const FontCascade&);
+};
     
 } // namespace WebCore
 

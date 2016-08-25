@@ -19,8 +19,6 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "SVGPointList.h"
 
 #include <wtf/text/StringBuilder.h>
@@ -38,12 +36,12 @@ String SVGPointList::valueAsString() const
             builder.append(' '); // FIXME: Shouldn't we use commas to seperate?
 
         const SVGPoint& point = at(i);
-        builder.append(String::number(point.x()) + ' ' + String::number(point.y()));
+        builder.appendNumber(point.x());
+        builder.append(' ');
+        builder.appendNumber(point.y());
     }
 
     return builder.toString();
 }
 
 }
-
-#endif // ENABLE(SVG)

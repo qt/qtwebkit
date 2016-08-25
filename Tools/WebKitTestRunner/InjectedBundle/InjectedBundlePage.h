@@ -26,9 +26,9 @@
 #ifndef InjectedBundlePage_h
 #define InjectedBundlePage_h
 
-#include <WebKit2/WKBundlePage.h>
-#include <WebKit2/WKBundleScriptWorld.h>
-#include <WebKit2/WKRetainPtr.h>
+#include <WebKit/WKBundlePage.h>
+#include <WebKit/WKBundleScriptWorld.h>
+#include <WebKit/WKRetainPtr.h>
 #include <wtf/text/WTFString.h>
 
 namespace WTR {
@@ -86,7 +86,7 @@ private:
     void didReceiveTitleForFrame(WKStringRef title, WKBundleFrameRef);
     void didClearWindowForFrame(WKBundleFrameRef, WKBundleScriptWorldRef);
     void didCancelClientRedirectForFrame(WKBundleFrameRef);
-    void willPerformClientRedirectForFrame(WKBundleFrameRef, WKURLRef url, double delay, double date);
+    void willPerformClientRedirectForFrame(WKBundlePageRef, WKBundleFrameRef, WKURLRef, double delay, double date);
     void didSameDocumentNavigationForFrame(WKBundleFrameRef, WKSameDocumentNavigationType);
     void didFinishDocumentLoadForFrame(WKBundleFrameRef);
     void didHandleOnloadEventsForFrame(WKBundleFrameRef);
@@ -169,6 +169,7 @@ private:
     void dumpDOMAsWebArchive(WKBundleFrameRef, WTF::StringBuilder&);
 
     void platformDidStartProvisionalLoadForFrame(WKBundleFrameRef);
+    String platformResponseMimeType(WKURLResponseRef);
 
     void frameDidChangeLocation(WKBundleFrameRef, bool shouldDump = false);
 

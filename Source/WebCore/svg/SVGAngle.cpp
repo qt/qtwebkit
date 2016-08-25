@@ -20,14 +20,13 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "SVGAngle.h"
 
 #include "ExceptionCode.h"
 #include "SVGParserUtilities.h"
 #include <wtf/MathExtras.h>
-#include <wtf/text/WTFString.h>
+#include <wtf/NeverDestroyed.h>
+#include <wtf/text/StringView.h>
 
 namespace WebCore {
 
@@ -114,16 +113,16 @@ String SVGAngle::valueAsString() const
 {
     switch (m_unitType) {
     case SVG_ANGLETYPE_DEG: {
-        DEFINE_STATIC_LOCAL(String, degString, (ASCIILiteral("deg")));
-        return String::number(m_valueInSpecifiedUnits) + degString;
+        static NeverDestroyed<String> degString(ASCIILiteral("deg"));
+        return String::number(m_valueInSpecifiedUnits) + degString.get();
     }
     case SVG_ANGLETYPE_RAD: {
-        DEFINE_STATIC_LOCAL(String, radString, (ASCIILiteral("rad")));
-        return String::number(m_valueInSpecifiedUnits) + radString;
+        static NeverDestroyed<String> radString(ASCIILiteral("rad"));
+        return String::number(m_valueInSpecifiedUnits) + radString.get();
     }
     case SVG_ANGLETYPE_GRAD: {
-        DEFINE_STATIC_LOCAL(String, gradString, (ASCIILiteral("grad")));
-        return String::number(m_valueInSpecifiedUnits) + gradString;
+        static NeverDestroyed<String> gradString(ASCIILiteral("grad"));
+        return String::number(m_valueInSpecifiedUnits) + gradString.get();
     }
     case SVG_ANGLETYPE_UNSPECIFIED:
     case SVG_ANGLETYPE_UNKNOWN:
@@ -142,7 +141,8 @@ void SVGAngle::setValueAsString(const String& value, ExceptionCode& ec)
     }
 
     float valueInSpecifiedUnits = 0;
-    const UChar* ptr = value.characters();
+    auto upconvertedCharacters = StringView(value).upconvertedCharacters();
+    const UChar* ptr = upconvertedCharacters;
     const UChar* end = ptr + value.length();
 
     if (!parseNumber(ptr, end, valueInSpecifiedUnits, false)) {
@@ -241,5 +241,3 @@ void SVGAngle::convertToSpecifiedUnits(unsigned short unitType, ExceptionCode& e
 }
 
 }
-
-#endif // ENABLE(SVG)

@@ -29,7 +29,7 @@
 #ifndef DocumentWriter_h
 #define DocumentWriter_h
 
-#include "KURL.h"
+#include "URL.h"
 #include <wtf/text/WTFString.h>
 
 namespace WebCore {
@@ -50,13 +50,13 @@ public:
     void replaceDocument(const String&, Document* ownerDocument);
 
     void begin();
-    void begin(const KURL&, bool dispatchWindowObjectAvailable = true, Document* ownerDocument = 0);
+    void begin(const URL&, bool dispatchWindowObjectAvailable = true, Document* ownerDocument = 0);
     void addData(const char* bytes, size_t length);
-    void end();
+    WEBCORE_EXPORT void end();
     
     void setFrame(Frame* frame) { m_frame = frame; }
 
-    void setEncoding(const String& encoding, bool userChosen);
+    WEBCORE_EXPORT void setEncoding(const String& encoding, bool userChosen);
 
     const String& mimeType() const { return m_mimeType; }
     void setMIMEType(const String& type) { m_mimeType = type; }
@@ -68,7 +68,7 @@ public:
     void setDocumentWasLoadedAsPartOfNavigation();
 
 private:
-    PassRefPtr<Document> createDocument(const KURL&);
+    Ref<Document> createDocument(const URL&);
     void clear();
 
     Frame* m_frame;

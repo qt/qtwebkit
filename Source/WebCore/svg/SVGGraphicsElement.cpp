@@ -19,17 +19,14 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "SVGGraphicsElement.h"
 
 #include "AffineTransform.h"
-#include "Attribute.h"
 #include "RenderSVGPath.h"
 #include "RenderSVGResource.h"
-#include "SVGElementInstance.h"
 #include "SVGNames.h"
 #include "SVGPathData.h"
+#include <wtf/NeverDestroyed.h>
 
 namespace WebCore {
 
@@ -38,12 +35,13 @@ DEFINE_ANIMATED_TRANSFORM_LIST(SVGGraphicsElement, SVGNames::transformAttr, Tran
 
 BEGIN_REGISTER_ANIMATED_PROPERTIES(SVGGraphicsElement)
     REGISTER_LOCAL_ANIMATED_PROPERTY(transform)
-    REGISTER_PARENT_ANIMATED_PROPERTIES(SVGStyledElement)
+    REGISTER_PARENT_ANIMATED_PROPERTIES(SVGElement)
     REGISTER_PARENT_ANIMATED_PROPERTIES(SVGTests)
 END_REGISTER_ANIMATED_PROPERTIES
 
-SVGGraphicsElement::SVGGraphicsElement(const QualifiedName& tagName, Document* document, ConstructionType constructionType)
-    : SVGStyledElement(tagName, document, constructionType)
+SVGGraphicsElement::SVGGraphicsElement(const QualifiedName& tagName, Document& document)
+    : SVGElement(tagName, document)
+    , m_shouldIsolateBlending(false)
 {
     registerAnimatedPropertiesForSVGGraphicsElement();
 }
@@ -65,7 +63,7 @@ AffineTransform SVGGraphicsElement::getScreenCTM(StyleUpdateStrategy styleUpdate
 AffineTransform SVGGraphicsElement::animatedLocalTransform() const
 {
     AffineTransform matrix;
-    RenderStyle* style = renderer() ? renderer()->style() : 0;
+    RenderStyle* style = renderer() ? &renderer()->style() : nullptr;
 
     // If CSS property was set, use that, otherwise fallback to attribute (if set).
     if (style && style->hasTransform()) {
@@ -76,6 +74,14 @@ AffineTransform SVGGraphicsElement::animatedLocalTransform() const
 
         // Flatten any 3D transform.
         matrix = transform.toAffineTransform();
+        // CSS bakes the zoom factor into lengths, including translation components.
+        // In order to align CSS & SVG transforms, we need to invert this operation.
+        float zoom = style->effectiveZoom();
+        if (zoom != 1) {
+            matrix.setE(matrix.e() / zoom);
+            matrix.setF(matrix.f() / zoom);
+        }
+
     } else
         transform().concatenate(matrix);
 
@@ -87,27 +93,22 @@ AffineTransform SVGGraphicsElement::animatedLocalTransform() const
 AffineTransform* SVGGraphicsElement::supplementalTransform()
 {
     if (!m_supplementalTransform)
-        m_supplementalTransform = adoptPtr(new AffineTransform);
+        m_supplementalTransform = std::make_unique<AffineTransform>();
     return m_supplementalTransform.get();
 }
 
 bool SVGGraphicsElement::isSupportedAttribute(const QualifiedName& attrName)
 {
-    DEFINE_STATIC_LOCAL(HashSet<QualifiedName>, supportedAttributes, ());
-    if (supportedAttributes.isEmpty()) {
+    static NeverDestroyed<HashSet<QualifiedName>> supportedAttributes;
+    if (supportedAttributes.get().isEmpty()) {
         SVGTests::addSupportedAttributes(supportedAttributes);
-        supportedAttributes.add(SVGNames::transformAttr);
+        supportedAttributes.get().add(SVGNames::transformAttr);
     }
-    return supportedAttributes.contains<SVGAttributeHashTranslator>(attrName);
+    return supportedAttributes.get().contains<SVGAttributeHashTranslator>(attrName);
 }
 
 void SVGGraphicsElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
-    if (!isSupportedAttribute(name)) {
-        SVGStyledElement::parseAttribute(name, value);
-        return;
-    }
-
     if (name == SVGNames::transformAttr) {
         SVGTransformList newList;
         newList.parse(value);
@@ -116,31 +117,29 @@ void SVGGraphicsElement::parseAttribute(const QualifiedName& name, const AtomicS
         return;
     }
 
-    if (SVGTests::parseAttribute(name, value))
-        return;
-
-    ASSERT_NOT_REACHED();
+    SVGElement::parseAttribute(name, value);
+    SVGTests::parseAttribute(name, value);
 }
 
 void SVGGraphicsElement::svgAttributeChanged(const QualifiedName& attrName)
 {
     if (!isSupportedAttribute(attrName)) {
-        SVGStyledElement::svgAttributeChanged(attrName);
+        SVGElement::svgAttributeChanged(attrName);
         return;
     }
 
-    SVGElementInstance::InvalidationGuard invalidationGuard(this);
+    InstanceInvalidationGuard guard(*this);
 
     if (SVGTests::handleAttributeChange(this, attrName))
         return;
 
-    RenderObject* object = renderer();
-    if (!object)
+    auto renderer = this->renderer();
+    if (!renderer)
         return;
 
     if (attrName == SVGNames::transformAttr) {
-        object->setNeedsTransformUpdate();
-        RenderSVGResource::markForLayoutAndParentResourceInvalidation(object);
+        renderer->setNeedsTransformUpdate();
+        RenderSVGResource::markForLayoutAndParentResourceInvalidation(*renderer);
         return;
     }
 
@@ -162,10 +161,10 @@ FloatRect SVGGraphicsElement::getBBox(StyleUpdateStrategy styleUpdateStrategy)
     return SVGTransformable::getBBox(this, styleUpdateStrategy);
 }
 
-RenderObject* SVGGraphicsElement::createRenderer(RenderArena* arena, RenderStyle*)
+RenderPtr<RenderElement> SVGGraphicsElement::createElementRenderer(Ref<RenderStyle>&& style, const RenderTreePosition&)
 {
     // By default, any subclass is expected to do path-based drawing
-    return new (arena) RenderSVGPath(this);
+    return createRenderer<RenderSVGPath>(*this, WTFMove(style));
 }
 
 void SVGGraphicsElement::toClipPath(Path& path)
@@ -176,5 +175,3 @@ void SVGGraphicsElement::toClipPath(Path& path)
 }
 
 }
-
-#endif // ENABLE(SVG)

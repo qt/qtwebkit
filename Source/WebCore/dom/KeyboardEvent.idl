@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006 Apple Computer, Inc.
+ * Copyright (C) 2006 Apple Inc.
  * Copyright (C) 2006 Samuel Weinig <sam.weinig@gmail.com>
  *
  * This library is free software; you can redistribute it and/or
@@ -20,7 +20,7 @@
 
 [
     ConstructorConditional=DOM4_EVENTS_CONSTRUCTOR,
-    ConstructorTemplate=Event
+    ConstructorTemplate=Event,
 ] interface KeyboardEvent : UIEvent {
 
 #if !defined(LANGUAGE_JAVASCRIPT) || !LANGUAGE_JAVASCRIPT
@@ -69,7 +69,7 @@
                            [Default=Undefined] optional boolean altGraphKey);
 
     // WebKit Extensions
-#if !defined(LANGUAGE_JAVASCRIPT) || !LANGUAGE_JAVASCRIPT
+#if (!defined(LANGUAGE_JAVASCRIPT) || !LANGUAGE_JAVASCRIPT) && (!defined(LANGUAGE_GOBJECT) || !LANGUAGE_GOBJECT)
     readonly attribute long             keyCode;
     readonly attribute long             charCode;
     

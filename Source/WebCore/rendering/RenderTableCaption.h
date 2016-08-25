@@ -20,42 +20,32 @@
 #ifndef RenderTableCaption_h
 #define RenderTableCaption_h
 
-#include "RenderBlock.h"
+#include "RenderBlockFlow.h"
 
 namespace WebCore {
 
 class RenderTable;
 
-class RenderTableCaption : public RenderBlock {
+class RenderTableCaption final : public RenderBlockFlow {
 public:
-    explicit RenderTableCaption(Element*);
+    RenderTableCaption(Element&, Ref<RenderStyle>&&);
     virtual ~RenderTableCaption();
-    virtual LayoutUnit containingBlockLogicalWidthForContent() const OVERRIDE;
+
+    Element& element() const { return downcast<Element>(nodeForNonAnonymous()); }
+
+    virtual LayoutUnit containingBlockLogicalWidthForContent() const override { return containingBlock()->logicalWidth(); }
     
 private:
-    virtual bool isTableCaption() const OVERRIDE { return true; }
+    virtual bool isTableCaption() const override { return true; }
 
-    virtual void insertedIntoTree() OVERRIDE;
-    virtual void willBeRemovedFromTree() OVERRIDE;
+    virtual void insertedIntoTree() override;
+    virtual void willBeRemovedFromTree() override;
 
     RenderTable* table() const;
 };
 
-inline RenderTableCaption* toRenderTableCaption(RenderObject* object)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isTableCaption());
-    return static_cast<RenderTableCaption*>(object);
-}
-
-inline const RenderTableCaption* toRenderTableCaption(const RenderObject* object)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isTableCaption());
-    return static_cast<const RenderTableCaption*>(object);
-}
-
-// This will catch anyone doing an unnecessary cast.
-void toRenderTableCaption(const RenderTableCaption*);
-
 } // namespace WebCore
+
+SPECIALIZE_TYPE_TRAITS_RENDER_OBJECT(RenderTableCaption, isTableCaption())
 
 #endif // RenderTableCaption_h

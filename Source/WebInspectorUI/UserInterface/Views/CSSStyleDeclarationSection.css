@@ -1,0 +1,175 @@
+/*
+ * Copyright (C) 2013 Apple Inc. All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. AND ITS CONTRIBUTORS ``AS IS''
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+ * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+ * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL APPLE INC. OR ITS CONTRIBUTORS
+ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+ * THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+.style-declaration-section {
+    display: flex;
+    flex-direction: column;
+
+    padding: 3px;
+}
+
+.style-declaration-section.locked {
+    background-color: hsl(0, 0%, 97%);
+}
+
+.style-declaration-section:not(.locked) {
+    background-color: white;
+    border-top-color: hsla(0, 0%, 0%, 0.2);
+}
+
+.style-declaration-section.last-in-group {
+    margin-bottom: 10px;
+
+    border-bottom: 1px solid hsla(0, 0%, 0%, 0.3);
+}
+
+.style-declaration-section + .style-declaration-section {
+    border-top: 1px solid hsla(0, 0%, 0%, 0.15);
+}
+
+.style-declaration-section:last-child {
+    margin-bottom: 0 !important;
+}
+
+.style-declaration-section > .header {
+    position: relative;
+
+    padding: 4px 5px 3px 25px;
+
+    font-size: 11px;
+    line-height: 12px;
+}
+
+.style-declaration-section > .header > .icon {
+    position: absolute;
+
+    top: 2px;
+    left: 4px;
+
+    width: 16px;
+    height: 16px;
+}
+
+.style-declaration-section > .header > .icon.toggle-able:hover {
+    filter: brightness(0.9);
+}
+
+.style-declaration-section > .header > .icon.toggle-able:active {
+    filter: brightness(0.8);
+}
+
+.style-declaration-section:not(.invalid-selector).rule-disabled > .header > .icon {
+    opacity: 0.5;
+}
+
+.style-declaration-section > .header > .selector {
+    font-family: Menlo, monospace;
+    color: hsl(0, 0%, 50%);
+
+    outline: none;
+
+    cursor: text;
+
+    word-wrap: break-word;
+
+    -webkit-user-select: text;
+    -webkit-user-modify: read-write-plaintext-only;
+}
+
+.style-declaration-section > .header > .selector:empty {
+    /* This prevents the cursor from disappearing when empty. */
+    display: inline-block;
+    min-width: 1px;
+}
+
+.style-declaration-section > .header > .selector:empty::before {
+    /* This prevents the cursor from positioning badly when empty. */
+    content: "";
+}
+
+.style-declaration-section > .header > .selector:focus {
+    color: black;
+}
+
+.style-declaration-section:matches(.locked, .selector-locked) > .header > .selector {
+    -webkit-user-modify: read-only;
+}
+
+.style-declaration-section.locked > .header::before {
+    float: right;
+
+    content: "";
+
+    width: 8px;
+    height: 10px;
+
+    background-image: url(../Images/Locked.svg);
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 8px 10px;
+
+    margin-left: 5px;
+}
+
+.style-declaration-section > .header > .selector > .matched {
+    color: black;
+}
+
+.style-declaration-section > .header > .origin {
+    line-height: 10px;
+
+    color: hsl(0, 0%, 50%);
+
+    word-wrap: break-word;
+    white-space: nowrap;
+}
+
+.style-declaration-section > .header > .origin a {
+    white-space: normal;
+}
+
+.style-declaration-section > .header > .origin > .go-to-link {
+    color: inherit !important;
+}
+
+.style-declaration-section.invalid-selector > .header > .icon {
+    top: 4px;
+    left: 6px;
+    width: 12px;
+    height: 12px;
+    content: url(../Images/Error.svg);
+}
+
+.style-declaration-section.invalid-selector > .header > .selector,
+.style-declaration-section.invalid-selector > .header > .selector> * {
+    color: red;
+}
+
+@media (-webkit-min-device-pixel-ratio: 2) {
+    .style-declaration-section,
+    .sidebar > .panel.details.css-style > .content > .pseudo-classes {
+        border-width: 0.5px !important;
+    }
+}

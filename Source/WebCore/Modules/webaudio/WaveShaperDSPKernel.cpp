@@ -35,8 +35,6 @@
 
 const unsigned RenderingQuantum = 128;
 
-using namespace std;
-
 namespace WebCore {
 
 WaveShaperDSPKernel::WaveShaperDSPKernel(WaveShaperProcessor* processor)
@@ -51,12 +49,12 @@ void WaveShaperDSPKernel::lazyInitializeOversampling()
     ASSERT(isMainThread());
 
     if (!m_tempBuffer) {
-        m_tempBuffer = adoptPtr(new AudioFloatArray(RenderingQuantum * 2));
-        m_tempBuffer2 = adoptPtr(new AudioFloatArray(RenderingQuantum * 4));
-        m_upSampler = adoptPtr(new UpSampler(RenderingQuantum));
-        m_downSampler = adoptPtr(new DownSampler(RenderingQuantum * 2));
-        m_upSampler2 = adoptPtr(new UpSampler(RenderingQuantum * 2));
-        m_downSampler2 = adoptPtr(new DownSampler(RenderingQuantum * 4));
+        m_tempBuffer = std::make_unique<AudioFloatArray>(RenderingQuantum * 2);
+        m_tempBuffer2 = std::make_unique<AudioFloatArray>(RenderingQuantum * 4);
+        m_upSampler = std::make_unique<UpSampler>(RenderingQuantum);
+        m_downSampler = std::make_unique<DownSampler>(RenderingQuantum * 2);
+        m_upSampler2 = std::make_unique<UpSampler>(RenderingQuantum * 2);
+        m_downSampler2 = std::make_unique<DownSampler>(RenderingQuantum * 4);
     }
 }
 
@@ -112,10 +110,10 @@ void WaveShaperDSPKernel::processCurve(const float* source, float* destination, 
 
         // Clip index to the input range of the curve.
         // This takes care of input outside of nominal range -1 -> +1
-        index1 = max(index1, 0);
-        index1 = min(index1, curveLength - 1);
-        index2 = max(index2, 0);
-        index2 = min(index2, curveLength - 1);
+        index1 = std::max(index1, 0);
+        index1 = std::min(index1, curveLength - 1);
+        index2 = std::max(index2, 0);
+        index2 = std::min(index2, curveLength - 1);
 
         double value1 = curveData[index1];
         double value2 = curveData[index2];

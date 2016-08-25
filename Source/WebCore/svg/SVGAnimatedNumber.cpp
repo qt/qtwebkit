@@ -18,14 +18,10 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "SVGAnimatedNumber.h"
 
-#include "SVGAnimateElement.h"
+#include "SVGAnimateElementBase.h"
 #include "SVGParserUtilities.h"
-
-using namespace std;
 
 namespace WebCore {
 
@@ -34,16 +30,16 @@ SVGAnimatedNumberAnimator::SVGAnimatedNumberAnimator(SVGAnimationElement* animat
 {
 }
 
-PassOwnPtr<SVGAnimatedType> SVGAnimatedNumberAnimator::constructFromString(const String& string)
+std::unique_ptr<SVGAnimatedType> SVGAnimatedNumberAnimator::constructFromString(const String& string)
 {
-    OwnPtr<SVGAnimatedType> animtedType = SVGAnimatedType::createNumber(new float);
-    float& animatedNumber = animtedType->number();
+    auto animatedType = SVGAnimatedType::createNumber(std::make_unique<float>());
+    float& animatedNumber = animatedType->number();
     if (!parseNumberFromString(string, animatedNumber))
         animatedNumber = 0;
-    return animtedType.release();
+    return animatedType;
 }
 
-PassOwnPtr<SVGAnimatedType> SVGAnimatedNumberAnimator::startAnimValAnimation(const SVGElementAnimatedPropertyList& animatedTypes)
+std::unique_ptr<SVGAnimatedType> SVGAnimatedNumberAnimator::startAnimValAnimation(const SVGElementAnimatedPropertyList& animatedTypes)
 {
     return SVGAnimatedType::createNumber(constructFromBaseValue<SVGAnimatedNumber>(animatedTypes));
 }
@@ -53,7 +49,7 @@ void SVGAnimatedNumberAnimator::stopAnimValAnimation(const SVGElementAnimatedPro
     stopAnimValAnimationForType<SVGAnimatedNumber>(animatedTypes);
 }
 
-void SVGAnimatedNumberAnimator::resetAnimValToBaseVal(const SVGElementAnimatedPropertyList& animatedTypes, SVGAnimatedType* type)
+void SVGAnimatedNumberAnimator::resetAnimValToBaseVal(const SVGElementAnimatedPropertyList& animatedTypes, SVGAnimatedType& type)
 {
     resetFromBaseValue<SVGAnimatedNumber>(animatedTypes, type, &SVGAnimatedType::number);
 }
@@ -111,5 +107,3 @@ float SVGAnimatedNumberAnimator::calculateDistance(const String& fromString, con
 }
 
 }
-
-#endif // ENABLE(SVG)

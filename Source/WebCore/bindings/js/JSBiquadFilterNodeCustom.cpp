@@ -31,33 +31,32 @@
 #include "BiquadFilterNode.h"
 #include "ExceptionCode.h"
 #include <runtime/Error.h>
+#include <runtime/JSCJSValueInlines.h>
 
 using namespace JSC;
 
 namespace WebCore {
 
-void JSBiquadFilterNode::setType(ExecState* exec, JSValue value)
+void JSBiquadFilterNode::setType(ExecState& state, JSValue value)
 {
-    BiquadFilterNode* imp = static_cast<BiquadFilterNode*>(impl());
-
 #if ENABLE(LEGACY_WEB_AUDIO)
     if (value.isNumber()) {
-        uint32_t type = value.toUInt32(exec);
-        if (!imp->setType(type))
-            throwError(exec, createTypeError(exec, "Illegal BiquadFilterNode type"));
+        uint32_t type = value.toUInt32(&state);
+        if (!wrapped().setType(type))
+            state.vm().throwException(&state, createTypeError(&state, "Illegal BiquadFilterNode type"));
         return;
     }
 #endif
 
     if (value.isString()) {
-        String type = value.toString(exec)->value(exec);
+        String type = value.toString(&state)->value(&state);
         if (type == "lowpass" || type == "highpass" || type == "bandpass" || type == "lowshelf" || type == "highshelf" || type == "peaking" || type == "notch" || type == "allpass") {
-            imp->setType(type);
+            wrapped().setType(type);
             return;
         }
     }
     
-    throwError(exec, createTypeError(exec, "Illegal BiquadFilterNode type"));
+    state.vm().throwException(&state, createTypeError(&state, "Illegal BiquadFilterNode type"));
 }
 
 } // namespace WebCore

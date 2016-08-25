@@ -32,23 +32,12 @@
 #include "URLInputType.h"
 
 #include "HTMLInputElement.h"
+#include "HTMLParserIdioms.h"
 #include "InputTypeNames.h"
 #include "LocalizedStrings.h"
-#include "KURL.h"
-#include <wtf/PassOwnPtr.h>
+#include "URL.h"
 
 namespace WebCore {
-
-PassOwnPtr<InputType> URLInputType::create(HTMLInputElement* element)
-{
-    return adoptPtr(new URLInputType(element));
-}
-
-void URLInputType::attach()
-{
-    TextFieldInputType::attach();
-    observeFeatureIfVisible(FeatureObserver::InputTypeURL);
-}
 
 const AtomicString& URLInputType::formControlType() const
 {
@@ -57,12 +46,12 @@ const AtomicString& URLInputType::formControlType() const
 
 bool URLInputType::typeMismatchFor(const String& value) const
 {
-    return !value.isEmpty() && !KURL(KURL(), value).isValid();
+    return !value.isEmpty() && !URL(URL(), value).isValid();
 }
 
 bool URLInputType::typeMismatch() const
 {
-    return typeMismatchFor(element()->value());
+    return typeMismatchFor(element().value());
 }
 
 String URLInputType::typeMismatchText() const
@@ -73,6 +62,11 @@ String URLInputType::typeMismatchText() const
 bool URLInputType::isURLField() const
 {
     return true;
+}
+
+String URLInputType::sanitizeValue(const String& proposedValue) const
+{
+    return stripLeadingAndTrailingHTMLSpaces(BaseTextInputType::sanitizeValue(proposedValue));
 }
 
 } // namespace WebCore

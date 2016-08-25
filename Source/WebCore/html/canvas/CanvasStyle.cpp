@@ -13,10 +13,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -35,9 +35,7 @@
 #include "CanvasPattern.h"
 #include "GraphicsContext.h"
 #include "HTMLCanvasElement.h"
-#include "StylePropertySet.h"
-#include <wtf/Assertions.h>
-#include <wtf/PassRefPtr.h>
+#include "StyleProperties.h"
 
 #if USE(CG)
 #include <CoreGraphics/CGContext.h>
@@ -54,9 +52,9 @@ namespace WebCore {
 
 enum ColorParseResult { ParsedRGBA, ParsedCurrentColor, ParsedSystemColor, ParseFailed };
 
-static ColorParseResult parseColor(RGBA32& parsedColor, const String& colorString, Document* document = 0)
+static ColorParseResult parseColor(RGBA32& parsedColor, const String& colorString, Document* document = nullptr)
 {
-    if (equalIgnoringCase(colorString, "currentcolor"))
+    if (equalLettersIgnoringASCIICase(colorString, "currentcolor"))
         return ParsedCurrentColor;
     if (CSSParser::parseColor(parsedColor, colorString))
         return ParsedRGBA;
@@ -76,7 +74,7 @@ RGBA32 currentColor(HTMLCanvasElement* canvas)
 
 bool parseColorOrCurrentColor(RGBA32& parsedColor, const String& colorString, HTMLCanvasElement* canvas)
 {
-    ColorParseResult parseResult = parseColor(parsedColor, colorString, canvas ? canvas->document() : 0);
+    ColorParseResult parseResult = parseColor(parsedColor, colorString, canvas ? &canvas->document() : 0);
     switch (parseResult) {
     case ParsedRGBA:
     case ParsedSystemColor:
@@ -250,7 +248,7 @@ void CanvasStyle::applyStrokeColor(GraphicsContext* context) const
         return;
     switch (m_type) {
     case RGBA:
-        context->setStrokeColor(m_rgba, ColorSpaceDeviceRGB);
+        context->setStrokeColor(m_rgba);
         break;
     case CMYKA: {
         // FIXME: Do this through platform-independent GraphicsContext API.
@@ -264,7 +262,7 @@ void CanvasStyle::applyStrokeColor(GraphicsContext* context) const
         currentPen.setColor(clr);
         context->platformContext()->setPen(currentPen);
 #else
-        context->setStrokeColor(m_cmyka->rgba, ColorSpaceDeviceRGB);
+        context->setStrokeColor(m_cmyka->rgba);
 #endif
         break;
     }
@@ -288,7 +286,7 @@ void CanvasStyle::applyFillColor(GraphicsContext* context) const
         return;
     switch (m_type) {
     case RGBA:
-        context->setFillColor(m_rgba, ColorSpaceDeviceRGB);
+        context->setFillColor(m_rgba);
         break;
     case CMYKA: {
         // FIXME: Do this through platform-independent GraphicsContext API.
@@ -302,7 +300,7 @@ void CanvasStyle::applyFillColor(GraphicsContext* context) const
         currentBrush.setColor(clr);
         context->platformContext()->setBrush(currentBrush);
 #else
-        context->setFillColor(m_cmyka->rgba, ColorSpaceDeviceRGB);
+        context->setFillColor(m_cmyka->rgba);
 #endif
         break;
     }

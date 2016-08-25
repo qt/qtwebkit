@@ -1,6 +1,7 @@
 /*
  * Copyright (C) Research In Motion Limited 2010. All rights reserved.
  * Copyright (C) 2013 Samsung Electronics. All rights reserved.
+ * Copyright (C) 2016 Apple Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -19,8 +20,6 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "SVGAnimatedProperty.h"
 
 #include "SVGElement.h"
@@ -31,7 +30,6 @@ SVGAnimatedProperty::SVGAnimatedProperty(SVGElement* contextElement, const Quali
     : m_contextElement(contextElement)
     , m_attributeName(attributeName)
     , m_animatedPropertyType(animatedPropertyType)
-    , m_isAnimating(false)
     , m_isReadOnly(false)
 {
 }
@@ -39,17 +37,15 @@ SVGAnimatedProperty::SVGAnimatedProperty(SVGElement* contextElement, const Quali
 SVGAnimatedProperty::~SVGAnimatedProperty()
 {
     // Remove wrapper from cache.
-    Cache* cache = animatedPropertyCache();
-    const Cache::const_iterator end = cache->end();
-    for (Cache::const_iterator it = cache->begin(); it != end; ++it) {
-        if (it->value == this) {
-            cache->remove(it->key);
+    for (auto& cache : *animatedPropertyCache()) {
+        if (cache.value == this) {
+            animatedPropertyCache()->remove(cache.key);
             break;
         }
     }
 
     // Assure that animationEnded() was called, if animationStarted() was called before.
-    ASSERT(!m_isAnimating);
+    ASSERT(!isAnimating());
 }
 
 void SVGAnimatedProperty::commitChange()
@@ -58,6 +54,8 @@ void SVGAnimatedProperty::commitChange()
     ASSERT(!m_contextElement->m_deletionHasBegun);
     m_contextElement->invalidateSVGAttributes();
     m_contextElement->svgAttributeChanged(m_attributeName);
+    // Needed to synchronize with CSSOM for presentation attributes with SVG DOM.
+    m_contextElement->synchronizeAnimatedSVGAttribute(m_attributeName);
 }
 
 SVGAnimatedProperty::Cache* SVGAnimatedProperty::animatedPropertyCache()
@@ -67,5 +65,3 @@ SVGAnimatedProperty::Cache* SVGAnimatedProperty::animatedPropertyCache()
 }
 
 } // namespace WebCore
-
-#endif // ENABLE(SVG)

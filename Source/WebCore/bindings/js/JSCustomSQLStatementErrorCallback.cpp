@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -27,15 +27,14 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SQL_DATABASE)
-
 #include "JSSQLStatementErrorCallback.h"
 
 #include "JSSQLError.h"
 #include "JSSQLTransaction.h"
 #include "ScriptExecutionContext.h"
+#include <runtime/Exception.h>
 #include <runtime/JSLock.h>
+#include <wtf/Ref.h>
 
 namespace WebCore {
 
@@ -46,7 +45,7 @@ bool JSSQLStatementErrorCallback::handleEvent(SQLTransaction* transaction, SQLEr
     if (!m_data || !m_data->globalObject() || !canInvokeCallback())
         return true;
 
-    RefPtr<JSSQLStatementErrorCallback> protect(this);
+    Ref<JSSQLStatementErrorCallback> protect(*this);
 
     JSC::JSLockHolder lock(m_data->globalObject()->vm());
 
@@ -55,9 +54,11 @@ bool JSSQLStatementErrorCallback::handleEvent(SQLTransaction* transaction, SQLEr
     args.append(toJS(exec, m_data->globalObject(), transaction));
     args.append(toJS(exec, m_data->globalObject(), error));
 
-    bool raisedException = false;
-    JSValue result = m_data->invokeCallback(args, &raisedException);
-    if (raisedException) {
+    NakedPtr<Exception> returnedException;
+    JSValue result = m_data->invokeCallback(args, JSCallbackData::CallbackType::Function, Identifier(), returnedException);
+    if (returnedException) {
+        reportException(exec, returnedException);
+
         // The spec says:
         // "If the error callback returns false, then move on to the next statement..."
         // "Otherwise, the error callback did not return false, or there was no error callback"
@@ -68,5 +69,3 @@ bool JSSQLStatementErrorCallback::handleEvent(SQLTransaction* transaction, SQLEr
 }
 
 }
-
-#endif // ENABLE(SQL_DATABASE)

@@ -32,7 +32,7 @@
 #include "FrameView.h"
 #include "GraphicsContext.h"
 #include "HTMLElement.h"
-#include "StylePropertySet.h"
+#include "StyleProperties.h"
 #include "StyleRule.h"
 #include "Completion.h"
 #include "JSGlobalObject.h"
@@ -255,7 +255,7 @@ QWebElement QWebElement::findFirst(const QString &selectorQuery) const
     if (!m_element)
         return QWebElement();
     ExceptionCode exception = 0; // ###
-    return QWebElement(m_element->querySelector(selectorQuery, exception).get());
+    return QWebElement(m_element->querySelector(selectorQuery, exception));
 }
 
 /*!
@@ -507,9 +507,9 @@ QStringList QWebElement::attributeNames(const QString& namespaceUri) const
         const String namespaceUriString(namespaceUri); // convert QString -> String once
         const unsigned attrsCount = m_element->attributeCount();
         for (unsigned i = 0; i < attrsCount; ++i) {
-            const Attribute* const attribute = m_element->attributeItem(i);
-            if (namespaceUriString == attribute->namespaceURI())
-                attributeNameList.append(attribute->localName());
+            const Attribute& attribute = m_element->attributeAt(i);
+            if (namespaceUriString == attribute.namespaceURI())
+                attributeNameList.append(attribute.localName());
         }
     }
     return attributeNameList;
@@ -524,9 +524,7 @@ bool QWebElement::hasFocus() const
 {
     if (!m_element)
         return false;
-    if (m_element->document())
-        return m_element == m_element->document()->focusedElement();
-    return false;
+    return m_element == m_element->document().focusedElement();
 }
 
 /*!
@@ -538,8 +536,8 @@ void QWebElement::setFocus()
 {
     if (!m_element)
         return;
-    if (m_element->document() && m_element->isFocusable())
-        m_element->document()->setFocusedElement(m_element);
+    if (m_element->isFocusable())
+        m_element->document().setFocusedElement(m_element);
 }
 
 /*!
@@ -551,7 +549,12 @@ QRect QWebElement::geometry() const
 {
     if (!m_element)
         return QRect();
-    return m_element->pixelSnappedBoundingBox();
+
+    auto* renderer = m_element->renderer();
+    if (!renderer)
+        return QRect();
+
+    return renderer->absoluteBoundingBoxRect();
 }
 
 /*!
@@ -622,7 +625,7 @@ QWebElement QWebElement::firstChild() const
     for (Node* child = m_element->firstChild(); child; child = child->nextSibling()) {
         if (!child->isElementNode())
             continue;
-        Element* e = toElement(child);
+        Element* e = downcast<Element>(child);
         return QWebElement(e);
     }
     return QWebElement();
@@ -640,7 +643,7 @@ QWebElement QWebElement::lastChild() const
     for (Node* child = m_element->lastChild(); child; child = child->previousSibling()) {
         if (!child->isElementNode())
             continue;
-        Element* e = toElement(child);
+        Element* e = downcast<Element>(child);
         return QWebElement(e);
     }
     return QWebElement();
@@ -658,7 +661,7 @@ QWebElement QWebElement::nextSibling() const
     for (Node* sib = m_element->nextSibling(); sib; sib = sib->nextSibling()) {
         if (!sib->isElementNode())
             continue;
-        Element* e = toElement(sib);
+        Element* e = downcast<Element>(sib);
         return QWebElement(e);
     }
     return QWebElement();
@@ -676,7 +679,7 @@ QWebElement QWebElement::previousSibling() const
     for (Node* sib = m_element->previousSibling(); sib; sib = sib->previousSibling()) {
         if (!sib->isElementNode())
             continue;
-        Element* e = toElement(sib);
+        Element* e = downcast<Element>(sib);
         return QWebElement(e);
     }
     return QWebElement();
@@ -689,10 +692,7 @@ QWebElement QWebElement::document() const
 {
     if (!m_element)
         return QWebElement();
-    Document* document = m_element->document();
-    if (!document)
-        return QWebElement();
-    return QWebElement(document->documentElement());
+    return QWebElement(m_element->document().documentElement());
 }
 
 /*!
@@ -704,35 +704,23 @@ QWebFrame *QWebElement::webFrame() const
     if (!m_element)
         return 0;
 
-    Document* document = m_element->document();
-    if (!document)
-        return 0;
-
-    Frame* frame = document->frame();
+    Frame* frame = m_element->document().frame();
     if (!frame)
         return 0;
     QWebFrameAdapter* frameAdapter = QWebFrameAdapter::kit(frame);
     return frameAdapter->apiHandle();
 }
 
-static bool setupScriptContext(WebCore::Element* element, ScriptState*& state, ScriptController*& scriptController)
+static bool setupScriptContext(WebCore::Element* element, ScriptState*& state)
 {
     if (!element)
         return false;
 
-    Document* document = element->document();
-    if (!document)
-        return false;
-
-    Frame* frame = document->frame();
+    Frame* frame = element->document().frame();
     if (!frame)
         return false;
 
-    scriptController = frame->script();
-    if (!scriptController)
-        return false;
-
-    state = scriptController->globalObject(mainThreadNormalWorld())->globalExec();
+    state = frame->script().globalObject(mainThreadNormalWorld())->globalExec();
     if (!state)
         return false;
 
@@ -755,22 +743,21 @@ QVariant QWebElement::evaluateJavaScript(const QString& scriptSource)
         return QVariant();
 
     ScriptState* state = 0;
-    ScriptController* scriptController = 0;
 
-    if (!setupScriptContext(m_element, state, scriptController))
+    if (!setupScriptContext(m_element, state))
         return QVariant();
 
     JSC::JSLockHolder lock(state);
     RefPtr<Element> protect = m_element;
 
-    JSC::JSValue thisValue = toJS(state, toJSDOMGlobalObject(m_element->document(), state), m_element);
+    JSC::JSValue thisValue = toJS(state, toJSDOMGlobalObject(&m_element->document(), state), m_element);
     if (!thisValue)
         return QVariant();
 
     ScriptSourceCode sourceCode(scriptSource);
 
-    JSC::JSValue evaluationException;
-    JSC::JSValue evaluationResult = JSC::evaluate(state, sourceCode.jsSourceCode(), thisValue, &evaluationException);
+    NakedPtr<JSC::Exception> evaluationException;
+    JSC::JSValue evaluationResult = JSC::evaluate(state, sourceCode.jsSourceCode(), thisValue, evaluationException);
     if (evaluationException)
         return QVariant();
     JSValueRef evaluationResultRef = toRef(state, evaluationResult);
@@ -825,14 +812,14 @@ QString QWebElement::styleProperty(const QString &name, StyleResolveStrategy str
         return QString();
 
     if (strategy == InlineStyle) {
-        const StylePropertySet* style = static_cast<StyledElement*>(m_element)->inlineStyle();
+        const StyleProperties* style = static_cast<StyledElement*>(m_element)->inlineStyle();
         if (!style)
             return QString();
         return style->getPropertyValue(propID);
     }
 
     if (strategy == CascadedStyle) {
-        const StylePropertySet* style = static_cast<StyledElement*>(m_element)->inlineStyle();
+        const StyleProperties* style = static_cast<StyledElement*>(m_element)->inlineStyle();
         if (style && style->propertyIsImportant(propID))
             return style->getPropertyValue(propID);
 
@@ -844,18 +831,18 @@ QString QWebElement::styleProperty(const QString &name, StyleResolveStrategy str
         // by importance and inheritance order. This include external CSS
         // declarations, as well as embedded and inline style declarations.
 
-        Document* doc = m_element->document();
-        Vector<RefPtr<StyleRuleBase> > rules = doc->ensureStyleResolver()->styleRulesForElement(m_element, StyleResolver::AuthorCSSRules | StyleResolver::CrossOriginCSSRules);
+        Document& document = m_element->document();
+        Vector<RefPtr<StyleRule>> rules = document.ensureStyleResolver().styleRulesForElement(m_element, StyleResolver::AuthorCSSRules | StyleResolver::CrossOriginCSSRules);
         for (int i = rules.size(); i > 0; --i) {
             if (!rules[i - 1]->isStyleRule())
                 continue;
             StyleRule* styleRule = static_cast<StyleRule*>(rules[i - 1].get());
 
-            if (styleRule->properties()->propertyIsImportant(propID))
-                return styleRule->properties()->getPropertyValue(propID);
+            if (styleRule->properties().propertyIsImportant(propID))
+                return styleRule->properties().getPropertyValue(propID);
 
             if (!style || style->getPropertyValue(propID).isEmpty())
-                style = styleRule->properties();
+                style = &styleRule->properties();
         }
 
         if (!style)
@@ -988,7 +975,7 @@ void QWebElement::appendInside(const QWebElement &element)
         return;
 
     ExceptionCode exception = 0;
-    m_element->appendChild(element.m_element, exception);
+    m_element->appendChild(*element.m_element, exception);
 }
 
 /*!
@@ -1007,9 +994,11 @@ void QWebElement::appendInside(const QString &markup)
         return;
 
     ExceptionCode exception = 0;
-    RefPtr<DocumentFragment> fragment =  createContextualFragment(markup, toHTMLElement(m_element), AllowScriptingContent, exception);
+    RefPtr<DocumentFragment> fragment =  createContextualFragment(markup, downcast<HTMLElement>(m_element), AllowScriptingContent, exception);
+    if (!fragment)
+        return;
 
-    m_element->appendChild(fragment, exception);
+    m_element->appendChild(*fragment, exception);
 }
 
 /*!
@@ -1031,9 +1020,9 @@ void QWebElement::prependInside(const QWebElement &element)
     ExceptionCode exception = 0;
 
     if (m_element->hasChildNodes())
-        m_element->insertBefore(element.m_element, m_element->firstChild(), exception);
+        m_element->insertBefore(*element.m_element, m_element->firstChild(), exception);
     else
-        m_element->appendChild(element.m_element, exception);
+        m_element->appendChild(*element.m_element, exception);
 }
 
 /*!
@@ -1052,12 +1041,14 @@ void QWebElement::prependInside(const QString &markup)
         return;
 
     ExceptionCode exception = 0;
-    RefPtr<DocumentFragment> fragment =  createContextualFragment(markup, toHTMLElement(m_element), AllowScriptingContent, exception);
+    RefPtr<DocumentFragment> fragment =  createContextualFragment(markup, downcast<HTMLElement>(m_element), AllowScriptingContent, exception);
+    if (!fragment)
+        return;
 
     if (m_element->hasChildNodes())
-        m_element->insertBefore(fragment, m_element->firstChild(), exception);
+        m_element->insertBefore(*fragment, m_element->firstChild(), exception);
     else
-        m_element->appendChild(fragment, exception);
+        m_element->appendChild(*fragment, exception);
 }
 
 
@@ -1080,7 +1071,7 @@ void QWebElement::prependOutside(const QWebElement &element)
         return;
 
     ExceptionCode exception = 0;
-    m_element->parentNode()->insertBefore(element.m_element, m_element, exception);
+    m_element->parentNode()->insertBefore(*element.m_element, m_element, exception);
 }
 
 /*!
@@ -1103,7 +1094,7 @@ void QWebElement::prependOutside(const QString &markup)
         return;
 
     ExceptionCode exception = 0;
-    RefPtr<DocumentFragment> fragment = createContextualFragment(markup, toHTMLElement(parent), AllowScriptingContent, exception);
+    RefPtr<DocumentFragment> fragment = createContextualFragment(markup, downcast<HTMLElement>(parent), AllowScriptingContent, exception);
 
     parent->insertBefore(fragment, m_element, exception);
 }
@@ -1128,9 +1119,9 @@ void QWebElement::appendOutside(const QWebElement &element)
 
     ExceptionCode exception = 0;
     if (!m_element->nextSibling())
-        m_element->parentNode()->appendChild(element.m_element, exception);
+        m_element->parentNode()->appendChild(*element.m_element, exception);
     else
-        m_element->parentNode()->insertBefore(element.m_element, m_element->nextSibling(), exception);
+        m_element->parentNode()->insertBefore(*element.m_element, m_element->nextSibling(), exception);
 }
 
 /*!
@@ -1153,7 +1144,7 @@ void QWebElement::appendOutside(const QString &markup)
         return;
 
     ExceptionCode exception = 0;
-    RefPtr<DocumentFragment> fragment = createContextualFragment(markup, toHTMLElement(parent), AllowScriptingContent, exception);
+    RefPtr<DocumentFragment> fragment = createContextualFragment(markup, downcast<HTMLElement>(parent), AllowScriptingContent, exception);
 
     if (!m_element->nextSibling())
         parent->appendChild(fragment, exception);
@@ -1173,7 +1164,8 @@ QWebElement QWebElement::clone() const
     if (!m_element)
         return QWebElement();
 
-    return QWebElement(m_element->cloneElementWithChildren().get());
+    // FIXME: Do we need to add document argument? What is use case for cloning to different document?
+    return QWebElement(&m_element->cloneElementWithChildren(m_element->document()).get());
 }
 
 /*!
@@ -1276,9 +1268,9 @@ void QWebElement::encloseContentsWith(const QWebElement &element)
     }
 
     if (m_element->hasChildNodes())
-        m_element->insertBefore(element.m_element, m_element->firstChild(), exception);
+        m_element->insertBefore(*element.m_element, m_element->firstChild(), exception);
     else
-        m_element->appendChild(element.m_element, exception);
+        m_element->appendChild(*element.m_element, exception);
 }
 
 /*!
@@ -1299,7 +1291,7 @@ void QWebElement::encloseContentsWith(const QString &markup)
         return;
 
     ExceptionCode exception = 0;
-    RefPtr<DocumentFragment> fragment =  createContextualFragment(markup, toHTMLElement(m_element), AllowScriptingContent, exception);
+    RefPtr<DocumentFragment> fragment =  createContextualFragment(markup, downcast<HTMLElement>(m_element), AllowScriptingContent, exception);
 
     if (!fragment || !fragment->firstChild())
         return;
@@ -1317,9 +1309,9 @@ void QWebElement::encloseContentsWith(const QString &markup)
     }
 
     if (m_element->hasChildNodes())
-        m_element->insertBefore(fragment, m_element->firstChild(), exception);
+        m_element->insertBefore(*fragment, m_element->firstChild(), exception);
     else
-        m_element->appendChild(fragment, exception);
+        m_element->appendChild(*fragment, exception);
 }
 
 /*!
@@ -1373,7 +1365,7 @@ void QWebElement::encloseWith(const QString &markup)
         return;
 
     ExceptionCode exception = 0;
-    RefPtr<DocumentFragment> fragment = createContextualFragment(markup, toHTMLElement(parent), AllowScriptingContent, exception);
+    RefPtr<DocumentFragment> fragment = createContextualFragment(markup, downcast<HTMLElement>(parent), AllowScriptingContent, exception);
 
     if (!fragment || !fragment->firstChild())
         return;
@@ -1475,11 +1467,14 @@ void QWebElement::render(QPainter* painter)
 void QWebElement::render(QPainter* painter, const QRect& clip)
 {
     WebCore::Element* e = m_element;
-    Document* doc = e ? e->document() : 0;
-    if (!doc)
+    if (!e)
         return;
 
-    Frame* frame = doc->frame();
+    auto* renderer = e->renderer();
+    if (!renderer)
+        return;
+
+    Frame* frame = e->document().frame();
     if (!frame || !frame->view() || !frame->contentRenderer())
         return;
 
@@ -1487,9 +1482,9 @@ void QWebElement::render(QPainter* painter, const QRect& clip)
 
     view->updateLayoutAndStyleIfNeededRecursive();
 
-    IntRect rect = e->pixelSnappedBoundingBox();
+    IntRect rect = renderer->absoluteBoundingBoxRect();
 
-    if (rect.size().isEmpty())
+    if (rect.isEmpty())
         return;
 
     QRect finalClipRect = rect;
@@ -1502,7 +1497,7 @@ void QWebElement::render(QPainter* painter, const QRect& clip)
     context.translate(-rect.x(), -rect.y());
     painter->setClipRect(finalClipRect, Qt::IntersectClip);
     view->setNodeToDraw(e);
-    view->paintContents(&context, finalClipRect);
+    view->paintContents(context, finalClipRect);
     view->setNodeToDraw(0);
     context.restore();
 }
@@ -1510,7 +1505,7 @@ void QWebElement::render(QPainter* painter, const QRect& clip)
 class QWebElementCollectionPrivate : public QSharedData
 {
 public:
-    static QWebElementCollectionPrivate* create(const PassRefPtr<Node> &context, const QString &query);
+    static QWebElementCollectionPrivate* create(const PassRefPtr<ContainerNode> &context, const QString &query);
 
     RefPtr<NodeList> m_result;
 
@@ -1518,7 +1513,7 @@ private:
     inline QWebElementCollectionPrivate() {}
 };
 
-QWebElementCollectionPrivate* QWebElementCollectionPrivate::create(const PassRefPtr<Node> &context, const QString &query)
+QWebElementCollectionPrivate* QWebElementCollectionPrivate::create(const PassRefPtr<ContainerNode> &context, const QString &query)
 {
     if (!context)
         return 0;
@@ -1633,7 +1628,7 @@ void QWebElementCollection::append(const QWebElementCollection &other)
     }
     if (!other.d)
         return;
-    Vector<RefPtr<Node> > nodes;
+    Vector<Ref<Node>> nodes;
     RefPtr<NodeList> results[] = { d->m_result, other.d->m_result };
     nodes.reserveInitialCapacity(results[0]->length() + results[1]->length());
 
@@ -1641,7 +1636,7 @@ void QWebElementCollection::append(const QWebElementCollection &other)
         int j = 0;
         Node* n = results[i]->item(j);
         while (n) {
-            nodes.append(n);
+            nodes.append(*n);
             n = results[i]->item(++j);
         }
     }
@@ -1667,7 +1662,7 @@ QWebElement QWebElementCollection::at(int i) const
     if (!d)
         return QWebElement();
     Node* n = d->m_result->item(i);
-    return QWebElement(toElement(n));
+    return QWebElement(downcast<Element>(n));
 }
 
 /*!
@@ -1702,7 +1697,7 @@ QList<QWebElement> QWebElementCollection::toList() const
     Node* n = d->m_result->item(i);
     while (n) {
         if (n->isElementNode())
-            elements.append(QWebElement(toElement(n)));
+            elements.append(QWebElement(downcast<Element>(n)));
         n = d->m_result->item(++i);
     }
     return elements;
@@ -2087,18 +2082,18 @@ static QVariant convertJSValueToWebElementVariant(JSC::JSObject* object, int *di
 {
     Element* element = 0;
     QVariant ret;
-    if (object && object->inherits(&JSElement::s_info)) {
-        element =(static_cast<JSElement*>(object))->impl();
+    if (object && object->inherits(JSElement::info())) {
+        element = JSElement::toWrapped(object);
         *distance = 0;
         // Allow other objects to reach this one. This won't cause our algorithm to
         // loop since when we find an Element we do not recurse.
         visitedObjects->remove(toRef(object));
-    } else if (object && object->inherits(&JSDocument::s_info)) {
+    } else if (object && object->inherits(JSDocument::info())) {
         // To support TestRunnerQt::nodesFromRect(), used in DRT, we do an implicit
         // conversion from 'document' to the QWebElement representing the 'document.documentElement'.
         // We can't simply use a QVariantMap in nodesFromRect() because it currently times out
         // when serializing DOMMimeType and DOMPlugin, even if we limit the recursion.
-        element =(static_cast<JSDocument*>(object))->impl()->documentElement();
+        element = JSDocument::toWrapped(object)->documentElement();
     }
 
     return QVariant::fromValue<QWebElement>(QtWebElementRuntime::create(element));

@@ -43,17 +43,21 @@ public:
         EncodingFromParentFrame
     };
 
-    static PassRefPtr<TextResourceDecoder> create(const String& mimeType, const TextEncoding& defaultEncoding = TextEncoding(), bool usesEncodingDetector = false)
+    static Ref<TextResourceDecoder> create(const String& mimeType, const TextEncoding& defaultEncoding = TextEncoding(), bool usesEncodingDetector = false)
     {
-        return adoptRef(new TextResourceDecoder(mimeType, defaultEncoding, usesEncodingDetector));
+        return adoptRef(*new TextResourceDecoder(mimeType, defaultEncoding, usesEncodingDetector));
     }
-    ~TextResourceDecoder();
+    WEBCORE_EXPORT ~TextResourceDecoder();
 
     void setEncoding(const TextEncoding&, EncodingSource);
     const TextEncoding& encoding() const { return m_encoding; }
 
-    String decode(const char* data, size_t length);
-    String flush();
+    bool hasEqualEncodingForCharset(const String&) const;
+
+    WEBCORE_EXPORT String decode(const char* data, size_t length);
+    WEBCORE_EXPORT String flush();
+
+    WEBCORE_EXPORT String decodeAndFlush(const char* data, size_t length);
 
     void setHintEncoding(const TextResourceDecoder* hintDecoder)
     {
@@ -67,8 +71,7 @@ public:
     bool sawError() const { return m_sawError; }
 
 private:
-    TextResourceDecoder(const String& mimeType, const TextEncoding& defaultEncoding,
-                        bool usesEncodingDetector);
+    WEBCORE_EXPORT TextResourceDecoder(const String& mimeType, const TextEncoding& defaultEncoding, bool usesEncodingDetector);
 
     enum ContentType { PlainText, HTML, XML, CSS }; // PlainText only checks for BOM.
     static ContentType determineContentType(const String& mimeType);
@@ -83,7 +86,7 @@ private:
 
     ContentType m_contentType;
     TextEncoding m_encoding;
-    OwnPtr<TextCodec> m_codec;
+    std::unique_ptr<TextCodec> m_codec;
     EncodingSource m_source;
     const char* m_hintEncoding;
     Vector<char> m_buffer;
@@ -94,7 +97,7 @@ private:
     bool m_sawError;
     bool m_usesEncodingDetector;
 
-    OwnPtr<HTMLMetaCharsetParser> m_charsetParser;
+    std::unique_ptr<HTMLMetaCharsetParser> m_charsetParser;
 };
 
 }

@@ -24,7 +24,6 @@
 #include "config.h"
 #include "HTMLFrameElementBase.h"
 
-#include "Attribute.h"
 #include "Document.h"
 #include "EventNames.h"
 #include "FocusController.h"
@@ -33,32 +32,35 @@
 #include "FrameView.h"
 #include "HTMLNames.h"
 #include "HTMLParserIdioms.h"
-#include "KURL.h"
+#include "URL.h"
 #include "Page.h"
-#include "RenderPart.h"
+#include "RenderWidget.h"
 #include "ScriptController.h"
-#include "ScriptEventListener.h"
 #include "Settings.h"
+#include "SubframeLoader.h"
 
 namespace WebCore {
 
 using namespace HTMLNames;
 
-HTMLFrameElementBase::HTMLFrameElementBase(const QualifiedName& tagName, Document* document)
+HTMLFrameElementBase::HTMLFrameElementBase(const QualifiedName& tagName, Document& document)
     : HTMLFrameOwnerElement(tagName, document)
     , m_scrolling(ScrollbarAuto)
     , m_marginWidth(-1)
     , m_marginHeight(-1)
-    , m_viewSource(false)
 {
+    setHasCustomStyleResolveCallbacks();
 }
 
 bool HTMLFrameElementBase::isURLAllowed() const
 {
+    if (document().page() && document().page()->subframeCount() >= Page::maxNumberOfFrames)
+        return false;
+
     if (m_URL.isEmpty())
         return true;
 
-    const KURL& completeURL = document()->completeURL(m_URL);
+    const URL& completeURL = document().completeURL(m_URL);
 
     if (protocolIsJavaScript(completeURL)) { 
         Document* contentDoc = this->contentDocument();
@@ -66,14 +68,14 @@ bool HTMLFrameElementBase::isURLAllowed() const
             return false;
     }
 
-    Frame* parentFrame = document()->frame();
+    Frame* parentFrame = document().frame();
     if (parentFrame)
         return parentFrame->isURLAllowed(completeURL);
 
     return true;
 }
 
-void HTMLFrameElementBase::openURL(bool lockHistory, bool lockBackForwardList)
+void HTMLFrameElementBase::openURL(LockHistory lockHistory, LockBackForwardList lockBackForwardList)
 {
     if (!isURLAllowed())
         return;
@@ -81,13 +83,11 @@ void HTMLFrameElementBase::openURL(bool lockHistory, bool lockBackForwardList)
     if (m_URL.isEmpty())
         m_URL = blankURL().string();
 
-    Frame* parentFrame = document()->frame();
+    Frame* parentFrame = document().frame();
     if (!parentFrame)
         return;
 
-    parentFrame->loader()->subframeLoader()->requestFrame(this, m_URL, m_frameName, lockHistory, lockBackForwardList);
-    if (contentFrame())
-        contentFrame()->setInViewSourceMode(viewSourceMode());
+    parentFrame->loader().subframeLoader().requestFrame(*this, m_URL, m_frameName, lockHistory, lockBackForwardList);
 }
 
 void HTMLFrameElementBase::parseAttribute(const QualifiedName& name, const AtomicString& value)
@@ -96,10 +96,11 @@ void HTMLFrameElementBase::parseAttribute(const QualifiedName& name, const Atomi
         setLocation("about:srcdoc");
     else if (name == srcAttr && !fastHasAttribute(srcdocAttr))
         setLocation(stripLeadingAndTrailingHTMLSpaces(value));
-    else if (isIdAttributeName(name)) {
-        // Important to call through to base for the id attribute so the hasID bit gets set.
+    else if (name == idAttr) {
         HTMLFrameOwnerElement::parseAttribute(name, value);
-        m_frameName = value;
+        // Falling back to using the 'id' attribute is not standard but some content relies on this behavior.
+        if (!hasAttribute(nameAttr))
+            m_frameName = value;
     } else if (name == nameAttr) {
         m_frameName = value;
         // FIXME: If we are already attached, this doesn't actually change the frame's name.
@@ -113,22 +114,11 @@ void HTMLFrameElementBase::parseAttribute(const QualifiedName& name, const Atomi
         // FIXME: If we are already attached, this has no effect.
     } else if (name == scrollingAttr) {
         // Auto and yes both simply mean "allow scrolling." No means "don't allow scrolling."
-        if (equalIgnoringCase(value, "auto") || equalIgnoringCase(value, "yes"))
-            m_scrolling = document()->frameElementsShouldIgnoreScrolling() ? ScrollbarAlwaysOff : ScrollbarAuto;
-        else if (equalIgnoringCase(value, "no"))
+        if (equalLettersIgnoringASCIICase(value, "auto") || equalLettersIgnoringASCIICase(value, "yes"))
+            m_scrolling = document().frameElementsShouldIgnoreScrolling() ? ScrollbarAlwaysOff : ScrollbarAuto;
+        else if (equalLettersIgnoringASCIICase(value, "no"))
             m_scrolling = ScrollbarAlwaysOff;
         // FIXME: If we are already attached, this has no effect.
-#if ENABLE(VIEWSOURCE_ATTRIBUTE)
-    } else if (name == viewsourceAttr) {
-        m_viewSource = !value.isNull();
-        if (contentFrame())
-            contentFrame()->setInViewSourceMode(viewSourceMode());
-#endif
-    } else if (name == onbeforeloadAttr)
-        setAttributeEventListener(eventNames().beforeloadEvent, createAttributeEventListener(this, name, value));
-    else if (name == onbeforeunloadAttr) {
-        // FIXME: should <frame> elements have beforeunload handlers?
-        setAttributeEventListener(eventNames().beforeunloadEvent, createAttributeEventListener(this, name, value));
     } else
         HTMLFrameOwnerElement::parseAttribute(name, value);
 }
@@ -136,69 +126,62 @@ void HTMLFrameElementBase::parseAttribute(const QualifiedName& name, const Atomi
 void HTMLFrameElementBase::setNameAndOpenURL()
 {
     m_frameName = getNameAttribute();
+    // Falling back to using the 'id' attribute is not standard but some content relies on this behavior.
     if (m_frameName.isNull())
         m_frameName = getIdAttribute();
     openURL();
 }
 
-Node::InsertionNotificationRequest HTMLFrameElementBase::insertedInto(ContainerNode* insertionPoint)
+Node::InsertionNotificationRequest HTMLFrameElementBase::insertedInto(ContainerNode& insertionPoint)
 {
     HTMLFrameOwnerElement::insertedInto(insertionPoint);
-    if (insertionPoint->inDocument())
-        return InsertionShouldCallDidNotifySubtreeInsertions;
+    if (insertionPoint.inDocument())
+        return InsertionShouldCallFinishedInsertingSubtree;
     return InsertionDone;
 }
 
-void HTMLFrameElementBase::didNotifySubtreeInsertions(ContainerNode*)
+void HTMLFrameElementBase::finishedInsertingSubtree()
 {
     if (!inDocument())
         return;
 
     // DocumentFragments don't kick of any loads.
-    if (!document()->frame())
+    if (!document().frame())
         return;
 
-    if (!SubframeLoadingDisabler::canLoadFrame(this))
+    if (!SubframeLoadingDisabler::canLoadFrame(*this))
         return;
 
-    // JavaScript in src=javascript: and beforeonload can access the renderer
-    // during attribute parsing *before* the normal parser machinery would
-    // attach the element. To support this, we lazyAttach here, but only
-    // if we don't already have a renderer (if we're inserted
-    // as part of a DocumentFragment, insertedInto from an earlier element
-    // could have forced a style resolve and already attached us).
     if (!renderer())
-        lazyAttach(DoNotSetAttached);
+        setNeedsStyleRecalc(ReconstructRenderTree);
     setNameAndOpenURL();
 }
 
-void HTMLFrameElementBase::attach(const AttachContext& context)
+void HTMLFrameElementBase::didAttachRenderers()
 {
-    HTMLFrameOwnerElement::attach(context);
-
-    if (RenderPart* part = renderPart()) {
+    if (RenderWidget* part = renderWidget()) {
         if (Frame* frame = contentFrame())
             part->setWidget(frame->view());
     }
 }
 
-KURL HTMLFrameElementBase::location() const
+URL HTMLFrameElementBase::location() const
 {
     if (fastHasAttribute(srcdocAttr))
-        return KURL(ParsedURLString, "about:srcdoc");
-    return document()->completeURL(getAttribute(srcAttr));
+        return URL(ParsedURLString, "about:srcdoc");
+    return document().completeURL(fastGetAttribute(srcAttr));
 }
 
 void HTMLFrameElementBase::setLocation(const String& str)
 {
-    Settings* settings = document()->settings();
+    Settings* settings = document().settings();
     if (settings && settings->needsAcrobatFrameReloadingQuirk() && m_URL == str)
         return;
 
     m_URL = AtomicString(str);
 
     if (inDocument())
-        openURL(false, false);
+        openURL(LockHistory::No, LockBackForwardList::No);
 }
 
 bool HTMLFrameElementBase::supportsFocus() const
@@ -209,11 +192,11 @@ bool HTMLFrameElementBase::supportsFocus() const
 void HTMLFrameElementBase::setFocus(bool received)
 {
     HTMLFrameOwnerElement::setFocus(received);
-    if (Page* page = document()->page()) {
+    if (Page* page = document().page()) {
         if (received)
-            page->focusController()->setFocusedFrame(contentFrame());
-        else if (page->focusController()->focusedFrame() == contentFrame()) // Focus may have already been given to another frame, don't take it away.
-            page->focusController()->setFocusedFrame(0);
+            page->focusController().setFocusedFrame(contentFrame());
+        else if (page->focusController().focusedFrame() == contentFrame()) // Focus may have already been given to another frame, don't take it away.
+            page->focusController().setFocusedFrame(0);
     }
 }
 
@@ -229,7 +212,7 @@ bool HTMLFrameElementBase::isHTMLContentAttribute(const Attribute& attribute) co
 
 int HTMLFrameElementBase::width()
 {
-    document()->updateLayoutIgnorePendingStylesheets();
+    document().updateLayoutIgnorePendingStylesheets();
     if (!renderBox())
         return 0;
     return renderBox()->width();
@@ -237,7 +220,7 @@ int HTMLFrameElementBase::width()
 
 int HTMLFrameElementBase::height()
 {
-    document()->updateLayoutIgnorePendingStylesheets();
+    document().updateLayoutIgnorePendingStylesheets();
     if (!renderBox())
         return 0;
     return renderBox()->height();

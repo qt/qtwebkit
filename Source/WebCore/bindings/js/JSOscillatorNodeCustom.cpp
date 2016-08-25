@@ -31,33 +31,34 @@
 #include "ExceptionCode.h"
 #include "OscillatorNode.h"
 #include <runtime/Error.h>
+#include <runtime/JSCJSValueInlines.h>
 
 using namespace JSC;
 
 namespace WebCore {
 
-void JSOscillatorNode::setType(ExecState* exec, JSValue value)
+void JSOscillatorNode::setType(ExecState& state, JSValue value)
 {
-    OscillatorNode* imp = static_cast<OscillatorNode*>(impl());
+    OscillatorNode& imp = wrapped();
 
 #if ENABLE(LEGACY_WEB_AUDIO)
     if (value.isNumber()) {
-        uint32_t type = value.toUInt32(exec);
-        if (!imp->setType(type))
-            throwError(exec, createTypeError(exec, "Illegal OscillatorNode type"));
+        uint32_t type = value.toUInt32(&state);
+        if (!imp.setType(type))
+            state.vm().throwException(&state, createTypeError(&state, "Illegal OscillatorNode type"));
         return;
     }
 #endif
 
     if (value.isString()) {
-        String type = value.toString(exec)->value(exec);
+        String type = value.toString(&state)->value(&state);
         if (type == "sine" || type == "square" || type == "sawtooth" || type == "triangle") {
-            imp->setType(type);
+            imp.setType(type);
             return;
         }
     }
     
-    throwError(exec, createTypeError(exec, "Illegal OscillatorNode type"));
+    state.vm().throwException(&state, createTypeError(&state, "Illegal OscillatorNode type"));
 }
 
 } // namespace WebCore

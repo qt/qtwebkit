@@ -29,47 +29,31 @@
 
 namespace WebCore {
 
-class HTMLLabelElement FINAL : public HTMLElement {
+class HTMLLabelElement final : public HTMLElement {
 public:
-    static PassRefPtr<HTMLLabelElement> create(const QualifiedName&, Document*);
+    static Ref<HTMLLabelElement> create(const QualifiedName&, Document&);
 
     LabelableElement* control();
     HTMLFormElement* form() const;
 
-    virtual bool willRespondToMouseClickEvents() OVERRIDE;
+    virtual bool willRespondToMouseClickEvents() override;
 
 private:
-    HTMLLabelElement(const QualifiedName&, Document*);
+    HTMLLabelElement(const QualifiedName&, Document&);
 
-    virtual bool isFocusable() const OVERRIDE;
+    virtual bool isFocusable() const override;
 
-    virtual void accessKeyAction(bool sendMouseEvents);
+    virtual void accessKeyAction(bool sendMouseEvents) override;
 
     // Overridden to update the hover/active state of the corresponding control.
-    virtual void setActive(bool = true, bool pause = false) OVERRIDE;
-    virtual void setHovered(bool = true) OVERRIDE;
+    virtual void setActive(bool = true, bool pause = false) override;
+    virtual void setHovered(bool = true) override;
 
     // Overridden to either click() or focus() the corresponding control.
-    virtual void defaultEventHandler(Event*);
+    virtual void defaultEventHandler(Event*) override;
 
-    virtual void focus(bool restorePreviousSelection, FocusDirection) OVERRIDE;
+    virtual void focus(bool restorePreviousSelection, FocusDirection) override;
 };
-
-inline bool isHTMLLabelElement(Node* node)
-{
-    return node->hasTagName(HTMLNames::labelTag);
-}
-
-inline bool isHTMLLabelElement(Element* element)
-{
-    return element->hasTagName(HTMLNames::labelTag);
-}
-
-inline HTMLLabelElement* toHTMLLabelElement(Node* node)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!node || isHTMLLabelElement(node));
-    return static_cast<HTMLLabelElement*>(node);
-}
 
 } //namespace
 

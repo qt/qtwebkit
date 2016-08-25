@@ -21,14 +21,13 @@
 #ifndef SVGGradientElement_h
 #define SVGGradientElement_h
 
-#if ENABLE(SVG)
 #include "Gradient.h"
 #include "SVGAnimatedBoolean.h"
 #include "SVGAnimatedEnumeration.h"
 #include "SVGAnimatedTransformList.h"
+#include "SVGElement.h"
 #include "SVGExternalResourcesRequired.h"
 #include "SVGNames.h"
-#include "SVGStyledElement.h"
 #include "SVGURIReference.h"
 #include "SVGUnitTypes.h"
 
@@ -51,11 +50,11 @@ struct SVGPropertyTraits<SVGSpreadMethodType> {
         case SVGSpreadMethodUnknown:
             return emptyString();
         case SVGSpreadMethodPad:
-            return "pad";
+            return ASCIILiteral("pad");
         case SVGSpreadMethodReflect:
-            return "reflect";
+            return ASCIILiteral("reflect");
         case SVGSpreadMethodRepeat:
-            return "repeat";
+            return ASCIILiteral("repeat");
         }
 
         ASSERT_NOT_REACHED();
@@ -74,7 +73,7 @@ struct SVGPropertyTraits<SVGSpreadMethodType> {
     }
 };
 
-class SVGGradientElement : public SVGStyledElement,
+class SVGGradientElement : public SVGElement,
                            public SVGURIReference,
                            public SVGExternalResourcesRequired {
 public:
@@ -88,33 +87,37 @@ public:
     Vector<Gradient::ColorStop> buildStops();
  
 protected:
-    SVGGradientElement(const QualifiedName&, Document*);
+    SVGGradientElement(const QualifiedName&, Document&);
 
-    bool isSupportedAttribute(const QualifiedName&);
-    virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
-    virtual void svgAttributeChanged(const QualifiedName&);
+    static bool isSupportedAttribute(const QualifiedName&);
+    virtual void parseAttribute(const QualifiedName&, const AtomicString&) override;
+    virtual void svgAttributeChanged(const QualifiedName&) override;
 
 private:
-    virtual bool needsPendingResourceHandling() const { return false; }
+    virtual bool needsPendingResourceHandling() const override { return false; }
 
-    virtual void childrenChanged(bool changedByParser = false, Node* beforeChange = 0, Node* afterChange = 0, int childCountDelta = 0);
+    virtual void childrenChanged(const ChildChange&) override;
 
     BEGIN_DECLARE_ANIMATED_PROPERTIES(SVGGradientElement)
         DECLARE_ANIMATED_ENUMERATION(SpreadMethod, spreadMethod, SVGSpreadMethodType)
         DECLARE_ANIMATED_ENUMERATION(GradientUnits, gradientUnits, SVGUnitTypes::SVGUnitType)
         DECLARE_ANIMATED_TRANSFORM_LIST(GradientTransform, gradientTransform)
-        DECLARE_ANIMATED_STRING(Href, href)
-        DECLARE_ANIMATED_BOOLEAN(ExternalResourcesRequired, externalResourcesRequired)
+        DECLARE_ANIMATED_STRING_OVERRIDE(Href, href)
+        DECLARE_ANIMATED_BOOLEAN_OVERRIDE(ExternalResourcesRequired, externalResourcesRequired)
     END_DECLARE_ANIMATED_PROPERTIES
 };
 
-inline SVGGradientElement* toSVGGradientElement(Node* node)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!node || (node->hasTagName(SVGNames::radialGradientTag) || node->hasTagName(SVGNames::linearGradientTag)));
-    return static_cast<SVGGradientElement*>(node);
-}
-
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
+SPECIALIZE_TYPE_TRAITS_BEGIN(WebCore::SVGGradientElement)
+static bool isType(const WebCore::SVGElement& element)
+{
+    return element.hasTagName(WebCore::SVGNames::radialGradientTag) || element.hasTagName(WebCore::SVGNames::linearGradientTag);
+}
+static bool isType(const WebCore::Node& node)
+{
+    return is<WebCore::SVGElement>(node) && isType(downcast<WebCore::SVGElement>(node));
+}
+SPECIALIZE_TYPE_TRAITS_END()
+
 #endif

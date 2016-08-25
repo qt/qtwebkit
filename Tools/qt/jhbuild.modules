@@ -1,0 +1,261 @@
+<?xml version="1.0"?>
+<!DOCTYPE moduleset SYSTEM "moduleset.dtd">
+<?xml-stylesheet type="text/xsl" href="moduleset.xsl"?>
+<moduleset>
+
+  <metamodule id="webkitqt-testing-dependencies">
+    <dependencies>
+        <!--      <dep package="fonts"/> -->
+      <dep package="dicts"/>
+      <dep package="fontconfig"/>
+      <dep package="icu"/>
+      <dep package="libxml2"/>
+      <dep package="libxslt"/>
+      <dep package="glib"/>
+      <dep package="gstreamer"/>
+      <dep package="gst-plugins-base"/>
+      <dep package="gst-plugins-good"/>
+      <dep package="gst-plugins-bad"/>
+      <dep package="gst-libav"/>
+      <dep package="openwebrtc"/>
+      <dep package="qt"/>
+    </dependencies>
+  </metamodule>
+
+  <include href="jhbuild-qt-5.4.modules"/>
+
+  <!-- Please use http/https to access repositories to be friendly to users stuck behind firewalls. -->
+  <repository type="git" name="github.com"
+      href="https://github.com"/>
+  <repository type="tarball" name="github.com-tarball"
+      href="https://github.com"/>
+  <repository type="tarball" name="sourceware.org-mirror"
+      href="http://mirrors.kernel.org/sources.redhat.com/"/>
+  <repository type="tarball" name="ftp.gnome.org"
+      href="http://ftp.gnome.org"/>
+  <repository type="tarball" name="freedesktop.org"
+      href="http://www.freedesktop.org"/>
+  <repository type="tarball" name="xmlsoft.org"
+      href="http://xmlsoft.org"/>
+  <repository type="tarball" name="gstreamer"
+      href="http://gstreamer.freedesktop.org/src/"/>
+  <repository type="tarball" name="savannah.gnu.org"
+      href="http://download.savannah.gnu.org/releases/"/>
+  <repository type="git" name="freedesktop-git"
+      href="http://anongit.freedesktop.org/git"/>
+  <repository type="tarball" name="webkitgtk-jhbuild-mirror"
+      href="http://webkitgtk.org/jhbuild_mirror/"/>
+  <repository type="tarball" name="nice.freedesktop.org"
+      href="http://nice.freedesktop.org/"/>
+
+  <autotools id="fonts" supports-non-srcdir-builds="no"
+             skip-autogen="true">
+      <branch repo="github.com" module="carewolf/qtwebkit-testfonts.git" checkoutdir="qtwebkitg-testfonts"/>
+  </autotools>
+
+  <autotools id="dicts" supports-non-srcdir-builds="no"
+             skip-autogen="true">
+    <branch repo="github.com" module="mrobinson/webkitgtk-test-dicts.git" checkoutdir="webkitgtk-test-dicts" tag="0.0.1"/>
+  </autotools>
+
+  <autotools id="freetype6" autogen-sh="configure">
+    <branch module="freetype/freetype-2.4.11.tar.bz2" version="2.4.11"
+            repo="savannah.gnu.org"
+            hash="sha256:ef9d0bcb64647d9e5125dc7534d7ca371c98310fec87677c410f397f71ffbe3f"
+            md5sum="b93435488942486c8d0ca22e8f768034">
+      <patch file="freetype6-2.4.11-truetype-font-height-fix.patch" strip="1"/>
+    </branch>
+  </autotools>
+
+  <autotools id="harfbuzz" autogen-sh="configure">
+    <dependencies>
+      <dep package="icu"/>
+    </dependencies>
+    <branch module="software/harfbuzz/release/harfbuzz-${version}.tar.bz2"
+            version="1.2.7"
+            repo="freedesktop.org"
+            hash="sha256:bba0600ae08b84384e6d2d7175bea10b5fc246c4583dc841498d01894d479026">
+    </branch>
+  </autotools>
+
+  <autotools id="libffi" autogen-sh="configure">
+    <branch module="libffi/libffi-3.1.tar.gz" version="3.1"
+             repo="sourceware.org-mirror"
+             hash="sha256:97feeeadca5e21870fa4433bc953d1b3af3f698d5df8a428f68b73cd60aef6eb"
+             md5sum="f5898b29bbfd70502831a212d9249d10"/>
+  </autotools>
+
+  <autotools id="glib"
+             autogen-sh="configure"
+             autogenargs="--disable-dtrace --disable-gtk-doc-html">
+    <dependencies>
+      <dep package="libffi"/>
+    </dependencies>
+    <branch module="/pub/GNOME/sources/glib/2.44/glib-2.44.1.tar.xz" version="2.44.1"
+            repo="ftp.gnome.org"
+            hash="sha256:8811deacaf8a503d0a9b701777ea079ca6a4277be10e3d730d2112735d5eca07">
+    </branch>
+  </autotools>
+
+  <autotools id="fontconfig" 
+             autogen-sh="configure"
+             autogenargs="--enable-libxml2">
+    <dependencies>
+      <dep package="freetype6"/>
+      <dep package="libxml2"/>
+    </dependencies>
+    <branch module="software/fontconfig/release/fontconfig-2.11.1.tar.gz" version="2.11.1"
+            repo="freedesktop.org"
+            hash="sha256:b6b066c7dce3f436fdc0dfbae9d36122b38094f4f53bd8dffd45e195b0540d8d"
+            md5sum="e75e303b4f7756c2b16203a57ac87eba">
+      <patch file="fontconfig-2.11.1-no-bitmaps.patch" strip="0"/>
+    </branch>
+  </autotools>
+
+
+  <autotools id="libxml2" supports-non-srcdir-builds="no"
+             autogen-sh="./autogen.sh; ./configure --with-python=no">
+    <branch module="/sources/libxml2-2.9.1.tar.gz" version="2.9.1"
+            repo="xmlsoft.org"
+            hash="sha256:fd3c64cb66f2c4ea27e934d275904d92cec494a8e8405613780cbc8a71680fdb"
+            md5sum="9c0cfef285d5c4a5c80d00904ddab380"/>
+  </autotools>
+
+  <autotools id="libxslt">
+    <branch module="/sources/libxslt-${version}.tar.gz" version="1.1.29"
+            repo="xmlsoft.org"
+            hash="sha256:b5976e3857837e7617b29f2249ebb5eeac34e249208d31f1fbf7a6ba7a4090ce"/>
+    <dependencies>
+      <dep package="libxml2"/>
+    </dependencies>
+  </autotools>
+
+  <autotools id="orc" autogenargs="--disable-gtk-doc" autogen-sh="configure">
+    <branch module="orc/orc-0.4.17.tar.gz" version="0.4.17"
+            repo="gstreamer"
+            hash="sha256:4fc7cca48c59fff23afee78fb642cdbde001f56401c8f47b95a16578d1d5d7e8"
+            md5sum="af1bf3dab9e69f3c36f389285e2a12a1"/>
+  </autotools>
+
+  <autotools id="gstreamer" autogenargs="--disable-gtk-doc --disable-introspection">
+    <if condition-set="macos">
+      <makeargs value="CFLAGS+=-Wno-error"/>
+    </if>
+    <dependencies>
+      <dep package="orc"/>
+    </dependencies>
+    <branch module="gstreamer/gstreamer-${version}.tar.xz" version="1.8.0"
+            repo="gstreamer"
+            hash="sha256:947a314a212b5d94985d89b43440dbe66b696e12bbdf9a2f78967b98d74abedc"
+            md5sum="6846d7289ec323c38c49b818171e955a"/>
+  </autotools>
+
+  <autotools id="gst-plugins-base"
+             autogen-sh="autogen.sh"
+             autogenargs="--disable-examples --disable-gtk-doc --disable-introspection">
+    <if condition-set="macos">
+      <makeargs value="CFLAGS+=-Wno-error"/>
+    </if>
+    <dependencies>
+      <dep package="gstreamer"/>
+    </dependencies>
+    <branch module="gst-plugins-base/gst-plugins-base-${version}.tar.xz" version="1.8.0"
+            repo="gstreamer"
+            hash="sha256:abc0acc1d15b4b9c97c65cd9689bd6400081853b9980ea428d3c8572dd791522"
+            md5sum="20cc8231609318310f2a55f64c86cbb4"/>
+  </autotools>
+
+  <autotools id="gst-plugins-good" autogenargs="--disable-examples --disable-soup --disable-gtk-doc --disable-introspection">
+    <if condition-set="macos">
+      <makeargs value="CFLAGS+=-Wno-error  OBJCFLAGS+=-Wno-error"/>
+    </if>
+    <dependencies>
+      <dep package="gst-plugins-base"/>
+    </dependencies>
+
+    <branch module="gst-plugins-good/gst-plugins-good-${version}.tar.xz" version="1.8.0"
+            repo="gstreamer"
+            hash="sha256:c20c134d47dbc238d921707a3b66da709c2b4dd89f9d267cec13d1ddf16e9f4d"
+            md5sum="91ed4649c7c2e43a61f731d144f6f6d0">
+      <patch file="gst-plugins-good-use-the-tfdt-decode-time.patch" strip="1"/>
+      <patch file="gst-plugins-good-Revert-qtdemux-expose-streams-with-first-moof-for-fr.patch" strip="1"/>
+    </branch>
+  </autotools>
+
+  <autotools id="gst-plugins-bad" autogenargs="--disable-examples --disable-gtk-doc --disable-introspection">
+    <if condition-set="macos">
+      <makeargs value="CFLAGS+=-Wno-error CXXFLAGS+=-Wno-error OBJCFLAGS+=-Wno-error"/>
+    </if>
+    <dependencies>
+      <dep package="gst-plugins-base"/>
+    </dependencies>
+    <branch module="gst-plugins-bad/gst-plugins-bad-${version}.tar.xz" version="1.8.0"
+            repo="gstreamer"
+            hash="sha256:116376dd1085082422e0b21b0ecd3d1cb345c469c58e32463167d4675f4ca90e"
+            md5sum="1c2d797bb96a81e9ef570c7a0a37203e"/>
+  </autotools>
+
+  <autotools id="gst-libav" autogenargs="--with-libav-extra-configure='--disable-yasm' --disable-gtk-doc">
+    <if condition-set="macos">
+      <makeargs value="CFLAGS+=-Wno-error"/>
+    </if>
+    <dependencies>
+      <dep package="gst-plugins-base"/>
+    </dependencies>
+    <branch module="gst-libav/gst-libav-${version}.tar.xz" version="1.8.0"
+            repo="gstreamer"
+            hash="sha256:5a1ce28876aee93cb4f3d090f0e807915a5d9bc1325e3480dd302b85aeb4291c"
+            md5sum="361638fa45466c5050bcde6bfe10fa46"/>
+  </autotools>
+
+  <autotools id="libusrsctp" supports-non-srcdir-builds="no" autogen-sh="./bootstrap; ./configure --disable-warnings-as-errors">
+    <branch repo="github.com" module="sctplab/usrsctp.git" checkoutdir="usrsctp" tag="078ff3252f73327e0ac11d6fd5eff62011f6646e"/>
+   </autotools>
+
+   <autotools id="gst-plugins-openwebrtc" supports-parallel-builds="no" supports-non-srcdir-builds="no" autogen-sh="./autogen.sh; ./configure">
+     <if condition-set="macos">
+       <makeargs value="CFLAGS+=-Wno-error"/>
+     </if>
+     <dependencies>
+       <dep package="gst-plugins-base"/>
+       <dep package="libusrsctp"/>
+     </dependencies>
+    <branch repo="github.com" module="EricssonResearch/openwebrtc-gst-plugins.git" checkoutdir="gst-plugins-openwebrtc" tag="e359b67484af90f416ea35e301205d2b53c77a14"/>
+   </autotools>
+
+  <autotools id="libnice">
+    <dependencies>
+      <dep package="gstreamer"/>
+    </dependencies>
+    <branch repo="nice.freedesktop.org" module="releases/libnice-0.1.10.tar.gz" checkoutdir="libnice" version="0.1.10"
+            hash="sha256:1dbfb663b730889ae8cab13a2913fe557d581f70b513c918bbbd0b7d3eefebc9"
+            md5sum="27b62d0093ce29a39df1c6fcf0bb4396" size="903083">
+    </branch>
+  </autotools>
+
+  <autotools id="openwebrtc" autogenargs="--enable-bridge=no --enable-owr-gst=yes --disable-tests">
+     <if condition-set="macos">
+       <makeargs value="CFLAGS+=-Wno-error"/>
+     </if>
+    <dependencies>
+      <dep package="gst-plugins-openwebrtc"/>
+      <dep package="libnice"/>
+     </dependencies>
+    <branch repo="github.com-tarball" module="EricssonResearch/openwebrtc/archive/13516c7f79a0c48bb411464f7613d4b426c70f5b.tar.gz" checkoutdir="openwebrtc" version="13516c7f79a0c48bb411464f7613d4b426c70f5b"
+            hash="sha256:c849d36d97c17a198a5d9c180f13f14c7897c9236e2384ea11029e23b09b59ac"
+            md5sum="13516c7f79a0c48bb411464f7613d4b426c70f5b.tar.gz" size="258936">
+      <patch file="openwebrtc-no-gtk-doc.patch" strip="1"/>
+    </branch>
+  </autotools>
+
+  <autotools id="icu"
+             autogen-sh="./source/configure"
+             autogenargs="--disable-samples --enable-weak-threads">
+    <branch module="icu4c-55_1-src.tgz" version="55.1" checkoutdir="icu"
+            repo="webkitgtk-jhbuild-mirror"
+            hash="sha256:e16b22cbefdd354bec114541f7849a12f8fc2015320ca5282ee4fd787571457b">
+      <patch file="icudata-stdlibs.patch" strip="1"/>
+    </branch>
+  </autotools>
+
+</moduleset>

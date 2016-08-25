@@ -21,7 +21,6 @@
 #ifndef SVGLength_h
 #define SVGLength_h
 
-#if ENABLE(SVG)
 #include "AnimationUtilities.h"
 #include "SVGLengthContext.h"
 #include "SVGParsingError.h"
@@ -57,6 +56,7 @@ public:
         SVG_LENGTHTYPE_PC = LengthTypePC
     };
 
+    // FIXME: Once all SVGLength users use Length internally, we make this a wrapper for Length.
     SVGLength(SVGLengthMode = LengthModeOther, const String& valueAsString = String());
     SVGLength(const SVGLengthContext&, float, SVGLengthMode = LengthModeOther, SVGLengthType = LengthTypeNumber);
     SVGLength(const SVGLength&);
@@ -98,8 +98,8 @@ public:
         return !m_valueInSpecifiedUnits;
     }
 
-    static SVGLength fromCSSPrimitiveValue(CSSPrimitiveValue*);
-    static PassRefPtr<CSSPrimitiveValue> toCSSPrimitiveValue(const SVGLength&);
+    static SVGLength fromCSSPrimitiveValue(const CSSPrimitiveValue&);
+    static Ref<CSSPrimitiveValue> toCSSPrimitiveValue(const SVGLength&);
     static SVGLengthMode lengthModeForAnimatedLengthAttribute(const QualifiedName&);
 
     SVGLength blend(const SVGLength& from, float progress) const
@@ -141,7 +141,7 @@ public:
         ASSERT(!isRelative());
         ASSERT(!from.isRelative());
 
-        SVGLengthContext nonRelativeLengthContext(0);
+        SVGLengthContext nonRelativeLengthContext(nullptr);
         float fromValueInUserUnits = nonRelativeLengthContext.convertValueToUserUnits(from.valueInSpecifiedUnits(), from.unitMode(), fromType, ec);
         if (ec)
             return SVGLength();
@@ -172,5 +172,4 @@ struct SVGPropertyTraits<SVGLength> {
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif // SVGLength_h

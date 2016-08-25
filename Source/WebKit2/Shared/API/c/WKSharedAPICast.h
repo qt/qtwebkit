@@ -26,10 +26,19 @@
 #ifndef WKSharedAPICast_h
 #define WKSharedAPICast_h
 
+#include "APIError.h"
+#include "APINumber.h"
+#include "APISecurityOrigin.h"
+#include "APISession.h"
+#include "APIString.h"
+#include "APIURL.h"
+#include "APIURLRequest.h"
+#include "APIURLResponse.h"
 #include "ImageOptions.h"
 #include "SameDocumentNavigationType.h"
 #include "WKBase.h"
 #include "WKContextMenuItemTypes.h"
+#include "WKDiagnosticLoggingResultType.h"
 #include "WKEvent.h"
 #include "WKFindOptions.h"
 #include "WKGeometry.h"
@@ -37,16 +46,12 @@
 #include "WKPageLoadTypes.h"
 #include "WKPageLoadTypesPrivate.h"
 #include "WKPageVisibilityTypes.h"
-#include "WebError.h"
+#include "WKUserContentInjectedFrames.h"
+#include "WKUserScriptInjectionTime.h"
 #include "WebEvent.h"
 #include "WebFindOptions.h"
-#include "WebNumber.h"
-#include "WebSecurityOrigin.h"
-#include "WebString.h"
-#include "WebURL.h"
-#include "WebURLRequest.h"
-#include "WebURLResponse.h"
 #include <WebCore/ContextMenuItem.h>
+#include <WebCore/DiagnosticLoggingResultType.h>
 #include <WebCore/FloatRect.h>
 #include <WebCore/FrameLoaderTypes.h>
 #include <WebCore/IntRect.h>
@@ -55,76 +60,93 @@
 #include <WebCore/SecurityOrigin.h>
 #include <WebCore/UserContentTypes.h>
 #include <WebCore/UserScriptTypes.h>
-#include <wtf/TypeTraits.h>
+
+namespace API {
+class Array;
+class Dictionary;
+class Data;
+class Point;
+class Rect;
+class SecurityOrigin;
+class SerializedScriptValue;
+class Size;
+class UserContentURLPattern;
+class WebArchive;
+class WebArchiveResource;
+}
 
 namespace WebKit {
 
-class ImmutableArray;
-class ImmutableDictionary;
-class MutableArray;
-class MutableDictionary;
 class ObjCObjectGraph;
-class WebArchive;
-class WebArchiveResource;
 class WebCertificateInfo;
 class WebConnection;
 class WebContextMenuItem;
-class WebData;
 class WebGraphicsContext;
 class WebImage;
-class WebPoint;
-class WebRect;
-class WebSecurityOrigin;
-class WebSerializedScriptValue;
-class WebSize;
-class WebURLRequest;
-class WebURLResponse;
-class WebUserContentURLPattern;
 
-template<typename APIType> struct APITypeInfo { };
-template<typename ImplType> struct ImplTypeInfo { };
+template<typename APIType> struct APITypeInfo;
+template<typename ImplType> struct ImplTypeInfo;
 
 #define WK_ADD_API_MAPPING(TheAPIType, TheImplType) \
-    template<> struct APITypeInfo<TheAPIType> { typedef TheImplType* ImplType; }; \
-    template<> struct ImplTypeInfo<TheImplType*> { typedef TheAPIType APIType; };
+    template<> struct APITypeInfo<TheAPIType> { typedef TheImplType ImplType; }; \
+    template<> struct ImplTypeInfo<TheImplType> { typedef TheAPIType APIType; };
 
-WK_ADD_API_MAPPING(WKArrayRef, ImmutableArray)
-WK_ADD_API_MAPPING(WKBooleanRef, WebBoolean)
+WK_ADD_API_MAPPING(WKArrayRef, API::Array)
+WK_ADD_API_MAPPING(WKBooleanRef, API::Boolean)
 WK_ADD_API_MAPPING(WKCertificateInfoRef, WebCertificateInfo)
 WK_ADD_API_MAPPING(WKConnectionRef, WebConnection)
 WK_ADD_API_MAPPING(WKContextMenuItemRef, WebContextMenuItem)
-WK_ADD_API_MAPPING(WKDataRef, WebData)
-WK_ADD_API_MAPPING(WKDictionaryRef, ImmutableDictionary)
-WK_ADD_API_MAPPING(WKDoubleRef, WebDouble)
-WK_ADD_API_MAPPING(WKErrorRef, WebError)
+WK_ADD_API_MAPPING(WKDataRef, API::Data)
+WK_ADD_API_MAPPING(WKDictionaryRef, API::Dictionary)
+WK_ADD_API_MAPPING(WKDoubleRef, API::Double)
+WK_ADD_API_MAPPING(WKErrorRef, API::Error)
 WK_ADD_API_MAPPING(WKGraphicsContextRef, WebGraphicsContext)
 WK_ADD_API_MAPPING(WKImageRef, WebImage)
-WK_ADD_API_MAPPING(WKMutableArrayRef, MutableArray)
-WK_ADD_API_MAPPING(WKMutableDictionaryRef, MutableDictionary)
-WK_ADD_API_MAPPING(WKPointRef, WebPoint)
-WK_ADD_API_MAPPING(WKRectRef, WebRect)
-WK_ADD_API_MAPPING(WKSecurityOriginRef, WebSecurityOrigin)
-WK_ADD_API_MAPPING(WKSerializedScriptValueRef, WebSerializedScriptValue)
-WK_ADD_API_MAPPING(WKSizeRef, WebSize)
-WK_ADD_API_MAPPING(WKStringRef, WebString)
-WK_ADD_API_MAPPING(WKTypeRef, APIObject)
-WK_ADD_API_MAPPING(WKUInt64Ref, WebUInt64)
-WK_ADD_API_MAPPING(WKURLRef, WebURL)
-WK_ADD_API_MAPPING(WKURLRequestRef, WebURLRequest)
-WK_ADD_API_MAPPING(WKURLResponseRef, WebURLResponse)
-WK_ADD_API_MAPPING(WKUserContentURLPatternRef, WebUserContentURLPattern)
+WK_ADD_API_MAPPING(WKPointRef, API::Point)
+WK_ADD_API_MAPPING(WKRectRef, API::Rect)
+WK_ADD_API_MAPPING(WKSecurityOriginRef, API::SecurityOrigin)
+WK_ADD_API_MAPPING(WKSerializedScriptValueRef, API::SerializedScriptValue)
+WK_ADD_API_MAPPING(WKSizeRef, API::Size)
+WK_ADD_API_MAPPING(WKStringRef, API::String)
+WK_ADD_API_MAPPING(WKTypeRef, API::Object)
+WK_ADD_API_MAPPING(WKUInt64Ref, API::UInt64)
+WK_ADD_API_MAPPING(WKURLRef, API::URL)
+WK_ADD_API_MAPPING(WKURLRequestRef, API::URLRequest)
+WK_ADD_API_MAPPING(WKURLResponseRef, API::URLResponse)
+WK_ADD_API_MAPPING(WKUserContentURLPatternRef, API::UserContentURLPattern)
+WK_ADD_API_MAPPING(WKSessionRef, API::Session)
 
-#if PLATFORM(MAC)
-WK_ADD_API_MAPPING(WKWebArchiveRef, WebArchive)
-WK_ADD_API_MAPPING(WKWebArchiveResourceRef, WebArchiveResource)
+template<> struct APITypeInfo<WKMutableArrayRef> { typedef API::Array ImplType; };
+template<> struct APITypeInfo<WKMutableDictionaryRef> { typedef API::Dictionary ImplType; };
+
+#if PLATFORM(COCOA)
+WK_ADD_API_MAPPING(WKWebArchiveRef, API::WebArchive)
+WK_ADD_API_MAPPING(WKWebArchiveResourceRef, API::WebArchiveResource)
 WK_ADD_API_MAPPING(WKObjCTypeWrapperRef, ObjCObjectGraph)
 #endif
 
-template<typename ImplType, typename APIType = typename ImplTypeInfo<ImplType*>::APIType>
+template<typename T, typename APIType = typename ImplTypeInfo<T>::APIType>
+auto toAPI(T* t) -> APIType
+{
+    return reinterpret_cast<APIType>(API::Object::wrap(t));
+}
+
+template<typename T, typename ImplType = typename APITypeInfo<T>::ImplType>
+auto toImpl(T t) -> ImplType*
+{
+    return static_cast<ImplType*>(API::Object::unwrap(static_cast<void*>(const_cast<typename std::remove_const<typename std::remove_pointer<T>::type>::type*>(t))));
+}
+
+template<typename ImplType, typename APIType = typename ImplTypeInfo<ImplType>::APIType>
 class ProxyingRefPtr {
 public:
     ProxyingRefPtr(PassRefPtr<ImplType> impl)
         : m_impl(impl)
+    {
+    }
+
+    ProxyingRefPtr(Ref<ImplType>&& impl)
+        : m_impl(WTFMove(impl))
     {
     }
 
@@ -134,52 +156,30 @@ private:
     RefPtr<ImplType> m_impl;
 };
 
-/* Opaque typing convenience methods */
-
-template<typename T>
-inline typename APITypeInfo<T>::ImplType toImpl(T t)
-{
-    // An example of the conversions that take place:
-    // const struct OpaqueWKArray* -> const struct OpaqueWKArray -> struct OpaqueWKArray -> struct OpaqueWKArray* -> ImmutableArray*
-    
-    typedef typename WTF::RemovePointer<T>::Type PotentiallyConstValueType;
-    typedef typename WTF::RemoveConst<PotentiallyConstValueType>::Type NonConstValueType;
-
-    return reinterpret_cast<typename APITypeInfo<T>::ImplType>(const_cast<NonConstValueType*>(t));
-}
-
-template<typename T>
-inline typename ImplTypeInfo<T>::APIType toAPI(T t)
-{
-    return reinterpret_cast<typename ImplTypeInfo<T>::APIType>(t);
-}
-
 /* Special cases. */
 
-inline ProxyingRefPtr<WebString> toAPI(StringImpl* string)
+inline ProxyingRefPtr<API::String> toAPI(StringImpl* string)
 {
-    return ProxyingRefPtr<WebString>(WebString::create(string));
+    return ProxyingRefPtr<API::String>(API::String::create(string));
 }
 
 inline WKStringRef toCopiedAPI(const String& string)
 {
-    RefPtr<WebString> webString = WebString::create(string);
-    return toAPI(webString.release().leakRef());
+    return toAPI(&API::String::create(string).leakRef());
 }
 
-inline ProxyingRefPtr<WebURL> toURLRef(StringImpl* string)
+inline ProxyingRefPtr<API::URL> toURLRef(StringImpl* string)
 {
     if (!string)
-        return ProxyingRefPtr<WebURL>(0);
-    return ProxyingRefPtr<WebURL>(WebURL::create(String(string)));
+        return ProxyingRefPtr<API::URL>(nullptr);
+    return ProxyingRefPtr<API::URL>(API::URL::create(String(string)));
 }
 
 inline WKURLRef toCopiedURLAPI(const String& string)
 {
     if (!string)
-        return 0;
-    RefPtr<WebURL> webURL = WebURL::create(string);
-    return toAPI(webURL.release().leakRef());
+        return nullptr;
+    return toAPI(&API::URL::create(string).leakRef());
 }
 
 inline String toWTFString(WKStringRef stringRef)
@@ -196,26 +196,26 @@ inline String toWTFString(WKURLRef urlRef)
     return toImpl(urlRef)->string();
 }
 
-inline ProxyingRefPtr<WebError> toAPI(const WebCore::ResourceError& error)
+inline ProxyingRefPtr<API::Error> toAPI(const WebCore::ResourceError& error)
 {
-    return ProxyingRefPtr<WebError>(WebError::create(error));
+    return ProxyingRefPtr<API::Error>(API::Error::create(error));
 }
 
-inline ProxyingRefPtr<WebURLRequest> toAPI(const WebCore::ResourceRequest& request)
+inline ProxyingRefPtr<API::URLRequest> toAPI(const WebCore::ResourceRequest& request)
 {
-    return ProxyingRefPtr<WebURLRequest>(WebURLRequest::create(request));
+    return ProxyingRefPtr<API::URLRequest>(API::URLRequest::create(request));
 }
 
-inline ProxyingRefPtr<WebURLResponse> toAPI(const WebCore::ResourceResponse& response)
+inline ProxyingRefPtr<API::URLResponse> toAPI(const WebCore::ResourceResponse& response)
 {
-    return ProxyingRefPtr<WebURLResponse>(WebURLResponse::create(response));
+    return ProxyingRefPtr<API::URLResponse>(API::URLResponse::create(response));
 }
 
 inline WKSecurityOriginRef toCopiedAPI(WebCore::SecurityOrigin* origin)
 {
     if (!origin)
         return 0;
-    return toAPI(WebSecurityOrigin::create(origin).leakRef());
+    return toAPI(API::SecurityOrigin::create(*origin).leakRef());
 }
 
 /* Geometry conversions */
@@ -280,7 +280,7 @@ inline WKPoint toAPI(const WebCore::IntPoint& point)
 
 /* Enum conversions */
 
-inline WKTypeID toAPI(APIObject::Type type)
+inline WKTypeID toAPI(API::Object::Type type)
 {
     return static_cast<WKTypeID>(type);
 }
@@ -448,10 +448,8 @@ inline WKContextMenuItemTag toAPI(WebCore::ContextMenuAction action)
         return kWKContextMenuItemTagPDFFacingPagesScrolling;
     case WebCore::ContextMenuItemTagDictationAlternative:
         return kWKContextMenuItemTagDictationAlternative;
-#if ENABLE(INSPECTOR)
     case WebCore::ContextMenuItemTagInspectElement:
         return kWKContextMenuItemTagInspectElement;
-#endif
     case WebCore::ContextMenuItemTagTextDirectionMenu:
         return kWKContextMenuItemTagTextDirectionMenu;
     case WebCore::ContextMenuItemTagTextDirectionDefault:
@@ -478,7 +476,7 @@ inline WKContextMenuItemTag toAPI(WebCore::ContextMenuAction action)
         return kWKContextMenuItemTagMediaPlayPause;
     case WebCore::ContextMenuItemTagMediaMute:
         return kWKContextMenuItemTagMediaMute;
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     case WebCore::ContextMenuItemTagCorrectSpellingAutomatically:
         return kWKContextMenuItemTagCorrectSpellingAutomatically;
     case WebCore::ContextMenuItemTagSubstitutionsMenu:
@@ -506,8 +504,12 @@ inline WKContextMenuItemTag toAPI(WebCore::ContextMenuAction action)
     case WebCore::ContextMenuItemTagChangeBack:
         return kWKContextMenuItemTagChangeBack;
 #endif
+#if PLATFORM(QT)
     case WebCore::ContextMenuItemTagOpenLinkInThisWindow:
         return kWKContextMenuItemTagOpenLinkInThisWindow;
+#endif
+    case WebCore::ContextMenuItemTagShareMenu:
+        return kWKContextMenuItemTagShareMenu;
     default:
         if (action < WebCore::ContextMenuItemBaseApplicationTag)
             LOG_ERROR("ContextMenuAction %i is an unknown tag but is below the allowable custom tag value of %i", action, WebCore::  ContextMenuItemBaseApplicationTag);
@@ -642,10 +644,8 @@ inline WebCore::ContextMenuAction toImpl(WKContextMenuItemTag tag)
         return WebCore::ContextMenuItemTagPDFFacingPagesScrolling;
     case kWKContextMenuItemTagDictationAlternative:
         return WebCore::ContextMenuItemTagDictationAlternative;
-#if ENABLE(INSPECTOR)
     case kWKContextMenuItemTagInspectElement:
         return WebCore::ContextMenuItemTagInspectElement;
-#endif
     case kWKContextMenuItemTagTextDirectionMenu:
         return WebCore::ContextMenuItemTagTextDirectionMenu;
     case kWKContextMenuItemTagTextDirectionDefault:
@@ -672,7 +672,7 @@ inline WebCore::ContextMenuAction toImpl(WKContextMenuItemTag tag)
         return WebCore::ContextMenuItemTagMediaPlayPause;
     case kWKContextMenuItemTagMediaMute:
         return WebCore::ContextMenuItemTagMediaMute;
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     case kWKContextMenuItemTagCorrectSpellingAutomatically:
         return WebCore::ContextMenuItemTagCorrectSpellingAutomatically;
     case kWKContextMenuItemTagSubstitutionsMenu:
@@ -699,9 +699,13 @@ inline WebCore::ContextMenuAction toImpl(WKContextMenuItemTag tag)
         return WebCore::ContextMenuItemTagCapitalize;
     case kWKContextMenuItemTagChangeBack:
         return WebCore::ContextMenuItemTagChangeBack;
+    case kWKContextMenuItemTagShareMenu:
+        return WebCore::ContextMenuItemTagShareMenu;
 #endif
+#if PLATFORM(QT)
     case kWKContextMenuItemTagOpenLinkInThisWindow:
         return WebCore::ContextMenuItemTagOpenLinkInThisWindow;
+#endif
     default:
         if (tag < kWKContextMenuItemBaseApplicationTag)
             LOG_ERROR("WKContextMenuItemTag %i is an unknown tag but is below the allowable custom tag value of %i", tag, kWKContextMenuItemBaseApplicationTag);
@@ -755,22 +759,22 @@ inline WKFrameNavigationType toAPI(WebCore::NavigationType type)
     WKFrameNavigationType wkType = kWKFrameNavigationTypeOther;
 
     switch (type) {
-    case WebCore::NavigationTypeLinkClicked:
+    case WebCore::NavigationType::LinkClicked:
         wkType = kWKFrameNavigationTypeLinkClicked;
         break;
-    case WebCore::NavigationTypeFormSubmitted:
+    case WebCore::NavigationType::FormSubmitted:
         wkType = kWKFrameNavigationTypeFormSubmitted;
         break;
-    case WebCore::NavigationTypeBackForward:
+    case WebCore::NavigationType::BackForward:
         wkType = kWKFrameNavigationTypeBackForward;
         break;
-    case WebCore::NavigationTypeReload:
+    case WebCore::NavigationType::Reload:
         wkType = kWKFrameNavigationTypeReload;
         break;
-    case WebCore::NavigationTypeFormResubmitted:
+    case WebCore::NavigationType::FormResubmitted:
         wkType = kWKFrameNavigationTypeFormResubmitted;
         break;
-    case WebCore::NavigationTypeOther:
+    case WebCore::NavigationType::Other:
         wkType = kWKFrameNavigationTypeOther;
         break;
     }
@@ -798,6 +802,66 @@ inline WKSameDocumentNavigationType toAPI(SameDocumentNavigationType type)
     }
     
     return wkType;
+}
+
+inline SameDocumentNavigationType toSameDocumentNavigationType(WKSameDocumentNavigationType wkType)
+{
+    SameDocumentNavigationType type = SameDocumentNavigationAnchorNavigation;
+
+    switch (wkType) {
+    case kWKSameDocumentNavigationAnchorNavigation:
+        type = SameDocumentNavigationAnchorNavigation;
+        break;
+    case kWKSameDocumentNavigationSessionStatePush:
+        type = SameDocumentNavigationSessionStatePush;
+        break;
+    case kWKSameDocumentNavigationSessionStateReplace:
+        type = SameDocumentNavigationSessionStateReplace;
+        break;
+    case kWKSameDocumentNavigationSessionStatePop:
+        type = SameDocumentNavigationSessionStatePop;
+        break;
+    }
+    
+    return type;
+}
+
+inline WKDiagnosticLoggingResultType toAPI(WebCore::DiagnosticLoggingResultType type)
+{
+    WKDiagnosticLoggingResultType wkType;
+
+    switch (type) {
+    case WebCore::DiagnosticLoggingResultPass:
+        wkType = kWKDiagnosticLoggingResultPass;
+        break;
+    case WebCore::DiagnosticLoggingResultFail:
+        wkType = kWKDiagnosticLoggingResultFail;
+        break;
+    case WebCore::DiagnosticLoggingResultNoop:
+        wkType = kWKDiagnosticLoggingResultNoop;
+        break;
+    }
+
+    return wkType;
+}
+
+inline WebCore::DiagnosticLoggingResultType toDiagnosticLoggingResultType(WKDiagnosticLoggingResultType wkType)
+{
+    WebCore::DiagnosticLoggingResultType type;
+
+    switch (wkType) {
+    case kWKDiagnosticLoggingResultPass:
+        type = WebCore::DiagnosticLoggingResultPass;
+        break;
+    case kWKDiagnosticLoggingResultFail:
+        type = WebCore::DiagnosticLoggingResultFail;
+        break;
+    case kWKDiagnosticLoggingResultNoop:
+        type = WebCore::DiagnosticLoggingResultNoop;
+        break;
+    }
+
+    return type;
 }
 
 inline WKLayoutMilestones toWKLayoutMilestones(WebCore::LayoutMilestones milestones)
@@ -849,8 +913,6 @@ inline WebCore::PageVisibilityState toPageVisibilityState(WKPageVisibilityState 
         return WebCore::PageVisibilityStateHidden;
     case kWKPageVisibilityStatePrerender:
         return WebCore::PageVisibilityStatePrerender;
-    case kWKPageVisibilityStateUnloaded:
-        return WebCore::PageVisibilityStateUnloaded;
     }
 
     ASSERT_NOT_REACHED();
@@ -889,11 +951,17 @@ inline SnapshotOptions toSnapshotOptions(WKSnapshotOptions wkSnapshotOptions)
         snapshotOptions |= SnapshotOptionsInViewCoordinates;
     if (wkSnapshotOptions & kWKSnapshotOptionsPaintSelectionRectangle)
         snapshotOptions |= SnapshotOptionsPaintSelectionRectangle;
+    if (wkSnapshotOptions & kWKSnapshotOptionsForceBlackText)
+        snapshotOptions |= SnapshotOptionsForceBlackText;
+    if (wkSnapshotOptions & kWKSnapshotOptionsForceWhiteText)
+        snapshotOptions |= SnapshotOptionsForceWhiteText;
+    if (wkSnapshotOptions & kWKSnapshotOptionsPrinting)
+        snapshotOptions |= SnapshotOptionsPrinting;
 
     return snapshotOptions;
 }
 
-inline WebCore::UserScriptInjectionTime toUserScriptInjectionTime(WKUserScriptInjectionTime wkInjectedTime)
+inline WebCore::UserScriptInjectionTime toUserScriptInjectionTime(_WKUserScriptInjectionTime wkInjectedTime)
 {
     switch (wkInjectedTime) {
     case kWKInjectAtDocumentStart:
@@ -904,6 +972,19 @@ inline WebCore::UserScriptInjectionTime toUserScriptInjectionTime(WKUserScriptIn
 
     ASSERT_NOT_REACHED();
     return WebCore::InjectAtDocumentStart;
+}
+
+inline _WKUserScriptInjectionTime toWKUserScriptInjectionTime(WebCore::UserScriptInjectionTime injectedTime)
+{
+    switch (injectedTime) {
+    case WebCore::InjectAtDocumentStart:
+        return kWKInjectAtDocumentStart;
+    case WebCore::InjectAtDocumentEnd:
+        return kWKInjectAtDocumentEnd;
+    }
+
+    ASSERT_NOT_REACHED();
+    return kWKInjectAtDocumentStart;
 }
 
 inline WebCore::UserContentInjectedFrames toUserContentInjectedFrames(WKUserContentInjectedFrames wkInjectedFrames)

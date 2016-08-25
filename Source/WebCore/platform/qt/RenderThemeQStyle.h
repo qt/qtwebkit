@@ -35,7 +35,7 @@ struct QStyleFacadeOption;
 
 typedef QStyleFacade* (*QtStyleFactoryFunction)(Page*);
 
-class RenderThemeQStyle : public RenderThemeQt {
+class RenderThemeQStyle final : public RenderThemeQt {
 private:
     friend class StylePainterQStyle;
 
@@ -48,63 +48,62 @@ public:
     static void setStyleFactoryFunction(QtStyleFactoryFunction);
     static QtStyleFactoryFunction styleFactory();
 
-    virtual void adjustSliderThumbSize(RenderStyle*, Element*) const;
+    void adjustSliderThumbSize(RenderStyle&, Element*) const override;
 
     QStyleFacade* qStyle() { return m_qStyle.get(); }
 
 protected:
-    virtual void adjustButtonStyle(StyleResolver*, RenderStyle*, Element*) const;
-    virtual bool paintButton(RenderObject*, const PaintInfo&, const IntRect&);
+    void adjustButtonStyle(StyleResolver&, RenderStyle&, Element*) const override;
+    bool paintButton(const RenderObject&, const PaintInfo&, const IntRect&) override;
 
-    virtual bool paintTextField(RenderObject*, const PaintInfo&, const IntRect&);
+    bool paintTextField(const RenderObject&, const PaintInfo&, const FloatRect&) override;
 
-    virtual bool paintTextArea(RenderObject*, const PaintInfo&, const IntRect&);
-    virtual void adjustTextAreaStyle(StyleResolver*, RenderStyle*, Element*) const;
+    bool paintTextArea(const RenderObject&, const PaintInfo&, const FloatRect&) override;
+    void adjustTextAreaStyle(StyleResolver&, RenderStyle&, Element*) const override;
 
-    virtual bool paintMenuList(RenderObject*, const PaintInfo&, const IntRect&);
+    bool paintMenuList(const RenderObject&, const PaintInfo&, const FloatRect&) override;
 
-    virtual bool paintMenuListButton(RenderObject*, const PaintInfo&, const IntRect&);
-    virtual void adjustMenuListButtonStyle(StyleResolver*, RenderStyle*, Element*) const;
+    bool paintMenuListButtonDecorations(const RenderBox&, const PaintInfo&, const FloatRect&) override;
+    void adjustMenuListButtonStyle(StyleResolver&, RenderStyle&, Element*) const override;
 
-#if ENABLE(PROGRESS_ELEMENT)
     // Returns the duration of the animation for the progress bar.
-    virtual double animationDurationForProgressBar(RenderProgress*) const;
-    virtual bool paintProgressBar(RenderObject*, const PaintInfo&, const IntRect&);
-#endif
+    double animationDurationForProgressBar(RenderProgress&) const override;
+    bool paintProgressBar(const RenderObject&, const PaintInfo&, const IntRect&) override;
 
-    virtual bool paintSliderTrack(RenderObject*, const PaintInfo&, const IntRect&);
-    virtual void adjustSliderTrackStyle(StyleResolver*, RenderStyle*, Element*) const;
+    bool paintSliderTrack(const RenderObject&, const PaintInfo&, const IntRect&) override;
+    void adjustSliderTrackStyle(StyleResolver&, RenderStyle&, Element*) const override;
 
-    virtual bool paintSliderThumb(RenderObject*, const PaintInfo&, const IntRect&);
-    virtual void adjustSliderThumbStyle(StyleResolver*, RenderStyle*, Element*) const;
+    bool paintSliderThumb(const RenderObject&, const PaintInfo&, const IntRect&) override;
+    void adjustSliderThumbStyle(StyleResolver&, RenderStyle&, Element*) const override;
 
-    virtual bool paintSearchField(RenderObject*, const PaintInfo&, const IntRect&);
+    bool paintSearchField(const RenderObject&, const PaintInfo&, const IntRect&) override;
 
-    virtual void adjustSearchFieldDecorationStyle(StyleResolver*, RenderStyle*, Element*) const;
-    virtual bool paintSearchFieldDecoration(RenderObject*, const PaintInfo&, const IntRect&);
+    void adjustSearchFieldDecorationPartStyle(StyleResolver&, RenderStyle&, Element*) const override;
+    bool paintSearchFieldDecorationPart(const RenderObject&, const PaintInfo&, const IntRect&) override;
 
-    virtual void adjustSearchFieldResultsDecorationStyle(StyleResolver*, RenderStyle*, Element*) const;
-    virtual bool paintSearchFieldResultsDecoration(RenderObject*, const PaintInfo&, const IntRect&);
+    void adjustSearchFieldResultsDecorationPartStyle(StyleResolver&, RenderStyle&, Element*) const override;
+    bool paintSearchFieldResultsDecorationPart(const RenderBox&, const PaintInfo&, const IntRect&) override;
 
 #ifndef QT_NO_SPINBOX
-    virtual bool paintInnerSpinButton(RenderObject*, const PaintInfo&, const IntRect&);
+    bool paintInnerSpinButton(const RenderObject&, const PaintInfo&, const IntRect&) override;
 #endif
 
 protected:
-    virtual void computeSizeBasedOnStyle(RenderStyle*) const;
+    void computeSizeBasedOnStyle(RenderStyle&) const override;
 
-    virtual QSharedPointer<StylePainter> getStylePainter(const PaintInfo&);
+    QSharedPointer<StylePainter> getStylePainter(const PaintInfo&) override;
 
-    virtual QRect inflateButtonRect(const QRect& originalRect) const;
+    QRect inflateButtonRect(const QRect& originalRect) const override;
+    QRectF inflateButtonRect(const QRectF& originalRect) const override;
 
-    virtual void setPopupPadding(RenderStyle*) const;
+    void setPopupPadding(RenderStyle&) const override;
 
-    virtual QPalette colorPalette() const;
+    QPalette colorPalette() const override;
 
 private:
-    ControlPart initializeCommonQStyleOptions(QStyleFacadeOption&, RenderObject*) const;
+    ControlPart initializeCommonQStyleOptions(QStyleFacadeOption&, const RenderObject&) const;
 
-    void setButtonPadding(RenderStyle*) const;
+    void setButtonPadding(RenderStyle&) const;
 
     void setPaletteFromPageClientIfExists(QPalette&) const;
 
@@ -112,13 +111,14 @@ private:
     int m_buttonFontPixelSize;
 #endif
 
-    OwnPtr<QStyleFacade> m_qStyle;
+    std::unique_ptr<QStyleFacade> m_qStyle;
 };
 
 class StylePainterQStyle : public StylePainter {
 public:
-    explicit StylePainterQStyle(RenderThemeQStyle*, const PaintInfo&, RenderObject*);
-    explicit StylePainterQStyle(ScrollbarThemeQStyle*, GraphicsContext*);
+    explicit StylePainterQStyle(RenderThemeQStyle*, const PaintInfo&);
+    explicit StylePainterQStyle(RenderThemeQStyle*, const PaintInfo&, const RenderObject&);
+    explicit StylePainterQStyle(ScrollbarThemeQStyle*, GraphicsContext&);
 
     bool isValid() const { return qStyle && qStyle->isValid() && StylePainter::isValid(); }
 

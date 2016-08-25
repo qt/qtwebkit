@@ -24,14 +24,17 @@
  */
 
 #include "config.h"
+
+#if WK_HAVE_C_SPI
+
 #include "JavaScriptTest.h"
 #include "PlatformUtilities.h"
 #include "PlatformWebView.h"
 #include "Test.h"
 #include <JavaScriptCore/JSContextRef.h>
-#include <WebKit2/WKContextPrivate.h>
-#include <WebKit2/WKPagePrivate.h>
-#include <WebKit2/WKSerializedScriptValue.h>
+#include <WebKit/WKContextPrivate.h>
+#include <WebKit/WKPagePrivate.h>
+#include <WebKit/WKSerializedScriptValue.h>
 
 namespace TestWebKitAPI {
 
@@ -61,13 +64,14 @@ TEST(WebKit2, ResizeReversePaginatedWebView)
     WKRetainPtr<WKContextRef> context(AdoptWK, WKContextCreate());
     PlatformWebView webView(context.get());
 
-    WKPageLoaderClient loaderClient;
+    WKPageLoaderClientV3 loaderClient;
     memset(&loaderClient, 0, sizeof(loaderClient));
-    loaderClient.version = kWKPageLoaderClientCurrentVersion;
-    loaderClient.didLayout = didLayout;
-    loaderClient.clientInfo = &webView;
 
-    WKPageSetPageLoaderClient(webView.page(), &loaderClient);
+    loaderClient.base.version = 3;
+    loaderClient.base.clientInfo = &webView;
+    loaderClient.didLayout = didLayout;
+
+    WKPageSetPageLoaderClient(webView.page(), &loaderClient.base);
 
     WKPageListenForLayoutMilestones(webView.page(), kWKDidFirstLayoutAfterSuppressedIncrementalRendering);
 
@@ -87,3 +91,5 @@ TEST(WebKit2, ResizeReversePaginatedWebView)
 }
 
 } // namespace TestWebKitAPI
+
+#endif

@@ -66,7 +66,7 @@ class QWebSettings;
 class QWebFullScreenVideoHandler;
 class UndoStepQt;
 
-class WEBKIT_EXPORTDATA QWebPageAdapter {
+class QWEBKIT_EXPORT QWebPageAdapter {
 public:
 
 #define FOR_EACH_MAPPED_MENU_ACTION(F, SEPARATOR) \
@@ -109,9 +109,7 @@ public:
     enum MenuAction {
         NoAction = - 1,
         FOR_EACH_MAPPED_MENU_ACTION(DEFINE_ACTION, COMMA_SEPARATOR)
-#if ENABLE(INSPECTOR)
         , InspectElement
-#endif
         , ActionCount
     };
 
@@ -150,6 +148,30 @@ public:
         VisibilityStateUnloaded
     };
 
+    // Must match with values of QWebPage::MessageSource enum.
+    enum MessageSource {
+        XmlMessageSource,
+        JSMessageSource,
+        NetworkMessageSource,
+        ConsoleAPIMessageSource,
+        StorageMessageSource,
+        AppCacheMessageSource,
+        RenderingMessageSource,
+        CSSMessageSource,
+        SecurityMessageSource,
+        ContentBlockerMessageSource,
+        OtherMessageSource,
+    };
+
+    // Must match with values of QWebPage::MessageLevel enum.
+    enum MessageLevel {
+        LogMessageLevel = 1,
+        WarningMessageLevel = 2,
+        ErrorMessageLevel = 3,
+        DebugMessageLevel = 4,
+        InfoMessageLevel = 5,
+    };
+
     QWebPageAdapter();
     virtual ~QWebPageAdapter();
 
@@ -168,7 +190,7 @@ public:
     virtual QSize viewportSize() const = 0;
     virtual QWebPageAdapter* createWindow(bool /*dialog*/) = 0;
     virtual QObject* handle() = 0;
-    virtual void javaScriptConsoleMessage(const QString& message, int lineNumber, const QString& sourceID) = 0;
+    virtual void consoleMessageReceived(MessageSource, MessageLevel, const QString& message, int lineNumber, const QString& sourceID) = 0;
     virtual void javaScriptAlert(QWebFrameAdapter*, const QString& msg) = 0;
     virtual bool javaScriptConfirm(QWebFrameAdapter*, const QString& msg) = 0;
     virtual bool javaScriptPrompt(QWebFrameAdapter*, const QString& msg, const QString& defaultValue, QString* result) = 0;
@@ -179,7 +201,7 @@ public:
     virtual void setToolTip(const QString&) = 0;
     virtual QStringList chooseFiles(QWebFrameAdapter*, bool allowMultiple, const QStringList& suggestedFileNames) = 0;
     virtual QColor colorSelectionRequested(const QColor& selectedColor) = 0;
-    virtual QWebSelectMethod* createSelectPopup() = 0;
+    virtual std::unique_ptr<QWebSelectMethod> createSelectPopup() = 0;
     virtual QRect viewRectRelativeToWindow() = 0;
 
 #if USE(QT_MULTIMEDIA)
@@ -267,7 +289,7 @@ public:
     void setVisibilityState(VisibilityState);
     VisibilityState visibilityState() const;
 
-    void setPluginsVisible(bool visible);
+    void setPluginsVisible(bool);
 
     static QWebPageAdapter* kit(WebCore::Page*);
     WebCore::ViewportArguments viewportArguments() const;
@@ -296,7 +318,7 @@ public:
 #ifndef QT_NO_WHEELEVENT
     void wheelEvent(QWheelEvent*, int wheelScrollLines);
 #endif
-#ifndef QT_NO_DRAGANDDROP
+#if ENABLE(DRAG_SUPPORT)
     Qt::DropAction dragEntered(const QMimeData*, const QPoint&, Qt::DropActions);
     void dragLeaveEvent();
     Qt::DropAction dragUpdated(const QMimeData*, const QPoint&, Qt::DropActions);

@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -26,6 +26,7 @@
 #ifndef EditCommand_h
 #define EditCommand_h
 
+#include "AXTextStateChangeIntent.h"
 #include "EditAction.h"
 #include "VisibleSelection.h"
 
@@ -38,6 +39,7 @@ namespace WebCore {
 class CompositeEditCommand;
 class Document;
 class Element;
+class Frame;
 
 class EditCommand : public RefCounted<EditCommand> {
 public:
@@ -45,11 +47,12 @@ public:
 
     void setParent(CompositeEditCommand*);
 
-    virtual EditAction editingAction() const;
+    EditAction editingAction() const;
 
     const VisibleSelection& startingSelection() const { return m_startingSelection; }
     const VisibleSelection& endingSelection() const { return m_endingSelection; }
 
+    virtual bool isInsertTextCommand() const { return false; }    
     virtual bool isSimpleEditCommand() const { return false; }
     virtual bool isCompositeEditCommand() const { return false; }
     virtual bool isEditCommandComposition() const { return false; }
@@ -57,20 +60,27 @@ public:
 
     virtual void doApply() = 0;
 
-protected:
-    explicit EditCommand(Document*);
-    EditCommand(Document*, const VisibleSelection&, const VisibleSelection&);
+    AXTextEditType applyEditType() const;
+    AXTextEditType unapplyEditType() const;
 
-    Document* document() const { return m_document.get(); }
+    bool shouldPostAccessibilityNotification() const;
+
+protected:
+    explicit EditCommand(Document&, EditAction = EditActionUnspecified);
+    EditCommand(Document&, const VisibleSelection&, const VisibleSelection&);
+
+    Frame& frame();
+    Document& document() { return m_document; }
     CompositeEditCommand* parent() const { return m_parent; }
     void setStartingSelection(const VisibleSelection&);
-    void setEndingSelection(const VisibleSelection&);
+    WEBCORE_EXPORT void setEndingSelection(const VisibleSelection&);
 
 private:
-    RefPtr<Document> m_document;
+    Ref<Document> m_document;
     VisibleSelection m_startingSelection;
     VisibleSelection m_endingSelection;
-    CompositeEditCommand* m_parent;
+    CompositeEditCommand* m_parent { nullptr };
+    EditAction m_editingAction { EditActionUnspecified };
 };
 
 enum ShouldAssumeContentIsAlwaysEditable {
@@ -88,14 +98,16 @@ public:
 #endif
 
 protected:
-    explicit SimpleEditCommand(Document* document) : EditCommand(document) { }
+    explicit SimpleEditCommand(Document&, EditAction = EditActionUnspecified);
 
 #ifndef NDEBUG
     void addNodeAndDescendants(Node*, HashSet<Node*>&);
 #endif
 
+    virtual void notifyAccessibilityForTextChange(Node*, AXTextEditType, const String&, const VisiblePosition&);
+
 private:
-    virtual bool isSimpleEditCommand() const OVERRIDE { return true; }
+    virtual bool isSimpleEditCommand() const override { return true; }
 };
 
 inline SimpleEditCommand* toSimpleEditCommand(EditCommand* command)

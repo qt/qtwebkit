@@ -20,7 +20,6 @@
 #ifndef SVGAnimatedPathSegListPropertyTearOff_h
 #define SVGAnimatedPathSegListPropertyTearOff_h
 
-#if ENABLE(SVG)
 #include "SVGAnimatedListPropertyTearOff.h"
 #include "SVGPathByteStream.h"
 #include "SVGPathElement.h"
@@ -32,24 +31,24 @@ namespace WebCore {
 
 class SVGAnimatedPathSegListPropertyTearOff : public SVGAnimatedListPropertyTearOff<SVGPathSegList> {
 public:
-    virtual PassRefPtr<ListProperty> baseVal() OVERRIDE
+    virtual RefPtr<ListProperty> baseVal() override
     {
         if (m_baseVal)
             return m_baseVal;
 
-        RefPtr<ListProperty> property = SVGPathSegListPropertyTearOff::create(this, BaseValRole, PathSegUnalteredRole, m_values, m_wrappers);
-        m_baseVal = property.get();
-        return property.release();
+        auto property = SVGPathSegListPropertyTearOff::create(this, BaseValRole, PathSegUnalteredRole, m_values, m_wrappers);
+        m_baseVal = property.ptr();
+        return WTFMove(property);
     }
 
-    virtual PassRefPtr<ListProperty> animVal() OVERRIDE
+    virtual RefPtr<ListProperty> animVal() override
     {
         if (m_animVal)
             return m_animVal;
 
-        RefPtr<ListProperty> property = SVGPathSegListPropertyTearOff::create(this, AnimValRole, PathSegUnalteredRole, m_values, m_wrappers);
-        m_animVal = property.get();
-        return property.release();
+        auto property = SVGPathSegListPropertyTearOff::create(this, AnimValRole, PathSegUnalteredRole, m_values, m_wrappers);
+        m_animVal = property.ptr();
+        return WTFMove(property);
     }
 
     int findItem(const RefPtr<SVGPathSeg>& segment)
@@ -64,10 +63,10 @@ public:
         static_cast<SVGPathSegListPropertyTearOff*>(baseVal().get())->removeItemFromList(itemIndex, shouldSynchronizeWrappers);
     }
 
-    static PassRefPtr<SVGAnimatedPathSegListPropertyTearOff> create(SVGElement* contextElement, const QualifiedName& attributeName, AnimatedPropertyType animatedPropertyType, SVGPathSegList& values)
+    static Ref<SVGAnimatedPathSegListPropertyTearOff> create(SVGElement* contextElement, const QualifiedName& attributeName, AnimatedPropertyType animatedPropertyType, SVGPathSegList& values)
     {
         ASSERT(contextElement);
-        return adoptRef(new SVGAnimatedPathSegListPropertyTearOff(contextElement, attributeName, animatedPropertyType, values));
+        return adoptRef(*new SVGAnimatedPathSegListPropertyTearOff(contextElement, attributeName, animatedPropertyType, values));
     }
 
     using SVGAnimatedListPropertyTearOff<SVGPathSegList>::animationStarted;
@@ -86,21 +85,21 @@ public:
     void animationEnded()
     {
         ASSERT(m_animatedPathByteStream);
-        m_animatedPathByteStream = 0;
+        m_animatedPathByteStream = nullptr;
         SVGAnimatedListPropertyTearOff<SVGPathSegList>::animationEnded();
     }
 
     void animValDidChange()
     {
         ASSERT(m_animatedPathByteStream);
-        SVGPathElement* pathElement = toSVGPathElement(contextElement());
+        SVGPathElement* pathElement = downcast<SVGPathElement>(contextElement());
 
         // If the animVal is observed from JS, we have to update it on each animation step.
         // This is an expensive operation and only done, if someone actually observes the animatedPathSegList() while an animation is running.
         if (pathElement->isAnimValObserved()) {
             SVGPathSegList& animatedList = currentAnimatedValue();
             animatedList.clear();
-            buildSVGPathSegListFromByteStream(m_animatedPathByteStream, pathElement, animatedList, UnalteredParsing);
+            buildSVGPathSegListFromByteStream(*m_animatedPathByteStream, *pathElement, animatedList, UnalteredParsing);
         }
 
         SVGAnimatedListPropertyTearOff<SVGPathSegList>::animValDidChange();
@@ -111,15 +110,15 @@ public:
 private:
     SVGAnimatedPathSegListPropertyTearOff(SVGElement* contextElement, const QualifiedName& attributeName, AnimatedPropertyType animatedPropertyType, SVGPathSegList& values)
         : SVGAnimatedListPropertyTearOff<SVGPathSegList>(contextElement, attributeName, animatedPropertyType, values)
-        , m_animatedPathByteStream(0)
+        , m_animatedPathByteStream(nullptr)
     {
         ASSERT(contextElement);
-        ASSERT(toSVGPathElement(contextElement));
+        ASSERT(is<SVGPathElement>(contextElement));
     }
 
     virtual ~SVGAnimatedPathSegListPropertyTearOff()
     {
-        static_cast<SVGPathElement*>(contextElement())->animatedPropertyWillBeDeleted();
+        downcast<SVGPathElement>(contextElement())->animatedPropertyWillBeDeleted();
     }
 
     SVGPathByteStream* m_animatedPathByteStream;
@@ -127,5 +126,4 @@ private:
 
 }
 
-#endif // ENABLE(SVG)
 #endif // SVGAnimatedPathSegListPropertyTearOff_h

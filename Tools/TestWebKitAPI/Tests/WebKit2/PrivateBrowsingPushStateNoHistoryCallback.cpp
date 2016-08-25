@@ -24,47 +24,56 @@
  */
 
 #include "config.h"
+
+#if WK_HAVE_C_SPI
+
 #include "PlatformUtilities.h"
 #include "PlatformWebView.h"
 #include "Test.h"
-#include <WebKit2/WKRetainPtr.h>
+#include <WebKit/WKRetainPtr.h>
 
 namespace TestWebKitAPI {
 
-static bool testDone;
+static bool didNavigate;
+static bool didSameDocumentNavigation;
 
-static void didNavigateWithNavigationData(WKContextRef context, WKPageRef page, WKNavigationDataRef navigationData, WKFrameRef frame, const void* clientInfo)
+static void didNavigateWithoutNavigationData(WKContextRef context, WKPageRef page, WKNavigationDataRef navigationData, WKFrameRef frame, const void* clientInfo)
 {
     // This should never be called when navigating in Private Browsing.
     FAIL();
 }
 
+static void didNavigateWithNavigationData(WKContextRef context, WKPageRef page, WKNavigationDataRef navigationData, WKFrameRef frame, const void* clientInfo)
+{
+    didNavigate = true;
+}
+
 static void didSameDocumentNavigationForFrame(WKPageRef page, WKFrameRef frame, WKSameDocumentNavigationType type, WKTypeRef userData, const void *clientInfo)
 {
-    testDone = true;
+    didSameDocumentNavigation = true;
 }
 
 TEST(WebKit2, PrivateBrowsingPushStateNoHistoryCallback)
 {
     WKRetainPtr<WKContextRef> context(AdoptWK, WKContextCreate());
 
-    WKContextHistoryClient historyClient;
+    WKContextHistoryClientV0 historyClient;
     memset(&historyClient, 0, sizeof(historyClient));
 
-    historyClient.version = 0;
-    historyClient.clientInfo = 0;
-    historyClient.didNavigateWithNavigationData = didNavigateWithNavigationData;
-    WKContextSetHistoryClient(context.get(), &historyClient);
+    historyClient.base.version = 0;
+    historyClient.didNavigateWithNavigationData = didNavigateWithoutNavigationData;
+
+    WKContextSetHistoryClient(context.get(), &historyClient.base);
 
     PlatformWebView webView(context.get());
 
-    WKPageLoaderClient pageLoaderClient;
+    WKPageLoaderClientV0 pageLoaderClient;
     memset(&pageLoaderClient, 0, sizeof(pageLoaderClient));
 
-    pageLoaderClient.version = 0;
-    pageLoaderClient.clientInfo = 0;
+    pageLoaderClient.base.version = 0;
     pageLoaderClient.didSameDocumentNavigationForFrame = didSameDocumentNavigationForFrame;
-    WKPageSetPageLoaderClient(webView.page(), &pageLoaderClient);
+
+    WKPageSetPageLoaderClient(webView.page(), &pageLoaderClient.base);
 
     WKRetainPtr<WKPreferencesRef> preferences(AdoptWK, WKPreferencesCreate());
     WKPreferencesSetPrivateBrowsingEnabled(preferences.get(), true);
@@ -75,7 +84,18 @@ TEST(WebKit2, PrivateBrowsingPushStateNoHistoryCallback)
     WKRetainPtr<WKURLRef> url(AdoptWK, Util::createURLForResource("push-state", "html"));
     WKPageLoadURL(webView.page(), url.get());
 
-    Util::run(&testDone);
+    Util::run(&didSameDocumentNavigation);
+
+    WKPreferencesSetPrivateBrowsingEnabled(preferences.get(), false);
+
+    historyClient.didNavigateWithNavigationData = didNavigateWithNavigationData;
+    WKContextSetHistoryClient(context.get(), &historyClient.base);
+
+    WKPageLoadURL(webView.page(), url.get());
+
+    Util::run(&didNavigate);
 }
 
 } // namespace TestWebKitAPI
+
+#endif

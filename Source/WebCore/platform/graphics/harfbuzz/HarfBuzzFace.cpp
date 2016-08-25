@@ -32,8 +32,8 @@
 #include "HarfBuzzFace.h"
 
 #include "FontPlatformData.h"
-#include "hb-ot.h"
-#include "hb.h"
+#include <hb-ot.h>
+#include <hb.h>
 
 namespace WebCore {
 
@@ -74,7 +74,7 @@ typedef HashMap<uint64_t, RefPtr<FaceCacheEntry>, WTF::IntHash<uint64_t>, WTF::U
 
 static HarfBuzzFaceCache* harfBuzzFaceCache()
 {
-    DEFINE_STATIC_LOCAL(HarfBuzzFaceCache, s_harfBuzzFaceCache, ());
+    DEPRECATED_DEFINE_STATIC_LOCAL(HarfBuzzFaceCache, s_harfBuzzFaceCache, ());
     return &s_harfBuzzFaceCache;
 }
 
@@ -83,7 +83,7 @@ HarfBuzzFace::HarfBuzzFace(FontPlatformData* platformData, uint64_t uniqueID)
     , m_uniqueID(uniqueID)
     , m_scriptForVerticalText(HB_SCRIPT_INVALID)
 {
-    HarfBuzzFaceCache::AddResult result = harfBuzzFaceCache()->add(m_uniqueID, 0);
+    HarfBuzzFaceCache::AddResult result = harfBuzzFaceCache()->add(m_uniqueID, nullptr);
     if (result.isNewEntry)
         result.iterator->value = FaceCacheEntry::create(createFace());
     result.iterator->value->ref();

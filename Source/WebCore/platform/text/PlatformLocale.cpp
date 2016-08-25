@@ -51,8 +51,8 @@ public:
 
 private:
     // DateTimeFormat::TokenHandler functions.
-    virtual void visitField(DateTimeFormat::FieldType, int) OVERRIDE FINAL;
-    virtual void visitLiteral(const String&) OVERRIDE FINAL;
+    virtual void visitField(DateTimeFormat::FieldType, int) override final;
+    virtual void visitLiteral(const String&) override final;
 
     String zeroPadString(const String&, size_t width);
     void appendNumber(int number, size_t width);
@@ -81,7 +81,7 @@ String DateTimeStringBuilder::zeroPadString(const String& string, size_t width)
     StringBuilder zeroPaddedStringBuilder;
     zeroPaddedStringBuilder.reserveCapacity(width);
     for (size_t i = string.length(); i < width; ++i)
-        zeroPaddedStringBuilder.append("0");
+        zeroPaddedStringBuilder.append('0');
     zeroPaddedStringBuilder.append(string);
     return zeroPaddedStringBuilder.toString();
 }
@@ -311,7 +311,7 @@ String Locale::convertFromLocalizedNumber(const String& localized)
     StringBuilder builder;
     builder.reserveCapacity(input.length());
     if (isNegative)
-        builder.append("-");
+        builder.append('-');
     for (unsigned i = startIndex; i < endIndex;) {
         unsigned symbolIndex = matchedDecimalSymbolIndex(input, i);
         if (symbolIndex >= DecimalSymbolsSize)
@@ -328,6 +328,7 @@ String Locale::convertFromLocalizedNumber(const String& localized)
 
 #if ENABLE(DATE_AND_TIME_INPUT_TYPES)
 
+#if !PLATFORM(IOS)
 String Locale::formatDateTime(const DateComponents& date, FormatType formatType)
 {
     if (date.type() == DateComponents::Invalid)
@@ -363,6 +364,8 @@ String Locale::formatDateTime(const DateComponents& date, FormatType formatType)
     }
     return builder.toString();
 }
+#endif // !PLATFORM(IOS)
+
 #endif
 
 }

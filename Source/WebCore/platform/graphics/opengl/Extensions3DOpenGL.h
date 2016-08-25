@@ -32,17 +32,13 @@
 #include <wtf/HashSet.h>
 #include <wtf/text/StringHash.h>
 
-#if PLATFORM(QT)
-QT_BEGIN_NAMESPACE
-class QOpenGLVertexArrayObjectHelper;
-QT_END_NAMESPACE
-#endif
-
 namespace WebCore {
 
 class Extensions3DOpenGL : public Extensions3DOpenGLCommon {
     WTF_MAKE_FAST_ALLOCATED;
 public:
+    // This class only needs to be instantiated by GraphicsContext3D implementations.
+    explicit Extensions3DOpenGL(GraphicsContext3D*);
     virtual ~Extensions3DOpenGL();
 
     // Extensions3D methods.
@@ -53,26 +49,21 @@ public:
     virtual void deleteVertexArrayOES(Platform3DObject);
     virtual GC3Dboolean isVertexArrayOES(Platform3DObject);
     virtual void bindVertexArrayOES(Platform3DObject);
-    virtual void copyTextureCHROMIUM(GC3Denum, Platform3DObject, Platform3DObject, GC3Dint, GC3Denum);
     virtual void insertEventMarkerEXT(const String&);
     virtual void pushGroupMarkerEXT(const String&);
     virtual void popGroupMarkerEXT(void);
     virtual void drawBuffersEXT(GC3Dsizei, const GC3Denum*);
 
-protected:
-    // This class only needs to be instantiated by GraphicsContext3D implementations.
-    friend class GraphicsContext3D;
-    Extensions3DOpenGL(GraphicsContext3D*);
+    virtual void drawArraysInstanced(GC3Denum mode, GC3Dint first, GC3Dsizei count, GC3Dsizei primcount);
+    virtual void drawElementsInstanced(GC3Denum mode, GC3Dsizei count, GC3Denum type, long long offset, GC3Dsizei primcount);
+    virtual void vertexAttribDivisor(GC3Duint index, GC3Duint divisor);
 
+protected:
     virtual bool supportsExtension(const WTF::String&);
     virtual String getExtensions();
-#if (PLATFORM(GTK) || PLATFORM(QT) || PLATFORM(EFL) || PLATFORM(WIN))
+#if (PLATFORM(GTK) || PLATFORM(QT) || PLATFORM(EFL) || PLATFORM(WIN) || PLATFORM(IOS))
 private:
     bool isVertexArrayObjectSupported();
-#endif
-
-#if PLATFORM(QT) && QT_VERSION >= QT_VERSION_CHECK(5, 4, 0)
-    QOpenGLVertexArrayObjectHelper *m_vaoFunctions;
 #endif
 };
 

@@ -26,8 +26,6 @@
 #include "config.h"
 #include "WKBundleInspector.h"
 
-#if ENABLE(INSPECTOR)
-
 #include "WKAPICast.h"
 #include "WKBundleAPICast.h"
 #include "WebInspector.h"
@@ -42,17 +40,17 @@ WKTypeID WKBundleInspectorGetTypeID()
 
 void WKBundleInspectorShow(WKBundleInspectorRef inspectorRef)
 {
-    return toImpl(inspectorRef)->show();
+    toImpl(inspectorRef)->show();
 }
 
 void WKBundleInspectorClose(WKBundleInspectorRef inspectorRef)
 {
-    return toImpl(inspectorRef)->close();
+    toImpl(inspectorRef)->close();
 }
 
-void WKBundleInspectorEvaluateScriptForTest(WKBundleInspectorRef inspectorRef, long callID, WKStringRef script)
+void WKBundleInspectorEvaluateScriptForTest(WKBundleInspectorRef inspectorRef, WKStringRef script)
 {
-    return toImpl(inspectorRef)->evaluateScriptForTest(callID, toWTFString(script));
+    toImpl(inspectorRef)->evaluateScriptForTest(toWTFString(script));
 }
 
 void WKBundleInspectorSetPageProfilingEnabled(WKBundleInspectorRef inspectorRef, bool enabled)
@@ -62,5 +60,3 @@ void WKBundleInspectorSetPageProfilingEnabled(WKBundleInspectorRef inspectorRef,
     else
         toImpl(inspectorRef)->stopPageProfiling();
 }
-
-#endif // ENABLE(INSPECTOR)

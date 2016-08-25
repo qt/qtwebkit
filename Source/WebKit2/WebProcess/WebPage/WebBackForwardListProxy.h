@@ -26,7 +26,7 @@
 #ifndef WebBackForwardListProxy_h
 #define WebBackForwardListProxy_h
 
-#include <WebCore/BackForwardList.h>
+#include <WebCore/BackForwardClient.h>
 #include <wtf/HashSet.h>
 #include <wtf/PassRefPtr.h>
 
@@ -34,15 +34,15 @@ namespace WebKit {
 
 class WebPage;
 
-class WebBackForwardListProxy : public WebCore::BackForwardList {
+class WebBackForwardListProxy : public WebCore::BackForwardClient {
 public: 
-    static PassRefPtr<WebBackForwardListProxy> create(WebPage* page) { return adoptRef(new WebBackForwardListProxy(page)); }
+    static Ref<WebBackForwardListProxy> create(WebPage* page) { return adoptRef(*new WebBackForwardListProxy(page)); }
 
     static WebCore::HistoryItem* itemForID(uint64_t);
     static uint64_t idForItem(WebCore::HistoryItem*);
     static void removeItem(uint64_t itemID);
 
-    static void addItemFromUIProcess(uint64_t itemID, PassRefPtr<WebCore::HistoryItem>);
+    static void addItemFromUIProcess(uint64_t itemID, Ref<WebCore::HistoryItem>&&, uint64_t pageID);
     static void setHighestItemIDFromUIProcess(uint64_t itemID);
     
     void clear();
@@ -50,17 +50,23 @@ public:
 private:
     WebBackForwardListProxy(WebPage*);
 
-    virtual void addItem(PassRefPtr<WebCore::HistoryItem>);
+    virtual void addItem(Ref<WebCore::HistoryItem>&&) override;
 
-    virtual void goToItem(WebCore::HistoryItem*);
+    virtual void goToItem(WebCore::HistoryItem*) override;
         
-    virtual WebCore::HistoryItem* itemAtIndex(int);
-    virtual int backListCount();
-    virtual int forwardListCount();
+    virtual WebCore::HistoryItem* itemAtIndex(int) override;
+    virtual int backListCount() override;
+    virtual int forwardListCount() override;
 
     virtual bool isActive();
 
-    virtual void close();
+    virtual void close() override;
+
+#if PLATFORM(IOS)
+    virtual unsigned current() override;
+    virtual void setCurrent(unsigned newCurrent) override;
+    virtual bool clearAllPageCaches() override;
+#endif
 
     WebPage* m_page;
     HashSet<uint64_t> m_associatedItemIDs;

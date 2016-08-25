@@ -34,7 +34,7 @@ class WebProcess;
 
 class WebConnectionToUIProcess : public WebConnection {
 public:
-    static PassRefPtr<WebConnectionToUIProcess> create(WebProcess*);
+    static Ref<WebConnectionToUIProcess> create(WebProcess*);
 
     void invalidate();
 
@@ -42,13 +42,13 @@ private:
     WebConnectionToUIProcess(WebProcess*);
 
     // WebConnection
-    virtual void encodeMessageBody(CoreIPC::ArgumentEncoder&, APIObject*) OVERRIDE;
-    virtual bool decodeMessageBody(CoreIPC::ArgumentDecoder&, RefPtr<APIObject>&) OVERRIDE;
-    virtual bool hasValidConnection() const OVERRIDE;
+    virtual RefPtr<API::Object> transformHandlesToObjects(API::Object*) override;
+    virtual RefPtr<API::Object> transformObjectsToHandles(API::Object*) override;
+    virtual bool hasValidConnection() const override;
 
-    // CoreIPC::MessageSender
-    virtual CoreIPC::Connection* messageSenderConnection() OVERRIDE;
-    virtual uint64_t messageSenderDestinationID() OVERRIDE;
+    // IPC::MessageSender
+    virtual IPC::Connection* messageSenderConnection() override;
+    virtual uint64_t messageSenderDestinationID() override;
 
     WebProcess* m_process;
 };

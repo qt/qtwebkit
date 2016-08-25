@@ -26,23 +26,25 @@
 #include "config.h"
 #include "PluginProcessManager.h"
 
-#if ENABLE(PLUGIN_PROCESS)
+#if ENABLE(NETSCAPE_PLUGIN_API)
 
 #include "PluginProcessProxy.h"
-#include "WebContext.h"
 #include <wtf/CryptographicallyRandomNumber.h>
 #include <wtf/StdLibExtras.h>
 #include <wtf/text/WTFString.h>
 
 namespace WebKit {
 
-PluginProcessManager& PluginProcessManager::shared()
+PluginProcessManager& PluginProcessManager::singleton()
 {
-    DEFINE_STATIC_LOCAL(PluginProcessManager, pluginProcessManager, ());
+    static NeverDestroyed<PluginProcessManager> pluginProcessManager;
     return pluginProcessManager;
 }
 
 PluginProcessManager::PluginProcessManager()
+#if PLATFORM(COCOA)
+    : m_processSuppressionDisabledForPageCounter([this](bool value) { updateProcessSuppressionDisabled(value); })
+#endif
 {
 }
 
@@ -71,11 +73,7 @@ uint64_t PluginProcessManager::pluginProcessToken(const PluginModuleInfo& plugin
     attributes.processType = pluginProcessType;
     attributes.sandboxPolicy = pluginProcessSandboxPolicy;
 
-#if COMPILER_SUPPORTS(CXX_RVALUE_REFERENCES)
-    m_pluginProcessTokens.append(std::make_pair(std::move(attributes), token));
-#else
-    m_pluginProcessTokens.append(std::make_pair(attributes, token));
-#endif
+    m_pluginProcessTokens.append(std::make_pair(WTFMove(attributes), token));
     m_knownTokens.add(token);
 
     return token;
@@ -97,16 +95,24 @@ void PluginProcessManager::removePluginProcessProxy(PluginProcessProxy* pluginPr
     m_pluginProcesses.remove(vectorIndex);
 }
 
-void PluginProcessManager::getSitesWithData(const PluginModuleInfo& plugin, WebPluginSiteDataManager* webPluginSiteDataManager, uint64_t callbackID)
+void PluginProcessManager::fetchWebsiteData(const PluginModuleInfo& plugin, std::function<void (Vector<String>)> completionHandler)
 {
     PluginProcessProxy* pluginProcess = getOrCreatePluginProcess(pluginProcessToken(plugin, PluginProcessTypeNormal, PluginProcessSandboxPolicyNormal));
-    pluginProcess->getSitesWithData(webPluginSiteDataManager, callbackID);
+
+    pluginProcess->fetchWebsiteData(WTFMove(completionHandler));
 }
 
-void PluginProcessManager::clearSiteData(const PluginModuleInfo& plugin, WebPluginSiteDataManager* webPluginSiteDataManager, const Vector<String>& sites, uint64_t flags, uint64_t maxAgeInSeconds, uint64_t callbackID)
+void PluginProcessManager::deleteWebsiteData(const PluginModuleInfo& plugin, std::chrono::system_clock::time_point modifiedSince, std::function<void ()> completionHandler)
 {
     PluginProcessProxy* pluginProcess = getOrCreatePluginProcess(pluginProcessToken(plugin, PluginProcessTypeNormal, PluginProcessSandboxPolicyNormal));
-    pluginProcess->clearSiteData(webPluginSiteDataManager, sites, flags, maxAgeInSeconds, callbackID);
+
+    pluginProcess->deleteWebsiteData(modifiedSince, WTFMove(completionHandler));
+}
+
+void PluginProcessManager::deleteWebsiteDataForHostNames(const PluginModuleInfo& plugin, const Vector<String>& hostNames, std::function<void ()> completionHandler)
+{
+    PluginProcessProxy* pluginProcess = getOrCreatePluginProcess(pluginProcessToken(plugin, PluginProcessTypeNormal, PluginProcessSandboxPolicyNormal));
+    pluginProcess->deleteWebsiteDataForHostNames(hostNames, WTFMove(completionHandler));
 }
 
 PluginProcessProxy* PluginProcessManager::getOrCreatePluginProcess(uint64_t pluginProcessToken)
@@ -117,7 +123,7 @@ PluginProcessProxy* PluginProcessManager::getOrCreatePluginProcess(uint64_t plug
     }
 
     for (size_t i = 0; i < m_pluginProcessTokens.size(); ++i) {
-        std::pair<PluginProcessAttributes, uint64_t>& attributesAndToken = m_pluginProcessTokens[i];
+        auto& attributesAndToken = m_pluginProcessTokens[i];
         if (attributesAndToken.second == pluginProcessToken) {
             RefPtr<PluginProcessProxy> pluginProcess = PluginProcessProxy::create(this, attributesAndToken.first, attributesAndToken.second);
             PluginProcessProxy* pluginProcessPtr = pluginProcess.get();
@@ -127,9 +133,9 @@ PluginProcessProxy* PluginProcessManager::getOrCreatePluginProcess(uint64_t plug
         }
     }
 
-    return 0;
+    return nullptr;
 }
 
 } // namespace WebKit
 
-#endif // ENABLE(PLUGIN_PROCESS)
+#endif // ENABLE(NETSCAPE_PLUGIN_API)

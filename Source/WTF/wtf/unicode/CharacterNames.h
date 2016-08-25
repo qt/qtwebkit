@@ -10,23 +10,23 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
  * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
  * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #ifndef CharacterNames_h
 #define CharacterNames_h
 
-#include <wtf/unicode/Unicode.h>
+#include <unicode/utypes.h>
 
 namespace WTF {
 namespace Unicode {
@@ -36,6 +36,7 @@ namespace Unicode {
 // Most of these are UChar constants, not UChar32, which makes them
 // more convenient for WebCore code that mostly uses UTF-16.
 
+const UChar AppleLogo = 0xF8FF;
 const UChar32 aegeanWordSeparatorLine = 0x10100;
 const UChar32 aegeanWordSeparatorDot = 0x10101;
 const UChar apostrophe = 0x0027;
@@ -64,6 +65,7 @@ const UChar leftToRightEmbed = 0x202A;
 const UChar leftToRightMark = 0x200E;
 const UChar leftToRightOverride = 0x202D;
 const UChar minusSign = 0x2212;
+const UChar narrowNonBreakingSpace = 0x202F;
 const UChar newlineCharacter = 0x000A;
 const UChar noBreakSpace = 0x00A0;
 const UChar objectReplacementCharacter = 0xFFFC;
@@ -94,6 +96,7 @@ const UChar zeroWidthNoBreakSpace = 0xFEFF;
 } // namespace Unicode
 } // namespace WTF
 
+using WTF::Unicode::AppleLogo;
 using WTF::Unicode::aegeanWordSeparatorLine;
 using WTF::Unicode::aegeanWordSeparatorDot;
 using WTF::Unicode::blackCircle;
@@ -120,6 +123,7 @@ using WTF::Unicode::leftToRightEmbed;
 using WTF::Unicode::leftToRightMark;
 using WTF::Unicode::leftToRightOverride;
 using WTF::Unicode::minusSign;
+using WTF::Unicode::narrowNonBreakingSpace;
 using WTF::Unicode::newlineCharacter;
 using WTF::Unicode::noBreakSpace;
 using WTF::Unicode::objectReplacementCharacter;

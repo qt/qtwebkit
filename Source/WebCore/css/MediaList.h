@@ -22,6 +22,7 @@
 #define MediaList_h
 
 #include "ExceptionCode.h"
+#include <memory>
 #include <wtf/Forward.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
@@ -38,17 +39,17 @@ class MediaQuery;
 
 class MediaQuerySet : public RefCounted<MediaQuerySet> {
 public:
-    static PassRefPtr<MediaQuerySet> create()
+    static Ref<MediaQuerySet> create()
     {
-        return adoptRef(new MediaQuerySet());
+        return adoptRef(*new MediaQuerySet);
     }
-    static PassRefPtr<MediaQuerySet> create(const String& mediaString)
+    static Ref<MediaQuerySet> create(const String& mediaString)
     {
-        return adoptRef(new MediaQuerySet(mediaString, false));
+        return adoptRef(*new MediaQuerySet(mediaString, false));
     }
-    static PassRefPtr<MediaQuerySet> createAllowingDescriptionSyntax(const String& mediaString)
+    static Ref<MediaQuerySet> createAllowingDescriptionSyntax(const String& mediaString)
     {
-        return adoptRef(new MediaQuerySet(mediaString, true));
+        return adoptRef(*new MediaQuerySet(mediaString, true));
     }
     ~MediaQuerySet();
     
@@ -56,16 +57,16 @@ public:
     bool add(const String&);
     bool remove(const String&);
 
-    void addMediaQuery(PassOwnPtr<MediaQuery>);
+    void addMediaQuery(std::unique_ptr<MediaQuery>);
 
-    const Vector<OwnPtr<MediaQuery> >& queryVector() const { return m_queries; }
+    const Vector<std::unique_ptr<MediaQuery>>& queryVector() const { return m_queries; }
     
     int lastLine() const { return m_lastLine; }
     void setLastLine(int lastLine) { m_lastLine = lastLine; }
     
     String mediaText() const;
 
-    PassRefPtr<MediaQuerySet> copy() const { return adoptRef(new MediaQuerySet(*this)); }
+    Ref<MediaQuerySet> copy() const { return adoptRef(*new MediaQuerySet(*this)); }
 
 private:
     MediaQuerySet();
@@ -74,18 +75,18 @@ private:
     
     unsigned m_fallbackToDescriptor : 1; // true if failed media query parsing should fallback to media description parsing.
     signed m_lastLine : 31;
-    Vector<OwnPtr<MediaQuery> > m_queries;
+    Vector<std::unique_ptr<MediaQuery>> m_queries;
 };
 
 class MediaList : public RefCounted<MediaList> {
 public:
-    static PassRefPtr<MediaList> create(MediaQuerySet* mediaQueries, CSSStyleSheet* parentSheet)
+    static Ref<MediaList> create(MediaQuerySet* mediaQueries, CSSStyleSheet* parentSheet)
     {
-        return adoptRef(new MediaList(mediaQueries, parentSheet));
+        return adoptRef(*new MediaList(mediaQueries, parentSheet));
     }
-    static PassRefPtr<MediaList> create(MediaQuerySet* mediaQueries, CSSRule* parentRule)
+    static Ref<MediaList> create(MediaQuerySet* mediaQueries, CSSRule* parentRule)
     {
-        return adoptRef(new MediaList(mediaQueries, parentRule));
+        return adoptRef(*new MediaList(mediaQueries, parentRule));
     }
 
     ~MediaList();

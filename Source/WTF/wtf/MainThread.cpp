@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007, 2008 Apple Inc. All rights reserved.
+ * Copyright (C) 2007, 2008, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -31,61 +31,29 @@
 
 #include "CurrentTime.h"
 #include "Deque.h"
-#include "Functional.h"
 #include "StdLibExtras.h"
 #include "Threading.h"
+#include <mutex>
+#include <wtf/Lock.h>
+#include <wtf/NeverDestroyed.h>
 #include <wtf/ThreadSpecific.h>
 
 namespace WTF {
 
-struct FunctionWithContext {
-    MainThreadFunction* function;
-    void* context;
-    ThreadCondition* syncFlag;
-
-    FunctionWithContext(MainThreadFunction* function = 0, void* context = 0, ThreadCondition* syncFlag = 0)
-        : function(function)
-        , context(context)
-        , syncFlag(syncFlag)
-    { 
-    }
-    bool operator == (const FunctionWithContext& o)
-    {
-        return function == o.function
-            && context == o.context
-            && syncFlag == o.syncFlag;
-    }
-};
-
-class FunctionWithContextFinder {
-public:
-    FunctionWithContextFinder(const FunctionWithContext& m) : m(m) {}
-    bool operator() (FunctionWithContext& o) { return o == m; }
-    FunctionWithContext m;
-};
-
-
-typedef Deque<FunctionWithContext> FunctionQueue;
-
 static bool callbacksPaused; // This global variable is only accessed from main thread.
-#if !PLATFORM(MAC)
+#if !OS(DARWIN) || PLATFORM(EFL) || PLATFORM(GTK) || PLATFORM(QT)
 static ThreadIdentifier mainThreadIdentifier;
 #endif
 
-static Mutex& mainThreadFunctionQueueMutex()
+static StaticLock mainThreadFunctionQueueMutex;
+
+static Deque<std::function<void ()>>& functionQueue()
 {
-    DEFINE_STATIC_LOCAL(Mutex, staticMutex, ());
-    return staticMutex;
+    static NeverDestroyed<Deque<std::function<void ()>>> functionQueue;
+    return functionQueue;
 }
 
-static FunctionQueue& functionQueue()
-{
-    DEFINE_STATIC_LOCAL(FunctionQueue, staticFunctionQueue, ());
-    return staticFunctionQueue;
-}
-
-
-#if !PLATFORM(MAC)
+#if !OS(DARWIN) || PLATFORM(EFL) || PLATFORM(GTK) || PLATFORM(QT)
 
 void initializeMainThread()
 {
@@ -96,7 +64,6 @@ void initializeMainThread()
 
     mainThreadIdentifier = currentThread();
 
-    mainThreadFunctionQueueMutex();
     initializeMainThreadPlatform();
     initializeGCThreads();
 }
@@ -107,7 +74,6 @@ static pthread_once_t initializeMainThreadKeyOnce = PTHREAD_ONCE_INIT;
 
 static void initializeMainThreadOnce()
 {
-    mainThreadFunctionQueueMutex();
     initializeMainThreadPlatform();
 }
 
@@ -119,7 +85,6 @@ void initializeMainThread()
 #if !USE(WEB_THREAD)
 static void initializeMainThreadToProcessMainThreadOnce()
 {
-    mainThreadFunctionQueueMutex();
     initializeMainThreadToProcessMainThreadPlatform();
 }
 
@@ -127,12 +92,24 @@ void initializeMainThreadToProcessMainThread()
 {
     pthread_once(&initializeMainThreadKeyOnce, initializeMainThreadToProcessMainThreadOnce);
 }
+#else
+static pthread_once_t initializeWebThreadKeyOnce = PTHREAD_ONCE_INIT;
+
+static void initializeWebThreadOnce()
+{
+    initializeWebThreadPlatform();
+}
+
+void initializeWebThread()
+{
+    pthread_once(&initializeWebThreadKeyOnce, initializeWebThreadOnce);
+}
 #endif // !USE(WEB_THREAD)
 
 #endif
 
 // 0.1 sec delays in UI is approximate threshold when they become noticeable. Have a limit that's half of that.
-static const double maxRunLoopSuspensionTime = 0.05;
+static const auto maxRunLoopSuspensionTime = std::chrono::milliseconds(50);
 
 void dispatchFunctionsFromMainThread()
 {
@@ -141,93 +118,46 @@ void dispatchFunctionsFromMainThread()
     if (callbacksPaused)
         return;
 
-    double startTime = currentTime();
+    auto startTime = std::chrono::steady_clock::now();
 
-    FunctionWithContext invocation;
+    std::function<void ()> function;
+
     while (true) {
         {
-            MutexLocker locker(mainThreadFunctionQueueMutex());
+            std::lock_guard<StaticLock> lock(mainThreadFunctionQueueMutex);
             if (!functionQueue().size())
                 break;
-            invocation = functionQueue().takeFirst();
+
+            function = functionQueue().takeFirst();
         }
 
-        invocation.function(invocation.context);
-        if (invocation.syncFlag) {
-            MutexLocker locker(mainThreadFunctionQueueMutex());
-            invocation.syncFlag->signal();
-        }
+        function();
 
         // If we are running accumulated functions for too long so UI may become unresponsive, we need to
         // yield so the user input can be processed. Otherwise user may not be able to even close the window.
         // This code has effect only in case the scheduleDispatchFunctionsOnMainThread() is implemented in a way that
         // allows input events to be processed before we are back here.
-        if (currentTime() - startTime > maxRunLoopSuspensionTime) {
+        if (std::chrono::steady_clock::now() - startTime > maxRunLoopSuspensionTime) {
             scheduleDispatchFunctionsOnMainThread();
             break;
         }
     }
 }
 
-void callOnMainThread(MainThreadFunction* function, void* context)
+void callOnMainThread(std::function<void ()> function)
 {
     ASSERT(function);
+
     bool needToSchedule = false;
+
     {
-        MutexLocker locker(mainThreadFunctionQueueMutex());
+        std::lock_guard<StaticLock> lock(mainThreadFunctionQueueMutex);
         needToSchedule = functionQueue().size() == 0;
-        functionQueue().append(FunctionWithContext(function, context));
+        functionQueue().append(WTFMove(function));
     }
+
     if (needToSchedule)
         scheduleDispatchFunctionsOnMainThread();
-}
-
-void callOnMainThreadAndWait(MainThreadFunction* function, void* context)
-{
-    ASSERT(function);
-
-    if (isMainThread()) {
-        function(context);
-        return;
-    }
-
-    ThreadCondition syncFlag;
-    Mutex& functionQueueMutex = mainThreadFunctionQueueMutex();
-    MutexLocker locker(functionQueueMutex);
-    functionQueue().append(FunctionWithContext(function, context, &syncFlag));
-    if (functionQueue().size() == 1)
-        scheduleDispatchFunctionsOnMainThread();
-    syncFlag.wait(functionQueueMutex);
-}
-
-void cancelCallOnMainThread(MainThreadFunction* function, void* context)
-{
-    ASSERT(function);
-
-    MutexLocker locker(mainThreadFunctionQueueMutex());
-
-    FunctionWithContextFinder pred(FunctionWithContext(function, context));
-
-    while (true) {
-        // We must redefine 'i' each pass, because the itererator's operator= 
-        // requires 'this' to be valid, and remove() invalidates all iterators
-        FunctionQueue::iterator i(functionQueue().findIf(pred));
-        if (i == functionQueue().end())
-            break;
-        functionQueue().remove(i);
-    }
-}
-
-static void callFunctionObject(void* context)
-{
-    Function<void ()>* function = static_cast<Function<void ()>*>(context);
-    (*function)();
-    delete function;
-}
-
-void callOnMainThread(const Function<void ()>& function)
-{
-    callOnMainThread(callFunctionObject, new Function<void ()>(function));
 }
 
 void setMainThreadCallbacksPaused(bool paused)
@@ -243,25 +173,27 @@ void setMainThreadCallbacksPaused(bool paused)
         scheduleDispatchFunctionsOnMainThread();
 }
 
-#if !PLATFORM(MAC)
+#if !OS(DARWIN) || PLATFORM(EFL) || PLATFORM(GTK) || PLATFORM(QT)
 bool isMainThread()
 {
     return currentThread() == mainThreadIdentifier;
 }
 #endif
 
-#if ENABLE(PARALLEL_GC)
-static ThreadSpecific<bool>* isGCThread;
+#if !USE(WEB_THREAD)
+bool canAccessThreadLocalDataForThread(ThreadIdentifier threadId)
+{
+    return threadId == currentThread();
+}
 #endif
+
+static ThreadSpecific<bool>* isGCThread;
 
 void initializeGCThreads()
 {
-#if ENABLE(PARALLEL_GC)
     isGCThread = new ThreadSpecific<bool>();
-#endif
 }
 
-#if ENABLE(PARALLEL_GC)
 void registerGCThread()
 {
     if (!isGCThread) {
@@ -280,12 +212,5 @@ bool isMainThreadOrGCThread()
 
     return isMainThread();
 }
-#elif PLATFORM(MAC)
-// This is necessary because JavaScriptCore.exp doesn't support preprocessor macros.
-bool isMainThreadOrGCThread()
-{
-    return isMainThread();
-}
-#endif
 
 } // namespace WTF

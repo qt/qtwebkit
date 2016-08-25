@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2012, 2013, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution. 
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission. 
  *
@@ -29,44 +29,44 @@
 #include "config.h"
 #include "JSSegmentedVariableObject.h"
 
-#include "Operations.h"
+#include "JSCInlines.h"
 
 namespace JSC {
 
-int JSSegmentedVariableObject::findRegisterIndex(void* registerAddress)
+ScopeOffset JSSegmentedVariableObject::findVariableIndex(void* variableAddress)
 {
-    for (int i = m_registers.size(); i--;) {
-        if (&m_registers[i] != registerAddress)
+    ConcurrentJITLocker locker(m_lock);
+    
+    for (unsigned i = m_variables.size(); i--;) {
+        if (&m_variables[i] != variableAddress)
             continue;
-        return i;
+        return ScopeOffset(i);
     }
     CRASH();
-    return -1;
+    return ScopeOffset();
 }
 
-int JSSegmentedVariableObject::addRegisters(int numberOfRegistersToAdd)
+ScopeOffset JSSegmentedVariableObject::addVariables(unsigned numberOfVariablesToAdd, JSValue initialValue)
 {
-    ASSERT(numberOfRegistersToAdd >= 0);
+    ConcurrentJITLocker locker(m_lock);
     
-    size_t oldSize = m_registers.size();
-    m_registers.grow(oldSize + numberOfRegistersToAdd);
+    size_t oldSize = m_variables.size();
+    m_variables.grow(oldSize + numberOfVariablesToAdd);
     
-    for (size_t i = numberOfRegistersToAdd; i--;)
-        m_registers[oldSize + i].setWithoutWriteBarrier(jsUndefined());
+    for (size_t i = numberOfVariablesToAdd; i--;)
+        m_variables[oldSize + i].setWithoutWriteBarrier(initialValue);
     
-    return static_cast<int>(oldSize);
+    return ScopeOffset(oldSize);
 }
 
 void JSSegmentedVariableObject::visitChildren(JSCell* cell, SlotVisitor& slotVisitor)
 {
     JSSegmentedVariableObject* thisObject = jsCast<JSSegmentedVariableObject*>(cell);
-    ASSERT_GC_OBJECT_INHERITS(thisObject, &s_info);
-    COMPILE_ASSERT(StructureFlags & OverridesVisitChildren, OverridesVisitChildrenWithoutSettingFlag);
-    ASSERT(thisObject->structure()->typeInfo().overridesVisitChildren());
+    ASSERT_GC_OBJECT_INHERITS(thisObject, info());
     JSSymbolTableObject::visitChildren(thisObject, slotVisitor);
     
-    for (unsigned i = thisObject->m_registers.size(); i--;)
-        slotVisitor.append(&thisObject->m_registers[i]);
+    for (unsigned i = thisObject->m_variables.size(); i--;)
+        slotVisitor.append(&thisObject->m_variables[i]);
 }
 
 } // namespace JSC

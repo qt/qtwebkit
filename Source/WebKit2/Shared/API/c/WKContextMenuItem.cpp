@@ -26,15 +26,11 @@
 #include "config.h"
 #include "WKContextMenuItem.h"
 
-#include "MutableArray.h"
+#include "APIArray.h"
 #include "WebContextMenuItem.h"
 #include "WebContextMenuItemData.h"
 #include "WKAPICast.h"
 #include "WKContextMenuItemTypes.h"
-
-#if PLATFORM(MAC)
-#import <mach-o/dyld.h>
-#endif
 
 using namespace WebCore;
 using namespace WebKit;
@@ -44,15 +40,18 @@ WKTypeID WKContextMenuItemGetTypeID()
 #if ENABLE(CONTEXT_MENUS)
     return toAPI(WebContextMenuItem::APIType);
 #else
-    return toAPI(APIObject::TypeNull);
+    return toAPI(API::Object::Type::Null);
 #endif
 }
 
 WKContextMenuItemRef WKContextMenuItemCreateAsAction(WKContextMenuItemTag tag, WKStringRef title, bool enabled)
 {
 #if ENABLE(CONTEXT_MENUS)
-    return toAPI(WebContextMenuItem::create(WebContextMenuItemData(ActionType, toImpl(tag), toImpl(title)->string(), enabled, false)).leakRef());
+    return toAPI(&WebContextMenuItem::create(WebContextMenuItemData(ActionType, toImpl(tag), toImpl(title)->string(), enabled, false)).leakRef());
 #else
+    UNUSED_PARAM(tag);
+    UNUSED_PARAM(title);
+    UNUSED_PARAM(enabled);
     return 0;
 #endif
 }
@@ -60,8 +59,12 @@ WKContextMenuItemRef WKContextMenuItemCreateAsAction(WKContextMenuItemTag tag, W
 WKContextMenuItemRef WKContextMenuItemCreateAsCheckableAction(WKContextMenuItemTag tag, WKStringRef title, bool enabled, bool checked)
 {
 #if ENABLE(CONTEXT_MENUS)
-    return toAPI(WebContextMenuItem::create(WebContextMenuItemData(CheckableActionType, toImpl(tag), toImpl(title)->string(), enabled, checked)).leakRef());
+    return toAPI(&WebContextMenuItem::create(WebContextMenuItemData(CheckableActionType, toImpl(tag), toImpl(title)->string(), enabled, checked)).leakRef());
 #else
+    UNUSED_PARAM(tag);
+    UNUSED_PARAM(title);
+    UNUSED_PARAM(enabled);
+    UNUSED_PARAM(checked);
     return 0;
 #endif
 }
@@ -71,6 +74,9 @@ WKContextMenuItemRef WKContextMenuItemCreateAsSubmenu(WKStringRef title, bool en
 #if ENABLE(CONTEXT_MENUS)
     return toAPI(WebContextMenuItem::create(toImpl(title)->string(), enabled, toImpl(submenuItems)).leakRef());
 #else
+    UNUSED_PARAM(title);
+    UNUSED_PARAM(enabled);
+    UNUSED_PARAM(submenuItems);
     return 0;
 #endif
 }
@@ -84,37 +90,12 @@ WKContextMenuItemRef WKContextMenuItemSeparatorItem()
 #endif
 }
 
-#if PLATFORM(MAC)
-static WKContextMenuItemTag compatibleContextMenuItemTag(WKContextMenuItemTag tag)
-{
-    static bool needsWorkaround = ^bool {
-        const int32_t safariFrameworkVersionWithIncompatibleContextMenuItemTags = 0x02181900; // 536.25.0 (Safari 6.0)
-        return NSVersionOfRunTimeLibrary("Safari") == safariFrameworkVersionWithIncompatibleContextMenuItemTags;
-    }();
-
-    if (!needsWorkaround)
-        return tag;
-
-    // kWKContextMenuItemTagDictationAlternative was inserted before kWKContextMenuItemTagInspectElement.
-    // DictationAlternative is now at the end like it should have been. To be compatible we need to return
-    // InspectElement for DictationAlternative and shift InspectElement and after by one.
-    if (tag == kWKContextMenuItemTagDictationAlternative)
-        return kWKContextMenuItemTagInspectElement;
-    if (tag >= kWKContextMenuItemTagInspectElement && tag < kWKContextMenuItemBaseApplicationTag)
-        return tag + 1;
-    return tag;
-}
-#endif
-
 WKContextMenuItemTag WKContextMenuItemGetTag(WKContextMenuItemRef itemRef)
 {
 #if ENABLE(CONTEXT_MENUS)
-#if PLATFORM(MAC)
-    return compatibleContextMenuItemTag(toAPI(toImpl(itemRef)->data()->action()));
+    return toAPI(toImpl(itemRef)->data().action());
 #else
-    return toAPI(toImpl(itemRef)->data()->action());
-#endif
-#else
+    UNUSED_PARAM(itemRef);
     return toAPI(ContextMenuItemTagNoAction);
 #endif
 }
@@ -122,8 +103,9 @@ WKContextMenuItemTag WKContextMenuItemGetTag(WKContextMenuItemRef itemRef)
 WKContextMenuItemType WKContextMenuItemGetType(WKContextMenuItemRef itemRef)
 {
 #if ENABLE(CONTEXT_MENUS)
-    return toAPI(toImpl(itemRef)->data()->type());
+    return toAPI(toImpl(itemRef)->data().type());
 #else
+    UNUSED_PARAM(itemRef);
     return toAPI(ActionType);
 #endif
 }
@@ -131,8 +113,9 @@ WKContextMenuItemType WKContextMenuItemGetType(WKContextMenuItemRef itemRef)
 WKStringRef WKContextMenuItemCopyTitle(WKContextMenuItemRef itemRef)
 {
 #if ENABLE(CONTEXT_MENUS)
-    return toCopiedAPI(toImpl(itemRef)->data()->title().impl());
+    return toCopiedAPI(toImpl(itemRef)->data().title().impl());
 #else
+    UNUSED_PARAM(itemRef);
     return 0;
 #endif
 }
@@ -140,8 +123,9 @@ WKStringRef WKContextMenuItemCopyTitle(WKContextMenuItemRef itemRef)
 bool WKContextMenuItemGetEnabled(WKContextMenuItemRef itemRef)
 {
 #if ENABLE(CONTEXT_MENUS)
-    return toImpl(itemRef)->data()->enabled();
+    return toImpl(itemRef)->data().enabled();
 #else
+    UNUSED_PARAM(itemRef);
     return false;
 #endif
 }
@@ -149,8 +133,9 @@ bool WKContextMenuItemGetEnabled(WKContextMenuItemRef itemRef)
 bool WKContextMenuItemGetChecked(WKContextMenuItemRef itemRef)
 {
 #if ENABLE(CONTEXT_MENUS)
-    return toImpl(itemRef)->data()->checked();
+    return toImpl(itemRef)->data().checked();
 #else
+    UNUSED_PARAM(itemRef);
     return false;
 #endif
 }
@@ -158,8 +143,9 @@ bool WKContextMenuItemGetChecked(WKContextMenuItemRef itemRef)
 WKArrayRef WKContextMenuCopySubmenuItems(WKContextMenuItemRef itemRef)
 {
 #if ENABLE(CONTEXT_MENUS)
-    return toAPI(toImpl(itemRef)->submenuItemsAsImmutableArray().leakRef());
+    return toAPI(&toImpl(itemRef)->submenuItemsAsAPIArray().leakRef());
 #else
+    UNUSED_PARAM(itemRef);
     return 0;
 #endif
 }
@@ -169,6 +155,7 @@ WKTypeRef WKContextMenuItemGetUserData(WKContextMenuItemRef itemRef)
 #if ENABLE(CONTEXT_MENUS)
     return toAPI(toImpl(itemRef)->userData());
 #else
+    UNUSED_PARAM(itemRef);
     return 0;
 #endif
 }
@@ -177,5 +164,8 @@ void WKContextMenuItemSetUserData(WKContextMenuItemRef itemRef, WKTypeRef userDa
 {
 #if ENABLE(CONTEXT_MENUS)
     toImpl(itemRef)->setUserData(toImpl(userDataRef));
+#else
+    UNUSED_PARAM(itemRef);
+    UNUSED_PARAM(userDataRef);
 #endif
 }

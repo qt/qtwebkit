@@ -20,7 +20,6 @@
 #ifndef SVGUnitTypes_h
 #define SVGUnitTypes_h
 
-#if ENABLE(SVG)
 #include "SVGPropertyTraits.h"
 #include <wtf/RefCounted.h>
 
@@ -48,9 +47,9 @@ struct SVGPropertyTraits<SVGUnitTypes::SVGUnitType> {
         case SVGUnitTypes::SVG_UNIT_TYPE_UNKNOWN:
             return emptyString();
         case SVGUnitTypes::SVG_UNIT_TYPE_USERSPACEONUSE:
-            return "userSpaceOnUse";
+            return ASCIILiteral("userSpaceOnUse");
         case SVGUnitTypes::SVG_UNIT_TYPE_OBJECTBOUNDINGBOX:
-            return "objectBoundingBox";
+            return ASCIILiteral("objectBoundingBox");
         }
 
         ASSERT_NOT_REACHED();
@@ -69,5 +68,4 @@ struct SVGPropertyTraits<SVGUnitTypes::SVGUnitType> {
 
 }
 
-#endif
 #endif

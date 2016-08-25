@@ -28,56 +28,57 @@
 
 #if ENABLE(INDEXED_DATABASE)
 
+#include "IndexedDB.h"
 #include <wtf/Forward.h>
 #include <wtf/RefCounted.h>
 #include <wtf/Vector.h>
 #include <wtf/text/WTFString.h>
 
+using WebCore::IndexedDB::KeyType;
+
 namespace WebCore {
 
 class IDBKey : public RefCounted<IDBKey> {
 public:
-    typedef Vector<RefPtr<IDBKey> > KeyArray;
-
-    static PassRefPtr<IDBKey> createInvalid()
+    static Ref<IDBKey> createInvalid()
     {
-        return adoptRef(new IDBKey());
+        return adoptRef(*new IDBKey());
     }
 
-    static PassRefPtr<IDBKey> createNumber(double number)
+    static Ref<IDBKey> createNumber(double number)
     {
-        return adoptRef(new IDBKey(NumberType, number));
+        return adoptRef(*new IDBKey(KeyType::Number, number));
     }
 
-    static PassRefPtr<IDBKey> createString(const String& string)
+    static Ref<IDBKey> createString(const String& string)
     {
-        return adoptRef(new IDBKey(string));
+        return adoptRef(*new IDBKey(string));
     }
 
-    static PassRefPtr<IDBKey> createDate(double date)
+    static Ref<IDBKey> createDate(double date)
     {
-        return adoptRef(new IDBKey(DateType, date));
+        return adoptRef(*new IDBKey(KeyType::Date, date));
     }
 
-    static PassRefPtr<IDBKey> createMultiEntryArray(const KeyArray& array)
+    static PassRefPtr<IDBKey> createMultiEntryArray(const Vector<RefPtr<IDBKey>>& array)
     {
-        KeyArray result;
+        Vector<RefPtr<IDBKey>> result;
 
         size_t sizeEstimate = 0;
-        for (size_t i = 0; i < array.size(); i++) {
-            if (!array[i]->isValid())
+        for (auto& key : array) {
+            if (!key->isValid())
                 continue;
 
             bool skip = false;
-            for (size_t j = 0; j < result.size(); j++) {
-                if (array[i]->isEqual(result[j].get())) {
+            for (auto& resultKey : result) {
+                if (key->isEqual(resultKey.get())) {
                     skip = true;
                     break;
                 }
             }
             if (!skip) {
-                result.append(array[i]);
-                sizeEstimate += array[i]->m_sizeEstimate;
+                result.append(key);
+                sizeEstimate += key->m_sizeEstimate;
             }
         }
         RefPtr<IDBKey> idbKey = adoptRef(new IDBKey(result, sizeEstimate));
@@ -85,51 +86,41 @@ public:
         return idbKey.release();
     }
 
-    static PassRefPtr<IDBKey> createArray(const KeyArray& array)
+    static Ref<IDBKey> createArray(const Vector<RefPtr<IDBKey>>& array)
     {
         size_t sizeEstimate = 0;
-        for (size_t i = 0; i < array.size(); ++i)
-            sizeEstimate += array[i]->m_sizeEstimate;
+        for (auto& key : array)
+            sizeEstimate += key->m_sizeEstimate;
 
-        return adoptRef(new IDBKey(array, sizeEstimate));
+        return adoptRef(*new IDBKey(array, sizeEstimate));
     }
 
-    ~IDBKey();
+    WEBCORE_EXPORT ~IDBKey();
 
-    // In order of the least to the highest precedent in terms of sort order.
-    enum Type {
-        InvalidType = 0,
-        ArrayType,
-        StringType,
-        DateType,
-        NumberType,
-        MinType
-    };
+    KeyType type() const { return m_type; }
+    WEBCORE_EXPORT bool isValid() const;
 
-    Type type() const { return m_type; }
-    bool isValid() const;
-
-    const KeyArray& array() const
+    const Vector<RefPtr<IDBKey>>& array() const
     {
-        ASSERT(m_type == ArrayType);
+        ASSERT(m_type == KeyType::Array);
         return m_array;
     }
 
     const String& string() const
     {
-        ASSERT(m_type == StringType);
+        ASSERT(m_type == KeyType::String);
         return m_string;
     }
 
     double date() const
     {
-        ASSERT(m_type == DateType);
+        ASSERT(m_type == KeyType::Date);
         return m_number;
     }
 
     double number() const
     {
-        ASSERT(m_type == NumberType);
+        ASSERT(m_type == KeyType::Number);
         return m_number;
     }
 
@@ -139,7 +130,7 @@ public:
 
     size_t sizeEstimate() const { return m_sizeEstimate; }
 
-    static int compareTypes(Type a, Type b)
+    static int compareTypes(KeyType a, KeyType b)
     {
         return b - a;
     }
@@ -147,14 +138,18 @@ public:
     using RefCounted<IDBKey>::ref;
     using RefCounted<IDBKey>::deref;
 
-private:
-    IDBKey() : m_type(InvalidType), m_number(0), m_sizeEstimate(OverheadSize) { }
-    IDBKey(Type type, double number) : m_type(type), m_number(number), m_sizeEstimate(OverheadSize + sizeof(double)) { }
-    explicit IDBKey(const String& value) : m_type(StringType), m_string(value), m_number(0), m_sizeEstimate(OverheadSize + value.length() * sizeof(UChar)) { }
-    IDBKey(const KeyArray& keyArray, size_t arraySize) : m_type(ArrayType), m_array(keyArray), m_number(0), m_sizeEstimate(OverheadSize + arraySize) { }
+#ifndef NDEBUG
+    String loggingString() const;
+#endif
 
-    const Type m_type;
-    const KeyArray m_array;
+private:
+    IDBKey() : m_type(KeyType::Invalid), m_number(0), m_sizeEstimate(OverheadSize) { }
+    IDBKey(KeyType type, double number) : m_type(type), m_number(number), m_sizeEstimate(OverheadSize + sizeof(double)) { }
+    explicit IDBKey(const String& value) : m_type(KeyType::String), m_string(value), m_number(0), m_sizeEstimate(OverheadSize + value.length() * sizeof(UChar)) { }
+    IDBKey(const Vector<RefPtr<IDBKey>>& keyArray, size_t arraySize) : m_type(KeyType::Array), m_array(keyArray), m_number(0), m_sizeEstimate(OverheadSize + arraySize) { }
+
+    const KeyType m_type;
+    const Vector<RefPtr<IDBKey>> m_array;
     const String m_string;
     const double m_number;
 

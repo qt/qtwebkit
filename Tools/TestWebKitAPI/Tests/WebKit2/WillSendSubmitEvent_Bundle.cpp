@@ -24,10 +24,13 @@
  */
 
 #include "config.h"
+
+#if WK_HAVE_C_SPI
+
 #include "InjectedBundleTest.h"
 
 #include "PlatformUtilities.h"
-#include <WebKit2/WKBundlePage.h>
+#include <WebKit/WKBundlePage.h>
 
 namespace TestWebKitAPI {
 
@@ -42,7 +45,7 @@ static InjectedBundleTest::Register<WillSendSubmitEventTest> registrar("WillSend
 
 static void willSendSubmitEvent(WKBundlePageRef, WKBundleNodeHandleRef, WKBundleFrameRef, WKBundleFrameRef, WKDictionaryRef values, const void*)
 {
-    WKBundlePostMessage(InjectedBundleController::shared().bundle(), Util::toWK("DidReceiveWillSendSubmitEvent").get(), values);
+    WKBundlePostMessage(InjectedBundleController::singleton().bundle(), Util::toWK("DidReceiveWillSendSubmitEvent").get(), values);
 }
 
 WillSendSubmitEventTest::WillSendSubmitEventTest(const std::string& identifier)
@@ -52,14 +55,16 @@ WillSendSubmitEventTest::WillSendSubmitEventTest(const std::string& identifier)
 
 void WillSendSubmitEventTest::didCreatePage(WKBundleRef bundle, WKBundlePageRef page)
 {
-    WKBundlePageFormClient formClient;
+    WKBundlePageFormClientV1 formClient;
     memset(&formClient, 0, sizeof(formClient));
     
-    formClient.version = 1;
-    formClient.clientInfo = this;
+    formClient.base.version = 1;
+    formClient.base.clientInfo = this;
     formClient.willSendSubmitEvent = willSendSubmitEvent;
     
-    WKBundlePageSetFormClient(page, &formClient);
+    WKBundlePageSetFormClient(page, &formClient.base);
 }
 
 } // namespace TestWebKitAPI
+
+#endif

@@ -25,12 +25,11 @@
 #include "config.h"
 #include "HTMLIFrameElement.h"
 
-#include "Attribute.h"
+#include "AttributeDOMTokenList.h"
 #include "CSSPropertyNames.h"
 #include "Frame.h"
 #include "HTMLDocument.h"
 #include "HTMLNames.h"
-#include "NodeRenderingContext.h"
 #include "RenderIFrame.h"
 #include "ScriptableDocumentParser.h"
 
@@ -38,26 +37,32 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-inline HTMLIFrameElement::HTMLIFrameElement(const QualifiedName& tagName, Document* document)
+inline HTMLIFrameElement::HTMLIFrameElement(const QualifiedName& tagName, Document& document)
     : HTMLFrameElementBase(tagName, document)
 {
     ASSERT(hasTagName(iframeTag));
-    setHasCustomStyleCallbacks();
 }
 
-PassRefPtr<HTMLIFrameElement> HTMLIFrameElement::create(const QualifiedName& tagName, Document* document)
+Ref<HTMLIFrameElement> HTMLIFrameElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new HTMLIFrameElement(tagName, document));
+    return adoptRef(*new HTMLIFrameElement(tagName, document));
+}
+
+DOMTokenList& HTMLIFrameElement::sandbox()
+{
+    if (!m_sandbox)
+        m_sandbox = std::make_unique<AttributeDOMTokenList>(*this, sandboxAttr);
+    return *m_sandbox;
 }
 
 bool HTMLIFrameElement::isPresentationAttribute(const QualifiedName& name) const
 {
-    if (name == widthAttr || name == heightAttr || name == alignAttr || name == frameborderAttr || name == seamlessAttr)
+    if (name == widthAttr || name == heightAttr || name == alignAttr || name == frameborderAttr)
         return true;
     return HTMLFrameElementBase::isPresentationAttribute(name);
 }
 
-void HTMLIFrameElement::collectStyleForPresentationAttribute(const QualifiedName& name, const AtomicString& value, MutableStylePropertySet* style)
+void HTMLIFrameElement::collectStyleForPresentationAttribute(const QualifiedName& name, const AtomicString& value, MutableStyleProperties& style)
 {
     if (name == widthAttr)
         addHTMLLengthToStyle(style, CSSPropertyWidth, value);
@@ -79,52 +84,25 @@ void HTMLIFrameElement::collectStyleForPresentationAttribute(const QualifiedName
 void HTMLIFrameElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
     if (name == sandboxAttr) {
+        if (m_sandbox)
+            m_sandbox->attributeValueChanged(value);
+
         String invalidTokens;
         setSandboxFlags(value.isNull() ? SandboxNone : SecurityContext::parseSandboxPolicy(value, invalidTokens));
         if (!invalidTokens.isNull())
-            document()->addConsoleMessage(OtherMessageSource, ErrorMessageLevel, "Error while parsing the 'sandbox' attribute: " + invalidTokens);
-    } else if (name == seamlessAttr) {
-        // If we're adding or removing the seamless attribute, we need to force the content document to recalculate its StyleResolver.
-        if (contentDocument())
-            contentDocument()->styleResolverChanged(DeferRecalcStyle);
+            document().addConsoleMessage(MessageSource::Other, MessageLevel::Error, "Error while parsing the 'sandbox' attribute: " + invalidTokens);
     } else
         HTMLFrameElementBase::parseAttribute(name, value);
 }
 
-bool HTMLIFrameElement::rendererIsNeeded(const NodeRenderingContext& context)
+bool HTMLIFrameElement::rendererIsNeeded(const RenderStyle& style)
 {
-    return isURLAllowed() && context.style()->display() != NONE;
+    return isURLAllowed() && style.display() != NONE;
 }
 
-RenderObject* HTMLIFrameElement::createRenderer(RenderArena* arena, RenderStyle*)
+RenderPtr<RenderElement> HTMLIFrameElement::createElementRenderer(Ref<RenderStyle>&& style, const RenderTreePosition&)
 {
-    return new (arena) RenderIFrame(this);
+    return createRenderer<RenderIFrame>(*this, WTFMove(style));
 }
-
-bool HTMLIFrameElement::shouldDisplaySeamlessly() const
-{
-    return contentDocument() && contentDocument()->shouldDisplaySeamlesslyWithParent();
-}
-
-void HTMLIFrameElement::didRecalcStyle(StyleChange styleChange)
-{
-    if (!shouldDisplaySeamlessly())
-        return;
-    Document* childDocument = contentDocument();
-    if (styleChange >= Inherit || childDocument->childNeedsStyleRecalc() || childDocument->needsStyleRecalc())
-        contentDocument()->recalcStyle(styleChange);
-}
-
-#if ENABLE(MICRODATA)
-String HTMLIFrameElement::itemValueText() const
-{
-    return getURLAttribute(srcAttr);
-}
-
-void HTMLIFrameElement::setItemValueText(const String& value, ExceptionCode&)
-{
-    setAttribute(srcAttr, value);
-}
-#endif
 
 }

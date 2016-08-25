@@ -21,9 +21,9 @@
 #include "config.h"
 #include "StyleSheetList.h"
 
+#include "AuthorStyleSheets.h"
 #include "CSSStyleSheet.h"
 #include "Document.h"
-#include "DocumentStyleSheetCollection.h"
 #include "HTMLNames.h"
 #include "HTMLStyleElement.h"
 #include <wtf/text/WTFString.h>
@@ -41,17 +41,17 @@ StyleSheetList::~StyleSheetList()
 {
 }
 
-inline const Vector<RefPtr<StyleSheet> >& StyleSheetList::styleSheets() const
+inline const Vector<RefPtr<StyleSheet>>& StyleSheetList::styleSheets() const
 {
     if (!m_document)
         return m_detachedStyleSheets;
-    return m_document->styleSheetCollection()->styleSheetsForStyleSheetList();
+    return m_document->authorStyleSheets().styleSheetsForStyleSheetList();
 }
 
 void StyleSheetList::detachFromDocument()
 {
-    m_detachedStyleSheets = m_document->styleSheetCollection()->styleSheetsForStyleSheetList();
-    m_document = 0;
+    m_detachedStyleSheets = m_document->authorStyleSheets().styleSheetsForStyleSheetList();
+    m_document = nullptr;
 }
 
 unsigned StyleSheetList::length() const
@@ -61,14 +61,14 @@ unsigned StyleSheetList::length() const
 
 StyleSheet* StyleSheetList::item(unsigned index)
 {
-    const Vector<RefPtr<StyleSheet> >& sheets = styleSheets();
+    const Vector<RefPtr<StyleSheet>>& sheets = styleSheets();
     return index < sheets.size() ? sheets[index].get() : 0;
 }
 
 HTMLStyleElement* StyleSheetList::getNamedItem(const String& name) const
 {
     if (!m_document)
-        return 0;
+        return nullptr;
 
     // IE also supports retrieving a stylesheet by name, using the name/id of the <style> tag
     // (this is consistent with all the other collections)
@@ -76,9 +76,15 @@ HTMLStyleElement* StyleSheetList::getNamedItem(const String& name) const
     // and doesn't look for name attribute.
     // But unicity of stylesheet ids is good practice anyway ;)
     Element* element = m_document->getElementById(name);
-    if (element && isHTMLStyleElement(element))
-        return toHTMLStyleElement(element);
-    return 0;
+    if (is<HTMLStyleElement>(element))
+        return downcast<HTMLStyleElement>(element);
+    return nullptr;
+}
+
+Vector<AtomicString> StyleSheetList::supportedPropertyNames()
+{
+    // FIXME: Should be implemented.
+    return Vector<AtomicString>();
 }
 
 } // namespace WebCore

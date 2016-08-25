@@ -22,10 +22,8 @@
 #ifndef SVGColor_h
 #define SVGColor_h
 
-#if ENABLE(SVG)
 #include "CSSValue.h"
 #include "Color.h"
-#include <wtf/PassRefPtr.h>
 
 namespace WebCore {
 
@@ -40,28 +38,28 @@ public:
         SVG_COLORTYPE_CURRENTCOLOR = 3
     };
 
-    static PassRefPtr<SVGColor> createFromString(const String& rgbColor)
+    static Ref<SVGColor> createFromString(const String& rgbColor)
     {
-        RefPtr<SVGColor> color = adoptRef(new SVGColor(SVG_COLORTYPE_RGBCOLOR));
-        color->setColor(colorFromRGBColorString(rgbColor));
-        return color.release();
+        auto color = adoptRef(*new SVGColor(SVG_COLORTYPE_RGBCOLOR));
+        color.get().setColor(colorFromRGBColorString(rgbColor));
+        return color;
     }
 
-    static PassRefPtr<SVGColor> createFromColor(const Color& rgbColor)
+    static Ref<SVGColor> createFromColor(const Color& rgbColor)
     {
-        RefPtr<SVGColor> color = adoptRef(new SVGColor(SVG_COLORTYPE_RGBCOLOR));
-        color->setColor(rgbColor);
-        return color.release();
+        auto color = adoptRef(*new SVGColor(SVG_COLORTYPE_RGBCOLOR));
+        color.get().setColor(rgbColor);
+        return color;
     }
 
-    static PassRefPtr<SVGColor> createCurrentColor()
+    static Ref<SVGColor> createCurrentColor()
     {
-        return adoptRef(new SVGColor(SVG_COLORTYPE_CURRENTCOLOR));
+        return adoptRef(*new SVGColor(SVG_COLORTYPE_CURRENTCOLOR));
     }
 
     const Color& color() const { return m_color; }
     const SVGColorType& colorType() const { return m_colorType; }
-    PassRefPtr<RGBColor> rgbColor() const;
+    Ref<RGBColor> rgbColor() const;
 
     static Color colorFromRGBColorString(const String&);
 
@@ -69,11 +67,11 @@ public:
     void setRGBColorICCColor(const String& rgbColor, const String& iccColor, ExceptionCode&);
     void setColor(unsigned short colorType, const String& rgbColor, const String& iccColor, ExceptionCode&);
 
-    String customCssText() const;
+    String customCSSText() const;
 
     ~SVGColor() { }
     
-    PassRefPtr<SVGColor> cloneForCSSOM() const;
+    Ref<SVGColor> cloneForCSSOM() const;
 
     bool equals(const SVGColor&) const;
 
@@ -95,5 +93,6 @@ private:
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
+SPECIALIZE_TYPE_TRAITS_CSS_VALUE(SVGColor, isSVGColor())
+
 #endif // SVGColor_h

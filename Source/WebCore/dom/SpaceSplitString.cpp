@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2007 David Smith (catfish.man@gmail.com)
- * Copyright (C) 2007, 2008, 2011, 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2007, 2008, 2011-2014 Apple Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -22,42 +22,18 @@
 #include "SpaceSplitString.h"
 
 #include "HTMLParserIdioms.h"
-#include <wtf/ASCIICType.h>
 #include <wtf/HashMap.h>
+#include <wtf/NeverDestroyed.h>
 #include <wtf/text/AtomicStringHash.h>
-#include <wtf/text/StringBuilder.h>
-
-using namespace WTF;
 
 namespace WebCore {
 
-template <typename CharacterType>
-static inline bool hasNonASCIIOrUpper(const CharacterType* characters, unsigned length)
-{
-    bool hasUpper = false;
-    CharacterType ored = 0;
-    for (unsigned i = 0; i < length; i++) {
-        CharacterType c = characters[i];
-        hasUpper |= isASCIIUpper(c);
-        ored |= c;
-    }
-    return hasUpper || (ored & ~0x7F);
-}
-
-static inline bool hasNonASCIIOrUpper(const String& string)
-{
-    unsigned length = string.length();
-
-    if (string.is8Bit())
-        return hasNonASCIIOrUpper(string.characters8(), length);
-    return hasNonASCIIOrUpper(string.characters16(), length);
-}
+COMPILE_ASSERT(!(sizeof(SpaceSplitStringData) % sizeof(uintptr_t)), SpaceSplitStringDataTailIsAlignedToWordSize);
 
 template <typename CharacterType, typename TokenProcessor>
 static inline void tokenizeSpaceSplitString(TokenProcessor& tokenProcessor, const CharacterType* characters, unsigned length)
 {
-    unsigned start = 0;
-    while (true) {
+    for (unsigned start = 0; ; ) {
         while (start < length && isHTMLSpace(characters[start]))
             ++start;
         if (start >= length)
@@ -73,31 +49,16 @@ static inline void tokenizeSpaceSplitString(TokenProcessor& tokenProcessor, cons
     }
 }
 
-class AppendTokenToVectorTokenProcessor {
-public:
-    AppendTokenToVectorTokenProcessor(Vector<AtomicString, 4>& vector) : m_vector(vector) { }
-
-    template <typename CharacterType>
-    bool processToken(const CharacterType* characters, unsigned length)
-    {
-        m_vector.append(AtomicString(characters, length));
-        return true;
-    }
-private:
-    Vector<AtomicString, 4>& m_vector;
-};
-
-void SpaceSplitStringData::createVector(const String& string)
+template<typename TokenProcessor>
+static inline void tokenizeSpaceSplitString(TokenProcessor& tokenProcessor, const String& string)
 {
-    unsigned length = string.length();
+    ASSERT(!string.isNull());
 
-    AppendTokenToVectorTokenProcessor tokenProcessor(m_vector);
-    if (string.is8Bit()) {
-        tokenizeSpaceSplitString(tokenProcessor, string.characters8(), length);
-        return;
-    }
-
-    tokenizeSpaceSplitString(tokenProcessor, string.characters16(), length);
+    const StringImpl& stringImpl = *string.impl();
+    if (stringImpl.is8Bit())
+        tokenizeSpaceSplitString(tokenProcessor, stringImpl.characters8(), stringImpl.length());
+    else
+        tokenizeSpaceSplitString(tokenProcessor, stringImpl.characters16(), stringImpl.length());
 }
 
 bool SpaceSplitStringData::containsAll(SpaceSplitStringData& other)
@@ -105,69 +66,30 @@ bool SpaceSplitStringData::containsAll(SpaceSplitStringData& other)
     if (this == &other)
         return true;
 
-    size_t thisSize = m_vector.size();
-    size_t otherSize = other.m_vector.size();
-    for (size_t i = 0; i < otherSize; ++i) {
-        const AtomicString& name = other.m_vector[i];
-        size_t j;
-        for (j = 0; j < thisSize; ++j) {
-            if (m_vector[j] == name)
-                break;
-        }
-        if (j == thisSize)
+    unsigned otherSize = other.m_size;
+    unsigned i = 0;
+    do {
+        if (!contains(other[i]))
             return false;
-    }
+        ++i;
+    } while (i < otherSize);
     return true;
 }
 
-void SpaceSplitStringData::add(const AtomicString& string)
+struct SpaceSplitStringTableKeyTraits : public HashTraits<AtomicString>
 {
-    ASSERT(hasOneRef());
-    ASSERT(!contains(string));
-    m_vector.append(string);
-}
+    // The number 200 for typicalNumberOfSpaceSplitString was based on the typical number of unique class names
+    // on typical websites on August 2013.
+    static const unsigned typicalNumberOfSpaceSplitString = 200;
+    static const int minimumTableSize = WTF::HashTableCapacityForSize<typicalNumberOfSpaceSplitString>::value;
+};
 
-void SpaceSplitStringData::remove(unsigned index)
+typedef HashMap<AtomicString, SpaceSplitStringData*, AtomicStringHash, SpaceSplitStringTableKeyTraits> SpaceSplitStringTable;
+
+static SpaceSplitStringTable& spaceSplitStringTable()
 {
-    ASSERT(hasOneRef());
-    m_vector.remove(index);
-}
-
-void SpaceSplitString::add(const AtomicString& string)
-{
-    // FIXME: add() does not allow duplicates but createVector() does.
-    if (contains(string))
-        return;
-    ensureUnique();
-    if (m_data)
-        m_data->add(string);
-}
-
-bool SpaceSplitString::remove(const AtomicString& string)
-{
-    if (!m_data)
-        return false;
-    unsigned i = 0;
-    bool changed = false;
-    while (i < m_data->size()) {
-        if ((*m_data)[i] == string) {
-            if (!changed)
-                ensureUnique();
-            m_data->remove(i);
-            changed = true;
-            continue;
-        }
-        ++i;
-    }
-    return changed;
-}
-
-typedef HashMap<AtomicString, SpaceSplitStringData*> SpaceSplitStringDataMap;
-
-static SpaceSplitStringDataMap& sharedDataMap()
-{
-    DEFINE_STATIC_LOCAL(SpaceSplitStringDataMap, map, ());
-    return map;
+    static NeverDestroyed<SpaceSplitStringTable> table;
+    return table;
 }
 
 void SpaceSplitString::set(const AtomicString& inputString, bool shouldFoldCase)
@@ -176,12 +98,7 @@ void SpaceSplitString::set(const AtomicString& inputString, bool shouldFoldCase)
         clear();
         return;
     }
-
-    String string(inputString.string());
-    if (shouldFoldCase && hasNonASCIIOrUpper(string))
-        string = string.foldCase();
-
-    m_data = SpaceSplitStringData::create(string);
+    m_data = SpaceSplitStringData::create(shouldFoldCase ? inputString.convertToASCIILowercase() : inputString);
 }
 
 class TokenIsEqualToCStringTokenProcessor {
@@ -216,53 +133,105 @@ bool SpaceSplitString::spaceSplitStringContainsValue(const String& inputString, 
     if (inputString.isNull())
         return false;
 
-    String string = inputString;
-    if (shouldFoldCase && hasNonASCIIOrUpper(string))
-        string = string.foldCase();
-
     TokenIsEqualToCStringTokenProcessor tokenProcessor(value, valueLength);
-    unsigned length = string.length();
-    if (string.is8Bit())
-        tokenizeSpaceSplitString(tokenProcessor, string.characters8(), length);
-    else
-        tokenizeSpaceSplitString(tokenProcessor, string.characters16(), length);
+    tokenizeSpaceSplitString(tokenProcessor, shouldFoldCase ? inputString.impl()->convertToASCIILowercase() : inputString);
     return tokenProcessor.referenceStringWasFound();
 }
 
-SpaceSplitStringData::~SpaceSplitStringData()
-{
-    if (!m_keyString.isNull())
-        sharedDataMap().remove(m_keyString);
-}
+class TokenCounter {
+    WTF_MAKE_NONCOPYABLE(TokenCounter);
+public:
+    TokenCounter() : m_tokenCount(0) { }
 
-PassRefPtr<SpaceSplitStringData> SpaceSplitStringData::create(const AtomicString& string)
-{
-    SpaceSplitStringData*& data = sharedDataMap().add(string, 0).iterator->value;
-    if (!data) {
-        data = new SpaceSplitStringData(string);
-        return adoptRef(data);
+    template<typename CharacterType> bool processToken(const CharacterType*, unsigned)
+    {
+        ++m_tokenCount;
+        return true;
     }
-    return data;
+
+    unsigned tokenCount() const { return m_tokenCount; }
+
+private:
+    unsigned m_tokenCount;
+};
+
+class TokenAtomicStringInitializer {
+    WTF_MAKE_NONCOPYABLE(TokenAtomicStringInitializer);
+public:
+    TokenAtomicStringInitializer(AtomicString* memory) : m_memoryBucket(memory) { }
+
+    template<typename CharacterType> bool processToken(const CharacterType* characters, unsigned length)
+    {
+        new (NotNull, m_memoryBucket) AtomicString(characters, length);
+        ++m_memoryBucket;
+        return true;
+    }
+
+    const AtomicString* nextMemoryBucket() const { return m_memoryBucket; }
+
+private:
+    AtomicString* m_memoryBucket;
+};
+
+inline Ref<SpaceSplitStringData> SpaceSplitStringData::create(const AtomicString& keyString, unsigned tokenCount)
+{
+    ASSERT(tokenCount);
+
+    RELEASE_ASSERT(tokenCount < (std::numeric_limits<unsigned>::max() - sizeof(SpaceSplitStringData)) / sizeof(AtomicString));
+    unsigned sizeToAllocate = sizeof(SpaceSplitStringData) + tokenCount * sizeof(AtomicString);
+    SpaceSplitStringData* spaceSplitStringData = static_cast<SpaceSplitStringData*>(fastMalloc(sizeToAllocate));
+
+    new (NotNull, spaceSplitStringData) SpaceSplitStringData(keyString, tokenCount);
+    AtomicString* tokenArrayStart = spaceSplitStringData->tokenArrayStart();
+    TokenAtomicStringInitializer tokenInitializer(tokenArrayStart);
+    tokenizeSpaceSplitString(tokenInitializer, keyString);
+    ASSERT(static_cast<unsigned>(tokenInitializer.nextMemoryBucket() - tokenArrayStart) == tokenCount);
+    ASSERT(reinterpret_cast<const char*>(tokenInitializer.nextMemoryBucket()) == reinterpret_cast<const char*>(spaceSplitStringData) + sizeToAllocate);
+
+    return adoptRef(*spaceSplitStringData);
 }
 
-PassRefPtr<SpaceSplitStringData> SpaceSplitStringData::createUnique(const SpaceSplitStringData& other)
+RefPtr<SpaceSplitStringData> SpaceSplitStringData::create(const AtomicString& keyString)
 {
-    return adoptRef(new SpaceSplitStringData(other));
+    ASSERT(isMainThread());
+    ASSERT(!keyString.isNull());
+
+    auto addResult = spaceSplitStringTable().add(keyString, nullptr);
+    if (!addResult.isNewEntry)
+        return addResult.iterator->value;
+
+    // Nothing in the cache? Let's create a new SpaceSplitStringData if the input has something useful.
+    // 1) We find the number of strings in the input to know how much size we need to allocate.
+    TokenCounter tokenCounter;
+    tokenizeSpaceSplitString(tokenCounter, keyString);
+    unsigned tokenCount = tokenCounter.tokenCount();
+
+    if (!tokenCount)
+        return nullptr;
+
+    RefPtr<SpaceSplitStringData> spaceSplitStringData = create(keyString, tokenCount);
+    addResult.iterator->value = spaceSplitStringData.get();
+    return spaceSplitStringData;
 }
 
-SpaceSplitStringData::SpaceSplitStringData(const AtomicString& string)
-    : m_keyString(string)
-{
-    ASSERT(!string.isNull());
-    createVector(string);
-}
 
-SpaceSplitStringData::SpaceSplitStringData(const SpaceSplitStringData& other)
-    : RefCounted<SpaceSplitStringData>()
-    , m_vector(other.m_vector)
+void SpaceSplitStringData::destroy(SpaceSplitStringData* spaceSplitString)
 {
-    // Note that we don't copy m_keyString to indicate to the destructor that there's nothing
-    // to be removed from the sharedDataMap().
+    ASSERT(isMainThread());
+
+    spaceSplitStringTable().remove(spaceSplitString->m_keyString);
+
+    unsigned i = 0;
+    unsigned size = spaceSplitString->size();
+    const AtomicString* data = spaceSplitString->tokenArrayStart();
+    do {
+        data[i].~AtomicString();
+        ++i;
+    } while (i < size);
+
+    spaceSplitString->~SpaceSplitStringData();
+
+    fastFree(spaceSplitString);
 }
 
 } // namespace WebCore

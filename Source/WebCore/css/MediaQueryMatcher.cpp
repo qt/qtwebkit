@@ -28,6 +28,7 @@
 #include "MediaQueryEvaluator.h"
 #include "MediaQueryList.h"
 #include "MediaQueryListListener.h"
+#include "NodeRenderStyle.h"
 #include "StyleResolver.h"
 
 namespace WebCore {
@@ -42,12 +43,12 @@ MediaQueryMatcher::Listener::~Listener()
 {
 }
 
-void MediaQueryMatcher::Listener::evaluate(ScriptState* state, MediaQueryEvaluator* evaluator)
+void MediaQueryMatcher::Listener::evaluate(MediaQueryEvaluator* evaluator)
 {
     bool notify;
     m_query->evaluate(evaluator, notify);
     if (notify)
-        m_listener->queryChanged(state, m_query.get());
+        m_listener->queryChanged(m_query.get());
 }
 
 MediaQueryMatcher::MediaQueryMatcher(Document* document)
@@ -75,7 +76,7 @@ String MediaQueryMatcher::mediaType() const
     return m_document->frame()->view()->mediaType();
 }
 
-PassOwnPtr<MediaQueryEvaluator> MediaQueryMatcher::prepareEvaluator() const
+std::unique_ptr<MediaQueryEvaluator> MediaQueryMatcher::prepareEvaluator() const
 {
     if (!m_document || !m_document->frame())
         return nullptr;
@@ -84,11 +85,9 @@ PassOwnPtr<MediaQueryEvaluator> MediaQueryMatcher::prepareEvaluator() const
     if (!documentElement)
         return nullptr;
 
-    StyleResolver* styleResolver = m_document->ensureStyleResolver();
+    RefPtr<RenderStyle> rootStyle = m_document->ensureStyleResolver().styleForElement(*documentElement, m_document->renderStyle(), MatchOnlyUserAgentRules);
 
-    RefPtr<RenderStyle> rootStyle = styleResolver->styleForElement(documentElement, 0 /*defaultParent*/, DisallowStyleSharing, MatchOnlyUserAgentRules);
-
-    return adoptPtr(new MediaQueryEvaluator(mediaType(), m_document->frame(), rootStyle.get()));
+    return std::make_unique<MediaQueryEvaluator>(mediaType(), m_document->frame(), rootStyle.get());
 }
 
 bool MediaQueryMatcher::evaluate(const MediaQuerySet* media)
@@ -96,14 +95,14 @@ bool MediaQueryMatcher::evaluate(const MediaQuerySet* media)
     if (!media)
         return false;
 
-    OwnPtr<MediaQueryEvaluator> evaluator(prepareEvaluator());
+    std::unique_ptr<MediaQueryEvaluator> evaluator = prepareEvaluator();
     return evaluator && evaluator->eval(media);
 }
 
-PassRefPtr<MediaQueryList> MediaQueryMatcher::matchMedia(const String& query)
+RefPtr<MediaQueryList> MediaQueryMatcher::matchMedia(const String& query)
 {
     if (!m_document)
-        return 0;
+        return nullptr;
 
     RefPtr<MediaQuerySet> media = MediaQuerySet::create(query);
 #if ENABLE(RESOLUTION_MEDIA_QUERY)
@@ -123,7 +122,7 @@ void MediaQueryMatcher::addListener(PassRefPtr<MediaQueryListListener> listener,
             return;
     }
 
-    m_listeners.append(adoptPtr(new Listener(listener, query)));
+    m_listeners.append(std::make_unique<Listener>(listener, query));
 }
 
 void MediaQueryMatcher::removeListener(MediaQueryListListener* listener, MediaQueryList* query)
@@ -131,29 +130,22 @@ void MediaQueryMatcher::removeListener(MediaQueryListListener* listener, MediaQu
     if (!m_document)
         return;
 
-    for (size_t i = 0; i < m_listeners.size(); ++i) {
-        if (*m_listeners[i]->listener() == *listener && m_listeners[i]->query() == query) {
-            m_listeners.remove(i);
-            return;
-        }
-    }
+    m_listeners.removeFirstMatching([listener, query] (const std::unique_ptr<Listener>& current) {
+        return *current->listener() == *listener && current->query() == query;
+    });
 }
 
 void MediaQueryMatcher::styleResolverChanged()
 {
     ASSERT(m_document);
 
-    ScriptState* scriptState = mainWorldScriptState(m_document->frame());
-    if (!scriptState)
-        return;
-
     ++m_evaluationRound;
-    OwnPtr<MediaQueryEvaluator> evaluator = prepareEvaluator();
+    std::unique_ptr<MediaQueryEvaluator> evaluator = prepareEvaluator();
     if (!evaluator)
         return;
 
     for (size_t i = 0; i < m_listeners.size(); ++i)
-        m_listeners[i]->evaluate(scriptState, evaluator.get());
+        m_listeners[i]->evaluate(evaluator.get());
 }
 
-}
+} // namespace WebCore

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, 2012, 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2011-2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,1421 +28,689 @@
 
 #if ENABLE(DFG_JIT)
 
+#include "DFGAbstractHeap.h"
+#include "DFGBlockMapInlines.h"
+#include "DFGClobberSet.h"
+#include "DFGClobberize.h"
+#include "DFGDominators.h"
+#include "DFGEdgeUsesStructure.h"
 #include "DFGGraph.h"
 #include "DFGPhase.h"
-#include "JSCellInlines.h"
+#include "JSCInlines.h"
+#include <array>
 #include <wtf/FastBitVector.h>
 
 namespace JSC { namespace DFG {
 
-enum CSEMode { NormalCSE, StoreElimination };
+// This file contains two CSE implementations: local and global. LocalCSE typically runs when we're
+// in DFG mode, i.e. we want to compile quickly. LocalCSE contains a lot of optimizations for
+// compile time. GlobalCSE, on the other hand, is fairly straight-forward. It will find more
+// optimization opportunities by virtue of being global.
 
-template<CSEMode cseMode>
-class CSEPhase : public Phase {
+namespace {
+
+const bool verbose = false;
+
+class ClobberFilter {
 public:
-    CSEPhase(Graph& graph)
-        : Phase(graph, cseMode == NormalCSE ? "common subexpression elimination" : "store elimination")
+    ClobberFilter(AbstractHeap heap)
+        : m_heap(heap)
+    {
+    }
+    
+    bool operator()(const ImpureMap::KeyValuePairType& pair) const
+    {
+        return m_heap.overlaps(pair.key.heap());
+    }
+    
+private:
+    AbstractHeap m_heap;
+};
+
+inline void clobber(ImpureMap& map, AbstractHeap heap)
+{
+    ClobberFilter filter(heap);
+    map.removeIf(filter);
+}
+
+class LocalCSEPhase : public Phase {
+public:
+    LocalCSEPhase(Graph& graph)
+        : Phase(graph, "local common subexpression elimination")
+        , m_smallBlock(graph)
+        , m_largeBlock(graph)
     {
     }
     
     bool run()
     {
-        ASSERT((cseMode == NormalCSE) == (m_graph.m_fixpointState == FixpointNotConverged));
-        ASSERT(m_graph.m_fixpointState != BeforeFixpoint);
+        ASSERT(m_graph.m_fixpointState == FixpointNotConverged);
+        ASSERT(m_graph.m_form == ThreadedCPS || m_graph.m_form == LoadStore);
         
-        m_changed = false;
+        bool changed = false;
         
-        for (unsigned block = 0; block < m_graph.m_blocks.size(); ++block)
-            performBlockCSE(m_graph.m_blocks[block].get());
+        m_graph.clearReplacements();
         
-        return m_changed;
+        for (BlockIndex blockIndex = m_graph.numBlocks(); blockIndex--;) {
+            BasicBlock* block = m_graph.block(blockIndex);
+            if (!block)
+                continue;
+            
+            if (block->size() <= SmallMaps::capacity)
+                changed |= m_smallBlock.run(block);
+            else
+                changed |= m_largeBlock.run(block);
+        }
+        
+        return changed;
     }
     
 private:
+    class SmallMaps {
+    public:
+        // This permits SmallMaps to be used for blocks that have up to 100 nodes. In practice,
+        // fewer than half of the nodes in a block have pure defs, and even fewer have impure defs.
+        // Thus, a capacity limit of 100 probably means that somewhere around ~40 things may end up
+        // in one of these "small" list-based maps. That number still seems largeish, except that
+        // the overhead of HashMaps can be quite high currently: clearing them, or even removing
+        // enough things from them, deletes (or resizes) their backing store eagerly. Hence
+        // HashMaps induce a lot of malloc traffic.
+        static const unsigned capacity = 100;
     
-    Node* canonicalize(Node* node)
-    {
-        if (!node)
-            return 0;
+        SmallMaps()
+            : m_pureLength(0)
+            , m_impureLength(0)
+        {
+        }
+    
+        void clear()
+        {
+            m_pureLength = 0;
+            m_impureLength = 0;
+        }
+    
+        void write(AbstractHeap heap)
+        {
+            for (unsigned i = 0; i < m_impureLength; ++i) {
+                if (heap.overlaps(m_impureMap[i].key.heap()))
+                    m_impureMap[i--] = m_impureMap[--m_impureLength];
+            }
+        }
+    
+        Node* addPure(PureValue value, Node* node)
+        {
+            for (unsigned i = m_pureLength; i--;) {
+                if (m_pureMap[i].key == value)
+                    return m_pureMap[i].value;
+            }
         
-        if (node->op() == ValueToInt32)
-            node = node->child1().node();
+            ASSERT(m_pureLength < capacity);
+            m_pureMap[m_pureLength++] = WTF::KeyValuePair<PureValue, Node*>(value, node);
+            return nullptr;
+        }
         
-        return node;
-    }
-    Node* canonicalize(Edge edge)
-    {
-        return canonicalize(edge.node());
-    }
+        LazyNode findReplacement(HeapLocation location)
+        {
+            for (unsigned i = m_impureLength; i--;) {
+                if (m_impureMap[i].key == location)
+                    return m_impureMap[i].value;
+            }
+            return nullptr;
+        }
     
-    unsigned endIndexForPureCSE()
-    {
-        unsigned result = m_lastSeen[m_currentNode->op()];
-        if (result == UINT_MAX)
-            result = 0;
-        else
-            result++;
-        ASSERT(result <= m_indexInBlock);
-#if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
-        dataLogF("  limit %u: ", result);
-#endif
-        return result;
-    }
+        LazyNode addImpure(HeapLocation location, LazyNode node)
+        {
+            // FIXME: If we are using small maps, we must not def() derived values.
+            // For now the only derived values we def() are constant-based.
+            if (location.index() && !location.index().isNode())
+                return nullptr;
+            if (LazyNode result = findReplacement(location))
+                return result;
+            ASSERT(m_impureLength < capacity);
+            m_impureMap[m_impureLength++] = WTF::KeyValuePair<HeapLocation, LazyNode>(location, node);
+            return nullptr;
+        }
+    
+    private:
+        WTF::KeyValuePair<PureValue, Node*> m_pureMap[capacity];
+        WTF::KeyValuePair<HeapLocation, LazyNode> m_impureMap[capacity];
+        unsigned m_pureLength;
+        unsigned m_impureLength;
+    };
 
-    Node* pureCSE(Node* node)
-    {
-        Node* child1 = canonicalize(node->child1());
-        Node* child2 = canonicalize(node->child2());
-        Node* child3 = canonicalize(node->child3());
+    class LargeMaps {
+    public:
+        LargeMaps()
+        {
+        }
+    
+        void clear()
+        {
+            m_pureMap.clear();
+            m_impureMap.clear();
+        }
+    
+        void write(AbstractHeap heap)
+        {
+            clobber(m_impureMap, heap);
+        }
+    
+        Node* addPure(PureValue value, Node* node)
+        {
+            auto result = m_pureMap.add(value, node);
+            if (result.isNewEntry)
+                return nullptr;
+            return result.iterator->value;
+        }
         
-        for (unsigned i = endIndexForPureCSE(); i--;) {
-            Node* otherNode = m_currentBlock->at(i);
-            if (otherNode == child1 || otherNode == child2 || otherNode == child3)
-                break;
+        LazyNode findReplacement(HeapLocation location)
+        {
+            return m_impureMap.get(location);
+        }
+    
+        LazyNode addImpure(HeapLocation location, LazyNode node)
+        {
+            auto result = m_impureMap.add(location, node);
+            if (result.isNewEntry)
+                return nullptr;
+            return result.iterator->value;
+        }
 
-            if (node->op() != otherNode->op())
-                continue;
-            
-            if (node->arithNodeFlags() != otherNode->arithNodeFlags())
-                continue;
-            
-            Node* otherChild = canonicalize(otherNode->child1());
-            if (!otherChild)
-                return otherNode;
-            if (otherChild != child1)
-                continue;
-            
-            otherChild = canonicalize(otherNode->child2());
-            if (!otherChild)
-                return otherNode;
-            if (otherChild != child2)
-                continue;
-            
-            otherChild = canonicalize(otherNode->child3());
-            if (!otherChild)
-                return otherNode;
-            if (otherChild != child3)
-                continue;
-            
-            return otherNode;
-        }
-        return 0;
-    }
-    
-    Node* int32ToDoubleCSE(Node* node)
-    {
-        for (unsigned i = m_indexInBlock; i--;) {
-            Node* otherNode = m_currentBlock->at(i);
-            if (otherNode == node->child1())
-                return 0;
-            switch (otherNode->op()) {
-            case Int32ToDouble:
-            case ForwardInt32ToDouble:
-                if (otherNode->child1() == node->child1())
-                    return otherNode;
-                break;
-            default:
-                break;
-            }
-        }
-        return 0;
-    }
-    
-    Node* constantCSE(Node* node)
-    {
-        for (unsigned i = endIndexForPureCSE(); i--;) {
-            Node* otherNode = m_currentBlock->at(i);
-            if (otherNode->op() != JSConstant)
-                continue;
-            
-            if (otherNode->constantNumber() != node->constantNumber())
-                continue;
-            
-            return otherNode;
-        }
-        return 0;
-    }
-    
-    Node* weakConstantCSE(Node* node)
-    {
-        for (unsigned i = endIndexForPureCSE(); i--;) {
-            Node* otherNode = m_currentBlock->at(i);
-            if (otherNode->op() != WeakJSConstant)
-                continue;
-            
-            if (otherNode->weakConstant() != node->weakConstant())
-                continue;
-            
-            return otherNode;
-        }
-        return 0;
-    }
-    
-    Node* getCalleeLoadElimination(InlineCallFrame* inlineCallFrame)
-    {
-        for (unsigned i = m_indexInBlock; i--;) {
-            Node* node = m_currentBlock->at(i);
-            if (node->codeOrigin.inlineCallFrame != inlineCallFrame)
-                continue;
-            switch (node->op()) {
-            case GetCallee:
-                return node;
-            case SetCallee:
-                return node->child1().node();
-            default:
-                break;
-            }
-        }
-        return 0;
-    }
-    
-    Node* getArrayLengthElimination(Node* array)
-    {
-        for (unsigned i = m_indexInBlock; i--;) {
-            Node* node = m_currentBlock->at(i);
-            switch (node->op()) {
-            case GetArrayLength:
-                if (node->child1() == array)
-                    return node;
-                break;
-                
-            case PutByVal:
-                if (!m_graph.byValIsPure(node))
-                    return 0;
-                if (node->arrayMode().mayStoreToHole())
-                    return 0;
-                break;
-                
-            default:
-                if (m_graph.clobbersWorld(node))
-                    return 0;
-            }
-        }
-        return 0;
-    }
-    
-    Node* globalVarLoadElimination(WriteBarrier<Unknown>* registerPointer)
-    {
-        for (unsigned i = m_indexInBlock; i--;) {
-            Node* node = m_currentBlock->at(i);
-            switch (node->op()) {
-            case GetGlobalVar:
-                if (node->registerPointer() == registerPointer)
-                    return node;
-                break;
-            case PutGlobalVar:
-                if (node->registerPointer() == registerPointer)
-                    return node->child1().node();
-                break;
-            default:
-                break;
-            }
-            if (m_graph.clobbersWorld(node))
-                break;
-        }
-        return 0;
-    }
-    
-    Node* scopedVarLoadElimination(Node* registers, unsigned varNumber)
-    {
-        for (unsigned i = m_indexInBlock; i--;) {
-            Node* node = m_currentBlock->at(i);
-            switch (node->op()) {
-            case GetScopedVar: {
-                if (node->child1() == registers && node->varNumber() == varNumber)
-                    return node;
-                break;
-            } 
-            case PutScopedVar: {
-                if (node->varNumber() != varNumber)
-                    break;
-                if (node->child2() == registers)
-                    return node->child3().node();
-                return 0;
-            }
-            case SetLocal: {
-                VariableAccessData* variableAccessData = node->variableAccessData();
-                if (variableAccessData->isCaptured()
-                    && variableAccessData->local() == static_cast<VirtualRegister>(varNumber))
-                    return 0;
-                break;
-            }
-            default:
-                break;
-            }
-            if (m_graph.clobbersWorld(node))
-                break;
-        }
-        return 0;
-    }
-    
-    bool globalVarWatchpointElimination(WriteBarrier<Unknown>* registerPointer)
-    {
-        for (unsigned i = m_indexInBlock; i--;) {
-            Node* node = m_currentBlock->at(i);
-            switch (node->op()) {
-            case GlobalVarWatchpoint:
-                if (node->registerPointer() == registerPointer)
-                    return true;
-                break;
-            case PutGlobalVar:
-                if (node->registerPointer() == registerPointer)
-                    return false;
-                break;
-            default:
-                break;
-            }
-            if (m_graph.clobbersWorld(node))
-                break;
-        }
-        return false;
-    }
-    
-    Node* globalVarStoreElimination(WriteBarrier<Unknown>* registerPointer)
-    {
-        for (unsigned i = m_indexInBlock; i--;) {
-            Node* node = m_currentBlock->at(i);
-            switch (node->op()) {
-            case PutGlobalVar:
-            case PutGlobalVarCheck:
-                if (node->registerPointer() == registerPointer)
-                    return node;
-                break;
-                
-            case GetGlobalVar:
-                if (node->registerPointer() == registerPointer)
-                    return 0;
-                break;
-                
-            default:
-                break;
-            }
-            if (m_graph.clobbersWorld(node) || node->canExit())
-                return 0;
-        }
-        return 0;
-    }
-    
-    Node* scopedVarStoreElimination(Node* scope, Node* registers, unsigned varNumber)
-    {
-        for (unsigned i = m_indexInBlock; i--;) {
-            Node* node = m_currentBlock->at(i);
-            switch (node->op()) {
-            case PutScopedVar: {
-                if (node->varNumber() != varNumber)
-                    break;
-                if (node->child1() == scope && node->child2() == registers)
-                    return node;
-                return 0;
-            }
-                
-            case GetScopedVar: {
-                // Let's be conservative.
-                if (node->varNumber() == varNumber)
-                    return 0;
-                break;
-            }
-                
-            case GetLocal: {
-                VariableAccessData* variableAccessData = node->variableAccessData();
-                if (variableAccessData->isCaptured()
-                    && variableAccessData->local() == static_cast<VirtualRegister>(varNumber))
-                    return 0;
-                break;
-            }
+    private:
+        HashMap<PureValue, Node*> m_pureMap;
+        HashMap<HeapLocation, LazyNode> m_impureMap;
+    };
 
-            default:
-                break;
-            }
-            if (m_graph.clobbersWorld(node) || node->canExit())
-                return 0;
+    template<typename Maps>
+    class BlockCSE {
+    public:
+        BlockCSE(Graph& graph)
+            : m_graph(graph)
+            , m_insertionSet(graph)
+        {
         }
-        return 0;
-    }
     
-    Node* getByValLoadElimination(Node* child1, Node* child2)
-    {
-        for (unsigned i = m_indexInBlock; i--;) {
-            Node* node = m_currentBlock->at(i);
-            if (node == child1 || node == canonicalize(child2)) 
-                break;
-
-            switch (node->op()) {
-            case GetByVal:
-                if (!m_graph.byValIsPure(node))
-                    return 0;
-                if (node->child1() == child1 && canonicalize(node->child2()) == canonicalize(child2))
-                    return node;
-                break;
-            case PutByVal:
-            case PutByValAlias: {
-                if (!m_graph.byValIsPure(node))
-                    return 0;
-                if (m_graph.varArgChild(node, 0) == child1 && canonicalize(m_graph.varArgChild(node, 1)) == canonicalize(child2))
-                    return m_graph.varArgChild(node, 2).node();
-                // We must assume that the PutByVal will clobber the location we're getting from.
-                // FIXME: We can do better; if we know that the PutByVal is accessing an array of a
-                // different type than the GetByVal, then we know that they won't clobber each other.
-                // ... except of course for typed arrays, where all typed arrays clobber all other
-                // typed arrays!  An Int32Array can alias a Float64Array for example, and so on.
-                return 0;
-            }
-            case PutStructure:
-            case PutByOffset:
-                // GetByVal currently always speculates that it's accessing an
-                // array with an integer index, which means that it's impossible
-                // for a structure change or a put to property storage to affect
-                // the GetByVal.
-                break;
-            default:
-                if (m_graph.clobbersWorld(node))
-                    return 0;
-                break;
-            }
-        }
-        return 0;
-    }
-
-    bool checkFunctionElimination(JSCell* function, Node* child1)
-    {
-        for (unsigned i = endIndexForPureCSE(); i--;) {
-            Node* node = m_currentBlock->at(i);
-            if (node == child1) 
-                break;
-
-            if (node->op() == CheckFunction && node->child1() == child1 && node->function() == function)
-                return true;
-        }
-        return false;
-    }
-    
-    bool checkExecutableElimination(ExecutableBase* executable, Node* child1)
-    {
-        for (unsigned i = endIndexForPureCSE(); i--;) {
-            Node* node = m_currentBlock->at(i);
-            if (node == child1)
-                break;
-
-            if (node->op() == CheckExecutable && node->child1() == child1 && node->executable() == executable)
-                return true;
-        }
-        return false;
-    }
-
-    bool checkStructureElimination(const StructureSet& structureSet, Node* child1)
-    {
-        for (unsigned i = m_indexInBlock; i--;) {
-            Node* node = m_currentBlock->at(i);
-            if (node == child1) 
-                break;
-
-            switch (node->op()) {
-            case CheckStructure:
-            case ForwardCheckStructure:
-                if (node->child1() == child1
-                    && structureSet.isSupersetOf(node->structureSet()))
-                    return true;
-                break;
-                
-            case StructureTransitionWatchpoint:
-            case ForwardStructureTransitionWatchpoint:
-                if (node->child1() == child1
-                    && structureSet.contains(node->structure()))
-                    return true;
-                break;
-                
-            case PutStructure:
-                if (node->child1() == child1
-                    && structureSet.contains(node->structureTransitionData().newStructure))
-                    return true;
-                if (structureSet.contains(node->structureTransitionData().previousStructure))
-                    return false;
-                break;
-                
-            case PutByOffset:
-                // Setting a property cannot change the structure.
-                break;
-                
-            case PutByVal:
-            case PutByValAlias:
-                if (m_graph.byValIsPure(node)) {
-                    // If PutByVal speculates that it's accessing an array with an
-                    // integer index, then it's impossible for it to cause a structure
-                    // change.
-                    break;
-                }
-                return false;
-                
-            case Arrayify:
-            case ArrayifyToStructure:
-                // We could check if the arrayification could affect our structures.
-                // But that seems like it would take Effort.
-                return false;
-                
-            default:
-                if (m_graph.clobbersWorld(node))
-                    return false;
-                break;
-            }
-        }
-        return false;
-    }
-    
-    bool structureTransitionWatchpointElimination(Structure* structure, Node* child1)
-    {
-        for (unsigned i = m_indexInBlock; i--;) {
-            Node* node = m_currentBlock->at(i);
-            if (node == child1) 
-                break;
-
-            switch (node->op()) {
-            case CheckStructure:
-            case ForwardCheckStructure:
-                if (node->child1() == child1
-                    && node->structureSet().containsOnly(structure))
-                    return true;
-                break;
-                
-            case PutStructure:
-                ASSERT(node->structureTransitionData().previousStructure != structure);
-                break;
-                
-            case PutByOffset:
-                // Setting a property cannot change the structure.
-                break;
-                
-            case PutByVal:
-            case PutByValAlias:
-                if (m_graph.byValIsPure(node)) {
-                    // If PutByVal speculates that it's accessing an array with an
-                    // integer index, then it's impossible for it to cause a structure
-                    // change.
-                    break;
-                }
-                return false;
-                
-            case StructureTransitionWatchpoint:
-            case ForwardStructureTransitionWatchpoint:
-                if (node->structure() == structure && node->child1() == child1)
-                    return true;
-                break;
-                
-            case Arrayify:
-            case ArrayifyToStructure:
-                // We could check if the arrayification could affect our structures.
-                // But that seems like it would take Effort.
-                return false;
-                
-            default:
-                if (m_graph.clobbersWorld(node))
-                    return false;
-                break;
-            }
-        }
-        return false;
-    }
-    
-    Node* putStructureStoreElimination(Node* child1)
-    {
-        for (unsigned i = m_indexInBlock; i--;) {
-            Node* node = m_currentBlock->at(i);
-            if (node == child1)
-                break;
-            switch (node->op()) {
-            case CheckStructure:
-            case ForwardCheckStructure:
-                return 0;
-                
-            case PhantomPutStructure:
-                if (node->child1() == child1) // No need to retrace our steps.
-                    return 0;
-                break;
-                
-            case PutStructure:
-                if (node->child1() == child1)
-                    return node;
-                break;
-                
-            // PutStructure needs to execute if we GC. Hence this needs to
-            // be careful with respect to nodes that GC.
-            case CreateArguments:
-            case TearOffArguments:
-            case NewFunctionNoCheck:
-            case NewFunction:
-            case NewFunctionExpression:
-            case CreateActivation:
-            case TearOffActivation:
-            case ToPrimitive:
-            case NewRegexp:
-            case NewArrayBuffer:
-            case NewArray:
-            case NewObject:
-            case CreateThis:
-            case AllocatePropertyStorage:
-            case ReallocatePropertyStorage:
-            case TypeOf:
-            case ToString:
-            case NewStringObject:
-            case MakeRope:
-                return 0;
-                
-            case GetIndexedPropertyStorage:
-                if (node->arrayMode().getIndexedPropertyStorageMayTriggerGC())
-                    return 0;
-                break;
-                
-            default:
-                break;
-            }
-            if (m_graph.clobbersWorld(node) || node->canExit())
-                return 0;
-        }
-        return 0;
-    }
-    
-    Node* getByOffsetLoadElimination(unsigned identifierNumber, Node* child1)
-    {
-        for (unsigned i = m_indexInBlock; i--;) {
-            Node* node = m_currentBlock->at(i);
-            if (node == child1)
-                break;
-
-            switch (node->op()) {
-            case GetByOffset:
-                if (node->child1() == child1
-                    && m_graph.m_storageAccessData[node->storageAccessDataIndex()].identifierNumber == identifierNumber)
-                    return node;
-                break;
-                
-            case PutByOffset:
-                if (m_graph.m_storageAccessData[node->storageAccessDataIndex()].identifierNumber == identifierNumber) {
-                    if (node->child1() == child1) // Must be same property storage.
-                        return node->child3().node();
-                    return 0;
-                }
-                break;
-                
-            case PutStructure:
-                // Changing the structure cannot change the outcome of a property get.
-                break;
-                
-            case PutByVal:
-            case PutByValAlias:
-                if (m_graph.byValIsPure(node)) {
-                    // If PutByVal speculates that it's accessing an array with an
-                    // integer index, then it's impossible for it to cause a structure
-                    // change.
-                    break;
-                }
-                return 0;
-                
-            default:
-                if (m_graph.clobbersWorld(node))
-                    return 0;
-                break;
-            }
-        }
-        return 0;
-    }
-    
-    Node* putByOffsetStoreElimination(unsigned identifierNumber, Node* child1)
-    {
-        for (unsigned i = m_indexInBlock; i--;) {
-            Node* node = m_currentBlock->at(i);
-            if (node == child1)
-                break;
-
-            switch (node->op()) {
-            case GetByOffset:
-                if (m_graph.m_storageAccessData[node->storageAccessDataIndex()].identifierNumber == identifierNumber)
-                    return 0;
-                break;
-                
-            case PutByOffset:
-                if (m_graph.m_storageAccessData[node->storageAccessDataIndex()].identifierNumber == identifierNumber) {
-                    if (node->child1() == child1) // Must be same property storage.
-                        return node;
-                    return 0;
-                }
-                break;
-                
-            case PutByVal:
-            case PutByValAlias:
-            case GetByVal:
-                if (m_graph.byValIsPure(node)) {
-                    // If PutByVal speculates that it's accessing an array with an
-                    // integer index, then it's impossible for it to cause a structure
-                    // change.
-                    break;
-                }
-                return 0;
-                
-            default:
-                if (m_graph.clobbersWorld(node))
-                    return 0;
-                break;
-            }
-            if (node->canExit())
-                return 0;
-        }
-        return 0;
-    }
-    
-    Node* getPropertyStorageLoadElimination(Node* child1)
-    {
-        for (unsigned i = m_indexInBlock; i--;) {
-            Node* node = m_currentBlock->at(i);
-            if (node == child1) 
-                break;
-
-            switch (node->op()) {
-            case GetButterfly:
-                if (node->child1() == child1)
-                    return node;
-                break;
-
-            case AllocatePropertyStorage:
-            case ReallocatePropertyStorage:
-                // If we can cheaply prove this is a change to our object's storage, we
-                // can optimize and use its result.
-                if (node->child1() == child1)
-                    return node;
-                // Otherwise, we currently can't prove that this doesn't change our object's
-                // storage, so we conservatively assume that it may change the storage
-                // pointer of any object, including ours.
-                return 0;
-                
-            case PutByOffset:
-            case PutStructure:
-                // Changing the structure or putting to the storage cannot
-                // change the property storage pointer.
-                break;
-                
-            case PutByVal:
-            case PutByValAlias:
-                if (m_graph.byValIsPure(node)) {
-                    // If PutByVal speculates that it's accessing an array with an
-                    // integer index, then it's impossible for it to cause a structure
-                    // change.
-                    break;
-                }
-                return 0;
-                
-            case Arrayify:
-            case ArrayifyToStructure:
-                // We could check if the arrayification could affect our butterfly.
-                // But that seems like it would take Effort.
-                return 0;
-                
-            default:
-                if (m_graph.clobbersWorld(node))
-                    return 0;
-                break;
-            }
-        }
-        return 0;
-    }
-    
-    bool checkArrayElimination(Node* child1, ArrayMode arrayMode)
-    {
-        for (unsigned i = m_indexInBlock; i--;) {
-            Node* node = m_currentBlock->at(i);
-            if (node == child1) 
-                break;
-
-            switch (node->op()) {
-            case PutByOffset:
-            case PutStructure:
-                // Changing the structure or putting to the storage cannot
-                // change the property storage pointer.
-                break;
-                
-            case CheckArray:
-                if (node->child1() == child1 && node->arrayMode() == arrayMode)
-                    return true;
-                break;
-                
-            case Arrayify:
-            case ArrayifyToStructure:
-                // We could check if the arrayification could affect our array.
-                // But that seems like it would take Effort.
-                return false;
-                
-            default:
-                if (m_graph.clobbersWorld(node))
-                    return false;
-                break;
-            }
-        }
-        return false;
-    }
-
-    Node* getIndexedPropertyStorageLoadElimination(Node* child1, ArrayMode arrayMode)
-    {
-        for (unsigned i = m_indexInBlock; i--;) {
-            Node* node = m_currentBlock->at(i);
-            if (node == child1) 
-                break;
-
-            switch (node->op()) {
-            case GetIndexedPropertyStorage: {
-                if (node->child1() == child1 && node->arrayMode() == arrayMode)
-                    return node;
-                break;
-            }
-
-            case PutByOffset:
-            case PutStructure:
-                // Changing the structure or putting to the storage cannot
-                // change the property storage pointer.
-                break;
-                
-            default:
-                if (m_graph.clobbersWorld(node))
-                    return 0;
-                break;
-            }
-        }
-        return 0;
-    }
-    
-    Node* getMyScopeLoadElimination(InlineCallFrame* inlineCallFrame)
-    {
-        for (unsigned i = m_indexInBlock; i--;) {
-            Node* node = m_currentBlock->at(i);
-            if (node->codeOrigin.inlineCallFrame != inlineCallFrame)
-                continue;
-            switch (node->op()) {
-            case CreateActivation:
-                // This may cause us to return a different scope.
-                return 0;
-            case GetMyScope:
-                return node;
-            case SetMyScope:
-                return node->child1().node();
-            default:
-                break;
-            }
-        }
-        return 0;
-    }
-    
-    Node* getLocalLoadElimination(VirtualRegister local, Node*& relevantLocalOp, bool careAboutClobbering)
-    {
-        relevantLocalOp = 0;
+        bool run(BasicBlock* block)
+        {
+            m_maps.clear();
+            m_changed = false;
+            m_block = block;
         
-        for (unsigned i = m_indexInBlock; i--;) {
-            Node* node = m_currentBlock->at(i);
-            switch (node->op()) {
-            case GetLocal:
-                if (node->local() == local) {
-                    relevantLocalOp = node;
-                    return node;
+            for (unsigned nodeIndex = 0; nodeIndex < block->size(); ++nodeIndex) {
+                m_node = block->at(nodeIndex);
+                m_graph.performSubstitution(m_node);
+            
+                if (m_node->op() == Identity) {
+                    m_node->replaceWith(m_node->child1().node());
+                    m_changed = true;
+                } else {
+                    // This rule only makes sense for local CSE, since in SSA form we have already
+                    // factored the bounds check out of the PutByVal. It's kind of gross, but we
+                    // still have reason to believe that PutByValAlias is a good optimization and
+                    // that it's better to do it with a single node rather than separating out the
+                    // CheckInBounds.
+                    if (m_node->op() == PutByVal || m_node->op() == PutByValDirect) {
+                        HeapLocation heap;
+                        
+                        Node* base = m_graph.varArgChild(m_node, 0).node();
+                        Node* index = m_graph.varArgChild(m_node, 1).node();
+                        
+                        ArrayMode mode = m_node->arrayMode();
+                        switch (mode.type()) {
+                        case Array::Int32:
+                            if (!mode.isInBounds())
+                                break;
+                            heap = HeapLocation(
+                                IndexedPropertyLoc, IndexedInt32Properties, base, index);
+                            break;
+                            
+                        case Array::Double:
+                            if (!mode.isInBounds())
+                                break;
+                            heap = HeapLocation(
+                                IndexedPropertyLoc, IndexedDoubleProperties, base, index);
+                            break;
+                            
+                        case Array::Contiguous:
+                            if (!mode.isInBounds())
+                                break;
+                            heap = HeapLocation(
+                                IndexedPropertyLoc, IndexedContiguousProperties, base, index);
+                            break;
+                            
+                        case Array::Int8Array:
+                        case Array::Int16Array:
+                        case Array::Int32Array:
+                        case Array::Uint8Array:
+                        case Array::Uint8ClampedArray:
+                        case Array::Uint16Array:
+                        case Array::Uint32Array:
+                        case Array::Float32Array:
+                        case Array::Float64Array:
+                            if (!mode.isInBounds())
+                                break;
+                            heap = HeapLocation(
+                                IndexedPropertyLoc, TypedArrayProperties, base, index);
+                            break;
+                            
+                        default:
+                            break;
+                        }
+
+                        if (!!heap && m_maps.findReplacement(heap))
+                            m_node->setOp(PutByValAlias);
+                    }
+
+                    clobberize(m_graph, m_node, *this);
                 }
-                break;
-                
-            case GetLocalUnlinked:
-                if (node->unlinkedLocal() == local) {
-                    relevantLocalOp = node;
-                    return node;
-                }
-                break;
-                
-            case SetLocal:
-                if (node->local() == local) {
-                    relevantLocalOp = node;
-                    return node->child1().node();
-                }
-                break;
-                
-            case PutScopedVar:
-                if (static_cast<VirtualRegister>(node->varNumber()) == local)
-                    return 0;
-                break;
-                
-            default:
-                if (careAboutClobbering && m_graph.clobbersWorld(node))
-                    return 0;
-                break;
+            }
+
+            m_insertionSet.execute(block);
+        
+            return m_changed;
+        }
+    
+        void read(AbstractHeap) { }
+    
+        void write(AbstractHeap heap)
+        {
+            m_maps.write(heap);
+        }
+        
+        void def(PureValue value)
+        {
+            Node* match = m_maps.addPure(value, m_node);
+            if (!match)
+                return;
+
+            m_node->replaceWith(match);
+            m_changed = true;
+        }
+    
+        void def(HeapLocation location, LazyNode value)
+        {
+            LazyNode match = m_maps.addImpure(location, value);
+            if (!match)
+                return;
+        
+            if (m_node->op() == GetLocal) {
+                // Usually the CPS rethreading phase does this. But it's OK for us to mess with
+                // locals so long as:
+                // 
+                // - We dethread the graph. Any changes we make may invalidate the assumptions of
+                //   our CPS form, particularly if this GetLocal is linked to the variablesAtTail.
+                //
+                // - We don't introduce a Phantom for the child of the GetLocal. This wouldn't be
+                //   totally wrong but it would pessimize the code. Just because there is a
+                //   GetLocal doesn't mean that the child was live. Simply rerouting the all uses
+                //   of this GetLocal will preserve the live-at-exit information just fine.
+                //
+                // We accomplish the latter by just clearing the child; then the Phantom that we
+                // introduce won't have children and so it will eventually just be deleted.
+            
+                m_node->child1() = Edge();
+                m_graph.dethread();
+            }
+        
+            if (value.isNode() && value.asNode() == m_node) {
+                match.ensureIsNode(m_insertionSet, m_block, 0)->owner = m_block;
+                ASSERT(match.isNode());
+                m_node->replaceWith(match.asNode());
+                m_changed = true;
             }
         }
-        return 0;
+    
+    private:
+        Graph& m_graph;
+        
+        bool m_changed;
+        Node* m_node;
+        BasicBlock* m_block;
+    
+        Maps m_maps;
+
+        InsertionSet m_insertionSet;
+    };
+
+    BlockCSE<SmallMaps> m_smallBlock;
+    BlockCSE<LargeMaps> m_largeBlock;
+};
+
+class GlobalCSEPhase : public Phase {
+public:
+    GlobalCSEPhase(Graph& graph)
+        : Phase(graph, "global common subexpression elimination")
+        , m_impureDataMap(graph)
+        , m_insertionSet(graph)
+    {
     }
     
-    struct SetLocalStoreEliminationResult {
-        SetLocalStoreEliminationResult()
-            : mayBeAccessed(false)
-            , mayExit(false)
-            , mayClobberWorld(false)
+    bool run()
+    {
+        ASSERT(m_graph.m_fixpointState == FixpointNotConverged);
+        ASSERT(m_graph.m_form == SSA);
+        
+        m_graph.initializeNodeOwners();
+        m_graph.ensureDominators();
+        
+        m_preOrder = m_graph.blocksInPreOrder();
+        
+        // First figure out what gets clobbered by blocks. Node that this uses the preOrder list
+        // for convenience only.
+        for (unsigned i = m_preOrder.size(); i--;) {
+            m_block = m_preOrder[i];
+            m_impureData = &m_impureDataMap[m_block];
+            for (unsigned nodeIndex = m_block->size(); nodeIndex--;)
+                addWrites(m_graph, m_block->at(nodeIndex), m_impureData->writes);
+        }
+        
+        // Based on my experience doing this before, what follows might have to be made iterative.
+        // Right now it doesn't have to be iterative because everything is dominator-bsed. But when
+        // validation is enabled, we check if iterating would find new CSE opportunities.
+
+        bool changed = iterate();
+        
+        // FIXME: It should be possible to assert that CSE will not find any new opportunities if you
+        // run it a second time. Unfortunately, we cannot assert this right now. Note that if we did
+        // this, we'd have to first reset all of our state.
+        // https://bugs.webkit.org/show_bug.cgi?id=145853
+        
+        return changed;
+    }
+    
+    bool iterate()
+    {
+        if (verbose)
+            dataLog("Performing iteration.\n");
+        
+        m_changed = false;
+        m_graph.clearReplacements();
+        
+        for (unsigned i = 0; i < m_preOrder.size(); ++i) {
+            m_block = m_preOrder[i];
+            m_impureData = &m_impureDataMap[m_block];
+            m_writesSoFar.clear();
+            
+            if (verbose)
+                dataLog("Processing block ", *m_block, ":\n");
+
+            for (unsigned nodeIndex = 0; nodeIndex < m_block->size(); ++nodeIndex) {
+                m_nodeIndex = nodeIndex;
+                m_node = m_block->at(nodeIndex);
+                if (verbose)
+                    dataLog("  Looking at node ", m_node, ":\n");
+                
+                m_graph.performSubstitution(m_node);
+                
+                if (m_node->op() == Identity) {
+                    m_node->replaceWith(m_node->child1().node());
+                    m_changed = true;
+                } else
+                    clobberize(m_graph, m_node, *this);
+            }
+
+            m_insertionSet.execute(m_block);
+            
+            m_impureData->didVisit = true;
+        }
+        
+        return m_changed;
+    }
+
+    void read(AbstractHeap) { }
+    
+    void write(AbstractHeap heap)
+    {
+        clobber(m_impureData->availableAtTail, heap);
+        m_writesSoFar.add(heap);
+        if (verbose)
+            dataLog("    Clobbered, new tail map: ", mapDump(m_impureData->availableAtTail), "\n");
+    }
+    
+    void def(PureValue value)
+    {
+        // With pure values we do not have to worry about the possibility of some control flow path
+        // clobbering the value. So, we just search for all of the like values that have been
+        // computed. We pick one that is in a block that dominates ours. Note that this means that
+        // a PureValue will map to a list of nodes, since there may be many places in the control
+        // flow graph that compute a value but only one of them that dominates us. We may build up
+        // a large list of nodes that compute some value in the case of gnarly control flow. This
+        // is probably OK.
+        
+        auto result = m_pureValues.add(value, Vector<Node*>());
+        if (result.isNewEntry) {
+            result.iterator->value.append(m_node);
+            return;
+        }
+        
+        for (unsigned i = result.iterator->value.size(); i--;) {
+            Node* candidate = result.iterator->value[i];
+            if (m_graph.m_dominators->dominates(candidate->owner, m_block)) {
+                m_node->replaceWith(candidate);
+                m_changed = true;
+                return;
+            }
+        }
+        
+        result.iterator->value.append(m_node);
+    }
+    
+    LazyNode findReplacement(HeapLocation location)
+    {
+        // At this instant, our "availableAtTail" reflects the set of things that are available in
+        // this block so far. We check this map to find block-local CSE opportunities before doing
+        // a global search.
+        LazyNode match = m_impureData->availableAtTail.get(location);
+        if (!!match) {
+            if (verbose)
+                dataLog("      Found local match: ", match, "\n");
+            return match;
+        }
+        
+        // If it's not available at this point in the block, and at some prior point in the block
+        // we have clobbered this heap location, then there is no point in doing a global search.
+        if (m_writesSoFar.overlaps(location.heap())) {
+            if (verbose)
+                dataLog("      Not looking globally because of local clobber: ", m_writesSoFar, "\n");
+            return nullptr;
+        }
+        
+        // This perfoms a backward search over the control flow graph to find some possible
+        // non-local def() that matches our heap location. Such a match is only valid if there does
+        // not exist any path from that def() to our block that contains a write() that overlaps
+        // our heap. This algorithm looks for both of these things (the matching def and the
+        // overlapping writes) in one backwards DFS pass.
+        //
+        // This starts by looking at the starting block's predecessors, and then it continues along
+        // their predecessors. As soon as this finds a possible def() - one that defines the heap
+        // location we want while dominating our starting block - it assumes that this one must be
+        // the match. It then lets the DFS over predecessors complete, but it doesn't add the
+        // def()'s predecessors; this ensures that any blocks we visit thereafter are on some path
+        // from the def() to us. As soon as the DFG finds a write() that overlaps the location's
+        // heap, it stops, assuming that there is no possible match. Note that the write() case may
+        // trigger before we find a def(), or after. Either way, the write() case causes this
+        // function to immediately return nullptr.
+        //
+        // If the write() is found before we find the def(), then we know that any def() we would
+        // find would have a path to us that trips over the write() and hence becomes invalid. This
+        // is just a direct outcome of us looking for a def() that dominates us. Given a block A
+        // that dominates block B - so that A is the one that would have the def() and B is our
+        // starting block - we know that any other block must either be on the path from A to B, or
+        // it must be on a path from the root to A, but not both. So, if we haven't found A yet but
+        // we already have found a block C that has a write(), then C must be on some path from A
+        // to B, which means that A's def() is invalid for our purposes. Hence, before we find the
+        // def(), stopping on write() is the right thing to do.
+        //
+        // Stopping on write() is also the right thing to do after we find the def(). After we find
+        // the def(), we don't add that block's predecessors to the search worklist. That means
+        // that henceforth the only blocks we will see in the search are blocks on the path from
+        // the def() to us. If any such block has a write() that clobbers our heap then we should
+        // give up.
+        //
+        // Hence this graph search algorithm ends up being deceptively simple: any overlapping
+        // write() causes us to immediately return nullptr, and a matching def() means that we just
+        // record it and neglect to visit its precessors.
+        
+        Vector<BasicBlock*, 8> worklist;
+        Vector<BasicBlock*, 8> seenList;
+        BitVector seen;
+        
+        for (unsigned i = m_block->predecessors.size(); i--;) {
+            BasicBlock* predecessor = m_block->predecessors[i];
+            if (!seen.get(predecessor->index)) {
+                worklist.append(predecessor);
+                seen.set(predecessor->index);
+            }
+        }
+        
+        while (!worklist.isEmpty()) {
+            BasicBlock* block = worklist.takeLast();
+            seenList.append(block);
+            
+            if (verbose)
+                dataLog("      Searching in block ", *block, "\n");
+            ImpureBlockData& data = m_impureDataMap[block];
+            
+            // We require strict domination because this would only see things in our own block if
+            // they came *after* our position in the block. Clearly, while our block dominates
+            // itself, the things in the block after us don't dominate us.
+            if (m_graph.m_dominators->strictlyDominates(block, m_block)) {
+                if (verbose)
+                    dataLog("        It strictly dominates.\n");
+                DFG_ASSERT(m_graph, m_node, data.didVisit);
+                DFG_ASSERT(m_graph, m_node, !match);
+                if (verbose)
+                    dataLog("        Availability map: ", mapDump(data.availableAtTail), "\n");
+                match = data.availableAtTail.get(location);
+                if (verbose)
+                    dataLog("        Availability: ", match, "\n");
+                if (!!match) {
+                    // Don't examine the predecessors of a match. At this point we just want to
+                    // establish that other blocks on the path from here to there don't clobber
+                    // the location we're interested in.
+                    continue;
+                }
+            }
+            
+            if (verbose)
+                dataLog("        Dealing with write set ", data.writes, "\n");
+            if (data.writes.overlaps(location.heap())) {
+                if (verbose)
+                    dataLog("        Clobbered.\n");
+                return nullptr;
+            }
+            
+            for (unsigned i = block->predecessors.size(); i--;) {
+                BasicBlock* predecessor = block->predecessors[i];
+                if (!seen.get(predecessor->index)) {
+                    worklist.append(predecessor);
+                    seen.set(predecessor->index);
+                }
+            }
+        }
+        
+        if (!match)
+            return nullptr;
+        
+        // Cache the results for next time. We cache them both for this block and for all of our
+        // predecessors, since even though we've already visited our predecessors, our predecessors
+        // probably have successors other than us.
+        // FIXME: Consider caching failed searches as well, when match is null. It's not clear that
+        // the reduction in compile time would warrant the increase in complexity, though.
+        // https://bugs.webkit.org/show_bug.cgi?id=134876
+        for (BasicBlock* block : seenList)
+            m_impureDataMap[block].availableAtTail.add(location, match);
+        m_impureData->availableAtTail.add(location, match);
+        
+        return match;
+    }
+    
+    void def(HeapLocation location, LazyNode value)
+    {
+        if (verbose)
+            dataLog("    Got heap location def: ", location, " -> ", value, "\n");
+        
+        LazyNode match = findReplacement(location);
+        
+        if (verbose)
+            dataLog("      Got match: ", match, "\n");
+        
+        if (!match) {
+            if (verbose)
+                dataLog("      Adding at-tail mapping: ", location, " -> ", value, "\n");
+            auto result = m_impureData->availableAtTail.add(location, value);
+            ASSERT_UNUSED(result, result.isNewEntry);
+            return;
+        }
+
+        if (value.isNode() && value.asNode() == m_node) {
+            if (!match.isNode()) {
+                // We need to properly record the constant in order to use an existing one if applicable.
+                // This ensures that re-running GCSE will not find new optimizations.
+                match.ensureIsNode(m_insertionSet, m_block, m_nodeIndex)->owner = m_block;
+                auto result = m_pureValues.add(PureValue(match.asNode(), match->constant()), Vector<Node*>());
+                bool replaced = false;
+                if (!result.isNewEntry) {
+                    for (unsigned i = result.iterator->value.size(); i--;) {
+                        Node* candidate = result.iterator->value[i];
+                        if (m_graph.m_dominators->dominates(candidate->owner, m_block)) {
+                            ASSERT(candidate);
+                            match->replaceWith(candidate);
+                            match.setNode(candidate);
+                            replaced = true;
+                            break;
+                        }
+                    }
+                }
+                if (!replaced)
+                    result.iterator->value.append(match.asNode());
+            }
+            ASSERT(match.asNode());
+            m_node->replaceWith(match.asNode());
+            m_changed = true;
+        }
+    }
+    
+    struct ImpureBlockData {
+        ImpureBlockData()
+            : didVisit(false)
         {
         }
         
-        bool mayBeAccessed;
-        bool mayExit;
-        bool mayClobberWorld;
+        ClobberSet writes;
+        ImpureMap availableAtTail;
+        bool didVisit;
     };
-    SetLocalStoreEliminationResult setLocalStoreElimination(
-        VirtualRegister local, Node* expectedNode)
-    {
-        SetLocalStoreEliminationResult result;
-        for (unsigned i = m_indexInBlock; i--;) {
-            Node* node = m_currentBlock->at(i);
-            switch (node->op()) {
-            case GetLocal:
-            case Flush:
-                if (node->local() == local)
-                    result.mayBeAccessed = true;
-                break;
-                
-            case GetLocalUnlinked:
-                if (node->unlinkedLocal() == local)
-                    result.mayBeAccessed = true;
-                break;
-                
-            case SetLocal: {
-                if (node->local() != local)
-                    break;
-                if (node != expectedNode)
-                    result.mayBeAccessed = true;
-                return result;
-            }
-                
-            case GetScopedVar:
-                if (static_cast<VirtualRegister>(node->varNumber()) == local)
-                    result.mayBeAccessed = true;
-                break;
-                
-            case GetMyScope:
-            case SkipTopScope:
-                if (m_graph.uncheckedActivationRegisterFor(node->codeOrigin) == local)
-                    result.mayBeAccessed = true;
-                break;
-                
-            case CheckArgumentsNotCreated:
-            case GetMyArgumentsLength:
-            case GetMyArgumentsLengthSafe:
-                if (m_graph.uncheckedArgumentsRegisterFor(node->codeOrigin) == local)
-                    result.mayBeAccessed = true;
-                break;
-                
-            case GetMyArgumentByVal:
-            case GetMyArgumentByValSafe:
-                result.mayBeAccessed = true;
-                break;
-                
-            case GetByVal:
-                // If this is accessing arguments then it's potentially accessing locals.
-                if (node->arrayMode().type() == Array::Arguments)
-                    result.mayBeAccessed = true;
-                break;
-                
-            case CreateArguments:
-            case TearOffActivation:
-            case TearOffArguments:
-                // If an activation is being torn off then it means that captured variables
-                // are live. We could be clever here and check if the local qualifies as an
-                // argument register. But that seems like it would buy us very little since
-                // any kind of tear offs are rare to begin with.
-                result.mayBeAccessed = true;
-                break;
-                
-            default:
-                break;
-            }
-            result.mayExit |= node->canExit();
-            result.mayClobberWorld |= m_graph.clobbersWorld(node);
-        }
-        RELEASE_ASSERT_NOT_REACHED();
-        // Be safe in release mode.
-        result.mayBeAccessed = true;
-        return result;
-    }
     
-    void eliminateIrrelevantPhantomChildren(Node* node)
-    {
-        ASSERT(node->op() == Phantom);
-        for (unsigned i = 0; i < AdjacencyList::Size; ++i) {
-            Edge edge = node->children.child(i);
-            if (!edge)
-                continue;
-            if (edge.useKind() != UntypedUse)
-                continue; // Keep the type check.
-            if (edge->flags() & NodeRelevantToOSR)
-                continue;
-            
-#if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
-            dataLog("   Eliminating edge @", m_currentNode->index(), " -> @", edge->index());
-#endif
-            node->children.removeEdge(i--);
-            m_changed = true;
-        }
-    }
+    Vector<BasicBlock*> m_preOrder;
+
+    PureMultiMap m_pureValues;
+    BlockMap<ImpureBlockData> m_impureDataMap;
     
-    bool setReplacement(Node* replacement)
-    {
-        if (!replacement)
-            return false;
-        
-#if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
-        dataLogF("   Replacing @%u -> @%u", m_currentNode->index(), replacement->index());
-#endif
-        
-        m_currentNode->convertToPhantom();
-        eliminateIrrelevantPhantomChildren(m_currentNode);
-        
-        // At this point we will eliminate all references to this node.
-        m_currentNode->replacement = replacement;
-        
-        m_changed = true;
-        
-        return true;
-    }
+    BasicBlock* m_block;
+    Node* m_node;
+    unsigned m_nodeIndex;
+    ImpureBlockData* m_impureData;
+    ClobberSet m_writesSoFar;
+    InsertionSet m_insertionSet;
     
-    void eliminate()
-    {
-#if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
-        dataLogF("   Eliminating @%u", m_currentNode->index());
-#endif
-        
-        ASSERT(m_currentNode->mustGenerate());
-        m_currentNode->convertToPhantom();
-        eliminateIrrelevantPhantomChildren(m_currentNode);
-        
-        m_changed = true;
-    }
-    
-    void eliminate(Node* node, NodeType phantomType = Phantom)
-    {
-        if (!node)
-            return;
-        ASSERT(node->mustGenerate());
-        node->setOpAndDefaultNonExitFlags(phantomType);
-        if (phantomType == Phantom)
-            eliminateIrrelevantPhantomChildren(node);
-        
-        m_changed = true;
-    }
-    
-    void performNodeCSE(Node* node)
-    {
-        if (cseMode == NormalCSE)
-            m_graph.performSubstitution(node);
-        
-        if (node->op() == SetLocal)
-            node->child1()->mergeFlags(NodeRelevantToOSR);
-        
-#if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
-        dataLogF("   %s @%u: ", Graph::opName(node->op()), node->index());
-#endif
-        
-        // NOTE: there are some nodes that we deliberately don't CSE even though we
-        // probably could, like MakeRope and ToPrimitive. That's because there is no
-        // evidence that doing CSE on these nodes would result in a performance
-        // progression. Hence considering these nodes in CSE would just mean that this
-        // code does more work with no win. Of course, we may want to reconsider this,
-        // since MakeRope is trivially CSE-able. It's not trivially doable for
-        // ToPrimitive, but we could change that with some speculations if we really
-        // needed to.
-        
-        switch (node->op()) {
-        
-        case Identity:
-            if (cseMode == StoreElimination)
-                break;
-            setReplacement(node->child1().node());
-            break;
-            
-        // Handle the pure nodes. These nodes never have any side-effects.
-        case BitAnd:
-        case BitOr:
-        case BitXor:
-        case BitRShift:
-        case BitLShift:
-        case BitURShift:
-        case ArithAdd:
-        case ArithSub:
-        case ArithNegate:
-        case ArithMul:
-        case ArithIMul:
-        case ArithMod:
-        case ArithDiv:
-        case ArithAbs:
-        case ArithMin:
-        case ArithMax:
-        case ArithSqrt:
-        case StringCharAt:
-        case StringCharCodeAt:
-        case IsUndefined:
-        case IsBoolean:
-        case IsNumber:
-        case IsString:
-        case IsObject:
-        case IsFunction:
-        case DoubleAsInt32:
-        case LogicalNot:
-        case SkipTopScope:
-        case SkipScope:
-        case GetScopeRegisters:
-        case GetScope:
-        case TypeOf:
-        case CompareEqConstant:
-        case ValueToInt32:
-            if (cseMode == StoreElimination)
-                break;
-            setReplacement(pureCSE(node));
-            break;
-            
-        case Int32ToDouble:
-        case ForwardInt32ToDouble:
-            if (cseMode == StoreElimination)
-                break;
-            setReplacement(int32ToDoubleCSE(node));
-            break;
-            
-        case GetCallee:
-            if (cseMode == StoreElimination)
-                break;
-            setReplacement(getCalleeLoadElimination(node->codeOrigin.inlineCallFrame));
-            break;
-
-        case GetLocal: {
-            if (cseMode == StoreElimination)
-                break;
-            VariableAccessData* variableAccessData = node->variableAccessData();
-            if (!variableAccessData->isCaptured())
-                break;
-            Node* relevantLocalOp;
-            Node* possibleReplacement = getLocalLoadElimination(variableAccessData->local(), relevantLocalOp, variableAccessData->isCaptured());
-            if (!relevantLocalOp)
-                break;
-            if (relevantLocalOp->op() != GetLocalUnlinked
-                && relevantLocalOp->variableAccessData() != variableAccessData)
-                break;
-            Node* phi = node->child1().node();
-            if (!setReplacement(possibleReplacement))
-                break;
-            
-            m_graph.dethread();
-            
-            // If we replace a GetLocal with a GetLocalUnlinked, then turn the GetLocalUnlinked
-            // into a GetLocal.
-            if (relevantLocalOp->op() == GetLocalUnlinked)
-                relevantLocalOp->convertToGetLocal(variableAccessData, phi);
-
-            m_changed = true;
-            break;
-        }
-            
-        case GetLocalUnlinked: {
-            if (cseMode == StoreElimination)
-                break;
-            Node* relevantLocalOpIgnored;
-            setReplacement(getLocalLoadElimination(node->unlinkedLocal(), relevantLocalOpIgnored, true));
-            break;
-        }
-            
-        case Flush: {
-            VariableAccessData* variableAccessData = node->variableAccessData();
-            VirtualRegister local = variableAccessData->local();
-            Node* replacement = node->child1().node();
-            if (replacement->op() != SetLocal)
-                break;
-            ASSERT(replacement->variableAccessData() == variableAccessData);
-            // FIXME: We should be able to remove SetLocals that can exit; we just need
-            // to replace them with appropriate type checks.
-            if (cseMode == NormalCSE) {
-                // Need to be conservative at this time; if the SetLocal has any chance of performing
-                // any speculations then we cannot do anything.
-                if (variableAccessData->isCaptured()) {
-                    // Captured SetLocals never speculate and hence never exit.
-                } else {
-                    if (variableAccessData->shouldUseDoubleFormat())
-                        break;
-                    SpeculatedType prediction = variableAccessData->argumentAwarePrediction();
-                    if (isInt32Speculation(prediction))
-                        break;
-                    if (isArraySpeculation(prediction))
-                        break;
-                    if (isBooleanSpeculation(prediction))
-                        break;
-                }
-            } else {
-                if (replacement->canExit())
-                    break;
-            }
-            SetLocalStoreEliminationResult result =
-                setLocalStoreElimination(local, replacement);
-            if (result.mayBeAccessed || result.mayClobberWorld)
-                break;
-            ASSERT(replacement->op() == SetLocal);
-            // FIXME: Investigate using mayExit as a further optimization.
-            node->convertToPhantom();
-            Node* dataNode = replacement->child1().node();
-            ASSERT(dataNode->hasResult());
-            m_graph.clearAndDerefChild1(node);
-            node->children.child1() = Edge(dataNode);
-            m_graph.dethread();
-            m_changed = true;
-            break;
-        }
-            
-        case JSConstant:
-            if (cseMode == StoreElimination)
-                break;
-            // This is strange, but necessary. Some phases will convert nodes to constants,
-            // which may result in duplicated constants. We use CSE to clean this up.
-            setReplacement(constantCSE(node));
-            break;
-            
-        case WeakJSConstant:
-            if (cseMode == StoreElimination)
-                break;
-            // FIXME: have CSE for weak constants against strong constants and vice-versa.
-            setReplacement(weakConstantCSE(node));
-            break;
-            
-        case GetArrayLength:
-            if (cseMode == StoreElimination)
-                break;
-            setReplacement(getArrayLengthElimination(node->child1().node()));
-            break;
-
-        case GetMyScope:
-            if (cseMode == StoreElimination)
-                break;
-            setReplacement(getMyScopeLoadElimination(node->codeOrigin.inlineCallFrame));
-            break;
-            
-        // Handle nodes that are conditionally pure: these are pure, and can
-        // be CSE'd, so long as the prediction is the one we want.
-        case ValueAdd:
-        case CompareLess:
-        case CompareLessEq:
-        case CompareGreater:
-        case CompareGreaterEq:
-        case CompareEq: {
-            if (cseMode == StoreElimination)
-                break;
-            if (m_graph.isPredictedNumerical(node)) {
-                Node* replacement = pureCSE(node);
-                if (replacement && m_graph.isPredictedNumerical(replacement))
-                    setReplacement(replacement);
-            }
-            break;
-        }
-            
-        // Finally handle heap accesses. These are not quite pure, but we can still
-        // optimize them provided that some subtle conditions are met.
-        case GetGlobalVar:
-            if (cseMode == StoreElimination)
-                break;
-            setReplacement(globalVarLoadElimination(node->registerPointer()));
-            break;
-
-        case GetScopedVar: {
-            if (cseMode == StoreElimination)
-                break;
-            setReplacement(scopedVarLoadElimination(node->child1().node(), node->varNumber()));
-            break;
-        }
-
-        case GlobalVarWatchpoint:
-            if (cseMode == StoreElimination)
-                break;
-            if (globalVarWatchpointElimination(node->registerPointer()))
-                eliminate();
-            break;
-            
-        case PutGlobalVar:
-        case PutGlobalVarCheck:
-            if (cseMode == NormalCSE)
-                break;
-            eliminate(globalVarStoreElimination(node->registerPointer()));
-            break;
-            
-        case PutScopedVar: {
-            if (cseMode == NormalCSE)
-                break;
-            eliminate(scopedVarStoreElimination(node->child1().node(), node->child2().node(), node->varNumber()));
-            break;
-        }
-
-        case GetByVal:
-            if (cseMode == StoreElimination)
-                break;
-            if (m_graph.byValIsPure(node))
-                setReplacement(getByValLoadElimination(node->child1().node(), node->child2().node()));
-            break;
-            
-        case PutByVal: {
-            if (cseMode == StoreElimination)
-                break;
-            Edge child1 = m_graph.varArgChild(node, 0);
-            Edge child2 = m_graph.varArgChild(node, 1);
-            if (node->arrayMode().canCSEStorage()) {
-                Node* replacement = getByValLoadElimination(child1.node(), child2.node());
-                if (!replacement)
-                    break;
-                node->setOp(PutByValAlias);
-            }
-            break;
-        }
-            
-        case CheckStructure:
-        case ForwardCheckStructure:
-            if (cseMode == StoreElimination)
-                break;
-            if (checkStructureElimination(node->structureSet(), node->child1().node()))
-                eliminate();
-            break;
-            
-        case StructureTransitionWatchpoint:
-        case ForwardStructureTransitionWatchpoint:
-            if (cseMode == StoreElimination)
-                break;
-            if (structureTransitionWatchpointElimination(node->structure(), node->child1().node()))
-                eliminate();
-            break;
-            
-        case PutStructure:
-            if (cseMode == NormalCSE)
-                break;
-            eliminate(putStructureStoreElimination(node->child1().node()), PhantomPutStructure);
-            break;
-
-        case CheckFunction:
-            if (cseMode == StoreElimination)
-                break;
-            if (checkFunctionElimination(node->function(), node->child1().node()))
-                eliminate();
-            break;
-                
-        case CheckExecutable:
-            if (cseMode == StoreElimination)
-                break;
-            if (checkExecutableElimination(node->executable(), node->child1().node()))
-                eliminate();
-            break;
-                
-        case CheckArray:
-            if (cseMode == StoreElimination)
-                break;
-            if (checkArrayElimination(node->child1().node(), node->arrayMode()))
-                eliminate();
-            break;
-            
-        case GetIndexedPropertyStorage: {
-            if (cseMode == StoreElimination)
-                break;
-            setReplacement(getIndexedPropertyStorageLoadElimination(node->child1().node(), node->arrayMode()));
-            break;
-        }
-
-        case GetButterfly:
-            if (cseMode == StoreElimination)
-                break;
-            setReplacement(getPropertyStorageLoadElimination(node->child1().node()));
-            break;
-
-        case GetByOffset:
-            if (cseMode == StoreElimination)
-                break;
-            setReplacement(getByOffsetLoadElimination(m_graph.m_storageAccessData[node->storageAccessDataIndex()].identifierNumber, node->child1().node()));
-            break;
-            
-        case PutByOffset:
-            if (cseMode == NormalCSE)
-                break;
-            eliminate(putByOffsetStoreElimination(m_graph.m_storageAccessData[node->storageAccessDataIndex()].identifierNumber, node->child1().node()));
-            break;
-            
-        case Phantom:
-            // FIXME: we ought to remove Phantom's that have no children.
-            
-            eliminateIrrelevantPhantomChildren(node);
-            break;
-            
-        default:
-            // do nothing.
-            break;
-        }
-        
-        m_lastSeen[node->op()] = m_indexInBlock;
-#if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
-        dataLogF("\n");
-#endif
-    }
-    
-    void performBlockCSE(BasicBlock* block)
-    {
-        if (!block)
-            return;
-        if (!block->isReachable)
-            return;
-        
-        m_currentBlock = block;
-        for (unsigned i = 0; i < LastNodeType; ++i)
-            m_lastSeen[i] = UINT_MAX;
-        
-        // All Phis need to already be marked as relevant to OSR, and have their
-        // replacements cleared, so we don't get confused while doing substitutions on
-        // GetLocal's.
-        for (unsigned i = 0; i < block->phis.size(); ++i) {
-            ASSERT(block->phis[i]->flags() & NodeRelevantToOSR);
-            block->phis[i]->replacement = 0;
-        }
-        
-        // Make all of my SetLocal and GetLocal nodes relevant to OSR, and do some other
-        // necessary bookkeeping.
-        for (unsigned i = 0; i < block->size(); ++i) {
-            Node* node = block->at(i);
-            
-            node->replacement = 0;
-            
-            switch (node->op()) {
-            case SetLocal:
-            case GetLocal: // FIXME: The GetLocal case is only necessary until we do https://bugs.webkit.org/show_bug.cgi?id=106707.
-                node->mergeFlags(NodeRelevantToOSR);
-                break;
-            default:
-                node->clearFlags(NodeRelevantToOSR);
-                break;
-            }
-        }
-
-        for (m_indexInBlock = 0; m_indexInBlock < block->size(); ++m_indexInBlock) {
-            m_currentNode = block->at(m_indexInBlock);
-            performNodeCSE(m_currentNode);
-        }
-        
-        if (!ASSERT_DISABLED && cseMode == StoreElimination) {
-            // Nobody should have replacements set.
-            for (unsigned i = 0; i < block->size(); ++i)
-                ASSERT(!block->at(i)->replacement);
-        }
-    }
-    
-    BasicBlock* m_currentBlock;
-    Node* m_currentNode;
-    unsigned m_indexInBlock;
-    FixedArray<unsigned, LastNodeType> m_lastSeen;
-    bool m_changed; // Only tracks changes that have a substantive effect on other optimizations.
+    bool m_changed;
 };
 
-bool performCSE(Graph& graph)
+} // anonymous namespace
+
+bool performLocalCSE(Graph& graph)
 {
-    SamplingRegion samplingRegion("DFG CSE Phase");
-    return runPhase<CSEPhase<NormalCSE> >(graph);
+    SamplingRegion samplingRegion("DFG LocalCSE Phase");
+    return runPhase<LocalCSEPhase>(graph);
 }
 
-bool performStoreElimination(Graph& graph)
+bool performGlobalCSE(Graph& graph)
 {
-    SamplingRegion samplingRegion("DFG Store Elimination Phase");
-    return runPhase<CSEPhase<StoreElimination> >(graph);
+    SamplingRegion samplingRegion("DFG GlobalCSE Phase");
+    return runPhase<GlobalCSEPhase>(graph);
 }
 
 } } // namespace JSC::DFG
 
 #endif // ENABLE(DFG_JIT)
-
-

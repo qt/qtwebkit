@@ -21,7 +21,7 @@
 #ifndef TextureMapperShaderProgram_h
 #define TextureMapperShaderProgram_h
 
-#if USE(TEXTURE_MAPPER)
+#if USE(TEXTURE_MAPPER_GL)
 #include "GraphicsContext3D.h"
 #include "TransformationMatrix.h"
 #include <wtf/HashMap.h>
@@ -74,13 +74,11 @@ public:
     TEXMAP_DECLARE_SAMPLER(sampler)
     TEXMAP_DECLARE_SAMPLER(mask)
 
-#if ENABLE(CSS_FILTERS)
     TEXMAP_DECLARE_UNIFORM(filterAmount)
     TEXMAP_DECLARE_UNIFORM(gaussianKernel)
     TEXMAP_DECLARE_UNIFORM(blurRadius)
     TEXMAP_DECLARE_UNIFORM(shadowOffset)
     TEXMAP_DECLARE_SAMPLER(contentTexture)
-#endif
 
     void setMatrix(GC3Duint, const TransformationMatrix&);
 
@@ -98,6 +96,6 @@ private:
 };
 
 }
-#endif
+#endif // USE(TEXTURE_MAPPER_GL)
 
 #endif // TextureMapperShaderProgram_h

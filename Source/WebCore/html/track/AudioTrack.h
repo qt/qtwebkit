@@ -11,10 +11,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -27,12 +27,13 @@
 #ifndef AudioTrack_h
 #define AudioTrack_h
 
+#include "PlatformExportMacros.h"
+
 #if ENABLE(VIDEO_TRACK)
 
 #include "AudioTrackPrivate.h"
 #include "ExceptionCode.h"
 #include "TrackBase.h"
-#include <wtf/PassOwnPtr.h>
 #include <wtf/RefCounted.h>
 #include <wtf/text/WTFString.h>
 
@@ -46,16 +47,13 @@ public:
     virtual void audioTrackEnabledChanged(AudioTrack*) = 0;
 };
 
-class AudioTrack : public TrackBase, public AudioTrackPrivateClient {
+class AudioTrack final : public TrackBase, public AudioTrackPrivateClient {
 public:
-    static PassRefPtr<AudioTrack> create(AudioTrackClient* client, PassRefPtr<AudioTrackPrivate> trackPrivate)
+    static Ref<AudioTrack> create(AudioTrackClient* client, PassRefPtr<AudioTrackPrivate> trackPrivate)
     {
-        return adoptRef(new AudioTrack(client, trackPrivate));
+        return adoptRef(*new AudioTrack(client, trackPrivate));
     }
     virtual ~AudioTrack();
-
-    AtomicString id() const { return m_id; }
-    void setId(const AtomicString& id) { m_id = id; }
 
     static const AtomicString& alternativeKeyword();
     static const AtomicString& descriptionKeyword();
@@ -63,24 +61,35 @@ public:
     static const AtomicString& mainDescKeyword();
     static const AtomicString& translationKeyword();
     static const AtomicString& commentaryKeyword();
-    virtual const AtomicString& defaultKindKeyword() const OVERRIDE { return emptyAtom; }
+    virtual const AtomicString& defaultKindKeyword() const override { return emptyAtom; }
 
-    bool enabled() const { return m_enabled; }
-    virtual void setEnabled(const bool);
+    virtual bool enabled() const override { return m_enabled; }
+    void setEnabled(const bool);
 
-    virtual void clearClient() OVERRIDE { m_client = 0; }
+    virtual void clearClient() override { m_client = nullptr; }
     AudioTrackClient* client() const { return m_client; }
 
     size_t inbandTrackIndex();
+
+    void setPrivate(PassRefPtr<AudioTrackPrivate>);
 
 protected:
     AudioTrack(AudioTrackClient*, PassRefPtr<AudioTrackPrivate>);
 
 private:
-    virtual bool isValidKind(const AtomicString&) const OVERRIDE;
-    virtual void willRemoveAudioTrackPrivate(AudioTrackPrivate*) OVERRIDE;
+    virtual bool isValidKind(const AtomicString&) const override;
 
-    AtomicString m_id;
+    // AudioTrackPrivateClient
+    void enabledChanged(AudioTrackPrivate*, bool) override;
+
+    // TrackPrivateBaseClient
+    void idChanged(TrackPrivateBase*, const AtomicString&) override;
+    void labelChanged(TrackPrivateBase*, const AtomicString&) override;
+    void languageChanged(TrackPrivateBase*, const AtomicString&) override;
+    void willRemove(TrackPrivateBase*) override;
+
+    void updateKindFromPrivate();
+
     bool m_enabled;
     AudioTrackClient* m_client;
 
@@ -89,7 +98,7 @@ private:
 
 inline AudioTrack* toAudioTrack(TrackBase* track)
 {
-    ASSERT(track->type() == TrackBase::AudioTrack);
+    ASSERT_WITH_SECURITY_IMPLICATION(track->type() == TrackBase::AudioTrack);
     return static_cast<AudioTrack*>(track);
 }
 

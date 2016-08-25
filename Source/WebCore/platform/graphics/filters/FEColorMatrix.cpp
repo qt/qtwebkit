@@ -21,30 +21,27 @@
  */
 
 #include "config.h"
-
-#if ENABLE(FILTERS)
 #include "FEColorMatrix.h"
 
 #include "Filter.h"
 #include "GraphicsContext.h"
-#include "RenderTreeAsText.h"
 #include "TextStream.h"
 
+#include <runtime/Uint8ClampedArray.h>
 #include <wtf/MathExtras.h>
-#include <wtf/Uint8ClampedArray.h>
 
 namespace WebCore {
 
-FEColorMatrix::FEColorMatrix(Filter* filter, ColorMatrixType type, const Vector<float>& values)
+FEColorMatrix::FEColorMatrix(Filter& filter, ColorMatrixType type, const Vector<float>& values)
     : FilterEffect(filter)
     , m_type(type)
     , m_values(values)
 {
 }
 
-PassRefPtr<FEColorMatrix> FEColorMatrix::create(Filter* filter, ColorMatrixType type, const Vector<float>& values)
+Ref<FEColorMatrix> FEColorMatrix::create(Filter& filter, ColorMatrixType type, const Vector<float>& values)
 {
-    return adoptRef(new FEColorMatrix(filter, type, values));
+    return adoptRef(*new FEColorMatrix(filter, type, values));
 }
 
 ColorMatrixType FEColorMatrix::type() const
@@ -150,9 +147,11 @@ void FEColorMatrix::platformApplySoftware()
     if (!resultImage)
         return;
 
-    resultImage->context()->drawImageBuffer(in->asImageBuffer(), ColorSpaceDeviceRGB, drawingRegionOfInputImage(in->absolutePaintRect()));
+    ImageBuffer* inBuffer = in->asImageBuffer();
+    if (inBuffer)
+        resultImage->context().drawImageBuffer(*inBuffer, drawingRegionOfInputImage(in->absolutePaintRect()));
 
-    IntRect imageRect(IntPoint(), absolutePaintRect().size());
+    IntRect imageRect(IntPoint(), resultImage->logicalSize());
     RefPtr<Uint8ClampedArray> pixelArray = resultImage->getUnmultipliedImageData(imageRect);
 
     switch (m_type) {
@@ -226,5 +225,3 @@ TextStream& FEColorMatrix::externalRepresentation(TextStream& ts, int indent) co
 }
 
 } // namespace WebCore
-
-#endif // ENABLE(FILTERS)

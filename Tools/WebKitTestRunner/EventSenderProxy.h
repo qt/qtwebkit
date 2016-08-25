@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2014 Apple Inc. All rights reserved.
  * Copyright (C) 2011 Nokia Corporation and/or its subsidiary(-ies).
  *
  * Redistribution and use in source and binary forms, with or without
@@ -27,15 +27,24 @@
 #ifndef EventSenderProxy_h
 #define EventSenderProxy_h
 
-#if PLATFORM(QT)
+#include <wtf/Deque.h>
+#include <wtf/HashMap.h>
+#include <wtf/RetainPtr.h>
+#include <wtf/Vector.h>
+
+#if PLATFORM(GTK)
+#include <WebCore/GUniquePtrGtk.h>
+#include <gdk/gdk.h>
+#include <wtf/HashSet.h>
+#elif PLATFORM(EFL)
+#include "EWebKit2.h"
+#elif PLATFORM(QT)
 #include <QEvent>
 #include <QTouchEvent>
-#elif PLATFORM(GTK)
-#include <gdk/gdk.h>
-#include <wtf/Deque.h>
-#elif PLATFORM(EFL)
-#include <WebKit2/EWebKit2.h>
-#include <wtf/Deque.h>
+#endif
+
+#if PLATFORM(COCOA)
+OBJC_CLASS NSEvent;
 #endif
 
 namespace WTR {
@@ -53,10 +62,19 @@ public:
     explicit EventSenderProxy(TestController*);
     ~EventSenderProxy();
 
+    WKPoint position() const { return m_position; }
+
     void mouseDown(unsigned button, WKEventModifiers);
     void mouseUp(unsigned button, WKEventModifiers);
+    void mouseForceDown();
+    void mouseForceUp();
+    void mouseForceChanged(float);
+    void mouseForceClick();
+    void startAndCancelMouseForceClick();
     void mouseMoveTo(double x, double y);
     void mouseScrollBy(int x, int y);
+    void mouseScrollByWithWheelAndMomentumPhases(int x, int y, int phase, int momentum);
+    void swipeGestureWithWheelAndMomentumPhases(int x, int y, int phase, int momentum);
     void continuousMouseScrollBy(int x, int y, bool paged);
 
     void leapForward(int milliseconds);
@@ -88,14 +106,25 @@ private:
     void replaySavedEvents();
 #endif
 
-#if PLATFORM(QT)
+    void sendMouseDownToStartPressureEvents();
+#if PLATFORM(COCOA)
+    enum class PressureChangeDirection { Increasing, Decreasing };
+    RetainPtr<NSEvent> beginPressureEvent(int stage);
+    RetainPtr<NSEvent> pressureChangeEvent(int stage, PressureChangeDirection);
+    RetainPtr<NSEvent> pressureChangeEvent(int stage, float pressure, PressureChangeDirection);
+#endif
+
+#if PLATFORM(GTK)
+    void sendOrQueueEvent(GdkEvent*);
+    void dispatchEvent(GdkEvent*);
+    GdkEvent* createMouseButtonEvent(GdkEventType, unsigned button, WKEventModifiers);
+    GUniquePtr<GdkEvent> createTouchEvent(GdkEventType, int id);
+    void sendUpdatedTouchEvents();
+#elif PLATFORM(QT)
 #if ENABLE(TOUCH_EVENTS)
     void sendTouchEvent(QEvent::Type);
 #endif
     void sendOrQueueEvent(QEvent*);
-#elif PLATFORM(GTK)
-    void sendOrQueueEvent(GdkEvent*);
-    GdkEvent* createMouseButtonEvent(GdkEventType, unsigned button, WKEventModifiers);
 #elif PLATFORM(EFL)
     void sendOrQueueEvent(const WTREvent&);
     void dispatchEvent(const WTREvent&);
@@ -111,11 +140,13 @@ private:
     double m_clickTime;
     WKPoint m_clickPosition;
     WKEventMouseButton m_clickButton;
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     int eventNumber;
 #elif PLATFORM(GTK)
     Deque<WTREventQueueItem> m_eventQueue;
     unsigned m_mouseButtonCurrentlyDown;
+    Vector<GUniquePtr<GdkEvent>> m_touchEvents;
+    HashSet<int> m_updatedTouchEvents;
 #elif PLATFORM(QT)
     Qt::MouseButtons m_mouseButtons;
 

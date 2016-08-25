@@ -36,22 +36,18 @@ class DeviceProximityClient;
 
 class DeviceProximityController : public DeviceController {
 public:
+    explicit DeviceProximityController(DeviceProximityClient*);
     ~DeviceProximityController() { }
-
-    static PassOwnPtr<DeviceProximityController> create(DeviceProximityClient*);
 
     void didChangeDeviceProximity(const double value, const double min, const double max);
     DeviceProximityClient* deviceProximityClient();
 
     virtual bool hasLastData();
-    virtual PassRefPtr<Event> getLastEvent();
+    virtual RefPtr<Event> getLastEvent();
 
     static const char* supplementName();
     static DeviceProximityController* from(Page*);
     static bool isActiveAt(Page*);
-
-private:
-    explicit DeviceProximityController(DeviceProximityClient*);
 };
 
 } // namespace WebCore

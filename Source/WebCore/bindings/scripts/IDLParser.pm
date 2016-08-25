@@ -82,6 +82,7 @@ struct( domSignature => {
     isNullable => '$', # Is variable type Nullable (T?)
     isVariadic => '$', # Is variable variadic (long... numbers)
     isOptional => '$', # Is variable optional (optional T)
+    default => '$', # Default value for parameters
 });
 
 # Used to represent string constants
@@ -299,13 +300,22 @@ sub unquoteString
 sub typeHasNullableSuffix
 {
     my $type = shift;
-    return $type =~ /\?$/;
+    return $type ? $type =~ /\?$/ : 0;
 }
 
 sub typeRemoveNullableSuffix
 {
     my $type = shift;
-    $type =~ s/\?//g;
+    if ($type) {
+        $type =~ s/\?//g;
+    }
+    return $type;
+}
+
+sub identifierRemoveNullablePrefix
+{
+    my $type = shift;
+    $type =~ s/^_//;
     return $type;
 }
 
@@ -496,7 +506,7 @@ sub parseInterface
         $self->assertTokenValue($self->getToken(), "interface", __LINE__);
         my $interfaceNameToken = $self->getToken();
         $self->assertTokenType($interfaceNameToken, IdentifierToken);
-        $interface->name($interfaceNameToken->value());
+        $interface->name(identifierRemoveNullablePrefix($interfaceNameToken->value()));
         my $parents = $self->parseInheritance();
         $interface->parents($parents);
         $interface->parent($parents->[0]);
@@ -696,7 +706,7 @@ sub parseException
         $self->assertTokenValue($self->getToken(), "exception", __LINE__);
         my $exceptionNameToken = $self->getToken();
         $self->assertTokenType($exceptionNameToken, IdentifierToken);
-        $interface->name($exceptionNameToken->value());
+        $interface->name(identifierRemoveNullablePrefix($exceptionNameToken->value()));
         $interface->isException(1);
         my $parents = $self->parseInheritance();
         $interface->parents($parents);
@@ -760,7 +770,7 @@ sub parseEnum
         $self->assertTokenValue($self->getToken(), "enum", __LINE__);
         my $enumNameToken = $self->getToken();
         $self->assertTokenType($enumNameToken, IdentifierToken);
-        $enum->name($enumNameToken->value());
+        $enum->name(identifierRemoveNullablePrefix($enumNameToken->value()));
         $self->assertTokenValue($self->getToken(), "{", __LINE__);
         push(@{$enum->values}, @{$self->parseEnumValueList()});
         $self->assertTokenValue($self->getToken(), "}", __LINE__);
@@ -874,7 +884,7 @@ sub parseConst
         $newDataNode->type($self->parseConstType());
         my $constNameToken = $self->getToken();
         $self->assertTokenType($constNameToken, IdentifierToken);
-        $newDataNode->name($constNameToken->value());
+        $newDataNode->name(identifierRemoveNullablePrefix($constNameToken->value()));
         $self->assertTokenValue($self->getToken(), "=", __LINE__);
         $newDataNode->value($self->parseConstValue());
         $self->assertTokenValue($self->getToken(), ";", __LINE__);
@@ -897,10 +907,6 @@ sub parseConstValue
     }
     if ($next->type() == FloatToken || $next->value() =~ /$nextConstValue_2/) {
         return $self->parseFloatLiteral();
-    }
-    # backward compatibility
-    if ($next->type() == StringToken) {
-        return $self->getToken()->value();
     }
     if ($next->type() == IntegerToken) {
         return $self->getToken()->value();
@@ -1156,7 +1162,7 @@ sub parseAttributeRest
         $newDataNode->signature->type(typeRemoveNullableSuffix($type));
         my $token = $self->getToken();
         $self->assertTokenType($token, IdentifierToken);
-        $newDataNode->signature->name($token->value());
+        $newDataNode->signature->name(identifierRemoveNullablePrefix($token->value()));
         $self->assertTokenValue($self->getToken(), ";", __LINE__);
         # CustomConstructor may also be used on attributes.
         if (defined $extendedAttributeList->{"CustomConstructors"}) {
@@ -1342,7 +1348,7 @@ sub parseOperationRest
         my $newDataNode = domFunction->new();
         $newDataNode->signature(domSignature->new());
         my $name = $self->parseOptionalIdentifier();
-        $newDataNode->signature->name($name);
+        $newDataNode->signature->name(identifierRemoveNullablePrefix($name));
         $self->assertTokenValue($self->getToken(), "(", $name, __LINE__);
         push(@{$newDataNode->parameters}, @{$self->parseArgumentList()});
         $self->assertTokenValue($self->getToken(), ")", __LINE__);
@@ -1427,10 +1433,10 @@ sub parseOptionalOrRequiredArgument
             $paramDataNode->isNullable(0);
         }
         # Remove all "?" if exists, e.g. "object?[]?" -> "object[]".
-        $paramDataNode->type(typeRemoveNullableSuffix($type));
+        $paramDataNode->type(identifierRemoveNullablePrefix(typeRemoveNullableSuffix($type)));
         $paramDataNode->isOptional(1);
         $paramDataNode->name($self->parseArgumentName());
-        $self->parseDefault();
+        $paramDataNode->default($self->parseDefault());
         return $paramDataNode;
     }
     if ($next->type() == IdentifierToken || $next->value() =~ /$nextExceptionField_1/) {
@@ -1504,7 +1510,7 @@ sub parseExceptionField
         $newDataNode->signature->type($self->parseType());
         my $token = $self->getToken();
         $self->assertTokenType($token, IdentifierToken);
-        $newDataNode->signature->name($token->value());
+        $newDataNode->signature->name(identifierRemoveNullablePrefix($token->value()));
         $self->assertTokenValue($self->getToken(), ";", __LINE__);
         $newDataNode->signature->extendedAttributes($extendedAttributeList);
         return $newDataNode;
@@ -1876,7 +1882,7 @@ sub parseNonAnyType
         return "Date" . $self->parseTypeSuffix();
     }
     if ($next->type() == IdentifierToken || $next->value() eq "::") {
-        my $name = $self->parseScopedName();
+        my $name = identifierRemoveNullablePrefix($self->parseScopedName());
         return $name . $self->parseTypeSuffix();
     }
     $self->assertUnexpectedToken($next->value(), __LINE__);

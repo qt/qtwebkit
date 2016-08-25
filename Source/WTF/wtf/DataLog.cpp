@@ -26,25 +26,23 @@
 #include "config.h"
 #include "DataLog.h"
 #include <stdarg.h>
+#include <string.h>
 #include <wtf/FilePrintStream.h>
 #include <wtf/WTFThreadData.h>
 #include <wtf/Threading.h>
 
-#if OS(UNIX)
+#if OS(UNIX) || OS(DARWIN)
 #include <unistd.h>
-#endif
-
-#if OS(WINCE)
-#ifndef _IONBF
-#define _IONBF 0x0004
-#endif
 #endif
 
 #define DATA_LOG_TO_FILE 0
 
-// Uncomment to force logging to the given file regardless of what the environment variable says. Note that
-// we will append ".<pid>.txt" where <pid> is the PID.
+// Set to 1 to use the temp directory from confstr instead of hardcoded directory.
+// The last component of DATA_LOG_FILENAME will still be used.
+#define DATA_LOG_TO_DARWIN_TEMP_DIR 0
 
+// Uncomment to force logging to the given file regardless of what the environment variable says.
+// Note that we will append ".<pid>.txt" where <pid> is the PID.
 // This path won't work on Windows, make sure to change to something like C:\\Users\\<more path>\\log.txt.
 #define DATA_LOG_FILENAME "/tmp/WTFLog"
 
@@ -56,30 +54,75 @@ static pthread_once_t initializeLogFileOnceKey = PTHREAD_ONCE_INIT;
 
 static FilePrintStream* file;
 
+static uint64_t fileData[(sizeof(FilePrintStream) + 7) / 8];
+
 static void initializeLogFileOnce()
 {
 #if DATA_LOG_TO_FILE
-#ifdef DATA_LOG_FILENAME
+    const long maxPathLength = 1024;
+
+    char filenameSuffix[maxPathLength + 1];
+
+#if PLATFORM(WIN)
+    _snprintf(filenameSuffix, sizeof(filenameSuffix), ".%d.txt", GetCurrentProcessId());
+#else
+    snprintf(filenameSuffix, sizeof(filenameSuffix), ".%d.txt", getpid());
+#endif
+
+#if DATA_LOG_TO_DARWIN_TEMP_DIR
+    char filenameBuffer[maxPathLength + 1];
+    unsigned suffixLength = strlen(filenameSuffix);
+
+#if defined(DATA_LOG_FILENAME)
+    char* logBasename = strrchr(DATA_LOG_FILENAME, '/');
+    if (!logBasename)
+        logBasename = (char*)DATA_LOG_FILENAME;
+#else
+    const char* logBasename = "WTFLog";
+#endif
+
+    const char* filename = nullptr;
+
+    bool success = confstr(_CS_DARWIN_USER_TEMP_DIR, filenameBuffer, sizeof(filenameBuffer));
+    if (success) {
+        // FIXME: Assert that the path ends with a slash instead of adding a slash if it does not exist
+        // once <rdar://problem/23579077> is fixed in all iOS Simulator versions that we use.
+        size_t lastComponentLength = strlen(logBasename) + suffixLength;
+        size_t dirnameLength = strlen(filenameBuffer);
+        bool shouldAddPathSeparator = filenameBuffer[dirnameLength - 1] != '/' && logBasename[0] != '/';
+        if (lastComponentLength + shouldAddPathSeparator <= sizeof(filenameBuffer) - dirnameLength - 1) {
+            if (shouldAddPathSeparator)
+                strncat(filenameBuffer, "/", 1);
+            strncat(filenameBuffer, logBasename, sizeof(filenameBuffer) - strlen(filenameBuffer) - 1);
+            filename = filenameBuffer;
+        }
+    }
+#elif defined(DATA_LOG_FILENAME)
     const char* filename = DATA_LOG_FILENAME;
 #else
     const char* filename = getenv("WTF_DATA_LOG_FILENAME");
 #endif
-    char actualFilename[1024];
-
-#if PLATFORM(WIN)
-    _snprintf(actualFilename, sizeof(actualFilename), "%s.%d.txt", filename, GetCurrentProcessId());
-#else
-    snprintf(actualFilename, sizeof(actualFilename), "%s.%d.txt", filename, getpid());
-#endif
+    char actualFilename[maxPathLength + 1];
 
     if (filename) {
-        file = FilePrintStream::open(actualFilename, "w").leakPtr();
-        if (!file)
-            fprintf(stderr, "Warning: Could not open log file %s for writing.\n", actualFilename);
+#if PLATFORM(WIN)
+        _snprintf(actualFilename, sizeof(actualFilename), "%s%s", filename, filenameSuffix);
+#else
+        snprintf(actualFilename, sizeof(actualFilename), "%s%s", filename, filenameSuffix);
+#endif
+        
+        file = FilePrintStream::open(actualFilename, "w").release();
+        if (file)
+            WTFLogAlways("*** DataLog output to \"%s\" ***\n", actualFilename);
+        else
+            WTFLogAlways("Warning: Could not open DataLog file %s for writing.\n", actualFilename);
     }
 #endif // DATA_LOG_TO_FILE
-    if (!file)
-        file = new FilePrintStream(stderr, FilePrintStream::Borrow);
+    if (!file) {
+        // Use placement new; this makes it easier to use dataLog() to debug
+        // fastMalloc.
+        file = new (fileData) FilePrintStream(stderr, FilePrintStream::Borrow);
+    }
     
     setvbuf(file->file(), 0, _IONBF, 0); // Prefer unbuffered output, so that we get a full log upon crash or deadlock.
 }

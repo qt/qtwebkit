@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2004 Apple Computer, Inc.  All rights reserved.
+ * Copyright (C) 2004 Apple Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -33,7 +33,6 @@
 #include <wtf/HashCountedSet.h>
 #include <wtf/HashSet.h>
 #include <wtf/Noncopyable.h>
-#include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
 
 namespace JSC {
@@ -55,9 +54,9 @@ class RootObject : public RefCounted<RootObject>, private JSC::WeakHandleOwner {
     friend class JavaJSObject;
 
 public:
-    ~RootObject();
+    WEBCORE_EXPORT virtual ~RootObject();
     
-    static PassRefPtr<RootObject> create(const void* nativeHandle, JSGlobalObject*);
+    static Ref<RootObject> create(const void* nativeHandle, JSGlobalObject*);
 
     bool isValid() { return m_isValid; }
     void invalidate();
@@ -67,7 +66,7 @@ public:
     bool gcIsProtected(JSObject*);
 
     const void* nativeHandle() const;
-    JSGlobalObject* globalObject() const;
+    WEBCORE_EXPORT JSGlobalObject* globalObject() const;
     void updateGlobalObject(JSGlobalObject*);
 
     void addRuntimeObject(VM&, RuntimeObject*);
@@ -83,7 +82,7 @@ private:
     RootObject(const void* nativeHandle, JSGlobalObject*);
 
     // WeakHandleOwner
-    virtual void finalize(JSC::Handle<JSC::Unknown>, void* context);
+    virtual void finalize(JSC::Handle<JSC::Unknown>, void* context) override;
 
     bool m_isValid;
     
@@ -91,7 +90,7 @@ private:
     Strong<JSGlobalObject> m_globalObject;
 
     ProtectCountSet m_protectCountSet;
-    HashMap<RuntimeObject*, JSC::Weak<RuntimeObject> > m_runtimeObjects; // We use a map to implement a set.
+    HashMap<RuntimeObject*, JSC::Weak<RuntimeObject>> m_runtimeObjects; // We use a map to implement a set.
 
     HashSet<InvalidationCallback*> m_invalidationCallbacks;
 };

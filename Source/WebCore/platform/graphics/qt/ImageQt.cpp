@@ -39,13 +39,14 @@
 #include "ImageObserver.h"
 #include "ShadowBlur.h"
 #include "StillImageQt.h"
+#include "Timer.h"
 #include <wtf/text/WTFString.h>
 
 #include <QCoreApplication>
 #include <QImage>
 #include <QImageReader>
-#include <QPainter>
 #include <QPaintEngine>
+#include <QPainter>
 #include <QPixmap>
 #include <QPixmapCache>
 #include <QTransform>
@@ -77,17 +78,13 @@ static WebGraphicHash* graphics()
         qAddPostRoutine(earlyClearGraphics);
 
         // QWebSettings::MissingImageGraphic
-        hash->insert("missingImage", QPixmap(QLatin1String(":webkit/resources/missingImage.png")));
+        hash->insert("missingImage", QPixmap(QStringLiteral(":webkit/resources/missingImage.png")));
         // QWebSettings::MissingPluginGraphic
-        hash->insert("nullPlugin", QPixmap(QLatin1String(":webkit/resources/nullPlugin.png")));
+        hash->insert("nullPlugin", QPixmap(QStringLiteral(":webkit/resources/nullPlugin.png")));
         // QWebSettings::DefaultFrameIconGraphic
-        hash->insert("urlIcon", QPixmap(QLatin1String(":webkit/resources/urlIcon.png")));
+        hash->insert("urlIcon", QPixmap(QStringLiteral(":webkit/resources/urlIcon.png")));
         // QWebSettings::TextAreaSizeGripCornerGraphic
-        hash->insert("textAreaResizeCorner", QPixmap(QLatin1String(":webkit/resources/textAreaResizeCorner.png")));
-        // QWebSettings::DeleteButtonGraphic
-        hash->insert("deleteButton", QPixmap(QLatin1String(":webkit/resources/deleteButton.png")));
-        // QWebSettings::InputSpeechButtonGraphic
-        hash->insert("inputSpeech", QPixmap(QLatin1String(":webkit/resources/inputSpeech.png")));
+        hash->insert("textAreaResizeCorner", QPixmap(QStringLiteral(":webkit/resources/textAreaResizeCorner.png")));
     }
 
     return hash;
@@ -105,6 +102,9 @@ bool FrameData::clear(bool clearMetadata)
 {
     if (clearMetadata)
         m_haveMetadata = false;
+
+    m_orientation = DefaultImageOrientation;
+    m_subsamplingLevel = 0;
 
     if (m_frame) {
         delete m_frame;
@@ -133,69 +133,10 @@ void Image::setPlatformResource(const char* name, const QPixmap& pixmap)
         h->insert(name, pixmap);
 }
 
-void Image::drawPattern(GraphicsContext* ctxt, const FloatRect& tileRect, const AffineTransform& patternTransform,
-    const FloatPoint& phase, ColorSpace, CompositeOperator op, const FloatRect& destRect, BlendMode)
+void Image::drawPattern(GraphicsContext& ctxt, const FloatRect& tileRect, const AffineTransform& patternTransform,
+    const FloatPoint& phase, const FloatSize& spacing, CompositeOperator op, const FloatRect& destRect, BlendMode blendMode)
 {
-    QPixmap* framePixmap = nativeImageForCurrentFrame();
-    if (!framePixmap) // If it's too early we won't have an image yet.
-        return;
-
-#if ENABLE(IMAGE_DECODER_DOWN_SAMPLING)
-    FloatRect tileRectAdjusted = adjustSourceRectForDownSampling(tileRect, framePixmap->size());
-#else
-    FloatRect tileRectAdjusted = tileRect;
-#endif
-
-    // Qt interprets 0 width/height as full width/height so just short circuit.
-    QRectF dr = QRectF(destRect).normalized();
-    QRect tr = QRectF(tileRectAdjusted).toRect().normalized();
-    if (!dr.width() || !dr.height() || !tr.width() || !tr.height())
-        return;
-
-    QPixmap pixmap = *framePixmap;
-    if (tr.x() || tr.y() || tr.width() != pixmap.width() || tr.height() != pixmap.height())
-        pixmap = pixmap.copy(tr);
-
-    QPoint trTopLeft = tr.topLeft();
-
-    CompositeOperator previousOperator = ctxt->compositeOperation();
-
-    ctxt->setCompositeOperation(!pixmap.hasAlpha() && op == CompositeSourceOver ? CompositeCopy : op);
-
-    QPainter* p = ctxt->platformContext();
-    QTransform transform(patternTransform);
-
-    // If this would draw more than one scaled tile, we scale the pixmap first and then use the result to draw.
-    if (transform.type() == QTransform::TxScale && p->transform().type() < QTransform::TxScale) {
-        QRectF tileRectInTargetCoords = (transform * QTransform().translate(phase.x(), phase.y())).mapRect(tr);
-
-        bool tileWillBePaintedOnlyOnce = tileRectInTargetCoords.contains(dr);
-        if (!tileWillBePaintedOnlyOnce) {
-            QSizeF scaledSize(float(pixmap.width()) * transform.m11(), float(pixmap.height()) * transform.m22());
-            QPixmap scaledPixmap(scaledSize.toSize());
-            if (pixmap.hasAlpha())
-                scaledPixmap.fill(Qt::transparent);
-            {
-                QPainter painter(&scaledPixmap);
-                painter.setCompositionMode(QPainter::CompositionMode_Source);
-                painter.setRenderHints(p->renderHints());
-                painter.drawPixmap(QRect(0, 0, scaledPixmap.width(), scaledPixmap.height()), pixmap);
-            }
-            pixmap = scaledPixmap;
-            trTopLeft = transform.map(trTopLeft);
-            transform = QTransform::fromTranslate(transform.dx(), transform.dy());
-        }
-    }
-
-    /* Translate the coordinates as phase is not in world matrix coordinate space but the tile rect origin is. */
-    transform *= QTransform().translate(phase.x(), phase.y());
-    transform.translate(trTopLeft.x(), trTopLeft.y());
-
-    QBrush b(pixmap);
-    b.setTransform(transform);
-    p->fillRect(dr, b);
-
-    ctxt->setCompositeOperation(previousOperator);
+    ctxt.drawPattern(*this, tileRect, patternTransform, phase, spacing, op, destRect, blendMode);
 
     if (imageObserver())
         imageObserver()->didDraw(this);
@@ -203,9 +144,9 @@ void Image::drawPattern(GraphicsContext* ctxt, const FloatRect& tileRect, const 
 
 BitmapImage::BitmapImage(QPixmap* pixmap, ImageObserver* observer)
     : Image(observer)
+    , m_minimumSubsamplingLevel(0)
     , m_currentFrame(0)
     , m_frames(0)
-    , m_frameTimer(0)
     , m_repetitionCount(cAnimationNone)
     , m_repetitionCountStatus(Unknown)
     , m_repetitionsComplete(0)
@@ -282,8 +223,8 @@ QPixmap* prescaleImageIfRequired(QPainter* painter, QPixmap* image, QPixmap* buf
 }
 
 // Drawing Routines
-void BitmapImage::draw(GraphicsContext* ctxt, const FloatRect& dst,
-    const FloatRect& src, ColorSpace styleColorSpace, CompositeOperator op, BlendMode blendMode)
+void BitmapImage::draw(GraphicsContext& ctxt, const FloatRect& dst,
+    const FloatRect& src, CompositeOperator op, BlendMode blendMode, ImageOrientationDescription)
 {
     QRectF normalizedDst = dst.normalized();
     QRectF normalizedSrc = src.normalized();
@@ -298,7 +239,7 @@ void BitmapImage::draw(GraphicsContext* ctxt, const FloatRect& dst,
         return;
 
     if (mayFillWithSolidColor()) {
-        fillWithSolidColor(ctxt, normalizedDst, solidColor(), styleColorSpace, op);
+        fillWithSolidColor(ctxt, normalizedDst, solidColor(), op);
         return;
     }
 
@@ -307,14 +248,14 @@ void BitmapImage::draw(GraphicsContext* ctxt, const FloatRect& dst,
 #endif
 
     QPixmap prescaledBuffer;
-    image = prescaleImageIfRequired(ctxt->platformContext(), image, &prescaledBuffer, normalizedDst, &normalizedSrc);
+    image = prescaleImageIfRequired(ctxt.platformContext(), image, &prescaledBuffer, normalizedDst, &normalizedSrc);
 
-    CompositeOperator previousOperator = ctxt->compositeOperation();
-    BlendMode previousBlendMode = ctxt->blendModeOperation();
-    ctxt->setCompositeOperation(!image->hasAlpha() && op == CompositeSourceOver && blendMode == BlendModeNormal ? CompositeCopy : op, blendMode);
+    CompositeOperator previousOperator = ctxt.compositeOperation();
+    BlendMode previousBlendMode = ctxt.blendModeOperation();
+    ctxt.setCompositeOperation(!image->hasAlpha() && op == CompositeSourceOver && blendMode == BlendModeNormal ? CompositeCopy : op, blendMode);
 
-    if (ctxt->hasShadow()) {
-        ShadowBlur shadow(ctxt->state());
+    if (ctxt.hasShadow()) {
+        ShadowBlur shadow(ctxt.state());
         GraphicsContext* shadowContext = shadow.beginShadowLayer(ctxt, normalizedDst);
         if (shadowContext) {
             QPainter* shadowPainter = shadowContext->platformContext();
@@ -323,12 +264,17 @@ void BitmapImage::draw(GraphicsContext* ctxt, const FloatRect& dst,
         }
     }
 
-    ctxt->platformContext()->drawPixmap(normalizedDst, *image, normalizedSrc);
+    ctxt.platformContext()->drawPixmap(normalizedDst, *image, normalizedSrc);
 
-    ctxt->setCompositeOperation(previousOperator, previousBlendMode);
+    ctxt.setCompositeOperation(previousOperator, previousBlendMode);
 
     if (imageObserver())
         imageObserver()->didDraw(this);
+}
+
+void BitmapImage::determineMinimumSubsamplingLevel() const
+{
+    m_minimumSubsamplingLevel = 0;
 }
 
 void BitmapImage::checkForSolidColor()

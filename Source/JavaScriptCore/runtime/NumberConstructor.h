@@ -25,43 +25,36 @@
 
 namespace JSC {
 
-    class NumberPrototype;
+class NumberPrototype;
+class GetterSetter;
 
-    class NumberConstructor : public InternalFunction {
-    public:
-        typedef InternalFunction Base;
+class NumberConstructor : public InternalFunction {
+public:
+    typedef InternalFunction Base;
+    static const unsigned StructureFlags = Base::StructureFlags | OverridesGetOwnPropertySlot | ImplementsHasInstance | ImplementsDefaultHasInstance;
 
-        static NumberConstructor* create(ExecState* exec, JSGlobalObject* globalObject, Structure* structure, NumberPrototype* numberPrototype)
-        {
-            NumberConstructor* constructor = new (NotNull, allocateCell<NumberConstructor>(*exec->heap())) NumberConstructor(globalObject, structure);
-            constructor->finishCreation(exec, numberPrototype);
-            return constructor;
-        }
+    static NumberConstructor* create(VM& vm, Structure* structure, NumberPrototype* numberPrototype, GetterSetter*)
+    {
+        NumberConstructor* constructor = new (NotNull, allocateCell<NumberConstructor>(vm.heap)) NumberConstructor(vm, structure);
+        constructor->finishCreation(vm, numberPrototype);
+        return constructor;
+    }
 
-        static void put(JSCell*, ExecState*, PropertyName, JSValue, PutPropertySlot&);
+    DECLARE_INFO;
 
-        static bool getOwnPropertySlot(JSCell*, ExecState*, PropertyName, PropertySlot&);
-        static bool getOwnPropertyDescriptor(JSObject*, ExecState*, PropertyName, PropertyDescriptor&);
-        JSValue getValueProperty(ExecState*, int token) const;
+    static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue proto) 
+    { 
+        return Structure::create(vm, globalObject, proto, TypeInfo(ObjectType, StructureFlags), info()); 
+    }
 
-        static const ClassInfo s_info;
+protected:
+    void finishCreation(VM&, NumberPrototype*);
 
-        static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue proto) 
-        { 
-            return Structure::create(vm, globalObject, proto, TypeInfo(ObjectType, StructureFlags), &s_info); 
-        }
-
-        enum { NaNValue, NegInfinity, PosInfinity, MaxValue, MinValue };
-
-    protected:
-        void finishCreation(ExecState*, NumberPrototype*);
-        static const unsigned StructureFlags = OverridesGetOwnPropertySlot | ImplementsHasInstance | InternalFunction::StructureFlags;
-
-    private:
-        NumberConstructor(JSGlobalObject*, Structure*);
-        static ConstructType getConstructData(JSCell*, ConstructData&);
-        static CallType getCallData(JSCell*, CallData&);
-    };
+private:
+    NumberConstructor(VM&, Structure*);
+    static ConstructType getConstructData(JSCell*, ConstructData&);
+    static CallType getCallData(JSCell*, CallData&);
+};
 
 } // namespace JSC
 

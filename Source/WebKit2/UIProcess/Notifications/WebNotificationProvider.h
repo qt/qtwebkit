@@ -31,15 +31,22 @@
 #include <wtf/Forward.h>
 #include <wtf/Vector.h>
 
+namespace API {
+
+class Dictionary;
+
+template<> struct ClientTraits<WKNotificationProviderBase> {
+    typedef std::tuple<WKNotificationProviderV0> Versions;
+};
+}
+
 namespace WebKit {
 
-class ImmutableDictionary;
 class WebNotification;
 class WebNotificationManagerProxy;
 class WebPageProxy;
-class WebSecurityOrigin;
     
-class WebNotificationProvider : public APIClient<WKNotificationProvider, kWKNotificationProviderCurrentVersion> {
+class WebNotificationProvider : public API::Client<WKNotificationProviderBase> {
 public:
     void show(WebPageProxy*, WebNotification*);
     void cancel(WebNotification*);
@@ -49,7 +56,7 @@ public:
     void addNotificationManager(WebNotificationManagerProxy*);
     void removeNotificationManager(WebNotificationManagerProxy*);
     
-    PassRefPtr<ImmutableDictionary> notificationPermissions();
+    PassRefPtr<API::Dictionary> notificationPermissions();
 };
 
 } // namespace WebKit

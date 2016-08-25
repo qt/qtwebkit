@@ -26,8 +26,6 @@
 #ifndef GLPlatformSurface_h
 #define GLPlatformSurface_h
 
-#if USE(ACCELERATED_COMPOSITING)
-
 #include "GLDefs.h"
 #include "IntRect.h"
 #include <wtf/Noncopyable.h>
@@ -48,7 +46,7 @@ public:
 
     typedef unsigned SurfaceAttributes;
     // Creates a GL surface used for offscreen rendering.
-    static PassOwnPtr<GLPlatformSurface> createOffScreenSurface(SurfaceAttributes = GLPlatformSurface::Default);
+    static std::unique_ptr<GLPlatformSurface> createOffScreenSurface(SurfaceAttributes = GLPlatformSurface::Default);
 
     virtual ~GLPlatformSurface();
 
@@ -61,13 +59,12 @@ public:
 
     PlatformDrawable drawable() const;
 
-    PlatformDisplay sharedDisplay() const;
-
     virtual SurfaceAttributes attributes() const;
 
     virtual void swapBuffers();
 
-    virtual bool isCurrentDrawable() const;
+    virtual bool isCurrentDrawable() const = 0;
+
     virtual void onMakeCurrent();
 
     // Convenience Function to update surface backbuffer with texture contents.
@@ -86,7 +83,6 @@ public:
 protected:
     GLPlatformSurface(SurfaceAttributes);
 
-    PlatformDisplay m_sharedDisplay;
     PlatformDrawable m_drawable;
     PlatformBufferHandle m_bufferHandle;
     IntRect m_rect;
@@ -95,6 +91,3 @@ protected:
 }
 
 #endif
-
-#endif
-

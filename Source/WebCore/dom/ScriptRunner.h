@@ -30,8 +30,6 @@
 #include "Timer.h"
 #include <wtf/HashMap.h>
 #include <wtf/Noncopyable.h>
-#include <wtf/PassOwnPtr.h>
-#include <wtf/PassRefPtr.h>
 #include <wtf/Vector.h>
 
 namespace WebCore {
@@ -44,7 +42,7 @@ class ScriptElement;
 class ScriptRunner {
     WTF_MAKE_NONCOPYABLE(ScriptRunner); WTF_MAKE_FAST_ALLOCATED;
 public:
-    static PassOwnPtr<ScriptRunner> create(Document* document) { return adoptPtr(new ScriptRunner(document)); }
+    explicit ScriptRunner(Document&);
     ~ScriptRunner();
 
     enum ExecutionType { ASYNC_EXECUTION, IN_ORDER_EXECUTION };
@@ -55,15 +53,13 @@ public:
     void notifyScriptReady(ScriptElement*, ExecutionType);
 
 private:
-    explicit ScriptRunner(Document*);
+    void timerFired();
 
-    void timerFired(Timer<ScriptRunner>*);
-
-    Document* m_document;
+    Document& m_document;
     Vector<PendingScript> m_scriptsToExecuteInOrder;
     Vector<PendingScript> m_scriptsToExecuteSoon; // http://www.whatwg.org/specs/web-apps/current-work/#set-of-scripts-that-will-execute-as-soon-as-possible
     HashMap<ScriptElement*, PendingScript> m_pendingAsyncScripts;
-    Timer<ScriptRunner> m_timer;
+    Timer m_timer;
 };
 
 }

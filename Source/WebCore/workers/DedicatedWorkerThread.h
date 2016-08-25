@@ -30,32 +30,32 @@
 #ifndef DedicatedWorkerThread_h
 #define DedicatedWorkerThread_h
 
-#if ENABLE(WORKERS)
-
-#include "ContentSecurityPolicy.h"
 #include "WorkerThread.h"
 
 namespace WebCore {
 
+    class ContentSecurityPolicyResponseHeaders;
     class WorkerObjectProxy;
 
     class DedicatedWorkerThread : public WorkerThread {
     public:
-        static PassRefPtr<DedicatedWorkerThread> create(const KURL& scriptURL, const String& userAgent, const GroupSettings*, const String& sourceCode, WorkerLoaderProxy&, WorkerObjectProxy&, WorkerThreadStartMode, const String& contentSecurityPolicy, ContentSecurityPolicy::HeaderType, const SecurityOrigin* topOrigin);
-        WorkerObjectProxy& workerObjectProxy() const { return m_workerObjectProxy; }
+        template<typename... Args> static Ref<DedicatedWorkerThread> create(Args&&... args)
+        {
+            return adoptRef(*new DedicatedWorkerThread(std::forward<Args>(args)...));
+        }
         virtual ~DedicatedWorkerThread();
 
+        WorkerObjectProxy& workerObjectProxy() const { return m_workerObjectProxy; }
+
     protected:
-        virtual PassRefPtr<WorkerGlobalScope> createWorkerGlobalScope(const KURL&, const String& userAgent, PassOwnPtr<GroupSettings>, const String& contentSecurityPolicy, ContentSecurityPolicy::HeaderType, PassRefPtr<SecurityOrigin> topOrigin) OVERRIDE;
-        virtual void runEventLoop() OVERRIDE;
+        virtual Ref<WorkerGlobalScope> createWorkerGlobalScope(const URL&, const String& userAgent, const ContentSecurityPolicyResponseHeaders&, bool shouldBypassMainWorldContentSecurityPolicy, PassRefPtr<SecurityOrigin> topOrigin) override;
+        virtual void runEventLoop() override;
 
     private:
-        DedicatedWorkerThread(const KURL&, const String& userAgent, const GroupSettings*, const String& sourceCode, WorkerLoaderProxy&, WorkerObjectProxy&, WorkerThreadStartMode, const String& contentSecurityPolicy, ContentSecurityPolicy::HeaderType, const SecurityOrigin* topOrigin);
+        DedicatedWorkerThread(const URL&, const String& userAgent, const String& sourceCode, WorkerLoaderProxy&, WorkerObjectProxy&, WorkerThreadStartMode, const ContentSecurityPolicyResponseHeaders&, bool shouldBypassMainWorldContentSecurityPolicy, const SecurityOrigin* topOrigin);
 
         WorkerObjectProxy& m_workerObjectProxy;
     };
 } // namespace WebCore
-
-#endif // ENABLE(WORKERS)
 
 #endif // DedicatedWorkerThread_h

@@ -34,7 +34,8 @@ namespace WebKit {
 
 class WebUndoStep : public RefCounted<WebUndoStep> {
 public:
-    static PassRefPtr<WebUndoStep> create(PassRefPtr<WebCore::UndoStep>);
+    static Ref<WebUndoStep> create(PassRefPtr<WebCore::UndoStep>);
+    ~WebUndoStep();
 
     WebCore::UndoStep* step() const { return m_step.get(); }
     uint64_t stepID() const { return m_stepID; }

@@ -28,16 +28,40 @@
 
 #include "Executable.h"
 #include "Interpreter.h"
+#include "JSCInlines.h"
 #include "JSFunction.h"
-#include "Operations.h"
+#include "ScriptProfilingScope.h"
 
 namespace JSC {
 
 JSValue call(ExecState* exec, JSValue functionObject, CallType callType, const CallData& callData, JSValue thisValue, const ArgList& args)
 {
     ASSERT(callType == CallTypeJS || callType == CallTypeHost);
-    ASSERT(isValidThisObject(thisValue, exec));
     return exec->interpreter()->executeCall(exec, asObject(functionObject), callType, callData, thisValue, args);
+}
+
+JSValue call(ExecState* exec, JSValue functionObject, CallType callType, const CallData& callData, JSValue thisValue, const ArgList& args, NakedPtr<Exception>& returnedException)
+{
+    JSValue result = call(exec, functionObject, callType, callData, thisValue, args);
+    if (exec->hadException()) {
+        returnedException = exec->exception();
+        exec->clearException();
+        return jsUndefined();
+    }
+    RELEASE_ASSERT(result);
+    return result;
+}
+
+JSValue profiledCall(ExecState* exec, ProfilingReason reason, JSValue functionObject, CallType callType, const CallData& callData, JSValue thisValue, const ArgList& args)
+{
+    ScriptProfilingScope profilingScope(exec->vmEntryGlobalObject(), reason);
+    return call(exec, functionObject, callType, callData, thisValue, args);
+}
+
+JSValue profiledCall(ExecState* exec, ProfilingReason reason, JSValue functionObject, CallType callType, const CallData& callData, JSValue thisValue, const ArgList& args, NakedPtr<Exception>& returnedException)
+{
+    ScriptProfilingScope profilingScope(exec->vmEntryGlobalObject(), reason);
+    return call(exec, functionObject, callType, callData, thisValue, args, returnedException);
 }
 
 } // namespace JSC

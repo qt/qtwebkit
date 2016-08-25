@@ -11,10 +11,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -54,21 +54,22 @@ WorkerGlobalScopeNotifications* WorkerGlobalScopeNotifications::from(WorkerGloba
 {
     WorkerGlobalScopeNotifications* supplement = static_cast<WorkerGlobalScopeNotifications*>(Supplement<ScriptExecutionContext>::from(context, supplementName()));
     if (!supplement) {
-        supplement = new WorkerGlobalScopeNotifications(context);
-        Supplement<ScriptExecutionContext>::provideTo(context, supplementName(), adoptPtr(supplement));
+        auto newSupplement = std::make_unique<WorkerGlobalScopeNotifications>(context);
+        supplement = newSupplement.get();
+        provideTo(context, supplementName(), WTFMove(newSupplement));
     }
     return supplement;
 }
 
-NotificationCenter* WorkerGlobalScopeNotifications::webkitNotifications(WorkerGlobalScope* context)
+NotificationCenter* WorkerGlobalScopeNotifications::webkitNotifications(WorkerGlobalScope& context)
 {
-    return WorkerGlobalScopeNotifications::from(context)->webkitNotifications();
+    return WorkerGlobalScopeNotifications::from(&context)->webkitNotifications();
 }
 
 NotificationCenter* WorkerGlobalScopeNotifications::webkitNotifications()
 {
     if (!m_notificationCenter)
-        m_notificationCenter = NotificationCenter::create(m_context, m_context->thread()->getNotificationClient());
+        m_notificationCenter = NotificationCenter::create(m_context, m_context->thread().getNotificationClient());
     return m_notificationCenter.get();
 }
 

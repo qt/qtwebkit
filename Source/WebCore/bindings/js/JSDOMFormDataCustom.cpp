@@ -41,34 +41,32 @@ using namespace JSC;
 
 namespace WebCore {
 
-static HTMLFormElement* toHTMLFormElement(JSC::JSValue value)
+static HTMLFormElement* toHTMLFormElementOrNull(JSC::JSValue value)
 {
-    return value.inherits(&JSHTMLFormElement::s_info) ? toHTMLFormElement(jsCast<JSHTMLFormElement*>(asObject(value))->impl()) : 0;
+    return value.inherits(JSHTMLFormElement::info()) ? &jsCast<JSHTMLFormElement*>(asObject(value))->wrapped() : nullptr;
 }
 
-EncodedJSValue JSC_HOST_CALL JSDOMFormDataConstructor::constructJSDOMFormData(ExecState* exec)
+EncodedJSValue JSC_HOST_CALL constructJSDOMFormData(ExecState* exec)
 {
-    JSDOMFormDataConstructor* jsConstructor = jsCast<JSDOMFormDataConstructor*>(exec->callee());
+    DOMConstructorObject* jsConstructor = jsCast<DOMConstructorObject*>(exec->callee());
 
-    HTMLFormElement* form = 0;
-    if (exec->argumentCount() > 0)
-        form = toHTMLFormElement(exec->argument(0));
+    HTMLFormElement* form = toHTMLFormElementOrNull(exec->argument(0));
     RefPtr<DOMFormData> domFormData = DOMFormData::create(form);
     return JSValue::encode(asObject(toJS(exec, jsConstructor->globalObject(), domFormData.get())));
 }
 
-JSValue JSDOMFormData::append(ExecState* exec)
+JSValue JSDOMFormData::append(ExecState& state)
 {
-    if (exec->argumentCount() >= 2) {
-        String name = exec->argument(0).toString(exec)->value(exec);
-        JSValue value = exec->argument(1);
-        if (value.inherits(&JSBlob::s_info)) {
+    if (state.argumentCount() >= 2) {
+        String name = state.argument(0).toString(&state)->value(&state);
+        JSValue value = state.argument(1);
+        if (value.inherits(JSBlob::info())) {
             String filename;
-            if (exec->argumentCount() >= 3 && !exec->argument(2).isUndefinedOrNull())
-                filename = exec->argument(2).toString(exec)->value(exec);
-            impl()->append(name, toBlob(value), filename);
+            if (state.argumentCount() >= 3 && !state.argument(2).isUndefinedOrNull())
+                filename = state.argument(2).toString(&state)->value(&state);
+            wrapped().append(name, JSBlob::toWrapped(value), filename);
         } else
-            impl()->append(name, value.toString(exec)->value(exec));
+            wrapped().append(name, value.toString(&state)->value(&state));
     }
 
     return jsUndefined();

@@ -618,7 +618,7 @@ void tst_QWebPage::userStyleSheetFromQrcUrl()
 
 void tst_QWebPage::loadHtml5Video()
 {
-#if defined(WTF_USE_QT_MULTIMEDIA) && WTF_USE_QT_MULTIMEDIA
+#if defined(USE_QT_MULTIMEDIA) && USE_QT_MULTIMEDIA
     QByteArray url("http://does.not/exist?a=1%2Cb=2");
     m_view->setHtml("<p><video id ='video' src='" + url + "' autoplay/></p>");
     QTest::qWait(2000);
@@ -3189,7 +3189,6 @@ void tst_QWebPage::macCopyUnicodeToClipboard()
 
 void tst_QWebPage::changeVisibilityState()
 {
-#if ENABLE_PAGE_VISIBILITY_API
     QVariant stateBool, stateString, cpt;
 
     m_page->mainFrame()->setHtml("<html><body></body></html>");
@@ -3260,7 +3259,6 @@ void tst_QWebPage::changeVisibilityState()
     QVERIFY(stateString.type() == QVariant::String && stateString.toString() == QString("visible"));
     cpt = m_page->mainFrame()->evaluateJavaScript("cpt");
     QVERIFY(cpt.type() == QVariant::Double && cpt.toDouble() == 5);
-#endif
 }
 
 void tst_QWebPage::contextMenuCopy()

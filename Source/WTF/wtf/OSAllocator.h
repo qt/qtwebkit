@@ -63,13 +63,15 @@ public:
     // committing/decommitting the entire region additional parameters allow a subregion to be
     // specified.
     WTF_EXPORT_PRIVATE static void* reserveAndCommit(size_t reserveSize, size_t commitSize, Usage = UnknownUsage, bool writable = true, bool executable = false);
-    static void decommitAndRelease(void* releaseBase, size_t releaseSize, void* decommitBase, size_t decommitSize);
 
     // Reallocate an existing, committed allocation.
     // The prior allocation must be fully comitted, and the new size will also be fully committed.
     // This interface is provided since it may be possible to optimize this operation on some platforms.
     template<typename T>
     static T* reallocateCommitted(T*, size_t oldSize, size_t newSize, Usage = UnknownUsage, bool writable = true, bool executable = false);
+
+    // Hint to the OS that an address range is not expected to be accessed anytime soon.
+    WTF_EXPORT_PRIVATE static void hintMemoryNotNeededSoon(void*, size_t);
 };
 
 inline void* OSAllocator::reserveAndCommit(size_t reserveSize, size_t commitSize, Usage usage, bool writable, bool executable)
@@ -79,23 +81,9 @@ inline void* OSAllocator::reserveAndCommit(size_t reserveSize, size_t commitSize
     return base;
 }
 
-inline void OSAllocator::decommitAndRelease(void* releaseBase, size_t releaseSize, void* decommitBase, size_t decommitSize)
+inline void OSAllocator::decommitAndRelease(void* releaseBase, size_t releaseSize)
 {
-    ASSERT(decommitBase >= releaseBase && (static_cast<char*>(decommitBase) + decommitSize) <= (static_cast<char*>(releaseBase) + releaseSize));
-#if OS(WINCE)
-    // On most platforms we can actually skip this final decommit; releasing the VM will
-    // implicitly decommit any physical memory in the region. This is not true on WINCE.
-    decommit(decommitBase, decommitSize);
-#else
-    UNUSED_PARAM(decommitBase);
-    UNUSED_PARAM(decommitSize);
-#endif
     releaseDecommitted(releaseBase, releaseSize);
-}
-
-inline void OSAllocator::decommitAndRelease(void* base, size_t size)
-{
-    decommitAndRelease(base, size, base, size);
 }
 
 template<typename T>

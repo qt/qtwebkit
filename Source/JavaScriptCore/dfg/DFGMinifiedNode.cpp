@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2012-2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,6 +29,7 @@
 #if ENABLE(DFG_JIT)
 
 #include "DFGNode.h"
+#include "JSCInlines.h"
 
 namespace JSC { namespace DFG {
 
@@ -38,15 +39,11 @@ MinifiedNode MinifiedNode::fromNode(Node* node)
     MinifiedNode result;
     result.m_id = MinifiedID(node);
     result.m_op = node->op();
-    if (hasChild(node->op()))
-        result.m_childOrInfo = MinifiedID(node->child1().node()).m_id;
-    else if (hasConstantNumber(node->op()))
-        result.m_childOrInfo = node->constantNumber();
-    else if (hasWeakConstant(node->op()))
-        result.m_childOrInfo = bitwise_cast<uintptr_t>(node->weakConstant());
+    if (hasConstant(node->op()))
+        result.m_info = JSValue::encode(node->asJSValue());
     else {
-        ASSERT(node->op() == PhantomArguments);
-        result.m_childOrInfo = 0;
+        ASSERT(node->op() == PhantomDirectArguments || node->op() == PhantomClonedArguments);
+        result.m_info = bitwise_cast<uintptr_t>(node->origin.semantic.inlineCallFrame);
     }
     return result;
 }

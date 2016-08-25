@@ -34,14 +34,16 @@ namespace WebCore {
 
 class StyleTransformData : public RefCounted<StyleTransformData> {
 public:
-    static PassRefPtr<StyleTransformData> create() { return adoptRef(new StyleTransformData); }
-    PassRefPtr<StyleTransformData> copy() const { return adoptRef(new StyleTransformData(*this)); }
+    static Ref<StyleTransformData> create() { return adoptRef(*new StyleTransformData); }
+    Ref<StyleTransformData> copy() const;
 
     bool operator==(const StyleTransformData& o) const;
     bool operator!=(const StyleTransformData& o) const
     {
         return !(*this == o);
     }
+    
+    bool hasTransform() const { return m_operations.size(); }
 
     TransformOperations m_operations;
     Length m_x;

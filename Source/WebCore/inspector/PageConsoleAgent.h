@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2011 Google Inc. All rights reserved.
+ * Copyright (C) 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -31,39 +32,27 @@
 #ifndef PageConsoleAgent_h
 #define PageConsoleAgent_h
 
-#include "InspectorConsoleAgent.h"
-#include <wtf/PassOwnPtr.h>
-
-#if ENABLE(INSPECTOR)
+#include "InspectorWebAgentBase.h"
+#include "WebConsoleAgent.h"
 
 namespace WebCore {
 
-class InspectorAgent;
 class InspectorDOMAgent;
 
-class PageConsoleAgent : public InspectorConsoleAgent {
+class PageConsoleAgent final : public WebConsoleAgent {
     WTF_MAKE_NONCOPYABLE(PageConsoleAgent);
+    WTF_MAKE_FAST_ALLOCATED;
 public:
-    static PassOwnPtr<PageConsoleAgent> create(InstrumentingAgents* instrumentingAgents, InspectorAgent* agent, InspectorCompositeState* state, InjectedScriptManager* injectedScriptManager, InspectorDOMAgent* domAgent)
-    {
-        return adoptPtr(new PageConsoleAgent(instrumentingAgents, agent, state, injectedScriptManager, domAgent));
-    }
-    virtual ~PageConsoleAgent();
-
-    virtual bool isWorkerAgent() OVERRIDE { return false; }
+    PageConsoleAgent(WebAgentContext&, InspectorDOMAgent*);
+    virtual ~PageConsoleAgent() { }
 
 private:
-    PageConsoleAgent(InstrumentingAgents*, InspectorAgent*, InspectorCompositeState*, InjectedScriptManager*, InspectorDOMAgent*);
-    virtual void clearMessages(ErrorString*);
-    virtual void addInspectedNode(ErrorString*, int nodeId);
-    virtual bool developerExtrasEnabled();
+    virtual void clearMessages(ErrorString&) override;
+    virtual void addInspectedNode(ErrorString&, int nodeId) override;
 
-    InspectorAgent* m_inspectorAgent;
     InspectorDOMAgent* m_inspectorDOMAgent;
 };
 
 } // namespace WebCore
-
-#endif // ENABLE(INSPECTOR)
 
 #endif // !defined(PageConsoleAgent_h)

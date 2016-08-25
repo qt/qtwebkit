@@ -31,27 +31,18 @@
 QT_BEGIN_NAMESPACE
 class QProcess;
 QT_END_NAMESPACE
-#elif PLATFORM(EFL)
+#else
 #include <unistd.h>
 #endif
 
 namespace WebKit {
 
-#if PLATFORM(MAC)
-typedef pid_t PlatformProcessIdentifier;
-#elif PLATFORM(QT)
+#if PLATFORM(QT)
 typedef QProcess* PlatformProcessIdentifier;
-#elif PLATFORM(GTK)
-#ifdef G_OS_WIN32
-typedef void* GPid;
 #else
-typedef int GPid;
-#endif
-typedef GPid PlatformProcessIdentifier;
-#elif PLATFORM(EFL)
 typedef pid_t PlatformProcessIdentifier;
 #endif
 
-} // namespace WebKit 
+} // namespace WebKit
 
 #endif // PlatformProcessIdentifier_h

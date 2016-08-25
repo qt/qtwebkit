@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2010 Google Inc. All rights reserved.
+ * Copyright (C) 2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -36,38 +37,37 @@
 
 namespace WebCore {
 
-class SearchFieldCancelButtonElement;
 class SearchFieldResultsButtonElement;
 
-class SearchInputType : public BaseTextInputType {
+class SearchInputType final : public BaseTextInputType {
 public:
-    static PassOwnPtr<InputType> create(HTMLInputElement*);
+    explicit SearchInputType(HTMLInputElement&);
 
     void stopSearchEventTimer();
 
 private:
-    SearchInputType(HTMLInputElement*);
-    virtual void attach() OVERRIDE;
-    virtual void addSearchResult() OVERRIDE;
-    virtual RenderObject* createRenderer(RenderArena*, RenderStyle*) const OVERRIDE;
-    virtual const AtomicString& formControlType() const OVERRIDE;
-    virtual bool shouldRespectSpeechAttribute() OVERRIDE;
-    virtual bool isSearchField() const OVERRIDE;
-    virtual bool needsContainer() const OVERRIDE;
-    virtual void createShadowSubtree() OVERRIDE;
-    virtual void destroyShadowSubtree() OVERRIDE;
-    virtual HTMLElement* resultsButtonElement() const OVERRIDE;
-    virtual HTMLElement* cancelButtonElement() const OVERRIDE;
-    virtual void handleKeydownEvent(KeyboardEvent*) OVERRIDE;
-    virtual void didSetValueByUserEdit(ValueChangeState) OVERRIDE;
+    virtual void addSearchResult() override;
+    virtual void maxResultsAttributeChanged() override;
+    virtual RenderPtr<RenderElement> createInputRenderer(Ref<RenderStyle>&&) override;
+    virtual const AtomicString& formControlType() const override;
+    virtual bool isSearchField() const override;
+    virtual bool needsContainer() const override;
+    virtual void createShadowSubtree() override;
+    virtual void destroyShadowSubtree() override;
+    virtual HTMLElement* resultsButtonElement() const override;
+    virtual HTMLElement* cancelButtonElement() const override;
+    virtual void handleKeydownEvent(KeyboardEvent*) override;
+    virtual void didSetValueByUserEdit() override;
+    virtual bool sizeShouldIncludeDecoration(int defaultSize, int& preferredSize) const override;
+    virtual float decorationWidth() const override;
 
-    void searchEventTimerFired(Timer<SearchInputType>*);
+    void searchEventTimerFired();
     bool searchEventsShouldBeDispatched() const;
     void startSearchEventTimer();
 
-    HTMLElement* m_resultsButton;
+    SearchFieldResultsButtonElement* m_resultsButton;
     HTMLElement* m_cancelButton;
-    Timer<SearchInputType> m_searchEventTimer;
+    Timer m_searchEventTimer;
 };
 
 } // namespace WebCore

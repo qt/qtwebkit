@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2012 Google Inc. All rights reserved.
+ * Copyright (C) 2013 Nokia Corporation and/or its subsidiary(-ies).
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -35,8 +36,6 @@
 #include "RTCSessionDescription.h"
 
 #include "Dictionary.h"
-#include "ExceptionCode.h"
-#include "RTCSessionDescriptionDescriptor.h"
 
 namespace WebCore {
 
@@ -45,66 +44,47 @@ static bool verifyType(const String& type)
     return type == "offer" || type == "pranswer" || type == "answer";
 }
 
-PassRefPtr<RTCSessionDescription> RTCSessionDescription::create(const Dictionary& dictionary, ExceptionCode& ec)
+RefPtr<RTCSessionDescription> RTCSessionDescription::create(const Dictionary& dictionary, ExceptionCode& ec)
 {
     String type;
     bool ok = dictionary.get("type", type);
-    if (!ok || !verifyType(type)) {
+    if (ok && !verifyType(type)) {
         ec = TYPE_MISMATCH_ERR;
-        return 0;
+        return nullptr;
     }
 
     String sdp;
     ok = dictionary.get("sdp", sdp);
-    if (!ok || sdp.isEmpty()) {
+    if (ok && sdp.isEmpty()) {
         ec = TYPE_MISMATCH_ERR;
-        return 0;
+        return nullptr;
     }
 
-    return adoptRef(new RTCSessionDescription(RTCSessionDescriptionDescriptor::create(type, sdp)));
+    return adoptRef(new RTCSessionDescription(type, sdp));
 }
 
-PassRefPtr<RTCSessionDescription> RTCSessionDescription::create(PassRefPtr<RTCSessionDescriptionDescriptor> descriptor)
+Ref<RTCSessionDescription> RTCSessionDescription::create(const RTCSessionDescription* description)
 {
-    ASSERT(descriptor);
-    return adoptRef(new RTCSessionDescription(descriptor));
+    return adoptRef(*new RTCSessionDescription(description->type(), description->sdp()));
 }
 
-RTCSessionDescription::RTCSessionDescription(PassRefPtr<RTCSessionDescriptionDescriptor> descriptor)
-    : m_descriptor(descriptor)
+Ref<RTCSessionDescription> RTCSessionDescription::create(const String& type, const String& sdp)
 {
+    return adoptRef(*new RTCSessionDescription(type, sdp));
 }
 
-RTCSessionDescription::~RTCSessionDescription()
+RTCSessionDescription::RTCSessionDescription(const String& type, const String& sdp)
+    : m_type(type)
+    , m_sdp(sdp)
 {
-}
-
-const String& RTCSessionDescription::type() const
-{
-    return m_descriptor->type();
 }
 
 void RTCSessionDescription::setType(const String& type, ExceptionCode& ec)
 {
     if (verifyType(type))
-        m_descriptor->setType(type);
+        m_type = type;
     else
         ec = TYPE_MISMATCH_ERR;
-}
-
-const String& RTCSessionDescription::sdp() const
-{
-    return m_descriptor->sdp();
-}
-
-void RTCSessionDescription::setSdp(const String& sdp, ExceptionCode& ec)
-{
-    m_descriptor->setSdp(sdp);
-}
-
-RTCSessionDescriptionDescriptor* RTCSessionDescription::descriptor()
-{
-    return m_descriptor.get();
 }
 
 } // namespace WebCore

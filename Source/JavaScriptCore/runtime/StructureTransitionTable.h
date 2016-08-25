@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, 2009 Apple Inc. All rights reserved.
+ * Copyright (C) 2008, 2009, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -29,9 +29,7 @@
 #include "IndexingType.h"
 #include "WeakGCMap.h"
 #include <wtf/HashFunctions.h>
-#include <wtf/OwnPtr.h>
-#include <wtf/RefPtr.h>
-#include <wtf/text/StringImpl.h>
+#include <wtf/text/UniquedStringImpl.h>
 
 namespace JSC {
 
@@ -80,7 +78,7 @@ inline IndexingType newIndexingType(IndexingType oldType, NonPropertyTransition 
         ASSERT(!hasIndexedProperties(oldType) || hasUndecided(oldType) || hasInt32(oldType) || hasDouble(oldType) || hasContiguous(oldType) || hasContiguous(oldType));
         return (oldType & ~IndexingShapeMask) | SlowPutArrayStorageShape;
     case SwitchToSlowPutArrayStorage:
-        ASSERT(hasFastArrayStorage(oldType));
+        ASSERT(hasArrayStorage(oldType));
         return (oldType & ~IndexingShapeMask) | SlowPutArrayStorageShape;
     case AddIndexedAccessors:
         return oldType | MayHaveIndexedAccessors;
@@ -93,14 +91,13 @@ inline IndexingType newIndexingType(IndexingType oldType, NonPropertyTransition 
 class StructureTransitionTable {
     static const intptr_t UsingSingleSlotFlag = 1;
 
+    
     struct Hash {
-        typedef std::pair<RefPtr<StringImpl>, unsigned> Key;
+        typedef std::pair<UniquedStringImpl*, unsigned> Key;
+        
         static unsigned hash(const Key& p)
         {
-            unsigned result = p.second;
-            if (p.first)
-                result += p.first->existingHash();
-            return result;
+            return PtrHash<UniquedStringImpl*>::hash(p.first) + p.second;
         }
 
         static bool equal(const Key& a, const Key& b)
@@ -132,11 +129,13 @@ public:
         WeakSet::deallocate(impl);
     }
 
-    inline void add(VM&, Structure*);
-    inline bool contains(StringImpl* rep, unsigned attributes) const;
-    inline Structure* get(StringImpl* rep, unsigned attributes) const;
+    void add(VM&, Structure*);
+    bool contains(UniquedStringImpl*, unsigned attributes) const;
+    Structure* get(UniquedStringImpl*, unsigned attributes) const;
 
 private:
+    friend class SingleSlotTransitionWeakOwner;
+
     bool isUsingSingleSlot() const
     {
         return m_data & UsingSingleSlotFlag;
@@ -167,24 +166,8 @@ private:
         ASSERT(!isUsingSingleSlot());
     }
 
-    Structure* singleTransition() const
-    {
-        ASSERT(isUsingSingleSlot());
-        if (WeakImpl* impl = this->weakImpl()) {
-            if (impl->state() == WeakImpl::Live)
-                return reinterpret_cast<Structure*>(impl->jsValue().asCell());
-        }
-        return 0;
-    }
-    
-    void setSingleTransition(VM&, Structure* structure)
-    {
-        ASSERT(isUsingSingleSlot());
-        if (WeakImpl* impl = this->weakImpl())
-            WeakSet::deallocate(impl);
-        WeakImpl* impl = WeakSet::allocate(reinterpret_cast<JSCell*>(structure));
-        m_data = reinterpret_cast<intptr_t>(impl) | UsingSingleSlotFlag;
-    }
+    Structure* singleTransition() const;
+    void setSingleTransition(Structure*);
 
     intptr_t m_data;
 };

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2013-2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,15 +26,35 @@
 #include "config.h"
 #include "DFGCommon.h"
 
-#if ENABLE(DFG_JIT)
-
 #include "DFGNode.h"
+#include "JSCInlines.h"
+#include <wtf/PrintStream.h>
+
+#if ENABLE(DFG_JIT)
 
 namespace JSC { namespace DFG {
 
-void NodePointerTraits::dump(Node* value, PrintStream& out)
+static StaticLock crashLock;
+
+void startCrashing()
 {
-    out.print(value);
+    crashLock.lock();
+}
+
+bool isCrashing()
+{
+    return crashLock.isLocked();
+}
+
+bool stringLessThan(StringImpl& a, StringImpl& b)
+{
+    unsigned minLength = std::min(a.length(), b.length());
+    for (unsigned i = 0; i < minLength; ++i) {
+        if (a[i] == b[i])
+            continue;
+        return a[i] < b[i];
+    }
+    return a.length() < b.length();
 }
 
 } } // namespace JSC::DFG
@@ -48,17 +68,15 @@ void printInternal(PrintStream& out, OptimizationFixpointState state)
     switch (state) {
     case BeforeFixpoint:
         out.print("BeforeFixpoint");
-        break;
+        return;
     case FixpointNotConverged:
         out.print("FixpointNotConverged");
-        break;
+        return;
     case FixpointConverged:
         out.print("FixpointConverged");
-        break;
-    default:
-        RELEASE_ASSERT_NOT_REACHED();
-        break;
+        return;
     }
+    RELEASE_ASSERT_NOT_REACHED();
 }
 
 void printInternal(PrintStream& out, GraphForm form)
@@ -66,14 +84,15 @@ void printInternal(PrintStream& out, GraphForm form)
     switch (form) {
     case LoadStore:
         out.print("LoadStore");
-        break;
+        return;
     case ThreadedCPS:
         out.print("ThreadedCPS");
-        break;
-    default:
-        RELEASE_ASSERT_NOT_REACHED();
-        break;
+        return;
+    case SSA:
+        out.print("SSA");
+        return;
     }
+    RELEASE_ASSERT_NOT_REACHED();
 }
 
 void printInternal(PrintStream& out, UnificationState state)
@@ -81,14 +100,12 @@ void printInternal(PrintStream& out, UnificationState state)
     switch (state) {
     case LocallyUnified:
         out.print("LocallyUnified");
-        break;
+        return;
     case GloballyUnified:
         out.print("GloballyUnified");
-        break;
-    default:
-        RELEASE_ASSERT_NOT_REACHED();
-        break;
+        return;
     }
+    RELEASE_ASSERT_NOT_REACHED();
 }
 
 void printInternal(PrintStream& out, RefCountState state)
@@ -96,14 +113,12 @@ void printInternal(PrintStream& out, RefCountState state)
     switch (state) {
     case EverythingIsLive:
         out.print("EverythingIsLive");
-        break;
+        return;
     case ExactRefCount:
         out.print("ExactRefCount");
-        break;
-    default:
-        RELEASE_ASSERT_NOT_REACHED();
-        break;
+        return;
     }
+    RELEASE_ASSERT_NOT_REACHED();
 }
 
 void printInternal(PrintStream& out, ProofStatus status)
@@ -111,17 +126,40 @@ void printInternal(PrintStream& out, ProofStatus status)
     switch (status) {
     case IsProved:
         out.print("IsProved");
-        break;
+        return;
     case NeedsCheck:
         out.print("NeedsCheck");
-        break;
-    default:
-        RELEASE_ASSERT_NOT_REACHED();
-        break;
+        return;
     }
+    RELEASE_ASSERT_NOT_REACHED();
 }
 
 } // namespace WTF
 
 #endif // ENABLE(DFG_JIT)
+
+namespace WTF {
+
+using namespace JSC::DFG;
+
+void printInternal(PrintStream& out, CapabilityLevel capabilityLevel)
+{
+    switch (capabilityLevel) {
+    case CannotCompile:
+        out.print("CannotCompile");
+        return;
+    case CanCompile:
+        out.print("CanCompile");
+        return;
+    case CanCompileAndInline:
+        out.print("CanCompileAndInline");
+        return;
+    case CapabilityLevelNotSet:
+        out.print("CapabilityLevelNotSet");
+        return;
+    }
+    RELEASE_ASSERT_NOT_REACHED();
+}
+
+} // namespace WTF
 

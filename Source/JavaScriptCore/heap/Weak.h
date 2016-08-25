@@ -26,12 +26,12 @@
 #ifndef Weak_h
 #define Weak_h
 
+#include "JSExportMacros.h"
+#include <cstddef>
 #include <wtf/Noncopyable.h>
-#include <wtf/NullPtr.h>
 
 namespace JSC {
 
-template<typename T> class PassWeak;
 class WeakImpl;
 class WeakHandleOwner;
 
@@ -46,18 +46,18 @@ public:
     {
     }
 
-    explicit Weak(std::nullptr_t)
+    Weak(std::nullptr_t)
         : m_impl(0)
     {
     }
 
-    explicit Weak(T*, WeakHandleOwner* = 0, void* context = 0);
+    Weak(T*, WeakHandleOwner* = 0, void* context = 0);
 
     enum HashTableDeletedValueTag { HashTableDeletedValue };
     bool isHashTableDeletedValue() const;
     Weak(HashTableDeletedValueTag);
 
-    template<typename U> Weak(const PassWeak<U>&);
+    Weak(Weak&&);
 
     ~Weak()
     {
@@ -65,8 +65,9 @@ public:
     }
 
     void swap(Weak&);
-    Weak& operator=(const PassWeak<T>&);
-    
+
+    Weak& operator=(Weak&&);
+
     bool operator!() const;
     T* operator->() const;
     T& operator*() const;
@@ -74,11 +75,9 @@ public:
 
     bool was(T*) const;
 
-    // This conversion operator allows implicit conversion to bool but not to other integer types.
-    typedef void* (Weak::*UnspecifiedBoolType);
-    operator UnspecifiedBoolType*() const;
+    explicit operator bool() const;
 
-    PassWeak<T> release();
+    WeakImpl* leakImpl() WARN_UNUSED_RETURN;
     void clear()
     {
         if (!m_impl)

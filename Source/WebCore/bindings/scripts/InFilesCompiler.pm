@@ -14,7 +14,7 @@
 # THIS SOFTWARE IS PROVIDED BY GOOGLE, INC. ``AS IS'' AND ANY
 # EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
-# PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+# PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
 # CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
 # EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
 # PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -37,7 +37,7 @@ require Config;
 
 package InFilesCompiler;
 
-my $inputFile = "";
+my @inputFiles;
 my $outputDir = ".";
 my $defaultItemFactory;
 
@@ -82,11 +82,11 @@ sub new()
 sub initializeFromCommandLine()
 {
     ::GetOptions(
-        'input=s' => \$inputFile,
+        'input=s' => \@inputFiles,
         'outputDir=s' => \$outputDir,
     );
 
-    die "You must specify --input <file>" unless length($inputFile);
+    die "You must specify at least one --input <file>" unless scalar(@inputFiles);
 
     ::mkpath($outputDir);
 
@@ -99,14 +99,17 @@ sub compile()
     my $object = shift;
     my $generateCode = shift;
 
-    my $file = new IO::File;
-    open($file, $inputFile) or die "Failed to open file: $!";
-
     my $InParser = InFilesParser->new();
-    $InParser->parse($file, \&parameterHandler, \&itemHandler);
 
-    close($file);
-    die "Failed to read from file: $inputFile" if (keys %parsedItems == 0);
+    foreach my $inputFile (@inputFiles) {
+        my $file = new IO::File;
+        open($file, $inputFile) or die "Failed to open file: $!";
+
+        $InParser->parse($file, \&parameterHandler, \&itemHandler);
+
+        close($file);
+        die "Failed to read from file: $inputFile" if (keys %parsedItems == 0);
+    }
 
     &$generateCode(\%parsedParameters, \%parsedItems);
 }
@@ -130,7 +133,7 @@ sub license()
  * THIS SOFTWARE IS PROVIDED BY GOOGLE, INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR

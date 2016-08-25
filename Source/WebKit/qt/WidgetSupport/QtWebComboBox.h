@@ -36,7 +36,7 @@ public:
     void showPopupAtCursorPosition();
     virtual bool eventFilter(QObject* watched, QEvent*);
 
-    virtual void hidePopup() OVERRIDE;
+    void hidePopup() override;
     void deleteComboBox();
 
 Q_SIGNALS:

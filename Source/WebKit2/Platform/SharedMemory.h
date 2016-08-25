@@ -26,8 +26,8 @@
 #ifndef SharedMemory_h
 #define SharedMemory_h
 
+#include <wtf/Forward.h>
 #include <wtf/Noncopyable.h>
-#include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
 
 #if PLATFORM(QT) || PLATFORM(GTK) || PLATFORM(EFL)
@@ -35,16 +35,22 @@
 #include <wtf/text/WTFString.h>
 #endif
 
-namespace CoreIPC {
-    class ArgumentDecoder;
-    class ArgumentEncoder;
+namespace IPC {
+class ArgumentDecoder;
+class ArgumentEncoder;
 }
+
+#if OS(DARWIN)
+namespace WebCore {
+class MachSendRight;
+}
+#endif
 
 namespace WebKit {
 
 class SharedMemory : public RefCounted<SharedMemory> {
 public:
-    enum Protection {
+    enum class Protection {
         ReadOnly,
         ReadWrite
     };
@@ -57,34 +63,33 @@ public:
 
         bool isNull() const;
 
-        void encode(CoreIPC::ArgumentEncoder&) const;
-        static bool decode(CoreIPC::ArgumentDecoder&, Handle&);
+        void clear();
+
+        void encode(IPC::ArgumentEncoder&) const;
+        static bool decode(IPC::ArgumentDecoder&, Handle&);
 
 #if USE(UNIX_DOMAIN_SOCKETS)
-        CoreIPC::Attachment releaseToAttachment() const;
-        void adoptFromAttachment(int fileDescriptor, size_t);
+        IPC::Attachment releaseAttachment() const;
+        void adoptAttachment(IPC::Attachment&&);
 #endif
     private:
         friend class SharedMemory;
-#if OS(DARWIN)
+#if USE(UNIX_DOMAIN_SOCKETS)
+        mutable IPC::Attachment m_attachment;
+#elif OS(DARWIN)
         mutable mach_port_t m_port;
+        size_t m_size;
 #elif OS(WINDOWS)
         mutable HANDLE m_handle;
-#elif USE(UNIX_DOMAIN_SOCKETS)
-        mutable int m_fileDescriptor;
 #endif
-        size_t m_size;
     };
-    
-    // Create a shared memory object with the given size. Will return 0 on failure.
-    static PassRefPtr<SharedMemory> create(size_t);
 
-    // Create a shared memory object from the given handle and the requested protection. Will return 0 on failure.
-    static PassRefPtr<SharedMemory> create(const Handle&, Protection);
-
-    // Create a shared memory object with the given size by vm_copy'ing the given buffer.
-    // Will return 0 on failure.
-    static PassRefPtr<SharedMemory> createFromVMBuffer(void*, size_t);
+    static RefPtr<SharedMemory> allocate(size_t);
+    static RefPtr<SharedMemory> create(void*, size_t, Protection);
+    static RefPtr<SharedMemory> map(const Handle&, Protection);
+#if USE(UNIX_DOMAIN_SOCKETS)
+    static RefPtr<SharedMemory> wrapMap(void*, size_t, int fileDescriptor);
+#endif
 
 #if OS(WINDOWS)
     static PassRefPtr<SharedMemory> adopt(HANDLE, size_t, Protection);
@@ -95,28 +100,34 @@ public:
     bool createHandle(Handle&, Protection);
 
     size_t size() const { return m_size; }
-    void* data() const { return m_data; }
+    void* data() const
+    {
+        ASSERT(m_data);
+        return m_data;
+    }
 #if OS(WINDOWS)
     HANDLE handle() const { return m_handle; }
 #endif
-
-    // Creates a copy-on-write copy of the first |size| bytes.
-    PassRefPtr<SharedMemory> createCopyOnWriteCopy(size_t) const;
 
     // Return the system page size in bytes.
     static unsigned systemPageSize();
 
 private:
+#if OS(DARWIN)
+    WebCore::MachSendRight createSendRight(Protection) const;
+#endif
+
     size_t m_size;
     void* m_data;
-    bool m_shouldVMDeallocateData;
+    Protection m_protection;
 
-#if OS(DARWIN)
+#if USE(UNIX_DOMAIN_SOCKETS)
+    int m_fileDescriptor;
+    bool m_isWrappingMap { false };
+#elif OS(DARWIN)
     mach_port_t m_port;
 #elif OS(WINDOWS)
     HANDLE m_handle;
-#elif USE(UNIX_DOMAIN_SOCKETS)
-    int m_fileDescriptor;
 #endif
 };
 

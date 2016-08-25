@@ -29,23 +29,21 @@
 #include "DataReference.h"
 #include "NetworkConnectionToWebProcessMessages.h"
 #include "WebCoreArgumentCoders.h"
+#include "WebLoaderStrategy.h"
 #include "WebProcess.h"
-#include "WebResourceBuffer.h"
-#include "WebResourceLoadScheduler.h"
 #include "WebResourceLoaderMessages.h"
 #include <WebCore/CachedResource.h>
 #include <WebCore/MemoryCache.h>
-#include <WebCore/ResourceBuffer.h>
-
-#if ENABLE(NETWORK_PROCESS)
+#include <WebCore/SessionID.h>
+#include <WebCore/SharedBuffer.h>
 
 using namespace WebCore;
 
 namespace WebKit {
 
-NetworkProcessConnection::NetworkProcessConnection(CoreIPC::Connection::Identifier connectionIdentifier)
+NetworkProcessConnection::NetworkProcessConnection(IPC::Connection::Identifier connectionIdentifier)
 {
-    m_connection = CoreIPC::Connection::createClientConnection(connectionIdentifier, this, RunLoop::main());
+    m_connection = IPC::Connection::createClientConnection(connectionIdentifier, *this);
     m_connection->open();
 }
 
@@ -53,10 +51,10 @@ NetworkProcessConnection::~NetworkProcessConnection()
 {
 }
 
-void NetworkProcessConnection::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::MessageDecoder& decoder)
+void NetworkProcessConnection::didReceiveMessage(IPC::Connection& connection, IPC::MessageDecoder& decoder)
 {
     if (decoder.messageReceiverName() == Messages::WebResourceLoader::messageReceiverName()) {
-        if (WebResourceLoader* webResourceLoader = WebProcess::shared().webResourceLoadScheduler().webResourceLoaderForIdentifier(decoder.destinationID()))
+        if (WebResourceLoader* webResourceLoader = WebProcess::singleton().webLoaderStrategy().webResourceLoaderForIdentifier(decoder.destinationID()))
             webResourceLoader->didReceiveWebResourceLoaderMessage(connection, decoder);
         
         return;
@@ -65,36 +63,36 @@ void NetworkProcessConnection::didReceiveMessage(CoreIPC::Connection* connection
     didReceiveNetworkProcessConnectionMessage(connection, decoder);
 }
 
-void NetworkProcessConnection::didReceiveSyncMessage(CoreIPC::Connection* connection, CoreIPC::MessageDecoder& decoder, OwnPtr<CoreIPC::MessageEncoder>& replyEncoder)
+void NetworkProcessConnection::didReceiveSyncMessage(IPC::Connection&, IPC::MessageDecoder&, std::unique_ptr<IPC::MessageEncoder>&)
 {
     ASSERT_NOT_REACHED();
 }
 
-void NetworkProcessConnection::didClose(CoreIPC::Connection*)
+void NetworkProcessConnection::didClose(IPC::Connection&)
 {
     // The NetworkProcess probably crashed.
-    WebProcess::shared().networkProcessConnectionClosed(this);
+    WebProcess::singleton().networkProcessConnectionClosed(this);
 }
 
-void NetworkProcessConnection::didReceiveInvalidMessage(CoreIPC::Connection*, CoreIPC::StringReference, CoreIPC::StringReference)
+void NetworkProcessConnection::didReceiveInvalidMessage(IPC::Connection&, IPC::StringReference, IPC::StringReference)
 {
 }
 
-void NetworkProcessConnection::didCacheResource(const ResourceRequest& request, const ShareableResource::Handle& handle)
+#if ENABLE(SHAREABLE_RESOURCE)
+void NetworkProcessConnection::didCacheResource(const ResourceRequest& request, const ShareableResource::Handle& handle, SessionID sessionID)
 {
-    CachedResource* resource = memoryCache()->resourceForRequest(request);
+    CachedResource* resource = MemoryCache::singleton().resourceForRequest(request, sessionID);
     if (!resource)
         return;
     
     RefPtr<SharedBuffer> buffer = handle.tryWrapInSharedBuffer();
     if (!buffer) {
-        LOG_ERROR("Unabled to create SharedBuffer from ShareableResource handle for resource url %s", request.url().string().utf8().data());
+        LOG_ERROR("Unable to create SharedBuffer from ShareableResource handle for resource url %s", request.url().string().utf8().data());
         return;
     }
 
-    resource->tryReplaceEncodedData(buffer.release());
+    resource->tryReplaceEncodedData(*buffer);
 }
+#endif
 
 } // namespace WebKit
-
-#endif // ENABLE(NETWORK_PROCESS)

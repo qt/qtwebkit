@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007 Apple Computer, Inc.  All rights reserved.
+ * Copyright (C) 2007 Apple Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -29,12 +29,12 @@
 #include <wtf/Assertions.h>
 
 #if PLATFORM(GTK) || PLATFORM(EFL)
-    #define supressNotImplementedWarning() getenv("DISABLE_NI_WARNING")
+    #define suppressNotImplementedWarning() getenv("DISABLE_NI_WARNING")
 #elif PLATFORM(QT)
     #include <QByteArray>
-    #define supressNotImplementedWarning() !qgetenv("DISABLE_NI_WARNING").isEmpty()
+    #define suppressNotImplementedWarning() !qgetenv("DISABLE_NI_WARNING").isEmpty()
 #else
-    #define supressNotImplementedWarning() false
+    #define suppressNotImplementedWarning() false
 #endif
 
 #if LOG_DISABLED
@@ -42,12 +42,12 @@
 #else
 
 namespace WebCore {
-WTFLogChannel* notImplementedLoggingChannel();
+WEBCORE_EXPORT WTFLogChannel* notImplementedLoggingChannel();
 }
 
 #define notImplemented() do { \
         static bool havePrinted = false; \
-        if (!havePrinted && !supressNotImplementedWarning()) { \
+        if (!havePrinted && !suppressNotImplementedWarning()) { \
             WTFLogVerbose(__FILE__, __LINE__, WTF_PRETTY_FUNCTION, WebCore::notImplementedLoggingChannel(), "UNIMPLEMENTED: "); \
             havePrinted = true; \
         } \

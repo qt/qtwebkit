@@ -24,14 +24,14 @@
 #ifndef HTMLFrameSetElement_h
 #define HTMLFrameSetElement_h
 
-#include <wtf/OwnArrayPtr.h>
 #include "HTMLElement.h"
+#include <memory>
 
 namespace WebCore {
 
-class HTMLFrameSetElement FINAL : public HTMLElement {
+class HTMLFrameSetElement final : public HTMLElement {
 public:
-    static PassRefPtr<HTMLFrameSetElement> create(const QualifiedName&, Document*);
+    static Ref<HTMLFrameSetElement> create(const QualifiedName&, Document&);
 
     bool hasFrameBorder() const { return m_frameborder; }
     bool noResize() const { return m_noresize; }
@@ -45,45 +45,28 @@ public:
     const Length* rowLengths() const { return m_rowLengths.get(); }
     const Length* colLengths() const { return m_colLengths.get(); }
 
-    // Declared virtual in Element
-    DEFINE_WINDOW_ATTRIBUTE_EVENT_LISTENER(blur);
-    DEFINE_WINDOW_ATTRIBUTE_EVENT_LISTENER(error);
-    DEFINE_WINDOW_ATTRIBUTE_EVENT_LISTENER(focus);
-    DEFINE_WINDOW_ATTRIBUTE_EVENT_LISTENER(load);
-
-    DEFINE_WINDOW_ATTRIBUTE_EVENT_LISTENER(beforeunload);
-    DEFINE_WINDOW_ATTRIBUTE_EVENT_LISTENER(hashchange);
-    DEFINE_WINDOW_ATTRIBUTE_EVENT_LISTENER(message);
-    DEFINE_WINDOW_ATTRIBUTE_EVENT_LISTENER(offline);
-    DEFINE_WINDOW_ATTRIBUTE_EVENT_LISTENER(online);
-    DEFINE_WINDOW_ATTRIBUTE_EVENT_LISTENER(popstate);
-    DEFINE_WINDOW_ATTRIBUTE_EVENT_LISTENER(resize);
-    DEFINE_WINDOW_ATTRIBUTE_EVENT_LISTENER(storage);
-    DEFINE_WINDOW_ATTRIBUTE_EVENT_LISTENER(unload);
-#if ENABLE(ORIENTATION_EVENTS)
-    DEFINE_WINDOW_ATTRIBUTE_EVENT_LISTENER(orientationchange);
-#endif
+    static HTMLFrameSetElement* findContaining(Element* descendant);
 
 private:
-    HTMLFrameSetElement(const QualifiedName&, Document*);
+    HTMLFrameSetElement(const QualifiedName&, Document&);
 
-    virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
-    virtual bool isPresentationAttribute(const QualifiedName&) const OVERRIDE;
-    virtual void collectStyleForPresentationAttribute(const QualifiedName&, const AtomicString&, MutableStylePropertySet*) OVERRIDE;
+    virtual void parseAttribute(const QualifiedName&, const AtomicString&) override;
+    virtual bool isPresentationAttribute(const QualifiedName&) const override;
+    virtual void collectStyleForPresentationAttribute(const QualifiedName&, const AtomicString&, MutableStyleProperties&) override;
 
-    virtual void attach(const AttachContext& = AttachContext()) OVERRIDE;
-    virtual bool rendererIsNeeded(const NodeRenderingContext&);
-    virtual RenderObject* createRenderer(RenderArena*, RenderStyle*);
+    virtual void willAttachRenderers() override;
+    virtual bool rendererIsNeeded(const RenderStyle&) override;
+    virtual RenderPtr<RenderElement> createElementRenderer(Ref<RenderStyle>&&, const RenderTreePosition&) override;
     
-    virtual void defaultEventHandler(Event*);
+    virtual void defaultEventHandler(Event*) override;
 
-    virtual bool willRecalcStyle(StyleChange);
+    virtual bool willRecalcStyle(Style::Change) override;
 
-    virtual InsertionNotificationRequest insertedInto(ContainerNode*) OVERRIDE;
-    virtual void removedFrom(ContainerNode*) OVERRIDE;
+    virtual InsertionNotificationRequest insertedInto(ContainerNode&) override;
+    virtual void removedFrom(ContainerNode&) override;
 
-    OwnArrayPtr<Length> m_rowLengths;
-    OwnArrayPtr<Length> m_colLengths;
+    std::unique_ptr<Length[]> m_rowLengths;
+    std::unique_ptr<Length[]> m_colLengths;
 
     int m_totalRows;
     int m_totalCols;

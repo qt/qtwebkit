@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 2013 Cisco Systems, Inc. All rights reserved.
  * Copyright (C) 2009-2011 STMicroelectronics. All rights reserved.
- * Copyright (C) 2008 Apple Inc. All rights reserved.
+ * Copyright (C) 2008, 2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -36,13 +36,14 @@
 
 namespace JSC {
 
-class MacroAssemblerSH4 : public AbstractMacroAssembler<SH4Assembler> {
+class MacroAssemblerSH4 : public AbstractMacroAssembler<SH4Assembler, MacroAssemblerSH4> {
 public:
     typedef SH4Assembler::FPRegisterID FPRegisterID;
 
     static const Scale ScalePtr = TimesFour;
     static const FPRegisterID fscratch = SH4Registers::dr10;
     static const RegisterID stackPointerRegister = SH4Registers::sp;
+    static const RegisterID framePointerRegister = SH4Registers::fp;
     static const RegisterID linkRegister = SH4Registers::pr;
     static const RegisterID scratchReg3 = SH4Registers::r13;
 
@@ -699,19 +700,31 @@ public:
         releaseScratch(scr);
     }
 
+    void load8(AbsoluteAddress address, RegisterID dest)
+    {
+        move(TrustedImmPtr(address.m_ptr), dest);
+        m_assembler.movbMemReg(dest, dest);
+        m_assembler.extub(dest, dest);
+    }
+
+    void load8(const void* address, RegisterID dest)
+    {
+        load8(AbsoluteAddress(address), dest);
+    }
+
     void load8PostInc(RegisterID base, RegisterID dest)
     {
         m_assembler.movbMemRegIn(base, dest);
         m_assembler.extub(dest, dest);
     }
 
-    void load8Signed(BaseIndex address, RegisterID dest)
+    void load8SignedExtendTo32(BaseIndex address, RegisterID dest)
     {
         RegisterID scr = claimScratch();
         move(address.index, scr);
         lshift32(TrustedImm32(address.scale), scr);
         add32(address.base, scr);
-        load8Signed(scr, address.offset, dest);
+        load8SignedExtendTo32(scr, address.offset, dest);
         releaseScratch(scr);
     }
 
@@ -757,7 +770,7 @@ public:
             releaseScratch(scr);
     }
 
-    void load8Signed(RegisterID base, int offset, RegisterID dest)
+    void load8SignedExtendTo32(RegisterID base, int offset, RegisterID dest)
     {
         if (!offset) {
             m_assembler.movbMemReg(base, dest);
@@ -785,7 +798,7 @@ public:
 
     void load8(RegisterID base, int offset, RegisterID dest)
     {
-        load8Signed(base, offset, dest);
+        load8SignedExtendTo32(base, offset, dest);
         m_assembler.extub(dest, dest);
     }
 
@@ -845,14 +858,14 @@ public:
         m_assembler.extuw(dest, dest);
     }
 
-    void load16Signed(RegisterID src, RegisterID dest)
+    void load16SignedExtendTo32(RegisterID src, RegisterID dest)
     {
         m_assembler.movwMemReg(src, dest);
     }
 
     void load16(BaseIndex address, RegisterID dest)
     {
-        load16Signed(address, dest);
+        load16SignedExtendTo32(address, dest);
         m_assembler.extuw(dest, dest);
     }
 
@@ -862,7 +875,7 @@ public:
         m_assembler.extuw(dest, dest);
     }
 
-    void load16Signed(BaseIndex address, RegisterID dest)
+    void load16SignedExtendTo32(BaseIndex address, RegisterID dest)
     {
         RegisterID scr = claimScratch();
 
@@ -874,7 +887,7 @@ public:
             m_assembler.movwR0mr(scr, dest);
         else {
             add32(address.base, scr);
-            load16Signed(scr, dest);
+            load16SignedExtendTo32(scr, dest);
         }
 
         releaseScratch(scr);
@@ -898,12 +911,34 @@ public:
         releaseScratch(scr);
     }
 
+    void store8(RegisterID src, void* address)
+    {
+        RegisterID destptr = claimScratch();
+        move(TrustedImmPtr(address), destptr);
+        m_assembler.movbRegMem(src, destptr);
+        releaseScratch(destptr);
+    }
+
     void store8(TrustedImm32 imm, void* address)
     {
-        RegisterID srcval = claimScratch();
+        ASSERT((imm.m_value >= -128) && (imm.m_value <= 127));
         RegisterID dstptr = claimScratch();
+        move(TrustedImmPtr(address), dstptr);
+        RegisterID srcval = claimScratch();
         move(imm, srcval);
-        m_assembler.loadConstant(reinterpret_cast<uint32_t>(address), dstptr);
+        m_assembler.movbRegMem(srcval, dstptr);
+        releaseScratch(dstptr);
+        releaseScratch(srcval);
+    }
+
+    void store8(TrustedImm32 imm, Address address)
+    {
+        ASSERT((imm.m_value >= -128) && (imm.m_value <= 127));
+        RegisterID dstptr = claimScratch();
+        move(address.base, dstptr);
+        add32(TrustedImm32(address.offset), dstptr);
+        RegisterID srcval = claimScratch();
+        move(imm, srcval);
         m_assembler.movbRegMem(srcval, dstptr);
         releaseScratch(dstptr);
         releaseScratch(srcval);
@@ -1056,6 +1091,7 @@ public:
     static bool supportsFloatingPointTruncate() { return true; }
     static bool supportsFloatingPointSqrt() { return true; }
     static bool supportsFloatingPointAbs() { return true; }
+    static bool supportsFloatingPointRounding() { return false; }
 
     void moveDoubleToInts(FPRegisterID src, RegisterID dest1, RegisterID dest2)
     {
@@ -1133,10 +1169,10 @@ public:
         releaseScratch(scr);
     }
 
-    void loadDouble(const void* address, FPRegisterID dest)
+    void loadDouble(TrustedImmPtr address, FPRegisterID dest)
     {
         RegisterID scr = claimScratch();
-        move(TrustedImmPtr(address), scr);
+        move(address, scr);
         m_assembler.fmovsReadrminc(scr, (FPRegisterID)(dest + 1));
         m_assembler.fmovsReadrm(scr, dest);
         releaseScratch(scr);
@@ -1182,10 +1218,10 @@ public:
         }
     }
 
-    void storeDouble(FPRegisterID src, const void* address)
+    void storeDouble(FPRegisterID src, TrustedImmPtr address)
     {
         RegisterID scr = claimScratch();
-        m_assembler.loadConstant(reinterpret_cast<uint32_t>(const_cast<void*>(address)) + 8, scr);
+        m_assembler.loadConstant(reinterpret_cast<uint32_t>(const_cast<void*>(address.m_value)) + 8, scr);
         m_assembler.fmovsWriterndec(src, scr);
         m_assembler.fmovsWriterndec((FPRegisterID)(src + 1), scr);
         releaseScratch(scr);
@@ -1198,7 +1234,7 @@ public:
 
     void addDouble(AbsoluteAddress address, FPRegisterID dest)
     {
-        loadDouble(address.m_ptr, fscratch);
+        loadDouble(TrustedImmPtr(address.m_ptr), fscratch);
         addDouble(fscratch, dest);
     }
 
@@ -1539,7 +1575,28 @@ public:
         m_assembler.dabs(dest);
     }
 
+    NO_RETURN_DUE_TO_CRASH void ceilDouble(FPRegisterID, FPRegisterID)
+    {
+        ASSERT(!supportsFloatingPointRounding());
+        CRASH();
+    }
+
+    NO_RETURN_DUE_TO_CRASH void floorDouble(FPRegisterID, FPRegisterID)
+    {
+        ASSERT(!supportsFloatingPointRounding());
+        CRASH();
+    }
+
     Jump branchTest8(ResultCondition cond, Address address, TrustedImm32 mask = TrustedImm32(-1))
+    {
+        RegisterID addressTempRegister = claimScratch();
+        load8(address, addressTempRegister);
+        Jump jmp = branchTest32(cond, addressTempRegister, mask);
+        releaseScratch(addressTempRegister);
+        return jmp;
+    }
+
+    Jump branchTest8(ResultCondition cond, BaseIndex address, TrustedImm32 mask = TrustedImm32(-1))
     {
         RegisterID addressTempRegister = claimScratch();
         load8(address, addressTempRegister);
@@ -1569,6 +1626,15 @@ public:
     }
 
     Jump branch8(RelationalCondition cond, Address left, TrustedImm32 right)
+    {
+        RegisterID addressTempRegister = claimScratch();
+        load8(left, addressTempRegister);
+        Jump jmp = branch32(cond, addressTempRegister, right);
+        releaseScratch(addressTempRegister);
+        return jmp;
+    }
+
+    Jump branch8(RelationalCondition cond, AbsoluteAddress left, TrustedImm32 right)
     {
         RegisterID addressTempRegister = claimScratch();
         load8(left, addressTempRegister);
@@ -1693,6 +1759,14 @@ public:
         return dataLabel;
     }
 
+    DataLabel32 moveWithPatch(TrustedImm32 initialValue, RegisterID dest)
+    {
+        m_assembler.ensureSpace(m_assembler.maxInstructionSize, sizeof(uint32_t));
+        DataLabel32 dataLabel(this);
+        m_assembler.loadConstantUnReusable(static_cast<uint32_t>(initialValue.m_value), dest);
+        return dataLabel;
+    }
+
     void move(RegisterID src, RegisterID dest)
     {
         if (src != dest)
@@ -1746,6 +1820,26 @@ public:
         ASSERT((cond == Zero) || (cond == NonZero));
 
         load8(address, dest);
+        if (mask.m_value == -1)
+            compare32(0, dest, static_cast<RelationalCondition>(cond));
+        else
+            testlImm(mask.m_value, dest);
+        if (cond != NonZero) {
+            m_assembler.movt(dest);
+            return;
+        }
+
+        m_assembler.ensureSpace(m_assembler.maxInstructionSize + 4);
+        m_assembler.movImm8(0, dest);
+        m_assembler.branch(BT_OPCODE, 0);
+        m_assembler.movImm8(1, dest);
+    }
+
+    void test32(ResultCondition cond, Address address, TrustedImm32 mask, RegisterID dest)
+    {
+        ASSERT((cond == Zero) || (cond == NonZero));
+
+        load32(address, dest);
         if (mask.m_value == -1)
             compare32(0, dest, static_cast<RelationalCondition>(cond));
         else
@@ -1959,7 +2053,7 @@ public:
         ASSERT((cond == Overflow) || (cond == Signed) || (cond == Zero) || (cond == NonZero));
 
         if (cond == Overflow)
-            return branchMul32(cond, TrustedImm32(-1), srcDest, srcDest);
+            return branchMul32(cond, srcDest, TrustedImm32(-1), srcDest);
 
         neg32(srcDest);
 
@@ -2163,7 +2257,7 @@ public:
         return (cond == NonZero) ? branchFalse() : branchTrue();
     }
 
-    Jump branchMul32(ResultCondition cond, TrustedImm32 imm, RegisterID src, RegisterID dest)
+    Jump branchMul32(ResultCondition cond, RegisterID src, TrustedImm32 imm, RegisterID dest)
     {
         ASSERT((cond == Overflow) || (cond == Signed) || (cond == Zero) || (cond == NonZero));
 
@@ -2322,6 +2416,11 @@ public:
         return Call(m_assembler.call(), Call::Linkable);
     }
 
+    Call nearTailCall()
+    {
+        return Call(m_assembler.jump(), Call::LinkableNearTail);
+    }
+
     Call nearCall()
     {
         return Call(m_assembler.call(), Call::LinkableNear);
@@ -2332,12 +2431,14 @@ public:
         return Call(m_assembler.call(target), Call::None);
     }
 
-    void call(Address address, RegisterID target)
+    void call(Address address)
     {
+        RegisterID target = claimScratch();
         load32(address.base, address.offset, target);
         m_assembler.ensureSpace(m_assembler.maxInstructionSize + 2);
         m_assembler.branch(JSR_OPCODE, target);
         m_assembler.nop();
+        releaseScratch(target);
     }
 
     void breakpoint()
@@ -2378,6 +2479,23 @@ public:
         if (cond == NotEqual)
             return branchFalse();
         return branchTrue();
+    }
+
+    Jump branch32WithPatch(RelationalCondition cond, Address left, DataLabel32& dataLabel, TrustedImm32 initialRightValue = TrustedImm32(0))
+    {
+        RegisterID scr = claimScratch();
+
+        m_assembler.loadConstant(left.offset, scr);
+        m_assembler.addlRegReg(left.base, scr);
+        m_assembler.movlMemReg(scr, scr);
+        RegisterID scr1 = claimScratch();
+        m_assembler.ensureSpace(m_assembler.maxInstructionSize + 10, 2 * sizeof(uint32_t));
+        dataLabel = moveWithPatch(initialRightValue, scr1);
+        m_assembler.cmplRegReg(scr1, scr, SH4Condition(cond));
+        releaseScratch(scr);
+        releaseScratch(scr1);
+
+        return (cond == NotEqual) ? branchFalse() : branchTrue();
     }
 
     void ret()
@@ -2424,6 +2542,23 @@ public:
         m_assembler.nop();
     }
 
+    void memoryFence()
+    {
+        m_assembler.synco();
+    }
+
+    void abortWithReason(AbortReason reason)
+    {
+        move(TrustedImm32(reason), SH4Registers::r0);
+        breakpoint();
+    }
+
+    void abortWithReason(AbortReason reason, intptr_t misc)
+    {
+        move(TrustedImm32(misc), SH4Registers::r1);
+        abortWithReason(reason);
+    }
+
     static FunctionPtr readCallTarget(CodeLocationCall call)
     {
         return FunctionPtr(reinterpret_cast<void(*)()>(SH4Assembler::readCallTarget(call.dataLocation())));
@@ -2441,6 +2576,8 @@ public:
 
     static bool canJumpReplacePatchableBranchPtrWithPatch() { return false; }
 
+    static bool canJumpReplacePatchableBranch32WithPatch() { return false; }
+
     static CodeLocationLabel startOfBranchPtrWithPatchOnRegister(CodeLocationDataLabelPtr label)
     {
         return label.labelAtOffset(0);
@@ -2457,7 +2594,18 @@ public:
         return CodeLocationLabel();
     }
 
-    static void revertJumpReplacementToPatchableBranchPtrWithPatch(CodeLocationLabel instructionStart, Address, void* initialValue)
+    static CodeLocationLabel startOfPatchableBranch32WithPatchOnAddress(CodeLocationDataLabel32)
+    {
+        UNREACHABLE_FOR_PLATFORM();
+        return CodeLocationLabel();
+    }
+
+    static void revertJumpReplacementToPatchableBranchPtrWithPatch(CodeLocationLabel, Address, void*)
+    {
+        UNREACHABLE_FOR_PLATFORM();
+    }
+
+    static void revertJumpReplacementToPatchableBranch32WithPatch(CodeLocationLabel, Address, int32_t)
     {
         UNREACHABLE_FOR_PLATFORM();
     }
@@ -2474,11 +2622,13 @@ protected:
     }
 private:
     friend class LinkBuffer;
-    friend class RepatchBuffer;
 
     static void linkCall(void* code, Call call, FunctionPtr function)
     {
-        SH4Assembler::linkCall(code, call.m_label, function.value());
+        if (call.isFlagSet(Call::Tail))
+            SH4Assembler::linkJump(code, call.m_label, function.value());
+        else
+            SH4Assembler::linkCall(code, call.m_label, function.value());
     }
 
     static void repatchCall(CodeLocationCall call, CodeLocationLabel destination)

@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -33,24 +33,28 @@
 
 namespace WebCore {
     
-class AccessibilityARIAGridRow : public AccessibilityTableRow {
+class AccessibilityTable;
     
-private:
-    explicit AccessibilityARIAGridRow(RenderObject*);
+class AccessibilityARIAGridRow final : public AccessibilityTableRow {
 public:
-    static PassRefPtr<AccessibilityARIAGridRow> create(RenderObject*);
+    static Ref<AccessibilityARIAGridRow> create(RenderObject*);
     virtual ~AccessibilityARIAGridRow();
     
     void disclosedRows(AccessibilityChildrenVector&);
     AccessibilityObject* disclosedByRow() const;
     
-    virtual AccessibilityObject* headerObject();
+    virtual AccessibilityObject* headerObject() override;
     
 private:
-    virtual bool isARIATreeGridRow() const;
-    virtual AccessibilityObject* parentTable() const;
-}; 
-    
+    explicit AccessibilityARIAGridRow(RenderObject*);
+
+    virtual bool isARIATreeGridRow() const override;
+    virtual AccessibilityTable* parentTable() const override;
+    virtual AccessibilityObject* parentObjectUnignored() const override;
+};
+
 } // namespace WebCore 
+
+SPECIALIZE_TYPE_TRAITS_ACCESSIBILITY(AccessibilityARIAGridRow, isARIATreeGridRow())
 
 #endif // AccessibilityARIAGridRow_h

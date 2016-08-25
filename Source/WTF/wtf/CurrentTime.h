@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006 Apple Computer, Inc.  All rights reserved.
+ * Copyright (C) 2006 Apple Inc.  All rights reserved.
  * Copyright (C) 2008 Google Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,6 +32,7 @@
 #ifndef CurrentTime_h
 #define CurrentTime_h
 
+#include <chrono>
 #include <time.h>
 
 namespace WTF {
@@ -39,6 +40,8 @@ namespace WTF {
 // Returns the current UTC time in seconds, counted from January 1, 1970.
 // Precision varies depending on platform but is usually as good or better
 // than a millisecond.
+// Use this function only if wall clock time is needed. For elapsed time
+// measurement use monotonicallyIncreasingTime() instead.
 WTF_EXPORT_PRIVATE double currentTime();
 
 // Same thing, in milliseconds.
@@ -49,21 +52,26 @@ inline double currentTimeMS()
 
 // Provides a monotonically increasing time in seconds since an arbitrary point in the past.
 // On unsupported platforms, this function only guarantees the result will be non-decreasing.
+// Result of this function increases monotonically even when clock time goes back due to
+// NTP or manual adjustments, so it is better suited for elapsed time measurement.
 WTF_EXPORT_PRIVATE double monotonicallyIncreasingTime();
 
-// Returns the current CPU time of the current thread in seconds.
+inline double monotonicallyIncreasingTimeMS()
+{
+    return monotonicallyIncreasingTime() * 1000.0;
+}
+
+// Returns the current CPU time of the current thread.
 // Precision varies depending on platform but is usually as good or better
 // than a millisecond.
-WTF_EXPORT_PRIVATE double currentCPUTime();
-
-// Returns the current CPU time of the current thread in milliseconds.
-WTF_EXPORT_PRIVATE double currentCPUTimeMS();
+WTF_EXPORT_PRIVATE std::chrono::microseconds currentCPUTime();
 
 } // namespace WTF
 
 using WTF::currentTime;
 using WTF::currentTimeMS;
 using WTF::monotonicallyIncreasingTime;
+using WTF::monotonicallyIncreasingTimeMS;
 using WTF::currentCPUTime;
 
 #endif // CurrentTime_h

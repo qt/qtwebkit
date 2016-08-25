@@ -28,28 +28,30 @@
 
 #if ENABLE(VIDEO_TRACK)
 
+#include "AudioTrack.h"
 #include "Language.h"
 #include "LocalizedStrings.h"
 #include "TextTrack.h"
 #include "Timer.h"
-#include <wtf/PassOwnPtr.h>
 #include <wtf/text/AtomicString.h>
 
 namespace WebCore {
 
 class HTMLMediaElement;
 class PageGroup;
+class AudioTrackList;
 class TextTrackList;
 
 class CaptionUserPreferences {
 public:
-    static PassOwnPtr<CaptionUserPreferences> create(PageGroup* group) { return adoptPtr(new CaptionUserPreferences(group)); }
+    CaptionUserPreferences(PageGroup&);
     virtual ~CaptionUserPreferences();
 
     enum CaptionDisplayMode {
         Automatic,
         ForcedOnly,
-        AlwaysOn
+        AlwaysOn,
+        Manual,
     };
     virtual CaptionDisplayMode captionDisplayMode() const;
     virtual void setCaptionDisplayMode(CaptionDisplayMode);
@@ -78,8 +80,14 @@ public:
     virtual void setPreferredLanguage(const String&);
     virtual Vector<String> preferredLanguages() const;
 
+    virtual void setPreferredAudioCharacteristic(const String&);
+    virtual Vector<String> preferredAudioCharacteristics() const;
+
     virtual String displayNameForTrack(TextTrack*) const;
-    virtual Vector<RefPtr<TextTrack> > sortedTrackListForMenu(TextTrackList*);
+    virtual Vector<RefPtr<TextTrack>> sortedTrackListForMenu(TextTrackList*);
+
+    virtual String displayNameForTrack(AudioTrack*) const;
+    virtual Vector<RefPtr<AudioTrack>> sortedTrackListForMenu(AudioTrackList*);
 
     void setPrimaryAudioTrackLanguageOverride(const String& language) { m_primaryAudioTrackLanguageOverride = language;  }
     String primaryAudioTrackLanguageOverride() const;
@@ -87,22 +95,25 @@ public:
     virtual bool testingMode() const { return m_testingMode; }
     virtual void setTestingMode(bool override) { m_testingMode = override; }
     
-    PageGroup* pageGroup() const { return m_pageGroup; }
+    PageGroup& pageGroup() const { return m_pageGroup; }
 
 protected:
-    CaptionUserPreferences(PageGroup*);
     void updateCaptionStyleSheetOveride();
+    void beginBlockingNotifications();
+    void endBlockingNotifications();
 
 private:
-    void timerFired(Timer<CaptionUserPreferences>*);
+    void timerFired();
     void notify();
 
-    PageGroup* m_pageGroup;
-    CaptionDisplayMode m_displayMode;
-    Timer<CaptionUserPreferences> m_timer;
+    PageGroup& m_pageGroup;
+    mutable CaptionDisplayMode m_displayMode;
+    Timer m_timer;
     String m_userPreferredLanguage;
+    String m_userPreferredAudioCharacteristic;
     String m_captionsStyleSheetOverride;
     String m_primaryAudioTrackLanguageOverride;
+    unsigned m_blockNotificationsCounter { 0 };
     bool m_testingMode;
     bool m_havePreferences;
 };

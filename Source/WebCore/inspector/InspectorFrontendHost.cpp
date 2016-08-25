@@ -11,7 +11,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -28,52 +28,52 @@
  */
 
 #include "config.h"
-
-#if ENABLE(INSPECTOR)
-
 #include "InspectorFrontendHost.h"
 
 #include "ContextMenu.h"
-#include "ContextMenuItem.h"
 #include "ContextMenuController.h"
+#include "ContextMenuItem.h"
 #include "ContextMenuProvider.h"
-#include "DOMFileSystem.h"
 #include "DOMWrapperWorld.h"
-#include "Element.h"
-#include "Frame.h"
-#include "FrameLoader.h"
+#include "Document.h"
+#include "Editor.h"
+#include "Event.h"
+#include "FocusController.h"
 #include "HitTestResult.h"
-#include "HTMLFrameOwnerElement.h"
-#include "InspectorAgent.h"
-#include "InspectorController.h"
 #include "InspectorFrontendClient.h"
+#include "JSMainThreadExecState.h"
+#include "MainFrame.h"
+#include "MouseEvent.h"
+#include "Node.h"
 #include "Page.h"
 #include "Pasteboard.h"
-#include "ResourceError.h"
-#include "ResourceRequest.h"
-#include "ResourceResponse.h"
-#include "ScriptFunctionCall.h"
+#include "ScriptGlobalObject.h"
+#include "ScriptState.h"
+#include "Sound.h"
 #include "UserGestureIndicator.h"
+#include <bindings/ScriptFunctionCall.h>
 #include <wtf/StdLibExtras.h>
+
+using namespace Inspector;
 
 namespace WebCore {
 
 #if ENABLE(CONTEXT_MENUS)
 class FrontendMenuProvider : public ContextMenuProvider {
 public:
-    static PassRefPtr<FrontendMenuProvider> create(InspectorFrontendHost* frontendHost, ScriptObject frontendApiObject, const Vector<ContextMenuItem>& items)
+    static Ref<FrontendMenuProvider> create(InspectorFrontendHost* frontendHost, Deprecated::ScriptObject frontendApiObject, const Vector<ContextMenuItem>& items)
     {
-        return adoptRef(new FrontendMenuProvider(frontendHost, frontendApiObject, items));
+        return adoptRef(*new FrontendMenuProvider(frontendHost, frontendApiObject, items));
     }
     
     void disconnect()
     {
-        m_frontendApiObject = ScriptObject();
-        m_frontendHost = 0;
+        m_frontendApiObject = Deprecated::ScriptObject();
+        m_frontendHost = nullptr;
     }
     
 private:
-    FrontendMenuProvider(InspectorFrontendHost* frontendHost, ScriptObject frontendApiObject, const Vector<ContextMenuItem>& items)
+    FrontendMenuProvider(InspectorFrontendHost* frontendHost, Deprecated::ScriptObject frontendApiObject, const Vector<ContextMenuItem>& items)
         : m_frontendHost(frontendHost)
         , m_frontendApiObject(frontendApiObject)
         , m_items(items)
@@ -85,37 +85,37 @@ private:
         contextMenuCleared();
     }
     
-    virtual void populateContextMenu(ContextMenu* menu)
+    virtual void populateContextMenu(ContextMenu* menu) override
     {
-        for (size_t i = 0; i < m_items.size(); ++i)
-            menu->appendItem(m_items[i]);
+        for (auto& item : m_items)
+            menu->appendItem(item);
     }
     
-    virtual void contextMenuItemSelected(ContextMenuItem* item)
+    virtual void contextMenuItemSelected(ContextMenuAction action, const String&) override
     {
         if (m_frontendHost) {
             UserGestureIndicator gestureIndicator(DefinitelyProcessingUserGesture);
-            int itemNumber = item->action() - ContextMenuItemBaseCustomTag;
+            int itemNumber = action - ContextMenuItemBaseCustomTag;
 
-            ScriptFunctionCall function(m_frontendApiObject, "contextMenuItemSelected");
+            Deprecated::ScriptFunctionCall function(m_frontendApiObject, "contextMenuItemSelected", WebCore::functionCallHandlerFromAnyThread);
             function.appendArgument(itemNumber);
             function.call();
         }
     }
     
-    virtual void contextMenuCleared()
+    virtual void contextMenuCleared() override
     {
         if (m_frontendHost) {
-            ScriptFunctionCall function(m_frontendApiObject, "contextMenuCleared");
+            Deprecated::ScriptFunctionCall function(m_frontendApiObject, "contextMenuCleared", WebCore::functionCallHandlerFromAnyThread);
             function.call();
 
-            m_frontendHost->m_menuProvider = 0;
+            m_frontendHost->m_menuProvider = nullptr;
         }
         m_items.clear();
     }
 
     InspectorFrontendHost* m_frontendHost;
-    ScriptObject m_frontendApiObject;
+    Deprecated::ScriptObject m_frontendApiObject;
     Vector<ContextMenuItem> m_items;
 };
 #endif
@@ -124,7 +124,7 @@ InspectorFrontendHost::InspectorFrontendHost(InspectorFrontendClient* client, Pa
     : m_client(client)
     , m_frontendPage(frontendPage)
 #if ENABLE(CONTEXT_MENUS)
-    , m_menuProvider(0)
+    , m_menuProvider(nullptr)
 #endif
 {
 }
@@ -136,12 +136,12 @@ InspectorFrontendHost::~InspectorFrontendHost()
 
 void InspectorFrontendHost::disconnectClient()
 {
-    m_client = 0;
+    m_client = nullptr;
 #if ENABLE(CONTEXT_MENUS)
     if (m_menuProvider)
         m_menuProvider->disconnect();
 #endif
-    m_frontendPage = 0;
+    m_frontendPage = nullptr;
 }
 
 void InspectorFrontendHost::loaded()
@@ -155,11 +155,11 @@ void InspectorFrontendHost::requestSetDockSide(const String& side)
     if (!m_client)
         return;
     if (side == "undocked")
-        m_client->requestSetDockSide(InspectorFrontendClient::UNDOCKED);
+        m_client->requestSetDockSide(InspectorFrontendClient::DockSide::Undocked);
     else if (side == "right")
-        m_client->requestSetDockSide(InspectorFrontendClient::DOCKED_TO_RIGHT);
+        m_client->requestSetDockSide(InspectorFrontendClient::DockSide::Right);
     else if (side == "bottom")
-        m_client->requestSetDockSide(InspectorFrontendClient::DOCKED_TO_BOTTOM);
+        m_client->requestSetDockSide(InspectorFrontendClient::DockSide::Bottom);
 }
 
 void InspectorFrontendHost::closeWindow()
@@ -176,15 +176,24 @@ void InspectorFrontendHost::bringToFront()
         m_client->bringToFront();
 }
 
-void InspectorFrontendHost::setZoomFactor(float zoom)
-{
-    m_frontendPage->mainFrame()->setPageAndTextZoomFactors(zoom, 1);
-}
-
 void InspectorFrontendHost::inspectedURLChanged(const String& newURL)
 {
     if (m_client)
         m_client->inspectedURLChanged(newURL);
+}
+
+void InspectorFrontendHost::setZoomFactor(float zoom)
+{
+    if (m_frontendPage)
+        m_frontendPage->mainFrame().setPageAndTextZoomFactors(zoom, 1);
+}
+
+float InspectorFrontendHost::zoomFactor()
+{
+    if (m_frontendPage)
+        return m_frontendPage->mainFrame().pageZoomFactor();
+
+    return 1.0;
 }
 
 void InspectorFrontendHost::setAttachedWindowHeight(unsigned height)
@@ -199,10 +208,10 @@ void InspectorFrontendHost::setAttachedWindowWidth(unsigned width)
         m_client->changeAttachedWindowWidth(width);
 }
 
-void InspectorFrontendHost::setToolbarHeight(unsigned height)
+void InspectorFrontendHost::startWindowDrag()
 {
     if (m_client)
-        m_client->setToolbarHeight(height);
+        m_client->startWindowDrag();
 }
 
 void InspectorFrontendHost::moveWindowBy(float x, float y) const
@@ -211,20 +220,67 @@ void InspectorFrontendHost::moveWindowBy(float x, float y) const
         m_client->moveWindowBy(x, y);
 }
 
-void InspectorFrontendHost::setInjectedScriptForOrigin(const String& origin, const String& script)
-{
-    ASSERT(m_frontendPage->inspectorController());
-    m_frontendPage->inspectorController()->setInjectedScriptForOrigin(origin, script);
-}
-
 String InspectorFrontendHost::localizedStringsURL()
 {
     return m_client ? m_client->localizedStringsURL() : "";
 }
 
+String InspectorFrontendHost::debuggableType()
+{
+    return ASCIILiteral("web");
+}
+
+unsigned InspectorFrontendHost::inspectionLevel()
+{
+    return m_client ? m_client->inspectionLevel() : 1;
+}
+
+String InspectorFrontendHost::platform()
+{
+#if PLATFORM(MAC) || PLATFORM(IOS)
+    return ASCIILiteral("mac");
+#elif OS(WINDOWS)
+    return ASCIILiteral("windows");
+#elif OS(LINUX)
+    return ASCIILiteral("linux");
+#elif OS(FREEBSD)
+    return ASCIILiteral("freebsd");
+#elif OS(OPENBSD)
+    return ASCIILiteral("openbsd");
+#elif OS(SOLARIS)
+    return ASCIILiteral("solaris");
+#else
+    return ASCIILiteral("unknown");
+#endif
+}
+
+String InspectorFrontendHost::port()
+{
+#if PLATFORM(GTK)
+    return ASCIILiteral("gtk");
+#elif PLATFORM(EFL)
+    return ASCIILiteral("efl");
+#elif PLATFORM(QT)
+    return ASCIILiteral("qt");
+#else
+    return ASCIILiteral("unknown");
+#endif
+}
+
 void InspectorFrontendHost::copyText(const String& text)
 {
-    Pasteboard::generalPasteboard()->writePlainText(text, Pasteboard::CannotSmartReplace);
+    Pasteboard::createForCopyAndPaste()->writePlainText(text, Pasteboard::CannotSmartReplace);
+}
+
+void InspectorFrontendHost::killText(const String& text, bool shouldPrependToKillRing, bool shouldStartNewSequence)
+{
+    if (!m_frontendPage)
+        return;
+
+    Editor& editor = m_frontendPage->focusController().focusedOrMainFrame().editor();
+    editor.setStartNewKillRingSequence(shouldStartNewSequence);
+    Editor::KillRingInsertionMode insertionMode = shouldPrependToKillRing ? Editor::KillRingInsertionMode::PrependText : Editor::KillRingInsertionMode::AppendText;
+    editor.addTextToKillRing(text, insertionMode);
 }
 
 void InspectorFrontendHost::openInNewTab(const String& url)
@@ -240,10 +296,10 @@ bool InspectorFrontendHost::canSave()
     return false;
 }
 
-void InspectorFrontendHost::save(const String& url, const String& content, bool forceSaveAs)
+void InspectorFrontendHost::save(const String& url, const String& content, bool base64Encoded, bool forceSaveAs)
 {
     if (m_client)
-        m_client->save(url, content, forceSaveAs);
+        m_client->save(url, content, base64Encoded, forceSaveAs);
 }
 
 void InspectorFrontendHost::append(const String& url, const String& content)
@@ -269,79 +325,48 @@ void InspectorFrontendHost::showContextMenu(Event* event, const Vector<ContextMe
         return;
 
     ASSERT(m_frontendPage);
-    ScriptState* frontendScriptState = scriptStateFromPage(debuggerWorld(), m_frontendPage);
-    ScriptObject frontendApiObject;
-    if (!ScriptGlobalObject::get(frontendScriptState, "InspectorFrontendAPI", frontendApiObject)) {
+    JSC::ExecState* frontendExecState = execStateFromPage(debuggerWorld(), m_frontendPage);
+    Deprecated::ScriptObject frontendApiObject;
+    if (!ScriptGlobalObject::get(frontendExecState, "InspectorFrontendAPI", frontendApiObject)) {
         ASSERT_NOT_REACHED();
         return;
     }
     RefPtr<FrontendMenuProvider> menuProvider = FrontendMenuProvider::create(this, frontendApiObject, items);
-    ContextMenuController* menuController = m_frontendPage->contextMenuController();
-    menuController->showContextMenu(event, menuProvider);
+    m_frontendPage->contextMenuController().showContextMenu(event, menuProvider);
     m_menuProvider = menuProvider.get();
 }
 #endif
 
-String InspectorFrontendHost::loadResourceSynchronously(const String& url)
+void InspectorFrontendHost::dispatchEventAsContextMenuEvent(Event* event)
 {
-    ResourceRequest request(url);
-    request.setHTTPMethod("GET");
+#if ENABLE(CONTEXT_MENUS) && USE(ACCESSIBILITY_CONTEXT_MENUS)
+    if (!is<MouseEvent>(event))
+        return;
 
-    Vector<char> data;
-    ResourceError error;
-    ResourceResponse response;
-    m_frontendPage->mainFrame()->loader()->loadResourceSynchronously(request, DoNotAllowStoredCredentials, DoNotAskClientForCrossOriginCredentials, error, response, data);
-    return String::fromUTF8(data.data(), data.size());
-}
+    Frame* frame = event->target()->toNode()->document().frame();
+    MouseEvent& mouseEvent = downcast<MouseEvent>(*event);
+    IntPoint mousePoint = IntPoint(mouseEvent.clientX(), mouseEvent.clientY());
 
-bool InspectorFrontendHost::supportsFileSystems()
-{
-    if (m_client)
-        return m_client->supportsFileSystems();
-    return false;
-}
-
-void InspectorFrontendHost::requestFileSystems()
-{
-    if (m_client)
-        m_client->requestFileSystems();
-}
-
-void InspectorFrontendHost::addFileSystem()
-{
-    if (m_client)
-        m_client->addFileSystem();
-}
-
-void InspectorFrontendHost::removeFileSystem(const String& fileSystemPath)
-{
-    if (m_client)
-        m_client->removeFileSystem(fileSystemPath);
-}
-
-#if ENABLE(FILE_SYSTEM)
-PassRefPtr<DOMFileSystem> InspectorFrontendHost::isolatedFileSystem(const String& fileSystemName, const String& rootURL)
-{
-    ScriptExecutionContext* context = m_frontendPage->mainFrame()->document();
-    return DOMFileSystem::create(context, fileSystemName, FileSystemTypeIsolated, KURL(ParsedURLString, rootURL), AsyncFileSystem::create());
-}
+    m_frontendPage->contextMenuController().showContextMenuAt(frame, mousePoint);
+#else
+    UNUSED_PARAM(event);
 #endif
+}
 
 bool InspectorFrontendHost::isUnderTest()
 {
     return m_client && m_client->isUnderTest();
 }
 
-bool InspectorFrontendHost::canSaveAs()
+void InspectorFrontendHost::unbufferedLog(const String& message)
 {
-    return false;
+    // This is used only for debugging inspector tests.
+    WTFLogAlways("%s", message.utf8().data());
 }
 
-bool InspectorFrontendHost::canInspectWorkers()
+void InspectorFrontendHost::beep()
 {
-    return false;
+    systemBeep();
 }
 
 } // namespace WebCore
-
-#endif // ENABLE(INSPECTOR)

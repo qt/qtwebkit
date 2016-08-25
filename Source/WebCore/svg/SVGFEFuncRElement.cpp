@@ -19,26 +19,21 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG) && ENABLE(FILTERS)
 #include "SVGFEFuncRElement.h"
+
 #include "SVGNames.h"
 
 namespace WebCore {
 
-inline SVGFEFuncRElement::SVGFEFuncRElement(const QualifiedName& tagName, Document* document)
+inline SVGFEFuncRElement::SVGFEFuncRElement(const QualifiedName& tagName, Document& document)
     : SVGComponentTransferFunctionElement(tagName, document)
 {
     ASSERT(hasTagName(SVGNames::feFuncRTag));
 }
 
-PassRefPtr<SVGFEFuncRElement> SVGFEFuncRElement::create(const QualifiedName& tagName, Document* document)
+Ref<SVGFEFuncRElement> SVGFEFuncRElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new SVGFEFuncRElement(tagName, document));
+    return adoptRef(*new SVGFEFuncRElement(tagName, document));
 }
 
 }
-
-#endif // ENABLE(SVG)
-
-// vim:ts=4:noet

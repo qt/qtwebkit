@@ -31,28 +31,28 @@
 #define CSSPrimitiveValueMappings_h
 
 #include "CSSCalculationValue.h"
+#include "CSSFontFamily.h"
 #include "CSSPrimitiveValue.h"
 #include "CSSReflectionDirection.h"
+#include "CSSToLengthConversionData.h"
 #include "ColorSpace.h"
 #include "CSSValueKeywords.h"
 #include "FontDescription.h"
-#include "FontSmoothingMode.h"
 #include "GraphicsTypes.h"
-#if ENABLE(CSS_IMAGE_ORIENTATION)
-#include "ImageOrientation.h"
-#endif
 #include "Length.h"
 #include "LineClampValue.h"
 #include "Path.h"
 #include "RenderStyleConstants.h"
 #include "SVGRenderStyleDefs.h"
-#include "TextDirection.h"
-#include "TextRenderingMode.h"
+#include "TextFlags.h"
 #include "ThemeTypes.h"
 #include "UnicodeBidi.h"
 #include "WritingMode.h"
-
 #include <wtf/MathExtras.h>
+
+#if ENABLE(CSS_IMAGE_ORIENTATION)
+#include "ImageOrientation.h"
+#endif
 
 namespace WebCore {
 
@@ -81,8 +81,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(unsigned short i)
 
 template<> inline CSSPrimitiveValue::operator unsigned short() const
 {
-    if (m_primitiveUnitType == CSS_NUMBER)
-        return clampTo<unsigned short>(m_value.num);
+    if (primitiveType() == CSS_NUMBER)
+        return getValue<unsigned short>();
 
     ASSERT_NOT_REACHED();
     return 0;
@@ -90,8 +90,8 @@ template<> inline CSSPrimitiveValue::operator unsigned short() const
 
 template<> inline CSSPrimitiveValue::operator int() const
 {
-    if (m_primitiveUnitType == CSS_NUMBER)
-        return clampTo<int>(m_value.num);
+    if (primitiveType() == CSS_NUMBER)
+        return getValue<int>();
 
     ASSERT_NOT_REACHED();
     return 0;
@@ -99,8 +99,8 @@ template<> inline CSSPrimitiveValue::operator int() const
 
 template<> inline CSSPrimitiveValue::operator unsigned() const
 {
-    if (m_primitiveUnitType == CSS_NUMBER)
-        return clampTo<unsigned>(m_value.num);
+    if (primitiveType() == CSS_NUMBER)
+        return getValue<unsigned>();
 
     ASSERT_NOT_REACHED();
     return 0;
@@ -116,8 +116,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(float i)
 
 template<> inline CSSPrimitiveValue::operator float() const
 {
-    if (m_primitiveUnitType == CSS_NUMBER)
-        return clampTo<float>(m_value.num);
+    if (primitiveType() == CSS_NUMBER)
+        return getValue<float>();
 
     ASSERT_NOT_REACHED();
     return 0.0f;
@@ -132,11 +132,11 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(LineClampValue i)
 
 template<> inline CSSPrimitiveValue::operator LineClampValue() const
 {
-    if (m_primitiveUnitType == CSS_NUMBER)
-        return LineClampValue(clampTo<int>(m_value.num), LineClampLineCount);
+    if (primitiveType() == CSS_NUMBER)
+        return LineClampValue(getValue<int>(), LineClampLineCount);
 
-    if (m_primitiveUnitType == CSS_PERCENTAGE)
-        return LineClampValue(clampTo<int>(m_value.num), LineClampPercentage);
+    if (primitiveType() == CSS_PERCENTAGE)
+        return LineClampValue(getValue<int>(), LineClampPercentage);
 
     ASSERT_NOT_REACHED();
     return LineClampValue();
@@ -163,6 +163,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(CSSReflectionDirection e)
 
 template<> inline CSSPrimitiveValue::operator CSSReflectionDirection() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueAbove:
         return ReflectionAbove;
@@ -178,6 +180,32 @@ template<> inline CSSPrimitiveValue::operator CSSReflectionDirection() const
 
     ASSERT_NOT_REACHED();
     return ReflectionBelow;
+}
+
+template<> inline CSSPrimitiveValue::CSSPrimitiveValue(ColumnFill columnFill)
+    : CSSValue(PrimitiveClass)
+{
+    m_primitiveUnitType = CSS_VALUE_ID;
+    switch (columnFill) {
+    case ColumnFillAuto:
+        m_value.valueID = CSSValueAuto;
+        break;
+    case ColumnFillBalance:
+        m_value.valueID = CSSValueBalance;
+        break;
+    }
+}
+
+template<> inline CSSPrimitiveValue::operator ColumnFill() const
+{
+    if (m_primitiveUnitType == CSS_VALUE_ID) {
+        if (m_value.valueID == CSSValueBalance)
+            return ColumnFillBalance;
+        if (m_value.valueID == CSSValueAuto)
+            return ColumnFillAuto;
+    }
+    ASSERT_NOT_REACHED();
+    return ColumnFillBalance;
 }
 
 template<> inline CSSPrimitiveValue::CSSPrimitiveValue(ColumnSpan columnSpan)
@@ -199,6 +227,8 @@ template<> inline CSSPrimitiveValue::operator ColumnSpan() const
     // Map 1 to none for compatibility reasons.
     if (m_primitiveUnitType == CSS_NUMBER && m_value.num == 1)
         return ColumnSpanNone;
+
+    ASSERT(isValueID());
 
     switch (m_value.valueID) {
     case CSSValueAll:
@@ -230,6 +260,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(PrintColorAdjust value)
 
 template<> inline CSSPrimitiveValue::operator PrintColorAdjust() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueEconomy:
         return PrintColorAdjustEconomy;
@@ -284,6 +316,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EBorderStyle e)
 
 template<> inline CSSPrimitiveValue::operator EBorderStyle() const
 {
+    ASSERT(isValueID());
+
     if (m_value.valueID == CSSValueAuto) // Valid for CSS outline-style
         return DOTTED;
     return (EBorderStyle)(m_value.valueID - CSSValueNone);
@@ -291,6 +325,8 @@ template<> inline CSSPrimitiveValue::operator EBorderStyle() const
 
 template<> inline CSSPrimitiveValue::operator OutlineIsAuto() const
 {
+    ASSERT(isValueID());
+
     if (m_value.valueID == CSSValueAuto)
         return AUTO_ON;
     return AUTO_OFF;
@@ -348,6 +384,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(CompositeOperator e)
 
 template<> inline CSSPrimitiveValue::operator CompositeOperator() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueClear:
         return CompositeClear;
@@ -487,6 +525,12 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(ControlPart e)
     case MediaTimeRemainingPart:
         m_value.valueID = CSSValueMediaTimeRemainingDisplay;
         break;
+    case MediaControlsLightBarBackgroundPart:
+        m_value.valueID = CSSValueMediaControlsLightBarBackground;
+        break;
+    case MediaControlsDarkBarBackgroundPart:
+        m_value.valueID = CSSValueMediaControlsDarkBarBackground;
+        break;
     case MenulistPart:
         m_value.valueID = CSSValueMenulist;
         break;
@@ -515,14 +559,10 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(ControlPart e)
         m_value.valueID = CSSValueRatingLevelIndicator;
         break;
     case ProgressBarPart:
-#if ENABLE(PROGRESS_ELEMENT)
         m_value.valueID = CSSValueProgressBar;
-#endif
         break;
     case ProgressBarValuePart:
-#if ENABLE(PROGRESS_ELEMENT)
         m_value.valueID = CSSValueProgressBarValue;
-#endif
         break;
     case SliderHorizontalPart:
         m_value.valueID = CSSValueSliderHorizontal;
@@ -566,16 +606,23 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(ControlPart e)
     case CapsLockIndicatorPart:
         m_value.valueID = CSSValueCapsLockIndicator;
         break;
-    case InputSpeechButtonPart:
-#if ENABLE(INPUT_SPEECH)
-        m_value.valueID = CSSValueWebkitInputSpeechButton;
-#endif
+#if ENABLE(ATTACHMENT_ELEMENT)
+    case AttachmentPart:
+        m_value.valueID = CSSValueAttachment;
         break;
+#endif
+#if ENABLE(SERVICE_CONTROLS)
+    case ImageControlsButtonPart:
+        m_value.valueID = CSSValueImageControlsButton;
+        break;
+#endif
     }
 }
 
 template<> inline CSSPrimitiveValue::operator ControlPart() const
 {
+    ASSERT(isValueID());
+
     if (m_value.valueID == CSSValueNone)
         return NoControlPart;
     return ControlPart(m_value.valueID - CSSValueCheckbox + 1);
@@ -597,6 +644,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EBackfaceVisibility e)
 
 template<> inline CSSPrimitiveValue::operator EBackfaceVisibility() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueVisible:
         return BackfaceVisibilityVisible;
@@ -630,6 +679,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EFillAttachment e)
 
 template<> inline CSSPrimitiveValue::operator EFillAttachment() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueScroll:
         return ScrollBackgroundAttachment;
@@ -667,6 +718,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EFillBox e)
 
 template<> inline CSSPrimitiveValue::operator EFillBox() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueBorder:
     case CSSValueBorderBox:
@@ -710,6 +763,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EFillRepeat e)
 
 template<> inline CSSPrimitiveValue::operator EFillRepeat() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueRepeat:
         return RepeatFill;
@@ -749,6 +804,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EBoxPack e)
 
 template<> inline CSSPrimitiveValue::operator EBoxPack() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueStart:
         return Start;
@@ -791,6 +848,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EBoxAlignment e)
 
 template<> inline CSSPrimitiveValue::operator EBoxAlignment() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueStretch:
         return BSTRETCH;
@@ -827,6 +886,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EBoxDecorationBreak e)
 
 template<> inline CSSPrimitiveValue::operator EBoxDecorationBreak() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueSlice:
         return DSLICE;
@@ -841,43 +902,45 @@ template<> inline CSSPrimitiveValue::operator EBoxDecorationBreak() const
 }
 #endif
 
-template<> inline CSSPrimitiveValue::CSSPrimitiveValue(BackgroundEdgeOrigin e)
+template<> inline CSSPrimitiveValue::CSSPrimitiveValue(Edge e)
     : CSSValue(PrimitiveClass)
 {
     m_primitiveUnitType = CSS_VALUE_ID;
     switch (e) {
-    case TopEdge:
+    case Edge::Top:
         m_value.valueID = CSSValueTop;
         break;
-    case RightEdge:
+    case Edge::Right:
         m_value.valueID = CSSValueRight;
         break;
-    case BottomEdge:
+    case Edge::Bottom:
         m_value.valueID = CSSValueBottom;
         break;
-    case LeftEdge:
+    case Edge::Left:
         m_value.valueID = CSSValueLeft;
         break;
     }
 }
 
-template<> inline CSSPrimitiveValue::operator BackgroundEdgeOrigin() const
+template<> inline CSSPrimitiveValue::operator Edge() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueTop:
-        return TopEdge;
+        return Edge::Top;
     case CSSValueRight:
-        return RightEdge;
+        return Edge::Right;
     case CSSValueBottom:
-        return BottomEdge;
+        return Edge::Bottom;
     case CSSValueLeft:
-        return LeftEdge;
+        return Edge::Left;
     default:
         break;
     }
 
     ASSERT_NOT_REACHED();
-    return TopEdge;
+    return Edge::Top;
 }
 
 template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EBoxSizing e)
@@ -896,6 +959,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EBoxSizing e)
 
 template<> inline CSSPrimitiveValue::operator EBoxSizing() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueBorderBox:
         return BORDER_BOX;
@@ -925,6 +990,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EBoxDirection e)
 
 template<> inline CSSPrimitiveValue::operator EBoxDirection() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueNormal:
         return BNORMAL;
@@ -954,6 +1021,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EBoxLines e)
 
 template<> inline CSSPrimitiveValue::operator EBoxLines() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueSingle:
         return SINGLE;
@@ -983,6 +1052,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EBoxOrient e)
 
 template<> inline CSSPrimitiveValue::operator EBoxOrient() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueHorizontal:
     case CSSValueInlineAxis:
@@ -1020,6 +1091,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(ECaptionSide e)
 
 template<> inline CSSPrimitiveValue::operator ECaptionSide() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueLeft:
         return CAPLEFT;
@@ -1059,6 +1132,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EClear e)
 
 template<> inline CSSPrimitiveValue::operator EClear() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueNone:
         return CNONE;
@@ -1081,112 +1156,112 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(ECursor e)
 {
     m_primitiveUnitType = CSS_VALUE_ID;
     switch (e) {
-    case CURSOR_AUTO:
+    case CursorAuto:
         m_value.valueID = CSSValueAuto;
         break;
-    case CURSOR_CROSS:
+    case CursorCross:
         m_value.valueID = CSSValueCrosshair;
         break;
-    case CURSOR_DEFAULT:
+    case CursorDefault:
         m_value.valueID = CSSValueDefault;
         break;
-    case CURSOR_POINTER:
+    case CursorPointer:
         m_value.valueID = CSSValuePointer;
         break;
-    case CURSOR_MOVE:
+    case CursorMove:
         m_value.valueID = CSSValueMove;
         break;
-    case CURSOR_CELL:
+    case CursorCell:
         m_value.valueID = CSSValueCell;
         break;
-    case CURSOR_VERTICAL_TEXT:
+    case CursorVerticalText:
         m_value.valueID = CSSValueVerticalText;
         break;
-    case CURSOR_CONTEXT_MENU:
+    case CursorContextMenu:
         m_value.valueID = CSSValueContextMenu;
         break;
-    case CURSOR_ALIAS:
+    case CursorAlias:
         m_value.valueID = CSSValueAlias;
         break;
-    case CURSOR_COPY:
+    case CursorCopy:
         m_value.valueID = CSSValueCopy;
         break;
-    case CURSOR_NONE:
+    case CursorNone:
         m_value.valueID = CSSValueNone;
         break;
-    case CURSOR_PROGRESS:
+    case CursorProgress:
         m_value.valueID = CSSValueProgress;
         break;
-    case CURSOR_NO_DROP:
+    case CursorNoDrop:
         m_value.valueID = CSSValueNoDrop;
         break;
-    case CURSOR_NOT_ALLOWED:
+    case CursorNotAllowed:
         m_value.valueID = CSSValueNotAllowed;
         break;
-    case CURSOR_WEBKIT_ZOOM_IN:
-        m_value.valueID = CSSValueWebkitZoomIn;
+    case CursorZoomIn:
+        m_value.valueID = CSSValueZoomIn;
         break;
-    case CURSOR_WEBKIT_ZOOM_OUT:
-        m_value.valueID = CSSValueWebkitZoomOut;
+    case CursorZoomOut:
+        m_value.valueID = CSSValueZoomOut;
         break;
-    case CURSOR_E_RESIZE:
+    case CursorEResize:
         m_value.valueID = CSSValueEResize;
         break;
-    case CURSOR_NE_RESIZE:
+    case CursorNeResize:
         m_value.valueID = CSSValueNeResize;
         break;
-    case CURSOR_NW_RESIZE:
+    case CursorNwResize:
         m_value.valueID = CSSValueNwResize;
         break;
-    case CURSOR_N_RESIZE:
+    case CursorNResize:
         m_value.valueID = CSSValueNResize;
         break;
-    case CURSOR_SE_RESIZE:
+    case CursorSeResize:
         m_value.valueID = CSSValueSeResize;
         break;
-    case CURSOR_SW_RESIZE:
+    case CursorSwResize:
         m_value.valueID = CSSValueSwResize;
         break;
-    case CURSOR_S_RESIZE:
+    case CursorSResize:
         m_value.valueID = CSSValueSResize;
         break;
-    case CURSOR_W_RESIZE:
+    case CursorWResize:
         m_value.valueID = CSSValueWResize;
         break;
-    case CURSOR_EW_RESIZE:
+    case CursorEwResize:
         m_value.valueID = CSSValueEwResize;
         break;
-    case CURSOR_NS_RESIZE:
+    case CursorNsResize:
         m_value.valueID = CSSValueNsResize;
         break;
-    case CURSOR_NESW_RESIZE:
+    case CursorNeswResize:
         m_value.valueID = CSSValueNeswResize;
         break;
-    case CURSOR_NWSE_RESIZE:
+    case CursorNwseResize:
         m_value.valueID = CSSValueNwseResize;
         break;
-    case CURSOR_COL_RESIZE:
+    case CursorColResize:
         m_value.valueID = CSSValueColResize;
         break;
-    case CURSOR_ROW_RESIZE:
+    case CursorRowResize:
         m_value.valueID = CSSValueRowResize;
         break;
-    case CURSOR_TEXT:
+    case CursorText:
         m_value.valueID = CSSValueText;
         break;
-    case CURSOR_WAIT:
+    case CursorWait:
         m_value.valueID = CSSValueWait;
         break;
-    case CURSOR_HELP:
+    case CursorHelp:
         m_value.valueID = CSSValueHelp;
         break;
-    case CURSOR_ALL_SCROLL:
+    case CursorAllScroll:
         m_value.valueID = CSSValueAllScroll;
         break;
-    case CURSOR_WEBKIT_GRAB:
+    case CursorWebkitGrab:
         m_value.valueID = CSSValueWebkitGrab;
         break;
-    case CURSOR_WEBKIT_GRABBING:
+    case CursorWebkitGrabbing:
         m_value.valueID = CSSValueWebkitGrabbing;
         break;
     }
@@ -1194,13 +1269,20 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(ECursor e)
 
 template<> inline CSSPrimitiveValue::operator ECursor() const
 {
-    if (m_value.valueID == CSSValueCopy)
-        return CURSOR_COPY;
-    if (m_value.valueID == CSSValueNone)
-        return CURSOR_NONE;
-    return static_cast<ECursor>(m_value.valueID - CSSValueAuto);
+    ASSERT(isValueID());
+    switch (m_value.valueID) {
+    case CSSValueCopy:
+        return CursorCopy;
+    case CSSValueWebkitZoomIn:
+        return CursorZoomIn;
+    case CSSValueWebkitZoomOut:
+        return CursorZoomOut;
+    case CSSValueNone:
+        return CursorNone;
+    default:
+        return static_cast<ECursor>(m_value.valueID - CSSValueAuto);
+    }
 }
-
 
 #if ENABLE(CURSOR_VISIBILITY)
 template<> inline CSSPrimitiveValue::CSSPrimitiveValue(CursorVisibility e)
@@ -1219,6 +1301,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(CursorVisibility e)
 
 template<> inline CSSPrimitiveValue::operator CursorVisibility() const
 {
+    ASSERT(isValueID());
+
     if (m_value.valueID == CSSValueAuto)
         return CursorVisibilityAuto;
     if (m_value.valueID == CSSValueAutoHide)
@@ -1242,9 +1326,6 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EDisplay e)
         break;
     case LIST_ITEM:
         m_value.valueID = CSSValueListItem;
-        break;
-    case RUN_IN:
-        m_value.valueID = CSSValueRunIn;
         break;
     case COMPACT:
         m_value.valueID = CSSValueCompact;
@@ -1289,17 +1370,21 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EDisplay e)
         m_value.valueID = CSSValueWebkitInlineBox;
         break;
     case FLEX:
-        m_value.valueID = CSSValueWebkitFlex;
+    case WEBKIT_FLEX:
+        m_value.valueID = CSSValueFlex;
         break;
     case INLINE_FLEX:
-        m_value.valueID = CSSValueWebkitInlineFlex;
+    case WEBKIT_INLINE_FLEX:
+        m_value.valueID = CSSValueInlineFlex;
         break;
+#if ENABLE(CSS_GRID_LAYOUT)
     case GRID:
         m_value.valueID = CSSValueWebkitGrid;
         break;
     case INLINE_GRID:
         m_value.valueID = CSSValueWebkitInlineGrid;
         break;
+#endif
     case NONE:
         m_value.valueID = CSSValueNone;
         break;
@@ -1308,11 +1393,17 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EDisplay e)
 
 template<> inline CSSPrimitiveValue::operator EDisplay() const
 {
+    ASSERT(isValueID());
+
     if (m_value.valueID == CSSValueNone)
         return NONE;
 
     EDisplay display = static_cast<EDisplay>(m_value.valueID - CSSValueInline);
     ASSERT(display >= INLINE && display <= NONE);
+    if (display == WEBKIT_FLEX)
+        return FLEX;
+    if (display == WEBKIT_INLINE_FLEX)
+        return INLINE_FLEX;
     return display;
 }
 
@@ -1332,6 +1423,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EEmptyCell e)
 
 template<> inline CSSPrimitiveValue::operator EEmptyCell() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueShow:
         return SHOW;
@@ -1343,99 +1436,6 @@ template<> inline CSSPrimitiveValue::operator EEmptyCell() const
 
     ASSERT_NOT_REACHED();
     return SHOW;
-}
-
-template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EAlignItems e)
-    : CSSValue(PrimitiveClass)
-{
-    m_primitiveUnitType = CSS_VALUE_ID;
-    switch (e) {
-    case AlignAuto:
-        m_value.valueID = CSSValueAuto;
-        break;
-    case AlignFlexStart:
-        m_value.valueID = CSSValueFlexStart;
-        break;
-    case AlignFlexEnd:
-        m_value.valueID = CSSValueFlexEnd;
-        break;
-    case AlignCenter:
-        m_value.valueID = CSSValueCenter;
-        break;
-    case AlignStretch:
-        m_value.valueID = CSSValueStretch;
-        break;
-    case AlignBaseline:
-        m_value.valueID = CSSValueBaseline;
-        break;
-    }
-}
-
-template<> inline CSSPrimitiveValue::operator EAlignItems() const
-{
-    switch (m_value.valueID) {
-    case CSSValueAuto:
-        return AlignAuto;
-    case CSSValueFlexStart:
-        return AlignFlexStart;
-    case CSSValueFlexEnd:
-        return AlignFlexEnd;
-    case CSSValueCenter:
-        return AlignCenter;
-    case CSSValueStretch:
-        return AlignStretch;
-    case CSSValueBaseline:
-        return AlignBaseline;
-    default:
-        break;
-    }
-
-    ASSERT_NOT_REACHED();
-    return AlignFlexStart;
-}
-
-template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EJustifyContent e)
-    : CSSValue(PrimitiveClass)
-{
-    m_primitiveUnitType = CSS_VALUE_ID;
-    switch (e) {
-    case JustifyFlexStart:
-        m_value.valueID = CSSValueFlexStart;
-        break;
-    case JustifyFlexEnd:
-        m_value.valueID = CSSValueFlexEnd;
-        break;
-    case JustifyCenter:
-        m_value.valueID = CSSValueCenter;
-        break;
-    case JustifySpaceBetween:
-        m_value.valueID = CSSValueSpaceBetween;
-        break;
-    case JustifySpaceAround:
-        m_value.valueID = CSSValueSpaceAround;
-        break;
-    }
-}
-
-template<> inline CSSPrimitiveValue::operator EJustifyContent() const
-{
-    switch (m_value.valueID) {
-    case CSSValueFlexStart:
-        return JustifyFlexStart;
-    case CSSValueFlexEnd:
-        return JustifyFlexEnd;
-    case CSSValueCenter:
-        return JustifyCenter;
-    case CSSValueSpaceBetween:
-        return JustifySpaceBetween;
-    case CSSValueSpaceAround:
-        return JustifySpaceAround;
-    default:
-        break;
-    }
-
-    ASSERT_NOT_REACHED();
-    return JustifyFlexStart;
 }
 
 template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EFlexDirection e)
@@ -1460,6 +1460,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EFlexDirection e)
 
 template<> inline CSSPrimitiveValue::operator EFlexDirection() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueRow:
         return FlowRow;
@@ -1505,6 +1507,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EAlignContent e)
 
 template<> inline CSSPrimitiveValue::operator EAlignContent() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueFlexStart:
         return AlignContentFlexStart;
@@ -1545,6 +1549,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EFlexWrap e)
 
 template<> inline CSSPrimitiveValue::operator EFlexWrap() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueNowrap:
         return FlexNoWrap;
@@ -1579,6 +1585,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EFloat e)
 
 template<> inline CSSPrimitiveValue::operator EFloat() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueLeft:
         return LeftFloat;
@@ -1618,8 +1626,33 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(LineBreak e)
     }
 }
 
+template<> inline CSSPrimitiveValue::operator HangingPunctuation() const
+{
+    ASSERT(isValueID());
+    
+    switch (m_value.valueID) {
+    case CSSValueNone:
+        return NoHangingPunctuation;
+    case CSSValueFirst:
+        return FirstHangingPunctuation;
+    case CSSValueLast:
+        return LastHangingPunctuation;
+    case CSSValueAllowEnd:
+        return AllowEndHangingPunctuation;
+    case CSSValueForceEnd:
+        return ForceEndHangingPunctuation;
+    default:
+        break;
+    }
+    
+    ASSERT_NOT_REACHED();
+    return NoHangingPunctuation;
+}
+
 template<> inline CSSPrimitiveValue::operator LineBreak() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueAuto:
         return LineBreakAuto;
@@ -1655,6 +1688,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EListStylePosition e)
 
 template<> inline CSSPrimitiveValue::operator EListStylePosition() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueOutside:
         return OUTSIDE;
@@ -1921,6 +1956,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EListStyleType e)
 
 template<> inline CSSPrimitiveValue::operator EListStyleType() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueNone:
         return NoneListStyle;
@@ -1948,6 +1985,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EMarginCollapse e)
 
 template<> inline CSSPrimitiveValue::operator EMarginCollapse() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueCollapse:
         return MCOLLAPSE;
@@ -1985,6 +2024,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EMarqueeBehavior e)
 
 template<> inline CSSPrimitiveValue::operator EMarqueeBehavior() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueNone:
         return MNONE;
@@ -2018,6 +2059,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(RegionFragment e)
 
 template<> inline CSSPrimitiveValue::operator RegionFragment() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueAuto:
         return AutoRegionFragment;
@@ -2062,6 +2105,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EMarqueeDirection e)
 
 template<> inline CSSPrimitiveValue::operator EMarqueeDirection() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueForwards:
         return MFORWARD;
@@ -2103,6 +2148,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(ENBSPMode e)
 
 template<> inline CSSPrimitiveValue::operator ENBSPMode() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueSpace:
         return SPACE;
@@ -2150,6 +2197,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EOverflow e)
 
 template<> inline CSSPrimitiveValue::operator EOverflow() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueVisible:
         return OVISIBLE;
@@ -2175,40 +2224,131 @@ template<> inline CSSPrimitiveValue::operator EOverflow() const
     return OVISIBLE;
 }
 
-template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EPageBreak e)
+template<> inline CSSPrimitiveValue::CSSPrimitiveValue(BreakBetween e)
     : CSSValue(PrimitiveClass)
 {
     m_primitiveUnitType = CSS_VALUE_ID;
     switch (e) {
-    case PBAUTO:
+    case AutoBreakBetween:
         m_value.valueID = CSSValueAuto;
         break;
-    case PBALWAYS:
-        m_value.valueID = CSSValueAlways;
-        break;
-    case PBAVOID:
+    case AvoidBreakBetween:
         m_value.valueID = CSSValueAvoid;
+        break;
+    case AvoidColumnBreakBetween:
+        m_value.valueID = CSSValueAvoidColumn;
+        break;
+    case AvoidPageBreakBetween:
+        m_value.valueID = CSSValueAvoidPage;
+        break;
+    case AvoidRegionBreakBetween:
+        m_value.valueID = CSSValueAvoidRegion;
+        break;
+    case ColumnBreakBetween:
+        m_value.valueID = CSSValueColumn;
+        break;
+    case PageBreakBetween:
+        m_value.valueID = CSSValuePage;
+        break;
+    case RegionBreakBetween:
+        m_value.valueID = CSSValueRegion;
+        break;
+    case LeftPageBreakBetween:
+        m_value.valueID = CSSValueLeft;
+        break;
+    case RightPageBreakBetween:
+        m_value.valueID = CSSValueRight;
+        break;
+    case RectoPageBreakBetween:
+        m_value.valueID = CSSValueRecto;
+        break;
+    case VersoPageBreakBetween:
+        m_value.valueID = CSSValueVerso;
         break;
     }
 }
 
-template<> inline CSSPrimitiveValue::operator EPageBreak() const
+template<> inline CSSPrimitiveValue::operator BreakBetween() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueAuto:
-        return PBAUTO;
-    case CSSValueLeft:
-    case CSSValueRight:
-    case CSSValueAlways:
-        return PBALWAYS; // CSS2.1: "Conforming user agents may map left/right to always."
+        return AutoBreakBetween;
     case CSSValueAvoid:
-        return PBAVOID;
+        return AvoidBreakBetween;
+    case CSSValueAvoidColumn:
+        return AvoidColumnBreakBetween;
+    case CSSValueAvoidPage:
+        return AvoidPageBreakBetween;
+    case CSSValueAvoidRegion:
+        return AvoidRegionBreakBetween;
+    case CSSValueColumn:
+        return ColumnBreakBetween;
+    case CSSValuePage:
+        return PageBreakBetween;
+    case CSSValueRegion:
+        return RegionBreakBetween;
+    case CSSValueLeft:
+        return LeftPageBreakBetween;
+    case CSSValueRight:
+        return RightPageBreakBetween;
+    case CSSValueRecto:
+        return RectoPageBreakBetween;
+    case CSSValueVerso:
+        return VersoPageBreakBetween;
     default:
         break;
     }
 
     ASSERT_NOT_REACHED();
-    return PBAUTO;
+    return AutoBreakBetween;
+}
+
+template<> inline CSSPrimitiveValue::CSSPrimitiveValue(BreakInside e)
+    : CSSValue(PrimitiveClass)
+{
+    m_primitiveUnitType = CSS_VALUE_ID;
+    switch (e) {
+    case AutoBreakInside:
+        m_value.valueID = CSSValueAuto;
+        break;
+    case AvoidBreakInside:
+        m_value.valueID = CSSValueAvoid;
+        break;
+    case AvoidColumnBreakInside:
+        m_value.valueID = CSSValueAvoidColumn;
+        break;
+    case AvoidPageBreakInside:
+        m_value.valueID = CSSValueAvoidPage;
+        break;
+    case AvoidRegionBreakInside:
+        m_value.valueID = CSSValueAvoidRegion;
+        break;
+    }
+}
+
+template<> inline CSSPrimitiveValue::operator BreakInside() const
+{
+    ASSERT(isValueID());
+    
+    switch (m_value.valueID) {
+    case CSSValueAuto:
+        return AutoBreakInside;
+    case CSSValueAvoid:
+        return AvoidBreakInside;
+    case CSSValueAvoidColumn:
+        return AvoidColumnBreakInside;
+    case CSSValueAvoidPage:
+        return AvoidPageBreakInside;
+    case CSSValueAvoidRegion:
+        return AvoidRegionBreakInside;
+    default:
+        break;
+    }
+
+    ASSERT_NOT_REACHED();
+    return AutoBreakInside;
 }
 
 template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EPosition e)
@@ -2229,15 +2369,15 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EPosition e)
         m_value.valueID = CSSValueFixed;
         break;
     case StickyPosition:
-#if ENABLE(CSS_STICKY_POSITION)
         m_value.valueID = CSSValueWebkitSticky;
-#endif
         break;
     }
 }
 
 template<> inline CSSPrimitiveValue::operator EPosition() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueStatic:
         return StaticPosition;
@@ -2247,10 +2387,8 @@ template<> inline CSSPrimitiveValue::operator EPosition() const
         return AbsolutePosition;
     case CSSValueFixed:
         return FixedPosition;
-#if ENABLE(CSS_STICKY_POSITION)
     case CSSValueWebkitSticky:
         return StickyPosition;
-#endif
     default:
         break;
     }
@@ -2281,6 +2419,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EResize e)
 
 template<> inline CSSPrimitiveValue::operator EResize() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueBoth:
         return RESIZE_BOTH;
@@ -2317,6 +2457,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(ETableLayout e)
 
 template<> inline CSSPrimitiveValue::operator ETableLayout() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueFixed:
         return TFIXED;
@@ -2367,6 +2509,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(ETextAlign e)
 
 template<> inline CSSPrimitiveValue::operator ETextAlign() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueWebkitAuto: // Legacy -webkit-auto. Eqiuvalent to start.
     case CSSValueStart:
@@ -2410,6 +2554,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(TextAlignLast e)
 
 template<> inline CSSPrimitiveValue::operator TextAlignLast() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueAuto:
         return TextAlignLastAuto;
@@ -2447,23 +2593,16 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(TextJustify e)
     case TextJustifyInterWord:
         m_value.valueID = CSSValueInterWord;
         break;
-    case TextJustifyInterIdeograph:
-        m_value.valueID = CSSValueInterIdeograph;
-        break;
-    case TextJustifyInterCluster:
-        m_value.valueID = CSSValueInterCluster;
-        break;
     case TextJustifyDistribute:
         m_value.valueID = CSSValueDistribute;
-        break;
-    case TextJustifyKashida:
-        m_value.valueID = CSSValueKashida;
         break;
     }
 }
 
 template<> inline CSSPrimitiveValue::operator TextJustify() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueAuto:
         return TextJustifyAuto;
@@ -2471,14 +2610,8 @@ template<> inline CSSPrimitiveValue::operator TextJustify() const
         return TextJustifyNone;
     case CSSValueInterWord:
         return TextJustifyInterWord;
-    case CSSValueInterIdeograph:
-        return TextJustifyInterIdeograph;
-    case CSSValueInterCluster:
-        return TextJustifyInterCluster;
     case CSSValueDistribute:
         return TextJustifyDistribute;
-    case CSSValueKashida:
-        return TextJustifyKashida;
     default:
         break;
     }
@@ -2490,6 +2623,8 @@ template<> inline CSSPrimitiveValue::operator TextJustify() const
 
 template<> inline CSSPrimitiveValue::operator TextDecoration() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueNone:
         return TextDecorationNone;
@@ -2501,6 +2636,10 @@ template<> inline CSSPrimitiveValue::operator TextDecoration() const
         return TextDecorationLineThrough;
     case CSSValueBlink:
         return TextDecorationBlink;
+#if ENABLE(LETTERPRESS)
+    case CSSValueWebkitLetterpress:
+        return TextDecorationLetterpress;
+#endif
     default:
         break;
     }
@@ -2509,9 +2648,10 @@ template<> inline CSSPrimitiveValue::operator TextDecoration() const
     return TextDecorationNone;
 }
 
-#if ENABLE(CSS3_TEXT)
 template<> inline CSSPrimitiveValue::operator TextDecorationStyle() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueSolid:
         return TextDecorationStyleSolid;
@@ -2552,6 +2692,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(TextUnderlinePosition e)
 
 template<> inline CSSPrimitiveValue::operator TextUnderlinePosition() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueAuto:
         return TextUnderlinePositionAuto;
@@ -2568,7 +2710,6 @@ template<> inline CSSPrimitiveValue::operator TextUnderlinePosition() const
     ASSERT_NOT_REACHED();
     return TextUnderlinePositionAuto;
 }
-#endif // CSS3_TEXT
 
 template<> inline CSSPrimitiveValue::CSSPrimitiveValue(ETextSecurity e)
     : CSSValue(PrimitiveClass)
@@ -2592,6 +2733,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(ETextSecurity e)
 
 template<> inline CSSPrimitiveValue::operator ETextSecurity() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueNone:
         return TSNONE;
@@ -2631,6 +2774,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(ETextTransform e)
 
 template<> inline CSSPrimitiveValue::operator ETextTransform() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueCapitalize:
         return CAPITALIZE;
@@ -2676,6 +2821,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EUnicodeBidi e)
 
 template<> inline CSSPrimitiveValue::operator EUnicodeBidi() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueNormal:
         return UBNormal;
@@ -2718,6 +2865,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EUserDrag e)
 
 template<> inline CSSPrimitiveValue::operator EUserDrag() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueAuto:
         return DRAG_AUTO;
@@ -2752,6 +2901,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EUserModify e)
 
 template<> inline CSSPrimitiveValue::operator EUserModify() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueReadOnly:
         return READ_ONLY;
@@ -2786,6 +2937,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EUserSelect e)
 
 template<> inline CSSPrimitiveValue::operator EUserSelect() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueAuto:
         return SELECT_TEXT;
@@ -2842,6 +2995,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EVerticalAlign a)
 
 template<> inline CSSPrimitiveValue::operator EVerticalAlign() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueTop:
         return TOP;
@@ -2888,6 +3043,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EVisibility e)
 
 template<> inline CSSPrimitiveValue::operator EVisibility() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueHidden:
         return HIDDEN;
@@ -2931,6 +3088,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EWhiteSpace e)
 
 template<> inline CSSPrimitiveValue::operator EWhiteSpace() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueWebkitNowrap:
         return KHTML_NOWRAP;
@@ -2963,6 +3122,9 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EWordBreak e)
     case BreakAllWordBreak:
         m_value.valueID = CSSValueBreakAll;
         break;
+    case KeepAllWordBreak:
+        m_value.valueID = CSSValueKeepAll;
+        break;
     case BreakWordBreak:
         m_value.valueID = CSSValueBreakWord;
         break;
@@ -2971,9 +3133,13 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EWordBreak e)
 
 template<> inline CSSPrimitiveValue::operator EWordBreak() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueBreakAll:
         return BreakAllWordBreak;
+    case CSSValueKeepAll:
+        return KeepAllWordBreak;
     case CSSValueBreakWord:
         return BreakWordBreak;
     case CSSValueNormal:
@@ -3002,6 +3168,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EOverflowWrap e)
 
 template<> inline CSSPrimitiveValue::operator EOverflowWrap() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueBreakWord:
         return BreakOverflowWrap;
@@ -3031,6 +3199,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(TextDirection e)
 
 template<> inline CSSPrimitiveValue::operator TextDirection() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueLtr:
         return LTR;
@@ -3066,6 +3236,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(WritingMode e)
 
 template<> inline CSSPrimitiveValue::operator WritingMode() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueHorizontalTb:
         return TopToBottomWritingMode;
@@ -3099,6 +3271,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(TextCombine e)
 
 template<> inline CSSPrimitiveValue::operator TextCombine() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueNone:
         return TextCombineNone;
@@ -3123,51 +3297,29 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(RubyPosition position)
     case RubyPositionAfter:
         m_value.valueID = CSSValueAfter;
         break;
+    case RubyPositionInterCharacter:
+        m_value.valueID = CSSValueInterCharacter;
+        break;
     }
 }
 
 template<> inline CSSPrimitiveValue::operator RubyPosition() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueBefore:
         return RubyPositionBefore;
     case CSSValueAfter:
         return RubyPositionAfter;
+    case CSSValueInterCharacter:
+        return RubyPositionInterCharacter;
     default:
         break;
     }
 
     ASSERT_NOT_REACHED();
     return RubyPositionBefore;
-}
-
-template<> inline CSSPrimitiveValue::CSSPrimitiveValue(TextEmphasisPosition position)
-    : CSSValue(PrimitiveClass)
-{
-    m_primitiveUnitType = CSS_VALUE_ID;
-    switch (position) {
-    case TextEmphasisPositionOver:
-        m_value.valueID = CSSValueOver;
-        break;
-    case TextEmphasisPositionUnder:
-        m_value.valueID = CSSValueUnder;
-        break;
-    }
-}
-
-template<> inline CSSPrimitiveValue::operator TextEmphasisPosition() const
-{
-    switch (m_value.valueID) {
-    case CSSValueOver:
-        return TextEmphasisPositionOver;
-    case CSSValueUnder:
-        return TextEmphasisPositionUnder;
-    default:
-        break;
-    }
-
-    ASSERT_NOT_REACHED();
-    return TextEmphasisPositionOver;
 }
 
 template<> inline CSSPrimitiveValue::CSSPrimitiveValue(TextOverflow overflow)
@@ -3186,6 +3338,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(TextOverflow overflow)
 
 template<> inline CSSPrimitiveValue::operator TextOverflow() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueClip:
         return TextOverflowClip;
@@ -3215,6 +3369,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(TextEmphasisFill fill)
 
 template<> inline CSSPrimitiveValue::operator TextEmphasisFill() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueFilled:
         return TextEmphasisFillFilled;
@@ -3259,6 +3415,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(TextEmphasisMark mark)
 
 template<> inline CSSPrimitiveValue::operator TextEmphasisMark() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueNone:
         return TextEmphasisMarkNone;
@@ -3285,16 +3443,13 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(TextOrientation e)
 {
     m_primitiveUnitType = CSS_VALUE_ID;
     switch (e) {
-    case TextOrientationSideways:
+    case TextOrientation::Sideways:
         m_value.valueID = CSSValueSideways;
         break;
-    case TextOrientationSidewaysRight:
-        m_value.valueID = CSSValueSidewaysRight;
+    case TextOrientation::Mixed:
+        m_value.valueID = CSSValueMixed;
         break;
-    case TextOrientationVerticalRight:
-        m_value.valueID = CSSValueVerticalRight;
-        break;
-    case TextOrientationUpright:
+    case TextOrientation::Upright:
         m_value.valueID = CSSValueUpright;
         break;
     }
@@ -3302,21 +3457,25 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(TextOrientation e)
 
 template<> inline CSSPrimitiveValue::operator TextOrientation() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueSideways:
-        return TextOrientationSideways;
+        return TextOrientation::Sideways;
     case CSSValueSidewaysRight:
-        return TextOrientationSidewaysRight;
+        return TextOrientation::Sideways;
     case CSSValueVerticalRight:
-        return TextOrientationVerticalRight;
+        return TextOrientation::Mixed;
+    case CSSValueMixed:
+        return TextOrientation::Mixed;
     case CSSValueUpright:
-        return TextOrientationUpright;
+        return TextOrientation::Upright;
     default:
         break;
     }
 
     ASSERT_NOT_REACHED();
-    return TextOrientationVerticalRight;
+    return TextOrientation::Mixed;
 }
 
 template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EPointerEvents e)
@@ -3359,6 +3518,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EPointerEvents e)
 
 template<> inline CSSPrimitiveValue::operator EPointerEvents() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueAll:
         return PE_ALL;
@@ -3388,18 +3549,18 @@ template<> inline CSSPrimitiveValue::operator EPointerEvents() const
     return PE_ALL;
 }
 
-template<> inline CSSPrimitiveValue::CSSPrimitiveValue(FontDescription::Kerning kerning)
+template<> inline CSSPrimitiveValue::CSSPrimitiveValue(Kerning kerning)
     : CSSValue(PrimitiveClass)
 {
     m_primitiveUnitType = CSS_VALUE_ID;
     switch (kerning) {
-    case FontDescription::AutoKerning:
+    case Kerning::Auto:
         m_value.valueID = CSSValueAuto;
         return;
-    case FontDescription::NormalKerning:
+    case Kerning::Normal:
         m_value.valueID = CSSValueNormal;
         return;
-    case FontDescription::NoneKerning:
+    case Kerning::NoShift:
         m_value.valueID = CSSValueNone;
         return;
     }
@@ -3408,21 +3569,67 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(FontDescription::Kerning 
     m_value.valueID = CSSValueAuto;
 }
 
-template<> inline CSSPrimitiveValue::operator FontDescription::Kerning() const
+template<> inline CSSPrimitiveValue::operator Kerning() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueAuto:
-        return FontDescription::AutoKerning;
+        return Kerning::Auto;
     case CSSValueNormal:
-        return FontDescription::NormalKerning;
+        return Kerning::Normal;
     case CSSValueNone:
-        return FontDescription::NoneKerning;
+        return Kerning::NoShift;
     default:
         break;
     }
 
     ASSERT_NOT_REACHED();
-    return FontDescription::AutoKerning;
+    return Kerning::Auto;
+}
+
+template<> inline CSSPrimitiveValue::CSSPrimitiveValue(ObjectFit fit)
+    : CSSValue(PrimitiveClass)
+{
+    m_primitiveUnitType = CSS_VALUE_ID;
+    switch (fit) {
+    case ObjectFitFill:
+        m_value.valueID = CSSValueFill;
+        break;
+    case ObjectFitContain:
+        m_value.valueID = CSSValueContain;
+        break;
+    case ObjectFitCover:
+        m_value.valueID = CSSValueCover;
+        break;
+    case ObjectFitNone:
+        m_value.valueID = CSSValueNone;
+        break;
+    case ObjectFitScaleDown:
+        m_value.valueID = CSSValueScaleDown;
+        break;
+    }
+}
+
+template<> inline CSSPrimitiveValue::operator ObjectFit() const
+{
+    ASSERT(isValueID());
+
+    switch (m_value.valueID) {
+    case CSSValueFill:
+        return ObjectFitFill;
+    case CSSValueContain:
+        return ObjectFitContain;
+    case CSSValueCover:
+        return ObjectFitCover;
+    case CSSValueNone:
+        return ObjectFitNone;
+    case CSSValueScaleDown:
+        return ObjectFitScaleDown;
+    default:
+        ASSERT_NOT_REACHED();
+        return ObjectFitFill;
+    }
 }
 
 template<> inline CSSPrimitiveValue::CSSPrimitiveValue(FontSmoothingMode smoothing)
@@ -3450,6 +3657,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(FontSmoothingMode smoothi
 
 template<> inline CSSPrimitiveValue::operator FontSmoothingMode() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueAuto:
         return AutoSmoothing;
@@ -3507,6 +3716,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(FontWeight weight)
 
 template<> inline CSSPrimitiveValue::operator FontWeight() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueBold:
         return FontWeightBold;
@@ -3557,6 +3768,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(FontItalic italic)
 
 template<> inline CSSPrimitiveValue::operator FontItalic() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueOblique:
     // FIXME: oblique is the same as italic for the moment...
@@ -3590,6 +3803,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(FontSmallCaps smallCaps)
 
 template<> inline CSSPrimitiveValue::operator FontSmallCaps() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueSmallCaps:
         return FontSmallCapsOn;
@@ -3624,6 +3839,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(TextRenderingMode e)
 
 template<> inline CSSPrimitiveValue::operator TextRenderingMode() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueAuto:
         return AutoTextRendering;
@@ -3639,40 +3856,6 @@ template<> inline CSSPrimitiveValue::operator TextRenderingMode() const
 
     ASSERT_NOT_REACHED();
     return AutoTextRendering;
-}
-
-template<> inline CSSPrimitiveValue::CSSPrimitiveValue(ColorSpace space)
-    : CSSValue(PrimitiveClass)
-{
-    m_primitiveUnitType = CSS_VALUE_ID;
-    switch (space) {
-    case ColorSpaceDeviceRGB:
-        m_value.valueID = CSSValueDefault;
-        break;
-    case ColorSpaceSRGB:
-        m_value.valueID = CSSValueSrgb;
-        break;
-    case ColorSpaceLinearRGB:
-        // CSS color correction does not support linearRGB yet.
-        ASSERT_NOT_REACHED();
-        m_value.valueID = CSSValueDefault;
-        break;
-    }
-}
-
-template<> inline CSSPrimitiveValue::operator ColorSpace() const
-{
-    switch (m_value.valueID) {
-    case CSSValueDefault:
-        return ColorSpaceDeviceRGB;
-    case CSSValueSrgb:
-        return ColorSpaceSRGB;
-    default:
-        break;
-    }
-
-    ASSERT_NOT_REACHED();
-    return ColorSpaceDeviceRGB;
 }
 
 template<> inline CSSPrimitiveValue::CSSPrimitiveValue(Hyphens hyphens)
@@ -3694,6 +3877,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(Hyphens hyphens)
 
 template<> inline CSSPrimitiveValue::operator Hyphens() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueNone:
         return HyphensNone;
@@ -3728,6 +3913,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(LineSnap gridSnap)
 
 template<> inline CSSPrimitiveValue::operator LineSnap() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueNone:
         return LineSnapNone;
@@ -3759,6 +3946,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(LineAlign lineAlign)
 
 template<> inline CSSPrimitiveValue::operator LineAlign() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueNone:
         return LineAlignNone;
@@ -3800,6 +3989,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(ESpeak e)
 
 template<> inline CSSPrimitiveValue::operator Order() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueLogical:
         return LogicalOrder;
@@ -3829,6 +4020,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(Order e)
 
 template<> inline CSSPrimitiveValue::operator ESpeak() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueNone:
         return SpeakNone;
@@ -3903,11 +4096,19 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(BlendMode blendMode)
     case BlendModeLuminosity:
         m_value.valueID = CSSValueLuminosity;
         break;
+    case BlendModePlusDarker:
+        m_value.valueID = CSSValuePlusDarker;
+        break;
+    case BlendModePlusLighter:
+        m_value.valueID = CSSValuePlusLighter;
+        break;
     }
 }
 
 template<> inline CSSPrimitiveValue::operator BlendMode() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueNormal:
         return BlendModeNormal;
@@ -3941,6 +4142,10 @@ template<> inline CSSPrimitiveValue::operator BlendMode() const
         return BlendModeColor;
     case CSSValueLuminosity:
         return BlendModeLuminosity;
+    case CSSValuePlusDarker:
+        return BlendModePlusDarker;
+    case CSSValuePlusLighter:
+        return BlendModePlusLighter;
     default:
         break;
     }
@@ -3949,7 +4154,37 @@ template<> inline CSSPrimitiveValue::operator BlendMode() const
     return BlendModeNormal;
 }
 
-#if ENABLE(SVG)
+template<> inline CSSPrimitiveValue::CSSPrimitiveValue(Isolation isolation)
+    : CSSValue(PrimitiveClass)
+{
+    m_primitiveUnitType = CSS_VALUE_ID;
+    switch (isolation) {
+    case IsolationAuto:
+        m_value.valueID = CSSValueAuto;
+        break;
+    case IsolationIsolate:
+        m_value.valueID = CSSValueIsolate;
+        break;
+    default:
+        ASSERT_NOT_REACHED();
+    }
+}
+
+template<> inline CSSPrimitiveValue::operator Isolation() const
+{
+    ASSERT(isValueID());
+    switch (m_value.valueID) {
+    case CSSValueAuto:
+        return IsolationAuto;
+    case CSSValueIsolate:
+        return IsolationIsolate;
+    default:
+        break;
+    }
+
+    ASSERT_NOT_REACHED();
+    return IsolationAuto;
+}
 
 template<> inline CSSPrimitiveValue::CSSPrimitiveValue(LineCap e)
     : CSSValue(PrimitiveClass)
@@ -3970,6 +4205,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(LineCap e)
 
 template<> inline CSSPrimitiveValue::operator LineCap() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueButt:
         return ButtCap;
@@ -4004,6 +4241,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(LineJoin e)
 
 template<> inline CSSPrimitiveValue::operator LineJoin() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueMiter:
         return MiterJoin;
@@ -4035,6 +4274,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(WindRule e)
 
 template<> inline CSSPrimitiveValue::operator WindRule() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueNonzero:
         return RULE_NONZERO;
@@ -4095,6 +4336,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EAlignmentBaseline e)
 
 template<> inline CSSPrimitiveValue::operator EAlignmentBaseline() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueAuto:
         return AB_AUTO;
@@ -4128,8 +4371,6 @@ template<> inline CSSPrimitiveValue::operator EAlignmentBaseline() const
     return AB_AUTO;
 }
 
-#endif
-
 template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EBorderCollapse e)
     : CSSValue(PrimitiveClass)
 {
@@ -4146,6 +4387,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EBorderCollapse e)
 
 template<> inline CSSPrimitiveValue::operator EBorderCollapse() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueSeparate:
         return BSEPARATE;
@@ -4175,6 +4418,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EBorderFit e)
 
 template<> inline CSSPrimitiveValue::operator EBorderFit() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueBorder:
         return BorderFitBorder;
@@ -4188,16 +4433,19 @@ template<> inline CSSPrimitiveValue::operator EBorderFit() const
     return BorderFitLines;
 }
 
-template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EImageRendering e)
+template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EImageRendering imageRendering)
     : CSSValue(PrimitiveClass)
 {
     m_primitiveUnitType = CSS_VALUE_ID;
-    switch (e) {
+    switch (imageRendering) {
     case ImageRenderingAuto:
         m_value.valueID = CSSValueAuto;
         break;
     case ImageRenderingCrispEdges:
-        m_value.valueID = CSSValueWebkitCrispEdges;
+        m_value.valueID = CSSValueCrispEdges;
+        break;
+    case ImageRenderingPixelated:
+        m_value.valueID = CSSValuePixelated;
         break;
     case ImageRenderingOptimizeSpeed:
         m_value.valueID = CSSValueOptimizespeed;
@@ -4210,12 +4458,17 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EImageRendering e)
 
 template<> inline CSSPrimitiveValue::operator EImageRendering() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueAuto:
         return ImageRenderingAuto;
     case CSSValueWebkitOptimizeContrast:
+    case CSSValueCrispEdges:
     case CSSValueWebkitCrispEdges:
         return ImageRenderingCrispEdges;
+    case CSSValuePixelated:
+        return ImageRenderingPixelated;
     case CSSValueOptimizespeed:
         return ImageRenderingOptimizeSpeed;
     case CSSValueOptimizequality:
@@ -4244,6 +4497,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(ETransformStyle3D e)
 
 template<> inline CSSPrimitiveValue::operator ETransformStyle3D() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueFlat:
         return TransformStyle3DFlat;
@@ -4276,6 +4531,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(ColumnAxis e)
 
 template<> inline CSSPrimitiveValue::operator ColumnAxis() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueHorizontal:
         return HorizontalColumnAxis;
@@ -4307,6 +4564,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(ColumnProgression e)
 
 template<> inline CSSPrimitiveValue::operator ColumnProgression() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueNormal:
         return NormalColumnProgression;
@@ -4320,155 +4579,45 @@ template<> inline CSSPrimitiveValue::operator ColumnProgression() const
     return NormalColumnProgression;
 }
 
-template<> inline CSSPrimitiveValue::CSSPrimitiveValue(WrapFlow wrapFlow)
-: CSSValue(PrimitiveClass)
-{
-    m_primitiveUnitType = CSS_VALUE_ID;
-    switch (wrapFlow) {
-    case WrapFlowAuto:
-        m_value.valueID = CSSValueAuto;
-        break;
-    case WrapFlowBoth:
-        m_value.valueID = CSSValueBoth;
-        break;
-    case WrapFlowStart:
-        m_value.valueID = CSSValueStart;
-        break;
-    case WrapFlowEnd:
-        m_value.valueID = CSSValueEnd;
-        break;
-    case WrapFlowMaximum:
-        m_value.valueID = CSSValueMaximum;
-        break;
-    case WrapFlowClear:
-        m_value.valueID = CSSValueClear;
-        break;
-    }
-}
-
-template<> inline CSSPrimitiveValue::operator WrapFlow() const
-{
-    switch (m_value.valueID) {
-    case CSSValueAuto:
-        return WrapFlowAuto;
-    case CSSValueBoth:
-        return WrapFlowBoth;
-    case CSSValueStart:
-        return WrapFlowStart;
-    case CSSValueEnd:
-        return WrapFlowEnd;
-    case CSSValueMaximum:
-        return WrapFlowMaximum;
-    case CSSValueClear:
-        return WrapFlowClear;
-    default:
-        break;
-    }
-
-    ASSERT_NOT_REACHED();
-    return WrapFlowAuto;
-}
-
-template<> inline CSSPrimitiveValue::CSSPrimitiveValue(WrapThrough wrapThrough)
-: CSSValue(PrimitiveClass)
-{
-    m_primitiveUnitType = CSS_VALUE_ID;
-    switch (wrapThrough) {
-    case WrapThroughWrap:
-        m_value.valueID = CSSValueWrap;
-        break;
-    case WrapThroughNone:
-        m_value.valueID = CSSValueNone;
-        break;
-    }
-}
-
-template<> inline CSSPrimitiveValue::operator WrapThrough() const
-{
-    switch (m_value.valueID) {
-    case CSSValueWrap:
-        return WrapThroughWrap;
-    case CSSValueNone:
-        return WrapThroughNone;
-    default:
-        break;
-    }
-
-    ASSERT_NOT_REACHED();
-    return WrapThroughWrap;
-}
-
-template<> inline CSSPrimitiveValue::operator GridAutoFlow() const
-{
-    switch (m_value.valueID) {
-    case CSSValueNone:
-        return AutoFlowNone;
-    case CSSValueColumn:
-        return AutoFlowColumn;
-    case CSSValueRow:
-        return AutoFlowRow;
-    default:
-        break;
-    }
-
-    ASSERT_NOT_REACHED();
-    return AutoFlowNone;
-
-}
-
-template<> inline CSSPrimitiveValue::CSSPrimitiveValue(GridAutoFlow flow)
-    : CSSValue(PrimitiveClass)
-{
-    m_primitiveUnitType = CSS_VALUE_ID;
-    switch (flow) {
-    case AutoFlowNone:
-        m_value.valueID = CSSValueNone;
-        break;
-    case AutoFlowColumn:
-        m_value.valueID = CSSValueColumn;
-        break;
-    case AutoFlowRow:
-        m_value.valueID = CSSValueRow;
-        break;
-    }
-}
-
 enum LengthConversion {
     AnyConversion = ~0,
     FixedIntegerConversion = 1 << 0,
     FixedFloatConversion = 1 << 1,
     AutoConversion = 1 << 2,
     PercentConversion = 1 << 3,
-    FractionConversion = 1 << 4,
-    CalculatedConversion = 1 << 5,
-    ViewportPercentageConversion = 1 << 6
+    CalculatedConversion = 1 << 4
 };
 
-template<int supported> Length CSSPrimitiveValue::convertToLength(const RenderStyle* style, const RenderStyle* rootStyle, double multiplier, bool computingFontSize) const
+inline bool CSSPrimitiveValue::convertingToLengthRequiresNonNullStyle(int lengthConversion) const
 {
-#if ENABLE(CSS_VARIABLES)
-    ASSERT(!hasVariableReference());
-#endif
-    if ((supported & (FixedIntegerConversion | FixedFloatConversion)) && isFontRelativeLength() && (!style || !rootStyle))
+    ASSERT(isFontRelativeLength());
+    // This matches the implementation in CSSPrimitiveValue::computeLengthDouble().
+    switch (m_primitiveUnitType) {
+    case CSS_EMS:
+    case CSS_EXS:
+    case CSS_CHS:
+        return lengthConversion & (FixedIntegerConversion | FixedFloatConversion);
+    default:
+        return false;
+    }
+}
+
+template<int supported> Length CSSPrimitiveValue::convertToLength(const CSSToLengthConversionData& conversionData) const
+{
+    if (isFontRelativeLength() && convertingToLengthRequiresNonNullStyle(supported) && !conversionData.style())
         return Length(Undefined);
     if ((supported & FixedIntegerConversion) && isLength())
-        return computeLength<Length>(style, rootStyle, multiplier, computingFontSize);
+        return computeLength<Length>(conversionData);
     if ((supported & FixedFloatConversion) && isLength())
-        return Length(computeLength<double>(style, rootStyle, multiplier), Fixed);
+        return Length(computeLength<double>(conversionData), Fixed);
     if ((supported & PercentConversion) && isPercentage())
         return Length(getDoubleValue(), Percent);
-    if ((supported & FractionConversion) && isNumber())
-        return Length(getDoubleValue() * 100.0, Percent);
     if ((supported & AutoConversion) && getValueID() == CSSValueAuto)
         return Length(Auto);
     if ((supported & CalculatedConversion) && isCalculated())
-        return Length(cssCalcValue()->toCalcValue(style, rootStyle, multiplier));
-    if ((supported & ViewportPercentageConversion) && isViewportPercentageLength())
-        return viewportPercentageLength();
+        return Length(cssCalcValue()->createCalculationValue(conversionData));
     return Length(Undefined);
 }
-
-#if ENABLE(SVG)
 
 template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EBufferedRendering e)
     : CSSValue(PrimitiveClass)
@@ -4489,6 +4638,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EBufferedRendering e)
 
 template<> inline CSSPrimitiveValue::operator EBufferedRendering() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueAuto:
         return BR_AUTO;
@@ -4523,6 +4674,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EColorInterpolation e)
 
 template<> inline CSSPrimitiveValue::operator EColorInterpolation() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueSrgb:
         return CI_SRGB;
@@ -4557,6 +4710,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EColorRendering e)
 
 template<> inline CSSPrimitiveValue::operator EColorRendering() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueOptimizespeed:
         return CR_OPTIMIZESPEED;
@@ -4618,6 +4773,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EDominantBaseline e)
 
 template<> inline CSSPrimitiveValue::operator EDominantBaseline() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueAuto:
         return DB_AUTO;
@@ -4673,6 +4830,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EShapeRendering e)
 
 template<> inline CSSPrimitiveValue::operator EShapeRendering() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueAuto:
         return SR_AUTO;
@@ -4709,6 +4868,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(ETextAnchor e)
 
 template<> inline CSSPrimitiveValue::operator ETextAnchor() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueStart:
         return TA_START;
@@ -4752,6 +4913,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(SVGWritingMode e)
 
 template<> inline CSSPrimitiveValue::operator SVGWritingMode() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueLrTb:
         return WM_LRTB;
@@ -4773,6 +4936,13 @@ template<> inline CSSPrimitiveValue::operator SVGWritingMode() const
     return WM_LRTB;
 }
 
+template<> inline CSSPrimitiveValue::CSSPrimitiveValue(CSSFontFamily fontFamily)
+    : CSSValue(PrimitiveClass)
+{
+    m_primitiveUnitType = CSS_FONT_FAMILY;
+    m_value.fontFamily = new CSSFontFamily(WTFMove(fontFamily));
+}
+
 template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EVectorEffect e)
     : CSSValue(PrimitiveClass)
 {
@@ -4789,6 +4959,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EVectorEffect e)
 
 template<> inline CSSPrimitiveValue::operator EVectorEffect() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueNone:
         return VE_NONE;
@@ -4818,6 +4990,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EMaskType e)
 
 template<> inline CSSPrimitiveValue::operator EMaskType() const
 {
+    ASSERT(isValueID());
+
     switch (m_value.valueID) {
     case CSSValueLuminance:
         return MT_LUMINANCE;
@@ -4830,8 +5004,6 @@ template<> inline CSSPrimitiveValue::operator EMaskType() const
     ASSERT_NOT_REACHED();
     return MT_LUMINANCE;
 }
-
-#endif // ENABLE(SVG)
 
 #if ENABLE(CSS_IMAGE_ORIENTATION)
 
@@ -4882,6 +5054,547 @@ template<> inline CSSPrimitiveValue::operator ImageOrientationEnum() const
 
 #endif // ENABLE(CSS_IMAGE_ORIENTATION)
 
+template<> inline CSSPrimitiveValue::CSSPrimitiveValue(CSSBoxType cssBox)
+    : CSSValue(PrimitiveClass)
+{
+    m_primitiveUnitType = CSS_VALUE_ID;
+    switch (cssBox) {
+    case MarginBox:
+        m_value.valueID = CSSValueMarginBox;
+        break;
+    case BorderBox:
+        m_value.valueID = CSSValueBorderBox;
+        break;
+    case PaddingBox:
+        m_value.valueID = CSSValuePaddingBox;
+        break;
+    case ContentBox:
+        m_value.valueID = CSSValueContentBox;
+        break;
+    case Fill:
+        m_value.valueID = CSSValueFill;
+        break;
+    case Stroke:
+        m_value.valueID = CSSValueStroke;
+        break;
+    case ViewBox:
+        m_value.valueID = CSSValueViewBox;
+        break;
+    case BoxMissing:
+        ASSERT_NOT_REACHED();
+        m_value.valueID = CSSValueNone;
+        break;
+    }
+}
+
+template<> inline CSSPrimitiveValue::operator CSSBoxType() const
+{
+    switch (getValueID()) {
+    case CSSValueMarginBox:
+        return MarginBox;
+    case CSSValueBorderBox:
+        return BorderBox;
+    case CSSValuePaddingBox:
+        return PaddingBox;
+    case CSSValueContentBox:
+        return ContentBox;
+    // The following are used in an SVG context.
+    case CSSValueFill:
+        return Fill;
+    case CSSValueStroke:
+        return Stroke;
+    case CSSValueViewBox:
+        return ViewBox;
+    default:
+        break;
+    }
+    ASSERT_NOT_REACHED();
+    return BoxMissing;
+}
+
+template<> inline CSSPrimitiveValue::CSSPrimitiveValue(ItemPosition itemPosition)
+    : CSSValue(PrimitiveClass)
+{
+    m_primitiveUnitType = CSS_VALUE_ID;
+    switch (itemPosition) {
+    case ItemPositionAuto:
+        m_value.valueID = CSSValueAuto;
+        break;
+    case ItemPositionStretch:
+        m_value.valueID = CSSValueStretch;
+        break;
+    case ItemPositionBaseline:
+        m_value.valueID = CSSValueBaseline;
+        break;
+    case ItemPositionLastBaseline:
+        m_value.valueID = CSSValueLastBaseline;
+        break;
+    case ItemPositionCenter:
+        m_value.valueID = CSSValueCenter;
+        break;
+    case ItemPositionStart:
+        m_value.valueID = CSSValueStart;
+        break;
+    case ItemPositionEnd:
+        m_value.valueID = CSSValueEnd;
+        break;
+    case ItemPositionSelfStart:
+        m_value.valueID = CSSValueSelfStart;
+        break;
+    case ItemPositionSelfEnd:
+        m_value.valueID = CSSValueSelfEnd;
+        break;
+    case ItemPositionFlexStart:
+        m_value.valueID = CSSValueFlexStart;
+        break;
+    case ItemPositionFlexEnd:
+        m_value.valueID = CSSValueFlexEnd;
+        break;
+    case ItemPositionLeft:
+        m_value.valueID = CSSValueLeft;
+        break;
+    case ItemPositionRight:
+        m_value.valueID = CSSValueRight;
+        break;
+    }
+}
+
+template<> inline CSSPrimitiveValue::operator ItemPosition() const
+{
+    switch (m_value.valueID) {
+    case CSSValueAuto:
+        return ItemPositionAuto;
+    case CSSValueStretch:
+        return ItemPositionStretch;
+    case CSSValueBaseline:
+        return ItemPositionBaseline;
+    case CSSValueLastBaseline:
+        return ItemPositionLastBaseline;
+    case CSSValueCenter:
+        return ItemPositionCenter;
+    case CSSValueStart:
+        return ItemPositionStart;
+    case CSSValueEnd:
+        return ItemPositionEnd;
+    case CSSValueSelfStart:
+        return ItemPositionSelfStart;
+    case CSSValueSelfEnd:
+        return ItemPositionSelfEnd;
+    case CSSValueFlexStart:
+        return ItemPositionFlexStart;
+    case CSSValueFlexEnd:
+        return ItemPositionFlexEnd;
+    case CSSValueLeft:
+        return ItemPositionLeft;
+    case CSSValueRight:
+        return ItemPositionRight;
+    default:
+        break;
+    }
+    ASSERT_NOT_REACHED();
+    return ItemPositionAuto;
+}
+
+template<> inline CSSPrimitiveValue::CSSPrimitiveValue(OverflowAlignment overflowAlignment)
+    : CSSValue(PrimitiveClass)
+{
+    m_primitiveUnitType = CSS_VALUE_ID;
+    switch (overflowAlignment) {
+    case OverflowAlignmentDefault:
+        m_value.valueID = CSSValueDefault;
+        break;
+    case OverflowAlignmentUnsafe:
+        m_value.valueID = CSSValueUnsafe;
+        break;
+    case OverflowAlignmentSafe:
+        m_value.valueID = CSSValueSafe;
+        break;
+    }
+}
+
+template<> inline CSSPrimitiveValue::operator OverflowAlignment() const
+{
+    switch (m_value.valueID) {
+    case CSSValueUnsafe:
+        return OverflowAlignmentUnsafe;
+    case CSSValueSafe:
+        return OverflowAlignmentSafe;
+    default:
+        break;
+    }
+    ASSERT_NOT_REACHED();
+    return OverflowAlignmentUnsafe;
+}
+
+template<> inline CSSPrimitiveValue::CSSPrimitiveValue(ContentPosition contentPosition)
+    : CSSValue(PrimitiveClass)
+{
+    m_primitiveUnitType = CSS_VALUE_ID;
+    switch (contentPosition) {
+    case ContentPositionAuto:
+        m_value.valueID = CSSValueAuto;
+        break;
+    case ContentPositionBaseline:
+        m_value.valueID = CSSValueBaseline;
+        break;
+    case ContentPositionLastBaseline:
+        m_value.valueID = CSSValueLastBaseline;
+        break;
+    case ContentPositionCenter:
+        m_value.valueID = CSSValueCenter;
+        break;
+    case ContentPositionStart:
+        m_value.valueID = CSSValueStart;
+        break;
+    case ContentPositionEnd:
+        m_value.valueID = CSSValueEnd;
+        break;
+    case ContentPositionFlexStart:
+        m_value.valueID = CSSValueFlexStart;
+        break;
+    case ContentPositionFlexEnd:
+        m_value.valueID = CSSValueFlexEnd;
+        break;
+    case ContentPositionLeft:
+        m_value.valueID = CSSValueLeft;
+        break;
+    case ContentPositionRight:
+        m_value.valueID = CSSValueRight;
+        break;
+    }
+}
+
+template<> inline CSSPrimitiveValue::operator ContentPosition() const
+{
+    switch (m_value.valueID) {
+    case CSSValueAuto:
+        return ContentPositionAuto;
+    case CSSValueBaseline:
+        return ContentPositionBaseline;
+    case CSSValueLastBaseline:
+        return ContentPositionLastBaseline;
+    case CSSValueCenter:
+        return ContentPositionCenter;
+    case CSSValueStart:
+        return ContentPositionStart;
+    case CSSValueEnd:
+        return ContentPositionEnd;
+    case CSSValueFlexStart:
+        return ContentPositionFlexStart;
+    case CSSValueFlexEnd:
+        return ContentPositionFlexEnd;
+    case CSSValueLeft:
+        return ContentPositionLeft;
+    case CSSValueRight:
+        return ContentPositionRight;
+    default:
+        break;
+    }
+    ASSERT_NOT_REACHED();
+    return ContentPositionAuto;
+}
+
+template<> inline CSSPrimitiveValue::CSSPrimitiveValue(ContentDistributionType contentDistribution)
+    : CSSValue(PrimitiveClass)
+{
+    m_primitiveUnitType = CSS_VALUE_ID;
+    switch (contentDistribution) {
+    case ContentDistributionDefault:
+        m_value.valueID = CSSValueDefault;
+        break;
+    case ContentDistributionSpaceBetween:
+        m_value.valueID = CSSValueSpaceBetween;
+        break;
+    case ContentDistributionSpaceAround:
+        m_value.valueID = CSSValueSpaceAround;
+        break;
+    case ContentDistributionSpaceEvenly:
+        m_value.valueID = CSSValueSpaceEvenly;
+        break;
+    case ContentDistributionStretch:
+        m_value.valueID = CSSValueStretch;
+        break;
+    }
+}
+
+template<> inline CSSPrimitiveValue::operator ContentDistributionType() const
+{
+    switch (m_value.valueID) {
+    case CSSValueSpaceBetween:
+        return ContentDistributionSpaceBetween;
+    case CSSValueSpaceAround:
+        return ContentDistributionSpaceAround;
+    case CSSValueSpaceEvenly:
+        return ContentDistributionSpaceEvenly;
+    case CSSValueStretch:
+        return ContentDistributionStretch;
+    default:
+        break;
+    }
+    ASSERT_NOT_REACHED();
+    return ContentDistributionStretch;
+}
+
+template<> inline CSSPrimitiveValue::operator TextZoom() const
+{
+    ASSERT(isValueID());
+
+    switch (m_value.valueID) {
+    case CSSValueNormal:
+        return TextZoomNormal;
+    case CSSValueReset:
+        return TextZoomReset;
+    default:
+        break;
+    }
+
+    ASSERT_NOT_REACHED();
+    return TextZoomNormal;
+}
+
+template<> inline CSSPrimitiveValue::CSSPrimitiveValue(TextZoom textZoom)
+    : CSSValue(PrimitiveClass)
+{
+    m_primitiveUnitType = CSS_VALUE_ID;
+    switch (textZoom) {
+    case TextZoomNormal:
+        m_value.valueID = CSSValueNormal;
+        return;
+    case TextZoomReset:
+        m_value.valueID = CSSValueReset;
+        return;
+    }
+
+    ASSERT_NOT_REACHED();
+    m_value.valueID = CSSValueNormal;
+}
+
+#if ENABLE(TOUCH_EVENTS)
+template<> inline CSSPrimitiveValue::CSSPrimitiveValue(TouchAction touchAction)
+    : CSSValue(PrimitiveClass)
+{
+    m_primitiveUnitType = CSS_VALUE_ID;
+    switch (touchAction) {
+    case TouchAction::Auto:
+        m_value.valueID = CSSValueAuto;
+        break;
+    case TouchAction::Manipulation:
+        m_value.valueID = CSSValueManipulation;
+        break;
+    }
+}
+
+template<> inline CSSPrimitiveValue::operator TouchAction() const
+{
+    ASSERT(isValueID());
+    switch (m_value.valueID) {
+    case CSSValueAuto:
+        return TouchAction::Auto;
+    case CSSValueManipulation:
+        return TouchAction::Manipulation;
+    default:
+        break;
+    }
+    ASSERT_NOT_REACHED();
+    return TouchAction::Auto;
+}
+#endif
+
+#if ENABLE(CSS_SCROLL_SNAP)
+template<> inline CSSPrimitiveValue::CSSPrimitiveValue(ScrollSnapType e)
+    : CSSValue(PrimitiveClass)
+{
+    m_primitiveUnitType = CSS_VALUE_ID;
+    switch (e) {
+    case ScrollSnapType::None:
+        m_value.valueID = CSSValueNone;
+        break;
+    case ScrollSnapType::Proximity:
+        m_value.valueID = CSSValueProximity;
+        break;
+    case ScrollSnapType::Mandatory:
+        m_value.valueID = CSSValueMandatory;
+        break;
+    }
+}
+
+template<> inline CSSPrimitiveValue::operator ScrollSnapType() const
+{
+    ASSERT(isValueID());
+    switch (m_value.valueID) {
+    case CSSValueNone:
+        return ScrollSnapType::None;
+    case CSSValueProximity:
+        return ScrollSnapType::Proximity;
+    case CSSValueMandatory:
+        return ScrollSnapType::Mandatory;
+    default:
+        break;
+    }
+    ASSERT_NOT_REACHED();
+    return ScrollSnapType::None;
+}
+#endif
+
+#if ENABLE(CSS_TRAILING_WORD)
+template<> inline CSSPrimitiveValue::CSSPrimitiveValue(TrailingWord e)
+    : CSSValue(PrimitiveClass)
+{
+    m_primitiveUnitType = CSS_VALUE_ID;
+    switch (e) {
+    case TrailingWord::Auto:
+        m_value.valueID = CSSValueAuto;
+        break;
+    case TrailingWord::PartiallyBalanced:
+        m_value.valueID = CSSValueWebkitPartiallyBalanced;
+        break;
+    default:
+        ASSERT_NOT_REACHED();
+        break;
+    }
+}
+
+template<> inline CSSPrimitiveValue::operator TrailingWord() const
+{
+    ASSERT(isValueID());
+    switch (m_value.valueID) {
+    case CSSValueAuto:
+        return TrailingWord::Auto;
+    case CSSValueWebkitPartiallyBalanced:
+        return TrailingWord::PartiallyBalanced;
+    default:
+        break;
+    }
+    ASSERT_NOT_REACHED();
+    return TrailingWord::Auto;
+}
+#endif
+
+template<> inline CSSPrimitiveValue::CSSPrimitiveValue(FontVariantPosition position)
+    : CSSValue(PrimitiveClass)
+{
+    m_primitiveUnitType = CSS_VALUE_ID;
+    switch (position) {
+    case FontVariantPosition::Normal:
+        m_value.valueID = CSSValueNormal;
+        break;
+    case FontVariantPosition::Subscript:
+        m_value.valueID = CSSValueSub;
+        break;
+    case FontVariantPosition::Superscript:
+        m_value.valueID = CSSValueSuper;
+        break;
+    default:
+        ASSERT_NOT_REACHED();
+        break;
+    }
+}
+
+template<> inline CSSPrimitiveValue::operator FontVariantPosition() const
+{
+    ASSERT(isValueID());
+    switch (m_value.valueID) {
+    case CSSValueNormal:
+        return FontVariantPosition::Normal;
+    case CSSValueSub:
+        return FontVariantPosition::Subscript;
+    case CSSValueSuper:
+        return FontVariantPosition::Superscript;
+    default:
+        break;
+    }
+    ASSERT_NOT_REACHED();
+    return FontVariantPosition::Normal;
+}
+
+template<> inline CSSPrimitiveValue::CSSPrimitiveValue(FontVariantCaps caps)
+    : CSSValue(PrimitiveClass)
+{
+    m_primitiveUnitType = CSS_VALUE_ID;
+    switch (caps) {
+    case FontVariantCaps::Normal:
+        m_value.valueID = CSSValueNormal;
+        break;
+    case FontVariantCaps::Small:
+        m_value.valueID = CSSValueSmallCaps;
+        break;
+    case FontVariantCaps::AllSmall:
+        m_value.valueID = CSSValueAllSmallCaps;
+        break;
+    case FontVariantCaps::Petite:
+        m_value.valueID = CSSValuePetiteCaps;
+        break;
+    case FontVariantCaps::AllPetite:
+        m_value.valueID = CSSValueAllPetiteCaps;
+        break;
+    case FontVariantCaps::Unicase:
+        m_value.valueID = CSSValueUnicase;
+        break;
+    case FontVariantCaps::Titling:
+        m_value.valueID = CSSValueTitlingCaps;
+        break;
+    default:
+        ASSERT_NOT_REACHED();
+        break;
+    }
+}
+
+template<> inline CSSPrimitiveValue::operator FontVariantCaps() const
+{
+    ASSERT(isValueID());
+    switch (m_value.valueID) {
+    case CSSValueNormal:
+        return FontVariantCaps::Normal;
+    case CSSValueSmallCaps:
+        return FontVariantCaps::Small;
+    case CSSValueAllSmallCaps:
+        return FontVariantCaps::AllSmall;
+    case CSSValuePetiteCaps:
+        return FontVariantCaps::Petite;
+    case CSSValueAllPetiteCaps:
+        return FontVariantCaps::AllPetite;
+    case CSSValueUnicase:
+        return FontVariantCaps::Unicase;
+    case CSSValueTitlingCaps:
+        return FontVariantCaps::Titling;
+    default:
+        break;
+    }
+    ASSERT_NOT_REACHED();
+    return FontVariantCaps::Normal;
+}
+
+template<> inline CSSPrimitiveValue::CSSPrimitiveValue(FontVariantAlternates alternates)
+    : CSSValue(PrimitiveClass)
+{
+    m_primitiveUnitType = CSS_VALUE_ID;
+    switch (alternates) {
+    case FontVariantAlternates::Normal:
+        m_value.valueID = CSSValueNormal;
+        break;
+    case FontVariantAlternates::HistoricalForms:
+        m_value.valueID = CSSValueHistoricalForms;
+        break;
+    default:
+        ASSERT_NOT_REACHED();
+        break;
+    }
+}
+
+template<> inline CSSPrimitiveValue::operator FontVariantAlternates() const
+{
+    ASSERT(isValueID());
+    switch (m_value.valueID) {
+    case CSSValueNormal:
+        return FontVariantAlternates::Normal;
+    case CSSValueHistoricalForms:
+        return FontVariantAlternates::HistoricalForms;
+    default:
+        break;
+    }
+    ASSERT_NOT_REACHED();
+    return FontVariantAlternates::Normal;
+}
 }
 
 #endif

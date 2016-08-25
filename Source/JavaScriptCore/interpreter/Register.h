@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -37,13 +37,9 @@ namespace JSC {
 
     class CodeBlock;
     class ExecState;
-    class JSActivation;
+    class JSLexicalEnvironment;
     class JSObject;
-    class JSPropertyNameIterator;
     class JSScope;
-
-    struct InlineCallFrame;
-    struct Instruction;
 
     typedef ExecState CallFrame;
 
@@ -55,28 +51,29 @@ namespace JSC {
         Register(const JSValue&);
         Register& operator=(const JSValue&);
         JSValue jsValue() const;
+        JSValue asanUnsafeJSValue() const;
         EncodedJSValue encodedJSValue() const;
         
         Register& operator=(CallFrame*);
         Register& operator=(CodeBlock*);
         Register& operator=(JSScope*);
-        Register& operator=(Instruction*);
-        Register& operator=(InlineCallFrame*);
+        Register& operator=(JSObject*);
 
         int32_t i() const;
-        JSActivation* activation() const;
         CallFrame* callFrame() const;
         CodeBlock* codeBlock() const;
-        JSObject* function() const;
-        JSPropertyNameIterator* propertyNameIterator() const;
+        CodeBlock* asanUnsafeCodeBlock() const;
+        JSObject* object() const;
         JSScope* scope() const;
-        Instruction* vPC() const;
-        InlineCallFrame* asInlineCallFrame() const;
         int32_t unboxedInt32() const;
+        int64_t unboxedInt52() const;
+        int64_t unboxedStrictInt52() const;
         bool unboxedBoolean() const;
+        double unboxedDouble() const;
         JSCell* unboxedCell() const;
         int32_t payload() const;
         int32_t tag() const;
+        int32_t unsafeTag() const;
         int32_t& payload();
         int32_t& tag();
 
@@ -86,16 +83,14 @@ namespace JSC {
             return r;
         }
 
-        static Register withCallee(JSObject* callee);
-
     private:
         union {
             EncodedJSValue value;
             CallFrame* callFrame;
             CodeBlock* codeBlock;
-            Instruction* vPC;
-            InlineCallFrame* inlineCallFrame;
             EncodedValueDescriptor encodedValue;
+            double number;
+            int64_t integer;
         } u;
     };
 
@@ -115,6 +110,12 @@ namespace JSC {
     {
         u.value = JSValue::encode(v);
         return *this;
+    }
+
+    // FIXME (rdar://problem/19379214): ASan only needs to be suppressed for Register::jsValue() when called from prepareOSREntry(), but there is currently no way to express this short of adding a separate copy of the function.
+    SUPPRESS_ASAN ALWAYS_INLINE JSValue Register::asanUnsafeJSValue() const
+    {
+        return JSValue::decode(u.value);
     }
 
     ALWAYS_INLINE JSValue Register::jsValue() const
@@ -141,18 +142,6 @@ namespace JSC {
         return *this;
     }
 
-    ALWAYS_INLINE Register& Register::operator=(Instruction* vPC)
-    {
-        u.vPC = vPC;
-        return *this;
-    }
-
-    ALWAYS_INLINE Register& Register::operator=(InlineCallFrame* inlineCallFrame)
-    {
-        u.inlineCallFrame = inlineCallFrame;
-        return *this;
-    }
-
     ALWAYS_INLINE int32_t Register::i() const
     {
         return jsValue().asInt32();
@@ -168,24 +157,34 @@ namespace JSC {
         return u.codeBlock;
     }
 
-    ALWAYS_INLINE Instruction* Register::vPC() const
+    SUPPRESS_ASAN ALWAYS_INLINE CodeBlock* Register::asanUnsafeCodeBlock() const
     {
-        return u.vPC;
+        return u.codeBlock;
     }
 
-    ALWAYS_INLINE InlineCallFrame* Register::asInlineCallFrame() const
-    {
-        return u.inlineCallFrame;
-    }
-        
     ALWAYS_INLINE int32_t Register::unboxedInt32() const
     {
         return payload();
     }
 
+    ALWAYS_INLINE int64_t Register::unboxedInt52() const
+    {
+        return u.integer >> JSValue::int52ShiftAmount;
+    }
+
+    ALWAYS_INLINE int64_t Register::unboxedStrictInt52() const
+    {
+        return u.integer;
+    }
+
     ALWAYS_INLINE bool Register::unboxedBoolean() const
     {
         return !!payload();
+    }
+
+    ALWAYS_INLINE double Register::unboxedDouble() const
+    {
+        return u.number;
     }
 
     ALWAYS_INLINE JSCell* Register::unboxedCell() const
@@ -203,6 +202,11 @@ namespace JSC {
     }
 
     ALWAYS_INLINE int32_t Register::tag() const
+    {
+        return u.encodedValue.asBits.tag;
+    }
+
+    SUPPRESS_ASAN ALWAYS_INLINE int32_t Register::unsafeTag() const
     {
         return u.encodedValue.asBits.tag;
     }

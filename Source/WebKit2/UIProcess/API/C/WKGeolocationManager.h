@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2012, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,7 +26,7 @@
 #ifndef WKGeolocationManager_h
 #define WKGeolocationManager_h
 
-#include <WebKit2/WKBase.h>
+#include <WebKit/WKBase.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -35,20 +35,36 @@ extern "C" {
 // Provider.
 typedef void (*WKGeolocationProviderStartUpdatingCallback)(WKGeolocationManagerRef geolocationManager, const void* clientInfo);
 typedef void (*WKGeolocationProviderStopUpdatingCallback)(WKGeolocationManagerRef geolocationManager, const void* clientInfo);
+typedef void (*WKGeolocationProviderSetEnableHighAccuracyCallback)(WKGeolocationManagerRef geolocationManager, bool enabled, const void* clientInfo);
 
-struct WKGeolocationProvider {
+typedef struct WKGeolocationProviderBase {
     int                                                                 version;
     const void *                                                        clientInfo;
+} WKGeolocationProviderBase;
+
+typedef struct WKGeolocationProviderV0 {
+    WKGeolocationProviderBase                                           base;
+
+    // Version 0.
     WKGeolocationProviderStartUpdatingCallback                          startUpdating;
     WKGeolocationProviderStopUpdatingCallback                           stopUpdating;
-};
-typedef struct WKGeolocationProvider WKGeolocationProvider;
+} WKGeolocationProviderV0;
 
-enum { kWKGeolocationProviderCurrentVersion = 0 };
+typedef struct WKGeolocationProviderV1 {
+    WKGeolocationProviderBase                                           base;
+
+    // Version 0.
+    WKGeolocationProviderStartUpdatingCallback                          startUpdating;
+    WKGeolocationProviderStopUpdatingCallback                           stopUpdating;
+
+    // Version 1.
+    WKGeolocationProviderSetEnableHighAccuracyCallback                  setEnableHighAccuracy;
+} WKGeolocationProviderV1;
+
 
 WK_EXPORT WKTypeID WKGeolocationManagerGetTypeID();
 
-WK_EXPORT void WKGeolocationManagerSetProvider(WKGeolocationManagerRef geolocationManager, const WKGeolocationProvider* provider);
+WK_EXPORT void WKGeolocationManagerSetProvider(WKGeolocationManagerRef geolocationManager, const WKGeolocationProviderBase* provider);
 
 WK_EXPORT void WKGeolocationManagerProviderDidChangePosition(WKGeolocationManagerRef geolocationManager, WKGeolocationPositionRef position);
 WK_EXPORT void WKGeolocationManagerProviderDidFailToDeterminePosition(WKGeolocationManagerRef geolocationManager);

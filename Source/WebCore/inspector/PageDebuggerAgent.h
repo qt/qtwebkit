@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2011 Google Inc. All rights reserved.
+ * Copyright (C) 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -31,47 +32,48 @@
 #ifndef PageDebuggerAgent_h
 #define PageDebuggerAgent_h
 
-#if ENABLE(JAVASCRIPT_DEBUGGER) && ENABLE(INSPECTOR)
-#include "InspectorDebuggerAgent.h"
-#include "PageScriptDebugServer.h"
+#include "WebDebuggerAgent.h"
 
 namespace WebCore {
 
 class InspectorOverlay;
 class InspectorPageAgent;
 class Page;
-class PageScriptDebugServer;
 
-class PageDebuggerAgent : public InspectorDebuggerAgent {
+class PageDebuggerAgent final : public WebDebuggerAgent {
     WTF_MAKE_NONCOPYABLE(PageDebuggerAgent);
     WTF_MAKE_FAST_ALLOCATED;
 public:
-    static PassOwnPtr<PageDebuggerAgent> create(InstrumentingAgents*, InspectorCompositeState*, InspectorPageAgent*, InjectedScriptManager*, InspectorOverlay*);
-    virtual ~PageDebuggerAgent();
+    PageDebuggerAgent(PageAgentContext&, InspectorPageAgent*, InspectorOverlay*);
+    virtual ~PageDebuggerAgent() { }
 
     void didClearMainFrameWindowObject();
 
+    void mainFrameStartedLoading();
+    void mainFrameStoppedLoading();
+    void mainFrameNavigated();
+
 protected:
-    virtual void enable();
-    virtual void disable();
+    virtual void enable() override;
+    virtual void disable(bool isBeingDestroyed) override;
+
+    virtual String sourceMapURLForScript(const Script&) override;
 
 private:
-    virtual void startListeningScriptDebugServer();
-    virtual void stopListeningScriptDebugServer();
-    virtual PageScriptDebugServer& scriptDebugServer();
-    virtual void muteConsole();
-    virtual void unmuteConsole();
+    virtual void muteConsole() override;
+    virtual void unmuteConsole() override;
 
-    virtual InjectedScript injectedScriptForEval(ErrorString*, const int* executionContextId);
-    virtual void setOverlayMessage(ErrorString*, const String*);
+    virtual void breakpointActionLog(JSC::ExecState*, const String&) override;
 
-    PageDebuggerAgent(InstrumentingAgents*, InspectorCompositeState*, InspectorPageAgent*, InjectedScriptManager*, InspectorOverlay*);
+    virtual Inspector::InjectedScript injectedScriptForEval(ErrorString&, const int* executionContextId) override;
+    virtual void setOverlayMessage(ErrorString&, const String*) override;
+
+    Page& m_page;
+
     InspectorPageAgent* m_pageAgent;
-    InspectorOverlay* m_overlay;
+    InspectorOverlay* m_overlay { nullptr };
 };
 
 } // namespace WebCore
-
-#endif // ENABLE(JAVASCRIPT_DEBUGGER) && ENABLE(INSPECTOR)
 
 #endif // !defined(PageDebuggerAgent_h)

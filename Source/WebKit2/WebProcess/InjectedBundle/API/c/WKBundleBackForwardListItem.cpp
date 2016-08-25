@@ -26,7 +26,7 @@
 #include "config.h"
 #include "WKBundleBackForwardListItem.h"
 
-#include "ImmutableArray.h"
+#include "APIArray.h"
 #include "InjectedBundleBackForwardListItem.h"
 #include "WKBundleAPICast.h"
 
@@ -79,6 +79,6 @@ bool WKBundleBackForwardListItemHasCachedPageExpired(WKBundleBackForwardListItem
 
 WKArrayRef WKBundleBackForwardListItemCopyChildren(WKBundleBackForwardListItemRef itemRef)
 {
-    return toAPI(toImpl(itemRef)->children().leakRef());
+    return toAPI(&toImpl(itemRef)->children().leakRef());
 }
 

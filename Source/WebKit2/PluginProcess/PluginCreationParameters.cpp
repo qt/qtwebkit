@@ -26,7 +26,7 @@
 #include "config.h"
 #include "PluginCreationParameters.h"
 
-#if ENABLE(PLUGIN_PROCESS)
+#if ENABLE(NETSCAPE_PLUGIN_API)
 
 #include "ArgumentCoders.h"
 
@@ -37,15 +37,14 @@ PluginCreationParameters::PluginCreationParameters()
     , windowNPObjectID(0)
     , contentsScaleFactor(1)
     , isPrivateBrowsingEnabled(false)
+    , isMuted(false)
     , asynchronousCreationIncomplete(false)
     , artificialPluginInitializationDelayEnabled(false)
-#if USE(ACCELERATED_COMPOSITING)
     , isAcceleratedCompositingEnabled(false)
-#endif
 {
 }
 
-void PluginCreationParameters::encode(CoreIPC::ArgumentEncoder& encoder) const
+void PluginCreationParameters::encode(IPC::ArgumentEncoder& encoder) const
 {
     encoder << pluginInstanceID;
     encoder << windowNPObjectID;
@@ -53,15 +52,13 @@ void PluginCreationParameters::encode(CoreIPC::ArgumentEncoder& encoder) const
     encoder << userAgent;
     encoder << contentsScaleFactor;
     encoder << isPrivateBrowsingEnabled;
+    encoder << isMuted;
     encoder << asynchronousCreationIncomplete;
     encoder << artificialPluginInitializationDelayEnabled;
-
-#if USE(ACCELERATED_COMPOSITING)
     encoder << isAcceleratedCompositingEnabled;
-#endif
 }
 
-bool PluginCreationParameters::decode(CoreIPC::ArgumentDecoder& decoder, PluginCreationParameters& result)
+bool PluginCreationParameters::decode(IPC::ArgumentDecoder& decoder, PluginCreationParameters& result)
 {
     if (!decoder.decode(result.pluginInstanceID) || !result.pluginInstanceID)
         return false;
@@ -81,16 +78,17 @@ bool PluginCreationParameters::decode(CoreIPC::ArgumentDecoder& decoder, PluginC
     if (!decoder.decode(result.isPrivateBrowsingEnabled))
         return false;
 
+    if (!decoder.decode(result.isMuted))
+        return false;
+
     if (!decoder.decode(result.asynchronousCreationIncomplete))
         return false;
 
     if (!decoder.decode(result.artificialPluginInitializationDelayEnabled))
         return false;
 
-#if USE(ACCELERATED_COMPOSITING)
     if (!decoder.decode(result.isAcceleratedCompositingEnabled))
         return false;
-#endif
 
     return true;
 }
@@ -98,4 +96,4 @@ bool PluginCreationParameters::decode(CoreIPC::ArgumentDecoder& decoder, PluginC
 
 } // namespace WebKit
 
-#endif // ENABLE(PLUGIN_PROCESS)
+#endif // ENABLE(NETSCAPE_PLUGIN_API)

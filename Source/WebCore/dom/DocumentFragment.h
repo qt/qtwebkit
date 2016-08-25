@@ -31,24 +31,31 @@ namespace WebCore {
 
 class DocumentFragment : public ContainerNode {
 public:
-    static PassRefPtr<DocumentFragment> create(Document*);
+    static Ref<DocumentFragment> create(Document&);
 
     void parseHTML(const String&, Element* contextElement, ParserContentPolicy = AllowScriptingContent);
     bool parseXML(const String&, Element* contextElement, ParserContentPolicy = AllowScriptingContent);
     
-    virtual bool canContainRangeEndPoint() const { return true; }
+    virtual bool canContainRangeEndPoint() const override final { return true; }
     virtual bool isTemplateContent() const { return false; }
 
+    // From the NonElementParentNode interface - https://dom.spec.whatwg.org/#interface-nonelementparentnode
+    Element* getElementById(const AtomicString&) const;
+
 protected:
-    DocumentFragment(Document*, ConstructionType = CreateContainer);
-    virtual String nodeName() const;
+    DocumentFragment(Document&, ConstructionType = CreateContainer);
+    virtual String nodeName() const override final;
 
 private:
-    virtual NodeType nodeType() const;
-    virtual PassRefPtr<Node> cloneNode(bool deep);
-    virtual bool childTypeAllowed(NodeType) const;
+    virtual NodeType nodeType() const override final;
+    virtual Ref<Node> cloneNodeInternal(Document&, CloningOperation) override;
+    virtual bool childTypeAllowed(NodeType) const override;
 };
 
-} //namespace
+} // namespace WebCore
+
+SPECIALIZE_TYPE_TRAITS_BEGIN(WebCore::DocumentFragment)
+    static bool isType(const WebCore::Node& node) { return node.isDocumentFragment(); }
+SPECIALIZE_TYPE_TRAITS_END()
 
 #endif

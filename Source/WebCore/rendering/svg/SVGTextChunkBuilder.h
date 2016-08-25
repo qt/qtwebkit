@@ -1,5 +1,6 @@
 /*
  * Copyright (C) Research In Motion Limited 2010. All rights reserved.
+ * Copyright (C) 2015 Apple Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -20,7 +21,6 @@
 #ifndef SVGTextChunkBuilder_h
 #define SVGTextChunkBuilder_h
 
-#if ENABLE(SVG)
 #include "SVGTextChunk.h"
 #include <wtf/Vector.h>
 
@@ -41,18 +41,13 @@ public:
     SVGTextChunkBuilder();
 
     const Vector<SVGTextChunk>& textChunks() const { return m_textChunks; }
-    void transformationForTextBox(SVGInlineTextBox*, AffineTransform&) const;
+    unsigned totalCharacters() const;
+    float totalLength() const;
+    float totalAnchorShift() const;
+    AffineTransform transformationForTextBox(SVGInlineTextBox*) const;
 
-    void buildTextChunks(Vector<SVGInlineTextBox*>& lineLayoutBoxes);
-    void layoutTextChunks(Vector<SVGInlineTextBox*>& lineLayoutBoxes);
-
-private:
-    void addTextChunk(Vector<SVGInlineTextBox*>& lineLayoutBoxes, unsigned boxPosition, unsigned boxCount);
-    void processTextChunk(const SVGTextChunk&);
-
-    void processTextLengthSpacingCorrection(bool isVerticalText, float textLengthShift, Vector<SVGTextFragment>&, unsigned& atCharacter);
-    void processTextAnchorCorrection(bool isVerticalText, float textAnchorShift, Vector<SVGTextFragment>&);
-    void buildSpacingAndGlyphsTransform(bool isVerticalText, float scale, const SVGTextFragment&, AffineTransform&);
+    void buildTextChunks(const Vector<SVGInlineTextBox*>& lineLayoutBoxes);
+    void layoutTextChunks(const Vector<SVGInlineTextBox*>& lineLayoutBoxes);
 
 private:
     Vector<SVGTextChunk> m_textChunks;
@@ -61,5 +56,4 @@ private:
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif

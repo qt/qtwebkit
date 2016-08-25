@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2012, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,23 +26,25 @@
 #ifndef ByValInfo_h
 #define ByValInfo_h
 
-#include <wtf/Platform.h>
-
-#if ENABLE(JIT)
-
 #include "ClassInfo.h"
 #include "CodeLocation.h"
+#include "CodeOrigin.h"
 #include "IndexingType.h"
 #include "JITStubRoutine.h"
 #include "Structure.h"
+#include "StructureStubInfo.h"
 
 namespace JSC {
+
+#if ENABLE(JIT)
 
 enum JITArrayMode {
     JITInt32,
     JITDouble,
     JITContiguous,
     JITArrayStorage,
+    JITDirectArguments,
+    JITScopedArguments,
     JITInt8Array,
     JITInt16Array,
     JITInt32Array,
@@ -67,14 +69,26 @@ inline bool isOptimizableIndexingType(IndexingType indexingType)
     }
 }
 
+inline bool hasOptimizableIndexingForJSType(JSType type)
+{
+    switch (type) {
+    case DirectArgumentsType:
+    case ScopedArgumentsType:
+        return true;
+    default:
+        return false;
+    }
+}
+
 inline bool hasOptimizableIndexingForClassInfo(const ClassInfo* classInfo)
 {
-    return classInfo->typedArrayStorageType != TypedArrayNone;
+    return isTypedView(classInfo->typedArrayStorageType);
 }
 
 inline bool hasOptimizableIndexing(Structure* structure)
 {
     return isOptimizableIndexingType(structure->indexingType())
+        || hasOptimizableIndexingForJSType(structure->typeInfo().type())
         || hasOptimizableIndexingForClassInfo(structure->classInfo());
 }
 
@@ -95,30 +109,83 @@ inline JITArrayMode jitArrayModeForIndexingType(IndexingType indexingType)
     }
 }
 
+inline JITArrayMode jitArrayModeForJSType(JSType type)
+{
+    switch (type) {
+    case DirectArgumentsType:
+        return JITDirectArguments;
+    case ScopedArgumentsType:
+        return JITScopedArguments;
+    default:
+        RELEASE_ASSERT_NOT_REACHED();
+        return JITContiguous;
+    }
+}
+
 inline JITArrayMode jitArrayModeForClassInfo(const ClassInfo* classInfo)
 {
     switch (classInfo->typedArrayStorageType) {
-    case TypedArrayInt8:
+    case TypeInt8:
         return JITInt8Array;
-    case TypedArrayInt16:
+    case TypeInt16:
         return JITInt16Array;
-    case TypedArrayInt32:
+    case TypeInt32:
         return JITInt32Array;
-    case TypedArrayUint8:
+    case TypeUint8:
         return JITUint8Array;
-    case TypedArrayUint8Clamped:
+    case TypeUint8Clamped:
         return JITUint8ClampedArray;
-    case TypedArrayUint16:
+    case TypeUint16:
         return JITUint16Array;
-    case TypedArrayUint32:
+    case TypeUint32:
         return JITUint32Array;
-    case TypedArrayFloat32:
+    case TypeFloat32:
         return JITFloat32Array;
-    case TypedArrayFloat64:
+    case TypeFloat64:
         return JITFloat64Array;
     default:
         CRASH();
         return JITContiguous;
+    }
+}
+
+inline bool jitArrayModePermitsPut(JITArrayMode mode)
+{
+    switch (mode) {
+    case JITDirectArguments:
+    case JITScopedArguments:
+        // We could support put_by_val on these at some point, but it's just not that profitable
+        // at the moment.
+        return false;
+    default:
+        return true;
+    }
+}
+
+inline TypedArrayType typedArrayTypeForJITArrayMode(JITArrayMode mode)
+{
+    switch (mode) {
+    case JITInt8Array:
+        return TypeInt8;
+    case JITInt16Array:
+        return TypeInt16;
+    case JITInt32Array:
+        return TypeInt32;
+    case JITUint8Array:
+        return TypeUint8;
+    case JITUint8ClampedArray:
+        return TypeUint8Clamped;
+    case JITUint16Array:
+        return TypeUint16;
+    case JITUint32Array:
+        return TypeUint32;
+    case JITFloat32Array:
+        return TypeFloat32;
+    case JITFloat64Array:
+        return TypeFloat64;
+    default:
+        CRASH();
+        return NotTypedArray;
     }
 }
 
@@ -127,30 +194,46 @@ inline JITArrayMode jitArrayModeForStructure(Structure* structure)
     if (isOptimizableIndexingType(structure->indexingType()))
         return jitArrayModeForIndexingType(structure->indexingType());
     
+    if (hasOptimizableIndexingForJSType(structure->typeInfo().type()))
+        return jitArrayModeForJSType(structure->typeInfo().type());
+    
     ASSERT(hasOptimizableIndexingForClassInfo(structure->classInfo()));
     return jitArrayModeForClassInfo(structure->classInfo());
 }
 
 struct ByValInfo {
     ByValInfo() { }
-    
-    ByValInfo(unsigned bytecodeIndex, CodeLocationJump badTypeJump, JITArrayMode arrayMode, int16_t badTypeJumpToDone, int16_t returnAddressToSlowPath)
+
+    ByValInfo(unsigned bytecodeIndex, CodeLocationJump notIndexJump, CodeLocationJump badTypeJump, JITArrayMode arrayMode, ArrayProfile* arrayProfile, int16_t badTypeJumpToDone, int16_t badTypeJumpToNextHotPath, int16_t returnAddressToSlowPath)
         : bytecodeIndex(bytecodeIndex)
+        , notIndexJump(notIndexJump)
         , badTypeJump(badTypeJump)
         , arrayMode(arrayMode)
+        , arrayProfile(arrayProfile)
         , badTypeJumpToDone(badTypeJumpToDone)
+        , badTypeJumpToNextHotPath(badTypeJumpToNextHotPath)
         , returnAddressToSlowPath(returnAddressToSlowPath)
         , slowPathCount(0)
+        , stubInfo(nullptr)
+        , tookSlowPath(false)
+        , seen(false)
     {
     }
-    
+
     unsigned bytecodeIndex;
+    CodeLocationJump notIndexJump;
     CodeLocationJump badTypeJump;
     JITArrayMode arrayMode; // The array mode that was baked into the inline JIT code.
+    ArrayProfile* arrayProfile;
     int16_t badTypeJumpToDone;
+    int16_t badTypeJumpToNextHotPath;
     int16_t returnAddressToSlowPath;
     unsigned slowPathCount;
     RefPtr<JITStubRoutine> stubRoutine;
+    Identifier cachedId;
+    StructureStubInfo* stubInfo;
+    bool tookSlowPath : 1;
+    bool seen : 1;
 };
 
 inline unsigned getByValInfoBytecodeIndex(ByValInfo* info)
@@ -158,9 +241,15 @@ inline unsigned getByValInfoBytecodeIndex(ByValInfo* info)
     return info->bytecodeIndex;
 }
 
-} // namespace JSC
+typedef HashMap<CodeOrigin, ByValInfo*, CodeOriginApproximateHash> ByValInfoMap;
+
+#else // ENABLE(JIT)
+
+typedef HashMap<int, void*> ByValInfoMap;
 
 #endif // ENABLE(JIT)
+
+} // namespace JSC
 
 #endif // ByValInfo_h
 

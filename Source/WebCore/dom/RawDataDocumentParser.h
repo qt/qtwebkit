@@ -32,31 +32,31 @@ namespace WebCore {
 
 class RawDataDocumentParser : public DocumentParser {
 protected:
-    explicit RawDataDocumentParser(Document* document)
+    explicit RawDataDocumentParser(Document& document)
         : DocumentParser(document)
     {
     }
 
-    virtual void finish()
+    virtual void finish() override
     {
         if (!isStopped())
             document()->finishedParsing();
     }
 
 private:
-    virtual void flush(DocumentWriter* writer)
+    virtual void flush(DocumentWriter& writer) override
     {
         // Make sure appendBytes is called at least once.
         appendBytes(writer, 0, 0);
     }
 
-    virtual void insert(const SegmentedString&)
+    virtual void insert(const SegmentedString&) override
     {
         // <https://bugs.webkit.org/show_bug.cgi?id=25397>: JS code can always call document.write, we need to handle it.
         ASSERT_NOT_REACHED();
     }
 
-    virtual void append(PassRefPtr<StringImpl>)
+    virtual void append(RefPtr<StringImpl>&&) override
     {
         ASSERT_NOT_REACHED();
     }

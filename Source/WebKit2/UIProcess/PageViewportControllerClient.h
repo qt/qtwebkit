@@ -30,22 +30,18 @@ class IntSize;
 
 namespace WebKit {
 
-class PageViewportController;
-
 class PageViewportControllerClient {
     WTF_MAKE_NONCOPYABLE(PageViewportControllerClient);
 public:
     PageViewportControllerClient() { }
     virtual ~PageViewportControllerClient() { }
 
-    virtual void setViewportPosition(const WebCore::FloatPoint& contentsPoint) = 0;
+    virtual void setViewportPosition(const WebCore::FloatPoint&) = 0;
     virtual void setPageScaleFactor(float) = 0;
 
     virtual void didChangeContentsSize(const WebCore::IntSize&) = 0;
     virtual void didChangeVisibleContents() = 0;
     virtual void didChangeViewportAttributes() = 0;
-
-    virtual void setController(PageViewportController*) = 0;
 };
 
 } // namespace WebKit

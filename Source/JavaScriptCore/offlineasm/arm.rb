@@ -1,4 +1,4 @@
-# Copyright (C) 2011, 2012 Apple Inc. All rights reserved.
+# Copyright (C) 2011, 2012, 2015-2016 Apple Inc. All rights reserved.
 # Copyright (C) 2013 University of Szeged. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -26,6 +26,34 @@ require "config"
 require "ast"
 require "opt"
 require "risc"
+
+# GPR conventions, to match the baseline JIT
+#
+#  x0 => t0, a0, r0
+#  x1 => t1, a1, r1
+#  x2 => t2, a2, r2
+#  x3 => t3, a3, r3
+#  x6 =>            (callee-save scratch)
+#  x7 => cfr        (ARMv7 only)
+#  x8 => t4         (callee-save)
+#  x9 => t5         (callee-save)
+# x10 =>            (callee-save scratch)
+# x11 => cfr        (ARM and ARMv7 traditional)
+# x12 =>            (callee-save scratch)
+#  lr => lr
+#  sp => sp
+#  pc => pc
+#
+# FPR conventions, to match the baseline JIT
+#
+# d0 => ft0, fa0, fr
+# d1 => ft1, fa1
+# d2 => ft2
+# d3 => ft3
+# d4 => ft4
+# d5 => ft5
+# d6 =>              (scratch)
+# d7 =>              (scratch)
 
 def isARMv7
     case $activeBackend
@@ -63,13 +91,15 @@ class SpecialRegister
     end
 end
 
-ARM_EXTRA_GPRS = [SpecialRegister.new("r9"), SpecialRegister.new("r8"), SpecialRegister.new("r3")]
+ARM_EXTRA_GPRS = [SpecialRegister.new("r6"), SpecialRegister.new("r10"), SpecialRegister.new("r12")]
 ARM_EXTRA_FPRS = [SpecialRegister.new("d7")]
 ARM_SCRATCH_FPR = SpecialRegister.new("d6")
 
 def armMoveImmediate(value, register)
     # Currently we only handle the simple cases, and fall back to mov/movt for the complex ones.
-    if value >= 0 && value < 256
+    if value.is_a? String
+      $asm.puts "mov #{register.armOperand}, (#{value})"
+    elsif value >= 0 && value < 256
         $asm.puts "mov #{register.armOperand}, \##{value}"
     elsif (~value) >= 0 && (~value) < 256
         $asm.puts "mvn #{register.armOperand}, \##{~value}"
@@ -97,13 +127,17 @@ class RegisterID
         when "t3"
             "r4"
         when "t4"
-            "r10"
+            "r8"
+        when "t5"
+            "r9"
         when "cfr"
-            "r5"
+            isARMv7 ?  "r7" : "r11"
         when "lr"
             "lr"
         when "sp"
             "sp"
+        when "pc"
+            "pc"
         else
             raise "Bad register #{name} for ARM at #{codeOriginString}"
         end
@@ -113,9 +147,9 @@ end
 class FPRegisterID
     def armOperand
         case name
-        when "ft0", "fr"
+        when "ft0", "fr", "fa0"
             "d0"
-        when "ft1"
+        when "ft1", "fa1"
             "d1"
         when "ft2"
             "d2"
@@ -217,7 +251,7 @@ class Sequence
             end
         }
         result = riscLowerMalformedAddressesDouble(result)
-        result = riscLowerMisplacedImmediates(result, ["storeb", "storei", "storep"])
+        result = riscLowerMisplacedImmediates(result, ["storeb", "storei", "storep", "storeq"])
         result = riscLowerMalformedImmediates(result, 0..0xff)
         result = riscLowerMisplacedAddresses(result)
         result = riscLowerRegisterReuse(result)
@@ -315,6 +349,7 @@ class Instruction
     def lowerARMCommon
         $asm.codeOrigin codeOriginString if $enableCodeOriginComments
         $asm.annotation annotation if $enableInstrAnnotations
+        $asm.debugAnnotation codeOrigin.debugDirective if $enableDebugAnnotations
 
         case opcode
         when "addi", "addp", "addis", "addps"
@@ -333,7 +368,7 @@ class Instruction
                 else
                     $asm.puts "adds #{operands[2].armOperand}, #{operands[1].armOperand}, #{operands[0].armOperand}"
                 end
-            elsif operands.size == 3 and operands[0].immediate?
+            elsif operands.size == 3 and operands[0].register?
                 raise unless operands[1].register?
                 raise unless operands[2].register?
                 $asm.puts "adds #{armFlippedOperands(operands)}"
@@ -451,15 +486,24 @@ class Instruction
             # FIXME: either support this or remove it.
             raise "ARM does not support this opcode yet, #{codeOrigin}"
         when "pop"
-            $asm.puts "pop #{operands[0].armOperand}"
+            operands.each {
+                | op |
+                $asm.puts "pop { #{op.armOperand} }"
+            }
         when "push"
-            $asm.puts "push #{operands[0].armOperand}"
+            operands.each {
+                | op |
+                $asm.puts "push { #{op.armOperand} }"
+            }
         when "move"
             if operands[0].immediate?
                 armMoveImmediate(operands[0].value, operands[1])
             else
                 $asm.puts "mov #{armFlippedOperands(operands)}"
             end
+        when "mvlbl"
+                $asm.puts "movw #{operands[1].armOperand}, \#:lower16:#{operands[0].value}"
+                $asm.puts "movt #{operands[1].armOperand}, \#:upper16:#{operands[0].value}"
         when "nop"
             $asm.puts "nop"
         when "bieq", "bpeq", "bbeq"
@@ -579,6 +623,10 @@ class Instruction
         when "smulli"
             raise "Wrong number of arguments to smull in #{self.inspect} at #{codeOriginString}" unless operands.length == 4
             $asm.puts "smull #{operands[2].armOperand}, #{operands[3].armOperand}, #{operands[0].armOperand}, #{operands[1].armOperand}"
+        when "memfence"
+            $asm.puts "dmb sy"
+        when "clrbp"
+            $asm.puts "bic #{operands[2].armOperand}, #{operands[0].armOperand}, #{operands[1].armOperand}"
         else
             lowerDefault
         end

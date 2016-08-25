@@ -26,73 +26,39 @@
 #include "config.h"
 #include "UIRequestEvent.h"
 
-#include "EventDispatcher.h"
-
 #if ENABLE(INDIE_UI)
 
 namespace WebCore {
 
-UIRequestEventInit::UIRequestEventInit()
-    : UIEventInit(true, true)
-    , receiver(0)
+Ref<UIRequestEvent> UIRequestEvent::createForBindings(const AtomicString& type, const UIRequestEventInit& initializer)
 {
-}
-    
-PassRefPtr<UIRequestEvent> UIRequestEvent::create()
-{
-    return adoptRef(new UIRequestEvent);
-}
-    
-PassRefPtr<UIRequestEvent> UIRequestEvent::create(const AtomicString& type, const UIRequestEventInit& initializer)
-{
-    return adoptRef(new UIRequestEvent(type, initializer));
+    return adoptRef(*new UIRequestEvent(type, initializer));
 }
 
-PassRefPtr<UIRequestEvent> UIRequestEvent::create(const AtomicString& type, bool bubbles, bool cancelable, PassRefPtr<AbstractView> view, int detail, PassRefPtr<EventTarget> receiver)
+Ref<UIRequestEvent> UIRequestEvent::create(const AtomicString& type, bool bubbles, bool cancelable, AbstractView* view, int detail, PassRefPtr<EventTarget> receiver)
 {
-    return adoptRef(new UIRequestEvent(type, bubbles, cancelable, view, detail, receiver));
+    return adoptRef(*new UIRequestEvent(type, bubbles, cancelable, view, detail, receiver));
 }
 
 UIRequestEvent::UIRequestEvent(const AtomicString& type, const UIRequestEventInit& initializer)
-    : UIEvent(type, initializer.bubbles, initializer.cancelable, initializer.view, initializer.detail)
+    : UIEvent(type, initializer)
     , m_receiver(initializer.receiver)
 {
 }
     
-UIRequestEvent::UIRequestEvent(const AtomicString& type, bool bubbles, bool cancelable, PassRefPtr<AbstractView> view, int detail, PassRefPtr<EventTarget> receiver)
+UIRequestEvent::UIRequestEvent(const AtomicString& type, bool bubbles, bool cancelable, AbstractView* view, int detail, PassRefPtr<EventTarget> receiver)
     : UIEvent(type, bubbles, cancelable, view, detail)
     , m_receiver(receiver)
-{
-}
-
-UIRequestEvent::UIRequestEvent()
-    : m_receiver(0)
 {
 }
 
 UIRequestEvent::~UIRequestEvent()
 {
 }
-    
-const AtomicString& UIRequestEvent::interfaceName() const
-{
-    return eventNames().interfaceForUIRequestEvent;
-}
 
-UIRequestEventDispatchMediator::UIRequestEventDispatchMediator(PassRefPtr<UIRequestEvent> event)
-    : EventDispatchMediator(event)
+EventInterface UIRequestEvent::eventInterface() const
 {
-}
-
-UIRequestEvent* UIRequestEventDispatchMediator::event() const
-{
-    return static_cast<UIRequestEvent*>(EventDispatchMediator::event());
-}
-
-bool UIRequestEventDispatchMediator::dispatchEvent(EventDispatcher* dispatcher) const
-{
-    dispatcher->dispatch();
-    return event()->defaultHandled() || event()->defaultPrevented();
+    return UIRequestEventInterfaceType;
 }
     
 } // namespace WebCore

@@ -11,10 +11,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -27,35 +27,34 @@
 
 #include "config.h"
 
-#if ENABLE(WORKERS)
-
 #include "JSWorkerGlobalScopeBase.h"
 
 #include "DOMWrapperWorld.h"
+#include "JSDOMGlobalObjectTask.h"
 #include "JSDedicatedWorkerGlobalScope.h"
 #include "JSWorkerGlobalScope.h"
 #include "WorkerGlobalScope.h"
-
-#if ENABLE(SHARED_WORKERS)
-#include "JSSharedWorkerGlobalScope.h"
-#endif
+#include <runtime/JSCJSValueInlines.h>
+#include <runtime/Microtask.h>
 
 using namespace JSC;
 
 namespace WebCore {
 
-const ClassInfo JSWorkerGlobalScopeBase::s_info = { "WorkerGlobalScope", &JSDOMGlobalObject::s_info, 0, 0, CREATE_METHOD_TABLE(JSWorkerGlobalScopeBase) };
+const ClassInfo JSWorkerGlobalScopeBase::s_info = { "WorkerGlobalScope", &JSDOMGlobalObject::s_info, 0, CREATE_METHOD_TABLE(JSWorkerGlobalScopeBase) };
+
+const GlobalObjectMethodTable JSWorkerGlobalScopeBase::s_globalObjectMethodTable = { &allowsAccessFrom, &supportsLegacyProfiling, &supportsRichSourceInfo, &shouldInterruptScript, &javaScriptRuntimeFlags, &queueTaskToEventLoop, &shouldInterruptScriptBeforeTimeout, nullptr, nullptr, nullptr, nullptr, nullptr };
 
 JSWorkerGlobalScopeBase::JSWorkerGlobalScopeBase(JSC::VM& vm, JSC::Structure* structure, PassRefPtr<WorkerGlobalScope> impl)
-    : JSDOMGlobalObject(vm, structure, normalWorld(vm))
-    , m_impl(impl)
+    : JSDOMGlobalObject(vm, structure, &normalWorld(vm), &s_globalObjectMethodTable)
+    , m_wrapped(impl)
 {
 }
 
 void JSWorkerGlobalScopeBase::finishCreation(VM& vm)
 {
     Base::finishCreation(vm);
-    ASSERT(inherits(&s_info));
+    ASSERT(inherits(info()));
 }
 
 void JSWorkerGlobalScopeBase::destroy(JSCell* cell)
@@ -65,7 +64,43 @@ void JSWorkerGlobalScopeBase::destroy(JSCell* cell)
 
 ScriptExecutionContext* JSWorkerGlobalScopeBase::scriptExecutionContext() const
 {
-    return m_impl.get();
+    return m_wrapped.get();
+}
+
+bool JSWorkerGlobalScopeBase::allowsAccessFrom(const JSGlobalObject* object, ExecState* exec)
+{
+    return JSGlobalObject::allowsAccessFrom(object, exec);
+}
+
+bool JSWorkerGlobalScopeBase::supportsLegacyProfiling(const JSGlobalObject* object)
+{
+    return JSGlobalObject::supportsLegacyProfiling(object);
+}
+
+bool JSWorkerGlobalScopeBase::supportsRichSourceInfo(const JSGlobalObject* object)
+{
+    return JSGlobalObject::supportsRichSourceInfo(object);
+}
+
+bool JSWorkerGlobalScopeBase::shouldInterruptScript(const JSGlobalObject* object)
+{
+    return JSGlobalObject::shouldInterruptScript(object);
+}
+
+bool JSWorkerGlobalScopeBase::shouldInterruptScriptBeforeTimeout(const JSGlobalObject* object)
+{
+    return JSGlobalObject::shouldInterruptScriptBeforeTimeout(object);
+}
+
+RuntimeFlags JSWorkerGlobalScopeBase::javaScriptRuntimeFlags(const JSGlobalObject* object)
+{
+    return JSGlobalObject::javaScriptRuntimeFlags(object);
+}
+
+void JSWorkerGlobalScopeBase::queueTaskToEventLoop(const JSGlobalObject* object, PassRefPtr<JSC::Microtask> task)
+{
+    const JSWorkerGlobalScopeBase* thisObject = static_cast<const JSWorkerGlobalScopeBase*>(object);
+    thisObject->scriptExecutionContext()->postTask(JSGlobalObjectTask((JSDOMGlobalObject*)thisObject, task));
 }
 
 JSValue toJS(ExecState* exec, JSDOMGlobalObject*, WorkerGlobalScope* workerGlobalScope)
@@ -90,33 +125,17 @@ JSDedicatedWorkerGlobalScope* toJSDedicatedWorkerGlobalScope(JSValue value)
     if (!value.isObject())
         return 0;
     const ClassInfo* classInfo = asObject(value)->classInfo();
-    if (classInfo == &JSDedicatedWorkerGlobalScope::s_info)
+    if (classInfo == JSDedicatedWorkerGlobalScope::info())
         return jsCast<JSDedicatedWorkerGlobalScope*>(asObject(value));
+    if (classInfo == JSProxy::info())
+        return jsDynamicCast<JSDedicatedWorkerGlobalScope*>(jsCast<JSProxy*>(asObject(value))->target());
     return 0;
 }
 
-#if ENABLE(SHARED_WORKERS)
-JSSharedWorkerGlobalScope* toJSSharedWorkerGlobalScope(JSValue value)
-{
-    if (!value.isObject())
-        return 0;
-    const ClassInfo* classInfo = asObject(value)->classInfo();
-    if (classInfo == &JSSharedWorkerGlobalScope::s_info)
-        return jsCast<JSSharedWorkerGlobalScope*>(asObject(value));
-    return 0;
-}
-#endif
 
 JSWorkerGlobalScope* toJSWorkerGlobalScope(JSValue value)
 {
-    JSWorkerGlobalScope* context = toJSDedicatedWorkerGlobalScope(value);
-#if ENABLE(SHARED_WORKERS)
-    if (!context)
-        context = toJSSharedWorkerGlobalScope(value);
-#endif
-    return context;
+    return toJSDedicatedWorkerGlobalScope(value);
 }
 
 } // namespace WebCore
-
-#endif // ENABLE(WORKERS)

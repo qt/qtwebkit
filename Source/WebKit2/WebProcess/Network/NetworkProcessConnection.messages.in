@@ -20,12 +20,10 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#if ENABLE(NETWORK_PROCESS)
-
 messages -> NetworkProcessConnection LegacyReceiver {
 
-    DidCacheResource(WebCore::ResourceRequest request, WebKit::ShareableResource::Handle resource)
+#if ENABLE(SHAREABLE_RESOURCE)
+    DidCacheResource(WebCore::ResourceRequest request, WebKit::ShareableResource::Handle resource, WebCore::SessionID sessionID)
+#endif
 
 }
-
-#endif // ENABLE(NETWORK_PROCESS)

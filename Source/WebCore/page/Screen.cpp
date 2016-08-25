@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution. 
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission. 
  *
@@ -26,17 +26,13 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-
 #include "config.h"
 #include "Screen.h"
 
 #include "FloatRect.h"
 #include "Frame.h"
 #include "FrameView.h"
-#include "InspectorInstrumentation.h"
 #include "PlatformScreen.h"
-#include "Settings.h"
-#include "Widget.h"
 
 namespace WebCore {
 
@@ -50,7 +46,6 @@ unsigned Screen::height() const
     if (!m_frame)
         return 0;
     long height = static_cast<long>(screenRect(m_frame->view()).height());
-    InspectorInstrumentation::applyScreenHeightOverride(m_frame, &height);
     return static_cast<unsigned>(height);
 }
 
@@ -59,7 +54,6 @@ unsigned Screen::width() const
     if (!m_frame)
         return 0;
     long width = static_cast<long>(screenRect(m_frame->view()).width());
-    InspectorInstrumentation::applyScreenWidthOverride(m_frame, &width);
     return static_cast<unsigned>(width);
 }
 

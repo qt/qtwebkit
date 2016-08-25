@@ -24,6 +24,7 @@
 #ifndef HTMLImageElement_h
 #define HTMLImageElement_h
 
+#include "FormNamedItem.h"
 #include "GraphicsTypes.h"
 #include "HTMLElement.h"
 #include "HTMLImageLoader.h"
@@ -31,13 +32,14 @@
 namespace WebCore {
 
 class HTMLFormElement;
+struct ImageCandidate;
 
-class HTMLImageElement : public HTMLElement {
+class HTMLImageElement : public HTMLElement, public FormNamedItem {
     friend class HTMLFormElement;
 public:
-    static PassRefPtr<HTMLImageElement> create(Document*);
-    static PassRefPtr<HTMLImageElement> create(const QualifiedName&, Document*, HTMLFormElement*);
-    static PassRefPtr<HTMLImageElement> createForJSConstructor(Document*, const int* optionalWidth, const int* optionalHeight);
+    static Ref<HTMLImageElement> create(Document&);
+    static Ref<HTMLImageElement> create(const QualifiedName&, Document&, HTMLFormElement*);
+    static Ref<HTMLImageElement> createForJSConstructor(Document&, const int* optionalWidth, const int* optionalHeight);
 
     virtual ~HTMLImageElement();
 
@@ -46,23 +48,28 @@ public:
 
     int naturalWidth() const;
     int naturalHeight() const;
+    const AtomicString& currentSrc() const { return m_currentSrc; }
 
     bool isServerMap() const;
 
-    String altText() const;
+    const AtomicString& altText() const;
 
     CompositeOperator compositeOperator() const { return m_compositeOperator; }
 
     CachedImage* cachedImage() const { return m_imageLoader.image(); }
+#if PLATFORM(QT)
     void setCachedImage(CachedImage* i) { m_imageLoader.setImage(i); };
+#endif
 
     void setLoadManually(bool loadManually) { m_imageLoader.setLoadManually(loadManually); }
+
+    bool matchesCaseFoldedUsemap(const AtomicStringImpl&) const;
 
     const AtomicString& alt() const;
 
     void setHeight(int);
 
-    KURL src() const;
+    URL src() const;
     void setSrc(const String&);
 
     void setWidth(int);
@@ -72,61 +79,79 @@ public:
 
     bool complete() const;
 
+#if PLATFORM(IOS)
+    virtual bool willRespondToMouseClickEvents() override;
+#endif
+
     bool hasPendingActivity() const { return m_imageLoader.hasPendingActivity(); }
 
-    virtual bool canContainRangeEndPoint() const { return false; }
+    virtual bool canContainRangeEndPoint() const override { return false; }
+
+    virtual const AtomicString& imageSourceURL() const override;
+
+    bool hasShadowControls() const { return m_experimentalImageMenuEnabled; }
+    
+    HTMLPictureElement* pictureElement() const;
+    void setPictureElement(HTMLPictureElement*);
 
 protected:
-    HTMLImageElement(const QualifiedName&, Document*, HTMLFormElement* = 0);
+    HTMLImageElement(const QualifiedName&, Document&, HTMLFormElement* = 0);
 
-    virtual void didMoveToNewDocument(Document* oldDocument) OVERRIDE;
+    virtual void didMoveToNewDocument(Document* oldDocument) override;
 
 private:
-    virtual bool areAuthorShadowsAllowed() const OVERRIDE { return false; }
+    virtual void parseAttribute(const QualifiedName&, const AtomicString&) override;
+    virtual bool isPresentationAttribute(const QualifiedName&) const override;
+    virtual void collectStyleForPresentationAttribute(const QualifiedName&, const AtomicString&, MutableStyleProperties&) override;
 
-    virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
-    virtual bool isPresentationAttribute(const QualifiedName&) const OVERRIDE;
-    virtual void collectStyleForPresentationAttribute(const QualifiedName&, const AtomicString&, MutableStylePropertySet*) OVERRIDE;
+    virtual void didAttachRenderers() override;
+    virtual RenderPtr<RenderElement> createElementRenderer(Ref<RenderStyle>&&, const RenderTreePosition&) override;
+    void setBestFitURLAndDPRFromImageCandidate(const ImageCandidate&);
 
-    virtual void attach(const AttachContext& = AttachContext()) OVERRIDE;
-    virtual RenderObject* createRenderer(RenderArena*, RenderStyle*);
+    virtual bool canStartSelection() const override;
 
-    virtual bool canStartSelection() const;
+    virtual bool isURLAttribute(const Attribute&) const override;
+    virtual bool attributeContainsURL(const Attribute&) const override;
+    virtual String completeURLsInAttributeValue(const URL& base, const Attribute&) const override;
 
-    virtual bool isURLAttribute(const Attribute&) const OVERRIDE;
+    virtual bool draggable() const override;
 
-    virtual bool draggable() const;
+    virtual void addSubresourceAttributeURLs(ListHashSet<URL>&) const override;
 
-    virtual void addSubresourceAttributeURLs(ListHashSet<KURL>&) const;
+    virtual InsertionNotificationRequest insertedInto(ContainerNode&) override;
+    virtual void removedFrom(ContainerNode&) override;
 
-    virtual InsertionNotificationRequest insertedInto(ContainerNode*) OVERRIDE;
-    virtual void removedFrom(ContainerNode*) OVERRIDE;
+    virtual bool isFormAssociatedElement() const override final { return false; }
+    virtual FormNamedItem* asFormNamedItem() override final { return this; }
+    virtual HTMLImageElement& asHTMLElement() override final { return *this; }
+    virtual const HTMLImageElement& asHTMLElement() const override final { return *this; }
 
-#if ENABLE(MICRODATA)
-    virtual String itemValueText() const OVERRIDE;
-    virtual void setItemValueText(const String&, ExceptionCode&) OVERRIDE;
-#endif
+    void selectImageSource();
+
+    ImageCandidate bestFitSourceFromPictureElement();
 
     HTMLImageLoader m_imageLoader;
     HTMLFormElement* m_form;
+    HTMLFormElement* m_formSetByParser;
+
     CompositeOperator m_compositeOperator;
+    AtomicString m_bestFitImageURL;
+    AtomicString m_currentSrc;
+    AtomicString m_caseFoldedUsemap;
+    float m_imageDevicePixelRatio;
+    bool m_experimentalImageMenuEnabled;
+    bool m_hadNameBeforeAttributeChanged { false }; // FIXME: We only need this because parseAttribute() can't see the old value.
+
+#if ENABLE(SERVICE_CONTROLS)
+    void updateImageControls();
+    void createImageControls();
+    void destroyImageControls();
+    bool hasImageControls() const;
+    virtual bool childShouldCreateRenderer(const Node&) const override;
+#endif
+
+    friend class HTMLPictureElement;
 };
-
-inline bool isHTMLImageElement(Node* node)
-{
-    return node->hasTagName(HTMLNames::imgTag);
-}
-
-inline bool isHTMLImageElement(Element* element)
-{
-    return element->hasTagName(HTMLNames::imgTag);
-}
-
-inline HTMLImageElement* toHTMLImageElement(Node* node)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!node || isHTMLImageElement(node));
-    return static_cast<HTMLImageElement*>(node);
-}
 
 } //namespace
 

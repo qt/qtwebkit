@@ -30,12 +30,11 @@
 
 namespace WebCore {
 
-DocumentParser::DocumentParser(Document* document)
+DocumentParser::DocumentParser(Document& document)
     : m_state(ParsingState)
     , m_documentWasLoadedAsPartOfNavigation(false)
-    , m_document(document)
+    , m_document(&document)
 {
-    ASSERT(document);
 }
 
 DocumentParser::~DocumentParser()
@@ -65,7 +64,7 @@ void DocumentParser::stopParsing()
 void DocumentParser::detach()
 {
     m_state = DetachedState;
-    m_document = 0;
+    m_document = nullptr;
 }
 
 void DocumentParser::suspendScheduledTasks()
@@ -76,5 +75,4 @@ void DocumentParser::resumeScheduledTasks()
 {
 }
 
-};
-
+} // namespace WebCore

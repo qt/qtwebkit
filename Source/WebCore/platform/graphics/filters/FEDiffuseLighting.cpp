@@ -20,27 +20,24 @@
  */
 
 #include "config.h"
-
-#if ENABLE(FILTERS)
 #include "FEDiffuseLighting.h"
 
 #include "LightSource.h"
-#include "RenderTreeAsText.h"
 #include "TextStream.h"
 
 namespace WebCore {
 
-FEDiffuseLighting::FEDiffuseLighting(Filter* filter, const Color& lightingColor, float surfaceScale,
+FEDiffuseLighting::FEDiffuseLighting(Filter& filter, const Color& lightingColor, float surfaceScale,
     float diffuseConstant, float kernelUnitLengthX, float kernelUnitLengthY, PassRefPtr<LightSource> lightSource)
     : FELighting(filter, DiffuseLighting, lightingColor, surfaceScale, diffuseConstant, 0, 0, kernelUnitLengthX, kernelUnitLengthY, lightSource)
 {
 }
 
-PassRefPtr<FEDiffuseLighting> FEDiffuseLighting::create(Filter* filter, const Color& lightingColor,
+Ref<FEDiffuseLighting> FEDiffuseLighting::create(Filter& filter, const Color& lightingColor,
     float surfaceScale, float diffuseConstant, float kernelUnitLengthX,
     float kernelUnitLengthY, PassRefPtr<LightSource> lightSource)
 {
-    return adoptRef(new FEDiffuseLighting(filter, lightingColor, surfaceScale, diffuseConstant, kernelUnitLengthX, kernelUnitLengthY, lightSource));
+    return adoptRef(*new FEDiffuseLighting(filter, lightingColor, surfaceScale, diffuseConstant, kernelUnitLengthX, kernelUnitLengthY, lightSource));
 }
 
 FEDiffuseLighting::~FEDiffuseLighting()
@@ -139,5 +136,3 @@ TextStream& FEDiffuseLighting::externalRepresentation(TextStream& ts, int indent
 }
 
 } // namespace WebCore
-
-#endif // ENABLE(FILTERS)

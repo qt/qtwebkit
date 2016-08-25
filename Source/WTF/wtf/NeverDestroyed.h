@@ -26,10 +26,10 @@
 #ifndef NeverDestroyed_h
 #define NeverDestroyed_h
 
-#include <wtf/Alignment.h>
+#include <type_traits>
+#include <utility>
 #include <wtf/Noncopyable.h>
-#include <wtf/StdLibExtras.h>
-#include <wtf/TypeTraits.h>
+#include <wtf/RefCounted.h>
 
 // NeverDestroyed is a smart pointer like class who ensures that the destructor
 // for the given object is never called, but doesn't use the heap to allocate it.
@@ -40,7 +40,6 @@
 //   static NeverDestroyed<MySharedGlobal> myGlobal("Hello", 42);
 //   return myGlobal;
 // }
-//
 
 namespace WTF {
 
@@ -48,44 +47,86 @@ template<typename T> class NeverDestroyed {
     WTF_MAKE_NONCOPYABLE(NeverDestroyed);
 
 public:
-#if COMPILER_SUPPORTS(CXX_VARIADIC_TEMPLATES)
     template<typename... Args>
     NeverDestroyed(Args&&... args)
     {
-        new (asPtr()) T(std::forward<Args>(args)...);
+        MaybeRelax<T>(new (asPtr()) T(std::forward<Args>(args)...));
     }
-#else
-    NeverDestroyed()
-    {
-        new (NotNull, asPtr()) T;
-    }
-
-    template<typename P1>
-    NeverDestroyed(const P1& p1)
-    {
-        new (NotNull, asPtr()) T(p1);
-    }
-#endif
 
     operator T&() { return *asPtr(); }
+    T& get() { return *asPtr(); }
 
 private:
-#if COMPILER_SUPPORTS(CXX_RVALUE_REFERENCES)
-    NeverDestroyed(NeverDestroyed&&) WTF_DELETED_FUNCTION;
-    NeverDestroyed& operator=(NeverDestroyed&&) WTF_DELETED_FUNCTION;
-#endif
-
-    typedef typename WTF::RemoveConst<T>::Type *PointerType;
+    typedef typename std::remove_const<T>::type* PointerType;
 
     PointerType asPtr() { return reinterpret_cast<PointerType>(&m_storage); }
 
     // FIXME: Investigate whether we should allocate a hunk of virtual memory
     // and hand out chunks of it to NeverDestroyed instead, to reduce fragmentation.
-    AlignedBuffer<sizeof(T), WTF_ALIGN_OF(T)> m_storage;
+    typename std::aligned_storage<sizeof(T), std::alignment_of<T>::value>::type m_storage;
+
+    template <typename PtrType, bool ShouldRelax = std::is_base_of<RefCountedBase, PtrType>::value> struct MaybeRelax {
+        explicit MaybeRelax(PtrType*) { }
+    };
+    template <typename PtrType> struct MaybeRelax<PtrType, true> {
+        explicit MaybeRelax(PtrType* ptr) { ptr->relaxAdoptionRequirement(); }
+    };
+};
+
+template<typename T> class LazyNeverDestroyed {
+    WTF_MAKE_NONCOPYABLE(LazyNeverDestroyed);
+
+public:
+    LazyNeverDestroyed() = default;
+
+    template<typename... Args>
+    void construct(Args&&... args)
+    {
+        ASSERT(!m_isConstructed);
+
+#if !ASSERT_DISABLED
+        m_isConstructed = true;
+#endif
+
+        MaybeRelax<T>(new (asPtr()) T(std::forward<Args>(args)...));
+    }
+
+    operator T&() { return *asPtr(); }
+    T& get() { return *asPtr(); }
+
+    T* operator->() { return asPtr(); }
+
+private:
+    typedef typename std::remove_const<T>::type* PointerType;
+
+    PointerType asPtr()
+    {
+        ASSERT(m_isConstructed);
+
+        return reinterpret_cast<PointerType>(&m_storage);
+    }
+
+    // FIXME: Investigate whether we should allocate a hunk of virtual memory
+    // and hand out chunks of it to NeverDestroyed instead, to reduce fragmentation.
+    typename std::aligned_storage<sizeof(T), std::alignment_of<T>::value>::type m_storage;
+
+    template <typename PtrType, bool ShouldRelax = std::is_base_of<RefCountedBase, PtrType>::value> struct MaybeRelax {
+        explicit MaybeRelax(PtrType*) { }
+    };
+    template <typename PtrType> struct MaybeRelax<PtrType, true> {
+        explicit MaybeRelax(PtrType* ptr) { ptr->relaxAdoptionRequirement(); }
+    };
+
+#if !ASSERT_DISABLED
+    // LazyNeverDestroyed objects are always static, so this variable is initialized to false.
+    // It must not be initialized dynamically, because that would not be thread safe.
+    bool m_isConstructed;
+#endif
 };
 
 } // namespace WTF;
 
+using WTF::LazyNeverDestroyed;
 using WTF::NeverDestroyed;
 
 #endif // NeverDestroyed_h

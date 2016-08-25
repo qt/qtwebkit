@@ -20,19 +20,15 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "RenderSVGTransformableContainer.h"
 
-#include "SVGGraphicsElement.h"
 #include "SVGNames.h"
-#include "SVGRenderSupport.h"
 #include "SVGUseElement.h"
 
 namespace WebCore {
     
-RenderSVGTransformableContainer::RenderSVGTransformableContainer(SVGGraphicsElement* node)
-    : RenderSVGContainer(node)
+RenderSVGTransformableContainer::RenderSVGTransformableContainer(SVGGraphicsElement& element, Ref<RenderStyle>&& style)
+    : RenderSVGContainer(element, WTFMove(style))
     , m_needsTransformUpdate(true)
     , m_didTransformToRootUpdate(false)
 {
@@ -40,18 +36,18 @@ RenderSVGTransformableContainer::RenderSVGTransformableContainer(SVGGraphicsElem
 
 bool RenderSVGTransformableContainer::calculateLocalTransform()
 {
-    SVGGraphicsElement* element = toSVGGraphicsElement(node());
+    SVGGraphicsElement& element = graphicsElement();
 
     // If we're either the renderer for a <use> element, or for any <g> element inside the shadow
     // tree, that was created during the use/symbol/svg expansion in SVGUseElement. These containers
     // need to respect the translations induced by their corresponding use elements x/y attributes.
-    SVGUseElement* useElement = 0;
-    if (element->hasTagName(SVGNames::useTag))
-        useElement = toSVGUseElement(element);
-    else if (element->isInShadowTree() && element->hasTagName(SVGNames::gTag)) {
-        SVGElement* correspondingElement = element->correspondingElement();
-        if (correspondingElement && correspondingElement->hasTagName(SVGNames::useTag))
-            useElement = toSVGUseElement(correspondingElement);
+    SVGUseElement* useElement = nullptr;
+    if (is<SVGUseElement>(element))
+        useElement = &downcast<SVGUseElement>(element);
+    else if (element.isInShadowTree() && is<SVGGElement>(element)) {
+        SVGElement* correspondingElement = element.correspondingElement();
+        if (is<SVGUseElement>(correspondingElement))
+            useElement = downcast<SVGUseElement>(correspondingElement);
     }
 
     if (useElement) {
@@ -66,12 +62,10 @@ bool RenderSVGTransformableContainer::calculateLocalTransform()
     if (!m_needsTransformUpdate)
         return false;
 
-    m_localTransform = element->animatedLocalTransform();
+    m_localTransform = element.animatedLocalTransform();
     m_localTransform.translate(m_lastTranslation.width(), m_lastTranslation.height());
     m_needsTransformUpdate = false;
     return true;
 }
 
 }
-
-#endif // ENABLE(SVG)

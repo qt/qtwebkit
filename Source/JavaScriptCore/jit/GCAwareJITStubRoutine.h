@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2012, 2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -25,8 +25,6 @@
 
 #ifndef GCAwareJITStubRoutine_h
 #define GCAwareJITStubRoutine_h
-
-#include <wtf/Platform.h>
 
 #if ENABLE(JIT)
 
@@ -54,7 +52,7 @@ class JITStubRoutineSet;
 // list which does not get reclaimed all at once).
 class GCAwareJITStubRoutine : public JITStubRoutine {
 public:
-    GCAwareJITStubRoutine(const MacroAssemblerCodeRef&, VM&, bool isClosureCall = false);
+    GCAwareJITStubRoutine(const MacroAssemblerCodeRef&, VM&);
     virtual ~GCAwareJITStubRoutine();
     
     void markRequiredObjects(SlotVisitor& visitor)
@@ -64,10 +62,8 @@ public:
     
     void deleteFromGC();
     
-    bool isClosureCall() const { return m_isClosureCall; }
-    
 protected:
-    virtual void observeZeroRefCount();
+    virtual void observeZeroRefCount() override;
     
     virtual void markRequiredObjectsInternal(SlotVisitor&);
 
@@ -76,7 +72,6 @@ private:
 
     bool m_mayBeExecuting;
     bool m_isJettisoned;
-    bool m_isClosureCall;
 };
 
 // Use this if you want to mark one additional object during GC if your stub
@@ -88,10 +83,28 @@ public:
     virtual ~MarkingGCAwareJITStubRoutineWithOneObject();
     
 protected:
-    virtual void markRequiredObjectsInternal(SlotVisitor&);
+    virtual void markRequiredObjectsInternal(SlotVisitor&) override;
 
 private:
     WriteBarrier<JSCell> m_object;
+};
+
+
+// The stub has exception handlers in it. So it clears itself from exception
+// handling table when it dies. It also frees space in CodeOrigin table
+// for new exception handlers to use the same CallSiteIndex.
+class GCAwareJITStubRoutineWithExceptionHandler : public GCAwareJITStubRoutine {
+public:
+    typedef GCAwareJITStubRoutine Base;
+
+    GCAwareJITStubRoutineWithExceptionHandler(const MacroAssemblerCodeRef&, VM&, CodeBlock*, CallSiteIndex);
+
+    void aboutToDie() override;
+    void observeZeroRefCount() override;
+
+private:
+    CodeBlock* m_codeBlockWithExceptionHandler;
+    CallSiteIndex m_exceptionHandlerCallSiteIndex;
 };
 
 // Helper for easily creating a GC-aware JIT stub routine. For the varargs,
@@ -114,10 +127,14 @@ private:
 // way.
 
 PassRefPtr<JITStubRoutine> createJITStubRoutine(
-    const MacroAssemblerCodeRef&, VM&, const JSCell* owner, bool makesCalls);
-PassRefPtr<JITStubRoutine> createJITStubRoutine(
     const MacroAssemblerCodeRef&, VM&, const JSCell* owner, bool makesCalls,
-    JSCell*);
+    JSCell* = nullptr, 
+    CodeBlock* codeBlockForExceptionHandlers = nullptr, CallSiteIndex exceptionHandlingCallSiteIndex = CallSiteIndex(std::numeric_limits<unsigned>::max()));
+
+// Helper for the creation of simple stub routines that need no help from the GC. Note
+// that codeBlock gets "executed" more than once.
+#define FINALIZE_CODE_FOR_GC_AWARE_STUB(codeBlock, patchBuffer, makesCalls, cell, dataLogFArguments) \
+    (createJITStubRoutine(FINALIZE_CODE_FOR((codeBlock), (patchBuffer), dataLogFArguments), *(codeBlock)->vm(), (codeBlock), (makesCalls), (cell)))
 
 } // namespace JSC
 

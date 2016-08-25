@@ -21,31 +21,30 @@
 #ifndef SVGDefsElement_h
 #define SVGDefsElement_h
 
-#if ENABLE(SVG)
 #include "SVGAnimatedBoolean.h"
 #include "SVGExternalResourcesRequired.h"
 #include "SVGGraphicsElement.h"
 
 namespace WebCore {
 
-class SVGDefsElement FINAL : public SVGGraphicsElement,
+class SVGDefsElement final : public SVGGraphicsElement,
                              public SVGExternalResourcesRequired {
 public:
-    static PassRefPtr<SVGDefsElement> create(const QualifiedName&, Document*);
+    static Ref<SVGDefsElement> create(const QualifiedName&, Document&);
 
 private:
-    SVGDefsElement(const QualifiedName&, Document*);
+    SVGDefsElement(const QualifiedName&, Document&);
 
-    virtual bool isValid() const;
+    virtual bool isValid() const override;
+    virtual bool supportsFocus() const override { return false; }
 
-    virtual RenderObject* createRenderer(RenderArena*, RenderStyle*);
+    virtual RenderPtr<RenderElement> createElementRenderer(Ref<RenderStyle>&&, const RenderTreePosition&) override;
 
     BEGIN_DECLARE_ANIMATED_PROPERTIES(SVGDefsElement)
-        DECLARE_ANIMATED_BOOLEAN(ExternalResourcesRequired, externalResourcesRequired)
+        DECLARE_ANIMATED_BOOLEAN_OVERRIDE(ExternalResourcesRequired, externalResourcesRequired)
     END_DECLARE_ANIMATED_PROPERTIES
 };
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif

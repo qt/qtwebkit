@@ -11,10 +11,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -27,13 +27,16 @@
 #include "config.h"
 #include "ThreadTimers.h"
 
+#include "MainThreadSharedTimer.h"
 #include "SharedTimer.h"
 #include "ThreadGlobalData.h"
 #include "Timer.h"
 #include <wtf/CurrentTime.h>
 #include <wtf/MainThread.h>
 
-using namespace std;
+#if PLATFORM(IOS)
+#include "WebCoreThread.h"
+#endif
 
 namespace WebCore {
 
@@ -45,27 +48,21 @@ static const double maxDurationOfFiringTimers = 0.050;
 // Timers are created, started and fired on the same thread, and each thread has its own ThreadTimers
 // copy to keep the heap and a set of currently firing timers.
 
-static MainThreadSharedTimer* mainThreadSharedTimer()
-{
-    static MainThreadSharedTimer* timer = new MainThreadSharedTimer;
-    return timer;
-}
-
 ThreadTimers::ThreadTimers()
     : m_sharedTimer(0)
     , m_firingTimers(false)
     , m_pendingSharedTimerFireTime(0)
 {
-    if (isMainThread())
-        setSharedTimer(mainThreadSharedTimer());
+    if (isUIThread())
+        setSharedTimer(&MainThreadSharedTimer::singleton());
 }
 
 // A worker thread may initialize SharedTimer after some timers are created.
-// Also, SharedTimer can be replaced with 0 before all timers are destroyed.
+// Also, SharedTimer can be replaced with nullptr before all timers are destroyed.
 void ThreadTimers::setSharedTimer(SharedTimer* sharedTimer)
 {
     if (m_sharedTimer) {
-        m_sharedTimer->setFiredFunction(0);
+        m_sharedTimer->setFiredFunction(nullptr);
         m_sharedTimer->stop();
         m_pendingSharedTimerFireTime = 0;
     }
@@ -73,7 +70,7 @@ void ThreadTimers::setSharedTimer(SharedTimer* sharedTimer)
     m_sharedTimer = sharedTimer;
     
     if (sharedTimer) {
-        m_sharedTimer->setFiredFunction(ThreadTimers::sharedTimerFired);
+        m_sharedTimer->setFiredFunction([] { threadGlobalData().threadTimers().sharedTimerFiredInternal(); });
         updateSharedTimer();
     }
 }
@@ -95,18 +92,13 @@ void ThreadTimers::updateSharedTimer()
                 return;
         } 
         m_pendingSharedTimerFireTime = nextFireTime;
-        m_sharedTimer->setFireInterval(max(nextFireTime - currentMonotonicTime, 0.0));
+        m_sharedTimer->setFireInterval(std::max(nextFireTime - currentMonotonicTime, 0.0));
     }
-}
-
-void ThreadTimers::sharedTimerFired()
-{
-    // Redirect to non-static method.
-    threadGlobalData().threadTimers().sharedTimerFiredInternal();
 }
 
 void ThreadTimers::sharedTimerFiredInternal()
 {
+    ASSERT(isMainThread() || (!isWebThread() && !isUIThread()));
     // Do a re-entrancy check.
     if (m_firingTimers)
         return;
@@ -142,6 +134,12 @@ void ThreadTimers::fireTimersInNestedEventLoop()
 {
     // Reset the reentrancy guard so the timers can fire again.
     m_firingTimers = false;
+
+    if (m_sharedTimer) {
+        m_sharedTimer->invalidate();
+        m_pendingSharedTimerFireTime = 0;
+    }
+
     updateSharedTimer();
 }
 

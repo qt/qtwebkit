@@ -36,30 +36,31 @@ namespace WebCore {
     class TextResourceDecoder;
     struct CSSParserContext;
 
-    class CachedCSSStyleSheet FINAL : public CachedResource {
+    class CachedCSSStyleSheet final : public CachedResource {
     public:
-        CachedCSSStyleSheet(const ResourceRequest&, const String& charset);
+        CachedCSSStyleSheet(const ResourceRequest&, const String& charset, SessionID);
         virtual ~CachedCSSStyleSheet();
 
-        const String sheetText(bool enforceMIMEType = true, bool* hasValidMIMEType = 0) const;
+        enum class MIMETypeCheck { Strict, Lax };
+        const String sheetText(MIMETypeCheck = MIMETypeCheck::Strict, bool* hasValidMIMEType = nullptr) const;
 
-        PassRefPtr<StyleSheetContents> restoreParsedStyleSheet(const CSSParserContext&);
-        void saveParsedStyleSheet(PassRefPtr<StyleSheetContents>);
+        PassRefPtr<StyleSheetContents> restoreParsedStyleSheet(const CSSParserContext&, CachePolicy);
+        void saveParsedStyleSheet(Ref<StyleSheetContents>&&);
 
     private:
-        bool canUseSheet(bool enforceMIMEType, bool* hasValidMIMEType) const;
-        virtual PurgePriority purgePriority() const OVERRIDE { return PurgeLast; }
-        virtual bool mayTryReplaceEncodedData() const OVERRIDE { return true; }
+        bool canUseSheet(MIMETypeCheck, bool* hasValidMIMEType) const;
+        virtual bool mayTryReplaceEncodedData() const override { return true; }
 
-        virtual void didAddClient(CachedResourceClient*) OVERRIDE;
+        virtual void didAddClient(CachedResourceClient*) override;
 
-        virtual void setEncoding(const String&) OVERRIDE;
-        virtual String encoding() const OVERRIDE;
-        virtual void finishLoading(ResourceBuffer*) OVERRIDE;
-        virtual void destroyDecodedData() OVERRIDE;
+        void setEncoding(const String&) override;
+        String encoding() const override;
+        const TextResourceDecoder* textResourceDecoder() const override { return m_decoder.get(); }
+        void finishLoading(SharedBuffer*) override;
+        void destroyDecodedData() override;
 
     protected:
-        virtual void checkNotify();
+        virtual void checkNotify() override;
 
         RefPtr<TextResourceDecoder> m_decoder;
         String m_decodedSheetText;
@@ -67,6 +68,8 @@ namespace WebCore {
         RefPtr<StyleSheetContents> m_parsedStyleSheetCache;
     };
 
-}
+} // namespace WebCore
 
-#endif
+SPECIALIZE_TYPE_TRAITS_CACHED_RESOURCE(CachedCSSStyleSheet, CachedResource::CSSStyleSheet)
+
+#endif // CachedCSSStyleSheet_h

@@ -25,10 +25,14 @@
 [
     NoInterfaceObject,
     Conditional=MEDIA_STREAM,
-    EventTarget
-] interface RTCDataChannel {
+] interface RTCDataChannel : EventTarget {
     readonly attribute DOMString label;
-    readonly attribute boolean reliable;
+    readonly attribute boolean ordered;
+    readonly attribute unsigned short maxRetransmitTime;
+    readonly attribute unsigned short maxRetransmits;
+    readonly attribute DOMString protocol;
+    readonly attribute boolean negotiated;
+    readonly attribute unsigned short id;
     readonly attribute DOMString readyState;
     readonly attribute unsigned long bufferedAmount;
 
@@ -41,17 +45,8 @@
 
     void close();
 
-    attribute EventListener onopen;
-    attribute EventListener onerror;
-    attribute EventListener onclose;
-    attribute EventListener onmessage;
-
-    // EventTarget interface
-    void addEventListener(DOMString type,
-                          EventListener listener,
-                          optional boolean useCapture);
-    void removeEventListener(DOMString type,
-                             EventListener listener,
-                             optional boolean useCapture);
-    [RaisesException] boolean dispatchEvent(Event event);
+    attribute EventHandler onopen;
+    attribute EventHandler onerror;
+    attribute EventHandler onclose;
+    attribute EventHandler onmessage;
 };

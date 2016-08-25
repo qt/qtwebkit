@@ -34,12 +34,12 @@
 
 namespace WebCore {
 
-AudioBasicInspectorNode::AudioBasicInspectorNode(AudioContext* context, float sampleRate, unsigned outputChannelCount)
+AudioBasicInspectorNode::AudioBasicInspectorNode(AudioContext& context, float sampleRate, unsigned outputChannelCount)
     : AudioNode(context, sampleRate)
     , m_needAutomaticPull(false)
 {
-    addInput(adoptPtr(new AudioNodeInput(this)));
-    addOutput(adoptPtr(new AudioNodeOutput(this, outputChannelCount)));
+    addInput(std::make_unique<AudioNodeInput>(this));
+    addOutput(std::make_unique<AudioNodeOutput>(this, outputChannelCount));
 }
 
 // We override pullInputs() as an optimization allowing this node to take advantage of in-place processing,
@@ -73,7 +73,7 @@ void AudioBasicInspectorNode::disconnect(unsigned outputIndex, ExceptionCode& ec
 
 void AudioBasicInspectorNode::checkNumberOfChannelsForInput(AudioNodeInput* input)
 {
-    ASSERT(context()->isAudioThread() && context()->isGraphOwner());
+    ASSERT(context().isAudioThread() && context().isGraphOwner());
 
     ASSERT(input == this->input(0));
     if (input != this->input(0))
@@ -93,13 +93,13 @@ void AudioBasicInspectorNode::checkNumberOfChannelsForInput(AudioNodeInput* inpu
 
 void AudioBasicInspectorNode::updatePullStatus()
 {
-    ASSERT(context()->isGraphOwner());
+    ASSERT(context().isGraphOwner());
 
     if (output(0)->isConnected()) {
         // When an AudioBasicInspectorNode is connected to a downstream node, it will get pulled by the
         // downstream node, thus remove it from the context's automatic pull list.
         if (m_needAutomaticPull) {
-            context()->removeAutomaticPullNode(this);
+            context().removeAutomaticPullNode(this);
             m_needAutomaticPull = false;
         }
     } else {
@@ -107,11 +107,11 @@ void AudioBasicInspectorNode::updatePullStatus()
         if (numberOfInputConnections && !m_needAutomaticPull) {
             // When an AudioBasicInspectorNode is not connected to any downstream node while still connected from
             // upstream node(s), add it to the context's automatic pull list.
-            context()->addAutomaticPullNode(this);
+            context().addAutomaticPullNode(this);
             m_needAutomaticPull = true;
         } else if (!numberOfInputConnections && m_needAutomaticPull) {
             // The AudioBasicInspectorNode is connected to nothing, remove it from the context's automatic pull list.
-            context()->removeAutomaticPullNode(this);
+            context().removeAutomaticPullNode(this);
             m_needAutomaticPull = false;
         }
     }

@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2009 Google Inc. All rights reserved.
+ * Copyright (C) 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -33,181 +34,141 @@
 
 #include "DatabaseManager.h"
 #include "MediaPlayer.h"
-#include "SharedWorkerRepository.h"
 #include "WebSocket.h"
-
-#if ENABLE(FILE_SYSTEM)
-#include "AsyncFileSystem.h"
-#endif
+#include <wtf/NeverDestroyed.h>
 
 namespace WebCore {
 
-bool RuntimeEnabledFeatures::isLocalStorageEnabled = true;
-bool RuntimeEnabledFeatures::isSessionStorageEnabled = true;
-bool RuntimeEnabledFeatures::isWebkitNotificationsEnabled = false;
-bool RuntimeEnabledFeatures::isApplicationCacheEnabled = true;
-bool RuntimeEnabledFeatures::isDataTransferItemsEnabled = true;
-bool RuntimeEnabledFeatures::isGeolocationEnabled = true;
-bool RuntimeEnabledFeatures::isIndexedDBEnabled = false;
-bool RuntimeEnabledFeatures::isTouchEnabled = true;
-bool RuntimeEnabledFeatures::isDeviceMotionEnabled = true;
-bool RuntimeEnabledFeatures::isDeviceOrientationEnabled = true;
-bool RuntimeEnabledFeatures::isSpeechInputEnabled = true;
-bool RuntimeEnabledFeatures::isCSSExclusionsEnabled = true;
-bool RuntimeEnabledFeatures::isCSSShapesEnabled = true;
-bool RuntimeEnabledFeatures::isCSSRegionsEnabled = false;
-bool RuntimeEnabledFeatures::isCSSCompositingEnabled = false;
-bool RuntimeEnabledFeatures::isLangAttributeAwareFormControlUIEnabled = false;
-
-#if ENABLE(SCRIPTED_SPEECH)
-bool RuntimeEnabledFeatures::isScriptedSpeechEnabled = false;
+RuntimeEnabledFeatures::RuntimeEnabledFeatures()
+    : m_isLocalStorageEnabled(true)
+    , m_isSessionStorageEnabled(true)
+    , m_isWebkitNotificationsEnabled(false)
+    , m_isApplicationCacheEnabled(true)
+    , m_isDataTransferItemsEnabled(true)
+    , m_isGeolocationEnabled(true)
+    , m_isIndexedDBEnabled(false)
+    , m_isTouchEnabled(true)
+    , m_isDeviceMotionEnabled(true)
+    , m_isDeviceOrientationEnabled(true)
+    , m_isCSSShapesEnabled(true)
+    , m_isCSSRegionsEnabled(false)
+    , m_isCSSCompositingEnabled(false)
+    , m_isLangAttributeAwareFormControlUIEnabled(false)
+#if PLATFORM(IOS)
+    , m_isPluginReplacementEnabled(true)
+#else
+    , m_isPluginReplacementEnabled(false)
 #endif
-
 #if ENABLE(MEDIA_STREAM)
-bool RuntimeEnabledFeatures::isMediaStreamEnabled = true;
-bool RuntimeEnabledFeatures::isPeerConnectionEnabled = true;
+    , m_isMediaStreamEnabled(true)
+    , m_isPeerConnectionEnabled(true)
 #endif
-
 #if ENABLE(LEGACY_CSS_VENDOR_PREFIXES)
-bool RuntimeEnabledFeatures::isLegacyCSSVendorPrefixesEnabled = false;
+    , m_isLegacyCSSVendorPrefixesEnabled(false)
 #endif
-
-#if ENABLE(FILE_SYSTEM)
-bool RuntimeEnabledFeatures::isFileSystemEnabled = false;
-
-bool RuntimeEnabledFeatures::fileSystemEnabled()
+#if ENABLE(JAVASCRIPT_I18N_API)
+    , m_isJavaScriptI18NAPIEnabled(false)
+#endif
+#if ENABLE(VIDEO_TRACK)
+    , m_isVideoTrackEnabled(true)
+#endif
+#if ENABLE(INPUT_TYPE_DATE)
+    , m_isInputTypeDateEnabled(true)
+#endif
+#if ENABLE(INPUT_TYPE_DATETIME_INCOMPLETE)
+    , m_isInputTypeDateTimeEnabled(false)
+#endif
+#if ENABLE(INPUT_TYPE_DATETIMELOCAL)
+    , m_isInputTypeDateTimeLocalEnabled(true)
+#endif
+#if ENABLE(INPUT_TYPE_MONTH)
+    , m_isInputTypeMonthEnabled(true)
+#endif
+#if ENABLE(INPUT_TYPE_TIME)
+    , m_isInputTypeTimeEnabled(true)
+#endif
+#if ENABLE(INPUT_TYPE_WEEK)
+    , m_isInputTypeWeekEnabled(true)
+#endif
+#if ENABLE(CSP_NEXT)
+    , m_areExperimentalContentSecurityPolicyFeaturesEnabled(false)
+#endif
+#if ENABLE(FONT_LOAD_EVENTS)
+    , m_isFontLoadEventsEnabled(true)
+#endif
+#if ENABLE(GAMEPAD)
+    , m_areGamepadsEnabled(false)
+#endif
+#if ENABLE(CSS_ANIMATIONS_LEVEL_2)
+    , m_areAnimationTriggersEnabled(false)
+#endif
+#if ENABLE(WEB_ANIMATIONS)
+    , m_areWebAnimationsEnabled(false)
+#endif
 {
-    return isFileSystemEnabled && AsyncFileSystem::isAvailable();
 }
-#endif
+
+RuntimeEnabledFeatures& RuntimeEnabledFeatures::sharedFeatures()
+{
+    static NeverDestroyed<RuntimeEnabledFeatures> runtimeEnabledFeatures;
+
+    return runtimeEnabledFeatures;
+}
 
 #if ENABLE(JAVASCRIPT_I18N_API)
-bool RuntimeEnabledFeatures::isJavaScriptI18NAPIEnabled = false;
-
 bool RuntimeEnabledFeatures::javaScriptI18NAPIEnabled()
 {
-    return isJavaScriptI18NAPIEnabled;
+    return m_isJavaScriptI18NAPIEnabled;
 }
 #endif
 
 #if ENABLE(VIDEO)
-
-bool RuntimeEnabledFeatures::audioEnabled()
+bool RuntimeEnabledFeatures::audioEnabled() const
 {
     return MediaPlayer::isAvailable();
 }
 
-bool RuntimeEnabledFeatures::htmlMediaElementEnabled()
+bool RuntimeEnabledFeatures::htmlMediaElementEnabled() const
 {
     return MediaPlayer::isAvailable();
 }
 
-bool RuntimeEnabledFeatures::htmlAudioElementEnabled()
+bool RuntimeEnabledFeatures::htmlAudioElementEnabled() const
 {
     return MediaPlayer::isAvailable();
 }
 
-bool RuntimeEnabledFeatures::htmlVideoElementEnabled()
+bool RuntimeEnabledFeatures::htmlVideoElementEnabled() const
 {
     return MediaPlayer::isAvailable();
 }
 
-bool RuntimeEnabledFeatures::htmlSourceElementEnabled()
+bool RuntimeEnabledFeatures::htmlSourceElementEnabled() const
 {
     return MediaPlayer::isAvailable();
 }
 
-bool RuntimeEnabledFeatures::mediaControllerEnabled()
+bool RuntimeEnabledFeatures::mediaControllerEnabled() const
 {
     return MediaPlayer::isAvailable();
 }
 
-bool RuntimeEnabledFeatures::mediaErrorEnabled()
+bool RuntimeEnabledFeatures::mediaErrorEnabled() const
 {
     return MediaPlayer::isAvailable();
 }
 
-bool RuntimeEnabledFeatures::timeRangesEnabled()
+bool RuntimeEnabledFeatures::timeRangesEnabled() const
 {
     return MediaPlayer::isAvailable();
-}
-
-#endif
-
-#if ENABLE(SHARED_WORKERS)
-bool RuntimeEnabledFeatures::sharedWorkerEnabled()
-{
-    return SharedWorkerRepository::isAvailable();
 }
 #endif
 
 #if ENABLE(WEB_SOCKETS)
-bool RuntimeEnabledFeatures::webSocketEnabled()
+bool RuntimeEnabledFeatures::webSocketEnabled() const
 {
     return WebSocket::isAvailable();
 }
-#endif
-
-#if ENABLE(VIDEO_TRACK)
-#if PLATFORM(MAC) || PLATFORM(GTK) || PLATFORM(EFL) || PLATFORM(BLACKBERRY) || PLATFORM(WIN) || PLATFORM(QT)
-    bool RuntimeEnabledFeatures::isVideoTrackEnabled = true;
-#else
-    bool RuntimeEnabledFeatures::isVideoTrackEnabled = false;
-#endif
-#endif
-
-#if ENABLE(SHADOW_DOM)
-bool RuntimeEnabledFeatures::isShadowDOMEnabled = false;
-
-bool RuntimeEnabledFeatures::isAuthorShadowDOMForAnyElementEnabled = false;
-#endif
-
-#if ENABLE(CUSTOM_ELEMENTS)
-bool RuntimeEnabledFeatures::isCustomDOMElementsEnabled = false;
-#endif
-
-#if ENABLE(STYLE_SCOPED)
-bool RuntimeEnabledFeatures::isStyleScopedEnabled = false;
-#endif
-
-#if ENABLE(INPUT_TYPE_DATE)
-bool RuntimeEnabledFeatures::isInputTypeDateEnabled = true;
-#endif
-
-#if ENABLE(INPUT_TYPE_DATETIME_INCOMPLETE)
-bool RuntimeEnabledFeatures::isInputTypeDateTimeEnabled = false;
-#endif
-
-#if ENABLE(INPUT_TYPE_DATETIMELOCAL)
-bool RuntimeEnabledFeatures::isInputTypeDateTimeLocalEnabled = true;
-#endif
-
-#if ENABLE(INPUT_TYPE_MONTH)
-bool RuntimeEnabledFeatures::isInputTypeMonthEnabled = true;
-#endif
-
-#if ENABLE(INPUT_TYPE_TIME)
-bool RuntimeEnabledFeatures::isInputTypeTimeEnabled = true;
-#endif
-
-#if ENABLE(INPUT_TYPE_WEEK)
-bool RuntimeEnabledFeatures::isInputTypeWeekEnabled = true;
-#endif
-
-#if ENABLE(DIALOG_ELEMENT)
-bool RuntimeEnabledFeatures::isDialogElementEnabled = false;
-#endif
-
-#if ENABLE(CSP_NEXT)
-bool RuntimeEnabledFeatures::areExperimentalContentSecurityPolicyFeaturesEnabled = false;
-#endif
-
-#if ENABLE(IFRAME_SEAMLESS)
-bool RuntimeEnabledFeatures::areSeamlessIFramesEnabled = false;
-#endif
-
-#if ENABLE(FONT_LOAD_EVENTS)
-bool RuntimeEnabledFeatures::isFontLoadEventsEnabled = false;
 #endif
 
 } // namespace WebCore

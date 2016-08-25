@@ -32,8 +32,11 @@
 #include "Cone.h"
 #include "Distance.h"
 #include "FloatPoint3D.h"
+#include "HRTFDatabaseLoader.h"
 #include "Panner.h"
-#include <wtf/OwnPtr.h>
+#include <memory>
+#include <wtf/HashSet.h>
+#include <wtf/Lock.h>
 
 namespace WebCore {
 
@@ -61,19 +64,19 @@ public:
         EXPONENTIAL_DISTANCE = 2,
     };
 
-    static PassRefPtr<PannerNode> create(AudioContext* context, float sampleRate)
+    static Ref<PannerNode> create(AudioContext& context, float sampleRate)
     {
-        return adoptRef(new PannerNode(context, sampleRate));
+        return adoptRef(*new PannerNode(context, sampleRate));
     }
 
     virtual ~PannerNode();
 
     // AudioNode
-    virtual void process(size_t framesToProcess);
-    virtual void pullInputs(size_t framesToProcess);
-    virtual void reset();
-    virtual void initialize();
-    virtual void uninitialize();
+    virtual void process(size_t framesToProcess) override;
+    virtual void pullInputs(size_t framesToProcess) override;
+    virtual void reset() override;
+    virtual void initialize() override;
+    virtual void uninitialize() override;
 
     // Listener
     AudioListener* listener();
@@ -126,20 +129,20 @@ public:
     AudioParam* distanceGain() { return m_distanceGain.get(); }
     AudioParam* coneGain() { return m_coneGain.get(); }
 
-    virtual double tailTime() const OVERRIDE { return m_panner ? m_panner->tailTime() : 0; }
-    virtual double latencyTime() const OVERRIDE { return m_panner ? m_panner->latencyTime() : 0; }
+    virtual double tailTime() const override { return m_panner ? m_panner->tailTime() : 0; }
+    virtual double latencyTime() const override { return m_panner ? m_panner->latencyTime() : 0; }
 
 private:
-    PannerNode(AudioContext*, float sampleRate);
+    PannerNode(AudioContext&, float sampleRate);
 
     // Returns the combined distance and cone gain attenuation.
     float distanceConeGain();
 
     // Notifies any AudioBufferSourceNodes connected to us either directly or indirectly about our existence.
     // This is in order to handle the pitch change necessary for the doppler shift.
-    void notifyAudioSourcesConnectedToNode(AudioNode*);
+    void notifyAudioSourcesConnectedToNode(AudioNode*, HashSet<AudioNode*>& visitedNodes);
 
-    OwnPtr<Panner> m_panner;
+    std::unique_ptr<Panner> m_panner;
     unsigned m_panningModel;
 
     FloatPoint3D m_position;
@@ -153,10 +156,13 @@ private:
     ConeEffect m_coneEffect;
     float m_lastGain;
 
+    // HRTF Database loader
+    RefPtr<HRTFDatabaseLoader> m_hrtfDatabaseLoader;
+
     unsigned m_connectionCount;
 
     // Synchronize process() and setPanningModel() which can change the panner.
-    mutable Mutex m_pannerLock;
+    mutable Lock m_pannerMutex;
 };
 
 } // namespace WebCore

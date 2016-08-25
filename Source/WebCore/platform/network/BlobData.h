@@ -31,193 +31,97 @@
 #ifndef BlobData_h
 #define BlobData_h
 
-#include "FileSystem.h"
-#include "KURL.h"
+#include "BlobDataFileReference.h"
+#include "ThreadSafeDataBuffer.h"
+#include "URL.h"
 #include <wtf/Forward.h>
-#include <wtf/PassOwnPtr.h>
+#include <wtf/RefCounted.h>
 #include <wtf/ThreadSafeRefCounted.h>
 #include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
-class RawData : public ThreadSafeRefCounted<RawData> {
+class BlobDataItem {
 public:
-    static PassRefPtr<RawData> create()
-    {
-        return adoptRef(new RawData());
-    }
+    WEBCORE_EXPORT static const long long toEndOfFile;
 
-    void detachFromCurrentThread();
-
-    const char* data() const { return m_data.data(); }
-    size_t length() const { return m_data.size(); }
-    Vector<char>* mutableData() { return &m_data; }
-
-private:
-    RawData();
-
-    Vector<char> m_data;
-};
-
-struct BlobDataItem {
-    static const long long toEndOfFile;
-
-    // Default constructor.
-    BlobDataItem()
-        : type(Data)
-        , offset(0)
-        , length(toEndOfFile)
-        , expectedModificationTime(invalidFileTime())
-    {
-    }
-
-    // Constructor for String type (complete string).
-    explicit BlobDataItem(PassRefPtr<RawData> data)
-        : type(Data)
-        , data(data)
-        , offset(0)
-        , length(toEndOfFile)
-        , expectedModificationTime(invalidFileTime())
-    {
-    }
-
-    // Constructor for File type (complete file).
-    explicit BlobDataItem(const String& path)
-        : type(File)
-        , path(path)
-        , offset(0)
-        , length(toEndOfFile)
-        , expectedModificationTime(invalidFileTime())
-    {
-    }
-
-    // Constructor for File type (partial file).
-    BlobDataItem(const String& path, long long offset, long long length, double expectedModificationTime)
-        : type(File)
-        , path(path)
-        , offset(offset)
-        , length(length)
-        , expectedModificationTime(expectedModificationTime)
-    {
-    }
-
-    // Constructor for Blob type.
-    BlobDataItem(const KURL& url, long long offset, long long length)
-        : type(Blob)
-        , url(url)
-        , offset(offset)
-        , length(length)
-        , expectedModificationTime(invalidFileTime())
-    {
-    }
-
-#if ENABLE(FILE_SYSTEM)
-    // Constructor for URL type (e.g. FileSystem files).
-    BlobDataItem(const KURL& url, long long offset, long long length, double expectedModificationTime)
-        : type(URL)
-        , url(url)
-        , offset(offset)
-        , length(length)
-        , expectedModificationTime(expectedModificationTime)
-    {
-    }
-#endif
-
-    // Detaches from current thread so that it can be passed to another thread.
-    void detachFromCurrentThread();
-
-    enum {
+    enum class Type {
         Data,
-        File,
-        Blob
-#if ENABLE(FILE_SYSTEM)
-        , URL
-#endif
-    } type;
+        File
+    };
+
+    Type type() const { return m_type; }
 
     // For Data type.
-    RefPtr<RawData> data;
+    const ThreadSafeDataBuffer& data() const { return m_data; }
 
     // For File type.
-    String path;
+    BlobDataFileReference* file() const { return m_file.get(); }
 
-    // For Blob or URL type.
-    KURL url;
-
-    long long offset;
-    long long length;
-    double expectedModificationTime;
+    long long offset() const { return m_offset; }
+    long long length() const; // Computes file length if it's not known yet.
 
 private:
     friend class BlobData;
 
-    // Constructor for String type (partial string).
-    BlobDataItem(PassRefPtr<RawData> data, long long offset, long long length)
-        : type(Data)
-        , data(data)
-        , offset(offset)
-        , length(length)
-        , expectedModificationTime(invalidFileTime())
+    explicit BlobDataItem(PassRefPtr<BlobDataFileReference> file)
+        : m_type(Type::File)
+        , m_file(file)
+        , m_offset(0)
+        , m_length(toEndOfFile)
     {
     }
+
+    BlobDataItem(ThreadSafeDataBuffer data, long long offset, long long length)
+        : m_type(Type::Data)
+        , m_data(data)
+        , m_offset(offset)
+        , m_length(length)
+    {
+    }
+
+    BlobDataItem(BlobDataFileReference* file, long long offset, long long length)
+        : m_type(Type::File)
+        , m_file(file)
+        , m_offset(offset)
+        , m_length(length)
+    {
+    }
+
+    Type m_type;
+    ThreadSafeDataBuffer m_data;
+    RefPtr<BlobDataFileReference> m_file;
+
+    long long m_offset;
+    long long m_length;
 };
 
 typedef Vector<BlobDataItem> BlobDataItemList;
 
-class BlobData {
-    WTF_MAKE_FAST_ALLOCATED;
+class BlobData : public ThreadSafeRefCounted<BlobData> {
 public:
-    static PassOwnPtr<BlobData> create();
-
-    // Detaches from current thread so that it can be passed to another thread.
-    void detachFromCurrentThread();
+    static Ref<BlobData> create(const String& contentType)
+    {
+        return adoptRef(*new BlobData(contentType));
+    }
 
     const String& contentType() const { return m_contentType; }
-    void setContentType(const String&);
-
-    const String& contentDisposition() const { return m_contentDisposition; }
-    void setContentDisposition(const String& contentDisposition) { m_contentDisposition = contentDisposition; }
 
     const BlobDataItemList& items() const { return m_items; }
     void swapItems(BlobDataItemList&);
 
-    void appendData(PassRefPtr<RawData>, long long offset, long long length);
-    void appendFile(const String& path);
-    void appendFile(const String& path, long long offset, long long length, double expectedModificationTime);
-    void appendBlob(const KURL&, long long offset, long long length);
-#if ENABLE(FILE_SYSTEM)
-    void appendURL(const KURL&, long long offset, long long length, double expectedModificationTime);
-#endif
+    void appendData(const ThreadSafeDataBuffer&);
+    void appendFile(PassRefPtr<BlobDataFileReference>);
 
 private:
     friend class BlobRegistryImpl;
-    friend class BlobStorageData;
+    BlobData(const String& contentType);
 
-    BlobData() { }
-
-    // This is only exposed to BlobStorageData.
-    void appendData(const RawData&, long long offset, long long length);
+    void appendData(const ThreadSafeDataBuffer&, long long offset, long long length);
+    void appendFile(BlobDataFileReference*, long long offset, long long length);
 
     String m_contentType;
-    String m_contentDisposition;
     BlobDataItemList m_items;
-};
-
-// FIXME: This class is mostly place holder until I get farther along with
-// https://bugs.webkit.org/show_bug.cgi?id=108733 and more specifically with landing
-// https://codereview.chromium.org/11192017/.
-class BlobDataHandle : public ThreadSafeRefCounted<BlobDataHandle> {
-public:
-    static PassRefPtr<BlobDataHandle> create(PassOwnPtr<BlobData> data, long long size)
-    {
-        return adoptRef(new BlobDataHandle(data, size));
-    }
-
-    ~BlobDataHandle();
-
-private:
-    BlobDataHandle(PassOwnPtr<BlobData>, long long size);
-    KURL m_internalURL;
 };
 
 } // namespace WebCore

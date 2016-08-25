@@ -26,15 +26,13 @@
 #include "config.h"
 #include "OriginAndDatabases.h"
 
-#if ENABLE(SQL_DATABASE)
-
 #include "WebCoreArgumentCoders.h"
 
 using namespace WebCore;
 
 namespace WebKit {
 
-void OriginAndDatabases::encode(CoreIPC::ArgumentEncoder& encoder) const
+void OriginAndDatabases::encode(IPC::ArgumentEncoder& encoder) const
 {
     encoder << originIdentifier;
     encoder << originQuota;
@@ -42,7 +40,7 @@ void OriginAndDatabases::encode(CoreIPC::ArgumentEncoder& encoder) const
     encoder << databases;
 }
 
-bool OriginAndDatabases::decode(CoreIPC::ArgumentDecoder& decoder, OriginAndDatabases& originAndDatabases)
+bool OriginAndDatabases::decode(IPC::ArgumentDecoder& decoder, OriginAndDatabases& originAndDatabases)
 {
     if (!decoder.decode(originAndDatabases.originIdentifier))
         return false;
@@ -57,5 +55,3 @@ bool OriginAndDatabases::decode(CoreIPC::ArgumentDecoder& decoder, OriginAndData
 }
 
 } // namespace WebKit
-
-#endif // ENABLE(SQL_DATABASE)

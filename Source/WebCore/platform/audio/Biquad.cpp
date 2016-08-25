@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -37,7 +37,7 @@
 #include <stdio.h>
 #include <wtf/MathExtras.h>
 
-#if OS(DARWIN)
+#if USE(ACCELERATE)
 // Work around a bug where VForce.h forward declares std::complex in a way that's incompatible with libc++ complex.
 #define __VFORCE_H
 #include <Accelerate/Accelerate.h>
@@ -45,21 +45,17 @@
 
 namespace WebCore {
 
+#if USE(ACCELERATE)
 const int kBufferSize = 1024;
+#endif
 
 Biquad::Biquad()
 {
-#if OS(DARWIN)
+#if USE(ACCELERATE)
     // Allocate two samples more for filter history
     m_inputBuffer.allocate(kBufferSize + 2);
     m_outputBuffer.allocate(kBufferSize + 2);
 #endif
-
-#if USE(WEBAUDIO_IPP)
-    int bufferSize;
-    ippsIIRGetStateSize64f_BiQuad_32f(1, &bufferSize);
-    m_ippInternalBuffer = ippsMalloc_8u(bufferSize);
-#endif // USE(WEBAUDIO_IPP)
 
     // Initialize as pass-thru (straight-wire, no filter effect)
     setNormalizedCoefficients(1, 0, 0, 1, 0, 0);
@@ -69,20 +65,15 @@ Biquad::Biquad()
 
 Biquad::~Biquad()
 {
-#if USE(WEBAUDIO_IPP)
-    ippsFree(m_ippInternalBuffer);
-#endif // USE(WEBAUDIO_IPP)
 }
 
 void Biquad::process(const float* sourceP, float* destP, size_t framesToProcess)
 {
-#if OS(DARWIN)
+#if USE(ACCELERATE)
     // Use vecLib if available
     processFast(sourceP, destP, framesToProcess);
 
-#elif USE(WEBAUDIO_IPP)
-    ippsIIR64f_32f(sourceP, destP, static_cast<int>(framesToProcess), m_biquadState);
-#else // USE(WEBAUDIO_IPP)
+#else
 
     int n = framesToProcess;
 
@@ -127,7 +118,7 @@ void Biquad::process(const float* sourceP, float* destP, size_t framesToProcess)
 #endif
 }
 
-#if OS(DARWIN)
+#if USE(ACCELERATE)
 
 // Here we have optimized version using Accelerate.framework
 
@@ -181,12 +172,12 @@ void Biquad::processSliceFast(double* sourceP, double* destP, double* coefficien
     destP[1] = destP[framesToProcess - 1 + 2];
 }
 
-#endif // OS(DARWIN)
+#endif // USE(ACCELERATE)
 
 
 void Biquad::reset()
 {
-#if OS(DARWIN)
+#if USE(ACCELERATE)
     // Two extra samples for filter history
     double* inputP = m_inputBuffer.data();
     inputP[0] = 0;
@@ -195,11 +186,6 @@ void Biquad::reset()
     double* outputP = m_outputBuffer.data();
     outputP[0] = 0;
     outputP[1] = 0;
-
-#elif USE(WEBAUDIO_IPP)
-    int bufferSize;
-    ippsIIRGetStateSize64f_BiQuad_32f(1, &bufferSize);
-    ippsZero_8u(m_ippInternalBuffer, bufferSize);
 
 #else
     m_x1 = m_x2 = m_y1 = m_y2 = 0;
@@ -289,19 +275,6 @@ void Biquad::setNormalizedCoefficients(double b0, double b1, double b2, double a
     m_b2 = b2 * a0Inverse;
     m_a1 = a1 * a0Inverse;
     m_a2 = a2 * a0Inverse;
-
-#if USE(WEBAUDIO_IPP)
-    Ipp64f taps[6];
-    taps[0] = m_b0;
-    taps[1] = m_b1;
-    taps[2] = m_b2;
-    taps[3] = 1;
-    taps[4] = m_a1;
-    taps[5] = m_a2;
-    m_biquadState = 0;
-
-    ippsIIRInit64f_BiQuad_32f(&m_biquadState, taps, 1, 0, m_ippInternalBuffer);
-#endif // USE(WEBAUDIO_IPP)
 }
 
 void Biquad::setLowShelfParams(double frequency, double dbGain)

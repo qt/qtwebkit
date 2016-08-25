@@ -28,11 +28,12 @@
 
 #include "EditorState.h"
 #include "WebCoreArgumentCoders.h"
-#include "WebFrameLoaderClient.h"
+#include "WebFrame.h"
 #include "WebPage.h"
 #include "WebPageProxy.h"
 #include "WebPageProxyMessages.h"
 #include "WebProcess.h"
+#include "WebUndoStep.h"
 #include <WebCore/ArchiveResource.h>
 #include <WebCore/DocumentFragment.h>
 #include <WebCore/FocusController.h>
@@ -46,10 +47,15 @@
 #include <WebCore/NotImplemented.h>
 #include <WebCore/Page.h>
 #include <WebCore/SpellChecker.h>
-#include <WebCore/StylePropertySet.h>
-#include <WebCore/TextIterator.h>
+#include <WebCore/StyleProperties.h>
 #include <WebCore/UndoStep.h>
 #include <WebCore/UserTypingGestureIndicator.h>
+#include <wtf/NeverDestroyed.h>
+#include <wtf/text/StringView.h>
+
+#if PLATFORM(X11)
+#include <WebCore/PlatformDisplay.h>
+#endif
 
 #if PLATFORM(QT)
 #include <QClipboard>
@@ -80,14 +86,6 @@ bool WebEditorClient::shouldDeleteRange(Range* range)
     return result;
 }
 
-#if ENABLE(DELETION_UI)
-bool WebEditorClient::shouldShowDeleteInterface(HTMLElement*)
-{
-    notImplemented();
-    return false;
-}
-#endif
-
 bool WebEditorClient::smartInsertDeleteEnabled()
 {
     return m_page->isSmartInsertDeleteEnabled();
@@ -100,7 +98,7 @@ bool WebEditorClient::isSelectTrailingWhitespaceEnabled()
 
 bool WebEditorClient::isContinuousSpellCheckingEnabled()
 {
-    return WebProcess::shared().textCheckerState().isContinuousSpellCheckingEnabled;
+    return WebProcess::singleton().textCheckerState().isContinuousSpellCheckingEnabled;
 }
 
 void WebEditorClient::toggleContinuousSpellChecking()
@@ -110,7 +108,7 @@ void WebEditorClient::toggleContinuousSpellChecking()
 
 bool WebEditorClient::isGrammarCheckingEnabled()
 {
-    return WebProcess::shared().textCheckerState().isGrammarCheckingEnabled;
+    return WebProcess::singleton().textCheckerState().isGrammarCheckingEnabled;
 }
 
 void WebEditorClient::toggleGrammarChecking()
@@ -159,12 +157,17 @@ bool WebEditorClient::shouldChangeSelectedRange(Range* fromRange, Range* toRange
     return result;
 }
     
-bool WebEditorClient::shouldApplyStyle(StylePropertySet* style, Range* range)
+bool WebEditorClient::shouldApplyStyle(StyleProperties* style, Range* range)
 {
-    RefPtr<MutableStylePropertySet> mutableStyle = style->isMutable() ? static_cast<MutableStylePropertySet*>(style) : style->mutableCopy();
+    Ref<MutableStyleProperties> mutableStyle(style->isMutable() ? Ref<MutableStyleProperties>(static_cast<MutableStyleProperties&>(*style)) : style->mutableCopy());
     bool result = m_page->injectedBundleEditorClient().shouldApplyStyle(m_page, mutableStyle->ensureCSSStyleDeclaration(), range);
     notImplemented();
     return result;
+}
+
+void WebEditorClient::didApplyStyle()
+{
+    notImplemented();
 }
 
 bool WebEditorClient::shouldMoveRangeAfterDelete(Range*, Range*)
@@ -176,22 +179,22 @@ bool WebEditorClient::shouldMoveRangeAfterDelete(Range*, Range*)
 void WebEditorClient::didBeginEditing()
 {
     // FIXME: What good is a notification name, if it's always the same?
-    DEFINE_STATIC_LOCAL(String, WebViewDidBeginEditingNotification, (ASCIILiteral("WebViewDidBeginEditingNotification")));
-    m_page->injectedBundleEditorClient().didBeginEditing(m_page, WebViewDidBeginEditingNotification.impl());
+    static NeverDestroyed<String> WebViewDidBeginEditingNotification(ASCIILiteral("WebViewDidBeginEditingNotification"));
+    m_page->injectedBundleEditorClient().didBeginEditing(m_page, WebViewDidBeginEditingNotification.get().impl());
     notImplemented();
 }
 
 void WebEditorClient::respondToChangedContents()
 {
-    DEFINE_STATIC_LOCAL(String, WebViewDidChangeNotification, (ASCIILiteral("WebViewDidChangeNotification")));
-    m_page->injectedBundleEditorClient().didChange(m_page, WebViewDidChangeNotification.impl());
+    static NeverDestroyed<String> WebViewDidChangeNotification(ASCIILiteral("WebViewDidChangeNotification"));
+    m_page->injectedBundleEditorClient().didChange(m_page, WebViewDidChangeNotification.get().impl());
     notImplemented();
 }
 
 void WebEditorClient::respondToChangedSelection(Frame* frame)
 {
-    DEFINE_STATIC_LOCAL(String, WebViewDidChangeSelectionNotification, (ASCIILiteral("WebViewDidChangeSelectionNotification")));
-    m_page->injectedBundleEditorClient().didChangeSelection(m_page, WebViewDidChangeSelectionNotification.impl());
+    static NeverDestroyed<String> WebViewDidChangeSelectionNotification(ASCIILiteral("WebViewDidChangeSelectionNotification"));
+    m_page->injectedBundleEditorClient().didChangeSelection(m_page, WebViewDidChangeSelectionNotification.get().impl());
     if (!frame)
         return;
 
@@ -202,23 +205,31 @@ void WebEditorClient::respondToChangedSelection(Frame* frame)
 #endif
 }
 
+void WebEditorClient::didChangeSelectionAndUpdateLayout()
+{
+    m_page->sendPostLayoutEditorStateIfNeeded();
+}
+
+void WebEditorClient::discardedComposition(Frame*)
+{
+    m_page->discardedComposition();
+}
+
 #if PLATFORM(QT)
+
 // FIXME: Use this function for other X11-based platforms that need to manually update the global selection.
 void WebEditorClient::updateGlobalSelection(Frame* frame)
 {
-    if (supportsGlobalSelection() && frame->selection()->isRange()) {
-        bool oldSelectionMode = Pasteboard::generalPasteboard()->isSelectionMode();
-        Pasteboard::generalPasteboard()->setSelectionMode(true);
-        Pasteboard::generalPasteboard()->writeSelection(frame->selection()->toNormalizedRange().get(), frame->editor().canSmartCopyOrDelete(), frame);
-        Pasteboard::generalPasteboard()->setSelectionMode(oldSelectionMode);
-    }
+    if (supportsGlobalSelection() && frame->selection().isRange())
+        Pasteboard::createForGlobalSelection()->writeSelection(frame->selection().toNormalizedRange().get(), frame->editor().canSmartCopyOrDelete(), frame);
 }
+
 #endif
 
 void WebEditorClient::didEndEditing()
 {
-    DEFINE_STATIC_LOCAL(String, WebViewDidEndEditingNotification, (ASCIILiteral("WebViewDidEndEditingNotification")));
-    m_page->injectedBundleEditorClient().didEndEditing(m_page, WebViewDidEndEditingNotification.impl());
+    static NeverDestroyed<String> WebViewDidEndEditingNotification(ASCIILiteral("WebViewDidEndEditingNotification"));
+    m_page->injectedBundleEditorClient().didEndEditing(m_page, WebViewDidEndEditingNotification.get().impl());
     notImplemented();
 }
 
@@ -232,14 +243,9 @@ void WebEditorClient::willWriteSelectionToPasteboard(Range* range)
     m_page->injectedBundleEditorClient().willWriteToPasteboard(m_page, range);
 }
 
-void WebEditorClient::getClientPasteboardDataForRange(Range* range, Vector<String>& pasteboardTypes, Vector<RefPtr<SharedBuffer> >& pasteboardData)
+void WebEditorClient::getClientPasteboardDataForRange(Range* range, Vector<String>& pasteboardTypes, Vector<RefPtr<SharedBuffer>>& pasteboardData)
 {
     m_page->injectedBundleEditorClient().getPasteboardDataForRange(m_page, range, pasteboardTypes, pasteboardData);
-}
-
-void WebEditorClient::didSetSelectionTypesForPasteboard()
-{
-    notImplemented();
 }
 
 void WebEditorClient::registerUndoStep(PassRefPtr<UndoStep> step)
@@ -301,7 +307,7 @@ void WebEditorClient::redo()
     m_page->sendSync(Messages::WebPageProxy::ExecuteUndoRedo(static_cast<uint32_t>(WebPageProxy::Redo)), Messages::WebPageProxy::ExecuteUndoRedo::Reply(result));
 }
 
-#if !PLATFORM(GTK) && !PLATFORM(MAC) && !PLATFORM(EFL)
+#if !PLATFORM(GTK) && !PLATFORM(COCOA) && !PLATFORM(EFL)
 void WebEditorClient::handleKeyboardEvent(KeyboardEvent* event)
 {
     if (m_page->handleEditingKeyboardEvent(event))
@@ -316,54 +322,56 @@ void WebEditorClient::handleInputMethodKeydown(KeyboardEvent*)
 
 void WebEditorClient::textFieldDidBeginEditing(Element* element)
 {
-    if (!isHTMLInputElement(element))
+    if (!is<HTMLInputElement>(*element))
         return;
 
-    WebFrameLoaderClient* webFrameLoaderClient = toWebFrameLoaderClient(element->document()->frame()->loader()->client());
-    WebFrame* webFrame = webFrameLoaderClient ? webFrameLoaderClient->webFrame() : 0;
+    WebFrame* webFrame = WebFrame::fromCoreFrame(*element->document().frame());
     ASSERT(webFrame);
 
-    m_page->injectedBundleFormClient().textFieldDidBeginEditing(m_page, toHTMLInputElement(element), webFrame);
+    m_page->injectedBundleFormClient().textFieldDidBeginEditing(m_page, downcast<HTMLInputElement>(element), webFrame);
 }
 
 void WebEditorClient::textFieldDidEndEditing(Element* element)
 {
-    if (!isHTMLInputElement(element))
+    if (!is<HTMLInputElement>(*element))
         return;
 
-    WebFrameLoaderClient* webFrameLoaderClient = toWebFrameLoaderClient(element->document()->frame()->loader()->client());
-    WebFrame* webFrame = webFrameLoaderClient ? webFrameLoaderClient->webFrame() : 0;
+    WebFrame* webFrame = WebFrame::fromCoreFrame(*element->document().frame());
     ASSERT(webFrame);
 
-    m_page->injectedBundleFormClient().textFieldDidEndEditing(m_page, toHTMLInputElement(element), webFrame);
+    m_page->injectedBundleFormClient().textFieldDidEndEditing(m_page, downcast<HTMLInputElement>(element), webFrame);
 }
 
 void WebEditorClient::textDidChangeInTextField(Element* element)
 {
-    if (!isHTMLInputElement(element))
+    if (!is<HTMLInputElement>(*element))
         return;
 
-    if (!UserTypingGestureIndicator::processingUserTypingGesture() || UserTypingGestureIndicator::focusedElementAtGestureStart() != element)
-        return;
+    bool initiatedByUserTyping = UserTypingGestureIndicator::processingUserTypingGesture() && UserTypingGestureIndicator::focusedElementAtGestureStart() == element;
 
-    WebFrameLoaderClient* webFrameLoaderClient = toWebFrameLoaderClient(element->document()->frame()->loader()->client());
-    WebFrame* webFrame = webFrameLoaderClient ? webFrameLoaderClient->webFrame() : 0;
+    WebFrame* webFrame = WebFrame::fromCoreFrame(*element->document().frame());
     ASSERT(webFrame);
 
-    m_page->injectedBundleFormClient().textDidChangeInTextField(m_page, toHTMLInputElement(element), webFrame);
+    m_page->injectedBundleFormClient().textDidChangeInTextField(m_page, downcast<HTMLInputElement>(element), webFrame, initiatedByUserTyping);
 }
 
 void WebEditorClient::textDidChangeInTextArea(Element* element)
 {
-    if (!isHTMLTextAreaElement(element))
+    if (!is<HTMLTextAreaElement>(*element))
         return;
 
-    WebFrameLoaderClient* webFrameLoaderClient = toWebFrameLoaderClient(element->document()->frame()->loader()->client());
-    WebFrame* webFrame = webFrameLoaderClient ? webFrameLoaderClient->webFrame() : 0;
+    WebFrame* webFrame = WebFrame::fromCoreFrame(*element->document().frame());
     ASSERT(webFrame);
 
-    m_page->injectedBundleFormClient().textDidChangeInTextArea(m_page, toHTMLTextAreaElement(element), webFrame);
+    m_page->injectedBundleFormClient().textDidChangeInTextArea(m_page, downcast<HTMLTextAreaElement>(element), webFrame);
 }
+
+#if !PLATFORM(IOS)
+void WebEditorClient::overflowScrollPositionChanged()
+{
+    notImplemented();
+}
+#endif
 
 static bool getActionTypeForKeyEvent(KeyboardEvent* event, WKInputFieldActionType& type)
 {
@@ -387,38 +395,59 @@ static bool getActionTypeForKeyEvent(KeyboardEvent* event, WKInputFieldActionTyp
     return true;
 }
 
+static API::InjectedBundle::FormClient::InputFieldAction toInputFieldAction(WKInputFieldActionType action)
+{
+    switch (action) {
+    case WKInputFieldActionTypeMoveUp:
+        return API::InjectedBundle::FormClient::InputFieldAction::MoveUp;
+    case WKInputFieldActionTypeMoveDown:
+        return API::InjectedBundle::FormClient::InputFieldAction::MoveDown;
+    case WKInputFieldActionTypeCancel:
+        return API::InjectedBundle::FormClient::InputFieldAction::Cancel;
+    case WKInputFieldActionTypeInsertTab:
+        return API::InjectedBundle::FormClient::InputFieldAction::InsertTab;
+    case WKInputFieldActionTypeInsertNewline:
+        return API::InjectedBundle::FormClient::InputFieldAction::InsertNewline;
+    case WKInputFieldActionTypeInsertDelete:
+        return API::InjectedBundle::FormClient::InputFieldAction::InsertDelete;
+    case WKInputFieldActionTypeInsertBacktab:
+        return API::InjectedBundle::FormClient::InputFieldAction::InsertBacktab;
+    }
+
+    ASSERT_NOT_REACHED();
+    return API::InjectedBundle::FormClient::InputFieldAction::Cancel;
+}
+
 bool WebEditorClient::doTextFieldCommandFromEvent(Element* element, KeyboardEvent* event)
 {
-    if (!isHTMLInputElement(element))
+    if (!is<HTMLInputElement>(*element))
         return false;
 
     WKInputFieldActionType actionType = static_cast<WKInputFieldActionType>(0);
     if (!getActionTypeForKeyEvent(event, actionType))
         return false;
 
-    WebFrameLoaderClient* webFrameLoaderClient = toWebFrameLoaderClient(element->document()->frame()->loader()->client());
-    WebFrame* webFrame = webFrameLoaderClient ? webFrameLoaderClient->webFrame() : 0;
+    WebFrame* webFrame = WebFrame::fromCoreFrame(*element->document().frame());
     ASSERT(webFrame);
 
-    return m_page->injectedBundleFormClient().shouldPerformActionInTextField(m_page, toHTMLInputElement(element), actionType, webFrame);
+    return m_page->injectedBundleFormClient().shouldPerformActionInTextField(m_page, downcast<HTMLInputElement>(element), toInputFieldAction(actionType), webFrame);
 }
 
 void WebEditorClient::textWillBeDeletedInTextField(Element* element)
 {
-    if (!isHTMLInputElement(element))
+    if (!is<HTMLInputElement>(*element))
         return;
 
-    WebFrameLoaderClient* webFrameLoaderClient = toWebFrameLoaderClient(element->document()->frame()->loader()->client());
-    WebFrame* webFrame = webFrameLoaderClient ? webFrameLoaderClient->webFrame() : 0;
+    WebFrame* webFrame = WebFrame::fromCoreFrame(*element->document().frame());
     ASSERT(webFrame);
 
-    m_page->injectedBundleFormClient().shouldPerformActionInTextField(m_page, toHTMLInputElement(element), WKInputFieldActionTypeInsertDelete, webFrame);
+    m_page->injectedBundleFormClient().shouldPerformActionInTextField(m_page, downcast<HTMLInputElement>(element), toInputFieldAction(WKInputFieldActionTypeInsertDelete), webFrame);
 }
 
 bool WebEditorClient::shouldEraseMarkersAfterChangeSelection(WebCore::TextCheckingType type) const
 {
     // This prevents erasing spelling markers on OS X Lion or later to match AppKit on these Mac OS X versions.
-#if PLATFORM(MAC) || PLATFORM(EFL)
+#if PLATFORM(COCOA) || PLATFORM(EFL)
     return type != TextCheckingTypeSpelling;
 #else
     UNUSED_PARAM(type);
@@ -436,12 +465,11 @@ void WebEditorClient::learnWord(const String& word)
     m_page->send(Messages::WebPageProxy::LearnWord(word));
 }
 
-void WebEditorClient::checkSpellingOfString(const UChar* text, int length, int* misspellingLocation, int* misspellingLength)
+void WebEditorClient::checkSpellingOfString(StringView text, int* misspellingLocation, int* misspellingLength)
 {
     int32_t resultLocation = -1;
     int32_t resultLength = 0;
-    // FIXME: It would be nice if we wouldn't have to copy the text here.
-    m_page->sendSync(Messages::WebPageProxy::CheckSpellingOfString(String(text, length)),
+    m_page->sendSync(Messages::WebPageProxy::CheckSpellingOfString(text.toStringWithoutCopying()),
         Messages::WebPageProxy::CheckSpellingOfString::Reply(resultLocation, resultLength));
     *misspellingLocation = resultLocation;
     *misspellingLength = resultLength;
@@ -453,16 +481,26 @@ String WebEditorClient::getAutoCorrectSuggestionForMisspelledWord(const String&)
     return String();
 }
 
-void WebEditorClient::checkGrammarOfString(const UChar* text, int length, Vector<WebCore::GrammarDetail>& grammarDetails, int* badGrammarLocation, int* badGrammarLength)
+void WebEditorClient::checkGrammarOfString(StringView text, Vector<WebCore::GrammarDetail>& grammarDetails, int* badGrammarLocation, int* badGrammarLength)
 {
     int32_t resultLocation = -1;
     int32_t resultLength = 0;
-    // FIXME: It would be nice if we wouldn't have to copy the text here.
-    m_page->sendSync(Messages::WebPageProxy::CheckGrammarOfString(String(text, length)),
+    m_page->sendSync(Messages::WebPageProxy::CheckGrammarOfString(text.toStringWithoutCopying()),
         Messages::WebPageProxy::CheckGrammarOfString::Reply(grammarDetails, resultLocation, resultLength));
     *badGrammarLocation = resultLocation;
     *badGrammarLength = resultLength;
 }
+
+#if USE(UNIFIED_TEXT_CHECKING)
+Vector<TextCheckingResult> WebEditorClient::checkTextOfParagraph(StringView stringView, WebCore::TextCheckingTypeMask checkingTypes)
+{
+    Vector<TextCheckingResult> results;
+
+    m_page->sendSync(Messages::WebPageProxy::CheckTextOfParagraph(stringView.toStringWithoutCopying(), checkingTypes), Messages::WebPageProxy::CheckTextOfParagraph::Reply(results));
+
+    return results;
+}
+#endif
 
 void WebEditorClient::updateSpellingUIWithGrammarString(const String& badGrammarPhrase, const GrammarDetail& grammarDetail)
 {
@@ -510,17 +548,22 @@ void WebEditorClient::willSetInputMethodState()
 #endif
 }
 
-void WebEditorClient::setInputMethodState(bool)
+void WebEditorClient::setInputMethodState(bool enabled)
 {
+#if PLATFORM(GTK)
+    m_page->setInputMethodState(enabled);
+#else
     notImplemented();
+    UNUSED_PARAM(enabled);
+#endif
 }
 
 bool WebEditorClient::supportsGlobalSelection()
 {
-#if PLATFORM(QT) && !defined(QT_NO_CLIPBOARD)
+#if PLATFORM(GTK) && PLATFORM(X11)
+    return PlatformDisplay::sharedDisplay().type() == PlatformDisplay::Type::X11;
+#elif PLATFORM(QT) && !defined(QT_NO_CLIPBOARD)
     return qApp->clipboard()->supportsSelection();
-#elif PLATFORM(GTK) && PLATFORM(X11)
-    return true;
 #else
     // FIXME: Return true on other X11 platforms when they support global selection.
     return false;

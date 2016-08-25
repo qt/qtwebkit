@@ -21,7 +21,6 @@
 #ifndef SVGComponentTransferFunctionElement_h
 #define SVGComponentTransferFunctionElement_h
 
-#if ENABLE(SVG) && ENABLE(FILTERS)
 #include "FEComponentTransfer.h"
 #include "SVGAnimatedEnumeration.h"
 #include "SVGAnimatedNumber.h"
@@ -39,15 +38,15 @@ struct SVGPropertyTraits<ComponentTransferType> {
         case FECOMPONENTTRANSFER_TYPE_UNKNOWN:
             return emptyString();
         case FECOMPONENTTRANSFER_TYPE_IDENTITY:
-            return "identity";
+            return ASCIILiteral("identity");
         case FECOMPONENTTRANSFER_TYPE_TABLE:
-            return "table";
+            return ASCIILiteral("table");
         case FECOMPONENTTRANSFER_TYPE_DISCRETE:
-            return "discrete";
+            return ASCIILiteral("discrete");
         case FECOMPONENTTRANSFER_TYPE_LINEAR:
-            return "linear";
+            return ASCIILiteral("linear");
         case FECOMPONENTTRANSFER_TYPE_GAMMA:
-            return "gamma";
+            return ASCIILiteral("gamma");
         }
 
         ASSERT_NOT_REACHED();
@@ -75,13 +74,16 @@ public:
     ComponentTransferFunction transferFunction() const;
 
 protected:
-    SVGComponentTransferFunctionElement(const QualifiedName&, Document*);
+    SVGComponentTransferFunctionElement(const QualifiedName&, Document&);
 
-    bool isSupportedAttribute(const QualifiedName&);
-    virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
-    virtual void svgAttributeChanged(const QualifiedName&);
+    virtual void parseAttribute(const QualifiedName&, const AtomicString&) override;
+    virtual void svgAttributeChanged(const QualifiedName&) override;
+
+    virtual bool rendererIsNeeded(const RenderStyle&) override { return false; }
     
 private:
+    static bool isSupportedAttribute(const QualifiedName&);
+
     BEGIN_DECLARE_ANIMATED_PROPERTIES(SVGComponentTransferFunctionElement)
         DECLARE_ANIMATED_ENUMERATION(Type, type, ComponentTransferType)
         DECLARE_ANIMATED_NUMBER_LIST(TableValues, tableValues)
@@ -95,5 +97,4 @@ private:
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG) && ENABLE(FILTERS)
 #endif

@@ -11,10 +11,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -35,8 +35,6 @@
 namespace WebCore {
 
 struct MediaKeyMessageEventInit : public EventInit {
-    MediaKeyMessageEventInit();
-
     RefPtr<Uint8Array> message;
     String destinationURL;
 };
@@ -45,23 +43,23 @@ class MediaKeyMessageEvent : public Event {
 public:
     virtual ~MediaKeyMessageEvent();
 
-    static PassRefPtr<MediaKeyMessageEvent> create()
+    static Ref<MediaKeyMessageEvent> create(const AtomicString& type, Uint8Array* message, const String& destinationURL)
     {
-        return adoptRef(new MediaKeyMessageEvent);
+        return adoptRef(*new MediaKeyMessageEvent(type, message, destinationURL));
     }
 
-    static PassRefPtr<MediaKeyMessageEvent> create(const AtomicString& type, const MediaKeyMessageEventInit& initializer)
+    static Ref<MediaKeyMessageEvent> createForBindings(const AtomicString& type, const MediaKeyMessageEventInit& initializer)
     {
-        return adoptRef(new MediaKeyMessageEvent(type, initializer));
+        return adoptRef(*new MediaKeyMessageEvent(type, initializer));
     }
 
-    virtual const AtomicString& interfaceName() const OVERRIDE;
+    virtual EventInterface eventInterface() const override;
 
     Uint8Array* message() const { return m_message.get(); }
     String destinationURL() const { return m_destinationURL; }
 
 private:
-    MediaKeyMessageEvent();
+    MediaKeyMessageEvent(const AtomicString& type, Uint8Array* message, const String& destinationURL);
     MediaKeyMessageEvent(const AtomicString& type, const MediaKeyMessageEventInit& initializer);
 
     RefPtr<Uint8Array> m_message;

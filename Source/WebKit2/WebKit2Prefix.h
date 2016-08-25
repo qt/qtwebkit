@@ -24,43 +24,40 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#if defined (BUILDING_GTK__)
-#include "autotoolsconfig.h"
-#endif /* defined (BUILDING_GTK__) */
+#if defined(HAVE_CONFIG_H) && HAVE_CONFIG_H && defined(BUILDING_WITH_CMAKE)
+#include "cmakeconfig.h"
+#endif
 
 #include <wtf/Platform.h>
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
+
+#define ENABLE_SANDBOX_EXTENSIONS 1
 
 #define ENABLE_WEB_PROCESS_SANDBOX 1
 
-#if ENABLE(NETSCAPE_PLUGIN_API)
-#define ENABLE_PLUGIN_PROCESS 1
-#endif
-
-#define ENABLE_NETWORK_PROCESS 1
+#define ENABLE_DATABASE_PROCESS 1
 
 #define ENABLE_MEMORY_SAMPLER 1
 
-#define ENABLE_CUSTOM_PROTOCOLS 1
+#define ENABLE_SHAREABLE_RESOURCE 1
+
+#define _WKImmediateActionType _WKImmediateActionType
 
 #include <CoreFoundation/CoreFoundation.h>
 #include <CoreGraphics/CoreGraphics.h>
 
 #ifdef __OBJC__
 #import <Foundation/Foundation.h>
-#import <WebCore/EmptyProtocolDefinitions.h>
 #if USE(APPKIT)
 #import <Cocoa/Cocoa.h>
 #endif
 #endif
 
-#if ENABLE(PLUGIN_PROCESS)
-#define ENABLE_SHARED_WORKER_PROCESS 1
 #endif
 
-#else
-#define ENABLE_SHARED_WORKER_PROCESS 1
+#if PLATFORM(GTK)
+#define ENABLE_SHAREABLE_RESOURCE 1
 #endif
 
 /* When C++ exceptions are disabled, the C++ library defines |try| and |catch|
@@ -81,3 +78,4 @@
 #define new ("if you use new/delete make sure to include config.h at the top of the file"()) 
 #define delete ("if you use new/delete make sure to include config.h at the top of the file"()) 
 #endif
+

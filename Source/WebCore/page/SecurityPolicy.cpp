@@ -29,12 +29,12 @@
 #include "config.h"
 #include "SecurityPolicy.h"
 
-#include "KURL.h"
+#include "URL.h"
 #include <wtf/MainThread.h>
 #include "OriginAccessEntry.h"
 #include "SecurityOrigin.h"
-#include <wtf/OwnPtr.h>
-#include <wtf/PassOwnPtr.h>
+#include <memory>
+#include <wtf/NeverDestroyed.h>
 #include <wtf/text/StringHash.h>
 
 namespace WebCore {
@@ -42,15 +42,15 @@ namespace WebCore {
 static SecurityPolicy::LocalLoadPolicy localLoadPolicy = SecurityPolicy::AllowLocalLoadsForLocalOnly;
 
 typedef Vector<OriginAccessEntry> OriginAccessWhiteList;
-typedef HashMap<String, OwnPtr<OriginAccessWhiteList> > OriginAccessMap;
+typedef HashMap<String, std::unique_ptr<OriginAccessWhiteList>> OriginAccessMap;
 
 static OriginAccessMap& originAccessMap()
 {
-    DEFINE_STATIC_LOCAL(OriginAccessMap, originAccessMap, ());
+    static NeverDestroyed<OriginAccessMap> originAccessMap;
     return originAccessMap;
 }
 
-bool SecurityPolicy::shouldHideReferrer(const KURL& url, const String& referrer)
+bool SecurityPolicy::shouldHideReferrer(const URL& url, const String& referrer)
 {
     bool referrerIsSecureURL = protocolIs(referrer, "https");
     bool referrerIsWebURL = referrerIsSecureURL || protocolIs(referrer, "http");
@@ -66,9 +66,12 @@ bool SecurityPolicy::shouldHideReferrer(const KURL& url, const String& referrer)
     return !URLIsSecureURL;
 }
 
-String SecurityPolicy::generateReferrerHeader(ReferrerPolicy referrerPolicy, const KURL& url, const String& referrer)
+String SecurityPolicy::generateReferrerHeader(ReferrerPolicy referrerPolicy, const URL& url, const String& referrer)
 {
     if (referrer.isEmpty())
+        return String();
+
+    if (!protocolIsInHTTPFamily(referrer))
         return String();
 
     switch (referrerPolicy) {
@@ -109,18 +112,18 @@ bool SecurityPolicy::allowSubstituteDataAccessToLocal()
 bool SecurityPolicy::isAccessWhiteListed(const SecurityOrigin* activeOrigin, const SecurityOrigin* targetOrigin)
 {
     if (OriginAccessWhiteList* list = originAccessMap().get(activeOrigin->toString())) {
-        for (size_t i = 0; i < list->size();  ++i) {
-           if (list->at(i).matchesOrigin(*targetOrigin))
-               return true;
-       }
+        for (auto& entry : *list) {
+            if (entry.matchesOrigin(*targetOrigin))
+                return true;
+        }
     }
     return false;
 }
 
-bool SecurityPolicy::isAccessToURLWhiteListed(const SecurityOrigin* activeOrigin, const KURL& url)
+bool SecurityPolicy::isAccessToURLWhiteListed(const SecurityOrigin* activeOrigin, const URL& url)
 {
-    RefPtr<SecurityOrigin> targetOrigin = SecurityOrigin::create(url);
-    return isAccessWhiteListed(activeOrigin, targetOrigin.get());
+    Ref<SecurityOrigin> targetOrigin(SecurityOrigin::create(url));
+    return isAccessWhiteListed(activeOrigin, &targetOrigin.get());
 }
 
 void SecurityPolicy::addOriginAccessWhitelistEntry(const SecurityOrigin& sourceOrigin, const String& destinationProtocol, const String& destinationDomain, bool allowDestinationSubdomains)
@@ -133,7 +136,7 @@ void SecurityPolicy::addOriginAccessWhitelistEntry(const SecurityOrigin& sourceO
     String sourceString = sourceOrigin.toString();
     OriginAccessMap::AddResult result = originAccessMap().add(sourceString, nullptr);
     if (result.isNewEntry)
-        result.iterator->value = adoptPtr(new OriginAccessWhiteList);
+        result.iterator->value = std::make_unique<OriginAccessWhiteList>();
 
     OriginAccessWhiteList* list = result.iterator->value.get();
     list->append(OriginAccessEntry(destinationProtocol, destinationDomain, allowDestinationSubdomains ? OriginAccessEntry::AllowSubdomains : OriginAccessEntry::DisallowSubdomains));
@@ -152,14 +155,12 @@ void SecurityPolicy::removeOriginAccessWhitelistEntry(const SecurityOrigin& sour
     if (it == map.end())
         return;
 
-    OriginAccessWhiteList* list = it->value.get();
-    size_t index = list->find(OriginAccessEntry(destinationProtocol, destinationDomain, allowDestinationSubdomains ? OriginAccessEntry::AllowSubdomains : OriginAccessEntry::DisallowSubdomains));
-    if (index == notFound)
+    OriginAccessWhiteList& list = *it->value;
+    OriginAccessEntry originAccessEntry(destinationProtocol, destinationDomain, allowDestinationSubdomains ? OriginAccessEntry::AllowSubdomains : OriginAccessEntry::DisallowSubdomains);
+    if (!list.removeFirst(originAccessEntry))
         return;
 
-    list->remove(index);
-
-    if (list->isEmpty())
+    if (list.isEmpty())
         map.remove(it);
 }
 

@@ -23,21 +23,17 @@
 
 #include "WKView.h"
 
+#include "APIPageConfiguration.h"
 #include "WKAPICast.h"
 #include "WebView.h"
 
 using namespace WebCore;
 using namespace WebKit;
 
-WKViewRef WKViewCreate(WKContextRef contextRef, WKPageGroupRef pageGroupRef)
+WKViewRef WKViewCreate(WKContextRef context, WKPageConfigurationRef pageConfiguration)
 {
-    RefPtr<WebView> webView = WebView::create(toImpl(contextRef), toImpl(pageGroupRef));
+    RefPtr<WebView> webView = WebView::create(toImpl(context), *toImpl(pageConfiguration));
     return toAPI(webView.release().leakRef());
-}
-
-void WKViewInitialize(WKViewRef viewRef)
-{
-    toImpl(viewRef)->initialize();
 }
 
 WKSize WKViewGetSize(WKViewRef viewRef)
@@ -50,9 +46,19 @@ void WKViewSetSize(WKViewRef viewRef, WKSize size)
     toImpl(viewRef)->setSize(toIntSize(size));
 }
 
-void WKViewSetViewClient(WKViewRef viewRef, const WKViewClient* client)
+void WKViewSetViewClient(WKViewRef viewRef, const WKViewClientBase* client)
 {
     toImpl(viewRef)->initializeClient(client);
+}
+
+bool WKViewIsActive(WKViewRef viewRef)
+{
+    return toImpl(viewRef)->isActive();
+}
+
+void WKViewSetIsActive(WKViewRef viewRef, bool isActive)
+{
+    toImpl(viewRef)->setActive(isActive);
 }
 
 bool WKViewIsFocused(WKViewRef viewRef)
@@ -159,20 +165,10 @@ void WKViewResumeActiveDOMObjectsAndAnimations(WKViewRef viewRef)
     toImpl(viewRef)->resumeActiveDOMObjectsAndAnimations();
 }
 
-void WKViewSetShowsAsSource(WKViewRef viewRef, bool flag)
-{
-    toImpl(viewRef)->setShowsAsSource(flag);
-}
-
-bool WKViewGetShowsAsSource(WKViewRef viewRef)
-{
-    return toImpl(viewRef)->showsAsSource();
-}
-
 bool WKViewExitFullScreen(WKViewRef viewRef)
 {
 #if ENABLE(FULLSCREEN_API)
-    return toImpl(viewRef)->exitFullScreen();
+    return toImpl(viewRef)->requestExitFullScreen();
 #else
     UNUSED_PARAM(viewRef);
     return false;
@@ -191,8 +187,19 @@ double WKViewOpacity(WKViewRef view)
 
 void WKViewFindZoomableAreaForRect(WKViewRef viewRef, WKRect wkRect)
 {
+#if USE(COORDINATED_GRAPHICS_MULTIPROCESS)
     IntRect rect = toIntRect(wkRect);
     toImpl(viewRef)->findZoomableAreaForPoint(rect.center(), rect.size());
+#else
+    UNUSED_PARAM(viewRef);
+    UNUSED_PARAM(wkRect);
+#endif
+}
+
+WKSize WKViewGetContentsSize(WKViewRef viewRef)
+{
+    const WebCore::IntSize& size = toImpl(viewRef)->contentsSize();
+    return WKSizeMake(size.width(), size.height());
 }
 
 #endif // USE(COORDINATED_GRAPHICS)

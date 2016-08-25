@@ -26,15 +26,12 @@
 #ifndef PlatformUtilities_h
 #define PlatformUtilities_h
 
-#include <WebKit2/WKRetainPtr.h>
+#include <WebKit/WKNativeEvent.h>
+#include <WebKit/WKRetainPtr.h>
 #include <string>
 
-#if PLATFORM(MAC)
-#if __OBJC__
-@class NSString;
-#else
-class NSString;
-#endif
+#if USE(FOUNDATION)
+OBJC_CLASS NSString;
 #endif
 
 namespace TestWebKitAPI {
@@ -42,12 +39,14 @@ namespace Util {
 
 // Runs a platform runloop until the 'done' is true. 
 void run(bool* done);
+void sleep(double seconds);
 
-#if PLATFORM(WIN)
-bool shouldTranslateMessage(const MSG&);
+std::string toSTD(const char*);
+#if USE(FOUNDATION)
+std::string toSTD(NSString *);
 #endif
 
-void sleep(double seconds);
+#if WK_HAVE_C_SPI
 
 WKContextRef createContextWithInjectedBundle();
 WKContextRef createContextForInjectedBundleTest(const std::string&, WKTypeRef userData = 0);
@@ -62,12 +61,10 @@ bool isKeyDown(WKNativeEventPtr);
 
 std::string toSTD(WKStringRef);
 std::string toSTD(WKRetainPtr<WKStringRef>);
-std::string toSTD(const char*);
-#if PLATFORM(MAC)
-std::string toSTD(NSString *);
-#endif
 
 WKRetainPtr<WKStringRef> toWK(const char* utf8String);
+
+#endif // WK_HAVE_C_SPI
 
 template<typename T, typename U>
 static inline ::testing::AssertionResult assertWKStringEqual(const char* expected_expression, const char* actual_expression, T expected, U actual)
@@ -77,6 +74,10 @@ static inline ::testing::AssertionResult assertWKStringEqual(const char* expecte
 
 #define EXPECT_WK_STREQ(expected, actual) \
     EXPECT_PRED_FORMAT2(TestWebKitAPI::Util::assertWKStringEqual, expected, actual)
+
+#if WK_API_ENABLED
+extern NSString * const TestPlugInClassNameParameter;
+#endif
 
 } // namespace Util
 } // namespace TestWebKitAPI

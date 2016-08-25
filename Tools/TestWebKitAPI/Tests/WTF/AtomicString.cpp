@@ -35,14 +35,11 @@ TEST(WTF, AtomicStringCreationFromLiteral)
     ASSERT_EQ(strlen("Template Literal"), stringWithTemplate.length());
     ASSERT_TRUE(stringWithTemplate == "Template Literal");
     ASSERT_TRUE(stringWithTemplate.string().is8Bit());
-    ASSERT_TRUE(stringWithTemplate.impl()->hasTerminatingNullCharacter());
 
     const char* programmaticStringData = "Explicit Size Literal";
     AtomicString programmaticString(programmaticStringData, strlen(programmaticStringData), AtomicString::ConstructFromLiteral);
     ASSERT_EQ(strlen(programmaticStringData), programmaticString.length());
-    ASSERT_TRUE(programmaticStringData == programmaticStringData);
     ASSERT_TRUE(programmaticString.string().is8Bit());
-    ASSERT_TRUE(programmaticString.impl()->hasTerminatingNullCharacter());
     ASSERT_EQ(programmaticStringData, reinterpret_cast<const char*>(programmaticString.string().characters8()));
 }
 
@@ -54,6 +51,14 @@ TEST(WTF, AtomicStringCreationFromLiteralUniqueness)
 
     AtomicString string3("Template Literal");
     ASSERT_EQ(string1.impl(), string3.impl());
+}
+
+TEST(WTF, AtomicStringExistingHash)
+{
+    AtomicString string1("Template Literal", AtomicString::ConstructFromLiteral);
+    ASSERT_EQ(string1.existingHash(), string1.impl()->existingHash());
+    AtomicString string2;
+    ASSERT_EQ(string2.existingHash(), 0u);
 }
 
 } // namespace TestWebKitAPI

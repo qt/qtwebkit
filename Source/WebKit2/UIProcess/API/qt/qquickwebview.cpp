@@ -594,7 +594,7 @@ void QQuickWebViewPrivate::processDidCrash()
 {
     Q_Q(QQuickWebView);
 
-    QUrl url(KURL(WebCore::ParsedURLString, webPageProxy->urlAtProcessExit()));
+    QUrl url(URL(WebCore::ParsedURLString, webPageProxy->urlAtProcessExit()));
     qWarning("WARNING: The web process experienced a crash on '%s'.", qPrintable(url.toString(QUrl::RemoveUserInfo)));
 
     pageEventHandler->resetGestureRecognizers();
@@ -642,9 +642,9 @@ void QQuickWebViewPrivate::processDidBecomeResponsive(WKPageRef, const void* cli
     emit q->experimental()->processDidBecomeResponsive();
 }
 
-PassOwnPtr<DrawingAreaProxy> QQuickWebViewPrivate::createDrawingAreaProxy()
+std::unique_ptr<DrawingAreaProxy> QQuickWebViewPrivate::createDrawingAreaProxy()
 {
-    return DrawingAreaProxyImpl::create(webPageProxy.get());
+    return std::make_unique<WebKit::DrawingAreaProxyImpl>(webPageProxy.get());
 }
 
 void QQuickWebViewPrivate::handleDownloadRequest(DownloadProxy* download)

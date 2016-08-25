@@ -26,8 +26,7 @@
 
 namespace WebCore {
 
-// FIXME: This abstract class is only here so that the JavaScript and Objective-C bindings
-// can continue to be compiled.
+// FIXME: This abstract class is only here so that the Objective-C bindings can continue to be compiled.
 class Entity : public ContainerNode {
 public:
     String publicId() const { ASSERT_NOT_REACHED(); return String(); }
@@ -35,7 +34,9 @@ public:
     String notationName() const { ASSERT_NOT_REACHED(); return String(); }
 
 private:
-    Entity() : ContainerNode(0) {}
+    Entity(Document& document)
+        : ContainerNode(document)
+    { }
 };
 
 } //namespace

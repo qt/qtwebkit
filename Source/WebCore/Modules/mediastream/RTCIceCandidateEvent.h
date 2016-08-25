@@ -37,16 +37,14 @@ class RTCIceCandidateEvent : public Event {
 public:
     virtual ~RTCIceCandidateEvent();
 
-    static PassRefPtr<RTCIceCandidateEvent> create();
-    static PassRefPtr<RTCIceCandidateEvent> create(bool canBubble, bool cancelable, PassRefPtr<RTCIceCandidate>);
+    static Ref<RTCIceCandidateEvent> create(bool canBubble, bool cancelable, RefPtr<RTCIceCandidate>&&);
 
     RTCIceCandidate* candidate() const;
 
-    virtual const AtomicString& interfaceName() const;
+    virtual EventInterface eventInterface() const;
 
 private:
-    RTCIceCandidateEvent();
-    RTCIceCandidateEvent(bool canBubble, bool cancelable, PassRefPtr<RTCIceCandidate>);
+    RTCIceCandidateEvent(bool canBubble, bool cancelable, RefPtr<RTCIceCandidate>&&);
 
     RefPtr<RTCIceCandidate> m_candidate;
 };

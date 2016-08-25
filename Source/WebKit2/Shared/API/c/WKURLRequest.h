@@ -26,7 +26,7 @@
 #ifndef WKURLRequest_h
 #define WKURLRequest_h
 
-#include <WebKit2/WKBase.h>
+#include <WebKit/WKBase.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -41,6 +41,8 @@ WK_EXPORT WKURLRef WKURLRequestCopyURL(WKURLRequestRef);
 WK_EXPORT WKURLRef WKURLRequestCopyFirstPartyForCookies(WKURLRequestRef);
 
 WK_EXPORT WKStringRef WKURLRequestCopyHTTPMethod(WKURLRequestRef);
+
+WK_EXPORT WKURLRequestRef WKURLRequestCopySettingHTTPBody(WKURLRequestRef, WKDataRef);
 
 WK_EXPORT void WKURLRequestSetDefaultTimeoutInterval(double);
 

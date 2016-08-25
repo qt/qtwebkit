@@ -22,7 +22,7 @@
 interface HTMLInputElement : HTMLElement {
     [Reflect] attribute DOMString accept;
     [Reflect] attribute DOMString alt;
-    [Reflect] attribute DOMString autocomplete;
+    attribute DOMString autocomplete;
     [Reflect] attribute boolean autofocus;
     [Reflect=checked] attribute boolean defaultChecked;
     attribute boolean checked;
@@ -30,7 +30,7 @@ interface HTMLInputElement : HTMLElement {
     [Reflect] attribute boolean disabled;
     readonly attribute HTMLFormElement form;
     attribute FileList files;
-    [Reflect, URL] attribute DOMString formAction;
+    attribute DOMString formAction;
     [TreatNullAs=NullString] attribute DOMString formEnctype;
     [TreatNullAs=NullString] attribute DOMString formMethod;
     [Reflect] attribute boolean formNoValidate;
@@ -54,21 +54,19 @@ interface HTMLInputElement : HTMLElement {
 #endif
     [Reflect, URL] attribute DOMString src;
     [Reflect] attribute DOMString step;
-    [TreatNullAs=NullString] attribute DOMString type; // readonly dropped as part of DOM level 2
-    [TreatNullAs=NullString] attribute DOMString defaultValue;
+    attribute DOMString type; // readonly dropped as part of DOM level 2
+    attribute DOMString defaultValue;
     // See the discussion in https://bugs.webkit.org/show_bug.cgi?id=100085
 #if defined(LANGUAGE_JAVASCRIPT) && LANGUAGE_JAVASCRIPT
     [TreatNullAs=NullString, SetterRaisesException] attribute DOMString value;
 #else
     [TreatNullAs=NullString] attribute DOMString value;
 #endif
-#if !defined(LANGUAGE_CPP) || !LANGUAGE_CPP
     [SetterRaisesException] attribute Date valueAsDate;
-#endif
-    [SetterRaisesException] attribute double valueAsNumber;
+    [SetterRaisesException] attribute unrestricted double valueAsNumber;
 
-    [RaisesException] void stepUp(optional long n);
-    [RaisesException] void stepDown(optional long n);
+    [RaisesException] void stepUp(optional long n = 1);
+    [RaisesException] void stepDown(optional long n = 1);
 
     attribute unsigned long width;
     readonly attribute boolean willValidate;
@@ -100,12 +98,8 @@ interface HTMLInputElement : HTMLElement {
 
     // Non-standard attributes
     [Reflect] attribute DOMString align;
-    [Conditional=DIRECTORY_UPLOAD, Reflect] attribute boolean webkitdirectory;
     [Reflect] attribute DOMString useMap;
     [Reflect] attribute boolean incremental;
-    [Conditional=INPUT_SPEECH, Reflect] attribute boolean webkitSpeech;
-    [Conditional=INPUT_SPEECH, Reflect] attribute boolean webkitGrammar;
-    [Conditional=INPUT_SPEECH, NotEnumerable] attribute EventListener onwebkitspeechchange;
 
 #if defined(LANGUAGE_OBJECTIVE_C) && LANGUAGE_OBJECTIVE_C
     [Reflect] attribute DOMString accessKey;
@@ -125,6 +119,9 @@ interface HTMLInputElement : HTMLElement {
     readonly attribute URL absoluteImageURL;
 #endif
 
+    [Conditional=IOS_AUTOCORRECT_AND_AUTOCAPITALIZE] attribute boolean autocorrect;
+    [Conditional=IOS_AUTOCORRECT_AND_AUTOCAPITALIZE, TreatNullAs=NullString] attribute DOMString autocapitalize;
+
     // See http://www.w3.org/TR/html-media-capture/
-    [Conditional=MEDIA_CAPTURE] attribute DOMString capture;
+    [Conditional=MEDIA_CAPTURE, Reflect] attribute boolean capture;
 };

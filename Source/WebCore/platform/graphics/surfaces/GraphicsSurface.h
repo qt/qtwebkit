@@ -26,8 +26,6 @@
 #include "GraphicsContext3D.h"
 #include "GraphicsSurfaceToken.h"
 #include "IntRect.h"
-#include <wtf/OwnPtr.h>
-#include <wtf/PassOwnPtr.h>
 #include <wtf/RefCounted.h>
 #include <wtf/RefPtr.h>
 
@@ -79,12 +77,12 @@ public:
     static PassRefPtr<GraphicsSurface> create(const IntSize&, Flags, const GraphicsSurfaceToken&);
     void copyToGLTexture(uint32_t target, uint32_t texture, const IntRect& targetRect, const IntPoint& sourceOffset);
     void copyFromTexture(uint32_t texture, const IntRect& sourceRect);
-    void paintToTextureMapper(TextureMapper*, const FloatRect& targetRect, const TransformationMatrix&, float opacity);
+    void paintToTextureMapper(TextureMapper&, const FloatRect& targetRect, const TransformationMatrix&, float opacity);
     uint32_t frontBuffer();
     uint32_t swapBuffers();
     GraphicsSurfaceToken exportToken();
     uint32_t getTextureID();
-    PassOwnPtr<GraphicsContext> beginPaint(const IntRect&, LockOptions);
+    std::unique_ptr<GraphicsContext> beginPaint(const IntRect&, LockOptions);
     PassRefPtr<Image> createReadOnlyImage(const IntRect&);
     ~GraphicsSurface();
 
@@ -99,12 +97,12 @@ protected:
     void platformUnlock();
     void platformCopyToGLTexture(uint32_t target, uint32_t texture, const IntRect&, const IntPoint&);
     void platformCopyFromTexture(uint32_t texture, const IntRect& sourceRect);
-    void platformPaintToTextureMapper(TextureMapper*, const FloatRect& targetRect, const TransformationMatrix&, float opacity);
+    void platformPaintToTextureMapper(TextureMapper&, const FloatRect& targetRect, const TransformationMatrix&, float opacity);
     uint32_t platformFrontBuffer() const;
     uint32_t platformSwapBuffers();
     IntSize platformSize() const;
 
-    PassOwnPtr<GraphicsContext> platformBeginPaint(const IntSize&, char* bits, int stride);
+    std::unique_ptr<GraphicsContext> platformBeginPaint(const IntSize&, char* bits, int stride);
 
 protected:
     LockOptions m_lockOptions;

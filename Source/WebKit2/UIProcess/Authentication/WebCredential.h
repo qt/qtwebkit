@@ -27,41 +27,31 @@
 #define WebCredential_h
 
 #include "APIObject.h"
-#include "WebString.h"
-
+#include "APIString.h"
 #include <WebCore/Credential.h>
-#include <wtf/PassRefPtr.h>
-
 
 namespace WebKit {
 
 class WebCertificateInfo;
 
-class WebCredential : public TypedAPIObject<APIObject::TypeCredential> {
+class WebCredential : public API::ObjectImpl<API::Object::Type::Credential> {
 public:
     ~WebCredential();
 
-    static PassRefPtr<WebCredential> create(const WebCore::Credential& credential)
+    static Ref<WebCredential> create(const WebCore::Credential& credential)
     {
-        return adoptRef(new WebCredential(credential));
+        return adoptRef(*new WebCredential(credential));
     }
     
-    static PassRefPtr<WebCredential> create(WebString* username, WebString* password, WebCore::CredentialPersistence persistence)
+    static Ref<WebCredential> create(WebCertificateInfo* certificateInfo)
     {
-        return adoptRef(new WebCredential(WebCore::Credential(username->string(), password->string(), persistence)));
-    }
-
-    static PassRefPtr<WebCredential> create(WebCertificateInfo* certificateInfo)
-    {
-        return adoptRef(new WebCredential(certificateInfo));
+        return adoptRef(*new WebCredential(certificateInfo));
     }
     
     WebCertificateInfo* certificateInfo();
 
-    const WebCore::Credential& core();
+    const WebCore::Credential& credential();
 
-    const String& user() const;
-    
 private:
     explicit WebCredential(const WebCore::Credential&);
     explicit WebCredential(WebCertificateInfo*);

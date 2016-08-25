@@ -35,15 +35,6 @@
 
 #include <thread.h>
 
-#elif OS(QNX)
-
-#include <errno.h>
-#include <fcntl.h>
-#include <pthread.h>
-#include <stdio.h>
-#include <string.h>
-#include <sys/procfs.h>
-
 #elif OS(UNIX)
 
 #include <pthread.h>
@@ -72,31 +63,6 @@ void StackBounds::initialize()
         size = pthread_get_stacksize_np(thread);
 
     m_bound = static_cast<char*>(m_origin) - size;
-}
-
-#elif OS(QNX)
-
-void StackBounds::initialize()
-{
-    void* stackBase = 0;
-    size_t stackSize = 0;
-
-    struct _debug_thread_info threadInfo;
-    memset(&threadInfo, 0, sizeof(threadInfo));
-    threadInfo.tid = pthread_self();
-    int fd = open("/proc/self", O_RDONLY);
-    if (fd == -1) {
-        LOG_ERROR("Unable to open /proc/self (errno: %d)", errno);
-        CRASH();
-    }
-    devctl(fd, DCMD_PROC_TIDSTATUS, &threadInfo, sizeof(threadInfo), 0);
-    close(fd);
-    stackBase = reinterpret_cast<void*>(threadInfo.stkbase);
-    stackSize = threadInfo.stksize;
-    ASSERT(stackBase);
-
-    m_bound = static_cast<char*>(stackBase) + 0x1000; // 4kb guard page
-    m_origin = static_cast<char*>(stackBase) + stackSize;
 }
 
 #elif OS(SOLARIS)
@@ -153,21 +119,11 @@ void StackBounds::initialize()
 
 void StackBounds::initialize()
 {
-    MEMORY_BASIC_INFORMATION stackOrigin;
+    MEMORY_BASIC_INFORMATION stackOrigin = { 0 };
     VirtualQuery(&stackOrigin, &stackOrigin, sizeof(stackOrigin));
     // stackOrigin.AllocationBase points to the reserved stack memory base address.
 
     m_origin = static_cast<char*>(stackOrigin.BaseAddress) + stackOrigin.RegionSize;
-#if OS(WINCE)
-    SYSTEM_INFO systemInfo;
-    GetSystemInfo(&systemInfo);
-    DWORD pageSize = systemInfo.dwPageSize;
-
-    MEMORY_BASIC_INFORMATION stackMemory;
-    VirtualQuery(m_origin, &stackMemory, sizeof(stackMemory));
-
-    m_bound = static_cast<char*>(m_origin) - stackMemory.RegionSize + pageSize;
-#else
     // The stack on Windows consists out of three parts (uncommitted memory, a guard page and present
     // committed memory). The 3 regions have different BaseAddresses but all have the same AllocationBase
     // since they are all from the same VirtualAlloc. The 3 regions are laid out in memory (from high to
@@ -185,26 +141,12 @@ void StackBounds::initialize()
 
     MEMORY_BASIC_INFORMATION uncommittedMemory;
     VirtualQuery(stackOrigin.AllocationBase, &uncommittedMemory, sizeof(uncommittedMemory));
-    SIZE_T extraGuardPageRegionSize = 0;
-    SIZE_T extraUncommittedMemoryRegionSize = 0;
-    if (uncommittedMemory.Protect & PAGE_GUARD) {
-        extraGuardPageRegionSize = uncommittedMemory.RegionSize;
-        VirtualQuery(static_cast<char*>(uncommittedMemory.BaseAddress) + uncommittedMemory.RegionSize, &uncommittedMemory, sizeof(uncommittedMemory));
-    }
     ASSERT(uncommittedMemory.State == MEM_RESERVE);
 
     MEMORY_BASIC_INFORMATION guardPage;
     VirtualQuery(static_cast<char*>(uncommittedMemory.BaseAddress) + uncommittedMemory.RegionSize, &guardPage, sizeof(guardPage));
-
-    if (!(guardPage.Protect & PAGE_GUARD)) {
-        // Within a .NET application the stack layout will sometimes be different. It will contain 2 blocks of uncommited memory instead of one.
-        // This can be reproduced always on WindowsXP and sometimes on Windows 7
-        // So search one block further if we didn't find the guard page yet.
-        extraUncommittedMemoryRegionSize = guardPage.RegionSize;
-        VirtualQuery(static_cast<char*>(guardPage.BaseAddress) + guardPage.RegionSize, &guardPage, sizeof(guardPage));
-    }
-
     ASSERT(guardPage.Protect & PAGE_GUARD);
+
     void* endOfStack = stackOrigin.AllocationBase;
 
 #ifndef NDEBUG
@@ -212,16 +154,15 @@ void StackBounds::initialize()
     VirtualQuery(static_cast<char*>(guardPage.BaseAddress) + guardPage.RegionSize, &committedMemory, sizeof(committedMemory));
     ASSERT(committedMemory.State == MEM_COMMIT);
 
-    void* computedEnd = static_cast<char*>(m_origin) - (uncommittedMemory.RegionSize + extraUncommittedMemoryRegionSize + extraGuardPageRegionSize + guardPage.RegionSize + committedMemory.RegionSize);
+    void* computedEnd = static_cast<char*>(m_origin) - (uncommittedMemory.RegionSize + guardPage.RegionSize + committedMemory.RegionSize);
 
     ASSERT(stackOrigin.AllocationBase == uncommittedMemory.AllocationBase);
     ASSERT(stackOrigin.AllocationBase == guardPage.AllocationBase);
     ASSERT(stackOrigin.AllocationBase == committedMemory.AllocationBase);
-    ASSERT(stackOrigin.AllocationBase == static_cast<char*>(uncommittedMemory.BaseAddress) - extraGuardPageRegionSize);
+    ASSERT(stackOrigin.AllocationBase == uncommittedMemory.BaseAddress);
     ASSERT(endOfStack == computedEnd);
 #endif // NDEBUG
     m_bound = static_cast<char*>(endOfStack) + guardPage.RegionSize;
-#endif // OS(WINCE)
 }
 
 #else

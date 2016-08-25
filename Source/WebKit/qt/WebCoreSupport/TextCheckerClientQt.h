@@ -34,8 +34,6 @@
 #include "qwebkitplatformplugin.h"
 
 #include <wtf/Forward.h>
-#include <wtf/OwnPtr.h>
-
 
 namespace WebCore {
 
@@ -44,9 +42,9 @@ public:
     virtual bool shouldEraseMarkersAfterChangeSelection(TextCheckingType) const;
     virtual void ignoreWordInSpellDocument(const String&);
     virtual void learnWord(const String&);
-    virtual void checkSpellingOfString(const UChar*, int length, int* misspellingLocation, int* misspellingLength);
+    virtual void checkSpellingOfString(StringView, int* misspellingLocation, int* misspellingLength);
     virtual String getAutoCorrectSuggestionForMisspelledWord(const String& misspelledWord);
-    virtual void checkGrammarOfString(const UChar*, int length, Vector<GrammarDetail>&, int* badGrammarLocation, int* badGrammarLength);
+    virtual void checkGrammarOfString(StringView, Vector<GrammarDetail>&, int* badGrammarLocation, int* badGrammarLength);
     virtual void getGuessesForWord(const String& word, const String& context, Vector<String>& guesses);
     virtual void requestCheckingOfString(WTF::PassRefPtr<WebCore::TextCheckingRequest>) { }
 
@@ -61,7 +59,7 @@ private:
 
 private:
     QtPlatformPlugin m_platformPlugin;
-    OwnPtr<QWebSpellChecker> m_spellChecker;
+    std::unique_ptr<QWebSpellChecker> m_spellChecker;
 };
 
 }

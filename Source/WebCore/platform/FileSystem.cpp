@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2007, 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2015 Canon Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,7 +28,15 @@
 #include "FileSystem.h"
 
 #include <wtf/HexNumber.h>
+#include <wtf/text/CString.h>
 #include <wtf/text/StringBuilder.h>
+
+#if !OS(WINDOWS)
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#endif
 
 namespace WebCore {
 
@@ -73,21 +82,46 @@ static const bool needsEscaping[128] = {
     /* 78-7F */ false, false, false, false, true,  false, false, true, 
 };
 
-static inline bool shouldEscapeUChar(UChar c)
+static inline bool shouldEscapeUChar(UChar character, UChar previousCharacter, UChar nextCharacter)
 {
-    return c > 127 ? false : needsEscaping[c];
+    if (character <= 127)
+        return needsEscaping[character];
+
+    if (U16_IS_LEAD(character) && !U16_IS_TRAIL(nextCharacter))
+        return true;
+
+    if (U16_IS_TRAIL(character) && !U16_IS_LEAD(previousCharacter))
+        return true;
+
+    return false;
 }
 
 String encodeForFileName(const String& inputString)
 {
-    StringBuilder result;
-    StringImpl* stringImpl = inputString.impl();
     unsigned length = inputString.length();
+    if (!length)
+        return inputString;
+
+    StringBuilder result;
+    result.reserveCapacity(length);
+
+    UChar previousCharacter;
+    UChar character = 0;
+    UChar nextCharacter = inputString[0];
     for (unsigned i = 0; i < length; ++i) {
-        UChar character = (*stringImpl)[i];
-        if (shouldEscapeUChar(character)) {
-            result.append('%');
-            appendByteAsHex(character, result);
+        previousCharacter = character;
+        character = nextCharacter;
+        nextCharacter = i + 1 < length ? inputString[i + 1] : 0;
+
+        if (shouldEscapeUChar(character, previousCharacter, nextCharacter)) {
+            if (character <= 255) {
+                result.append('%');
+                appendByteAsHex(character, result);
+            } else {
+                result.appendLiteral("%+");
+                appendByteAsHex(character >> 8, result);
+                appendByteAsHex(character, result);
+            }
         } else
             result.append(character);
     }
@@ -95,7 +129,11 @@ String encodeForFileName(const String& inputString)
     return result.toString();
 }
 
-#if !PLATFORM(MAC) || PLATFORM(IOS)
+#if !PLATFORM(MAC)
+
+void setMetadataURL(String&, const String&, const String&)
+{
+}
 
 bool canExcludeFromBackup()
 {
@@ -108,5 +146,61 @@ bool excludeFromBackup(const String&)
 }
 
 #endif
+
+MappedFileData::~MappedFileData()
+{
+#if !OS(WINDOWS)
+    if (!m_fileData)
+        return;
+    munmap(m_fileData, m_fileSize);
+#endif
+}
+
+MappedFileData::MappedFileData(const String& filePath, bool& success)
+{
+#if OS(WINDOWS)
+    // FIXME: Implement mapping
+    success = false;
+#else
+    CString fsRep = fileSystemRepresentation(filePath);
+    int fd = !fsRep.isNull() ? open(fsRep.data(), O_RDONLY) : -1;
+    if (fd < 0) {
+        success = false;
+        return;
+    }
+
+    struct stat fileStat;
+    if (fstat(fd, &fileStat)) {
+        close(fd);
+        success = false;
+        return;
+    }
+
+    unsigned size;
+    if (!WTF::convertSafely(fileStat.st_size, size)) {
+        close(fd);
+        success = false;
+        return;
+    }
+
+    if (!size) {
+        close(fd);
+        success = true;
+        return;
+    }
+
+    void* data = mmap(0, size, PROT_READ, MAP_FILE | MAP_SHARED, fd, 0);
+    close(fd);
+
+    if (data == MAP_FAILED) {
+        success = false;
+        return;
+    }
+
+    success = true;
+    m_fileData = data;
+    m_fileSize = size;
+#endif
+}
 
 } // namespace WebCore

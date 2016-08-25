@@ -44,22 +44,16 @@
 #include "ResourceError.h"
 #include "ResourceRequest.h"
 #include "ResourceResponse.h"
+#include "SVGNames.h"
+#include "SVGStyleElement.h"
 #include "ScriptElement.h"
 #include "ScriptSourceCode.h"
-#include "ScriptValue.h"
 #include "TextResourceDecoder.h"
 #include "TreeDepthLimit.h"
-#include "XMLErrors.h"
+#include <wtf/Ref.h>
 #include <wtf/StringExtras.h>
 #include <wtf/Threading.h>
 #include <wtf/Vector.h>
-
-#if ENABLE(SVG)
-#include "SVGNames.h"
-#include "SVGStyleElement.h"
-#endif
-
-using namespace std;
 
 namespace WebCore {
 
@@ -94,8 +88,8 @@ void XMLDocumentParser::clearCurrentNodeStack()
 {
     if (m_currentNode && m_currentNode != document())
         m_currentNode->deref();
-    m_currentNode = 0;
-    m_leafTextNode = 0;
+    m_currentNode = nullptr;
+    m_leafTextNode = nullptr;
 
     if (m_currentNodeStack.size()) { // Aborted parsing.
         for (size_t i = m_currentNodeStack.size() - 1; i != 0; --i)
@@ -111,9 +105,9 @@ void XMLDocumentParser::insert(const SegmentedString&)
     ASSERT_NOT_REACHED();
 }
 
-void XMLDocumentParser::append(PassRefPtr<StringImpl> inputSource)
+void XMLDocumentParser::append(RefPtr<StringImpl>&& inputSource)
 {
-    SegmentedString source(inputSource);
+    SegmentedString source(WTFMove(inputSource));
     if (m_sawXSLTransform || !m_sawFirstElement)
         m_originalSourceForTransform.append(source);
 
@@ -127,56 +121,55 @@ void XMLDocumentParser::append(PassRefPtr<StringImpl> inputSource)
 
     doWrite(source.toString());
 
-    // After parsing, go ahead and dispatch image beforeload events.
+    // After parsing, dispatch image beforeload events.
     ImageLoader::dispatchPendingBeforeLoadEvents();
 }
 
 void XMLDocumentParser::handleError(XMLErrors::ErrorType type, const char* m, TextPosition position)
 {
-    m_xmlErrors.handleError(type, m, position);
+    if (!m_xmlErrors)
+        m_xmlErrors = std::make_unique<XMLErrors>(document());
+    m_xmlErrors->handleError(type, m, position);
     if (type != XMLErrors::warning)
         m_sawError = true;
     if (type == XMLErrors::fatal)
         stopParsing();
 }
 
-void XMLDocumentParser::enterText()
+void XMLDocumentParser::createLeafTextNode()
 {
-#if !USE(QXMLSTREAM)
+    if (m_leafTextNode)
+        return;
+
     ASSERT(m_bufferedText.size() == 0);
-#endif
     ASSERT(!m_leafTextNode);
     m_leafTextNode = Text::create(m_currentNode->document(), "");
-    m_currentNode->parserAppendChild(m_leafTextNode.get());
+    m_currentNode->parserAppendChild(*m_leafTextNode);
 }
 
-#if !USE(QXMLSTREAM)
 static inline String toString(const xmlChar* string, size_t size) 
 { 
     return String::fromUTF8(reinterpret_cast<const char*>(string), size); 
 }
-#endif
 
 
-void XMLDocumentParser::exitText()
+bool XMLDocumentParser::updateLeafTextNode()
 {
     if (isStopped())
-        return;
+        return false;
 
     if (!m_leafTextNode)
-        return;
+        return true;
 
-#if !USE(QXMLSTREAM)
-    m_leafTextNode->appendData(toString(m_bufferedText.data(), m_bufferedText.size()), IGNORE_EXCEPTION);
-    Vector<xmlChar> empty;
-    m_bufferedText.swap(empty);
-#endif
+    // This operation might fire mutation event, see below.
+    m_leafTextNode->appendData(toString(m_bufferedText.data(), m_bufferedText.size()));
+    m_bufferedText = { };
 
-    if (m_view && m_leafTextNode->parentNode() && m_leafTextNode->parentNode()->attached()
-        && !m_leafTextNode->attached())
-        m_leafTextNode->attach();
+    m_leafTextNode = nullptr;
 
-    m_leafTextNode = 0;
+    // Hence, we need to check again whether the parser is stopped, since mutation
+    // event handlers executed by appendData might have detached this parser.
+    return !isStopped();
 }
 
 void XMLDocumentParser::detach()
@@ -205,7 +198,7 @@ void XMLDocumentParser::end()
     if (m_sawError)
         insertErrorMessageBlock();
     else {
-        exitText();
+        updateLeafTextNode();
         document()->styleResolverChanged(RecalcStyleImmediately);
     }
 
@@ -230,12 +223,8 @@ void XMLDocumentParser::finish()
 
 void XMLDocumentParser::insertErrorMessageBlock()
 {
-#if USE(QXMLSTREAM)
-    if (m_parsingFragment)
-        return;
-#endif
-
-    m_xmlErrors.insertErrorMessageBlock();
+    ASSERT(m_xmlErrors);
+    m_xmlErrors->insertErrorMessageBlock();
 }
 
 void XMLDocumentParser::notifyFinished(CachedResource* unusedResource)
@@ -248,16 +237,16 @@ void XMLDocumentParser::notifyFinished(CachedResource* unusedResource)
     bool wasCanceled = m_pendingScript->wasCanceled();
 
     m_pendingScript->removeClient(this);
-    m_pendingScript = 0;
+    m_pendingScript = nullptr;
 
     RefPtr<Element> e = m_scriptElement;
-    m_scriptElement = 0;
+    m_scriptElement = nullptr;
 
     ScriptElement* scriptElement = toScriptElementIfPossible(e.get());
     ASSERT(scriptElement);
 
     // JavaScript can detach this parser, make sure it's kept alive even if detached.
-    RefPtr<XMLDocumentParser> protect(this);
+    Ref<XMLDocumentParser> protect(*this);
     
     if (errorOccurred)
         scriptElement->dispatchErrorEvent();
@@ -266,7 +255,7 @@ void XMLDocumentParser::notifyFinished(CachedResource* unusedResource)
         scriptElement->dispatchLoadEvent();
     }
 
-    m_scriptElement = 0;
+    m_scriptElement = nullptr;
 
     if (!isDetached() && !m_requestingScript)
         resumeParsing();
@@ -279,13 +268,15 @@ bool XMLDocumentParser::isWaitingForScripts() const
 
 void XMLDocumentParser::pauseParsing()
 {
+    ASSERT(!m_parserPaused);
+
     if (m_parsingFragment)
         return;
 
     m_parserPaused = true;
 }
 
-bool XMLDocumentParser::parseDocumentFragment(const String& chunk, DocumentFragment* fragment, Element* contextElement, ParserContentPolicy parserContentPolicy)
+bool XMLDocumentParser::parseDocumentFragment(const String& chunk, DocumentFragment& fragment, Element* contextElement, ParserContentPolicy parserContentPolicy)
 {
     if (!chunk.length())
         return true;
@@ -293,17 +284,16 @@ bool XMLDocumentParser::parseDocumentFragment(const String& chunk, DocumentFragm
     // FIXME: We need to implement the HTML5 XML Fragment parsing algorithm:
     // http://www.whatwg.org/specs/web-apps/current-work/multipage/the-xhtml-syntax.html#xml-fragment-parsing-algorithm
     // For now we have a hack for script/style innerHTML support:
-    if (contextElement && (contextElement->hasLocalName(HTMLNames::scriptTag) || contextElement->hasLocalName(HTMLNames::styleTag))) {
-        fragment->parserAppendChild(fragment->document()->createTextNode(chunk));
+    if (contextElement && (contextElement->hasLocalName(HTMLNames::scriptTag.localName()) || contextElement->hasLocalName(HTMLNames::styleTag.localName()))) {
+        fragment.parserAppendChild(fragment.document().createTextNode(chunk));
         return true;
     }
 
     RefPtr<XMLDocumentParser> parser = XMLDocumentParser::create(fragment, contextElement, parserContentPolicy);
     bool wellFormed = parser->appendFragmentSource(chunk);
-    // Do not call finish().  Current finish() and doEnd() implementations touch the main Document/loader
-    // and can cause crashes in the fragment case.
+    // Do not call finish(). The finish() and doEnd() implementations touch the main document and loader and can cause crashes in the fragment case.
     parser->detach(); // Allows ~DocumentParser to assert it was detached before destruction.
-    return wellFormed; // appendFragmentSource()'s wellFormed is more permissive than wellFormed().
+    return wellFormed; // appendFragmentSource()'s wellFormed is more permissive than Document::wellFormed().
 }
 
 } // namespace WebCore

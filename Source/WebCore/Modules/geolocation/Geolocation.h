@@ -42,77 +42,60 @@ namespace WebCore {
 
 class Document;
 class Frame;
+class GeoNotifier;
 class GeolocationController;
 class GeolocationError;
 class GeolocationPosition;
 class Page;
 class ScriptExecutionContext;
+class SecurityOrigin;
 
 class Geolocation : public ScriptWrappable, public RefCounted<Geolocation>, public ActiveDOMObject
 {
+friend class GeoNotifier;
+
 public:
-    static PassRefPtr<Geolocation> create(ScriptExecutionContext*);
-    ~Geolocation();
+    static Ref<Geolocation> create(ScriptExecutionContext*);
+    WEBCORE_EXPORT ~Geolocation();
 
-    virtual void stop() OVERRIDE;
+    WEBCORE_EXPORT void resetAllGeolocationPermission();
     Document* document() const;
-    Frame* frame() const;
+    WEBCORE_EXPORT Frame* frame() const;
 
-    void getCurrentPosition(PassRefPtr<PositionCallback>, PassRefPtr<PositionErrorCallback>, PassRefPtr<PositionOptions>);
-    int watchPosition(PassRefPtr<PositionCallback>, PassRefPtr<PositionErrorCallback>, PassRefPtr<PositionOptions>);
+    void getCurrentPosition(RefPtr<PositionCallback>&&, RefPtr<PositionErrorCallback>&&, RefPtr<PositionOptions>&&);
+    int watchPosition(RefPtr<PositionCallback>&&, RefPtr<PositionErrorCallback>&&, RefPtr<PositionOptions>&&);
     void clearWatch(int watchID);
 
-    void setIsAllowed(bool);
+    WEBCORE_EXPORT void setIsAllowed(bool);
+    void resetIsAllowed() { m_allowGeolocation = Unknown; }
     bool isAllowed() const { return m_allowGeolocation == Yes; }
 
     void positionChanged();
     void setError(GeolocationError*);
 
 private:
+    explicit Geolocation(ScriptExecutionContext*);
+
     Geoposition* lastPosition();
+
+    // ActiveDOMObject
+    void stop() override;
+    bool canSuspendForDocumentSuspension() const override;
+    void suspend(ReasonForSuspension) override;
+    void resume() override;
+    const char* activeDOMObjectName() const override;
 
     bool isDenied() const { return m_allowGeolocation == No; }
 
-    explicit Geolocation(ScriptExecutionContext*);
-
     Page* page() const;
+    SecurityOrigin* securityOrigin() const;
 
-    class GeoNotifier : public RefCounted<GeoNotifier> {
-    public:
-        static PassRefPtr<GeoNotifier> create(Geolocation* geolocation, PassRefPtr<PositionCallback> positionCallback, PassRefPtr<PositionErrorCallback> positionErrorCallback, PassRefPtr<PositionOptions> options) { return adoptRef(new GeoNotifier(geolocation, positionCallback, positionErrorCallback, options)); }
-
-        PositionOptions* options() const { return m_options.get(); };
-        void setFatalError(PassRefPtr<PositionError>);
-
-        bool useCachedPosition() const { return m_useCachedPosition; }
-        void setUseCachedPosition();
-
-        void runSuccessCallback(Geoposition*);
-        void runErrorCallback(PositionError*);
-
-        void startTimerIfNeeded();
-        void stopTimer();
-        void timerFired(Timer<GeoNotifier>*);
-        bool hasZeroTimeout() const;
-
-    private:
-        GeoNotifier(Geolocation*, PassRefPtr<PositionCallback>, PassRefPtr<PositionErrorCallback>, PassRefPtr<PositionOptions>);
-
-        RefPtr<Geolocation> m_geolocation;
-        RefPtr<PositionCallback> m_successCallback;
-        RefPtr<PositionErrorCallback> m_errorCallback;
-        RefPtr<PositionOptions> m_options;
-        Timer<GeoNotifier> m_timer;
-        RefPtr<PositionError> m_fatalError;
-        bool m_useCachedPosition;
-    };
-
-    typedef Vector<RefPtr<GeoNotifier> > GeoNotifierVector;
-    typedef HashSet<RefPtr<GeoNotifier> > GeoNotifierSet;
+    typedef Vector<RefPtr<GeoNotifier>> GeoNotifierVector;
+    typedef HashSet<RefPtr<GeoNotifier>> GeoNotifierSet;
 
     class Watchers {
     public:
-        bool add(int id, PassRefPtr<GeoNotifier>);
+        bool add(int id, RefPtr<GeoNotifier>&&);
         GeoNotifier* find(int id);
         void remove(int id);
         void remove(GeoNotifier*);
@@ -121,7 +104,7 @@ private:
         bool isEmpty() const;
         void getNotifiersVector(GeoNotifierVector&) const;
     private:
-        typedef HashMap<int, RefPtr<GeoNotifier> > IdToNotifierMap;
+        typedef HashMap<int, RefPtr<GeoNotifier>> IdToNotifierMap;
         typedef HashMap<RefPtr<GeoNotifier>, int> NotifierToIdMap;
         IdToNotifierMap m_idToNotifierMap;
         NotifierToIdMap m_notifierToIdMap;
@@ -172,6 +155,13 @@ private:
         Yes,
         No
     } m_allowGeolocation;
+    bool m_isSuspended;
+    bool m_resetOnResume;
+    bool m_hasChangedPosition;
+    RefPtr<PositionError> m_errorWaitingForResume;
+
+    void resumeTimerFired();
+    Timer m_resumeTimer;
 
     GeoNotifierSet m_requestsAwaitingCachedPosition;
 };

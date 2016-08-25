@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -29,39 +29,49 @@
 #ifndef WTF_Collator_h
 #define WTF_Collator_h
 
-#include <wtf/FastAllocBase.h>
+#include <unicode/uconfig.h>
 #include <wtf/Noncopyable.h>
-#include <wtf/PassOwnPtr.h>
-#include <wtf/unicode/Unicode.h>
 
-#if USE(ICU_UNICODE) && !UCONFIG_NO_COLLATION
+struct UCharIterator;
 struct UCollator;
-#endif
 
 namespace WTF {
 
-    class Collator {
-        WTF_MAKE_NONCOPYABLE(Collator); WTF_MAKE_FAST_ALLOCATED;
-    public:
-        enum Result { Equal = 0, Greater = 1, Less = -1 };
+class StringView;
 
-        WTF_EXPORT_PRIVATE Collator(const char* locale); // Parsing is lenient; e.g. language identifiers (such as "en-US") are accepted, too.
-        WTF_EXPORT_PRIVATE ~Collator();
-        WTF_EXPORT_PRIVATE void setOrderLowerFirst(bool);
+#if UCONFIG_NO_COLLATION
 
-        WTF_EXPORT_PRIVATE static PassOwnPtr<Collator> userDefault();
+class Collator {
+public:
+    explicit Collator(const char* = nullptr, bool = false) { }
 
-        WTF_EXPORT_PRIVATE Result collate(const ::UChar*, size_t, const ::UChar*, size_t) const;
+    WTF_EXPORT_PRIVATE static int collate(StringView, StringView);
+    WTF_EXPORT_PRIVATE static int collateUTF8(const char*, const char*);
+};
 
-    private:
-#if USE(ICU_UNICODE) && !UCONFIG_NO_COLLATION
-        void createCollator() const;
-        void releaseCollator();
-        mutable UCollator* m_collator;
+#else
+
+class Collator {
+    WTF_MAKE_NONCOPYABLE(Collator);
+public:
+    // The value nullptr is a special one meaning the system default locale.
+    // Locale name parsing is lenient; e.g. language identifiers (such as "en-US") are accepted, too.
+    WTF_EXPORT_PRIVATE explicit Collator(const char* locale = nullptr, bool shouldSortLowercaseFirst = false);
+    WTF_EXPORT_PRIVATE ~Collator();
+
+    WTF_EXPORT_PRIVATE int collate(StringView, StringView) const;
+    WTF_EXPORT_PRIVATE int collateUTF8(const char*, const char*) const;
+
+private:
+    char* m_locale;
+    bool m_shouldSortLowercaseFirst;
+    UCollator* m_collator;
+};
+
+WTF_EXPORT_PRIVATE UCharIterator createIterator(StringView);
+
 #endif
-        char* m_locale;
-        bool m_lowerFirst;
-    };
+
 }
 
 using WTF::Collator;
