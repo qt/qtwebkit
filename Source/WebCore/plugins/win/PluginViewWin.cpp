@@ -356,6 +356,20 @@ static inline bool isWebViewVisible(FrameView* view)
 #endif // PLATFORM(QT)
 }
 
+static inline IntRect toDevicePixelRatio(FrameView* view, const IntRect & rect)
+{
+#if PLATFORM(QT)
+    if (PlatformPageClient client = view->hostWindow()->platformPageClient()) {
+        if (QWindow* window = client->ownerWindow()) {
+            IntRect scaleRect = rect;
+            scaleRect.scale(window->devicePixelRatio());
+            return scaleRect;
+        }
+    }
+#endif
+    return rect;
+}
+
 static inline IntPoint contentsToNativeWindow(FrameView* view, const IntPoint& point)
 {
 #if PLATFORM(QT)
@@ -465,6 +479,7 @@ void PluginView::updatePluginWidget()
 #endif
     m_clipRect = windowClipRect();
     m_clipRect.move(-m_windowRect.x(), -m_windowRect.y());
+    IntRect scaledClipRect(toDevicePixelRatio(frameView, m_clipRect));
     if (platformPluginWidget() && (!m_haveUpdatedPluginWidget || m_windowRect != oldWindowRect || m_clipRect != oldClipRect)) {
         HRGN rgn;
 
@@ -479,17 +494,18 @@ void PluginView::updatePluginWidget()
             rgn = ::CreateRectRgn(0, 0, 0, 0);
             ::SetWindowRgn(platformPluginWidget(), rgn, FALSE);
         } else {
-            rgn = ::CreateRectRgn(m_clipRect.x(), m_clipRect.y(), m_clipRect.maxX(), m_clipRect.maxY());
+            rgn = ::CreateRectRgn(scaledClipRect.x(), scaledClipRect.y(), scaledClipRect.maxX(), scaledClipRect.maxY());
             ::SetWindowRgn(platformPluginWidget(), rgn, TRUE);
         }
 
         if (!m_haveUpdatedPluginWidget || m_windowRect != oldWindowRect) {
             IntRect nativeWindowRect = contentsToNativeWindow(frameView, frameRect());
+            nativeWindowRect = IntRect(toDevicePixelRatio(frameView, nativeWindowRect));
             ::MoveWindow(platformPluginWidget(), nativeWindowRect.x(), nativeWindowRect.y(), nativeWindowRect.width(), nativeWindowRect.height(), TRUE);
         }
 
         if (clipToZeroRect) {
-            rgn = ::CreateRectRgn(m_clipRect.x(), m_clipRect.y(), m_clipRect.maxX(), m_clipRect.maxY());
+            rgn = ::CreateRectRgn(scaledClipRect.x(), scaledClipRect.y(), scaledClipRect.maxX(), scaledClipRect.maxY());
             ::SetWindowRgn(platformPluginWidget(), rgn, TRUE);
         }
 
@@ -839,10 +855,13 @@ void PluginView::setParentVisible(bool visible)
     }
 }
 
-void PluginView::setNPWindowRect(const IntRect& rect)
+void PluginView::setNPWindowRect(const IntRect& winRect)
 {
     if (!m_isStarted)
         return;
+
+    ASSERT(parent()->isFrameView());
+    IntRect rect(toDevicePixelRatio(toFrameView(parent()), winRect));
 
 #if OS(WINCE)
     IntRect r = toFrameView(parent())->contentsToWindow(rect);
