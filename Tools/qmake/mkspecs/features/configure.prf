@@ -129,6 +129,7 @@ defineTest(finalizeConfigure) {
     production_build:android {
         addReasonForSkippingBuild("Build not supported on Android.")
     }
+    QT_FOR_CONFIG += gui-private
     production_build:qtConfig(mirclient) {
         addReasonForSkippingBuild("Build not supported on Ubuntu Touch.")
     }

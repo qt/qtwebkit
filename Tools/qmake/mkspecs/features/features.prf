@@ -48,6 +48,7 @@ defineTest(detectFeatures) {
 
     # We can't use Qt's 3rdparty sources for libjpeg and libpng outside of qtbase, but if Qt
     # is using the system libraries, use them to take advantage of the WebCore image decoders as well.
+    QT_FOR_CONFIG += gui-private
     qtConfig(system-jpeg): WEBKIT_CONFIG += use_libjpeg
     else: CONFIGURE_WARNINGS += "Qt not configured to use system libjpeg, QImageDecoder will decode JPEG images"
 
