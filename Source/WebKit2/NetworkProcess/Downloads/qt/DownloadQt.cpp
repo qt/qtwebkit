@@ -41,18 +41,18 @@ namespace WebKit {
 
 void Download::start()
 {
-    QNetworkAccessManager* manager = WebProcess::shared().networkAccessManager();
+    QNetworkAccessManager* manager = WebProcess::singleton().networkAccessManager();
     ASSERT(manager);
     ASSERT(!m_qtDownloader);
 
-    m_qtDownloader = new QtFileDownloader(this, adoptPtr(manager->get(m_request.toNetworkRequest())));
+    m_qtDownloader = new QtFileDownloader(this, manager->get(m_request.toNetworkRequest()));
     m_qtDownloader->init();
 }
 
 void Download::startWithHandle(ResourceHandle* handle, const ResourceResponse& resp)
 {
     ASSERT(!m_qtDownloader);
-    m_qtDownloader = new QtFileDownloader(this, adoptPtr(handle->getInternal()->m_job->release()));
+    m_qtDownloader = new QtFileDownloader(this, handle->getInternal()->m_job->release());
     m_qtDownloader->init();
 }
 
@@ -69,32 +69,12 @@ void Download::platformInvalidate()
     m_qtDownloader = 0;
 }
 
-void Download::didDecideDestination(const String& destination, bool allowOverwrite)
-{
-    notImplemented();
-}
-
 void Download::startTransfer(const String& destination)
 {
     m_qtDownloader->startTransfer(destination);
 }
 
 void Download::platformDidFinish()
-{
-    notImplemented();
-}
-
-void Download::receivedCredential(const AuthenticationChallenge& authenticationChallenge, const Credential& credential)
-{
-    notImplemented();
-}
-
-void Download::receivedRequestToContinueWithoutCredential(const AuthenticationChallenge& authenticationChallenge)
-{
-    notImplemented();
-}
-
-void Download::receivedCancellation(const AuthenticationChallenge& authenticationChallenge)
 {
     notImplemented();
 }

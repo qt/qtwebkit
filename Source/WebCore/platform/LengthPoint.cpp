@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Apple Inc. All rights reserved.
+ * Copyright (C) 2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -24,19 +24,15 @@
  */
 
 #include "config.h"
-#include "WebURLRequest.h"
+#include "LengthPoint.h"
 
-namespace WebKit {
+#include "TextStream.h"
 
-WebURLRequest::WebURLRequest(PlatformRequest)
+namespace WebCore {
+
+TextStream& operator<<(TextStream& ts, const LengthPoint& size)
 {
-    ASSERT_NOT_REACHED();
+    return ts << size.x() << " " << size.y();
 }
 
-PlatformRequest WebURLRequest::platformRequest() const
-{
-    ASSERT_NOT_REACHED();
-    return 0;
-}
-
-} // namespace WebKit
+} // namespace WebCore

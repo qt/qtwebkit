@@ -31,19 +31,13 @@
 #define FrameLoaderClientQt_h
 
 #include "FormState.h"
-#include "Frame.h"
-#include "FrameLoader.h"
 #include "FrameLoaderClient.h"
 #include "HTMLFormElement.h"
-#include "PluginView.h"
-#include "ProgressTrackerClient.h"
-#include "ResourceError.h"
 #include "ResourceResponse.h"
+#include "SharedBuffer.h"
 #include "URL.h"
 #include <QUrl>
 #include <qobject.h>
-#include <wtf/Forward.h>
-#include <wtf/RefCounted.h>
 
 QT_BEGIN_NAMESPACE
 class QNetworkReply;
@@ -60,6 +54,7 @@ class Element;
 class FormState;
 class NavigationAction;
 class FrameNetworkingContext;
+class PluginView;
 class ResourceLoader;
 
 struct LoadErrorResetToken;

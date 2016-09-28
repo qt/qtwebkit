@@ -179,6 +179,9 @@ void QWebSettingsPrivate::apply()
         settings->setMediaSourceEnabled(value);
 #endif
 
+        value = attributes.value(QWebSettings::MediaEnabled, global->attributes.value(QWebSettings::MediaEnabled));
+        settings->setMediaEnabled(value);
+
         value = attributes.value(QWebSettings::CSSRegionsEnabled,
                                  global->attributes.value(QWebSettings::CSSRegionsEnabled));
         WebCore::RuntimeEnabledFeatures::sharedFeatures().setCSSRegionsEnabled(value);
@@ -247,7 +250,7 @@ void QWebSettingsPrivate::apply()
 
         value = attributes.value(QWebSettings::OfflineStorageDatabaseEnabled,
                                       global->attributes.value(QWebSettings::OfflineStorageDatabaseEnabled));
-        WebCore::DatabaseManager::singleton().setIsAvailable(value);
+        settings->setOfflineStorageDatabaseEnabled(value);
 
         value = attributes.value(QWebSettings::OfflineWebApplicationCacheEnabled,
                                       global->attributes.value(QWebSettings::OfflineWebApplicationCacheEnabled));
@@ -439,7 +442,7 @@ QWebSettings* QWebSettings::globalSettings()
     \value PrivateBrowsingEnabled Private browsing prevents WebKit from
         recording visited pages in the history and storing web page icons. This is disabled by default.
     \value JavascriptCanOpenWindows Specifies whether JavaScript programs
-        can open new windows. This is disabled by default.
+        can open popup windows without user interaction. This is disabled by default.
     \value JavascriptCanCloseWindows Specifies whether JavaScript programs
         can close windows. This is disabled by default.
     \value JavascriptCanAccessClipboard Specifies whether JavaScript programs
@@ -552,6 +555,7 @@ QWebSettings::QWebSettings()
     d->attributes.insert(QWebSettings::WebGLEnabled, true);
     d->attributes.insert(QWebSettings::WebAudioEnabled, false);
     d->attributes.insert(QWebSettings::MediaSourceEnabled, false);
+    d->attributes.insert(QWebSettings::MediaEnabled, true);
     d->attributes.insert(QWebSettings::CSSRegionsEnabled, true);
     d->attributes.insert(QWebSettings::CSSGridLayoutEnabled, false);
     d->attributes.insert(QWebSettings::HyperlinkAuditingEnabled, false);
@@ -757,6 +761,43 @@ QIcon QWebSettings::iconForUrl(const QUrl& url)
         return QIcon();
 
     return* icon;
+}
+
+/*!
+    Changes the NPAPI plugin search paths to \a paths.
+
+    \sa pluginSearchPaths()
+*/
+void QWebSettings::setPluginSearchPaths(const QStringList& paths)
+{
+    WebCore::initializeWebCoreQt();
+
+    Vector<String> directories;
+
+    for (int i = 0; i < paths.count(); ++i)
+        directories.append(paths.at(i));
+
+    WebCore::PluginDatabase::installedPlugins()->setPluginDirectories(directories);
+    // PluginDatabase::setPluginDirectories() does not refresh the database.
+    WebCore::PluginDatabase::installedPlugins()->refresh();
+}
+
+/*!
+    Returns a list of search paths that are used by WebKit to look for NPAPI plugins.
+
+    \sa setPluginSearchPaths()
+*/
+QStringList QWebSettings::pluginSearchPaths()
+{
+    WebCore::initializeWebCoreQt();
+
+    QStringList paths;
+
+    const Vector<String>& directories = WebCore::PluginDatabase::installedPlugins()->pluginDirectories();
+    for (unsigned i = 0; i < directories.size(); ++i)
+        paths.append(directories[i]);
+
+    return paths;
 }
 
 /*

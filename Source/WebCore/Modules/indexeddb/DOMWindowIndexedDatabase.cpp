@@ -35,6 +35,10 @@
 #include "Page.h"
 #include "SecurityOrigin.h"
 
+#if PLATFORM(QT)
+#include "Settings.h"
+#endif
+
 namespace WebCore {
 
 DOMWindowIndexedDatabase::DOMWindowIndexedDatabase(DOMWindow* window)
@@ -93,9 +97,9 @@ void DOMWindowIndexedDatabase::willDetachGlobalObjectFromFrame()
     DOMWindowProperty::willDetachGlobalObjectFromFrame();
 }
 
-IDBFactory* DOMWindowIndexedDatabase::indexedDB(DOMWindow* window)
+IDBFactory* DOMWindowIndexedDatabase::indexedDB(DOMWindow& window)
 {
-    return from(window)->indexedDB();
+    return from(&window)->indexedDB();
 }
 
 IDBFactory* DOMWindowIndexedDatabase::indexedDB()
@@ -107,6 +111,11 @@ IDBFactory* DOMWindowIndexedDatabase::indexedDB()
     Page* page = document->page();
     if (!page)
         return nullptr;
+
+#if PLATFORM(QT)
+    if (!page->settings().offlineStorageDatabaseEnabled())
+        return nullptr;
+#endif
 
     if (!m_window->isCurrentlyDisplayedInFrame())
         return nullptr;

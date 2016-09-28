@@ -42,6 +42,7 @@
 #include "FrameSelection.h"
 #include "FrameView.h"
 #include "GeolocationPermissionClientQt.h"
+#include "HTMLFormElement.h"
 #include "HTMLFrameOwnerElement.h"
 #include "HTMLInputElement.h"
 #include "HTMLMediaElement.h"
@@ -1359,6 +1360,11 @@ QWebPageAdapter::ViewportAttributes QWebPageAdapter::viewportAttributesForSize(c
 void QWebPageAdapter::setDevicePixelRatio(float devicePixelRatio)
 {
     page->setDeviceScaleFactor(devicePixelRatio);
+}
+
+bool QWebPageAdapter::isPlayingAudio() const
+{
+    return page->mediaState() & MediaProducer::IsPlayingAudio;
 }
 
 bool QWebPageAdapter::handleKeyEvent(QKeyEvent *ev)

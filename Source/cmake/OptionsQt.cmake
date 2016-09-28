@@ -38,10 +38,6 @@ set(PROJECT_VERSION_STRING "${PROJECT_VERSION}")
 
 add_definitions(-DBUILDING_QT__=1)
 
-if (CMAKE_COMPILER_IS_GNUCXX OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
-    set(COMPILER_IS_GCC_OR_CLANG ON)
-endif ()
-
 WEBKIT_OPTION_BEGIN()
 
 if (WIN32 OR APPLE)
@@ -66,13 +62,16 @@ else ()
     set(ENABLE_FTL_DEFAULT OFF)
 endif ()
 
-if (UNIX AND NOT APPLE)
+# FIXME: Move Qt handling here
+find_package(Qt5Gui QUIET)
+
+if (UNIX AND TARGET Qt5::QXcbIntegrationPlugin AND NOT APPLE)
     set(ENABLE_X11_TARGET_DEFAULT ON)
 else ()
     set(ENABLE_X11_TARGET_DEFAULT OFF)
 endif ()
 
-if (NOT APPLE)
+if (WIN32 OR ENABLE_X11_TARGET_DEFAULT)
     set(ENABLE_NETSCAPE_PLUGIN_API_DEFAULT ON)
 else ()
     set(ENABLE_NETSCAPE_PLUGIN_API_DEFAULT OFF)
@@ -81,6 +80,7 @@ endif ()
 WEBKIT_OPTION_DEFINE(USE_GSTREAMER "Use GStreamer implementation of MediaPlayer" PUBLIC ${USE_GSTREAMER_DEFAULT})
 WEBKIT_OPTION_DEFINE(USE_LIBHYPHEN "Use automatic hyphenation with LibHyphen" PUBLIC ${USE_LIBHYPHEN_DEFAULT})
 WEBKIT_OPTION_DEFINE(USE_QT_MULTIMEDIA "Use Qt Multimedia implementation of MediaPlayer" PUBLIC ${USE_QT_MULTIMEDIA_DEFAULT})
+WEBKIT_OPTION_DEFINE(USE_WOFF2 "Include support of WOFF2 fonts format" PUBLIC ON)
 WEBKIT_OPTION_DEFINE(ENABLE_INSPECTOR_UI "Include Inspector UI into resources" PUBLIC ON)
 WEBKIT_OPTION_DEFINE(ENABLE_OPENGL "Whether to use OpenGL." PUBLIC OFF)
 WEBKIT_OPTION_DEFINE(ENABLE_PRINT_SUPPORT "Enable support for printing web pages" PUBLIC ON)
@@ -138,6 +138,15 @@ WEBKIT_OPTION_DEFAULT_PORT_VALUE(ENABLE_WEB_TIMING PRIVATE ON)
 
 WEBKIT_OPTION_DEPEND(ENABLE_MEDIA_SOURCE ENABLE_VIDEO)
 
+# WebAudio is supported with GStreamer only
+WEBKIT_OPTION_DEPEND(ENABLE_WEB_AUDIO USE_GSTREAMER)
+WEBKIT_OPTION_DEPEND(ENABLE_LEGACY_WEB_AUDIO USE_GSTREAMER)
+
+# While it's possible to have UI-less NPAPI plugins without X11, we don't support this case yet
+if (UNIX AND NOT APPLE)
+    WEBKIT_OPTION_DEPEND(ENABLE_NETSCAPE_PLUGIN_API ENABLE_X11_TARGET)
+endif ()
+
 WEBKIT_OPTION_END()
 
 # FTL JIT and IndexedDB support require GCC 4.9
@@ -152,6 +161,12 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
             message(FATAL_ERROR "GCC 4.8.0 is required to build QtWebKit, use a newer GCC version or clang")
         endif ()
     endif ()
+elseif (MSVC AND MSVC_VERSION LESS 1900)
+    message(FATAL_ERROR "MSVC 2015 is required to build QtWebKit, use a newer MSVC version")
+endif ()
+
+if (APPLE AND CMAKE_SYSTEM_VERSION VERSION_LESS 14.0.0)
+    message(FATAL_ERROR "macOS 10.10 or higher is required to build and run QtWebKit")
 endif ()
 
 set(ENABLE_WEBKIT ON)
@@ -330,6 +345,10 @@ if (COMPILER_IS_GCC_OR_CLANG AND UNIX AND NOT APPLE)
         set(CMAKE_C_FLAGS "-fvisibility=hidden ${CMAKE_C_FLAGS}")
         set(CMAKE_CXX_FLAGS "-fvisibility=hidden -fvisibility-inlines-hidden ${CMAKE_CXX_FLAGS}")
     endif ()
+endif ()
+
+if (ENABLE_MATHML)
+    SET_AND_EXPOSE_TO_BUILD(ENABLE_OPENTYPE_MATH 1)
 endif ()
 
 SET_AND_EXPOSE_TO_BUILD(WTF_PLATFORM_X11 ${ENABLE_X11_TARGET})

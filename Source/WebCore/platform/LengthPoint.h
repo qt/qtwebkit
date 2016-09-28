@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Apple Inc. All rights reserved.
+ * Copyright (C) 2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -23,20 +23,54 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "config.h"
-#include "WebURLResponse.h"
+#ifndef LengthPoint_h
+#define LengthPoint_h
 
-namespace WebKit {
+#include "Length.h"
 
-WebURLResponse::WebURLResponse(PlatformResponse)
-{
-    ASSERT_NOT_REACHED();
-}
+namespace WebCore {
 
-PlatformResponse WebURLResponse::platformResponse() const
-{
-    ASSERT_NOT_REACHED();
-    return 0;
-}
+struct LengthPoint {
+public:
+    LengthPoint()
+    {
+    }
+    
+    LengthPoint(Length x, Length y)
+        : m_x(WTFMove(x))
+        , m_y(WTFMove(y))
+    {
+    }
 
-} // namespace WebKit
+    bool operator==(const LengthPoint& o) const
+    {
+        return m_x == o.m_x && m_y == o.m_y;
+    }
+
+    bool operator!=(const LengthPoint& o) const
+    {
+        return !(*this == o);
+    }
+
+    void setX(Length x) { m_x = WTFMove(x); }
+    const Length& x() const { return m_x; }
+
+    void setY(Length y) { m_y = WTFMove(y); }
+    const Length& y() const { return m_y; }
+
+    LengthPoint blend(const LengthPoint& from, double progress) const
+    {
+        return LengthPoint(m_x.blend(from.x(), progress), m_y.blend(from.y(), progress));
+    }
+
+private:
+    // FIXME: it would be nice to pack the two Lengths together better somehow (to avoid padding between them).
+    Length m_x;
+    Length m_y;
+};
+
+TextStream& operator<<(TextStream&, const LengthPoint&);
+
+} // namespace WebCore
+
+#endif // LengthPoint_h

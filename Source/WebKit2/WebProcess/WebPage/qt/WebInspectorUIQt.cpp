@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2010 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -24,40 +24,25 @@
  */
 
 #include "config.h"
-#include "LayerTreeContext.h"
+#include "WebInspectorUI.h"
 
-#include "ArgumentDecoder.h"
-#include "ArgumentEncoder.h"
+#if ENABLE(INSPECTOR)
+
+#include <WebCore/NotImplemented.h>
+#include <wtf/text/WTFString.h>
 
 namespace WebKit {
 
-LayerTreeContext::LayerTreeContext()
-    : coordinatedLayerID(0)
+bool WebInspectorUI::canSave()
 {
+    return false;
 }
 
-LayerTreeContext::~LayerTreeContext()
+String WebInspectorUI::localizedStringsURL()
 {
-}
-
-void LayerTreeContext::encode(CoreIPC::ArgumentEncoder& encoder) const
-{
-    encoder << coordinatedLayerID;
-}
-
-bool LayerTreeContext::decode(CoreIPC::ArgumentDecoder& decoder, LayerTreeContext& context)
-{
-    return decoder.decode(context.coordinatedLayerID);
-}
-
-bool LayerTreeContext::isEmpty() const
-{
-    return !coordinatedLayerID;
-}
-
-bool operator==(const LayerTreeContext& a, const LayerTreeContext& b)
-{
-    return a.coordinatedLayerID == b.coordinatedLayerID;
+    return ASCIILiteral("qrc:///org/webkitgtk/inspector/Localizations/en.lproj/localizedStrings.js");
 }
 
 } // namespace WebKit
+
+#endif // ENABLE(INSPECTOR)

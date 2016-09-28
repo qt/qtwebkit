@@ -2099,6 +2099,7 @@ set(WebCore_SOURCES
     platform/FileSystem.cpp
     platform/Language.cpp
     platform/Length.cpp
+    platform/LengthPoint.cpp
     platform/LengthSize.cpp
     platform/LinkHash.cpp
     platform/Logging.cpp
@@ -3352,6 +3353,11 @@ if (ENABLE_USER_MESSAGE_HANDLERS)
     )
 endif ()
 
+if (USE_WOFF2)
+  list(APPEND WebCore_INCLUDE_DIRECTORIES "${THIRDPARTY_DIR}/woff2/src")
+  list(APPEND WebCore_LIBRARIES woff2)
+endif ()
+
 set(WebCoreTestSupport_INCLUDE_DIRECTORIES
     "${WEBCORE_DIR}/platform/mock"
     "${WEBCORE_DIR}/testing"
@@ -3782,7 +3788,7 @@ if (ENABLE_GRAPHICS_CONTEXT_3D AND NOT WIN32)
     set_target_properties(ANGLESupport PROPERTIES FOLDER "WebCore")
 
     # Suppress null conversion warnings for sources in Source/ThirdParty/ANGLE
-    if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+    if (COMPILER_IS_CLANG)
         ADD_TARGET_PROPERTIES(ANGLESupport COMPILE_FLAGS "-Wno-null-conversion")
     endif ()
 
