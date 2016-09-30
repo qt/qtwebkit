@@ -15,6 +15,12 @@ list(APPEND WTF_LIBRARIES
     ${CMAKE_THREAD_LIBS_INIT}
 )
 
+if (QT_STATIC_BUILD)
+    list(APPEND WTF_LIBRARIES
+        ${STATIC_LIB_DEPENDENCIES}
+    )
+endif ()
+
 if (USE_GLIB)
     list(APPEND WTF_SOURCES
         glib/GRefPtr.cpp
