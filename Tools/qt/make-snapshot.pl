@@ -28,8 +28,6 @@ my @commands = (
     "Tools/gtk/make-dist.py -t snapshot Tools/qt/manifest.txt",
     "cd $target_repo",
     "git rm -rf *",
-    "git reset -- dist LICENSE.LGPLv21",
-    "git checkout -- dist LICENSE.LGPLv21",
     "tar -xf $src_repo/snapshot.tar --strip-components=1",
     "git add -A",
     "rm $src_repo/snapshot.tar",
