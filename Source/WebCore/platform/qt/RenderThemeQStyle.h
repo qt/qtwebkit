@@ -22,7 +22,6 @@
 #ifndef RenderThemeQStyle_h
 #define RenderThemeQStyle_h
 
-#include "QStyleFacade.h"
 #include "RenderThemeQt.h"
 
 namespace WebCore {
@@ -96,6 +95,8 @@ protected:
     virtual QSharedPointer<StylePainter> getStylePainter(const PaintInfo&);
 
     virtual QRect inflateButtonRect(const QRect& originalRect) const;
+    void computeControlRect(QStyleFacade::ButtonType, QRect& originalRect) const OVERRIDE;
+    void computeControlRect(QStyleFacade::ButtonType, IntRect& originalRect) const OVERRIDE;
 
     virtual void setPopupPadding(RenderStyle*) const;
 
@@ -107,6 +108,8 @@ private:
     void setButtonPadding(RenderStyle*) const;
 
     void setPaletteFromPageClientIfExists(QPalette&) const;
+
+    QRect indicatorRect(QStyleFacade::ButtonType part, const QRect& originalRect) const;
 
 #ifdef Q_OS_MAC
     int m_buttonFontPixelSize;
