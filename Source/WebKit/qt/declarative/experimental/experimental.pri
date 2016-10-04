@@ -11,9 +11,11 @@ TARGET.module_name = QtWebKit/experimental
 
 CONFIG += plugin
 
-cpqmldir.files = $${_PRO_FILE_PWD_}/qmldir
-cpqmldir.path = $${ROOT_BUILD_DIR}/imports/$${TARGET.module_name}
-COPIES += cpqmldir
+!debug_and_release|!build_all|CONFIG(release, debug|release) {
+    cpqmldir.files = $${_PRO_FILE_PWD_}/qmldir
+    cpqmldir.path = $${ROOT_BUILD_DIR}/imports/$${TARGET.module_name}
+    COPIES += cpqmldir
+}
 
 qtConfig(reduce_exports):CONFIG += hide_symbols
 

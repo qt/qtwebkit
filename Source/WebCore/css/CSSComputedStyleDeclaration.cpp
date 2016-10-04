@@ -276,15 +276,15 @@ static const CSSPropertyID computedProperties[] = {
 #if ENABLE(CSS_FILTERS)
     CSSPropertyWebkitFilter,
 #endif
-    CSSPropertyWebkitAlignContent,
-    CSSPropertyWebkitAlignItems,
-    CSSPropertyWebkitAlignSelf,
-    CSSPropertyWebkitFlexBasis,
-    CSSPropertyWebkitFlexGrow,
-    CSSPropertyWebkitFlexShrink,
-    CSSPropertyWebkitFlexDirection,
-    CSSPropertyWebkitFlexWrap,
-    CSSPropertyWebkitJustifyContent,
+    CSSPropertyAlignContent,
+    CSSPropertyAlignItems,
+    CSSPropertyAlignSelf,
+    CSSPropertyFlexBasis,
+    CSSPropertyFlexGrow,
+    CSSPropertyFlexShrink,
+    CSSPropertyFlexDirection,
+    CSSPropertyFlexWrap,
+    CSSPropertyJustifyContent,
     CSSPropertyWebkitFontKerning,
     CSSPropertyWebkitFontSmoothing,
     CSSPropertyWebkitFontVariantLigatures,
@@ -330,7 +330,7 @@ static const CSSPropertyID computedProperties[] = {
     CSSPropertyWebkitMaskRepeat,
     CSSPropertyWebkitMaskSize,
     CSSPropertyWebkitNbspMode,
-    CSSPropertyWebkitOrder,
+    CSSPropertyOrder,
 #if ENABLE(ACCELERATED_OVERFLOW_SCROLLING)
     CSSPropertyWebkitOverflowScrolling,
 #endif
@@ -1958,11 +1958,11 @@ PassRefPtr<CSSValue> ComputedStyleExtractor::propertyValue(CSSPropertyID propert
             return cssValuePool().createValue(style->display());
         case CSSPropertyEmptyCells:
             return cssValuePool().createValue(style->emptyCells());
-        case CSSPropertyWebkitAlignContent:
+        case CSSPropertyAlignContent:
             return cssValuePool().createValue(style->alignContent());
-        case CSSPropertyWebkitAlignItems:
+        case CSSPropertyAlignItems:
             return cssValuePool().createValue(style->alignItems());
-        case CSSPropertyWebkitAlignSelf:
+        case CSSPropertyAlignSelf:
             if (style->alignSelf() == AlignAuto) {
                 Node* parent = styledNode->parentNode();
                 if (parent && parent->computedStyle())
@@ -1970,23 +1970,23 @@ PassRefPtr<CSSValue> ComputedStyleExtractor::propertyValue(CSSPropertyID propert
                 return cssValuePool().createValue(AlignStretch);
             }
             return cssValuePool().createValue(style->alignSelf());
-        case CSSPropertyWebkitFlex:
-            return getCSSPropertyValuesForShorthandProperties(webkitFlexShorthand());
-        case CSSPropertyWebkitFlexBasis:
+        case CSSPropertyFlex:
+            return getCSSPropertyValuesForShorthandProperties(flexShorthand());
+        case CSSPropertyFlexBasis:
             return cssValuePool().createValue(style->flexBasis());
-        case CSSPropertyWebkitFlexDirection:
+        case CSSPropertyFlexDirection:
             return cssValuePool().createValue(style->flexDirection());
-        case CSSPropertyWebkitFlexFlow:
-            return getCSSPropertyValuesForShorthandProperties(webkitFlexFlowShorthand());
-        case CSSPropertyWebkitFlexGrow:
+        case CSSPropertyFlexFlow:
+            return getCSSPropertyValuesForShorthandProperties(flexFlowShorthand());
+        case CSSPropertyFlexGrow:
             return cssValuePool().createValue(style->flexGrow());
-        case CSSPropertyWebkitFlexShrink:
+        case CSSPropertyFlexShrink:
             return cssValuePool().createValue(style->flexShrink());
-        case CSSPropertyWebkitFlexWrap:
+        case CSSPropertyFlexWrap:
             return cssValuePool().createValue(style->flexWrap());
-        case CSSPropertyWebkitJustifyContent:
+        case CSSPropertyJustifyContent:
             return cssValuePool().createValue(style->justifyContent());
-        case CSSPropertyWebkitOrder:
+        case CSSPropertyOrder:
             return cssValuePool().createValue(style->order(), CSSPrimitiveValue::CSS_NUMBER);
         case CSSPropertyFloat:
             if (style->display() != NONE && style->hasOutOfFlowPosition())
@@ -2707,7 +2707,7 @@ PassRefPtr<CSSValue> ComputedStyleExtractor::propertyValue(CSSPropertyID propert
         case CSSPropertyWebkitClipPath:
             if (ClipPathOperation* operation = style->clipPath()) {
                 if (operation->getOperationType() == ClipPathOperation::SHAPE)
-                    return valueForBasicShape(static_cast<ShapeClipPathOperation*>(operation)->basicShape());
+                    return valueForBasicShape(style.get(), static_cast<ShapeClipPathOperation*>(operation)->basicShape());
 #if ENABLE(SVG)
                 else if (operation->getOperationType() == ClipPathOperation::REFERENCE) {
                     ReferenceClipPathOperation* referenceOperation = static_cast<ReferenceClipPathOperation*>(operation);
@@ -2750,7 +2750,7 @@ PassRefPtr<CSSValue> ComputedStyleExtractor::propertyValue(CSSPropertyID propert
                 return cssValuePool().createIdentifierValue(CSSValueNone);
             }
             ASSERT(style->shapeInside()->type() == ShapeValue::Shape);
-            return valueForBasicShape(style->shapeInside()->shape());
+            return valueForBasicShape(style.get(), style->shapeInside()->shape());
         case CSSPropertyWebkitShapeOutside:
             if (!style->shapeOutside())
                 return cssValuePool().createIdentifierValue(CSSValueAuto);
@@ -2760,7 +2760,7 @@ PassRefPtr<CSSValue> ComputedStyleExtractor::propertyValue(CSSPropertyID propert
                 return cssValuePool().createIdentifierValue(CSSValueNone);
             }
             ASSERT(style->shapeOutside()->type() == ShapeValue::Shape);
-            return valueForBasicShape(style->shapeOutside()->shape());
+            return valueForBasicShape(style.get(), style->shapeOutside()->shape());
 #endif
 #if ENABLE(CSS_FILTERS)
         case CSSPropertyWebkitFilter:
