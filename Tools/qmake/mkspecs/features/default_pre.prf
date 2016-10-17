@@ -102,9 +102,7 @@ gcc:isEqual(QT_ARCH, "arm"): CONFIG -= use_gold_linker
 
 # Pick up Qt's defaults for debug/release/debug_and_release
 if(win32|mac):!macx-xcode {
-    qtConfig(simulator_and_device): CONFIG += simulator_and_device
-    qtConfig(debug_and_release): CONFIG += debug_and_release
-    qtConfig(build_all): CONFIG += build_all
+    qtConfig(debug_and_release): CONFIG += debug_and_release build_all
 }
 
 FLEX = flex
