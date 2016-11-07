@@ -39,6 +39,11 @@ if (COMPILER_IS_CLANG AND CMAKE_GENERATOR STREQUAL "Ninja")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fcolor-diagnostics")
 endif ()
 
+if (WIN32 AND COMPILER_IS_GCC_OR_CLANG)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mno-ms-bitfields -Wno-unknown-pragmas")
+    add_definitions(-D__USE_MINGW_ANSI_STDIO=1)
+endif ()
+
 # Detect Cortex-A53 core if CPU is ARM64 and OS is Linux.
 # Query /proc/cpuinfo for each available core and check reported CPU part number: 0xd03 signals Cortex-A53.
 # (see Main ID Register in ARM Cortex-A53 MPCore Processor Technical Reference Manual)
@@ -93,7 +98,7 @@ endif ()
 # Use ld.gold if it is available and isn't disabled explicitly
 include(CMakeDependentOption)
 CMAKE_DEPENDENT_OPTION(USE_LD_GOLD "Use GNU gold linker" ON
-                       "NOT CXX_ACCEPTS_MFIX_CORTEX_A53_835769;NOT ARM_TRADITIONAL_DETECTED" OFF)
+                       "NOT CXX_ACCEPTS_MFIX_CORTEX_A53_835769;NOT ARM_TRADITIONAL_DETECTED;NOT WIN32;NOT APPLE" OFF)
 if (USE_LD_GOLD)
     execute_process(COMMAND ${CMAKE_C_COMPILER} -fuse-ld=gold -Wl,--version ERROR_QUIET OUTPUT_VARIABLE LD_VERSION)
     if ("${LD_VERSION}" MATCHES "GNU gold")

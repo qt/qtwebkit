@@ -188,6 +188,7 @@ list(APPEND WebKit_SOURCES
     qt/WebCoreSupport/PopupMenuQt.cpp
     qt/WebCoreSupport/ProgressTrackerClientQt.cpp
     qt/WebCoreSupport/QWebFrameAdapter.cpp
+    qt/WebCoreSupport/QWebFrameData.cpp
     qt/WebCoreSupport/QWebPageAdapter.cpp
     qt/WebCoreSupport/QtPlatformPlugin.cpp
     qt/WebCoreSupport/QtPluginWidgetAdapter.cpp
@@ -253,8 +254,6 @@ if (ENABLE_TEST_SUPPORT)
     )
     if (SHARED_CORE)
         list(APPEND WebKit_LIBRARIES PUBLIC WebCoreTestSupport)
-        install(TARGETS WebCoreTestSupport EXPORT WebKitTargets
-                DESTINATION "${LIB_INSTALL_DIR}")
     else ()
         list(APPEND WebKit_LIBRARIES PRIVATE WebCoreTestSupport)
     endif ()

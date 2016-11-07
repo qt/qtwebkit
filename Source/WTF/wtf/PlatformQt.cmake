@@ -15,9 +15,21 @@ list(APPEND WTF_LIBRARIES
     ${CMAKE_THREAD_LIBS_INIT}
 )
 
+if (SHARED_CORE)
+    set(WTF_LIBRARY_TYPE SHARED)
+else ()
+    set(WTF_LIBRARY_TYPE STATIC)
+endif ()
+
 if (QT_STATIC_BUILD)
     list(APPEND WTF_LIBRARIES
         ${STATIC_LIB_DEPENDENCIES}
+    )
+endif ()
+
+if (UNIX AND NOT APPLE)
+    list(APPEND WTF_SOURCES
+        UniStdExtras.cpp
     )
 endif ()
 

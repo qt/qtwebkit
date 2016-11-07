@@ -17,28 +17,31 @@
  * Boston, MA 02110-1301, USA.
  *
  */
-#ifndef QWidgetPluginImpl_h
-#define QWidgetPluginImpl_h
 
-#include "QtPluginWidgetAdapter.h"
+#pragma once
 
-QT_BEGIN_NAMESPACE
-class QWidget;
-QT_END_NAMESPACE
+#include <wtf/RefPtr.h>
+#include <wtf/text/WTFString.h>
 
-class QWidgetPluginImpl final : public QtPluginWidgetAdapter {
-    Q_OBJECT
+namespace WebCore {
+class Frame;
+class FrameLoaderClientQt;
+class HTMLFrameOwnerElement;
+class Page;
+}
+
+class QWebFrameData {
 public:
-    QWidgetPluginImpl(QWidget *w) : m_widget(w) { }
-    ~QWidgetPluginImpl();
-    void update(const QRect &) final;
-    void setGeometryAndClip(const QRect&, const QRect&, bool isVisible) final;
-    void setVisible(bool) final;
-    void setStyleSheet(const QString&) final;
-    void setWidgetParent(QObject *) final;
-    QObject* handle() const final;
-private:
-    QWidget *m_widget;
-};
+    QWebFrameData(WebCore::Page*, WebCore::Frame* parentFrame = 0, WebCore::HTMLFrameOwnerElement* = 0, const WTF::String& frameName = WTF::String());
 
-#endif // QWidgetPluginImpl_h
+    WTF::String name;
+    WebCore::HTMLFrameOwnerElement* ownerElement;
+    WebCore::Page* page;
+    RefPtr<WebCore::Frame> frame;
+    WebCore::FrameLoaderClientQt* frameLoaderClient;
+
+    WTF::String referrer;
+    bool allowsScrolling;
+    int marginWidth;
+    int marginHeight;
+};
