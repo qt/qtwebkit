@@ -20,38 +20,51 @@ build_pass|!debug_and_release {
         CMAKE_TOOLCHAIN_FILE=$$toolchain_file \
         CMAKE_PREFIX_PATH=\"$$[QT_INSTALL_PREFIX];$$ROOT_QT_BUILD_DIR/qtbase;$$ROOT_QT_BUILD_DIR/qtlocation;$$ROOT_QT_BUILD_DIR/qtsensors\" \
         CMAKE_INSTALL_PREFIX=\"$$[QT_INSTALL_PREFIX]\" \
-        KDE_INSTALL_LIBDIR=\"$$relative_path($$[QT_INSTALL_LIBS], $$[QT_INSTALL_PREFIX])\" \
+        ENABLE_TEST_SUPPORT=OFF \
         USE_LIBHYPHEN=OFF
 
     QT_FOR_CONFIG += gui-private
     !qtConfig(system-jpeg):exists($$QTBASE_DIR) {
         CMAKE_CONFIG += \
             QT_BUNDLED_JPEG=1 \
-            JPEG_INCLUDE_DIR=$$system_path($$QTBASE_DIR/src/3rdparty/libjpeg) \
-            JPEG_LIBRARIES=$$system_path($$ROOT_BUILD_DIR/lib/libqtjpeg.$$QMAKE_EXTENSION_STATICLIB)
+            JPEG_INCLUDE_DIR=$$QTBASE_DIR/src/3rdparty/libjpeg \
+            JPEG_LIBRARIES=$$ROOT_BUILD_DIR/lib/$${QMAKE_PREFIX_STATICLIB}qtjpeg.$$QMAKE_EXTENSION_STATICLIB
     }
 
     !qtConfig(system-png):qtConfig(png):exists($$QTBASE_DIR) {
         CMAKE_CONFIG += \
             QT_BUNDLED_PNG=1 \
-            PNG_INCLUDE_DIRS=$$system_path($$QTBASE_DIR/src/3rdparty/libpng) \
-            PNG_LIBRARIES=$$system_path($$ROOT_BUILD_DIR/lib/libqtpng.$$QMAKE_EXTENSION_STATICLIB)
+            PNG_INCLUDE_DIRS=$$QTBASE_DIR/src/3rdparty/libpng \
+            PNG_LIBRARIES=$$ROOT_BUILD_DIR/lib/$${QMAKE_PREFIX_STATICLIB}qtpng.$$QMAKE_EXTENSION_STATICLIB
     }
 
     !qtConfig(system-zlib):exists($$QTBASE_DIR) {
         CMAKE_CONFIG += \
             QT_BUNDLED_ZLIB=1 \
-            ZLIB_INCLUDE_DIRS=$$system_path($$QTBASE_DIR/src/3rdparty/zlib)
+            ZLIB_INCLUDE_DIRS=$$QTBASE_DIR/src/3rdparty/zlib
     }
 
-    equals(QMAKE_HOST.os, Windows): cmake_args += "-G \"NMake Makefiles JOM\""
+    equals(QMAKE_HOST.os, Windows) {
+        if(equals(MAKEFILE_GENERATOR, MSVC.NET)|equals(MAKEFILE_GENERATOR, MSBUILD)) {
+            cmake_generator = "NMake Makefiles JOM"
+        } else: if(equals(MAKEFILE_GENERATOR, MINGW)) {
+            cmake_generator = "MinGW Makefiles"
+        } else {
+            cmake_generator = "Unix Makefiles"
+        }
+        cmake_args += "-G \"$$cmake_generator\""
+    }
 
     !silent: make_args += "VERBOSE=1"
 
     # Append additional platform options defined in CMAKE_CONFIG
     for (config, CMAKE_CONFIG): cmake_args += "-D$$config"
 
-    cmake_cmd_base = "$$QMAKE_MKDIR $$cmake_build_dir && cd $$cmake_build_dir &&"
+    !exists($$cmake_build_dir) {
+        !system("$$QMAKE_MKDIR $$cmake_build_dir"): error("Failed to create cmake build directory")
+    }
+
+    cmake_cmd_base = "cd $$cmake_build_dir &&"
 
     log("$${EOL}Running $$cmake_env cmake $$ROOT_WEBKIT_DIR $$cmake_args $${EOL}$${EOL}")
     !system("$$cmake_cmd_base $$cmake_env cmake $$ROOT_WEBKIT_DIR $$cmake_args"): error("Running cmake failed")
