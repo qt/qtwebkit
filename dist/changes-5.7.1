@@ -1,0 +1,40 @@
+Qt 5.7.1 is a bug-fix release. It maintains both forward and backward
+compatibility (source and binary) with Qt 5.7.0.
+
+Qt 5.7.1 contains a merge from Qt 5.6.2 and all changes in Qt 5.6.2 are
+also in Qt 5.7.1. For more see changes-5.6.2.
+
+Qt 5.7 introduces many new features and improvements as well as bugfixes
+over the 5.6.x series. For more details, refer to the online documentation
+included in this distribution. The documentation is also available online:
+
+  http://doc.qt.io/qt-5/index.html
+
+The Qt version 5.7 series is binary compatible with the 5.6.x series.
+Applications compiled for 5.6 will continue to run with 5.7.
+
+Some of the changes listed in this file include issue tracking numbers
+corresponding to tasks in the Qt Bug Tracker:
+
+  https://bugreports.qt.io/
+
+Each of these identifiers can be entered in the bug tracker to obtain more
+information about a particular change.
+
+****************************************************************************
+*                              Library                                     *
+****************************************************************************
+
+QtWebkit
+--------
+ - [QTBUG-37899] Report JavaScript errors from Qt signals and slots to Console
+ - [QTBUG-56302] Fixed painting of checkbox and radiobutton indicators
+ - Support unprefixed CSS3 Flexbox properties, which are required for correct
+   layout in some real world web content
+ - Backported a few fixes for CSS calc() from WebKit upstream
+
+****************************************************************************
+*                      Platform Specific Changes                           *
+****************************************************************************
+
+ - Fixed build with Python 3

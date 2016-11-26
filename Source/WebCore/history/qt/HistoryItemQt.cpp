@@ -81,8 +81,7 @@ QDataStreamCoder::QDataStreamCoder(QDataStream& stream)
 void QDataStreamCoder::encodeBytes(const uint8_t* bytes, size_t size)
 {
     m_stream << qint64(size);
-    for (; size > 0; --size)
-        m_stream << bytes++;
+    m_stream.writeRawData(reinterpret_cast<const char *>(bytes++), size);
 }
 
 void QDataStreamCoder::encodeBool(bool value)
@@ -129,13 +128,9 @@ bool QDataStreamCoder::decodeBytes(Vector<uint8_t>& out)
 {
     out.clear();
     qint64 count;
-    uint8_t byte;
     m_stream >> count;
-    out.reserveCapacity(count);
-    for (qint64 i = 0; i < count; ++i) {
-        m_stream >> byte;
-        out.append(byte);
-    }
+    out.resize(count);
+    m_stream.readRawData(reinterpret_cast<char *>(out.data()), count);
     return m_stream.status() == QDataStream::Ok;
 }
 
