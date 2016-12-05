@@ -18,5 +18,3 @@ win32 {
 } else {
     LIBS += -licui18n -licuuc -licudata
 }
-
-load(qt_build_config)
