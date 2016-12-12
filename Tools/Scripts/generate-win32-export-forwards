@@ -28,7 +28,7 @@ import sys
 import re
 
 def exportForwardsForLibrary(library):
-    dumpBin = subprocess.Popen("dumpbin /directives " + library, stdout=subprocess.PIPE, universal_newlines=True)
+    dumpBin = subprocess.Popen(["dumpbin.exe", "-directives", library], stdout=subprocess.PIPE, universal_newlines=True)
 
     output = dumpBin.communicate()[0]
     return output
