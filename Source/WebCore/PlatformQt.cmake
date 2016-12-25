@@ -36,8 +36,10 @@ list(APPEND WebCore_INCLUDE_DIRECTORIES
     "${WEBCORE_DIR}/platform/graphics/surfaces"
     "${WEBCORE_DIR}/platform/graphics/surfaces/qt"
     "${WEBCORE_DIR}/platform/graphics/qt"
+    "${WEBCORE_DIR}/platform/graphics/win"
     "${WEBCORE_DIR}/platform/network/qt"
     "${WEBCORE_DIR}/platform/text/qt"
+    "${WEBCORE_DIR}/platform/win"
     "${WTF_DIR}"
 )
 
@@ -241,6 +243,12 @@ list(APPEND WebCore_USER_AGENT_STYLE_SHEETS
     ${WEBCORE_DIR}/css/themeQtNoListboxes.css
 )
 
+if (ENABLE_WEBKIT2)
+    list(APPEND WebCore_SOURCES
+        page/qt/GestureTapHighlighter.cpp
+    )
+endif ()
+
 if (ENABLE_OPENGL)
     list(APPEND WebCore_SOURCES
         platform/graphics/OpenGLShims.cpp
@@ -290,6 +298,16 @@ if (USE_GSTREAMER)
     include(platform/GStreamer.cmake)
     list(APPEND WebCore_SOURCES
         platform/graphics/gstreamer/ImageGStreamerQt.cpp
+    )
+endif ()
+
+if (USE_MEDIA_FOUNDATION)
+    list(APPEND WebCore_SOURCES
+        platform/graphics/win/MediaPlayerPrivateMediaFoundation.cpp
+    )
+    list(APPEND WebCore_LIBRARIES
+        mfuuid
+        strmbase
     )
 endif ()
 
@@ -356,12 +374,18 @@ if (HAVE_FONTCONFIG)
 endif ()
 
 # From PlatformWin.cmake
-if (WIN32)
 
+if (WIN32)
     if (${JavaScriptCore_LIBRARY_TYPE} MATCHES STATIC)
         add_definitions(-DSTATICALLY_LINKED_WITH_WTF -DSTATICALLY_LINKED_WITH_JavaScriptCore)
     endif ()
 
+    list(APPEND WebCore_SOURCES
+        platform/win/SystemInfo.cpp
+    )
+endif ()
+
+if (MSVC)
     list(APPEND WebCore_INCLUDE_DIRECTORIES
         "${CMAKE_BINARY_DIR}/../include/private"
         "${CMAKE_BINARY_DIR}/../include/private/JavaScriptCore"
@@ -388,10 +412,6 @@ if (WIN32)
         "${DERIVED_SOURCES_DIR}/ForwardingHeaders/WTF"
         "${WEBCORE_DIR}/ForwardingHeaders"
         "${WEBCORE_DIR}/platform/win"
-    )
-
-    list(APPEND WebCore_SOURCES
-        platform/win/SystemInfo.cpp
     )
 
     file(MAKE_DIRECTORY ${DERIVED_SOURCES_DIR}/ForwardingHeaders/WebCore)

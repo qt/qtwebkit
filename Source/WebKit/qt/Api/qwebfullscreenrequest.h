@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 Apple Inc. All Rights Reserved.
+ * Copyright (C) 2016 Michal Dutkiewicz aka Emdek <michal@emdek.pl>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -23,43 +23,52 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ScrollbarThemeQStyle_h
-#define ScrollbarThemeQStyle_h
+#ifndef QWEBFULLSCREENREQUEST_H
+#define QWEBFULLSCREENREQUEST_H
 
-#include "ScrollbarTheme.h"
-
-#include <QtCore/qglobal.h>
+#include <QtWebKit/qwebkitglobal.h>
+#include <QtCore/qmetatype.h>
+#include <QtCore/qscopedpointer.h>
+#include <QtCore/qurl.h>
 
 namespace WebCore {
+class ChromeClientQt;
+}
 
-class QStyleFacade;
+class QWebElement;
+class QWebFullScreenRequestPrivate;
+class QWebPageAdapter;
 
-class ScrollbarThemeQStyle final : public ScrollbarTheme {
+class QWEBKIT_EXPORT QWebFullScreenRequest {
 public:
-    ScrollbarThemeQStyle();
-    ~ScrollbarThemeQStyle() final;
+    QWebFullScreenRequest();
+    QWebFullScreenRequest(const QWebFullScreenRequest&);
+    ~QWebFullScreenRequest();
 
-    bool paint(Scrollbar&, GraphicsContext&, const IntRect& dirtyRect) final;
-    void paintScrollCorner(ScrollView*, GraphicsContext&, const IntRect& cornerRect) final;
-
-    ScrollbarPart hitTest(Scrollbar&, const IntPoint&) final;
-
-    ScrollbarButtonPressAction handleMousePressEvent(Scrollbar&, const PlatformMouseEvent&, ScrollbarPart) override;
-
-    void invalidatePart(Scrollbar&, ScrollbarPart) final;
-
-    int thumbPosition(Scrollbar&) final;
-    int thumbLength(Scrollbar&) final;
-    int trackPosition(Scrollbar&) final;
-    int trackLength(Scrollbar&) final;
-
-    int scrollbarThickness(ScrollbarControlSize = RegularScrollbar) final;
-
-    QStyleFacade* qStyle() { return m_qStyle.get(); }
+    void accept();
+    void reject();
+    bool toggleOn() const;
+    QUrl origin() const;
+    const QWebElement &element() const;
 
 private:
-    std::unique_ptr<QStyleFacade> m_qStyle;
+    friend class WebCore::ChromeClientQt;
+
+    static QWebFullScreenRequest createEnterRequest(QWebPageAdapter* page, const QWebElement& element)
+    {
+        return QWebFullScreenRequest(page, element, true);
+    }
+
+    static QWebFullScreenRequest createExitRequest(QWebPageAdapter* page, const QWebElement& element)
+    {
+        return QWebFullScreenRequest(page, element, false);
+    }
+
+    QWebFullScreenRequest(QWebPageAdapter* page, const QWebElement& element, bool toggleOn);
+    QScopedPointer<QWebFullScreenRequestPrivate> d;
 };
 
-}
+Q_DECLARE_TYPEINFO(QWebFullScreenRequest, Q_MOVABLE_TYPE);
+Q_DECLARE_METATYPE(QWebFullScreenRequest)
+
 #endif

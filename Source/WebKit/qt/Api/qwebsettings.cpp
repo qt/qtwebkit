@@ -272,6 +272,10 @@ void QWebSettingsPrivate::apply()
                                       global->attributes.value(QWebSettings::XSSAuditingEnabled));
         settings->setXSSAuditorEnabled(value);
 
+        value = attributes.value(QWebSettings::WebSecurityEnabled,
+                                      global->attributes.value(QWebSettings::WebSecurityEnabled));
+        settings->setWebSecurityEnabled(value);
+
 #if USE(TILED_BACKING_STORE)
         value = attributes.value(QWebSettings::TiledBackingStoreEnabled,
                                       global->attributes.value(QWebSettings::TiledBackingStoreEnabled));
@@ -295,6 +299,9 @@ void QWebSettingsPrivate::apply()
         value = attributes.value(QWebSettings::SiteSpecificQuirksEnabled,
                                       global->attributes.value(QWebSettings::SiteSpecificQuirksEnabled));
         settings->setNeedsSiteSpecificQuirks(value);
+
+        value = attributes.value(QWebSettings::FullScreenSupportEnabled, global->attributes.value(QWebSettings::FullScreenSupportEnabled));
+        settings->setFullScreenEnabled(value);
 
         settings->setUsesPageCache(WebCore::PageCache::singleton().maxSize());
     } else {
@@ -508,6 +515,11 @@ QWebSettings* QWebSettings::globalSettings()
     \value CaretBrowsingEnabled This setting enables caret browsing. It is disabled by default.
     \value NotificationsEnabled Specifies whether support for the HTML 5 web notifications is enabled
         or not. This is enabled by default.
+    \value WebSecurityEnabled Specifies whether browser should enforce same-origin policy for scripts downloaded
+        from remote servers. This setting is set to true by default. Note that setting this flag to false is
+        strongly discouraged as it makes the browser more prone to malicious code. This setting is intended
+        primarily for site-specific browsers (i.e. when the user can't navigate to unsecure web page) and for testing
+        web applications before deployment.
 */
 
 /*!
@@ -565,6 +577,8 @@ QWebSettings::QWebSettings()
     d->attributes.insert(QWebSettings::ScrollAnimatorEnabled, false);
     d->attributes.insert(QWebSettings::CaretBrowsingEnabled, false);
     d->attributes.insert(QWebSettings::NotificationsEnabled, true);
+    d->attributes.insert(QWebSettings::WebSecurityEnabled, true);
+    d->attributes.insert(QWebSettings::FullScreenSupportEnabled, true);
     d->offlineStorageDefaultQuota = 5 * 1024 * 1024;
     d->defaultTextEncoding = QLatin1String("iso-8859-1");
     d->thirdPartyCookiePolicy = AlwaysAllowThirdPartyCookies;
