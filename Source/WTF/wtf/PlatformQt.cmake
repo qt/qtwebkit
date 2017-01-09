@@ -52,13 +52,13 @@ if (WIN32)
     )
 endif ()
 
-if (MSVC)
-    set(WTF_POST_BUILD_COMMAND "${CMAKE_BINARY_DIR}/DerivedSources/WTF/postBuild.cmd")
-    file(WRITE "${WTF_POST_BUILD_COMMAND}" "@xcopy /y /s /d /f \"${WTF_DIR}/wtf/*.h\" \"${DERIVED_SOURCES_DIR}/ForwardingHeaders/WTF\" >nul 2>nul\n@xcopy /y /s /d /f \"${DERIVED_SOURCES_DIR}/WTF/*.h\" \"${DERIVED_SOURCES_DIR}/ForwardingHeaders/WTF\" >nul 2>nul\n")
-    file(MAKE_DIRECTORY ${DERIVED_SOURCES_DIR}/ForwardingHeaders/WTF)
-endif ()
-
 if (APPLE)
+    list(APPEND WTF_SOURCES
+        text/cf/AtomicStringImplCF.cpp
+        text/cf/StringCF.cpp
+        text/cf/StringImplCF.cpp
+        text/cf/StringViewCF.cpp
+    )
     list(APPEND WTF_LIBRARIES
         ${COREFOUNDATION_LIBRARY}
     )
