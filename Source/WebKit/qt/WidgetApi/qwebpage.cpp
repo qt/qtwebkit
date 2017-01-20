@@ -3143,7 +3143,8 @@ QWebPageAdapter *QWebPage::handle() const
 */
 bool QWebPage::findText(const QString &subString, FindFlags options)
 {
-    return d->findText(subString, static_cast<QWebPageAdapter::FindFlag>(options.operator int()));
+    return d->findText(subString, static_cast<QWebPageAdapter::FindFlag>(
+        static_cast<FindFlags::Int>(options)));
 }
 
 /*!
