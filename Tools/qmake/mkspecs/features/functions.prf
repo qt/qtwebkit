@@ -293,7 +293,7 @@ defineTest(linkAgainstLibrary) {
 }
 
 defineTest(xlibAvailable) {
-    contains(QT_CONFIG, xcb-xlib) {
+    qtConfig(xcb):qtConfig(xcb-xlib) {
         return(true)
     } else {
         return(false)
