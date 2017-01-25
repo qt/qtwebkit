@@ -62,10 +62,6 @@ win32-msvc*: MAKEFILE_NOOP_COMMAND = @echo >NUL
 scratchbox: PYTHON = python2.6
 else: PYTHON = python
 
-# We use private_tests to detect developer build, since the destdir will
-# always be our webkit build dir. This might change as configure changes.
-qtConfig(private_tests): CONFIG += qt_developer_build
-
 # By default we enable "production build", and build-webkit, which is
 # used by bots and developers, will disable it, to enable warnings etc.
 CONFIG += production_build
