@@ -4,6 +4,26 @@ include(ECMQueryQmake)
 
 set(ECM_MODULE_DIR ${CMAKE_MODULE_PATH})
 
+set(QT_CONAN_DIR "" CACHE PATH "Directory containing conanbuildinfo.cmake and conanfile.txt")
+if (QT_CONAN_DIR)
+    include("${QT_CONAN_DIR}/conanbuildinfo.cmake")
+    conan_basic_setup()
+
+    install(CODE "
+        set(_conan_imports_dest \${CMAKE_INSTALL_PREFIX})
+        if (DEFINED ENV{DESTDIR})
+            get_filename_component(_absolute_destdir \$ENV{DESTDIR} ABSOLUTE)
+            string(REGEX REPLACE \"^[A-z]:\" \"\" _conan_imports_dest \${CMAKE_INSTALL_PREFIX})
+            set(_conan_imports_dest \"\${_absolute_destdir}\${_conan_imports_dest}\")
+        endif ()
+
+        execute_process(
+            COMMAND conan imports -f \"${QT_CONAN_DIR}/conanfile.txt\" --dest \${_conan_imports_dest}
+            WORKING_DIRECTORY \"${QT_CONAN_DIR}\"
+        )
+    ")
+endif ()
+
 set(STATIC_DEPENDENCIES_CMAKE_FILE "${CMAKE_BINARY_DIR}/QtStaticDependencies.cmake")
 if (EXISTS ${STATIC_DEPENDENCIES_CMAKE_FILE})
     file(REMOVE ${STATIC_DEPENDENCIES_CMAKE_FILE})
@@ -30,7 +50,7 @@ endmacro()
 
 set(PROJECT_VERSION_MAJOR 5)
 set(PROJECT_VERSION_MINOR 602)
-set(PROJECT_VERSION_MICRO 2)
+set(PROJECT_VERSION_MICRO 3)
 set(PROJECT_VERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_MICRO})
 set(PROJECT_VERSION_STRING "${PROJECT_VERSION}")
 
@@ -87,7 +107,7 @@ WEBKIT_OPTION_DEFINE(USE_MEDIA_FOUNDATION "Use MediaFoundation implementation of
 WEBKIT_OPTION_DEFINE(USE_QT_MULTIMEDIA "Use Qt Multimedia implementation of MediaPlayer" PUBLIC ${USE_QT_MULTIMEDIA_DEFAULT})
 WEBKIT_OPTION_DEFINE(USE_WOFF2 "Include support of WOFF2 fonts format" PUBLIC ON)
 WEBKIT_OPTION_DEFINE(ENABLE_INSPECTOR_UI "Include Inspector UI into resources" PUBLIC ON)
-WEBKIT_OPTION_DEFINE(ENABLE_OPENGL "Whether to use OpenGL." PUBLIC OFF)
+WEBKIT_OPTION_DEFINE(ENABLE_OPENGL "Whether to use OpenGL." PUBLIC ON)
 WEBKIT_OPTION_DEFINE(ENABLE_PRINT_SUPPORT "Enable support for printing web pages" PUBLIC ON)
 WEBKIT_OPTION_DEFINE(ENABLE_X11_TARGET "Whether to enable support for the X11 windowing target." PUBLIC ${ENABLE_X11_TARGET_DEFAULT})
 
@@ -98,6 +118,7 @@ option(USE_STATIC_RUNTIME "Use static runtime (MSVC only)" OFF)
 
 # Public options shared with other WebKit ports. There must be strong reason
 # to support changing the value of the option.
+WEBKIT_OPTION_DEFAULT_PORT_VALUE(ENABLE_ACCELERATED_2D_CANVAS PUBLIC ON)
 WEBKIT_OPTION_DEFAULT_PORT_VALUE(ENABLE_ALLINONE_BUILD PUBLIC ON)
 WEBKIT_OPTION_DEFAULT_PORT_VALUE(ENABLE_API_TESTS PUBLIC ON)
 WEBKIT_OPTION_DEFAULT_PORT_VALUE(ENABLE_CSS_GRID_LAYOUT PUBLIC ON)
@@ -127,6 +148,7 @@ WEBKIT_OPTION_DEFAULT_PORT_VALUE(USE_SYSTEM_MALLOC PUBLIC OFF)
 # Private options shared with other WebKit ports. Add options here when
 # we need a value different from the default defined in WebKitFeatures.cmake.
 # Changing these options is completely unsupported.
+WEBKIT_OPTION_DEFAULT_PORT_VALUE(ENABLE_3D_TRANSFORMS PRIVATE ON)
 WEBKIT_OPTION_DEFAULT_PORT_VALUE(ENABLE_CSS_IMAGE_SET PRIVATE ON)
 WEBKIT_OPTION_DEFAULT_PORT_VALUE(ENABLE_CSS_REGIONS PRIVATE ON)
 WEBKIT_OPTION_DEFAULT_PORT_VALUE(ENABLE_CSS_SHAPES PRIVATE ON)
@@ -142,12 +164,18 @@ WEBKIT_OPTION_DEFAULT_PORT_VALUE(ENABLE_NOTIFICATIONS PRIVATE ON)
 WEBKIT_OPTION_DEFAULT_PORT_VALUE(ENABLE_USERSELECT_ALL PRIVATE ON)
 WEBKIT_OPTION_DEFAULT_PORT_VALUE(ENABLE_VIDEO_TRACK PRIVATE ON)
 WEBKIT_OPTION_DEFAULT_PORT_VALUE(ENABLE_WEB_TIMING PRIVATE ON)
+WEBKIT_OPTION_DEFAULT_PORT_VALUE(ENABLE_WEBGL PRIVATE ON)
 
-WEBKIT_OPTION_DEPEND(ENABLE_MEDIA_SOURCE ENABLE_VIDEO)
+WEBKIT_OPTION_CONFLICT(USE_GSTREAMER USE_QT_MULTIMEDIA)
 
-# WebAudio is supported with GStreamer only
+WEBKIT_OPTION_DEPEND(ENABLE_3D_TRANSFORMS ENABLE_OPENGL)
+WEBKIT_OPTION_DEPEND(ENABLE_ACCELERATED_2D_CANVAS ENABLE_OPENGL)
+WEBKIT_OPTION_DEPEND(ENABLE_WEBGL ENABLE_OPENGL)
+
+# WebAudio and MediaSource are supported with GStreamer only
 WEBKIT_OPTION_DEPEND(ENABLE_WEB_AUDIO USE_GSTREAMER)
 WEBKIT_OPTION_DEPEND(ENABLE_LEGACY_WEB_AUDIO USE_GSTREAMER)
+WEBKIT_OPTION_DEPEND(ENABLE_MEDIA_SOURCE USE_GSTREAMER)
 
 # While it's possible to have UI-less NPAPI plugins without X11, we don't support this case yet
 if (UNIX AND NOT APPLE)
@@ -242,6 +270,7 @@ if (DEFINED ENV{SQLITE3SRCDIR})
     endif ()
     add_library(qtsqlite STATIC ${SQLITE_SOURCE_FILE})
     target_compile_definitions(qtsqlite PUBLIC -DSQLITE_CORE -DSQLITE_OMIT_LOAD_EXTENSION -DSQLITE_OMIT_COMPLETE)
+    WEBKIT_SET_EXTRA_COMPILER_FLAGS(qtsqlite)
     set(SQLITE_LIBRARIES qtsqlite)
     set(SQLITE_FOUND 1)
 else ()
@@ -438,6 +467,16 @@ endif ()
 if (ENABLE_OPENGL)
     SET_AND_EXPOSE_TO_BUILD(USE_TEXTURE_MAPPER_GL TRUE)
     SET_AND_EXPOSE_TO_BUILD(ENABLE_GRAPHICS_CONTEXT_3D TRUE)
+
+    # TODO: Add proper support of DynamicGL detection to Qt and use it
+    if (WIN32)
+        if  (QT_USES_GLES2_ONLY)
+            # FIXME: Fix build with ANGLE-only Qt
+            message(FATAL_ERROR "Only dynamic GL is supported on Windows at the moment")
+        else ()
+            set(Qt5Gui_OPENGL_IMPLEMENTATION GL)
+        endif ()
+    endif ()
 endif ()
 
 if (NOT ENABLE_VIDEO)
@@ -641,24 +680,4 @@ include(KDEInstallDirs)
 
 if (NOT qt_install_prefix_dir STREQUAL "${CMAKE_INSTALL_PREFIX}")
     set(KDE_INSTALL_USE_QT_SYS_PATHS OFF)
-endif ()
-
-set(QT_CONAN_DIR "" CACHE PATH "Directory containing conanbuildinfo.cmake and conanfile.txt")
-if (QT_CONAN_DIR)
-    include("${QT_CONAN_DIR}/conanbuildinfo.cmake")
-    conan_basic_setup()
-
-    install(CODE "
-        set(_conan_imports_dest \${CMAKE_INSTALL_PREFIX})
-        if (DEFINED ENV{DESTDIR})
-            get_filename_component(_absolute_destdir \$ENV{DESTDIR} ABSOLUTE)
-            string(REGEX REPLACE \"^[A-z]:\" \"\" _conan_imports_dest \${CMAKE_INSTALL_PREFIX})
-            set(_conan_imports_dest \"\${_absolute_destdir}\${_conan_imports_dest}\")
-        endif ()
-
-        execute_process(
-            COMMAND conan imports -f \"${QT_CONAN_DIR}/conanfile.txt\" --dest \${_conan_imports_dest}
-            WORKING_DIRECTORY \"${QT_CONAN_DIR}\"
-        )
-    ")
 endif ()

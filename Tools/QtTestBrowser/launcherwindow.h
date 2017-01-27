@@ -38,6 +38,9 @@
 #ifndef QT_NO_OPENGL
 #include <QtOpenGL/QGLWidget>
 #endif
+#if QT_VERSION >= QT_VERSION_CHECK(5, 4, 0)
+#include <QOpenGLWidget>
+#endif
 
 #include <QDebug>
 
@@ -82,9 +85,8 @@ public:
     bool useDiskCookies { true };
     bool enableScrollAnimator { false };
     quint64 offlineStorageDefaultQuotaSize { 0 };
-#ifndef QT_NO_OPENGL
     bool useQGLWidgetViewport { false };
-#endif
+    bool useQOpenGLWidgetViewport { false };
     bool printLoadedUrls { false };
     QUrl inspectorUrl;
     quint16 remoteInspectorPort { 0 };
@@ -128,6 +130,7 @@ protected Q_SLOTS:
     void setTouchMocking(bool on);
     void toggleWebView(bool graphicsBased);
     void toggleAcceleratedCompositing(bool toggle);
+    void toggleAccelerated2dCanvas(bool toggle);
     void toggleTiledBackingStore(bool toggle);
     void toggleResizesToContents(bool toggle);
     void toggleWebGL(bool toggle);
@@ -140,6 +143,7 @@ protected Q_SLOTS:
     void toggleInterruptingJavaScriptEnabled(bool enable);
     void toggleJavascriptCanOpenWindows(bool enable);
     void toggleAutoLoadImages(bool enable);
+    void togglePrivateBrowsing(bool enable);
     void setUseDiskCookies(bool enable);
     void clearCookies();
     void togglePlugins(bool enable);
@@ -154,6 +158,7 @@ protected Q_SLOTS:
 #endif
 #ifndef QT_NO_OPENGL
     void toggleQGLWidgetViewport(bool enable);
+    void toggleQOpenGLWidgetViewport(bool enable);
 #endif
 
     void changeViewportUpdateMode(int mode);

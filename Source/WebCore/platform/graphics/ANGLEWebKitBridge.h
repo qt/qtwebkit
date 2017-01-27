@@ -38,6 +38,11 @@
 #include "OpenGLESShims.h"
 #elif PLATFORM(QT)
 #include <qopengl.h>
+
+#ifndef GL_SAMPLER_2D_RECT_ARB
+#define GL_SAMPLER_2D_RECT_ARB            0x8B63
+#endif
+
 #elif PLATFORM(GTK) || PLATFORM(EFL)
 #if USE(OPENGL_ES_2)
 #include <GLES2/gl2.h>

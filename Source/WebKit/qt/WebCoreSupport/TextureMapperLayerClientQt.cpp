@@ -70,9 +70,10 @@ void TextureMapperLayerClientQt::setRootGraphicsLayer(GraphicsLayer* layer)
         m_rootGraphicsLayer->setDrawsContent(false);
         m_rootGraphicsLayer->setMasksToBounds(false);
         m_rootGraphicsLayer->setSize(IntSize(1, 1));
-        if (!m_frame->pageAdapter->client->makeOpenGLContextCurrentIfAvailable())
-            ASSERT_WITH_MESSAGE(false, "TextureMapper::SoftwareMode is not implemented");
-        m_textureMapper = TextureMapper::create();
+        TextureMapper::AccelerationMode mode = TextureMapper::SoftwareMode;
+        if (m_frame->pageAdapter->client->makeOpenGLContextCurrentIfAvailable())
+            mode = TextureMapper::OpenGLMode;
+        m_textureMapper = TextureMapper::create(mode);
         m_rootTextureMapperLayer->setTextureMapper(m_textureMapper.get());
         syncRootLayer();
     } else {
@@ -86,12 +87,13 @@ void TextureMapperLayerClientQt::syncLayers()
     if (m_rootGraphicsLayer)
         syncRootLayer();
 
-    m_frame->frame->view()->flushCompositingStateIncludingSubframes();
+    bool didSync = m_frame->frame->view()->flushCompositingStateIncludingSubframes();
 
     if (!m_rootGraphicsLayer)
         return;
 
-    downcast<GraphicsLayerTextureMapper>(*m_rootGraphicsLayer).updateBackingStoreIncludingSubLayers();
+    if (didSync)
+        downcast<GraphicsLayerTextureMapper>(*m_rootGraphicsLayer).updateBackingStoreIncludingSubLayers();
 
     if (rootLayer()->descendantsOrSelfHaveRunningAnimations() && !m_syncTimer.isActive())
         m_syncTimer.startOneShot(1.0 / 60.0);
@@ -115,7 +117,16 @@ void TextureMapperLayerClientQt::renderCompositedLayers(GraphicsContext& context
 
     m_textureMapper->setTextDrawingMode(context.textDrawingMode());
     QPainter* painter = context.platformContext();
-    const QTransform transform = painter->worldTransform();
+    QTransform transform;
+    if (m_textureMapper->accelerationMode() == TextureMapper::OpenGLMode) {
+        // TextureMapperGL needs to duplicate the entire transform QPainter would do,
+        // including the transforms QPainter would normally do behind the scenes.
+        transform = painter->deviceTransform();
+    } else {
+        // TextureMapperImageBuffer needs a transform that can be used
+        // with QPainter::setWorldTransform.
+        transform = painter->worldTransform();
+    }
     const TransformationMatrix matrix(
         transform.m11(), transform.m12(), 0, transform.m13(),
         transform.m21(), transform.m22(), 0, transform.m23(),
