@@ -120,6 +120,7 @@ public:
     virtual const char* editorCommandForKeyEvent(QKeyEvent*) OVERRIDE;
 
     void updateNavigationActions() OVERRIDE;
+    void clearCustomActions() OVERRIDE;
 
     virtual QObject* inspectorHandle() OVERRIDE;
     virtual void setInspectorFrontend(QObject*) OVERRIDE;
@@ -145,6 +146,7 @@ public:
     void createMainFrame();
 
     void _q_webActionTriggered(bool checked);
+    void _q_customActionTriggered(bool checked);
     void updateAction(QWebPage::WebAction);
     void updateEditorActions();
 
@@ -198,6 +200,7 @@ public:
     bool useFixedLayout;
 
     QAction *actions[QWebPage::WebActionCount];
+    QHash<int, QAction*> customActions;
 
     QPointer <QWindow> window;
     QWidget* inspectorFrontend;
