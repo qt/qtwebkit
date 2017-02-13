@@ -136,6 +136,7 @@ defineTest(finalizeConfigure) {
     !gnu_thin_archives:!win32-msvc2013:!mingw:qtConfig(static) {
         addReasonForSkippingBuild("QtWebKit cannot be built as a static library on this platform. Check your configuration in qtbase/config.summary.")
     }
+    uikit: addReasonForSkippingBuild("QtWebKit is not supported on iOS/tvOS/watchOS")
     winrt: addReasonForSkippingBuild("QtWebKit is not supported on Windows Phone/Windows RT")
     requiredPrograms = gperf python perl bison ruby flex
     for(program, requiredPrograms): \
