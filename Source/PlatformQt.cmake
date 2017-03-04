@@ -1,6 +1,28 @@
+# Minimal debug
+
+# Builds with debug flags result in a huge amount of symbols with the GNU toolchain,
+# resulting in the need of several gigabytes of memory at link-time. Reduce the pressure
+# by compiling any static library like WTF or JSC with optimization flags instead and keep
+# debug symbols for the static libraries that implement API.
+cmake_dependent_option(USE_MINIMAL_DEBUG_INFO "Add debug info only for the libraries that implement API" OFF
+    "NOT MINGW" ON)
+
+if (USE_MINIMAL_DEBUG_INFO)
+    target_compile_options(WTF                PRIVATE -g0 -O1)
+    target_compile_options(JavaScriptCore     PRIVATE -g0 -O1)
+    target_compile_options(WebCore            PRIVATE -g0 -O1)
+    target_compile_options(WebCoreTestSupport PRIVATE -g0 -O1)
+    if (TARGET ANGLESupport)
+        target_compile_options(ANGLESupport   PRIVATE -g0 -O1)
+    endif ()
+    if (TARGET gtest)
+        target_compile_options(gtest          PRIVATE -g0 -O1)
+    endif ()
+endif ()
+
 # GTest
 
-if (ENABLE_API_TESTS)
+if (TARGET gtest)
     set(GTEST_DEFINITIONS QT_NO_KEYWORDS)
     if (COMPILER_IS_GCC_OR_CLANG)
         list(APPEND GTEST_DEFINITIONS "GTEST_API_=__attribute__((visibility(\"default\")))")
@@ -10,17 +32,59 @@ endif ()
 
 # Installation
 
-target_include_directories(WebKit INTERFACE $<INSTALL_INTERFACE:${KDE_INSTALL_INCLUDEDIR}/QtWebKit>)
-target_include_directories(WebKitWidgets INTERFACE $<INSTALL_INTERFACE:${KDE_INSTALL_INCLUDEDIR}/QtWebKitWidgets>)
+target_compile_definitions(WebKit INTERFACE QT_WEBKIT_LIB)
+target_include_directories(WebKit INTERFACE
+    $<INSTALL_INTERFACE:${KDE_INSTALL_INCLUDEDIR}>
+    $<INSTALL_INTERFACE:${KDE_INSTALL_INCLUDEDIR}/QtWebKit>
+)
 
+target_compile_definitions(WebKitWidgets INTERFACE QT_WEBKITWIDGETS_LIB)
+target_include_directories(WebKitWidgets INTERFACE
+    $<INSTALL_INTERFACE:${KDE_INSTALL_INCLUDEDIR}>
+    $<INSTALL_INTERFACE:${KDE_INSTALL_INCLUDEDIR}/QtWebKitWidgets>
+)
+
+set(_package_footer_template "
+####### Expanded from QTWEBKIT_PACKAGE_FOOTER variable #######
+
+set(Qt5@MODULE_NAME@_LIBRARIES Qt5::@MODULE_NAME@)
+set(Qt5@MODULE_NAME@_VERSION_STRING \${Qt5@MODULE_NAME@_VERSION})
+set(Qt5@MODULE_NAME@_EXECUTABLE_COMPILE_FLAGS \"\")
+set(Qt5@MODULE_NAME@_PRIVATE_INCLUDE_DIRS \"\") # FIXME: Support private headers
+
+get_target_property(Qt5@MODULE_NAME@_INCLUDE_DIRS        Qt5::@MODULE_NAME@ INTERFACE_INCLUDE_DIRECTORIES)
+get_target_property(Qt5@MODULE_NAME@_COMPILE_DEFINITIONS Qt5::@MODULE_NAME@ INTERFACE_COMPILE_DEFINITIONS)
+
+foreach (_module_dep \${_Qt5@MODULE_NAME@_MODULE_DEPENDENCIES})
+    list(APPEND Qt5@MODULE_NAME@_INCLUDE_DIRS \${Qt5\${_module_dep}_INCLUDE_DIRS})
+    list(APPEND Qt5@MODULE_NAME@_PRIVATE_INCLUDE_DIRS \${Qt5\${_module_dep}_PRIVATE_INCLUDE_DIRS})
+    list(APPEND Qt5@MODULE_NAME@_DEFINITIONS \${Qt5\${_module_dep}_DEFINITIONS})
+    list(APPEND Qt5@MODULE_NAME@_COMPILE_DEFINITIONS \${Qt5\${_module_dep}_COMPILE_DEFINITIONS})
+    list(APPEND Qt5@MODULE_NAME@_EXECUTABLE_COMPILE_FLAGS \${Qt5\${_module_dep}_EXECUTABLE_COMPILE_FLAGS})
+endforeach ()
+list(REMOVE_DUPLICATES Qt5@MODULE_NAME@_INCLUDE_DIRS)
+list(REMOVE_DUPLICATES Qt5@MODULE_NAME@_PRIVATE_INCLUDE_DIRS)
+list(REMOVE_DUPLICATES Qt5@MODULE_NAME@_DEFINITIONS)
+list(REMOVE_DUPLICATES Qt5@MODULE_NAME@_COMPILE_DEFINITIONS)
+list(REMOVE_DUPLICATES Qt5@MODULE_NAME@_EXECUTABLE_COMPILE_FLAGS)
+")
+
+set(MODULE_NAME WebKit)
+string(CONFIGURE ${_package_footer_template} QTWEBKIT_PACKAGE_FOOTER @ONLY)
 ecm_configure_package_config_file("${CMAKE_CURRENT_SOURCE_DIR}/Qt5WebKitConfig.cmake.in"
     "${CMAKE_CURRENT_BINARY_DIR}/Qt5WebKitConfig.cmake"
     INSTALL_DESTINATION "${KDE_INSTALL_CMAKEPACKAGEDIR}/Qt5WebKit"
 )
+
+set(MODULE_NAME WebKitWidgets)
+string(CONFIGURE ${_package_footer_template} QTWEBKIT_PACKAGE_FOOTER @ONLY)
 ecm_configure_package_config_file("${CMAKE_CURRENT_SOURCE_DIR}/Qt5WebKitWidgetsConfig.cmake.in"
     "${CMAKE_CURRENT_BINARY_DIR}/Qt5WebKitWidgetsConfig.cmake"
     INSTALL_DESTINATION "${KDE_INSTALL_CMAKEPACKAGEDIR}/Qt5WebKitWidgets"
 )
+
+unset(MODULE_NAME)
+unset(QTWEBKIT_PACKAGE_FOOTER)
 
 write_basic_package_version_file("${CMAKE_CURRENT_BINARY_DIR}/Qt5WebKitConfigVersion.cmake"
     VERSION ${PROJECT_VERSION}

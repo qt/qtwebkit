@@ -90,7 +90,9 @@ public:
         MediaSourceEnabled,
         MediaEnabled,
         WebSecurityEnabled,
-        FullScreenSupportEnabled
+        FullScreenSupportEnabled,
+        ImagesEnabled,
+        AllowRunningInsecureContent
     };
     enum WebGraphic {
         MissingImageGraphic,

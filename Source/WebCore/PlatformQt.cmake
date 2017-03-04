@@ -88,7 +88,6 @@ list(APPEND WebCore_SOURCES
     platform/graphics/qt/IntPointQt.cpp
     platform/graphics/qt/IntRectQt.cpp
     platform/graphics/qt/IntSizeQt.cpp
-    platform/graphics/qt/QFramebufferPaintDevice.cpp
     platform/graphics/qt/PathQt.cpp
     platform/graphics/qt/PatternQt.cpp
     platform/graphics/qt/StillImageQt.cpp
@@ -198,6 +197,13 @@ if (ENABLE_NETSCAPE_PLUGIN_API AND WIN32)
     )
 endif ()
 
+if (ENABLE_SMOOTH_SCROLLING)
+    list(APPEND WebCore_SOURCES
+        platform/ScrollAnimationSmooth.cpp
+        platform/ScrollAnimatorSmooth.cpp
+    )
+endif ()
+
 # Do it in the WebCore to support SHARED_CORE since WebKitWidgets won't load WebKit in that case.
 # This should match the opposite statement in WebKit/PlatformQt.cmake
 if (SHARED_CORE)
@@ -265,6 +271,8 @@ if (ENABLE_OPENGL)
         platform/graphics/opengl/Extensions3DOpenGLCommon.cpp
         platform/graphics/opengl/GraphicsContext3DOpenGLCommon.cpp
         platform/graphics/opengl/TemporaryOpenGLSetting.cpp
+
+        platform/graphics/qt/QFramebufferPaintDevice.cpp
     )
 
     if (${Qt5Gui_OPENGL_IMPLEMENTATION} STREQUAL GLESv2)
