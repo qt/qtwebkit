@@ -38,7 +38,7 @@
 
 namespace WebCore {
 
-PassRefPtr<CSSValue> valueForBasicShape(const BasicShape* basicShape)
+PassRefPtr<CSSValue> valueForBasicShape(const RenderStyle* style, const BasicShape* basicShape)
 {
     RefPtr<CSSBasicShape> basicShapeValue;
     switch (basicShape->type()) {
@@ -46,12 +46,12 @@ PassRefPtr<CSSValue> valueForBasicShape(const BasicShape* basicShape)
         const BasicShapeRectangle* rectangle = static_cast<const BasicShapeRectangle*>(basicShape);
         RefPtr<CSSBasicShapeRectangle> rectangleValue = CSSBasicShapeRectangle::create();
 
-        rectangleValue->setX(cssValuePool().createValue(rectangle->x()));
-        rectangleValue->setY(cssValuePool().createValue(rectangle->y()));
-        rectangleValue->setWidth(cssValuePool().createValue(rectangle->width()));
-        rectangleValue->setHeight(cssValuePool().createValue(rectangle->height()));
-        rectangleValue->setRadiusX(cssValuePool().createValue(rectangle->cornerRadiusX()));
-        rectangleValue->setRadiusY(cssValuePool().createValue(rectangle->cornerRadiusY()));
+        rectangleValue->setX(cssValuePool().createValue(rectangle->x(), style));
+        rectangleValue->setY(cssValuePool().createValue(rectangle->y(), style));
+        rectangleValue->setWidth(cssValuePool().createValue(rectangle->width(), style));
+        rectangleValue->setHeight(cssValuePool().createValue(rectangle->height(), style));
+        rectangleValue->setRadiusX(cssValuePool().createValue(rectangle->cornerRadiusX(), style));
+        rectangleValue->setRadiusY(cssValuePool().createValue(rectangle->cornerRadiusY(), style));
 
         basicShapeValue = rectangleValue.release();
         break;
@@ -60,9 +60,9 @@ PassRefPtr<CSSValue> valueForBasicShape(const BasicShape* basicShape)
         const BasicShapeCircle* circle = static_cast<const BasicShapeCircle*>(basicShape);
         RefPtr<CSSBasicShapeCircle> circleValue = CSSBasicShapeCircle::create();
 
-        circleValue->setCenterX(cssValuePool().createValue(circle->centerX()));
-        circleValue->setCenterY(cssValuePool().createValue(circle->centerY()));
-        circleValue->setRadius(cssValuePool().createValue(circle->radius()));
+        circleValue->setCenterX(cssValuePool().createValue(circle->centerX(), style));
+        circleValue->setCenterY(cssValuePool().createValue(circle->centerY(), style));
+        circleValue->setRadius(cssValuePool().createValue(circle->radius(), style));
 
         basicShapeValue = circleValue.release();
         break;
@@ -71,10 +71,10 @@ PassRefPtr<CSSValue> valueForBasicShape(const BasicShape* basicShape)
         const BasicShapeEllipse* ellipse = static_cast<const BasicShapeEllipse*>(basicShape);
         RefPtr<CSSBasicShapeEllipse> ellipseValue = CSSBasicShapeEllipse::create();
 
-        ellipseValue->setCenterX(cssValuePool().createValue(ellipse->centerX()));
-        ellipseValue->setCenterY(cssValuePool().createValue(ellipse->centerY()));
-        ellipseValue->setRadiusX(cssValuePool().createValue(ellipse->radiusX()));
-        ellipseValue->setRadiusY(cssValuePool().createValue(ellipse->radiusY()));
+        ellipseValue->setCenterX(cssValuePool().createValue(ellipse->centerX(), style));
+        ellipseValue->setCenterY(cssValuePool().createValue(ellipse->centerY(), style));
+        ellipseValue->setRadiusX(cssValuePool().createValue(ellipse->radiusX(), style));
+        ellipseValue->setRadiusY(cssValuePool().createValue(ellipse->radiusY(), style));
 
         basicShapeValue = ellipseValue.release();
         break;
@@ -86,7 +86,7 @@ PassRefPtr<CSSValue> valueForBasicShape(const BasicShape* basicShape)
         polygonValue->setWindRule(polygon->windRule());
         const Vector<Length>& values = polygon->values();
         for (unsigned i = 0; i < values.size(); i += 2)
-            polygonValue->appendPoint(cssValuePool().createValue(values.at(i)), cssValuePool().createValue(values.at(i + 1)));
+            polygonValue->appendPoint(cssValuePool().createValue(values.at(i), style), cssValuePool().createValue(values.at(i + 1), style));
 
         basicShapeValue = polygonValue.release();
         break;
@@ -95,12 +95,12 @@ PassRefPtr<CSSValue> valueForBasicShape(const BasicShape* basicShape)
         const BasicShapeInsetRectangle* rectangle = static_cast<const BasicShapeInsetRectangle*>(basicShape);
         RefPtr<CSSBasicShapeInsetRectangle> rectangleValue = CSSBasicShapeInsetRectangle::create();
 
-        rectangleValue->setTop(cssValuePool().createValue(rectangle->top()));
-        rectangleValue->setRight(cssValuePool().createValue(rectangle->right()));
-        rectangleValue->setBottom(cssValuePool().createValue(rectangle->bottom()));
-        rectangleValue->setLeft(cssValuePool().createValue(rectangle->left()));
-        rectangleValue->setRadiusX(cssValuePool().createValue(rectangle->cornerRadiusX()));
-        rectangleValue->setRadiusY(cssValuePool().createValue(rectangle->cornerRadiusY()));
+        rectangleValue->setTop(cssValuePool().createValue(rectangle->top(), style));
+        rectangleValue->setRight(cssValuePool().createValue(rectangle->right(), style));
+        rectangleValue->setBottom(cssValuePool().createValue(rectangle->bottom(), style));
+        rectangleValue->setLeft(cssValuePool().createValue(rectangle->left(), style));
+        rectangleValue->setRadiusX(cssValuePool().createValue(rectangle->cornerRadiusX(), style));
+        rectangleValue->setRadiusY(cssValuePool().createValue(rectangle->cornerRadiusY(), style));
 
         basicShapeValue = rectangleValue.release();
         break;
@@ -113,7 +113,7 @@ PassRefPtr<CSSValue> valueForBasicShape(const BasicShape* basicShape)
 
 static Length convertToLength(const RenderStyle* style, const RenderStyle* rootStyle, CSSPrimitiveValue* value)
 {
-    return value->convertToLength<FixedIntegerConversion | FixedFloatConversion | PercentConversion | ViewportPercentageConversion>(style, rootStyle, style->effectiveZoom());
+    return value->convertToLength<FixedIntegerConversion | FixedFloatConversion | PercentConversion | CalculatedConversion | ViewportPercentageConversion>(style, rootStyle, style->effectiveZoom());
 }
 
 PassRefPtr<BasicShape> basicShapeForValue(const RenderStyle* style, const RenderStyle* rootStyle, const CSSBasicShape* basicShapeValue)

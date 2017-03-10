@@ -238,6 +238,8 @@ QWebPagePrivate::~QWebPagePrivate()
     // in order for various destruction callbacks out of WebCore to
     // work.
     deletePage();
+
+    clearCustomActions();
 }
 
 void QWebPagePrivate::show()
@@ -499,8 +501,15 @@ QMenu *createContextMenu(QWebPage* page, const QList<MenuItem>& items, QBitArray
         const MenuItem &item = items.at(i);
         switch (item.type) {
         case MenuItem::Action: {
-            QWebPage::WebAction action = webActionForAdapterMenuAction(item.action);
-            QAction *a = page->action(action);
+            QAction* a = nullptr;
+            if (item.action < QWebPageAdapter::ActionCount) {
+                QWebPage::WebAction action = webActionForAdapterMenuAction(static_cast<QWebPageAdapter::MenuAction>(item.action));
+                a = page->action(action);
+                if (a)
+                    visitedWebActions->setBit(action);
+            } else {
+                a = page->customAction(item.action);
+            }
             if (a) {
                 a->setText(item.title);
                 a->setEnabled(item.traits & MenuItem::Enabled);
@@ -508,7 +517,6 @@ QMenu *createContextMenu(QWebPage* page, const QList<MenuItem>& items, QBitArray
                 a->setChecked(item.traits & MenuItem::Checked);
 
                 menu->addAction(a);
-                visitedWebActions->setBit(action);
             }
             break;
         }
@@ -561,6 +569,16 @@ void QWebPagePrivate::_q_webActionTriggered(bool checked)
         return;
     QWebPage::WebAction action = static_cast<QWebPage::WebAction>(a->data().toInt());
     q->triggerAction(action, checked);
+}
+
+void QWebPagePrivate::_q_customActionTriggered(bool checked)
+{
+    Q_UNUSED(checked);
+    QAction* a = qobject_cast<QAction*>(q->sender());
+    if (!a)
+        return;
+    int action = a->data().toInt();
+    triggerCustomAction(action, a->text());
 }
 #endif // QT_NO_ACTION
 
@@ -623,6 +641,12 @@ void QWebPagePrivate::updateNavigationActions()
     updateAction(QWebPage::Stop);
     updateAction(QWebPage::Reload);
     updateAction(QWebPage::ReloadAndBypassCache);
+}
+
+void QWebPagePrivate::clearCustomActions()
+{
+    qDeleteAll(customActions);
+    customActions.clear();
 }
 
 QObject *QWebPagePrivate::inspectorHandle()
@@ -2507,6 +2531,21 @@ QAction *QWebPage::action(WebAction action) const
 
     d->actions[action] = a;
     d->updateAction(action);
+    return a;
+}
+
+QAction* QWebPage::customAction(int action) const
+{
+    auto actionIter = d->customActions.constFind(action);
+    if (actionIter != d->customActions.constEnd())
+        return *actionIter;
+
+    QAction* a = new QAction(d->q);
+    a->setData(action);
+    connect(a, SIGNAL(triggered(bool)),
+        this, SLOT(_q_customActionTriggered(bool)));
+
+    d->customActions.insert(action, a);
     return a;
 }
 #endif // QT_NO_ACTION

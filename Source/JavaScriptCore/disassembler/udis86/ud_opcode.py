@@ -115,9 +115,9 @@ class UdOpcodeTables:
             '/mod'   : lambda v: '00' if v == '!11' else '01',
             # Mode extensions:
             # (16, 32, 64) => (00, 01, 02)
-            '/o'     : lambda v: "%02x" % (int(v) / 32),
-            '/a'     : lambda v: "%02x" % (int(v) / 32),
-            '/m'     : lambda v: "%02x" % (int(v) / 32),
+            '/o'     : lambda v: "%02x" % (int(v) // 32),
+            '/a'     : lambda v: "%02x" % (int(v) // 32),
+            '/m'     : lambda v: "%02x" % (int(v) // 32),
             '/sse'   : lambda v: UdOpcodeTables.OpcExtIndex['sse'][v]
         }
 
