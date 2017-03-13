@@ -48,6 +48,7 @@ WindowOptions windowOptions;
 #include <QFile>
 #include <QFileInfo>
 #include <QFontDatabase>
+#include <QRegExp>
 
 int launcherMain(const QApplication& app)
 {
