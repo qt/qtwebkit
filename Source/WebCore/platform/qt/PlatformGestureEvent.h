@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2015 Igalia S.L.
- * Copyright (C) 2006 Apple Inc.  All rights reserved.
+ * Copyright (C) 2011 Apple Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -11,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -24,45 +23,38 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef MainThreadSharedTimer_h
-#define MainThreadSharedTimer_h
+#ifndef PlatformGestureEvent_h
+#define PlatformGestureEvent_h
 
-#include "SharedTimer.h"
-#include <wtf/NeverDestroyed.h>
+#if ENABLE(QT_GESTURE_EVENTS)
 
-#if PLATFORM(GTK)
-#include <wtf/RunLoop.h>
-#endif
+#include "FloatPoint.h"
+#include "IntPoint.h"
+#include "IntSize.h"
+#include "PlatformEvent.h"
 
 namespace WebCore {
 
-class MainThreadSharedTimer final : public SharedTimer {
-    friend class WTF::NeverDestroyed<MainThreadSharedTimer>;
+class PlatformGestureEvent : public PlatformEvent {
 public:
-    static MainThreadSharedTimer& singleton();
+    PlatformGestureEvent()
+        : PlatformEvent(PlatformEvent::GestureTap)
+    {
+    }
 
-    void setFiredFunction(std::function<void()>&&) override;
-    void setFireInterval(double) override;
-    void stop() override;
-    void invalidate() override;
+    const IntPoint& position() const { return m_position; } // PlatformWindow coordinates.
+    const IntPoint& globalPosition() const { return m_globalPosition; } // Screen coordinates.
 
-    // FIXME: This should be private, but CF and Windows implementations
-    // need to call this from non-member functions at the moment.
-    void fired();
+    const IntSize& area() const { return m_area; }
 
-#if PLATFORM(QT)
-    bool hasFiredFunction() const { return bool(m_firedFunction); }
-#endif
-
-private:
-    MainThreadSharedTimer();
-
-    std::function<void()> m_firedFunction;
-#if PLATFORM(GTK)
-    RunLoop::Timer<MainThreadSharedTimer> m_timer;
-#endif
+protected:
+    IntPoint m_position;
+    IntPoint m_globalPosition;
+    IntSize m_area;
 };
 
 } // namespace WebCore
 
-#endif // MainThreadSharedTimer
+#endif // ENABLE(QT_GESTURE_EVENTS)
+
+#endif // PlatformGestureEvent_h

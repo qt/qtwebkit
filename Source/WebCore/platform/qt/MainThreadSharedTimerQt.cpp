@@ -33,7 +33,6 @@
 
 #include <QBasicTimer>
 #include <QCoreApplication>
-#include <QDebug>
 #include <QPointer>
 #include <wtf/CurrentTime.h>
 
@@ -104,7 +103,8 @@ void SharedTimerQt::timerEvent(QTimerEvent* ev)
         return;
 
     m_timer.stop();
-    MainThreadSharedTimer::singleton().fired();
+    if (MainThreadSharedTimer::singleton().hasFiredFunction())
+        MainThreadSharedTimer::singleton().fired();
 }
 
 void MainThreadSharedTimer::setFireInterval(double interval)

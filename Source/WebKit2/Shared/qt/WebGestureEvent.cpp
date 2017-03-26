@@ -1,7 +1,5 @@
 /*
- * Copyright (C) 2011 Samsung Electronics
- * Copyright (C) 2012 Nokia Corporation and/or its subsidiary(-ies)
- * Copyright (C) 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2011 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,17 +24,53 @@
  */
 
 #include "config.h"
-#include "Logging.h"
+#include "WebEvent.h"
+
+#if ENABLE(QT_GESTURE_EVENTS)
+
+#include "Arguments.h"
+#include "WebCoreArgumentCoders.h"
+
+using namespace WebCore;
 
 namespace WebKit {
 
-#if !LOG_DISABLED
-
-String logLevelString()
+WebGestureEvent::WebGestureEvent(Type type, const IntPoint& position, const IntPoint& globalPosition, Modifiers modifiers, double timestamp, const IntSize& area/*, const FloatPoint& delta*/)
+    : WebEvent(type, modifiers, timestamp)
+    , m_position(position)
+    , m_globalPosition(globalPosition)
+    , m_area(area)
 {
-    return QString::fromLocal8Bit(qgetenv("QT_WEBKIT_LOG"));
+    ASSERT(isGestureEventType(type));
 }
 
-#endif // !LOG_DISABLED
+void WebGestureEvent::encode(IPC::ArgumentEncoder& encoder) const
+{
+    WebEvent::encode(encoder);
 
+    encoder << m_position;
+    encoder << m_globalPosition;
+    encoder << m_area;
 }
+
+bool WebGestureEvent::decode(IPC::ArgumentDecoder& decoder, WebGestureEvent& t)
+{
+    if (!WebEvent::decode(decoder, t))
+        return false;
+    if (!decoder.decode(t.m_position))
+        return false;
+    if (!decoder.decode(t.m_globalPosition))
+        return false;
+    if (!decoder.decode(t.m_area))
+        return false;
+    return true;
+}
+
+bool WebGestureEvent::isGestureEventType(Type type)
+{
+    return type == GestureSingleTap;
+}
+
+} // namespace WebKit
+
+#endif // ENABLE(QT_GESTURE_EVENTS)

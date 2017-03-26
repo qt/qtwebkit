@@ -31,6 +31,7 @@
 #include "QtFallbackWebPopup.h"
 #include "QtPlatformPlugin.h"
 #include "UndoStepQt.h"
+#include "WebEventConversion.h"
 
 #include "qwebframe.h"
 #include "qwebframe_p.h"
@@ -48,7 +49,6 @@
 #include <QBitArray>
 #include <QClipboard>
 #include <QColorDialog>
-#include <QDebug>
 #include <QDesktopWidget>
 #include <QDragEnterEvent>
 #include <QDragLeaveEvent>
@@ -976,7 +976,7 @@ bool QWebPagePrivate::gestureEvent(QGestureEvent* event)
         return false;
     // QGestureEvents can contain updates for multiple gestures.
     bool handled = false;
-#if ENABLE(GESTURE_EVENTS)
+#if ENABLE(QT_GESTURE_EVENTS)
     // QGestureEvent lives in Widgets, we'll need a dummy struct to mule the info it contains to the "other side"
     QGestureEventFacade gestureFacade;
 
@@ -1000,7 +1000,7 @@ bool QWebPagePrivate::gestureEvent(QGestureEvent* event)
         frame->handleGestureEvent(&gestureFacade);
         handled = true;
     }
-#endif // ENABLE(GESTURE_EVENTS)
+#endif // ENABLE(QT_GESTURE_EVENTS)
 
     event->setAccepted(handled);
     return handled;
@@ -3064,7 +3064,7 @@ bool QWebPage::extension(Extension extension, const ExtensionOption *option, Ext
     if (extension == ChooseMultipleFilesExtension) {
         // FIXME: do not ignore suggestedFiles
         QStringList suggestedFiles = static_cast<const ChooseMultipleFilesExtensionOption*>(option)->suggestedFileNames;
-        QStringList names = QFileDialog::getOpenFileNames(view(), QString::null);
+        QStringList names = QFileDialog::getOpenFileNames(view(), QString());
         static_cast<ChooseMultipleFilesExtensionReturn*>(output)->fileNames = names;
         return true;
     }
@@ -3139,9 +3139,9 @@ QString QWebPage::chooseFile(QWebFrame *parentFrame, const QString& suggestedFil
 {
     Q_UNUSED(parentFrame);
 #ifndef QT_NO_FILEDIALOG
-    return QFileDialog::getOpenFileName(view(), QString::null, suggestedFile);
+    return QFileDialog::getOpenFileName(view(), QString(), suggestedFile);
 #else
-    return QString::null;
+    return QString();
 #endif
 }
 
