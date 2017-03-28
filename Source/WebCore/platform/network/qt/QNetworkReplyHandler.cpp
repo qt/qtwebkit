@@ -395,12 +395,16 @@ void QNetworkReplyWrapper::replyDestroyed()
 void QNetworkReplyWrapper::emitMetaDataChanged()
 {
     QueueLocker lock(m_queue);
-    m_queue->push(&QNetworkReplyHandler::sendResponseIfNeeded);
 
     if (m_reply->bytesAvailable()) {
         m_responseContainsData = true;
         m_queue->push(&QNetworkReplyHandler::forwardData);
     }
+
+    // In case if m_reply is about local file and sendResponseIfNeeded has been applied before forwardData (or whatever),
+    // all subsequent calls in queue will never be called (e.g. and no data will be read)
+    // due to m_queue is cleared within destruction of current QNetworkReplyWrapper object.
+    m_queue->push(&QNetworkReplyHandler::sendResponseIfNeeded);
 
     if (isFinished()) {
         m_queue->push(&QNetworkReplyHandler::finish);

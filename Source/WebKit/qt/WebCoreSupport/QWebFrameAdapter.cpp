@@ -378,15 +378,19 @@ QUrl QWebFrameAdapter::ensureAbsoluteUrl(const QUrl& url)
     if (!validatedUrl.isValid() || !validatedUrl.isRelative())
         return validatedUrl;
 
+    // Since validatedUrl is not relative url (no schema provided)
+    // we are working with file context and need to explicitly specify this.
+    // Otherwise toLocalFile() will return empty string
+    // due to it requires url as local file (i.e. with "file" schema).
+    validatedUrl.setScheme("file");
+
     // This contains the URL with absolute path but without
     // the query and the fragment part.
     QUrl baseUrl = QUrl::fromLocalFile(QFileInfo(validatedUrl.toLocalFile()).absoluteFilePath());
+    baseUrl.setFragment(validatedUrl.fragment());
+    baseUrl.setQuery(validatedUrl.query());
 
-    // The path is removed so the query and the fragment parts are there.
-    QString pathRemoved = validatedUrl.toString(QUrl::RemovePath);
-    QUrl toResolve(pathRemoved);
-
-    return baseUrl.resolved(toResolve);
+    return baseUrl;
 }
 
 QWebHitTestResultPrivate* QWebFrameAdapter::hitTestContent(const QPoint& pos) const
