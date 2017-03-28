@@ -691,7 +691,7 @@ void Interpreter::addStackTraceIfNecessary(CallFrame* callFrame, JSValue error)
             builder.append('\n');
     }
 
-    errorObject->putDirect(*vm, vm->propertyNames->stack, jsString(vm, builder.toString()), ReadOnly | DontDelete);
+    errorObject->putDirect(*vm, vm->propertyNames->stack, jsString(vm, builder.toString()), DontDelete);
 }
 
 NEVER_INLINE HandlerInfo* Interpreter::throwException(CallFrame*& callFrame, JSValue& exceptionValue, unsigned bytecodeOffset)
