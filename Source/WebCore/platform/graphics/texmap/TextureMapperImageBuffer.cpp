@@ -67,6 +67,15 @@ void TextureMapperImageBuffer::beginClip(const TransformationMatrix& matrix, con
 #endif
 }
 
+void TextureMapperImageBuffer::endClip()
+{
+    GraphicsContext* context = currentContext();
+    if (!context)
+        return;
+
+    context->restore();
+}
+
 void TextureMapperImageBuffer::drawTexture(const BitmapTexture& texture, const FloatRect& targetRect, const TransformationMatrix& matrix, float opacity, unsigned /* exposedEdges */)
 {
     GraphicsContext* context = currentContext();
@@ -115,9 +124,10 @@ void TextureMapperImageBuffer::drawNumber(int /* number */, const Color&, const 
     notImplemented();
 }
 
-PassRefPtr<BitmapTexture> BitmapTextureImageBuffer::applyFilters(TextureMapper&, const FilterOperations&)
+PassRefPtr<BitmapTexture> BitmapTextureImageBuffer::applyFilters(TextureMapper&, const FilterOperations& filters)
 {
-    ASSERT_NOT_REACHED();
+    ASSERT_UNUSED(filters, filters.isEmpty());
+
     return this;
 }
 
