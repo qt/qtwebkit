@@ -67,6 +67,12 @@ if (WIN32)
     set(CMAKE_SHARED_MODULE_PREFIX "")
 endif ()
 
+if (APPLE)
+    if (${CMAKE_BUILD_TYPE} MATCHES "Debug")
+        set(CMAKE_DEBUG_POSTFIX _debug)
+    endif ()
+endif ()
+
 WEBKIT_OPTION_BEGIN()
 
 if (APPLE)
@@ -679,7 +685,9 @@ if (MSVC)
         endforeach ()
     endif ()
 
-    set(ICU_LIBRARIES icuuc${CMAKE_DEBUG_POSTFIX} icuin${CMAKE_DEBUG_POSTFIX} icudt${CMAKE_DEBUG_POSTFIX})
+    if (NOT QT_CONAN_DIR)
+        set(ICU_LIBRARIES icuuc${CMAKE_DEBUG_POSTFIX} icuin${CMAKE_DEBUG_POSTFIX} icudt${CMAKE_DEBUG_POSTFIX})
+    endif ()
 endif ()
 
 if (NOT RUBY_FOUND AND RUBY_EXECUTABLE AND NOT RUBY_VERSION VERSION_LESS 1.9)
@@ -706,3 +714,8 @@ include(KDEInstallDirs)
 if (NOT qt_install_prefix_dir STREQUAL "${CMAKE_INSTALL_PREFIX}")
     set(KDE_INSTALL_USE_QT_SYS_PATHS OFF)
 endif ()
+
+# We split all installed files into 2 components: Code and Data. This is different from
+# traditional approach with Runtime and Devel, but we need it to fix concurrent installation of
+# debug and release builds in qmake-based build
+set(CMAKE_INSTALL_DEFAULT_COMPONENT_NAME "Code")

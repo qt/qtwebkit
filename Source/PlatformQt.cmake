@@ -5,9 +5,9 @@
 # by compiling any static library like WTF or JSC with optimization flags instead and keep
 # debug symbols for the static libraries that implement API.
 cmake_dependent_option(USE_MINIMAL_DEBUG_INFO "Add debug info only for the libraries that implement API" OFF
-    "NOT MINGW" ON)
+    "NOT MINGW;NOT APPLE" ON)
 
-if (USE_MINIMAL_DEBUG_INFO)
+if (USE_MINIMAL_DEBUG_INFO AND CMAKE_BUILD_TYPE STREQUAL "Debug")
     target_compile_options(WTF                PRIVATE -g0 -O1)
     target_compile_options(JavaScriptCore     PRIVATE -g0 -O1)
     target_compile_options(WebCore            PRIVATE -g0 -O1)
@@ -97,22 +97,26 @@ install(FILES
     "${CMAKE_CURRENT_BINARY_DIR}/Qt5WebKitConfig.cmake"
     "${CMAKE_CURRENT_BINARY_DIR}/Qt5WebKitConfigVersion.cmake"
     DESTINATION "${KDE_INSTALL_CMAKEPACKAGEDIR}/Qt5WebKit"
+    COMPONENT Data
 )
 install(FILES
     "${CMAKE_CURRENT_BINARY_DIR}/Qt5WebKitWidgetsConfig.cmake"
     "${CMAKE_CURRENT_BINARY_DIR}/Qt5WebKitWidgetsConfigVersion.cmake"
     DESTINATION "${KDE_INSTALL_CMAKEPACKAGEDIR}/Qt5WebKitWidgets"
+    COMPONENT Data
 )
 
 install(EXPORT WebKitTargets
     FILE WebKitTargets.cmake
     NAMESPACE Qt5::
     DESTINATION "${KDE_INSTALL_CMAKEPACKAGEDIR}/Qt5WebKit"
+    COMPONENT Data
 )
 install(EXPORT Qt5WebKitWidgetsTargets
     FILE Qt5WebKitWidgetsTargets.cmake
     NAMESPACE Qt5::
     DESTINATION "${KDE_INSTALL_CMAKEPACKAGEDIR}/Qt5WebKitWidgets"
+    COMPONENT Data
 )
 
 # Documentation
@@ -191,8 +195,8 @@ add_custom_target(docs)
 add_dependencies(docs qch_docs)
 
 if (GENERATE_DOCUMENTATION)
-    install(DIRECTORY "${DOC_OUTPUT_DIR}/qtwebkit" DESTINATION ${DOC_INSTALL_DIR})
-    install(FILES "${DOC_OUTPUT_DIR}/qtwebkit.qch" DESTINATION ${DOC_INSTALL_DIR})
+    install(DIRECTORY "${DOC_OUTPUT_DIR}/qtwebkit" DESTINATION ${DOC_INSTALL_DIR} COMPONENT Data)
+    install(FILES "${DOC_OUTPUT_DIR}/qtwebkit.qch" DESTINATION ${DOC_INSTALL_DIR} COMPONENT Data)
 endif ()
 
 # Uninstall target
