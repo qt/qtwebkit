@@ -50,7 +50,7 @@ if (MSVC)
     endif ()
 endif ()
 
-set(WebKit_PRIVATE_HEADERS_LOCATION Headers/${PROJECT_VERSION}/QtWebKit/Private)
+set(WebKit_PRIVATE_HEADERS_LOCATION Headers/${PROJECT_VERSION}/QtWebKit/private)
 
 WEBKIT_FRAMEWORK(WebKit)
 
@@ -66,6 +66,13 @@ if (${PORT} STREQUAL "Qt")
 
     if (NOT MSVC)
         ADD_PREFIX_HEADER(WebKit "${WEBKIT_DIR}/qt/WebKitPrefix.h")
+    endif ()
+
+    if (MACOS_BUILD_FRAMEWORKS)
+        set_target_properties(WebKit PROPERTIES
+            FRAMEWORK_VERSION 5
+            MACOSX_FRAMEWORK_IDENTIFIER org.qt-project.QtWebKit
+        )
     endif ()
 endif ()
 
