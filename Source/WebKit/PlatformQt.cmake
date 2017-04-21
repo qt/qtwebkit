@@ -392,17 +392,38 @@ install(
 
 set(WEBKIT_PKGCONGIG_DEPS "Qt5Core Qt5Gui Qt5Network")
 set(WEBKIT_PRI_DEPS "core gui network")
-set(WEBKIT_PRI_RUNTIME_DEPS "sensors positioning qml quick webchannel core_private gui_private")
 set(WEBKIT_PRI_EXTRA_LIBS "")
-set(WEBKITWIDGETS_PKGCONGIG_DEPS "Qt5Core Qt5Gui Qt5Network Qt5Widgets Qt5WebKit")
-set(WEBKITWIDGETS_PRI_DEPS "core gui network widgets webkit")
-set(WEBKITWIDGETS_PRI_RUNTIME_DEPS "sensors positioning widgets_private opengl sql core_private gui_private")
+set(WEBKIT_PRI_RUNTIME_DEPS "core_private gui_private")
+
+if (QT_WEBCHANNEL)
+    set(WEBKIT_PRI_RUNTIME_DEPS "webchannel ${WEBKIT_PRI_RUNTIME_DEPS}")
+endif ()
+if (ENABLE_WEBKIT2)
+    set(WEBKIT_PRI_RUNTIME_DEPS "qml quick ${WEBKIT_PRI_RUNTIME_DEPS}")
+endif ()
+if (ENABLE_GEOLOCATION)
+    set(WEBKIT_PRI_RUNTIME_DEPS "positioning ${WEBKIT_PRI_RUNTIME_DEPS}")
+endif ()
+if (ENABLE_DEVICE_ORIENTATION)
+    set(WEBKIT_PRI_RUNTIME_DEPS "sensors ${WEBKIT_PRI_RUNTIME_DEPS}")
+endif ()
+
+set(WEBKITWIDGETS_PKGCONGIG_DEPS "${WEBKIT_PKGCONGIG_DEPS} Qt5Widgets Qt5WebKit")
+set(WEBKITWIDGETS_PRI_DEPS "${WEBKIT_PRI_DEPS} widgets webkit")
+set(WEBKITWIDGETS_PRI_RUNTIME_DEPS "${WEBKIT_PRI_RUNTIME_DEPS} widgets_private")
+
+if (Qt5OpenGL_FOUND)
+    set(WEBKITWIDGETS_PRI_RUNTIME_DEPS "${WEBKITWIDGETS_PRI_RUNTIME_DEPS} opengl")
+endif ()
+
+if (ENABLE_PRINT_SUPPORT)
+    set(WEBKITWIDGETS_PRI_RUNTIME_DEPS "${WEBKITWIDGETS_PRI_RUNTIME_DEPS} printsupport")
+endif ()
+
 if (QT_STATIC_BUILD)
     if (MSVC)
         set(LIB_PREFIX "lib")
     endif ()
-    set(WEBKIT_PKGCONGIG_DEPS "${WEBKIT_PKGCONGIG_DEPS} Qt5Sql")
-    set(WEBKIT_PRI_DEPS "${WEBKIT_PRI_DEPS} sql")
     set(WEBKITWIDGETS_PKGCONGIG_DEPS "${WEBKITWIDGETS_PKGCONGIG_DEPS} Qt5PrintSupport")
     set(WEBKITWIDGETS_PRI_DEPS "${WEBKITWIDGETS_PRI_DEPS} printsupport")
     set(EXTRA_LIBS_NAMES WebCore JavaScriptCore WTF xml2)
@@ -428,9 +449,6 @@ if (QT_STATIC_BUILD)
         set(WEBKIT_PKGCONGIG_DEPS "${WEBKIT_PKGCONGIG_DEPS} ${LIB_PREFIX}${LIB_NAME}")
         set(WEBKIT_PRI_EXTRA_LIBS "${WEBKIT_PRI_EXTRA_LIBS} -l${LIB_PREFIX}${LIB_NAME}")
     endforeach ()
-else ()
-    set(WEBKIT_PRI_RUNTIME_DEPS "${WEBKIT_PRI_RUNTIME_DEPS} sql")
-    set(WEBKITWIDGETS_PRI_RUNTIME_DEPS "${WEBKITWIDGETS_PRI_RUNTIME_DEPS} printsupport")
 endif ()
 
 if (NOT MACOS_BUILD_FRAMEWORKS)
@@ -445,12 +463,13 @@ endif ()
 
 if (KDE_INSTALL_USE_QT_SYS_PATHS)
     set(WebKit_PRI_ARGUMENTS
+        BIN_INSTALL_DIR "$$QT_MODULE_BIN_BASE"
         LIB_INSTALL_DIR "$$QT_MODULE_LIB_BASE"
     )
     if (MACOS_BUILD_FRAMEWORKS)
         list(APPEND WebKit_PRI_ARGUMENTS
             INCLUDE_INSTALL_DIR "$$QT_MODULE_LIB_BASE/QtWebKit.framework/Headers"
-            MODULE_CONFIG "v2 lib_bundle"
+            MODULE_CONFIG "lib_bundle"
         )
     else ()
         list(APPEND WebKit_PRI_ARGUMENTS
@@ -465,7 +484,7 @@ else ()
     if (MACOS_BUILD_FRAMEWORKS)
         list(APPEND WebKit_PRI_ARGUMENTS
             INCLUDE_INSTALL_DIR "${LIB_INSTALL_DIR}/QtWebKit.framework/Headers"
-            MODULE_CONFIG "v2 lib_bundle"
+            MODULE_CONFIG "lib_bundle"
         )
     else ()
         list(APPEND WebKit_PRI_ARGUMENTS
@@ -483,6 +502,7 @@ endif ()
 
 ecm_generate_pri_file(
     BASE_NAME webkit
+    NAME QtWebKit
     LIB_NAME ${WebKit_OUTPUT_NAME}
     INCLUDE_INSTALL_DIR "${KDE_INSTALL_INCLUDEDIR}/QtWebKit"
     DEPS "${WEBKIT_PRI_DEPS}"
@@ -633,12 +653,13 @@ endif ()
 
 if (KDE_INSTALL_USE_QT_SYS_PATHS)
     set(WebKitWidgets_PRI_ARGUMENTS
+        BIN_INSTALL_DIR "$$QT_MODULE_BIN_BASE"
         LIB_INSTALL_DIR "$$QT_MODULE_LIB_BASE"
     )
     if (MACOS_BUILD_FRAMEWORKS)
         list(APPEND WebKitWidgets_PRI_ARGUMENTS
             INCLUDE_INSTALL_DIR "$$QT_MODULE_LIB_BASE/QtWebKitWidgets.framework/Headers"
-            MODULE_CONFIG "v2 lib_bundle"
+            MODULE_CONFIG "lib_bundle"
         )
     else ()
         list(APPEND WebKitWidgets_PRI_ARGUMENTS
@@ -653,7 +674,7 @@ else ()
     if (MACOS_BUILD_FRAMEWORKS)
         list(APPEND WebKitWidgets_PRI_ARGUMENTS
             INCLUDE_INSTALL_DIR "${LIB_INSTALL_DIR}/QtWebKitWidgets.framework/Headers"
-            MODULE_CONFIG "v2 lib_bundle"
+            MODULE_CONFIG "lib_bundle"
         )
     else ()
         list(APPEND WebKitWidgets_PRI_ARGUMENTS
@@ -671,6 +692,7 @@ endif ()
 
 ecm_generate_pri_file(
     BASE_NAME webkitwidgets
+    NAME QtWebKitWidgets
     LIB_NAME ${WebKitWidgets_OUTPUT_NAME}
     INCLUDE_INSTALL_DIR "${KDE_INSTALL_INCLUDEDIR}/QtWebKitWidgets"
     DEPS "${WEBKITWIDGETS_PRI_DEPS}"

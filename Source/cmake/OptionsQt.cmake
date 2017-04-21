@@ -1,6 +1,5 @@
 include(FeatureSummary)
 include(ECMPackageConfigHelpers)
-include(ECMQueryQmake)
 
 set(ECM_MODULE_DIR ${CMAKE_MODULE_PATH})
 
@@ -57,6 +56,15 @@ set(PROJECT_VERSION_STRING "${PROJECT_VERSION}")
 set(CMAKE_MACOSX_RPATH ON)
 
 add_definitions(-DBUILDING_QT__=1)
+add_definitions(-DQT_NO_EXCEPTIONS)
+add_definitions(-DQT_USE_QSTRINGBUILDER)
+add_definitions(-DQT_NO_CAST_TO_ASCII -DQT_ASCII_CAST_WARNINGS)
+add_definitions(-DQT_DEPRECATED_WARNINGS -DQT_DISABLE_DEPRECATED_BEFORE=0x050000)
+
+# We use -fno-rtti with GCC and Clang, see OptionsCommon.cmake
+if (COMPILER_IS_GCC_OR_CLANG)
+    add_definitions(-DQT_NO_DYNAMIC_CAST)
+endif ()
 
 if (WIN32)
     if (${CMAKE_BUILD_TYPE} MATCHES "Debug")
@@ -368,7 +376,7 @@ if (WEBP_FOUND)
 endif ()
 
 set(REQUIRED_QT_VERSION 5.2.0)
-set(QT_REQUIRED_COMPONENTS Core Gui Network Sql)
+set(QT_REQUIRED_COMPONENTS Core Gui Network)
 
 # FIXME: Allow building w/o these components
 list(APPEND QT_REQUIRED_COMPONENTS
@@ -446,7 +454,7 @@ set(CMAKE_AUTOMOC ON)
 if (COMPILER_IS_GCC_OR_CLANG AND UNIX)
     if (NOT APPLE)
         set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -ffunction-sections -fdata-sections")
-        set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -ffunction-sections -fdata-sections -fno-rtti")
+        set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -ffunction-sections -fdata-sections")
         set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} -Wl,--gc-sections")
     endif ()
 
@@ -699,6 +707,9 @@ endif ()
 set_package_properties(Ruby PROPERTIES TYPE REQUIRED)
 set_package_properties(Qt5PrintSupport PROPERTIES PURPOSE "Required for ENABLE_PRINT_SUPPORT=ON")
 feature_summary(WHAT ALL FATAL_ON_MISSING_REQUIRED_PACKAGES)
+
+
+include(ECMQueryQmake)
 
 query_qmake(qt_install_prefix_dir QT_INSTALL_PREFIX)
 if (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)

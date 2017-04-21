@@ -21,9 +21,10 @@
 #ifndef CookieJarQt_h
 #define CookieJarQt_h
 
+#include "SQLiteDatabase.h"
+
 #include <QtCore/QObject>
 #include <QtNetwork/QNetworkCookieJar>
-#include <QtSql/QSqlDatabase>
 
 #include <wtf/HashSet.h>
 #include <wtf/text/WTFString.h>
@@ -47,9 +48,9 @@ public:
 private:
     SharedCookieJarQt(const String&);
     ~SharedCookieJarQt();
-    void ensureDatabaseTable();
+    bool ensureDatabaseTable();
 
-    QSqlDatabase m_database;
+    SQLiteDatabase m_database;
 };
 
 }
