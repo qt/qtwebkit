@@ -43,6 +43,7 @@ list(APPEND WebCore_INCLUDE_DIRECTORIES
     "${WEBCORE_DIR}/platform/network/qt"
     "${WEBCORE_DIR}/platform/text/qt"
     "${WEBCORE_DIR}/platform/win"
+    "${WEBCORE_DIR}/platform/graphics/x11"
     "${WTF_DIR}"
 )
 
@@ -69,6 +70,7 @@ list(APPEND WebCore_SOURCES
     platform/audio/qt/AudioBusQt.cpp
 
     platform/graphics/ImageSource.cpp
+    platform/graphics/PlatformDisplay.cpp
     platform/graphics/WOFFFileFormat.cpp
 
     platform/graphics/texmap/BitmapTextureImageBuffer.cpp
@@ -101,6 +103,9 @@ list(APPEND WebCore_SOURCES
     platform/graphics/qt/TransformationMatrixQt.cpp
 
     platform/graphics/surfaces/qt/GraphicsSurfaceQt.cpp
+
+    platform/graphics/x11/PlatformDisplayX11.cpp
+    platform/graphics/x11/XUniqueResource.cpp
 
     platform/network/NetworkStorageSessionStub.cpp
     platform/network/MIMESniffing.cpp
@@ -186,21 +191,32 @@ if (ENABLE_GRAPHICS_CONTEXT_3D)
     )
 endif ()
 
-if (ENABLE_NETSCAPE_PLUGIN_API AND WIN32)
-    set(WebCore_FORWARDING_HEADERS_FILES
-        platform/graphics/win/LocalWindowsContext.h
-        platform/win/BitmapInfo.h
-        platform/win/WebCoreInstanceHandle.h
-    )
-    list(APPEND WebCore_SOURCES
-        platform/graphics/win/TransformationMatrixWin.cpp
-        platform/win/BitmapInfo.cpp
-        platform/win/WebCoreInstanceHandle.cpp
-    )
-    list(APPEND WebCore_LIBRARIES
-        Shlwapi
-        version
-    )
+if (ENABLE_NETSCAPE_PLUGIN_API)
+    if (WIN32)
+        set(WebCore_FORWARDING_HEADERS_FILES
+            platform/graphics/win/LocalWindowsContext.h
+
+            platform/win/BitmapInfo.h
+            platform/win/WebCoreInstanceHandle.h
+        )
+        list(APPEND WebCore_SOURCES
+            platform/graphics/win/TransformationMatrixWin.cpp
+
+            platform/win/BitmapInfo.cpp
+            platform/win/WebCoreInstanceHandle.cpp
+        )
+        list(APPEND WebCore_LIBRARIES
+            Shlwapi
+            version
+        )
+    elseif (PLUGIN_BACKEND_XLIB)
+        set(WebCore_FORWARDING_HEADERS_FILES
+            plugins/qt/QtX11ImageConversion.h
+        )
+        list(APPEND WebCore_SOURCES
+            plugins/qt/QtX11ImageConversion.cpp
+        )
+    endif ()
 endif ()
 
 if (ENABLE_SMOOTH_SCROLLING)
@@ -247,6 +263,7 @@ list(APPEND WebCore_LIBRARIES
     ${Qt5Network_LIBRARIES}
     ${Qt5Sensors_LIBRARIES}
     ${SQLITE_LIBRARIES}
+    ${X11_X11_LIB}
     ${ZLIB_LIBRARIES}
 )
 
@@ -396,36 +413,6 @@ if (WIN32)
 
     list(APPEND WebCore_SOURCES
         platform/win/SystemInfo.cpp
-    )
-endif ()
-
-if (MSVC)
-    list(APPEND WebCore_INCLUDE_DIRECTORIES
-        "${CMAKE_BINARY_DIR}/../include/private"
-        "${CMAKE_BINARY_DIR}/../include/private/JavaScriptCore"
-        "${DERIVED_SOURCES_DIR}/ForwardingHeaders/ANGLE"
-        "${DERIVED_SOURCES_DIR}/ForwardingHeaders/ANGLE/include/KHR"
-        "${DERIVED_SOURCES_DIR}/ForwardingHeaders/JavaScriptCore"
-        "${DERIVED_SOURCES_DIR}/ForwardingHeaders/JavaScriptCore/ForwardingHeaders"
-        "${DERIVED_SOURCES_DIR}/ForwardingHeaders/JavaScriptCore/API"
-        "${DERIVED_SOURCES_DIR}/ForwardingHeaders/JavaScriptCore/assembler"
-        "${DERIVED_SOURCES_DIR}/ForwardingHeaders/JavaScriptCore/builtins"
-        "${DERIVED_SOURCES_DIR}/ForwardingHeaders/JavaScriptCore/bytecode"
-        "${DERIVED_SOURCES_DIR}/ForwardingHeaders/JavaScriptCore/bytecompiler"
-        "${DERIVED_SOURCES_DIR}/ForwardingHeaders/JavaScriptCore/dfg"
-        "${DERIVED_SOURCES_DIR}/ForwardingHeaders/JavaScriptCore/disassembler"
-        "${DERIVED_SOURCES_DIR}/ForwardingHeaders/JavaScriptCore/heap"
-        "${DERIVED_SOURCES_DIR}/ForwardingHeaders/JavaScriptCore/debugger"
-        "${DERIVED_SOURCES_DIR}/ForwardingHeaders/JavaScriptCore/interpreter"
-        "${DERIVED_SOURCES_DIR}/ForwardingHeaders/JavaScriptCore/jit"
-        "${DERIVED_SOURCES_DIR}/ForwardingHeaders/JavaScriptCore/llint"
-        "${DERIVED_SOURCES_DIR}/ForwardingHeaders/JavaScriptCore/parser"
-        "${DERIVED_SOURCES_DIR}/ForwardingHeaders/JavaScriptCore/profiler"
-        "${DERIVED_SOURCES_DIR}/ForwardingHeaders/JavaScriptCore/runtime"
-        "${DERIVED_SOURCES_DIR}/ForwardingHeaders/JavaScriptCore/yarr"
-        "${DERIVED_SOURCES_DIR}/ForwardingHeaders/WTF"
-        "${WEBCORE_DIR}/ForwardingHeaders"
-        "${WEBCORE_DIR}/platform/win"
     )
 endif ()
 
