@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Apple Inc. All rights reserved.
+ * Copyright (C) 2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -23,43 +23,37 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef WKNativeEvent_h
-#define WKNativeEvent_h
+#ifndef MachSendRight_h
+#define MachSendRight_h
 
-#ifdef __APPLE__
-#include <TargetConditionals.h>
-#endif
+#include <mach/mach_port.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+namespace WebCore {
 
-#if defined(__APPLE__) && !TARGET_OS_IPHONE && !defined(BUILDING_GTK__) && !defined(BUILDING_QT__)
-#ifdef __OBJC__
-@class NSEvent;
-#elif __cplusplus
-class NSEvent;
-#else
-struct NSEvent;
-#endif
-typedef NSEvent *WKNativeEventPtr;
-#elif defined(BUILDING_GTK__)
-typedef union _GdkEvent GdkEvent;
-typedef const GdkEvent* WKNativeEventPtr;
-#elif !defined(BUILDING_QT__)
-typedef const void* WKNativeEventPtr;
-#endif
+class MachSendRight {
+public:
+    WEBCORE_EXPORT static MachSendRight adopt(mach_port_t);
+    WEBCORE_EXPORT static MachSendRight create(mach_port_t);
 
-#ifdef __cplusplus
+    MachSendRight() = default;
+    WEBCORE_EXPORT MachSendRight(MachSendRight&&);
+    WEBCORE_EXPORT ~MachSendRight();
+
+    WEBCORE_EXPORT MachSendRight& operator=(MachSendRight&&);
+
+    explicit operator bool() const { return m_port != MACH_PORT_NULL; }
+
+    mach_port_t sendRight() const { return m_port; }
+
+    WEBCORE_EXPORT MachSendRight copySendRight() const;
+    WEBCORE_EXPORT mach_port_t leakSendRight() WARN_UNUSED_RETURN;
+
+private:
+    explicit MachSendRight(mach_port_t);
+
+    mach_port_t m_port { MACH_PORT_NULL };
+};
+
 }
-#endif
 
-#if defined(BUILDING_QT__)
-#include <qglobal.h>
-QT_BEGIN_NAMESPACE
-class QEvent;
-QT_END_NAMESPACE
-typedef const QEvent* WKNativeEventPtr;
-#endif
-
-#endif /* WKNativeEvent_h */
+#endif // MachSendRight_h
