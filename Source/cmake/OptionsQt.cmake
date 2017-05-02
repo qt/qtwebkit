@@ -20,6 +20,12 @@ if (QT_CONAN_DIR)
             COMMAND conan imports -f \"${QT_CONAN_DIR}/conanfile.txt\" --dest \${_conan_imports_dest}
             WORKING_DIRECTORY \"${QT_CONAN_DIR}\"
         )
+
+        set(_conan_imports_manifest \"\${_conan_imports_dest}/conan_imports_manifest.txt\")
+        if (EXISTS \${_conan_imports_manifest})
+            file(REMOVE \${_conan_imports_manifest})
+            message(\"Removed conan install manifest: \${_conan_imports_manifest}\")
+        endif ()
     ")
 endif ()
 
@@ -306,8 +312,13 @@ if (MSVC)
 endif ()
 
 if (DEFINED ENV{SQLITE3SRCDIR})
-    get_filename_component(SQLITE_INCLUDE_DIR $ENV{SQLITE3SRCDIR} ABSOLUTE)
-    set(SQLITE_SOURCE_FILE ${SQLITE_INCLUDE_DIR}/sqlite3.c)
+    get_filename_component(SQLITE3SRC_ABS_DIR $ENV{SQLITE3SRCDIR} ABSOLUTE)
+    set(SQLITE3_SOURCE_DIR ${SQLITE3SRC_ABS_DIR} CACHE PATH "Path to SQLite sources to use instead of system library" FORCE)
+endif ()
+
+if (SQLITE3_SOURCE_DIR)
+    set(SQLITE_INCLUDE_DIR ${SQLITE3_SOURCE_DIR})
+    set(SQLITE_SOURCE_FILE ${SQLITE3_SOURCE_DIR}/sqlite3.c)
     if (NOT EXISTS ${SQLITE_SOURCE_FILE})
         message(FATAL_ERROR "${SQLITE_SOURCE_FILE} not found.")
     endif ()
@@ -426,12 +437,14 @@ if (ENABLE_WEBKIT2)
     )
     SET_AND_EXPOSE_TO_BUILD(USE_COORDINATED_GRAPHICS TRUE)
     SET_AND_EXPOSE_TO_BUILD(USE_COORDINATED_GRAPHICS_MULTIPROCESS TRUE)
+endif ()
 
-    if (APPLE)
-        SET_AND_EXPOSE_TO_BUILD(USE_MACH_PORTS 1) # Qt-specific
-    elseif (UNIX)
-        SET_AND_EXPOSE_TO_BUILD(USE_UNIX_DOMAIN_SOCKETS 1)
-    endif ()
+# Mach ports and Unix sockets are currently used by WK2, but their USE() values
+# affect building WorkQueue
+if (APPLE)
+    SET_AND_EXPOSE_TO_BUILD(USE_MACH_PORTS 1) # Qt-specific
+elseif (UNIX)
+    SET_AND_EXPOSE_TO_BUILD(USE_UNIX_DOMAIN_SOCKETS 1)
 endif ()
 
 if (ENABLE_QT_WEBCHANNEL)
