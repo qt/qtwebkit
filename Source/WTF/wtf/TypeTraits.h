@@ -72,6 +72,9 @@ namespace WTF {
     template<> struct IsInteger<unsigned long>      { static const bool value = true; };
     template<> struct IsInteger<long long>          { static const bool value = true; };
     template<> struct IsInteger<unsigned long long> { static const bool value = true; };
+#if __cplusplus >= 201103L || defined(__GXX_EXPERIMENTAL_CXX0X__) || (defined(_HAS_CHAR16_T_LANGUAGE_SUPPORT) && _HAS_CHAR16_T_LANGUAGE_SUPPORT)
+    template<> struct IsInteger<char16_t>           { static const bool value = true; };
+#endif
 #if !COMPILER(MSVC) || defined(_NATIVE_WCHAR_T_DEFINED)
     template<> struct IsInteger<wchar_t>            { static const bool value = true; };
 #endif
