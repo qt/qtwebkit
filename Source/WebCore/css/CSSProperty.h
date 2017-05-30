@@ -1,6 +1,7 @@
 /*
  * (C) 1999-2003 Lars Knoll (knoll@kde.org)
- * Copyright (C) 2004, 2005, 2006 Apple Computer, Inc.
+ * Copyright (C) 2004, 2005, 2006 Apple Inc.
+ * Copyright (C) 2013 Intel Corporation. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -24,56 +25,54 @@
 #include "CSSPropertyNames.h"
 #include "CSSValue.h"
 #include "RenderStyleConstants.h"
-#include "TextDirection.h"
 #include "WritingMode.h"
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefPtr.h>
 
 namespace WebCore {
 
-union StylePropertyMetadata {
-    StylePropertyMetadata(CSSPropertyID propertyID, CSSPropertyID shorthandID, bool important, bool implicit, bool inherited)
+struct StylePropertyMetadata {
+    StylePropertyMetadata(CSSPropertyID propertyID, bool isSetFromShorthand, int indexInShorthandsVector, bool important, bool implicit, bool inherited)
         : m_propertyID(propertyID)
-        , m_shorthandID(shorthandID)
+        , m_isSetFromShorthand(isSetFromShorthand)
+        , m_indexInShorthandsVector(indexInShorthandsVector)
         , m_important(important)
         , m_implicit(implicit)
         , m_inherited(inherited)
     {
     }
 
-    unsigned m_bits;
-    struct {
-        unsigned m_propertyID : 14;
-        unsigned m_shorthandID : 14; // If this property was set as part of a shorthand, gives the shorthand.
-        unsigned m_important : 1;
-        unsigned m_implicit : 1; // Whether or not the property was set implicitly as the result of a shorthand.
-        unsigned m_inherited : 1;
-    };
+    CSSPropertyID shorthandID() const;
+    
+    bool operator==(const StylePropertyMetadata& other) const
+    {
+        return m_propertyID == other.m_propertyID
+            && m_isSetFromShorthand == other.m_isSetFromShorthand
+            && m_indexInShorthandsVector == other.m_indexInShorthandsVector
+            && m_important == other.m_important
+            && m_implicit == other.m_implicit
+            && m_inherited == other.m_inherited;
+    }
+
+    uint16_t m_propertyID : 10;
+    uint16_t m_isSetFromShorthand : 1;
+    uint16_t m_indexInShorthandsVector : 2; // If this property was set as part of an ambiguous shorthand, gives the index in the shorthands vector.
+    uint16_t m_important : 1;
+    uint16_t m_implicit : 1; // Whether or not the property was set implicitly as the result of a shorthand.
+    uint16_t m_inherited : 1;
 };
 
 class CSSProperty {
 public:
-    CSSProperty(CSSPropertyID propertyID, PassRefPtr<CSSValue> value, bool important = false, CSSPropertyID shorthandID = CSSPropertyInvalid, bool implicit = false)
-        : m_metadata(propertyID, shorthandID, important, implicit, isInheritedProperty(propertyID))
+    CSSProperty(CSSPropertyID propertyID, PassRefPtr<CSSValue> value, bool important = false, bool isSetFromShorthand = false, int indexInShorthandsVector = 0, bool implicit = false)
+        : m_metadata(propertyID, isSetFromShorthand, indexInShorthandsVector, important, implicit, isInheritedProperty(propertyID))
         , m_value(value)
     {
-#if ENABLE(CSS_VARIABLES)
-    ASSERT((propertyID == CSSPropertyVariable) == (m_value && m_value->isVariableValue()));
-#endif
-    }
-
-    // FIXME: Remove this.
-    CSSProperty(StylePropertyMetadata metadata, CSSValue* value)
-        : m_metadata(metadata)
-        , m_value(value)
-    {
-#if ENABLE(CSS_VARIABLES)
-    ASSERT((metadata.m_propertyID == CSSPropertyVariable) == (m_value && m_value->isVariableValue()));
-#endif
     }
 
     CSSPropertyID id() const { return static_cast<CSSPropertyID>(m_metadata.m_propertyID); }
-    CSSPropertyID shorthandID() const { return static_cast<CSSPropertyID>(m_metadata.m_shorthandID); }
+    bool isSetFromShorthand() const { return m_metadata.m_isSetFromShorthand; };
+    CSSPropertyID shorthandID() const { return m_metadata.shorthandID(); };
     bool isImportant() const { return m_metadata.m_important; }
 
     CSSValue* value() const { return m_value.get(); }
@@ -82,54 +81,93 @@ public:
 
     static CSSPropertyID resolveDirectionAwareProperty(CSSPropertyID, TextDirection, WritingMode);
     static bool isInheritedProperty(CSSPropertyID);
+    static bool isDirectionAwareProperty(CSSPropertyID);
 
-    StylePropertyMetadata metadata() const { return m_metadata; }
+    const StylePropertyMetadata& metadata() const { return m_metadata; }
+
+    bool operator==(const CSSProperty& other) const
+    {
+        if (!(m_metadata == other.m_metadata))
+            return false;
+
+        if (!m_value && !other.m_value)
+            return true;
+
+        if (!m_value || !other.m_value)
+            return false;
+        
+        return m_value->equals(*other.m_value);
+    }
 
 private:
     StylePropertyMetadata m_metadata;
     RefPtr<CSSValue> m_value;
 };
 
-inline CSSPropertyID prefixingVariantForPropertyId(CSSPropertyID propId)
+inline CSSPropertyID prefixingVariantForPropertyId(CSSPropertyID propertyID)
 {
-    CSSPropertyID propertyId = CSSPropertyInvalid;
-    switch (propId) {
+    ASSERT(propertyID != CSSPropertyInvalid);
+
+    switch (propertyID) {
+    case CSSPropertyAnimation:
+        return CSSPropertyWebkitAnimation;
+    case CSSPropertyAnimationDelay:
+        return CSSPropertyWebkitAnimationDelay;
+    case CSSPropertyAnimationDirection:
+        return CSSPropertyWebkitAnimationDirection;
+    case CSSPropertyAnimationDuration:
+        return CSSPropertyWebkitAnimationDuration;
+    case CSSPropertyAnimationFillMode:
+        return CSSPropertyWebkitAnimationFillMode;
+    case CSSPropertyAnimationName:
+        return CSSPropertyWebkitAnimationName;
+    case CSSPropertyAnimationPlayState:
+        return CSSPropertyWebkitAnimationPlayState;
+    case CSSPropertyAnimationIterationCount:
+        return CSSPropertyWebkitAnimationIterationCount;
+    case CSSPropertyAnimationTimingFunction:
+        return CSSPropertyWebkitAnimationTimingFunction;
+    case CSSPropertyWebkitAnimation:
+        return CSSPropertyAnimation;
+    case CSSPropertyWebkitAnimationDelay:
+        return CSSPropertyAnimationDelay;
+    case CSSPropertyWebkitAnimationDirection:
+        return CSSPropertyAnimationDirection;
+    case CSSPropertyWebkitAnimationDuration:
+        return CSSPropertyAnimationDuration;
+    case CSSPropertyWebkitAnimationFillMode:
+        return CSSPropertyAnimationFillMode;
+    case CSSPropertyWebkitAnimationName:
+        return CSSPropertyAnimationName;
+    case CSSPropertyWebkitAnimationPlayState:
+        return CSSPropertyAnimationPlayState;
+    case CSSPropertyWebkitAnimationIterationCount:
+        return CSSPropertyAnimationIterationCount;
+    case CSSPropertyWebkitAnimationTimingFunction:
+        return CSSPropertyAnimationTimingFunction;
     case CSSPropertyTransitionDelay:
-        propertyId = CSSPropertyWebkitTransitionDelay;
-        break;
+        return CSSPropertyWebkitTransitionDelay;
     case CSSPropertyTransitionDuration:
-        propertyId = CSSPropertyWebkitTransitionDuration;
-        break;
+        return CSSPropertyWebkitTransitionDuration;
     case CSSPropertyTransitionProperty:
-        propertyId = CSSPropertyWebkitTransitionProperty;
-        break;
+        return CSSPropertyWebkitTransitionProperty;
     case CSSPropertyTransitionTimingFunction:
-        propertyId = CSSPropertyWebkitTransitionTimingFunction;
-        break;
+        return CSSPropertyWebkitTransitionTimingFunction;
     case CSSPropertyTransition:
-        propertyId = CSSPropertyWebkitTransition;
-        break;
+        return CSSPropertyWebkitTransition;
     case CSSPropertyWebkitTransitionDelay:
-        propertyId = CSSPropertyTransitionDelay;
-        break;
+        return CSSPropertyTransitionDelay;
     case CSSPropertyWebkitTransitionDuration:
-        propertyId = CSSPropertyTransitionDuration;
-        break;
+        return CSSPropertyTransitionDuration;
     case CSSPropertyWebkitTransitionProperty:
-        propertyId = CSSPropertyTransitionProperty;
-        break;
+        return CSSPropertyTransitionProperty;
     case CSSPropertyWebkitTransitionTimingFunction:
-        propertyId = CSSPropertyTransitionTimingFunction;
-        break;
+        return CSSPropertyTransitionTimingFunction;
     case CSSPropertyWebkitTransition:
-        propertyId = CSSPropertyTransition;
-        break;
+        return CSSPropertyTransition;
     default:
-        propertyId = propId;
-        break;
+        return propertyID;
     }
-    ASSERT(propertyId != CSSPropertyInvalid);
-    return propertyId;
 }
 
 } // namespace WebCore

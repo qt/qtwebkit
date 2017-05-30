@@ -32,19 +32,35 @@
 
 #include "CrossThreadCopier.h"
 
-#include "KURL.h"
+#include "URL.h"
 #include "ResourceError.h"
 #include "ResourceRequest.h"
 #include "ResourceResponse.h"
 #include "SerializedScriptValue.h"
+#include "SessionID.h"
+#include "ThreadSafeDataBuffer.h"
 #include <wtf/Assertions.h>
 #include <wtf/text/WTFString.h>
 
+#if ENABLE(INDEXED_DATABASE)
+#include "IDBCursorInfo.h"
+#include "IDBDatabaseIdentifier.h"
+#include "IDBDatabaseInfo.h"
+#include "IDBError.h"
+#include "IDBGetResult.h"
+#include "IDBIndexInfo.h"
+#include "IDBKeyData.h"
+#include "IDBKeyRangeData.h"
+#include "IDBObjectStoreInfo.h"
+#include "IDBResourceIdentifier.h"
+#include "IDBTransactionInfo.h"
+#endif
+
 namespace WebCore {
 
-CrossThreadCopierBase<false, false, KURL>::Type CrossThreadCopierBase<false, false, KURL>::copy(const KURL& url)
+CrossThreadCopierBase<false, false, URL>::Type CrossThreadCopierBase<false, false, URL>::copy(const URL& url)
 {
-    return url.copy();
+    return url.isolatedCopy();
 }
 
 CrossThreadCopierBase<false, false, String>::Type CrossThreadCopierBase<false, false, String>::copy(const String& str)
@@ -67,23 +83,107 @@ CrossThreadCopierBase<false, false, ResourceResponse>::Type CrossThreadCopierBas
     return response.copyData();
 }
 
+CrossThreadCopierBase<false, false, SessionID>::Type CrossThreadCopierBase<false, false, SessionID>::copy(const SessionID& sessionID)
+{
+    return sessionID;
+}
+
+CrossThreadCopierBase<false, false, ThreadSafeDataBuffer>::Type CrossThreadCopierBase<false, false, ThreadSafeDataBuffer>::copy(const ThreadSafeDataBuffer& buffer)
+{
+    return ThreadSafeDataBuffer(buffer);
+}
+
+#if ENABLE(INDEXED_DATABASE)
+
+IndexedDB::TransactionMode CrossThreadCopierBase<false, false, IndexedDB::TransactionMode>::copy(const IndexedDB::TransactionMode& mode)
+{
+    return mode;
+}
+
+IndexedDB::CursorDirection CrossThreadCopierBase<false, false, IndexedDB::CursorDirection>::copy(const IndexedDB::CursorDirection& direction)
+{
+    return direction;
+}
+
+IndexedDB::CursorType CrossThreadCopierBase<false, false, IndexedDB::CursorType>::copy(const IndexedDB::CursorType& type)
+{
+    return type;
+}
+
+CrossThreadCopierBase<false, false, IDBGetResult>::Type CrossThreadCopierBase<false, false, IDBGetResult>::copy(const IDBGetResult& result)
+{
+    return result.isolatedCopy();
+}
+
+CrossThreadCopierBase<false, false, IDBKeyData>::Type CrossThreadCopierBase<false, false, IDBKeyData>::copy(const IDBKeyData& keyData)
+{
+    return keyData.isolatedCopy();
+}
+
+CrossThreadCopierBase<false, false, IDBKeyRangeData>::Type CrossThreadCopierBase<false, false, IDBKeyRangeData>::copy(const IDBKeyRangeData& keyRangeData)
+{
+    return keyRangeData.isolatedCopy();
+}
+
+CrossThreadCopierBase<false, false, IDBDatabaseInfo>::Type CrossThreadCopierBase<false, false, IDBDatabaseInfo>::copy(const IDBDatabaseInfo& info)
+{
+    return info.isolatedCopy();
+}
+
+CrossThreadCopierBase<false, false, IDBDatabaseIdentifier>::Type CrossThreadCopierBase<false, false, IDBDatabaseIdentifier>::copy(const IDBDatabaseIdentifier& identifier)
+{
+    return identifier.isolatedCopy();
+}
+
+CrossThreadCopierBase<false, false, IDBTransactionInfo>::Type CrossThreadCopierBase<false, false, IDBTransactionInfo>::copy(const IDBTransactionInfo& info)
+{
+    return info.isolatedCopy();
+}
+
+CrossThreadCopierBase<false, false, IDBResourceIdentifier>::Type CrossThreadCopierBase<false, false, IDBResourceIdentifier>::copy(const IDBResourceIdentifier& identifier)
+{
+    return identifier.isolatedCopy();
+}
+
+CrossThreadCopierBase<false, false, IDBError>::Type CrossThreadCopierBase<false, false, IDBError>::copy(const IDBError& error)
+{
+    return error.isolatedCopy();
+}
+
+CrossThreadCopierBase<false, false, IDBObjectStoreInfo>::Type CrossThreadCopierBase<false, false, IDBObjectStoreInfo>::copy(const IDBObjectStoreInfo& info)
+{
+    return info.isolatedCopy();
+}
+
+CrossThreadCopierBase<false, false, IDBIndexInfo>::Type CrossThreadCopierBase<false, false, IDBIndexInfo>::copy(const IDBIndexInfo& info)
+{
+    return info.isolatedCopy();
+}
+
+CrossThreadCopierBase<false, false, IDBCursorInfo>::Type CrossThreadCopierBase<false, false, IDBCursorInfo>::copy(const IDBCursorInfo& info)
+{
+    return info.isolatedCopy();
+}
+
+#endif // ENABLE(INDEXED_DATABASE)
+
 // Test CrossThreadCopier using COMPILE_ASSERT.
 
 // Verify that ThreadSafeRefCounted objects get handled correctly.
 class CopierThreadSafeRefCountedTest : public ThreadSafeRefCounted<CopierThreadSafeRefCountedTest> {
 };
 
-COMPILE_ASSERT((WTF::IsSameType<
+COMPILE_ASSERT((std::is_same<
                   PassRefPtr<CopierThreadSafeRefCountedTest>,
-                  CrossThreadCopier<PassRefPtr<CopierThreadSafeRefCountedTest> >::Type
+                  CrossThreadCopier<PassRefPtr<CopierThreadSafeRefCountedTest>>::Type
                   >::value),
                PassRefPtrTest);
-COMPILE_ASSERT((WTF::IsSameType<
+COMPILE_ASSERT((std::is_same<
                   PassRefPtr<CopierThreadSafeRefCountedTest>,
-                  CrossThreadCopier<RefPtr<CopierThreadSafeRefCountedTest> >::Type
+                  CrossThreadCopier<RefPtr<CopierThreadSafeRefCountedTest>>::Type
                   >::value),
                RefPtrTest);
-COMPILE_ASSERT((WTF::IsSameType<
+COMPILE_ASSERT((std::is_same<
                   PassRefPtr<CopierThreadSafeRefCountedTest>,
                   CrossThreadCopier<CopierThreadSafeRefCountedTest*>::Type
                   >::value),
@@ -99,36 +199,22 @@ template<typename T> struct CrossThreadCopierBase<false, false, T> {
 class CopierRefCountedTest : public RefCounted<CopierRefCountedTest> {
 };
 
-COMPILE_ASSERT((WTF::IsSameType<
+COMPILE_ASSERT((std::is_same<
                   int,
-                  CrossThreadCopier<PassRefPtr<CopierRefCountedTest> >::Type
+                  CrossThreadCopier<PassRefPtr<CopierRefCountedTest>>::Type
                   >::value),
                PassRefPtrRefCountedTest);
 
-COMPILE_ASSERT((WTF::IsSameType<
+COMPILE_ASSERT((std::is_same<
                   int,
-                  CrossThreadCopier<RefPtr<CopierRefCountedTest> >::Type
+                  CrossThreadCopier<RefPtr<CopierRefCountedTest>>::Type
                   >::value),
                RefPtrRefCountedTest);
 
-COMPILE_ASSERT((WTF::IsSameType<
+COMPILE_ASSERT((std::is_same<
                   int,
                   CrossThreadCopier<CopierRefCountedTest*>::Type
                   >::value),
                RawPointerRefCountedTest);
-
-// Verify that PassOwnPtr gets passed through.
-COMPILE_ASSERT((WTF::IsSameType<
-                  PassOwnPtr<float>,
-                  CrossThreadCopier<PassOwnPtr<float> >::Type
-                  >::value),
-               PassOwnPtrTest);
-
-// Verify that PassOwnPtr does not get passed through.
-COMPILE_ASSERT((WTF::IsSameType<
-                  int,
-                  CrossThreadCopier<OwnPtr<float> >::Type
-                  >::value),
-               OwnPtrTest);
 
 } // namespace WebCore

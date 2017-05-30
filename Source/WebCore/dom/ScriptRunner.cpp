@@ -27,28 +27,26 @@
 #include "ScriptRunner.h"
 
 #include "CachedScript.h"
-#include "Document.h"
 #include "Element.h"
 #include "PendingScript.h"
 #include "ScriptElement.h"
 
 namespace WebCore {
 
-ScriptRunner::ScriptRunner(Document* document)
+ScriptRunner::ScriptRunner(Document& document)
     : m_document(document)
-    , m_timer(this, &ScriptRunner::timerFired)
+    , m_timer(*this, &ScriptRunner::timerFired)
 {
-    ASSERT(document);
 }
 
 ScriptRunner::~ScriptRunner()
 {
     for (size_t i = 0; i < m_scriptsToExecuteSoon.size(); ++i)
-        m_document->decrementLoadEventDelayCount();
+        m_document.decrementLoadEventDelayCount();
     for (size_t i = 0; i < m_scriptsToExecuteInOrder.size(); ++i)
-        m_document->decrementLoadEventDelayCount();
-    for (int i = 0; i < m_pendingAsyncScripts.size(); ++i)
-        m_document->decrementLoadEventDelayCount();
+        m_document.decrementLoadEventDelayCount();
+    for (unsigned i = 0; i < m_pendingAsyncScripts.size(); ++i)
+        m_document.decrementLoadEventDelayCount();
 }
 
 void ScriptRunner::queueScriptForExecution(ScriptElement* scriptElement, CachedResourceHandle<CachedScript> cachedScript, ExecutionType executionType)
@@ -56,19 +54,18 @@ void ScriptRunner::queueScriptForExecution(ScriptElement* scriptElement, CachedR
     ASSERT(scriptElement);
     ASSERT(cachedScript.get());
 
-    Element* element = scriptElement->element();
-    ASSERT(element);
-    ASSERT(element->inDocument());
+    Element& element = scriptElement->element();
+    ASSERT(element.inDocument());
 
-    m_document->incrementLoadEventDelayCount();
+    m_document.incrementLoadEventDelayCount();
 
     switch (executionType) {
     case ASYNC_EXECUTION:
-        m_pendingAsyncScripts.add(scriptElement, PendingScript(element, cachedScript.get()));
+        m_pendingAsyncScripts.add(scriptElement, PendingScript(&element, cachedScript.get()));
         break;
 
     case IN_ORDER_EXECUTION:
-        m_scriptsToExecuteInOrder.append(PendingScript(element, cachedScript.get()));
+        m_scriptsToExecuteInOrder.append(PendingScript(&element, cachedScript.get()));
         break;
     }
 }
@@ -99,11 +96,9 @@ void ScriptRunner::notifyScriptReady(ScriptElement* scriptElement, ExecutionType
     m_timer.startOneShot(0);
 }
 
-void ScriptRunner::timerFired(Timer<ScriptRunner>* timer)
+void ScriptRunner::timerFired()
 {
-    ASSERT_UNUSED(timer, timer == &m_timer);
-
-    RefPtr<Document> protect(m_document);
+    Ref<Document> protect(m_document);
 
     Vector<PendingScript> scripts;
     scripts.swap(m_scriptsToExecuteSoon);
@@ -114,12 +109,15 @@ void ScriptRunner::timerFired(Timer<ScriptRunner>* timer)
     if (numInOrderScriptsToExecute)
         m_scriptsToExecuteInOrder.remove(0, numInOrderScriptsToExecute);
 
-    size_t size = scripts.size();
-    for (size_t i = 0; i < size; ++i) {
-        CachedScript* cachedScript = scripts[i].cachedScript();
-        RefPtr<Element> element = scripts[i].releaseElementAndClear();
+    for (auto& script : scripts) {
+        CachedScript* cachedScript = script.cachedScript();
+        RefPtr<Element> element = script.releaseElementAndClear();
+        ASSERT(element);
+        // Paper over https://bugs.webkit.org/show_bug.cgi?id=144050
+        if (!element)
+            continue;
         toScriptElementIfPossible(element.get())->execute(cachedScript);
-        m_document->decrementLoadEventDelayCount();
+        m_document.decrementLoadEventDelayCount();
     }
 }
 

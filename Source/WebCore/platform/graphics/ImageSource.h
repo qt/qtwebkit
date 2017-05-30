@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2004, 2005, 2006 Apple Computer, Inc.  All rights reserved.
+ * Copyright (C) 2004, 2005, 2006 Apple Inc.  All rights reserved.
  * Copyright (C) 2007-2008 Torch Mobile, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -11,10 +11,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -77,6 +77,9 @@ const int cAnimationLoopOnce = 0;
 const int cAnimationLoopInfinite = -1;
 const int cAnimationNone = -2;
 
+// SubsamplingLevel. 0 is no subsampling, 1 is half dimensions on each axis etc.
+typedef short SubsamplingLevel;
+
 class ImageSource {
     WTF_MAKE_NONCOPYABLE(ImageSource);
 public:
@@ -89,13 +92,6 @@ public:
         GammaAndColorProfileApplied,
         GammaAndColorProfileIgnored
     };
-
-#if USE(CG)
-    enum ShouldSkipMetadata {
-        DoNotSkipMetadata,
-        SkipMetadata
-    };
-#endif
 
     ImageSource(AlphaOption alphaOption = AlphaPremultiplied, GammaAndColorProfileOption gammaAndColorProfileOption = GammaAndColorProfileApplied);
     ~ImageSource();
@@ -131,9 +127,14 @@ public:
     void setData(SharedBuffer* data, bool allDataReceived);
     String filenameExtension() const;
 
+    SubsamplingLevel subsamplingLevelForScale(float) const;
+    bool allowSubsamplingOfFrameAtIndex(size_t) const;
+
     bool isSizeAvailable();
-    IntSize size(RespectImageOrientationEnum = DoNotRespectImageOrientation) const;
-    IntSize frameSizeAtIndex(size_t, RespectImageOrientationEnum = DoNotRespectImageOrientation) const;
+    // Always original size, without subsampling.
+    IntSize size(ImageOrientationDescription = ImageOrientationDescription()) const;
+    // Size of optionally subsampled frame.
+    IntSize frameSizeAtIndex(size_t, SubsamplingLevel = 0, ImageOrientationDescription = ImageOrientationDescription()) const;
 
     bool getHotSpot(IntPoint&) const;
 
@@ -145,16 +146,16 @@ public:
 
     // Callers should not call this after calling clear() with a higher index;
     // see comments on clear() above.
-    PassNativeImagePtr createFrameAtIndex(size_t);
+    PassNativeImagePtr createFrameAtIndex(size_t, SubsamplingLevel = 0);
 
-    float frameDurationAtIndex(size_t) const;
-    bool frameHasAlphaAtIndex(size_t) const; // Whether or not the frame actually used any alpha.
-    bool frameIsCompleteAtIndex(size_t) const; // Whether or not the frame is completely decoded.
+    float frameDurationAtIndex(size_t);
+    bool frameHasAlphaAtIndex(size_t); // Whether or not the frame actually used any alpha.
+    bool frameIsCompleteAtIndex(size_t); // Whether or not the frame is completely decoded.
     ImageOrientation orientationAtIndex(size_t) const; // EXIF image orientation
 
     // Return the number of bytes in the decoded frame. If the frame is not yet
     // decoded then return 0.
-    unsigned frameBytesAtIndex(size_t) const;
+    unsigned frameBytesAtIndex(size_t, SubsamplingLevel = 0) const;
 
 #if ENABLE(IMAGE_DECODER_DOWN_SAMPLING)
     static unsigned maxPixelsPerDecodedImage() { return s_maxPixelsPerDecodedImage; }

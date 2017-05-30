@@ -27,14 +27,14 @@
 #include "CSSStyleSheet.h"
 #include "Document.h"
 #include "PropertySetCSSStyleDeclaration.h"
-#include "StylePropertySet.h"
+#include "StyleProperties.h"
 #include "StyleRule.h"
 #include <wtf/Vector.h>
 #include <wtf/text/StringBuilder.h>
 
 namespace WebCore {
 
-CSSPageRule::CSSPageRule(StyleRulePage* pageRule, CSSStyleSheet* parent)
+CSSPageRule::CSSPageRule(StyleRulePage& pageRule, CSSStyleSheet* parent)
     : CSSRule(parent)
     , m_pageRule(pageRule)
 {
@@ -46,11 +46,11 @@ CSSPageRule::~CSSPageRule()
         m_propertiesCSSOMWrapper->clearParentRule();
 }
 
-CSSStyleDeclaration* CSSPageRule::style()
+CSSStyleDeclaration& CSSPageRule::style()
 {
     if (!m_propertiesCSSOMWrapper)
-        m_propertiesCSSOMWrapper = StyleRuleCSSStyleDeclaration::create(m_pageRule->mutableProperties(), this);
-    return m_propertiesCSSOMWrapper.get();
+        m_propertiesCSSOMWrapper = StyleRuleCSSStyleDeclaration::create(m_pageRule->mutableProperties(), *this);
+    return *m_propertiesCSSOMWrapper;
 }
 
 String CSSPageRule::selectorText() const
@@ -86,7 +86,7 @@ String CSSPageRule::cssText() const
     StringBuilder result;
     result.append(selectorText());
     result.appendLiteral(" { ");
-    String decls = m_pageRule->properties()->asText();
+    String decls = m_pageRule->properties().asText();
     result.append(decls);
     if (!decls.isEmpty())
         result.append(' ');
@@ -94,13 +94,11 @@ String CSSPageRule::cssText() const
     return result.toString();
 }
 
-void CSSPageRule::reattach(StyleRuleBase* rule)
+void CSSPageRule::reattach(StyleRuleBase& rule)
 {
-    ASSERT(rule);
-    ASSERT_WITH_SECURITY_IMPLICATION(rule->isPageRule());
-    m_pageRule = static_cast<StyleRulePage*>(rule);
+    m_pageRule = downcast<StyleRulePage>(rule);
     if (m_propertiesCSSOMWrapper)
-        m_propertiesCSSOMWrapper->reattach(m_pageRule->mutableProperties());
+        m_propertiesCSSOMWrapper->reattach(m_pageRule.get().mutableProperties());
 }
 
 } // namespace WebCore

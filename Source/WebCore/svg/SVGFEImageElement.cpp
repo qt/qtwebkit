@@ -20,11 +20,8 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG) && ENABLE(FILTERS)
 #include "SVGFEImageElement.h"
 
-#include "Attr.h"
 #include "CachedImage.h"
 #include "CachedResourceLoader.h"
 #include "CachedResourceRequest.h"
@@ -33,7 +30,6 @@
 #include "Image.h"
 #include "RenderObject.h"
 #include "RenderSVGResource.h"
-#include "SVGElementInstance.h"
 #include "SVGNames.h"
 #include "SVGPreserveAspectRatio.h"
 #include "XLinkNames.h"
@@ -52,16 +48,16 @@ BEGIN_REGISTER_ANIMATED_PROPERTIES(SVGFEImageElement)
     REGISTER_PARENT_ANIMATED_PROPERTIES(SVGFilterPrimitiveStandardAttributes)
 END_REGISTER_ANIMATED_PROPERTIES
 
-inline SVGFEImageElement::SVGFEImageElement(const QualifiedName& tagName, Document* document)
+inline SVGFEImageElement::SVGFEImageElement(const QualifiedName& tagName, Document& document)
     : SVGFilterPrimitiveStandardAttributes(tagName, document)
 {
     ASSERT(hasTagName(SVGNames::feImageTag));
     registerAnimatedPropertiesForSVGFEImageElement();
 }
 
-PassRefPtr<SVGFEImageElement> SVGFEImageElement::create(const QualifiedName& tagName, Document* document)
+Ref<SVGFEImageElement> SVGFEImageElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new SVGFEImageElement(tagName, document));
+    return adoptRef(*new SVGFEImageElement(tagName, document));
 }
 
 SVGFEImageElement::~SVGFEImageElement()
@@ -69,22 +65,32 @@ SVGFEImageElement::~SVGFEImageElement()
     clearResourceReferences();
 }
 
+bool SVGFEImageElement::hasSingleSecurityOrigin() const
+{
+    if (!m_cachedImage)
+        return true;
+    auto* image = m_cachedImage->image();
+    return !image || image->hasSingleSecurityOrigin();
+}
+
 void SVGFEImageElement::clearResourceReferences()
 {
     if (m_cachedImage) {
         m_cachedImage->removeClient(this);
-        m_cachedImage = 0;
+        m_cachedImage = nullptr;
     }
 
-    ASSERT(document());
-    document()->accessSVGExtensions()->removeAllTargetReferencesForElement(this);
+    document().accessSVGExtensions().removeAllTargetReferencesForElement(this);
 }
 
 void SVGFEImageElement::requestImageResource()
 {
-    CachedResourceRequest request(ResourceRequest(ownerDocument()->completeURL(href())));
+    ResourceLoaderOptions options = CachedResourceLoader::defaultCachedResourceOptions();
+    options.setContentSecurityPolicyImposition(isInUserAgentShadowTree() ? ContentSecurityPolicyImposition::SkipPolicyCheck : ContentSecurityPolicyImposition::DoPolicyCheck);
+
+    CachedResourceRequest request(ResourceRequest(document().completeURL(href())), options);
     request.setInitiator(this);
-    m_cachedImage = document()->cachedResourceLoader()->requestImage(request);
+    m_cachedImage = document().cachedResourceLoader().requestImage(request);
 
     if (m_cachedImage)
         m_cachedImage->addClient(this);
@@ -102,37 +108,20 @@ void SVGFEImageElement::buildPendingResource()
         if (id.isEmpty())
             requestImageResource();
         else {
-            document()->accessSVGExtensions()->addPendingResource(id, this);
+            document().accessSVGExtensions().addPendingResource(id, this);
             ASSERT(hasPendingResources());
         }
     } else if (target->isSVGElement()) {
         // Register us with the target in the dependencies map. Any change of hrefElement
         // that leads to relayout/repainting now informs us, so we can react to it.
-        document()->accessSVGExtensions()->addElementReferencingTarget(this, toSVGElement(target));
+        document().accessSVGExtensions().addElementReferencingTarget(this, downcast<SVGElement>(target));
     }
 
     invalidate();
 }
 
-bool SVGFEImageElement::isSupportedAttribute(const QualifiedName& attrName)
-{
-    DEFINE_STATIC_LOCAL(HashSet<QualifiedName>, supportedAttributes, ());
-    if (supportedAttributes.isEmpty()) {
-        SVGURIReference::addSupportedAttributes(supportedAttributes);
-        SVGLangSpace::addSupportedAttributes(supportedAttributes);
-        SVGExternalResourcesRequired::addSupportedAttributes(supportedAttributes);
-        supportedAttributes.add(SVGNames::preserveAspectRatioAttr);
-    }
-    return supportedAttributes.contains<SVGAttributeHashTranslator>(attrName);
-}
-
 void SVGFEImageElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
-    if (!isSupportedAttribute(name)) {
-        SVGFilterPrimitiveStandardAttributes::parseAttribute(name, value);
-        return;
-    }
-
     if (name == SVGNames::preserveAspectRatioAttr) {
         SVGPreserveAspectRatio preserveAspectRatio;
         preserveAspectRatio.parse(value);
@@ -140,52 +129,43 @@ void SVGFEImageElement::parseAttribute(const QualifiedName& name, const AtomicSt
         return;
     }
 
-    if (SVGURIReference::parseAttribute(name, value))
-        return;
-    if (SVGLangSpace::parseAttribute(name, value))
-        return;
-    if (SVGExternalResourcesRequired::parseAttribute(name, value))
-        return;
-
-    ASSERT_NOT_REACHED();
+    SVGFilterPrimitiveStandardAttributes::parseAttribute(name, value);
+    SVGURIReference::parseAttribute(name, value);
+    SVGExternalResourcesRequired::parseAttribute(name, value);
 }
 
 void SVGFEImageElement::svgAttributeChanged(const QualifiedName& attrName)
 {
-    if (!isSupportedAttribute(attrName)) {
-        SVGFilterPrimitiveStandardAttributes::svgAttributeChanged(attrName);
-        return;
-    }
-
-    SVGElementInstance::InvalidationGuard invalidationGuard(this);
-    
     if (attrName == SVGNames::preserveAspectRatioAttr) {
+        InstanceInvalidationGuard guard(*this);
         invalidate();
         return;
     }
 
     if (SVGURIReference::isKnownAttribute(attrName)) {
+        InstanceInvalidationGuard guard(*this);
         buildPendingResource();
         return;
     }
 
-    if (SVGLangSpace::isKnownAttribute(attrName) || SVGExternalResourcesRequired::isKnownAttribute(attrName))
-        return;
-
-    ASSERT_NOT_REACHED();
+    SVGFilterPrimitiveStandardAttributes::svgAttributeChanged(attrName);
 }
 
-Node::InsertionNotificationRequest SVGFEImageElement::insertedInto(ContainerNode* rootParent)
+Node::InsertionNotificationRequest SVGFEImageElement::insertedInto(ContainerNode& rootParent)
 {
     SVGFilterPrimitiveStandardAttributes::insertedInto(rootParent);
-    buildPendingResource();
-    return InsertionDone;
+    return InsertionShouldCallFinishedInsertingSubtree;
 }
 
-void SVGFEImageElement::removedFrom(ContainerNode* rootParent)
+void SVGFEImageElement::finishedInsertingSubtree()
+{
+    buildPendingResource();
+}
+
+void SVGFEImageElement::removedFrom(ContainerNode& rootParent)
 {
     SVGFilterPrimitiveStandardAttributes::removedFrom(rootParent);
-    if (rootParent->inDocument())
+    if (rootParent.inDocument())
         clearResourceReferences();
 }
 
@@ -195,28 +175,29 @@ void SVGFEImageElement::notifyFinished(CachedResource*)
         return;
 
     Element* parent = parentElement();
-    ASSERT(parent);
 
-    if (!parent->hasTagName(SVGNames::filterTag) || !parent->renderer())
+    if (!parent || !parent->hasTagName(SVGNames::filterTag))
         return;
 
-    RenderSVGResource::markForLayoutAndParentResourceInvalidation(parent->renderer());
+    RenderElement* parentRenderer = parent->renderer();
+    if (!parentRenderer)
+        return;
+
+    RenderSVGResource::markForLayoutAndParentResourceInvalidation(*parentRenderer);
 }
 
-PassRefPtr<FilterEffect> SVGFEImageElement::build(SVGFilterBuilder*, Filter* filter)
+RefPtr<FilterEffect> SVGFEImageElement::build(SVGFilterBuilder*, Filter& filter)
 {
     if (m_cachedImage)
         return FEImage::createWithImage(filter, m_cachedImage->imageForRenderer(renderer()), preserveAspectRatio());
     return FEImage::createWithIRIReference(filter, document(), href(), preserveAspectRatio());
 }
 
-void SVGFEImageElement::addSubresourceAttributeURLs(ListHashSet<KURL>& urls) const
+void SVGFEImageElement::addSubresourceAttributeURLs(ListHashSet<URL>& urls) const
 {
     SVGFilterPrimitiveStandardAttributes::addSubresourceAttributeURLs(urls);
 
-    addSubresourceURL(urls, document()->completeURL(href()));
+    addSubresourceURL(urls, document().completeURL(href()));
 }
 
 }
-
-#endif // ENABLE(SVG)

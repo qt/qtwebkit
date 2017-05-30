@@ -22,7 +22,6 @@
 #ifndef FEFlood_h
 #define FEFlood_h
 
-#if ENABLE(FILTERS)
 #include "Color.h"
 #include "Filter.h"
 #include "FilterEffect.h"
@@ -31,10 +30,10 @@ namespace WebCore {
 
 class FEFlood : public FilterEffect {
 public:
-    static PassRefPtr<FEFlood> create(Filter* filter, const Color&, float);
+    static Ref<FEFlood> create(Filter&, const Color&, float);
 
     Color floodColor() const;
-    bool setFloodColor(const Color &);
+    bool setFloodColor(const Color&);
 
     float floodOpacity() const;
     bool setFloodOpacity(float);
@@ -42,29 +41,24 @@ public:
 #if !USE(CG)
     // feFlood does not perform color interpolation of any kind, so the result is always in the current
     // color space regardless of the value of color-interpolation-filters.
-    void setOperatingColorSpace(ColorSpace) OVERRIDE { FilterEffect::setResultColorSpace(ColorSpaceDeviceRGB); }
-    void setResultColorSpace(ColorSpace) OVERRIDE { FilterEffect::setResultColorSpace(ColorSpaceDeviceRGB); }
+    void setOperatingColorSpace(ColorSpace) override { FilterEffect::setResultColorSpace(ColorSpaceSRGB); }
+    void setResultColorSpace(ColorSpace) override { FilterEffect::setResultColorSpace(ColorSpaceSRGB); }
 #endif
 
-    virtual void platformApplySoftware();
-#if ENABLE(OPENCL)
-    virtual bool platformApplyOpenCL();
-#endif
-    virtual void dump();
+    virtual void platformApplySoftware() override;
+    virtual void dump() override;
 
-    virtual void determineAbsolutePaintRect() { setAbsolutePaintRect(enclosingIntRect(maxEffectRect())); }
+    virtual void determineAbsolutePaintRect() override { setAbsolutePaintRect(enclosingIntRect(maxEffectRect())); }
 
-    virtual TextStream& externalRepresentation(TextStream&, int indention) const;
+    virtual TextStream& externalRepresentation(TextStream&, int indention) const override;
 
 private:
-    FEFlood(Filter*, const Color&, float);
+    FEFlood(Filter&, const Color&, float);
 
     Color m_floodColor;
     float m_floodOpacity;
 };
 
 } // namespace WebCore
-
-#endif // ENABLE(FILTERS)
 
 #endif // FEFlood_h

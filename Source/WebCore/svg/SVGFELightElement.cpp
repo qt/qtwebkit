@@ -20,14 +20,11 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG) && ENABLE(FILTERS)
 #include "SVGFELightElement.h"
 
-#include "Attribute.h"
+#include "ElementIterator.h"
 #include "RenderObject.h"
 #include "RenderSVGResource.h"
-#include "SVGElementInstance.h"
 #include "SVGFEDiffuseLightingElement.h"
 #include "SVGFESpecularLightingElement.h"
 #include "SVGFilterElement.h"
@@ -61,7 +58,7 @@ BEGIN_REGISTER_ANIMATED_PROPERTIES(SVGFELightElement)
     REGISTER_LOCAL_ANIMATED_PROPERTY(limitingConeAngle)
 END_REGISTER_ANIMATED_PROPERTIES
 
-SVGFELightElement::SVGFELightElement(const QualifiedName& tagName, Document* document)
+SVGFELightElement::SVGFELightElement(const QualifiedName& tagName, Document& document)
     : SVGElement(tagName, document)
     , m_specularExponent(1)
 {
@@ -70,17 +67,14 @@ SVGFELightElement::SVGFELightElement(const QualifiedName& tagName, Document* doc
 
 SVGFELightElement* SVGFELightElement::findLightElement(const SVGElement* svgElement)
 {
-    for (Node* node = svgElement->firstChild(); node; node = node->nextSibling()) {
-        if (node->hasTagName(SVGNames::feDistantLightTag)
-            || node->hasTagName(SVGNames::fePointLightTag)
-            || node->hasTagName(SVGNames::feSpotLightTag)) {
-            return static_cast<SVGFELightElement*>(node);
-        }
+    for (auto& child : childrenOfType<SVGElement>(*svgElement)) {
+        if (is<SVGFEDistantLightElement>(child) || is<SVGFEPointLightElement>(child) || is<SVGFESpotLightElement>(child))
+            return static_cast<SVGFELightElement*>(const_cast<SVGElement*>(&child));
     }
-    return 0;
+    return nullptr;
 }
 
-PassRefPtr<LightSource> SVGFELightElement::findLightSource(const SVGElement* svgElement)
+RefPtr<LightSource> SVGFELightElement::findLightSource(const SVGElement* svgElement)
 {
     SVGFELightElement* lightNode = findLightElement(svgElement);
     if (!lightNode)
@@ -88,31 +82,8 @@ PassRefPtr<LightSource> SVGFELightElement::findLightSource(const SVGElement* svg
     return lightNode->lightSource();
 }
 
-bool SVGFELightElement::isSupportedAttribute(const QualifiedName& attrName)
-{
-    DEFINE_STATIC_LOCAL(HashSet<QualifiedName>, supportedAttributes, ());
-    if (supportedAttributes.isEmpty()) {
-        supportedAttributes.add(SVGNames::azimuthAttr);
-        supportedAttributes.add(SVGNames::elevationAttr);
-        supportedAttributes.add(SVGNames::xAttr);
-        supportedAttributes.add(SVGNames::yAttr);
-        supportedAttributes.add(SVGNames::zAttr);
-        supportedAttributes.add(SVGNames::pointsAtXAttr);
-        supportedAttributes.add(SVGNames::pointsAtYAttr);
-        supportedAttributes.add(SVGNames::pointsAtZAttr);
-        supportedAttributes.add(SVGNames::specularExponentAttr);
-        supportedAttributes.add(SVGNames::limitingConeAngleAttr);
-    }
-    return supportedAttributes.contains<SVGAttributeHashTranslator>(attrName);
-}
-
 void SVGFELightElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
-    if (!isSupportedAttribute(name)) {
-        SVGElement::parseAttribute(name, value);
-        return;
-    }
-
     if (name == SVGNames::azimuthAttr) {
         setAzimuthBaseValue(value.toFloat());
         return;
@@ -163,63 +134,50 @@ void SVGFELightElement::parseAttribute(const QualifiedName& name, const AtomicSt
         return;
     }
 
-    ASSERT_NOT_REACHED();
+    SVGElement::parseAttribute(name, value);
 }
 
 void SVGFELightElement::svgAttributeChanged(const QualifiedName& attrName)
 {
-    if (!isSupportedAttribute(attrName)) {
-        SVGElement::svgAttributeChanged(attrName);
-        return;
-    }
+    if (attrName == SVGNames::azimuthAttr || attrName == SVGNames::elevationAttr
+        || attrName == SVGNames::xAttr || attrName == SVGNames::yAttr || attrName == SVGNames::zAttr
+        || attrName == SVGNames::pointsAtXAttr || attrName == SVGNames::pointsAtYAttr || attrName == SVGNames::pointsAtZAttr
+        || attrName == SVGNames::specularExponentAttr || attrName == SVGNames::limitingConeAngleAttr) {
 
-    SVGElementInstance::InvalidationGuard invalidationGuard(this);
-    
-    if (attrName == SVGNames::azimuthAttr
-        || attrName == SVGNames::elevationAttr
-        || attrName == SVGNames::xAttr
-        || attrName == SVGNames::yAttr
-        || attrName == SVGNames::zAttr
-        || attrName == SVGNames::pointsAtXAttr
-        || attrName == SVGNames::pointsAtYAttr
-        || attrName == SVGNames::pointsAtZAttr
-        || attrName == SVGNames::specularExponentAttr
-        || attrName == SVGNames::limitingConeAngleAttr) {
-        ContainerNode* parent = parentNode();
+        auto* parent = parentElement();
         if (!parent)
             return;
 
-        RenderObject* renderer = parent->renderer();
+        auto* renderer = parent->renderer();
         if (!renderer || !renderer->isSVGResourceFilterPrimitive())
             return;
 
-        if (parent->hasTagName(SVGNames::feDiffuseLightingTag)) {
-            SVGFEDiffuseLightingElement* diffuseLighting = static_cast<SVGFEDiffuseLightingElement*>(parent);
-            diffuseLighting->lightElementAttributeChanged(this, attrName);
-            return;
-        } else if (parent->hasTagName(SVGNames::feSpecularLightingTag)) {
-            SVGFESpecularLightingElement* specularLighting = static_cast<SVGFESpecularLightingElement*>(parent);
-            specularLighting->lightElementAttributeChanged(this, attrName);
-            return;
+        if (is<SVGFEDiffuseLightingElement>(*parent)) {
+            InstanceInvalidationGuard guard(*this);
+            downcast<SVGFEDiffuseLightingElement>(*parent).lightElementAttributeChanged(this, attrName);
+        } else if (is<SVGFESpecularLightingElement>(*parent)) {
+            InstanceInvalidationGuard guard(*this);
+            downcast<SVGFESpecularLightingElement>(*parent).lightElementAttributeChanged(this, attrName);
         }
+
+        return;
     }
 
-    ASSERT_NOT_REACHED();
+    SVGElement::svgAttributeChanged(attrName);
 }
 
-void SVGFELightElement::childrenChanged(bool changedByParser, Node* beforeChange, Node* afterChange, int childCountDelta)
+void SVGFELightElement::childrenChanged(const ChildChange& change)
 {
-    SVGElement::childrenChanged(changedByParser, beforeChange, afterChange, childCountDelta);
+    SVGElement::childrenChanged(change);
 
-    if (!changedByParser) {
-        if (ContainerNode* parent = parentNode()) {
-            RenderObject* renderer = parent->renderer();
-            if (renderer && renderer->isSVGResourceFilterPrimitive())
-                RenderSVGResource::markForLayoutAndParentResourceInvalidation(renderer);
-        }
-    }
+    if (change.source == ChildChangeSourceParser)
+        return;
+    ContainerNode* parent = parentNode();
+    if (!parent)
+        return;
+    RenderElement* renderer = parent->renderer();
+    if (renderer && renderer->isSVGResourceFilterPrimitive())
+        RenderSVGResource::markForLayoutAndParentResourceInvalidation(*renderer);
 }
 
 }
-
-#endif // ENABLE(SVG)

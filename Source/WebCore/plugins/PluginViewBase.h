@@ -22,9 +22,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef PluginWidget_h
-#define PluginWidget_h
+#ifndef PluginViewBase_h
+#define PluginViewBase_h
 
+#include "AudioHardwareListener.h"
+#include "BridgeJSC.h"
 #include "PlatformLayer.h"
 #include "ScrollTypes.h"
 #include "Widget.h"
@@ -44,8 +46,11 @@ class Scrollbar;
 // It's intended as a stopgap measure until we can merge all plug-in views into a single plug-in view.
 class PluginViewBase : public Widget {
 public:
-#if USE(ACCELERATED_COMPOSITING)
     virtual PlatformLayer* platformLayer() const { return 0; }
+#if PLATFORM(IOS)
+    virtual bool willProvidePluginLayer() const { return false; }
+    virtual void attachPluginLayer() { }
+    virtual void detachPluginLayer() { }
 #endif
 
     virtual JSC::JSObject* scriptObject(JSC::JSGlobalObject*) { return 0; }
@@ -71,25 +76,20 @@ public:
     virtual bool isPluginViewBase() const { return true; }
     virtual bool shouldNotAddLayer() const { return false; }
 
+    virtual AudioHardwareActivityType audioHardwareActivity() const { return AudioHardwareActivityType::Unknown; }
+
+    virtual void setJavaScriptPaused(bool) { }
+
+    virtual RefPtr<JSC::Bindings::Instance> bindingInstance() { return nullptr; }
+    
+    virtual void willDetatchRenderer() { }
+
 protected:
     explicit PluginViewBase(PlatformWidget widget = 0) : Widget(widget) { }
 };
 
-inline PluginViewBase* toPluginViewBase(Widget* widget)
-{
-    ASSERT(!widget || widget->isPluginViewBase());
-    return static_cast<PluginViewBase*>(widget);
-}
-
-inline const PluginViewBase* toPluginViewBase(const Widget* widget)
-{
-    ASSERT(!widget || widget->isPluginViewBase());
-    return static_cast<const PluginViewBase*>(widget);
-}
-
-// This will catch anyone doing an unnecessary cast.
-void toPluginViewBase(const PluginViewBase*);
-
 } // namespace WebCore
 
-#endif // PluginWidget_h
+SPECIALIZE_TYPE_TRAITS_WIDGET(PluginViewBase, isPluginViewBase())
+
+#endif // PluginViewBase_h

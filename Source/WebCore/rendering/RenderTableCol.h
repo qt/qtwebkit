@@ -33,40 +33,23 @@ namespace WebCore {
 class RenderTable;
 class RenderTableCell;
 
-class RenderTableCol : public RenderBox {
+class RenderTableCol final : public RenderBox {
 public:
-    explicit RenderTableCol(Element*);
-
-    RenderObject* firstChild() const { ASSERT(children() == virtualChildren()); return children()->firstChild(); }
-    RenderObject* lastChild() const { ASSERT(children() == virtualChildren()); return children()->lastChild(); }
-
-    const RenderObjectChildList* children() const { return &m_children; }
-    RenderObjectChildList* children() { return &m_children; }
+    RenderTableCol(Element&, Ref<RenderStyle>&&);
+    Element& element() const { return downcast<Element>(nodeForNonAnonymous()); }
 
     void clearPreferredLogicalWidthsDirtyBits();
 
     unsigned span() const { return m_span; }
     void setSpan(unsigned span) { m_span = span; }
 
-    bool isTableColumnGroupWithColumnChildren() { return firstChild(); }
-    bool isTableColumn() const { return style()->display() == TABLE_COLUMN; }
-    bool isTableColumnGroup() const { return style()->display() == TABLE_COLUMN_GROUP; }
+    bool isTableColumnGroupWithColumnChildren() const { return firstChild(); }
+    bool isTableColumn() const { return style().display() == TABLE_COLUMN; }
+    bool isTableColumnGroup() const { return style().display() == TABLE_COLUMN_GROUP; }
 
     RenderTableCol* enclosingColumnGroup() const;
-    RenderTableCol* enclosingColumnGroupIfAdjacentBefore() const
-    {
-        if (previousSibling())
-            return 0;
-        return enclosingColumnGroup();
-    }
-
-    RenderTableCol* enclosingColumnGroupIfAdjacentAfter() const
-    {
-        if (nextSibling())
-            return 0;
-        return enclosingColumnGroup();
-    }
-
+    RenderTableCol* enclosingColumnGroupIfAdjacentBefore() const;
+    RenderTableCol* enclosingColumnGroupIfAdjacentAfter() const;
 
     // Returns the next column or column-group.
     RenderTableCol* nextColumn() const;
@@ -76,48 +59,51 @@ public:
     const BorderValue& borderAdjoiningCellBefore(const RenderTableCell*) const;
     const BorderValue& borderAdjoiningCellAfter(const RenderTableCell*) const;
 
+    virtual LayoutUnit offsetLeft() const override;
+    virtual LayoutUnit offsetTop() const override;
+    virtual LayoutUnit offsetWidth() const override;
+    virtual LayoutUnit offsetHeight() const override;
+    virtual void updateFromElement() override;
+
 private:
-    virtual RenderObjectChildList* virtualChildren() { return children(); }
-    virtual const RenderObjectChildList* virtualChildren() const { return children(); }
+    virtual const char* renderName() const override { return "RenderTableCol"; }
+    virtual bool isRenderTableCol() const override { return true; }
+    virtual void computePreferredLogicalWidths() override { ASSERT_NOT_REACHED(); }
 
-    virtual const char* renderName() const { return "RenderTableCol"; }
-    virtual bool isRenderTableCol() const OVERRIDE { return true; }
-    virtual void updateFromElement();
-    virtual void computePreferredLogicalWidths() OVERRIDE { ASSERT_NOT_REACHED(); }
+    virtual void insertedIntoTree() override;
+    virtual void willBeRemovedFromTree() override;
 
-    virtual void insertedIntoTree() OVERRIDE;
-    virtual void willBeRemovedFromTree() OVERRIDE;
+    virtual bool isChildAllowed(const RenderObject&, const RenderStyle&) const override;
+    virtual bool canHaveChildren() const override;
+    virtual bool requiresLayer() const override { return false; }
 
-    virtual bool isChildAllowed(RenderObject*, RenderStyle*) const;
-    virtual bool canHaveChildren() const;
-    virtual bool requiresLayer() const { return false; }
+    virtual LayoutRect clippedOverflowRectForRepaint(const RenderLayerModelObject* repaintContainer) const override;
+    virtual void imageChanged(WrappedImagePtr, const IntRect* = 0) override;
 
-    virtual LayoutRect clippedOverflowRectForRepaint(const RenderLayerModelObject* repaintContainer) const OVERRIDE;
-    virtual void imageChanged(WrappedImagePtr, const IntRect* = 0);
-
-    virtual void styleDidChange(StyleDifference, const RenderStyle* oldStyle);
+    virtual void styleDidChange(StyleDifference, const RenderStyle* oldStyle) override;
+    virtual void paint(PaintInfo&, const LayoutPoint&) override { }
 
     RenderTable* table() const;
 
-    RenderObjectChildList m_children;
-    unsigned m_span;
+    unsigned m_span { 1 };
 };
 
-inline RenderTableCol* toRenderTableCol(RenderObject* object)
+inline RenderTableCol* RenderTableCol::enclosingColumnGroupIfAdjacentBefore() const
 {
-    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isRenderTableCol());
-    return static_cast<RenderTableCol*>(object);
+    if (previousSibling())
+        return nullptr;
+    return enclosingColumnGroup();
 }
 
-inline const RenderTableCol* toRenderTableCol(const RenderObject* object)
+inline RenderTableCol* RenderTableCol::enclosingColumnGroupIfAdjacentAfter() const
 {
-    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isRenderTableCol());
-    return static_cast<const RenderTableCol*>(object);
+    if (nextSibling())
+        return nullptr;
+    return enclosingColumnGroup();
 }
 
-// This will catch anyone doing an unnecessary cast.
-void toRenderTableCol(const RenderTableCol*);
+} // namespace WebCore
 
-}
+SPECIALIZE_TYPE_TRAITS_RENDER_OBJECT(RenderTableCol, isRenderTableCol())
 
-#endif
+#endif // RenderTableCol_h

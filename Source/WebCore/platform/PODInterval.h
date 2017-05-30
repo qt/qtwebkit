@@ -27,6 +27,7 @@
 #define PODInterval_h
 
 #ifndef NDEBUG
+#include "ValueToString.h"
 #include <wtf/text/StringBuilder.h>
 #endif
 
@@ -69,11 +70,6 @@ namespace WebCore {
 //
 // Note that this class requires a copy constructor and assignment
 // operator in order to be stored in the red-black tree.
-
-#ifndef NDEBUG
-template<class T>
-struct ValueToString;
-#endif
 
 template<class T, class UserData = void*>
 class PODInterval {
@@ -148,7 +144,7 @@ public:
         builder.append(ValueToString<UserData>::string(data()));
         builder.append(", maxHigh=");
         builder.append(ValueToString<T>::string(maxHigh()));
-        builder.append("]");
+        builder.append(']');
         return builder.toString();
     }
 #endif

@@ -1,5 +1,6 @@
 /*
  * Copyright (C) Research In Motion Limited 2010-2012. All rights reserved.
+ * Copyright (C) 2016 Apple Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -20,7 +21,6 @@
 #ifndef SVGAnimatedStaticPropertyTearOff_h
 #define SVGAnimatedStaticPropertyTearOff_h
 
-#if ENABLE(SVG)
 #include "ExceptionCode.h"
 #include "SVGAnimatedProperty.h"
 
@@ -31,12 +31,12 @@ class SVGAnimatedStaticPropertyTearOff : public SVGAnimatedProperty {
 public:
     typedef PropertyType ContentType;
 
-    PropertyType& baseVal()
+    virtual PropertyType& baseVal()
     {
         return m_property;
     }
 
-    PropertyType& animVal()
+    virtual PropertyType& animVal()
     {
         if (m_animatedProperty)
             return *m_animatedProperty;
@@ -49,16 +49,17 @@ public:
         commitChange();
     }
 
-    static PassRefPtr<SVGAnimatedStaticPropertyTearOff<PropertyType> > create(SVGElement* contextElement, const QualifiedName& attributeName, AnimatedPropertyType animatedPropertyType, PropertyType& property)
+    bool isAnimating() const override { return m_animatedProperty; }
+
+    static Ref<SVGAnimatedStaticPropertyTearOff<PropertyType>> create(SVGElement* contextElement, const QualifiedName& attributeName, AnimatedPropertyType animatedPropertyType, PropertyType& property)
     {
         ASSERT(contextElement);
-        return adoptRef(new SVGAnimatedStaticPropertyTearOff<PropertyType>(contextElement, attributeName, animatedPropertyType, property));
+        return adoptRef(*new SVGAnimatedStaticPropertyTearOff<PropertyType>(contextElement, attributeName, animatedPropertyType, property));
     }
 
     PropertyType& currentAnimatedValue()
     {
-        ASSERT(m_isAnimating);
-        ASSERT(m_animatedProperty);
+        ASSERT(isAnimating());
         return *m_animatedProperty;
     }
 
@@ -69,40 +70,34 @@ public:
 
     void animationStarted(PropertyType* newAnimVal)
     {
-        ASSERT(!m_isAnimating);
-        ASSERT(!m_animatedProperty);
+        ASSERT(!isAnimating());
         ASSERT(newAnimVal);
         m_animatedProperty = newAnimVal;
-        m_isAnimating = true;
     }
 
     void animationEnded()
     {
-        ASSERT(m_isAnimating);
-        ASSERT(m_animatedProperty);
-        m_animatedProperty = 0;
-        m_isAnimating = false;
+        ASSERT(isAnimating());
+        m_animatedProperty = nullptr;
     }
 
     void animValWillChange()
     {
         // no-op for non list types.
-        ASSERT(m_isAnimating);
-        ASSERT(m_animatedProperty);
+        ASSERT(isAnimating());
     }
 
     void animValDidChange()
     {
         // no-op for non list types.
-        ASSERT(m_isAnimating);
-        ASSERT(m_animatedProperty);
+        ASSERT(isAnimating());
     }
 
 protected:
     SVGAnimatedStaticPropertyTearOff(SVGElement* contextElement, const QualifiedName& attributeName, AnimatedPropertyType animatedPropertyType, PropertyType& property)
         : SVGAnimatedProperty(contextElement, attributeName, animatedPropertyType)
         , m_property(property)
-        , m_animatedProperty(0)
+        , m_animatedProperty(nullptr)
     {
     }
 
@@ -113,5 +108,4 @@ private:
 
 }
 
-#endif // ENABLE(SVG)
 #endif // SVGAnimatedStaticPropertyTearOff_h

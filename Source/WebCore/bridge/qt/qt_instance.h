@@ -58,7 +58,7 @@ private:
     RefPtr<WeakMapImpl> m_impl;
 };
 
-class QtInstance : public Instance {
+class QtInstance final : public Instance {
 public:
     enum ValueOwnership {
         QtOwnership,
@@ -68,22 +68,19 @@ public:
 
     ~QtInstance();
 
-    virtual Class* getClass() const;
-    virtual RuntimeObject* newRuntimeObject(ExecState*);
+    Class* getClass() const override;
+    RuntimeObject* newRuntimeObject(ExecState*) final;
 
-    virtual void begin();
-    virtual void end();
+    JSValue valueOf(ExecState*) const final;
+    JSValue defaultValue(ExecState*, PreferredPrimitiveType) const final;
 
-    virtual JSValue valueOf(ExecState*) const;
-    virtual JSValue defaultValue(ExecState*, PreferredPrimitiveType) const;
+    JSValue getMethod(ExecState*, PropertyName) final;
+    JSValue invokeMethod(ExecState*, RuntimeMethod*) final;
 
-    virtual JSValue getMethod(ExecState*, PropertyName);
-    virtual JSValue invokeMethod(ExecState*, RuntimeMethod*);
+    void getPropertyNames(ExecState*, PropertyNameArray&) final;
 
-    virtual void getPropertyNames(ExecState*, PropertyNameArray&);
-
-    JSValue stringValue(ExecState* exec) const;
-    JSValue numberValue(ExecState* exec) const;
+    JSValue stringValue(ExecState*) const;
+    JSValue numberValue(ExecState*) const;
     JSValue booleanValue() const;
 
     QObject* getObject() const { return m_object.data(); }
@@ -91,8 +88,8 @@ public:
 
     static PassRefPtr<QtInstance> getQtInstance(QObject*, PassRefPtr<RootObject>, ValueOwnership);
 
-    virtual bool getOwnPropertySlot(JSObject*, ExecState*, PropertyName, PropertySlot&);
-    virtual void put(JSObject*, ExecState*, PropertyName, JSValue, PutPropertySlot&);
+    bool getOwnPropertySlot(JSObject*, ExecState*, PropertyName, PropertySlot&) final;
+    void put(JSObject*, ExecState*, PropertyName, JSValue, PutPropertySlot&) final;
 
     static QtInstance* getInstance(JSObject*);
 

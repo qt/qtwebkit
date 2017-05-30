@@ -20,16 +20,11 @@
 
 #define Config_H
 
-#if defined(HAVE_CONFIG_H) && HAVE_CONFIG_H
-#if defined(BUILDING_WITH_CMAKE)
+#if defined(HAVE_CONFIG_H) && HAVE_CONFIG_H && defined(BUILDING_WITH_CMAKE)
 #include "cmakeconfig.h"
-#else
-#include "autotoolsconfig.h"
-#endif
 #endif
 
-#include <wtf/Platform.h>
-#include <wtf/ExportMacros.h>
+#include <WebCore/PlatformExportMacros.h>
 #include <runtime/JSExportMacros.h>
 
 #ifdef __cplusplus
@@ -38,42 +33,25 @@
 #include <wtf/FastMalloc.h>
 #endif
 
-#if PLATFORM(MAC)
-#define WTF_USE_CF 1
-
-// FIXME: These can be removed after sufficient time has passed since the removal of BUILDING_ON / TARGETING macros.
-
-#define ERROR_PLEASE_COMPARE_WITH_MAC_OS_X_VERSION_MIN_REQUIRED 0 / 0
-#define ERROR_PLEASE_COMPARE_WITH_MAC_OS_X_VERSION_MAX_ALLOWED 0 / 0
-
-#define BUILDING_ON_LEOPARD ERROR_PLEASE_COMPARE_WITH_MAC_OS_X_VERSION_MIN_REQUIRED
-#define BUILDING_ON_SNOW_LEOPARD ERROR_PLEASE_COMPARE_WITH_MAC_OS_X_VERSION_MIN_REQUIRED
-#define BUILDING_ON_LION ERROR_PLEASE_COMPARE_WITH_MAC_OS_X_VERSION_MIN_REQUIRED
-
-#define TARGETING_LEOPARD ERROR_PLEASE_COMPARE_WITH_MAC_OS_X_VERSION_MAX_ALLOWED
-#define TARGETING_SNOW_LEOPARD ERROR_PLEASE_COMPARE_WITH_MAC_OS_X_VERSION_MAX_ALLOWED
-#define TARGETING_LION ERROR_PLEASE_COMPARE_WITH_MAC_OS_X_VERSION_MAX_ALLOWED
-
-#endif // PLATFORM(MAC)
-
-#if OS(WINDOWS)
-// If we don't define these, they get defined in windef.h. 
-// We want to use std::min and std::max
-#undef max
-#define max max
-#undef min
-#define min min
+#if PLATFORM(COCOA)
+#define USE_CF 1
 #endif
 
 #if PLATFORM(WIN)
-#define WTF_USE_CF 1 
+#define USE_CF 1 
 #if PLATFORM(WIN_CAIRO)
-#define WTF_USE_CAIRO 1
-#define WTF_USE_CURL 1
+#define USE_CAIRO 1
+#define USE_CURL 1
 #else
-#define WTF_USE_CG 1
-#define WTF_USE_CFNETWORK 1
+#define USE_CG 1
+#define USE_CFNETWORK 1
 #endif
+
+#undef _WIN32_WINNT
+#define _WIN32_WINNT 0x601
+
+#undef WINVER
+#define WINVER 0x0601
 
 #undef _WINSOCKAPI_
 #define _WINSOCKAPI_ // Prevent inclusion of winsock.h in windows.h

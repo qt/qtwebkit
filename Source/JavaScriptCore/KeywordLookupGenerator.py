@@ -141,7 +141,7 @@ class Trie:
         str = makePadding(indent)
 
         if self.value != None:
-            print(str + "if (!isIdentPart(code[%d])) {" % (len(self.fullPrefix)))
+            print(str + "if (!isIdentPartIncludingEscape(code+%d, m_codeEnd)) {" % (len(self.fullPrefix)))
             print(str + "    internalShift<%d>();" % len(self.fullPrefix))
             print(str + "    if (shouldCreateIdentifier)")
             print(str + ("        data->ident = &m_vm->propertyNames->%sKeyword;" % self.fullPrefix))
@@ -184,8 +184,8 @@ class Trie:
     def printAsC(self):
         print("namespace JSC {")
         print("")
-        print("static ALWAYS_INLINE bool isIdentPart(LChar c);")
-        print("static ALWAYS_INLINE bool isIdentPart(UChar c);")
+        print("static ALWAYS_INLINE bool isIdentPartIncludingEscape(const LChar* code, const LChar* codeEnd);")
+        print("static ALWAYS_INLINE bool isIdentPartIncludingEscape(const UChar* code, const UChar* codeEnd);")
         # max length + 1 so we don't need to do any bounds checking at all
         print("static const int maxTokenLength = %d;" % (self.maxLength() + 1))
         print("")
@@ -258,16 +258,16 @@ print("""
 
 
 #define COMPARE_2CHARS(address, char1, char2) \\
-    (((uint16_t*)(address))[0] == CHARPAIR_TOUINT16(char1, char2))
+    ((reinterpret_cast<const uint16_t*>(address))[0] == CHARPAIR_TOUINT16(char1, char2))
 #define COMPARE_2UCHARS(address, char1, char2) \\
-    (((uint32_t*)(address))[0] == UCHARPAIR_TOUINT32(char1, char2))
+    ((reinterpret_cast<const uint32_t*>(address))[0] == UCHARPAIR_TOUINT32(char1, char2))
 
 #if CPU(X86_64)
 
 #define COMPARE_4CHARS(address, char1, char2, char3, char4) \\
-    (((uint32_t*)(address))[0] == CHARQUAD_TOUINT32(char1, char2, char3, char4))
+    ((reinterpret_cast<const uint32_t*>(address))[0] == CHARQUAD_TOUINT32(char1, char2, char3, char4))
 #define COMPARE_4UCHARS(address, char1, char2, char3, char4) \\
-    (((uint64_t*)(address))[0] == UCHARQUAD_TOUINT64(char1, char2, char3, char4))
+    ((reinterpret_cast<const uint64_t*>(address))[0] == UCHARQUAD_TOUINT64(char1, char2, char3, char4))
 
 #else // CPU(X86_64)
 

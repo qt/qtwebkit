@@ -36,7 +36,6 @@
 #include <unicode/udatpg.h>
 #include <unicode/uloc.h>
 #include <wtf/DateMath.h>
-#include <wtf/PassOwnPtr.h>
 #include <wtf/text/StringBuilder.h>
 
 using namespace icu;
@@ -44,9 +43,9 @@ using namespace std;
 
 namespace WebCore {
 
-PassOwnPtr<Locale> Locale::create(const AtomicString& locale)
+std::unique_ptr<Locale> Locale::create(const AtomicString& locale)
 {
-    return LocaleICU::create(locale.string().utf8().data());
+    return std::make_unique<LocaleICU>(locale.string().utf8().data());
 }
 
 LocaleICU::LocaleICU(const char* locale)
@@ -71,11 +70,6 @@ LocaleICU::~LocaleICU()
     udat_close(m_mediumTimeFormat);
     udat_close(m_shortTimeFormat);
 #endif
-}
-
-PassOwnPtr<LocaleICU> LocaleICU::create(const char* localeString)
-{
-    return adoptPtr(new LocaleICU(localeString));
 }
 
 String LocaleICU::decimalSymbol(UNumberFormatSymbol symbol)
@@ -170,39 +164,39 @@ static String getDateFormatPattern(const UDateFormat* dateFormat)
     return String::adopt(buffer);
 }
 
-PassOwnPtr<Vector<String> > LocaleICU::createLabelVector(const UDateFormat* dateFormat, UDateFormatSymbolType type, int32_t startIndex, int32_t size)
+std::unique_ptr<Vector<String>> LocaleICU::createLabelVector(const UDateFormat* dateFormat, UDateFormatSymbolType type, int32_t startIndex, int32_t size)
 {
     if (!dateFormat)
-        return PassOwnPtr<Vector<String> >();
+        return std::make_unique<Vector<String>>();
     if (udat_countSymbols(dateFormat, type) != startIndex + size)
-        return PassOwnPtr<Vector<String> >();
+        return std::make_unique<Vector<String>>();
 
-    OwnPtr<Vector<String> > labels = adoptPtr(new Vector<String>());
+    auto labels = std::make_unique<Vector<String>>();
     labels->reserveCapacity(size);
     for (int32_t i = 0; i < size; ++i) {
         UErrorCode status = U_ZERO_ERROR;
         int32_t length = udat_getSymbols(dateFormat, type, startIndex + i, 0, 0, &status);
         if (status != U_BUFFER_OVERFLOW_ERROR)
-            return PassOwnPtr<Vector<String> >();
+            return std::make_unique<Vector<String>>();
         Vector<UChar> buffer(length);
         status = U_ZERO_ERROR;
         udat_getSymbols(dateFormat, type, startIndex + i, buffer.data(), length, &status);
         if (U_FAILURE(status))
-            return PassOwnPtr<Vector<String> >();
+            return std::make_unique<Vector<String>>();
         labels->append(String::adopt(buffer));
     }
-    return labels.release();
+    return WTFMove(labels);
 }
 #endif
 
 #if ENABLE(DATE_AND_TIME_INPUT_TYPES)
-static PassOwnPtr<Vector<String> > createFallbackMonthLabels()
+static std::unique_ptr<Vector<String>> createFallbackMonthLabels()
 {
-    OwnPtr<Vector<String> > labels = adoptPtr(new Vector<String>());
+    auto labels = std::make_unique<Vector<String>>();
     labels->reserveCapacity(WTF_ARRAY_LENGTH(WTF::monthFullName));
     for (unsigned i = 0; i < WTF_ARRAY_LENGTH(WTF::monthFullName); ++i)
         labels->append(WTF::monthFullName[i]);
-    return labels.release();
+    return WTFMove(labels);
 }
 
 const Vector<String>& LocaleICU::monthLabels()
@@ -220,13 +214,13 @@ const Vector<String>& LocaleICU::monthLabels()
 #endif
 
 #if ENABLE(DATE_AND_TIME_INPUT_TYPES)
-static PassOwnPtr<Vector<String> > createFallbackAMPMLabels()
+static std::unique_ptr<Vector<String>> createFallbackAMPMLabels()
 {
-    OwnPtr<Vector<String> > labels = adoptPtr(new Vector<String>());
+    auto labels = std::make_unique<Vector<String>>();
     labels->reserveCapacity(2);
     labels->append("AM");
     labels->append("PM");
-    return labels.release();
+    return WTFMove(labels);
 }
 
 void LocaleICU::initializeDateTimeFormat()
@@ -251,7 +245,7 @@ void LocaleICU::initializeDateTimeFormat()
     m_dateTimeFormatWithoutSeconds = getDateFormatPattern(dateTimeFormatWithoutSeconds);
     udat_close(dateTimeFormatWithoutSeconds);
 
-    OwnPtr<Vector<String> > timeAMPMLabels = createLabelVector(m_mediumTimeFormat, UDAT_AM_PMS, UCAL_AM, 2);
+    auto timeAMPMLabels = createLabelVector(m_mediumTimeFormat, UDAT_AM_PMS, UCAL_AM, 2);
     if (!timeAMPMLabels)
         timeAMPMLabels = createFallbackAMPMLabels();
     m_timeAMPMLabels = *timeAMPMLabels;
@@ -269,7 +263,7 @@ String LocaleICU::dateFormat()
     return m_dateFormat;
 }
 
-static String getFormatForSkeleton(const char* locale, const String& skeleton)
+static String getFormatForSkeleton(const char* locale, const UChar* skeleton, int32_t skeletonLength)
 {
     String format = ASCIILiteral("yyyy-MM");
     UErrorCode status = U_ZERO_ERROR;
@@ -277,11 +271,11 @@ static String getFormatForSkeleton(const char* locale, const String& skeleton)
     if (!patternGenerator)
         return format;
     status = U_ZERO_ERROR;
-    int32_t length = udatpg_getBestPattern(patternGenerator, skeleton.characters(), skeleton.length(), 0, 0, &status);
+    int32_t length = udatpg_getBestPattern(patternGenerator, skeleton, skeletonLength, 0, 0, &status);
     if (status == U_BUFFER_OVERFLOW_ERROR && length) {
         Vector<UChar> buffer(length);
         status = U_ZERO_ERROR;
-        udatpg_getBestPattern(patternGenerator, skeleton.characters(), skeleton.length(), buffer.data(), length, &status);
+        udatpg_getBestPattern(patternGenerator, skeleton, skeletonLength, buffer.data(), length, &status);
         if (U_SUCCESS(status))
             format = String::adopt(buffer);
     }
@@ -295,7 +289,8 @@ String LocaleICU::monthFormat()
         return m_monthFormat;
     // Gets a format for "MMMM" because Windows API always provides formats for
     // "MMMM" in some locales.
-    m_monthFormat = getFormatForSkeleton(m_locale.data(), ASCIILiteral("yyyyMMMM"));
+    const UChar skeleton[] = { 'y', 'y', 'y', 'y', 'M', 'M', 'M', 'M' };
+    m_monthFormat = getFormatForSkeleton(m_locale.data(), skeleton, WTF_ARRAY_LENGTH(skeleton));
     return m_monthFormat;
 }
 
@@ -303,7 +298,8 @@ String LocaleICU::shortMonthFormat()
 {
     if (!m_shortMonthFormat.isNull())
         return m_shortMonthFormat;
-    m_shortMonthFormat = getFormatForSkeleton(m_locale.data(), ASCIILiteral("yyyyMMM"));
+    const UChar skeleton[] = { 'y', 'y', 'y', 'y', 'M', 'M', 'M' };
+    m_shortMonthFormat = getFormatForSkeleton(m_locale.data(), skeleton, WTF_ARRAY_LENGTH(skeleton));
     return m_shortMonthFormat;
 }
 
@@ -336,7 +332,7 @@ const Vector<String>& LocaleICU::shortMonthLabels()
     if (!m_shortMonthLabels.isEmpty())
         return m_shortMonthLabels;
     if (initializeShortDateFormat()) {
-        if (OwnPtr<Vector<String> > labels = createLabelVector(m_shortDateFormat, UDAT_SHORT_MONTHS, UCAL_JANUARY, 12)) {
+        if (auto labels = createLabelVector(m_shortDateFormat, UDAT_SHORT_MONTHS, UCAL_JANUARY, 12)) {
             m_shortMonthLabels = *labels;
             return m_shortMonthLabels;
         }
@@ -352,7 +348,7 @@ const Vector<String>& LocaleICU::standAloneMonthLabels()
     if (!m_standAloneMonthLabels.isEmpty())
         return m_standAloneMonthLabels;
     if (initializeShortDateFormat()) {
-        if (OwnPtr<Vector<String> > labels = createLabelVector(m_shortDateFormat, UDAT_STANDALONE_MONTHS, UCAL_JANUARY, 12)) {
+        if (auto labels = createLabelVector(m_shortDateFormat, UDAT_STANDALONE_MONTHS, UCAL_JANUARY, 12)) {
             m_standAloneMonthLabels = *labels;
             return m_standAloneMonthLabels;
         }
@@ -366,7 +362,7 @@ const Vector<String>& LocaleICU::shortStandAloneMonthLabels()
     if (!m_shortStandAloneMonthLabels.isEmpty())
         return m_shortStandAloneMonthLabels;
     if (initializeShortDateFormat()) {
-        if (OwnPtr<Vector<String> > labels = createLabelVector(m_shortDateFormat, UDAT_STANDALONE_SHORT_MONTHS, UCAL_JANUARY, 12)) {
+        if (auto labels = createLabelVector(m_shortDateFormat, UDAT_STANDALONE_SHORT_MONTHS, UCAL_JANUARY, 12)) {
             m_shortStandAloneMonthLabels = *labels;
             return m_shortStandAloneMonthLabels;
         }

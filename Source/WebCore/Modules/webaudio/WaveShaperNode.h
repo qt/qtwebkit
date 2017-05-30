@@ -34,9 +34,9 @@ namespace WebCore {
     
 class WaveShaperNode : public AudioBasicProcessorNode {
 public:
-    static PassRefPtr<WaveShaperNode> create(AudioContext* context)
+    static Ref<WaveShaperNode> create(AudioContext& context)
     {
-        return adoptRef(new WaveShaperNode(context));
+        return adoptRef(*new WaveShaperNode(context));
     }
 
     // setCurve() is called on the main thread.
@@ -49,7 +49,7 @@ public:
     double latency() const { return latencyTime(); }
 
 private:    
-    explicit WaveShaperNode(AudioContext*);    
+    explicit WaveShaperNode(AudioContext&);    
 
     WaveShaperProcessor* waveShaperProcessor() { return static_cast<WaveShaperProcessor*>(processor()); }
 };

@@ -30,6 +30,7 @@
 #include "WebIconDatabaseMessages.h"
 #include "WebIconDatabaseProxyMessages.h"
 #include "WebProcess.h"
+#include "WebProcessProxyMessages.h"
 #include <WebCore/SharedBuffer.h>
 #include <wtf/text/WTFString.h>
 
@@ -45,7 +46,7 @@ WebIconDatabaseProxy::WebIconDatabaseProxy(WebProcess* process)
     : m_isEnabled(false)
     , m_process(process)
 {
-    m_process->addMessageReceiver(Messages::WebIconDatabaseProxy::messageReceiverName(), this);
+    m_process->addMessageReceiver(Messages::WebIconDatabaseProxy::messageReceiverName(), *this);
 }
 
 bool WebIconDatabaseProxy::isEnabled() const
@@ -64,17 +65,17 @@ void WebIconDatabaseProxy::setEnabled(bool enabled)
 
 void WebIconDatabaseProxy::retainIconForPageURL(const String& pageURL)
 {
-    m_process->parentProcessConnection()->send(Messages::WebIconDatabase::RetainIconForPageURL(pageURL), 0);
+    m_process->parentProcessConnection()->send(Messages::WebProcessProxy::RetainIconForPageURL(pageURL), 0);
 }
 
 void WebIconDatabaseProxy::releaseIconForPageURL(const String& pageURL)
 {
-    m_process->parentProcessConnection()->send(Messages::WebIconDatabase::ReleaseIconForPageURL(pageURL), 0);
+    m_process->parentProcessConnection()->send(Messages::WebProcessProxy::ReleaseIconForPageURL(pageURL), 0);
 }
 
 Image* WebIconDatabaseProxy::synchronousIconForPageURL(const String& pageURL, const IntSize& /*size*/)
 {
-    CoreIPC::DataReference result;
+    IPC::DataReference result;
     if (!m_process->parentProcessConnection()->sendSync(Messages::WebIconDatabase::SynchronousIconDataForPageURL(pageURL), Messages::WebIconDatabase::SynchronousIconDataForPageURL::Reply(result), 0))
         return 0;
     
@@ -135,7 +136,7 @@ void WebIconDatabaseProxy::setIconURLForPageURL(const String& iconURL, const Str
 
 void WebIconDatabaseProxy::setIconDataForIconURL(PassRefPtr<SharedBuffer> iconData, const String& iconURL)
 {
-    CoreIPC::DataReference data(reinterpret_cast<const uint8_t*>(iconData ? iconData->data() : 0), iconData ? iconData->size() : 0);
+    IPC::DataReference data(reinterpret_cast<const uint8_t*>(iconData ? iconData->data() : 0), iconData ? iconData->size() : 0);
     m_process->parentProcessConnection()->send(Messages::WebIconDatabase::SetIconDataForIconURL(data, iconURL), 0);
 }
 

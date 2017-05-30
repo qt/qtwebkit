@@ -61,11 +61,11 @@ static int64_t generateFormDataIdentifier()
     return ++nextIdentifier;
 }
 
-static void appendMailtoPostFormDataToURL(KURL& url, const FormData& data, const String& encodingType)
+static void appendMailtoPostFormDataToURL(URL& url, const FormData& data, const String& encodingType)
 {
     String body = data.flattenToString();
 
-    if (equalIgnoringCase(encodingType, "text/plain")) {
+    if (equalLettersIgnoringASCIICase(encodingType, "text/plain")) {
         // Convention seems to be to decode, and s/&/\r\n/. Also, spaces are encoded as %20.
         body = decodeURLEscapeSequences(body.replaceWithLiteral('&', "\r\n").replace('+', ' ') + "\r\n");
     }
@@ -76,23 +76,23 @@ static void appendMailtoPostFormDataToURL(KURL& url, const FormData& data, const
     body = String(bodyData.data(), bodyData.size()).replaceWithLiteral('+', "%20");
 
     String query = url.query();
-    if (!query.isEmpty())
-        query.append('&');
-    query.append(body);
-    url.setQuery(query);
+    if (query.isEmpty())
+        url.setQuery(body);
+    else
+        url.setQuery(query + '&' + body);
 }
 
 void FormSubmission::Attributes::parseAction(const String& action)
 {
-    // FIXME: Can we parse into a KURL?
+    // FIXME: Can we parse into a URL?
     m_action = stripLeadingAndTrailingHTMLSpaces(action);
 }
 
 String FormSubmission::Attributes::parseEncodingType(const String& type)
 {
-    if (equalIgnoringCase(type, "multipart/form-data"))
+    if (equalLettersIgnoringASCIICase(type, "multipart/form-data"))
         return "multipart/form-data";
-    if (equalIgnoringCase(type, "text/plain"))
+    if (equalLettersIgnoringASCIICase(type, "text/plain"))
         return "text/plain";
     return "application/x-www-form-urlencoded";
 }
@@ -105,7 +105,7 @@ void FormSubmission::Attributes::updateEncodingType(const String& type)
 
 FormSubmission::Method FormSubmission::Attributes::parseMethodType(const String& type)
 {
-    return equalIgnoringCase(type, "post") ? FormSubmission::PostMethod : FormSubmission::GetMethod;
+    return equalLettersIgnoringASCIICase(type, "post") ? FormSubmission::PostMethod : FormSubmission::GetMethod;
 }
 
 void FormSubmission::Attributes::updateMethodType(const String& type)
@@ -124,7 +124,7 @@ void FormSubmission::Attributes::copyFrom(const Attributes& other)
     m_acceptCharset = other.m_acceptCharset;
 }
 
-inline FormSubmission::FormSubmission(Method method, const KURL& action, const String& target, const String& contentType, PassRefPtr<FormState> state, PassRefPtr<FormData> data, const String& boundary, bool lockHistory, PassRefPtr<Event> event)
+inline FormSubmission::FormSubmission(Method method, const URL& action, const String& target, const String& contentType, PassRefPtr<FormState> state, PassRefPtr<FormData> data, const String& boundary, LockHistory lockHistory, PassRefPtr<Event> event)
     : m_method(method)
     , m_action(action)
     , m_target(target)
@@ -137,15 +137,32 @@ inline FormSubmission::FormSubmission(Method method, const KURL& action, const S
 {
 }
 
-PassRefPtr<FormSubmission> FormSubmission::create(HTMLFormElement* form, const Attributes& attributes, PassRefPtr<Event> event, bool lockHistory, FormSubmissionTrigger trigger)
+static TextEncoding encodingFromAcceptCharset(const String& acceptCharset, Document& document)
+{
+    String normalizedAcceptCharset = acceptCharset;
+    normalizedAcceptCharset.replace(',', ' ');
+
+    Vector<String> charsets;
+    normalizedAcceptCharset.split(' ', charsets);
+
+    for (auto& charset : charsets) {
+        TextEncoding encoding(charset);
+        if (encoding.isValid())
+            return encoding;
+    }
+
+    return document.textEncoding();
+}
+
+Ref<FormSubmission> FormSubmission::create(HTMLFormElement* form, const Attributes& attributes, PassRefPtr<Event> event, LockHistory lockHistory, FormSubmissionTrigger trigger)
 {
     ASSERT(form);
 
-    HTMLFormControlElement* submitButton = 0;
+    HTMLFormControlElement* submitButton = nullptr;
     if (event && event->target()) {
         for (Node* node = event->target()->toNode(); node; node = node->parentNode()) {
-            if (node->isElementNode() && toElement(node)->isFormControlElement()) {
-                submitButton = static_cast<HTMLFormControlElement*>(node);
+            if (is<HTMLFormControlElement>(*node)) {
+                submitButton = downcast<HTMLFormControlElement>(node);
                 break;
             }
         }
@@ -154,19 +171,19 @@ PassRefPtr<FormSubmission> FormSubmission::create(HTMLFormElement* form, const A
     FormSubmission::Attributes copiedAttributes;
     copiedAttributes.copyFrom(attributes);
     if (submitButton) {
-        String attributeValue;
-        if (!(attributeValue = submitButton->getAttribute(formactionAttr)).isNull())
+        AtomicString attributeValue;
+        if (!(attributeValue = submitButton->fastGetAttribute(formactionAttr)).isNull())
             copiedAttributes.parseAction(attributeValue);
-        if (!(attributeValue = submitButton->getAttribute(formenctypeAttr)).isNull())
+        if (!(attributeValue = submitButton->fastGetAttribute(formenctypeAttr)).isNull())
             copiedAttributes.updateEncodingType(attributeValue);
-        if (!(attributeValue = submitButton->getAttribute(formmethodAttr)).isNull())
+        if (!(attributeValue = submitButton->fastGetAttribute(formmethodAttr)).isNull())
             copiedAttributes.updateMethodType(attributeValue);
-        if (!(attributeValue = submitButton->getAttribute(formtargetAttr)).isNull())
+        if (!(attributeValue = submitButton->fastGetAttribute(formtargetAttr)).isNull())
             copiedAttributes.setTarget(attributeValue);
     }
     
-    Document* document = form->document();
-    KURL actionURL = document->completeURL(copiedAttributes.action().isEmpty() ? document->url().string() : copiedAttributes.action());
+    Document& document = form->document();
+    URL actionURL = document.completeURL(copiedAttributes.action().isEmpty() ? document.url().string() : copiedAttributes.action());
     bool isMailtoForm = actionURL.protocolIs("mailto");
     bool isMultiPartForm = false;
     String encodingType = copiedAttributes.encodingType();
@@ -179,23 +196,22 @@ PassRefPtr<FormSubmission> FormSubmission::create(HTMLFormElement* form, const A
         }
     }
 
-    TextEncoding dataEncoding = isMailtoForm ? UTF8Encoding() : FormDataBuilder::encodingFromAcceptCharset(copiedAttributes.acceptCharset(), document);
+    TextEncoding dataEncoding = isMailtoForm ? UTF8Encoding() : encodingFromAcceptCharset(copiedAttributes.acceptCharset(), document);
     RefPtr<DOMFormData> domFormData = DOMFormData::create(dataEncoding.encodingForFormSubmission());
-    Vector<pair<String, String> > formValues;
+    Vector<std::pair<String, String>> formValues;
 
     bool containsPasswordData = false;
-    for (unsigned i = 0; i < form->associatedElements().size(); ++i) {
-        FormAssociatedElement* control = form->associatedElements()[i];
-        HTMLElement* element = toHTMLElement(control);
-        if (!element->isDisabledFormControl())
+    for (auto& control : form->associatedElements()) {
+        HTMLElement& element = control->asHTMLElement();
+        if (!element.isDisabledFormControl())
             control->appendFormData(*domFormData, isMultiPartForm);
-        if (isHTMLInputElement(element)) {
-            HTMLInputElement* input = toHTMLInputElement(element);
-            if (input->isTextField()) {
-                formValues.append(pair<String, String>(input->name().string(), input->value()));
-                input->addSearchResult();
+        if (is<HTMLInputElement>(element)) {
+            HTMLInputElement& input = downcast<HTMLInputElement>(element);
+            if (input.isTextField()) {
+                formValues.append(std::pair<String, String>(input.name().string(), input.value()));
+                input.addSearchResult();
             }
-            if (input->isPasswordField() && !input->value().isEmpty())
+            if (input.isPasswordField() && !input.value().isEmpty())
                 containsPasswordData = true;
         }
     }
@@ -204,7 +220,7 @@ PassRefPtr<FormSubmission> FormSubmission::create(HTMLFormElement* form, const A
     String boundary;
 
     if (isMultiPartForm) {
-        formData = FormData::createMultiPart(*(static_cast<FormDataList*>(domFormData.get())), domFormData->encoding(), document);
+        formData = FormData::createMultiPart(*(static_cast<FormDataList*>(domFormData.get())), domFormData->encoding(), &document);
         boundary = formData->boundary().data();
     } else {
         formData = FormData::create(*(static_cast<FormDataList*>(domFormData.get())), domFormData->encoding(), attributes.method() == GetMethod ? FormData::FormURLEncoded : FormData::parseEncodingType(encodingType));
@@ -217,17 +233,17 @@ PassRefPtr<FormSubmission> FormSubmission::create(HTMLFormElement* form, const A
 
     formData->setIdentifier(generateFormDataIdentifier());
     formData->setContainsPasswordData(containsPasswordData);
-    String targetOrBaseTarget = copiedAttributes.target().isEmpty() ? document->baseTarget() : copiedAttributes.target();
-    RefPtr<FormState> formState = FormState::create(form, formValues, document, trigger);
-    return adoptRef(new FormSubmission(copiedAttributes.method(), actionURL, targetOrBaseTarget, encodingType, formState.release(), formData.release(), boundary, lockHistory, event));
+    String targetOrBaseTarget = copiedAttributes.target().isEmpty() ? document.baseTarget() : copiedAttributes.target();
+    RefPtr<FormState> formState = FormState::create(form, formValues, &document, trigger);
+    return adoptRef(*new FormSubmission(copiedAttributes.method(), actionURL, targetOrBaseTarget, encodingType, formState.release(), formData.release(), boundary, lockHistory, event));
 }
 
-KURL FormSubmission::requestURL() const
+URL FormSubmission::requestURL() const
 {
     if (m_method == FormSubmission::PostMethod)
         return m_action;
 
-    KURL requestURL(m_action);
+    URL requestURL(m_action);
     requestURL.setQuery(m_formData->flattenToString());    
     return requestURL;
 }
@@ -242,7 +258,7 @@ void FormSubmission::populateFrameLoadRequest(FrameLoadRequest& frameRequest)
 
     if (m_method == FormSubmission::PostMethod) {
         frameRequest.resourceRequest().setHTTPMethod("POST");
-        frameRequest.resourceRequest().setHTTPBody(m_formData);
+        frameRequest.resourceRequest().setHTTPBody(m_formData.copyRef());
 
         // construct some user headers if necessary
         if (m_boundary.isEmpty())

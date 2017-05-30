@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006, 2007, 2009 Apple Inc. All rights reserved.
+ * Copyright (C) 2006-2007, 2009, 2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution. 
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission. 
  *
@@ -30,33 +30,47 @@
 #include "SubresourceLoader.h"
 
 #include "CachedResourceLoader.h"
+#include "CrossOriginAccessControl.h"
+#include "DiagnosticLoggingClient.h"
+#include "DiagnosticLoggingKeys.h"
 #include "Document.h"
 #include "DocumentLoader.h"
 #include "Frame.h"
 #include "FrameLoader.h"
 #include "Logging.h"
+#include "MainFrame.h"
 #include "MemoryCache.h"
 #include "Page.h"
-#include "PageActivityAssertionToken.h"
-#include "ResourceBuffer.h"
+#include "ResourceLoadObserver.h"
+#include "Settings.h"
+#include <wtf/Ref.h>
 #include <wtf/RefCountedLeakCounter.h>
 #include <wtf/StdLibExtras.h>
+#include <wtf/TemporaryChange.h>
 #include <wtf/text/CString.h>
+
+#if PLATFORM(IOS)
+#include <RuntimeApplicationChecksIOS.h>
+#endif
+
+#if ENABLE(CONTENT_EXTENSIONS)
+#include "ResourceLoadInfo.h"
+#endif
 
 namespace WebCore {
 
 DEFINE_DEBUG_ONLY_GLOBAL(WTF::RefCountedLeakCounter, subresourceLoaderCounter, ("SubresourceLoader"));
 
-SubresourceLoader::RequestCountTracker::RequestCountTracker(CachedResourceLoader* cachedResourceLoader, CachedResource* resource)
+SubresourceLoader::RequestCountTracker::RequestCountTracker(CachedResourceLoader& cachedResourceLoader, CachedResource* resource)
     : m_cachedResourceLoader(cachedResourceLoader)
     , m_resource(resource)
 {
-    m_cachedResourceLoader->incrementRequestCount(m_resource);
+    m_cachedResourceLoader.incrementRequestCount(m_resource);
 }
 
 SubresourceLoader::RequestCountTracker::~RequestCountTracker()
 {
-    m_cachedResourceLoader->decrementRequestCount(m_resource);
+    m_cachedResourceLoader.decrementRequestCount(m_resource);
 }
 
 SubresourceLoader::SubresourceLoader(Frame* frame, CachedResource* resource, const ResourceLoaderOptions& options)
@@ -64,10 +78,13 @@ SubresourceLoader::SubresourceLoader(Frame* frame, CachedResource* resource, con
     , m_resource(resource)
     , m_loadingMultipartContent(false)
     , m_state(Uninitialized)
-    , m_requestCountTracker(adoptPtr(new RequestCountTracker(frame->document()->cachedResourceLoader(), resource)))
+    , m_requestCountTracker(std::make_unique<RequestCountTracker>(frame->document()->cachedResourceLoader(), resource))
 {
 #ifndef NDEBUG
     subresourceLoaderCounter.increment();
+#endif
+#if ENABLE(CONTENT_EXTENSIONS)
+    m_resourceType = toResourceType(resource->type());
 #endif
 }
 
@@ -80,13 +97,34 @@ SubresourceLoader::~SubresourceLoader()
 #endif
 }
 
-PassRefPtr<SubresourceLoader> SubresourceLoader::create(Frame* frame, CachedResource* resource, const ResourceRequest& request, const ResourceLoaderOptions& options)
+RefPtr<SubresourceLoader> SubresourceLoader::create(Frame* frame, CachedResource* resource, const ResourceRequest& request, const ResourceLoaderOptions& options)
 {
     RefPtr<SubresourceLoader> subloader(adoptRef(new SubresourceLoader(frame, resource, options)));
+#if PLATFORM(IOS)
+    if (!applicationIsWebProcess()) {
+        // On iOS, do not invoke synchronous resource load delegates while resource load scheduling
+        // is disabled to avoid re-entering style selection from a different thread (see <rdar://problem/9121719>).
+        // FIXME: This should be fixed for all ports in <https://bugs.webkit.org/show_bug.cgi?id=56647>.
+        subloader->m_iOSOriginalRequest = request;
+        return subloader.release();
+    }
+#endif
     if (!subloader->init(request))
-        return 0;
-    return subloader.release();
+        return nullptr;
+    return subloader;
 }
+    
+#if PLATFORM(IOS)
+bool SubresourceLoader::startLoading()
+{
+    ASSERT(!applicationIsWebProcess());
+    if (!init(m_iOSOriginalRequest))
+        return false;
+    m_iOSOriginalRequest = ResourceRequest();
+    start();
+    return true;
+}
+#endif
 
 CachedResource* SubresourceLoader::cachedResource()
 {
@@ -108,9 +146,14 @@ bool SubresourceLoader::init(const ResourceRequest& request)
 
     ASSERT(!reachedTerminalState());
     m_state = Initialized;
-    if (m_frame && m_frame->page() && !m_activityAssertion)
-        m_activityAssertion = m_frame->page()->createActivityToken();
     m_documentLoader->addSubresourceLoader(this);
+
+    // FIXME: https://bugs.webkit.org/show_bug.cgi?id=155633.
+    // SubresourceLoader could use the document origin as a default and set PotentiallyCrossOriginEnabled requests accordingly.
+    // This would simplify resource loader users as they would only need to set the policy to PotentiallyCrossOriginEnabled.
+    if (options().requestOriginPolicy() == PotentiallyCrossOriginEnabled)
+        m_origin = SecurityOrigin::createFromString(request.httpOrigin());
+
     return true;
 }
 
@@ -119,11 +162,16 @@ bool SubresourceLoader::isSubresourceLoader()
     return true;
 }
 
-void SubresourceLoader::willSendRequest(ResourceRequest& newRequest, const ResourceResponse& redirectResponse)
+void SubresourceLoader::willSendRequestInternal(ResourceRequest& newRequest, const ResourceResponse& redirectResponse)
 {
     // Store the previous URL because the call to ResourceLoader::willSendRequest will modify it.
-    KURL previousURL = request().url();
-    RefPtr<SubresourceLoader> protect(this);
+    URL previousURL = request().url();
+    Ref<SubresourceLoader> protect(*this);
+
+    if (!newRequest.url().isValid()) {
+        cancel(cannotShowURLError());
+        return;
+    }
 
     ASSERT(!newRequest.isNull());
     if (!redirectResponse.isNull()) {
@@ -133,32 +181,43 @@ void SubresourceLoader::willSendRequest(ResourceRequest& newRequest, const Resou
         // Doing so would have us reusing the resource from the first request if the second request's revalidation succeeds.
         if (newRequest.isConditional() && m_resource->resourceToRevalidate() && newRequest.url() != m_resource->resourceToRevalidate()->response().url()) {
             newRequest.makeUnconditional();
-            memoryCache()->revalidationFailed(m_resource);
+            MemoryCache::singleton().revalidationFailed(*m_resource);
+            if (m_frame)
+                m_frame->mainFrame().diagnosticLoggingClient().logDiagnosticMessageWithResult(DiagnosticLoggingKeys::cachedResourceRevalidationKey(), emptyString(), DiagnosticLoggingResultFail, ShouldSample::Yes);
         }
         
-        if (!m_documentLoader->cachedResourceLoader()->canRequest(m_resource->type(), newRequest.url(), options())) {
+        if (!m_documentLoader->cachedResourceLoader().canRequest(m_resource->type(), newRequest.url(), options())) {
             cancel();
             return;
         }
-        if (m_resource->type() == CachedResource::ImageResource && m_documentLoader->cachedResourceLoader()->shouldDeferImageLoad(newRequest.url())) {
+
+        if (options().requestOriginPolicy() == PotentiallyCrossOriginEnabled && !checkCrossOriginAccessControl(request(), redirectResponse, newRequest)) {
             cancel();
             return;
         }
-        m_resource->willSendRequest(newRequest, redirectResponse);
+
+        if (m_resource->isImage() && m_documentLoader->cachedResourceLoader().shouldDeferImageLoad(newRequest.url())) {
+            cancel();
+            return;
+        }
+        m_resource->redirectReceived(newRequest, redirectResponse);
     }
 
     if (newRequest.isNull() || reachedTerminalState())
         return;
 
-    ResourceLoader::willSendRequest(newRequest, redirectResponse);
+    ResourceLoader::willSendRequestInternal(newRequest, redirectResponse);
     if (newRequest.isNull())
         cancel();
+
+    if (Settings::resourceLoadStatisticsEnabled())
+        ResourceLoadObserver::sharedObserver().logSubresourceLoading(!redirectResponse.isNull(), redirectResponse.url(), newRequest.url(), m_frame ? m_frame->mainFrame().document()->url() : URL());
 }
 
 void SubresourceLoader::didSendData(unsigned long long bytesSent, unsigned long long totalBytesToBeSent)
 {
     ASSERT(m_state == Initialized);
-    RefPtr<SubresourceLoader> protect(this);
+    Ref<SubresourceLoader> protect(*this);
     m_resource->didSendData(bytesSent, totalBytesToBeSent);
 }
 
@@ -169,20 +228,35 @@ void SubresourceLoader::didReceiveResponse(const ResourceResponse& response)
 
     // Reference the object in this method since the additional processing can do
     // anything including removing the last reference to this object; one example of this is 3266216.
-    RefPtr<SubresourceLoader> protect(this);
+    Ref<SubresourceLoader> protect(*this);
+
+    if (shouldIncludeCertificateInfo())
+        response.includeCertificateInfo();
+
+    if (response.isHttpVersion0_9()) {
+        if (m_frame) {
+            String message = "Sandboxing '" + response.url().string() + "' because it is using HTTP/0.9.";
+            m_frame->document()->addConsoleMessage(MessageSource::Security, MessageLevel::Error, message, identifier());
+            frameLoader()->forceSandboxFlags(SandboxScripts | SandboxPlugins);
+        }
+    }
 
     if (m_resource->resourceToRevalidate()) {
         if (response.httpStatusCode() == 304) {
             // 304 Not modified / Use local copy
             // Existing resource is ok, just use it updating the expiration time.
             m_resource->setResponse(response);
-            memoryCache()->revalidationSucceeded(m_resource, response);
+            MemoryCache::singleton().revalidationSucceeded(*m_resource, response);
+            if (m_frame)
+                m_frame->mainFrame().diagnosticLoggingClient().logDiagnosticMessageWithResult(DiagnosticLoggingKeys::cachedResourceRevalidationKey(), emptyString(), DiagnosticLoggingResultPass, ShouldSample::Yes);
             if (!reachedTerminalState())
                 ResourceLoader::didReceiveResponse(response);
             return;
         }
         // Did not get 304 response, continue as a regular resource load.
-        memoryCache()->revalidationFailed(m_resource);
+        MemoryCache::singleton().revalidationFailed(*m_resource);
+        if (m_frame)
+            m_frame->mainFrame().diagnosticLoggingClient().logDiagnosticMessageWithResult(DiagnosticLoggingKeys::cachedResourceRevalidationKey(), emptyString(), DiagnosticLoggingResultFail, ShouldSample::Yes);
     }
 
     m_resource->responseReceived(response);
@@ -199,18 +273,17 @@ void SubresourceLoader::didReceiveResponse(const ResourceResponse& response)
         m_loadingMultipartContent = true;
 
         // We don't count multiParts in a CachedResourceLoader's request count
-        m_requestCountTracker.clear();
+        m_requestCountTracker = nullptr;
         if (!m_resource->isImage()) {
             cancel();
             return;
         }
     }
 
-    RefPtr<ResourceBuffer> buffer = resourceData();
+    auto* buffer = resourceData();
     if (m_loadingMultipartContent && buffer && buffer->size()) {
         // The resource data will change as the next part is loaded, so we need to make a copy.
-        RefPtr<ResourceBuffer> copiedData = ResourceBuffer::create(buffer->data(), buffer->size());
-        m_resource->finishLoading(copiedData.get());
+        m_resource->finishLoading(buffer->copy().ptr());
         clearResourceData();
         // Since a subresource loader does not load multipart sections progressively, data was delivered to the loader all at once.        
         // After the first multipart section is complete, signal to delegates that this load is "finished" 
@@ -221,7 +294,7 @@ void SubresourceLoader::didReceiveResponse(const ResourceResponse& response)
     checkForHTTPStatusCodeError();
 }
 
-void SubresourceLoader::didReceiveData(const char* data, int length, long long encodedDataLength, DataPayloadType dataPayloadType)
+void SubresourceLoader::didReceiveData(const char* data, unsigned length, long long encodedDataLength, DataPayloadType dataPayloadType)
 {
     didReceiveDataOrBuffer(data, length, 0, encodedDataLength, dataPayloadType);
 }
@@ -240,14 +313,14 @@ void SubresourceLoader::didReceiveDataOrBuffer(const char* data, int length, Pas
     ASSERT(m_state == Initialized);
     // Reference the object in this method since the additional processing can do
     // anything including removing the last reference to this object; one example of this is 3266216.
-    RefPtr<SubresourceLoader> protect(this);
+    Ref<SubresourceLoader> protect(*this);
     RefPtr<SharedBuffer> buffer = prpBuffer;
     
     ResourceLoader::didReceiveDataOrBuffer(data, length, buffer, encodedDataLength, dataPayloadType);
 
     if (!m_loadingMultipartContent) {
-        if (ResourceBuffer* resourceData = this->resourceData())
-            m_resource->addDataBuffer(resourceData);
+        if (auto* resourceData = this->resourceData())
+            m_resource->addDataBuffer(*resourceData);
         else
             m_resource->addData(buffer ? buffer->data() : data, buffer ? buffer->size() : length);
     }
@@ -259,9 +332,80 @@ bool SubresourceLoader::checkForHTTPStatusCodeError()
         return false;
 
     m_state = Finishing;
-    m_activityAssertion.clear();
     m_resource->error(CachedResource::LoadError);
     cancel();
+    return true;
+}
+
+static void logResourceLoaded(Frame* frame, CachedResource::Type type)
+{
+    if (!frame)
+        return;
+
+    String resourceType;
+    switch (type) {
+    case CachedResource::MainResource:
+        resourceType = DiagnosticLoggingKeys::mainResourceKey();
+        break;
+    case CachedResource::ImageResource:
+        resourceType = DiagnosticLoggingKeys::imageKey();
+        break;
+#if ENABLE(XSLT)
+    case CachedResource::XSLStyleSheet:
+#endif
+    case CachedResource::CSSStyleSheet:
+        resourceType = DiagnosticLoggingKeys::styleSheetKey();
+        break;
+    case CachedResource::Script:
+        resourceType = DiagnosticLoggingKeys::scriptKey();
+        break;
+    case CachedResource::FontResource:
+#if ENABLE(SVG_FONTS)
+    case CachedResource::SVGFontResource:
+#endif
+        resourceType = DiagnosticLoggingKeys::fontKey();
+        break;
+    case CachedResource::RawResource:
+        resourceType = DiagnosticLoggingKeys::rawKey();
+        break;
+    case CachedResource::SVGDocumentResource:
+        resourceType = DiagnosticLoggingKeys::svgDocumentKey();
+        break;
+#if ENABLE(LINK_PREFETCH)
+    case CachedResource::LinkPrefetch:
+    case CachedResource::LinkSubresource:
+#endif
+#if ENABLE(VIDEO_TRACK)
+    case CachedResource::TextTrackResource:
+#endif
+        resourceType = DiagnosticLoggingKeys::otherKey();
+        break;
+    }
+    frame->mainFrame().diagnosticLoggingClient().logDiagnosticMessageWithValue(DiagnosticLoggingKeys::resourceKey(), DiagnosticLoggingKeys::loadedKey(), resourceType, ShouldSample::Yes);
+}
+
+bool SubresourceLoader::checkCrossOriginAccessControl(const ResourceRequest& previousRequest, const ResourceResponse& redirectResponse, ResourceRequest& newRequest)
+{
+    if (m_origin->canRequest(newRequest.url()))
+        return true;
+
+    String errorDescription;
+    bool responsePassesCORS = m_origin->canRequest(previousRequest.url())
+        || passesAccessControlCheck(redirectResponse, options().allowCredentials(), m_origin.get(), errorDescription);
+    if (!responsePassesCORS || !isValidCrossOriginRedirectionURL(newRequest.url())) {
+        if (m_frame && m_frame->document()) {
+            String errorMessage = "Cross-origin redirection denied by Cross-Origin Resource Sharing policy: " +
+                (!responsePassesCORS ? errorDescription : "Redirected to either a non-HTTP URL or a URL that contains credentials.");
+            m_frame->document()->addConsoleMessage(MessageSource::Security, MessageLevel::Error, errorMessage);
+        }
+        return false;
+    }
+
+    // If the request URL origin is not the same as the original origin, the request origin should be set to a globally unique identifier.
+    m_origin = SecurityOrigin::createUnique();
+    cleanRedirectedRequestForAccessControl(newRequest);
+    updateRequestForAccessControl(newRequest, m_origin.get(), options().allowCredentials());
+
     return true;
 }
 
@@ -271,13 +415,15 @@ void SubresourceLoader::didFinishLoading(double finishTime)
         return;
     ASSERT(!reachedTerminalState());
     ASSERT(!m_resource->resourceToRevalidate());
-    ASSERT(!m_resource->errorOccurred());
+    // FIXME (129394): We should cancel the load when a decode error occurs instead of continuing the load to completion.
+    ASSERT(!m_resource->errorOccurred() || m_resource->status() == CachedResource::DecodeError);
     LOG(ResourceLoading, "Received '%s'.", m_resource->url().string().latin1().data());
+    logResourceLoaded(m_frame.get(), m_resource->type());
 
-    RefPtr<SubresourceLoader> protect(this);
+    Ref<SubresourceLoader> protect(*this);
     CachedResourceHandle<CachedResource> protectResource(m_resource);
+
     m_state = Finishing;
-    m_activityAssertion.clear();
     m_resource->setLoadFinishTime(finishTime);
     m_resource->finishLoading(resourceData());
 
@@ -299,15 +445,14 @@ void SubresourceLoader::didFail(const ResourceError& error)
     ASSERT(!reachedTerminalState());
     LOG(ResourceLoading, "Failed to load '%s'.\n", m_resource->url().string().latin1().data());
 
-    RefPtr<SubresourceLoader> protect(this);
+    Ref<SubresourceLoader> protect(*this);
     CachedResourceHandle<CachedResource> protectResource(m_resource);
     m_state = Finishing;
-    m_activityAssertion.clear();
     if (m_resource->resourceToRevalidate())
-        memoryCache()->revalidationFailed(m_resource);
+        MemoryCache::singleton().revalidationFailed(*m_resource);
     m_resource->setResourceError(error);
     if (!m_resource->isPreloaded())
-        memoryCache()->remove(m_resource);
+        MemoryCache::singleton().remove(*m_resource);
     m_resource->error(CachedResource::LoadError);
     cleanupForError(error);
     notifyDone();
@@ -318,18 +463,29 @@ void SubresourceLoader::didFail(const ResourceError& error)
 
 void SubresourceLoader::willCancel(const ResourceError& error)
 {
+#if PLATFORM(IOS)
+    // Since we defer initialization to scheduling time on iOS but
+    // CachedResourceLoader stores resources in the memory cache immediately,
+    // m_resource might be cached despite its loader not being initialized.
+    if (m_state != Initialized && m_state != Uninitialized)
+#else
     if (m_state != Initialized)
+#endif
         return;
     ASSERT(!reachedTerminalState());
     LOG(ResourceLoading, "Cancelled load of '%s'.\n", m_resource->url().string().latin1().data());
 
-    RefPtr<SubresourceLoader> protect(this);
+    Ref<SubresourceLoader> protect(*this);
+#if PLATFORM(IOS)
+    m_state = m_state == Uninitialized ? CancelledWhileInitializing : Finishing;
+#else
     m_state = Finishing;
-    m_activityAssertion.clear();
+#endif
+    auto& memoryCache = MemoryCache::singleton();
     if (m_resource->resourceToRevalidate())
-        memoryCache()->revalidationFailed(m_resource);
+        memoryCache.revalidationFailed(*m_resource);
     m_resource->setResourceError(error);
-    memoryCache()->remove(m_resource);
+    memoryCache.remove(*m_resource);
 }
 
 void SubresourceLoader::didCancel(const ResourceError&)
@@ -346,8 +502,12 @@ void SubresourceLoader::notifyDone()
     if (reachedTerminalState())
         return;
 
-    m_requestCountTracker.clear();
-    m_documentLoader->cachedResourceLoader()->loadDone(m_resource);
+    m_requestCountTracker = nullptr;
+#if PLATFORM(IOS)
+    m_documentLoader->cachedResourceLoader().loadDone(m_resource, m_state != CancelledWhileInitializing);
+#else
+    m_documentLoader->cachedResourceLoader().loadDone(m_resource);
+#endif
     if (reachedTerminalState())
         return;
     m_documentLoader->removeSubresourceLoader(this);
@@ -356,9 +516,13 @@ void SubresourceLoader::notifyDone()
 void SubresourceLoader::releaseResources()
 {
     ASSERT(!reachedTerminalState());
+#if PLATFORM(IOS)
+    if (m_state != Uninitialized && m_state != CancelledWhileInitializing)
+#else
     if (m_state != Uninitialized)
+#endif
         m_resource->clearLoader();
-    m_resource = 0;
+    m_resource = nullptr;
     ResourceLoader::releaseResources();
 }
 

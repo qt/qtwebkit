@@ -11,10 +11,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -34,37 +34,24 @@ namespace WebCore {
 
 class Document;
 
-class HTMLAudioElement FINAL : public HTMLMediaElement {
+class HTMLAudioElement final : public HTMLMediaElement {
 public:
-    static PassRefPtr<HTMLAudioElement> create(const QualifiedName&, Document*, bool);
-    static PassRefPtr<HTMLAudioElement> createForJSConstructor(Document*, const String& src);
+    static Ref<HTMLAudioElement> create(const QualifiedName&, Document&, bool);
+    static Ref<HTMLAudioElement> createForJSConstructor(Document&, const String& src);
 
 private:
-    HTMLAudioElement(const QualifiedName&, Document*, bool);
+    HTMLAudioElement(const QualifiedName&, Document&, bool);
+
+    virtual PlatformMediaSession::MediaType presentationType() const override { return PlatformMediaSession::Audio; }
 };
 
-inline bool isHTMLAudioElement(HTMLElement* element)
-{
-    return !element->isHTMLUnknownElement() && element->hasTagName(HTMLNames::audioTag);
-}
+} // namespace WebCore
 
-inline bool isHTMLAudioElement(Element* element)
-{
-    return element->isHTMLElement() && isHTMLAudioElement(toHTMLElement(element));
-}
+SPECIALIZE_TYPE_TRAITS_BEGIN(WebCore::HTMLAudioElement)
+    static bool isType(const WebCore::HTMLMediaElement& element) { return element.hasTagName(WebCore::HTMLNames::audioTag); }
+    static bool isType(const WebCore::Element& element) { return is<WebCore::HTMLMediaElement>(element) && isType(downcast<WebCore::HTMLMediaElement>(element)); }
+    static bool isType(const WebCore::Node& node) { return is<WebCore::HTMLMediaElement>(node) && isType(downcast<WebCore::HTMLMediaElement>(node)); }
+SPECIALIZE_TYPE_TRAITS_END()
 
-inline bool isHTMLAudioElement(Node* node)
-{
-    return node->isHTMLElement() && isHTMLAudioElement(toHTMLElement(node));
-}
-
-inline HTMLAudioElement* toHTMLAudioElement(Node* node)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!node || isHTMLAudioElement(node));
-    return static_cast<HTMLAudioElement*>(node);
-}
-
-} //namespace
-
-#endif
-#endif
+#endif // ENABLE(VIDEO)
+#endif // HTMLAudioElement_h

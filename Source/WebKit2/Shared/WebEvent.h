@@ -36,10 +36,16 @@
 #include <WebCore/IntSize.h>
 #include <wtf/text/WTFString.h>
 
-namespace CoreIPC {
+namespace IPC {
     class ArgumentDecoder;
     class ArgumentEncoder;
 }
+
+#if USE(APPKIT)
+namespace WebCore {
+struct KeypressCommand;
+}
+#endif
 
 namespace WebKit {
 
@@ -52,6 +58,9 @@ public:
         MouseDown,
         MouseUp,
         MouseMove,
+        MouseForceChanged,
+        MouseForceDown,
+        MouseForceUp,
 
         // WebWheelEvent
         Wheel,
@@ -62,10 +71,8 @@ public:
         RawKeyDown,
         Char,
 
-#if ENABLE(GESTURE_EVENTS)
+#if ENABLE(QT_GESTURE_EVENTS)
         // WebGestureEvent
-        GestureScrollBegin,
-        GestureScrollEnd,
         GestureSingleTap,
 #endif
 
@@ -75,6 +82,12 @@ public:
         TouchMove,
         TouchEnd,
         TouchCancel,
+#endif
+
+#if ENABLE(MAC_GESTURE_EVENTS)
+        GestureStart,
+        GestureChange,
+        GestureEnd,
 #endif
     };
 
@@ -103,8 +116,8 @@ protected:
 
     WebEvent(Type, Modifiers, double timestamp);
 
-    void encode(CoreIPC::ArgumentEncoder&) const;
-    static bool decode(CoreIPC::ArgumentDecoder&, WebEvent&);
+    void encode(IPC::ArgumentEncoder&) const;
+    static bool decode(IPC::ArgumentDecoder&, WebEvent&);
 
 private:
     uint32_t m_type; // Type
@@ -124,7 +137,11 @@ public:
 
     WebMouseEvent();
 
-    WebMouseEvent(Type, Button, const WebCore::IntPoint& position, const WebCore::IntPoint& globalPosition, float deltaX, float deltaY, float deltaZ, int clickCount, Modifiers, double timestamp);
+#if PLATFORM(MAC)
+    WebMouseEvent(Type, Button, const WebCore::IntPoint& position, const WebCore::IntPoint& globalPosition, float deltaX, float deltaY, float deltaZ, int clickCount, Modifiers, double timestamp, double force, int eventNumber = -1, int menuType = 0);
+#else
+    WebMouseEvent(Type, Button, const WebCore::IntPoint& position, const WebCore::IntPoint& globalPosition, float deltaX, float deltaY, float deltaZ, int clickCount, Modifiers, double timestamp, double force = 0);
+#endif
 
     Button button() const { return static_cast<Button>(m_button); }
     const WebCore::IntPoint& position() const { return m_position; }
@@ -133,9 +150,14 @@ public:
     float deltaY() const { return m_deltaY; }
     float deltaZ() const { return m_deltaZ; }
     int32_t clickCount() const { return m_clickCount; }
+#if PLATFORM(MAC)
+    int32_t eventNumber() const { return m_eventNumber; }
+    int32_t menuTypeForEvent() const { return m_menuTypeForEvent; }
+#endif
+    double force() const { return m_force; }
 
-    void encode(CoreIPC::ArgumentEncoder&) const;
-    static bool decode(CoreIPC::ArgumentDecoder&, WebMouseEvent&);
+    void encode(IPC::ArgumentEncoder&) const;
+    static bool decode(IPC::ArgumentDecoder&, WebMouseEvent&);
 
 private:
     static bool isMouseEventType(Type);
@@ -147,6 +169,11 @@ private:
     float m_deltaY;
     float m_deltaZ;
     int32_t m_clickCount;
+#if PLATFORM(MAC)
+    int32_t m_eventNumber;
+    int32_t m_menuTypeForEvent;
+#endif
+    double m_force { 0 };
 };
 
 // FIXME: Move this class to its own header file.
@@ -157,7 +184,7 @@ public:
         ScrollByPixelWheelEvent
     };
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     enum Phase {
         PhaseNone        = 0,
         PhaseBegan       = 1 << 0,
@@ -172,7 +199,7 @@ public:
     WebWheelEvent() { }
 
     WebWheelEvent(Type, const WebCore::IntPoint& position, const WebCore::IntPoint& globalPosition, const WebCore::FloatSize& delta, const WebCore::FloatSize& wheelTicks, Granularity, Modifiers, double timestamp);
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     WebWheelEvent(Type, const WebCore::IntPoint& position, const WebCore::IntPoint& globalPosition, const WebCore::FloatSize& delta, const WebCore::FloatSize& wheelTicks, Granularity, bool directionInvertedFromDevice, Phase, Phase momentumPhase, bool hasPreciseScrollingDeltas, uint32_t scrollCount, const WebCore::FloatSize& unacceleratedScrollingDelta, Modifiers, double timestamp);
 #endif
 
@@ -182,7 +209,7 @@ public:
     const WebCore::FloatSize wheelTicks() const { return m_wheelTicks; }
     Granularity granularity() const { return static_cast<Granularity>(m_granularity); }
     bool directionInvertedFromDevice() const { return m_directionInvertedFromDevice; }
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     Phase phase() const { return static_cast<Phase>(m_phase); }
     Phase momentumPhase() const { return static_cast<Phase>(m_momentumPhase); }
     bool hasPreciseScrollingDeltas() const { return m_hasPreciseScrollingDeltas; }
@@ -190,8 +217,8 @@ public:
     const WebCore::FloatSize& unacceleratedScrollingDelta() const { return m_unacceleratedScrollingDelta; }
 #endif
 
-    void encode(CoreIPC::ArgumentEncoder&) const;
-    static bool decode(CoreIPC::ArgumentDecoder&, WebWheelEvent&);
+    void encode(IPC::ArgumentEncoder&) const;
+    static bool decode(IPC::ArgumentDecoder&, WebWheelEvent&);
 
 private:
     static bool isWheelEventType(Type);
@@ -202,7 +229,7 @@ private:
     WebCore::FloatSize m_wheelTicks;
     uint32_t m_granularity; // Granularity
     bool m_directionInvertedFromDevice;
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     uint32_t m_phase; // Phase
     uint32_t m_momentumPhase; // Phase
     bool m_hasPreciseScrollingDeltas;
@@ -214,9 +241,16 @@ private:
 // FIXME: Move this class to its own header file.
 class WebKeyboardEvent : public WebEvent {
 public:
-    WebKeyboardEvent() { }
+    WebKeyboardEvent();
+    ~WebKeyboardEvent();
 
+#if USE(APPKIT)
+    WebKeyboardEvent(Type, const String& text, const String& unmodifiedText, const String& keyIdentifier, int windowsVirtualKeyCode, int nativeVirtualKeyCode, int macCharCode, bool handledByInputMethod, const Vector<WebCore::KeypressCommand>&, bool isAutoRepeat, bool isKeypad, bool isSystemKey, Modifiers, double timestamp);
+#elif PLATFORM(GTK)
+    WebKeyboardEvent(Type, const String& text, const String& keyIdentifier, int windowsVirtualKeyCode, int nativeVirtualKeyCode, bool handledByInputMethod, Vector<String>&& commands, bool isKeypad, Modifiers, double timestamp);
+#else
     WebKeyboardEvent(Type, const String& text, const String& unmodifiedText, const String& keyIdentifier, int windowsVirtualKeyCode, int nativeVirtualKeyCode, int macCharCode, bool isAutoRepeat, bool isKeypad, bool isSystemKey, Modifiers, double timestamp);
+#endif
 
     const String& text() const { return m_text; }
     const String& unmodifiedText() const { return m_unmodifiedText; }
@@ -224,12 +258,20 @@ public:
     int32_t windowsVirtualKeyCode() const { return m_windowsVirtualKeyCode; }
     int32_t nativeVirtualKeyCode() const { return m_nativeVirtualKeyCode; }
     int32_t macCharCode() const { return m_macCharCode; }
+#if USE(APPKIT) || PLATFORM(GTK)
+    bool handledByInputMethod() const { return m_handledByInputMethod; }
+#endif
+#if USE(APPKIT)
+    const Vector<WebCore::KeypressCommand>& commands() const { return m_commands; }
+#elif PLATFORM(GTK)
+    const Vector<String>& commands() const { return m_commands; }
+#endif
     bool isAutoRepeat() const { return m_isAutoRepeat; }
     bool isKeypad() const { return m_isKeypad; }
     bool isSystemKey() const { return m_isSystemKey; }
 
-    void encode(CoreIPC::ArgumentEncoder&) const;
-    static bool decode(CoreIPC::ArgumentDecoder&, WebKeyboardEvent&);
+    void encode(IPC::ArgumentEncoder&) const;
+    static bool decode(IPC::ArgumentDecoder&, WebKeyboardEvent&);
 
     static bool isKeyboardEventType(Type);
 
@@ -240,27 +282,33 @@ private:
     int32_t m_windowsVirtualKeyCode;
     int32_t m_nativeVirtualKeyCode;
     int32_t m_macCharCode;
+#if USE(APPKIT) || PLATFORM(GTK)
+    bool m_handledByInputMethod;
+#endif
+#if USE(APPKIT)
+    Vector<WebCore::KeypressCommand> m_commands;
+#elif PLATFORM(GTK)
+    Vector<String> m_commands;
+#endif
     bool m_isAutoRepeat;
     bool m_isKeypad;
     bool m_isSystemKey;
 };
 
 
-#if ENABLE(GESTURE_EVENTS)
+#if ENABLE(QT_GESTURE_EVENTS)
 // FIXME: Move this class to its own header file.
 class WebGestureEvent : public WebEvent {
 public:
     WebGestureEvent() { }
-    WebGestureEvent(Type, const WebCore::IntPoint& position, const WebCore::IntPoint& globalPosition, Modifiers, double timestamp);
-    WebGestureEvent(Type, const WebCore::IntPoint& position, const WebCore::IntPoint& globalPosition, Modifiers, double timestamp, const WebCore::IntSize& area, const WebCore::FloatPoint& delta);
+    WebGestureEvent(Type, const WebCore::IntPoint& position, const WebCore::IntPoint& globalPosition, Modifiers, double timestamp, const WebCore::IntSize& area);
 
     const WebCore::IntPoint position() const { return m_position; }
     const WebCore::IntPoint globalPosition() const { return m_globalPosition; }
     const WebCore::IntSize area() const { return m_area; }
-    const WebCore::FloatPoint delta() const { return m_delta; }
 
-    void encode(CoreIPC::ArgumentEncoder&) const;
-    static bool decode(CoreIPC::ArgumentDecoder&, WebGestureEvent&);
+    void encode(IPC::ArgumentEncoder&) const;
+    static bool decode(IPC::ArgumentDecoder&, WebGestureEvent&);
 
 private:
     static bool isGestureEventType(Type);
@@ -268,12 +316,97 @@ private:
     WebCore::IntPoint m_position;
     WebCore::IntPoint m_globalPosition;
     WebCore::IntSize m_area;
-    WebCore::FloatPoint m_delta;
 };
-#endif // ENABLE(GESTURE_EVENTS)
+#endif // ENABLE(QT_GESTURE_EVENTS)
 
 
 #if ENABLE(TOUCH_EVENTS)
+#if PLATFORM(IOS)
+class WebPlatformTouchPoint {
+public:
+    enum TouchPointState {
+        TouchReleased,
+        TouchPressed,
+        TouchMoved,
+        TouchStationary,
+        TouchCancelled
+    };
+
+    WebPlatformTouchPoint() { }
+    WebPlatformTouchPoint(unsigned identifier, WebCore::IntPoint location, TouchPointState phase)
+        : m_identifier(identifier)
+        , m_location(location)
+        , m_phase(phase)
+    {
+    }
+
+    unsigned identifier() const { return m_identifier; }
+    WebCore::IntPoint location() const { return m_location; }
+    TouchPointState phase() const { return static_cast<TouchPointState>(m_phase); }
+    TouchPointState state() const { return phase(); }
+
+#if ENABLE(IOS_TOUCH_EVENTS)
+    void setForce(double force) { m_force = force; }
+    double force() const { return m_force; }
+#endif
+
+    void encode(IPC::ArgumentEncoder&) const;
+    static bool decode(IPC::ArgumentDecoder&, WebPlatformTouchPoint&);
+
+private:
+    unsigned m_identifier;
+    WebCore::IntPoint m_location;
+    uint32_t m_phase;
+#if ENABLE(IOS_TOUCH_EVENTS)
+    double m_force { 0 };
+#endif
+};
+
+class WebTouchEvent : public WebEvent {
+public:
+    WebTouchEvent() { }
+    WebTouchEvent(WebEvent::Type type, Modifiers modifiers, double timestamp, const Vector<WebPlatformTouchPoint>& touchPoints, WebCore::IntPoint position, bool isPotentialTap, bool isGesture, float gestureScale, float gestureRotation)
+        : WebEvent(type, modifiers, timestamp)
+        , m_touchPoints(touchPoints)
+        , m_position(position)
+        , m_canPreventNativeGestures(true)
+        , m_isPotentialTap(isPotentialTap)
+        , m_isGesture(isGesture)
+        , m_gestureScale(gestureScale)
+        , m_gestureRotation(gestureRotation)
+    {
+        ASSERT(type == TouchStart || type == TouchMove || type == TouchEnd || type == TouchCancel);
+    }
+
+    const Vector<WebPlatformTouchPoint>& touchPoints() const { return m_touchPoints; }
+
+    WebCore::IntPoint position() const { return m_position; }
+
+    bool isPotentialTap() const { return m_isPotentialTap; }
+
+    bool isGesture() const { return m_isGesture; }
+    float gestureScale() const { return m_gestureScale; }
+    float gestureRotation() const { return m_gestureRotation; }
+
+    bool canPreventNativeGestures() const { return m_canPreventNativeGestures; }
+    void setCanPreventNativeGestures(bool canPreventNativeGestures) { m_canPreventNativeGestures = canPreventNativeGestures; }
+
+    bool allTouchPointsAreReleased() const;
+
+    void encode(IPC::ArgumentEncoder&) const;
+    static bool decode(IPC::ArgumentDecoder&, WebTouchEvent&);
+    
+private:
+    Vector<WebPlatformTouchPoint> m_touchPoints;
+    
+    WebCore::IntPoint m_position;
+    bool m_canPreventNativeGestures;
+    bool m_isPotentialTap;
+    bool m_isGesture;
+    float m_gestureScale;
+    float m_gestureRotation;
+};
+#else
 // FIXME: Move this class to its own header file.
 // FIXME: Having "Platform" in the name makes it sound like this event is platform-specific or low-
 // level in some way. That doesn't seem to be the case.
@@ -304,8 +437,8 @@ public:
 
     void setState(TouchPointState state) { m_state = state; }
 
-    void encode(CoreIPC::ArgumentEncoder&) const;
-    static bool decode(CoreIPC::ArgumentDecoder&, WebPlatformTouchPoint&);
+    void encode(IPC::ArgumentEncoder&) const;
+    static bool decode(IPC::ArgumentDecoder&, WebPlatformTouchPoint&);
 
 private:
     uint32_t m_id;
@@ -321,14 +454,14 @@ private:
 class WebTouchEvent : public WebEvent {
 public:
     WebTouchEvent() { }
- 
-    // FIXME: It would be nice not to have to copy the Vector here.
-    WebTouchEvent(Type, Vector<WebPlatformTouchPoint>, Modifiers, double timestamp);
+    WebTouchEvent(Type, Vector<WebPlatformTouchPoint>&&, Modifiers, double timestamp);
 
     const Vector<WebPlatformTouchPoint>& touchPoints() const { return m_touchPoints; }
 
-    void encode(CoreIPC::ArgumentEncoder&) const;
-    static bool decode(CoreIPC::ArgumentDecoder&, WebTouchEvent&);
+    bool allTouchPointsAreReleased() const;
+
+    void encode(IPC::ArgumentEncoder&) const;
+    static bool decode(IPC::ArgumentDecoder&, WebTouchEvent&);
   
 private:
     static bool isTouchEventType(Type);
@@ -336,6 +469,7 @@ private:
     Vector<WebPlatformTouchPoint> m_touchPoints;
 };
 
+#endif // PLATFORM(IOS)
 #endif // ENABLE(TOUCH_EVENTS)
 
 } // namespace WebKit

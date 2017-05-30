@@ -12,10 +12,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -31,6 +31,7 @@
 #include "FloatRect.h"
 #include "HTMLElement.h"
 #include "IntSize.h"
+#include <memory>
 #include <wtf/Forward.h>
 
 #if PLATFORM(QT)
@@ -53,23 +54,27 @@ class ImageData;
 class ImageBuffer;
 class IntSize;
 
+namespace DisplayList {
+typedef unsigned AsTextFlags;
+}
+
 class CanvasObserver {
 public:
     virtual ~CanvasObserver() { }
 
-    virtual void canvasChanged(HTMLCanvasElement*, const FloatRect& changedRect) = 0;
-    virtual void canvasResized(HTMLCanvasElement*) = 0;
-    virtual void canvasDestroyed(HTMLCanvasElement*) = 0;
+    virtual void canvasChanged(HTMLCanvasElement&, const FloatRect& changedRect) = 0;
+    virtual void canvasResized(HTMLCanvasElement&) = 0;
+    virtual void canvasDestroyed(HTMLCanvasElement&) = 0;
 };
 
-class HTMLCanvasElement FINAL : public HTMLElement {
+class HTMLCanvasElement final : public HTMLElement {
 public:
-    static PassRefPtr<HTMLCanvasElement> create(Document*);
-    static PassRefPtr<HTMLCanvasElement> create(const QualifiedName&, Document*);
+    static Ref<HTMLCanvasElement> create(Document&);
+    static Ref<HTMLCanvasElement> create(const QualifiedName&, Document&);
     virtual ~HTMLCanvasElement();
 
-    void addObserver(CanvasObserver*);
-    void removeObserver(CanvasObserver*);
+    void addObserver(CanvasObserver&);
+    void removeObserver(CanvasObserver&);
 
     // Attributes and functions exposed to script
     int width() const { return size().width(); }
@@ -82,7 +87,7 @@ public:
 
     void setSize(const IntSize& newSize)
     { 
-        if (newSize == size() && targetDeviceScaleFactor() == m_deviceScaleFactor)
+        if (newSize == size())
             return;
         m_ignoreReset = true; 
         setWidth(newSize.width());
@@ -92,7 +97,7 @@ public:
     }
 
     CanvasRenderingContext* getContext(const String&, CanvasContextAttributes* attributes = 0);
-    bool supportsContext(const String&, CanvasContextAttributes* = 0);
+    bool probablySupportsContext(const String&, CanvasContextAttributes* = 0);
     static bool is2dType(const String&);
 #if ENABLE(WEBGL)
     static bool is3dType(const String&);
@@ -106,7 +111,7 @@ public:
     void didDraw(const FloatRect&);
     void notifyObserversCanvasChanged(const FloatRect&);
 
-    void paint(GraphicsContext*, const LayoutRect&, bool useLowQualityScale = false);
+    void paint(GraphicsContext&, const LayoutRect&);
 
     GraphicsContext* drawingContext() const;
     GraphicsContext* existingDrawingContext() const;
@@ -116,7 +121,7 @@ public:
     ImageBuffer* buffer() const;
     Image* copiedImage() const;
     void clearCopiedImage();
-    PassRefPtr<ImageData> getImageData();
+    RefPtr<ImageData> getImageData();
     void makePresentationCopy();
     void clearPresentationCopy();
 
@@ -131,58 +136,60 @@ public:
 
     AffineTransform baseTransform() const;
 
-#if ENABLE(WEBGL)    
-    bool is3D() const;
-#endif
-
     void makeRenderingResultsAvailable();
     bool hasCreatedImageBuffer() const { return m_hasCreatedImageBuffer; }
 
     bool shouldAccelerate(const IntSize&) const;
 
-    float deviceScaleFactor() const { return m_deviceScaleFactor; }
+    WEBCORE_EXPORT void setUsesDisplayListDrawing(bool);
+    WEBCORE_EXPORT void setTracksDisplayListReplay(bool);
+    WEBCORE_EXPORT String displayListAsText(DisplayList::AsTextFlags) const;
+    WEBCORE_EXPORT String replayDisplayListAsText(DisplayList::AsTextFlags) const;
+
+    size_t memoryCost() const;
 
 private:
-    HTMLCanvasElement(const QualifiedName&, Document*);
+    HTMLCanvasElement(const QualifiedName&, Document&);
 
-    virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
-    virtual RenderObject* createRenderer(RenderArena*, RenderStyle*);
-    virtual void attach(const AttachContext& = AttachContext()) OVERRIDE;
-    virtual bool areAuthorShadowsAllowed() const OVERRIDE;
+    virtual void parseAttribute(const QualifiedName&, const AtomicString&) override;
+    virtual RenderPtr<RenderElement> createElementRenderer(Ref<RenderStyle>&&, const RenderTreePosition&) override;
 
-    virtual bool canContainRangeEndPoint() const OVERRIDE;
-    virtual bool canStartSelection() const OVERRIDE;
+    virtual bool canContainRangeEndPoint() const override;
+    virtual bool canStartSelection() const override;
 
     void reset();
-
-    float targetDeviceScaleFactor() const;
 
     void createImageBuffer() const;
     void clearImageBuffer() const;
 
     void setSurfaceSize(const IntSize&);
+    void setImageBuffer(std::unique_ptr<ImageBuffer>) const;
+    void releaseImageBufferAndContext();
 
     bool paintsIntoCanvasBuffer() const;
 
-    HashSet<CanvasObserver*> m_observers;
+#if ENABLE(WEBGL)
+    bool is3D() const;
+#endif
 
+    HashSet<CanvasObserver*> m_observers;
+    std::unique_ptr<CanvasRenderingContext> m_context;
+
+    FloatRect m_dirtyRect;
     IntSize m_size;
 
-    OwnPtr<CanvasRenderingContext> m_context;
+    bool m_originClean { true };
+    bool m_rendererIsCanvas { false };
+    bool m_ignoreReset { false };
 
-    bool m_rendererIsCanvas;
-
-    bool m_ignoreReset;
-    FloatRect m_dirtyRect;
-
-    float m_deviceScaleFactor;
-    bool m_originClean;
+    bool m_usesDisplayListDrawing { false };
+    bool m_tracksDisplayListReplay { false };
 
     // m_createdImageBuffer means we tried to malloc the buffer.  We didn't necessarily get it.
-    mutable bool m_hasCreatedImageBuffer;
-    mutable bool m_didClearImageBuffer;
-    mutable OwnPtr<ImageBuffer> m_imageBuffer;
-    mutable OwnPtr<GraphicsContextStateSaver> m_contextStateSaver;
+    mutable bool m_hasCreatedImageBuffer { false };
+    mutable bool m_didClearImageBuffer { false };
+    mutable std::unique_ptr<ImageBuffer> m_imageBuffer;
+    mutable std::unique_ptr<GraphicsContextStateSaver> m_contextStateSaver;
     
     mutable RefPtr<Image> m_presentedImage;
     mutable RefPtr<Image> m_copiedImage; // FIXME: This is temporary for platforms that have to copy the image buffer to render (and for CSSCanvasValue).

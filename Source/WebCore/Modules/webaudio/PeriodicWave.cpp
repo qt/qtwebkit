@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -36,7 +36,6 @@
 #include "OscillatorNode.h"
 #include "VectorMath.h"
 #include <algorithm>
-#include <wtf/OwnPtr.h>
 
 const unsigned PeriodicWaveSize = 4096; // This must be a power of two.
 const unsigned NumberOfRanges = 36; // There should be 3 * log2(PeriodicWaveSize) 1/3 octave ranges.
@@ -46,7 +45,7 @@ namespace WebCore {
     
 using namespace VectorMath;
 
-PassRefPtr<PeriodicWave> PeriodicWave::create(float sampleRate, Float32Array* real, Float32Array* imag)
+RefPtr<PeriodicWave> PeriodicWave::create(float sampleRate, Float32Array* real, Float32Array* imag)
 {
     bool isGood = real && imag && real->length() == imag->length();
     ASSERT(isGood);
@@ -56,33 +55,33 @@ PassRefPtr<PeriodicWave> PeriodicWave::create(float sampleRate, Float32Array* re
         waveTable->createBandLimitedTables(real->data(), imag->data(), numberOfComponents);
         return waveTable;
     }
-    return 0;
+    return nullptr;
 }
 
-PassRefPtr<PeriodicWave> PeriodicWave::createSine(float sampleRate)
+Ref<PeriodicWave> PeriodicWave::createSine(float sampleRate)
 {
-    RefPtr<PeriodicWave> waveTable = adoptRef(new PeriodicWave(sampleRate));
+    Ref<PeriodicWave> waveTable = adoptRef(*new PeriodicWave(sampleRate));
     waveTable->generateBasicWaveform(OscillatorNode::SINE);
     return waveTable;
 }
 
-PassRefPtr<PeriodicWave> PeriodicWave::createSquare(float sampleRate)
+Ref<PeriodicWave> PeriodicWave::createSquare(float sampleRate)
 {
-    RefPtr<PeriodicWave> waveTable = adoptRef(new PeriodicWave(sampleRate));
+    Ref<PeriodicWave> waveTable = adoptRef(*new PeriodicWave(sampleRate));
     waveTable->generateBasicWaveform(OscillatorNode::SQUARE);
     return waveTable;
 }
 
-PassRefPtr<PeriodicWave> PeriodicWave::createSawtooth(float sampleRate)
+Ref<PeriodicWave> PeriodicWave::createSawtooth(float sampleRate)
 {
-    RefPtr<PeriodicWave> waveTable = adoptRef(new PeriodicWave(sampleRate));
+    Ref<PeriodicWave> waveTable = adoptRef(*new PeriodicWave(sampleRate));
     waveTable->generateBasicWaveform(OscillatorNode::SAWTOOTH);
     return waveTable;
 }
 
-PassRefPtr<PeriodicWave> PeriodicWave::createTriangle(float sampleRate)
+Ref<PeriodicWave> PeriodicWave::createTriangle(float sampleRate)
 {
-    RefPtr<PeriodicWave> waveTable = adoptRef(new PeriodicWave(sampleRate));
+    Ref<PeriodicWave> waveTable = adoptRef(*new PeriodicWave(sampleRate));
     waveTable->generateBasicWaveform(OscillatorNode::TRIANGLE);
     return waveTable;
 }
@@ -198,8 +197,7 @@ void PeriodicWave::createBandLimitedTables(const float* realData, const float* i
         realP[0] = 0;
 
         // Create the band-limited table.
-        OwnPtr<AudioFloatArray> table = adoptPtr(new AudioFloatArray(m_periodicWaveSize));
-        m_bandLimitedTables.append(table.release());
+        m_bandLimitedTables.append(std::make_unique<AudioFloatArray>(m_periodicWaveSize));
 
         // Apply an inverse FFT to generate the time-domain table data.
         float* data = m_bandLimitedTables[rangeIndex]->data();

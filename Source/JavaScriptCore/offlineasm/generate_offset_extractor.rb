@@ -34,10 +34,16 @@ require "self_hash"
 require "settings"
 require "transform"
 
+IncludeFile.processIncludeOptions()
+
 inputFlnm = ARGV.shift
 outputFlnm = ARGV.shift
 
-$stderr.puts "offlineasm: Parsing #{inputFlnm} and creating offset extractor #{outputFlnm}."
+validBackends = ARGV.shift
+if validBackends
+    $stderr.puts "Only dealing with backends: #{validBackends}"
+    includeOnlyBackends(validBackends.split(","))
+end
 
 def emitMagicNumber
     OFFSET_MAGIC_NUMBERS.each {
@@ -141,6 +147,3 @@ File.open(outputFlnm, "w") {
     }
     outp.puts "};"
 }
-
-$stderr.puts "offlineasm: offset extractor #{outputFlnm} successfully generated."
-

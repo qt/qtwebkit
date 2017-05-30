@@ -21,10 +21,10 @@
 #include "config.h"
 #include "RenderView.h"
 
-#include "ColumnInfo.h"
 #include "Document.h"
 #include "Element.h"
 #include "FloatQuad.h"
+#include "FloatingObjects.h"
 #include "FlowThreadController.h"
 #include "Frame.h"
 #include "FrameSelection.h"
@@ -33,44 +33,113 @@
 #include "HTMLFrameOwnerElement.h"
 #include "HTMLIFrameElement.h"
 #include "HitTestResult.h"
+#include "ImageQualityController.h"
+#include "NodeTraversal.h"
 #include "Page.h"
 #include "RenderGeometryMap.h"
+#include "RenderIterator.h"
 #include "RenderLayer.h"
 #include "RenderLayerBacking.h"
+#include "RenderLayerCompositor.h"
+#include "RenderMultiColumnFlowThread.h"
+#include "RenderMultiColumnSet.h"
+#include "RenderMultiColumnSpannerPlaceholder.h"
 #include "RenderNamedFlowThread.h"
 #include "RenderSelectionInfo.h"
 #include "RenderWidget.h"
-#include "RenderWidgetProtector.h"
+#include "ScrollbarTheme.h"
+#include "Settings.h"
 #include "StyleInheritedData.h"
 #include "TransformState.h"
 #include <wtf/StackStats.h>
 
-#if USE(ACCELERATED_COMPOSITING)
-#include "RenderLayerCompositor.h"
-#endif
-
-#if ENABLE(CSS_SHADERS) && USE(3D_GRAPHICS)
-#include "CustomFilterGlobalContext.h"
-#endif
-
 namespace WebCore {
 
-RenderView::RenderView(Document* document)
-    : RenderBlock(document)
-    , m_frameView(document->view())
-    , m_selectionStart(0)
-    , m_selectionEnd(0)
-    , m_selectionStartPos(-1)
-    , m_selectionEndPos(-1)
-    , m_maximalOutlineSize(0)
+struct FrameFlatteningLayoutDisallower {
+    FrameFlatteningLayoutDisallower(FrameView& frameView)
+        : m_frameView(frameView)
+        , m_disallowLayout(frameView.frame().settings().frameFlatteningEnabled())
+    {
+        if (m_disallowLayout)
+            m_frameView.startDisallowingLayout();
+    }
+
+    ~FrameFlatteningLayoutDisallower()
+    {
+        if (m_disallowLayout)
+            m_frameView.endDisallowingLayout();
+    }
+
+private:
+    FrameView& m_frameView;
+    bool m_disallowLayout { false };
+};
+
+struct SelectionIterator {
+    SelectionIterator(RenderObject* start)
+        : m_current(start)
+    {
+        checkForSpanner();
+    }
+    
+    RenderObject* current() const
+    {
+        return m_current;
+    }
+    
+    RenderObject* next()
+    {
+        RenderObject* currentSpan = m_spannerStack.isEmpty() ? nullptr : m_spannerStack.last()->spanner();
+        m_current = m_current->nextInPreOrder(currentSpan);
+        checkForSpanner();
+        if (!m_current && currentSpan) {
+            RenderObject* placeholder = m_spannerStack.last();
+            m_spannerStack.removeLast();
+            m_current = placeholder->nextInPreOrder();
+            checkForSpanner();
+        }
+        return m_current;
+    }
+
+private:
+    void checkForSpanner()
+    {
+        if (!is<RenderMultiColumnSpannerPlaceholder>(m_current))
+            return;
+        auto& placeholder = downcast<RenderMultiColumnSpannerPlaceholder>(*m_current);
+        m_spannerStack.append(&placeholder);
+        m_current = placeholder.spanner();
+    }
+
+    RenderObject* m_current { nullptr };
+    Vector<RenderMultiColumnSpannerPlaceholder*> m_spannerStack;
+};
+
+RenderView::RenderView(Document& document, Ref<RenderStyle>&& style)
+    : RenderBlockFlow(document, WTFMove(style))
+    , m_frameView(*document.view())
+    , m_selectionUnsplitStart(nullptr)
+    , m_selectionUnsplitEnd(nullptr)
+    , m_selectionUnsplitStartPos(-1)
+    , m_selectionUnsplitEndPos(-1)
+    , m_lazyRepaintTimer(*this, &RenderView::lazyRepaintTimerFired)
     , m_pageLogicalHeight(0)
     , m_pageLogicalHeightChanged(false)
-    , m_layoutState(0)
+    , m_layoutState(nullptr)
     , m_layoutStateDisableCount(0)
-    , m_renderQuoteHead(0)
+    , m_renderQuoteHead(nullptr)
     , m_renderCounterCount(0)
     , m_selectionWasCaret(false)
+    , m_hasSoftwareFilters(false)
+#if ENABLE(SERVICE_CONTROLS)
+    , m_selectionRectGatherer(*this)
+#endif
 {
+    setIsRenderView();
+
+    // FIXME: We should find a way to enforce this at compile time.
+    ASSERT(document.view());
+
     // init RenderObject attributes
     setInline(false);
     
@@ -86,6 +155,38 @@ RenderView::~RenderView()
 {
 }
 
+void RenderView::scheduleLazyRepaint(RenderBox& renderer)
+{
+    if (renderer.renderBoxNeedsLazyRepaint())
+        return;
+    renderer.setRenderBoxNeedsLazyRepaint(true);
+    m_renderersNeedingLazyRepaint.add(&renderer);
+    if (!m_lazyRepaintTimer.isActive())
+        m_lazyRepaintTimer.startOneShot(0);
+}
+
+void RenderView::unscheduleLazyRepaint(RenderBox& renderer)
+{
+    if (!renderer.renderBoxNeedsLazyRepaint())
+        return;
+    renderer.setRenderBoxNeedsLazyRepaint(false);
+    m_renderersNeedingLazyRepaint.remove(&renderer);
+    if (m_renderersNeedingLazyRepaint.isEmpty())
+        m_lazyRepaintTimer.stop();
+}
+
+void RenderView::lazyRepaintTimerFired()
+{
+    bool shouldRepaint = !document().inPageCache();
+
+    for (auto& renderer : m_renderersNeedingLazyRepaint) {
+        if (shouldRepaint)
+            renderer->repaint();
+        renderer->setRenderBoxNeedsLazyRepaint(false);
+    }
+    m_renderersNeedingLazyRepaint.clear();
+}
+
 bool RenderView::hitTest(const HitTestRequest& request, HitTestResult& result)
 {
     return hitTest(request, result.hitTestLocation(), result);
@@ -93,45 +194,58 @@ bool RenderView::hitTest(const HitTestRequest& request, HitTestResult& result)
 
 bool RenderView::hitTest(const HitTestRequest& request, const HitTestLocation& location, HitTestResult& result)
 {
-    if (layer()->hitTest(request, location, result))
-        return true;
+    document().updateLayout();
 
-    // FIXME: Consider if this test should be done unconditionally.
-    if (request.allowsFrameScrollbars() && m_frameView) {
-        // ScrollView scrollbars are not the same as RenderLayer scrollbars tested by RenderLayer::hitTestOverflowControls,
-        // so we need to test ScrollView scrollbars separately here.
-        Scrollbar* frameScrollbar = m_frameView->scrollbarAtPoint(location.roundedPoint());
-        if (frameScrollbar) {
-            result.setScrollbar(frameScrollbar);
-            return true;
+    FrameFlatteningLayoutDisallower disallower(frameView());
+
+    bool resultLayer = layer()->hitTest(request, location, result);
+
+    // ScrollView scrollbars are not the same as RenderLayer scrollbars tested by RenderLayer::hitTestOverflowControls,
+    // so we need to test ScrollView scrollbars separately here. In case of using overlay scrollbars, the layer hit test
+    // will always work so we need to check the ScrollView scrollbars in that case too.
+    if (!resultLayer || ScrollbarTheme::theme().usesOverlayScrollbars()) {
+        // FIXME: Consider if this test should be done unconditionally.
+        if (request.allowsFrameScrollbars()) {
+            IntPoint windowPoint = frameView().contentsToWindow(location.roundedPoint());
+            if (Scrollbar* frameScrollbar = frameView().scrollbarAtPoint(windowPoint)) {
+                result.setScrollbar(frameScrollbar);
+                return true;
+            }
         }
     }
 
-    return false;
+    return resultLayer;
 }
 
 void RenderView::computeLogicalHeight(LayoutUnit logicalHeight, LayoutUnit, LogicalExtentComputedValues& computedValues) const
 {
-    computedValues.m_extent = (!shouldUsePrintingLayout() && m_frameView) ? LayoutUnit(viewLogicalHeight()) : logicalHeight;
+    computedValues.m_extent = !shouldUsePrintingLayout() ? LayoutUnit(viewLogicalHeight()) : logicalHeight;
 }
 
 void RenderView::updateLogicalWidth()
 {
-    if (!shouldUsePrintingLayout() && m_frameView)
+    if (!shouldUsePrintingLayout())
         setLogicalWidth(viewLogicalWidth());
 }
 
-LayoutUnit RenderView::availableLogicalHeight(AvailableLogicalHeightType heightType) const
+LayoutUnit RenderView::availableLogicalHeight(AvailableLogicalHeightType) const
 {
-    // If we have columns, then the available logical height is reduced to the column height.
-    if (hasColumns())
-        return columnInfo()->columnHeight();
-    return RenderBlock::availableLogicalHeight(heightType);
+    // Make sure block progression pagination for percentages uses the column extent and
+    // not the view's extent. See https://bugs.webkit.org/show_bug.cgi?id=135204.
+    if (multiColumnFlowThread() && multiColumnFlowThread()->firstMultiColumnSet())
+        return multiColumnFlowThread()->firstMultiColumnSet()->computedColumnHeight();
+
+#if PLATFORM(IOS)
+    // Workaround for <rdar://problem/7166808>.
+    if (document().isPluginDocument() && frameView().useFixedLayout())
+        return frameView().fixedLayoutSize().height();
+#endif
+    return isHorizontalWritingMode() ? frameView().visibleHeight() : frameView().visibleWidth();
 }
 
-bool RenderView::isChildAllowed(RenderObject* child, RenderStyle*) const
+bool RenderView::isChildAllowed(const RenderObject& child, const RenderStyle&) const
 {
-    return child->isBox();
+    return child.isBox();
 }
 
 void RenderView::layoutContent(const LayoutState& state)
@@ -139,9 +253,9 @@ void RenderView::layoutContent(const LayoutState& state)
     UNUSED_PARAM(state);
     ASSERT(needsLayout());
 
-    RenderBlock::layout();
+    RenderBlockFlow::layout();
     if (hasRenderNamedFlowThreads())
-        flowThreadController()->layoutRenderNamedFlowThreads();
+        flowThreadController().layoutRenderNamedFlowThreads();
 #ifndef NDEBUG
     checkLayoutState(state);
 #endif
@@ -152,73 +266,18 @@ void RenderView::checkLayoutState(const LayoutState& state)
 {
     ASSERT(layoutDeltaMatches(LayoutSize()));
     ASSERT(!m_layoutStateDisableCount);
-    ASSERT(m_layoutState == &state);
+    ASSERT(m_layoutState.get() == &state);
 }
 #endif
 
-static RenderBox* enclosingSeamlessRenderer(Document* doc)
+void RenderView::initializeLayoutState(LayoutState& state)
 {
-    if (!doc)
-        return 0;
-    Element* ownerElement = doc->seamlessParentIFrame();
-    if (!ownerElement)
-        return 0;
-    return ownerElement->renderBox();
-}
-
-void RenderView::addChild(RenderObject* newChild, RenderObject* beforeChild)
-{
-    // Seamless iframes are considered part of an enclosing render flow thread from the parent document. This is necessary for them to look
-    // up regions in the parent document during layout.
-    if (newChild && !newChild->isRenderFlowThread()) {
-        RenderBox* seamlessBox = enclosingSeamlessRenderer(document());
-        if (seamlessBox && seamlessBox->flowThreadContainingBlock())
-            newChild->setFlowThreadState(seamlessBox->flowThreadState());
-    }
-    RenderBlock::addChild(newChild, beforeChild);
-}
-
-bool RenderView::initializeLayoutState(LayoutState& state)
-{
-    bool isSeamlessAncestorInFlowThread = false;
-
     // FIXME: May be better to push a clip and avoid issuing offscreen repaints.
     state.m_clipped = false;
-    
-    // Check the writing mode of the seamless ancestor. It has to match our document's writing mode, or we won't inherit any
-    // pagination information.
-    RenderBox* seamlessAncestor = enclosingSeamlessRenderer(document());
-    LayoutState* seamlessLayoutState = seamlessAncestor ? seamlessAncestor->view()->layoutState() : 0;
-    bool shouldInheritPagination = seamlessLayoutState && !m_pageLogicalHeight && seamlessAncestor->style()->writingMode() == style()->writingMode();
-    
-    state.m_pageLogicalHeight = shouldInheritPagination ? seamlessLayoutState->m_pageLogicalHeight : m_pageLogicalHeight;
-    state.m_pageLogicalHeightChanged = shouldInheritPagination ? seamlessLayoutState->m_pageLogicalHeightChanged : m_pageLogicalHeightChanged;
-    state.m_isPaginated = state.m_pageLogicalHeight;
-    if (state.m_isPaginated && shouldInheritPagination) {
-        // Set up the correct pagination offset. We can use a negative offset in order to push the top of the RenderView into its correct place
-        // on a page. We can take the iframe's offset from the logical top of the first page and make the negative into the pagination offset within the child
-        // view.
-        bool isFlipped = seamlessAncestor->style()->isFlippedBlocksWritingMode();
-        LayoutSize layoutOffset = seamlessLayoutState->layoutOffset();
-        LayoutSize iFrameOffset(layoutOffset.width() + seamlessAncestor->x() + (!isFlipped ? seamlessAncestor->borderLeft() + seamlessAncestor->paddingLeft() :
-            seamlessAncestor->borderRight() + seamlessAncestor->paddingRight()),
-            layoutOffset.height() + seamlessAncestor->y() + (!isFlipped ? seamlessAncestor->borderTop() + seamlessAncestor->paddingTop() :
-            seamlessAncestor->borderBottom() + seamlessAncestor->paddingBottom()));
-        
-        LayoutSize offsetDelta = seamlessLayoutState->m_pageOffset - iFrameOffset;
-        state.m_pageOffset = offsetDelta;
-        
-        // Set the current render flow thread to point to our ancestor. This will allow the seamless document to locate the correct
-        // regions when doing a layout.
-        if (seamlessAncestor->flowThreadContainingBlock()) {
-            flowThreadController()->setCurrentRenderFlowThread(seamlessAncestor->view()->flowThreadController()->currentRenderFlowThread());
-            isSeamlessAncestorInFlowThread = true;
-        }
-    }
 
-    // FIXME: We need to make line grids and exclusions work with seamless iframes as well here. Basically all layout state information needs
-    // to propagate here and not just pagination information.
-    return isSeamlessAncestorInFlowThread;
+    state.m_pageLogicalHeight = m_pageLogicalHeight;
+    state.m_pageLogicalHeightChanged = m_pageLogicalHeightChanged;
+    state.m_isPaginated = state.m_pageLogicalHeight;
 }
 
 // The algorithm below assumes this is a full layout. In case there are previously computed values for regions, supplemental steps are taken
@@ -236,13 +295,13 @@ void RenderView::layoutContentInAutoLogicalHeightRegions(const LayoutState& stat
 {
     // We need to invalidate all the flows with auto-height regions if one such flow needs layout.
     // If none is found we do a layout a check back again afterwards.
-    if (!flowThreadController()->updateFlowThreadsNeedingLayout()) {
+    if (!flowThreadController().updateFlowThreadsNeedingLayout()) {
         // Do a first layout of the content. In some cases more layouts are not needed (e.g. only flows with non-auto-height regions have changed).
         layoutContent(state);
 
         // If we find no named flow needing a two step layout after the first layout, exit early.
         // Otherwise, initiate the two step layout algorithm and recompute all the flows.
-        if (!flowThreadController()->updateFlowThreadsNeedingTwoStepLayout())
+        if (!flowThreadController().updateFlowThreadsNeedingTwoStepLayout())
             return;
     }
 
@@ -251,7 +310,7 @@ void RenderView::layoutContentInAutoLogicalHeightRegions(const LayoutState& stat
 
     // Propagate the computed auto-height values upwards.
     // Non-auto-height regions may invalidate the flow thread because they depended on auto-height regions, but that's ok.
-    flowThreadController()->updateFlowThreadsIntoConstrainedPhase();
+    flowThreadController().updateFlowThreadsIntoConstrainedPhase();
 
     // Do one last layout that should update the auto-height regions found in the main flow
     // and solve pathological dependencies between regions (e.g. a non-auto-height region depending
@@ -260,32 +319,50 @@ void RenderView::layoutContentInAutoLogicalHeightRegions(const LayoutState& stat
         layoutContent(state);
 }
 
+void RenderView::layoutContentToComputeOverflowInRegions(const LayoutState& state)
+{
+    if (!hasRenderNamedFlowThreads())
+        return;
+
+    // First pass through the flow threads and mark the regions as needing a simple layout.
+    // The regions extract the overflow from the flow thread and pass it to their containg
+    // block chain.
+    flowThreadController().updateFlowThreadsIntoOverflowPhase();
+    if (needsLayout())
+        layoutContent(state);
+
+    // In case scrollbars resized the regions a new pass is necessary to update the flow threads
+    // and recompute the overflow on regions. This is the final state of the flow threads.
+    flowThreadController().updateFlowThreadsIntoFinalPhase();
+    if (needsLayout())
+        layoutContent(state);
+
+    // Finally reset the layout state of the flow threads.
+    flowThreadController().updateFlowThreadsIntoMeasureContentPhase();
+}
+
 void RenderView::layout()
 {
     StackStats::LayoutCheckPoint layoutCheckPoint;
-    if (!document()->paginated())
+    if (!document().paginated())
         setPageLogicalHeight(0);
 
     if (shouldUsePrintingLayout())
         m_minPreferredLogicalWidth = m_maxPreferredLogicalWidth = logicalWidth();
 
     // Use calcWidth/Height to get the new width/height, since this will take the full page zoom factor into account.
-    bool relayoutChildren = !shouldUsePrintingLayout() && (!m_frameView || width() != viewWidth() || height() != viewHeight());
+    bool relayoutChildren = !shouldUsePrintingLayout() && (width() != viewWidth() || height() != viewHeight());
     if (relayoutChildren) {
-        setChildNeedsLayout(true, MarkOnlyThis);
-        for (RenderObject* child = firstChild(); child; child = child->nextSibling()) {
-            if ((child->isBox() && (toRenderBox(child)->hasRelativeLogicalHeight() || toRenderBox(child)->hasViewportPercentageLogicalHeight()))
-                    || child->style()->logicalHeight().isPercent()
-                    || child->style()->logicalMinHeight().isPercent()
-                    || child->style()->logicalMaxHeight().isPercent()
-                    || child->style()->logicalHeight().isViewportPercentage()
-                    || child->style()->logicalMinHeight().isViewportPercentage()
-                    || child->style()->logicalMaxHeight().isViewportPercentage()
-#if ENABLE(SVG)
-                    || child->isSVGRoot()
-#endif
+        setChildNeedsLayout(MarkOnlyThis);
+
+        for (auto& box : childrenOfType<RenderBox>(*this)) {
+            if (box.hasRelativeLogicalHeight()
+                || box.style().logicalHeight().isPercentOrCalculated()
+                || box.style().logicalMinHeight().isPercentOrCalculated()
+                || box.style().logicalMaxHeight().isPercentOrCalculated()
+                || box.isSVGRoot()
                 )
-                child->setChildNeedsLayout(true, MarkOnlyThis);
+                box.setChildNeedsLayout(MarkOnlyThis);
         }
     }
 
@@ -293,114 +370,126 @@ void RenderView::layout()
     if (!needsLayout())
         return;
 
-    LayoutState state;
-    bool isSeamlessAncestorInFlowThread = initializeLayoutState(state);
+    m_layoutState = std::make_unique<LayoutState>();
+    initializeLayoutState(*m_layoutState);
 
     m_pageLogicalHeightChanged = false;
-    m_layoutState = &state;
 
     if (checkTwoPassLayoutForAutoHeightRegions())
-        layoutContentInAutoLogicalHeightRegions(state);
+        layoutContentInAutoLogicalHeightRegions(*m_layoutState);
     else
-        layoutContent(state);
+        layoutContent(*m_layoutState);
+
+    layoutContentToComputeOverflowInRegions(*m_layoutState);
 
 #ifndef NDEBUG
-    checkLayoutState(state);
+    checkLayoutState(*m_layoutState);
 #endif
-    m_layoutState = 0;
-    setNeedsLayout(false);
-    
-    if (isSeamlessAncestorInFlowThread)
-        flowThreadController()->setCurrentRenderFlowThread(0);
+    m_layoutState = nullptr;
+    clearNeedsLayout();
 }
 
 LayoutUnit RenderView::pageOrViewLogicalHeight() const
 {
-    if (document()->printing())
+    if (document().printing())
         return pageLogicalHeight();
     
-    if (hasColumns() && !style()->hasInlineColumnAxis()) {
-        if (int pageLength = frameView()->pagination().pageLength)
+    if (multiColumnFlowThread() && !style().hasInlineColumnAxis()) {
+        if (int pageLength = frameView().pagination().pageLength)
             return pageLength;
     }
 
     return viewLogicalHeight();
 }
 
+LayoutUnit RenderView::clientLogicalWidthForFixedPosition() const
+{
+    // FIXME: If the FrameView's fixedVisibleContentRect() is not empty, perhaps it should be consulted here too?
+    if (frameView().fixedElementsLayoutRelativeToFrame())
+        return (isHorizontalWritingMode() ? frameView().visibleWidth() : frameView().visibleHeight()) / frameView().frame().frameScaleFactor();
+
+#if PLATFORM(IOS)
+    if (frameView().useCustomFixedPositionLayoutRect())
+        return isHorizontalWritingMode() ? frameView().customFixedPositionLayoutRect().width() : frameView().customFixedPositionLayoutRect().height();
+#endif
+
+    return clientLogicalWidth();
+}
+
+LayoutUnit RenderView::clientLogicalHeightForFixedPosition() const
+{
+    // FIXME: If the FrameView's fixedVisibleContentRect() is not empty, perhaps it should be consulted here too?
+    if (frameView().fixedElementsLayoutRelativeToFrame())
+        return (isHorizontalWritingMode() ? frameView().visibleHeight() : frameView().visibleWidth()) / frameView().frame().frameScaleFactor();
+
+#if PLATFORM(IOS)
+    if (frameView().useCustomFixedPositionLayoutRect())
+        return isHorizontalWritingMode() ? frameView().customFixedPositionLayoutRect().height() : frameView().customFixedPositionLayoutRect().width();
+#endif
+
+    return clientLogicalHeight();
+}
+
 void RenderView::mapLocalToContainer(const RenderLayerModelObject* repaintContainer, TransformState& transformState, MapCoordinatesFlags mode, bool* wasFixed) const
 {
-    // If a container was specified, and was not 0 or the RenderView,
+    // If a container was specified, and was not nullptr or the RenderView,
     // then we should have found it by now.
     ASSERT_ARG(repaintContainer, !repaintContainer || repaintContainer == this);
     ASSERT_UNUSED(wasFixed, !wasFixed || *wasFixed == (mode & IsFixed));
 
-    if (!repaintContainer && mode & UseTransforms && shouldUseTransformFromContainer(0)) {
+    if (!repaintContainer && mode & UseTransforms && shouldUseTransformFromContainer(nullptr)) {
         TransformationMatrix t;
-        getTransformFromContainer(0, LayoutSize(), t);
+        getTransformFromContainer(nullptr, LayoutSize(), t);
         transformState.applyTransform(t);
     }
     
-    if (mode & IsFixed && m_frameView)
-        transformState.move(m_frameView->scrollOffsetForFixedPosition());
+    if (mode & IsFixed)
+        transformState.move(toLayoutSize(frameView().scrollPositionRespectingCustomFixedPosition()));
 }
 
 const RenderObject* RenderView::pushMappingToContainer(const RenderLayerModelObject* ancestorToStopAt, RenderGeometryMap& geometryMap) const
 {
-    // If a container was specified, and was not 0 or the RenderView,
+    // If a container was specified, and was not nullptr or the RenderView,
     // then we should have found it by now.
     ASSERT_ARG(ancestorToStopAt, !ancestorToStopAt || ancestorToStopAt == this);
 
-    LayoutSize scrollOffset;
+    LayoutPoint scrollPosition = frameView().scrollPositionRespectingCustomFixedPosition();
 
-    if (m_frameView)
-        scrollOffset = m_frameView->scrollOffsetForFixedPosition();
-
-    if (!ancestorToStopAt && shouldUseTransformFromContainer(0)) {
+    if (!ancestorToStopAt && shouldUseTransformFromContainer(nullptr)) {
         TransformationMatrix t;
-        getTransformFromContainer(0, LayoutSize(), t);
-        geometryMap.pushView(this, scrollOffset, &t);
+        getTransformFromContainer(nullptr, LayoutSize(), t);
+        geometryMap.pushView(this, toLayoutSize(scrollPosition), &t);
     } else
-        geometryMap.pushView(this, scrollOffset);
+        geometryMap.pushView(this, toLayoutSize(scrollPosition));
 
-    return 0;
+    return nullptr;
 }
 
 void RenderView::mapAbsoluteToLocalPoint(MapCoordinatesFlags mode, TransformState& transformState) const
 {
-    if (mode & IsFixed && m_frameView)
-        transformState.move(m_frameView->scrollOffsetForFixedPosition());
+    if (mode & IsFixed)
+        transformState.move(toLayoutSize(frameView().scrollPositionRespectingCustomFixedPosition()));
 
-    if (mode & UseTransforms && shouldUseTransformFromContainer(0)) {
+    if (mode & UseTransforms && shouldUseTransformFromContainer(nullptr)) {
         TransformationMatrix t;
-        getTransformFromContainer(0, LayoutSize(), t);
+        getTransformFromContainer(nullptr, LayoutSize(), t);
         transformState.applyTransform(t);
     }
 }
 
-bool RenderView::requiresColumns(int desiredColumnCount) const
+bool RenderView::requiresColumns(int) const
 {
-    if (m_frameView)
-        return m_frameView->pagination().mode != Pagination::Unpaginated;
-
-    return RenderBlock::requiresColumns(desiredColumnCount);
+    return frameView().pagination().mode != Pagination::Unpaginated;
 }
 
-void RenderView::calcColumnWidth()
+void RenderView::computeColumnCountAndWidth()
 {
     int columnWidth = contentLogicalWidth();
-    if (m_frameView && style()->hasInlineColumnAxis()) {
-        if (int pageLength = m_frameView->pagination().pageLength)
+    if (style().hasInlineColumnAxis()) {
+        if (int pageLength = frameView().pagination().pageLength)
             columnWidth = pageLength;
     }
-    setDesiredColumnCountAndWidth(1, columnWidth);
-}
-
-ColumnInfo::PaginationUnit RenderView::paginationUnit() const
-{
-    if (m_frameView)
-        return m_frameView->pagination().behavesLikeColumns ? ColumnInfo::Column : ColumnInfo::Page;
-
-    return ColumnInfo::Page;
+    setComputedColumnCountAndWidth(1, columnWidth);
 }
 
 void RenderView::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
@@ -411,33 +500,30 @@ void RenderView::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
     ASSERT(LayoutPoint(IntPoint(paintOffset.x(), paintOffset.y())) == paintOffset);
 
     // This avoids painting garbage between columns if there is a column gap.
-    if (m_frameView && m_frameView->pagination().mode != Pagination::Unpaginated && paintInfo.shouldPaintWithinRoot(this))
-        paintInfo.context->fillRect(paintInfo.rect, m_frameView->baseBackgroundColor(), ColorSpaceDeviceRGB);
+    if (frameView().pagination().mode != Pagination::Unpaginated && paintInfo.shouldPaintWithinRoot(*this))
+        paintInfo.context().fillRect(paintInfo.rect, frameView().baseBackgroundColor());
 
     paintObject(paintInfo, paintOffset);
 }
 
-static inline bool isComposited(RenderObject* object)
-{
-    return object->hasLayer() && toRenderLayerModelObject(object)->layer()->isComposited();
-}
-
-static inline bool rendererObscuresBackground(RenderObject* rootObject)
+static inline bool rendererObscuresBackground(RenderElement* rootObject)
 {
     if (!rootObject)
         return false;
     
-    RenderStyle* style = rootObject->style();
-    if (style->visibility() != VISIBLE
-        || style->opacity() != 1
-        || style->hasTransform())
+    const RenderStyle& style = rootObject->style();
+    if (style.visibility() != VISIBLE
+        || style.opacity() != 1
+        || style.hasTransform())
         return false;
     
-    if (isComposited(rootObject))
+    if (rootObject->isComposited())
         return false;
 
-    const RenderObject* rootRenderer = rootObject->rendererForRootBackground();
-    if (rootRenderer->style()->backgroundClip() == TextFillBox)
+    if (rootObject->rendererForRootBackground().style().backgroundClip() == TextFillBox)
+        return false;
+
+    if (style.hasBorderRadius())
         return false;
 
     return true;
@@ -445,7 +531,7 @@ static inline bool rendererObscuresBackground(RenderObject* rootObject)
 
 void RenderView::paintBoxDecorations(PaintInfo& paintInfo, const LayoutPoint&)
 {
-    if (!paintInfo.shouldPaintWithinRoot(this))
+    if (!paintInfo.shouldPaintWithinRoot(*this))
         return;
 
     // Check to see if we are enclosed by a layer that requires complex painting rules.  If so, we cannot blit
@@ -453,25 +539,22 @@ void RenderView::paintBoxDecorations(PaintInfo& paintInfo, const LayoutPoint&)
     // layers with reflections, or transformed layers.
     // FIXME: This needs to be dynamic.  We should be able to go back to blitting if we ever stop being inside
     // a transform, transparency layer, etc.
-    Element* elt;
-    for (elt = document()->ownerElement(); view() && elt && elt->renderer(); elt = elt->document()->ownerElement()) {
-        RenderLayer* layer = elt->renderer()->enclosingLayer();
+    for (HTMLFrameOwnerElement* element = document().ownerElement(); element && element->renderer(); element = element->document().ownerElement()) {
+        RenderLayer* layer = element->renderer()->enclosingLayer();
         if (layer->cannotBlitToWindow()) {
-            frameView()->setCannotBlitToWindow();
+            frameView().setCannotBlitToWindow();
             break;
         }
 
-#if USE(ACCELERATED_COMPOSITING)
         if (RenderLayer* compositingLayer = layer->enclosingCompositingLayerForRepaint()) {
             if (!compositingLayer->backing()->paintsIntoWindow()) {
-                frameView()->setCannotBlitToWindow();
+                frameView().setCannotBlitToWindow();
                 break;
             }
         }
-#endif
     }
 
-    if (document()->ownerElement() || !view())
+    if (document().ownerElement())
         return;
 
     if (paintInfo.skipRootBackground())
@@ -479,15 +562,18 @@ void RenderView::paintBoxDecorations(PaintInfo& paintInfo, const LayoutPoint&)
 
     bool rootFillsViewport = false;
     bool rootObscuresBackground = false;
-    Node* documentElement = document()->documentElement();
-    if (RenderObject* rootRenderer = documentElement ? documentElement->renderer() : 0) {
+    Element* documentElement = document().documentElement();
+    if (RenderElement* rootRenderer = documentElement ? documentElement->renderer() : nullptr) {
         // The document element's renderer is currently forced to be a block, but may not always be.
-        RenderBox* rootBox = rootRenderer->isBox() ? toRenderBox(rootRenderer) : 0;
+        RenderBox* rootBox = is<RenderBox>(*rootRenderer) ? downcast<RenderBox>(rootRenderer) : nullptr;
         rootFillsViewport = rootBox && !rootBox->x() && !rootBox->y() && rootBox->width() >= width() && rootBox->height() >= height();
         rootObscuresBackground = rendererObscuresBackground(rootRenderer);
     }
-    
-    Page* page = document()->page();
+
+    bool backgroundShouldExtendBeyondPage = frameView().frame().settings().backgroundShouldExtendBeyondPage();
+    compositor().setRootExtendedBackgroundColor(backgroundShouldExtendBeyondPage ? frameView().documentBackgroundColor() : Color());
+
+    Page* page = document().page();
     float pageScaleFactor = page ? page->pageScaleFactor() : 1;
 
     // If painting will entirely fill the view, no need to fill the background.
@@ -496,122 +582,143 @@ void RenderView::paintBoxDecorations(PaintInfo& paintInfo, const LayoutPoint&)
 
     // This code typically only executes if the root element's visibility has been set to hidden,
     // if there is a transform on the <html>, or if there is a page scale factor less than 1.
-    // Only fill with the base background color (typically white) if we're the root document, 
+    // Only fill with a background color (typically white) if we're the root document, 
     // since iframes/frames with no background in the child document should show the parent's background.
-    if (frameView()->isTransparent()) // FIXME: This needs to be dynamic.  We should be able to go back to blitting if we ever stop being transparent.
-        frameView()->setCannotBlitToWindow(); // The parent must show behind the child.
+    // We use the base background color unless the backgroundShouldExtendBeyondPage setting is set,
+    // in which case we use the document's background color.
+    if (frameView().isTransparent()) // FIXME: This needs to be dynamic. We should be able to go back to blitting if we ever stop being transparent.
+        frameView().setCannotBlitToWindow(); // The parent must show behind the child.
     else {
-        Color baseColor = frameView()->baseBackgroundColor();
-        if (baseColor.alpha()) {
-            CompositeOperator previousOperator = paintInfo.context->compositeOperation();
-            paintInfo.context->setCompositeOperation(CompositeCopy);
-            paintInfo.context->fillRect(paintInfo.rect, baseColor, style()->colorSpace());
-            paintInfo.context->setCompositeOperation(previousOperator);
+        Color documentBackgroundColor = frameView().documentBackgroundColor();
+        Color backgroundColor = (backgroundShouldExtendBeyondPage && documentBackgroundColor.isValid()) ? documentBackgroundColor : frameView().baseBackgroundColor();
+        if (backgroundColor.alpha()) {
+            CompositeOperator previousOperator = paintInfo.context().compositeOperation();
+            paintInfo.context().setCompositeOperation(CompositeCopy);
+            paintInfo.context().fillRect(paintInfo.rect, backgroundColor);
+            paintInfo.context().setCompositeOperation(previousOperator);
         } else
-            paintInfo.context->clearRect(paintInfo.rect);
+            paintInfo.context().clearRect(paintInfo.rect);
     }
 }
 
-bool RenderView::shouldRepaint(const LayoutRect& r) const
+bool RenderView::shouldRepaint(const LayoutRect& rect) const
 {
-    if (printing() || r.width() == 0 || r.height() == 0)
-        return false;
-
-    if (!m_frameView)
-        return false;
-
-    if (m_frameView->repaintsDisabled())
-        return false;
-
-    return true;
+    return !printing() && !rect.isEmpty();
 }
 
-void RenderView::repaintViewRectangle(const LayoutRect& ur, bool immediate) const
+void RenderView::repaintRootContents()
 {
-    if (!shouldRepaint(ur))
+    if (layer()->isComposited()) {
+        layer()->setBackingNeedsRepaint(GraphicsLayer::DoNotClipToLayer);
+        return;
+    }
+    repaint();
+}
+
+void RenderView::repaintViewRectangle(const LayoutRect& repaintRect) const
+{
+    if (!shouldRepaint(repaintRect))
         return;
 
-    // We always just invalidate the root view, since we could be an iframe that is clipped out
-    // or even invisible.
-    Element* elt = document()->ownerElement();
-    if (!elt)
-        m_frameView->repaintContentRectangle(pixelSnappedIntRect(ur), immediate);
-    else if (RenderBox* obj = elt->renderBox()) {
-        LayoutRect vr = viewRect();
-        LayoutRect r = intersection(ur, vr);
-        
-        // Subtract out the contentsX and contentsY offsets to get our coords within the viewing
-        // rectangle.
-        r.moveBy(-vr.location());
-
-        // FIXME: Hardcoded offsets here are not good.
-        r.moveBy(obj->contentBoxRect().location());
-        obj->repaintRectangle(r, immediate);
-    }
-}
-
-void RenderView::repaintRectangleInViewAndCompositedLayers(const LayoutRect& ur, bool immediate)
-{
-    if (!shouldRepaint(ur))
-        return;
-
-    repaintViewRectangle(ur, immediate);
-    
-#if USE(ACCELERATED_COMPOSITING)
-    if (compositor()->inCompositingMode()) {
-        IntRect repaintRect = pixelSnappedIntRect(ur);
-        compositor()->repaintCompositedLayers(&repaintRect);
-    }
+    // FIXME: enclosingRect is needed as long as we integral snap ScrollView/FrameView/RenderWidget size/position.
+    IntRect enclosingRect = enclosingIntRect(repaintRect);
+    if (auto ownerElement = document().ownerElement()) {
+        RenderBox* ownerBox = ownerElement->renderBox();
+        if (!ownerBox)
+            return;
+        LayoutRect viewRect = this->viewRect();
+#if PLATFORM(IOS)
+        // Don't clip using the visible rect since clipping is handled at a higher level on iPhone.
+        LayoutRect adjustedRect = enclosingRect;
+#else
+        LayoutRect adjustedRect = intersection(enclosingRect, viewRect);
 #endif
+        adjustedRect.moveBy(-viewRect.location());
+        adjustedRect.moveBy(ownerBox->contentBoxRect().location());
+        ownerBox->repaintRectangle(adjustedRect);
+        return;
+    }
+
+    frameView().addTrackedRepaintRect(snapRectToDevicePixels(repaintRect, document().deviceScaleFactor()));
+    if (!m_accumulatedRepaintRegion) {
+        frameView().repaintContentRectangle(enclosingRect);
+        return;
+    }
+    m_accumulatedRepaintRegion->unite(enclosingRect);
+
+    // Region will get slow if it gets too complex. Merge all rects so far to bounds if this happens.
+    // FIXME: Maybe there should be a region type that does this automatically.
+    static const unsigned maximumRepaintRegionGridSize = 16 * 16;
+    if (m_accumulatedRepaintRegion->gridSize() > maximumRepaintRegionGridSize)
+        m_accumulatedRepaintRegion = std::make_unique<Region>(m_accumulatedRepaintRegion->bounds());
+}
+
+void RenderView::flushAccumulatedRepaintRegion() const
+{
+    ASSERT(!document().ownerElement());
+    ASSERT(m_accumulatedRepaintRegion);
+    auto repaintRects = m_accumulatedRepaintRegion->rects();
+    for (auto& rect : repaintRects)
+        frameView().repaintContentRectangle(rect);
+    m_accumulatedRepaintRegion = nullptr;
 }
 
 void RenderView::repaintViewAndCompositedLayers()
 {
-    repaint();
-    
-#if USE(ACCELERATED_COMPOSITING)
-    if (compositor()->inCompositingMode())
-        compositor()->repaintCompositedLayers();
-#endif
+    repaintRootContents();
+
+    RenderLayerCompositor& compositor = this->compositor();
+    if (compositor.inCompositingMode())
+        compositor.repaintCompositedLayers();
 }
 
 LayoutRect RenderView::visualOverflowRect() const
 {
-    if (m_frameView->paintsEntireContents())
+    if (frameView().paintsEntireContents())
         return layoutOverflowRect();
 
-    return RenderBlock::visualOverflowRect();
+    return RenderBlockFlow::visualOverflowRect();
 }
 
-void RenderView::computeRectForRepaint(const RenderLayerModelObject* repaintContainer, LayoutRect& rect, bool fixed) const
+LayoutRect RenderView::computeRectForRepaint(const LayoutRect& rect, const RenderLayerModelObject* repaintContainer, bool fixed) const
 {
-    // If a container was specified, and was not 0 or the RenderView,
+    // If a container was specified, and was not nullptr or the RenderView,
     // then we should have found it by now.
     ASSERT_ARG(repaintContainer, !repaintContainer || repaintContainer == this);
 
     if (printing())
-        return;
-
-    if (style()->isFlippedBlocksWritingMode()) {
+        return rect;
+    
+    LayoutRect adjustedRect = rect;
+    if (style().isFlippedBlocksWritingMode()) {
         // We have to flip by hand since the view's logical height has not been determined.  We
         // can use the viewport width and height.
-        if (style()->isHorizontalWritingMode())
-            rect.setY(viewHeight() - rect.maxY());
+        if (style().isHorizontalWritingMode())
+            adjustedRect.setY(viewHeight() - adjustedRect.maxY());
         else
-            rect.setX(viewWidth() - rect.maxX());
+            adjustedRect.setX(viewWidth() - adjustedRect.maxX());
     }
 
-    if (fixed && m_frameView)
-        rect.move(m_frameView->scrollOffsetForFixedPosition());
-        
+    if (fixed)
+        adjustedRect.moveBy(frameView().scrollPositionRespectingCustomFixedPosition());
+    
     // Apply our transform if we have one (because of full page zooming).
     if (!repaintContainer && layer() && layer()->transform())
-        rect = layer()->transform()->mapRect(rect);
+        adjustedRect = LayoutRect(layer()->transform()->mapRect(snapRectToDevicePixels(adjustedRect, document().deviceScaleFactor())));
+    return adjustedRect;
+}
+
+bool RenderView::isScrollableOrRubberbandableBox() const
+{
+    // The main frame might be allowed to rubber-band even if there is no content to scroll to. This is unique to
+    // the main frame; subframes and overflow areas have to have content that can be scrolled to in order to rubber-band.
+    FrameView::Scrollability defineScrollable = frame().ownerElement() ? FrameView::Scrollability::Scrollable : FrameView::Scrollability::ScrollableOrRubberbandable;
+    return frameView().isScrollable(defineScrollable);
 }
 
 void RenderView::absoluteRects(Vector<IntRect>& rects, const LayoutPoint& accumulatedOffset) const
 {
-    rects.append(pixelSnappedIntRect(accumulatedOffset, layer()->size()));
+    rects.append(snappedIntRect(accumulatedOffset, layer()->size()));
 }
 
 void RenderView::absoluteQuads(Vector<FloatQuad>& quads, bool* wasFixed) const
@@ -624,7 +731,7 @@ void RenderView::absoluteQuads(Vector<FloatQuad>& quads, bool* wasFixed) const
 static RenderObject* rendererAfterPosition(RenderObject* object, unsigned offset)
 {
     if (!object)
-        return 0;
+        return nullptr;
 
     RenderObject* child = object->childAt(offset);
     return child ? child : object->nextInPreOrderAfterChildren();
@@ -632,28 +739,41 @@ static RenderObject* rendererAfterPosition(RenderObject* object, unsigned offset
 
 IntRect RenderView::selectionBounds(bool clipToVisibleContent) const
 {
-    document()->updateStyleIfNeeded();
+    LayoutRect selRect = subtreeSelectionBounds(*this, clipToVisibleContent);
 
-    typedef HashMap<RenderObject*, OwnPtr<RenderSelectionInfo> > SelectionMap;
+    if (hasRenderNamedFlowThreads()) {
+        for (auto* namedFlowThread : *m_flowThreadController->renderNamedFlowThreadList()) {
+            LayoutRect currRect = subtreeSelectionBounds(*namedFlowThread, clipToVisibleContent);
+            selRect.unite(currRect);
+        }
+    }
+
+    return snappedIntRect(selRect);
+}
+
+LayoutRect RenderView::subtreeSelectionBounds(const SelectionSubtreeRoot& root, bool clipToVisibleContent) const
+{
+    typedef HashMap<RenderObject*, std::unique_ptr<RenderSelectionInfo>> SelectionMap;
     SelectionMap selectedObjects;
 
-    RenderObject* os = m_selectionStart;
-    RenderObject* stop = rendererAfterPosition(m_selectionEnd, m_selectionEndPos);
+    RenderObject* os = root.selectionData().selectionStart();
+    RenderObject* stop = rendererAfterPosition(root.selectionData().selectionEnd(), root.selectionData().selectionEndPos());
+    SelectionIterator selectionIterator(os);
     while (os && os != stop) {
-        if ((os->canBeSelectionLeaf() || os == m_selectionStart || os == m_selectionEnd) && os->selectionState() != SelectionNone) {
+        if ((os->canBeSelectionLeaf() || os == root.selectionData().selectionStart() || os == root.selectionData().selectionEnd()) && os->selectionState() != SelectionNone) {
             // Blocks are responsible for painting line gaps and margin gaps. They must be examined as well.
-            selectedObjects.set(os, adoptPtr(new RenderSelectionInfo(os, clipToVisibleContent)));
+            selectedObjects.set(os, std::make_unique<RenderSelectionInfo>(*os, clipToVisibleContent));
             RenderBlock* cb = os->containingBlock();
-            while (cb && !cb->isRenderView()) {
-                OwnPtr<RenderSelectionInfo>& blockInfo = selectedObjects.add(cb, nullptr).iterator->value;
+            while (cb && !is<RenderView>(*cb)) {
+                std::unique_ptr<RenderSelectionInfo>& blockInfo = selectedObjects.add(cb, nullptr).iterator->value;
                 if (blockInfo)
                     break;
-                blockInfo = adoptPtr(new RenderSelectionInfo(cb, clipToVisibleContent));
+                blockInfo = std::make_unique<RenderSelectionInfo>(*cb, clipToVisibleContent);
                 cb = cb->containingBlock();
             }
         }
 
-        os = os->nextInPreOrder();
+        os = selectionIterator.next();
     }
 
     // Now create a single bounding box rect that encloses the whole selection.
@@ -669,47 +789,41 @@ IntRect RenderView::selectionBounds(bool clipToVisibleContent) const
         }
         selRect.unite(currRect);
     }
-    return pixelSnappedIntRect(selRect);
+    return selRect;
 }
 
 void RenderView::repaintSelection() const
 {
-    document()->updateStyleIfNeeded();
+    repaintSubtreeSelection(*this);
 
+    if (hasRenderNamedFlowThreads()) {
+        for (auto* namedFlowThread : *m_flowThreadController->renderNamedFlowThreadList())
+            repaintSubtreeSelection(*namedFlowThread);
+    }
+}
+
+void RenderView::repaintSubtreeSelection(const SelectionSubtreeRoot& root) const
+{
     HashSet<RenderBlock*> processedBlocks;
 
-    RenderObject* end = rendererAfterPosition(m_selectionEnd, m_selectionEndPos);
-    for (RenderObject* o = m_selectionStart; o && o != end; o = o->nextInPreOrder()) {
-        if (!o->canBeSelectionLeaf() && o != m_selectionStart && o != m_selectionEnd)
+    RenderObject* end = rendererAfterPosition(root.selectionData().selectionEnd(), root.selectionData().selectionEndPos());
+    SelectionIterator selectionIterator(root.selectionData().selectionStart());
+    for (RenderObject* o = selectionIterator.current(); o && o != end; o = selectionIterator.next()) {
+        if (!o->canBeSelectionLeaf() && o != root.selectionData().selectionStart() && o != root.selectionData().selectionEnd())
             continue;
         if (o->selectionState() == SelectionNone)
             continue;
 
-        RenderSelectionInfo(o, true).repaint();
+        RenderSelectionInfo(*o, true).repaint();
 
         // Blocks are responsible for painting line gaps and margin gaps. They must be examined as well.
-        for (RenderBlock* block = o->containingBlock(); block && !block->isRenderView(); block = block->containingBlock()) {
+        for (RenderBlock* block = o->containingBlock(); block && !is<RenderView>(*block); block = block->containingBlock()) {
             if (!processedBlocks.add(block).isNewEntry)
                 break;
-            RenderSelectionInfo(block, true).repaint();
+            RenderSelectionInfo(*block, true).repaint();
         }
     }
 }
-
-#if USE(ACCELERATED_COMPOSITING)
-// Compositing layer dimensions take outline size into account, so we have to recompute layer
-// bounds when it changes.
-// FIXME: This is ugly; it would be nice to have a better way to do this.
-void RenderView::setMaximalOutlineSize(int o)
-{
-    if (o != m_maximalOutlineSize) {
-        m_maximalOutlineSize = o;
-
-        // maximalOutlineSize affects compositing layer dimensions.
-        compositor()->setCompositingLayersNeedRebuild();    // FIXME: this really just needs to be a geometry update.
-    }
-}
-#endif
 
 void RenderView::setSelection(RenderObject* start, int startPos, RenderObject* end, int endPos, SelectionRepaintMode blockRepaintMode)
 {
@@ -718,82 +832,168 @@ void RenderView::setSelection(RenderObject* start, int startPos, RenderObject* e
     if ((start && !end) || (end && !start))
         return;
 
-    bool caretChanged = m_selectionWasCaret != view()->frame()->selection()->isCaret();
-    m_selectionWasCaret = view()->frame()->selection()->isCaret();
+    bool caretChanged = m_selectionWasCaret != frame().selection().isCaret();
+    m_selectionWasCaret = frame().selection().isCaret();
     // Just return if the selection hasn't changed.
-    if (m_selectionStart == start && m_selectionStartPos == startPos &&
-        m_selectionEnd == end && m_selectionEndPos == endPos && !caretChanged)
+    if (m_selectionUnsplitStart == start && m_selectionUnsplitStartPos == startPos
+        && m_selectionUnsplitEnd == end && m_selectionUnsplitEndPos == endPos && !caretChanged) {
         return;
+    }
 
-    if ((start && end) && (start->flowThreadContainingBlock() != end->flowThreadContainingBlock()))
+#if ENABLE(SERVICE_CONTROLS)
+    // Clear the current rects and create a notifier for the new rects we are about to gather.
+    // The Notifier updates the Editor when it goes out of scope and is destroyed.
+    std::unique_ptr<SelectionRectGatherer::Notifier> rectNotifier = m_selectionRectGatherer.clearAndCreateNotifier();
+#endif // ENABLE(SERVICE_CONTROLS)
+    // Set global positions for new selection.
+    m_selectionUnsplitStart = start;
+    m_selectionUnsplitStartPos = startPos;
+    m_selectionUnsplitEnd = end;
+    m_selectionUnsplitEndPos = endPos;
+
+    // If there is no RenderNamedFlowThreads we follow the regular selection.
+    if (!hasRenderNamedFlowThreads()) {
+        RenderSubtreesMap singleSubtreeMap;
+        singleSubtreeMap.set(this, SelectionSubtreeData(start, startPos, end, endPos));
+        updateSelectionForSubtrees(singleSubtreeMap, blockRepaintMode);
         return;
+    }
 
+    splitSelectionBetweenSubtrees(start, startPos, end, endPos, blockRepaintMode);
+}
+
+void RenderView::splitSelectionBetweenSubtrees(const RenderObject* start, int startPos, const RenderObject* end, int endPos, SelectionRepaintMode blockRepaintMode)
+{
+    // Compute the visible selection end points for each of the subtrees.
+    RenderSubtreesMap renderSubtreesMap;
+
+    SelectionSubtreeData initialSelection;
+    renderSubtreesMap.set(this, initialSelection);
+    for (auto* namedFlowThread : *flowThreadController().renderNamedFlowThreadList())
+        renderSubtreesMap.set(namedFlowThread, initialSelection);
+
+    if (start && end) {
+        Node* startNode = start->node();
+        Node* endNode = end->node();
+        ASSERT(endNode);
+        Node* stopNode = NodeTraversal::nextSkippingChildren(*endNode);
+
+        for (Node* node = startNode; node != stopNode; node = NodeTraversal::next(*node)) {
+            RenderObject* renderer = node->renderer();
+            if (!renderer)
+                continue;
+
+            SelectionSubtreeRoot& root = renderer->selectionRoot();
+            SelectionSubtreeData selectionData = renderSubtreesMap.get(&root);
+            if (selectionData.selectionClear()) {
+                selectionData.setSelectionStart(node->renderer());
+                selectionData.setSelectionStartPos(node == startNode ? startPos : 0);
+            }
+
+            selectionData.setSelectionEnd(node->renderer());
+            if (node == endNode)
+                selectionData.setSelectionEndPos(endPos);
+            else
+                selectionData.setSelectionEndPos(node->offsetInCharacters() ? node->maxCharacterOffset() : node->countChildNodes());
+
+            renderSubtreesMap.set(&root, selectionData);
+        }
+    }
+    
+    updateSelectionForSubtrees(renderSubtreesMap, blockRepaintMode);
+}
+
+void RenderView::updateSelectionForSubtrees(RenderSubtreesMap& renderSubtreesMap, SelectionRepaintMode blockRepaintMode)
+{
+    SubtreeOldSelectionDataMap oldSelectionDataMap;
+    for (auto& subtreeSelectionInfo : renderSubtreesMap) {
+        SelectionSubtreeRoot& root = *subtreeSelectionInfo.key;
+        std::unique_ptr<OldSelectionData> oldSelectionData = std::make_unique<OldSelectionData>();
+
+        clearSubtreeSelection(root, blockRepaintMode, *oldSelectionData);
+        oldSelectionDataMap.set(&root, WTFMove(oldSelectionData));
+
+        root.setSelectionData(subtreeSelectionInfo.value);
+        if (hasRenderNamedFlowThreads())
+            root.adjustForVisibleSelection(document());
+    }
+
+    // Update selection status for the objects inside the selection subtrees.
+    // This needs to be done after the previous loop updated the selectionStart/End
+    // parameters of all subtrees because we're going to be climbing up the containing
+    // block chain and we might end up in a different selection subtree.
+    for (const auto* subtreeSelectionRoot : renderSubtreesMap.keys()) {
+        OldSelectionData& oldSelectionData = *oldSelectionDataMap.get(subtreeSelectionRoot);
+        applySubtreeSelection(*subtreeSelectionRoot, blockRepaintMode, oldSelectionData);
+    }
+}
+
+static inline bool isValidObjectForNewSelection(const SelectionSubtreeRoot& root, const RenderObject& object)
+{
+    return (object.canBeSelectionLeaf() || &object == root.selectionData().selectionStart() || &object == root.selectionData().selectionEnd()) && object.selectionState() != RenderObject::SelectionNone && object.containingBlock();
+}
+
+void RenderView::clearSubtreeSelection(const SelectionSubtreeRoot& root, SelectionRepaintMode blockRepaintMode, OldSelectionData& oldSelectionData) const
+{
     // Record the old selected objects.  These will be used later
     // when we compare against the new selected objects.
-    int oldStartPos = m_selectionStartPos;
-    int oldEndPos = m_selectionEndPos;
-
-    // Objects each have a single selection rect to examine.
-    typedef HashMap<RenderObject*, OwnPtr<RenderSelectionInfo> > SelectedObjectMap;
-    SelectedObjectMap oldSelectedObjects;
-    SelectedObjectMap newSelectedObjects;
-
+    oldSelectionData.selectionStartPos = root.selectionData().selectionStartPos();
+    oldSelectionData.selectionEndPos = root.selectionData().selectionEndPos();
+    
     // Blocks contain selected objects and fill gaps between them, either on the left, right, or in between lines and blocks.
     // In order to get the repaint rect right, we have to examine left, middle, and right rects individually, since otherwise
     // the union of those rects might remain the same even when changes have occurred.
-    typedef HashMap<RenderBlock*, OwnPtr<RenderBlockSelectionInfo> > SelectedBlockMap;
-    SelectedBlockMap oldSelectedBlocks;
-    SelectedBlockMap newSelectedBlocks;
 
-    RenderObject* os = m_selectionStart;
-    RenderObject* stop = rendererAfterPosition(m_selectionEnd, m_selectionEndPos);
+    RenderObject* os = root.selectionData().selectionStart();
+    RenderObject* stop = rendererAfterPosition(root.selectionData().selectionEnd(), root.selectionData().selectionEndPos());
+    SelectionIterator selectionIterator(os);
     while (os && os != stop) {
-        if ((os->canBeSelectionLeaf() || os == m_selectionStart || os == m_selectionEnd) && os->selectionState() != SelectionNone) {
+        if (isValidObjectForNewSelection(root, *os)) {
             // Blocks are responsible for painting line gaps and margin gaps.  They must be examined as well.
-            oldSelectedObjects.set(os, adoptPtr(new RenderSelectionInfo(os, true)));
+            oldSelectionData.selectedObjects.set(os, std::make_unique<RenderSelectionInfo>(*os, true));
             if (blockRepaintMode == RepaintNewXOROld) {
                 RenderBlock* cb = os->containingBlock();
-                while (cb && !cb->isRenderView()) {
-                    OwnPtr<RenderBlockSelectionInfo>& blockInfo = oldSelectedBlocks.add(cb, nullptr).iterator->value;
+                while (cb && !is<RenderView>(*cb)) {
+                    std::unique_ptr<RenderBlockSelectionInfo>& blockInfo = oldSelectionData.selectedBlocks.add(cb, nullptr).iterator->value;
                     if (blockInfo)
                         break;
-                    blockInfo = adoptPtr(new RenderBlockSelectionInfo(cb));
+                    blockInfo = std::make_unique<RenderBlockSelectionInfo>(*cb);
                     cb = cb->containingBlock();
                 }
             }
         }
 
-        os = os->nextInPreOrder();
+        os = selectionIterator.next();
     }
 
-    // Now clear the selection.
-    SelectedObjectMap::iterator oldObjectsEnd = oldSelectedObjects.end();
-    for (SelectedObjectMap::iterator i = oldSelectedObjects.begin(); i != oldObjectsEnd; ++i)
-        i->key->setSelectionStateIfNeeded(SelectionNone);
+    for (auto* selectedObject : oldSelectionData.selectedObjects.keys())
+        selectedObject->setSelectionStateIfNeeded(SelectionNone);
+}
 
-    // set selection start and end
-    m_selectionStart = start;
-    m_selectionStartPos = startPos;
-    m_selectionEnd = end;
-    m_selectionEndPos = endPos;
-
-    // Update the selection status of all objects between m_selectionStart and m_selectionEnd
-    if (start && start == end)
-        start->setSelectionStateIfNeeded(SelectionBoth);
+void RenderView::applySubtreeSelection(const SelectionSubtreeRoot& root, SelectionRepaintMode blockRepaintMode, const OldSelectionData& oldSelectionData)
+{
+    // Update the selection status of all objects between selectionStart and selectionEnd
+    if (root.selectionData().selectionStart() && root.selectionData().selectionStart() == root.selectionData().selectionEnd())
+        root.selectionData().selectionStart()->setSelectionStateIfNeeded(SelectionBoth);
     else {
-        if (start)
-            start->setSelectionStateIfNeeded(SelectionStart);
-        if (end)
-            end->setSelectionStateIfNeeded(SelectionEnd);
+        if (root.selectionData().selectionStart())
+            root.selectionData().selectionStart()->setSelectionStateIfNeeded(SelectionStart);
+        if (root.selectionData().selectionEnd())
+            root.selectionData().selectionEnd()->setSelectionStateIfNeeded(SelectionEnd);
     }
 
-    RenderObject* o = start;
-    stop = rendererAfterPosition(end, endPos);
-
-    while (o && o != stop) {
-        if (o != start && o != end && o->canBeSelectionLeaf())
-            o->setSelectionStateIfNeeded(SelectionInside);
-        o = o->nextInPreOrder();
+    RenderObject* selectionStart = root.selectionData().selectionStart();
+    RenderObject* selectionEnd = rendererAfterPosition(root.selectionData().selectionEnd(), root.selectionData().selectionEndPos());
+    SelectionIterator selectionIterator(selectionStart);
+    for (RenderObject* currentRenderer = selectionStart; currentRenderer && currentRenderer != selectionEnd; currentRenderer = selectionIterator.next()) {
+        if (currentRenderer == root.selectionData().selectionStart() || currentRenderer == root.selectionData().selectionEnd())
+            continue;
+        if (!currentRenderer->canBeSelectionLeaf())
+            continue;
+        // FIXME: Move this logic to SelectionIterator::next()
+        if (&currentRenderer->selectionRoot() != &root)
+            continue;
+        currentRenderer->setSelectionStateIfNeeded(SelectionInside);
     }
 
     if (blockRepaintMode != RepaintNothing)
@@ -801,36 +1001,48 @@ void RenderView::setSelection(RenderObject* start, int startPos, RenderObject* e
 
     // Now that the selection state has been updated for the new objects, walk them again and
     // put them in the new objects list.
-    o = start;
-    while (o && o != stop) {
-        if ((o->canBeSelectionLeaf() || o == start || o == end) && o->selectionState() != SelectionNone) {
-            newSelectedObjects.set(o, adoptPtr(new RenderSelectionInfo(o, true)));
-            RenderBlock* cb = o->containingBlock();
-            while (cb && !cb->isRenderView()) {
-                OwnPtr<RenderBlockSelectionInfo>& blockInfo = newSelectedBlocks.add(cb, nullptr).iterator->value;
+    SelectedObjectMap newSelectedObjects;
+    SelectedBlockMap newSelectedBlocks;
+    selectionIterator = SelectionIterator(selectionStart);
+    for (RenderObject* currentRenderer = selectionStart; currentRenderer && currentRenderer != selectionEnd; currentRenderer = selectionIterator.next()) {
+        if (isValidObjectForNewSelection(root, *currentRenderer)) {
+            std::unique_ptr<RenderSelectionInfo> selectionInfo = std::make_unique<RenderSelectionInfo>(*currentRenderer, true);
+
+#if ENABLE(SERVICE_CONTROLS)
+            for (auto& rect : selectionInfo->collectedSelectionRects())
+                m_selectionRectGatherer.addRect(selectionInfo->repaintContainer(), rect);
+            if (!currentRenderer->isTextOrLineBreak())
+                m_selectionRectGatherer.setTextOnly(false);
+#endif
+
+            newSelectedObjects.set(currentRenderer, WTFMove(selectionInfo));
+
+            RenderBlock* containingBlock = currentRenderer->containingBlock();
+            while (containingBlock && !is<RenderView>(*containingBlock)) {
+                std::unique_ptr<RenderBlockSelectionInfo>& blockInfo = newSelectedBlocks.add(containingBlock, nullptr).iterator->value;
                 if (blockInfo)
                     break;
-                blockInfo = adoptPtr(new RenderBlockSelectionInfo(cb));
-                cb = cb->containingBlock();
+                blockInfo = std::make_unique<RenderBlockSelectionInfo>(*containingBlock);
+                containingBlock = containingBlock->containingBlock();
+
+#if ENABLE(SERVICE_CONTROLS)
+                m_selectionRectGatherer.addGapRects(blockInfo->repaintContainer(), blockInfo->rects());
+#endif
             }
         }
-
-        o = o->nextInPreOrder();
     }
 
-    if (!m_frameView || blockRepaintMode == RepaintNothing)
+    if (blockRepaintMode == RepaintNothing)
         return;
 
-    m_frameView->beginDeferredRepaints();
-
     // Have any of the old selected objects changed compared to the new selection?
-    for (SelectedObjectMap::iterator i = oldSelectedObjects.begin(); i != oldObjectsEnd; ++i) {
-        RenderObject* obj = i->key;
+    for (const auto& selectedObjectInfo : oldSelectionData.selectedObjects) {
+        RenderObject* obj = selectedObjectInfo.key;
         RenderSelectionInfo* newInfo = newSelectedObjects.get(obj);
-        RenderSelectionInfo* oldInfo = i->value.get();
-        if (!newInfo || oldInfo->rect() != newInfo->rect() || oldInfo->state() != newInfo->state() ||
-            (m_selectionStart == obj && oldStartPos != m_selectionStartPos) ||
-            (m_selectionEnd == obj && oldEndPos != m_selectionEndPos)) {
+        RenderSelectionInfo* oldInfo = selectedObjectInfo.value.get();
+        if (!newInfo || oldInfo->rect() != newInfo->rect() || oldInfo->state() != newInfo->state()
+            || (root.selectionData().selectionStart() == obj && oldSelectionData.selectionStartPos != root.selectionData().selectionStartPos())
+            || (root.selectionData().selectionEnd() == obj && oldSelectionData.selectionEndPos != root.selectionData().selectionEndPos())) {
             oldInfo->repaint();
             if (newInfo) {
                 newInfo->repaint();
@@ -840,16 +1052,14 @@ void RenderView::setSelection(RenderObject* start, int startPos, RenderObject* e
     }
 
     // Any new objects that remain were not found in the old objects dict, and so they need to be updated.
-    SelectedObjectMap::iterator newObjectsEnd = newSelectedObjects.end();
-    for (SelectedObjectMap::iterator i = newSelectedObjects.begin(); i != newObjectsEnd; ++i)
-        i->value->repaint();
+    for (const auto& selectedObjectInfo : newSelectedObjects)
+        selectedObjectInfo.value->repaint();
 
     // Have any of the old blocks changed?
-    SelectedBlockMap::iterator oldBlocksEnd = oldSelectedBlocks.end();
-    for (SelectedBlockMap::iterator i = oldSelectedBlocks.begin(); i != oldBlocksEnd; ++i) {
-        RenderBlock* block = i->key;
+    for (const auto& selectedBlockInfo : oldSelectionData.selectedBlocks) {
+        const RenderBlock* block = selectedBlockInfo.key;
         RenderBlockSelectionInfo* newInfo = newSelectedBlocks.get(block);
-        RenderBlockSelectionInfo* oldInfo = i->value.get();
+        RenderBlockSelectionInfo* oldInfo = selectedBlockInfo.value.get();
         if (!newInfo || oldInfo->rects() != newInfo->rects() || oldInfo->state() != newInfo->state()) {
             oldInfo->repaint();
             if (newInfo) {
@@ -860,147 +1070,72 @@ void RenderView::setSelection(RenderObject* start, int startPos, RenderObject* e
     }
 
     // Any new blocks that remain were not found in the old blocks dict, and so they need to be updated.
-    SelectedBlockMap::iterator newBlocksEnd = newSelectedBlocks.end();
-    for (SelectedBlockMap::iterator i = newSelectedBlocks.begin(); i != newBlocksEnd; ++i)
-        i->value->repaint();
-
-    m_frameView->endDeferredRepaints();
+    for (const auto& selectedBlockInfo : newSelectedBlocks)
+        selectedBlockInfo.value->repaint();
 }
 
 void RenderView::getSelection(RenderObject*& startRenderer, int& startOffset, RenderObject*& endRenderer, int& endOffset) const
 {
-    startRenderer = m_selectionStart;
-    startOffset = m_selectionStartPos;
-    endRenderer = m_selectionEnd;
-    endOffset = m_selectionEndPos;
+    startRenderer = m_selectionUnsplitStart;
+    startOffset = m_selectionUnsplitStartPos;
+    endRenderer = m_selectionUnsplitEnd;
+    endOffset = m_selectionUnsplitEndPos;
 }
 
 void RenderView::clearSelection()
 {
     layer()->repaintBlockSelectionGaps();
-    setSelection(0, -1, 0, -1, RepaintNewMinusOld);
-}
-
-void RenderView::selectionStartEnd(int& startPos, int& endPos) const
-{
-    startPos = m_selectionStartPos;
-    endPos = m_selectionEndPos;
+    setSelection(nullptr, -1, nullptr, -1, RepaintNewMinusOld);
 }
 
 bool RenderView::printing() const
 {
-    return document()->printing();
+    return document().printing();
 }
 
 bool RenderView::shouldUsePrintingLayout() const
 {
-    if (!printing() || !m_frameView)
+    if (!printing())
         return false;
-    Frame* frame = m_frameView->frame();
-    return frame && frame->shouldUsePrintingLayout();
-}
-
-size_t RenderView::getRetainedWidgets(Vector<RenderWidget*>& renderWidgets)
-{
-    size_t size = m_widgets.size();
-
-    renderWidgets.reserveCapacity(size);
-
-    RenderWidgetSet::const_iterator end = m_widgets.end();
-    for (RenderWidgetSet::const_iterator it = m_widgets.begin(); it != end; ++it) {
-        renderWidgets.uncheckedAppend(*it);
-        (*it)->ref();
-    }
-    
-    return size;
-}
-
-void RenderView::releaseWidgets(Vector<RenderWidget*>& renderWidgets)
-{
-    size_t size = renderWidgets.size();
-
-    for (size_t i = 0; i < size; ++i)
-        renderWidgets[i]->deref(renderArena());
-}
-
-void RenderView::updateWidgetPositions()
-{
-    // updateWidgetPosition() can possibly cause layout to be re-entered (via plug-ins running
-    // scripts in response to NPP_SetWindow, for example), so we need to keep the Widgets
-    // alive during enumeration.    
-
-    Vector<RenderWidget*> renderWidgets;
-    size_t size = getRetainedWidgets(renderWidgets);
-    
-    for (size_t i = 0; i < size; ++i)
-        renderWidgets[i]->updateWidgetPosition();
-
-    for (size_t i = 0; i < size; ++i)
-        renderWidgets[i]->widgetPositionsUpdated();
-
-    releaseWidgets(renderWidgets);
-}
-
-void RenderView::addWidget(RenderWidget* o)
-{
-    m_widgets.add(o);
-}
-
-void RenderView::removeWidget(RenderWidget* o)
-{
-    m_widgets.remove(o);
-}
-
-void RenderView::notifyWidgets(WidgetNotification notification)
-{
-    Vector<RenderWidget*> renderWidgets;
-    size_t size = getRetainedWidgets(renderWidgets);
-
-    for (size_t i = 0; i < size; ++i)
-        renderWidgets[i]->notifyWidget(notification);
-
-    releaseWidgets(renderWidgets);
+    return frameView().frame().shouldUsePrintingLayout();
 }
 
 LayoutRect RenderView::viewRect() const
 {
     if (shouldUsePrintingLayout())
         return LayoutRect(LayoutPoint(), size());
-    if (m_frameView)
-        return m_frameView->visibleContentRect();
-    return LayoutRect();
+    return frameView().visibleContentRect(ScrollableArea::LegacyIOSDocumentVisibleRect);
 }
-
 
 IntRect RenderView::unscaledDocumentRect() const
 {
     LayoutRect overflowRect(layoutOverflowRect());
     flipForWritingMode(overflowRect);
-    return pixelSnappedIntRect(overflowRect);
+    return snappedIntRect(overflowRect);
 }
 
 bool RenderView::rootBackgroundIsEntirelyFixed() const
 {
-    RenderObject* rootObject = document()->documentElement() ? document()->documentElement()->renderer() : 0;
+    RenderElement* rootObject = document().documentElement() ? document().documentElement()->renderer() : nullptr;
     if (!rootObject)
         return false;
 
-    RenderObject* rootRenderer = rootObject->rendererForRootBackground();
-    return rootRenderer->hasEntirelyFixedBackground();
+    return rootObject->rendererForRootBackground().hasEntirelyFixedBackground();
 }
-
-LayoutRect RenderView::backgroundRect(RenderBox* backgroundRenderer) const
+    
+LayoutRect RenderView::unextendedBackgroundRect() const
 {
-    if (!hasColumns())
-        return unscaledDocumentRect();
+    // FIXME: What is this? Need to patch for new columns?
+    return unscaledDocumentRect();
+}
+    
+LayoutRect RenderView::backgroundRect() const
+{
+    // FIXME: New columns care about this?
+    if (frameView().hasExtendedBackgroundRectForPainting())
+        return frameView().extendedBackgroundRectForPainting();
 
-    ColumnInfo* columnInfo = this->columnInfo();
-    LayoutRect backgroundRect(0, 0, columnInfo->desiredColumnWidth(), columnInfo->columnHeight() * columnInfo->columnCount());
-    if (!isHorizontalWritingMode())
-        backgroundRect = backgroundRect.transposedRect();
-    backgroundRenderer->flipForWritingMode(backgroundRect);
-
-    return backgroundRect;
+    return unextendedBackgroundRect();
 }
 
 IntRect RenderView::documentRect() const
@@ -1014,9 +1149,9 @@ IntRect RenderView::documentRect() const
 int RenderView::viewHeight() const
 {
     int height = 0;
-    if (!shouldUsePrintingLayout() && m_frameView) {
-        height = m_frameView->layoutHeight();
-        height = m_frameView->useFixedLayout() ? ceilf(style()->effectiveZoom() * float(height)) : height;
+    if (!shouldUsePrintingLayout()) {
+        height = frameView().layoutHeight();
+        height = frameView().useFixedLayout() ? ceilf(style().effectiveZoom() * float(height)) : height;
     }
     return height;
 }
@@ -1024,43 +1159,47 @@ int RenderView::viewHeight() const
 int RenderView::viewWidth() const
 {
     int width = 0;
-    if (!shouldUsePrintingLayout() && m_frameView) {
-        width = m_frameView->layoutWidth();
-        width = m_frameView->useFixedLayout() ? ceilf(style()->effectiveZoom() * float(width)) : width;
+    if (!shouldUsePrintingLayout()) {
+        width = frameView().layoutWidth();
+        width = frameView().useFixedLayout() ? ceilf(style().effectiveZoom() * float(width)) : width;
     }
     return width;
 }
 
 int RenderView::viewLogicalHeight() const
 {
-    int height = style()->isHorizontalWritingMode() ? viewHeight() : viewWidth();
+    int height = style().isHorizontalWritingMode() ? viewHeight() : viewWidth();
     return height;
 }
 
 float RenderView::zoomFactor() const
 {
-    Frame* frame = m_frameView->frame();
-    return frame ? frame->pageZoomFactor() : 1;
+    return frameView().frame().pageZoomFactor();
 }
 
-void RenderView::pushLayoutState(RenderObject* root)
+void RenderView::pushLayoutState(RenderObject& root)
 {
     ASSERT(m_layoutStateDisableCount == 0);
     ASSERT(m_layoutState == 0);
 
+    m_layoutState = std::make_unique<LayoutState>(root);
     pushLayoutStateForCurrentFlowThread(root);
-    m_layoutState = new (renderArena()) LayoutState(root);
 }
 
 bool RenderView::shouldDisableLayoutStateForSubtree(RenderObject* renderer) const
 {
     RenderObject* o = renderer;
     while (o) {
-        if (o->hasColumns() || o->hasTransform() || o->hasReflection())
+        if (o->hasTransform() || o->hasReflection())
             return true;
         o = o->container();
     }
     return false;
+}
+
+IntSize RenderView::viewportSizeForCSSViewportUnits() const
+{
+    return frameView().viewportSizeForCSSViewportUnits();
 }
 
 void RenderView::updateHitTestResult(HitTestResult& result, const LayoutPoint& point)
@@ -1068,7 +1207,10 @@ void RenderView::updateHitTestResult(HitTestResult& result, const LayoutPoint& p
     if (result.innerNode())
         return;
 
-    Node* node = document()->documentElement();
+    if (multiColumnFlowThread() && multiColumnFlowThread()->firstMultiColumnSet())
+        return multiColumnFlowThread()->firstMultiColumnSet()->updateHitTestResult(result, point);
+
+    Node* node = document().documentElement();
     if (node) {
         result.setInnerNode(node);
         if (!result.innerNonSharedNode())
@@ -1099,50 +1241,39 @@ void RenderView::setBestTruncatedAt(int y, RenderBoxModelObject* forRenderer, bo
     }
 
     // Prefer the widest object that tries to move the pagination point
-    IntRect boundingBox = forRenderer->borderBoundingBox();
+    LayoutRect boundingBox = forRenderer->borderBoundingBox();
     if (boundingBox.width() > m_legacyPrinting.m_truncatorWidth) {
         m_legacyPrinting.m_truncatorWidth = boundingBox.width();
         m_legacyPrinting.m_bestTruncatedAt = y;
     }
 }
 
-#if USE(ACCELERATED_COMPOSITING)
 bool RenderView::usesCompositing() const
 {
     return m_compositor && m_compositor->inCompositingMode();
 }
 
-RenderLayerCompositor* RenderView::compositor()
+RenderLayerCompositor& RenderView::compositor()
 {
     if (!m_compositor)
-        m_compositor = adoptPtr(new RenderLayerCompositor(this));
+        m_compositor = std::make_unique<RenderLayerCompositor>(*this);
 
-    return m_compositor.get();
+    return *m_compositor;
 }
-#endif
 
 void RenderView::setIsInWindow(bool isInWindow)
 {
-#if USE(ACCELERATED_COMPOSITING)
     if (m_compositor)
         m_compositor->setIsInWindow(isInWindow);
-#endif
 }
-
-#if ENABLE(CSS_SHADERS) && USE(3D_GRAPHICS)
-CustomFilterGlobalContext* RenderView::customFilterGlobalContext()
-{
-    if (!m_customFilterGlobalContext)
-        m_customFilterGlobalContext = adoptPtr(new CustomFilterGlobalContext());
-    return m_customFilterGlobalContext.get();
-}
-#endif
 
 void RenderView::styleDidChange(StyleDifference diff, const RenderStyle* oldStyle)
 {
-    RenderBlock::styleDidChange(diff, oldStyle);
+    RenderBlockFlow::styleDidChange(diff, oldStyle);
     if (hasRenderNamedFlowThreads())
-        flowThreadController()->styleDidChange();
+        flowThreadController().styleDidChange();
+
+    frameView().styleDidChange();
 }
 
 bool RenderView::hasRenderNamedFlowThreads() const
@@ -1155,22 +1286,24 @@ bool RenderView::checkTwoPassLayoutForAutoHeightRegions() const
     return hasRenderNamedFlowThreads() && m_flowThreadController->hasFlowThreadsWithAutoLogicalHeightRegions();
 }
 
-FlowThreadController* RenderView::flowThreadController()
+FlowThreadController& RenderView::flowThreadController()
 {
     if (!m_flowThreadController)
-        m_flowThreadController = FlowThreadController::create(this);
+        m_flowThreadController = std::make_unique<FlowThreadController>(this);
 
-    return m_flowThreadController.get();
+    return *m_flowThreadController;
 }
 
-void RenderView::pushLayoutStateForCurrentFlowThread(const RenderObject* object)
+void RenderView::pushLayoutStateForCurrentFlowThread(const RenderObject& object)
 {
     if (!m_flowThreadController)
         return;
 
-    RenderFlowThread* currentFlowThread = m_flowThreadController->currentRenderFlowThread();
+    RenderFlowThread* currentFlowThread = object.flowThreadContainingBlock();
     if (!currentFlowThread)
         return;
+
+    m_layoutState->setCurrentRenderFlowThread(currentFlowThread);
 
     currentFlowThread->pushFlowThreadLayoutState(object);
 }
@@ -1180,56 +1313,137 @@ void RenderView::popLayoutStateForCurrentFlowThread()
     if (!m_flowThreadController)
         return;
 
-    RenderFlowThread* currentFlowThread = m_flowThreadController->currentRenderFlowThread();
+    RenderFlowThread* currentFlowThread = m_layoutState->currentRenderFlowThread();
     if (!currentFlowThread)
         return;
 
     currentFlowThread->popFlowThreadLayoutState();
 }
 
-RenderBlock::IntervalArena* RenderView::intervalArena()
+ImageQualityController& RenderView::imageQualityController()
 {
-    if (!m_intervalArena)
-        m_intervalArena = IntervalArena::create();
-    return m_intervalArena.get();
+    if (!m_imageQualityController)
+        m_imageQualityController = std::make_unique<ImageQualityController>(*this);
+    return *m_imageQualityController;
 }
 
-FragmentationDisabler::FragmentationDisabler(RenderObject* root)
+void RenderView::registerForVisibleInViewportCallback(RenderElement& renderer)
 {
-    RenderView* renderView = root->view();
-    ASSERT(renderView);
+    ASSERT(!m_visibleInViewportRenderers.contains(&renderer));
+    m_visibleInViewportRenderers.add(&renderer);
+}
 
-    LayoutState* layoutState = renderView->layoutState();
+void RenderView::unregisterForVisibleInViewportCallback(RenderElement& renderer)
+{
+    ASSERT(m_visibleInViewportRenderers.contains(&renderer));
+    m_visibleInViewportRenderers.remove(&renderer);
+}
 
-    m_root = root;
-    m_fragmenting = layoutState && layoutState->isPaginated();
-    m_flowThreadState = m_root->flowThreadState();
-#ifndef NDEBUG
-    m_layoutState = layoutState;
+void RenderView::updateVisibleViewportRect(const IntRect& visibleRect)
+{
+    resumePausedImageAnimationsIfNeeded(visibleRect);
+
+    for (auto* renderer : m_visibleInViewportRenderers)
+        renderer->visibleInViewportStateChanged(visibleRect.intersects(enclosingIntRect(renderer->absoluteClippedOverflowRect())) ? RenderElement::VisibleInViewport : RenderElement::NotVisibleInViewport);
+}
+
+void RenderView::addRendererWithPausedImageAnimations(RenderElement& renderer)
+{
+    if (renderer.hasPausedImageAnimations()) {
+        ASSERT(m_renderersWithPausedImageAnimation.contains(&renderer));
+        return;
+    }
+    renderer.setHasPausedImageAnimations(true);
+    m_renderersWithPausedImageAnimation.add(&renderer);
+}
+
+void RenderView::removeRendererWithPausedImageAnimations(RenderElement& renderer)
+{
+    ASSERT(renderer.hasPausedImageAnimations());
+    ASSERT(m_renderersWithPausedImageAnimation.contains(&renderer));
+
+    renderer.setHasPausedImageAnimations(false);
+    m_renderersWithPausedImageAnimation.remove(&renderer);
+}
+
+void RenderView::resumePausedImageAnimationsIfNeeded(IntRect visibleRect)
+{
+    Vector<RenderElement*, 10> toRemove;
+    for (auto* renderer : m_renderersWithPausedImageAnimation) {
+        if (renderer->repaintForPausedImageAnimationsIfNeeded(visibleRect))
+            toRemove.append(renderer);
+    }
+    for (auto& renderer : toRemove)
+        removeRendererWithPausedImageAnimations(*renderer);
+}
+
+RenderView::RepaintRegionAccumulator::RepaintRegionAccumulator(RenderView* view)
+    : m_rootView(view ? view->document().topDocument().renderView() : nullptr)
+{
+    if (!m_rootView)
+        return;
+    m_wasAccumulatingRepaintRegion = !!m_rootView->m_accumulatedRepaintRegion;
+    if (!m_wasAccumulatingRepaintRegion)
+        m_rootView->m_accumulatedRepaintRegion = std::make_unique<Region>();
+}
+
+RenderView::RepaintRegionAccumulator::~RepaintRegionAccumulator()
+{
+    if (!m_rootView)
+        return;
+    if (m_wasAccumulatingRepaintRegion)
+        return;
+    m_rootView->flushAccumulatedRepaintRegion();
+}
+
+unsigned RenderView::pageNumberForBlockProgressionOffset(int offset) const
+{
+    int columnNumber = 0;
+    const Pagination& pagination = frameView().frame().page()->pagination();
+    if (pagination.mode == Pagination::Unpaginated)
+        return columnNumber;
+    
+    bool progressionIsInline = false;
+    bool progressionIsReversed = false;
+    
+    if (multiColumnFlowThread()) {
+        progressionIsInline = multiColumnFlowThread()->progressionIsInline();
+        progressionIsReversed = multiColumnFlowThread()->progressionIsReversed();
+    } else
+        return columnNumber;
+    
+    if (!progressionIsInline) {
+        if (!progressionIsReversed)
+            columnNumber = (pagination.pageLength + pagination.gap - offset) / (pagination.pageLength + pagination.gap);
+        else
+            columnNumber = offset / (pagination.pageLength + pagination.gap);
+    }
+
+    return columnNumber;
+}
+
+unsigned RenderView::pageCount() const
+{
+    const Pagination& pagination = frameView().frame().page()->pagination();
+    if (pagination.mode == Pagination::Unpaginated)
+        return 0;
+    
+    if (multiColumnFlowThread() && multiColumnFlowThread()->firstMultiColumnSet())
+        return multiColumnFlowThread()->firstMultiColumnSet()->columnCount();
+
+    return 0;
+}
+
+#if ENABLE(CSS_SCROLL_SNAP)
+void RenderView::registerBoxWithScrollSnapCoordinates(const RenderBox& box)
+{
+    m_boxesWithScrollSnapCoordinates.add(&box);
+}
+
+void RenderView::unregisterBoxWithScrollSnapCoordinates(const RenderBox& box)
+{
+    m_boxesWithScrollSnapCoordinates.remove(&box);
+}
 #endif
-
-    if (layoutState)
-        layoutState->m_isPaginated = false;
-        
-    if (m_flowThreadState != RenderObject::NotInsideFlowThread)
-        m_root->setFlowThreadStateIncludingDescendants(RenderObject::NotInsideFlowThread);
-}
-
-FragmentationDisabler::~FragmentationDisabler()
-{
-    RenderView* renderView = m_root->view();
-    ASSERT(renderView);
-
-    LayoutState* layoutState = renderView->layoutState();
-#ifndef NDEBUG
-    ASSERT(m_layoutState == layoutState);
-#endif
-
-    if (layoutState)
-        layoutState->m_isPaginated = m_fragmenting;
-        
-    if (m_flowThreadState != RenderObject::NotInsideFlowThread)
-        m_root->setFlowThreadStateIncludingDescendants(m_flowThreadState);
-}
 
 } // namespace WebCore

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2013, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution. 
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission. 
  *
@@ -31,14 +31,15 @@
 
 #include <wtf/Assertions.h>
 #include <wtf/RedBlackTree.h>
-#include <wtf/RefCounted.h>
+#include <wtf/ThreadSafeRefCounted.h>
 #include <wtf/RefPtr.h>
 
 namespace WTF {
 
 class MetaAllocator;
+class PrintStream;
 
-class MetaAllocatorHandle : public RefCounted<MetaAllocatorHandle>, public RedBlackTree<MetaAllocatorHandle, void*>::Node {
+class MetaAllocatorHandle : public ThreadSafeRefCounted<MetaAllocatorHandle>, public RedBlackTree<MetaAllocatorHandle, void*>::Node {
 private:
     MetaAllocatorHandle(MetaAllocator*, void* start, size_t sizeInBytes, void* ownerUID);
     
@@ -102,6 +103,8 @@ public:
     {
         return m_start;
     }
+
+    WTF_EXPORT_PRIVATE void dump(PrintStream& out) const;
     
 private:
     friend class MetaAllocator;

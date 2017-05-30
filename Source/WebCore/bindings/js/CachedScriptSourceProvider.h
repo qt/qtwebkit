@@ -37,14 +37,15 @@ namespace WebCore {
 class CachedScriptSourceProvider : public JSC::SourceProvider, public CachedResourceClient {
     WTF_MAKE_FAST_ALLOCATED;
 public:
-    static PassRefPtr<CachedScriptSourceProvider> create(CachedScript* cachedScript) { return adoptRef(new CachedScriptSourceProvider(cachedScript)); }
+    static Ref<CachedScriptSourceProvider> create(CachedScript* cachedScript) { return adoptRef(*new CachedScriptSourceProvider(cachedScript)); }
 
     virtual ~CachedScriptSourceProvider()
     {
         m_cachedScript->removeClient(this);
     }
 
-    const String& source() const { return m_cachedScript->script(); }
+    unsigned hash() const override { return m_cachedScript->scriptHash(); }
+    StringView source() const override { return m_cachedScript->script(); }
 
 private:
     CachedScriptSourceProvider(CachedScript* cachedScript)

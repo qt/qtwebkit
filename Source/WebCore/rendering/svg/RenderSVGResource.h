@@ -20,10 +20,10 @@
 #ifndef RenderSVGResource_h
 #define RenderSVGResource_h
 
-#if ENABLE(SVG)
 #include "RenderSVGShape.h"
 #include "RenderStyleConstants.h"
 #include "SVGDocumentExtensions.h"
+#include <wtf/TypeCasts.h>
 
 namespace WebCore {
 
@@ -60,32 +60,27 @@ public:
     virtual ~RenderSVGResource() { }
 
     virtual void removeAllClientsFromCache(bool markForInvalidation = true) = 0;
-    virtual void removeClientFromCache(RenderObject*, bool markForInvalidation = true) = 0;
+    virtual void removeClientFromCache(RenderElement&, bool markForInvalidation = true) = 0;
 
-    virtual bool applyResource(RenderObject*, RenderStyle*, GraphicsContext*&, unsigned short resourceMode) = 0;
-    virtual void postApplyResource(RenderObject*, GraphicsContext*&, unsigned short, const Path*, const RenderSVGShape*) { }
-    virtual FloatRect resourceBoundingBox(RenderObject*) = 0;
+    virtual bool applyResource(RenderElement&, const RenderStyle&, GraphicsContext*&, unsigned short resourceMode) = 0;
+    virtual void postApplyResource(RenderElement&, GraphicsContext*&, unsigned short, const Path*, const RenderSVGShape*) { }
+    virtual FloatRect resourceBoundingBox(const RenderObject&) = 0;
 
     virtual RenderSVGResourceType resourceType() const = 0;
 
-    template<class Renderer>
-    Renderer* cast()
-    {
-        if (Renderer::s_resourceType == resourceType())
-            return static_cast<Renderer*>(this);
-
-        return 0;
-    }
-
     // Helper utilities used in the render tree to access resources used for painting shapes/text (gradients & patterns & solid colors only)
-    static RenderSVGResource* fillPaintingResource(RenderObject*, const RenderStyle*, Color& fallbackColor);
-    static RenderSVGResource* strokePaintingResource(RenderObject*, const RenderStyle*, Color& fallbackColor);
+    static RenderSVGResource* fillPaintingResource(RenderElement&, const RenderStyle&, Color& fallbackColor);
+    static RenderSVGResource* strokePaintingResource(RenderElement&, const RenderStyle&, Color& fallbackColor);
     static RenderSVGResourceSolidColor* sharedSolidPaintingResource();
 
-    static void markForLayoutAndParentResourceInvalidation(RenderObject*, bool needsLayout = true);
+    static void markForLayoutAndParentResourceInvalidation(RenderObject&, bool needsLayout = true);
 };
 
 }
 
-#endif
+#define SPECIALIZE_TYPE_TRAITS_RENDER_SVG_RESOURCE(ToValueTypeName, ResourceType) \
+SPECIALIZE_TYPE_TRAITS_BEGIN(WebCore::ToValueTypeName) \
+    static bool isType(const WebCore::RenderSVGResource& resource) { return resource.resourceType() == WebCore::ResourceType; } \
+SPECIALIZE_TYPE_TRAITS_END()
+
 #endif

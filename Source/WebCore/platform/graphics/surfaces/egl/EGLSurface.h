@@ -31,7 +31,6 @@
 #include "GLTransportSurface.h"
 
 #include <wtf/Noncopyable.h>
-#include <wtf/PassOwnPtr.h>
 
 namespace WebCore {
 
@@ -39,29 +38,31 @@ class EGLConfigSelector;
 
 class EGLTransportSurface : public GLTransportSurface {
 public:
-    static PassOwnPtr<GLTransportSurface> createTransportSurface(const IntSize&, SurfaceAttributes);
-    static PassOwnPtr<GLTransportSurfaceClient> createTransportSurfaceClient(const PlatformBufferHandle, const IntSize&, bool);
+    static std::unique_ptr<GLTransportSurface> createTransportSurface(const IntSize&, SurfaceAttributes);
+    static std::unique_ptr<GLTransportSurfaceClient> createTransportSurfaceClient(const PlatformBufferHandle, const IntSize&, bool);
     virtual ~EGLTransportSurface();
-    virtual PlatformSurfaceConfig configuration() OVERRIDE;
-    virtual void destroy() OVERRIDE;
-    virtual GLPlatformSurface::SurfaceAttributes attributes() const OVERRIDE;
+    virtual PlatformSurfaceConfig configuration() override;
+    virtual void destroy() override;
+    virtual GLPlatformSurface::SurfaceAttributes attributes() const override;
+    virtual bool isCurrentDrawable() const override;
 
 protected:
     EGLTransportSurface(const IntSize&, SurfaceAttributes);
-    OwnPtr<EGLConfigSelector> m_configSelector;
+    std::unique_ptr<EGLConfigSelector> m_configSelector;
 };
 
 class EGLOffScreenSurface : public GLPlatformSurface {
 public:
-    static PassOwnPtr<GLPlatformSurface> createOffScreenSurface(SurfaceAttributes);
+    static std::unique_ptr<GLPlatformSurface> createOffScreenSurface(SurfaceAttributes);
     virtual ~EGLOffScreenSurface();
-    virtual PlatformSurfaceConfig configuration() OVERRIDE;
-    virtual void destroy() OVERRIDE;
-    virtual GLPlatformSurface::SurfaceAttributes attributes() const OVERRIDE;
+    virtual PlatformSurfaceConfig configuration() override;
+    virtual void destroy() override;
+    virtual GLPlatformSurface::SurfaceAttributes attributes() const override;
+    virtual bool isCurrentDrawable() const override;
 
 protected:
     EGLOffScreenSurface(SurfaceAttributes);
-    OwnPtr<EGLConfigSelector> m_configSelector;
+    std::unique_ptr<EGLConfigSelector> m_configSelector;
 };
 
 }

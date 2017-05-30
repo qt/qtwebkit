@@ -20,7 +20,7 @@
 #ifndef SVGElementRareData_h
 #define SVGElementRareData_h
 
-#include "StylePropertySet.h"
+#include "StyleProperties.h"
 #include "StyleResolver.h"
 #include <wtf/HashSet.h>
 #include <wtf/Noncopyable.h>
@@ -31,36 +31,19 @@ namespace WebCore {
 class CSSCursorImageValue;
 class SVGCursorElement;
 class SVGElement;
-class SVGElementInstance;
 
 class SVGElementRareData {
     WTF_MAKE_NONCOPYABLE(SVGElementRareData); WTF_MAKE_FAST_ALLOCATED;
 public:
     SVGElementRareData()
-        : m_cursorElement(0)
-        , m_cursorImageValue(0)
-        , m_correspondingElement(0)
-        , m_instancesUpdatesBlocked(false)
+        : m_instancesUpdatesBlocked(false)
         , m_useOverrideComputedStyle(false)
         , m_needsOverrideComputedStyleUpdate(false)
     {
     }
 
-    typedef HashMap<const SVGElement*, SVGElementRareData*> SVGElementRareDataMap;
-
-    static SVGElementRareDataMap& rareDataMap()
-    {
-        DEFINE_STATIC_LOCAL(SVGElementRareDataMap, rareDataMap, ());
-        return rareDataMap;
-    }
-
-    static SVGElementRareData* rareDataFromMap(const SVGElement* element)
-    {
-        return rareDataMap().get(element);
-    }
-
-    HashSet<SVGElementInstance*>& elementInstances() { return m_elementInstances; }
-    const HashSet<SVGElementInstance*>& elementInstances() const { return m_elementInstances; }
+    HashSet<SVGElement*>& instances() { return m_instances; }
+    const HashSet<SVGElement*>& instances() const { return m_instances; }
 
     bool instanceUpdatesBlocked() const { return m_instancesUpdatesBlocked; }
     void setInstanceUpdatesBlocked(bool value) { m_instancesUpdatesBlocked = value; }
@@ -74,27 +57,21 @@ public:
     CSSCursorImageValue* cursorImageValue() const { return m_cursorImageValue; }
     void setCursorImageValue(CSSCursorImageValue* cursorImageValue) { m_cursorImageValue = cursorImageValue; }
 
-    MutableStylePropertySet* animatedSMILStyleProperties() const { return m_animatedSMILStyleProperties.get(); }
-    MutableStylePropertySet* ensureAnimatedSMILStyleProperties()
+    MutableStyleProperties* animatedSMILStyleProperties() const { return m_animatedSMILStyleProperties.get(); }
+    MutableStyleProperties& ensureAnimatedSMILStyleProperties()
     {
         if (!m_animatedSMILStyleProperties)
-            m_animatedSMILStyleProperties = MutableStylePropertySet::create(SVGAttributeMode);
-        return m_animatedSMILStyleProperties.get();
+            m_animatedSMILStyleProperties = MutableStyleProperties::create(SVGAttributeMode);
+        return *m_animatedSMILStyleProperties;
     }
 
-    void destroyAnimatedSMILStyleProperties()
+    RenderStyle* overrideComputedStyle(Element& element, RenderStyle* parentStyle)
     {
-        m_animatedSMILStyleProperties.clear();
-    }
-
-    RenderStyle* overrideComputedStyle(Element* element, RenderStyle* parentStyle)
-    {
-        ASSERT(element);
-        if (!element->document() || !m_useOverrideComputedStyle)
+        if (!m_useOverrideComputedStyle)
             return 0;
         if (!m_overrideComputedStyle || m_needsOverrideComputedStyleUpdate) {
             // The style computed here contains no CSS Animations/Transitions or SMIL induced rules - this is needed to compute the "base value" for the SMIL animation sandwhich model.
-            m_overrideComputedStyle = element->document()->ensureStyleResolver()->styleForElement(element, parentStyle, DisallowStyleSharing, MatchAllRulesExcludingSMIL);
+            m_overrideComputedStyle = element.styleResolver().styleForElement(element, parentStyle, MatchAllRulesExcludingSMIL);
             m_needsOverrideComputedStyleUpdate = false;
         }
         ASSERT(m_overrideComputedStyle);
@@ -106,14 +83,14 @@ public:
     void setNeedsOverrideComputedStyleUpdate() { m_needsOverrideComputedStyleUpdate = true; }
 
 private:
-    HashSet<SVGElementInstance*> m_elementInstances;
-    SVGCursorElement* m_cursorElement;
-    CSSCursorImageValue* m_cursorImageValue;
-    SVGElement* m_correspondingElement;
+    HashSet<SVGElement*> m_instances;
+    SVGCursorElement* m_cursorElement { nullptr };
+    CSSCursorImageValue* m_cursorImageValue { nullptr };
+    SVGElement* m_correspondingElement { nullptr };
     bool m_instancesUpdatesBlocked : 1;
     bool m_useOverrideComputedStyle : 1;
     bool m_needsOverrideComputedStyleUpdate : 1;
-    RefPtr<MutableStylePropertySet> m_animatedSMILStyleProperties;
+    RefPtr<MutableStyleProperties> m_animatedSMILStyleProperties;
     RefPtr<RenderStyle> m_overrideComputedStyle;
 };
 

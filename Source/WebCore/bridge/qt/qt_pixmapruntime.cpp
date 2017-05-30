@@ -20,7 +20,6 @@
 #include "qt_pixmapruntime.h"
 
 #include "APICast.h"
-#include "APIShims.h"
 #include "CachedImage.h"
 #include "HTMLImageElement.h"
 #include "ImageData.h"
@@ -31,6 +30,7 @@
 #include "JSImageData.h"
 #include "JSRetainPtr.h"
 #include "JavaScript.h"
+#include "RenderElement.h"
 #include "StillImageQt.h"
 #include <QBuffer>
 #include <QByteArray>
@@ -120,7 +120,7 @@ static JSValueRef getPixmapHeight(JSContextRef context, JSObjectRef object, JSSt
     return JSValueMakeNumber(context, imageSizeForVariant(data).height());
 }
 
-static JSValueRef assignToHTMLImageElement(JSContextRef context, JSObjectRef function, JSObjectRef object, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
+static JSValueRef assignToHTMLImageElement(JSContextRef context, JSObjectRef /*function*/, JSObjectRef object, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
 {
     if (!argumentCount)
         return JSValueMakeUndefined(context);
@@ -131,19 +131,19 @@ static JSValueRef assignToHTMLImageElement(JSContextRef context, JSObjectRef fun
 
     JSObject* jsObject = ::toJS(objectArg);
 
-    if (!jsObject->inherits(&JSHTMLImageElement::s_info))
+    if (!jsObject->inherits(JSHTMLImageElement::info()))
         return JSValueMakeUndefined(context);
 
     QVariant& data = *static_cast<QVariant*>(JSObjectGetPrivate(object));
 
     // We now know that we have a valid <img> element as the argument, we can attach the pixmap to it.
     RefPtr<StillImage> stillImage = WebCore::StillImage::create(toPixmap(data));
-    HTMLImageElement* imageElement = toHTMLImageElement(static_cast<JSHTMLImageElement*>(jsObject)->impl());
-    imageElement->setCachedImage(new CachedImage(stillImage.get()));
+    HTMLImageElement* imageElement = JSHTMLImageElement::toWrapped(jsObject);
+    imageElement->setCachedImage(new CachedImage(stillImage.get(), SessionID::defaultSessionID()));
     return JSValueMakeUndefined(context);
 }
 
-static JSValueRef pixmapToImageData(JSContextRef context, JSObjectRef function, JSObjectRef object, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
+static JSValueRef pixmapToImageData(JSContextRef context, JSObjectRef /*function*/, JSObjectRef object, size_t /*argumentCount*/, const JSValueRef /*arguments*/[], JSValueRef* /*exception*/)
 {
     QVariant& data = *static_cast<QVariant*>(JSObjectGetPrivate(object));
     QImage image = toImage(data);
@@ -151,7 +151,7 @@ static JSValueRef pixmapToImageData(JSContextRef context, JSObjectRef function, 
     int height = image.height();
 
     JSC::ExecState* exec = ::toJS(context);
-    APIEntryShim entryShim(exec);
+    JSLockHolder locker(exec);
 
     RefPtr<ImageData> imageData = ImageData::create(IntSize(width, height));
     copyPixelsInto(image, width, height, imageData->data()->data());
@@ -160,7 +160,7 @@ static JSValueRef pixmapToImageData(JSContextRef context, JSObjectRef function, 
     return ::toRef(exec, toJS(exec, globalObject, imageData.get()));
 }
 
-static JSValueRef pixmapToDataUrl(JSContextRef context, JSObjectRef function, JSObjectRef object, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
+static JSValueRef pixmapToDataUrl(JSContextRef context, JSObjectRef /*function*/, JSObjectRef object, size_t /*argumentCount*/, const JSValueRef /*arguments*/[], JSValueRef* /*exception*/)
 {
     QVariant& data = *static_cast<QVariant*>(JSObjectGetPrivate(object));
     QByteArray byteArray;
@@ -173,7 +173,7 @@ static JSValueRef pixmapToDataUrl(JSContextRef context, JSObjectRef function, JS
     return value;
 }
 
-static JSValueRef pixmapToString(JSContextRef context, JSObjectRef function, JSObjectRef object, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
+static JSValueRef pixmapToString(JSContextRef context, JSObjectRef /*function*/, JSObjectRef object, size_t /*argumentCount*/, const JSValueRef /*arguments*/[], JSValueRef* /*exception*/)
 {
     QVariant& data = *static_cast<QVariant*>(JSObjectGetPrivate(object));
     QSize size = imageSizeForVariant(data);
@@ -189,7 +189,7 @@ static void finalizePixmap(JSObjectRef object)
     delete static_cast<QVariant*>(JSObjectGetPrivate(object));
 }
 
-JSObjectRef QtPixmapRuntime::toJS(JSContextRef context, const QVariant& value, JSValueRef* exception)
+JSObjectRef QtPixmapRuntime::toJS(JSContextRef context, const QVariant& value, JSValueRef* /*exception*/)
 {
     return JSObjectMake(context, getClassRef(), new QVariant(value));
 }
@@ -203,7 +203,7 @@ static QVariant emptyVariantForHint(QMetaType::Type hint)
     return QVariant();
 }
 
-QVariant QtPixmapRuntime::toQt(JSContextRef context, JSObjectRef obj, QMetaType::Type hint, JSValueRef* exception)
+QVariant QtPixmapRuntime::toQt(JSContextRef context, JSObjectRef obj, QMetaType::Type hint, JSValueRef* /*exception*/)
 {
     if (!obj)
         return emptyVariantForHint(hint);
@@ -218,11 +218,10 @@ QVariant QtPixmapRuntime::toQt(JSContextRef context, JSObjectRef obj, QMetaType:
     }
 
     JSObject* jsObject = ::toJS(obj);
-    if (!jsObject->inherits(&JSHTMLImageElement::s_info))
+    if (!jsObject->inherits(JSHTMLImageElement::info()))
         return emptyVariantForHint(hint);
 
-    JSHTMLImageElement* elementJSWrapper = static_cast<JSHTMLImageElement*>(jsObject);
-    HTMLImageElement* imageElement = toHTMLImageElement(elementJSWrapper->impl());
+    HTMLImageElement* imageElement = JSHTMLImageElement::toWrapped(jsObject);
 
     if (!imageElement)
         return emptyVariantForHint(hint);

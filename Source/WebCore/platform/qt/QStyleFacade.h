@@ -33,11 +33,13 @@ QT_END_NAMESPACE
 namespace WebCore {
 
 class Page;
-class QStyleFacadeOption;
+struct QStyleFacadeOption;
 
 class QStyleFacade {
 public:
     enum ButtonSubElement {
+        CheckBoxIndicator,
+        RadioButtonIndicator,
         PushButtonLayoutItem,
         PushButtonContents
     };

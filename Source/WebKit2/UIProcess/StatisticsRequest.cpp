@@ -26,9 +26,8 @@
 #include "config.h"
 #include "StatisticsRequest.h"
 
-#include "ImmutableArray.h"
-#include "MutableDictionary.h"
-#include <wtf/Threading.h>
+#include "APIArray.h"
+#include "APIDictionary.h"
 
 namespace WebKit {
 
@@ -45,32 +44,24 @@ StatisticsRequest::~StatisticsRequest()
 
 uint64_t StatisticsRequest::addOutstandingRequest()
 {
-    static int64_t uniqueRequestID;
+    static std::atomic<int64_t> uniqueRequestID;
 
-#if HAVE(ATOMICS_64BIT)
-    uint64_t requestID = atomicIncrement(&uniqueRequestID);
-#else
-    static Mutex uniqueRequestMutex;
-    uniqueRequestMutex.lock();
     uint64_t requestID = ++uniqueRequestID;
-    uniqueRequestMutex.unlock();
-#endif
-
     m_outstandingRequests.add(requestID);
     return requestID;
 }
 
-static void addToDictionaryFromHashMap(MutableDictionary* dictionary, const HashMap<String, uint64_t>& map)
+static void addToDictionaryFromHashMap(API::Dictionary* dictionary, const HashMap<String, uint64_t>& map)
 {
     HashMap<String, uint64_t>::const_iterator end = map.end();
     for (HashMap<String, uint64_t>::const_iterator it = map.begin(); it != end; ++it)
-        dictionary->set(it->key, RefPtr<WebUInt64>(WebUInt64::create(it->value)).get());
+        dictionary->set(it->key, RefPtr<API::UInt64>(API::UInt64::create(it->value)).get());
 }
 
-static PassRefPtr<MutableDictionary> createDictionaryFromHashMap(const HashMap<String, uint64_t>& map)
+static Ref<API::Dictionary> createDictionaryFromHashMap(const HashMap<String, uint64_t>& map)
 {
-    RefPtr<MutableDictionary> result = MutableDictionary::create();
-    addToDictionaryFromHashMap(result.get(), map);
+    Ref<API::Dictionary> result = API::Dictionary::create();
+    addToDictionaryFromHashMap(result.ptr(), map);
     return result;
 }
 
@@ -80,7 +71,7 @@ void StatisticsRequest::completedRequest(uint64_t requestID, const StatisticsDat
     m_outstandingRequests.remove(requestID);
 
     if (!m_responseDictionary)
-        m_responseDictionary = MutableDictionary::create();
+        m_responseDictionary = API::Dictionary::create();
     
     // FIXME (Multi-WebProcess) <rdar://problem/13200059>: This code overwrites any previous response data received.
     // When getting responses from multiple WebProcesses we need to combine items instead of clobbering them.
@@ -88,21 +79,23 @@ void StatisticsRequest::completedRequest(uint64_t requestID, const StatisticsDat
     addToDictionaryFromHashMap(m_responseDictionary.get(), data.statisticsNumbers);
 
     if (!data.javaScriptProtectedObjectTypeCounts.isEmpty())
-        m_responseDictionary->set("JavaScriptProtectedObjectTypeCounts", createDictionaryFromHashMap(data.javaScriptProtectedObjectTypeCounts).get());
+        m_responseDictionary->set("JavaScriptProtectedObjectTypeCounts", createDictionaryFromHashMap(data.javaScriptProtectedObjectTypeCounts));
     if (!data.javaScriptObjectTypeCounts.isEmpty())
-        m_responseDictionary->set("JavaScriptObjectTypeCounts", createDictionaryFromHashMap(data.javaScriptObjectTypeCounts).get());
-    
-    size_t cacheStatisticsCount = data.webCoreCacheStatistics.size();
-    if (cacheStatisticsCount) {
-        Vector<RefPtr<APIObject> > cacheStatisticsVector(cacheStatisticsCount);
-        for (size_t i = 0; i < cacheStatisticsCount; ++i)
-            cacheStatisticsVector[i] = createDictionaryFromHashMap(data.webCoreCacheStatistics[i]);
-        m_responseDictionary->set("WebCoreCacheStatistics", ImmutableArray::adopt(cacheStatisticsVector).get());
+        m_responseDictionary->set("JavaScriptObjectTypeCounts", createDictionaryFromHashMap(data.javaScriptObjectTypeCounts));
+
+    if (!data.webCoreCacheStatistics.isEmpty()) {
+        Vector<RefPtr<API::Object>> cacheStatistics;
+        cacheStatistics.reserveInitialCapacity(data.webCoreCacheStatistics.size());
+
+        for (const auto& statistic : data.webCoreCacheStatistics)
+            cacheStatistics.uncheckedAppend(createDictionaryFromHashMap(statistic));
+
+        m_responseDictionary->set("WebCoreCacheStatistics", API::Array::create(WTFMove(cacheStatistics)));
     }
 
     if (m_outstandingRequests.isEmpty()) {
         m_callback->performCallbackWithReturnValue(m_responseDictionary.get());
-        m_callback = 0;
+        m_callback = nullptr;
     }
 }
 

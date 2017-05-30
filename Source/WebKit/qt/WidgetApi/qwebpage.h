@@ -22,6 +22,7 @@
 #define QWEBPAGE_H
 
 #include <QtWebKit/qwebkitglobal.h>
+#include <QtWebKit/qwebfullscreenrequest.h>
 #include <QtWebKit/qwebsettings.h>
 
 #include <QtCore/qobject.h>
@@ -44,6 +45,7 @@ class QWebNetworkRequest;
 class QWebHistory;
 
 class QWebFrameData;
+class QWebFullScreenRequest;
 class QWebHistoryItem;
 class QWebHitTestResult;
 class QWebNetworkInterface;
@@ -80,7 +82,8 @@ class QWEBKITWIDGETS_EXPORT QWebPage : public QObject {
     Q_PROPERTY(QPalette palette READ palette WRITE setPalette)
     Q_PROPERTY(bool contentEditable READ isContentEditable WRITE setContentEditable)
     Q_PROPERTY(VisibilityState visibilityState READ visibilityState WRITE setVisibilityState)
-    Q_ENUMS(LinkDelegationPolicy NavigationType VisibilityState WebAction)
+    Q_PROPERTY(bool recentlyAudible READ recentlyAudible NOTIFY recentlyAudibleChanged)
+    Q_ENUMS(LinkDelegationPolicy MessageLevel MessageSource NavigationType VisibilityState WebAction)
 public:
     enum NavigationType {
         NavigationTypeLinkClicked,
@@ -190,6 +193,8 @@ public:
         ToggleMediaMute,
         ToggleVideoFullscreen,
 
+        RequestClose,
+
         WebActionCount
     };
 
@@ -231,6 +236,28 @@ public:
         VisibilityStateHidden,
         VisibilityStatePrerender,
         VisibilityStateUnloaded
+    };
+
+    enum MessageSource {
+        XmlMessageSource,
+        JSMessageSource,
+        NetworkMessageSource,
+        ConsoleAPIMessageSource,
+        StorageMessageSource,
+        AppCacheMessageSource,
+        RenderingMessageSource,
+        CSSMessageSource,
+        SecurityMessageSource,
+        ContentBlockerMessageSource,
+        OtherMessageSource,
+    };
+
+    enum MessageLevel {
+        LogMessageLevel = 1,
+        WarningMessageLevel = 2,
+        ErrorMessageLevel = 3,
+        DebugMessageLevel = 4,
+        InfoMessageLevel = 5,
     };
 
     class QWEBKITWIDGETS_EXPORT ViewportAttributes {
@@ -295,12 +322,15 @@ public:
     VisibilityState visibilityState() const;
     void setVisibilityState(VisibilityState);
 
+    bool recentlyAudible() const;
+
     bool hasSelection() const;
     QString selectedText() const;
     QString selectedHtml() const;
 
 #ifndef QT_NO_ACTION
     QAction *action(WebAction action) const;
+    QAction *customAction(int action) const;
 #endif
     virtual void triggerAction(WebAction action, bool checked = false);
 
@@ -312,7 +342,7 @@ public:
     void setPreferredContentsSize(const QSize &size) const;
     void setActualVisibleContentRect(const QRect& rect) const;
 
-    virtual bool event(QEvent*);
+    bool event(QEvent*) Q_DECL_OVERRIDE;
     bool focusNextPrevChild(bool next);
 
     QVariant inputMethodQuery(Qt::InputMethodQuery property) const;
@@ -413,6 +443,7 @@ Q_SIGNALS:
     void unsupportedContent(QNetworkReply *reply);
     void downloadRequested(const QNetworkRequest &request);
 
+    void focusedElementChanged(const QWebElement &element);
     void microFocusChanged();
     void contentsChanged();
     void databaseQuotaExceeded(QWebFrame* frame, QString databaseName);
@@ -425,6 +456,11 @@ Q_SIGNALS:
 
     void featurePermissionRequested(QWebFrame* frame, QWebPage::Feature feature);
     void featurePermissionRequestCanceled(QWebFrame* frame, QWebPage::Feature feature);
+    void fullScreenRequested(QWebFullScreenRequest fullScreenRequest);
+
+    void consoleMessageReceived(MessageSource source, MessageLevel level, const QString& message, int lineNumber, const QString& sourceID);
+
+    void recentlyAudibleChanged(bool recentlyAudible);
 
 protected:
     virtual QWebPage *createWindow(WebWindowType type);
@@ -443,6 +479,7 @@ private:
     Q_PRIVATE_SLOT(d, void _q_onLoadProgressChanged(int))
 #ifndef QT_NO_ACTION
     Q_PRIVATE_SLOT(d, void _q_webActionTriggered(bool checked))
+    Q_PRIVATE_SLOT(d, void _q_customActionTriggered(bool checked))
 #endif
     Q_PRIVATE_SLOT(d, void _q_cleanupLeakMessages())
     Q_PRIVATE_SLOT(d, void _q_updateScreen(QScreen*))
@@ -450,6 +487,7 @@ private:
     QWebPagePrivate *d;
 
     friend class QWebFrame;
+    friend class QWebFullScreenRequest;
     friend class QWebPagePrivate;
     friend class QWebView;
     friend class QWebViewPrivate;

@@ -25,11 +25,9 @@
 
 #include "config.h"
 #include "JSMainThreadExecState.h"
-#include "MutationObserver.h"
 
-#if ENABLE(INDEXED_DATABASE)
-#include "IDBPendingTransactionMonitor.h"
-#endif
+#include "Microtasks.h"
+#include "MutationObserver.h"
 
 namespace WebCore {
 
@@ -37,13 +35,21 @@ JSC::ExecState* JSMainThreadExecState::s_mainThreadState = 0;
 
 void JSMainThreadExecState::didLeaveScriptContext()
 {
-#if ENABLE(INDEXED_DATABASE)
-    // Indexed DB requires that transactions are created with an internal |active| flag
-    // set to true, but the flag becomes false when control returns to the event loop.
-    IDBPendingTransactionMonitor::deactivateNewTransactions();
-#endif
+    MicrotaskQueue::mainThreadQueue().performMicrotaskCheckpoint();
+}
 
-    MutationObserver::deliverAllMutations();
+JSC::JSValue functionCallHandlerFromAnyThread(JSC::ExecState* exec, JSC::JSValue functionObject, JSC::CallType callType, const JSC::CallData& callData, JSC::JSValue thisValue, const JSC::ArgList& args, NakedPtr<JSC::Exception>& returnedException)
+{
+    if (isMainThread())
+        return JSMainThreadExecState::call(exec, functionObject, callType, callData, thisValue, args, returnedException);
+    return JSC::call(exec, functionObject, callType, callData, thisValue, args, returnedException);
+}
+
+JSC::JSValue evaluateHandlerFromAnyThread(JSC::ExecState* exec, const JSC::SourceCode& source, JSC::JSValue thisValue, NakedPtr<JSC::Exception>& returnedException)
+{
+    if (isMainThread())
+        return JSMainThreadExecState::evaluate(exec, source, thisValue, returnedException);
+    return JSC::evaluate(exec, source, thisValue, returnedException);
 }
 
 } // namespace WebCore

@@ -3,7 +3,7 @@
  *           (C) 1999 Antti Koivisto (koivisto@kde.org)
  *           (C) 2001 Peter Kelly (pmk@post.com)
  *           (C) 2001 Dirk Mueller (mueller@kde.org)
- * Copyright (C) 2003, 2004, 2005, 2006, 2008, 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2003, 2004, 2005, 2006, 2008, 2012, 2014 Apple Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -44,13 +44,16 @@ public:
     // as the Attribute stays in place. For example, calling a function that mutates
     // an Element's internal attribute storage may invalidate them.
     const AtomicString& value() const { return m_value; }
+    static ptrdiff_t valueMemoryOffset() { return OBJECT_OFFSETOF(Attribute, m_value); }
     const AtomicString& prefix() const { return m_name.prefix(); }
     const AtomicString& localName() const { return m_name.localName(); }
     const AtomicString& namespaceURI() const { return m_name.namespaceURI(); }
 
     const QualifiedName& name() const { return m_name; }
+    static ptrdiff_t nameMemoryOffset() { return OBJECT_OFFSETOF(Attribute, m_name); }
 
     bool isEmpty() const { return m_value.isEmpty(); }
+    static bool nameMatchesFilter(const QualifiedName&, const AtomicString& filterPrefix, const AtomicString& filterLocalName, const AtomicString& filterNamespaceURI);
     bool matches(const AtomicString& prefix, const AtomicString& localName, const AtomicString& namespaceURI) const;
 
     void setValue(const AtomicString& value) { m_value = value; }
@@ -61,13 +64,10 @@ public:
     // elements may have placed the Attribute in a hash by name.
     void parserSetName(const QualifiedName& name) { m_name = name; }
 
-#if COMPILER(MSVC) || COMPILER(CLANG)
-    // NOTE: This constructor is not actually used, it's just defined so MSVC (or clang)
+#if COMPILER(MSVC)
+    // NOTE: This constructor is not actually implemented, it's just defined so MSVC
     // will let us use a zero-length array of Attributes.
-    Attribute() : m_name(WTF::HashTableDeletedValue)
-    {
-        ASSERT_NOT_REACHED();
-    }
+    Attribute();
 #endif
 
 private:
@@ -75,11 +75,16 @@ private:
     AtomicString m_value;
 };
 
+inline bool Attribute::nameMatchesFilter(const QualifiedName& name, const AtomicString& filterPrefix, const AtomicString& filterLocalName, const AtomicString& filterNamespaceURI)
+{
+    if (filterLocalName != name.localName())
+        return false;
+    return filterPrefix == starAtom || filterNamespaceURI == name.namespaceURI();
+}
+
 inline bool Attribute::matches(const AtomicString& prefix, const AtomicString& localName, const AtomicString& namespaceURI) const
 {
-    if (localName != this->localName())
-        return false;
-    return prefix == starAtom || namespaceURI == this->namespaceURI();
+    return nameMatchesFilter(m_name, prefix, localName, namespaceURI);
 }
 
 } // namespace WebCore

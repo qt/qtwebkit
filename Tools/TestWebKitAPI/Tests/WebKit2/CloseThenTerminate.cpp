@@ -24,6 +24,9 @@
  */
 
 #include "config.h"
+
+#if WK_HAVE_C_SPI
+
 #include "PlatformUtilities.h"
 #include "PlatformWebView.h"
 
@@ -44,10 +47,13 @@ TEST(WebKit2, CloseThenTerminate)
     WKRetainPtr<WKContextRef> context = adoptWK(WKContextCreate());
     PlatformWebView webView(context.get());
 
-    WKPageLoaderClient loaderClient;
+    WKPageLoaderClientV0 loaderClient;
     memset(&loaderClient, 0 , sizeof(loaderClient));
+
+    loaderClient.base.version = 0;
     loaderClient.didFinishLoadForFrame = didFinishLoadForFrame;
-    WKPageSetPageLoaderClient(webView.page(), &loaderClient);
+    
+    WKPageSetPageLoaderClient(webView.page(), &loaderClient.base);
 
     WKRetainPtr<WKURLRef> url(AdoptWK, Util::createURLForResource("simple", "html"));
     WKPageLoadURL(webView.page(), url.get());
@@ -59,3 +65,5 @@ TEST(WebKit2, CloseThenTerminate)
 }
 
 } // namespace TestWebKitAPI
+
+#endif

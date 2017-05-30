@@ -26,10 +26,10 @@
 #ifndef WebPopupItem_h
 #define WebPopupItem_h
 
-#include <WebCore/TextDirection.h>
+#include <WebCore/WritingMode.h>
 #include <wtf/text/WTFString.h>
 
-namespace CoreIPC {
+namespace IPC {
     class ArgumentDecoder;
     class ArgumentEncoder;
 }
@@ -46,8 +46,8 @@ struct WebPopupItem {
     WebPopupItem(Type);
     WebPopupItem(Type, const String& text, WebCore::TextDirection, bool hasTextDirectionOverride, const String& toolTip, const String& accessibilityText, bool isEnabled, bool isLabel, bool isSelected);
 
-    void encode(CoreIPC::ArgumentEncoder&) const;
-    static bool decode(CoreIPC::ArgumentDecoder&, WebPopupItem&);
+    void encode(IPC::ArgumentEncoder&) const;
+    static bool decode(IPC::ArgumentDecoder&, WebPopupItem&);
 
     Type m_type;
     String m_text;

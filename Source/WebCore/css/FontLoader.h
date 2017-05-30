@@ -30,8 +30,8 @@
 
 #include "ActiveDOMObject.h"
 #include "EventListener.h"
-#include "EventNames.h"
 #include "EventTarget.h"
+#include "Timer.h"
 #include "VoidCallback.h"
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
@@ -45,31 +45,28 @@ class CSSFontFaceSource;
 class Dictionary;
 class Document;
 class Event;
-class Font;
+class FontCascade;
+class LoadFontCallback;
 class ScriptExecutionContext;
 
-class FontLoader : public RefCounted<FontLoader>, public ActiveDOMObject, public EventTarget {
+class FontLoader final : public RefCounted<FontLoader>, public ActiveDOMObject, public EventTarget {
 public:
-    static PassRefPtr<FontLoader> create(Document* document)
+    static Ref<FontLoader> create(Document* document)
     {
-        return adoptRef<FontLoader>(new FontLoader(document));
+        return adoptRef<FontLoader>(*new FontLoader(document));
     }
     virtual ~FontLoader();
 
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(loading);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(loadingdone);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(loadstart);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(load);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(error);
-
     bool checkFont(const String&, const String&);
     void loadFont(const Dictionary&);
+    void loadFontDone(const LoadFontCallback&);
+
     void notifyWhenFontsReady(PassRefPtr<VoidCallback>);
 
-    bool loading() const { return m_loadingCount > 0; }
+    bool loading() const { return m_numLoadingFromCSS > 0 || m_numLoadingFromJS > 0; }
 
-    virtual ScriptExecutionContext* scriptExecutionContext() const;
-    virtual const AtomicString& interfaceName() const;
+    virtual ScriptExecutionContext* scriptExecutionContext() const override;
+    virtual EventTargetInterface eventTargetInterface() const override;
 
     using RefCounted<FontLoader>::ref;
     using RefCounted<FontLoader>::deref;
@@ -85,21 +82,27 @@ public:
 private:
     FontLoader(Document*);
 
-    virtual void refEventTarget() { ref(); }
-    virtual void derefEventTarget() { deref(); }
-    virtual EventTargetData* eventTargetData();
-    virtual EventTargetData* ensureEventTargetData();
+    virtual void refEventTarget() override { ref(); }
+    virtual void derefEventTarget() override { deref(); }
+    virtual EventTargetData* eventTargetData() override;
+    virtual EventTargetData& ensureEventTargetData() override;
+
+    // ActiveDOMObject API.
+    const char* activeDOMObjectName() const override;
+    bool canSuspendForDocumentSuspension() const override;
 
     void scheduleEvent(PassRefPtr<Event>);
     void firePendingEvents();
-    bool resolveFontStyle(const String&, Font&);
+    bool resolveFontStyle(const String&, FontCascade&);
 
     Document* m_document;
     EventTargetData m_eventTargetData;
-    unsigned m_loadingCount;
-    Vector<RefPtr<Event> > m_pendingEvents;
-    Vector<RefPtr<VoidCallback> > m_callbacks;
+    unsigned m_numLoadingFromCSS;
+    unsigned m_numLoadingFromJS;
+    Vector<Ref<Event>> m_pendingEvents;
+    Vector<RefPtr<VoidCallback>> m_callbacks;
     RefPtr<Event> m_loadingDoneEvent;
+    Timer m_pendingEventsTimer;
 };
 
 } // namespace WebCore

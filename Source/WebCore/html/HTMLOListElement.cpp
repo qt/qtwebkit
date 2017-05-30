@@ -23,7 +23,6 @@
 #include "config.h"
 #include "HTMLOListElement.h"
 
-#include "Attribute.h"
 #include "CSSPropertyNames.h"
 #include "CSSValueKeywords.h"
 #include "HTMLNames.h"
@@ -33,7 +32,7 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-HTMLOListElement::HTMLOListElement(const QualifiedName& tagName, Document* document)
+HTMLOListElement::HTMLOListElement(const QualifiedName& tagName, Document& document)
     : HTMLElement(tagName, document)
     , m_start(0xBADBEEF)
     , m_itemCount(0)
@@ -44,14 +43,14 @@ HTMLOListElement::HTMLOListElement(const QualifiedName& tagName, Document* docum
     ASSERT(hasTagName(olTag));
 }
 
-PassRefPtr<HTMLOListElement> HTMLOListElement::create(Document* document)
+Ref<HTMLOListElement> HTMLOListElement::create(Document& document)
 {
-    return adoptRef(new HTMLOListElement(olTag, document));
+    return adoptRef(*new HTMLOListElement(olTag, document));
 }
 
-PassRefPtr<HTMLOListElement> HTMLOListElement::create(const QualifiedName& tagName, Document* document)
+Ref<HTMLOListElement> HTMLOListElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new HTMLOListElement(tagName, document));
+    return adoptRef(*new HTMLOListElement(tagName, document));
 }
 
 bool HTMLOListElement::isPresentationAttribute(const QualifiedName& name) const
@@ -61,7 +60,7 @@ bool HTMLOListElement::isPresentationAttribute(const QualifiedName& name) const
     return HTMLElement::isPresentationAttribute(name);
 }
 
-void HTMLOListElement::collectStyleForPresentationAttribute(const QualifiedName& name, const AtomicString& value, MutableStylePropertySet* style)
+void HTMLOListElement::collectStyleForPresentationAttribute(const QualifiedName& name, const AtomicString& value, MutableStyleProperties& style)
 {
     if (name == typeAttr) {
         if (value == "a")
@@ -101,17 +100,17 @@ void HTMLOListElement::parseAttribute(const QualifiedName& name, const AtomicStr
 
 void HTMLOListElement::setStart(int start)
 {
-    setAttribute(startAttr, String::number(start));
+    setIntegralAttribute(startAttr, start);
 }
 
 void HTMLOListElement::updateItemValues()
 {
-    RenderListItem::updateItemValuesForOrderedList(this);
+    RenderListItem::updateItemValuesForOrderedList(*this);
 }
 
 void HTMLOListElement::recalculateItemCount()
 {
-    m_itemCount = RenderListItem::itemCountForOrderedList(this);
+    m_itemCount = RenderListItem::itemCountForOrderedList(*this);
     m_shouldRecalculateItemCount = false;
 }
 

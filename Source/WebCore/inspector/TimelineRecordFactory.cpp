@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2009 Google Inc. All rights reserved.
+ * Copyright (C) 2014 University of Washington.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -29,226 +30,185 @@
  */
 
 #include "config.h"
-
-#if ENABLE(INSPECTOR)
-
 #include "TimelineRecordFactory.h"
 
 #include "Event.h"
 #include "FloatQuad.h"
-#include "InspectorValues.h"
-#include "IntRect.h"
-#include "LayoutRect.h"
-#include "ResourceRequest.h"
-#include "ResourceResponse.h"
-#include "ScriptCallStack.h"
-#include "ScriptCallStackFactory.h"
-#include <wtf/CurrentTime.h>
+#include "JSMainThreadExecState.h"
+#include <inspector/InspectorProtocolObjects.h>
+#include <inspector/ScriptBreakpoint.h>
+#include <inspector/ScriptCallStack.h>
+#include <inspector/ScriptCallStackFactory.h>
+#include <profiler/Profile.h>
+
+using namespace Inspector;
 
 namespace WebCore {
 
-PassRefPtr<InspectorObject> TimelineRecordFactory::createGenericRecord(double startTime, int maxCallStackDepth)
+Ref<InspectorObject> TimelineRecordFactory::createGenericRecord(double startTime, int maxCallStackDepth)
 {
-    RefPtr<InspectorObject> record = InspectorObject::create();
-    record->setNumber("startTime", startTime);
+    Ref<InspectorObject> record = InspectorObject::create();
+    record->setDouble(ASCIILiteral("startTime"), startTime);
 
     if (maxCallStackDepth) {
-        RefPtr<ScriptCallStack> stackTrace = createScriptCallStack(maxCallStackDepth, true);
+        RefPtr<ScriptCallStack> stackTrace = createScriptCallStack(JSMainThreadExecState::currentState(), maxCallStackDepth);
         if (stackTrace && stackTrace->size())
-            record->setValue("stackTrace", stackTrace->buildInspectorArray());
+            record->setValue(ASCIILiteral("stackTrace"), stackTrace->buildInspectorArray());
     }
-    return record.release();
+    return record;
 }
 
-PassRefPtr<InspectorObject> TimelineRecordFactory::createBackgroundRecord(double startTime, const String& threadName)
+Ref<InspectorObject> TimelineRecordFactory::createFunctionCallData(const String& scriptName, int scriptLine)
 {
-    RefPtr<InspectorObject> record = InspectorObject::create();
-    record->setNumber("startTime", startTime);
-    record->setString("thread", threadName);
-    return record.release();
+    Ref<InspectorObject> data = InspectorObject::create();
+    data->setString(ASCIILiteral("scriptName"), scriptName);
+    data->setInteger(ASCIILiteral("scriptLine"), scriptLine);
+    return data;
 }
 
-PassRefPtr<InspectorObject> TimelineRecordFactory::createGCEventData(const size_t usedHeapSizeDelta)
+Ref<InspectorObject> TimelineRecordFactory::createConsoleProfileData(const String& title)
 {
-    RefPtr<InspectorObject> data = InspectorObject::create();
-    data->setNumber("usedHeapSizeDelta", usedHeapSizeDelta);
-    return data.release();
+    Ref<InspectorObject> data = InspectorObject::create();
+    data->setString(ASCIILiteral("title"), title);
+    return data;
 }
 
-PassRefPtr<InspectorObject> TimelineRecordFactory::createFunctionCallData(const String& scriptName, int scriptLine)
+Ref<InspectorObject> TimelineRecordFactory::createProbeSampleData(const ScriptBreakpointAction& action, unsigned sampleId)
 {
-    RefPtr<InspectorObject> data = InspectorObject::create();
-    data->setString("scriptName", scriptName);
-    data->setNumber("scriptLine", scriptLine);
-    return data.release();
+    Ref<InspectorObject> data = InspectorObject::create();
+    data->setInteger(ASCIILiteral("probeId"), action.identifier);
+    data->setInteger(ASCIILiteral("sampleId"), sampleId);
+    return data;
 }
 
-PassRefPtr<InspectorObject> TimelineRecordFactory::createEventDispatchData(const Event& event)
+Ref<InspectorObject> TimelineRecordFactory::createEventDispatchData(const Event& event)
 {
-    RefPtr<InspectorObject> data = InspectorObject::create();
-    data->setString("type", event.type().string());
-    return data.release();
+    Ref<InspectorObject> data = InspectorObject::create();
+    data->setString(ASCIILiteral("type"), event.type().string());
+    return data;
 }
 
-PassRefPtr<InspectorObject> TimelineRecordFactory::createGenericTimerData(int timerId)
+Ref<InspectorObject> TimelineRecordFactory::createGenericTimerData(int timerId)
 {
-    RefPtr<InspectorObject> data = InspectorObject::create();
-    data->setNumber("timerId", timerId);
-    return data.release();
+    Ref<InspectorObject> data = InspectorObject::create();
+    data->setInteger(ASCIILiteral("timerId"), timerId);
+    return data;
 }
 
-PassRefPtr<InspectorObject> TimelineRecordFactory::createTimerInstallData(int timerId, int timeout, bool singleShot)
+Ref<InspectorObject> TimelineRecordFactory::createTimerInstallData(int timerId, int timeout, bool singleShot)
 {
-    RefPtr<InspectorObject> data = InspectorObject::create();
-    data->setNumber("timerId", timerId);
-    data->setNumber("timeout", timeout);
-    data->setBoolean("singleShot", singleShot);
-    return data.release();
+    Ref<InspectorObject> data = InspectorObject::create();
+    data->setInteger(ASCIILiteral("timerId"), timerId);
+    data->setInteger(ASCIILiteral("timeout"), timeout);
+    data->setBoolean(ASCIILiteral("singleShot"), singleShot);
+    return data;
 }
 
-PassRefPtr<InspectorObject> TimelineRecordFactory::createXHRReadyStateChangeData(const String& url, int readyState)
+Ref<InspectorObject> TimelineRecordFactory::createEvaluateScriptData(const String& url, double lineNumber)
 {
-    RefPtr<InspectorObject> data = InspectorObject::create();
-    data->setString("url", url);
-    data->setNumber("readyState", readyState);
-    return data.release();
+    Ref<InspectorObject> data = InspectorObject::create();
+    data->setString(ASCIILiteral("url"), url);
+    data->setInteger(ASCIILiteral("lineNumber"), lineNumber);
+    return data;
 }
 
-PassRefPtr<InspectorObject> TimelineRecordFactory::createXHRLoadData(const String& url)
+Ref<InspectorObject> TimelineRecordFactory::createTimeStampData(const String& message)
 {
-    RefPtr<InspectorObject> data = InspectorObject::create();
-    data->setString("url", url);
-    return data.release();
+    Ref<InspectorObject> data = InspectorObject::create();
+    data->setString(ASCIILiteral("message"), message);
+    return data;
 }
 
-PassRefPtr<InspectorObject> TimelineRecordFactory::createEvaluateScriptData(const String& url, double lineNumber)
+Ref<InspectorObject> TimelineRecordFactory::createAnimationFrameData(int callbackId)
 {
-    RefPtr<InspectorObject> data = InspectorObject::create();
-    data->setString("url", url);
-    data->setNumber("lineNumber", lineNumber);
-    return data.release();
+    Ref<InspectorObject> data = InspectorObject::create();
+    data->setInteger(ASCIILiteral("id"), callbackId);
+    return data;
 }
 
-PassRefPtr<InspectorObject> TimelineRecordFactory::createTimeStampData(const String& message)
+static Ref<InspectorArray> createQuad(const FloatQuad& quad)
 {
-    RefPtr<InspectorObject> data = InspectorObject::create();
-    data->setString("message", message);
-    return data.release();
+    Ref<InspectorArray> array = InspectorArray::create();
+    array->pushDouble(quad.p1().x());
+    array->pushDouble(quad.p1().y());
+    array->pushDouble(quad.p2().x());
+    array->pushDouble(quad.p2().y());
+    array->pushDouble(quad.p3().x());
+    array->pushDouble(quad.p3().y());
+    array->pushDouble(quad.p4().x());
+    array->pushDouble(quad.p4().y());
+    return array;
 }
 
-PassRefPtr<InspectorObject> TimelineRecordFactory::createScheduleResourceRequestData(const String& url)
+Ref<InspectorObject> TimelineRecordFactory::createPaintData(const FloatQuad& quad)
 {
-    RefPtr<InspectorObject> data = InspectorObject::create();
-    data->setString("url", url);
-    return data.release();
-}
-
-PassRefPtr<InspectorObject> TimelineRecordFactory::createResourceSendRequestData(const String& requestId, const ResourceRequest& request)
-{
-    RefPtr<InspectorObject> data = InspectorObject::create();
-    data->setString("requestId", requestId);
-    data->setString("url", request.url().string());
-    data->setString("requestMethod", request.httpMethod());
-    return data.release();
-}
-
-PassRefPtr<InspectorObject> TimelineRecordFactory::createResourceReceiveResponseData(const String& requestId, const ResourceResponse& response)
-{
-    RefPtr<InspectorObject> data = InspectorObject::create();
-    data->setString("requestId", requestId);
-    data->setNumber("statusCode", response.httpStatusCode());
-    data->setString("mimeType", response.mimeType());
-    return data.release();
-}
-
-PassRefPtr<InspectorObject> TimelineRecordFactory::createResourceFinishData(const String& requestId, bool didFail, double finishTime)
-{
-    RefPtr<InspectorObject> data = InspectorObject::create();
-    data->setString("requestId", requestId);
-    data->setBoolean("didFail", didFail);
-    if (finishTime)
-        data->setNumber("networkTime", finishTime);
-    return data.release();
-}
-
-PassRefPtr<InspectorObject> TimelineRecordFactory::createReceiveResourceData(const String& requestId, int length)
-{
-    RefPtr<InspectorObject> data = InspectorObject::create();
-    data->setString("requestId", requestId);
-    data->setNumber("encodedDataLength", length);
-    return data.release();
-}
-
-PassRefPtr<InspectorObject> TimelineRecordFactory::createLayoutData(unsigned dirtyObjects, unsigned totalObjects, bool partialLayout)
-{
-    RefPtr<InspectorObject> data = InspectorObject::create();
-    data->setNumber("dirtyObjects", dirtyObjects);
-    data->setNumber("totalObjects", totalObjects);
-    data->setBoolean("partialLayout", partialLayout);
-    return data.release();
-}
-    
-PassRefPtr<InspectorObject> TimelineRecordFactory::createDecodeImageData(const String& imageType)
-{
-    RefPtr<InspectorObject> data = InspectorObject::create();
-    data->setString("imageType", imageType);
-    return data.release();
-}
-
-PassRefPtr<InspectorObject> TimelineRecordFactory::createResizeImageData(bool shouldCache)
-{
-    RefPtr<InspectorObject> data = InspectorObject::create();
-    data->setBoolean("cached", shouldCache);
-    return data.release();
-}
-
-PassRefPtr<InspectorObject> TimelineRecordFactory::createMarkData(bool isMainFrame)
-{
-    RefPtr<InspectorObject> data = InspectorObject::create();
-    data->setBoolean("isMainFrame", isMainFrame);
-    return data.release();
-}
-
-PassRefPtr<InspectorObject> TimelineRecordFactory::createParseHTMLData(unsigned startLine)
-{
-    RefPtr<InspectorObject> data = InspectorObject::create();
-    data->setNumber("startLine", startLine);
-    return data.release();
-}
-
-PassRefPtr<InspectorObject> TimelineRecordFactory::createAnimationFrameData(int callbackId)
-{
-    RefPtr<InspectorObject> data = InspectorObject::create();
-    data->setNumber("id", callbackId);
-    return data.release();
-}
-
-static PassRefPtr<InspectorArray> createQuad(const FloatQuad& quad)
-{
-    RefPtr<InspectorArray> array = InspectorArray::create();
-    array->pushNumber(quad.p1().x());
-    array->pushNumber(quad.p1().y());
-    array->pushNumber(quad.p2().x());
-    array->pushNumber(quad.p2().y());
-    array->pushNumber(quad.p3().x());
-    array->pushNumber(quad.p3().y());
-    array->pushNumber(quad.p4().x());
-    array->pushNumber(quad.p4().y());
-    return array.release();
-}
-
-PassRefPtr<InspectorObject> TimelineRecordFactory::createPaintData(const FloatQuad& quad)
-{
-    RefPtr<InspectorObject> data = InspectorObject::create();
-    data->setArray("clip", createQuad(quad));
-    return data.release();
+    Ref<InspectorObject> data = InspectorObject::create();
+    data->setArray(ASCIILiteral("clip"), createQuad(quad));
+    return data;
 }
 
 void TimelineRecordFactory::appendLayoutRoot(InspectorObject* data, const FloatQuad& quad)
 {
-    data->setArray("root", createQuad(quad));
+    data->setArray(ASCIILiteral("root"), createQuad(quad));
+}
+
+static Ref<Protocol::Timeline::CPUProfileNodeAggregateCallInfo> buildAggregateCallInfoInspectorObject(const JSC::ProfileNode* node)
+{
+    double startTime = node->calls()[0].startTime();
+    double endTime = node->calls().last().startTime() + node->calls().last().elapsedTime();
+
+    double totalTime = 0;
+    for (const JSC::ProfileNode::Call& call : node->calls())
+        totalTime += call.elapsedTime();
+
+    return Protocol::Timeline::CPUProfileNodeAggregateCallInfo::create()
+        .setCallCount(node->calls().size())
+        .setStartTime(startTime)
+        .setEndTime(endTime)
+        .setTotalTime(totalTime)
+        .release();
+}
+
+static Ref<Protocol::Timeline::CPUProfileNode> buildInspectorObject(const JSC::ProfileNode* node)
+{
+    auto result = Protocol::Timeline::CPUProfileNode::create()
+        .setId(node->id())
+        .setCallInfo(buildAggregateCallInfoInspectorObject(node))
+        .release();
+
+    if (!node->functionName().isEmpty())
+        result->setFunctionName(node->functionName());
+
+    if (!node->url().isEmpty()) {
+        result->setUrl(node->url());
+        result->setLineNumber(node->lineNumber());
+        result->setColumnNumber(node->columnNumber());
+    }
+
+    if (!node->children().isEmpty()) {
+        auto children = Protocol::Array<Protocol::Timeline::CPUProfileNode>::create();
+        for (RefPtr<JSC::ProfileNode> profileNode : node->children())
+            children->addItem(buildInspectorObject(profileNode.get()));
+        result->setChildren(WTFMove(children));
+    }
+
+    return result;
+}
+
+static Ref<Protocol::Timeline::CPUProfile> buildProfileInspectorObject(const JSC::Profile* profile)
+{
+    auto rootNodes = Protocol::Array<Protocol::Timeline::CPUProfileNode>::create();
+    for (RefPtr<JSC::ProfileNode> profileNode : profile->rootNode()->children())
+        rootNodes->addItem(buildInspectorObject(profileNode.get()));
+
+    return Protocol::Timeline::CPUProfile::create()
+        .setRootNodes(WTFMove(rootNodes))
+        .release();
+}
+
+void TimelineRecordFactory::appendProfile(InspectorObject* data, RefPtr<JSC::Profile>&& profile)
+{
+    data->setValue(ASCIILiteral("profile"), buildProfileInspectorObject(profile.get()));
 }
 
 } // namespace WebCore
-
-#endif // ENABLE(INSPECTOR)

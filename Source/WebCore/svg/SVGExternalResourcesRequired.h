@@ -21,13 +21,11 @@
 #ifndef SVGExternalResourcesRequired_h
 #define SVGExternalResourcesRequired_h
 
-#if ENABLE(SVG)
 #include "QualifiedName.h"
 #include <wtf/HashSet.h>
 
 namespace WebCore {
 
-class Attribute;
 class SVGElement;
 
 // Notes on a SVG 1.1 spec discrepancy:
@@ -39,9 +37,11 @@ class SVGExternalResourcesRequired {
 public:
     virtual ~SVGExternalResourcesRequired() { }
 
-    bool parseAttribute(const QualifiedName&, const AtomicString&);
-    bool isKnownAttribute(const QualifiedName&);
-    void addSupportedAttributes(HashSet<QualifiedName>&);
+    void parseAttribute(const QualifiedName&, const AtomicString&);
+
+    static bool isKnownAttribute(const QualifiedName&);
+    static void addSupportedAttributes(HashSet<QualifiedName>&);
+
     bool handleAttributeChange(SVGElement*, const QualifiedName&);
 
 protected:
@@ -61,5 +61,4 @@ protected:
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif

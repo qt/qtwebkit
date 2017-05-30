@@ -36,22 +36,23 @@ class CachedResourceLoader;
 class Document;
 class StyleCachedImageSet;
 class StyleImage;
+struct ResourceLoaderOptions;
 
 class CSSImageSetValue : public CSSValueList {
 public:
 
-    static PassRefPtr<CSSImageSetValue> create()
+    static Ref<CSSImageSetValue> create()
     {
-        return adoptRef(new CSSImageSetValue());
+        return adoptRef(*new CSSImageSetValue());
     }
     ~CSSImageSetValue();
 
-    StyleCachedImageSet* cachedImageSet(CachedResourceLoader*);
+    StyleCachedImageSet* cachedImageSet(CachedResourceLoader&, const ResourceLoaderOptions&);
 
     // Returns a StyleCachedImageSet if the best fit image has been cached already, otherwise a StylePendingImage.
-    StyleImage* cachedOrPendingImageSet(Document*);
+    StyleImage* cachedOrPendingImageSet(Document&);
 
-    String customCssText() const;
+    String customCSSText() const;
 
     bool isPending() const { return !m_accessedBestFitImage; }
 
@@ -60,9 +61,9 @@ public:
         float scaleFactor;
     };
 
-    bool hasFailedOrCanceledSubresources() const;
+    bool traverseSubresources(const std::function<bool (const CachedResource&)>& handler) const;
 
-    PassRefPtr<CSSImageSetValue> cloneForCSSOM() const;
+    Ref<CSSImageSetValue> cloneForCSSOM() const;
 
 protected:
     ImageWithScale bestImageForScaleFactor();
@@ -86,6 +87,8 @@ private:
 };
 
 } // namespace WebCore
+
+SPECIALIZE_TYPE_TRAITS_CSS_VALUE(CSSImageSetValue, isImageSetValue())
 
 #endif // ENABLE(CSS_IMAGE_SET)
 

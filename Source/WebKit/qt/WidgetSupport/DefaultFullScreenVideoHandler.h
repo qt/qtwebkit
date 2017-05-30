@@ -20,14 +20,12 @@
 #ifndef DefaultFullScreenVideoHandler_h
 #define DefaultFullScreenVideoHandler_h
 
-#include "qwebkitplatformplugin.h"
+#include "qwebfullscreenvideohandler.h"
 
 namespace WebKit {
 
 class FullScreenVideoWidget;
 
-// We do not use ENABLE or USE because moc does not expand these macros.
-#if defined(WTF_USE_QT_MULTIMEDIA) && WTF_USE_QT_MULTIMEDIA
 class DefaultFullScreenVideoHandler : public QWebFullScreenVideoHandler {
     Q_OBJECT
 public:
@@ -43,7 +41,6 @@ private:
     static bool s_shouldForceFullScreenVideoPlayback;
     FullScreenVideoWidget *m_fullScreenWidget;
 };
-#endif
 
 } // namespace WebKit
 

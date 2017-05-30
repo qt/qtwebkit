@@ -26,19 +26,16 @@
 #include "config.h"
 #include "JSWithScope.h"
 
-#include "Operations.h"
+#include "JSCInlines.h"
 
 namespace JSC {
 
-const ClassInfo JSWithScope::s_info = { "WithScope", &Base::s_info, 0, 0, CREATE_METHOD_TABLE(JSWithScope) };
+const ClassInfo JSWithScope::s_info = { "WithScope", &Base::s_info, 0, CREATE_METHOD_TABLE(JSWithScope) };
 
 void JSWithScope::visitChildren(JSCell* cell, SlotVisitor& visitor)
 {
     JSWithScope* thisObject = jsCast<JSWithScope*>(cell);
-    ASSERT_GC_OBJECT_INHERITS(thisObject, &s_info);
-    COMPILE_ASSERT(StructureFlags & OverridesVisitChildren, OverridesVisitChildrenWithoutSettingFlag);
-    ASSERT(thisObject->structure()->typeInfo().overridesVisitChildren());
-
+    ASSERT_GC_OBJECT_INHERITS(thisObject, info());
     Base::visitChildren(thisObject, visitor);
     visitor.append(&thisObject->m_object);
 }

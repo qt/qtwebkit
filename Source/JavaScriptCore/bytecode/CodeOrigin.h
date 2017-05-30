@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, 2012, 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2011-2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,11 +26,12 @@
 #ifndef CodeOrigin_h
 #define CodeOrigin_h
 
+#include "CallMode.h"
 #include "CodeBlockHash.h"
 #include "CodeSpecializationKind.h"
-#include "ValueRecovery.h"
 #include "WriteBarrier.h"
 #include <wtf/BitVector.h>
+#include <wtf/HashMap.h>
 #include <wtf/PrintStream.h>
 #include <wtf/StdLibExtras.h>
 #include <wtf/Vector.h>
@@ -39,41 +40,45 @@ namespace JSC {
 
 struct InlineCallFrame;
 class ExecState;
-class ExecutableBase;
+class ScriptExecutable;
 class JSFunction;
 
 struct CodeOrigin {
-    static const unsigned maximumBytecodeIndex = (1u << 29) - 1;
+    static const unsigned invalidBytecodeIndex = UINT_MAX;
     
-    // Bytecode offset that you'd use to re-execute this instruction.
-    unsigned bytecodeIndex : 29;
-    // Bytecode offset corresponding to the opcode that gives the result (needed to handle
-    // op_call/op_call_put_result and op_method_check/op_get_by_id).
-    unsigned valueProfileOffset : 3;
+    // Bytecode offset that you'd use to re-execute this instruction, and the
+    // bytecode index of the bytecode instruction that produces some result that
+    // you're interested in (used for mapping Nodes whose values you're using
+    // to bytecode instructions that have the appropriate value profile).
+    unsigned bytecodeIndex;
     
     InlineCallFrame* inlineCallFrame;
     
     CodeOrigin()
-        : bytecodeIndex(maximumBytecodeIndex)
-        , valueProfileOffset(0)
+        : bytecodeIndex(invalidBytecodeIndex)
         , inlineCallFrame(0)
     {
     }
     
-    explicit CodeOrigin(unsigned bytecodeIndex, InlineCallFrame* inlineCallFrame = 0, unsigned valueProfileOffset = 0)
-        : bytecodeIndex(bytecodeIndex)
-        , valueProfileOffset(valueProfileOffset)
-        , inlineCallFrame(inlineCallFrame)
+    CodeOrigin(WTF::HashTableDeletedValueType)
+        : bytecodeIndex(invalidBytecodeIndex)
+        , inlineCallFrame(deletedMarker())
     {
-        RELEASE_ASSERT(bytecodeIndex <= maximumBytecodeIndex);
-        RELEASE_ASSERT(valueProfileOffset < (1u << 3));
     }
     
-    bool isSet() const { return bytecodeIndex != maximumBytecodeIndex; }
-    
-    unsigned bytecodeIndexForValueProfile() const
+    explicit CodeOrigin(unsigned bytecodeIndex, InlineCallFrame* inlineCallFrame = 0)
+        : bytecodeIndex(bytecodeIndex)
+        , inlineCallFrame(inlineCallFrame)
     {
-        return bytecodeIndex + valueProfileOffset;
+        ASSERT(bytecodeIndex < invalidBytecodeIndex);
+    }
+    
+    bool isSet() const { return bytecodeIndex != invalidBytecodeIndex; }
+    explicit operator bool() const { return isSet(); }
+    
+    bool isHashTableDeletedValue() const
+    {
+        return bytecodeIndex == invalidBytecodeIndex && !!inlineCallFrame;
     }
     
     // The inline depth is the depth of the inline stack, so 1 = not inlined,
@@ -82,60 +87,42 @@ struct CodeOrigin {
     
     // If the code origin corresponds to inlined code, gives you the heap object that
     // would have owned the code if it had not been inlined. Otherwise returns 0.
-    ExecutableBase* codeOriginOwner() const;
+    CodeBlock* codeOriginOwner() const;
     
-    unsigned stackOffset() const;
+    int stackOffset() const;
     
     static unsigned inlineDepthForCallFrame(InlineCallFrame*);
     
+    unsigned hash() const;
     bool operator==(const CodeOrigin& other) const;
-    
     bool operator!=(const CodeOrigin& other) const { return !(*this == other); }
+    
+    // This checks if the two code origins correspond to the same stack trace snippets,
+    // but ignore whether the InlineCallFrame's are identical.
+    bool isApproximatelyEqualTo(const CodeOrigin& other) const;
+    
+    unsigned approximateHash() const;
+
+    template <typename Function>
+    void walkUpInlineStack(const Function&);
     
     // Get the inline stack. This is slow, and is intended for debugging only.
     Vector<CodeOrigin> inlineStack() const;
     
     void dump(PrintStream&) const;
+    void dumpInContext(PrintStream&, DumpContext*) const;
+
+private:
+    static InlineCallFrame* deletedMarker()
+    {
+        return bitwise_cast<InlineCallFrame*>(static_cast<uintptr_t>(1));
+    }
 };
 
-struct InlineCallFrame {
-    Vector<ValueRecovery> arguments;
-    WriteBarrier<ExecutableBase> executable;
-    WriteBarrier<JSFunction> callee; // This may be null, indicating that this is a closure call and that the JSFunction and JSScope are already on the stack.
-    CodeOrigin caller;
-    BitVector capturedVars; // Indexed by the machine call frame's variable numbering.
-    unsigned stackOffset : 31;
-    bool isCall : 1;
-    
-    CodeSpecializationKind specializationKind() const { return specializationFromIsCall(isCall); }
-    
-    bool isClosureCall() const { return !callee; }
-    
-    // Get the callee given a machine call frame to which this InlineCallFrame belongs.
-    JSFunction* calleeForCallFrame(ExecState*) const;
-    
-    String inferredName() const;
-    CodeBlockHash hash() const;
-    
-    CodeBlock* baselineCodeBlock() const;
-    
-    void dumpBriefFunctionInformation(PrintStream&) const;
-    void dump(PrintStream&) const;
-
-    MAKE_PRINT_METHOD(InlineCallFrame, dumpBriefFunctionInformation, briefFunctionInformation);
-};
-
-struct CodeOriginAtCallReturnOffset {
-    CodeOrigin codeOrigin;
-    unsigned callReturnOffset;
-};
-
-inline unsigned CodeOrigin::stackOffset() const
+inline unsigned CodeOrigin::hash() const
 {
-    if (!inlineCallFrame)
-        return 0;
-    
-    return inlineCallFrame->stackOffset;
+    return WTF::IntHash<unsigned>::hash(bytecodeIndex) +
+        WTF::PtrHash<InlineCallFrame*>::hash(inlineCallFrame);
 }
 
 inline bool CodeOrigin::operator==(const CodeOrigin& other) const
@@ -143,20 +130,34 @@ inline bool CodeOrigin::operator==(const CodeOrigin& other) const
     return bytecodeIndex == other.bytecodeIndex
         && inlineCallFrame == other.inlineCallFrame;
 }
-    
-inline unsigned getCallReturnOffsetForCodeOrigin(CodeOriginAtCallReturnOffset* data)
-{
-    return data->callReturnOffset;
-}
 
-inline ExecutableBase* CodeOrigin::codeOriginOwner() const
-{
-    if (!inlineCallFrame)
-        return 0;
-    return inlineCallFrame->executable.get();
-}
+struct CodeOriginHash {
+    static unsigned hash(const CodeOrigin& key) { return key.hash(); }
+    static bool equal(const CodeOrigin& a, const CodeOrigin& b) { return a == b; }
+    static const bool safeToCompareToEmptyOrDeleted = true;
+};
+
+struct CodeOriginApproximateHash {
+    static unsigned hash(const CodeOrigin& key) { return key.approximateHash(); }
+    static bool equal(const CodeOrigin& a, const CodeOrigin& b) { return a.isApproximatelyEqualTo(b); }
+    static const bool safeToCompareToEmptyOrDeleted = true;
+};
 
 } // namespace JSC
+
+namespace WTF {
+
+template<typename T> struct DefaultHash;
+template<> struct DefaultHash<JSC::CodeOrigin> {
+    typedef JSC::CodeOriginHash Hash;
+};
+
+template<typename T> struct HashTraits;
+template<> struct HashTraits<JSC::CodeOrigin> : SimpleClassHashTraits<JSC::CodeOrigin> {
+    static const bool emptyValueIsZero = false;
+};
+
+} // namespace WTF
 
 #endif // CodeOrigin_h
 

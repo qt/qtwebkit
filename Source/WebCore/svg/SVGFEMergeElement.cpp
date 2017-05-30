@@ -19,10 +19,9 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG) && ENABLE(FILTERS)
 #include "SVGFEMergeElement.h"
 
+#include "ElementIterator.h"
 #include "FilterEffect.h"
 #include "SVGFEMergeNodeElement.h"
 #include "SVGFilterBuilder.h"
@@ -30,36 +29,33 @@
 
 namespace WebCore {
 
-inline SVGFEMergeElement::SVGFEMergeElement(const QualifiedName& tagName, Document* document)
+inline SVGFEMergeElement::SVGFEMergeElement(const QualifiedName& tagName, Document& document)
     : SVGFilterPrimitiveStandardAttributes(tagName, document)
 {
     ASSERT(hasTagName(SVGNames::feMergeTag));
 }
 
-PassRefPtr<SVGFEMergeElement> SVGFEMergeElement::create(const QualifiedName& tagName, Document* document)
+Ref<SVGFEMergeElement> SVGFEMergeElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new SVGFEMergeElement(tagName, document));
+    return adoptRef(*new SVGFEMergeElement(tagName, document));
 }
 
-PassRefPtr<FilterEffect> SVGFEMergeElement::build(SVGFilterBuilder* filterBuilder, Filter* filter)
+RefPtr<FilterEffect> SVGFEMergeElement::build(SVGFilterBuilder* filterBuilder, Filter& filter)
 {
     RefPtr<FilterEffect> effect = FEMerge::create(filter);
     FilterEffectVector& mergeInputs = effect->inputEffects();
-    for (Node* node = firstChild(); node; node = node->nextSibling()) {
-        if (node->hasTagName(SVGNames::feMergeNodeTag)) {
-            FilterEffect* mergeEffect = filterBuilder->getEffectById(static_cast<SVGFEMergeNodeElement*>(node)->in1());
-            if (!mergeEffect)
-                return 0;
-            mergeInputs.append(mergeEffect);
-        }
+
+    for (auto& mergeNode : childrenOfType<SVGFEMergeNodeElement>(*this)) {
+        FilterEffect* mergeEffect = filterBuilder->getEffectById(mergeNode.in1());
+        if (!mergeEffect)
+            return nullptr;
+        mergeInputs.append(mergeEffect);
     }
 
     if (mergeInputs.isEmpty())
-        return 0;
+        return nullptr;
 
-    return effect.release();
+    return effect;
 }
 
 }
-
-#endif // ENABLE(SVG)

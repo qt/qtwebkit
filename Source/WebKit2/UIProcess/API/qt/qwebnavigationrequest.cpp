@@ -18,19 +18,19 @@
 */
 
 #include "config.h"
-
 #include "qwebnavigationrequest_p.h"
 
 #include "qquickwebview_p.h"
 
 class QWebNavigationRequestPrivate {
 public:
-    QWebNavigationRequestPrivate(const QUrl& url, Qt::MouseButton mouseButton, Qt::KeyboardModifiers keyboardModifiers, QQuickWebView::NavigationType navigationType)
+    QWebNavigationRequestPrivate(const QUrl& url, Qt::MouseButton mouseButton, Qt::KeyboardModifiers keyboardModifiers, QQuickWebView::NavigationType navigationType, bool isMainFrame)
         : url(url)
         , mouseButton(mouseButton)
         , keyboardModifiers(keyboardModifiers)
         , action(QQuickWebView::AcceptRequest)
         , navigationType(navigationType)
+        , isMainFrame(isMainFrame)
     {
     }
 
@@ -43,11 +43,12 @@ public:
     Qt::KeyboardModifiers keyboardModifiers;
     QQuickWebView::NavigationRequestAction action;
     QQuickWebView::NavigationType navigationType;
+    bool isMainFrame;
 };
 
-QWebNavigationRequest::QWebNavigationRequest(const QUrl& url, Qt::MouseButton mouseButton, Qt::KeyboardModifiers keyboardModifiers, QQuickWebView::NavigationType navigationType, QObject* parent)
+QWebNavigationRequest::QWebNavigationRequest(const QUrl& url, Qt::MouseButton mouseButton, Qt::KeyboardModifiers keyboardModifiers, QQuickWebView::NavigationType navigationType, bool isMainFrame, QObject* parent)
     : QObject(parent)
-    , d(new QWebNavigationRequestPrivate(url, mouseButton, keyboardModifiers, navigationType))
+    , d(new QWebNavigationRequestPrivate(url, mouseButton, keyboardModifiers, navigationType, isMainFrame))
 {
 }
 
@@ -88,4 +89,9 @@ QQuickWebView::NavigationRequestAction QWebNavigationRequest::action() const
 QQuickWebView::NavigationType QWebNavigationRequest::navigationType() const
 {
     return d->navigationType;
+}
+
+bool QWebNavigationRequest::isMainFrame() const
+{
+    return d->isMainFrame;
 }

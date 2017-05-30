@@ -26,26 +26,27 @@
 #include "config.h"
 #include "WKURLRequest.h"
 
+#include "APIURLRequest.h"
 #include "WKAPICast.h"
-#include "WebURLRequest.h"
-#include <WebCore/KURL.h>
+#include "WKData.h"
+#include <WebCore/URL.h>
 
 using namespace WebCore;
 using namespace WebKit;
 
 WKTypeID WKURLRequestGetTypeID()
 {
-    return toAPI(WebURLRequest::APIType);
+    return toAPI(API::URLRequest::APIType);
 }
 
 WKURLRequestRef WKURLRequestCreateWithWKURL(WKURLRef url)
 {
-    return toAPI(WebURLRequest::create(KURL(KURL(), toImpl(url)->string())).leakRef());
+    return toAPI(&API::URLRequest::create(URL(URL(), toImpl(url)->string())).leakRef());
 }
 
 WKURLRef WKURLRequestCopyURL(WKURLRequestRef requestRef)
 {
-    return toCopiedURLAPI(toImpl(requestRef)->url());
+    return toCopiedURLAPI(toImpl(requestRef)->resourceRequest().url());
 }
 
 WKURLRef WKURLRequestCopyFirstPartyForCookies(WKURLRequestRef requestRef)
@@ -58,7 +59,14 @@ WKStringRef WKURLRequestCopyHTTPMethod(WKURLRequestRef requestRef)
     return toCopiedAPI(toImpl(requestRef)->resourceRequest().httpMethod());
 }
 
+WKURLRequestRef WKURLRequestCopySettingHTTPBody(WKURLRequestRef requestRef, WKDataRef body)
+{
+    WebCore::ResourceRequest requestCopy(toImpl(requestRef)->resourceRequest());
+    requestCopy.setHTTPBody(FormData::create(WKDataGetBytes(body), WKDataGetSize(body)));
+    return toAPI(&API::URLRequest::create(requestCopy).leakRef());
+}
+
 void WKURLRequestSetDefaultTimeoutInterval(double timeoutInterval)
 {
-    WebURLRequest::setDefaultTimeoutInterval(timeoutInterval);
+    API::URLRequest::setDefaultTimeoutInterval(timeoutInterval);
 }

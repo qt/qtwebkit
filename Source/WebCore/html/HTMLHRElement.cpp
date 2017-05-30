@@ -23,31 +23,30 @@
 #include "config.h"
 #include "HTMLHRElement.h"
 
-#include "Attribute.h"
 #include "CSSPropertyNames.h"
 #include "CSSValueKeywords.h"
 #include "CSSValuePool.h"
 #include "HTMLNames.h"
-#include "StylePropertySet.h"
+#include "StyleProperties.h"
 
 namespace WebCore {
 
 using namespace HTMLNames;
 
-HTMLHRElement::HTMLHRElement(const QualifiedName& tagName, Document* document)
+HTMLHRElement::HTMLHRElement(const QualifiedName& tagName, Document& document)
     : HTMLElement(tagName, document)
 {
     ASSERT(hasTagName(hrTag));
 }
 
-PassRefPtr<HTMLHRElement> HTMLHRElement::create(Document* document)
+Ref<HTMLHRElement> HTMLHRElement::create(Document& document)
 {
-    return adoptRef(new HTMLHRElement(hrTag, document));
+    return adoptRef(*new HTMLHRElement(hrTag, document));
 }
 
-PassRefPtr<HTMLHRElement> HTMLHRElement::create(const QualifiedName& tagName, Document* document)
+Ref<HTMLHRElement> HTMLHRElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new HTMLHRElement(tagName, document));
+    return adoptRef(*new HTMLHRElement(tagName, document));
 }
 
 bool HTMLHRElement::isPresentationAttribute(const QualifiedName& name) const
@@ -57,13 +56,13 @@ bool HTMLHRElement::isPresentationAttribute(const QualifiedName& name) const
     return HTMLElement::isPresentationAttribute(name);
 }
 
-void HTMLHRElement::collectStyleForPresentationAttribute(const QualifiedName& name, const AtomicString& value, MutableStylePropertySet* style)
+void HTMLHRElement::collectStyleForPresentationAttribute(const QualifiedName& name, const AtomicString& value, MutableStyleProperties& style)
 {
     if (name == alignAttr) {
-        if (equalIgnoringCase(value, "left")) {
+        if (equalLettersIgnoringASCIICase(value, "left")) {
             addPropertyToPresentationAttributeStyle(style, CSSPropertyMarginLeft, 0, CSSPrimitiveValue::CSS_PX);
             addPropertyToPresentationAttributeStyle(style, CSSPropertyMarginRight, CSSValueAuto);
-        } else if (equalIgnoringCase(value, "right")) {
+        } else if (equalLettersIgnoringASCIICase(value, "right")) {
             addPropertyToPresentationAttributeStyle(style, CSSPropertyMarginLeft, CSSValueAuto);
             addPropertyToPresentationAttributeStyle(style, CSSPropertyMarginRight, 0, CSSPrimitiveValue::CSS_PX);
         } else {
@@ -82,11 +81,13 @@ void HTMLHRElement::collectStyleForPresentationAttribute(const QualifiedName& na
         addHTMLColorToStyle(style, CSSPropertyBorderColor, value);
         addHTMLColorToStyle(style, CSSPropertyBackgroundColor, value);
     } else if (name == noshadeAttr) {
-        addPropertyToPresentationAttributeStyle(style, CSSPropertyBorderStyle, CSSValueSolid);
+        if (!fastHasAttribute(colorAttr)) {
+            addPropertyToPresentationAttributeStyle(style, CSSPropertyBorderStyle, CSSValueSolid);
 
-        RefPtr<CSSPrimitiveValue> darkGrayValue = cssValuePool().createColorValue(Color::darkGray);
-        style->setProperty(CSSPropertyBorderColor, darkGrayValue);
-        style->setProperty(CSSPropertyBackgroundColor, darkGrayValue);
+            RefPtr<CSSPrimitiveValue> darkGrayValue = CSSValuePool::singleton().createColorValue(Color::darkGray);
+            style.setProperty(CSSPropertyBorderColor, darkGrayValue);
+            style.setProperty(CSSPropertyBackgroundColor, darkGrayValue);
+        }
     } else if (name == sizeAttr) {
         StringImpl* si = value.impl();
         int size = si->toInt();
@@ -96,6 +97,11 @@ void HTMLHRElement::collectStyleForPresentationAttribute(const QualifiedName& na
             addPropertyToPresentationAttributeStyle(style, CSSPropertyHeight, size - 2, CSSPrimitiveValue::CSS_PX);
     } else
         HTMLElement::collectStyleForPresentationAttribute(name, value, style);
+}
+
+bool HTMLHRElement::canContainRangeEndPoint() const
+{
+    return hasChildNodes() && HTMLElement::canContainRangeEndPoint();
 }
 
 }

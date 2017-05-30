@@ -34,8 +34,8 @@
 #include "WebPage.h"
 #include <WebCore/ContextMenu.h>
 #include <WebCore/Event.h>
-#include <WebCore/Frame.h>
 #include <WebCore/FrameLoader.h>
+#include <WebCore/MainFrame.h>
 #include <WebCore/NotImplemented.h>
 #include <WebCore/Page.h>
 #include <WebCore/UserGestureIndicator.h>
@@ -49,32 +49,13 @@ void WebContextMenuClient::contextMenuDestroyed()
     delete this;
 }
 
-#if USE(CROSS_PLATFORM_CONTEXT_MENUS)
-PassOwnPtr<ContextMenu> WebContextMenuClient::customizeMenu(PassOwnPtr<ContextMenu> menu)
-{
-    // WebKit2 ignores this client callback and does context menu customization when it is told to show the menu.
-    return menu;
-}
-#else
-PlatformMenuDescription WebContextMenuClient::getCustomMenuFromDefaultItems(ContextMenu* menu)
-{
-    // WebKit2 ignores this client callback and does context menu customization when it is told to show the menu.
-    return menu->platformDescription();
-}
-#endif
-
-void WebContextMenuClient::contextMenuItemSelected(ContextMenuItem*, const ContextMenu*)
-{
-    notImplemented();
-}
-
-void WebContextMenuClient::downloadURL(const KURL&)
+void WebContextMenuClient::downloadURL(const URL&)
 {
     // This is handled in the UI process.
     ASSERT_NOT_REACHED();
 }
 
-#if !PLATFORM(MAC)
+#if !PLATFORM(COCOA)
 void WebContextMenuClient::searchWithGoogle(const Frame* frame)
 {
     String searchString = frame->editor().selectedText();
@@ -86,7 +67,7 @@ void WebContextMenuClient::searchWithGoogle(const Frame* frame)
 
     if (Page* page = frame->page()) {
         UserGestureIndicator indicator(DefinitelyProcessingUserGesture);
-        page->mainFrame()->loader()->urlSelected(KURL(ParsedURLString, url), String(), 0, false, false, MaybeSendReferrer);
+        page->mainFrame().loader().urlSelected(URL(ParsedURLString, url), String(), 0, LockHistory::No, LockBackForwardList::No, MaybeSendReferrer, ShouldOpenExternalURLsPolicy::ShouldNotAllow);
     }
 }
 #endif

@@ -20,7 +20,6 @@
 #ifndef SVGLengthContext_h
 #define SVGLengthContext_h
 
-#if ENABLE(SVG)
 #include "FloatRect.h"
 #include "SVGUnitTypes.h"
 
@@ -28,6 +27,7 @@ namespace WebCore {
 
 class SVGElement;
 class SVGLength;
+struct Length;
 
 typedef int ExceptionCode;
 
@@ -65,10 +65,11 @@ public:
     static FloatPoint resolvePoint(const SVGElement*, SVGUnitTypes::SVGUnitType, const SVGLength& x, const SVGLength& y);
     static float resolveLength(const SVGElement*, SVGUnitTypes::SVGUnitType, const SVGLength&);
 
+    float valueForLength(const Length&, SVGLengthMode = LengthModeOther);
     float convertValueToUserUnits(float, SVGLengthMode, SVGLengthType fromUnit, ExceptionCode&) const;
     float convertValueFromUserUnits(float, SVGLengthMode, SVGLengthType toUnit, ExceptionCode&) const;
 
-    bool determineViewport(float& width, float& height) const;
+    bool determineViewport(FloatSize&) const;
 
 private:
     SVGLengthContext(const SVGElement*, const FloatRect& viewport);
@@ -88,5 +89,4 @@ private:
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif // SVGLengthContext_h

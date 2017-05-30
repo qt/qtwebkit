@@ -28,24 +28,25 @@
 
 #if ENABLE(JIT)
 
+#include "CodeBlock.h"
+#include "DFGCommonData.h"
 #include "Heap.h"
 #include "VM.h"
-#include "Operations.h"
+#include "JSCInlines.h"
 #include "SlotVisitor.h"
 #include "Structure.h"
 
 namespace JSC {
 
 GCAwareJITStubRoutine::GCAwareJITStubRoutine(
-    const MacroAssemblerCodeRef& code, VM& vm, bool isClosureCall)
+    const MacroAssemblerCodeRef& code, VM& vm)
     : JITStubRoutine(code)
     , m_mayBeExecuting(false)
     , m_isJettisoned(false)
-    , m_isClosureCall(isClosureCall)
 {
     vm.heap.m_jitStubRoutines.add(this);
 }
-    
+
 GCAwareJITStubRoutine::~GCAwareJITStubRoutine() { }
 
 void GCAwareJITStubRoutine::observeZeroRefCount()
@@ -95,28 +96,60 @@ void MarkingGCAwareJITStubRoutineWithOneObject::markRequiredObjectsInternal(Slot
     visitor.append(&m_object);
 }
 
-PassRefPtr<JITStubRoutine> createJITStubRoutine(
-    const MacroAssemblerCodeRef& code,
-    VM& vm,
-    const JSCell*,
-    bool makesCalls)
-{
-    if (!makesCalls)
-        return adoptRef(new JITStubRoutine(code));
 
-    return static_pointer_cast<JITStubRoutine>(
-        adoptRef(new GCAwareJITStubRoutine(code, vm)));
+GCAwareJITStubRoutineWithExceptionHandler::GCAwareJITStubRoutineWithExceptionHandler(
+    const MacroAssemblerCodeRef& code, VM& vm, 
+    CodeBlock* codeBlockForExceptionHandlers, CallSiteIndex exceptionHandlerCallSiteIndex)
+    : GCAwareJITStubRoutine(code, vm)
+    , m_codeBlockWithExceptionHandler(codeBlockForExceptionHandlers)
+    , m_exceptionHandlerCallSiteIndex(exceptionHandlerCallSiteIndex)
+{
+    RELEASE_ASSERT(m_codeBlockWithExceptionHandler);
+    ASSERT(!!m_codeBlockWithExceptionHandler->handlerForIndex(exceptionHandlerCallSiteIndex.bits()));
 }
+
+void GCAwareJITStubRoutineWithExceptionHandler::aboutToDie()
+{
+    m_codeBlockWithExceptionHandler = nullptr;
+}
+
+void GCAwareJITStubRoutineWithExceptionHandler::observeZeroRefCount()
+{
+#if ENABLE(DFG_JIT)
+    if (m_codeBlockWithExceptionHandler) {
+        m_codeBlockWithExceptionHandler->jitCode()->dfgCommon()->removeCallSiteIndex(m_exceptionHandlerCallSiteIndex);
+        m_codeBlockWithExceptionHandler->removeExceptionHandlerForCallSite(m_exceptionHandlerCallSiteIndex);
+        m_codeBlockWithExceptionHandler = nullptr;
+    }
+#endif
+
+    Base::observeZeroRefCount();
+}
+
 
 PassRefPtr<JITStubRoutine> createJITStubRoutine(
     const MacroAssemblerCodeRef& code,
     VM& vm,
     const JSCell* owner,
     bool makesCalls,
-    JSCell* object)
+    JSCell* object,
+    CodeBlock* codeBlockForExceptionHandlers,
+    CallSiteIndex exceptionHandlerCallSiteIndex)
 {
     if (!makesCalls)
         return adoptRef(new JITStubRoutine(code));
+    
+    if (codeBlockForExceptionHandlers) {
+        RELEASE_ASSERT(!object); // We're not a marking stub routine.
+        RELEASE_ASSERT(JITCode::isOptimizingJIT(codeBlockForExceptionHandlers->jitType()));
+        return static_pointer_cast<JITStubRoutine>(
+            adoptRef(new GCAwareJITStubRoutineWithExceptionHandler(code, vm, codeBlockForExceptionHandlers, exceptionHandlerCallSiteIndex)));
+    }
+
+    if (!object) {
+        return static_pointer_cast<JITStubRoutine>(
+            adoptRef(new GCAwareJITStubRoutine(code, vm)));
+    }
     
     return static_pointer_cast<JITStubRoutine>(
         adoptRef(new MarkingGCAwareJITStubRoutineWithOneObject(code, vm, owner, object)));

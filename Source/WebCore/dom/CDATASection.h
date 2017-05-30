@@ -27,20 +27,24 @@
 
 namespace WebCore {
 
-class CDATASection FINAL : public Text {
+class CDATASection final : public Text {
 public:
-    static PassRefPtr<CDATASection> create(Document*, const String&);
+    static Ref<CDATASection> create(Document&, const String&);
 
 private:
-    CDATASection(Document*, const String&);
+    CDATASection(Document&, const String&);
 
-    virtual String nodeName() const;
-    virtual NodeType nodeType() const;
-    virtual PassRefPtr<Node> cloneNode(bool deep);
-    virtual bool childTypeAllowed(NodeType) const;
-    virtual PassRefPtr<Text> virtualCreate(const String&);
+    virtual String nodeName() const override;
+    virtual NodeType nodeType() const override;
+    virtual Ref<Node> cloneNodeInternal(Document&, CloningOperation) override;
+    virtual bool childTypeAllowed(NodeType) const override;
+    virtual Ref<Text> virtualCreate(const String&) override;
 };
 
 } // namespace WebCore
+
+SPECIALIZE_TYPE_TRAITS_BEGIN(WebCore::CDATASection)
+    static bool isType(const WebCore::Node& node) { return node.nodeType() == WebCore::Node::CDATA_SECTION_NODE; }
+SPECIALIZE_TYPE_TRAITS_END()
 
 #endif // CDATASection_h

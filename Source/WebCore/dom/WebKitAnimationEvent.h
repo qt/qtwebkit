@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -31,25 +31,19 @@
 namespace WebCore {
 
 struct WebKitAnimationEventInit : public EventInit {
-    WebKitAnimationEventInit();
-
     String animationName;
-    double elapsedTime;
+    double elapsedTime { 0.0 };
 };
 
-class WebKitAnimationEvent : public Event {
+class WebKitAnimationEvent final : public Event {
 public:
-    static PassRefPtr<WebKitAnimationEvent> create()
+    static Ref<WebKitAnimationEvent> create(const AtomicString& type, const String& animationName, double elapsedTime)
     {
-        return adoptRef(new WebKitAnimationEvent);
+        return adoptRef(*new WebKitAnimationEvent(type, animationName, elapsedTime));
     }
-    static PassRefPtr<WebKitAnimationEvent> create(const AtomicString& type, const String& animationName, double elapsedTime)
+    static Ref<WebKitAnimationEvent> createForBindings(const AtomicString& type, const WebKitAnimationEventInit& initializer)
     {
-        return adoptRef(new WebKitAnimationEvent(type, animationName, elapsedTime));
-    }
-    static PassRefPtr<WebKitAnimationEvent> create(const AtomicString& type, const WebKitAnimationEventInit& initializer)
-    {
-        return adoptRef(new WebKitAnimationEvent(type, initializer));
+        return adoptRef(*new WebKitAnimationEvent(type, initializer));
     }
 
     virtual ~WebKitAnimationEvent();
@@ -57,10 +51,9 @@ public:
     const String& animationName() const;
     double elapsedTime() const;
 
-    virtual const AtomicString& interfaceName() const;
+    virtual EventInterface eventInterface() const override;
 
 private:
-    WebKitAnimationEvent();
     WebKitAnimationEvent(const AtomicString& type, const String& animationName, double elapsedTime);
     WebKitAnimationEvent(const AtomicString&, const WebKitAnimationEventInit&);
 

@@ -1,5 +1,6 @@
 /*
  * Copyright (C) Research In Motion Limited 2010, 2012. All rights reserved.
+ * Copyright (C) 2015 Apple Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -20,10 +21,8 @@
 #ifndef SVGPathUtilities_h
 #define SVGPathUtilities_h
 
-#if ENABLE(SVG)
 #include "SVGPathConsumer.h"
 #include "SVGPoint.h"
-#include <wtf/OwnPtr.h>
 #include <wtf/text/WTFString.h>
 
 namespace WebCore {
@@ -36,28 +35,32 @@ class SVGPathSegList;
 
 // String/SVGPathByteStream -> Path
 bool buildPathFromString(const String&, Path&);
-bool buildPathFromByteStream(SVGPathByteStream*, Path&);
+bool buildPathFromByteStream(const SVGPathByteStream&, Path&);
 
 // SVGPathSegList/String -> SVGPathByteStream
-bool buildSVGPathByteStreamFromSVGPathSegList(const SVGPathSegList&, SVGPathByteStream*, PathParsingMode);
-bool appendSVGPathByteStreamFromSVGPathSeg(PassRefPtr<SVGPathSeg>, SVGPathByteStream*, PathParsingMode);
-bool buildSVGPathByteStreamFromString(const String&, SVGPathByteStream*, PathParsingMode);
+bool buildSVGPathByteStreamFromSVGPathSegList(const SVGPathSegList&, SVGPathByteStream& result, PathParsingMode);
+bool appendSVGPathByteStreamFromSVGPathSeg(RefPtr<SVGPathSeg>&&, SVGPathByteStream&, PathParsingMode);
+bool buildSVGPathByteStreamFromString(const String&, SVGPathByteStream&, PathParsingMode);
 
 // SVGPathByteStream/SVGPathSegList -> String
-bool buildStringFromByteStream(SVGPathByteStream*, String&, PathParsingMode);
+bool buildStringFromByteStream(const SVGPathByteStream&, String&, PathParsingMode);
 bool buildStringFromSVGPathSegList(const SVGPathSegList&, String&, PathParsingMode);
 
 // SVGPathByteStream -> SVGPathSegList
-bool buildSVGPathSegListFromByteStream(SVGPathByteStream*, SVGPathElement*, SVGPathSegList&, PathParsingMode);
+bool buildSVGPathSegListFromByteStream(const SVGPathByteStream&, SVGPathElement&, SVGPathSegList&, PathParsingMode);
 
-bool buildAnimatedSVGPathByteStream(SVGPathByteStream*, SVGPathByteStream*, SVGPathByteStream*, float);
-bool addToSVGPathByteStream(SVGPathByteStream*, SVGPathByteStream*, unsigned repeatCount = 1);
+bool canBlendSVGPathByteStreams(const SVGPathByteStream& from, const SVGPathByteStream& to);
 
-bool getSVGPathSegAtLengthFromSVGPathByteStream(SVGPathByteStream*, float length, unsigned& pathSeg);
-bool getTotalLengthOfSVGPathByteStream(SVGPathByteStream*, float& totalLength);
-bool getPointAtLengthOfSVGPathByteStream(SVGPathByteStream*, float length, SVGPoint&);
+bool buildAnimatedSVGPathByteStream(const SVGPathByteStream& from, const SVGPathByteStream& to, SVGPathByteStream& result, float progress);
+bool addToSVGPathByteStream(SVGPathByteStream& streamToAppendTo, const SVGPathByteStream& from, unsigned repeatCount = 1);
+
+bool getSVGPathSegAtLengthFromSVGPathByteStream(const SVGPathByteStream&, float length, unsigned& pathSeg);
+bool getTotalLengthOfSVGPathByteStream(const SVGPathByteStream&, float& totalLength);
+bool getPointAtLengthOfSVGPathByteStream(const SVGPathByteStream&, float length, SVGPoint&);
+
+// Path -> String
+WEBCORE_EXPORT bool buildStringFromPath(const Path&, String&);
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif // SVGPathUtilities_h

@@ -33,22 +33,22 @@
 
 #include "ThreadableLoaderClient.h"
 #include <wtf/Noncopyable.h>
-#include <wtf/PassRefPtr.h>
+#include <wtf/Ref.h>
 #include <wtf/Threading.h>
 
 namespace WebCore {
 
 class ThreadableLoaderClientWrapper : public ThreadSafeRefCounted<ThreadableLoaderClientWrapper> {
 public:
-    static PassRefPtr<ThreadableLoaderClientWrapper> create(ThreadableLoaderClient* client)
+    static Ref<ThreadableLoaderClientWrapper> create(ThreadableLoaderClient* client)
     {
-        return adoptRef(new ThreadableLoaderClientWrapper(client));
+        return adoptRef(*new ThreadableLoaderClientWrapper(client));
     }
 
     void clearClient()
     {
         m_done = true;
-        m_client = 0;
+        m_client = nullptr;
     }
 
     bool done() const

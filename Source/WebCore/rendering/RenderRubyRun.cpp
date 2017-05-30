@@ -32,6 +32,7 @@
 
 #include "RenderRubyRun.h"
 
+#include "RenderRuby.h"
 #include "RenderRubyBase.h"
 #include "RenderRubyText.h"
 #include "RenderText.h"
@@ -39,12 +40,14 @@
 #include "StyleInheritedData.h"
 #include <wtf/StackStats.h>
 
-using namespace std;
-
 namespace WebCore {
 
-RenderRubyRun::RenderRubyRun()
-    : RenderBlock(0)
+using namespace std;
+
+RenderRubyRun::RenderRubyRun(Document& document, Ref<RenderStyle>&& style)
+    : RenderBlockFlow(document, WTFMove(style))
+    , m_lastCharacter(0)
+    , m_secondToLastCharacter(0)
 {
     setReplaced(true);
     setInline(true);
@@ -93,7 +96,7 @@ RenderRubyBase* RenderRubyRun::rubyBaseSafe()
     RenderRubyBase* base = rubyBase();
     if (!base) {
         base = createRubyBase();
-        RenderBlock::addChild(base);
+        RenderBlockFlow::addChild(base);
     }
     return base;
 }
@@ -107,9 +110,9 @@ void RenderRubyRun::updateFirstLetter()
 {
 }
 
-bool RenderRubyRun::isChildAllowed(RenderObject* child, RenderStyle*) const
+bool RenderRubyRun::isChildAllowed(const RenderObject& child, const RenderStyle&) const
 {
-    return child->isRubyText() || child->isInline();
+    return child.isInline() || child.isRubyText();
 }
 
 void RenderRubyRun::addChild(RenderObject* child, RenderObject* beforeChild)
@@ -121,27 +124,27 @@ void RenderRubyRun::addChild(RenderObject* child, RenderObject* beforeChild)
             // RenderRuby has already ascertained that we can add the child here.
             ASSERT(!hasRubyText());
             // prepend ruby texts as first child
-            RenderBlock::addChild(child, firstChild());
+            RenderBlockFlow::addChild(child, firstChild());
         }  else if (beforeChild->isRubyText()) {
             // New text is inserted just before another.
             // In this case the new text takes the place of the old one, and
             // the old text goes into a new run that is inserted as next sibling.
             ASSERT(beforeChild->parent() == this);
-            RenderObject* ruby = parent();
-            ASSERT(ruby->isRuby());
+            RenderElement* ruby = parent();
+            ASSERT(isRuby(ruby));
             RenderBlock* newRun = staticCreateRubyRun(ruby);
             ruby->addChild(newRun, nextSibling());
             // Add the new ruby text and move the old one to the new run
             // Note: Doing it in this order and not using RenderRubyRun's methods,
             // in order to avoid automatic removal of the ruby run in case there is no
             // other child besides the old ruby text.
-            RenderBlock::addChild(child, beforeChild);
-            RenderBlock::removeChild(beforeChild);
+            RenderBlockFlow::addChild(child, beforeChild);
+            RenderBlockFlow::removeChild(*beforeChild);
             newRun->addChild(beforeChild);
         } else if (hasRubyBase()) {
             // Insertion before a ruby base object.
             // In this case we need insert a new run before the current one and split the base.
-            RenderObject* ruby = parent();
+            RenderElement* ruby = parent();
             RenderRubyRun* newRun = staticCreateRubyRun(ruby);
             ruby->addChild(newRun, this);
             newRun->addChild(child);
@@ -156,43 +159,43 @@ void RenderRubyRun::addChild(RenderObject* child, RenderObject* beforeChild)
     }
 }
 
-void RenderRubyRun::removeChild(RenderObject* child)
+void RenderRubyRun::removeChild(RenderObject& child)
 {
     // If the child is a ruby text, then merge the ruby base with the base of
     // the right sibling run, if possible.
-    if (!beingDestroyed() && !documentBeingDestroyed() && child->isRubyText()) {
+    if (!beingDestroyed() && !documentBeingDestroyed() && child.isRubyText()) {
         RenderRubyBase* base = rubyBase();
         RenderObject* rightNeighbour = nextSibling();
-        if (base && rightNeighbour && rightNeighbour->isRubyRun()) {
+        if (base && is<RenderRubyRun>(rightNeighbour)) {
             // Ruby run without a base can happen only at the first run.
-            RenderRubyRun* rightRun = toRenderRubyRun(rightNeighbour);
-            if (rightRun->hasRubyBase()) {
-                RenderRubyBase* rightBase = rightRun->rubyBaseSafe();
+            RenderRubyRun& rightRun = downcast<RenderRubyRun>(*rightNeighbour);
+            if (rightRun.hasRubyBase()) {
+                RenderRubyBase* rightBase = rightRun.rubyBaseSafe();
                 // Collect all children in a single base, then swap the bases.
-                rightBase->moveChildren(base);
-                moveChildTo(rightRun, base);
-                rightRun->moveChildTo(this, rightBase);
+                rightBase->mergeChildrenWithBase(base);
+                moveChildTo(&rightRun, base);
+                rightRun.moveChildTo(this, rightBase);
                 // The now empty ruby base will be removed below.
                 ASSERT(!rubyBase()->firstChild());
             }
         }
     }
 
-    RenderBlock::removeChild(child);
+    RenderBlockFlow::removeChild(child);
 
     if (!beingDestroyed() && !documentBeingDestroyed()) {
         // Check if our base (if any) is now empty. If so, destroy it.
         RenderBlock* base = rubyBase();
         if (base && !base->firstChild()) {
-            RenderBlock::removeChild(base);
-            base->deleteLineBoxTree();
+            RenderBlockFlow::removeChild(*base);
+            base->deleteLines();
             base->destroy();
         }
 
         // If any of the above leaves the run empty, destroy it as well.
         if (isEmpty()) {
-            parent()->removeChild(this);
-            deleteLineBoxTree();
+            parent()->removeChild(*this);
+            deleteLines();
             destroy();
         }
     }
@@ -200,21 +203,19 @@ void RenderRubyRun::removeChild(RenderObject* child)
 
 RenderRubyBase* RenderRubyRun::createRubyBase() const
 {
-    RenderRubyBase* renderer = RenderRubyBase::createAnonymous(document());
-    RefPtr<RenderStyle> newStyle = RenderStyle::createAnonymousStyleWithDisplay(style(), BLOCK);
-    newStyle->setTextAlign(CENTER); // FIXME: use WEBKIT_CENTER?
-    renderer->setStyle(newStyle.release());
+    auto newStyle = RenderStyle::createAnonymousStyleWithDisplay(&style(), BLOCK);
+    newStyle.get().setTextAlign(CENTER); // FIXME: use WEBKIT_CENTER?
+    auto renderer = new RenderRubyBase(document(), WTFMove(newStyle));
+    renderer->initializeStyle();
     return renderer;
 }
 
 RenderRubyRun* RenderRubyRun::staticCreateRubyRun(const RenderObject* parentRuby)
 {
-    ASSERT(parentRuby && parentRuby->isRuby());
-    RenderRubyRun* rr = new (parentRuby->renderArena()) RenderRubyRun();
-    rr->setDocumentForAnonymous(parentRuby->document());
-    RefPtr<RenderStyle> newStyle = RenderStyle::createAnonymousStyleWithDisplay(parentRuby->style(), INLINE_BLOCK);
-    rr->setStyle(newStyle.release());
-    return rr;
+    ASSERT(isRuby(parentRuby));
+    auto renderer = new RenderRubyRun(parentRuby->document(), RenderStyle::createAnonymousStyleWithDisplay(&parentRuby->style(), INLINE_BLOCK));
+    renderer->initializeStyle();
+    return renderer;
 }
 
 RenderObject* RenderRubyRun::layoutSpecialExcludedChild(bool relayoutChildren)
@@ -225,14 +226,17 @@ RenderObject* RenderRubyRun::layoutSpecialExcludedChild(bool relayoutChildren)
     if (!rt)
         return 0;
     if (relayoutChildren)
-        rt->setChildNeedsLayout(true, MarkOnlyThis);
+        rt->setChildNeedsLayout(MarkOnlyThis);
     rt->layoutIfNeeded();
     return rt;
 }
 
 void RenderRubyRun::layout()
 {
-    RenderBlock::layout();
+    if (RenderRubyBase* base = rubyBase())
+        base->reset();
+
+    RenderBlockFlow::layout();
     
     RenderRubyText* rt = rubyText();
     if (!rt)
@@ -249,8 +253,28 @@ void RenderRubyRun::layout()
         firstLineRubyTextTop = rt->firstRootBox()->logicalTopLayoutOverflow();
         lastLineRubyTextBottom = rootBox->logicalBottomLayoutOverflow();
     }
-
-    if (style()->isFlippedLinesWritingMode() == (style()->rubyPosition() == RubyPositionAfter)) {
+    
+    if (isHorizontalWritingMode() && rt->style().rubyPosition() == RubyPositionInterCharacter) {
+        // Bopomofo. We need to move the RenderRubyText over to the right side and center it
+        // vertically relative to the base.
+        const FontCascade& font = style().fontCascade();
+        float distanceBetweenBase = max(font.letterSpacing(), 2.0f * rt->style().fontCascade().fontMetrics().height());
+        setWidth(width() + distanceBetweenBase - font.letterSpacing());
+        if (RenderRubyBase* rb = rubyBase()) {
+            LayoutUnit firstLineTop = 0;
+            LayoutUnit lastLineBottom = logicalHeight();
+            RootInlineBox* rootBox = rb->firstRootBox();
+            if (rootBox)
+                firstLineTop = rootBox->logicalTopLayoutOverflow();
+            firstLineTop += rb->logicalTop();
+            if (rootBox)
+                lastLineBottom = rootBox->logicalBottomLayoutOverflow();
+            lastLineBottom += rb->logicalTop();
+            rt->setX(rb->x() + rb->width() - font.letterSpacing());
+            LayoutUnit extent = lastLineBottom - firstLineTop;
+            rt->setY(firstLineTop + (extent - rt->height()) / 2);
+        }
+    } else if (style().isFlippedLinesWritingMode() == (style().rubyPosition() == RubyPositionAfter)) {
         LayoutUnit firstLineTop = 0;
         if (RenderRubyBase* rb = rubyBase()) {
             RootInlineBox* rootBox = rb->firstRootBox();
@@ -276,7 +300,16 @@ void RenderRubyRun::layout()
     computeOverflow(clientLogicalBottom());
 }
 
-void RenderRubyRun::getOverhang(bool firstLine, RenderObject* startRenderer, RenderObject* endRenderer, int& startOverhang, int& endOverhang) const
+static bool shouldOverhang(bool firstLine, const RenderObject* renderer, const RenderRubyBase& rubyBase)
+{
+    if (!renderer || !renderer->isText())
+        return false;
+    const RenderStyle& rubyBaseStyle = firstLine ? rubyBase.firstLineStyle() : rubyBase.style();
+    const RenderStyle& style = firstLine ? renderer->firstLineStyle() : renderer->style();
+    return style.fontSize() <= rubyBaseStyle.fontSize();
+}
+
+void RenderRubyRun::getOverhang(bool firstLine, RenderObject* startRenderer, RenderObject* endRenderer, float& startOverhang, float& endOverhang) const
 {
     ASSERT(!needsLayout());
 
@@ -292,31 +325,44 @@ void RenderRubyRun::getOverhang(bool firstLine, RenderObject* startRenderer, Ren
     if (!rubyBase->firstRootBox())
         return;
 
-    int logicalWidth = this->logicalWidth();
-    int logicalLeftOverhang = numeric_limits<int>::max();
-    int logicalRightOverhang = numeric_limits<int>::max();
+    LayoutUnit logicalWidth = this->logicalWidth();
+    float logicalLeftOverhang = std::numeric_limits<float>::max();
+    float logicalRightOverhang = std::numeric_limits<float>::max();
     for (RootInlineBox* rootInlineBox = rubyBase->firstRootBox(); rootInlineBox; rootInlineBox = rootInlineBox->nextRootBox()) {
-        logicalLeftOverhang = min<int>(logicalLeftOverhang, rootInlineBox->logicalLeft());
-        logicalRightOverhang = min<int>(logicalRightOverhang, logicalWidth - rootInlineBox->logicalRight());
+        logicalLeftOverhang = std::min<float>(logicalLeftOverhang, rootInlineBox->logicalLeft());
+        logicalRightOverhang = std::min<float>(logicalRightOverhang, logicalWidth - rootInlineBox->logicalRight());
     }
 
-    startOverhang = style()->isLeftToRightDirection() ? logicalLeftOverhang : logicalRightOverhang;
-    endOverhang = style()->isLeftToRightDirection() ? logicalRightOverhang : logicalLeftOverhang;
+    startOverhang = style().isLeftToRightDirection() ? logicalLeftOverhang : logicalRightOverhang;
+    endOverhang = style().isLeftToRightDirection() ? logicalRightOverhang : logicalLeftOverhang;
 
-    if (!startRenderer || !startRenderer->isText() || startRenderer->style(firstLine)->fontSize() > rubyBase->style(firstLine)->fontSize())
+    if (!shouldOverhang(firstLine, startRenderer, *rubyBase))
         startOverhang = 0;
-
-    if (!endRenderer || !endRenderer->isText() || endRenderer->style(firstLine)->fontSize() > rubyBase->style(firstLine)->fontSize())
+    if (!shouldOverhang(firstLine, endRenderer, *rubyBase))
         endOverhang = 0;
 
     // We overhang a ruby only if the neighboring render object is a text.
     // We can overhang the ruby by no more than half the width of the neighboring text
     // and no more than half the font size.
-    int halfWidthOfFontSize = rubyText->style(firstLine)->fontSize() / 2;
+    const RenderStyle& rubyTextStyle = firstLine ? rubyText->firstLineStyle() : rubyText->style();
+    float halfWidthOfFontSize = rubyTextStyle.fontSize() / 2.;
     if (startOverhang)
-        startOverhang = min<int>(startOverhang, min<int>(toRenderText(startRenderer)->minLogicalWidth(), halfWidthOfFontSize));
+        startOverhang = std::min(startOverhang, std::min(downcast<RenderText>(*startRenderer).minLogicalWidth(), halfWidthOfFontSize));
     if (endOverhang)
-        endOverhang = min<int>(endOverhang, min<int>(toRenderText(endRenderer)->minLogicalWidth(), halfWidthOfFontSize));
+        endOverhang = std::min(endOverhang, std::min(downcast<RenderText>(*endRenderer).minLogicalWidth(), halfWidthOfFontSize));
+}
+
+void RenderRubyRun::updatePriorContextFromCachedBreakIterator(LazyLineBreakIterator& iterator) const
+{
+    iterator.setPriorContext(m_lastCharacter, m_secondToLastCharacter);
+}
+
+bool RenderRubyRun::canBreakBefore(const LazyLineBreakIterator& iterator) const
+{
+    RenderRubyText* rubyText = this->rubyText();
+    if (!rubyText)
+        return true;
+    return rubyText->canBreakBefore(iterator);
 }
 
 } // namespace WebCore

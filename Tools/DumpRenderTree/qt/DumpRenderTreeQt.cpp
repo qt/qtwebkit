@@ -64,6 +64,7 @@
 #include <QPrinter>
 #endif
 #include <QProgressBar>
+#include <QRegExp>
 #include <QUndoStack>
 #include <QUrl>
 #include <limits.h>
@@ -109,18 +110,18 @@ void NetworkAccessManager::sslErrorsEncountered(QNetworkReply* reply, const QLis
 
 
 #if !defined(QT_NO_PRINTER) && HAVE(QTPRINTSUPPORT)
-class NullPrinter : public QPrinter {
+class NullPrinter final : public QPrinter {
 public:
     class NullPaintEngine : public QPaintEngine {
     public:
-        virtual bool begin(QPaintDevice*) { return true; }
-        virtual bool end() { return true; }
-        virtual QPaintEngine::Type type() const { return QPaintEngine::User; }
-        virtual void drawPixmap(const QRectF& r, const QPixmap& pm, const QRectF& sr) { }
-        virtual void updateState(const QPaintEngineState& state) { }
+        bool begin(QPaintDevice*) final { return true; }
+        bool end() final { return true; }
+        QPaintEngine::Type type() const final { return QPaintEngine::User; }
+        void drawPixmap(const QRectF& r, const QPixmap& pm, const QRectF& sr) final { }
+        void updateState(const QPaintEngineState& state) final { }
     };
 
-    virtual QPaintEngine* paintEngine() const { return const_cast<NullPaintEngine*>(&m_engine); }
+    QPaintEngine* paintEngine() const final { return const_cast<NullPaintEngine*>(&m_engine); }
 
     NullPaintEngine m_engine;
 };
@@ -155,6 +156,8 @@ WebPage::WebPage(QObject* parent, DumpRenderTree* drt)
 
     connect(this, SIGNAL(featurePermissionRequested(QWebFrame*, QWebPage::Feature)), this, SLOT(requestPermission(QWebFrame*, QWebPage::Feature)));
     connect(this, SIGNAL(featurePermissionRequestCanceled(QWebFrame*, QWebPage::Feature)), this, SLOT(cancelPermission(QWebFrame*, QWebPage::Feature)));
+
+    connect(this, &QWebPage::fullScreenRequested, this, &WebPage::requestFullScreen);
 }
 
 WebPage::~WebPage()
@@ -191,6 +194,7 @@ void WebPage::resetSettings()
     settings()->resetAttribute(QWebSettings::CSSRegionsEnabled);
     settings()->resetAttribute(QWebSettings::CSSGridLayoutEnabled);
     settings()->resetAttribute(QWebSettings::AcceleratedCompositingEnabled);
+    settings()->resetAttribute(QWebSettings::FullScreenSupportEnabled);
 
     m_drt->testRunner()->setCaretBrowsingEnabled(false);
     m_drt->testRunner()->setAuthorAndUserStylesEnabled(true);
@@ -201,8 +205,6 @@ void WebPage::resetSettings()
 
     QWebSettings::setMaximumPagesInCache(0); // reset to default
     settings()->setUserStyleSheetUrl(QUrl()); // reset to default
-
-    DumpRenderTreeSupportQt::setSeamlessIFramesEnabled(true);
 
     DumpRenderTreeSupportQt::resetInternalsObject(mainFrame()->handle());
 
@@ -275,6 +277,12 @@ void WebPage::permissionSet(QWebPage::Feature feature)
     }
 }
 
+void WebPage::requestFullScreen(QWebFullScreenRequest request)
+{
+    request.accept();
+}
+
+// FIXME (119591): Make this match other platforms better.
 static QString urlSuitableForTestResult(const QString& url)
 {
     if (url.isEmpty() || !url.startsWith(QLatin1String("file://")))
@@ -292,7 +300,7 @@ void WebPage::javaScriptConsoleMessage(const QString& message, int lineNumber, c
     if (!message.isEmpty()) {
         newMessage = message;
 
-        size_t fileProtocol = newMessage.indexOf(QLatin1String("file://"));
+        int fileProtocol = newMessage.indexOf(QLatin1String("file://"));
         if (fileProtocol != -1) {
             newMessage = newMessage.left(fileProtocol) + urlSuitableForTestResult(newMessage.mid(fileProtocol));
         }
@@ -567,8 +575,8 @@ void DumpRenderTree::resetToConsistentStateBeforeTesting(const QUrl& url)
         m_page->setNetworkAccessManager(m_networkAccessManager);
     }
 
-    WorkQueue::shared()->clear();
-    WorkQueue::shared()->setFrozen(false);
+    WorkQueue::singleton().clear();
+    WorkQueue::singleton().setFrozen(false);
 
     DumpRenderTreeSupportQt::resetOriginAccessWhiteLists();
 
@@ -772,8 +780,7 @@ void DumpRenderTree::initJSObjects()
                                                                                    "    }\n"
                                                                                    "for (var prop in this.jscBasedTestRunner) {\n"
                                                                                    "    var pd = Object.getOwnPropertyDescriptor(this.qtBasedTestRunner, prop);\n"
-                                                                                   "    if (pd !== undefined) continue;\n"
-                                                                                   "    pd = Object.getOwnPropertyDescriptor(this.jscBasedTestRunner, prop);\n"
+                                                                                   "    if (pd !== undefined && (pd.writable === false || pd.configurable === false)) continue;\n"
                                                                                    "    this.qtBasedTestRunner[prop] = bind(this.jscBasedTestRunner[prop], this.jscBasedTestRunner);\n"
                                                                                    "}\n"
                                                                                    "}).apply(this)\n"));
@@ -869,19 +876,25 @@ static QString dumpHistoryItem(const QWebHistoryItem& item, int indent, bool cur
     for (int i = start; i < indent; i++)
         result.append(' ');
 
-    QString url = item.url().toString();
-    if (url.contains("file://")) {
+    QUrl url = item.url();
+    QString urlString;
+    if (url.scheme() == "data")
+        urlString = url.toString(QUrl::DecodeReserved);
+    else
+        urlString = url.toString();
+
+    if (urlString.contains("file://")) {
         static QString layoutTestsString("/LayoutTests/");
         static QString fileTestString("(file test):");
 
-        QString res = url.mid(url.indexOf(layoutTestsString) + layoutTestsString.length());
+        QString res = urlString.mid(urlString.indexOf(layoutTestsString) + layoutTestsString.length());
         if (res.isEmpty())
             return result;
 
         result.append(fileTestString);
         result.append(res);
     } else {
-        result.append(url);
+        result.append(urlString);
     }
 
     QString target = DumpRenderTreeSupportQt::historyItemTarget(item);
@@ -1001,18 +1014,22 @@ void DumpRenderTree::dump()
     fputs("#EOF\n", stderr);
 
     if (m_dumpPixelsForCurrentTest && m_jscController->generatePixelResults()) {
+        // Should use the same render hints as default QWebView/QGraphicsWebView
+        QPainter::RenderHints renderHints(QPainter::TextAntialiasing | QPainter::SmoothPixmapTransform);
+
         QImage image;
         if (!m_jscController->isPrinting()) {
             image = QImage(m_page->viewportSize(), QImage::Format_ARGB32);
             image.fill(Qt::white);
             QPainter painter(&image);
+            painter.setRenderHints(renderHints);
             mainFrame->render(&painter);
             painter.end();
         } else
             image = DumpRenderTreeSupportQt::paintPagesWithBoundaries(mainFrame->handle());
 
         if (DumpRenderTreeSupportQt::trackRepaintRects(mainFrameAdapter())) {
-            QVector<QRect> repaintRects;
+            QVector<QRectF> repaintRects;
             DumpRenderTreeSupportQt::getTrackedRepaintRects(mainFrameAdapter(), repaintRects);
             QImage mask(image.size(), image.format());
             mask.fill(QColor(0, 0, 0, 0.66 * 255));
@@ -1023,6 +1040,7 @@ void DumpRenderTree::dump()
                 maskPainter.fillRect(repaintRects[i], Qt::transparent);
 
             QPainter painter(&image);
+            painter.setRenderHints(renderHints);
             painter.drawImage(image.rect(), mask);
 
             DumpRenderTreeSupportQt::setTrackRepaintRects(mainFrameAdapter(), false);

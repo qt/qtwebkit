@@ -36,35 +36,35 @@
 
 namespace WebKit {
 
-class WebContext;
+class WebProcessPool;
 class WebBatteryStatus;
 
-class WebBatteryManagerProxy : public TypedAPIObject<APIObject::TypeBatteryManager>, public WebContextSupplement, private CoreIPC::MessageReceiver {
+class WebBatteryManagerProxy : public API::ObjectImpl<API::Object::Type::BatteryManager>, public WebContextSupplement, private IPC::MessageReceiver {
 public:
     static const char* supplementName();
 
-    static PassRefPtr<WebBatteryManagerProxy> create(WebContext*);
+    static Ref<WebBatteryManagerProxy> create(WebProcessPool*);
     virtual ~WebBatteryManagerProxy();
 
-    void initializeProvider(const WKBatteryProvider*);
+    void initializeProvider(const WKBatteryProviderBase*);
 
     void providerDidChangeBatteryStatus(const WTF::AtomicString&, WebBatteryStatus*);
     void providerUpdateBatteryStatus(WebBatteryStatus*);
 
-    using APIObject::ref;
-    using APIObject::deref;
+    using API::Object::ref;
+    using API::Object::deref;
 
 private:
-    explicit WebBatteryManagerProxy(WebContext*);
+    explicit WebBatteryManagerProxy(WebProcessPool*);
 
     // WebContextSupplement
-    virtual void contextDestroyed() OVERRIDE;
-    virtual void processDidClose(WebProcessProxy*) OVERRIDE;
-    virtual void refWebContextSupplement() OVERRIDE;
-    virtual void derefWebContextSupplement() OVERRIDE;
+    virtual void processPoolDestroyed() override;
+    virtual void processDidClose(WebProcessProxy*) override;
+    virtual void refWebContextSupplement() override;
+    virtual void derefWebContextSupplement() override;
 
-    // CoreIPC::MessageReceiver
-    virtual void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&) OVERRIDE;
+    // IPC::MessageReceiver
+    virtual void didReceiveMessage(IPC::Connection&, IPC::MessageDecoder&) override;
 
     void startUpdating();
     void stopUpdating();

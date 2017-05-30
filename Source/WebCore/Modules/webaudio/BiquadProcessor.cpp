@@ -32,7 +32,7 @@
 
 namespace WebCore {
     
-BiquadProcessor::BiquadProcessor(AudioContext* context, float sampleRate, size_t numberOfChannels, bool autoInitialize)
+BiquadProcessor::BiquadProcessor(AudioContext& context, float sampleRate, size_t numberOfChannels, bool autoInitialize)
     : AudioDSPKernelProcessor(sampleRate, numberOfChannels)
     , m_type(LowPass)
     , m_parameter1(0)
@@ -60,9 +60,9 @@ BiquadProcessor::~BiquadProcessor()
         uninitialize();
 }
 
-PassOwnPtr<AudioDSPKernel> BiquadProcessor::createKernel()
+std::unique_ptr<AudioDSPKernel> BiquadProcessor::createKernel()
 {
-    return adoptPtr(new BiquadDSPKernel(this));
+    return std::make_unique<BiquadDSPKernel>(this);
 }
 
 void BiquadProcessor::checkForDirtyCoefficients()
@@ -128,7 +128,7 @@ void BiquadProcessor::getFrequencyResponse(int nFrequencies,
     // to avoid interfering with the processing running in the audio
     // thread on the main kernels.
     
-    OwnPtr<BiquadDSPKernel> responseKernel = adoptPtr(new BiquadDSPKernel(this));
+    auto responseKernel = std::make_unique<BiquadDSPKernel>(this);
 
     responseKernel->getFrequencyResponse(nFrequencies, frequencyHz, magResponse, phaseResponse);
 }

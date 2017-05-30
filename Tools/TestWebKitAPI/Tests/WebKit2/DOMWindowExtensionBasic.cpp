@@ -24,10 +24,13 @@
  */
 
 #include "config.h"
+
+#if WK_HAVE_C_SPI
+
 #include "PlatformUtilities.h"
 #include "PlatformWebView.h"
 #include "Test.h"
-#include <WebKit2/WKRetainPtr.h>
+#include <WebKit/WKRetainPtr.h>
 #include <wtf/Vector.h>
 
 namespace TestWebKitAPI {
@@ -83,12 +86,13 @@ TEST(WebKit2, DISABLED_DOMWindowExtensionBasic)
 
     WKRetainPtr<WKContextRef> context(AdoptWK, Util::createContextForInjectedBundleTest("DOMWindowExtensionBasic", pageGroup.get()));
 
-    WKContextInjectedBundleClient injectedBundleClient;
+    WKContextInjectedBundleClientV0 injectedBundleClient;
     memset(&injectedBundleClient, 0, sizeof(injectedBundleClient));
-    injectedBundleClient.version = 0;
-    injectedBundleClient.clientInfo = 0;
+
+    injectedBundleClient.base.version = 0;
     injectedBundleClient.didReceiveMessageFromInjectedBundle = didReceiveMessageFromInjectedBundle;
-    WKContextSetInjectedBundleClient(context.get(), &injectedBundleClient);
+
+    WKContextSetInjectedBundleClient(context.get(), &injectedBundleClient.base);
     
     // The default cache model has a capacity of 0, so it is necessary to switch to a cache
     // model that actually allows for a page cache.
@@ -132,3 +136,5 @@ TEST(WebKit2, DISABLED_DOMWindowExtensionBasic)
 }
 
 } // namespace TestWebKitAPI
+
+#endif

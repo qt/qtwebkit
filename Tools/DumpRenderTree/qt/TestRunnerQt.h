@@ -51,7 +51,7 @@ class QWebFrame;
 class DumpRenderTreeSupportQt;
 class DumpRenderTree;
 
-class TestRunnerQt : public QObject {
+class TestRunnerQt final : public QObject {
     Q_OBJECT
     Q_PROPERTY(int webHistoryItemCount READ webHistoryItemCount)
     Q_PROPERTY(bool globalFlag READ globalFlag WRITE setGlobalFlag)
@@ -72,7 +72,7 @@ public:
     void setShouldTimeout(bool flag) { m_shouldTimeout = flag; }
 
 protected:
-    void timerEvent(QTimerEvent*);
+    void timerEvent(QTimerEvent*) final;
 
 Q_SIGNALS:
     void done();
@@ -125,7 +125,7 @@ public Q_SLOTS:
     void setDeveloperExtrasEnabled(bool);
     void showWebInspector();
     void closeWebInspector();
-    void evaluateInWebInspector(long callId, const QString& script);
+    void evaluateInWebInspector(const QString& script);
     void removeAllVisitedLinks();
     void setAllowUniversalAccessFromFileURLs(bool enable);
     void setAllowFileAccessFromFileURLs(bool enable);

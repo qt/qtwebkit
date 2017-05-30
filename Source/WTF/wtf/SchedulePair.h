@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -30,23 +30,23 @@
 #define SchedulePair_h
 
 #include <wtf/HashSet.h>
-#include <wtf/RefCounted.h>
 #include <wtf/RetainPtr.h>
+#include <wtf/ThreadSafeRefCounted.h>
 #include <wtf/text/StringHash.h>
 #include <wtf/text/WTFString.h>
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA) && !USE(CFNETWORK)
 OBJC_CLASS NSRunLoop;
 #endif
 
 namespace WTF {
 
-class SchedulePair : public RefCounted<SchedulePair> {
+class SchedulePair : public ThreadSafeRefCounted<SchedulePair> {
 public:
-    static PassRefPtr<SchedulePair> create(CFRunLoopRef runLoop, CFStringRef mode) { return adoptRef(new SchedulePair(runLoop, mode)); }
+    static Ref<SchedulePair> create(CFRunLoopRef runLoop, CFStringRef mode) { return adoptRef(*new SchedulePair(runLoop, mode)); }
 
-#if PLATFORM(MAC) && !USE(CFNETWORK)
-    static PassRefPtr<SchedulePair> create(NSRunLoop* runLoop, CFStringRef mode) { return adoptRef(new SchedulePair(runLoop, mode)); }
+#if PLATFORM(COCOA) && !USE(CFNETWORK)
+    static Ref<SchedulePair> create(NSRunLoop* runLoop, CFStringRef mode) { return adoptRef(*new SchedulePair(runLoop, mode)); }
     NSRunLoop* nsRunLoop() const { return m_nsRunLoop.get(); }
 #endif
 
@@ -63,7 +63,7 @@ private:
             m_mode = adoptCF(CFStringCreateCopy(0, mode));
     }
 
-#if PLATFORM(MAC) && !USE(CFNETWORK)
+#if PLATFORM(COCOA) && !USE(CFNETWORK)
     WTF_EXPORT_PRIVATE SchedulePair(NSRunLoop*, CFStringRef);
     RetainPtr<NSRunLoop*> m_nsRunLoop;
 #endif

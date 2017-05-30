@@ -26,12 +26,14 @@
 #ifndef LayerTreeHost_h
 #define LayerTreeHost_h
 
+#if USE(COORDINATED_GRAPHICS) || USE(TEXTURE_MAPPER)
+
 #include "LayerTreeContext.h"
 #include <WebCore/Color.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
 
-namespace CoreIPC {
+namespace IPC {
 class Connection;
 class MessageDecoder;
 }
@@ -43,11 +45,13 @@ class IntRect;
 class IntSize;
 class GraphicsLayer;
 class GraphicsLayerFactory;
+#if USE(COORDINATED_GRAPHICS_THREADED)
+struct ViewportAttributes;
+#endif
 }
 
 namespace WebKit {
 
-class PageOverlay;
 class UpdateInfo;
 class WebPage;
 
@@ -55,8 +59,6 @@ class LayerTreeHost : public RefCounted<LayerTreeHost> {
 public:
     static PassRefPtr<LayerTreeHost> create(WebPage*);
     virtual ~LayerTreeHost();
-
-    static bool supportsAcceleratedCompositing();
 
     virtual const LayerTreeContext& layerTreeContext() = 0;
     virtual void scheduleLayerFlush() = 0;
@@ -74,47 +76,38 @@ public:
     virtual void deviceOrPageScaleFactorChanged() = 0;
     virtual void pageBackgroundTransparencyChanged() = 0;
 
-    virtual void didInstallPageOverlay(PageOverlay*) = 0;
-    virtual void didUninstallPageOverlay(PageOverlay*) = 0;
-    virtual void setPageOverlayNeedsDisplay(PageOverlay*, const WebCore::IntRect&) = 0;
-    virtual void setPageOverlayOpacity(PageOverlay*, float) { }
-    virtual bool pageOverlayShouldApplyFadeWhenPainting() const { return true; }
-
     virtual void pauseRendering() { }
     virtual void resumeRendering() { }
 
     virtual WebCore::GraphicsLayerFactory* graphicsLayerFactory() { return 0; }
-    virtual void setBackgroundColor(const WebCore::Color&) { }
 
-#if USE(COORDINATED_GRAPHICS)
-    virtual void didReceiveCoordinatedLayerTreeHostMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&) = 0;
+#if USE(COORDINATED_GRAPHICS_MULTIPROCESS)
+    virtual void didReceiveCoordinatedLayerTreeHostMessage(IPC::Connection&, IPC::MessageDecoder&) = 0;
 #endif
 
-#if PLATFORM(MAC)
-    virtual void setLayerHostingMode(LayerHostingMode) { }
+#if USE(COORDINATED_GRAPHICS_THREADED)
+    virtual void viewportSizeChanged(const WebCore::IntSize&) = 0;
+    virtual void didChangeViewportProperties(const WebCore::ViewportAttributes&) = 0;
 #endif
 
 #if USE(COORDINATED_GRAPHICS) && ENABLE(REQUEST_ANIMATION_FRAME)
     virtual void scheduleAnimation() = 0;
 #endif
 
+#if USE(TEXTURE_MAPPER) && PLATFORM(GTK)
+    virtual void setNativeSurfaceHandleForCompositing(uint64_t) = 0;
+#endif
+
+    virtual void setViewOverlayRootLayer(WebCore::GraphicsLayer*) = 0;
+
 protected:
     explicit LayerTreeHost(WebPage*);
 
     WebPage* m_webPage;
-
-#if USE(COORDINATED_GRAPHICS)
-    bool m_waitingForUIProcess;
-#endif
 };
 
-#if !USE(COORDINATED_GRAPHICS)
-inline bool LayerTreeHost::supportsAcceleratedCompositing()
-{
-    return true;
-}
-#endif
-
 } // namespace WebKit
+
+#endif // USE(COORDINATED_GRAPHICS) || USE(TEXTURE_MAPPER)
 
 #endif // LayerTreeHost_h

@@ -33,12 +33,9 @@
 #include "Element.h"
 #include "Frame.h"
 #include "HTMLNames.h"
+#include "SVGNames.h"
 #include "Text.h"
 #include <wtf/text/WTFString.h>
-
-#if ENABLE(SVG)
-#include "SVGNames.h"
-#endif
 
 namespace WebCore {
 
@@ -87,23 +84,23 @@ void XMLErrors::appendErrorMessage(const String& typeString, TextPosition positi
     m_errorMessages.append(message);
 }
 
-static inline PassRefPtr<Element> createXHTMLParserErrorHeader(Document* doc, const String& errorMessages)
+static inline Ref<Element> createXHTMLParserErrorHeader(Document* doc, const String& errorMessages)
 {
-    RefPtr<Element> reportElement = doc->createElement(QualifiedName(nullAtom, "parsererror", xhtmlNamespaceURI), true);
+    Ref<Element> reportElement = doc->createElement(QualifiedName(nullAtom, "parsererror", xhtmlNamespaceURI), true);
 
     Vector<Attribute> reportAttributes;
     reportAttributes.append(Attribute(styleAttr, "display: block; white-space: pre; border: 2px solid #c77; padding: 0 1em 0 1em; margin: 1em; background-color: #fdd; color: black"));
     reportElement->parserSetAttributes(reportAttributes);
 
-    RefPtr<Element> h3 = doc->createElement(h3Tag, true);
-    reportElement->parserAppendChild(h3.get());
+    auto h3 = doc->createElement(h3Tag, true);
+    reportElement->parserAppendChild(h3.copyRef());
     h3->parserAppendChild(doc->createTextNode("This page contains the following errors:"));
 
-    RefPtr<Element> fixed = doc->createElement(divTag, true);
+    auto fixed = doc->createElement(divTag, true);
     Vector<Attribute> fixedAttributes;
     fixedAttributes.append(Attribute(styleAttr, "font-family:monospace;font-size:12px"));
     fixed->parserSetAttributes(fixedAttributes);
-    reportElement->parserAppendChild(fixed.get());
+    reportElement->parserAppendChild(fixed.copyRef());
 
     fixed->parserAppendChild(doc->createTextNode(errorMessages));
 
@@ -111,7 +108,7 @@ static inline PassRefPtr<Element> createXHTMLParserErrorHeader(Document* doc, co
     reportElement->parserAppendChild(h3.get());
     h3->parserAppendChild(doc->createTextNode("Below is a rendering of the page up to the first error."));
 
-    return reportElement.release();
+    return reportElement;
 }
 
 void XMLErrors::insertErrorMessageBlock()
@@ -123,58 +120,50 @@ void XMLErrors::insertErrorMessageBlock()
     // Create elements for display
     RefPtr<Element> documentElement = m_document->documentElement();
     if (!documentElement) {
-        RefPtr<Element> rootElement = m_document->createElement(htmlTag, true);
-        RefPtr<Element> body = m_document->createElement(bodyTag, true);
-        rootElement->parserAppendChild(body);
-        m_document->parserAppendChild(rootElement);
-        if (m_document->attached() && !rootElement->attached())
-            rootElement->attach();
-        documentElement = body.get();
+        auto rootElement = m_document->createElement(htmlTag, true);
+        auto body = m_document->createElement(bodyTag, true);
+        rootElement->parserAppendChild(body.copyRef());
+        m_document->parserAppendChild(rootElement.copyRef());
+        documentElement = WTFMove(body);
     }
-#if ENABLE(SVG)
     else if (documentElement->namespaceURI() == SVGNames::svgNamespaceURI) {
-        RefPtr<Element> rootElement = m_document->createElement(htmlTag, true);
-        RefPtr<Element> body = m_document->createElement(bodyTag, true);
-        rootElement->parserAppendChild(body);
+        auto rootElement = m_document->createElement(htmlTag, true);
+        auto head = m_document->createElement(headTag, true);
+        auto style = m_document->createElement(styleTag, true);
+        head->parserAppendChild(style.copyRef());
+        style->parserAppendChild(m_document->createTextNode("html, body { height: 100% } parsererror + svg { width: 100%; height: 100% }"));
+        style->finishParsingChildren();
+        rootElement->parserAppendChild(head.copyRef());
+        auto body = m_document->createElement(bodyTag, true);
+        rootElement->parserAppendChild(body.copyRef());
 
-        documentElement->parentNode()->parserRemoveChild(documentElement.get());
-        if (documentElement->attached())
-            documentElement->detach();
+        m_document->parserRemoveChild(*documentElement);
 
-        body->parserAppendChild(documentElement);
-        m_document->parserAppendChild(rootElement.get());
+        body->parserAppendChild(*documentElement);
+        m_document->parserAppendChild(WTFMove(rootElement));
 
-        if (m_document->attached())
-            // In general, rootElement shouldn't be attached right now, but it will be if there is a style element
-            // in the SVG content.
-            rootElement->reattach();
-
-        documentElement = body.get();
+        documentElement = WTFMove(body);
     }
-#endif
 
     String errorMessages = m_errorMessages.toString();
-    RefPtr<Element> reportElement = createXHTMLParserErrorHeader(m_document, errorMessages);
+    auto reportElement = createXHTMLParserErrorHeader(m_document, errorMessages);
 
 #if ENABLE(XSLT)
     if (m_document->transformSourceDocument()) {
         Vector<Attribute> attributes;
         attributes.append(Attribute(styleAttr, "white-space: normal"));
-        RefPtr<Element> paragraph = m_document->createElement(pTag, true);
+        auto paragraph = m_document->createElement(pTag, true);
         paragraph->parserSetAttributes(attributes);
         paragraph->parserAppendChild(m_document->createTextNode("This document was created as the result of an XSL transformation. The line and column numbers given are from the transformed result."));
-        reportElement->parserAppendChild(paragraph.release());
+        reportElement->parserAppendChild(WTFMove(paragraph));
     }
 #endif
 
     Node* firstChild = documentElement->firstChild();
     if (firstChild)
-        documentElement->parserInsertBefore(reportElement, documentElement->firstChild());
+        documentElement->parserInsertBefore(WTFMove(reportElement), *firstChild);
     else
-        documentElement->parserAppendChild(reportElement);
-
-    if (documentElement->attached() && !reportElement->attached())
-        reportElement->attach();
+        documentElement->parserAppendChild(WTFMove(reportElement));
 
     m_document->updateStyleIfNeeded();
 }

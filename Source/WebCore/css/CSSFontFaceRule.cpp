@@ -23,13 +23,13 @@
 #include "CSSFontFaceRule.h"
 
 #include "PropertySetCSSStyleDeclaration.h"
-#include "StylePropertySet.h"
+#include "StyleProperties.h"
 #include "StyleRule.h"
 #include <wtf/text/StringBuilder.h>
 
 namespace WebCore {
 
-CSSFontFaceRule::CSSFontFaceRule(StyleRuleFontFace* fontFaceRule, CSSStyleSheet* parent)
+CSSFontFaceRule::CSSFontFaceRule(StyleRuleFontFace& fontFaceRule, CSSStyleSheet* parent)
     : CSSRule(parent)
     , m_fontFaceRule(fontFaceRule)
 {
@@ -41,18 +41,18 @@ CSSFontFaceRule::~CSSFontFaceRule()
         m_propertiesCSSOMWrapper->clearParentRule();
 }
 
-CSSStyleDeclaration* CSSFontFaceRule::style()
+CSSStyleDeclaration& CSSFontFaceRule::style()
 {
     if (!m_propertiesCSSOMWrapper)
-        m_propertiesCSSOMWrapper = StyleRuleCSSStyleDeclaration::create(m_fontFaceRule->mutableProperties(), this);
-    return m_propertiesCSSOMWrapper.get();
+        m_propertiesCSSOMWrapper = StyleRuleCSSStyleDeclaration::create(m_fontFaceRule->mutableProperties(), *this);
+    return *m_propertiesCSSOMWrapper;
 }
 
 String CSSFontFaceRule::cssText() const
 {
     StringBuilder result;
     result.appendLiteral("@font-face { ");
-    String descs = m_fontFaceRule->properties()->asText();
+    String descs = m_fontFaceRule->properties().asText();
     result.append(descs);
     if (!descs.isEmpty())
         result.append(' ');
@@ -60,11 +60,9 @@ String CSSFontFaceRule::cssText() const
     return result.toString();
 }
 
-void CSSFontFaceRule::reattach(StyleRuleBase* rule)
+void CSSFontFaceRule::reattach(StyleRuleBase& rule)
 {
-    ASSERT(rule);
-    ASSERT_WITH_SECURITY_IMPLICATION(rule->isFontFaceRule());
-    m_fontFaceRule = static_cast<StyleRuleFontFace*>(rule);
+    m_fontFaceRule = downcast<StyleRuleFontFace>(rule);
     if (m_propertiesCSSOMWrapper)
         m_propertiesCSSOMWrapper->reattach(m_fontFaceRule->mutableProperties());
 }

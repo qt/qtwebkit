@@ -27,7 +27,8 @@
 #define WKBundleFramePrivate_h
 
 #include <JavaScriptCore/JavaScript.h>
-#include <WebKit2/WKBase.h>
+#include <WebKit/WKBase.h>
+#include <WebKit/WKGeometry.h>
 
 #ifndef __cplusplus
 #include <stdbool.h>
@@ -52,6 +53,8 @@ WK_EXPORT bool WKBundleFrameCallShouldCloseOnWebView(WKBundleFrameRef frame);
 WK_EXPORT WKBundleHitTestResultRef WKBundleFrameCreateHitTestResult(WKBundleFrameRef frame, WKPoint point);
 
 WK_EXPORT bool WKBundleFrameHandlesPageScaleGesture(WKBundleFrameRef frame);
+
+WK_EXPORT void WKBundleFrameFocus(WKBundleFrameRef frame);
 
 #ifdef __cplusplus
 }

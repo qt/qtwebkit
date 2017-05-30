@@ -26,20 +26,29 @@
 #include "config.h"
 #include "WKDictionary.h"
 
-#include "ImmutableArray.h"
-#include "ImmutableDictionary.h"
+#include "APIArray.h"
+#include "APIDictionary.h"
 #include "WKAPICast.h"
 
 using namespace WebKit;
 
 WKTypeID WKDictionaryGetTypeID()
 {
-    return toAPI(ImmutableDictionary::APIType);
+    return toAPI(API::Dictionary::APIType);
+}
+
+WK_EXPORT WKDictionaryRef WKDictionaryCreate(const WKStringRef* keys, const WKTypeRef* values, size_t numberOfValues)
+{
+    API::Dictionary::MapType map;
+    for (size_t i = 0; i < numberOfValues; ++i)
+        map.add(toImpl(keys[i])->string(), toImpl(values[i]));
+
+    return toAPI(&API::Dictionary::create(WTFMove(map)).leakRef());
 }
 
 WKTypeRef WKDictionaryGetItemForKey(WKDictionaryRef dictionaryRef, WKStringRef key)
 {
-    return toImpl(dictionaryRef)->get(toImpl(key)->string());
+    return toAPI(toImpl(dictionaryRef)->get(toImpl(key)->string()));
 }
 
 size_t WKDictionaryGetSize(WKDictionaryRef dictionaryRef)
@@ -49,6 +58,5 @@ size_t WKDictionaryGetSize(WKDictionaryRef dictionaryRef)
 
 WKArrayRef WKDictionaryCopyKeys(WKDictionaryRef dictionaryRef)
 {
-    RefPtr<ImmutableArray> keys = toImpl(dictionaryRef)->keys();
-    return toAPI(keys.release().leakRef());
+    return toAPI(&toImpl(dictionaryRef)->keys().leakRef());
 }

@@ -21,7 +21,6 @@
 #ifndef SVGFECompositeElement_h
 #define SVGFECompositeElement_h
 
-#if ENABLE(SVG) && ENABLE(FILTERS)
 #include "FEComposite.h"
 #include "SVGAnimatedEnumeration.h"
 #include "SVGAnimatedNumber.h"
@@ -30,8 +29,11 @@
 namespace WebCore {
 
 template<>
+inline unsigned SVGIDLEnumLimits<CompositeOperationType>::highestExposedEnumValue() { return FECOMPOSITE_OPERATOR_ARITHMETIC; }
+
+template<>
 struct SVGPropertyTraits<CompositeOperationType> {
-    static unsigned highestEnumValue() { return FECOMPOSITE_OPERATOR_ARITHMETIC; }
+    static unsigned highestEnumValue() { return FECOMPOSITE_OPERATOR_LIGHTER; }
 
     static String toString(CompositeOperationType type)
     {
@@ -39,17 +41,19 @@ struct SVGPropertyTraits<CompositeOperationType> {
         case FECOMPOSITE_OPERATOR_UNKNOWN:
             return emptyString();
         case FECOMPOSITE_OPERATOR_OVER:
-            return "over";
+            return ASCIILiteral("over");
         case FECOMPOSITE_OPERATOR_IN:
-            return "in";
+            return ASCIILiteral("in");
         case FECOMPOSITE_OPERATOR_OUT:
-            return "out";
+            return ASCIILiteral("out");
         case FECOMPOSITE_OPERATOR_ATOP:
-            return "atop";
+            return ASCIILiteral("atop");
         case FECOMPOSITE_OPERATOR_XOR:
-            return "xor";
+            return ASCIILiteral("xor");
         case FECOMPOSITE_OPERATOR_ARITHMETIC:
-            return "arithmetic";
+            return ASCIILiteral("arithmetic");
+        case FECOMPOSITE_OPERATOR_LIGHTER:
+            return ASCIILiteral("lighter");
         }
 
         ASSERT_NOT_REACHED();
@@ -70,22 +74,23 @@ struct SVGPropertyTraits<CompositeOperationType> {
             return FECOMPOSITE_OPERATOR_XOR;
         if (value == "arithmetic")
             return FECOMPOSITE_OPERATOR_ARITHMETIC;
+        if (value == "lighter")
+            return FECOMPOSITE_OPERATOR_LIGHTER;
         return FECOMPOSITE_OPERATOR_UNKNOWN;
     }
 };
 
-class SVGFECompositeElement FINAL : public SVGFilterPrimitiveStandardAttributes {
+class SVGFECompositeElement final : public SVGFilterPrimitiveStandardAttributes {
 public:
-    static PassRefPtr<SVGFECompositeElement> create(const QualifiedName&, Document*);
+    static Ref<SVGFECompositeElement> create(const QualifiedName&, Document&);
 
 private:
-    SVGFECompositeElement(const QualifiedName&, Document*);
+    SVGFECompositeElement(const QualifiedName&, Document&);
 
-    bool isSupportedAttribute(const QualifiedName&);
-    virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
-    virtual bool setFilterEffectAttribute(FilterEffect*, const QualifiedName&);
-    virtual void svgAttributeChanged(const QualifiedName&);
-    virtual PassRefPtr<FilterEffect> build(SVGFilterBuilder*, Filter*);
+    virtual void parseAttribute(const QualifiedName&, const AtomicString&) override;
+    virtual bool setFilterEffectAttribute(FilterEffect*, const QualifiedName&) override;
+    virtual void svgAttributeChanged(const QualifiedName&) override;
+    virtual RefPtr<FilterEffect> build(SVGFilterBuilder*, Filter&) override;
 
     BEGIN_DECLARE_ANIMATED_PROPERTIES(SVGFECompositeElement)
         DECLARE_ANIMATED_STRING(In1, in1)
@@ -100,5 +105,4 @@ private:
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif

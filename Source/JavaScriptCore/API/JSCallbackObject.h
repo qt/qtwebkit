@@ -11,10 +11,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -30,11 +30,12 @@
 #include "JSObjectRef.h"
 #include "JSValueRef.h"
 #include "JSObject.h"
-#include <wtf/PassOwnPtr.h>
 
 namespace JSC {
 
-struct JSCallbackObjectData : WeakHandleOwner {
+struct JSCallbackObjectData {
+    WTF_MAKE_FAST_ALLOCATED;
+public:
     JSCallbackObjectData(void* privateData, JSClassRef jsClass)
         : privateData(privateData)
         , jsClass(jsClass)
@@ -57,7 +58,7 @@ struct JSCallbackObjectData : WeakHandleOwner {
     void setPrivateProperty(VM& vm, JSCell* owner, const Identifier& propertyName, JSValue value)
     {
         if (!m_privateProperties)
-            m_privateProperties = adoptPtr(new JSPrivatePropertyMap);
+            m_privateProperties = std::make_unique<JSPrivatePropertyMap>();
         m_privateProperties->setPrivateProperty(vm, owner, propertyName, value);
     }
     
@@ -78,6 +79,8 @@ struct JSCallbackObjectData : WeakHandleOwner {
     void* privateData;
     JSClassRef jsClass;
     struct JSPrivatePropertyMap {
+        WTF_MAKE_FAST_ALLOCATED;
+    public:
         JSValue getPrivateProperty(const Identifier& propertyName) const
         {
             PrivatePropertyMap::const_iterator location = m_propertyMap.find(propertyName.impl());
@@ -106,11 +109,10 @@ struct JSCallbackObjectData : WeakHandleOwner {
         }
 
     private:
-        typedef HashMap<RefPtr<StringImpl>, WriteBarrier<Unknown>, IdentifierRepHash> PrivatePropertyMap;
+        typedef HashMap<RefPtr<UniquedStringImpl>, WriteBarrier<Unknown>, IdentifierRepHash> PrivatePropertyMap;
         PrivatePropertyMap m_propertyMap;
     };
-    OwnPtr<JSPrivatePropertyMap> m_privateProperties;
-    virtual void finalize(Handle<Unknown>, void*);
+    std::unique_ptr<JSPrivatePropertyMap> m_privateProperties;
 };
 
     
@@ -125,6 +127,9 @@ protected:
 
 public:
     typedef Parent Base;
+    static const unsigned StructureFlags = Base::StructureFlags | ProhibitsPropertyCaching | OverridesGetOwnPropertySlot | InterceptsGetOwnPropertySlotByIndexEvenWhenLengthIsNotZero | ImplementsHasInstance | OverridesGetPropertyNames | TypeOfShouldCallGetCallData;
+
+    ~JSCallbackObject();
 
     static JSCallbackObject* create(ExecState* exec, JSGlobalObject* globalObject, Structure* structure, JSClassRef classRef, void* data)
     {
@@ -144,7 +149,19 @@ public:
     void setPrivate(void* data);
     void* getPrivate();
 
-    static const ClassInfo s_info;
+    // FIXME: We should fix the warnings for extern-template in JSObject template classes: https://bugs.webkit.org/show_bug.cgi?id=161979
+#if COMPILER(CLANG)
+#if __has_warning("-Wundefined-var-template")
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wundefined-var-template"
+#endif
+#endif
+    DECLARE_INFO;
+#if COMPILER(CLANG)
+#if __has_warning("-Wundefined-var-template")
+#pragma clang diagnostic pop
+#endif
+#endif
 
     JSClassRef classRef() const { return m_callbackObjectData->jsClass; }
     bool inherits(JSClassRef) const;
@@ -168,17 +185,13 @@ public:
 
     using Parent::methodTable;
 
-protected:
-    static const unsigned StructureFlags = ProhibitsPropertyCaching | OverridesGetOwnPropertySlot | InterceptsGetOwnPropertySlotByIndexEvenWhenLengthIsNotZero | ImplementsHasInstance | OverridesHasInstance | OverridesVisitChildren | OverridesGetPropertyNames | Parent::StructureFlags;
-
 private:
     static String className(const JSObject*);
 
     static JSValue defaultValue(const JSObject*, ExecState*, PreferredPrimitiveType);
 
-    static bool getOwnPropertySlot(JSCell*, ExecState*, PropertyName, PropertySlot&);
-    static bool getOwnPropertySlotByIndex(JSCell*, ExecState*, unsigned propertyName, PropertySlot&);
-    static bool getOwnPropertyDescriptor(JSObject*, ExecState*, PropertyName, PropertyDescriptor&);
+    static bool getOwnPropertySlot(JSObject*, ExecState*, PropertyName, PropertySlot&);
+    static bool getOwnPropertySlotByIndex(JSObject*, ExecState*, unsigned propertyName, PropertySlot&);
     
     static void put(JSCell*, ExecState*, PropertyName, JSValue, PutPropertySlot&);
     static void putByIndex(JSCell*, ExecState*, unsigned, JSValue, bool shouldThrow);
@@ -196,9 +209,7 @@ private:
     static void visitChildren(JSCell* cell, SlotVisitor& visitor)
     {
         JSCallbackObject* thisObject = jsCast<JSCallbackObject*>(cell);
-        ASSERT_GC_OBJECT_INHERITS((static_cast<Parent*>(thisObject)), &JSCallbackObject<Parent>::s_info);
-        COMPILE_ASSERT(StructureFlags & OverridesVisitChildren, OverridesVisitChildrenWithoutSettingFlag);
-        ASSERT(thisObject->Parent::structure()->typeInfo().overridesVisitChildren());
+        ASSERT_GC_OBJECT_INHERITS((static_cast<Parent*>(thisObject)), JSCallbackObject<Parent>::info());
         Parent::visitChildren(thisObject, visitor);
         thisObject->m_callbackObjectData->visitChildren(visitor);
     }
@@ -206,15 +217,16 @@ private:
     void init(ExecState*);
  
     static JSCallbackObject* asCallbackObject(JSValue);
+    static JSCallbackObject* asCallbackObject(EncodedJSValue);
  
     static EncodedJSValue JSC_HOST_CALL call(ExecState*);
     static EncodedJSValue JSC_HOST_CALL construct(ExecState*);
    
     JSValue getStaticValue(ExecState*, PropertyName);
-    static JSValue staticFunctionGetter(ExecState*, JSValue, PropertyName);
-    static JSValue callbackGetter(ExecState*, JSValue, PropertyName);
+    static EncodedJSValue staticFunctionGetter(ExecState*, EncodedJSValue, PropertyName);
+    static EncodedJSValue callbackGetter(ExecState*, EncodedJSValue, PropertyName);
 
-    OwnPtr<JSCallbackObjectData> m_callbackObjectData;
+    std::unique_ptr<JSCallbackObjectData> m_callbackObjectData;
 };
 
 } // namespace JSC

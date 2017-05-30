@@ -28,12 +28,12 @@
 
 #include "TextChecker.h"
 #include "WKAPICast.h"
-#include "WebContext.h"
+#include "WebProcessPool.h"
 #include <wtf/RefPtr.h>
 
 namespace WebKit {
 
-WebTextChecker* WebTextChecker::shared()
+WebTextChecker* WebTextChecker::singleton()
 {
     static WebTextChecker* textChecker = adoptRef(new WebTextChecker).leakRef();
     return textChecker;
@@ -43,14 +43,14 @@ WebTextChecker::WebTextChecker()
 {
 }
 
-void WebTextChecker::setClient(const WKTextCheckerClient* client)
+void WebTextChecker::setClient(const WKTextCheckerClientBase* client)
 {
     m_client.initialize(client);
 }
 
 static void updateStateForAllContexts()
 {
-    const Vector<WebContext*>& contexts = WebContext::allContexts();
+    const Vector<WebProcessPool*>& contexts = WebProcessPool::allProcessPools();
     for (size_t i = 0; i < contexts.size(); ++i)
         contexts[i]->textCheckerStateChanged();
 }
@@ -67,12 +67,12 @@ void WebTextChecker::grammarCheckingEnabledStateChanged(bool enabled)
     updateStateForAllContexts();
 }
 
-void WebTextChecker::checkSpelling(const WebPageProxy* page, bool startBeforeSelection)
+void WebTextChecker::checkSpelling(WebPageProxy* page, bool startBeforeSelection)
 {
     page->advanceToNextMisspelling(startBeforeSelection);
 }
 
-void WebTextChecker::changeSpellingToWord(const WebPageProxy* page, const String& text)
+void WebTextChecker::changeSpellingToWord(WebPageProxy* page, const String& text)
 {
     page->changeSpellingToWord(text);
 }

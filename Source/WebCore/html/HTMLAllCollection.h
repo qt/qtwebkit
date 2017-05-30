@@ -26,21 +26,25 @@
 #ifndef HTMLAllCollection_h
 #define HTMLAllCollection_h
 
-#include "HTMLCollection.h"
+#include "CachedHTMLCollection.h"
 
 namespace WebCore {
 
-class HTMLAllCollection : public HTMLCollection {
+class HTMLAllCollection final : public CachedHTMLCollection<HTMLAllCollection, CollectionTypeTraits<DocAll>::traversalType> {
 public:
-    static PassRefPtr<HTMLAllCollection> create(Node*, CollectionType);
-    virtual ~HTMLAllCollection();
+    static Ref<HTMLAllCollection> create(Document&, CollectionType);
 
-    Node* namedItemWithIndex(const AtomicString& name, unsigned index) const;
+    Element* namedItemWithIndex(const AtomicString& name, unsigned index) const;
+
+    // For CachedHTMLCollection.
+    bool elementMatches(Element&) const { return true; }
 
 private:
-    HTMLAllCollection(Node*, CollectionType);
+    HTMLAllCollection(Document&, CollectionType);
 };
 
 } // namespace WebCore
+
+SPECIALIZE_TYPE_TRAITS_HTMLCOLLECTION(HTMLAllCollection, DocAll)
 
 #endif // HTMLAllCollection_h

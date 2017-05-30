@@ -41,7 +41,7 @@ namespace WebKit {
 
 static QHash<int, QByteArray> createRoleNamesHash();
 
-class PopupMenuItemModel : public QAbstractListModel {
+class PopupMenuItemModel final : public QAbstractListModel {
     Q_OBJECT
 
 public:
@@ -53,9 +53,9 @@ public:
     };
 
     PopupMenuItemModel(const Vector<WebPopupItem>&, bool multiple);
-    virtual int rowCount(const QModelIndex& parent = QModelIndex()) const { return m_items.size(); }
-    virtual QVariant data(const QModelIndex&, int role = Qt::DisplayRole) const;
-    virtual QHash<int, QByteArray> roleNames() const;
+    int rowCount(const QModelIndex& parent = QModelIndex()) const final { return m_items.size(); }
+    QVariant data(const QModelIndex&, int role = Qt::DisplayRole) const final;
+    QHash<int, QByteArray> roleNames() const final;
 
     Q_INVOKABLE void select(int);
 
@@ -250,7 +250,7 @@ void PopupMenuItemModel::buildItems(const Vector<WebPopupItem>& webPopupItems)
 {
     QString currentGroup;
     m_items.reserveInitialCapacity(webPopupItems.size());
-    for (size_t i = 0; i < webPopupItems.size(); i++) {
+    for (int i = 0; i < webPopupItems.size(); i++) {
         const WebPopupItem& webPopupItem = webPopupItems[i];
         if (webPopupItem.m_isLabel) {
             currentGroup = webPopupItem.m_text;
@@ -262,7 +262,7 @@ void PopupMenuItemModel::buildItems(const Vector<WebPopupItem>& webPopupItems)
     }
 }
 
-WebPopupMenuProxyQt::WebPopupMenuProxyQt(WebPopupMenuProxy::Client* client, QQuickWebView* webView)
+WebPopupMenuProxyQt::WebPopupMenuProxyQt(WebPopupMenuProxy::Client& client, QQuickWebView* webView)
     : WebPopupMenuProxy(client)
     , m_webView(webView)
 {
@@ -287,8 +287,8 @@ void WebPopupMenuProxyQt::showPopupMenu(const IntRect& rect, WebCore::TextDirect
 
 void WebPopupMenuProxyQt::hidePopupMenu()
 {
-    m_itemSelector.clear();
-    m_context.clear();
+    m_itemSelector = nullptr;
+    m_context = nullptr;
 
     if (m_client) {
         m_client->closePopupMenu();
@@ -314,7 +314,7 @@ void WebPopupMenuProxyQt::createItem(QObject* contextObject)
     if (!object)
         return;
 
-    m_itemSelector = adoptPtr(qobject_cast<QQuickItem*>(object));
+    m_itemSelector.reset(qobject_cast<QQuickItem*>(object));
     if (!m_itemSelector)
         return;
 
@@ -339,10 +339,10 @@ void WebPopupMenuProxyQt::createContext(QQmlComponent* component, QObject* conte
     QQmlContext* baseContext = component->creationContext();
     if (!baseContext)
         baseContext = QQmlEngine::contextForObject(m_webView);
-    m_context = adoptPtr(new QQmlContext(baseContext));
+    m_context.reset(new QQmlContext(baseContext));
 
     contextObject->setParent(m_context.get());
-    m_context->setContextProperty(QLatin1String("model"), contextObject);
+    m_context->setContextProperty(QStringLiteral("model"), contextObject);
     m_context->setContextObject(contextObject);
 }
 

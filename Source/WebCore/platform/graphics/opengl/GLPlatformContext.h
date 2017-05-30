@@ -26,13 +26,10 @@
 #ifndef GLPlatformContext_h
 #define GLPlatformContext_h
 
-#if USE(ACCELERATED_COMPOSITING)
-
 #include "GLDefs.h"
 #include "GLPlatformSurface.h"
 #include "GraphicsContext3D.h"
 #include <wtf/Noncopyable.h>
-#include <wtf/PassOwnPtr.h>
 
 // Encapsulates an OpenGL context, hiding platform specific management.
 namespace WebCore {
@@ -49,7 +46,7 @@ public:
         PLATFORMCONTEXT_UNKNOWN_CONTEXT_RESET = 0x8255,
     };
 
-    static PassOwnPtr<GLPlatformContext> createContext(GraphicsContext3D::RenderStyle);
+    static std::unique_ptr<GLPlatformContext> createContext(GraphicsContext3D::RenderStyle);
 
     static bool supportsGLExtension(const String&);
 
@@ -76,14 +73,12 @@ public:
 
     virtual PlatformContext handle() const;
 
-    virtual bool isCurrentContext() const;
+    virtual bool isCurrentContext() const = 0;
 
     bool isValid() const;
 
     // Destroys any GL resources associated with this context.
     virtual void destroy();
-
-    static GLPlatformContext* getCurrent();
 
 protected:
     GLPlatformContext();
@@ -95,7 +90,5 @@ protected:
 };
 
 } // namespace WebCore
-
-#endif
 
 #endif // GLNativeContext_H

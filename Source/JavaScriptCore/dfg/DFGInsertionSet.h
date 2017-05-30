@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2012-2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,31 +26,15 @@
 #ifndef DFGInsertionSet_h
 #define DFGInsertionSet_h
 
-#include <wtf/Platform.h>
-
 #if ENABLE(DFG_JIT)
 
 #include "DFGGraph.h"
+#include <wtf/Insertion.h>
 #include <wtf/Vector.h>
 
 namespace JSC { namespace DFG {
 
-class Insertion {
-public:
-    Insertion() { }
-    
-    Insertion(size_t index, Node* element)
-        : m_index(index)
-        , m_element(element)
-    {
-    }
-    
-    size_t index() const { return m_index; }
-    Node* element() const { return m_element; }
-private:
-    size_t m_index;
-    Node* m_element;
-};
+typedef WTF::Insertion<Node*> Insertion;
 
 class InsertionSet {
 public:
@@ -59,10 +43,18 @@ public:
     {
     }
     
+    Graph& graph() { return m_graph; }
+
+    // Adds another code insertion. It's expected that you'll usually insert things in order. If
+    // you don't, this function will perform a linear search to find the largest insertion point
+    // at which insertion order would be preserved. This is essentially equivalent to if you did
+    // a stable sort on the insertions.
     Node* insert(const Insertion& insertion)
     {
-        ASSERT(!m_insertions.size() || m_insertions.last().index() <= insertion.index());
-        m_insertions.append(insertion);
+        if (LIKELY(!m_insertions.size() || m_insertions.last().index() <= insertion.index()))
+            m_insertions.append(insertion);
+        else
+            insertSlow(insertion);
         return insertion.element();
     }
     
@@ -71,32 +63,77 @@ public:
         return insert(Insertion(index, element));
     }
 
-#define DFG_DEFINE_INSERT_NODE(templatePre, templatePost, typeParams, valueParamsComma, valueParams, valueArgs) \
-    templatePre typeParams templatePost Node* insertNode(size_t index, SpeculatedType type valueParamsComma valueParams) \
-    { \
-        return insert(index, m_graph.addNode(type valueParamsComma valueArgs)); \
-    }
-    DFG_VARIADIC_TEMPLATE_FUNCTION(DFG_DEFINE_INSERT_NODE)
-#undef DFG_DEFINE_INSERT_NODE
-    
-    void execute(BasicBlock* block)
+    template<typename... Params>
+    Node* insertNode(size_t index, SpeculatedType type, Params... params)
     {
-        if (!m_insertions.size())
-            return;
-        block->grow(block->size() + m_insertions.size());
-        size_t lastIndex = block->size();
-        for (size_t indexInInsertions = m_insertions.size(); indexInInsertions--;) {
-            Insertion& insertion = m_insertions[indexInInsertions];
-            size_t firstIndex = insertion.index() + indexInInsertions;
-            size_t indexOffset = indexInInsertions + 1;
-            for (size_t i = lastIndex; --i > firstIndex;)
-                block->at(i) = block->at(i - indexOffset);
-            block->at(firstIndex) = insertion.element();
-            lastIndex = firstIndex;
-        }
-        m_insertions.resize(0);
+        return insert(index, m_graph.addNode(type, params...));
     }
+    
+    Node* insertConstant(
+        size_t index, NodeOrigin origin, FrozenValue* value,
+        NodeType op = JSConstant)
+    {
+        return insertNode(
+            index, speculationFromValue(value->value()), op, origin, OpInfo(value));
+    }
+    
+    Edge insertConstantForUse(
+        size_t index, NodeOrigin origin, FrozenValue* value, UseKind useKind)
+    {
+        NodeType op;
+        if (isDouble(useKind))
+            op = DoubleConstant;
+        else if (useKind == Int52RepUse)
+            op = Int52Constant;
+        else
+            op = JSConstant;
+        return Edge(insertConstant(index, origin, value, op), useKind);
+    }
+    
+    Node* insertConstant(size_t index, NodeOrigin origin, JSValue value, NodeType op = JSConstant)
+    {
+        return insertConstant(index, origin, m_graph.freeze(value), op);
+    }
+    
+    Edge insertConstantForUse(size_t index, NodeOrigin origin, JSValue value, UseKind useKind)
+    {
+        return insertConstantForUse(index, origin, m_graph.freeze(value), useKind);
+    }
+    
+    Edge insertBottomConstantForUse(size_t index, NodeOrigin origin, UseKind useKind)
+    {
+        if (isDouble(useKind))
+            return insertConstantForUse(index, origin, jsNumber(PNaN), useKind);
+        if (useKind == Int52RepUse)
+            return insertConstantForUse(index, origin, jsNumber(0), useKind);
+        return insertConstantForUse(index, origin, jsUndefined(), useKind);
+    }
+    
+    Node* insertCheck(size_t index, NodeOrigin origin, AdjacencyList children)
+    {
+        children = children.justChecks();
+        if (children.isEmpty())
+            return nullptr;
+        return insertNode(index, SpecNone, Check, origin, children);
+    }
+    
+    Node* insertCheck(size_t index, Node* node)
+    {
+        return insertCheck(index, node->origin, node->children);
+    }
+    
+    Node* insertCheck(size_t index, NodeOrigin origin, Edge edge)
+    {
+        if (edge.willHaveCheck())
+            return insertNode(index, SpecNone, Check, origin, edge);
+        return nullptr;
+    }
+    
+    void execute(BasicBlock* block);
+
 private:
+    void insertSlow(const Insertion&);
+    
     Graph& m_graph;
     Vector<Insertion, 8> m_insertions;
 };

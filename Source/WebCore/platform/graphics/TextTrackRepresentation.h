@@ -28,13 +28,11 @@
 
 #if ENABLE(VIDEO_TRACK)
 
-#include "IntRect.h"
 #include "PlatformLayer.h"
-#include <wtf/PassOwnPtr.h>
+#include <wtf/Forward.h>
 
 namespace WebCore {
 
-class GraphicsContext;
 class Image;
 class IntRect;
 
@@ -42,20 +40,18 @@ class TextTrackRepresentationClient {
 public:
     virtual ~TextTrackRepresentationClient() { }
 
-    virtual PassRefPtr<Image> createTextTrackRepresentationImage() = 0;
+    virtual RefPtr<Image> createTextTrackRepresentationImage() = 0;
     virtual void textTrackRepresentationBoundsChanged(const IntRect&) = 0;
 };
 
 class TextTrackRepresentation {
 public:
-    static PassOwnPtr<TextTrackRepresentation> create(TextTrackRepresentationClient*);
+    static std::unique_ptr<TextTrackRepresentation> create(TextTrackRepresentationClient&);
 
     virtual ~TextTrackRepresentation() { }
 
     virtual void update() = 0;
-#if USE(ACCELERATED_COMPOSITING)
     virtual PlatformLayer* platformLayer() = 0;
-#endif
     virtual void setContentScale(float) = 0;
     virtual IntRect bounds() const = 0;
 };

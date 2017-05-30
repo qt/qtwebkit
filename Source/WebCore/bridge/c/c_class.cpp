@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2003, 2006 Apple Computer, Inc.  All rights reserved.
+ * Copyright (C) 2003, 2006 Apple Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -41,16 +41,13 @@ namespace JSC { namespace Bindings {
 
 CClass::CClass(NPClass* aClass)
 {
-    _isa = aClass;
+    m_isa = aClass;
 }
 
 CClass::~CClass()
 {
-    deleteAllValues(_methods);
-    _methods.clear();
-
-    deleteAllValues(_fields);
-    _fields.clear();
+    m_methods.clear();
+    m_fields.clear();
 }
 
 typedef HashMap<NPClass*, CClass*> ClassesByIsAMap;
@@ -73,38 +70,45 @@ CClass* CClass::classForIsA(NPClass* isa)
 Method* CClass::methodNamed(PropertyName propertyName, Instance* instance) const
 {
     String name(propertyName.publicName());
+    if (name.isNull())
+        return nullptr;
     
-    if (Method* method = _methods.get(name.impl()))
+    if (Method* method = m_methods.get(name.impl()))
         return method;
 
     NPIdentifier ident = _NPN_GetStringIdentifier(name.ascii().data());
     const CInstance* inst = static_cast<const CInstance*>(instance);
     NPObject* obj = inst->getObject();
-    if (_isa->hasMethod && _isa->hasMethod(obj, ident)){
-        Method* method = new CMethod(ident); // deleted in the CClass destructor
-        _methods.set(name.impl(), method);
-        return method;
+    if (m_isa->hasMethod && m_isa->hasMethod(obj, ident)) {
+        auto method = std::make_unique<CMethod>(ident);
+        CMethod* ret = method.get();
+        m_methods.set(name.impl(), WTFMove(method));
+        return ret;
     }
     
-    return 0;
+    return nullptr;
 }
 
 Field* CClass::fieldNamed(PropertyName propertyName, Instance* instance) const
 {
     String name(propertyName.publicName());
+    if (name.isNull())
+        return nullptr;
     
-    Field* aField = _fields.get(name.impl());
-    if (aField)
-        return aField;
-    
+    if (Field* field = m_fields.get(name.impl()))
+        return field;
+
     NPIdentifier ident = _NPN_GetStringIdentifier(name.ascii().data());
     const CInstance* inst = static_cast<const CInstance*>(instance);
     NPObject* obj = inst->getObject();
-    if (_isa->hasProperty && _isa->hasProperty(obj, ident)){
-        aField = new CField(ident); // deleted in the CClass destructor
-        _fields.set(name.impl(), aField);
+    if (m_isa->hasProperty && m_isa->hasProperty(obj, ident)) {
+        auto field = std::make_unique<CField>(ident);
+        CField* ret = field.get();
+        m_fields.set(name.impl(), WTFMove(field));
+        return ret;
     }
-    return aField;
+
+    return nullptr;
 }
 
 } } // namespace JSC::Bindings

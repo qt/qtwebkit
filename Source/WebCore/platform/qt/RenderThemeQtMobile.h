@@ -37,58 +37,56 @@ typedef QPixmapCache::Key CacheKey;
 
 namespace WebCore {
 
-class RenderThemeQtMobile : public RenderThemeQt {
+class RenderThemeQtMobile final : public RenderThemeQt {
 private:
     RenderThemeQtMobile(Page*);
-    virtual ~RenderThemeQtMobile();
+    ~RenderThemeQtMobile();
 
 public:
     static PassRefPtr<RenderTheme> create(Page*);
 
-    virtual void adjustSliderThumbSize(RenderStyle*, Element*) const;
+    void adjustSliderThumbSize(RenderStyle&, Element*) const final;
 
-    virtual bool isControlStyled(const RenderStyle*, const BorderData&, const FillLayer&, const Color& backgroundColor) const;
+    bool isControlStyled(const RenderStyle&, const BorderData&, const FillLayer&, const Color& backgroundColor) const final;
 
-    virtual int popupInternalPaddingBottom(RenderStyle*) const;
+    LengthBox popupInternalPaddingBox(const RenderStyle&) const final;
 
-    virtual bool delegatesMenuListRendering() const { return true; }
+    bool delegatesMenuListRendering() const final { return true; }
 
     // We don't want the focus ring to be drawn by the graphics context so we
     // always claim to support it in the theme.
     // FIXME: This could be a usability problem in the case of contenteditable divs.
-    virtual bool supportsFocusRing(const RenderStyle*) const { return true; }
+    bool supportsFocusRing(const RenderStyle&) const final { return true; }
 
 protected:
 
-    virtual void adjustButtonStyle(StyleResolver*, RenderStyle*, Element*) const;
-    virtual bool paintButton(RenderObject*, const PaintInfo&, const IntRect&);
+    void adjustButtonStyle(StyleResolver&, RenderStyle&, Element*) const final;
+    bool paintButton(const RenderObject&, const PaintInfo&, const IntRect&) final;
 
-    virtual bool paintTextField(RenderObject*, const PaintInfo&, const IntRect&);
-    virtual void adjustTextFieldStyle(StyleResolver*, RenderStyle*, Element*) const;
+    bool paintTextField(const RenderObject&, const PaintInfo&, const FloatRect&) final;
+    void adjustTextFieldStyle(StyleResolver&, RenderStyle&, Element*) const final;
 
-    virtual bool paintMenuList(RenderObject*, const PaintInfo&, const IntRect&);
-    virtual void adjustMenuListStyle(StyleResolver*, RenderStyle*, Element*) const;
+    bool paintMenuList(const RenderObject&, const PaintInfo&, const FloatRect&) final;
+    void adjustMenuListStyle(StyleResolver&, RenderStyle&, Element*) const final;
 
-    virtual bool paintMenuListButton(RenderObject*, const PaintInfo&, const IntRect&);
+    virtual bool paintMenuListButton(RenderObject&, const PaintInfo&, const IntRect&);
 
-#if ENABLE(PROGRESS_ELEMENT)
     // Returns the duration of the animation for the progress bar.
-    virtual double animationDurationForProgressBar(RenderProgress*) const;
-    virtual bool paintProgressBar(RenderObject*, const PaintInfo&, const IntRect&);
-#endif
+    double animationDurationForProgressBar(RenderProgress&) const final;
+    bool paintProgressBar(const RenderObject&, const PaintInfo&, const IntRect&) final;
 
-    virtual bool paintSliderTrack(RenderObject*, const PaintInfo&, const IntRect&);
-    virtual bool paintSliderThumb(RenderObject*, const PaintInfo&, const IntRect&);
+    bool paintSliderTrack(const RenderObject&, const PaintInfo&, const IntRect&) final;
+    bool paintSliderThumb(const RenderObject&, const PaintInfo&, const IntRect&) final;
 
-    virtual void computeSizeBasedOnStyle(RenderStyle*) const;
-    virtual QSharedPointer<StylePainter> getStylePainter(const PaintInfo&);
+    void computeSizeBasedOnStyle(RenderStyle&) const final;
+    QSharedPointer<StylePainter> getStylePainter(const PaintInfo&) final;
 
-    virtual QPalette colorPalette() const;
+    QPalette colorPalette() const final;
 
 private:
-    bool checkMultiple(RenderObject*) const;
-    void setButtonPadding(RenderStyle*) const;
-    void setPopupPadding(RenderStyle*) const;
+    bool checkMultiple(const RenderObject&) const;
+    void setButtonPadding(RenderStyle&) const;
+    void setPopupPadding(RenderStyle&) const final;
 };
 
 struct KeyIdentifier {
@@ -129,17 +127,18 @@ struct KeyIdentifier {
     }
 };
 
-class StylePainterMobile : public StylePainter {
+class StylePainterMobile final : public StylePainter {
 
 public:
     explicit StylePainterMobile(RenderThemeQtMobile*, const PaintInfo&);
     ~StylePainterMobile();
 
-    void drawLineEdit(const QRect&, bool focused, bool enabled = true);
+    void drawLineEdit(const QRectF&, bool focused, bool enabled = true);
     void drawCheckBox(const QRect&, bool checked, bool enabled = true);
     void drawRadioButton(const QRect&, bool checked, bool enabled = true);
     void drawPushButton(const QRect&, bool sunken, bool enabled = true);
     void drawComboBox(const QRect&, bool multiple, bool enabled = true);
+    void drawComboBox(const QRectF&, bool multiple, bool enabled = true);
     void drawProgress(const QRect&, double progress, bool leftToRight = true, bool animated = false, bool vertical = false) const;
     void drawSliderThumb(const QRect&, bool pressed) const;
 
@@ -157,9 +156,12 @@ private:
     QPixmap findComboButton(const QSize&, bool multiple, bool enabled) const;
 
     QPixmap findLineEdit(const QSize&, bool focused) const;
+    QPixmap findLineEdit(const QSizeF&, bool focused) const;
     QPixmap findPushButton(const QSize&, bool sunken, bool enabled) const;
+    QPixmap findPushButton(const QSizeF&, bool sunken, bool enabled) const;
 
     QSize sizeForPainterScale(const QRect&) const;
+    QSizeF sizeForPainterScale(const QRectF&) const;
 
     static bool findCachedControl(const KeyIdentifier&, QPixmap*);
     static void insertIntoCache(const KeyIdentifier&, const QPixmap&);

@@ -24,7 +24,6 @@
 #if ENABLE(SVG_FONTS)
 #include "SVGGlyphElement.h"
 
-#include "Attribute.h"
 #include "SVGFontData.h"
 #include "SVGFontElement.h"
 #include "SVGFontFaceElement.h"
@@ -33,22 +32,22 @@
 
 namespace WebCore {
 
-inline SVGGlyphElement::SVGGlyphElement(const QualifiedName& tagName, Document* document)
-    : SVGStyledElement(tagName, document)
+inline SVGGlyphElement::SVGGlyphElement(const QualifiedName& tagName, Document& document)
+    : SVGElement(tagName, document)
 {
     ASSERT(hasTagName(SVGNames::glyphTag));
 }
 
-PassRefPtr<SVGGlyphElement> SVGGlyphElement::create(const QualifiedName& tagName, Document* document)
+Ref<SVGGlyphElement> SVGGlyphElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new SVGGlyphElement(tagName, document));
+    return adoptRef(*new SVGGlyphElement(tagName, document));
 }
 
 void SVGGlyphElement::invalidateGlyphCache()
 {
     ContainerNode* fontNode = parentNode();
-    if (fontNode && isSVGFontElement(fontNode))
-        toSVGFontElement(fontNode)->invalidateGlyphCache();
+    if (is<SVGFontElement>(fontNode))
+        downcast<SVGFontElement>(*fontNode).invalidateGlyphCache();
 }
 
 void SVGGlyphElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
@@ -56,20 +55,20 @@ void SVGGlyphElement::parseAttribute(const QualifiedName& name, const AtomicStri
     if (name == SVGNames::dAttr)
         invalidateGlyphCache();
     else
-        SVGStyledElement::parseAttribute(name, value);
+        SVGElement::parseAttribute(name, value);
 }
 
-Node::InsertionNotificationRequest SVGGlyphElement::insertedInto(ContainerNode* rootParent)
+Node::InsertionNotificationRequest SVGGlyphElement::insertedInto(ContainerNode& rootParent)
 {
     invalidateGlyphCache();
-    return SVGStyledElement::insertedInto(rootParent);
+    return SVGElement::insertedInto(rootParent);
 }
 
-void SVGGlyphElement::removedFrom(ContainerNode* rootParent)
+void SVGGlyphElement::removedFrom(ContainerNode& rootParent)
 {
-    if (rootParent->inDocument())
+    if (rootParent.inDocument())
         invalidateGlyphCache();
-    SVGStyledElement::removedFrom(rootParent);
+    SVGElement::removedFrom(rootParent);
 }
 
 static inline SVGGlyph::ArabicForm parseArabicForm(const AtomicString& value)

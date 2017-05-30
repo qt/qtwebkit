@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2005 Frerich Raabe <raabe@kde.org>
- * Copyright (C) 2006, 2009 Apple Inc.
+ * Copyright (C) 2006, 2009, 2013 Apple Inc. All rights reserved.
  * Copyright (C) 2007 Alexey Proskuryakov <ap@webkit.org>
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,62 +31,48 @@
 #include "Document.h"
 #include "XPathPredicate.h"
 #include "XPathStep.h"
-#include "XPathValue.h"
 
 namespace WebCore {
 namespace XPath {
         
-Filter::Filter(Expression* expr, const Vector<Predicate*>& predicates)
-    : m_expr(expr), m_predicates(predicates)
+Filter::Filter(std::unique_ptr<Expression> expression, Vector<std::unique_ptr<Expression>> predicates)
+    : m_expression(WTFMove(expression)), m_predicates(WTFMove(predicates))
 {
-    setIsContextNodeSensitive(m_expr->isContextNodeSensitive());
-    setIsContextPositionSensitive(m_expr->isContextPositionSensitive());
-    setIsContextSizeSensitive(m_expr->isContextSizeSensitive());
-}
-
-Filter::~Filter()
-{
-    delete m_expr;
-    deleteAllValues(m_predicates);
+    setIsContextNodeSensitive(m_expression->isContextNodeSensitive());
+    setIsContextPositionSensitive(m_expression->isContextPositionSensitive());
+    setIsContextSizeSensitive(m_expression->isContextSizeSensitive());
 }
 
 Value Filter::evaluate() const
 {
-    Value v = m_expr->evaluate();
+    Value result = m_expression->evaluate();
     
-    NodeSet& nodes = v.modifiableNodeSet();
+    NodeSet& nodes = result.modifiableNodeSet();
     nodes.sort();
 
     EvaluationContext& evaluationContext = Expression::evaluationContext();
-    for (unsigned i = 0; i < m_predicates.size(); i++) {
+    for (auto& predicate : m_predicates) {
         NodeSet newNodes;
         evaluationContext.size = nodes.size();
         evaluationContext.position = 0;
         
-        for (unsigned j = 0; j < nodes.size(); j++) {
-            Node* node = nodes[j];
-            
+        for (auto& node : nodes) {
             evaluationContext.node = node;
             ++evaluationContext.position;
             
-            if (m_predicates[i]->evaluate())
-                newNodes.append(node);
+            if (evaluatePredicate(*predicate))
+                newNodes.append(node.copyRef());
         }
-        nodes.swap(newNodes);
+        nodes = WTFMove(newNodes);
     }
 
-    return v;
+    return result;
 }
 
 LocationPath::LocationPath()
-    : m_absolute(false)
+    : m_isAbsolute(false)
 {
     setIsContextNodeSensitive(true);
-}
-
-LocationPath::~LocationPath()
-{
-    deleteAllValues(m_steps);
 }
 
 Value LocationPath::evaluate() const
@@ -102,7 +88,7 @@ Value LocationPath::evaluate() const
     // This is for compatibility with Firefox, and also seems like a more
     // logical treatment of where you would expect the "root" to be.
     Node* context = evaluationContext.node.get();
-    if (m_absolute && context->nodeType() != Node::DOCUMENT_NODE)  {
+    if (m_isAbsolute && !context->isDocumentNode())  {
         if (context->inDocument())
             context = context->ownerDocument();
         else
@@ -114,15 +100,14 @@ Value LocationPath::evaluate() const
     evaluate(nodes);
     
     evaluationContext = backupContext;
-    return Value(nodes, Value::adopt);
+    return Value(WTFMove(nodes));
 }
 
 void LocationPath::evaluate(NodeSet& nodes) const
 {
     bool resultIsSorted = nodes.isSorted();
 
-    for (unsigned i = 0; i < m_steps.size(); i++) {
-        Step* step = m_steps[i];
+    for (auto& step : m_steps) {
         NodeSet newNodes;
         HashSet<Node*> newNodesSet;
 
@@ -136,79 +121,69 @@ void LocationPath::evaluate(NodeSet& nodes) const
         if (nodes.subtreesAreDisjoint() && (step->axis() == Step::ChildAxis || step->axis() == Step::SelfAxis))
             newNodes.markSubtreesDisjoint(true);
 
-        for (unsigned j = 0; j < nodes.size(); j++) {
+        for (auto& node : nodes) {
             NodeSet matches;
-            step->evaluate(nodes[j], matches);
+            step->evaluate(*node, matches);
 
             if (!matches.isSorted())
                 resultIsSorted = false;
 
-            for (size_t nodeIndex = 0; nodeIndex < matches.size(); ++nodeIndex) {
-                Node* node = matches[nodeIndex];
-                if (!needToCheckForDuplicateNodes || newNodesSet.add(node).isNewEntry)
-                    newNodes.append(node);
+            for (auto& match : matches) {
+                if (!needToCheckForDuplicateNodes || newNodesSet.add(match.get()).isNewEntry)
+                    newNodes.append(match.copyRef());
             }
         }
         
-        nodes.swap(newNodes);
+        nodes = WTFMove(newNodes);
     }
 
     nodes.markSorted(resultIsSorted);
 }
 
-void LocationPath::appendStep(Step* step)
+void LocationPath::appendStep(std::unique_ptr<Step> step)
 {
     unsigned stepCount = m_steps.size();
     if (stepCount) {
         bool dropSecondStep;
-        optimizeStepPair(m_steps[stepCount - 1], step, dropSecondStep);
-        if (dropSecondStep) {
-            delete step;
+        optimizeStepPair(*m_steps[stepCount - 1], *step, dropSecondStep);
+        if (dropSecondStep)
             return;
-        }
     }
     step->optimize();
-    m_steps.append(step);
+    m_steps.append(WTFMove(step));
 }
 
-void LocationPath::insertFirstStep(Step* step)
+void LocationPath::prependStep(std::unique_ptr<Step> step)
 {
     if (m_steps.size()) {
         bool dropSecondStep;
-        optimizeStepPair(step, m_steps[0], dropSecondStep);
+        optimizeStepPair(*step, *m_steps[0], dropSecondStep);
         if (dropSecondStep) {
-            delete m_steps[0];
-            m_steps[0] = step;
+            m_steps[0] = WTFMove(step);
             return;
         }
     }
     step->optimize();
-    m_steps.insert(0, step);
+    m_steps.insert(0, WTFMove(step));
 }
 
-Path::Path(Filter* filter, LocationPath* path)
-    : m_filter(filter)
-    , m_path(path)
+Path::Path(std::unique_ptr<Expression> filter, std::unique_ptr<LocationPath> path)
+    : m_filter(WTFMove(filter))
+    , m_path(WTFMove(path))
 {
-    setIsContextNodeSensitive(filter->isContextNodeSensitive());
-    setIsContextPositionSensitive(filter->isContextPositionSensitive());
-    setIsContextSizeSensitive(filter->isContextSizeSensitive());
-}
-
-Path::~Path()
-{
-    delete m_filter;
-    delete m_path;
+    setIsContextNodeSensitive(m_filter->isContextNodeSensitive());
+    setIsContextPositionSensitive(m_filter->isContextPositionSensitive());
+    setIsContextSizeSensitive(m_filter->isContextSizeSensitive());
 }
 
 Value Path::evaluate() const
 {
-    Value v = m_filter->evaluate();
+    Value result = m_filter->evaluate();
 
-    NodeSet& nodes = v.modifiableNodeSet();
+    NodeSet& nodes = result.modifiableNodeSet();
     m_path->evaluate(nodes);
     
-    return v;
+    return result;
 }
 
 }

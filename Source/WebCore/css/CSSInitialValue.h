@@ -22,37 +22,46 @@
 #define CSSInitialValue_h
 
 #include "CSSValue.h"
-#include <wtf/PassRefPtr.h>
+#include <wtf/NeverDestroyed.h>
 
 namespace WebCore {
 
 class CSSInitialValue : public CSSValue {
 public:
-    static PassRefPtr<CSSInitialValue> createExplicit()
+    static Ref<CSSInitialValue> createExplicit()
     {
-        return adoptRef(new CSSInitialValue(/* implicit */ false));
+        return adoptRef(*new CSSInitialValue(/* implicit */ false));
     }
-    static PassRefPtr<CSSInitialValue> createImplicit()
+    static Ref<CSSInitialValue> createImplicit()
     {
-        return adoptRef(new CSSInitialValue(/* implicit */ true));
+        return adoptRef(*new CSSInitialValue(/* implicit */ true));
     }
 
-    String customCssText() const;
+    String customCSSText() const;
 
     bool isImplicit() const { return m_isImplicit; }
 
     bool equals(const CSSInitialValue&) const { return true; }
 
+#if COMPILER(MSVC)
+    // FIXME: This should be private, but for some reason MSVC then fails to invoke it from LazyNeverDestroyed::construct.
+public:
+#else
 private:
+    friend class LazyNeverDestroyed<CSSInitialValue>;
+#endif
     CSSInitialValue(bool implicit)
         : CSSValue(InitialClass)
         , m_isImplicit(implicit)
     {
     }
 
+private:
     bool m_isImplicit;
 };
 
 } // namespace WebCore
+
+SPECIALIZE_TYPE_TRAITS_CSS_VALUE(CSSInitialValue, isInitialValue())
 
 #endif // CSSInitialValue_h

@@ -27,7 +27,7 @@
 
 #include "AudioDestination.h"
 #include "AudioDestinationNode.h"
-#include <wtf/OwnPtr.h>
+#include <memory>
 
 namespace WebCore {
 
@@ -35,28 +35,32 @@ class AudioContext;
     
 class DefaultAudioDestinationNode : public AudioDestinationNode {
 public:
-    static PassRefPtr<DefaultAudioDestinationNode> create(AudioContext* context)
+    static Ref<DefaultAudioDestinationNode> create(AudioContext& context)
     {
-        return adoptRef(new DefaultAudioDestinationNode(context));     
+        return adoptRef(*new DefaultAudioDestinationNode(context));     
     }
 
     virtual ~DefaultAudioDestinationNode();
     
     // AudioNode   
-    virtual void initialize() OVERRIDE;
-    virtual void uninitialize() OVERRIDE;
-    virtual void setChannelCount(unsigned long, ExceptionCode&) OVERRIDE;
+    virtual void initialize() override;
+    virtual void uninitialize() override;
+    virtual void setChannelCount(unsigned long, ExceptionCode&) override;
 
     // AudioDestinationNode
-    virtual void enableInput(const String& inputDeviceId) OVERRIDE;
-    virtual void startRendering() OVERRIDE;
-    virtual unsigned long maxChannelCount() const OVERRIDE;
-    
+    virtual void enableInput(const String& inputDeviceId) override;
+    virtual void startRendering() override;
+    virtual void resume(std::function<void()>) override;
+    virtual void suspend(std::function<void()>) override;
+    virtual void close(std::function<void()>) override;
+    virtual unsigned long maxChannelCount() const override;
+    virtual bool isPlaying() override;
+
 private:
-    explicit DefaultAudioDestinationNode(AudioContext*);
+    explicit DefaultAudioDestinationNode(AudioContext&);
     void createDestination();
 
-    OwnPtr<AudioDestination> m_destination;
+    std::unique_ptr<AudioDestination> m_destination;
     String m_inputDeviceId;
     unsigned m_numberOfInputChannels;
 };

@@ -95,12 +95,6 @@ LauncherWindow::LauncherWindow(WindowOptions* data, QGraphicsScene* sharedScene)
     , m_inspector(0)
     , m_formatMenuAction(0)
     , m_zoomAnimation(0)
-#if !defined(QT_NO_FILEDIALOG) && !defined(QT_NO_MESSAGEBOX)
-    , m_reply(0)
-#endif
-#ifndef QT_NO_LINEEDIT
-    , m_findFlag(0)
-#endif
 {
     if (data)
         m_windowOptions = *data;
@@ -221,11 +215,15 @@ void LauncherWindow::initializeView()
 void LauncherWindow::applyPrefs()
 {
     QWebSettings* settings = page()->settings();
-    settings->setAttribute(QWebSettings::AcceleratedCompositingEnabled, m_windowOptions.useCompositing);
+#ifndef QT_NO_OPENGL
+    settings->setAttribute(QWebSettings::AcceleratedCompositingEnabled, m_windowOptions.useCompositing
+        && (m_windowOptions.useQGLWidgetViewport || m_windowOptions.useQOpenGLWidgetViewport));
+#endif
     settings->setAttribute(QWebSettings::TiledBackingStoreEnabled, m_windowOptions.useTiledBackingStore);
     settings->setAttribute(QWebSettings::FrameFlatteningEnabled, m_windowOptions.useFrameFlattening);
     settings->setAttribute(QWebSettings::WebGLEnabled, m_windowOptions.useWebGL);
     m_windowOptions.useWebAudio = settings->testAttribute(QWebSettings::WebAudioEnabled);
+    m_windowOptions.useMediaSource = settings->testAttribute(QWebSettings::MediaSourceEnabled);
 
     if (!isGraphicsBased())
         return;
@@ -262,6 +260,8 @@ void LauncherWindow::createChrome()
     editMenu->addAction(page()->action(QWebPage::Cut));
     editMenu->addAction(page()->action(QWebPage::Copy));
     editMenu->addAction(page()->action(QWebPage::Paste));
+    editMenu->addSeparator();
+    editMenu->addAction(page()->action(QWebPage::SelectAll));
     editMenu->addSeparator();
 #ifndef QT_NO_LINEEDIT
     editMenu->addAction("&Find", this, SLOT(showFindBar()), QKeySequence(Qt::CTRL | Qt::Key_F));
@@ -333,6 +333,13 @@ void LauncherWindow::createChrome()
     toggleWebAudio->setEnabled(false);
 #endif
 
+    QAction* toggleMediaSource = toolsMenu->addAction("Toggle MediaSource", this, SLOT(toggleMediaSource(bool)));
+    toggleMediaSource->setCheckable(true);
+    toggleWebGL->setChecked(settings->testAttribute(QWebSettings::MediaSourceEnabled));
+#if !ENABLE(MEDIA_SOURCE)
+    toggleMediaSource->setEnabled(false);
+#endif
+
     QAction* spatialNavigationAction = toolsMenu->addAction("Toggle Spatial Navigation", this, SLOT(toggleSpatialNavigation(bool)));
     spatialNavigationAction->setCheckable(true);
     spatialNavigationAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_S));
@@ -377,6 +384,9 @@ void LauncherWindow::createChrome()
     showInspectorAction->connect(m_inspector, SIGNAL(visibleChanged(bool)), SLOT(setChecked(bool)));
     toolsMenu->addSeparator();
     toolsMenu->addAction("Load URLs from file", this, SLOT(loadURLListFromFile()));
+
+    toolsMenu->addSeparator();
+    toolsMenu->addAction("Clear memory caches", this, SLOT(clearMemoryCaches()));
 
     // GraphicsView sub menu.
     QAction* toggleAcceleratedCompositing = graphicsViewMenu->addAction("Toggle Accelerated Compositing", this, SLOT(toggleAcceleratedCompositing(bool)));
@@ -522,6 +532,10 @@ void LauncherWindow::createChrome()
     toggleJavascriptCanOpenWindows->setCheckable(true);
     toggleJavascriptCanOpenWindows->setChecked(false);
 
+    QAction* togglePrivateBrowsing = settingsMenu->addAction("Enable Private Browsing", this, SLOT(togglePrivateBrowsing(bool)));
+    togglePrivateBrowsing->setCheckable(true);
+    togglePrivateBrowsing->setChecked(false);
+
     QAction* toggleUseDiskCookies = settingsMenu->addAction("Save Cookies on Disk", this, SLOT(setUseDiskCookies(bool)));
     toggleUseDiskCookies->setCheckable(true);
     toggleUseDiskCookies->setChecked(m_windowOptions.useDiskCookies);
@@ -576,6 +590,16 @@ void LauncherWindow::createChrome()
 bool LauncherWindow::isGraphicsBased() const
 {
     return bool(qobject_cast<QGraphicsView*>(m_view));
+}
+
+void LauncherWindow::closeEvent(QCloseEvent* e)
+{
+    e->ignore();
+    auto c = connect(page(), &QWebPage::windowCloseRequested, this, [e]() {
+        e->accept();
+    });
+    page()->triggerAction(QWebPage::RequestClose);
+    disconnect(c);
 }
 
 void LauncherWindow::sendTouchEvent()
@@ -922,6 +946,12 @@ void LauncherWindow::toggleWebAudio(bool toggle)
     page()->settings()->setAttribute(QWebSettings::WebAudioEnabled, toggle);
 }
 
+void LauncherWindow::toggleMediaSource(bool toggle)
+{
+    m_windowOptions.useMediaSource = toggle;
+    page()->settings()->setAttribute(QWebSettings::MediaSourceEnabled, toggle);
+}
+
 void LauncherWindow::animatedFlip()
 {
     qobject_cast<WebViewGraphicsBased*>(m_view)->animatedFlip();
@@ -931,9 +961,10 @@ void LauncherWindow::animatedYFlip()
 {
     qobject_cast<WebViewGraphicsBased*>(m_view)->animatedYFlip();
 }
-void LauncherWindow::toggleSpatialNavigation(bool b)
+
+void LauncherWindow::toggleSpatialNavigation(bool enable)
 {
-    page()->settings()->setAttribute(QWebSettings::SpatialNavigationEnabled, b);
+    page()->settings()->setAttribute(QWebSettings::SpatialNavigationEnabled, enable);
 }
 
 void LauncherWindow::toggleFullScreenMode(bool enable)
@@ -962,6 +993,11 @@ void LauncherWindow::toggleInterruptingJavaScriptEnabled(bool enable)
 void LauncherWindow::toggleJavascriptCanOpenWindows(bool enable)
 {
     page()->settings()->setAttribute(QWebSettings::JavascriptCanOpenWindows, enable);
+}
+
+void LauncherWindow::togglePrivateBrowsing(bool enable)
+{
+    page()->settings()->setAttribute(QWebSettings::PrivateBrowsingEnabled, enable);
 }
 
 void LauncherWindow::setUseDiskCookies(bool enable)
@@ -1125,7 +1161,7 @@ void LauncherWindow::fileDownloadFinished()
     if (fileName.isEmpty())
         return;
     if (m_reply->error() != QNetworkReply::NoError)
-        QMessageBox::critical(this, QString("Download"), QString("Download failed."));
+        QMessageBox::critical(this, QStringLiteral("Download"), QStringLiteral("Download failed: ") + m_reply->errorString());
     else {
         QFile file(fileName);
         file.open(QIODevice::WriteOnly);
@@ -1135,6 +1171,12 @@ void LauncherWindow::fileDownloadFinished()
     }
 }
 #endif
+
+void LauncherWindow::clearMemoryCaches()
+{
+    QWebSettings::clearMemoryCaches();
+    qDebug() << "Memory caches were cleared";
+}
 
 void LauncherWindow::updateFPS(int fps)
 {

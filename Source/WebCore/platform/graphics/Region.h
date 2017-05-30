@@ -32,46 +32,70 @@
 namespace WebCore {
 
 class Region {
+    WTF_MAKE_FAST_ALLOCATED;
+
 public:
-    Region();
-    Region(const IntRect&);
+    WEBCORE_EXPORT Region();
+    WEBCORE_EXPORT Region(const IntRect&);
 
     IntRect bounds() const { return m_bounds; }
     bool isEmpty() const { return m_bounds.isEmpty(); }
     bool isRect() const { return m_shape.isRect(); }
 
-    Vector<IntRect> rects() const;
+    WEBCORE_EXPORT Vector<IntRect> rects() const;
 
-    void unite(const Region&);
-    void intersect(const Region&);
-    void subtract(const Region&);
+    WEBCORE_EXPORT void unite(const Region&);
+    WEBCORE_EXPORT void intersect(const Region&);
+    WEBCORE_EXPORT void subtract(const Region&);
 
-    void translate(const IntSize&);
+    WEBCORE_EXPORT void translate(const IntSize&);
 
     // Returns true if the query region is a subset of this region.
-    bool contains(const Region&) const;
+    WEBCORE_EXPORT bool contains(const Region&) const;
 
     bool contains(const IntPoint&) const;
 
     // Returns true if the query region intersects any part of this region.
     bool intersects(const Region&) const;
 
-    unsigned totalArea() const;
+    WEBCORE_EXPORT unsigned totalArea() const;
+
+    unsigned gridSize() const { return m_shape.gridSize(); }
 
 #ifndef NDEBUG
     void dump() const;
 #endif
 
-private:
+    bool isValid() const { return m_shape.isValid(); }
+
+    // This is internal to Region, but exposed just for encoding.
+    // FIXME: figure out a better way to encode WebCore classes.
     struct Span {
+        Span()
+            : y(0)
+            , segmentIndex(0)
+        {
+        }
+
         Span(int y, size_t segmentIndex)
-            : y(y), segmentIndex(segmentIndex)
+            : y(y)
+            , segmentIndex(segmentIndex)
         {
         }
 
         int y;
         size_t segmentIndex;
     };
+
+    // For encoding/decoding only.
+    const Vector<int, 32>& shapeSegments() const { return m_shape.segments(); }
+    const Vector<Span, 16>& shapeSpans() const { return m_shape.spans(); }
+
+    void setShapeSegments(const Vector<int>& segments) { m_shape.setSegments(segments); }
+    void setShapeSpans(const Vector<Span>& spans) { m_shape.setSpans(spans); }
+    WEBCORE_EXPORT void updateBoundsFromShape();
+
+private:
 
     class Shape {
     public:
@@ -81,6 +105,7 @@ private:
         IntRect bounds() const;
         bool isEmpty() const { return m_spans.isEmpty(); }
         bool isRect() const { return m_spans.size() <= 2 && m_segments.size() <= 2; }
+        unsigned gridSize() const { return m_spans.size() * m_segments.size(); }
 
         typedef const Span* SpanIterator;
         SpanIterator spans_begin() const;
@@ -94,7 +119,7 @@ private:
         static Shape intersectShapes(const Shape& shape1, const Shape& shape2);
         static Shape subtractShapes(const Shape& shape1, const Shape& shape2);
 
-        void translate(const IntSize&);
+        WEBCORE_EXPORT void translate(const IntSize&);
         void swap(Shape&);
 
         struct CompareContainsOperation;
@@ -102,6 +127,15 @@ private:
 
         template<typename CompareOperation>
         static bool compareShapes(const Shape& shape1, const Shape& shape2);
+        
+        WEBCORE_EXPORT bool isValid() const;
+
+        // For encoding/decoding only.
+        const Vector<int, 32>& segments() const { return m_segments; }
+        const Vector<Span, 16>& spans() const { return m_spans; }
+
+        void setSegments(const Vector<int>& segments) { m_segments = segments; }
+        void setSpans(const Vector<Span>& spans) { m_spans = spans; }
 
 #ifndef NDEBUG
         void dump() const;

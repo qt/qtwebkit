@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 Apple Inc. All Rights Reserved.
+ * Copyright (C) 2008, 2014 Apple Inc. All Rights Reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -29,50 +29,35 @@
 
 #include "CachedResourceRequestInitiators.h"
 #include "EventNames.h"
-#include "InspectorCounters.h"
+#include "TextCodecICU.h"
 #include "ThreadTimers.h"
 #include <wtf/MainThread.h>
-#include <wtf/PassOwnPtr.h>
+#include <wtf/ThreadSpecific.h>
+#include <wtf/Threading.h>
 #include <wtf/WTFThreadData.h>
 #include <wtf/text/StringImpl.h>
 
-#if USE(ICU_UNICODE)
-#include "TextCodecICU.h"
-#endif
-
 #if PLATFORM(MAC)
-#include "TextCodecMac.h"
-#endif
-
-#if ENABLE(WORKERS)
-#include <wtf/Threading.h>
-#include <wtf/ThreadSpecific.h>
-using namespace WTF;
+#include "TextCodeCMac.h"
 #endif
 
 namespace WebCore {
 
-#if ENABLE(WORKERS)
 ThreadSpecific<ThreadGlobalData>* ThreadGlobalData::staticData;
-#else
-ThreadGlobalData* ThreadGlobalData::staticData;
+#if USE(WEB_THREAD)
+ThreadGlobalData* ThreadGlobalData::sharedMainThreadStaticData;
 #endif
 
 ThreadGlobalData::ThreadGlobalData()
-    : m_cachedResourceRequestInitiators(adoptPtr(new CachedResourceRequestInitiators))
-    , m_eventNames(adoptPtr(new EventNames))
-    , m_threadTimers(adoptPtr(new ThreadTimers))
+    : m_cachedResourceRequestInitiators(std::make_unique<CachedResourceRequestInitiators>())
+    , m_eventNames(EventNames::create())
+    , m_threadTimers(std::make_unique<ThreadTimers>())
 #ifndef NDEBUG
     , m_isMainThread(isMainThread())
 #endif
-#if USE(ICU_UNICODE)
-    , m_cachedConverterICU(adoptPtr(new ICUConverterWrapper))
-#endif
+    , m_cachedConverterICU(std::make_unique<ICUConverterWrapper>())
 #if PLATFORM(MAC)
-    , m_cachedConverterTEC(adoptPtr(new TECConverterWrapper))
-#endif
-#if ENABLE(INSPECTOR)
-    , m_inspectorCounters(adoptPtr(new ThreadLocalInspectorCounters()))
+    , m_cachedConverterTEC(std::make_unique<TECConverterWrapper>())
 #endif
 {
     // This constructor will have been called on the main thread before being called on
@@ -90,19 +75,44 @@ ThreadGlobalData::~ThreadGlobalData()
 void ThreadGlobalData::destroy()
 {
 #if PLATFORM(MAC)
-    m_cachedConverterTEC.clear();
+    m_cachedConverterTEC = nullptr;
 #endif
 
-#if USE(ICU_UNICODE)
-    m_cachedConverterICU.clear();
+    m_cachedConverterICU = nullptr;
+
+    m_eventNames = nullptr;
+    m_threadTimers = nullptr;
+}
+
+#if USE(WEB_THREAD)
+void ThreadGlobalData::setWebCoreThreadData()
+{
+    ASSERT(isWebThread());
+    ASSERT(&threadGlobalData() != ThreadGlobalData::sharedMainThreadStaticData);
+
+    // Set WebThread's ThreadGlobalData object to be the same as the main UI thread.
+    ThreadGlobalData::staticData->replace(ThreadGlobalData::sharedMainThreadStaticData);
+
+    ASSERT(&threadGlobalData() == ThreadGlobalData::sharedMainThreadStaticData);
+}
 #endif
 
-#if ENABLE(INSPECTOR)
-    m_inspectorCounters.clear();
+ThreadGlobalData& threadGlobalData() 
+{
+#if USE(WEB_THREAD)
+    if (UNLIKELY(!ThreadGlobalData::staticData)) {
+        ThreadGlobalData::staticData = new ThreadSpecific<ThreadGlobalData>;
+        // WebThread and main UI thread need to share the same object. Save it in a static
+        // here, the WebThread will pick it up in setWebCoreThreadData().
+        if (pthread_main_np())
+            ThreadGlobalData::sharedMainThreadStaticData = *ThreadGlobalData::staticData;
+    }
+    return **ThreadGlobalData::staticData;
+#else
+    if (!ThreadGlobalData::staticData)
+        ThreadGlobalData::staticData = new ThreadSpecific<ThreadGlobalData>;
+    return **ThreadGlobalData::staticData;
 #endif
-
-    m_eventNames.clear();
-    m_threadTimers.clear();
 }
 
 } // namespace WebCore

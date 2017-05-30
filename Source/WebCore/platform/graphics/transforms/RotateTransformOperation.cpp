@@ -26,19 +26,25 @@
 #include <algorithm>
 #include <wtf/MathExtras.h>
 
-using namespace std;
-
 namespace WebCore {
 
-PassRefPtr<TransformOperation> RotateTransformOperation::blend(const TransformOperation* from, double progress, bool blendToIdentity)
+bool RotateTransformOperation::operator==(const TransformOperation& other) const
+{
+    if (!isSameType(other))
+        return false;
+    const RotateTransformOperation& r = downcast<RotateTransformOperation>(other);
+    return m_x == r.m_x && m_y == r.m_y && m_z == r.m_z && m_angle == r.m_angle;
+}
+
+Ref<TransformOperation> RotateTransformOperation::blend(const TransformOperation* from, double progress, bool blendToIdentity)
 {
     if (from && !from->isSameType(*this))
-        return this;
+        return *this;
     
     if (blendToIdentity)
         return RotateTransformOperation::create(m_x, m_y, m_z, m_angle - m_angle * progress, m_type);
     
-    const RotateTransformOperation* fromOp = static_cast<const RotateTransformOperation*>(from);
+    const RotateTransformOperation* fromOp = downcast<RotateTransformOperation>(from);
     
     // Optimize for single axis rotation
     if (!fromOp || (fromOp->m_x == 0 && fromOp->m_y == 0 && fromOp->m_z == 1) || 
@@ -70,8 +76,8 @@ PassRefPtr<TransformOperation> RotateTransformOperation::blend(const TransformOp
     toT.blend(fromT, progress);
     
     // Extract the result as a quaternion
-    TransformationMatrix::DecomposedType decomp;
-    toT.decompose(decomp);
+    TransformationMatrix::Decomposed4Type decomp;
+    toT.decompose4(decomp);
     
     // Convert that to Axis/Angle form
     double x = -decomp.quaternionX;

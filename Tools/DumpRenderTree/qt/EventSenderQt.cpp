@@ -291,7 +291,7 @@ void EventSender::keyDown(const QString& string, const QStringList& modifiers, u
         code = string.unicode()->unicode();
         //qDebug() << ">>>>>>>>> keyDown" << code << (char)code;
         // map special keycodes used by the tests to something that works for Qt/X11
-        if (code == '\r') {
+        if (code == '\r' || code == '\n') {
             code = Qt::Key_Return;
         } else if (code == '\t') {
             code = Qt::Key_Tab;
@@ -576,7 +576,7 @@ void EventSender::gestureTap(int x, int y)
     m_gestures.clear();
     m_gestures.append(&m_tapGesture);
     QGestureEvent event(m_gestures);
-    sendEvent(m_page, &event);
+    sendEvent(m_page->view(), &event);
 }
 
 void EventSender::gestureLongPress(int x, int y)
@@ -585,7 +585,7 @@ void EventSender::gestureLongPress(int x, int y)
     m_gestures.clear();
     m_gestures.append(&m_tapAndHoldGesture);
     QGestureEvent event(m_gestures);
-    sendEvent(m_page, &event);
+    sendEvent(m_page->view(), &event);
 }
 #endif
 

@@ -28,8 +28,7 @@
 #include <QtCore/qshareddata.h>
 
 namespace WebCore {
-    class GroupSettings;
-    class Settings;
+class Page;
 }
 
 class QWebPage;
@@ -87,7 +86,13 @@ public:
         CaretBrowsingEnabled,
         NotificationsEnabled,
         WebAudioEnabled,
-        Accelerated2dCanvasEnabled
+        Accelerated2dCanvasEnabled,
+        MediaSourceEnabled,
+        MediaEnabled,
+        WebSecurityEnabled,
+        FullScreenSupportEnabled,
+        ImagesEnabled,
+        AllowRunningInsecureContent
     };
     enum WebGraphic {
         MissingImageGraphic,
@@ -136,6 +141,9 @@ public:
     static void clearIconDatabase();
     static QIcon iconForUrl(const QUrl &url);
 
+    static void setPluginSearchPaths(const QStringList& paths);
+    static QStringList pluginSearchPaths();
+
     //static QWebPluginDatabase *pluginDatabase();
 
     static void setWebGraphic(WebGraphic type, const QPixmap &graphic);
@@ -178,7 +186,7 @@ private:
     Q_DISABLE_COPY(QWebSettings)
 
     QWebSettings();
-    QWebSettings(WebCore::Settings *settings, WebCore::GroupSettings *groupSettings);
+    QWebSettings(WebCore::Page* page);
     ~QWebSettings();
 
     QWebSettingsPrivate *d;

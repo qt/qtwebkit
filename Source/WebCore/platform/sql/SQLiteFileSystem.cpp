@@ -28,15 +28,17 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#define __STDC_FORMAT_MACROS
 #include "config.h"
 #include "SQLiteFileSystem.h"
 
 #include "FileSystem.h"
 #include "SQLiteDatabase.h"
 #include "SQLiteStatement.h"
-#include <inttypes.h>
 #include <sqlite3.h>
+
+#if PLATFORM(IOS)
+#include <sqlite3_private.h>
+#endif
 
 namespace WebCore {
 
@@ -44,37 +46,9 @@ SQLiteFileSystem::SQLiteFileSystem()
 {
 }
 
-int SQLiteFileSystem::openDatabase(const String& fileName, sqlite3** database, bool)
+int SQLiteFileSystem::openDatabase(const String& filename, sqlite3** database, bool)
 {
-    // SQLite expects a null terminator on its UTF-16 strings.
-    String path = fileName;
-    return sqlite3_open16(path.deprecatedCharactersWithNullTermination(), database);
-}
-
-String SQLiteFileSystem::getFileNameForNewDatabase(const String& dbDir, const String&,
-                                                   const String&, SQLiteDatabase* db)
-{
-    // try to get the next sequence number from the given database
-    // if we can't get a number, return an empty string
-    SQLiteStatement sequenceStatement(*db, "SELECT seq FROM sqlite_sequence WHERE name='Databases';");
-    if (sequenceStatement.prepare() != SQLResultOk)
-        return String();
-    int result = sequenceStatement.step();
-    int64_t seq = 0;
-    if (result == SQLResultRow)
-        seq = sequenceStatement.getColumnInt64(0);
-    else if (result != SQLResultDone)
-        return String();
-    sequenceStatement.finalize();
-
-    // increment the number until we can use it to form a file name that doesn't exist
-    String fileName;
-    do {
-        ++seq;
-        fileName = pathByAppendingComponent(dbDir, String::format("%016" PRIx64 ".db", seq));
-    } while (fileExists(fileName));
-
-    return String::format("%016" PRIx64 ".db", seq);
+    return sqlite3_open(fileSystemRepresentation(filename).data(), database);
 }
 
 String SQLiteFileSystem::appendDatabaseFileNameToPath(const String& path, const String& fileName)
@@ -112,10 +86,29 @@ bool SQLiteFileSystem::deleteDatabaseFile(const String& fileName)
     return deleteFile(fileName);
 }
 
+#if PLATFORM(IOS)
+bool SQLiteFileSystem::truncateDatabaseFile(sqlite3* database)
+{
+    return sqlite3_file_control(database, 0, SQLITE_TRUNCATE_DATABASE, 0) == SQLITE_OK;
+}
+#endif
+    
 long long SQLiteFileSystem::getDatabaseFileSize(const String& fileName)
 {        
     long long size;
     return getFileSize(fileName, size) ? size : 0;
+}
+
+double SQLiteFileSystem::databaseCreationTime(const String& fileName)
+{
+    time_t time;
+    return getFileCreationTime(fileName, time) ? time : 0;
+}
+
+double SQLiteFileSystem::databaseModificationTime(const String& fileName)
+{
+    time_t time;
+    return getFileModificationTime(fileName, time) ? time : 0;
 }
 
 } // namespace WebCore

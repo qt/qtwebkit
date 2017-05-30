@@ -26,7 +26,7 @@
 #include "config.h"
 #include "PluginProcessConnectionManager.h"
 
-#if ENABLE(PLUGIN_PROCESS)
+#if ENABLE(NETSCAPE_PLUGIN_API)
 
 #include "ArgumentDecoder.h"
 #include "ArgumentEncoder.h"
@@ -36,15 +36,15 @@
 #include "WebProcess.h"
 #include "WebProcessProxyMessages.h"
 
-#if PLATFORM(MAC)
+#if OS(DARWIN) && !USE(UNIX_DOMAIN_SOCKETS)
 #include "MachPort.h"
 #endif
 
 namespace WebKit {
 
-PassRefPtr<PluginProcessConnectionManager> PluginProcessConnectionManager::create()
+Ref<PluginProcessConnectionManager> PluginProcessConnectionManager::create()
 {
-    return adoptRef(new PluginProcessConnectionManager);
+    return adoptRef(*new PluginProcessConnectionManager);
 }
 
 PluginProcessConnectionManager::PluginProcessConnectionManager()
@@ -56,9 +56,9 @@ PluginProcessConnectionManager::~PluginProcessConnectionManager()
 {
 }
 
-void PluginProcessConnectionManager::initializeConnection(CoreIPC::Connection* connection)
+void PluginProcessConnectionManager::initializeConnection(IPC::Connection* connection)
 {
-    connection->addWorkQueueMessageReceiver(Messages::PluginProcessConnectionManager::messageReceiverName(), m_queue.get(), this);
+    connection->addWorkQueueMessageReceiver(Messages::PluginProcessConnectionManager::messageReceiverName(), &m_queue.get(), this);
 }
 
 PluginProcessConnection* PluginProcessConnectionManager::getPluginProcessConnection(uint64_t pluginProcessToken)
@@ -68,27 +68,25 @@ PluginProcessConnection* PluginProcessConnectionManager::getPluginProcessConnect
             return m_pluginProcessConnections[i].get();
     }
 
-    CoreIPC::Attachment encodedConnectionIdentifier;
+    IPC::Attachment encodedConnectionIdentifier;
     bool supportsAsynchronousInitialization;
-    if (!WebProcess::shared().parentProcessConnection()->sendSync(Messages::WebProcessProxy::GetPluginProcessConnection(pluginProcessToken),
+    if (!WebProcess::singleton().parentProcessConnection()->sendSync(Messages::WebProcessProxy::GetPluginProcessConnection(pluginProcessToken),
                                                      Messages::WebProcessProxy::GetPluginProcessConnection::Reply(encodedConnectionIdentifier, supportsAsynchronousInitialization), 0))
         return 0;
 
-#if PLATFORM(MAC)
-    CoreIPC::Connection::Identifier connectionIdentifier(encodedConnectionIdentifier.port());
-    if (CoreIPC::Connection::identifierIsNull(connectionIdentifier))
-        return 0;
-#elif USE(UNIX_DOMAIN_SOCKETS)
-    CoreIPC::Connection::Identifier connectionIdentifier = encodedConnectionIdentifier.fileDescriptor();
-    if (connectionIdentifier == -1)
-        return 0;
+#if USE(UNIX_DOMAIN_SOCKETS)
+    IPC::Connection::Identifier connectionIdentifier = encodedConnectionIdentifier.releaseFileDescriptor();
+#elif OS(DARWIN)
+    IPC::Connection::Identifier connectionIdentifier(encodedConnectionIdentifier.port());
 #endif
+    if (IPC::Connection::identifierIsNull(connectionIdentifier))
+        return nullptr;
 
     RefPtr<PluginProcessConnection> pluginProcessConnection = PluginProcessConnection::create(this, pluginProcessToken, connectionIdentifier, supportsAsynchronousInitialization);
     m_pluginProcessConnections.append(pluginProcessConnection);
 
     {
-        MutexLocker locker(m_tokensAndConnectionsMutex);
+        LockHolder locker(m_tokensAndConnectionsMutex);
         ASSERT(!m_tokensAndConnections.contains(pluginProcessToken));
 
         m_tokensAndConnections.set(pluginProcessToken, pluginProcessConnection->connection());
@@ -103,7 +101,7 @@ void PluginProcessConnectionManager::removePluginProcessConnection(PluginProcess
     ASSERT(vectorIndex != notFound);
 
     {
-        MutexLocker locker(m_tokensAndConnectionsMutex);
+        LockHolder locker(m_tokensAndConnectionsMutex);
         ASSERT(m_tokensAndConnections.contains(pluginProcessConnection->pluginProcessToken()));
         
         m_tokensAndConnections.remove(pluginProcessConnection->pluginProcessToken());
@@ -114,8 +112,8 @@ void PluginProcessConnectionManager::removePluginProcessConnection(PluginProcess
 
 void PluginProcessConnectionManager::pluginProcessCrashed(uint64_t pluginProcessToken)
 {
-    MutexLocker locker(m_tokensAndConnectionsMutex);
-    CoreIPC::Connection* connection = m_tokensAndConnections.get(pluginProcessToken);
+    LockHolder locker(m_tokensAndConnectionsMutex);
+    IPC::Connection* connection = m_tokensAndConnections.get(pluginProcessToken);
 
     // It's OK for connection to be null here; it will happen if this web process doesn't know
     // anything about the plug-in process.
@@ -127,4 +125,4 @@ void PluginProcessConnectionManager::pluginProcessCrashed(uint64_t pluginProcess
 
 } // namespace WebKit
 
-#endif // ENABLE(PLUGIN_PROCESS)
+#endif // ENABLE(NETSCAPE_PLUGIN_API)

@@ -26,18 +26,21 @@
 #ifndef PluginProcessManager_h
 #define PluginProcessManager_h
 
-#if ENABLE(PLUGIN_PROCESS)
+#if ENABLE(NETSCAPE_PLUGIN_API)
 
 #include "PluginModuleInfo.h"
 #include "PluginProcess.h"
 #include "PluginProcessAttributes.h"
+#include "ProcessThrottler.h"
 #include "WebProcessProxyMessages.h"
 #include <wtf/Forward.h>
 #include <wtf/HashSet.h>
+#include <wtf/NeverDestroyed.h>
 #include <wtf/Noncopyable.h>
+#include <wtf/RefCounter.h>
 #include <wtf/Vector.h>
 
-namespace CoreIPC {
+namespace IPC {
     class ArgumentEncoder;
 }
 
@@ -46,23 +49,26 @@ namespace WebKit {
 class PluginInfoStore;
 class PluginProcessProxy;
 class WebProcessProxy;
-class WebPluginSiteDataManager;
 
 class PluginProcessManager {
     WTF_MAKE_NONCOPYABLE(PluginProcessManager);
+    friend class NeverDestroyed<PluginProcessManager>;
 public:
-    static PluginProcessManager& shared();
+    static PluginProcessManager& singleton();
 
     uint64_t pluginProcessToken(const PluginModuleInfo&, PluginProcessType, PluginProcessSandboxPolicy);
 
     void getPluginProcessConnection(uint64_t pluginProcessToken, PassRefPtr<Messages::WebProcessProxy::GetPluginProcessConnection::DelayedReply>);
     void removePluginProcessProxy(PluginProcessProxy*);
 
-    void getSitesWithData(const PluginModuleInfo&, WebPluginSiteDataManager*, uint64_t callbackID);
-    void clearSiteData(const PluginModuleInfo&, WebPluginSiteDataManager*, const Vector<String>& sites, uint64_t flags, uint64_t maxAgeInSeconds, uint64_t callbackID);
+    void fetchWebsiteData(const PluginModuleInfo&, std::function<void (Vector<String>)> completionHandler);
+    void deleteWebsiteData(const PluginModuleInfo&, std::chrono::system_clock::time_point modifiedSince, std::function<void ()> completionHandler);
+    void deleteWebsiteDataForHostNames(const PluginModuleInfo&, const Vector<String>& hostNames, std::function<void ()> completionHandler);
 
-#if PLATFORM(MAC)
-    void setProcessSuppressionEnabled(bool);
+#if PLATFORM(COCOA)
+    inline ProcessSuppressionDisabledToken processSuppressionDisabledToken();
+    inline bool processSuppressionDisabled() const;
+    void updateProcessSuppressionDisabled(bool);
 #endif
 
 private:
@@ -70,14 +76,30 @@ private:
 
     PluginProcessProxy* getOrCreatePluginProcess(uint64_t pluginProcessToken);
 
-    Vector<std::pair<PluginProcessAttributes, uint64_t> > m_pluginProcessTokens;
+    Vector<std::pair<PluginProcessAttributes, uint64_t>> m_pluginProcessTokens;
     HashSet<uint64_t> m_knownTokens;
 
-    Vector<RefPtr<PluginProcessProxy> > m_pluginProcesses;
+    Vector<RefPtr<PluginProcessProxy>> m_pluginProcesses;
+
+#if PLATFORM(COCOA)
+    RefCounter m_processSuppressionDisabledForPageCounter;
+#endif
 };
+
+#if PLATFORM(COCOA)
+inline ProcessSuppressionDisabledToken PluginProcessManager::processSuppressionDisabledToken()
+{
+    return m_processSuppressionDisabledForPageCounter.token<ProcessSuppressionDisabledTokenType>();
+}
+
+inline bool PluginProcessManager::processSuppressionDisabled() const
+{
+    return m_processSuppressionDisabledForPageCounter.value();
+}
+#endif
 
 } // namespace WebKit
 
-#endif // ENABLE(PLUGIN_PROCESS)
+#endif // ENABLE(NETSCAPE_PLUGIN_API)
 
 #endif // PluginProcessManager_h

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007 Apple Inc.  All rights reserved.
+ * Copyright (C) 2007, 2014-2015 Apple Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -36,10 +36,10 @@ class WCEnumFormatEtc : public IEnumFORMATETC
 {
 public:
     WCEnumFormatEtc(const Vector<FORMATETC>& formats);
-    WCEnumFormatEtc(const Vector<FORMATETC*>& formats);
+    WCEnumFormatEtc(const Vector<std::unique_ptr<FORMATETC>>& formats);
 
     //IUnknown members
-    STDMETHOD(QueryInterface)(REFIID, void**);
+    STDMETHOD(QueryInterface)(_In_ REFIID, _COM_Outptr_ void**);
     STDMETHOD_(ULONG, AddRef)(void);
     STDMETHOD_(ULONG, Release)(void);
 
@@ -50,32 +50,28 @@ public:
     STDMETHOD(Clone)(IEnumFORMATETC**);
 
 private:
-    long m_ref;
-    Vector<FORMATETC>  m_formats;
-    size_t m_current;
+    Vector<FORMATETC> m_formats;
+    size_t m_current { 0 };
+    long m_ref { 1 };
 };
 
-
-
 WCEnumFormatEtc::WCEnumFormatEtc(const Vector<FORMATETC>& formats)
-: m_ref(1)
-, m_current(0)
 {
-    for(size_t i = 0; i < formats.size(); ++i)
-        m_formats.append(formats[i]);
+    for (const auto& format : formats)
+        m_formats.append(format);
 }
 
-WCEnumFormatEtc::WCEnumFormatEtc(const Vector<FORMATETC*>& formats)
-: m_ref(1)
-, m_current(0)
+WCEnumFormatEtc::WCEnumFormatEtc(const Vector<std::unique_ptr<FORMATETC>>& formats)
 {
-    for(size_t i = 0; i < formats.size(); ++i)
-        m_formats.append(*formats[i]);
+    for (auto& format : formats)
+        m_formats.append(*format);
 }
 
-STDMETHODIMP  WCEnumFormatEtc::QueryInterface(REFIID riid, void** ppvObject)
+STDMETHODIMP WCEnumFormatEtc::QueryInterface(_In_ REFIID riid, _COM_Outptr_ void** ppvObject)
 {
-    *ppvObject = 0;
+    if (!ppvObject)
+        return E_POINTER;
+    *ppvObject = nullptr;
     if (IsEqualIID(riid, IID_IUnknown) || IsEqualIID(riid, IID_IEnumFORMATETC)) {
         *ppvObject = this;
         AddRef();
@@ -85,12 +81,12 @@ STDMETHODIMP  WCEnumFormatEtc::QueryInterface(REFIID riid, void** ppvObject)
     return E_NOINTERFACE;
 }
 
-STDMETHODIMP_(ULONG) WCEnumFormatEtc::AddRef(void)
+STDMETHODIMP_(ULONG) WCEnumFormatEtc::AddRef()
 {
     return InterlockedIncrement(&m_ref);
 }
 
-STDMETHODIMP_(ULONG) WCEnumFormatEtc::Release(void)
+STDMETHODIMP_(ULONG) WCEnumFormatEtc::Release()
 {
     long c = InterlockedDecrement(&m_ref);
     if (c == 0)
@@ -105,10 +101,10 @@ STDMETHODIMP WCEnumFormatEtc::Next(ULONG celt, LPFORMATETC lpFormatEtc, ULONG* p
 
     ULONG cReturn = celt;
 
-    if(celt <= 0 || lpFormatEtc == 0 || m_current >= m_formats.size())
+    if (celt <= 0 || !lpFormatEtc || m_current >= m_formats.size())
         return S_FALSE;
 
-    if(pceltFetched == 0 && celt != 1) // pceltFetched can be 0 only for 1 item request
+    if (!pceltFetched && celt != 1) // pceltFetched can be 0 only for 1 item request
         return S_FALSE;
 
     while (m_current < m_formats.size() && cReturn > 0) {
@@ -123,7 +119,7 @@ STDMETHODIMP WCEnumFormatEtc::Next(ULONG celt, LPFORMATETC lpFormatEtc, ULONG* p
 
 STDMETHODIMP WCEnumFormatEtc::Skip(ULONG celt)
 {
-    if((m_current + int(celt)) >= m_formats.size())
+    if ((m_current + int(celt)) >= m_formats.size())
         return S_FALSE;
     m_current += celt;
     return S_OK;
@@ -137,11 +133,11 @@ STDMETHODIMP WCEnumFormatEtc::Reset(void)
 
 STDMETHODIMP WCEnumFormatEtc::Clone(IEnumFORMATETC** ppCloneEnumFormatEtc)
 {
-    if(!ppCloneEnumFormatEtc)
+    if (!ppCloneEnumFormatEtc)
         return E_POINTER;
 
     WCEnumFormatEtc *newEnum = new WCEnumFormatEtc(m_formats);
-    if(!newEnum)
+    if (!newEnum)
         return E_OUTOFMEMORY;
 
     newEnum->AddRef();
@@ -174,22 +170,14 @@ HRESULT WCDataObject::createInstance(WCDataObject** result, const DragDataMap& d
 }
 
 WCDataObject::WCDataObject()
-: m_ref(1)
 {
 }
 
-WCDataObject::~WCDataObject()
+STDMETHODIMP WCDataObject::QueryInterface(_In_ REFIID riid, _COM_Outptr_ void** ppvObject)
 {
-    for(size_t i = 0; i < m_medium.size(); ++i) {
-        ReleaseStgMedium(m_medium[i]);
-        delete m_medium[i];
-    }
-    WTF::deleteAllValues(m_formats);
-}
-
-STDMETHODIMP WCDataObject::QueryInterface(REFIID riid,void** ppvObject)
-{
-    *ppvObject = 0;
+    if (!ppvObject)
+        return E_POINTER;
+    *ppvObject = nullptr;
     if (IsEqualIID(riid, IID_IUnknown) || 
         IsEqualIID(riid, IID_IDataObject)) {
         *ppvObject=this;
@@ -216,16 +204,16 @@ STDMETHODIMP_(ULONG) WCDataObject::Release( void)
 
 STDMETHODIMP WCDataObject::GetData(FORMATETC* pformatetcIn, STGMEDIUM* pmedium)
 { 
-    if(!pformatetcIn || !pmedium)
+    if (!pformatetcIn || !pmedium)
         return E_POINTER;
-    pmedium->hGlobal = 0;
+    pmedium->hGlobal = nullptr;
 
-    for(size_t i=0; i < m_formats.size(); ++i) {
-        if(/*pformatetcIn->tymed & m_formats[i]->tymed &&*/     // tymed can be 0 (TYMED_NULL) - but it can have a medium that contains an pUnkForRelease
-            pformatetcIn->lindex == m_formats[i]->lindex &&
-            pformatetcIn->dwAspect == m_formats[i]->dwAspect &&
-            pformatetcIn->cfFormat == m_formats[i]->cfFormat) {
-            CopyMedium(pmedium, m_medium[i], m_formats[i]);
+    for (size_t i = 0; i < m_formats.size(); ++i) {
+        if (/*pformatetcIn->tymed & m_formats[i]->tymed &&*/ // tymed can be 0 (TYMED_NULL) - but it can have a medium that contains an pUnkForRelease
+            pformatetcIn->lindex == m_formats[i]->lindex
+            && pformatetcIn->dwAspect == m_formats[i]->dwAspect
+            && pformatetcIn->cfFormat == m_formats[i]->cfFormat) {
+            CopyMedium(pmedium, m_medium[i].get(), m_formats[i].get());
             return S_OK;
         }
     }
@@ -239,18 +227,18 @@ STDMETHODIMP WCDataObject::GetDataHere(FORMATETC*, STGMEDIUM*)
 
 STDMETHODIMP WCDataObject::QueryGetData(FORMATETC* pformatetc)
 { 
-    if(!pformatetc)
+    if (!pformatetc)
         return E_POINTER;
 
     if (!(DVASPECT_CONTENT & pformatetc->dwAspect))
         return (DV_E_DVASPECT);
     HRESULT  hr = DV_E_TYMED;
-    for(size_t i = 0; i < m_formats.size(); ++i) {
-        if(pformatetc->tymed & m_formats[i]->tymed) {
-            if(pformatetc->cfFormat == m_formats[i]->cfFormat)
+    for (auto& format : m_formats) {
+        if (pformatetc->tymed & format->tymed) {
+            if (pformatetc->cfFormat == format->cfFormat)
                 return S_OK;
-            else
-                hr = DV_E_CLIPFORMAT;
+
+            hr = DV_E_CLIPFORMAT;
         }
         else
             hr = DV_E_TYMED;
@@ -265,31 +253,23 @@ STDMETHODIMP WCDataObject::GetCanonicalFormatEtc(FORMATETC*, FORMATETC*)
 
 STDMETHODIMP WCDataObject::SetData(FORMATETC* pformatetc, STGMEDIUM* pmedium, BOOL fRelease)
 { 
-    if(!pformatetc || !pmedium)
+    if (!pformatetc || !pmedium)
         return E_POINTER;
 
-    FORMATETC* fetc=new FORMATETC;
-    if (!fetc)
-        return E_OUTOFMEMORY;
+    auto fetc = std::make_unique<FORMATETC>();
+    std::unique_ptr<STGMEDIUM, StgMediumDeleter> pStgMed(new STGMEDIUM);
 
-    STGMEDIUM* pStgMed = new STGMEDIUM;
-
-    if(!pStgMed) {
-        delete fetc;
-        return E_OUTOFMEMORY;
-    }
-
-    ZeroMemory(fetc,sizeof(FORMATETC));
-    ZeroMemory(pStgMed,sizeof(STGMEDIUM));
+    ZeroMemory(fetc.get(), sizeof(FORMATETC));
+    ZeroMemory(pStgMed.get(), sizeof(STGMEDIUM));
 
     *fetc = *pformatetc;
-    m_formats.append(fetc);
+    m_formats.append(WTFMove(fetc));
 
     if(fRelease)
         *pStgMed = *pmedium;
     else
-        CopyMedium(pStgMed, pmedium, pformatetc);
-    m_medium.append(pStgMed);
+        CopyMedium(pStgMed.get(), pmedium, pformatetc);
+    m_medium.append(WTFMove(pStgMed));
 
     return S_OK;
 }
@@ -298,7 +278,6 @@ void WCDataObject::CopyMedium(STGMEDIUM* pMedDest, STGMEDIUM* pMedSrc, FORMATETC
 {
     switch(pMedSrc->tymed)
     {
-#if !OS(WINCE)
     case TYMED_HGLOBAL:
         pMedDest->hGlobal = (HGLOBAL)OleDuplicateData(pMedSrc->hGlobal,pFmtSrc->cfFormat, 0);
         break;
@@ -314,7 +293,6 @@ void WCDataObject::CopyMedium(STGMEDIUM* pMedDest, STGMEDIUM* pMedSrc, FORMATETC
     case TYMED_FILE:
         pMedSrc->lpszFileName = (LPOLESTR)OleDuplicateData(pMedSrc->lpszFileName,pFmtSrc->cfFormat, 0);
         break;
-#endif
     case TYMED_ISTREAM:
         pMedDest->pstm = pMedSrc->pstm;
         pMedSrc->pstm->AddRef();
@@ -328,14 +306,14 @@ void WCDataObject::CopyMedium(STGMEDIUM* pMedDest, STGMEDIUM* pMedSrc, FORMATETC
     }
     pMedDest->tymed = pMedSrc->tymed;
     pMedDest->pUnkForRelease = 0;
-    if(pMedSrc->pUnkForRelease != 0) {
+    if (pMedSrc->pUnkForRelease) {
         pMedDest->pUnkForRelease = pMedSrc->pUnkForRelease;
         pMedSrc->pUnkForRelease->AddRef();
     }
 }
 STDMETHODIMP WCDataObject::EnumFormatEtc(DWORD dwDirection, IEnumFORMATETC** ppenumFormatEtc)
 { 
-    if(!ppenumFormatEtc)
+    if (!ppenumFormatEtc)
         return E_POINTER;
 
     *ppenumFormatEtc=0;
@@ -343,7 +321,7 @@ STDMETHODIMP WCDataObject::EnumFormatEtc(DWORD dwDirection, IEnumFORMATETC** ppe
     {
     case DATADIR_GET:
         *ppenumFormatEtc= new WCEnumFormatEtc(m_formats);
-        if(!(*ppenumFormatEtc))
+        if (!(*ppenumFormatEtc))
             return E_OUTOFMEMORY;
         break;
 
@@ -376,17 +354,8 @@ void WCDataObject::clearData(CLIPFORMAT format)
     size_t ptr = 0;
     while (ptr < m_formats.size()) {
         if (m_formats[ptr]->cfFormat == format) {
-            FORMATETC* current = m_formats[ptr];
-            m_formats[ptr] = m_formats[m_formats.size() - 1];
-            m_formats[m_formats.size() - 1] = 0;
-            m_formats.removeLast();
-            delete current;
-            STGMEDIUM* medium = m_medium[ptr];
-            m_medium[ptr] = m_medium[m_medium.size() - 1];
-            m_medium[m_medium.size() - 1] = 0;
-            m_medium.removeLast();
-            ReleaseStgMedium(medium);
-            delete medium;
+            m_formats[ptr] = m_formats.takeLast();
+            m_medium[ptr] = m_medium.takeLast();
             continue;
         }
         ptr++;

@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2011 Google Inc. All rights reserved.
+ * Copyright (C) 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -29,96 +30,125 @@
  */
 
 #include "config.h"
-
-#if ENABLE(JAVASCRIPT_DEBUGGER) && ENABLE(INSPECTOR)
-
 #include "PageDebuggerAgent.h"
 
+#include "CachedResource.h"
 #include "InspectorOverlay.h"
 #include "InspectorPageAgent.h"
 #include "InstrumentingAgents.h"
+#include "MainFrame.h"
 #include "Page.h"
-#include "PageConsole.h"
+#include "PageConsoleClient.h"
 #include "PageScriptDebugServer.h"
+#include "ScriptState.h"
+#include <inspector/InjectedScript.h>
+#include <inspector/InjectedScriptManager.h>
+#include <inspector/ScriptCallStack.h>
+#include <inspector/ScriptCallStackFactory.h>
+#include <profiler/Profile.h>
+#include <wtf/NeverDestroyed.h>
+
+using namespace Inspector;
 
 namespace WebCore {
 
-PassOwnPtr<PageDebuggerAgent> PageDebuggerAgent::create(InstrumentingAgents* instrumentingAgents, InspectorCompositeState* inspectorState, InspectorPageAgent* pageAgent, InjectedScriptManager* injectedScriptManager, InspectorOverlay* overlay)
-{
-    return adoptPtr(new PageDebuggerAgent(instrumentingAgents, inspectorState, pageAgent, injectedScriptManager, overlay));
-}
-
-PageDebuggerAgent::PageDebuggerAgent(InstrumentingAgents* instrumentingAgents, InspectorCompositeState* inspectorState, InspectorPageAgent* pageAgent, InjectedScriptManager* injectedScriptManager, InspectorOverlay* overlay)
-    : InspectorDebuggerAgent(instrumentingAgents, inspectorState, injectedScriptManager)
+PageDebuggerAgent::PageDebuggerAgent(PageAgentContext& context, InspectorPageAgent* pageAgent, InspectorOverlay* overlay)
+    : WebDebuggerAgent(context)
+    , m_page(context.inspectedPage)
     , m_pageAgent(pageAgent)
     , m_overlay(overlay)
 {
 }
 
-PageDebuggerAgent::~PageDebuggerAgent()
-{
-}
-
 void PageDebuggerAgent::enable()
 {
-    InspectorDebuggerAgent::enable();
-    m_instrumentingAgents->setPageDebuggerAgent(this);
+    WebDebuggerAgent::enable();
+    m_instrumentingAgents.setPageDebuggerAgent(this);
 }
 
-void PageDebuggerAgent::disable()
+void PageDebuggerAgent::disable(bool isBeingDestroyed)
 {
-    InspectorDebuggerAgent::disable();
-    m_instrumentingAgents->setPageDebuggerAgent(0);
+    WebDebuggerAgent::disable(isBeingDestroyed);
+    m_instrumentingAgents.setPageDebuggerAgent(nullptr);
 }
 
-void PageDebuggerAgent::startListeningScriptDebugServer()
+String PageDebuggerAgent::sourceMapURLForScript(const Script& script)
 {
-    scriptDebugServer().addListener(this, m_pageAgent->page());
-}
+    static NeverDestroyed<String> sourceMapHTTPHeader(ASCIILiteral("SourceMap"));
+    static NeverDestroyed<String> sourceMapHTTPHeaderDeprecated(ASCIILiteral("X-SourceMap"));
 
-void PageDebuggerAgent::stopListeningScriptDebugServer()
-{
-    scriptDebugServer().removeListener(this, m_pageAgent->page());
-}
+    if (!script.url.isEmpty()) {
+        CachedResource* resource = m_pageAgent->cachedResource(&m_page.mainFrame(), URL(ParsedURLString, script.url));
+        if (resource) {
+            String sourceMapHeader = resource->response().httpHeaderField(sourceMapHTTPHeader);
+            if (!sourceMapHeader.isEmpty())
+                return sourceMapHeader;
 
-PageScriptDebugServer& PageDebuggerAgent::scriptDebugServer()
-{
-    return PageScriptDebugServer::shared();
+            sourceMapHeader = resource->response().httpHeaderField(sourceMapHTTPHeaderDeprecated);
+            if (!sourceMapHeader.isEmpty())
+                return sourceMapHeader;
+        }
+    }
+
+    return InspectorDebuggerAgent::sourceMapURLForScript(script);
 }
 
 void PageDebuggerAgent::muteConsole()
 {
-    PageConsole::mute();
+    PageConsoleClient::mute();
 }
 
 void PageDebuggerAgent::unmuteConsole()
 {
-    PageConsole::unmute();
+    PageConsoleClient::unmute();
 }
 
-InjectedScript PageDebuggerAgent::injectedScriptForEval(ErrorString* errorString, const int* executionContextId)
+void PageDebuggerAgent::breakpointActionLog(JSC::ExecState* exec, const String& message)
+{
+    m_pageAgent->page().console().addMessage(MessageSource::JS, MessageLevel::Log, message, createScriptCallStack(exec, ScriptCallStack::maxCallStackSizeToCapture));
+}
+
+InjectedScript PageDebuggerAgent::injectedScriptForEval(ErrorString& errorString, const int* executionContextId)
 {
     if (!executionContextId) {
-        ScriptState* scriptState = mainWorldScriptState(m_pageAgent->mainFrame());
-        return injectedScriptManager()->injectedScriptFor(scriptState);
+        JSC::ExecState* scriptState = mainWorldExecState(&m_pageAgent->mainFrame());
+        return injectedScriptManager().injectedScriptFor(scriptState);
     }
-    InjectedScript injectedScript = injectedScriptManager()->injectedScriptForId(*executionContextId);
+
+    InjectedScript injectedScript = injectedScriptManager().injectedScriptForId(*executionContextId);
     if (injectedScript.hasNoValue())
-        *errorString = "Execution context with given id not found.";
+        errorString = ASCIILiteral("Execution context with given id not found.");
+
     return injectedScript;
 }
 
-void PageDebuggerAgent::setOverlayMessage(ErrorString*, const String* message)
+void PageDebuggerAgent::setOverlayMessage(ErrorString&, const String* message)
 {
     m_overlay->setPausedInDebuggerMessage(message);
 }
 
 void PageDebuggerAgent::didClearMainFrameWindowObject()
 {
-    reset();
-    scriptDebugServer().setScriptPreprocessor(m_pageAgent->scriptPreprocessor());
+    didClearGlobalObject();
+}
+
+void PageDebuggerAgent::mainFrameStartedLoading()
+{
+    if (isPaused()) {
+        setSuppressAllPauses(true);
+        ErrorString unused;
+        resume(unused);
+    }
+}
+
+void PageDebuggerAgent::mainFrameStoppedLoading()
+{
+    setSuppressAllPauses(false);
+}
+
+void PageDebuggerAgent::mainFrameNavigated()
+{
+    setSuppressAllPauses(false);
 }
 
 } // namespace WebCore
-
-#endif // ENABLE(JAVASCRIPT_DEBUGGER) && ENABLE(INSPECTOR)

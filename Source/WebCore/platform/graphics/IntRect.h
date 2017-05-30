@@ -27,7 +27,7 @@
 #define IntRect_h
 
 #include "IntPoint.h"
-#include <wtf/Vector.h>
+#include "LayoutUnit.h"
 
 #if USE(CG)
 typedef struct CGRect CGRect;
@@ -41,24 +41,18 @@ typedef struct _NSRect NSRect;
 #endif
 #endif
 
+#if PLATFORM(IOS)
+#ifndef NSRect
+#define NSRect CGRect
+#endif
+#endif
+
 #if PLATFORM(WIN)
 typedef struct tagRECT RECT;
 #elif PLATFORM(QT)
 QT_BEGIN_NAMESPACE
 class QRect;
 QT_END_NAMESPACE
-#elif PLATFORM(GTK)
-#ifdef GTK_API_VERSION_2
-typedef struct _GdkRectangle GdkRectangle;
-#endif
-#elif PLATFORM(EFL)
-typedef struct _Eina_Rectangle Eina_Rectangle;
-#elif PLATFORM(BLACKBERRY)
-namespace BlackBerry {
-namespace Platform {
-class IntRect;
-}
-}
 #endif
 
 #if USE(CAIRO)
@@ -69,6 +63,7 @@ namespace WebCore {
 
 class FloatRect;
 class LayoutRect;
+class TextStream;
 
 class IntRect {
     WTF_MAKE_FAST_ALLOCATED;
@@ -79,8 +74,8 @@ public:
     IntRect(int x, int y, int width, int height)
         : m_location(IntPoint(x, y)), m_size(IntSize(width, height)) { }
 
-    explicit IntRect(const FloatRect&); // don't do this implicitly since it's lossy
-    explicit IntRect(const LayoutRect&); // don't do this implicitly since it's lossy
+    WEBCORE_EXPORT explicit IntRect(const FloatRect&); // don't do this implicitly since it's lossy
+    WEBCORE_EXPORT explicit IntRect(const LayoutRect&); // don't do this implicitly since it's lossy
         
     IntPoint location() const { return m_location; }
     IntSize size() const { return m_size; }
@@ -143,8 +138,8 @@ public:
     IntPoint minXMaxYCorner() const { return IntPoint(m_location.x(), m_location.y() + m_size.height()); } // typically bottomLeft
     IntPoint maxXMaxYCorner() const { return IntPoint(m_location.x() + m_size.width(), m_location.y() + m_size.height()); } // typically bottomRight
     
-    bool intersects(const IntRect&) const;
-    bool contains(const IntRect&) const;
+    WEBCORE_EXPORT bool intersects(const IntRect&) const;
+    WEBCORE_EXPORT bool contains(const IntRect&) const;
 
     // This checks to see if the rect contains x,y in the traditional sense.
     // Equivalent to checking if the rect contains a 1x1 rect below and to the right of (px,py).
@@ -152,8 +147,8 @@ public:
         { return px >= x() && px < maxX() && py >= y() && py < maxY(); }
     bool contains(const IntPoint& point) const { return contains(point.x(), point.y()); }
 
-    void intersect(const IntRect&);
-    void unite(const IntRect&);
+    WEBCORE_EXPORT void intersect(const IntRect&);
+    WEBCORE_EXPORT void unite(const IntRect&);
     void uniteIfNonZero(const IntRect&);
 
     void inflateX(int dx)
@@ -167,7 +162,7 @@ public:
         m_size.setHeight(m_size.height() + dy + dy);
     }
     void inflate(int d) { inflateX(d); inflateY(d); }
-    void scale(float s);
+    WEBCORE_EXPORT void scale(float s);
 
     IntSize differenceToPoint(const IntPoint&) const;
     int distanceSquaredToPoint(const IntPoint& p) const { return differenceToPoint(p).diagonalLengthSquared(); }
@@ -180,11 +175,6 @@ public:
 #elif PLATFORM(QT)
     IntRect(const QRect&);
     operator QRect() const;
-#elif PLATFORM(GTK)
-#ifdef GTK_API_VERSION_2
-    IntRect(const GdkRectangle&);
-    operator GdkRectangle() const;
-#endif
 #elif PLATFORM(EFL)
     explicit IntRect(const Eina_Rectangle&);
     operator Eina_Rectangle() const;
@@ -196,16 +186,11 @@ public:
 #endif
 
 #if USE(CG)
-    operator CGRect() const;
+    WEBCORE_EXPORT operator CGRect() const;
 #endif
 
-#if (PLATFORM(MAC) && !defined(NSGEOMETRY_TYPES_SAME_AS_CGGEOMETRY_TYPES))
-    operator NSRect() const;
-#endif
-
-#if PLATFORM(BLACKBERRY)
-    IntRect(const BlackBerry::Platform::IntRect&);
-    operator BlackBerry::Platform::IntRect() const;
+#if PLATFORM(MAC) && !defined(NSGEOMETRY_TYPES_SAME_AS_CGGEOMETRY_TYPES)
+    WEBCORE_EXPORT operator NSRect() const;
 #endif
 
 private:
@@ -227,8 +212,6 @@ inline IntRect unionRect(const IntRect& a, const IntRect& b)
     return c;
 }
 
-IntRect unionRect(const Vector<IntRect>&);
-
 inline bool operator==(const IntRect& a, const IntRect& b)
 {
     return a.location() == b.location() && a.size() == b.size();
@@ -239,13 +222,27 @@ inline bool operator!=(const IntRect& a, const IntRect& b)
     return a.location() != b.location() || a.size() != b.size();
 }
 
+inline IntRect& operator-=(IntRect& r, const IntPoint& offset)
+{
+    r.move(-offset.x(), -offset.y());
+    return r;
+}
+
+inline IntRect operator-(const IntRect& r, const IntPoint& offset)
+{
+    IntRect t = r;
+    return t -= offset;
+}
+
 #if USE(CG)
-IntRect enclosingIntRect(const CGRect&);
+WEBCORE_EXPORT IntRect enclosingIntRect(const CGRect&);
 #endif
 
-#if (PLATFORM(MAC) && !defined(NSGEOMETRY_TYPES_SAME_AS_CGGEOMETRY_TYPES))
-IntRect enclosingIntRect(const NSRect&);
+#if PLATFORM(MAC) && !defined(NSGEOMETRY_TYPES_SAME_AS_CGGEOMETRY_TYPES)
+WEBCORE_EXPORT IntRect enclosingIntRect(const NSRect&);
 #endif
+
+WEBCORE_EXPORT TextStream& operator<<(TextStream&, const IntRect&);
 
 } // namespace WebCore
 

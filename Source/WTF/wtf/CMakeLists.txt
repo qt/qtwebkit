@@ -1,116 +1,121 @@
 set(WTF_HEADERS
     ASCIICType.h
-    AVLTree.h
-    Alignment.h
     Assertions.h
     Atomics.h
-    BitArray.h
+    Bag.h
+    BagToHashMap.h
     BitVector.h
     Bitmap.h
-    BoundsCheckedPointer.h
+    BubbleSort.h
     BumpPointerAllocator.h
     ByteOrder.h
+    CompilationThread.h
     Compiler.h
+    Condition.h
+    CryptographicUtilities.h
     CryptographicallyRandomNumber.h
     CurrentTime.h
-    DateMath.h
     DataLog.h
+    DateMath.h
+    Dominators.h
     DecimalNumber.h
-    Decoder.h
+    DeferrableRefCounted.h
     Deque.h
     DisallowCType.h
     DoublyLinkedList.h
-    DynamicAnnotations.h
-    Encoder.h
-    FastAllocBase.h
     FastMalloc.h
     FeatureDefines.h
     FilePrintStream.h
-    FixedArray.h
+    FlipBytes.h
     Forward.h
     FunctionDispatcher.h
     Functional.h
     GetPtr.h
+    GraphNodeWorklist.h
     GregorianDateTime.h
     HashCountedSet.h
+    Hasher.h
     HashFunctions.h
     HashIterators.h
     HashMap.h
+    HashMethod.h
     HashSet.h
     HashTable.h
     HashTraits.h
     HexNumber.h
+    IteratorAdaptors.h
+    IteratorRange.h
     ListHashSet.h
+    Lock.h
     Locker.h
     MD5.h
     MainThread.h
+    MallocPtr.h
     MathExtras.h
     MediaTime.h
     MessageQueue.h
     MetaAllocator.h
     MetaAllocatorHandle.h
-    NonCopyingSort.h
-    ThreadRestrictionVerifier.h
     Noncopyable.h
-    NotFound.h
-    NullPtr.h
     NumberOfCores.h
-    RAMSize.h
     OSAllocator.h
     OSRandomSource.h
-    OwnArrayPtr.h
-    OwnPtr.h
-    OwnPtrCommon.h
+    OptionSet.h
+    OrderMaker.h
     PageAllocation.h
-    PageAllocationAligned.h
     PageBlock.h
     PageReservation.h
-    PassOwnArrayPtr.h
-    PassOwnPtr.h
-    PassRefPtr.h
-    PassTraits.h
+    ParallelHelperPool.h
     ParallelJobs.h
     ParallelJobsGeneric.h
     ParallelJobsLibdispatch.h
     ParallelJobsOpenMP.h
+    ParallelVectorIterator.h
+    ParkingLot.h
+    PassRefPtr.h
     Platform.h
-    PossiblyNull.h
     PrintStream.h
     ProcessID.h
+    RAMSize.h
     RandomNumber.h
     RandomNumberSeed.h
+    RangeSet.h
     RawPointer.h
     RedBlackTree.h
+    Ref.h
     RefCounted.h
     RefCountedLeakCounter.h
+    RefCounter.h
     RefPtr.h
-    RefPtrHashMap.h
     RetainPtr.h
-    SaturatedArithmetic.h
-    SegmentedVector.h
+    RunLoop.h
     SHA1.h
+    SharedTask.h
+    SaturatedArithmetic.h
+    ScopedLambda.h
+    SegmentedVector.h
     StackBounds.h
+    StackStats.h
     StaticConstructors.h
     StdLibExtras.h
+    Stopwatch.h
     StringExtras.h
-    StringHasher.h
     StringPrintStream.h
-    TCPackedCache.h
-    TCPageMap.h
-    TCSpinLock.h
-    TCSystemAlloc.h
+    SystemTracing.h
     ThreadIdentifierDataPthreads.h
     ThreadSafeRefCounted.h
     ThreadSpecific.h
     Threading.h
     ThreadingPrimitives.h
-    TypeTraits.h
+    TinyPtrSet.h
     VMTags.h
     ValueCheck.h
     Vector.h
     VectorTraits.h
     WTFThreadData.h
     WeakPtr.h
+    WordLock.h
+    WorkQueue.h
     dtoa.h
 
     dtoa/bignum-dtoa.h
@@ -130,9 +135,15 @@ set(WTF_HEADERS
     text/Base64.h
     text/CString.h
     text/IntegerToStringConversion.h
+    text/LChar.h
     text/StringBuffer.h
+    text/StringCommon.h
     text/StringHash.h
     text/StringImpl.h
+    text/StringView.h
+    text/SymbolImpl.h
+    text/SymbolRegistry.h
+    text/UniquedStringImpl.h
     text/WTFString.h
 
     threads/BinarySemaphore.h
@@ -140,47 +151,51 @@ set(WTF_HEADERS
     unicode/CharacterNames.h
     unicode/Collator.h
     unicode/UTF8.h
-    unicode/Unicode.h
 )
 
 set(WTF_SOURCES
-    ArrayBuffer.cpp
-    ArrayBufferView.cpp
     Assertions.cpp
     Atomics.cpp
     BitVector.cpp
+    CompilationThread.cpp
+    CryptographicUtilities.cpp
     CryptographicallyRandomNumber.cpp
     CurrentTime.cpp
-    DateMath.cpp
     DataLog.cpp
+    DateMath.cpp
     DecimalNumber.cpp
-    DynamicAnnotations.cpp
+    FastBitVector.cpp
     FastMalloc.cpp
     FilePrintStream.cpp
     FunctionDispatcher.cpp
     GregorianDateTime.cpp
     HashTable.cpp
+    Lock.cpp
     MD5.cpp
     MainThread.cpp
     MediaTime.cpp
     MetaAllocator.cpp
-    NullPtr.cpp
-    OSRandomSource.cpp
     NumberOfCores.cpp
-    RAMSize.cpp
-    PageAllocationAligned.cpp
+    OSRandomSource.cpp
     PageBlock.cpp
+    ParallelHelperPool.cpp
     ParallelJobsGeneric.cpp
+    ParkingLot.cpp
     PrintStream.cpp
+    RAMSize.cpp
     RandomNumber.cpp
     RefCountedLeakCounter.cpp
+    RefCounter.cpp
+    RunLoop.cpp
     SHA1.cpp
+    SixCharacterHash.cpp
     StackBounds.cpp
+    StackStats.cpp
     StringPrintStream.cpp
-    TCSystemAlloc.cpp
     Threading.cpp
-    TypeTraits.cpp
     WTFThreadData.cpp
+    WordLock.cpp
+    WorkQueue.cpp
     dtoa.cpp
 
     dtoa/bignum-dtoa.cc
@@ -193,12 +208,15 @@ set(WTF_SOURCES
     dtoa/strtod.cc
 
     text/AtomicString.cpp
+    text/AtomicStringImpl.cpp
     text/AtomicStringTable.cpp
     text/Base64.cpp
     text/CString.cpp
     text/StringBuilder.cpp
     text/StringImpl.cpp
     text/StringStatics.cpp
+    text/StringView.cpp
+    text/SymbolRegistry.cpp
     text/WTFString.cpp
 
     threads/BinarySemaphore.cpp
@@ -207,50 +225,51 @@ set(WTF_SOURCES
 )
 
 set(WTF_INCLUDE_DIRECTORIES
+    "${BMALLOC_DIR}"
     "${WTF_DIR}"
     "${WTF_DIR}/wtf"
     "${WTF_DIR}/wtf/dtoa"
+    "${WTF_DIR}/wtf/text"
     "${WTF_DIR}/wtf/threads"
     "${WTF_DIR}/wtf/unicode"
     "${THIRDPARTY_DIR}"
     "${CMAKE_BINARY_DIR}"
+    "${DERIVED_SOURCES_DIR}"
 )
 
 set(WTF_LIBRARIES
     ${CMAKE_DL_LIBS}
 )
 
-if (WTF_USE_ICU_UNICODE)
+if (CMAKE_SYSTEM_NAME MATCHES "Darwin")
     list(APPEND WTF_HEADERS
-        unicode/icu/UnicodeIcu.h
-    )
-    list(APPEND WTF_SOURCES
-        unicode/icu/CollatorICU.cpp
+        spi/darwin/CommonCryptoSPI.h
     )
     list(APPEND WTF_INCLUDE_DIRECTORIES
-        ${ICU_INCLUDE_DIRS}
-    )
-    list(APPEND WTF_LIBRARIES
-        ${ICU_I18N_LIBRARIES}
-        ${ICU_LIBRARIES}
-    )
-elseif (WTF_USE_WCHAR_UNICODE)
-    list(APPEND WTF_HEADERS
-        unicode/wchar/UnicodeWchar.h
-    )
-    list(APPEND WTF_SOURCES
-        unicode/CollatorDefault.cpp
-        unicode/wchar/UnicodeWchar.cpp
+        "${WTF_DIR}/wtf/spi/darwin"
     )
 endif ()
+
+if (NOT USE_SYSTEM_MALLOC)
+    list(APPEND WTF_LIBRARIES bmalloc)
+endif ()
+
+list(APPEND WTF_SOURCES
+    unicode/icu/CollatorICU.cpp
+)
+set(WTF_SYSTEM_INCLUDE_DIRECTORIES
+    ${ICU_INCLUDE_DIRS}
+)
+list(APPEND WTF_LIBRARIES
+    ${ICU_I18N_LIBRARIES}
+    ${ICU_LIBRARIES}
+)
 
 if (WIN32)
     list(APPEND WTF_SOURCES
         OSAllocatorWin.cpp
         ThreadSpecificWin.cpp
         ThreadingWin.cpp
-
-        win/OwnPtrWin.cpp
     )
 else ()
     list(APPEND WTF_HEADERS
@@ -266,12 +285,11 @@ endif ()
 WEBKIT_INCLUDE_CONFIG_FILES_IF_EXISTS()
 
 WEBKIT_WRAP_SOURCELIST(${WTF_SOURCES})
-include_directories(${WTF_INCLUDE_DIRECTORIES})
-add_definitions(-DBUILDING_WTF)
-add_library(WTF STATIC ${WTF_HEADERS} ${WTF_SOURCES})
-target_link_libraries(WTF ${WTF_LIBRARIES})
-set_target_properties(WTF PROPERTIES FOLDER "JavaScriptCore")
+WEBKIT_FRAMEWORK(WTF)
 
-if (WTF_OUTPUT_NAME)
-    set_target_properties(WTF PROPERTIES OUTPUT_NAME ${WTF_OUTPUT_NAME})
+if (MSVC)
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /SUBSYSTEM:WINDOWS")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /SUBSYSTEM:WINDOWS")
 endif ()
+
+QT_ADD_EXTRA_WEBKIT_TARGET_EXPORT(WTF)

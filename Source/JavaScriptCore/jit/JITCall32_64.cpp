@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2008, 2013-2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,28 +29,23 @@
 #if USE(JSVALUE32_64)
 #include "JIT.h"
 
-#include "Arguments.h"
 #include "CodeBlock.h"
 #include "Interpreter.h"
 #include "JITInlines.h"
-#include "JITStubCall.h"
 #include "JSArray.h"
 #include "JSFunction.h"
-#include "Operations.h"
-#include "RepatchBuffer.h"
+#include "JSCInlines.h"
+#include "LinkBuffer.h"
 #include "ResultType.h"
 #include "SamplingTool.h"
+#include "SetupVarargsFrame.h"
+#include "StackAlignment.h"
 #include <wtf/StringPrintStream.h>
 
-#ifndef NDEBUG
-#include <stdio.h>
-#endif
-
-using namespace std;
 
 namespace JSC {
 
-void JIT::emit_op_call_put_result(Instruction* instruction)
+void JIT::emitPutCallResult(Instruction* instruction)
 {
     int dst = instruction[1].u.operand;
     emitValueProfilingSite();
@@ -62,43 +57,21 @@ void JIT::emit_op_ret(Instruction* currentInstruction)
     unsigned dst = currentInstruction[1].u.operand;
 
     emitLoad(dst, regT1, regT0);
-    emitGetFromCallFrameHeaderPtr(JSStack::ReturnPC, regT2);
-    emitGetFromCallFrameHeaderPtr(JSStack::CallerFrame, callFrameRegister);
 
-    restoreReturnAddressBeforeReturn(regT2);
-    ret();
-}
-
-void JIT::emit_op_ret_object_or_this(Instruction* currentInstruction)
-{
-    unsigned result = currentInstruction[1].u.operand;
-    unsigned thisReg = currentInstruction[2].u.operand;
-
-    emitLoad(result, regT1, regT0);
-    Jump notJSCell = branch32(NotEqual, regT1, TrustedImm32(JSValue::CellTag));
-    loadPtr(Address(regT0, JSCell::structureOffset()), regT2);
-    Jump notObject = emitJumpIfNotObject(regT2);
-
-    emitGetFromCallFrameHeaderPtr(JSStack::ReturnPC, regT2);
-    emitGetFromCallFrameHeaderPtr(JSStack::CallerFrame, callFrameRegister);
-
-    restoreReturnAddressBeforeReturn(regT2);
-    ret();
-
-    notJSCell.link(this);
-    notObject.link(this);
-    emitLoad(thisReg, regT1, regT0);
-
-    emitGetFromCallFrameHeaderPtr(JSStack::ReturnPC, regT2);
-    emitGetFromCallFrameHeaderPtr(JSStack::CallerFrame, callFrameRegister);
-
-    restoreReturnAddressBeforeReturn(regT2);
+    checkStackPointerAlignment();
+    emitRestoreCalleeSaves();
+    emitFunctionEpilogue();
     ret();
 }
 
 void JIT::emitSlow_op_call(Instruction* currentInstruction, Vector<SlowCaseEntry>::iterator& iter)
 {
     compileOpCallSlowCase(op_call, currentInstruction, iter, m_callLinkInfoIndex++);
+}
+
+void JIT::emitSlow_op_tail_call(Instruction* currentInstruction, Vector<SlowCaseEntry>::iterator& iter)
+{
+    compileOpCallSlowCase(op_tail_call, currentInstruction, iter, m_callLinkInfoIndex++);
 }
 
 void JIT::emitSlow_op_call_eval(Instruction* currentInstruction, Vector<SlowCaseEntry>::iterator& iter)
@@ -111,6 +84,16 @@ void JIT::emitSlow_op_call_varargs(Instruction* currentInstruction, Vector<SlowC
     compileOpCallSlowCase(op_call_varargs, currentInstruction, iter, m_callLinkInfoIndex++);
 }
 
+void JIT::emitSlow_op_tail_call_varargs(Instruction* currentInstruction, Vector<SlowCaseEntry>::iterator& iter)
+{
+    compileOpCallSlowCase(op_tail_call_varargs, currentInstruction, iter, m_callLinkInfoIndex++);
+}
+    
+void JIT::emitSlow_op_construct_varargs(Instruction* currentInstruction, Vector<SlowCaseEntry>::iterator& iter)
+{
+    compileOpCallSlowCase(op_construct_varargs, currentInstruction, iter, m_callLinkInfoIndex++);
+}
+    
 void JIT::emitSlow_op_construct(Instruction* currentInstruction, Vector<SlowCaseEntry>::iterator& iter)
 {
     compileOpCallSlowCase(op_construct, currentInstruction, iter, m_callLinkInfoIndex++);
@@ -119,6 +102,11 @@ void JIT::emitSlow_op_construct(Instruction* currentInstruction, Vector<SlowCase
 void JIT::emit_op_call(Instruction* currentInstruction)
 {
     compileOpCall(op_call, currentInstruction, m_callLinkInfoIndex++);
+}
+
+void JIT::emit_op_tail_call(Instruction* currentInstruction)
+{
+    compileOpCall(op_tail_call, currentInstruction, m_callLinkInfoIndex++);
 }
 
 void JIT::emit_op_call_eval(Instruction* currentInstruction)
@@ -131,224 +119,207 @@ void JIT::emit_op_call_varargs(Instruction* currentInstruction)
     compileOpCall(op_call_varargs, currentInstruction, m_callLinkInfoIndex++);
 }
 
+void JIT::emit_op_tail_call_varargs(Instruction* currentInstruction)
+{
+    compileOpCall(op_tail_call_varargs, currentInstruction, m_callLinkInfoIndex++);
+}
+    
+void JIT::emit_op_construct_varargs(Instruction* currentInstruction)
+{
+    compileOpCall(op_construct_varargs, currentInstruction, m_callLinkInfoIndex++);
+}
+    
 void JIT::emit_op_construct(Instruction* currentInstruction)
 {
     compileOpCall(op_construct, currentInstruction, m_callLinkInfoIndex++);
 }
 
-void JIT::compileLoadVarargs(Instruction* instruction)
+void JIT::compileSetupVarargsFrame(Instruction* instruction, CallLinkInfo* info)
 {
-    int thisValue = instruction[2].u.operand;
-    int arguments = instruction[3].u.operand;
-    int firstFreeRegister = instruction[4].u.operand;
+    int thisValue = instruction[3].u.operand;
+    int arguments = instruction[4].u.operand;
+    int firstFreeRegister = instruction[5].u.operand;
+    int firstVarArgOffset = instruction[6].u.operand;
 
-    JumpList slowCase;
-    JumpList end;
-    bool canOptimize = m_codeBlock->usesArguments()
-        && arguments == m_codeBlock->argumentsRegister()
-        && !m_codeBlock->symbolTable()->slowArguments();
+    emitLoad(arguments, regT1, regT0);
+    callOperation(operationSizeFrameForVarargs, regT1, regT0, -firstFreeRegister, firstVarArgOffset);
+    move(TrustedImm32(-firstFreeRegister), regT1);
+    emitSetVarargsFrame(*this, returnValueGPR, false, regT1, regT1);
+    addPtr(TrustedImm32(-(sizeof(CallerFrameAndPC) + WTF::roundUpToMultipleOf(stackAlignmentBytes(), 6 * sizeof(void*)))), regT1, stackPointerRegister);
+    emitLoad(arguments, regT2, regT4);
+    callOperation(operationSetupVarargsFrame, regT1, regT2, regT4, firstVarArgOffset, regT0);
+    move(returnValueGPR, regT1);
 
-    if (canOptimize) {
-        emitLoadTag(arguments, regT1);
-        slowCase.append(branch32(NotEqual, regT1, TrustedImm32(JSValue::EmptyValueTag)));
-
-        load32(payloadFor(JSStack::ArgumentCount), regT2);
-        slowCase.append(branch32(Above, regT2, TrustedImm32(Arguments::MaxArguments + 1)));
-        // regT2: argumentCountIncludingThis
-
-        move(regT2, regT3);
-        add32(TrustedImm32(firstFreeRegister + JSStack::CallFrameHeaderSize), regT3);
-        lshift32(TrustedImm32(3), regT3);
-        addPtr(callFrameRegister, regT3);
-        // regT3: newCallFrame
-
-        slowCase.append(branchPtr(Below, AbsoluteAddress(m_vm->interpreter->stack().addressOfEnd()), regT3));
-
-        // Initialize ArgumentCount.
-        store32(regT2, payloadFor(JSStack::ArgumentCount, regT3));
-
-        // Initialize 'this'.
-        emitLoad(thisValue, regT1, regT0);
-        store32(regT0, Address(regT3, OBJECT_OFFSETOF(JSValue, u.asBits.payload) + (CallFrame::thisArgumentOffset() * static_cast<int>(sizeof(Register)))));
-        store32(regT1, Address(regT3, OBJECT_OFFSETOF(JSValue, u.asBits.tag) + (CallFrame::thisArgumentOffset() * static_cast<int>(sizeof(Register)))));
-
-        // Copy arguments.
-        neg32(regT2);
-        end.append(branchAdd32(Zero, TrustedImm32(1), regT2));
-        // regT2: -argumentCount;
-
-        Label copyLoop = label();
-        load32(BaseIndex(callFrameRegister, regT2, TimesEight, OBJECT_OFFSETOF(JSValue, u.asBits.payload) +(CallFrame::thisArgumentOffset() * static_cast<int>(sizeof(Register)))), regT0);
-        load32(BaseIndex(callFrameRegister, regT2, TimesEight, OBJECT_OFFSETOF(JSValue, u.asBits.tag) +(CallFrame::thisArgumentOffset() * static_cast<int>(sizeof(Register)))), regT1);
-        store32(regT0, BaseIndex(regT3, regT2, TimesEight, OBJECT_OFFSETOF(JSValue, u.asBits.payload) +(CallFrame::thisArgumentOffset() * static_cast<int>(sizeof(Register)))));
-        store32(regT1, BaseIndex(regT3, regT2, TimesEight, OBJECT_OFFSETOF(JSValue, u.asBits.tag) +(CallFrame::thisArgumentOffset() * static_cast<int>(sizeof(Register)))));
-        branchAdd32(NonZero, TrustedImm32(1), regT2).linkTo(copyLoop, this);
-
-        end.append(jump());
-    }
-
-    if (canOptimize)
-        slowCase.link(this);
-
-    JITStubCall stubCall(this, cti_op_load_varargs);
-    stubCall.addArgument(thisValue);
-    stubCall.addArgument(arguments);
-    stubCall.addArgument(Imm32(firstFreeRegister));
-    stubCall.call(regT3);
-
-    if (canOptimize)
-        end.link(this);
+    // Profile the argument count.
+    load32(Address(regT1, JSStack::ArgumentCount * static_cast<int>(sizeof(Register)) + PayloadOffset), regT2);
+    load8(info->addressOfMaxNumArguments(), regT0);
+    Jump notBiggest = branch32(Above, regT0, regT2);
+    Jump notSaturated = branch32(BelowOrEqual, regT2, TrustedImm32(255));
+    move(TrustedImm32(255), regT2);
+    notSaturated.link(this);
+    store8(regT2, info->addressOfMaxNumArguments());
+    notBiggest.link(this);
+    
+    // Initialize 'this'.
+    emitLoad(thisValue, regT2, regT0);
+    store32(regT0, Address(regT1, PayloadOffset + (CallFrame::thisArgumentOffset() * static_cast<int>(sizeof(Register)))));
+    store32(regT2, Address(regT1, TagOffset + (CallFrame::thisArgumentOffset() * static_cast<int>(sizeof(Register)))));
+    
+    addPtr(TrustedImm32(sizeof(CallerFrameAndPC)), regT1, stackPointerRegister);
 }
 
-void JIT::compileCallEval()
+void JIT::compileCallEval(Instruction* instruction)
 {
-    JITStubCall stubCall(this, cti_op_call_eval); // Initializes ScopeChain; ReturnPC; CodeBlock.
-    stubCall.call();
+    addPtr(TrustedImm32(-static_cast<ptrdiff_t>(sizeof(CallerFrameAndPC))), stackPointerRegister, regT1);
+    storePtr(callFrameRegister, Address(regT1, CallFrame::callerFrameOffset()));
+
+    addPtr(TrustedImm32(stackPointerOffsetFor(m_codeBlock) * sizeof(Register)), callFrameRegister, stackPointerRegister);
+
+    callOperation(operationCallEval, regT1);
+
     addSlowCase(branch32(Equal, regT1, TrustedImm32(JSValue::EmptyValueTag)));
-    emitGetFromCallFrameHeaderPtr(JSStack::CallerFrame, callFrameRegister);
 
     sampleCodeBlock(m_codeBlock);
+    
+    emitPutCallResult(instruction);
 }
 
-void JIT::compileCallEvalSlowCase(Vector<SlowCaseEntry>::iterator& iter)
+void JIT::compileCallEvalSlowCase(Instruction* instruction, Vector<SlowCaseEntry>::iterator& iter)
 {
+    CallLinkInfo* info = m_codeBlock->addCallLinkInfo();
+    info->setUpCall(CallLinkInfo::Call, CodeOrigin(m_bytecodeOffset), regT0);
+
     linkSlowCase(iter);
 
+    int registerOffset = -instruction[4].u.operand;
+
+    addPtr(TrustedImm32(registerOffset * sizeof(Register) + sizeof(CallerFrameAndPC)), callFrameRegister, stackPointerRegister);
+
+    loadPtr(Address(stackPointerRegister, sizeof(Register) * JSStack::Callee - sizeof(CallerFrameAndPC)), regT0);
+    loadPtr(Address(stackPointerRegister, sizeof(Register) * JSStack::Callee - sizeof(CallerFrameAndPC)), regT1);
+    move(TrustedImmPtr(info), regT2);
+
     emitLoad(JSStack::Callee, regT1, regT0);
-    emitNakedCall(m_vm->getCTIStub(virtualCallGenerator).code());
+    MacroAssemblerCodeRef virtualThunk = virtualThunkFor(m_vm, *info);
+    info->setSlowStub(createJITStubRoutine(virtualThunk, *m_vm, nullptr, true));
+    emitNakedCall(virtualThunk.code());
+    addPtr(TrustedImm32(stackPointerOffsetFor(m_codeBlock) * sizeof(Register)), callFrameRegister, stackPointerRegister);
+    checkStackPointerAlignment();
 
     sampleCodeBlock(m_codeBlock);
+    
+    emitPutCallResult(instruction);
 }
 
 void JIT::compileOpCall(OpcodeID opcodeID, Instruction* instruction, unsigned callLinkInfoIndex)
 {
-    int callee = instruction[1].u.operand;
+    int callee = instruction[2].u.operand;
 
     /* Caller always:
         - Updates callFrameRegister to callee callFrame.
         - Initializes ArgumentCount; CallerFrame; Callee.
 
        For a JS call:
-        - Caller initializes ScopeChain.
         - Callee initializes ReturnPC; CodeBlock.
         - Callee restores callFrameRegister before return.
 
        For a non-JS call:
-        - Caller initializes ScopeChain; ReturnPC; CodeBlock.
+        - Caller initializes ReturnPC; CodeBlock.
         - Caller restores callFrameRegister after return.
     */
-    
-    if (opcodeID == op_call_varargs)
-        compileLoadVarargs(instruction);
+    CallLinkInfo* info;
+    if (opcodeID != op_call_eval)
+        info = m_codeBlock->addCallLinkInfo();
+    if (opcodeID == op_call_varargs || opcodeID == op_construct_varargs || opcodeID == op_tail_call_varargs)
+        compileSetupVarargsFrame(instruction, info);
     else {
-        int argCount = instruction[2].u.operand;
-        int registerOffset = instruction[3].u.operand;
+        int argCount = instruction[3].u.operand;
+        int registerOffset = -instruction[4].u.operand;
         
         if (opcodeID == op_call && shouldEmitProfiling()) {
             emitLoad(registerOffset + CallFrame::argumentOffsetIncludingThis(0), regT0, regT1);
             Jump done = branch32(NotEqual, regT0, TrustedImm32(JSValue::CellTag));
-            loadPtr(Address(regT1, JSCell::structureOffset()), regT1);
-            storePtr(regT1, instruction[5].u.arrayProfile->addressOfLastSeenStructure());
+            loadPtr(Address(regT1, JSCell::structureIDOffset()), regT1);
+            storePtr(regT1, instruction[OPCODE_LENGTH(op_call) - 2].u.arrayProfile->addressOfLastSeenStructureID());
             done.link(this);
         }
     
-        addPtr(TrustedImm32(registerOffset * sizeof(Register)), callFrameRegister, regT3);
+        addPtr(TrustedImm32(registerOffset * sizeof(Register) + sizeof(CallerFrameAndPC)), callFrameRegister, stackPointerRegister);
 
-        store32(TrustedImm32(argCount), payloadFor(JSStack::ArgumentCount, regT3));
-    } // regT3 holds newCallFrame with ArgumentCount initialized.
+        store32(TrustedImm32(argCount), Address(stackPointerRegister, JSStack::ArgumentCount * static_cast<int>(sizeof(Register)) + PayloadOffset - sizeof(CallerFrameAndPC)));
+    } // SP holds newCallFrame + sizeof(CallerFrameAndPC), with ArgumentCount initialized.
     
-    storePtr(TrustedImmPtr(instruction), tagFor(JSStack::ArgumentCount, callFrameRegister));
+    uint32_t locationBits = CallSiteIndex(instruction).bits();
+    store32(TrustedImm32(locationBits), tagFor(JSStack::ArgumentCount, callFrameRegister));
     emitLoad(callee, regT1, regT0); // regT1, regT0 holds callee.
 
-    storePtr(callFrameRegister, Address(regT3, JSStack::CallerFrame * static_cast<int>(sizeof(Register))));
-    emitStore(JSStack::Callee, regT1, regT0, regT3);
-    move(regT3, callFrameRegister);
+    store32(regT0, Address(stackPointerRegister, JSStack::Callee * static_cast<int>(sizeof(Register)) + PayloadOffset - sizeof(CallerFrameAndPC)));
+    store32(regT1, Address(stackPointerRegister, JSStack::Callee * static_cast<int>(sizeof(Register)) + TagOffset - sizeof(CallerFrameAndPC)));
 
     if (opcodeID == op_call_eval) {
-        compileCallEval();
+        compileCallEval(instruction);
         return;
     }
 
-    DataLabelPtr addressOfLinkedFunctionCheck;
-    BEGIN_UNINTERRUPTED_SEQUENCE(sequenceOpCall);
-    Jump slowCase = branchPtrWithPatch(NotEqual, regT0, addressOfLinkedFunctionCheck, TrustedImmPtr(0));
-    END_UNINTERRUPTED_SEQUENCE(sequenceOpCall);
+    if (opcodeID == op_tail_call || opcodeID == op_tail_call_varargs)
+        emitRestoreCalleeSaves();
 
-    addSlowCase(slowCase);
     addSlowCase(branch32(NotEqual, regT1, TrustedImm32(JSValue::CellTag)));
 
-    ASSERT(m_callStructureStubCompilationInfo.size() == callLinkInfoIndex);
-    m_callStructureStubCompilationInfo.append(StructureStubCompilationInfo());
-    m_callStructureStubCompilationInfo[callLinkInfoIndex].hotPathBegin = addressOfLinkedFunctionCheck;
-    m_callStructureStubCompilationInfo[callLinkInfoIndex].callType = CallLinkInfo::callTypeFor(opcodeID);
-    m_callStructureStubCompilationInfo[callLinkInfoIndex].bytecodeIndex = m_bytecodeOffset;
+    DataLabelPtr addressOfLinkedFunctionCheck;
+    Jump slowCase = branchPtrWithPatch(NotEqual, regT0, addressOfLinkedFunctionCheck, TrustedImmPtr(0));
 
-    loadPtr(Address(regT0, OBJECT_OFFSETOF(JSFunction, m_scope)), regT1);
-    emitPutCellToCallFrameHeader(regT1, JSStack::ScopeChain);
-    m_callStructureStubCompilationInfo[callLinkInfoIndex].hotPathOther = emitNakedCall();
+    addSlowCase(slowCase);
+
+    ASSERT(m_callCompilationInfo.size() == callLinkInfoIndex);
+    info->setUpCall(CallLinkInfo::callTypeFor(opcodeID), CodeOrigin(m_bytecodeOffset), regT0);
+    m_callCompilationInfo.append(CallCompilationInfo());
+    m_callCompilationInfo[callLinkInfoIndex].hotPathBegin = addressOfLinkedFunctionCheck;
+    m_callCompilationInfo[callLinkInfoIndex].callLinkInfo = info;
+
+    checkStackPointerAlignment();
+    if (opcodeID == op_tail_call || opcodeID == op_tail_call_varargs) {
+        prepareForTailCallSlow();
+        m_callCompilationInfo[callLinkInfoIndex].hotPathOther = emitNakedTailCall();
+        return;
+    }
+
+    m_callCompilationInfo[callLinkInfoIndex].hotPathOther = emitNakedCall();
+
+    addPtr(TrustedImm32(stackPointerOffsetFor(m_codeBlock) * sizeof(Register)), callFrameRegister, stackPointerRegister);
+    checkStackPointerAlignment();
 
     sampleCodeBlock(m_codeBlock);
+    emitPutCallResult(instruction);
 }
 
-void JIT::compileOpCallSlowCase(OpcodeID opcodeID, Instruction*, Vector<SlowCaseEntry>::iterator& iter, unsigned callLinkInfoIndex)
+void JIT::compileOpCallSlowCase(OpcodeID opcodeID, Instruction* instruction, Vector<SlowCaseEntry>::iterator& iter, unsigned callLinkInfoIndex)
 {
     if (opcodeID == op_call_eval) {
-        compileCallEvalSlowCase(iter);
+        compileCallEvalSlowCase(instruction, iter);
         return;
     }
 
     linkSlowCase(iter);
     linkSlowCase(iter);
-    
-    m_callStructureStubCompilationInfo[callLinkInfoIndex].callReturnLocation = emitNakedCall(opcodeID == op_construct ? m_vm->getCTIStub(linkConstructGenerator).code() : m_vm->getCTIStub(linkCallGenerator).code());
+
+    move(TrustedImmPtr(m_callCompilationInfo[callLinkInfoIndex].callLinkInfo), regT2);
+
+    if (opcodeID == op_tail_call || opcodeID == op_tail_call_varargs)
+        emitRestoreCalleeSaves();
+
+    m_callCompilationInfo[callLinkInfoIndex].callReturnLocation = emitNakedCall(m_vm->getCTIStub(linkCallThunkGenerator).code());
+
+    if (opcodeID == op_tail_call || opcodeID == op_tail_call_varargs) {
+        abortWithReason(JITDidReturnFromTailCall);
+        return;
+    }
+
+    addPtr(TrustedImm32(stackPointerOffsetFor(m_codeBlock) * sizeof(Register)), callFrameRegister, stackPointerRegister);
+    checkStackPointerAlignment();
 
     sampleCodeBlock(m_codeBlock);
-}
-
-void JIT::privateCompileClosureCall(CallLinkInfo* callLinkInfo, CodeBlock* calleeCodeBlock, Structure* expectedStructure, ExecutableBase* expectedExecutable, MacroAssemblerCodePtr codePtr)
-{
-    JumpList slowCases;
-
-    slowCases.append(branch32(NotEqual, regT1, TrustedImm32(JSValue::CellTag)));
-    slowCases.append(branchPtr(NotEqual, Address(regT0, JSCell::structureOffset()), TrustedImmPtr(expectedStructure)));
-    slowCases.append(branchPtr(NotEqual, Address(regT0, JSFunction::offsetOfExecutable()), TrustedImmPtr(expectedExecutable)));
-    
-    loadPtr(Address(regT0, JSFunction::offsetOfScopeChain()), regT1);
-    emitPutCellToCallFrameHeader(regT1, JSStack::ScopeChain);
-    
-    Call call = nearCall();
-    Jump done = jump();
-    
-    slowCases.link(this);
-    move(TrustedImmPtr(callLinkInfo->callReturnLocation.executableAddress()), regT2);
-    restoreReturnAddressBeforeReturn(regT2);
-    Jump slow = jump();
-    
-    LinkBuffer patchBuffer(*m_vm, this, m_codeBlock);
-    
-    patchBuffer.link(call, FunctionPtr(codePtr.executableAddress()));
-    patchBuffer.link(done, callLinkInfo->hotPathOther.labelAtOffset(0));
-    patchBuffer.link(slow, CodeLocationLabel(m_vm->getCTIStub(virtualCallGenerator).code()));
-    
-    RefPtr<ClosureCallStubRoutine> stubRoutine = adoptRef(new ClosureCallStubRoutine(
-        FINALIZE_CODE(
-            patchBuffer,
-            ("Baseline closure call stub for %s, return point %p, target %p (%s)",
-                toCString(*m_codeBlock).data(),
-                callLinkInfo->hotPathOther.labelAtOffset(0).executableAddress(),
-                codePtr.executableAddress(),
-                toCString(pointerDump(calleeCodeBlock)).data())),
-        *m_vm, m_codeBlock->ownerExecutable(), expectedStructure, expectedExecutable,
-        callLinkInfo->codeOrigin));
-    
-    RepatchBuffer repatchBuffer(m_codeBlock);
-    
-    repatchBuffer.replaceWithJump(
-        RepatchBuffer::startOfBranchPtrWithPatchOnRegister(callLinkInfo->hotPathBegin),
-        CodeLocationLabel(stubRoutine->code().code()));
-    repatchBuffer.relink(callLinkInfo->callReturnLocation, m_vm->getCTIStub(virtualCallGenerator).code());
-    
-    callLinkInfo->stub = stubRoutine.release();
+    emitPutCallResult(instruction);
 }
 
 } // namespace JSC

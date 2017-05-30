@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -27,14 +27,10 @@
 #include "config.h"
 #include "EventContext.h"
 
-#include "DOMWindow.h"
 #include "Document.h"
-#include "Event.h"
 #include "FocusEvent.h"
 #include "MouseEvent.h"
-#include "Node.h"
 #include "TouchEvent.h"
-#include "TouchList.h"
 
 namespace WebCore {
 
@@ -51,10 +47,10 @@ EventContext::~EventContext()
 {
 }
 
-void EventContext::handleLocalEvents(Event* event) const
+void EventContext::handleLocalEvents(Event& event) const
 {
-    event->setTarget(m_target.get());
-    event->setCurrentTarget(m_currentTarget.get());
+    event.setTarget(m_target.get());
+    event.setCurrentTarget(m_currentTarget.get());
     m_node->handleLocalEvents(event);
 }
 
@@ -70,7 +66,6 @@ bool EventContext::isTouchEventContext() const
 
 MouseOrFocusEventContext::MouseOrFocusEventContext(PassRefPtr<Node> node, PassRefPtr<EventTarget> currentTarget, PassRefPtr<EventTarget> target)
     : EventContext(node, currentTarget, target)
-    , m_relatedTarget(0)
 {
 }
 
@@ -78,13 +73,15 @@ MouseOrFocusEventContext::~MouseOrFocusEventContext()
 {
 }
 
-void MouseOrFocusEventContext::handleLocalEvents(Event* event) const
+void MouseOrFocusEventContext::handleLocalEvents(Event& event) const
 {
-    ASSERT(event->isMouseEvent() || event->isFocusEvent());
-    if (m_relatedTarget.get() && event->isMouseEvent())
-        toMouseEvent(event)->setRelatedTarget(m_relatedTarget.get());
-    else if (m_relatedTarget.get() && event->isFocusEvent())
-        toFocusEvent(event)->setRelatedTarget(m_relatedTarget.get());
+    ASSERT(is<MouseEvent>(event) || is<FocusEvent>(event));
+    if (m_relatedTarget) {
+        if (is<MouseEvent>(event))
+            downcast<MouseEvent>(event).setRelatedTarget(m_relatedTarget.get());
+        else if (is<FocusEvent>(event))
+            downcast<FocusEvent>(event).setRelatedTarget(m_relatedTarget.get());
+    }
     EventContext::handleLocalEvents(event);
 }
 
@@ -106,18 +103,18 @@ TouchEventContext::~TouchEventContext()
 {
 }
 
-void TouchEventContext::handleLocalEvents(Event* event) const
+void TouchEventContext::handleLocalEvents(Event& event) const
 {
-#ifndef NDEBUG
+#if !ASSERT_DISABLED
     checkReachability(m_touches.get());
     checkReachability(m_targetTouches.get());
     checkReachability(m_changedTouches.get());
 #endif
-    ASSERT(event->isTouchEvent());
-    TouchEvent* touchEvent = toTouchEvent(event);
-    touchEvent->setTouches(m_touches);
-    touchEvent->setTargetTouches(m_targetTouches);
-    touchEvent->setChangedTouches(m_changedTouches);
+    ASSERT(is<TouchEvent>(event));
+    TouchEvent& touchEvent = downcast<TouchEvent>(event);
+    touchEvent.setTouches(m_touches.get());
+    touchEvent.setTargetTouches(m_targetTouches.get());
+    touchEvent.setChangedTouches(m_changedTouches.get());
     EventContext::handleLocalEvents(event);
 }
 
@@ -126,14 +123,15 @@ bool TouchEventContext::isTouchEventContext() const
     return true;
 }
 
-#ifndef NDEBUG
+#if !ASSERT_DISABLED
 void TouchEventContext::checkReachability(TouchList* touchList) const
 {
-    for (size_t i = 0; i < touchList->length(); ++i)
+    size_t length = touchList->length();
+    for (size_t i = 0; i < length; ++i)
         ASSERT(isReachable(touchList->item(i)->target()->toNode()));
 }
 #endif
 
-#endif // ENABLE(TOUCH_EVENTS)
+#endif // ENABLE(TOUCH_EVENTS) && !PLATFORM(IOS)
 
 }

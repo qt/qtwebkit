@@ -25,7 +25,6 @@
 
 // This all-in-one cpp file cuts down on template bloat to allow us to build our Windows release build.
 
-#include "ColorDistance.cpp"
 #include "SVGAElement.cpp"
 #include "SVGAltGlyphDefElement.cpp"
 #include "SVGAltGlyphElement.cpp"
@@ -33,6 +32,7 @@
 #include "SVGAngle.cpp"
 #include "SVGAnimateColorElement.cpp"
 #include "SVGAnimateElement.cpp"
+#include "SVGAnimateElementBase.cpp"
 #include "SVGAnimateMotionElement.cpp"
 #include "SVGAnimateTransformElement.cpp"
 #include "SVGAnimatedAngle.cpp"
@@ -65,8 +65,6 @@
 #include "SVGDocument.cpp"
 #include "SVGDocumentExtensions.cpp"
 #include "SVGElement.cpp"
-#include "SVGElementInstance.cpp"
-#include "SVGElementInstanceList.cpp"
 #include "SVGEllipseElement.cpp"
 #include "SVGException.cpp"
 #include "SVGExternalResourcesRequired.cpp"
@@ -157,7 +155,6 @@
 #include "SVGStopElement.cpp"
 #include "SVGStringList.cpp"
 #include "SVGStyleElement.cpp"
-#include "SVGStyledElement.cpp"
 #include "SVGSwitchElement.cpp"
 #include "SVGSymbolElement.cpp"
 #include "SVGTRefElement.cpp"

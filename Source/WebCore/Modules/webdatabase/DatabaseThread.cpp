@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -29,8 +29,6 @@
 #include "config.h"
 #include "DatabaseThread.h"
 
-#if ENABLE(SQL_DATABASE)
-
 #include "Database.h"
 #include "DatabaseTask.h"
 #include "Logging.h"
@@ -42,9 +40,9 @@ namespace WebCore {
 
 DatabaseThread::DatabaseThread()
     : m_threadID(0)
-    , m_transactionClient(adoptPtr(new SQLTransactionClient()))
-    , m_transactionCoordinator(adoptPtr(new SQLTransactionCoordinator()))
-    , m_cleanupSync(0)
+    , m_transactionClient(std::make_unique<SQLTransactionClient>())
+    , m_transactionCoordinator(std::make_unique<SQLTransactionCoordinator>())
+    , m_cleanupSync(nullptr)
 {
     m_selfRef = this;
 }
@@ -63,7 +61,7 @@ DatabaseThread::~DatabaseThread()
 
 bool DatabaseThread::start()
 {
-    MutexLocker lock(m_threadCreationMutex);
+    LockHolder lock(m_threadCreationMutex);
 
     if (m_threadID)
         return true;
@@ -102,11 +100,11 @@ void DatabaseThread::databaseThread()
 {
     {
         // Wait for DatabaseThread::start() to complete.
-        MutexLocker lock(m_threadCreationMutex);
+        LockHolder lock(m_threadCreationMutex);
         LOG(StorageAPI, "Started DatabaseThread %p", this);
     }
 
-    while (OwnPtr<DatabaseTask> task = m_queue.waitForMessage()) {
+    while (auto task = m_queue.waitForMessage()) {
         AutodrainedPool pool;
 
         task->performTask();
@@ -119,14 +117,17 @@ void DatabaseThread::databaseThread()
 
     // Close the databases that we ran transactions on. This ensures that if any transactions are still open, they are rolled back and we don't leave the database in an
     // inconsistent or locked state.
-    if (m_openDatabaseSet.size() > 0) {
-        // As the call to close will modify the original set, we must take a copy to iterate over.
-        DatabaseSet openSetCopy;
-        openSetCopy.swap(m_openDatabaseSet);
-        DatabaseSet::iterator end = openSetCopy.end();
-        for (DatabaseSet::iterator it = openSetCopy.begin(); it != end; ++it)
-            (*it).get()->close();
+    DatabaseSet openSetCopy;
+    {
+        LockHolder lock(m_openDatabaseSetMutex);
+        if (m_openDatabaseSet.size() > 0) {
+            // As the call to close will modify the original set, we must take a copy to iterate over.
+            openSetCopy.swap(m_openDatabaseSet);
+        }
     }
+
+    for (auto& openDatabase : openSetCopy)
+        openDatabase->close();
 
     // Detach the thread so its resources are no longer of any concern to anyone else
     detachThread(m_threadID);
@@ -134,54 +135,68 @@ void DatabaseThread::databaseThread()
     DatabaseTaskSynchronizer* cleanupSync = m_cleanupSync;
 
     // Clear the self refptr, possibly resulting in deletion
-    m_selfRef = 0;
+    m_selfRef = nullptr;
 
     if (cleanupSync) // Someone wanted to know when we were done cleaning up.
         cleanupSync->taskCompleted();
 }
 
-void DatabaseThread::recordDatabaseOpen(DatabaseBackend* database)
+void DatabaseThread::recordDatabaseOpen(Database* database)
 {
+    LockHolder lock(m_openDatabaseSetMutex);
+
     ASSERT(currentThread() == m_threadID);
     ASSERT(database);
     ASSERT(!m_openDatabaseSet.contains(database));
     m_openDatabaseSet.add(database);
 }
 
-void DatabaseThread::recordDatabaseClosed(DatabaseBackend* database)
+void DatabaseThread::recordDatabaseClosed(Database* database)
 {
+    LockHolder lock(m_openDatabaseSetMutex);
+
     ASSERT(currentThread() == m_threadID);
     ASSERT(database);
     ASSERT(m_queue.killed() || m_openDatabaseSet.contains(database));
     m_openDatabaseSet.remove(database);
 }
 
-void DatabaseThread::scheduleTask(PassOwnPtr<DatabaseTask> task)
+void DatabaseThread::scheduleTask(std::unique_ptr<DatabaseTask> task)
 {
     ASSERT(!task->hasSynchronizer() || task->hasCheckedForTermination());
-    m_queue.append(task);
+    m_queue.append(WTFMove(task));
 }
 
-void DatabaseThread::scheduleImmediateTask(PassOwnPtr<DatabaseTask> task)
+void DatabaseThread::scheduleImmediateTask(std::unique_ptr<DatabaseTask> task)
 {
     ASSERT(!task->hasSynchronizer() || task->hasCheckedForTermination());
-    m_queue.prepend(task);
+    m_queue.prepend(WTFMove(task));
 }
 
 class SameDatabasePredicate {
 public:
-    SameDatabasePredicate(const DatabaseBackend* database) : m_database(database) { }
-    bool operator()(DatabaseTask* task) const { return task->database() == m_database; }
+    SameDatabasePredicate(const Database* database) : m_database(database) { }
+    bool operator()(const DatabaseTask& task) const { return &task.database() == m_database; }
 private:
-    const DatabaseBackend* m_database;
+    const Database* m_database;
 };
 
-void DatabaseThread::unscheduleDatabaseTasks(DatabaseBackend* database)
+void DatabaseThread::unscheduleDatabaseTasks(Database* database)
 {
     // Note that the thread loop is running, so some tasks for the database
     // may still be executed. This is unavoidable.
     SameDatabasePredicate predicate(database);
     m_queue.removeIf(predicate);
 }
+
+bool DatabaseThread::hasPendingDatabaseActivity() const
+{
+    LockHolder lock(m_openDatabaseSetMutex);
+    for (auto& database : m_openDatabaseSet) {
+        if (database->hasPendingCreationEvent() || database->hasPendingTransaction())
+            return true;
+    }
+    return false;
+}
+
 } // namespace WebCore
-#endif

@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2003, 2004, 2005, 2006, 2007, 2009 Apple Inc. All rights reserved.
+ *  Copyright (C) 2003, 2004, 2005, 2006, 2007, 2009, 2016 Apple Inc. All rights reserved.
  *
  *  This library is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU Library General Public
@@ -24,7 +24,7 @@
 #include "HeapRootVisitor.h"
 #include "JSCJSValue.h"
 #include "JSObject.h"
-#include "Operations.h"
+#include "JSCInlines.h"
 
 using std::min;
 
@@ -37,7 +37,7 @@ void ArgList::getSlice(int startIndex, ArgList& result) const
         return;
     }
 
-    result.m_args = m_args - startIndex;
+    result.m_args = m_args + startIndex;
     result.m_argCount =  m_argCount - startIndex;
 }
 
@@ -53,13 +53,14 @@ void MarkedArgumentBuffer::markLists(HeapRootVisitor& heapRootVisitor, ListSet& 
 
 void MarkedArgumentBuffer::slowAppend(JSValue v)
 {
-    int newCapacity = m_capacity * 4;
-    EncodedJSValue* newBuffer = &(new EncodedJSValue[newCapacity])[newCapacity - 1];
+    int newCapacity = (Checked<int>(m_capacity) * 2).unsafeGet();
+    size_t size = (Checked<size_t>(newCapacity) * sizeof(EncodedJSValue)).unsafeGet();
+    EncodedJSValue* newBuffer = static_cast<EncodedJSValue*>(fastMalloc(size));
     for (int i = 0; i < m_capacity; ++i)
-        newBuffer[-i] = m_buffer[-i];
+        newBuffer[i] = m_buffer[i];
 
     if (EncodedJSValue* base = mallocBase())
-        delete [] base;
+        fastFree(base);
 
     m_buffer = newBuffer;
     m_capacity = newCapacity;

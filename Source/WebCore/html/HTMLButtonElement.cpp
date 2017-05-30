@@ -26,21 +26,19 @@
 #include "config.h"
 #include "HTMLButtonElement.h"
 
-#include "Attribute.h"
 #include "EventNames.h"
 #include "FormDataList.h"
 #include "HTMLFormElement.h"
 #include "HTMLNames.h"
 #include "KeyboardEvent.h"
 #include "RenderButton.h"
-#include "ScriptEventListener.h"
 #include <wtf/StdLibExtras.h>
 
 namespace WebCore {
 
 using namespace HTMLNames;
 
-inline HTMLButtonElement::HTMLButtonElement(const QualifiedName& tagName, Document* document, HTMLFormElement* form)
+inline HTMLButtonElement::HTMLButtonElement(const QualifiedName& tagName, Document& document, HTMLFormElement* form)
     : HTMLFormControlElement(tagName, document, form)
     , m_type(SUBMIT)
     , m_isActivatedSubmit(false)
@@ -48,9 +46,9 @@ inline HTMLButtonElement::HTMLButtonElement(const QualifiedName& tagName, Docume
     ASSERT(hasTagName(buttonTag));
 }
 
-PassRefPtr<HTMLButtonElement> HTMLButtonElement::create(const QualifiedName& tagName, Document* document, HTMLFormElement* form)
+Ref<HTMLButtonElement> HTMLButtonElement::create(const QualifiedName& tagName, Document& document, HTMLFormElement* form)
 {
-    return adoptRef(new HTMLButtonElement(tagName, document, form));
+    return adoptRef(*new HTMLButtonElement(tagName, document, form));
 }
 
 void HTMLButtonElement::setType(const AtomicString& type)
@@ -58,24 +56,24 @@ void HTMLButtonElement::setType(const AtomicString& type)
     setAttribute(typeAttr, type);
 }
 
-RenderObject* HTMLButtonElement::createRenderer(RenderArena* arena, RenderStyle*)
+RenderPtr<RenderElement> HTMLButtonElement::createElementRenderer(Ref<RenderStyle>&& style, const RenderTreePosition&)
 {
-    return new (arena) RenderButton(this);
+    return createRenderer<RenderButton>(*this, WTFMove(style));
 }
 
 const AtomicString& HTMLButtonElement::formControlType() const
 {
     switch (m_type) {
         case SUBMIT: {
-            DEFINE_STATIC_LOCAL(const AtomicString, submit, ("submit", AtomicString::ConstructFromLiteral));
+            static NeverDestroyed<const AtomicString> submit("submit", AtomicString::ConstructFromLiteral);
             return submit;
         }
         case BUTTON: {
-            DEFINE_STATIC_LOCAL(const AtomicString, button, ("button", AtomicString::ConstructFromLiteral));
+            static NeverDestroyed<const AtomicString> button("button", AtomicString::ConstructFromLiteral);
             return button;
         }
         case RESET: {
-            DEFINE_STATIC_LOCAL(const AtomicString, reset, ("reset", AtomicString::ConstructFromLiteral));
+            static NeverDestroyed<const AtomicString> reset("reset", AtomicString::ConstructFromLiteral);
             return reset;
         }
     }
@@ -98,9 +96,9 @@ bool HTMLButtonElement::isPresentationAttribute(const QualifiedName& name) const
 void HTMLButtonElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
     if (name == typeAttr) {
-        if (equalIgnoringCase(value, "reset"))
+        if (equalLettersIgnoringASCIICase(value, "reset"))
             m_type = RESET;
-        else if (equalIgnoringCase(value, "button"))
+        else if (equalLettersIgnoringASCIICase(value, "button"))
             m_type = BUTTON;
         else
             m_type = SUBMIT;
@@ -124,28 +122,29 @@ void HTMLButtonElement::defaultEventHandler(Event* event)
         }
     }
 
-    if (event->isKeyboardEvent()) {
-        if (event->type() == eventNames().keydownEvent && static_cast<KeyboardEvent*>(event)->keyIdentifier() == "U+0020") {
+    if (is<KeyboardEvent>(*event)) {
+        KeyboardEvent& keyboardEvent = downcast<KeyboardEvent>(*event);
+        if (keyboardEvent.type() == eventNames().keydownEvent && keyboardEvent.keyIdentifier() == "U+0020") {
             setActive(true, true);
             // No setDefaultHandled() - IE dispatches a keypress in this case.
             return;
         }
-        if (event->type() == eventNames().keypressEvent) {
-            switch (static_cast<KeyboardEvent*>(event)->charCode()) {
+        if (keyboardEvent.type() == eventNames().keypressEvent) {
+            switch (keyboardEvent.charCode()) {
                 case '\r':
-                    dispatchSimulatedClick(event);
-                    event->setDefaultHandled();
+                    dispatchSimulatedClick(&keyboardEvent);
+                    keyboardEvent.setDefaultHandled();
                     return;
                 case ' ':
                     // Prevent scrolling down the page.
-                    event->setDefaultHandled();
+                    keyboardEvent.setDefaultHandled();
                     return;
             }
         }
-        if (event->type() == eventNames().keyupEvent && static_cast<KeyboardEvent*>(event)->keyIdentifier() == "U+0020") {
+        if (keyboardEvent.type() == eventNames().keyupEvent && keyboardEvent.keyIdentifier() == "U+0020") {
             if (active())
-                dispatchSimulatedClick(event);
-            event->setDefaultHandled();
+                dispatchSimulatedClick(&keyboardEvent);
+            keyboardEvent.setDefaultHandled();
             return;
         }
     }
@@ -155,9 +154,7 @@ void HTMLButtonElement::defaultEventHandler(Event* event)
 
 bool HTMLButtonElement::willRespondToMouseClickEvents()
 {
-    if (!isDisabledFormControl() && form() && (m_type == SUBMIT || m_type == RESET))
-        return true;
-    return HTMLFormControlElement::willRespondToMouseClickEvents();
+    return !isDisabledFormControl();
 }
 
 bool HTMLButtonElement::isSuccessfulSubmitButton() const
@@ -197,14 +194,14 @@ bool HTMLButtonElement::isURLAttribute(const Attribute& attribute) const
     return attribute.name() == formactionAttr || HTMLFormControlElement::isURLAttribute(attribute);
 }
 
-String HTMLButtonElement::value() const
+const AtomicString& HTMLButtonElement::value() const
 {
-    return getAttribute(valueAttr);
+    return fastGetAttribute(valueAttr);
 }
 
-bool HTMLButtonElement::recalcWillValidate() const
+bool HTMLButtonElement::computeWillValidate() const
 {
-    return m_type == SUBMIT && HTMLFormControlElement::recalcWillValidate();
+    return m_type == SUBMIT && HTMLFormControlElement::computeWillValidate();
 }
 
 } // namespace

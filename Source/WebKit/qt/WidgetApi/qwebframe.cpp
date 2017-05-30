@@ -26,10 +26,7 @@
 #include "qwebframe_p.h"
 #include "qwebpage.h"
 #include "qwebpage_p.h"
-#include "qwebscriptworld.h"
-#include "qwebscriptworld_p.h"
 #include "qwebsecurityorigin.h"
-#include "DOMWrapperWorld.h"
 #include <QMultiMap>
 #include <qdebug.h>
 #include <qevent.h>
@@ -117,16 +114,6 @@ QWebFrameAdapter* QWebFramePrivate::createChildFrame(QWebFrameData* frameData)
 {
     QWebFrame* newFrame = new QWebFrame(/*parent frame*/q, frameData);
     return newFrame->d;
-}
-
-QWebFrame *QWebFramePrivate::apiHandle()
-{
-    return q;
-}
-
-QObject *QWebFramePrivate::handle()
-{
-    return q;
 }
 
 void QWebFramePrivate::contentsSizeDidChange(const QSize &size)
@@ -761,6 +748,11 @@ QSize QWebFrame::contentsSize() const
 QWebElement QWebFrame::documentElement() const
 {
     return d->documentElement();
+}
+
+QWebElement QWebFrame::ownerElement() const
+{
+    return d->ownerElement();
 }
 
 /*!

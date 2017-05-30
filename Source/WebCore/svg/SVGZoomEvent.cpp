@@ -21,8 +21,6 @@
 
 #include "config.h"
 
-#if ENABLE(SVG)
-
 #include "SVGZoomEvent.h"
 #include "EventNames.h"
 
@@ -69,11 +67,9 @@ SVGPoint SVGZoomEvent::newTranslate() const
     return m_newTranslate;
 }
 
-const AtomicString& SVGZoomEvent::interfaceName() const
+EventInterface SVGZoomEvent::eventInterface() const
 {
-    return eventNames().interfaceForSVGZoomEvent;
+    return SVGZoomEventInterfaceType;
 }
 
 } // namespace WebCore
-
-#endif // ENABLE(SVG)

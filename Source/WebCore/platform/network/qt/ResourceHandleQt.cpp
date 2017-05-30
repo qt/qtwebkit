@@ -49,7 +49,7 @@
 
 namespace WebCore {
 
-class WebCoreSynchronousLoader : public ResourceHandleClient {
+class WebCoreSynchronousLoader final : public ResourceHandleClient {
 public:
     WebCoreSynchronousLoader(ResourceError& error, ResourceResponse& response, Vector<char>& data)
         : m_error(error)
@@ -57,11 +57,12 @@ public:
         , m_data(data)
     {}
 
-    virtual void willSendRequest(ResourceHandle*, ResourceRequest&, const ResourceResponse&);
-    virtual void didReceiveResponse(ResourceHandle*, const ResourceResponse& response) { m_response = response; }
-    virtual void didReceiveData(ResourceHandle*, const char* data, int length, int) { m_data.append(data, length); }
-    virtual void didFinishLoading(ResourceHandle*, double /*finishTime*/) {}
-    virtual void didFail(ResourceHandle*, const ResourceError& error) { m_error = error; }
+    void willSendRequest(ResourceHandle*, ResourceRequest&, const ResourceResponse&) override;
+    void didReceiveResponse(ResourceHandle*, const ResourceResponse& response) override { m_response = response; }
+    void didReceiveData(ResourceHandle*, const char*, unsigned, int) override;
+    void didReceiveBuffer(ResourceHandle*, PassRefPtr<SharedBuffer>, int /*encodedDataLength*/) override;
+    void didFinishLoading(ResourceHandle*, double /*finishTime*/) override {}
+    void didFail(ResourceHandle*, const ResourceError& error) override { m_error = error; }
 private:
     ResourceError& m_error;
     ResourceResponse& m_response;
@@ -76,6 +77,22 @@ void WebCoreSynchronousLoader::willSendRequest(ResourceHandle* handle, ResourceR
         m_error.setIsCancellation(true);
         request = ResourceRequest();
         return;
+    }
+}
+
+void WebCoreSynchronousLoader::didReceiveData(ResourceHandle*, const char*, unsigned, int)
+{
+    ASSERT_NOT_REACHED();
+}
+
+void WebCoreSynchronousLoader::didReceiveBuffer(ResourceHandle*, PassRefPtr<SharedBuffer> buffer, int)
+{
+    // This pattern is suggested by SharedBuffer.h.
+    const char* segment;
+    unsigned position = 0;
+    while (unsigned length = buffer->getSomeData(segment, position)) {
+        m_data.append(segment, length);
+        position += length;
     }
 }
 
@@ -99,7 +116,7 @@ bool ResourceHandle::start()
     if (!d->m_user.isEmpty() || !d->m_pass.isEmpty()) {
         // If credentials were specified for this request, add them to the url,
         // so that they will be passed to QNetworkRequest.
-        KURL urlWithCredentials(firstRequest().url());
+        URL urlWithCredentials(firstRequest().url());
         urlWithCredentials.setUser(d->m_user);
         urlWithCredentials.setPass(d->m_pass);
         d->m_firstRequest.setURL(urlWithCredentials);
@@ -118,9 +135,18 @@ void ResourceHandle::cancel()
     }
 }
 
-bool ResourceHandle::loadsBlocked()
+void ResourceHandle::continueWillSendRequest(const ResourceRequest& request)
 {
-    return false;
+    ASSERT(!client() || client()->usesAsyncCallbacks());
+    ASSERT(d->m_job);
+    d->m_job->continueWillSendRequest(request);
+}
+
+void ResourceHandle::continueDidReceiveResponse()
+{
+    ASSERT(!client() || client()->usesAsyncCallbacks());
+    ASSERT(d->m_job);
+    d->m_job->continueDidReceiveResponse();
 }
 
 void ResourceHandle::platformLoadResourceSynchronously(NetworkingContext* context, const ResourceRequest& request, StoredCredentials /*storedCredentials*/, ResourceError& error, ResourceResponse& response, Vector<char>& data)
@@ -132,7 +158,7 @@ void ResourceHandle::platformLoadResourceSynchronously(NetworkingContext* contex
     if (!d->m_user.isEmpty() || !d->m_pass.isEmpty()) {
         // If credentials were specified for this request, add them to the url,
         // so that they will be passed to QNetworkRequest.
-        KURL urlWithCredentials(d->m_firstRequest.url());
+        URL urlWithCredentials(d->m_firstRequest.url());
         urlWithCredentials.setUser(d->m_user);
         urlWithCredentials.setPass(d->m_pass);
         d->m_firstRequest.setURL(urlWithCredentials);

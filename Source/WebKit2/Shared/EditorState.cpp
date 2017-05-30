@@ -31,7 +31,7 @@
 
 namespace WebKit {
 
-void EditorState::encode(CoreIPC::ArgumentEncoder& encoder) const
+void EditorState::encode(IPC::ArgumentEncoder& encoder) const
 {
     encoder << shouldIgnoreCompositionSelectionChange;
     encoder << selectionIsNone;
@@ -41,9 +41,22 @@ void EditorState::encode(CoreIPC::ArgumentEncoder& encoder) const
     encoder << isInPasswordField;
     encoder << isInPlugin;
     encoder << hasComposition;
+    encoder << isMissingPostLayoutData;
+
+#if PLATFORM(IOS) || PLATFORM(GTK) || PLATFORM(MAC)
+    if (!isMissingPostLayoutData)
+        m_postLayoutData.encode(encoder);
+#endif
+
+#if PLATFORM(IOS)
+    encoder << firstMarkedRect;
+    encoder << lastMarkedRect;
+    encoder << markedText;
+#endif
 
 #if PLATFORM(QT)
     encoder << cursorPosition;
+    encoder << cursorRect;
     encoder << anchorPosition;
     encoder << editorRect;
     encoder << compositionRect;
@@ -51,13 +64,9 @@ void EditorState::encode(CoreIPC::ArgumentEncoder& encoder) const
     encoder << selectedText;
     encoder << surroundingText;
 #endif
-
-#if PLATFORM(QT) || PLATFORM(GTK)
-    encoder << cursorRect;
-#endif
 }
 
-bool EditorState::decode(CoreIPC::ArgumentDecoder& decoder, EditorState& result)
+bool EditorState::decode(IPC::ArgumentDecoder& decoder, EditorState& result)
 {
     if (!decoder.decode(result.shouldIgnoreCompositionSelectionChange))
         return false;
@@ -83,8 +92,30 @@ bool EditorState::decode(CoreIPC::ArgumentDecoder& decoder, EditorState& result)
     if (!decoder.decode(result.hasComposition))
         return false;
 
+    if (!decoder.decode(result.isMissingPostLayoutData))
+        return false;
+
+#if PLATFORM(IOS) || PLATFORM(GTK) || PLATFORM(MAC)
+    if (!result.isMissingPostLayoutData) {
+        if (!PostLayoutData::decode(decoder, result.postLayoutData()))
+            return false;
+    }
+#endif
+
+#if PLATFORM(IOS)
+    if (!decoder.decode(result.firstMarkedRect))
+        return false;
+    if (!decoder.decode(result.lastMarkedRect))
+        return false;
+    if (!decoder.decode(result.markedText))
+        return false;
+#endif
+
 #if PLATFORM(QT)
     if (!decoder.decode(result.cursorPosition))
+        return false;
+
+    if (!decoder.decode(result.cursorRect))
         return false;
 
     if (!decoder.decode(result.anchorPosition))
@@ -106,12 +137,82 @@ bool EditorState::decode(CoreIPC::ArgumentDecoder& decoder, EditorState& result)
         return false;
 #endif
 
-#if PLATFORM(QT) || PLATFORM(GTK)
-    if (!decoder.decode(result.cursorRect))
+    return true;
+}
+
+#if PLATFORM(IOS) || PLATFORM(GTK) || PLATFORM(MAC)
+void EditorState::PostLayoutData::encode(IPC::ArgumentEncoder& encoder) const
+{
+#if PLATFORM(IOS) || PLATFORM(GTK)
+    encoder << typingAttributes;
+    encoder << caretRectAtStart;
+#endif
+#if PLATFORM(IOS) || PLATFORM(MAC)
+    encoder << selectionClipRect;
+    encoder << selectedTextLength;
+#endif
+#if PLATFORM(IOS)
+    encoder << caretRectAtEnd;
+    encoder << selectionRects;
+    encoder << wordAtSelection;
+    encoder << characterAfterSelection;
+    encoder << characterBeforeSelection;
+    encoder << twoCharacterBeforeSelection;
+    encoder << isReplaceAllowed;
+    encoder << hasContent;
+#endif
+#if PLATFORM(MAC)
+    encoder << candidateRequestStartPosition;
+    encoder << paragraphContextForCandidateRequest;
+    encoder << stringForCandidateRequest;
+#endif
+}
+
+bool EditorState::PostLayoutData::decode(IPC::ArgumentDecoder& decoder, PostLayoutData& result)
+{
+#if PLATFORM(IOS) || PLATFORM(GTK)
+    if (!decoder.decode(result.typingAttributes))
+        return false;
+    if (!decoder.decode(result.caretRectAtStart))
+        return false;
+#endif
+#if PLATFORM(IOS) || PLATFORM(MAC)
+    if (!decoder.decode(result.selectionClipRect))
+        return false;
+    if (!decoder.decode(result.selectedTextLength))
+        return false;
+#endif
+#if PLATFORM(IOS)
+    if (!decoder.decode(result.caretRectAtEnd))
+        return false;
+    if (!decoder.decode(result.selectionRects))
+        return false;
+    if (!decoder.decode(result.wordAtSelection))
+        return false;
+    if (!decoder.decode(result.characterAfterSelection))
+        return false;
+    if (!decoder.decode(result.characterBeforeSelection))
+        return false;
+    if (!decoder.decode(result.twoCharacterBeforeSelection))
+        return false;
+    if (!decoder.decode(result.isReplaceAllowed))
+        return false;
+    if (!decoder.decode(result.hasContent))
+        return false;
+#endif
+#if PLATFORM(MAC)
+    if (!decoder.decode(result.candidateRequestStartPosition))
+        return false;
+
+    if (!decoder.decode(result.paragraphContextForCandidateRequest))
+        return false;
+
+    if (!decoder.decode(result.stringForCandidateRequest))
         return false;
 #endif
 
     return true;
 }
+#endif // PLATFORM(IOS) || PLATFORM(GTK) || PLATFORM(MAC)
 
 }

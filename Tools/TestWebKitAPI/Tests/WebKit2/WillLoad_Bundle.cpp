@@ -24,11 +24,14 @@
  */
 
 #include "config.h"
+
+#if WK_HAVE_C_SPI
+
 #include "InjectedBundleTest.h"
 
 #include "PlatformUtilities.h"
-#include <WebKit2/WKBundlePage.h>
-#include <WebKit2/WKRetainPtr.h>
+#include <WebKit/WKBundlePage.h>
+#include <WebKit/WKRetainPtr.h>
 
 namespace TestWebKitAPI {
 
@@ -44,41 +47,43 @@ private:
     {
         WKRetainPtr<WKMutableDictionaryRef> messageBody = adoptWK(WKMutableDictionaryCreate());
 
-        WKDictionaryAddItem(messageBody.get(), Util::toWK("URLRequestReturn").get(), request);
-        WKDictionaryAddItem(messageBody.get(), Util::toWK("UserDataReturn").get(), userData);
+        WKDictionarySetItem(messageBody.get(), Util::toWK("URLRequestReturn").get(), request);
+        WKDictionarySetItem(messageBody.get(), Util::toWK("UserDataReturn").get(), userData);
 
-        WKBundlePostMessage(InjectedBundleController::shared().bundle(), Util::toWK("WillLoadURLRequestReturn").get(), messageBody.get());
+        WKBundlePostMessage(InjectedBundleController::singleton().bundle(), Util::toWK("WillLoadURLRequestReturn").get(), messageBody.get());
     }
 
     static void willLoadDataRequest(WKBundlePageRef page, WKURLRequestRef request, WKDataRef data, WKStringRef MIMEType, WKStringRef encodingName, WKURLRef unreachableURL, WKTypeRef userData, const void *clientInfo)
     {
         WKRetainPtr<WKMutableDictionaryRef> messageBody = adoptWK(WKMutableDictionaryCreate());
 
-        WKDictionaryAddItem(messageBody.get(), Util::toWK("URLRequestReturn").get(), request);
-        WKDictionaryAddItem(messageBody.get(), Util::toWK("DataReturn").get(), data);
-        WKDictionaryAddItem(messageBody.get(), Util::toWK("MIMETypeReturn").get(), MIMEType);
-        WKDictionaryAddItem(messageBody.get(), Util::toWK("EncodingNameReturn").get(), encodingName);
-        WKDictionaryAddItem(messageBody.get(), Util::toWK("UnreachableURLReturn").get(), unreachableURL);
-        WKDictionaryAddItem(messageBody.get(), Util::toWK("UserDataReturn").get(), userData);
+        WKDictionarySetItem(messageBody.get(), Util::toWK("URLRequestReturn").get(), request);
+        WKDictionarySetItem(messageBody.get(), Util::toWK("DataReturn").get(), data);
+        WKDictionarySetItem(messageBody.get(), Util::toWK("MIMETypeReturn").get(), MIMEType);
+        WKDictionarySetItem(messageBody.get(), Util::toWK("EncodingNameReturn").get(), encodingName);
+        WKDictionarySetItem(messageBody.get(), Util::toWK("UnreachableURLReturn").get(), unreachableURL);
+        WKDictionarySetItem(messageBody.get(), Util::toWK("UserDataReturn").get(), userData);
 
-        WKBundlePostMessage(InjectedBundleController::shared().bundle(), Util::toWK("WillLoadDataRequestReturn").get(), messageBody.get());
+        WKBundlePostMessage(InjectedBundleController::singleton().bundle(), Util::toWK("WillLoadDataRequestReturn").get(), messageBody.get());
 
     }
 
-    virtual void didCreatePage(WKBundleRef, WKBundlePageRef bundlePage) OVERRIDE
+    virtual void didCreatePage(WKBundleRef, WKBundlePageRef bundlePage) override
     {
-        WKBundlePageLoaderClient pageLoaderClient;
+        WKBundlePageLoaderClientV6 pageLoaderClient;
         memset(&pageLoaderClient, 0, sizeof(pageLoaderClient));
         
-        pageLoaderClient.version = 6;
-        pageLoaderClient.clientInfo = this;
+        pageLoaderClient.base.version = 6;
+        pageLoaderClient.base.clientInfo = this;
         pageLoaderClient.willLoadURLRequest = willLoadURLRequest;
         pageLoaderClient.willLoadDataRequest = willLoadDataRequest;
         
-        WKBundlePageSetPageLoaderClient(bundlePage, &pageLoaderClient);
+        WKBundlePageSetPageLoaderClient(bundlePage, &pageLoaderClient.base);
     }
 };
 
 static InjectedBundleTest::Register<WillLoadTest> registrar("WillLoadTest");
 
 } // namespace TestWebKitAPI
+
+#endif

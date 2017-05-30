@@ -31,11 +31,10 @@
 #include "GCController.h"
 #include "TestRunner.h"
 #include "TextInputController.h"
-#include <WebKit2/WKBase.h>
-#include <WebKit2/WKRetainPtr.h>
+#include <WebKit/WKBase.h>
+#include <WebKit/WKRetainPtr.h>
 #include <sstream>
 #include <wtf/Forward.h>
-#include <wtf/OwnPtr.h>
 #include <wtf/RefPtr.h>
 #include <wtf/Vector.h>
 
@@ -45,7 +44,7 @@ class InjectedBundlePage;
 
 class InjectedBundle {
 public:
-    static InjectedBundle& shared();
+    static InjectedBundle& singleton();
 
     // Initialize the InjectedBundle.
     void initialize(WKBundleRef, WKTypeRef initializationUserData);
@@ -67,7 +66,8 @@ public:
 
     void done();
     void setAudioResult(WKDataRef audioData) { m_audioResult = audioData; }
-    void setPixelResult(WKImageRef image) { m_pixelResult = image; }
+    void setPixelResult(WKImageRef image) { m_pixelResult = image; m_pixelResultIsPending = false; }
+    void setPixelResultIsPending(bool isPending) { m_pixelResultIsPending = isPending; }
     void setRepaintRects(WKArrayRef rects) { m_repaintRects = rects; }
 
     bool isTestRunning() { return m_state == Testing; }
@@ -86,28 +86,39 @@ public:
     void postSetBackingScaleFactor(double);
     void postSetWindowIsKey(bool);
     void postSimulateWebNotificationClick(uint64_t notificationID);
+    void postSetAddsVisitedLinks(bool);
 
     // Geolocation.
     void setGeolocationPermission(bool);
     void setMockGeolocationPosition(double latitude, double longitude, double accuracy, bool providesAltitude, double altitude, bool providesAltitudeAccuracy, double altitudeAccuracy, bool providesHeading, double heading, bool providesSpeed, double speed);
     void setMockGeolocationPositionUnavailableError(WKStringRef errorMessage);
+    bool isGeolocationProviderActive() const;
+
+    // MediaStream.
+    void setUserMediaPermission(bool);
+    void setUserMediaPermissionForOrigin(bool permission, WKStringRef url);
 
     // Policy delegate.
     void setCustomPolicyDelegate(bool enabled, bool permissive);
 
     // Page Visibility.
-    void setVisibilityState(WKPageVisibilityState, bool isInitialState);
+    void setHidden(bool);
+
+    // Cache.
+    void setCacheModel(int);
 
     // Work queue.
     bool shouldProcessWorkQueue() const;
     void processWorkQueue();
     void queueBackNavigation(unsigned howFarBackward);
     void queueForwardNavigation(unsigned howFarForward);
-    void queueLoad(WKStringRef url, WKStringRef target);
+    void queueLoad(WKStringRef url, WKStringRef target, bool shouldOpenExternalURLs = false);
     void queueLoadHTMLString(WKStringRef content, WKStringRef baseURL = 0, WKStringRef unreachableURL = 0);
     void queueReload();
     void queueLoadingScript(WKStringRef script);
     void queueNonLoadingScript(WKStringRef script);
+
+    bool isAllowedHost(WKStringRef);
 
 private:
     InjectedBundle();
@@ -134,7 +145,7 @@ private:
 
     WKBundleRef m_bundle;
     WKBundlePageGroupRef m_pageGroup;
-    Vector<OwnPtr<InjectedBundlePage> > m_pages;
+    Vector<std::unique_ptr<InjectedBundlePage>> m_pages;
 
     RefPtr<AccessibilityController> m_accessibilityController;
     RefPtr<TestRunner> m_testRunner;
@@ -155,10 +166,13 @@ private:
     bool m_useWaitToDumpWatchdogTimer;
     bool m_useWorkQueue;
     int m_timeout;
+    bool m_pixelResultIsPending { false };
 
     WKRetainPtr<WKDataRef> m_audioResult;
     WKRetainPtr<WKImageRef> m_pixelResult;
     WKRetainPtr<WKArrayRef> m_repaintRects;
+
+    Vector<String> m_allowedHosts;
 };
 
 } // namespace WTR

@@ -26,8 +26,8 @@
 #ifndef WKBundleHitTestResult_h
 #define WKBundleHitTestResult_h
 
-#include <WebKit2/WKBase.h>
-#include <WebKit2/WKGeometry.h>
+#include <WebKit/WKBase.h>
+#include <WebKit/WKGeometry.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -43,6 +43,7 @@ typedef uint32_t WKBundleHitTestResultMediaType;
 WK_EXPORT WKTypeID WKBundleHitTestResultGetTypeID();
 
 WK_EXPORT WKBundleNodeHandleRef WKBundleHitTestResultCopyNodeHandle(WKBundleHitTestResultRef hitTestResult);
+WK_EXPORT WKBundleNodeHandleRef WKBundleHitTestResultCopyURLElementHandle(WKBundleHitTestResultRef hitTestResult);
 
 WK_EXPORT WKBundleFrameRef WKBundleHitTestResultGetFrame(WKBundleHitTestResultRef hitTestResult);
 WK_EXPORT WKBundleFrameRef WKBundleHitTestResultGetTargetFrame(WKBundleHitTestResultRef hitTestResult);
@@ -53,6 +54,7 @@ WK_EXPORT WKURLRef WKBundleHitTestResultCopyAbsoluteLinkURL(WKBundleHitTestResul
 WK_EXPORT WKURLRef WKBundleHitTestResultCopyAbsoluteMediaURL(WKBundleHitTestResultRef hitTestResult);
 WK_EXPORT bool WKBundleHitTestResultMediaIsInFullscreen(WKBundleHitTestResultRef hitTestResult);
 WK_EXPORT bool WKBundleHitTestResultMediaHasAudio(WKBundleHitTestResultRef hitTestResult);
+WK_EXPORT bool WKBundleHitTestResultIsDownloadableMedia(WKBundleHitTestResultRef hitTestResultRef);
 WK_EXPORT WKBundleHitTestResultMediaType WKBundleHitTestResultGetMediaType(WKBundleHitTestResultRef hitTestResult);
 
 WK_EXPORT WKRect WKBundleHitTestResultGetImageRect(WKBundleHitTestResultRef hitTestResult);

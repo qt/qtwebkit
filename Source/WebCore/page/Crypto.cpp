@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2011 Google Inc. All rights reserved.
+ * Copyright (C) 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,36 +31,31 @@
 #include "config.h"
 #include "Crypto.h"
 
+#include "Document.h"
 #include "ExceptionCode.h"
-#include "ScriptWrappableInlines.h"
-#include <wtf/ArrayBufferView.h>
+#include "SubtleCrypto.h"
+#include <runtime/ArrayBufferView.h>
 #include <wtf/CryptographicallyRandomNumber.h>
 
 namespace WebCore {
 
-namespace {
-
-bool isIntegerArray(ArrayBufferView* array)
+Crypto::Crypto(Document& document)
+    : ContextDestructionObserver(&document)
 {
-    ArrayBufferView::ViewType type = array->getType();
-    return type == ArrayBufferView::TypeInt8
-           || type == ArrayBufferView::TypeUint8
-           || type == ArrayBufferView::TypeUint8Clamped
-           || type == ArrayBufferView::TypeInt16
-           || type == ArrayBufferView::TypeUint16
-           || type == ArrayBufferView::TypeInt32
-           || type == ArrayBufferView::TypeUint32;
 }
 
+Crypto::~Crypto()
+{
 }
 
-Crypto::Crypto()
+Document* Crypto::document() const
 {
+    return downcast<Document>(scriptExecutionContext());
 }
 
 void Crypto::getRandomValues(ArrayBufferView* array, ExceptionCode& ec)
 {
-    if (!array || !isIntegerArray(array)) {
+    if (!array || !JSC::isInt(array->getType())) {
         ec = TYPE_MISMATCH_ERR;
         return;
     }
@@ -69,5 +65,16 @@ void Crypto::getRandomValues(ArrayBufferView* array, ExceptionCode& ec)
     }
     cryptographicallyRandomValues(array->baseAddress(), array->byteLength());
 }
+
+#if ENABLE(SUBTLE_CRYPTO)
+SubtleCrypto* Crypto::subtle()
+{
+    ASSERT(isMainThread());
+    if (!m_subtle)
+        m_subtle = SubtleCrypto::create(*document());
+
+    return m_subtle.get();
+}
+#endif
 
 }

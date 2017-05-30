@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2012, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,8 +26,6 @@
 #ifndef JITThunks_h
 #define JITThunks_h
 
-#include <wtf/Platform.h>
-
 #if ENABLE(JIT)
 
 #include "CallData.h"
@@ -36,36 +34,42 @@
 #include "MacroAssemblerCodeRef.h"
 #include "ThunkGenerator.h"
 #include "Weak.h"
+#include "WeakHandleOwner.h"
 #include "WeakInlines.h"
 #include <wtf/HashMap.h>
-#include <wtf/OwnPtr.h>
 #include <wtf/RefPtr.h>
+#include <wtf/ThreadingPrimitives.h>
 
 namespace JSC {
 
 class VM;
 class NativeExecutable;
 
-class JITThunks {
+class JITThunks final : private WeakHandleOwner {
+    WTF_MAKE_FAST_ALLOCATED;
 public:
     JITThunks();
-    ~JITThunks();
+    virtual ~JITThunks();
 
     MacroAssemblerCodePtr ctiNativeCall(VM*);
     MacroAssemblerCodePtr ctiNativeConstruct(VM*);
+    MacroAssemblerCodePtr ctiNativeTailCall(VM*);    
 
     MacroAssemblerCodeRef ctiStub(VM*, ThunkGenerator);
 
-    NativeExecutable* hostFunctionStub(VM*, NativeFunction, NativeFunction constructor);
-    NativeExecutable* hostFunctionStub(VM*, NativeFunction, ThunkGenerator, Intrinsic);
+    NativeExecutable* hostFunctionStub(VM*, NativeFunction, NativeFunction constructor, const String& name);
+    NativeExecutable* hostFunctionStub(VM*, NativeFunction, ThunkGenerator, Intrinsic, const String& name);
 
     void clearHostFunctionStubs();
 
 private:
+    void finalize(Handle<Unknown>, void* context) override;
+    
     typedef HashMap<ThunkGenerator, MacroAssemblerCodeRef> CTIStubMap;
     CTIStubMap m_ctiStubMap;
-    typedef HashMap<std::pair<NativeFunction, NativeFunction>, Weak<NativeExecutable> > HostFunctionStubMap;
-    OwnPtr<HostFunctionStubMap> m_hostFunctionStubMap;
+    typedef HashMap<std::pair<NativeFunction, NativeFunction>, Weak<NativeExecutable>> HostFunctionStubMap;
+    std::unique_ptr<HostFunctionStubMap> m_hostFunctionStubMap;
+    Lock m_lock;
 };
 
 } // namespace JSC

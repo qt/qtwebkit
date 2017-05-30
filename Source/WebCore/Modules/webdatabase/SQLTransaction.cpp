@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -29,17 +29,16 @@
 #include "config.h"
 #include "SQLTransaction.h"
 
-#if ENABLE(SQL_DATABASE)
-
-#include "AbstractSQLTransactionBackend.h"
 #include "Database.h"
 #include "DatabaseAuthorizer.h"
 #include "DatabaseContext.h"
 #include "ExceptionCode.h"
 #include "Logging.h"
 #include "SQLError.h"
+#include "SQLStatement.h"
 #include "SQLStatementCallback.h"
 #include "SQLStatementErrorCallback.h"
+#include "SQLTransactionBackend.h"
 #include "SQLTransactionCallback.h"
 #include "SQLTransactionClient.h" // FIXME: Should be used in the backend only.
 #include "SQLTransactionErrorCallback.h"
@@ -49,24 +48,23 @@
 
 namespace WebCore {
 
-PassRefPtr<SQLTransaction> SQLTransaction::create(Database* db, PassRefPtr<SQLTransactionCallback> callback,
-    PassRefPtr<VoidCallback> successCallback, PassRefPtr<SQLTransactionErrorCallback> errorCallback,
-    bool readOnly)
+Ref<SQLTransaction> SQLTransaction::create(Ref<Database>&& database, RefPtr<SQLTransactionCallback>&& callback, RefPtr<VoidCallback>&& successCallback, RefPtr<SQLTransactionErrorCallback>&& errorCallback, bool readOnly)
 {
-    return adoptRef(new SQLTransaction(db, callback, successCallback, errorCallback, readOnly));
+    return adoptRef(*new SQLTransaction(WTFMove(database), WTFMove(callback), WTFMove(successCallback), WTFMove(errorCallback), readOnly));
 }
 
-SQLTransaction::SQLTransaction(Database* db, PassRefPtr<SQLTransactionCallback> callback,
-    PassRefPtr<VoidCallback> successCallback, PassRefPtr<SQLTransactionErrorCallback> errorCallback,
-    bool readOnly)
-    : m_database(db)
-    , m_callbackWrapper(callback, db->scriptExecutionContext())
-    , m_successCallbackWrapper(successCallback, db->scriptExecutionContext())
-    , m_errorCallbackWrapper(errorCallback, db->scriptExecutionContext())
+SQLTransaction::SQLTransaction(Ref<Database>&& database, RefPtr<SQLTransactionCallback>&& callback, RefPtr<VoidCallback>&& successCallback, RefPtr<SQLTransactionErrorCallback>&& errorCallback, bool readOnly)
+    : m_database(WTFMove(database))
+    , m_callbackWrapper(WTFMove(callback), m_database->scriptExecutionContext())
+    , m_successCallbackWrapper(WTFMove(successCallback), m_database->scriptExecutionContext())
+    , m_errorCallbackWrapper(WTFMove(errorCallback), m_database->scriptExecutionContext())
     , m_executeSqlAllowed(false)
     , m_readOnly(readOnly)
 {
-    ASSERT(m_database);
+}
+
+SQLTransaction::~SQLTransaction()
+{
 }
 
 bool SQLTransaction::hasCallback() const
@@ -84,7 +82,7 @@ bool SQLTransaction::hasErrorCallback() const
     return m_errorCallbackWrapper.hasCallback();
 }
 
-void SQLTransaction::setBackend(AbstractSQLTransactionBackend* backend)
+void SQLTransaction::setBackend(SQLTransactionBackend* backend)
 {
     ASSERT(!m_backend);
     m_backend = backend;
@@ -97,10 +95,10 @@ SQLTransaction::StateFunction SQLTransaction::stateFunctionFor(SQLTransactionSta
         &SQLTransaction::unreachableState,                // 1. idle
         &SQLTransaction::unreachableState,                // 2. acquireLock
         &SQLTransaction::unreachableState,                // 3. openTransactionAndPreflight
-        &SQLTransaction::sendToBackendState,              // 4. runStatements
+        &SQLTransaction::unreachableState,                // 4. runStatements
         &SQLTransaction::unreachableState,                // 5. postflightAndCommit
-        &SQLTransaction::sendToBackendState,              // 6. cleanupAndTerminate
-        &SQLTransaction::sendToBackendState,              // 7. cleanupAfterTransactionErrorCallback
+        &SQLTransaction::unreachableState,                // 6. cleanupAndTerminate
+        &SQLTransaction::unreachableState,                // 7. cleanupAfterTransactionErrorCallback
         &SQLTransaction::deliverTransactionCallback,      // 8.
         &SQLTransaction::deliverTransactionErrorCallback, // 9.
         &SQLTransaction::deliverStatementCallback,        // 10.
@@ -124,18 +122,7 @@ void SQLTransaction::requestTransitToState(SQLTransactionState nextState)
     m_database->scheduleTransactionCallback(this);
 }
 
-SQLTransactionState SQLTransaction::nextStateForTransactionError()
-{
-    ASSERT(m_transactionError);
-    if (m_errorCallbackWrapper.hasCallback())
-        return SQLTransactionState::DeliverTransactionErrorCallback;
-
-    // No error callback, so fast-forward to:
-    // Transaction Step 11 - Rollback the transaction.
-    return SQLTransactionState::CleanupAfterTransactionErrorCallback;
-}
-
-SQLTransactionState SQLTransaction::deliverTransactionCallback()
+void SQLTransaction::deliverTransactionCallback()
 {
     bool shouldDeliverErrorCallback = false;
 
@@ -148,15 +135,15 @@ SQLTransactionState SQLTransaction::deliverTransactionCallback()
     }
 
     // Spec 4.3.2 5: If the transaction callback was null or raised an exception, jump to the error callback
-    SQLTransactionState nextState = SQLTransactionState::RunStatements;
     if (shouldDeliverErrorCallback) {
         m_transactionError = SQLError::create(SQLError::UNKNOWN_ERR, "the SQLTransactionCallback was null or threw an exception");
-        nextState = SQLTransactionState::DeliverTransactionErrorCallback;
+        return deliverTransactionErrorCallback();
     }
-    return nextState;
+
+    m_backend->requestTransitToState(SQLTransactionState::RunStatements);
 }
 
-SQLTransactionState SQLTransaction::deliverTransactionErrorCallback()
+void SQLTransaction::deliverTransactionErrorCallback()
 {
     // Spec 4.3.2.10: If exists, invoke error callback with the last
     // error to have occurred in this transaction.
@@ -172,23 +159,22 @@ SQLTransactionState SQLTransaction::deliverTransactionErrorCallback()
         ASSERT(m_transactionError);
         errorCallback->handleEvent(m_transactionError.get());
 
-        m_transactionError = 0;
+        m_transactionError = nullptr;
     }
 
     clearCallbackWrappers();
 
     // Spec 4.3.2.10: Rollback the transaction.
-    return SQLTransactionState::CleanupAfterTransactionErrorCallback;
+    m_backend->requestTransitToState(SQLTransactionState::CleanupAfterTransactionErrorCallback);
 }
 
-SQLTransactionState SQLTransaction::deliverStatementCallback()
+void SQLTransaction::deliverStatementCallback()
 {
     // Spec 4.3.2.6.6 and 4.3.2.6.3: If the statement callback went wrong, jump to the transaction error callback
     // Otherwise, continue to loop through the statement queue
     m_executeSqlAllowed = true;
 
-    AbstractSQLStatement* currentAbstractStatement = m_backend->currentStatement();
-    SQLStatement* currentStatement = static_cast<SQLStatement*>(currentAbstractStatement);
+    SQLStatement* currentStatement = m_backend->currentStatement();
     ASSERT(currentStatement);
 
     bool result = currentStatement->performCallback(this);
@@ -197,22 +183,30 @@ SQLTransactionState SQLTransaction::deliverStatementCallback()
 
     if (result) {
         m_transactionError = SQLError::create(SQLError::UNKNOWN_ERR, "the statement callback raised an exception or statement error callback did not return false");
-        return nextStateForTransactionError();
+
+        if (m_errorCallbackWrapper.hasCallback())
+            return deliverTransactionErrorCallback();
+
+        // No error callback, so fast-forward to:
+        // Transaction Step 11 - Rollback the transaction.
+        m_backend->requestTransitToState(SQLTransactionState::CleanupAfterTransactionErrorCallback);
+        return;
     }
-    return SQLTransactionState::RunStatements;
+
+    m_backend->requestTransitToState(SQLTransactionState::RunStatements);
 }
 
-SQLTransactionState SQLTransaction::deliverQuotaIncreaseCallback()
+void SQLTransaction::deliverQuotaIncreaseCallback()
 {
     ASSERT(m_backend->currentStatement());
 
-    bool shouldRetryCurrentStatement = m_database->transactionClient()->didExceedQuota(database());
+    bool shouldRetryCurrentStatement = m_database->transactionClient()->didExceedQuota(&database());
     m_backend->setShouldRetryCurrentStatement(shouldRetryCurrentStatement);
 
-    return SQLTransactionState::RunStatements;
+    m_backend->requestTransitToState(SQLTransactionState::RunStatements);
 }
 
-SQLTransactionState SQLTransaction::deliverSuccessCallback()
+void SQLTransaction::deliverSuccessCallback()
 {
     // Spec 4.3.2.8: Deliver success callback.
     RefPtr<VoidCallback> successCallback = m_successCallbackWrapper.unwrap();
@@ -223,23 +217,15 @@ SQLTransactionState SQLTransaction::deliverSuccessCallback()
 
     // Schedule a "post-success callback" step to return control to the database thread in case there
     // are further transactions queued up for this Database
-    return SQLTransactionState::CleanupAndTerminate;
+    m_backend->requestTransitToState(SQLTransactionState::CleanupAndTerminate);
 }
 
 // This state function is used as a stub function to plug unimplemented states
 // in the state dispatch table. They are unimplemented because they should
 // never be reached in the course of correct execution.
-SQLTransactionState SQLTransaction::unreachableState()
+void SQLTransaction::unreachableState()
 {
     ASSERT_NOT_REACHED();
-    return SQLTransactionState::End;
-}
-
-SQLTransactionState SQLTransaction::sendToBackendState()
-{
-    ASSERT(m_nextState != SQLTransactionState::Idle);
-    m_backend->requestTransitToState(m_nextState);
-    return SQLTransactionState::Idle;
 }
 
 void SQLTransaction::performPendingCallback()
@@ -248,10 +234,10 @@ void SQLTransaction::performPendingCallback()
     runStateMachine();
 }
 
-void SQLTransaction::executeSQL(const String& sqlStatement, const Vector<SQLValue>& arguments, PassRefPtr<SQLStatementCallback> callback, PassRefPtr<SQLStatementErrorCallback> callbackError, ExceptionCode& e)
+void SQLTransaction::executeSQL(const String& sqlStatement, const Vector<SQLValue>& arguments, RefPtr<SQLStatementCallback>&& callback, RefPtr<SQLStatementErrorCallback>&& callbackError, ExceptionCode& ec)
 {
     if (!m_executeSqlAllowed || !m_database->opened()) {
-        e = INVALID_STATE_ERR;
+        ec = INVALID_STATE_ERR;
         return;
     }
 
@@ -261,15 +247,15 @@ void SQLTransaction::executeSQL(const String& sqlStatement, const Vector<SQLValu
     else if (m_readOnly)
         permissions |= DatabaseAuthorizer::ReadOnlyMask;
 
-    OwnPtr<SQLStatement> statement = SQLStatement::create(m_database.get(), callback, callbackError);
-    m_backend->executeSQL(statement.release(), sqlStatement, arguments, permissions);
+    auto statement = std::make_unique<SQLStatement>(m_database, sqlStatement, arguments, WTFMove(callback), WTFMove(callbackError), permissions);
+    m_backend->executeSQL(WTFMove(statement));
 }
 
-bool SQLTransaction::computeNextStateAndCleanupIfNeeded()
+void SQLTransaction::computeNextStateAndCleanupIfNeeded()
 {
     // Only honor the requested state transition if we're not supposed to be
     // cleaning up and shutting down:
-    if (m_database->opened() && !m_database->isInterrupted()) {
+    if (m_database->opened()) {
         setStateToRequestedState();
         ASSERT(m_nextState == SQLTransactionState::End
             || m_nextState == SQLTransactionState::DeliverTransactionCallback
@@ -279,13 +265,11 @@ bool SQLTransaction::computeNextStateAndCleanupIfNeeded()
             || m_nextState == SQLTransactionState::DeliverSuccessCallback);
 
         LOG(StorageAPI, "Callback %s\n", nameForSQLTransactionState(m_nextState));
-        return false;
+        return;
     }
 
     clearCallbackWrappers();
-    m_nextState = SQLTransactionState::CleanupAndTerminate;
-
-    return true;
+    m_backend->requestTransitToState(SQLTransactionState::CleanupAndTerminate);
 }
 
 void SQLTransaction::clearCallbackWrappers()
@@ -297,5 +281,3 @@ void SQLTransaction::clearCallbackWrappers()
 }
 
 } // namespace WebCore
-
-#endif // ENABLE(SQL_DATABASE)

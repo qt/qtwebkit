@@ -24,6 +24,7 @@
 
 #include "CSSFontFaceSrcValue.h"
 #include "CSSValueList.h"
+#include "ElementIterator.h"
 #include "SVGFontFaceElement.h"
 #include "SVGFontFaceNameElement.h"
 #include "SVGFontFaceUriElement.h"
@@ -33,37 +34,37 @@ namespace WebCore {
     
 using namespace SVGNames;
     
-inline SVGFontFaceSrcElement::SVGFontFaceSrcElement(const QualifiedName& tagName, Document* document)
+inline SVGFontFaceSrcElement::SVGFontFaceSrcElement(const QualifiedName& tagName, Document& document)
     : SVGElement(tagName, document)
 {
     ASSERT(hasTagName(font_face_srcTag));
 }
 
-PassRefPtr<SVGFontFaceSrcElement> SVGFontFaceSrcElement::create(const QualifiedName& tagName, Document* document)
+Ref<SVGFontFaceSrcElement> SVGFontFaceSrcElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new SVGFontFaceSrcElement(tagName, document));
+    return adoptRef(*new SVGFontFaceSrcElement(tagName, document));
 }
 
-PassRefPtr<CSSValueList> SVGFontFaceSrcElement::srcValue() const
+Ref<CSSValueList> SVGFontFaceSrcElement::srcValue() const
 {
-    RefPtr<CSSValueList> list = CSSValueList::createCommaSeparated();
-    for (Node* child = firstChild(); child; child = child->nextSibling()) {
+    Ref<CSSValueList> list = CSSValueList::createCommaSeparated();
+    for (auto& child : childrenOfType<SVGElement>(*this)) {
         RefPtr<CSSFontFaceSrcValue> srcValue;
-        if (child->hasTagName(font_face_uriTag))
-            srcValue = static_cast<SVGFontFaceUriElement*>(child)->srcValue();
-        else if (child->hasTagName(font_face_nameTag))
-            srcValue = static_cast<SVGFontFaceNameElement*>(child)->srcValue();
+        if (is<SVGFontFaceUriElement>(child))
+            srcValue = downcast<SVGFontFaceUriElement>(child).srcValue();
+        else if (is<SVGFontFaceNameElement>(child))
+            srcValue = downcast<SVGFontFaceNameElement>(child).srcValue();
         if (srcValue && srcValue->resource().length())
-            list->append(srcValue);
+            list->append(srcValue.releaseNonNull());
     }
     return list;
 }
 
-void SVGFontFaceSrcElement::childrenChanged(bool changedByParser, Node* beforeChange, Node* afterChange, int childCountDelta)
+void SVGFontFaceSrcElement::childrenChanged(const ChildChange& change)
 {
-    SVGElement::childrenChanged(changedByParser, beforeChange, afterChange, childCountDelta);
-    if (parentNode() && parentNode()->hasTagName(font_faceTag))
-        static_cast<SVGFontFaceElement*>(parentNode())->rebuildFontFace();
+    SVGElement::childrenChanged(change);
+    if (is<SVGFontFaceElement>(parentNode()))
+        downcast<SVGFontFaceElement>(*parentNode()).rebuildFontFace();
 }
 
 }

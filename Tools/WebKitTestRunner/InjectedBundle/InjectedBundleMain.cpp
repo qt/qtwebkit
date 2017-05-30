@@ -26,14 +26,10 @@
 #include "config.h"
 
 #include "InjectedBundle.h"
-#include <WebKit2/WKBundleInitialize.h>
+#include <WebKit/WKBundleInitialize.h>
 
-#if defined(WIN32) || defined(_WIN32)
-extern "C" __declspec(dllexport) 
-#else
 extern "C"
-#endif
 void WKBundleInitialize(WKBundleRef bundle, WKTypeRef initializationUserData)
 {
-    WTR::InjectedBundle::shared().initialize(bundle, initializationUserData);
+    WTR::InjectedBundle::singleton().initialize(bundle, initializationUserData);
 }

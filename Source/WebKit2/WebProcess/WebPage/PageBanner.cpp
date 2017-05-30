@@ -33,7 +33,9 @@ namespace WebKit {
 
 PageBanner::~PageBanner()
 {
+#if PLATFORM(MAC)
     ASSERT(!m_webPage);
+#endif
     m_client->pageBannerDestroyed(this);
 }
 

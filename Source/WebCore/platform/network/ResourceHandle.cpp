@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -29,10 +29,12 @@
 
 #include "Logging.h"
 #include "NetworkingContext.h"
+#include "NotImplemented.h"
 #include "ResourceHandleClient.h"
 #include "Timer.h"
 #include <algorithm>
 #include <wtf/MainThread.h>
+#include <wtf/NeverDestroyed.h>
 #include <wtf/text/CString.h>
 
 namespace WebCore {
@@ -42,8 +44,12 @@ static bool shouldForceContentSniffing;
 typedef HashMap<AtomicString, ResourceHandle::BuiltinConstructor> BuiltinResourceHandleConstructorMap;
 static BuiltinResourceHandleConstructorMap& builtinResourceHandleConstructorMap()
 {
+#if PLATFORM(IOS)
+    ASSERT(WebThreadIsLockedOrDisabled());
+#else
     ASSERT(isMainThread());
-    DEFINE_STATIC_LOCAL(BuiltinResourceHandleConstructorMap, map, ());
+#endif
+    static NeverDestroyed<BuiltinResourceHandleConstructorMap> map;
     return map;
 }
 
@@ -56,7 +62,7 @@ typedef HashMap<AtomicString, ResourceHandle::BuiltinSynchronousLoader> BuiltinR
 static BuiltinResourceHandleSynchronousLoaderMap& builtinResourceHandleSynchronousLoaderMap()
 {
     ASSERT(isMainThread());
-    DEFINE_STATIC_LOCAL(BuiltinResourceHandleSynchronousLoaderMap, map, ());
+    static NeverDestroyed<BuiltinResourceHandleSynchronousLoaderMap> map;
     return map;
 }
 
@@ -66,7 +72,7 @@ void ResourceHandle::registerBuiltinSynchronousLoader(const AtomicString& protoc
 }
 
 ResourceHandle::ResourceHandle(NetworkingContext* context, const ResourceRequest& request, ResourceHandleClient* client, bool defersLoading, bool shouldContentSniff)
-    : d(adoptPtr(new ResourceHandleInternal(this, context, request, client, defersLoading, shouldContentSniff && shouldContentSniffURL(request.url()))))
+    : d(std::make_unique<ResourceHandleInternal>(this, context, request, client, defersLoading, shouldContentSniff && shouldContentSniffURL(request.url())))
 {
     if (!request.url().isValid()) {
         scheduleFailure(InvalidURLFailure);
@@ -103,7 +109,7 @@ void ResourceHandle::scheduleFailure(FailureType type)
     d->m_failureTimer.startOneShot(0);
 }
 
-void ResourceHandle::fireFailure(Timer<ResourceHandle>*)
+void ResourceHandle::failureTimerFired()
 {
     if (!client())
         return;
@@ -142,32 +148,27 @@ ResourceHandleClient* ResourceHandle::client() const
     return d->m_client;
 }
 
-void ResourceHandle::setClient(ResourceHandleClient* client)
+void ResourceHandle::clearClient()
 {
-    d->m_client = client;
+    d->m_client = nullptr;
 }
 
-#if !PLATFORM(MAC)
+#if !PLATFORM(COCOA) && !USE(CFNETWORK) && !USE(SOUP) && !PLATFORM(QT)
 // ResourceHandle never uses async client calls on these platforms yet.
 void ResourceHandle::continueWillSendRequest(const ResourceRequest&)
 {
-    ASSERT_NOT_REACHED();
+    notImplemented();
 }
 
 void ResourceHandle::continueDidReceiveResponse()
 {
-    ASSERT_NOT_REACHED();
-}
-
-void ResourceHandle::continueShouldUseCredentialStorage(bool)
-{
-    ASSERT_NOT_REACHED();
+    notImplemented();
 }
 
 #if USE(PROTECTION_SPACE_AUTH_CALLBACK)
 void ResourceHandle::continueCanAuthenticateAgainstProtectionSpace(bool)
 {
-    ASSERT_NOT_REACHED();
+    notImplemented();
 }
 #endif
 #endif
@@ -194,7 +195,7 @@ bool ResourceHandle::hasAuthenticationChallenge() const
 
 void ResourceHandle::clearAuthentication()
 {
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     d->m_currentMacChallenge = nil;
 #endif
     d->m_currentWebChallenge.nullify();
@@ -205,11 +206,15 @@ bool ResourceHandle::shouldContentSniff() const
     return d->m_shouldContentSniff;
 }
 
-bool ResourceHandle::shouldContentSniffURL(const KURL& url)
+bool ResourceHandle::shouldContentSniffURL(const URL& url)
 {
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     if (shouldForceContentSniffing)
         return true;
+#endif
+#if PLATFORM(QT)
+    if (url.protocolIs("qrc"))
+        return false;
 #endif
     // We shouldn't content sniff file URLs as their MIME type should be established via their extension.
     return !url.isLocalFile();
@@ -239,9 +244,9 @@ void ResourceHandle::setDefersLoading(bool defers)
     platformSetDefersLoading(defers);
 }
 
-void ResourceHandle::didChangePriority(ResourceLoadPriority)
+bool ResourceHandle::usesAsyncCallbacks() const
 {
-    // Optionally implemented by platform.
+    return d->m_usesAsyncCallbacks;
 }
 
 } // namespace WebCore

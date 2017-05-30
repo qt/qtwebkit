@@ -21,11 +21,10 @@
 #ifndef QtDialogRunner_h
 #define QtDialogRunner_h
 
-#include "WKSecurityOrigin.h"
+#include "WKSecurityOriginRef.h"
 #include "qquickwebview_p.h"
 #include <QtCore/QEventLoop>
 #include <QtCore/QStringList>
-#include <wtf/OwnPtr.h>
 
 QT_BEGIN_NAMESPACE
 class QQmlComponent;
@@ -35,7 +34,7 @@ QT_END_NAMESPACE
 
 namespace WebKit {
 
-class QtDialogRunner : public QEventLoop {
+class QtDialogRunner final : public QEventLoop {
     Q_OBJECT
 
 public:
@@ -75,8 +74,8 @@ private:
     bool createDialog(QQmlComponent*, QObject* contextObject);
 
     QQuickWebView* m_webView;
-    OwnPtr<QQmlContext> m_dialogContext;
-    OwnPtr<QQuickItem> m_dialog;
+    std::unique_ptr<QQmlContext> m_dialogContext;
+    std::unique_ptr<QQuickItem> m_dialog;
     QString m_result;
     bool m_wasAccepted;
 

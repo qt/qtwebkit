@@ -21,7 +21,6 @@
 #ifndef SVGClipPathElement_h
 #define SVGClipPathElement_h
 
-#if ENABLE(SVG)
 #include "SVGAnimatedBoolean.h"
 #include "SVGAnimatedEnumeration.h"
 #include "SVGExternalResourcesRequired.h"
@@ -32,31 +31,31 @@ namespace WebCore {
 
 class RenderObject;
 
-class SVGClipPathElement FINAL : public SVGGraphicsElement,
+class SVGClipPathElement final : public SVGGraphicsElement,
                                  public SVGExternalResourcesRequired {
 public:
-    static PassRefPtr<SVGClipPathElement> create(const QualifiedName&, Document*);
+    static Ref<SVGClipPathElement> create(const QualifiedName&, Document&);
 
 private:
-    SVGClipPathElement(const QualifiedName&, Document*);
+    SVGClipPathElement(const QualifiedName&, Document&);
 
-    virtual bool isValid() const { return SVGTests::isValid(); }
-    virtual bool needsPendingResourceHandling() const { return false; }
+    virtual bool isValid() const override { return SVGTests::isValid(); }
+    virtual bool supportsFocus() const override { return false; }
+    virtual bool needsPendingResourceHandling() const override { return false; }
 
-    bool isSupportedAttribute(const QualifiedName&);
-    virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
-    virtual void svgAttributeChanged(const QualifiedName&);
-    virtual void childrenChanged(bool changedByParser = false, Node* beforeChange = 0, Node* afterChange = 0, int childCountDelta = 0);
+    static bool isSupportedAttribute(const QualifiedName&);
+    virtual void parseAttribute(const QualifiedName&, const AtomicString&) override;
+    virtual void svgAttributeChanged(const QualifiedName&) override;
+    virtual void childrenChanged(const ChildChange&) override;
 
-    virtual RenderObject* createRenderer(RenderArena*, RenderStyle*);
+    virtual RenderPtr<RenderElement> createElementRenderer(Ref<RenderStyle>&&, const RenderTreePosition&) override;
 
     BEGIN_DECLARE_ANIMATED_PROPERTIES(SVGClipPathElement)
         DECLARE_ANIMATED_ENUMERATION(ClipPathUnits, clipPathUnits, SVGUnitTypes::SVGUnitType)
-        DECLARE_ANIMATED_BOOLEAN(ExternalResourcesRequired, externalResourcesRequired)
+        DECLARE_ANIMATED_BOOLEAN_OVERRIDE(ExternalResourcesRequired, externalResourcesRequired)
     END_DECLARE_ANIMATED_PROPERTIES
 };
 
 }
 
-#endif
 #endif

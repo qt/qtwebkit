@@ -1,6 +1,6 @@
 /*
  * Copyright 2005 Frerich Raabe <raabe@kde.org>
- * Copyright (C) 2006 Apple Computer, Inc.
+ * Copyright (C) 2006, 2013 Apple Inc. All rights reserved.
  * Copyright (C) 2007 Alexey Proskuryakov <ap@webkit.org>
  *
  * Redistribution and use in source and binary forms, with or without
@@ -28,10 +28,8 @@
 #include "config.h"
 #include "XPathPredicate.h"
 
-#include "Node.h"
 #include "XPathFunctions.h"
 #include "XPathUtil.h"
-#include "XPathValue.h"
 #include <math.h>
 #include <wtf/MathExtras.h>
 
@@ -48,8 +46,8 @@ Value Number::evaluate() const
     return m_value;
 }
 
-StringExpression::StringExpression(const String& value)
-    : m_value(value)
+StringExpression::StringExpression(String&& value)
+    : m_value(WTFMove(value))
 {
 }
 
@@ -58,26 +56,27 @@ Value StringExpression::evaluate() const
     return m_value;
 }
 
-Value Negative::evaluate() const
+Negative::Negative(std::unique_ptr<Expression> expression)
 {
-    Value p(subExpr(0)->evaluate());
-    return -p.toNumber();
+    addSubexpression(WTFMove(expression));
 }
 
-NumericOp::NumericOp(Opcode opcode, Expression* lhs, Expression* rhs)
+Value Negative::evaluate() const
+{
+    return -subexpression(0).evaluate().toNumber();
+}
+
+NumericOp::NumericOp(Opcode opcode, std::unique_ptr<Expression> lhs, std::unique_ptr<Expression> rhs)
     : m_opcode(opcode)
 {
-    addSubExpression(lhs);
-    addSubExpression(rhs);
+    addSubexpression(WTFMove(lhs));
+    addSubexpression(WTFMove(rhs));
 }
 
 Value NumericOp::evaluate() const
 {
-    Value lhs(subExpr(0)->evaluate());
-    Value rhs(subExpr(1)->evaluate());
-    
-    double leftVal = lhs.toNumber();
-    double rightVal = rhs.toNumber();
+    double leftVal = subexpression(0).evaluate().toNumber();
+    double rightVal = subexpression(1).evaluate().toNumber();
 
     switch (m_opcode) {
         case OP_Add:
@@ -91,15 +90,16 @@ Value NumericOp::evaluate() const
         case OP_Mod:
             return fmod(leftVal, rightVal);
     }
+
     ASSERT_NOT_REACHED();
     return 0.0;
 }
 
-EqTestOp::EqTestOp(Opcode opcode, Expression* lhs, Expression* rhs)
+EqTestOp::EqTestOp(Opcode opcode, std::unique_ptr<Expression> lhs, std::unique_ptr<Expression> rhs)
     : m_opcode(opcode)
 {
-    addSubExpression(lhs);
-    addSubExpression(rhs);
+    addSubexpression(WTFMove(lhs));
+    addSubexpression(WTFMove(rhs));
 }
 
 bool EqTestOp::compare(const Value& lhs, const Value& rhs) const
@@ -111,28 +111,32 @@ bool EqTestOp::compare(const Value& lhs, const Value& rhs) const
             // there is a node in the first node-set and a node in the second node-set such that the result of
             // performing the comparison on the string-values of the two nodes is true.
             const NodeSet& rhsSet = rhs.toNodeSet();
-            for (unsigned lindex = 0; lindex < lhsSet.size(); ++lindex)
-                for (unsigned rindex = 0; rindex < rhsSet.size(); ++rindex)
-                    if (compare(stringValue(lhsSet[lindex]), stringValue(rhsSet[rindex])))
+            for (auto& lhs : lhsSet) {
+                for (auto& rhs : rhsSet) {
+                    if (compare(stringValue(lhs.get()), stringValue(rhs.get())))
                         return true;
+                }
+            }
             return false;
         }
         if (rhs.isNumber()) {
             // If one object to be compared is a node-set and the other is a number, then the comparison will be true
             // if and only if there is a node in the node-set such that the result of performing the comparison on the number
             // to be compared and on the result of converting the string-value of that node to a number using the number function is true.
-            for (unsigned lindex = 0; lindex < lhsSet.size(); ++lindex)
-                if (compare(Value(stringValue(lhsSet[lindex])).toNumber(), rhs))
+            for (auto& lhs : lhsSet) {
+                if (compare(Value(stringValue(lhs.get())).toNumber(), rhs))
                     return true;
+            }
             return false;
         }
         if (rhs.isString()) {
             // If one object to be compared is a node-set and the other is a string, then the comparison will be true
             // if and only if there is a node in the node-set such that the result of performing the comparison on
             // the string-value of the node and the other string is true.
-            for (unsigned lindex = 0; lindex < lhsSet.size(); ++lindex)
-                if (compare(stringValue(lhsSet[lindex]), rhs))
+            for (auto& lhs : lhsSet) {
+                if (compare(stringValue(lhs.get()), rhs))
                     return true;
+            }
             return false;
         }
         if (rhs.isBoolean()) {
@@ -141,25 +145,27 @@ bool EqTestOp::compare(const Value& lhs, const Value& rhs) const
             // the node-set to a boolean using the boolean function is true.
             return compare(lhs.toBoolean(), rhs);
         }
-        ASSERT(0);
+        ASSERT_NOT_REACHED();
     }
     if (rhs.isNodeSet()) {
         const NodeSet& rhsSet = rhs.toNodeSet();
         if (lhs.isNumber()) {
-            for (unsigned rindex = 0; rindex < rhsSet.size(); ++rindex)
-                if (compare(lhs, Value(stringValue(rhsSet[rindex])).toNumber()))
+            for (auto& rhs : rhsSet) {
+                if (compare(lhs, Value(stringValue(rhs.get())).toNumber()))
                     return true;
+            }
             return false;
         }
         if (lhs.isString()) {
-            for (unsigned rindex = 0; rindex < rhsSet.size(); ++rindex)
-                if (compare(lhs, stringValue(rhsSet[rindex])))
+            for (auto& rhs : rhsSet) {
+                if (compare(lhs, stringValue(rhs.get())))
                     return true;
+            }
             return false;
         }
         if (lhs.isBoolean())
             return compare(lhs, rhs.toBoolean());
-        ASSERT(0);
+        ASSERT_NOT_REACHED();
     }
     
     // Neither side is a NodeSet.
@@ -186,91 +192,85 @@ bool EqTestOp::compare(const Value& lhs, const Value& rhs) const
         case OP_LE:
             return lhs.toNumber() <= rhs.toNumber();
     }
-    ASSERT(0);
+
+    ASSERT_NOT_REACHED();
     return false;
 }
 
 Value EqTestOp::evaluate() const
 {
-    Value lhs(subExpr(0)->evaluate());
-    Value rhs(subExpr(1)->evaluate());
-
+    Value lhs(subexpression(0).evaluate());
+    Value rhs(subexpression(1).evaluate());
     return compare(lhs, rhs);
 }
 
-LogicalOp::LogicalOp(Opcode opcode, Expression* lhs, Expression* rhs)
+LogicalOp::LogicalOp(Opcode opcode, std::unique_ptr<Expression> lhs, std::unique_ptr<Expression> rhs)
     : m_opcode(opcode)
 {
-    addSubExpression(lhs);
-    addSubExpression(rhs);
+    addSubexpression(WTFMove(lhs));
+    addSubexpression(WTFMove(rhs));
 }
 
-bool LogicalOp::shortCircuitOn() const
+inline bool LogicalOp::shortCircuitOn() const
 {
-    if (m_opcode == OP_And)
-        return false; //false and foo
-
-    return true;  //true or bar
+    return m_opcode != OP_And;
 }
 
 Value LogicalOp::evaluate() const
 {
-    Value lhs(subExpr(0)->evaluate());
-
     // This is not only an optimization, http://www.w3.org/TR/xpath
     // dictates that we must do short-circuit evaluation
-    bool lhsBool = lhs.toBoolean();
+    bool lhsBool = subexpression(0).evaluate().toBoolean();
     if (lhsBool == shortCircuitOn())
         return lhsBool;
 
-    return subExpr(1)->evaluate().toBoolean();
+    return subexpression(1).evaluate().toBoolean();
+}
+
+Union::Union(std::unique_ptr<Expression> lhs, std::unique_ptr<Expression> rhs)
+{
+    addSubexpression(WTFMove(lhs));
+    addSubexpression(WTFMove(rhs));
 }
 
 Value Union::evaluate() const
 {
-    Value lhsResult = subExpr(0)->evaluate();
-    Value rhs = subExpr(1)->evaluate();
-    
+    Value lhsResult = subexpression(0).evaluate();
+    Value rhs = subexpression(1).evaluate();
+
     NodeSet& resultSet = lhsResult.modifiableNodeSet();
     const NodeSet& rhsNodes = rhs.toNodeSet();
-    
+
     HashSet<Node*> nodes;
-    for (size_t i = 0; i < resultSet.size(); ++i)
-        nodes.add(resultSet[i]);
-    
-    for (size_t i = 0; i < rhsNodes.size(); ++i) {
-        Node* node = rhsNodes[i];
-        if (nodes.add(node).isNewEntry)
-            resultSet.append(node);
+    for (auto& result : resultSet)
+        nodes.add(result.get());
+
+    for (auto& node : rhsNodes) {
+        if (nodes.add(node.get()).isNewEntry)
+            resultSet.append(node.get());
     }
 
-    // It is also possible to use merge sort to avoid making the result unsorted;
-    // but this would waste the time in cases when order is not important.
+    // It would also be possible to perform a merge sort here to avoid making an unsorted result,
+    // but that would waste the time in cases when order is not important.
     resultSet.markSorted(false);
+
     return lhsResult;
 }
 
-Predicate::Predicate(Expression* expr)
-    : m_expr(expr)
+bool evaluatePredicate(const Expression& expression)
 {
-}
-
-Predicate::~Predicate()
-{
-    delete m_expr;
-}
-
-bool Predicate::evaluate() const
-{
-    ASSERT(m_expr != 0);
-
-    Value result(m_expr->evaluate());
+    Value result(expression.evaluate());
 
     // foo[3] means foo[position()=3]
     if (result.isNumber())
-        return EqTestOp(EqTestOp::OP_EQ, createFunction("position"), new Number(result.toNumber())).evaluate().toBoolean();
+        return EqTestOp(EqTestOp::OP_EQ, Function::create(ASCIILiteral("position")), std::make_unique<Number>(result.toNumber())).evaluate().toBoolean();
 
     return result.toBoolean();
+}
+
+bool predicateIsContextPositionSensitive(const Expression& expression)
+{
+    return expression.isContextPositionSensitive() || expression.resultType() == Value::NumberValue;
 }
 
 }

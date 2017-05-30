@@ -27,10 +27,9 @@
 #define WebBackForwardList_h
 
 #include "APIObject.h"
-#include "ImmutableArray.h"
 #include "WebBackForwardListItem.h"
 #include "WebPageProxy.h"
-#include <wtf/PassRefPtr.h>
+#include <wtf/Ref.h>
 #include <wtf/RefPtr.h>
 #include <wtf/Vector.h>
 #if USE(CF)
@@ -39,19 +38,13 @@
 
 namespace WebKit {
 
-typedef Vector<RefPtr<WebBackForwardListItem> > BackForwardListItemVector;
+struct BackForwardListState;
 
-/*
- *          Current
- *   |---------*--------------| Entries
- *      Back        Forward
- */
-
-class WebBackForwardList : public TypedAPIObject<APIObject::TypeBackForwardList> {
+class WebBackForwardList : public API::ObjectImpl<API::Object::Type::BackForwardList> {
 public:
-    static PassRefPtr<WebBackForwardList> create(WebPageProxy* page)
+    static Ref<WebBackForwardList> create(WebPageProxy& page)
     {
-        return adoptRef(new WebBackForwardList(page));
+        return adoptRef(*new WebBackForwardList(page));
     }
     void pageClosed();
 
@@ -59,31 +52,35 @@ public:
 
     void addItem(WebBackForwardListItem*);
     void goToItem(WebBackForwardListItem*);
+    void removeAllItems();
     void clear();
 
-    WebBackForwardListItem* currentItem();
-    WebBackForwardListItem* backItem();
-    WebBackForwardListItem* forwardItem();
-    WebBackForwardListItem* itemAtIndex(int);
-    
+    WebBackForwardListItem* currentItem() const;
+    WebBackForwardListItem* backItem() const;
+    WebBackForwardListItem* forwardItem() const;
+    WebBackForwardListItem* itemAtIndex(int) const;
+
     const BackForwardListItemVector& entries() const { return m_entries; }
 
     uint32_t currentIndex() const { return m_currentIndex; }
     int backListCount() const;
     int forwardListCount() const;
 
-    PassRefPtr<ImmutableArray> backListAsImmutableArrayWithLimit(unsigned limit) const;
-    PassRefPtr<ImmutableArray> forwardListAsImmutableArrayWithLimit(unsigned limit) const;
+    Ref<API::Array> backList() const;
+    Ref<API::Array> forwardList() const;
 
-#if USE(CF)
-    CFDictionaryRef createCFDictionaryRepresentation(WebPageProxy::WebPageProxySessionStateFilterCallback, void* context) const;
-    bool restoreFromCFDictionaryRepresentation(CFDictionaryRef);
-    bool restoreFromV0CFDictionaryRepresentation(CFDictionaryRef);
-    bool restoreFromV1CFDictionaryRepresentation(CFDictionaryRef);
-#endif
+    Ref<API::Array> backListAsAPIArrayWithLimit(unsigned limit) const;
+    Ref<API::Array> forwardListAsAPIArrayWithLimit(unsigned limit) const;
+
+    BackForwardListState backForwardListState(const std::function<bool (WebBackForwardListItem&)>&) const;
+    void restoreFromState(BackForwardListState);
+
+    Vector<BackForwardListItemState> itemStates() const;
 
 private:
-    explicit WebBackForwardList(WebPageProxy*);
+    explicit WebBackForwardList(WebPageProxy&);
+
+    void didRemoveItem(WebBackForwardListItem&);
 
     WebPageProxy* m_page;
     BackForwardListItemVector m_entries;

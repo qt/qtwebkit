@@ -38,8 +38,6 @@
 #include "ScriptExecutionContext.h"
 #include <wtf/MathExtras.h>
 
-using namespace std;
-
 namespace WebCore {
 
 static void fixNANs(double &x)
@@ -48,14 +46,17 @@ static void fixNANs(double &x)
         x = 0.0;
 }
 
-PannerNode::PannerNode(AudioContext* context, float sampleRate)
+PannerNode::PannerNode(AudioContext& context, float sampleRate)
     : AudioNode(context, sampleRate)
     , m_panningModel(Panner::PanningModelHRTF)
     , m_lastGain(-1.0)
     , m_connectionCount(0)
 {
-    addInput(adoptPtr(new AudioNodeInput(this)));
-    addOutput(adoptPtr(new AudioNodeOutput(this, 2)));
+    // Load the HRTF database asynchronously so we don't block the Javascript thread while creating the HRTF database.
+    m_hrtfDatabaseLoader = HRTFDatabaseLoader::createAndLoadAsynchronouslyIfNecessary(context.sampleRate());
+
+    addInput(std::make_unique<AudioNodeInput>(this));
+    addOutput(std::make_unique<AudioNodeOutput>(this, 2));
 
     // Node-specific default mixing rules.
     m_channelCount = 2;
@@ -83,11 +84,12 @@ void PannerNode::pullInputs(size_t framesToProcess)
 {
     // We override pullInputs(), so we can detect new AudioSourceNodes which have connected to us when new connections are made.
     // These AudioSourceNodes need to be made aware of our existence in order to handle doppler shift pitch changes.
-    if (m_connectionCount != context()->connectionCount()) {
-        m_connectionCount = context()->connectionCount();
+    if (m_connectionCount != context().connectionCount()) {
+        m_connectionCount = context().connectionCount();
 
         // Recursively go through all nodes connected to us.
-        notifyAudioSourcesConnectedToNode(this);
+        HashSet<AudioNode*> visitedNodes;
+        notifyAudioSourcesConnectedToNode(this, visitedNodes);
     }
     
     AudioNode::pullInputs(framesToProcess);
@@ -103,34 +105,44 @@ void PannerNode::process(size_t framesToProcess)
     }
 
     AudioBus* source = input(0)->bus();
-
     if (!source) {
         destination->zero();
         return;
     }
 
-    // The audio thread can't block on this lock, so we call tryLock() instead.
-    MutexTryLocker tryLocker(m_pannerLock);
-    if (tryLocker.locked()) {
-        // Apply the panning effect.
-        double azimuth;
-        double elevation;
-        getAzimuthElevation(&azimuth, &elevation);
-        m_panner->pan(azimuth, elevation, source, destination, framesToProcess);
-
-        // Get the distance and cone gain.
-        double totalGain = distanceConeGain();
-
-        // Snap to desired gain at the beginning.
-        if (m_lastGain == -1.0)
-            m_lastGain = totalGain;
-        
-        // Apply gain in-place with de-zippering.
-        destination->copyWithGainFrom(*destination, &m_lastGain, totalGain);
-    } else {
-        // Too bad - The tryLock() failed. We must be in the middle of changing the panner.
-        destination->zero();
+    // HRTFDatabase should be loaded before proceeding for offline audio context when panningModel() is "HRTF".
+    if (panningModel() == "HRTF" && !m_hrtfDatabaseLoader->isLoaded()) {
+        if (context().isOfflineContext())
+            m_hrtfDatabaseLoader->waitForLoaderThreadCompletion();
+        else {
+            destination->zero();
+            return;
+        }
     }
+
+    // The audio thread can't block on this lock, so we use std::try_to_lock instead.
+    std::unique_lock<Lock> lock(m_pannerMutex, std::try_to_lock);
+    if (!lock.owns_lock()) {
+        // Too bad - The try_lock() failed. We must be in the middle of changing the panner.
+        destination->zero();
+        return;
+    }
+
+    // Apply the panning effect.
+    double azimuth;
+    double elevation;
+    getAzimuthElevation(&azimuth, &elevation);
+    m_panner->pan(azimuth, elevation, source, destination, framesToProcess);
+
+    // Get the distance and cone gain.
+    double totalGain = distanceConeGain();
+
+    // Snap to desired gain at the beginning.
+    if (m_lastGain == -1.0)
+        m_lastGain = totalGain;
+
+    // Apply gain in-place with de-zippering.
+    destination->copyWithGainFrom(*destination, &m_lastGain, totalGain);
 }
 
 void PannerNode::reset()
@@ -145,7 +157,7 @@ void PannerNode::initialize()
     if (isInitialized())
         return;
 
-    m_panner = Panner::create(m_panningModel, sampleRate(), context()->hrtfDatabaseLoader());
+    m_panner = Panner::create(m_panningModel, sampleRate(), m_hrtfDatabaseLoader.get());
 
     AudioNode::initialize();
 }
@@ -155,13 +167,13 @@ void PannerNode::uninitialize()
     if (!isInitialized())
         return;
         
-    m_panner.clear();
+    m_panner = nullptr;
     AudioNode::uninitialize();
 }
 
 AudioListener* PannerNode::listener()
 {
-    return context()->listener();
+    return context().listener();
 }
 
 String PannerNode::panningModel() const
@@ -198,16 +210,15 @@ bool PannerNode::setPanningModel(unsigned model)
     case HRTF:
         if (!m_panner.get() || model != m_panningModel) {
             // This synchronizes with process().
-            MutexLocker processLocker(m_pannerLock);
-            
-            OwnPtr<Panner> newPanner = Panner::create(model, sampleRate(), context()->hrtfDatabaseLoader());
-            m_panner = newPanner.release();
+            std::lock_guard<Lock> lock(m_pannerMutex);
+
+            m_panner = Panner::create(model, sampleRate(), m_hrtfDatabaseLoader.get());
             m_panningModel = model;
         }
         break;
     case SOUNDFIELD:
         // FIXME: Implement sound field model. See // https://bugs.webkit.org/show_bug.cgi?id=77367.
-        context()->scriptExecutionContext()->addConsoleMessage(JSMessageSource, WarningMessageLevel, "'soundfield' panning model not implemented.");
+        context().scriptExecutionContext()->addConsoleMessage(MessageSource::JS, MessageLevel::Warning, ASCIILiteral("'soundfield' panning model not implemented."));
         break;
     default:
         return false;
@@ -353,8 +364,8 @@ float PannerNode::dopplerRate()
             sourceProjection = -sourceProjection;
 
             double scaledSpeedOfSound = speedOfSound / dopplerFactor;
-            listenerProjection = min(listenerProjection, scaledSpeedOfSound);
-            sourceProjection = min(sourceProjection, scaledSpeedOfSound);
+            listenerProjection = std::min(listenerProjection, scaledSpeedOfSound);
+            sourceProjection = std::min(sourceProjection, scaledSpeedOfSound);
 
             dopplerShift = ((speedOfSound - dopplerFactor * listenerProjection) / (speedOfSound - dopplerFactor * sourceProjection));
             fixNANs(dopplerShift); // avoid illegal values
@@ -387,7 +398,7 @@ float PannerNode::distanceConeGain()
     return float(distanceGain * coneGain);
 }
 
-void PannerNode::notifyAudioSourcesConnectedToNode(AudioNode* node)
+void PannerNode::notifyAudioSourcesConnectedToNode(AudioNode* node, HashSet<AudioNode*>& visitedNodes)
 {
     ASSERT(node);
     if (!node)
@@ -406,7 +417,11 @@ void PannerNode::notifyAudioSourcesConnectedToNode(AudioNode* node)
             for (unsigned j = 0; j < input->numberOfRenderingConnections(); ++j) {
                 AudioNodeOutput* connectedOutput = input->renderingOutput(j);
                 AudioNode* connectedNode = connectedOutput->node();
-                notifyAudioSourcesConnectedToNode(connectedNode); // recurse
+                if (visitedNodes.contains(connectedNode))
+                    continue;
+
+                visitedNodes.add(connectedNode);
+                notifyAudioSourcesConnectedToNode(connectedNode, visitedNodes);
             }
         }
     }

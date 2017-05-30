@@ -26,13 +26,21 @@
 #ifndef StringUtilities_h
 #define StringUtilities_h
 
+#import <WebKit/WKDeclarationSpecifiers.h>
 #import <wtf/Forward.h>
 
 namespace WebKit {
 
+#ifdef __OBJC__
+
 // NOTE: This does not use String::operator NSString*() since that function
 // expects to be called on the thread running WebCore.
-NSString* nsStringFromWebCoreString(const String&);
+NSString *nsStringFromWebCoreString(const String&);
+NSString *formattedPhoneNumberString(NSString *originalPhoneNumber);
+
+#endif // defined(__OBJC__)
+
+WK_EXPORT bool stringMatchesWildcardString(const String& stringToBeMatched, const String& wildcardString);
 
 }
 

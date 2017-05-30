@@ -21,38 +21,32 @@
 #ifndef RenderSVGTextPath_h
 #define RenderSVGTextPath_h
 
-#if ENABLE(SVG)
 #include "RenderSVGInline.h"
 
 namespace WebCore {
 
-class RenderSVGTextPath : public RenderSVGInline {
+class RenderSVGTextPath final : public RenderSVGInline {
 public:
-    RenderSVGTextPath(Element*);
+    RenderSVGTextPath(SVGTextPathElement&, Ref<RenderStyle>&&);
+
+    SVGTextPathElement& textPathElement() const;
 
     Path layoutPath() const;
     float startOffset() const;
     bool exactAlignment() const;
     bool stretchMethod() const;
 
-    virtual bool isSVGTextPath() const { return true; }
-
 private:
-    virtual const char* renderName() const { return "RenderSVGTextPath"; }
+    void graphicsElement() const = delete;
+
+    virtual bool isSVGTextPath() const override { return true; }
+    virtual const char* renderName() const override { return "RenderSVGTextPath"; }
 
     Path m_layoutPath;
 };
 
-inline RenderSVGTextPath* toRenderSVGTextPath(RenderObject* object)
-{ 
-    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isSVGTextPath());
-    return static_cast<RenderSVGTextPath*>(object);
-}
+} // namespace WebCore
 
-// This will catch anyone doing an unnecessary cast.
-void toRenderSVGTextPath(const RenderSVGTextPath*);
+SPECIALIZE_TYPE_TRAITS_RENDER_OBJECT(RenderSVGTextPath, isSVGTextPath())
 
-}
-
-#endif // ENABLE(SVG)
 #endif // RenderSVGTextPath_h

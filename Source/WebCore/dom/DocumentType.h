@@ -30,16 +30,16 @@ namespace WebCore {
 
 class NamedNodeMap;
 
-class DocumentType FINAL : public Node {
+class DocumentType final : public Node {
 public:
-    static PassRefPtr<DocumentType> create(Document* document, const String& name, const String& publicId, const String& systemId)
+    static Ref<DocumentType> create(Document& document, const String& name, const String& publicId, const String& systemId)
     {
-        return adoptRef(new DocumentType(document, name, publicId, systemId));
+        return adoptRef(*new DocumentType(document, name, publicId, systemId));
     }
 
-    // FIXME: We never fill m_entities and m_notations. Current implementation of NamedNodeMap doesn't work without an associated Element yet.
-    NamedNodeMap* entities() const { return m_entities.get(); }
-    NamedNodeMap* notations() const { return m_notations.get(); }
+    // These are needed by ObjC / GObject bindings for backward compatibility.
+    NamedNodeMap* entitiesForBindings() const { return nullptr; }
+    NamedNodeMap* notationsForBindings() const { return nullptr; }
 
     const String& name() const { return m_name; }
     const String& publicId() const { return m_publicId; }
@@ -47,18 +47,11 @@ public:
     const String& internalSubset() const { return m_subset; }
 
 private:
-    DocumentType(Document*, const String& name, const String& publicId, const String& systemId);
+    DocumentType(Document&, const String& name, const String& publicId, const String& systemId);
 
-    virtual KURL baseURI() const;
-    virtual String nodeName() const;
-    virtual NodeType nodeType() const;
-    virtual PassRefPtr<Node> cloneNode(bool deep);
-
-    virtual InsertionNotificationRequest insertedInto(ContainerNode*) OVERRIDE;
-    virtual void removedFrom(ContainerNode*) OVERRIDE;
-
-    OwnPtr<NamedNodeMap> m_entities;
-    OwnPtr<NamedNodeMap> m_notations;
+    virtual String nodeName() const override;
+    virtual NodeType nodeType() const override;
+    virtual Ref<Node> cloneNodeInternal(Document&, CloningOperation) override;
 
     String m_name;
     String m_publicId;
@@ -67,5 +60,9 @@ private:
 };
 
 } // namespace WebCore
+
+SPECIALIZE_TYPE_TRAITS_BEGIN(WebCore::DocumentType)
+    static bool isType(const WebCore::Node& node) { return node.nodeType() == WebCore::Node::DOCUMENT_TYPE_NODE; }
+SPECIALIZE_TYPE_TRAITS_END()
 
 #endif

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 Apple Inc. All Rights Reserved.
+ * Copyright (C) 2008, 2016 Apple Inc. All Rights Reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,17 +26,22 @@
 #include "config.h"
 #include "JSEventTarget.h"
 
+#include "DOMWindow.h"
+#include "EventTarget.h"
 #include "EventTargetHeaders.h"
 #include "EventTargetInterfaces.h"
+#include "JSDOMWindow.h"
 #include "JSDOMWindowShell.h"
 #include "JSEventListener.h"
+#include "JSWorkerGlobalScope.h"
+#include "WorkerGlobalScope.h"
 
 using namespace JSC;
 
 namespace WebCore {
 
 #define TRY_TO_WRAP_WITH_INTERFACE(interfaceName) \
-    if (eventNames().interfaceFor##interfaceName == desiredInterface) \
+    case interfaceName##EventTargetInterfaceType: \
         return toJS(exec, globalObject, static_cast<interfaceName*>(target));
 
 JSValue toJS(ExecState* exec, JSDOMGlobalObject* globalObject, EventTarget* target)
@@ -44,19 +49,9 @@ JSValue toJS(ExecState* exec, JSDOMGlobalObject* globalObject, EventTarget* targ
     if (!target)
         return jsNull();
 
-    AtomicString desiredInterface = target->interfaceName();
-
-    // FIXME: Why can't we use toJS for these cases?
-#if ENABLE(WORKERS)
-    if (eventNames().interfaceForDedicatedWorkerGlobalScope == desiredInterface)
-        return toJSDOMGlobalObject(static_cast<DedicatedWorkerGlobalScope*>(target), exec);
-#endif
-#if ENABLE(SHARED_WORKERS)
-    if (eventNames().interfaceForSharedWorkerGlobalScope == desiredInterface)
-        return toJSDOMGlobalObject(static_cast<SharedWorkerGlobalScope*>(target), exec);
-#endif
-
+    switch (target->eventTargetInterface()) {
     DOM_EVENT_TARGET_INTERFACES_FOR_EACH(TRY_TO_WRAP_WITH_INTERFACE)
+    }
 
     ASSERT_NOT_REACHED();
     return jsNull();
@@ -65,20 +60,29 @@ JSValue toJS(ExecState* exec, JSDOMGlobalObject* globalObject, EventTarget* targ
 #undef TRY_TO_WRAP_WITH_INTERFACE
 
 #define TRY_TO_UNWRAP_WITH_INTERFACE(interfaceName) \
-    if (value.inherits(&JS##interfaceName::s_info)) \
-        return static_cast<interfaceName*>(jsCast<JS##interfaceName*>(asObject(value))->impl());
+    if (value.inherits(JS##interfaceName::info()))                      \
+        return &jsCast<JS##interfaceName*>(asObject(value))->wrapped();
 
-EventTarget* toEventTarget(JSC::JSValue value)
+EventTarget* JSEventTarget::toWrapped(JSC::JSValue value)
 {
-    if (value.inherits(&JSDOMWindowShell::s_info))
-        return jsCast<JSDOMWindowShell*>(asObject(value))->impl();
-
+    TRY_TO_UNWRAP_WITH_INTERFACE(DOMWindowShell)
+    TRY_TO_UNWRAP_WITH_INTERFACE(DOMWindow)
+    TRY_TO_UNWRAP_WITH_INTERFACE(WorkerGlobalScope)
     TRY_TO_UNWRAP_WITH_INTERFACE(EventTarget)
-    // FIXME: Remove this once all event targets extend EventTarget
-    DOM_EVENT_TARGET_INTERFACES_FOR_EACH(TRY_TO_UNWRAP_WITH_INTERFACE)
-    return 0;
+    return nullptr;
 }
 
 #undef TRY_TO_UNWRAP_WITH_INTERFACE
+
+std::unique_ptr<JSEventTargetWrapper> jsEventTargetCast(JSC::JSValue thisValue)
+{
+    if (auto* target = JSC::jsDynamicCast<JSEventTarget*>(thisValue))
+        return std::make_unique<JSEventTargetWrapper>(target->wrapped(), *target);
+    if (auto* window = toJSDOMWindow(thisValue))
+        return std::make_unique<JSEventTargetWrapper>(window->wrapped(), *window);
+    if (auto* scope = toJSWorkerGlobalScope(thisValue))
+        return std::make_unique<JSEventTargetWrapper>(scope->wrapped(), *scope);
+    return nullptr;
+}
 
 } // namespace WebCore

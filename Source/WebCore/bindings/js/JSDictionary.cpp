@@ -27,6 +27,7 @@
 #include "JSDictionary.h"
 
 #include "ArrayValue.h"
+#include "DOMWindow.h"
 #include "Dictionary.h"
 #include "JSCSSFontFaceRule.h"
 #include "JSDOMError.h"
@@ -36,10 +37,9 @@
 #include "JSNode.h"
 #include "JSStorage.h"
 #include "JSTrackCustom.h"
-#include "JSUint8Array.h"
 #include "JSVoidCallback.h"
-#include "ScriptValue.h"
 #include "SerializedScriptValue.h"
+#include <runtime/JSTypedArrays.h>
 #include <wtf/HashMap.h>
 #include <wtf/MathExtras.h>
 #include <wtf/text/AtomicString.h>
@@ -48,12 +48,18 @@
 #include "JSMediaKeyError.h"
 #endif
 
-#if ENABLE(MEDIA_STREAM)
-#include "JSMediaStream.h"
+#if ENABLE(FETCH_API)
+#include "JSFetchHeaders.h"
 #endif
 
-#if ENABLE(SCRIPTED_SPEECH)
-#include "JSSpeechRecognitionResultList.h"
+#if ENABLE(MEDIA_STREAM)
+#include "JSMediaStream.h"
+#include "JSMediaStreamTrack.h"
+#include "JSRTCRtpReceiver.h"
+#endif
+
+#if ENABLE(GAMEPAD)
+#include "JSGamepad.h"
 #endif
 
 using namespace JSC;
@@ -63,8 +69,8 @@ namespace WebCore {
 JSDictionary::GetPropertyResult JSDictionary::tryGetProperty(const char* propertyName, JSValue& finalResult) const
 {
     ASSERT(isValid());
-    Identifier identifier(m_exec, propertyName);
-    PropertySlot slot(m_initializerObject.get());
+    Identifier identifier = Identifier::fromString(m_exec, propertyName);
+    PropertySlot slot(m_initializerObject.get(), PropertySlot::InternalMethodType::Get);
 
     if (!m_initializerObject.get()->getPropertySlot(m_exec, identifier, slot))
         return NoPropertyFound;
@@ -143,9 +149,9 @@ void JSDictionary::convertValue(ExecState* exec, JSValue value, Vector<String>& 
     }
 }
 
-void JSDictionary::convertValue(ExecState* exec, JSValue value, ScriptValue& result)
+void JSDictionary::convertValue(ExecState* exec, JSValue value, Deprecated::ScriptValue& result)
 {
-    result = ScriptValue(exec->vm(), value);
+    result = Deprecated::ScriptValue(exec->vm(), value);
 }
 
 void JSDictionary::convertValue(ExecState* exec, JSValue value, RefPtr<SerializedScriptValue>& result)
@@ -155,28 +161,28 @@ void JSDictionary::convertValue(ExecState* exec, JSValue value, RefPtr<Serialize
 
 void JSDictionary::convertValue(ExecState*, JSValue value, RefPtr<DOMWindow>& result)
 {
-    result = toDOMWindow(value);
+    result = JSDOMWindow::toWrapped(value);
 }
 
 void JSDictionary::convertValue(ExecState*, JSValue value, RefPtr<EventTarget>& result)
 {
-    result = toEventTarget(value);
+    result = JSEventTarget::toWrapped(value);
 }
 
 void JSDictionary::convertValue(ExecState*, JSValue value, RefPtr<Node>& result)
 {
-    result = toNode(value);
+    result = JSNode::toWrapped(value);
 }
 
 void JSDictionary::convertValue(ExecState*, JSValue value, RefPtr<Storage>& result)
 {
-    result = toStorage(value);
+    result = JSStorage::toWrapped(value);
 }
 
 void JSDictionary::convertValue(ExecState* exec, JSValue value, MessagePortArray& result)
 {
     ArrayBufferArray arrayBuffers;
-    fillMessagePortArray(exec, value, result, arrayBuffers);
+    fillMessagePortArray(*exec, value, result, arrayBuffers);
 }
 
 #if ENABLE(VIDEO_TRACK)
@@ -222,26 +228,43 @@ void JSDictionary::convertValue(JSC::ExecState*, JSC::JSValue value, RefPtr<Uint
 #if ENABLE(ENCRYPTED_MEDIA)
 void JSDictionary::convertValue(JSC::ExecState*, JSC::JSValue value, RefPtr<MediaKeyError>& result)
 {
-    result = toMediaKeyError(value);
+    result = JSMediaKeyError::toWrapped(value);
+}
+#endif
+
+#if ENABLE(FETCH_API)
+void JSDictionary::convertValue(JSC::ExecState*, JSC::JSValue value, RefPtr<FetchHeaders>& result)
+{
+    result = JSFetchHeaders::toWrapped(value);
 }
 #endif
 
 #if ENABLE(MEDIA_STREAM)
 void JSDictionary::convertValue(JSC::ExecState*, JSC::JSValue value, RefPtr<MediaStream>& result)
 {
-    result = toMediaStream(value);
+    result = JSMediaStream::toWrapped(value);
+}
+
+void JSDictionary::convertValue(JSC::ExecState*, JSC::JSValue value, RefPtr<MediaStreamTrack>& result)
+{
+    result = JSMediaStreamTrack::toWrapped(value);
+}
+
+void JSDictionary::convertValue(JSC::ExecState*, JSC::JSValue value, RefPtr<RTCRtpReceiver>& result)
+{
+    result = JSRTCRtpReceiver::toWrapped(value);
 }
 #endif
 
 #if ENABLE(FONT_LOAD_EVENTS)
 void JSDictionary::convertValue(JSC::ExecState*, JSC::JSValue value, RefPtr<CSSFontFaceRule>& result)
 {
-    result = toCSSFontFaceRule(value);
+    result = JSCSSFontFaceRule::toWrapped(value);
 }
 
 void JSDictionary::convertValue(JSC::ExecState*, JSC::JSValue value, RefPtr<DOMError>& result)
 {
-    result = toDOMError(value);
+    result = JSDOMError::toWrapped(value);
 }
 
 void JSDictionary::convertValue(JSC::ExecState* exec, JSC::JSValue value, RefPtr<VoidCallback>& result)
@@ -253,18 +276,23 @@ void JSDictionary::convertValue(JSC::ExecState* exec, JSC::JSValue value, RefPtr
 }
 #endif
 
-#if ENABLE(SCRIPTED_SPEECH)
-void JSDictionary::convertValue(JSC::ExecState*, JSC::JSValue value, RefPtr<SpeechRecognitionResultList>& result)
+#if ENABLE(GAMEPAD)
+void JSDictionary::convertValue(JSC::ExecState*, JSC::JSValue value, RefPtr<Gamepad>& result)
 {
-    result = toSpeechRecognitionResultList(value);
+    result = JSGamepad::toWrapped(value);
 }
 #endif
 
-bool JSDictionary::getWithUndefinedOrNullCheck(const String& propertyName, String& result) const
+void JSDictionary::convertValue(JSC::ExecState*, JSC::JSValue value, JSC::JSFunction*& result)
+{
+    result = jsDynamicCast<JSC::JSFunction*>(value);
+}
+
+bool JSDictionary::getWithUndefinedOrNullCheck(const char* propertyName, String& result) const
 {
     ASSERT(isValid());
     JSValue value;
-    if (tryGetProperty(propertyName.utf8().data(), value) != PropertyFound || value.isUndefinedOrNull())
+    if (tryGetProperty(propertyName, value) != PropertyFound || value.isUndefinedOrNull())
         return false;
 
     result = value.toWTFString(m_exec);

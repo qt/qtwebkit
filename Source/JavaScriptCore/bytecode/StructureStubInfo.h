@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2008, 2012-2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,298 +26,155 @@
 #ifndef StructureStubInfo_h
 #define StructureStubInfo_h
 
-#include <wtf/Platform.h>
-
-#if ENABLE(JIT)
-
 #include "CodeOrigin.h"
-#include "DFGRegisterSet.h"
 #include "Instruction.h"
 #include "JITStubRoutine.h"
 #include "MacroAssembler.h"
+#include "ObjectPropertyConditionSet.h"
 #include "Opcode.h"
-#include "PolymorphicAccessStructureList.h"
+#include "Options.h"
+#include "PolymorphicAccess.h"
+#include "RegisterSet.h"
 #include "Structure.h"
 #include "StructureStubClearingWatchpoint.h"
-#include <wtf/OwnPtr.h>
 
 namespace JSC {
 
-class PolymorphicPutByIdList;
+#if ENABLE(JIT)
 
-enum AccessType {
-    access_get_by_id_self,
-    access_get_by_id_proto,
-    access_get_by_id_chain,
-    access_get_by_id_self_list,
-    access_get_by_id_proto_list,
-    access_put_by_id_transition_normal,
-    access_put_by_id_transition_direct,
-    access_put_by_id_replace,
-    access_put_by_id_list,
-    access_unset,
-    access_get_by_id_generic,
-    access_put_by_id_generic,
-    access_get_array_length,
-    access_get_string_length,
+class PolymorphicAccess;
+
+enum class AccessType : int8_t {
+    Get,
+    Put,
+    In
 };
 
-inline bool isGetByIdAccess(AccessType accessType)
-{
-    switch (accessType) {
-    case access_get_by_id_self:
-    case access_get_by_id_proto:
-    case access_get_by_id_chain:
-    case access_get_by_id_self_list:
-    case access_get_by_id_proto_list:
-    case access_get_by_id_generic:
-    case access_get_array_length:
-    case access_get_string_length:
-        return true;
-    default:
-        return false;
-    }
-}
-    
-inline bool isPutByIdAccess(AccessType accessType)
-{
-    switch (accessType) {
-    case access_put_by_id_transition_normal:
-    case access_put_by_id_transition_direct:
-    case access_put_by_id_replace:
-    case access_put_by_id_list:
-    case access_put_by_id_generic:
-        return true;
-    default:
-        return false;
-    }
-}
+enum class CacheType : int8_t {
+    Unset,
+    GetByIdSelf,
+    PutByIdReplace,
+    Stub
+};
 
-struct StructureStubInfo {
-    StructureStubInfo()
-        : accessType(access_unset)
-        , seen(false)
-        , resetByGC(false)
-    {
-    }
+class StructureStubInfo {
+    WTF_MAKE_NONCOPYABLE(StructureStubInfo);
+    WTF_MAKE_FAST_ALLOCATED;
+public:
+    StructureStubInfo(AccessType);
+    ~StructureStubInfo();
 
-    void initGetByIdSelf(VM& vm, JSCell* owner, Structure* baseObjectStructure)
-    {
-        accessType = access_get_by_id_self;
+    void initGetByIdSelf(CodeBlock*, Structure* baseObjectStructure, PropertyOffset);
+    void initPutByIdReplace(CodeBlock*, Structure* baseObjectStructure, PropertyOffset);
+    void initStub(CodeBlock*, std::unique_ptr<PolymorphicAccess>);
 
-        u.getByIdSelf.baseObjectStructure.set(vm, owner, baseObjectStructure);
-    }
+    MacroAssemblerCodePtr addAccessCase(
+        CodeBlock*, const Identifier&, std::unique_ptr<AccessCase>);
 
-    void initGetByIdProto(VM& vm, JSCell* owner, Structure* baseObjectStructure, Structure* prototypeStructure, bool isDirect)
-    {
-        accessType = access_get_by_id_proto;
-
-        u.getByIdProto.baseObjectStructure.set(vm, owner, baseObjectStructure);
-        u.getByIdProto.prototypeStructure.set(vm, owner, prototypeStructure);
-        u.getByIdProto.isDirect = isDirect;
-    }
-
-    void initGetByIdChain(VM& vm, JSCell* owner, Structure* baseObjectStructure, StructureChain* chain, unsigned count, bool isDirect)
-    {
-        accessType = access_get_by_id_chain;
-
-        u.getByIdChain.baseObjectStructure.set(vm, owner, baseObjectStructure);
-        u.getByIdChain.chain.set(vm, owner, chain);
-        u.getByIdChain.count = count;
-        u.getByIdChain.isDirect = isDirect;
-    }
-
-    void initGetByIdSelfList(PolymorphicAccessStructureList* structureList, int listSize)
-    {
-        accessType = access_get_by_id_self_list;
-
-        u.getByIdSelfList.structureList = structureList;
-        u.getByIdSelfList.listSize = listSize;
-    }
-
-    void initGetByIdProtoList(PolymorphicAccessStructureList* structureList, int listSize)
-    {
-        accessType = access_get_by_id_proto_list;
-
-        u.getByIdProtoList.structureList = structureList;
-        u.getByIdProtoList.listSize = listSize;
-    }
-
-    // PutById*
-
-    void initPutByIdTransition(VM& vm, JSCell* owner, Structure* previousStructure, Structure* structure, StructureChain* chain, bool isDirect)
-    {
-        if (isDirect)
-            accessType = access_put_by_id_transition_direct;
-        else
-            accessType = access_put_by_id_transition_normal;
-
-        u.putByIdTransition.previousStructure.set(vm, owner, previousStructure);
-        u.putByIdTransition.structure.set(vm, owner, structure);
-        u.putByIdTransition.chain.set(vm, owner, chain);
-    }
-
-    void initPutByIdReplace(VM& vm, JSCell* owner, Structure* baseObjectStructure)
-    {
-        accessType = access_put_by_id_replace;
-    
-        u.putByIdReplace.baseObjectStructure.set(vm, owner, baseObjectStructure);
-    }
-        
-    void initPutByIdList(PolymorphicPutByIdList* list)
-    {
-        accessType = access_put_by_id_list;
-        u.putByIdList.list = list;
-    }
-        
-    void reset()
-    {
-        deref();
-        accessType = access_unset;
-        stubRoutine.clear();
-        watchpoints.clear();
-    }
+    void reset(CodeBlock*);
 
     void deref();
+    void aboutToDie();
 
-    bool visitWeakReferences();
+    // Check if the stub has weak references that are dead. If it does, then it resets itself,
+    // either entirely or just enough to ensure that those dead pointers don't get used anymore.
+    void visitWeakReferences(CodeBlock*);
         
-    bool seenOnce()
+    ALWAYS_INLINE bool considerCaching()
     {
-        return seen;
+        everConsidered = true;
+        if (!countdown) {
+            // Check if we have been doing repatching too frequently. If so, then we should cool off
+            // for a while.
+            willRepatch();
+            if (repatchCount > Options::repatchCountForCoolDown()) {
+                // We've been repatching too much, so don't do it now.
+                repatchCount = 0;
+                // The amount of time we require for cool-down depends on the number of times we've
+                // had to cool down in the past. The relationship is exponential. The max value we
+                // allow here is 2^256 - 2, since the slow paths may increment the count to indicate
+                // that they'd like to temporarily skip patching just this once.
+                countdown = WTF::leftShiftWithSaturation(
+                    static_cast<uint8_t>(Options::initialCoolDownCount()),
+                    numberOfCoolDowns,
+                    static_cast<uint8_t>(std::numeric_limits<uint8_t>::max() - 1));
+                willCoolDown();
+                return false;
+            }
+            return true;
+        }
+        countdown--;
+        return false;
     }
 
-    void setSeen()
+    ALWAYS_INLINE void willRepatch()
     {
-        seen = true;
+        WTF::incrementWithSaturation(repatchCount);
     }
-        
-    StructureStubClearingWatchpoint* addWatchpoint(CodeBlock* codeBlock)
+
+    ALWAYS_INLINE void willCoolDown()
     {
-        return WatchpointsOnStructureStubInfo::ensureReferenceAndAddWatchpoint(
-            watchpoints, codeBlock, this);
+        WTF::incrementWithSaturation(numberOfCoolDowns);
     }
-        
-    unsigned bytecodeIndex;
 
-    int8_t accessType;
-    bool seen : 1;
-    bool resetByGC : 1;
+    CodeLocationCall callReturnLocation;
 
-#if ENABLE(DFG_JIT)
     CodeOrigin codeOrigin;
-#endif // ENABLE(DFG_JIT)
+    CallSiteIndex callSiteIndex;
+
+    bool containsPC(void* pc) const;
 
     union {
         struct {
-            int8_t registersFlushed;
-            int8_t baseGPR;
-#if USE(JSVALUE32_64)
-            int8_t valueTagGPR;
-#endif
-            int8_t valueGPR;
-            DFG::RegisterSetPOD usedRegisters;
-            int32_t deltaCallToDone;
-            int32_t deltaCallToStorageLoad;
-            int32_t deltaCallToStructCheck;
-            int32_t deltaCallToSlowCase;
-            int32_t deltaCheckImmToCall;
-#if USE(JSVALUE64)
-            int32_t deltaCallToLoadOrStore;
-#else
-            int32_t deltaCallToTagLoadOrStore;
-            int32_t deltaCallToPayloadLoadOrStore;
-#endif
-        } dfg;
-        struct {
-            union {
-                struct {
-                    int16_t structureToCompare;
-                    int16_t structureCheck;
-                    int16_t propertyStorageLoad;
-#if USE(JSVALUE64)
-                    int16_t displacementLabel;
-#else
-                    int16_t displacementLabel1;
-                    int16_t displacementLabel2;
-#endif
-                    int16_t putResult;
-                    int16_t coldPathBegin;
-                } get;
-                struct {
-                    int16_t structureToCompare;
-                    int16_t propertyStorageLoad;
-#if USE(JSVALUE64)
-                    int16_t displacementLabel;
-#else
-                    int16_t displacementLabel1;
-                    int16_t displacementLabel2;
-#endif
-                } put;
-            } u;
-            int16_t methodCheckProtoObj;
-            int16_t methodCheckProtoStructureToCompare;
-            int16_t methodCheckPutFunction;
-        } baseline;
-    } patch;
-
-    union {
-        struct {
-            // It would be unwise to put anything here, as it will surely be overwritten.
-        } unset;
-        struct {
             WriteBarrierBase<Structure> baseObjectStructure;
-        } getByIdSelf;
-        struct {
-            WriteBarrierBase<Structure> baseObjectStructure;
-            WriteBarrierBase<Structure> prototypeStructure;
-            bool isDirect;
-        } getByIdProto;
-        struct {
-            WriteBarrierBase<Structure> baseObjectStructure;
-            WriteBarrierBase<StructureChain> chain;
-            unsigned count : 31;
-            bool isDirect : 1;
-        } getByIdChain;
-        struct {
-            PolymorphicAccessStructureList* structureList;
-            int listSize;
-        } getByIdSelfList;
-        struct {
-            PolymorphicAccessStructureList* structureList;
-            int listSize;
-        } getByIdProtoList;
-        struct {
-            WriteBarrierBase<Structure> previousStructure;
-            WriteBarrierBase<Structure> structure;
-            WriteBarrierBase<StructureChain> chain;
-        } putByIdTransition;
-        struct {
-            WriteBarrierBase<Structure> baseObjectStructure;
-        } putByIdReplace;
-        struct {
-            PolymorphicPutByIdList* list;
-        } putByIdList;
+            PropertyOffset offset;
+        } byIdSelf;
+        PolymorphicAccess* stub;
     } u;
 
-    RefPtr<JITStubRoutine> stubRoutine;
-    CodeLocationCall callReturnLocation;
-    CodeLocationLabel hotPathBegin;
-    RefPtr<WatchpointsOnStructureStubInfo> watchpoints;
+    struct {
+        int8_t baseGPR;
+#if USE(JSVALUE32_64)
+        int8_t valueTagGPR;
+        int8_t baseTagGPR;
+#endif
+        int8_t valueGPR;
+        RegisterSet usedRegisters;
+        int32_t deltaCallToDone;
+        int32_t deltaCallToJump;
+        int32_t deltaCallToSlowCase;
+        int32_t deltaCheckImmToCall;
+#if USE(JSVALUE64)
+        int32_t deltaCallToLoadOrStore;
+#else
+        int32_t deltaCallToTagLoadOrStore;
+        int32_t deltaCallToPayloadLoadOrStore;
+#endif
+    } patch;
+
+    AccessType accessType;
+    CacheType cacheType;
+    uint8_t countdown; // We repatch only when this is zero. If not zero, we decrement.
+    uint8_t repatchCount;
+    uint8_t numberOfCoolDowns;
+    bool resetByGC : 1;
+    bool tookSlowPath : 1;
+    bool everConsidered : 1;
 };
 
-inline void* getStructureStubInfoReturnLocation(StructureStubInfo* structureStubInfo)
+inline CodeOrigin getStructureStubInfoCodeOrigin(StructureStubInfo& structureStubInfo)
 {
-    return structureStubInfo->callReturnLocation.executableAddress();
+    return structureStubInfo.codeOrigin;
 }
 
-inline unsigned getStructureStubInfoBytecodeIndex(StructureStubInfo* structureStubInfo)
-{
-    return structureStubInfo->bytecodeIndex;
-}
+typedef HashMap<CodeOrigin, StructureStubInfo*, CodeOriginApproximateHash> StubInfoMap;
 
-} // namespace JSC
+#else
+
+typedef HashMap<int, void*> StubInfoMap;
 
 #endif // ENABLE(JIT)
+
+} // namespace JSC
 
 #endif // StructureStubInfo_h

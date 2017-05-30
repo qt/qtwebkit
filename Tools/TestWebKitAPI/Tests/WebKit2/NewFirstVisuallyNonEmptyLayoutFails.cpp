@@ -24,11 +24,14 @@
  */
 
 #include "config.h"
+
+#if WK_HAVE_C_SPI
+
 #include "PlatformUtilities.h"
 #include "PlatformWebView.h"
 #include "Test.h"
-#include <WebKit2/WKContextPrivate.h>
-#include <WebKit2/WKRetainPtr.h>
+#include <WebKit/WKContextPrivate.h>
+#include <WebKit/WKRetainPtr.h>
 
 namespace TestWebKitAPI {
 
@@ -56,13 +59,14 @@ static void didLayout(WKPageRef, WKLayoutMilestones type, WKTypeRef, const void 
 
 static void setPageLoaderClient(WKPageRef page)
 {
-    WKPageLoaderClient loaderClient;
+    WKPageLoaderClientV3 loaderClient;
     memset(&loaderClient, 0, sizeof(loaderClient));
-    loaderClient.version = kWKPageLoaderClientCurrentVersion;
+
+    loaderClient.base.version = 3;
     loaderClient.didFinishLoadForFrame = didFinishLoadForFrame;
     loaderClient.didLayout = didLayout;
 
-    WKPageSetPageLoaderClient(page, &loaderClient);
+    WKPageSetPageLoaderClient(page, &loaderClient.base);
 }
 
 TEST(WebKit2, NewFirstVisuallyNonEmptyLayoutFails)
@@ -85,3 +89,5 @@ TEST(WebKit2, NewFirstVisuallyNonEmptyLayoutFails)
 }
 
 } // namespace TestWebKitAPI
+
+#endif

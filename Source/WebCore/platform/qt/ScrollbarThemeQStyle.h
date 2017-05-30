@@ -34,31 +34,31 @@ namespace WebCore {
 
 class QStyleFacade;
 
-class ScrollbarThemeQStyle : public ScrollbarTheme {
+class ScrollbarThemeQStyle final : public ScrollbarTheme {
 public:
     ScrollbarThemeQStyle();
-    virtual ~ScrollbarThemeQStyle();
+    ~ScrollbarThemeQStyle() final;
 
-    virtual bool paint(ScrollbarThemeClient*, GraphicsContext*, const IntRect& dirtyRect);
-    virtual void paintScrollCorner(ScrollView*, GraphicsContext*, const IntRect& cornerRect);
+    bool paint(Scrollbar&, GraphicsContext&, const IntRect& dirtyRect) final;
+    void paintScrollCorner(ScrollView*, GraphicsContext&, const IntRect& cornerRect) final;
 
-    virtual ScrollbarPart hitTest(ScrollbarThemeClient*, const IntPoint&);
+    ScrollbarPart hitTest(Scrollbar&, const IntPoint&) final;
 
-    virtual bool shouldCenterOnThumb(ScrollbarThemeClient*, const PlatformMouseEvent&);
+    ScrollbarButtonPressAction handleMousePressEvent(Scrollbar&, const PlatformMouseEvent&, ScrollbarPart) override;
 
-    virtual void invalidatePart(ScrollbarThemeClient*, ScrollbarPart);
+    void invalidatePart(Scrollbar&, ScrollbarPart) final;
 
-    virtual int thumbPosition(ScrollbarThemeClient*);
-    virtual int thumbLength(ScrollbarThemeClient*);
-    virtual int trackPosition(ScrollbarThemeClient*);
-    virtual int trackLength(ScrollbarThemeClient*);
+    int thumbPosition(Scrollbar&) final;
+    int thumbLength(Scrollbar&) final;
+    int trackPosition(Scrollbar&) final;
+    int trackLength(Scrollbar&) final;
 
-    virtual int scrollbarThickness(ScrollbarControlSize = RegularScrollbar);
+    int scrollbarThickness(ScrollbarControlSize = RegularScrollbar) final;
 
     QStyleFacade* qStyle() { return m_qStyle.get(); }
 
 private:
-    OwnPtr<QStyleFacade> m_qStyle;
+    std::unique_ptr<QStyleFacade> m_qStyle;
 };
 
 }

@@ -35,19 +35,19 @@ namespace WebCore {
 
 class ImageBackingSurfaceClient : public CoordinatedSurface::Client {
 public:
-    ImageBackingSurfaceClient(Image* image, const IntRect& rect)
+    ImageBackingSurfaceClient(Image& image, const IntRect& rect)
         : m_image(image)
         , m_rect(rect)
     {
     }
 
-    virtual void paintToSurfaceContext(GraphicsContext* context) OVERRIDE
+    virtual void paintToSurfaceContext(GraphicsContext& context) override
     {
-        context->drawImage(m_image, ColorSpaceDeviceRGB, m_rect, m_rect);
+        context.drawImage(m_image, m_rect, m_rect);
     }
 
 private:
-    Image* m_image;
+    Image& m_image;
     IntRect m_rect;
 };
 
@@ -66,7 +66,7 @@ CoordinatedImageBacking::CoordinatedImageBacking(Client* client, PassRefPtr<Imag
     : m_client(client)
     , m_image(image)
     , m_id(getCoordinatedImageBackingID(m_image.get()))
-    , m_clearContentsTimer(this, &CoordinatedImageBacking::clearContentsTimerFired)
+    , m_clearContentsTimer(*this, &CoordinatedImageBacking::clearContentsTimerFired)
     , m_isDirty(false)
     , m_isVisible(false)
 {
@@ -92,10 +92,8 @@ void CoordinatedImageBacking::removeHost(Host* host)
     ASSERT(position != notFound);
     m_hosts.remove(position);
 
-    if (m_hosts.isEmpty()) {
+    if (m_hosts.isEmpty())
         m_client->removeImageBacking(id());
-        m_clearContentsTimer.stop();
-    }
 }
 
 void CoordinatedImageBacking::markDirty()
@@ -122,15 +120,15 @@ void CoordinatedImageBacking::update()
         }
     }
 
-    m_surface = CoordinatedSurface::create(m_image->size(), !m_image->currentFrameKnownToBeOpaque() ? CoordinatedSurface::SupportsAlpha : CoordinatedSurface::NoFlags);
+    m_surface = CoordinatedSurface::create(IntSize(m_image->size()), !m_image->currentFrameKnownToBeOpaque() ? CoordinatedSurface::SupportsAlpha : CoordinatedSurface::NoFlags);
     if (!m_surface) {
         m_isDirty = false;
         return;
     }
 
-    IntRect rect(IntPoint::zero(), m_image->size());
+    IntRect rect(IntPoint::zero(), IntSize(m_image->size()));
 
-    ImageBackingSurfaceClient surfaceClient(m_image.get(), rect);
+    ImageBackingSurfaceClient surfaceClient(*m_image, rect);
     m_surface->paintToSurface(rect, &surfaceClient);
 
     m_nativeImagePtr = m_image->nativeImageForCurrentFrame();
@@ -143,7 +141,7 @@ void CoordinatedImageBacking::releaseSurfaceIfNeeded()
 {
     // We must keep m_surface until UI Process reads m_surface.
     // If m_surface exists, it was created in the previous update.
-    m_surface.clear();
+    m_surface = nullptr;
 }
 
 static const double clearContentsTimerInterval = 3;
@@ -153,8 +151,8 @@ void CoordinatedImageBacking::updateVisibilityIfNeeded(bool& changedToVisible)
     bool previousIsVisible = m_isVisible;
 
     m_isVisible = false;
-    for (size_t i = 0; i < m_hosts.size(); ++i) {
-        if (m_hosts[i]->imageBackingVisible()) {
+    for (auto& host : m_hosts) {
+        if (host->imageBackingVisible()) {
             m_isVisible = true;
             break;
         }
@@ -175,7 +173,7 @@ void CoordinatedImageBacking::updateVisibilityIfNeeded(bool& changedToVisible)
     }
 }
 
-void CoordinatedImageBacking::clearContentsTimerFired(Timer<CoordinatedImageBacking>*)
+void CoordinatedImageBacking::clearContentsTimerFired()
 {
     m_client->clearImageBackingContents(id());
 }

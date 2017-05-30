@@ -21,14 +21,13 @@
 #ifndef SVGPathSegLinetoVertical_h
 #define SVGPathSegLinetoVertical_h
 
-#if ENABLE(SVG)
 #include "SVGPathSegWithContext.h"
 
 namespace WebCore {
 
 class SVGPathSegLinetoVertical : public SVGPathSegWithContext {
 public:
-    SVGPathSegLinetoVertical(SVGPathElement* element, SVGPathSegRole role, float y)
+    SVGPathSegLinetoVertical(const SVGPathElement& element, SVGPathSegRole role, float y)
         : SVGPathSegWithContext(element, role)
         , m_y(y)
     {
@@ -47,5 +46,4 @@ private:
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif

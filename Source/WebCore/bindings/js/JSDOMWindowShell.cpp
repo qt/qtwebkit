@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -32,7 +32,7 @@
 #include "Frame.h"
 #include "GCController.h"
 #include "JSDOMWindow.h"
-#include "DOMWindow.h"
+#include "JSEventTarget.h"
 #include "ScriptController.h"
 #include <heap/StrongInlines.h>
 #include <runtime/JSObject.h>
@@ -41,10 +41,10 @@ using namespace JSC;
 
 namespace WebCore {
 
-const ClassInfo JSDOMWindowShell::s_info = { "JSDOMWindowShell", &Base::s_info, 0, 0, CREATE_METHOD_TABLE(JSDOMWindowShell) };
+const ClassInfo JSDOMWindowShell::s_info = { "JSDOMWindowShell", &Base::s_info, 0, CREATE_METHOD_TABLE(JSDOMWindowShell) };
 
-JSDOMWindowShell::JSDOMWindowShell(Structure* structure, DOMWrapperWorld* world)
-    : Base(*world->vm(), structure)
+JSDOMWindowShell::JSDOMWindowShell(VM& vm, Structure* structure, DOMWrapperWorld& world)
+    : Base(vm, structure)
     , m_world(world)
 {
 }
@@ -52,7 +52,7 @@ JSDOMWindowShell::JSDOMWindowShell(Structure* structure, DOMWrapperWorld* world)
 void JSDOMWindowShell::finishCreation(VM& vm, PassRefPtr<DOMWindow> window)
 {
     Base::finishCreation(vm);
-    ASSERT(inherits(&s_info));
+    ASSERT(inherits(info()));
     setWindow(window);
 }
 
@@ -61,29 +61,32 @@ void JSDOMWindowShell::destroy(JSCell* cell)
     static_cast<JSDOMWindowShell*>(cell)->JSDOMWindowShell::~JSDOMWindowShell();
 }
 
-void JSDOMWindowShell::setWindow(JSC::VM& vm, JSDOMWindow* window)
+void JSDOMWindowShell::setWindow(VM& vm, JSDOMWindow* window)
 {
     ASSERT_ARG(window, window);
     setTarget(vm, window);
-    structure()->setGlobalObject(*JSDOMWindow::commonVM(), window);
-    gcController().garbageCollectSoon();
+    structure()->setGlobalObject(vm, window);
+    GCController::singleton().garbageCollectSoon();
 }
 
 void JSDOMWindowShell::setWindow(PassRefPtr<DOMWindow> domWindow)
 {
     // Replacing JSDOMWindow via telling JSDOMWindowShell to use the same DOMWindow it already uses makes no sense,
     // so we'd better never try to.
-    ASSERT(!window() || domWindow.get() != window()->impl());
+    ASSERT(!window() || domWindow.get() != &window()->wrapped());
     // Explicitly protect the global object's prototype so it isn't collected
     // when we allocate the global object. (Once the global object is fully
     // constructed, it can mark its own prototype.)
-    Structure* prototypeStructure = JSDOMWindowPrototype::createStructure(*JSDOMWindow::commonVM(), 0, jsNull());
-    Strong<JSDOMWindowPrototype> prototype(*JSDOMWindow::commonVM(), JSDOMWindowPrototype::create(*JSDOMWindow::commonVM(), 0, prototypeStructure));
+    
+    VM& vm = JSDOMWindow::commonVM();
+    Structure* prototypeStructure = JSDOMWindowPrototype::createStructure(vm, 0, jsNull());
+    Strong<JSDOMWindowPrototype> prototype(vm, JSDOMWindowPrototype::create(vm, 0, prototypeStructure));
 
-    Structure* structure = JSDOMWindow::createStructure(*JSDOMWindow::commonVM(), 0, prototype.get());
-    JSDOMWindow* jsDOMWindow = JSDOMWindow::create(*JSDOMWindow::commonVM(), structure, domWindow, this);
-    prototype->structure()->setGlobalObject(*JSDOMWindow::commonVM(), jsDOMWindow);
-    setWindow(*JSDOMWindow::commonVM(), jsDOMWindow);
+    Structure* structure = JSDOMWindow::createStructure(vm, 0, prototype.get());
+    JSDOMWindow* jsDOMWindow = JSDOMWindow::create(vm, structure, *domWindow, this);
+    prototype->structure()->setGlobalObject(vm, jsDOMWindow);
+    prototype->structure()->setPrototypeWithoutTransition(vm, JSEventTarget::getPrototype(vm, jsDOMWindow));
+    setWindow(vm, jsDOMWindow);
     ASSERT(jsDOMWindow->globalObject() == jsDOMWindow);
     ASSERT(prototype->globalObject() == jsDOMWindow);
 }
@@ -92,9 +95,9 @@ void JSDOMWindowShell::setWindow(PassRefPtr<DOMWindow> domWindow)
 // JSDOMWindow methods
 // ----
 
-DOMWindow* JSDOMWindowShell::impl() const
+DOMWindow& JSDOMWindowShell::wrapped() const
 {
-    return window()->impl();
+    return window()->wrapped();
 }
 
 // ----
@@ -105,14 +108,14 @@ JSValue toJS(ExecState* exec, Frame* frame)
 {
     if (!frame)
         return jsNull();
-    return frame->script()->windowShell(currentWorld(exec));
+    return frame->script().windowShell(currentWorld(exec));
 }
 
-JSDOMWindowShell* toJSDOMWindowShell(Frame* frame, DOMWrapperWorld* isolatedWorld)
+JSDOMWindowShell* toJSDOMWindowShell(Frame* frame, DOMWrapperWorld& world)
 {
     if (!frame)
         return 0;
-    return frame->script()->windowShell(isolatedWorld);
+    return frame->script().windowShell(world);
 }
 
 } // namespace WebCore

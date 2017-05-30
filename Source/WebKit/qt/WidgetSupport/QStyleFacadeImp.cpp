@@ -61,7 +61,7 @@ static QStyle::SubControl convertToQStyleSubControl(QStyleFacade::SubControl sc)
     switch (sc) {
         FOR_EACH_SUBCONTROL(CONVERT_SUBCONTROL, SEMICOLON);
     }
-    ASSERT_NOT_REACHED();
+    Q_UNREACHABLE();
     return QStyle::SC_None;
 #undef CONVERT_SUBCONTROL
 }
@@ -118,7 +118,7 @@ static QStyle::PixelMetric convertPixelMetric(QStyleFacade::PixelMetric state)
     switch (state) {
         FOR_EACH_MAPPED_METRIC(CONVERT_METRIC, SEMICOLON);
     }
-    ASSERT_NOT_REACHED();
+    Q_UNREACHABLE();
     return QStyle::PM_CustomBase;
 
 #undef CONVERT_METRIC
@@ -132,7 +132,7 @@ static QStyleFacade::SubControl convertToQStyleFacadeSubControl(QStyle::SubContr
     switch (sc) {
         FOR_EACH_SUBCONTROL(CONVERT_SUBCONTROL, SEMICOLON);
     }
-    ASSERT_NOT_REACHED();
+    Q_UNREACHABLE();
     return QStyleFacade::SC_None;
 #undef CONVERT_SUBCONTROL
 }
@@ -163,9 +163,11 @@ QRect QStyleFacadeImp::buttonSubElementRect(QStyleFacade::ButtonSubElement butto
 
     QStyle::SubElement subElement = QStyle::SE_CustomBase;
     switch (buttonElement) {
+    case CheckBoxIndicator: subElement = QStyle::SE_CheckBoxIndicator; break;
+    case RadioButtonIndicator: subElement = QStyle::SE_RadioButtonIndicator; break;
     case PushButtonLayoutItem: subElement = QStyle::SE_PushButtonLayoutItem; break;
     case PushButtonContents: subElement = QStyle::SE_PushButtonContents; break;
-    default: ASSERT_NOT_REACHED();
+    default: Q_UNREACHABLE();
     }
     return style()->subElementRect(subElement, &option);
 }

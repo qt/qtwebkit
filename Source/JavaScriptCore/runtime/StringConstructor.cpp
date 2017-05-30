@@ -21,16 +21,18 @@
 #include "config.h"
 #include "StringConstructor.h"
 
+#include "Error.h"
 #include "Executable.h"
 #include "JITCode.h"
 #include "JSFunction.h"
 #include "JSGlobalObject.h"
-#include "Operations.h"
+#include "JSCInlines.h"
 #include "StringPrototype.h"
 
 namespace JSC {
 
 static EncodedJSValue JSC_HOST_CALL stringFromCharCode(ExecState*);
+static EncodedJSValue JSC_HOST_CALL stringFromCodePoint(ExecState*);
 
 }
 
@@ -38,36 +40,33 @@ static EncodedJSValue JSC_HOST_CALL stringFromCharCode(ExecState*);
 
 namespace JSC {
 
-const ClassInfo StringConstructor::s_info = { "Function", &InternalFunction::s_info, 0, ExecState::stringConstructorTable, CREATE_METHOD_TABLE(StringConstructor) };
+const ClassInfo StringConstructor::s_info = { "Function", &InternalFunction::s_info, &stringConstructorTable, CREATE_METHOD_TABLE(StringConstructor) };
 
 /* Source for StringConstructor.lut.h
 @begin stringConstructorTable
   fromCharCode          stringFromCharCode         DontEnum|Function 1
+  fromCodePoint         stringFromCodePoint        DontEnum|Function 1
+  raw                   JSBuiltin                  DontEnum|Function 1
 @end
 */
 
-ASSERT_HAS_TRIVIAL_DESTRUCTOR(StringConstructor);
+STATIC_ASSERT_IS_TRIVIALLY_DESTRUCTIBLE(StringConstructor);
 
-StringConstructor::StringConstructor(JSGlobalObject* globalObject, Structure* structure)
-    : InternalFunction(globalObject, structure)
+StringConstructor::StringConstructor(VM& vm, Structure* structure)
+    : InternalFunction(vm, structure)
 {
 }
 
-void StringConstructor::finishCreation(ExecState* exec, StringPrototype* stringPrototype)
+void StringConstructor::finishCreation(VM& vm, StringPrototype* stringPrototype)
 {
-    Base::finishCreation(exec->vm(), stringPrototype->classInfo()->className);
-    putDirectWithoutTransition(exec->vm(), exec->propertyNames().prototype, stringPrototype, ReadOnly | DontEnum | DontDelete);
-    putDirectWithoutTransition(exec->vm(), exec->propertyNames().length, jsNumber(1), ReadOnly | DontEnum | DontDelete);
+    Base::finishCreation(vm, stringPrototype->classInfo()->className);
+    putDirectWithoutTransition(vm, vm.propertyNames->prototype, stringPrototype, ReadOnly | DontEnum | DontDelete);
+    putDirectWithoutTransition(vm, vm.propertyNames->length, jsNumber(1), ReadOnly | DontEnum | DontDelete);
 }
 
-bool StringConstructor::getOwnPropertySlot(JSCell* cell, ExecState* exec, PropertyName propertyName, PropertySlot &slot)
+bool StringConstructor::getOwnPropertySlot(JSObject* object, ExecState* exec, PropertyName propertyName, PropertySlot &slot)
 {
-    return getStaticFunctionSlot<InternalFunction>(exec, ExecState::stringConstructorTable(exec), jsCast<StringConstructor*>(cell), propertyName, slot);
-}
-
-bool StringConstructor::getOwnPropertyDescriptor(JSObject* object, ExecState* exec, PropertyName propertyName, PropertyDescriptor& descriptor)
-{
-    return getStaticFunctionDescriptor<InternalFunction>(exec, ExecState::stringConstructorTable(exec), jsCast<StringConstructor*>(object), propertyName, descriptor);
+    return getStaticFunctionSlot<InternalFunction>(exec, stringConstructorTable, jsCast<StringConstructor*>(object), propertyName, slot);
 }
 
 // ------------------------------ Functions --------------------------------
@@ -78,14 +77,14 @@ static NEVER_INLINE JSValue stringFromCharCodeSlowCase(ExecState* exec)
     UChar* buf;
     PassRefPtr<StringImpl> impl = StringImpl::createUninitialized(length, buf);
     for (unsigned i = 0; i < length; ++i)
-        buf[i] = static_cast<UChar>(exec->argument(i).toUInt32(exec));
+        buf[i] = static_cast<UChar>(exec->uncheckedArgument(i).toUInt32(exec));
     return jsString(exec, impl);
 }
 
 static EncodedJSValue JSC_HOST_CALL stringFromCharCode(ExecState* exec)
 {
     if (LIKELY(exec->argumentCount() == 1))
-        return JSValue::encode(jsSingleCharacterString(exec, exec->argument(0).toUInt32(exec)));
+        return JSValue::encode(jsSingleCharacterString(exec, exec->uncheckedArgument(0).toUInt32(exec)));
     return JSValue::encode(stringFromCharCodeSlowCase(exec));
 }
 
@@ -94,13 +93,42 @@ JSCell* JSC_HOST_CALL stringFromCharCode(ExecState* exec, int32_t arg)
     return jsSingleCharacterString(exec, arg);
 }
 
+static EncodedJSValue JSC_HOST_CALL stringFromCodePoint(ExecState* exec)
+{
+    unsigned length = exec->argumentCount();
+    StringBuilder builder;
+    builder.reserveCapacity(length);
+
+    for (unsigned i = 0; i < length; ++i) {
+        double codePointAsDouble = exec->uncheckedArgument(i).toNumber(exec);
+        if (exec->hadException())
+            return JSValue::encode(jsUndefined());
+
+        uint32_t codePoint = static_cast<uint32_t>(codePointAsDouble);
+
+        if (codePoint != codePointAsDouble || codePoint > UCHAR_MAX_VALUE)
+            return throwVMError(exec, createRangeError(exec, ASCIILiteral("Arguments contain a value that is out of range of code points")));
+
+        if (U_IS_BMP(codePoint))
+            builder.append(static_cast<UChar>(codePoint));
+        else {
+            builder.append(U16_LEAD(codePoint));
+            builder.append(U16_TRAIL(codePoint));
+        }
+    }
+
+    return JSValue::encode(jsString(exec, builder.toString()));
+}
+
 static EncodedJSValue JSC_HOST_CALL constructWithStringConstructor(ExecState* exec)
 {
     JSGlobalObject* globalObject = asInternalFunction(exec->callee())->globalObject();
+    VM& vm = exec->vm();
+
     if (!exec->argumentCount())
-        return JSValue::encode(StringObject::create(exec, globalObject->stringObjectStructure()));
-    
-    return JSValue::encode(StringObject::create(exec, globalObject->stringObjectStructure(), exec->argument(0).toString(exec)));
+        return JSValue::encode(StringObject::create(vm, InternalFunction::createSubclassStructure(exec, exec->newTarget(), globalObject->stringObjectStructure())));
+
+    return JSValue::encode(StringObject::create(vm, InternalFunction::createSubclassStructure(exec, exec->newTarget(), globalObject->stringObjectStructure()), exec->uncheckedArgument(0).toString(exec)));
 }
 
 ConstructType StringConstructor::getConstructData(JSCell*, ConstructData& constructData)
@@ -109,11 +137,18 @@ ConstructType StringConstructor::getConstructData(JSCell*, ConstructData& constr
     return ConstructTypeHost;
 }
 
+JSCell* stringConstructor(ExecState* exec, JSValue argument)
+{
+    if (argument.isSymbol())
+        return jsNontrivialString(exec, asSymbol(argument)->descriptiveString());
+    return argument.toString(exec);
+}
+
 static EncodedJSValue JSC_HOST_CALL callStringConstructor(ExecState* exec)
 {
     if (!exec->argumentCount())
         return JSValue::encode(jsEmptyString(exec));
-    return JSValue::encode(exec->argument(0).toString(exec));
+    return JSValue::encode(stringConstructor(exec, exec->uncheckedArgument(0)));
 }
 
 CallType StringConstructor::getCallData(JSCell*, CallData& callData)

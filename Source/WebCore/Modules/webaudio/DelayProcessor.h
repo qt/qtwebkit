@@ -27,8 +27,7 @@
 
 #include "AudioDSPKernelProcessor.h"
 #include "AudioParam.h"
-
-#include <wtf/PassOwnPtr.h>
+#include <memory>
 #include <wtf/RefPtr.h>
 
 namespace WebCore {
@@ -37,10 +36,10 @@ class AudioDSPKernel;
     
 class DelayProcessor : public AudioDSPKernelProcessor {
 public:
-    DelayProcessor(AudioContext*, float sampleRate, unsigned numberOfChannels, double maxDelayTime);
+    DelayProcessor(AudioContext&, float sampleRate, unsigned numberOfChannels, double maxDelayTime);
     virtual ~DelayProcessor();
     
-    virtual PassOwnPtr<AudioDSPKernel> createKernel();
+    virtual std::unique_ptr<AudioDSPKernel> createKernel() override;
         
     AudioParam* delayTime() const { return m_delayTime.get(); }
 

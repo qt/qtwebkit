@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution. 
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission. 
  *
@@ -31,13 +31,13 @@
 
 #include <wtf/Assertions.h>
 #include <wtf/HashMap.h>
+#include <wtf/Lock.h>
 #include <wtf/MetaAllocatorHandle.h>
 #include <wtf/Noncopyable.h>
 #include <wtf/PageBlock.h>
 #include <wtf/RedBlackTree.h>
 #include <wtf/RefCounted.h>
 #include <wtf/RefPtr.h>
-#include <wtf/TCSpinLock.h>
 
 namespace WTF {
 
@@ -86,7 +86,7 @@ public:
         size_t bytesReserved;
         size_t bytesCommitted;
     };
-    Statistics currentStatistics();
+    WTF_EXPORT_PRIVATE Statistics currentStatistics();
 
     // Add more free space to the allocator. Call this directly from
     // the constructor if you wish to operate the allocator within a
@@ -96,6 +96,9 @@ public:
     // This is meant only for implementing tests. Never call this in release
     // builds.
     WTF_EXPORT_PRIVATE size_t debugFreeSpaceSize();
+
+    Lock& getLock() { return m_lock; }
+    WTF_EXPORT_PRIVATE bool isInAllocatedMemory(const LockHolder&, void* address);
     
 #if ENABLE(META_ALLOCATOR_PROFILE)
     void dumpProfile();
@@ -183,7 +186,7 @@ private:
     size_t m_bytesReserved;
     size_t m_bytesCommitted;
     
-    SpinLock m_lock;
+    Lock m_lock;
 
     MetaAllocatorTracker* m_tracker;
 

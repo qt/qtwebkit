@@ -26,7 +26,6 @@
 #include "config.h"
 #include "WebConnectionToUIProcess.h"
 
-#include "InjectedBundleUserMessageCoders.h"
 #include "WebConnectionMessages.h"
 #include "WebProcess.h"
 
@@ -34,33 +33,33 @@ using namespace WebCore;
 
 namespace WebKit {
 
-PassRefPtr<WebConnectionToUIProcess> WebConnectionToUIProcess::create(WebProcess* process)
+Ref<WebConnectionToUIProcess> WebConnectionToUIProcess::create(WebProcess* process)
 {
-    return adoptRef(new WebConnectionToUIProcess(process));
+    return adoptRef(*new WebConnectionToUIProcess(process));
 }
 
 WebConnectionToUIProcess::WebConnectionToUIProcess(WebProcess* process)
     : m_process(process)
 {
-    m_process->addMessageReceiver(Messages::WebConnection::messageReceiverName(), this);
+    m_process->addMessageReceiver(Messages::WebConnection::messageReceiverName(), *this);
 }
 
 void WebConnectionToUIProcess::invalidate()
 {
-    m_process = 0;
+    m_process->removeMessageReceiver(Messages::WebConnection::messageReceiverName());
+    m_process = nullptr;
 }
 
 // WebConnection
 
-void WebConnectionToUIProcess::encodeMessageBody(CoreIPC::ArgumentEncoder& encoder, APIObject* messageBody)
+RefPtr<API::Object> WebConnectionToUIProcess::transformHandlesToObjects(API::Object* object)
 {
-    encoder << InjectedBundleUserMessageEncoder(messageBody);
+    return m_process->transformHandlesToObjects(object);
 }
 
-bool WebConnectionToUIProcess::decodeMessageBody(CoreIPC::ArgumentDecoder& decoder, RefPtr<APIObject>& messageBody)
+RefPtr<API::Object> WebConnectionToUIProcess::transformObjectsToHandles(API::Object* object)
 {
-    InjectedBundleUserMessageDecoder messageBodyDecoder(messageBody);
-    return decoder.decode(messageBodyDecoder);
+    return m_process->transformObjectsToHandles(object);
 }
 
 bool WebConnectionToUIProcess::hasValidConnection() const
@@ -68,7 +67,7 @@ bool WebConnectionToUIProcess::hasValidConnection() const
     return m_process;
 }
 
-CoreIPC::Connection* WebConnectionToUIProcess::messageSenderConnection()
+IPC::Connection* WebConnectionToUIProcess::messageSenderConnection()
 {
     return m_process->parentProcessConnection();
 }

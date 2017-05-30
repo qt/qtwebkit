@@ -31,9 +31,9 @@
 
 #include "ChromeClient.h"
 #include "FloatRect.h"
-#include "KURL.h"
+#include "MediaProducer.h"
 #include "QtPlatformPlugin.h"
-#include <wtf/PassOwnPtr.h>
+#include "URL.h"
 #include <wtf/RefCounted.h>
 #include <wtf/text/WTFString.h>
 
@@ -60,150 +60,150 @@ class FullScreenVideoQt;
 #endif
 class TextureMapperLayerClientQt;
 
-class ChromeClientQt : public ChromeClient {
+class ChromeClientQt final : public ChromeClient {
 public:
     ChromeClientQt(QWebPageAdapter*);
-    virtual ~ChromeClientQt();
-    virtual void chromeDestroyed();
+    ~ChromeClientQt();
+    void chromeDestroyed() final;
 
-    virtual void setWindowRect(const FloatRect&);
-    virtual FloatRect windowRect();
+    void setWindowRect(const FloatRect&) final;
+    FloatRect windowRect() final;
 
-    virtual FloatRect pageRect();
+    FloatRect pageRect() final;
 
-    virtual void focus();
-    virtual void unfocus();
+    void focus() final;
+    void unfocus() final;
 
-    virtual bool canTakeFocus(FocusDirection);
-    virtual void takeFocus(FocusDirection);
+    bool canTakeFocus(FocusDirection) final;
+    void takeFocus(FocusDirection) final;
 
-    virtual void focusedNodeChanged(Node*);
-    virtual void focusedFrameChanged(Frame*);
+    void focusedElementChanged(Element*) final;
+    void focusedFrameChanged(Frame*) final;
 
-    virtual Page* createWindow(Frame*, const FrameLoadRequest&, const WindowFeatures&, const NavigationAction&);
-    virtual void show();
+    Page* createWindow(Frame*, const FrameLoadRequest&, const WindowFeatures&, const NavigationAction&) final;
+    void show() final;
 
-    virtual bool canRunModal();
-    virtual void runModal();
+    bool canRunModal() final;
+    void runModal() final;
 
-    virtual void setToolbarsVisible(bool);
-    virtual bool toolbarsVisible();
+    void setToolbarsVisible(bool) final;
+    bool toolbarsVisible() final;
 
-    virtual void setStatusbarVisible(bool);
-    virtual bool statusbarVisible();
+    void setStatusbarVisible(bool) final;
+    bool statusbarVisible() final;
 
-    virtual void setScrollbarsVisible(bool);
-    virtual bool scrollbarsVisible();
+    void setScrollbarsVisible(bool) final;
+    bool scrollbarsVisible() final;
 
-    virtual void setMenubarVisible(bool);
-    virtual bool menubarVisible();
+    void setMenubarVisible(bool) final;
+    bool menubarVisible() final;
 
-    virtual void setResizable(bool);
+    void setResizable(bool) final;
 
-    virtual void addMessageToConsole(MessageSource, MessageLevel, const String& message, unsigned lineNumber, unsigned columnNumber, const String& sourceID);
+    void addMessageToConsole(MessageSource, MessageLevel, const String& message, unsigned lineNumber, unsigned columnNumber, const String& sourceID) final;
 
-    virtual bool canRunBeforeUnloadConfirmPanel();
-    virtual bool runBeforeUnloadConfirmPanel(const String& message, Frame*);
+    bool canRunBeforeUnloadConfirmPanel() final;
+    bool runBeforeUnloadConfirmPanel(const String& message, Frame*) final;
 
-    virtual void closeWindowSoon();
+    void closeWindowSoon() final;
 
-    virtual void runJavaScriptAlert(Frame*, const String&);
-    virtual bool runJavaScriptConfirm(Frame*, const String&);
-    virtual bool runJavaScriptPrompt(Frame*, const String& message, const String& defaultValue, String& result);
-    virtual bool shouldInterruptJavaScript();
+    void runJavaScriptAlert(Frame*, const String&) final;
+    bool runJavaScriptConfirm(Frame*, const String&) final;
+    bool runJavaScriptPrompt(Frame*, const String& message, const String& defaultValue, String& result) final;
 
-    virtual void setStatusbarText(const String&);
+    void setStatusbarText(const String&) final;
 
-    virtual KeyboardUIMode keyboardUIMode();
-    virtual IntRect windowResizerRect() const;
+    KeyboardUIMode keyboardUIMode() final;
 
-    virtual void invalidateRootView(const IntRect&, bool);
-    virtual void invalidateContentsAndRootView(const IntRect&, bool);
-    virtual void invalidateContentsForSlowScroll(const IntRect&, bool);
-    virtual void scroll(const IntSize& scrollDelta, const IntRect& rectToScroll, const IntRect& clipRect);
-#if USE(TILED_BACKING_STORE)
-    virtual void delegatedScrollRequested(const IntPoint& scrollPoint);
+    void invalidateRootView(const IntRect&) final;
+    void invalidateContentsAndRootView(const IntRect&) final;
+    void invalidateContentsForSlowScroll(const IntRect&) final;
+    void scroll(const IntSize& scrollDelta, const IntRect& rectToScroll, const IntRect& clipRect) final;
+#if USE(COORDINATED_GRAPHICS)
+    void delegatedScrollRequested(const IntPoint& scrollPoint) final;
 #endif
 
-    virtual IntPoint screenToRootView(const IntPoint&) const;
-    virtual IntRect rootViewToScreen(const IntRect&) const;
-    virtual PlatformPageClient platformPageClient() const;
-    virtual void contentsSizeChanged(Frame*, const IntSize&) const;
+    IntPoint screenToRootView(const IntPoint&) const final;
+    IntRect rootViewToScreen(const IntRect&) const final;
+    PlatformPageClient platformPageClient() const final;
+    void contentsSizeChanged(Frame*, const IntSize&) const final;
 
-    virtual void scrollbarsModeDidChange() const { }
-    virtual void mouseDidMoveOverElement(const HitTestResult&, unsigned modifierFlags);
+    void scrollbarsModeDidChange() const final { }
+    void mouseDidMoveOverElement(const HitTestResult&, unsigned modifierFlags) final;
 
-    virtual void setToolTip(const String&, TextDirection);
+    void setToolTip(const String&, TextDirection) final;
 
-    virtual void print(Frame*);
-#if ENABLE(SQL_DATABASE)
-    virtual void exceededDatabaseQuota(Frame*, const String&, DatabaseDetails);
-#endif
-    virtual void reachedMaxAppCacheSize(int64_t spaceNeeded);
-    virtual void reachedApplicationCacheOriginQuota(SecurityOrigin*, int64_t totalSpaceNeeded);
+    void print(Frame*) final;
+    void exceededDatabaseQuota(Frame*, const String&, DatabaseDetails) final;
+    void reachedMaxAppCacheSize(int64_t spaceNeeded) final;
+    void reachedApplicationCacheOriginQuota(SecurityOrigin*, int64_t totalSpaceNeeded) final;
 
-#if USE(ACCELERATED_COMPOSITING)
     // This is a hook for WebCore to tell us what we need to do with the GraphicsLayers.
-    virtual void attachRootGraphicsLayer(Frame*, GraphicsLayer*);
-    virtual void setNeedsOneShotDrawingSynchronization();
-    virtual void scheduleCompositingLayerFlush();
-    virtual CompositingTriggerFlags allowedCompositingTriggers() const;
-#endif
-    virtual bool allowsAcceleratedCompositing() const;
+    void attachRootGraphicsLayer(Frame*, GraphicsLayer*) final;
+    void setNeedsOneShotDrawingSynchronization() final;
+    void scheduleCompositingLayerFlush() final;
+    CompositingTriggerFlags allowedCompositingTriggers() const final;
+    bool allowsAcceleratedCompositing() const final;
 
 #if USE(TILED_BACKING_STORE)
     virtual IntRect visibleRectForTiledBackingStore() const;
 #endif
 
 #if ENABLE(TOUCH_EVENTS)
-    virtual void needTouchEvents(bool) { }
+    void needTouchEvents(bool) final { }
 #endif
 
+    void isPlayingMediaDidChange(MediaProducer::MediaStateFlags, uint64_t) final;
+
 #if ENABLE(VIDEO) && ((USE(GSTREAMER) && USE(NATIVE_FULLSCREEN_VIDEO)) || USE(QT_MULTIMEDIA))
-    virtual bool supportsFullscreenForNode(const Node*);
-    virtual void enterFullscreenForNode(Node*);
-    virtual void exitFullscreenForNode(Node*);
-    virtual bool requiresFullscreenForVideoPlayback();
+    bool supportsVideoFullscreen(MediaPlayerEnums::VideoFullscreenMode) final;
+    void enterVideoFullscreenForVideoElement(HTMLVideoElement&, MediaPlayerEnums::VideoFullscreenMode) final;
+    void exitVideoFullscreenForVideoElement(WebCore::HTMLVideoElement&) final;
+    bool requiresFullscreenForVideoPlayback() final;
     FullScreenVideoQt* fullScreenVideo();
 #endif
 
-#if ENABLE(INPUT_TYPE_COLOR)
-    virtual PassOwnPtr<ColorChooser> createColorChooser(ColorChooserClient*, const Color&);
+#if ENABLE(FULLSCREEN_API)
+    bool supportsFullScreenForElement(const Element*, bool) override;
+    void enterFullScreenForElement(Element*) override;
+    void exitFullScreenForElement(Element*) override;
 #endif
 
-    virtual void runOpenPanel(Frame*, PassRefPtr<FileChooser>);
-    virtual void loadIconForFiles(const Vector<String>&, FileIconLoader*);
+#if ENABLE(INPUT_TYPE_COLOR)
+    std::unique_ptr<ColorChooser> createColorChooser(ColorChooserClient*, const Color&) final;
+#endif
 
-    virtual void formStateDidChange(const Node*) { }
+    void runOpenPanel(Frame*, PassRefPtr<FileChooser>) final;
+    void loadIconForFiles(const Vector<String>&, FileIconLoader*) final;
 
-    virtual void setCursor(const Cursor&);
-    virtual void setCursorHiddenUntilMouseMoves(bool) { }
+    void setCursor(const Cursor&) final;
+    void setCursorHiddenUntilMouseMoves(bool) final { }
 
 #if ENABLE(REQUEST_ANIMATION_FRAME) && !USE(REQUEST_ANIMATION_FRAME_TIMER)
-    virtual void scheduleAnimation();
-    virtual void serviceScriptedAnimations();
+    void scheduleAnimation() final;
+    void serviceScriptedAnimations();
 #endif
 
-    virtual void scrollRectIntoView(const LayoutRect) const { }
+    void scrollRectIntoView(const IntRect&) const final { }
 
-    virtual bool selectItemWritingDirectionIsNatural();
-    virtual bool selectItemAlignmentFollowsMenuWritingDirection();
-    virtual bool hasOpenedPopup() const;
-    virtual PassRefPtr<PopupMenu> createPopupMenu(PopupMenuClient*) const;
-    virtual PassRefPtr<SearchPopupMenu> createSearchPopupMenu(PopupMenuClient*) const;
-    virtual void populateVisitedLinks();
+    bool selectItemWritingDirectionIsNatural() final;
+    bool selectItemAlignmentFollowsMenuWritingDirection() final;
+    bool hasOpenedPopup() const final;
+    RefPtr<PopupMenu> createPopupMenu(PopupMenuClient*) const final;
+    RefPtr<SearchPopupMenu> createSearchPopupMenu(PopupMenuClient*) const final;
 
-    PassOwnPtr<QWebSelectMethod> createSelectPopup() const;
+    std::unique_ptr<QWebSelectMethod> createSelectPopup() const;
 
-    virtual void dispatchViewportPropertiesDidChange(const ViewportArguments&) const;
+    void dispatchViewportPropertiesDidChange(const ViewportArguments&) const final;
 
-    virtual bool shouldRubberBandInDirection(WebCore::ScrollDirection) const { return true; }
-    virtual void numWheelEventHandlersChanged(unsigned) { }
+    void wheelEventHandlersChanged(bool) final { }
+
+    void attachViewOverlayGraphicsLayer(Frame *, GraphicsLayer *) final;
 
     QWebFullScreenVideoHandler* createFullScreenVideoHandler();
 
     QWebPageAdapter* m_webPage;
-    KURL lastHoverURL;
+    URL lastHoverURL;
     String lastHoverTitle;
     String lastHoverContent;
 
@@ -212,8 +212,9 @@ public:
     bool menuBarVisible;
     QEventLoop* m_eventLoop;
 #if ENABLE(REQUEST_ANIMATION_FRAME) && !USE(REQUEST_ANIMATION_FRAME_TIMER)
-    OwnPtr<RefreshAnimation> m_refreshAnimation;
+    std::unique_ptr<RefreshAnimation> m_refreshAnimation;
 #endif
+    MediaProducer::MediaStateFlags m_mediaState { WebCore::MediaProducer::IsNotPlaying };
 
 #if ENABLE(VIDEO) && (USE(GSTREAMER) || USE(QT_MULTIMEDIA))
     FullScreenVideoQt* m_fullScreenVideo;
@@ -223,9 +224,7 @@ public:
 
     mutable QtPlatformPlugin m_platformPlugin;
 
-#if USE(ACCELERATED_COMPOSITING)
-    OwnPtr<TextureMapperLayerClientQt> m_textureMapperLayerClient;
-#endif
+    std::unique_ptr<TextureMapperLayerClientQt> m_textureMapperLayerClient;
 };
 }
 

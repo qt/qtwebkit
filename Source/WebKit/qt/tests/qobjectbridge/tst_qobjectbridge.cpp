@@ -642,6 +642,7 @@ private Q_SLOTS:
     void introspectQtMethods_data();
     void introspectQtMethods();
     void scriptablePlugin();
+    void exceptionInSlot();
 
 private:
     QString evalJS(const QString& s)
@@ -1567,31 +1568,34 @@ void tst_QObjectBridge::connectAndDisconnect()
     QCOMPARE(evalJS("myObject.mySignalWithIntArg.disconnect(myObject, 'myOverloadedSlot(int)')"), sUndefined);
 
     // erroneous input
+#define NOT_A_FUNCTION(f, expr) \
+    "TypeError: " f " is not a function. (In '" expr "', '" f "' is undefined)"
+
     {
         // ### QtScript adds .connect to all functions, WebKit does only to signals/slots
         QString type;
         QString ret = evalJS("(function() { }).connect()", type);
         QCOMPARE(type, sError);
-        QCOMPARE(ret, QLatin1String("TypeError: undefined is not a function (evaluating '(function() { }).connect()')"));
+        QCOMPARE(ret, QLatin1String(NOT_A_FUNCTION("(function() { }).connect", "(function() { }).connect()")));
     }
     {
         QString type;
         QString ret = evalJS("var o = { }; o.connect = Function.prototype.connect;  o.connect()", type);
         QCOMPARE(type, sError);
-        QCOMPARE(ret, QLatin1String("TypeError: undefined is not a function (evaluating 'o.connect()')"));
+        QCOMPARE(ret, QLatin1String(NOT_A_FUNCTION("o.connect", "o.connect()")));
     }
 
     {
         QString type;
         QString ret = evalJS("(function() { }).connect(123)", type);
         QCOMPARE(type, sError);
-        QCOMPARE(ret, QLatin1String("TypeError: undefined is not a function (evaluating '(function() { }).connect(123)')"));
+        QCOMPARE(ret, QLatin1String(NOT_A_FUNCTION("(function() { }).connect", "(function() { }).connect(123)")));
     }
     {
         QString type;
         QString ret = evalJS("var o = { }; o.connect = Function.prototype.connect;  o.connect(123)", type);
         QCOMPARE(type, sError);
-        QCOMPARE(ret, QLatin1String("TypeError: undefined is not a function (evaluating 'o.connect(123)')"));
+        QCOMPARE(ret, QLatin1String(NOT_A_FUNCTION("o.connect", "o.connect(123)")));
     }
 
     {
@@ -2221,6 +2225,7 @@ protected:
 
 void tst_QObjectBridge::scriptablePlugin()
 {
+//#if !PLUGIN_VIEW_IS_BROKEN
     QWebView view;
     TestWebPage* page = new TestWebPage;
     view.setPage(page);
@@ -2232,6 +2237,34 @@ void tst_QObjectBridge::scriptablePlugin()
 
     QVariant result = page->mainFrame()->evaluateJavaScript("document.querySelector(\"object\").slotWithReturnValue()");
     QCOMPARE(result.toString(), QLatin1String("42"));
+//#endif
+}
+
+class WebPageWithConsoleCapture : public QWebPage
+{
+public:
+    void javaScriptConsoleMessage(const QString &message, int, const QString &)
+    {
+        consoleMessages << message;
+    }
+
+    QStringList consoleMessages;
+};
+
+void tst_QObjectBridge::exceptionInSlot()
+{
+    WebPageWithConsoleCapture page;
+    QWebFrame* frame = page.mainFrame();
+    frame->addToJavaScriptWindowObject("myObject", m_myObject);
+    frame->evaluateJavaScript(
+        "myHandler = function() { window.gotSignal = true; throw 'exception in slot'; };"
+        "myObject.mySignal.connect(myHandler);"
+        "gotSignal = false;"
+        "myObject.mySignal();"
+    );
+    QString ret = frame->evaluateJavaScript("gotSignal").toString();
+    QCOMPARE(ret, sTrue);
+    QCOMPARE(page.consoleMessages, QStringList() << "exception in slot");
 }
 
 QTEST_MAIN(tst_QObjectBridge)

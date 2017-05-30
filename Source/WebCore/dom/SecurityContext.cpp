@@ -13,7 +13,7 @@
  * THIS SOFTWARE IS PROVIDED BY GOOGLE, INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -30,13 +30,13 @@
 #include "ContentSecurityPolicy.h"
 #include "HTMLParserIdioms.h"
 #include "SecurityOrigin.h"
+#include "SecurityOriginPolicy.h"
 #include <wtf/text/StringBuilder.h>
 
 namespace WebCore {
 
 SecurityContext::SecurityContext()
-    : m_mayDisplaySeamlesslyWithParent(false)
-    , m_haveInitializedSecurityOrigin(false)
+    : m_haveInitializedSecurityOrigin(false)
     , m_sandboxFlags(SandboxNone)
 {
 }
@@ -45,18 +45,26 @@ SecurityContext::~SecurityContext()
 {
 }
 
-void SecurityContext::setSecurityOrigin(PassRefPtr<SecurityOrigin> securityOrigin)
+void SecurityContext::setSecurityOriginPolicy(RefPtr<SecurityOriginPolicy>&& securityOriginPolicy)
 {
-    m_securityOrigin = securityOrigin;
+    m_securityOriginPolicy = WTFMove(securityOriginPolicy);
     m_haveInitializedSecurityOrigin = true;
 }
 
-void SecurityContext::setContentSecurityPolicy(PassOwnPtr<ContentSecurityPolicy> contentSecurityPolicy)
+SecurityOrigin* SecurityContext::securityOrigin() const
 {
-    m_contentSecurityPolicy = contentSecurityPolicy;
+    if (!m_securityOriginPolicy)
+        return nullptr;
+
+    return &m_securityOriginPolicy->origin();
 }
 
-bool SecurityContext::isSecureTransitionTo(const KURL& url) const
+void SecurityContext::setContentSecurityPolicy(std::unique_ptr<ContentSecurityPolicy> contentSecurityPolicy)
+{
+    m_contentSecurityPolicy = WTFMove(contentSecurityPolicy);
+}
+
+bool SecurityContext::isSecureTransitionTo(const URL& url) const
 {
     // If we haven't initialized our security origin by now, this is probably
     // a new window created via the API (i.e., that lacks an origin and lacks
@@ -64,8 +72,7 @@ bool SecurityContext::isSecureTransitionTo(const KURL& url) const
     if (!haveInitializedSecurityOrigin())
         return true;
 
-    RefPtr<SecurityOrigin> other = SecurityOrigin::create(url);
-    return securityOrigin()->canAccess(other.get());
+    return securityOriginPolicy()->origin().canAccess(SecurityOrigin::create(url).ptr());
 }
 
 void SecurityContext::enforceSandboxFlags(SandboxFlags mask)
@@ -73,8 +80,8 @@ void SecurityContext::enforceSandboxFlags(SandboxFlags mask)
     m_sandboxFlags |= mask;
 
     // The SandboxOrigin is stored redundantly in the security origin.
-    if (isSandboxed(SandboxOrigin) && securityOrigin() && !securityOrigin()->isUnique())
-        setSecurityOrigin(SecurityOrigin::createUnique());
+    if (isSandboxed(SandboxOrigin) && securityOriginPolicy() && !securityOriginPolicy()->origin().isUnique())
+        setSecurityOriginPolicy(SecurityOriginPolicy::create(SecurityOrigin::createUnique()));
 }
 
 SandboxFlags SecurityContext::parseSandboxPolicy(const String& policy, String& invalidTokensErrorMessage)
@@ -97,18 +104,18 @@ SandboxFlags SecurityContext::parseSandboxPolicy(const String& policy, String& i
 
         // Turn off the corresponding sandbox flag if it's set as "allowed".
         String sandboxToken = policy.substring(start, end - start);
-        if (equalIgnoringCase(sandboxToken, "allow-same-origin"))
+        if (equalLettersIgnoringASCIICase(sandboxToken, "allow-same-origin"))
             flags &= ~SandboxOrigin;
-        else if (equalIgnoringCase(sandboxToken, "allow-forms"))
+        else if (equalLettersIgnoringASCIICase(sandboxToken, "allow-forms"))
             flags &= ~SandboxForms;
-        else if (equalIgnoringCase(sandboxToken, "allow-scripts")) {
+        else if (equalLettersIgnoringASCIICase(sandboxToken, "allow-scripts")) {
             flags &= ~SandboxScripts;
             flags &= ~SandboxAutomaticFeatures;
-        } else if (equalIgnoringCase(sandboxToken, "allow-top-navigation"))
+        } else if (equalLettersIgnoringASCIICase(sandboxToken, "allow-top-navigation"))
             flags &= ~SandboxTopNavigation;
-        else if (equalIgnoringCase(sandboxToken, "allow-popups"))
+        else if (equalLettersIgnoringASCIICase(sandboxToken, "allow-popups"))
             flags &= ~SandboxPopups;
-        else if (equalIgnoringCase(sandboxToken, "allow-pointer-lock"))
+        else if (equalLettersIgnoringASCIICase(sandboxToken, "allow-pointer-lock"))
             flags &= ~SandboxPointerLock;
         else {
             if (numberOfTokenErrors)

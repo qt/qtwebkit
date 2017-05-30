@@ -27,6 +27,7 @@
 #include "NetworkProcessPlatformStrategies.h"
 
 #include <WebCore/BlobRegistryImpl.h>
+#include <wtf/NeverDestroyed.h>
 
 using namespace WebCore;
 
@@ -34,68 +35,33 @@ namespace WebKit {
 
 void NetworkProcessPlatformStrategies::initialize()
 {
-    DEFINE_STATIC_LOCAL(NetworkProcessPlatformStrategies, platformStrategies, ());
-    setPlatformStrategies(&platformStrategies);
+    static NeverDestroyed<NetworkProcessPlatformStrategies> platformStrategies;
+    setPlatformStrategies(&platformStrategies.get());
 }
 
 CookiesStrategy* NetworkProcessPlatformStrategies::createCookiesStrategy()
 {
-    return 0;
-}
-
-DatabaseStrategy* NetworkProcessPlatformStrategies::createDatabaseStrategy()
-{
-    return 0;
+    return nullptr;
 }
 
 LoaderStrategy* NetworkProcessPlatformStrategies::createLoaderStrategy()
 {
-    return this;
+    return nullptr;
 }
 
 PasteboardStrategy* NetworkProcessPlatformStrategies::createPasteboardStrategy()
 {
-    return 0;
+    return nullptr;
 }
 
 PluginStrategy* NetworkProcessPlatformStrategies::createPluginStrategy()
 {
-    return 0;
+    return nullptr;
 }
 
-SharedWorkerStrategy* NetworkProcessPlatformStrategies::createSharedWorkerStrategy()
-{
-    return 0;
-}
-
-StorageStrategy* NetworkProcessPlatformStrategies::createStorageStrategy()
-{
-    return 0;
-}
-
-VisitedLinkStrategy* NetworkProcessPlatformStrategies::createVisitedLinkStrategy()
-{
-    return 0;
-}
-
-ResourceLoadScheduler* NetworkProcessPlatformStrategies::resourceLoadScheduler()
-{
-    ASSERT_NOT_REACHED();
-    return 0;
-}
-
-void NetworkProcessPlatformStrategies::loadResourceSynchronously(NetworkingContext*, unsigned long resourceLoadIdentifier, const ResourceRequest&, StoredCredentials, ClientCredentialPolicy, ResourceError&, ResourceResponse&, Vector<char>& data)
-{
-    ASSERT_NOT_REACHED();
-}
-
-#if ENABLE(BLOB)
 BlobRegistry* NetworkProcessPlatformStrategies::createBlobRegistry()
 {
     return new BlobRegistryImpl;
 }
-
-#endif
-
 
 }

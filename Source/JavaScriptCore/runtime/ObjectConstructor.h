@@ -27,62 +27,76 @@
 
 namespace JSC {
 
-    class ObjectPrototype;
+EncodedJSValue JSC_HOST_CALL objectConstructorGetOwnPropertyDescriptor(ExecState*);
+EncodedJSValue JSC_HOST_CALL objectConstructorGetOwnPropertyDescriptors(ExecState*);
+EncodedJSValue JSC_HOST_CALL objectConstructorGetOwnPropertySymbols(ExecState*);
+EncodedJSValue JSC_HOST_CALL objectConstructorKeys(ExecState*);
+EncodedJSValue JSC_HOST_CALL ownEnumerablePropertyKeys(ExecState*);
 
-    class ObjectConstructor : public InternalFunction {
-    public:
-        typedef InternalFunction Base;
+class ObjectPrototype;
 
-        static ObjectConstructor* create(ExecState* exec, JSGlobalObject* globalObject, Structure* structure, ObjectPrototype* objectPrototype)
-        {
-            ObjectConstructor* constructor = new (NotNull, allocateCell<ObjectConstructor>(*exec->heap())) ObjectConstructor(globalObject, structure);
-            constructor->finishCreation(exec, objectPrototype);
-            return constructor;
-        }
+class ObjectConstructor : public InternalFunction {
+public:
+    typedef InternalFunction Base;
+    static const unsigned StructureFlags = Base::StructureFlags | OverridesGetOwnPropertySlot;
 
-        static bool getOwnPropertySlot(JSCell*, ExecState*, PropertyName, PropertySlot&);
-        static bool getOwnPropertyDescriptor(JSObject*, ExecState*, PropertyName, PropertyDescriptor&);
-
-        static const ClassInfo s_info;
-
-        static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype)
-        {
-            return Structure::create(vm, globalObject, prototype, TypeInfo(ObjectType, StructureFlags), &s_info);
-        }
-
-    protected:
-        void finishCreation(ExecState*, ObjectPrototype*);
-        static const unsigned StructureFlags = OverridesGetOwnPropertySlot | InternalFunction::StructureFlags;
-
-    private:
-        ObjectConstructor(JSGlobalObject*, Structure*);
-        static ConstructType getConstructData(JSCell*, ConstructData&);
-        static CallType getCallData(JSCell*, CallData&);
-    };
-
-    inline JSObject* constructEmptyObject(ExecState* exec, Structure* structure)
+    static ObjectConstructor* create(VM& vm, JSGlobalObject* globalObject, Structure* structure, ObjectPrototype* objectPrototype)
     {
-        return JSFinalObject::create(exec, structure);
+        ObjectConstructor* constructor = new (NotNull, allocateCell<ObjectConstructor>(vm.heap)) ObjectConstructor(vm, structure);
+        constructor->finishCreation(vm, globalObject, objectPrototype);
+        return constructor;
     }
 
-    inline JSObject* constructEmptyObject(ExecState* exec, JSObject* prototype, unsigned inlineCapacity)
+    static bool getOwnPropertySlot(JSObject*, ExecState*, PropertyName, PropertySlot&);
+
+    DECLARE_INFO;
+
+    static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype)
     {
-        JSGlobalObject* globalObject = exec->lexicalGlobalObject();
-        PrototypeMap& prototypeMap = globalObject->vm().prototypeMap;
-        Structure* structure = prototypeMap.emptyObjectStructureForPrototype(
-            prototype, inlineCapacity);
-        return constructEmptyObject(exec, structure);
+        return Structure::create(vm, globalObject, prototype, TypeInfo(ObjectType, StructureFlags), info());
     }
 
-    inline JSObject* constructEmptyObject(ExecState* exec, JSObject* prototype)
-    {
-        return constructEmptyObject(exec, prototype, JSFinalObject::defaultInlineCapacity());
-    }
+    JSFunction* addDefineProperty(ExecState*, JSGlobalObject*);
 
-    inline JSObject* constructEmptyObject(ExecState* exec)
-    {
-        return constructEmptyObject(exec, exec->lexicalGlobalObject()->objectPrototype());
-    }
+protected:
+    void finishCreation(VM&, JSGlobalObject*, ObjectPrototype*);
+
+private:
+    ObjectConstructor(VM&, Structure*);
+    static ConstructType getConstructData(JSCell*, ConstructData&);
+    static CallType getCallData(JSCell*, CallData&);
+};
+
+inline JSObject* constructEmptyObject(ExecState* exec, Structure* structure)
+{
+    return JSFinalObject::create(exec, structure);
+}
+
+inline JSObject* constructEmptyObject(ExecState* exec, JSObject* prototype, unsigned inlineCapacity)
+{
+    JSGlobalObject* globalObject = exec->lexicalGlobalObject();
+    PrototypeMap& prototypeMap = globalObject->vm().prototypeMap;
+    Structure* structure = prototypeMap.emptyObjectStructureForPrototype(
+        prototype, inlineCapacity);
+    return constructEmptyObject(exec, structure);
+}
+
+inline JSObject* constructEmptyObject(ExecState* exec, JSObject* prototype)
+{
+    return constructEmptyObject(exec, prototype, JSFinalObject::defaultInlineCapacity());
+}
+
+inline JSObject* constructEmptyObject(ExecState* exec)
+{
+    return constructEmptyObject(exec, exec->lexicalGlobalObject()->objectPrototype());
+}
+
+JSObject* objectConstructorFreeze(ExecState*, JSObject*);
+JSValue objectConstructorGetPrototypeOf(ExecState*, JSObject*);
+JSValue objectConstructorGetOwnPropertyDescriptor(ExecState*, JSObject*, const Identifier&);
+JSValue objectConstructorGetOwnPropertyDescriptors(ExecState*, JSObject*);
+JSArray* ownPropertyKeys(ExecState*, JSObject*, PropertyNameMode, DontEnumPropertiesMode);
+bool toPropertyDescriptor(ExecState*, JSValue, PropertyDescriptor&);
 
 } // namespace JSC
 

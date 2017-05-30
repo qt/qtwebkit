@@ -30,10 +30,8 @@
 #include <wtf/HashMap.h>
 #include <wtf/text/StringHash.h>
 
-#if !USE(QXMLQUERY)
 #include <libxml/parserInternals.h>
 #include <libxslt/documents.h>
-#endif
 
 namespace WebCore {
 
@@ -43,21 +41,21 @@ class DocumentFragment;
 
 class XSLTProcessor : public RefCounted<XSLTProcessor> {
 public:
-    static PassRefPtr<XSLTProcessor> create() { return adoptRef(new XSLTProcessor); }
+    static Ref<XSLTProcessor> create() { return adoptRef(*new XSLTProcessor); }
     ~XSLTProcessor();
 
-    void setXSLStyleSheet(PassRefPtr<XSLStyleSheet> styleSheet) { m_stylesheet = styleSheet; }
-    bool transformToString(Node* source, String& resultMIMEType, String& resultString, String& resultEncoding);
-    PassRefPtr<Document> createDocumentFromSource(const String& source, const String& sourceEncoding, const String& sourceMIMEType, Node* sourceNode, Frame* frame);
+    void setXSLStyleSheet(RefPtr<XSLStyleSheet>&& styleSheet) { m_stylesheet = WTFMove(styleSheet); }
+    bool transformToString(Node& source, String& resultMIMEType, String& resultString, String& resultEncoding);
+    Ref<Document> createDocumentFromSource(const String& source, const String& sourceEncoding, const String& sourceMIMEType, Node* sourceNode, Frame* frame);
     
     // DOM methods
-    void importStylesheet(PassRefPtr<Node> style)
+    void importStylesheet(RefPtr<Node>&& style)
     {
         if (style)
-            m_stylesheetRootNode = style;
+            m_stylesheetRootNode = WTFMove(style);
     }
-    PassRefPtr<DocumentFragment> transformToFragment(Node* source, Document* ouputDoc);
-    PassRefPtr<Document> transformToDocument(Node* source);
+    RefPtr<DocumentFragment> transformToFragment(Node* source, Document* ouputDoc);
+    RefPtr<Document> transformToDocument(Node* source);
     
     void setParameter(const String& namespaceURI, const String& localName, const String& value);
     String getParameter(const String& namespaceURI, const String& localName) const;
@@ -66,13 +64,11 @@ public:
 
     void reset();
 
-#if !USE(QXMLQUERY)
     static void parseErrorFunc(void* userData, xmlError*);
     static void genericErrorFunc(void* userData, const char* msg, ...);
     
     // Only for libXSLT callbacks
     XSLStyleSheet* xslStylesheet() const { return m_stylesheet.get(); }
-#endif
 
     typedef HashMap<String, String> ParameterMap;
 

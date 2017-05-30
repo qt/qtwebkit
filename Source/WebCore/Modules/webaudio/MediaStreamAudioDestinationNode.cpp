@@ -30,38 +30,34 @@
 
 #include "AudioContext.h"
 #include "AudioNodeInput.h"
-#include "LocalMediaStream.h"
-#include "MediaStreamCenter.h"
+#include "MediaStream.h"
+#include "MediaStreamAudioSource.h"
 #include "RTCPeerConnectionHandler.h"
-#include "UUID.h"
 #include <wtf/Locker.h>
 
 namespace WebCore {
 
-PassRefPtr<MediaStreamAudioDestinationNode> MediaStreamAudioDestinationNode::create(AudioContext* context, size_t numberOfChannels)
+Ref<MediaStreamAudioDestinationNode> MediaStreamAudioDestinationNode::create(AudioContext& context, size_t numberOfChannels)
 {
-    return adoptRef(new MediaStreamAudioDestinationNode(context, numberOfChannels));
+    return adoptRef(*new MediaStreamAudioDestinationNode(context, numberOfChannels));
 }
 
-MediaStreamAudioDestinationNode::MediaStreamAudioDestinationNode(AudioContext* context, size_t numberOfChannels)
-    : AudioBasicInspectorNode(context, context->sampleRate(), numberOfChannels)
+MediaStreamAudioDestinationNode::MediaStreamAudioDestinationNode(AudioContext& context, size_t numberOfChannels)
+    : AudioBasicInspectorNode(context, context.sampleRate(), numberOfChannels)
     , m_mixBus(AudioBus::create(numberOfChannels, ProcessingSizeInFrames))
 {
     setNodeType(NodeTypeMediaStreamAudioDestination);
 
-    m_source = MediaStreamSource::create(ASCIILiteral("WebAudio-") + createCanonicalUUIDString(), MediaStreamSource::TypeAudio, "MediaStreamAudioDestinationNode", MediaStreamSource::ReadyStateLive, true);
-    MediaStreamSourceVector audioSources;
-    audioSources.append(m_source);
-    MediaStreamSourceVector videoSources;
-    m_stream = LocalMediaStream::create(context->scriptExecutionContext(), audioSources, videoSources);
-    MediaStreamCenter::instance().didCreateMediaStream(m_stream->descriptor());
+    m_source = MediaStreamAudioSource::create();
+    Vector<RefPtr<RealtimeMediaSource>> audioSources(1, m_source);
+    m_stream = MediaStream::create(*context.scriptExecutionContext(), MediaStreamPrivate::create(WTFMove(audioSources), Vector<RefPtr<RealtimeMediaSource>>()));
 
-    m_source->setAudioFormat(numberOfChannels, context->sampleRate());
+    m_source->setAudioFormat(numberOfChannels, context.sampleRate());
 
     initialize();
 }
 
-MediaStreamSource* MediaStreamAudioDestinationNode::mediaStreamSource()
+RealtimeMediaSource* MediaStreamAudioDestinationNode::mediaStreamSource()
 {
     return m_source.get();
 }

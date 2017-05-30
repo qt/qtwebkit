@@ -25,9 +25,11 @@
 
 // This all-in-one cpp file cuts down on template bloat to allow us to build our Windows release build.
 
+#include "BasicShapes.cpp"
 #include "ContentData.cpp"
 #include "CounterDirectives.cpp"
 #include "FillLayer.cpp"
+#include "GridResolvedPosition.cpp"
 #include "KeyframeList.cpp"
 #include "NinePieceImage.cpp"
 #include "QuotesData.cpp"
@@ -35,9 +37,11 @@
 #include "SVGRenderStyle.cpp"
 #include "SVGRenderStyleDefs.cpp"
 #include "ShadowData.cpp"
+#include "ShapeValue.cpp"
 #include "StyleBackgroundData.cpp"
 #include "StyleBoxData.cpp"
 #include "StyleCachedImage.cpp"
+#include "StyleCachedImageSet.cpp"
 #include "StyleDeprecatedFlexibleBoxData.cpp"
 #include "StyleFilterData.cpp"
 #include "StyleFlexibleBoxData.cpp"
@@ -49,6 +53,8 @@
 #include "StyleMultiColData.cpp"
 #include "StyleRareInheritedData.cpp"
 #include "StyleRareNonInheritedData.cpp"
+#include "StyleScrollSnapPoints.cpp"
 #include "StyleSurroundData.cpp"
 #include "StyleTransformData.cpp"
 #include "StyleVisualData.cpp"
+#include "WillChangeData.cpp"

@@ -25,6 +25,7 @@
 #include "CachedResourceHandle.h"
 #include "CachedStyleSheetClient.h"
 #include "StyleRule.h"
+#include <wtf/TypeCasts.h>
 
 namespace WebCore {
 
@@ -35,7 +36,7 @@ class StyleSheetContents;
 class StyleRuleImport : public StyleRuleBase {
     WTF_MAKE_FAST_ALLOCATED;
 public:
-    static PassRefPtr<StyleRuleImport> create(const String& href, PassRefPtr<MediaQuerySet>);
+    static Ref<StyleRuleImport> create(const String& href, PassRefPtr<MediaQuerySet>);
 
     ~StyleRuleImport();
     
@@ -47,7 +48,7 @@ public:
     StyleSheetContents* styleSheet() const { return m_styleSheet.get(); }
 
     bool isLoading() const;
-    MediaQuerySet* mediaQueries() { return m_mediaQueries.get(); }
+    MediaQuerySet* mediaQueries() const { return m_mediaQueries.get(); }
 
     void requestStyleSheet();
 
@@ -58,7 +59,7 @@ private:
     public:
         ImportedStyleSheetClient(StyleRuleImport* ownerRule) : m_ownerRule(ownerRule) { }
         virtual ~ImportedStyleSheetClient() { }
-        virtual void setCSSStyleSheet(const String& href, const KURL& baseURL, const String& charset, const CachedCSSStyleSheet* sheet)
+        virtual void setCSSStyleSheet(const String& href, const URL& baseURL, const String& charset, const CachedCSSStyleSheet* sheet)
         {
             m_ownerRule->setCSSStyleSheet(href, baseURL, charset, sheet);
         }
@@ -66,7 +67,7 @@ private:
         StyleRuleImport* m_ownerRule;
     };
 
-    void setCSSStyleSheet(const String& href, const KURL& baseURL, const String& charset, const CachedCSSStyleSheet*);
+    void setCSSStyleSheet(const String& href, const URL& baseURL, const String& charset, const CachedCSSStyleSheet*);
     friend class ImportedStyleSheetClient;
 
     StyleRuleImport(const String& href, PassRefPtr<MediaQuerySet>);
@@ -82,5 +83,9 @@ private:
 };
 
 } // namespace WebCore
+
+SPECIALIZE_TYPE_TRAITS_BEGIN(WebCore::StyleRuleImport)
+    static bool isType(const WebCore::StyleRuleBase& rule) { return rule.isImportRule(); }
+SPECIALIZE_TYPE_TRAITS_END()
 
 #endif

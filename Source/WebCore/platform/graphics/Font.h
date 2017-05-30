@@ -1,9 +1,8 @@
 /*
- * Copyright (C) 2000 Lars Knoll (knoll@kde.org)
- *           (C) 2000 Antti Koivisto (koivisto@kde.org)
- *           (C) 2000 Dirk Mueller (mueller@kde.org)
- * Copyright (C) 2003, 2006, 2007, 2010, 2011 Apple Inc. All rights reserved.
- * Copyright (C) 2008 Holger Hans Peter Freyther
+ * This file is part of the internal font implementation.
+ *
+ * Copyright (C) 2006, 2008, 2010, 2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2007-2008 Torch Mobile, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -25,339 +24,370 @@
 #ifndef Font_h
 #define Font_h
 
-#include "FontDescription.h"
-#include "FontGlyphs.h"
-#include "SimpleFontData.h"
-#include "TextDirection.h"
-#include "TypesettingFeatures.h"
-#include <wtf/HashMap.h>
-#include <wtf/HashSet.h>
-#include <wtf/MathExtras.h>
-#include <wtf/unicode/CharacterNames.h>
+#include "FloatRect.h"
+#include "FontBaseline.h"
+#include "FontMetrics.h"
+#include "FontPlatformData.h"
+#include "GlyphBuffer.h"
+#include "GlyphMetricsMap.h"
+#include "GlyphPage.h"
+#include "OpenTypeMathData.h"
+#if ENABLE(OPENTYPE_VERTICAL)
+#include "OpenTypeVerticalData.h"
+#endif
+#include <wtf/BitVector.h>
+#include <wtf/Optional.h>
+#include <wtf/TypeCasts.h>
+#include <wtf/text/StringHash.h>
+
+#if PLATFORM(COCOA)
+#include "WebCoreSystemInterface.h"
+#include <wtf/RetainPtr.h>
+#endif
+
+#if PLATFORM(WIN)
+#include <usp10.h>
+#endif
+
+#if USE(CAIRO)
+#include <cairo.h>
+#endif
+
+#if USE(CG)
+#include <WebCore/CoreGraphicsSPI.h>
+#endif
 
 #if PLATFORM(QT)
 #include <QRawFont>
-QT_BEGIN_NAMESPACE
-class QTextLayout;
-QT_END_NAMESPACE
-#endif
-
-// "X11/X.h" defines Complex to 0 and conflicts
-// with Complex value in CodePath enum.
-#ifdef Complex
-#undef Complex
 #endif
 
 namespace WebCore {
 
-class FloatPoint;
-class FloatRect;
-class FontData;
-class FontMetrics;
-class FontPlatformData;
-class FontSelector;
-class GlyphBuffer;
-class GraphicsContext;
-class RenderText;
-class TextLayout;
-class TextRun;
-
+class GlyphPage;
+class FontDescription;
+class SharedBuffer;
 struct GlyphData;
+struct WidthIterator;
 
-struct GlyphOverflow {
-    GlyphOverflow()
-        : left(0)
-        , right(0)
-        , top(0)
-        , bottom(0)
-        , computeBounds(false)
-    {
-    }
+enum FontVariant { AutoVariant, NormalVariant, SmallCapsVariant, EmphasisMarkVariant, BrokenIdeographVariant };
+enum Pitch { UnknownPitch, FixedPitch, VariablePitch };
 
-    int left;
-    int right;
-    int top;
-    int bottom;
-    bool computeBounds;
-};
-
-
-class Font {
+class Font : public RefCounted<Font> {
 public:
-    Font();
-    Font(const FontDescription&, float letterSpacing, float wordSpacing);
-    // This constructor is only used if the platform wants to start with a native font.
-    Font(const FontPlatformData&, bool isPrinting, FontSmoothingMode = AutoSmoothing);
-    ~Font();
+    class SVGData {
+        WTF_MAKE_FAST_ALLOCATED;
+    public:
+        virtual ~SVGData() { }
 
-    Font(const Font&);
-    Font& operator=(const Font&);
+        virtual void initializeFont(Font*, float fontSize) = 0;
+        virtual float widthForSVGGlyph(Glyph, float fontSize) const = 0;
+        virtual bool fillSVGGlyphPage(GlyphPage*, UChar* buffer, unsigned bufferLength) const = 0;
+    };
 
-    bool operator==(const Font& other) const;
-    bool operator!=(const Font& other) const { return !(*this == other); }
-
-    const FontDescription& fontDescription() const { return m_fontDescription; }
-
-    int pixelSize() const { return fontDescription().computedPixelSize(); }
-    float size() const { return fontDescription().computedSize(); }
-
-    void update(PassRefPtr<FontSelector>) const;
-
-    enum CustomFontNotReadyAction { DoNotPaintIfFontNotReady, UseFallbackIfFontNotReady };
-    void drawText(GraphicsContext*, const TextRun&, const FloatPoint&, int from = 0, int to = -1, CustomFontNotReadyAction = DoNotPaintIfFontNotReady) const;
-    void drawEmphasisMarks(GraphicsContext*, const TextRun&, const AtomicString& mark, const FloatPoint&, int from = 0, int to = -1) const;
-
-    float width(const TextRun&, HashSet<const SimpleFontData*>* fallbackFonts = 0, GlyphOverflow* = 0) const;
-    float width(const TextRun&, int& charsConsumed, String& glyphName) const;
-
-    PassOwnPtr<TextLayout> createLayout(RenderText*, float xPos, bool collapseWhiteSpace) const;
-    static void deleteLayout(TextLayout*);
-    static float width(TextLayout&, unsigned from, unsigned len, HashSet<const SimpleFontData*>* fallbackFonts = 0);
-
-    int offsetForPosition(const TextRun&, float position, bool includePartialGlyphs) const;
-    FloatRect selectionRectForText(const TextRun&, const FloatPoint&, int h, int from = 0, int to = -1) const;
-
-    bool isSmallCaps() const { return m_fontDescription.smallCaps(); }
-
-    float wordSpacing() const { return m_wordSpacing; }
-    float letterSpacing() const { return m_letterSpacing; }
-    void setWordSpacing(float s) { m_wordSpacing = s; }
-    void setLetterSpacing(float s) { m_letterSpacing = s; }
-    bool isFixedPitch() const;
-    bool isPrinterFont() const { return m_fontDescription.usePrinterFont(); }
-    
-    FontRenderingMode renderingMode() const { return m_fontDescription.renderingMode(); }
-
-    TypesettingFeatures typesettingFeatures() const { return static_cast<TypesettingFeatures>(m_typesettingFeatures); }
-
-    const AtomicString& firstFamily() const { return m_fontDescription.firstFamily(); }
-    unsigned familyCount() const { return m_fontDescription.familyCount(); }
-    const AtomicString& familyAt(unsigned i) const { return m_fontDescription.familyAt(i); }
-
-    FontItalic italic() const { return m_fontDescription.italic(); }
-    FontWeight weight() const { return m_fontDescription.weight(); }
-    FontWidthVariant widthVariant() const { return m_fontDescription.widthVariant(); }
-
-    bool isPlatformFont() const { return m_glyphs->isForPlatformFont(); }
-
-    const FontMetrics& fontMetrics() const { return primaryFont()->fontMetrics(); }
-    float spaceWidth() const { return primaryFont()->spaceWidth() + m_letterSpacing; }
-    float tabWidth(const SimpleFontData&, unsigned tabSize, float position) const;
-    float tabWidth(unsigned tabSize, float position) const { return tabWidth(*primaryFont(), tabSize, position); }
-
-    int emphasisMarkAscent(const AtomicString&) const;
-    int emphasisMarkDescent(const AtomicString&) const;
-    int emphasisMarkHeight(const AtomicString&) const;
-
-    const SimpleFontData* primaryFont() const;
-    const FontData* fontDataAt(unsigned) const;
-    GlyphData glyphDataForCharacter(UChar32 c, bool mirror, FontDataVariant variant = AutoVariant) const
+    // Used to create platform fonts.
+    static Ref<Font> create(const FontPlatformData& platformData, bool isCustomFont = false, bool isLoading = false, bool isTextOrientationFallback = false)
     {
-        return glyphDataAndPageForCharacter(c, mirror, variant).first;
+        return adoptRef(*new Font(platformData, isCustomFont, isLoading, isTextOrientationFallback));
     }
-#if PLATFORM(MAC)
-    const SimpleFontData* fontDataForCombiningCharacterSequence(const UChar*, size_t length, FontDataVariant) const;
+
+    // Used to create SVG Fonts.
+    static Ref<Font> create(std::unique_ptr<SVGData> svgData, float fontSize, bool syntheticBold, bool syntheticItalic)
+    {
+        return adoptRef(*new Font(WTFMove(svgData), fontSize, syntheticBold, syntheticItalic));
+    }
+
+    WEBCORE_EXPORT ~Font();
+
+    static const Font* systemFallback() { return reinterpret_cast<const Font*>(-1); }
+
+    const FontPlatformData& platformData() const { return m_platformData; }
+    const OpenTypeMathData* mathData() const;
+#if ENABLE(OPENTYPE_VERTICAL)
+    const OpenTypeVerticalData* verticalData() const { return m_verticalData.get(); }
 #endif
-    std::pair<GlyphData, GlyphPage*> glyphDataAndPageForCharacter(UChar32 c, bool mirror, FontDataVariant variant) const
+
+    const Font* smallCapsFont(const FontDescription&) const;
+    const Font& noSynthesizableFeaturesFont() const;
+    const Font* emphasisMarkFont(const FontDescription&) const;
+    const Font& brokenIdeographFont() const;
+    const Font& nonSyntheticItalicFont() const;
+
+    const Font* variantFont(const FontDescription& description, FontVariant variant) const
     {
-        return m_glyphs->glyphDataAndPageForCharacter(m_fontDescription, c, mirror, variant);
+#if PLATFORM(COCOA)
+        ASSERT(variant != SmallCapsVariant);
+#endif
+        switch (variant) {
+        case SmallCapsVariant:
+            return smallCapsFont(description);
+        case EmphasisMarkVariant:
+            return emphasisMarkFont(description);
+        case BrokenIdeographVariant:
+            return &brokenIdeographFont();
+        case AutoVariant:
+        case NormalVariant:
+            break;
+        }
+        ASSERT_NOT_REACHED();
+        return const_cast<Font*>(this);
     }
-    bool primaryFontHasGlyphForCharacter(UChar32) const;
 
-    static bool isCJKIdeograph(UChar32);
-    static bool isCJKIdeographOrSymbol(UChar32);
+    bool variantCapsSupportsCharacterForSynthesis(FontVariantCaps, UChar32) const;
 
-    static unsigned expansionOpportunityCount(const LChar*, size_t length, TextDirection, bool& isAfterExpansion);
-    static unsigned expansionOpportunityCount(const UChar*, size_t length, TextDirection, bool& isAfterExpansion);
+    const Font& verticalRightOrientationFont() const;
+    const Font& uprightOrientationFont() const;
+
+    bool hasVerticalGlyphs() const { return m_hasVerticalGlyphs; }
+    bool isTextOrientationFallback() const { return m_isTextOrientationFallback; }
+
+    FontMetrics& fontMetrics() { return m_fontMetrics; }
+    const FontMetrics& fontMetrics() const { return m_fontMetrics; }
+    float sizePerUnit() const { return platformData().size() / (fontMetrics().unitsPerEm() ? fontMetrics().unitsPerEm() : 1); }
+
+    float maxCharWidth() const { return m_maxCharWidth; }
+    void setMaxCharWidth(float maxCharWidth) { m_maxCharWidth = maxCharWidth; }
+
+    float avgCharWidth() const { return m_avgCharWidth; }
+    void setAvgCharWidth(float avgCharWidth) { m_avgCharWidth = avgCharWidth; }
+
+    FloatRect boundsForGlyph(Glyph) const;
+    float widthForGlyph(Glyph) const;
+    FloatRect platformBoundsForGlyph(Glyph) const;
+    float platformWidthForGlyph(Glyph) const;
+
+    float spaceWidth() const { return m_spaceWidth; }
+    float adjustedSpaceWidth() const { return m_adjustedSpaceWidth; }
+    void setSpaceWidths(float spaceWidth)
+    {
+        m_spaceWidth = spaceWidth;
+        m_adjustedSpaceWidth = spaceWidth;
+    }
+
+#if USE(CG) || USE(CAIRO)
+    float syntheticBoldOffset() const { return m_syntheticBoldOffset; }
+#endif
+
+    Glyph spaceGlyph() const { return m_spaceGlyph; }
+    void setSpaceGlyph(Glyph spaceGlyph) { m_spaceGlyph = spaceGlyph; }
+    Glyph zeroWidthSpaceGlyph() const { return m_zeroWidthSpaceGlyph; }
+    void setZeroWidthSpaceGlyph(Glyph spaceGlyph) { m_zeroWidthSpaceGlyph = spaceGlyph; }
+    bool isZeroWidthSpaceGlyph(Glyph glyph) const { return glyph == m_zeroWidthSpaceGlyph && glyph; }
+    Glyph zeroGlyph() const { return m_zeroGlyph; }
+    void setZeroGlyph(Glyph zeroGlyph) { m_zeroGlyph = zeroGlyph; }
+
+    GlyphData glyphDataForCharacter(UChar32) const;
+    Glyph glyphForCharacter(UChar32) const;
+
+    RefPtr<Font> systemFallbackFontForCharacter(UChar32, const FontDescription&, bool isForPlatformFont) const;
+
+    const GlyphPage* glyphPage(unsigned pageNumber) const;
+
+    void determinePitch();
+    Pitch pitch() const { return m_treatAsFixedPitch ? FixedPitch : VariablePitch; }
+
+    const SVGData* svgData() const { return m_svgData.get(); }
+    bool isSVGFont() const { return !!m_svgData; }
+
+    bool isCustomFont() const { return m_isCustomFont; }
+    bool isLoading() const { return m_isLoading; }
+
+#ifndef NDEBUG
+    String description() const;
+#endif
+
+#if USE(APPKIT)
+    NSFont* getNSFont() const { return m_platformData.nsFont(); }
+#endif
+
+#if PLATFORM(IOS)
+    CTFontRef getCTFont() const { return m_platformData.font(); }
+    bool shouldNotBeUsedForArabic() const { return m_shouldNotBeUsedForArabic; };
+#endif
+#if PLATFORM(COCOA)
+    CFDictionaryRef getCFStringAttributes(bool enableKerning, FontOrientation) const;
+    const BitVector& glyphsSupportedBySmallCaps() const;
+    const BitVector& glyphsSupportedByAllSmallCaps() const;
+    const BitVector& glyphsSupportedByPetiteCaps() const;
+    const BitVector& glyphsSupportedByAllPetiteCaps() const;
+#endif
+
+#if PLATFORM(COCOA) || USE(HARFBUZZ)
+    bool canRenderCombiningCharacterSequence(const UChar*, size_t) const;
+#endif
+
+    bool applyTransforms(GlyphBufferGlyph*, GlyphBufferAdvance*, size_t glyphCount, bool enableKerning, bool requiresShaping) const;
 
 #if PLATFORM(QT)
-    QRawFont rawFont() const;
-    QFont syntheticFont() const;
+    QRawFont getQtRawFont() const { return m_platformData.rawFont(); }
 #endif
 
-    static void setShouldUseSmoothing(bool);
-    static bool shouldUseSmoothing();
-
-    enum CodePath { Auto, Simple, Complex, SimpleWithGlyphOverflow };
-    CodePath codePath(const TextRun&) const;
-    static CodePath characterRangeCodePath(const LChar*, unsigned) { return Simple; }
-    static CodePath characterRangeCodePath(const UChar*, unsigned len);
-
-private:
-    enum ForTextEmphasisOrNot { NotForTextEmphasis, ForTextEmphasis };
-
-    // Returns the initial in-stream advance.
-    float getGlyphsAndAdvancesForSimpleText(const TextRun&, int from, int to, GlyphBuffer&, ForTextEmphasisOrNot = NotForTextEmphasis) const;
-    void drawSimpleText(GraphicsContext*, const TextRun&, const FloatPoint&, int from, int to) const;
-    void drawEmphasisMarksForSimpleText(GraphicsContext*, const TextRun&, const AtomicString& mark, const FloatPoint&, int from, int to) const;
-    void drawGlyphs(GraphicsContext*, const SimpleFontData*, const GlyphBuffer&, int from, int to, const FloatPoint&) const;
-    void drawGlyphBuffer(GraphicsContext*, const TextRun&, const GlyphBuffer&, const FloatPoint&) const;
-    void drawEmphasisMarks(GraphicsContext*, const TextRun&, const GlyphBuffer&, const AtomicString&, const FloatPoint&) const;
-    float floatWidthForSimpleText(const TextRun&, HashSet<const SimpleFontData*>* fallbackFonts = 0, GlyphOverflow* = 0) const;
-    int offsetForPositionForSimpleText(const TextRun&, float position, bool includePartialGlyphs) const;
-    FloatRect selectionRectForSimpleText(const TextRun&, const FloatPoint&, int h, int from, int to) const;
-
-    bool getEmphasisMarkGlyphData(const AtomicString&, GlyphData&) const;
-
-    static bool canReturnFallbackFontsForComplexText();
-    static bool canExpandAroundIdeographsInComplexText();
-
-    // Returns the initial in-stream advance.
-    float getGlyphsAndAdvancesForComplexText(const TextRun&, int from, int to, GlyphBuffer&, ForTextEmphasisOrNot = NotForTextEmphasis) const;
-    void drawComplexText(GraphicsContext*, const TextRun&, const FloatPoint&, int from, int to) const;
-    void drawEmphasisMarksForComplexText(GraphicsContext*, const TextRun&, const AtomicString& mark, const FloatPoint&, int from, int to) const;
-    float floatWidthForComplexText(const TextRun&, HashSet<const SimpleFontData*>* fallbackFonts = 0, GlyphOverflow* = 0) const;
-    int offsetForPositionForComplexText(const TextRun&, float position, bool includePartialGlyphs) const;
-    FloatRect selectionRectForComplexText(const TextRun&, const FloatPoint&, int h, int from, int to) const;
-
-    friend struct WidthIterator;
-    friend class SVGTextRunRenderingContext;
-    friend class TextLayout;
-
-public:
-    // Useful for debugging the different font rendering code paths.
-    static void setCodePath(CodePath);
-    static CodePath codePath();
-    static CodePath s_codePath;
-
-    static void setDefaultTypesettingFeatures(TypesettingFeatures);
-    static TypesettingFeatures defaultTypesettingFeatures();
-
-    static const uint8_t s_roundingHackCharacterTable[256];
-    static bool isRoundingHackCharacter(UChar32 c)
-    {
-        return !(c & ~0xFF) && s_roundingHackCharacterTable[c];
-    }
-
-    FontSelector* fontSelector() const;
-    static bool treatAsSpace(UChar c) { return c == ' ' || c == '\t' || c == '\n' || c == noBreakSpace; }
-    static bool treatAsZeroWidthSpace(UChar c) { return treatAsZeroWidthSpaceInComplexScript(c) || c == 0x200c || c == 0x200d; }
-    static bool treatAsZeroWidthSpaceInComplexScript(UChar c) { return c < 0x20 || (c >= 0x7F && c < 0xA0) || c == softHyphen || c == zeroWidthSpace || (c >= 0x200e && c <= 0x200f) || (c >= 0x202a && c <= 0x202e) || c == zeroWidthNoBreakSpace || c == objectReplacementCharacter; }
-    static bool canReceiveTextEmphasis(UChar32 c);
-
-    static inline UChar normalizeSpaces(UChar character)
-    {
-        if (treatAsSpace(character))
-            return space;
-
-        if (treatAsZeroWidthSpace(character))
-            return zeroWidthSpace;
-
-        return character;
-    }
-
-    static String normalizeSpaces(const LChar*, unsigned length);
-    static String normalizeSpaces(const UChar*, unsigned length);
-
-    bool needsTranscoding() const { return m_needsTranscoding; }
-    FontGlyphs* glyphs() const { return m_glyphs.get(); }
-
-private:
-    bool loadingCustomFonts() const
-    {
-        return m_glyphs && m_glyphs->loadingCustomFonts();
-    }
-
-    TypesettingFeatures computeTypesettingFeatures() const
-    {
-        TextRenderingMode textRenderingMode = m_fontDescription.textRenderingMode();
-        TypesettingFeatures features = s_defaultTypesettingFeatures;
-
-        switch (textRenderingMode) {
-        case AutoTextRendering:
-            break;
-        case OptimizeSpeed:
-            features &= ~(Kerning | Ligatures);
-            break;
-        case GeometricPrecision:
-        case OptimizeLegibility:
-            features |= Kerning | Ligatures;
-            break;
-        }
-
-        switch (m_fontDescription.kerning()) {
-        case FontDescription::NoneKerning:
-            features &= ~Kerning;
-            break;
-        case FontDescription::NormalKerning:
-            features |= Kerning;
-            break;
-        case FontDescription::AutoKerning:
-            break;
-        }
-
-        switch (m_fontDescription.commonLigaturesState()) {
-        case FontDescription::DisabledLigaturesState:
-            features &= ~Ligatures;
-            break;
-        case FontDescription::EnabledLigaturesState:
-            features |= Ligatures;
-            break;
-        case FontDescription::NormalLigaturesState:
-            break;
-        }
-
-        return features;
-    }
-
-#if PLATFORM(QT)
-    void initFormatForTextLayout(QTextLayout*, const TextRun&) const;
+#if PLATFORM(WIN)
+    SCRIPT_FONTPROPERTIES* scriptFontProperties() const;
+    SCRIPT_CACHE* scriptCache() const { return &m_scriptCache; }
+    static void setShouldApplyMacAscentHack(bool);
+    static bool shouldApplyMacAscentHack();
+    static float ascentConsideringMacAscentHack(const WCHAR*, float ascent, float descent);
 #endif
 
-    static TypesettingFeatures s_defaultTypesettingFeatures;
+private:
+    Font(const FontPlatformData&, bool isCustomFont = false, bool isLoading = false, bool isTextOrientationFallback = false);
 
-    FontDescription m_fontDescription;
-    mutable RefPtr<FontGlyphs> m_glyphs;
-    float m_letterSpacing;
-    float m_wordSpacing;
-    bool m_needsTranscoding;
-    mutable unsigned m_typesettingFeatures : 2; // (TypesettingFeatures) Caches values computed from m_fontDescription.
+    Font(std::unique_ptr<SVGData>, float fontSize, bool syntheticBold, bool syntheticItalic);
+
+    Font(const FontPlatformData&, std::unique_ptr<SVGData>&&, bool isCustomFont = false, bool isLoading = false, bool isTextOrientationFallback = false);
+
+    void platformInit();
+    void platformGlyphInit();
+    void platformCharWidthInit();
+    void platformDestroy();
+
+    void initCharWidths();
+
+    RefPtr<Font> createFontWithoutSynthesizableFeatures() const;
+    RefPtr<Font> createScaledFont(const FontDescription&, float scaleFactor) const;
+    RefPtr<Font> platformCreateScaledFont(const FontDescription&, float scaleFactor) const;
+
+    void removeFromSystemFallbackCache();
+
+#if PLATFORM(WIN)
+    void initGDIFont();
+    void platformCommonDestroy();
+    FloatRect boundsForGDIGlyph(Glyph) const;
+    float widthForGDIGlyph(Glyph) const;
+#endif
+
+    FontMetrics m_fontMetrics;
+    float m_maxCharWidth;
+    float m_avgCharWidth;
+
+    FontPlatformData m_platformData;
+    std::unique_ptr<SVGData> m_svgData;
+
+    mutable RefPtr<GlyphPage> m_glyphPageZero;
+    mutable HashMap<unsigned, RefPtr<GlyphPage>> m_glyphPages;
+    mutable std::unique_ptr<GlyphMetricsMap<FloatRect>> m_glyphToBoundsMap;
+    mutable GlyphMetricsMap<float> m_glyphToWidthMap;
+
+    mutable RefPtr<OpenTypeMathData> m_mathData;
+#if ENABLE(OPENTYPE_VERTICAL)
+    RefPtr<OpenTypeVerticalData> m_verticalData;
+#endif
+
+    Glyph m_spaceGlyph { 0 };
+    float m_spaceWidth { 0 };
+    Glyph m_zeroGlyph { 0 };
+    float m_adjustedSpaceWidth { 0 };
+
+    Glyph m_zeroWidthSpaceGlyph { 0 };
+
+    struct DerivedFontData {
+#if !COMPILER(MSVC)
+        WTF_MAKE_FAST_ALLOCATED;
+#endif
+    public:
+        explicit DerivedFontData(bool custom)
+            : forCustomFont(custom)
+        {
+        }
+        ~DerivedFontData();
+
+        bool forCustomFont;
+        RefPtr<Font> smallCaps;
+        RefPtr<Font> noSynthesizableFeatures;
+        RefPtr<Font> emphasisMark;
+        RefPtr<Font> brokenIdeograph;
+        RefPtr<Font> verticalRightOrientation;
+        RefPtr<Font> uprightOrientation;
+        RefPtr<Font> nonSyntheticItalic;
+    };
+
+    mutable std::unique_ptr<DerivedFontData> m_derivedFontData;
+
+#if USE(CG) || USE(CAIRO)
+    float m_syntheticBoldOffset;
+#endif
+
+#if PLATFORM(COCOA)
+    mutable HashMap<unsigned, RetainPtr<CFDictionaryRef>> m_CFStringAttributes;
+    mutable Optional<BitVector> m_glyphsSupportedBySmallCaps;
+    mutable Optional<BitVector> m_glyphsSupportedByAllSmallCaps;
+    mutable Optional<BitVector> m_glyphsSupportedByPetiteCaps;
+    mutable Optional<BitVector> m_glyphsSupportedByAllPetiteCaps;
+#endif
+
+#if PLATFORM(COCOA) || USE(HARFBUZZ)
+    mutable std::unique_ptr<HashMap<String, bool>> m_combiningCharacterSequenceSupport;
+#endif
+
+#if PLATFORM(WIN)
+    mutable SCRIPT_CACHE m_scriptCache;
+    mutable SCRIPT_FONTPROPERTIES* m_scriptFontProperties;
+#endif
+
+    unsigned m_treatAsFixedPitch : 1;
+    unsigned m_isCustomFont : 1; // Whether or not we are custom font loaded via @font-face
+    unsigned m_isLoading : 1; // Whether or not this custom font is still in the act of loading.
+
+    unsigned m_isTextOrientationFallback : 1;
+    unsigned m_isBrokenIdeographFallback : 1;
+    unsigned m_hasVerticalGlyphs : 1;
+
+    unsigned m_isUsedInSystemFallbackCache : 1;
+
+#if PLATFORM(IOS)
+    unsigned m_shouldNotBeUsedForArabic : 1;
+#endif
 };
 
-void invalidateFontGlyphsCache();
-void pruneUnreferencedEntriesFromFontGlyphsCache();
-
-inline Font::~Font()
-{
-}
-
-inline const SimpleFontData* Font::primaryFont() const
-{
-    ASSERT(m_glyphs);
-    return m_glyphs->primarySimpleFontData(m_fontDescription);
-}
-
-inline const FontData* Font::fontDataAt(unsigned index) const
-{
-    ASSERT(m_glyphs);
-    return m_glyphs->realizeFontDataAt(m_fontDescription, index);
-}
-
-inline bool Font::isFixedPitch() const
-{
-    ASSERT(m_glyphs);
-    return m_glyphs->isFixedPitch(m_fontDescription);
-}
-
-inline FontSelector* Font::fontSelector() const
-{
-    return m_glyphs ? m_glyphs->fontSelector() : 0;
-}
-
-inline float Font::tabWidth(const SimpleFontData& fontData, unsigned tabSize, float position) const
-{
-    if (!tabSize)
-        return letterSpacing();
-    float tabWidth = tabSize * fontData.spaceWidth() + letterSpacing();
-    return tabWidth - fmodf(position, tabWidth);
-}
-
-}
-
-namespace WTF {
-
-template <> void deleteOwnedPtr<WebCore::TextLayout>(WebCore::TextLayout*);
-
-}
-
+#if PLATFORM(IOS)
+bool fontFamilyShouldNotBeUsedForArabic(CFStringRef);
 #endif
+
+ALWAYS_INLINE FloatRect Font::boundsForGlyph(Glyph glyph) const
+{
+    if (isZeroWidthSpaceGlyph(glyph))
+        return FloatRect();
+
+    FloatRect bounds;
+    if (m_glyphToBoundsMap) {
+        bounds = m_glyphToBoundsMap->metricsForGlyph(glyph);
+        if (bounds.width() != cGlyphSizeUnknown)
+            return bounds;
+    }
+
+    bounds = platformBoundsForGlyph(glyph);
+    if (!m_glyphToBoundsMap)
+        m_glyphToBoundsMap = std::make_unique<GlyphMetricsMap<FloatRect>>();
+    m_glyphToBoundsMap->setMetricsForGlyph(glyph, bounds);
+    return bounds;
+}
+
+ALWAYS_INLINE float Font::widthForGlyph(Glyph glyph) const
+{
+    if (isZeroWidthSpaceGlyph(glyph))
+        return 0;
+
+    float width = m_glyphToWidthMap.metricsForGlyph(glyph);
+    if (width != cGlyphSizeUnknown)
+        return width;
+
+    if (isSVGFont())
+        width = m_svgData->widthForSVGGlyph(glyph, m_platformData.size());
+#if ENABLE(OPENTYPE_VERTICAL)
+    else if (m_verticalData)
+#if USE(CG) || USE(CAIRO)
+        width = m_verticalData->advanceHeight(this, glyph) + m_syntheticBoldOffset;
+#else
+        width = m_verticalData->advanceHeight(this, glyph);
+#endif
+#endif
+    else
+        width = platformWidthForGlyph(glyph);
+
+    m_glyphToWidthMap.setMetricsForGlyph(glyph, width);
+    return width;
+}
+
+} // namespace WebCore
+
+#endif // Font_h

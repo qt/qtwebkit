@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -35,16 +35,35 @@ using namespace JSC;
 
 namespace WebCore {
 
-void JSVideoTrack::visitChildren(JSCell* cell, SlotVisitor& visitor)
+void JSVideoTrack::visitAdditionalChildren(SlotVisitor& visitor)
 {
-    JSVideoTrack* jsVideoTrack = jsCast<JSVideoTrack*>(cell);
-    ASSERT_GC_OBJECT_INHERITS(jsVideoTrack, &s_info);
-    COMPILE_ASSERT(StructureFlags & OverridesVisitChildren, OverridesVisitChildrenWithoutSettingFlag);
-    ASSERT(jsVideoTrack->structure()->typeInfo().overridesVisitChildren());
-    Base::visitChildren(jsVideoTrack, visitor);
+    visitor.addOpaqueRoot(root(&wrapped()));
+}
 
-    VideoTrack* videoTrack = static_cast<VideoTrack*>(jsVideoTrack->impl());
-    visitor.addOpaqueRoot(root(videoTrack));
+void JSVideoTrack::setKind(ExecState& state, JSValue value)
+{
+#if ENABLE(MEDIA_SOURCE)
+    auto& string = value.toString(&state)->value(&state);
+    if (state.hadException())
+        return;
+    wrapped().setKind(string);
+#else
+    UNUSED_PARAM(state);
+    UNUSED_PARAM(value);
+#endif
+}
+
+void JSVideoTrack::setLanguage(ExecState& state, JSValue value)
+{
+#if ENABLE(MEDIA_SOURCE)
+    auto& string = value.toString(&state)->value(&state);
+    if (state.hadException())
+        return;
+    wrapped().setLanguage(string);
+#else
+    UNUSED_PARAM(state);
+    UNUSED_PARAM(value);
+#endif
 }
 
 } // namespace WebCore

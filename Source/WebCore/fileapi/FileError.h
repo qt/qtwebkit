@@ -31,9 +31,7 @@
 #ifndef FileError_h
 #define FileError_h
 
-#if ENABLE(BLOB)
-
-#include <wtf/PassRefPtr.h>
+#include <wtf/Ref.h>
 #include <wtf/RefCounted.h>
 
 namespace WebCore {
@@ -56,7 +54,7 @@ public:
         PATH_EXISTS_ERR = 12,
     };
 
-    static PassRefPtr<FileError> create(ErrorCode code) { return adoptRef(new FileError(code)); }
+    static Ref<FileError> create(ErrorCode code) { return adoptRef(*new FileError(code)); }
 
     ErrorCode code() const { return m_code; }
 
@@ -69,7 +67,5 @@ private:
 };
 
 } // namespace WebCore
-
-#endif // ENABLE(BLOB)
 
 #endif // FileError_h

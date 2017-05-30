@@ -27,29 +27,28 @@
 #define TestRunner_h
 
 #include "JSWrappable.h"
+#include "StringFunctions.h"
 #include <JavaScriptCore/JSRetainPtr.h>
-#include <WebKit2/WKBundleScriptWorld.h>
-#include <WebKit2/WKRetainPtr.h>
+#include <WebKit/WKBundleScriptWorld.h>
+#include <WebKit/WKRetainPtr.h>
 #include <string>
 #include <wtf/PassRefPtr.h>
+#include <wtf/text/WTFString.h>
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
 #include <wtf/RetainPtr.h>
 #include <CoreFoundation/CFRunLoop.h>
 typedef RetainPtr<CFRunLoopTimerRef> PlatformTimerRef;
-#elif PLATFORM(WIN)
-typedef UINT_PTR PlatformTimerRef;
 #elif PLATFORM(QT)
 #include <QTimer>
 typedef QTimer PlatformTimerRef;
 #elif PLATFORM(GTK)
-typedef unsigned int PlatformTimerRef;
+#include <wtf/RunLoop.h>
+namespace WTR {
+class TestRunner;
+typedef RunLoop::Timer<TestRunner> PlatformTimerRef;
+}
 #elif PLATFORM(EFL)
-#if USE(EO)
-typedef struct _Eo Ecore_Timer;
-#else
-typedef struct _Ecore_Timer Ecore_Timer;
-#endif
 typedef Ecore_Timer* PlatformTimerRef;
 #endif
 
@@ -66,6 +65,8 @@ public:
     void makeWindowObject(JSContextRef, JSObjectRef windowObject, JSValueRef* exception);
 
     // The basics.
+    WKURLRef testURL() const { return m_testURL.get(); }
+    void setTestURL(WKURLRef url) { m_testURL = url; }
     void dumpAsText(bool dumpPixels);
     void waitForPolicyDelegate();
     void dumpChildFramesAsText() { m_whatToDump = AllFramesText; }
@@ -89,6 +90,7 @@ public:
     void dumpApplicationCacheDelegateCallbacks() { m_dumpApplicationCacheDelegateCallbacks = true; }
     void dumpDatabaseCallbacks() { m_dumpDatabaseCallbacks = true; }
     void dumpDOMAsWebArchive() { m_whatToDump = DOMAsWebArchive; }
+    void dumpPolicyDelegateCallbacks() { m_dumpPolicyCallbacks = true; }
 
     void setShouldDumpFrameLoadCallbacks(bool value) { m_dumpFrameLoadCallbacks = value; }
     void setShouldDumpProgressFinishedCallback(bool value) { m_dumpProgressFinishedCallback = value; }
@@ -146,7 +148,6 @@ public:
     void clearApplicationCacheForOrigin(JSStringRef origin);
     void setAppCacheMaximumSize(uint64_t);
     long long applicationCacheDiskUsageForOrigin(JSStringRef origin);
-    void setApplicationCacheOriginQuota(unsigned long long);
     void disallowIncreaseForApplicationCacheQuota();
     bool shouldDisallowIncreaseForApplicationCacheQuota() { return m_disallowIncreaseForApplicationCacheQuota; }
     JSValueRef originsWithApplicationCache();
@@ -187,6 +188,7 @@ public:
     bool shouldDumpApplicationCacheDelegateCallbacks() const { return m_dumpApplicationCacheDelegateCallbacks; }
     bool shouldDumpDatabaseCallbacks() const { return m_dumpDatabaseCallbacks; }
     bool shouldDumpSelectionRect() const { return m_dumpSelectionRect; }
+    bool shouldDumpPolicyCallbacks() const { return m_dumpPolicyCallbacks; }
 
     bool isPolicyDelegateEnabled() const { return m_policyDelegateEnabled; }
     bool isPolicyDelegatePermissive() const { return m_policyDelegatePermissive; }
@@ -204,7 +206,8 @@ public:
 
     void showWebInspector();
     void closeWebInspector();
-    void evaluateInWebInspector(long callId, JSStringRef script);
+    void evaluateInWebInspector(JSStringRef script);
+    JSRetainPtr<JSStringRef> inspectorTestStubURL();
 
     void setPOSIXLocale(JSStringRef);
 
@@ -212,6 +215,8 @@ public:
     void setWillSendRequestReturnsNull(bool f) { m_willSendRequestReturnsNull = f; }
     bool willSendRequestReturnsNullOnRedirect() const { return m_willSendRequestReturnsNullOnRedirect; }
     void setWillSendRequestReturnsNullOnRedirect(bool f) { m_willSendRequestReturnsNullOnRedirect = f; }
+    void setWillSendRequestAddsHTTPBody(JSStringRef body) { m_willSendRequestHTTPBody = toWTFString(toWK(body)); }
+    String willSendRequestHTTPBody() const { return m_willSendRequestHTTPBody; }
 
     void setTextDirection(JSStringRef);
 
@@ -224,6 +229,12 @@ public:
     
     bool globalFlag() const { return m_globalFlag; }
     void setGlobalFlag(bool value) { m_globalFlag = value; }
+
+    double databaseDefaultQuota() const { return m_databaseDefaultQuota; }
+    void setDatabaseDefaultQuota(double quota) { m_databaseDefaultQuota = quota; }
+
+    double databaseMaxQuota() const { return m_databaseMaxQuota; }
+    void setDatabaseMaxQuota(double quota) { m_databaseMaxQuota = quota; }
 
     void addChromeInputField(JSValueRef);
     void removeChromeInputField(JSValueRef);
@@ -256,34 +267,59 @@ public:
     void setGeolocationPermission(bool);
     void setMockGeolocationPosition(double latitude, double longitude, double accuracy, JSValueRef altitude, JSValueRef altitudeAccuracy, JSValueRef heading, JSValueRef speed);
     void setMockGeolocationPositionUnavailableError(JSStringRef message);
+    bool isGeolocationProviderActive();
 
-    JSRetainPtr<JSStringRef> platformName();
+    // MediaStream
+    void setUserMediaPermission(bool);
+    void setUserMediaPermissionForOrigin(bool permission, JSStringRef url);
 
     void setPageVisibility(JSStringRef state);
     void resetPageVisibility();
 
     bool callShouldCloseOnWebView();
 
-    void setCustomTimeout(int duration);
+    void setCustomTimeout(int duration) { m_timeout = duration; }
 
     // Work queue.
     void queueBackNavigation(unsigned howFarBackward);
     void queueForwardNavigation(unsigned howFarForward);
-    void queueLoad(JSStringRef url, JSStringRef target);
+    void queueLoad(JSStringRef url, JSStringRef target, bool shouldOpenExternalURLs);
     void queueLoadHTMLString(JSStringRef content, JSStringRef baseURL, JSStringRef unreachableURL);
     void queueReload();
     void queueLoadingScript(JSStringRef script);
     void queueNonLoadingScript(JSStringRef script);
 
     bool secureEventInputIsEnabled() const;
+    
+    JSValueRef failNextNewCodeBlock();
+    JSValueRef numberOfDFGCompiles(JSValueRef theFunction);
+    JSValueRef neverInlineFunction(JSValueRef theFunction);
+
+    bool shouldDecideNavigationPolicyAfterDelay() const { return m_shouldDecideNavigationPolicyAfterDelay; }
+    void setShouldDecideNavigationPolicyAfterDelay(bool);
+    void setNavigationGesturesEnabled(bool);
+
+    void runUIScript(JSStringRef script, JSValueRef callback);
+    void runUIScriptCallback(unsigned callbackID, JSStringRef result);
+
+    void installDidBeginSwipeCallback(JSValueRef);
+    void installWillEndSwipeCallback(JSValueRef);
+    void installDidEndSwipeCallback(JSValueRef);
+    void installDidRemoveSwipeSnapshotCallback(JSValueRef);
+    void callDidBeginSwipeCallback();
+    void callWillEndSwipeCallback();
+    void callDidEndSwipeCallback();
+    void callDidRemoveSwipeSnapshotCallback();
+
+    void clearTestRunnerCallbacks();
 
 private:
-    static const double waitToDumpWatchdogTimerInterval;
-
     TestRunner();
 
     void platformInitialize();
     void initializeWaitToDumpWatchdogTimerIfNeeded();
+
+    WKRetainPtr<WKURLRef> m_testURL; // Set by InjectedBundlePage once provisional load starts.
 
     WhatToDump m_whatToDump;
     bool m_shouldDumpAllFrameScrollPositions;
@@ -305,6 +341,7 @@ private:
     bool m_dumpWillCacheResponse;
     bool m_dumpApplicationCacheDelegateCallbacks;
     bool m_dumpDatabaseCallbacks;
+    bool m_dumpPolicyCallbacks { false };
     bool m_disallowIncreaseForApplicationCacheQuota;
     bool m_waitToDump; // True if waitUntilDone() has been called, but notifyDone() has not yet been called.
     bool m_testRepaint;
@@ -314,6 +351,7 @@ private:
     bool m_willSendRequestReturnsNull;
     bool m_willSendRequestReturnsNullOnRedirect;
     bool m_shouldStopProvisionalFrameLoads;
+    String m_willSendRequestHTTPBody;
 
     bool m_policyDelegateEnabled;
     bool m_policyDelegatePermissive;
@@ -323,8 +361,15 @@ private:
 
     int m_timeout;
 
+    double m_databaseDefaultQuota;
+    double m_databaseMaxQuota;
+
+    bool m_shouldDecideNavigationPolicyAfterDelay { false };
+
     bool m_userStyleSheetEnabled;
     WKRetainPtr<WKStringRef> m_userStyleSheetLocation;
+
+    WKRetainPtr<WKArrayRef> m_allowedHosts;
 
     PlatformTimerRef m_waitToDumpWatchdogTimer;
 };

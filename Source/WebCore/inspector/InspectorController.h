@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2011 Google Inc. All rights reserved.
+ * Copyright (C) 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -31,136 +32,128 @@
 #ifndef InspectorController_h
 #define InspectorController_h
 
-#if ENABLE(INSPECTOR)
-
-#include "InspectorBaseAgent.h"
+#include "InspectorOverlay.h"
+#include "PageScriptDebugServer.h"
+#include <inspector/InspectorAgentRegistry.h>
+#include <inspector/InspectorEnvironment.h>
 #include <wtf/Forward.h>
-#include <wtf/HashMap.h>
 #include <wtf/Noncopyable.h>
 #include <wtf/text/WTFString.h>
+
+namespace Inspector {
+class BackendDispatcher;
+class FrontendChannel;
+class FrontendRouter;
+class InspectorAgent;
+
+namespace Protocol {
+namespace OverlayTypes {
+class NodeHighlightData;
+}
+}
+}
 
 namespace WebCore {
 
 class DOMWrapperWorld;
 class Frame;
 class GraphicsContext;
-class InjectedScriptManager;
-class InspectorAgent;
-class InspectorApplicationCacheAgent;
-class InspectorBackendDispatcher;
-class InspectorBaseAgentInterface;
 class InspectorClient;
 class InspectorDOMAgent;
-class InspectorDOMDebuggerAgent;
-class InspectorDebuggerAgent;
-class InspectorFrontend;
-class InspectorFrontendChannel;
 class InspectorFrontendClient;
-class InspectorMemoryAgent;
-class InspectorOverlay;
+class InspectorInstrumentation;
 class InspectorPageAgent;
-class InspectorProfilerAgent;
-class InspectorResourceAgent;
-class InspectorState;
+class InspectorTimelineAgent;
 class InstrumentingAgents;
-class IntSize;
-class Page;
-class PostWorkerNotificationToFrontendTask;
 class Node;
+class Page;
+class WebInjectedScriptManager;
 
-struct Highlight;
-
-class InspectorController {
+class InspectorController final : public Inspector::InspectorEnvironment {
     WTF_MAKE_NONCOPYABLE(InspectorController);
     WTF_MAKE_FAST_ALLOCATED;
 public:
-    ~InspectorController();
+    InspectorController(Page&, InspectorClient*);
+    virtual ~InspectorController();
 
-    static PassOwnPtr<InspectorController> create(Page*, InspectorClient*);
     void inspectedPageDestroyed();
 
     bool enabled() const;
-    Page* inspectedPage() const;
+    Page& inspectedPage() const;
 
-    void show();
-    void close();
+    WEBCORE_EXPORT void show();
 
-    void setInspectorFrontendClient(PassOwnPtr<InspectorFrontendClient>);
-    bool hasInspectorFrontendClient() const;
-    void didClearWindowObjectInWorld(Frame*, DOMWrapperWorld*);
-    void setInjectedScriptForOrigin(const String& origin, const String& source);
+    WEBCORE_EXPORT void setInspectorFrontendClient(InspectorFrontendClient*);
+    unsigned inspectionLevel() const;
+    void didClearWindowObjectInWorld(Frame&, DOMWrapperWorld&);
 
-    void dispatchMessageFromFrontend(const String& message);
+    WEBCORE_EXPORT void dispatchMessageFromFrontend(const String& message);
 
-    bool hasFrontend() const { return m_inspectorFrontend; }
-    void connectFrontend(InspectorFrontendChannel*);
-    void disconnectFrontend();
-    void reconnectFrontend(InspectorFrontendChannel*, const String& inspectorStateCookie);
+    bool hasLocalFrontend() const;
+    bool hasRemoteFrontend() const;
+
+    WEBCORE_EXPORT void connectFrontend(Inspector::FrontendChannel*, bool isAutomaticInspection = false);
+    WEBCORE_EXPORT void disconnectFrontend(Inspector::FrontendChannel*);
+    WEBCORE_EXPORT void disconnectAllFrontends();
     void setProcessId(long);
-    void webViewResized(const IntSize&);
 
     void inspect(Node*);
-    void drawHighlight(GraphicsContext&) const;
-    void getHighlight(Highlight*) const;
+    WEBCORE_EXPORT void drawHighlight(GraphicsContext&) const;
+    WEBCORE_EXPORT void getHighlight(Highlight&, InspectorOverlay::CoordinateSystem) const;
     void hideHighlight();
     Node* highlightedNode() const;
 
-    bool isUnderTest();
-    void evaluateForTestInFrontend(long callId, const String& script);
+    void setIndicating(bool);
 
-#if ENABLE(JAVASCRIPT_DEBUGGER)
-    bool profilerEnabled();
-    void setProfilerEnabled(bool);
+    WEBCORE_EXPORT Ref<Inspector::Protocol::Array<Inspector::Protocol::OverlayTypes::NodeHighlightData>> buildObjectForHighlightedNodes() const;
 
-    void resume();
-#endif
+    bool isUnderTest() const { return m_isUnderTest; }
+    void setIsUnderTest(bool isUnderTest) { m_isUnderTest = isUnderTest; }
+    WEBCORE_EXPORT void evaluateForTestInFrontend(const String& script);
 
-    void setResourcesDataSizeLimitsFromInternals(int maximumResourcesContentSize, int maximumSingleResourceContentSize);
+    WEBCORE_EXPORT bool legacyProfilerEnabled() const;
+    WEBCORE_EXPORT void setLegacyProfilerEnabled(bool);
 
     InspectorClient* inspectorClient() const { return m_inspectorClient; }
     InspectorPageAgent* pageAgent() const { return m_pageAgent; }
 
-    void willProcessTask();
-    void didProcessTask();
+    virtual bool developerExtrasEnabled() const override;
+    virtual bool canAccessInspectedScriptState(JSC::ExecState*) const override;
+    virtual Inspector::InspectorFunctionCallHandler functionCallHandler() const override;
+    virtual Inspector::InspectorEvaluateHandler evaluateHandler() const override;
+    virtual void frontendInitialized() override;
+    virtual Ref<WTF::Stopwatch> executionStopwatch() override;
+    virtual PageScriptDebugServer& scriptDebugServer() override;
+    virtual JSC::VM& vm() override;
 
-    void didBeginFrame();
-    void didCancelFrame();
-    void willComposite();
-    void didComposite();
+    WEBCORE_EXPORT void didComposite(Frame&);
 
 private:
-    InspectorController(Page*, InspectorClient*);
+    friend class InspectorInstrumentation;
 
-    friend class PostWorkerNotificationToFrontendTask;
-    friend InstrumentingAgents* instrumentationForPage(Page*);
+    Ref<InstrumentingAgents> m_instrumentingAgents;
+    std::unique_ptr<WebInjectedScriptManager> m_injectedScriptManager;
+    Ref<Inspector::FrontendRouter> m_frontendRouter;
+    Ref<Inspector::BackendDispatcher> m_backendDispatcher;
+    std::unique_ptr<InspectorOverlay> m_overlay;
+    Ref<WTF::Stopwatch> m_executionStopwatch;
+    PageScriptDebugServer m_scriptDebugServer;
+    Inspector::AgentRegistry m_agents;
 
-    RefPtr<InstrumentingAgents> m_instrumentingAgents;
-    OwnPtr<InjectedScriptManager> m_injectedScriptManager;
-    OwnPtr<InspectorCompositeState> m_state;
-    OwnPtr<InspectorOverlay> m_overlay;
-
-    InspectorAgent* m_inspectorAgent;
-    InspectorDOMAgent* m_domAgent;
-    InspectorResourceAgent* m_resourceAgent;
-    InspectorPageAgent* m_pageAgent;
-    InspectorMemoryAgent* m_memoryAgent;
-#if ENABLE(JAVASCRIPT_DEBUGGER)
-    InspectorDebuggerAgent* m_debuggerAgent;
-    InspectorDOMDebuggerAgent* m_domDebuggerAgent;
-    InspectorProfilerAgent* m_profilerAgent;
-#endif
-
-    RefPtr<InspectorBackendDispatcher> m_inspectorBackendDispatcher;
-    OwnPtr<InspectorFrontendClient> m_inspectorFrontendClient;
-    OwnPtr<InspectorFrontend> m_inspectorFrontend;
-    Page* m_page;
+    Page& m_page;
     InspectorClient* m_inspectorClient;
-    InspectorAgentRegistry m_agents;
-    bool m_isUnderTest;
+    InspectorFrontendClient* m_inspectorFrontendClient { nullptr };
+
+    Inspector::InspectorAgent* m_inspectorAgent { nullptr };
+    InspectorDOMAgent* m_domAgent { nullptr };
+    InspectorPageAgent* m_pageAgent { nullptr };
+    InspectorTimelineAgent* m_timelineAgent { nullptr };
+
+    bool m_isUnderTest { false };
+    bool m_isAutomaticInspection { false };
+    bool m_legacyProfilerEnabled { false };
 };
 
-}
-
-#endif // ENABLE(INSPECTOR)
+} // namespace WebCore
 
 #endif // !defined(InspectorController_h)

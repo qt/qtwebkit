@@ -21,24 +21,26 @@
 #ifndef RenderSVGTransformableContainer_h
 #define RenderSVGTransformableContainer_h
 
-#if ENABLE(SVG)
 #include "RenderSVGContainer.h"
+#include "SVGGraphicsElement.h"
 
 namespace WebCore {
     
 class SVGGraphicsElement;
-class RenderSVGTransformableContainer : public RenderSVGContainer {
+class RenderSVGTransformableContainer final : public RenderSVGContainer {
 public:
-    explicit RenderSVGTransformableContainer(SVGGraphicsElement*);
+    RenderSVGTransformableContainer(SVGGraphicsElement&, Ref<RenderStyle>&&);
+    SVGGraphicsElement& graphicsElement() { return downcast<SVGGraphicsElement>(RenderSVGContainer::element()); }
 
-    virtual bool isSVGTransformableContainer() const { return true; }
-    virtual const AffineTransform& localToParentTransform() const { return m_localTransform; }
-    virtual void setNeedsTransformUpdate() { m_needsTransformUpdate = true; }
-    virtual bool didTransformToRootUpdate() { return m_didTransformToRootUpdate; }
+    virtual bool isSVGTransformableContainer() const override { return true; }
+    virtual const AffineTransform& localToParentTransform() const override { return m_localTransform; }
+    virtual void setNeedsTransformUpdate() override { m_needsTransformUpdate = true; }
+    virtual bool didTransformToRootUpdate() override { return m_didTransformToRootUpdate; }
 
 private:
-    virtual bool calculateLocalTransform();
-    virtual AffineTransform localTransform() const { return m_localTransform; }
+    void element() const = delete;
+    virtual bool calculateLocalTransform() override;
+    virtual AffineTransform localTransform() const override { return m_localTransform; }
 
     bool m_needsTransformUpdate : 1;
     bool m_didTransformToRootUpdate : 1;
@@ -46,7 +48,8 @@ private:
     FloatSize m_lastTranslation;
 };
 
-}
+} // namespace WebCore
 
-#endif // ENABLE(SVG)
+SPECIALIZE_TYPE_TRAITS_RENDER_OBJECT(RenderSVGTransformableContainer, isSVGTransformableContainer())
+
 #endif // RenderSVGTransformableContainer_h

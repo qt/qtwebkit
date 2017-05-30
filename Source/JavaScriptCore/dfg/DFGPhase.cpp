@@ -29,13 +29,26 @@
 #if ENABLE(DFG_JIT)
 
 #include "DFGValidate.h"
+#include "JSCInlines.h"
 
 namespace JSC { namespace DFG {
 
+void Phase::validate()
+{
+    DFG::validate(m_graph, DumpGraph, m_graphDumpBeforePhase);
+}
+
 void Phase::beginPhase()
 {
-    if (!shouldDumpGraphAtEachPhase())
+    if (Options::verboseValidationFailure()) {
+        StringPrintStream out;
+        m_graph.dump(out);
+        m_graphDumpBeforePhase = out.toCString();
+    }
+    
+    if (!shouldDumpGraphAtEachPhase(m_graph.m_plan.mode))
         return;
+    
     dataLog("Beginning DFG phase ", m_name, ".\n");
     dataLog("Before ", m_name, ":\n");
     m_graph.dump();
@@ -45,7 +58,7 @@ void Phase::endPhase()
 {
     if (!Options::validateGraphAtEachPhase())
         return;
-    validate(m_graph, DumpGraph);
+    validate();
 }
 
 } } // namespace JSC::DFG

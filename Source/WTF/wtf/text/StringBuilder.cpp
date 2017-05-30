@@ -28,14 +28,16 @@
 #include "StringBuilder.h"
 
 #include "IntegerToStringConversion.h"
+#include "MathExtras.h"
 #include "WTFString.h"
+#include <wtf/dtoa.h>
 
 namespace WTF {
 
-static size_t expandedCapacity(size_t capacity, size_t newLength)
+static unsigned expandedCapacity(unsigned capacity, unsigned requiredLength)
 {
-    static const size_t minimumCapacity = 16;
-    return std::max(capacity, std::max(minimumCapacity, newLength * 2));
+    static const unsigned minimumCapacity = 16;
+    return std::max(requiredLength, std::max(minimumCapacity, capacity * 2));
 }
 
 void StringBuilder::reifyString() const
@@ -54,14 +56,10 @@ void StringBuilder::reifyString() const
 
     // Must be valid in the buffer, take a substring (unless string fills the buffer).
     ASSERT(m_buffer && m_length <= m_buffer->length());
-    m_string = (m_length == m_buffer->length())
-        ? m_buffer.get()
-        : StringImpl::create(m_buffer, 0, m_length);
-
-    if (m_buffer->has16BitShadow() && m_valid16BitShadowLength < m_length)
-        m_buffer->upconvertCharacters(m_valid16BitShadowLength, m_length);
-
-    m_valid16BitShadowLength = m_length;
+    if (m_length == m_buffer->length())
+        m_string = m_buffer.get();
+    else
+        m_string = StringImpl::createSubstringSharingImpl(m_buffer, 0, m_length);
 }
 
 void StringBuilder::resize(unsigned newSize)
@@ -90,7 +88,7 @@ void StringBuilder::resize(unsigned newSize)
     ASSERT(m_length == m_string.length());
     ASSERT(newSize < m_string.length());
     m_length = newSize;
-    m_string = StringImpl::create(m_string.impl(), 0, newSize);
+    m_string = StringImpl::createSubstringSharingImpl(m_string.impl(), 0, newSize);
 }
 
 // Allocate a new 8 bit buffer, copying in currentCharacters (these may come from either m_string
@@ -231,7 +229,7 @@ CharType* StringBuilder::appendUninitializedSlow(unsigned requiredLength)
         reallocateBuffer<CharType>(expandedCapacity(capacity(), requiredLength));
     } else {
         ASSERT(m_string.length() == m_length);
-        allocateBuffer(m_length ? m_string.getCharacters<CharType>() : 0, expandedCapacity(capacity(), requiredLength));
+        allocateBuffer(m_length ? m_string.characters<CharType>() : 0, expandedCapacity(capacity(), requiredLength));
     }
     
     CharType* result = getBufferCharacters<CharType>() + m_length;
@@ -328,6 +326,24 @@ void StringBuilder::appendNumber(unsigned long long number)
     numberToStringUnsigned<StringBuilder>(number, this);
 }
 
+void StringBuilder::appendNumber(double number, unsigned precision, TrailingZerosTruncatingPolicy trailingZerosTruncatingPolicy)
+{
+    NumberToStringBuffer buffer;
+    append(numberToFixedPrecisionString(number, precision, buffer, trailingZerosTruncatingPolicy == TruncateTrailingZeros));
+}
+
+void StringBuilder::appendECMAScriptNumber(double number)
+{
+    NumberToStringBuffer buffer;
+    append(numberToString(number, buffer));
+}
+
+void StringBuilder::appendFixedWidthNumber(double number, unsigned decimalPlaces)
+{
+    NumberToStringBuffer buffer;
+    append(numberToFixedWidthString(number, decimalPlaces, buffer));
+}
+
 bool StringBuilder::canShrink() const
 {
     // Only shrink the buffer if it's less than 80% full. Need to tune this heuristic!
@@ -341,8 +357,85 @@ void StringBuilder::shrinkToFit()
             reallocateBuffer<LChar>(m_length);
         else
             reallocateBuffer<UChar>(m_length);
-        m_string = m_buffer;
-        m_buffer = 0;
+        m_string = m_buffer.release();
+    }
+}
+
+template <typename OutputCharacterType, typename InputCharacterType>
+static void appendQuotedJSONStringInternal(OutputCharacterType*& output, const InputCharacterType* input, unsigned length)
+{
+    for (const InputCharacterType* end = input + length; input != end; ++input) {
+        if (LIKELY(*input > 0x1F)) {
+            if (*input == '"' || *input == '\\')
+                *output++ = '\\';
+            *output++ = *input;
+            continue;
+        }
+        switch (*input) {
+        case '\t':
+            *output++ = '\\';
+            *output++ = 't';
+            break;
+        case '\r':
+            *output++ = '\\';
+            *output++ = 'r';
+            break;
+        case '\n':
+            *output++ = '\\';
+            *output++ = 'n';
+            break;
+        case '\f':
+            *output++ = '\\';
+            *output++ = 'f';
+            break;
+        case '\b':
+            *output++ = '\\';
+            *output++ = 'b';
+            break;
+        default:
+            ASSERT((*input & 0xFF00) == 0);
+            static const char hexDigits[] = "0123456789abcdef";
+            *output++ = '\\';
+            *output++ = 'u';
+            *output++ = '0';
+            *output++ = '0';
+            *output++ = static_cast<LChar>(hexDigits[(*input >> 4) & 0xF]);
+            *output++ = static_cast<LChar>(hexDigits[*input & 0xF]);
+            break;
+        }
+    }
+}
+
+void StringBuilder::appendQuotedJSONString(const String& string)
+{
+    // Make sure we have enough buffer space to append this string without having
+    // to worry about reallocating in the middle.
+    // The 2 is for the '"' quotes on each end.
+    // The 6 is for characters that need to be \uNNNN encoded.
+    size_t maximumCapacityRequired = length() + 2 + string.length() * 6;
+    RELEASE_ASSERT(maximumCapacityRequired < std::numeric_limits<unsigned>::max());
+
+    if (is8Bit() && !string.is8Bit())
+        allocateBufferUpConvert(m_bufferCharacters8, roundUpToPowerOfTwo(maximumCapacityRequired));
+    else
+        reserveCapacity(roundUpToPowerOfTwo(maximumCapacityRequired));
+
+    if (is8Bit()) {
+        ASSERT(string.is8Bit());
+        LChar* output = m_bufferCharacters8 + m_length;
+        *output++ = '"';
+        appendQuotedJSONStringInternal(output, string.characters8(), string.length());
+        *output++ = '"';
+        m_length = output - m_bufferCharacters8;
+    } else {
+        UChar* output = m_bufferCharacters16 + m_length;
+        *output++ = '"';
+        if (string.is8Bit())
+            appendQuotedJSONStringInternal(output, string.characters8(), string.length());
+        else
+            appendQuotedJSONStringInternal(output, string.characters16(), string.length());
+        *output++ = '"';
+        m_length = output - m_bufferCharacters16;
     }
 }
 

@@ -28,6 +28,8 @@
 
 #if ENABLE(INDEXED_DATABASE)
 
+#include "IDBKeyData.h"
+
 namespace WebCore {
 
 IDBKey::~IDBKey()
@@ -36,12 +38,12 @@ IDBKey::~IDBKey()
 
 bool IDBKey::isValid() const
 {
-    if (m_type == InvalidType)
+    if (m_type == KeyType::Invalid)
         return false;
 
-    if (m_type == ArrayType) {
-        for (size_t i = 0; i < m_array.size(); i++) {
-            if (!m_array[i]->isValid())
+    if (m_type == KeyType::Array) {
+        for (auto& key : m_array) {
+            if (!key->isValid())
                 return false;
         }
     }
@@ -56,7 +58,7 @@ int IDBKey::compare(const IDBKey* other) const
         return m_type > other->m_type ? -1 : 1;
 
     switch (m_type) {
-    case ArrayType:
+    case KeyType::Array:
         for (size_t i = 0; i < m_array.size() && i < other->m_array.size(); ++i) {
             if (int result = m_array[i]->compare(other->m_array[i].get()))
                 return result;
@@ -66,14 +68,15 @@ int IDBKey::compare(const IDBKey* other) const
         if (m_array.size() > other->m_array.size())
             return 1;
         return 0;
-    case StringType:
+    case KeyType::String:
         return -codePointCompare(other->m_string, m_string);
-    case DateType:
-    case NumberType:
+    case KeyType::Date:
+    case KeyType::Number:
         return (m_number < other->m_number) ? -1 :
                 (m_number > other-> m_number) ? 1 : 0;
-    case InvalidType:
-    case MinType:
+    case KeyType::Invalid:
+    case KeyType::Min:
+    case KeyType::Max:
         ASSERT_NOT_REACHED();
         return 0;
     }
@@ -95,6 +98,13 @@ bool IDBKey::isEqual(const IDBKey* other) const
 
     return !compare(other);
 }
+
+#ifndef NDEBUG
+String IDBKey::loggingString() const
+{
+    return IDBKeyData(this).loggingString();
+}
+#endif
 
 } // namespace WebCore
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2013-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,6 +28,8 @@
 
 #if ENABLE(DFG_JIT)
 
+#include "JSCInlines.h"
+
 namespace WTF {
 
 using namespace JSC::DFG;
@@ -37,59 +39,105 @@ void printInternal(PrintStream& out, UseKind useKind)
     switch (useKind) {
     case UntypedUse:
         out.print("Untyped");
-        break;
+        return;
     case Int32Use:
         out.print("Int32");
-        break;
+        return;
     case KnownInt32Use:
         out.print("KnownInt32");
-        break;
-    case RealNumberUse:
-        out.print("RealNumber");
-        break;
+        return;
+    case Int52RepUse:
+        out.print("Int52Rep");
+        return;
+    case MachineIntUse:
+        out.print("MachineInt");
+        return;
     case NumberUse:
         out.print("Number");
-        break;
-    case KnownNumberUse:
-        out.print("KnownNumber");
-        break;
+        return;
+    case RealNumberUse:
+        out.print("RealNumber");
+        return;
+    case DoubleRepUse:
+        out.print("DoubleRep");
+        return;
+    case DoubleRepRealUse:
+        out.print("DoubleRepReal");
+        return;
+    case DoubleRepMachineIntUse:
+        out.print("DoubleRepMachineInt");
+        return;
     case BooleanUse:
         out.print("Boolean");
-        break;
+        return;
+    case KnownBooleanUse:
+        out.print("KnownBoolean");
+        return;
     case CellUse:
         out.print("Cell");
-        break;
+        return;
     case KnownCellUse:
         out.print("KnownCell");
-        break;
+        return;
+    case CellOrOtherUse:
+        out.print("CellOrOther");
+        return;
     case ObjectUse:
         out.print("Object");
-        break;
+        return;
+    case FunctionUse:
+        out.print("Function");
+        return;
+    case FinalObjectUse:
+        out.print("FinalObject");
+        return;
+    case RegExpObjectUse:
+        out.print("RegExpObject");
+        return;
     case ObjectOrOtherUse:
         out.print("ObjectOrOther");
-        break;
+        return;
+    case StringIdentUse:
+        out.print("StringIdent");
+        return;
     case StringUse:
         out.print("String");
-        break;
+        return;
+    case StringOrOtherUse:
+        out.print("StringOrOther");
+        return;
     case KnownStringUse:
         out.print("KnownString");
-        break;
+        return;
+    case KnownPrimitiveUse:
+        out.print("KnownPrimitive");
+        return;
+    case SymbolUse:
+        out.print("Symbol");
+        return;
     case StringObjectUse:
         out.print("StringObject");
-        break;
+        return;
     case StringOrStringObjectUse:
         out.print("StringOrStringObject");
-        break;
+        return;
+    case NotStringVarUse:
+        out.print("NotStringVar");
+        return;
     case NotCellUse:
         out.print("NotCell");
-        break;
+        return;
     case OtherUse:
         out.print("Other");
-        break;
-    default:
+        return;
+    case MiscUse:
+        out.print("Misc");
+        return;
+    case LastUseKind:
         RELEASE_ASSERT_NOT_REACHED();
-        break;
+        return;
     }
+    RELEASE_ASSERT_NOT_REACHED();
 }
 
 } // namespace WTF

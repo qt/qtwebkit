@@ -32,17 +32,23 @@
 #include <wtf/RetainPtr.h>
 
 OBJC_CLASS CALayer;
-typedef struct __WKCAContextRef *WKCAContextRef;
+OBJC_CLASS CAContext;
+
+namespace WebCore {
+class MachSendRight;
+}
 
 namespace WebKit {
 
 class LayerHostingContext {
-    WTF_MAKE_NONCOPYABLE(LayerHostingContext);
+    WTF_MAKE_NONCOPYABLE(LayerHostingContext); WTF_MAKE_FAST_ALLOCATED;
 public:
-    static PassOwnPtr<LayerHostingContext> createForPort(mach_port_t serverPort);
-#if HAVE(LAYER_HOSTING_IN_WINDOW_SERVER)
-    static PassOwnPtr<LayerHostingContext> createForWindowServer();
+    static std::unique_ptr<LayerHostingContext> createForPort(const WebCore::MachSendRight& serverPort);
+#if HAVE(OUT_OF_PROCESS_LAYER_HOSTING)
+    static std::unique_ptr<LayerHostingContext> createForExternalHostingProcess();
 #endif
+
+    LayerHostingContext();
     ~LayerHostingContext();
 
     void setRootLayer(CALayer *);
@@ -56,11 +62,22 @@ public:
     void setColorSpace(CGColorSpaceRef);
     CGColorSpaceRef colorSpace() const;
 
-private:
-    LayerHostingContext();
+#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101100
+    void setColorMatchUntaggedContent(bool);
+    bool colorMatchUntaggedContent() const;
+#endif
 
+    // Fences only work on iOS and OS 10.10+.
+    void setFencePort(mach_port_t);
+
+    // createFencePort does not install the fence port on the LayerHostingContext's
+    // CAContext; call setFencePort() with the newly created port if synchronization
+    // with this context is desired.
+    WebCore::MachSendRight createFencePort();
+
+private:
     LayerHostingMode m_layerHostingMode;
-    RetainPtr<WKCAContextRef> m_context;
+    RetainPtr<CAContext> m_context;
 };
 
 } // namespace WebKit

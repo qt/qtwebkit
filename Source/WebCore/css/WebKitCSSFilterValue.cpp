@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -26,8 +26,6 @@
 #include "config.h"
 #include "WebKitCSSFilterValue.h"
 
-#if ENABLE(CSS_FILTERS)
-
 #include "CSSValueList.h"
 #include <wtf/PassRefPtr.h>
 #include <wtf/text/WTFString.h>
@@ -35,22 +33,12 @@
 namespace WebCore {
 
 WebKitCSSFilterValue::WebKitCSSFilterValue(FilterOperationType operationType)
-    : CSSValueList(WebKitCSSFilterClass, typeUsesSpaceSeparator(operationType) ? SpaceSeparator : CommaSeparator)
+    : CSSValueList(WebKitCSSFilterClass, SpaceSeparator)
     , m_type(operationType)
 {
 }
 
-bool WebKitCSSFilterValue::typeUsesSpaceSeparator(FilterOperationType operationType)
-{
-#if ENABLE(CSS_SHADERS)
-    return operationType != CustomFilterOperation;
-#else
-    UNUSED_PARAM(operationType);
-    return true;
-#endif
-}
-
-String WebKitCSSFilterValue::customCssText() const
+String WebKitCSSFilterValue::customCSSText() const
 {
     const char* result = "";
     switch (m_type) {
@@ -58,8 +46,7 @@ String WebKitCSSFilterValue::customCssText() const
         result = "";
         break;
     case ReferenceFilterOperation:
-        result = "url(";
-        break;
+        return CSSValueList::customCSSText();
     case GrayscaleFilterOperation:
         result = "grayscale(";
         break;
@@ -90,14 +77,9 @@ String WebKitCSSFilterValue::customCssText() const
     case DropShadowFilterOperation:
         result = "drop-shadow(";
         break;
-#if ENABLE(CSS_SHADERS)
-    case CustomFilterOperation:
-        result = "custom(";
-        break;
-#endif
     }
 
-    return result + CSSValueList::customCssText() + ')';
+    return result + CSSValueList::customCSSText() + ')';
 }
 
 WebKitCSSFilterValue::WebKitCSSFilterValue(const WebKitCSSFilterValue& cloneFrom)
@@ -106,9 +88,9 @@ WebKitCSSFilterValue::WebKitCSSFilterValue(const WebKitCSSFilterValue& cloneFrom
 {
 }
 
-PassRefPtr<WebKitCSSFilterValue> WebKitCSSFilterValue::cloneForCSSOM() const
+Ref<WebKitCSSFilterValue> WebKitCSSFilterValue::cloneForCSSOM() const
 {
-    return adoptRef(new WebKitCSSFilterValue(*this));
+    return adoptRef(*new WebKitCSSFilterValue(*this));
 }
 
 bool WebKitCSSFilterValue::equals(const WebKitCSSFilterValue& other) const
@@ -117,5 +99,3 @@ bool WebKitCSSFilterValue::equals(const WebKitCSSFilterValue& other) const
 }
 
 }
-
-#endif // ENABLE(CSS_FILTERS)

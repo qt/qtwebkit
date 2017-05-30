@@ -25,35 +25,33 @@
 #ifndef CachedResourceClient_h
 #define CachedResourceClient_h
 
-#include <wtf/FastAllocBase.h>
-
 namespace WebCore {
+
 class CachedResource;
 
 class CachedResourceClient {
-    WTF_MAKE_FAST_ALLOCATED;
 public:
     enum CachedResourceClientType {
         BaseResourceType,
         ImageType,
         FontType,
         StyleSheetType,
-#if ENABLE(SVG)
         SVGDocumentType,
-#endif
         RawResourceType
     };
 
     virtual ~CachedResourceClient() { }
     virtual void notifyFinished(CachedResource*) { }
     virtual void deprecatedDidReceiveCachedResource(CachedResource*) { }
-    
+    virtual bool isXMLHttpRequest() const { return false; }
+
     static CachedResourceClientType expectedType() { return BaseResourceType; }
     virtual CachedResourceClientType resourceClientType() const { return expectedType(); }
 
 protected:
     CachedResourceClient() { }
 };
+
 }
 
 #endif

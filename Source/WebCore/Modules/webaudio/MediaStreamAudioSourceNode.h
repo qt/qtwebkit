@@ -31,46 +31,47 @@
 #include "AudioSourceProvider.h"
 #include "AudioSourceProviderClient.h"
 #include "MediaStream.h"
-#include <wtf/OwnPtr.h>
-#include <wtf/PassRefPtr.h>
-#include <wtf/Threading.h>
+#include "MultiChannelResampler.h"
+#include <wtf/Lock.h>
+#include <wtf/RefPtr.h>
 
 namespace WebCore {
 
 class AudioContext;
+class MultiChannelResampler;
 
 class MediaStreamAudioSourceNode : public AudioNode, public AudioSourceProviderClient {
 public:
-    static PassRefPtr<MediaStreamAudioSourceNode> create(AudioContext*, MediaStream*, AudioSourceProvider*);
+    static Ref<MediaStreamAudioSourceNode> create(AudioContext&, MediaStream&, MediaStreamTrack&);
 
     virtual ~MediaStreamAudioSourceNode();
 
-    MediaStream* mediaStream() { return m_mediaStream.get(); }
+    MediaStream* mediaStream() { return &m_mediaStream.get(); }
 
     // AudioNode
-    virtual void process(size_t framesToProcess);
-    virtual void reset();
+    void process(size_t framesToProcess) override;
+    void reset() override { }
 
     // AudioSourceProviderClient
-    virtual void setFormat(size_t numberOfChannels, float sampleRate);
-
-    AudioSourceProvider* audioSourceProvider() const { return m_audioSourceProvider; }
+    void setFormat(size_t numberOfChannels, float sampleRate) override;
 
 private:
-    MediaStreamAudioSourceNode(AudioContext*, MediaStream*, AudioSourceProvider*);
+    MediaStreamAudioSourceNode(AudioContext&, MediaStream&, MediaStreamTrack&);
 
-    virtual double tailTime() const OVERRIDE { return 0; }
-    virtual double latencyTime() const OVERRIDE { return 0; }
+    double tailTime() const override { return 0; }
+    double latencyTime() const override { return 0; }
 
     // As an audio source, we will never propagate silence.
-    virtual bool propagatesSilence() const OVERRIDE { return false; }
+    bool propagatesSilence() const override { return false; }
 
-    RefPtr<MediaStream> m_mediaStream;
-    AudioSourceProvider* m_audioSourceProvider;
+    Ref<MediaStream> m_mediaStream;
+    Ref<MediaStreamTrack> m_audioTrack;
+    std::unique_ptr<MultiChannelResampler> m_multiChannelResampler;
 
-    Mutex m_processLock;
+    Lock m_processMutex;
 
-    unsigned m_sourceNumberOfChannels;
+    unsigned m_sourceNumberOfChannels { 0 };
+    double m_sourceSampleRate { 0 };
 };
 
 } // namespace WebCore

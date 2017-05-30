@@ -29,15 +29,14 @@
 #include "CopiedBlock.h"
 #include "CopiedSpace.h"
 #include "Heap.h"
-#include "HeapBlock.h"
 #include "VM.h"
-#include <wtf/CheckedBoolean.h>
 
 namespace JSC {
 
 inline bool CopiedSpace::contains(CopiedBlock* block)
 {
-    return !m_blockFilter.ruleOut(reinterpret_cast<Bits>(block)) && m_blockSet.contains(block);
+    return (!m_newGen.blockFilter.ruleOut(reinterpret_cast<Bits>(block)) || !m_oldGen.blockFilter.ruleOut(reinterpret_cast<Bits>(block)))
+        && m_blockSet.contains(block);
 }
 
 inline bool CopiedSpace::contains(void* ptr, CopiedBlock*& result)
@@ -92,40 +91,41 @@ inline void CopiedSpace::pinIfNecessary(void* opaquePointer)
         pin(block);
 }
 
-inline void CopiedSpace::recycleEvacuatedBlock(CopiedBlock* block)
+inline void CopiedSpace::recycleEvacuatedBlock(CopiedBlock* block, HeapOperation collectionType)
 {
     ASSERT(block);
     ASSERT(block->canBeRecycled());
     ASSERT(!block->m_isPinned);
     {
-        SpinLockHolder locker(&m_toSpaceLock);
+        LockHolder locker(&m_toSpaceLock);
         m_blockSet.remove(block);
-        m_fromSpace->remove(block);
+        if (collectionType == EdenCollection)
+            m_newGen.fromSpace->remove(block);
+        else
+            m_oldGen.fromSpace->remove(block);
     }
-    m_heap->blockAllocator().deallocate(CopiedBlock::destroy(block));
+    CopiedBlock::destroy(*heap(), block);
 }
 
 inline void CopiedSpace::recycleBorrowedBlock(CopiedBlock* block)
 {
-    m_heap->blockAllocator().deallocate(CopiedBlock::destroy(block));
+    CopiedBlock::destroy(*heap(), block);
 
     {
-        MutexLocker locker(m_loanedBlocksLock);
+        LockHolder locker(m_loanedBlocksLock);
         ASSERT(m_numberOfLoanedBlocks > 0);
         ASSERT(m_inCopyingPhase);
         m_numberOfLoanedBlocks--;
-        if (!m_numberOfLoanedBlocks)
-            m_loanedBlocksCondition.signal();
     }
 }
 
 inline CopiedBlock* CopiedSpace::allocateBlockForCopyingPhase()
 {
     ASSERT(m_inCopyingPhase);
-    CopiedBlock* block = CopiedBlock::createNoZeroFill(m_heap->blockAllocator().allocate<CopiedBlock>());
+    CopiedBlock* block = CopiedBlock::createNoZeroFill(*m_heap);
 
     {
-        MutexLocker locker(m_loanedBlocksLock);
+        LockHolder locker(m_loanedBlocksLock);
         m_numberOfLoanedBlocks++;
     }
 
@@ -135,15 +135,14 @@ inline CopiedBlock* CopiedSpace::allocateBlockForCopyingPhase()
 
 inline void CopiedSpace::allocateBlock()
 {
-    if (m_heap->shouldCollect())
-        m_heap->collect(Heap::DoNotSweep);
+    m_heap->collectIfNecessaryOrDefer();
 
     m_allocator.resetCurrentBlock();
     
-    CopiedBlock* block = CopiedBlock::create(m_heap->blockAllocator().allocate<CopiedBlock>());
+    CopiedBlock* block = CopiedBlock::create(*m_heap);
         
-    m_toSpace->push(block);
-    m_blockFilter.add(reinterpret_cast<Bits>(block));
+    m_newGen.toSpace->push(block);
+    m_newGen.blockFilter.add(reinterpret_cast<Bits>(block));
     m_blockSet.add(block);
     m_allocator.setCurrentBlock(block);
 }
@@ -151,6 +150,7 @@ inline void CopiedSpace::allocateBlock()
 inline CheckedBoolean CopiedSpace::tryAllocate(size_t bytes, void** outPtr)
 {
     ASSERT(!m_heap->vm()->isInitializingObject());
+    ASSERT(bytes);
 
     if (!m_allocator.tryAllocate(bytes, outPtr))
         return tryAllocateSlowCase(bytes, outPtr);
@@ -174,7 +174,85 @@ inline CopiedBlock* CopiedSpace::blockFor(void* ptr)
     return reinterpret_cast<CopiedBlock*>(reinterpret_cast<size_t>(ptr) & s_blockMask);
 }
 
+template <HeapOperation collectionType>
+inline void CopiedSpace::startedCopying()
+{
+    DoublyLinkedList<CopiedBlock>* fromSpace;
+    DoublyLinkedList<CopiedBlock>* oversizeBlocks;
+    TinyBloomFilter* blockFilter;
+    if (collectionType == FullCollection) {
+        ASSERT(m_oldGen.fromSpace->isEmpty());
+        ASSERT(m_newGen.fromSpace->isEmpty());
+
+        m_oldGen.toSpace->append(*m_newGen.toSpace);
+        m_oldGen.oversizeBlocks.append(m_newGen.oversizeBlocks);
+
+        ASSERT(m_newGen.toSpace->isEmpty());
+        ASSERT(m_newGen.fromSpace->isEmpty());
+        ASSERT(m_newGen.oversizeBlocks.isEmpty());
+
+        std::swap(m_oldGen.fromSpace, m_oldGen.toSpace);
+        fromSpace = m_oldGen.fromSpace;
+        oversizeBlocks = &m_oldGen.oversizeBlocks;
+        blockFilter = &m_oldGen.blockFilter;
+    } else {
+        std::swap(m_newGen.fromSpace, m_newGen.toSpace);
+        fromSpace = m_newGen.fromSpace;
+        oversizeBlocks = &m_newGen.oversizeBlocks;
+        blockFilter = &m_newGen.blockFilter;
+    }
+
+    blockFilter->reset();
+    m_allocator.resetCurrentBlock();
+
+    CopiedBlock* next = 0;
+    size_t totalLiveBytes = 0;
+    size_t totalUsableBytes = 0;
+    for (CopiedBlock* block = fromSpace->head(); block; block = next) {
+        next = block->next();
+        if (!block->isPinned() && block->canBeRecycled()) {
+            recycleEvacuatedBlock(block, collectionType);
+            continue;
+        }
+        ASSERT(block->liveBytes() <= CopiedBlock::blockSize);
+        totalLiveBytes += block->liveBytes();
+        totalUsableBytes += block->payloadCapacity();
+        block->didPromote();
+    }
+
+    CopiedBlock* block = oversizeBlocks->head();
+    while (block) {
+        CopiedBlock* next = block->next();
+        if (block->isPinned()) {
+            blockFilter->add(reinterpret_cast<Bits>(block));
+            totalLiveBytes += block->payloadCapacity();
+            totalUsableBytes += block->payloadCapacity();
+            block->didPromote();
+        } else {
+            oversizeBlocks->remove(block);
+            m_blockSet.remove(block);
+            CopiedBlock::destroy(*heap(), block);
+        } 
+        block = next;
+    }
+
+    double markedSpaceBytes = m_heap->objectSpace().capacity();
+    double totalUtilization = static_cast<double>(totalLiveBytes + markedSpaceBytes) / static_cast<double>(totalUsableBytes + markedSpaceBytes);
+    m_shouldDoCopyPhase = m_heap->operationInProgress() == EdenCollection || totalUtilization <= Options::minHeapUtilization();
+    if (!m_shouldDoCopyPhase) {
+        if (Options::logGC())
+            dataLog("Skipped copying, ");
+        return;
+    }
+
+    if (Options::logGC())
+        dataLogF("Did copy, ");
+    ASSERT(m_shouldDoCopyPhase);
+    ASSERT(!m_numberOfLoanedBlocks);
+    ASSERT(!m_inCopyingPhase);
+    m_inCopyingPhase = true;
+}
+
 } // namespace JSC
 
 #endif // CopiedSpaceInlines_h
-

@@ -26,53 +26,79 @@
 #include "config.h"
 #include "DrawingArea.h"
 
-// Subclasses
-#include "DrawingAreaImpl.h"
-
-#if PLATFORM(MAC) && ENABLE(THREADED_SCROLLING)
-#include "TiledCoreAnimationDrawingArea.h"
-#endif
-
-#if PLATFORM(MAC)
-#include "RemoteLayerTreeDrawingArea.h"
-#endif
-
+#include "DrawingAreaMessages.h"
+#include "WebPage.h"
 #include "WebPageCreationParameters.h"
+#include "WebProcess.h"
+#include <WebCore/DisplayRefreshMonitor.h>
+#include <WebCore/TransformationMatrix.h>
+
+// Subclasses
+#if PLATFORM(COCOA)
+#include "RemoteLayerTreeDrawingArea.h"
+#include "TiledCoreAnimationDrawingArea.h"
+#else
+#if USE(COORDINATED_GRAPHICS_MULTIPROCESS)
+#include "CoordinatedDrawingArea.h"
+#else
+#include "DrawingAreaImpl.h"
+#endif
+#endif
+
+using namespace WebCore;
 
 namespace WebKit {
 
-PassOwnPtr<DrawingArea> DrawingArea::create(WebPage* webPage, const WebPageCreationParameters& parameters)
+std::unique_ptr<DrawingArea> DrawingArea::create(WebPage& webPage, const WebPageCreationParameters& parameters)
 {
     switch (parameters.drawingAreaType) {
-    case DrawingAreaTypeImpl:
-        return DrawingAreaImpl::create(webPage, parameters);
-#if PLATFORM(MAC) && ENABLE(THREADED_SCROLLING)
+#if PLATFORM(COCOA)
+#if !PLATFORM(IOS)
     case DrawingAreaTypeTiledCoreAnimation:
-        return TiledCoreAnimationDrawingArea::create(webPage, parameters);
+        return std::make_unique<TiledCoreAnimationDrawingArea>(webPage, parameters);
 #endif
-#if PLATFORM(MAC)
     case DrawingAreaTypeRemoteLayerTree:
-        return RemoteLayerTreeDrawingArea::create(webPage, parameters);
+        return std::make_unique<RemoteLayerTreeDrawingArea>(webPage, parameters);
+#else
+#if USE(COORDINATED_GRAPHICS_MULTIPROCESS)
+    case DrawingAreaTypeCoordinated:
+        return std::make_unique<CoordinatedDrawingArea>(webPage, parameters);
+#else
+    case DrawingAreaTypeImpl:
+        return std::make_unique<DrawingAreaImpl>(webPage, parameters);
+#endif
 #endif
     }
 
     return nullptr;
 }
 
-DrawingArea::DrawingArea(DrawingAreaType type, WebPage* webPage)
+DrawingArea::DrawingArea(DrawingAreaType type, WebPage& webPage)
     : m_type(type)
     , m_webPage(webPage)
+#if USE(TEXTURE_MAPPER) && PLATFORM(GTK)
+    , m_nativeSurfaceHandleForCompositing(0)
+#endif
 {
+    WebProcess::singleton().addMessageReceiver(Messages::DrawingArea::messageReceiverName(), m_webPage.pageID(), *this);
 }
 
 DrawingArea::~DrawingArea()
 {
+    WebProcess::singleton().removeMessageReceiver(Messages::DrawingArea::messageReceiverName(), m_webPage.pageID());
 }
 
-void DrawingArea::dispatchAfterEnsuringUpdatedScrollPosition(const Function<void ()>& function)
+void DrawingArea::dispatchAfterEnsuringUpdatedScrollPosition(std::function<void ()> function)
 {
     // Scroll position updates are synchronous by default so we can just call the function right away here.
     function();
 }
+
+#if USE(REQUEST_ANIMATION_FRAME_DISPLAY_MONITOR)
+RefPtr<WebCore::DisplayRefreshMonitor> DrawingArea::createDisplayRefreshMonitor(PlatformDisplayID)
+{
+    return nullptr;
+}
+#endif
 
 } // namespace WebKit

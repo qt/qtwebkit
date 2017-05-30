@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution. 
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission. 
  *
@@ -43,7 +43,6 @@ MetaAllocator::~MetaAllocator()
         freeFreeSpaceNode(node);
         node = next;
     }
-    m_lock.Finalize();
 #ifndef NDEBUG
     ASSERT(!m_mallocBalance);
 #endif
@@ -61,7 +60,7 @@ void MetaAllocatorTracker::release(MetaAllocatorHandle* handle)
 
 ALWAYS_INLINE void MetaAllocator::release(MetaAllocatorHandle* handle)
 {
-    SpinLockHolder locker(&m_lock);
+    LockHolder locker(&m_lock);
     if (handle->sizeInBytes()) {
         decrementPageOccupancy(handle->start(), handle->sizeInBytes());
         addFreeSpaceFromReleasedHandle(handle->start(), handle->sizeInBytes());
@@ -92,7 +91,7 @@ void MetaAllocatorHandle::shrink(size_t newSizeInBytes)
 {
     ASSERT(newSizeInBytes <= m_sizeInBytes);
     
-    SpinLockHolder locker(&m_allocator->m_lock);
+    LockHolder locker(&m_allocator->m_lock);
 
     newSizeInBytes = m_allocator->roundUp(newSizeInBytes);
     
@@ -114,6 +113,11 @@ void MetaAllocatorHandle::shrink(size_t newSizeInBytes)
     m_sizeInBytes = newSizeInBytes;
 }
 
+void MetaAllocatorHandle::dump(PrintStream& out) const
+{
+    out.print(RawPointer(start()), "...", RawPointer(end()));
+}
+
 MetaAllocator::MetaAllocator(size_t allocationGranule, size_t pageSize)
     : m_allocationGranule(allocationGranule)
     , m_pageSize(pageSize)
@@ -129,8 +133,6 @@ MetaAllocator::MetaAllocator(size_t allocationGranule, size_t pageSize)
     , m_numFrees(0)
 #endif
 {
-    m_lock.Init();
-    
     for (m_logPageSize = 0; m_logPageSize < 32; ++m_logPageSize) {
         if (static_cast<size_t>(1) << m_logPageSize == m_pageSize)
             break;
@@ -148,7 +150,7 @@ MetaAllocator::MetaAllocator(size_t allocationGranule, size_t pageSize)
 
 PassRefPtr<MetaAllocatorHandle> MetaAllocator::allocate(size_t sizeInBytes, void* ownerUID)
 {
-    SpinLockHolder locker(&m_lock);
+    LockHolder locker(&m_lock);
 
     if (!sizeInBytes)
         return 0;
@@ -194,7 +196,7 @@ PassRefPtr<MetaAllocatorHandle> MetaAllocator::allocate(size_t sizeInBytes, void
 
 MetaAllocator::Statistics MetaAllocator::currentStatistics()
 {
-    SpinLockHolder locker(&m_lock);
+    LockHolder locker(&m_lock);
     Statistics result;
     result.bytesAllocated = m_bytesAllocated;
     result.bytesReserved = m_bytesReserved;
@@ -279,7 +281,7 @@ void MetaAllocator::addFreeSpaceFromReleasedHandle(void* start, size_t sizeInByt
 
 void MetaAllocator::addFreshFreeSpace(void* start, size_t sizeInBytes)
 {
-    SpinLockHolder locker(&m_lock);
+    LockHolder locker(&m_lock);
     m_bytesReserved += sizeInBytes;
     addFreeSpace(start, sizeInBytes);
 }
@@ -287,7 +289,7 @@ void MetaAllocator::addFreshFreeSpace(void* start, size_t sizeInBytes)
 size_t MetaAllocator::debugFreeSpaceSize()
 {
 #ifndef NDEBUG
-    SpinLockHolder locker(&m_lock);
+    LockHolder locker(&m_lock);
     size_t result = 0;
     for (FreeSpaceNode* node = m_freeSpaceSizeMap.first(); node; node = node->successor())
         result += node->m_sizeInBytes;
@@ -422,6 +424,13 @@ void MetaAllocator::decrementPageOccupancy(void* address, size_t sizeInBytes)
             notifyPageIsFree(reinterpret_cast<void*>(page << m_logPageSize));
         }
     }
+}
+
+bool MetaAllocator::isInAllocatedMemory(const LockHolder&, void* address)
+{
+    ASSERT(m_lock.isLocked());
+    uintptr_t page = reinterpret_cast<uintptr_t>(address) >> m_logPageSize;
+    return m_pageOccupancyMap.contains(page);
 }
 
 size_t MetaAllocator::roundUp(size_t sizeInBytes)

@@ -30,37 +30,45 @@
 
 namespace WebCore {
 
-    class CachedResourceLoader;
-    class TextResourceDecoder;
+class TextResourceDecoder;
 
-    class CachedScript FINAL : public CachedResource {
-    public:
-        CachedScript(const ResourceRequest&, const String& charset);
-        virtual ~CachedScript();
+class CachedScript final : public CachedResource {
+public:
+    CachedScript(const ResourceRequest&, const String& charset, SessionID);
+    virtual ~CachedScript();
 
-        const String& script();
+    StringView script();
+    unsigned scriptHash();
 
-        String mimeType() const;
+    String mimeType() const;
 
 #if ENABLE(NOSNIFF)
-        bool mimeTypeAllowedByNosniff() const;
+    bool mimeTypeAllowedByNosniff() const;
 #endif
 
-    private:
-        virtual PurgePriority purgePriority() const OVERRIDE { return PurgeLast; }
-        virtual bool mayTryReplaceEncodedData() const OVERRIDE { return true; }
+private:
+    virtual bool mayTryReplaceEncodedData() const override { return true; }
 
-        virtual bool shouldIgnoreHTTPStatusCodeErrors() const OVERRIDE;
+    virtual bool shouldIgnoreHTTPStatusCodeErrors() const override;
 
-        virtual void setEncoding(const String&) OVERRIDE;
-        virtual String encoding() const OVERRIDE;
-        virtual void finishLoading(ResourceBuffer*) OVERRIDE;
+    void setEncoding(const String&) override;
+    String encoding() const override;
+    const TextResourceDecoder* textResourceDecoder() const override { return m_decoder.get(); }
+    void finishLoading(SharedBuffer*) override;
 
-        virtual void destroyDecodedData() OVERRIDE;
+    virtual void destroyDecodedData() override;
 
-        String m_script;
-        RefPtr<TextResourceDecoder> m_decoder;
-    };
-}
+    String m_script;
+    unsigned m_scriptHash { 0 };
 
-#endif
+    enum DecodingState { NeverDecoded, DataAndDecodedStringHaveSameBytes, DataAndDecodedStringHaveDifferentBytes };
+    DecodingState m_decodingState { NeverDecoded };
+
+    RefPtr<TextResourceDecoder> m_decoder;
+};
+
+} // namespace WebCore
+
+SPECIALIZE_TYPE_TRAITS_CACHED_RESOURCE(CachedScript, CachedResource::Script)
+
+#endif // CachedScript_h

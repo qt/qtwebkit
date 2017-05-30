@@ -26,7 +26,7 @@
 #ifndef WKConnectionRef_h
 #define WKConnectionRef_h
 
-#include <WebKit2/WKBase.h>
+#include <WebKit/WKBase.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -35,19 +35,22 @@ extern "C" {
 typedef void (*WKConnectionDidReceiveMessageCallback)(WKConnectionRef connection, WKStringRef messageName, WKTypeRef messageBody, const void *clientInfo);
 typedef void (*WKConnectionDidCloseCallback)(WKConnectionRef connection, const void* clientInfo);
 
-struct WKConnectionClient {
+typedef struct WKConnectionClientBase {
     int                                                                 version;
     const void *                                                        clientInfo;
+} WKConnectionClientBase;
+
+typedef struct WKConnectionClientV0 {
+    WKConnectionClientBase                                              base;
+
+    // Version 0.
     WKConnectionDidReceiveMessageCallback                               didReceiveMessage;
     WKConnectionDidCloseCallback                                        didClose;
-};
-typedef struct WKConnectionClient WKConnectionClient;
-
-enum { WKConnectionClientCurrentVersion = 0 };
+} WKConnectionClientV0;
 
 WK_EXPORT WKTypeID WKConnectionGetTypeID();
 
-WK_EXPORT void WKConnectionSetConnectionClient(WKConnectionRef connection, const WKConnectionClient* client);
+WK_EXPORT void WKConnectionSetConnectionClient(WKConnectionRef connection, const WKConnectionClientBase* client);
 WK_EXPORT void WKConnectionPostMessage(WKConnectionRef connection, WKStringRef messageName, WKTypeRef messageBody);
 
 #ifdef __cplusplus

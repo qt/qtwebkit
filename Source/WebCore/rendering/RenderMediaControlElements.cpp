@@ -35,32 +35,32 @@
 
 namespace WebCore {
 
-RenderMediaVolumeSliderContainer::RenderMediaVolumeSliderContainer(Element* element)
-    : RenderBlock(element)
+RenderMediaVolumeSliderContainer::RenderMediaVolumeSliderContainer(Element& element, Ref<RenderStyle>&& style)
+    : RenderBlockFlow(element, WTFMove(style))
 {
 }
 
 void RenderMediaVolumeSliderContainer::layout()
 {
-    RenderBlock::layout();
+    RenderBlockFlow::layout();
 
-    if (style()->display() == NONE || !nextSibling() || !nextSibling()->isBox())
+    if (style().display() == NONE || !is<RenderBox>(nextSibling()))
         return;
 
-    RenderBox* buttonBox = toRenderBox(nextSibling());
-    int absoluteOffsetTop = buttonBox->localToAbsolute(FloatPoint(0, -size().height())).y();
+    RenderBox& buttonBox = downcast<RenderBox>(*nextSibling());
+    int absoluteOffsetTop = buttonBox.localToAbsolute(FloatPoint(0, -size().height())).y();
 
     LayoutStateDisabler layoutStateDisabler(view());
 
     // If the slider would be rendered outside the page, it should be moved below the controls.
     if (UNLIKELY(absoluteOffsetTop < 0))
-        setY(buttonBox->offsetTop() + theme()->volumeSliderOffsetFromMuteButton(buttonBox, pixelSnappedSize()).y());
+        setY(buttonBox.offsetTop() + theme().volumeSliderOffsetFromMuteButton(buttonBox, size()).y());
 }
 
 // ----------------------------
 
-RenderMediaControlTimelineContainer::RenderMediaControlTimelineContainer(Element* element)
-    : RenderFlexibleBox(element)
+RenderMediaControlTimelineContainer::RenderMediaControlTimelineContainer(Element& element, Ref<RenderStyle>&& style)
+    : RenderFlexibleBox(element, WTFMove(style))
 {
 }
 
@@ -73,7 +73,7 @@ void RenderMediaControlTimelineContainer::layout()
     RenderFlexibleBox::layout();
 
     LayoutStateDisabler layoutStateDisabler(view());
-    MediaControlTimelineContainerElement* container = static_cast<MediaControlTimelineContainerElement*>(node());
+    MediaControlTimelineContainerElement* container = static_cast<MediaControlTimelineContainerElement*>(element());
     container->setTimeDisplaysHidden(width().toInt() < minWidthToDisplayTimeDisplays);
 }
 
@@ -81,21 +81,21 @@ void RenderMediaControlTimelineContainer::layout()
 
 #if ENABLE(VIDEO_TRACK)
 
-RenderTextTrackContainerElement::RenderTextTrackContainerElement(Element* element)
-    : RenderBlock(element)
+RenderTextTrackContainerElement::RenderTextTrackContainerElement(Element& element, Ref<RenderStyle>&& style)
+    : RenderBlockFlow(element, WTFMove(style))
 {
 }
 
 void RenderTextTrackContainerElement::layout()
 {
-    RenderBlock::layout();
-    if (style()->display() == NONE)
+    RenderBlockFlow::layout();
+    if (style().display() == NONE)
         return;
 
-    ASSERT(mediaControlElementType(node()) == MediaTextTrackDisplayContainer);
+    ASSERT(mediaControlElementType(element()) == MediaTextTrackDisplayContainer);
 
     LayoutStateDisabler layoutStateDisabler(view());
-    static_cast<MediaControlTextTrackContainerElement*>(node())->updateSizes();
+    static_cast<MediaControlTextTrackContainerElement*>(element())->updateSizes();
 }
 
 #endif // ENABLE(VIDEO_TRACK)

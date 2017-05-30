@@ -26,43 +26,38 @@
 
 #include "DOMWindow.h"
 #include "Event.h"
-#include "EventDispatchMediator.h"
 
 namespace WebCore {
 
 typedef DOMWindow AbstractView;
 
 struct UIEventInit : public EventInit {
-    UIEventInit();
-    UIEventInit(bool bubbles, bool cancelable);
-
     RefPtr<AbstractView> view;
-    int detail;
+    int detail { 0 };
 };
 
 class UIEvent : public Event {
 public:
-    static PassRefPtr<UIEvent> create()
+    static Ref<UIEvent> create(const AtomicString& type, bool canBubble, bool cancelable, AbstractView* view, int detail)
     {
-        return adoptRef(new UIEvent);
+        return adoptRef(*new UIEvent(type, canBubble, cancelable, view, detail));
     }
-    static PassRefPtr<UIEvent> create(const AtomicString& type, bool canBubble, bool cancelable, PassRefPtr<AbstractView> view, int detail)
+    static Ref<UIEvent> createForBindings()
     {
-        return adoptRef(new UIEvent(type, canBubble, cancelable, view, detail));
+        return adoptRef(*new UIEvent);
     }
-    static PassRefPtr<UIEvent> create(const AtomicString& type, const UIEventInit& initializer)
+    static Ref<UIEvent> createForBindings(const AtomicString& type, const UIEventInit& initializer)
     {
-        return adoptRef(new UIEvent(type, initializer));
+        return adoptRef(*new UIEvent(type, initializer));
     }
     virtual ~UIEvent();
 
-    void initUIEvent(const AtomicString& type, bool canBubble, bool cancelable, PassRefPtr<AbstractView>, int detail);
+    void initUIEvent(const AtomicString& type, bool canBubble, bool cancelable, AbstractView*, int detail);
 
     AbstractView* view() const { return m_view.get(); }
     int detail() const { return m_detail; }
 
-    virtual const AtomicString& interfaceName() const;
-    virtual bool isUIEvent() const;
+    virtual EventInterface eventInterface() const override;
 
     virtual int keyCode() const;
     virtual int charCode() const;
@@ -77,15 +72,19 @@ public:
 
 protected:
     UIEvent();
-    UIEvent(const AtomicString& type, bool canBubble, bool cancelable, PassRefPtr<AbstractView>, int detail);
-    UIEvent(const AtomicString& type, bool canBubble, bool cancelable, double timestamp, PassRefPtr<AbstractView>, int detail);
+    UIEvent(const AtomicString& type, bool canBubble, bool cancelable, AbstractView*, int detail);
+    UIEvent(const AtomicString& type, bool canBubble, bool cancelable, double timestamp, AbstractView*, int detail);
     UIEvent(const AtomicString&, const UIEventInit&);
 
 private:
+    virtual bool isUIEvent() const override final;
+
     RefPtr<AbstractView> m_view;
     int m_detail;
 };
 
 } // namespace WebCore
+
+SPECIALIZE_TYPE_TRAITS_EVENT(UIEvent)
 
 #endif // UIEvent_h

@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -27,7 +27,7 @@
 #include "IconDatabaseBase.h"
 
 #include "IconDatabase.h"
-#include "KURL.h"
+#include "URL.h"
 #include "SharedBuffer.h"
 
 namespace WebCore {
@@ -47,7 +47,7 @@ bool IconDatabaseBase::open(const String&, const String&)
     return false;
 }
 
-static IconDatabaseBase* vmbase = 0;
+static IconDatabaseBase* vmbase = nullptr;
 
 // Functions to get/set the global icon database.
 IconDatabaseBase& iconDatabase()
@@ -55,7 +55,7 @@ IconDatabaseBase& iconDatabase()
     if (vmbase)
         return *vmbase;
 
-    static IconDatabaseBase* defaultDatabase = 0;        
+    static IconDatabaseBase* defaultDatabase = nullptr;
     if (!defaultDatabase)
         defaultDatabase = new IconDatabase;
 

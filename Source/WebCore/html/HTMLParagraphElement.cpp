@@ -23,7 +23,6 @@
 #include "config.h"
 #include "HTMLParagraphElement.h"
 
-#include "Attribute.h"
 #include "CSSPropertyNames.h"
 #include "CSSValueKeywords.h"
 #include "Document.h"
@@ -33,20 +32,20 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-inline HTMLParagraphElement::HTMLParagraphElement(const QualifiedName& tagName, Document* document)
+inline HTMLParagraphElement::HTMLParagraphElement(const QualifiedName& tagName, Document& document)
     : HTMLElement(tagName, document)
 {
     ASSERT(hasTagName(pTag));
 }
 
-PassRefPtr<HTMLParagraphElement> HTMLParagraphElement::create(Document* document)
+Ref<HTMLParagraphElement> HTMLParagraphElement::create(Document& document)
 {
-    return adoptRef(new HTMLParagraphElement(pTag, document));
+    return adoptRef(*new HTMLParagraphElement(pTag, document));
 }
 
-PassRefPtr<HTMLParagraphElement> HTMLParagraphElement::create(const QualifiedName& tagName, Document* document)
+Ref<HTMLParagraphElement> HTMLParagraphElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new HTMLParagraphElement(tagName, document));
+    return adoptRef(*new HTMLParagraphElement(tagName, document));
 }
 
 bool HTMLParagraphElement::isPresentationAttribute(const QualifiedName& name) const
@@ -56,14 +55,14 @@ bool HTMLParagraphElement::isPresentationAttribute(const QualifiedName& name) co
     return HTMLElement::isPresentationAttribute(name);
 }
 
-void HTMLParagraphElement::collectStyleForPresentationAttribute(const QualifiedName& name, const AtomicString& value, MutableStylePropertySet* style)
+void HTMLParagraphElement::collectStyleForPresentationAttribute(const QualifiedName& name, const AtomicString& value, MutableStyleProperties& style)
 {
     if (name == alignAttr) {
-        if (equalIgnoringCase(value, "middle") || equalIgnoringCase(value, "center"))
+        if (equalLettersIgnoringASCIICase(value, "middle") || equalLettersIgnoringASCIICase(value, "center"))
             addPropertyToPresentationAttributeStyle(style, CSSPropertyTextAlign, CSSValueWebkitCenter);
-        else if (equalIgnoringCase(value, "left"))
+        else if (equalLettersIgnoringASCIICase(value, "left"))
             addPropertyToPresentationAttributeStyle(style, CSSPropertyTextAlign, CSSValueWebkitLeft);
-        else if (equalIgnoringCase(value, "right"))
+        else if (equalLettersIgnoringASCIICase(value, "right"))
             addPropertyToPresentationAttributeStyle(style, CSSPropertyTextAlign, CSSValueWebkitRight);
         else
             addPropertyToPresentationAttributeStyle(style, CSSPropertyTextAlign, value);

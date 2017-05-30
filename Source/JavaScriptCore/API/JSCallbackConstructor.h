@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -34,6 +34,7 @@ namespace JSC {
 class JSCallbackConstructor : public JSDestructibleObject {
 public:
     typedef JSDestructibleObject Base;
+    static const unsigned StructureFlags = Base::StructureFlags | ImplementsHasInstance | ImplementsDefaultHasInstance;
 
     static JSCallbackConstructor* create(ExecState* exec, JSGlobalObject* globalObject, Structure* structure, JSClassRef classRef, JSObjectCallAsConstructorCallback callback) 
     {
@@ -46,20 +47,23 @@ public:
     static void destroy(JSCell*);
     JSClassRef classRef() const { return m_class; }
     JSObjectCallAsConstructorCallback callback() const { return m_callback; }
-    static const ClassInfo s_info;
+    DECLARE_INFO;
 
     static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue proto) 
     {
-        return Structure::create(vm, globalObject, proto, TypeInfo(ObjectType, StructureFlags), &s_info);
+        return Structure::create(vm, globalObject, proto, TypeInfo(ObjectType, StructureFlags), info());
     }
 
 protected:
     JSCallbackConstructor(JSGlobalObject*, Structure*, JSClassRef, JSObjectCallAsConstructorCallback);
     void finishCreation(JSGlobalObject*, JSClassRef);
-    static const unsigned StructureFlags = ImplementsHasInstance | JSObject::StructureFlags;
 
 private:
+    friend struct APICallbackFunction;
+
     static ConstructType getConstructData(JSCell*, ConstructData&);
+
+    JSObjectCallAsConstructorCallback constructCallback() { return m_callback; }
 
     JSClassRef m_class;
     JSObjectCallAsConstructorCallback m_callback;

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Apple Inc. All rights reserved.
+ * Copyright (C) 2010, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,7 +26,7 @@
 #ifndef PluginProxy_h
 #define PluginProxy_h
 
-#if ENABLE(PLUGIN_PROCESS)
+#if ENABLE(NETSCAPE_PLUGIN_API)
 
 #include "Connection.h"
 #include "Plugin.h"
@@ -35,8 +35,9 @@
 #include <WebCore/FindOptions.h>
 #include <WebCore/IntRect.h>
 #include <WebCore/SecurityOrigin.h>
+#include <memory>
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
 #include <wtf/RetainPtr.h>
 OBJC_CLASS CALayer;
 #endif
@@ -56,88 +57,99 @@ struct PluginCreationParameters;
 
 class PluginProxy : public Plugin {
 public:
-    static PassRefPtr<PluginProxy> create(uint64_t pluginProcessToken, bool isRestartedProcess);
+    static Ref<PluginProxy> create(uint64_t pluginProcessToken, bool isRestartedProcess);
     ~PluginProxy();
 
     uint64_t pluginInstanceID() const { return m_pluginInstanceID; }
     void pluginProcessCrashed();
 
-    void didReceivePluginProxyMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&);
-    void didReceiveSyncPluginProxyMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&, OwnPtr<CoreIPC::MessageEncoder>&);
+    void didReceivePluginProxyMessage(IPC::Connection&, IPC::MessageDecoder&);
+    void didReceiveSyncPluginProxyMessage(IPC::Connection&, IPC::MessageDecoder&, std::unique_ptr<IPC::MessageEncoder>&);
 
-    bool isBeingAsynchronouslyInitialized() const { return m_waitingOnAsynchronousInitialization; }
+    bool isBeingAsynchronouslyInitialized() const override { return m_waitingOnAsynchronousInitialization; }
 
 private:
     explicit PluginProxy(uint64_t pluginProcessToken, bool isRestartedProcess);
 
     // Plugin
-    virtual bool initialize(const Parameters&);
+    virtual bool initialize(const Parameters&) override;
     bool initializeSynchronously();
 
-    virtual void destroy();
-    virtual void paint(WebCore::GraphicsContext*, const WebCore::IntRect& dirtyRect);
-    virtual bool supportsSnapshotting() const;
-    virtual PassRefPtr<ShareableBitmap> snapshot();
-#if PLATFORM(MAC)
-    virtual PlatformLayer* pluginLayer();
+    virtual void destroy() override;
+    virtual void paint(WebCore::GraphicsContext&, const WebCore::IntRect& dirtyRect) override;
+    virtual bool supportsSnapshotting() const override;
+    virtual RefPtr<ShareableBitmap> snapshot() override;
+#if PLATFORM(COCOA)
+    virtual PlatformLayer* pluginLayer() override;
 #endif
-    virtual bool isTransparent();
-    virtual bool wantsWheelEvents() OVERRIDE;
-    virtual void geometryDidChange(const WebCore::IntSize& pluginSize, const WebCore::IntRect& clipRect, const WebCore::AffineTransform& pluginToRootViewTransform);
-    virtual void visibilityDidChange();
-    virtual void frameDidFinishLoading(uint64_t requestID);
-    virtual void frameDidFail(uint64_t requestID, bool wasCancelled);
-    virtual void didEvaluateJavaScript(uint64_t requestID, const String& result);
-    virtual void streamDidReceiveResponse(uint64_t streamID, const WebCore::KURL& responseURL, uint32_t streamLength, uint32_t lastModifiedTime, const String& mimeType, const String& headers, const String& suggestedFileName);
-    virtual void streamDidReceiveData(uint64_t streamID, const char* bytes, int length);
-    virtual void streamDidFinishLoading(uint64_t streamID);
-    virtual void streamDidFail(uint64_t streamID, bool wasCancelled);
-    virtual void manualStreamDidReceiveResponse(const WebCore::KURL& responseURL, uint32_t streamLength, uint32_t lastModifiedTime, const WTF::String& mimeType, const WTF::String& headers, const String& suggestedFileName);
-    virtual void manualStreamDidReceiveData(const char* bytes, int length);
-    virtual void manualStreamDidFinishLoading();
-    virtual void manualStreamDidFail(bool wasCancelled);
+    virtual bool isTransparent() override;
+    virtual bool wantsWheelEvents() override;
+    virtual void geometryDidChange(const WebCore::IntSize& pluginSize, const WebCore::IntRect& clipRect, const WebCore::AffineTransform& pluginToRootViewTransform) override;
+    virtual void visibilityDidChange(bool isVisible) override;
+    virtual void frameDidFinishLoading(uint64_t requestID) override;
+    virtual void frameDidFail(uint64_t requestID, bool wasCancelled) override;
+    virtual void didEvaluateJavaScript(uint64_t requestID, const String& result) override;
+    virtual void streamWillSendRequest(uint64_t streamID, const WebCore::URL& requestURL, const WebCore::URL& responseURL, int responseStatus) override;
+    virtual void streamDidReceiveResponse(uint64_t streamID, const WebCore::URL& responseURL, uint32_t streamLength, uint32_t lastModifiedTime, const String& mimeType, const String& headers, const String& suggestedFileName) override;
+    virtual void streamDidReceiveData(uint64_t streamID, const char* bytes, int length) override;
+    virtual void streamDidFinishLoading(uint64_t streamID) override;
+    virtual void streamDidFail(uint64_t streamID, bool wasCancelled) override;
+    virtual void manualStreamDidReceiveResponse(const WebCore::URL& responseURL, uint32_t streamLength, uint32_t lastModifiedTime, const WTF::String& mimeType, const WTF::String& headers, const String& suggestedFileName) override;
+    virtual void manualStreamDidReceiveData(const char* bytes, int length) override;
+    virtual void manualStreamDidFinishLoading() override;
+    virtual void manualStreamDidFail(bool wasCancelled) override;
     
-    virtual bool handleMouseEvent(const WebMouseEvent&);
-    virtual bool handleWheelEvent(const WebWheelEvent&);
-    virtual bool handleMouseEnterEvent(const WebMouseEvent&);
-    virtual bool handleMouseLeaveEvent(const WebMouseEvent&);
-    virtual bool handleContextMenuEvent(const WebMouseEvent&);
-    virtual bool handleKeyboardEvent(const WebKeyboardEvent&);
-    virtual void setFocus(bool);
-    virtual bool handleEditingCommand(const String& commandName, const String& argument) OVERRIDE;
-    virtual bool isEditingCommandEnabled(const String& commandName) OVERRIDE;
-    virtual bool shouldAllowScripting() OVERRIDE { return true; }
-    virtual bool shouldAllowNavigationFromDrags() OVERRIDE { return false; }
+    virtual bool handleMouseEvent(const WebMouseEvent&) override;
+    virtual bool handleWheelEvent(const WebWheelEvent&) override;
+    virtual bool handleMouseEnterEvent(const WebMouseEvent&) override;
+    virtual bool handleMouseLeaveEvent(const WebMouseEvent&) override;
+    virtual bool handleContextMenuEvent(const WebMouseEvent&) override;
+    virtual bool handleKeyboardEvent(const WebKeyboardEvent&) override;
+    virtual void setFocus(bool) override;
+    virtual bool handleEditingCommand(const String& commandName, const String& argument) override;
+    virtual bool isEditingCommandEnabled(const String& commandName) override;
+    virtual bool shouldAllowScripting() override { return true; }
+    virtual bool shouldAllowNavigationFromDrags() override { return false; }
     
-    virtual bool handlesPageScaleFactor();
+    virtual bool handlesPageScaleFactor() const override;
+    virtual bool requiresUnifiedScaleFactor() const override;
     
-    virtual NPObject* pluginScriptableNPObject();
-#if PLATFORM(MAC)
-    virtual void windowFocusChanged(bool);
-    virtual void windowAndViewFramesChanged(const WebCore::IntRect& windowFrameInScreenCoordinates, const WebCore::IntRect& viewFrameInWindowCoordinates);
-    virtual void windowVisibilityChanged(bool);
-    virtual uint64_t pluginComplexTextInputIdentifier() const;
-    virtual void sendComplexTextInput(const String& textInput);
-    virtual void setLayerHostingMode(LayerHostingMode) OVERRIDE;
+    virtual NPObject* pluginScriptableNPObject() override;
+
+    virtual void windowFocusChanged(bool) override;
+    virtual void windowVisibilityChanged(bool) override;
+
+#if PLATFORM(COCOA)
+    virtual void windowAndViewFramesChanged(const WebCore::IntRect& windowFrameInScreenCoordinates, const WebCore::IntRect& viewFrameInWindowCoordinates) override;
+    virtual uint64_t pluginComplexTextInputIdentifier() const override;
+    virtual void sendComplexTextInput(const String& textInput) override;
+    virtual void setLayerHostingMode(LayerHostingMode) override;
 #endif
 
-    virtual void contentsScaleFactorChanged(float);
-    virtual void storageBlockingStateChanged(bool);
-    virtual void privateBrowsingStateChanged(bool);
-    virtual bool getFormValue(String& formValue);
-    virtual bool handleScroll(WebCore::ScrollDirection, WebCore::ScrollGranularity);
-    virtual WebCore::Scrollbar* horizontalScrollbar();
-    virtual WebCore::Scrollbar* verticalScrollbar();
+    virtual void contentsScaleFactorChanged(float) override;
+    virtual void storageBlockingStateChanged(bool) override;
+    virtual void privateBrowsingStateChanged(bool) override;
+    virtual void mutedStateChanged(bool) override;
+    virtual bool getFormValue(String& formValue) override;
+    virtual bool handleScroll(WebCore::ScrollDirection, WebCore::ScrollGranularity) override;
+    virtual WebCore::Scrollbar* horizontalScrollbar() override;
+    virtual WebCore::Scrollbar* verticalScrollbar() override;
 
-    virtual unsigned countFindMatches(const String&, WebCore::FindOptions, unsigned) OVERRIDE  { return 0; }
-    virtual bool findString(const String&, WebCore::FindOptions, unsigned) OVERRIDE { return false; }
+    virtual unsigned countFindMatches(const String&, WebCore::FindOptions, unsigned) override  { return 0; }
+    virtual bool findString(const String&, WebCore::FindOptions, unsigned) override { return false; }
 
-    virtual WebCore::IntPoint convertToRootView(const WebCore::IntPoint&) const OVERRIDE;
+    virtual WebCore::IntPoint convertToRootView(const WebCore::IntPoint&) const override;
 
-    virtual PassRefPtr<WebCore::SharedBuffer> liveResourceData() const OVERRIDE;
-    virtual bool performDictionaryLookupAtLocation(const WebCore::FloatPoint&) OVERRIDE { return false; }
+    virtual RefPtr<WebCore::SharedBuffer> liveResourceData() const override;
+    virtual bool performDictionaryLookupAtLocation(const WebCore::FloatPoint&) override { return false; }
 
-    virtual String getSelectionString() const OVERRIDE { return String(); }
+    String getSelectionString() const override { return String(); }
+    String getSelectionForWordAtPoint(const WebCore::FloatPoint&) const override { return String(); }
+    bool existingSelectionContainsPoint(const WebCore::FloatPoint&) const override { return false; }
+
+#if PLATFORM(COCOA)
+    virtual WebCore::AudioHardwareActivityType audioHardwareActivity() const override;
+#endif
 
     float contentsScaleFactor();
     bool needsBackingStore() const;
@@ -156,10 +168,12 @@ private:
     void getAuthenticationInfo(const WebCore::ProtectionSpace&, bool& returnValue, String& username, String& password);
     void getPluginElementNPObject(uint64_t& pluginElementNPObjectID);
     void evaluate(const NPVariantData& npObjectAsVariantData, const String& scriptString, bool allowPopups, bool& returnValue, NPVariantData& resultData);
+    void setPluginIsPlayingAudio(bool);
+    void continueStreamLoad(uint64_t streamID);
     void cancelStreamLoad(uint64_t streamID);
     void cancelManualStreamLoad();
     void setStatusbarText(const String& statusbarText);
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     void pluginFocusOrWindowFocusChanged(bool);
     void setComplexTextInputState(uint64_t);
     void setLayerHostingContextID(uint32_t);
@@ -167,6 +181,7 @@ private:
 #if PLUGIN_ARCHITECTURE(X11)
     void createPluginContainer(uint64_t& windowID);
     void windowedPluginGeometryDidChange(const WebCore::IntRect& frameRect, const WebCore::IntRect& clipRect, uint64_t windowID);
+    void windowedPluginVisibilityDidChange(bool isVisible, uint64_t windowID);
 #endif
 
     bool canInitializeAsynchronously() const;
@@ -211,10 +226,10 @@ private:
     // The client ID for the CA layer in the plug-in process. Will be 0 if the plug-in is not a CA plug-in.
     uint32_t m_remoteLayerClientID;
     
-    OwnPtr<PluginCreationParameters> m_pendingPluginCreationParameters;
+    std::unique_ptr<PluginCreationParameters> m_pendingPluginCreationParameters;
     bool m_waitingOnAsynchronousInitialization;
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     RetainPtr<CALayer> m_pluginLayer;
 #endif
 
@@ -223,6 +238,8 @@ private:
 
 } // namespace WebKit
 
-#endif // ENABLE(PLUGIN_PROCESS)
+SPECIALIZE_TYPE_TRAITS_PLUGIN(PluginProxy, PluginProxyType)
+
+#endif // ENABLE(NETSCAPE_PLUGIN_API)
 
 #endif // PluginProxy_h

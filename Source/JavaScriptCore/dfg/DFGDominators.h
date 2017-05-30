@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2014, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,48 +26,28 @@
 #ifndef DFGDominators_h
 #define DFGDominators_h
 
-#include <wtf/Platform.h>
-
 #if ENABLE(DFG_JIT)
 
+#include "DFGBasicBlock.h"
+#include "DFGBlockMap.h"
+#include "DFGBlockSet.h"
+#include "DFGCFG.h"
 #include "DFGCommon.h"
-#include <wtf/FastBitVector.h>
+#include "DFGGraph.h"
+#include <wtf/Dominators.h>
+#include <wtf/FastMalloc.h>
+#include <wtf/Noncopyable.h>
 
 namespace JSC { namespace DFG {
 
-class Graph;
-
-class Dominators {
+class Dominators : public WTF::Dominators<CFG> {
+    WTF_MAKE_NONCOPYABLE(Dominators);
+    WTF_MAKE_FAST_ALLOCATED;
 public:
-    Dominators();
-    ~Dominators();
-    
-    void compute(Graph& graph);
-    void invalidate()
+    Dominators(Graph& graph)
+        : WTF::Dominators<CFG>(*graph.m_cfg)
     {
-        m_valid = false;
     }
-    void computeIfNecessary(Graph& graph)
-    {
-        if (m_valid)
-            return;
-        compute(graph);
-    }
-    
-    bool isValid() const { return m_valid; }
-    
-    bool dominates(BlockIndex from, BlockIndex to) const
-    {
-        ASSERT(isValid());
-        return m_results[to].get(from);
-    }
-    
-private:
-    bool iterateForBlock(Graph& graph, BlockIndex);
-    
-    Vector<FastBitVector> m_results;
-    FastBitVector m_scratch;
-    bool m_valid;
 };
 
 } } // namespace JSC::DFG

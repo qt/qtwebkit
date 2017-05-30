@@ -27,6 +27,10 @@
 
 /* Things that need to be defined globally should go into "config.h". */
 
+#if defined(HAVE_CONFIG_H) && HAVE_CONFIG_H && defined(BUILDING_WITH_CMAKE)
+#include "cmakeconfig.h"
+#endif
+
 #include <wtf/Platform.h>
 
 #if defined(__APPLE__)
@@ -38,18 +42,23 @@
 #endif
 
 #if OS(WINDOWS)
+
+#ifndef _WIN32_WINNT
+#define _WIN32_WINNT 0x601
+#endif
+
+#ifndef WINVER
+#define WINVER 0x0601
+#endif
+
 #if !USE(CURL)
 #ifndef _WINSOCKAPI_
 #define _WINSOCKAPI_ // Prevent inclusion of winsock.h in windows.h
 #endif
 #endif
 
-// If we don't define these, they get defined in windef.h. 
-// We want to use std::min and std::max
-#ifdef __cplusplus
-#define max max
-#define min min
-#endif
+#undef WEBCORE_EXPORT
+#define WEBCORE_EXPORT WTF_EXPORT_DECLARATION
 
 #else
 
@@ -77,37 +86,9 @@
 #endif
 
 #ifdef __cplusplus
-
-
-#include <ciso646>
-
-#if defined(_LIBCPP_VERSION)
-
-// Add work around for a bug in libc++ that caused standard heap
-// APIs to not compile <rdar://problem/10858112>.
-
-#include <type_traits>
-
-namespace WebCore {
-    class TimerHeapReference;
-}
-
-_LIBCPP_BEGIN_NAMESPACE_STD
-
-inline _LIBCPP_INLINE_VISIBILITY
-const WebCore::TimerHeapReference& move(const WebCore::TimerHeapReference& t)
-{
-    return t;
-}
-
-_LIBCPP_END_NAMESPACE_STD
-
-#endif // defined(_LIBCPP_VERSION)
-
 #include <algorithm>
 #include <cstddef>
 #include <new>
-
 #endif
 
 #if defined(__APPLE__)
@@ -119,7 +100,36 @@ _LIBCPP_END_NAMESPACE_STD
 #include <sys/resource.h>
 #endif
 
+#if USE(CF)
 #include <CoreFoundation/CoreFoundation.h>
+
+#if OS(WINDOWS)
+#ifndef CF_IMPLICIT_BRIDGING_ENABLED
+#define CF_IMPLICIT_BRIDGING_ENABLED
+#endif
+
+#ifndef CF_IMPLICIT_BRIDGING_DISABLED
+#define CF_IMPLICIT_BRIDGING_DISABLED
+#endif
+
+#include <CoreFoundation/CFBase.h>
+
+#ifndef CF_ENUM
+#define CF_ENUM(_type, _name) _type _name; enum
+#endif
+#ifndef CF_OPTIONS
+#define CF_OPTIONS(_type, _name) _type _name; enum
+#endif
+#ifndef CF_ENUM_DEPRECATED
+#define CF_ENUM_DEPRECATED(_macIntro, _macDep, _iosIntro, _iosDep)
+#endif
+#ifndef CF_ENUM_AVAILABLE
+#define CF_ENUM_AVAILABLE(_mac, _ios)
+#endif
+#endif // OS(WINDOWS)
+
+#endif // USE(CF)
+
 #if PLATFORM(WIN_CAIRO)
 #include <ConditionalMacros.h>
 #include <windows.h>
@@ -127,25 +137,6 @@ _LIBCPP_END_NAMESPACE_STD
 
 #if OS(WINDOWS)
 #if USE(CG)
-
-#if defined(_MSC_VER) && _MSC_VER <= 1600
-
-#include <WebCore/WebCoreHeaderDetection.h>
-
-#if HAVE(AVCF_LEGIBLE_OUTPUT)
-// These must be defined before including CGFloat.h
-// This can be removed once we move to VS2012 or newer
-#include <wtf/ExportMacros.h>
-#include <wtf/MathExtras.h>
-
-#define isnan _isnan
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
-#include <CoreGraphics/CGFloat.h>
-#endif
-#include <CoreGraphics/CoreGraphics.h>
-#undef isnan
-#endif
-#endif
 
 // FIXME <rdar://problem/8208868> Remove support for obsolete ColorSync API, CoreServices header in CoreGraphics
 // We can remove this once the new ColorSync APIs are available in an internal Safari SDK.

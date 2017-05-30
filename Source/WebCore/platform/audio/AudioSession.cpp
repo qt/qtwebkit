@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2013-2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,40 +28,18 @@
 
 #if USE(AUDIO_SESSION)
 
-#include "AudioSessionListener.h"
 #include "NotImplemented.h"
+#include <wtf/NeverDestroyed.h>
 
 namespace WebCore {
 
 AudioSession& AudioSession::sharedSession()
 {
-    DEFINE_STATIC_LOCAL(AudioSession, session, ());
+    static NeverDestroyed<AudioSession> session;
     return session;
 }
 
-void AudioSession::addListener(AudioSessionListener* listener)
-{
-    m_listeners.add(listener);
-}
-
-void AudioSession::removeListener(AudioSessionListener* listener)
-{
-    m_listeners.remove(listener);
-}
-
-void AudioSession::beganAudioInterruption()
-{
-    for (HashSet<AudioSessionListener*>::iterator i = m_listeners.begin(); i != m_listeners.end(); ++i)
-        (*i)->beganAudioInterruption();
-}
-
-void AudioSession::endedAudioInterruption()
-{
-    for (HashSet<AudioSessionListener*>::iterator i = m_listeners.begin(); i != m_listeners.end(); ++i)
-        (*i)->endedAudioInterruption();
-}
-
-#if !PLATFORM(IOS) && !PLATFORM(MAC)
+#if !PLATFORM(COCOA)
 class AudioSessionPrivate {
 };
 
@@ -109,9 +87,10 @@ size_t AudioSession::numberOfOutputChannels() const
     return 0;
 }
 
-void AudioSession::setActive(bool)
+bool AudioSession::tryToSetActive(bool)
 {
     notImplemented();
+    return true;
 }
 
 size_t AudioSession::preferredBufferSize() const
@@ -124,7 +103,7 @@ void AudioSession::setPreferredBufferSize(size_t)
 {
     notImplemented();
 }
-#endif // !PLATFORM(IOS)
+#endif // !PLATFORM(COCOA)
 
 }
 

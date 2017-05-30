@@ -21,16 +21,16 @@
 #ifndef SVGPatternElement_h
 #define SVGPatternElement_h
 
-#if ENABLE(SVG)
 #include "SVGAnimatedBoolean.h"
 #include "SVGAnimatedEnumeration.h"
 #include "SVGAnimatedLength.h"
 #include "SVGAnimatedPreserveAspectRatio.h"
 #include "SVGAnimatedRect.h"
 #include "SVGAnimatedTransformList.h"
+#include "SVGElement.h"
 #include "SVGExternalResourcesRequired.h"
 #include "SVGFitToViewBox.h"
-#include "SVGStyledElement.h"
+#include "SVGNames.h"
 #include "SVGTests.h"
 #include "SVGURIReference.h"
 #include "SVGUnitTypes.h"
@@ -39,32 +39,32 @@ namespace WebCore {
 
 struct PatternAttributes;
  
-class SVGPatternElement FINAL : public SVGStyledElement,
+class SVGPatternElement final : public SVGElement,
                                 public SVGURIReference,
                                 public SVGTests,
                                 public SVGExternalResourcesRequired,
                                 public SVGFitToViewBox {
 public:
-    static PassRefPtr<SVGPatternElement> create(const QualifiedName&, Document*);
+    static Ref<SVGPatternElement> create(const QualifiedName&, Document&);
 
     void collectPatternAttributes(PatternAttributes&) const;
 
-    virtual AffineTransform localCoordinateSpaceTransform(SVGLocatable::CTMScope) const;
+    virtual AffineTransform localCoordinateSpaceTransform(SVGLocatable::CTMScope) const override;
 
 private:
-    SVGPatternElement(const QualifiedName&, Document*);
+    SVGPatternElement(const QualifiedName&, Document&);
     
-    virtual bool isValid() const { return SVGTests::isValid(); }
-    virtual bool needsPendingResourceHandling() const { return false; }
+    virtual bool isValid() const override { return SVGTests::isValid(); }
+    virtual bool needsPendingResourceHandling() const override { return false; }
 
-    bool isSupportedAttribute(const QualifiedName&);
-    virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
-    virtual void svgAttributeChanged(const QualifiedName&);
-    virtual void childrenChanged(bool changedByParser = false, Node* beforeChange = 0, Node* afterChange = 0, int childCountDelta = 0);
+    static bool isSupportedAttribute(const QualifiedName&);
+    virtual void parseAttribute(const QualifiedName&, const AtomicString&) override;
+    virtual void svgAttributeChanged(const QualifiedName&) override;
+    virtual void childrenChanged(const ChildChange&) override;
 
-    virtual RenderObject* createRenderer(RenderArena*, RenderStyle*);
+    virtual RenderPtr<RenderElement> createElementRenderer(Ref<RenderStyle>&&, const RenderTreePosition&) override;
 
-    virtual bool selfHasRelativeLengths() const;
+    virtual bool selfHasRelativeLengths() const override { return true; }
 
     BEGIN_DECLARE_ANIMATED_PROPERTIES(SVGPatternElement)
         DECLARE_ANIMATED_LENGTH(X, x)
@@ -74,19 +74,18 @@ private:
         DECLARE_ANIMATED_ENUMERATION(PatternUnits, patternUnits, SVGUnitTypes::SVGUnitType)
         DECLARE_ANIMATED_ENUMERATION(PatternContentUnits, patternContentUnits, SVGUnitTypes::SVGUnitType)
         DECLARE_ANIMATED_TRANSFORM_LIST(PatternTransform, patternTransform)
-        DECLARE_ANIMATED_STRING(Href, href)
-        DECLARE_ANIMATED_BOOLEAN(ExternalResourcesRequired, externalResourcesRequired)
+        DECLARE_ANIMATED_STRING_OVERRIDE(Href, href)
+        DECLARE_ANIMATED_BOOLEAN_OVERRIDE(ExternalResourcesRequired, externalResourcesRequired)
         DECLARE_ANIMATED_RECT(ViewBox, viewBox)
         DECLARE_ANIMATED_PRESERVEASPECTRATIO(PreserveAspectRatio, preserveAspectRatio) 
     END_DECLARE_ANIMATED_PROPERTIES
 
     // SVGTests
-    virtual void synchronizeRequiredFeatures() { SVGTests::synchronizeRequiredFeatures(this); }
-    virtual void synchronizeRequiredExtensions() { SVGTests::synchronizeRequiredExtensions(this); }
-    virtual void synchronizeSystemLanguage() { SVGTests::synchronizeSystemLanguage(this); }
+    virtual void synchronizeRequiredFeatures() override { SVGTests::synchronizeRequiredFeatures(this); }
+    virtual void synchronizeRequiredExtensions() override { SVGTests::synchronizeRequiredExtensions(this); }
+    virtual void synchronizeSystemLanguage() override { SVGTests::synchronizeSystemLanguage(this); }
 };
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif

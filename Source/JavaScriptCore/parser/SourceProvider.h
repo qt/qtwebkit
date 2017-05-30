@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -29,7 +29,6 @@
 #ifndef SourceProvider_h
 #define SourceProvider_h
 
-#include <wtf/PassOwnPtr.h>
 #include <wtf/RefCounted.h>
 #include <wtf/text/TextPosition.h>
 #include <wtf/text/WTFString.h>
@@ -44,19 +43,20 @@ namespace JSC {
 
         JS_EXPORT_PRIVATE virtual ~SourceProvider();
 
-        virtual const String& source() const = 0;
-        String getRange(int start, int end) const
+        virtual unsigned hash() const = 0;
+        virtual StringView source() const = 0;
+        StringView getRange(int start, int end) const
         {
-            return source().substringSharingImpl(start, end - start);
+            return source().substring(start, end - start);
         }
 
-        const String& url() { return m_url; }
+        const String& url() const { return m_url; }
+        const String& sourceURL() const { return m_sourceURLDirective; }
+        const String& sourceMappingURL() const { return m_sourceMappingURLDirective; }
+
         TextPosition startPosition() const { return m_startPosition; }
         intptr_t asID()
         {
-            ASSERT(this);
-            if (!this) // Be defensive in release mode.
-                return nullID;
             if (!m_id)
                 getID();
             return m_id;
@@ -66,11 +66,16 @@ namespace JSC {
         void setValid() { m_validated = true; }
 
     private:
+        template <typename T> friend class Parser;
+
+        void setSourceURLDirective(const String& sourceURL) { m_sourceURLDirective = sourceURL; }
+        void setSourceMappingURLDirective(const String& sourceMappingURL) { m_sourceMappingURLDirective = sourceMappingURL; }
 
         JS_EXPORT_PRIVATE void getID();
-        Vector<size_t>& lineStarts();
 
         String m_url;
+        String m_sourceURLDirective;
+        String m_sourceMappingURLDirective;
         TextPosition m_startPosition;
         bool m_validated : 1;
         uintptr_t m_id : sizeof(uintptr_t) * 8 - 1;
@@ -78,26 +83,69 @@ namespace JSC {
 
     class StringSourceProvider : public SourceProvider {
     public:
-        static PassRefPtr<StringSourceProvider> create(const String& source, const String& url, const TextPosition& startPosition = TextPosition::minimumPosition())
+        static Ref<StringSourceProvider> create(const String& source, const String& url, const TextPosition& startPosition = TextPosition::minimumPosition())
         {
-            return adoptRef(new StringSourceProvider(source, url, startPosition));
+            return adoptRef(*new StringSourceProvider(source, url, startPosition));
         }
 
-        virtual const String& source() const OVERRIDE
+        JS_EXPORT_PRIVATE ~StringSourceProvider() override;
+
+        unsigned hash() const override
         {
-            return m_source;
+            return m_source.get().hash();
+        }
+
+        virtual StringView source() const override
+        {
+            return m_source.get();
         }
 
     private:
         StringSourceProvider(const String& source, const String& url, const TextPosition& startPosition)
             : SourceProvider(url, startPosition)
-            , m_source(source)
+            , m_source(source.isNull() ? *StringImpl::empty() : *source.impl())
+        {
+        }
+
+        Ref<StringImpl> m_source;
+    };
+    
+#if ENABLE(WEBASSEMBLY)
+    class WebAssemblySourceProvider : public SourceProvider {
+    public:
+        static Ref<WebAssemblySourceProvider> create(const Vector<uint8_t>& data, const String& url)
+        {
+            return adoptRef(*new WebAssemblySourceProvider(data, url));
+        }
+
+        unsigned hash() const override
+        {
+            return m_source.impl()->hash();
+        }
+
+        virtual StringView source() const override
+        {
+            return m_source;
+        }
+
+        const Vector<uint8_t>& data() const
+        {
+            return m_data;
+        }
+
+    private:
+        WebAssemblySourceProvider(const Vector<uint8_t>& data, const String& url)
+            : SourceProvider(url, TextPosition::minimumPosition())
+            , m_source("[WebAssembly source]")
+            , m_data(data)
         {
         }
 
         String m_source;
+        Vector<uint8_t> m_data;
     };
-    
+#endif
+
 } // namespace JSC
 
 #endif // SourceProvider_h

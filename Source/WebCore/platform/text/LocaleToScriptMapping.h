@@ -31,13 +31,13 @@
 #ifndef LocaleToScriptMapping_h
 #define LocaleToScriptMapping_h
 
+#include <unicode/uscript.h>
 #include <wtf/Forward.h>
-#include <wtf/unicode/Unicode.h>
 
 namespace WebCore {
 
 UScriptCode localeToScriptCodeForFontSelection(const String&);
-UScriptCode scriptNameToCode(const String&);
+WEBCORE_EXPORT UScriptCode scriptNameToCode(const String&);
 
 }
 

@@ -24,13 +24,16 @@
  */
 
 #include "config.h"
+
+#if WK_HAVE_C_SPI
+
 #include "JavaScriptTest.h"
 #include "PlatformUtilities.h"
 #include "PlatformWebView.h"
 
-#include <WebKit2/WKContext.h>
-#include <WebKit2/WKFrame.h>
-#include <WebKit2/WKRetainPtr.h>
+#include <WebKit/WKContext.h>
+#include <WebKit/WKFrame.h>
+#include <WebKit/WKRetainPtr.h>
 
 namespace TestWebKitAPI {
 
@@ -59,27 +62,30 @@ TEST(WebKit2, LoadCanceledNoServerRedirectCallback)
 {
     WKRetainPtr<WKContextRef> context(AdoptWK, Util::createContextForInjectedBundleTest("LoadCanceledNoServerRedirectCallbackTest"));
     
-    WKContextInjectedBundleClient injectedBundleClient;
+    WKContextInjectedBundleClientV0 injectedBundleClient;
     memset(&injectedBundleClient, 0, sizeof(injectedBundleClient));
-    injectedBundleClient.version = 0;
-    injectedBundleClient.clientInfo = 0;
-    WKContextSetInjectedBundleClient(context.get(), &injectedBundleClient);
+
+    injectedBundleClient.base.version = 0;
+
+    WKContextSetInjectedBundleClient(context.get(), &injectedBundleClient.base);
 
     PlatformWebView webView(context.get());
 
-    WKPageLoaderClient loaderClient;
+    WKPageLoaderClientV0 loaderClient;
     memset(&loaderClient, 0, sizeof(loaderClient));
     
-    loaderClient.version = 0;
+    loaderClient.base.version = 0;
     loaderClient.didFinishLoadForFrame = didFinishLoadForFrame;
-    WKPageSetPageLoaderClient(webView.page(), &loaderClient);
+
+    WKPageSetPageLoaderClient(webView.page(), &loaderClient.base);
     
-    WKContextHistoryClient historyClient;
+    WKContextHistoryClientV0 historyClient;
     memset(&historyClient, 0, sizeof(historyClient));
     
-    historyClient.version = 0;
+    historyClient.base.version = 0;
     historyClient.didPerformServerRedirect = didPerformServerRedirect;
-    WKContextSetHistoryClient(context.get(), &historyClient);
+
+    WKContextSetHistoryClient(context.get(), &historyClient.base);
 
     WKRetainPtr<WKURLRef> url(AdoptWK, Util::createURLForResource("simple-iframe", "html"));
     WKPageLoadURL(webView.page(), url.get());
@@ -90,3 +96,5 @@ TEST(WebKit2, LoadCanceledNoServerRedirectCallback)
 }
 
 } // namespace TestWebKitAPI
+
+#endif

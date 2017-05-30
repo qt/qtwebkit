@@ -42,43 +42,33 @@ public:
     public:
         virtual ~Client() { }
         
-        virtual void didFinishLaunching(ProcessLauncher*, CoreIPC::Connection::Identifier) = 0;
+        virtual void didFinishLaunching(ProcessLauncher*, IPC::Connection::Identifier) = 0;
     };
     
-    enum ProcessType {
-        WebProcess,
-#if ENABLE(PLUGIN_PROCESS)
-        PluginProcess,
+    enum class ProcessType {
+        Web,
+#if ENABLE(NETSCAPE_PLUGIN_API)
+        Plugin32,
+        Plugin64,
 #endif
-#if ENABLE(NETWORK_PROCESS)
-        NetworkProcess,
-#endif
-#if ENABLE(SHARED_WORKER_PROCESS)
-        SharedWorkerProcess
+        Network,
+#if ENABLE(DATABASE_PROCESS)
+        Database,
 #endif
     };
 
     struct LaunchOptions {
         ProcessType processType;
         HashMap<String, String> extraInitializationData;
-#if PLATFORM(MAC)
-        static const cpu_type_t MatchCurrentArchitecture = 0;
-        cpu_type_t architecture;
-        bool executableHeap;
-#if HAVE(XPC)
-        bool useXPC;
-#endif
-#endif
-#if PLATFORM(EFL)
-#ifndef NDEBUG
+
+#if (PLATFORM(EFL) || PLATFORM(GTK)) && !defined(NDEBUG)
         String processCmdPrefix;
-#endif
 #endif
     };
 
-    static PassRefPtr<ProcessLauncher> create(Client* client, const LaunchOptions& launchOptions)
+    static Ref<ProcessLauncher> create(Client* client, const LaunchOptions& launchOptions)
     {
-        return adoptRef(new ProcessLauncher(client, launchOptions));
+        return adoptRef(*new ProcessLauncher(client, launchOptions));
     }
 
     bool isLaunching() const { return m_isLaunching; }
@@ -87,14 +77,11 @@ public:
     void terminateProcess();
     void invalidate();
 
-    static bool getProcessTypeFromString(const char*, ProcessType&);
-    static const char* processTypeAsString(ProcessType);
-
 private:
     ProcessLauncher(Client*, const LaunchOptions& launchOptions);
 
     void launchProcess();
-    void didFinishLaunchingProcess(PlatformProcessIdentifier, CoreIPC::Connection::Identifier);
+    void didFinishLaunchingProcess(PlatformProcessIdentifier, IPC::Connection::Identifier);
 
     void platformInvalidate();
 

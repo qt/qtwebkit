@@ -23,16 +23,11 @@
 #ifndef FEConvolveMatrix_h
 #define FEConvolveMatrix_h
 
-#if ENABLE(FILTERS)
 #include "FilterEffect.h"
 #include "FloatPoint.h"
 #include "FloatSize.h"
 #include "Filter.h"
 #include <wtf/Vector.h>
-
-namespace WTF {
-template<typename Type> class ParallelJobs;
-}
 
 namespace WebCore {
 
@@ -45,7 +40,7 @@ enum EdgeModeType {
 
 class FEConvolveMatrix : public FilterEffect {
 public:
-    static PassRefPtr<FEConvolveMatrix> create(Filter*, const IntSize&,
+    static Ref<FEConvolveMatrix> create(Filter&, const IntSize&,
             float, float, const IntPoint&, EdgeModeType, const FloatPoint&,
             bool, const Vector<float>&);
 
@@ -90,7 +85,7 @@ private:
         float bias;
     };
 
-    FEConvolveMatrix(Filter*, const IntSize&, float, float,
+    FEConvolveMatrix(Filter&, const IntSize&, float, float,
             const IntPoint&, EdgeModeType, const FloatPoint&, bool, const Vector<float>&);
 
     template<bool preserveAlphaValues>
@@ -108,20 +103,6 @@ private:
     // Parallelization parts
     static const int s_minimalRectDimension = (100 * 100); // Empirical data limit for parallel jobs
 
-    template<typename Type>
-    friend class WTF::ParallelJobs;
-
-    struct InteriorPixelParameters {
-        FEConvolveMatrix* filter;
-        PaintingData* paintingData;
-        int clipBottom;
-        int clipRight;
-        int yStart;
-        int yEnd;
-    };
-
-    static void setInteriorPixelsWorker(InteriorPixelParameters*);
-
     IntSize m_kernelSize;
     float m_divisor;
     float m_bias;
@@ -133,7 +114,5 @@ private:
 };
 
 } // namespace WebCore
-
-#endif // ENABLE(FILTERS)
 
 #endif // FEConvolveMatrix_h

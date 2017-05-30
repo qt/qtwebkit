@@ -22,22 +22,23 @@
 #define CSSInheritedValue_h
 
 #include "CSSValue.h"
-#include <wtf/PassRefPtr.h>
+#include <wtf/NeverDestroyed.h>
 
 namespace WebCore {
 
 class CSSInheritedValue : public CSSValue {
 public:
-    static PassRefPtr<CSSInheritedValue> create()
-    {
-        return adoptRef(new CSSInheritedValue);
-    }
-
-    String customCssText() const;
+    String customCSSText() const;
 
     bool equals(const CSSInheritedValue&) const { return true; }
 
+#if COMPILER(MSVC)
+    // FIXME: This should be private, but for some reason MSVC then fails to invoke it from LazyNeverDestroyed::construct.
+public:
+#else
 private:
+    friend class LazyNeverDestroyed<CSSInheritedValue>;
+#endif
     CSSInheritedValue()
         : CSSValue(InheritedClass)
     {
@@ -45,5 +46,7 @@ private:
 };
 
 } // namespace WebCore
+
+SPECIALIZE_TYPE_TRAITS_CSS_VALUE(CSSInheritedValue, isInheritedValue())
 
 #endif // CSSInheritedValue_h

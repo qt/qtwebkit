@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2011 Google Inc. All rights reserved.
+ * Copyright (C) 2013 Nokia Corporation and/or its subsidiary(-ies).
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,29 +28,39 @@
 
 #if ENABLE(MEDIA_STREAM)
 
+#include "URLRegistry.h"
 #include <wtf/HashMap.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/text/StringHash.h>
 
 namespace WebCore {
 
-class KURL;
 class MediaStream;
-class MediaStreamDescriptor;
+class MediaStreamPrivate;
+class URL;
 
-class MediaStreamRegistry {
+class MediaStreamRegistry final : public URLRegistry {
 public:
+    friend class NeverDestroyed<MediaStreamRegistry>;
+
     // Returns a single instance of MediaStreamRegistry.
-    static MediaStreamRegistry& registry();
+    static MediaStreamRegistry& shared();
 
     // Registers a blob URL referring to the specified stream data.
-    void registerMediaStreamURL(const KURL&, PassRefPtr<MediaStream>);
-    void unregisterMediaStreamURL(const KURL&);
+    virtual void registerURL(SecurityOrigin*, const URL&, URLRegistrable*) override;
+    virtual void unregisterURL(const URL&) override;
 
-    MediaStreamDescriptor* lookupMediaStreamDescriptor(const String& url);
+    virtual URLRegistrable* lookup(const String&) const override;
+
+    void registerStream(MediaStream&);
+    void unregisterStream(MediaStream&);
+
+    MediaStream* lookUp(const URL&) const;
+    MediaStream* lookUp(const MediaStreamPrivate&) const;
 
 private:
-    HashMap<String, RefPtr<MediaStreamDescriptor> > m_streamDescriptors;
+    MediaStreamRegistry();
+    HashMap<String, RefPtr<MediaStream>> m_mediaStreams;
 };
 
 } // namespace WebCore

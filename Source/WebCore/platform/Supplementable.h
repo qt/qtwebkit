@@ -28,8 +28,7 @@
 
 #include <wtf/Assertions.h>
 #include <wtf/HashMap.h>
-#include <wtf/OwnPtr.h>
-#include <wtf/PassOwnPtr.h>
+#include <wtf/MainThread.h>
 
 #if !ASSERT_DISABLED
 #include <wtf/Threading.h>
@@ -79,13 +78,13 @@ template<typename T>
 class Supplement {
 public:
     virtual ~Supplement() { }
-#if !ASSERT_DISABLED || defined(ADDRESS_SANITIZER)
+#if !ASSERT_DISABLED || ENABLE(SECURITY_ASSERTIONS)
     virtual bool isRefCountedWrapper() const { return false; }
 #endif
 
-    static void provideTo(Supplementable<T>* host, const char* key, PassOwnPtr<Supplement<T> > supplement)
+    static void provideTo(Supplementable<T>* host, const char* key, std::unique_ptr<Supplement<T>> supplement)
     {
-        host->provideSupplement(key, supplement);
+        host->provideSupplement(key, WTFMove(supplement));
     }
 
     static Supplement<T>* from(Supplementable<T>* host, const char* key)
@@ -97,22 +96,22 @@ public:
 template<typename T>
 class Supplementable {
 public:
-    void provideSupplement(const char* key, PassOwnPtr<Supplement<T> > supplement)
+    void provideSupplement(const char* key, std::unique_ptr<Supplement<T>> supplement)
     {
-        ASSERT(m_threadId == currentThread());
+        ASSERT(canAccessThreadLocalDataForThread(m_threadId));
         ASSERT(!m_supplements.get(key));
-        m_supplements.set(key, supplement);
+        m_supplements.set(key, WTFMove(supplement));
     }
 
     void removeSupplement(const char* key)
     {
-        ASSERT(m_threadId == currentThread());
+        ASSERT(canAccessThreadLocalDataForThread(m_threadId));
         m_supplements.remove(key);
     }
 
     Supplement<T>* requireSupplement(const char* key)
     {
-        ASSERT(m_threadId == currentThread());
+        ASSERT(canAccessThreadLocalDataForThread(m_threadId));
         return m_supplements.get(key);
     }
 
@@ -122,7 +121,7 @@ protected:
 #endif
 
 private:
-    typedef HashMap<const char*, OwnPtr<Supplement<T> >, PtrHash<const char*> > SupplementMap;
+    typedef HashMap<const char*, std::unique_ptr<Supplement<T>>, PtrHash<const char*>> SupplementMap;
     SupplementMap m_supplements;
 #if !ASSERT_DISABLED
     ThreadIdentifier m_threadId;

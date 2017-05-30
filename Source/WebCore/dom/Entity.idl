@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006 Apple Computer, Inc.
+ * Copyright (C) 2006 Apple Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -16,7 +16,11 @@
  * the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
  * Boston, MA 02110-1301, USA.
  */
+
+#if defined(LANGUAGE_OBJECTIVE_C) && LANGUAGE_OBJECTIVE_C
+
 [
+    NoInterfaceObject,
     ImplementationLacksVTable
 ] interface Entity : Node {
     [TreatReturnedNullStringAs=Null] readonly attribute DOMString publicId;
@@ -24,3 +28,4 @@
     [TreatReturnedNullStringAs=Null] readonly attribute DOMString notationName;
 };
 
+#endif

@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 1999 Lars Knoll (knoll@kde.org)
  *           (C) 1999 Antti Koivisto (koivisto@kde.org)
- * Copyright (C) 2004, 2005, 2006, 2007, 2010 Apple Inc. All rights reserved.
+ * Copyright (C) 2004, 2005, 2006, 2007, 2010, 2015 Apple Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -23,22 +23,24 @@
 #include "HTMLImageLoader.h"
 
 #include "CachedImage.h"
+#include "DOMWindow.h"
 #include "Element.h"
 #include "Event.h"
 #include "EventNames.h"
 #include "HTMLNames.h"
 #include "HTMLObjectElement.h"
 #include "HTMLParserIdioms.h"
+#include "HTMLVideoElement.h"
 #include "Settings.h"
 
 #include "JSDOMWindowBase.h"
+#include <runtime/JSCInlines.h>
 #include <runtime/JSLock.h>
-#include <runtime/Operations.h>
 
 namespace WebCore {
 
-HTMLImageLoader::HTMLImageLoader(Element* node)
-    : ImageLoader(node)
+HTMLImageLoader::HTMLImageLoader(Element& element)
+    : ImageLoader(element)
 {
 }
 
@@ -48,20 +50,22 @@ HTMLImageLoader::~HTMLImageLoader()
 
 void HTMLImageLoader::dispatchLoadEvent()
 {
+#if ENABLE(VIDEO)
     // HTMLVideoElement uses this class to load the poster image, but it should not fire events for loading or failure.
-    if (element()->hasTagName(HTMLNames::videoTag))
+    if (is<HTMLVideoElement>(element()))
         return;
+#endif
 
     bool errorOccurred = image()->errorOccurred();
     if (!errorOccurred && image()->response().httpStatusCode() >= 400)
-        errorOccurred = element()->hasTagName(HTMLNames::objectTag); // An <object> considers a 404 to be an error and should fire onerror.
-    element()->dispatchEvent(Event::create(errorOccurred ? eventNames().errorEvent : eventNames().loadEvent, false, false));
+        errorOccurred = is<HTMLObjectElement>(element()); // An <object> considers a 404 to be an error and should fire onerror.
+    element().dispatchEvent(Event::create(errorOccurred ? eventNames().errorEvent : eventNames().loadEvent, false, false));
 }
 
 String HTMLImageLoader::sourceURI(const AtomicString& attr) const
 {
 #if ENABLE(DASHBOARD_SUPPORT)
-    Settings* settings = element()->document()->settings();
+    Settings* settings = element().document().settings();
     if (settings && settings->usesDashboardBackwardCompatibilityMode() && attr.length() > 7 && attr.startsWith("url(\"") && attr.endsWith("\")"))
         return attr.string().substring(5, attr.length() - 7);
 #endif
@@ -73,20 +77,22 @@ void HTMLImageLoader::notifyFinished(CachedResource*)
 {
     CachedImage* cachedImage = image();
 
-    RefPtr<Element> element = this->element();
+    Ref<Element> protect(element());
     ImageLoader::notifyFinished(cachedImage);
 
     bool loadError = cachedImage->errorOccurred() || cachedImage->response().httpStatusCode() >= 400;
     if (!loadError) {
-        if (!element->inDocument()) {
-            JSC::VM* vm = JSDOMWindowBase::commonVM();
+        if (!element().inDocument()) {
+            JSC::VM& vm = JSDOMWindowBase::commonVM();
             JSC::JSLockHolder lock(vm);
-            vm->heap.reportExtraMemoryCost(cachedImage->encodedSize());
+            // FIXME: Adopt reportExtraMemoryVisited, and switch to reportExtraMemoryAllocated.
+            // https://bugs.webkit.org/show_bug.cgi?id=142595
+            vm.heap.deprecatedReportExtraMemory(cachedImage->encodedSize());
         }
     }
 
-    if (loadError && element->hasTagName(HTMLNames::objectTag))
-        static_cast<HTMLObjectElement*>(element.get())->renderFallbackContent();
+    if (loadError && is<HTMLObjectElement>(element()))
+        downcast<HTMLObjectElement>(element()).renderFallbackContent();
 }
 
 }

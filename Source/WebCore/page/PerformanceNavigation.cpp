@@ -49,15 +49,15 @@ unsigned short PerformanceNavigation::type() const
     if (!m_frame)
         return TYPE_NAVIGATE;
 
-    DocumentLoader* documentLoader = m_frame->loader()->documentLoader();
+    DocumentLoader* documentLoader = m_frame->loader().documentLoader();
     if (!documentLoader)
         return TYPE_NAVIGATE;
 
     WebCore::NavigationType navigationType = documentLoader->triggeringAction().type();
     switch (navigationType) {
-    case NavigationTypeReload:
+    case NavigationType::Reload:
         return TYPE_RELOAD;
-    case NavigationTypeBackForward:
+    case NavigationType::BackForward:
         return TYPE_BACK_FORWARD;
     default:
         return TYPE_NAVIGATE;
@@ -69,15 +69,15 @@ unsigned short PerformanceNavigation::redirectCount() const
     if (!m_frame)
         return 0;
 
-    DocumentLoader* loader = m_frame->loader()->documentLoader();
+    DocumentLoader* loader = m_frame->loader().documentLoader();
     if (!loader)
         return 0;
 
-    DocumentLoadTiming* timing = loader->timing();
-    if (timing->hasCrossOriginRedirect())
+    DocumentLoadTiming& timing = loader->timing();
+    if (timing.hasCrossOriginRedirect())
         return 0;
 
-    return timing->redirectCount();
+    return timing.redirectCount();
 }
 
 } // namespace WebCore

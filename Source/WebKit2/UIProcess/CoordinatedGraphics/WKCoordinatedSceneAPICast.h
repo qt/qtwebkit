@@ -12,10 +12,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -28,21 +28,22 @@
 #ifndef WKCoordinatedSceneAPICast_h
 #define WKCoordinatedSceneAPICast_h
 
-#include <WebKit2/WKCoordinatedScene.h>
+#include <WebKit/WKCoordinatedScene.h>
 
 namespace WebCore {
-
-class CoordinatedGraphicsScene;
 class TextureMapperLayer;
-
-} // namespace WebCore
-
-inline WebCore::CoordinatedGraphicsScene* toImpl(WKCoordinatedScene scene)
-{
-    return reinterpret_cast<WebCore::CoordinatedGraphicsScene*>(scene);
 }
 
-inline WKCoordinatedScene toAPI(WebCore::CoordinatedGraphicsScene* scene)
+namespace WebKit {
+
+class CoordinatedGraphicsScene;
+
+inline WebKit::CoordinatedGraphicsScene* toImpl(WKCoordinatedScene scene)
+{
+    return reinterpret_cast<WebKit::CoordinatedGraphicsScene*>(scene);
+}
+
+inline WKCoordinatedScene toAPI(WebKit::CoordinatedGraphicsScene* scene)
 {
     return reinterpret_cast<WKCoordinatedScene>(scene);
 }
@@ -56,5 +57,7 @@ inline WKCoordinatedSceneLayer toAPI(WebCore::TextureMapperLayer* layer)
 {
     return reinterpret_cast<WKCoordinatedSceneLayer>(layer);
 }
+
+} // namespace WebKit
 
 #endif // WKCoordinatedSceneAPICast_h

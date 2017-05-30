@@ -26,22 +26,32 @@
 #ifndef ThunkGenerators_h
 #define ThunkGenerators_h
 
+#include "CodeSpecializationKind.h"
 #include "ThunkGenerator.h"
 
 #if ENABLE(JIT)
 namespace JSC {
 
-MacroAssemblerCodeRef linkCallGenerator(VM*);
-MacroAssemblerCodeRef linkConstructGenerator(VM*);
-MacroAssemblerCodeRef linkClosureCallGenerator(VM*);
-MacroAssemblerCodeRef virtualCallGenerator(VM*);
-MacroAssemblerCodeRef virtualConstructGenerator(VM*);
-MacroAssemblerCodeRef stringLengthTrampolineGenerator(VM*);
+class CallLinkInfo;
+class CCallHelpers;
+
+MacroAssemblerCodeRef throwExceptionFromCallSlowPathGenerator(VM*);
+
+MacroAssemblerCodeRef linkCallThunk(VM*, CallLinkInfo&, CodeSpecializationKind);
+MacroAssemblerCodeRef linkCallThunkGenerator(VM*);
+MacroAssemblerCodeRef linkPolymorphicCallThunkGenerator(VM*);
+
+MacroAssemblerCodeRef virtualThunkFor(VM*, CallLinkInfo&);
+
 MacroAssemblerCodeRef nativeCallGenerator(VM*);
 MacroAssemblerCodeRef nativeConstructGenerator(VM*);
+MacroAssemblerCodeRef nativeTailCallGenerator(VM*);
+MacroAssemblerCodeRef arityFixupGenerator(VM*);
+MacroAssemblerCodeRef unreachableGenerator(VM*);
 
 MacroAssemblerCodeRef charCodeAtThunkGenerator(VM*);
 MacroAssemblerCodeRef charAtThunkGenerator(VM*);
+MacroAssemblerCodeRef clz32ThunkGenerator(VM*);
 MacroAssemblerCodeRef fromCharCodeThunkGenerator(VM*);
 MacroAssemblerCodeRef absThunkGenerator(VM*);
 MacroAssemblerCodeRef ceilThunkGenerator(VM*);
@@ -52,6 +62,7 @@ MacroAssemblerCodeRef roundThunkGenerator(VM*);
 MacroAssemblerCodeRef sqrtThunkGenerator(VM*);
 MacroAssemblerCodeRef powThunkGenerator(VM*);
 MacroAssemblerCodeRef imulThunkGenerator(VM*);
+MacroAssemblerCodeRef randomThunkGenerator(VM*);
 
 }
 #endif // ENABLE(JIT)

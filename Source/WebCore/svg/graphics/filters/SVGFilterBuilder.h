@@ -21,12 +21,10 @@
 #ifndef SVGFilterBuilder_h
 #define SVGFilterBuilder_h
 
-#if ENABLE(SVG) && ENABLE(FILTERS)
 #include "FilterEffect.h"
 
 #include <wtf/HashMap.h>
 #include <wtf/HashSet.h>
-#include <wtf/PassRefPtr.h>
 #include <wtf/text/AtomicStringHash.h>
 #include <wtf/text/WTFString.h>
 
@@ -34,18 +32,18 @@ namespace WebCore {
 
 class RenderObject;
 
-class SVGFilterBuilder : public RefCounted<SVGFilterBuilder> {
+class SVGFilterBuilder {
 public:
     typedef HashSet<FilterEffect*> FilterEffectSet;
 
-    static PassRefPtr<SVGFilterBuilder> create(PassRefPtr<FilterEffect> sourceGraphic, PassRefPtr<FilterEffect> sourceAlpha) { return adoptRef(new SVGFilterBuilder(sourceGraphic, sourceAlpha)); }
+    SVGFilterBuilder(RefPtr<FilterEffect> sourceGraphic);
 
-    void add(const AtomicString& id, PassRefPtr<FilterEffect>);
+    void add(const AtomicString& id, RefPtr<FilterEffect>);
 
     FilterEffect* getEffectById(const AtomicString& id) const;
     FilterEffect* lastEffect() const { return m_lastEffect.get(); }
 
-    void appendEffectToEffectReferences(PassRefPtr<FilterEffect>, RenderObject*);
+    void appendEffectToEffectReferences(RefPtr<FilterEffect>&&, RenderObject*);
 
     inline FilterEffectSet& effectReferences(FilterEffect* effect)
     {
@@ -61,17 +59,14 @@ public:
     void clearResultsRecursive(FilterEffect*);
 
 private:
-    SVGFilterBuilder(PassRefPtr<FilterEffect> sourceGraphic, PassRefPtr<FilterEffect> sourceAlpha);
-
     inline void addBuiltinEffects()
     {
-        HashMap<AtomicString, RefPtr<FilterEffect> >::iterator end = m_builtinEffects.end();
-        for (HashMap<AtomicString, RefPtr<FilterEffect> >::iterator iterator = m_builtinEffects.begin(); iterator != end; ++iterator)
-             m_effectReferences.add(iterator->value, FilterEffectSet());
+        for (auto& effect : m_builtinEffects.values())
+            m_effectReferences.add(effect, FilterEffectSet());
     }
 
-    HashMap<AtomicString, RefPtr<FilterEffect> > m_builtinEffects;
-    HashMap<AtomicString, RefPtr<FilterEffect> > m_namedEffects;
+    HashMap<AtomicString, RefPtr<FilterEffect>> m_builtinEffects;
+    HashMap<AtomicString, RefPtr<FilterEffect>> m_namedEffects;
     // The value is a list, which contains those filter effects,
     // which depends on the key filter effect.
     HashMap<RefPtr<FilterEffect>, FilterEffectSet> m_effectReferences;
@@ -82,5 +77,4 @@ private:
     
 } // namespace WebCore
 
-#endif // ENABLE(SVG) && ENABLE(FILTERS)
 #endif // SVGFilterBuilder_h

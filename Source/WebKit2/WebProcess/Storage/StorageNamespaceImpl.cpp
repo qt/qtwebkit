@@ -31,102 +31,66 @@
 #include "WebPage.h"
 #include "WebPageGroupProxy.h"
 #include "WebProcess.h"
-#include <WebCore/GroupSettings.h>
 #include <WebCore/PageGroup.h>
 #include <WebCore/SecurityOrigin.h>
 #include <WebCore/Settings.h>
+#include <wtf/NeverDestroyed.h>
 
 using namespace WebCore;
 
 namespace WebKit {
 
-typedef HashMap<uint64_t, StorageNamespaceImpl*> LocalStorageNamespaceMap;
-
-static LocalStorageNamespaceMap& localStorageNamespaceMap()
+RefPtr<StorageNamespaceImpl> StorageNamespaceImpl::createSessionStorageNamespace(uint64_t identifier, unsigned quotaInBytes)
 {
-    DEFINE_STATIC_LOCAL(LocalStorageNamespaceMap, localStorageNamespaceMap, ());
-    return localStorageNamespaceMap;
+    return adoptRef(new StorageNamespaceImpl(SessionStorage, identifier, nullptr, quotaInBytes));
 }
 
-PassRefPtr<StorageNamespaceImpl> StorageNamespaceImpl::createLocalStorageNamespace(PageGroup* pageGroup)
+RefPtr<StorageNamespaceImpl> StorageNamespaceImpl::createLocalStorageNamespace(uint64_t identifier, unsigned quotaInBytes)
 {
-    uint64_t pageGroupID = WebProcess::shared().webPageGroup(pageGroup)->pageGroupID();
-
-    LocalStorageNamespaceMap::AddResult result = localStorageNamespaceMap().add(pageGroupID, 0);
-    if (!result.isNewEntry)
-        return result.iterator->value;
-
-    unsigned quota = pageGroup->groupSettings()->localStorageQuotaBytes();
-    RefPtr<StorageNamespaceImpl> localStorageNamespace = adoptRef(new StorageNamespaceImpl(LocalStorage, pageGroupID, quota));
-
-    result.iterator->value = localStorageNamespace.get();
-    return localStorageNamespace.release();
+    return adoptRef(new StorageNamespaceImpl(LocalStorage, identifier, nullptr, quotaInBytes));
 }
 
-PassRefPtr<StorageNamespaceImpl> StorageNamespaceImpl::createSessionStorageNamespace(WebPage* webPage)
+RefPtr<StorageNamespaceImpl> StorageNamespaceImpl::createTransientLocalStorageNamespace(uint64_t identifier, WebCore::SecurityOrigin& topLevelOrigin, uint64_t quotaInBytes)
 {
-    return adoptRef(new StorageNamespaceImpl(SessionStorage, webPage->pageID(), webPage->corePage()->settings()->sessionStorageQuota()));
+    return adoptRef(new StorageNamespaceImpl(LocalStorage, identifier, &topLevelOrigin, quotaInBytes));
 }
 
-StorageNamespaceImpl::StorageNamespaceImpl(WebCore::StorageType storageType, uint64_t storageNamespaceID, unsigned quotaInBytes)
+StorageNamespaceImpl::StorageNamespaceImpl(WebCore::StorageType storageType, uint64_t storageNamespaceID, WebCore::SecurityOrigin* topLevelOrigin, unsigned quotaInBytes)
     : m_storageType(storageType)
     , m_storageNamespaceID(storageNamespaceID)
+    , m_topLevelOrigin(topLevelOrigin)
     , m_quotaInBytes(quotaInBytes)
 {
 }
 
 StorageNamespaceImpl::~StorageNamespaceImpl()
 {
-    if (m_storageType == LocalStorage) {
-        ASSERT(localStorageNamespaceMap().contains(m_storageNamespaceID));
-        localStorageNamespaceMap().remove(m_storageNamespaceID);
-    }
 }
 
-PassRefPtr<StorageArea> StorageNamespaceImpl::storageArea(PassRefPtr<SecurityOrigin> securityOrigin)
+void StorageNamespaceImpl::didDestroyStorageAreaMap(StorageAreaMap& map)
 {
-    HashMap<RefPtr<WebCore::SecurityOrigin>, RefPtr<StorageAreaMap> >::AddResult result = m_storageAreaMaps.add(securityOrigin.get(), 0);
-    if (result.isNewEntry)
-        result.iterator->value = StorageAreaMap::create(this, securityOrigin);
-
-    return StorageAreaImpl::create(result.iterator->value);
+    m_storageAreaMaps.remove(&map.securityOrigin());
 }
 
-PassRefPtr<StorageNamespace> StorageNamespaceImpl::copy(Page* newPage)
+RefPtr<StorageArea> StorageNamespaceImpl::storageArea(RefPtr<SecurityOrigin>&& securityOrigin)
+{
+    RefPtr<StorageAreaMap> map;
+
+    auto& slot = m_storageAreaMaps.add(securityOrigin.get(), nullptr).iterator->value;
+    if (!slot) {
+        map = StorageAreaMap::create(this, *securityOrigin);
+        slot = map.get();
+    } else
+        map = slot;
+
+    return StorageAreaImpl::create(WTFMove(map));
+}
+
+RefPtr<StorageNamespace> StorageNamespaceImpl::copy(Page* newPage)
 {
     ASSERT(m_storageNamespaceID);
 
-    return createSessionStorageNamespace(WebPage::fromCorePage(newPage));
-}
-
-void StorageNamespaceImpl::close()
-{
-    // FIXME: Implement this.
-    ASSERT_NOT_REACHED();
-}
-
-void StorageNamespaceImpl::clearOriginForDeletion(SecurityOrigin*)
-{
-    // FIXME: Implement this.
-    ASSERT_NOT_REACHED();
-}
-
-void StorageNamespaceImpl::clearAllOriginsForDeletion()
-{
-    // FIXME: Implement this.
-    ASSERT_NOT_REACHED();
-}
-
-void StorageNamespaceImpl::sync()
-{
-    // FIXME: Implement this.
-    ASSERT_NOT_REACHED();
-}
-
-void StorageNamespaceImpl::closeIdleLocalStorageDatabases()
-{
-    // FIXME: Implement this.
-    ASSERT_NOT_REACHED();
+    return createSessionStorageNamespace(WebPage::fromCorePage(newPage)->pageID(), m_quotaInBytes);
 }
 
 } // namespace WebKit

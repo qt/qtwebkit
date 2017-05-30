@@ -26,12 +26,13 @@
 #include "config.h"
 #include "JSDOMWrapper.h"
 
+#include "DOMWrapperWorld.h"
 #include <runtime/Error.h>
 
 using namespace JSC;
 
 namespace WebCore {
 
-ASSERT_HAS_TRIVIAL_DESTRUCTOR(JSDOMWrapper);
+STATIC_ASSERT_IS_TRIVIALLY_DESTRUCTIBLE(JSDOMObject);
 
 } // namespace WebCore

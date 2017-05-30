@@ -33,22 +33,21 @@ namespace WebCore {
     class Node;
     class NodeFilter;
 
-    class Traversal {
+    class NodeIteratorBase {
     public:
         Node* root() const { return m_root.get(); }
-        unsigned whatToShow() const { return m_whatToShow; }
+        unsigned long whatToShow() const { return m_whatToShow; }
         NodeFilter* filter() const { return m_filter.get(); }
-        bool expandEntityReferences() const { return m_expandEntityReferences; }
+        bool expandEntityReferences() const { return false; }
 
     protected:
-        Traversal(PassRefPtr<Node>, unsigned whatToShow, PassRefPtr<NodeFilter>, bool expandEntityReferences);
-        short acceptNode(ScriptState*, Node*) const;
+        NodeIteratorBase(Node&, unsigned long whatToShow, RefPtr<NodeFilter>&&);
+        short acceptNode(Node*) const;
 
     private:
         RefPtr<Node> m_root;
-        unsigned m_whatToShow;
+        unsigned long m_whatToShow;
         RefPtr<NodeFilter> m_filter;
-        bool m_expandEntityReferences;
     };
 
 } // namespace WebCore

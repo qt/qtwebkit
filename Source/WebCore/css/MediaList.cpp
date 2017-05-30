@@ -23,7 +23,6 @@
 #include "CSSImportRule.h"
 #include "CSSParser.h"
 #include "CSSStyleSheet.h"
-#include "Console.h"
 #include "DOMWindow.h"
 #include "Document.h"
 #include "ExceptionCode.h"
@@ -31,6 +30,7 @@
 #include "MediaQuery.h"
 #include "MediaQueryExp.h"
 #include "ScriptableDocumentParser.h"
+#include <wtf/NeverDestroyed.h>
 #include <wtf/text/StringBuilder.h>
 
 namespace WebCore {
@@ -125,7 +125,7 @@ bool MediaQuerySet::parse(const String& mediaString)
 {
     CSSParser parser(CSSStrictMode);
     
-    Vector<OwnPtr<MediaQuery> > result;
+    Vector<std::unique_ptr<MediaQuery>> result;
     Vector<String> list;
     mediaString.split(',', list);
     for (unsigned i = 0; i < list.size(); ++i) {
@@ -135,16 +135,16 @@ bool MediaQuerySet::parse(const String& mediaString)
                 return false;
             continue;
         }
-        OwnPtr<MediaQuery> mediaQuery = parser.parseMediaQuery(medium);
+        std::unique_ptr<MediaQuery> mediaQuery = parser.parseMediaQuery(medium);
         if (!mediaQuery) {
             if (!m_fallbackToDescriptor)
                 return false;
             String mediaDescriptor = parseMediaDescriptor(medium);
             if (mediaDescriptor.isNull())
                 continue;
-            mediaQuery = adoptPtr(new MediaQuery(MediaQuery::None, mediaDescriptor, nullptr));
+            mediaQuery = std::make_unique<MediaQuery>(MediaQuery::None, mediaDescriptor, nullptr);
         }
-        result.append(mediaQuery.release());
+        result.append(WTFMove(mediaQuery));
     }
     // ",,,," falls straight through, but is not valid unless fallback
     if (!m_fallbackToDescriptor && list.isEmpty()) {
@@ -152,7 +152,7 @@ bool MediaQuerySet::parse(const String& mediaString)
         if (!strippedMediaString.isEmpty())
             return false;
     }
-    m_queries.swap(result);
+    m_queries = WTFMove(result);
     return true;
 }
 
@@ -160,16 +160,16 @@ bool MediaQuerySet::add(const String& queryString)
 {
     CSSParser parser(CSSStrictMode);
 
-    OwnPtr<MediaQuery> parsedQuery = parser.parseMediaQuery(queryString);
+    std::unique_ptr<MediaQuery> parsedQuery = parser.parseMediaQuery(queryString);
     if (!parsedQuery && m_fallbackToDescriptor) {
         String medium = parseMediaDescriptor(queryString);
         if (!medium.isNull())
-            parsedQuery = adoptPtr(new MediaQuery(MediaQuery::None, medium, nullptr));
+            parsedQuery = std::make_unique<MediaQuery>(MediaQuery::None, medium, nullptr);
     }
     if (!parsedQuery)
         return false;
 
-    m_queries.append(parsedQuery.release());
+    m_queries.append(WTFMove(parsedQuery));
     return true;
 }
 
@@ -177,28 +177,23 @@ bool MediaQuerySet::remove(const String& queryStringToRemove)
 {
     CSSParser parser(CSSStrictMode);
 
-    OwnPtr<MediaQuery> parsedQuery = parser.parseMediaQuery(queryStringToRemove);
+    std::unique_ptr<MediaQuery> parsedQuery = parser.parseMediaQuery(queryStringToRemove);
     if (!parsedQuery && m_fallbackToDescriptor) {
         String medium = parseMediaDescriptor(queryStringToRemove);
         if (!medium.isNull())
-            parsedQuery = adoptPtr(new MediaQuery(MediaQuery::None, medium, nullptr));
+            parsedQuery = std::make_unique<MediaQuery>(MediaQuery::None, medium, nullptr);
     }
     if (!parsedQuery)
         return false;
     
-    for (size_t i = 0; i < m_queries.size(); ++i) {
-        MediaQuery* query = m_queries[i].get();
-        if (*query == *parsedQuery) {
-            m_queries.remove(i);
-            return true;
-        }
-    }
-    return false;
+    return m_queries.removeFirstMatching([&parsedQuery] (const std::unique_ptr<MediaQuery>& query) {
+        return *query == *parsedQuery;
+    });
 }
 
-void MediaQuerySet::addMediaQuery(PassOwnPtr<MediaQuery> mediaQuery)
+void MediaQuerySet::addMediaQuery(std::unique_ptr<MediaQuery> mediaQuery)
 {
-    m_queries.append(mediaQuery);
+    m_queries.append(WTFMove(mediaQuery));
 }
 
 String MediaQuerySet::mediaText() const
@@ -249,7 +244,7 @@ void MediaList::setMediaText(const String& value, ExceptionCode& ec)
 
 String MediaList::item(unsigned index) const
 {
-    const Vector<OwnPtr<MediaQuery> >& queries = m_mediaQueries->queryVector();
+    auto& queries = m_mediaQueries->queryVector();
     if (index < queries.size())
         return queries[index]->cssText();
     return String();
@@ -294,11 +289,11 @@ static void addResolutionWarningMessageToConsole(Document* document, const Strin
     ASSERT(document);
     ASSERT(value);
 
-    DEFINE_STATIC_LOCAL(String, mediaQueryMessage, (ASCIILiteral("Consider using 'dppx' units instead of '%replacementUnits%', as in CSS '%replacementUnits%' means dots-per-CSS-%lengthUnit%, not dots-per-physical-%lengthUnit%, so does not correspond to the actual '%replacementUnits%' of a screen. In media query expression: ")));
-    DEFINE_STATIC_LOCAL(String, mediaValueDPI, (ASCIILiteral("dpi")));
-    DEFINE_STATIC_LOCAL(String, mediaValueDPCM, (ASCIILiteral("dpcm")));
-    DEFINE_STATIC_LOCAL(String, lengthUnitInch, (ASCIILiteral("inch")));
-    DEFINE_STATIC_LOCAL(String, lengthUnitCentimeter, (ASCIILiteral("centimeter")));
+    static NeverDestroyed<String> mediaQueryMessage(ASCIILiteral("Consider using 'dppx' units instead of '%replacementUnits%', as in CSS '%replacementUnits%' means dots-per-CSS-%lengthUnit%, not dots-per-physical-%lengthUnit%, so does not correspond to the actual '%replacementUnits%' of a screen. In media query expression: "));
+    static NeverDestroyed<String> mediaValueDPI(ASCIILiteral("dpi"));
+    static NeverDestroyed<String> mediaValueDPCM(ASCIILiteral("dpcm"));
+    static NeverDestroyed<String> lengthUnitInch(ASCIILiteral("inch"));
+    static NeverDestroyed<String> lengthUnitCentimeter(ASCIILiteral("centimeter"));
 
     String message;
     if (value->isDotsPerInch())
@@ -310,7 +305,7 @@ static void addResolutionWarningMessageToConsole(Document* document, const Strin
 
     message.append(serializedExpression);
 
-    document->addConsoleMessage(CSSMessageSource, DebugMessageLevel, message);
+    document->addConsoleMessage(MessageSource::CSS, MessageLevel::Debug, message);
 }
 
 void reportMediaQueryWarningIfNeeded(Document* document, const MediaQuerySet* mediaQuerySet)
@@ -318,7 +313,7 @@ void reportMediaQueryWarningIfNeeded(Document* document, const MediaQuerySet* me
     if (!mediaQuerySet || !document)
         return;
 
-    const Vector<OwnPtr<MediaQuery> >& mediaQueries = mediaQuerySet->queryVector();
+    auto& mediaQueries = mediaQuerySet->queryVector();
     const size_t queryCount = mediaQueries.size();
 
     if (!queryCount)
@@ -327,16 +322,16 @@ void reportMediaQueryWarningIfNeeded(Document* document, const MediaQuerySet* me
     for (size_t i = 0; i < queryCount; ++i) {
         const MediaQuery* query = mediaQueries[i].get();
         String mediaType = query->mediaType();
-        if (!query->ignored() && !equalIgnoringCase(mediaType, "print")) {
-            const Vector<OwnPtr<MediaQueryExp> >* exps = query->expressions();
-            for (size_t j = 0; j < exps->size(); ++j) {
-                const MediaQueryExp* exp = exps->at(j).get();
+        if (!query->ignored() && !equalLettersIgnoringASCIICase(mediaType, "print")) {
+            auto& expressions = query->expressions();
+            for (size_t j = 0; j < expressions.size(); ++j) {
+                const MediaQueryExp* exp = expressions.at(j).get();
                 if (exp->mediaFeature() == MediaFeatureNames::resolutionMediaFeature || exp->mediaFeature() == MediaFeatureNames::max_resolutionMediaFeature || exp->mediaFeature() == MediaFeatureNames::min_resolutionMediaFeature) {
                     CSSValue* cssValue =  exp->value();
-                    if (cssValue && cssValue->isPrimitiveValue()) {
-                        CSSPrimitiveValue* primitiveValue = static_cast<CSSPrimitiveValue*>(cssValue);
-                        if (primitiveValue->isDotsPerInch() || primitiveValue->isDotsPerCentimeter())
-                            addResolutionWarningMessageToConsole(document, mediaQuerySet->mediaText(), primitiveValue);
+                    if (is<CSSPrimitiveValue>(cssValue)) {
+                        CSSPrimitiveValue& primitiveValue = downcast<CSSPrimitiveValue>(*cssValue);
+                        if (primitiveValue.isDotsPerInch() || primitiveValue.isDotsPerCentimeter())
+                            addResolutionWarningMessageToConsole(document, mediaQuerySet->mediaText(), &primitiveValue);
                     }
                 }
             }

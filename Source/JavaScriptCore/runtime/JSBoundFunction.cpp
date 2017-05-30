@@ -28,11 +28,11 @@
 
 #include "GetterSetter.h"
 #include "JSGlobalObject.h"
-#include "Operations.h"
+#include "JSCInlines.h"
 
 namespace JSC {
 
-const ClassInfo JSBoundFunction::s_info = { "Function", &Base::s_info, 0, 0, CREATE_METHOD_TABLE(JSBoundFunction) };
+const ClassInfo JSBoundFunction::s_info = { "Function", &Base::s_info, 0, CREATE_METHOD_TABLE(JSBoundFunction) };
 
 EncodedJSValue JSC_HOST_CALL boundFunctionCall(ExecState* exec)
 {
@@ -45,7 +45,7 @@ EncodedJSValue JSC_HOST_CALL boundFunctionCall(ExecState* exec)
     for (unsigned i = 0; i < boundArgs->length(); ++i)
         args.append(boundArgs->getIndexQuickly(i));
     for (unsigned i = 0; i < exec->argumentCount(); ++i)
-        args.append(exec->argument(i));
+        args.append(exec->uncheckedArgument(i));
 
     JSObject* targetFunction = boundFunction->targetFunction();
     CallData callData;
@@ -65,7 +65,7 @@ EncodedJSValue JSC_HOST_CALL boundFunctionConstruct(ExecState* exec)
     for (unsigned i = 0; i < boundArgs->length(); ++i)
         args.append(boundArgs->getIndexQuickly(i));
     for (unsigned i = 0; i < exec->argumentCount(); ++i)
-        args.append(exec->argument(i));
+        args.append(exec->uncheckedArgument(i));
 
     JSObject* targetFunction = boundFunction->targetFunction();
     ConstructData constructData;
@@ -74,21 +74,29 @@ EncodedJSValue JSC_HOST_CALL boundFunctionConstruct(ExecState* exec)
     return JSValue::encode(construct(exec, targetFunction, constructType, constructData, args));
 }
 
-JSBoundFunction* JSBoundFunction::create(ExecState* exec, JSGlobalObject* globalObject, JSObject* targetFunction, JSValue boundThis, JSValue boundArgs, int length, const String& name)
+EncodedJSValue JSC_HOST_CALL isBoundFunction(ExecState* exec)
+{
+    return JSValue::encode(JSValue(static_cast<bool>(jsDynamicCast<JSBoundFunction*>(exec->uncheckedArgument(0)))));
+}
+
+EncodedJSValue JSC_HOST_CALL hasInstanceBoundFunction(ExecState* exec)
+{
+    JSBoundFunction* boundObject = jsCast<JSBoundFunction*>(exec->uncheckedArgument(0));
+    JSValue value = exec->uncheckedArgument(1);
+
+    return JSValue::encode(jsBoolean(boundObject->targetFunction()->hasInstance(exec, value)));
+}
+
+JSBoundFunction* JSBoundFunction::create(VM& vm, JSGlobalObject* globalObject, JSObject* targetFunction, JSValue boundThis, JSValue boundArgs, int length, const String& name)
 {
     ConstructData constructData;
     ConstructType constructType = JSC::getConstructData(targetFunction, constructData);
     bool canConstruct = constructType != ConstructTypeNone;
-    NativeExecutable* executable = exec->vm().getHostFunction(boundFunctionCall, canConstruct ? boundFunctionConstruct : callHostFunctionAsConstructor);
-    JSBoundFunction* function = new (NotNull, allocateCell<JSBoundFunction>(*exec->heap())) JSBoundFunction(exec, globalObject, globalObject->boundFunctionStructure(), targetFunction, boundThis, boundArgs);
+    NativeExecutable* executable = vm.getHostFunction(boundFunctionCall, canConstruct ? boundFunctionConstruct : callHostFunctionAsConstructor, ASCIILiteral("Function.prototype.bind result"));
+    JSBoundFunction* function = new (NotNull, allocateCell<JSBoundFunction>(vm.heap)) JSBoundFunction(vm, globalObject, globalObject->boundFunctionStructure(), targetFunction, boundThis, boundArgs);
 
-    function->finishCreation(exec, executable, length, name);
+    function->finishCreation(vm, executable, length, makeString("bound ", name));
     return function;
-}
-
-void JSBoundFunction::destroy(JSCell* cell)
-{
-    static_cast<JSBoundFunction*>(cell)->JSBoundFunction::~JSBoundFunction();
 }
 
 bool JSBoundFunction::customHasInstance(JSObject* object, ExecState* exec, JSValue value)
@@ -96,34 +104,37 @@ bool JSBoundFunction::customHasInstance(JSObject* object, ExecState* exec, JSVal
     return jsCast<JSBoundFunction*>(object)->m_targetFunction->hasInstance(exec, value);
 }
 
-JSBoundFunction::JSBoundFunction(ExecState* exec, JSGlobalObject* globalObject, Structure* structure, JSObject* targetFunction, JSValue boundThis, JSValue boundArgs)
-    : Base(exec, globalObject, structure)
-    , m_targetFunction(exec->vm(), this, targetFunction)
-    , m_boundThis(exec->vm(), this, boundThis)
-    , m_boundArgs(exec->vm(), this, boundArgs)
+JSBoundFunction::JSBoundFunction(VM& vm, JSGlobalObject* globalObject, Structure* structure, JSObject* targetFunction, JSValue boundThis, JSValue boundArgs)
+    : Base(vm, globalObject, structure)
+    , m_targetFunction(vm, this, targetFunction)
+    , m_boundThis(vm, this, boundThis)
+    , m_boundArgs(vm, this, boundArgs)
 {
 }
 
-void JSBoundFunction::finishCreation(ExecState* exec, NativeExecutable* executable, int length, const String& name)
+void JSBoundFunction::finishCreation(VM& vm, NativeExecutable* executable, int length, const String& name)
 {
-    Base::finishCreation(exec, executable, length, name);
-    ASSERT(inherits(&s_info));
+    Base::finishCreation(vm, executable, length, name);
+    ASSERT(inherits(info()));
 
-    putDirectAccessor(exec, exec->propertyNames().arguments, globalObject()->throwTypeErrorGetterSetter(exec), DontDelete | DontEnum | Accessor);
-    putDirectAccessor(exec, exec->propertyNames().caller, globalObject()->throwTypeErrorGetterSetter(exec), DontDelete | DontEnum | Accessor);
+    putDirectNonIndexAccessor(vm, vm.propertyNames->arguments, globalObject()->throwTypeErrorGetterSetter(vm), DontDelete | DontEnum | Accessor);
+    putDirectNonIndexAccessor(vm, vm.propertyNames->caller, globalObject()->throwTypeErrorGetterSetter(vm), DontDelete | DontEnum | Accessor);
 }
 
 void JSBoundFunction::visitChildren(JSCell* cell, SlotVisitor& visitor)
 {
     JSBoundFunction* thisObject = jsCast<JSBoundFunction*>(cell);
-    ASSERT_GC_OBJECT_INHERITS(thisObject, &s_info);
-    COMPILE_ASSERT(StructureFlags & OverridesVisitChildren, OverridesVisitChildrenWithoutSettingFlag);
-    ASSERT(thisObject->structure()->typeInfo().overridesVisitChildren());
+    ASSERT_GC_OBJECT_INHERITS(thisObject, info());
     Base::visitChildren(thisObject, visitor);
 
     visitor.append(&thisObject->m_targetFunction);
     visitor.append(&thisObject->m_boundThis);
     visitor.append(&thisObject->m_boundArgs);
+}
+
+String JSBoundFunction::toStringName(ExecState* exec)
+{
+    return m_targetFunction->get(exec, exec->vm().propertyNames->name).toWTFString(exec);
 }
 
 } // namespace JSC

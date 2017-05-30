@@ -12,10 +12,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -28,40 +28,70 @@
 #ifndef BackForwardList_h
 #define BackForwardList_h
 
-#include <wtf/Forward.h>
-#include <wtf/RefCounted.h>
+#include "BackForwardClient.h"
+#include <wtf/HashSet.h>
+#include <wtf/Vector.h>
 
 namespace WebCore {
 
-class HistoryItem;
+class Page;
 
-// FIXME: Rename this class to BackForwardClient, and rename the
-// getter in Page accordingly.
-class BackForwardList : public RefCounted<BackForwardList> {
+typedef Vector<Ref<HistoryItem>> HistoryItemVector;
+typedef HashSet<RefPtr<HistoryItem>> HistoryItemHashSet;
+
+class BackForwardList : public BackForwardClient {
 public: 
-    virtual ~BackForwardList()
-    {
-    }
+    static Ref<BackForwardList> create(Page* page) { return adoptRef(*new BackForwardList(page)); }
+    virtual ~BackForwardList();
 
-    virtual void addItem(PassRefPtr<HistoryItem>) = 0;
+    Page* page() { return m_page; }
 
-    virtual void goToItem(HistoryItem*) = 0;
+    virtual void addItem(Ref<HistoryItem>&&) override;
+    WEBCORE_EXPORT void goBack();
+    WEBCORE_EXPORT void goForward();
+    virtual void goToItem(HistoryItem*) override;
         
-    virtual HistoryItem* itemAtIndex(int) = 0;
-    virtual int backListCount() = 0;
-    virtual int forwardListCount() = 0;
+    WEBCORE_EXPORT HistoryItem* backItem();
+    WEBCORE_EXPORT HistoryItem* currentItem();
+    WEBCORE_EXPORT HistoryItem* forwardItem();
+    virtual HistoryItem* itemAtIndex(int) override;
 
-    virtual bool isActive() = 0;
+    WEBCORE_EXPORT void backListWithLimit(int, HistoryItemVector&);
+    WEBCORE_EXPORT void forwardListWithLimit(int, HistoryItemVector&);
 
-    virtual void close() = 0;
+    WEBCORE_EXPORT int capacity();
+    WEBCORE_EXPORT void setCapacity(int);
+    WEBCORE_EXPORT bool enabled();
+    WEBCORE_EXPORT void setEnabled(bool);
+    virtual int backListCount() override;
+    virtual int forwardListCount() override;
+    WEBCORE_EXPORT bool containsItem(HistoryItem*);
 
-    // FIXME: Delete these once all callers are using BackForwardController
-    // instead of calling this directly.
-    HistoryItem* backItem() { return itemAtIndex(-1); }
-    HistoryItem* currentItem() { return itemAtIndex(0); }
-    HistoryItem* forwardItem() { return itemAtIndex(1); }
+    virtual void close() override;
+    WEBCORE_EXPORT bool closed();
+
+    WEBCORE_EXPORT void removeItem(HistoryItem*);
+    WEBCORE_EXPORT HistoryItemVector& entries();
+
+#if PLATFORM(IOS)
+    virtual unsigned current() override;
+    virtual void setCurrent(unsigned newCurrent) override;
+
+    virtual bool clearAllPageCaches() override;
+#endif
+
+private:
+    WEBCORE_EXPORT explicit BackForwardList(Page*);
+
+    Page* m_page;
+    HistoryItemVector m_entries;
+    HistoryItemHashSet m_entryHash;
+    unsigned m_current;
+    unsigned m_capacity;
+    bool m_closed;
+    bool m_enabled;
 };
-
+    
 } // namespace WebCore
 
 #endif // BackForwardList_h

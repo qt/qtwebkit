@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2012, 2014, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,8 +26,6 @@
 #ifndef DFGMinifiedNode_h
 #define DFGMinifiedNode_h
 
-#include <wtf/Platform.h>
-
 #if ENABLE(DFG_JIT)
 
 #include "DFGCommon.h"
@@ -42,13 +40,10 @@ inline bool belongsInMinifiedGraph(NodeType type)
 {
     switch (type) {
     case JSConstant:
-    case WeakJSConstant:
-    case ValueToInt32:
-    case Int32ToDouble:
-    case ForwardInt32ToDouble:
-    case UInt32ToNumber:
-    case DoubleAsInt32:
-    case PhantomArguments:
+    case Int52Constant:
+    case DoubleConstant:
+    case PhantomDirectArguments:
+    case PhantomClonedArguments:
         return true;
     default:
         return false;
@@ -64,30 +59,18 @@ public:
     MinifiedID id() const { return m_id; }
     NodeType op() const { return m_op; }
     
-    bool hasChild1() const { return hasChild(m_op); }
+    bool hasConstant() const { return hasConstant(m_op); }
     
-    MinifiedID child1() const
+    JSValue constant() const
     {
-        ASSERT(hasChild(m_op));
-        return MinifiedID::fromBits(m_childOrInfo);
+        return JSValue::decode(bitwise_cast<EncodedJSValue>(m_info));
     }
     
-    bool hasConstant() const { return hasConstantNumber() || hasWeakConstant(); }
+    bool hasInlineCallFrame() const { return hasInlineCallFrame(m_op); }
     
-    bool hasConstantNumber() const { return hasConstantNumber(m_op); }
-    
-    unsigned constantNumber() const
+    InlineCallFrame* inlineCallFrame() const
     {
-        ASSERT(hasConstantNumber(m_op));
-        return m_childOrInfo;
-    }
-    
-    bool hasWeakConstant() const { return hasWeakConstant(m_op); }
-    
-    JSCell* weakConstant() const
-    {
-        ASSERT(hasWeakConstant(m_op));
-        return bitwise_cast<JSCell*>(m_childOrInfo);
+        return bitwise_cast<InlineCallFrame*>(static_cast<uintptr_t>(m_info));
     }
     
     static MinifiedID getID(MinifiedNode* node) { return node->id(); }
@@ -97,30 +80,18 @@ public:
     }
     
 private:
-    static bool hasChild(NodeType type)
+    static bool hasConstant(NodeType type)
     {
-        switch (type) {
-        case ValueToInt32:
-        case Int32ToDouble:
-        case ForwardInt32ToDouble:
-        case UInt32ToNumber:
-        case DoubleAsInt32:
-            return true;
-        default:
-            return false;
-        }
+        return type == JSConstant || type == Int52Constant || type == DoubleConstant;
     }
-    static bool hasConstantNumber(NodeType type)
+    
+    static bool hasInlineCallFrame(NodeType type)
     {
-        return type == JSConstant;
-    }
-    static bool hasWeakConstant(NodeType type)
-    {
-        return type == WeakJSConstant;
+        return type == PhantomDirectArguments || type == PhantomClonedArguments;
     }
     
     MinifiedID m_id;
-    uintptr_t m_childOrInfo; // Nodes in the minified graph have only one child each.
+    uint64_t m_info;
     NodeType m_op;
 };
 

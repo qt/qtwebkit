@@ -34,14 +34,11 @@
     EnabledAtRuntime,
     Conditional=WEB_SOCKETS,
     ActiveDOMObject,
-    Constructor(DOMString url),
-    Constructor(DOMString url, sequence<DOMString> protocols),
+    Constructor(DOMString url, [Default=Undefined] optional sequence<DOMString>? protocols),
     Constructor(DOMString url, DOMString protocol),
     ConstructorRaisesException,
     ConstructorCallWith=ScriptExecutionContext,
-    EventTarget,
-    JSNoStaticTables,
-] interface WebSocket {
+] interface WebSocket : EventTarget {
     readonly attribute DOMString URL; // Lowercased .url is the one in the spec, but leaving .URL for compatibility reasons.
     readonly attribute DOMString url;
 
@@ -55,15 +52,15 @@
     readonly attribute unsigned long bufferedAmount;
 
     // networking
-    attribute EventListener onopen;
-    attribute EventListener onmessage;
-    attribute EventListener onerror;
-    attribute EventListener onclose;
+    attribute EventHandler onopen;
+    attribute EventHandler onmessage;
+    attribute EventHandler onerror;
+    attribute EventHandler onclose;
 
     [TreatReturnedNullStringAs=Undefined] readonly attribute DOMString protocol;
     [TreatReturnedNullStringAs=Undefined] readonly attribute DOMString extensions;
 
-    attribute DOMString binaryType;
+    [SetterRaisesException] attribute DOMString binaryType;
 
     [RaisesException] void send(ArrayBuffer data);
     [RaisesException] void send(ArrayBufferView data);
@@ -71,13 +68,4 @@
     [RaisesException] void send(DOMString data);
 
     [RaisesException] void close([Clamp] optional unsigned short code, optional DOMString reason);
-
-    // EventTarget interface
-    void addEventListener(DOMString type,
-                          EventListener listener,
-                          optional boolean useCapture);
-    void removeEventListener(DOMString type,
-                             EventListener listener,
-                             optional boolean useCapture);
-    [RaisesException] boolean dispatchEvent(Event evt);
 };

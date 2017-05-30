@@ -32,13 +32,12 @@
 #include "config.h"
 
 #include "RenderRubyText.h"
-
-using namespace std;
+#include "RenderRubyRun.h"
 
 namespace WebCore {
 
-RenderRubyText::RenderRubyText(Element* element)
-    : RenderBlock(element)
+RenderRubyText::RenderRubyText(Element& element, Ref<RenderStyle>&& style)
+    : RenderBlockFlow(element, WTFMove(style))
 {
 }
 
@@ -46,17 +45,23 @@ RenderRubyText::~RenderRubyText()
 {
 }
 
-bool RenderRubyText::isChildAllowed(RenderObject* child, RenderStyle*) const
+RenderRubyRun* RenderRubyText::rubyRun() const
 {
-    return child->isInline();
+    ASSERT(parent());
+    return downcast<RenderRubyRun>(parent());
+}
+
+bool RenderRubyText::isChildAllowed(const RenderObject& child, const RenderStyle&) const
+{
+    return child.isInline();
 }
 
 ETextAlign RenderRubyText::textAlignmentForLine(bool endsWithSoftBreak) const
 {
-    ETextAlign textAlign = style()->textAlign();
+    ETextAlign textAlign = style().textAlign();
     // FIXME: This check is bogus since user can set the initial value.
     if (textAlign != RenderStyle::initialTextAlign())
-        return RenderBlock::textAlignmentForLine(endsWithSoftBreak);
+        return RenderBlockFlow::textAlignmentForLine(endsWithSoftBreak);
 
     // The default behavior is to allow ruby text to expand if it is shorter than the ruby base.
     return JUSTIFY;
@@ -64,10 +69,10 @@ ETextAlign RenderRubyText::textAlignmentForLine(bool endsWithSoftBreak) const
 
 void RenderRubyText::adjustInlineDirectionLineBounds(int expansionOpportunityCount, float& logicalLeft, float& logicalWidth) const
 {
-    ETextAlign textAlign = style()->textAlign();
+    ETextAlign textAlign = style().textAlign();
     // FIXME: This check is bogus since user can set the initial value.
     if (textAlign != RenderStyle::initialTextAlign())
-        return RenderBlock::adjustInlineDirectionLineBounds(expansionOpportunityCount, logicalLeft, logicalWidth);
+        return RenderBlockFlow::adjustInlineDirectionLineBounds(expansionOpportunityCount, logicalLeft, logicalWidth);
 
     int maxPreferredLogicalWidth = this->maxPreferredLogicalWidth();
     if (maxPreferredLogicalWidth >= logicalWidth)
@@ -77,7 +82,7 @@ void RenderRubyText::adjustInlineDirectionLineBounds(int expansionOpportunityCou
     // ruby character on each side.
     float inset = (logicalWidth - maxPreferredLogicalWidth) / (expansionOpportunityCount + 1);
     if (expansionOpportunityCount)
-        inset = min<float>(2 * style()->fontSize(), inset);
+        inset = std::min<float>(2 * style().fontSize(), inset);
 
     logicalLeft += inset / 2;
     logicalWidth -= inset;
@@ -85,6 +90,47 @@ void RenderRubyText::adjustInlineDirectionLineBounds(int expansionOpportunityCou
 
 bool RenderRubyText::avoidsFloats() const
 {
+    return true;
+}
+
+bool RenderRubyText::canBreakBefore(const LazyLineBreakIterator& iterator) const
+{
+    // FIXME: It would be nice to improve this so that it isn't just hard-coded, but lookahead in this
+    // case is particularly problematic.
+
+    if (!iterator.priorContextLength())
+        return true;
+    UChar ch = iterator.lastCharacter();
+    ULineBreak lineBreak = (ULineBreak)u_getIntPropertyValue(ch, UCHAR_LINE_BREAK);
+    // UNICODE LINE BREAKING ALGORITHM
+    // http://www.unicode.org/reports/tr14/
+    // And Requirements for Japanese Text Layout, 3.1.7 Characters Not Starting a Line
+    // http://www.w3.org/TR/2012/NOTE-jlreq-20120403/#characters_not_starting_a_line
+    switch (lineBreak) {
+    case U_LB_NONSTARTER:
+    case U_LB_CLOSE_PARENTHESIS:
+    case U_LB_CLOSE_PUNCTUATION:
+    case U_LB_EXCLAMATION:
+    case U_LB_BREAK_SYMBOLS:
+    case U_LB_INFIX_NUMERIC:
+    case U_LB_ZWSPACE:
+    case U_LB_WORD_JOINER:
+        return false;
+    default:
+        break;
+    }
+    // Special care for Requirements for Japanese Text Layout
+    switch (ch) {
+    case 0x2019: // RIGHT SINGLE QUOTATION MARK
+    case 0x201D: // RIGHT DOUBLE QUOTATION MARK
+    case 0x00BB: // RIGHT-POINTING DOUBLE ANGLE QUOTATION MARK
+    case 0x2010: // HYPHEN
+    case 0x2013: // EN DASH
+    case 0x300C: // LEFT CORNER BRACKET
+        return false;
+    default:
+        break;
+    }
     return true;
 }
 

@@ -48,13 +48,13 @@
 
 namespace JSC {
 
-class ExecState;
+class VM;
 
-void msToGregorianDateTime(ExecState*, double, bool outputIsUTC, GregorianDateTime&);
-double gregorianDateTimeToMS(ExecState*, const GregorianDateTime&, double, bool inputIsUTC);
-double getUTCOffset(ExecState*);
-double parseDateFromNullTerminatedCharacters(ExecState*, const char* dateString);
-double parseDate(ExecState*, const WTF::String&);
+JS_EXPORT_PRIVATE void msToGregorianDateTime(VM&, double, WTF::TimeType outputTimeType, GregorianDateTime&);
+JS_EXPORT_PRIVATE double gregorianDateTimeToMS(VM&, const GregorianDateTime&, double, WTF::TimeType inputTimeType);
+JS_EXPORT_PRIVATE double getUTCOffset(VM&);
+JS_EXPORT_PRIVATE double parseDateFromNullTerminatedCharacters(VM&, const char* dateString);
+JS_EXPORT_PRIVATE double parseDate(VM&, const WTF::String&);
 
 } // namespace JSC
 

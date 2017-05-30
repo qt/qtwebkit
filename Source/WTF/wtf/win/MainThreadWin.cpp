@@ -11,7 +11,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution. 
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission. 
  *
@@ -32,7 +32,7 @@
 
 #include "Assertions.h"
 #include "Threading.h"
-#include <windows.h>
+#include "WindowsExtras.h"
 
 namespace WTF {
 
@@ -54,18 +54,14 @@ void initializeMainThreadPlatform()
     if (threadingWindowHandle)
         return;
 
-    HWND hWndParent = 0;
     WNDCLASSW wcex;
     memset(&wcex, 0, sizeof(WNDCLASSW));
     wcex.lpfnWndProc    = ThreadingWindowWndProc;
     wcex.lpszClassName  = kThreadingWindowClassName;
     RegisterClassW(&wcex);
-#if !OS(WINCE)
-    hWndParent = HWND_MESSAGE;
-#endif
 
     threadingWindowHandle = CreateWindowW(kThreadingWindowClassName, 0, 0,
-       CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, hWndParent, 0, 0, 0);
+        CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, HWND_MESSAGE, 0, 0, 0);
     threadingFiredMessage = RegisterWindowMessageW(L"com.apple.WebKit.MainThreadFired");
 
     initializeCurrentThreadInternal("Main Thread");

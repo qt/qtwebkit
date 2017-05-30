@@ -21,16 +21,15 @@
 #ifndef RenderProgress_h
 #define RenderProgress_h
 
-#if ENABLE(PROGRESS_ELEMENT)
-#include "RenderBlock.h"
+#include "RenderBlockFlow.h"
 
 namespace WebCore {
 
 class HTMLProgressElement;
 
-class RenderProgress : public RenderBlock {
+class RenderProgress final : public RenderBlockFlow {
 public:
-    explicit RenderProgress(HTMLElement*);
+    RenderProgress(HTMLElement&, Ref<RenderStyle>&&);
     virtual ~RenderProgress();
 
     double position() const { return m_position; }
@@ -38,17 +37,17 @@ public:
     double animationStartTime() const { return m_animationStartTime; }
 
     bool isDeterminate() const;
-    virtual void updateFromElement();
+    virtual void updateFromElement() override;
 
     HTMLProgressElement* progressElement() const;
 
 private:
-    virtual const char* renderName() const { return "RenderProgress"; }
-    virtual bool isProgress() const { return true; }
-    virtual bool requiresForcedStyleRecalcPropagation() const { return true; }
-    virtual bool canBeReplacedWithInlineRunIn() const OVERRIDE;
+    virtual const char* renderName() const override { return "RenderProgress"; }
+    virtual bool isProgress() const override { return true; }
+    virtual bool requiresForcedStyleRecalcPropagation() const override { return true; }
+    virtual void computeLogicalHeight(LayoutUnit logicalHeight, LayoutUnit logicalTop, LogicalExtentComputedValues&) const override;
 
-    void animationTimerFired(Timer<RenderProgress>*);
+    void animationTimerFired();
     void updateAnimationState();
 
     double m_position;
@@ -56,21 +55,12 @@ private:
     double m_animationRepeatInterval;
     double m_animationDuration;
     bool m_animating;
-    Timer<RenderProgress> m_animationTimer;
+    Timer m_animationTimer;
 };
-
-inline RenderProgress* toRenderProgress(RenderObject* object)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isProgress());
-    return static_cast<RenderProgress*>(object);
-}
-
-// This will catch anyone doing an unnecessary cast.
-void toRenderProgress(const RenderProgress*);
 
 } // namespace WebCore
 
-#endif
+SPECIALIZE_TYPE_TRAITS_RENDER_OBJECT(RenderProgress, isProgress())
 
 #endif // RenderProgress_h
 

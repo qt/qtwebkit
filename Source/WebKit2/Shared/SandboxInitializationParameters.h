@@ -29,7 +29,7 @@
 #include <wtf/Vector.h>
 #include <wtf/text/WTFString.h>
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
 OBJC_CLASS NSString;
 #endif
 
@@ -41,7 +41,7 @@ public:
     SandboxInitializationParameters();
     ~SandboxInitializationParameters();
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     // Name must be a literal.
     void addConfDirectoryParameter(const char* name, int confID);
     void addPathParameter(const char* name, NSString *path);
@@ -86,23 +86,23 @@ public:
         return m_overrideSandboxProfilePathOrSandboxProfile;
     }
 
-    void setSystemDirectorySuffix(const String& suffix) { m_systemDirectorySuffix = suffix; }
-    const String& systemDirectorySuffix() const { return m_systemDirectorySuffix; }
+    void setUserDirectorySuffix(const String& suffix) { m_userDirectorySuffix = suffix; }
+    const String& userDirectorySuffix() const { return m_userDirectorySuffix; }
 #endif
 
 private:
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     void appendPathInternal(const char* name, const char* path);
 
     mutable Vector<const char*> m_namedParameters;
-    String m_systemDirectorySuffix;
+    String m_userDirectorySuffix;
 
     ProfileSelectionMode m_profileSelectionMode;
     String m_overrideSandboxProfilePathOrSandboxProfile;
 #endif
 };
 
-#if !PLATFORM(MAC)
+#if !PLATFORM(COCOA)
 SandboxInitializationParameters::SandboxInitializationParameters()
 {
 }

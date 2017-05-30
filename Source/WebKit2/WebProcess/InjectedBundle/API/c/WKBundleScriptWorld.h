@@ -26,7 +26,7 @@
 #ifndef WKBundleScriptWorld_h
 #define WKBundleScriptWorld_h
 
-#include <WebKit2/WKBase.h>
+#include <WebKit/WKBase.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -37,6 +37,7 @@ WK_EXPORT WKTypeID WKBundleScriptWorldGetTypeID();
 WK_EXPORT WKBundleScriptWorldRef WKBundleScriptWorldCreateWorld();
 WK_EXPORT WKBundleScriptWorldRef WKBundleScriptWorldNormalWorld();
 WK_EXPORT void WKBundleScriptWorldClearWrappers(WKBundleScriptWorldRef scriptWorld);
+WK_EXPORT void WKBundleScriptWorldMakeAllShadowRootsOpen(WKBundleScriptWorldRef scriptWorld);
 
 #ifdef __cplusplus
 }

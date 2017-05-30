@@ -22,7 +22,6 @@
 #ifndef RenderThemeQStyle_h
 #define RenderThemeQStyle_h
 
-#include "QStyleFacade.h"
 #include "RenderThemeQt.h"
 
 namespace WebCore {
@@ -35,12 +34,12 @@ struct QStyleFacadeOption;
 
 typedef QStyleFacade* (*QtStyleFactoryFunction)(Page*);
 
-class RenderThemeQStyle : public RenderThemeQt {
+class RenderThemeQStyle final : public RenderThemeQt {
 private:
     friend class StylePainterQStyle;
 
     RenderThemeQStyle(Page*);
-    virtual ~RenderThemeQStyle();
+    ~RenderThemeQStyle();
 
 public:
     static PassRefPtr<RenderTheme> create(Page*);
@@ -48,77 +47,81 @@ public:
     static void setStyleFactoryFunction(QtStyleFactoryFunction);
     static QtStyleFactoryFunction styleFactory();
 
-    virtual void adjustSliderThumbSize(RenderStyle*, Element*) const;
+    void adjustSliderThumbSize(RenderStyle&, Element*) const final;
 
     QStyleFacade* qStyle() { return m_qStyle.get(); }
 
 protected:
-    virtual void adjustButtonStyle(StyleResolver*, RenderStyle*, Element*) const;
-    virtual bool paintButton(RenderObject*, const PaintInfo&, const IntRect&);
+    void adjustButtonStyle(StyleResolver&, RenderStyle&, Element*) const final;
+    bool paintButton(const RenderObject&, const PaintInfo&, const IntRect&) final;
 
-    virtual bool paintTextField(RenderObject*, const PaintInfo&, const IntRect&);
+    bool paintTextField(const RenderObject&, const PaintInfo&, const FloatRect&) final;
 
-    virtual bool paintTextArea(RenderObject*, const PaintInfo&, const IntRect&);
-    virtual void adjustTextAreaStyle(StyleResolver*, RenderStyle*, Element*) const;
+    bool paintTextArea(const RenderObject&, const PaintInfo&, const FloatRect&) final;
+    void adjustTextAreaStyle(StyleResolver&, RenderStyle&, Element*) const final;
 
-    virtual bool paintMenuList(RenderObject*, const PaintInfo&, const IntRect&);
+    bool paintMenuList(const RenderObject&, const PaintInfo&, const FloatRect&) final;
 
-    virtual bool paintMenuListButton(RenderObject*, const PaintInfo&, const IntRect&);
-    virtual void adjustMenuListButtonStyle(StyleResolver*, RenderStyle*, Element*) const;
+    bool paintMenuListButtonDecorations(const RenderBox&, const PaintInfo&, const FloatRect&) final;
+    void adjustMenuListButtonStyle(StyleResolver&, RenderStyle&, Element*) const final;
 
-#if ENABLE(PROGRESS_ELEMENT)
     // Returns the duration of the animation for the progress bar.
-    virtual double animationDurationForProgressBar(RenderProgress*) const;
-    virtual bool paintProgressBar(RenderObject*, const PaintInfo&, const IntRect&);
-#endif
+    double animationDurationForProgressBar(RenderProgress&) const final;
+    bool paintProgressBar(const RenderObject&, const PaintInfo&, const IntRect&) final;
 
-    virtual bool paintSliderTrack(RenderObject*, const PaintInfo&, const IntRect&);
-    virtual void adjustSliderTrackStyle(StyleResolver*, RenderStyle*, Element*) const;
+    bool paintSliderTrack(const RenderObject&, const PaintInfo&, const IntRect&) final;
+    void adjustSliderTrackStyle(StyleResolver&, RenderStyle&, Element*) const final;
 
-    virtual bool paintSliderThumb(RenderObject*, const PaintInfo&, const IntRect&);
-    virtual void adjustSliderThumbStyle(StyleResolver*, RenderStyle*, Element*) const;
+    bool paintSliderThumb(const RenderObject&, const PaintInfo&, const IntRect&) final;
+    void adjustSliderThumbStyle(StyleResolver&, RenderStyle&, Element*) const final;
 
-    virtual bool paintSearchField(RenderObject*, const PaintInfo&, const IntRect&);
+    bool paintSearchField(const RenderObject&, const PaintInfo&, const IntRect&) final;
 
-    virtual void adjustSearchFieldDecorationStyle(StyleResolver*, RenderStyle*, Element*) const;
-    virtual bool paintSearchFieldDecoration(RenderObject*, const PaintInfo&, const IntRect&);
+    void adjustSearchFieldDecorationPartStyle(StyleResolver&, RenderStyle&, Element*) const final;
+    bool paintSearchFieldDecorationPart(const RenderObject&, const PaintInfo&, const IntRect&) final;
 
-    virtual void adjustSearchFieldResultsDecorationStyle(StyleResolver*, RenderStyle*, Element*) const;
-    virtual bool paintSearchFieldResultsDecoration(RenderObject*, const PaintInfo&, const IntRect&);
+    void adjustSearchFieldResultsDecorationPartStyle(StyleResolver&, RenderStyle&, Element*) const final;
+    bool paintSearchFieldResultsDecorationPart(const RenderBox&, const PaintInfo&, const IntRect&) final;
 
 #ifndef QT_NO_SPINBOX
-    virtual bool paintInnerSpinButton(RenderObject*, const PaintInfo&, const IntRect&);
+    bool paintInnerSpinButton(const RenderObject&, const PaintInfo&, const IntRect&) final;
 #endif
 
 protected:
-    virtual void computeSizeBasedOnStyle(RenderStyle*) const;
+    void computeSizeBasedOnStyle(RenderStyle&) const final;
 
-    virtual QSharedPointer<StylePainter> getStylePainter(const PaintInfo&);
+    QSharedPointer<StylePainter> getStylePainter(const PaintInfo&) final;
 
-    virtual QRect inflateButtonRect(const QRect& originalRect) const;
+    QRect inflateButtonRect(const QRect& originalRect) const final;
+    QRectF inflateButtonRect(const QRectF& originalRect) const final;
+    void computeControlRect(QStyleFacade::ButtonType, QRect& originalRect) const final;
+    void computeControlRect(QStyleFacade::ButtonType, FloatRect& originalRect) const final;
 
-    virtual void setPopupPadding(RenderStyle*) const;
+    void setPopupPadding(RenderStyle&) const final;
 
-    virtual QPalette colorPalette() const;
+    QPalette colorPalette() const final;
 
 private:
-    ControlPart initializeCommonQStyleOptions(QStyleFacadeOption&, RenderObject*) const;
+    ControlPart initializeCommonQStyleOptions(QStyleFacadeOption&, const RenderObject&) const;
 
-    void setButtonPadding(RenderStyle*) const;
+    void setButtonPadding(RenderStyle&) const;
 
     void setPaletteFromPageClientIfExists(QPalette&) const;
+
+    QRect indicatorRect(QStyleFacade::ButtonType part, const QRect& originalRect) const;
 
 #ifdef Q_OS_MAC
     int m_buttonFontPixelSize;
 #endif
 
-    OwnPtr<QStyleFacade> m_qStyle;
+    std::unique_ptr<QStyleFacade> m_qStyle;
 };
 
-class StylePainterQStyle : public StylePainter {
+class StylePainterQStyle final : public StylePainter {
 public:
-    explicit StylePainterQStyle(RenderThemeQStyle*, const PaintInfo&, RenderObject*);
-    explicit StylePainterQStyle(ScrollbarThemeQStyle*, GraphicsContext*);
+    explicit StylePainterQStyle(RenderThemeQStyle*, const PaintInfo&);
+    explicit StylePainterQStyle(RenderThemeQStyle*, const PaintInfo&, const RenderObject&);
+    explicit StylePainterQStyle(ScrollbarThemeQStyle*, GraphicsContext&);
 
     bool isValid() const { return qStyle && qStyle->isValid() && StylePainter::isValid(); }
 

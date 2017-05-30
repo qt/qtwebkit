@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -36,30 +36,30 @@
 
 namespace WebCore {
 
-bool IDBEventDispatcher::dispatch(Event* event, Vector<RefPtr<EventTarget> >& eventTargets)
+bool IDBEventDispatcher::dispatch(Event& event, Vector<RefPtr<EventTarget>>& eventTargets)
 {
     size_t size = eventTargets.size();
     ASSERT(size);
 
-    event->setEventPhase(Event::CAPTURING_PHASE);
+    event.setEventPhase(Event::CAPTURING_PHASE);
     for (size_t i = size - 1; i; --i) { // Don't do the first element.
-        event->setCurrentTarget(eventTargets[i].get());
+        event.setCurrentTarget(eventTargets[i].get());
         eventTargets[i]->fireEventListeners(event);
-        if (event->propagationStopped())
+        if (event.propagationStopped())
             goto doneDispatching;
     }
 
-    event->setEventPhase(Event::AT_TARGET);
-    event->setCurrentTarget(eventTargets[0].get());
+    event.setEventPhase(Event::AT_TARGET);
+    event.setCurrentTarget(eventTargets[0].get());
     eventTargets[0]->fireEventListeners(event);
-    if (event->propagationStopped() || !event->bubbles() || event->cancelBubble())
+    if (event.propagationStopped() || !event.bubbles() || event.cancelBubble())
         goto doneDispatching;
 
-    event->setEventPhase(Event::BUBBLING_PHASE);
+    event.setEventPhase(Event::BUBBLING_PHASE);
     for (size_t i = 1; i < size; ++i) { // Don't do the first element.
-        event->setCurrentTarget(eventTargets[i].get());
+        event.setCurrentTarget(eventTargets[i].get());
         eventTargets[i]->fireEventListeners(event);
-        if (event->propagationStopped() || event->cancelBubble())
+        if (event.propagationStopped() || event.cancelBubble())
             goto doneDispatching;
     }
 
@@ -82,9 +82,9 @@ bool IDBEventDispatcher::dispatch(Event* event, Vector<RefPtr<EventTarget> >& ev
     //        event on the window until that has been implemented)." -- Jonas Sicking
 
 doneDispatching:
-    event->setCurrentTarget(0);
-    event->setEventPhase(0);
-    return !event->defaultPrevented();
+    event.setCurrentTarget(nullptr);
+    event.setEventPhase(0);
+    return !event.defaultPrevented();
 }
 
 } // namespace WebCore

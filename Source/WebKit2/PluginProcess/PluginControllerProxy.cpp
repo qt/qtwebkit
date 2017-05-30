@@ -26,7 +26,7 @@
 #include "config.h"
 #include "PluginControllerProxy.h"
 
-#if ENABLE(PLUGIN_PROCESS)
+#if ENABLE(NETSCAPE_PLUGIN_API)
 
 #include "DataReference.h"
 #include "NPObjectProxy.h"
@@ -41,12 +41,13 @@
 #include "WebCoreArgumentCoders.h"
 #include "WebProcessConnection.h"
 #include <WebCore/GraphicsContext.h>
+#include <WebCore/HTTPHeaderMap.h>
 #include <WebCore/IdentifierRep.h>
 #include <WebCore/NotImplemented.h>
 #include <wtf/TemporaryChange.h>
 #include <wtf/text/WTFString.h>
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
 #include "LayerHostingContext.h"
 #endif
 
@@ -54,31 +55,28 @@ using namespace WebCore;
 
 namespace WebKit {
 
-PassOwnPtr<PluginControllerProxy> PluginControllerProxy::create(WebProcessConnection* connection, const PluginCreationParameters& creationParameters)
-{
-    return adoptPtr(new PluginControllerProxy(connection, creationParameters));
-}
-
 PluginControllerProxy::PluginControllerProxy(WebProcessConnection* connection, const PluginCreationParameters& creationParameters)
     : m_connection(connection)
     , m_pluginInstanceID(creationParameters.pluginInstanceID)
     , m_userAgent(creationParameters.userAgent)
     , m_isPrivateBrowsingEnabled(creationParameters.isPrivateBrowsingEnabled)
-#if USE(ACCELERATED_COMPOSITING)
+    , m_isMuted(creationParameters.isMuted)
     , m_isAcceleratedCompositingEnabled(creationParameters.isAcceleratedCompositingEnabled)
-#endif
     , m_isInitializing(false)
+    , m_isVisible(false)
+    , m_isWindowVisible(false)
     , m_paintTimer(RunLoop::main(), this, &PluginControllerProxy::paint)
     , m_pluginDestructionProtectCount(0)
     , m_pluginDestroyTimer(RunLoop::main(), this, &PluginControllerProxy::destroy)
     , m_waitingForDidUpdate(false)
     , m_pluginCanceledManualStreamLoad(false)
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     , m_isComplexTextInputEnabled(false)
 #endif
     , m_contentsScaleFactor(creationParameters.contentsScaleFactor)
     , m_windowNPObject(0)
     , m_pluginElementNPObject(0)
+    , m_visiblityActivity("Plugin is visible.")
 {
 }
 
@@ -99,18 +97,19 @@ void PluginControllerProxy::setInitializationReply(PassRefPtr<Messages::WebProce
     m_initializationReply = reply;
 }
 
-PassRefPtr<Messages::WebProcessConnection::CreatePlugin::DelayedReply> PluginControllerProxy::takeInitializationReply()
+RefPtr<Messages::WebProcessConnection::CreatePlugin::DelayedReply> PluginControllerProxy::takeInitializationReply()
 {
-    return m_initializationReply.release();
+    return m_initializationReply;
 }
 
 bool PluginControllerProxy::initialize(const PluginCreationParameters& creationParameters)
 {
     ASSERT(!m_plugin);
-    
-    TemporaryChange<bool> initializing(m_isInitializing, true);
 
-    m_plugin = NetscapePlugin::create(PluginProcess::shared().netscapePluginModule());
+    ASSERT(!m_isInitializing);
+    m_isInitializing = true; // Cannot use TemporaryChange here, because this object can be deleted before the function returns.
+
+    m_plugin = NetscapePlugin::create(PluginProcess::singleton().netscapePluginModule());
     if (!m_plugin) {
         // This will delete the plug-in controller proxy object.
         m_connection->removePluginControllerProxy(this, 0);
@@ -127,7 +126,7 @@ bool PluginControllerProxy::initialize(const PluginCreationParameters& creationP
         // used as an identifier so it's OK to just get a weak reference.
         Plugin* plugin = m_plugin.get();
         
-        m_plugin = 0;
+        m_plugin = nullptr;
 
         // This will delete the plug-in controller proxy object.
         m_connection->removePluginControllerProxy(this, plugin);
@@ -136,6 +135,7 @@ bool PluginControllerProxy::initialize(const PluginCreationParameters& creationP
 
     platformInitialize(creationParameters);
 
+    m_isInitializing = false;
     return true;
 }
 
@@ -156,7 +156,7 @@ void PluginControllerProxy::destroy()
     Plugin* plugin = m_plugin.get();
 
     m_plugin->destroyPlugin();
-    m_plugin = 0;
+    m_plugin = nullptr;
 
     platformDestroy();
 
@@ -183,9 +183,9 @@ void PluginControllerProxy::paint()
     ASSERT(m_plugin);
 
     // Create a graphics context.
-    OwnPtr<GraphicsContext> graphicsContext = m_backingStore->createGraphicsContext();
+    auto graphicsContext = m_backingStore->createGraphicsContext();
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     // FIXME: We should really call applyDeviceScaleFactor instead of scale, but that ends up calling into WKSI
     // which we currently don't have initiated in the plug-in process.
     graphicsContext->scale(FloatSize(m_contentsScaleFactor, m_contentsScaleFactor));
@@ -194,7 +194,7 @@ void PluginControllerProxy::paint()
     if (m_plugin->isTransparent())
         graphicsContext->clearRect(dirtyRect);
 
-    m_plugin->paint(graphicsContext.get(), dirtyRect);
+    m_plugin->paint(*graphicsContext, dirtyRect);
 
     m_connection->connection()->send(Messages::PluginProxy::Update(dirtyRect), m_pluginInstanceID);
 }
@@ -220,13 +220,6 @@ void PluginControllerProxy::startPaintTimer()
     m_waitingForDidUpdate = true;
 }
 
-bool PluginControllerProxy::isPluginVisible()
-{
-    // FIXME: Implement this.
-    notImplemented();
-    return false;
-}
-
 void PluginControllerProxy::invalidate(const IntRect& rect)
 {
     IntRect dirtyRect = rect;
@@ -246,6 +239,11 @@ String PluginControllerProxy::userAgent()
 void PluginControllerProxy::loadURL(uint64_t requestID, const String& method, const String& urlString, const String& target, const HTTPHeaderMap& headerFields, const Vector<uint8_t>& httpBody, bool allowPopups)
 {
     m_connection->connection()->send(Messages::PluginProxy::LoadURL(requestID, method, urlString, target, headerFields, httpBody, allowPopups), m_pluginInstanceID);
+}
+
+void PluginControllerProxy::continueStreamLoad(uint64_t streamID)
+{
+    m_connection->connection()->send(Messages::PluginProxy::ContinueStreamLoad(streamID), m_pluginInstanceID);
 }
 
 void PluginControllerProxy::cancelStreamLoad(uint64_t streamID)
@@ -311,6 +309,11 @@ bool PluginControllerProxy::evaluate(NPObject* npObject, const String& scriptStr
     return true;
 }
 
+void PluginControllerProxy::setPluginIsPlayingAudio(bool pluginIsPlayingAudio)
+{
+    m_connection->connection()->send(Messages::PluginProxy::SetPluginIsPlayingAudio(pluginIsPlayingAudio), m_pluginInstanceID);
+}
+
 void PluginControllerProxy::setStatusbarText(const String& statusbarText)
 {
     m_connection->connection()->send(Messages::PluginProxy::SetStatusbarText(statusbarText), m_pluginInstanceID);
@@ -324,12 +327,6 @@ bool PluginControllerProxy::isAcceleratedCompositingEnabled()
 void PluginControllerProxy::pluginProcessCrashed()
 {
     // This should never be called from here.
-    ASSERT_NOT_REACHED();
-}
-
-void PluginControllerProxy::willSendEventToPlugin()
-{
-    // This is only used when running plugins in the web process.
     ASSERT_NOT_REACHED();
 }
 
@@ -432,17 +429,56 @@ void PluginControllerProxy::geometryDidChange(const IntSize& pluginSize, const I
     m_plugin->geometryDidChange(pluginSize, clipRect, pluginToRootViewTransform);
 }
 
+void PluginControllerProxy::visibilityDidChange(bool isVisible)
+{
+    m_isVisible = isVisible;
+    
+    ASSERT(m_plugin);
+    m_plugin->visibilityDidChange(isVisible);
+
+    updateVisibilityActivity();
+}
+
+void PluginControllerProxy::windowFocusChanged(bool hasFocus)
+{
+    ASSERT(m_plugin);
+    m_plugin->windowFocusChanged(hasFocus);
+}
+
+void PluginControllerProxy::windowVisibilityChanged(bool isVisible)
+{
+    m_isWindowVisible = isVisible;
+
+    ASSERT(m_plugin);
+    m_plugin->windowVisibilityChanged(isVisible);
+
+    updateVisibilityActivity();
+}
+
+void PluginControllerProxy::updateVisibilityActivity()
+{
+    if (m_isVisible && m_isWindowVisible)
+        m_visiblityActivity.start();
+    else
+        m_visiblityActivity.stop();
+}
+
 void PluginControllerProxy::didEvaluateJavaScript(uint64_t requestID, const String& result)
 {
     m_plugin->didEvaluateJavaScript(requestID, result);
 }
 
-void PluginControllerProxy::streamDidReceiveResponse(uint64_t streamID, const String& responseURLString, uint32_t streamLength, uint32_t lastModifiedTime, const String& mimeType, const String& headers)
+void PluginControllerProxy::streamWillSendRequest(uint64_t streamID, const String& requestURLString, const String& redirectResponseURLString, uint32_t redirectResponseStatusCode)
 {
-    m_plugin->streamDidReceiveResponse(streamID, KURL(ParsedURLString, responseURLString), streamLength, lastModifiedTime, mimeType, headers, String());
+    m_plugin->streamWillSendRequest(streamID, URL(ParsedURLString, requestURLString), URL(ParsedURLString, redirectResponseURLString), redirectResponseStatusCode);
 }
 
-void PluginControllerProxy::streamDidReceiveData(uint64_t streamID, const CoreIPC::DataReference& data)
+void PluginControllerProxy::streamDidReceiveResponse(uint64_t streamID, const String& responseURLString, uint32_t streamLength, uint32_t lastModifiedTime, const String& mimeType, const String& headers)
+{
+    m_plugin->streamDidReceiveResponse(streamID, URL(ParsedURLString, responseURLString), streamLength, lastModifiedTime, mimeType, headers, String());
+}
+
+void PluginControllerProxy::streamDidReceiveData(uint64_t streamID, const IPC::DataReference& data)
 {
     m_plugin->streamDidReceiveData(streamID, reinterpret_cast<const char*>(data.data()), data.size());
 }
@@ -462,10 +498,10 @@ void PluginControllerProxy::manualStreamDidReceiveResponse(const String& respons
     if (m_pluginCanceledManualStreamLoad)
         return;
 
-    m_plugin->manualStreamDidReceiveResponse(KURL(ParsedURLString, responseURLString), streamLength, lastModifiedTime, mimeType, headers, String());
+    m_plugin->manualStreamDidReceiveResponse(URL(ParsedURLString, responseURLString), streamLength, lastModifiedTime, mimeType, headers, String());
 }
 
-void PluginControllerProxy::manualStreamDidReceiveData(const CoreIPC::DataReference& data)
+void PluginControllerProxy::manualStreamDidReceiveData(const IPC::DataReference& data)
 {
     if (m_pluginCanceledManualStreamLoad)
         return;
@@ -488,17 +524,9 @@ void PluginControllerProxy::manualStreamDidFail(bool wasCancelled)
     
     m_plugin->manualStreamDidFail(wasCancelled);
 }
-    
-void PluginControllerProxy::handleMouseEvent(const WebMouseEvent& mouseEvent, PassRefPtr<Messages::PluginControllerProxy::HandleMouseEvent::DelayedReply> reply)
-{
-    // Always let the web process think that we've handled this mouse event, even before passing it along to the plug-in.
-    // This is a workaround for 
-    // <rdar://problem/9299901> UI process thinks the page is unresponsive when a plug-in is showing a context menu.
-    // The web process sends a synchronous HandleMouseEvent message and the plug-in process spawns a nested
-    // run loop when showing the context menu, so eventually the unresponsiveness timer kicks in in the UI process.
-    // FIXME: We should come up with a better way to do this.
-    reply->send(true);
 
+void PluginControllerProxy::handleMouseEvent(const WebMouseEvent& mouseEvent)
+{
     m_plugin->handleMouseEvent(mouseEvent);
 }
 
@@ -535,6 +563,11 @@ void PluginControllerProxy::isEditingCommandEnabled(const String& commandName, b
 void PluginControllerProxy::handlesPageScaleFactor(bool& isHandled)
 {
     isHandled = m_plugin->handlesPageScaleFactor();
+}
+
+void PluginControllerProxy::requiresUnifiedScaleFactor(bool& required)
+{
+    required = m_plugin->requiresUnifiedScaleFactor();
 }
 
 void PluginControllerProxy::paintEntirePlugin()
@@ -599,6 +632,15 @@ void PluginControllerProxy::privateBrowsingStateChanged(bool isPrivateBrowsingEn
     m_plugin->privateBrowsingStateChanged(isPrivateBrowsingEnabled);
 }
 
+void PluginControllerProxy::mutedStateChanged(bool isMuted)
+{
+    if (m_isMuted == isMuted)
+        return;
+    
+    m_isMuted = isMuted;
+    m_plugin->mutedStateChanged(isMuted);
+}
+
 void PluginControllerProxy::getFormValue(bool& returnValue, String& formValue)
 {
     returnValue = m_plugin->getFormValue(formValue);
@@ -616,8 +658,13 @@ void PluginControllerProxy::windowedPluginGeometryDidChange(const IntRect& frame
 {
     m_connection->connection()->send(Messages::PluginProxy::WindowedPluginGeometryDidChange(frameRect, clipRect, windowID), m_pluginInstanceID);
 }
+
+void PluginControllerProxy::windowedPluginVisibilityDidChange(bool isVisible, uint64_t windowID)
+{
+    m_connection->connection()->send(Messages::PluginProxy::WindowedPluginVisibilityDidChange(isVisible, windowID), m_pluginInstanceID);
+}
 #endif
 
 } // namespace WebKit
 
-#endif // ENABLE(PLUGIN_PROCESS)
+#endif // ENABLE(NETSCAPE_PLUGIN_API)

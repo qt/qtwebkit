@@ -30,10 +30,10 @@ namespace WebCore {
 class HitTestResult;
 class HTMLImageElement;
     
-class HTMLMapElement FINAL : public HTMLElement {
+class HTMLMapElement final : public HTMLElement {
 public:
-    static PassRefPtr<HTMLMapElement> create(Document*);
-    static PassRefPtr<HTMLMapElement> create(const QualifiedName&, Document*);
+    static Ref<HTMLMapElement> create(Document&);
+    static Ref<HTMLMapElement> create(const QualifiedName&, Document&);
     virtual ~HTMLMapElement();
 
     const AtomicString& getName() const { return m_name; }
@@ -41,35 +41,19 @@ public:
     bool mapMouseEvent(LayoutPoint location, const LayoutSize&, HitTestResult&);
     
     HTMLImageElement* imageElement();
-    PassRefPtr<HTMLCollection> areas();
+    Ref<HTMLCollection> areas();
 
 private:
-    HTMLMapElement(const QualifiedName&, Document*);
+    HTMLMapElement(const QualifiedName&, Document&);
 
-    virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
+    virtual void parseAttribute(const QualifiedName&, const AtomicString&) override;
 
-    virtual InsertionNotificationRequest insertedInto(ContainerNode*) OVERRIDE;
-    virtual void removedFrom(ContainerNode*) OVERRIDE;
+    virtual InsertionNotificationRequest insertedInto(ContainerNode&) override;
+    virtual void removedFrom(ContainerNode&) override;
 
     AtomicString m_name;
 };
 
-inline bool isHTMLMapElement(Node* node)
-{
-    return node->hasTagName(HTMLNames::mapTag);
-}
-
-inline bool isHTMLMapElement(Element* element)
-{
-    return element->hasTagName(HTMLNames::mapTag);
-}
-
-inline HTMLMapElement* toHTMLMapElement(Node* node)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!node || isHTMLMapElement(node));
-    return static_cast<HTMLMapElement*>(node);
-}
-
-} //namespace
+} // namespaces
 
 #endif

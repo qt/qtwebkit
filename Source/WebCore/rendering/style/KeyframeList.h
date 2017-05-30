@@ -34,12 +34,12 @@
 
 namespace WebCore {
 
-class RenderObject;
 class RenderStyle;
+class TimingFunction;
 
 class KeyframeValue {
 public:
-    KeyframeValue(float key, PassRefPtr<RenderStyle> style)
+    KeyframeValue(double key, PassRefPtr<RenderStyle> style)
         : m_key(key)
         , m_style(style)
     {
@@ -49,21 +49,23 @@ public:
     bool containsProperty(CSSPropertyID prop) const { return m_properties.contains(prop); }
     const HashSet<CSSPropertyID>& properties() const { return m_properties; }
 
-    float key() const { return m_key; }
-    void setKey(float key) { m_key = key; }
+    double key() const { return m_key; }
+    void setKey(double key) { m_key = key; }
 
     const RenderStyle* style() const { return m_style.get(); }
     void setStyle(PassRefPtr<RenderStyle> style) { m_style = style; }
 
+    TimingFunction* timingFunction(const AtomicString& name) const;
+
 private:
-    float m_key;
+    double m_key;
     HashSet<CSSPropertyID> m_properties; // The properties specified in this keyframe.
     RefPtr<RenderStyle> m_style;
 };
 
 class KeyframeList {
 public:
-    KeyframeList(RenderObject*, const AtomicString& animationName)
+    explicit KeyframeList(const AtomicString& animationName)
         : m_animationName(animationName)
     {
         insert(KeyframeValue(0, 0));
@@ -80,13 +82,13 @@ public:
     
     void addProperty(CSSPropertyID prop) { m_properties.add(prop); }
     bool containsProperty(CSSPropertyID prop) const { return m_properties.contains(prop); }
-    HashSet<CSSPropertyID>::const_iterator beginProperties() const { return m_properties.begin(); }
-    HashSet<CSSPropertyID>::const_iterator endProperties() const { return m_properties.end(); }
+    const HashSet<CSSPropertyID>& properties() const { return m_properties; }
     
     void clear();
     bool isEmpty() const { return m_keyframes.isEmpty(); }
     size_t size() const { return m_keyframes.size(); }
     const KeyframeValue& operator[](size_t index) const { return m_keyframes[index]; }
+    const Vector<KeyframeValue>& keyframes() const { return m_keyframes; }
 
 private:
     AtomicString m_animationName;

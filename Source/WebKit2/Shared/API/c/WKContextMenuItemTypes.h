@@ -26,6 +26,8 @@
 #ifndef WKContextMenuItemTypes_h
 #define WKContextMenuItemTypes_h
 
+#include <stdint.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -119,6 +121,7 @@ enum {
     kWKContextMenuItemTagSelectAll,
     kWKContextMenuItemTagOpenLinkInThisWindow,
     kWKContextMenuItemTagToggleVideoFullscreen,
+    kWKContextMenuItemTagShareMenu,
     kWKContextMenuItemBaseApplicationTag = 10000
 };
 typedef uint32_t WKContextMenuItemTag;

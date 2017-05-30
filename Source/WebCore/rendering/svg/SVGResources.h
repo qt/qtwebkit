@@ -20,21 +20,22 @@
 #ifndef SVGResources_h
 #define SVGResources_h
 
-#if ENABLE(SVG)
+#include <memory>
 #include <wtf/HashSet.h>
 #include <wtf/Noncopyable.h>
-#include <wtf/OwnPtr.h>
-#include <wtf/PassOwnPtr.h>
 
 namespace WebCore {
 
 class Document;
+class RenderElement;
 class RenderObject;
+class RenderStyle;
 class RenderSVGResourceClipper;
 class RenderSVGResourceContainer;
 class RenderSVGResourceFilter;
 class RenderSVGResourceMarker;
 class RenderSVGResourceMasker;
+class RenderSVGRoot;
 class SVGRenderStyle;
 
 // Holds a set of resources associated with a RenderObject
@@ -43,27 +44,20 @@ class SVGResources {
 public:
     SVGResources();
 
-    bool buildCachedResources(const RenderObject*, const SVGRenderStyle*);
+    bool buildCachedResources(const RenderElement&, const RenderStyle&);
+    void layoutDifferentRootIfNeeded(const RenderSVGRoot*);
 
     // Ordinary resources
-    RenderSVGResourceClipper* clipper() const { return m_clipperFilterMaskerData ? m_clipperFilterMaskerData->clipper : 0; }
-    RenderSVGResourceMarker* markerStart() const { return m_markerData ? m_markerData->markerStart : 0; }
-    RenderSVGResourceMarker* markerMid() const { return m_markerData ? m_markerData->markerMid : 0; }
-    RenderSVGResourceMarker* markerEnd() const { return m_markerData ? m_markerData->markerEnd : 0; }
-    RenderSVGResourceMasker* masker() const { return m_clipperFilterMaskerData ? m_clipperFilterMaskerData->masker : 0; }
-
-    RenderSVGResourceFilter* filter() const
-    {
-#if ENABLE(FILTERS)
-        if (m_clipperFilterMaskerData)
-            return m_clipperFilterMaskerData->filter;
-#endif
-        return 0;
-    }
+    RenderSVGResourceClipper* clipper() const { return m_clipperFilterMaskerData ? m_clipperFilterMaskerData->clipper : nullptr; }
+    RenderSVGResourceMarker* markerStart() const { return m_markerData ? m_markerData->markerStart : nullptr; }
+    RenderSVGResourceMarker* markerMid() const { return m_markerData ? m_markerData->markerMid : nullptr; }
+    RenderSVGResourceMarker* markerEnd() const { return m_markerData ? m_markerData->markerEnd : nullptr; }
+    RenderSVGResourceMasker* masker() const { return m_clipperFilterMaskerData ? m_clipperFilterMaskerData->masker : nullptr; }
+    RenderSVGResourceFilter* filter() const { return m_clipperFilterMaskerData ? m_clipperFilterMaskerData->filter : nullptr; }
 
     // Paint servers
-    RenderSVGResourceContainer* fill() const { return m_fillStrokeData ? m_fillStrokeData->fill : 0; }
-    RenderSVGResourceContainer* stroke() const { return m_fillStrokeData ? m_fillStrokeData->stroke : 0; }
+    RenderSVGResourceContainer* fill() const { return m_fillStrokeData ? m_fillStrokeData->fill : nullptr; }
+    RenderSVGResourceContainer* stroke() const { return m_fillStrokeData ? m_fillStrokeData->stroke : nullptr; }
 
     // Chainable resources - linked through xlink:href
     RenderSVGResourceContainer* linkedResource() const { return m_linkedResource; }
@@ -71,10 +65,10 @@ public:
     void buildSetOfResources(HashSet<RenderSVGResourceContainer*>&);
 
     // Methods operating on all cached resources
-    void removeClientFromCache(RenderObject*, bool markForInvalidation = true) const;
-    void resourceDestroyed(RenderSVGResourceContainer*);
+    void removeClientFromCache(RenderElement&, bool markForInvalidation = true) const;
+    void resourceDestroyed(RenderSVGResourceContainer&);
 
-#ifndef NDEBUG
+#if ENABLE(TREE_DEBUGGING)
     void dump(const RenderObject*);
 #endif
 
@@ -83,9 +77,7 @@ private:
 
     // Only used by SVGResourcesCache cycle detection logic
     void resetClipper();
-#if ENABLE(FILTERS)
     void resetFilter();
-#endif
     void resetMarkerStart();
     void resetMarkerMid();
     void resetMarkerEnd();
@@ -96,9 +88,7 @@ private:
 
 private:
     bool setClipper(RenderSVGResourceClipper*);
-#if ENABLE(FILTERS)
     bool setFilter(RenderSVGResourceFilter*);
-#endif
     bool setMarkerStart(RenderSVGResourceMarker*);
     bool setMarkerMid(RenderSVGResourceMarker*);
     bool setMarkerEnd(RenderSVGResourceMarker*);
@@ -117,22 +107,13 @@ private:
     public:
         ClipperFilterMaskerData()
             : clipper(0)
-#if ENABLE(FILTERS)
             , filter(0)
-#endif
             , masker(0)
         {
         }
 
-        static PassOwnPtr<ClipperFilterMaskerData> create()
-        {
-            return adoptPtr(new ClipperFilterMaskerData);
-        }
-
         RenderSVGResourceClipper* clipper;
-#if ENABLE(FILTERS)
         RenderSVGResourceFilter* filter;
-#endif
         RenderSVGResourceMasker* masker;
     };
 
@@ -146,11 +127,6 @@ private:
             , markerMid(0)
             , markerEnd(0)
         {
-        }
-
-        static PassOwnPtr<MarkerData> create()
-        {
-            return adoptPtr(new MarkerData);
         }
 
         RenderSVGResourceMarker* markerStart;
@@ -171,22 +147,16 @@ private:
         {
         }
 
-        static PassOwnPtr<FillStrokeData> create()
-        {
-            return adoptPtr(new FillStrokeData);
-        }
-
         RenderSVGResourceContainer* fill;
         RenderSVGResourceContainer* stroke;
     };
 
-    OwnPtr<ClipperFilterMaskerData> m_clipperFilterMaskerData;
-    OwnPtr<MarkerData> m_markerData;
-    OwnPtr<FillStrokeData> m_fillStrokeData;
+    std::unique_ptr<ClipperFilterMaskerData> m_clipperFilterMaskerData;
+    std::unique_ptr<MarkerData> m_markerData;
+    std::unique_ptr<FillStrokeData> m_fillStrokeData;
     RenderSVGResourceContainer* m_linkedResource;
 };
 
 }
 
-#endif
 #endif

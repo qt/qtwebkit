@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Apple Inc. All Rights Reserved.
+ * Copyright (C) 2012-2015  Apple Inc. All Rights Reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,37 +26,47 @@
 #ifndef JSScope_h
 #define JSScope_h
 
+#include "GetPutInfo.h"
 #include "JSObject.h"
-#include "ResolveOperation.h"
+#include "VariableEnvironment.h"
 
 namespace JSC {
 
 class ScopeChainIterator;
+class WatchpointSet;
 
 class JSScope : public JSNonFinalObject {
 public:
     typedef JSNonFinalObject Base;
+    static const unsigned StructureFlags = Base::StructureFlags;
 
     friend class LLIntOffsetsExtractor;
     static size_t offsetOfNext();
 
-    JS_EXPORT_PRIVATE static JSObject* objectAtScope(JSScope*);
+    static JSObject* objectAtScope(JSScope*);
 
-    static JSValue resolve(CallFrame*, const Identifier&, ResolveOperations*);
-    static JSValue resolveBase(CallFrame*, const Identifier&, bool isStrict, ResolveOperations*, PutToBaseOperation*);
-    static JSValue resolveWithBase(CallFrame*, const Identifier&, Register* base, ResolveOperations*, PutToBaseOperation*);
-    static JSValue resolveWithThis(CallFrame*, const Identifier&, Register* base, ResolveOperations*);
-    static JSValue resolveGlobal(CallFrame*, const Identifier&, JSGlobalObject*, ResolveOperation*);
-    static void resolvePut(CallFrame*, JSValue base, const Identifier&, JSValue, PutToBaseOperation*);
+    static JSValue resolve(ExecState*, JSScope*, const Identifier&);
+    static ResolveOp abstractResolve(ExecState*, size_t depthOffset, JSScope*, const Identifier&, GetOrPut, ResolveType, InitializationMode);
+
+    static bool hasConstantScope(ResolveType);
+    static JSScope* constantScopeForCodeBlock(ResolveType, CodeBlock*);
+
+    static void collectVariablesUnderTDZ(JSScope*, VariableEnvironment& result);
 
     static void visitChildren(JSCell*, SlotVisitor&);
 
-    bool isDynamicScope(bool& requiresDynamicChecks) const;
+    bool isVarScope();
+    bool isLexicalScope();
+    bool isModuleScope();
+    bool isGlobalLexicalEnvironment();
+    bool isCatchScope();
+    bool isFunctionNameScopeObject();
+
+    bool isNestedLexicalScope();
 
     ScopeChainIterator begin();
     ScopeChainIterator end();
     JSScope* next();
-    int localDepth();
 
     JSGlobalObject* globalObject();
     VM* vm();
@@ -64,20 +74,9 @@ public:
 
 protected:
     JSScope(VM&, Structure*, JSScope* next);
-    static const unsigned StructureFlags = OverridesVisitChildren | Base::StructureFlags;
 
 private:
     WriteBarrier<JSScope> m_next;
-    enum ReturnValues {
-        ReturnValue = 1,
-        ReturnBase = 2,
-        ReturnThis = 4,
-        ReturnBaseAndValue = ReturnValue | ReturnBase,
-        ReturnThisAndValue = ReturnValue | ReturnThis,
-    };
-    enum LookupMode { UnknownResolve, KnownResolve };
-    template <LookupMode, ReturnValues> static JSObject* resolveContainingScopeInternal(CallFrame*, const Identifier&, PropertySlot&, ResolveOperations*, PutToBaseOperation*, bool isStrict);
-    template <ReturnValues> static JSObject* resolveContainingScope(CallFrame*, const Identifier&, PropertySlot&, ResolveOperations*, PutToBaseOperation*, bool isStrict);
 };
 
 inline JSScope::JSScope(VM& vm, Structure* structure, JSScope* next)
@@ -95,6 +94,7 @@ public:
 
     JSObject* get() const { return JSScope::objectAtScope(m_node); }
     JSObject* operator->() const { return JSScope::objectAtScope(m_node); }
+    JSScope* scope() const { return m_node; }
 
     ScopeChainIterator& operator++() { m_node = m_node->next(); return *this; }
 
@@ -129,7 +129,7 @@ inline JSGlobalObject* JSScope::globalObject()
 
 inline VM* JSScope::vm()
 { 
-    return Heap::heap(this)->vm();
+    return MarkedBlock::blockFor(this)->vm();
 }
 
 inline Register& Register::operator=(JSScope* scope)
@@ -143,20 +143,9 @@ inline JSScope* Register::scope() const
     return jsCast<JSScope*>(jsValue());
 }
 
-inline VM& ExecState::vm() const
-{
-    ASSERT(scope()->vm());
-    return *scope()->vm();
-}
-
 inline JSGlobalObject* ExecState::lexicalGlobalObject() const
 {
-    return scope()->globalObject();
-}
-
-inline JSObject* ExecState::globalThisValue() const
-{
-    return scope()->globalThis();
+    return callee()->globalObject();
 }
 
 inline size_t JSScope::offsetOfNext()

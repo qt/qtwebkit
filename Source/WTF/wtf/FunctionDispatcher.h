@@ -23,7 +23,10 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <wtf/Forward.h>
+#ifndef FunctionDispatcher_h
+#define FunctionDispatcher_h
+
+#include <functional>
 #include <wtf/ThreadSafeRefCounted.h>
 
 namespace WTF {
@@ -35,7 +38,7 @@ class FunctionDispatcher : public ThreadSafeRefCounted<FunctionDispatcher> {
 public:
     WTF_EXPORT_PRIVATE virtual ~FunctionDispatcher();
 
-    virtual void dispatch(const Function<void ()>&) = 0;
+    virtual void dispatch(std::function<void ()>) = 0;
 
 protected:
     WTF_EXPORT_PRIVATE FunctionDispatcher();
@@ -44,3 +47,5 @@ protected:
 } // namespace WTF
 
 using WTF::FunctionDispatcher;
+
+#endif // FunctionDispatcher_h

@@ -21,39 +21,36 @@
 #ifndef SVGGElement_h
 #define SVGGElement_h
 
-#if ENABLE(SVG)
 #include "SVGAnimatedBoolean.h"
 #include "SVGExternalResourcesRequired.h"
 #include "SVGGraphicsElement.h"
 
 namespace WebCore {
 
-class SVGGElement FINAL : public SVGGraphicsElement,
+class SVGGElement final : public SVGGraphicsElement,
                           public SVGExternalResourcesRequired {
 public:
-    static PassRefPtr<SVGGElement> create(const QualifiedName&, Document*);
-
-protected:
-    SVGGElement(const QualifiedName&, Document*, ConstructionType = CreateSVGElement);
-
-    virtual RenderObject* createRenderer(RenderArena*, RenderStyle*);
+    static Ref<SVGGElement> create(const QualifiedName&, Document&);
+    static Ref<SVGGElement> create(Document&);
 
 private:
-    virtual bool isValid() const { return SVGTests::isValid(); }
-    virtual bool supportsFocus() const OVERRIDE { return true; }
+    SVGGElement(const QualifiedName&, Document&);
 
-    bool isSupportedAttribute(const QualifiedName&);
-    virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
-    virtual void svgAttributeChanged(const QualifiedName&);
+    virtual RenderPtr<RenderElement> createElementRenderer(Ref<RenderStyle>&&, const RenderTreePosition&) override;
 
-    virtual bool rendererIsNeeded(const NodeRenderingContext&);
+    virtual bool isValid() const override { return SVGTests::isValid(); }
+
+    static bool isSupportedAttribute(const QualifiedName&);
+    virtual void parseAttribute(const QualifiedName&, const AtomicString&) override;
+    virtual void svgAttributeChanged(const QualifiedName&) override;
+
+    virtual bool rendererIsNeeded(const RenderStyle&) override;
 
     BEGIN_DECLARE_ANIMATED_PROPERTIES(SVGGElement)
-        DECLARE_ANIMATED_BOOLEAN(ExternalResourcesRequired, externalResourcesRequired)
+        DECLARE_ANIMATED_BOOLEAN_OVERRIDE(ExternalResourcesRequired, externalResourcesRequired)
     END_DECLARE_ANIMATED_PROPERTIES
 };
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif

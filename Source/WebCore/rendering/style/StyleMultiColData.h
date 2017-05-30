@@ -37,8 +37,8 @@ namespace WebCore {
 
 class StyleMultiColData : public RefCounted<StyleMultiColData> {
 public:
-    static PassRefPtr<StyleMultiColData> create() { return adoptRef(new StyleMultiColData); }
-    PassRefPtr<StyleMultiColData> copy() const { return adoptRef(new StyleMultiColData(*this)); }
+    static Ref<StyleMultiColData> create() { return adoptRef(*new StyleMultiColData); }
+    Ref<StyleMultiColData> copy() const;
     
     bool operator==(const StyleMultiColData& o) const;
     bool operator!=(const StyleMultiColData &o) const
@@ -62,10 +62,8 @@ public:
     bool m_autoWidth : 1;
     bool m_autoCount : 1;
     bool m_normalGap : 1;
+    unsigned m_fill : 1; // ColumnFill
     unsigned m_columnSpan : 1;
-    unsigned m_breakBefore : 2; // EPageBreak
-    unsigned m_breakAfter : 2; // EPageBreak
-    unsigned m_breakInside : 2; // EPageBreak
     unsigned m_axis : 2; // ColumnAxis
     unsigned m_progression : 2; // ColumnProgression
 

@@ -33,11 +33,16 @@
 #include <WebCore/TextAffinity.h>
 #include <wtf/Forward.h>
 
+namespace API {
+template<> struct ClientTraits<WKBundlePageEditorClientBase> {
+    typedef std::tuple<WKBundlePageEditorClientV0, WKBundlePageEditorClientV1> Versions;
+};
+}
+
 namespace WebCore {
-    class CSSStyleDeclaration;
-    class Node;
-    class Range;
-    class SharedBuffer;
+class CSSStyleDeclaration;
+class Node;
+class Range;
 }
 
 namespace WebKit {
@@ -45,7 +50,7 @@ namespace WebKit {
 class WebFrame;
 class WebPage;
 
-class InjectedBundlePageEditorClient : public APIClient<WKBundlePageEditorClient, kWKBundlePageEditorClientCurrentVersion> {
+class InjectedBundlePageEditorClient : public API::Client<WKBundlePageEditorClientBase> {
 public:
     bool shouldBeginEditing(WebPage*, WebCore::Range*);
     bool shouldEndEditing(WebPage*, WebCore::Range*);
@@ -59,7 +64,7 @@ public:
     void didChange(WebPage*, StringImpl* notificationName);
     void didChangeSelection(WebPage*, StringImpl* notificationName);
     void willWriteToPasteboard(WebPage*, WebCore::Range*);
-    void getPasteboardDataForRange(WebPage*, WebCore::Range*, Vector<String>& pasteboardTypes, Vector<RefPtr<WebCore::SharedBuffer> >& pasteboardData);
+    void getPasteboardDataForRange(WebPage*, WebCore::Range*, Vector<String>& pasteboardTypes, Vector<RefPtr<WebCore::SharedBuffer>>& pasteboardData);
     void didWriteToPasteboard(WebPage*);
 };
 

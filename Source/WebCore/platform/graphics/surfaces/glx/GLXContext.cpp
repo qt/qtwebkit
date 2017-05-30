@@ -26,7 +26,7 @@
 #include "config.h"
 #include "GLXContext.h"
 
-#if USE(ACCELERATED_COMPOSITING) && USE(GLX)
+#if USE(GLX)
 
 #include "X11Helper.h"
 
@@ -61,7 +61,7 @@ bool GLXOffScreenContext::initialize(GLPlatformSurface* surface, PlatformContext
     if (!surface)
         return false;
 
-    Display* x11Display = surface->sharedDisplay();
+    Display* x11Display = X11Helper::nativeDisplay();
     if (!x11Display)
         return false;
 
@@ -106,7 +106,7 @@ bool GLXOffScreenContext::isCurrentContext() const
 
 bool GLXOffScreenContext::platformMakeCurrent(GLPlatformSurface* surface)
 {
-    return glXMakeCurrent(surface->sharedDisplay(), surface->drawable(), m_contextHandle);
+    return glXMakeCurrent(X11Helper::nativeDisplay(), surface->drawable(), m_contextHandle);
 }
 
 void GLXOffScreenContext::platformReleaseCurrent()

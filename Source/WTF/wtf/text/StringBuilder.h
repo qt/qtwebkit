@@ -28,6 +28,7 @@
 #define StringBuilder_h
 
 #include <wtf/text/AtomicString.h>
+#include <wtf/text/StringView.h>
 #include <wtf/text/WTFString.h>
 
 namespace WTF {
@@ -40,7 +41,6 @@ public:
     StringBuilder()
         : m_length(0)
         , m_is8Bit(true)
-        , m_valid16BitShadowLength(0)
         , m_bufferCharacters8(0)
     {
     }
@@ -89,6 +89,14 @@ public:
             append(other.characters16(), other.m_length);
     }
 
+    void append(StringView stringView)
+    {
+        if (stringView.is8Bit())
+            append(stringView.characters8(), stringView.length());
+        else
+            append(stringView.characters16(), stringView.length());
+    }
+    
     void append(const String& string, unsigned offset, unsigned length)
     {
         if (!string.length())
@@ -151,6 +159,8 @@ public:
         append(U16_TRAIL(c));
     }
 
+    WTF_EXPORT_PRIVATE void appendQuotedJSONString(const String&);
+
     template<unsigned charactersCount>
     ALWAYS_INLINE void appendLiteral(const char (&characters)[charactersCount]) { append(characters, charactersCount - 1); }
 
@@ -160,6 +170,9 @@ public:
     WTF_EXPORT_PRIVATE void appendNumber(unsigned long);
     WTF_EXPORT_PRIVATE void appendNumber(long long);
     WTF_EXPORT_PRIVATE void appendNumber(unsigned long long);
+    WTF_EXPORT_PRIVATE void appendNumber(double, unsigned precision = 6, TrailingZerosTruncatingPolicy = TruncateTrailingZeros);
+    WTF_EXPORT_PRIVATE void appendECMAScriptNumber(double);
+    WTF_EXPORT_PRIVATE void appendFixedWidthNumber(double, unsigned decimalPlaces);
 
     String toString()
     {
@@ -245,31 +258,15 @@ public:
         return m_buffer->characters16();
     }
     
-    const UChar* characters() const
-    {
-        if (!m_length)
-            return 0;
-        if (!m_string.isNull())
-            return m_string.characters();
-        ASSERT(m_buffer);
-        if (m_buffer->has16BitShadow() && m_valid16BitShadowLength < m_length)
-            m_buffer->upconvertCharacters(m_valid16BitShadowLength, m_length);
-
-        m_valid16BitShadowLength = m_length;
-
-        return m_buffer->characters();
-    }
-    
     bool is8Bit() const { return m_is8Bit; }
 
     void clear()
     {
         m_length = 0;
         m_string = String();
-        m_buffer = 0;
+        m_buffer = nullptr;
         m_bufferCharacters8 = 0;
         m_is8Bit = true;
-        m_valid16BitShadowLength = 0;
     }
 
     void swap(StringBuilder& stringBuilder)
@@ -278,7 +275,6 @@ public:
         m_string.swap(stringBuilder.m_string);
         m_buffer.swap(stringBuilder.m_buffer);
         std::swap(m_is8Bit, stringBuilder.m_is8Bit);
-        std::swap(m_valid16BitShadowLength, stringBuilder.m_valid16BitShadowLength);
         std::swap(m_bufferCharacters8, stringBuilder.m_bufferCharacters8);
     }
 
@@ -300,7 +296,6 @@ private:
     mutable String m_string;
     RefPtr<StringImpl> m_buffer;
     bool m_is8Bit;
-    mutable unsigned m_valid16BitShadowLength;
     union {
         LChar* m_bufferCharacters8;
         UChar* m_bufferCharacters16;

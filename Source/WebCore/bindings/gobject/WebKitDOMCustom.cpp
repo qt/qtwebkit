@@ -19,13 +19,19 @@
 #include "config.h"
 #include "WebKitDOMCustom.h"
 
-#include "WebKitDOMBlob.h"
-#include "WebKitDOMHTMLFormElement.h"
+#include "DOMTokenList.h"
+#include "JSMainThreadExecState.h"
+#include "SerializedScriptValue.h"
+#include "WebKitDOMDOMWindowPrivate.h"
 #include "WebKitDOMHTMLInputElement.h"
 #include "WebKitDOMHTMLInputElementPrivate.h"
+#include "WebKitDOMHTMLLinkElementPrivate.h"
 #include "WebKitDOMHTMLTextAreaElement.h"
 #include "WebKitDOMHTMLTextAreaElementPrivate.h"
-#include "WebKitDOMWebKitNamedFlow.h"
+#include "WebKitDOMPrivate.h"
+#include "WebKitDOMUserMessageHandlerPrivate.h"
+#include "WebKitDOMUserMessageHandlersNamespacePrivate.h"
+#include "WebKitDOMWebKitNamespacePrivate.h"
 
 using namespace WebKit;
 
@@ -43,65 +49,55 @@ gboolean webkit_dom_html_input_element_is_edited(WebKitDOMHTMLInputElement* inpu
     return core(input)->lastChangeWasUserEdit();
 }
 
-/* Compatibility */
-WebKitDOMBlob*
-webkit_dom_blob_webkit_slice(WebKitDOMBlob* self, gint64 start, gint64 end, const gchar* content_type)
+WebKitDOMWebKitNamespace* webkit_dom_dom_window_get_webkit_namespace(WebKitDOMDOMWindow* window)
 {
-    return webkit_dom_blob_slice(self, start, end, content_type);
+    g_return_val_if_fail(WEBKIT_DOM_IS_DOM_WINDOW(window), nullptr);
+
+    WebCore::DOMWindow* domWindow = core(window);
+    if (!domWindow->shouldHaveWebKitNamespaceForWorld(WebCore::mainThreadNormalWorld()))
+        return nullptr;
+    return kit(domWindow->webkitNamespace());
 }
 
-gchar*
-webkit_dom_html_element_get_class_name(WebKitDOMHTMLElement* element)
+WebKitDOMUserMessageHandler* webkit_dom_user_message_handlers_namespace_get_handler(WebKitDOMUserMessageHandlersNamespace* handlersNamespace, const gchar* name)
 {
-    return webkit_dom_element_get_class_name(WEBKIT_DOM_ELEMENT(element));
+    g_return_val_if_fail(WEBKIT_DOM_IS_USER_MESSAGE_HANDLERS_NAMESPACE(handlersNamespace), nullptr);
+    g_return_val_if_fail(name, nullptr);
+
+    return kit(core(handlersNamespace)->handler(String::fromUTF8(name), WebCore::mainThreadNormalWorld()));
 }
 
-void
-webkit_dom_html_element_set_class_name(WebKitDOMHTMLElement* element, const gchar* value)
+gboolean webkit_dom_dom_window_webkit_message_handlers_post_message(WebKitDOMDOMWindow* window, const gchar* handlerName, const gchar* message)
 {
-    webkit_dom_element_set_class_name(WEBKIT_DOM_ELEMENT(element), value);
+    g_return_val_if_fail(WEBKIT_DOM_IS_DOM_WINDOW(window), FALSE);
+    g_return_val_if_fail(handlerName, FALSE);
+    g_return_val_if_fail(message, FALSE);
+
+    WebCore::DOMWindow* domWindow = core(window);
+    if (!domWindow->shouldHaveWebKitNamespaceForWorld(WebCore::mainThreadNormalWorld()))
+        return FALSE;
+
+    auto webkitNamespace = domWindow->webkitNamespace();
+    if (!webkitNamespace)
+        return FALSE;
+
+    auto handler = webkitNamespace->messageHandlers()->handler(String::fromUTF8(handlerName), WebCore::mainThreadNormalWorld());
+    if (!handler)
+        return FALSE;
+
+    WebCore::JSMainThreadNullState state;
+    WebCore::ExceptionCode ec = 0;
+    handler->postMessage(WebCore::SerializedScriptValue::create(String::fromUTF8(message)), ec);
+    if (ec)
+        return FALSE;
+
+    return TRUE;
 }
 
-gboolean
-webkit_dom_webkit_named_flow_get_overflow(WebKitDOMWebKitNamedFlow* flow)
+void webkit_dom_html_link_element_set_sizes(WebKitDOMHTMLLinkElement* linkElement, const gchar* value)
 {
-    g_warning("The WebKitDOMWebKitNamedFlow::overflow property has been renamed to WebKitDOMWebKitNamedFlow::overset. Please update your code to use the new name.");
-    return webkit_dom_webkit_named_flow_get_overset(flow);
-}
+    g_return_if_fail(WEBKIT_DOM_IS_HTML_LINK_ELEMENT(linkElement));
+    g_return_if_fail(value);
 
-WebKitDOMDOMTokenList*
-webkit_dom_html_element_get_class_list(WebKitDOMHTMLElement* element)
-{
-    return webkit_dom_element_get_class_list(WEBKIT_DOM_ELEMENT(element));
-}
-
-gchar*
-webkit_dom_element_get_webkit_region_overflow(WebKitDOMElement* element)
-{
-    return webkit_dom_element_get_webkit_region_overset(element);
-}
-
-WebKitDOMNodeList*
-webkit_dom_webkit_named_flow_get_content_nodes(WebKitDOMWebKitNamedFlow* namedFlow)
-{
-    return webkit_dom_webkit_named_flow_get_content(namedFlow);
-
-}
-
-WebKitDOMNodeList*
-webkit_dom_webkit_named_flow_get_regions_by_content_node(WebKitDOMWebKitNamedFlow* namedFlow, WebKitDOMNode* contentNode)
-{
-    return webkit_dom_webkit_named_flow_get_regions_by_content(namedFlow, contentNode);
-}
-
-void
-webkit_dom_html_form_element_dispatch_form_change(WebKitDOMHTMLFormElement* self)
-{
-    g_warning("The onformchange functionality has been removed from the DOM spec, this function does nothing.");
-}
-
-void
-webkit_dom_html_form_element_dispatch_form_input(WebKitDOMHTMLFormElement* self)
-{
-    g_warning("The onforminput functionality has been removed from the DOM spec, this function does nothing.");
+    core(linkElement)->sizes().setValue(String::fromUTF8(value));
 }

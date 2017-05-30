@@ -28,12 +28,12 @@ namespace WebKit {
 
 class WebSearchPopupMenu : public WebCore::SearchPopupMenu {
 public:
-    static PassRefPtr<WebSearchPopupMenu> create(WebPage*, WebCore::PopupMenuClient*);
+    static Ref<WebSearchPopupMenu> create(WebPage*, WebCore::PopupMenuClient*);
 
-    virtual WebCore::PopupMenu* popupMenu() OVERRIDE;
-    virtual void saveRecentSearches(const WTF::AtomicString& name, const Vector<String>& searchItems) OVERRIDE;
-    virtual void loadRecentSearches(const WTF::AtomicString& name, Vector<String>& searchItems) OVERRIDE;
-    virtual bool enabled() OVERRIDE;
+    virtual WebCore::PopupMenu* popupMenu() override;
+    virtual void saveRecentSearches(const WTF::AtomicString& name, const Vector<WebCore::RecentSearch>&) override;
+    virtual void loadRecentSearches(const WTF::AtomicString& name, Vector<WebCore::RecentSearch>&) override;
+    virtual bool enabled() override;
 
 private:
     WebSearchPopupMenu(WebPage*, WebCore::PopupMenuClient*);

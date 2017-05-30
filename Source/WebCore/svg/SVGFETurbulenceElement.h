@@ -21,7 +21,6 @@
 #ifndef SVGFETurbulenceElement_h
 #define SVGFETurbulenceElement_h
 
-#if ENABLE(SVG) && ENABLE(FILTERS)
 #include "FETurbulence.h"
 #include "SVGAnimatedEnumeration.h"
 #include "SVGAnimatedInteger.h"
@@ -46,9 +45,9 @@ struct SVGPropertyTraits<SVGStitchOptions> {
         case SVG_STITCHTYPE_UNKNOWN:
             return emptyString();
         case SVG_STITCHTYPE_STITCH:
-            return "stitch";
+            return ASCIILiteral("stitch");
         case SVG_STITCHTYPE_NOSTITCH:
-            return "noStitch";
+            return ASCIILiteral("noStitch");
         }
 
         ASSERT_NOT_REACHED();
@@ -75,9 +74,9 @@ struct SVGPropertyTraits<TurbulenceType> {
         case FETURBULENCE_TYPE_UNKNOWN:
             return emptyString();
         case FETURBULENCE_TYPE_FRACTALNOISE:
-            return "fractalNoise";
+            return ASCIILiteral("fractalNoise");
         case FETURBULENCE_TYPE_TURBULENCE:
-            return "turbulence";
+            return ASCIILiteral("turbulence");
         }
 
         ASSERT_NOT_REACHED();
@@ -94,18 +93,17 @@ struct SVGPropertyTraits<TurbulenceType> {
     }
 };
 
-class SVGFETurbulenceElement FINAL : public SVGFilterPrimitiveStandardAttributes {
+class SVGFETurbulenceElement final : public SVGFilterPrimitiveStandardAttributes {
 public:
-    static PassRefPtr<SVGFETurbulenceElement> create(const QualifiedName&, Document*);
+    static Ref<SVGFETurbulenceElement> create(const QualifiedName&, Document&);
 
 private:
-    SVGFETurbulenceElement(const QualifiedName&, Document*);
+    SVGFETurbulenceElement(const QualifiedName&, Document&);
 
-    bool isSupportedAttribute(const QualifiedName&);
-    virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
-    virtual bool setFilterEffectAttribute(FilterEffect*, const QualifiedName& attrName);
-    virtual void svgAttributeChanged(const QualifiedName&);
-    virtual PassRefPtr<FilterEffect> build(SVGFilterBuilder*, Filter*);
+    virtual void parseAttribute(const QualifiedName&, const AtomicString&) override;
+    virtual bool setFilterEffectAttribute(FilterEffect*, const QualifiedName& attrName) override;
+    virtual void svgAttributeChanged(const QualifiedName&) override;
+    virtual RefPtr<FilterEffect> build(SVGFilterBuilder*, Filter&) override;
 
     static const AtomicString& baseFrequencyXIdentifier();
     static const AtomicString& baseFrequencyYIdentifier();
@@ -122,5 +120,4 @@ private:
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif

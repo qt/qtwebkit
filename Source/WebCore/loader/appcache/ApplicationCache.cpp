@@ -37,14 +37,14 @@
 
 namespace WebCore {
  
-static inline bool fallbackURLLongerThan(const std::pair<KURL, KURL>& lhs, const std::pair<KURL, KURL>& rhs)
+static inline bool fallbackURLLongerThan(const std::pair<URL, URL>& lhs, const std::pair<URL, URL>& rhs)
 {
     return lhs.first.string().length() > rhs.first.string().length();
 }
 
 ApplicationCache::ApplicationCache()
-    : m_group(0)
-    , m_manifest(0)
+    : m_group(nullptr)
+    , m_manifest(nullptr)
     , m_estimatedSizeInStorage(0)
     , m_storageID(0)
 {
@@ -52,7 +52,7 @@ ApplicationCache::ApplicationCache()
 
 ApplicationCache::~ApplicationCache()
 {
-    if (m_group && !m_group->isCopy())
+    if (m_group)
         m_group->cacheDestroyed(this);
 }
     
@@ -62,9 +62,9 @@ void ApplicationCache::setGroup(ApplicationCacheGroup* group)
     m_group = group;
 }
 
-bool ApplicationCache::isComplete() const
+bool ApplicationCache::isComplete()
 {
-    return !m_group->cacheIsBeingUpdated(this);
+    return m_group && m_group->cacheIsComplete(this);
 }
 
 void ApplicationCache::setManifestResource(PassRefPtr<ApplicationCacheResource> manifest)
@@ -91,7 +91,7 @@ void ApplicationCache::addResource(PassRefPtr<ApplicationCacheResource> resource
         ASSERT(resource->type() & ApplicationCacheResource::Master);
         
         // Add the resource to the storage.
-        cacheStorage().store(resource.get(), this);
+        ApplicationCacheStorage::singleton().store(resource.get(), this);
     }
 
     m_estimatedSizeInStorage += resource->estimatedSizeInStorage();
@@ -101,61 +101,54 @@ void ApplicationCache::addResource(PassRefPtr<ApplicationCacheResource> resource
 
 unsigned ApplicationCache::removeResource(const String& url)
 {
-    HashMap<String, RefPtr<ApplicationCacheResource> >::iterator it = m_resources.find(url);
+    HashMap<String, RefPtr<ApplicationCacheResource>>::iterator it = m_resources.find(url);
     if (it == m_resources.end())
         return 0;
 
     // The resource exists, get its type so we can return it.
     unsigned type = it->value->type();
 
-    m_resources.remove(it);
-
     m_estimatedSizeInStorage -= it->value->estimatedSizeInStorage();
+
+    m_resources.remove(it);
 
     return type;
 }    
     
 ApplicationCacheResource* ApplicationCache::resourceForURL(const String& url)
 {
-    ASSERT(!KURL(ParsedURLString, url).hasFragmentIdentifier());
+    ASSERT(!URL(ParsedURLString, url).hasFragmentIdentifier());
     return m_resources.get(url);
 }    
 
 bool ApplicationCache::requestIsHTTPOrHTTPSGet(const ResourceRequest& request)
 {
-    if (!request.url().protocolIsInHTTPFamily())
-        return false;
-    
-    if (!equalIgnoringCase(request.httpMethod(), "GET"))
-        return false;
-
-    return true;
-}    
+    return request.url().protocolIsInHTTPFamily() && equalLettersIgnoringASCIICase(request.httpMethod(), "get");
+}
 
 ApplicationCacheResource* ApplicationCache::resourceForRequest(const ResourceRequest& request)
 {
     // We only care about HTTP/HTTPS GET requests.
     if (!requestIsHTTPOrHTTPSGet(request))
-        return 0;
+        return nullptr;
 
-    KURL url(request.url());
+    URL url(request.url());
     if (url.hasFragmentIdentifier())
         url.removeFragmentIdentifier();
 
     return resourceForURL(url);
 }
 
-void ApplicationCache::setOnlineWhitelist(const Vector<KURL>& onlineWhitelist)
+void ApplicationCache::setOnlineWhitelist(const Vector<URL>& onlineWhitelist)
 {
     ASSERT(m_onlineWhitelist.isEmpty());
     m_onlineWhitelist = onlineWhitelist; 
 }
 
-bool ApplicationCache::isURLInOnlineWhitelist(const KURL& url)
+bool ApplicationCache::isURLInOnlineWhitelist(const URL& url)
 {
-    size_t whitelistSize = m_onlineWhitelist.size();
-    for (size_t i = 0; i < whitelistSize; ++i) {
-        if (protocolHostAndPortAreEqual(url, m_onlineWhitelist[i]) && url.string().startsWith(m_onlineWhitelist[i].string()))
+    for (auto& whitelistURL : m_onlineWhitelist) {
+        if (protocolHostAndPortAreEqual(url, whitelistURL) && url.string().startsWith(whitelistURL.string()))
             return true;
     }
     return false;
@@ -169,13 +162,12 @@ void ApplicationCache::setFallbackURLs(const FallbackURLVector& fallbackURLs)
     std::stable_sort(m_fallbackURLs.begin(), m_fallbackURLs.end(), fallbackURLLongerThan);
 }
 
-bool ApplicationCache::urlMatchesFallbackNamespace(const KURL& url, KURL* fallbackURL)
+bool ApplicationCache::urlMatchesFallbackNamespace(const URL& url, URL* fallbackURL)
 {
-    size_t fallbackCount = m_fallbackURLs.size();
-    for (size_t i = 0; i < fallbackCount; ++i) {
-        if (protocolHostAndPortAreEqual(url, m_fallbackURLs[i].first) && url.string().startsWith(m_fallbackURLs[i].first.string())) {
+    for (auto& fallback : m_fallbackURLs) {
+        if (protocolHostAndPortAreEqual(url, fallback.first) && url.string().startsWith(fallback.first.string())) {
             if (fallbackURL)
-                *fallbackURL = m_fallbackURLs[i].second;
+                *fallbackURL = fallback.second;
             return true;
         }
     }
@@ -186,48 +178,16 @@ void ApplicationCache::clearStorageID()
 {
     m_storageID = 0;
     
-    ResourceMap::const_iterator end = m_resources.end();
-    for (ResourceMap::const_iterator it = m_resources.begin(); it != end; ++it)
-        it->value->clearStorageID();
+    for (const auto& resource : m_resources.values())
+        resource->clearStorageID();
 }
     
-void ApplicationCache::deleteCacheForOrigin(SecurityOrigin* origin)
-{
-    Vector<KURL> urls;
-    if (!cacheStorage().manifestURLs(&urls)) {
-        LOG_ERROR("Failed to retrieve ApplicationCache manifest URLs");
-        return;
-    }
-
-    KURL originURL(KURL(), origin->toString());
-
-    size_t count = urls.size();
-    for (size_t i = 0; i < count; ++i) {
-        if (protocolHostAndPortAreEqual(urls[i], originURL)) {
-            ApplicationCacheGroup* group = cacheStorage().findInMemoryCacheGroup(urls[i]);
-            if (group)
-                group->makeObsolete();
-            else
-                cacheStorage().deleteCacheGroup(urls[i]);
-        }
-    }
-}
-
-int64_t ApplicationCache::diskUsageForOrigin(SecurityOrigin* origin)
-{
-    int64_t usage = 0;
-    cacheStorage().calculateUsageForOrigin(origin, usage);
-    return usage;
-}
-
 #ifndef NDEBUG
 void ApplicationCache::dump()
 {
-    HashMap<String, RefPtr<ApplicationCacheResource> >::const_iterator end = m_resources.end();
-    
-    for (HashMap<String, RefPtr<ApplicationCacheResource> >::const_iterator it = m_resources.begin(); it != end; ++it) {
-        printf("%s ", it->key.ascii().data());
-        ApplicationCacheResource::dumpType(it->value->type());
+    for (const auto& urlAndResource : m_resources) {
+        printf("%s ", urlAndResource.key.utf8().data());
+        ApplicationCacheResource::dumpType(urlAndResource.value->type());
     }
 }
 #endif

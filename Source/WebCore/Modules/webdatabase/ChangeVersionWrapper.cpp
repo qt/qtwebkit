@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -27,8 +27,6 @@
  */
 #include "config.h"
 #include "ChangeVersionWrapper.h"
-
-#if ENABLE(SQL_DATABASE)
 
 #include "Database.h"
 #include "SQLError.h"
@@ -47,7 +45,7 @@ bool ChangeVersionWrapper::performPreflight(SQLTransactionBackend* transaction)
 {
     ASSERT(transaction && transaction->database());
 
-    DatabaseBackend* database = transaction->database();
+    Database* database = transaction->database();
 
     String actualVersion;
     if (!database->getVersionFromDatabase(actualVersion)) {
@@ -69,7 +67,7 @@ bool ChangeVersionWrapper::performPostflight(SQLTransactionBackend* transaction)
 {
     ASSERT(transaction && transaction->database());
 
-    DatabaseBackend* database = transaction->database();
+    Database* database = transaction->database();
 
     if (!database->setVersionInDatabase(m_newVersion)) {
         int sqliteError = database->sqliteDatabase().lastError();
@@ -88,5 +86,3 @@ void ChangeVersionWrapper::handleCommitFailedAfterPostflight(SQLTransactionBacke
 }
 
 } // namespace WebCore
-
-#endif // ENABLE(SQL_DATABASE)

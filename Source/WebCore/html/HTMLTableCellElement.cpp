@@ -25,15 +25,11 @@
 #include "config.h"
 #include "HTMLTableCellElement.h"
 
-#include "Attribute.h"
 #include "CSSPropertyNames.h"
 #include "CSSValueKeywords.h"
 #include "HTMLNames.h"
 #include "HTMLTableElement.h"
 #include "RenderTableCell.h"
-
-using std::max;
-using std::min;
 
 namespace WebCore {
 
@@ -42,26 +38,22 @@ static const int maxRowspan = 8190;
 
 using namespace HTMLNames;
 
-inline HTMLTableCellElement::HTMLTableCellElement(const QualifiedName& tagName, Document* document)
+HTMLTableCellElement::HTMLTableCellElement(const QualifiedName& tagName, Document& document)
     : HTMLTablePartElement(tagName, document)
 {
-}
-
-PassRefPtr<HTMLTableCellElement> HTMLTableCellElement::create(const QualifiedName& tagName, Document* document)
-{
-    return adoptRef(new HTMLTableCellElement(tagName, document));
+    ASSERT(tagName == thTag || tagName == tdTag);
 }
 
 int HTMLTableCellElement::colSpan() const
 {
     const AtomicString& colSpanValue = fastGetAttribute(colspanAttr);
-    return max(1, colSpanValue.toInt());
+    return std::max(1, colSpanValue.toInt());
 }
 
 int HTMLTableCellElement::rowSpan() const
 {
     const AtomicString& rowSpanValue = fastGetAttribute(rowspanAttr);
-    return max(1, min(rowSpanValue.toInt(), maxRowspan));
+    return std::max(1, std::min(rowSpanValue.toInt(), maxRowspan));
 }
 
 int HTMLTableCellElement::cellIndex() const
@@ -85,7 +77,7 @@ bool HTMLTableCellElement::isPresentationAttribute(const QualifiedName& name) co
     return HTMLTablePartElement::isPresentationAttribute(name);
 }
 
-void HTMLTableCellElement::collectStyleForPresentationAttribute(const QualifiedName& name, const AtomicString& value, MutableStylePropertySet* style)
+void HTMLTableCellElement::collectStyleForPresentationAttribute(const QualifiedName& name, const AtomicString& value, MutableStyleProperties& style)
 {
     if (name == nowrapAttr)
         addPropertyToPresentationAttributeStyle(style, CSSPropertyWhiteSpace, CSSValueWebkitNowrap);
@@ -108,16 +100,16 @@ void HTMLTableCellElement::collectStyleForPresentationAttribute(const QualifiedN
 void HTMLTableCellElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
     if (name == rowspanAttr) {
-        if (renderer() && renderer()->isTableCell())
-            toRenderTableCell(renderer())->colSpanOrRowSpanChanged();
+        if (is<RenderTableCell>(renderer()))
+            downcast<RenderTableCell>(*renderer()).colSpanOrRowSpanChanged();
     } else if (name == colspanAttr) {
-        if (renderer() && renderer()->isTableCell())
-            toRenderTableCell(renderer())->colSpanOrRowSpanChanged();
+        if (is<RenderTableCell>(renderer()))
+            downcast<RenderTableCell>(*renderer()).colSpanOrRowSpanChanged();
     } else
         HTMLTablePartElement::parseAttribute(name, value);
 }
 
-const StylePropertySet* HTMLTableCellElement::additionalPresentationAttributeStyle()
+const StyleProperties* HTMLTableCellElement::additionalPresentationAttributeStyle()
 {
     if (HTMLTableElement* table = findParentTable())
         return table->additionalCellStyle();
@@ -131,71 +123,53 @@ bool HTMLTableCellElement::isURLAttribute(const Attribute& attribute) const
 
 String HTMLTableCellElement::abbr() const
 {
-    return getAttribute(abbrAttr);
+    return fastGetAttribute(abbrAttr);
 }
 
 String HTMLTableCellElement::axis() const
 {
-    return getAttribute(axisAttr);
+    return fastGetAttribute(axisAttr);
 }
 
 void HTMLTableCellElement::setColSpan(int n)
 {
-    setAttribute(colspanAttr, String::number(n));
+    setIntegralAttribute(colspanAttr, n);
 }
 
 String HTMLTableCellElement::headers() const
 {
-    return getAttribute(headersAttr);
+    return fastGetAttribute(headersAttr);
 }
 
 void HTMLTableCellElement::setRowSpan(int n)
 {
-    setAttribute(rowspanAttr, String::number(n));
+    setIntegralAttribute(rowspanAttr, n);
 }
 
 String HTMLTableCellElement::scope() const
 {
-    return getAttribute(scopeAttr);
+    return fastGetAttribute(scopeAttr);
 }
 
-void HTMLTableCellElement::addSubresourceAttributeURLs(ListHashSet<KURL>& urls) const
+void HTMLTableCellElement::addSubresourceAttributeURLs(ListHashSet<URL>& urls) const
 {
     HTMLTablePartElement::addSubresourceAttributeURLs(urls);
 
-    addSubresourceURL(urls, document()->completeURL(getAttribute(backgroundAttr)));
+    addSubresourceURL(urls, document().completeURL(fastGetAttribute(backgroundAttr)));
 }
 
 HTMLTableCellElement* HTMLTableCellElement::cellAbove() const
 {
-    RenderObject* cellRenderer = renderer();
-    if (!cellRenderer)
-        return 0;
-    if (!cellRenderer->isTableCell())
-        return 0;
+    auto* cellRenderer = renderer();
+    if (!is<RenderTableCell>(cellRenderer))
+        return nullptr;
 
-    RenderTableCell* tableCellRenderer = toRenderTableCell(cellRenderer);
-    RenderTableCell* cellAboveRenderer = tableCellRenderer->table()->cellAbove(tableCellRenderer);
+    auto& tableCellRenderer = downcast<RenderTableCell>(*cellRenderer);
+    auto* cellAboveRenderer = tableCellRenderer.table()->cellAbove(&tableCellRenderer);
     if (!cellAboveRenderer)
-        return 0;
+        return nullptr;
 
-    return static_cast<HTMLTableCellElement*>(cellAboveRenderer->node());
+    return downcast<HTMLTableCellElement>(cellAboveRenderer->element());
 }
-
-#ifndef NDEBUG
-
-HTMLTableCellElement* toHTMLTableCellElement(Node* node)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->hasTagName(HTMLNames::tdTag) || node->hasTagName(HTMLNames::thTag));
-    return static_cast<HTMLTableCellElement*>(node);
-}
-
-const HTMLTableCellElement* toHTMLTableCellElement(const Node* node)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->hasTagName(HTMLNames::tdTag) || node->hasTagName(HTMLNames::thTag));
-    return static_cast<const HTMLTableCellElement*>(node);
-}
-
-#endif
 
 } // namespace WebCore

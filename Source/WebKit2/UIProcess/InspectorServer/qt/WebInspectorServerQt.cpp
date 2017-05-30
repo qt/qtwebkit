@@ -28,6 +28,7 @@
 #include "WebPageProxy.h"
 #include <QFile>
 #include <WebCore/MIMETypeRegistry.h>
+#include <wtf/NeverDestroyed.h>
 #include <wtf/text/CString.h>
 #include <wtf/text/StringBuilder.h>
 
@@ -35,7 +36,7 @@ namespace WebKit {
 
 static String remoteInspectorPagePath()
 {
-    DEFINE_STATIC_LOCAL(String, pagePath, (ASCIILiteral("/webkit/inspector/inspector.html?page=")));
+    static NeverDestroyed<WTF::String> pagePath(ASCIILiteral("/webkit/inspector/UserInterface/Main.html?page="));
     return pagePath;
 }
 
@@ -55,10 +56,7 @@ bool WebInspectorServer::platformResourceForPath(const String& path, Vector<char
         file.open(QIODevice::ReadOnly);
         data.grow(file.size());
         file.read(data.data(), data.size());
-
-        size_t extStart = localPath.reverseFind('.');
-        String ext = localPath.substring(extStart != notFound ? extStart + 1 : 0);
-        contentType = WebCore::MIMETypeRegistry::getMIMETypeForExtension(ext);
+        contentType = WebCore::MIMETypeRegistry::getMIMETypeForPath(localPath);
         return true;
     }
     return false;
@@ -84,15 +82,15 @@ void WebInspectorServer::buildPageList(Vector<char>& data, String& contentType)
     builder.appendLiteral("[ ");
     ClientMap::iterator end = m_clientMap.end();
     for (ClientMap::iterator it = m_clientMap.begin(); it != end; ++it) {
-        WebPageProxy* webPage = it->value->page();
+        WebPageProxy* webPage = it->value->inspectedPage();
         if (it != m_clientMap.begin())
             builder.appendLiteral(", ");
         builder.appendLiteral("{ \"id\": ");
         builder.appendNumber(it->key);
         builder.appendLiteral(", \"title\": \"");
-        builder.append(webPage->pageTitle());
+        builder.append(webPage->pageLoadState().title());
         builder.appendLiteral("\", \"url\": \"");
-        builder.append(webPage->activeURL());
+        builder.append(webPage->pageLoadState().activeURL());
         builder.appendLiteral("\", \"inspectorUrl\": \"");
         builder.append(remoteInspectorPagePath());
         builder.appendNumber(it->key);

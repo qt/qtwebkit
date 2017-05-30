@@ -27,11 +27,10 @@
 #define CheckedArithmetic_h
 
 #include <wtf/Assertions.h>
-#include <wtf/EnumClass.h>
-#include <wtf/TypeTraits.h>
 
 #include <limits>
 #include <stdint.h>
+#include <type_traits>
 
 /* Checked<T>
  *
@@ -67,20 +66,24 @@
 
 namespace WTF {
 
-ENUM_CLASS(CheckedState)
-{
+enum class CheckedState {
     DidOverflow,
     DidNotOverflow
-} ENUM_CLASS_END(CheckedState);
-    
+};
+
 class CrashOnOverflow {
 public:
     static NO_RETURN_DUE_TO_CRASH void overflowed()
     {
-        CRASH();
+        crash();
     }
 
     void clearOverflow() { }
+
+    static NO_RETURN_DUE_TO_CRASH void crash()
+    {
+        CRASH();
+    }
 
 public:
     bool hasOverflowed() const { return false; }
@@ -103,6 +106,11 @@ protected:
         m_overflowed = false;
     }
 
+    static NO_RETURN_DUE_TO_CRASH void crash()
+    {
+        CRASH();
+    }
+
 public:
     bool hasOverflowed() const { return m_overflowed; }
 
@@ -112,65 +120,86 @@ private:
 
 template <typename T, class OverflowHandler = CrashOnOverflow> class Checked;
 template <typename T> struct RemoveChecked;
-template <typename T> struct RemoveChecked<Checked<T> >;
+template <typename T> struct RemoveChecked<Checked<T>>;
 
-template <typename Target, typename Source, bool targetSigned = std::numeric_limits<Target>::is_signed, bool sourceSigned = std::numeric_limits<Source>::is_signed> struct BoundsChecker;
-template <typename Target, typename Source> struct BoundsChecker<Target, Source, false, false> {
+template <typename Target, typename Source, bool isTargetBigger = sizeof(Target) >= sizeof(Source), bool targetSigned = std::numeric_limits<Target>::is_signed, bool sourceSigned = std::numeric_limits<Source>::is_signed> struct BoundsChecker;
+template <typename Target, typename Source> struct BoundsChecker<Target, Source, false, false, false> {
     static bool inBounds(Source value)
     {
-        // Same signedness so implicit type conversion will always increase precision
-        // to widest type
+        // Same signedness so implicit type conversion will always increase precision to widest type.
         return value <= std::numeric_limits<Target>::max();
     }
 };
-
-template <typename Target, typename Source> struct BoundsChecker<Target, Source, true, true> {
+template <typename Target, typename Source> struct BoundsChecker<Target, Source, false, true, true> {
     static bool inBounds(Source value)
     {
-        // Same signedness so implicit type conversion will always increase precision
-        // to widest type
+        // Same signedness so implicit type conversion will always increase precision to widest type.
         return std::numeric_limits<Target>::min() <= value && value <= std::numeric_limits<Target>::max();
     }
 };
 
-template <typename Target, typename Source> struct BoundsChecker<Target, Source, false, true> {
+template <typename Target, typename Source> struct BoundsChecker<Target, Source, false, false, true> {
     static bool inBounds(Source value)
     {
-        // Target is unsigned so any value less than zero is clearly unsafe
-        if (value < 0)
-            return false;
-        // If our (unsigned) Target is the same or greater width we can
-        // convert value to type Target without losing precision
-        if (sizeof(Target) >= sizeof(Source)) 
-            return static_cast<Target>(value) <= std::numeric_limits<Target>::max();
-        // The signed Source type has greater precision than the target so
-        // max(Target) -> Source will widen.
+        // When converting value to unsigned Source, value will become a big value if value is negative.
+        // Casted value will become bigger than Target::max as Source is bigger than Target.
+        return static_cast<typename std::make_unsigned<Source>::type>(value) <= std::numeric_limits<Target>::max();
+    }
+};
+
+template <typename Target, typename Source> struct BoundsChecker<Target, Source, false, true, false> {
+    static bool inBounds(Source value)
+    {
+        // The unsigned Source type has greater precision than the target so max(Target) -> Source will widen.
         return value <= static_cast<Source>(std::numeric_limits<Target>::max());
     }
 };
 
-template <typename Target, typename Source> struct BoundsChecker<Target, Source, true, false> {
-    static bool inBounds(Source value)
+template <typename Target, typename Source> struct BoundsChecker<Target, Source, true, false, false> {
+    static bool inBounds(Source)
     {
-        // Signed target with an unsigned source
-        if (sizeof(Target) <= sizeof(Source)) 
-            return value <= static_cast<Source>(std::numeric_limits<Target>::max());
-        // Target is Wider than Source so we're guaranteed to fit any value in
-        // unsigned Source
+        // Same sign, greater or same precision.
         return true;
     }
 };
 
-template <typename Target, typename Source, bool CanElide = IsSameType<Target, Source>::value || (sizeof(Target) > sizeof(Source)) > struct BoundsCheckElider;
-template <typename Target, typename Source> struct BoundsCheckElider<Target, Source, true> {
-    static bool inBounds(Source) { return true; }
+template <typename Target, typename Source> struct BoundsChecker<Target, Source, true, true, true> {
+    static bool inBounds(Source)
+    {
+        // Same sign, greater or same precision.
+        return true;
+    }
 };
-template <typename Target, typename Source> struct BoundsCheckElider<Target, Source, false> : public BoundsChecker<Target, Source> {
+
+template <typename Target, typename Source> struct BoundsChecker<Target, Source, true, true, false> {
+    static bool inBounds(Source value)
+    {
+        // Target is signed with greater or same precision. If strictly greater, it is always safe.
+        if (sizeof(Target) > sizeof(Source))
+            return true;
+        return value <= static_cast<Source>(std::numeric_limits<Target>::max());
+    }
+};
+
+template <typename Target, typename Source> struct BoundsChecker<Target, Source, true, false, true> {
+    static bool inBounds(Source value)
+    {
+        // Target is unsigned with greater precision.
+        return value >= 0;
+    }
 };
 
 template <typename Target, typename Source> static inline bool isInBounds(Source value)
 {
-    return BoundsCheckElider<Target, Source>::inBounds(value);
+    return BoundsChecker<Target, Source>::inBounds(value);
+}
+
+template <typename Target, typename Source> static inline bool convertSafely(Source input, Target& output)
+{
+    if (!isInBounds<Target>(input))
+        return false;
+    output = static_cast<Target>(input);
+    return true;
 }
 
 template <typename T> struct RemoveChecked {
@@ -178,12 +207,12 @@ template <typename T> struct RemoveChecked {
     static const CleanType DefaultValue = 0;    
 };
 
-template <typename T> struct RemoveChecked<Checked<T, CrashOnOverflow> > {
+template <typename T> struct RemoveChecked<Checked<T, CrashOnOverflow>> {
     typedef typename RemoveChecked<T>::CleanType CleanType;
     static const CleanType DefaultValue = 0;
 };
 
-template <typename T> struct RemoveChecked<Checked<T, RecordOverflow> > {
+template <typename T> struct RemoveChecked<Checked<T, RecordOverflow>> {
     typedef typename RemoveChecked<T>::CleanType CleanType;
     static const CleanType DefaultValue = 0;
 };
@@ -419,9 +448,6 @@ template <typename U, typename V> static inline bool safeEquals(U lhs, V rhs)
 
 enum ResultOverflowedTag { ResultOverflowed };
     
-// FIXME: Needed to workaround http://llvm.org/bugs/show_bug.cgi?id=10801
-static inline bool workAroundClangBug() { return true; }
-
 template <typename T, class OverflowHandler> class Checked : public OverflowHandler {
 public:
     template <typename _T, class _OverflowHandler> friend class Checked;
@@ -433,9 +459,7 @@ public:
     Checked(ResultOverflowedTag)
         : m_value(0)
     {
-        // FIXME: Remove this when clang fixes http://llvm.org/bugs/show_bug.cgi?id=10801
-        if (workAroundClangBug())
-            this->overflowed();
+        this->overflowed();
     }
 
     template <typename U> Checked(U value)
@@ -524,23 +548,22 @@ public:
     bool operator!() const
     {
         if (this->hasOverflowed())
-            CRASH();
+            this->crash();
         return !m_value;
     }
 
-    typedef void* (Checked::*UnspecifiedBoolType);
-    operator UnspecifiedBoolType*() const
+    explicit operator bool() const
     {
         if (this->hasOverflowed())
-            CRASH();
-        return (m_value) ? reinterpret_cast<UnspecifiedBoolType*>(1) : 0;
+            this->crash();
+        return m_value;
     }
 
     // Value accessors. unsafeGet() will crash if there's been an overflow.
     T unsafeGet() const
     {
         if (this->hasOverflowed())
-            CRASH();
+            this->crash();
         return m_value;
     }
     
@@ -619,7 +642,7 @@ public:
     template <typename U> bool operator==(U rhs)
     {
         if (this->hasOverflowed())
-            this->overflowed();
+            this->crash();
         return safeEquals(m_value, rhs);
     }
     
@@ -631,6 +654,47 @@ public:
     template <typename U> bool operator!=(U rhs)
     {
         return !(*this == rhs);
+    }
+
+    // Other comparisons
+    template <typename V> bool operator<(Checked<T, V> rhs) const
+    {
+        return unsafeGet() < rhs.unsafeGet();
+    }
+
+    bool operator<(T rhs) const
+    {
+        return unsafeGet() < rhs;
+    }
+
+    template <typename V> bool operator<=(Checked<T, V> rhs) const
+    {
+        return unsafeGet() <= rhs.unsafeGet();
+    }
+
+    bool operator<=(T rhs) const
+    {
+        return unsafeGet() <= rhs;
+    }
+
+    template <typename V> bool operator>(Checked<T, V> rhs) const
+    {
+        return unsafeGet() > rhs.unsafeGet();
+    }
+
+    bool operator>(T rhs) const
+    {
+        return unsafeGet() > rhs;
+    }
+
+    template <typename V> bool operator>=(Checked<T, V> rhs) const
+    {
+        return unsafeGet() >= rhs.unsafeGet();
+    }
+
+    bool operator>=(T rhs) const
+    {
+        return unsafeGet() >= rhs;
     }
 
 private:
@@ -712,10 +776,77 @@ template <typename U, typename V, typename OverflowHandler> static inline Checke
     return Checked<U, OverflowHandler>(lhs) * rhs;
 }
 
+// Convenience typedefs.
+typedef Checked<int8_t, RecordOverflow> CheckedInt8;
+typedef Checked<uint8_t, RecordOverflow> CheckedUint8;
+typedef Checked<int16_t, RecordOverflow> CheckedInt16;
+typedef Checked<uint16_t, RecordOverflow> CheckedUint16;
+typedef Checked<int32_t, RecordOverflow> CheckedInt32;
+typedef Checked<uint32_t, RecordOverflow> CheckedUint32;
+typedef Checked<int64_t, RecordOverflow> CheckedInt64;
+typedef Checked<uint64_t, RecordOverflow> CheckedUint64;
+typedef Checked<size_t, RecordOverflow> CheckedSize;
+
+template<typename T, typename U>
+Checked<T, RecordOverflow> checkedSum(U value)
+{
+    return Checked<T, RecordOverflow>(value);
+}
+template<typename T, typename U, typename... Args>
+Checked<T, RecordOverflow> checkedSum(U value, Args... args)
+{
+    return Checked<T, RecordOverflow>(value) + checkedSum<T>(args...);
+}
+
+// Sometimes, you just want to check if some math would overflow - the code to do the math is
+// already in place, and you want to guard it.
+
+template<typename T, typename... Args> bool sumOverflows(Args... args)
+{
+    return checkedSum<T>(args...).hasOverflowed();
+}
+
+template<typename T, typename U> bool differenceOverflows(U left, U right)
+{
+    return (Checked<T, RecordOverflow>(left) - Checked<T, RecordOverflow>(right)).hasOverflowed();
+}
+
+template<typename T, typename U>
+Checked<T, RecordOverflow> checkedProduct(U value)
+{
+    return Checked<T, RecordOverflow>(value);
+}
+template<typename T, typename U, typename... Args>
+Checked<T, RecordOverflow> checkedProduct(U value, Args... args)
+{
+    return Checked<T, RecordOverflow>(value) * checkedProduct<T>(args...);
+}
+
+// Sometimes, you just want to check if some math would overflow - the code to do the math is
+// already in place, and you want to guard it.
+
+template<typename T, typename... Args> bool productOverflows(Args... args)
+{
+    return checkedProduct<T>(args...).hasOverflowed();
+}
+
 }
 
 using WTF::Checked;
 using WTF::CheckedState;
 using WTF::RecordOverflow;
+using WTF::CheckedInt8;
+using WTF::CheckedUint8;
+using WTF::CheckedInt16;
+using WTF::CheckedUint16;
+using WTF::CheckedInt32;
+using WTF::CheckedUint32;
+using WTF::CheckedInt64;
+using WTF::CheckedUint64;
+using WTF::CheckedSize;
+using WTF::checkedSum;
+using WTF::differenceOverflows;
+using WTF::productOverflows;
+using WTF::sumOverflows;
 
 #endif

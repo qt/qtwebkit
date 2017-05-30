@@ -33,32 +33,31 @@
 #include <WebCore/EditorInsertAction.h>
 #include <WebCore/TextAffinity.h>
 
-namespace WebCore {
-    class CSSStyleDeclaration;
-}
-
 namespace WebKit {
 
 class InjectedBundle;
 class InjectedBundleBackForwardList;
 class InjectedBundleBackForwardListItem;
+class InjectedBundleCSSStyleDeclarationHandle;
 class InjectedBundleDOMWindowExtension;
+class InjectedBundleFileHandle;
 class InjectedBundleHitTestResult;
 class InjectedBundleNavigationAction;
 class InjectedBundleNodeHandle;
 class InjectedBundleRangeHandle;
 class InjectedBundleScriptWorld;
 class PageBanner;
-class PageOverlay;
 class WebFrame;
 class WebInspector;
 class WebPage;
 class WebPageGroupProxy;
+class WebPageOverlay;
 
 WK_ADD_API_MAPPING(WKBundleBackForwardListItemRef, InjectedBundleBackForwardListItem)
 WK_ADD_API_MAPPING(WKBundleBackForwardListRef, InjectedBundleBackForwardList)
-WK_ADD_API_MAPPING(WKBundleCSSStyleDeclarationRef, WebCore::CSSStyleDeclaration)
+WK_ADD_API_MAPPING(WKBundleCSSStyleDeclarationRef, InjectedBundleCSSStyleDeclarationHandle)
 WK_ADD_API_MAPPING(WKBundleDOMWindowExtensionRef, InjectedBundleDOMWindowExtension)
+WK_ADD_API_MAPPING(WKBundleFileHandleRef, InjectedBundleFileHandle)
 WK_ADD_API_MAPPING(WKBundleFrameRef, WebFrame)
 WK_ADD_API_MAPPING(WKBundleHitTestResultRef, InjectedBundleHitTestResult)
 WK_ADD_API_MAPPING(WKBundleInspectorRef, WebInspector)
@@ -66,7 +65,7 @@ WK_ADD_API_MAPPING(WKBundleNavigationActionRef, InjectedBundleNavigationAction)
 WK_ADD_API_MAPPING(WKBundleNodeHandleRef, InjectedBundleNodeHandle)
 WK_ADD_API_MAPPING(WKBundlePageBannerRef, PageBanner)
 WK_ADD_API_MAPPING(WKBundlePageGroupRef, WebPageGroupProxy)
-WK_ADD_API_MAPPING(WKBundlePageOverlayRef, PageOverlay)
+WK_ADD_API_MAPPING(WKBundlePageOverlayRef, WebPageOverlay)
 WK_ADD_API_MAPPING(WKBundlePageRef, WebPage)
 WK_ADD_API_MAPPING(WKBundleRangeHandleRef, InjectedBundleRangeHandle)
 WK_ADD_API_MAPPING(WKBundleRef, InjectedBundle)
@@ -77,13 +76,10 @@ inline WKInsertActionType toAPI(WebCore::EditorInsertAction action)
     switch (action) {
     case WebCore::EditorInsertActionTyped:
         return kWKInsertActionTyped;
-        break;
     case WebCore::EditorInsertActionPasted:
         return kWKInsertActionPasted;
-        break;
     case WebCore::EditorInsertActionDropped:
         return kWKInsertActionDropped;
-        break;
     }
     ASSERT_NOT_REACHED();
     return kWKInsertActionTyped;
@@ -94,10 +90,8 @@ inline WKAffinityType toAPI(WebCore::EAffinity affinity)
     switch (affinity) {
     case WebCore::UPSTREAM:
         return kWKAffinityUpstream;
-        break;
     case WebCore::DOWNSTREAM:
         return kWKAffinityDownstream;
-        break;
     }
     ASSERT_NOT_REACHED();
     return kWKAffinityUpstream;

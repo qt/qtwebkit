@@ -22,8 +22,6 @@
 
 #include "PopupMenu.h"
 #include <QObject>
-#include <wtf/OwnPtr.h>
-#include <wtf/PassOwnPtr.h>
 
 class QWebSelectData;
 class QWebSelectMethod;
@@ -34,16 +32,16 @@ class ChromeClientQt;
 class FrameView;
 class PopupMenuClient;
 
-class PopupMenuQt : public QObject, public PopupMenu {
+class PopupMenuQt final : public QObject, public PopupMenu {
     Q_OBJECT
 public:
     PopupMenuQt(PopupMenuClient*, const ChromeClientQt*);
     ~PopupMenuQt();
 
-    virtual void show(const IntRect&, FrameView*, int index);
-    virtual void hide();
-    virtual void updateFromElement();
-    virtual void disconnectClient();
+    void show(const IntRect&, FrameView*, int index) final;
+    void hide() final;
+    void updateFromElement() final;
+    void disconnectClient() final;
 
 private Q_SLOTS:
     void didHide();
@@ -51,8 +49,8 @@ private Q_SLOTS:
 
 private:
     PopupMenuClient* m_popupClient;
-    OwnPtr<QWebSelectMethod> m_popup;
-    OwnPtr<QWebSelectData> m_selectData;
+    std::unique_ptr<QWebSelectMethod> m_popup;
+    std::unique_ptr<QWebSelectData> m_selectData;
     const ChromeClientQt* m_chromeClient;
 };
 

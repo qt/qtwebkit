@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -32,22 +32,22 @@ namespace WebCore {
 
 class RemoveNodeCommand : public SimpleEditCommand {
 public:
-    static PassRefPtr<RemoveNodeCommand> create(PassRefPtr<Node> node, ShouldAssumeContentIsAlwaysEditable shouldAssumeContentIsAlwaysEditable)
+    static Ref<RemoveNodeCommand> create(Ref<Node>&& node, ShouldAssumeContentIsAlwaysEditable shouldAssumeContentIsAlwaysEditable)
     {
-        return adoptRef(new RemoveNodeCommand(node, shouldAssumeContentIsAlwaysEditable));
+        return adoptRef(*new RemoveNodeCommand(WTFMove(node), shouldAssumeContentIsAlwaysEditable));
     }
 
 private:
-    explicit RemoveNodeCommand(PassRefPtr<Node>, ShouldAssumeContentIsAlwaysEditable);
+    RemoveNodeCommand(Ref<Node>&&, ShouldAssumeContentIsAlwaysEditable);
 
-    virtual void doApply() OVERRIDE;
-    virtual void doUnapply() OVERRIDE;
+    virtual void doApply() override;
+    virtual void doUnapply() override;
 
 #ifndef NDEBUG
-    void getNodesInCommand(HashSet<Node*>&) OVERRIDE;
+    void getNodesInCommand(HashSet<Node*>&) override;
 #endif
 
-    RefPtr<Node> m_node;
+    Ref<Node> m_node;
     RefPtr<ContainerNode> m_parent;
     RefPtr<Node> m_refChild;
     ShouldAssumeContentIsAlwaysEditable m_shouldAssumeContentIsAlwaysEditable;

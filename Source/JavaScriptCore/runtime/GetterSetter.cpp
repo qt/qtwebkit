@@ -1,7 +1,7 @@
 /*
  *  Copyright (C) 1999-2002 Harri Porten (porten@kde.org)
  *  Copyright (C) 2001 Peter Kelly (pmk@post.com)
- *  Copyright (C) 2004, 2007, 2008, 2009 Apple Inc. All rights reserved.
+ *  Copyright (C) 2004, 2007, 2008, 2009, 2014 Apple Inc. All rights reserved.
  *
  *  This library is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU Library General Public
@@ -23,25 +23,86 @@
 #include "config.h"
 #include "GetterSetter.h"
 
+#include "Error.h"
+#include "Exception.h"
 #include "JSObject.h"
-#include "Operations.h"
+#include "JSCInlines.h"
 #include <wtf/Assertions.h>
 
 namespace JSC {
 
-ASSERT_HAS_TRIVIAL_DESTRUCTOR(GetterSetter);
+STATIC_ASSERT_IS_TRIVIALLY_DESTRUCTIBLE(GetterSetter);
 
-const ClassInfo GetterSetter::s_info = { "GetterSetter", 0, 0, 0, CREATE_METHOD_TABLE(GetterSetter) };
+const ClassInfo GetterSetter::s_info = { "GetterSetter", 0, 0, CREATE_METHOD_TABLE(GetterSetter) };
 
 void GetterSetter::visitChildren(JSCell* cell, SlotVisitor& visitor)
 {
     GetterSetter* thisObject = jsCast<GetterSetter*>(cell);
-    ASSERT_GC_OBJECT_INHERITS(thisObject, &s_info);
-    ASSERT(thisObject->structure()->typeInfo().overridesVisitChildren());
+    ASSERT_GC_OBJECT_INHERITS(thisObject, info());
     JSCell::visitChildren(thisObject, visitor);
 
     visitor.append(&thisObject->m_getter);
     visitor.append(&thisObject->m_setter);
+}
+
+GetterSetter* GetterSetter::withGetter(VM& vm, JSGlobalObject* globalObject, JSObject* newGetter)
+{
+    if (isGetterNull()) {
+        setGetter(vm, globalObject, newGetter);
+        return this;
+    }
+    
+    GetterSetter* result = GetterSetter::create(vm, globalObject);
+    result->setGetter(vm, globalObject, newGetter);
+    result->setSetter(vm, globalObject, setter());
+    return result;
+}
+
+GetterSetter* GetterSetter::withSetter(VM& vm, JSGlobalObject* globalObject, JSObject* newSetter)
+{
+    if (isSetterNull()) {
+        setSetter(vm, globalObject, newSetter);
+        return this;
+    }
+    
+    GetterSetter* result = GetterSetter::create(vm, globalObject);
+    result->setGetter(vm, globalObject, getter());
+    result->setSetter(vm, globalObject, newSetter);
+    return result;
+}
+
+JSValue callGetter(ExecState* exec, JSValue base, JSValue getterSetter)
+{
+    // FIXME: Some callers may invoke get() without checking for an exception first.
+    // We work around that by checking here.
+    if (exec->hadException())
+        return exec->exception()->value();
+
+    JSObject* getter = jsCast<GetterSetter*>(getterSetter)->getter();
+
+    CallData callData;
+    CallType callType = getter->methodTable(exec->vm())->getCallData(getter, callData);
+    return call(exec, getter, callType, callData, base, ArgList());
+}
+
+void callSetter(ExecState* exec, JSValue base, JSValue getterSetter, JSValue value, ECMAMode ecmaMode)
+{
+    GetterSetter* getterSetterObj = jsCast<GetterSetter*>(getterSetter);
+
+    if (getterSetterObj->isSetterNull()) {
+        if (ecmaMode == StrictMode)
+            throwTypeError(exec, StrictModeReadonlyPropertyWriteError);
+        return;
+    }
+
+    JSObject* setter = getterSetterObj->setter();
+
+    MarkedArgumentBuffer args;
+    args.append(value);
+
+    CallData callData;
+    CallType callType = setter->methodTable(exec->vm())->getCallData(setter, callData);
+    call(exec, setter, callType, callData, base, args);
 }
 
 } // namespace JSC

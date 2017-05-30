@@ -27,18 +27,13 @@
 #ifndef FELighting_h
 #define FELighting_h
 
-#if ENABLE(FILTERS)
 #include "Color.h"
 #include "Filter.h"
 #include "FilterEffect.h"
 #include "LightSource.h"
 #include "PointLightSource.h"
 #include "SpotLightSource.h"
-#include <wtf/Uint8ClampedArray.h>
-
-namespace WTF {
-template<typename Type> class ParallelJobs;
-}
+#include <runtime/Uint8ClampedArray.h>
 
 // Common base class for FEDiffuseLighting and FESpecularLighting
 
@@ -80,7 +75,7 @@ protected:
     };
 
     template<typename Type>
-    friend class WTF::ParallelJobs;
+    friend class ParallelJobs;
 
     struct PlatformApplyGenericParameters {
         FELighting* filter;
@@ -93,7 +88,7 @@ protected:
     static void platformApplyGenericWorker(PlatformApplyGenericParameters*);
     static void platformApplyNeonWorker(FELightingPaintingDataForNeon*);
 
-    FELighting(Filter*, LightingType, const Color&, float, float, float, float, float, float, PassRefPtr<LightSource>);
+    FELighting(Filter&, LightingType, const Color&, float, float, float, float, float, float, PassRefPtr<LightSource>);
 
     bool drawLighting(Uint8ClampedArray*, int, int);
     inline void inlineSetPixel(int offset, LightingData&, LightSource::PaintingData&,
@@ -124,7 +119,5 @@ protected:
 };
 
 } // namespace WebCore
-
-#endif // ENABLE(FILTERS)
 
 #endif // FELighting_h

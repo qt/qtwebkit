@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution. 
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission. 
  *
@@ -31,10 +31,8 @@
 
 #include <wtf/Noncopyable.h>
 
-#ifdef Q_FORWARD_DECLARE_OBJC_CLASS
-Q_FORWARD_DECLARE_OBJC_CLASS(NSAutoreleasePool);
-#else
-OBJC_CLASS NSAutoreleasePool;
+#if USE(FOUNDATION) && !defined(__OBJC__)
+typedef struct objc_object *id;
 #endif
 
 namespace WTF {
@@ -42,7 +40,7 @@ namespace WTF {
 class AutodrainedPool {
     WTF_MAKE_NONCOPYABLE(AutodrainedPool);
 public:
-#if PLATFORM(MAC)
+#if USE(FOUNDATION)
     WTF_EXPORT_PRIVATE AutodrainedPool();
     WTF_EXPORT_PRIVATE ~AutodrainedPool();
 #else
@@ -51,8 +49,8 @@ public:
 #endif
     
 private:
-#if PLATFORM(MAC)
-    NSAutoreleasePool* m_pool;
+#if USE(FOUNDATION)
+    id m_pool;
 #endif
 };
 

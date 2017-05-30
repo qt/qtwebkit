@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Apple Inc. All Rights Reserved.
+ * Copyright (C) 2012-2015 Apple Inc. All Rights Reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,610 +26,290 @@
 #include "config.h"
 #include "JSScope.h"
 
-#include "JSActivation.h"
 #include "JSGlobalObject.h"
-#include "JSNameScope.h"
+#include "JSLexicalEnvironment.h"
+#include "JSModuleEnvironment.h"
+#include "JSModuleRecord.h"
 #include "JSWithScope.h"
-#include "Operations.h"
+#include "JSCInlines.h"
 
 namespace JSC {
 
-ASSERT_HAS_TRIVIAL_DESTRUCTOR(JSScope);
+STATIC_ASSERT_IS_TRIVIALLY_DESTRUCTIBLE(JSScope);
 
 void JSScope::visitChildren(JSCell* cell, SlotVisitor& visitor)
 {
     JSScope* thisObject = jsCast<JSScope*>(cell);
-    ASSERT_GC_OBJECT_INHERITS(thisObject, &s_info);
-    COMPILE_ASSERT(StructureFlags & OverridesVisitChildren, OverridesVisitChildrenWithoutSettingFlag);
-    ASSERT(thisObject->structure()->typeInfo().overridesVisitChildren());
-
+    ASSERT_GC_OBJECT_INHERITS(thisObject, info());
     Base::visitChildren(thisObject, visitor);
     visitor.append(&thisObject->m_next);
 }
 
-bool JSScope::isDynamicScope(bool& requiresDynamicChecks) const
+// Returns true if we found enough information to terminate optimization.
+static inline bool abstractAccess(ExecState* exec, JSScope* scope, const Identifier& ident, GetOrPut getOrPut, size_t depth, bool& needsVarInjectionChecks, ResolveOp& op, InitializationMode initializationMode)
 {
-    switch (structure()->typeInfo().type()) {
-    case GlobalObjectType:
-        return static_cast<const JSGlobalObject*>(this)->isDynamicScope(requiresDynamicChecks);
-    case ActivationObjectType:
-        return static_cast<const JSActivation*>(this)->isDynamicScope(requiresDynamicChecks);
-    case NameScopeObjectType:
-        return static_cast<const JSNameScope*>(this)->isDynamicScope(requiresDynamicChecks);
-    default:
-        RELEASE_ASSERT_NOT_REACHED();
-        break;
+    if (JSLexicalEnvironment* lexicalEnvironment = jsDynamicCast<JSLexicalEnvironment*>(scope)) {
+        if (ident == exec->propertyNames().arguments) {
+            // We know the property will be at this lexical environment scope, but we don't know how to cache it.
+            op = ResolveOp(Dynamic, 0, 0, 0, 0, 0);
+            return true;
+        }
+
+        SymbolTableEntry entry = lexicalEnvironment->symbolTable()->get(ident.impl());
+        if (entry.isReadOnly() && getOrPut == Put) {
+            // We know the property will be at this lexical environment scope, but we don't know how to cache it.
+            op = ResolveOp(Dynamic, 0, 0, 0, 0, 0);
+            return true;
+        }
+
+        if (!entry.isNull()) {
+            op = ResolveOp(makeType(ClosureVar, needsVarInjectionChecks), depth, 0, lexicalEnvironment, entry.watchpointSet(), entry.scopeOffset().offset());
+            return true;
+        }
+
+        if (JSModuleEnvironment* moduleEnvironment = jsDynamicCast<JSModuleEnvironment*>(scope)) {
+            JSModuleRecord* moduleRecord = moduleEnvironment->moduleRecord();
+            JSModuleRecord::Resolution resolution = moduleRecord->resolveImport(exec, ident);
+            if (resolution.type == JSModuleRecord::Resolution::Type::Resolved) {
+                JSModuleRecord* importedRecord = resolution.moduleRecord;
+                JSModuleEnvironment* importedEnvironment = importedRecord->moduleEnvironment();
+                SymbolTableEntry entry = importedEnvironment->symbolTable()->get(resolution.localName.impl());
+                ASSERT(!entry.isNull());
+                op = ResolveOp(makeType(ModuleVar, needsVarInjectionChecks), depth, 0, importedEnvironment, entry.watchpointSet(), entry.scopeOffset().offset(), resolution.localName.impl());
+                return true;
+            }
+        }
+
+        if (lexicalEnvironment->symbolTable()->usesNonStrictEval())
+            needsVarInjectionChecks = true;
+        return false;
     }
 
-    return false;
+    if (JSGlobalLexicalEnvironment* globalLexicalEnvironment = jsDynamicCast<JSGlobalLexicalEnvironment*>(scope)) {
+        SymbolTableEntry entry = globalLexicalEnvironment->symbolTable()->get(ident.impl());
+        if (!entry.isNull()) {
+            if (getOrPut == Put && entry.isReadOnly() && initializationMode != Initialization) {
+                // We know the property will be at global lexical environment, but we don't know how to cache it.
+                op = ResolveOp(Dynamic, 0, 0, 0, 0, 0);
+                return true;
+            }
+
+            // We can try to force const Initialization to always go down the fast path. It is provably impossible to construct
+            // a program that needs a var injection check here. You can convince yourself of this as follows:
+            // Any other let/const/class would be a duplicate of this in the global scope, so we would never get here in that situation.
+            // Also, if we had an eval in the global scope that defined a const, it would also be a duplicate of this const, and so it would
+            // also throw an error. Therefore, we're *the only* thing that can assign to this "const" slot for the first (and only) time. Also, 
+            // we will never have a Dynamic ResolveType here because if we were inside a "with" statement, that would mean the "const" definition 
+            // isn't a global, it would be a local to the "with" block. 
+            // We still need to make the slow path correct for when we need to fire a watchpoint.
+            ResolveType resolveType = initializationMode == Initialization ? GlobalLexicalVar : makeType(GlobalLexicalVar, needsVarInjectionChecks);
+            op = ResolveOp(
+                resolveType, depth, 0, 0, entry.watchpointSet(),
+                reinterpret_cast<uintptr_t>(globalLexicalEnvironment->variableAt(entry.scopeOffset()).slot()));
+            return true;
+        }
+
+        return false;
+    }
+
+    if (JSGlobalObject* globalObject = jsDynamicCast<JSGlobalObject*>(scope)) {
+        SymbolTableEntry entry = globalObject->symbolTable()->get(ident.impl());
+        if (!entry.isNull()) {
+            if (getOrPut == Put && entry.isReadOnly()) {
+                // We know the property will be at global scope, but we don't know how to cache it.
+                op = ResolveOp(Dynamic, 0, 0, 0, 0, 0);
+                return true;
+            }
+
+            op = ResolveOp(
+                makeType(GlobalVar, needsVarInjectionChecks), depth, 0, 0, entry.watchpointSet(),
+                reinterpret_cast<uintptr_t>(globalObject->variableAt(entry.scopeOffset()).slot()));
+            return true;
+        }
+
+        PropertySlot slot(globalObject, PropertySlot::InternalMethodType::VMInquiry);
+        bool hasOwnProperty = globalObject->getOwnPropertySlot(globalObject, exec, ident, slot);
+        if (!hasOwnProperty) {
+            op = ResolveOp(makeType(UnresolvedProperty, needsVarInjectionChecks), 0, 0, 0, 0, 0);
+            return true;
+        }
+
+        if (!slot.isCacheableValue()
+            || !globalObject->structure()->propertyAccessesAreCacheable()
+            || (globalObject->structure()->hasReadOnlyOrGetterSetterPropertiesExcludingProto() && getOrPut == Put)) {
+            // We know the property will be at global scope, but we don't know how to cache it.
+            ASSERT(!scope->next());
+            op = ResolveOp(makeType(GlobalProperty, needsVarInjectionChecks), 0, 0, 0, 0, 0);
+            return true;
+        }
+
+        
+        WatchpointState state = globalObject->structure()->ensurePropertyReplacementWatchpointSet(exec->vm(), slot.cachedOffset())->state();
+        if (state == IsWatched && getOrPut == Put) {
+            // The field exists, but because the replacement watchpoint is still intact. This is
+            // kind of dangerous. We have two options:
+            // 1) Invalidate the watchpoint set. That would work, but it's possible that this code
+            //    path never executes - in which case this would be unwise.
+            // 2) Have the invalidation happen at run-time. All we have to do is leave the code
+            //    uncached. The only downside is slightly more work when this does execute.
+            // We go with option (2) here because it seems less evil.
+            op = ResolveOp(makeType(GlobalProperty, needsVarInjectionChecks), depth, 0, 0, 0, 0);
+        } else
+            op = ResolveOp(makeType(GlobalProperty, needsVarInjectionChecks), depth, globalObject->structure(), 0, 0, slot.cachedOffset());
+        return true;
+    }
+
+    op = ResolveOp(Dynamic, 0, 0, 0, 0, 0);
+    return true;
 }
 
 JSObject* JSScope::objectAtScope(JSScope* scope)
 {
     JSObject* object = scope;
-    if (object->structure()->typeInfo().type() == WithScopeType)
+    if (object->type() == WithScopeType)
         return jsCast<JSWithScope*>(object)->object();
 
     return object;
 }
 
-int JSScope::localDepth()
+// When an exception occurs, the result of isUnscopable becomes false.
+static inline bool isUnscopable(ExecState* exec, JSScope* scope, JSObject* object, const Identifier& ident)
 {
-    int scopeDepth = 0;
-    ScopeChainIterator iter = this->begin();
-    ScopeChainIterator end = this->end();
-    while (!iter->inherits(&JSActivation::s_info)) {
-        ++iter;
-        if (iter == end)
-            break;
-        ++scopeDepth;
-    }
-    return scopeDepth;
+    if (scope->type() != WithScopeType)
+        return false;
+
+    JSValue unscopables = object->get(exec, exec->propertyNames().unscopablesSymbol);
+    if (exec->hadException())
+        return false;
+    if (!unscopables.isObject())
+        return false;
+    JSValue blocked = jsCast<JSObject*>(unscopables)->get(exec, ident);
+    if (exec->hadException())
+        return false;
+
+    return blocked.toBoolean(exec);
 }
 
-struct LookupResult {
-    JSValue base() const { return m_base; }
-    JSValue value() const { return m_value; }
-    void setBase(JSValue base) { ASSERT(base); m_base = base; }
-    void setValue(JSValue value) { ASSERT(value); m_value = value; }
-
-private:
-    JSValue m_base;
-    JSValue m_value;
-};
-
-
-static void setPutPropertyAccessOffset(PutToBaseOperation* operation, PropertyOffset offset)
+JSValue JSScope::resolve(ExecState* exec, JSScope* scope, const Identifier& ident)
 {
-    ASSERT(isOutOfLineOffset(offset));
-    operation->m_offset = offset;
-    operation->m_offsetInButterfly = offsetInButterfly(offset);
-}
+    ScopeChainIterator end = scope->end();
+    ScopeChainIterator it = scope->begin();
+    while (1) {
+        JSScope* scope = it.scope();
+        JSObject* object = it.get();
 
-static bool executeResolveOperations(CallFrame* callFrame, JSScope* scope, const Identifier& propertyName, ResolveOperation* pc, LookupResult& result)
-{
-    while (true) {
-        switch (pc->m_operation) {
-        case ResolveOperation::Fail:
-            return false;
-        case ResolveOperation::CheckForDynamicEntriesBeforeGlobalScope: {
-            while (JSScope* nextScope = scope->next()) {
-                if (scope->isActivationObject() && scope->structure() != scope->globalObject()->activationStructure())
-                    return false;
-                ASSERT(scope->isNameScopeObject() || scope->isVariableObject() || scope->isGlobalObject());
-                scope = nextScope;
-            }
-            pc++;
-            break;
-        }
-        case ResolveOperation::SetBaseToUndefined:
-            result.setBase(jsUndefined());
-            pc++;
-            continue;
-        case ResolveOperation::SetBaseToScope:
-            result.setBase(scope);
-            pc++;
-            continue;
-        case ResolveOperation::ReturnScopeAsBase:
-            result.setBase(scope);
-            return true;
-        case ResolveOperation::SetBaseToGlobal:
-            result.setBase(scope->globalObject());
-            pc++;
-            continue;
-        case ResolveOperation::SkipScopes: {
-            int count = pc->m_scopesToSkip;
-            while (count--)
-                scope = scope->next();
-            ASSERT(scope);
-            pc++;
-            continue;
-        }
-        case ResolveOperation::SkipTopScopeNode:
-            if (callFrame->r(pc->m_activationRegister).jsValue())
-                scope = scope->next();
-            ASSERT(scope);
-            pc++;
-            continue;
-        case ResolveOperation::GetAndReturnScopedVar:
-            ASSERT(jsCast<JSVariableObject*>(scope)->registerAt(pc->m_offset).get());
-            result.setValue(jsCast<JSVariableObject*>(scope)->registerAt(pc->m_offset).get());
-            return true;
-        case ResolveOperation::GetAndReturnGlobalVar:
-            result.setValue(pc->m_registerAddress->get());
-            return true;
-        case ResolveOperation::GetAndReturnGlobalVarWatchable:
-            result.setValue(pc->m_registerAddress->get());
-            return true;
-        case ResolveOperation::ReturnGlobalObjectAsBase:
-            result.setBase(callFrame->lexicalGlobalObject());
-            return true;
-        case ResolveOperation::GetAndReturnGlobalProperty: {
-            JSGlobalObject* globalObject = scope->globalObject();
-            if (globalObject->structure() == pc->m_structure.get()) {
-                result.setValue(globalObject->getDirect(pc->m_offset));
-                return true;
-            }
-
-            PropertySlot slot(globalObject);
-            if (!globalObject->getPropertySlot(callFrame, propertyName, slot))
-                return false;
-
-            JSValue value = slot.getValue(callFrame, propertyName);
-            if (callFrame->hadException())
-                return false;
-
-            Structure* structure = globalObject->structure();
-
-            // Don't try to cache prototype lookups
-            if (globalObject != slot.slotBase() || !slot.isCacheableValue() || !structure->propertyAccessesAreCacheable()) {
-                result.setValue(value);
-                return true;
-            }
-
-            pc->m_structure.set(callFrame->vm(), callFrame->codeBlock()->ownerExecutable(), structure);
-            pc->m_offset = slot.cachedOffset();
-            result.setValue(value);
-            return true;
-        }
-        }
-    }
-}
-
-template <JSScope::LookupMode mode, JSScope::ReturnValues returnValues> JSObject* JSScope::resolveContainingScopeInternal(CallFrame* callFrame, const Identifier& identifier, PropertySlot& slot, Vector<ResolveOperation>* operations, PutToBaseOperation* putToBaseOperation, bool )
-{
-    JSScope* scope = callFrame->scope();
-    ASSERT(scope);
-    int scopeCount = 0;
-    bool seenGenericObjectScope = false;
-    bool requiresDynamicChecks = false;
-    bool skipTopScopeNode = false;
-    int activationRegister = 0;
-    CodeBlock* codeBlock = callFrame->codeBlock();
-    if (mode == UnknownResolve) {
-        ASSERT(operations->isEmpty());
-        if (codeBlock->codeType() == FunctionCode && codeBlock->needsActivation()) {
-            activationRegister = codeBlock->activationRegister();
-            JSValue activation = callFrame->r(activationRegister).jsValue();
-            
-            // If the activation register doesn't match our actual scope, a dynamic
-            // scope has been inserted so we shouldn't skip the top scope node.
-            if (activation == scope) {
-                jsCast<JSActivation*>(activation.asCell())->isDynamicScope(requiresDynamicChecks);
-                if (!requiresDynamicChecks) {
-                    ASSERT(jsCast<JSActivation*>(activation.asCell())->symbolTable()->get(identifier.impl()).isNull());
-                    scope = scope->next();
-                    ASSERT(scope);
-                    skipTopScopeNode = true;
-                }
-            } else if (!activation)
-                skipTopScopeNode = true;
-        }
-    } else
-        ASSERT(operations->size());
-
-    if (codeBlock->codeType() == EvalCode && scope->next())
-        requiresDynamicChecks = true;
-
-    if (mode == UnknownResolve && putToBaseOperation)
-        putToBaseOperation->m_kind = PutToBaseOperation::Generic;
-
-    do {
-        JSObject* object = JSScope::objectAtScope(scope);
-        slot = PropertySlot(object);
-
-        bool currentScopeNeedsDynamicChecks = false;
-        if (!(scope->isVariableObject() || scope->isNameScopeObject()) || (scope->next() && scope->isDynamicScope(currentScopeNeedsDynamicChecks)))
-            seenGenericObjectScope = true;
-
-        requiresDynamicChecks = requiresDynamicChecks || currentScopeNeedsDynamicChecks;
-
-        if (object->getPropertySlot(callFrame, identifier, slot)) {
-            if (mode == UnknownResolve) {
-                if (seenGenericObjectScope)
-                    goto fail;
-                if (putToBaseOperation)
-                    putToBaseOperation->m_isDynamic = requiresDynamicChecks;
-                if (!scope->next()) {
-                    // Global lookup of some kind
-                    JSGlobalObject* globalObject = jsCast<JSGlobalObject*>(scope);
-                    SymbolTableEntry entry = globalObject->symbolTable()->get(identifier.impl());
-                    if (!entry.isNull()) {
-                        if (requiresDynamicChecks)
-                            operations->append(ResolveOperation::checkForDynamicEntriesBeforeGlobalScope());
-
-                        if (putToBaseOperation) {
-                            putToBaseOperation->m_isDynamic = requiresDynamicChecks;
-                            if (entry.isReadOnly())
-                                putToBaseOperation->m_kind = PutToBaseOperation::Readonly;
-                            else if (entry.couldBeWatched()) {
-                                putToBaseOperation->m_kind = PutToBaseOperation::GlobalVariablePutChecked;
-                                putToBaseOperation->m_predicatePointer = entry.addressOfIsWatched();
-                            } else
-                                putToBaseOperation->m_kind = PutToBaseOperation::GlobalVariablePut;
-                            putToBaseOperation->m_registerAddress = &globalObject->registerAt(entry.getIndex());
-                        }
-                        // Override custom accessor behaviour that the DOM introduces for some
-                        // event handlers declared on function declarations.
-                        if (!requiresDynamicChecks)
-                            slot.setValue(globalObject, globalObject->registerAt(entry.getIndex()).get());
-                        switch (returnValues) {
-                        case ReturnValue:
-                            ASSERT(!putToBaseOperation);
-                            operations->append(ResolveOperation::getAndReturnGlobalVar(&globalObject->registerAt(entry.getIndex()), entry.couldBeWatched()));
-                            break;
-                        case ReturnBase:
-                            ASSERT(putToBaseOperation);
-                            operations->append(ResolveOperation::returnGlobalObjectAsBase());
-                            break;
-                        case ReturnBaseAndValue:
-                            ASSERT(putToBaseOperation);
-                            operations->append(ResolveOperation::setBaseToGlobal());
-                            operations->append(ResolveOperation::getAndReturnGlobalVar(&globalObject->registerAt(entry.getIndex()), entry.couldBeWatched()));
-                            break;
-                        case ReturnThisAndValue:
-                            ASSERT(!putToBaseOperation);
-                            operations->append(ResolveOperation::setBaseToUndefined());
-                            operations->append(ResolveOperation::getAndReturnGlobalVar(&globalObject->registerAt(entry.getIndex()), entry.couldBeWatched()));
-                            break;
-                        }
-                    } else {
-                        if (!slot.isCacheableValue() || slot.slotBase() != globalObject)
-                            goto fail;
-
-                        if (requiresDynamicChecks)
-                            operations->append(ResolveOperation::checkForDynamicEntriesBeforeGlobalScope());
-
-                        if (putToBaseOperation) {
-                            putToBaseOperation->m_isDynamic = requiresDynamicChecks;
-                            putToBaseOperation->m_kind = PutToBaseOperation::GlobalPropertyPut;
-                            putToBaseOperation->m_structure.set(callFrame->vm(), callFrame->codeBlock()->ownerExecutable(), globalObject->structure());
-                            setPutPropertyAccessOffset(putToBaseOperation, slot.cachedOffset());
-                        }
-                        switch (returnValues) {
-                        case ReturnValue:
-                            ASSERT(!putToBaseOperation);
-                            operations->append(ResolveOperation::getAndReturnGlobalProperty());
-                            break;
-                        case ReturnBase:
-                            ASSERT(putToBaseOperation);
-                            operations->append(ResolveOperation::returnGlobalObjectAsBase());
-                            break;
-                        case ReturnBaseAndValue:
-                            ASSERT(putToBaseOperation);
-                            operations->append(ResolveOperation::setBaseToGlobal());
-                            operations->append(ResolveOperation::getAndReturnGlobalProperty());
-                            break;
-                        case ReturnThisAndValue:
-                            ASSERT(!putToBaseOperation);
-                            operations->append(ResolveOperation::setBaseToUndefined());
-                            operations->append(ResolveOperation::getAndReturnGlobalProperty());
-                            break;
-                        }
-                    }
-                    return object;
-                }
-                if (!requiresDynamicChecks) {
-                    // Normal lexical lookup
-                    JSVariableObject* variableObject = jsCast<JSVariableObject*>(scope);
-                    ASSERT(variableObject);
-                    ASSERT(variableObject->symbolTable());
-                    SymbolTableEntry entry = variableObject->symbolTable()->get(identifier.impl());
-                    // Defend against the variable being actually inserted by eval.
-                    if (entry.isNull()) {
-                        ASSERT(!jsDynamicCast<JSNameScope*>(variableObject));
-                        goto fail;
-                    }
-                    // If we're getting the 'arguments' then give up on life.
-                    if (identifier == callFrame->propertyNames().arguments)
-                        goto fail;
-
-                    if (putToBaseOperation) {
-                        putToBaseOperation->m_kind = entry.isReadOnly() ? PutToBaseOperation::Readonly : PutToBaseOperation::VariablePut;
-                        putToBaseOperation->m_structure.set(callFrame->vm(), callFrame->codeBlock()->ownerExecutable(), callFrame->lexicalGlobalObject()->activationStructure());
-                        putToBaseOperation->m_offset = entry.getIndex();
-                        putToBaseOperation->m_scopeDepth = (skipTopScopeNode ? 1 : 0) + scopeCount;
-                    }
-
-                    if (skipTopScopeNode)
-                        operations->append(ResolveOperation::skipTopScopeNode(activationRegister));
-
-                    operations->append(ResolveOperation::skipScopes(scopeCount));
-                    switch (returnValues) {
-                    case ReturnBaseAndValue:
-                        operations->append(ResolveOperation::setBaseToScope());
-                        operations->append(ResolveOperation::getAndReturnScopedVar(entry.getIndex()));
-                        break;
-
-                    case ReturnBase:
-                        operations->append(ResolveOperation::returnScopeAsBase());
-                        break;
-
-                    case ReturnThisAndValue:
-                        operations->append(ResolveOperation::setBaseToUndefined());
-                        // fallthrough
-                    case ReturnValue:
-                        operations->append(ResolveOperation::getAndReturnScopedVar(entry.getIndex()));
-                        break;
-                    }
-                    return object;
-                }
-            fail:
-                if (!operations->size())
-                    operations->append(ResolveOperation::resolveFail());
-            }
+        if (++it == end) // Global scope.
             return object;
+
+        if (object->hasProperty(exec, ident)) {
+            if (!isUnscopable(exec, scope, object, ident))
+                return object;
+            ASSERT_WITH_MESSAGE(!exec->hadException(), "When an exception occurs, the result of isUnscopable becomes false");
         }
-        scopeCount++;
-    } while ((scope = scope->next()));
-    
-    if (mode == UnknownResolve) {
-        ASSERT(operations->isEmpty());
-        if (seenGenericObjectScope) {
-            operations->append(ResolveOperation::resolveFail());
-            return 0;
-        }
-        if (putToBaseOperation) {
-            putToBaseOperation->m_isDynamic = requiresDynamicChecks;
-            putToBaseOperation->m_kind = PutToBaseOperation::GlobalPropertyPut;
-            putToBaseOperation->m_structure.clear();
-            putToBaseOperation->m_offset = -1;
-        }
-        if (requiresDynamicChecks)
-            operations->append(ResolveOperation::checkForDynamicEntriesBeforeGlobalScope());
-        switch (returnValues) {
-        case ReturnValue:
-            ASSERT(!putToBaseOperation);
-            operations->append(ResolveOperation::getAndReturnGlobalProperty());
+    }
+}
+
+ResolveOp JSScope::abstractResolve(ExecState* exec, size_t depthOffset, JSScope* scope, const Identifier& ident, GetOrPut getOrPut, ResolveType unlinkedType, InitializationMode initializationMode)
+{
+    ResolveOp op(Dynamic, 0, 0, 0, 0, 0);
+    if (unlinkedType == Dynamic)
+        return op;
+
+    bool needsVarInjectionChecks = JSC::needsVarInjectionChecks(unlinkedType);
+    size_t depth = depthOffset;
+    for (; scope; scope = scope->next()) {
+        if (abstractAccess(exec, scope, ident, getOrPut, depth, needsVarInjectionChecks, op, initializationMode))
             break;
-        case ReturnBase:
-            ASSERT(putToBaseOperation);
-            operations->append(ResolveOperation::returnGlobalObjectAsBase());
-            break;
-        case ReturnBaseAndValue:
-            ASSERT(putToBaseOperation);
-            operations->append(ResolveOperation::setBaseToGlobal());
-            operations->append(ResolveOperation::getAndReturnGlobalProperty());
-            break;
-        case ReturnThisAndValue:
-            ASSERT(!putToBaseOperation);
-            operations->append(ResolveOperation::setBaseToUndefined());
-            operations->append(ResolveOperation::getAndReturnGlobalProperty());
-            break;
+        ++depth;
+    }
+
+    return op;
+}
+
+void JSScope::collectVariablesUnderTDZ(JSScope* scope, VariableEnvironment& result)
+{
+    for (; scope; scope = scope->next()) {
+        if (!scope->isLexicalScope() && !scope->isGlobalLexicalEnvironment())
+            continue;
+
+        if (scope->isModuleScope()) {
+            JSModuleRecord* moduleRecord = jsCast<JSModuleEnvironment*>(scope)->moduleRecord();
+            for (const auto& pair : moduleRecord->importEntries())
+                result.add(pair.key);
         }
+
+        SymbolTable* symbolTable = jsCast<JSSymbolTableObject*>(scope)->symbolTable();
+        ASSERT(symbolTable->scopeType() == SymbolTable::ScopeType::LexicalScope || symbolTable->scopeType() == SymbolTable::ScopeType::GlobalLexicalScope);
+        ConcurrentJITLocker locker(symbolTable->m_lock);
+        for (auto end = symbolTable->end(locker), iter = symbolTable->begin(locker); iter != end; ++iter)
+            result.add(iter->key);
     }
-    return 0;
 }
 
-template <JSScope::ReturnValues returnValues> JSObject* JSScope::resolveContainingScope(CallFrame* callFrame, const Identifier& identifier, PropertySlot& slot, Vector<ResolveOperation>* operations, PutToBaseOperation* putToBaseOperation, bool isStrict)
+template <typename EnvironmentType, SymbolTable::ScopeType scopeType>
+inline static bool isScopeType(JSScope* scope)
 {
-    if (operations->size())
-        return resolveContainingScopeInternal<KnownResolve, returnValues>(callFrame, identifier, slot, operations, putToBaseOperation, isStrict);
-    JSObject* result = resolveContainingScopeInternal<UnknownResolve, returnValues>(callFrame, identifier, slot, operations, putToBaseOperation, isStrict);
-    operations->shrinkToFit();
-    return result;
+    EnvironmentType* environment = jsDynamicCast<EnvironmentType*>(scope);
+    if (!environment)
+        return false;
+
+    return environment->symbolTable()->scopeType() == scopeType;
 }
 
-JSValue JSScope::resolve(CallFrame* callFrame, const Identifier& identifier, ResolveOperations* operations)
+bool JSScope::isVarScope()
 {
-    ASSERT(operations);
-    LookupResult fastResult;
-    if (operations->size() && executeResolveOperations(callFrame, callFrame->scope(), identifier, operations->data(), fastResult)) {
-        ASSERT(fastResult.value());
-        ASSERT(!callFrame->hadException());
-        return fastResult.value();
-    }
-
-    if (callFrame->hadException())
-        return JSValue();
-
-    PropertySlot slot;
-    if (JSScope::resolveContainingScope<ReturnValue>(callFrame, identifier, slot, operations, 0, false)) {
-        ASSERT(operations->size());
-        return slot.getValue(callFrame, identifier);
-    }
-    ASSERT(operations->size());
-
-    return throwError(callFrame, createUndefinedVariableError(callFrame, identifier));
+    return isScopeType<JSLexicalEnvironment, SymbolTable::ScopeType::VarScope>(this);
 }
 
-JSValue JSScope::resolveBase(CallFrame* callFrame, const Identifier& identifier, bool isStrict, ResolveOperations* operations, PutToBaseOperation* putToBaseOperations)
+bool JSScope::isLexicalScope()
 {
-    ASSERT(operations);
-    ASSERT_UNUSED(putToBaseOperations, putToBaseOperations);
-    LookupResult fastResult;
-    if (operations->size() && executeResolveOperations(callFrame, callFrame->scope(), identifier, operations->data(), fastResult)) {
-        ASSERT(fastResult.base());
-        ASSERT(!callFrame->hadException());
-        return fastResult.base();
-    }
-
-    if (callFrame->hadException())
-        return JSValue();
-
-    PropertySlot slot;
-    if (JSObject* base = JSScope::resolveContainingScope<ReturnBase>(callFrame, identifier, slot, operations, putToBaseOperations, isStrict)) {
-        ASSERT(operations->size());
-        return base;
-    }
-
-    if (!isStrict)
-        return callFrame->lexicalGlobalObject();
-
-    return throwError(callFrame, createErrorForInvalidGlobalAssignment(callFrame, identifier.string()));
+    return isScopeType<JSLexicalEnvironment, SymbolTable::ScopeType::LexicalScope>(this);
 }
 
-JSValue JSScope::resolveWithBase(CallFrame* callFrame, const Identifier& identifier, Register* base, ResolveOperations* operations, PutToBaseOperation* putToBaseOperations)
+bool JSScope::isModuleScope()
 {
-    ASSERT(operations);
-    ASSERT_UNUSED(putToBaseOperations, putToBaseOperations);
-    LookupResult fastResult;
-    if (operations->size() && executeResolveOperations(callFrame, callFrame->scope(), identifier, operations->data(), fastResult)) {
-        ASSERT(fastResult.base());
-        ASSERT(fastResult.value());
-        ASSERT(!callFrame->hadException());
-        *base = fastResult.base();
-        return fastResult.value();
-    }
-
-    if (callFrame->hadException())
-        return JSValue();
-
-    PropertySlot slot;
-    if (JSObject* propertyBase = JSScope::resolveContainingScope<ReturnBaseAndValue>(callFrame, identifier, slot, operations, putToBaseOperations, false)) {
-        ASSERT(operations->size());
-        JSValue value = slot.getValue(callFrame, identifier);
-        if (callFrame->vm().exception)
-            return JSValue();
-
-        *base = propertyBase;
-        return value;
-    }
-    ASSERT(operations->size());
-
-    return throwError(callFrame, createUndefinedVariableError(callFrame, identifier));
+    return isScopeType<JSModuleEnvironment, SymbolTable::ScopeType::LexicalScope>(this);
 }
 
-JSValue JSScope::resolveWithThis(CallFrame* callFrame, const Identifier& identifier, Register* base, ResolveOperations* operations)
+bool JSScope::isCatchScope()
 {
-    ASSERT(operations);
-    LookupResult fastResult;
-    if (operations->size() && executeResolveOperations(callFrame, callFrame->scope(), identifier, operations->data(), fastResult)) {
-        ASSERT(fastResult.base());
-        ASSERT(fastResult.value());
-        ASSERT(!callFrame->hadException());
-        *base = fastResult.base();
-        return fastResult.value();
-    }
-
-    if (callFrame->hadException())
-        return JSValue();
-
-    PropertySlot slot;
-    if (JSObject* propertyBase = JSScope::resolveContainingScope<ReturnThisAndValue>(callFrame, identifier, slot, operations, 0, false)) {
-        ASSERT(operations->size());
-        JSValue value = slot.getValue(callFrame, identifier);
-        if (callFrame->vm().exception)
-            return JSValue();
-        ASSERT(value);
-        *base = propertyBase->structure()->typeInfo().isEnvironmentRecord() ? jsUndefined() : JSValue(propertyBase);
-        return value;
-    }
-    ASSERT(operations->size());
-
-    return throwError(callFrame, createUndefinedVariableError(callFrame, identifier));
+    return isScopeType<JSLexicalEnvironment, SymbolTable::ScopeType::CatchScope>(this);
 }
 
-void JSScope::resolvePut(CallFrame* callFrame, JSValue base, const Identifier& property, JSValue value, PutToBaseOperation* operation)
+bool JSScope::isFunctionNameScopeObject()
 {
-    ASSERT_UNUSED(operation, operation);
-    ASSERT(base);
-    ASSERT(value);
-    switch (operation->m_kind) {
-    case PutToBaseOperation::Uninitialised:
-        CRASH();
-
-    case PutToBaseOperation::Readonly:
-        return;
-
-    case PutToBaseOperation::GlobalVariablePutChecked:
-        if (*operation->m_predicatePointer)
-            goto genericHandler;
-    case PutToBaseOperation::GlobalVariablePut:
-        if (operation->m_isDynamic) {
-            JSObject* baseObject = jsCast<JSObject*>(base);
-            if (baseObject != callFrame->lexicalGlobalObject()) {
-                if (baseObject->isGlobalObject())
-                    ASSERT(!jsCast<JSGlobalObject*>(baseObject)->assertRegisterIsInThisObject(operation->m_registerAddress));
-                goto genericHandler;
-            }
-        }
-        operation->m_registerAddress->set(callFrame->vm(), base.asCell(), value);
-        return;
-
-    case PutToBaseOperation::VariablePut: {
-        if (operation->m_isDynamic) {
-            JSObject* baseObject = jsCast<JSObject*>(base);
-            if (baseObject->structure() != operation->m_structure.get())
-                goto genericHandler;
-        }
-        JSVariableObject* variableObject = jsCast<JSVariableObject*>(base);
-        variableObject->registerAt(operation->m_offset).set(callFrame->vm(), variableObject, value);
-        return;
-    }
-
-    case PutToBaseOperation::GlobalPropertyPut: {
-        JSObject* object = jsCast<JSObject*>(base);
-        if (operation->m_structure.get() != object->structure())
-            break;
-        object->putDirect(callFrame->vm(), operation->m_offset, value);
-        return;
-    }
-
-    genericHandler:
-    case PutToBaseOperation::Generic:
-        PutPropertySlot slot(operation->m_isStrict);
-        base.put(callFrame, property, value, slot);
-        return;
-    }
-    ASSERT(operation->m_kind == PutToBaseOperation::GlobalPropertyPut);
-    PutPropertySlot slot(operation->m_isStrict);
-    base.put(callFrame, property, value, slot);
-    if (!slot.isCacheable())
-        return;
-    if (callFrame->hadException())
-        return;
-    JSObject* baseObject = jsCast<JSObject*>(base);
-    if (!baseObject->structure()->propertyAccessesAreCacheable())
-        return;
-    if (slot.base() != callFrame->lexicalGlobalObject())
-        return;
-    if (slot.base() != baseObject)
-        return;
-    ASSERT(!baseObject->hasInlineStorage());
-    operation->m_structure.set(callFrame->vm(), callFrame->codeBlock()->ownerExecutable(), baseObject->structure());
-    setPutPropertyAccessOffset(operation, slot.cachedOffset());
-    return;
+    return isScopeType<JSLexicalEnvironment, SymbolTable::ScopeType::FunctionNameScope>(this);
 }
 
-JSValue JSScope::resolveGlobal(CallFrame* callFrame, const Identifier& identifier, JSGlobalObject* globalObject, ResolveOperation* resolveOperation)
+bool JSScope::isGlobalLexicalEnvironment()
 {
-    ASSERT(resolveOperation);
-    ASSERT(resolveOperation->m_operation == ResolveOperation::GetAndReturnGlobalProperty);
-    ASSERT_UNUSED(globalObject, callFrame->lexicalGlobalObject() == globalObject);
-
-    LookupResult fastResult;
-    if (executeResolveOperations(callFrame, callFrame->scope(), identifier, resolveOperation, fastResult)) {
-        ASSERT(fastResult.value());
-        ASSERT(!callFrame->hadException());
-        return fastResult.value();
-    }
-
-    if (callFrame->hadException())
-        return JSValue();
-
-    return throwError(callFrame, createUndefinedVariableError(callFrame, identifier));
+    return isScopeType<JSGlobalLexicalEnvironment, SymbolTable::ScopeType::GlobalLexicalScope>(this);
 }
 
+bool JSScope::isNestedLexicalScope()
+{
+    if (JSLexicalEnvironment* environment = jsDynamicCast<JSLexicalEnvironment*>(this))
+        return environment->symbolTable()->isNestedLexicalScope();
+    return false;
+}
+
+JSScope* JSScope::constantScopeForCodeBlock(ResolveType type, CodeBlock* codeBlock)
+{
+    switch (type) {
+    case GlobalProperty:
+    case GlobalVar:
+    case GlobalPropertyWithVarInjectionChecks:
+    case GlobalVarWithVarInjectionChecks:
+        return codeBlock->globalObject();
+    case GlobalLexicalVarWithVarInjectionChecks:
+    case GlobalLexicalVar:
+        return codeBlock->globalObject()->globalLexicalEnvironment();
+    default:
+        return nullptr;
+    }
+
+    RELEASE_ASSERT_NOT_REACHED();
+    return nullptr;
+}
 
 } // namespace JSC

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005, 2006, 2007 Apple, Inc.  All rights reserved.
+ * Copyright (C) 2005, 2006, 2007, 2013 Apple, Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -26,35 +26,31 @@
 #include "config.h"
 #include "EditCommand.h"
 
+#include "AXObjectCache.h"
 #include "CompositeEditCommand.h"
 #include "Document.h"
 #include "Editor.h"
 #include "Element.h"
 #include "EventNames.h"
 #include "Frame.h"
-#include "FrameSelection.h"
 #include "NodeTraversal.h"
-#include "VisiblePosition.h"
 #include "htmlediting.h"
 
 namespace WebCore {
 
-EditCommand::EditCommand(Document* document)
+EditCommand::EditCommand(Document& document, EditAction editingAction)
     : m_document(document)
-    , m_parent(0)
+    , m_editingAction(editingAction)
 {
-    ASSERT(m_document);
-    ASSERT(m_document->frame());
-    setStartingSelection(m_document->frame()->editor().avoidIntersectionWithDeleteButtonController(m_document->frame()->selection()->selection()));
+    ASSERT(document.frame());
+    setStartingSelection(m_document->frame()->selection().selection());
     setEndingSelection(m_startingSelection);
 }
 
-EditCommand::EditCommand(Document* document, const VisibleSelection& startingSelection, const VisibleSelection& endingSelection)
+EditCommand::EditCommand(Document& document, const VisibleSelection& startingSelection, const VisibleSelection& endingSelection)
     : m_document(document)
-    , m_parent(0)
 {
-    ASSERT(m_document);
-    ASSERT(m_document->frame());
+    ASSERT(document.frame());
     setStartingSelection(startingSelection);
     setEndingSelection(endingSelection);
 }
@@ -63,9 +59,15 @@ EditCommand::~EditCommand()
 {
 }
 
+Frame& EditCommand::frame()
+{
+    ASSERT(document().frame());
+    return *document().frame();
+}
+
 EditAction EditCommand::editingAction() const
 {
-    return EditActionUnspecified;
+    return m_editingAction;
 }
 
 static inline EditCommandComposition* compositionIfPossible(EditCommand* command)
@@ -110,6 +112,87 @@ void EditCommand::setParent(CompositeEditCommand* parent)
     }
 }
 
+AXTextEditType EditCommand::applyEditType() const
+{
+    switch (editingAction()) {
+    case EditActionCut:
+        return AXTextEditTypeCut;
+    case EditActionDelete:
+        return AXTextEditTypeDelete;
+    case EditActionDictation:
+        return AXTextEditTypeDictation;
+    case EditActionInsert:
+        return AXTextEditTypeInsert;
+    case EditActionPaste:
+        return AXTextEditTypePaste;
+    case EditActionTyping:
+        return AXTextEditTypeTyping;
+    case EditActionSetColor:
+    case EditActionSetBackgroundColor:
+    case EditActionTurnOffKerning:
+    case EditActionTightenKerning:
+    case EditActionLoosenKerning:
+    case EditActionUseStandardKerning:
+    case EditActionTurnOffLigatures:
+    case EditActionUseStandardLigatures:
+    case EditActionUseAllLigatures:
+    case EditActionRaiseBaseline:
+    case EditActionLowerBaseline:
+    case EditActionSetTraditionalCharacterShape:
+    case EditActionSetFont:
+    case EditActionChangeAttributes:
+    case EditActionAlignLeft:
+    case EditActionAlignRight:
+    case EditActionCenter:
+    case EditActionJustify:
+    case EditActionSetWritingDirection:
+    case EditActionSubscript:
+    case EditActionSuperscript:
+    case EditActionUnderline:
+    case EditActionOutline:
+    case EditActionUnscript:
+    case EditActionBold:
+    case EditActionItalics:
+    case EditActionFormatBlock:
+    case EditActionIndent:
+    case EditActionOutdent:
+        return AXTextEditTypeAttributesChange;
+    // Include default case for unhandled EditAction cases.
+    default:
+        break;
+    }
+    return AXTextEditTypeUnknown;
+}
+
+AXTextEditType EditCommand::unapplyEditType() const
+{
+    switch (applyEditType()) {
+    case AXTextEditTypeUnknown:
+        return AXTextEditTypeUnknown;
+    case AXTextEditTypeDelete:
+    case AXTextEditTypeCut:
+        return AXTextEditTypeInsert;
+    case AXTextEditTypeInsert:
+    case AXTextEditTypeTyping:
+    case AXTextEditTypeDictation:
+    case AXTextEditTypePaste:
+        return AXTextEditTypeDelete;
+    case AXTextEditTypeAttributesChange:
+        return AXTextEditTypeAttributesChange;
+    }
+    return AXTextEditTypeUnknown;
+}
+
+bool EditCommand::shouldPostAccessibilityNotification() const
+{
+    return AXObjectCache::accessibilityEnabled() && editingAction() != EditActionUnspecified;
+}
+
+SimpleEditCommand::SimpleEditCommand(Document& document, EditAction editingAction)
+    : EditCommand(document, editingAction)
+{
+}
+
 void SimpleEditCommand::doReapply()
 {
     doApply();
@@ -118,9 +201,19 @@ void SimpleEditCommand::doReapply()
 #ifndef NDEBUG
 void SimpleEditCommand::addNodeAndDescendants(Node* startNode, HashSet<Node*>& nodes)
 {
-    for (Node* node = startNode; node; node = NodeTraversal::next(node, startNode))
+    for (Node* node = startNode; node; node = NodeTraversal::next(*node, startNode))
         nodes.add(node);
 }
 #endif
+
+void SimpleEditCommand::notifyAccessibilityForTextChange(Node* node, AXTextEditType type, const String& text, const VisiblePosition& position)
+{
+    if (!AXObjectCache::accessibilityEnabled())
+        return;
+    AXObjectCache* cache = document().existingAXObjectCache();
+    if (!cache)
+        return;
+    cache->postTextStateChangeNotification(node, type, text, position);
+}
 
 } // namespace WebCore

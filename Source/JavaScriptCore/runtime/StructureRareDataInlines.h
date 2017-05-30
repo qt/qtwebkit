@@ -26,6 +26,7 @@
 #ifndef StructureRareDataInlines_h
 #define StructureRareDataInlines_h
 
+#include "JSString.h"
 #include "StructureRareData.h"
 
 namespace JSC {
@@ -35,9 +36,9 @@ inline Structure* StructureRareData::previousID() const
     return m_previous.get();
 }
 
-inline void StructureRareData::setPreviousID(VM& vm, Structure* transition, Structure* structure)
+inline void StructureRareData::setPreviousID(VM& vm, Structure* structure)
 {
-    m_previous.set(vm, transition, structure);
+    m_previous.set(vm, this, structure);
 }
 
 inline void StructureRareData::clearPreviousID()
@@ -48,11 +49,6 @@ inline void StructureRareData::clearPreviousID()
 inline JSString* StructureRareData::objectToStringValue() const
 {
     return m_objectToStringValue.get();
-}
-
-inline void StructureRareData::setObjectToStringValue(VM& vm, const JSCell* owner, JSString* value)
-{
-    m_objectToStringValue.set(vm, owner, value);
 }
 
 } // namespace JSC

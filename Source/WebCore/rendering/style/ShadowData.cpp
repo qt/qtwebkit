@@ -23,8 +23,7 @@
 #include "ShadowData.h"
 
 #include "LayoutRect.h"
-
-using namespace std;
+#include <wtf/PointerComparison.h>
 
 namespace WebCore {
 
@@ -35,14 +34,13 @@ ShadowData::ShadowData(const ShadowData& o)
     , m_color(o.m_color)
     , m_style(o.m_style)
     , m_isWebkitBoxShadow(o.m_isWebkitBoxShadow)
-    , m_next(o.m_next ? adoptPtr(new ShadowData(*o.m_next)) : nullptr)
+    , m_next(o.m_next ? std::make_unique<ShadowData>(*o.m_next) : nullptr)
 {
 }
 
 bool ShadowData::operator==(const ShadowData& o) const
 {
-    if ((m_next && !o.m_next) || (!m_next && o.m_next)
-        || (m_next && o.m_next && *m_next != *o.m_next))
+    if (!arePointingToEqualData(m_next, o.m_next))
         return false;
     
     return m_location == o.m_location
@@ -58,10 +56,10 @@ static inline void calculateShadowExtent(const ShadowData* shadow, int additiona
     do {
         int extentAndSpread = shadow->paintingExtent() + shadow->spread() + additionalOutlineSize;
         if (shadow->style() == Normal) {
-            shadowLeft = min(shadow->x() - extentAndSpread, shadowLeft);
-            shadowRight = max(shadow->x() + extentAndSpread, shadowRight);
-            shadowTop = min(shadow->y() - extentAndSpread, shadowTop);
-            shadowBottom = max(shadow->y() + extentAndSpread, shadowBottom);
+            shadowLeft = std::min(shadow->x() - extentAndSpread, shadowLeft);
+            shadowRight = std::max(shadow->x() + extentAndSpread, shadowRight);
+            shadowTop = std::min(shadow->y() - extentAndSpread, shadowTop);
+            shadowBottom = std::max(shadow->y() + extentAndSpread, shadowBottom);
         }
 
         shadow = shadow->next();

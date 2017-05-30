@@ -72,7 +72,8 @@ public:
         VectorTypeOperations<T>::initialize(begin(), end());
     }
 
-    explicit RefCountedArray(const Vector<T>& other)
+    template<size_t inlineCapacity, typename OverflowHandler>
+    explicit RefCountedArray(const Vector<T, inlineCapacity, OverflowHandler>& other)
     {
         if (other.isEmpty()) {
             m_data = 0;
@@ -112,12 +113,21 @@ public:
         fastFree(Header::fromPayload(m_data));
     }
     
+    unsigned refCount() const
+    {
+        if (!m_data)
+            return 0;
+        return Header::fromPayload(m_data)->refCount;
+    }
+    
     size_t size() const
     {
         if (!m_data)
             return 0;
         return Header::fromPayload(m_data)->length;
     }
+    
+    size_t byteSize() const { return size() * sizeof(T); }
     
     T* data() { return m_data; }
     T* begin() { return m_data; }
@@ -146,6 +156,22 @@ public:
     
     T& operator[](size_t i) { return at(i); }
     const T& operator[](size_t i) const { return at(i); }
+
+    bool operator==(const RefCountedArray& other) const
+    {
+        if (m_data == other.m_data)
+            return true;
+        if (!m_data || !other.m_data)
+            return false;
+        unsigned length = Header::fromPayload(m_data)->length;
+        if (length != Header::fromPayload(other.m_data)->length)
+            return false;
+        for (unsigned i = 0; i < length; ++i) {
+            if (m_data[i] != other.m_data[i])
+                return false;
+        }
+        return true;
+    }
     
 private:
     struct Header {

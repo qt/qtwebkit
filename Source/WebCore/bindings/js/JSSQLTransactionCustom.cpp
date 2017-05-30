@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -28,51 +28,49 @@
 
 #include "config.h"
 
-#if ENABLE(SQL_DATABASE)
-
 #include "JSSQLTransaction.h"
-
 #include "DOMWindow.h"
 #include "ExceptionCode.h"
 #include "JSSQLStatementCallback.h"
 #include "JSSQLStatementErrorCallback.h"
 #include "JSDOMWindowCustom.h"
 #include "SQLTransaction.h"
+#include "SQLValue.h"
 
 using namespace JSC;
 
 namespace WebCore {
 
-JSValue JSSQLTransaction::executeSql(ExecState* exec)
+JSValue JSSQLTransaction::executeSql(ExecState& state)
 {
-    if (!exec->argumentCount()) {
-        setDOMException(exec, SYNTAX_ERR);
+    if (!state.argumentCount()) {
+        setDOMException(&state, SYNTAX_ERR);
         return jsUndefined();
     }
 
-    String sqlStatement = exec->argument(0).toString(exec)->value(exec);
-    if (exec->hadException())
+    String sqlStatement = state.argument(0).toString(&state)->value(&state);
+    if (state.hadException())
         return jsUndefined();
 
     // Now assemble the list of SQL arguments
     Vector<SQLValue> sqlValues;
-    if (!exec->argument(1).isUndefinedOrNull()) {
-        JSObject* object = exec->argument(1).getObject();
+    if (!state.argument(1).isUndefinedOrNull()) {
+        JSObject* object = state.argument(1).getObject();
         if (!object) {
-            setDOMException(exec, TYPE_MISMATCH_ERR);
+            setDOMException(&state, TYPE_MISMATCH_ERR);
             return jsUndefined();
         }
 
-        JSValue lengthValue = object->get(exec, exec->propertyNames().length);
-        if (exec->hadException())
+        JSValue lengthValue = object->get(&state, state.propertyNames().length);
+        if (state.hadException())
             return jsUndefined();
-        unsigned length = lengthValue.toUInt32(exec);
-        if (exec->hadException())
+        unsigned length = lengthValue.toUInt32(&state);
+        if (state.hadException())
             return jsUndefined();
 
         for (unsigned i = 0 ; i < length; ++i) {
-            JSValue value = object->get(exec, i);
-            if (exec->hadException())
+            JSValue value = object->get(&state, i);
+            if (state.hadException())
                 return jsUndefined();
 
             if (value.isUndefinedOrNull())
@@ -81,18 +79,18 @@ JSValue JSSQLTransaction::executeSql(ExecState* exec)
                 sqlValues.append(value.asNumber());
             else {
                 // Convert the argument to a string and append it
-                sqlValues.append(value.toString(exec)->value(exec));
-                if (exec->hadException())
+                sqlValues.append(value.toString(&state)->value(&state));
+                if (state.hadException())
                     return jsUndefined();
             }
         }
     }
 
     RefPtr<SQLStatementCallback> callback;
-    if (!exec->argument(2).isUndefinedOrNull()) {
-        JSObject* object = exec->argument(2).getObject();
+    if (!state.argument(2).isUndefinedOrNull()) {
+        JSObject* object = state.argument(2).getObject();
         if (!object) {
-            setDOMException(exec, TYPE_MISMATCH_ERR);
+            setDOMException(&state, TYPE_MISMATCH_ERR);
             return jsUndefined();
         }
 
@@ -100,10 +98,10 @@ JSValue JSSQLTransaction::executeSql(ExecState* exec)
     }
 
     RefPtr<SQLStatementErrorCallback> errorCallback;
-    if (!exec->argument(3).isUndefinedOrNull()) {
-        JSObject* object = exec->argument(3).getObject();
+    if (!state.argument(3).isUndefinedOrNull()) {
+        JSObject* object = state.argument(3).getObject();
         if (!object) {
-            setDOMException(exec, TYPE_MISMATCH_ERR);
+            setDOMException(&state, TYPE_MISMATCH_ERR);
             return jsUndefined();
         }
 
@@ -111,12 +109,10 @@ JSValue JSSQLTransaction::executeSql(ExecState* exec)
     }
 
     ExceptionCode ec = 0;
-    m_impl->executeSQL(sqlStatement, sqlValues, callback.release(), errorCallback.release(), ec);
-    setDOMException(exec, ec);
+    wrapped().executeSQL(sqlStatement, sqlValues, callback.release(), errorCallback.release(), ec);
+    setDOMException(&state, ec);
 
     return jsUndefined();
 }
 
 } // namespace WebCore
-
-#endif // ENABLE(SQL_DATABASE)

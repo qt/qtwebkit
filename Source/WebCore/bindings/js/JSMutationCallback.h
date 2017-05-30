@@ -39,16 +39,16 @@ class JSDOMGlobalObject;
 
 class JSMutationCallback : public MutationCallback, public ActiveDOMCallback {
 public:
-    static PassRefPtr<JSMutationCallback> create(JSC::JSObject* callback, JSDOMGlobalObject* globalObject)
+    static Ref<JSMutationCallback> create(JSC::JSObject* callback, JSDOMGlobalObject* globalObject)
     {
-        return adoptRef(new JSMutationCallback(callback, globalObject));
+        return adoptRef(*new JSMutationCallback(callback, globalObject));
     }
 
     virtual ~JSMutationCallback();
 
-    virtual void call(const Vector<RefPtr<MutationRecord> >&, MutationObserver*) OVERRIDE;
+    virtual void call(const Vector<RefPtr<MutationRecord>>&, MutationObserver*) override;
 
-    virtual ScriptExecutionContext* scriptExecutionContext() const OVERRIDE { return ContextDestructionObserver::scriptExecutionContext(); }
+    virtual ScriptExecutionContext* scriptExecutionContext() const override { return ContextDestructionObserver::scriptExecutionContext(); }
 
 private:
     JSMutationCallback(JSC::JSObject* callback, JSDOMGlobalObject*);

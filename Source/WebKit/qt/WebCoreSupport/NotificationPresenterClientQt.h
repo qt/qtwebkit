@@ -32,7 +32,6 @@
 #ifndef NotificationPresenterClientQt_h
 #define NotificationPresenterClientQt_h
 
-#include "Notification.h"
 #include "NotificationClient.h"
 #include "QtPlatformPlugin.h"
 #include "Timer.h"
@@ -50,54 +49,49 @@ class Document;
 class Frame;
 class ScriptExecutionContext;
 
-class NotificationWrapper : public QObject, public QWebNotificationData {
+class NotificationWrapper final : public QObject, public QWebNotificationData {
     Q_OBJECT
 public:
     NotificationWrapper();
     ~NotificationWrapper() { }
 
     void close();
-    void close(Timer<NotificationWrapper>*);
-    void sendDisplayEvent(Timer<NotificationWrapper>*);
-    const QString title() const;
-    const QString message() const;
-    const QUrl iconUrl() const;
-    const QUrl openerPageUrl() const;
+    void sendDisplayEvent();
+    const QString title() const final;
+    const QString message() const final;
+    const QUrl iconUrl() const final;
+    const QUrl openerPageUrl() const final;
 
 public Q_SLOTS:
     void notificationClosed();
     void notificationClicked();
 
 private:
-    OwnPtr<QWebNotificationPresenter> m_presenter;
-    Timer<NotificationWrapper> m_closeTimer;
-    Timer<NotificationWrapper> m_displayEventTimer;
+    std::unique_ptr<QWebNotificationPresenter> m_presenter;
+    Timer m_closeTimer;
+    Timer m_displayEventTimer;
 
     friend class NotificationPresenterClientQt;
 };
 
-#if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
+#if ENABLE(NOTIFICATIONS)
 
 typedef QHash <Notification*, NotificationWrapper*> NotificationsQueue;
 
-class NotificationPresenterClientQt : public NotificationClient {
+class NotificationPresenterClientQt final : public NotificationClient {
 public:
     NotificationPresenterClientQt();
     ~NotificationPresenterClientQt();
 
     /* WebCore::NotificationClient interface */
-    virtual bool show(Notification*);
-    virtual void cancel(Notification*);
-    virtual void notificationObjectDestroyed(Notification*);
-    virtual void notificationControllerDestroyed();
-#if ENABLE(LEGACY_NOTIFICATIONS)
-    virtual void requestPermission(ScriptExecutionContext*, PassRefPtr<VoidCallback>);
-#endif
-#if ENABLE(NOTIFICATIONS)
-    virtual void requestPermission(ScriptExecutionContext*, PassRefPtr<NotificationPermissionCallback>);
-#endif
-    virtual NotificationClient::Permission checkPermission(ScriptExecutionContext*);
-    virtual void cancelRequestsForPermission(ScriptExecutionContext*);
+    bool show(Notification*) override;
+    void cancel(Notification*) override;
+    void notificationObjectDestroyed(Notification*) override;
+    void notificationControllerDestroyed() override;
+    void requestPermission(ScriptExecutionContext*, PassRefPtr<NotificationPermissionCallback>) override;
+    bool hasPendingPermissionRequests(ScriptExecutionContext*) const override;
+    NotificationClient::Permission checkPermission(ScriptExecutionContext*) override;
+    void cancelRequestsForPermission(ScriptExecutionContext*) override;
 
     void cancel(NotificationWrapper*);
 
@@ -133,12 +127,7 @@ private:
     int m_clientCount;
     struct CallbacksInfo {
         QWebFrameAdapter* m_frame;
-#if ENABLE(LEGACY_NOTIFICATIONS)
-        QList<RefPtr<VoidCallback> > m_voidCallbacks;
-#endif
-#if ENABLE(NOTIFICATIONS)
         QList<RefPtr<NotificationPermissionCallback> > m_callbacks;
-#endif
     };
     QHash<ScriptExecutionContext*,  CallbacksInfo > m_pendingPermissionRequests;
     QHash<ScriptExecutionContext*, NotificationClient::Permission> m_cachedPermissions;
@@ -150,7 +139,7 @@ private:
 #endif
 };
 
-#endif // ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
+#endif // ENABLE(NOTIFICATIONS)
 
 }
 

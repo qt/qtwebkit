@@ -27,16 +27,24 @@
 #include "WKBundleFrame.h"
 #include "WKBundleFramePrivate.h"
 
+#include "APIArray.h"
+#include "APISecurityOrigin.h"
+#include "InjectedBundleFileHandle.h"
 #include "InjectedBundleHitTestResult.h"
+#include "InjectedBundleNodeHandle.h"
+#include "InjectedBundleRangeHandle.h"
+#include "InjectedBundleScriptWorld.h"
 #include "WKAPICast.h"
 #include "WKBundleAPICast.h"
 #include "WKData.h"
 #include "WebFrame.h"
-#include "WebSecurityOrigin.h"
+#include "WebPage.h"
 #include <WebCore/Document.h>
+#include <WebCore/FocusController.h>
 #include <WebCore/Frame.h>
 #include <WebCore/FrameLoader.h>
 #include <WebCore/FrameView.h>
+#include <WebCore/Page.h>
 
 using namespace WebCore;
 using namespace WebKit;
@@ -72,11 +80,7 @@ WKFrameLoadState WKBundleFrameGetFrameLoadState(WKBundleFrameRef frameRef)
     if (!coreFrame)
         return kWKFrameLoadStateFinished;
 
-    FrameLoader* loader = coreFrame->loader();
-    if (!loader)
-        return kWKFrameLoadStateFinished;
-
-    switch (loader->state()) {
+    switch (coreFrame->loader().state()) {
     case FrameStateProvisional:
         return kWKFrameLoadStateProvisional;
     case FrameStateCommittedPage:
@@ -91,7 +95,7 @@ WKFrameLoadState WKBundleFrameGetFrameLoadState(WKBundleFrameRef frameRef)
 
 WKArrayRef WKBundleFrameCopyChildFrames(WKBundleFrameRef frameRef)
 {
-    return toAPI(toImpl(frameRef)->childFrames().leakRef());    
+    return toAPI(&toImpl(frameRef)->childFrames().leakRef());    
 }
 
 JSGlobalContextRef WKBundleFrameGetJavaScriptContext(WKBundleFrameRef frameRef)
@@ -117,6 +121,11 @@ JSValueRef WKBundleFrameGetJavaScriptWrapperForNodeForWorld(WKBundleFrameRef fra
 JSValueRef WKBundleFrameGetJavaScriptWrapperForRangeForWorld(WKBundleFrameRef frameRef, WKBundleRangeHandleRef rangeHandleRef, WKBundleScriptWorldRef worldRef)
 {
     return toImpl(frameRef)->jsWrapperForWorld(toImpl(rangeHandleRef), toImpl(worldRef));
+}
+
+JSValueRef WKBundleFrameGetJavaScriptWrapperForFileForWorld(WKBundleFrameRef frameRef, WKBundleFileHandleRef fileHandleRef, WKBundleScriptWorldRef worldRef)
+{
+    return toImpl(frameRef)->jsWrapperForWorld(toImpl(fileHandleRef), toImpl(worldRef));
 }
 
 WKStringRef WKBundleFrameCopyName(WKBundleFrameRef frameRef)
@@ -148,7 +157,7 @@ void WKBundleFrameClearOpener(WKBundleFrameRef frameRef)
 {
     Frame* coreFrame = toImpl(frameRef)->coreFrame();
     if (coreFrame)
-        coreFrame->loader()->setOpener(0);
+        coreFrame->loader().setOpener(0);
 }
 
 void WKBundleFrameStopLoading(WKBundleFrameRef frameRef)
@@ -163,7 +172,7 @@ WKStringRef WKBundleFrameCopyLayerTreeAsText(WKBundleFrameRef frameRef)
 
 bool WKBundleFrameAllowsFollowingLink(WKBundleFrameRef frameRef, WKURLRef urlRef)
 {
-    return toImpl(frameRef)->allowsFollowingLink(WebCore::KURL(WebCore::KURL(), toWTFString(urlRef)));
+    return toImpl(frameRef)->allowsFollowingLink(WebCore::URL(WebCore::URL(), toWTFString(urlRef)));
 }
 
 bool WKBundleFrameHandlesPageScaleGesture(WKBundleFrameRef frameRef)
@@ -208,12 +217,12 @@ bool WKBundleFrameGetDocumentBackgroundColor(WKBundleFrameRef frameRef, double* 
 
 WKStringRef WKBundleFrameCopySuggestedFilenameForResourceWithURL(WKBundleFrameRef frameRef, WKURLRef urlRef)
 {
-    return toCopiedAPI(toImpl(frameRef)->suggestedFilenameForResourceWithURL(WebCore::KURL(WebCore::KURL(), toWTFString(urlRef))));
+    return toCopiedAPI(toImpl(frameRef)->suggestedFilenameForResourceWithURL(WebCore::URL(WebCore::URL(), toWTFString(urlRef))));
 }
 
 WKStringRef WKBundleFrameCopyMIMETypeForResourceWithURL(WKBundleFrameRef frameRef, WKURLRef urlRef)
 {
-    return toCopiedAPI(toImpl(frameRef)->mimeTypeForResourceWithURL(WebCore::KURL(WebCore::KURL(), toWTFString(urlRef))));
+    return toCopiedAPI(toImpl(frameRef)->mimeTypeForResourceWithURL(WebCore::URL(WebCore::URL(), toWTFString(urlRef))));
 }
 
 bool WKBundleFrameContainsAnyFormElements(WKBundleFrameRef frameRef)
@@ -231,6 +240,11 @@ void WKBundleFrameSetTextDirection(WKBundleFrameRef frameRef, WKStringRef direct
     toImpl(frameRef)->setTextDirection(toWTFString(directionRef));
 }
 
+void WKBundleFrameSetAccessibleName(WKBundleFrameRef frameRef, WKStringRef accessibleNameRef)
+{
+    toImpl(frameRef)->setAccessibleName(toWTFString(accessibleNameRef));
+}
+
 WKDataRef WKBundleFrameCopyWebArchive(WKBundleFrameRef frameRef)
 {
     return WKBundleFrameCopyWebArchiveFilteringSubframes(frameRef, 0, 0);
@@ -238,7 +252,7 @@ WKDataRef WKBundleFrameCopyWebArchive(WKBundleFrameRef frameRef)
 
 WKDataRef WKBundleFrameCopyWebArchiveFilteringSubframes(WKBundleFrameRef frameRef, WKBundleFrameFrameFilterCallback frameFilterCallback, void* context)
 {
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     RetainPtr<CFDataRef> data = toImpl(frameRef)->webArchiveData(frameFilterCallback, context);
     if (data)
         return WKDataCreate(CFDataGetBytePtr(data.get()), CFDataGetLength(data.get()));
@@ -257,7 +271,7 @@ bool WKBundleFrameCallShouldCloseOnWebView(WKBundleFrameRef frameRef)
     if (!coreFrame)
         return true;
 
-    return coreFrame->loader()->shouldClose();
+    return coreFrame->loader().shouldClose();
 }
 
 WKBundleHitTestResultRef WKBundleFrameCreateHitTestResult(WKBundleFrameRef frameRef, WKPoint point)
@@ -272,4 +286,13 @@ WKSecurityOriginRef WKBundleFrameCopySecurityOrigin(WKBundleFrameRef frameRef)
         return 0;
 
     return toCopiedAPI(coreFrame->document()->securityOrigin());
+}
+
+void WKBundleFrameFocus(WKBundleFrameRef frameRef)
+{
+    Frame* coreFrame = toImpl(frameRef)->coreFrame();
+    if (!coreFrame)
+        return;
+
+    coreFrame->page()->focusController().setFocusedFrame(coreFrame);
 }

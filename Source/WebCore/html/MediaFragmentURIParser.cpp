@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -42,7 +42,7 @@ namespace WebCore {
 
 const int secondsPerHour = 3600;
 const int secondsPerMinute = 60;
-const unsigned nptIdentiferLength = 4; // "npt:"
+const unsigned nptIdentifierLength = 4; // "npt:"
 
 static String collectDigits(const LChar* input, unsigned length, unsigned& position)
 {
@@ -70,32 +70,27 @@ static String collectFraction(const LChar* input, unsigned length, unsigned& pos
     return digits.toString();
 }
 
-double MediaFragmentURIParser::invalidTimeValue()
-{
-    return MediaPlayer::invalidTime();
-}
-
-MediaFragmentURIParser::MediaFragmentURIParser(const KURL& url)
+MediaFragmentURIParser::MediaFragmentURIParser(const URL& url)
     : m_url(url)
     , m_timeFormat(None)
-    , m_startTime(MediaPlayer::invalidTime())
-    , m_endTime(MediaPlayer::invalidTime())
+    , m_startTime(MediaTime::invalidTime())
+    , m_endTime(MediaTime::invalidTime())
 {
 }
 
-double MediaFragmentURIParser::startTime()
+MediaTime MediaFragmentURIParser::startTime()
 {
     if (!m_url.isValid())
-        return MediaPlayer::invalidTime();
+        return MediaTime::invalidTime();
     if (m_timeFormat == None)
         parseTimeFragment();
     return m_startTime;
 }
 
-double MediaFragmentURIParser::endTime()
+MediaTime MediaFragmentURIParser::endTime()
 {
     if (!m_url.isValid())
-        return MediaPlayer::invalidTime();
+        return MediaTime::invalidTime();
     if (m_timeFormat == None)
         parseTimeFragment();
     return m_endTime;
@@ -139,14 +134,15 @@ void MediaFragmentURIParser::parseFragments()
         
         //  b. Convert name and value to Unicode strings by interpreting them as UTF-8. If either
         //     name or value are not valid UTF-8 strings, then remove the name-value pair from the list.
-        bool validUTF8 = true;
-        if (!name.isEmpty()) {
-            name = name.utf8(String::StrictConversion).data();
+        bool validUTF8 = false;
+        if (!name.isEmpty() && !value.isEmpty()) {
+            name = name.utf8(StrictConversion).data();
             validUTF8 = !name.isEmpty();
-        }
-        if (validUTF8 && !value.isEmpty()) {
-            value = value.utf8(String::StrictConversion).data();
-            validUTF8 = !value.isEmpty();
+
+            if (validUTF8) {
+                value = value.utf8(StrictConversion).data();
+                validUTF8 = !value.isEmpty();
+            }
         }
         
         if (validUTF8)
@@ -165,9 +161,7 @@ void MediaFragmentURIParser::parseTimeFragment()
 
     m_timeFormat = Invalid;
 
-    for (unsigned i = 0; i < m_fragments.size(); ++i) {
-        pair<String, String>& fragment = m_fragments[i];
-
+    for (auto& fragment : m_fragments) {
         ASSERT(fragment.first.is8Bit());
         ASSERT(fragment.second.is8Bit());
 
@@ -183,8 +177,8 @@ void MediaFragmentURIParser::parseTimeFragment()
         // in the same format. The format is specified by name, followed by a colon (:), with npt: being
         // the default.
         
-        double start = MediaPlayer::invalidTime();
-        double end = MediaPlayer::invalidTime();
+        MediaTime start = MediaTime::invalidTime();
+        MediaTime end = MediaTime::invalidTime();
         if (parseNPTFragment(fragment.second.characters8(), fragment.second.length(), start, end)) {
             m_startTime = start;
             m_endTime = end;
@@ -201,11 +195,11 @@ void MediaFragmentURIParser::parseTimeFragment()
     m_fragments.clear();
 }
 
-bool MediaFragmentURIParser::parseNPTFragment(const LChar* timeString, unsigned length, double& startTime, double& endTime)
+bool MediaFragmentURIParser::parseNPTFragment(const LChar* timeString, unsigned length, MediaTime& startTime, MediaTime& endTime)
 {
     unsigned offset = 0;
-    if (length >= nptIdentiferLength && timeString[0] == 'n' && timeString[1] == 'p' && timeString[2] == 't' && timeString[3] == ':')
-            offset += nptIdentiferLength;
+    if (length >= nptIdentifierLength && timeString[0] == 'n' && timeString[1] == 'p' && timeString[2] == 't' && timeString[3] == ':')
+        offset += nptIdentifierLength;
 
     if (offset == length)
         return false;
@@ -214,7 +208,7 @@ bool MediaFragmentURIParser::parseNPTFragment(const LChar* timeString, unsigned 
     // If a single number only is given, this corresponds to the begin time except if it is preceded
     // by a comma that would in this case indicate the end time.
     if (timeString[offset] == ',')
-        startTime = 0;
+        startTime = MediaTime::zeroTime();
     else {
         if (!parseNPTTime(timeString, length, offset, startTime))
             return false;
@@ -240,7 +234,7 @@ bool MediaFragmentURIParser::parseNPTFragment(const LChar* timeString, unsigned 
     return true;
 }
 
-bool MediaFragmentURIParser::parseNPTTime(const LChar* timeString, unsigned length, unsigned& offset, double& time)
+bool MediaFragmentURIParser::parseNPTTime(const LChar* timeString, unsigned length, unsigned& offset, MediaTime& time)
 {
     enum Mode { minutes, hours };
     Mode mode = minutes;
@@ -270,17 +264,17 @@ bool MediaFragmentURIParser::parseNPTTime(const LChar* timeString, unsigned leng
     String digits1 = collectDigits(timeString, length, offset);
     int value1 = digits1.toInt();
     if (offset >= length || timeString[offset] == ',') {
-        time = value1;
+        time = MediaTime::createWithDouble(value1);
         return true;
     }
 
-    double fraction = 0;
+    MediaTime fraction;
     if (timeString[offset] == '.') {
         if (offset == length)
             return true;
         String digits = collectFraction(timeString, length, offset);
-        fraction = digits.toDouble();
-        time = value1 + fraction;
+        fraction = MediaTime::createWithDouble(digits.toDouble());
+        time = MediaTime::createWithDouble(value1) + fraction;
         return true;
     }
     
@@ -317,9 +311,9 @@ bool MediaFragmentURIParser::parseNPTTime(const LChar* timeString, unsigned leng
     }
 
     if (offset < length && timeString[offset] == '.')
-        fraction = collectFraction(timeString, length, offset).toDouble();
+        fraction = MediaTime::createWithDouble(collectFraction(timeString, length, offset).toDouble());
     
-    time = (value1 * secondsPerHour) + (value2 * secondsPerMinute) + value3 + fraction;
+    time = MediaTime::createWithDouble((value1 * secondsPerHour) + (value2 * secondsPerMinute) + value3) + fraction;
     return true;
 }
 

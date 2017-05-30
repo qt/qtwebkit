@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -32,79 +32,67 @@
 #include "TextTrack.h"
 #include "TextTrackCueGeneric.h"
 #include <wtf/RefPtr.h>
+#include <wtf/TypeCasts.h>
 
 namespace WebCore {
-
-class Document;
-class InbandTextTrackPrivate;
-class TextTrackCue;
-class WebVTTCueData;
-
-class TextTrackCueMap {
-public:
-    TextTrackCueMap();
-    virtual ~TextTrackCueMap();
-
-    void add(GenericCueData*, TextTrackCueGeneric*);
-    void add(WebVTTCueData*, TextTrackCue*);
-
-    void remove(TextTrackCue*);
-    void remove(GenericCueData*);
-    void remove(WebVTTCueData*);
-
-    PassRefPtr<GenericCueData> findGenericData(TextTrackCue*);
-    PassRefPtr<WebVTTCueData> findWebVTTData(TextTrackCue*);
-    PassRefPtr<TextTrackCueGeneric> find(GenericCueData*);
-    PassRefPtr<TextTrackCue> find(WebVTTCueData*);
-    
-private:
-    typedef HashMap<RefPtr<TextTrackCue>, RefPtr<GenericCueData> > GenericCueToDataMap;
-    typedef HashMap<RefPtr<GenericCueData>, RefPtr<TextTrackCueGeneric> > GenericCueDataToCueMap;
-    typedef HashMap<RefPtr<TextTrackCue>, RefPtr<WebVTTCueData> > WebVTTCueToDataMap;
-    typedef HashMap<RefPtr<WebVTTCueData>, RefPtr<TextTrackCue> > WebVTTCueDataToCueMap;
-
-    GenericCueToDataMap* m_genericCueToDataMap;
-    GenericCueDataToCueMap* m_genericDataToCueMap;
-    WebVTTCueToDataMap* m_webVTTCueToDataMap;
-    WebVTTCueDataToCueMap* m_webVTTDataToCueMap;
-};
 
 class InbandTextTrack : public TextTrack, public InbandTextTrackPrivateClient {
 public:
     static PassRefPtr<InbandTextTrack> create(ScriptExecutionContext*, TextTrackClient*, PassRefPtr<InbandTextTrackPrivate>);
     virtual ~InbandTextTrack();
 
-    virtual bool isClosedCaptions() const OVERRIDE;
-    virtual bool isSDH() const OVERRIDE;
-    virtual bool containsOnlyForcedSubtitles() const OVERRIDE;
-    virtual bool isMainProgramContent() const OVERRIDE;
-    virtual bool isEasyToRead() const OVERRIDE;
-    virtual void setMode(const AtomicString&) OVERRIDE;
+    virtual bool isClosedCaptions() const override;
+    virtual bool isSDH() const override;
+    virtual bool containsOnlyForcedSubtitles() const override;
+    virtual bool isMainProgramContent() const override;
+    virtual bool isEasyToRead() const override;
+    virtual void setMode(const AtomicString&) override;
     size_t inbandTrackIndex();
 
-private:
+    virtual AtomicString inBandMetadataTrackDispatchType() const override;
+
+    void setPrivate(PassRefPtr<InbandTextTrackPrivate>);
+
+protected:
     InbandTextTrack(ScriptExecutionContext*, TextTrackClient*, PassRefPtr<InbandTextTrackPrivate>);
 
-    virtual void addGenericCue(InbandTextTrackPrivate*, PassRefPtr<GenericCueData>) OVERRIDE;
-    virtual void updateGenericCue(InbandTextTrackPrivate*, GenericCueData*) OVERRIDE;
-    virtual void removeGenericCue(InbandTextTrackPrivate*, GenericCueData*) OVERRIDE;
-    virtual void addWebVTTCue(InbandTextTrackPrivate*, PassRefPtr<WebVTTCueData>) OVERRIDE;
-    virtual void removeWebVTTCue(InbandTextTrackPrivate*, WebVTTCueData*) OVERRIDE;
-    virtual void removeCue(TextTrackCue*, ExceptionCode&) OVERRIDE;
-    virtual void willRemoveTextTrackPrivate(InbandTextTrackPrivate*) OVERRIDE;
+    void setModeInternal(const AtomicString&);
+    void updateKindFromPrivate();
 
-    PassRefPtr<TextTrackCueGeneric> createCue(PassRefPtr<GenericCueData>);
-    void updateCueFromCueData(TextTrackCueGeneric*, GenericCueData*);
+    RefPtr<InbandTextTrackPrivate> m_private;
 
-#if USE(PLATFORM_TEXT_TRACK_MENU)
-    virtual InbandTextTrackPrivate* privateTrack() OVERRIDE { return m_private.get(); }
+private:
+    virtual bool isInband() const override final { return true; }
+    virtual void idChanged(TrackPrivateBase*, const AtomicString&) override;
+    virtual void labelChanged(TrackPrivateBase*, const AtomicString&) override;
+    virtual void languageChanged(TrackPrivateBase*, const AtomicString&) override;
+    virtual void willRemove(TrackPrivateBase*) override;
+
+    virtual void addDataCue(InbandTextTrackPrivate*, const MediaTime&, const MediaTime&, const void*, unsigned) override { ASSERT_NOT_REACHED(); }
+
+#if ENABLE(DATACUE_VALUE)
+    virtual void addDataCue(InbandTextTrackPrivate*, const MediaTime&, const MediaTime&, PassRefPtr<SerializedPlatformRepresentation>, const String&) override { ASSERT_NOT_REACHED(); }
+    virtual void updateDataCue(InbandTextTrackPrivate*, const MediaTime&, const MediaTime&, PassRefPtr<SerializedPlatformRepresentation>) override  { ASSERT_NOT_REACHED(); }
+    virtual void removeDataCue(InbandTextTrackPrivate*, const MediaTime&, const MediaTime&, PassRefPtr<SerializedPlatformRepresentation>) override  { ASSERT_NOT_REACHED(); }
 #endif
 
-    TextTrackCueMap m_cueMap;
-    RefPtr<InbandTextTrackPrivate> m_private;
+    virtual void addGenericCue(InbandTextTrackPrivate*, PassRefPtr<GenericCueData>) override { ASSERT_NOT_REACHED(); }
+    virtual void updateGenericCue(InbandTextTrackPrivate*, GenericCueData*) override { ASSERT_NOT_REACHED(); }
+    virtual void removeGenericCue(InbandTextTrackPrivate*, GenericCueData*) override { ASSERT_NOT_REACHED(); }
+
+    virtual void parseWebVTTFileHeader(InbandTextTrackPrivate*, String) override { ASSERT_NOT_REACHED(); }
+    virtual void parseWebVTTCueData(InbandTextTrackPrivate*, const char*, unsigned) override { ASSERT_NOT_REACHED(); }
+    virtual void parseWebVTTCueData(InbandTextTrackPrivate*, const ISOWebVTTCue&) override { ASSERT_NOT_REACHED(); }
+
+    virtual MediaTime startTimeVariance() const override;
 };
 
 } // namespace WebCore
 
-#endif
-#endif
+SPECIALIZE_TYPE_TRAITS_BEGIN(WebCore::InbandTextTrack)
+    static bool isType(const WebCore::TextTrack& track) { return track.isInband(); }
+SPECIALIZE_TYPE_TRAITS_END()
+
+#endif // ENABLE(VIDEO_TRACK)
+
+#endif // InbandTextTrack_h

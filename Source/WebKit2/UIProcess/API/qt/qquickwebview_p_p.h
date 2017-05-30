@@ -27,21 +27,17 @@
 #include "QtPageClient.h"
 #include "QtWebPageUIClient.h"
 
-#include "qquickwebview_p.h"
 #include "qquickwebpage_p.h"
+#include "qquickwebview_p.h"
 #include <QtCore/QElapsedTimer>
 #include <QtCore/QObject>
 #include <QtCore/QScopedPointer>
 #include <WebCore/ViewportArguments.h>
-#include <WebKit2/WKRetainPtr.h>
-#include <wtf/OwnPtr.h>
+#include <WebKit/WKRetainPtr.h>
 #include <wtf/RefPtr.h>
 
-namespace WebCore {
-class CoordinatedGraphicsScene;
-}
-
 namespace WebKit {
+class CoordinatedGraphicsScene;
 class DownloadProxy;
 class DrawingAreaProxy;
 class QtDialogRunner;
@@ -75,7 +71,7 @@ public:
 
     virtual ~QQuickWebViewPrivate();
 
-    virtual void initialize(WKContextRef contextRef = 0, WKPageGroupRef pageGroupRef = 0);
+    virtual void initialize(WKPageConfigurationRef configurationRef = 0);
 
     virtual void onComponentComplete() { }
 
@@ -135,15 +131,15 @@ public:
     virtual void pageDidRequestScroll(const QPoint& pos) { }
     void processDidCrash();
     void didRelaunchProcess();
-    PassOwnPtr<WebKit::DrawingAreaProxy> createDrawingAreaProxy();
+    std::unique_ptr<WebKit::DrawingAreaProxy> createDrawingAreaProxy();
     void handleDownloadRequest(WebKit::DownloadProxy*);
 
     void didReceiveMessageFromNavigatorQtObject(WKStringRef message);
-#ifdef HAVE_WEBCHANNEL
-    void didReceiveMessageFromNavigatorQtWebChannelTransportObject(WKStringRef message);
+#if ENABLE(QT_WEBCHANNEL)
+    void didReceiveMessageFromNavigatorQtWebChannelTransportObject(WKDataRef);
 #endif
 
-    WebCore::CoordinatedGraphicsScene* coordinatedGraphicsScene();
+    WebKit::CoordinatedGraphicsScene* coordinatedGraphicsScene();
     float deviceScaleFactor();
     void setIntrinsicDeviceScaleFactor(float);
 
@@ -185,12 +181,11 @@ protected:
     QQuickWebViewPrivate(QQuickWebView* viewport);
     RefPtr<WebKit::WebPageProxy> webPageProxy;
     WKRetainPtr<WKPageRef> webPage;
-    WKRetainPtr<WKPageGroupRef> pageGroup;
 
     WebKit::QtPageClient pageClient;
     WebKit::DefaultUndoController undoController;
-    OwnPtr<QWebNavigationHistory> navigationHistory;
-    OwnPtr<QWebPreferences> preferences;
+    std::unique_ptr<QWebNavigationHistory> navigationHistory;
+    std::unique_ptr<QWebPreferences> preferences;
 
     QScopedPointer<WebKit::QtWebPagePolicyClient> pagePolicyClient;
     QScopedPointer<WebKit::QtWebPageUIClient> pageUIClient;
@@ -231,28 +226,28 @@ class QQuickWebViewLegacyPrivate : public QQuickWebViewPrivate {
     Q_DECLARE_PUBLIC(QQuickWebView)
 public:
     QQuickWebViewLegacyPrivate(QQuickWebView* viewport);
-    virtual void initialize(WKContextRef contextRef = 0, WKPageGroupRef pageGroupRef = 0);
+    void initialize(WKPageConfigurationRef configurationRef = 0) Q_DECL_OVERRIDE;
 
-    virtual void updateViewportSize();
+    void updateViewportSize() Q_DECL_OVERRIDE;
 
-    qreal zoomFactor() const;
-    void setZoomFactor(qreal);
+    qreal zoomFactor() const Q_DECL_OVERRIDE;
+    void setZoomFactor(qreal) Q_DECL_OVERRIDE;
 };
 
 class QQuickWebViewFlickablePrivate : public QQuickWebViewPrivate {
     Q_DECLARE_PUBLIC(QQuickWebView)
 public:
     QQuickWebViewFlickablePrivate(QQuickWebView* viewport);
-    virtual void initialize(WKContextRef contextRef = 0, WKPageGroupRef pageGroupRef = 0);
+    void initialize(WKPageConfigurationRef configurationRef = 0) Q_DECL_OVERRIDE;
 
-    virtual void onComponentComplete();
+    void onComponentComplete() Q_DECL_OVERRIDE;
 
-    virtual void didChangeViewportProperties(const WebCore::ViewportAttributes&);
-    virtual WebKit::PageViewportController* viewportController() const { return m_pageViewportController.data(); }
-    virtual void updateViewportSize();
+    void didChangeViewportProperties(const WebCore::ViewportAttributes&) Q_DECL_OVERRIDE;
+    WebKit::PageViewportController* viewportController() const Q_DECL_OVERRIDE { return m_pageViewportController.data(); }
+    void updateViewportSize() Q_DECL_OVERRIDE;
 
-    virtual void pageDidRequestScroll(const QPoint& pos);
-    virtual void handleMouseEvent(QMouseEvent*);
+    void pageDidRequestScroll(const QPoint& pos) Q_DECL_OVERRIDE;
+    void handleMouseEvent(QMouseEvent*) Q_DECL_OVERRIDE;
 
 private:
     QScopedPointer<WebKit::PageViewportController> m_pageViewportController;

@@ -21,8 +21,13 @@
 #include "config.h"
 #include "AccessibilityObject.h"
 
-#include "RenderObject.h"
+#include "HTMLSpanElement.h"
+#include "RenderBlock.h"
+#include "RenderInline.h"
+#include "RenderIterator.h"
+#include "RenderTableCell.h"
 #include "RenderText.h"
+#include "TextControlInnerElements.h"
 #include <glib-object.h>
 
 #if HAVE(ACCESSIBILITY)
@@ -41,9 +46,6 @@ AccessibilityObjectInclusion AccessibilityObject::accessibilityPlatformIncludesO
         return DefaultBehavior;
 
     AccessibilityRole role = roleValue();
-    if (role == HorizontalRuleRole)
-        return IncludeObject;
-
     // We expose the slider as a whole but not its value indicator.
     if (role == SliderThumbRole)
         return IgnoreObject;
@@ -58,7 +60,7 @@ AccessibilityObjectInclusion AccessibilityObject::accessibilityPlatformIncludesO
         return IgnoreObject;
 
     // Include all tables, even layout tables. The AT can decide what to do with each.
-    if (role == CellRole || role == TableRole)
+    if (role == CellRole || role == TableRole || role == ColumnHeaderRole || role == RowHeaderRole)
         return IncludeObject;
 
     // The object containing the text should implement AtkText itself.
@@ -78,39 +80,72 @@ AccessibilityObjectInclusion AccessibilityObject::accessibilityPlatformIncludesO
     if (role == UnknownRole)
         return IgnoreObject;
 
-    // Given a paragraph or div containing a non-nested anonymous block, WebCore
-    // ignores the paragraph or div and includes the block. We want the opposite:
-    // ATs are expecting accessible objects associated with textual elements. They
-    // usually have no need for the anonymous block. And when the wrong objects
-    // get included or ignored, needed accessibility signals do not get emitted.
-    if (role == ParagraphRole || role == DivRole) {
-        // Don't call textUnderElement() here, because it's slow and it can
-        // crash when called while we're in the middle of a subtree being deleted.
-        if (!renderer()->firstChild())
-            return DefaultBehavior;
+    if (role == InlineRole)
+        return IncludeObject;
 
-        if (!parent->renderer() || parent->renderer()->isAnonymousBlock())
-            return DefaultBehavior;
+    // Lines past this point only make sense for AccessibilityRenderObjects.
+    RenderObject* renderObject = renderer();
+    if (!renderObject)
+        return DefaultBehavior;
 
-        for (RenderObject* r = renderer()->firstChild(); r; r = r->nextSibling()) {
-            if (r->isAnonymousBlock())
-                return IncludeObject;
-        }
+    // We always want to include paragraphs that have rendered content.
+    // WebCore Accessibility does so unless there is a RenderBlock child.
+    if (role == ParagraphRole) {
+        auto child = childrenOfType<RenderBlock>(downcast<RenderElement>(*renderObject)).first();
+        return child ? IncludeObject : DefaultBehavior;
     }
 
-    // Block spans result in objects of ATK_ROLE_PANEL which are almost always unwanted.
-    // However, if we ignore block spans whose parent is the body, the child controls
-    // will become immediate children of the ATK_ROLE_DOCUMENT_FRAME and any text will
-    // become text within the document frame itself. This ultimately may be what we want
-    // and would largely be consistent with what we see from Gecko. However, ignoring
-    // spans whose parent is the body changes the current behavior we see from WebCore.
-    // Until we have sufficient time to properly analyze these cases, we will defer to
-    // WebCore. We only check that the parent is not aria because we do not expect
-    // anonymous blocks which are aria-related to themselves have an aria role, nor
-    // have we encountered instances where the parent of an anonymous block also lacked
-    // an aria role but the grandparent had one.
-    if (renderer() && renderer()->isAnonymousBlock() && !parent->renderer()->isBody()
-        && parent->ariaRoleAttribute() == UnknownRole)
+    // We always want to include table cells (layout and CSS) that have rendered text content.
+    if (is<RenderTableCell>(renderObject)) {
+        for (const auto& child : childrenOfType<RenderObject>(downcast<RenderElement>(*renderObject))) {
+            if (is<RenderInline>(child) || is<RenderText>(child) || is<HTMLSpanElement>(child.node()))
+                return IncludeObject;
+        }
+        return DefaultBehavior;
+    }
+
+    if (renderObject->isAnonymousBlock()) {
+        // The text displayed by an ARIA menu item is exposed through the accessible name.
+        if (parent->isMenuItem())
+            return IgnoreObject;
+
+        // The text displayed in headings is typically exposed in the heading itself.
+        if (parent->isHeading())
+            return IgnoreObject;
+
+        // The text displayed in list items is typically exposed in the list item itself.
+        if (parent->isListItem())
+            return IgnoreObject;
+
+        // The text displayed in links is typically exposed in the link itself.
+        if (parent->isLink())
+            return IgnoreObject;
+
+        // FIXME: This next one needs some further consideration. But paragraphs are not
+        // typically huge (like divs). And ignoring anonymous block children of paragraphs
+        // will preserve existing behavior.
+        if (parent->roleValue() == ParagraphRole)
+            return IgnoreObject;
+
+        return DefaultBehavior;
+    }
+
+    Node* node = renderObject->node();
+    if (!node)
+        return DefaultBehavior;
+
+    // We don't want <span> elements to show up in the accessibility hierarchy unless
+    // we have good reasons for that (e.g. focusable or visible because of containing
+    // a meaningful accessible name, maybe set through ARIA), so we can use
+    // atk_component_grab_focus() to set the focus to it.
+    if (is<HTMLSpanElement>(node) && !canSetFocusAttribute() && !hasAttributesRequiredForInclusion())
+        return IgnoreObject;
+
+    // If we include TextControlInnerTextElement children, changes to those children
+    // will result in focus and text notifications that suggest the user is no longer
+    // in the control. This can be especially problematic for screen reader users with
+    // key echo enabled when typing in a password input.
+    if (is<TextControlInnerTextElement>(node))
         return IgnoreObject;
 
     return DefaultBehavior;
@@ -143,7 +178,7 @@ bool AccessibilityObject::allowsTextRanges() const
 
     // Check roles as the last fallback mechanism.
     AccessibilityRole role = roleValue();
-    return role == ParagraphRole || role == LabelRole || role == DivRole || role == FormRole;
+    return role == ParagraphRole || role == LabelRole || role == DivRole || role == FormRole || role == PreRole;
 }
 
 unsigned AccessibilityObject::getLengthForTextRange() const
@@ -155,16 +190,14 @@ unsigned AccessibilityObject::getLengthForTextRange() const
 
     // Gtk ATs need this for all text objects; not just text controls.
     Node* node = this->node();
-    RenderObject* renderer = node ? node->renderer() : 0;
-    if (renderer && renderer->isText()) {
-        RenderText* renderText = toRenderText(renderer);
-        textLength = renderText ? renderText->textLength() : 0;
-    }
+    RenderObject* renderer = node ? node->renderer() : nullptr;
+    if (is<RenderText>(renderer))
+        textLength = downcast<RenderText>(*renderer).textLength();
 
     // Get the text length from the elements under the
     // accessibility object if the value is still zero.
     if (!textLength && allowsTextRanges())
-        textLength = textUnderElement(TextUnderElementModeIncludeAllChildren).length();
+        textLength = textUnderElement(AccessibilityTextUnderElementMode(AccessibilityTextUnderElementMode::TextUnderElementModeIncludeAllChildren)).length();
 
     return textLength;
 }

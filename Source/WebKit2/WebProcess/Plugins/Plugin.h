@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Apple Inc. All rights reserved.
+ * Copyright (C) 2010, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,25 +26,28 @@
 #ifndef Plugin_h
 #define Plugin_h
 
+#include <WebCore/AudioHardwareListener.h>
 #include <WebCore/FindOptions.h>
 #include <WebCore/GraphicsLayer.h>
-#include <WebCore/KURL.h>
+#include <WebCore/URL.h>
 #include <WebCore/ScrollTypes.h>
 #include <WebCore/SecurityOrigin.h>
 #include <wtf/RefCounted.h>
 #include <wtf/RetainPtr.h>
 #include <wtf/Vector.h>
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
 #include "LayerHostingContext.h"
 
+OBJC_CLASS NSDictionary;
 OBJC_CLASS NSObject;
 OBJC_CLASS PDFDocument;
+OBJC_CLASS PDFSelection;
 #endif
 
 struct NPObject;
 
-namespace CoreIPC {
+namespace IPC {
     class ArgumentEncoder;
     class ArgumentDecoder;
 }
@@ -70,21 +73,27 @@ class WebWheelEvent;
     
 class PluginController;
 
+enum PluginType {
+    PluginProxyType,
+    NetscapePluginType,
+    PDFPluginType,
+};
+
 class Plugin : public ThreadSafeRefCounted<Plugin> {
 public:
     struct Parameters {
-        WebCore::KURL url;
+        WebCore::URL url;
         Vector<String> names;
         Vector<String> values;
         String mimeType;
         bool isFullFramePlugin;
         bool shouldUseManualLoader;
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
         LayerHostingMode layerHostingMode;
 #endif
 
-        void encode(CoreIPC::ArgumentEncoder&) const;
-        static bool decode(CoreIPC::ArgumentDecoder&, Parameters&);
+        void encode(IPC::ArgumentEncoder&) const;
+        static bool decode(IPC::ArgumentDecoder&, Parameters&);
     };
 
     // Sets the active plug-in controller and initializes the plug-in.
@@ -101,6 +110,8 @@ public:
 
     virtual ~Plugin();
 
+    PluginType type() const { return m_type; }
+
 private:
 
     // Initializes the plug-in. If the plug-in fails to initialize this should return false.
@@ -114,18 +125,18 @@ public:
 
     // Tells the plug-in to paint itself into the given graphics context. The passed-in context and
     // dirty rect are in window coordinates. The context is saved/restored by the caller.
-    virtual void paint(WebCore::GraphicsContext*, const WebCore::IntRect& dirtyRect) = 0;
+    virtual void paint(WebCore::GraphicsContext&, const WebCore::IntRect& dirtyRect) = 0;
 
     // Invalidate native tintable controls. The passed-in context is in window coordinates.
-    virtual void updateControlTints(WebCore::GraphicsContext*);
+    virtual void updateControlTints(WebCore::GraphicsContext&);
 
     // Returns whether the plug-in supports snapshotting or not.
     virtual bool supportsSnapshotting() const = 0;
 
     // Tells the plug-in to draw itself into a bitmap, and return that.
-    virtual PassRefPtr<ShareableBitmap> snapshot() = 0;
+    virtual RefPtr<ShareableBitmap> snapshot() = 0;
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     // If a plug-in is using the Core Animation drawing model, this returns its plug-in layer.
     virtual PlatformLayer* pluginLayer() = 0;
 #endif
@@ -141,7 +152,7 @@ public:
     virtual void geometryDidChange(const WebCore::IntSize& pluginSize, const WebCore::IntRect& clipRect, const WebCore::AffineTransform& pluginToRootViewTransform) = 0;
 
     // Tells the plug-in that it has been explicitly hidden or shown. (Note that this is not called when the plug-in becomes obscured from view on screen.)
-    virtual void visibilityDidChange() = 0;
+    virtual void visibilityDidChange(bool isVisible) = 0;
 
     // Tells the plug-in that a frame load request that the plug-in made by calling PluginController::loadURL has finished.
     virtual void frameDidFinishLoading(uint64_t requestID) = 0;
@@ -153,8 +164,11 @@ public:
     // back the result. If evaluating the script failed, result will be null.
     virtual void didEvaluateJavaScript(uint64_t requestID, const String& result) = 0;
 
+    // Tells the plug-in that a stream may send an HTTP request.
+    virtual void streamWillSendRequest(uint64_t streamID, const WebCore::URL& requestURL, const WebCore::URL& responseURL, int responseStatusCode) = 0;
+
     // Tells the plug-in that a stream has received its HTTP response.
-    virtual void streamDidReceiveResponse(uint64_t streamID, const WebCore::KURL& responseURL, uint32_t streamLength, 
+    virtual void streamDidReceiveResponse(uint64_t streamID, const WebCore::URL& responseURL, uint32_t streamLength, 
                                           uint32_t lastModifiedTime, const String& mimeType, const String& headers, const String& suggestedFileName) = 0;
 
     // Tells the plug-in that a stream did receive data.
@@ -167,7 +181,7 @@ public:
     virtual void streamDidFail(uint64_t streamID, bool wasCancelled) = 0;
 
     // Tells the plug-in that the manual stream has received its HTTP response.
-    virtual void manualStreamDidReceiveResponse(const WebCore::KURL& responseURL, uint32_t streamLength, 
+    virtual void manualStreamDidReceiveResponse(const WebCore::URL& responseURL, uint32_t streamLength, 
                                                 uint32_t lastModifiedTime, const String& mimeType, const String& headers, const String& suggestedFileName) = 0;
 
     // Tells the plug-in that the manual stream did receive data.
@@ -208,25 +222,25 @@ public:
 
     // Ask the plug-in whether it wants URLs and files dragged onto it to cause navigation.
     virtual bool shouldAllowNavigationFromDrags() = 0;
-    
+
     // Ask the plug-in whether it wants to override full-page zoom.
-    virtual bool handlesPageScaleFactor() = 0;
-    
+    virtual bool handlesPageScaleFactor() const = 0;
+
     // Tells the plug-in about focus changes.
     virtual void setFocus(bool) = 0;
 
     // Get the NPObject that corresponds to the plug-in's scriptable object. Returns a retained object.
     virtual NPObject* pluginScriptableNPObject() = 0;
 
-#if PLATFORM(MAC)
     // Tells the plug-in about window focus changes.
     virtual void windowFocusChanged(bool) = 0;
-
-    // Tells the plug-in about window and plug-in frame changes.
-    virtual void windowAndViewFramesChanged(const WebCore::IntRect& windowFrameInScreenCoordinates, const WebCore::IntRect& viewFrameInWindowCoordinates) = 0;
-
+    
     // Tells the plug-in about window visibility changes.
     virtual void windowVisibilityChanged(bool) = 0;
+    
+#if PLATFORM(COCOA)
+    // Tells the plug-in about window and plug-in frame changes.
+    virtual void windowAndViewFramesChanged(const WebCore::IntRect& windowFrameInScreenCoordinates, const WebCore::IntRect& viewFrameInWindowCoordinates) = 0;
 
     // Get the per complex text input identifier.
     virtual uint64_t pluginComplexTextInputIdentifier() const = 0;
@@ -258,7 +272,7 @@ public:
     virtual WebCore::Scrollbar* horizontalScrollbar() = 0;
     virtual WebCore::Scrollbar* verticalScrollbar() = 0;
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     virtual RetainPtr<PDFDocument> pdfDocumentForPrinting() const { return 0; }
     virtual NSObject *accessibilityObject() const { return 0; }
 #endif
@@ -271,19 +285,38 @@ public:
 
     virtual bool shouldAlwaysAutoStart() const { return false; }
 
-    virtual PassRefPtr<WebCore::SharedBuffer> liveResourceData() const = 0;
+    virtual RefPtr<WebCore::SharedBuffer> liveResourceData() const = 0;
 
     virtual bool performDictionaryLookupAtLocation(const WebCore::FloatPoint&) = 0;
 
     virtual String getSelectionString() const = 0;
+    virtual String getSelectionForWordAtPoint(const WebCore::FloatPoint&) const = 0;
+    virtual bool existingSelectionContainsPoint(const WebCore::FloatPoint&) const = 0;
+
+    virtual WebCore::AudioHardwareActivityType audioHardwareActivity() const { return WebCore::AudioHardwareActivityType::Unknown; }
+
+    virtual void mutedStateChanged(bool) { }
+
+    virtual bool canCreateTransientPaintingSnapshot() const { return true; }
+
+    virtual bool requiresUnifiedScaleFactor() const { return false; }
+
+    virtual void willDetatchRenderer() { }
 
 protected:
-    Plugin();
+    Plugin(PluginType);
+
+    PluginType m_type;
 
 private:
     PluginController* m_pluginController;
 };
     
 } // namespace WebKit
+
+#define SPECIALIZE_TYPE_TRAITS_PLUGIN(ToValueTypeName, SpecificPluginType) \
+SPECIALIZE_TYPE_TRAITS_BEGIN(WebKit::ToValueTypeName) \
+static bool isType(const WebKit::Plugin& plugin) { return plugin.type() == WebKit::SpecificPluginType; } \
+SPECIALIZE_TYPE_TRAITS_END()
 
 #endif // Plugin_h

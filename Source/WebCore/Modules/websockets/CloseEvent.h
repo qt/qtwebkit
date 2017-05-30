@@ -37,32 +37,21 @@
 namespace WebCore {
 
 struct CloseEventInit : public EventInit {
-    CloseEventInit()
-        : wasClean(false)
-        , code(0)
-    {
-    };
-
-    bool wasClean;
-    unsigned short code;
+    bool wasClean { false };
+    unsigned short code { 0 };
     String reason;
 };
 
 class CloseEvent : public Event {
 public:
-    static PassRefPtr<CloseEvent> create()
+    static Ref<CloseEvent> create(bool wasClean, unsigned short code, const String& reason)
     {
-        return adoptRef(new CloseEvent());
+        return adoptRef(*new CloseEvent(wasClean, code, reason));
     }
 
-    static PassRefPtr<CloseEvent> create(bool wasClean, unsigned short code, const String& reason)
+    static Ref<CloseEvent> createForBindings(const AtomicString& type, const CloseEventInit& initializer)
     {
-        return adoptRef(new CloseEvent(wasClean, code, reason));
-    }
-
-    static PassRefPtr<CloseEvent> create(const AtomicString& type, const CloseEventInit& initializer)
-    {
-        return adoptRef(new CloseEvent(type, initializer));
+        return adoptRef(*new CloseEvent(type, initializer));
     }
 
     bool wasClean() const { return m_wasClean; }
@@ -70,16 +59,9 @@ public:
     String reason() const { return m_reason; }
 
     // Event function.
-    virtual const AtomicString& interfaceName() const OVERRIDE { return eventNames().interfaceForCloseEvent; }
+    virtual EventInterface eventInterface() const override { return CloseEventInterfaceType; }
 
 private:
-    CloseEvent()
-        : Event(eventNames().closeEvent, false, false)
-        , m_wasClean(false)
-        , m_code(0)
-    {
-    }
-
     CloseEvent(bool wasClean, int code, const String& reason)
         : Event(eventNames().closeEvent, false, false)
         , m_wasClean(wasClean)

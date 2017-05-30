@@ -11,10 +11,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -27,16 +27,70 @@
 #include "config.h"
 #include "ImageBuffer.h"
 
+#include "GraphicsContext.h"
 #include "IntRect.h"
 #include <wtf/MathExtras.h>
+#include <wtf/NeverDestroyed.h>
 
 namespace WebCore {
 
+static const float MaxClampedLength = 4096;
+static const float MaxClampedArea = MaxClampedLength * MaxClampedLength;
+
+bool ImageBuffer::sizeNeedsClamping(const FloatSize& size)
+{
+    if (size.isEmpty())
+        return false;
+
+    return floorf(size.height()) * floorf(size.width()) > MaxClampedArea;
+}
+
+bool ImageBuffer::sizeNeedsClamping(const FloatSize& size, FloatSize& scale)
+{
+    FloatSize scaledSize(size);
+    scaledSize.scale(scale.width(), scale.height());
+
+    if (!sizeNeedsClamping(scaledSize))
+        return false;
+
+    // The area of scaled size is bigger than the upper limit, adjust the scale to fit.
+    scale.scale(sqrtf(MaxClampedArea / (scaledSize.width() * scaledSize.height())));
+    ASSERT(!sizeNeedsClamping(size, scale));
+    return true;
+}
+
+FloatSize ImageBuffer::clampedSize(const FloatSize& size)
+{
+    return size.shrunkTo(FloatSize(MaxClampedLength, MaxClampedLength));
+}
+
+FloatSize ImageBuffer::clampedSize(const FloatSize& size, FloatSize& scale)
+{
+    if (size.isEmpty())
+        return size;
+
+    FloatSize clampedSize = ImageBuffer::clampedSize(size);
+    scale = FloatSize(clampedSize.width() / size.width(), clampedSize.height() / size.height());
+    ASSERT(!sizeNeedsClamping(clampedSize));
+    ASSERT(!sizeNeedsClamping(size, scale));
+    return clampedSize;
+}
+
+FloatRect ImageBuffer::clampedRect(const FloatRect& rect)
+{
+    return FloatRect(rect.location(), clampedSize(rect.size()));
+}
+
 #if !USE(CG)
+FloatSize ImageBuffer::sizeForDestinationSize(FloatSize size) const
+{
+    return size;
+}
+
 void ImageBuffer::transformColorSpace(ColorSpace srcColorSpace, ColorSpace dstColorSpace)
 {
-    DEFINE_STATIC_LOCAL(Vector<int>, deviceRgbLUT, ());
-    DEFINE_STATIC_LOCAL(Vector<int>, linearRgbLUT, ());
+    static NeverDestroyed<Vector<int>> deviceRgbLUT;
+    static NeverDestroyed<Vector<int>> linearRgbLUT;
 
     if (srcColorSpace == dstColorSpace)
         return;
@@ -47,27 +101,27 @@ void ImageBuffer::transformColorSpace(ColorSpace srcColorSpace, ColorSpace dstCo
         return;
 
     if (dstColorSpace == ColorSpaceLinearRGB) {
-        if (linearRgbLUT.isEmpty()) {
+        if (linearRgbLUT.get().isEmpty()) {
             for (unsigned i = 0; i < 256; i++) {
                 float color = i  / 255.0f;
                 color = (color <= 0.04045f ? color / 12.92f : pow((color + 0.055f) / 1.055f, 2.4f));
                 color = std::max(0.0f, color);
                 color = std::min(1.0f, color);
-                linearRgbLUT.append(static_cast<int>(round(color * 255)));
+                linearRgbLUT.get().append(static_cast<int>(round(color * 255)));
             }
         }
-        platformTransformColorSpace(linearRgbLUT);
+        platformTransformColorSpace(linearRgbLUT.get());
     } else if (dstColorSpace == ColorSpaceDeviceRGB) {
-        if (deviceRgbLUT.isEmpty()) {
+        if (deviceRgbLUT.get().isEmpty()) {
             for (unsigned i = 0; i < 256; i++) {
                 float color = i / 255.0f;
                 color = (powf(color, 1.0f / 2.4f) * 1.055f) - 0.055f;
                 color = std::max(0.0f, color);
                 color = std::min(1.0f, color);
-                deviceRgbLUT.append(static_cast<int>(round(color * 255)));
+                deviceRgbLUT.get().append(static_cast<int>(round(color * 255)));
             }
         }
-        platformTransformColorSpace(deviceRgbLUT);
+        platformTransformColorSpace(deviceRgbLUT.get());
     }
 }
 #endif // USE(CG)
@@ -98,21 +152,23 @@ void ImageBuffer::convertToLuminanceMask()
     genericConvertToLuminanceMask();
 }
 
-#if USE(ACCELERATED_COMPOSITING) && !USE(CAIRO) && !PLATFORM(BLACKBERRY) && !PLATFORM(QT)
+#if !USE(CAIRO)
+#if !PLATFORM(QT)
 PlatformLayer* ImageBuffer::platformLayer() const
 {
     return 0;
 }
 #endif
 
-bool ImageBuffer::copyToPlatformTexture(GraphicsContext3D&, Platform3DObject, GC3Denum, bool, bool)
+bool ImageBuffer::copyToPlatformTexture(GraphicsContext3D&, GC3Denum, Platform3DObject, GC3Denum, bool, bool)
 {
     return false;
 }
+#endif
 
-PassOwnPtr<ImageBuffer> ImageBuffer::createCompatibleBuffer(const IntSize& size, float resolutionScale, ColorSpace colorSpace, const GraphicsContext* context, bool)
+std::unique_ptr<ImageBuffer> ImageBuffer::createCompatibleBuffer(const FloatSize& size, float resolutionScale, ColorSpace colorSpace, const GraphicsContext& context, bool)
 {
-    return create(size, resolutionScale, colorSpace, context->isAcceleratedContext() ? Accelerated : Unaccelerated);
+    return create(size, context.renderingMode(), resolutionScale, colorSpace);
 }
 
 }

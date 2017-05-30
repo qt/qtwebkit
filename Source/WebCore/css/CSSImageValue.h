@@ -30,31 +30,30 @@ class CachedResourceLoader;
 class Element;
 class StyleCachedImage;
 class StyleImage;
-class RenderObject;
+class RenderElement;
 struct ResourceLoaderOptions;
 
 class CSSImageValue : public CSSValue {
 public:
-    static PassRefPtr<CSSImageValue> create(const String& url) { return adoptRef(new CSSImageValue(url)); }
-    static PassRefPtr<CSSImageValue> create(const String& url, StyleImage* image) { return adoptRef(new CSSImageValue(url, image)); }
+    static Ref<CSSImageValue> create(const String& url) { return adoptRef(*new CSSImageValue(url)); }
+    static Ref<CSSImageValue> create(const String& url, StyleImage* image) { return adoptRef(*new CSSImageValue(url, image)); }
     ~CSSImageValue();
 
-    StyleCachedImage* cachedImage(CachedResourceLoader*, const ResourceLoaderOptions&);
-    StyleCachedImage* cachedImage(CachedResourceLoader*);
+    StyleCachedImage* cachedImage(CachedResourceLoader&, const ResourceLoaderOptions&);
     // Returns a StyleCachedImage if the image is cached already, otherwise a StylePendingImage.
     StyleImage* cachedOrPendingImage();
 
-    const String& url() { return m_url; }
+    const String& url() const { return m_url; }
 
-    String customCssText() const;
+    String customCSSText() const;
 
-    PassRefPtr<CSSValue> cloneForCSSOM() const;
+    Ref<CSSValue> cloneForCSSOM() const;
 
-    bool hasFailedOrCanceledSubresources() const;
+    bool traverseSubresources(const std::function<bool (const CachedResource&)>& handler) const;
 
     bool equals(const CSSImageValue&) const;
 
-    bool knownToBeOpaque(const RenderObject*) const;
+    bool knownToBeOpaque(const RenderElement*) const;
 
     void setInitiator(const AtomicString& name) { m_initiatorName = name; }
 
@@ -70,5 +69,7 @@ private:
 };
 
 } // namespace WebCore
+
+SPECIALIZE_TYPE_TRAITS_CSS_VALUE(CSSImageValue, isImageValue())
 
 #endif // CSSImageValue_h

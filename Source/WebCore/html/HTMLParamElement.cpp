@@ -23,7 +23,6 @@
 #include "config.h"
 #include "HTMLParamElement.h"
 
-#include "Attribute.h"
 #include "Document.h"
 #include "HTMLNames.h"
 
@@ -31,22 +30,22 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-inline HTMLParamElement::HTMLParamElement(const QualifiedName& tagName, Document* document)
+inline HTMLParamElement::HTMLParamElement(const QualifiedName& tagName, Document& document)
     : HTMLElement(tagName, document)
 {
     ASSERT(hasTagName(paramTag));
 }
 
-PassRefPtr<HTMLParamElement> HTMLParamElement::create(const QualifiedName& tagName, Document* document)
+Ref<HTMLParamElement> HTMLParamElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new HTMLParamElement(tagName, document));
+    return adoptRef(*new HTMLParamElement(tagName, document));
 }
 
 String HTMLParamElement::name() const
 {
     if (hasName())
         return getNameAttribute();
-    return document()->isHTMLDocument() ? emptyAtom : getIdAttribute();
+    return document().isHTMLDocument() ? emptyAtom : getIdAttribute();
 }
 
 String HTMLParamElement::value() const
@@ -56,7 +55,7 @@ String HTMLParamElement::value() const
 
 bool HTMLParamElement::isURLParameter(const String& name)
 {
-    return equalIgnoringCase(name, "data") || equalIgnoringCase(name, "movie") || equalIgnoringCase(name, "src");
+    return equalLettersIgnoringASCIICase(name, "data") || equalLettersIgnoringASCIICase(name, "movie") || equalLettersIgnoringASCIICase(name, "src");
 }
 
 bool HTMLParamElement::isURLAttribute(const Attribute& attribute) const
@@ -66,14 +65,14 @@ bool HTMLParamElement::isURLAttribute(const Attribute& attribute) const
     return HTMLElement::isURLAttribute(attribute);
 }
 
-void HTMLParamElement::addSubresourceAttributeURLs(ListHashSet<KURL>& urls) const
+void HTMLParamElement::addSubresourceAttributeURLs(ListHashSet<URL>& urls) const
 {
     HTMLElement::addSubresourceAttributeURLs(urls);
 
     if (!isURLParameter(name()))
         return;
 
-    addSubresourceURL(urls, document()->completeURL(value()));
+    addSubresourceURL(urls, document().completeURL(value()));
 }
 
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 Apple Inc. All rights reserved.
+ * Copyright (C) 2008, 2013, 2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -29,39 +29,65 @@
 #ifndef DebuggerCallFrame_h
 #define DebuggerCallFrame_h
 
-#include "CallFrame.h"
+#include "DebuggerPrimitives.h"
+#include "Strong.h"
+#include <wtf/NakedPtr.h>
+#include <wtf/PassRefPtr.h>
+#include <wtf/RefCounted.h>
+#include <wtf/text/TextPosition.h>
 
 namespace JSC {
-    
-    class DebuggerCallFrame {
-    public:
-        enum Type { ProgramType, FunctionType };
 
-        DebuggerCallFrame(CallFrame* callFrame)
-            : m_callFrame(callFrame)
-        {
-        }
+class DebuggerScope;
+class Exception;
+class ExecState;
+typedef ExecState CallFrame;
 
-        DebuggerCallFrame(CallFrame* callFrame, JSValue exception)
-            : m_callFrame(callFrame)
-            , m_exception(exception)
-        {
-        }
+class DebuggerCallFrame : public RefCounted<DebuggerCallFrame> {
+public:
+    enum Type { ProgramType, FunctionType };
 
-        CallFrame* callFrame() const { return m_callFrame; }
-        JSGlobalObject* dynamicGlobalObject() const { return m_callFrame->dynamicGlobalObject(); }
-        JSScope* scope() const { return m_callFrame->scope(); }
-        JS_EXPORT_PRIVATE String functionName() const;
-        JS_EXPORT_PRIVATE String calculatedFunctionName() const;
-        JS_EXPORT_PRIVATE Type type() const;
-        JS_EXPORT_PRIVATE JSObject* thisObject() const;
-        JS_EXPORT_PRIVATE JSValue evaluate(const String&, JSValue& exception) const;
-        JSValue exception() const { return m_exception; }
+    static Ref<DebuggerCallFrame> create(CallFrame* callFrame)
+    {
+        return adoptRef(*new DebuggerCallFrame(callFrame));
+    }
 
-    private:
-        CallFrame* m_callFrame;
-        JSValue m_exception;
-    };
+    JS_EXPORT_PRIVATE explicit DebuggerCallFrame(CallFrame*);
+
+    JS_EXPORT_PRIVATE RefPtr<DebuggerCallFrame> callerFrame();
+    ExecState* exec() const { return m_callFrame; }
+    JS_EXPORT_PRIVATE SourceID sourceID() const;
+
+    // line and column are in base 0 e.g. the first line is line 0.
+    int line() const { return m_position.m_line.zeroBasedInt(); }
+    int column() const { return m_position.m_column.zeroBasedInt(); }
+    const TextPosition& position() const { return m_position; }
+
+    JS_EXPORT_PRIVATE JSGlobalObject* vmEntryGlobalObject() const;
+    JS_EXPORT_PRIVATE DebuggerScope* scope();
+    JS_EXPORT_PRIVATE String functionName() const;
+    JS_EXPORT_PRIVATE Type type() const;
+    JS_EXPORT_PRIVATE JSValue thisValue() const;
+    JSValue evaluate(const String&, NakedPtr<Exception>&);
+
+    bool isValid() const { return !!m_callFrame; }
+    JS_EXPORT_PRIVATE void invalidate();
+
+    // The following are only public for the Debugger's use only. They will be
+    // made private soon. Other clients should not use these.
+
+    JS_EXPORT_PRIVATE static TextPosition positionForCallFrame(CallFrame*);
+    JS_EXPORT_PRIVATE static SourceID sourceIDForCallFrame(CallFrame*);
+    static JSValue thisValueForCallFrame(CallFrame*);
+
+private:
+    CallFrame* m_callFrame;
+    RefPtr<DebuggerCallFrame> m_caller;
+    TextPosition m_position;
+    // The DebuggerPausedScope is responsible for calling invalidate() which,
+    // in turn, will clear this strong ref.
+    Strong<DebuggerScope> m_scope;
+};
 
 } // namespace JSC
 

@@ -27,9 +27,6 @@
  */
 
 #include "config.h"
-
-#if ENABLE(INSPECTOR)
-
 #include "NetworkResourcesData.h"
 
 #include "CachedResource.h"
@@ -40,33 +37,15 @@
 
 namespace {
 // 100MB
-static size_t maximumResourcesContentSize = 100 * 1000 * 1000;
+static const size_t maximumResourcesContentSize = 100 * 1000 * 1000;
 
 // 10MB
-static size_t maximumSingleResourceContentSize = 10 * 1000 * 1000;
+static const size_t maximumSingleResourceContentSize = 10 * 1000 * 1000;
 }
+
+using namespace Inspector;
 
 namespace WebCore {
-
-
-PassRefPtr<XHRReplayData> XHRReplayData::create(const String &method, const KURL& url, bool async, PassRefPtr<FormData> formData, bool includeCredentials)
-{
-    return adoptRef(new XHRReplayData(method, url, async, formData, includeCredentials));
-}
-
-void XHRReplayData::addHeader(const AtomicString& key, const String& value)
-{
-    m_headers.set(key, value);
-}
-
-XHRReplayData::XHRReplayData(const String &method, const KURL& url, bool async, PassRefPtr<FormData> formData, bool includeCredentials)
-    : m_method(method)
-    , m_url(url)
-    , m_async(async)
-    , m_formData(formData)
-    , m_includeCredentials(includeCredentials)
-{
-}
 
 // ResourceData
 NetworkResourcesData::ResourceData::ResourceData(const String& requestId, const String& loaderId)
@@ -75,7 +54,7 @@ NetworkResourcesData::ResourceData::ResourceData(const String& requestId, const 
     , m_base64Encoded(false)
     , m_isContentEvicted(false)
     , m_type(InspectorPageAgent::OtherResource)
-    , m_cachedResource(0)
+    , m_cachedResource(nullptr)
 {
 }
 
@@ -133,8 +112,7 @@ size_t NetworkResourcesData::ResourceData::decodeDataToContent()
 {
     ASSERT(!hasContent());
     size_t dataLength = m_dataBuffer->size();
-    m_content = m_decoder->decode(m_dataBuffer->data(), m_dataBuffer->size());
-    m_content.append(m_decoder->flush());
+    m_content = m_decoder->decodeAndFlush(m_dataBuffer->data(), m_dataBuffer->size());
     m_dataBuffer = nullptr;
     return contentSizeInBytes(m_content) - dataLength;
 }
@@ -158,15 +136,15 @@ void NetworkResourcesData::resourceCreated(const String& requestId, const String
     m_requestIdToResourceDataMap.set(requestId, new ResourceData(requestId, loaderId));
 }
 
-static PassRefPtr<TextResourceDecoder> createOtherResourceTextDecoder(const String& mimeType, const String& textEncodingName)
+static RefPtr<TextResourceDecoder> createOtherResourceTextDecoder(const String& mimeType, const String& textEncodingName)
 {
     RefPtr<TextResourceDecoder> decoder;
     if (!textEncodingName.isEmpty())
         decoder = TextResourceDecoder::create("text/plain", textEncodingName);
-    else if (DOMImplementation::isXMLMIMEType(mimeType.lower())) {
+    else if (DOMImplementation::isXMLMIMEType(mimeType)) {
         decoder = TextResourceDecoder::create("application/xml");
         decoder->useLenientXMLDecoding();
-    } else if (equalIgnoringCase(mimeType, "text/html"))
+    } else if (equalLettersIgnoringASCIICase(mimeType, "text/html"))
         decoder = TextResourceDecoder::create("text/html", "UTF-8");
     else if (mimeType == "text/plain")
         decoder = TextResourceDecoder::create("text/plain", "ISO-8859-1");
@@ -259,12 +237,12 @@ void NetworkResourcesData::addCachedResource(const String& requestId, CachedReso
     resourceData->setCachedResource(cachedResource);
 }
 
-void NetworkResourcesData::addResourceSharedBuffer(const String& requestId, PassRefPtr<SharedBuffer> buffer, const String& textEncodingName)
+void NetworkResourcesData::addResourceSharedBuffer(const String& requestId, RefPtr<SharedBuffer>&& buffer, const String& textEncodingName)
 {
     ResourceData* resourceData = resourceDataForRequestId(requestId);
     if (!resourceData)
         return;
-    resourceData->setBuffer(buffer);
+    resourceData->setBuffer(WTFMove(buffer));
     resourceData->setTextEncodingName(textEncodingName);
 }
 
@@ -273,56 +251,14 @@ NetworkResourcesData::ResourceData const* NetworkResourcesData::data(const Strin
     return resourceDataForRequestId(requestId);
 }
 
-XHRReplayData* NetworkResourcesData::xhrReplayData(const String& requestId)
-{
-    if (m_reusedXHRReplayDataRequestIds.contains(requestId))
-        return xhrReplayData(m_reusedXHRReplayDataRequestIds.get(requestId));
-
-    ResourceData* resourceData = resourceDataForRequestId(requestId);
-    if (!resourceData)
-        return 0;
-    return resourceData->xhrReplayData();
-}
-
-void NetworkResourcesData::setXHRReplayData(const String& requestId, XHRReplayData* xhrReplayData)
-{
-    ResourceData* resourceData = resourceDataForRequestId(requestId);
-    if (!resourceData) {
-        Vector<String> result;
-        ReusedRequestIds::iterator it;
-        ReusedRequestIds::iterator end = m_reusedXHRReplayDataRequestIds.end();
-        for (it = m_reusedXHRReplayDataRequestIds.begin(); it != end; ++it) {
-            if (it->value == requestId)
-                setXHRReplayData(it->key, xhrReplayData);
-        }
-        return;
-    }
-
-    resourceData->setXHRReplayData(xhrReplayData);
-}
-
-void NetworkResourcesData::reuseXHRReplayData(const String& requestId, const String& reusedRequestId)
-{
-    ResourceData* reusedResourceData = resourceDataForRequestId(reusedRequestId);
-    ResourceData* resourceData = resourceDataForRequestId(requestId);
-    if (!reusedResourceData || !resourceData) {
-        m_reusedXHRReplayDataRequestIds.set(requestId, reusedRequestId);
-        return;
-    }
-
-    resourceData->setXHRReplayData(reusedResourceData->xhrReplayData());
-}
-
 Vector<String> NetworkResourcesData::removeCachedResource(CachedResource* cachedResource)
 {
     Vector<String> result;
-    ResourceDataMap::iterator it;
-    ResourceDataMap::iterator end = m_requestIdToResourceDataMap.end();
-    for (it = m_requestIdToResourceDataMap.begin(); it != end; ++it) {
-        ResourceData* resourceData = it->value;
+    for (auto& entry : m_requestIdToResourceDataMap) {
+        ResourceData* resourceData = entry.value;
         if (resourceData->cachedResource() == cachedResource) {
-            resourceData->setCachedResource(0);
-            result.append(it->key);
+            resourceData->setCachedResource(nullptr);
+            result.append(entry.key);
         }
     }
 
@@ -336,31 +272,21 @@ void NetworkResourcesData::clear(const String& preservedLoaderId)
 
     ResourceDataMap preservedMap;
 
-    ResourceDataMap::iterator it;
-    ResourceDataMap::iterator end = m_requestIdToResourceDataMap.end();
-    for (it = m_requestIdToResourceDataMap.begin(); it != end; ++it) {
-        ResourceData* resourceData = it->value;
+    for (auto& entry : m_requestIdToResourceDataMap) {
+        ResourceData* resourceData = entry.value;
+        ASSERT(resourceData);
         if (!preservedLoaderId.isNull() && resourceData->loaderId() == preservedLoaderId)
-            preservedMap.set(it->key, it->value);
+            preservedMap.set(entry.key, entry.value);
         else
             delete resourceData;
     }
     m_requestIdToResourceDataMap.swap(preservedMap);
-
-    m_reusedXHRReplayDataRequestIds.clear();
-}
-
-void NetworkResourcesData::setResourcesDataSizeLimits(size_t maximumResourcesContentSize, size_t maximumSingleResourceContentSize)
-{
-    clear();
-    m_maximumResourcesContentSize = maximumResourcesContentSize;
-    m_maximumSingleResourceContentSize = maximumSingleResourceContentSize;
 }
 
 NetworkResourcesData::ResourceData* NetworkResourcesData::resourceDataForRequestId(const String& requestId)
 {
     if (requestId.isNull())
-        return 0;
+        return nullptr;
     return m_requestIdToResourceDataMap.get(requestId);
 }
 
@@ -390,5 +316,3 @@ bool NetworkResourcesData::ensureFreeSpace(size_t size)
 }
 
 } // namespace WebCore
-
-#endif // ENABLE(INSPECTOR)

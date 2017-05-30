@@ -24,11 +24,14 @@
  */
 
 #include "config.h"
+
+#if WK_HAVE_C_SPI
+
 #include "InjectedBundleTest.h"
 
 #include "PlatformUtilities.h"
-#include <WebKit2/WKBundlePage.h>
-#include <WebKit2/WKBundleBackForwardListItem.h>
+#include <WebKit/WKBundlePage.h>
+#include <WebKit/WKBundleBackForwardListItem.h>
 
 namespace TestWebKitAPI {
 
@@ -57,14 +60,16 @@ ShouldGoToBackForwardListItemTest::ShouldGoToBackForwardListItemTest(const std::
 
 void ShouldGoToBackForwardListItemTest::didCreatePage(WKBundleRef bundle, WKBundlePageRef page)
 {    
-    WKBundlePageLoaderClient pageLoaderClient;
+    WKBundlePageLoaderClientV1 pageLoaderClient;
     memset(&pageLoaderClient, 0, sizeof(pageLoaderClient));
     
-    pageLoaderClient.version = 1;
-    pageLoaderClient.clientInfo = this;
+    pageLoaderClient.base.version = 1;
+    pageLoaderClient.base.clientInfo = this;
     pageLoaderClient.shouldGoToBackForwardListItem = shouldGoToBackForwardListItemCallback;
     
-    WKBundlePageSetPageLoaderClient(page, &pageLoaderClient);
+    WKBundlePageSetPageLoaderClient(page, &pageLoaderClient.base);
 }
 
 } // namespace TestWebKitAPI
+
+#endif

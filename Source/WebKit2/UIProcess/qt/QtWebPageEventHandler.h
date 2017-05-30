@@ -51,7 +51,7 @@ class ShareableBitmap;
 class WebGestureEvent;
 class WebPageProxy;
 
-class QtWebPageEventHandler : public QObject {
+class QtWebPageEventHandler final : public QObject {
     Q_OBJECT
 
 public:
@@ -84,7 +84,7 @@ public:
 
     void didFindZoomableArea(const WebCore::IntPoint& target, const WebCore::IntRect& area);
     void updateTextInputState();
-    void doneWithGestureEvent(const WebGestureEvent& event, bool wasEventHandled);
+    void doneWithGestureEvent(const WebGestureEvent&, bool wasEventHandled);
 #if ENABLE(TOUCH_EVENTS)
     void doneWithTouchEvent(const NativeWebTouchEvent&, bool wasEventHandled);
 #endif
@@ -109,7 +109,7 @@ private Q_SLOTS:
     void inputPanelVisibleChanged();
 
 private:
-    void timerEvent(QTimerEvent*);
+    void timerEvent(QTimerEvent*) final;
 
     QPointF m_lastClick;
     QBasicTimer m_clickTimer;

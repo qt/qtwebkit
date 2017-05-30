@@ -24,6 +24,9 @@
  */
 
 #include "config.h"
+
+#if WK_HAVE_C_SPI
+
 #include "JavaScriptTest.h"
 #include "PlatformUtilities.h"
 #include "PlatformWebView.h"
@@ -39,20 +42,16 @@ static void didFinishLoadForFrame(WKPageRef, WKFrameRef, WKTypeRef, const void*)
 
 static void setPageLoaderClient(WKPageRef page)
 {
-    WKPageLoaderClient loaderClient;
+    WKPageLoaderClientV0 loaderClient;
     memset(&loaderClient, 0, sizeof(loaderClient));
-    loaderClient.version = 0;
-    loaderClient.clientInfo = 0;
+
+    loaderClient.base.version = 0;
     loaderClient.didFinishLoadForFrame = didFinishLoadForFrame;
 
-    WKPageSetPageLoaderClient(page, &loaderClient);
+    WKPageSetPageLoaderClient(page, &loaderClient.base);
 }
 
-#if PLATFORM(WIN)
-TEST(WebKit2, DISABLED_MouseMoveAfterCrash)
-#else
 TEST(WebKit2, MouseMoveAfterCrash)
-#endif
 {
     WKRetainPtr<WKContextRef> context = adoptWK(Util::createContextForInjectedBundleTest("MouseMoveAfterCrashTest"));
 
@@ -90,3 +89,5 @@ TEST(WebKit2, MouseMoveAfterCrash)
 }
 
 } // namespace TestWebKitAPI
+
+#endif

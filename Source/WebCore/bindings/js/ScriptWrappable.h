@@ -35,22 +35,24 @@
 #include <heap/Weak.h>
 
 namespace JSC {
-class VM;
 class WeakHandleOwner;
 }
 
 namespace WebCore {
 
-class JSDOMWrapper;
+class JSDOMObject;
 
 class ScriptWrappable {
 public:
-    JSDOMWrapper* wrapper() const;
-    void setWrapper(JSC::VM&, JSDOMWrapper*, JSC::WeakHandleOwner*, void*);
-    void clearWrapper(JSDOMWrapper*);
+    JSDOMObject* wrapper() const;
+    void setWrapper(JSDOMObject*, JSC::WeakHandleOwner*, void*);
+    void clearWrapper(JSDOMObject*);
+
+protected:
+    ~ScriptWrappable() { }
 
 private:
-    JSC::Weak<JSDOMWrapper> m_wrapper;
+    JSC::Weak<JSDOMObject> m_wrapper;
 };
 
 } // namespace WebCore

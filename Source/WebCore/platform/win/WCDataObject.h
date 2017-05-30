@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007 Apple Inc.  All rights reserved.
+ * Copyright (C) 2007, 2014-2015 Apple Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -34,14 +34,21 @@
 
 namespace WebCore {
 
+struct StgMediumDeleter {
+    void operator()(STGMEDIUM* medium)
+    {
+        ::ReleaseStgMedium(medium);
+    }
+};
+
 class WCDataObject : public IDataObject {
 public:
     void CopyMedium(STGMEDIUM* pMedDest, STGMEDIUM* pMedSrc, FORMATETC* pFmtSrc);
 
     //IUnknown
-    virtual HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** ppvObject);        
-    virtual ULONG STDMETHODCALLTYPE AddRef(void);
-    virtual ULONG STDMETHODCALLTYPE Release(void);
+    virtual HRESULT STDMETHODCALLTYPE QueryInterface(_In_ REFIID riid, _COM_Outptr_ void** ppvObject);        
+    virtual ULONG STDMETHODCALLTYPE AddRef();
+    virtual ULONG STDMETHODCALLTYPE Release();
 
     //IDataObject
     virtual HRESULT STDMETHODCALLTYPE GetData(FORMATETC* pformatIn, STGMEDIUM* pmedium);
@@ -60,10 +67,10 @@ public:
     static HRESULT createInstance(WCDataObject**, const DragDataMap&);
 private:
     WCDataObject();
-    virtual ~WCDataObject();
-    long m_ref;
-    Vector<FORMATETC*> m_formats;
-    Vector<STGMEDIUM*> m_medium;
+
+    Vector<std::unique_ptr<FORMATETC>> m_formats;
+    Vector<std::unique_ptr<STGMEDIUM, StgMediumDeleter>> m_medium;
+    long m_ref { 1 };
 };
 
 }

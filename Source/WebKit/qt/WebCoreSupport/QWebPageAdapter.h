@@ -20,9 +20,8 @@
 #ifndef QWebPageAdapter_h
 #define QWebPageAdapter_h
 
-#include "PlatformExportMacros.h"
 #include "QWebPageClient.h"
-#include "ViewportArguments.h"
+#include "qwebelement.h"
 #include "qwebhistory.h"
 
 #include <qbasictimer.h>
@@ -33,7 +32,7 @@
 #include <qsharedpointer.h>
 #include <qstring.h>
 #include <qurl.h>
-#include <wtf/ExportMacros.h>
+#include <wtf/Forward.h>
 
 QT_BEGIN_NAMESPACE
 class QBitArray;
@@ -52,10 +51,12 @@ class DeviceMotionClient;
 class GeolocationClientQt;
 class Page;
 class UndoStep;
+struct ViewportArguments;
 }
 
 class QtPluginWidgetAdapter;
 class QWebFrameAdapter;
+class QWebFullScreenRequest;
 class QWebHistoryItem;
 class QWebHitTestResultPrivate;
 class QWebPageClient;
@@ -66,7 +67,7 @@ class QWebSettings;
 class QWebFullScreenVideoHandler;
 class UndoStepQt;
 
-class WEBKIT_EXPORTDATA QWebPageAdapter {
+class QWEBKIT_EXPORT QWebPageAdapter {
 public:
 
 #define FOR_EACH_MAPPED_MENU_ACTION(F, SEPARATOR) \
@@ -109,9 +110,7 @@ public:
     enum MenuAction {
         NoAction = - 1,
         FOR_EACH_MAPPED_MENU_ACTION(DEFINE_ACTION, COMMA_SEPARATOR)
-#if ENABLE(INSPECTOR)
         , InspectElement
-#endif
         , ActionCount
     };
 
@@ -150,6 +149,30 @@ public:
         VisibilityStateUnloaded
     };
 
+    // Must match with values of QWebPage::MessageSource enum.
+    enum MessageSource {
+        XmlMessageSource,
+        JSMessageSource,
+        NetworkMessageSource,
+        ConsoleAPIMessageSource,
+        StorageMessageSource,
+        AppCacheMessageSource,
+        RenderingMessageSource,
+        CSSMessageSource,
+        SecurityMessageSource,
+        ContentBlockerMessageSource,
+        OtherMessageSource,
+    };
+
+    // Must match with values of QWebPage::MessageLevel enum.
+    enum MessageLevel {
+        LogMessageLevel = 1,
+        WarningMessageLevel = 2,
+        ErrorMessageLevel = 3,
+        DebugMessageLevel = 4,
+        InfoMessageLevel = 5,
+    };
+
     QWebPageAdapter();
     virtual ~QWebPageAdapter();
 
@@ -168,7 +191,7 @@ public:
     virtual QSize viewportSize() const = 0;
     virtual QWebPageAdapter* createWindow(bool /*dialog*/) = 0;
     virtual QObject* handle() = 0;
-    virtual void javaScriptConsoleMessage(const QString& message, int lineNumber, const QString& sourceID) = 0;
+    virtual void consoleMessageReceived(MessageSource, MessageLevel, const QString& message, int lineNumber, const QString& sourceID) = 0;
     virtual void javaScriptAlert(QWebFrameAdapter*, const QString& msg) = 0;
     virtual bool javaScriptConfirm(QWebFrameAdapter*, const QString& msg) = 0;
     virtual bool javaScriptPrompt(QWebFrameAdapter*, const QString& msg, const QString& defaultValue, QString* result) = 0;
@@ -179,12 +202,13 @@ public:
     virtual void setToolTip(const QString&) = 0;
     virtual QStringList chooseFiles(QWebFrameAdapter*, bool allowMultiple, const QStringList& suggestedFileNames) = 0;
     virtual QColor colorSelectionRequested(const QColor& selectedColor) = 0;
-    virtual QWebSelectMethod* createSelectPopup() = 0;
+    virtual std::unique_ptr<QWebSelectMethod> createSelectPopup() = 0;
     virtual QRect viewRectRelativeToWindow() = 0;
 
 #if USE(QT_MULTIMEDIA)
     virtual QWebFullScreenVideoHandler* createFullScreenVideoHandler() = 0;
 #endif
+    virtual void fullScreenRequested(QWebFullScreenRequest) = 0;
     virtual void geolocationPermissionRequested(QWebFrameAdapter*) = 0;
     virtual void geolocationPermissionRequestCancelled(QWebFrameAdapter*) = 0;
     virtual void notificationsPermissionRequested(QWebFrameAdapter*) = 0;
@@ -204,8 +228,9 @@ public:
     virtual void createUndoStep(QSharedPointer<UndoStepQt>) = 0;
 
     virtual void updateNavigationActions() = 0;
+    virtual void clearCustomActions() = 0;
 
-    virtual QWebFrameAdapter* mainFrameAdapter() = 0;
+    virtual QWebFrameAdapter& mainFrameAdapter() = 0;
 
     virtual QObject* inspectorHandle() = 0;
     virtual void setInspectorFrontend(QObject*) = 0;
@@ -249,7 +274,7 @@ public:
             Separator,
             SubMenu
         } type;
-        MenuAction action;
+        int action;
         enum Trait {
             None = 0,
             Enabled = 1,
@@ -264,10 +289,13 @@ public:
     virtual void createAndSetCurrentContextMenu(const QList<MenuItemDescription>&, QBitArray*) = 0;
     virtual bool handleScrollbarContextMenuEvent(QContextMenuEvent*, bool, ScrollDirection*, ScrollGranularity*) = 0;
 
+    virtual void recentlyAudibleChanged(bool) = 0;
+    virtual void focusedElementChanged(const QWebElement&) = 0;
+
     void setVisibilityState(VisibilityState);
     VisibilityState visibilityState() const;
 
-    void setPluginsVisible(bool visible);
+    void setPluginsVisible(bool);
 
     static QWebPageAdapter* kit(WebCore::Page*);
     WebCore::ViewportArguments viewportArguments() const;
@@ -287,6 +315,7 @@ public:
 
     void adjustPointForClicking(QMouseEvent*);
 
+    bool tryClosePage();
     void mouseMoveEvent(QMouseEvent*);
     void mousePressEvent(QMouseEvent*);
     void mouseDoubleClickEvent(QMouseEvent*);
@@ -296,7 +325,7 @@ public:
 #ifndef QT_NO_WHEELEVENT
     void wheelEvent(QWheelEvent*, int wheelScrollLines);
 #endif
-#ifndef QT_NO_DRAGANDDROP
+#if ENABLE(DRAG_SUPPORT)
     Qt::DropAction dragEntered(const QMimeData*, const QPoint&, Qt::DropActions);
     void dragLeaveEvent();
     Qt::DropAction dragUpdated(const QMimeData*, const QPoint&, Qt::DropActions);
@@ -317,20 +346,21 @@ public:
     QWebHitTestResultPrivate* updatePositionDependentMenuActions(const QPoint&, QBitArray*);
     void updateActionInternal(MenuAction, const char* commandName, bool* enabled, bool* checked);
     void triggerAction(MenuAction, QWebHitTestResultPrivate*, const char* commandName, bool endToEndReload);
+    void triggerCustomAction(int action, const QString &title);
     QString contextMenuItemTagForAction(MenuAction, bool* checkable) const;
 
     QStringList supportedContentTypes() const;
 #if ENABLE(GEOLOCATION) && HAVE(QTPOSITIONING)
     void setGeolocationEnabledForFrame(QWebFrameAdapter*, bool);
 #endif
-#if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
+#if ENABLE(NOTIFICATIONS)
     void setNotificationsAllowedForFrame(QWebFrameAdapter*, bool allowed);
     void addNotificationPresenterClient();
 #ifndef QT_NO_SYSTEMTRAYICON
     bool hasSystemTrayIcon() const;
     void setSystemTrayIcon(QObject*);
 #endif // QT_NO_SYSTEMTRAYICON
-#endif // ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
+#endif // ENABLE(NOTIFICATIONS)
 
     // Called from QWebPage as private slots.
     void _q_cleanupLeakMessages();
@@ -358,6 +388,11 @@ public:
     ViewportAttributes viewportAttributesForSize(const QSize& availableSize, const QSize& deviceSize) const;
     void setDevicePixelRatio(float devicePixelRatio);
 
+    bool isPlayingAudio() const;
+
+    const QWebElement& fullScreenElement() const;
+    void setFullScreenElement(const QWebElement&);
+
     QWebSettings *settings;
 
     WebCore::Page *page;
@@ -381,6 +416,10 @@ private:
     QNetworkAccessManager *networkManager;
     WebCore::DeviceOrientationClient* m_deviceOrientationClient;
     WebCore::DeviceMotionClient* m_deviceMotionClient;
+
+#if ENABLE(FULLSCREEN_API)
+    QWebElement m_fullScreenElement;
+#endif
 
 public:
     static bool drtRun;

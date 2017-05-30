@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -28,17 +28,21 @@
 
 #include "config.h"
 #include "ExceptionBase.h"
-#include "ExceptionCode.h"
 
-#include <wtf/text/WTFString.h>
+#include "ExceptionCodeDescription.h"
 
 namespace WebCore {
 
-ExceptionBase::ExceptionBase(const ExceptionCodeDescription& description)
+ExceptionBase::ExceptionBase(const ExceptionCodeDescription& description, MessageSource messageSource)
     : m_code(description.code)
     , m_name(description.name)
     , m_description(description.description)
 {
+    if (messageSource == MessageSource::UseDescription) {
+        m_message = m_description;
+        return;
+    }
+
     if (description.name)
         m_message = m_name + ": " + description.typeName + " Exception " + String::number(description.code);
     else

@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -71,6 +71,9 @@ typedef uint32_t (*NPN_ScheduleTimerProcPtr)(NPP npp, uint32_t interval, NPBool 
 typedef void (*NPN_UnscheduleTimerProcPtr)(NPP npp, uint32_t timerID);
 typedef NPError (*NPN_PopUpContextMenuProcPtr)(NPP instance, NPMenu* menu);
 typedef NPBool (*NPN_ConvertPointProcPtr)(NPP npp, double sourceX, double sourceY, NPCoordinateSpace sourceSpace, double *destX, double *destY, NPCoordinateSpace destSpace);
+typedef NPBool (*NPN_HandleEventPtr)(NPP instance, void *event, NPBool handled);
+typedef NPBool (*NPN_UnfocusInstancePtr)(NPP instance, NPFocusDirection direction);
+typedef void (*NPN_URLRedirectResponsePtr)(NPP instance, void* notifyData, NPBool allow);
 
 typedef void (*NPN_ReleaseVariantValueProcPtr) (NPVariant *variant);
 
@@ -175,6 +178,9 @@ typedef struct _NPNetscapeFuncs {
     NPN_UnscheduleTimerProcPtr unscheduletimer;
     NPN_PopUpContextMenuProcPtr popupcontextmenu;
     NPN_ConvertPointProcPtr convertpoint;
+    NPN_HandleEventPtr handleevent;
+    NPN_UnfocusInstancePtr unfocusinstance;
+    NPN_URLRedirectResponsePtr urlredirectresponse;
 } NPNetscapeFuncs;
 
 typedef struct _NPPluginFuncs {

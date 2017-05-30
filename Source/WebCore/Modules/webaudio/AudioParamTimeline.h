@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -30,10 +30,10 @@
 #define AudioParamTimeline_h
 
 #include "AudioContext.h"
-#include <wtf/Float32Array.h>
+#include <runtime/Float32Array.h>
+#include <wtf/Lock.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
-#include <wtf/Threading.h>
 #include <wtf/Vector.h>
 
 namespace WebCore {
@@ -53,7 +53,7 @@ public:
 
     // hasValue is set to true if a valid timeline value is returned.
     // otherwise defaultValue is returned.
-    float valueForContextTime(AudioContext*, float defaultValue, bool& hasValue);
+    float valueForContextTime(AudioContext&, float defaultValue, bool& hasValue);
 
     // Given the time range, calculates parameter values into the values buffer
     // and returns the last parameter value calculated for "values" or the defaultValue if none were calculated.
@@ -107,7 +107,7 @@ private:
 
     Vector<ParamEvent> m_events;
 
-    Mutex m_eventsLock;
+    Lock m_eventsMutex;
 };
 
 } // namespace WebCore

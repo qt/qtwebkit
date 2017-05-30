@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -31,32 +31,14 @@
 
 namespace WebCore {
 
-class CSSLinearTimingFunctionValue : public CSSValue {
-public:
-    static PassRefPtr<CSSLinearTimingFunctionValue> create()
-    {
-        return adoptRef(new CSSLinearTimingFunctionValue);
-    }
-
-    String customCssText() const;
-
-    bool equals(const CSSLinearTimingFunctionValue&) const { return true; }
-
-private:
-    CSSLinearTimingFunctionValue()
-        : CSSValue(LinearTimingFunctionClass)
-    {
-    }
-};
-
 class CSSCubicBezierTimingFunctionValue : public CSSValue {
 public:
-    static PassRefPtr<CSSCubicBezierTimingFunctionValue> create(double x1, double y1, double x2, double y2)
+    static Ref<CSSCubicBezierTimingFunctionValue> create(double x1, double y1, double x2, double y2)
     {
-        return adoptRef(new CSSCubicBezierTimingFunctionValue(x1, y1, x2, y2));
+        return adoptRef(*new CSSCubicBezierTimingFunctionValue(x1, y1, x2, y2));
     }
 
-    String customCssText() const;
+    String customCSSText() const;
 
     double x1() const { return m_x1; }
     double y1() const { return m_y1; }
@@ -83,15 +65,15 @@ private:
 
 class CSSStepsTimingFunctionValue : public CSSValue {
 public:
-    static PassRefPtr<CSSStepsTimingFunctionValue> create(int steps, bool stepAtStart)
+    static Ref<CSSStepsTimingFunctionValue> create(int steps, bool stepAtStart)
     {
-        return adoptRef(new CSSStepsTimingFunctionValue(steps, stepAtStart));
+        return adoptRef(*new CSSStepsTimingFunctionValue(steps, stepAtStart));
     }
 
     int numberOfSteps() const { return m_steps; }
     bool stepAtStart() const { return m_stepAtStart; }
 
-    String customCssText() const;
+    String customCSSText() const;
 
     bool equals(const CSSStepsTimingFunctionValue&) const;
 
@@ -107,6 +89,9 @@ private:
     bool m_stepAtStart;
 };
 
-} // namespace
+} // namespace WebCore
 
-#endif
+SPECIALIZE_TYPE_TRAITS_CSS_VALUE(CSSCubicBezierTimingFunctionValue, isCubicBezierTimingFunctionValue())
+SPECIALIZE_TYPE_TRAITS_CSS_VALUE(CSSStepsTimingFunctionValue, isStepsTimingFunctionValue())
+
+#endif // CSSTimingFunctionValue_h

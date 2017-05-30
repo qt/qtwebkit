@@ -9,10 +9,15 @@
 #  ICU_I18N_LIBRARIES - Libraries to link against for ICU internationaliation
 #                       (note: in addition to ICU_LIBRARIES)
 
+find_package(PkgConfig)
+pkg_check_modules(PC_ICU icu-uc)
+
 # Look for the header file.
 find_path(
     ICU_INCLUDE_DIR
     NAMES unicode/utypes.h
+    HINTS ${PC_ICU_INCLUDE_DIRS}
+          ${PC_ICU_INCLUDEDIR}
     DOC "Include directory for the ICU library")
 mark_as_advanced(ICU_INCLUDE_DIR)
 
@@ -20,6 +25,8 @@ mark_as_advanced(ICU_INCLUDE_DIR)
 find_library(
     ICU_LIBRARY
     NAMES icuuc cygicuuc cygicuuc32
+    HINTS ${PC_ICU_LIBRARY_DIRS}
+          ${PC_ICU_LIBDIR}
     DOC "Libraries to link against for the common parts of ICU")
 mark_as_advanced(ICU_LIBRARY)
 
@@ -39,9 +46,12 @@ if (ICU_INCLUDE_DIR AND ICU_LIBRARY)
     set(ICU_VERSION "${ICU_MAJOR_VERSION}.${ICU_MINOR_VERSION}")
 
     # Look for the ICU internationalization libraries
+    pkg_check_modules(PC_ICU_I18N icu-i18n)
     find_library(
         ICU_I18N_LIBRARY
-        NAMES icuin icui18n cygicuin cygicuin32
+        NAMES icui18n icuin cygicuin cygicuin32
+        HINTS ${PC_ICU_I18N_LIBRARY_DIRS}
+              ${PC_ICU_I18N_LIBDIR}
         DOC "Libraries to link against for ICU internationalization")
     mark_as_advanced(ICU_I18N_LIBRARY)
     if (ICU_I18N_LIBRARY)

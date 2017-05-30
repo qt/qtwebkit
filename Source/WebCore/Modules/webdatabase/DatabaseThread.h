@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -28,21 +28,17 @@
 #ifndef DatabaseThread_h
 #define DatabaseThread_h
 
-#if ENABLE(SQL_DATABASE)
-
+#include <memory>
 #include <wtf/Deque.h>
 #include <wtf/HashMap.h>
 #include <wtf/HashSet.h>
 #include <wtf/MessageQueue.h>
-#include <wtf/OwnPtr.h>
-#include <wtf/PassOwnPtr.h>
-#include <wtf/PassRefPtr.h>
 #include <wtf/RefPtr.h>
 #include <wtf/Threading.h>
 
 namespace WebCore {
 
-class DatabaseBackend;
+class Database;
 class DatabaseTask;
 class DatabaseTaskSynchronizer;
 class Document;
@@ -51,19 +47,20 @@ class SQLTransactionCoordinator;
 
 class DatabaseThread : public ThreadSafeRefCounted<DatabaseThread> {
 public:
-    static PassRefPtr<DatabaseThread> create() { return adoptRef(new DatabaseThread); }
+    static Ref<DatabaseThread> create() { return adoptRef(*new DatabaseThread); }
     ~DatabaseThread();
 
     bool start();
     void requestTermination(DatabaseTaskSynchronizer* cleanupSync);
-    bool terminationRequested(DatabaseTaskSynchronizer* taskSynchronizer = 0) const;
+    bool terminationRequested(DatabaseTaskSynchronizer* = nullptr) const;
 
-    void scheduleTask(PassOwnPtr<DatabaseTask>);
-    void scheduleImmediateTask(PassOwnPtr<DatabaseTask>); // This just adds the task to the front of the queue - the caller needs to be extremely careful not to create deadlocks when waiting for completion.
-    void unscheduleDatabaseTasks(DatabaseBackend*);
+    void scheduleTask(std::unique_ptr<DatabaseTask>);
+    void scheduleImmediateTask(std::unique_ptr<DatabaseTask>); // This just adds the task to the front of the queue - the caller needs to be extremely careful not to create deadlocks when waiting for completion.
+    void unscheduleDatabaseTasks(Database*);
+    bool hasPendingDatabaseActivity() const;
 
-    void recordDatabaseOpen(DatabaseBackend*);
-    void recordDatabaseClosed(DatabaseBackend*);
+    void recordDatabaseOpen(Database*);
+    void recordDatabaseClosed(Database*);
     ThreadIdentifier getThreadID() { return m_threadID; }
 
     SQLTransactionClient* transactionClient() { return m_transactionClient.get(); }
@@ -75,22 +72,22 @@ private:
     static void databaseThreadStart(void*);
     void databaseThread();
 
-    Mutex m_threadCreationMutex;
+    Lock m_threadCreationMutex;
     ThreadIdentifier m_threadID;
     RefPtr<DatabaseThread> m_selfRef;
 
     MessageQueue<DatabaseTask> m_queue;
 
     // This set keeps track of the open databases that have been used on this thread.
-    typedef HashSet<RefPtr<DatabaseBackend> > DatabaseSet;
+    typedef HashSet<RefPtr<Database>> DatabaseSet;
+    mutable Lock m_openDatabaseSetMutex;
     DatabaseSet m_openDatabaseSet;
 
-    OwnPtr<SQLTransactionClient> m_transactionClient;
-    OwnPtr<SQLTransactionCoordinator> m_transactionCoordinator;
+    std::unique_ptr<SQLTransactionClient> m_transactionClient;
+    std::unique_ptr<SQLTransactionCoordinator> m_transactionCoordinator;
     DatabaseTaskSynchronizer* m_cleanupSync;
 };
 
 } // namespace WebCore
 
-#endif // ENABLE(SQL_DATABASE)
 #endif // DatabaseThread_h

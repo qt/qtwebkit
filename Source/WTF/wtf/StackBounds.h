@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -27,12 +27,11 @@
 #ifndef StackBounds_h
 #define StackBounds_h
 
+#include <algorithm>
+
 namespace WTF {
 
 class StackBounds {
-    // isSafeToRecurse() / recursionLimit() tests (by default)
-    // that we are at least this far from the end of the stack.
-    //
     // This 64k number was picked because a sampling of stack usage differences
     // between consecutive entries into one of the Interpreter::execute...()
     // functions was seen to be as high as 27k. Hence, 64k is chosen as a
@@ -49,41 +48,23 @@ public:
         return bounds;
     }
 
-    bool isSafeToRecurse(size_t minAvailableDelta = s_defaultAvailabilityDelta) const
-    {
-        checkConsistency();
-        if (isGrowingDownward())
-            return current() >= recursionLimit(minAvailableDelta);
-        return current() <= recursionLimit(minAvailableDelta);
-    }
-
     void* origin() const
     {
         ASSERT(m_origin);
         return m_origin;
     }
 
+    void* end() const
+    {
+        ASSERT(m_bound);
+        return m_bound;
+    }
+    
     size_t size() const
     {
         if (isGrowingDownward())
             return static_cast<char*>(m_origin) - static_cast<char*>(m_bound);
         return static_cast<char*>(m_bound) - static_cast<char*>(m_origin);
-    }
-
-private:
-    StackBounds()
-        : m_origin(0)
-        , m_bound(0)
-    {
-    }
-
-    WTF_EXPORT_PRIVATE void initialize();
-
-    void* current() const
-    {
-        checkConsistency();
-        void* currentPosition = &currentPosition;
-        return currentPosition;
     }
 
     void* recursionLimit(size_t minAvailableDelta = s_defaultAvailabilityDelta) const
@@ -94,15 +75,46 @@ private:
         return static_cast<char*>(m_bound) - minAvailableDelta;
     }
 
+    void* recursionLimit(char* startOfUserStack, size_t maxUserStack, size_t reservedZoneSize) const
+    {
+        checkConsistency();
+        if (maxUserStack < reservedZoneSize)
+            reservedZoneSize = maxUserStack;
+        size_t maxUserStackWithReservedZone = maxUserStack - reservedZoneSize;
+
+        if (isGrowingDownward()) {
+            char* endOfStackWithReservedZone = reinterpret_cast<char*>(m_bound) + reservedZoneSize;
+            if (startOfUserStack < endOfStackWithReservedZone)
+                return endOfStackWithReservedZone;
+            size_t availableUserStack = startOfUserStack - endOfStackWithReservedZone;
+            if (maxUserStackWithReservedZone > availableUserStack)
+                maxUserStackWithReservedZone = availableUserStack;
+            return startOfUserStack - maxUserStackWithReservedZone;
+        }
+
+        char* endOfStackWithReservedZone = reinterpret_cast<char*>(m_bound) - reservedZoneSize;
+        if (startOfUserStack > endOfStackWithReservedZone)
+            return endOfStackWithReservedZone;
+        size_t availableUserStack = endOfStackWithReservedZone - startOfUserStack;
+        if (maxUserStackWithReservedZone > availableUserStack)
+            maxUserStackWithReservedZone = availableUserStack;
+        return startOfUserStack + maxUserStackWithReservedZone;
+    }
+
     bool isGrowingDownward() const
     {
         ASSERT(m_origin && m_bound);
-#if OS(WINCE)
-        return m_origin > m_bound;
-#else
         return true;
-#endif
     }
+
+private:
+    StackBounds()
+        : m_origin(0)
+        , m_bound(0)
+    {
+    }
+
+    WTF_EXPORT_PRIVATE void initialize();
 
     void checkConsistency() const
     {

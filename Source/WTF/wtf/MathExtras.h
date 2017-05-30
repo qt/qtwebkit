@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006, 2007, 2008, 2009, 2010, 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2006, 2007, 2008, 2009, 2010, 2013, 2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -43,18 +43,6 @@
 #include <machine/ieee.h>
 #endif
 
-#if OS(QNX) || COMPILER(INTEL)
-// FIXME: Look into a way to have cmath import its functions into both the standard and global
-// namespace. For now, we include math.h since the QNX cmath header only imports its functions
-// into the standard namespace.
-#include <math.h>
-// These macros from math.h conflict with the real functions in the std namespace.
-#undef signbit
-#undef isnan
-#undef isinf
-#undef isfinite
-#endif
-
 #ifndef M_PI
 const double piDouble = 3.14159265358979323846;
 const float piFloat = 3.14159265358979323846f;
@@ -79,13 +67,12 @@ const double piOverFourDouble = M_PI_4;
 const float piOverFourFloat = static_cast<float>(M_PI_4);
 #endif
 
-#if OS(DARWIN)
-
-// Work around a bug in the Mac OS X libc where ceil(-0.1) return +0.
-inline double wtf_ceil(double x) { return copysign(ceil(x), x); }
-
-#define ceil(x) wtf_ceil(x)
-
+#ifndef M_SQRT2
+const double sqrtOfTwoDouble = 1.41421356237309504880;
+const float sqrtOfTwoFloat = 1.41421356237309504880f;
+#else
+const double sqrtOfTwoDouble = M_SQRT2;
+const float sqrtOfTwoFloat = static_cast<float>(M_SQRT2);
 #endif
 
 #if OS(SOLARIS)
@@ -106,89 +93,7 @@ inline bool isinf(double x) { return !finite(x) && !isnand(x); }
 
 #endif
 
-#if OS(OPENBSD) && __cplusplus < 201103L
-
-namespace std {
-
-#ifndef isfinite
-inline bool isfinite(double x) { return finite(x); }
-#endif
-#ifndef signbit
-inline bool signbit(double x) { struct ieee_double *p = (struct ieee_double *)&x; return p->dbl_sign; }
-#endif
-
-} // namespace std
-
-#endif
-
 #if COMPILER(MSVC)
-
-#if _MSC_VER < 1800
-// We must not do 'num + 0.5' or 'num - 0.5' because they can cause precision loss.
-static double round(double num)
-{
-    double integer = ceil(num);
-    if (num > 0)
-        return integer - num > 0.5 ? integer - 1.0 : integer;
-    return integer - num >= 0.5 ? integer - 1.0 : integer;
-}
-static float roundf(float num)
-{
-    float integer = ceilf(num);
-    if (num > 0)
-        return integer - num > 0.5f ? integer - 1.0f : integer;
-    return integer - num >= 0.5f ? integer - 1.0f : integer;
-}
-#endif
-inline long long llround(double num) { return static_cast<long long>(round(num)); }
-inline long long llroundf(float num) { return static_cast<long long>(roundf(num)); }
-inline long lround(double num) { return static_cast<long>(round(num)); }
-inline long lroundf(float num) { return static_cast<long>(roundf(num)); }
-inline double trunc(double num) { return num > 0 ? floor(num) : ceil(num); }
-
-#endif
-
-#if COMPILER(GCC) && OS(QNX) && _CPPLIB_VER < 640
-// The stdlib on QNX < 6.6 doesn't contain long abs(long). See PR #104666.
-inline long long abs(long num) { return labs(num); }
-#endif
-
-#if OS(ANDROID) || COMPILER(MSVC)
-// ANDROID and MSVC's math.h does not currently supply log2 or log2f.
-inline double log2(double num)
-{
-    // This constant is roughly M_LN2, which is not provided by default on Windows and Android.
-    return log(num) / 0.693147180559945309417232121458176568;
-}
-
-inline float log2f(float num)
-{
-    // This constant is roughly M_LN2, which is not provided by default on Windows and Android.
-    return logf(num) / 0.693147180559945309417232121458176568f;
-}
-#endif
-
-#if COMPILER(MSVC)
-// The 64bit version of abs() is already defined in stdlib.h which comes with VC10
-#if COMPILER(MSVC9_OR_LOWER)
-inline long long abs(long long num) { return _abs64(num); }
-#endif
-
-namespace std {
-
-inline bool isinf(double num) { return !_finite(num) && !_isnan(num); }
-inline bool isnan(double num) { return !!_isnan(num); }
-inline bool isfinite(double x) { return _finite(x); }
-#if _MSC_VER < 1800
-inline bool signbit(double num) { return _copysign(1.0, num) < 0; }
-#endif
-
-} // namespace std
-
-inline double nextafter(double x, double y) { return _nextafter(x, y); }
-inline float nextafterf(float x, float y) { return x > y ? x - FLT_EPSILON : x + FLT_EPSILON; }
-
-inline double copysign(double x, double y) { return _copysign(x, y); }
 
 // Work around a bug in Win, where atan2(+-infinity, +-infinity) yields NaN instead of specific values.
 extern "C" inline double wtf_atan2(double x, double y)
@@ -213,37 +118,7 @@ extern "C" inline double wtf_atan2(double x, double y)
     return result;
 }
 
-// Work around a bug in the Microsoft CRT, where fmod(x, +-infinity) yields NaN instead of x.
-extern "C" inline double wtf_fmod(double x, double y) { return (!std::isinf(x) && std::isinf(y)) ? x : fmod(x, y); }
-
-// Work around a bug in the Microsoft CRT, where pow(NaN, 0) yields NaN instead of 1.
-extern "C" inline double wtf_pow(double x, double y) { return y == 0 ? 1 : pow(x, y); }
-
 #define atan2(x, y) wtf_atan2(x, y)
-#define fmod(x, y) wtf_fmod(x, y)
-#define pow(x, y) wtf_pow(x, y)
-
-// MSVC's math functions do not bring lrint.
-inline long int lrint(double flt)
-{
-    int64_t intgr;
-#if CPU(X86)
-    __asm {
-        fld flt
-        fistp intgr
-    };
-#else
-    ASSERT(std::isfinite(flt));
-    double rounded = round(flt);
-    intgr = static_cast<int64_t>(rounded);
-    // If the fractional part is exactly 0.5, we need to check whether
-    // the rounded result is even. If it is not we need to add 1 to
-    // negative values and subtract one from positive values.
-    if ((fabs(intgr - flt) == 0.5) & intgr)
-        intgr -= ((intgr >> 62) | 1); // 1 with the sign of result, i.e. -1 or 1.
-#endif
-    return static_cast<long int>(intgr);
-}
 
 #endif // COMPILER(MSVC)
 
@@ -279,11 +154,16 @@ template<typename T> inline T clampTo(double value, T min = defaultMinimumForCla
         return min;
     return static_cast<T>(value);
 }
-template<> long long int clampTo(double, long long int, long long int); // clampTo does not support long long ints.
+template<> inline long long int clampTo(double, long long int, long long int); // clampTo does not support long long ints.
 
 inline int clampToInteger(double value)
 {
     return clampTo<int>(value);
+}
+
+inline unsigned clampToUnsigned(double value)
+{
+    return clampTo<unsigned>(value);
 }
 
 inline float clampToFloat(double value)
@@ -340,6 +220,11 @@ template <typename T> inline unsigned getLSBSet(T value)
     return result;
 }
 
+template<typename T> inline T divideRoundedUp(T a, T b)
+{
+    return (a + b - 1) / b;
+}
+
 template<typename T> inline T timesThreePlusOneDividedByTwo(T value)
 {
     // Mathematically equivalent to:
@@ -358,6 +243,13 @@ template<typename T> inline bool isNotZeroAndOrdered(T value)
 template<typename T> inline bool isZeroOrUnordered(T value)
 {
     return !isNotZeroAndOrdered(value);
+}
+
+template<typename T> inline bool isGreaterThanNonZeroPowerOfTwo(T value, unsigned power)
+{
+    // The crazy way of testing of index >= 2 ** power
+    // (where I use ** to denote pow()).
+    return !!((value >> 1) >> (power - 1));
 }
 
 #ifndef UINT64_C
@@ -466,6 +358,98 @@ inline unsigned fastLog2(unsigned i)
     if (i >> 1)
         log2 += 1;
     return log2;
+}
+
+inline unsigned fastLog2(uint64_t value)
+{
+    unsigned high = static_cast<unsigned>(value >> 32);
+    if (high)
+        return fastLog2(high) + 32;
+    return fastLog2(static_cast<unsigned>(value));
+}
+
+template <typename T>
+inline typename std::enable_if<std::is_floating_point<T>::value, T>::type safeFPDivision(T u, T v)
+{
+    // Protect against overflow / underflow.
+    if (v < 1 && u > v * std::numeric_limits<T>::max())
+        return std::numeric_limits<T>::max();
+    if (v > 1 && u < v * std::numeric_limits<T>::min())
+        return 0;
+    return u / v;
+}
+
+// Floating point numbers comparison:
+// u is "essentially equal" [1][2] to v if: | u - v | / |u| <= e and | u - v | / |v| <= e
+//
+// [1] Knuth, D. E. "Accuracy of Floating Point Arithmetic." The Art of Computer Programming. 3rd ed. Vol. 2.
+//     Boston: Addison-Wesley, 1998. 229-45.
+// [2] http://www.boost.org/doc/libs/1_34_0/libs/test/doc/components/test_tools/floating_point_comparison.html
+template <typename T>
+inline typename std::enable_if<std::is_floating_point<T>::value, bool>::type areEssentiallyEqual(T u, T v, T epsilon = std::numeric_limits<T>::epsilon())
+{
+    if (u == v)
+        return true;
+
+    const T delta = std::abs(u - v);
+    return safeFPDivision(delta, std::abs(u)) <= epsilon && safeFPDivision(delta, std::abs(v)) <= epsilon;
+}
+
+inline bool isIntegral(float value)
+{
+    return static_cast<int>(value) == value;
+}
+
+template<typename T>
+inline void incrementWithSaturation(T& value)
+{
+    if (value != std::numeric_limits<T>::max())
+        value++;
+}
+
+template<typename T>
+inline T leftShiftWithSaturation(T value, unsigned shiftAmount, T max = std::numeric_limits<T>::max())
+{
+    T result = value << shiftAmount;
+    // We will have saturated if shifting right doesn't recover the original value.
+    if (result >> shiftAmount != value)
+        return max;
+    if (result > max)
+        return max;
+    return result;
+}
+
+// Check if two ranges overlap assuming that neither range is empty.
+template<typename T>
+inline bool nonEmptyRangesOverlap(T leftMin, T leftMax, T rightMin, T rightMax)
+{
+    ASSERT(leftMin < leftMax);
+    ASSERT(rightMin < rightMax);
+    
+    if (leftMin <= rightMin && leftMax > rightMin)
+        return true;
+    if (rightMin <= leftMin && rightMax > leftMin)
+        return true;
+    return false;
+}
+
+// Pass ranges with the min being inclusive and the max being exclusive. For example, this should
+// return false:
+//
+//     rangesOverlap(0, 8, 8, 16)
+template<typename T>
+inline bool rangesOverlap(T leftMin, T leftMax, T rightMin, T rightMax)
+{
+    ASSERT(leftMin <= leftMax);
+    ASSERT(rightMin <= rightMax);
+    
+    // Empty ranges interfere with nothing.
+    if (leftMin == leftMax)
+        return false;
+    if (rightMin == rightMax)
+        return false;
+
+    return nonEmptyRangesOverlap(leftMin, leftMax, rightMin, rightMax);
 }
 
 } // namespace WTF

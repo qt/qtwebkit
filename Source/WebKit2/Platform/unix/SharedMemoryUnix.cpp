@@ -44,99 +44,56 @@
 #include <wtf/UniStdExtras.h>
 #include <wtf/text/CString.h>
 
-#if OS(ANDROID)
-#include <linux/ashmem.h>
-#endif
-
 namespace WebKit {
 
 SharedMemory::Handle::Handle()
-    : m_fileDescriptor(-1)
-    , m_size(0)
 {
 }
 
 SharedMemory::Handle::~Handle()
 {
-    if (!isNull())
-        closeWithRetry(m_fileDescriptor);
+}
+
+void SharedMemory::Handle::clear()
+{
+    m_attachment = IPC::Attachment();
 }
 
 bool SharedMemory::Handle::isNull() const
 {
-    return m_fileDescriptor == -1;
+    return m_attachment.fileDescriptor() == -1;
 }
 
-void SharedMemory::Handle::encode(CoreIPC::ArgumentEncoder& encoder) const
+void SharedMemory::Handle::encode(IPC::ArgumentEncoder& encoder) const
 {
-    encoder << releaseToAttachment();
+    encoder << releaseAttachment();
 }
 
-bool SharedMemory::Handle::decode(CoreIPC::ArgumentDecoder& decoder, Handle& handle)
+bool SharedMemory::Handle::decode(IPC::ArgumentDecoder& decoder, Handle& handle)
 {
-    ASSERT_ARG(handle, !handle.m_size);
     ASSERT_ARG(handle, handle.isNull());
 
-    CoreIPC::Attachment attachment;
+    IPC::Attachment attachment;
     if (!decoder.decode(attachment))
         return false;
 
-    handle.adoptFromAttachment(attachment.releaseFileDescriptor(), attachment.size());
+    handle.adoptAttachment(WTFMove(attachment));
     return true;
 }
 
-CoreIPC::Attachment SharedMemory::Handle::releaseToAttachment() const
+IPC::Attachment SharedMemory::Handle::releaseAttachment() const
 {
-    int temp = m_fileDescriptor;
-    m_fileDescriptor = -1;
-    return CoreIPC::Attachment(temp, m_size);
+    return WTFMove(m_attachment);
 }
 
-void SharedMemory::Handle::adoptFromAttachment(int fileDescriptor, size_t size)
+void SharedMemory::Handle::adoptAttachment(IPC::Attachment&& attachment)
 {
-    ASSERT(!m_size);
     ASSERT(isNull());
 
-    m_fileDescriptor = fileDescriptor;
-    m_size = size;
+    m_attachment = WTFMove(attachment);
 }
 
-#if OS(ANDROID)
-PassRefPtr<SharedMemory> SharedMemory::create(size_t size)
-{
-    int fileDescriptor = open("/dev/ashmem", O_RDWR);
-    if (fileDescriptor < 0) {
-        WTFLogAlways("Failed to open ashmem device");
-        return 0;
-    }
-
-    String name = String("/WK2SharedMemory.") + String::number(static_cast<unsigned>(WTF::randomNumber() * (std::numeric_limits<unsigned>::max() + 1.0)));
-    char buf[ASHMEM_NAME_LEN];
-    strlcpy(buf,name.utf8().data(), sizeof(buf));
-    // Ashmem names does not need to be unique.
-    ioctl(fileDescriptor, ASHMEM_SET_NAME, buf);
-
-    int ret = ioctl(fileDescriptor, ASHMEM_SET_SIZE, size);
-    if (ret < 0) {
-        closeWithRetry(fileDescriptor);
-        WTFLogAlways("Failed to create shared memory of size %d", size);
-        return 0;
-    }
-
-    void* data = mmap(0, size, PROT_READ | PROT_WRITE, MAP_SHARED, fileDescriptor, 0);
-    if (data == MAP_FAILED) {
-        closeWithRetry(fileDescriptor);
-        return 0;
-    }
-
-    RefPtr<SharedMemory> instance = adoptRef(new SharedMemory());
-    instance->m_data = data;
-    instance->m_fileDescriptor = fileDescriptor;
-    instance->m_size = size;
-    return instance.release();
-}
-#else
-PassRefPtr<SharedMemory> SharedMemory::create(size_t size)
+RefPtr<SharedMemory> SharedMemory::allocate(size_t size)
 {
     CString tempName;
 
@@ -146,11 +103,11 @@ PassRefPtr<SharedMemory> SharedMemory::create(size_t size)
         tempName = name.utf8();
 
         do {
-            fileDescriptor = shm_open(tempName.data(), O_CREAT | O_CLOEXEC | O_RDWR, S_IRUSR | S_IWUSR);
+            fileDescriptor = shm_open(tempName.data(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
         } while (fileDescriptor == -1 && errno == EINTR);
     }
     if (fileDescriptor == -1) {
-        WTFLogAlways("Failed to create shared memory file %s", tempName.data());
+        WTFLogAlways("Failed to create shared memory file %s: %s", tempName.data(), strerror(errno));
         return 0;
     }
 
@@ -177,14 +134,13 @@ PassRefPtr<SharedMemory> SharedMemory::create(size_t size)
     instance->m_size = size;
     return instance.release();
 }
-#endif
 
 static inline int accessModeMMap(SharedMemory::Protection protection)
 {
     switch (protection) {
-    case SharedMemory::ReadOnly:
+    case SharedMemory::Protection::ReadOnly:
         return PROT_READ;
-    case SharedMemory::ReadWrite:
+    case SharedMemory::Protection::ReadWrite:
         return PROT_READ | PROT_WRITE;
     }
 
@@ -192,63 +148,56 @@ static inline int accessModeMMap(SharedMemory::Protection protection)
     return PROT_READ | PROT_WRITE;
 }
 
-PassRefPtr<SharedMemory> SharedMemory::create(const Handle& handle, Protection protection)
+RefPtr<SharedMemory> SharedMemory::map(const Handle& handle, Protection protection)
 {
     ASSERT(!handle.isNull());
 
-    void* data = mmap(0, handle.m_size, accessModeMMap(protection), MAP_SHARED, handle.m_fileDescriptor, 0);
+    int fd = handle.m_attachment.releaseFileDescriptor();
+    void* data = mmap(0, handle.m_attachment.size(), accessModeMMap(protection), MAP_SHARED, fd, 0);
+    closeWithRetry(fd);
     if (data == MAP_FAILED)
-        return 0;
+        return nullptr;
 
+    RefPtr<SharedMemory> instance = wrapMap(data, handle.m_attachment.size(), -1);
+    instance->m_fileDescriptor = Nullopt;
+    instance->m_isWrappingMap = false;
+    return instance;
+}
+
+RefPtr<SharedMemory> SharedMemory::wrapMap(void* data, size_t size, int fileDescriptor)
+{
     RefPtr<SharedMemory> instance = adoptRef(new SharedMemory());
     instance->m_data = data;
-    instance->m_fileDescriptor = handle.m_fileDescriptor;
-    instance->m_size = handle.m_size;
-    handle.m_fileDescriptor = -1;
+    instance->m_size = size;
+    instance->m_fileDescriptor = fileDescriptor;
+    instance->m_isWrappingMap = true;
     return instance;
 }
 
 SharedMemory::~SharedMemory()
 {
+    if (m_isWrappingMap)
+        return;
+
     munmap(m_data, m_size);
-    closeWithRetry(m_fileDescriptor);
+    if (m_fileDescriptor)
+        closeWithRetry(m_fileDescriptor.value());
 }
 
-static inline int accessModeFile(SharedMemory::Protection protection)
+bool SharedMemory::createHandle(Handle& handle, Protection)
 {
-    switch (protection) {
-    case SharedMemory::ReadOnly:
-        return O_RDONLY;
-    case SharedMemory::ReadWrite:
-        return O_RDWR;
-    }
-
-    ASSERT_NOT_REACHED();
-    return O_RDWR;
-}
-
-bool SharedMemory::createHandle(Handle& handle, Protection protection)
-{
-    ASSERT_ARG(handle, !handle.m_size);
     ASSERT_ARG(handle, handle.isNull());
+    ASSERT(m_fileDescriptor);
 
-    int duplicatedHandle;
-    while ((duplicatedHandle = dup(m_fileDescriptor)) == -1) {
-        if (errno != EINTR) {
-            ASSERT_NOT_REACHED();
-            return false;
-        }
-    }
+    // FIXME: Handle the case where the passed Protection is ReadOnly.
+    // See https://bugs.webkit.org/show_bug.cgi?id=131542.
 
-    while ((fcntl(duplicatedHandle, F_SETFD, FD_CLOEXEC | accessModeFile(protection)) == -1)) {
-        if (errno != EINTR) {
-            ASSERT_NOT_REACHED();
-            closeWithRetry(duplicatedHandle);
-            return false;
-        }
+    int duplicatedHandle = dupCloseOnExec(m_fileDescriptor.value());
+    if (duplicatedHandle == -1) {
+        ASSERT_NOT_REACHED();
+        return false;
     }
-    handle.m_fileDescriptor = duplicatedHandle;
-    handle.m_size = m_size;
+    handle.m_attachment = IPC::Attachment(duplicatedHandle, m_size);
     return true;
 }
 

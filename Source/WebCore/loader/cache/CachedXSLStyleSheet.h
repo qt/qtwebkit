@@ -26,39 +26,38 @@
 #ifndef CachedXSLStyleSheet_h
 #define CachedXSLStyleSheet_h
 
+#if ENABLE(XSLT)
+
 #include "CachedResource.h"
-#include <wtf/Vector.h>
 
 namespace WebCore {
 
-    class CachedResourceLoader;
-    class TextResourceDecoder;
+class TextResourceDecoder;
 
-#if ENABLE(XSLT)
-    class CachedXSLStyleSheet FINAL : public CachedResource {
-    public:
-        CachedXSLStyleSheet(const ResourceRequest&);
+class CachedXSLStyleSheet final : public CachedResource {
+public:
+    CachedXSLStyleSheet(const ResourceRequest&, SessionID);
+    virtual ~CachedXSLStyleSheet();
 
-        const String& sheet() const { return m_sheet; }
+    const String& sheet() const { return m_sheet; }
 
-    protected:
-        virtual void checkNotify();
+private:
+    void checkNotify() override;
+    bool mayTryReplaceEncodedData() const override { return true; }
+    void didAddClient(CachedResourceClient*) override;
+    void setEncoding(const String&) override;
+    String encoding() const override;
+    const TextResourceDecoder* textResourceDecoder() const override { return m_decoder.get(); }
+    void finishLoading(SharedBuffer*) override;
 
-        String m_sheet;
-        RefPtr<TextResourceDecoder> m_decoder;
+    String m_sheet;
+    RefPtr<TextResourceDecoder> m_decoder;
+};
 
-    private:
-        virtual bool mayTryReplaceEncodedData() const OVERRIDE { return true; }
+} // namespace WebCore
 
-        virtual void didAddClient(CachedResourceClient*) OVERRIDE;
+SPECIALIZE_TYPE_TRAITS_CACHED_RESOURCE(CachedXSLStyleSheet, CachedResource::XSLStyleSheet)
 
-        virtual void setEncoding(const String&) OVERRIDE;
-        virtual String encoding() const OVERRIDE;
-        virtual void finishLoading(ResourceBuffer*) OVERRIDE;
-    };
+#endif // ENABLE(XSLT)
 
-#endif
-
-}
-
-#endif
+#endif // CachedXSLStyleSheet_h

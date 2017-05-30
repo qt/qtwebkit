@@ -31,6 +31,7 @@
 #include "ActiveDOMObject.h"
 #include "EventTarget.h"
 #include "RTCDTMFSenderHandlerClient.h"
+#include "ScriptWrappable.h"
 #include "Timer.h"
 #include <wtf/RefCounted.h>
 
@@ -40,9 +41,9 @@ class MediaStreamTrack;
 class RTCPeerConnectionHandler;
 class RTCDTMFSenderHandler;
 
-class RTCDTMFSender : public RefCounted<RTCDTMFSender>, public EventTarget, public RTCDTMFSenderHandlerClient, public ActiveDOMObject {
+class RTCDTMFSender final : public RefCounted<RTCDTMFSender>, public EventTargetWithInlineData, public RTCDTMFSenderHandlerClient, public ActiveDOMObject {
 public:
-    static PassRefPtr<RTCDTMFSender> create(ScriptExecutionContext*, RTCPeerConnectionHandler*, PassRefPtr<MediaStreamTrack>, ExceptionCode&);
+    static RefPtr<RTCDTMFSender> create(ScriptExecutionContext*, RTCPeerConnectionHandler*, PassRefPtr<MediaStreamTrack>, ExceptionCode&);
     ~RTCDTMFSender();
 
     bool canInsertDTMF() const;
@@ -55,44 +56,41 @@ public:
     void insertDTMF(const String& tones, long duration, ExceptionCode&);
     void insertDTMF(const String& tones, long duration, long interToneGap, ExceptionCode&);
 
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(tonechange);
-
     // EventTarget
-    virtual const AtomicString& interfaceName() const OVERRIDE;
-    virtual ScriptExecutionContext* scriptExecutionContext() const OVERRIDE;
-
-    // ActiveDOMObject
-    virtual void stop() OVERRIDE;
+    virtual EventTargetInterface eventTargetInterface() const override { return RTCDTMFSenderEventTargetInterfaceType; }
+    virtual ScriptExecutionContext* scriptExecutionContext() const override { return ActiveDOMObject::scriptExecutionContext(); }
 
     using RefCounted<RTCDTMFSender>::ref;
     using RefCounted<RTCDTMFSender>::deref;
 
 private:
-    RTCDTMFSender(ScriptExecutionContext*, PassRefPtr<MediaStreamTrack>, PassOwnPtr<RTCDTMFSenderHandler>);
+    RTCDTMFSender(ScriptExecutionContext*, PassRefPtr<MediaStreamTrack>, std::unique_ptr<RTCDTMFSenderHandler>);
 
-    void scheduleDispatchEvent(PassRefPtr<Event>);
-    void scheduledEventTimerFired(Timer<RTCDTMFSender>*);
+    // ActiveDOMObject
+    void stop() override;
+    const char* activeDOMObjectName() const override;
+    bool canSuspendForDocumentSuspension() const override;
+
+    void scheduleDispatchEvent(Ref<Event>&&);
+    void scheduledEventTimerFired();
 
     // EventTarget
-    virtual EventTargetData* eventTargetData() OVERRIDE;
-    virtual EventTargetData* ensureEventTargetData() OVERRIDE;
-    virtual void refEventTarget() OVERRIDE { ref(); }
-    virtual void derefEventTarget() OVERRIDE { deref(); }
-    EventTargetData m_eventTargetData;
+    virtual void refEventTarget() override { ref(); }
+    virtual void derefEventTarget() override { deref(); }
 
     // RTCDTMFSenderHandlerClient
-    virtual void didPlayTone(const String&) OVERRIDE;
+    virtual void didPlayTone(const String&) override;
 
     RefPtr<MediaStreamTrack> m_track;
     long m_duration;
     long m_interToneGap;
 
-    OwnPtr<RTCDTMFSenderHandler> m_handler;
+    std::unique_ptr<RTCDTMFSenderHandler> m_handler;
 
     bool m_stopped;
 
-    Timer<RTCDTMFSender> m_scheduledEventTimer;
-    Vector<RefPtr<Event> > m_scheduledEvents;
+    Timer m_scheduledEventTimer;
+    Vector<Ref<Event>> m_scheduledEvents;
 };
 
 } // namespace WebCore

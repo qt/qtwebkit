@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -31,25 +31,14 @@
 #include "JSCSSPrimitiveValue.h"
 #include "JSCSSValueList.h"
 #include "JSNode.h"
-#include "JSWebKitCSSTransformValue.h"
-#include "WebKitCSSTransformValue.h"
-
-#if ENABLE(CSS_FILTERS)
-#include "JSWebKitCSSFilterValue.h"
-#include "WebKitCSSFilterValue.h"
-#endif
-
-#if ENABLE(CSS_SHADERS)
-#include "JSWebKitCSSMixFunctionValue.h"
-#include "WebKitCSSMixFunctionValue.h"
-#endif
-
-#if ENABLE(SVG)
 #include "JSSVGColor.h"
 #include "JSSVGPaint.h"
+#include "JSWebKitCSSFilterValue.h"
+#include "JSWebKitCSSTransformValue.h"
 #include "SVGColor.h"
 #include "SVGPaint.h"
-#endif
+#include "WebKitCSSFilterValue.h"
+#include "WebKitCSSTransformValue.h"
 
 using namespace JSC;
 
@@ -57,11 +46,11 @@ namespace WebCore {
 
 bool JSCSSValueOwner::isReachableFromOpaqueRoots(JSC::Handle<JSC::Unknown> handle, void* context, SlotVisitor& visitor)
 {
-    JSCSSValue* jsCSSValue = jsCast<JSCSSValue*>(handle.get().asCell());
+    JSCSSValue* jsCSSValue = jsCast<JSCSSValue*>(handle.slot()->asCell());
     if (!jsCSSValue->hasCustomProperties())
         return false;
     DOMWrapperWorld* world = static_cast<DOMWrapperWorld*>(context);
-    void* root = world->m_cssValueRoots.get(jsCSSValue->impl());
+    void* root = world->m_cssValueRoots.get(&jsCSSValue->wrapped());
     if (!root)
         return false;
     return visitor.containsOpaqueRoot(root);
@@ -69,14 +58,13 @@ bool JSCSSValueOwner::isReachableFromOpaqueRoots(JSC::Handle<JSC::Unknown> handl
 
 void JSCSSValueOwner::finalize(JSC::Handle<JSC::Unknown> handle, void* context)
 {
-    JSCSSValue* jsCSSValue = jsCast<JSCSSValue*>(handle.get().asCell());
-    DOMWrapperWorld* world = static_cast<DOMWrapperWorld*>(context);
-    world->m_cssValueRoots.remove(jsCSSValue->impl());
-    uncacheWrapper(world, jsCSSValue->impl(), jsCSSValue);
-    jsCSSValue->releaseImpl();
+    JSCSSValue* jsCSSValue = jsCast<JSCSSValue*>(handle.slot()->asCell());
+    DOMWrapperWorld& world = *static_cast<DOMWrapperWorld*>(context);
+    world.m_cssValueRoots.remove(&jsCSSValue->wrapped());
+    uncacheWrapper(world, &jsCSSValue->wrapped(), jsCSSValue);
 }
 
-JSValue toJS(ExecState* exec, JSDOMGlobalObject* globalObject, CSSValue* value)
+JSValue toJS(ExecState*, JSDOMGlobalObject* globalObject, CSSValue* value)
 {
     if (!value)
         return jsNull();
@@ -88,33 +76,25 @@ JSValue toJS(ExecState* exec, JSDOMGlobalObject* globalObject, CSSValue* value)
     if (!value->isCSSOMSafe())
         return jsNull();
 
-    JSDOMWrapper* wrapper = getCachedWrapper(currentWorld(exec), value);
+    JSObject* wrapper = getCachedWrapper(globalObject->world(), value);
 
     if (wrapper)
         return wrapper;
 
     if (value->isWebKitCSSTransformValue())
-        wrapper = CREATE_DOM_WRAPPER(exec, globalObject, WebKitCSSTransformValue, value);
-#if ENABLE(CSS_FILTERS)
+        wrapper = CREATE_DOM_WRAPPER(globalObject, WebKitCSSTransformValue, value);
     else if (value->isWebKitCSSFilterValue())
-        wrapper = CREATE_DOM_WRAPPER(exec, globalObject, WebKitCSSFilterValue, value);
-#endif
-#if ENABLE(CSS_SHADERS)
-    else if (value->isWebKitCSSMixFunctionValue())
-        wrapper = CREATE_DOM_WRAPPER(exec, globalObject, WebKitCSSMixFunctionValue, value);
-#endif
+        wrapper = CREATE_DOM_WRAPPER(globalObject, WebKitCSSFilterValue, value);
     else if (value->isValueList())
-        wrapper = CREATE_DOM_WRAPPER(exec, globalObject, CSSValueList, value);
-#if ENABLE(SVG)
+        wrapper = CREATE_DOM_WRAPPER(globalObject, CSSValueList, value);
     else if (value->isSVGPaint())
-        wrapper = CREATE_DOM_WRAPPER(exec, globalObject, SVGPaint, value);
+        wrapper = CREATE_DOM_WRAPPER(globalObject, SVGPaint, value);
     else if (value->isSVGColor())
-        wrapper = CREATE_DOM_WRAPPER(exec, globalObject, SVGColor, value);
-#endif
+        wrapper = CREATE_DOM_WRAPPER(globalObject, SVGColor, value);
     else if (value->isPrimitiveValue())
-        wrapper = CREATE_DOM_WRAPPER(exec, globalObject, CSSPrimitiveValue, value);
+        wrapper = CREATE_DOM_WRAPPER(globalObject, CSSPrimitiveValue, value);
     else
-        wrapper = CREATE_DOM_WRAPPER(exec, globalObject, CSSValue, value);
+        wrapper = CREATE_DOM_WRAPPER(globalObject, CSSValue, value);
 
     return wrapper;
 }

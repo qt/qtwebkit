@@ -26,119 +26,48 @@
 #ifndef PageGroup_h
 #define PageGroup_h
 
-#include "LinkHash.h"
-#include "SecurityOriginHash.h"
 #include "Supplementable.h"
-#include "UserScript.h"
-#include "UserStyleSheet.h"
 #include <wtf/HashSet.h>
 #include <wtf/Noncopyable.h>
+#include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
+    class Page;
 #if ENABLE(VIDEO_TRACK)
-    class CaptionPreferencesChangedListener;
     class CaptionUserPreferences;
 #endif
-    class KURL;
-    class GroupSettings;
-    class IDBFactoryBackendInterface;
-    class Page;
-    class SecurityOrigin;
-    class StorageNamespace;
 
-    class PageGroup : public Supplementable<PageGroup> {
+    class PageGroup {
         WTF_MAKE_NONCOPYABLE(PageGroup); WTF_MAKE_FAST_ALLOCATED;
     public:
-        explicit PageGroup(const String& name);
+        WEBCORE_EXPORT explicit PageGroup(const String& name);
+        explicit PageGroup(Page&);
         ~PageGroup();
 
-        static PassOwnPtr<PageGroup> create(Page*);
-        static PageGroup* pageGroup(const String& groupName);
-
-        static void closeLocalStorage();
-
-        static void clearLocalStorageForAllOrigins();
-        static void clearLocalStorageForOrigin(SecurityOrigin*);
-        static void closeIdleLocalStorageDatabases();
-        // DumpRenderTree helper that triggers a StorageArea sync.
-        static void syncLocalStorage();
-
-        static unsigned numberOfPageGroups();
+        WEBCORE_EXPORT static PageGroup* pageGroup(const String& groupName);
 
         const HashSet<Page*>& pages() const { return m_pages; }
 
-        void addPage(Page*);
-        void removePage(Page*);
-
-        bool isLinkVisited(LinkHash);
-
-        void addVisitedLink(const KURL&);
-        void addVisitedLink(const UChar*, size_t);
-        void addVisitedLinkHash(LinkHash);
-        void removeVisitedLinks();
-
-        static void setShouldTrackVisitedLinks(bool);
-        static void removeAllVisitedLinks();
+        void addPage(Page&);
+        void removePage(Page&);
 
         const String& name() { return m_name; }
         unsigned identifier() { return m_identifier; }
 
-        StorageNamespace* localStorage();
-        bool hasLocalStorage() { return m_localStorage; }
-
-        StorageNamespace* transientLocalStorage(SecurityOrigin* topOrigin);
-
-        void addUserScriptToWorld(DOMWrapperWorld*, const String& source, const KURL&,
-                                  const Vector<String>& whitelist, const Vector<String>& blacklist,
-                                  UserScriptInjectionTime, UserContentInjectedFrames);
-        void addUserStyleSheetToWorld(DOMWrapperWorld*, const String& source, const KURL&,
-                                      const Vector<String>& whitelist, const Vector<String>& blacklist,
-                                      UserContentInjectedFrames,
-                                      UserStyleLevel level = UserStyleUserLevel,
-                                      UserStyleInjectionTime injectionTime = InjectInExistingDocuments);
-        void removeUserScriptFromWorld(DOMWrapperWorld*, const KURL&);
-        void removeUserStyleSheetFromWorld(DOMWrapperWorld*, const KURL&);
-
-        void removeUserScriptsFromWorld(DOMWrapperWorld*);
-        void removeUserStyleSheetsFromWorld(DOMWrapperWorld*);
-
-        void removeAllUserContent();
-
-        const UserScriptMap* userScripts() const { return m_userScripts.get(); }
-        const UserStyleSheetMap* userStyleSheets() const { return m_userStyleSheets.get(); }
-
-        GroupSettings* groupSettings() const { return m_groupSettings.get(); }
-
 #if ENABLE(VIDEO_TRACK)
-        void captionPreferencesChanged();
-        CaptionUserPreferences* captionPreferences();
+        WEBCORE_EXPORT void captionPreferencesChanged();
+        WEBCORE_EXPORT CaptionUserPreferences& captionPreferences();
 #endif
 
     private:
-        PageGroup(Page*);
-
-        void addVisitedLink(LinkHash);
-        void invalidatedInjectedStyleSheetCacheInAllFrames();
-
         String m_name;
-
         HashSet<Page*> m_pages;
 
-        HashSet<LinkHash, LinkHashHash> m_visitedLinkHashes;
-        bool m_visitedLinksPopulated;
-
         unsigned m_identifier;
-        RefPtr<StorageNamespace> m_localStorage;
-        HashMap<RefPtr<SecurityOrigin>, RefPtr<StorageNamespace> > m_transientLocalStorageMap;
-
-        OwnPtr<UserScriptMap> m_userScripts;
-        OwnPtr<UserStyleSheetMap> m_userStyleSheets;
-
-        OwnPtr<GroupSettings> m_groupSettings;
 
 #if ENABLE(VIDEO_TRACK)
-        OwnPtr<CaptionUserPreferences> m_captionPreferences;
+        std::unique_ptr<CaptionUserPreferences> m_captionPreferences;
 #endif
     };
 

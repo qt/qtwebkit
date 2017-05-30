@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -28,65 +28,69 @@
 
 #include "CachedFontClient.h"
 #include "CachedResourceHandle.h"
-#include "Timer.h"
-#include <wtf/HashMap.h>
 #include <wtf/text/AtomicString.h>
 
 namespace WebCore {
 
-class CachedFont;
 class CSSFontFace;
 class CSSFontSelector;
+class Font;
+struct FontCustomPlatformData;
 class FontDescription;
-class SimpleFontData;
-#if ENABLE(SVG_FONTS)
-class SVGFontElement;
+class FontFeatureSettings;
+struct FontVariantSettings;
 class SVGFontFaceElement;
-#endif
+class SharedBuffer;
 
-class CSSFontFaceSource : public CachedFontClient {
+class CSSFontFaceSource final : public CachedFontClient {
+    WTF_MAKE_FAST_ALLOCATED;
 public:
-    CSSFontFaceSource(const String&, CachedFont* = 0);
+
+    //                      => Success
+    //                    //
+    // Pending => Loading
+    //                    \\.
+    //                      => Failure
+    enum class Status {
+        Pending,
+        Loading,
+        Success,
+        Failure
+    };
+
+    CSSFontFaceSource(CSSFontFace& owner, const String& familyNameOrURI, CachedFont* = nullptr, SVGFontFaceElement* = nullptr);
     virtual ~CSSFontFaceSource();
 
-    bool isLoaded() const;
-    bool isValid() const;
+    Status status() const { return m_status; }
 
-    const AtomicString& string() const { return m_string; }
+    const AtomicString& familyNameOrURI() const { return m_familyNameOrURI; }
 
-    void setFontFace(CSSFontFace* face) { m_face = face; }
-
-    virtual void fontLoaded(CachedFont*);
-
-    PassRefPtr<SimpleFontData> getFontData(const FontDescription&, bool syntheticBold, bool syntheticItalic, CSSFontSelector*);
-
-    void pruneTable();
+    void load(CSSFontSelector&);
+    RefPtr<Font> font(const FontDescription&, bool syntheticBold, bool syntheticItalic, const FontFeatureSettings&, const FontVariantSettings&);
 
 #if ENABLE(SVG_FONTS)
-    SVGFontFaceElement* svgFontFaceElement() const;
-    void setSVGFontFaceElement(PassRefPtr<SVGFontFaceElement>);
     bool isSVGFontFaceSource() const;
-    void setHasExternalSVGFont(bool value) { m_hasExternalSVGFont = value; }
-#endif
-
-#if ENABLE(FONT_LOAD_EVENTS)
-    bool isDecodeError() const;
-    bool ensureFontData();
 #endif
 
 private:
-    void startLoadingTimerFired(Timer<CSSFontFaceSource>*);
+    virtual void fontLoaded(CachedFont&) override;
 
-    AtomicString m_string; // URI for remote, built-in font name for local.
+    void setStatus(Status);
+
+    AtomicString m_familyNameOrURI; // URI for remote, built-in font name for local.
     CachedResourceHandle<CachedFont> m_font; // For remote fonts, a pointer to our cached resource.
-    CSSFontFace* m_face; // Our owning font face.
-    HashMap<unsigned, RefPtr<SimpleFontData> > m_fontDataTable; // The hash key is composed of size synthetic styles.
+    CSSFontFace& m_face; // Our owning font face.
 
-#if ENABLE(SVG_FONTS)
-    RefPtr<SVGFontFaceElement> m_svgFontFaceElement;
-    RefPtr<SVGFontElement> m_externalSVGFontElement;
-    bool m_hasExternalSVGFont;
+#if ENABLE(SVG_OTF_CONVERTER)
+    RefPtr<SharedBuffer> m_generatedOTFBuffer;
 #endif
+
+#if ENABLE(SVG_FONTS) || ENABLE(SVG_OTF_CONVERTER)
+    RefPtr<SVGFontFaceElement> m_svgFontFaceElement;
+    std::unique_ptr<FontCustomPlatformData> m_inDocumentCustomPlatformData;
+#endif
+
+    Status m_status { Status::Pending };
 };
 
 }

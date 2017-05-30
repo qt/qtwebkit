@@ -29,71 +29,76 @@
 
 #include "EventTarget.h"
 #include "RTCDataChannelHandlerClient.h"
+#include "ScriptWrappable.h"
 #include "Timer.h"
 #include <wtf/RefCounted.h>
+
+namespace JSC {
+    class ArrayBuffer;
+    class ArrayBufferView;
+}
 
 namespace WebCore {
 
 class Blob;
+class Dictionary;
 class RTCDataChannelHandler;
 class RTCPeerConnectionHandler;
 
-class RTCDataChannel : public RefCounted<RTCDataChannel>, public EventTarget, public RTCDataChannelHandlerClient {
+class RTCDataChannel final : public RefCounted<RTCDataChannel>, public EventTargetWithInlineData, public RTCDataChannelHandlerClient {
 public:
-    static PassRefPtr<RTCDataChannel> create(ScriptExecutionContext*, RTCPeerConnectionHandler*, const String& label, bool reliable, ExceptionCode&);
-    static PassRefPtr<RTCDataChannel> create(ScriptExecutionContext*, PassOwnPtr<RTCDataChannelHandler>);
+    static Ref<RTCDataChannel> create(ScriptExecutionContext*, std::unique_ptr<RTCDataChannelHandler>);
+    static RefPtr<RTCDataChannel> create(ScriptExecutionContext*, RTCPeerConnectionHandler*, const String& label, const Dictionary& options, ExceptionCode&);
     ~RTCDataChannel();
 
     String label() const;
-    bool reliable() const;
-    String readyState() const;
+    bool ordered() const;
+    unsigned short maxRetransmitTime() const;
+    unsigned short maxRetransmits() const;
+    String protocol() const;
+    bool negotiated() const;
+    unsigned short id() const;
+    AtomicString readyState() const;
     unsigned long bufferedAmount() const;
 
-    String binaryType() const;
-    void setBinaryType(const String&, ExceptionCode&);
+    AtomicString binaryType() const;
+    void setBinaryType(const AtomicString&, ExceptionCode&);
 
     void send(const String&, ExceptionCode&);
-    void send(PassRefPtr<ArrayBuffer>, ExceptionCode&);
-    void send(PassRefPtr<ArrayBufferView>, ExceptionCode&);
+    void send(PassRefPtr<JSC::ArrayBuffer>, ExceptionCode&);
+    void send(PassRefPtr<JSC::ArrayBufferView>, ExceptionCode&);
     void send(PassRefPtr<Blob>, ExceptionCode&);
 
     void close();
 
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(open);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(error);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(close);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(message);
-
     void stop();
 
     // EventTarget
-    virtual const AtomicString& interfaceName() const OVERRIDE;
-    virtual ScriptExecutionContext* scriptExecutionContext() const OVERRIDE;
+    virtual EventTargetInterface eventTargetInterface() const override { return RTCDataChannelEventTargetInterfaceType; }
+    virtual ScriptExecutionContext* scriptExecutionContext() const override { return m_scriptExecutionContext; }
 
     using RefCounted<RTCDataChannel>::ref;
     using RefCounted<RTCDataChannel>::deref;
 
 private:
-    RTCDataChannel(ScriptExecutionContext*, PassOwnPtr<RTCDataChannelHandler>);
+    RTCDataChannel(ScriptExecutionContext*, std::unique_ptr<RTCDataChannelHandler>);
 
-    void scheduleDispatchEvent(PassRefPtr<Event>);
-    void scheduledEventTimerFired(Timer<RTCDataChannel>*);
+    void scheduleDispatchEvent(Ref<Event>&&);
+    void scheduledEventTimerFired();
 
     // EventTarget
-    virtual EventTargetData* eventTargetData();
-    virtual EventTargetData* ensureEventTargetData();
-    virtual void refEventTarget() { ref(); }
-    virtual void derefEventTarget() { deref(); }
-    EventTargetData m_eventTargetData;
+    virtual void refEventTarget() override { ref(); }
+    virtual void derefEventTarget() override { deref(); }
+
     ScriptExecutionContext* m_scriptExecutionContext;
 
     // RTCDataChannelHandlerClient
-    virtual void didChangeReadyState(ReadyState) OVERRIDE;
-    virtual void didReceiveStringData(const String&) OVERRIDE;
-    virtual void didReceiveRawData(const char*, size_t) OVERRIDE;
-    virtual void didDetectError() OVERRIDE;
+    virtual void didChangeReadyState(ReadyState) override;
+    virtual void didReceiveStringData(const String&) override;
+    virtual void didReceiveRawData(const char*, size_t) override;
+    virtual void didDetectError() override;
 
-    OwnPtr<RTCDataChannelHandler> m_handler;
+    std::unique_ptr<RTCDataChannelHandler> m_handler;
 
     bool m_stopped;
 
@@ -104,8 +109,8 @@ private:
     };
     BinaryType m_binaryType;
 
-    Timer<RTCDataChannel> m_scheduledEventTimer;
-    Vector<RefPtr<Event> > m_scheduledEvents;
+    Timer m_scheduledEventTimer;
+    Vector<Ref<Event>> m_scheduledEvents;
 };
 
 } // namespace WebCore

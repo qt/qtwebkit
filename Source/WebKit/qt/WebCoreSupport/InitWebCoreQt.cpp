@@ -34,7 +34,7 @@
 #include "ChromeClientQt.h"
 #include "Font.h"
 #include "Image.h"
-#include "InitializeLogging.h"
+#include "Logging.h"
 #include "MemoryCache.h"
 #include "NotImplemented.h"
 #include "Page.h"
@@ -44,7 +44,6 @@
 #include "ScriptController.h"
 #include "ScrollbarThemeQStyle.h"
 #include "SecurityPolicy.h"
-#include "Settings.h"
 
 #include "qwebelement_p.h"
 #include <JavaScriptCore/runtime/InitializeThreading.h>
@@ -63,7 +62,7 @@ static WebCore::QStyleFacade* createStyleForPage(WebCore::Page* page)
 {
     QWebPageAdapter* pageAdapter = 0;
     if (page)
-        pageAdapter = static_cast<WebCore::ChromeClientQt*>(page->chrome().client())->m_webPage;
+        pageAdapter = static_cast<WebCore::ChromeClientQt&>(page->chrome().client()).m_webPage;
     return initCallback(pageAdapter);
 }
 
@@ -73,7 +72,6 @@ Q_DECL_EXPORT void initializeWebKitQt()
     if (initCallback) {
         WebCore::RenderThemeQStyle::setStyleFactoryFunction(createStyleForPage);
         WebCore::RenderThemeQt::setCustomTheme(WebCore::RenderThemeQStyle::create, new WebCore::ScrollbarThemeQStyle);
-        WebCore::Font::setDefaultTypesettingFeatures(WebCore::Kerning);
     }
 }
 
@@ -95,17 +93,19 @@ Q_DECL_EXPORT void initializeWebCoreQt()
 #if !LOG_DISABLED
     WebCore::initializeLoggingChannelsIfNecessary();
 #endif // !LOG_DISABLED
-    ScriptController::initializeThreading();
+    JSC::initializeThreading();
     WTF::initializeMainThread();
+    RunLoop::initializeMainRunLoop();
     WebCore::SecurityPolicy::setLocalLoadPolicy(WebCore::SecurityPolicy::AllowLocalLoadsForLocalAndSubstituteData);
 
     PlatformStrategiesQt::initialize();
     QtWebElementRuntime::initialize();
 
-    if (!WebCore::memoryCache()->disabled())
-        WebCore::memoryCache()->setDeadDecodedDataDeletionInterval(60);
-    WebCore::RuntimeEnabledFeatures::setCSSCompositingEnabled(true);
-    WebCore::Settings::setDefaultMinDOMTimerInterval(0.004);
+    auto& memoryCache = MemoryCache::singleton();
+    if (!memoryCache.disabled())
+        memoryCache.setDeadDecodedDataDeletionInterval(std::chrono::seconds{60});
+    WebCore::RuntimeEnabledFeatures::sharedFeatures().setCSSCompositingEnabled(true);
+    WebCore::RuntimeEnabledFeatures::sharedFeatures().setWebkitIndexedDBEnabled(true);
 
     initialized = true;
 }

@@ -19,30 +19,25 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "SVGTextElement.h"
 
-#include "Attribute.h"
-#include "NodeRenderingContext.h"
 #include "RenderSVGResource.h"
 #include "RenderSVGText.h"
-#include "SVGElementInstance.h"
 #include "SVGNames.h"
 #include "SVGRenderStyle.h"
 #include "SVGTSpanElement.h"
 
 namespace WebCore {
 
-inline SVGTextElement::SVGTextElement(const QualifiedName& tagName, Document* doc)
-    : SVGTextPositioningElement(tagName, doc)
+inline SVGTextElement::SVGTextElement(const QualifiedName& tagName, Document& document)
+    : SVGTextPositioningElement(tagName, document)
 {
     ASSERT(hasTagName(SVGNames::textTag));
 }
 
-PassRefPtr<SVGTextElement> SVGTextElement::create(const QualifiedName& tagName, Document* document)
+Ref<SVGTextElement> SVGTextElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new SVGTextElement(tagName, document));
+    return adoptRef(*new SVGTextElement(tagName, document));
 }
 
 // We override SVGGraphics::animatedLocalTransform() so that the transform-origin
@@ -50,14 +45,14 @@ PassRefPtr<SVGTextElement> SVGTextElement::create(const QualifiedName& tagName, 
 AffineTransform SVGTextElement::animatedLocalTransform() const
 {
     AffineTransform matrix;
-    RenderStyle* style = renderer() ? renderer()->style() : 0;
+    RenderStyle* style = renderer() ? &renderer()->style() : nullptr;
 
     // if CSS property was set, use that, otherwise fallback to attribute (if set)
     if (style && style->hasTransform()) {
         TransformationMatrix t;
         // For now, the transform-origin is not taken into account
         // Also, any percentage values will not be taken into account
-        style->applyTransform(t, IntSize(0, 0), RenderStyle::ExcludeTransformOrigin);
+        style->applyTransform(t, FloatRect(0, 0, 0, 0), RenderStyle::ExcludeTransformOrigin);
         // Flatten any 3D transform
         matrix = t.toAffineTransform();
     } else
@@ -69,26 +64,24 @@ AffineTransform SVGTextElement::animatedLocalTransform() const
     return matrix;
 }
 
-RenderObject* SVGTextElement::createRenderer(RenderArena* arena, RenderStyle*)
+RenderPtr<RenderElement> SVGTextElement::createElementRenderer(Ref<RenderStyle>&& style, const RenderTreePosition&)
 {
-    return new (arena) RenderSVGText(this);
+    return createRenderer<RenderSVGText>(*this, WTFMove(style));
 }
 
-bool SVGTextElement::childShouldCreateRenderer(const NodeRenderingContext& childContext) const
+bool SVGTextElement::childShouldCreateRenderer(const Node& child) const
 {
-    if (childContext.node()->isTextNode()
-        || childContext.node()->hasTagName(SVGNames::aTag)
+    if (child.isTextNode()
+        || child.hasTagName(SVGNames::aTag)
 #if ENABLE(SVG_FONTS)
-        || childContext.node()->hasTagName(SVGNames::altGlyphTag)
+        || child.hasTagName(SVGNames::altGlyphTag)
 #endif
-        || childContext.node()->hasTagName(SVGNames::textPathTag)
-        || childContext.node()->hasTagName(SVGNames::trefTag)
-        || childContext.node()->hasTagName(SVGNames::tspanTag))
+        || child.hasTagName(SVGNames::textPathTag)
+        || child.hasTagName(SVGNames::trefTag)
+        || child.hasTagName(SVGNames::tspanTag))
         return true;
 
     return false;
 }
 
 }
-
-#endif // ENABLE(SVG)

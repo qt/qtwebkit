@@ -26,16 +26,88 @@
 #import "config.h"
 #import "StringUtilities.h"
 
-#import <WebCore/FoundationExtras.h>
 #import "WKSharedAPICast.h"
 #import "WKStringCF.h"
-#import <wtf/text/WTFString.h>
+#import <WebCore/SoftLinking.h>
+#import <wtf/ObjcRuntimeExtras.h>
+#import <wtf/text/StringBuilder.h>
+#import <yarr/RegularExpression.h>
 
 namespace WebKit {
 
-NSString* nsStringFromWebCoreString(const String& string)
+NSString *nsStringFromWebCoreString(const String& string)
 {
-    return string.impl() ? HardAutorelease(WKStringCopyCFString(0, toAPI(string.impl()))) : @"";
+    return string.isEmpty() ? @"" : CFBridgingRelease(WKStringCopyCFString(0, toAPI(string.impl())));
 }
+
+static String wildcardRegexPatternString(const String& string)
+{
+    String metaCharacters = ".|+?()[]{}^$";
+    UChar escapeCharacter = '\\';
+    UChar wildcardCharacter = '*';
+
+    StringBuilder stringBuilder;
+
+    stringBuilder.append('^');
+    for (unsigned i = 0; i < string.length(); i++) {
+        auto character = string[i];
+        if (metaCharacters.contains(character) || character == escapeCharacter)
+            stringBuilder.append(escapeCharacter);
+        else if (character == wildcardCharacter)
+            stringBuilder.append('.');
+
+        stringBuilder.append(character);
+    }
+    stringBuilder.append('$');
+
+    return stringBuilder.toString();
+}
+
+bool stringMatchesWildcardString(const String& string, const String& wildcardString)
+{
+    return JSC::Yarr::RegularExpression(wildcardRegexPatternString(wildcardString), TextCaseInsensitive).match(string) != -1;
+}
+
+#if ENABLE(TELEPHONE_NUMBER_DETECTION) && PLATFORM(MAC)
+
+SOFT_LINK_PRIVATE_FRAMEWORK(PhoneNumbers);
+
+typedef struct __CFPhoneNumber* CFPhoneNumberRef;
+
+// These functions are declared with __attribute__((visibility ("default")))
+// We currently don't have a way to soft link such functions, so we forward declare them again here.
+extern "C" CFPhoneNumberRef CFPhoneNumberCreate(CFAllocatorRef, CFStringRef, CFStringRef);
+SOFT_LINK(PhoneNumbers, CFPhoneNumberCreate, CFPhoneNumberRef, (CFAllocatorRef allocator, CFStringRef digits, CFStringRef countryCode), (allocator, digits, countryCode));
+
+extern "C" CFStringRef CFPhoneNumberCopyFormattedRepresentation(CFPhoneNumberRef);
+SOFT_LINK(PhoneNumbers, CFPhoneNumberCopyFormattedRepresentation, CFStringRef, (CFPhoneNumberRef phoneNumber), (phoneNumber));
+
+extern "C" CFStringRef CFPhoneNumberCopyUnformattedRepresentation(CFPhoneNumberRef);
+SOFT_LINK(PhoneNumbers, CFPhoneNumberCopyUnformattedRepresentation, CFStringRef, (CFPhoneNumberRef phoneNumber), (phoneNumber));
+
+
+NSString *formattedPhoneNumberString(NSString *originalPhoneNumber)
+{
+    NSString *countryCode = [[[NSLocale currentLocale] objectForKey:NSLocaleCountryCode] lowercaseString];
+
+    RetainPtr<CFPhoneNumberRef> phoneNumber = adoptCF(CFPhoneNumberCreate(kCFAllocatorDefault, (CFStringRef)originalPhoneNumber, (CFStringRef)countryCode));
+    if (!phoneNumber)
+        return originalPhoneNumber;
+
+    CFStringRef phoneNumberString = CFPhoneNumberCopyFormattedRepresentation(phoneNumber.get());
+    if (!phoneNumberString)
+        phoneNumberString = CFPhoneNumberCopyUnformattedRepresentation(phoneNumber.get());
+
+    return [(NSString *)phoneNumberString autorelease];
+}
+
+#else
+
+NSString *formattedPhoneNumberString(NSString *)
+{
+    return nil;
+}
+
+#endif // ENABLE(TELEPHONE_NUMBER_DETECTION) && PLATFORM(MAC)
 
 }

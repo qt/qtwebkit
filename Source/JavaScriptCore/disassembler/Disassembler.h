@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2012, 2013, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,12 +26,15 @@
 #ifndef Disassembler_h
 #define Disassembler_h
 
-#include <wtf/Platform.h>
+#include "JSExportMacros.h"
+#include <functional>
 #include <wtf/PrintStream.h>
+#include <wtf/text/CString.h>
 
 namespace JSC {
 
 class MacroAssemblerCodePtr;
+class MacroAssemblerCodeRef;
 
 #if ENABLE(DISASSEMBLER)
 bool tryToDisassemble(const MacroAssemblerCodePtr&, size_t, const char* prefix, PrintStream&);
@@ -45,6 +48,13 @@ inline bool tryToDisassemble(const MacroAssemblerCodePtr&, size_t, const char*, 
 // Prints either the disassembly, or a line of text indicating that disassembly failed and
 // the range of machine code addresses.
 void disassemble(const MacroAssemblerCodePtr&, size_t, const char* prefix, PrintStream& out);
+
+// Asynchronous disassembly. This happens on another thread, and calls the provided
+// callback when the disassembly is done.
+void disassembleAsynchronously(
+    const CString& header, const MacroAssemblerCodeRef&, size_t, const char* prefix);
+
+JS_EXPORT_PRIVATE void waitForAsynchronousDisassembly();
 
 } // namespace JSC
 

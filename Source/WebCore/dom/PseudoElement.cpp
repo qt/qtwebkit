@@ -29,22 +29,22 @@
 
 #include "ContentData.h"
 #include "InspectorInstrumentation.h"
-#include "NodeRenderingContext.h"
-#include "RenderObject.h"
+#include "RenderElement.h"
+#include "RenderImage.h"
 #include "RenderQuote.h"
 
 namespace WebCore {
 
 const QualifiedName& pseudoElementTagName()
 {
-    DEFINE_STATIC_LOCAL(QualifiedName, name, (nullAtom, "<pseudo>", nullAtom));
+    static NeverDestroyed<QualifiedName> name(nullAtom, "<pseudo>", nullAtom);
     return name;
 }
 
 String PseudoElement::pseudoElementNameForEvents(PseudoId pseudoId)
 {
-    DEFINE_STATIC_LOCAL(const String, after, (ASCIILiteral("::after")));
-    DEFINE_STATIC_LOCAL(const String, before, (ASCIILiteral("::before")));
+    static NeverDestroyed<const String> after(ASCIILiteral("::after"));
+    static NeverDestroyed<const String> before(ASCIILiteral("::before"));
     switch (pseudoId) {
     case AFTER:
         return after;
@@ -55,74 +55,71 @@ String PseudoElement::pseudoElementNameForEvents(PseudoId pseudoId)
     }
 }
 
-PseudoElement::PseudoElement(Element* parent, PseudoId pseudoId)
-    : Element(pseudoElementTagName(), parent->document(), CreatePseudoElement)
+PseudoElement::PseudoElement(Element& host, PseudoId pseudoId)
+    : Element(pseudoElementTagName(), host.document(), CreatePseudoElement)
+    , m_hostElement(&host)
     , m_pseudoId(pseudoId)
 {
-    ASSERT(pseudoId != NOPSEUDO);
-    setParentOrShadowHostNode(parent);
-    setHasCustomStyleCallbacks();
+    ASSERT(pseudoId == BEFORE || pseudoId == AFTER);
+    setHasCustomStyleResolveCallbacks();
 }
 
 PseudoElement::~PseudoElement()
 {
-#if USE(ACCELERATED_COMPOSITING)
-    InspectorInstrumentation::pseudoElementDestroyed(document()->page(), this);
-#endif
+    ASSERT(!m_hostElement);
 }
 
-PassRefPtr<RenderStyle> PseudoElement::customStyleForRenderer()
+void PseudoElement::clearHostElement()
 {
-    return parentOrShadowHostElement()->renderer()->getCachedPseudoStyle(m_pseudoId);
+    InspectorInstrumentation::pseudoElementDestroyed(document().page(), *this);
+
+    m_hostElement = nullptr;
 }
 
-void PseudoElement::attach(const AttachContext& context)
+RefPtr<RenderStyle> PseudoElement::customStyleForRenderer(RenderStyle& parentStyle)
 {
-    ASSERT(!renderer());
+    return m_hostElement->renderer()->getCachedPseudoStyle(m_pseudoId, &parentStyle);
+}
 
-    Element::attach(context);
-
-    RenderObject* renderer = this->renderer();
-    if (!renderer || !renderer->style()->regionThread().isEmpty())
+void PseudoElement::didAttachRenderers()
+{
+    RenderElement* renderer = this->renderer();
+    if (!renderer || renderer->style().hasFlowFrom())
         return;
 
-    RenderStyle* style = renderer->style();
-    ASSERT(style->contentData());
+    const RenderStyle& style = renderer->style();
+    ASSERT(style.contentData());
 
-    for (const ContentData* content = style->contentData(); content; content = content->next()) {
-        RenderObject* child = content->createRenderer(document(), style);
-        if (renderer->isChildAllowed(child, style)) {
-            renderer->addChild(child);
-            if (child->isQuote())
-                toRenderQuote(child)->attachQuote();
-        } else
-            child->destroy();
+    for (const ContentData* content = style.contentData(); content; content = content->next()) {
+        auto child = content->createContentRenderer(document(), style);
+        if (renderer->isChildAllowed(*child, style)) {
+            auto* childPtr = child.get();
+            renderer->addChild(child.leakPtr());
+            if (is<RenderQuote>(*childPtr))
+                downcast<RenderQuote>(*childPtr).attachQuote();
+        }
     }
 }
 
-bool PseudoElement::rendererIsNeeded(const NodeRenderingContext& context)
+bool PseudoElement::rendererIsNeeded(const RenderStyle& style)
 {
-    return pseudoElementRendererIsNeeded(context.style());
+    return pseudoElementRendererIsNeeded(&style);
 }
 
-void PseudoElement::didRecalcStyle(StyleChange)
+void PseudoElement::didRecalcStyle(Style::Change)
 {
     if (!renderer())
         return;
 
     // The renderers inside pseudo elements are anonymous so they don't get notified of recalcStyle and must have
     // the style propagated downward manually similar to RenderObject::propagateStyleToAnonymousChildren.
-    RenderObject* renderer = this->renderer();
-    for (RenderObject* child = renderer->nextInPreOrder(renderer); child; child = child->nextInPreOrder(renderer)) {
+    RenderElement& renderer = *this->renderer();
+    for (RenderObject* child = renderer.nextInPreOrder(&renderer); child; child = child->nextInPreOrder(&renderer)) {
         // We only manage the style for the generated content which must be images or text.
-        if (!child->isText() && !child->isImage())
+        if (!is<RenderImage>(*child) && !is<RenderQuote>(*child))
             continue;
-
-        // The style for the RenderTextFragment for first letter is managed by an enclosing block, not by us.
-        if (child->style()->styleType() == FIRST_LETTER)
-            continue;
-
-        child->setPseudoStyle(renderer->style());
+        Ref<RenderStyle> createdStyle = RenderStyle::createStyleInheritingFromPseudoStyle(renderer.style());
+        downcast<RenderElement>(*child).setStyle(WTFMove(createdStyle));
     }
 }
 

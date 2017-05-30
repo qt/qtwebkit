@@ -1,6 +1,6 @@
 /*
  *  Copyright (C) 1999-2000 Harri Porten (porten@kde.org)
- *  Copyright (C) 2003, 2007, 2008, 2012 Apple Inc. All Rights Reserved.
+ *  Copyright (C) 2003, 2007, 2008, 2012, 2016 Apple Inc. All Rights Reserved.
  *
  *  This library is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU Lesser General Public
@@ -26,89 +26,86 @@
 
 namespace JSC {
     
-    class RegExpObject : public JSNonFinalObject {
-    public:
-        typedef JSNonFinalObject Base;
+class RegExpObject : public JSNonFinalObject {
+public:
+    typedef JSNonFinalObject Base;
+    static const unsigned StructureFlags = Base::StructureFlags | OverridesGetOwnPropertySlot | OverridesGetPropertyNames;
 
-        static RegExpObject* create(ExecState* exec, JSGlobalObject* globalObject, Structure* structure, RegExp* regExp)
-        {
-            RegExpObject* object = new (NotNull, allocateCell<RegExpObject>(*exec->heap())) RegExpObject(globalObject, structure, regExp);
-            object->finishCreation(globalObject);
-            return object;
-        }
-        
-        static RegExpObject* create(VM& vm, JSGlobalObject* globalObject, Structure* structure, RegExp* regExp)
-        {
-            RegExpObject* object = new (NotNull, allocateCell<RegExpObject>(vm.heap)) RegExpObject(globalObject, structure, regExp);
-            object->finishCreation(globalObject);
-            return object;
-        }
-
-        void setRegExp(VM& vm, RegExp* r) { m_regExp.set(vm, this, r); }
-        RegExp* regExp() const { return m_regExp.get(); }
-
-        void setLastIndex(ExecState* exec, size_t lastIndex)
-        {
-            m_lastIndex.setWithoutWriteBarrier(jsNumber(lastIndex));
-            if (LIKELY(m_lastIndexIsWritable))
-                m_lastIndex.setWithoutWriteBarrier(jsNumber(lastIndex));
-            else
-                throwTypeError(exec, StrictModeReadonlyPropertyWriteError);
-        }
-        void setLastIndex(ExecState* exec, JSValue lastIndex, bool shouldThrow)
-        {
-            if (LIKELY(m_lastIndexIsWritable))
-                m_lastIndex.set(exec->vm(), this, lastIndex);
-            else if (shouldThrow)
-                throwTypeError(exec, StrictModeReadonlyPropertyWriteError);
-        }
-        JSValue getLastIndex() const
-        {
-            return m_lastIndex.get();
-        }
-
-        bool test(ExecState* exec, JSString* string) { return match(exec, string); }
-        JSValue exec(ExecState*, JSString*);
-
-        static bool getOwnPropertySlot(JSCell*, ExecState*, PropertyName, PropertySlot&);
-        static bool getOwnPropertyDescriptor(JSObject*, ExecState*, PropertyName, PropertyDescriptor&);
-        static void put(JSCell*, ExecState*, PropertyName, JSValue, PutPropertySlot&);
-
-        static JS_EXPORTDATA const ClassInfo s_info;
-
-        static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype)
-        {
-            return Structure::create(vm, globalObject, prototype, TypeInfo(ObjectType, StructureFlags), &s_info);
-        }
-
-    protected:
-        JS_EXPORT_PRIVATE RegExpObject(JSGlobalObject*, Structure*, RegExp*);
-        JS_EXPORT_PRIVATE void finishCreation(JSGlobalObject*);
-
-        static const unsigned StructureFlags = OverridesVisitChildren | OverridesGetOwnPropertySlot | Base::StructureFlags;
-
-        static void visitChildren(JSCell*, SlotVisitor&);
-
-        JS_EXPORT_PRIVATE static bool deleteProperty(JSCell*, ExecState*, PropertyName);
-        JS_EXPORT_PRIVATE static void getOwnNonIndexPropertyNames(JSObject*, ExecState*, PropertyNameArray&, EnumerationMode);
-        JS_EXPORT_PRIVATE static void getPropertyNames(JSObject*, ExecState*, PropertyNameArray&, EnumerationMode);
-        JS_EXPORT_PRIVATE static bool defineOwnProperty(JSObject*, ExecState*, PropertyName, PropertyDescriptor&, bool shouldThrow);
-
-    private:
-        MatchResult match(ExecState*, JSString*);
-
-        WriteBarrier<RegExp> m_regExp;
-        WriteBarrier<Unknown> m_lastIndex;
-        bool m_lastIndexIsWritable;
-    };
-
-    RegExpObject* asRegExpObject(JSValue);
-
-    inline RegExpObject* asRegExpObject(JSValue value)
+    static RegExpObject* create(VM& vm, Structure* structure, RegExp* regExp)
     {
-        ASSERT(asObject(value)->inherits(&RegExpObject::s_info));
-        return static_cast<RegExpObject*>(asObject(value));
+        RegExpObject* object = new (NotNull, allocateCell<RegExpObject>(vm.heap)) RegExpObject(vm, structure, regExp);
+        object->finishCreation(vm);
+        return object;
     }
+
+    void setRegExp(VM& vm, RegExp* r) { m_regExp.set(vm, this, r); }
+    RegExp* regExp() const { return m_regExp.get(); }
+
+    bool setLastIndex(ExecState* exec, size_t lastIndex)
+    {
+        if (LIKELY(m_lastIndexIsWritable)) {
+            m_lastIndex.setWithoutWriteBarrier(jsNumber(lastIndex));
+            return true;
+        }
+        throwTypeError(exec, StrictModeReadonlyPropertyWriteError);
+        return false;
+    }
+    bool setLastIndex(ExecState* exec, JSValue lastIndex, bool shouldThrow)
+    {
+        if (LIKELY(m_lastIndexIsWritable)) {
+            m_lastIndex.set(exec->vm(), this, lastIndex);
+            return true;
+        }
+
+        if (shouldThrow)
+            throwTypeError(exec, StrictModeReadonlyPropertyWriteError);
+        return false;
+    }
+    JSValue getLastIndex() const
+    {
+        return m_lastIndex.get();
+    }
+
+    bool test(ExecState* exec, JSString* string) { return match(exec, string); }
+    JSValue exec(ExecState*, JSString*);
+
+    static bool getOwnPropertySlot(JSObject*, ExecState*, PropertyName, PropertySlot&);
+    static void put(JSCell*, ExecState*, PropertyName, JSValue, PutPropertySlot&);
+
+    DECLARE_EXPORT_INFO;
+
+    static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype)
+    {
+        return Structure::create(vm, globalObject, prototype, TypeInfo(RegExpObjectType, StructureFlags), info());
+    }
+
+protected:
+    JS_EXPORT_PRIVATE RegExpObject(VM&, Structure*, RegExp*);
+    JS_EXPORT_PRIVATE void finishCreation(VM&);
+
+    static void visitChildren(JSCell*, SlotVisitor&);
+
+    JS_EXPORT_PRIVATE static bool deleteProperty(JSCell*, ExecState*, PropertyName);
+    JS_EXPORT_PRIVATE static void getOwnNonIndexPropertyNames(JSObject*, ExecState*, PropertyNameArray&, EnumerationMode);
+    JS_EXPORT_PRIVATE static void getPropertyNames(JSObject*, ExecState*, PropertyNameArray&, EnumerationMode);
+    JS_EXPORT_PRIVATE static void getGenericPropertyNames(JSObject*, ExecState*, PropertyNameArray&, EnumerationMode);
+    JS_EXPORT_PRIVATE static bool defineOwnProperty(JSObject*, ExecState*, PropertyName, const PropertyDescriptor&, bool shouldThrow);
+
+private:
+    MatchResult match(ExecState*, JSString*);
+
+    WriteBarrier<RegExp> m_regExp;
+    WriteBarrier<Unknown> m_lastIndex;
+    bool m_lastIndexIsWritable;
+};
+
+RegExpObject* asRegExpObject(JSValue);
+
+inline RegExpObject* asRegExpObject(JSValue value)
+{
+    ASSERT(asObject(value)->inherits(RegExpObject::info()));
+    return static_cast<RegExpObject*>(asObject(value));
+}
 
 } // namespace JSC
 

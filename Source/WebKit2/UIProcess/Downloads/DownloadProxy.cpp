@@ -26,19 +26,18 @@
 #include "config.h"
 #include "DownloadProxy.h"
 
+#include "APIData.h"
+#include "APIDownloadClient.h"
 #include "AuthenticationChallengeProxy.h"
 #include "DataReference.h"
 #include "DownloadProxyMap.h"
-#include "WebContext.h"
-#include "WebData.h"
-#include "WebProcessMessages.h"
-#include <wtf/text/CString.h>
-#include <wtf/text/WTFString.h>
-
-#if ENABLE(NETWORK_PROCESS)
 #include "NetworkProcessMessages.h"
 #include "NetworkProcessProxy.h"
-#endif
+#include "WebProcessMessages.h"
+#include "WebProcessPool.h"
+#include "WebProtectionSpace.h"
+#include <wtf/text/CString.h>
+#include <wtf/text/WTFString.h>
 
 using namespace WebCore;
 
@@ -50,107 +49,135 @@ static uint64_t generateDownloadID()
     return ++uniqueDownloadID;
 }
     
-PassRefPtr<DownloadProxy> DownloadProxy::create(DownloadProxyMap& downloadProxyMap, WebContext* webContext)
+PassRefPtr<DownloadProxy> DownloadProxy::create(DownloadProxyMap& downloadProxyMap, WebProcessPool& processPool, const ResourceRequest& resourceRequest)
 {
-    return adoptRef(new DownloadProxy(downloadProxyMap, webContext));
+    return adoptRef(new DownloadProxy(downloadProxyMap, processPool, resourceRequest));
 }
 
-DownloadProxy::DownloadProxy(DownloadProxyMap& downloadProxyMap, WebContext* webContext)
+DownloadProxy::DownloadProxy(DownloadProxyMap& downloadProxyMap, WebProcessPool& processPool, const ResourceRequest& resourceRequest)
     : m_downloadProxyMap(downloadProxyMap)
-    , m_webContext(webContext)
+    , m_processPool(&processPool)
     , m_downloadID(generateDownloadID())
+    , m_request(resourceRequest)
 {
 }
 
 DownloadProxy::~DownloadProxy()
 {
-    ASSERT(!m_webContext);
+    ASSERT(!m_processPool);
 }
 
 void DownloadProxy::cancel()
 {
-    if (!m_webContext)
+    if (!m_processPool)
         return;
 
-#if ENABLE(NETWORK_PROCESS)
-    if (m_webContext->usesNetworkProcess()) {
-        if (NetworkProcessProxy* networkProcess = m_webContext->networkProcess())
-            networkProcess->connection()->send(Messages::NetworkProcess::CancelDownload(m_downloadID), 0);
-        return;
-    }
-#endif
-
-    m_webContext->sendToAllProcesses(Messages::WebProcess::CancelDownload(m_downloadID));
+    if (NetworkProcessProxy* networkProcess = m_processPool->networkProcess())
+        networkProcess->connection()->send(Messages::NetworkProcess::CancelDownload(m_downloadID), 0);
 }
 
 void DownloadProxy::invalidate()
 {
-    ASSERT(m_webContext);
-    m_webContext = 0;
+    ASSERT(m_processPool);
+    m_processPool = nullptr;
 }
 
 void DownloadProxy::processDidClose()
 {
-    if (!m_webContext)
+    if (!m_processPool)
         return;
 
-    m_webContext->downloadClient().processDidCrash(m_webContext.get(), this);
+    m_processPool->downloadClient().processDidCrash(m_processPool.get(), this);
 }
 
 void DownloadProxy::didStart(const ResourceRequest& request)
 {
     m_request = request;
 
-    if (!m_webContext)
+    if (!m_processPool)
         return;
 
-    m_webContext->downloadClient().didStart(m_webContext.get(), this);
+    m_processPool->downloadClient().didStart(m_processPool.get(), this);
 }
 
 void DownloadProxy::didReceiveAuthenticationChallenge(const AuthenticationChallenge& authenticationChallenge, uint64_t challengeID)
 {
-    if (!m_webContext)
+    if (!m_processPool)
         return;
 
-    RefPtr<AuthenticationChallengeProxy> authenticationChallengeProxy = AuthenticationChallengeProxy::create(authenticationChallenge, challengeID, m_webContext->networkingProcessConnection());
+    RefPtr<AuthenticationChallengeProxy> authenticationChallengeProxy = AuthenticationChallengeProxy::create(authenticationChallenge, challengeID, m_processPool->networkingProcessConnection());
 
-    m_webContext->downloadClient().didReceiveAuthenticationChallenge(m_webContext.get(), this, authenticationChallengeProxy.get());
+    m_processPool->downloadClient().didReceiveAuthenticationChallenge(m_processPool.get(), this, authenticationChallengeProxy.get());
 }
+
+#if USE(NETWORK_SESSION)
+void DownloadProxy::canAuthenticateAgainstProtectionSpace(const ProtectionSpace& protectionSpace)
+{
+    if (!m_processPool)
+        return;
+    
+    auto* networkProcessProxy = m_processPool->networkProcess();
+    if (!networkProcessProxy)
+        return;
+
+    bool result = m_processPool->downloadClient().canAuthenticateAgainstProtectionSpace(getPtr(WebProtectionSpace::create(protectionSpace)));
+    
+    networkProcessProxy->connection()->send(Messages::NetworkProcess::ContinueCanAuthenticateAgainstProtectionSpace(m_downloadID, result), 0);
+}
+
+void DownloadProxy::willSendRequest(const ResourceRequest& proposedRequest, const ResourceResponse& redirectResponse)
+{
+    if (!m_processPool)
+        return;
+
+    RefPtr<DownloadProxy> protectedThis(this);
+    m_processPool->downloadClient().willSendRequest(proposedRequest, redirectResponse, [protectedThis](const ResourceRequest& newRequest) {
+        if (!protectedThis->m_processPool)
+            return;
+        
+        auto* networkProcessProxy = protectedThis->m_processPool->networkProcess();
+        if (!networkProcessProxy)
+            return;
+        
+        networkProcessProxy->connection()->send(Messages::NetworkProcess::ContinueWillSendRequest(protectedThis->m_downloadID, newRequest), 0);
+    });
+}
+#endif
 
 void DownloadProxy::didReceiveResponse(const ResourceResponse& response)
 {
-    if (!m_webContext)
+    if (!m_processPool)
         return;
 
-    m_webContext->downloadClient().didReceiveResponse(m_webContext.get(), this, response);
+    m_processPool->downloadClient().didReceiveResponse(m_processPool.get(), this, response);
 }
 
 void DownloadProxy::didReceiveData(uint64_t length)
 {
-    if (!m_webContext)
+    if (!m_processPool)
         return;
 
-    m_webContext->downloadClient().didReceiveData(m_webContext.get(), this, length);
+    m_processPool->downloadClient().didReceiveData(m_processPool.get(), this, length);
 }
 
 void DownloadProxy::shouldDecodeSourceDataOfMIMEType(const String& mimeType, bool& result)
 {
     result = false;
 
-    if (!m_webContext)
+    if (!m_processPool)
         return;
 
-    result = m_webContext->downloadClient().shouldDecodeSourceDataOfMIMEType(m_webContext.get(), this, mimeType);
+    result = m_processPool->downloadClient().shouldDecodeSourceDataOfMIMEType(m_processPool.get(), this, mimeType);
 }
 
 void DownloadProxy::decideDestinationWithSuggestedFilename(const String& filename, String& destination, bool& allowOverwrite, SandboxExtension::Handle& sandboxExtensionHandle)
 {
     allowOverwrite = false;
 
-    if (!m_webContext)
+    if (!m_processPool)
         return;
 
-    destination = m_webContext->downloadClient().decideDestinationWithSuggestedFilename(m_webContext.get(), this, filename, allowOverwrite);
+    destination = m_processPool->downloadClient().decideDestinationWithSuggestedFilename(m_processPool.get(), this, filename, allowOverwrite);
 
     if (!destination.isNull())
         SandboxExtension::createHandle(destination, SandboxExtension::ReadWrite, sandboxExtensionHandle);
@@ -158,49 +185,49 @@ void DownloadProxy::decideDestinationWithSuggestedFilename(const String& filenam
 
 void DownloadProxy::didCreateDestination(const String& path)
 {
-    if (!m_webContext)
+    if (!m_processPool)
         return;
 
-    m_webContext->downloadClient().didCreateDestination(m_webContext.get(), this, path);
+    m_processPool->downloadClient().didCreateDestination(m_processPool.get(), this, path);
 }
 
 void DownloadProxy::didFinish()
 {
-    if (!m_webContext)
+    if (!m_processPool)
         return;
 
-    m_webContext->downloadClient().didFinish(m_webContext.get(), this);
+    m_processPool->downloadClient().didFinish(m_processPool.get(), this);
 
     // This can cause the DownloadProxy object to be deleted.
     m_downloadProxyMap.downloadFinished(this);
 }
 
-static PassRefPtr<WebData> createWebData(const CoreIPC::DataReference& data)
+static RefPtr<API::Data> createData(const IPC::DataReference& data)
 {
     if (data.isEmpty())
         return 0;
 
-    return WebData::create(data.data(), data.size());
+    return API::Data::create(data.data(), data.size());
 }
 
-void DownloadProxy::didFail(const ResourceError& error, const CoreIPC::DataReference& resumeData)
+void DownloadProxy::didFail(const ResourceError& error, const IPC::DataReference& resumeData)
 {
-    if (!m_webContext)
+    if (!m_processPool)
         return;
 
-    m_resumeData = createWebData(resumeData);
+    m_resumeData = createData(resumeData);
 
-    m_webContext->downloadClient().didFail(m_webContext.get(), this, error);
+    m_processPool->downloadClient().didFail(m_processPool.get(), this, error);
 
     // This can cause the DownloadProxy object to be deleted.
     m_downloadProxyMap.downloadFinished(this);
 }
 
-void DownloadProxy::didCancel(const CoreIPC::DataReference& resumeData)
+void DownloadProxy::didCancel(const IPC::DataReference& resumeData)
 {
-    m_resumeData = createWebData(resumeData);
+    m_resumeData = createData(resumeData);
 
-    m_webContext->downloadClient().didCancel(m_webContext.get(), this);
+    m_processPool->downloadClient().didCancel(m_processPool.get(), this);
 
     // This can cause the DownloadProxy object to be deleted.
     m_downloadProxyMap.downloadFinished(this);
@@ -209,11 +236,11 @@ void DownloadProxy::didCancel(const CoreIPC::DataReference& resumeData)
 #if PLATFORM(QT)
 void DownloadProxy::startTransfer(const String& filename)
 {
-    if (!m_webContext)
+    if (!m_processPool)
         return;
 
-    // FIXME (Multi-WebProcess): <rdar://problem/12239483> Downloads shouldn't be handled in the web process.
-    m_webContext->sendToAllProcesses(Messages::WebProcess::StartTransfer(m_downloadID, filename));
+    if (NetworkProcessProxy* networkProcess = m_processPool->networkProcess())
+        networkProcess->connection()->send(Messages::NetworkProcess::StartTransfer(m_downloadID, filename), 0);
 }
 #endif
 

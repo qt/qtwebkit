@@ -32,39 +32,32 @@
 
 namespace WebCore {
 
-class RenderFullScreen : public RenderFlexibleBox {
+class RenderFullScreen final : public RenderFlexibleBox {
 public:
-    static RenderFullScreen* createAnonymous(Document*);
+    RenderFullScreen(Document&, Ref<RenderStyle>&&);
 
-    virtual bool isRenderFullScreen() const { return true; }
-    virtual const char* renderName() const { return "RenderFullScreen"; }
+    virtual const char* renderName() const override { return "RenderFullScreen"; }
 
     void setPlaceholder(RenderBlock*);
     RenderBlock* placeholder() { return m_placeholder; }
-    void createPlaceholder(PassRefPtr<RenderStyle>, const LayoutRect& frameRect);
+    void createPlaceholder(Ref<RenderStyle>&&, const LayoutRect& frameRect);
 
-
-    static RenderObject* wrapRenderer(RenderObject*, RenderObject*, Document*);
-    void unwrapRenderer();
+    static RenderFullScreen* wrapRenderer(RenderObject*, RenderElement*, Document&);
+    void unwrapRenderer(bool& requiresRenderTreeRebuild);
 
 private:
-    RenderFullScreen();
-    virtual void willBeDestroyed();
+    virtual bool isRenderFullScreen() const override { return true; }
+    virtual void willBeDestroyed() override;
+    bool isFlexibleBoxImpl() const override { return true; }
 
 protected:
     RenderBlock* m_placeholder;
 };
-    
-inline RenderFullScreen* toRenderFullScreen(RenderObject* object)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(object->isRenderFullScreen());
-    return static_cast<RenderFullScreen*>(object);
-}
-    
-// This will catch anyone doing an unnecessary cast:
-void toRenderFullScreen(RenderFullScreen*);
-}
 
-#endif
+} // namespace WebCore
 
-#endif
+SPECIALIZE_TYPE_TRAITS_RENDER_OBJECT(RenderFullScreen, isRenderFullScreen())
+
+#endif // ENABLE(FULLSCREEN_API)
+
+#endif // RenderFullScreen_h

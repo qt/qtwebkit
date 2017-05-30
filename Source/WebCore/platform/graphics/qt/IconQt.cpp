@@ -75,12 +75,12 @@ PassRefPtr<Icon> Icon::createIconForFiles(const Vector<String>& filenames)
     return icon.release();
 }
 
-void Icon::paint(GraphicsContext* context, const IntRect& rect)
+void Icon::paint(GraphicsContext& context, const FloatRect& rect)
 {
-    if (m_icon.isNull())
+    if (m_icon.isNull() || context.paintingDisabled())
         return;
 
-    m_icon.paint(context->platformContext(), rect);
+    m_icon.paint(context.platformContext(), enclosingIntRect(rect));
 }
 
 }

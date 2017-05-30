@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2015 Apple Inc. All rights reserved.
  * Copyright (C) 2010 Nokia Corporation and/or its subsidiary(-ies).
  *
  * This library is free software; you can redistribute it and/or
@@ -21,23 +21,23 @@
 #ifndef PopupMenuWin_h
 #define PopupMenuWin_h
 
+#include "COMPtr.h"
 #include "IntRect.h"
 #include "PopupMenu.h"
 #include "PopupMenuClient.h"
 #include "ScrollableArea.h"
 #include "Scrollbar.h"
+#include <OleAcc.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
 #include <wtf/RefPtr.h>
-
-typedef struct HWND__* HWND;
-typedef struct HDC__* HDC;
-typedef struct HBITMAP__* HBITMAP;
+#include <wtf/win/GDIObject.h>
 
 namespace WebCore {
 
 class FrameView;
 class Scrollbar;
+class AccessiblePopupMenu;
 
 class PopupMenuWin : public PopupMenu, private ScrollableArea {
 public:
@@ -91,21 +91,23 @@ private:
     void setScrollbarCapturingMouse(bool b) { m_scrollbarCapturingMouse = b; }
 
     // ScrollableArea
-    virtual int scrollSize(ScrollbarOrientation) const OVERRIDE;
-    virtual int scrollPosition(Scrollbar*) const OVERRIDE;
-    virtual void setScrollOffset(const IntPoint&) OVERRIDE;
-    virtual void invalidateScrollbarRect(Scrollbar*, const IntRect&) OVERRIDE;
-    virtual void invalidateScrollCornerRect(const IntRect&) OVERRIDE { }
-    virtual bool isActive() const OVERRIDE { return true; }
-    ScrollableArea* enclosingScrollableArea() const OVERRIDE { return 0; }
-    virtual bool isScrollCornerVisible() const OVERRIDE { return false; }
-    virtual IntRect scrollCornerRect() const OVERRIDE { return IntRect(); }
-    virtual Scrollbar* verticalScrollbar() const OVERRIDE { return m_scrollbar.get(); }
-    virtual int visibleHeight() const OVERRIDE;
-    virtual int visibleWidth() const OVERRIDE;
-    virtual IntSize contentsSize() const OVERRIDE;
-    virtual bool scrollbarsCanBeActive() const OVERRIDE;
-    virtual IntRect scrollableAreaBoundingBox() const OVERRIDE;
+    virtual int scrollSize(ScrollbarOrientation) const override;
+    virtual int scrollOffset(ScrollbarOrientation) const override;
+    virtual void setScrollOffset(const IntPoint&) override;
+    virtual void invalidateScrollbarRect(Scrollbar*, const IntRect&) override;
+    virtual void invalidateScrollCornerRect(const IntRect&) override { }
+    virtual bool isActive() const override { return true; }
+    ScrollableArea* enclosingScrollableArea() const override { return 0; }
+    virtual bool isScrollableOrRubberbandable() override { return true; }
+    virtual bool hasScrollableOrRubberbandableAncestor() override { return true; }
+    virtual bool isScrollCornerVisible() const override { return false; }
+    virtual IntRect scrollCornerRect() const override { return IntRect(); }
+    virtual Scrollbar* verticalScrollbar() const override { return m_scrollbar.get(); }
+    virtual IntSize visibleSize() const override;
+    virtual IntSize contentsSize() const override;
+    virtual IntRect scrollableAreaBoundingBox(bool* = nullptr) const override;
+    virtual bool updatesScrollLayerPositionOnMainThread() const override { return true; }
+    virtual bool forceUpdateScrollbarsOnMainThreadForPerformanceTesting() const override { return false; }
 
     // NOTE: This should only be called by the overriden setScrollOffset from ScrollableArea.
     void scrollTo(int offset);
@@ -113,23 +115,73 @@ private:
     void calculatePositionAndSize(const IntRect&, FrameView*);
     void invalidateItem(int index);
 
+    bool onGetObject(WPARAM wParam, LPARAM lParam, LRESULT& lResult);
+
     static LRESULT CALLBACK PopupMenuWndProc(HWND, UINT, WPARAM, LPARAM);
     LRESULT wndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
     static void registerClass();
 
-    PopupMenuClient* m_popupClient;
     RefPtr<Scrollbar> m_scrollbar;
-    HWND m_popup;
-    HDC m_DC;
-    HBITMAP m_bmp;
-    bool m_wasClicked;
+    COMPtr<IAccessible> m_accessiblePopupMenu;
+    GDIObject<HDC> m_DC;
+    GDIObject<HBITMAP> m_bmp;
+    PopupMenuClient* m_popupClient;
+    HWND m_popup { nullptr };
     IntRect m_windowRect;
-    int m_itemHeight;
-    int m_scrollOffset;
-    int m_wheelDelta;
-    int m_focusedIndex;
-    bool m_scrollbarCapturingMouse;
-    bool m_showPopup;
+    int m_itemHeight { 0 };
+    int m_scrollOffset { 0 };
+    int m_wheelDelta { 0 };
+    int m_focusedIndex { 0 };
+    int m_hoveredIndex { 0 };
+    bool m_wasClicked { false };
+    bool m_scrollbarCapturingMouse { false };
+    bool m_showPopup { false };
+
+    friend class AccessiblePopupMenu;
+};
+
+class AccessiblePopupMenu : public IAccessible {
+public:
+    AccessiblePopupMenu(const PopupMenuWin&);
+    ~AccessiblePopupMenu();
+
+    // IUnknown
+    virtual HRESULT STDMETHODCALLTYPE QueryInterface(_In_ REFIID, _COM_Outptr_ void**);
+    virtual ULONG STDMETHODCALLTYPE AddRef();
+    virtual ULONG STDMETHODCALLTYPE Release();
+
+    // IDispatch - Not to be implemented.
+    virtual HRESULT STDMETHODCALLTYPE GetTypeInfoCount(_Out_ UINT* count);
+    virtual HRESULT STDMETHODCALLTYPE GetTypeInfo(UINT, LCID, _COM_Outptr_opt_ ITypeInfo**);
+    virtual HRESULT STDMETHODCALLTYPE GetIDsOfNames(_In_ REFIID, __in_ecount(cNames) LPOLESTR*, UINT cNames, LCID, __out_ecount_full(cNames) DISPID*);
+    virtual HRESULT STDMETHODCALLTYPE Invoke(DISPID, REFIID, LCID, WORD, DISPPARAMS*, VARIANT*, EXCEPINFO*, UINT*);
+
+    // IAccessible
+    virtual HRESULT STDMETHODCALLTYPE get_accParent(_COM_Outptr_opt_ IDispatch**);
+    virtual HRESULT STDMETHODCALLTYPE get_accChildCount(_Out_ long*);
+    virtual HRESULT STDMETHODCALLTYPE get_accChild(VARIANT vChild, _COM_Outptr_opt_ IDispatch** ppChild);
+    virtual HRESULT STDMETHODCALLTYPE get_accName(VARIANT vChild, __deref_out_opt BSTR*);
+    virtual HRESULT STDMETHODCALLTYPE get_accValue(VARIANT vChild, __deref_out_opt BSTR*);
+    virtual HRESULT STDMETHODCALLTYPE get_accDescription(VARIANT, __deref_out_opt BSTR*);
+    virtual HRESULT STDMETHODCALLTYPE get_accRole(VARIANT vChild, _Out_ VARIANT* pvRole);
+    virtual HRESULT STDMETHODCALLTYPE get_accState(VARIANT vChild, _Out_ VARIANT* pvState);
+    virtual HRESULT STDMETHODCALLTYPE get_accHelp(VARIANT vChild, __deref_out_opt BSTR* helpText);
+    virtual HRESULT STDMETHODCALLTYPE get_accKeyboardShortcut(VARIANT vChild, __deref_out_opt BSTR*);
+    virtual HRESULT STDMETHODCALLTYPE get_accFocus(_Out_ VARIANT* pvFocusedChild);
+    virtual HRESULT STDMETHODCALLTYPE get_accSelection(_Out_ VARIANT* pvSelectedChild);
+    virtual HRESULT STDMETHODCALLTYPE get_accDefaultAction(VARIANT vChild, __deref_out_opt BSTR* actionDescription);
+    virtual HRESULT STDMETHODCALLTYPE accSelect(long selectionFlags, VARIANT vChild);
+    virtual HRESULT STDMETHODCALLTYPE accLocation(_Out_ long* left, _Out_ long* top, _Out_ long* width, _Out_ long* height, VARIANT vChild);
+    virtual HRESULT STDMETHODCALLTYPE accNavigate(long direction, VARIANT vFromChild, _Out_ VARIANT* pvNavigatedTo);
+    virtual HRESULT STDMETHODCALLTYPE accHitTest(long x, long y, _Out_ VARIANT* pvChildAtPoint);
+    virtual HRESULT STDMETHODCALLTYPE accDoDefaultAction(VARIANT vChild);
+    virtual HRESULT STDMETHODCALLTYPE put_accName(VARIANT, _In_ BSTR);
+    virtual HRESULT STDMETHODCALLTYPE put_accValue(VARIANT, _In_ BSTR);
+    virtual HRESULT STDMETHODCALLTYPE get_accHelpTopic(BSTR* helpFile, VARIANT, _Out_ long* topicID);
+
+private:
+    int m_refCount { 0 };
+    const PopupMenuWin& m_popupMenu;
 };
 
 } // namespace WebCore

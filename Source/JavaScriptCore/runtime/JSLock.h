@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005, 2008, 2009 Apple Inc. All rights reserved.
+ * Copyright (C) 2005, 2008, 2009, 2014 Apple Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -21,106 +21,125 @@
 #ifndef JSLock_h
 #define JSLock_h
 
+#include <mutex>
+#include <thread>
 #include <wtf/Assertions.h>
+#include <wtf/Lock.h>
 #include <wtf/Noncopyable.h>
 #include <wtf/RefPtr.h>
-#include <wtf/TCSpinLock.h>
-#include <wtf/Threading.h>
+#include <wtf/ThreadSafeRefCounted.h>
+#include <wtf/WTFThreadData.h>
 
 namespace JSC {
 
-    // To make it safe to use JavaScript on multiple threads, it is
-    // important to lock before doing anything that allocates a
-    // JavaScript data structure or that interacts with shared state
-    // such as the protect count hash table. The simplest way to lock
-    // is to create a local JSLockHolder object in the scope where the lock 
-    // must be held and pass it the context that requires protection. 
-    // The lock is recursive so nesting is ok. The JSLock 
-    // object also acts as a convenience short-hand for running important
-    // initialization routines.
+// To make it safe to use JavaScript on multiple threads, it is
+// important to lock before doing anything that allocates a
+// JavaScript data structure or that interacts with shared state
+// such as the protect count hash table. The simplest way to lock
+// is to create a local JSLockHolder object in the scope where the lock 
+// must be held and pass it the context that requires protection. 
+// The lock is recursive so nesting is ok. The JSLock 
+// object also acts as a convenience short-hand for running important
+// initialization routines.
 
-    // To avoid deadlock, sometimes it is necessary to temporarily
-    // release the lock. Since it is recursive you actually have to
-    // release all locks held by your thread. This is safe to do if
-    // you are executing code that doesn't require the lock, and you
-    // reacquire the right number of locks at the end. You can do this
-    // by constructing a locally scoped JSLock::DropAllLocks object. The 
-    // DropAllLocks object takes care to release the JSLock only if your
-    // thread acquired it to begin with.
+// To avoid deadlock, sometimes it is necessary to temporarily
+// release the lock. Since it is recursive you actually have to
+// release all locks held by your thread. This is safe to do if
+// you are executing code that doesn't require the lock, and you
+// reacquire the right number of locks at the end. You can do this
+// by constructing a locally scoped JSLock::DropAllLocks object. The 
+// DropAllLocks object takes care to release the JSLock only if your
+// thread acquired it to begin with.
 
-    class ExecState;
-    class VM;
+class ExecState;
+class VM;
 
-    // This class is used to protect the initialization of the legacy single 
-    // shared VM.
-    class GlobalJSLock {
-        WTF_MAKE_NONCOPYABLE(GlobalJSLock);
+// This class is used to protect the initialization of the legacy single 
+// shared VM.
+class GlobalJSLock {
+    WTF_MAKE_NONCOPYABLE(GlobalJSLock);
+public:
+    JS_EXPORT_PRIVATE GlobalJSLock();
+    JS_EXPORT_PRIVATE ~GlobalJSLock();
+private:
+    static StaticLock s_sharedInstanceMutex;
+};
+
+class JSLockHolder {
+public:
+    JS_EXPORT_PRIVATE JSLockHolder(VM*);
+    JS_EXPORT_PRIVATE JSLockHolder(VM&);
+    JS_EXPORT_PRIVATE JSLockHolder(ExecState*);
+
+    JS_EXPORT_PRIVATE ~JSLockHolder();
+private:
+    void init();
+
+    RefPtr<VM> m_vm;
+};
+
+class JSLock : public ThreadSafeRefCounted<JSLock> {
+    WTF_MAKE_NONCOPYABLE(JSLock);
+public:
+    JSLock(VM*);
+    JS_EXPORT_PRIVATE ~JSLock();
+
+    JS_EXPORT_PRIVATE void lock();
+    JS_EXPORT_PRIVATE void unlock();
+
+    static void lock(ExecState*);
+    static void unlock(ExecState*);
+    static void lock(VM&);
+    static void unlock(VM&);
+
+    VM* vm() { return m_vm; }
+
+    bool hasExclusiveThread() const { return m_hasExclusiveThread; }
+    std::thread::id exclusiveThread() const
+    {
+        ASSERT(m_hasExclusiveThread);
+        return m_ownerThreadID;
+    }
+    JS_EXPORT_PRIVATE void setExclusiveThread(std::thread::id);
+    JS_EXPORT_PRIVATE bool currentThreadIsHoldingLock();
+
+    void willDestroyVM(VM*);
+
+    class DropAllLocks {
+        WTF_MAKE_NONCOPYABLE(DropAllLocks);
     public:
-        JS_EXPORT_PRIVATE GlobalJSLock();
-        JS_EXPORT_PRIVATE ~GlobalJSLock();
+        JS_EXPORT_PRIVATE DropAllLocks(ExecState*);
+        JS_EXPORT_PRIVATE DropAllLocks(VM*);
+        JS_EXPORT_PRIVATE DropAllLocks(VM&);
+        JS_EXPORT_PRIVATE ~DropAllLocks();
 
-        static void initialize();
+        void setDropDepth(unsigned depth) { m_dropDepth = depth; }
+        unsigned dropDepth() const { return m_dropDepth; }
+
     private:
-        static Mutex* s_sharedInstanceLock;
-    };
-
-    class JSLockHolder {
-    public:
-        JS_EXPORT_PRIVATE JSLockHolder(VM*);
-        JS_EXPORT_PRIVATE JSLockHolder(VM&);
-        JS_EXPORT_PRIVATE JSLockHolder(ExecState*);
-
-        JS_EXPORT_PRIVATE ~JSLockHolder();
-    private:
-        void init();
-
+        intptr_t m_droppedLockCount;
         RefPtr<VM> m_vm;
+        unsigned m_dropDepth;
     };
 
-    class JSLock : public ThreadSafeRefCounted<JSLock> {
-        WTF_MAKE_NONCOPYABLE(JSLock);
-    public:
-        JSLock(VM*);
-        JS_EXPORT_PRIVATE ~JSLock();
+private:
+    void lock(intptr_t lockCount);
+    void unlock(intptr_t unlockCount);
 
-        JS_EXPORT_PRIVATE void lock();
-        JS_EXPORT_PRIVATE void unlock();
+    void didAcquireLock();
+    void willReleaseLock();
 
-        static void lock(ExecState*);
-        static void unlock(ExecState*);
-        static void lock(VM&);
-        static void unlock(VM&);
+    unsigned dropAllLocks(DropAllLocks*);
+    void grabAllLocks(DropAllLocks*, unsigned lockCount);
 
-        VM* vm() { return m_vm; }
-
-        JS_EXPORT_PRIVATE bool currentThreadIsHoldingLock();
-
-        unsigned dropAllLocks();
-        unsigned dropAllLocksUnconditionally();
-        void grabAllLocks(unsigned lockCount);
-
-        void willDestroyVM(VM*);
-
-        class DropAllLocks {
-            WTF_MAKE_NONCOPYABLE(DropAllLocks);
-        public:
-            JS_EXPORT_PRIVATE DropAllLocks(ExecState* exec);
-            JS_EXPORT_PRIVATE DropAllLocks(VM*);
-            JS_EXPORT_PRIVATE ~DropAllLocks();
-            
-        private:
-            intptr_t m_lockCount;
-            RefPtr<VM> m_vm;
-        };
-
-    private:
-        SpinLock m_spinLock;
-        Mutex m_lock;
-        ThreadIdentifier m_ownerThread;
-        intptr_t m_lockCount;
-        unsigned m_lockDropDepth;
-        VM* m_vm;
-    };
+    Lock m_lock;
+    std::thread::id m_ownerThreadID;
+    intptr_t m_lockCount;
+    unsigned m_lockDropDepth;
+    bool m_hasExclusiveThread;
+    VM* m_vm;
+    AtomicStringTable* m_entryAtomicStringTable; 
+};
 
 } // namespace
 

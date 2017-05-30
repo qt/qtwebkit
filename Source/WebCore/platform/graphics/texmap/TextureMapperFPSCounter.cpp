@@ -21,8 +21,6 @@
 
 #include "config.h"
 
-#if USE(ACCELERATED_COMPOSITING) && USE(TEXTURE_MAPPER)
-
 #include "TextureMapperFPSCounter.h"
 
 #include "TextureMapper.h"
@@ -42,26 +40,24 @@ TextureMapperFPSCounter::TextureMapperFPSCounter()
     m_fpsInterval = showFPSEnvironment.toDouble(&ok);
     if (ok && m_fpsInterval) {
         m_isShowingFPS = true;
-        m_fpsTimestamp = WTF::currentTime();
+        m_fpsTimestamp = monotonicallyIncreasingTime();
     }
 }
 
-void TextureMapperFPSCounter::updateFPSAndDisplay(TextureMapper* textureMapper, const FloatPoint& location, const TransformationMatrix& matrix)
+void TextureMapperFPSCounter::updateFPSAndDisplay(TextureMapper& textureMapper, const FloatPoint& location, const TransformationMatrix& matrix)
 {
     if (!m_isShowingFPS)
         return;
 
     m_frameCount++;
-    double delta = WTF::currentTime() - m_fpsTimestamp;
+    double delta = monotonicallyIncreasingTime() - m_fpsTimestamp;
     if (delta >= m_fpsInterval) {
         m_lastFPS = int(m_frameCount / delta);
         m_frameCount = 0;
         m_fpsTimestamp += delta;
     }
 
-    textureMapper->drawNumber(m_lastFPS, Color::black, location, matrix);
+    textureMapper.drawNumber(m_lastFPS, Color::black, location, matrix);
 }
 
 } // namespace WebCore
-
-#endif // USE(ACCELERATED_COMPOSITING)

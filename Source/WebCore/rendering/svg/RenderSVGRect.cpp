@@ -26,23 +26,25 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "RenderSVGRect.h"
 
 #include "SVGNames.h"
-#include "SVGRectElement.h"
 
 namespace WebCore {
 
-RenderSVGRect::RenderSVGRect(SVGRectElement* node)
-    : RenderSVGShape(node)
+RenderSVGRect::RenderSVGRect(SVGRectElement& element, Ref<RenderStyle>&& style)
+    : RenderSVGShape(element, WTFMove(style))
     , m_usePathFallback(false)
 {
 }
 
 RenderSVGRect::~RenderSVGRect()
 {
+}
+
+SVGRectElement& RenderSVGRect::rectElement() const
+{
+    return downcast<SVGRectElement>(RenderSVGShape::graphicsElement());
 }
 
 void RenderSVGRect::updateShapeFromElement()
@@ -52,30 +54,35 @@ void RenderSVGRect::updateShapeFromElement()
     m_fillBoundingBox = FloatRect();
     m_innerStrokeRect = FloatRect();
     m_outerStrokeRect = FloatRect();
-    SVGRectElement* rect = static_cast<SVGRectElement*>(node());
-    ASSERT(rect);
 
-    // Fallback to RenderSVGShape if rect has rounded corners or a non-scaling stroke.
-    if (rect->hasAttribute(SVGNames::rxAttr) || rect->hasAttribute(SVGNames::ryAttr) || hasNonScalingStroke()) {
-        RenderSVGShape::updateShapeFromElement();
-        m_usePathFallback = true;
+    SVGLengthContext lengthContext(&rectElement());
+    FloatSize boundingBoxSize(lengthContext.valueForLength(style().width(), LengthModeWidth), lengthContext.valueForLength(style().height(), LengthModeHeight));
+
+    // Element is invalid if either dimension is negative.
+    if (boundingBoxSize.width() < 0 || boundingBoxSize.height() < 0)
         return;
-    } else
+
+    // Rendering enabled? Spec: "A value of zero disables rendering of the element."
+    if (!boundingBoxSize.isEmpty()) {
+        if (rectElement().rx().value(lengthContext) > 0 || rectElement().ry().value(lengthContext) > 0 || hasNonScalingStroke()) {
+            // Fall back to RenderSVGShape
+            RenderSVGShape::updateShapeFromElement();
+            m_usePathFallback = true;
+            return;
+        }
         m_usePathFallback = false;
+    }
 
-    SVGLengthContext lengthContext(rect);
-    FloatSize boundingBoxSize(rect->width().value(lengthContext), rect->height().value(lengthContext));
-    if (boundingBoxSize.isEmpty())
-        return;
-
-    m_fillBoundingBox = FloatRect(FloatPoint(rect->x().value(lengthContext), rect->y().value(lengthContext)), boundingBoxSize);
+    m_fillBoundingBox = FloatRect(FloatPoint(lengthContext.valueForLength(style().svgStyle().x(), LengthModeWidth),
+        lengthContext.valueForLength(style().svgStyle().y(), LengthModeHeight)),
+        boundingBoxSize);
 
     // To decide if the stroke contains a point we create two rects which represent the inner and
     // the outer stroke borders. A stroke contains the point, if the point is between them.
     m_innerStrokeRect = m_fillBoundingBox;
     m_outerStrokeRect = m_fillBoundingBox;
 
-    if (style()->svgStyle()->hasStroke()) {
+    if (style().svgStyle().hasStroke()) {
         float strokeWidth = this->strokeWidth();
         m_innerStrokeRect.inflate(-strokeWidth / 2);
         m_outerStrokeRect.inflate(strokeWidth / 2);
@@ -85,12 +92,12 @@ void RenderSVGRect::updateShapeFromElement()
 
 #if USE(CG)
     // CoreGraphics can inflate the stroke by 1px when drawing a rectangle with antialiasing disabled at non-integer coordinates, we need to compensate.
-    if (style()->svgStyle()->shapeRendering() == SR_CRISPEDGES)
+    if (style().svgStyle().shapeRendering() == SR_CRISPEDGES)
         m_strokeBoundingBox.inflate(1);
 #endif
 }
 
-void RenderSVGRect::fillShape(GraphicsContext* context) const
+void RenderSVGRect::fillShape(GraphicsContext& context) const
 {
     if (m_usePathFallback) {
         RenderSVGShape::fillShape(context);
@@ -102,20 +109,20 @@ void RenderSVGRect::fillShape(GraphicsContext* context) const
     // shadow drawing method, which draws an extra shadow.
     // This is a workaround for switching off the extra shadow.
     // https://bugs.webkit.org/show_bug.cgi?id=68899
-    if (context->hasShadow()) {
-        GraphicsContextStateSaver stateSaver(*context);
-        context->clearShadow();
-        context->fillRect(m_fillBoundingBox);
+    if (context.hasShadow()) {
+        GraphicsContextStateSaver stateSaver(context);
+        context.clearShadow();
+        context.fillRect(m_fillBoundingBox);
         return;
     }
 #endif
 
-    context->fillRect(m_fillBoundingBox);
+    context.fillRect(m_fillBoundingBox);
 }
 
-void RenderSVGRect::strokeShape(GraphicsContext* context) const
+void RenderSVGRect::strokeShape(GraphicsContext& context) const
 {
-    if (!style()->svgStyle()->hasVisibleStroke())
+    if (!style().svgStyle().hasVisibleStroke())
         return;
 
     if (m_usePathFallback) {
@@ -123,7 +130,7 @@ void RenderSVGRect::strokeShape(GraphicsContext* context) const
         return;
     }
 
-    context->strokeRect(m_fillBoundingBox, strokeWidth());
+    context.strokeRect(m_fillBoundingBox, strokeWidth());
 }
 
 bool RenderSVGRect::shapeDependentStrokeContains(const FloatPoint& point)
@@ -146,6 +153,10 @@ bool RenderSVGRect::shapeDependentFillContains(const FloatPoint& point, const Wi
     return m_fillBoundingBox.contains(point.x(), point.y());
 }
 
+bool RenderSVGRect::isRenderingDisabled() const
+{
+    // A width or height of zero disables rendering for the element, and results in an empty bounding box.
+    return m_fillBoundingBox.isEmpty();
 }
 
-#endif // ENABLE(SVG)
+}

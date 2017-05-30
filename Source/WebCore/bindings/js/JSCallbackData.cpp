@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007, 2008, 2009 Apple Inc. All rights reserved.
+ * Copyright (C) 2007-2009, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -32,64 +32,67 @@
 #include "Document.h"
 #include "JSDOMBinding.h"
 #include "JSMainThreadExecState.h"
+#include "JSMainThreadExecStateInstrumentation.h"
+#include <runtime/Exception.h>
 
 using namespace JSC;
     
 namespace WebCore {
 
-void JSCallbackData::deleteData(void* context)
+JSValue JSCallbackData::invokeCallback(JSObject* callback, MarkedArgumentBuffer& args, CallbackType method, PropertyName functionName, NakedPtr<Exception>& returnedException)
 {
-    delete static_cast<JSCallbackData*>(context);
-}
+    ASSERT(callback);
 
-JSValue JSCallbackData::invokeCallback(MarkedArgumentBuffer& args, bool* raisedException)
-{
-    ASSERT(callback());
-    return invokeCallback(callback(), args, raisedException);
-}
+    auto* globalObject = JSC::jsCast<JSDOMGlobalObject*>(callback->globalObject());
+    ASSERT(globalObject);
 
-JSValue JSCallbackData::invokeCallback(JSValue thisValue, MarkedArgumentBuffer& args, bool* raisedException)
-{
-    ASSERT(callback());
-    ASSERT(globalObject());
-
-    ExecState* exec = globalObject()->globalExec();
-    JSValue function = callback();
-
+    ExecState* exec = globalObject->globalExec();
+    JSValue function;
     CallData callData;
-    CallType callType = callback()->methodTable()->getCallData(callback(), callData);
+    CallType callType = CallTypeNone;
+
+    if (method != CallbackType::Object) {
+        function = callback;
+        callType = callback->methodTable()->getCallData(callback, callData);
+    }
     if (callType == CallTypeNone) {
-        function = callback()->get(exec, Identifier(exec, "handleEvent"));
-        callType = getCallData(function, callData);
-        if (callType == CallTypeNone)
+        if (method == CallbackType::Function) {
+            returnedException = Exception::create(exec->vm(), createTypeError(exec));
             return JSValue();
+        }
+
+        ASSERT(!functionName.isNull());
+        function = callback->get(exec, functionName);
+        callType = getCallData(function, callData);
+        if (callType == CallTypeNone) {
+            returnedException = Exception::create(exec->vm(), createTypeError(exec));
+            return JSValue();
+        }
     }
 
-    ScriptExecutionContext* context = globalObject()->scriptExecutionContext();
+    ASSERT(!function.isEmpty());
+    ASSERT(callType != CallTypeNone);
+
+    ScriptExecutionContext* context = globalObject->scriptExecutionContext();
     // We will fail to get the context if the frame has been detached.
     if (!context)
         return JSValue();
 
     InspectorInstrumentationCookie cookie = JSMainThreadExecState::instrumentFunctionCall(context, callType, callData);
 
-    bool contextIsDocument = context->isDocument();
-    JSValue result = contextIsDocument
-        ? JSMainThreadExecState::call(exec, function, callType, callData, thisValue, args)
-        : JSC::call(exec, function, callType, callData, thisValue, args);
+    returnedException = nullptr;
+    JSValue result = context->isDocument()
+        ? JSMainThreadExecState::profiledCall(exec, JSC::ProfilingReason::Other, function, callType, callData, callback, args, returnedException)
+        : JSC::profiledCall(exec, JSC::ProfilingReason::Other, function, callType, callData, callback, args, returnedException);
 
-    InspectorInstrumentation::didCallFunction(cookie);
-
-    if (contextIsDocument)
-        Document::updateStyleForAllDocuments();
-
-    if (exec->hadException()) {
-        reportCurrentException(exec);
-        if (raisedException)
-            *raisedException = true;
-        return result;
-    }
+    InspectorInstrumentation::didCallFunction(cookie, context);
 
     return result;
+}
+
+bool JSCallbackDataWeak::WeakOwner::isReachableFromOpaqueRoots(JSC::Handle<JSC::Unknown>, void* context, SlotVisitor& visitor)
+{
+    return visitor.containsOpaqueRoot(context);
 }
 
 } // namespace WebCore

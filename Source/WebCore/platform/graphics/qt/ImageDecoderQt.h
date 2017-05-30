@@ -33,27 +33,25 @@
 #include <QtCore/QList>
 #include <QtGui/QImageReader>
 #include <QtGui/QPixmap>
-#include <wtf/OwnPtr.h>
-#include <wtf/PassOwnPtr.h>
 
 namespace WebCore {
 
 
-class ImageDecoderQt : public ImageDecoder
+class ImageDecoderQt final : public ImageDecoder
 {
 public:
     ImageDecoderQt(ImageSource::AlphaOption, ImageSource::GammaAndColorProfileOption);
     ~ImageDecoderQt();
 
-    virtual void setData(SharedBuffer* data, bool allDataReceived);
-    virtual bool isSizeAvailable();
-    virtual size_t frameCount();
-    virtual int repetitionCount() const;
-    virtual ImageFrame* frameBufferAtIndex(size_t index);
+    void setData(SharedBuffer* data, bool allDataReceived) final;
+    bool isSizeAvailable() final;
+    size_t frameCount() final;
+    int repetitionCount() const final;
+    ImageFrame* frameBufferAtIndex(size_t index) final;
 
-    virtual String filenameExtension() const;
+    String filenameExtension() const final;
 
-    virtual void clearFrameBufferCache(size_t clearBeforeFrame);
+    void clearFrameBufferCache(size_t clearBeforeFrame) final;
 
 private:
     ImageDecoderQt(const ImageDecoderQt&);
@@ -68,8 +66,8 @@ private:
 
 private:
     QByteArray m_format;
-    OwnPtr<QBuffer> m_buffer;
-    OwnPtr<QImageReader> m_reader;
+    std::unique_ptr<QBuffer> m_buffer;
+    std::unique_ptr<QImageReader> m_reader;
     mutable int m_repetitionCount;
 };
 

@@ -28,40 +28,39 @@ namespace JSC {
 class ArrayAllocationProfile;
 class ArrayPrototype;
 class JSArray;
+class GetterSetter;
 
 class ArrayConstructor : public InternalFunction {
 public:
     typedef InternalFunction Base;
+    static const unsigned StructureFlags = OverridesGetOwnPropertySlot | InternalFunction::StructureFlags;
 
-    static ArrayConstructor* create(ExecState* exec, JSGlobalObject* globalObject, Structure* structure, ArrayPrototype* arrayPrototype)
+    static ArrayConstructor* create(VM& vm, Structure* structure, ArrayPrototype* arrayPrototype, GetterSetter* speciesSymbol)
     {
-        ArrayConstructor* constructor = new (NotNull, allocateCell<ArrayConstructor>(*exec->heap())) ArrayConstructor(globalObject, structure);
-        constructor->finishCreation(exec, arrayPrototype);
+        ArrayConstructor* constructor = new (NotNull, allocateCell<ArrayConstructor>(vm.heap)) ArrayConstructor(vm, structure);
+        constructor->finishCreation(vm, arrayPrototype, speciesSymbol);
         return constructor;
     }
 
-    static const ClassInfo s_info;
+    DECLARE_INFO;
 
     static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype)
     {
-        return Structure::create(vm, globalObject, prototype, TypeInfo(ObjectType, StructureFlags), &s_info);
+        return Structure::create(vm, globalObject, prototype, TypeInfo(ObjectType, StructureFlags), info());
     }
 
 protected:
-    void finishCreation(ExecState*, ArrayPrototype*);
-    static const unsigned StructureFlags = OverridesGetOwnPropertySlot | InternalFunction::StructureFlags;
+    void finishCreation(VM&, ArrayPrototype*, GetterSetter* speciesSymbol);
 
 private:
-    ArrayConstructor(JSGlobalObject*, Structure*);
-    static bool getOwnPropertySlot(JSCell*, ExecState*, PropertyName, PropertySlot&);
-
-    static bool getOwnPropertyDescriptor(JSObject*, ExecState*, PropertyName, PropertyDescriptor&);
+    ArrayConstructor(VM&, Structure*);
+    static bool getOwnPropertySlot(JSObject*, ExecState*, PropertyName, PropertySlot&);
 
     static ConstructType getConstructData(JSCell*, ConstructData&);
     static CallType getCallData(JSCell*, CallData&);
 };
 
-JSObject* constructArrayWithSizeQuirk(ExecState*, ArrayAllocationProfile*, JSGlobalObject*, JSValue);
+JSObject* constructArrayWithSizeQuirk(ExecState*, ArrayAllocationProfile*, JSGlobalObject*, JSValue length, JSValue prototype = JSValue());
 
 } // namespace JSC
 

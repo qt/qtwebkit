@@ -21,7 +21,7 @@
 #ifndef SVGTextRunRenderingContext_h
 #define SVGTextRunRenderingContext_h
 
-#include "Font.h"
+#include "FontCascade.h"
 #include "TextRun.h"
 
 namespace WebCore {
@@ -29,27 +29,27 @@ namespace WebCore {
 class RenderObject;
 class RenderSVGResource;
 
-class SVGTextRunRenderingContext : public TextRun::RenderingContext {
+class SVGTextRunRenderingContext final : public TextRun::RenderingContext {
 public:
-    static PassRefPtr<SVGTextRunRenderingContext> create(RenderObject* renderer)
+    static Ref<SVGTextRunRenderingContext> create(RenderObject& renderer)
     {
-        return adoptRef(new SVGTextRunRenderingContext(renderer));
+        return adoptRef(*new SVGTextRunRenderingContext(renderer));
     }
 
-    RenderObject* renderer() const { return m_renderer; }
+    RenderObject& renderer() const { return m_renderer; }
 
 #if ENABLE(SVG_FONTS)
     RenderSVGResource* activePaintingResource() const { return m_activePaintingResource; }
     void setActivePaintingResource(RenderSVGResource* object) { m_activePaintingResource = object; }
 
-    virtual GlyphData glyphDataForCharacter(const Font&, const TextRun&, WidthIterator&, UChar32 character, bool mirror, int currentCharacter, unsigned& advanceLength);
-    virtual void drawSVGGlyphs(GraphicsContext*, const TextRun&, const SimpleFontData*, const GlyphBuffer&, int from, int to, const FloatPoint&) const;
-    virtual float floatWidthUsingSVGFont(const Font&, const TextRun&, int& charsConsumed, String& glyphName) const;
-    virtual bool applySVGKerning(const SimpleFontData*, WidthIterator&, GlyphBuffer*, int from) const;
+    virtual GlyphData glyphDataForCharacter(const FontCascade&, WidthIterator&, UChar32 character, bool mirror, int currentCharacter, unsigned& advanceLength, String& normalizedSpacesStringCache) override;
+    virtual void drawSVGGlyphs(GraphicsContext&, const Font&, const GlyphBuffer&, int from, int to, const FloatPoint&) const override;
+    virtual float floatWidthUsingSVGFont(const FontCascade&, const TextRun&, int& charsConsumed, String& glyphName) const override;
+    virtual bool applySVGKerning(const Font*, WidthIterator&, GlyphBuffer*, int from) const override;
 #endif
 
 private:
-    SVGTextRunRenderingContext(RenderObject* renderer)
+    SVGTextRunRenderingContext(RenderObject& renderer)
         : m_renderer(renderer)
 #if ENABLE(SVG_FONTS)
         , m_activePaintingResource(0)
@@ -59,20 +59,16 @@ private:
 
     virtual ~SVGTextRunRenderingContext() { }
 
-    RenderObject* m_renderer;
+#if ENABLE(SVG_FONTS)
+    virtual std::unique_ptr<GlyphToPathTranslator> createGlyphToPathTranslator(const Font&, const TextRun*, const GlyphBuffer&, int from, int numGlyphs, const FloatPoint&) const override;
+#endif
+
+    RenderObject& m_renderer;
 
 #if ENABLE(SVG_FONTS)
     RenderSVGResource* m_activePaintingResource;
 #endif
 };
-
-inline bool textRunNeedsRenderingContext(const Font& font)
-{
-    // Only save the extra data if SVG Fonts are used, which depend on them.
-    // FIXME: SVG Fonts won't work as segmented fonts at the moment, if that's fixed, we need to check for them as well below.
-    ASSERT(font.primaryFont());
-    return font.primaryFont()->isSVGFont();
-}
 
 } // namespace WebCore
 

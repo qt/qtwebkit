@@ -26,29 +26,31 @@
 #ifndef WebContextMenuProxy_h
 #define WebContextMenuProxy_h
 
-#include <wtf/PassRefPtr.h>
-#include <wtf/RefCounted.h>
-#include <wtf/Vector.h>
+#if ENABLE(CONTEXT_MENUS)
 
-namespace WebCore {
-    class IntPoint;
-}
+#include "ContextMenuContextData.h"
+#include "UserData.h"
+#include <wtf/RefCounted.h>
 
 namespace WebKit {
 
-class WebContextMenuItemData;
+class WebContextMenuItem;
 
-class WebContextMenuProxy : public RefCounted<WebContextMenuProxy> {
+class WebContextMenuProxy {
 public:
     virtual ~WebContextMenuProxy();
 
-    virtual void showContextMenu(const WebCore::IntPoint&, const Vector<WebContextMenuItemData>& items) = 0;
-    virtual void hideContextMenu() = 0;
+    virtual void show() = 0;
 
 protected:
-    WebContextMenuProxy();
+    WebContextMenuProxy(const ContextMenuContextData&, const UserData&);
+
+    const ContextMenuContextData m_context;
+    const UserData m_userData;
 };
 
 } // namespace WebKit
+
+#endif
 
 #endif // WebPopupMenuProxy_h

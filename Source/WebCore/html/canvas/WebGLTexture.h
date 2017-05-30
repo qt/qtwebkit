@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -28,16 +28,22 @@
 
 #include "WebGLSharedObject.h"
 
-#include <wtf/PassRefPtr.h>
 #include <wtf/Vector.h>
 
 namespace WebCore {
 
-class WebGLTexture : public WebGLSharedObject {
+class WebGLTexture final : public WebGLSharedObject {
 public:
+
+    enum TextureExtensionFlag {
+        TextureExtensionsDisabled = 0,
+        TextureExtensionFloatLinearEnabled = 1 << 0,
+        TextureExtensionHalfFloatLinearEnabled = 2 << 0
+    };
+
     virtual ~WebGLTexture();
 
-    static PassRefPtr<WebGLTexture> create(WebGLRenderingContext*);
+    static Ref<WebGLTexture> create(WebGLRenderingContextBase*);
 
     void setTarget(GC3Denum target, GC3Dint maxLevel);
     void setParameteri(GC3Denum pname, GC3Dint param);
@@ -58,24 +64,27 @@ public:
     GC3Dsizei getWidth(GC3Denum target, GC3Dint level) const;
     GC3Dsizei getHeight(GC3Denum target, GC3Dint level) const;
     bool isValid(GC3Denum target, GC3Dint level) const;
+    void markInvalid(GC3Denum target, GC3Dint level);
 
     // Whether width/height is NotPowerOfTwo.
     static bool isNPOT(GC3Dsizei, GC3Dsizei);
 
     bool isNPOT() const;
     // Determine if texture sampling should always return [0, 0, 0, 1] (OpenGL ES 2.0 Sec 3.8.2).
-    bool needToUseBlackTexture() const;
+    bool needToUseBlackTexture(TextureExtensionFlag) const;
+
+    bool isCompressed() const;
+    void setCompressed();
 
     bool hasEverBeenBound() const { return object() && m_target; }
 
     static GC3Dint computeLevelCount(GC3Dsizei width, GC3Dsizei height);
 
-protected:
-    WebGLTexture(WebGLRenderingContext*);
-
-    virtual void deleteObjectImpl(GraphicsContext3D*, Platform3DObject);
-
 private:
+    WebGLTexture(WebGLRenderingContextBase*);
+
+    virtual void deleteObjectImpl(GraphicsContext3D*, Platform3DObject) override;
+
     class LevelInfo {
     public:
         LevelInfo()
@@ -103,7 +112,7 @@ private:
         GC3Denum type;
     };
 
-    virtual bool isTexture() const { return true; }
+    virtual bool isTexture() const override { return true; }
 
     void update();
 
@@ -118,11 +127,14 @@ private:
     GC3Denum m_wrapS;
     GC3Denum m_wrapT;
 
-    Vector<Vector<LevelInfo> > m_info;
+    Vector<Vector<LevelInfo>> m_info;
 
     bool m_isNPOT;
     bool m_isComplete;
     bool m_needToUseBlackTexture;
+    bool m_isCompressed;
+    bool m_isFloatType;
+    bool m_isHalfFloatType;
 };
 
 } // namespace WebCore

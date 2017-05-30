@@ -18,16 +18,12 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG) && ENABLE(FILTERS)
 #include "SVGFEDiffuseLightingElement.h"
 
-#include "Attr.h"
 #include "FEDiffuseLighting.h"
 #include "FilterEffect.h"
 #include "RenderStyle.h"
 #include "SVGColor.h"
-#include "SVGElementInstance.h"
 #include "SVGFELightElement.h"
 #include "SVGFilterBuilder.h"
 #include "SVGNames.h"
@@ -51,7 +47,7 @@ BEGIN_REGISTER_ANIMATED_PROPERTIES(SVGFEDiffuseLightingElement)
     REGISTER_PARENT_ANIMATED_PROPERTIES(SVGFilterPrimitiveStandardAttributes)
 END_REGISTER_ANIMATED_PROPERTIES
 
-inline SVGFEDiffuseLightingElement::SVGFEDiffuseLightingElement(const QualifiedName& tagName, Document* document)
+inline SVGFEDiffuseLightingElement::SVGFEDiffuseLightingElement(const QualifiedName& tagName, Document& document)
     : SVGFilterPrimitiveStandardAttributes(tagName, document)
     , m_diffuseConstant(1)
     , m_surfaceScale(1)
@@ -60,43 +56,25 @@ inline SVGFEDiffuseLightingElement::SVGFEDiffuseLightingElement(const QualifiedN
     registerAnimatedPropertiesForSVGFEDiffuseLightingElement();
 }
 
-PassRefPtr<SVGFEDiffuseLightingElement> SVGFEDiffuseLightingElement::create(const QualifiedName& tagName, Document* document)
+Ref<SVGFEDiffuseLightingElement> SVGFEDiffuseLightingElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new SVGFEDiffuseLightingElement(tagName, document));
+    return adoptRef(*new SVGFEDiffuseLightingElement(tagName, document));
 }
 
 const AtomicString& SVGFEDiffuseLightingElement::kernelUnitLengthXIdentifier()
 {
-    DEFINE_STATIC_LOCAL(AtomicString, s_identifier, ("SVGKernelUnitLengthX", AtomicString::ConstructFromLiteral));
+    static NeverDestroyed<AtomicString> s_identifier("SVGKernelUnitLengthX", AtomicString::ConstructFromLiteral);
     return s_identifier;
 }
 
 const AtomicString& SVGFEDiffuseLightingElement::kernelUnitLengthYIdentifier()
 {
-    DEFINE_STATIC_LOCAL(AtomicString, s_identifier, ("SVGKernelUnitLengthY", AtomicString::ConstructFromLiteral));
+    static NeverDestroyed<AtomicString> s_identifier("SVGKernelUnitLengthY", AtomicString::ConstructFromLiteral);
     return s_identifier;
-}
-
-bool SVGFEDiffuseLightingElement::isSupportedAttribute(const QualifiedName& attrName)
-{
-    DEFINE_STATIC_LOCAL(HashSet<QualifiedName>, supportedAttributes, ());
-    if (supportedAttributes.isEmpty()) {
-        supportedAttributes.add(SVGNames::inAttr);
-        supportedAttributes.add(SVGNames::diffuseConstantAttr);
-        supportedAttributes.add(SVGNames::surfaceScaleAttr);
-        supportedAttributes.add(SVGNames::kernelUnitLengthAttr);
-        supportedAttributes.add(SVGNames::lighting_colorAttr); // Even though it's a SVG-CSS property, we override its handling here.
-    }
-    return supportedAttributes.contains<SVGAttributeHashTranslator>(attrName);
 }
 
 void SVGFEDiffuseLightingElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
-    if (!isSupportedAttribute(name) || name == SVGNames::lighting_colorAttr) {
-        SVGFilterPrimitiveStandardAttributes::parseAttribute(name, value);
-        return;
-    }
-
     if (name == SVGNames::inAttr) {
         setIn1BaseValue(value);
         return;
@@ -121,7 +99,7 @@ void SVGFEDiffuseLightingElement::parseAttribute(const QualifiedName& name, cons
         return;
     }
 
-    ASSERT_NOT_REACHED();
+    SVGFilterPrimitiveStandardAttributes::parseAttribute(name, value);
 }
 
 bool SVGFEDiffuseLightingElement::setFilterEffectAttribute(FilterEffect* effect, const QualifiedName& attrName)
@@ -131,8 +109,7 @@ bool SVGFEDiffuseLightingElement::setFilterEffectAttribute(FilterEffect* effect,
     if (attrName == SVGNames::lighting_colorAttr) {
         RenderObject* renderer = this->renderer();
         ASSERT(renderer);
-        ASSERT(renderer->style());
-        return diffuseLighting->setLightingColor(renderer->style()->svgStyle()->lightingColor());
+        return diffuseLighting->setLightingColor(renderer->style().svgStyle().lightingColor());
     }
     if (attrName == SVGNames::surfaceScaleAttr)
         return diffuseLighting->setSurfaceScale(surfaceScale());
@@ -171,27 +148,19 @@ bool SVGFEDiffuseLightingElement::setFilterEffectAttribute(FilterEffect* effect,
 
 void SVGFEDiffuseLightingElement::svgAttributeChanged(const QualifiedName& attrName)
 {
-    if (!isSupportedAttribute(attrName)) {
-        SVGFilterPrimitiveStandardAttributes::svgAttributeChanged(attrName);
-        return;
-    }
-
-    SVGElementInstance::InvalidationGuard invalidationGuard(this);
-    
-    if (attrName == SVGNames::surfaceScaleAttr
-        || attrName == SVGNames::diffuseConstantAttr
-        || attrName == SVGNames::kernelUnitLengthAttr
-        || attrName == SVGNames::lighting_colorAttr) {
+    if (attrName == SVGNames::surfaceScaleAttr || attrName == SVGNames::diffuseConstantAttr || attrName == SVGNames::kernelUnitLengthAttr || attrName == SVGNames::lighting_colorAttr) {
+        InstanceInvalidationGuard guard(*this);
         primitiveAttributeChanged(attrName);
         return;
     }
 
     if (attrName == SVGNames::inAttr) {
+        InstanceInvalidationGuard guard(*this);
         invalidate();
         return;
     }
 
-    ASSERT_NOT_REACHED();
+    SVGFilterPrimitiveStandardAttributes::svgAttributeChanged(attrName);
 }
 
 void SVGFEDiffuseLightingElement::lightElementAttributeChanged(const SVGFELightElement* lightElement, const QualifiedName& attrName)
@@ -203,30 +172,27 @@ void SVGFEDiffuseLightingElement::lightElementAttributeChanged(const SVGFELightE
     primitiveAttributeChanged(attrName);
 }
 
-PassRefPtr<FilterEffect> SVGFEDiffuseLightingElement::build(SVGFilterBuilder* filterBuilder, Filter* filter)
+RefPtr<FilterEffect> SVGFEDiffuseLightingElement::build(SVGFilterBuilder* filterBuilder, Filter& filter)
 {
     FilterEffect* input1 = filterBuilder->getEffectById(in1());
 
     if (!input1)
-        return 0;
+        return nullptr;
 
     RefPtr<LightSource> lightSource = SVGFELightElement::findLightSource(this);
     if (!lightSource)
-        return 0;
+        return nullptr;
 
     RenderObject* renderer = this->renderer();
     if (!renderer)
-        return 0;
+        return nullptr;
     
-    ASSERT(renderer->style());
-    Color color = renderer->style()->svgStyle()->lightingColor();
+    Color color = renderer->style().svgStyle().lightingColor();
 
     RefPtr<FilterEffect> effect = FEDiffuseLighting::create(filter, color, surfaceScale(), diffuseConstant(),
                                                                 kernelUnitLengthX(), kernelUnitLengthY(), lightSource.release());
     effect->inputEffects().append(input1);
-    return effect.release();
+    return effect;
 }
 
 }
-
-#endif // ENABLE(SVG)

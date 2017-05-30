@@ -33,27 +33,19 @@
 
 namespace WebCore {
 
-inline MathMLMathElement::MathMLMathElement(const QualifiedName& tagName, Document* document)
+inline MathMLMathElement::MathMLMathElement(const QualifiedName& tagName, Document& document)
     : MathMLInlineContainerElement(tagName, document)
 {
 }
 
-PassRefPtr<MathMLMathElement> MathMLMathElement::create(const QualifiedName& tagName, Document* document)
+Ref<MathMLMathElement> MathMLMathElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new MathMLMathElement(tagName, document));
+    return adoptRef(*new MathMLMathElement(tagName, document));
 }
 
-Node::InsertionNotificationRequest MathMLMathElement::insertedInto(ContainerNode* insertionPoint)
+RenderPtr<RenderElement> MathMLMathElement::createElementRenderer(Ref<RenderStyle>&& style, const RenderTreePosition&)
 {
-    // There are sibling rules in the MathML default style.
-    if (insertionPoint->inDocument())
-        document()->styleSheetCollection()->setUsesSiblingRulesOverride(true);
-    return MathMLInlineContainerElement::insertedInto(insertionPoint);
-}
-
-RenderObject* MathMLMathElement::createRenderer(RenderArena* arena, RenderStyle*)
-{
-    return new (arena) RenderMathMLMath(this);
+    return createRenderer<RenderMathMLMath>(*this, WTFMove(style));
 }
 
 }

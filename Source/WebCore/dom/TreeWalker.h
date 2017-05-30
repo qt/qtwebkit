@@ -28,45 +28,36 @@
 #include "NodeFilter.h"
 #include "ScriptWrappable.h"
 #include "Traversal.h"
-#include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
 
 namespace WebCore {
 
     typedef int ExceptionCode;
 
-    class TreeWalker : public ScriptWrappable, public RefCounted<TreeWalker>, public Traversal {
+    class TreeWalker : public ScriptWrappable, public RefCounted<TreeWalker>, public NodeIteratorBase {
     public:
-        static PassRefPtr<TreeWalker> create(PassRefPtr<Node> rootNode, unsigned whatToShow, PassRefPtr<NodeFilter> filter, bool expandEntityReferences)
+        static Ref<TreeWalker> create(Node& rootNode, unsigned long whatToShow, RefPtr<NodeFilter>&& filter)
         {
-            return adoptRef(new TreeWalker(rootNode, whatToShow, filter, expandEntityReferences));
+            return adoptRef(*new TreeWalker(rootNode, whatToShow, WTFMove(filter)));
         }                            
 
         Node* currentNode() const { return m_current.get(); }
-        void setCurrentNode(PassRefPtr<Node>, ExceptionCode&);
+        void setCurrentNode(Node*, ExceptionCode&);
 
-        Node* parentNode(ScriptState*);
-        Node* firstChild(ScriptState*);
-        Node* lastChild(ScriptState*);
-        Node* previousSibling(ScriptState*);
-        Node* nextSibling(ScriptState*);
-        Node* previousNode(ScriptState*);
-        Node* nextNode(ScriptState*);
-
-        // Do not call these functions. They are just scaffolding to support the Objective-C bindings.
-        // They operate in the main thread normal world, and they swallow JS exceptions.
-        Node* parentNode() { return parentNode(scriptStateFromNode(mainThreadNormalWorld(), m_current.get())); }
-        Node* firstChild() { return firstChild(scriptStateFromNode(mainThreadNormalWorld(), m_current.get())); }
-        Node* lastChild() { return lastChild(scriptStateFromNode(mainThreadNormalWorld(), m_current.get())); }
-        Node* previousSibling() { return previousSibling(scriptStateFromNode(mainThreadNormalWorld(), m_current.get())); }
-        Node* nextSibling() { return nextSibling(scriptStateFromNode(mainThreadNormalWorld(), m_current.get())); }
-        Node* previousNode() { return previousNode(scriptStateFromNode(mainThreadNormalWorld(), m_current.get())); }
-        Node* nextNode() { return nextNode(scriptStateFromNode(mainThreadNormalWorld(), m_current.get())); }
+        Node* parentNode();
+        Node* firstChild();
+        Node* lastChild();
+        Node* previousSibling();
+        Node* nextSibling();
+        Node* previousNode();
+        Node* nextNode();
 
     private:
-        TreeWalker(PassRefPtr<Node>, unsigned whatToShow, PassRefPtr<NodeFilter>, bool expandEntityReferences);
+        TreeWalker(Node&, unsigned long whatToShow, RefPtr<NodeFilter>&&);
+        enum class SiblingTraversalType { Previous, Next };
+        template<SiblingTraversalType> Node* traverseSiblings();
         
-        Node* setCurrent(PassRefPtr<Node>);
+        Node* setCurrent(RefPtr<Node>&&);
 
         RefPtr<Node> m_current;
     };

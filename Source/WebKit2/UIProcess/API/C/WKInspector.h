@@ -26,7 +26,7 @@
 #ifndef WKInspector_h
 #define WKInspector_h
 
-#include <WebKit2/WKBase.h>
+#include <WebKit/WKBase.h>
 
 #ifndef __cplusplus
 #include <stdbool.h>
@@ -57,12 +57,6 @@ WK_EXPORT void WKInspectorShowMainResourceForFrame(WKInspectorRef inspector, WKF
 WK_EXPORT bool WKInspectorIsAttached(WKInspectorRef inspector);
 WK_EXPORT void WKInspectorAttach(WKInspectorRef inspector);
 WK_EXPORT void WKInspectorDetach(WKInspectorRef inspector);
-
-WK_EXPORT bool WKInspectorIsDebuggingJavaScript(WKInspectorRef inspector);
-WK_EXPORT void WKInspectorToggleJavaScriptDebugging(WKInspectorRef inspector);
-
-WK_EXPORT bool WKInspectorIsProfilingJavaScript(WKInspectorRef inspector);
-WK_EXPORT void WKInspectorToggleJavaScriptProfiling(WKInspectorRef inspector);
 
 WK_EXPORT bool WKInspectorIsProfilingPage(WKInspectorRef inspector);
 WK_EXPORT void WKInspectorTogglePageProfiling(WKInspectorRef inspector);

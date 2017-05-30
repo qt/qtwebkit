@@ -30,12 +30,12 @@
 #include "qquickwebpage_p.h"
 #include "qquickwebview_p.h"
 
-#include <QCoreApplication>
+#include <QApplication>
 #include <QEventLoop>
 #include <QQmlProperty>
 #include <QtQuick/QQuickView>
 #include <QtQuick/private/qquickwindow_p.h>
-#include <WebKit2/WKImageQt.h>
+#include <WebKit/WKImageQt.h>
 #include <qpa/qwindowsysteminterface.h>
 
 namespace WTR {
@@ -65,7 +65,7 @@ private Q_SLOTS:
         m_view->setParentItem(rootObject());
         QQmlProperty::write(m_view, "anchors.fill", qVariantFromValue(rootObject()));
 
-        if (PlatformWebView::windowShapshotEnabled()) {
+        if (PlatformWebView::windowSnapshotEnabled()) {
             setSurfaceType(OpenGLSurface);
             create();
 #if QT_VERSION < QT_VERSION_CHECK(5, 1, 0)
@@ -105,6 +105,11 @@ PlatformWebView::~PlatformWebView()
     delete m_window;
     if (m_modalEventLoop)
         m_modalEventLoop->exit();
+}
+
+void PlatformWebView::setWindowIsKey(bool isKey)
+{
+    m_windowIsKey = isKey;
 }
 
 void PlatformWebView::resizeTo(unsigned width, unsigned height)
@@ -175,7 +180,7 @@ WKRetainPtr<WKImageRef> PlatformWebView::windowSnapshotImage()
     return adoptWK(WKImageCreateFromQImage(m_window->grabWindow()));
 }
 
-bool PlatformWebView::windowShapshotEnabled()
+bool PlatformWebView::windowSnapshotEnabled()
 {
     // We need a way to disable UI side rendering for tests because it is
     // too slow without appropriate hardware.

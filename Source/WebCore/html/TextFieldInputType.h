@@ -31,84 +31,92 @@
 #ifndef TextFieldInputType_h
 #define TextFieldInputType_h
 
+#include "AutoFillButtonElement.h"
 #include "InputType.h"
 #include "SpinButtonElement.h"
 
 namespace WebCore {
 
-class FormDataList; 
+class FormDataList;
+class TextControlInnerTextElement;
 
 // The class represents types of which UI contain text fields.
 // It supports not only the types for BaseTextInputType but also type=number.
-class TextFieldInputType : public InputType, protected SpinButtonElement::SpinButtonOwner {
+class TextFieldInputType : public InputType, protected SpinButtonElement::SpinButtonOwner, protected AutoFillButtonElement::AutoFillButtonOwner {
 protected:
-    TextFieldInputType(HTMLInputElement*);
+    explicit TextFieldInputType(HTMLInputElement&);
     virtual ~TextFieldInputType();
-    virtual bool canSetSuggestedValue() OVERRIDE;
-    virtual void handleKeydownEvent(KeyboardEvent*) OVERRIDE;
+    virtual void handleKeydownEvent(KeyboardEvent*) override;
     void handleKeydownEventForSpinButton(KeyboardEvent*);
 
-    virtual HTMLElement* containerElement() const OVERRIDE;
-    virtual HTMLElement* innerBlockElement() const OVERRIDE;
-    virtual HTMLElement* innerTextElement() const OVERRIDE;
-    virtual HTMLElement* innerSpinButtonElement() const OVERRIDE;
-#if ENABLE(INPUT_SPEECH)
-    virtual HTMLElement* speechButtonElement() const OVERRIDE;
-#endif
+    virtual HTMLElement* containerElement() const override final;
+    virtual HTMLElement* innerBlockElement() const override final;
+    virtual TextControlInnerTextElement* innerTextElement() const override final;
+    virtual HTMLElement* innerSpinButtonElement() const override final;
+    virtual HTMLElement* capsLockIndicatorElement() const override final;
+    virtual HTMLElement* autoFillButtonElement() const override final;
 
 protected:
-    virtual void attach() OVERRIDE;
     virtual bool needsContainer() const;
-    virtual bool shouldHaveSpinButton() const;
-    virtual void createShadowSubtree() OVERRIDE;
-    virtual void destroyShadowSubtree() OVERRIDE;
-    virtual void attributeChanged() OVERRIDE;
-    virtual void disabledAttributeChanged() OVERRIDE;
-    virtual void readonlyAttributeChanged() OVERRIDE;
-    virtual bool supportsReadOnly() const OVERRIDE;
-    virtual void handleBlurEvent() OVERRIDE;
-    virtual void setValue(const String&, bool valueChanged, TextFieldEventBehavior) OVERRIDE;
-    virtual void updateInnerTextValue() OVERRIDE;
+    virtual void createShadowSubtree() override;
+    virtual void destroyShadowSubtree() override;
+    virtual void attributeChanged() override final;
+    virtual void disabledAttributeChanged() override final;
+    virtual void readonlyAttributeChanged() override final;
+    virtual bool supportsReadOnly() const override final;
+    void handleFocusEvent(Node* oldFocusedNode, FocusDirection) override final;
+    virtual void handleBlurEvent() override final;
+    virtual void setValue(const String&, bool valueChanged, TextFieldEventBehavior) override;
+    virtual void updateInnerTextValue() override final;
+    virtual String sanitizeValue(const String&) const override;
 
     virtual String convertFromVisibleValue(const String&) const;
-    enum ValueChangeState {
-        ValueChangeStateNone,
-        ValueChangeStateChanged
-    };
-    virtual void didSetValueByUserEdit(ValueChangeState);
+    virtual void didSetValueByUserEdit();
 
 private:
-    virtual bool isKeyboardFocusable(KeyboardEvent*) const OVERRIDE;
-    virtual bool isMouseFocusable() const OVERRIDE;
-    virtual bool isTextField() const OVERRIDE;
-    virtual bool valueMissing(const String&) const OVERRIDE;
-    virtual void handleBeforeTextInsertedEvent(BeforeTextInsertedEvent*) OVERRIDE;
-    virtual void forwardEvent(Event*) OVERRIDE;
-    virtual bool shouldSubmitImplicitly(Event*) OVERRIDE;
-    virtual RenderObject* createRenderer(RenderArena*, RenderStyle*) const OVERRIDE;
-    virtual bool shouldUseInputMethod() const OVERRIDE;
-    virtual String sanitizeValue(const String&) const OVERRIDE;
-    virtual bool shouldRespectListAttribute() OVERRIDE;
-    virtual HTMLElement* placeholderElement() const OVERRIDE;
-    virtual void updatePlaceholderText() OVERRIDE;
-    virtual bool appendFormData(FormDataList&, bool multipart) const OVERRIDE;
-    virtual void subtreeHasChanged() OVERRIDE;
+    virtual bool isKeyboardFocusable(KeyboardEvent*) const override final;
+    virtual bool isMouseFocusable() const override final;
+    virtual bool isTextField() const override final;
+    virtual bool isEmptyValue() const override final;
+    virtual bool valueMissing(const String&) const override final;
+    virtual void handleBeforeTextInsertedEvent(BeforeTextInsertedEvent*) override final;
+    virtual void forwardEvent(Event*) override final;
+    virtual bool shouldSubmitImplicitly(Event*) override final;
+    virtual RenderPtr<RenderElement> createInputRenderer(Ref<RenderStyle>&&) override;
+    virtual bool shouldUseInputMethod() const override;
+    virtual bool shouldRespectListAttribute() override;
+    virtual HTMLElement* placeholderElement() const override final;
+    virtual void updatePlaceholderText() override final;
+    virtual bool appendFormData(FormDataList&, bool multipart) const override final;
+    virtual void subtreeHasChanged() override final;
+    virtual void capsLockStateMayHaveChanged() override final;
+    virtual void updateAutoFillButton() override final;
 
     // SpinButtonElement::SpinButtonOwner functions.
-    virtual void focusAndSelectSpinButtonOwner() OVERRIDE;
-    virtual bool shouldSpinButtonRespondToMouseEvents() OVERRIDE;
-    virtual bool shouldSpinButtonRespondToWheelEvents() OVERRIDE;
-    virtual void spinButtonStepDown() OVERRIDE;
-    virtual void spinButtonStepUp() OVERRIDE;
+    virtual void focusAndSelectSpinButtonOwner() override final;
+    virtual bool shouldSpinButtonRespondToMouseEvents() override final;
+    virtual bool shouldSpinButtonRespondToWheelEvents() override final;
+    virtual void spinButtonStepDown() override final;
+    virtual void spinButtonStepUp() override final;
+
+    // AutoFillButtonElement::AutoFillButtonOwner
+    virtual void autoFillButtonElementWasClicked() override final;
+
+    bool shouldHaveSpinButton() const;
+    bool shouldHaveCapsLockIndicator() const;
+    bool shouldDrawCapsLockIndicator() const;
+    bool shouldDrawAutoFillButton() const;
+
+    void createContainer();
+    void createAutoFillButton(AutoFillButtonType);
 
     RefPtr<HTMLElement> m_container;
     RefPtr<HTMLElement> m_innerBlock;
-    RefPtr<HTMLElement> m_innerText;
+    RefPtr<TextControlInnerTextElement> m_innerText;
     RefPtr<HTMLElement> m_placeholder;
     RefPtr<SpinButtonElement> m_innerSpinButton;
-#if ENABLE(INPUT_SPEECH)
-    RefPtr<HTMLElement> m_speechButton;
-#endif
+    RefPtr<HTMLElement> m_capsLockIndicator;
+    RefPtr<HTMLElement> m_autoFillButton;
 };
 
 } // namespace WebCore

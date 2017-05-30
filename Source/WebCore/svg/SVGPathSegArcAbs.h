@@ -22,29 +22,27 @@
 #ifndef SVGPathSegArcAbs_h
 #define SVGPathSegArcAbs_h
 
-#if ENABLE(SVG)
 #include "SVGPathSegArc.h"
 
 namespace WebCore {
 
 class SVGPathSegArcAbs : public SVGPathSegArc {
 public:
-    static PassRefPtr<SVGPathSegArcAbs> create(SVGPathElement* element, SVGPathSegRole role, float x, float y, float r1, float r2, float angle, bool largeArcFlag, bool sweepFlag)
+    static Ref<SVGPathSegArcAbs> create(const SVGPathElement& element, SVGPathSegRole role, float x, float y, float r1, float r2, float angle, bool largeArcFlag, bool sweepFlag)
     {
-        return adoptRef(new SVGPathSegArcAbs(element, role, x, y, r1, r2, angle, largeArcFlag, sweepFlag));
+        return adoptRef(*new SVGPathSegArcAbs(element, role, x, y, r1, r2, angle, largeArcFlag, sweepFlag));
     }
 
 private:
-    SVGPathSegArcAbs(SVGPathElement* element, SVGPathSegRole role, float x, float y, float r1, float r2, float angle, bool largeArcFlag, bool sweepFlag)
+    SVGPathSegArcAbs(const SVGPathElement& element, SVGPathSegRole role, float x, float y, float r1, float r2, float angle, bool largeArcFlag, bool sweepFlag)
         : SVGPathSegArc(element, role, x, y, r1, r2, angle, largeArcFlag, sweepFlag)
     {
     }
 
-    virtual unsigned short pathSegType() const { return PATHSEG_ARC_ABS; }
-    virtual String pathSegTypeAsLetter() const { return "A"; }
+    virtual unsigned short pathSegType() const override { return PATHSEG_ARC_ABS; }
+    virtual String pathSegTypeAsLetter() const override { return "A"; }
 };
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif

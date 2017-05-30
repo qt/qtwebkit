@@ -36,10 +36,12 @@ const double XMLHttpRequestProgressEventThrottle::minimumProgressEventDispatchin
 
 XMLHttpRequestProgressEventThrottle::XMLHttpRequestProgressEventThrottle(EventTarget* target)
     : m_target(target)
+    , m_hasThrottledProgressEvent(false)
+    , m_lengthComputable(false)
     , m_loaded(0)
     , m_total(0)
     , m_deferEvents(false)
-    , m_dispatchDeferredEventsTimer(this, &XMLHttpRequestProgressEventThrottle::dispatchDeferredEvents)
+    , m_dispatchDeferredEventsTimer(*this, &XMLHttpRequestProgressEventThrottle::dispatchDeferredEvents)
 {
     ASSERT(target);
 }
@@ -48,8 +50,15 @@ XMLHttpRequestProgressEventThrottle::~XMLHttpRequestProgressEventThrottle()
 {
 }
 
-void XMLHttpRequestProgressEventThrottle::dispatchProgressEvent(bool lengthComputable, unsigned long long loaded, unsigned long long total)
+void XMLHttpRequestProgressEventThrottle::dispatchThrottledProgressEvent(bool lengthComputable, unsigned long long loaded, unsigned long long total)
 {
+    m_lengthComputable = lengthComputable;
+    m_loaded = loaded;
+    m_total = total;
+
+    if (!m_target->hasEventListeners(eventNames().progressEvent))
+        return;
+    
     if (m_deferEvents) {
         // Only store the latest progress event while suspended.
         m_deferredProgressEvent = XMLHttpRequestProgressEvent::create(eventNames().progressEvent, lengthComputable, loaded, total);
@@ -57,25 +66,22 @@ void XMLHttpRequestProgressEventThrottle::dispatchProgressEvent(bool lengthCompu
     }
 
     if (!isActive()) {
-        // The timer is not active so the least frequent event for now is every byte.
-        // Just go ahead and dispatch the event.
+        // The timer is not active so the least frequent event for now is every byte. Just dispatch the event.
 
-        // We should not have any pending loaded & total information from a previous run.
-        ASSERT(!m_loaded);
-        ASSERT(!m_total);
+        // We should not have any throttled progress event.
+        ASSERT(!m_hasThrottledProgressEvent);
 
         dispatchEvent(XMLHttpRequestProgressEvent::create(eventNames().progressEvent, lengthComputable, loaded, total));
         startRepeating(minimumProgressEventDispatchingIntervalInSeconds);
+        m_hasThrottledProgressEvent = false;
         return;
     }
 
     // The timer is already active so minimumProgressEventDispatchingIntervalInSeconds is the least frequent event.
-    m_lengthComputable = lengthComputable;
-    m_loaded = loaded;
-    m_total = total;
+    m_hasThrottledProgressEvent = true;
 }
 
-void XMLHttpRequestProgressEventThrottle::dispatchReadyStateChangeEvent(PassRefPtr<Event> event, ProgressEventAction progressEventAction)
+void XMLHttpRequestProgressEventThrottle::dispatchReadyStateChangeEvent(Event& event, ProgressEventAction progressEventAction)
 {
     if (progressEventAction == FlushProgressEvent)
         flushProgressEvent();
@@ -83,11 +89,10 @@ void XMLHttpRequestProgressEventThrottle::dispatchReadyStateChangeEvent(PassRefP
     dispatchEvent(event);
 }
 
-void XMLHttpRequestProgressEventThrottle::dispatchEvent(PassRefPtr<Event> event)
+void XMLHttpRequestProgressEventThrottle::dispatchEvent(Event& event)
 {
-    ASSERT(event);
     if (m_deferEvents) {
-        if (m_deferredEvents.size() > 1 && event->type() == eventNames().readystatechangeEvent && event->type() == m_deferredEvents.last()->type()) {
+        if (m_deferredEvents.size() > 1 && event.type() == eventNames().readystatechangeEvent && event.type() == m_deferredEvents.last()->type()) {
             // Readystatechange events are state-less so avoid repeating two identical events in a row on resume.
             return;
         }
@@ -96,58 +101,56 @@ void XMLHttpRequestProgressEventThrottle::dispatchEvent(PassRefPtr<Event> event)
         m_target->dispatchEvent(event);
 }
 
-void XMLHttpRequestProgressEventThrottle::dispatchEventAndLoadEnd(PassRefPtr<Event> event)
+void XMLHttpRequestProgressEventThrottle::dispatchProgressEvent(const AtomicString& type)
 {
-    ASSERT(event->type() == eventNames().loadEvent || event->type() == eventNames().abortEvent || event->type() == eventNames().errorEvent || event->type() == eventNames().timeoutEvent);
+    ASSERT(type == eventNames().loadstartEvent || type == eventNames().progressEvent || type == eventNames().loadEvent || type == eventNames().loadendEvent || type == eventNames().abortEvent || type == eventNames().errorEvent || type == eventNames().timeoutEvent);
 
-    dispatchEvent(event);
-    dispatchEvent(XMLHttpRequestProgressEvent::create(eventNames().loadendEvent));
+    if (type == eventNames().loadstartEvent) {
+        m_lengthComputable = false;
+        m_loaded = 0;
+        m_total = 0;
+    }
+
+    if (m_target->hasEventListeners(type))
+        dispatchEvent(XMLHttpRequestProgressEvent::create(type, m_lengthComputable, m_loaded, m_total));
 }
 
 void XMLHttpRequestProgressEventThrottle::flushProgressEvent()
 {
     if (m_deferEvents && m_deferredProgressEvent) {
         // Move the progress event to the queue, to get it in the right order on resume.
-        m_deferredEvents.append(m_deferredProgressEvent);
-        m_deferredProgressEvent = 0;
+        m_deferredEvents.append(m_deferredProgressEvent.releaseNonNull());
         return;
     }
 
     if (!hasEventToDispatch())
         return;
-
-    PassRefPtr<Event> event = XMLHttpRequestProgressEvent::create(eventNames().progressEvent, m_lengthComputable, m_loaded, m_total);
-    m_loaded = 0;
-    m_total = 0;
+    Ref<Event> event = XMLHttpRequestProgressEvent::create(eventNames().progressEvent, m_lengthComputable, m_loaded, m_total);
+    m_hasThrottledProgressEvent = false;
 
     // We stop the timer as this is called when no more events are supposed to occur.
     stop();
 
-    dispatchEvent(event);
+    dispatchEvent(WTFMove(event));
 }
 
-void XMLHttpRequestProgressEventThrottle::dispatchDeferredEvents(Timer<XMLHttpRequestProgressEventThrottle>* timer)
+void XMLHttpRequestProgressEventThrottle::dispatchDeferredEvents()
 {
-    ASSERT_UNUSED(timer, timer == &m_dispatchDeferredEventsTimer);
     ASSERT(m_deferEvents);
     m_deferEvents = false;
 
     // Take over the deferred events before dispatching them which can potentially add more.
-    Vector<RefPtr<Event> > deferredEvents;
-    m_deferredEvents.swap(deferredEvents);
+    auto deferredEvents = WTFMove(m_deferredEvents);
 
-    RefPtr<Event> deferredProgressEvent = m_deferredProgressEvent;
-    m_deferredProgressEvent = 0;
+    RefPtr<Event> deferredProgressEvent = WTFMove(m_deferredProgressEvent);
 
-    Vector<RefPtr<Event> >::const_iterator it = deferredEvents.begin();
-    const Vector<RefPtr<Event> >::const_iterator end = deferredEvents.end();
-    for (; it != end; ++it)
-        dispatchEvent(*it);
+    for (auto& deferredEvent : deferredEvents)
+        dispatchEvent(deferredEvent);
 
     // The progress event will be in the m_deferredEvents vector if the load was finished while suspended.
     // If not, just send the most up-to-date progress on resume.
     if (deferredProgressEvent)
-        dispatchEvent(deferredProgressEvent);
+        dispatchEvent(*deferredProgressEvent);
 }
 
 void XMLHttpRequestProgressEventThrottle::fired()
@@ -160,13 +163,12 @@ void XMLHttpRequestProgressEventThrottle::fired()
     }
 
     dispatchEvent(XMLHttpRequestProgressEvent::create(eventNames().progressEvent, m_lengthComputable, m_loaded, m_total));
-    m_total = 0;
-    m_loaded = 0;
+    m_hasThrottledProgressEvent = false;
 }
 
 bool XMLHttpRequestProgressEventThrottle::hasEventToDispatch() const
 {
-    return (m_total || m_loaded) && isActive();
+    return m_hasThrottledProgressEvent && isActive();
 }
 
 void XMLHttpRequestProgressEventThrottle::suspend()
@@ -187,16 +189,14 @@ void XMLHttpRequestProgressEventThrottle::suspend()
     // just defer it.
     if (hasEventToDispatch()) {
         m_deferredProgressEvent = XMLHttpRequestProgressEvent::create(eventNames().progressEvent, m_lengthComputable, m_loaded, m_total);
-        m_total = 0;
-        m_loaded = 0;
+        m_hasThrottledProgressEvent = false;
     }
     stop();
 }
 
 void XMLHttpRequestProgressEventThrottle::resume()
 {
-    ASSERT(!m_loaded);
-    ASSERT(!m_total);
+    ASSERT(!m_hasThrottledProgressEvent);
 
     if (m_deferredEvents.isEmpty() && !m_deferredProgressEvent) {
         m_deferEvents = false;

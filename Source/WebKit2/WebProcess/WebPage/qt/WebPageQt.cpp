@@ -97,6 +97,19 @@ void WebPage::platformInitialize()
 {
 }
 
+void WebPage::platformDetach()
+{
+}
+
+String WebPage::platformUserAgent(const WebCore::URL&) const
+{
+    return String();
+}
+
+void WebPage::platformEditorState(Frame&, EditorState&, WebPage::IncludePostLayoutDataHint) const
+{
+}
+
 void WebPage::platformPreferencesDidChange(const WebPreferencesStore&)
 {
 }
@@ -221,16 +234,6 @@ const char* WebPage::interpretKeyEvent(const KeyboardEvent* evt)
     return mapKey ? keyPressCommandsMap->get(mapKey) : 0;
 }
 
-static inline void scroll(Page* page, ScrollDirection direction, ScrollGranularity granularity)
-{
-    page->focusController()->focusedOrMainFrame()->eventHandler()->scrollRecursively(direction, granularity);
-}
-
-static inline void logicalScroll(Page* page, ScrollLogicalDirection direction, ScrollGranularity granularity)
-{
-    page->focusController()->focusedOrMainFrame()->eventHandler()->logicalScrollRecursively(direction, granularity);
-}
-
 bool WebPage::performDefaultBehaviorForKeyEvent(const WebKeyboardEvent& keyboardEvent)
 {
     if (keyboardEvent.type() != WebEvent::KeyDown && keyboardEvent.type() != WebEvent::RawKeyDown)
@@ -268,13 +271,13 @@ bool WebPage::performDefaultBehaviorForKeyEvent(const WebKeyboardEvent& keyboard
     return true;
 }
 
-bool WebPage::platformHasLocalDataForURL(const KURL&)
+bool WebPage::platformHasLocalDataForURL(const URL&)
 {
     notImplemented();
     return false;
 }
 
-String WebPage::cachedResponseMIMETypeForURL(const KURL&)
+String WebPage::cachedResponseMIMETypeForURL(const URL&)
 {
     notImplemented();
     return String();
@@ -286,41 +289,16 @@ bool WebPage::platformCanHandleRequest(const ResourceRequest&)
     return true;
 }
 
-String WebPage::cachedSuggestedFilenameForURL(const KURL&)
+String WebPage::cachedSuggestedFilenameForURL(const URL&)
 {
     notImplemented();
     return String();
 }
 
-PassRefPtr<SharedBuffer> WebPage::cachedResponseDataForURL(const KURL&)
+PassRefPtr<SharedBuffer> WebPage::cachedResponseDataForURL(const URL&)
 {
     notImplemented();
     return 0;
-}
-
-void WebPage::registerApplicationScheme(const String& scheme)
-{
-    QtNetworkAccessManager* qnam = qobject_cast<QtNetworkAccessManager*>(WebProcess::shared().networkAccessManager());
-    if (!qnam)
-        return;
-    qnam->registerApplicationScheme(this, QString(scheme));
-}
-
-void WebPage::receivedApplicationSchemeRequest(const QNetworkRequest& request, QtNetworkReply* reply)
-{
-    QtNetworkRequestData requestData(request, reply);
-    m_applicationSchemeReplies.add(requestData.m_replyUuid, reply);
-    send(Messages::WebPageProxy::ResolveApplicationSchemeRequest(requestData));
-}
-
-void WebPage::applicationSchemeReply(const QtNetworkReplyData& replyData)
-{
-    if (!m_applicationSchemeReplies.contains(replyData.m_replyUuid))
-        return;
-
-    QtNetworkReply* networkReply = m_applicationSchemeReplies.take(replyData.m_replyUuid);
-    networkReply->setReplyData(replyData);
-    networkReply->finalize();
 }
 
 void WebPage::selectedIndex(int32_t newIndex)
@@ -334,7 +312,7 @@ void WebPage::hidePopupMenu()
         return;
 
     m_activePopupMenu->client()->popupDidHide();
-    m_activePopupMenu = 0;
+    m_activePopupMenu = nullptr;
 }
 
 } // namespace WebKit

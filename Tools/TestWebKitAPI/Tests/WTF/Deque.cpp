@@ -24,11 +24,13 @@
  */
 
 #include "config.h"
+
+#include "MoveOnly.h"
 #include <wtf/Deque.h>
 
 namespace TestWebKitAPI {
 
-TEST(WTF, DequeIterator)
+TEST(WTF_Deque, Iterator)
 {
     Deque<int> deque;
     deque.append(11);
@@ -47,6 +49,28 @@ TEST(WTF, DequeIterator)
     EXPECT_EQ(12, *it);
     ++it;
     EXPECT_EQ(13, *it);
+    ++it;
+
+    EXPECT_TRUE(end == it);
+}
+
+TEST(WTF_Deque, InitializerList)
+{
+    Deque<int> deque = { 1, 2, 3, 4 };
+
+    EXPECT_EQ(4u, deque.size());
+
+    auto it = deque.begin();
+    auto end = deque.end();
+    EXPECT_TRUE(end != it);
+
+    EXPECT_EQ(1, *it);
+    ++it;
+    EXPECT_EQ(2, *it);
+    ++it;
+    EXPECT_EQ(3, *it);
+    ++it;
+    EXPECT_EQ(4, *it);
     ++it;
 
     EXPECT_TRUE(end == it);
@@ -76,7 +100,7 @@ TEST(WTF, DequeReverseIterator)
     EXPECT_TRUE(end == it);
 }
 
-TEST(WTF, DequeRemove)
+TEST(WTF_Deque, Remove)
 {
     Deque<int> deque;
     deque.append(11);
@@ -101,6 +125,67 @@ TEST(WTF, DequeRemove)
 
     deque.removeLast();
     EXPECT_TRUE(deque.isEmpty());
+}
+
+TEST(WTF_Deque, MoveOnly)
+{
+    Deque<MoveOnly> deque;
+
+    deque.append(MoveOnly(1));
+    deque.prepend(MoveOnly(0));
+
+    EXPECT_EQ(0U, deque.first().value());
+    EXPECT_EQ(1U, deque.last().value());
+
+    auto first = deque.takeFirst();
+    EXPECT_EQ(0U, first.value());
+
+    auto last = deque.takeLast();
+    EXPECT_EQ(1U, last.value());
+}
+
+TEST(WTF_Deque, MoveConstructor)
+{
+    Deque<MoveOnly, 4> deque;
+
+    for (unsigned i = 0; i < 10; ++i)
+        deque.append(MoveOnly(i));
+
+    EXPECT_EQ(10u, deque.size());
+
+    Deque<MoveOnly, 4> deque2 = WTFMove(deque);
+
+    EXPECT_EQ(10u, deque2.size());
+
+    unsigned i = 0;
+    for (auto& element : deque2) {
+        EXPECT_EQ(i, element.value());
+        ++i;
+    }
+}
+
+TEST(WTF_Deque, MoveAssignmentOperator)
+{
+    Deque<MoveOnly, 4> deque1;
+
+    for (unsigned i = 0; i < 10; ++i)
+        deque1.append(MoveOnly(i));
+
+    EXPECT_EQ(10u, deque1.size());
+
+    Deque<MoveOnly, 4> deque2;
+    for (unsigned i = 0; i < 10; ++i)
+        deque2.append(MoveOnly(i * 2));
+
+    deque1 = WTFMove(deque2);
+
+    EXPECT_EQ(10u, deque2.size());
+
+    unsigned i = 0;
+    for (auto& element : deque1) {
+        EXPECT_EQ(i * 2, element.value());
+        ++i;
+    }
 }
 
 } // namespace TestWebKitAPI

@@ -23,7 +23,6 @@
 #include "config.h"
 #include "HTMLUListElement.h"
 
-#include "Attribute.h"
 #include "CSSPropertyNames.h"
 #include "HTMLNames.h"
 
@@ -31,20 +30,20 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-HTMLUListElement::HTMLUListElement(const QualifiedName& tagName, Document* document)
+HTMLUListElement::HTMLUListElement(const QualifiedName& tagName, Document& document)
     : HTMLElement(tagName, document)
 {
     ASSERT(hasTagName(ulTag));
 }
 
-PassRefPtr<HTMLUListElement> HTMLUListElement::create(Document* document)
+Ref<HTMLUListElement> HTMLUListElement::create(Document& document)
 {
-    return adoptRef(new HTMLUListElement(ulTag, document));
+    return adoptRef(*new HTMLUListElement(ulTag, document));
 }
 
-PassRefPtr<HTMLUListElement> HTMLUListElement::create(const QualifiedName& tagName, Document* document)
+Ref<HTMLUListElement> HTMLUListElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new HTMLUListElement(tagName, document));
+    return adoptRef(*new HTMLUListElement(tagName, document));
 }
 
 bool HTMLUListElement::isPresentationAttribute(const QualifiedName& name) const
@@ -54,7 +53,7 @@ bool HTMLUListElement::isPresentationAttribute(const QualifiedName& name) const
     return HTMLElement::isPresentationAttribute(name);
 }
 
-void HTMLUListElement::collectStyleForPresentationAttribute(const QualifiedName& name, const AtomicString& value, MutableStylePropertySet* style)
+void HTMLUListElement::collectStyleForPresentationAttribute(const QualifiedName& name, const AtomicString& value, MutableStyleProperties& style)
 {
     if (name == typeAttr)
         addPropertyToPresentationAttributeStyle(style, CSSPropertyListStyleType, value);

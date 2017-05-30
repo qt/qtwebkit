@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution. 
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission. 
  *
@@ -30,7 +30,6 @@
 #define TestRunner_h
 
 #include <JavaScriptCore/JSObjectRef.h>
-#include <JavaScriptCore/JSRetainPtr.h>
 #include <map>
 #include <set>
 #include <string>
@@ -40,7 +39,7 @@
 
 class TestRunner : public RefCounted<TestRunner> {
 public:
-    static PassRefPtr<TestRunner> create(const std::string& testPathOrURL, const std::string& expectedPixelHash);
+    static PassRefPtr<TestRunner> create(const std::string& testURL, const std::string& expectedPixelHash);
 
     static const unsigned viewWidth;
     static const unsigned viewHeight;
@@ -53,6 +52,8 @@ public:
     void makeWindowObject(JSContextRef, JSObjectRef windowObject, JSValueRef* exception);
 
     void addDisallowedURL(JSStringRef url);
+    const std::set<std::string>& allowedHosts() const { return m_allowedHosts; }
+    void setAllowedHosts(std::set<std::string> hosts) { m_allowedHosts = WTFMove(hosts); }
     void addURLToRedirect(std::string origin, std::string destination);
     const std::string& redirectionDestinationForURL(std::string);
     void clearAllApplicationCaches();
@@ -75,6 +76,7 @@ public:
     void keepWebHistory();
     void notifyDone();
     int numberOfPendingGeolocationPermissionRequests();
+    bool isGeolocationProviderActive();
     void overridePreference(JSStringRef key, JSStringRef value);
     JSStringRef pathToLocalResource(JSContextRef, JSStringRef url);
     void queueBackNavigation(int howFarBackward);
@@ -90,7 +92,6 @@ public:
     void setAllowUniversalAccessFromFileURLs(bool);
     void setAllowFileAccessFromFileURLs(bool);
     void setAppCacheMaximumSize(unsigned long long quota);
-    void setApplicationCacheOriginQuota(unsigned long long);
     void setAuthorAndUserStylesEnabled(bool);
     void setCacheModel(int);
     void setCustomPolicyDelegate(bool setDelegate, bool permissive);
@@ -104,8 +105,6 @@ public:
     void setMockDeviceOrientation(bool canProvideAlpha, double alpha, bool canProvideBeta, double beta, bool canProvideGamma, double gamma);
     void setMockGeolocationPosition(double latitude, double longitude, double accuracy, bool providesAltitude, double altitude, bool providesAltitudeAccuracy, double altitudeAccuracy, bool providesHeading, double heading, bool providesSpeed, double speed);
     void setMockGeolocationPositionUnavailableError(JSStringRef message);
-    void addMockSpeechInputResult(JSStringRef result, double confidence, JSStringRef language);
-    void setMockSpeechInputDumpRect(bool flag);
     void setPersistentUserStyleSheetLocation(JSStringRef path);
     void setPluginsEnabled(bool);
     void setPopupBlockingEnabled(bool);
@@ -119,16 +118,20 @@ public:
     void setXSSAuditorEnabled(bool flag);
     void setSpatialNavigationEnabled(bool);
     void setScrollbarPolicy(JSStringRef orientation, JSStringRef policy);
-    void startSpeechInput(JSContextRef inputElement);
+#if PLATFORM(IOS)
+    void setTelephoneNumberParsingEnabled(bool enable);
+    void setPagePaused(bool paused);
+#endif
+
     void setPageVisibility(const char*);
     void resetPageVisibility();
 
     void waitForPolicyDelegate();
     size_t webHistoryItemCount();
     int windowCount();
-    
-#if PLATFORM(MAC) || PLATFORM(GTK) || PLATFORM(WIN) || PLATFORM(EFL)
-    JSRetainPtr<JSStringRef> platformName() const;
+
+#if ENABLE(IOS_TEXT_AUTOSIZING)
+    void setTextAutosizingEnabled(bool);
 #endif
 
     // Legacy here refers to the old TestRunner API for handling web notifications, not the legacy web notification API.
@@ -273,17 +276,23 @@ public:
     bool globalFlag() const { return m_globalFlag; }
     void setGlobalFlag(bool globalFlag) { m_globalFlag = globalFlag; }
     
+    double databaseDefaultQuota() const { return m_databaseDefaultQuota; }
+    void setDatabaseDefaultQuota(double quota) { m_databaseDefaultQuota = quota; }
+
+    double databaseMaxQuota() const { return m_databaseMaxQuota; }
+    void setDatabaseMaxQuota(double quota) { m_databaseMaxQuota = quota; }
+
     bool deferMainResourceDataLoad() const { return m_deferMainResourceDataLoad; }
     void setDeferMainResourceDataLoad(bool flag) { m_deferMainResourceDataLoad = flag; }
 
     bool useDeferredFrameLoading() const { return m_useDeferredFrameLoading; }
     void setUseDeferredFrameLoading(bool flag) { m_useDeferredFrameLoading = flag; }
 
-    const std::string& testPathOrURL() const { return m_testPathOrURL; }
+    const std::string& testURL() const { return m_testURL; }
     const std::string& expectedPixelHash() const { return m_expectedPixelHash; }
 
-    const std::string& encodedAudioData() const { return m_encodedAudioData; }
-    void setEncodedAudioData(const std::string& encodedAudioData) { m_encodedAudioData = encodedAudioData; }
+    const std::vector<char>& audioResult() const { return m_audioResult; }
+    void setAudioResult(const std::vector<char>& audioData) { m_audioResult = audioData; }
 
     void addOriginAccessWhitelistEntry(JSStringRef sourceOrigin, JSStringRef destinationProtocol, JSStringRef destinationHost, bool allowDestinationSubdomains);
     void removeOriginAccessWhitelistEntry(JSStringRef sourceOrigin, JSStringRef destinationProtocol, JSStringRef destinationHost, bool allowDestinationSubdomains);
@@ -298,7 +307,9 @@ public:
     void setDeveloperExtrasEnabled(bool);
     void showWebInspector();
     void closeWebInspector();
-    void evaluateInWebInspector(long callId, JSStringRef script);
+    void evaluateInWebInspector(JSStringRef script);
+    JSStringRef inspectorTestStubURL();
+
     void evaluateScriptInIsolatedWorld(unsigned worldID, JSObjectRef globalObject, JSStringRef script);
     void evaluateScriptInIsolatedWorldAndReturnValue(unsigned worldID, JSObjectRef globalObject, JSStringRef script);
 
@@ -327,13 +338,6 @@ public:
     // Simulate a request an embedding application could make, populating per-session credential storage.
     void authenticateSession(JSStringRef url, JSStringRef username, JSStringRef password);
 
-    JSValueRef originsWithLocalStorage(JSContextRef);
-    void deleteAllLocalStorage();
-    void deleteLocalStorageForOrigin(JSStringRef originIdentifier);
-    long long localStorageDiskUsageForOrigin(JSStringRef originIdentifier);
-    void observeStorageTrackerNotifications(unsigned number);
-    void syncLocalStorage();
-
     void setShouldPaintBrokenImage(bool);
     bool shouldPaintBrokenImage() const { return m_shouldPaintBrokenImage; }
 
@@ -350,8 +354,10 @@ public:
 
     bool hasPendingWebNotificationClick() const { return m_hasPendingWebNotificationClick; }
 
+    void setCustomTimeout(int duration) { m_timeout = duration; }
+
 private:
-    TestRunner(const std::string& testPathOrURL, const std::string& expectedPixelHash);
+    TestRunner(const std::string& testURL, const std::string& expectedPixelHash);
 
     void setGeolocationPermissionCommon(bool allow);
 
@@ -407,22 +413,27 @@ private:
     bool m_customFullScreenBehavior;
     bool m_hasPendingWebNotificationClick;
 
+    double m_databaseDefaultQuota;
+    double m_databaseMaxQuota;
+
     std::string m_authenticationUsername;
     std::string m_authenticationPassword; 
-    std::string m_testPathOrURL;
+    std::string m_testURL;
     std::string m_expectedPixelHash; // empty string if no hash
     std::string m_titleTextDirection;
 
     std::set<std::string> m_willSendRequestClearHeaders;
-    
-    // base64 encoded WAV audio data is stored here.
-    std::string m_encodedAudioData;
+    std::set<std::string> m_allowedHosts;
+
+    std::vector<char> m_audioResult;
 
     std::map<std::string, std::string> m_URLsToRedirect;
-    
+
     static JSClassRef getJSClass();
     static JSStaticValue* staticValues();
     static JSStaticFunction* staticFunctions();
+
+    int m_timeout;
 };
 
 #endif // TestRunner_h

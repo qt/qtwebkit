@@ -50,30 +50,48 @@ enum CollectionType {
     SelectedOptions,
     DataListOptions,
     MapAreas,
-#if ENABLE(MICRODATA)
-    ItemProperties, // Microdata item properties in the document
-#endif
     FormControls,
-
-    // Live NodeList.
-    ChildNodeListType,
-    ClassNodeListType,
-    NameNodeListType,
-    TagNodeListType,
-    HTMLTagNodeListType,
-    RadioNodeListType,
-    LabelsNodeListType,
-    MicroDataItemListType,
-    PropertyNodeListType,
+    ByClass,
+    ByTag,
+    ByHTMLTag,
 };
 
-static const CollectionType FirstNodeListType = ChildNodeListType;
+enum class CollectionTraversalType { Descendants, ChildrenOnly, CustomForwardOnly };
+template<CollectionType collectionType>
+struct CollectionTypeTraits {
+    static const CollectionTraversalType traversalType = CollectionTraversalType::Descendants;
+};
 
-inline bool isNodeList(CollectionType type)
-{
-    return type >= FirstNodeListType;
-}
+template<>
+struct CollectionTypeTraits<NodeChildren> {
+    static const CollectionTraversalType traversalType = CollectionTraversalType::ChildrenOnly;
+};
 
-} // namespace
+template<>
+struct CollectionTypeTraits<TRCells> {
+    static const CollectionTraversalType traversalType = CollectionTraversalType::ChildrenOnly;
+};
+
+template<>
+struct CollectionTypeTraits<TSectionRows> {
+    static const CollectionTraversalType traversalType = CollectionTraversalType::ChildrenOnly;
+};
+
+template<>
+struct CollectionTypeTraits<TableTBodies> {
+    static const CollectionTraversalType traversalType = CollectionTraversalType::ChildrenOnly;
+};
+
+template<>
+struct CollectionTypeTraits<TableRows> {
+    static const CollectionTraversalType traversalType = CollectionTraversalType::CustomForwardOnly;
+};
+
+template<>
+struct CollectionTypeTraits<FormControls> {
+    static const CollectionTraversalType traversalType = CollectionTraversalType::CustomForwardOnly;
+};
+
+} // namespace WebCore
 
 #endif

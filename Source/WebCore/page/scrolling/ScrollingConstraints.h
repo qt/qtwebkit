@@ -33,9 +33,10 @@ namespace WebCore {
 // ViewportConstraints classes encapsulate data and logic required to reposition elements whose layout
 // depends on the viewport rect (positions fixed and sticky), when scrolling and zooming.
 class ViewportConstraints {
+    WTF_MAKE_FAST_ALLOCATED;
 public:
     enum ConstraintType {
-        FixedPositionConstaint,
+        FixedPositionConstraint,
         StickyPositionConstraint
     };
 
@@ -85,7 +86,7 @@ public:
         , m_layerPositionAtLastLayout(other.m_layerPositionAtLastLayout)
     { }
     
-    FloatPoint layerPositionForViewportRect(const FloatRect& viewportRect) const;
+    WEBCORE_EXPORT FloatPoint layerPositionForViewportRect(const FloatRect& viewportRect) const;
 
     const FloatRect& viewportRectAtLastLayout() const { return m_viewportRectAtLastLayout; }
     void setViewportRectAtLastLayout(const FloatRect& rect) { m_viewportRectAtLastLayout = rect; }
@@ -104,7 +105,7 @@ public:
     bool operator!=(const FixedPositionViewportConstraints& other) const { return !(*this == other); }
 
 private:
-    virtual ConstraintType constraintType() const OVERRIDE { return FixedPositionConstaint; };
+    virtual ConstraintType constraintType() const override { return FixedPositionConstraint; };
 
     FloatRect m_viewportRectAtLastLayout;
     FloatPoint m_layerPositionAtLastLayout;
@@ -137,7 +138,7 @@ public:
     const FloatSize stickyOffsetAtLastLayout() const { return m_stickyOffsetAtLastLayout; }
     void setStickyOffsetAtLastLayout(const FloatSize& offset) { m_stickyOffsetAtLastLayout = offset; }
 
-    FloatPoint layerPositionForConstrainingRect(const FloatRect& constrainingRect) const;
+    WEBCORE_EXPORT FloatPoint layerPositionForConstrainingRect(const FloatRect& constrainingRect) const;
 
     const FloatPoint& layerPositionAtLastLayout() const { return m_layerPositionAtLastLayout; }
     void setLayerPositionAtLastLayout(const FloatPoint& point) { m_layerPositionAtLastLayout = point; }
@@ -167,7 +168,9 @@ public:
 
     bool operator==(const StickyPositionViewportConstraints& other) const
     {
-        return m_leftOffset == other.m_leftOffset
+        return m_alignmentOffset == other.m_alignmentOffset
+            && m_anchorEdges == other.m_anchorEdges
+            && m_leftOffset == other.m_leftOffset
             && m_rightOffset == other.m_rightOffset
             && m_topOffset == other.m_topOffset
             && m_bottomOffset == other.m_bottomOffset
@@ -180,7 +183,7 @@ public:
     bool operator!=(const StickyPositionViewportConstraints& other) const { return !(*this == other); }
 
 private:
-    virtual ConstraintType constraintType() const OVERRIDE { return StickyPositionConstraint; };
+    virtual ConstraintType constraintType() const override { return StickyPositionConstraint; };
 
     float m_leftOffset;
     float m_rightOffset;
@@ -192,6 +195,9 @@ private:
     FloatSize m_stickyOffsetAtLastLayout;
     FloatPoint m_layerPositionAtLastLayout;
 };
+
+WEBCORE_EXPORT TextStream& operator<<(TextStream&, const FixedPositionViewportConstraints&);
+WEBCORE_EXPORT TextStream& operator<<(TextStream&, const StickyPositionViewportConstraints&);
 
 } // namespace WebCore
 

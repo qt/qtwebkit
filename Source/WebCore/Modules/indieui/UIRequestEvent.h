@@ -34,50 +34,29 @@
 namespace WebCore {
     
 struct UIRequestEventInit : public UIEventInit {
-    UIRequestEventInit();
-    
     RefPtr<EventTarget> receiver;
 };
 
 class UIRequestEvent : public UIEvent {
 public:
-    static PassRefPtr<UIRequestEvent> create();
-    static PassRefPtr<UIRequestEvent> create(const AtomicString& type, bool bubbles, bool cancelable, PassRefPtr<AbstractView>, int detail, PassRefPtr<EventTarget> receiver);
-    
-    static PassRefPtr<UIRequestEvent> create(const AtomicString& eventType, const UIRequestEventInit&);
+    static Ref<UIRequestEvent> create(const AtomicString& type, bool bubbles, bool cancelable, AbstractView*, int detail, PassRefPtr<EventTarget> receiver);
+    static Ref<UIRequestEvent> createForBindings(const AtomicString& eventType, const UIRequestEventInit&);
     
     virtual ~UIRequestEvent();
     
     EventTarget* receiver() const { return m_receiver.get(); }
 
 protected:
-    UIRequestEvent(const AtomicString& type, bool bubbles, bool cancelable, PassRefPtr<AbstractView>, int detail, PassRefPtr<EventTarget> receiver);
+    UIRequestEvent(const AtomicString& type, bool bubbles, bool cancelable, AbstractView*, int detail, PassRefPtr<EventTarget> receiver);
     
     UIRequestEvent(const AtomicString& type, const UIRequestEventInit&);
     
-    UIRequestEvent();
-    
-    const AtomicString& interfaceName() const OVERRIDE;
+    EventInterface eventInterface() const override;
     
 private:
     RefPtr<EventTarget> m_receiver;
 };
 
-class UIRequestEventDispatchMediator : public EventDispatchMediator {
-public:
-    static PassRefPtr<UIRequestEventDispatchMediator> create(PassRefPtr<UIRequestEvent> event)
-    {
-        return adoptRef(new UIRequestEventDispatchMediator(event));
-    }
-    
-private:
-    explicit UIRequestEventDispatchMediator(PassRefPtr<UIRequestEvent>);
-    
-    UIRequestEvent* event() const;
-    
-    virtual bool dispatchEvent(EventDispatcher*) const OVERRIDE;
-};
-    
 } // namespace WebCore
 
 #endif // ENABLE(INDIE_UI)

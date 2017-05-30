@@ -39,28 +39,29 @@ class DeviceClient;
 class Page;
 
 class DeviceController : public Supplement<Page> {
+    WTF_MAKE_FAST_ALLOCATED;
 public:
     explicit DeviceController(DeviceClient*);
-    ~DeviceController() { }
+    virtual ~DeviceController() { }
 
     void addDeviceEventListener(DOMWindow*);
     void removeDeviceEventListener(DOMWindow*);
     void removeAllDeviceEventListeners(DOMWindow*);
 
-    void dispatchDeviceEvent(PassRefPtr<Event>);
+    void dispatchDeviceEvent(Event&);
     bool isActive() { return !m_listeners.isEmpty(); }
     DeviceClient* client() { return m_client; }
 
     virtual bool hasLastData() { return false; }
-    virtual PassRefPtr<Event> getLastEvent() { return 0; }
+    virtual RefPtr<Event> getLastEvent() { return nullptr; }
 
 protected:
-    void fireDeviceEvent(Timer<DeviceController>*);
+    void fireDeviceEvent();
 
-    HashCountedSet<RefPtr<DOMWindow> > m_listeners;
-    HashCountedSet<RefPtr<DOMWindow> > m_lastEventListeners;
+    HashCountedSet<RefPtr<DOMWindow>> m_listeners;
+    HashCountedSet<RefPtr<DOMWindow>> m_lastEventListeners;
     DeviceClient* m_client;
-    Timer<DeviceController> m_timer;
+    Timer m_timer;
 };
 
 } // namespace WebCore

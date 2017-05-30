@@ -26,7 +26,7 @@
 #ifndef PluginProcessProxy_h
 #define PluginProcessProxy_h
 
-#if ENABLE(PLUGIN_PROCESS)
+#if ENABLE(NETSCAPE_PLUGIN_API)
 
 #include "ChildProcessProxy.h"
 #include "Connection.h"
@@ -37,21 +37,15 @@
 #include "WebProcessProxyMessages.h"
 #include <wtf/Deque.h>
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
 #include <wtf/RetainPtr.h>
 OBJC_CLASS NSObject;
 OBJC_CLASS WKPlaceholderModalWindow;
 #endif
 
-// FIXME: This is platform specific.
-namespace CoreIPC {
-    class MachPort;
-}
-
 namespace WebKit {
 
 class PluginProcessManager;
-class WebPluginSiteDataManager;
 class WebProcessProxy;
 struct PluginProcessCreationParameters;
 
@@ -60,12 +54,21 @@ struct RawPluginMetaData {
     String name;
     String description;
     String mimeDescription;
+
+#if PLATFORM(GTK)
+    bool requiresGtk2;
+#endif
 };
+#endif
+
+#if PLATFORM(COCOA)
+int pluginProcessLatencyQOS();
+int pluginProcessThroughputQOS();
 #endif
 
 class PluginProcessProxy : public ChildProcessProxy {
 public:
-    static PassRefPtr<PluginProcessProxy> create(PluginProcessManager*, const PluginProcessAttributes&, uint64_t pluginProcessToken);
+    static Ref<PluginProcessProxy> create(PluginProcessManager*, const PluginProcessAttributes&, uint64_t pluginProcessToken);
     ~PluginProcessProxy();
 
     const PluginProcessAttributes& pluginProcessAttributes() const { return m_pluginProcessAttributes; }
@@ -74,23 +77,21 @@ public:
     // Asks the plug-in process to create a new connection to a web process. The connection identifier will be
     // encoded in the given argument encoder and sent back to the connection of the given web process.
     void getPluginProcessConnection(PassRefPtr<Messages::WebProcessProxy::GetPluginProcessConnection::DelayedReply>);
-    
-    // Asks the plug-in process to get a list of domains for which the plug-in has data stored.
-    void getSitesWithData(WebPluginSiteDataManager*, uint64_t callbackID);
 
-    // Asks the plug-in process to clear the data for the given sites.
-    void clearSiteData(WebPluginSiteDataManager*, const Vector<String>& sites, uint64_t flags, uint64_t maxAgeInSeconds, uint64_t callbackID);
+    void fetchWebsiteData(std::function<void (Vector<String>)> completionHandler);
+    void deleteWebsiteData(std::chrono::system_clock::time_point modifiedSince, std::function<void ()> completionHandler);
+    void deleteWebsiteDataForHostNames(const Vector<String>& hostNames, std::function<void ()> completionHandler);
 
     bool isValid() const { return m_connection; }
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     void setProcessSuppressionEnabled(bool);
 
-    // Returns whether the plug-in needs the heap to be marked executable.
-    static bool pluginNeedsExecutableHeap(const PluginModuleInfo&);
-
+#if __MAC_OS_X_VERSION_MIN_REQUIRED <= 101000
     // Creates a property list in ~/Library/Preferences that contains all the MIME types supported by the plug-in.
     static bool createPropertyListFile(const PluginModuleInfo&);
+#endif
+
 #endif
 
 #if PLUGIN_ARCHITECTURE(X11)
@@ -100,27 +101,31 @@ public:
 private:
     PluginProcessProxy(PluginProcessManager*, const PluginProcessAttributes&, uint64_t pluginProcessToken);
 
-    virtual void getLaunchOptions(ProcessLauncher::LaunchOptions&) OVERRIDE;
+    virtual void getLaunchOptions(ProcessLauncher::LaunchOptions&) override;
     void platformGetLaunchOptions(ProcessLauncher::LaunchOptions&, const PluginProcessAttributes&);
+    virtual void processWillShutDown(IPC::Connection&) override;
 
     void pluginProcessCrashedOrFailedToLaunch();
 
-    // CoreIPC::Connection::Client
-    virtual void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&) OVERRIDE;
-    virtual void didReceiveSyncMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&, OwnPtr<CoreIPC::MessageEncoder>&) OVERRIDE;
+    // IPC::Connection::Client
+    virtual void didReceiveMessage(IPC::Connection&, IPC::MessageDecoder&) override;
+    virtual void didReceiveSyncMessage(IPC::Connection&, IPC::MessageDecoder&, std::unique_ptr<IPC::MessageEncoder>&) override;
 
-    virtual void didClose(CoreIPC::Connection*) OVERRIDE;
-    virtual void didReceiveInvalidMessage(CoreIPC::Connection*, CoreIPC::StringReference messageReceiverName, CoreIPC::StringReference messageName) OVERRIDE;
+    virtual void didClose(IPC::Connection&) override;
+    virtual void didReceiveInvalidMessage(IPC::Connection&, IPC::StringReference messageReceiverName, IPC::StringReference messageName) override;
+    virtual IPC::ProcessType localProcessType() override { return IPC::ProcessType::UI; }
+    virtual IPC::ProcessType remoteProcessType() override { return IPC::ProcessType::Plugin; }
 
     // ProcessLauncher::Client
-    virtual void didFinishLaunching(ProcessLauncher*, CoreIPC::Connection::Identifier);
+    virtual void didFinishLaunching(ProcessLauncher*, IPC::Connection::Identifier) override;
 
     // Message handlers
-    void didCreateWebProcessConnection(const CoreIPC::Attachment&, bool supportsAsynchronousPluginInitialization);
+    void didCreateWebProcessConnection(const IPC::Attachment&, bool supportsAsynchronousPluginInitialization);
     void didGetSitesWithData(const Vector<String>& sites, uint64_t callbackID);
-    void didClearSiteData(uint64_t callbackID);
+    void didDeleteWebsiteData(uint64_t callbackID);
+    void didDeleteWebsiteDataForHostNames(uint64_t callbackID);
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     bool getPluginProcessSerialNumber(ProcessSerialNumber&);
     void makePluginProcessTheFrontProcess();
     void makeUIProcessTheFrontProcess();
@@ -134,10 +139,10 @@ private:
     void endModal();
 
     void applicationDidBecomeActive();
-    void openPluginPreferencePane();
     void launchProcess(const String& launchPath, const Vector<String>& arguments, bool& result);
     void launchApplicationAtURL(const String& urlString, const Vector<String>& arguments, bool& result);
     void openURL(const String& url, bool& result, int32_t& status, String& launchedURLString);
+    void openFile(const String& fullPath, bool& result);
 #endif
 
     void platformInitializePluginProcess(PluginProcessCreationParameters& parameters);
@@ -149,27 +154,32 @@ private:
     uint64_t m_pluginProcessToken;
 
     // The connection to the plug-in host process.
-    RefPtr<CoreIPC::Connection> m_connection;
+    RefPtr<IPC::Connection> m_connection;
 
-    Deque<RefPtr<Messages::WebProcessProxy::GetPluginProcessConnection::DelayedReply> > m_pendingConnectionReplies;
+    Deque<RefPtr<Messages::WebProcessProxy::GetPluginProcessConnection::DelayedReply>> m_pendingConnectionReplies;
 
-    Vector<uint64_t> m_pendingGetSitesRequests;
-    HashMap<uint64_t, RefPtr<WebPluginSiteDataManager> > m_pendingGetSitesReplies;
+    Vector<uint64_t> m_pendingFetchWebsiteDataRequests;
+    HashMap<uint64_t, std::function<void (Vector<String>)>> m_pendingFetchWebsiteDataCallbacks;
 
-    struct ClearSiteDataRequest {
-        Vector<String> sites;
-        uint64_t flags;
-        uint64_t maxAgeInSeconds;
+    struct DeleteWebsiteDataRequest {
+        std::chrono::system_clock::time_point modifiedSince;
         uint64_t callbackID;
     };
-    Vector<ClearSiteDataRequest> m_pendingClearSiteDataRequests;
-    HashMap<uint64_t, RefPtr<WebPluginSiteDataManager> > m_pendingClearSiteDataReplies;
+    Vector<DeleteWebsiteDataRequest> m_pendingDeleteWebsiteDataRequests;
+    HashMap<uint64_t, std::function<void ()>> m_pendingDeleteWebsiteDataCallbacks;
+
+    struct DeleteWebsiteDataForHostNamesRequest {
+        Vector<String> hostNames;
+        uint64_t callbackID;
+    };
+    Vector<DeleteWebsiteDataForHostNamesRequest> m_pendingDeleteWebsiteDataForHostNamesRequests;
+    HashMap<uint64_t, std::function<void ()>> m_pendingDeleteWebsiteDataForHostNamesCallbacks;
 
     // If createPluginConnection is called while the process is still launching we'll keep count of it and send a bunch of requests
     // when the process finishes launching.
     unsigned m_numPendingConnectionRequests;
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     RetainPtr<NSObject> m_activationObserver;
     RetainPtr<WKPlaceholderModalWindow *> m_placeholderWindow;
     bool m_modalWindowIsShowing;
@@ -180,6 +190,6 @@ private:
 
 } // namespace WebKit
 
-#endif // ENABLE(PLUGIN_PROCESS)
+#endif // ENABLE(NETSCAPE_PLUGIN_API)
 
 #endif // PluginProcessProxy_h

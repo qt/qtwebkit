@@ -11,10 +11,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -29,29 +29,29 @@
 
 #include "CanvasContextAttributes.h"
 #include "HTMLCanvasElement.h"
-#include "InspectorCanvasInstrumentation.h"
 #include "JSCanvasRenderingContext2D.h"
-#include "ScriptObject.h"
+#include <bindings/ScriptObject.h>
+#include <wtf/GetPtr.h>
+
 #if ENABLE(WEBGL)
 #include "JSDictionary.h"
-#include "JSWebGLRenderingContext.h"
+#include "JSWebGLRenderingContextBase.h"
 #include "WebGLContextAttributes.h"
 #endif
-#include <wtf/GetPtr.h>
 
 using namespace JSC;
 
 namespace WebCore {
 
 #if ENABLE(WEBGL)
-static void get3DContextAttributes(ExecState* exec, RefPtr<CanvasContextAttributes>& attrs)
+static void get3DContextAttributes(ExecState& state, RefPtr<CanvasContextAttributes>& attrs)
 {
-    JSValue initializerValue = exec->argument(1);
+    JSValue initializerValue = state.argument(1);
     if (initializerValue.isUndefinedOrNull())
         return;
     
-    JSObject* initializerObject = initializerValue.toObject(exec);
-    JSDictionary dictionary(exec, initializerObject);
+    JSObject* initializerObject = initializerValue.toObject(&state);
+    JSDictionary dictionary(&state, initializerObject);
     
     GraphicsContext3D::Attributes graphicsAttrs;
     
@@ -66,78 +66,65 @@ static void get3DContextAttributes(ExecState* exec, RefPtr<CanvasContextAttribut
 }
 #endif
 
-JSValue JSHTMLCanvasElement::getContext(ExecState* exec)
+JSValue JSHTMLCanvasElement::getContext(ExecState& state)
 {
-    HTMLCanvasElement* canvas = static_cast<HTMLCanvasElement*>(impl());
-    const String& contextId = exec->argument(0).toString(exec)->value(exec);
+    HTMLCanvasElement& canvas = wrapped();
+    const String& contextId = state.argument(0).toString(&state)->value(&state);
     
     RefPtr<CanvasContextAttributes> attrs;
 #if ENABLE(WEBGL)
     if (HTMLCanvasElement::is3dType(contextId)) {
-        get3DContextAttributes(exec, attrs);
-        if (exec->hadException())
+        get3DContextAttributes(state, attrs);
+        if (state.hadException())
             return jsUndefined();
     }
 #endif
     
-    CanvasRenderingContext* context = canvas->getContext(contextId, attrs.get());
+    CanvasRenderingContext* context = canvas.getContext(contextId, attrs.get());
     if (!context)
         return jsNull();
-    JSValue jsValue = toJS(exec, globalObject(), WTF::getPtr(context));
-    if (InspectorInstrumentation::canvasAgentEnabled(canvas->document())) {
-        ScriptObject contextObject(exec, jsValue.getObject());
-        ScriptObject wrapped;
-        if (context->is2d())
-            wrapped = InspectorInstrumentation::wrapCanvas2DRenderingContextForInstrumentation(canvas->document(), contextObject);
-#if ENABLE(WEBGL)
-        else if (context->is3d())
-            wrapped = InspectorInstrumentation::wrapWebGLRenderingContextForInstrumentation(canvas->document(), contextObject);
-#endif
-        if (!wrapped.hasNoValue())
-            return wrapped.jsValue();
-    }
-    return jsValue;
+    return toJS(&state, globalObject(), WTF::getPtr(context));
 }
 
-JSValue JSHTMLCanvasElement::supportsContext(ExecState* exec)
+JSValue JSHTMLCanvasElement::probablySupportsContext(ExecState& state)
 {
-    HTMLCanvasElement* canvas = static_cast<HTMLCanvasElement*>(impl());
-    if (!exec->argumentCount())
+    HTMLCanvasElement& canvas = wrapped();
+    if (!state.argumentCount())
         return jsBoolean(false);
-    const String& contextId = exec->argument(0).toString(exec)->value(exec);
-    if (exec->hadException())
+    const String& contextId = state.uncheckedArgument(0).toString(&state)->value(&state);
+    if (state.hadException())
         return jsUndefined();
     
     RefPtr<CanvasContextAttributes> attrs;
 #if ENABLE(WEBGL)
     if (HTMLCanvasElement::is3dType(contextId)) {
-        get3DContextAttributes(exec, attrs);
-        if (exec->hadException())
+        get3DContextAttributes(state, attrs);
+        if (state.hadException())
             return jsUndefined();
     }
 #endif
     
-    return jsBoolean(canvas->supportsContext(contextId, attrs.get()));
+    return jsBoolean(canvas.probablySupportsContext(contextId, attrs.get()));
 }
 
-JSValue JSHTMLCanvasElement::toDataURL(ExecState* exec)
+JSValue JSHTMLCanvasElement::toDataURL(ExecState& state)
 {
-    HTMLCanvasElement* canvas = static_cast<HTMLCanvasElement*>(impl());
+    HTMLCanvasElement& canvas = wrapped();
     ExceptionCode ec = 0;
 
-    const String& type = valueToStringWithUndefinedOrNullCheck(exec, exec->argument(0));
+    const String& type = valueToStringWithUndefinedOrNullCheck(&state, state.argument(0));
     double quality;
     double* qualityPtr = 0;
-    if (exec->argumentCount() > 1) {
-        JSValue v = exec->argument(1);
+    if (state.argumentCount() > 1) {
+        JSValue v = state.uncheckedArgument(1);
         if (v.isNumber()) {
-            quality = v.toNumber(exec);
+            quality = v.toNumber(&state);
             qualityPtr = &quality;
         }
     }
 
-    JSValue result = JSC::jsString(exec, canvas->toDataURL(type, qualityPtr, ec));
-    setDOMException(exec, ec);
+    JSValue result = JSC::jsString(&state, canvas.toDataURL(type, qualityPtr, ec));
+    setDOMException(&state, ec);
     return result;
 }
 

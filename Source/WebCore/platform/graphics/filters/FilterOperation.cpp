@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -24,20 +24,25 @@
  */
 
 #include "config.h"
-
-#if ENABLE(CSS_FILTERS)
 #include "FilterOperation.h"
 
 #include "AnimationUtilities.h"
-
-#if ENABLE(SVG)
 #include "CachedSVGDocumentReference.h"
-#endif
+#include "FilterEffect.h"
+#include "TextStream.h"
 
 namespace WebCore {
+    
+bool DefaultFilterOperation::operator==(const FilterOperation& operation) const
+{
+    if (!isSameType(operation))
+        return false;
+    
+    return representedType() == downcast<DefaultFilterOperation>(operation).representedType();
+}
 
-ReferenceFilterOperation::ReferenceFilterOperation(const String& url, const String& fragment, OperationType type)
-    : FilterOperation(type)
+ReferenceFilterOperation::ReferenceFilterOperation(const String& url, const String& fragment)
+    : FilterOperation(REFERENCE)
     , m_url(url)
     , m_fragment(fragment)
 {
@@ -46,13 +51,26 @@ ReferenceFilterOperation::ReferenceFilterOperation(const String& url, const Stri
 ReferenceFilterOperation::~ReferenceFilterOperation()
 {
 }
-
-#if ENABLE(SVG)
-void ReferenceFilterOperation::setCachedSVGDocumentReference(PassOwnPtr<CachedSVGDocumentReference> cachedSVGDocumentReference)
+    
+bool ReferenceFilterOperation::operator==(const FilterOperation& operation) const
 {
-    m_cachedSVGDocumentReference = cachedSVGDocumentReference;
+    if (!isSameType(operation))
+        return false;
+    
+    return m_url == downcast<ReferenceFilterOperation>(operation).m_url;
 }
-#endif
+    
+CachedSVGDocumentReference* ReferenceFilterOperation::getOrCreateCachedSVGDocumentReference()
+{
+    if (!m_cachedSVGDocumentReference)
+        m_cachedSVGDocumentReference = std::make_unique<CachedSVGDocumentReference>(m_url);
+    return m_cachedSVGDocumentReference.get();
+}
+
+void ReferenceFilterOperation::setFilterEffect(PassRefPtr<FilterEffect> filterEffect)
+{
+    m_filterEffect = filterEffect;
+}
 
 PassRefPtr<FilterOperation> BasicColorMatrixFilterOperation::blend(const FilterOperation* from, double progress, bool blendToPassthrough)
 {
@@ -62,9 +80,17 @@ PassRefPtr<FilterOperation> BasicColorMatrixFilterOperation::blend(const FilterO
     if (blendToPassthrough)
         return BasicColorMatrixFilterOperation::create(WebCore::blend(m_amount, passthroughAmount(), progress), m_type);
         
-    const BasicColorMatrixFilterOperation* fromOp = static_cast<const BasicColorMatrixFilterOperation*>(from);
-    double fromAmount = fromOp ? fromOp->amount() : passthroughAmount();
+    const BasicColorMatrixFilterOperation* fromOperation = downcast<BasicColorMatrixFilterOperation>(from);
+    double fromAmount = fromOperation ? fromOperation->amount() : passthroughAmount();
     return BasicColorMatrixFilterOperation::create(WebCore::blend(fromAmount, m_amount, progress), m_type);
+}
+
+inline bool BasicColorMatrixFilterOperation::operator==(const FilterOperation& operation) const
+{
+    if (!isSameType(operation))
+        return false;
+    const BasicColorMatrixFilterOperation& other = downcast<BasicColorMatrixFilterOperation>(operation);
+    return m_amount == other.m_amount;
 }
 
 double BasicColorMatrixFilterOperation::passthroughAmount() const
@@ -90,9 +116,17 @@ PassRefPtr<FilterOperation> BasicComponentTransferFilterOperation::blend(const F
     if (blendToPassthrough)
         return BasicComponentTransferFilterOperation::create(WebCore::blend(m_amount, passthroughAmount(), progress), m_type);
         
-    const BasicComponentTransferFilterOperation* fromOp = static_cast<const BasicComponentTransferFilterOperation*>(from);
-    double fromAmount = fromOp ? fromOp->amount() : passthroughAmount();
+    const BasicComponentTransferFilterOperation* fromOperation = downcast<BasicComponentTransferFilterOperation>(from);
+    double fromAmount = fromOperation ? fromOperation->amount() : passthroughAmount();
     return BasicComponentTransferFilterOperation::create(WebCore::blend(fromAmount, m_amount, progress), m_type);
+}
+
+inline bool BasicComponentTransferFilterOperation::operator==(const FilterOperation& operation) const
+{
+    if (!isSameType(operation))
+        return false;
+    const BasicComponentTransferFilterOperation& other = downcast<BasicComponentTransferFilterOperation>(operation);
+    return m_amount == other.m_amount;
 }
 
 double BasicComponentTransferFilterOperation::passthroughAmount() const
@@ -111,28 +145,15 @@ double BasicComponentTransferFilterOperation::passthroughAmount() const
         return 0;
     }
 }
-
-PassRefPtr<FilterOperation> GammaFilterOperation::blend(const FilterOperation* from, double progress, bool blendToPassthrough)
-{
-    if (from && !from->isSameType(*this))
-        return this;
     
-    if (blendToPassthrough)
-        return GammaFilterOperation::create(
-            WebCore::blend(m_amplitude, 1.0, progress),
-            WebCore::blend(m_exponent, 1.0, progress),
-            WebCore::blend(m_offset, 0.0, progress), m_type);
-        
-    const GammaFilterOperation* fromOp = static_cast<const GammaFilterOperation*>(from);
-    double fromAmplitude = fromOp ? fromOp->amplitude() : 1;
-    double fromExponent = fromOp ? fromOp->exponent() : 1;
-    double fromOffset = fromOp ? fromOp->offset() : 0;
-    return GammaFilterOperation::create(
-        WebCore::blend(fromAmplitude, m_amplitude, progress),
-        WebCore::blend(fromExponent, m_exponent, progress),
-        WebCore::blend(fromOffset, m_offset, progress), m_type);
+bool BlurFilterOperation::operator==(const FilterOperation& operation) const
+{
+    if (!isSameType(operation))
+        return false;
+    
+    return m_stdDeviation == downcast<BlurFilterOperation>(operation).stdDeviation();
 }
-
+    
 PassRefPtr<FilterOperation> BlurFilterOperation::blend(const FilterOperation* from, double progress, bool blendToPassthrough)
 {
     if (from && !from->isSameType(*this))
@@ -141,13 +162,21 @@ PassRefPtr<FilterOperation> BlurFilterOperation::blend(const FilterOperation* fr
     LengthType lengthType = m_stdDeviation.type();
 
     if (blendToPassthrough)
-        return BlurFilterOperation::create(Length(lengthType).blend(m_stdDeviation, progress), m_type);
+        return BlurFilterOperation::create(Length(lengthType).blend(m_stdDeviation, progress));
 
-    const BlurFilterOperation* fromOp = static_cast<const BlurFilterOperation*>(from);
-    Length fromLength = fromOp ? fromOp->m_stdDeviation : Length(lengthType);
-    return BlurFilterOperation::create(m_stdDeviation.blend(fromLength, progress), m_type);
+    const BlurFilterOperation* fromOperation = downcast<BlurFilterOperation>(from);
+    Length fromLength = fromOperation ? fromOperation->m_stdDeviation : Length(lengthType);
+    return BlurFilterOperation::create(m_stdDeviation.blend(fromLength, progress));
 }
-
+    
+bool DropShadowFilterOperation::operator==(const FilterOperation& operation) const
+{
+    if (!isSameType(operation))
+        return false;
+    const DropShadowFilterOperation& other = downcast<DropShadowFilterOperation>(operation);
+    return m_location == other.m_location && m_stdDeviation == other.m_stdDeviation && m_color == other.m_color;
+}
+    
 PassRefPtr<FilterOperation> DropShadowFilterOperation::blend(const FilterOperation* from, double progress, bool blendToPassthrough)
 {
     if (from && !from->isSameType(*this))
@@ -157,20 +186,89 @@ PassRefPtr<FilterOperation> DropShadowFilterOperation::blend(const FilterOperati
         return DropShadowFilterOperation::create(
             WebCore::blend(m_location, IntPoint(), progress),
             WebCore::blend(m_stdDeviation, 0, progress),
-            WebCore::blend(m_color, Color(Color::transparent), progress),
-            m_type);
+            WebCore::blend(m_color, Color(Color::transparent), progress));
 
-    const DropShadowFilterOperation* fromOp = static_cast<const DropShadowFilterOperation*>(from);
-    IntPoint fromLocation = fromOp ? fromOp->location() : IntPoint();
-    int fromStdDeviation = fromOp ? fromOp->stdDeviation() : 0;
-    Color fromColor = fromOp ? fromOp->color() : Color(Color::transparent);
+    const DropShadowFilterOperation* fromOperation = downcast<DropShadowFilterOperation>(from);
+    IntPoint fromLocation = fromOperation ? fromOperation->location() : IntPoint();
+    int fromStdDeviation = fromOperation ? fromOperation->stdDeviation() : 0;
+    Color fromColor = fromOperation ? fromOperation->color() : Color(Color::transparent);
     
     return DropShadowFilterOperation::create(
         WebCore::blend(fromLocation, m_location, progress),
         WebCore::blend(fromStdDeviation, m_stdDeviation, progress),
-        WebCore::blend(fromColor, m_color, progress), m_type);
+        WebCore::blend(fromColor, m_color, progress));
+}
+
+TextStream& operator<<(TextStream& ts, const FilterOperation& filter)
+{
+    switch (filter.type()) {
+    case FilterOperation::REFERENCE:
+        ts << "reference";
+        break;
+    case FilterOperation::GRAYSCALE: {
+        const auto& colorMatrixFilter = downcast<BasicColorMatrixFilterOperation>(filter);
+        ts << "grayscale(" << colorMatrixFilter.amount() << ")";
+        break;
+    }
+    case FilterOperation::SEPIA: {
+        const auto& colorMatrixFilter = downcast<BasicColorMatrixFilterOperation>(filter);
+        ts << "sepia(" << colorMatrixFilter.amount() << ")";
+        break;
+    }
+    case FilterOperation::SATURATE: {
+        const auto& colorMatrixFilter = downcast<BasicColorMatrixFilterOperation>(filter);
+        ts << "saturate(" << colorMatrixFilter.amount() << ")";
+        break;
+    }
+    case FilterOperation::HUE_ROTATE: {
+        const auto& colorMatrixFilter = downcast<BasicColorMatrixFilterOperation>(filter);
+        ts << "hue-rotate(" << colorMatrixFilter.amount() << ")";
+        break;
+    }
+    case FilterOperation::INVERT: {
+        const auto& componentTransferFilter = downcast<BasicComponentTransferFilterOperation>(filter);
+        ts << "invert(" << componentTransferFilter.amount() << ")";
+        break;
+    }
+    case FilterOperation::OPACITY: {
+        const auto& componentTransferFilter = downcast<BasicComponentTransferFilterOperation>(filter);
+        ts << "opacity(" << componentTransferFilter.amount() << ")";
+        break;
+    }
+    case FilterOperation::BRIGHTNESS: {
+        const auto& componentTransferFilter = downcast<BasicComponentTransferFilterOperation>(filter);
+        ts << "brightness(" << componentTransferFilter.amount() << ")";
+        break;
+    }
+    case FilterOperation::CONTRAST: {
+        const auto& componentTransferFilter = downcast<BasicComponentTransferFilterOperation>(filter);
+        ts << "contrast(" << componentTransferFilter.amount() << ")";
+        break;
+    }
+    case FilterOperation::BLUR: {
+        const auto& blurFilter = downcast<BlurFilterOperation>(filter);
+        ts << "blur(" << blurFilter.stdDeviation().value() << ")"; // FIXME: should call floatValueForLength() but that's outisde of platform/.
+        break;
+    }
+    case FilterOperation::DROP_SHADOW: {
+        const auto& dropShadowFilter = downcast<DropShadowFilterOperation>(filter);
+        ts << "drop-shadow(" << dropShadowFilter.x() << " " << dropShadowFilter.y() << " " << dropShadowFilter.location() << " ";
+        ts << dropShadowFilter.color() << ")";
+        break;
+    }
+    case FilterOperation::PASSTHROUGH:
+        ts << "passthrough";
+        break;
+    case FilterOperation::DEFAULT: {
+        const auto& defaultFilter = downcast<DefaultFilterOperation>(filter);
+        ts << "default type=" << (int)defaultFilter.representedType();
+        break;
+    }
+    case FilterOperation::NONE:
+        ts << "none";
+        break;
+    }
+    return ts;
 }
 
 } // namespace WebCore
-
-#endif // ENABLE(CSS_FILTERS)

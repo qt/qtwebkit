@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 Apple Inc. All rights reserved.
+ * Copyright (C) 2008, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -35,10 +35,27 @@ namespace WTF {
 template <typename T> class Locker {
     WTF_MAKE_NONCOPYABLE(Locker);
 public:
-    Locker(T& lockable) : m_lockable(lockable) { m_lockable.lock(); }
-    ~Locker() { m_lockable.unlock(); }
+    explicit Locker(T& lockable) : m_lockable(&lockable) { lock(); }
+    explicit Locker(T* lockable) : m_lockable(lockable) { lock(); }
+    ~Locker()
+    {
+        if (m_lockable)
+            m_lockable->unlock();
+    }
+    
+    void unlockEarly()
+    {
+        m_lockable->unlock();
+        m_lockable = 0;
+    }
 private:
-    T& m_lockable;
+    void lock()
+    {
+        if (m_lockable)
+            m_lockable->lock();
+    }
+    
+    T* m_lockable;
 };
 
 }

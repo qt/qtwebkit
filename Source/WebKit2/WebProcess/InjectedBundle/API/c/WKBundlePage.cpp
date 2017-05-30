@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, 2011, 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2010, 2011, 2013, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,8 +27,14 @@
 #include "WKBundlePage.h"
 #include "WKBundlePagePrivate.h"
 
+#include "APIArray.h"
+#include "APIString.h"
+#include "APIURL.h"
+#include "APIURLRequest.h"
 #include "InjectedBundleBackForwardList.h"
 #include "InjectedBundleNodeHandle.h"
+#include "InjectedBundlePageFormClient.h"
+#include "InjectedBundlePageUIClient.h"
 #include "PageBanner.h"
 #include "WKAPICast.h"
 #include "WKArray.h"
@@ -40,19 +46,22 @@
 #include "WebFrame.h"
 #include "WebFullScreenManager.h"
 #include "WebImage.h"
+#include "WebInspector.h"
 #include "WebPage.h"
+#include "WebPageGroupProxy.h"
+#include "WebPageOverlay.h"
 #include "WebRenderLayer.h"
 #include "WebRenderObject.h"
-#include "WebString.h"
-#include "WebURL.h"
-#include "WebURLRequest.h"
-
 #include <WebCore/AXObjectCache.h>
 #include <WebCore/AccessibilityObject.h>
-#include <WebCore/Frame.h>
-#include <WebCore/KURL.h>
+#include <WebCore/ApplicationCacheStorage.h>
+#include <WebCore/MainFrame.h>
 #include <WebCore/Page.h>
-#include <wtf/OwnArrayPtr.h>
+#include <WebCore/PageOverlay.h>
+#include <WebCore/PageOverlayController.h>
+#include <WebCore/URL.h>
+#include <WebCore/WheelEventTestTrigger.h>
+#include <wtf/StdLibExtras.h>
 
 using namespace WebKit;
 
@@ -61,47 +70,53 @@ WKTypeID WKBundlePageGetTypeID()
     return toAPI(WebPage::APIType);
 }
 
-void WKBundlePageSetContextMenuClient(WKBundlePageRef pageRef, WKBundlePageContextMenuClient* wkClient)
+void WKBundlePageSetContextMenuClient(WKBundlePageRef pageRef, WKBundlePageContextMenuClientBase* wkClient)
 {
 #if ENABLE(CONTEXT_MENUS)
-    toImpl(pageRef)->initializeInjectedBundleContextMenuClient(wkClient);
+    toImpl(pageRef)->setInjectedBundleContextMenuClient(std::make_unique<InjectedBundlePageContextMenuClient>(wkClient));
+#else
+    UNUSED_PARAM(pageRef);
+    UNUSED_PARAM(wkClient);
 #endif
 }
 
-void WKBundlePageSetEditorClient(WKBundlePageRef pageRef, WKBundlePageEditorClient* wkClient)
+void WKBundlePageSetEditorClient(WKBundlePageRef pageRef, WKBundlePageEditorClientBase* wkClient)
 {
     toImpl(pageRef)->initializeInjectedBundleEditorClient(wkClient);
 }
 
-void WKBundlePageSetFormClient(WKBundlePageRef pageRef, WKBundlePageFormClient* wkClient)
+void WKBundlePageSetFormClient(WKBundlePageRef pageRef, WKBundlePageFormClientBase* wkClient)
 {
-    toImpl(pageRef)->initializeInjectedBundleFormClient(wkClient);
+    toImpl(pageRef)->setInjectedBundleFormClient(std::make_unique<InjectedBundlePageFormClient>(wkClient));
 }
 
-void WKBundlePageSetPageLoaderClient(WKBundlePageRef pageRef, WKBundlePageLoaderClient* wkClient)
+void WKBundlePageSetPageLoaderClient(WKBundlePageRef pageRef, WKBundlePageLoaderClientBase* wkClient)
 {
     toImpl(pageRef)->initializeInjectedBundleLoaderClient(wkClient);
 }
 
-void WKBundlePageSetResourceLoadClient(WKBundlePageRef pageRef, WKBundlePageResourceLoadClient* wkClient)
+void WKBundlePageSetResourceLoadClient(WKBundlePageRef pageRef, WKBundlePageResourceLoadClientBase* wkClient)
 {
     toImpl(pageRef)->initializeInjectedBundleResourceLoadClient(wkClient);
 }
 
-void WKBundlePageSetPolicyClient(WKBundlePageRef pageRef, WKBundlePagePolicyClient* wkClient)
+void WKBundlePageSetPolicyClient(WKBundlePageRef pageRef, WKBundlePagePolicyClientBase* wkClient)
 {
     toImpl(pageRef)->initializeInjectedBundlePolicyClient(wkClient);
 }
 
-void WKBundlePageSetUIClient(WKBundlePageRef pageRef, WKBundlePageUIClient* wkClient)
+void WKBundlePageSetUIClient(WKBundlePageRef pageRef, WKBundlePageUIClientBase* wkClient)
 {
-    toImpl(pageRef)->initializeInjectedBundleUIClient(wkClient);
+    toImpl(pageRef)->setInjectedBundleUIClient(std::make_unique<InjectedBundlePageUIClient>(wkClient));
 }
 
-void WKBundlePageSetFullScreenClient(WKBundlePageRef pageRef, WKBundlePageFullScreenClient* wkClient)
+void WKBundlePageSetFullScreenClient(WKBundlePageRef pageRef, WKBundlePageFullScreenClientBase* wkClient)
 {
 #if defined(ENABLE_FULLSCREEN_API) && ENABLE_FULLSCREEN_API
     toImpl(pageRef)->initializeInjectedBundleFullScreenClient(wkClient);
+#else
+    UNUSED_PARAM(pageRef);
+    UNUSED_PARAM(wkClient);
 #endif
 }
 
@@ -109,6 +124,8 @@ void WKBundlePageWillEnterFullScreen(WKBundlePageRef pageRef)
 {
 #if defined(ENABLE_FULLSCREEN_API) && ENABLE_FULLSCREEN_API
     toImpl(pageRef)->fullScreenManager()->willEnterFullScreen();
+#else
+    UNUSED_PARAM(pageRef);
 #endif
 }
 
@@ -116,6 +133,8 @@ void WKBundlePageDidEnterFullScreen(WKBundlePageRef pageRef)
 {
 #if defined(ENABLE_FULLSCREEN_API) && ENABLE_FULLSCREEN_API
     toImpl(pageRef)->fullScreenManager()->didEnterFullScreen();
+#else
+    UNUSED_PARAM(pageRef);
 #endif
 }
 
@@ -123,6 +142,8 @@ void WKBundlePageWillExitFullScreen(WKBundlePageRef pageRef)
 {
 #if defined(ENABLE_FULLSCREEN_API) && ENABLE_FULLSCREEN_API
     toImpl(pageRef)->fullScreenManager()->willExitFullScreen();
+#else
+    UNUSED_PARAM(pageRef);
 #endif
 }
 
@@ -130,10 +151,12 @@ void WKBundlePageDidExitFullScreen(WKBundlePageRef pageRef)
 {
 #if defined(ENABLE_FULLSCREEN_API) && ENABLE_FULLSCREEN_API
     toImpl(pageRef)->fullScreenManager()->didExitFullScreen();
+#else
+    UNUSED_PARAM(pageRef);
 #endif
 }
 
-void WKBundlePageSetDiagnosticLoggingClient(WKBundlePageRef pageRef, WKBundlePageDiagnosticLoggingClient* client)
+void WKBundlePageSetDiagnosticLoggingClient(WKBundlePageRef pageRef, WKBundlePageDiagnosticLoggingClientBase* client)
 {
     toImpl(pageRef)->initializeInjectedBundleDiagnosticLoggingClient(client);
 }
@@ -148,19 +171,40 @@ WKBundleFrameRef WKBundlePageGetMainFrame(WKBundlePageRef pageRef)
     return toAPI(toImpl(pageRef)->mainWebFrame());
 }
 
-WKArrayRef WKBundlePageCopyContextMenuItemTitles(WKBundlePageRef pageRef)
+void WKBundlePageClickMenuItem(WKBundlePageRef pageRef, WKContextMenuItemRef item)
+{
+#if ENABLE(CONTEXT_MENUS)
+    toImpl(pageRef)->contextMenu()->itemSelected(toImpl(item)->data());
+#else
+    UNUSED_PARAM(pageRef);
+    UNUSED_PARAM(item);
+#endif
+}
+
+#if ENABLE(CONTEXT_MENUS)
+static PassRefPtr<API::Array> contextMenuItems(const WebContextMenu& contextMenu)
+{
+    auto items = contextMenu.items();
+
+    Vector<RefPtr<API::Object>> menuItems;
+    menuItems.reserveInitialCapacity(items.size());
+
+    for (const auto& item : items)
+        menuItems.uncheckedAppend(WebContextMenuItem::create(item));
+
+    return API::Array::create(WTFMove(menuItems));
+}
+#endif
+
+WKArrayRef WKBundlePageCopyContextMenuItems(WKBundlePageRef pageRef)
 {
 #if ENABLE(CONTEXT_MENUS)
     WebContextMenu* contextMenu = toImpl(pageRef)->contextMenu();
-    const Vector<WebContextMenuItemData> &items = contextMenu->items();
-    size_t arrayLength = items.size();
-    OwnArrayPtr<WKTypeRef> itemNames = adoptArrayPtr(new WKTypeRef[arrayLength]);
-    for (size_t i = 0; i < arrayLength; ++i)
-        itemNames[i] = WKStringCreateWithUTF8CString(items[i].title().utf8().data());
 
-    return WKArrayCreateAdoptingValues(itemNames.get(), arrayLength);
+    return toAPI(contextMenuItems(*contextMenu).leakRef());
 #else
-    return 0;
+    UNUSED_PARAM(pageRef);
+    return nullptr;
 #endif
 }
 
@@ -169,19 +213,13 @@ WKArrayRef WKBundlePageCopyContextMenuAtPointInWindow(WKBundlePageRef pageRef, W
 #if ENABLE(CONTEXT_MENUS)
     WebContextMenu* contextMenu = toImpl(pageRef)->contextMenuAtPointInWindow(toIntPoint(point));
     if (!contextMenu)
-        return 0;
+        return nullptr;
 
-    const Vector<WebContextMenuItemData>& items = contextMenu->items();
-    size_t arrayLength = items.size();
-
-    RefPtr<MutableArray> menuArray = MutableArray::create();
-    menuArray->reserveCapacity(arrayLength);
-    for (unsigned i = 0; i < arrayLength; ++i)
-        menuArray->append(WebContextMenuItem::create(items[i]).get());
-    
-    return toAPI(menuArray.release().leakRef());
+    return toAPI(contextMenuItems(*contextMenu).leakRef());
 #else
-    return 0;
+    UNUSED_PARAM(pageRef);
+    UNUSED_PARAM(point);
+    return nullptr;
 #endif
 }
 
@@ -195,13 +233,13 @@ void* WKAccessibilityRootObject(WKBundlePageRef pageRef)
     if (!page)
         return 0;
     
-    WebCore::Frame* core = page->mainFrame();
-    if (!core || !core->document())
+    WebCore::Frame& core = page->mainFrame();
+    if (!core.document())
         return 0;
     
     WebCore::AXObjectCache::enableAccessibility();
 
-    WebCore::AccessibilityObject* root = core->document()->axObjectCache()->rootObject();
+    WebCore::AccessibilityObject* root = core.document()->axObjectCache()->rootObject();
     if (!root)
         return 0;
     
@@ -232,6 +270,22 @@ void* WKAccessibilityFocusedObject(WKBundlePageRef pageRef)
 #else
     UNUSED_PARAM(pageRef);
     return 0;
+#endif
+}
+
+void WKAccessibilityEnableEnhancedAccessibility(bool enable)
+{
+#if HAVE(ACCESSIBILITY)
+    WebCore::AXObjectCache::setEnhancedUserInterfaceAccessibility(enable);
+#endif
+}
+
+bool WKAccessibilityEnhancedAccessibilityEnabled()
+{
+#if HAVE(ACCESSIBILITY)
+    return WebCore::AXObjectCache::accessibilityEnhancedUserInterfaceEnabled();
+#else
+    return false;
 #endif
 }
 
@@ -305,29 +359,24 @@ WKBundleBackForwardListRef WKBundlePageGetBackForwardList(WKBundlePageRef pageRe
     return toAPI(toImpl(pageRef)->backForwardList());
 }
 
-void WKBundlePageSetUnderlayPage(WKBundlePageRef pageRef, WKBundlePageRef pageUnderlayRef)
-{
-    toImpl(pageRef)->setUnderlayPage(toImpl(pageUnderlayRef));
-}
-
 void WKBundlePageInstallPageOverlay(WKBundlePageRef pageRef, WKBundlePageOverlayRef pageOverlayRef)
 {
-    toImpl(pageRef)->installPageOverlay(toImpl(pageOverlayRef));
+    toImpl(pageRef)->mainFrame()->pageOverlayController().installPageOverlay(toImpl(pageOverlayRef)->coreOverlay(), WebCore::PageOverlay::FadeMode::DoNotFade);
 }
 
 void WKBundlePageUninstallPageOverlay(WKBundlePageRef pageRef, WKBundlePageOverlayRef pageOverlayRef)
 {
-    toImpl(pageRef)->uninstallPageOverlay(toImpl(pageOverlayRef));
+    toImpl(pageRef)->mainFrame()->pageOverlayController().uninstallPageOverlay(toImpl(pageOverlayRef)->coreOverlay(), WebCore::PageOverlay::FadeMode::DoNotFade);
 }
 
 void WKBundlePageInstallPageOverlayWithAnimation(WKBundlePageRef pageRef, WKBundlePageOverlayRef pageOverlayRef)
 {
-    toImpl(pageRef)->installPageOverlay(toImpl(pageOverlayRef), true);
+    toImpl(pageRef)->mainFrame()->pageOverlayController().installPageOverlay(toImpl(pageOverlayRef)->coreOverlay(), WebCore::PageOverlay::FadeMode::Fade);
 }
 
 void WKBundlePageUninstallPageOverlayWithAnimation(WKBundlePageRef pageRef, WKBundlePageOverlayRef pageOverlayRef)
 {
-    toImpl(pageRef)->uninstallPageOverlay(toImpl(pageOverlayRef), true);
+    toImpl(pageRef)->mainFrame()->pageOverlayController().uninstallPageOverlay(toImpl(pageOverlayRef)->coreOverlay(), WebCore::PageOverlay::FadeMode::Fade);
 }
 
 void WKBundlePageSetTopOverhangImage(WKBundlePageRef pageRef, WKImageRef imageRef)
@@ -350,6 +399,7 @@ void WKBundlePageSetBottomOverhangImage(WKBundlePageRef pageRef, WKImageRef imag
 #endif
 }
 
+#if !PLATFORM(IOS)
 void WKBundlePageSetHeaderBanner(WKBundlePageRef pageRef, WKBundlePageBannerRef bannerRef)
 {
     toImpl(pageRef)->setHeaderPageBanner(toImpl(bannerRef));
@@ -359,10 +409,11 @@ void WKBundlePageSetFooterBanner(WKBundlePageRef pageRef, WKBundlePageBannerRef 
 {
     toImpl(pageRef)->setFooterPageBanner(toImpl(bannerRef));
 }
+#endif // !PLATFORM(IOS)
 
 bool WKBundlePageHasLocalDataForURL(WKBundlePageRef pageRef, WKURLRef urlRef)
 {
-    return toImpl(pageRef)->hasLocalDataForURL(WebCore::KURL(WebCore::KURL(), toWTFString(urlRef)));
+    return toImpl(pageRef)->hasLocalDataForURL(WebCore::URL(WebCore::URL(), toWTFString(urlRef)));
 }
 
 bool WKBundlePageCanHandleRequest(WKURLRequestRef requestRef)
@@ -413,12 +464,7 @@ void WKBundlePageListenForLayoutMilestones(WKBundlePageRef pageRef, WKLayoutMile
 
 WKBundleInspectorRef WKBundlePageGetInspector(WKBundlePageRef pageRef)
 {
-#if ENABLE(INSPECTOR)
     return toAPI(toImpl(pageRef)->inspector());
-#else
-    UNUSED_PARAM(pageRef);
-    return 0;
-#endif
 }
 
 void WKBundlePageForceRepaint(WKBundlePageRef page)
@@ -479,7 +525,7 @@ void WKBundlePageResetTrackedRepaints(WKBundlePageRef pageRef)
 
 WKArrayRef WKBundlePageCopyTrackedRepaintRects(WKBundlePageRef pageRef)
 {
-    return toAPI(toImpl(pageRef)->trackedRepaintRects().leakRef());
+    return toAPI(&toImpl(pageRef)->trackedRepaintRects().leakRef());
 }
 
 void WKBundlePageSetComposition(WKBundlePageRef pageRef, WKStringRef text, int from, int length)
@@ -515,4 +561,122 @@ WKRenderingSuppressionToken WKBundlePageExtendIncrementalRenderingSuppression(WK
 void WKBundlePageStopExtendingIncrementalRenderingSuppression(WKBundlePageRef pageRef, WKRenderingSuppressionToken token)
 {
     toImpl(pageRef)->stopExtendingIncrementalRenderingSuppression(token);
+}
+
+bool WKBundlePageIsUsingEphemeralSession(WKBundlePageRef pageRef)
+{
+    return toImpl(pageRef)->usesEphemeralSession();
+}
+
+#if TARGET_OS_IPHONE
+void WKBundlePageSetUseTestingViewportConfiguration(WKBundlePageRef pageRef, bool useTestingViewportConfiguration)
+{
+    toImpl(pageRef)->setUseTestingViewportConfiguration(useTestingViewportConfiguration);
+}
+#endif
+
+void WKBundlePageStartMonitoringScrollOperations(WKBundlePageRef pageRef)
+{
+    WebKit::WebPage* webPage = toImpl(pageRef);
+    WebCore::Page* page = webPage ? webPage->corePage() : nullptr;
+    
+    if (!page)
+        return;
+
+    page->ensureTestTrigger();
+}
+
+void WKBundlePageRegisterScrollOperationCompletionCallback(WKBundlePageRef pageRef, WKBundlePageTestNotificationCallback callback, void* context)
+{
+    if (!callback)
+        return;
+    
+    WebKit::WebPage* webPage = toImpl(pageRef);
+    WebCore::Page* page = webPage ? webPage->corePage() : nullptr;
+    if (!page || !page->expectsWheelEventTriggers())
+        return;
+    
+    page->ensureTestTrigger().setTestCallbackAndStartNotificationTimer([=]() {
+        callback(context);
+    });
+}
+
+void WKBundlePagePostMessage(WKBundlePageRef pageRef, WKStringRef messageNameRef, WKTypeRef messageBodyRef)
+{
+    toImpl(pageRef)->postMessage(toWTFString(messageNameRef), toImpl(messageBodyRef));
+}
+
+void WKBundlePagePostSynchronousMessageForTesting(WKBundlePageRef pageRef, WKStringRef messageNameRef, WKTypeRef messageBodyRef, WKTypeRef* returnDataRef)
+{
+    WebPage* page = toImpl(pageRef);
+    page->layoutIfNeeded();
+
+    RefPtr<API::Object> returnData;
+    page->postSynchronousMessageForTesting(toWTFString(messageNameRef), toImpl(messageBodyRef), returnData);
+    if (returnDataRef)
+        *returnDataRef = toAPI(returnData.release().leakRef());
+}
+
+void WKBundlePageAddUserScript(WKBundlePageRef pageRef, WKStringRef source, _WKUserScriptInjectionTime injectionTime, WKUserContentInjectedFrames injectedFrames)
+{
+    toImpl(pageRef)->addUserScript(toWTFString(source), toUserContentInjectedFrames(injectedFrames), toUserScriptInjectionTime(injectionTime));
+}
+
+void WKBundlePageAddUserStyleSheet(WKBundlePageRef pageRef, WKStringRef source, WKUserContentInjectedFrames injectedFrames)
+{
+    toImpl(pageRef)->addUserStyleSheet(toWTFString(source), toUserContentInjectedFrames(injectedFrames));
+}
+
+void WKBundlePageRemoveAllUserContent(WKBundlePageRef pageRef)
+{
+    toImpl(pageRef)->removeAllUserContent();
+}
+
+WKStringRef WKBundlePageCopyGroupIdentifier(WKBundlePageRef pageRef)
+{
+    return toCopiedAPI(toImpl(pageRef)->pageGroup()->identifier());
+}
+
+void WKBundlePageClearApplicationCache(WKBundlePageRef page)
+{
+    toImpl(page)->corePage()->applicationCacheStorage().deleteAllEntries();
+}
+
+void WKBundlePageClearApplicationCacheForOrigin(WKBundlePageRef page, WKStringRef origin)
+{
+    toImpl(page)->corePage()->applicationCacheStorage().deleteCacheForOrigin(WebCore::SecurityOrigin::createFromString(toImpl(origin)->string()));
+}
+
+void WKBundlePageSetAppCacheMaximumSize(WKBundlePageRef page, uint64_t size)
+{
+    toImpl(page)->corePage()->applicationCacheStorage().setMaximumSize(size);
+}
+
+uint64_t WKBundlePageGetAppCacheUsageForOrigin(WKBundlePageRef page, WKStringRef origin)
+{
+    return toImpl(page)->corePage()->applicationCacheStorage().diskUsageForOrigin(WebCore::SecurityOrigin::createFromString(toImpl(origin)->string()));
+}
+
+void WKBundlePageSetApplicationCacheOriginQuota(WKBundlePageRef page, WKStringRef origin, uint64_t bytes)
+{
+    toImpl(page)->corePage()->applicationCacheStorage().storeUpdatedQuotaForOrigin(WebCore::SecurityOrigin::createFromString(toImpl(origin)->string()).ptr(), bytes);
+}
+
+void WKBundlePageResetApplicationCacheOriginQuota(WKBundlePageRef page, WKStringRef origin)
+{
+    toImpl(page)->corePage()->applicationCacheStorage().storeUpdatedQuotaForOrigin(WebCore::SecurityOrigin::createFromString(toImpl(origin)->string()).ptr(), toImpl(page)->corePage()->applicationCacheStorage().defaultOriginQuota());
+}
+
+WKArrayRef WKBundlePageCopyOriginsWithApplicationCache(WKBundlePageRef page)
+{
+    HashSet<RefPtr<WebCore::SecurityOrigin>> origins;
+    toImpl(page)->corePage()->applicationCacheStorage().getOriginsWithCache(origins);
+
+    Vector<RefPtr<API::Object>> originIdentifiers;
+    originIdentifiers.reserveInitialCapacity(origins.size());
+
+    for (const auto& origin : origins)
+        originIdentifiers.uncheckedAppend(API::String::create(origin->databaseIdentifier()));
+
+    return toAPI(&API::Array::create(WTFMove(originIdentifiers)).leakRef());
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2013, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,7 +31,7 @@
 #include "DFGBasicBlockInlines.h"
 #include "DFGGraph.h"
 #include "DFGPhase.h"
-#include "Operations.h"
+#include "JSCInlines.h"
 
 namespace JSC { namespace DFG {
 
@@ -48,8 +48,8 @@ public:
         ASSERT(m_graph.m_unificationState == LocallyUnified);
         
         // Ensure that all Phi functions are unified.
-        for (BlockIndex blockIndex = m_graph.m_blocks.size(); blockIndex--;) {
-            BasicBlock* block = m_graph.m_blocks[blockIndex].get();
+        for (BlockIndex blockIndex = m_graph.numBlocks(); blockIndex--;) {
+            BasicBlock* block = m_graph.block(blockIndex);
             if (!block)
                 continue;
             ASSERT(block->isReachable);
@@ -59,9 +59,10 @@ public:
                 for (unsigned childIdx = 0; childIdx < AdjacencyList::Size; ++childIdx) {
                     if (!phi->children.child(childIdx))
                         break;
-                    
-                    phi->variableAccessData()->unify(
-                        phi->children.child(childIdx)->variableAccessData());
+
+                    // FIXME: Consider reversing the order of this unification, since the other
+                    // order will reveal more bugs. https://bugs.webkit.org/show_bug.cgi?id=154368
+                    phi->variableAccessData()->unify(phi->children.child(childIdx)->variableAccessData());
                 }
             }
         }
@@ -70,10 +71,11 @@ public:
         for (unsigned i = 0; i < m_graph.m_variableAccessData.size(); ++i) {
             VariableAccessData* data = &m_graph.m_variableAccessData[i];
             data->find()->predict(data->nonUnifiedPrediction());
-            data->find()->mergeIsCaptured(data->isCaptured());
             data->find()->mergeStructureCheckHoistingFailed(data->structureCheckHoistingFailed());
+            data->find()->mergeCheckArrayHoistingFailed(data->checkArrayHoistingFailed());
             data->find()->mergeShouldNeverUnbox(data->shouldNeverUnbox());
             data->find()->mergeIsLoadedFrom(data->isLoadedFrom());
+            data->find()->mergeIsProfitableToUnbox(data->isProfitableToUnbox());
         }
         
         m_graph.m_unificationState = GloballyUnified;

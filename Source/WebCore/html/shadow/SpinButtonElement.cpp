@@ -11,10 +11,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -35,43 +35,40 @@
 #include "MouseEvent.h"
 #include "Page.h"
 #include "RenderBox.h"
+#include "RenderTheme.h"
 #include "ScrollbarTheme.h"
 #include "WheelEvent.h"
+#include <wtf/Ref.h>
 
 namespace WebCore {
 
 using namespace HTMLNames;
 
-inline SpinButtonElement::SpinButtonElement(Document* document, SpinButtonOwner& spinButtonOwner)
+inline SpinButtonElement::SpinButtonElement(Document& document, SpinButtonOwner& spinButtonOwner)
     : HTMLDivElement(divTag, document)
     , m_spinButtonOwner(&spinButtonOwner)
     , m_capturing(false)
     , m_upDownState(Indeterminate)
     , m_pressStartingState(Indeterminate)
-    , m_repeatingTimer(this, &SpinButtonElement::repeatingTimerFired)
+    , m_repeatingTimer(*this, &SpinButtonElement::repeatingTimerFired)
 {
+    setHasCustomStyleResolveCallbacks();
+    setPseudo(AtomicString("-webkit-inner-spin-button", AtomicString::ConstructFromLiteral));
 }
 
-PassRefPtr<SpinButtonElement> SpinButtonElement::create(Document* document, SpinButtonOwner& spinButtonOwner)
+Ref<SpinButtonElement> SpinButtonElement::create(Document& document, SpinButtonOwner& spinButtonOwner)
 {
-    return adoptRef(new SpinButtonElement(document, spinButtonOwner));
+    return adoptRef(*new SpinButtonElement(document, spinButtonOwner));
 }
 
-const AtomicString& SpinButtonElement::shadowPseudoId() const
-{
-    DEFINE_STATIC_LOCAL(AtomicString, innerPseudoId, ("-webkit-inner-spin-button", AtomicString::ConstructFromLiteral));
-    return innerPseudoId;
-}
-
-void SpinButtonElement::detach(const AttachContext& context)
+void SpinButtonElement::willDetachRenderers()
 {
     releaseCapture();
-    HTMLDivElement::detach(context);
 }
 
 void SpinButtonElement::defaultEventHandler(Event* event)
 {
-    if (!event->isMouseEvent()) {
+    if (!is<MouseEvent>(*event)) {
         if (!event->defaultHandled())
             HTMLDivElement::defaultEventHandler(event);
         return;
@@ -90,14 +87,14 @@ void SpinButtonElement::defaultEventHandler(Event* event)
         return;
     }
 
-    MouseEvent* mouseEvent = static_cast<MouseEvent*>(event);
-    IntPoint local = roundedIntPoint(box->absoluteToLocal(mouseEvent->absoluteLocation(), UseTransforms));
-    if (mouseEvent->type() == eventNames().mousedownEvent && mouseEvent->button() == LeftButton) {
-        if (box->pixelSnappedBorderBoxRect().contains(local)) {
+    MouseEvent& mouseEvent = downcast<MouseEvent>(*event);
+    IntPoint local = roundedIntPoint(box->absoluteToLocal(mouseEvent.absoluteLocation(), UseTransforms));
+    if (mouseEvent.type() == eventNames().mousedownEvent && mouseEvent.button() == LeftButton) {
+        if (box->borderBoxRect().contains(local)) {
             // The following functions of HTMLInputElement may run JavaScript
             // code which detaches this shadow node. We need to take a reference
             // and check renderer() after such function calls.
-            RefPtr<Node> protector(this);
+            Ref<SpinButtonElement> protect(*this);
             if (m_spinButtonOwner)
                 m_spinButtonOwner->focusAndSelectSpinButtonOwner();
             if (renderer()) {
@@ -111,22 +108,32 @@ void SpinButtonElement::defaultEventHandler(Event* event)
                     doStepAction(m_upDownState == Up ? 1 : -1);
                 }
             }
-            event->setDefaultHandled();
+            mouseEvent.setDefaultHandled();
         }
-    } else if (mouseEvent->type() == eventNames().mouseupEvent && mouseEvent->button() == LeftButton)
+    } else if (mouseEvent.type() == eventNames().mouseupEvent && mouseEvent.button() == LeftButton)
         stopRepeatingTimer();
-    else if (event->type() == eventNames().mousemoveEvent) {
-        if (box->pixelSnappedBorderBoxRect().contains(local)) {
+    else if (mouseEvent.type() == eventNames().mousemoveEvent) {
+        if (box->borderBoxRect().contains(local)) {
             if (!m_capturing) {
-                if (Frame* frame = document()->frame()) {
-                    frame->eventHandler()->setCapturingMouseEventsNode(this);
+                if (Frame* frame = document().frame()) {
+                    frame->eventHandler().setCapturingMouseEventsElement(this);
                     m_capturing = true;
-                    if (Page* page = document()->page())
+                    if (Page* page = document().page())
                         page->chrome().registerPopupOpeningObserver(this);
                 }
             }
             UpDownState oldUpDownState = m_upDownState;
-            m_upDownState = local.y() < box->height() / 2 ? Up : Down;
+            switch (renderer()->theme().innerSpinButtonLayout(*renderer())) {
+            case RenderTheme::InnerSpinButtonLayout::Vertical:
+                m_upDownState = local.y() < box->height() / 2 ? Up : Down;
+                break;
+            case RenderTheme::InnerSpinButtonLayout::HorizontalUpLeft:
+                m_upDownState = local.x() < box->width() / 2 ? Up : Down;
+                break;
+            case RenderTheme::InnerSpinButtonLayout::HorizontalUpRight:
+                m_upDownState = local.x() > box->width() / 2 ? Up : Down;
+                break;
+            }
             if (m_upDownState != oldUpDownState)
                 renderer()->repaint();
         } else {
@@ -135,8 +142,8 @@ void SpinButtonElement::defaultEventHandler(Event* event)
         }
     }
 
-    if (!event->defaultHandled())
-        HTMLDivElement::defaultEventHandler(event);
+    if (!mouseEvent.defaultHandled())
+        HTMLDivElement::defaultEventHandler(&mouseEvent);
 }
 
 void SpinButtonElement::willOpenPopup()
@@ -150,7 +157,7 @@ void SpinButtonElement::forwardEvent(Event* event)
     if (!renderBox())
         return;
 
-    if (!event->hasInterface(eventNames().interfaceForWheelEvent))
+    if (!is<WheelEvent>(*event))
         return;
 
     if (!m_spinButtonOwner)
@@ -159,7 +166,7 @@ void SpinButtonElement::forwardEvent(Event* event)
     if (!m_spinButtonOwner->shouldSpinButtonRespondToWheelEvents())
         return;
 
-    doStepAction(static_cast<WheelEvent*>(event)->wheelDeltaY());
+    doStepAction(downcast<WheelEvent>(*event).wheelDeltaY());
     event->setDefaultHandled();
 }
 
@@ -194,18 +201,13 @@ void SpinButtonElement::releaseCapture()
 {
     stopRepeatingTimer();
     if (m_capturing) {
-        if (Frame* frame = document()->frame()) {
-            frame->eventHandler()->setCapturingMouseEventsNode(0);
+        if (Frame* frame = document().frame()) {
+            frame->eventHandler().setCapturingMouseEventsElement(nullptr);
             m_capturing = false;
-            if (Page* page = document()->page())
+            if (Page* page = document().page())
                 page->chrome().unregisterPopupOpeningObserver(this);
         }
     }
-}
-
-bool SpinButtonElement::matchesReadOnlyPseudoClass() const
-{
-    return shadowHost()->matchesReadOnlyPseudoClass();
 }
 
 bool SpinButtonElement::matchesReadWritePseudoClass() const
@@ -216,8 +218,8 @@ bool SpinButtonElement::matchesReadWritePseudoClass() const
 void SpinButtonElement::startRepeatingTimer()
 {
     m_pressStartingState = m_upDownState;
-    ScrollbarTheme* theme = ScrollbarTheme::theme();
-    m_repeatingTimer.start(theme->initialAutoscrollTimerDelay(), theme->autoscrollTimerDelay());
+    ScrollbarTheme& theme = ScrollbarTheme::theme();
+    m_repeatingTimer.start(theme.initialAutoscrollTimerDelay(), theme.autoscrollTimerDelay());
 }
 
 void SpinButtonElement::stopRepeatingTimer()
@@ -239,7 +241,7 @@ void SpinButtonElement::step(int amount)
     doStepAction(amount);
 }
     
-void SpinButtonElement::repeatingTimerFired(Timer<SpinButtonElement>*)
+void SpinButtonElement::repeatingTimerFired()
 {
     if (m_upDownState != Indeterminate)
         step(m_upDownState == Up ? 1 : -1);

@@ -24,6 +24,9 @@
  */
 
 #include "config.h"
+
+#if WK_HAVE_C_SPI
+
 #include "PlatformUtilities.h"
 #include "PlatformWebView.h"
 #include "Test.h"
@@ -39,15 +42,16 @@ static void didFinishLoadForFrame(WKPageRef, WKFrameRef, WKTypeRef, const void*)
 
 static void setPageLoaderClient(WKPageRef page)
 {
-    WKPageLoaderClient loaderClient;
+    WKPageLoaderClientV0 loaderClient;
     memset(&loaderClient, 0, sizeof(loaderClient));
-    loaderClient.version = 0;
+
+    loaderClient.base.version = 0;
     loaderClient.didFinishLoadForFrame = didFinishLoadForFrame;
 
-    WKPageSetPageLoaderClient(page, &loaderClient);
+    WKPageSetPageLoaderClient(page, &loaderClient.base);
 }
 
-static WKRetainPtr<WKDataRef> createSessionState(WKContextRef context)
+static WKRetainPtr<WKSessionStateRef> createSessionState(WKContextRef context)
 {
     PlatformWebView webView(context);
     setPageLoaderClient(webView.page());
@@ -56,7 +60,7 @@ static WKRetainPtr<WKDataRef> createSessionState(WKContextRef context)
     Util::run(&didFinishLoad);
     didFinishLoad = false;
 
-    return adoptWK(WKPageCopySessionState(webView.page(), 0, 0));
+    return adoptWK(static_cast<WKSessionStateRef>(WKPageCopySessionState(webView.page(), reinterpret_cast<void*>(1), nullptr)));
 }
 
 TEST(WebKit2, WKPageGetScaleFactorNotZero)
@@ -66,13 +70,15 @@ TEST(WebKit2, WKPageGetScaleFactorNotZero)
     PlatformWebView webView(context.get());
     setPageLoaderClient(webView.page());
 
-    WKRetainPtr<WKDataRef> data = createSessionState(context.get());
-    EXPECT_NOT_NULL(data);
+    auto sessionState = createSessionState(context.get());
+    EXPECT_NOT_NULL(sessionState);
 
-    WKPageRestoreFromSessionState(webView.page(), data.get());
+    WKPageRestoreFromSessionState(webView.page(), sessionState.get());
     Util::run(&didFinishLoad);
 
     EXPECT_TRUE(WKPageGetScaleFactor(webView.page()) == 1.0);
 }
 
 } // namespace TestWebKitAPI
+
+#endif

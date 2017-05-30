@@ -26,35 +26,35 @@
 #include "config.h"
 #include "IncrementalSweeper.h"
 
-#include "APIShims.h"
 #include "Heap.h"
 #include "JSObject.h"
 #include "JSString.h"
 #include "MarkedBlock.h"
+#include "JSCInlines.h"
 
 #include <wtf/HashSet.h>
 #include <wtf/WTFThreadData.h>
 
+#if PLATFORM(EFL)
+#include <Ecore.h>
+#include <wtf/CurrentTime.h>
+#elif USE(GLIB) && !PLATFORM(QT)
+#include <glib.h>
+#endif
+
 namespace JSC {
 
-#if USE(CF) || PLATFORM(BLACKBERRY) || PLATFORM(QT)
+#if USE(CF) || PLATFORM(EFL) || USE(GLIB) || PLATFORM(QT)
 
 static const double sweepTimeSlice = .01; // seconds
 static const double sweepTimeTotal = .10;
 static const double sweepTimeMultiplier = 1.0 / sweepTimeTotal;
 
 #if USE(CF)
-    
 IncrementalSweeper::IncrementalSweeper(Heap* heap, CFRunLoopRef runLoop)
     : HeapTimer(heap->vm(), runLoop)
-    , m_currentBlockToSweepIndex(0)
     , m_blocksToSweep(heap->m_blockSnapshot)
 {
-}
-
-PassOwnPtr<IncrementalSweeper> IncrementalSweeper::create(Heap* heap)
-{
-    return adoptPtr(new IncrementalSweeper(heap, CFRunLoopGetCurrent()));
 }
 
 void IncrementalSweeper::scheduleTimer()
@@ -66,35 +66,62 @@ void IncrementalSweeper::cancelTimer()
 {
     CFRunLoopTimerSetNextFireDate(m_timer.get(), CFAbsoluteTimeGetCurrent() + s_decade);
 }
-
-#elif PLATFORM(BLACKBERRY) || PLATFORM(QT)
-   
+#elif PLATFORM(EFL)
 IncrementalSweeper::IncrementalSweeper(Heap* heap)
     : HeapTimer(heap->vm())
-    , m_currentBlockToSweepIndex(0)
     , m_blocksToSweep(heap->m_blockSnapshot)
 {
 }
 
-PassOwnPtr<IncrementalSweeper> IncrementalSweeper::create(Heap* heap)
+void IncrementalSweeper::scheduleTimer()
 {
-    return adoptPtr(new IncrementalSweeper(heap));
+    if (ecore_timer_freeze_get(m_timer))
+        ecore_timer_thaw(m_timer);
+
+    double targetTime = currentTime() + (sweepTimeSlice * sweepTimeMultiplier);
+    ecore_timer_interval_set(m_timer, targetTime);
+}
+
+void IncrementalSweeper::cancelTimer()
+{
+    ecore_timer_freeze(m_timer);
+}
+#elif PLATFORM(QT)
+IncrementalSweeper::IncrementalSweeper(Heap* heap)
+    : HeapTimer(heap->vm())
+    , m_blocksToSweep(heap->m_blockSnapshot)
+{
 }
 
 void IncrementalSweeper::scheduleTimer()
 {
-#if PLATFORM(QT)
     m_timer.start(sweepTimeSlice * sweepTimeMultiplier * 1000, this);
-#else
-    m_timer.start(sweepTimeSlice * sweepTimeMultiplier);
-#endif
 }
 
 void IncrementalSweeper::cancelTimer()
 {
     m_timer.stop();
 }
+#elif USE(GLIB)
+IncrementalSweeper::IncrementalSweeper(Heap* heap)
+    : HeapTimer(heap->vm())
+    , m_blocksToSweep(heap->m_blockSnapshot)
+{
+}
 
+void IncrementalSweeper::scheduleTimer()
+{
+    auto delayDuration = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::duration<double>(sweepTimeSlice * sweepTimeMultiplier));
+    gint64 currentTime = g_get_monotonic_time();
+    gint64 targetTime = currentTime + std::min<gint64>(G_MAXINT64 - currentTime, delayDuration.count());
+    ASSERT(targetTime >= currentTime);
+    g_source_set_ready_time(m_timer.get(), targetTime);
+}
+
+void IncrementalSweeper::cancelTimer()
+{
+    g_source_set_ready_time(m_timer.get(), -1);
+}
 #endif
 
 void IncrementalSweeper::doWork()
@@ -104,9 +131,7 @@ void IncrementalSweeper::doWork()
 
 void IncrementalSweeper::doSweep(double sweepBeginTime)
 {
-    while (m_currentBlockToSweepIndex < m_blocksToSweep.size()) {
-        sweepNextBlock();
-
+    while (sweepNextBlock()) {
         double elapsedTime = WTF::monotonicallyIncreasingTime() - sweepBeginTime;
         if (elapsedTime < sweepTimeSlice)
             continue;
@@ -119,30 +144,30 @@ void IncrementalSweeper::doSweep(double sweepBeginTime)
     cancelTimer();
 }
 
-void IncrementalSweeper::sweepNextBlock()
+bool IncrementalSweeper::sweepNextBlock()
 {
-    while (m_currentBlockToSweepIndex < m_blocksToSweep.size()) {
-        MarkedBlock* block = m_blocksToSweep[m_currentBlockToSweepIndex++];
+    while (!m_blocksToSweep.isEmpty()) {
+        MarkedBlock* block = m_blocksToSweep.takeLast();
 
         if (!block->needsSweeping())
             continue;
 
+        DeferGCForAWhile deferGC(m_vm->heap);
         block->sweep();
         m_vm->heap.objectSpace().freeOrShrinkBlock(block);
-        return;
+        return true;
     }
+
+    return m_vm->heap.sweepNextLogicallyEmptyWeakBlock();
 }
 
-void IncrementalSweeper::startSweeping(Vector<MarkedBlock*>& blockSnapshot)
+void IncrementalSweeper::startSweeping()
 {
-    m_blocksToSweep = blockSnapshot;
-    m_currentBlockToSweepIndex = 0;
     scheduleTimer();
 }
 
 void IncrementalSweeper::willFinishSweeping()
 {
-    m_currentBlockToSweepIndex = 0;
     m_blocksToSweep.clear();
     if (m_vm)
         cancelTimer();
@@ -150,8 +175,8 @@ void IncrementalSweeper::willFinishSweeping()
 
 #else
 
-IncrementalSweeper::IncrementalSweeper(VM* vm)
-    : HeapTimer(vm)
+IncrementalSweeper::IncrementalSweeper(Heap* heap)
+    : HeapTimer(heap->vm())
 {
 }
 
@@ -159,12 +184,7 @@ void IncrementalSweeper::doWork()
 {
 }
 
-PassOwnPtr<IncrementalSweeper> IncrementalSweeper::create(Heap* heap)
-{
-    return adoptPtr(new IncrementalSweeper(heap->vm()));
-}
-
-void IncrementalSweeper::startSweeping(Vector<MarkedBlock*>&)
+void IncrementalSweeper::startSweeping()
 {
 }
 
@@ -172,8 +192,9 @@ void IncrementalSweeper::willFinishSweeping()
 {
 }
 
-void IncrementalSweeper::sweepNextBlock()
+bool IncrementalSweeper::sweepNextBlock()
 {
+    return false;
 }
 
 #endif

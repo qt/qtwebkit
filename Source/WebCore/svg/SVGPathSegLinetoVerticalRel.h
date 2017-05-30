@@ -22,29 +22,27 @@
 #ifndef SVGPathSegLinetoVerticalRel_h
 #define SVGPathSegLinetoVerticalRel_h
 
-#if ENABLE(SVG)
 #include "SVGPathSegLinetoVertical.h"
 
 namespace WebCore {
 
 class SVGPathSegLinetoVerticalRel : public SVGPathSegLinetoVertical {
 public:
-    static PassRefPtr<SVGPathSegLinetoVerticalRel> create(SVGPathElement* element, SVGPathSegRole role, float y)
+    static Ref<SVGPathSegLinetoVerticalRel> create(const SVGPathElement& element, SVGPathSegRole role, float y)
     {
-        return adoptRef(new SVGPathSegLinetoVerticalRel(element, role, y));
+        return adoptRef(*new SVGPathSegLinetoVerticalRel(element, role, y));
     }
 
 private:
-    SVGPathSegLinetoVerticalRel(SVGPathElement* element, SVGPathSegRole role, float y)
+    SVGPathSegLinetoVerticalRel(const SVGPathElement& element, SVGPathSegRole role, float y)
         : SVGPathSegLinetoVertical(element, role, y)
     {
     }
 
-    virtual unsigned short pathSegType() const { return PATHSEG_LINETO_VERTICAL_REL; }
-    virtual String pathSegTypeAsLetter() const { return "v"; }
+    virtual unsigned short pathSegType() const override { return PATHSEG_LINETO_VERTICAL_REL; }
+    virtual String pathSegTypeAsLetter() const override { return "v"; }
 };
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif

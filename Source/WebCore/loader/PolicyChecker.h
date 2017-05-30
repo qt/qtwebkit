@@ -11,7 +11,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution. 
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission. 
  *
@@ -36,6 +36,10 @@
 #include <wtf/PassRefPtr.h>
 #include <wtf/text/WTFString.h>
 
+#if ENABLE(CONTENT_FILTERING)
+#include "ContentFilterUnblockHandler.h"
+#endif
+
 namespace WebCore {
 
 class DocumentLoader;
@@ -47,13 +51,14 @@ class ResourceResponse;
 
 class PolicyChecker {
     WTF_MAKE_NONCOPYABLE(PolicyChecker);
+    WTF_MAKE_FAST_ALLOCATED;
 public:
-    explicit PolicyChecker(Frame*);
+    explicit PolicyChecker(Frame&);
 
-    void checkNavigationPolicy(const ResourceRequest&, DocumentLoader*, PassRefPtr<FormState>, NavigationPolicyDecisionFunction, void* argument);
-    void checkNavigationPolicy(const ResourceRequest&, NavigationPolicyDecisionFunction, void* argument);
-    void checkNewWindowPolicy(const NavigationAction&, NewWindowPolicyDecisionFunction, const ResourceRequest&, PassRefPtr<FormState>, const String& frameName, void* argument);
-    void checkContentPolicy(const ResourceResponse&, ContentPolicyDecisionFunction, void* argument);
+    void checkNavigationPolicy(const ResourceRequest&, DocumentLoader*, PassRefPtr<FormState>, NavigationPolicyDecisionFunction);
+    void checkNavigationPolicy(const ResourceRequest&, NavigationPolicyDecisionFunction);
+    void checkNewWindowPolicy(const NavigationAction&, const ResourceRequest&, PassRefPtr<FormState>, const String& frameName, NewWindowPolicyDecisionFunction);
+    void checkContentPolicy(const ResourceResponse&, ContentPolicyDecisionFunction);
 
     // FIXME: These are different.  They could use better names.
     void cancelCheck();
@@ -74,6 +79,10 @@ public:
     // the heart to hack on all the platforms to make that happen right now.
     void continueLoadAfterWillSubmitForm(PolicyAction);
 
+#if ENABLE(CONTENT_FILTERING)
+    void setContentFilterUnblockHandler(ContentFilterUnblockHandler unblockHandler) { m_contentFilterUnblockHandler = WTFMove(unblockHandler); }
+#endif
+
 private:
     void continueAfterNavigationPolicy(PolicyAction);
     void continueAfterNewWindowPolicy(PolicyAction);
@@ -81,7 +90,7 @@ private:
 
     void handleUnimplementablePolicy(const ResourceError&);
 
-    Frame* m_frame;
+    Frame& m_frame;
 
     bool m_delegateIsDecidingNavigationPolicy;
     bool m_delegateIsHandlingUnimplementablePolicy;
@@ -91,6 +100,10 @@ private:
     // on navigation action delegate callbacks.
     FrameLoadType m_loadType;
     PolicyCallback m_callback;
+
+#if ENABLE(CONTENT_FILTERING)
+    ContentFilterUnblockHandler m_contentFilterUnblockHandler;
+#endif
 };
 
 } // namespace WebCore

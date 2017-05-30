@@ -32,44 +32,37 @@
 
 namespace WebCore {
 
-class MediaDocument FINAL : public HTMLDocument {
+class MediaDocument final : public HTMLDocument {
 public:
-    static PassRefPtr<MediaDocument> create(Frame* frame, const KURL& url)
+    static Ref<MediaDocument> create(Frame* frame, const URL& url)
     {
-        return adoptRef(new MediaDocument(frame, url));
+        return adoptRef(*new MediaDocument(frame, url));
     }
     virtual ~MediaDocument();
 
     void mediaElementSawUnsupportedTracks();
+    void mediaElementNaturalSizeChanged(const IntSize&);
+    String outgoingReferrer() const { return m_outgoingReferrer; }
 
 private:
-    MediaDocument(Frame*, const KURL&);
+    MediaDocument(Frame*, const URL&);
 
-    virtual PassRefPtr<DocumentParser> createParser();
+    virtual Ref<DocumentParser> createParser() override;
 
-    virtual void defaultEventHandler(Event*);
+    virtual void defaultEventHandler(Event*) override;
 
-    void replaceMediaElementTimerFired(Timer<MediaDocument>*);
+    void replaceMediaElementTimerFired();
 
-    Timer<MediaDocument> m_replaceMediaElementTimer;
+    Timer m_replaceMediaElementTimer;
+    String m_outgoingReferrer;
 };
 
-inline MediaDocument* toMediaDocument(Document* document)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!document || document->isMediaDocument());
-    return static_cast<MediaDocument*>(document);
-}
+} // namespace WebCore
 
-inline const MediaDocument* toMediaDocument(const Document* document)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!document || document->isMediaDocument());
-    return static_cast<const MediaDocument*>(document);
-}
-
-// This will catch anyone doing an unnecessary cast.
-void toMediaDocument(const MediaDocument*);
-
-}
+SPECIALIZE_TYPE_TRAITS_BEGIN(WebCore::MediaDocument)
+    static bool isType(const WebCore::Document& document) { return document.isMediaDocument(); }
+    static bool isType(const WebCore::Node& node) { return is<WebCore::Document>(node) && isType(downcast<WebCore::Document>(node)); }
+SPECIALIZE_TYPE_TRAITS_END()
 
 #endif
 #endif

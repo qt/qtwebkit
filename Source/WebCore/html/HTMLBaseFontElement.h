@@ -27,12 +27,10 @@
 
 namespace WebCore {
 
-class HTMLBaseFontElement FINAL : public HTMLElement {
-public:
-    static PassRefPtr<HTMLBaseFontElement> create(const QualifiedName&, Document*);
-
+// Only used by ObjC bindings.
+class HTMLBaseFontElement final : public HTMLElement {
 private:
-    HTMLBaseFontElement(const QualifiedName&, Document*);
+    HTMLBaseFontElement(const QualifiedName&, Document&);
 };
 
 } // namespace

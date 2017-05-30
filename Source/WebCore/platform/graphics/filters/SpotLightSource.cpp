@@ -30,8 +30,6 @@
  */
 
 #include "config.h"
-
-#if ENABLE(FILTERS)
 #include "SpotLightSource.h"
 
 #include "TextStream.h"
@@ -177,12 +175,6 @@ bool SpotLightSource::setLimitingConeAngle(float limitingConeAngle)
     return true;
 }
 
-static TextStream& operator<<(TextStream& ts, const FloatPoint3D& p)
-{
-    ts << "x=" << p.x() << " y=" << p.y() << " z=" << p.z();
-    return ts;
-}
-
 TextStream& SpotLightSource::externalRepresentation(TextStream& ts) const
 {
     ts << "[type=SPOT-LIGHT] ";
@@ -194,5 +186,3 @@ TextStream& SpotLightSource::externalRepresentation(TextStream& ts) const
 }
 
 }; // namespace WebCore
-
-#endif // ENABLE(FILTERS)

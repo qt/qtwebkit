@@ -24,9 +24,12 @@
  */
 
 #include "config.h"
+
+#if WK_HAVE_C_SPI
+
 #include "PlatformUtilities.h"
 #include "PlatformWebView.h"
-#include <WebKit2/WKRetainPtr.h>
+#include <WebKit/WKRetainPtr.h>
 
 namespace TestWebKitAPI {
 
@@ -47,13 +50,14 @@ TEST(WebKit2, GetInjectedBundleInitializationUserDataCallback)
 {
     WKRetainPtr<WKContextRef> context(AdoptWK, Util::createContextWithInjectedBundle());
 
-    WKContextInjectedBundleClient injectedBundleClient;
+    WKContextInjectedBundleClientV1 injectedBundleClient;
     memset(&injectedBundleClient, 0, sizeof(injectedBundleClient));
-    injectedBundleClient.version = 1;
-    injectedBundleClient.clientInfo = 0;
+
+    injectedBundleClient.base.version = 1;
     injectedBundleClient.didReceiveMessageFromInjectedBundle = didReceiveMessageFromInjectedBundle;
     injectedBundleClient.getInjectedBundleInitializationUserData = getInjectedBundleInitializationUserData;
-    WKContextSetInjectedBundleClient(context.get(), &injectedBundleClient);
+
+    WKContextSetInjectedBundleClient(context.get(), &injectedBundleClient.base);
 
     PlatformWebView webView(context.get());
 
@@ -64,3 +68,5 @@ TEST(WebKit2, GetInjectedBundleInitializationUserDataCallback)
 }
 
 } // namespace TestWebKitAPI
+
+#endif

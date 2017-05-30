@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 Apple Inc. All Rights Reserved.
+ * Copyright (C) 2008, 2015 Apple Inc. All Rights Reserved.
  * Copyright (C) 2012 Google Inc. All Rights Reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -11,10 +11,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -28,21 +28,25 @@
 #ifndef WorkerScriptController_h
 #define WorkerScriptController_h
 
-#if ENABLE(WORKERS)
 #include <debugger/Debugger.h>
 #include <heap/Strong.h>
 #include <wtf/Forward.h>
-#include <wtf/Threading.h>
+#include <wtf/Lock.h>
+#include <wtf/NakedPtr.h>
+
+namespace Deprecated {
+class ScriptValue;
+}
 
 namespace JSC {
-    class VM;
+class VM;
 }
 
 namespace WebCore {
 
     class JSWorkerGlobalScope;
     class ScriptSourceCode;
-    class ScriptValue;
+    class WorkerConsoleClient;
     class WorkerGlobalScope;
 
     class WorkerScriptController {
@@ -58,9 +62,9 @@ namespace WebCore {
         }
 
         void evaluate(const ScriptSourceCode&);
-        void evaluate(const ScriptSourceCode&, ScriptValue* exception);
+        void evaluate(const ScriptSourceCode&, NakedPtr<JSC::Exception>& returnedException);
 
-        void setException(const ScriptValue&);
+        void setException(JSC::Exception*);
 
         // Async request to terminate a JS run execution. Eventually causes termination
         // exception raised during JS execution, if the worker thread happens to run JS.
@@ -68,7 +72,7 @@ namespace WebCore {
         // forbidExecution()/isExecutionForbidden() to guard against reentry into JS.
         // Can be called from any thread.
         void scheduleExecutionTermination();
-        bool isExecutionTerminating() const;
+        bool isTerminatingExecution() const;
 
         // Called on Worker thread when JS exits with termination exception caused by forbidExecution() request,
         // or by Worker thread termination code to prevent future entry into JS.
@@ -77,7 +81,7 @@ namespace WebCore {
 
         void disableEval(const String& errorMessage);
 
-        JSC::VM* vm() { return m_vm.get(); }
+        JSC::VM& vm() { return *m_vm; }
 
         void attachDebugger(JSC::Debugger*);
         void detachDebugger(JSC::Debugger*);
@@ -93,12 +97,12 @@ namespace WebCore {
         RefPtr<JSC::VM> m_vm;
         WorkerGlobalScope* m_workerGlobalScope;
         JSC::Strong<JSWorkerGlobalScope> m_workerGlobalScopeWrapper;
+        std::unique_ptr<WorkerConsoleClient> m_consoleClient;
         bool m_executionForbidden;
-        mutable Mutex m_scheduledTerminationMutex;
+        bool m_isTerminatingExecution { false };
+        mutable Lock m_scheduledTerminationMutex;
     };
 
 } // namespace WebCore
-
-#endif // ENABLE(WORKERS)
 
 #endif // WorkerScriptController_h

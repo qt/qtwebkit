@@ -26,12 +26,12 @@
 #include "config.h"
 #include "WKFrame.h"
 
+#include "APIData.h"
+#include "APIFrameInfo.h"
 #include "WKAPICast.h"
+#include "WebCertificateInfo.h"
 #include "WebFrameProxy.h"
-
-#ifdef __BLOCKS__
-#include <Block.h>
-#endif
+#include "WebPageProxy.h"
 
 using namespace WebKit;
 
@@ -48,13 +48,13 @@ bool WKFrameIsMainFrame(WKFrameRef frameRef)
 WKFrameLoadState WKFrameGetFrameLoadState(WKFrameRef frameRef)
 {
     WebFrameProxy* frame = toImpl(frameRef);
-    switch (frame->loadState()) {
-        case WebFrameProxy::LoadStateProvisional:
-            return kWKFrameLoadStateProvisional;
-        case WebFrameProxy::LoadStateCommitted:
-            return kWKFrameLoadStateCommitted;
-        case WebFrameProxy::LoadStateFinished:
-            return kWKFrameLoadStateFinished;
+    switch (frame->frameLoadState().state()) {
+    case FrameLoadState::State::Provisional:
+        return kWKFrameLoadStateProvisional;
+    case FrameLoadState::State::Committed:
+        return kWKFrameLoadStateCommitted;
+    case FrameLoadState::State::Finished:
+        return kWKFrameLoadStateFinished;
     }
     
     ASSERT_NOT_REACHED();
@@ -126,63 +126,22 @@ bool WKFrameIsFrameSet(WKFrameRef frameRef)
     return toImpl(frameRef)->isFrameSet();
 }
 
+WKFrameInfoRef WKFrameCreateFrameInfo(WKFrameRef frameRef)
+{
+    return toAPI(&API::FrameInfo::create(*toImpl(frameRef), WebCore::SecurityOrigin::createFromString(toImpl(frameRef)->url())).leakRef());
+}
+
 void WKFrameGetMainResourceData(WKFrameRef frameRef, WKFrameGetResourceDataFunction callback, void* context)
 {
-    toImpl(frameRef)->getMainResourceData(DataCallback::create(context, callback));
+    toImpl(frameRef)->getMainResourceData(toGenericCallbackFunction(context, callback));
 }
 
 void WKFrameGetResourceData(WKFrameRef frameRef, WKURLRef resourceURL, WKFrameGetResourceDataFunction callback, void* context)
 {
-    toImpl(frameRef)->getResourceData(toImpl(resourceURL), DataCallback::create(context, callback));
+    toImpl(frameRef)->getResourceData(toImpl(resourceURL), toGenericCallbackFunction(context, callback));
 }
-
-#ifdef __BLOCKS__
-static void callGetResourceDataBlockAndDispose(WKDataRef data, WKErrorRef error, void* context)
-{
-    WKFrameGetResourceDataBlock block = (WKFrameGetResourceDataBlock)context;
-    block(data, error);
-    Block_release(block);
-}
-
-void WKFrameGetMainResourceData_b(WKFrameRef frameRef, WKFrameGetResourceDataBlock block)
-{
-    WKFrameGetMainResourceData(frameRef, callGetResourceDataBlockAndDispose, Block_copy(block));
-}
-
-void WKFrameGetResourceData_b(WKFrameRef frameRef, WKURLRef resourceURL, WKFrameGetResourceDataBlock block)
-{
-    WKFrameGetResourceData(frameRef, resourceURL, callGetResourceDataBlockAndDispose, Block_copy(block));
-}
-#endif
 
 void WKFrameGetWebArchive(WKFrameRef frameRef, WKFrameGetWebArchiveFunction callback, void* context)
 {
-    toImpl(frameRef)->getWebArchive(DataCallback::create(context, callback));
-}
-
-#ifdef __BLOCKS__
-static void callGetWebArchiveBlockAndDispose(WKDataRef archiveData, WKErrorRef error, void* context)
-{
-    WKFrameGetWebArchiveBlock block = (WKFrameGetWebArchiveBlock)context;
-    block(archiveData, error);
-    Block_release(block);
-}
-
-void WKFrameGetWebArchive_b(WKFrameRef frameRef, WKFrameGetWebArchiveBlock block)
-{
-    WKFrameGetWebArchive(frameRef, callGetWebArchiveBlockAndDispose, Block_copy(block));
-}
-#endif
-
-
-// NOTE: These are deprecated and should be removed. They currently do nothing.
-
-WKArrayRef WKFrameCopyChildFrames(WKFrameRef)
-{
-    return 0;
-}
-
-WKFrameRef WKFrameGetParentFrame(WKFrameRef)
-{
-    return 0;
+    toImpl(frameRef)->getWebArchive(toGenericCallbackFunction(context, callback));
 }

@@ -51,6 +51,7 @@ struct ViewportAttributes {
 
     float userScalable;
     float orientation;
+    float shrinkToFit;
 };
 
 struct ViewportArguments {
@@ -58,10 +59,9 @@ struct ViewportArguments {
     enum Type {
         // These are ordered in increasing importance.
         Implicit,
-#if ENABLE(LEGACY_VIEWPORT_ADAPTION)
-        XHTMLMobileProfile,
-        HandheldFriendlyMeta,
-        MobileOptimizedMeta,
+#if PLATFORM(IOS)
+        PluginDocument,
+        ImageDocument,
 #endif
         ViewportMeta,
         CSSDeviceAdaptation
@@ -75,36 +75,27 @@ struct ViewportArguments {
         ValueLandscape = -5
     };
 
-    ViewportArguments(Type type = Implicit)
+    explicit ViewportArguments(Type type = Implicit)
         : type(type)
-        , width(ValueAuto)
-        , minWidth(ValueAuto)
-        , maxWidth(ValueAuto)
-        , height(ValueAuto)
-        , minHeight(ValueAuto)
-        , maxHeight(ValueAuto)
-        , zoom(ValueAuto)
-        , minZoom(ValueAuto)
-        , maxZoom(ValueAuto)
-        , userZoom(ValueAuto)
-        , orientation(ValueAuto)
     {
     }
 
     // All arguments are in CSS units.
     ViewportAttributes resolve(const FloatSize& initialViewportSize, const FloatSize& deviceSize, int defaultWidth) const;
 
-    float width;
-    float minWidth;
-    float maxWidth;
-    float height;
-    float minHeight;
-    float maxHeight;
-    float zoom;
-    float minZoom;
-    float maxZoom;
-    float userZoom;
-    float orientation;
+    float width { ValueAuto };
+    float minWidth { ValueAuto };
+    float maxWidth { ValueAuto };
+    float height { ValueAuto };
+    float minHeight { ValueAuto };
+    float maxHeight { ValueAuto };
+    float zoom { ValueAuto };
+    float minZoom { ValueAuto };
+    float maxZoom { ValueAuto };
+    float userZoom { ValueAuto };
+    float orientation { ValueAuto };
+    float shrinkToFit { ValueAuto };
+    bool widthWasExplicit { false };
 
     bool operator==(const ViewportArguments& other) const
     {
@@ -120,7 +111,9 @@ struct ViewportArguments {
             && minZoom == other.minZoom
             && maxZoom == other.maxZoom
             && userZoom == other.userZoom
-            && orientation == other.orientation;
+            && orientation == other.orientation
+            && shrinkToFit == other.shrinkToFit
+            && widthWasExplicit == other.widthWasExplicit;
     }
 
     bool operator!=(const ViewportArguments& other) const
@@ -128,21 +121,22 @@ struct ViewportArguments {
         return !(*this == other);
     }
 
-#if PLATFORM(BLACKBERRY) || PLATFORM(GTK) || PLATFORM(QT)
+#if PLATFORM(GTK) || PLATFORM(QT)
     // FIXME: We're going to keep this constant around until all embedders
     // refactor their code to no longer need it.
     static const float deprecatedTargetDPI;
 #endif
 };
 
-ViewportAttributes computeViewportAttributes(ViewportArguments args, int desktopWidth, int deviceWidth, int deviceHeight, float devicePixelRatio, IntSize visibleViewport);
+WEBCORE_EXPORT ViewportAttributes computeViewportAttributes(ViewportArguments args, int desktopWidth, int deviceWidth, int deviceHeight, float devicePixelRatio, IntSize visibleViewport);
 
-void restrictMinimumScaleFactorToViewportSize(ViewportAttributes& result, IntSize visibleViewport, float devicePixelRatio);
-void restrictScaleFactorToInitialScaleIfNotUserScalable(ViewportAttributes& result);
+WEBCORE_EXPORT void restrictMinimumScaleFactorToViewportSize(ViewportAttributes& result, IntSize visibleViewport, float devicePixelRatio);
+WEBCORE_EXPORT void restrictScaleFactorToInitialScaleIfNotUserScalable(ViewportAttributes& result);
 float computeMinimumScaleFactorForContentContained(const ViewportAttributes& result, const IntSize& viewportSize, const IntSize& contentSize);
 
-void setViewportFeature(const String& keyString, const String& valueString, Document*, void* data);
-void reportViewportWarning(Document*, ViewportErrorCode, const String& replacement1, const String& replacement2);
+void setViewportFeature(ViewportArguments&, Document&, StringView key, StringView value);
+
+TextStream& operator<<(TextStream&, const ViewportArguments&);
 
 } // namespace WebCore
 

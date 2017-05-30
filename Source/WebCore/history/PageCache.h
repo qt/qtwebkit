@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007 Apple Inc.  All rights reserved.
+ * Copyright (C) 2007, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -26,75 +26,64 @@
 #ifndef PageCache_h
 #define PageCache_h
 
+#include "HistoryItem.h"
 #include "Timer.h"
 #include <wtf/Forward.h>
-#include <wtf/HashSet.h>
+#include <wtf/ListHashSet.h>
 #include <wtf/Noncopyable.h>
 
 namespace WebCore {
 
-    class CachedPage;
-    class Frame;
-    class HistoryItem;
-    class Page;
-    
-    class PageCache {
-        WTF_MAKE_NONCOPYABLE(PageCache); WTF_MAKE_FAST_ALLOCATED;
-    public:
-        friend PageCache* pageCache();
-        
-        bool canCache(Page*) const;
+class CachedPage;
+class Frame;
+class Page;
 
-        void setCapacity(int); // number of pages to cache
-        int capacity() { return m_capacity; }
-        
-        void add(PassRefPtr<HistoryItem>, Page*); // Prunes if capacity() is exceeded.
-        void remove(HistoryItem*);
-        CachedPage* get(HistoryItem* item);
+enum class PruningReason { None, ProcessSuspended, MemoryPressure, ReachedMaxSize };
 
-        int pageCount() const { return m_size; }
-        int frameCount() const;
-
-        void markPagesForVistedLinkStyleRecalc();
-
-        // Will mark all cached pages associated with the given page as needing style recalc.
-        void markPagesForFullStyleRecalc(Page*);
-
-#if ENABLE(VIDEO_TRACK)
-        void markPagesForCaptionPreferencesChanged();
-#endif
-
-#if USE(ACCELERATED_COMPOSITING)
-        bool shouldClearBackingStores() const { return m_shouldClearBackingStores; }
-        void setShouldClearBackingStores(bool flag) { m_shouldClearBackingStores = flag; }
-        void markPagesForDeviceScaleChanged(Page*);
-#endif
-
-    private:
-        PageCache(); // Use pageCache() instead.
-        ~PageCache(); // Not implemented to make sure nobody accidentally calls delete -- WebCore does not delete singletons.
-        
-        static bool canCachePageContainingThisFrame(Frame*);
-
-        void addToLRUList(HistoryItem*); // Adds to the head of the list.
-        void removeFromLRUList(HistoryItem*);
-
-        void prune();
-
-        int m_capacity;
-        int m_size;
-
-        // LRU List
-        HistoryItem* m_head;
-        HistoryItem* m_tail;
-        
-#if USE(ACCELERATED_COMPOSITING)
-        bool m_shouldClearBackingStores;
-#endif
-     };
-
+class PageCache {
+    WTF_MAKE_NONCOPYABLE(PageCache); WTF_MAKE_FAST_ALLOCATED;
+public:
     // Function to obtain the global page cache.
-    PageCache* pageCache();
+    WEBCORE_EXPORT static PageCache& singleton();
+
+    bool canCache(Page&) const;
+
+    // Used when memory is low to prune some cached pages.
+    WEBCORE_EXPORT void pruneToSizeNow(unsigned maxSize, PruningReason);
+    WEBCORE_EXPORT void setMaxSize(unsigned); // number of pages to cache.
+    unsigned maxSize() const { return m_maxSize; }
+
+    void addIfCacheable(HistoryItem&, Page*); // Prunes if maxSize() is exceeded.
+    WEBCORE_EXPORT void remove(HistoryItem&);
+    CachedPage* get(HistoryItem&, Page*);
+    std::unique_ptr<CachedPage> take(HistoryItem&, Page*);
+
+    unsigned pageCount() const { return m_items.size(); }
+    WEBCORE_EXPORT unsigned frameCount() const;
+
+    void markPagesForDeviceOrPageScaleChanged(Page&);
+    void markPagesForContentsSizeChanged(Page&);
+#if ENABLE(VIDEO_TRACK)
+    void markPagesForCaptionPreferencesChanged();
+#endif
+
+    bool shouldClearBackingStores() const { return m_shouldClearBackingStores; }
+    void setShouldClearBackingStores(bool flag) { m_shouldClearBackingStores = flag; }
+
+private:
+    PageCache() = default; // Use singleton() instead.
+    ~PageCache() = delete; // Make sure nobody accidentally calls delete -- WebCore does not delete singletons.
+
+    static bool canCachePageContainingThisFrame(Frame&);
+
+    void prune(PruningReason);
+
+    ListHashSet<RefPtr<HistoryItem>> m_items;
+    unsigned m_maxSize {0};
+    bool m_shouldClearBackingStores {false};
+
+    friend class WTF::NeverDestroyed<PageCache>;
+};
 
 } // namespace WebCore
 

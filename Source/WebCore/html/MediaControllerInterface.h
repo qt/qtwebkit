@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -28,6 +28,7 @@
 
 #if ENABLE(VIDEO)
 
+#include "HTMLMediaElementEnums.h"
 #include <wtf/PassRefPtr.h>
 
 namespace WebCore {
@@ -36,7 +37,7 @@ class TimeRanges;
 
 typedef int ExceptionCode;
 
-class MediaControllerInterface {
+class MediaControllerInterface : public HTMLMediaElementEnums {
 public:
     virtual ~MediaControllerInterface() { };
     
@@ -47,7 +48,7 @@ public:
     
     virtual double duration() const = 0;
     virtual double currentTime() const = 0;
-    virtual void setCurrentTime(double, ExceptionCode&) = 0;
+    virtual void setCurrentTime(double) = 0;
     
     virtual bool paused() const = 0;
     virtual void play() = 0;
@@ -64,12 +65,12 @@ public:
     
     virtual bool muted() const = 0;
     virtual void setMuted(bool) = 0;
-    
-    enum ReadyState { HAVE_NOTHING, HAVE_METADATA, HAVE_CURRENT_DATA, HAVE_FUTURE_DATA, HAVE_ENOUGH_DATA };
+
+    using HTMLMediaElementEnums::ReadyState;
     virtual ReadyState readyState() const = 0;
 
     // MediaControlElements:
-    virtual bool supportsFullscreen() const = 0;
+    virtual bool supportsFullscreen(HTMLMediaElementEnums::VideoFullscreenMode) const = 0;
     virtual bool isFullscreen() const = 0;
     virtual void enterFullscreen() = 0;
 
@@ -83,6 +84,13 @@ public:
 
     virtual void beginScrubbing() = 0;
     virtual void endScrubbing() = 0;
+
+    enum ScanDirection {
+        Backward,
+        Forward,
+    };
+    virtual void beginScanning(ScanDirection) = 0;
+    virtual void endScanning() = 0;
 
     virtual bool canPlay() const = 0;
 

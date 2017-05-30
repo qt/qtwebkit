@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2010 Google Inc. All rights reserved.
+ * Copyright (C) 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -10,7 +11,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -35,7 +36,9 @@
 #include "ReverbAccumulationBuffer.h"
 #include "ReverbConvolverStage.h"
 #include "ReverbInputBuffer.h"
-#include <wtf/OwnPtr.h>
+#include <memory>
+#include <wtf/Condition.h>
+#include <wtf/Lock.h>
 #include <wtf/RefCounted.h>
 #include <wtf/Threading.h>
 #include <wtf/Vector.h>
@@ -65,8 +68,8 @@ public:
 
     size_t latencyFrames() const;
 private:
-    Vector<OwnPtr<ReverbConvolverStage> > m_stages;
-    Vector<OwnPtr<ReverbConvolverStage> > m_backgroundStages;
+    Vector<std::unique_ptr<ReverbConvolverStage>> m_stages;
+    Vector<std::unique_ptr<ReverbConvolverStage>> m_backgroundStages;
     size_t m_impulseResponseLength;
 
     ReverbAccumulationBuffer m_accumulationBuffer;
@@ -86,8 +89,8 @@ private:
     ThreadIdentifier m_backgroundThread;
     bool m_wantsToExit;
     bool m_moreInputBuffered;
-    mutable Mutex m_backgroundThreadLock;
-    mutable ThreadCondition m_backgroundThreadCondition;
+    mutable Lock m_backgroundThreadMutex;
+    mutable Condition m_backgroundThreadConditionVariable;
 };
 
 } // namespace WebCore

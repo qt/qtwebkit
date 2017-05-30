@@ -67,57 +67,33 @@ struct HighlightedElement;
 
 class WindowOptions {
 public:
-    WindowOptions()
-        : useGraphicsView(false)
-        , useDiskCache(false)
-        , useCompositing(true)
-        , useTiledBackingStore(false)
-        , useWebGL(false)
-        , useWebAudio(false)
-        , useFrameFlattening(false)
-        , cacheWebView(false)
-        , showFrameRate(false)
-        , resizesToContents(false)
-        , viewportUpdateMode(QGraphicsView::MinimalViewportUpdate)
-        , useLocalStorage(false)
-        , useOfflineStorageDatabase(false)
-        , useOfflineWebApplicationCache(false)
-        , useDiskCookies(true)
-        , enableScrollAnimator(false)
-        , offlineStorageDefaultQuotaSize(0)
-        , useQGLWidgetViewport(false)
-        , useQOpenGLWidgetViewport(false)
-        , printLoadedUrls(false)
-        , startMaximized(false)
-    {
-    }
-
-    bool useGraphicsView;
-    bool useDiskCache;
-    bool useCompositing;
-    bool useTiledBackingStore;
-    bool useWebGL;
-    bool useWebAudio;
-    bool useFrameFlattening;
-    bool cacheWebView;
-    bool showFrameRate;
-    bool resizesToContents;
-    QGraphicsView::ViewportUpdateMode viewportUpdateMode;
-    bool useLocalStorage;
-    bool useOfflineStorageDatabase;
-    bool useOfflineWebApplicationCache;
-    bool useDiskCookies;
-    bool enableScrollAnimator;
-    quint64 offlineStorageDefaultQuotaSize;
-    bool useQGLWidgetViewport;
-    bool useQOpenGLWidgetViewport;
-    bool printLoadedUrls;
+    bool useGraphicsView { false };
+    bool useDiskCache { false };
+    bool useCompositing { false };
+    bool useTiledBackingStore { false };
+    bool useWebGL { false };
+    bool useWebAudio { false };
+    bool useMediaSource { false };
+    bool useFrameFlattening { false };
+    bool cacheWebView { false };
+    bool showFrameRate { false };
+    bool resizesToContents { false };
+    QGraphicsView::ViewportUpdateMode viewportUpdateMode { QGraphicsView::MinimalViewportUpdate };
+    bool useLocalStorage { false };
+    bool useOfflineStorageDatabase { false };
+    bool useOfflineWebApplicationCache { false };
+    bool useDiskCookies { true };
+    bool enableScrollAnimator { false };
+    quint64 offlineStorageDefaultQuotaSize { 0 };
+    bool useQGLWidgetViewport { false };
+    bool useQOpenGLWidgetViewport { false };
+    bool printLoadedUrls { false };
     QUrl inspectorUrl;
-    quint16 remoteInspectorPort;
-    bool startMaximized;
+    quint16 remoteInspectorPort { 0 };
+    bool startMaximized { false };
 };
 
-class LauncherWindow : public MainWindow {
+class LauncherWindow final : public MainWindow {
     Q_OBJECT
 
 public:
@@ -126,7 +102,7 @@ public:
 
     void sendTouchEvent();
 
-    bool eventFilter(QObject* obj, QEvent* event);
+    bool eventFilter(QObject*, QEvent*) final;
 
 protected Q_SLOTS:
     void loadStarted();
@@ -159,13 +135,15 @@ protected Q_SLOTS:
     void toggleResizesToContents(bool toggle);
     void toggleWebGL(bool toggle);
     void toggleWebAudio(bool toggle);
-    void toggleSpatialNavigation(bool b);
+    void toggleMediaSource(bool toggle);
+    void toggleSpatialNavigation(bool enable);
     void toggleFullScreenMode(bool enable);
     void toggleFrameFlattening(bool toggle);
     void toggleJavaScriptEnabled(bool enable);
     void toggleInterruptingJavaScriptEnabled(bool enable);
     void toggleJavascriptCanOpenWindows(bool enable);
     void toggleAutoLoadImages(bool enable);
+    void togglePrivateBrowsing(bool enable);
     void setUseDiskCookies(bool enable);
     void clearCookies();
     void togglePlugins(bool enable);
@@ -197,6 +175,8 @@ protected Q_SLOTS:
     void fileDownloadFinished();
 #endif
 
+    void clearMemoryCaches();
+
 public Q_SLOTS:
     LauncherWindow* newWindow();
     LauncherWindow* cloneWindow();
@@ -215,6 +195,8 @@ private:
     bool isGraphicsBased() const;
 
 private:
+    void closeEvent(QCloseEvent*) final;
+
     static QVector<int> m_zoomLevels;
     int m_currentZoom;
 
@@ -229,7 +211,7 @@ private:
 
     QPropertyAnimation* m_zoomAnimation;
 #if !defined(QT_NO_FILEDIALOG) && !defined(QT_NO_MESSAGEBOX)
-    QNetworkReply* m_reply;
+    QNetworkReply* m_reply { nullptr };
 #endif
     QList<QTouchEvent::TouchPoint> m_touchPoints;
     QList<HighlightedElement> m_highlightedElements;
@@ -239,8 +221,8 @@ private:
 #ifndef QT_NO_LINEEDIT
     QToolBar* m_findBar;
     QLineEdit* m_lineEdit;
-    int m_findFlag;
-    static const int s_findNormalFlag = 0;
+    int m_findFlag { 0 };
+    static const int s_findNormalFlag { 0 };
 #endif
 };
 

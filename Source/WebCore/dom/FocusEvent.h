@@ -34,84 +34,37 @@ namespace WebCore {
 class Node;
 
 struct FocusEventInit : public UIEventInit {
-    FocusEventInit();
-
     RefPtr<EventTarget> relatedTarget;
 };
 
-class FocusEvent : public UIEvent {
+class FocusEvent final : public UIEvent {
 public:
-    static PassRefPtr<FocusEvent> create()
+    static Ref<FocusEvent> create(const AtomicString& type, bool canBubble, bool cancelable, AbstractView* view, int detail, RefPtr<EventTarget>&& relatedTarget)
     {
-        return adoptRef(new FocusEvent);
+        return adoptRef(*new FocusEvent(type, canBubble, cancelable, view, detail, WTFMove(relatedTarget)));
     }
 
-    static PassRefPtr<FocusEvent> create(const AtomicString& type, bool canBubble, bool cancelable, PassRefPtr<AbstractView> view, int detail, PassRefPtr<EventTarget> relatedTarget)
+    static Ref<FocusEvent> createForBindings(const AtomicString& type, const FocusEventInit& initializer)
     {
-        return adoptRef(new FocusEvent(type, canBubble, cancelable, view, detail, relatedTarget));
+        return adoptRef(*new FocusEvent(type, initializer));
     }
 
-    static PassRefPtr<FocusEvent> create(const AtomicString& type, const FocusEventInit& initializer)
-    {
-        return adoptRef(new FocusEvent(type, initializer));
-    }
+    virtual EventTarget* relatedTarget() const override { return m_relatedTarget.get(); }
+    void setRelatedTarget(RefPtr<EventTarget>&& relatedTarget) { m_relatedTarget = WTFMove(relatedTarget); }
 
-    EventTarget* relatedTarget() const { return m_relatedTarget.get(); }
-    void setRelatedTarget(PassRefPtr<EventTarget> relatedTarget) { m_relatedTarget = relatedTarget; }
-
-    virtual const AtomicString& interfaceName() const;
-    virtual bool isFocusEvent() const;
+    virtual EventInterface eventInterface() const override;
 
 private:
-    FocusEvent();
-    FocusEvent(const AtomicString& type, bool canBubble, bool cancelable, PassRefPtr<AbstractView>, int, PassRefPtr<EventTarget>);
+    FocusEvent(const AtomicString& type, bool canBubble, bool cancelable, AbstractView*, int, RefPtr<EventTarget>&&);
     FocusEvent(const AtomicString& type, const FocusEventInit&);
+
+    virtual bool isFocusEvent() const override;
 
     RefPtr<EventTarget> m_relatedTarget;
 };
 
-inline FocusEvent* toFocusEvent(Event* event)
-{
-    ASSERT(event && event->isFocusEvent());
-    return static_cast<FocusEvent*>(event);
-}
-
-class FocusEventDispatchMediator : public EventDispatchMediator {
-public:
-    static PassRefPtr<FocusEventDispatchMediator> create(PassRefPtr<FocusEvent>);
-private:
-    explicit FocusEventDispatchMediator(PassRefPtr<FocusEvent>);
-    FocusEvent* event() const { return static_cast<FocusEvent*>(EventDispatchMediator::event()); }
-    virtual bool dispatchEvent(EventDispatcher*) const OVERRIDE;
-};
-
-class BlurEventDispatchMediator : public EventDispatchMediator {
-public:
-    static PassRefPtr<BlurEventDispatchMediator> create(PassRefPtr<FocusEvent>);
-private:
-    explicit BlurEventDispatchMediator(PassRefPtr<FocusEvent>);
-    FocusEvent* event() const { return static_cast<FocusEvent*>(EventDispatchMediator::event()); }
-    virtual bool dispatchEvent(EventDispatcher*) const OVERRIDE;
-};
-
-class FocusInEventDispatchMediator : public EventDispatchMediator {
-public:
-    static PassRefPtr<FocusInEventDispatchMediator> create(PassRefPtr<FocusEvent>);
-private:
-    explicit FocusInEventDispatchMediator(PassRefPtr<FocusEvent>);
-    FocusEvent* event() const { return static_cast<FocusEvent*>(EventDispatchMediator::event()); }
-    virtual bool dispatchEvent(EventDispatcher*) const OVERRIDE;
-};
-
-class FocusOutEventDispatchMediator : public EventDispatchMediator {
-public:
-    static PassRefPtr<FocusOutEventDispatchMediator> create(PassRefPtr<FocusEvent>);
-private:
-    explicit FocusOutEventDispatchMediator(PassRefPtr<FocusEvent>);
-    FocusEvent* event() const { return static_cast<FocusEvent*>(EventDispatchMediator::event()); }
-    virtual bool dispatchEvent(EventDispatcher*) const OVERRIDE;
-};
-
 } // namespace WebCore
+
+SPECIALIZE_TYPE_TRAITS_EVENT(FocusEvent)
 
 #endif // FocusEvent_h

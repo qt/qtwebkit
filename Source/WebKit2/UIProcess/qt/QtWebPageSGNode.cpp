@@ -21,11 +21,11 @@
 #include "config.h"
 #include "QtWebPageSGNode.h"
 
+#include "CoordinatedGraphicsScene.h"
+#include "WebPageProxy.h"
+
 #include <QtGui/QPolygonF>
-#include <QtQuick/QQuickItem>
-#include <QtQuick/QQuickWindow>
 #include <QtQuick/QSGSimpleRectNode>
-#include <WebCore/CoordinatedGraphicsScene.h>
 #include <WebCore/TransformationMatrix.h>
 
 #if QT_VERSION >= QT_VERSION_CHECK(5, 8, 0)
@@ -38,7 +38,7 @@ using namespace WebCore;
 
 namespace WebKit {
 
-class ContentsSGNode : public QSGRenderNode {
+class ContentsSGNode final : public QSGRenderNode {
 public:
     ContentsSGNode(PassRefPtr<CoordinatedGraphicsScene> scene)
         : m_scene(scene)
@@ -48,24 +48,24 @@ public:
 
 #if QT_VERSION >= QT_VERSION_CHECK(5, 8, 0)
 
-    StateFlags changedStates() const override
+    StateFlags changedStates() const final
     {
         return StateFlags(StencilState) | ColorState | BlendState;
     }
 
-    void render(const RenderState* state) override
+    void render(const RenderState* state) final
     {
         renderInternal(state->projectionMatrix());
     }
 
 #else
 
-    StateFlags changedStates() Q_DECL_OVERRIDE
+    StateFlags changedStates() final
     {
         return StateFlags(StencilState) | ColorState | BlendState;
     }
 
-    void render(const RenderState& state) Q_DECL_OVERRIDE
+    void render(const RenderState& state) final
     {
         renderInternal(state.projectionMatrix);
     }
@@ -87,12 +87,14 @@ public:
         bool mirrored = projection && (*projection)(0, 0) * (*projection)(1, 1) - (*projection)(0, 1) * (*projection)(1, 0) > 0;
 
         // FIXME: Support non-rectangular clippings.
-        coordinatedGraphicsScene()->paintToCurrentGLContext(renderMatrix, inheritedOpacity(), clipRect(), mirrored ? TextureMapper::PaintingMirrored : 0);
+        coordinatedGraphicsScene()->paintToCurrentGLContext(renderMatrix, inheritedOpacity(), clipRect(),
+            pageNode()->page().pageExtendedBackgroundColor(), pageNode()->page().drawsBackground(), FloatPoint(),
+            mirrored ? TextureMapper::PaintingMirrored : 0);
     }
 
     void releaseResources()
 #if QT_VERSION >= QT_VERSION_CHECK(5, 8, 0)
-        override
+        final
 #endif
     {
         coordinatedGraphicsScene()->purgeGLResources();
@@ -110,7 +112,7 @@ public:
         return parent;
     }
 
-    WebCore::CoordinatedGraphicsScene* coordinatedGraphicsScene() const { return m_scene.get(); }
+    CoordinatedGraphicsScene* coordinatedGraphicsScene() const { return m_scene.get(); }
 
 private:
     QRectF clipRect() const
@@ -159,11 +161,12 @@ private:
         return resultRect;
     }
 
-    RefPtr<WebCore::CoordinatedGraphicsScene> m_scene;
+    RefPtr<CoordinatedGraphicsScene> m_scene;
 };
 
-QtWebPageSGNode::QtWebPageSGNode()
-    : m_contentsNode(0)
+QtWebPageSGNode::QtWebPageSGNode(WebPageProxy& page)
+    : m_page(page)
+    , m_contentsNode(0)
     , m_backgroundNode(new QSGSimpleRectNode)
     , m_devicePixelRatio(1)
 {
@@ -183,7 +186,7 @@ void QtWebPageSGNode::setScale(float scale)
     setMatrix(matrix);
 }
 
-void QtWebPageSGNode::setCoordinatedGraphicsScene(PassRefPtr<WebCore::CoordinatedGraphicsScene> scene)
+void QtWebPageSGNode::setCoordinatedGraphicsScene(PassRefPtr<CoordinatedGraphicsScene> scene)
 {
     if (m_contentsNode && m_contentsNode->coordinatedGraphicsScene() == scene)
         return;

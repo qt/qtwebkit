@@ -31,8 +31,6 @@
 #ifndef BlobResourceHandle_h
 #define BlobResourceHandle_h
 
-#if ENABLE(BLOB)
-
 #include "FileStreamClient.h"
 #include "ResourceHandle.h"
 #include <wtf/PassRefPtr.h>
@@ -42,25 +40,17 @@
 namespace WebCore {
 
 class AsyncFileStream;
-class BlobStorageData;
+class BlobData;
 class FileStream;
 class ResourceHandleClient;
 class ResourceRequest;
-struct BlobDataItem;
+class BlobDataItem;
 
-class BlobResourceHandle : public FileStreamClient, public ResourceHandle  {
+class BlobResourceHandle final : public FileStreamClient, public ResourceHandle  {
 public:
-    static PassRefPtr<BlobResourceHandle> createAsync(BlobStorageData*, const ResourceRequest&, ResourceHandleClient*);
+    static PassRefPtr<BlobResourceHandle> createAsync(BlobData*, const ResourceRequest&, ResourceHandleClient*);
 
-    static void loadResourceSynchronously(BlobStorageData* blobData, const ResourceRequest& request, ResourceError& error, ResourceResponse& response, Vector<char>& data);
-
-    // FileStreamClient methods.
-    virtual void didGetSize(long long) OVERRIDE;
-    virtual void didOpen(bool) OVERRIDE;
-    virtual void didRead(int) OVERRIDE;
-
-    // ResourceHandle methods.
-    virtual void cancel() OVERRIDE;
+    static void loadResourceSynchronously(BlobData*, const ResourceRequest&, ResourceError&, ResourceResponse&, Vector<char>& data);
 
     void start();
     int readSync(char*, int);
@@ -68,10 +58,17 @@ public:
     bool aborted() const { return m_aborted; }
 
 private:
-    friend void delayedStartBlobResourceHandle(void*);
-
-    BlobResourceHandle(PassRefPtr<BlobStorageData>, const ResourceRequest&, ResourceHandleClient*, bool async);
+    BlobResourceHandle(BlobData*, const ResourceRequest&, ResourceHandleClient*, bool async);
     virtual ~BlobResourceHandle();
+
+    // FileStreamClient methods.
+    virtual void didGetSize(long long) override;
+    virtual void didOpen(bool) override;
+    virtual void didRead(int) override;
+
+    // ResourceHandle methods.
+    virtual void cancel() override;
+    virtual void continueDidReceiveResponse() override;
 
     void doStart();
     void getSizeForNext();
@@ -93,26 +90,27 @@ private:
     void notifyFail(int errorCode);
     void notifyFinish();
 
-    RefPtr<BlobStorageData> m_blobData;
+    enum { kPositionNotSpecified = -1 };
+
+    RefPtr<BlobData> m_blobData;
     bool m_async;
-    RefPtr<AsyncFileStream> m_asyncStream; // For asynchronous loading.
-    RefPtr<FileStream> m_stream; // For synchronous loading.
+    std::unique_ptr<AsyncFileStream> m_asyncStream; // For asynchronous loading.
+    std::unique_ptr<FileStream> m_stream; // For synchronous loading.
     Vector<char> m_buffer;
     Vector<long long> m_itemLengthList;
-    int m_errorCode;
-    bool m_aborted;
-    long long m_rangeOffset;
-    long long m_rangeEnd;
-    long long m_rangeSuffixLength;
-    long long m_totalRemainingSize;
-    long long m_currentItemReadSize;
-    unsigned m_sizeItemCount;
-    unsigned m_readItemCount;
-    bool m_fileOpened;
+    int m_errorCode { 0 };
+    bool m_aborted { false };
+    long long m_rangeOffset { kPositionNotSpecified };
+    long long m_rangeEnd { kPositionNotSpecified };
+    long long m_rangeSuffixLength { kPositionNotSpecified };
+    long long m_totalSize { 0 };
+    long long m_totalRemainingSize { 0 };
+    long long m_currentItemReadSize { 0 };
+    unsigned m_sizeItemCount { 0 };
+    unsigned m_readItemCount { 0 };
+    bool m_fileOpened { false };
 };
 
 } // namespace WebCore
-
-#endif // ENABLE(BLOB)
 
 #endif // BlobResourceHandle_h

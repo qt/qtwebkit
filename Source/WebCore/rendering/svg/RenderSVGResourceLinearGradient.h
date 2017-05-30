@@ -21,37 +21,39 @@
 #ifndef RenderSVGResourceLinearGradient_h
 #define RenderSVGResourceLinearGradient_h
 
-#if ENABLE(SVG)
 #include "LinearGradientAttributes.h"
 #include "RenderSVGResourceGradient.h"
+#include "SVGLinearGradientElement.h"
 
 namespace WebCore {
 
-class SVGLinearGradientElement;
-
-class RenderSVGResourceLinearGradient : public RenderSVGResourceGradient {
+class RenderSVGResourceLinearGradient final : public RenderSVGResourceGradient {
 public:
-    RenderSVGResourceLinearGradient(SVGLinearGradientElement*);
+    RenderSVGResourceLinearGradient(SVGLinearGradientElement&, Ref<RenderStyle>&&);
     virtual ~RenderSVGResourceLinearGradient();
 
-    virtual const char* renderName() const { return "RenderSVGResourceLinearGradient"; }
+    SVGLinearGradientElement& linearGradientElement() const { return downcast<SVGLinearGradientElement>(RenderSVGResourceGradient::gradientElement()); }
 
-    virtual RenderSVGResourceType resourceType() const { return s_resourceType; }
-    static RenderSVGResourceType s_resourceType;
+    virtual RenderSVGResourceType resourceType() const override { return LinearGradientResourceType; }
 
-    virtual SVGUnitTypes::SVGUnitType gradientUnits() const { return m_attributes.gradientUnits(); }
-    virtual void calculateGradientTransform(AffineTransform& transform) { transform = m_attributes.gradientTransform(); }
-    virtual bool collectGradientAttributes(SVGGradientElement*);
-    virtual void buildGradient(GradientData*) const;
+    virtual SVGUnitTypes::SVGUnitType gradientUnits() const override { return m_attributes.gradientUnits(); }
+    virtual void calculateGradientTransform(AffineTransform& transform) override { transform = m_attributes.gradientTransform(); }
+    virtual bool collectGradientAttributes() override;
+    virtual void buildGradient(GradientData*) const override;
 
     FloatPoint startPoint(const LinearGradientAttributes&) const;
     FloatPoint endPoint(const LinearGradientAttributes&) const;
 
 private:
+    void gradientElement() const = delete;
+
+    virtual const char* renderName() const override { return "RenderSVGResourceLinearGradient"; }
+
     LinearGradientAttributes m_attributes;
 };
 
 }
 
-#endif
+SPECIALIZE_TYPE_TRAITS_RENDER_SVG_RESOURCE(RenderSVGResourceLinearGradient, LinearGradientResourceType)
+
 #endif

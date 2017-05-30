@@ -26,7 +26,6 @@
 
 #include "Document.h"
 #include "HTMLElement.h"
-#include "InspectorInstrumentation.h"
 #include "IntSize.h"
 #include "RenderObject.h"
 #include "RenderStyle.h"
@@ -34,7 +33,6 @@
 #include "RenderView.h"
 #include "Settings.h"
 #include "StyleInheritedData.h"
-
 #include <algorithm>
 #include <wtf/StdLibExtras.h>
 #include <wtf/Vector.h>
@@ -73,7 +71,7 @@ struct TextAutosizingClusterInfo {
 static const Vector<QualifiedName>& formInputTags()
 {
     // Returns the tags for the form input elements.
-    DEFINE_STATIC_LOCAL(Vector<QualifiedName>, formInputTags, ());
+    DEPRECATED_DEFINE_STATIC_LOCAL(Vector<QualifiedName>, formInputTags, ());
     if (formInputTags.isEmpty()) {
         formInputTags.append(inputTag);
         formInputTags.append(buttonTag);
@@ -103,32 +101,30 @@ void TextAutosizer::recalculateMultipliers()
 
 bool TextAutosizer::processSubtree(RenderObject* layoutRoot)
 {
-    // FIXME: Text Autosizing should only be enabled when m_document->page()->mainFrame()->view()->useFixedLayout()
+    // FIXME: Text Autosizing should only be enabled when m_document->page()->mainFrame().view()->useFixedLayout()
     // is true, but for now it's useful to ignore this so that it can be tested on desktop.
     if (!m_document->settings() || !m_document->settings()->textAutosizingEnabled() || layoutRoot->view()->printing() || !m_document->page())
         return false;
 
-    Frame* mainFrame = m_document->page()->mainFrame();
+    Frame& mainFrame = m_document->page()->mainFrame();
 
     TextAutosizingWindowInfo windowInfo;
 
     // Window area, in logical (density-independent) pixels.
     windowInfo.windowSize = m_document->settings()->textAutosizingWindowSizeOverride();
-    if (windowInfo.windowSize.isEmpty()) {
-        bool includeScrollbars = !InspectorInstrumentation::shouldApplyScreenWidthOverride(mainFrame);
-        windowInfo.windowSize = mainFrame->view()->unscaledVisibleContentSize(includeScrollbars ? ScrollableArea::IncludeScrollbars : ScrollableArea::ExcludeScrollbars);
-    }
+    if (windowInfo.windowSize.isEmpty())
+        windowInfo.windowSize = mainFrame.view()->unscaledVisibleContentSize(ScrollableArea::IncludeScrollbars);
 
     // Largest area of block that can be visible at once (assuming the main
     // frame doesn't get scaled to less than overview scale), in CSS pixels.
-    windowInfo.minLayoutSize = mainFrame->view()->layoutSize();
-    for (Frame* frame = m_document->frame(); frame; frame = frame->tree()->parent()) {
+    windowInfo.minLayoutSize = mainFrame.view()->layoutSize();
+    for (Frame* frame = m_document->frame(); frame; frame = frame->tree().parent()) {
         if (!frame->view()->isInChildFrameWithFrameFlattening())
             windowInfo.minLayoutSize = windowInfo.minLayoutSize.shrunkTo(frame->view()->layoutSize());
     }
 
     // The layoutRoot could be neither a container nor a cluster, so walk up the tree till we find each of these.
-    RenderBlock* container = layoutRoot->isRenderBlock() ? toRenderBlock(layoutRoot) : layoutRoot->containingBlock();
+    RenderBlock* container = is<RenderBlock>(*layoutRoot) ? downcast<RenderBlock>(layoutRoot) : layoutRoot->containingBlock();
     while (container && !isAutosizingContainer(container))
         container = container->containingBlock();
 
@@ -206,14 +202,14 @@ void TextAutosizer::processContainer(float multiplier, RenderBlock* container, T
 
     RenderObject* descendant = nextInPreOrderSkippingDescendantsOfContainers(subtreeRoot, subtreeRoot);
     while (descendant) {
-        if (descendant->isText()) {
+        if (is<RenderText>(*descendant)) {
             if (localMultiplier != 1 && descendant->style()->textAutosizingMultiplier() == 1) {
                 setMultiplier(descendant, localMultiplier);
                 setMultiplier(descendant->parent(), localMultiplier); // Parent does line spacing.
             }
             // FIXME: Increase list marker size proportionately.
         } else if (isAutosizingContainer(descendant)) {
-            RenderBlock* descendantBlock = toRenderBlock(descendant);
+            RenderBlock* descendantBlock = downcast<RenderBlock>(descendant);
             TextAutosizingClusterInfo descendantClusterInfo(descendantBlock);
             if (isWiderDescendant(descendantBlock, clusterInfo) || isIndependentDescendant(descendantBlock))
                 processCluster(descendantClusterInfo, descendantBlock, descendantBlock, windowInfo);
@@ -278,8 +274,8 @@ bool TextAutosizer::isAutosizingContainer(const RenderObject* renderer)
     if (renderer->isListItem())
         return renderer->isFloating() || renderer->isOutOfFlowPositioned();
     // Avoid creating containers for text within text controls, buttons, or <select> buttons.
-    Node* parentNode = renderer->parent() ? renderer->parent()->generatingNode() : 0;
-    if (parentNode && parentNode->isElementNode() && formInputTags().contains(toElement(parentNode)->tagQName()))
+    Node* parentNode = renderer->parent() ? renderer->parent()->generatingNode() : nullptr;
+    if (is<Element>(parentNode) && formInputTags().contains(downcast<Element>(*parentNode).tagQName()))
         return false;
 
     return true;
@@ -390,8 +386,8 @@ bool TextAutosizer::containerContainsOneOfTags(const RenderBlock* container, con
     const RenderObject* renderer = container;
     while (renderer) {
         const Node* rendererNode = renderer->node();
-        if (rendererNode && rendererNode->isElementNode()) {
-            if (tags.contains(toElement(rendererNode)->tagQName()))
+        if (is<Element>(rendererNode)) {
+            if (tags.contains(downcast<Element>(*rendererNode).tagQName()))
                 return true;
         }
         renderer = nextInPreOrderSkippingDescendantsOfContainers(renderer, container);
@@ -415,7 +411,7 @@ bool TextAutosizer::containerIsRowOfLinks(const RenderObject* container)
 
     while (renderer) {
         if (!isAutosizingContainer(renderer)) {
-            if (renderer->isText() && toRenderText(renderer)->text()->stripWhiteSpace()->length() > 3)
+            if (is<RenderText>(*renderer) && downcast<RenderText>(*renderer).text()->stripWhiteSpace()->length() > 3)
                 return false;
             if (!renderer->isInline())
                 return false;
@@ -495,10 +491,10 @@ void TextAutosizer::measureDescendantTextWidth(const RenderBlock* container, Tex
 
     RenderObject* descendant = nextInPreOrderSkippingDescendantsOfContainers(container, container);
     while (descendant) {
-        if (!skipLocalText && descendant->isText()) {
-            textWidth += toRenderText(descendant)->renderedTextLength() * descendant->style()->specifiedFontSize();
-        } else if (isAutosizingContainer(descendant)) {
-            RenderBlock* descendantBlock = toRenderBlock(descendant);
+        if (!skipLocalText && is<RenderText>(*descendant))
+            textWidth += downcast<RenderText>(*descendant).renderedTextLength() * descendant->style()->specifiedFontSize();
+        else if (isAutosizingContainer(descendant)) {
+            RenderBlock* descendantBlock = downcast<RenderBlock>(descendant);
             if (!isAutosizingCluster(descendantBlock, clusterInfo))
                 measureDescendantTextWidth(descendantBlock, clusterInfo, minTextWidth, textWidth);
         }
@@ -544,8 +540,8 @@ const RenderBlock* TextAutosizer::findDeepestBlockContainingAllText(const Render
         lastNode = lastNode->parent();
     }
 
-    if (firstNode->isRenderBlock())
-        return toRenderBlock(firstNode);
+    if (is<RenderBlock>(*firstNode))
+        return downcast<RenderBlock>(firstNode);
 
     // containingBlock() should never leave the cluster, since it only skips ancestors when finding the
     // container of position:absolute/fixed blocks, and those cannot exist between a cluster and its text
@@ -560,21 +556,20 @@ const RenderBlock* TextAutosizer::findDeepestBlockContainingAllText(const Render
 const RenderObject* TextAutosizer::findFirstTextLeafNotInCluster(const RenderObject* parent, size_t& depth, TraversalDirection direction)
 {
     if (parent->isEmpty())
-        return parent->isText() ? parent : 0;
+        return is<RenderText>(*parent) ? parent : nullptr;
 
     ++depth;
     const RenderObject* child = (direction == FirstToLast) ? parent->firstChild() : parent->lastChild();
     while (child) {
-        if (!isAutosizingContainer(child) || !isIndependentDescendant(toRenderBlock(child))) {
-            const RenderObject* leaf = findFirstTextLeafNotInCluster(child, depth, direction);
-            if (leaf)
+        if (!isAutosizingContainer(child) || !isIndependentDescendant(downcast<RenderBlock>(child))) {
+            if (const RenderObject* leaf = findFirstTextLeafNotInCluster(child, depth, direction))
                 return leaf;
         }
         child = (direction == FirstToLast) ? child->nextSibling() : child->previousSibling();
     }
     --depth;
 
-    return 0;
+    return nullptr;
 }
 
 namespace {

@@ -26,13 +26,20 @@
 #include "config.h"
 #include "WKBundle.h"
 
-#include "ImmutableArray.h"
+#include "APIArray.h"
+#include "APIData.h"
 #include "InjectedBundle.h"
+#include "InjectedBundleScriptWorld.h"
 #include "WKAPICast.h"
 #include "WKBundleAPICast.h"
 #include "WKBundlePrivate.h"
-#include "WebData.h"
+#include "WebConnection.h"
+#include "WebFrame.h"
+#include "WebPage.h"
+#include "WebPageGroupProxy.h"
+#include <WebCore/DatabaseManager.h>
 
+using namespace WebCore;
 using namespace WebKit;
 
 WKTypeID WKBundleGetTypeID()
@@ -40,7 +47,7 @@ WKTypeID WKBundleGetTypeID()
     return toAPI(InjectedBundle::APIType);
 }
 
-void WKBundleSetClient(WKBundleRef bundleRef, WKBundleClient * wkClient)
+void WKBundleSetClient(WKBundleRef bundleRef, WKBundleClientBase *wkClient)
 {
     toImpl(bundleRef)->initializeClient(wkClient);
 }
@@ -52,7 +59,7 @@ void WKBundlePostMessage(WKBundleRef bundleRef, WKStringRef messageNameRef, WKTy
 
 void WKBundlePostSynchronousMessage(WKBundleRef bundleRef, WKStringRef messageNameRef, WKTypeRef messageBodyRef, WKTypeRef* returnDataRef)
 {
-    RefPtr<APIObject> returnData;
+    RefPtr<API::Object> returnData;
     toImpl(bundleRef)->postSynchronousMessage(toWTFString(messageNameRef), toImpl(messageBodyRef), returnData);
     if (returnDataRef)
         *returnDataRef = toAPI(returnData.release().leakRef());
@@ -61,26 +68,6 @@ void WKBundlePostSynchronousMessage(WKBundleRef bundleRef, WKStringRef messageNa
 WKConnectionRef WKBundleGetApplicationConnection(WKBundleRef bundleRef)
 {
     return toAPI(toImpl(bundleRef)->webConnectionToUIProcess());
-}
-
-void WKBundleSetShouldTrackVisitedLinks(WKBundleRef bundleRef, bool shouldTrackVisitedLinks)
-{
-    toImpl(bundleRef)->setShouldTrackVisitedLinks(shouldTrackVisitedLinks);
-}
-
-void WKBundleRemoveAllVisitedLinks(WKBundleRef bundleRef)
-{
-    toImpl(bundleRef)->removeAllVisitedLinks();
-}
-
-void WKBundleActivateMacFontAscentHack(WKBundleRef bundleRef)
-{
-    toImpl(bundleRef)->activateMacFontAscentHack();
-}
-
-void WKBundleSetCacheModel(WKBundleRef bundleRef, uint32_t cacheModel)
-{
-    toImpl(bundleRef)->setCacheModel(cacheModel);
 }
 
 void WKBundleGarbageCollectJavaScriptObjects(WKBundleRef bundleRef)
@@ -98,12 +85,7 @@ size_t WKBundleGetJavaScriptObjectsCount(WKBundleRef bundleRef)
     return toImpl(bundleRef)->javaScriptObjectsCount();
 }
 
-void WKBundleSetAlwaysAcceptCookies(WKBundleRef bundleRef, bool accept)
-{
-    toImpl(bundleRef)->setAlwaysAcceptCookies(accept);
-}
-
-void WKBundleAddUserScript(WKBundleRef bundleRef, WKBundlePageGroupRef pageGroupRef, WKBundleScriptWorldRef scriptWorldRef, WKStringRef sourceRef, WKURLRef urlRef, WKArrayRef whitelistRef, WKArrayRef blacklistRef, WKUserScriptInjectionTime injectionTimeRef, WKUserContentInjectedFrames injectedFramesRef)
+void WKBundleAddUserScript(WKBundleRef bundleRef, WKBundlePageGroupRef pageGroupRef, WKBundleScriptWorldRef scriptWorldRef, WKStringRef sourceRef, WKURLRef urlRef, WKArrayRef whitelistRef, WKArrayRef blacklistRef, _WKUserScriptInjectionTime injectionTimeRef, WKUserContentInjectedFrames injectedFramesRef)
 {
     toImpl(bundleRef)->addUserScript(toImpl(pageGroupRef), toImpl(scriptWorldRef), toWTFString(sourceRef), toWTFString(urlRef), toImpl(whitelistRef), toImpl(blacklistRef), toUserScriptInjectionTime(injectionTimeRef), toUserContentInjectedFrames(injectedFramesRef));
 }
@@ -183,11 +165,6 @@ void WKBundleSetPopupBlockingEnabled(WKBundleRef bundleRef, WKBundlePageGroupRef
     toImpl(bundleRef)->setPopupBlockingEnabled(toImpl(pageGroupRef), enabled);
 }
 
-void WKBundleSwitchNetworkLoaderToNewTestingSession(WKBundleRef bundleRef)
-{
-    toImpl(bundleRef)->switchNetworkLoaderToNewTestingSession();
-}
-
 void WKBundleSetAuthorAndUserStylesEnabled(WKBundleRef bundleRef, WKBundlePageGroupRef pageGroupRef, bool enabled)
 {
     toImpl(bundleRef)->setAuthorAndUserStylesEnabled(toImpl(pageGroupRef), enabled);
@@ -223,56 +200,21 @@ void WKBundleReportException(JSContextRef context, JSValueRef exception)
     InjectedBundle::reportException(context, exception);
 }
 
-void WKBundleClearAllDatabases(WKBundleRef bundleRef)
+void WKBundleClearAllDatabases(WKBundleRef)
 {
-    toImpl(bundleRef)->clearAllDatabases();
+    DatabaseManager::singleton().deleteAllDatabases();
 }
 
 void WKBundleSetDatabaseQuota(WKBundleRef bundleRef, uint64_t quota)
 {
-    toImpl(bundleRef)->setDatabaseQuota(quota);
-}
-
-void WKBundleClearApplicationCache(WKBundleRef bundleRef)
-{
-    toImpl(bundleRef)->clearApplicationCache();
-}
-
-void WKBundleClearApplicationCacheForOrigin(WKBundleRef bundleRef, WKStringRef origin)
-{
-    toImpl(bundleRef)->clearApplicationCacheForOrigin(toWTFString(origin));
-}
-
-void WKBundleSetAppCacheMaximumSize(WKBundleRef bundleRef, uint64_t size)
-{
-    toImpl(bundleRef)->setAppCacheMaximumSize(size);
-}
-
-uint64_t WKBundleGetAppCacheUsageForOrigin(WKBundleRef bundleRef, WKStringRef origin)
-{
-    return toImpl(bundleRef)->appCacheUsageForOrigin(toWTFString(origin));
-}
-
-void WKBundleSetApplicationCacheOriginQuota(WKBundleRef bundleRef, WKStringRef origin, uint64_t bytes)
-{
-    toImpl(bundleRef)->setApplicationCacheOriginQuota(toWTFString(origin), bytes);
-}
-
-void WKBundleResetApplicationCacheOriginQuota(WKBundleRef bundleRef, WKStringRef origin)
-{
-    toImpl(bundleRef)->resetApplicationCacheOriginQuota(toWTFString(origin));
-}
-
-WKArrayRef WKBundleCopyOriginsWithApplicationCache(WKBundleRef bundleRef)
-{
-    RefPtr<ImmutableArray> origins = toImpl(bundleRef)->originsWithApplicationCache();
-    return toAPI(origins.release().leakRef());
+    // Historically, we've used the following (somewhat non-sensical) string
+    // for the databaseIdentifier of local files.
+    DatabaseManager::singleton().setQuota(SecurityOrigin::createFromDatabaseIdentifier("file__0").ptr(), quota);
 }
 
 WKDataRef WKBundleCreateWKDataFromUInt8Array(WKBundleRef bundle, JSContextRef context, JSValueRef data)
 {
-    RefPtr<WebData> webData = toImpl(bundle)->createWebDataFromUint8Array(context, data);
-    return toAPI(webData.release().leakRef());
+    return toAPI(toImpl(bundle)->createWebDataFromUint8Array(context, data).leakRef());
 }
 
 int WKBundleNumberOfPages(WKBundleRef bundleRef, WKBundleFrameRef frameRef, double pageWidthInPixels, double pageHeightInPixels)
@@ -323,24 +265,4 @@ uint64_t WKBundleGetWebNotificationID(WKBundleRef bundleRef, JSContextRef contex
 void WKBundleSetTabKeyCyclesThroughElements(WKBundleRef bundleRef, WKBundlePageRef pageRef, bool enabled)
 {
     toImpl(bundleRef)->setTabKeyCyclesThroughElements(toImpl(pageRef), enabled);
-}
-
-void WKBundleSetSerialLoadingEnabled(WKBundleRef bundleRef, bool enabled)
-{
-    toImpl(bundleRef)->setSerialLoadingEnabled(enabled);
-}
-
-void WKBundleSetShadowDOMEnabled(WKBundleRef bundleRef, bool enabled)
-{
-    toImpl(bundleRef)->setShadowDOMEnabled(enabled);
-}
-
-void WKBundleSetSeamlessIFramesEnabled(WKBundleRef bundleRef, bool enabled)
-{
-    toImpl(bundleRef)->setSeamlessIFramesEnabled(enabled);
-}
-
-void WKBundleDispatchPendingLoadRequests(WKBundleRef bundleRef)
-{
-    toImpl(bundleRef)->dispatchPendingLoadRequests();
 }

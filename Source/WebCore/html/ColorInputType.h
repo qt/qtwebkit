@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2010 Google Inc. All rights reserved.
+ * Copyright (C) 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -32,45 +33,44 @@
 #define ColorInputType_h
 
 #if ENABLE(INPUT_TYPE_COLOR)
+
 #include "BaseClickableWithKeyInputType.h"
 #include "ColorChooserClient.h"
 
 namespace WebCore {
 
-class ColorInputType : public BaseClickableWithKeyInputType, public ColorChooserClient {
+class ColorInputType final : public BaseClickableWithKeyInputType, private ColorChooserClient {
 public:
-    static PassOwnPtr<InputType> create(HTMLInputElement*);
+    explicit ColorInputType(HTMLInputElement& element) : BaseClickableWithKeyInputType(element) { }
     virtual ~ColorInputType();
 
-    // ColorChooserClient implementation.
-    virtual void didChooseColor(const Color&) OVERRIDE;
-    virtual void didEndChooser() OVERRIDE;
-    virtual IntRect elementRectRelativeToRootView() const OVERRIDE;
-    virtual Color currentColor() OVERRIDE;
-    virtual bool shouldShowSuggestions() const OVERRIDE;
-    virtual Vector<Color> suggestions() const OVERRIDE;
-
 private:
-    ColorInputType(HTMLInputElement* element) : BaseClickableWithKeyInputType(element) { }
-    virtual void attach() OVERRIDE;
-    virtual bool isColorControl() const OVERRIDE;
-    virtual const AtomicString& formControlType() const OVERRIDE;
-    virtual bool supportsRequired() const OVERRIDE;
-    virtual String fallbackValue() const OVERRIDE;
-    virtual String sanitizeValue(const String&) const OVERRIDE;
-    virtual void createShadowSubtree() OVERRIDE;
-    virtual void setValue(const String&, bool valueChanged, TextFieldEventBehavior) OVERRIDE;
-    virtual void handleDOMActivateEvent(Event*) OVERRIDE;
-    virtual void detach() OVERRIDE;
-    virtual bool shouldRespectListAttribute() OVERRIDE;
-    virtual bool typeMismatchFor(const String&) const OVERRIDE;
+    virtual void didChooseColor(const Color&) override;
+    virtual void didEndChooser() override;
+    virtual IntRect elementRectRelativeToRootView() const override;
+    virtual Color currentColor() override;
+    virtual bool shouldShowSuggestions() const override;
+    virtual Vector<Color> suggestions() const override;
+    virtual bool isColorControl() const override;
+    virtual const AtomicString& formControlType() const override;
+    virtual bool supportsRequired() const override;
+    virtual String fallbackValue() const override;
+    virtual String sanitizeValue(const String&) const override;
+    virtual void createShadowSubtree() override;
+    virtual void setValue(const String&, bool valueChanged, TextFieldEventBehavior) override;
+    virtual void handleDOMActivateEvent(Event*) override;
+    virtual void detach() override;
+    virtual bool shouldRespectListAttribute() override;
+    virtual bool typeMismatchFor(const String&) const override;
+    virtual bool shouldResetOnDocumentActivation() override;
+    virtual Color valueAsColor() const override;
+    virtual void selectColor(const Color&) override;
 
-    Color valueAsColor() const;
     void endColorChooser();
     void updateColorSwatch();
     HTMLElement* shadowColorSwatch() const;
 
-    OwnPtr<ColorChooser> m_chooser;
+    std::unique_ptr<ColorChooser> m_chooser;
 };
 
 } // namespace WebCore

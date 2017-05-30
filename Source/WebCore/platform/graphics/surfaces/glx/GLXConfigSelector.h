@@ -26,9 +26,10 @@
 #ifndef GLXConfigSelector_h
 #define GLXConfigSelector_h
 
-#if USE(ACCELERATED_COMPOSITING) && USE(GLX)
+#if USE(GLX)
 
 #include "X11Helper.h"
+#include "XUniquePtr.h"
 #include <opengl/GLDefs.h>
 #include <opengl/GLPlatformSurface.h>
 
@@ -40,7 +41,7 @@ static int clientAttributes[] = {
     static_cast<int>(GLX_VISUAL_ID),    0,
     GLX_DRAWABLE_TYPE,                  GLX_PIXMAP_BIT,
     GLX_BIND_TO_TEXTURE_TARGETS_EXT,    GLX_TEXTURE_2D_BIT_EXT,
-    GLX_BIND_TO_TEXTURE_RGBA_EXT,       GL_TRUE,
+    GLX_BIND_TO_TEXTURE_RGBA_EXT,       TRUE,
     0
 };
 
@@ -140,14 +141,13 @@ private:
     GLXFBConfig findMatchingConfig(const int attributes[], int depth = 32)
     {
         int numAvailableConfigs;
-        OwnPtrX11<GLXFBConfig> temp(glXChooseFBConfig(X11Helper::nativeDisplay(), DefaultScreen(X11Helper::nativeDisplay()), attributes, &numAvailableConfigs));
+        XUniquePtr<GLXFBConfig> temp(glXChooseFBConfig(X11Helper::nativeDisplay(), DefaultScreen(X11Helper::nativeDisplay()), attributes, &numAvailableConfigs));
 
         if (!numAvailableConfigs || !temp.get())
             return 0;
 
-        OwnPtrX11<XVisualInfo> scopedVisualInfo;
         for (int i = 0; i < numAvailableConfigs; ++i) {
-            scopedVisualInfo = glXGetVisualFromFBConfig(X11Helper::nativeDisplay(), temp[i]);
+            XUniquePtr<XVisualInfo> scopedVisualInfo { glXGetVisualFromFBConfig(X11Helper::nativeDisplay(), temp.get()[i]) };
             if (!scopedVisualInfo.get())
                 continue;
 
@@ -158,41 +158,40 @@ private:
                 if (format) {
                     if (m_attributes & GLPlatformSurface::SupportAlpha) {
                         if (scopedVisualInfo->depth == depth && format->direct.alphaMask > 0)
-                            return temp[i];
+                            return temp.get()[i];
                     } else if (!format->direct.alphaMask)
-                        return temp[i];
+                        return temp.get()[i];
                 }
             }
 #endif
             if (scopedVisualInfo->depth == depth)
-                return temp[i];
+                return temp.get()[i];
         }
 
         // Did not find any visual supporting alpha, select the first available config.
-        scopedVisualInfo = glXGetVisualFromFBConfig(X11Helper::nativeDisplay(), temp[0]);
+        XUniquePtr<XVisualInfo> scopedVisualInfo { glXGetVisualFromFBConfig(X11Helper::nativeDisplay(), temp.get()[0]) };
 
         if ((m_attributes & GLPlatformSurface::SupportAlpha) && (scopedVisualInfo->depth != 32))
             m_attributes &= ~GLPlatformSurface::SupportAlpha;
 
-        return temp[0];
+        return temp.get()[0];
     }
 
     GLXFBConfig findMatchingConfigWithVisualId(const int attributes[], int depth, VisualID id)
     {
         int numAvailableConfigs;
-        OwnPtrX11<GLXFBConfig> temp(glXChooseFBConfig(X11Helper::nativeDisplay(), DefaultScreen(X11Helper::nativeDisplay()), attributes, &numAvailableConfigs));
+        XUniquePtr<GLXFBConfig> temp(glXChooseFBConfig(X11Helper::nativeDisplay(), DefaultScreen(X11Helper::nativeDisplay()), attributes, &numAvailableConfigs));
 
         if (!numAvailableConfigs || !temp.get())
             return 0;
 
-        OwnPtrX11<XVisualInfo> scopedVisualInfo;
         for (int i = 0; i < numAvailableConfigs; ++i) {
-            scopedVisualInfo = glXGetVisualFromFBConfig(X11Helper::nativeDisplay(), temp[i]);
+            XUniquePtr<XVisualInfo> scopedVisualInfo { glXGetVisualFromFBConfig(X11Helper::nativeDisplay(), temp.get()[i]) };
             if (!scopedVisualInfo.get())
                 continue;
 
             if (id && scopedVisualInfo->depth == depth && scopedVisualInfo->visualid == id)
-                return temp[i];
+                return temp.get()[i];
         }
 
         return 0;

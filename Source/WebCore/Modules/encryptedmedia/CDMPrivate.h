@@ -28,12 +28,12 @@
 
 #if ENABLE(ENCRYPTED_MEDIA_V2)
 
-#include <wtf/OwnPtr.h>
 #include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
 class CDMSession;
+class CDMSessionClient;
 
 class CDMPrivateInterface {
 public:
@@ -42,7 +42,7 @@ public:
 
     virtual bool supportsMIMEType(const String&) = 0;
 
-    virtual PassOwnPtr<CDMSession> createSession() = 0;
+    virtual std::unique_ptr<CDMSession> createSession(CDMSessionClient*) = 0;
 };
 
 }

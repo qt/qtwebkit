@@ -21,20 +21,18 @@
 #ifndef SVGFEFuncAElement_h
 #define SVGFEFuncAElement_h
 
-#if ENABLE(SVG) && ENABLE(FILTERS)
 #include "SVGComponentTransferFunctionElement.h"
 
 namespace WebCore {
 
-class SVGFEFuncAElement FINAL : public SVGComponentTransferFunctionElement {
+class SVGFEFuncAElement final : public SVGComponentTransferFunctionElement {
 public:
-    static PassRefPtr<SVGFEFuncAElement> create(const QualifiedName&, Document*);
+    static Ref<SVGFEFuncAElement> create(const QualifiedName&, Document&);
 
 private:
-    SVGFEFuncAElement(const QualifiedName&, Document*);
+    SVGFEFuncAElement(const QualifiedName&, Document&);
 };
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif

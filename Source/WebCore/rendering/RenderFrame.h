@@ -30,30 +30,24 @@ namespace WebCore {
 
 class HTMLFrameElement;
 
-class RenderFrame : public RenderFrameBase {
+class RenderFrame final : public RenderFrameBase {
 public:
-    explicit RenderFrame(HTMLFrameElement*);
+    RenderFrame(HTMLFrameElement&, Ref<RenderStyle>&&);
 
+    HTMLFrameElement& frameElement() const;
     FrameEdgeInfo edgeInfo() const;
 
 private:
-    virtual const char* renderName() const { return "RenderFrame"; }
-    virtual bool isFrame() const { return true; }
+    void frameOwnerElement() const = delete;
 
-    virtual void updateFromElement();
+    virtual const char* renderName() const override { return "RenderFrame"; }
+    virtual bool isFrame() const override { return true; }
 
-    virtual void viewCleared();
+    virtual void updateFromElement() override;
 };
 
-inline RenderFrame* toRenderFrame(RenderObject* object)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isFrame());
-    return static_cast<RenderFrame*>(object);
-}
-
-// This will catch anyone doing an unnecessary cast.
-void toRenderFrame(const RenderFrame*);
-
 } // namespace WebCore
+
+SPECIALIZE_TYPE_TRAITS_RENDER_OBJECT(RenderFrame, isFrame())
 
 #endif // RenderFrame_h

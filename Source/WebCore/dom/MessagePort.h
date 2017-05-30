@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -30,9 +30,8 @@
 #include "EventListener.h"
 #include "EventTarget.h"
 #include "MessagePortChannel.h"
+#include <memory>
 #include <wtf/Forward.h>
-#include <wtf/OwnPtr.h>
-#include <wtf/PassOwnPtr.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefPtr.h>
 #include <wtf/Vector.h>
@@ -47,9 +46,9 @@ namespace WebCore {
     // The overwhelmingly common case is sending a single port, so handle that efficiently with an inline buffer of size 1.
     typedef Vector<RefPtr<MessagePort>, 1> MessagePortArray;
 
-    class MessagePort : public RefCounted<MessagePort>, public EventTarget {
+    class MessagePort final : public RefCounted<MessagePort>, public EventTargetWithInlineData {
     public:
-        static PassRefPtr<MessagePort> create(ScriptExecutionContext& scriptExecutionContext) { return adoptRef(new MessagePort(scriptExecutionContext)); }
+        static Ref<MessagePort> create(ScriptExecutionContext& scriptExecutionContext) { return adoptRef(*new MessagePort(scriptExecutionContext)); }
         virtual ~MessagePort();
 
         void postMessage(PassRefPtr<SerializedScriptValue> message, const MessagePortArray*, ExceptionCode&);
@@ -59,22 +58,22 @@ namespace WebCore {
         void start();
         void close();
 
-        void entangle(PassOwnPtr<MessagePortChannel>);
-        PassOwnPtr<MessagePortChannel> disentangle();
+        void entangle(std::unique_ptr<MessagePortChannel>);
+        std::unique_ptr<MessagePortChannel> disentangle();
 
         // Returns 0 if there is an exception, or if the passed-in array is 0/empty.
-        static PassOwnPtr<MessagePortChannelArray> disentanglePorts(const MessagePortArray*, ExceptionCode&);
+        static std::unique_ptr<MessagePortChannelArray> disentanglePorts(const MessagePortArray*, ExceptionCode&);
 
         // Returns 0 if the passed array is 0/empty.
-        static PassOwnPtr<MessagePortArray> entanglePorts(ScriptExecutionContext&, PassOwnPtr<MessagePortChannelArray>);
+        static std::unique_ptr<MessagePortArray> entanglePorts(ScriptExecutionContext&, std::unique_ptr<MessagePortChannelArray>);
 
         void messageAvailable();
         bool started() const { return m_started; }
 
         void contextDestroyed();
 
-        virtual const AtomicString& interfaceName() const OVERRIDE;
-        virtual ScriptExecutionContext* scriptExecutionContext() const OVERRIDE;
+        virtual EventTargetInterface eventTargetInterface() const override { return MessagePortEventTargetInterfaceType; }
+        virtual ScriptExecutionContext* scriptExecutionContext() const override { return m_scriptExecutionContext; }
 
         void dispatchMessages();
 
@@ -82,13 +81,6 @@ namespace WebCore {
         using RefCounted<MessagePort>::deref;
 
         bool hasPendingActivity();
-
-        void setOnmessage(PassRefPtr<EventListener> listener)
-        {
-            setAttributeEventListener(eventNames().messageEvent, listener);
-            start();
-        }
-        EventListener* onmessage() { return getAttributeEventListener(eventNames().messageEvent); }
 
         // Returns null if there is no entangled port, or if the entangled port is run by a different thread.
         // This is used solely to enable a GC optimization. Some platforms may not be able to determine ownership
@@ -101,21 +93,21 @@ namespace WebCore {
         // A port gets neutered when it is transferred to a new owner via postMessage().
         bool isNeutered() { return !m_entangledChannel; }
 
+        bool addEventListener(const AtomicString& eventType, RefPtr<EventListener>&&, bool useCapture) override;
+
     private:
         explicit MessagePort(ScriptExecutionContext&);
 
-        virtual void refEventTarget() OVERRIDE { ref(); }
-        virtual void derefEventTarget() OVERRIDE { deref(); }
-        virtual EventTargetData* eventTargetData() OVERRIDE;
-        virtual EventTargetData* ensureEventTargetData() OVERRIDE;
+        virtual void refEventTarget() override { ref(); }
+        virtual void derefEventTarget() override { deref(); }
+        virtual bool isMessagePort() const override { return true; }
 
-        OwnPtr<MessagePortChannel> m_entangledChannel;
+        std::unique_ptr<MessagePortChannel> m_entangledChannel;
 
         bool m_started;
         bool m_closed;
 
         ScriptExecutionContext* m_scriptExecutionContext;
-        EventTargetData m_eventTargetData;
     };
 
 } // namespace WebCore

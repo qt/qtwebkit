@@ -1,6 +1,7 @@
-#!/usr/bin/perl
+#!/usr/bin/perl -w
 
 # Copyright (C) 2010 Google Inc. All rights reserved.
+# Copyright (C) 2013, 2015 Apple Inc. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -11,7 +12,7 @@
 # 2.  Redistributions in binary form must reproduce the above copyright
 #     notice, this list of conditions and the following disclaimer in the
 #     documentation and/or other materials provided with the distribution. 
-# 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+# 3.  Neither the name of Apple Inc. ("Apple") nor the names of
 #     its contributors may be used to endorse or promote products derived
 #     from this software without specific prior written permission. 
 #
@@ -35,6 +36,7 @@ use lib $FindBin::Bin;
 use webkitdirs;
 
 my $showConfigurationDirectory = 0;
+my $showExecutablePath = 0;
 my $showHelp = 0;
 my $showTopLevelDirectory = 0;
 
@@ -43,15 +45,13 @@ my $programName = basename($0);
 my $usage = <<EOF;
 Usage: $programName [options]
   --configuration       Show the build directory for a specific configuration (e.g. Debug, Release.  Defaults to the active configuration set by set-webkit-configuration)
+  --executablePath      Show the path to the executables produced by a specific build configuration. This differs from --configuration on Windows.
   -h|--help             Show this help message
   --top-level           Show the top-level build directory
 
-  --blackberry          Find the build directory for the BlackBerry port on Mac/Linux
   --efl                 Find the build directory for the EFL port
   --gtk                 Find the build directory for the GTK+ port
-  --qt                  Find the build directory for the Qt port
   --wincairo            Find the build directory for using Cairo (rather than CoreGraphics) on Windows
-  --wince               Find the build directory for the WinCE port
 
 Either --configuration or --top-level is required.
 EOF
@@ -62,6 +62,7 @@ setConfiguration(); # Figure out from the command line if we're --debug or --rel
 Getopt::Long::Configure('pass_through'); # Let --blackberry, etc... be handled by webkitdirs
 my $getOptionsResult = GetOptions(
     'configuration' => \$showConfigurationDirectory,
+    'executablePath' => \$showExecutablePath,
     'top-level' => \$showTopLevelDirectory,
     'help|h' => \$showHelp,
 );
@@ -71,11 +72,13 @@ if (!$getOptionsResult || $showHelp) {
     exit 1;
 }
 
-if (!$showConfigurationDirectory && !$showTopLevelDirectory) {
+if (!$showConfigurationDirectory && !$showTopLevelDirectory && !$showExecutablePath) {
     print baseProductDir() . "\n";
     print productDir() . "\n";
 } elsif ($showTopLevelDirectory) {
     print baseProductDir() . "\n";
+} elsif ($showExecutablePath) {
+    print executableProductDir() . "\n";
 } else {
     print productDir() . "\n";
 }

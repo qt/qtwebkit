@@ -43,10 +43,10 @@ class Credential;
 class SocketStreamHandleClient;
 class SocketStreamHandlePrivate;
 
-class SocketStreamHandlePrivate : public QObject {
+class SocketStreamHandlePrivate final : public QObject {
     Q_OBJECT
 public:
-    SocketStreamHandlePrivate(SocketStreamHandle*, const KURL&);
+    SocketStreamHandlePrivate(SocketStreamHandle*, const URL&);
     SocketStreamHandlePrivate(SocketStreamHandle*, QTcpSocket*);
     ~SocketStreamHandlePrivate();
 

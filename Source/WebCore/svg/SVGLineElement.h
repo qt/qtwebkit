@@ -21,7 +21,6 @@
 #ifndef SVGLineElement_h
 #define SVGLineElement_h
 
-#if ENABLE(SVG)
 #include "SVGAnimatedBoolean.h"
 #include "SVGAnimatedLength.h"
 #include "SVGExternalResourcesRequired.h"
@@ -29,35 +28,33 @@
 
 namespace WebCore {
 
-class SVGLineElement FINAL : public SVGGraphicsElement,
+class SVGLineElement final : public SVGGraphicsElement,
                              public SVGExternalResourcesRequired {
 public:
-    static PassRefPtr<SVGLineElement> create(const QualifiedName&, Document*);
+    static Ref<SVGLineElement> create(const QualifiedName&, Document&);
 
 private:
-    SVGLineElement(const QualifiedName&, Document*);
+    SVGLineElement(const QualifiedName&, Document&);
     
-    virtual bool isValid() const { return SVGTests::isValid(); }
-    virtual bool supportsFocus() const OVERRIDE { return true; }
+    virtual bool isValid() const override { return SVGTests::isValid(); }
 
-    bool isSupportedAttribute(const QualifiedName&);
-    virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
-    virtual void svgAttributeChanged(const QualifiedName&);
+    static bool isSupportedAttribute(const QualifiedName&);
+    virtual void parseAttribute(const QualifiedName&, const AtomicString&) override;
+    virtual void svgAttributeChanged(const QualifiedName&) override;
 
-    virtual bool supportsMarkers() const { return true; }
+    virtual bool supportsMarkers() const override { return true; }
 
-    virtual bool selfHasRelativeLengths() const;
+    virtual bool selfHasRelativeLengths() const override;
 
     BEGIN_DECLARE_ANIMATED_PROPERTIES(SVGLineElement)
         DECLARE_ANIMATED_LENGTH(X1, x1)
         DECLARE_ANIMATED_LENGTH(Y1, y1)
         DECLARE_ANIMATED_LENGTH(X2, x2)
         DECLARE_ANIMATED_LENGTH(Y2, y2)
-        DECLARE_ANIMATED_BOOLEAN(ExternalResourcesRequired, externalResourcesRequired)
+        DECLARE_ANIMATED_BOOLEAN_OVERRIDE(ExternalResourcesRequired, externalResourcesRequired)
     END_DECLARE_ANIMATED_PROPERTIES
 };
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif

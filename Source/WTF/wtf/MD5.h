@@ -31,7 +31,12 @@
 #ifndef WTF_MD5_h
 #define WTF_MD5_h
 
+#include <array>
 #include <wtf/Vector.h>
+
+#if PLATFORM(COCOA)
+#include <CommonCrypto/CommonDigest.h>
+#endif
 
 namespace WTF {
 
@@ -45,13 +50,23 @@ public:
     }
     WTF_EXPORT_PRIVATE void addBytes(const uint8_t* input, size_t length);
 
+    // Size of the SHA1 hash
+    WTF_EXPORT_PRIVATE static const size_t hashSize = 16;
+
+    // type for computing MD5 hash
+    typedef std::array<uint8_t, hashSize> Digest;
+
     // checksum has a side effect of resetting the state of the object.
-    WTF_EXPORT_PRIVATE void checksum(Vector<uint8_t, 16>&);
+    WTF_EXPORT_PRIVATE void checksum(Digest&);
 
 private:
+#if PLATFORM(COCOA)
+    CC_MD5_CTX m_context;
+#else
     uint32_t m_buf[4];
     uint32_t m_bits[2];
     uint8_t m_in[64];
+#endif
 };
 
 } // namespace WTF

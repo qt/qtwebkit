@@ -23,8 +23,7 @@
 #if ENABLE(SPELLCHECK)
 
 #include <enchant.h>
-#include <wtf/FastAllocBase.h>
-#include <wtf/PassOwnPtr.h>
+#include <wtf/FastMalloc.h>
 #include <wtf/Vector.h>
 #include <wtf/text/CString.h>
 #include <wtf/text/WTFString.h>
@@ -35,7 +34,7 @@ class TextCheckerEnchant {
     WTF_MAKE_FAST_ALLOCATED;
 
 public:
-    static PassOwnPtr<TextCheckerEnchant> create() { return adoptPtr(new TextCheckerEnchant); }
+    TextCheckerEnchant();
     virtual ~TextCheckerEnchant();
 
     void ignoreWord(const String&);
@@ -48,7 +47,6 @@ public:
     Vector<String> availableSpellCheckingLanguages() const;
 
 private:
-    TextCheckerEnchant();
     void freeEnchantBrokerDictionaries();
     void checkSpellingOfWord(const CString&, int start, int end, int& misspellingLocation, int& misspellingLength);
 

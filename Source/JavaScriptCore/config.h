@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006, 2007, 2008 Apple Inc. All rights reserved.
+ * Copyright (C) 2006, 2007, 2008, 2013 Apple Inc. All rights reserved.
  * Copyright (C) 2006 Samuel Weinig <sam.weinig@gmail.com>
  *
  * This library is free software; you can redistribute it and/or
@@ -19,12 +19,8 @@
  *
  */
 
-#if defined(HAVE_CONFIG_H) && HAVE_CONFIG_H
-#ifdef BUILDING_WITH_CMAKE
+#if defined(HAVE_CONFIG_H) && HAVE_CONFIG_H && defined(BUILDING_WITH_CMAKE)
 #include "cmakeconfig.h"
-#else
-#include "autotoolsconfig.h"
-#endif
 #endif
 
 #include <wtf/Platform.h>
@@ -34,21 +30,23 @@
 #endif
 
 #if OS(WINDOWS)
-// If we don't define these, they get defined in windef.h. 
-// We want to use std::min and std::max
-#define max max
-#define min min
 
-#if !COMPILER(MSVC7_OR_LOWER) && !OS(WINCE)
+#ifndef _WIN32_WINNT
+#define _WIN32_WINNT 0x601
+#endif
+
+#ifndef WINVER
+#define WINVER 0x0601
+#endif
+
+#if !COMPILER(MSVC7_OR_LOWER)
 // We need to define this before the first #include of stdlib.h or it won't contain rand_s.
 #ifndef _CRT_RAND_S
 #define _CRT_RAND_S
 #endif
-#endif // !COMPILER(MSVC7_OR_LOWER) && !OS(WINCE)
+#endif // !COMPILER(MSVC7_OR_LOWER
 
 #endif // OS(WINDOWS)
-
-#define WTF_CHANGES 1
 
 #ifdef __cplusplus
 #undef new
@@ -63,3 +61,4 @@
 #else
 #define SKIP_STATIC_CONSTRUCTORS_ON_GCC 1
 #endif
+

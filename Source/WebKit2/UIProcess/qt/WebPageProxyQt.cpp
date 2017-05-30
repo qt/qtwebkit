@@ -32,6 +32,7 @@
 #include "WebKitVersion.h"
 #include "WebPageMessages.h"
 #include "WebProcessProxy.h"
+#include "WebsiteDataStore.h"
 #include <WebCore/Editor.h>
 #include <WebCore/NotImplemented.h>
 
@@ -45,60 +46,52 @@ using namespace WebCore;
 
 namespace WebKit {
 
+void WebPageProxy::platformInitialize()
+{
+}
+
 String WebPageProxy::standardUserAgent(const String& applicationNameForUserAgent)
 {
     return UserAgentQt::standardUserAgent(applicationNameForUserAgent, WEBKIT_MAJOR_VERSION, WEBKIT_MINOR_VERSION);
 }
 
-void WebPageProxy::saveRecentSearches(const String&, const Vector<String>&)
+void WebPageProxy::saveRecentSearches(const String&, const Vector<WebCore::RecentSearch>&)
 {
     notImplemented();
 }
 
-void WebPageProxy::loadRecentSearches(const String&, Vector<String>&)
+void WebPageProxy::loadRecentSearches(const String&, Vector<WebCore::RecentSearch>&)
 {
     notImplemented();
 }
 
-void WebPageProxy::registerApplicationScheme(const String& scheme)
+void WebsiteDataStore::platformRemoveRecentSearches(std::chrono::system_clock::time_point oldestTimeToRemove)
 {
-    process()->send(Messages::WebPage::RegisterApplicationScheme(scheme), m_pageID);
+    notImplemented();
 }
 
-void WebPageProxy::resolveApplicationSchemeRequest(QtNetworkRequestData request)
+void WebPageProxy::editorStateChanged(const EditorState& editorState)
 {
-#if HAVE(QTQUICK)
-    RefPtr<QtRefCountedNetworkRequestData> requestData = adoptRef(new QtRefCountedNetworkRequestData(request));
-    m_applicationSchemeRequests.add(requestData);
-    static_cast<QtPageClient*>(m_pageClient)->handleApplicationSchemeRequest(requestData);
-#endif
-}
+    m_editorState = editorState;
 
-void WebPageProxy::sendApplicationSchemeReply(const QQuickNetworkReply* reply)
-{
-#if HAVE(QTQUICK)
-    RefPtr<QtRefCountedNetworkRequestData> requestData = reply->networkRequestData();
-    if (m_applicationSchemeRequests.contains(requestData)) {
-        RefPtr<QtRefCountedNetworkReplyData> replyData = reply->networkReplyData();
-        process()->send(Messages::WebPage::ApplicationSchemeReply(replyData->data()), pageID());
-        m_applicationSchemeRequests.remove(requestData);
-    }
-#endif
+    if (editorState.shouldIgnoreCompositionSelectionChange)
+        return;
+    m_pageClient.updateTextInputState();
 }
 
 void WebPageProxy::authenticationRequiredRequest(const String& hostname, const String& realm, const String& prefilledUsername, String& username, String& password)
 {
-    m_pageClient->handleAuthenticationRequiredRequest(hostname, realm, prefilledUsername, username, password);
+    m_pageClient.handleAuthenticationRequiredRequest(hostname, realm, prefilledUsername, username, password);
 }
 
 void WebPageProxy::proxyAuthenticationRequiredRequest(const String& hostname, uint16_t port, const String& prefilledUsername, String& username, String& password)
 {
-    m_pageClient->handleProxyAuthenticationRequiredRequest(hostname, port, prefilledUsername, username, password);
+    m_pageClient.handleProxyAuthenticationRequiredRequest(hostname, port, prefilledUsername, username, password);
 }
 
 void WebPageProxy::certificateVerificationRequest(const String& hostname, bool& ignoreErrors)
 {
-    m_pageClient->handleCertificateVerificationRequest(hostname, ignoreErrors);
+    m_pageClient.handleCertificateVerificationRequest(hostname, ignoreErrors);
 }
 
 #if PLUGIN_ARCHITECTURE(X11)
@@ -111,21 +104,26 @@ void WebPageProxy::windowedPluginGeometryDidChange(const WebCore::IntRect& frame
 {
     notImplemented();
 }
+
+void WebPageProxy::windowedPluginVisibilityDidChange(bool isVisible, uint64_t windowID)
+{
+    notImplemented();
+}
 #endif
 
 void WebPageProxy::changeSelectedIndex(int32_t selectedIndex)
 {
-    process()->send(Messages::WebPage::SelectedIndex(selectedIndex), m_pageID);
+    process().send(Messages::WebPage::SelectedIndex(selectedIndex), m_pageID);
 }
 
 void WebPageProxy::closePopupMenu()
 {
-    process()->send(Messages::WebPage::HidePopupMenu(), m_pageID);
+    process().send(Messages::WebPage::HidePopupMenu(), m_pageID);
 }
 
 void WebPageProxy::willSetInputMethodState()
 {
-    m_pageClient->handleWillSetInputMethodState();
+    m_pageClient.handleWillSetInputMethodState();
 }
 
 } // namespace WebKit

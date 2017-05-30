@@ -33,11 +33,10 @@
 
 #if ENABLE(WEB_SOCKETS)
 
-#include "KURL.h"
+#include "URL.h"
 #include "ResourceResponse.h"
 #include "WebSocketExtensionDispatcher.h"
 #include "WebSocketExtensionProcessor.h"
-#include <wtf/PassOwnPtr.h>
 #include <wtf/text/WTFString.h>
 
 namespace WebCore {
@@ -51,11 +50,11 @@ public:
     enum Mode {
         Incomplete, Normal, Failed, Connected
     };
-    WebSocketHandshake(const KURL&, const String& protocol, ScriptExecutionContext*);
+    WebSocketHandshake(const URL&, const String& protocol, ScriptExecutionContext*);
     ~WebSocketHandshake();
 
-    const KURL& url() const;
-    void setURL(const KURL&);
+    const URL& url() const;
+    void setURL(const URL&);
     const String host() const;
 
     const String& clientProtocol() const;
@@ -86,12 +85,12 @@ public:
 
     const ResourceResponse& serverHandshakeResponse() const;
 
-    void addExtensionProcessor(PassOwnPtr<WebSocketExtensionProcessor>);
+    void addExtensionProcessor(std::unique_ptr<WebSocketExtensionProcessor>);
 
     static String getExpectedWebSocketAccept(const String& secWebSocketKey);
 
 private:
-    KURL httpURLForAuthenticationAndCookies() const;
+    URL httpURLForAuthenticationAndCookies() const;
 
     int readStatusLine(const char* header, size_t headerLength, int& statusCode, String& statusText);
 
@@ -100,7 +99,7 @@ private:
     void processHeaders();
     bool checkResponseHeaders();
 
-    KURL m_url;
+    URL m_url;
     String m_clientProtocol;
     bool m_secure;
     ScriptExecutionContext* m_context;

@@ -33,6 +33,7 @@
 #include "webpage.h"
 
 #include "launcherwindow.h"
+#include "mainwindow.h"
 
 #include <QAction>
 #include <QApplication>
@@ -47,13 +48,16 @@
 #ifndef QT_NO_LINEEDIT
 #include <QLineEdit>
 #endif
+#include <QMessageBox>
 #include <QProgressBar>
+#include <QWindow>
 #include <QtNetwork/QNetworkReply>
 #include <QtNetwork/QNetworkRequest>
 #include <QtNetwork/QNetworkProxy>
 
-WebPage::WebPage(QObject* parent)
+WebPage::WebPage(MainWindow* parent)
     : QWebPage(parent)
+    , m_mainWindow(parent)
     , m_userAgent()
     , m_interruptingJavaScriptEnabled(false)
 {
@@ -63,6 +67,7 @@ WebPage::WebPage(QObject* parent)
             this, SLOT(authenticationRequired(QNetworkReply*, QAuthenticator*)));
     connect(this, SIGNAL(featurePermissionRequested(QWebFrame*, QWebPage::Feature)), this, SLOT(requestPermission(QWebFrame*, QWebPage::Feature)));
     connect(this, SIGNAL(featurePermissionRequestCanceled(QWebFrame*, QWebPage::Feature)), this, SLOT(featurePermissionRequestCanceled(QWebFrame*, QWebPage::Feature)));
+    connect(this, &QWebPage::fullScreenRequested, this, &WebPage::requestFullScreen);
 }
 
 void WebPage::applyProxy()
@@ -77,13 +82,16 @@ void WebPage::applyProxy()
 
 bool WebPage::supportsExtension(QWebPage::Extension extension) const
 {
-    if (extension == QWebPage::ErrorPageExtension)
+    if (extension == ChooseMultipleFilesExtension || extension == QWebPage::ErrorPageExtension)
         return true;
     return false;
 }
 
 bool WebPage::extension(Extension extension, const ExtensionOption* option, ExtensionReturn* output)
 {
+    if (extension == ChooseMultipleFilesExtension)
+        return QWebPage::extension(extension, option, output);
+
     const QWebPage::ErrorPageExtensionOption* info = static_cast<const QWebPage::ErrorPageExtensionOption*>(option);
     QWebPage::ErrorPageExtensionReturn* errorPage = static_cast<QWebPage::ErrorPageExtensionReturn*>(output);
 
@@ -141,6 +149,11 @@ bool WebPage::shouldInterruptJavaScript()
     return QWebPage::shouldInterruptJavaScript();
 }
 
+void WebPage::javaScriptConsoleMessage(const QString& message, int lineNumber, const QString& sourceID)
+{
+    qDebug() << "CONSOLE" << QString("%1:%2").arg(sourceID, lineNumber) << message;
+}
+
 void WebPage::authenticationRequired(QNetworkReply* reply, QAuthenticator* authenticator)
 {
     QDialog* dialog = new QDialog(QApplication::activeWindow());
@@ -193,6 +206,23 @@ void WebPage::featurePermissionRequestCanceled(QWebFrame*, QWebPage::Feature)
 {
 }
 
+void WebPage::requestFullScreen(QWebFullScreenRequest request)
+{
+    if (request.toggleOn()) {
+        if (QMessageBox::question(view(), "Enter Full Screen Mode", "Do you want to enter full screen mode?", QMessageBox::Ok | QMessageBox::Cancel, QMessageBox::Cancel) == QMessageBox::Ok) {
+            request.accept();
+            m_mainWindow->setToolBarsVisible(false);
+            m_mainWindow->showFullScreen();
+            return;
+        }
+    } else {
+        request.accept();
+        m_mainWindow->setToolBarsVisible(true);
+        m_mainWindow->showNormal();
+        return;
+    }
+    request.reject();
+}
 QWebPage* WebPage::createWindow(QWebPage::WebWindowType type)
 {
     LauncherWindow* mw = new LauncherWindow;

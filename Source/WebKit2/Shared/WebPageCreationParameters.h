@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2010, 2011, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,17 +27,26 @@
 #define WebPageCreationParameters_h
 
 #include "DrawingAreaInfo.h"
+#include "LayerTreeContext.h"
 #include "SessionState.h"
+#include "WebCoreArgumentCoders.h"
 #include "WebPageGroupData.h"
 #include "WebPreferencesStore.h"
+#include <WebCore/Color.h>
+#include <WebCore/FloatSize.h>
 #include <WebCore/IntSize.h>
+#include <WebCore/Pagination.h>
+#include <WebCore/ScrollTypes.h>
+#include <WebCore/SessionID.h>
+#include <WebCore/ViewState.h>
+#include <wtf/HashMap.h>
 #include <wtf/text/WTFString.h>
 
 #if PLATFORM(MAC)
 #include "ColorSpaceData.h"
 #endif
 
-namespace CoreIPC {
+namespace IPC {
     class ArgumentDecoder;
     class ArgumentEncoder;
 }
@@ -45,26 +54,21 @@ namespace CoreIPC {
 namespace WebKit {
 
 struct WebPageCreationParameters {
-    void encode(CoreIPC::ArgumentEncoder&) const;
-    static bool decode(CoreIPC::ArgumentDecoder&, WebPageCreationParameters&);
+    void encode(IPC::ArgumentEncoder&) const;
+    static bool decode(IPC::ArgumentDecoder&, WebPageCreationParameters&);
 
     WebCore::IntSize viewSize;
 
-    bool isActive;
-    bool isFocused;
-    bool isVisible;
-    bool isInWindow;
+    WebCore::ViewState::Flags viewState;
     
     WebPreferencesStore store;
     DrawingAreaType drawingAreaType;
     WebPageGroupData pageGroupData;
 
     bool drawsBackground;
-    bool drawsTransparentBackground;
+    bool isEditable;
 
     WebCore::Color underlayColor;
-
-    bool areMemoryCacheClientCallsEnabled;
 
     bool useFixedLayout;
     WebCore::IntSize fixedLayoutSize;
@@ -75,28 +79,61 @@ struct WebPageCreationParameters {
     bool paginationBehavesLikeColumns;
     double pageLength;
     double gapBetweenPages;
-
+    bool paginationLineGridEnabled;
+    
     String userAgent;
 
-    SessionState sessionState;
+    Vector<BackForwardListItemState> itemStates;
+    WebCore::SessionID sessionID;
     uint64_t highestUsedBackForwardItemID;
 
+    uint64_t userContentControllerID;
+    uint64_t visitedLinkTableID;
+    uint64_t websiteDataStoreID;
     bool canRunBeforeUnloadConfirmPanel;
     bool canRunModal;
 
     float deviceScaleFactor;
+    float viewScaleFactor;
+
+    float topContentInset;
     
     float mediaVolume;
+    bool muted;
     bool mayStartMediaWhenInWindow;
 
     WebCore::IntSize minimumLayoutSize;
+    bool autoSizingShouldExpandToViewHeight;
     
     WebCore::ScrollPinningBehavior scrollPinningBehavior;
 
-#if PLATFORM(MAC)
+    // FIXME: This should be WTF::Optional<WebCore::ScrollbarOverlayStyle>, but we would need to
+    // correctly handle enums inside Optionals when encoding and decoding. 
+    WTF::Optional<uint32_t> scrollbarOverlayStyle;
+
+    bool backgroundExtendsBeyondPage;
+
     LayerHostingMode layerHostingMode;
+
+    Vector<String> mimeTypesWithCustomContentProviders;
+
+#if ENABLE(REMOTE_INSPECTOR)
+    bool allowsRemoteInspection;
+    String remoteInspectionNameOverride;
+#endif
+
+#if PLATFORM(MAC)
     ColorSpaceData colorSpace;
 #endif
+#if PLATFORM(IOS)
+    WebCore::FloatSize screenSize;
+    WebCore::FloatSize availableScreenSize;
+    float textAutosizingWidth;
+#endif
+    bool appleMailPaginationQuirkEnabled;
+    bool shouldScaleViewToFitDocument;
+
+    HashMap<String, uint64_t> urlSchemeHandlers;
 };
 
 } // namespace WebKit

@@ -30,36 +30,33 @@
 
 namespace WebCore {
 
-PassRefPtr<HTMLAllCollection> HTMLAllCollection::create(Node* node, CollectionType type)
+Ref<HTMLAllCollection> HTMLAllCollection::create(Document& document, CollectionType type)
 {
-    return adoptRef(new HTMLAllCollection(node, type));
+    return adoptRef(*new HTMLAllCollection(document, type));
 }
 
-HTMLAllCollection::HTMLAllCollection(Node* node, CollectionType type)
-    : HTMLCollection(node, type, DoesNotOverrideItemAfter)
-{
-}
-
-HTMLAllCollection::~HTMLAllCollection()
+inline HTMLAllCollection::HTMLAllCollection(Document& document, CollectionType type)
+    : CachedHTMLCollection<HTMLAllCollection, CollectionTypeTraits<DocAll>::traversalType>(document, type)
 {
 }
 
-Node* HTMLAllCollection::namedItemWithIndex(const AtomicString& name, unsigned index) const
+Element* HTMLAllCollection::namedItemWithIndex(const AtomicString& name, unsigned index) const
 {
-    updateNameCache();
+    updateNamedElementCache();
+    const CollectionNamedElementCache& cache = namedItemCaches();
 
-    if (Vector<Element*>* cache = idCache(name)) {
-        if (index < cache->size())
-            return cache->at(index);
-        index -= cache->size();
+    if (const Vector<Element*>* elements = cache.findElementsWithId(name)) {
+        if (index < elements->size())
+            return elements->at(index);
+        index -= elements->size();
     }
 
-    if (Vector<Element*>* cache = nameCache(name)) {
-        if (index < cache->size())
-            return cache->at(index);
+    if (const Vector<Element*>* elements = cache.findElementsWithName(name)) {
+        if (index < elements->size())
+            return elements->at(index);
     }
 
-    return 0;
+    return nullptr;
 }
 
 } // namespace WebCore

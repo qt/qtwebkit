@@ -26,7 +26,6 @@
 #ifndef GeolocationPosition_h
 #define GeolocationPosition_h
 
-#include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
 #include <wtf/RefPtr.h>
 
@@ -34,9 +33,15 @@ namespace WebCore {
 
 class GeolocationPosition : public RefCounted<GeolocationPosition> {
 public:
-    static PassRefPtr<GeolocationPosition> create(double timestamp, double latitude, double longitude, double accuracy) { return adoptRef(new GeolocationPosition(timestamp, latitude, longitude, accuracy)); }
+    static Ref<GeolocationPosition> create(double timestamp, double latitude, double longitude, double accuracy)
+    {
+        return adoptRef(*new GeolocationPosition(timestamp, latitude, longitude, accuracy));
+    }
 
-    static PassRefPtr<GeolocationPosition> create(double timestamp, double latitude, double longitude, double accuracy, bool providesAltitude, double altitude, bool providesAltitudeAccuracy, double altitudeAccuracy, bool providesHeading, double heading, bool providesSpeed, double speed) { return adoptRef(new GeolocationPosition(timestamp, latitude, longitude, accuracy, providesAltitude, altitude, providesAltitudeAccuracy, altitudeAccuracy, providesHeading, heading, providesSpeed, speed)); }
+    static Ref<GeolocationPosition> create(double timestamp, double latitude, double longitude, double accuracy, bool providesAltitude, double altitude, bool providesAltitudeAccuracy, double altitudeAccuracy, bool providesHeading, double heading, bool providesSpeed, double speed)
+    {
+        return adoptRef(*new GeolocationPosition(timestamp, latitude, longitude, accuracy, providesAltitude, altitude, providesAltitudeAccuracy, altitudeAccuracy, providesHeading, heading, providesSpeed, speed));
+    }
 
     double timestamp() const { return m_timestamp; }
 

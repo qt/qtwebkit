@@ -24,60 +24,55 @@
 #ifndef MouseEvent_h
 #define MouseEvent_h
 
-#include "EventDispatchMediator.h"
 #include "MouseRelatedEvent.h"
 
 namespace WebCore {
 
-class Clipboard;
-class EventDispatcher;
+class DataTransfer;
 class PlatformMouseEvent;
 
-struct MouseEventInit : public UIEventInit {
-    MouseEventInit();
-
-    int screenX;
-    int screenY;
-    int clientX;
-    int clientY;
-    bool ctrlKey;
-    bool altKey;
-    bool shiftKey;
-    bool metaKey;
-    unsigned short button;
+struct MouseEventInit : public MouseRelatedEventInit {
+    int clientX { 0 };
+    int clientY { 0 };
+    unsigned short button { 0 };
     RefPtr<EventTarget> relatedTarget;
 };
 
 class MouseEvent : public MouseRelatedEvent {
 public:
-    static PassRefPtr<MouseEvent> create()
+    static Ref<MouseEvent> create(const AtomicString& type, bool canBubble, bool cancelable, double timestamp, AbstractView*,
+        int detail, int screenX, int screenY, int pageX, int pageY,
+#if ENABLE(POINTER_LOCK)
+        int movementX, int movementY,
+#endif
+        bool ctrlKey, bool altKey, bool shiftKey, bool metaKey, unsigned short button,
+        PassRefPtr<EventTarget> relatedTarget, double force);
+
+    WEBCORE_EXPORT static Ref<MouseEvent> create(const AtomicString& type, bool canBubble, bool cancelable, double timestamp, AbstractView*,
+        int detail, int screenX, int screenY, int pageX, int pageY,
+#if ENABLE(POINTER_LOCK)
+        int movementX, int movementY,
+#endif
+        bool ctrlKey, bool altKey, bool shiftKey, bool metaKey, unsigned short button,
+        PassRefPtr<EventTarget> relatedTarget, double force, PassRefPtr<DataTransfer>, bool isSimulated = false);
+
+    WEBCORE_EXPORT static Ref<MouseEvent> create(const AtomicString& eventType, AbstractView*, const PlatformMouseEvent&, int detail, PassRefPtr<Node> relatedTarget);
+
+    static Ref<MouseEvent> create(const AtomicString& eventType, bool canBubble, bool cancelable, AbstractView*,
+        int detail, int screenX, int screenY, int clientX, int clientY,
+        bool ctrlKey, bool altKey, bool shiftKey, bool metaKey,
+        unsigned short button, PassRefPtr<EventTarget> relatedTarget);
+
+    static Ref<MouseEvent> createForBindings()
     {
-        return adoptRef(new MouseEvent);
+        return adoptRef(*new MouseEvent);
     }
 
-    static PassRefPtr<MouseEvent> create(const AtomicString& type, bool canBubble, bool cancelable, double timestamp, PassRefPtr<AbstractView>,
-        int detail, int screenX, int screenY, int pageX, int pageY,
-#if ENABLE(POINTER_LOCK)
-        int movementX, int movementY,
-#endif
-        bool ctrlKey, bool altKey, bool shiftKey, bool metaKey, unsigned short button,
-        PassRefPtr<EventTarget> relatedTarget);
-
-    static PassRefPtr<MouseEvent> create(const AtomicString& type, bool canBubble, bool cancelable, double timestamp, PassRefPtr<AbstractView>,
-        int detail, int screenX, int screenY, int pageX, int pageY,
-#if ENABLE(POINTER_LOCK)
-        int movementX, int movementY,
-#endif
-        bool ctrlKey, bool altKey, bool shiftKey, bool metaKey, unsigned short button,
-        PassRefPtr<EventTarget> relatedTarget, PassRefPtr<Clipboard>, bool isSimulated = false);
-
-    static PassRefPtr<MouseEvent> create(const AtomicString& eventType, PassRefPtr<AbstractView>, const PlatformMouseEvent&, int detail, PassRefPtr<Node> relatedTarget);
-
-    static PassRefPtr<MouseEvent> create(const AtomicString& eventType, const MouseEventInit&);
+    static Ref<MouseEvent> createForBindings(const AtomicString& eventType, const MouseEventInit&);
 
     virtual ~MouseEvent();
 
-    void initMouseEvent(const AtomicString& type, bool canBubble, bool cancelable, PassRefPtr<AbstractView>,
+    void initMouseEvent(const AtomicString& type, bool canBubble, bool cancelable, AbstractView*,
         int detail, int screenX, int screenY, int clientX, int clientY,
         bool ctrlKey, bool altKey, bool shiftKey, bool metaKey,
         unsigned short button, PassRefPtr<EventTarget> relatedTarget);
@@ -86,32 +81,41 @@ public:
     // but we will match the standard DOM.
     unsigned short button() const { return m_button; }
     bool buttonDown() const { return m_buttonDown; }
-    EventTarget* relatedTarget() const { return m_relatedTarget.get(); }
+    virtual EventTarget* relatedTarget() const override final { return m_relatedTarget.get(); }
     void setRelatedTarget(PassRefPtr<EventTarget> relatedTarget) { m_relatedTarget = relatedTarget; }
-
-    Clipboard* clipboard() const { return m_clipboard.get(); }
+    double force() const { return m_force; }
+    void setForce(double force) { m_force = force; }
 
     Node* toElement() const;
     Node* fromElement() const;
 
-    Clipboard* dataTransfer() const { return isDragEvent() ? m_clipboard.get() : 0; }
+    // FIXME: These functions can be merged if m_dataTransfer is only initialized for drag events.
+    DataTransfer* dataTransfer() const { return isDragEvent() ? m_dataTransfer.get() : nullptr; }
+    virtual DataTransfer* internalDataTransfer() const override { return m_dataTransfer.get(); }
 
-    virtual const AtomicString& interfaceName() const;
+    virtual EventInterface eventInterface() const override;
 
-    virtual bool isMouseEvent() const;
-    virtual bool isDragEvent() const;
-    virtual int which() const;
+    virtual bool isMouseEvent() const override;
+    virtual bool isDragEvent() const override;
+    static bool canTriggerActivationBehavior(const Event&); 
 
-    virtual PassRefPtr<Event> cloneFor(HTMLIFrameElement*) const OVERRIDE;
+    virtual int which() const override;
+
+    virtual Ref<Event> cloneFor(HTMLIFrameElement*) const override;
 
 protected:
-    MouseEvent(const AtomicString& type, bool canBubble, bool cancelable, double timestamp, PassRefPtr<AbstractView>,
+    MouseEvent(const AtomicString& type, bool canBubble, bool cancelable, double timestamp, AbstractView*,
         int detail, int screenX, int screenY, int pageX, int pageY,
 #if ENABLE(POINTER_LOCK)
         int movementX, int movementY,
 #endif
         bool ctrlKey, bool altKey, bool shiftKey, bool metaKey, unsigned short button,
-        PassRefPtr<EventTarget> relatedTarget, PassRefPtr<Clipboard>, bool isSimulated);
+        PassRefPtr<EventTarget> relatedTarget, double force, PassRefPtr<DataTransfer>, bool isSimulated);
+
+    MouseEvent(const AtomicString& type, bool canBubble, bool cancelable, AbstractView*,
+        int detail, int screenX, int screenY, int clientX, int clientY,
+        bool ctrlKey, bool altKey, bool shiftKey, bool metaKey,
+        unsigned short button, PassRefPtr<EventTarget> relatedTarget);
 
     MouseEvent(const AtomicString& type, const MouseEventInit&);
 
@@ -121,38 +125,12 @@ private:
     unsigned short m_button;
     bool m_buttonDown;
     RefPtr<EventTarget> m_relatedTarget;
-    RefPtr<Clipboard> m_clipboard;
+    double m_force { 0 };
+    RefPtr<DataTransfer> m_dataTransfer;
 };
-
-class SimulatedMouseEvent : public MouseEvent {
-public:
-    static PassRefPtr<SimulatedMouseEvent> create(const AtomicString& eventType, PassRefPtr<AbstractView>, PassRefPtr<Event> underlyingEvent);
-    virtual ~SimulatedMouseEvent();
-
-private:
-    SimulatedMouseEvent(const AtomicString& eventType, PassRefPtr<AbstractView>, PassRefPtr<Event> underlyingEvent);
-};
-
-class MouseEventDispatchMediator : public EventDispatchMediator {
-public:
-    enum MouseEventType { SyntheticMouseEvent, NonSyntheticMouseEvent};
-    static PassRefPtr<MouseEventDispatchMediator> create(PassRefPtr<MouseEvent>, MouseEventType = NonSyntheticMouseEvent);
-
-private:
-    explicit MouseEventDispatchMediator(PassRefPtr<MouseEvent>, MouseEventType);
-    MouseEvent* event() const;
-
-    virtual bool dispatchEvent(EventDispatcher*) const OVERRIDE;
-    bool isSyntheticMouseEvent() const { return m_mouseEventType == SyntheticMouseEvent; }
-    MouseEventType m_mouseEventType;
-};
-
-inline MouseEvent* toMouseEvent(Event* event)
-{
-    ASSERT(event && event->isMouseEvent());
-    return static_cast<MouseEvent*>(event);
-}
 
 } // namespace WebCore
+
+SPECIALIZE_TYPE_TRAITS_EVENT(MouseEvent)
 
 #endif // MouseEvent_h

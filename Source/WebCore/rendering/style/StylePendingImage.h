@@ -13,7 +13,7 @@
  * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -34,9 +34,6 @@
 #if ENABLE(CSS_IMAGE_SET)
 #include "CSSImageSetValue.h"
 #endif
-#include "CSSImageValue.h"
-#include "Image.h"
-#include "StyleImage.h"
 
 namespace WebCore {
 
@@ -44,38 +41,42 @@ namespace WebCore {
 // style resolution, in order to avoid loading images that are not referenced by the final style.
 // They should never exist in a RenderStyle after it has been returned from the style selector.
 
-class StylePendingImage : public StyleImage {
+class StylePendingImage final : public StyleImage {
 public:
-    static PassRefPtr<StylePendingImage> create(CSSValue* value) { return adoptRef(new StylePendingImage(value)); }
+    static Ref<StylePendingImage> create(CSSValue* value) { return adoptRef(*new StylePendingImage(value)); }
 
-    virtual WrappedImagePtr data() const { return static_cast<CSSImageValue*>(m_value); }
+    CSSImageValue* cssImageValue() const { return is<CSSImageValue>(m_value) ? downcast<CSSImageValue>(m_value) : nullptr; }
+    CSSImageGeneratorValue* cssImageGeneratorValue() const { return is<CSSImageGeneratorValue>(m_value) ? static_cast<CSSImageGeneratorValue*>(m_value) : nullptr; }
+    CSSCursorImageValue* cssCursorImageValue() const { return is<CSSCursorImageValue>(m_value) ? downcast<CSSCursorImageValue>(m_value) : nullptr; }
 
-    virtual PassRefPtr<CSSValue> cssValue() const { return m_value; }
-    CSSImageValue* cssImageValue() const { return m_value && m_value->isImageValue() ? static_cast<CSSImageValue*>(m_value) : 0; }
-    CSSImageGeneratorValue* cssImageGeneratorValue() const { return m_value && m_value->isImageGeneratorValue() ? static_cast<CSSImageGeneratorValue*>(m_value) : 0; }
-    CSSCursorImageValue* cssCursorImageValue() const { return m_value && m_value->isCursorImageValue() ? static_cast<CSSCursorImageValue*>(m_value) : 0; }
 #if ENABLE(CSS_IMAGE_SET)
-    CSSImageSetValue* cssImageSetValue() const { return m_value && m_value->isImageSetValue() ? static_cast<CSSImageSetValue*>(m_value) : 0; }
+    CSSImageSetValue* cssImageSetValue() const { return is<CSSImageSetValue>(m_value) ? downcast<CSSImageSetValue>(m_value) : nullptr; }
 #endif
 
-    void detachFromCSSValue() { m_value = 0; }
+    void detachFromCSSValue() { m_value = nullptr; }
 
-    virtual LayoutSize imageSize(const RenderObject*, float /*multiplier*/) const OVERRIDE { return LayoutSize(); }
-    virtual bool imageHasRelativeWidth() const { return false; }
-    virtual bool imageHasRelativeHeight() const { return false; }
-    virtual void computeIntrinsicDimensions(const RenderObject*, Length& /* intrinsicWidth */ , Length& /* intrinsicHeight */, FloatSize& /* intrinsicRatio */) { }
-    virtual bool usesImageContainerSize() const { return false; }
-    virtual void setContainerSizeForRenderer(const RenderObject*, const IntSize&, float) { }
-    virtual void addClient(RenderObject*) { }
-    virtual void removeClient(RenderObject*) { }
-    virtual PassRefPtr<Image> image(RenderObject*, const IntSize&) const
+private:
+    virtual WrappedImagePtr data() const override { return const_cast<StylePendingImage*>(this); }
+
+    virtual PassRefPtr<CSSValue> cssValue() const override { return m_value; }
+    
+    virtual FloatSize imageSize(const RenderElement*, float /*multiplier*/) const override { return FloatSize(); }
+    virtual bool imageHasRelativeWidth() const override { return false; }
+    virtual bool imageHasRelativeHeight() const override { return false; }
+    virtual void computeIntrinsicDimensions(const RenderElement*, Length& /* intrinsicWidth */ , Length& /* intrinsicHeight */, FloatSize& /* intrinsicRatio */) override { }
+    virtual bool usesImageContainerSize() const override { return false; }
+    virtual void setContainerSizeForRenderer(const RenderElement*, const FloatSize&, float) override { }
+    virtual void addClient(RenderElement*) override { }
+    virtual void removeClient(RenderElement*) override { }
+
+    virtual RefPtr<Image> image(RenderElement*, const FloatSize&) const override
     {
         ASSERT_NOT_REACHED();
-        return 0;
+        return nullptr;
     }
-    virtual bool knownToBeOpaque(const RenderObject*) const { return false; }
+
+    virtual bool knownToBeOpaque(const RenderElement*) const override { return false; }
     
-private:
     StylePendingImage(CSSValue* value)
         : m_value(value)
     {
@@ -85,6 +86,8 @@ private:
     CSSValue* m_value; // Not retained; it owns us.
 };
 
-}
+} // namespace WebCore
 
-#endif
+SPECIALIZE_TYPE_TRAITS_STYLE_IMAGE(StylePendingImage, isPendingImage)
+
+#endif // StylePendingImage_h

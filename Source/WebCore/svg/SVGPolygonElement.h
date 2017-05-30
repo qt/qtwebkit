@@ -21,20 +21,18 @@
 #ifndef SVGPolygonElement_h
 #define SVGPolygonElement_h
 
-#if ENABLE(SVG)
 #include "SVGPolyElement.h"
 
 namespace WebCore {
 
-class SVGPolygonElement FINAL : public SVGPolyElement {
+class SVGPolygonElement final : public SVGPolyElement {
 public:
-    static PassRefPtr<SVGPolygonElement> create(const QualifiedName&, Document*);
+    static Ref<SVGPolygonElement> create(const QualifiedName&, Document&);
 
 private:
-    SVGPolygonElement(const QualifiedName&, Document*);
+    SVGPolygonElement(const QualifiedName&, Document&);
 };
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif

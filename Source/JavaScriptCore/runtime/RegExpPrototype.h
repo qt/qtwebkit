@@ -26,32 +26,32 @@
 
 namespace JSC {
 
-    class RegExpPrototype : public RegExpObject {
-    public:
-        typedef RegExpObject Base;
+class RegExpPrototype : public RegExpObject {
+public:
+    typedef RegExpObject Base;
+    static const unsigned StructureFlags = Base::StructureFlags | OverridesGetOwnPropertySlot;
 
-        static RegExpPrototype* create(ExecState* exec, JSGlobalObject* globalObject, Structure* structure, RegExp* regExp)
-        {
-            RegExpPrototype* prototype = new (NotNull, allocateCell<RegExpPrototype>(*exec->heap())) RegExpPrototype(globalObject, structure, regExp);
-            prototype->finishCreation(globalObject);
-            return prototype;
-        }
-        
-        static const ClassInfo s_info;
+    static RegExpPrototype* create(VM& vm, JSGlobalObject* globalObject, Structure* structure, RegExp* regExp)
+    {
+        RegExpPrototype* prototype = new (NotNull, allocateCell<RegExpPrototype>(vm.heap)) RegExpPrototype(vm, structure, regExp);
+        prototype->finishCreation(vm, globalObject);
+        return prototype;
+    }
 
-        static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype)
-        {
-            return Structure::create(vm, globalObject, prototype, TypeInfo(ObjectType, StructureFlags), &s_info);
-        }
+    DECLARE_INFO;
 
-    protected:
-        RegExpPrototype(JSGlobalObject*, Structure*, RegExp*);
-        static const unsigned StructureFlags = OverridesGetOwnPropertySlot | RegExpObject::StructureFlags;
+    static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype)
+    {
+        return Structure::create(vm, globalObject, prototype, TypeInfo(ObjectType, StructureFlags), info());
+    }
 
-    private:
-        static bool getOwnPropertySlot(JSCell*, ExecState*, PropertyName, PropertySlot&);
-        static bool getOwnPropertyDescriptor(JSObject*, ExecState*, PropertyName, PropertyDescriptor&);
-    };
+protected:
+    RegExpPrototype(VM&, Structure*, RegExp*);
+
+private:
+    void finishCreation(VM&, JSGlobalObject*);
+    static bool getOwnPropertySlot(JSObject*, ExecState*, PropertyName, PropertySlot&);
+};
 
 } // namespace JSC
 

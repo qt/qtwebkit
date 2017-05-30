@@ -30,18 +30,33 @@
 
 #include "WebEvent.h"
 
-#if PLATFORM(MAC)
+#if USE(APPKIT)
 #include <wtf/RetainPtr.h>
 OBJC_CLASS NSView;
-#elif PLATFORM(QT)
-#include <QKeyEvent>
-#elif PLATFORM(GTK)
-#include <GOwnPtrGtk.h>
-#include <WebCore/CompositionResults.h>
-#include <WebCore/GtkInputMethodFilter.h>
-typedef union _GdkEvent GdkEvent;
-#elif PLATFORM(EFL)
+
+namespace WebCore {
+struct KeypressCommand;
+}
+#endif
+
+#if PLATFORM(EFL)
 #include <Evas.h>
+#endif
+
+#if PLATFORM(GTK)
+#include "InputMethodFilter.h"
+#include <WebCore/CompositionResults.h>
+#include <WebCore/GUniquePtrGtk.h>
+typedef union _GdkEvent GdkEvent;
+#endif
+
+#if PLATFORM(IOS)
+#include <wtf/RetainPtr.h>
+OBJC_CLASS WebIOSEvent;
+#endif
+
+#if PLATFORM(QT)
+#include <QKeyEvent>
 #endif
 
 namespace WebKit {
@@ -49,15 +64,17 @@ namespace WebKit {
 class NativeWebKeyboardEvent : public WebKeyboardEvent {
 public:
 #if USE(APPKIT)
-    NativeWebKeyboardEvent(NSEvent *, NSView *);
+    NativeWebKeyboardEvent(NSEvent *, bool handledByInputMethod, const Vector<WebCore::KeypressCommand>&);
 #elif PLATFORM(QT)
     explicit NativeWebKeyboardEvent(QKeyEvent*);
 #elif PLATFORM(GTK)
     NativeWebKeyboardEvent(const NativeWebKeyboardEvent&);
-    NativeWebKeyboardEvent(GdkEvent*, const WebCore::CompositionResults&, WebCore::GtkInputMethodFilter::EventFakedForComposition);
+    NativeWebKeyboardEvent(GdkEvent*, const WebCore::CompositionResults&, InputMethodFilter::EventFakedForComposition, Vector<String>&& commands);
 #elif PLATFORM(EFL)
     NativeWebKeyboardEvent(const Evas_Event_Key_Down*, bool);
     NativeWebKeyboardEvent(const Evas_Event_Key_Up*);
+#elif PLATFORM(IOS)
+    NativeWebKeyboardEvent(WebIOSEvent *);
 #endif
 
 #if USE(APPKIT)
@@ -71,6 +88,8 @@ public:
 #elif PLATFORM(EFL)
     const void* nativeEvent() const { return m_nativeEvent; }
     bool isFiltered() const { return m_isFiltered; }
+#elif PLATFORM(IOS)
+    WebIOSEvent* nativeEvent() const { return m_nativeEvent.get(); }
 #endif
 
 private:
@@ -79,12 +98,14 @@ private:
 #elif PLATFORM(QT)
     QKeyEvent m_nativeEvent;
 #elif PLATFORM(GTK)
-    GOwnPtr<GdkEvent> m_nativeEvent;
+    GUniquePtr<GdkEvent> m_nativeEvent;
     WebCore::CompositionResults m_compositionResults;
     bool m_fakeEventForComposition;
 #elif PLATFORM(EFL)
     const void* m_nativeEvent;
     bool m_isFiltered;
+#elif PLATFORM(IOS)
+    RetainPtr<WebIOSEvent> m_nativeEvent;
 #endif
 };
 

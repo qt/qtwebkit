@@ -34,15 +34,15 @@
 
 namespace WebCore {
 
-GainNode::GainNode(AudioContext* context, float sampleRate)
+GainNode::GainNode(AudioContext& context, float sampleRate)
     : AudioNode(context, sampleRate)
     , m_lastGain(1.0)
     , m_sampleAccurateGainValues(AudioNode::ProcessingSizeInFrames) // FIXME: can probably share temp buffer in context
 {
     m_gain = AudioParam::create(context, "gain", 1.0, 0.0, 1.0);
 
-    addInput(adoptPtr(new AudioNodeInput(this)));
-    addOutput(adoptPtr(new AudioNodeOutput(this, 1)));
+    addInput(std::make_unique<AudioNodeInput>(this));
+    addOutput(std::make_unique<AudioNodeOutput>(this, 1));
 
     setNodeType(NodeTypeGain);
 
@@ -91,7 +91,7 @@ void GainNode::reset()
 // uninitialize and then re-initialize with the new channel count.
 void GainNode::checkNumberOfChannelsForInput(AudioNodeInput* input)
 {
-    ASSERT(context()->isAudioThread() && context()->isGraphOwner());
+    ASSERT(context().isAudioThread() && context().isGraphOwner());
 
     ASSERT(input && input == this->input(0));
     if (input != this->input(0))

@@ -28,9 +28,7 @@
 #if PLATFORM(QT)
 #include "ImageDecoderQt.h"
 #endif
-#if !PLATFORM(QT) || USE(LIBJPEG)
 #include "JPEGImageDecoder.h"
-#endif
 #include "PNGImageDecoder.h"
 #include "SharedBuffer.h"
 #if USE(WEBP)
@@ -111,18 +109,14 @@ ImageDecoder* ImageDecoder::create(const SharedBuffer& data, ImageSource::AlphaO
     if (matchesGIFSignature(contents))
         return new GIFImageDecoder(alphaOption, gammaAndColorProfileOption);
 
-#if !PLATFORM(QT) || (PLATFORM(QT) && USE(LIBPNG))
     if (matchesPNGSignature(contents))
         return new PNGImageDecoder(alphaOption, gammaAndColorProfileOption);
 
     if (matchesICOSignature(contents) || matchesCURSignature(contents))
         return new ICOImageDecoder(alphaOption, gammaAndColorProfileOption);
-#endif
 
-#if !PLATFORM(QT) || (PLATFORM(QT) && USE(LIBJPEG))
     if (matchesJPEGSignature(contents))
         return new JPEGImageDecoder(alphaOption, gammaAndColorProfileOption);
-#endif
 
 #if USE(WEBP)
     if (matchesWebPSignature(contents))
@@ -284,12 +278,11 @@ template <MatchType type> int getScaledValue(const Vector<int>& scaledValues, in
 
 bool ImageDecoder::frameHasAlphaAtIndex(size_t index) const
 {
-    return !frameIsCompleteAtIndex(index) || m_frameBufferCache[index].hasAlpha();
-}
-
-bool ImageDecoder::frameIsCompleteAtIndex(size_t index) const
-{
-    return (index < m_frameBufferCache.size()) && (m_frameBufferCache[index].status() == ImageFrame::FrameComplete);
+    if (m_frameBufferCache.size() <= index)
+        return true;
+    if (m_frameBufferCache[index].status() == ImageFrame::FrameComplete)
+        return m_frameBufferCache[index].hasAlpha();
+    return true;
 }
 
 unsigned ImageDecoder::frameBytesAtIndex(size_t index) const

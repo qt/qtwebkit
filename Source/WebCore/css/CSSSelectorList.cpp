@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, 2012, 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2008, 2012, 2013, 2014 Apple Inc. All rights reserved.
  * Copyright (C) 2009 Google Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,28 +32,27 @@
 
 namespace WebCore {
 
-CSSSelectorList::~CSSSelectorList()
-{
-    deleteSelectors();
-}
-
 CSSSelectorList::CSSSelectorList(const CSSSelectorList& other)
 {
     unsigned otherComponentCount = other.componentCount();
+    ASSERT_WITH_SECURITY_IMPLICATION(otherComponentCount);
+
     m_selectorArray = reinterpret_cast<CSSSelector*>(fastMalloc(sizeof(CSSSelector) * otherComponentCount));
     for (unsigned i = 0; i < otherComponentCount; ++i)
         new (NotNull, &m_selectorArray[i]) CSSSelector(other.m_selectorArray[i]);
 }
 
-void CSSSelectorList::adopt(CSSSelectorList& list)
+CSSSelectorList::CSSSelectorList(CSSSelectorList&& other)
+    : m_selectorArray(other.m_selectorArray)
 {
-    deleteSelectors();
-    m_selectorArray = list.m_selectorArray;
-    list.m_selectorArray = 0;
+    ASSERT_WITH_SECURITY_IMPLICATION(componentCount());
+    other.m_selectorArray = nullptr;
 }
 
-void CSSSelectorList::adoptSelectorVector(Vector<OwnPtr<CSSParserSelector> >& selectorVector)
+void CSSSelectorList::adoptSelectorVector(Vector<std::unique_ptr<CSSParserSelector>>& selectorVector)
 {
+    ASSERT_WITH_SECURITY_IMPLICATION(!selectorVector.isEmpty());
+
     deleteSelectors();
     size_t flattenedSize = 0;
     for (size_t i = 0; i < selectorVector.size(); ++i) {
@@ -68,9 +67,11 @@ void CSSSelectorList::adoptSelectorVector(Vector<OwnPtr<CSSParserSelector> >& se
         while (current) {
             {
                 // Move item from the parser selector vector into m_selectorArray without invoking destructor (Ugh.)
-                CSSSelector* currentSelector = current->releaseSelector().leakPtr();
+                CSSSelector* currentSelector = current->releaseSelector().release();
                 memcpy(&m_selectorArray[arrayIndex], currentSelector, sizeof(CSSSelector));
-                fastDeleteSkippingDestructor(currentSelector);
+
+                // Free the underlying memory without invoking the destructor.
+                operator delete (currentSelector);
             }
             current = current->tagHistory();
             ASSERT(!m_selectorArray[arrayIndex].isLastInSelectorList());
@@ -95,30 +96,47 @@ unsigned CSSSelectorList::componentCount() const
     return (current - m_selectorArray) + 1;
 }
 
+CSSSelectorList& CSSSelectorList::operator=(CSSSelectorList&& other)
+{
+    deleteSelectors();
+    m_selectorArray = other.m_selectorArray;
+    other.m_selectorArray = nullptr;
+
+    ASSERT_WITH_SECURITY_IMPLICATION(componentCount());
+    return *this;
+}
+
 void CSSSelectorList::deleteSelectors()
 {
     if (!m_selectorArray)
         return;
 
-    for (CSSSelector* s = m_selectorArray; ; ++s) {
+    CSSSelector* selectorArray = m_selectorArray;
+    m_selectorArray = nullptr;
+
+    bool isLastSelector = false;
+    for (CSSSelector* s = selectorArray; !isLastSelector; ++s) {
+        isLastSelector = s->isLastInSelectorList();
         s->~CSSSelector();
-        if (s->isLastInSelectorList())
-            break;
     }
-    fastFree(m_selectorArray);
+    fastFree(selectorArray);
 }
 
 String CSSSelectorList::selectorsText() const
 {
     StringBuilder result;
-
-    for (const CSSSelector* s = first(); s; s = next(s)) {
-        if (s != first())
-            result.append(", ");
-        result.append(s->selectorText());
-    }
-
+    buildSelectorsText(result);
     return result.toString();
+}
+
+void CSSSelectorList::buildSelectorsText(StringBuilder& stringBuilder) const
+{
+    const CSSSelector* firstSubSelector = first();
+    for (const CSSSelector* subSelector = firstSubSelector; subSelector; subSelector = CSSSelectorList::next(subSelector)) {
+        if (subSelector != firstSubSelector)
+            stringBuilder.appendLiteral(", ");
+        stringBuilder.append(subSelector->selectorText());
+    }
 }
 
 template <typename Functor>
@@ -155,7 +173,7 @@ class SelectorNeedsNamespaceResolutionFunctor {
 public:
     bool operator()(const CSSSelector* selector)
     {
-        if (selector->m_match == CSSSelector::Tag && selector->tagQName().prefix() != nullAtom && selector->tagQName().prefix() != starAtom)
+        if (selector->match() == CSSSelector::Tag && selector->tagQName().prefix() != nullAtom && selector->tagQName().prefix() != starAtom)
             return true;
         if (selector->isAttributeSelector() && selector->attribute().prefix() != nullAtom && selector->attribute().prefix() != starAtom)
             return true;

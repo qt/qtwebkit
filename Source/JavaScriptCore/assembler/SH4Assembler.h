@@ -33,6 +33,7 @@
 #include "AssemblerBuffer.h"
 #include "AssemblerBufferWithConstantPool.h"
 #include "JITCompilationEffort.h"
+#include <limits.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -182,6 +183,7 @@ enum {
     FSQRT_OPCODE = 0xf06d,
     FSCHG_OPCODE = 0xf3fd,
     CLRT_OPCODE = 8,
+    SYNCO_OPCODE = 0x00ab,
 };
 
 namespace SH4Registers {
@@ -325,6 +327,12 @@ public:
     static const RegisterID scratchReg2 = SH4Registers::r11;
     static const uint32_t maxInstructionSize = 16;
 
+    static constexpr RegisterID firstRegister() { return SH4Registers::r0; }
+    static constexpr RegisterID lastRegister() { return SH4Registers::r15; }
+
+    static constexpr FPRegisterID firstFPRegister() { return SH4Registers::dr0; }
+    static constexpr FPRegisterID lastFPRegister() { return SH4Registers::dr14; }
+
     enum {
         padForAlign8 = 0x00,
         padForAlign16 = 0x0009,
@@ -342,6 +350,8 @@ public:
         , m_indexOfTailOfLastWatchpoint(INT_MIN)
     {
     }
+
+    SH4Buffer& buffer() { return m_buffer; }
 
     // SH4 condition codes
     typedef enum {
@@ -459,7 +469,7 @@ public:
     void andlImm8r(int imm8, RegisterID dst)
     {
         ASSERT((imm8 <= 255) && (imm8 >= 0));
-        ASSERT(dst == SH4Registers::r0);
+        ASSERT_UNUSED(dst, dst == SH4Registers::r0);
 
         uint16_t opc = getOpcodeGroup5(ANDIMM_OPCODE, imm8);
         oneShortOp(opc);
@@ -492,7 +502,7 @@ public:
     void orlImm8r(int imm8, RegisterID dst)
     {
         ASSERT((imm8 <= 255) && (imm8 >= 0));
-        ASSERT(dst == SH4Registers::r0);
+        ASSERT_UNUSED(dst, dst == SH4Registers::r0);
 
         uint16_t opc = getOpcodeGroup5(ORIMM_OPCODE, imm8);
         oneShortOp(opc);
@@ -519,7 +529,7 @@ public:
     void xorlImm8r(int imm8, RegisterID dst)
     {
         ASSERT((imm8 <= 255) && (imm8 >= 0));
-        ASSERT(dst == SH4Registers::r0);
+        ASSERT_UNUSED(dst, dst == SH4Registers::r0);
 
         uint16_t opc = getOpcodeGroup5(XORIMM_OPCODE, imm8);
         oneShortOp(opc);
@@ -687,6 +697,7 @@ public:
 
     void cmpEqImmR0(int imm, RegisterID dst)
     {
+        ASSERT_UNUSED(dst, dst == SH4Registers::r0);
         uint16_t opc = getOpcodeGroup5(CMPEQIMM_OPCODE, imm);
         oneShortOp(opc);
     }
@@ -699,7 +710,8 @@ public:
 
     void testlImm8r(int imm, RegisterID dst)
     {
-        ASSERT((dst == SH4Registers::r0) && (imm <= 255) && (imm >= 0));
+        ASSERT((imm <= 255) && (imm >= 0));
+        ASSERT_UNUSED(dst, dst == SH4Registers::r0);
 
         uint16_t opc = getOpcodeGroup5(TSTIMM_OPCODE, imm);
         oneShortOp(opc);
@@ -708,6 +720,11 @@ public:
     void nop()
     {
         oneShortOp(NOP_OPCODE, false);
+    }
+
+    void synco()
+    {
+        oneShortOp(SYNCO_OPCODE);
     }
 
     void sett()
@@ -1062,7 +1079,7 @@ public:
 
     void movwPCReg(int offset, RegisterID base, RegisterID dst)
     {
-        ASSERT(base == SH4Registers::pc);
+        ASSERT_UNUSED(base, base == SH4Registers::pc);
         ASSERT((offset <= 255) && (offset >= 0));
 
         uint16_t opc = getOpcodeGroup3(MOVW_READ_OFFPC_OPCODE, dst, offset);
@@ -1071,7 +1088,7 @@ public:
 
     void movwMemReg(int offset, RegisterID base, RegisterID dst)
     {
-        ASSERT(dst == SH4Registers::r0);
+        ASSERT_UNUSED(dst, dst == SH4Registers::r0);
 
         uint16_t opc = getOpcodeGroup11(MOVW_READ_OFFRM_OPCODE, base, offset);
         oneShortOp(opc);
@@ -1137,7 +1154,7 @@ public:
 
     void movbMemReg(int offset, RegisterID base, RegisterID dst)
     {
-        ASSERT(dst == SH4Registers::r0);
+        ASSERT_UNUSED(dst, dst == SH4Registers::r0);
 
         uint16_t opc = getOpcodeGroup11(MOVB_READ_OFFRM_OPCODE, base, offset);
         oneShortOp(opc);
@@ -1457,7 +1474,7 @@ public:
         ASSERT(value >= 0);
         ASSERT(value <= 60);
 
-        // Handle the uncommon case where a flushConstantPool occurred in movlMemRegCompact.
+        // Handle the uncommon case where a flushConstantPool occured in movlMemRegCompact.
         if ((instructionPtr[0] & 0xf000) == BRA_OPCODE)
             instructionPtr += (instructionPtr[0] & 0x0fff) + 2;
 
@@ -1613,11 +1630,6 @@ public:
         uint16_t* instructionPtr = static_cast<uint16_t*>(from);
         instructionPtr -= 3;
         return reinterpret_cast<void*>(readPCrelativeAddress((*instructionPtr & 0xff), instructionPtr));
-    }
-
-    PassRefPtr<ExecutableMemoryHandle> executableCopy(VM& vm, void* ownerUID, JITCompilationEffort effort)
-    {
-        return m_buffer.executableCopy(vm, ownerUID, effort);
     }
 
     static void cacheFlush(void* code, size_t size)
@@ -2171,8 +2183,8 @@ public:
         printfStdoutInstr(">> end repatch\n");
     }
 #else
-    static void printInstr(uint16_t opc, unsigned size, bool isdoubleInst = true) { };
-    static void printBlockInstr(uint16_t* first, unsigned offset, int nbInstr) { };
+    static void printInstr(uint16_t, unsigned, bool = true) { };
+    static void printBlockInstr(uint16_t*, unsigned, int) { };
 #endif
 
     static void replaceWithLoad(void* instructionStart)

@@ -31,16 +31,15 @@
 #include "config.h"
 #include "PageVisibilityState.h"
 
-#if ENABLE(PAGE_VISIBILITY_API)
+#include <wtf/NeverDestroyed.h>
 
 namespace WebCore {
 
 String pageVisibilityStateString(PageVisibilityState state)
 {
-    DEFINE_STATIC_LOCAL(const String, visible, (ASCIILiteral("visible")));
-    DEFINE_STATIC_LOCAL(const String, hidden, (ASCIILiteral("hidden")));
-    DEFINE_STATIC_LOCAL(const String, prerender, (ASCIILiteral("prerender")));
-    DEFINE_STATIC_LOCAL(const String, unloaded, (ASCIILiteral("unloaded")));
+    static NeverDestroyed<const String> visible(ASCIILiteral("visible"));
+    static NeverDestroyed<const String> hidden(ASCIILiteral("hidden"));
+    static NeverDestroyed<const String> prerender(ASCIILiteral("prerender"));
 
     switch (state) {
     case PageVisibilityStateVisible:
@@ -49,8 +48,6 @@ String pageVisibilityStateString(PageVisibilityState state)
         return hidden;
     case PageVisibilityStatePrerender:
         return prerender;
-    case PageVisibilityStateUnloaded:
-        return unloaded;
     }
 
     ASSERT_NOT_REACHED();
@@ -58,5 +55,3 @@ String pageVisibilityStateString(PageVisibilityState state)
 }
 
 } // namespace WebCore
-
-#endif // if ENABLE(PAGE_VISIBILITY_API)

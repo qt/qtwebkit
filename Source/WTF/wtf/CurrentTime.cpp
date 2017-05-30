@@ -37,6 +37,7 @@
 #if OS(DARWIN)
 #include <mach/mach.h>
 #include <mach/mach_time.h>
+#include <mutex>
 #include <sys/time.h>
 #elif OS(WINDOWS)
 
@@ -75,11 +76,7 @@ static double lowResUTCTime()
 {
     FILETIME fileTime;
 
-#if OS(WINCE)
-    GetCurrentFT(&fileTime);
-#else
     GetSystemTimeAsFileTime(&fileTime);
-#endif
 
     // As per Windows documentation for FILETIME, copy the resulting FILETIME structure to a
     // ULARGE_INTEGER structure using memcpy (using memcpy instead of direct assignment can
@@ -110,7 +107,11 @@ static double highResUpTime()
 
     LARGE_INTEGER qpc;
     QueryPerformanceCounter(&qpc);
+#if defined(_M_IX86) || defined(__i386__)
     DWORD tickCount = GetTickCount();
+#else
+    ULONGLONG tickCount = GetTickCount64();
+#endif
 
     if (inited) {
         __int64 qpcElapsed = ((qpc.QuadPart - qpcLast.QuadPart) * 1000) / qpcFrequency.QuadPart;
@@ -242,16 +243,6 @@ double currentTime()
     return ecore_time_unix_get();
 }
 
-#elif OS(QNX)
-
-double currentTime()
-{
-    struct timespec time;
-    if (clock_gettime(CLOCK_REALTIME, &time))
-        CRASH();
-    return time.tv_sec + time.tv_nsec / 1.0e9;
-}
-
 #else
 
 double currentTime()
@@ -263,31 +254,11 @@ double currentTime()
 
 #endif
 
-#if PLATFORM(MAC)
-
-double monotonicallyIncreasingTime()
-{
-    // Based on listing #2 from Apple QA 1398.
-    static mach_timebase_info_data_t timebaseInfo;
-    if (!timebaseInfo.denom) {
-        kern_return_t kr = mach_timebase_info(&timebaseInfo);
-        ASSERT_UNUSED(kr, kr == KERN_SUCCESS);
-    }
-    return (mach_absolute_time() * timebaseInfo.numer) / (1.0e9 * timebaseInfo.denom);
-}
-
-#elif PLATFORM(EFL)
+#if PLATFORM(EFL)
 
 double monotonicallyIncreasingTime()
 {
     return ecore_time_get();
-}
-
-#elif USE(GLIB) && !PLATFORM(EFL) && !PLATFORM(QT)
-
-double monotonicallyIncreasingTime()
-{
-    return static_cast<double>(g_get_monotonic_time() / 1000000.0);
 }
 
 #elif PLATFORM(QT)
@@ -301,14 +272,27 @@ double monotonicallyIncreasingTime()
     return timer.nsecsElapsed() / 1.0e9;
 }
 
-#elif OS(QNX)
+#elif USE(GLIB)
 
 double monotonicallyIncreasingTime()
 {
-    struct timespec time;
-    if (clock_gettime(CLOCK_MONOTONIC, &time))
-        CRASH();
-    return time.tv_sec + time.tv_nsec / 1.0e9;
+    return static_cast<double>(g_get_monotonic_time() / 1000000.0);
+}
+
+#elif OS(DARWIN)
+
+double monotonicallyIncreasingTime()
+{
+    // Based on listing #2 from Apple QA 1398, but modified to be thread-safe.
+    static mach_timebase_info_data_t timebaseInfo;
+    static std::once_flag initializeTimerOnceFlag;
+    std::call_once(initializeTimerOnceFlag, [] {
+        kern_return_t kr = mach_timebase_info(&timebaseInfo);
+        ASSERT_UNUSED(kr, kr == KERN_SUCCESS);
+        ASSERT(timebaseInfo.denom);
+    });
+
+    return (mach_absolute_time() * timebaseInfo.numer) / (1.0e9 * timebaseInfo.denom);
 }
 
 #else
@@ -325,7 +309,7 @@ double monotonicallyIncreasingTime()
 
 #endif
 
-double currentCPUTime()
+std::chrono::microseconds currentCPUTime()
 {
 #if OS(DARWIN)
     mach_msg_type_number_t infoCount = THREAD_BASIC_INFO_COUNT;
@@ -335,11 +319,8 @@ double currentCPUTime()
     mach_port_t threadPort = mach_thread_self();
     thread_info(threadPort, THREAD_BASIC_INFO, reinterpret_cast<thread_info_t>(&info), &infoCount);
     mach_port_deallocate(mach_task_self(), threadPort);
-    
-    double time = info.user_time.seconds + info.user_time.microseconds / 1000000.;
-    time += info.system_time.seconds + info.system_time.microseconds / 1000000.;
-    
-    return time;
+
+    return std::chrono::seconds(info.user_time.seconds + info.system_time.seconds) + std::chrono::microseconds(info.user_time.microseconds + info.system_time.microseconds);
 #elif OS(WINDOWS)
     union {
         FILETIME fileTime;
@@ -351,25 +332,14 @@ double currentCPUTime()
     FILETIME creationTime, exitTime;
     
     GetThreadTimes(GetCurrentThread(), &creationTime, &exitTime, &kernelTime.fileTime, &userTime.fileTime);
-    
-    return userTime.fileTimeAsLong / 10000000. + kernelTime.fileTimeAsLong / 10000000.;
-#elif OS(QNX)
-    struct timespec time;
-    if (clock_gettime(CLOCK_THREAD_CPUTIME_ID, &time))
-        CRASH();
-    return time.tv_sec + time.tv_nsec / 1.0e9;
+
+    return std::chrono::microseconds((userTime.fileTimeAsLong + kernelTime.fileTimeAsLong) / 10);
 #else
     // FIXME: We should return the time the current thread has spent executing.
 
-    // use a relative time from first call in order to avoid an overflow
-    static double firstTime = currentTime();
-    return currentTime() - firstTime;
+    static auto firstTime = std::chrono::steady_clock::now();
+    return std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - firstTime);
 #endif
-}
-
-double currentCPUTimeMS()
-{
-    return currentCPUTime() * 1000;
 }
 
 } // namespace WTF

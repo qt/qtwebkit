@@ -21,11 +21,9 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "SVGLocatable.h"
 
-#include "RenderObject.h"
+#include "RenderElement.h"
 #include "SVGException.h"
 #include "SVGGraphicsElement.h"
 #include "SVGImageElement.h"
@@ -38,7 +36,7 @@ static bool isViewportElement(Node* node)
     return (node->hasTagName(SVGNames::svgTag)
         || node->hasTagName(SVGNames::symbolTag)
         || node->hasTagName(SVGNames::foreignObjectTag)
-        || isSVGImageElement(node));
+        || is<SVGImageElement>(*node));
 }
 
 SVGElement* SVGLocatable::nearestViewportElement(const SVGElement* element)
@@ -46,19 +44,19 @@ SVGElement* SVGLocatable::nearestViewportElement(const SVGElement* element)
     ASSERT(element);
     for (Element* current = element->parentOrShadowHostElement(); current; current = current->parentOrShadowHostElement()) {
         if (isViewportElement(current))
-            return toSVGElement(current);
+            return downcast<SVGElement>(current);
     }
 
-    return 0;
+    return nullptr;
 }
 
 SVGElement* SVGLocatable::farthestViewportElement(const SVGElement* element)
 {
     ASSERT(element);
-    SVGElement* farthest = 0;
+    SVGElement* farthest = nullptr;
     for (Element* current = element->parentOrShadowHostElement(); current; current = current->parentOrShadowHostElement()) {
         if (isViewportElement(current))
-            farthest = toSVGElement(current);
+            farthest = downcast<SVGElement>(current);
     }
     return farthest;
 }
@@ -67,7 +65,7 @@ FloatRect SVGLocatable::getBBox(SVGElement* element, StyleUpdateStrategy styleUp
 {
     ASSERT(element);
     if (styleUpdateStrategy == AllowStyleUpdate)
-        element->document()->updateLayoutIgnorePendingStylesheets();
+        element->document().updateLayoutIgnorePendingStylesheets();
 
     // FIXME: Eventually we should support getBBox for detached elements.
     if (!element->renderer())
@@ -80,17 +78,16 @@ AffineTransform SVGLocatable::computeCTM(SVGElement* element, CTMScope mode, Sty
 {
     ASSERT(element);
     if (styleUpdateStrategy == AllowStyleUpdate)
-        element->document()->updateLayoutIgnorePendingStylesheets();
+        element->document().updateLayoutIgnorePendingStylesheets();
 
     AffineTransform ctm;
 
-    SVGElement* stopAtElement = mode == NearestViewportScope ? nearestViewportElement(element) : 0;
+    SVGElement* stopAtElement = mode == NearestViewportScope ? nearestViewportElement(element) : nullptr;
     for (Element* currentElement = element; currentElement; currentElement = currentElement->parentOrShadowHostElement()) {
         if (!currentElement->isSVGElement())
             break;
 
-        if (toSVGElement(currentElement)->isSVGStyledElement())
-            ctm = toSVGStyledElement(currentElement)->localCoordinateSpaceTransform(mode).multiply(ctm);
+        ctm = downcast<SVGElement>(*currentElement).localCoordinateSpaceTransform(mode).multiply(ctm);
 
         // For getCTM() computation, stop at the nearest viewport element
         if (currentElement == stopAtElement)
@@ -104,18 +101,17 @@ AffineTransform SVGLocatable::getTransformToElement(SVGElement* target, Exceptio
 {
     AffineTransform ctm = getCTM(styleUpdateStrategy);
 
-    if (target && target->isSVGGraphicsElement()) {
-        AffineTransform targetCTM = toSVGGraphicsElement(target)->getCTM(styleUpdateStrategy);
-        if (!targetCTM.isInvertible()) {
+    if (is<SVGGraphicsElement>(target)) {
+        AffineTransform targetCTM = downcast<SVGGraphicsElement>(*target).getCTM(styleUpdateStrategy);
+        if (auto inverse = targetCTM.inverse())
+            ctm = inverse.value() * ctm;
+        else {
             ec = SVGException::SVG_MATRIX_NOT_INVERTABLE;
             return ctm;
         }
-        ctm = targetCTM.inverse() * ctm;
     }
 
     return ctm;
 }
 
 }
-
-#endif // ENABLE(SVG)

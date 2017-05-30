@@ -22,7 +22,8 @@
 #include "config.h"
 #include "TextureMapperShaderProgram.h"
 
-#if USE(ACCELERATED_COMPOSITING) && USE(TEXTURE_MAPPER)
+#if USE(TEXTURE_MAPPER_GL)
+
 #include "LengthFunctions.h"
 #include "Logging.h"
 #include "TextureMapperGL.h"
@@ -72,14 +73,9 @@ TextureMapperShaderProgram::TextureMapperShaderProgram(PassRefPtr<GraphicsContex
 
 void TextureMapperShaderProgram::setMatrix(GC3Duint location, const TransformationMatrix& matrix)
 {
-    GC3Dfloat matrixAsFloats[] = {
-        GC3Dfloat(matrix.m11()), GC3Dfloat(matrix.m12()), GC3Dfloat(matrix.m13()), GC3Dfloat(matrix.m14()),
-        GC3Dfloat(matrix.m21()), GC3Dfloat(matrix.m22()), GC3Dfloat(matrix.m23()), GC3Dfloat(matrix.m24()),
-        GC3Dfloat(matrix.m31()), GC3Dfloat(matrix.m32()), GC3Dfloat(matrix.m33()), GC3Dfloat(matrix.m34()),
-        GC3Dfloat(matrix.m41()), GC3Dfloat(matrix.m42()), GC3Dfloat(matrix.m43()), GC3Dfloat(matrix.m44())
-    };
-
-    m_context->uniformMatrix4fv(location, 1, false, matrixAsFloats);
+    TransformationMatrix::FloatMatrix4 floatMatrix;
+    matrix.toColumnMajorFloatArray(floatMatrix);
+    m_context->uniformMatrix4fv(location, 1, false, floatMatrix);
 }
 
 GC3Duint TextureMapperShaderProgram::getLocation(const AtomicString& name, VariableType type)
@@ -119,12 +115,22 @@ TextureMapperShaderProgram::~TextureMapperShaderProgram()
 }
 
 #define GLSL_DIRECTIVE(...) "#"#__VA_ARGS__"\n"
+
+#define TEXTURE_SPACE_MATRIX_PRECISION_DIRECTIVE \
+    GLSL_DIRECTIVE(ifdef GL_FRAGMENT_PRECISION_HIGH) \
+        GLSL_DIRECTIVE(define TextureSpaceMatrixPrecision highp) \
+    GLSL_DIRECTIVE(else) \
+        GLSL_DIRECTIVE(define TextureSpaceMatrixPrecision mediump) \
+    GLSL_DIRECTIVE(endif)
+
 static const char* vertexTemplate =
+    TEXTURE_SPACE_MATRIX_PRECISION_DIRECTIVE
     STRINGIFY(
+        precision TextureSpaceMatrixPrecision float;
         attribute vec4 a_vertex;
         uniform mat4 u_modelViewMatrix;
         uniform mat4 u_projectionMatrix;
-        uniform highp mat4 u_textureSpaceMatrix;
+        uniform mat4 u_textureSpaceMatrix;
 
         varying vec2 v_texCoord;
         varying vec2 v_transformedTexCoord;
@@ -207,7 +213,10 @@ static const char* fragmentTemplate =
     RECT_TEXTURE_DIRECTIVE
     ANTIALIASING_TEX_COORD_DIRECTIVE
     BLUR_CONSTANTS
+    TEXTURE_SPACE_MATRIX_PRECISION_DIRECTIVE
     STRINGIFY(
+        precision TextureSpaceMatrixPrecision float;
+        uniform mat4 u_textureSpaceMatrix;
         precision mediump float;
         uniform SamplerType s_sampler;
         uniform sampler2D s_contentTexture;
@@ -220,7 +229,6 @@ static const char* fragmentTemplate =
         uniform vec2 u_shadowOffset;
         uniform vec4 u_color;
         uniform float u_gaussianKernel[GAUSSIAN_KERNEL_HALF_WIDTH];
-        uniform highp mat4 u_textureSpaceMatrix;
 
         void noop(inout vec4 dummyParameter) { }
         void noop(inout vec4 dummyParameter, vec2 texCoord) { }
@@ -400,4 +408,4 @@ PassRefPtr<TextureMapperShaderProgram> TextureMapperShaderProgram::create(PassRe
 }
 
 }
-#endif
+#endif // USE(TEXTURE_MAPPER_GL)

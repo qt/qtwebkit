@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -35,12 +35,9 @@
 
 namespace WebCore {
     
-class AccessibilityImageMapLink : public AccessibilityMockObject {
-        
-private:
-    AccessibilityImageMapLink();
+class AccessibilityImageMapLink final : public AccessibilityMockObject {
 public:
-    static PassRefPtr<AccessibilityImageMapLink> create();
+    static Ref<AccessibilityImageMapLink> create();
     virtual ~AccessibilityImageMapLink();
     
     void setHTMLAreaElement(HTMLAreaElement* element) { m_areaElement = element; }
@@ -49,36 +46,41 @@ public:
     void setHTMLMapElement(HTMLMapElement* element) { m_mapElement = element; }    
     HTMLMapElement* mapElement() const { return m_mapElement.get(); }
     
-    virtual Node* node() const { return m_areaElement.get(); }
+    virtual Node* node() const override { return m_areaElement.get(); }
         
-    virtual AccessibilityRole roleValue() const;
-    virtual bool isEnabled() const { return true; }
+    virtual AccessibilityRole roleValue() const override;
+    virtual bool isEnabled() const override { return true; }
     
-    virtual Element* anchorElement() const;
-    virtual Element* actionElement() const;
-    virtual KURL url() const;
-    virtual bool isLink() const { return true; } 
-    virtual bool isLinked() const { return true; }
-    virtual String title() const;
-    virtual String accessibilityDescription() const;
-    virtual AccessibilityObject* parentObject() const;
+    virtual Element* anchorElement() const override;
+    virtual Element* actionElement() const override;
+    virtual URL url() const override;
+    virtual bool isLink() const override { return true; }
+    virtual bool isLinked() const override { return true; }
+    virtual String title() const override;
+    virtual String accessibilityDescription() const override;
+    virtual AccessibilityObject* parentObject() const override;
     
-    virtual String stringValueForMSAA() const;
-    virtual String nameForMSAA() const;
+    virtual String stringValueForMSAA() const override;
+    virtual String nameForMSAA() const override;
 
-    virtual LayoutRect elementRect() const;
+    virtual LayoutRect elementRect() const override;
 
-private:    
+private:
+    AccessibilityImageMapLink();
+
+    virtual void detachFromParent() override;
+    virtual Path elementPath() const override;
+    RenderElement* imageMapLinkRenderer() const;
+    virtual void accessibilityText(Vector<AccessibilityText>&) override;
+    virtual bool isImageMapLink() const override { return true; }
+    virtual bool supportsPath() const override { return true; }
+
     RefPtr<HTMLAreaElement> m_areaElement;
     RefPtr<HTMLMapElement> m_mapElement;
-    
-    virtual Path elementPath() const;
-    RenderObject* imageMapLinkRenderer() const;
-    virtual void accessibilityText(Vector<AccessibilityText>&);
-    virtual bool isImageMapLink() const { return true; }
-    virtual bool supportsPath() const { return true; }
 };
     
 } // namespace WebCore
+
+SPECIALIZE_TYPE_TRAITS_ACCESSIBILITY(AccessibilityImageMapLink, isImageMapLink())
 
 #endif // AccessibilityImageMapLink_h

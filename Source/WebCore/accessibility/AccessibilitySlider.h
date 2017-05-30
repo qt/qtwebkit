@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -37,52 +37,51 @@ namespace WebCore {
 class HTMLInputElement;
 
 class AccessibilitySlider : public AccessibilityRenderObject {
-    
 public:
-    static PassRefPtr<AccessibilitySlider> create(RenderObject*);
+    static Ref<AccessibilitySlider> create(RenderObject*);
     virtual ~AccessibilitySlider() { }
 
 protected:
     explicit AccessibilitySlider(RenderObject*);
 
 private:
-    HTMLInputElement* element() const;
-    virtual AccessibilityObject* elementAccessibilityHitTest(const IntPoint&) const;
+    HTMLInputElement* inputElement() const;
+    virtual AccessibilityObject* elementAccessibilityHitTest(const IntPoint&) const override;
 
-    virtual AccessibilityRole roleValue() const { return SliderRole; }    
-    virtual bool isSlider() const { return true; }
-    virtual bool isInputSlider() const { return true; }
-    virtual bool isControl() const { return true; }
+    virtual AccessibilityRole roleValue() const override { return SliderRole; }
+    virtual bool isSlider() const override final { return true; }
+    virtual bool isInputSlider() const override { return true; }
+    virtual bool isControl() const override { return true; }
     
-    virtual void addChildren();
+    virtual void addChildren() override;
     
-    virtual bool canSetValueAttribute() const { return true; }
+    virtual bool canSetValueAttribute() const override { return true; }
     const AtomicString& getAttribute(const QualifiedName& attribute) const;
     
-    virtual void setValue(const String&);
-    virtual float valueForRange() const;
-    virtual float maxValueForRange() const;
-    virtual float minValueForRange() const;
-    virtual AccessibilityOrientation orientation() const;    
+    virtual void setValue(const String&) override;
+    virtual float valueForRange() const override;
+    virtual float maxValueForRange() const override;
+    virtual float minValueForRange() const override;
+    virtual AccessibilityOrientation orientation() const override;
 };
 
-class AccessibilitySliderThumb : public AccessibilityMockObject {
-    
+class AccessibilitySliderThumb final : public AccessibilityMockObject {
 public:
-    static PassRefPtr<AccessibilitySliderThumb> create();
+    static Ref<AccessibilitySliderThumb> create();
     virtual ~AccessibilitySliderThumb() { }
 
-    virtual AccessibilityRole roleValue() const { return SliderThumbRole; }
-
-    virtual LayoutRect elementRect() const;
+    virtual AccessibilityRole roleValue() const override { return SliderThumbRole; }
+    virtual LayoutRect elementRect() const override;
 
 private:
     AccessibilitySliderThumb();
 
-    virtual bool computeAccessibilityIsIgnored() const;
+    virtual bool isSliderThumb() const override { return true; }
+    virtual bool computeAccessibilityIsIgnored() const override;
 };
 
-
 } // namespace WebCore
+
+SPECIALIZE_TYPE_TRAITS_ACCESSIBILITY(AccessibilitySliderThumb, isSliderThumb())
 
 #endif // AccessibilitySlider_h

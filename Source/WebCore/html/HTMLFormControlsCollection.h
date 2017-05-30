@@ -23,36 +23,47 @@
 #ifndef HTMLFormControlsCollection_h
 #define HTMLFormControlsCollection_h
 
-#include "HTMLCollection.h"
+#include "CachedHTMLCollection.h"
+#include "HTMLElement.h"
 
 namespace WebCore {
 
 class FormAssociatedElement;
-class HTMLElement;
 class HTMLImageElement;
-class QualifiedName;
 
 // This class is just a big hack to find form elements even in malformed HTML elements.
 // The famous <table><tr><form><td> problem.
 
-class HTMLFormControlsCollection : public HTMLCollection {
+class HTMLFormControlsCollection final : public CachedHTMLCollection<HTMLFormControlsCollection, CollectionTypeTraits<FormControls>::traversalType> {
 public:
-    static PassRefPtr<HTMLFormControlsCollection> create(Node*, CollectionType);
-
+    static Ref<HTMLFormControlsCollection> create(ContainerNode&, CollectionType);
     virtual ~HTMLFormControlsCollection();
 
-    virtual Node* namedItem(const AtomicString& name) const;
+    virtual HTMLElement* item(unsigned offset) const override;
+
+    // For CachedHTMLCollection.
+    HTMLElement* customElementAfter(Element*) const;
 
 private:
-    HTMLFormControlsCollection(Node*);
+    explicit HTMLFormControlsCollection(ContainerNode&);
 
-    virtual void updateNameCache() const;
+    virtual void invalidateCache(Document&) override;
+    virtual void updateNamedElementCache() const override;
 
     const Vector<FormAssociatedElement*>& formControlElements() const;
     const Vector<HTMLImageElement*>& formImageElements() const;
-    virtual Element* virtualItemAfter(unsigned& offsetInArray, Element*) const OVERRIDE;
+
+    mutable Element* m_cachedElement;
+    mutable unsigned m_cachedElementOffsetInArray;
 };
 
-} // namespace
+inline HTMLElement* HTMLFormControlsCollection::item(unsigned offset) const
+{
+    return downcast<HTMLElement>(CachedHTMLCollection<HTMLFormControlsCollection, CollectionTypeTraits<FormControls>::traversalType>::item(offset));
+}
 
-#endif
+} // namespace WebCore
+
+SPECIALIZE_TYPE_TRAITS_HTMLCOLLECTION(HTMLFormControlsCollection, FormControls)
+
+#endif // HTMLFormControlsCollection_h

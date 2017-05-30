@@ -27,34 +27,35 @@
 #include "LocalStorageDatabase.h"
 
 #include "LocalStorageDatabaseTracker.h"
-#include "WorkQueue.h"
 #include <WebCore/FileSystem.h>
 #include <WebCore/SQLiteStatement.h>
 #include <WebCore/SQLiteTransaction.h>
 #include <WebCore/SecurityOrigin.h>
 #include <WebCore/StorageMap.h>
+#include <WebCore/SuddenTermination.h>
 #include <wtf/PassRefPtr.h>
+#include <wtf/WorkQueue.h>
 #include <wtf/text/StringHash.h>
 #include <wtf/text/WTFString.h>
 
 using namespace WebCore;
 
-static const double databaseUpdateIntervalInSeconds = 1.0;
+static const auto databaseUpdateInterval = std::chrono::seconds(1);
 
 static const int maximumItemsToUpdate = 100;
 
 namespace WebKit {
 
-PassRefPtr<LocalStorageDatabase> LocalStorageDatabase::create(PassRefPtr<WorkQueue> queue, PassRefPtr<LocalStorageDatabaseTracker> tracker, PassRefPtr<SecurityOrigin> securityOrigin)
+PassRefPtr<LocalStorageDatabase> LocalStorageDatabase::create(PassRefPtr<WorkQueue> queue, PassRefPtr<LocalStorageDatabaseTracker> tracker, Ref<SecurityOrigin>&& securityOrigin)
 {
-    return adoptRef(new LocalStorageDatabase(queue, tracker, securityOrigin));
+    return adoptRef(new LocalStorageDatabase(queue, tracker, WTFMove(securityOrigin)));
 }
 
-LocalStorageDatabase::LocalStorageDatabase(PassRefPtr<WorkQueue> queue, PassRefPtr<LocalStorageDatabaseTracker> tracker, PassRefPtr<SecurityOrigin> securityOrigin)
+LocalStorageDatabase::LocalStorageDatabase(PassRefPtr<WorkQueue> queue, PassRefPtr<LocalStorageDatabaseTracker> tracker, Ref<SecurityOrigin>&& securityOrigin)
     : m_queue(queue)
     , m_tracker(tracker)
-    , m_securityOrigin(securityOrigin)
-    , m_databasePath(m_tracker->databasePath(m_securityOrigin.get()))
+    , m_securityOrigin(WTFMove(securityOrigin))
+    , m_databasePath(m_tracker->databasePath(m_securityOrigin.ptr()))
     , m_failedToOpenDatabase(false)
     , m_didImportItems(false)
     , m_isClosed(false)
@@ -79,7 +80,7 @@ void LocalStorageDatabase::openDatabase(DatabaseOpeningStrategy openingStrategy)
     }
 
     if (m_database.isOpen())
-        m_tracker->didOpenDatabaseWithOrigin(m_securityOrigin.get());
+        m_tracker->didOpenDatabaseWithOrigin(m_securityOrigin.ptr());
 }
 
 bool LocalStorageDatabase::tryToOpenDatabase(DatabaseOpeningStrategy openingStrategy)
@@ -171,7 +172,7 @@ void LocalStorageDatabase::importItems(StorageMap& storageMap)
         return;
 
     SQLiteStatement query(m_database, "SELECT key, value FROM ItemTable");
-    if (query.prepare() != SQLResultOk) {
+    if (query.prepare() != SQLITE_OK) {
         LOG_ERROR("Unable to select items from ItemTable for local storage");
         return;
     }
@@ -179,12 +180,15 @@ void LocalStorageDatabase::importItems(StorageMap& storageMap)
     HashMap<String, String> items;
 
     int result = query.step();
-    while (result == SQLResultRow) {
-        items.set(query.getColumnText(0), query.getColumnBlobAsString(1));
+    while (result == SQLITE_ROW) {
+        String key = query.getColumnText(0);
+        String value = query.getColumnBlobAsString(1);
+        if (!key.isNull() && !value.isNull())
+            items.set(key, value);
         result = query.step();
     }
 
-    if (result != SQLResultDone) {
+    if (result != SQLITE_DONE) {
         LOG_ERROR("Error reading items from ItemTable for local storage");
         return;
     }
@@ -226,7 +230,7 @@ void LocalStorageDatabase::close()
         m_database.close();
 
     if (isEmpty)
-        m_tracker->deleteDatabaseWithOrigin(m_securityOrigin.get());
+        m_tracker->deleteDatabaseWithOrigin(m_securityOrigin.ptr());
 }
 
 void LocalStorageDatabase::itemDidChange(const String& key, const String& value)
@@ -240,8 +244,15 @@ void LocalStorageDatabase::scheduleDatabaseUpdate()
     if (m_didScheduleDatabaseUpdate)
         return;
 
+    if (!m_disableSuddenTerminationWhileWritingToLocalStorage)
+        m_disableSuddenTerminationWhileWritingToLocalStorage = std::make_unique<SuddenTerminationDisabler>();
+
     m_didScheduleDatabaseUpdate = true;
-    m_queue->dispatchAfterDelay(bind(&LocalStorageDatabase::updateDatabase, this), databaseUpdateIntervalInSeconds);
+
+    RefPtr<LocalStorageDatabase> localStorageDatabase(this);
+    m_queue->dispatchAfter(databaseUpdateInterval, [localStorageDatabase] {
+        localStorageDatabase->updateDatabase();
+    });
 }
 
 void LocalStorageDatabase::updateDatabase()
@@ -256,9 +267,11 @@ void LocalStorageDatabase::updateDatabase()
     if (m_changedItems.size() <= maximumItemsToUpdate) {
         // There are few enough changed items that we can just always write all of them.
         m_changedItems.swap(changedItems);
+        updateDatabaseWithChangedItems(changedItems);
+        m_disableSuddenTerminationWhileWritingToLocalStorage = nullptr;
     } else {
         for (int i = 0; i < maximumItemsToUpdate; ++i) {
-            HashMap<String, String>::iterator it = m_changedItems.begin();
+            auto it = m_changedItems.begin();
             changedItems.add(it->key, it->value);
 
             m_changedItems.remove(it);
@@ -268,9 +281,8 @@ void LocalStorageDatabase::updateDatabase()
 
         // Reschedule the update for the remaining items.
         scheduleDatabaseUpdate();
+        updateDatabaseWithChangedItems(changedItems);
     }
-
-    updateDatabaseWithChangedItems(changedItems);
 }
 
 void LocalStorageDatabase::updateDatabaseWithChangedItems(const HashMap<String, String>& changedItems)
@@ -284,26 +296,26 @@ void LocalStorageDatabase::updateDatabaseWithChangedItems(const HashMap<String, 
         m_shouldClearItems = false;
 
         SQLiteStatement clearStatement(m_database, "DELETE FROM ItemTable");
-        if (clearStatement.prepare() != SQLResultOk) {
+        if (clearStatement.prepare() != SQLITE_OK) {
             LOG_ERROR("Failed to prepare clear statement - cannot write to local storage database");
             return;
         }
 
         int result = clearStatement.step();
-        if (result != SQLResultDone) {
+        if (result != SQLITE_DONE) {
             LOG_ERROR("Failed to clear all items in the local storage database - %i", result);
             return;
         }
     }
 
     SQLiteStatement insertStatement(m_database, "INSERT INTO ItemTable VALUES (?, ?)");
-    if (insertStatement.prepare() != SQLResultOk) {
+    if (insertStatement.prepare() != SQLITE_OK) {
         LOG_ERROR("Failed to prepare insert statement - cannot write to local storage database");
         return;
     }
 
     SQLiteStatement deleteStatement(m_database, "DELETE FROM ItemTable WHERE key=?");
-    if (deleteStatement.prepare() != SQLResultOk) {
+    if (deleteStatement.prepare() != SQLITE_OK) {
         LOG_ERROR("Failed to prepare delete statement - cannot write to local storage database");
         return;
     }
@@ -311,9 +323,7 @@ void LocalStorageDatabase::updateDatabaseWithChangedItems(const HashMap<String, 
     SQLiteTransaction transaction(m_database);
     transaction.begin();
 
-    HashMap<String, String>::const_iterator it = changedItems.begin();
-    const HashMap<String, String>::const_iterator end = changedItems.end();
-    for (; it != end; ++it) {
+    for (auto it = changedItems.begin(), end = changedItems.end(); it != end; ++it) {
         // A null value means that the key/value pair should be deleted.
         SQLiteStatement& statement = it->value.isNull() ? deleteStatement : insertStatement;
 
@@ -324,7 +334,7 @@ void LocalStorageDatabase::updateDatabaseWithChangedItems(const HashMap<String, 
             statement.bindBlob(2, it->value);
 
         int result = statement.step();
-        if (result != SQLResultDone) {
+        if (result != SQLITE_DONE) {
             LOG_ERROR("Failed to update item in the local storage database - %i", result);
             break;
         }
@@ -341,13 +351,13 @@ bool LocalStorageDatabase::databaseIsEmpty()
         return false;
 
     SQLiteStatement query(m_database, "SELECT COUNT(*) FROM ItemTable");
-    if (query.prepare() != SQLResultOk) {
+    if (query.prepare() != SQLITE_OK) {
         LOG_ERROR("Unable to count number of rows in ItemTable for local storage");
         return false;
     }
 
     int result = query.step();
-    if (result != SQLResultRow) {
+    if (result != SQLITE_ROW) {
         LOG_ERROR("No results when counting number of rows in ItemTable for local storage");
         return false;
     }

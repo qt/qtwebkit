@@ -35,7 +35,9 @@
 #include "QWebPageAdapter.h"
 #include "qwebhistoryinterface.h"
 #include "qwebpluginfactory.h"
+#include "WebResourceLoadScheduler.h"
 
+#include <BlobRegistryImpl.h>
 #include <IntSize.h>
 #include <NotImplemented.h>
 #include <Page.h>
@@ -45,12 +47,13 @@
 #include <QCoreApplication>
 #include <QLocale>
 #include <wtf/MathExtras.h>
+#include <wtf/NeverDestroyed.h>
 
 using namespace WebCore;
 
 void PlatformStrategiesQt::initialize()
 {
-    DEFINE_STATIC_LOCAL(PlatformStrategiesQt, platformStrategies, ());
+    static NeverDestroyed<PlatformStrategiesQt> platformStrategies;
     Q_UNUSED(platformStrategies);
 }
 
@@ -65,14 +68,9 @@ CookiesStrategy* PlatformStrategiesQt::createCookiesStrategy()
     return this;
 }
 
-DatabaseStrategy* PlatformStrategiesQt::createDatabaseStrategy()
-{
-    return this;
-}
-
 LoaderStrategy* PlatformStrategiesQt::createLoaderStrategy()
 {
-    return this;
+    return new WebResourceLoadScheduler;
 }
 
 PasteboardStrategy* PlatformStrategiesQt::createPasteboardStrategy()
@@ -85,47 +83,32 @@ PluginStrategy* PlatformStrategiesQt::createPluginStrategy()
     return this;
 }
 
-SharedWorkerStrategy* PlatformStrategiesQt::createSharedWorkerStrategy()
-{
-    return this;
-}
-
-StorageStrategy* PlatformStrategiesQt::createStorageStrategy()
-{
-    return this;
-}
-
-VisitedLinkStrategy* PlatformStrategiesQt::createVisitedLinkStrategy()
-{
-    return this;
-}
-
-String PlatformStrategiesQt::cookiesForDOM(const NetworkStorageSession& session, const KURL& firstParty, const KURL& url)
+String PlatformStrategiesQt::cookiesForDOM(const NetworkStorageSession& session, const URL& firstParty, const URL& url)
 {
     return WebCore::cookiesForDOM(session, firstParty, url);
 }
 
-void PlatformStrategiesQt::setCookiesFromDOM(const NetworkStorageSession& session, const KURL& firstParty, const KURL& url, const String& cookieString)
+void PlatformStrategiesQt::setCookiesFromDOM(const NetworkStorageSession& session, const URL& firstParty, const URL& url, const String& cookieString)
 {
     WebCore::setCookiesFromDOM(session, firstParty, url, cookieString);
 }
 
-bool PlatformStrategiesQt::cookiesEnabled(const NetworkStorageSession& session, const KURL& firstParty, const KURL& url)
+bool PlatformStrategiesQt::cookiesEnabled(const NetworkStorageSession& session, const URL& firstParty, const URL& url)
 {
     return WebCore::cookiesEnabled(session, firstParty, url);
 }
 
-String PlatformStrategiesQt::cookieRequestHeaderFieldValue(const NetworkStorageSession& session, const KURL& firstParty, const KURL& url)
+String PlatformStrategiesQt::cookieRequestHeaderFieldValue(const NetworkStorageSession& session, const URL& firstParty, const URL& url)
 {
     return WebCore::cookieRequestHeaderFieldValue(session, firstParty, url);
 }
 
-bool PlatformStrategiesQt::getRawCookies(const NetworkStorageSession& session, const KURL& firstParty, const KURL& url, Vector<Cookie>& rawCookies)
+bool PlatformStrategiesQt::getRawCookies(const NetworkStorageSession& session, const URL& firstParty, const URL& url, Vector<Cookie>& rawCookies)
 {
     return WebCore::getRawCookies(session, firstParty, url, rawCookies);
 }
 
-void PlatformStrategiesQt::deleteCookie(const NetworkStorageSession& session, const KURL& url, const String& cookieName)
+void PlatformStrategiesQt::deleteCookie(const NetworkStorageSession& session, const URL& url, const String& cookieName)
 {
     WebCore::deleteCookie(session, url, cookieName);
 }
@@ -138,8 +121,8 @@ void PlatformStrategiesQt::refreshPlugins()
 void PlatformStrategiesQt::getPluginInfo(const WebCore::Page* page, Vector<WebCore::PluginInfo>& outPlugins)
 {
     QWebPageAdapter* qPage = 0;
-    if (!page->chrome().client()->isEmptyChromeClient())
-        qPage = static_cast<ChromeClientQt*>(page->chrome().client())->m_webPage;
+    if (!page->chrome().client().isEmptyChromeClient())
+        qPage = static_cast<ChromeClientQt&>(page->chrome().client()).m_webPage;
 
     QWebPluginFactory* factory;
     if (qPage && (factory = qPage->pluginFactory)) {
@@ -169,17 +152,14 @@ void PlatformStrategiesQt::getPluginInfo(const WebCore::Page* page, Vector<WebCo
     PluginDatabase* db = PluginDatabase::installedPlugins();
     const Vector<PluginPackage*> &plugins = db->plugins();
 
-    for (size_t i = 0; i < plugins.size(); ++i) {
+    for (auto* package : plugins) {
         PluginInfo info;
-        PluginPackage* package = plugins[i];
-
         info.name = package->name();
         info.file = package->fileName();
         info.desc = package->description();
 
-        const MIMEToDescriptionsMap& mimeToDescriptions = package->mimeToDescriptions();
-        MIMEToDescriptionsMap::const_iterator end = mimeToDescriptions.end();
-        for (MIMEToDescriptionsMap::const_iterator it = mimeToDescriptions.begin(); it != end; ++it) {
+        const auto& mimeToDescriptions = package->mimeToDescriptions();
+        for (auto it = mimeToDescriptions.begin(); it != mimeToDescriptions.end(); ++it) {
             MimeClassInfo mime;
 
             mime.type = it->key;
@@ -194,25 +174,12 @@ void PlatformStrategiesQt::getPluginInfo(const WebCore::Page* page, Vector<WebCo
 
 }
 
-// VisitedLinkStrategy
-
-bool PlatformStrategiesQt::isLinkVisited(Page* page, LinkHash hash, const KURL& baseURL, const AtomicString& attributeURL)
+void PlatformStrategiesQt::getWebVisiblePluginInfo(const Page* page, Vector<PluginInfo>& outPlugins)
 {
-    ASSERT(hash);
-
-    // If the Qt4.4 interface for the history is used, we will have to fallback
-    // to the old global history.
-    QWebHistoryInterface* iface = QWebHistoryInterface::defaultInterface();
-    if (iface) {
-        Vector<UChar, 512> url;
-        visitedURL(baseURL, attributeURL, url);
-        return iface->historyContains(QString(reinterpret_cast<QChar*>(url.data()), url.size()));
-    }
-
-    return page->group().isLinkVisited(hash);
+    getPluginInfo(page, outPlugins);
 }
 
-void PlatformStrategiesQt::addVisitedLink(Page* page, LinkHash hash)
+BlobRegistry* PlatformStrategiesQt::createBlobRegistry()
 {
-    page->group().addVisitedLinkHash(hash);
+    return new BlobRegistryImpl;
 }

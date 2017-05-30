@@ -11,10 +11,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -43,12 +43,12 @@ namespace WebCore {
     String fileButtonNoFilesSelectedLabel();
     String defaultDetailsSummaryText();
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     String copyImageUnknownFileLabel();
 #endif
 
 #if ENABLE(CONTEXT_MENUS)
-    String contextMenuItemTagOpenLinkInNewWindow();
+    WEBCORE_EXPORT String contextMenuItemTagOpenLinkInNewWindow();
 #if PLATFORM(QT)
     String contextMenuItemTagOpenLinkInThisWindow();
 #endif
@@ -91,43 +91,43 @@ namespace WebCore {
     String contextMenuItemTagLearnSpelling();
     String contextMenuItemTagSearchWeb();
     String contextMenuItemTagLookUpInDictionary(const String& selectedString);
-    String contextMenuItemTagOpenLink();
-    String contextMenuItemTagIgnoreGrammar();
-    String contextMenuItemTagSpellingMenu();
-    String contextMenuItemTagShowSpellingPanel(bool show);
-    String contextMenuItemTagCheckSpelling();
-    String contextMenuItemTagCheckSpellingWhileTyping();
-    String contextMenuItemTagCheckGrammarWithSpelling();
-    String contextMenuItemTagFontMenu();
-    String contextMenuItemTagBold();
-    String contextMenuItemTagItalic();
-    String contextMenuItemTagUnderline();
-    String contextMenuItemTagOutline();
-    String contextMenuItemTagWritingDirectionMenu();
+    WEBCORE_EXPORT String contextMenuItemTagOpenLink();
+    WEBCORE_EXPORT String contextMenuItemTagIgnoreGrammar();
+    WEBCORE_EXPORT String contextMenuItemTagSpellingMenu();
+    WEBCORE_EXPORT String contextMenuItemTagShowSpellingPanel(bool show);
+    WEBCORE_EXPORT String contextMenuItemTagCheckSpelling();
+    WEBCORE_EXPORT String contextMenuItemTagCheckSpellingWhileTyping();
+    WEBCORE_EXPORT String contextMenuItemTagCheckGrammarWithSpelling();
+    WEBCORE_EXPORT String contextMenuItemTagFontMenu();
+    WEBCORE_EXPORT String contextMenuItemTagBold();
+    WEBCORE_EXPORT String contextMenuItemTagItalic();
+    WEBCORE_EXPORT String contextMenuItemTagUnderline();
+    WEBCORE_EXPORT String contextMenuItemTagOutline();
+    WEBCORE_EXPORT String contextMenuItemTagWritingDirectionMenu();
     String contextMenuItemTagTextDirectionMenu();
-    String contextMenuItemTagDefaultDirection();
-    String contextMenuItemTagLeftToRight();
-    String contextMenuItemTagRightToLeft();
-#if PLATFORM(MAC)
+    WEBCORE_EXPORT String contextMenuItemTagDefaultDirection();
+    WEBCORE_EXPORT String contextMenuItemTagLeftToRight();
+    WEBCORE_EXPORT String contextMenuItemTagRightToLeft();
+#if PLATFORM(COCOA)
     String contextMenuItemTagSearchInSpotlight();
-    String contextMenuItemTagShowFonts();
-    String contextMenuItemTagStyles();
-    String contextMenuItemTagShowColors();
-    String contextMenuItemTagSpeechMenu();
-    String contextMenuItemTagStartSpeaking();
-    String contextMenuItemTagStopSpeaking();
-    String contextMenuItemTagCorrectSpellingAutomatically();
-    String contextMenuItemTagSubstitutionsMenu();
-    String contextMenuItemTagShowSubstitutions(bool show);
-    String contextMenuItemTagSmartCopyPaste();
-    String contextMenuItemTagSmartQuotes();
-    String contextMenuItemTagSmartDashes();
-    String contextMenuItemTagSmartLinks();
-    String contextMenuItemTagTextReplacement();
-    String contextMenuItemTagTransformationsMenu();
-    String contextMenuItemTagMakeUpperCase();
-    String contextMenuItemTagMakeLowerCase();
-    String contextMenuItemTagCapitalize();
+    WEBCORE_EXPORT String contextMenuItemTagShowFonts();
+    WEBCORE_EXPORT String contextMenuItemTagStyles();
+    WEBCORE_EXPORT String contextMenuItemTagShowColors();
+    WEBCORE_EXPORT String contextMenuItemTagSpeechMenu();
+    WEBCORE_EXPORT String contextMenuItemTagStartSpeaking();
+    WEBCORE_EXPORT String contextMenuItemTagStopSpeaking();
+    WEBCORE_EXPORT String contextMenuItemTagCorrectSpellingAutomatically();
+    WEBCORE_EXPORT String contextMenuItemTagSubstitutionsMenu();
+    WEBCORE_EXPORT String contextMenuItemTagShowSubstitutions(bool show);
+    WEBCORE_EXPORT String contextMenuItemTagSmartCopyPaste();
+    WEBCORE_EXPORT String contextMenuItemTagSmartQuotes();
+    WEBCORE_EXPORT String contextMenuItemTagSmartDashes();
+    WEBCORE_EXPORT String contextMenuItemTagSmartLinks();
+    WEBCORE_EXPORT String contextMenuItemTagTextReplacement();
+    WEBCORE_EXPORT String contextMenuItemTagTransformationsMenu();
+    WEBCORE_EXPORT String contextMenuItemTagMakeUpperCase();
+    WEBCORE_EXPORT String contextMenuItemTagMakeLowerCase();
+    WEBCORE_EXPORT String contextMenuItemTagCapitalize();
     String contextMenuItemTagChangeBack(const String& replacedString);
 #endif
     String contextMenuItemTagOpenVideoInNewWindow();
@@ -145,15 +145,18 @@ namespace WebCore {
     String contextMenuItemTagToggleMediaLoop();
     String contextMenuItemTagEnterVideoFullscreen();
     String contextMenuItemTagExitVideoFullscreen();
+#if PLATFORM(QT)
     String contextMenuItemTagToggleVideoFullscreen();
+#endif
     String contextMenuItemTagMediaPlayPause();
     String contextMenuItemTagMediaPlay();
     String contextMenuItemTagMediaPause();
     String contextMenuItemTagMediaMute();
     String contextMenuItemTagMediaUnmute();
-    String contextMenuItemTagInspectElement();
+    WEBCORE_EXPORT String contextMenuItemTagInspectElement();
 #endif // ENABLE(CONTEXT_MENUS)
 
+#if !PLATFORM(IOS)
     String searchMenuNoRecentSearchesText();
     String searchMenuRecentSearchesText();
     String searchMenuClearRecentSearchesText();
@@ -169,6 +172,7 @@ namespace WebCore {
     String AXDescriptionListDetailText();
     String AXFooterRoleDescriptionText();
     String AXFileUploadButtonText();
+    String AXSearchFieldCancelButtonText();
     
     String AXButtonActionVerb();
     String AXRadioButtonActionVerb();
@@ -179,14 +183,16 @@ namespace WebCore {
     String AXMenuListPopupActionVerb();
     String AXLinkActionVerb();
     String AXListItemActionVerb();
+#endif
 
 #if ENABLE(INPUT_TYPE_WEEK)
     // weekFormatInLDML() returns week and year format in LDML, Unicode
     // technical standard 35, Locale Data Markup Language, e.g. "'Week' ww, yyyy"
     String weekFormatInLDML();
 #endif
-#if PLATFORM(MAC) || PLATFORM(IOS)
+#if PLATFORM(COCOA)
     String AXARIAContentGroupText(const String& ariaType);
+    String AXHorizontalRuleDescriptionText();
 #endif
 
     String missingPluginText();
@@ -202,10 +208,10 @@ namespace WebCore {
     String allFilesText();
 #endif
 
-#if PLATFORM(MAC)
-    String builtInPDFPluginName();
-    String pdfDocumentTypeDescription();
-    String postScriptDocumentTypeDescription();
+#if PLATFORM(COCOA)
+    WEBCORE_EXPORT String builtInPDFPluginName();
+    WEBCORE_EXPORT String pdfDocumentTypeDescription();
+    WEBCORE_EXPORT String postScriptDocumentTypeDescription();
     String keygenMenuItem512();
     String keygenMenuItem1024();
     String keygenMenuItem2048();
@@ -214,6 +220,10 @@ namespace WebCore {
 
 #if PLATFORM(IOS)
     String htmlSelectMultipleItems(size_t num);
+    String fileButtonChooseMediaFileLabel();
+    String fileButtonChooseMultipleMediaFilesLabel();
+    String fileButtonNoMediaFileSelectedLabel();
+    String fileButtonNoMediaFilesSelectedLabel();
 #endif
 
     String imageTitle(const String& filename, const IntSize& size);
@@ -251,22 +261,31 @@ namespace WebCore {
     String textTrackOffMenuItemText();
     String textTrackAutomaticMenuItemText();
     String textTrackNoLabelText();
-#if PLATFORM(MAC) || PLATFORM(WIN)
+    String audioTrackNoLabelText();
+#if PLATFORM(COCOA) || PLATFORM(WIN)
     String textTrackCountryAndLanguageMenuItemText(const String& title, const String& country, const String& language);
     String textTrackLanguageMenuItemText(const String& title, const String& language);
     String closedCaptionTrackMenuItemText(const String&);
     String sdhTrackMenuItemText(const String&);
     String easyReaderTrackMenuItemText(const String&);
+    String forcedTrackMenuItemText(const String&);
 #endif
 #endif
 
     String snapshottedPlugInLabelTitle();
     String snapshottedPlugInLabelSubtitle();
 
+    WEBCORE_EXPORT String useBlockedPlugInContextMenuTitle();
+
+#if ENABLE(SUBTLE_CRYPTO)
+    String webCryptoMasterKeyKeychainLabel(const String& localizedApplicationName);
+    String webCryptoMasterKeyKeychainComment();
+#endif
+
 #define WEB_UI_STRING(string, description) WebCore::localizedString(string)
 #define WEB_UI_STRING_KEY(string, key, description) WebCore::localizedString(key)
 
-    String localizedString(const char* key);
+    WEBCORE_EXPORT String localizedString(const char* key);
 
 } // namespace WebCore
 

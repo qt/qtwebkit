@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -54,9 +54,9 @@ TextTrackCue* TextTrackCueList::item(unsigned index) const
 
 TextTrackCue* TextTrackCueList::getCueById(const String& id) const
 {
-    for (size_t i = 0; i < m_list.size(); ++i) {
-        if (m_list[i]->id() == id)
-            return m_list[i].get();
+    for (auto& cue : m_list) {
+        if (cue->id() == id)
+            return cue.get();
     }
     return 0;
 }
@@ -67,8 +67,7 @@ TextTrackCueList* TextTrackCueList::activeCues()
         m_activeCues = create();
 
     m_activeCues->clear();
-    for (size_t i = 0; i < m_list.size(); ++i) {
-        RefPtr<TextTrackCue> cue = m_list[i];
+    for (auto& cue : m_list) {
         if (cue->isActive())
             m_activeCues->add(cue);
     }
@@ -77,8 +76,8 @@ TextTrackCueList* TextTrackCueList::activeCues()
 
 bool TextTrackCueList::add(PassRefPtr<TextTrackCue> cue)
 {
-    ASSERT(cue->startTime() >= 0);
-    ASSERT(cue->endTime() >= 0);
+    ASSERT(cue->startMediaTime() >= MediaTime::zeroTime());
+    ASSERT(cue->endMediaTime() >= MediaTime::zeroTime());
 
     return add(cue, 0, m_list.size());
 }

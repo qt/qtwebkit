@@ -20,7 +20,6 @@
 #ifndef SVGAnimatedRect_h
 #define SVGAnimatedRect_h
 
-#if ENABLE(SVG)
 #include "SVGAnimatedPropertyMacros.h"
 #include "SVGAnimatedPropertyTearOff.h"
 #include "SVGAnimatedTypeAnimator.h"
@@ -32,33 +31,31 @@ typedef SVGAnimatedPropertyTearOff<FloatRect> SVGAnimatedRect;
 
 // Helper macros to declare/define a SVGAnimatedRect object
 #define DECLARE_ANIMATED_RECT(UpperProperty, LowerProperty) \
-DECLARE_ANIMATED_PROPERTY(SVGAnimatedRect, FloatRect, UpperProperty, LowerProperty)
+DECLARE_ANIMATED_PROPERTY(SVGAnimatedRect, FloatRect, UpperProperty, LowerProperty, )
 
 #define DEFINE_ANIMATED_RECT(OwnerType, DOMAttribute, UpperProperty, LowerProperty) \
 DEFINE_ANIMATED_PROPERTY(AnimatedRect, OwnerType, DOMAttribute, DOMAttribute.localName(), UpperProperty, LowerProperty)
 
 class SVGAnimationElement;
 
-class SVGAnimatedRectAnimator : public SVGAnimatedTypeAnimator {
+class SVGAnimatedRectAnimator final : public SVGAnimatedTypeAnimator {
 public:
     SVGAnimatedRectAnimator(SVGAnimationElement*, SVGElement*);
-    virtual ~SVGAnimatedRectAnimator() { }
 
-    virtual PassOwnPtr<SVGAnimatedType> constructFromString(const String&);
-    virtual PassOwnPtr<SVGAnimatedType> startAnimValAnimation(const SVGElementAnimatedPropertyList&);
-    virtual void stopAnimValAnimation(const SVGElementAnimatedPropertyList&);
-    virtual void resetAnimValToBaseVal(const SVGElementAnimatedPropertyList&, SVGAnimatedType*);
-    virtual void animValWillChange(const SVGElementAnimatedPropertyList&);
-    virtual void animValDidChange(const SVGElementAnimatedPropertyList&);
+    virtual std::unique_ptr<SVGAnimatedType> constructFromString(const String&) override;
+    virtual std::unique_ptr<SVGAnimatedType> startAnimValAnimation(const SVGElementAnimatedPropertyList&) override;
+    virtual void stopAnimValAnimation(const SVGElementAnimatedPropertyList&) override;
+    virtual void resetAnimValToBaseVal(const SVGElementAnimatedPropertyList&, SVGAnimatedType&) override;
+    virtual void animValWillChange(const SVGElementAnimatedPropertyList&) override;
+    virtual void animValDidChange(const SVGElementAnimatedPropertyList&) override;
 
-    virtual void addAnimatedTypes(SVGAnimatedType*, SVGAnimatedType*);
-    virtual void calculateAnimatedValue(float percentage, unsigned repeatCount, SVGAnimatedType*, SVGAnimatedType*, SVGAnimatedType*, SVGAnimatedType*);
-    virtual float calculateDistance(const String& fromString, const String& toString);
+    virtual void addAnimatedTypes(SVGAnimatedType*, SVGAnimatedType*) override;
+    virtual void calculateAnimatedValue(float percentage, unsigned repeatCount, SVGAnimatedType*, SVGAnimatedType*, SVGAnimatedType*, SVGAnimatedType*) override;
+    virtual float calculateDistance(const String& fromString, const String& toString) override;
 
     static bool parseSVGRect(const String&, FloatRect&);
 };
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif

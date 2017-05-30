@@ -26,60 +26,79 @@
 #ifndef JSMainThreadExecState_h
 #define JSMainThreadExecState_h
 
-#include "InspectorInstrumentation.h"
 #include "JSDOMBinding.h"
 #include <runtime/Completion.h>
-#include <runtime/Executable.h>
-#ifndef NDEBUG
+#include <runtime/Microtask.h>
 #include <wtf/MainThread.h>
+
+#if PLATFORM(IOS)
+#include "WebCoreThread.h"
 #endif
 
 namespace WebCore {
 
+class InspectorInstrumentationCookie;
 class ScriptExecutionContext;
 
 class JSMainThreadExecState {
     WTF_MAKE_NONCOPYABLE(JSMainThreadExecState);
+    friend class JSMainThreadNullState;
 public:
     static JSC::ExecState* currentState()
-    { 
+    {
         ASSERT(isMainThread());
         return s_mainThreadState;
     };
     
-    static JSC::JSValue call(JSC::ExecState* exec, JSC::JSValue functionObject, JSC::CallType callType, const JSC::CallData& callData, JSC::JSValue thisValue, const JSC::ArgList& args)
+    static JSC::JSValue call(JSC::ExecState* exec, JSC::JSValue functionObject, JSC::CallType callType, const JSC::CallData& callData, JSC::JSValue thisValue, const JSC::ArgList& args, NakedPtr<JSC::Exception>& returnedException)
     {
         JSMainThreadExecState currentState(exec);
-        // Ensure DOM global object is unwrapped to the shell.
-        if (thisValue.isObject())
-            thisValue = thisValue.toThisObject(exec);
-        return JSC::call(exec, functionObject, callType, callData, thisValue, args);
+        return JSC::call(exec, functionObject, callType, callData, thisValue, args, returnedException);
     };
 
-    static inline InspectorInstrumentationCookie instrumentFunctionCall(ScriptExecutionContext* context, JSC::CallType callType, const JSC::CallData& callData)
+    static JSC::JSValue evaluate(JSC::ExecState* exec, const JSC::SourceCode& source, JSC::JSValue thisValue, NakedPtr<JSC::Exception>& returnedException)
     {
-        if (!InspectorInstrumentation::timelineAgentEnabled(context))
-            return InspectorInstrumentationCookie();
-        String resourceName;
-        int lineNumber = 1;
-        if (callType == JSC::CallTypeJS) {
-            resourceName = callData.js.functionExecutable->sourceURL();
-            lineNumber = callData.js.functionExecutable->lineNo();
-        } else
-            resourceName = "undefined";
-        return InspectorInstrumentation::willCallFunction(context, resourceName, lineNumber);
+        JSMainThreadExecState currentState(exec);
+        return JSC::evaluate(exec, source, thisValue, returnedException);
+    };
+
+    static JSC::JSValue evaluate(JSC::ExecState* exec, const JSC::SourceCode& source, JSC::JSValue thisValue = JSC::JSValue())
+    {
+        NakedPtr<JSC::Exception> unused;
+        return evaluate(exec, source, thisValue, unused);
+    };
+
+    static JSC::JSValue profiledCall(JSC::ExecState* exec, JSC::ProfilingReason reason, JSC::JSValue functionObject, JSC::CallType callType, const JSC::CallData& callData, JSC::JSValue thisValue, const JSC::ArgList& args, NakedPtr<JSC::Exception>& returnedException)
+    {
+        JSMainThreadExecState currentState(exec);
+        return JSC::profiledCall(exec, reason, functionObject, callType, callData, thisValue, args, returnedException);
     }
 
-    static JSC::JSValue evaluate(JSC::ExecState* exec, const JSC::SourceCode& source, JSC::JSValue thisValue, JSC::JSValue* exception)
+    static JSC::JSValue profiledEvaluate(JSC::ExecState* exec, JSC::ProfilingReason reason, const JSC::SourceCode& source, JSC::JSValue thisValue, NakedPtr<JSC::Exception>& returnedException)
     {
         JSMainThreadExecState currentState(exec);
-        JSC::JSLockHolder lock(exec);
-        return JSC::evaluate(exec, source, thisValue, exception);
-    };
+        return JSC::profiledEvaluate(exec, reason, source, thisValue, returnedException);
+    }
 
-protected:
+    static JSC::JSValue profiledEvaluate(JSC::ExecState* exec, JSC::ProfilingReason reason, const JSC::SourceCode& source, JSC::JSValue thisValue = JSC::JSValue())
+    {
+        NakedPtr<JSC::Exception> unused;
+        return profiledEvaluate(exec, reason, source, thisValue, unused);
+    }
+
+    static void runTask(JSC::ExecState* exec, JSC::Microtask& task)
+    {
+        JSMainThreadExecState currentState(exec);
+        task.run(exec);
+    }
+
+    static InspectorInstrumentationCookie instrumentFunctionCall(ScriptExecutionContext*, JSC::CallType, const JSC::CallData&);
+    static InspectorInstrumentationCookie instrumentFunctionConstruct(ScriptExecutionContext*, JSC::ConstructType, const JSC::ConstructData&);
+
+private:
     explicit JSMainThreadExecState(JSC::ExecState* exec)
         : m_previousState(s_mainThreadState)
+        , m_lock(exec)
     {
         ASSERT(isMainThread());
         s_mainThreadState = exec;
@@ -88,6 +107,7 @@ protected:
     ~JSMainThreadExecState()
     {
         ASSERT(isMainThread());
+        ASSERT(!s_mainThreadState->hadException());
 
         bool didExitJavaScript = s_mainThreadState && !m_previousState;
 
@@ -97,19 +117,39 @@ protected:
             didLeaveScriptContext();
     }
 
-private:
+    template<typename Type, Type jsType, typename DataType> static InspectorInstrumentationCookie instrumentFunctionInternal(ScriptExecutionContext*, Type, const DataType&);
+
     static JSC::ExecState* s_mainThreadState;
     JSC::ExecState* m_previousState;
+    JSC::JSLockHolder m_lock;
 
     static void didLeaveScriptContext();
 };
 
 // Null state prevents origin security checks.
 // Used by non-JavaScript bindings (ObjC, GObject).
-class JSMainThreadNullState : private JSMainThreadExecState {
+class JSMainThreadNullState {
+    WTF_MAKE_NONCOPYABLE(JSMainThreadNullState);
 public:
-    explicit JSMainThreadNullState() : JSMainThreadExecState(0) {};
+    explicit JSMainThreadNullState()
+        : m_previousState(JSMainThreadExecState::s_mainThreadState)
+    {
+        ASSERT(isMainThread());
+        JSMainThreadExecState::s_mainThreadState = nullptr;
+    }
+
+    ~JSMainThreadNullState()
+    {
+        ASSERT(isMainThread());
+        JSMainThreadExecState::s_mainThreadState = m_previousState;
+    }
+
+private:
+    JSC::ExecState* m_previousState;
 };
+
+JSC::JSValue functionCallHandlerFromAnyThread(JSC::ExecState*, JSC::JSValue functionObject, JSC::CallType, const JSC::CallData&, JSC::JSValue thisValue, const JSC::ArgList& args, NakedPtr<JSC::Exception>& returnedException);
+JSC::JSValue evaluateHandlerFromAnyThread(JSC::ExecState*, const JSC::SourceCode&, JSC::JSValue thisValue, NakedPtr<JSC::Exception>& returnedException);
 
 } // namespace WebCore
 

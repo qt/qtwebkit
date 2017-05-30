@@ -23,30 +23,29 @@
 #include "config.h"
 #include "HTMLBRElement.h"
 
-#include "Attribute.h"
 #include "CSSPropertyNames.h"
 #include "CSSValueKeywords.h"
 #include "HTMLNames.h"
-#include "RenderBR.h"
+#include "RenderLineBreak.h"
 
 namespace WebCore {
 
 using namespace HTMLNames;
 
-HTMLBRElement::HTMLBRElement(const QualifiedName& tagName, Document* document)
+HTMLBRElement::HTMLBRElement(const QualifiedName& tagName, Document& document)
     : HTMLElement(tagName, document)
 {
     ASSERT(hasTagName(brTag));
 }
 
-PassRefPtr<HTMLBRElement> HTMLBRElement::create(Document* document)
+Ref<HTMLBRElement> HTMLBRElement::create(Document& document)
 {
-    return adoptRef(new HTMLBRElement(brTag, document));
+    return adoptRef(*new HTMLBRElement(brTag, document));
 }
 
-PassRefPtr<HTMLBRElement> HTMLBRElement::create(const QualifiedName& tagName, Document* document)
+Ref<HTMLBRElement> HTMLBRElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new HTMLBRElement(tagName, document));
+    return adoptRef(*new HTMLBRElement(tagName, document));
 }
 
 bool HTMLBRElement::isPresentationAttribute(const QualifiedName& name) const
@@ -56,13 +55,13 @@ bool HTMLBRElement::isPresentationAttribute(const QualifiedName& name) const
     return HTMLElement::isPresentationAttribute(name);
 }
 
-void HTMLBRElement::collectStyleForPresentationAttribute(const QualifiedName& name, const AtomicString& value, MutableStylePropertySet* style)
+void HTMLBRElement::collectStyleForPresentationAttribute(const QualifiedName& name, const AtomicString& value, MutableStyleProperties& style)
 {
     if (name == clearAttr) {
         // If the string is empty, then don't add the clear property.
         // <br clear> and <br clear=""> are just treated like <br> by Gecko, Mac IE, etc. -dwh
         if (!value.isEmpty()) {
-            if (equalIgnoringCase(value, "all"))
+            if (equalLettersIgnoringASCIICase(value, "all"))
                 addPropertyToPresentationAttributeStyle(style, CSSPropertyClear, CSSValueBoth);
             else
                 addPropertyToPresentationAttributeStyle(style, CSSPropertyClear, value);
@@ -71,12 +70,12 @@ void HTMLBRElement::collectStyleForPresentationAttribute(const QualifiedName& na
         HTMLElement::collectStyleForPresentationAttribute(name, value, style);
 }
 
-RenderObject* HTMLBRElement::createRenderer(RenderArena* arena, RenderStyle* style)
+RenderPtr<RenderElement> HTMLBRElement::createElementRenderer(Ref<RenderStyle>&& style, const RenderTreePosition&)
 {
-     if (style->hasContent())
-        return RenderObject::createObject(this, style);
+    if (style.get().hasContent())
+        return RenderElement::createFor(*this, WTFMove(style));
 
-     return new (arena) RenderBR(this);
+    return createRenderer<RenderLineBreak>(*this, WTFMove(style));
 }
 
 }

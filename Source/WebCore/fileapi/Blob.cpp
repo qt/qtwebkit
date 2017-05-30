@@ -33,53 +33,82 @@
 
 #include "BlobURL.h"
 #include "File.h"
-#include "HistogramSupport.h"
-#include "ScriptCallStack.h"
 #include "ScriptExecutionContext.h"
 #include "ThreadableBlobRegistry.h"
+#include <wtf/NeverDestroyed.h>
 #include <wtf/text/CString.h>
 
 namespace WebCore {
 
-namespace {
+class BlobURLRegistry final : public URLRegistry {
+public:
+    virtual void registerURL(SecurityOrigin*, const URL&, URLRegistrable*) override;
+    virtual void unregisterURL(const URL&) override;
 
-// Used in histograms to see when we can actually deprecate the prefixed slice.
-enum SliceHistogramEnum {
-    SliceWithoutPrefix,
-    SliceWithPrefix,
-    SliceHistogramEnumMax,
+    static URLRegistry& registry();
 };
 
-} // namespace
+
+void BlobURLRegistry::registerURL(SecurityOrigin* origin, const URL& publicURL, URLRegistrable* blob)
+{
+    ASSERT(&blob->registry() == this);
+    ThreadableBlobRegistry::registerBlobURL(origin, publicURL, static_cast<Blob*>(blob)->url());
+}
+
+void BlobURLRegistry::unregisterURL(const URL& url)
+{
+    ThreadableBlobRegistry::unregisterBlobURL(url);
+}
+
+URLRegistry& BlobURLRegistry::registry()
+{
+    static NeverDestroyed<BlobURLRegistry> instance;
+    return instance;
+}
+
+Blob::Blob(UninitializedContructor)
+{
+}
 
 Blob::Blob()
     : m_size(0)
 {
-    OwnPtr<BlobData> blobData = BlobData::create();
-
-    // Create a new internal URL and register it with the provided blob data.
     m_internalURL = BlobURL::createInternalURL();
-    ThreadableBlobRegistry::registerBlobURL(m_internalURL, blobData.release());
+    ThreadableBlobRegistry::registerBlobURL(m_internalURL, Vector<BlobPart>(), String());
 }
 
-Blob::Blob(PassOwnPtr<BlobData> blobData, long long size)
-    : m_type(blobData->contentType())
-    , m_size(size)
+Blob::Blob(Vector<uint8_t> data, const String& contentType)
+    : m_type(contentType)
+    , m_size(data.size())
 {
-    ASSERT(blobData);
-
-    // Create a new internal URL and register it with the provided blob data.
+    Vector<BlobPart> blobParts;
+    blobParts.append(BlobPart(WTFMove(data)));
     m_internalURL = BlobURL::createInternalURL();
-    ThreadableBlobRegistry::registerBlobURL(m_internalURL, blobData);
+    ThreadableBlobRegistry::registerBlobURL(m_internalURL, WTFMove(blobParts), contentType);
 }
 
-Blob::Blob(const KURL& srcURL, const String& type, long long size)
-    : m_type(Blob::normalizedContentType(type))
+Blob::Blob(Vector<BlobPart> blobParts, const String& contentType)
+    : m_type(contentType)
+    , m_size(-1)
+{
+    m_internalURL = BlobURL::createInternalURL();
+    ThreadableBlobRegistry::registerBlobURL(m_internalURL, WTFMove(blobParts), contentType);
+}
+
+Blob::Blob(DeserializationContructor, const URL& srcURL, const String& type, long long size)
+    : m_type(normalizedContentType(type))
     , m_size(size)
 {
-    // Create a new internal URL and register it with the same blob data as the source URL.
     m_internalURL = BlobURL::createInternalURL();
-    ThreadableBlobRegistry::registerBlobURL(0, m_internalURL, srcURL);
+    ThreadableBlobRegistry::registerBlobURL(nullptr, m_internalURL, srcURL);
+}
+
+Blob::Blob(const URL& srcURL, long long start, long long end, const String& type)
+    : m_type(normalizedContentType(type))
+    , m_size(-1) // size is not necessarily equal to end - start.
+{
+    m_internalURL = BlobURL::createInternalURL();
+    ThreadableBlobRegistry::registerBlobURLForSlice(m_internalURL, srcURL, start, end);
 }
 
 Blob::~Blob()
@@ -87,123 +116,69 @@ Blob::~Blob()
     ThreadableBlobRegistry::unregisterBlobURL(m_internalURL);
 }
 
+unsigned long long Blob::size() const
+{
+    if (m_size < 0) {
+        // FIXME: JavaScript cannot represent sizes as large as unsigned long long, we need to
+        // come up with an exception to throw if file size is not representable.
+        unsigned long long actualSize = ThreadableBlobRegistry::blobSize(m_internalURL);
+        m_size = WTF::isInBounds<long long>(actualSize) ? static_cast<long long>(actualSize) : 0;
+    }
+
+    return static_cast<unsigned long long>(m_size);
+}
+
 bool Blob::isValidContentType(const String& contentType)
 {
-    if (contentType.isNull())
-        return true;
-
-    size_t length = contentType.length();
-    if (contentType.is8Bit()) {
-        const LChar* characters = contentType.characters8();
-        for (size_t i = 0; i < length; ++i) {
-            if (characters[i] < 0x20 || characters[i] > 0x7e)
-                return false;
-        }
-    } else {
-        const UChar* characters = contentType.characters16();
-        for (size_t i = 0; i < length; ++i) {
-            if (characters[i] < 0x20 || characters[i] > 0x7e)
-                return false;
-        }
+    // FIXME: Do we really want to treat the empty string and null string as valid content types?
+    unsigned length = contentType.length();
+    for (unsigned i = 0; i < length; ++i) {
+        if (contentType[i] < 0x20 || contentType[i] > 0x7e)
+            return false;
     }
     return true;
 }
 
 String Blob::normalizedContentType(const String& contentType)
 {
-    if (Blob::isValidContentType(contentType))
-        return contentType.lower();
-    return emptyString();
+    if (!isValidContentType(contentType))
+        return emptyString();
+    return contentType.convertToASCIILowercase();
 }
 
+#if !ASSERT_DISABLED
 bool Blob::isNormalizedContentType(const String& contentType)
 {
-    if (contentType.isNull())
-        return true;
-
-    size_t length = contentType.length();
-    if (contentType.is8Bit()) {
-        const LChar* characters = contentType.characters8();
-        for (size_t i = 0; i < length; ++i) {
-            if (characters[i] < 0x20 || characters[i] > 0x7e)
-                return false;
-            if (characters[i] >= 'A' && characters[i] <= 'Z')
-                return false;
-        }
-    } else {
-        const UChar* characters = contentType.characters16();
-        for (size_t i = 0; i < length; ++i) {
-            if (characters[i] < 0x20 || characters[i] > 0x7e)
-                return false;
-            if (characters[i] >= 'A' && characters[i] <= 'Z')
-                return false;
-        }
+    // FIXME: Do we really want to treat the empty string and null string as valid content types?
+    unsigned length = contentType.length();
+    for (size_t i = 0; i < length; ++i) {
+        if (contentType[i] < 0x20 || contentType[i] > 0x7e)
+            return false;
+        if (isASCIIUpper(contentType[i]))
+            return false;
     }
     return true;
 }
 
 bool Blob::isNormalizedContentType(const CString& contentType)
 {
+    // FIXME: Do we really want to treat the empty string and null string as valid content types?
     size_t length = contentType.length();
     const char* characters = contentType.data();
     for (size_t i = 0; i < length; ++i) {
         if (characters[i] < 0x20 || characters[i] > 0x7e)
             return false;
-        if (characters[i] >= 'A' && characters[i] <= 'Z')
+        if (isASCIIUpper(characters[i]))
             return false;
     }
     return true;
 }
+#endif
 
-#if ENABLE(BLOB)
-PassRefPtr<Blob> Blob::slice(long long start, long long end, const String& contentType) const
+URLRegistry& Blob::registry() const
 {
-    // When we slice a file for the first time, we obtain a snapshot of the file by capturing its current size and modification time.
-    // The modification time will be used to verify if the file has been changed or not, when the underlying data are accessed.
-    long long size;
-    double modificationTime;
-    if (isFile()) {
-        // FIXME: This involves synchronous file operation. We need to figure out how to make it asynchronous.
-        toFile(this)->captureSnapshot(size, modificationTime);
-    } else {
-        ASSERT(m_size != -1);
-        size = m_size;
-    }
-
-    // Convert the negative value that is used to select from the end.
-    if (start < 0)
-        start = start + size;
-    if (end < 0)
-        end = end + size;
-
-    // Clamp the range if it exceeds the size limit.
-    if (start < 0)
-        start = 0;
-    if (end < 0)
-        end = 0;
-    if (start >= size) {
-        start = 0;
-        end = 0;
-    } else if (end < start)
-        end = start;
-    else if (end > size)
-        end = size;
-
-    long long length = end - start;
-    OwnPtr<BlobData> blobData = BlobData::create();
-    blobData->setContentType(Blob::normalizedContentType(contentType));
-    if (isFile()) {
-#if ENABLE(FILE_SYSTEM)
-        if (!toFile(this)->fileSystemURL().isEmpty())
-            blobData->appendURL(toFile(this)->fileSystemURL(), start, length, modificationTime);
-        else
-#endif
-        blobData->appendFile(toFile(this)->path(), start, length, modificationTime);
-    } else
-        blobData->appendBlob(m_internalURL, start, length);
-
-    return Blob::create(blobData.release(), length);
+    return BlobURLRegistry::registry();
 }
-#endif
+
 
 } // namespace WebCore

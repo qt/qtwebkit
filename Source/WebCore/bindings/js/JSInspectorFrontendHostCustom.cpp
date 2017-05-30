@@ -31,14 +31,12 @@
  */
 
 #include "config.h"
-
-#if ENABLE(INSPECTOR)
-
 #include "JSInspectorFrontendHost.h"
 
 #include "ContextMenuItem.h"
 #include "InspectorController.h"
 #include "InspectorFrontendHost.h"
+#include "JSDOMBinding.h"
 #include "JSEvent.h"
 #include "MouseEvent.h"
 #include <runtime/JSArray.h>
@@ -51,68 +49,29 @@ using namespace JSC;
 
 namespace WebCore {
 
-JSValue JSInspectorFrontendHost::platform(ExecState* execState)
-{
-#if PLATFORM(MAC)
-    DEFINE_STATIC_LOCAL(const String, platform, (ASCIILiteral("mac")));
-#elif OS(WINDOWS)
-    DEFINE_STATIC_LOCAL(const String, platform, (ASCIILiteral("windows")));
-#elif OS(LINUX)
-    DEFINE_STATIC_LOCAL(const String, platform, (ASCIILiteral("linux")));
-#elif OS(FREEBSD)
-    DEFINE_STATIC_LOCAL(const String, platform, (ASCIILiteral("freebsd")));
-#elif OS(OPENBSD)
-    DEFINE_STATIC_LOCAL(const String, platform, (ASCIILiteral("openbsd")));
-#elif OS(SOLARIS)
-    DEFINE_STATIC_LOCAL(const String, platform, (ASCIILiteral("solaris")));
-#else
-    DEFINE_STATIC_LOCAL(const String, platform, (ASCIILiteral("unknown")));
-#endif
-    return jsStringWithCache(execState, platform);
-}
-
-JSValue JSInspectorFrontendHost::port(ExecState* execState)
-{
-#if PLATFORM(QT)
-    DEFINE_STATIC_LOCAL(const String, port, (ASCIILiteral("qt")));
-#elif PLATFORM(GTK)
-    DEFINE_STATIC_LOCAL(const String, port, (ASCIILiteral("gtk")));
-#elif PLATFORM(EFL)
-    DEFINE_STATIC_LOCAL(const String, port, (ASCIILiteral("efl")));
-#else
-    DEFINE_STATIC_LOCAL(const String, port, (ASCIILiteral("unknown")));
-#endif
-    return jsStringWithCache(execState, port);
-}
-
 #if ENABLE(CONTEXT_MENUS)
 static void populateContextMenuItems(ExecState* exec, JSArray* array, ContextMenu& menu)
 {
     for (size_t i = 0; i < array->length(); ++i) {
         JSObject* item = asObject(array->getIndex(exec, i));
-        JSValue label = item->get(exec, Identifier(exec, "label"));
-        JSValue type = item->get(exec, Identifier(exec, "type"));
-        JSValue id = item->get(exec, Identifier(exec, "id"));
-        JSValue enabled = item->get(exec, Identifier(exec, "enabled"));
-        JSValue checked = item->get(exec, Identifier(exec, "checked"));
-        JSValue subItems = item->get(exec, Identifier(exec, "subItems"));
+        JSValue label = item->get(exec, Identifier::fromString(exec, "label"));
+        JSValue type = item->get(exec, Identifier::fromString(exec, "type"));
+        JSValue id = item->get(exec, Identifier::fromString(exec, "id"));
+        JSValue enabled = item->get(exec, Identifier::fromString(exec, "enabled"));
+        JSValue checked = item->get(exec, Identifier::fromString(exec, "checked"));
+        JSValue subItems = item->get(exec, Identifier::fromString(exec, "subItems"));
         if (!type.isString())
             continue;
 
         String typeString = type.toString(exec)->value(exec);
         if (typeString == "separator") {
-            ContextMenuItem item(SeparatorType,
-                                 ContextMenuItemCustomTagNoAction,
-                                 String());
+            ContextMenuItem item(SeparatorType, ContextMenuItemTagNoAction, String());
             menu.appendItem(item);
-        } else if (typeString == "subMenu" && subItems.inherits(&JSArray::s_info)) {
+        } else if (typeString == "subMenu" && subItems.inherits(JSArray::info())) {
             ContextMenu subMenu;
             JSArray* subItemsArray = asArray(subItems);
             populateContextMenuItems(exec, subItemsArray, subMenu);
-            ContextMenuItem item(SubmenuType,
-                                 ContextMenuItemCustomTagNoAction,
-                                 label.toString(exec)->value(exec),
-                                 &subMenu);
+            ContextMenuItem item(SubmenuType, ContextMenuItemTagNoAction, label.toString(exec)->value(exec), &subMenu);
             menu.appendItem(item);
         } else {
             ContextMenuAction typedId = static_cast<ContextMenuAction>(ContextMenuItemBaseCustomTag + id.toInt32(exec));
@@ -127,44 +86,22 @@ static void populateContextMenuItems(ExecState* exec, JSArray* array, ContextMen
 }
 #endif
 
-JSValue JSInspectorFrontendHost::showContextMenu(ExecState* exec)
+JSValue JSInspectorFrontendHost::showContextMenu(ExecState& state)
 {
 #if ENABLE(CONTEXT_MENUS)
-    if (exec->argumentCount() < 2)
+    if (state.argumentCount() < 2)
         return jsUndefined();
-    Event* event = toEvent(exec->argument(0));
+    Event* event = JSEvent::toWrapped(state.argument(0));
 
-    JSArray* array = asArray(exec->argument(1));
+    JSArray* array = asArray(state.argument(1));
     ContextMenu menu;
-    populateContextMenuItems(exec, array, menu);
+    populateContextMenuItems(&state, array, menu);
 
-#if !USE(CROSS_PLATFORM_CONTEXT_MENUS)
-    Vector<ContextMenuItem> items = contextMenuItemVector(menu.platformDescription());
+    wrapped().showContextMenu(event, menu.items());
 #else
-    Vector<ContextMenuItem> items = menu.items();
+    UNUSED_PARAM(state);
 #endif
-    impl()->showContextMenu(event, items);
-#else
-    UNUSED_PARAM(exec);
-#endif
-    return jsUndefined();
-}
-
-JSValue JSInspectorFrontendHost::recordActionTaken(ExecState*)
-{
-    return jsUndefined();
-}
-
-JSValue JSInspectorFrontendHost::recordPanelShown(ExecState*)
-{
-    return jsUndefined();
-}
-
-JSValue JSInspectorFrontendHost::recordSettingChanged(ExecState*)
-{
     return jsUndefined();
 }
 
 } // namespace WebCore
-
-#endif // ENABLE(INSPECTOR)

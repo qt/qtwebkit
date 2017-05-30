@@ -21,42 +21,39 @@
 #ifndef SVGURIReference_h
 #define SVGURIReference_h
 
-#if ENABLE(SVG)
 #include "Document.h"
+#include "QualifiedName.h"
 
 namespace WebCore {
-
-class Attribute;
-class Element;
 
 class SVGURIReference {
 public:
     virtual ~SVGURIReference() { }
 
-    bool parseAttribute(const QualifiedName&, const AtomicString&);
-    bool isKnownAttribute(const QualifiedName&);
-    void addSupportedAttributes(HashSet<QualifiedName>&);
+    void parseAttribute(const QualifiedName&, const AtomicString&);
+    static bool isKnownAttribute(const QualifiedName&);
+    static void addSupportedAttributes(HashSet<QualifiedName>&);
 
-    static String fragmentIdentifierFromIRIString(const String&, Document*);
-    static Element* targetElementFromIRIString(const String&, Document*, String* = 0, Document* = 0);
+    static String fragmentIdentifierFromIRIString(const String&, Document&);
+    static Element* targetElementFromIRIString(const String&, Document&, String* = nullptr, Document* = nullptr);
 
-    static inline bool isExternalURIReference(const String& uri, Document* document)
+    static bool isExternalURIReference(const String& uri, Document& document)
     {
         // Fragment-only URIs are always internal
         if (uri.startsWith('#'))
             return false;
 
         // If the URI matches our documents URL, we're dealing with a local reference.
-        ASSERT(document);
-        KURL url = document->completeURL(uri);
-        return !equalIgnoringFragmentIdentifier(url, document->url());
+        URL url = document.completeURL(uri);
+        ASSERT(!url.protocolIsData());
+        return !equalIgnoringFragmentIdentifier(url, document.url());
     }
 
 protected:
+    virtual String& hrefBaseValue() const = 0;
     virtual void setHrefBaseValue(const String&, const bool validValue = true) = 0;
 };
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif // SVGURIReference_h

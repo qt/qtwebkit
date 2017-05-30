@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -26,15 +26,15 @@
 #ifndef HTMLSourceElement_h
 #define HTMLSourceElement_h
 
-#if ENABLE(VIDEO)
 #include "HTMLElement.h"
+#include "MediaList.h"
 #include "Timer.h"
 
 namespace WebCore {
 
-class HTMLSourceElement FINAL : public HTMLElement {
+class HTMLSourceElement final : public HTMLElement, public ActiveDOMObject {
 public:
-    static PassRefPtr<HTMLSourceElement> create(const QualifiedName&, Document*);
+    static Ref<HTMLSourceElement> create(const QualifiedName&, Document&);
 
     String media() const;
     String type() const;
@@ -45,24 +45,32 @@ public:
     void scheduleErrorEvent();
     void cancelPendingErrorEvent();
 
+    MediaQuerySet* mediaQuerySet() const { return m_mediaQuerySet.get(); }
+
 private:
-    HTMLSourceElement(const QualifiedName&, Document*);
+    HTMLSourceElement(const QualifiedName&, Document&);
     
-    virtual InsertionNotificationRequest insertedInto(ContainerNode*) OVERRIDE;
-    virtual void removedFrom(ContainerNode*) OVERRIDE;
-    virtual bool isURLAttribute(const Attribute&) const OVERRIDE;
+    virtual InsertionNotificationRequest insertedInto(ContainerNode&) override;
+    virtual void removedFrom(ContainerNode&) override;
+    virtual bool isURLAttribute(const Attribute&) const override;
 
-    void errorEventTimerFired(Timer<HTMLSourceElement>*);
+    // ActiveDOMObject.
+    const char* activeDOMObjectName() const override;
+    bool canSuspendForDocumentSuspension() const override;
+    void suspend(ReasonForSuspension) override;
+    void resume() override;
+    void stop() override;
 
-#if ENABLE(MICRODATA)
-    virtual String itemValueText() const OVERRIDE;
-    virtual void setItemValueText(const String&, ExceptionCode&) OVERRIDE;
-#endif
+    void parseAttribute(const QualifiedName&, const AtomicString&) override;
 
-    Timer<HTMLSourceElement> m_errorEventTimer;
+    void errorEventTimerFired();
+
+    Timer m_errorEventTimer;
+    bool m_shouldRescheduleErrorEventOnResume { false };
+    RefPtr<MediaQuerySet> m_mediaQuerySet;
 };
 
 } //namespace
 
 #endif
-#endif
+

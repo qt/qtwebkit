@@ -18,7 +18,6 @@
 */
 
 #include "config.h"
-
 #include "qwebloadrequest_p.h"
 
 class QWebLoadRequestPrivate {
@@ -109,3 +108,5 @@ int QWebLoadRequest::errorCode() const
 {
     return d->errorCode;
 }
+
+#include "moc_qwebloadrequest_p.cpp"

@@ -31,11 +31,8 @@
 #ifndef AbstractWorker_h
 #define AbstractWorker_h
 
-#if ENABLE(WORKERS)
-
 #include "ActiveDOMObject.h"
 #include "EventListener.h"
-#include "EventNames.h"
 #include "EventTarget.h"
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
@@ -44,39 +41,27 @@
 
 namespace WebCore {
 
-    class KURL;
-    class ScriptExecutionContext;
+    class URL;
 
-    class AbstractWorker : public RefCounted<AbstractWorker>, public ActiveDOMObject, public EventTarget {
+    class AbstractWorker : public RefCounted<AbstractWorker>, public EventTargetWithInlineData {
     public:
-        // EventTarget APIs
-        virtual ScriptExecutionContext* scriptExecutionContext() const OVERRIDE { return ActiveDOMObject::scriptExecutionContext(); }
-
-        DEFINE_ATTRIBUTE_EVENT_LISTENER(error);
-
         using RefCounted<AbstractWorker>::ref;
         using RefCounted<AbstractWorker>::deref;
 
-        virtual void contextDestroyed() OVERRIDE;
-        AbstractWorker(ScriptExecutionContext*);
         virtual ~AbstractWorker();
 
     protected:
+        AbstractWorker() = default;
+
         // Helper function that converts a URL to an absolute URL and checks the result for validity.
-        KURL resolveURL(const String& url, ExceptionCode& ec);
+        URL resolveURL(const String& url, bool shouldBypassMainWorldContentSecurityPolicy, ExceptionCode&);
         intptr_t asID() const { return reinterpret_cast<intptr_t>(this); }
 
     private:
-        virtual void refEventTarget() OVERRIDE { ref(); }
-        virtual void derefEventTarget() OVERRIDE { deref(); }
-        virtual EventTargetData* eventTargetData() OVERRIDE;
-        virtual EventTargetData* ensureEventTargetData() OVERRIDE;
-        
-        EventTargetData m_eventTargetData;
+        virtual void refEventTarget() override final { ref(); }
+        virtual void derefEventTarget() override final { deref(); }
     };
 
 } // namespace WebCore
-
-#endif // ENABLE(WORKERS)
 
 #endif // AbstractWorker_h

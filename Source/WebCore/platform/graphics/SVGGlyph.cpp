@@ -23,14 +23,10 @@
 #if ENABLE(SVG_FONTS)
 #include "SVGGlyph.h"
 
-#include <wtf/unicode/Unicode.h>
-
-using namespace WTF::Unicode;
-
 namespace WebCore {
 
 // Helper functions to determine the arabic character forms (initial, medial, terminal, isolated)
-enum ArabicCharShapingMode {
+enum ArabicCharShapingMode : uint8_t {
     SNone = 0,
     SRight = 1,
     SDual = 2
@@ -87,7 +83,7 @@ Vector<SVGGlyph::ArabicForm> charactersWithArabicForm(const String& input, bool 
 
     bool containsArabic = false;
     for (unsigned i = 0; i < length; ++i) {
-        if (isArabicChar(input[i])) {
+        if (ublock_getCode(input[i]) == UBLOCK_ARABIC) {
             containsArabic = true;
             break;
         }
@@ -116,11 +112,11 @@ static inline bool isCompatibleArabicForm(const SVGGlyph& identifier, const Vect
         return true;
 
     Vector<SVGGlyph::ArabicForm>::const_iterator realEnd = chars.end();
-    Vector<SVGGlyph::ArabicForm>::const_iterator it = chars.begin() + startPosition;
+    Vector<SVGGlyph::ArabicForm>::const_iterator it = chars.begin() + static_cast<int>(startPosition);
     if (it >= realEnd)
         return true;
 
-    Vector<SVGGlyph::ArabicForm>::const_iterator end = chars.begin() + endPosition;
+    Vector<SVGGlyph::ArabicForm>::const_iterator end = chars.begin() + static_cast<int>(endPosition);
     if (end >= realEnd)
         end = realEnd;
 

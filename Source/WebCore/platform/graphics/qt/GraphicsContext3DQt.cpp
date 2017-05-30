@@ -30,20 +30,19 @@
 #include "QWebPageClient.h"
 #include "SharedBuffer.h"
 #include "TextureMapperPlatformLayer.h"
+#include <QOffscreenSurface>
+#include <private/qopenglextensions_p.h>
 #include <qpa/qplatformpixmap.h>
 #include <wtf/text/CString.h>
-
-#include <private/qopenglextensions_p.h>
-#include <QOffscreenSurface>
 
 #if USE(TEXTURE_MAPPER_GL)
 #include <texmap/TextureMapperGL.h>
 #endif
 
-#if USE(3D_GRAPHICS)
+#if ENABLE(GRAPHICS_CONTEXT_3D)
 
 QT_BEGIN_NAMESPACE
-extern Q_GUI_EXPORT QImage qt_gl_read_framebuffer(const QSize &size, bool alpha_format, bool include_alpha);
+extern Q_GUI_EXPORT QImage qt_gl_read_framebuffer(const QSize&, bool alpha_format, bool include_alpha);
 QT_END_NAMESPACE
 
 namespace WebCore {
@@ -72,23 +71,16 @@ typedef char GLchar;
 #define GL_DRAW_FRAMEBUFFER               0x8CA9
 #endif
 
-class GraphicsContext3DPrivate
-#if USE(ACCELERATED_COMPOSITING)
-        : public TextureMapperPlatformLayer
-#endif
-        , public QOpenGLExtensions
-{
+class GraphicsContext3DPrivate final : public TextureMapperPlatformLayer, public QOpenGLExtensions {
 public:
     GraphicsContext3DPrivate(GraphicsContext3D*, HostWindow*, GraphicsContext3D::RenderStyle);
     ~GraphicsContext3DPrivate();
 
-#if USE(ACCELERATED_COMPOSITING)
-    virtual void paintToTextureMapper(TextureMapper*, const FloatRect& target, const TransformationMatrix&, float opacity);
-#endif
+    void paintToTextureMapper(TextureMapper&, const FloatRect& target, const TransformationMatrix&, float opacity) final;
 #if USE(GRAPHICS_SURFACE)
-    virtual IntSize platformLayerSize() const;
-    virtual uint32_t copyToGraphicsSurface();
-    virtual GraphicsSurfaceToken graphicsSurfaceToken() const;
+    IntSize platformLayerSize() const final;
+    uint32_t copyToGraphicsSurface() final;
+    GraphicsSurfaceToken graphicsSurfaceToken() const final;
 #endif
 
     QRectF boundingRect() const;
@@ -113,14 +105,14 @@ public:
 #endif
 
     // Register as a child of a Qt context to make the necessary when it may be destroyed before the GraphicsContext3D instance
-    class QtContextWatcher : public QObject
-    {
-        public:
-            QtContextWatcher(QObject* ctx, GraphicsContext3DPrivate* watcher): QObject(ctx), m_watcher(watcher) { }
-            ~QtContextWatcher() { m_watcher->m_platformContext = 0; m_watcher->m_platformContextWatcher = 0; }
+    class QtContextWatcher : public QObject {
+    public:
+        QtContextWatcher(QObject* ctx, GraphicsContext3DPrivate* watcher)
+            : QObject(ctx), m_watcher(watcher) { }
+        ~QtContextWatcher() { m_watcher->m_platformContext = 0; m_watcher->m_platformContextWatcher = 0; }
 
-        private:
-            GraphicsContext3DPrivate* m_watcher;
+    private:
+        GraphicsContext3DPrivate* m_watcher;
     };
     QtContextWatcher* m_platformContextWatcher;
 };
@@ -199,8 +191,7 @@ GraphicsContext3DPrivate::GraphicsContext3DPrivate(GraphicsContext3D* context, H
     initializeOpenGLFunctions();
 #if USE(GRAPHICS_SURFACE)
     IntSize surfaceSize(m_context->m_currentWidth, m_context->m_currentHeight);
-    m_surfaceFlags = GraphicsSurface::SupportsTextureTarget
-                    | GraphicsSurface::SupportsSharing;
+    m_surfaceFlags = GraphicsSurface::SupportsTextureTarget | GraphicsSurface::SupportsSharing;
 
     if (!surfaceSize.isEmpty())
         m_graphicsSurface = GraphicsSurface::create(surfaceSize, m_surfaceFlags, m_platformContext);
@@ -271,10 +262,6 @@ void GraphicsContext3DPrivate::initializeANGLE()
 
 GraphicsContext3DPrivate::~GraphicsContext3DPrivate()
 {
-#if USE(ACCELERATED_COMPOSITING)
-    if (TextureMapperPlatformLayer::Client* client = TextureMapperPlatformLayer::client())
-        client->platformLayerWasDestroyed();
-#endif
     delete m_surfaceOwner;
     m_surfaceOwner = 0;
 
@@ -282,22 +269,21 @@ GraphicsContext3DPrivate::~GraphicsContext3DPrivate()
     m_platformContextWatcher = 0;
 }
 
-#if USE(ACCELERATED_COMPOSITING)
-void GraphicsContext3DPrivate::paintToTextureMapper(TextureMapper* textureMapper, const FloatRect& targetRect, const TransformationMatrix& matrix, float opacity)
+void GraphicsContext3DPrivate::paintToTextureMapper(TextureMapper& textureMapper, const FloatRect& targetRect, const TransformationMatrix& matrix, float opacity)
 {
     m_context->markLayerComposited();
     blitMultisampleFramebufferAndRestoreContext();
 
-    if (textureMapper->accelerationMode() == TextureMapper::OpenGLMode) {
-        TextureMapperGL* texmapGL = static_cast<TextureMapperGL*>(textureMapper);
+    if (textureMapper.accelerationMode() == TextureMapper::OpenGLMode) {
+        TextureMapperGL& texmapGL = static_cast<TextureMapperGL&>(textureMapper);
         TextureMapperGL::Flags flags = TextureMapperGL::ShouldFlipTexture | (m_context->m_attrs.alpha ? TextureMapperGL::ShouldBlend : 0);
         IntSize textureSize(m_context->m_currentWidth, m_context->m_currentHeight);
-        texmapGL->drawTexture(m_context->m_texture, flags, textureSize, targetRect, matrix, opacity);
+        texmapGL.drawTexture(m_context->m_texture, flags, textureSize, targetRect, matrix, opacity);
         return;
     }
 
     // Alternatively read pixels to a memory buffer.
-    GraphicsContext* context = textureMapper->graphicsContext();
+    GraphicsContext* context = textureMapper.graphicsContext();
     QPainter* painter = context->platformContext();
     painter->save();
     painter->setTransform(matrix);
@@ -317,7 +303,6 @@ void GraphicsContext3DPrivate::paintToTextureMapper(TextureMapper* textureMapper
     painter->drawImage(targetRect, offscreenImage);
     painter->restore();
 }
-#endif // USE(ACCELERATED_COMPOSITING)
 
 #if USE(GRAPHICS_SURFACE)
 IntSize GraphicsContext3DPrivate::platformLayerSize() const
@@ -395,9 +380,11 @@ void GraphicsContext3DPrivate::createGraphicsSurfaces(const IntSize& size)
 {
 #if USE(GRAPHICS_SURFACE)
     if (size.isEmpty())
-        m_graphicsSurface.clear();
+        m_graphicsSurface = nullptr;
     else
         m_graphicsSurface = GraphicsSurface::create(size, m_surfaceFlags, m_platformContext);
+#else
+    UNUSED_PARAM(size);
 #endif
 }
 
@@ -427,8 +414,9 @@ GraphicsContext3D::GraphicsContext3D(GraphicsContext3D::Attributes attrs, HostWi
     , m_multisampleDepthStencilBuffer(0)
     , m_multisampleColorBuffer(0)
     , m_functions(0)
-    , m_private(adoptPtr(new GraphicsContext3DPrivate(this, hostWindow, renderStyle)))
+    , m_private(std::make_unique<GraphicsContext3DPrivate>(this, hostWindow, renderStyle))
     , m_compiler(isGLES2Compliant() ? SH_ESSL_OUTPUT : SH_GLSL_OUTPUT)
+    , m_webglContext(nullptr)
 {
     if (!m_private->m_surface || !m_private->m_platformContext) {
         LOG_ERROR("GraphicsContext3D: GL context creation failed.");
@@ -496,12 +484,10 @@ Platform3DObject GraphicsContext3D::platformTexture() const
     return m_texture;
 }
 
-#if USE(ACCELERATED_COMPOSITING)
 PlatformLayer* GraphicsContext3D::platformLayer() const
 {
     return m_private.get();
 }
-#endif
 
 bool GraphicsContext3D::makeContextCurrent()
 {
@@ -581,14 +567,18 @@ bool GraphicsContext3D::ImageExtractor::extractImage(bool premultiplyAlpha, bool
     return true;
 }
 
-void GraphicsContext3D::setContextLostCallback(PassOwnPtr<ContextLostCallback>)
+void GraphicsContext3D::checkGPUStatusIfNecessary()
 {
 }
 
-void GraphicsContext3D::setErrorMessageCallback(PassOwnPtr<ErrorMessageCallback>)
+void GraphicsContext3D::setContextLostCallback(std::unique_ptr<ContextLostCallback>)
+{
+}
+
+void GraphicsContext3D::setErrorMessageCallback(std::unique_ptr<ErrorMessageCallback>)
 {
 }
 
 }
 
-#endif // USE(3D_GRAPHICS)
+#endif // ENABLE(GRAPHICS_CONTEXT_3D)

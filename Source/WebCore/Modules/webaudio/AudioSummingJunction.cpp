@@ -32,11 +32,9 @@
 #include "AudioNodeOutput.h"
 #include <algorithm>
 
-using namespace std;
-
 namespace WebCore {
 
-AudioSummingJunction::AudioSummingJunction(AudioContext* context)
+AudioSummingJunction::AudioSummingJunction(AudioContext& context)
     : m_context(context)
     , m_renderingStateNeedUpdating(false)
 {
@@ -44,30 +42,29 @@ AudioSummingJunction::AudioSummingJunction(AudioContext* context)
 
 AudioSummingJunction::~AudioSummingJunction()
 {
-    if (m_renderingStateNeedUpdating && m_context.get())
-        m_context->removeMarkedSummingJunction(this);
+    if (m_renderingStateNeedUpdating)
+        context().removeMarkedSummingJunction(this);
 }
 
 void AudioSummingJunction::changedOutputs()
 {
-    ASSERT(context()->isGraphOwner());
+    ASSERT(context().isGraphOwner());
     if (!m_renderingStateNeedUpdating && canUpdateState()) {
-        context()->markSummingJunctionDirty(this);
+        context().markSummingJunctionDirty(this);
         m_renderingStateNeedUpdating = true;
     }
 }
 
 void AudioSummingJunction::updateRenderingState()
 {
-    ASSERT(context()->isAudioThread() && context()->isGraphOwner());
+    ASSERT(context().isAudioThread() && context().isGraphOwner());
 
     if (m_renderingStateNeedUpdating && canUpdateState()) {
         // Copy from m_outputs to m_renderingOutputs.
         m_renderingOutputs.resize(m_outputs.size());
-        unsigned j = 0;
-        for (HashSet<AudioNodeOutput*>::iterator i = m_outputs.begin(); i != m_outputs.end(); ++i, ++j) {
-            AudioNodeOutput* output = *i;
-            m_renderingOutputs[j] = output;
+        unsigned i = 0;
+        for (auto& output : m_outputs) {
+            m_renderingOutputs[i++] = output;
             output->updateRenderingState();
         }
 

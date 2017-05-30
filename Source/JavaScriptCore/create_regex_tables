@@ -86,15 +86,15 @@ for name, classes in types.items():
     
     # Generate createFunction:
     function = "";
-    function += ("CharacterClass* %sCreate()\n" % name)
+    function += ("std::unique_ptr<CharacterClass> %sCreate()\n" % name)
     function += ("{\n")
     if emitTables and classes["UseTable"]:
         if "Inverse" in classes:
-            function += ("    CharacterClass* characterClass = new CharacterClass(_%sData, true);\n" % (classes["Inverse"]))
+            function += ("    auto characterClass = std::make_unique<CharacterClass>(_%sData, true);\n" % (classes["Inverse"]))
         else:
-            function += ("    CharacterClass* characterClass = new CharacterClass(_%sData, false);\n" % (name))
+            function += ("    auto characterClass = std::make_unique<CharacterClass>(_%sData, false);\n" % (name))
     else:
-        function += ("    CharacterClass* characterClass = new CharacterClass;\n")
+        function += ("    auto characterClass = std::make_unique<CharacterClass>();\n")
     for (min, max) in ranges:
         if (min == max):
             if (min > 127):

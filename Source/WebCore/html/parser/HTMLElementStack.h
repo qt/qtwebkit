@@ -30,8 +30,6 @@
 #include "HTMLStackItem.h"
 #include <wtf/Forward.h>
 #include <wtf/Noncopyable.h>
-#include <wtf/OwnPtr.h>
-#include <wtf/PassOwnPtr.h>
 #include <wtf/RefPtr.h>
 
 namespace WebCore {
@@ -52,53 +50,50 @@ public:
     class ElementRecord {
         WTF_MAKE_NONCOPYABLE(ElementRecord); WTF_MAKE_FAST_ALLOCATED;
     public:
-        ~ElementRecord(); // Public for ~PassOwnPtr()
+        ElementRecord(PassRefPtr<HTMLStackItem>, std::unique_ptr<ElementRecord>);
+        ~ElementRecord();
     
-        Element* element() const { return m_item->element(); }
-        ContainerNode* node() const { return m_item->node(); }
+        Element& element() const { return m_item->element(); }
+        ContainerNode& node() const { return m_item->node(); }
         const AtomicString& namespaceURI() const { return m_item->namespaceURI(); }
-        PassRefPtr<HTMLStackItem> stackItem() const { return m_item; }
+        HTMLStackItem& stackItem() const { return *m_item; }
         void replaceElement(PassRefPtr<HTMLStackItem>);
 
         bool isAbove(ElementRecord*) const;
 
         ElementRecord* next() const { return m_next.get(); }
+
     private:
         friend class HTMLElementStack;
 
-        ElementRecord(PassRefPtr<HTMLStackItem>, PassOwnPtr<ElementRecord>);
-
-        PassOwnPtr<ElementRecord> releaseNext() { return m_next.release(); }
-        void setNext(PassOwnPtr<ElementRecord> next) { m_next = next; }
+        std::unique_ptr<ElementRecord> releaseNext() { return WTFMove(m_next); }
+        void setNext(std::unique_ptr<ElementRecord> next) { m_next = WTFMove(next); }
 
         RefPtr<HTMLStackItem> m_item;
-        OwnPtr<ElementRecord> m_next;
+        std::unique_ptr<ElementRecord> m_next;
     };
 
     unsigned stackDepth() const { return m_stackDepth; }
 
     // Inlining this function is a (small) performance win on the parsing
     // benchmark.
-    Element* top() const
+    Element& top() const
     {
-        ASSERT(m_top->element());
         return m_top->element();
     }
 
-    ContainerNode* topNode() const
+    ContainerNode& topNode() const
     {
-        ASSERT(m_top->node());
         return m_top->node();
     }
 
-    HTMLStackItem* topStackItem() const
+    HTMLStackItem& topStackItem() const
     {
-        ASSERT(m_top->stackItem());
-        return m_top->stackItem().get();
+        return m_top->stackItem();
     }
 
     HTMLStackItem* oneBelowTop() const;
-    ElementRecord* topRecord() const;
+    ElementRecord& topRecord() const;
     ElementRecord* find(Element*) const;
     ElementRecord* furthestBlockForFormattingElement(Element*) const;
     ElementRecord* topmost(const AtomicString& tagName) const;
@@ -127,8 +122,8 @@ public:
     void popHTMLBodyElement();
     void popAll();
 
-    static bool isMathMLTextIntegrationPoint(HTMLStackItem*);
-    static bool isHTMLIntegrationPoint(HTMLStackItem*);
+    static bool isMathMLTextIntegrationPoint(HTMLStackItem&);
+    static bool isHTMLIntegrationPoint(HTMLStackItem&);
 
     void remove(Element*);
     void removeHTMLHeadElement(Element*);
@@ -155,13 +150,13 @@ public:
 #if ENABLE(TEMPLATE_ELEMENT)
     bool hasTemplateInHTMLScope() const;
 #endif
-    Element* htmlElement() const;
-    Element* headElement() const;
-    Element* bodyElement() const;
-    
-    ContainerNode* rootNode() const;
+    Element& htmlElement() const;
+    Element& headElement() const;
+    Element& bodyElement() const;
 
-#ifndef NDEBUG
+    ContainerNode& rootNode() const;
+
+#if ENABLE(TREE_DEBUGGING)
     void show();
 #endif
 
@@ -171,7 +166,7 @@ private:
     void popCommon();
     void removeNonTopCommon(Element*);
 
-    OwnPtr<ElementRecord> m_top;
+    std::unique_ptr<ElementRecord> m_top;
 
     // We remember the root node, <head> and <body> as they are pushed. Their
     // ElementRecords keep them alive. The root node is never popped.

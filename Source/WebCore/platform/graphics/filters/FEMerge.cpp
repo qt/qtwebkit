@@ -20,25 +20,22 @@
  */
 
 #include "config.h"
-
-#if ENABLE(FILTERS)
 #include "FEMerge.h"
 
 #include "Filter.h"
 #include "GraphicsContext.h"
-#include "RenderTreeAsText.h"
 #include "TextStream.h"
 
 namespace WebCore {
 
-FEMerge::FEMerge(Filter* filter) 
+FEMerge::FEMerge(Filter& filter)
     : FilterEffect(filter)
 {
 }
 
-PassRefPtr<FEMerge> FEMerge::create(Filter* filter)
+Ref<FEMerge> FEMerge::create(Filter& filter)
 {
-    return adoptRef(new FEMerge(filter));
+    return adoptRef(*new FEMerge(filter));
 }
 
 void FEMerge::platformApplySoftware()
@@ -50,10 +47,12 @@ void FEMerge::platformApplySoftware()
     if (!resultImage)
         return;
 
-    GraphicsContext* filterContext = resultImage->context();
+
+    GraphicsContext& filterContext = resultImage->context();
     for (unsigned i = 0; i < size; ++i) {
         FilterEffect* in = inputEffect(i);
-        filterContext->drawImageBuffer(in->asImageBuffer(), ColorSpaceDeviceRGB, drawingRegionOfInputImage(in->absolutePaintRect()));
+        if (ImageBuffer* inBuffer = in->asImageBuffer())
+            filterContext.drawImageBuffer(*inBuffer, drawingRegionOfInputImage(in->absolutePaintRect()));
     }
 }
 
@@ -75,5 +74,3 @@ TextStream& FEMerge::externalRepresentation(TextStream& ts, int indent) const
 }
 
 } // namespace WebCore
-
-#endif // ENABLE(FILTERS)

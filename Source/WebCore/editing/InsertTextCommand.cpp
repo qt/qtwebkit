@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005 Apple Computer, Inc.  All rights reserved.
+ * Copyright (C) 2005 Apple Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -37,16 +37,16 @@
 
 namespace WebCore {
 
-InsertTextCommand::InsertTextCommand(Document* document, const String& text, bool selectInsertedText, RebalanceType rebalanceType) 
-    : CompositeEditCommand(document)
+InsertTextCommand::InsertTextCommand(Document& document, const String& text, bool selectInsertedText, RebalanceType rebalanceType, EditAction editingAction)
+    : CompositeEditCommand(document, editingAction)
     , m_text(text)
     , m_selectInsertedText(selectInsertedText)
     , m_rebalanceType(rebalanceType)
 {
 }
 
-InsertTextCommand::InsertTextCommand(Document* document, const String& text, PassRefPtr<TextInsertionMarkerSupplier> markerSupplier)
-    : CompositeEditCommand(document)
+InsertTextCommand::InsertTextCommand(Document& document, const String& text, PassRefPtr<TextInsertionMarkerSupplier> markerSupplier, EditAction editingAction)
+    : CompositeEditCommand(document, editingAction)
     , m_text(text)
     , m_selectInsertedText(false)
     , m_rebalanceType(RebalanceLeadingAndTrailingWhitespaces)
@@ -58,7 +58,7 @@ Position InsertTextCommand::positionInsideTextNode(const Position& p)
 {
     Position pos = p;
     if (isTabSpanTextNode(pos.anchorNode())) {
-        RefPtr<Node> textNode = document()->createEditingTextNode("");
+        RefPtr<Node> textNode = document().createEditingTextNode("");
         insertNodeAtTabSpanPosition(textNode.get(), pos);
         return firstPositionInNode(textNode.get());
     }
@@ -66,7 +66,7 @@ Position InsertTextCommand::positionInsideTextNode(const Position& p)
     // Prepare for text input by looking at the specified position.
     // It may be necessary to insert a text node to receive characters.
     if (!pos.containerNode()->isTextNode()) {
-        RefPtr<Node> textNode = document()->createEditingTextNode("");
+        RefPtr<Node> textNode = document().createEditingTextNode("");
         insertNodeAt(textNode.get(), pos);
         return firstPositionInNode(textNode.get());
     }
@@ -146,7 +146,7 @@ void InsertTextCommand::doApply()
         // anything other than NoSelection. The rest of this function requires a real endingSelection, so bail out.
         if (endingSelection().isNone())
             return;
-    } else if (document()->frame()->editor().isOverwriteModeEnabled()) {
+    } else if (frame().editor().isOverwriteModeEnabled()) {
         if (performOverwrite(m_text, m_selectInsertedText))
             return;
     }
@@ -222,7 +222,7 @@ void InsertTextCommand::doApply()
     setEndingSelectionWithoutValidation(startPosition, endPosition);
 
     // Handle the case where there is a typing style.
-    if (RefPtr<EditingStyle> typingStyle = document()->frame()->selection()->typingStyle()) {
+    if (RefPtr<EditingStyle> typingStyle = frame().selection().typingStyle()) {
         typingStyle->prepareToApplyAt(endPosition, EditingStyle::PreserveWritingDirection);
         if (!typingStyle->isEmpty())
             applyStyle(typingStyle.get());
@@ -235,13 +235,15 @@ void InsertTextCommand::doApply()
 Position InsertTextCommand::insertTab(const Position& pos)
 {
     Position insertPos = VisiblePosition(pos, DOWNSTREAM).deepEquivalent();
+    if (insertPos.isNull())
+        return pos;
 
     Node* node = insertPos.containerNode();
     unsigned int offset = node->isTextNode() ? insertPos.offsetInContainerNode() : 0;
 
     // keep tabs coalesced in tab span
     if (isTabSpanTextNode(node)) {
-        RefPtr<Text> textNode = toText(node);
+        RefPtr<Text> textNode = downcast<Text>(node);
         insertTextIntoNode(textNode, offset, "\t");
         return Position(textNode.release(), offset + 1);
     }
@@ -250,10 +252,10 @@ Position InsertTextCommand::insertTab(const Position& pos)
     RefPtr<Element> spanNode = createTabSpanElement(document());
     
     // place it
-    if (!node->isTextNode()) {
+    if (!is<Text>(*node)) {
         insertNodeAt(spanNode.get(), insertPos);
     } else {
-        RefPtr<Text> textNode = toText(node);
+        RefPtr<Text> textNode = downcast<Text>(node);
         if (offset >= textNode->length())
             insertNodeAfter(spanNode, textNode.release());
         else {

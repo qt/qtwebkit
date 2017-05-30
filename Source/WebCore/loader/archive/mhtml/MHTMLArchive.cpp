@@ -31,18 +31,19 @@
 #include "config.h"
 
 #if ENABLE(MHTML)
+
 #include "MHTMLArchive.h"
 
 #include "Document.h"
-#include "Frame.h"
 #include "MHTMLParser.h"
 #include "MIMETypeRegistry.h"
+#include "MainFrame.h"
 #include "Page.h"
 #include "PageSerializer.h"
 #include "QuotedPrintable.h"
 #include "SchemeRegistry.h"
 #include "SharedBuffer.h"
-
+#include <time.h>
 #include <wtf/CryptographicallyRandomNumber.h>
 #include <wtf/DateMath.h>
 #include <wtf/GregorianDateTime.h>
@@ -53,14 +54,11 @@
 #if HAVE(SYS_TIME_H)
 #include <sys/time.h>
 #endif
-#include <time.h>
-
 
 namespace WebCore {
 
 const char* const quotedPrintable = "quoted-printable";
 const char* const base64 = "base64";
-const char* const binary = "binary";
 
 static String generateRandomBoundary()
 {
@@ -108,16 +106,16 @@ PassRefPtr<MHTMLArchive> MHTMLArchive::create()
     return adoptRef(new MHTMLArchive);
 }
 
-PassRefPtr<MHTMLArchive> MHTMLArchive::create(const KURL& url, SharedBuffer* data)
+PassRefPtr<MHTMLArchive> MHTMLArchive::create(const URL& url, SharedBuffer* data)
 {
     // For security reasons we only load MHTML pages from local URLs.
     if (!SchemeRegistry::shouldTreatURLSchemeAsLocal(url.protocol()))
-        return 0;
+        return nullptr;
 
     MHTMLParser parser(data);
     RefPtr<MHTMLArchive> mainArchive = parser.parseArchive();
     if (!mainArchive)
-        return 0; // Invalid MHTML file.
+        return nullptr; // Invalid MHTML file.
 
     // Since MHTML is a flat format, we need to make all frames aware of all resources.
     for (size_t i = 0; i < parser.frameCount(); ++i) {
@@ -134,16 +132,6 @@ PassRefPtr<MHTMLArchive> MHTMLArchive::create(const KURL& url, SharedBuffer* dat
 
 PassRefPtr<SharedBuffer> MHTMLArchive::generateMHTMLData(Page* page)
 {
-    return generateMHTMLData(page, false);
-}
-
-PassRefPtr<SharedBuffer> MHTMLArchive::generateMHTMLDataUsingBinaryEncoding(Page* page)
-{
-    return generateMHTMLData(page, true);
-}
-
-PassRefPtr<SharedBuffer> MHTMLArchive::generateMHTMLData(Page* page, bool useBinaryEncoding)
-{
     Vector<PageSerializer::Resource> resources;
     PageSerializer pageSerializer(&resources);
     pageSerializer.serialize(page);
@@ -159,13 +147,13 @@ PassRefPtr<SharedBuffer> MHTMLArchive::generateMHTMLData(Page* page, bool useBin
     stringBuilder.append("From: <Saved by WebKit>\r\n");
     stringBuilder.append("Subject: ");
     // We replace non ASCII characters with '?' characters to match IE's behavior.
-    stringBuilder.append(replaceNonPrintableCharacters(page->mainFrame()->document()->title()));
+    stringBuilder.append(replaceNonPrintableCharacters(page->mainFrame().document()->title()));
     stringBuilder.append("\r\nDate: ");
     stringBuilder.append(dateString);
     stringBuilder.append("\r\nMIME-Version: 1.0\r\n");
     stringBuilder.append("Content-Type: multipart/related;\r\n");
     stringBuilder.append("\ttype=\"");
-    stringBuilder.append(page->mainFrame()->document()->suggestedMIMEType());
+    stringBuilder.append(page->mainFrame().document()->suggestedMIMEType());
     stringBuilder.append("\";\r\n");
     stringBuilder.append("\tboundary=\"");
     stringBuilder.append(boundary);
@@ -177,18 +165,14 @@ PassRefPtr<SharedBuffer> MHTMLArchive::generateMHTMLData(Page* page, bool useBin
     RefPtr<SharedBuffer> mhtmlData = SharedBuffer::create();
     mhtmlData->append(asciiString.data(), asciiString.length());
 
-    for (size_t i = 0; i < resources.size(); ++i) {
-        const PageSerializer::Resource& resource = resources[i];
-
+    for (auto& resource : resources) {
         stringBuilder.clear();
         stringBuilder.append(endOfResourceBoundary);
         stringBuilder.append("Content-Type: ");
         stringBuilder.append(resource.mimeType);
 
-        const char* contentEncoding = 0;
-        if (useBinaryEncoding)
-            contentEncoding = binary;
-        else if (MIMETypeRegistry::isSupportedJavaScriptMIMEType(resource.mimeType) || MIMETypeRegistry::isSupportedNonImageMIMEType(resource.mimeType))
+        const char* contentEncoding = nullptr;
+        if (MIMETypeRegistry::isSupportedJavaScriptMIMEType(resource.mimeType) || MIMETypeRegistry::isSupportedNonImageMIMEType(resource.mimeType))
             contentEncoding = quotedPrintable;
         else
             contentEncoding = base64;
@@ -202,36 +186,27 @@ PassRefPtr<SharedBuffer> MHTMLArchive::generateMHTMLData(Page* page, bool useBin
         asciiString = stringBuilder.toString().utf8();
         mhtmlData->append(asciiString.data(), asciiString.length());
 
-        if (!strcmp(contentEncoding, binary)) {
-            const char* data;
-            size_t position = 0;
-            while (size_t length = resource.data->getSomeData(data, position)) {
-                mhtmlData->append(data, length);
-                position += length;
-            }
+        // FIXME: ideally we would encode the content as a stream without having to fetch it all.
+        const char* data = resource.data->data();
+        size_t dataLength = resource.data->size();
+        Vector<char> encodedData;
+        if (!strcmp(contentEncoding, quotedPrintable)) {
+            quotedPrintableEncode(data, dataLength, encodedData);
+            mhtmlData->append(encodedData.data(), encodedData.size());
+            mhtmlData->append("\r\n", 2);
         } else {
-            // FIXME: ideally we would encode the content as a stream without having to fetch it all.
-            const char* data = resource.data->data();
-            size_t dataLength = resource.data->size();
-            Vector<char> encodedData;
-            if (!strcmp(contentEncoding, quotedPrintable)) {
-                quotedPrintableEncode(data, dataLength, encodedData);
-                mhtmlData->append(encodedData.data(), encodedData.size());
+            ASSERT(!strcmp(contentEncoding, base64));
+            // We are not specifying insertLFs = true below as it would cut the lines with LFs and MHTML requires CRLFs.
+            base64Encode(data, dataLength, encodedData);
+            const size_t maximumLineLength = 76;
+            size_t index = 0;
+            size_t encodedDataLength = encodedData.size();
+            do {
+                size_t lineLength = std::min(encodedDataLength - index, maximumLineLength);
+                mhtmlData->append(encodedData.data() + index, lineLength);
                 mhtmlData->append("\r\n", 2);
-            } else {
-                ASSERT(!strcmp(contentEncoding, base64));
-                // We are not specifying insertLFs = true below as it would cut the lines with LFs and MHTML requires CRLFs.
-                base64Encode(data, dataLength, encodedData);
-                const size_t maximumLineLength = 76;
-                size_t index = 0;
-                size_t encodedDataLength = encodedData.size();
-                do {
-                    size_t lineLength = std::min(encodedDataLength - index, maximumLineLength);
-                    mhtmlData->append(encodedData.data() + index, lineLength);
-                    mhtmlData->append("\r\n", 2);
-                    index += maximumLineLength;
-                } while (index < encodedDataLength);
-            }
+                index += maximumLineLength;
+            } while (index < encodedDataLength);
         }
     }
 
@@ -242,4 +217,5 @@ PassRefPtr<SharedBuffer> MHTMLArchive::generateMHTMLData(Page* page, bool useBin
 }
 
 }
+
 #endif

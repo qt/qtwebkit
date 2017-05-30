@@ -33,23 +33,14 @@
 
 namespace WebCore {
 
-PassRefPtr<RTCIceCandidateEvent> RTCIceCandidateEvent::create()
+Ref<RTCIceCandidateEvent> RTCIceCandidateEvent::create(bool canBubble, bool cancelable, RefPtr<RTCIceCandidate>&& candidate)
 {
-    return adoptRef(new RTCIceCandidateEvent);
+    return adoptRef(*new RTCIceCandidateEvent(canBubble, cancelable, WTFMove(candidate)));
 }
 
-PassRefPtr<RTCIceCandidateEvent> RTCIceCandidateEvent::create(bool canBubble, bool cancelable, PassRefPtr<RTCIceCandidate> candidate)
-{
-    return adoptRef(new RTCIceCandidateEvent(canBubble, cancelable, candidate));
-}
-
-RTCIceCandidateEvent::RTCIceCandidateEvent()
-{
-}
-
-RTCIceCandidateEvent::RTCIceCandidateEvent(bool canBubble, bool cancelable, PassRefPtr<RTCIceCandidate> candidate)
+RTCIceCandidateEvent::RTCIceCandidateEvent(bool canBubble, bool cancelable, RefPtr<RTCIceCandidate>&& candidate)
     : Event(eventNames().icecandidateEvent, canBubble, cancelable)
-    , m_candidate(candidate)
+    , m_candidate(WTFMove(candidate))
 {
 }
 
@@ -62,9 +53,9 @@ RTCIceCandidate* RTCIceCandidateEvent::candidate() const
     return m_candidate.get();
 }
 
-const AtomicString& RTCIceCandidateEvent::interfaceName() const
+EventInterface RTCIceCandidateEvent::eventInterface() const
 {
-    return eventNames().interfaceForRTCIceCandidateEvent;
+    return RTCIceCandidateEventInterfaceType;
 }
 
 } // namespace WebCore

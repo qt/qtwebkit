@@ -1,6 +1,6 @@
 /*
  *  Copyright (C) 1999-2000 Harri Porten (porten@kde.org)
- *  Copyright (C) 2008 Apple Inc. All rights reserved.
+ *  Copyright (C) 2008, 2016 Apple Inc. All rights reserved.
  *
  *  This library is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU Lesser General Public
@@ -26,36 +26,36 @@
 namespace JSC {
 
 class BooleanPrototype;
+class GetterSetter;
 
 class BooleanConstructor : public InternalFunction {
 public:
     typedef InternalFunction Base;
 
-    static BooleanConstructor* create(ExecState* exec, JSGlobalObject* globalObject, Structure* structure, BooleanPrototype* booleanPrototype)
+    static BooleanConstructor* create(VM& vm, Structure* structure, BooleanPrototype* booleanPrototype, GetterSetter*)
     {
-        BooleanConstructor* constructor = new (NotNull, allocateCell<BooleanConstructor>(*exec->heap())) BooleanConstructor(globalObject, structure);
-        constructor->finishCreation(exec, booleanPrototype);
+        BooleanConstructor* constructor = new (NotNull, allocateCell<BooleanConstructor>(vm.heap)) BooleanConstructor(vm, structure);
+        constructor->finishCreation(vm, booleanPrototype);
         return constructor;
     }
 
-    static const ClassInfo s_info;
+    DECLARE_INFO;
 
     static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype) 
     { 
-        return Structure::create(vm, globalObject, prototype, TypeInfo(ObjectType, StructureFlags), &s_info); 
+        return Structure::create(vm, globalObject, prototype, TypeInfo(ObjectType, StructureFlags), info()); 
     }
 
 protected:
-    void finishCreation(ExecState*, BooleanPrototype*);
+    void finishCreation(VM&, BooleanPrototype*);
 
 private:
-    BooleanConstructor(JSGlobalObject*, Structure*);
+    BooleanConstructor(VM&, Structure*);
     static ConstructType getConstructData(JSCell*, ConstructData&);
     static CallType getCallData(JSCell*, CallData&);
 };
 
 JSObject* constructBooleanFromImmediateBoolean(ExecState*, JSGlobalObject*, JSValue);
-JSObject* constructBoolean(ExecState*, const ArgList&);
 
 } // namespace JSC
 

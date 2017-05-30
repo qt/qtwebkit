@@ -21,7 +21,8 @@
 #ifndef TableLayout_h
 #define TableLayout_h
 
-#include <wtf/FastAllocBase.h>
+#include "LayoutUnit.h"
+#include <wtf/FastMalloc.h>
 #include <wtf/Noncopyable.h>
 
 namespace WebCore {
@@ -39,6 +40,7 @@ public:
     virtual ~TableLayout() { }
 
     virtual void computeIntrinsicLogicalWidths(LayoutUnit& minWidth, LayoutUnit& maxWidth) = 0;
+    virtual LayoutUnit scaledWidthFromPercentColumns() const { return LayoutUnit(0); }
     virtual void applyPreferredLogicalWidthQuirks(LayoutUnit& minWidth, LayoutUnit& maxWidth) const = 0;
     virtual void layout() = 0;
 

@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution. 
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission. 
  *
@@ -38,6 +38,7 @@ class NetscapePlugInStreamLoader;
 
 class NetscapePlugInStreamLoaderClient {
 public:
+    virtual void willSendRequest(NetscapePlugInStreamLoader*, ResourceRequest&&, const ResourceResponse& redirectResponse, std::function<void (ResourceRequest&&)>&&) = 0;
     virtual void didReceiveResponse(NetscapePlugInStreamLoader*, const ResourceResponse&) = 0;
     virtual void didReceiveData(NetscapePlugInStreamLoader*, const char*, int) = 0;
     virtual void didFail(NetscapePlugInStreamLoader*, const ResourceError&) = 0;
@@ -48,30 +49,36 @@ protected:
     virtual ~NetscapePlugInStreamLoaderClient() { }
 };
 
-class NetscapePlugInStreamLoader : public ResourceLoader {
+class NetscapePlugInStreamLoader final : public ResourceLoader {
 public:
-    static PassRefPtr<NetscapePlugInStreamLoader> create(Frame*, NetscapePlugInStreamLoaderClient*, const ResourceRequest&);
+    WEBCORE_EXPORT static PassRefPtr<NetscapePlugInStreamLoader> create(Frame*, NetscapePlugInStreamLoaderClient*, const ResourceRequest&);
     virtual ~NetscapePlugInStreamLoader();
 
-    bool isDone() const;
+    WEBCORE_EXPORT bool isDone() const;
 
 private:
-    virtual void didReceiveResponse(const ResourceResponse&) OVERRIDE;
-    virtual void didReceiveData(const char*, int, long long encodedDataLength, DataPayloadType) OVERRIDE;
-    virtual void didReceiveBuffer(PassRefPtr<SharedBuffer>, long long encodedDataLength, DataPayloadType) OVERRIDE;
-    virtual void didFinishLoading(double finishTime) OVERRIDE;
-    virtual void didFail(const ResourceError&) OVERRIDE;
+    virtual bool init(const ResourceRequest&) override;
 
-    virtual void releaseResources() OVERRIDE;
+    virtual void willSendRequest(ResourceRequest&&, const ResourceResponse& redirectResponse, std::function<void(ResourceRequest&&)>&& callback) override;
+    virtual void didReceiveResponse(const ResourceResponse&) override;
+    virtual void didReceiveData(const char*, unsigned, long long encodedDataLength, DataPayloadType) override;
+    virtual void didReceiveBuffer(PassRefPtr<SharedBuffer>, long long encodedDataLength, DataPayloadType) override;
+    virtual void didFinishLoading(double finishTime) override;
+    virtual void didFail(const ResourceError&) override;
+
+    virtual void releaseResources() override;
 
     NetscapePlugInStreamLoader(Frame*, NetscapePlugInStreamLoaderClient*);
 
-    virtual void willCancel(const ResourceError&) OVERRIDE;
-    virtual void didCancel(const ResourceError&) OVERRIDE;
+    virtual void willCancel(const ResourceError&) override;
+    virtual void didCancel(const ResourceError&) override;
 
     void didReceiveDataOrBuffer(const char*, int, PassRefPtr<SharedBuffer>, long long encodedDataLength, DataPayloadType);
 
+    void notifyDone();
+
     NetscapePlugInStreamLoaderClient* m_client;
+    bool m_isInitialized { false };
 };
 
 }

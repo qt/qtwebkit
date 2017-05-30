@@ -26,8 +26,8 @@
 #ifndef WKImage_h
 #define WKImage_h
 
-#include <WebKit2/WKBase.h>
-#include <WebKit2/WKGeometry.h>
+#include <WebKit/WKBase.h>
+#include <WebKit/WKGeometry.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -42,7 +42,10 @@ enum {
     kWKSnapshotOptionsShareable = 1 << 0,
     kWKSnapshotOptionsExcludeSelectionHighlighting = 1 << 1,
     kWKSnapshotOptionsInViewCoordinates = 1 << 2,
-    kWKSnapshotOptionsPaintSelectionRectangle = 1 << 3
+    kWKSnapshotOptionsPaintSelectionRectangle = 1 << 3,
+    kWKSnapshotOptionsForceBlackText = 1 << 4,
+    kWKSnapshotOptionsForceWhiteText = 1 << 5,
+    kWKSnapshotOptionsPrinting = 1 << 6,
 };
 typedef uint32_t WKSnapshotOptions;
 

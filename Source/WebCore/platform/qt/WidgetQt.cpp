@@ -39,10 +39,9 @@
 #include "IntRect.h"
 #include "NotImplemented.h"
 #include "QWebPageClient.h"
-#include "ScrollView.h"
+#include "FrameView.h"
 
 #include <QCoreApplication>
-#include <QDebug>
 #include <QPaintEngine>
 #include <QPainter>
 
@@ -70,14 +69,14 @@ void Widget::setFrameRect(const IntRect& rect)
     frameRectsChanged();
 }
 
-void Widget::setFocus(bool focused)
+void Widget::setFocus(bool)
 {
 }
 
 void Widget::setCursor(const Cursor& cursor)
 {
 #ifndef QT_NO_CURSOR
-    ScrollView* view = root();
+    FrameView* view = root();
     if (!view)
         return;
     view->hostWindow()->setCursor(cursor);
@@ -108,7 +107,7 @@ void Widget::hide()
         client->setWidgetVisible(this, false);
 }
 
-void Widget::paint(GraphicsContext*, const IntRect&)
+void Widget::paint(GraphicsContext&, const IntRect&)
 {
 }
 

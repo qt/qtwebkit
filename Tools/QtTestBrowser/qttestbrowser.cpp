@@ -33,7 +33,6 @@
 
 #include "config.h"
 
-#include "DumpRenderTreeSupportQt.h"
 #include "launcherwindow.h"
 #include "urlloader.h"
 
@@ -48,12 +47,17 @@ WindowOptions windowOptions;
 #include <QFile>
 #include <QFileInfo>
 #include <QFontDatabase>
+#include <QRegExp>
 
 int launcherMain(const QApplication& app)
 {
 #ifndef NDEBUG
     int retVal = app.exec();
-    DumpRenderTreeSupportQt::garbageCollectorCollect();
+
+#if HAVE(QTTESTSUPPORT)
+    WebKit::QtTestSupport::garbageCollectorCollect();
+#endif
+
     QWebSettings::clearMemoryCaches();
     return retVal;
 #else
@@ -251,6 +255,7 @@ void LauncherApplication::handleUserOptions()
         requiresGraphicsView("-opengl-viewport");
         windowOptions.useQOpenGLWidgetViewport = true;
     }
+
 
 #if HAVE(QTTESTSUPPORT)
     if (args.contains("-use-test-fonts"))

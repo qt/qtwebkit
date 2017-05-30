@@ -35,20 +35,19 @@ namespace WebKit {
 QtWebPagePolicyClient::QtWebPagePolicyClient(WKPageRef pageRef, QQuickWebView* webView)
     : m_webView(webView)
 {
-    WKPagePolicyClient policyClient;
-    memset(&policyClient, 0, sizeof(WKPagePolicyClient));
-    policyClient.version = kWKPagePolicyClientCurrentVersion;
-    policyClient.clientInfo = this;
+    WKPagePolicyClientV1 policyClient;
+    memset(&policyClient, 0, sizeof(WKPagePolicyClientV0));
+    policyClient.base = { 1, this };
     policyClient.decidePolicyForNavigationAction = decidePolicyForNavigationAction;
     policyClient.decidePolicyForResponse = decidePolicyForResponse;
-    WKPageSetPagePolicyClient(pageRef, &policyClient);
+    WKPageSetPagePolicyClient(pageRef, &policyClient.base);
 }
 
-void QtWebPagePolicyClient::decidePolicyForNavigationAction(const QUrl& url, Qt::MouseButton mouseButton, Qt::KeyboardModifiers keyboardModifiers, QQuickWebView::NavigationType navigationType, WKFramePolicyListenerRef listener)
+void QtWebPagePolicyClient::decidePolicyForNavigationAction(const QUrl& url, Qt::MouseButton mouseButton, Qt::KeyboardModifiers keyboardModifiers, QQuickWebView::NavigationType navigationType, bool isMainFrame, WKFramePolicyListenerRef listener)
 {
     // NOTE: even though the C API (and the WebKit2 IPC) supports an asynchronous answer, this is not currently working.
     // We are expected to call the listener immediately. See the patch for https://bugs.webkit.org/show_bug.cgi?id=53785.
-    QWebNavigationRequest navigationRequest(url, mouseButton, keyboardModifiers, navigationType);
+    QWebNavigationRequest navigationRequest(url, mouseButton, keyboardModifiers, navigationType, isMainFrame);
     emit m_webView->navigationRequested(&navigationRequest);
 
     switch (navigationRequest.action()) {
@@ -121,19 +120,19 @@ static QQuickWebView::NavigationType toQuickWebViewNavigationType(WKFrameNavigat
     return QQuickWebView::OtherNavigation;
 }
 
-void QtWebPagePolicyClient::decidePolicyForNavigationAction(WKPageRef, WKFrameRef frame, WKFrameNavigationType navigationType, WKEventModifiers modifiers, WKEventMouseButton mouseButton, WKURLRequestRef request, WKFramePolicyListenerRef listener, WKTypeRef, const void* clientInfo)
+void QtWebPagePolicyClient::decidePolicyForNavigationAction(WKPageRef page, WKFrameRef frame, WKFrameNavigationType navigationType, WKEventModifiers modifiers, WKEventMouseButton mouseButton, WKFrameRef originatingFrame, WKURLRequestRef request, WKFramePolicyListenerRef listener, WKTypeRef, const void* clientInfo)
 {
     WKRetainPtr<WKURLRef> frameURL(AdoptWK, WKFrameCopyURL(frame));
     WKRetainPtr<WKURLRef> requestURL(AdoptWK, WKURLRequestCopyURL(request));
     QUrl qUrl = WKURLCopyQUrl(requestURL.get());
-    toQtWebPagePolicyClient(clientInfo)->decidePolicyForNavigationAction(qUrl, toQtMouseButton(mouseButton), toQtKeyboardModifiers(modifiers), toQuickWebViewNavigationType(navigationType), listener);
+    bool isMainFrame = (WKPageGetMainFrame(page) == frame);
+    toQtWebPagePolicyClient(clientInfo)->decidePolicyForNavigationAction(qUrl, toQtMouseButton(mouseButton), toQtKeyboardModifiers(modifiers), toQuickWebViewNavigationType(navigationType), isMainFrame, listener);
 }
 
-void QtWebPagePolicyClient::decidePolicyForResponse(WKPageRef page, WKFrameRef frame, WKURLResponseRef response, WKURLRequestRef, WKFramePolicyListenerRef listener, WKTypeRef, const void*)
+void QtWebPagePolicyClient::decidePolicyForResponse(WKPageRef page, WKFrameRef frame, WKURLResponseRef response, WKURLRequestRef, bool canShowMIMEType, WKFramePolicyListenerRef listener, WKTypeRef, const void*)
 {
     String type = toImpl(response)->resourceResponse().mimeType();
-    type.makeLower();
-    bool canShowMIMEType = toImpl(frame)->canShowMIMEType(type);
+    type.convertToASCIILowercase(); // QTFIXME: See also FrameLoaderClientQt
 
     if (WKPageGetMainFrame(page) == frame) {
         if (canShowMIMEType) {
@@ -157,4 +156,3 @@ void QtWebPagePolicyClient::decidePolicyForResponse(WKPageRef page, WKFrameRef f
 }
 
 } // namespace WebKit
-

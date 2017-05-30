@@ -30,8 +30,7 @@
 #if ENABLE(NAVIGATOR_CONTENT_UTILS)
 
 #include "NavigatorContentUtilsClient.h"
-#include "RefCountedSupplement.h"
-#include <wtf/PassRefPtr.h>
+#include "Supplementable.h"
 #include <wtf/text/WTFString.h>
 
 namespace WebCore {
@@ -41,30 +40,28 @@ class Navigator;
 
 typedef int ExceptionCode;
 
-class NavigatorContentUtils : public RefCountedSupplement<Page, NavigatorContentUtils> {
+class NavigatorContentUtils final : public Supplement<Page> {
 public:
+    explicit NavigatorContentUtils(std::unique_ptr<NavigatorContentUtilsClient> client)
+        : m_client(WTFMove(client))
+    { }
+
     virtual ~NavigatorContentUtils();
 
     static const char* supplementName();
     static NavigatorContentUtils* from(Page*);
 
-    static void registerProtocolHandler(Navigator*, const String& scheme, const String& url, const String& title, ExceptionCode&);
+    static void registerProtocolHandler(Navigator&, const String& scheme, const String& url, const String& title, ExceptionCode&);
 
 #if ENABLE(CUSTOM_SCHEME_HANDLER)
-    static String isProtocolHandlerRegistered(Navigator*, const String& scheme, const String& url, ExceptionCode&);
-    static void unregisterProtocolHandler(Navigator*, const String& scheme, const String& url, ExceptionCode&);
+    static String isProtocolHandlerRegistered(Navigator&, const String& scheme, const String& url, ExceptionCode&);
+    static void unregisterProtocolHandler(Navigator&, const String& scheme, const String& url, ExceptionCode&);
 #endif
 
-    static PassRefPtr<NavigatorContentUtils> create(NavigatorContentUtilsClient*);
-
 private:
-    explicit NavigatorContentUtils(NavigatorContentUtilsClient* client)
-        : m_client(client)
-    { }
+    NavigatorContentUtilsClient* client() { return m_client.get(); }
 
-    NavigatorContentUtilsClient* client() { return m_client; }
-
-    NavigatorContentUtilsClient* m_client;
+    std::unique_ptr<NavigatorContentUtilsClient> m_client;
 };
 
 } // namespace WebCore

@@ -32,15 +32,20 @@ class Geolocation;
 class Navigator;
 
 class NavigatorGeolocation : public Supplement<Navigator>, public DOMWindowProperty {
+    WTF_MAKE_FAST_ALLOCATED;
 public:
+    explicit NavigatorGeolocation(Frame*);
     virtual ~NavigatorGeolocation();
     static NavigatorGeolocation* from(Navigator*);
 
-    static Geolocation* geolocation(Navigator*);
+    static Geolocation* geolocation(Navigator&);
     Geolocation* geolocation() const;
 
+#if PLATFORM(IOS)
+    void resetAllGeolocationPermission();
+#endif // PLATFORM(IOS)
+
 private:
-    NavigatorGeolocation(Frame*);
     static const char* supplementName();
 
     mutable RefPtr<Geolocation> m_geolocation;

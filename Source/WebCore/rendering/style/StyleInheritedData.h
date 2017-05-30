@@ -26,9 +26,9 @@
 #define StyleInheritedData_h
 
 #include "Color.h"
-#include "Font.h"
+#include "FontCascade.h"
 #include "Length.h"
-#include <wtf/PassRefPtr.h>
+#include <wtf/Ref.h>
 #include <wtf/RefCounted.h>
 #include <wtf/RefPtr.h>
 
@@ -36,8 +36,8 @@ namespace WebCore {
 
 class StyleInheritedData : public RefCounted<StyleInheritedData> {
 public:
-    static PassRefPtr<StyleInheritedData> create() { return adoptRef(new StyleInheritedData); }
-    PassRefPtr<StyleInheritedData> copy() const { return adoptRef(new StyleInheritedData(*this)); }
+    static Ref<StyleInheritedData> create() { return adoptRef(*new StyleInheritedData); }
+    Ref<StyleInheritedData> copy() const;
     ~StyleInheritedData();
 
     bool operator==(const StyleInheritedData& o) const;
@@ -52,8 +52,11 @@ public:
     // could be packed in a short but doesn't
     // make a difference currently because of padding
     Length line_height;
+#if ENABLE(IOS_TEXT_AUTOSIZING)
+    Length specifiedLineHeight;
+#endif
 
-    Font font;
+    FontCascade fontCascade;
     Color color;
     Color visitedLinkColor;
 

@@ -21,32 +21,30 @@
 #ifndef SVGRectElement_h
 #define SVGRectElement_h
 
-#if ENABLE(SVG)
 #include "SVGAnimatedBoolean.h"
 #include "SVGAnimatedLength.h"
 #include "SVGExternalResourcesRequired.h"
 #include "SVGGraphicsElement.h"
+#include "SVGNames.h"
 
 namespace WebCore {
 
-class SVGRectElement FINAL : public SVGGraphicsElement,
+class SVGRectElement final : public SVGGraphicsElement,
                              public SVGExternalResourcesRequired {
 public:
-    static PassRefPtr<SVGRectElement> create(const QualifiedName&, Document*);
+    static Ref<SVGRectElement> create(const QualifiedName&, Document&);
 
 private:
-    SVGRectElement(const QualifiedName&, Document*);
+    SVGRectElement(const QualifiedName&, Document&);
     
-    virtual bool isValid() const { return SVGTests::isValid(); }
-    virtual bool supportsFocus() const OVERRIDE { return true; }
+    virtual bool isValid() const override { return SVGTests::isValid(); }
 
-    bool isSupportedAttribute(const QualifiedName&);
-    virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
-    virtual void svgAttributeChanged(const QualifiedName&);
+    virtual void parseAttribute(const QualifiedName&, const AtomicString&) override;
+    virtual void svgAttributeChanged(const QualifiedName&) override;
 
-    virtual bool selfHasRelativeLengths() const;
+    virtual bool selfHasRelativeLengths() const override { return true; }
 
-    virtual RenderObject* createRenderer(RenderArena*, RenderStyle*) OVERRIDE;
+    virtual RenderPtr<RenderElement> createElementRenderer(Ref<RenderStyle>&&, const RenderTreePosition&) override;
 
     BEGIN_DECLARE_ANIMATED_PROPERTIES(SVGRectElement)
         DECLARE_ANIMATED_LENGTH(X, x)
@@ -55,11 +53,10 @@ private:
         DECLARE_ANIMATED_LENGTH(Height, height)
         DECLARE_ANIMATED_LENGTH(Rx, rx)
         DECLARE_ANIMATED_LENGTH(Ry, ry)
-        DECLARE_ANIMATED_BOOLEAN(ExternalResourcesRequired, externalResourcesRequired)
+        DECLARE_ANIMATED_BOOLEAN_OVERRIDE(ExternalResourcesRequired, externalResourcesRequired)
     END_DECLARE_ANIMATED_PROPERTIES
 };
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif

@@ -21,16 +21,17 @@
 #ifndef CookieJarQt_h
 #define CookieJarQt_h
 
+#include "SQLiteDatabase.h"
+
 #include <QtCore/QObject>
 #include <QtNetwork/QNetworkCookieJar>
-#include <QtSql/QSqlDatabase>
 
 #include <wtf/HashSet.h>
 #include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
-class SharedCookieJarQt : public QNetworkCookieJar {
+class SharedCookieJarQt final : public QNetworkCookieJar {
     Q_OBJECT
 public:
     static SharedCookieJarQt* shared();
@@ -38,18 +39,20 @@ public:
     void destroy();
 
     void getHostnamesWithCookies(HashSet<String>&);
-    bool deleteCookie(const QNetworkCookie&);
-    void deleteCookiesForHostname(const String&);
+    bool deleteCookie(const QNetworkCookie&) final;
+    void deleteCookiesForHostnames(const Vector<String>&);
     void deleteAllCookies();
-    bool setCookiesFromUrl(const QList<QNetworkCookie>&, const QUrl&);
+    void deleteAllCookiesModifiedSince(std::chrono::system_clock::time_point);
+    bool setCookiesFromUrl(const QList<QNetworkCookie>&, const QUrl&) final;
     void loadCookies();
 
 private:
     SharedCookieJarQt(const String&);
     ~SharedCookieJarQt();
-    void ensureDatabaseTable();
+    bool ensureDatabaseTable();
+    void deleteCookiesForHostname(const String&);
 
-    QSqlDatabase m_database;
+    SQLiteDatabase m_database;
 };
 
 }

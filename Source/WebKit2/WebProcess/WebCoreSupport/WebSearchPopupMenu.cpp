@@ -32,9 +32,9 @@ using namespace WebCore;
 
 namespace WebKit {
 
-PassRefPtr<WebSearchPopupMenu> WebSearchPopupMenu::create(WebPage* page, PopupMenuClient* client)
+Ref<WebSearchPopupMenu> WebSearchPopupMenu::create(WebPage* page, PopupMenuClient* client)
 {
-    return adoptRef(new WebSearchPopupMenu(page, client));
+    return adoptRef(*new WebSearchPopupMenu(page, client));
 }
 
 WebSearchPopupMenu::WebSearchPopupMenu(WebPage* page, PopupMenuClient* client)
@@ -47,7 +47,7 @@ PopupMenu* WebSearchPopupMenu::popupMenu()
     return m_popup.get();
 }
 
-void WebSearchPopupMenu::saveRecentSearches(const AtomicString& name, const Vector<String>& searchItems)
+void WebSearchPopupMenu::saveRecentSearches(const AtomicString& name, const Vector<RecentSearch>& searchItems)
 {
     if (name.isEmpty())
         return;
@@ -56,10 +56,10 @@ void WebSearchPopupMenu::saveRecentSearches(const AtomicString& name, const Vect
     if (!page)
         return;
 
-    WebProcess::shared().parentProcessConnection()->send(Messages::WebPageProxy::SaveRecentSearches(name, searchItems), page->pageID());
+    WebProcess::singleton().parentProcessConnection()->send(Messages::WebPageProxy::SaveRecentSearches(name, searchItems), page->pageID());
 }
 
-void WebSearchPopupMenu::loadRecentSearches(const AtomicString& name, Vector<String>& resultItems)
+void WebSearchPopupMenu::loadRecentSearches(const AtomicString& name, Vector<RecentSearch>& resultItems)
 {
     if (name.isEmpty())
         return;
@@ -68,7 +68,7 @@ void WebSearchPopupMenu::loadRecentSearches(const AtomicString& name, Vector<Str
     if (!page)
         return;
 
-    WebProcess::shared().parentProcessConnection()->sendSync(Messages::WebPageProxy::LoadRecentSearches(name), Messages::WebPageProxy::LoadRecentSearches::Reply(resultItems), page->pageID());
+    WebProcess::singleton().parentProcessConnection()->sendSync(Messages::WebPageProxy::LoadRecentSearches(name), Messages::WebPageProxy::LoadRecentSearches::Reply(resultItems), page->pageID());
 }
 
 bool WebSearchPopupMenu::enabled()

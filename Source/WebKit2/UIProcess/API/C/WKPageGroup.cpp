@@ -26,6 +26,7 @@
 #include "config.h"
 #include "WKPageGroup.h"
 
+#include "APIUserContentExtension.h"
 #include "WKAPICast.h"
 #include "WebPageGroup.h"
 #include "WebPreferences.h"
@@ -55,7 +56,7 @@ void WKPageGroupSetPreferences(WKPageGroupRef pageGroupRef, WKPreferencesRef pre
 
 WKPreferencesRef WKPageGroupGetPreferences(WKPageGroupRef pageGroupRef)
 {
-    return toAPI(toImpl(pageGroupRef)->preferences());
+    return toAPI(&toImpl(pageGroupRef)->preferences());
 }
 
 void WKPageGroupAddUserStyleSheet(WKPageGroupRef pageGroupRef, WKStringRef sourceRef, WKURLRef baseURL, WKArrayRef whitelistedURLPatterns, WKArrayRef blacklistedURLPatterns, WKUserContentInjectedFrames injectedFrames)
@@ -68,7 +69,7 @@ void WKPageGroupRemoveAllUserStyleSheets(WKPageGroupRef pageGroupRef)
     toImpl(pageGroupRef)->removeAllUserStyleSheets();
 }
 
-void WKPageGroupAddUserScript(WKPageGroupRef pageGroupRef, WKStringRef sourceRef, WKURLRef baseURL, WKArrayRef whitelistedURLPatterns, WKArrayRef blacklistedURLPatterns, WKUserContentInjectedFrames injectedFrames, WKUserScriptInjectionTime injectionTime)
+void WKPageGroupAddUserScript(WKPageGroupRef pageGroupRef, WKStringRef sourceRef, WKURLRef baseURL, WKArrayRef whitelistedURLPatterns, WKArrayRef blacklistedURLPatterns, WKUserContentInjectedFrames injectedFrames, _WKUserScriptInjectionTime injectionTime)
 {
     toImpl(pageGroupRef)->addUserScript(toWTFString(sourceRef), toWTFString(baseURL), toImpl(whitelistedURLPatterns), toImpl(blacklistedURLPatterns), toUserContentInjectedFrames(injectedFrames), toUserScriptInjectionTime(injectionTime));
 }
@@ -76,4 +77,34 @@ void WKPageGroupAddUserScript(WKPageGroupRef pageGroupRef, WKStringRef sourceRef
 void WKPageGroupRemoveAllUserScripts(WKPageGroupRef pageGroupRef)
 {
     toImpl(pageGroupRef)->removeAllUserScripts();
+}
+
+void WKPageGroupAddUserContentFilter(WKPageGroupRef pageGroupRef, WKUserContentFilterRef userContentFilterRef)
+{
+#if ENABLE(CONTENT_EXTENSIONS)
+    toImpl(pageGroupRef)->addUserContentExtension(*toImpl(userContentFilterRef));
+#else
+    UNUSED_PARAM(pageGroupRef);
+    UNUSED_PARAM(userContentFilterRef);
+#endif
+}
+
+void WKPageGroupRemoveUserContentFilter(WKPageGroupRef pageGroupRef, WKStringRef userContentFilterNameRef)
+{
+#if ENABLE(CONTENT_EXTENSIONS)
+    toImpl(pageGroupRef)->removeUserContentExtension(toWTFString(userContentFilterNameRef));
+#else
+    UNUSED_PARAM(pageGroupRef);
+    UNUSED_PARAM(userContentFilterNameRef);
+#endif
+}
+
+
+void WKPageGroupRemoveAllUserContentFilters(WKPageGroupRef pageGroupRef)
+{
+#if ENABLE(CONTENT_EXTENSIONS)
+    toImpl(pageGroupRef)->removeAllUserContentExtensions();
+#else
+    UNUSED_PARAM(pageGroupRef);
+#endif
 }

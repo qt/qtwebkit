@@ -25,27 +25,27 @@
 
 namespace JSC {
 
-    class ObjectPrototype : public JSNonFinalObject {
-    public:
-        typedef JSNonFinalObject Base;
+class ObjectPrototype : public JSNonFinalObject {
+public:
+    typedef JSNonFinalObject Base;
 
-        static ObjectPrototype* create(ExecState*, JSGlobalObject*, Structure*);
+    static ObjectPrototype* create(VM&, JSGlobalObject*, Structure*);
 
-        static const ClassInfo s_info;
+    DECLARE_INFO;
 
-        static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype)
-        {
-            return Structure::create(vm, globalObject, prototype, TypeInfo(ObjectType, StructureFlags), &s_info);
-        }
+    static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype)
+    {
+        return Structure::create(vm, globalObject, prototype, TypeInfo(ObjectType, StructureFlags), info());
+    }
 
-    protected:
-        void finishCreation(ExecState*, JSGlobalObject*);
+protected:
+    void finishCreation(VM&, JSGlobalObject*);
 
-    private:
-        ObjectPrototype(ExecState*, Structure*);
-    };
+private:
+    ObjectPrototype(VM&, Structure*);
+};
 
-    JS_EXPORT_PRIVATE EncodedJSValue JSC_HOST_CALL objectProtoFuncToString(ExecState*);
+JS_EXPORT_PRIVATE EncodedJSValue JSC_HOST_CALL objectProtoFuncToString(ExecState*);
 
 } // namespace JSC
 

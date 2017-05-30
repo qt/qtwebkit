@@ -32,8 +32,6 @@
 #ifndef SQLTransactionCoordinator_h
 #define SQLTransactionCoordinator_h
 
-#if ENABLE(SQL_DATABASE)
-
 #include <wtf/Deque.h>
 #include <wtf/HashMap.h>
 #include <wtf/HashSet.h>
@@ -52,10 +50,10 @@ public:
     void releaseLock(SQLTransactionBackend*);
     void shutdown();
 private:
-    typedef Deque<RefPtr<SQLTransactionBackend> > TransactionsQueue;
+    typedef Deque<RefPtr<SQLTransactionBackend>> TransactionsQueue;
     struct CoordinationInfo {
         TransactionsQueue pendingTransactions;
-        HashSet<RefPtr<SQLTransactionBackend> > activeReadTransactions;
+        HashSet<RefPtr<SQLTransactionBackend>> activeReadTransactions;
         RefPtr<SQLTransactionBackend> activeWriteTransaction;
     };
     // Maps database names to information about pending transactions
@@ -67,7 +65,5 @@ private:
 };
 
 } // namespace WebCore
-
-#endif // ENABLE(SQL_DATABASE)
 
 #endif // SQLTransactionCoordinator_h

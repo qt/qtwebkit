@@ -32,15 +32,18 @@
 #include "WebProcessProxy.h"
 #include <wtf/Forward.h>
 #include <wtf/HashSet.h>
+#include <wtf/text/WTFString.h>
 
 namespace WebKit {
 
 class WebPreferences;
 class WebPageProxy;
 
-class WebPageGroup : public TypedAPIObject<APIObject::TypePageGroup> {
+class WebPageGroup : public API::ObjectImpl<API::Object::Type::PageGroup> {
 public:
+    WebPageGroup(const String& identifier = String(), bool visibleToInjectedBundle = true, bool visibleToHistoryClient = true);
     static PassRefPtr<WebPageGroup> create(const String& identifier = String(), bool visibleToInjectedBundle = true, bool visibleToHistoryClient = true);
+    static Ref<WebPageGroup> createNonNull(const String& identifier = String(), bool visibleToInjectedBundle = true, bool visibleToHistoryClient = true);
     static WebPageGroup* get(uint64_t pageGroupID);
 
     virtual ~WebPageGroup();
@@ -48,41 +51,47 @@ public:
     void addPage(WebPageProxy*);
     void removePage(WebPageProxy*);
 
-    const String& identifier() const { return m_data.identifer; }
+    const String& identifier() const { return m_data.identifier; }
     uint64_t pageGroupID() const { return m_data.pageGroupID; }
 
-    const WebPageGroupData& data() { return m_data; }
+    const WebPageGroupData& data() const { return m_data; }
 
     void setPreferences(WebPreferences*);
-    WebPreferences* preferences() const;
+    WebPreferences& preferences() const;
     void preferencesDidChange();
     
-    void addUserStyleSheet(const String& source, const String& baseURL, ImmutableArray* whitelist, ImmutableArray* blacklist, WebCore::UserContentInjectedFrames, WebCore::UserStyleLevel);
-    void addUserScript(const String& source, const String& baseURL, ImmutableArray* whitelist, ImmutableArray* blacklist, WebCore::UserContentInjectedFrames, WebCore::UserScriptInjectionTime);
+    void addUserStyleSheet(const String& source, const String& baseURL, API::Array* whitelist, API::Array* blacklist, WebCore::UserContentInjectedFrames, WebCore::UserStyleLevel);
+    void addUserScript(const String& source, const String& baseURL, API::Array* whitelist, API::Array* blacklist, WebCore::UserContentInjectedFrames, WebCore::UserScriptInjectionTime);
     void removeAllUserStyleSheets();
     void removeAllUserScripts();
     void removeAllUserContent();
 
-private:
-    WebPageGroup(const String& identifier, bool visibleToInjectedBundle, bool visibleToHistoryClient);
+#if ENABLE(CONTENT_EXTENSIONS)
+    void addUserContentExtension(const API::UserContentExtension&);
+    void removeUserContentExtension(const String&);
+    void removeAllUserContentExtensions();
+#endif
 
-    template<typename MessageType> void sendToAllProcessesInGroup(const MessageType&, uint64_t destinationID);
+private:
+    template<typename T> void sendToAllProcessesInGroup(const T&, uint64_t destinationID);
 
     WebPageGroupData m_data;
-    mutable RefPtr<WebPreferences> m_preferences;
+    RefPtr<WebPreferences> m_preferences;
     HashSet<WebPageProxy*> m_pages;
 };
-    
-template<typename MessageType> inline void WebPageGroup::sendToAllProcessesInGroup(const MessageType& message, uint64_t destinationID)
+
+template<typename T>
+void WebPageGroup::sendToAllProcessesInGroup(const T& message, uint64_t destinationID)
 {
     HashSet<WebProcessProxy*> processesSeen;
-    for (HashSet<WebPageProxy*>::const_iterator it = m_pages.begin(), end = m_pages.end(); it != end; ++it) {
-        WebProcessProxy* webProcessProxy = (*it)->process();
-        ASSERT(webProcessProxy);
-        if (!processesSeen.add(webProcessProxy).isNewEntry)
+
+    for (WebPageProxy* webPageProxy : m_pages) {
+        WebProcessProxy& webProcessProxy = webPageProxy->process();
+        if (!processesSeen.add(&webProcessProxy).isNewEntry)
             continue;
-        if (webProcessProxy->canSendMessage())
-            webProcessProxy->send(message, destinationID);
+
+        if (webProcessProxy.canSendMessage())
+            webProcessProxy.send(T(message), destinationID);
     }
 }
 

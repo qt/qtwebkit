@@ -33,22 +33,22 @@
 #include "AudioBufferSourceNode.h"
 #include "JSAudioBuffer.h"
 #include <runtime/Error.h>
+#include <runtime/JSCJSValueInlines.h>
 
 using namespace JSC;
 
 namespace WebCore {
 
-void JSAudioBufferSourceNode::setBuffer(ExecState* exec, JSValue value)
+void JSAudioBufferSourceNode::setBuffer(ExecState& state, JSValue value)
 {
-    AudioBufferSourceNode* imp = static_cast<AudioBufferSourceNode*>(impl());
-    AudioBuffer* buffer = toAudioBuffer(value);
+    AudioBuffer* buffer = JSAudioBuffer::toWrapped(value);
     if (!buffer) {
-        throwError(exec, createTypeError(exec, "Value is not of type AudioBuffer"));
+        state.vm().throwException(&state, createTypeError(&state, "Value is not of type AudioBuffer"));
         return;
     }
     
-    if (!imp->setBuffer(buffer))
-        throwError(exec, createTypeError(exec, "AudioBuffer unsupported number of channels"));
+    if (!wrapped().setBuffer(buffer))
+        state.vm().throwException(&state, createTypeError(&state, "AudioBuffer unsupported number of channels"));
 }
 
 } // namespace WebCore

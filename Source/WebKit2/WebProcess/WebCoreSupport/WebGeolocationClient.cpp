@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -44,22 +44,23 @@ WebGeolocationClient::~WebGeolocationClient()
 
 void WebGeolocationClient::geolocationDestroyed()
 {
-    WebProcess::shared().supplement<WebGeolocationManager>()->unregisterWebPage(m_page);
+    WebProcess::singleton().supplement<WebGeolocationManager>()->unregisterWebPage(m_page);
     delete this;
 }
 
 void WebGeolocationClient::startUpdating()
 {
-    WebProcess::shared().supplement<WebGeolocationManager>()->registerWebPage(m_page);
+    WebProcess::singleton().supplement<WebGeolocationManager>()->registerWebPage(m_page);
 }
 
 void WebGeolocationClient::stopUpdating()
 {
-    WebProcess::shared().supplement<WebGeolocationManager>()->unregisterWebPage(m_page);
+    WebProcess::singleton().supplement<WebGeolocationManager>()->unregisterWebPage(m_page);
 }
 
-void WebGeolocationClient::setEnableHighAccuracy(bool)
+void WebGeolocationClient::setEnableHighAccuracy(bool enabled)
 {
+    WebProcess::singleton().supplement<WebGeolocationManager>()->setEnableHighAccuracyForPage(m_page, enabled);
 }
 
 GeolocationPosition* WebGeolocationClient::lastPosition()

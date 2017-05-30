@@ -12,7 +12,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution. 
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission. 
  *
@@ -32,24 +32,20 @@
 #define IconController_h
 
 #include "IconDatabaseBase.h"
-#include "IconURL.h"
-#include "KURL.h"
 
 namespace WebCore {
 
 class Frame;
 class IconLoader;
+class URL;
 
 class IconController {
-    WTF_MAKE_NONCOPYABLE(IconController);
     WTF_MAKE_FAST_ALLOCATED;
 public:
-    explicit IconController(Frame*);
+    explicit IconController(Frame&);
     ~IconController();
 
-    KURL url();
-    IconURLs urlsForTypes(int iconTypesMask);
-    IconURL iconURL(IconType) const;
+    WEBCORE_EXPORT URL url();
 
     void startLoader();
     void stopLoader();
@@ -57,16 +53,12 @@ public:
     void loadDecisionReceived(IconLoadDecision);
     void continueLoadWithDecision(IconLoadDecision);
 
-    void commitToDatabase(const KURL& icon);
+    void commitToDatabase(const URL& icon);
 
 private:
-    bool appendToIconURLs(IconType, IconURLs*);
-    IconURL defaultURL(IconType);
-
-    Frame* m_frame;
-
-    OwnPtr<IconLoader> m_iconLoader;
-    bool m_waitingForLoadDecision;
+    Frame& m_frame;
+    std::unique_ptr<IconLoader> m_iconLoader;
+    bool m_waitingForLoadDecision { false };
 };
 
 } // namespace WebCore

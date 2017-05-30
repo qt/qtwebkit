@@ -21,7 +21,6 @@
 #ifndef SVGTransformable_h
 #define SVGTransformable_h
 
-#if ENABLE(SVG)
 #include "SVGLocatable.h"
 #include "SVGTransform.h"
 #include <wtf/text/WTFString.h>
@@ -41,14 +40,13 @@ public:
     virtual ~SVGTransformable();
 
     static bool parseTransformAttribute(SVGTransformList&, const UChar*& ptr, const UChar* end, TransformParsingMode mode = ClearList);
-    static bool parseTransformValue(unsigned type, const UChar*& ptr, const UChar* end, SVGTransform&);
+    static bool parseTransformValue(SVGTransform::SVGTransformType, const UChar*& ptr, const UChar* end, SVGTransform&);
     static SVGTransform::SVGTransformType parseTransformType(const String&);
 
-    virtual AffineTransform localCoordinateSpaceTransform(SVGLocatable::CTMScope) const { return animatedLocalTransform(); }
+    virtual AffineTransform localCoordinateSpaceTransform(SVGLocatable::CTMScope) const override { return animatedLocalTransform(); }
     virtual AffineTransform animatedLocalTransform() const = 0;
 };
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif // SVGTransformable_h

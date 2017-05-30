@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006, 2007, 2009, 2010, 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2006-2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -37,22 +37,32 @@
 #include "TextEventInputType.h"
 #include "TextGranularity.h"
 #include "Timer.h"
+#include "WheelEventDeltaFilter.h"
+#include <memory>
 #include <wtf/Forward.h>
-#include <wtf/OwnPtr.h>
-#include <wtf/RefPtr.h>
-
-#if PLATFORM(MAC) && !defined(__OBJC__)
-class NSView;
-#endif
-
-#if ENABLE(TOUCH_EVENTS)
 #include <wtf/HashMap.h>
+#include <wtf/HashSet.h>
+#include <wtf/RefPtr.h>
+#include <wtf/Vector.h>
+#include <wtf/WeakPtr.h>
+
+#if PLATFORM(IOS)
+OBJC_CLASS WebEvent;
+OBJC_CLASS WAKView;
+#ifdef __OBJC__
+#include "WAKAppKitStubs.h"
+#endif
+#endif // PLATFORM(IOS)
+
+#if PLATFORM(COCOA)
+OBJC_CLASS NSView;
 #endif
 
 namespace WebCore {
 
 class AutoscrollController;
-class Clipboard;
+class ContainerNode;
+class DataTransfer;
 class Document;
 class Element;
 class Event;
@@ -67,15 +77,18 @@ class KeyboardEvent;
 class MouseEventWithHitTestResults;
 class Node;
 class OptionalCursor;
+class PlatformGestureEvent;
 class PlatformKeyboardEvent;
 class PlatformTouchEvent;
 class PlatformWheelEvent;
+class RenderBox;
+class RenderElement;
 class RenderLayer;
-class RenderObject;
 class RenderWidget;
-class SVGElementInstance;
+class ScrollableArea;
 class Scrollbar;
 class TextEvent;
+class Touch;
 class TouchEvent;
 class VisibleSelection;
 class WheelEvent;
@@ -83,8 +96,9 @@ class Widget;
 
 struct DragState;
 
-#if ENABLE(GESTURE_EVENTS)
+#if ENABLE(QT_GESTURE_EVENTS)
 class PlatformGestureEvent;
+class RenderObject;
 #endif
 
 #if ENABLE(DRAG_SUPPORT)
@@ -94,99 +108,140 @@ extern const int TextDragHysteresis;
 extern const int GeneralDragHysteresis;
 #endif // ENABLE(DRAG_SUPPORT)
 
+#if ENABLE(IOS_GESTURE_EVENTS) || ENABLE(MAC_GESTURE_EVENTS)
+extern const float GestureUnknown;
+extern const unsigned InvalidTouchIdentifier;
+#endif
+
 enum AppendTrailingWhitespace { ShouldAppendTrailingWhitespace, DontAppendTrailingWhitespace };
 enum CheckDragHysteresis { ShouldCheckDragHysteresis, DontCheckDragHysteresis };
 
+enum class ImmediateActionStage {
+    None,
+    PerformedHitTest,
+    ActionUpdated,
+    ActionCancelledWithoutUpdate,
+    ActionCancelledAfterUpdate,
+    ActionCompleted
+};
+
 class EventHandler {
     WTF_MAKE_NONCOPYABLE(EventHandler);
+    WTF_MAKE_FAST_ALLOCATED;
 public:
-    explicit EventHandler(Frame*);
+    explicit EventHandler(Frame&);
     ~EventHandler();
 
     void clear();
-    void nodeWillBeRemoved(Node*);
+    void nodeWillBeRemoved(Node&);
 
 #if ENABLE(DRAG_SUPPORT)
     void updateSelectionForMouseDrag();
 #endif
 
-    Node* mousePressNode() const;
-    void setMousePressNode(PassRefPtr<Node>);
-
 #if ENABLE(PAN_SCROLLING)
     void didPanScrollStart();
     void didPanScrollStop();
-    void startPanScrolling(RenderObject*);
+    void startPanScrolling(RenderElement*);
 #endif
 
     void stopAutoscrollTimer(bool rendererIsBeingDestroyed = false);
-    RenderObject* autoscrollRenderer() const;
+    RenderBox* autoscrollRenderer() const;
     void updateAutoscrollRenderer();
     bool autoscrollInProgress() const;
     bool mouseDownWasInSubframe() const { return m_mouseDownWasInSubframe; }
     bool panScrollInProgress() const;
 
-    void dispatchFakeMouseMoveEventSoon();
+    WEBCORE_EXPORT void dispatchFakeMouseMoveEventSoon();
     void dispatchFakeMouseMoveEventSoonInQuad(const FloatQuad&);
 
-    HitTestResult hitTestResultAtPoint(const LayoutPoint&,
+    WEBCORE_EXPORT HitTestResult hitTestResultAtPoint(const LayoutPoint&,
         HitTestRequest::HitTestRequestType hitType = HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::DisallowShadowContent,
         const LayoutSize& padding = LayoutSize());
 
     bool mousePressed() const { return m_mousePressed; }
-    void setMousePressed(bool pressed) { m_mousePressed = pressed; }
+    Node* mousePressNode() const { return m_mousePressNode.get(); }
 
-    void setCapturingMouseEventsNode(PassRefPtr<Node>); // A caller is responsible for resetting capturing node to 0.
+    WEBCORE_EXPORT void setCapturingMouseEventsElement(PassRefPtr<Element>); // A caller is responsible for resetting capturing element to 0.
 
 #if ENABLE(DRAG_SUPPORT)
-    bool updateDragAndDrop(const PlatformMouseEvent&, Clipboard*);
-    void cancelDragAndDrop(const PlatformMouseEvent&, Clipboard*);
-    bool performDragAndDrop(const PlatformMouseEvent&, Clipboard*);
+    bool updateDragAndDrop(const PlatformMouseEvent&, DataTransfer*);
+    void cancelDragAndDrop(const PlatformMouseEvent&, DataTransfer*);
+    bool performDragAndDrop(const PlatformMouseEvent&, DataTransfer*);
     void updateDragStateAfterEditDragIfNeeded(Element* rootEditableElement);
 #endif
 
     void scheduleHoverStateUpdate();
+#if ENABLE(CURSOR_SUPPORT)
     void scheduleCursorUpdate();
+#endif
 
     void setResizingFrameSet(HTMLFrameSetElement*);
 
     void resizeLayerDestroyed();
 
     IntPoint lastKnownMousePosition() const;
+    IntPoint lastKnownMouseGlobalPosition() const { return m_lastKnownMouseGlobalPosition; }
     Cursor currentMouseCursor() const { return m_currentMouseCursor; }
 
     static Frame* subframeForTargetNode(Node*);
     static Frame* subframeForHitTestResult(const MouseEventWithHitTestResults&);
 
-    bool scrollOverflow(ScrollDirection, ScrollGranularity, Node* startingNode = 0);
-    bool scrollRecursively(ScrollDirection, ScrollGranularity, Node* startingNode = 0);
-    bool logicalScrollRecursively(ScrollLogicalDirection, ScrollGranularity, Node* startingNode = 0);
+    WEBCORE_EXPORT bool scrollOverflow(ScrollDirection, ScrollGranularity, Node* startingNode = nullptr);
+    WEBCORE_EXPORT bool scrollRecursively(ScrollDirection, ScrollGranularity, Node* startingNode = nullptr);
+    WEBCORE_EXPORT bool logicalScrollRecursively(ScrollLogicalDirection, ScrollGranularity, Node* startingNode = nullptr);
 
     bool tabsToLinks(KeyboardEvent*) const;
     bool tabsToAllFormControls(KeyboardEvent*) const;
 
-    bool mouseMoved(const PlatformMouseEvent&);
-    bool passMouseMovedEventToScrollbars(const PlatformMouseEvent&);
+    WEBCORE_EXPORT bool mouseMoved(const PlatformMouseEvent&);
+    WEBCORE_EXPORT bool passMouseMovedEventToScrollbars(const PlatformMouseEvent&);
 
     void lostMouseCapture();
 
-    bool handleMousePressEvent(const PlatformMouseEvent&);
-    bool handleMouseMoveEvent(const PlatformMouseEvent&, HitTestResult* hoveredNode = 0, bool onlyUpdateScrollbars = false);
-    bool handleMouseReleaseEvent(const PlatformMouseEvent&);
-    bool handleWheelEvent(const PlatformWheelEvent&);
+    WEBCORE_EXPORT bool handleMousePressEvent(const PlatformMouseEvent&);
+    bool handleMouseMoveEvent(const PlatformMouseEvent&, HitTestResult* hoveredNode = nullptr, bool onlyUpdateScrollbars = false);
+    WEBCORE_EXPORT bool handleMouseReleaseEvent(const PlatformMouseEvent&);
+    bool handleMouseForceEvent(const PlatformMouseEvent&);
+    WEBCORE_EXPORT bool handleWheelEvent(const PlatformWheelEvent&);
     void defaultWheelEventHandler(Node*, WheelEvent*);
     bool handlePasteGlobalSelection(const PlatformMouseEvent&);
 
-#if ENABLE(GESTURE_EVENTS)
+    void platformPrepareForWheelEvents(const PlatformWheelEvent&, const HitTestResult&, RefPtr<Element>& eventTarget, RefPtr<ContainerNode>& scrollableContainer, ScrollableArea*&, bool& isOverWidget);
+    void platformRecordWheelEvent(const PlatformWheelEvent&);
+    bool platformCompleteWheelEvent(const PlatformWheelEvent&, ContainerNode* scrollableContainer, ScrollableArea*);
+    bool platformCompletePlatformWidgetWheelEvent(const PlatformWheelEvent&, const Widget&, ContainerNode* scrollableContainer);
+    void platformNotifyIfEndGesture(const PlatformWheelEvent&, ScrollableArea*);
+
+#if ENABLE(IOS_TOUCH_EVENTS) || ENABLE(IOS_GESTURE_EVENTS)
+    typedef Vector<RefPtr<Touch>> TouchArray;
+    typedef HashMap<EventTarget*, TouchArray*> EventTargetTouchMap;
+#endif
+
+#if ENABLE(IOS_TOUCH_EVENTS) || ENABLE(IOS_GESTURE_EVENTS) || ENABLE(MAC_GESTURE_EVENTS)
+    typedef HashSet<RefPtr<EventTarget>> EventTargetSet;
+#endif
+
+#if ENABLE(QT_GESTURE_EVENTS)
     bool handleGestureEvent(const PlatformGestureEvent&);
     bool handleGestureTap(const PlatformGestureEvent&);
     bool handleGestureLongPress(const PlatformGestureEvent&);
-    bool handleGestureLongTap(const PlatformGestureEvent&);
-    bool handleGestureTwoFingerTap(const PlatformGestureEvent&);
-    bool handleGestureScrollUpdate(const PlatformGestureEvent&);
-    bool handleGestureScrollBegin(const PlatformGestureEvent&);
-    void clearGestureScrollNodes();
-    bool isScrollbarHandlingGestures() const;
+#endif
+
+#if ENABLE(IOS_TOUCH_EVENTS)
+    bool dispatchTouchEvent(const PlatformTouchEvent&, const AtomicString&, const EventTargetTouchMap&, float, float);
+    bool dispatchSimulatedTouchEvent(IntPoint location);
+#endif
+
+#if ENABLE(IOS_GESTURE_EVENTS)
+    bool dispatchGestureEvent(const PlatformTouchEvent&, const AtomicString&, const EventTargetSet&, float, float);
+#elif ENABLE(MAC_GESTURE_EVENTS)
+    bool dispatchGestureEvent(const PlatformGestureEvent&, const AtomicString&, const EventTargetSet&, float, float);
+    WEBCORE_EXPORT bool handleGestureEvent(const PlatformGestureEvent&);
+#endif
+
+#if PLATFORM(IOS)
+    void defaultTouchEventHandler(Node*, TouchEvent*);
 #endif
 
 #if ENABLE(TOUCH_ADJUSTMENT)
@@ -200,9 +255,9 @@ public:
 #endif
 
 #if ENABLE(CONTEXT_MENUS)
-    bool sendContextMenuEvent(const PlatformMouseEvent&);
+    WEBCORE_EXPORT bool sendContextMenuEvent(const PlatformMouseEvent&);
     bool sendContextMenuEventForKey();
-#if ENABLE(GESTURE_EVENTS)
+#if ENABLE(QT_GESTURE_EVENTS)
     bool sendContextMenuEventForGesture(const PlatformGestureEvent&);
 #endif
 #endif
@@ -212,44 +267,69 @@ public:
     bool needsKeyboardEventDisambiguationQuirks() const;
 
     static unsigned accessKeyModifiers();
-    bool handleAccessKey(const PlatformKeyboardEvent&);
-    bool keyEvent(const PlatformKeyboardEvent&);
+    WEBCORE_EXPORT bool handleAccessKey(const PlatformKeyboardEvent&);
+    WEBCORE_EXPORT bool keyEvent(const PlatformKeyboardEvent&);
     void defaultKeyboardEventHandler(KeyboardEvent*);
 
-    bool handleTextInputEvent(const String& text, Event* underlyingEvent = 0, TextEventInputType = TextEventInputKeyboard);
+    bool accessibilityPreventsEventPropogation(KeyboardEvent&);
+    WEBCORE_EXPORT void handleKeyboardSelectionMovementForAccessibility(KeyboardEvent*);
+
+    bool handleTextInputEvent(const String& text, Event* underlyingEvent = nullptr, TextEventInputType = TextEventInputKeyboard);
     void defaultTextInputEventHandler(TextEvent*);
 
 #if ENABLE(DRAG_SUPPORT)
-    bool eventMayStartDrag(const PlatformMouseEvent&) const;
+    WEBCORE_EXPORT bool eventMayStartDrag(const PlatformMouseEvent&) const;
     
-    void dragSourceEndedAt(const PlatformMouseEvent&, DragOperation);
+    WEBCORE_EXPORT void dragSourceEndedAt(const PlatformMouseEvent&, DragOperation);
 #endif
 
     void focusDocumentView();
-
-    void capsLockStateMayHaveChanged(); // Only called by FrameSelection
     
-    void sendScrollEvent(); // Ditto
+    WEBCORE_EXPORT void sendScrollEvent();
 
-#if PLATFORM(MAC) && defined(__OBJC__)
-    void mouseDown(NSEvent *);
-    void mouseDragged(NSEvent *);
-    void mouseUp(NSEvent *);
-    void mouseMoved(NSEvent *);
-    bool keyEvent(NSEvent *);
-    bool wheelEvent(NSEvent *);
+#if PLATFORM(COCOA) && defined(__OBJC__)
+#if !PLATFORM(IOS)
+    WEBCORE_EXPORT void mouseDown(NSEvent *, NSEvent *correspondingPressureEvent);
+    WEBCORE_EXPORT void mouseDragged(NSEvent *, NSEvent *correspondingPressureEvent);
+    WEBCORE_EXPORT void mouseUp(NSEvent *, NSEvent *correspondingPressureEvent);
+    WEBCORE_EXPORT void mouseMoved(NSEvent *, NSEvent *correspondingPressureEvent);
+    WEBCORE_EXPORT void pressureChange(NSEvent *, NSEvent* correspondingPressureEvent);
+    WEBCORE_EXPORT bool keyEvent(NSEvent *);
+    WEBCORE_EXPORT bool wheelEvent(NSEvent *);
+#else
+    WEBCORE_EXPORT void mouseDown(WebEvent *);
+    WEBCORE_EXPORT void mouseUp(WebEvent *);
+    WEBCORE_EXPORT void mouseMoved(WebEvent *);
+    WEBCORE_EXPORT bool keyEvent(WebEvent *);
+    WEBCORE_EXPORT bool wheelEvent(WebEvent *);
+#endif
 
-    void passMouseMovedEventToScrollbars(NSEvent *);
+#if ENABLE(IOS_TOUCH_EVENTS)
+    WEBCORE_EXPORT void touchEvent(WebEvent *);
+#endif
 
-    void sendFakeEventsAfterWidgetTracking(NSEvent *initiatingEvent);
+#if !PLATFORM(IOS)
+    WEBCORE_EXPORT void passMouseMovedEventToScrollbars(NSEvent *, NSEvent* correspondingPressureEvent);
 
+    WEBCORE_EXPORT void sendFakeEventsAfterWidgetTracking(NSEvent *initiatingEvent);
+#endif
+
+#if !PLATFORM(IOS)
     void setActivationEventNumber(int num) { m_activationEventNumber = num; }
 
-    static NSEvent *currentNSEvent();
+    WEBCORE_EXPORT static NSEvent *currentNSEvent();
+    static NSEvent *correspondingPressureEvent();
+#else
+    static WebEvent *currentEvent();
+#endif // !PLATFORM(IOS)
+#endif // PLATFORM(COCOA) && defined(__OBJC__)
+
+#if PLATFORM(IOS)
+    void invalidateClick();
 #endif
 
 #if ENABLE(TOUCH_EVENTS)
-    bool handleTouchEvent(const PlatformTouchEvent&);
+    WEBCORE_EXPORT bool handleTouchEvent(const PlatformTouchEvent&);
 #endif
 
     bool useHandCursor(Node*, bool isOverLink, bool shiftKey);
@@ -257,55 +337,66 @@ public:
 
     bool isHandlingWheelEvent() const { return m_isHandlingWheelEvent; }
 
+    WEBCORE_EXPORT void setImmediateActionStage(ImmediateActionStage stage);
+    ImmediateActionStage immediateActionStage() const { return m_immediateActionStage; }
+
 private:
 #if ENABLE(DRAG_SUPPORT)
     static DragState& dragState();
     static const double TextDragDelay;
     
-    PassRefPtr<Clipboard> createDraggingClipboard() const;
+    PassRefPtr<DataTransfer> createDraggingDataTransfer() const;
 #endif // ENABLE(DRAG_SUPPORT)
 
     bool eventActivatedView(const PlatformMouseEvent&) const;
     bool updateSelectionForMouseDownDispatchingSelectStart(Node*, const VisibleSelection&, TextGranularity);
     void selectClosestWordFromHitTestResult(const HitTestResult&, AppendTrailingWhitespace);
+    VisibleSelection selectClosestWordFromHitTestResultBasedOnLookup(const HitTestResult&);
     void selectClosestWordFromMouseEvent(const MouseEventWithHitTestResults&);
-    void selectClosestWordOrLinkFromMouseEvent(const MouseEventWithHitTestResults&);
+    void selectClosestContextualWordFromMouseEvent(const MouseEventWithHitTestResults&);
+    void selectClosestContextualWordOrLinkFromMouseEvent(const MouseEventWithHitTestResults&);
 
     bool handleMouseDoubleClickEvent(const PlatformMouseEvent&);
 
-    bool handleMousePressEvent(const MouseEventWithHitTestResults&);
+    WEBCORE_EXPORT bool handleMousePressEvent(const MouseEventWithHitTestResults&);
     bool handleMousePressEventSingleClick(const MouseEventWithHitTestResults&);
     bool handleMousePressEventDoubleClick(const MouseEventWithHitTestResults&);
     bool handleMousePressEventTripleClick(const MouseEventWithHitTestResults&);
 #if ENABLE(DRAG_SUPPORT)
     bool handleMouseDraggedEvent(const MouseEventWithHitTestResults&);
 #endif
-    bool handleMouseReleaseEvent(const MouseEventWithHitTestResults&);
+    WEBCORE_EXPORT bool handleMouseReleaseEvent(const MouseEventWithHitTestResults&);
 
     OptionalCursor selectCursor(const HitTestResult&, bool shiftKey);
 
-    void hoverTimerFired(Timer<EventHandler>*);
-    void cursorUpdateTimerFired(Timer<EventHandler>*);
+    void hoverTimerFired();
+#if ENABLE(CURSOR_SUPPORT)
+    void cursorUpdateTimerFired();
+#endif
 
-    bool logicalScrollOverflow(ScrollLogicalDirection, ScrollGranularity, Node* startingNode = 0);
+    bool logicalScrollOverflow(ScrollLogicalDirection, ScrollGranularity, Node* startingNode = nullptr);
     
     bool shouldTurnVerticalTicksIntoHorizontal(const HitTestResult&, const PlatformWheelEvent&) const;
+    
     bool mouseDownMayStartSelect() const { return m_mouseDownMayStartSelect; }
 
     static bool isKeyboardOptionTab(KeyboardEvent*);
     static bool eventInvertsTabsToLinksClientCallResult(KeyboardEvent*);
 
-    void fakeMouseMoveEventTimerFired(Timer<EventHandler>*);
+#if !ENABLE(IOS_TOUCH_EVENTS)
+    void fakeMouseMoveEventTimerFired();
     void cancelFakeMouseMoveEvent();
+#endif
 
     bool isInsideScrollbar(const IntPoint&) const;
 
 #if ENABLE(TOUCH_EVENTS)
     bool dispatchSyntheticTouchEventIfEnabled(const PlatformMouseEvent&);
-    HitTestResult hitTestResultInFrame(Frame*, const LayoutPoint&, HitTestRequest::HitTestRequestType hitType = HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::DisallowShadowContent);
 #endif
 
+#if !PLATFORM(IOS)
     void invalidateClick();
+#endif
 
     Node* nodeUnderMouse() const;
     
@@ -316,9 +407,9 @@ private:
 
     bool dispatchMouseEvent(const AtomicString& eventType, Node* target, bool cancelable, int clickCount, const PlatformMouseEvent&, bool setUnder);
 #if ENABLE(DRAG_SUPPORT)
-    bool dispatchDragEvent(const AtomicString& eventType, Node* target, const PlatformMouseEvent&, Clipboard*);
+    bool dispatchDragEvent(const AtomicString& eventType, Element& target, const PlatformMouseEvent&, DataTransfer*);
 
-    void freeClipboard();
+    void freeDataTransfer();
 
     bool handleDrag(const MouseEventWithHitTestResults&, CheckDragHysteresis);
 #endif
@@ -331,12 +422,14 @@ private:
     bool dragHysteresisExceeded(const FloatPoint&) const;
     bool dragHysteresisExceeded(const IntPoint&) const;
 #endif // ENABLE(DRAG_SUPPORT)
+    
+    bool mouseMovementExceedsThreshold(const FloatPoint&, int pointsThreshold) const;
 
     bool passMousePressEventToSubframe(MouseEventWithHitTestResults&, Frame* subframe);
-    bool passMouseMoveEventToSubframe(MouseEventWithHitTestResults&, Frame* subframe, HitTestResult* hoveredNode = 0);
+    bool passMouseMoveEventToSubframe(MouseEventWithHitTestResults&, Frame* subframe, HitTestResult* hoveredNode = nullptr);
     bool passMouseReleaseEventToSubframe(MouseEventWithHitTestResults&, Frame* subframe);
 
-    bool passSubframeEventToSubframe(MouseEventWithHitTestResults&, Frame* subframe, HitTestResult* hoveredNode = 0);
+    bool passSubframeEventToSubframe(MouseEventWithHitTestResults&, Frame* subframe, HitTestResult* hoveredNode = nullptr);
 
     bool passMousePressEventToScrollbar(MouseEventWithHitTestResults&, Scrollbar*);
 
@@ -344,7 +437,7 @@ private:
     bool passWidgetMouseDownEventToWidget(RenderWidget*);
 
     bool passMouseDownEventToWidget(Widget*);
-    bool passWheelEventToWidget(const PlatformWheelEvent&, Widget*);
+    bool passWheelEventToWidget(const PlatformWheelEvent&, Widget&);
 
     void defaultSpaceEventHandler(KeyboardEvent*);
     void defaultBackspaceEventHandler(KeyboardEvent*);
@@ -372,7 +465,7 @@ private:
 
     bool capturesDragging() const { return m_capturesDragging; }
 
-#if PLATFORM(MAC) && defined(__OBJC__)
+#if PLATFORM(COCOA) && defined(__OBJC__)
     NSView *mouseDownViewIfStillGood();
 
     PlatformMouseEvent currentPlatformMouseEvent() const;
@@ -382,12 +475,8 @@ private:
     bool isKeyEventAllowedInFullScreen(const PlatformKeyboardEvent&) const;
 #endif
 
-#if ENABLE(GESTURE_EVENTS)
-    bool handleGestureTapDown();
+#if ENABLE(QT_GESTURE_EVENTS)
     bool handleGestureForTextSelectionOrContextMenu(const PlatformGestureEvent&);
-    bool passGestureEventToWidget(const PlatformGestureEvent&, Widget*);
-    bool passGestureEventToWidgetIfPossible(const PlatformGestureEvent&, RenderObject*);
-    bool sendScrollEventToView(const PlatformGestureEvent&, const FloatSize&);
 #endif
 
     void setLastKnownMousePosition(const PlatformMouseEvent&);
@@ -395,109 +484,122 @@ private:
 #if ENABLE(CURSOR_VISIBILITY)
     void startAutoHideCursorTimer();
     void cancelAutoHideCursorTimer();
-    void autoHideCursorTimerFired(Timer<EventHandler>*);
+    void autoHideCursorTimerFired();
 #endif
 
-    Frame* m_frame;
+    void clearLatchedState();
 
-    bool m_mousePressed;
-    bool m_capturesDragging;
+    Frame& m_frame;
+
+    bool m_mousePressed { false };
+    bool m_capturesDragging { false };
     RefPtr<Node> m_mousePressNode;
 
-    bool m_mouseDownMayStartSelect;
+    bool m_mouseDownMayStartSelect { false };
 #if ENABLE(DRAG_SUPPORT)
-    bool m_mouseDownMayStartDrag;
-    bool m_dragMayStartSelectionInstead;
+    bool m_mouseDownMayStartDrag { false };
+    bool m_dragMayStartSelectionInstead { false };
 #endif
-    bool m_mouseDownWasSingleClickInSelection;
+    bool m_mouseDownWasSingleClickInSelection { false };
     enum SelectionInitiationState { HaveNotStartedSelection, PlacedCaret, ExtendedSelection };
-    SelectionInitiationState m_selectionInitiationState;
+    SelectionInitiationState m_selectionInitiationState { HaveNotStartedSelection };
 
 #if ENABLE(DRAG_SUPPORT)
     LayoutPoint m_dragStartPos;
 #endif
 
-    bool m_panScrollButtonPressed;
+    bool m_panScrollButtonPressed { false };
 
-    Timer<EventHandler> m_hoverTimer;
-    Timer<EventHandler> m_cursorUpdateTimer;
-
-    OwnPtr<AutoscrollController> m_autoscrollController;
-    bool m_mouseDownMayStartAutoscroll;
-    bool m_mouseDownWasInSubframe;
-
-    Timer<EventHandler> m_fakeMouseMoveEventTimer;
-
-#if ENABLE(SVG)
-    bool m_svgPan;
-    RefPtr<SVGElementInstance> m_instanceUnderMouse;
-    RefPtr<SVGElementInstance> m_lastInstanceUnderMouse;
+    Timer m_hoverTimer;
+#if ENABLE(CURSOR_SUPPORT)
+    Timer m_cursorUpdateTimer;
 #endif
 
-    RenderLayer* m_resizeLayer;
+    std::unique_ptr<AutoscrollController> m_autoscrollController;
+    bool m_mouseDownMayStartAutoscroll { false };
+    bool m_mouseDownWasInSubframe { false };
 
-    RefPtr<Node> m_capturingMouseEventsNode;
-    bool m_eventHandlerWillResetCapturingMouseEventsNode;
+#if !ENABLE(IOS_TOUCH_EVENTS)
+    Timer m_fakeMouseMoveEventTimer;
+#endif
+
+    bool m_svgPan { false };
+
+    RenderLayer* m_resizeLayer { nullptr };
+
+    RefPtr<Element> m_capturingMouseEventsElement;
+    bool m_eventHandlerWillResetCapturingMouseEventsElement { false };
     
-    RefPtr<Node> m_nodeUnderMouse;
-    RefPtr<Node> m_lastNodeUnderMouse;
+    RefPtr<Element> m_elementUnderMouse;
+    RefPtr<Element> m_lastElementUnderMouse;
     RefPtr<Frame> m_lastMouseMoveEventSubframe;
-    RefPtr<Scrollbar> m_lastScrollbarUnderMouse;
+    WeakPtr<Scrollbar> m_lastScrollbarUnderMouse;
     Cursor m_currentMouseCursor;
 
-    int m_clickCount;
+    int m_clickCount { 0 };
     RefPtr<Node> m_clickNode;
 
+#if ENABLE(IOS_GESTURE_EVENTS)
+    float m_gestureInitialRotation { GestureUnknown };
+#endif
+#if ENABLE(IOS_GESTURE_EVENTS) || ENABLE(MAC_GESTURE_EVENTS)
+    float m_gestureInitialDiameter { GestureUnknown };
+    float m_gestureLastDiameter { GestureUnknown };
+    float m_gestureLastRotation { GestureUnknown };
+    EventTargetSet m_gestureTargets;
+#endif
+#if ENABLE(MAC_GESTURE_EVENTS)
+    bool m_hasActiveGesture { false };
+#endif
+
+#if ENABLE(IOS_TOUCH_EVENTS)
+    unsigned m_firstTouchID { InvalidTouchIdentifier };
+
+    TouchArray m_touches;
+    RefPtr<Frame> m_touchEventTargetSubframe;
+#endif
+
 #if ENABLE(DRAG_SUPPORT)
-    RefPtr<Node> m_dragTarget;
-    bool m_shouldOnlyFireDragOverEvent;
+    RefPtr<Element> m_dragTarget;
+    bool m_shouldOnlyFireDragOverEvent { false };
 #endif
     
     RefPtr<HTMLFrameSetElement> m_frameSetBeingResized;
 
     LayoutSize m_offsetFromResizeCorner; // In the coords of m_resizeLayer.
     
-    bool m_mousePositionIsUnknown;
+    bool m_mousePositionIsUnknown { true };
     IntPoint m_lastKnownMousePosition;
     IntPoint m_lastKnownMouseGlobalPosition;
     IntPoint m_mouseDownPos; // In our view's coords.
-    double m_mouseDownTimestamp;
+    double m_mouseDownTimestamp { 0 };
     PlatformMouseEvent m_mouseDown;
 
-    RefPtr<Node> m_latchedWheelEventNode;
-    bool m_widgetIsLatched;
-
-    RefPtr<Node> m_previousWheelScrolledNode;
-
-#if PLATFORM(MAC)
-    NSView *m_mouseDownView;
-    bool m_sendingEventToSubview;
-    int m_activationEventNumber;
+#if PLATFORM(COCOA)
+    NSView *m_mouseDownView { nullptr };
+    bool m_sendingEventToSubview { false };
+#if !PLATFORM(IOS)
+    int m_activationEventNumber { -1 };
 #endif
-#if ENABLE(TOUCH_EVENTS)
-    typedef HashMap<int, RefPtr<EventTarget> > TouchTargetMap;
+#endif
+#if ENABLE(TOUCH_EVENTS) && !ENABLE(IOS_TOUCH_EVENTS)
+    typedef HashMap<int, RefPtr<EventTarget>> TouchTargetMap;
     TouchTargetMap m_originatingTouchPointTargets;
     RefPtr<Document> m_originatingTouchPointDocument;
-    unsigned m_originatingTouchPointTargetKey;
-    bool m_touchPressed;
+    unsigned m_originatingTouchPointTargetKey { 0 };
+    bool m_touchPressed { false };
 #endif
 
-#if ENABLE(GESTURE_EVENTS)
-    RefPtr<Node> m_scrollGestureHandlingNode;
-    bool m_lastHitTestResultOverWidget;
-    RefPtr<Node> m_previousGestureScrolledNode;
-    RefPtr<Scrollbar> m_scrollbarHandlingScrollGesture;
-#endif
-
-    double m_maxMouseMovedDuration;
-    PlatformEvent::Type m_baseEventType;
-    bool m_didStartDrag;
-    bool m_didLongPressInvokeContextMenu;
-    bool m_isHandlingWheelEvent;
+    double m_maxMouseMovedDuration { 0 };
+    PlatformEvent::Type m_baseEventType { PlatformEvent::NoType };
+    bool m_didStartDrag { false };
+    bool m_isHandlingWheelEvent { false };
 
 #if ENABLE(CURSOR_VISIBILITY)
-    Timer<EventHandler> m_autoHideCursorTimer;
+    Timer m_autoHideCursorTimer;
 #endif
+
+    ImmediateActionStage m_immediateActionStage { ImmediateActionStage::None };
 };
 
 } // namespace WebCore

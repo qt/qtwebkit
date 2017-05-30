@@ -33,8 +33,6 @@
 #include "AudioNodeOutput.h"
 #include <algorithm>
 
-using namespace std;
- 
 namespace WebCore {
 
 AudioNodeInput::AudioNodeInput(AudioNode* node)
@@ -47,18 +45,17 @@ AudioNodeInput::AudioNodeInput(AudioNode* node)
 
 void AudioNodeInput::connect(AudioNodeOutput* output)
 {
-    ASSERT(context()->isGraphOwner());
+    ASSERT(context().isGraphOwner());
     
     ASSERT(output && node());
     if (!output || !node())
         return;
 
     // Check if we're already connected to this output.
-    if (m_outputs.contains(output))
+    if (!m_outputs.add(output).isNewEntry)
         return;
         
     output->addInput(this);
-    m_outputs.add(output);
     changedOutputs();
 
     // Sombody has just connected to us, so count it as a reference.
@@ -67,15 +64,14 @@ void AudioNodeInput::connect(AudioNodeOutput* output)
 
 void AudioNodeInput::disconnect(AudioNodeOutput* output)
 {
-    ASSERT(context()->isGraphOwner());
+    ASSERT(context().isGraphOwner());
 
     ASSERT(output && node());
     if (!output || !node())
         return;
 
     // First try to disconnect from "active" connections.
-    if (m_outputs.contains(output)) {
-        m_outputs.remove(output);
+    if (m_outputs.remove(output)) {
         changedOutputs();
         output->removeInput(this);
         node()->deref(AudioNode::RefTypeConnection); // Note: it's important to return immediately after all deref() calls since the node may be deleted.
@@ -83,8 +79,7 @@ void AudioNodeInput::disconnect(AudioNodeOutput* output)
     }
     
     // Otherwise, try to disconnect from disabled connections.
-    if (m_disabledOutputs.contains(output)) {
-        m_disabledOutputs.remove(output);
+    if (m_disabledOutputs.remove(output)) {
         output->removeInput(this);
         node()->deref(AudioNode::RefTypeConnection); // Note: it's important to return immediately after all deref() calls since the node may be deleted.
         return;
@@ -95,7 +90,7 @@ void AudioNodeInput::disconnect(AudioNodeOutput* output)
 
 void AudioNodeInput::disable(AudioNodeOutput* output)
 {
-    ASSERT(context()->isGraphOwner());
+    ASSERT(context().isGraphOwner());
 
     ASSERT(output && node());
     if (!output || !node())
@@ -113,7 +108,7 @@ void AudioNodeInput::disable(AudioNodeOutput* output)
 
 void AudioNodeInput::enable(AudioNodeOutput* output)
 {
-    ASSERT(context()->isGraphOwner());
+    ASSERT(context().isGraphOwner());
 
     ASSERT(output && node());
     if (!output || !node())
@@ -137,7 +132,7 @@ void AudioNodeInput::didUpdate()
 
 void AudioNodeInput::updateInternalBus()
 {
-    ASSERT(context()->isAudioThread() && context()->isGraphOwner());
+    ASSERT(context().isAudioThread() && context().isGraphOwner());
 
     unsigned numberOfInputChannels = numberOfChannels();
 
@@ -156,22 +151,21 @@ unsigned AudioNodeInput::numberOfChannels() const
     // Find the number of channels of the connection with the largest number of channels.
     unsigned maxChannels = 1; // one channel is the minimum allowed
 
-    for (HashSet<AudioNodeOutput*>::iterator i = m_outputs.begin(); i != m_outputs.end(); ++i) {
-        AudioNodeOutput* output = *i;
+    for (auto& output : m_outputs) {
         // Use output()->numberOfChannels() instead of output->bus()->numberOfChannels(),
         // because the calling of AudioNodeOutput::bus() is not safe here.
-        maxChannels = max(maxChannels, output->numberOfChannels());
+        maxChannels = std::max(maxChannels, output->numberOfChannels());
     }
 
     if (mode == AudioNode::ClampedMax)
-        maxChannels = min(maxChannels, static_cast<unsigned>(node()->channelCount()));
+        maxChannels = std::min(maxChannels, static_cast<unsigned>(node()->channelCount()));
 
     return maxChannels;
 }
 
 AudioBus* AudioNodeInput::bus()
 {
-    ASSERT(context()->isAudioThread());
+    ASSERT(context().isAudioThread());
 
     // Handle single connection specially to allow for in-place processing.
     if (numberOfRenderingConnections() == 1 && node()->internalChannelCountMode() == AudioNode::Max)
@@ -183,14 +177,14 @@ AudioBus* AudioNodeInput::bus()
 
 AudioBus* AudioNodeInput::internalSummingBus()
 {
-    ASSERT(context()->isAudioThread());
+    ASSERT(context().isAudioThread());
 
     return m_internalSummingBus.get();
 }
 
 void AudioNodeInput::sumAllConnections(AudioBus* summingBus, size_t framesToProcess)
 {
-    ASSERT(context()->isAudioThread());
+    ASSERT(context().isAudioThread());
 
     // We shouldn't be calling this method if there's only one connection, since it's less efficient.
     ASSERT(numberOfRenderingConnections() > 1 || node()->internalChannelCountMode() != AudioNode::Max);
@@ -203,8 +197,7 @@ void AudioNodeInput::sumAllConnections(AudioBus* summingBus, size_t framesToProc
 
     AudioBus::ChannelInterpretation interpretation = node()->internalChannelInterpretation();
 
-    for (unsigned i = 0; i < numberOfRenderingConnections(); ++i) {
-        AudioNodeOutput* output = renderingOutput(i);
+    for (auto& output : m_renderingOutputs) {
         ASSERT(output);
 
         // Render audio from this output.
@@ -217,7 +210,7 @@ void AudioNodeInput::sumAllConnections(AudioBus* summingBus, size_t framesToProc
 
 AudioBus* AudioNodeInput::pull(AudioBus* inPlaceBus, size_t framesToProcess)
 {
-    ASSERT(context()->isAudioThread());
+    ASSERT(context().isAudioThread());
 
     // Handle single connection case.
     if (numberOfRenderingConnections() == 1 && node()->internalChannelCountMode() == AudioNode::Max) {

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2011-2013, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,143 +30,165 @@
 
 #include "CallFrame.h"
 #include "DFGCommon.h"
+#include "DFGJITCode.h"
+#include "DFGOSRExitPreparation.h"
 #include "LinkBuffer.h"
-#include "Operations.h"
-#include "RepatchBuffer.h"
+#include "OperandsInlines.h"
+#include "JSCInlines.h"
 #include <wtf/StringPrintStream.h>
 
 namespace JSC { namespace DFG {
+
+void OSRExitCompiler::emitRestoreArguments(const Operands<ValueRecovery>& operands)
+{
+    HashMap<MinifiedID, int> alreadyAllocatedArguments; // Maps phantom arguments node ID to operand.
+    for (size_t index = 0; index < operands.size(); ++index) {
+        const ValueRecovery& recovery = operands[index];
+        int operand = operands.operandForIndex(index);
+        
+        if (recovery.technique() != DirectArgumentsThatWereNotCreated
+            && recovery.technique() != ClonedArgumentsThatWereNotCreated)
+            continue;
+        
+        MinifiedID id = recovery.nodeID();
+        auto iter = alreadyAllocatedArguments.find(id);
+        if (iter != alreadyAllocatedArguments.end()) {
+            JSValueRegs regs = JSValueRegs::withTwoAvailableRegs(GPRInfo::regT0, GPRInfo::regT1);
+            m_jit.loadValue(CCallHelpers::addressFor(iter->value), regs);
+            m_jit.storeValue(regs, CCallHelpers::addressFor(operand));
+            continue;
+        }
+        
+        InlineCallFrame* inlineCallFrame =
+            m_jit.codeBlock()->jitCode()->dfg()->minifiedDFG.at(id)->inlineCallFrame();
+
+        int stackOffset;
+        if (inlineCallFrame)
+            stackOffset = inlineCallFrame->stackOffset;
+        else
+            stackOffset = 0;
+        
+        if (!inlineCallFrame || inlineCallFrame->isClosureCall) {
+            m_jit.loadPtr(
+                AssemblyHelpers::addressFor(stackOffset + JSStack::Callee),
+                GPRInfo::regT0);
+        } else {
+            m_jit.move(
+                AssemblyHelpers::TrustedImmPtr(inlineCallFrame->calleeRecovery.constant().asCell()),
+                GPRInfo::regT0);
+        }
+        
+        if (!inlineCallFrame || inlineCallFrame->isVarargs()) {
+            m_jit.load32(
+                AssemblyHelpers::payloadFor(stackOffset + JSStack::ArgumentCount),
+                GPRInfo::regT1);
+        } else {
+            m_jit.move(
+                AssemblyHelpers::TrustedImm32(inlineCallFrame->arguments.size()),
+                GPRInfo::regT1);
+        }
+        
+        m_jit.setupArgumentsWithExecState(
+            AssemblyHelpers::TrustedImmPtr(inlineCallFrame), GPRInfo::regT0, GPRInfo::regT1);
+        switch (recovery.technique()) {
+        case DirectArgumentsThatWereNotCreated:
+            m_jit.move(AssemblyHelpers::TrustedImmPtr(bitwise_cast<void*>(operationCreateDirectArgumentsDuringExit)), GPRInfo::nonArgGPR0);
+            break;
+        case ClonedArgumentsThatWereNotCreated:
+            m_jit.move(AssemblyHelpers::TrustedImmPtr(bitwise_cast<void*>(operationCreateClonedArgumentsDuringExit)), GPRInfo::nonArgGPR0);
+            break;
+        default:
+            RELEASE_ASSERT_NOT_REACHED();
+            break;
+        }
+        m_jit.call(GPRInfo::nonArgGPR0);
+        m_jit.storeCell(GPRInfo::returnValueGPR, AssemblyHelpers::addressFor(operand));
+        
+        alreadyAllocatedArguments.add(id, operand);
+    }
+}
 
 extern "C" {
 
 void compileOSRExit(ExecState* exec)
 {
     SamplingRegion samplingRegion("DFG OSR Exit Compilation");
+
+    if (exec->vm().callFrameForCatch)
+        RELEASE_ASSERT(exec->vm().callFrameForCatch == exec);
     
     CodeBlock* codeBlock = exec->codeBlock();
-    
     ASSERT(codeBlock);
-    ASSERT(codeBlock->getJITType() == JITCode::DFGJIT);
-    
+    ASSERT(codeBlock->jitType() == JITCode::DFGJIT);
+
     VM* vm = &exec->vm();
     
+    // It's sort of preferable that we don't GC while in here. Anyways, doing so wouldn't
+    // really be profitable.
+    DeferGCForAWhile deferGC(vm->heap);
+
     uint32_t exitIndex = vm->osrExitIndex;
-    OSRExit& exit = codeBlock->osrExit(exitIndex);
+    OSRExit& exit = codeBlock->jitCode()->dfg()->osrExit[exitIndex];
     
-    // Make sure all code on our inline stack is JIT compiled. This is necessary since
-    // we may opt to inline a code block even before it had ever been compiled by the
-    // JIT, but our OSR exit infrastructure currently only works if the target of the
-    // OSR exit is JIT code. This could be changed since there is nothing particularly
-    // hard about doing an OSR exit into the interpreter, but for now this seems to make
-    // sense in that if we're OSR exiting from inlined code of a DFG code block, then
-    // probably it's a good sign that the thing we're exiting into is hot. Even more
-    // interestingly, since the code was inlined, it may never otherwise get JIT
-    // compiled since the act of inlining it may ensure that it otherwise never runs.
-    for (CodeOrigin codeOrigin = exit.m_codeOrigin; codeOrigin.inlineCallFrame; codeOrigin = codeOrigin.inlineCallFrame->caller) {
-        static_cast<FunctionExecutable*>(codeOrigin.inlineCallFrame->executable.get())
-            ->baselineCodeBlockFor(codeOrigin.inlineCallFrame->isCall ? CodeForCall : CodeForConstruct)
-            ->jitCompile(exec);
-    }
+    if (vm->callFrameForCatch)
+        ASSERT(exit.m_kind == GenericUnwind);
+    if (exit.isExceptionHandler())
+        ASSERT(!!vm->exception());
+        
+    
+    prepareCodeOriginForOSRExit(exec, exit.m_codeOrigin);
     
     // Compute the value recoveries.
     Operands<ValueRecovery> operands;
-    codeBlock->variableEventStream().reconstruct(codeBlock, exit.m_codeOrigin, codeBlock->minifiedDFG(), exit.m_streamIndex, operands);
-    
-    // There may be an override, for forward speculations.
-    if (!!exit.m_valueRecoveryOverride) {
-        operands.setOperand(
-            exit.m_valueRecoveryOverride->operand, exit.m_valueRecoveryOverride->recovery);
-    }
+    codeBlock->jitCode()->dfg()->variableEventStream.reconstruct(codeBlock, exit.m_codeOrigin, codeBlock->jitCode()->dfg()->minifiedDFG, exit.m_streamIndex, operands);
     
     SpeculationRecovery* recovery = 0;
-    if (exit.m_recoveryIndex)
-        recovery = &codeBlock->speculationRecovery(exit.m_recoveryIndex - 1);
-
-#if DFG_ENABLE(DEBUG_VERBOSE)
-    dataLog(
-        "Generating OSR exit #", exitIndex, " (seq#", exit.m_streamIndex,
-        ", bc#", exit.m_codeOrigin.bytecodeIndex, ", ",
-        exit.m_kind, ") for ", *codeBlock, ".\n");
-#endif
+    if (exit.m_recoveryIndex != UINT_MAX)
+        recovery = &codeBlock->jitCode()->dfg()->speculationRecovery[exit.m_recoveryIndex];
 
     {
         CCallHelpers jit(vm, codeBlock);
         OSRExitCompiler exitCompiler(jit);
 
+        if (exit.m_kind == GenericUnwind) {
+            // We are acting as a defacto op_catch because we arrive here from genericUnwind().
+            // So, we must restore our call frame and stack pointer.
+            jit.restoreCalleeSavesFromVMCalleeSavesBuffer();
+            jit.loadPtr(vm->addressOfCallFrameForCatch(), GPRInfo::callFrameRegister);
+            jit.addPtr(CCallHelpers::TrustedImm32(codeBlock->stackPointerOffset() * sizeof(Register)),
+                GPRInfo::callFrameRegister, CCallHelpers::stackPointerRegister);
+        }
+
         jit.jitAssertHasValidCallFrame();
         
-        if (vm->m_perBytecodeProfiler && codeBlock->compilation()) {
+        if (vm->m_perBytecodeProfiler && codeBlock->jitCode()->dfgCommon()->compilation) {
             Profiler::Database& database = *vm->m_perBytecodeProfiler;
-            Profiler::Compilation* compilation = codeBlock->compilation();
+            Profiler::Compilation* compilation = codeBlock->jitCode()->dfgCommon()->compilation.get();
             
             Profiler::OSRExit* profilerExit = compilation->addOSRExit(
                 exitIndex, Profiler::OriginStack(database, codeBlock, exit.m_codeOrigin),
-                exit.m_kind,
-                exit.m_watchpointIndex != std::numeric_limits<unsigned>::max());
+                exit.m_kind, exit.m_kind == UncountableInvalidation);
             jit.add64(CCallHelpers::TrustedImm32(1), CCallHelpers::AbsoluteAddress(profilerExit->counterAddress()));
         }
-        
+
         exitCompiler.compileExit(exit, operands, recovery);
         
-        LinkBuffer patchBuffer(*vm, &jit, codeBlock);
+        LinkBuffer patchBuffer(*vm, jit, codeBlock);
         exit.m_code = FINALIZE_CODE_IF(
-            shouldShowDisassembly(),
+            shouldDumpDisassembly() || Options::verboseOSR(),
             patchBuffer,
-            ("DFG OSR exit #%u (bc#%u, %s) from %s",
-                exitIndex, exit.m_codeOrigin.bytecodeIndex,
-                exitKindToString(exit.m_kind), toCString(*codeBlock).data()));
+            ("DFG OSR exit #%u (%s, %s) from %s, with operands = %s",
+                exitIndex, toCString(exit.m_codeOrigin).data(),
+                exitKindToString(exit.m_kind), toCString(*codeBlock).data(),
+                toCString(ignoringContext<DumpContext>(operands)).data()));
     }
     
-    {
-        RepatchBuffer repatchBuffer(codeBlock);
-        repatchBuffer.relink(exit.codeLocationForRepatch(codeBlock), CodeLocationLabel(exit.m_code.code()));
-    }
+    MacroAssembler::repatchJump(exit.codeLocationForRepatch(codeBlock), CodeLocationLabel(exit.m_code.code()));
     
     vm->osrExitJumpDestination = exit.m_code.code().executableAddress();
 }
 
 } // extern "C"
-
-void OSRExitCompiler::handleExitCounts(const OSRExit& exit)
-{
-    m_jit.add32(AssemblyHelpers::TrustedImm32(1), AssemblyHelpers::AbsoluteAddress(&exit.m_count));
-    
-    m_jit.move(AssemblyHelpers::TrustedImmPtr(m_jit.codeBlock()), GPRInfo::regT0);
-    
-    AssemblyHelpers::Jump tooFewFails;
-    
-    m_jit.load32(AssemblyHelpers::Address(GPRInfo::regT0, CodeBlock::offsetOfOSRExitCounter()), GPRInfo::regT2);
-    m_jit.add32(AssemblyHelpers::TrustedImm32(1), GPRInfo::regT2);
-    m_jit.store32(GPRInfo::regT2, AssemblyHelpers::Address(GPRInfo::regT0, CodeBlock::offsetOfOSRExitCounter()));
-    m_jit.move(AssemblyHelpers::TrustedImmPtr(m_jit.baselineCodeBlock()), GPRInfo::regT0);
-    tooFewFails = m_jit.branch32(AssemblyHelpers::BelowOrEqual, GPRInfo::regT2, AssemblyHelpers::TrustedImm32(m_jit.codeBlock()->exitCountThresholdForReoptimization()));
-    
-    // Reoptimize as soon as possible.
-#if !NUMBER_OF_ARGUMENT_REGISTERS
-    m_jit.poke(GPRInfo::regT0);
-#else
-    m_jit.move(GPRInfo::regT0, GPRInfo::argumentGPR0);
-    ASSERT(GPRInfo::argumentGPR0 != GPRInfo::regT1);
-#endif
-    m_jit.move(AssemblyHelpers::TrustedImmPtr(bitwise_cast<void*>(triggerReoptimizationNow)), GPRInfo::regT1);
-    m_jit.call(GPRInfo::regT1);
-    AssemblyHelpers::Jump doneAdjusting = m_jit.jump();
-    
-    tooFewFails.link(&m_jit);
-    
-    // Adjust the execution counter such that the target is to only optimize after a while.
-    int32_t activeThreshold =
-        m_jit.baselineCodeBlock()->counterValueForOptimizeAfterLongWarmUp();
-    int32_t targetValue = ExecutionCounter::applyMemoryUsageHeuristicsAndConvertToInt(
-        activeThreshold, m_jit.baselineCodeBlock());
-    int32_t clippedValue =
-        ExecutionCounter::clippedThreshold(m_jit.codeBlock()->globalObject(), targetValue);
-    m_jit.store32(AssemblyHelpers::TrustedImm32(-clippedValue), AssemblyHelpers::Address(GPRInfo::regT0, CodeBlock::offsetOfJITExecuteCounter()));
-    m_jit.store32(AssemblyHelpers::TrustedImm32(activeThreshold), AssemblyHelpers::Address(GPRInfo::regT0, CodeBlock::offsetOfJITExecutionActiveThreshold()));
-    m_jit.store32(AssemblyHelpers::TrustedImm32(ExecutionCounter::formattedTotalCount(clippedValue)), AssemblyHelpers::Address(GPRInfo::regT0, CodeBlock::offsetOfJITExecutionTotalCount()));
-    
-    doneAdjusting.link(&m_jit);
-}
 
 } } // namespace JSC::DFG
 

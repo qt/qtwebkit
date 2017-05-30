@@ -29,14 +29,20 @@
 #include "APIClient.h"
 #include "WKContext.h"
 
+namespace API {
+template<> struct ClientTraits<WKContextConnectionClientBase> {
+    typedef std::tuple<WKContextConnectionClientV0> Versions;
+};
+}
+
 namespace WebKit {
 
 class WebConnection;
-class WebContext;
+class WebProcessPool;
 
-class WebContextConnectionClient : public APIClient<WKContextConnectionClient, kWKContextConnectionClientCurrentVersion> {
+class WebContextConnectionClient : public API::Client<WKContextConnectionClientBase> {
 public:
-    void didCreateConnection(WebContext*, WebConnection*);
+    void didCreateConnection(WebProcessPool*, WebConnection*);
 };
 
 } // namespace WebKit

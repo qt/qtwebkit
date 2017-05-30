@@ -29,15 +29,15 @@
 #include "config.h"
 #include "InspectorCSSOMWrappers.h"
 
+#include "AuthorStyleSheets.h"
 #include "CSSDefaultStyleSheets.h"
-#include "CSSHostRule.h"
 #include "CSSImportRule.h"
 #include "CSSMediaRule.h"
 #include "CSSRule.h"
 #include "CSSStyleRule.h"
 #include "CSSStyleSheet.h"
 #include "CSSSupportsRule.h"
-#include "DocumentStyleSheetCollection.h"
+#include "ExtensionStyleSheets.h"
 #include "StyleSheetContents.h"
 #include "WebKitCSSRegionRule.h"
 
@@ -59,28 +59,21 @@ void InspectorCSSOMWrappers::collect(ListType* listType)
         CSSRule* cssRule = listType->item(i);
         switch (cssRule->type()) {
         case CSSRule::IMPORT_RULE:
-            collect(static_cast<CSSImportRule*>(cssRule)->styleSheet());
+            collect(downcast<CSSImportRule>(*cssRule).styleSheet());
             break;
         case CSSRule::MEDIA_RULE:
-            collect(static_cast<CSSMediaRule*>(cssRule));
+            collect(downcast<CSSMediaRule>(cssRule));
             break;
-#if ENABLE(CSS3_CONDITIONAL_RULES)
         case CSSRule::SUPPORTS_RULE:
-            collect(static_cast<CSSSupportsRule*>(cssRule));
+            collect(downcast<CSSSupportsRule>(cssRule));
             break;
-#endif
 #if ENABLE(CSS_REGIONS)
         case CSSRule::WEBKIT_REGION_RULE:
-            collect(static_cast<WebKitCSSRegionRule*>(cssRule));
-            break;
-#endif
-#if ENABLE(SHADOW_DOM)
-        case CSSRule::HOST_RULE:
-            collect(static_cast<CSSHostRule*>(cssRule));
+            collect(downcast<WebKitCSSRegionRule>(cssRule));
             break;
 #endif
         case CSSRule::STYLE_RULE:
-            m_styleRuleToCSSOMWrapperMap.add(static_cast<CSSStyleRule*>(cssRule)->styleRule(), static_cast<CSSStyleRule*>(cssRule));
+            m_styleRuleToCSSOMWrapperMap.add(&downcast<CSSStyleRule>(*cssRule).styleRule(), downcast<CSSStyleRule>(cssRule));
             break;
         default:
             break;
@@ -88,30 +81,22 @@ void InspectorCSSOMWrappers::collect(ListType* listType)
     }
 }
 
-void InspectorCSSOMWrappers::collectFromStyleSheetContents(HashSet<RefPtr<CSSStyleSheet> >& sheetWrapperSet, StyleSheetContents* styleSheet)
+void InspectorCSSOMWrappers::collectFromStyleSheetContents(HashSet<RefPtr<CSSStyleSheet>>& sheetWrapperSet, StyleSheetContents* styleSheet)
 {
     if (!styleSheet)
         return;
-    RefPtr<CSSStyleSheet> styleSheetWrapper = CSSStyleSheet::create(styleSheet);
+    RefPtr<CSSStyleSheet> styleSheetWrapper = CSSStyleSheet::create(*styleSheet);
     sheetWrapperSet.add(styleSheetWrapper);
     collect(styleSheetWrapper.get());
 }
 
-void InspectorCSSOMWrappers::collectFromStyleSheets(const Vector<RefPtr<CSSStyleSheet> >& sheets)
+void InspectorCSSOMWrappers::collectFromStyleSheets(const Vector<RefPtr<CSSStyleSheet>>& sheets)
 {
     for (unsigned i = 0; i < sheets.size(); ++i)
         collect(sheets[i].get());
 }
 
-void InspectorCSSOMWrappers::collectFromDocumentStyleSheetCollection(DocumentStyleSheetCollection* styleSheetCollection)
-{
-    collectFromStyleSheets(styleSheetCollection->activeAuthorStyleSheets());
-    collect(styleSheetCollection->pageUserSheet());
-    collectFromStyleSheets(styleSheetCollection->injectedUserStyleSheets());
-    collectFromStyleSheets(styleSheetCollection->documentUserStyleSheets());
-}
-
-CSSStyleRule* InspectorCSSOMWrappers::getWrapperForRuleInSheets(StyleRule* rule, DocumentStyleSheetCollection* styleSheetCollection)
+CSSStyleRule* InspectorCSSOMWrappers::getWrapperForRuleInSheets(StyleRule* rule, AuthorStyleSheets& authorStyleSheets, ExtensionStyleSheets& extensionStyleSheets)
 {
     if (m_styleRuleToCSSOMWrapperMap.isEmpty()) {
         collectFromStyleSheetContents(m_styleSheetCSSOMWrapperSet, CSSDefaultStyleSheets::simpleDefaultStyleSheet);
@@ -123,7 +108,10 @@ CSSStyleRule* InspectorCSSOMWrappers::getWrapperForRuleInSheets(StyleRule* rule,
         collectFromStyleSheetContents(m_styleSheetCSSOMWrapperSet, CSSDefaultStyleSheets::fullscreenStyleSheet);
         collectFromStyleSheetContents(m_styleSheetCSSOMWrapperSet, CSSDefaultStyleSheets::plugInsStyleSheet);
 
-        collectFromDocumentStyleSheetCollection(styleSheetCollection);
+        collectFromStyleSheets(authorStyleSheets.activeStyleSheets());
+        collect(extensionStyleSheets.pageUserSheet());
+        collectFromStyleSheets(extensionStyleSheets.injectedUserStyleSheets());
+        collectFromStyleSheets(extensionStyleSheets.documentUserStyleSheets());
     }
     return m_styleRuleToCSSOMWrapperMap.get(rule);
 }

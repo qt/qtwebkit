@@ -30,8 +30,6 @@
  
 #include "config.h"
 
-#if ENABLE(WORKERS)
-
 #include "ScriptExecutionContext.h"
 #include "SharedTimer.h"
 #include "ThreadGlobalData.h"
@@ -41,28 +39,26 @@
 #include "WorkerThread.h"
 #include <wtf/CurrentTime.h>
 
+#if PLATFORM(GTK)
+#include <glib.h>
+#endif
+
 namespace WebCore {
 
-class WorkerSharedTimer : public SharedTimer {
+class WorkerSharedTimer final : public SharedTimer {
 public:
-    WorkerSharedTimer()
-        : m_sharedTimerFunction(0)
-        , m_nextFireTime(0)
-    {
-    }
-
     // SharedTimer interface.
-    virtual void setFiredFunction(void (*function)()) { m_sharedTimerFunction = function; }
-    virtual void setFireInterval(double interval) { m_nextFireTime = interval + currentTime(); }
-    virtual void stop() { m_nextFireTime = 0; }
+    virtual void setFiredFunction(std::function<void()>&& function) override { m_sharedTimerFunction = WTFMove(function); }
+    virtual void setFireInterval(double interval) override { m_nextFireTime = interval + currentTime(); }
+    virtual void stop() override { m_nextFireTime = 0; }
 
     bool isActive() { return m_sharedTimerFunction && m_nextFireTime; }
     double fireTime() { return m_nextFireTime; }
     void fire() { m_sharedTimerFunction(); }
 
 private:
-    void (*m_sharedTimerFunction)();
-    double m_nextFireTime;
+    std::function<void()> m_sharedTimerFunction;
+    double m_nextFireTime { 0 };
 };
 
 class ModePredicate {
@@ -78,9 +74,9 @@ public:
         return m_defaultMode;
     }
 
-    bool operator()(WorkerRunLoop::Task* task) const
+    bool operator()(const WorkerRunLoop::Task& task) const
     {
-        return m_defaultMode || m_mode == task->mode();
+        return m_defaultMode || m_mode == task.mode();
     }
 
 private:
@@ -89,7 +85,7 @@ private:
 };
 
 WorkerRunLoop::WorkerRunLoop()
-    : m_sharedTimer(adoptPtr(new WorkerSharedTimer))
+    : m_sharedTimer(std::make_unique<WorkerSharedTimer>())
     , m_nestedCount(0)
     , m_uniqueId(0)
 {
@@ -148,14 +144,31 @@ MessageQueueWaitResult WorkerRunLoop::runInMode(WorkerGlobalScope* context, cons
 MessageQueueWaitResult WorkerRunLoop::runInMode(WorkerGlobalScope* context, const ModePredicate& predicate, WaitMode waitMode)
 {
     ASSERT(context);
-    ASSERT(context->thread());
-    ASSERT(context->thread()->threadID() == currentThread());
+    ASSERT(context->thread().threadID() == currentThread());
+
+#if PLATFORM(GTK)
+    GMainContext* mainContext = g_main_context_get_thread_default();
+    if (g_main_context_pending(mainContext))
+        g_main_context_iteration(mainContext, FALSE);
+#endif
+
+    double deadline = MessageQueue<Task>::infiniteTime();
+
+#if USE(CF)
+    CFAbsoluteTime nextCFRunLoopTimerFireDate = CFRunLoopGetNextTimerFireDate(CFRunLoopGetCurrent(), kCFRunLoopDefaultMode);
+    double timeUntilNextCFRunLoopTimerInSeconds = nextCFRunLoopTimerFireDate - CFAbsoluteTimeGetCurrent();
+    deadline = currentTime() + std::max(0.0, timeUntilNextCFRunLoopTimerInSeconds);
+#endif
 
     double absoluteTime = 0.0;
-    if (waitMode == WaitForMessage)
-        absoluteTime = (predicate.isDefaultMode() && m_sharedTimer->isActive()) ? m_sharedTimer->fireTime() : MessageQueue<Task>::infiniteTime();
+    if (waitMode == WaitForMessage) {
+        if (predicate.isDefaultMode() && m_sharedTimer->isActive())
+            absoluteTime = std::min(deadline, m_sharedTimer->fireTime());
+        else
+            absoluteTime = deadline;
+    }
     MessageQueueWaitResult result;
-    OwnPtr<WorkerRunLoop::Task> task = m_messageQueue.waitForMessageFilteredWithTimeout(result, predicate, absoluteTime);
+    auto task = m_messageQueue.waitForMessageFilteredWithTimeout(result, predicate, absoluteTime);
 
     // If the context is closing, don't execute any further JavaScript tasks (per section 4.1.1 of the Web Workers spec).  However, there may be implementation cleanup tasks in the queue, so keep running through it.
 
@@ -170,6 +183,10 @@ MessageQueueWaitResult WorkerRunLoop::runInMode(WorkerGlobalScope* context, cons
     case MessageQueueTimeout:
         if (!context->isClosing())
             m_sharedTimer->fire();
+#if USE(CF)
+        if (nextCFRunLoopTimerFireDate <= CFAbsoluteTimeGetCurrent())
+            CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0, /*returnAfterSourceHandled*/ false);
+#endif
         break;
     }
 
@@ -179,12 +196,11 @@ MessageQueueWaitResult WorkerRunLoop::runInMode(WorkerGlobalScope* context, cons
 void WorkerRunLoop::runCleanupTasks(WorkerGlobalScope* context)
 {
     ASSERT(context);
-    ASSERT(context->thread());
-    ASSERT(context->thread()->threadID() == currentThread());
+    ASSERT(context->thread().threadID() == currentThread());
     ASSERT(m_messageQueue.killed());
 
     while (true) {
-        OwnPtr<WorkerRunLoop::Task> task = m_messageQueue.tryGetMessageIgnoringKilled();
+        auto task = m_messageQueue.tryGetMessageIgnoringKilled();
         if (!task)
             return;
         task->performTask(*this, context);
@@ -196,39 +212,31 @@ void WorkerRunLoop::terminate()
     m_messageQueue.kill();
 }
 
-void WorkerRunLoop::postTask(PassOwnPtr<ScriptExecutionContext::Task> task)
+void WorkerRunLoop::postTask(ScriptExecutionContext::Task task)
 {
-    postTaskForMode(task, defaultMode());
+    postTaskForMode(WTFMove(task), defaultMode());
 }
 
-void WorkerRunLoop::postTaskAndTerminate(PassOwnPtr<ScriptExecutionContext::Task> task)
+void WorkerRunLoop::postTaskAndTerminate(ScriptExecutionContext::Task task)
 {
-    m_messageQueue.appendAndKill(Task::create(task, defaultMode().isolatedCopy()));
+    m_messageQueue.appendAndKill(std::make_unique<Task>(WTFMove(task), defaultMode()));
 }
 
-void WorkerRunLoop::postTaskForMode(PassOwnPtr<ScriptExecutionContext::Task> task, const String& mode)
+void WorkerRunLoop::postTaskForMode(ScriptExecutionContext::Task task, const String& mode)
 {
-    m_messageQueue.append(Task::create(task, mode.isolatedCopy()));
+    m_messageQueue.append(std::make_unique<Task>(WTFMove(task), mode));
 }
 
-PassOwnPtr<WorkerRunLoop::Task> WorkerRunLoop::Task::create(PassOwnPtr<ScriptExecutionContext::Task> task, const String& mode)
+void WorkerRunLoop::Task::performTask(const WorkerRunLoop& runLoop, WorkerGlobalScope* context)
 {
-    return adoptPtr(new Task(task, mode));
+    if ((!context->isClosing() && !runLoop.terminated()) || m_task.isCleanupTask())
+        m_task.performTask(*context);
 }
 
-void WorkerRunLoop::Task::performTask(const WorkerRunLoop& runLoop, ScriptExecutionContext* context)
-{
-    WorkerGlobalScope* workerGlobalScope = static_cast<WorkerGlobalScope*>(context);
-    if ((!workerGlobalScope->isClosing() && !runLoop.terminated()) || m_task->isCleanupTask())
-        m_task->performTask(context);
-}
-
-WorkerRunLoop::Task::Task(PassOwnPtr<ScriptExecutionContext::Task> task, const String& mode)
-    : m_task(task)
+WorkerRunLoop::Task::Task(ScriptExecutionContext::Task task, const String& mode)
+    : m_task(WTFMove(task))
     , m_mode(mode.isolatedCopy())
 {
 }
 
 } // namespace WebCore
-
-#endif // ENABLE(WORKERS)

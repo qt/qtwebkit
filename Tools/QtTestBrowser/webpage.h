@@ -36,33 +36,39 @@
 #include <qwebframe.h>
 #include <qwebpage.h>
 
+class MainWindow;
+
 class WebPage : public QWebPage {
     Q_OBJECT
 
 public:
-    WebPage(QObject* parent = 0);
+    WebPage(MainWindow* parent);
 
-    virtual QWebPage* createWindow(QWebPage::WebWindowType);
-    virtual QObject* createPlugin(const QString&, const QUrl&, const QStringList&, const QStringList&);
-    virtual bool supportsExtension(QWebPage::Extension extension) const;
-    virtual bool extension(Extension extension, const ExtensionOption* option, ExtensionReturn* output);
+    QWebPage* createWindow(QWebPage::WebWindowType) override;
+    QObject* createPlugin(const QString&, const QUrl&, const QStringList&, const QStringList&) override;
+    bool supportsExtension(QWebPage::Extension) const override;
+    bool extension(Extension, const ExtensionOption*, ExtensionReturn*) override;
 
-    virtual bool acceptNavigationRequest(QWebFrame* frame, const QNetworkRequest& request, NavigationType type);
+    bool acceptNavigationRequest(QWebFrame*, const QNetworkRequest&, NavigationType) override;
 
-    QString userAgentForUrl(const QUrl& url) const;
+    QString userAgentForUrl(const QUrl&) const override;
     void setInterruptingJavaScriptEnabled(bool enabled) { m_interruptingJavaScriptEnabled = enabled; }
 
-    virtual bool shouldInterruptJavaScript();
+    bool shouldInterruptJavaScript() override;
+
+    void javaScriptConsoleMessage(const QString &message, int lineNumber, const QString &sourceID) override;
 
 public Q_SLOTS:
-    void openUrlInDefaultBrowser(const QUrl& url = QUrl());
+    void openUrlInDefaultBrowser(const QUrl& = QUrl());
     void setUserAgent(const QString& ua) { m_userAgent = ua; }
     void authenticationRequired(QNetworkReply*, QAuthenticator*);
-    void requestPermission(QWebFrame* frame, QWebPage::Feature feature);
-    void featurePermissionRequestCanceled(QWebFrame* frame, QWebPage::Feature feature);
+    void requestPermission(QWebFrame*, QWebPage::Feature);
+    void featurePermissionRequestCanceled(QWebFrame*, QWebPage::Feature);
+    void requestFullScreen(QWebFullScreenRequest);
 
 private:
     void applyProxy();
+    MainWindow *m_mainWindow;
     QString m_userAgent;
     bool m_interruptingJavaScriptEnabled;
 };

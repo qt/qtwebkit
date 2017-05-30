@@ -39,14 +39,14 @@ ShareableBitmap::Handle::Handle()
 {
 }
 
-void ShareableBitmap::Handle::encode(CoreIPC::ArgumentEncoder& encoder) const
+void ShareableBitmap::Handle::encode(IPC::ArgumentEncoder& encoder) const
 {
     encoder << m_handle;
     encoder << m_size;
     encoder << m_flags;
 }
 
-bool ShareableBitmap::Handle::decode(CoreIPC::ArgumentDecoder& decoder, Handle& handle)
+bool ShareableBitmap::Handle::decode(IPC::ArgumentDecoder& decoder, Handle& handle)
 {
     if (!decoder.decode(handle.m_handle))
         return false;
@@ -57,13 +57,20 @@ bool ShareableBitmap::Handle::decode(CoreIPC::ArgumentDecoder& decoder, Handle& 
     return true;
 }
 
+void ShareableBitmap::Handle::clear()
+{
+    m_handle.clear();
+    m_size = IntSize();
+    m_flags = Flag::NoFlags;
+}
+
 PassRefPtr<ShareableBitmap> ShareableBitmap::create(const IntSize& size, Flags flags)
 {
     size_t numBytes = numBytesForSize(size);
     
     void* data = 0;
     if (!tryFastMalloc(numBytes).getValue(data))
-        return 0;
+        return nullptr;
 
     return adoptRef(new ShareableBitmap(size, flags, data));
 }
@@ -72,9 +79,9 @@ PassRefPtr<ShareableBitmap> ShareableBitmap::createShareable(const IntSize& size
 {
     size_t numBytes = numBytesForSize(size);
 
-    RefPtr<SharedMemory> sharedMemory = SharedMemory::create(numBytes);
+    RefPtr<SharedMemory> sharedMemory = SharedMemory::allocate(numBytes);
     if (!sharedMemory)
-        return 0;
+        return nullptr;
 
     return adoptRef(new ShareableBitmap(size, flags, sharedMemory));
 }
@@ -92,9 +99,9 @@ PassRefPtr<ShareableBitmap> ShareableBitmap::create(const IntSize& size, Flags f
 PassRefPtr<ShareableBitmap> ShareableBitmap::create(const Handle& handle, SharedMemory::Protection protection)
 {
     // Create the shared memory.
-    RefPtr<SharedMemory> sharedMemory = SharedMemory::create(handle.m_handle, protection);
+    RefPtr<SharedMemory> sharedMemory = SharedMemory::map(handle.m_handle, protection);
     if (!sharedMemory)
-        return 0;
+        return nullptr;
 
     return create(handle.m_size, handle.m_flags, sharedMemory.release());
 }
@@ -129,29 +136,6 @@ ShareableBitmap::~ShareableBitmap()
 {
     if (!isBackedBySharedMemory())
         fastFree(m_data);
-}
-
-bool ShareableBitmap::resize(const IntSize& size)
-{
-    // We can't resize backing stores that are backed by shared memory.
-    ASSERT(!isBackedBySharedMemory());
-
-    if (size == m_size)
-        return true;
-
-    size_t newNumBytes = numBytesForSize(size);
-    
-    // Try to resize.
-    char* newData = 0;
-    if (!tryFastRealloc(m_data, newNumBytes).getValue(newData)) {
-        // We failed, but the backing store is still kept in a consistent state.
-        return false;
-    }
-
-    m_size = size;
-    m_data = newData;
-
-    return true;
 }
 
 void* ShareableBitmap::data() const

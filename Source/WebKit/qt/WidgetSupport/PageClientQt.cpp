@@ -21,6 +21,8 @@
 #include "config.h"
 #include "PageClientQt.h"
 
+#include "Widget.h"
+
 #include <QGraphicsScene>
 #include <QGraphicsView>
 
@@ -33,11 +35,6 @@
 #endif
 #if QT_VERSION >= QT_VERSION_CHECK(5, 4, 0)
 #include <QOpenGLWidget>
-#endif
-
-#if USE(ACCELERATED_COMPOSITING)
-#include "TextureMapper.h"
-#include "texmap/TextureMapperLayer.h"
 #endif
 
 QWindow* QWebPageClient::ownerWindow() const
@@ -146,7 +143,7 @@ QStyle* PageClientQWidget::style() const
 
 QRectF PageClientQWidget::windowRect() const
 {
-    return QRectF(view->window()->geometry());
+    return QRectF(view->window()->frameGeometry());
 }
 
 void PageClientQWidget::setWidgetVisible(Widget* widget, bool visible)
@@ -189,13 +186,12 @@ void PageClientQGraphicsWidget::repaintViewport()
 
 bool PageClientQGraphicsWidget::makeOpenGLContextCurrentIfAvailable()
 {
-#if USE(ACCELERATED_COMPOSITING) && USE(TEXTURE_MAPPER_GL)
+#if USE(TEXTURE_MAPPER_GL)
     QGraphicsView* graphicsView = firstGraphicsView();
     if (graphicsView && graphicsView->viewport()) {
-        QWidget *widget = graphicsView->viewport();
+        QWidget* widget = graphicsView->viewport();
 #if defined(QT_OPENGL_LIB)
         if (widget->inherits("QGLWidget")) {
-
             QGLWidget* glWidget = static_cast<QGLWidget*>(widget);
             // The GL context belonging to the QGLWidget viewport must be current when TextureMapper is being created.
             glWidget->makeCurrent();
@@ -204,7 +200,7 @@ bool PageClientQGraphicsWidget::makeOpenGLContextCurrentIfAvailable()
 #endif
 #if QT_VERSION >= QT_VERSION_CHECK(5, 4, 0)
         if (widget->inherits("QOpenGLWidget")) {
-            QOpenGLWidget *qoglWidget = static_cast<QOpenGLWidget*>(widget);
+            QOpenGLWidget* qoglWidget = static_cast<QOpenGLWidget*>(widget);
             qoglWidget->makeCurrent();
             return true;
         }
@@ -216,10 +212,10 @@ bool PageClientQGraphicsWidget::makeOpenGLContextCurrentIfAvailable()
 
 QOpenGLContext* PageClientQGraphicsWidget::openGLContextIfAvailable()
 {
-#if USE(ACCELERATED_COMPOSITING) && USE(TEXTURE_MAPPER_GL)
+#if USE(TEXTURE_MAPPER_GL)
     QGraphicsView* graphicsView = firstGraphicsView();
     if (graphicsView && graphicsView->viewport()) {
-        QWidget *widget = graphicsView->viewport();
+        QWidget* widget = graphicsView->viewport();
 #if defined(QT_OPENGL_LIB)
         if (widget->inherits("QGLWidget")) {
             QGLWidget* glWidget = static_cast<QGLWidget*>(widget);
@@ -228,7 +224,7 @@ QOpenGLContext* PageClientQGraphicsWidget::openGLContextIfAvailable()
 #endif
 #if QT_VERSION >= QT_VERSION_CHECK(5, 4, 0)
         if (widget->inherits("QOpenGLWidget")) {
-            QOpenGLWidget *qoglWidget = static_cast<QOpenGLWidget*>(widget);
+            QOpenGLWidget* qoglWidget = static_cast<QOpenGLWidget*>(widget);
             return qoglWidget->context();
         }
 #endif
@@ -297,10 +293,9 @@ QRect PageClientQGraphicsWidget::geometryRelativeToOwnerWidget() const
 QPoint PageClientQGraphicsWidget::mapToOwnerWindow(const QPoint& point) const
 {
     if (const QGraphicsView* graphicsView = firstGraphicsView()) {
-        if (const QWidget *nativeParent = graphicsView->nativeParentWidget())
+        if (const QWidget* nativeParent = graphicsView->nativeParentWidget())
             return graphicsView->mapTo(nativeParent, graphicsView->mapFromScene(view->mapToScene(point)));
-        else
-            return graphicsView->mapFromScene(view->mapToScene(point));
+        return graphicsView->mapFromScene(view->mapToScene(point));
     }
     return point;
 }
@@ -356,4 +351,3 @@ bool PageClientQGraphicsWidget::isViewVisible()
 #endif // QT_NO_GRAPHICSVIEW
 
 } // namespace WebCore
-

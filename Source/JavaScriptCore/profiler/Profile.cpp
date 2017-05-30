@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 Apple Inc. All Rights Reserved.
+ * Copyright (C) 2008, 2014 Apple Inc. All Rights Reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,84 +27,38 @@
 #include "Profile.h"
 
 #include "ProfileNode.h"
-#include <stdio.h>
 #include <wtf/DataLog.h>
 
 namespace JSC {
 
-PassRefPtr<Profile> Profile::create(const String& title, unsigned uid)
+Ref<Profile> Profile::create(const String& title, unsigned uid, double startTime)
 {
-    return adoptRef(new Profile(title, uid));
+    return adoptRef(*new Profile(title, uid, startTime));
 }
 
-Profile::Profile(const String& title, unsigned uid)
+Profile::Profile(const String& title, unsigned uid, double startTime)
     : m_title(title)
     , m_uid(uid)
 {
     // FIXME: When multi-threading is supported this will be a vector and calls
     // into the profiler will need to know which thread it is executing on.
-    m_head = ProfileNode::create(0, CallIdentifier("Thread_1", String(), 0), 0, 0);
+    m_rootNode = ProfileNode::create(nullptr, CallIdentifier(ASCIILiteral("Thread_1"), String(), 0, 0), nullptr);
+    m_rootNode->appendCall(ProfileNode::Call(startTime));
 }
 
 Profile::~Profile()
 {
 }
 
-void Profile::forEach(void (ProfileNode::*function)())
-{
-    ProfileNode* currentNode = m_head->firstChild();
-    for (ProfileNode* nextNode = currentNode; nextNode; nextNode = nextNode->firstChild())
-        currentNode = nextNode;
-
-    if (!currentNode)
-        currentNode = m_head.get();
-
-    ProfileNode* endNode = m_head->traverseNextNodePostOrder();
-    while (currentNode && currentNode != endNode) {
-        (currentNode->*function)();
-        currentNode = currentNode->traverseNextNodePostOrder();
-    } 
-}
-
-void Profile::focus(const ProfileNode* profileNode)
-{
-    if (!profileNode || !m_head)
-        return;
-
-    bool processChildren;
-    const CallIdentifier& callIdentifier = profileNode->callIdentifier();
-    for (ProfileNode* currentNode = m_head.get(); currentNode; currentNode = currentNode->traverseNextNodePreOrder(processChildren))
-        processChildren = currentNode->focus(callIdentifier);
-
-    // Set the visible time of all nodes so that the %s display correctly.
-    forEach(&ProfileNode::calculateVisibleTotalTime);
-}
-
-void Profile::exclude(const ProfileNode* profileNode)
-{
-    if (!profileNode || !m_head)
-        return;
-
-    const CallIdentifier& callIdentifier = profileNode->callIdentifier();
-
-    for (ProfileNode* currentNode = m_head.get(); currentNode; currentNode = currentNode->traverseNextNodePreOrder())
-        currentNode->exclude(callIdentifier);
-
-    // Set the visible time of the head so the %s display correctly.
-    m_head->setVisibleTotalTime(m_head->totalTime() - m_head->selfTime());
-    m_head->setVisibleSelfTime(0.0);
-}
-
-void Profile::restoreAll()
-{
-    forEach(&ProfileNode::restore);
-}
-
 #ifndef NDEBUG
-void Profile::debugPrintData() const
+void Profile::debugPrint()
 {
+    CalculateProfileSubtreeDataFunctor functor;
+    m_rootNode->forEachNodePostorder(functor);
+    ProfileNode::ProfileSubtreeData data = functor.returnValue();
+
     dataLogF("Call graph:\n");
-    m_head->debugPrintData(0);
+    m_rootNode->debugPrintRecursively(0, data);
 }
 
 typedef WTF::KeyValuePair<FunctionCallHashCount::ValueType, unsigned> NameCountPair;
@@ -114,13 +68,17 @@ static inline bool functionNameCountPairComparator(const NameCountPair& a, const
     return a.value > b.value;
 }
 
-void Profile::debugPrintDataSampleStyle() const
+void Profile::debugPrintSampleStyle()
 {
     typedef Vector<NameCountPair> NameCountPairVector;
 
+    CalculateProfileSubtreeDataFunctor functor;
+    m_rootNode->forEachNodePostorder(functor);
+    ProfileNode::ProfileSubtreeData data = functor.returnValue();
+
     FunctionCallHashCount countedFunctions;
     dataLogF("Call graph:\n");
-    m_head->debugPrintDataSampleStyle(0, countedFunctions);
+    m_rootNode->debugPrintSampleStyleRecursively(0, countedFunctions, data);
 
     dataLogF("\nTotal number in stack:\n");
     NameCountPairVector sortedFunctions(countedFunctions.size());

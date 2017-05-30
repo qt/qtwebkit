@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2006 Apple Computer, Inc.  All rights reserved.
+ * Copyright (C) 2006 Apple Inc.  All rights reserved.
  * Copyright (C) 2012 Rik Cabanier (cabanier@adobe.com)
+ * Copyright (C) 2014 Adobe Systems Incorporated. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -11,10 +12,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -27,6 +28,7 @@
 #include "config.h"
 #include "GraphicsTypes.h"
 
+#include "TextStream.h"
 #include <wtf/Assertions.h>
 #include <wtf/text/WTFString.h>
 
@@ -45,15 +47,17 @@ static const char* const compositeOperatorNames[] = {
     "destination-atop",
     "xor",
     "darker",
-    "lighter"
+    "lighter",
+    "difference"
 };
 
 static const char* const blendOperatorNames[] = {
+    "normal",
     "multiply",
     "screen",
-    "overlay",
     "darken",
     "lighten",
+    "overlay",
     "color-dodge",
     "color-burn",
     "hard-light",
@@ -63,10 +67,24 @@ static const char* const blendOperatorNames[] = {
     "hue",
     "saturation",
     "color",
-    "luminosity"
+    "luminosity",
+    "plus-darker",
+    "plus-lighter"
 };
 const int numCompositeOperatorNames = WTF_ARRAY_LENGTH(compositeOperatorNames);
 const int numBlendOperatorNames = WTF_ARRAY_LENGTH(blendOperatorNames);
+
+bool parseBlendMode(const String& s, BlendMode& blendMode)
+{
+    for (int i = 0; i < numBlendOperatorNames; i++) {
+        if (s == blendOperatorNames[i]) {
+            blendMode = static_cast<BlendMode>(i + BlendModeNormal);
+            return true;
+        }
+    }
+    
+    return false;
+}
 
 bool parseCompositeAndBlendOperator(const String& s, CompositeOperator& op, BlendMode& blendOp)
 {
@@ -78,13 +96,10 @@ bool parseCompositeAndBlendOperator(const String& s, CompositeOperator& op, Blen
         }
     }
     
-    for (int i = 0; i < numBlendOperatorNames; i++) {
-        if (s == blendOperatorNames[i]) {
-            blendOp = static_cast<BlendMode>(i+1);
-            // For now, blending will always assume source-over. This will be fixed in the future
-            op = CompositeSourceOver;
-            return true;
-        }
+    if (parseBlendMode(s, blendOp)) {
+        // For now, blending will always assume source-over. This will be fixed in the future
+        op = CompositeSourceOver;
+        return true;
     }
     
     return false;
@@ -96,11 +111,18 @@ String compositeOperatorName(CompositeOperator op, BlendMode blendOp)
 {
     ASSERT(op >= 0);
     ASSERT(op < numCompositeOperatorNames);
-    ASSERT(blendOp >= 0);
+    ASSERT(blendOp >= BlendModeNormal);
     ASSERT(blendOp <= numBlendOperatorNames);
-    if (blendOp != BlendModeNormal)
-        return blendOperatorNames[blendOp-1];
+    if (blendOp > BlendModeNormal)
+        return blendOperatorNames[blendOp - BlendModeNormal];
     return compositeOperatorNames[op];
+}
+
+static String blendModeName(BlendMode blendOp)
+{
+    ASSERT(blendOp >= BlendModeNormal);
+    ASSERT(blendOp <= BlendModePlusLighter);
+    return blendOperatorNames[blendOp - BlendModeNormal];
 }
 
 bool parseLineCap(const String& s, LineCap& cap)
@@ -222,5 +244,62 @@ bool parseTextBaseline(const String& s, TextBaseline& baseline)
     }
     return false;
 }
+
+TextStream& operator<<(TextStream& ts, CompositeOperator op)
+{
+    return ts << compositeOperatorName(op, BlendModeNormal);
+}
+
+TextStream& operator<<(TextStream& ts, BlendMode blendMode)
+{
+    return ts << blendModeName(blendMode);
+}
+
+TextStream& operator<<(TextStream& ts, WindRule rule)
+{
+    switch (rule) {
+    case RULE_NONZERO:
+        ts << "NON-ZERO";
+        break;
+    case RULE_EVENODD:
+        ts << "EVEN-ODD";
+        break;
+    }
+
+    return ts;
+}
+
+TextStream& operator<<(TextStream& ts, LineCap capStyle)
+{
+    switch (capStyle) {
+    case ButtCap:
+        ts << "BUTT";
+        break;
+    case RoundCap:
+        ts << "ROUND";
+        break;
+    case SquareCap:
+        ts << "SQUARE";
+        break;
+    }
+    return ts;
+}
+
+TextStream& operator<<(TextStream& ts, LineJoin joinStyle)
+{
+    switch (joinStyle) {
+    case MiterJoin:
+        ts << "MITER";
+        break;
+    case RoundJoin:
+        ts << "ROUND";
+        break;
+    case BevelJoin:
+        ts << "BEVEL";
+        break;
+    }
+    return ts;
+}
+
 
 }

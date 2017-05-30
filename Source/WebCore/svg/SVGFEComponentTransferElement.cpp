@@ -19,11 +19,9 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG) && ENABLE(FILTERS)
 #include "SVGFEComponentTransferElement.h"
 
-#include "Attr.h"
+#include "ElementIterator.h"
 #include "FilterEffect.h"
 #include "SVGFEFuncAElement.h"
 #include "SVGFEFuncBElement.h"
@@ -31,6 +29,7 @@
 #include "SVGFEFuncRElement.h"
 #include "SVGFilterBuilder.h"
 #include "SVGNames.h"
+#include <wtf/NeverDestroyed.h>
 
 namespace WebCore {
 
@@ -42,69 +41,54 @@ BEGIN_REGISTER_ANIMATED_PROPERTIES(SVGFEComponentTransferElement)
     REGISTER_PARENT_ANIMATED_PROPERTIES(SVGFilterPrimitiveStandardAttributes)
 END_REGISTER_ANIMATED_PROPERTIES
 
-inline SVGFEComponentTransferElement::SVGFEComponentTransferElement(const QualifiedName& tagName, Document* document)
+inline SVGFEComponentTransferElement::SVGFEComponentTransferElement(const QualifiedName& tagName, Document& document)
     : SVGFilterPrimitiveStandardAttributes(tagName, document)
 {
     ASSERT(hasTagName(SVGNames::feComponentTransferTag));
     registerAnimatedPropertiesForSVGFEComponentTransferElement();
 }
 
-PassRefPtr<SVGFEComponentTransferElement> SVGFEComponentTransferElement::create(const QualifiedName& tagName, Document* document)
+Ref<SVGFEComponentTransferElement> SVGFEComponentTransferElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new SVGFEComponentTransferElement(tagName, document));
-}
-
-bool SVGFEComponentTransferElement::isSupportedAttribute(const QualifiedName& attrName)
-{
-    DEFINE_STATIC_LOCAL(HashSet<QualifiedName>, supportedAttributes, ());
-    if (supportedAttributes.isEmpty())
-        supportedAttributes.add(SVGNames::inAttr);
-    return supportedAttributes.contains<SVGAttributeHashTranslator>(attrName);
+    return adoptRef(*new SVGFEComponentTransferElement(tagName, document));
 }
 
 void SVGFEComponentTransferElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
-    if (!isSupportedAttribute(name)) {
-        SVGFilterPrimitiveStandardAttributes::parseAttribute(name, value);
-        return;
-    }
-
     if (name == SVGNames::inAttr) {
         setIn1BaseValue(value);
         return;
     }
 
-    ASSERT_NOT_REACHED();
+    SVGFilterPrimitiveStandardAttributes::parseAttribute(name, value);
 }
 
-PassRefPtr<FilterEffect> SVGFEComponentTransferElement::build(SVGFilterBuilder* filterBuilder, Filter* filter)
+RefPtr<FilterEffect> SVGFEComponentTransferElement::build(SVGFilterBuilder* filterBuilder, Filter& filter)
 {
     FilterEffect* input1 = filterBuilder->getEffectById(in1());
     
     if (!input1)
-        return 0;
+        return nullptr;
 
     ComponentTransferFunction red;
     ComponentTransferFunction green;
     ComponentTransferFunction blue;
     ComponentTransferFunction alpha;
-    
-    for (Node* node = firstChild(); node; node = node->nextSibling()) {
-        if (node->hasTagName(SVGNames::feFuncRTag))
-            red = static_cast<SVGFEFuncRElement*>(node)->transferFunction();
-        else if (node->hasTagName(SVGNames::feFuncGTag))
-            green = static_cast<SVGFEFuncGElement*>(node)->transferFunction();
-        else if (node->hasTagName(SVGNames::feFuncBTag))
-            blue = static_cast<SVGFEFuncBElement*>(node)->transferFunction();
-        else if (node->hasTagName(SVGNames::feFuncATag))
-            alpha = static_cast<SVGFEFuncAElement*>(node)->transferFunction();
+
+    for (auto& child : childrenOfType<SVGElement>(*this)) {
+        if (is<SVGFEFuncRElement>(child))
+            red = downcast<SVGFEFuncRElement>(child).transferFunction();
+        else if (is<SVGFEFuncGElement>(child))
+            green = downcast<SVGFEFuncGElement>(child).transferFunction();
+        else if (is<SVGFEFuncBElement>(child))
+            blue = downcast<SVGFEFuncBElement>(child).transferFunction();
+        else if (is<SVGFEFuncAElement>(child))
+            alpha = downcast<SVGFEFuncAElement>(child).transferFunction();
     }
     
     RefPtr<FilterEffect> effect = FEComponentTransfer::create(filter, red, green, blue, alpha);
     effect->inputEffects().append(input1);
-    return effect.release();
+    return effect;
 }
 
 }
-
-#endif

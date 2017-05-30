@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -28,16 +28,15 @@
 
 #include "WebGLSharedObject.h"
 
-#include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
 
 namespace WebCore {
 
-class WebGLRenderbuffer : public WebGLSharedObject {
+class WebGLRenderbuffer final : public WebGLSharedObject {
 public:
     virtual ~WebGLRenderbuffer();
 
-    static PassRefPtr<WebGLRenderbuffer> create(WebGLRenderingContext*);
+    static Ref<WebGLRenderbuffer> create(WebGLRenderingContextBase*);
 
     void setInternalFormat(GC3Denum internalformat)
     {
@@ -65,12 +64,12 @@ public:
     void setHasEverBeenBound() { m_hasEverBeenBound = true; }
 
 protected:
-    WebGLRenderbuffer(WebGLRenderingContext*);
+    WebGLRenderbuffer(WebGLRenderingContextBase*);
 
-    virtual void deleteObjectImpl(GraphicsContext3D*, Platform3DObject);
+    virtual void deleteObjectImpl(GraphicsContext3D*, Platform3DObject) override;
 
 private:
-    virtual bool isRenderbuffer() const { return true; }
+    virtual bool isRenderbuffer() const override { return true; }
 
     GC3Denum m_internalFormat;
     bool m_initialized;

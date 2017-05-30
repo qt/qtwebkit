@@ -30,16 +30,16 @@
 
 namespace WebCore {
 
-class TrailingFloatsRootInlineBox FINAL : public RootInlineBox {
+class TrailingFloatsRootInlineBox final : public RootInlineBox {
 public:
-    TrailingFloatsRootInlineBox(RenderBlock* block)
-        : RootInlineBox(block)
+    explicit TrailingFloatsRootInlineBox(RenderBlockFlow& blockFlow)
+        : RootInlineBox(blockFlow)
     {
         setHasVirtualLogicalHeight();
     }
 
 private:
-    virtual float virtualLogicalHeight() const { return 0; }
+    virtual float virtualLogicalHeight() const override { return 0; }
 };
 
 } // namespace WebCore

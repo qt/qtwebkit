@@ -10,36 +10,28 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
  * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
  * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #ifndef FilterOperation_h
 #define FilterOperation_h
 
-#if ENABLE(CSS_FILTERS)
-
 #include "Color.h"
-#include "FilterEffect.h"
 #include "LayoutSize.h"
 #include "Length.h"
-#include <wtf/OwnPtr.h>
-#include <wtf/PassOwnPtr.h>
 #include <wtf/RefCounted.h>
+#include <wtf/TypeCasts.h>
 #include <wtf/text/WTFString.h>
-
-#if PLATFORM(BLACKBERRY)
-#include <wtf/ThreadSafeRefCounted.h>
-#endif
 
 // Annoyingly, wingdi.h #defines this.
 #ifdef PASSTHROUGH
@@ -50,15 +42,10 @@ namespace WebCore {
 
 // CSS Filters
 
-#if ENABLE(SVG)
 class CachedSVGDocumentReference;
-#endif
+class FilterEffect;
 
-#if PLATFORM(BLACKBERRY)
-class FilterOperation : public ThreadSafeRefCounted<FilterOperation> {
-#else
 class FilterOperation : public RefCounted<FilterOperation> {
-#endif
 public:
     enum OperationType {
         REFERENCE, // url(#somefilter)
@@ -72,35 +59,43 @@ public:
         CONTRAST,
         BLUR,
         DROP_SHADOW,
-#if ENABLE(CSS_SHADERS)
-        CUSTOM,
-        VALIDATED_CUSTOM,
-#endif
         PASSTHROUGH,
+        DEFAULT,
         NONE
     };
 
     virtual ~FilterOperation() { }
 
+    virtual PassRefPtr<FilterOperation> clone() const = 0;
+
     virtual bool operator==(const FilterOperation&) const = 0;
     bool operator!=(const FilterOperation& o) const { return !(*this == o); }
 
     virtual PassRefPtr<FilterOperation> blend(const FilterOperation* /*from*/, double /*progress*/, bool /*blendToPassthrough*/ = false)
-    { 
+    {
         ASSERT(!blendingNeedsRendererSize());
-        return 0; 
+        return 0;
     }
 
     virtual PassRefPtr<FilterOperation> blend(const FilterOperation* /*from*/, double /*progress*/, const LayoutSize&, bool /*blendToPassthrough*/ = false)
-    { 
+    {
         ASSERT(blendingNeedsRendererSize());
-        return 0; 
+        return 0;
     }
 
-    virtual OperationType getOperationType() const { return m_type; }
-    virtual bool isSameType(const FilterOperation& o) const { return o.getOperationType() == m_type; }
-    
-    virtual bool isDefault() const { return false; }
+    OperationType type() const { return m_type; }
+
+    bool isBasicColorMatrixFilterOperation() const
+    {
+        return m_type == GRAYSCALE || m_type == SEPIA || m_type == SATURATE || m_type == HUE_ROTATE;
+    }
+
+    bool isBasicComponentTransferFilterOperation() const
+    {
+        return m_type == INVERT || m_type == BRIGHTNESS || m_type == CONTRAST || m_type == OPACITY;
+    }
+
+    bool isSameType(const FilterOperation& o) const { return o.type() == m_type; }
 
     // True if the alpha channel of any pixel can change under this operation.
     virtual bool affectsOpacity() const { return false; }
@@ -118,26 +113,30 @@ protected:
     OperationType m_type;
 };
 
-class DefaultFilterOperation : public FilterOperation {
+class WEBCORE_EXPORT DefaultFilterOperation : public FilterOperation {
 public:
-    static PassRefPtr<DefaultFilterOperation> create(OperationType type)
+    static PassRefPtr<DefaultFilterOperation> create(OperationType representedType)
     {
-        return adoptRef(new DefaultFilterOperation(type));
+        return adoptRef(new DefaultFilterOperation(representedType));
     }
+
+    virtual PassRefPtr<FilterOperation> clone() const override
+    {
+        return adoptRef(new DefaultFilterOperation(representedType()));
+    }
+
+    OperationType representedType() const { return m_representedType; }
 
 private:
+    virtual bool operator==(const FilterOperation&) const override;
 
-    virtual bool operator==(const FilterOperation& o) const
-    {
-        return isSameType(o);
-    }
-
-    virtual bool isDefault() const { return true; }
-
-    DefaultFilterOperation(OperationType type)
-        : FilterOperation(type)
+    DefaultFilterOperation(OperationType representedType)
+        : FilterOperation(DEFAULT)
+        , m_representedType(representedType)
     {
     }
+
+    OperationType m_representedType;
 };
 
 class PassthroughFilterOperation : public FilterOperation {
@@ -147,9 +146,13 @@ public:
         return adoptRef(new PassthroughFilterOperation());
     }
 
-private:
+    virtual PassRefPtr<FilterOperation> clone() const override
+    {
+        return adoptRef(new PassthroughFilterOperation());
+    }
 
-    virtual bool operator==(const FilterOperation& o) const
+private:
+    virtual bool operator==(const FilterOperation& o) const override
     {
         return isSameType(o);
     }
@@ -162,69 +165,65 @@ private:
 
 class ReferenceFilterOperation : public FilterOperation {
 public:
-    static PassRefPtr<ReferenceFilterOperation> create(const String& url, const String& fragment, OperationType type)
+    static PassRefPtr<ReferenceFilterOperation> create(const String& url, const String& fragment)
     {
-        return adoptRef(new ReferenceFilterOperation(url, fragment, type));
+        return adoptRef(new ReferenceFilterOperation(url, fragment));
     }
-    ~ReferenceFilterOperation();
+    virtual ~ReferenceFilterOperation();
 
-    virtual bool affectsOpacity() const { return true; }
-    virtual bool movesPixels() const { return true; }
+    virtual PassRefPtr<FilterOperation> clone() const override
+    {
+        // Reference filters cannot be cloned.
+        ASSERT_NOT_REACHED();
+        return nullptr;
+    }
+
+    virtual bool affectsOpacity() const override { return true; }
+    virtual bool movesPixels() const override { return true; }
 
     const String& url() const { return m_url; }
     const String& fragment() const { return m_fragment; }
 
-#if ENABLE(SVG)
     CachedSVGDocumentReference* cachedSVGDocumentReference() const { return m_cachedSVGDocumentReference.get(); }
-    void setCachedSVGDocumentReference(PassOwnPtr<CachedSVGDocumentReference>);
-#endif
+    CachedSVGDocumentReference* getOrCreateCachedSVGDocumentReference();
 
     FilterEffect* filterEffect() const { return m_filterEffect.get(); }
-    void setFilterEffect(PassRefPtr<FilterEffect> filterEffect) { m_filterEffect = filterEffect; }
+    void setFilterEffect(PassRefPtr<FilterEffect>);
 
 private:
-    ReferenceFilterOperation(const String& url, const String& fragment, OperationType);
+    ReferenceFilterOperation(const String& url, const String& fragment);
 
-    virtual bool operator==(const FilterOperation& o) const
-    {
-        if (!isSameType(o))
-            return false;
-        const ReferenceFilterOperation* other = static_cast<const ReferenceFilterOperation*>(&o);
-        return m_url == other->m_url;
-    }
+    virtual bool operator==(const FilterOperation&) const override;
 
     String m_url;
     String m_fragment;
-#if ENABLE(SVG)
-    OwnPtr<CachedSVGDocumentReference> m_cachedSVGDocumentReference;
-#endif
+    std::unique_ptr<CachedSVGDocumentReference> m_cachedSVGDocumentReference;
     RefPtr<FilterEffect> m_filterEffect;
 };
 
 // GRAYSCALE, SEPIA, SATURATE and HUE_ROTATE are variations on a basic color matrix effect.
 // For HUE_ROTATE, the angle of rotation is stored in m_amount.
-class BasicColorMatrixFilterOperation : public FilterOperation {
+class WEBCORE_EXPORT BasicColorMatrixFilterOperation : public FilterOperation {
 public:
     static PassRefPtr<BasicColorMatrixFilterOperation> create(double amount, OperationType type)
     {
         return adoptRef(new BasicColorMatrixFilterOperation(amount, type));
     }
 
+    virtual PassRefPtr<FilterOperation> clone() const override
+    {
+        return adoptRef(new BasicColorMatrixFilterOperation(amount(), type()));
+    }
+
     double amount() const { return m_amount; }
 
-    virtual PassRefPtr<FilterOperation> blend(const FilterOperation* from, double progress, bool blendToPassthrough = false);
+    virtual PassRefPtr<FilterOperation> blend(const FilterOperation* from, double progress, bool blendToPassthrough = false) override;
 
 private:
-    virtual bool operator==(const FilterOperation& o) const
-    {
-        if (!isSameType(o))
-            return false;
-        const BasicColorMatrixFilterOperation* other = static_cast<const BasicColorMatrixFilterOperation*>(&o);
-        return m_amount == other->m_amount;
-    }
-    
+    virtual bool operator==(const FilterOperation&) const override;
+
     double passthroughAmount() const;
-    
+
     BasicColorMatrixFilterOperation(double amount, OperationType type)
         : FilterOperation(type)
         , m_amount(amount)
@@ -235,27 +234,26 @@ private:
 };
 
 // INVERT, BRIGHTNESS, CONTRAST and OPACITY are variations on a basic component transfer effect.
-class BasicComponentTransferFilterOperation : public FilterOperation {
+class WEBCORE_EXPORT BasicComponentTransferFilterOperation : public FilterOperation {
 public:
     static PassRefPtr<BasicComponentTransferFilterOperation> create(double amount, OperationType type)
     {
         return adoptRef(new BasicComponentTransferFilterOperation(amount, type));
     }
 
+    virtual PassRefPtr<FilterOperation> clone() const override
+    {
+        return adoptRef(new BasicComponentTransferFilterOperation(amount(), type()));
+    }
+
     double amount() const { return m_amount; }
 
-    virtual bool affectsOpacity() const { return m_type == OPACITY; }
+    virtual bool affectsOpacity() const override { return m_type == OPACITY; }
 
-    virtual PassRefPtr<FilterOperation> blend(const FilterOperation* from, double progress, bool blendToPassthrough = false);
+    virtual PassRefPtr<FilterOperation> blend(const FilterOperation* from, double progress, bool blendToPassthrough = false) override;
 
 private:
-    virtual bool operator==(const FilterOperation& o) const
-    {
-        if (!isSameType(o))
-            return false;
-        const BasicComponentTransferFilterOperation* other = static_cast<const BasicComponentTransferFilterOperation*>(&o);
-        return m_amount == other->m_amount;
-    }
+    virtual bool operator==(const FilterOperation&) const override;
 
     double passthroughAmount() const;
 
@@ -268,78 +266,47 @@ private:
     double m_amount;
 };
 
-class GammaFilterOperation : public FilterOperation {
+class WEBCORE_EXPORT BlurFilterOperation : public FilterOperation {
 public:
-    static PassRefPtr<GammaFilterOperation> create(double amplitude, double exponent, double offset, OperationType type)
+    static PassRefPtr<BlurFilterOperation> create(Length stdDeviation)
     {
-        return adoptRef(new GammaFilterOperation(amplitude, exponent, offset, type));
+        return adoptRef(new BlurFilterOperation(WTFMove(stdDeviation)));
     }
 
-    double amplitude() const { return m_amplitude; }
-    double exponent() const { return m_exponent; }
-    double offset() const { return m_offset; }
+    virtual PassRefPtr<FilterOperation> clone() const override
+    {
+        return adoptRef(new BlurFilterOperation(stdDeviation()));
+    }
 
-    virtual PassRefPtr<FilterOperation> blend(const FilterOperation* from, double progress, bool blendToPassthrough = false);
+    const Length& stdDeviation() const { return m_stdDeviation; }
+
+    virtual bool affectsOpacity() const override { return true; }
+    virtual bool movesPixels() const override { return true; }
+
+    virtual PassRefPtr<FilterOperation> blend(const FilterOperation* from, double progress, bool blendToPassthrough = false) override;
 
 private:
-    virtual bool operator==(const FilterOperation& o) const
-    {
-        if (!isSameType(o))
-            return false;
-        const GammaFilterOperation* other = static_cast<const GammaFilterOperation*>(&o);
-        return m_amplitude == other->m_amplitude && m_exponent == other->m_exponent && m_offset == other->m_offset;
-    }
+    virtual bool operator==(const FilterOperation&) const override;
 
-    GammaFilterOperation(double amplitude, double exponent, double offset, OperationType type)
-        : FilterOperation(type)
-        , m_amplitude(amplitude)
-        , m_exponent(exponent)
-        , m_offset(offset)
-    {
-    }
-
-    double m_amplitude;
-    double m_exponent;
-    double m_offset;
-};
-
-class BlurFilterOperation : public FilterOperation {
-public:
-    static PassRefPtr<BlurFilterOperation> create(Length stdDeviation, OperationType type)
-    {
-        return adoptRef(new BlurFilterOperation(stdDeviation, type));
-    }
-
-    Length stdDeviation() const { return m_stdDeviation; }
-
-    virtual bool affectsOpacity() const { return true; }
-    virtual bool movesPixels() const { return true; }
-
-    virtual PassRefPtr<FilterOperation> blend(const FilterOperation* from, double progress, bool blendToPassthrough = false);
-
-private:
-    virtual bool operator==(const FilterOperation& o) const
-    {
-        if (!isSameType(o))
-            return false;
-        const BlurFilterOperation* other = static_cast<const BlurFilterOperation*>(&o);
-        return m_stdDeviation == other->m_stdDeviation;
-    }
-
-    BlurFilterOperation(Length stdDeviation, OperationType type)
-        : FilterOperation(type)
-        , m_stdDeviation(stdDeviation)
+    BlurFilterOperation(Length stdDeviation)
+        : FilterOperation(BLUR)
+        , m_stdDeviation(WTFMove(stdDeviation))
     {
     }
 
     Length m_stdDeviation;
 };
 
-class DropShadowFilterOperation : public FilterOperation {
+class WEBCORE_EXPORT DropShadowFilterOperation : public FilterOperation {
 public:
-    static PassRefPtr<DropShadowFilterOperation> create(const IntPoint& location, int stdDeviation, Color color, OperationType type)
+    static PassRefPtr<DropShadowFilterOperation> create(const IntPoint& location, int stdDeviation, Color color)
     {
-        return adoptRef(new DropShadowFilterOperation(location, stdDeviation, color, type));
+        return adoptRef(new DropShadowFilterOperation(location, stdDeviation, color));
+    }
+
+    virtual PassRefPtr<FilterOperation> clone() const override
+    {
+        return adoptRef(new DropShadowFilterOperation(location(), stdDeviation(), color()));
     }
 
     int x() const { return m_location.x(); }
@@ -348,23 +315,16 @@ public:
     int stdDeviation() const { return m_stdDeviation; }
     Color color() const { return m_color; }
 
-    virtual bool affectsOpacity() const { return true; }
-    virtual bool movesPixels() const { return true; }
+    virtual bool affectsOpacity() const override { return true; }
+    virtual bool movesPixels() const override { return true; }
 
-    virtual PassRefPtr<FilterOperation> blend(const FilterOperation* from, double progress, bool blendToPassthrough = false);
+    virtual PassRefPtr<FilterOperation> blend(const FilterOperation* from, double progress, bool blendToPassthrough = false) override;
 
 private:
+    virtual bool operator==(const FilterOperation&) const override;
 
-    virtual bool operator==(const FilterOperation& o) const
-    {
-        if (!isSameType(o))
-            return false;
-        const DropShadowFilterOperation* other = static_cast<const DropShadowFilterOperation*>(&o);
-        return m_location == other->m_location && m_stdDeviation == other->m_stdDeviation && m_color == other->m_color;
-    }
-
-    DropShadowFilterOperation(const IntPoint& location, int stdDeviation, Color color, OperationType type)
-        : FilterOperation(type)
+    DropShadowFilterOperation(const IntPoint& location, int stdDeviation, Color color)
+        : FilterOperation(DROP_SHADOW)
         , m_location(location)
         , m_stdDeviation(stdDeviation)
         , m_color(color)
@@ -376,8 +336,21 @@ private:
     Color m_color;
 };
 
+WEBCORE_EXPORT TextStream& operator<<(TextStream&, const FilterOperation&);
+
 } // namespace WebCore
 
-#endif // ENABLE(CSS_FILTERS)
+#define SPECIALIZE_TYPE_TRAITS_FILTEROPERATION(ToValueTypeName, predicate) \
+SPECIALIZE_TYPE_TRAITS_BEGIN(WebCore::ToValueTypeName) \
+    static bool isType(const WebCore::FilterOperation& operation) { return operation.predicate; } \
+SPECIALIZE_TYPE_TRAITS_END()
+
+SPECIALIZE_TYPE_TRAITS_FILTEROPERATION(DefaultFilterOperation, type() == WebCore::FilterOperation::DEFAULT)
+SPECIALIZE_TYPE_TRAITS_FILTEROPERATION(PassthroughFilterOperation, type() == WebCore::FilterOperation::PASSTHROUGH)
+SPECIALIZE_TYPE_TRAITS_FILTEROPERATION(ReferenceFilterOperation, type() == WebCore::FilterOperation::REFERENCE)
+SPECIALIZE_TYPE_TRAITS_FILTEROPERATION(BasicColorMatrixFilterOperation, isBasicColorMatrixFilterOperation())
+SPECIALIZE_TYPE_TRAITS_FILTEROPERATION(BasicComponentTransferFilterOperation, isBasicComponentTransferFilterOperation())
+SPECIALIZE_TYPE_TRAITS_FILTEROPERATION(BlurFilterOperation, type() == WebCore::FilterOperation::BLUR)
+SPECIALIZE_TYPE_TRAITS_FILTEROPERATION(DropShadowFilterOperation, type() == WebCore::FilterOperation::DROP_SHADOW)
 
 #endif // FilterOperation_h

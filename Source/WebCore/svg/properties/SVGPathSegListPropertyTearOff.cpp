@@ -18,8 +18,6 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "SVGPathSegListPropertyTearOff.h"
 
 #include "SVGAnimatedPathSegListPropertyTearOff.h"
@@ -32,10 +30,8 @@ namespace WebCore {
 void SVGPathSegListPropertyTearOff::clearContextAndRoles()
 {
     ASSERT(m_values);
-    unsigned size = m_values->size();
-    for (unsigned i = 0; i < size; ++i) {
-        ListItemType item = m_values->at(i);
-        static_cast<SVGPathSegWithContext*>(item.get())->setContextAndRole(0, PathSegUndefinedRole);
+    for (auto& item : *m_values) {
+        static_cast<SVGPathSegWithContext*>(item.get())->setContextAndRole(nullptr, PathSegUndefinedRole);
     }
 }
 
@@ -49,20 +45,20 @@ void SVGPathSegListPropertyTearOff::clear(ExceptionCode& ec)
     SVGPathSegListPropertyTearOff::Base::clearValues(ec);
 }
 
-SVGPathSegListPropertyTearOff::PassListItemType SVGPathSegListPropertyTearOff::getItem(unsigned index, ExceptionCode& ec)
+SVGPathSegListPropertyTearOff::PtrListItemType SVGPathSegListPropertyTearOff::getItem(unsigned index, ExceptionCode& ec)
 {
     ListItemType returnedItem = Base::getItemValues(index, ec);
     if (returnedItem) {
         ASSERT(static_cast<SVGPathSegWithContext*>(returnedItem.get())->contextElement() == contextElement());
         ASSERT(static_cast<SVGPathSegWithContext*>(returnedItem.get())->role() == m_pathSegRole);
     }
-    return returnedItem.release();
+    return returnedItem;
 }
 
-SVGPathSegListPropertyTearOff::PassListItemType SVGPathSegListPropertyTearOff::replaceItem(PassListItemType passNewItem, unsigned index, ExceptionCode& ec)
+SVGPathSegListPropertyTearOff::PtrListItemType SVGPathSegListPropertyTearOff::replaceItem(PtrListItemType newItem, unsigned index, ExceptionCode& ec)
 {
     // Not specified, but FF/Opera do it this way, and it's just sane.
-    if (!passNewItem) {
+    if (!newItem) {
         ec = SVGException::SVG_WRONG_TYPE_ERR;
         return 0;
     }
@@ -70,26 +66,25 @@ SVGPathSegListPropertyTearOff::PassListItemType SVGPathSegListPropertyTearOff::r
     if (index < m_values->size()) {
         ListItemType replacedItem = m_values->at(index);
         ASSERT(replacedItem);
-        static_cast<SVGPathSegWithContext*>(replacedItem.get())->setContextAndRole(0, PathSegUndefinedRole);
+        static_cast<SVGPathSegWithContext*>(replacedItem.get())->setContextAndRole(nullptr, PathSegUndefinedRole);
     }
 
-    ListItemType newItem = passNewItem;
     return Base::replaceItemValues(newItem, index, ec);
 }
 
-SVGPathSegListPropertyTearOff::PassListItemType SVGPathSegListPropertyTearOff::removeItem(unsigned index, ExceptionCode& ec)
+SVGPathSegListPropertyTearOff::PtrListItemType SVGPathSegListPropertyTearOff::removeItem(unsigned index, ExceptionCode& ec)
 {
     SVGPathSegListPropertyTearOff::ListItemType removedItem = SVGPathSegListPropertyTearOff::Base::removeItemValues(index, ec);
     if (removedItem)
-        static_cast<SVGPathSegWithContext*>(removedItem.get())->setContextAndRole(0, PathSegUndefinedRole);
-    return removedItem.release();
+        static_cast<SVGPathSegWithContext*>(removedItem.get())->setContextAndRole(nullptr, PathSegUndefinedRole);
+    return removedItem;
 }
 
 SVGPathElement* SVGPathSegListPropertyTearOff::contextElement() const
 {
     SVGElement* contextElement = m_animatedProperty->contextElement();
     ASSERT(contextElement);
-    return toSVGPathElement(contextElement);
+    return downcast<SVGPathElement>(contextElement);
 }
 
 bool SVGPathSegListPropertyTearOff::processIncomingListItemValue(const ListItemType& newItem, unsigned* indexToModify)
@@ -136,5 +131,3 @@ bool SVGPathSegListPropertyTearOff::processIncomingListItemValue(const ListItemT
 }
 
 }
-
-#endif // ENABLE(SVG)

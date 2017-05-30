@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -47,52 +47,51 @@ void SplitElementCommand::executeApply()
     if (m_atChild->parentNode() != m_element2)
         return;
     
-    Vector<RefPtr<Node> > children;
+    Vector<Ref<Node>> children;
     for (Node* node = m_element2->firstChild(); node != m_atChild; node = node->nextSibling())
-        children.append(node);
+        children.append(*node);
     
     ExceptionCode ec = 0;
     
     ContainerNode* parent = m_element2->parentNode();
-    if (!parent || !parent->rendererIsEditable())
+    if (!parent || !parent->hasEditableStyle())
         return;
-    parent->insertBefore(m_element1.get(), m_element2.get(), ec);
+    parent->insertBefore(*m_element1, m_element2.get(), ec);
     if (ec)
         return;
 
     // Delete id attribute from the second element because the same id cannot be used for more than one element
     m_element2->removeAttribute(HTMLNames::idAttr);
 
-    size_t size = children.size();
-    for (size_t i = 0; i < size; ++i)
-        m_element1->appendChild(children[i], ec);
+    for (auto& child : children)
+        m_element1->appendChild(WTFMove(child), ec);
 }
     
 void SplitElementCommand::doApply()
 {
-    m_element1 = m_element2->cloneElementWithoutChildren();
+    m_element1 = m_element2->cloneElementWithoutChildren(document());
     
     executeApply();
 }
 
 void SplitElementCommand::doUnapply()
 {
-    if (!m_element1 || !m_element1->rendererIsEditable() || !m_element2->rendererIsEditable())
+    if (!m_element1 || !m_element1->hasEditableStyle() || !m_element2->hasEditableStyle())
         return;
 
-    Vector<RefPtr<Node> > children;
+    Vector<Ref<Node>> children;
     for (Node* node = m_element1->firstChild(); node; node = node->nextSibling())
-        children.append(node);
+        children.append(*node);
 
     RefPtr<Node> refChild = m_element2->firstChild();
 
-    size_t size = children.size();
-    for (size_t i = 0; i < size; ++i)
-        m_element2->insertBefore(children[i].get(), refChild.get(), IGNORE_EXCEPTION);
+    for (auto& child : children)
+        m_element2->insertBefore(WTFMove(child), refChild.get(), IGNORE_EXCEPTION);
 
     // Recover the id attribute of the original element.
-    if (m_element1->hasAttribute(HTMLNames::idAttr))
-        m_element2->setAttribute(HTMLNames::idAttr, m_element1->getAttribute(HTMLNames::idAttr));
+    const AtomicString& id = m_element1->getIdAttribute();
+    if (!id.isNull())
+        m_element2->setIdAttribute(id);
 
     m_element1->remove(IGNORE_EXCEPTION);
 }

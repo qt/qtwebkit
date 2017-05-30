@@ -32,12 +32,22 @@
 #include "NetscapePlugin.h"
 #include "PluginController.h"
 #include <WebCore/HTTPHeaderMap.h>
+#include <WebCore/HTTPHeaderNames.h>
 #include <WebCore/IdentifierRep.h>
 #include <WebCore/NotImplemented.h>
 #include <WebCore/ProtectionSpace.h>
 #include <WebCore/SharedBuffer.h>
+#include <memory>
 #include <utility>
 #include <wtf/text/StringBuilder.h>
+
+#if PLATFORM(COCOA)
+#include <WebCore/MachSendRight.h>
+#endif
+
+#if PLUGIN_ARCHITECTURE(X11)
+#include <WebCore/PlatformDisplayX11.h>
+#endif
 
 using namespace WebCore;
 
@@ -49,11 +59,11 @@ public:
     explicit PluginDestructionProtector(NetscapePlugin* plugin)
     {
         if (plugin)
-            m_protector = adoptPtr(new PluginController::PluginDestructionProtector(static_cast<Plugin*>(plugin)->controller()));
+            m_protector = std::make_unique<PluginController::PluginDestructionProtector>(static_cast<Plugin*>(plugin)->controller());
     }
     
 private:
-    OwnPtr<PluginController::PluginDestructionProtector> m_protector;
+    std::unique_ptr<PluginController::PluginDestructionProtector> m_protector;
 };
 
 static bool startsWithBlankLine(const char* bytes, unsigned length)
@@ -244,15 +254,14 @@ static NPError parsePostBuffer(bool isFile, const char *buffer, uint32_t length,
                 // Sometimes plugins like to set Content-Length themselves when they post,
                 // but WebFoundation does not like that. So we will remove the header
                 // and instead truncate the data to the requested length.
-                String contentLength = headerFields.get("Content-Length");
+                String contentLength = headerFields.get(HTTPHeaderName::ContentLength);
                 
                 if (!contentLength.isNull())
                     dataLength = std::min(contentLength.toInt(), (int)dataLength);
-                headerFields.remove("Content-Length");
+                headerFields.remove(HTTPHeaderName::ContentLength);
                 
                 postBuffer += location;
                 postBufferSize = dataLength;
-                
             }
         }
     }
@@ -298,7 +307,7 @@ static NPError NPN_PostURL(NPP npp, const char* url, const char* target, uint32_
         return error;
 
     RefPtr<NetscapePlugin> plugin = NetscapePlugin::fromNPP(npp);
-    plugin->loadURL("POST", makeURLString(url), target, headerFields, postData, false, 0);
+    plugin->loadURL("POST", makeURLString(url), target, WTFMove(headerFields), postData, false, 0);
     return NPERR_NO_ERROR;
 }
 
@@ -400,7 +409,7 @@ static NPError NPN_PostURLNotify(NPP npp, const char* url, const char* target, u
     return NPERR_NO_ERROR;
 }
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
 // Whether the browser supports compositing of Core Animation plug-ins.
 static const unsigned WKNVSupportsCompositingCoreAnimationPluginsBool = 74656;
 
@@ -408,8 +417,6 @@ static const unsigned WKNVSupportsCompositingCoreAnimationPluginsBool = 74656;
 static const unsigned WKNVExpectsNonretainedLayer = 74657;
 
 // 74658 and 74659 are no longer implemented.
-
-static const unsigned WKNVPlugInContainer = 74660;
 
 #endif
 
@@ -441,7 +448,13 @@ static NPError NPN_GetValue(NPP npp, NPNVariable variable, void *value)
             *(NPBool*)value = plugin->isPrivateBrowsingEnabled();
             break;
         }
-#if PLATFORM(MAC)
+
+        case NPNVmuteAudioBool: {
+            RefPtr<NetscapePlugin> plugin = NetscapePlugin::fromNPP(npp);
+            *(NPBool*)value = plugin->isMuted();
+            break;
+        }
+#if PLATFORM(COCOA)
         case NPNVsupportsCoreGraphicsBool:
             // Always claim to support the Core Graphics drawing model.
             *(NPBool*)value = true;
@@ -482,7 +495,7 @@ static NPError NPN_GetValue(NPP npp, NPNVariable variable, void *value)
         case WKNVCALayerRenderServerPort: {
             RefPtr<NetscapePlugin> plugin = NetscapePlugin::fromNPP(npp);
 
-            *(mach_port_t*)value = plugin->compositingRenderServerPort();
+            *(mach_port_t*)value = plugin->compositingRenderServerPort().sendRight();
             break;
         }
 
@@ -492,12 +505,6 @@ static NPError NPN_GetValue(NPP npp, NPNVariable variable, void *value)
             // Asking for this will make us expect a non-retained layer from the plug-in.
             plugin->setPluginReturnsNonretainedLayer(true);
             *(NPBool*)value = true;
-            break;
-        }
-
-        case WKNVPlugInContainer: {
-            RefPtr<NetscapePlugin> plugin = NetscapePlugin::fromNPP(npp);
-            *reinterpret_cast<void**>(value) = plugin->plugInContainer();
             break;
         }
 
@@ -513,18 +520,21 @@ static NPError NPN_GetValue(NPP npp, NPNVariable variable, void *value)
             break;
 #endif
 #elif PLUGIN_ARCHITECTURE(X11)
-       case NPNVxDisplay: {
-           if (!npp)
-               return NPERR_GENERIC_ERROR;
-           *reinterpret_cast<Display**>(value) = NetscapePlugin::x11HostDisplay();
-           break;
-       }
-       case NPNVSupportsXEmbedBool:
-           *static_cast<NPBool*>(value) = true;
-           break;
-       case NPNVSupportsWindowless:
-           *static_cast<NPBool*>(value) = true;
-           break;
+        case NPNVxDisplay: {
+            if (!npp)
+                return NPERR_GENERIC_ERROR;
+            auto& display = PlatformDisplay::sharedDisplay();
+            if (display.type() != PlatformDisplay::Type::X11)
+                return NPERR_GENERIC_ERROR;
+            *reinterpret_cast<Display**>(value) = downcast<PlatformDisplayX11>(display).native();
+            break;
+        }
+        case NPNVSupportsXEmbedBool:
+            *static_cast<NPBool*>(value) = PlatformDisplay::sharedDisplay().type() == PlatformDisplay::Type::X11;
+            break;
+        case NPNVSupportsWindowless:
+            *static_cast<NPBool*>(value) = true;
+            break;
 
        case NPNVToolkit: {
            // Gtk based plugins need to be assured about the toolkit version.
@@ -546,7 +556,7 @@ static NPError NPN_GetValue(NPP npp, NPNVariable variable, void *value)
 static NPError NPN_SetValue(NPP npp, NPPVariable variable, void *value)
 {
     switch (variable) {
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
         case NPPVpluginDrawingModel: {
             RefPtr<NetscapePlugin> plugin = NetscapePlugin::fromNPP(npp);
             
@@ -571,6 +581,12 @@ static NPError NPN_SetValue(NPP npp, NPPVariable variable, void *value)
         case NPPVpluginTransparentBool: {
             RefPtr<NetscapePlugin> plugin = NetscapePlugin::fromNPP(npp);
             plugin->setIsTransparent(value);
+            return NPERR_NO_ERROR;
+        }
+
+        case NPPVpluginIsPlayingAudio: {
+            RefPtr<NetscapePlugin> plugin = NetscapePlugin::fromNPP(npp);
+            plugin->setIsPlayingAudio(value);
             return NPERR_NO_ERROR;
         }
 
@@ -940,7 +956,7 @@ static void NPN_UnscheduleTimer(NPP npp, uint32_t timerID)
     plugin->unscheduleTimer(timerID);
 }
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
 static NPError NPN_PopUpContextMenu(NPP npp, NPMenu* menu)
 {
     RefPtr<NetscapePlugin> plugin = NetscapePlugin::fromNPP(npp);
@@ -965,6 +981,13 @@ static NPBool NPN_ConvertPoint(NPP npp, double sourceX, double sourceY, NPCoordi
     return returnValue;
 }
 #endif
+
+static void NPN_URLRedirectResponse(NPP npp, void* notifyData, NPBool allow)
+{
+    RefPtr<NetscapePlugin> plugin = NetscapePlugin::fromNPP(npp);
+
+    plugin->urlRedirectResponse(notifyData, allow);
+}
 
 static void initializeBrowserFuncs(NPNetscapeFuncs &netscapeFuncs)
 {
@@ -1022,13 +1045,14 @@ static void initializeBrowserFuncs(NPNetscapeFuncs &netscapeFuncs)
     netscapeFuncs.getauthenticationinfo = NPN_GetAuthenticationInfo;
     netscapeFuncs.scheduletimer = NPN_ScheduleTimer;
     netscapeFuncs.unscheduletimer = NPN_UnscheduleTimer;
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     netscapeFuncs.popupcontextmenu = NPN_PopUpContextMenu;
     netscapeFuncs.convertpoint = NPN_ConvertPoint;
 #else
     netscapeFuncs.popupcontextmenu = 0;
     netscapeFuncs.convertpoint = 0;
 #endif
+    netscapeFuncs.urlredirectresponse = NPN_URLRedirectResponse;
 }
     
 NPNetscapeFuncs* netscapeBrowserFuncs()

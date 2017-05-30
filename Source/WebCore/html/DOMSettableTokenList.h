@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2010 Google Inc. All rights reserved.
+ * Copyright (C) 2013, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,46 +28,13 @@
 
 #include "DOMTokenList.h"
 #include "SpaceSplitString.h"
-#include <wtf/RefCounted.h>
 #include <wtf/text/AtomicString.h>
 
 namespace WebCore {
 
-typedef int ExceptionCode;
-
-class DOMSettableTokenList : public DOMTokenList, public RefCounted<DOMSettableTokenList> {
+// Only used by ObjC bindings.
+class DOMSettableTokenList : public DOMTokenList {
     WTF_MAKE_FAST_ALLOCATED;
-public:
-    static PassRefPtr<DOMSettableTokenList> create()
-    {
-        return adoptRef(new DOMSettableTokenList());
-    }
-    virtual ~DOMSettableTokenList();
-
-    virtual void ref() OVERRIDE { RefCounted<DOMSettableTokenList>::ref(); }
-    virtual void deref() OVERRIDE { RefCounted<DOMSettableTokenList>::deref(); }
-
-    virtual unsigned length() const OVERRIDE { return m_tokens.size(); }
-    virtual const AtomicString item(unsigned index) const OVERRIDE;
-
-    virtual void add(const Vector<String>&, ExceptionCode&) OVERRIDE;
-    virtual void remove(const Vector<String>&, ExceptionCode&) OVERRIDE;
-
-    virtual AtomicString value() const OVERRIDE { return m_value; }
-    virtual void setValue(const AtomicString&) OVERRIDE;
-
-    const SpaceSplitString& tokens() const { return m_tokens; }
-
-protected:
-    DOMSettableTokenList();
-
-private:
-    virtual void addInternal(const AtomicString&) OVERRIDE;
-    virtual bool containsInternal(const AtomicString&) const OVERRIDE;
-    virtual void removeInternal(const AtomicString&) OVERRIDE;
-
-    AtomicString m_value;
-    SpaceSplitString m_tokens;
 };
 
 } // namespace WebCore

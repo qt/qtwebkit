@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2012, 2014, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,6 +28,8 @@
 
 #if ENABLE(DFG_JIT)
 
+#include "JSCInlines.h"
+
 namespace JSC { namespace DFG {
 
 void ValueSource::dump(PrintStream& out) const
@@ -40,22 +42,22 @@ void ValueSource::dump(PrintStream& out) const
         out.print("IsDead");
         break;
     case ValueInJSStack:
-        out.print("InStack");
+        out.print("JS:", virtualRegister());
         break;
     case Int32InJSStack:
-        out.print("Int32");
+        out.print("Int32:", virtualRegister());
+        break;
+    case Int52InJSStack:
+        out.print("Int52:", virtualRegister());
         break;
     case CellInJSStack:
-        out.print("Cell");
+        out.print("Cell:", virtualRegister());
         break;
     case BooleanInJSStack:
-        out.print("Bool");
+        out.print("Bool:", virtualRegister());
         break;
     case DoubleInJSStack:
-        out.print("Double");
-        break;
-    case ArgumentsSource:
-        out.print("Arguments");
+        out.print("Double:", virtualRegister());
         break;
     case HaveNode:
         out.print("Node(", m_value, ")");
@@ -64,6 +66,11 @@ void ValueSource::dump(PrintStream& out) const
         RELEASE_ASSERT_NOT_REACHED();
         break;
     }
+}
+
+void ValueSource::dumpInContext(PrintStream& out, DumpContext*) const
+{
+    dump(out);
 }
 
 } } // namespace JSC::DFG

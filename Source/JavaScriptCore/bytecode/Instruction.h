@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, 2012, 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2008, 2012-2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -29,13 +29,18 @@
 #ifndef Instruction_h
 #define Instruction_h
 
+#include "BasicBlockLocation.h"
 #include "MacroAssembler.h"
 #include "Opcode.h"
+#include "PutByIdFlags.h"
+#include "SymbolTable.h"
+#include "TypeLocation.h"
 #include "PropertySlot.h"
-#include "ResolveOperation.h"
 #include "SpecialPointer.h"
 #include "Structure.h"
 #include "StructureChain.h"
+#include "ToThisStatus.h"
+#include "VirtualRegister.h"
 #include <wtf/VectorTraits.h>
 
 namespace JSC {
@@ -43,6 +48,7 @@ namespace JSC {
 class ArrayAllocationProfile;
 class ArrayProfile;
 class ObjectAllocationProfile;
+class WatchpointSet;
 struct LLIntCallLinkInfo;
 struct ValueProfile;
 
@@ -69,6 +75,18 @@ struct Instruction {
         u.jsCell.clear();
         u.operand = operand;
     }
+    Instruction(unsigned unsignedValue)
+    {
+        // We have to initialize one of the pointer members to ensure that
+        // the entire struct is initialized in 64-bit.
+        u.jsCell.clear();
+        u.unsignedValue = unsignedValue;
+    }
+
+    Instruction(PutByIdFlags flags)
+    {
+        u.putByIdFlags = flags;
+    }
 
     Instruction(VM& vm, JSCell* owner, Structure* structure)
     {
@@ -89,36 +107,40 @@ struct Instruction {
     Instruction(PropertySlot::GetValueFunc getterFunc) { u.getterFunc = getterFunc; }
         
     Instruction(LLIntCallLinkInfo* callLinkInfo) { u.callLinkInfo = callLinkInfo; }
-        
     Instruction(ValueProfile* profile) { u.profile = profile; }
     Instruction(ArrayProfile* profile) { u.arrayProfile = profile; }
     Instruction(ArrayAllocationProfile* profile) { u.arrayAllocationProfile = profile; }
     Instruction(ObjectAllocationProfile* profile) { u.objectAllocationProfile = profile; }
-        
-    Instruction(WriteBarrier<Unknown>* registerPointer) { u.registerPointer = registerPointer; }
-        
+    Instruction(WriteBarrier<Unknown>* variablePointer) { u.variablePointer = variablePointer; }
     Instruction(Special::Pointer pointer) { u.specialPointer = pointer; }
-        
+    Instruction(UniquedStringImpl* uid) { u.uid = uid; }
     Instruction(bool* predicatePointer) { u.predicatePointer = predicatePointer; }
 
     union {
         Opcode opcode;
         int operand;
+        unsigned unsignedValue;
         WriteBarrierBase<Structure> structure;
+        StructureID structureID;
+        WriteBarrierBase<SymbolTable> symbolTable;
         WriteBarrierBase<StructureChain> structureChain;
         WriteBarrierBase<JSCell> jsCell;
-        WriteBarrier<Unknown>* registerPointer;
+        WriteBarrier<Unknown>* variablePointer;
         Special::Pointer specialPointer;
         PropertySlot::GetValueFunc getterFunc;
         LLIntCallLinkInfo* callLinkInfo;
+        UniquedStringImpl* uid;
         ValueProfile* profile;
         ArrayProfile* arrayProfile;
         ArrayAllocationProfile* arrayAllocationProfile;
         ObjectAllocationProfile* objectAllocationProfile;
+        WatchpointSet* watchpointSet;
         void* pointer;
         bool* predicatePointer;
-        ResolveOperations* resolveOperations;
-        PutToBaseOperation* putToBaseOperation;
+        ToThisStatus toThisStatus;
+        TypeLocation* location;
+        BasicBlockLocation* basicBlockLocation;
+        PutByIdFlags putByIdFlags;
     } u;
         
 private:

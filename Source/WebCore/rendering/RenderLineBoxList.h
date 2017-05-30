@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -35,12 +35,13 @@
 namespace WebCore {
 
 class InlineFlowBox;
+class RenderBlockFlow;
 
 class RenderLineBoxList {
 public:
     RenderLineBoxList()
-        : m_firstLineBox(0)
-        , m_lastLineBox(0)
+        : m_firstLineBox(nullptr)
+        , m_lastLineBox(nullptr)
     {
     }
 
@@ -53,23 +54,23 @@ public:
 
     void checkConsistency() const;
 
-    void appendLineBox(InlineFlowBox*);
+    void appendLineBox(std::unique_ptr<InlineFlowBox>);
 
-    void deleteLineBoxTree(RenderArena*);
-    void deleteLineBoxes(RenderArena*);
+    void deleteLineBoxTree();
+    void deleteLineBoxes();
 
     void extractLineBox(InlineFlowBox*);
     void attachLineBox(InlineFlowBox*);
     void removeLineBox(InlineFlowBox*);
     
     void dirtyLineBoxes();
-    void dirtyLinesFromChangedChild(RenderObject* parent, RenderObject* child);
+    void dirtyLinesFromChangedChild(RenderBoxModelObject& parent, RenderObject& child);
 
     void paint(RenderBoxModelObject*, PaintInfo&, const LayoutPoint&) const;
     bool hitTest(RenderBoxModelObject*, const HitTestRequest&, HitTestResult&, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, HitTestAction) const;
 
 private:
-    bool anyLineIntersectsRect(RenderBoxModelObject*, const LayoutRect&, const LayoutPoint&, bool usePrintRect = false, LayoutUnit outlineSize = 0) const;
+    bool anyLineIntersectsRect(RenderBoxModelObject*, const LayoutRect&, const LayoutPoint&, bool usePrintRect = false) const;
     bool lineIntersectsDirtyRect(RenderBoxModelObject*, InlineFlowBox*, const PaintInfo&, const LayoutPoint&) const;
     bool rangeIntersectsRect(RenderBoxModelObject*, LayoutUnit logicalTop, LayoutUnit logicalBottom, const LayoutRect&, const LayoutPoint&) const;
 

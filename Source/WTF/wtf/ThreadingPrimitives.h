@@ -11,7 +11,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution. 
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission. 
  *
@@ -31,10 +31,8 @@
 #ifndef ThreadingPrimitives_h
 #define ThreadingPrimitives_h
 
-#include <wtf/Platform.h>
-
 #include <wtf/Assertions.h>
-#include <wtf/FastAllocBase.h>
+#include <wtf/FastMalloc.h>
 #include <wtf/Locker.h>
 #include <wtf/Noncopyable.h>
 
@@ -90,23 +88,6 @@ private:
 
 typedef Locker<Mutex> MutexLocker;
 
-class MutexTryLocker {
-    WTF_MAKE_NONCOPYABLE(MutexTryLocker);
-public:
-    MutexTryLocker(Mutex& mutex) : m_mutex(mutex), m_locked(mutex.tryLock()) { }
-    ~MutexTryLocker()
-    {
-        if (m_locked)
-            m_mutex.unlock();
-    }
-
-    bool locked() const { return m_locked; }
-
-private:
-    Mutex& m_mutex;
-    bool m_locked;
-};
-
 class ThreadCondition {
     WTF_MAKE_NONCOPYABLE(ThreadCondition);
 public:
@@ -134,7 +115,6 @@ WTF_EXPORT_PRIVATE DWORD absoluteTimeToWaitTimeoutInterval(double absoluteTime);
 
 using WTF::Mutex;
 using WTF::MutexLocker;
-using WTF::MutexTryLocker;
 using WTF::ThreadCondition;
 
 #if OS(WINDOWS)

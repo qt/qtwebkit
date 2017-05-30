@@ -43,16 +43,16 @@ static const float gLineMedium = 1.f;
 static const float gLineThick = 3.f;
 static const float gFractionBarWidth = 0.05f;
 
-RenderMathMLFraction::RenderMathMLFraction(Element* element)
-    : RenderMathMLBlock(element)
+RenderMathMLFraction::RenderMathMLFraction(MathMLInlineContainerElement& element, Ref<RenderStyle>&& style)
+    : RenderMathMLBlock(element, WTFMove(style))
     , m_lineThickness(gLineMedium)
 {
 }
 
 void RenderMathMLFraction::fixChildStyle(RenderObject* child)
 {
-    ASSERT(child->isAnonymous() && child->style()->refCount() == 1);
-    child->style()->setFlexDirection(FlowColumn);
+    ASSERT(child->isAnonymous() && child->style().refCount() == 1);
+    child->style().setFlexDirection(FlowColumn);
 }
 
 // FIXME: It's cleaner to only call updateFromElement when an attribute has changed. Move parts
@@ -62,49 +62,47 @@ void RenderMathMLFraction::updateFromElement()
     // FIXME: mfrac where bevelled=true will need to reorganize the descendants
     if (isEmpty()) 
         return;
-    
-    Element* fraction = toElement(node());
-    
+
     RenderObject* numeratorWrapper = firstChild();
     RenderObject* denominatorWrapper = numeratorWrapper->nextSibling();
     if (!denominatorWrapper)
         return;
-    
-    String thickness = fraction->getAttribute(MathMLNames::linethicknessAttr);
+
+    String thickness = element().getAttribute(MathMLNames::linethicknessAttr);
     m_lineThickness = gLineMedium;
-    if (equalIgnoringCase(thickness, "thin"))
+    if (equalLettersIgnoringASCIICase(thickness, "thin"))
         m_lineThickness = gLineThin;
-    else if (equalIgnoringCase(thickness, "medium"))
+    else if (equalLettersIgnoringASCIICase(thickness, "medium"))
         m_lineThickness = gLineMedium;
-    else if (equalIgnoringCase(thickness, "thick"))
+    else if (equalLettersIgnoringASCIICase(thickness, "thick"))
         m_lineThickness = gLineThick;
     else {
         // This function parses the thickness attribute using gLineMedium as
         // the default value. If the parsing fails, m_lineThickness will not be
         // modified i.e. the default value will be used.
-        parseMathMLLength(thickness, m_lineThickness, style(), false);
+        parseMathMLLength(thickness, m_lineThickness, &style(), false);
     }
 
     // Update the style for the padding of the denominator for the line thickness
-    lastChild()->style()->setPaddingTop(Length(static_cast<int>(m_lineThickness), Fixed));
+    lastChild()->style().setPaddingTop(Length(static_cast<int>(m_lineThickness), Fixed));
 }
 
 void RenderMathMLFraction::addChild(RenderObject* child, RenderObject* /* beforeChild */)
 {
     if (isEmpty()) {
-        RenderMathMLBlock* numeratorWrapper = createAnonymousMathMLBlock();
-        RenderMathMLBlock::addChild(numeratorWrapper);
-        fixChildStyle(numeratorWrapper);
+        RenderPtr<RenderMathMLBlock> numeratorWrapper = createAnonymousMathMLBlock();
+        fixChildStyle(numeratorWrapper.get());
+        RenderMathMLBlock::addChild(numeratorWrapper.leakPtr());
         
-        RenderMathMLBlock* denominatorWrapper = createAnonymousMathMLBlock();
-        RenderMathMLBlock::addChild(denominatorWrapper);
-        fixChildStyle(denominatorWrapper);
+        RenderPtr<RenderMathMLBlock> denominatorWrapper = createAnonymousMathMLBlock();
+        fixChildStyle(denominatorWrapper.get());
+        RenderMathMLBlock::addChild(denominatorWrapper.leakPtr());
     }
     
     if (firstChild()->isEmpty())
-        firstChild()->addChild(child);
+        downcast<RenderElement>(*firstChild()).addChild(child);
     else
-        lastChild()->addChild(child);
+        downcast<RenderElement>(*lastChild()).addChild(child);
     
     updateFromElement();
 }
@@ -122,11 +120,11 @@ RenderMathMLOperator* RenderMathMLFraction::unembellishedOperator()
 {
     RenderObject* numeratorWrapper = firstChild();
     if (!numeratorWrapper)
-        return 0;
-    RenderObject* numerator = numeratorWrapper->firstChild();
-    if (!numerator || !numerator->isRenderMathMLBlock())
-        return 0;
-    return toRenderMathMLBlock(numerator)->unembellishedOperator();
+        return nullptr;
+    RenderObject* numerator = numeratorWrapper->firstChildSlow();
+    if (!is<RenderMathMLBlock>(numerator))
+        return nullptr;
+    return downcast<RenderMathMLBlock>(*numerator).unembellishedOperator();
 }
 
 void RenderMathMLFraction::layout()
@@ -135,7 +133,7 @@ void RenderMathMLFraction::layout()
 
     // Adjust the fraction line thickness for the zoom
     if (lastChild() && lastChild()->isRenderBlock())
-        m_lineThickness *= ceilf(gFractionBarWidth * style()->fontSize());
+        m_lineThickness *= ceilf(gFractionBarWidth * style().fontSize());
 
     RenderMathMLBlock::layout();
 }
@@ -143,7 +141,7 @@ void RenderMathMLFraction::layout()
 void RenderMathMLFraction::paint(PaintInfo& info, const LayoutPoint& paintOffset)
 {
     RenderMathMLBlock::paint(info, paintOffset);
-    if (info.context->paintingDisabled() || info.phase != PaintPhaseForeground || style()->visibility() != VISIBLE)
+    if (info.context().paintingDisabled() || info.phase != PaintPhaseForeground || style().visibility() != VISIBLE)
         return;
     
     RenderBox* denominatorWrapper = lastChildBox();
@@ -152,20 +150,19 @@ void RenderMathMLFraction::paint(PaintInfo& info, const LayoutPoint& paintOffset
 
     IntPoint adjustedPaintOffset = roundedIntPoint(paintOffset + location() + denominatorWrapper->location() + LayoutPoint(0, m_lineThickness / 2));
     
-    GraphicsContextStateSaver stateSaver(*info.context);
+    GraphicsContextStateSaver stateSaver(info.context());
     
-    info.context->setStrokeThickness(m_lineThickness);
-    info.context->setStrokeStyle(SolidStroke);
-    info.context->setStrokeColor(style()->visitedDependentColor(CSSPropertyColor), ColorSpaceSRGB);
-    
-    info.context->drawLine(adjustedPaintOffset, IntPoint(adjustedPaintOffset.x() + denominatorWrapper->pixelSnappedOffsetWidth(), adjustedPaintOffset.y()));
+    info.context().setStrokeThickness(m_lineThickness);
+    info.context().setStrokeStyle(SolidStroke);
+    info.context().setStrokeColor(style().visitedDependentColor(CSSPropertyColor));
+    info.context().drawLine(adjustedPaintOffset, roundedIntPoint(LayoutPoint(adjustedPaintOffset.x() + denominatorWrapper->offsetWidth(), adjustedPaintOffset.y())));
 }
 
-int RenderMathMLFraction::firstLineBoxBaseline() const
+Optional<int> RenderMathMLFraction::firstLineBaseline() const
 {
     if (RenderBox* denominatorWrapper = lastChildBox())
-        return denominatorWrapper->logicalTop() + static_cast<int>(lroundf((m_lineThickness + style()->fontMetrics().xHeight()) / 2));
-    return RenderMathMLBlock::firstLineBoxBaseline();
+        return Optional<int>(denominatorWrapper->logicalTop() + static_cast<int>(lroundf((m_lineThickness + style().fontMetrics().xHeight()) / 2)));
+    return RenderMathMLBlock::firstLineBaseline();
 }
 
 }

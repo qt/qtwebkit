@@ -20,10 +20,15 @@
 #include "config.h"
 #include "WebFrameNetworkingContext.h"
 
+#include "SessionTracker.h"
 #include "WebFrame.h"
 #include "WebPage.h"
+
 #include <QObject>
 #include <QVariant>
+#include <WebCore/SessionID.h>
+
+using namespace WebCore;
 
 namespace WebKit {
 
@@ -33,14 +38,50 @@ WebFrameNetworkingContext::WebFrameNetworkingContext(WebFrame* frame)
 {
     // Save the page ID for a valid page as it is needed later for HTTP authentication and SSL errors.
     if (frame->page()) {
-        m_originatingObject = adoptPtr(new QObject);
+        m_originatingObject.reset(new QObject);
         m_originatingObject->setProperty("pageID", qulonglong(frame->page()->pageID()));
     }
 }
 
-PassRefPtr<WebFrameNetworkingContext> WebFrameNetworkingContext::create(WebFrame* frame)
+Ref<WebFrameNetworkingContext> WebFrameNetworkingContext::create(WebFrame* frame)
 {
-    return adoptRef(new WebFrameNetworkingContext(frame));
+    return adoptRef(*new WebFrameNetworkingContext(frame));
+}
+
+void WebFrameNetworkingContext::ensurePrivateBrowsingSession(SessionID sessionID)
+{
+    ASSERT(isMainThread());
+
+    if (SessionTracker::storageSession(sessionID))
+        return;
+
+    SessionTracker::setSession(sessionID, NetworkStorageSession::createPrivateBrowsingSession(String::number(sessionID.sessionID())));
+}
+
+WebFrameLoaderClient* WebFrameNetworkingContext::webFrameLoaderClient() const
+{
+    if (!frame())
+        return nullptr;
+
+    return toWebFrameLoaderClient(frame()->loader().client());
+}
+
+QNetworkAccessManager* WebFrameNetworkingContext::networkAccessManager() const
+{
+    // QTFIXME: This is a leftover of old process model
+    // QtMM player may call networkAccessManager() in WebProcess
+    // so we cannot just have ASSERT here.
+    qWarning("QtWebKit bug: WebFrameNetworkingContext::networkAccessManager() is called");
+    return nullptr;
+}
+
+WebCore::NetworkStorageSession& WebFrameNetworkingContext::storageSession() const
+{
+    if (frame() && frame()->page()->usesEphemeralSession())
+        return *SessionTracker::storageSession(SessionID::legacyPrivateSessionID());
+
+    return NetworkStorageSession::defaultStorageSession();
+
 }
 
 }

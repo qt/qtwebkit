@@ -28,20 +28,28 @@
 
 #include "Heap.h"
 #include "HeapRootVisitor.h"
+#include "JSCInlines.h"
 #include "JSObject.h"
-#include "Operations.h"
-#include "Structure.h"
+#include "WeakHandleOwner.h"
 
 namespace JSC {
 
-WeakBlock* WeakBlock::create(DeadBlock* block)
+WeakBlock* WeakBlock::create(Heap& heap, MarkedBlock& markedBlock)
 {
-    Region* region = block->region();
-    return new (NotNull, block) WeakBlock(region);
+    heap.didAllocateBlock(WeakBlock::blockSize);
+    return new (NotNull, fastMalloc(blockSize)) WeakBlock(markedBlock);
 }
 
-WeakBlock::WeakBlock(Region* region)
-    : HeapBlock<WeakBlock>(region)
+void WeakBlock::destroy(Heap& heap, WeakBlock* block)
+{
+    block->~WeakBlock();
+    fastFree(block);
+    heap.didFreeBlock(WeakBlock::blockSize);
+}
+
+WeakBlock::WeakBlock(MarkedBlock& markedBlock)
+    : DoublyLinkedListNode<WeakBlock>()
+    , m_markedBlock(&markedBlock)
 {
     for (size_t i = 0; i < weakImplCount(); ++i) {
         WeakImpl* weakImpl = &weakImpls()[i];
@@ -76,8 +84,11 @@ void WeakBlock::sweep()
             finalize(weakImpl);
         if (weakImpl->state() == WeakImpl::Deallocated)
             addToFreeList(&sweepResult.freeList, weakImpl);
-        else
+        else {
             sweepResult.blockIsFree = false;
+            if (weakImpl->state() == WeakImpl::Live)
+                sweepResult.blockIsLogicallyEmpty = false;
+        }
     }
 
     m_sweepResult = sweepResult;
@@ -90,6 +101,12 @@ void WeakBlock::visit(HeapRootVisitor& heapRootVisitor)
     if (isEmpty())
         return;
 
+    // If this WeakBlock doesn't belong to a MarkedBlock, we won't even be here.
+    ASSERT(m_markedBlock);
+
+    // We only visit after marking.
+    ASSERT(m_markedBlock->isMarkedOrRetired());
+
     SlotVisitor& visitor = heapRootVisitor.visitor();
 
     for (size_t i = 0; i < weakImplCount(); ++i) {
@@ -97,12 +114,12 @@ void WeakBlock::visit(HeapRootVisitor& heapRootVisitor)
         if (weakImpl->state() != WeakImpl::Live)
             continue;
 
-        const JSValue& jsValue = weakImpl->jsValue();
-        if (Heap::isLive(jsValue.asCell()))
-            continue;
-
         WeakHandleOwner* weakHandleOwner = weakImpl->weakHandleOwner();
         if (!weakHandleOwner)
+            continue;
+
+        const JSValue& jsValue = weakImpl->jsValue();
+        if (m_markedBlock->isMarkedOrNewlyAllocated(jsValue.asCell()))
             continue;
 
         if (!weakHandleOwner->isReachableFromOpaqueRoots(Handle<Unknown>::wrapSlot(&const_cast<JSValue&>(jsValue)), weakImpl->context(), visitor))
@@ -118,12 +135,18 @@ void WeakBlock::reap()
     if (isEmpty())
         return;
 
+    // If this WeakBlock doesn't belong to a MarkedBlock, we won't even be here.
+    ASSERT(m_markedBlock);
+
+    // We only reap after marking.
+    ASSERT(m_markedBlock->isMarkedOrRetired());
+
     for (size_t i = 0; i < weakImplCount(); ++i) {
         WeakImpl* weakImpl = &weakImpls()[i];
         if (weakImpl->state() > WeakImpl::Dead)
             continue;
 
-        if (Heap::isLive(weakImpl->jsValue().asCell())) {
+        if (m_markedBlock->isMarkedOrNewlyAllocated(weakImpl->jsValue().asCell())) {
             ASSERT(weakImpl->state() == WeakImpl::Live);
             continue;
         }

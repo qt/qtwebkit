@@ -1,6 +1,8 @@
 /*
  * Copyright (C) 2011 Google Inc. All rights reserved.
- * Copyright (C) 2011 Ericsson AB. All rights reserved.
+ * Copyright (C) 2011, 2015 Ericsson AB. All rights reserved.
+ * Copyright (C) 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2013 Nokia Corporation and/or its subsidiary(-ies).
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,145 +30,240 @@
 
 #if ENABLE(MEDIA_STREAM)
 
+#include "Dictionary.h"
 #include "Event.h"
-#include "MediaStreamCenter.h"
-#include "MediaStreamComponent.h"
+#include "ExceptionCode.h"
+#include "ExceptionCodePlaceholder.h"
+#include "MediaConstraintsImpl.h"
+#include "MediaSourceSettings.h"
+#include "MediaStream.h"
+#include "MediaStreamPrivate.h"
+#include "MediaTrackConstraints.h"
+#include "NotImplemented.h"
+#include "ScriptExecutionContext.h"
+#include <wtf/Functional.h>
+#include <wtf/NeverDestroyed.h>
 
 namespace WebCore {
 
-PassRefPtr<MediaStreamTrack> MediaStreamTrack::create(ScriptExecutionContext* context, MediaStreamComponent* component)
+Ref<MediaStreamTrack> MediaStreamTrack::create(ScriptExecutionContext& context, MediaStreamTrackPrivate& privateTrack)
 {
-    RefPtr<MediaStreamTrack> track = adoptRef(new MediaStreamTrack(context, component));
-    track->suspendIfNeeded();
-    return track.release();
+    return adoptRef(*new MediaStreamTrack(context, privateTrack));
 }
 
-MediaStreamTrack::MediaStreamTrack(ScriptExecutionContext* context, MediaStreamComponent* component)
-    : ActiveDOMObject(context)
-    , m_stopped(false)
-    , m_component(component)
+MediaStreamTrack::MediaStreamTrack(ScriptExecutionContext& context, MediaStreamTrackPrivate& privateTrack)
+    : RefCounted()
+    , ActiveDOMObject(&context)
+    , m_private(privateTrack)
 {
-    m_component->source()->addObserver(this);
+    suspendIfNeeded();
+
+    m_private->addObserver(*this);
 }
 
 MediaStreamTrack::~MediaStreamTrack()
 {
-    m_component->source()->removeObserver(this);
+    m_private->removeObserver(*this);
 }
 
-String MediaStreamTrack::kind() const
+const AtomicString& MediaStreamTrack::kind() const
 {
-    DEFINE_STATIC_LOCAL(String, audioKind, (ASCIILiteral("audio")));
-    DEFINE_STATIC_LOCAL(String, videoKind, (ASCIILiteral("video")));
+    static NeverDestroyed<AtomicString> audioKind("audio", AtomicString::ConstructFromLiteral);
+    static NeverDestroyed<AtomicString> videoKind("video", AtomicString::ConstructFromLiteral);
 
-    switch (m_component->source()->type()) {
-    case MediaStreamSource::TypeAudio:
+    if (m_private->type() == RealtimeMediaSource::Audio)
         return audioKind;
-    case MediaStreamSource::TypeVideo:
-        return videoKind;
-    }
-
-    ASSERT_NOT_REACHED();
-    return audioKind;
+    return videoKind;
 }
 
-String MediaStreamTrack::id() const
+const String& MediaStreamTrack::id() const
 {
-    return m_component->id();
+    return m_private->id();
 }
 
-String MediaStreamTrack::label() const
+const String& MediaStreamTrack::label() const
 {
-    return m_component->source()->name();
+    return m_private->label();
 }
 
 bool MediaStreamTrack::enabled() const
 {
-    return m_component->enabled();
+    return m_private->enabled();
 }
 
 void MediaStreamTrack::setEnabled(bool enabled)
 {
-    if (m_stopped || enabled == m_component->enabled())
-        return;
-
-    m_component->setEnabled(enabled);
-
-    if (m_component->stream()->ended())
-        return;
-
-    MediaStreamCenter::instance().didSetMediaStreamTrackEnabled(m_component->stream(), m_component.get());
+    m_private->setEnabled(enabled);
 }
 
-String MediaStreamTrack::readyState() const
+bool MediaStreamTrack::muted() const
 {
-    if (m_stopped)
-        return ASCIILiteral("ended");
+    return m_private->muted();
+}
 
-    switch (m_component->source()->readyState()) {
-    case MediaStreamSource::ReadyStateLive:
-        return ASCIILiteral("live");
-    case MediaStreamSource::ReadyStateMuted:
-        return ASCIILiteral("muted");
-    case MediaStreamSource::ReadyStateEnded:
-        return ASCIILiteral("ended");
-    }
+bool MediaStreamTrack::readonly() const
+{
+    return m_private->readonly();
+}
 
-    ASSERT_NOT_REACHED();
-    return String();
+bool MediaStreamTrack::remote() const
+{
+    return m_private->remote();
+}
+
+const AtomicString& MediaStreamTrack::readyState() const
+{
+    static NeverDestroyed<AtomicString> endedState("ended", AtomicString::ConstructFromLiteral);
+    static NeverDestroyed<AtomicString> liveState("live", AtomicString::ConstructFromLiteral);
+
+    return ended() ? endedState : liveState;
 }
 
 bool MediaStreamTrack::ended() const
 {
-    return m_stopped || (m_component->source()->readyState() == MediaStreamSource::ReadyStateEnded);
+    return m_ended || m_private->ended();
 }
 
-void MediaStreamTrack::sourceChangedState()
+RefPtr<MediaStreamTrack> MediaStreamTrack::clone()
 {
-    if (m_stopped)
+    return MediaStreamTrack::create(*scriptExecutionContext(), *m_private->clone());
+}
+
+void MediaStreamTrack::stopProducingData()
+{
+    // NOTE: this method is called when the "stop" method is called from JS, using
+    // the "ImplementedAs" IDL attribute. This is done because ActiveDOMObject requires
+    // a "stop" method.
+
+    // http://w3c.github.io/mediacapture-main/#widl-MediaStreamTrack-stop-void
+    // 4.3.3.2 Methods
+    // When a MediaStreamTrack object's stop() method is invoked, the User Agent must run following steps:
+    // 1. Let track be the current MediaStreamTrack object.
+    // 2. If track is sourced by a non-local source, then abort these steps.
+    if (remote() || ended())
         return;
 
-    switch (m_component->source()->readyState()) {
-    case MediaStreamSource::ReadyStateLive:
-        dispatchEvent(Event::create(eventNames().unmuteEvent, false, false));
-        break;
-    case MediaStreamSource::ReadyStateMuted:
-        dispatchEvent(Event::create(eventNames().muteEvent, false, false));
-        break;
-    case MediaStreamSource::ReadyStateEnded:
-        dispatchEvent(Event::create(eventNames().endedEvent, false, false));
-        break;
-    }
+    // 3. Notify track's source that track is ended so that the source may be stopped, unless other
+    // MediaStreamTrack objects depend on it.
+    // 4. Set track's readyState attribute to ended.
+
+    // Set m_ended to true before telling the private to stop so we do not fire an 'ended' event.
+    m_ended = true;
+
+    m_private->endTrack();
 }
 
-MediaStreamComponent* MediaStreamTrack::component()
+RefPtr<MediaTrackConstraints> MediaStreamTrack::getConstraints() const
 {
-    return m_component.get();
+    // FIXME: https://bugs.webkit.org/show_bug.cgi?id=122428
+    notImplemented();
+    return 0;
+}
+
+RefPtr<MediaSourceSettings> MediaStreamTrack::getSettings() const
+{
+    return MediaSourceSettings::create(m_private->settings());
+}
+
+RefPtr<RealtimeMediaSourceCapabilities> MediaStreamTrack::getCapabilities() const
+{
+    return m_private->capabilities();
+}
+
+void MediaStreamTrack::applyConstraints(const Dictionary& constraints)
+{
+    m_constraints->initialize(constraints);
+    m_private->applyConstraints(*m_constraints);
+}
+
+void MediaStreamTrack::applyConstraints(const MediaConstraints&)
+{
+    // FIXME: apply the new constraints to the track
+    // https://bugs.webkit.org/show_bug.cgi?id=122428
+}
+
+void MediaStreamTrack::addObserver(MediaStreamTrack::Observer* observer)
+{
+    m_observers.append(observer);
+}
+
+void MediaStreamTrack::removeObserver(MediaStreamTrack::Observer* observer)
+{
+    size_t pos = m_observers.find(observer);
+    if (pos != notFound)
+        m_observers.remove(pos);
+}
+
+void MediaStreamTrack::trackEnded(MediaStreamTrackPrivate&)
+{
+    // http://w3c.github.io/mediacapture-main/#life-cycle
+    // When a MediaStreamTrack track ends for any reason other than the stop() method being invoked, the User Agent must queue a task that runs the following steps:
+    // 1. If the track's readyState attribute has the value ended already, then abort these steps.
+    if (m_ended)
+        return;
+
+    // 2. Set track's readyState attribute to ended.
+    m_ended = true;
+
+    if (scriptExecutionContext()->activeDOMObjectsAreSuspended() || scriptExecutionContext()->activeDOMObjectsAreStopped())
+        return;
+
+    // 3. Notify track's source that track is ended so that the source may be stopped, unless other MediaStreamTrack objects depend on it.
+    // 4. Fire a simple event named ended at the object.
+    dispatchEvent(Event::create(eventNames().endedEvent, false, false));
+
+    for (auto& observer : m_observers)
+        observer->trackDidEnd();
+
+    configureTrackRendering();
+}
+    
+void MediaStreamTrack::trackMutedChanged(MediaStreamTrackPrivate&)
+{
+    if (scriptExecutionContext()->activeDOMObjectsAreSuspended() || scriptExecutionContext()->activeDOMObjectsAreStopped())
+        return;
+
+    AtomicString eventType = muted() ? eventNames().muteEvent : eventNames().unmuteEvent;
+    dispatchEvent(Event::create(eventType, false, false));
+
+    configureTrackRendering();
+}
+
+void MediaStreamTrack::trackSettingsChanged(MediaStreamTrackPrivate&)
+{
+    configureTrackRendering();
+}
+
+void MediaStreamTrack::trackEnabledChanged(MediaStreamTrackPrivate&)
+{
+    configureTrackRendering();
+}
+
+void MediaStreamTrack::configureTrackRendering()
+{
+    // 4.3.1
+    // ... media from the source only flows when a MediaStreamTrack object is both unmuted and enabled
 }
 
 void MediaStreamTrack::stop()
 {
-    m_stopped = true;
+    stopProducingData();
 }
 
-const AtomicString& MediaStreamTrack::interfaceName() const
+const char* MediaStreamTrack::activeDOMObjectName() const
 {
-    return eventNames().interfaceForMediaStreamTrack;
+    return "MediaStreamTrack";
 }
 
-ScriptExecutionContext* MediaStreamTrack::scriptExecutionContext() const
+bool MediaStreamTrack::canSuspendForDocumentSuspension() const
 {
-    return ActiveDOMObject::scriptExecutionContext();
+    // FIXME: We should try and do better here.
+    return false;
 }
 
-EventTargetData* MediaStreamTrack::eventTargetData()
+AudioSourceProvider* MediaStreamTrack::audioSourceProvider()
 {
-    return &m_eventTargetData;
-}
-
-EventTargetData* MediaStreamTrack::ensureEventTargetData()
-{
-    return &m_eventTargetData;
+    return m_private->audioSourceProvider();
 }
 
 } // namespace WebCore

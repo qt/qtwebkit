@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2008, 2012, 2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -32,12 +32,12 @@
 #include "Profile.h"
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefPtr.h>
+#include <wtf/Stopwatch.h>
 #include <wtf/Vector.h>
 
 namespace JSC {
 
 class ExecState;
-class VM;
 class JSGlobalObject;
 class JSObject;
 class JSValue;
@@ -47,24 +47,28 @@ struct CallIdentifier;
 class LegacyProfiler {
     WTF_MAKE_FAST_ALLOCATED;
 public:
-    JS_EXPORT_PRIVATE static LegacyProfiler* profiler(); 
-    static CallIdentifier createCallIdentifier(ExecState*, JSValue, const WTF::String& sourceURL, int lineNumber);
+    JS_EXPORT_PRIVATE static LegacyProfiler* profiler();
+    static CallIdentifier createCallIdentifier(ExecState*, JSValue, const WTF::String& sourceURL, unsigned defaultLineNumber, unsigned defaultColumnNumber);
 
-    JS_EXPORT_PRIVATE void startProfiling(ExecState*, const WTF::String& title);
-    JS_EXPORT_PRIVATE PassRefPtr<Profile> stopProfiling(ExecState*, const WTF::String& title);
+    JS_EXPORT_PRIVATE void startProfiling(ExecState*, const WTF::String& title, PassRefPtr<Stopwatch>);
+    JS_EXPORT_PRIVATE RefPtr<Profile> stopProfiling(ExecState*, const WTF::String& title);
     void stopProfiling(JSGlobalObject*);
 
+    // Used to ignore profile node subtrees rooted at InjectedScript calls.
+    JS_EXPORT_PRIVATE void suspendProfiling(ExecState*);
+    JS_EXPORT_PRIVATE void unsuspendProfiling(ExecState*);
+
     void willExecute(ExecState* callerCallFrame, JSValue function);
-    void willExecute(ExecState* callerCallFrame, const WTF::String& sourceURL, int startingLineNumber);
+    void willExecute(ExecState* callerCallFrame, const WTF::String& sourceURL, unsigned startingLineNumber, unsigned startingColumnNumber);
     void didExecute(ExecState* callerCallFrame, JSValue function);
-    void didExecute(ExecState* callerCallFrame, const WTF::String& sourceURL, int startingLineNumber);
+    void didExecute(ExecState* callerCallFrame, const WTF::String& sourceURL, unsigned startingLineNumber, unsigned startingColumnNumber);
 
     void exceptionUnwind(ExecState* handlerCallFrame);
 
-    const Vector<RefPtr<ProfileGenerator> >& currentProfiles() { return m_currentProfiles; };
+    const Vector<RefPtr<ProfileGenerator>>& currentProfiles() { return m_currentProfiles; };
 
 private:
-    Vector<RefPtr<ProfileGenerator> > m_currentProfiles;
+    Vector<RefPtr<ProfileGenerator>> m_currentProfiles;
     static LegacyProfiler* s_sharedLegacyProfiler;
 };
 

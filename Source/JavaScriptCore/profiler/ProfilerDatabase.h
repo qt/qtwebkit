@@ -30,11 +30,13 @@
 #include "ProfilerBytecodes.h"
 #include "ProfilerCompilation.h"
 #include "ProfilerCompilationKind.h"
-#include <wtf/FastAllocBase.h>
+#include <wtf/FastMalloc.h>
 #include <wtf/HashMap.h>
+#include <wtf/Lock.h>
 #include <wtf/Noncopyable.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/SegmentedVector.h>
+#include <wtf/ThreadingPrimitives.h>
 #include <wtf/text/WTFString.h>
 
 namespace JSC { namespace Profiler {
@@ -50,8 +52,7 @@ public:
     Bytecodes* ensureBytecodesFor(CodeBlock*);
     void notifyDestruction(CodeBlock*);
     
-    PassRefPtr<Compilation> newCompilation(CodeBlock*, CompilationKind);
-    PassRefPtr<Compilation> newCompilation(Bytecodes*, CompilationKind);
+    void addCompilation(PassRefPtr<Compilation>);
     
     // Converts the database to a JavaScript object that is suitable for JSON stringification.
     // Note that it's probably a good idea to use an ExecState* associated with a global
@@ -70,7 +71,6 @@ public:
     void registerToSaveAtExit(const char* filename);
     
 private:
-
     void addDatabaseToAtExit();
     void removeDatabaseFromAtExit();
     void performAtExitSave() const;
@@ -81,10 +81,11 @@ private:
     VM& m_vm;
     SegmentedVector<Bytecodes> m_bytecodes;
     HashMap<CodeBlock*, Bytecodes*> m_bytecodesMap;
-    Vector<RefPtr<Compilation> > m_compilations;
+    Vector<RefPtr<Compilation>> m_compilations;
     bool m_shouldSaveAtExit;
     CString m_atExitSaveFilename;
     Database* m_nextRegisteredDatabase;
+    Lock m_lock;
 };
 
 } } // namespace JSC::Profiler

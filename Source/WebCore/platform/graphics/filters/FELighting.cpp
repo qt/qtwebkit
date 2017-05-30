@@ -25,8 +25,6 @@
  */
 
 #include "config.h"
-
-#if ENABLE(FILTERS)
 #include "FELighting.h"
 
 #include "FELightingNEON.h"
@@ -34,7 +32,7 @@
 
 namespace WebCore {
 
-FELighting::FELighting(Filter* filter, LightingType lightingType, const Color& lightingColor, float surfaceScale,
+FELighting::FELighting(Filter& filter, LightingType lightingType, const Color& lightingColor, float surfaceScale,
     float diffuseConstant, float specularConstant, float specularExponent,
     float kernelUnitLengthX, float kernelUnitLengthY, PassRefPtr<LightSource> lightSource)
     : FilterEffect(filter)
@@ -284,7 +282,7 @@ inline void FELighting::platformApplyGeneric(LightingData& data, LightSource::Pa
 inline void FELighting::platformApply(LightingData& data, LightSource::PaintingData& paintingData)
 {
     // The selection here eventually should happen dynamically on some platforms.
-#if CPU(ARM_NEON) && CPU(ARM_TRADITIONAL) && COMPILER(GCC)
+#if CPU(ARM_NEON) && CPU(ARM_TRADITIONAL) && COMPILER(GCC_OR_CLANG)
     platformApplyNeon(data, paintingData);
 #else
     platformApplyGeneric(data, paintingData);
@@ -408,5 +406,3 @@ void FELighting::platformApplySoftware()
 }
 
 } // namespace WebCore
-
-#endif // ENABLE(FILTERS)

@@ -27,10 +27,9 @@
 #ifndef FELightingNEON_h
 #define FELightingNEON_h
 
-#if CPU(ARM_NEON) && CPU(ARM_TRADITIONAL) && COMPILER(GCC)
+#if CPU(ARM_NEON) && CPU(ARM_TRADITIONAL) && COMPILER(GCC_OR_CLANG)
 
 #include "FELighting.h"
-#include <wtf/Alignment.h>
 #include <wtf/ParallelJobs.h>
 
 namespace WebCore {
@@ -94,8 +93,7 @@ void neonDrawLighting(FELightingPaintingDataForNeon*);
 
 inline void FELighting::platformApplyNeon(LightingData& data, LightSource::PaintingData& paintingData)
 {
-    WTF_ALIGNED(FELightingFloatArgumentsForNeon, floatArguments, 16);
-
+    FELightingFloatArgumentsForNeon floatArguments __attribute__((__aligned__(16)));
     FELightingPaintingDataForNeon neonData = {
         data.pixels->data(),
         1,
@@ -196,6 +194,6 @@ inline void FELighting::platformApplyNeon(LightingData& data, LightSource::Paint
 
 } // namespace WebCore
 
-#endif // CPU(ARM_NEON) && COMPILER(GCC)
+#endif // CPU(ARM_NEON) && COMPILER(GCC_OR_CLANG)
 
 #endif // FELightingNEON_h

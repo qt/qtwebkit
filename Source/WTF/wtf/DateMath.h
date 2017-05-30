@@ -49,11 +49,14 @@
 #include <time.h>
 #include <wtf/CurrentTime.h>
 #include <wtf/Noncopyable.h>
-#include <wtf/OwnArrayPtr.h>
-#include <wtf/PassOwnArrayPtr.h>
 #include <wtf/text/WTFString.h>
 
 namespace WTF {
+
+enum TimeType {
+    UTCTime = 0,
+    LocalTime
+};
 
 struct LocalTimeOffset {
     LocalTimeOffset()
@@ -91,7 +94,7 @@ WTF_EXPORT_PRIVATE double parseDateFromNullTerminatedCharacters(const char* date
 WTF_EXPORT_PRIVATE double parseDateFromNullTerminatedCharacters(const char* dateString, bool& haveTZ, int& offset);
 WTF_EXPORT_PRIVATE double timeClip(double);
 // dayOfWeek: [0, 6] 0 being Monday, day: [1, 31], month: [0, 11], year: ex: 2011, hours: [0, 23], minutes: [0, 59], seconds: [0, 59], utcOffset: [-720,720]. 
-String makeRFC2822DateString(unsigned dayOfWeek, unsigned day, unsigned month, unsigned year, unsigned hours, unsigned minutes, unsigned seconds, int utcOffset);
+WTF_EXPORT_PRIVATE String makeRFC2822DateString(unsigned dayOfWeek, unsigned day, unsigned month, unsigned year, unsigned hours, unsigned minutes, unsigned seconds, int utcOffset);
 
 inline double jsCurrentTime()
 {
@@ -105,13 +108,14 @@ const char* const monthFullName[12] = { "January", "February", "March", "April",
 
 const double hoursPerDay = 24.0;
 const double minutesPerHour = 60.0;
-const double secondsPerHour = 60.0 * 60.0;
 const double secondsPerMinute = 60.0;
 const double msPerSecond = 1000.0;
-const double msPerMinute = 60.0 * 1000.0;
-const double msPerHour = 60.0 * 60.0 * 1000.0;
-const double msPerDay = 24.0 * 60.0 * 60.0 * 1000.0;
 const double msPerMonth = 2592000000.0;
+const double secondsPerHour = secondsPerMinute * minutesPerHour;
+const double secondsPerDay = secondsPerHour * hoursPerDay;
+const double msPerMinute = msPerSecond * secondsPerMinute;
+const double msPerHour = msPerSecond * secondsPerHour;
+const double msPerDay = msPerSecond * secondsPerDay;
 
 WTF_EXPORT_PRIVATE bool isLeapYear(int year);
 
@@ -127,7 +131,7 @@ WTF_EXPORT_PRIVATE int monthFromDayInYear(int dayInYear, bool leapYear);
 WTF_EXPORT_PRIVATE int dayInMonthFromDayInYear(int dayInYear, bool leapYear);
 
 // Returns combined offset in millisecond (UTC + DST).
-WTF_EXPORT_PRIVATE LocalTimeOffset calculateLocalTimeOffset(double utcInMilliseconds);
+WTF_EXPORT_PRIVATE LocalTimeOffset calculateLocalTimeOffset(double utcInMilliseconds, TimeType = UTCTime);
 
 } // namespace WTF
 
@@ -145,6 +149,7 @@ using WTF::msToYear;
 using WTF::msToDays;
 using WTF::msToMinutes;
 using WTF::msToHours;
+using WTF::secondsPerDay;
 using WTF::secondsPerMinute;
 using WTF::parseDateFromNullTerminatedCharacters;
 using WTF::makeRFC2822DateString;

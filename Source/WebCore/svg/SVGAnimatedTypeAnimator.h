@@ -21,21 +21,15 @@
 #ifndef SVGAnimatedTypeAnimator_h
 #define SVGAnimatedTypeAnimator_h
 
-#if ENABLE(SVG)
 #include "SVGAnimatedProperty.h"
 #include "SVGAnimatedType.h"
-#include "SVGElementInstance.h"
-#include <wtf/PassOwnPtr.h>
+#include <wtf/StdLibExtras.h>
 
 namespace WebCore {
 
 struct SVGElementAnimatedProperties {
-    SVGElementAnimatedProperties();
-
-    SVGElementAnimatedProperties(SVGElement*, Vector<RefPtr<SVGAnimatedProperty> >&);
-
     SVGElement* element;
-    Vector<RefPtr<SVGAnimatedProperty> > properties;
+    Vector<RefPtr<SVGAnimatedProperty>> properties;
 };
 typedef Vector<SVGElementAnimatedProperties> SVGElementAnimatedPropertyList;
 
@@ -45,11 +39,11 @@ class SVGAnimatedTypeAnimator {
     WTF_MAKE_FAST_ALLOCATED;
 public:
     virtual ~SVGAnimatedTypeAnimator();
-    virtual PassOwnPtr<SVGAnimatedType> constructFromString(const String&) = 0;
+    virtual std::unique_ptr<SVGAnimatedType> constructFromString(const String&) = 0;
 
-    virtual PassOwnPtr<SVGAnimatedType> startAnimValAnimation(const SVGElementAnimatedPropertyList&) = 0;
+    virtual std::unique_ptr<SVGAnimatedType> startAnimValAnimation(const SVGElementAnimatedPropertyList&) = 0;
     virtual void stopAnimValAnimation(const SVGElementAnimatedPropertyList&) = 0;
-    virtual void resetAnimValToBaseVal(const SVGElementAnimatedPropertyList&, SVGAnimatedType*) = 0;
+    virtual void resetAnimValToBaseVal(const SVGElementAnimatedPropertyList&, SVGAnimatedType&) = 0;
     virtual void animValWillChange(const SVGElementAnimatedPropertyList&) = 0;
     virtual void animValDidChange(const SVGElementAnimatedPropertyList&) = 0;
     virtual void addAnimatedTypes(SVGAnimatedType*, SVGAnimatedType*) = 0;
@@ -57,36 +51,35 @@ public:
     virtual void calculateAnimatedValue(float percentage, unsigned repeatCount, SVGAnimatedType*, SVGAnimatedType*, SVGAnimatedType*, SVGAnimatedType*) = 0;
     virtual float calculateDistance(const String& fromString, const String& toString) = 0;
 
-    void calculateFromAndToValues(OwnPtr<SVGAnimatedType>&, OwnPtr<SVGAnimatedType>&, const String& fromString, const String& toString);
-    void calculateFromAndByValues(OwnPtr<SVGAnimatedType>&, OwnPtr<SVGAnimatedType>&, const String& fromString, const String& byString);
+    void calculateFromAndToValues(std::unique_ptr<SVGAnimatedType>&, std::unique_ptr<SVGAnimatedType>&, const String& fromString, const String& toString);
+    void calculateFromAndByValues(std::unique_ptr<SVGAnimatedType>&, std::unique_ptr<SVGAnimatedType>&, const String& fromString, const String& byString);
 
     void setContextElement(SVGElement* contextElement) { m_contextElement = contextElement; }
     AnimatedPropertyType type() const { return m_type; }
 
-    SVGElementAnimatedPropertyList findAnimatedPropertiesForAttributeName(SVGElement*, const QualifiedName&);
+    SVGElementAnimatedPropertyList findAnimatedPropertiesForAttributeName(SVGElement&, const QualifiedName&);
 
 protected:
     SVGAnimatedTypeAnimator(AnimatedPropertyType, SVGAnimationElement*, SVGElement*);
 
     // Helpers for animators that operate on single types, eg. just one SVGAnimatedInteger.
     template<typename AnimValType>
-    typename AnimValType::ContentType* constructFromBaseValue(const SVGElementAnimatedPropertyList& animatedTypes)
+    std::unique_ptr<typename AnimValType::ContentType> constructFromBaseValue(const SVGElementAnimatedPropertyList& animatedTypes)
     {
         ASSERT(animatedTypes[0].properties.size() == 1);
         const typename AnimValType::ContentType& animatedType = castAnimatedPropertyToActualType<AnimValType>(animatedTypes[0].properties[0].get())->currentBaseValue();
 
-        typename AnimValType::ContentType* copy = new typename AnimValType::ContentType(animatedType);
-        executeAction<AnimValType>(StartAnimationAction, animatedTypes, 0, copy);
+        auto copy = std::make_unique<typename AnimValType::ContentType>(animatedType);
+        executeAction<AnimValType>(StartAnimationAction, animatedTypes, 0, copy.get());
         return copy;
     }
 
     template<typename AnimValType>
-    void resetFromBaseValue(const SVGElementAnimatedPropertyList& animatedTypes, SVGAnimatedType* type, typename AnimValType::ContentType& (SVGAnimatedType::*getter)())
+    void resetFromBaseValue(const SVGElementAnimatedPropertyList& animatedTypes, SVGAnimatedType& type, typename AnimValType::ContentType& (SVGAnimatedType::*getter)())
     {
         ASSERT(animatedTypes[0].properties.size() == 1);
-        ASSERT(type);
-        ASSERT(type->type() == m_type);
-        typename AnimValType::ContentType& animatedTypeValue = (type->*getter)();
+        ASSERT(type.type() == m_type);
+        typename AnimValType::ContentType& animatedTypeValue = (type.*getter)();
         animatedTypeValue = castAnimatedPropertyToActualType<AnimValType>(animatedTypes[0].properties[0].get())->currentBaseValue();
 
         executeAction<AnimValType>(StartAnimationAction, animatedTypes, 0, &animatedTypeValue);
@@ -115,26 +108,25 @@ protected:
 
     // Helpers for animators that operate on pair types, eg. a pair of SVGAnimatedIntegers.
     template<typename AnimValType1, typename AnimValType2>
-    pair<typename AnimValType1::ContentType, typename AnimValType2::ContentType>* constructFromBaseValues(const SVGElementAnimatedPropertyList& animatedTypes)
+    std::unique_ptr<std::pair<typename AnimValType1::ContentType, typename AnimValType2::ContentType>> constructFromBaseValues(const SVGElementAnimatedPropertyList& animatedTypes)
     {
         ASSERT(animatedTypes[0].properties.size() == 2);
         const typename AnimValType1::ContentType& firstType = castAnimatedPropertyToActualType<AnimValType1>(animatedTypes[0].properties[0].get())->currentBaseValue();
         const typename AnimValType2::ContentType& secondType = castAnimatedPropertyToActualType<AnimValType2>(animatedTypes[0].properties[1].get())->currentBaseValue();
 
-        pair<typename AnimValType1::ContentType, typename AnimValType2::ContentType>* copy = new pair<typename AnimValType1::ContentType, typename AnimValType2::ContentType>(firstType, secondType);
+        auto copy = std::make_unique<std::pair<typename AnimValType1::ContentType, typename AnimValType2::ContentType>>(firstType, secondType);
         executeAction<AnimValType1>(StartAnimationAction, animatedTypes, 0, &copy->first);
         executeAction<AnimValType2>(StartAnimationAction, animatedTypes, 1, &copy->second);
         return copy;
     }
 
     template<typename AnimValType1, typename AnimValType2>
-    void resetFromBaseValues(const SVGElementAnimatedPropertyList& animatedTypes, SVGAnimatedType* type, pair<typename AnimValType1::ContentType, typename AnimValType2::ContentType>& (SVGAnimatedType::*getter)())
+    void resetFromBaseValues(const SVGElementAnimatedPropertyList& animatedTypes, SVGAnimatedType& type, std::pair<typename AnimValType1::ContentType, typename AnimValType2::ContentType>& (SVGAnimatedType::*getter)())
     {
         ASSERT(animatedTypes[0].properties.size() == 2);
-        ASSERT(type);
-        ASSERT(type->type() == m_type);
+        ASSERT(type.type() == m_type);
 
-        pair<typename AnimValType1::ContentType, typename AnimValType2::ContentType>& animatedTypeValue = (type->*getter)();
+        std::pair<typename AnimValType1::ContentType, typename AnimValType2::ContentType>& animatedTypeValue = (type.*getter)();
         animatedTypeValue.first = castAnimatedPropertyToActualType<AnimValType1>(animatedTypes[0].properties[0].get())->currentBaseValue();
         animatedTypeValue.second = castAnimatedPropertyToActualType<AnimValType2>(animatedTypes[0].properties[1].get())->currentBaseValue();
 
@@ -194,12 +186,12 @@ private:
     template<typename AnimValType>
     void executeAction(AnimationAction action, const SVGElementAnimatedPropertyList& animatedTypes, unsigned whichProperty, typename AnimValType::ContentType* type = 0)
     {
-        SVGElementInstance::InstanceUpdateBlocker blocker(animatedTypes[0].element);
+        // FIXME: Can't use SVGElement::InstanceUpdateBlocker because of circular header dependency. Would be nice to untangle this.
+        setInstanceUpdatesBlocked(*animatedTypes[0].element, true);
 
-        SVGElementAnimatedPropertyList::const_iterator end = animatedTypes.end();
-        for (SVGElementAnimatedPropertyList::const_iterator it = animatedTypes.begin(); it != end; ++it) {
-            ASSERT_WITH_SECURITY_IMPLICATION(whichProperty < it->properties.size());
-            AnimValType* property = castAnimatedPropertyToActualType<AnimValType>(it->properties[whichProperty].get());
+        for (auto& animatedType : animatedTypes) {
+            ASSERT_WITH_SECURITY_IMPLICATION(whichProperty < animatedType.properties.size());
+            AnimValType* property = castAnimatedPropertyToActualType<AnimValType>(animatedType.properties[whichProperty].get());
 
             switch (action) {
             case StartAnimationAction:
@@ -209,7 +201,8 @@ private:
                 break;
             case StopAnimationAction:
                 ASSERT(!type);
-                property->animationEnded();
+                if (property->isAnimating())
+                    property->animationEnded();
                 break;
             case AnimValWillChangeAction:
                 ASSERT(!type);
@@ -221,10 +214,13 @@ private:
                 break;
             }
         }
+
+        setInstanceUpdatesBlocked(*animatedTypes[0].element, false);
     }
+
+    static void setInstanceUpdatesBlocked(SVGElement&, bool);
 };
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif // SVGAnimatedTypeAnimator_h

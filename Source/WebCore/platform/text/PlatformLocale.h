@@ -28,17 +28,20 @@
 
 #include "DateComponents.h"
 #include "Language.h"
-#include <wtf/PassOwnPtr.h>
 #include <wtf/text/WTFString.h>
 
 namespace WebCore {
+
+#if PLATFORM(IOS)
+class FontCascade;
+#endif
 
 class Locale {
     WTF_MAKE_NONCOPYABLE(Locale);
 
 public:
-    static PassOwnPtr<Locale> create(const AtomicString& localeIdentifier);
-    static PassOwnPtr<Locale> createDefault();
+    static std::unique_ptr<Locale> create(const AtomicString& localeIdentifier);
+    static std::unique_ptr<Locale> createDefault();
 
     // Converts the specified number string to another number string localized
     // for this Locale locale. The input string must conform to HTML
@@ -113,7 +116,11 @@ public:
     // display to the user. If an implementation doesn't support
     // localized dates the function should return an empty string.
     // FormatType can be used to specify if you want the short format. 
+#if !PLATFORM(IOS)
     String formatDateTime(const DateComponents&, FormatType = FormatTypeUnspecified);
+#else
+    virtual String formatDateTime(const DateComponents&, FormatType = FormatTypeUnspecified) = 0;
+#endif // !PLATFORM(IOS)
 #endif
 
     virtual ~Locale();
@@ -142,7 +149,7 @@ private:
     bool m_hasLocaleData;
 };
 
-inline PassOwnPtr<Locale> Locale::createDefault()
+inline std::unique_ptr<Locale> Locale::createDefault()
 {
     return Locale::create(defaultLanguage());
 }

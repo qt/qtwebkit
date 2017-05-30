@@ -24,6 +24,7 @@
 #include "DocumentFragment.h"
 
 #include "Document.h"
+#include "ElementDescendantIterator.h"
 #include "HTMLDocumentParser.h"
 #include "Page.h"
 #include "Settings.h"
@@ -31,20 +32,19 @@
 
 namespace WebCore {
 
-DocumentFragment::DocumentFragment(Document* document, ConstructionType constructionType)
+DocumentFragment::DocumentFragment(Document& document, ConstructionType constructionType)
     : ContainerNode(document, constructionType)
 {
 }
 
-PassRefPtr<DocumentFragment> DocumentFragment::create(Document* document)
+Ref<DocumentFragment> DocumentFragment::create(Document& document)
 {
-    ASSERT(document);
-    return adoptRef(new DocumentFragment(document, Node::CreateDocumentFragment));
+    return adoptRef(*new DocumentFragment(document, Node::CreateDocumentFragment));
 }
 
 String DocumentFragment::nodeName() const
 {
-    return "#document-fragment";
+    return ASCIILiteral("#document-fragment");
 }
 
 Node::NodeType DocumentFragment::nodeType() const
@@ -60,29 +60,50 @@ bool DocumentFragment::childTypeAllowed(NodeType type) const
         case COMMENT_NODE:
         case TEXT_NODE:
         case CDATA_SECTION_NODE:
-        case ENTITY_REFERENCE_NODE:
             return true;
         default:
             return false;
     }
 }
 
-PassRefPtr<Node> DocumentFragment::cloneNode(bool deep)
+Ref<Node> DocumentFragment::cloneNodeInternal(Document& targetDocument, CloningOperation type)
 {
-    RefPtr<DocumentFragment> clone = create(document());
-    if (deep)
-        cloneChildNodes(clone.get());
-    return clone.release();
+    Ref<DocumentFragment> clone = create(targetDocument);
+    switch (type) {
+    case CloningOperation::OnlySelf:
+    case CloningOperation::SelfWithTemplateContent:
+        break;
+    case CloningOperation::Everything:
+        cloneChildNodes(clone);
+        break;
+    }
+    return WTFMove(clone);
 }
 
 void DocumentFragment::parseHTML(const String& source, Element* contextElement, ParserContentPolicy parserContentPolicy)
 {
-    HTMLDocumentParser::parseDocumentFragment(source, this, contextElement, parserContentPolicy);
+    ASSERT(contextElement);
+    HTMLDocumentParser::parseDocumentFragment(source, *this, *contextElement, parserContentPolicy);
 }
 
 bool DocumentFragment::parseXML(const String& source, Element* contextElement, ParserContentPolicy parserContentPolicy)
 {
-    return XMLDocumentParser::parseDocumentFragment(source, this, contextElement, parserContentPolicy);
+    return XMLDocumentParser::parseDocumentFragment(source, *this, contextElement, parserContentPolicy);
+}
+
+Element* DocumentFragment::getElementById(const AtomicString& id) const
+{
+    // Fast path for ShadowRoot, where we are both a DocumentFragment and a TreeScope.
+    if (isTreeScope())
+        return treeScope().getElementById(id);
+
+    // Otherwise, fall back to iterating all of the element descendants.
+    for (auto& element : elementDescendants(*this)) {
+        if (element.getIdAttribute() == id)
+            return const_cast<Element*>(&element);
+    }
+
+    return nullptr;
 }
 
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2003, 2004, 2005, 2006 Apple Computer, Inc.  All rights reserved.
+ * Copyright (C) 2003, 2004, 2005, 2006 Apple Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -25,6 +25,13 @@
 
 #ifndef IntSize_h
 #define IntSize_h
+
+#include "PlatformExportMacros.h"
+#include <algorithm>
+
+#if PLATFORM(MAC) && defined __OBJC__
+#import <Foundation/NSGeometry.h>
+#endif
 
 #if USE(CG)
 typedef struct CGSize CGSize;
@@ -38,6 +45,12 @@ typedef struct _NSSize NSSize;
 #endif
 #endif
 
+#if PLATFORM(IOS)
+#ifndef NSSize
+#define NSSize CGSize
+#endif
+#endif
+
 #if PLATFORM(WIN)
 typedef struct tagSIZE SIZE;
 #elif PLATFORM(QT)
@@ -45,20 +58,18 @@ typedef struct tagSIZE SIZE;
 QT_BEGIN_NAMESPACE
 class QSize;
 QT_END_NAMESPACE
-#elif PLATFORM(BLACKBERRY)
-namespace BlackBerry {
-namespace Platform {
-class IntSize;
-}
-}
 #endif
 
 namespace WebCore {
+
+class FloatSize;
+class TextStream;
 
 class IntSize {
 public:
     IntSize() : m_width(0), m_height(0) { }
     IntSize(int width, int height) : m_width(width), m_height(height) { }
+    WEBCORE_EXPORT explicit IntSize(const FloatSize&); // don't do this implicitly since it's lossy
     
     int width() const { return m_width; }
     int height() const { return m_height; }
@@ -77,6 +88,12 @@ public:
         m_height += height;
     }
 
+    void contract(int width, int height)
+    {
+        m_width -= width;
+        m_height -= height;
+    }
+
     void scale(float widthScale, float heightScale)
     {
         m_width = static_cast<int>(static_cast<float>(m_width) * widthScale);
@@ -90,14 +107,12 @@ public:
 
     IntSize expandedTo(const IntSize& other) const
     {
-        return IntSize(m_width > other.m_width ? m_width : other.m_width,
-            m_height > other.m_height ? m_height : other.m_height);
+        return IntSize(std::max(m_width, other.m_width), std::max(m_height, other.m_height));
     }
 
     IntSize shrunkTo(const IntSize& other) const
     {
-        return IntSize(m_width < other.m_width ? m_width : other.m_width,
-            m_height < other.m_height ? m_height : other.m_height);
+        return IntSize(std::min(m_width, other.m_width), std::min(m_height, other.m_height));
     }
 
     void clampNegativeToZero()
@@ -129,13 +144,13 @@ public:
     }
 
 #if USE(CG)
-    explicit IntSize(const CGSize&); // don't do this implicitly since it's lossy
-    operator CGSize() const;
+    WEBCORE_EXPORT explicit IntSize(const CGSize&); // don't do this implicitly since it's lossy
+    WEBCORE_EXPORT operator CGSize() const;
 #endif
 
 #if PLATFORM(MAC) && !defined(NSGEOMETRY_TYPES_SAME_AS_CGGEOMETRY_TYPES)
-    explicit IntSize(const NSSize &); // don't do this implicitly since it's lossy
-    operator NSSize() const;
+    WEBCORE_EXPORT explicit IntSize(const NSSize &); // don't do this implicitly since it's lossy
+    WEBCORE_EXPORT operator NSSize() const;
 #endif
 
 #if PLATFORM(WIN)
@@ -146,11 +161,6 @@ public:
 #if PLATFORM(QT)
     IntSize(const QSize&);
     operator QSize() const;
-#endif
-
-#if PLATFORM(BLACKBERRY)
-    IntSize(const BlackBerry::Platform::IntSize&);
-    operator BlackBerry::Platform::IntSize() const;
 #endif
 
 private:
@@ -195,6 +205,8 @@ inline bool operator!=(const IntSize& a, const IntSize& b)
 {
     return a.width() != b.width() || a.height() != b.height();
 }
+
+WEBCORE_EXPORT TextStream& operator<<(TextStream&, const IntSize&);
 
 } // namespace WebCore
 

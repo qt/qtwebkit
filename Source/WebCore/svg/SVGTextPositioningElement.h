@@ -21,7 +21,6 @@
 #ifndef SVGTextPositioningElement_h
 #define SVGTextPositioningElement_h
 
-#if ENABLE(SVG)
 #include "SVGAnimatedLengthList.h"
 #include "SVGAnimatedNumberList.h"
 #include "SVGTextContentElement.h"
@@ -30,14 +29,17 @@ namespace WebCore {
 
 class SVGTextPositioningElement : public SVGTextContentElement {
 public:
-    static SVGTextPositioningElement* elementFromRenderer(RenderObject*);
+    static SVGTextPositioningElement* elementFromRenderer(RenderBoxModelObject&);
 
 protected:
-    SVGTextPositioningElement(const QualifiedName&, Document*);
+    SVGTextPositioningElement(const QualifiedName&, Document&);
 
-    bool isSupportedAttribute(const QualifiedName&);
-    virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
-    virtual void svgAttributeChanged(const QualifiedName&);
+    virtual void parseAttribute(const QualifiedName&, const AtomicString&) override;
+    virtual void svgAttributeChanged(const QualifiedName&) override;
+
+private:
+    virtual bool isPresentationAttribute(const QualifiedName&) const override final;
+    virtual void collectStyleForPresentationAttribute(const QualifiedName&, const AtomicString&, MutableStyleProperties&) override final;
 
     BEGIN_DECLARE_ANIMATED_PROPERTIES(SVGTextPositioningElement)
         DECLARE_ANIMATED_LENGTH_LIST(X, x)
@@ -50,5 +52,4 @@ protected:
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif

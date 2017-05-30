@@ -55,6 +55,9 @@ public:
 
     bool isValid() const;
 
+    QVariantMap toMap() const;
+    void loadFromMap(const QVariantMap &map);
+
 private:
     QWebHistoryItem(QWebHistoryItemPrivate *priv);
     friend class QWebHistory;
@@ -95,6 +98,9 @@ public:
 
     int maximumItemCount() const;
     void setMaximumItemCount(int count);
+
+    QVariantMap toMap() const;
+    void loadFromMap(const QVariantMap &map);
 
 private:
     QWebHistory();

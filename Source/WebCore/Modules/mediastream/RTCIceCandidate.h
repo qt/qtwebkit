@@ -34,7 +34,7 @@
 #if ENABLE(MEDIA_STREAM)
 
 #include "ExceptionBase.h"
-#include <wtf/PassRefPtr.h>
+#include "ScriptWrappable.h"
 #include <wtf/RefCounted.h>
 #include <wtf/RefPtr.h>
 #include <wtf/text/WTFString.h>
@@ -44,22 +44,27 @@ namespace WebCore {
 class Dictionary;
 class RTCIceCandidateDescriptor;
 
-class RTCIceCandidate : public RefCounted<RTCIceCandidate> {
+class RTCIceCandidate : public RefCounted<RTCIceCandidate>, public ScriptWrappable {
 public:
-    static PassRefPtr<RTCIceCandidate> create(const Dictionary&, ExceptionCode&);
-    static PassRefPtr<RTCIceCandidate> create(PassRefPtr<RTCIceCandidateDescriptor>);
-    virtual ~RTCIceCandidate();
+    static RefPtr<RTCIceCandidate> create(const Dictionary&, ExceptionCode&);
+    static Ref<RTCIceCandidate> create(const String& candidate, const String& sdpMid, unsigned short sdpMLineIndex);
+    virtual ~RTCIceCandidate() { }
 
-    const String& candidate() const;
-    const String& sdpMid() const;
-    unsigned short sdpMLineIndex() const;
+    const String& candidate() const { return m_candidate; }
+    void setCandidate(const String& candidate) { m_candidate = candidate; }
 
-    RTCIceCandidateDescriptor* descriptor();
+    const String& sdpMid() const { return m_sdpMid; }
+    void setSdpMid(const String& sdpMid) { m_sdpMid = sdpMid; }
+
+    unsigned short sdpMLineIndex() const { return m_sdpMLineIndex; }
+    void setSdpMLineIndex(unsigned short sdpMLineIndex) { m_sdpMLineIndex = sdpMLineIndex; }
 
 private:
-    explicit RTCIceCandidate(PassRefPtr<RTCIceCandidateDescriptor>);
+    explicit RTCIceCandidate(const String& candidate, const String& sdpMid, unsigned short sdpMLineIndex);
 
-    RefPtr<RTCIceCandidateDescriptor> m_descriptor;
+    String m_candidate;
+    String m_sdpMid;
+    unsigned short m_sdpMLineIndex;
 };
 
 } // namespace WebCore

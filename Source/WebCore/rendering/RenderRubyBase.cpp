@@ -34,12 +34,12 @@
 #include "RenderRubyRun.h"
 #include "RenderRubyText.h"
 
-using namespace std;
-
 namespace WebCore {
 
-RenderRubyBase::RenderRubyBase()
-    : RenderBlock(0)
+RenderRubyBase::RenderRubyBase(Document& document, Ref<RenderStyle>&& style)
+    : RenderBlockFlow(document, WTFMove(style))
+    , m_initialOffset(0)
+    , m_isAfterExpansion(true)
 {
     setInline(false);
 }
@@ -48,16 +48,9 @@ RenderRubyBase::~RenderRubyBase()
 {
 }
 
-RenderRubyBase* RenderRubyBase::createAnonymous(Document* document)
+bool RenderRubyBase::isChildAllowed(const RenderObject& child, const RenderStyle&) const
 {
-    RenderRubyBase* renderer = new (document->renderArena()) RenderRubyBase();
-    renderer->setDocumentForAnonymous(document);
-    return renderer;
-}
-
-bool RenderRubyBase::isChildAllowed(RenderObject* child, RenderStyle*) const
-{
-    return child->isInline();
+    return child.isInline();
 }
 
 void RenderRubyBase::moveChildren(RenderRubyBase* toBase, RenderObject* beforeChild)
@@ -78,6 +71,12 @@ void RenderRubyBase::moveChildren(RenderRubyBase* toBase, RenderObject* beforeCh
     toBase->setNeedsLayoutAndPrefWidthsRecalc();
 }
 
+void RenderRubyBase::mergeChildrenWithBase(RenderRubyBase* toBlock)
+{
+    moveChildren(toBlock);
+    moveFloatsTo(toBlock);
+}
+
 void RenderRubyBase::moveInlineChildren(RenderRubyBase* toBase, RenderObject* beforeChild)
 {
     ASSERT(childrenInline());
@@ -95,10 +94,10 @@ void RenderRubyBase::moveInlineChildren(RenderRubyBase* toBase, RenderObject* be
         // If toBase has a suitable block, we re-use it, otherwise create a new one.
         RenderObject* lastChild = toBase->lastChild();
         if (lastChild && lastChild->isAnonymousBlock() && lastChild->childrenInline())
-            toBlock = toRenderBlock(lastChild);
+            toBlock = downcast<RenderBlock>(lastChild);
         else {
             toBlock = toBase->createAnonymousBlock();
-            toBase->children()->appendChildNode(toBase, toBlock);
+            toBase->insertChildInternal(toBlock, nullptr, NotifyChildren);
         }
     }
     // Move our inline children into the target block we determined above.
@@ -121,10 +120,10 @@ void RenderRubyBase::moveBlockChildren(RenderRubyBase* toBase, RenderObject* bef
     RenderObject* lastChildThere = toBase->lastChild();
     if (firstChildHere->isAnonymousBlock() && firstChildHere->childrenInline() 
             && lastChildThere && lastChildThere->isAnonymousBlock() && lastChildThere->childrenInline()) {            
-        RenderBlock* anonBlockHere = toRenderBlock(firstChildHere);
-        RenderBlock* anonBlockThere = toRenderBlock(lastChildThere);
-        anonBlockHere->moveAllChildrenTo(anonBlockThere, anonBlockThere->children());
-        anonBlockHere->deleteLineBoxTree();
+        RenderBlock* anonBlockHere = downcast<RenderBlock>(firstChildHere);
+        RenderBlock* anonBlockThere = downcast<RenderBlock>(lastChildThere);
+        anonBlockHere->moveAllChildrenTo(anonBlockThere, true);
+        anonBlockHere->deleteLines();
         anonBlockHere->destroy();
     }
     // Move all remaining children normally.
@@ -134,9 +133,7 @@ void RenderRubyBase::moveBlockChildren(RenderRubyBase* toBase, RenderObject* bef
 RenderRubyRun* RenderRubyBase::rubyRun() const
 {
     ASSERT(parent());
-    ASSERT(parent()->isRubyRun());
-
-    return toRenderRubyRun(parent());
+    return downcast<RenderRubyRun>(parent());
 }
 
 ETextAlign RenderRubyBase::textAlignmentForLine(bool /* endsWithSoftBreak */) const
@@ -146,7 +143,13 @@ ETextAlign RenderRubyBase::textAlignmentForLine(bool /* endsWithSoftBreak */) co
 
 void RenderRubyBase::adjustInlineDirectionLineBounds(int expansionOpportunityCount, float& logicalLeft, float& logicalWidth) const
 {
-    int maxPreferredLogicalWidth = this->maxPreferredLogicalWidth();
+    if (rubyRun()->hasOverrideLogicalContentWidth() && firstRootBox() && !firstRootBox()->nextRootBox()) {
+        logicalLeft += m_initialOffset;
+        logicalWidth -= 2 * m_initialOffset;
+        return;
+    }
+
+    LayoutUnit maxPreferredLogicalWidth = rubyRun() && rubyRun()->hasOverrideLogicalContentWidth() ? rubyRun()->overrideLogicalContentWidth() : this->maxPreferredLogicalWidth();
     if (maxPreferredLogicalWidth >= logicalWidth)
         return;
 
@@ -155,6 +158,13 @@ void RenderRubyBase::adjustInlineDirectionLineBounds(int expansionOpportunityCou
 
     logicalLeft += inset / 2;
     logicalWidth -= inset;
+}
+
+void RenderRubyBase::cachePriorCharactersIfNeeded(const LazyLineBreakIterator& lineBreakIterator)
+{
+    auto* run = rubyRun();
+    if (run)
+        run->setCachedPriorCharacters(lineBreakIterator.lastCharacter(), lineBreakIterator.secondToLastCharacter());
 }
 
 } // namespace WebCore

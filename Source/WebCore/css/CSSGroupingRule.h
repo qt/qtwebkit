@@ -25,6 +25,7 @@
 
 #include "CSSRule.h"
 #include "StyleRule.h"
+#include <memory>
 #include <wtf/Vector.h>
 
 namespace WebCore {
@@ -35,9 +36,9 @@ class CSSGroupingRule : public CSSRule {
 public:
     virtual ~CSSGroupingRule();
 
-    virtual void reattach(StyleRuleBase*) OVERRIDE;
+    virtual void reattach(StyleRuleBase&) override;
 
-    CSSRuleList* cssRules() const;
+    CSSRuleList& cssRules() const;
 
     unsigned insertRule(const String& rule, unsigned index, ExceptionCode&);
     void deleteRule(unsigned index, ExceptionCode&);
@@ -47,13 +48,13 @@ public:
     CSSRule* item(unsigned index) const;
 
 protected:
-    CSSGroupingRule(StyleRuleGroup* groupRule, CSSStyleSheet* parent);
+    CSSGroupingRule(StyleRuleGroup& groupRule, CSSStyleSheet* parent);
     
     void appendCssTextForItems(StringBuilder&) const;
 
-    RefPtr<StyleRuleGroup> m_groupRule;
-    mutable Vector<RefPtr<CSSRule> > m_childRuleCSSOMWrappers;
-    mutable OwnPtr<CSSRuleList> m_ruleListCSSOMWrapper;
+    Ref<StyleRuleGroup> m_groupRule;
+    mutable Vector<RefPtr<CSSRule>> m_childRuleCSSOMWrappers;
+    mutable std::unique_ptr<CSSRuleList> m_ruleListCSSOMWrapper;
 };
 
 } // namespace WebCore

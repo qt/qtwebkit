@@ -51,7 +51,7 @@ const char* WebCookieManager::supplementName()
 WebCookieManager::WebCookieManager(ChildProcess* process)
     : m_process(process)
 {
-    m_process->addMessageReceiver(Messages::WebCookieManager::messageReceiverName(), this);
+    m_process->addMessageReceiver(Messages::WebCookieManager::messageReceiverName(), *this);
 
     ASSERT(!sharedCookieManager);
     sharedCookieManager = this;
@@ -70,12 +70,17 @@ void WebCookieManager::getHostnamesWithCookies(uint64_t callbackID)
 
 void WebCookieManager::deleteCookiesForHostname(const String& hostname)
 {
-    WebCore::deleteCookiesForHostname(NetworkStorageSession::defaultStorageSession(), hostname);
+    WebCore::deleteCookiesForHostnames(NetworkStorageSession::defaultStorageSession(), { hostname });
 }
 
 void WebCookieManager::deleteAllCookies()
 {
     WebCore::deleteAllCookies(NetworkStorageSession::defaultStorageSession());
+}
+
+void WebCookieManager::deleteAllCookiesModifiedSince(std::chrono::system_clock::time_point time)
+{
+    WebCore::deleteAllCookiesModifiedSince(NetworkStorageSession::defaultStorageSession(), time);
 }
 
 void WebCookieManager::startObservingCookieChanges()
@@ -95,7 +100,7 @@ void WebCookieManager::cookiesDidChange()
 
 void WebCookieManager::dispatchCookiesDidChange()
 {
-    ASSERT(isMainThread());
+    ASSERT(RunLoop::isMain());
     m_process->send(Messages::WebCookieManagerProxy::CookiesDidChange(), 0);
 }
 

@@ -5,7 +5,7 @@
 # (c) 2000-2002 by Harri Porten <porten@kde.org> and
 #                  David Faure <faure@kde.org>
 # Modified (c) 2004 by Nikolas Zimmermann <wildfox@kde.org>
-# Copyright (C) 2007, 2008, 2009 Apple Inc. All rights reserved.
+# Copyright (C) 2007, 2008, 2009, 2015 Apple Inc. All rights reserved.
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -21,27 +21,24 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #
-
+ 
 use strict;
+use Getopt::Long qw(:config pass_through);
 
-my $file = $ARGV[0];
-shift;
-my $includelookup = 0;
+my $file = shift @ARGV or die("Must provide source file as final argument.");
 
-# Use -i as second argument to make it include "Lookup.h"
-$includelookup = 1 if (defined($ARGV[0]) && $ARGV[0] eq "-i");
-
-# Use -n as second argument to make it use the third argument as namespace parameter ie. -n KDOM
-my $useNameSpace = $ARGV[1] if (defined($ARGV[0]) && $ARGV[0] eq "-n");
-
-print STDERR "Creating hashtable for $file\n";
 open(IN, $file) or die "No such file $file";
 
 my @keys = ();
 my @attrs = ();
 my @values = ();
 my @hashes = ();
+my @table = ();
+my @links = ();
 
+my $hasSetter = "false";
+
+my $includeBuiltin = 0;
 my $inside = 0;
 my $name;
 my $pefectHashSize;
@@ -74,6 +71,9 @@ while (<IN>) {
         @attrs = ();
         @values = ();
         @hashes = ();
+        @table = ();
+        @links = ();
+        $includeBuiltin = 0;
 
         $inside = 0;
     } elsif (/^(\S+)\s*(\S+)\s*([\w\|]*)\s*(\w*)\s*$/ && $inside) {
@@ -85,12 +85,25 @@ while (<IN>) {
         push(@keys, $key);
         push(@attrs, length($att) > 0 ? $att : "0");
 
+        if ($val eq "JSBuiltin") {
+            $includeBuiltin = 1;
+        }
+
         if ($att =~ m/Function/) {
             push(@values, { "type" => "Function", "function" => $val, "params" => (length($param) ? $param : "") });
             #printf STDERR "WARNING: Number of arguments missing for $key/$val\n" if (length($param) == 0);
+        } elsif ($att =~ m/Accessor/) {
+            my $get = $val;
+            my $put = "nullptr";
+            $hasSetter = "true";
+            push(@values, { "type" => "Accessor", "get" => $get, "put" => $put });
         } elsif (length($att)) {
             my $get = $val;
-            my $put = !($att =~ m/ReadOnly/) ? "set" . jsc_ucfirst($val) : "0";
+            my $put = "0";
+            if (!($att =~ m/ReadOnly/)) {
+                $put = "set" . jsc_ucfirst($val);
+            }
+            $hasSetter = "true";
             push(@values, { "type" => "Property", "get" => $get, "put" => $put });
         } else {
             push(@values, { "type" => "Lexer", "value" => $val });        
@@ -149,8 +162,6 @@ sub leftShift($$) {
 
 sub calcCompactHashSize()
 {
-    my @table = ();
-    my @links = ();
     my $compactHashSize = ceilingToPowerOf2(2 * @keys);
     $compactHashSizeMask = $compactHashSize - 1;
     $compactSize = $compactHashSize;
@@ -241,28 +252,47 @@ sub output() {
 
     my $nameEntries = "${name}Values";
     $nameEntries =~ s/:/_/g;
+    my $nameIndex = "${name}Index";
+    $nameIndex =~ s/:/_/g;
 
-    print "\n#include \"Lookup.h\"\n" if ($includelookup);
-    if ($useNameSpace) {
-        print "\nnamespace ${useNameSpace} {\n";
-        print "\nusing namespace JSC;\n";
-    } else {
-        print "\nnamespace JSC {\n";
+    print "\n";
+    print "#include \"JSCBuiltins.h\"\n" if ($includeBuiltin);
+    print "#include \"Lookup.h\"\n";
+    print "\n";
+    print "namespace JSC {\n";
+    print "\n";
+    print "static const struct CompactHashIndex ${nameIndex}\[$compactSize\] = {\n";
+    for (my $i = 0; $i < $compactSize; $i++) {
+        my $T = -1;
+        if (defined($table[$i])) { $T = $table[$i]; }
+        my $L = -1;
+        if (defined($links[$i])) { $L = $links[$i]; }
+        print "    { $T, $L },\n";
     }
-    my $count = scalar @keys + 1;
-    print "\nstatic const struct HashTableValue ${nameEntries}\[$count\] = {\n";
+    print "};\n";
+    print "\n";
+
+    my $packedSize = scalar @keys;
+    print "static const struct HashTableValue ${nameEntries}\[$packedSize\] = {\n";
     my $i = 0;
     foreach my $key (@keys) {
         my $firstValue = "";
         my $secondValue = "";
-        my $castStr = "";
+        my $firstCastStr = "";
+        my $secondCastStr = "";
 
         if ($values[$i]{"type"} eq "Function") {
-            $castStr = "static_cast<NativeFunction>";
+            $firstCastStr = "static_cast<NativeFunction>";
             $firstValue = $values[$i]{"function"};
             $secondValue = $values[$i]{"params"};
+        } elsif ($values[$i]{"type"} eq "Accessor") {
+            $firstCastStr = "static_cast<NativeFunction>";
+            $secondCastStr = "static_cast<NativeFunction>";
+            $firstValue = $values[$i]{"get"};
+            $secondValue = $values[$i]{"put"};
         } elsif ($values[$i]{"type"} eq "Property") {
-            $castStr = "static_cast<PropertySlot::GetValueFunc>";
+            $firstCastStr = "static_cast<PropertySlot::GetValueFunc>";
+            $secondCastStr = "static_cast<PutPropertySlot::PutValueFunc>";
             $firstValue = $values[$i]{"get"};
             $secondValue = $values[$i]{"put"};
         } elsif ($values[$i]{"type"} eq "Lexer") {
@@ -272,19 +302,6 @@ sub output() {
 
         my $intrinsic = "NoIntrinsic";
         $intrinsic = "FromCharCodeIntrinsic" if ($key eq "fromCharCode");
-        if ($name eq "mathTable") {
-            $intrinsic = "MinIntrinsic" if ($key eq "min");
-            $intrinsic = "MaxIntrinsic" if ($key eq "max");
-            $intrinsic = "SqrtIntrinsic" if ($key eq "sqrt");
-            $intrinsic = "PowIntrinsic" if ($key eq "pow");
-            $intrinsic = "AbsIntrinsic" if ($key eq "abs");
-            $intrinsic = "FloorIntrinsic" if ($key eq "floor");
-            $intrinsic = "CeilIntrinsic" if ($key eq "ceil");
-            $intrinsic = "RoundIntrinsic" if ($key eq "round");
-            $intrinsic = "ExpIntrinsic" if ($key eq "exp");
-            $intrinsic = "LogIntrinsic" if ($key eq "log");
-            $intrinsic = "IMulIntrinsic" if ($key eq "imul");
-        }
         if ($name eq "arrayPrototypeTable") {
             $intrinsic = "ArrayPushIntrinsic" if ($key eq "push");
             $intrinsic = "ArrayPopIntrinsic" if ($key eq "pop");
@@ -294,12 +311,20 @@ sub output() {
             $intrinsic = "RegExpTestIntrinsic" if ($key eq "test");
         }
 
-        print "   { \"$key\", $attrs[$i], (intptr_t)" . $castStr . "($firstValue), (intptr_t)$secondValue, $intrinsic },\n";
+        if ($values[$i]{"type"} eq "Function" && $firstValue eq "JSBuiltin")  {
+            my $tableHead = $name;
+            $tableHead =~ s/Table$//;
+            print "   { \"$key\", (($attrs[$i]) & ~Function) | Builtin, $intrinsic, { (intptr_t)static_cast<BuiltinGenerator>(" . $tableHead . ucfirst($key) . "CodeGenerator), (intptr_t)$secondValue } },\n";
+        }
+        else {
+            print "   { \"$key\", $attrs[$i], $intrinsic, { (intptr_t)" . $firstCastStr . "($firstValue), (intptr_t)" . $secondCastStr . "($secondValue) } },\n";
+        }
         $i++;
     }
-    print "   { 0, 0, 0, 0, NoIntrinsic }\n";
-    print "};\n\n";
-    print "extern const struct HashTable $name =\n";
-    print "    \{ $compactSize, $compactHashSizeMask, $nameEntries, 0 \};\n";
-    print "} // namespace\n";
+    print "};\n";
+    print "\n";
+    print "static const struct HashTable $name =\n";
+    print "    \{ $packedSize, $compactHashSizeMask, $hasSetter, $nameEntries, $nameIndex \};\n";
+    print "\n";
+    print "} // namespace JSC\n";
 }

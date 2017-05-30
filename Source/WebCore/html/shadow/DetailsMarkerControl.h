@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2011 Google Inc. All rights reserved.
+ * Copyright (C) 2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -32,29 +33,19 @@
 #define DetailsMarkerControl_h
 
 #include "HTMLDivElement.h"
-#include <wtf/Forward.h>
 
 namespace WebCore {
 
-class HTMLSummaryElement;
-
-class DetailsMarkerControl FINAL : public HTMLDivElement {
+class DetailsMarkerControl final : public HTMLDivElement {
 public:
-    DetailsMarkerControl(Document*);
-    static PassRefPtr<DetailsMarkerControl> create(Document*);
+    static Ref<DetailsMarkerControl> create(Document&);
 
 private:
-    virtual RenderObject* createRenderer(RenderArena*, RenderStyle*);
-    virtual bool rendererIsNeeded(const NodeRenderingContext&);
-    virtual const AtomicString& shadowPseudoId() const;
+    DetailsMarkerControl(Document&);
 
-    HTMLSummaryElement* summaryElement();
+    virtual RenderPtr<RenderElement> createElementRenderer(Ref<RenderStyle>&&, const RenderTreePosition&) override;
+    virtual bool rendererIsNeeded(const RenderStyle&) override;
 };
-
-inline PassRefPtr<DetailsMarkerControl> DetailsMarkerControl::create(Document* document)
-{
-    return adoptRef(new DetailsMarkerControl(document));
-}
 
 }
 

@@ -106,11 +106,11 @@ public:
     static void garbageCollectorCollect();
     static void garbageCollectorCollectOnAlternateThread(bool waitUntilDone);
     static void setValueForUser(const QWebElement&, const QString& value);
-    static int javaScriptObjectsCount();
+    static size_t javaScriptObjectsCount();
     static void clearScriptWorlds();
     static void evaluateScriptInIsolatedWorld(QWebFrameAdapter*, int worldID, const QString& script);
 
-    static void webInspectorExecuteScript(QWebPageAdapter*, long callId, const QString& script);
+    static void webInspectorExecuteScript(QWebPageAdapter*, const QString& script);
     static void webInspectorShow(QWebPageAdapter*);
     static void webInspectorClose(QWebPageAdapter*);
 
@@ -196,15 +196,13 @@ public:
 
     static void setTrackRepaintRects(QWebFrameAdapter*, bool enable);
     static bool trackRepaintRects(QWebFrameAdapter*);
-    static void getTrackedRepaintRects(QWebFrameAdapter*, QVector<QRect>& result);
+    static void getTrackedRepaintRects(QWebFrameAdapter*, QVector<QRectF>& result);
 
-    static void setSeamlessIFramesEnabled(bool);
     static void setShouldUseFontSmoothing(bool);
 
     static QString frameRenderTreeDump(QWebFrameAdapter*);
     static void clearNotificationPermissions();
 
-    static void disableDefaultTypesettingFeatures();
     static void resetPageVisibility(QWebPageAdapter*);
 
     static void getJSWindowObject(QWebFrameAdapter*, JSContextRef*, JSObjectRef*);

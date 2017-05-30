@@ -36,7 +36,7 @@
 #include <QStyleOptionFrame>
 #include <QTimer>
 
-class LocationEdit : public QLineEdit {
+class LocationEdit final : public QLineEdit {
     Q_OBJECT
 
 public:
@@ -45,14 +45,14 @@ public:
     void setPageIcon(const QIcon&);
 
 public Q_SLOTS:
-    void setProgress(int progress);
+    void setProgress(int);
 
 private Q_SLOTS:
     void reset();
 
 protected:
-    virtual void paintEvent(QPaintEvent*);
-    virtual void resizeEvent(QResizeEvent*);
+    void paintEvent(QPaintEvent*) final;
+    void resizeEvent(QResizeEvent*) final;
 
 private:
     void updateInternalGeometry();

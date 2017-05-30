@@ -25,12 +25,12 @@
 #include <QtCore/qstring.h>
 
 #ifndef QT_STATIC
-#  if !defined(QT_BUILD_WEBKITWIDGETS_LIB) && defined(BUILDING_WEBKIT)
+#  if !defined(BUILDING_WebKitWidgets) && defined(BUILDING_WebKit)
 #      define QWEBKIT_EXPORT Q_DECL_EXPORT
 #  else
 #      define QWEBKIT_EXPORT Q_DECL_IMPORT
 #  endif
-#  if defined(QT_BUILD_WEBKITWIDGETS_LIB)
+#  if defined(BUILDING_WebKitWidgets)
 #      define QWEBKITWIDGETS_EXPORT Q_DECL_EXPORT
 #  else
 #      define QWEBKITWIDGETS_EXPORT Q_DECL_IMPORT

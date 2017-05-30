@@ -30,10 +30,14 @@
 #include "PluginTest.h"
 #include "TestObject.h"
 #include <assert.h>
+#include <memory>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <wtf/Platform.h>
+#include <wtf/ExportMacros.h>
+#include <wtf/Assertions.h>
 
 // Helper function which takes in the plugin window object for logging to the console object.
 static void pluginLogWithWindowObject(NPObject* windowObject, NPP instance, const char* message)
@@ -60,6 +64,7 @@ static void pluginLogWithWindowObject(NPObject* windowObject, NPP instance, cons
     browser->releaseobject(consoleObject);
 }
 
+WTF_ATTRIBUTE_PRINTF(2, 0)
 void pluginLogWithArguments(NPP instance, const char* format, va_list args)
 {
     const size_t messageBufferSize = 2048;
@@ -80,6 +85,7 @@ void pluginLogWithArguments(NPP instance, const char* format, va_list args)
 }
 
 // Helper function to log to the console object.
+WTF_ATTRIBUTE_PRINTF(2, 3)
 void pluginLog(NPP instance, const char* format, ...)
 {
     va_list args;
@@ -770,11 +776,15 @@ static bool testGetPropertyReturnValue(PluginObject* obj, const NPVariant* args,
     return true;
 }
 
-static char* toCString(const NPString& string)
+static std::unique_ptr<char[]> toCString(const NPString& string)
 {
-    char* result = static_cast<char*>(malloc(string.UTF8Length + 1));
-    memcpy(result, string.UTF8Characters, string.UTF8Length);
-    result[string.UTF8Length] = '\0';
+    size_t length = string.UTF8Length;
+    std::unique_ptr<char[]> result(new char[length + 1]);
+    if (!result)
+        return result;
+
+    memcpy(result.get(), string.UTF8Characters, length);
+    result[length] = '\0';
 
     return result;
 }
@@ -785,30 +795,27 @@ static bool testPostURLFile(PluginObject* obj, const NPVariant* args, uint32_t a
         return false;
 
     NPString urlString = NPVARIANT_TO_STRING(args[0]);
-    char* url = toCString(urlString);
+    auto url = toCString(urlString);
 
     NPString targetString = NPVARIANT_TO_STRING(args[1]);
-    char* target = toCString(targetString);
+    auto target = toCString(targetString);
 
     NPString pathString = NPVARIANT_TO_STRING(args[2]);
-    char* path = toCString(pathString);
+    auto path = toCString(pathString);
 
     NPString contentsString = NPVARIANT_TO_STRING(args[3]);
 
-    FILE* tempFile = fopen(path, "w");
+    FILE* tempFile = fopen(path.get(), "w");
     if (!tempFile)
         return false;
 
-    if (!fwrite(contentsString.UTF8Characters, contentsString.UTF8Length, 1, tempFile))
-        return false;
-
+    size_t count = fwrite(contentsString.UTF8Characters, contentsString.UTF8Length, 1, tempFile);
     fclose(tempFile);
 
-    NPError error = browser->posturl(obj->npp, url, target, pathString.UTF8Length, path, TRUE);
+    if (!count)
+        return false;
 
-    free(path);
-    free(target);
-    free(url);
+    NPError error = browser->posturl(obj->npp, url.get(), target.get(), pathString.UTF8Length, path.get(), TRUE);
 
     BOOLEAN_TO_NPVARIANT(error == NPERR_NO_ERROR, *result);
     return true;
@@ -967,15 +974,14 @@ bool testWindowOpen(NPP npp)
 
 static bool testSetStatus(PluginObject* obj, const NPVariant* args, uint32_t argCount, NPVariant* result)
 {
-    char* message = 0;
+    std::unique_ptr<char[]> message;
     if (argCount && NPVARIANT_IS_STRING(args[0])) {
         NPString statusString = NPVARIANT_TO_STRING(args[0]);
         message = toCString(statusString);
     }
-    
-    browser->status(obj->npp, message);
 
-    free(message);
+    browser->status(obj->npp, message.get());
+
     return true;
 }
 

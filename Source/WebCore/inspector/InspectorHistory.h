@@ -33,7 +33,6 @@
 
 #include "ExceptionCode.h"
 
-#include <wtf/OwnPtr.h>
 #include <wtf/Vector.h>
 #include <wtf/text/WTFString.h>
 
@@ -43,9 +42,7 @@ class ContainerNode;
 class Element;
 class Node;
 
-#if ENABLE(INSPECTOR)
-
-class InspectorHistory {
+class InspectorHistory final {
     WTF_MAKE_NONCOPYABLE(InspectorHistory); WTF_MAKE_FAST_ALLOCATED;
 public:
     class Action {
@@ -56,7 +53,7 @@ public:
         virtual String toString();
 
         virtual String mergeId();
-        virtual void merge(PassOwnPtr<Action>);
+        virtual void merge(std::unique_ptr<Action>);
 
         virtual bool perform(ExceptionCode&) = 0;
 
@@ -69,9 +66,9 @@ public:
     };
 
     InspectorHistory();
-    virtual ~InspectorHistory();
+    ~InspectorHistory();
 
-    bool perform(PassOwnPtr<Action>, ExceptionCode&);
+    bool perform(std::unique_ptr<Action>, ExceptionCode&);
     void markUndoableState();
 
     bool undo(ExceptionCode&);
@@ -79,11 +76,9 @@ public:
     void reset();
 
 private:
-    Vector<OwnPtr<Action> > m_history;
+    Vector<std::unique_ptr<Action>> m_history;
     size_t m_afterLastActionIndex;
 };
-
-#endif // ENABLE(INSPECTOR)
 
 } // namespace WebCore
 

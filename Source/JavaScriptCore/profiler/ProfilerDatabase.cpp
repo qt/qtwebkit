@@ -29,21 +29,18 @@
 #include "CodeBlock.h"
 #include "JSONObject.h"
 #include "ObjectConstructor.h"
-#include "Operations.h"
+#include "JSCInlines.h"
 
 namespace JSC { namespace Profiler {
 
-#if COMPILER(MINGW) || COMPILER(MSVC7_OR_LOWER) || OS(WINCE)
-static int databaseCounter;
-#else
-static volatile int databaseCounter;
-#endif
-static SpinLock registrationLock = SPINLOCK_INITIALIZER;
-static int didRegisterAtExit;
+static std::atomic<int> databaseCounter;
+
+static StaticLock registrationLock;
+static std::atomic<int> didRegisterAtExit;
 static Database* firstDatabase;
 
 Database::Database(VM& vm)
-    : m_databaseID(atomicIncrement(&databaseCounter))
+    : m_databaseID(++databaseCounter)
     , m_vm(vm)
     , m_shouldSaveAtExit(false)
     , m_nextRegisteredDatabase(0)
@@ -60,6 +57,8 @@ Database::~Database()
 
 Bytecodes* Database::ensureBytecodesFor(CodeBlock* codeBlock)
 {
+    LockHolder locker(m_lock);
+    
     codeBlock = codeBlock->baselineVersion();
     
     HashMap<CodeBlock*, Bytecodes*>::iterator iter = m_bytecodesMap.find(codeBlock);
@@ -76,19 +75,16 @@ Bytecodes* Database::ensureBytecodesFor(CodeBlock* codeBlock)
 
 void Database::notifyDestruction(CodeBlock* codeBlock)
 {
+    LockHolder locker(m_lock);
+    
     m_bytecodesMap.remove(codeBlock);
 }
 
-PassRefPtr<Compilation> Database::newCompilation(Bytecodes* bytecodes, CompilationKind kind)
+void Database::addCompilation(PassRefPtr<Compilation> compilation)
 {
-    RefPtr<Compilation> compilation = adoptRef(new Compilation(bytecodes, kind));
+    ASSERT(!isCompilationThread());
+    
     m_compilations.append(compilation);
-    return compilation.release();
-}
-
-PassRefPtr<Compilation> Database::newCompilation(CodeBlock* codeBlock, CompilationKind kind)
-{
-    return newCompilation(ensureBytecodesFor(codeBlock), kind);
 }
 
 JSValue Database::toJS(ExecState* exec) const
@@ -118,7 +114,7 @@ String Database::toJSON() const
 
 bool Database::save(const char* filename) const
 {
-    OwnPtr<FilePrintStream> out = FilePrintStream::open(filename, "w");
+    auto out = FilePrintStream::open(filename, "w");
     if (!out)
         return false;
     
@@ -139,17 +135,17 @@ void Database::registerToSaveAtExit(const char* filename)
 
 void Database::addDatabaseToAtExit()
 {
-    if (atomicIncrement(&didRegisterAtExit) == 1)
+    if (++didRegisterAtExit == 1)
         atexit(atExitCallback);
     
-    TCMalloc_SpinLockHolder holder(&registrationLock);
+    LockHolder holder(registrationLock);
     m_nextRegisteredDatabase = firstDatabase;
     firstDatabase = this;
 }
 
 void Database::removeDatabaseFromAtExit()
 {
-    TCMalloc_SpinLockHolder holder(&registrationLock);
+    LockHolder holder(registrationLock);
     for (Database** current = &firstDatabase; *current; current = &(*current)->m_nextRegisteredDatabase) {
         if (*current != this)
             continue;
@@ -167,7 +163,7 @@ void Database::performAtExitSave() const
 
 Database* Database::removeFirstAtExitDatabase()
 {
-    TCMalloc_SpinLockHolder holder(&registrationLock);
+    LockHolder holder(registrationLock);
     Database* result = firstDatabase;
     if (result) {
         firstDatabase = result->m_nextRegisteredDatabase;

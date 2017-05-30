@@ -26,19 +26,19 @@
 
 namespace WebCore {
 
-class SVGVKernElement FINAL : public SVGElement {
+class SVGVKernElement final : public SVGElement {
 public:
-    static PassRefPtr<SVGVKernElement> create(const QualifiedName&, Document*);
+    static Ref<SVGVKernElement> create(const QualifiedName&, Document&);
 
-    void buildVerticalKerningPair(SVGKerningMap&);
+    bool buildVerticalKerningPair(SVGKerningPair& kerningPair) const;
 
 private:
-    SVGVKernElement(const QualifiedName&, Document*);
+    SVGVKernElement(const QualifiedName&, Document&);
 
-    virtual InsertionNotificationRequest insertedInto(ContainerNode*) OVERRIDE;
-    virtual void removedFrom(ContainerNode*) OVERRIDE;
+    virtual InsertionNotificationRequest insertedInto(ContainerNode&) override;
+    virtual void removedFrom(ContainerNode&) override;
 
-    virtual bool rendererIsNeeded(const NodeRenderingContext&) { return false; }
+    virtual bool rendererIsNeeded(const RenderStyle&) override { return false; }
 };
 
 } // namespace WebCore

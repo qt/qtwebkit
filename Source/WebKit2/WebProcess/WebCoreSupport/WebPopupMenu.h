@@ -25,7 +25,6 @@
 #include "WebPopupItem.h"
 #include <WebCore/PopupMenu.h>
 #include <wtf/Forward.h>
-#include <wtf/OwnPtr.h>
 #include <wtf/Vector.h>
 
 namespace WebCore {
@@ -40,7 +39,7 @@ struct WebPopupItem;
 
 class WebPopupMenu : public WebCore::PopupMenu {
 public:
-    static PassRefPtr<WebPopupMenu> create(WebPage*, WebCore::PopupMenuClient*);
+    static Ref<WebPopupMenu> create(WebPage*, WebCore::PopupMenuClient*);
     ~WebPopupMenu();
 
     WebPage* page() { return m_page; }
@@ -52,10 +51,10 @@ public:
     WebCore::PopupMenuClient* client() const { return m_popupClient; }
 #endif
 
-    virtual void show(const WebCore::IntRect&, WebCore::FrameView*, int index) OVERRIDE;
-    virtual void hide() OVERRIDE;
-    virtual void updateFromElement() OVERRIDE;
-    virtual void disconnectClient() OVERRIDE;
+    virtual void show(const WebCore::IntRect&, WebCore::FrameView*, int index) override;
+    virtual void hide() override;
+    virtual void updateFromElement() override;
+    virtual void disconnectClient() override;
 
 private:
     WebPopupMenu(WebPage*, WebCore::PopupMenuClient*);

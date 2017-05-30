@@ -31,10 +31,10 @@ class FrameNetworkingContext : public NetworkingContext {
 public:
     void invalidate()
     {
-        m_frame = 0;
+        m_frame = nullptr;
     }
 
-    virtual bool shouldClearReferrerOnHTTPSToHTTPRedirect() const
+    virtual bool shouldClearReferrerOnHTTPSToHTTPRedirect() const override
     {
         // FIXME: PingLoader finishes without a frame, but it should use its document's referrer policy.
         if (!m_frame)
@@ -52,7 +52,7 @@ protected:
     Frame* frame() const { return m_frame; }
 
 private:
-    virtual bool isValid() const OVERRIDE { return m_frame; }
+    virtual bool isValid() const override { return m_frame; }
 
     Frame* m_frame;
 };

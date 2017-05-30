@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006, 2007, 2008, 2010 Apple Inc.
+ * Copyright (C) 2006, 2007, 2008, 2010, 2013 Apple Inc.
  * Copyright (C) 2006 Michael Emmel mike.emmel@gmail.com
  * Copyright (C) 2007 Holger Hans Peter Freyther
  * Copyright (C) 2007 Pioneer Research Center USA, Inc.
@@ -23,24 +23,19 @@
  */
 
 // FIXME: This is temporary until all ports switch to using this file.
-#if PLATFORM(BLACKBERRY)
-#include "harfbuzz/FontPlatformDataHarfBuzz.h"
+#if PLATFORM(EFL) || PLATFORM(GTK)
+#include "freetype/FontPlatformData.h"
 #elif PLATFORM(QT)
 #include "qt/FontPlatformData.h"
-#elif USE(WINGDI)
-#include "wince/FontPlatformData.h"
-#elif PLATFORM(EFL) || PLATFORM(GTK)
-#include "freetype/FontPlatformData.h"
 #else
 
 #ifndef FontPlatformData_h
 #define FontPlatformData_h
 
-#include "FontOrientation.h"
-#include "FontWidthVariant.h"
+#include "TextFlags.h"
 
 #if PLATFORM(WIN)
-#include "RefCountedGDIHandle.h"
+#include "SharedGDIObject.h"
 #endif
 
 #if USE(CAIRO)
@@ -48,11 +43,20 @@
 #include <cairo.h>
 #endif
 
-#if OS(DARWIN)
+#if PLATFORM(COCOA)
+#if PLATFORM(IOS)
+#import <CoreGraphics/CoreGraphics.h>
+#endif
+#if USE(APPKIT)
 OBJC_CLASS NSFont;
+#endif
 
-typedef struct CGFont* CGFontRef;
 typedef const struct __CTFont* CTFontRef;
+
+#endif
+
+#if USE(CG)
+typedef struct CGFont* CGFontRef;
 #endif
 
 #include <wtf/Forward.h>
@@ -62,72 +66,73 @@ typedef const struct __CTFont* CTFontRef;
 #include <wtf/text/StringImpl.h>
 
 #if PLATFORM(WIN)
+#include <wtf/win/GDIObject.h>
 typedef struct HFONT__* HFONT;
 #endif
 
-#if USE(CG)
-typedef struct CGFont* CGFontRef;
-#if OS(DARWIN)
-typedef const struct __CTFont* CTFontRef;
-typedef UInt32 FMFont;
-typedef FMFont ATSUFontID;
-typedef UInt32 ATSFontRef;
-#endif
-#endif
 
 namespace WebCore {
 
 class FontDescription;
 class SharedBuffer;
 
-#if OS(DARWIN)
-inline CTFontRef toCTFontRef(NSFont *nsFont) { return reinterpret_cast<CTFontRef>(nsFont); }
-#endif
-
 class FontPlatformData {
+    WTF_MAKE_FAST_ALLOCATED;
 public:
     FontPlatformData(WTF::HashTableDeletedValueType);
     FontPlatformData();
     FontPlatformData(const FontPlatformData&);
     FontPlatformData(const FontDescription&, const AtomicString& family);
-    FontPlatformData(float size, bool syntheticBold, bool syntheticOblique, FontOrientation = Horizontal, FontWidthVariant = RegularWidth);
+    FontPlatformData(float size, bool syntheticBold, bool syntheticOblique, FontOrientation = Horizontal, FontWidthVariant = RegularWidth, TextRenderingMode = AutoTextRendering);
 
-#if OS(DARWIN)
-    FontPlatformData(NSFont*, float size, bool isPrinterFont = false, bool syntheticBold = false, bool syntheticOblique = false,
-                     FontOrientation = Horizontal, FontWidthVariant = RegularWidth);
+#if PLATFORM(COCOA)
+    WEBCORE_EXPORT FontPlatformData(CTFontRef, float size, bool syntheticBold = false, bool syntheticOblique = false, FontOrientation = Horizontal, FontWidthVariant = RegularWidth, TextRenderingMode = AutoTextRendering);
+#endif
+
 #if USE(CG)
-    FontPlatformData(CGFontRef, float size, bool syntheticBold, bool syntheticOblique, FontOrientation, FontWidthVariant);
+    FontPlatformData(CGFontRef, float size, bool syntheticBold, bool syntheticOblique, FontOrientation, FontWidthVariant, TextRenderingMode);
 #endif
-#endif
+
 #if PLATFORM(WIN)
-    FontPlatformData(HFONT, float size, bool syntheticBold, bool syntheticOblique, bool useGDI);
+    FontPlatformData(GDIObject<HFONT>, float size, bool syntheticBold, bool syntheticOblique, bool useGDI);
+
 #if USE(CG)
-    FontPlatformData(HFONT, CGFontRef, float size, bool syntheticBold, bool syntheticOblique, bool useGDI);
+    FontPlatformData(GDIObject<HFONT>, CGFontRef, float size, bool syntheticBold, bool syntheticOblique, bool useGDI);
 #elif USE(CAIRO)
-    FontPlatformData(HFONT, cairo_font_face_t*, float size, bool bold, bool italic);
+    FontPlatformData(GDIObject<HFONT>, cairo_font_face_t*, float size, bool bold, bool italic);
 #endif
 #endif
 
-    ~FontPlatformData();
+    WEBCORE_EXPORT ~FontPlatformData();
 
 #if PLATFORM(WIN)
-    HFONT hfont() const { return m_font ? m_font->handle() : 0; }
+    HFONT hfont() const { return m_font ? m_font->get() : 0; }
     bool useGDI() const { return m_useGDI; }
-#elif OS(DARWIN)
-    NSFont* font() const { return m_font; }
-    void setFont(NSFont*);
+#elif PLATFORM(COCOA)
+    CTFontRef font() const { return m_font.get(); }
+    WEBCORE_EXPORT CTFontRef registeredFont() const; // Returns nullptr iff the font is not registered, such as web fonts (otherwise returns font()).
+    void setFont(CTFontRef);
+
+    CTFontRef ctFont() const;
+    static RetainPtr<CFTypeRef> objectForEqualityCheck(CTFontRef);
+    RetainPtr<CFTypeRef> objectForEqualityCheck() const;
+
+    bool hasCustomTracking() const { return isSystemFont(); }
+
+#if USE(APPKIT)
+    // FIXME: Remove this when all NSFont usage is removed.
+    NSFont *nsFont() const { return (NSFont *)m_font.get(); }
+    void setNSFont(NSFont *font) { setFont(reinterpret_cast<CTFontRef>(font)); }
+#endif
+#endif
+
+#if PLATFORM(WIN) || PLATFORM(COCOA)
+    bool isSystemFont() const { return m_isSystemFont; }
+    void setIsSystemFont(bool isSystemFont) { m_isSystemFont = isSystemFont; }
 #endif
 
 #if USE(CG)
-#if OS(DARWIN)
     CGFontRef cgFont() const { return m_cgFont.get(); }
-    CTFontRef ctFont() const;
-
-    bool roundsGlyphAdvances() const;
-    bool allowsLigatures() const;
-#else
-    CGFontRef cgFont() const { return m_cgFont.get(); }
-#endif
 #endif
 
     bool isFixedPitch() const;
@@ -136,14 +141,13 @@ public:
     bool syntheticBold() const { return m_syntheticBold; }
     bool syntheticOblique() const { return m_syntheticOblique; }
     bool isColorBitmapFont() const { return m_isColorBitmapFont; }
-    bool isCompositeFontReference() const { return m_isCompositeFontReference; }
-#if OS(DARWIN)
-    bool isPrinterFont() const { return m_isPrinterFont; }
-#endif
     FontOrientation orientation() const { return m_orientation; }
     FontWidthVariant widthVariant() const { return m_widthVariant; }
+    TextRenderingMode textRenderingMode() const { return m_textRenderingMode; }
+    bool isForTextCombine() const { return widthVariant() != RegularWidth; } // Keep in sync with callers of FontDescription::setWidthVariant().
 
     void setOrientation(FontOrientation orientation) { m_orientation = orientation; }
+    void setSyntheticOblique(bool syntheticOblique) { m_syntheticOblique = syntheticOblique; }
 
 #if USE(CAIRO)
     cairo_scaled_font_t* scaledFont() const { return m_scaledFont; }
@@ -154,10 +158,13 @@ public:
 #if PLATFORM(WIN) && !USE(CAIRO)
         return m_font ? m_font->hash() : 0;
 #elif OS(DARWIN)
-#if USE(CG)
-        ASSERT(m_font || !m_cgFont);
+        uintptr_t flags = static_cast<uintptr_t>(m_isHashTableDeletedValue << 5 | m_textRenderingMode << 3 | m_orientation << 2 | m_syntheticBold << 1 | m_syntheticOblique);
+#if USE(APPKIT)
+        uintptr_t fontHash = (uintptr_t)m_font.get();
+#else
+        uintptr_t fontHash = reinterpret_cast<uintptr_t>(CFHash(m_font.get()));
 #endif
-        uintptr_t hashCodes[3] = { (uintptr_t)m_font, m_widthVariant, static_cast<uintptr_t>(m_isPrinterFont << 3 | m_orientation << 2 | m_syntheticBold << 1 | m_syntheticOblique) };
+        uintptr_t hashCodes[3] = { fontHash, m_widthVariant, flags };
         return StringHasher::hashMemory<sizeof(hashCodes)>(hashCodes);
 #elif USE(CAIRO)
         return PtrHash<cairo_scaled_font_t*>::hash(m_scaledFont);
@@ -169,30 +176,31 @@ public:
     bool operator==(const FontPlatformData& other) const
     {
         return platformIsEqual(other)
+            && m_isHashTableDeletedValue == other.m_isHashTableDeletedValue
             && m_size == other.m_size
             && m_syntheticBold == other.m_syntheticBold
             && m_syntheticOblique == other.m_syntheticOblique
             && m_isColorBitmapFont == other.m_isColorBitmapFont
-            && m_isCompositeFontReference == other.m_isCompositeFontReference
-#if OS(DARWIN)
-            && m_isPrinterFont == other.m_isPrinterFont
-#endif
             && m_orientation == other.m_orientation
-            && m_widthVariant == other.m_widthVariant;
+            && m_widthVariant == other.m_widthVariant
+            && m_textRenderingMode == other.m_textRenderingMode;
     }
 
     bool isHashTableDeletedValue() const
     {
-#if PLATFORM(WIN) && !USE(CAIRO)
-        return m_font.isHashTableDeletedValue();
-#elif OS(DARWIN)
-        return m_font == hashTableDeletedFontValue();
-#elif USE(CAIRO)
-        return m_scaledFont == hashTableDeletedFontValue();
+        return m_isHashTableDeletedValue;
+    }
+
+    bool isEmoji() const
+    {
+#if PLATFORM(IOS)
+        return m_isEmoji;
+#else
+        return false;
 #endif
     }
 
-#if PLATFORM(WIN) && (USE(CG) || USE(CAIRO))
+#if PLATFORM(COCOA) || PLATFORM(WIN)
     PassRefPtr<SharedBuffer> openTypeTable(uint32_t table) const;
 #endif
 
@@ -204,55 +212,60 @@ private:
     bool platformIsEqual(const FontPlatformData&) const;
     void platformDataInit(const FontPlatformData&);
     const FontPlatformData& platformDataAssign(const FontPlatformData&);
-#if OS(DARWIN)
-    // Load various data about the font specified by |nsFont| with the size fontSize into the following output paramters:
-    void loadFont(NSFont*, float fontSize, NSFont*& outNSFont, CGFontRef&);
-    static NSFont* hashTableDeletedFontValue() { return reinterpret_cast<NSFont *>(-1); }
-#elif PLATFORM(WIN)
+#if PLATFORM(COCOA)
+    CGFloat ctFontSize() const;
+#endif
+#if PLATFORM(WIN)
     void platformDataInit(HFONT, float size, HDC, WCHAR* faceName);
 #endif
 
-#if USE(CAIRO)
-    static cairo_scaled_font_t* hashTableDeletedFontValue() { return reinterpret_cast<cairo_scaled_font_t*>(-1); }
-#endif
-
 public:
-    bool m_syntheticBold;
-    bool m_syntheticOblique;
-    FontOrientation m_orientation;
-    float m_size;
-    FontWidthVariant m_widthVariant;
+    bool m_syntheticBold { false };
+    bool m_syntheticOblique { false };
+    FontOrientation m_orientation { Horizontal };
+    float m_size { 0 };
+    FontWidthVariant m_widthVariant { RegularWidth };
+    TextRenderingMode m_textRenderingMode { AutoTextRendering };
 
 private:
-#if OS(DARWIN)
-    NSFont* m_font;
+#if PLATFORM(COCOA)
+    // FIXME: Get rid of one of these. These two fonts are subtly different, and it is not obvious which one to use where.
+    RetainPtr<CTFontRef> m_font;
+    mutable RetainPtr<CTFontRef> m_ctFont;
 #elif PLATFORM(WIN)
-    RefPtr<RefCountedGDIHandle<HFONT> > m_font;
+    RefPtr<SharedGDIObject<HFONT>> m_font;
 #endif
 
 #if USE(CG)
-#if PLATFORM(WIN)
     RetainPtr<CGFontRef> m_cgFont;
-#else
-    RetainPtr<CGFontRef> m_cgFont;
-    mutable RetainPtr<CTFontRef> m_CTFont;
 #endif
-#endif
-
 #if USE(CAIRO)
-    cairo_scaled_font_t* m_scaledFont;
+    cairo_scaled_font_t* m_scaledFont { nullptr };
 #endif
 
-    bool m_isColorBitmapFont;
-    bool m_isCompositeFontReference;
-#if OS(DARWIN)
-    bool m_isPrinterFont;
+    bool m_isColorBitmapFont { false };
+    bool m_isHashTableDeletedValue { false };
+    bool m_isSystemFont { false };
+#if PLATFORM(IOS)
+    bool m_isEmoji { false };
 #endif
-
 #if PLATFORM(WIN)
-    bool m_useGDI;
+    bool m_useGDI { false };
 #endif
 };
+
+#if USE(APPKIT)
+// NSFonts and CTFontRefs are toll-free-bridged.
+inline CTFontRef toCTFont(NSFont *font)
+{
+    return (CTFontRef)font;
+}
+
+inline NSFont *toNSFont(CTFontRef font)
+{
+    return (NSFont *)font;
+}
+#endif
 
 } // namespace WebCore
 

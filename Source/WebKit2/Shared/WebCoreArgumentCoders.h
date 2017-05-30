@@ -29,58 +29,140 @@
 #include "ArgumentCoders.h"
 
 namespace WebCore {
-    class AffineTransform;
-    class AuthenticationChallenge;
-    class Color;
-    class Credential;
-    class Cursor;
-    class DatabaseDetails;
-    class FloatPoint;
-    class FloatRect;
-    class FloatSize;
-    class HTTPHeaderMap;
-    class IntPoint;
-    class IntRect;
-    class IntSize;
-    class KeyframeValueList;
-    class KURL;
-    class Notification;
-    class ProtectionSpace;
-    class ResourceError;
-    class ResourceRequest;
-    class ResourceResponse;
-    class TextCheckingRequestData;
-    class UserStyleSheet;
-    class UserScript;
-    struct CompositionUnderline;
-    struct Cookie;
-    struct DictationAlternative;
-    struct DragSession;
-    struct FileChooserSettings;
-    struct GrammarDetail;
-    struct MimeClassInfo;
-    struct PluginInfo;
-    struct TextCheckingResult;
-    struct ViewportAttributes;
-    struct WindowFeatures;
+class AffineTransform;
+class AuthenticationChallenge;
+class BlobPart;
+class CertificateInfo;
+class Color;
+class Credential;
+class CubicBezierTimingFunction;
+class Cursor;
+class DatabaseDetails;
+class FilterOperation;
+class FilterOperations;
+class FloatPoint;
+class FloatPoint3D;
+class FloatRect;
+class FloatRoundedRect;
+class FloatSize;
+class FixedPositionViewportConstraints;
+class HTTPHeaderMap;
+class IntPoint;
+class IntRect;
+class IntSize;
+class KeyframeValueList;
+class LinearTimingFunction;
+class Notification;
+class Path;
+class ProtectionSpace;
+class Region;
+class ResourceError;
+class ResourceRequest;
+class ResourceResponse;
+class SessionID;
+class StepsTimingFunction;
+class StickyPositionViewportConstraints;
+class TextCheckingRequestData;
+class TransformationMatrix;
+class UserStyleSheet;
+class UserScript;
+class URL;
+struct CompositionUnderline;
+struct Cookie;
+struct DictationAlternative;
+struct DictionaryPopupInfo;
+struct ExceptionDetails;
+struct FileChooserSettings;
+struct Length;
+struct GrammarDetail;
+struct MimeClassInfo;
+struct PasteboardImage;
+struct PasteboardWebContent;
+struct PluginInfo;
+struct RecentSearch;
+struct ScrollableAreaParameters;
+struct TextCheckingResult;
+struct TextIndicatorData;
+struct ViewportAttributes;
+struct WindowFeatures;
 }
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
 namespace WebCore {
-    struct KeypressCommand;
+class MachSendRight;
+struct KeypressCommand;
 }
 #endif
 
-namespace CoreIPC {
+#if PLATFORM(IOS)
+namespace WebCore {
+class FloatQuad;
+class SelectionRect;
+struct Highlight;
+struct PasteboardImage;
+struct PasteboardWebContent;
+struct ViewportArguments;
+}
+#endif
+
+#if ENABLE(CONTENT_FILTERING)
+namespace WebCore {
+class ContentFilterUnblockHandler;
+}
+#endif
+
+#if ENABLE(WIRELESS_PLAYBACK_TARGET)
+namespace WebCore {
+class MediaPlaybackTargetContext;
+}
+#endif
+
+#if ENABLE(MEDIA_SESSION)
+namespace WebCore {
+class MediaSessionMetadata;
+}
+#endif
+
+namespace IPC {
 
 template<> struct ArgumentCoder<WebCore::AffineTransform> {
     static void encode(ArgumentEncoder&, const WebCore::AffineTransform&);
     static bool decode(ArgumentDecoder&, WebCore::AffineTransform&);
 };
 
+template<> struct ArgumentCoder<WebCore::TransformationMatrix> {
+    static void encode(ArgumentEncoder&, const WebCore::TransformationMatrix&);
+    static bool decode(ArgumentDecoder&, WebCore::TransformationMatrix&);
+};
+
+template<> struct ArgumentCoder<WebCore::LinearTimingFunction> {
+    static void encode(ArgumentEncoder&, const WebCore::LinearTimingFunction&);
+    static bool decode(ArgumentDecoder&, WebCore::LinearTimingFunction&);
+};
+
+template<> struct ArgumentCoder<WebCore::CubicBezierTimingFunction> {
+    static void encode(ArgumentEncoder&, const WebCore::CubicBezierTimingFunction&);
+    static bool decode(ArgumentDecoder&, WebCore::CubicBezierTimingFunction&);
+};
+
+template<> struct ArgumentCoder<WebCore::StepsTimingFunction> {
+    static void encode(ArgumentEncoder&, const WebCore::StepsTimingFunction&);
+    static bool decode(ArgumentDecoder&, WebCore::StepsTimingFunction&);
+};
+
+template<> struct ArgumentCoder<WebCore::CertificateInfo> {
+    static void encode(ArgumentEncoder&, const WebCore::CertificateInfo&);
+    static bool decode(ArgumentDecoder&, WebCore::CertificateInfo&);
+};
+
 template<> struct ArgumentCoder<WebCore::FloatPoint> {
     static void encode(ArgumentEncoder&, const WebCore::FloatPoint&);
     static bool decode(ArgumentDecoder&, WebCore::FloatPoint&);
+};
+
+template<> struct ArgumentCoder<WebCore::FloatPoint3D> {
+    static void encode(ArgumentEncoder&, const WebCore::FloatPoint3D&);
+    static bool decode(ArgumentDecoder&, WebCore::FloatPoint3D&);
 };
 
 template<> struct ArgumentCoder<WebCore::FloatRect> {
@@ -92,6 +174,23 @@ template<> struct ArgumentCoder<WebCore::FloatSize> {
     static void encode(ArgumentEncoder&, const WebCore::FloatSize&);
     static bool decode(ArgumentDecoder&, WebCore::FloatSize&);
 };
+
+template<> struct ArgumentCoder<WebCore::FloatRoundedRect> {
+    static void encode(ArgumentEncoder&, const WebCore::FloatRoundedRect&);
+    static bool decode(ArgumentDecoder&, WebCore::FloatRoundedRect&);
+};
+
+#if PLATFORM(IOS)
+template<> struct ArgumentCoder<WebCore::FloatQuad> {
+    static void encode(ArgumentEncoder&, const WebCore::FloatQuad&);
+    static bool decode(ArgumentDecoder&, WebCore::FloatQuad&);
+};
+
+template<> struct ArgumentCoder<WebCore::ViewportArguments> {
+    static void encode(ArgumentEncoder&, const WebCore::ViewportArguments&);
+    static bool decode(ArgumentDecoder&, WebCore::ViewportArguments&);
+};
+#endif // PLATFORM(IOS)
 
 template<> struct ArgumentCoder<WebCore::IntPoint> {
     static void encode(ArgumentEncoder&, const WebCore::IntPoint&);
@@ -106,6 +205,21 @@ template<> struct ArgumentCoder<WebCore::IntRect> {
 template<> struct ArgumentCoder<WebCore::IntSize> {
     static void encode(ArgumentEncoder&, const WebCore::IntSize&);
     static bool decode(ArgumentDecoder&, WebCore::IntSize&);
+};
+
+template<> struct ArgumentCoder<WebCore::Path> {
+    static void encode(ArgumentEncoder&, const WebCore::Path&);
+    static bool decode(ArgumentDecoder&, WebCore::Path&);
+};
+
+template<> struct ArgumentCoder<WebCore::Region> {
+    static void encode(ArgumentEncoder&, const WebCore::Region&);
+    static bool decode(ArgumentDecoder&, WebCore::Region&);
+};
+
+template<> struct ArgumentCoder<WebCore::Length> {
+    static void encode(ArgumentEncoder&, const WebCore::Length&);
+    static bool decode(ArgumentDecoder&, WebCore::Length&);
 };
 
 template<> struct ArgumentCoder<WebCore::ViewportAttributes> {
@@ -123,11 +237,6 @@ template<> struct ArgumentCoder<WebCore::PluginInfo> {
     static bool decode(ArgumentDecoder&, WebCore::PluginInfo&);
 };
 
-template<> struct ArgumentCoder<WebCore::HTTPHeaderMap> {
-    static void encode(ArgumentEncoder&, const WebCore::HTTPHeaderMap&);
-    static bool decode(ArgumentDecoder&, WebCore::HTTPHeaderMap&);
-};
-
 template<> struct ArgumentCoder<WebCore::AuthenticationChallenge> {
     static void encode(ArgumentEncoder&, const WebCore::AuthenticationChallenge&);
     static bool decode(ArgumentDecoder&, WebCore::AuthenticationChallenge&);
@@ -136,11 +245,15 @@ template<> struct ArgumentCoder<WebCore::AuthenticationChallenge> {
 template<> struct ArgumentCoder<WebCore::ProtectionSpace> {
     static void encode(ArgumentEncoder&, const WebCore::ProtectionSpace&);
     static bool decode(ArgumentDecoder&, WebCore::ProtectionSpace&);
+    static void encodePlatformData(ArgumentEncoder&, const WebCore::ProtectionSpace&);
+    static bool decodePlatformData(ArgumentDecoder&, WebCore::ProtectionSpace&);
 };
 
 template<> struct ArgumentCoder<WebCore::Credential> {
     static void encode(ArgumentEncoder&, const WebCore::Credential&);
     static bool decode(ArgumentDecoder&, WebCore::Credential&);
+    static void encodePlatformData(ArgumentEncoder&, const WebCore::Credential&);
+    static bool decodePlatformData(ArgumentDecoder&, WebCore::Credential&);
 };
 
 template<> struct ArgumentCoder<WebCore::Cursor> {
@@ -149,32 +262,13 @@ template<> struct ArgumentCoder<WebCore::Cursor> {
 };
 
 template<> struct ArgumentCoder<WebCore::ResourceRequest> {
-#if PLATFORM(MAC)
-    static const bool kShouldSerializeWebCoreData = false;
-#else
-    static const bool kShouldSerializeWebCoreData = true;
-#endif
-
     static void encode(ArgumentEncoder&, const WebCore::ResourceRequest&);
     static bool decode(ArgumentDecoder&, WebCore::ResourceRequest&);
     static void encodePlatformData(ArgumentEncoder&, const WebCore::ResourceRequest&);
     static bool decodePlatformData(ArgumentDecoder&, WebCore::ResourceRequest&);
 };
 
-template<> struct ArgumentCoder<WebCore::ResourceResponse> {
-    static void encode(ArgumentEncoder&, const WebCore::ResourceResponse&);
-    static bool decode(ArgumentDecoder&, WebCore::ResourceResponse&);
-    static void encodePlatformData(ArgumentEncoder&, const WebCore::ResourceResponse&);
-    static bool decodePlatformData(ArgumentDecoder&, WebCore::ResourceResponse&);
-};
-
 template<> struct ArgumentCoder<WebCore::ResourceError> {
-#if PLATFORM(MAC)
-    static const bool kShouldSerializeWebCoreData = false;
-#else
-    static const bool kShouldSerializeWebCoreData = true;
-#endif
-
     static void encode(ArgumentEncoder&, const WebCore::ResourceError&);
     static bool decode(ArgumentDecoder&, WebCore::ResourceError&);
     static void encodePlatformData(ArgumentEncoder&, const WebCore::ResourceError&);
@@ -191,10 +285,38 @@ template<> struct ArgumentCoder<WebCore::Color> {
     static bool decode(ArgumentDecoder&, WebCore::Color&);
 };
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
+template<> struct ArgumentCoder<WebCore::MachSendRight> {
+    static void encode(ArgumentEncoder&, const WebCore::MachSendRight&);
+    static void encode(ArgumentEncoder&, WebCore::MachSendRight&&);
+    static bool decode(ArgumentDecoder&, WebCore::MachSendRight&);
+};
+
 template<> struct ArgumentCoder<WebCore::KeypressCommand> {
     static void encode(ArgumentEncoder&, const WebCore::KeypressCommand&);
     static bool decode(ArgumentDecoder&, WebCore::KeypressCommand&);
+};
+#endif
+
+#if PLATFORM(IOS)
+template<> struct ArgumentCoder<WebCore::SelectionRect> {
+    static void encode(ArgumentEncoder&, const WebCore::SelectionRect&);
+    static bool decode(ArgumentDecoder&, WebCore::SelectionRect&);
+};
+
+template<> struct ArgumentCoder<WebCore::Highlight> {
+    static void encode(ArgumentEncoder&, const WebCore::Highlight&);
+    static bool decode(ArgumentDecoder&, WebCore::Highlight&);
+};
+
+template<> struct ArgumentCoder<WebCore::PasteboardWebContent> {
+    static void encode(ArgumentEncoder&, const WebCore::PasteboardWebContent&);
+    static bool decode(ArgumentDecoder&, WebCore::PasteboardWebContent&);
+};
+
+template<> struct ArgumentCoder<WebCore::PasteboardImage> {
+    static void encode(ArgumentEncoder&, const WebCore::PasteboardImage&);
+    static bool decode(ArgumentDecoder&, WebCore::PasteboardImage&);
 };
 #endif
 
@@ -238,14 +360,9 @@ template<> struct ArgumentCoder<WebCore::TextCheckingResult> {
     static bool decode(ArgumentDecoder&, WebCore::TextCheckingResult&);
 };
     
-template<> struct ArgumentCoder<WebCore::DragSession> {
-    static void encode(ArgumentEncoder&, const WebCore::DragSession&);
-    static bool decode(ArgumentDecoder&, WebCore::DragSession&);
-};
-
-template<> struct ArgumentCoder<WebCore::KURL> {
-    static void encode(ArgumentEncoder&, const WebCore::KURL&);
-    static bool decode(ArgumentDecoder&, WebCore::KURL&);
+template<> struct ArgumentCoder<WebCore::URL> {
+    static void encode(ArgumentEncoder&, const WebCore::URL&);
+    static bool decode(ArgumentDecoder&, WebCore::URL&);
 };
 
 template<> struct ArgumentCoder<WebCore::UserStyleSheet> {
@@ -258,6 +375,90 @@ template<> struct ArgumentCoder<WebCore::UserScript> {
     static bool decode(ArgumentDecoder&, WebCore::UserScript&);
 };
 
-} // namespace CoreIPC
+template<> struct ArgumentCoder<WebCore::ScrollableAreaParameters> {
+    static void encode(ArgumentEncoder&, const WebCore::ScrollableAreaParameters&);
+    static bool decode(ArgumentDecoder&, WebCore::ScrollableAreaParameters&);
+};
+
+template<> struct ArgumentCoder<WebCore::FixedPositionViewportConstraints> {
+    static void encode(ArgumentEncoder&, const WebCore::FixedPositionViewportConstraints&);
+    static bool decode(ArgumentDecoder&, WebCore::FixedPositionViewportConstraints&);
+};
+
+template<> struct ArgumentCoder<WebCore::StickyPositionViewportConstraints> {
+    static void encode(ArgumentEncoder&, const WebCore::StickyPositionViewportConstraints&);
+    static bool decode(ArgumentDecoder&, WebCore::StickyPositionViewportConstraints&);
+};
+
+#if !USE(COORDINATED_GRAPHICS)
+template<> struct ArgumentCoder<WebCore::FilterOperations> {
+    static void encode(ArgumentEncoder&, const WebCore::FilterOperations&);
+    static bool decode(ArgumentDecoder&, WebCore::FilterOperations&);
+};
+    
+template<> struct ArgumentCoder<WebCore::FilterOperation> {
+    static void encode(ArgumentEncoder&, const WebCore::FilterOperation&);
+};
+bool decodeFilterOperation(ArgumentDecoder&, RefPtr<WebCore::FilterOperation>&);
+#endif
+
+template<> struct ArgumentCoder<WebCore::SessionID> {
+    static void encode(ArgumentEncoder&, const WebCore::SessionID&);
+    static bool decode(ArgumentDecoder&, WebCore::SessionID&);
+};
+
+template<> struct ArgumentCoder<WebCore::BlobPart> {
+    static void encode(ArgumentEncoder&, const WebCore::BlobPart&);
+    static bool decode(ArgumentDecoder&, WebCore::BlobPart&);
+};
+
+#if ENABLE(CONTENT_FILTERING)
+template<> struct ArgumentCoder<WebCore::ContentFilterUnblockHandler> {
+    static void encode(ArgumentEncoder&, const WebCore::ContentFilterUnblockHandler&);
+    static bool decode(ArgumentDecoder&, WebCore::ContentFilterUnblockHandler&);
+};
+#endif
+
+#if ENABLE(MEDIA_SESSION)
+template<> struct ArgumentCoder<WebCore::MediaSessionMetadata> {
+    static void encode(ArgumentEncoder&, const WebCore::MediaSessionMetadata&);
+    static bool decode(ArgumentDecoder&, WebCore::MediaSessionMetadata&);
+};
+#endif
+
+template<> struct ArgumentCoder<WebCore::TextIndicatorData> {
+    static void encode(ArgumentEncoder&, const WebCore::TextIndicatorData&);
+    static bool decode(ArgumentDecoder&, WebCore::TextIndicatorData&);
+};
+
+template<> struct ArgumentCoder<WebCore::DictionaryPopupInfo> {
+    static void encode(ArgumentEncoder&, const WebCore::DictionaryPopupInfo&);
+    static bool decode(ArgumentDecoder&, WebCore::DictionaryPopupInfo&);
+};
+
+#if ENABLE(WIRELESS_PLAYBACK_TARGET)
+template<> struct ArgumentCoder<WebCore::MediaPlaybackTargetContext> {
+    static void encode(ArgumentEncoder&, const WebCore::MediaPlaybackTargetContext&);
+    static bool decode(ArgumentDecoder&, WebCore::MediaPlaybackTargetContext&);
+    static void encodePlatformData(ArgumentEncoder&, const WebCore::MediaPlaybackTargetContext&);
+    static bool decodePlatformData(ArgumentDecoder&, WebCore::MediaPlaybackTargetContext&);
+};
+#endif
+
+template<> struct ArgumentCoder<WebCore::RecentSearch> {
+    static void encode(ArgumentEncoder&, const WebCore::RecentSearch&);
+    static bool decode(ArgumentDecoder&, WebCore::RecentSearch&);
+};
+
+template<> struct ArgumentCoder<WebCore::ExceptionDetails> {
+    static void encode(ArgumentEncoder&, const WebCore::ExceptionDetails&);
+    static bool decode(ArgumentDecoder&, WebCore::ExceptionDetails&);
+};
+
+} // namespace IPC
+
+#if USE(APPLE_INTERNAL_SDK)
+#include <WebKitAdditions/WebCoreArgumentCodersAdditions.h>
+#endif
 
 #endif // WebCoreArgumentCoders_h

@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -34,9 +34,9 @@
 
 namespace WebCore {
 
-PassRefPtr<DatabaseAuthorizer> DatabaseAuthorizer::create(const String& databaseInfoTableName)
+Ref<DatabaseAuthorizer> DatabaseAuthorizer::create(const String& databaseInfoTableName)
 {
-    return adoptRef(new DatabaseAuthorizer(databaseInfoTableName));
+    return adoptRef(*new DatabaseAuthorizer(databaseInfoTableName));
 }
 
 DatabaseAuthorizer::DatabaseAuthorizer(const String& databaseInfoTableName)
@@ -289,7 +289,7 @@ int DatabaseAuthorizer::createVTable(const String& tableName, const String& modu
         return SQLAuthDeny;
 
     // Allow only the FTS3 extension
-    if (!equalIgnoringCase(moduleName, "fts3"))
+    if (!equalLettersIgnoringASCIICase(moduleName, "fts3"))
         return SQLAuthDeny;
 
     m_lastActionChangedDatabase = true;
@@ -302,7 +302,7 @@ int DatabaseAuthorizer::dropVTable(const String& tableName, const String& module
         return SQLAuthDeny;
 
     // Allow only the FTS3 extension
-    if (!equalIgnoringCase(moduleName, "fts3"))
+    if (!equalLettersIgnoringASCIICase(moduleName, "fts3"))
         return SQLAuthDeny;
 
     return updateDeletesBasedOnTableName(tableName);
@@ -396,11 +396,6 @@ bool DatabaseAuthorizer::allowWrite()
     return !(m_securityEnabled && (m_permissions & ReadOnlyMask || m_permissions & NoAccessMask));
 }
 
-void DatabaseAuthorizer::setReadOnly()
-{
-    m_permissions |= ReadOnlyMask;
-}
-   
 void DatabaseAuthorizer::setPermissions(int permissions)
 {
     m_permissions = permissions;
@@ -412,12 +407,14 @@ int DatabaseAuthorizer::denyBasedOnTableName(const String& tableName) const
         return SQLAuthAllow;
 
     // Sadly, normal creates and drops end up affecting sqlite_master in an authorizer callback, so
-    // it will be tough to enforce all of the following policies
-    //if (equalIgnoringCase(tableName, "sqlite_master") || equalIgnoringCase(tableName, "sqlite_temp_master") ||
-    //    equalIgnoringCase(tableName, "sqlite_sequence") || equalIgnoringCase(tableName, Database::databaseInfoTableName()))
-    //        return SQLAuthDeny;
+    // it will be tough to enforce all of the following policies.
+    // if (equalIgnoringASCIICase(tableName, "sqlite_master")
+    //      || equalIgnoringASCIICase(tableName, "sqlite_temp_master")
+    //      || equalIgnoringASCIICase(tableName, "sqlite_sequence")
+    //      || equalIgnoringASCIICase(tableName, Database::databaseInfoTableName()))
+    //    return SQLAuthDeny;
 
-    if (equalIgnoringCase(tableName, m_databaseInfoTableName))
+    if (equalIgnoringASCIICase(tableName, m_databaseInfoTableName))
         return SQLAuthDeny;
 
     return SQLAuthAllow;

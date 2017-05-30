@@ -28,14 +28,13 @@
 #include "CachedResourceLoader.h"
 #include "CachedResourceRequest.h"
 #include "Document.h"
-#include "XSLStyleSheet.h"
 
 namespace WebCore {
 
 XSLImportRule::XSLImportRule(XSLStyleSheet* parent, const String& href)
     : m_parentStyleSheet(parent)
     , m_strHref(href)
-    , m_cachedSheet(0)
+    , m_cachedSheet(nullptr)
     , m_loading(false)
 {
 }
@@ -43,16 +42,16 @@ XSLImportRule::XSLImportRule(XSLStyleSheet* parent, const String& href)
 XSLImportRule::~XSLImportRule()
 {
     if (m_styleSheet)
-        m_styleSheet->setParentStyleSheet(0);
+        m_styleSheet->setParentStyleSheet(nullptr);
     
     if (m_cachedSheet)
         m_cachedSheet->removeClient(this);
 }
 
-void XSLImportRule::setXSLStyleSheet(const String& href, const KURL& baseURL, const String& sheet)
+void XSLImportRule::setXSLStyleSheet(const String& href, const URL& baseURL, const String& sheet)
 {
     if (m_styleSheet)
-        m_styleSheet->setParentStyleSheet(0);
+        m_styleSheet->setParentStyleSheet(nullptr);
 
     m_styleSheet = XSLStyleSheet::create(this, href, baseURL);
 
@@ -74,7 +73,7 @@ bool XSLImportRule::isLoading()
 
 void XSLImportRule::loadSheet()
 {
-    CachedResourceLoader* cachedResourceLoader = 0;
+    CachedResourceLoader* cachedResourceLoader = nullptr;
 
     XSLStyleSheet* rootSheet = parentStyleSheet();
 
@@ -90,7 +89,7 @@ void XSLImportRule::loadSheet()
     XSLStyleSheet* parentSheet = parentStyleSheet();
     if (!parentSheet->baseURL().isNull())
         // use parent styleheet's URL as the base URL
-        absHref = KURL(parentSheet->baseURL(), m_strHref).string();
+        absHref = URL(parentSheet->baseURL(), m_strHref).string();
     
     // Check for a cycle in our import chain.  If we encounter a stylesheet
     // in our parent chain with the same URL, then just bail.
@@ -100,6 +99,8 @@ void XSLImportRule::loadSheet()
     }
     
     CachedResourceRequest request(ResourceRequest(cachedResourceLoader->document()->completeURL(absHref)));
+    if (m_cachedSheet)
+        m_cachedSheet->removeClient(this);
     m_cachedSheet = cachedResourceLoader->requestXSLStyleSheet(request);
     
     if (m_cachedSheet) {

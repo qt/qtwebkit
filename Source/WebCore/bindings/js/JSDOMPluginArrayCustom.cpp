@@ -21,6 +21,7 @@
 #include "JSDOMPluginArray.h"
 
 #include "DOMPluginArray.h"
+#include "JSDOMBinding.h"
 #include "JSDOMPlugin.h"
 #include <wtf/text/AtomicString.h>
 
@@ -28,15 +29,14 @@ namespace WebCore {
 
 using namespace JSC;
 
-bool JSDOMPluginArray::canGetItemsForName(ExecState*, DOMPluginArray* pluginArray, PropertyName propertyName)
+bool JSDOMPluginArray::nameGetter(ExecState* exec, PropertyName propertyName, JSValue& value)
 {
-    return pluginArray->canGetItemsForName(propertyNameToAtomicString(propertyName));
-}
+    auto item = wrapped().namedItem(propertyNameToAtomicString(propertyName));
+    if (!item)
+        return false;
 
-JSValue JSDOMPluginArray::nameGetter(ExecState* exec, JSValue slotBase, PropertyName propertyName)
-{
-    JSDOMPluginArray* thisObj = jsCast<JSDOMPluginArray*>(asObject(slotBase));
-    return toJS(exec, thisObj->globalObject(), thisObj->impl()->namedItem(propertyNameToAtomicString(propertyName)));
+    value = toJS(exec, globalObject(), item);
+    return true;
 }
 
 } // namespace WebCore

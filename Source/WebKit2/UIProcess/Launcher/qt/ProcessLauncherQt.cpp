@@ -36,9 +36,9 @@
 #include <QProcess>
 #include <QString>
 #include <QtCore/qglobal.h>
-#include <WebCore/RunLoop.h>
 #include <wtf/HashSet.h>
 #include <wtf/PassRefPtr.h>
+#include <wtf/RunLoop.h>
 #include <wtf/Threading.h>
 #include <wtf/text/WTFString.h>
 
@@ -54,8 +54,8 @@
 #endif
 
 #if defined(Q_OS_LINUX)
-#include <sys/prctl.h>
 #include <signal.h>
+#include <sys/prctl.h>
 #endif
 
 #if OS(WINDOWS)
@@ -84,8 +84,7 @@ using namespace WebCore;
 
 namespace WebKit {
 
-class QtWebProcess : public QProcess
-{
+class QtWebProcess final : public QProcess {
     Q_OBJECT
 public:
     QtWebProcess(QObject* parent = 0)
@@ -94,7 +93,7 @@ public:
     }
 
 protected:
-    virtual void setupChildProcess();
+    void setupChildProcess() final;
 };
 
 void QtWebProcess::setupChildProcess()
@@ -114,18 +113,24 @@ void QtWebProcess::setupChildProcess()
 void ProcessLauncher::launchProcess()
 {
     QString commandLine;
-    if (m_launchOptions.processType == WebProcess) {
+    if (m_launchOptions.processType == ProcessType::Web) {
         commandLine = QLatin1String("%1 \"%2\" %3");
         QByteArray webProcessPrefix = qgetenv("QT_WEBKIT2_WP_CMD_PREFIX");
         commandLine = commandLine.arg(QLatin1String(webProcessPrefix.constData())).arg(QString(executablePathOfWebProcess()));
+    } else if (m_launchOptions.processType == ProcessType::Network) {
+        commandLine = QLatin1String("%1 \"%2\" %3");
+        QByteArray networkProcessPrefix = qgetenv("QT_WEBKIT2_NP_CMD_PREFIX");
+        commandLine = commandLine.arg(QLatin1String(networkProcessPrefix.constData())).arg(QString(executablePathOfNetworkProcess()));
 #if ENABLE(PLUGIN_PROCESS)
-    } else if (m_launchOptions.processType == PluginProcess) {
+    } else if (m_launchOptions.processType == ProcessType::Plugin32 || m_launchOptions.processType == ProcessType::Plugin64) {
         commandLine = QLatin1String("%1 \"%2\" %3 %4");
         QByteArray pluginProcessPrefix = qgetenv("QT_WEBKIT2_PP_CMD_PREFIX");
         commandLine = commandLine.arg(QLatin1String(pluginProcessPrefix.constData())).arg(QString(executablePathOfPluginProcess()));
 #endif
-    } else
+    } else {
+        qDebug() << "Unsupported process type" << (int)m_launchOptions.processType;
         ASSERT_NOT_REACHED();
+    }
 
 #if OS(DARWIN)
     // Create the listening port.
@@ -143,8 +148,8 @@ void ProcessLauncher::launchProcess()
 
     commandLine = commandLine.arg(serviceName);
 #elif OS(WINDOWS)
-    CoreIPC::Connection::Identifier connector, clientIdentifier;
-    if (!CoreIPC::Connection::createServerAndClientIdentifiers(connector, clientIdentifier)) {
+    IPC::Connection::Identifier connector, clientIdentifier;
+    if (!IPC::Connection::createServerAndClientIdentifiers(connector, clientIdentifier)) {
         // FIXME: What should we do here?
         ASSERT_NOT_REACHED();
     }
@@ -174,7 +179,7 @@ void ProcessLauncher::launchProcess()
 #endif
 
 #if ENABLE(PLUGIN_PROCESS)
-    if (m_launchOptions.processType == PluginProcess)
+    if (m_launchOptions.processType == ProcessType::Plugin32 || m_launchOptions.processType == ProcessType::Plugin64)
         commandLine = commandLine.arg(QString(m_launchOptions.extraInitializationData.get("plugin-path")));
 #endif
 
@@ -219,7 +224,10 @@ void ProcessLauncher::launchProcess()
 #if OS(UNIX)
     setpriority(PRIO_PROCESS, webProcessOrSUIDHelper->pid(), 10);
 #endif
-    RunLoop::main()->dispatch(bind(&WebKit::ProcessLauncher::didFinishLaunchingProcess, this, webProcessOrSUIDHelper, connector));
+    RefPtr<ProcessLauncher> protector(this);
+    RunLoop::main().dispatch([protector, webProcessOrSUIDHelper, connector] {
+        protector->didFinishLaunchingProcess(webProcessOrSUIDHelper, connector);
+    });
 }
 
 void ProcessLauncher::terminateProcess()

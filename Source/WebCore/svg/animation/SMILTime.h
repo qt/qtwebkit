@@ -26,12 +26,12 @@
 #ifndef SMILTime_h
 #define SMILTime_h
 
-#if ENABLE(SVG)
-
 #include <algorithm>
-#include <wtf/MathExtras.h>
+#include <cmath>
 
 namespace WebCore {
+
+const double SMILAnimationFrameDelay = 1.0 / 60;
 
 class SMILTime {
 public:
@@ -98,5 +98,4 @@ SMILTime operator*(const SMILTime&, const SMILTime&);
 
 }
 
-#endif // ENABLE(SVG)
 #endif // SMILTime_h

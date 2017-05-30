@@ -57,16 +57,17 @@ DOMWindowSpeechSynthesis* DOMWindowSpeechSynthesis::from(DOMWindow* window)
 {
     DOMWindowSpeechSynthesis* supplement = static_cast<DOMWindowSpeechSynthesis*>(Supplement<DOMWindow>::from(window, supplementName()));
     if (!supplement) {
-        supplement = new DOMWindowSpeechSynthesis(window);
-        provideTo(window, supplementName(), adoptPtr(supplement));
+        auto newSupplement = std::make_unique<DOMWindowSpeechSynthesis>(window);
+        supplement = newSupplement.get();
+        provideTo(window, supplementName(), WTFMove(newSupplement));
     }
     return supplement;
 }
 
 // static
-SpeechSynthesis* DOMWindowSpeechSynthesis::speechSynthesis(DOMWindow* window)
+SpeechSynthesis* DOMWindowSpeechSynthesis::speechSynthesis(DOMWindow& window)
 {
-    return DOMWindowSpeechSynthesis::from(window)->speechSynthesis();
+    return DOMWindowSpeechSynthesis::from(&window)->speechSynthesis();
 }
 
 SpeechSynthesis* DOMWindowSpeechSynthesis::speechSynthesis()

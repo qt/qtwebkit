@@ -33,29 +33,27 @@ namespace JSC {
 class StrictEvalActivation : public JSScope {
 public:
     typedef JSScope Base;
+    static const unsigned StructureFlags = Base::StructureFlags | IsEnvironmentRecord;
 
-    static StrictEvalActivation* create(ExecState* exec)
+    static StrictEvalActivation* create(ExecState* exec, JSScope* currentScope)
     {
-        StrictEvalActivation* activation = new (NotNull, allocateCell<StrictEvalActivation>(*exec->heap())) StrictEvalActivation(exec);
-        activation->finishCreation(exec->vm());
-        return activation;
+        StrictEvalActivation* lexicalEnvironment = new (NotNull, allocateCell<StrictEvalActivation>(*exec->heap())) StrictEvalActivation(exec, currentScope);
+        lexicalEnvironment->finishCreation(exec->vm());
+        return lexicalEnvironment;
     }
 
     static bool deleteProperty(JSCell*, ExecState*, PropertyName);
-    static JSObject* toThisObject(JSCell*, ExecState*);
+    static JSValue toThis(JSCell*, ExecState*, ECMAMode);
 
     static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype)
     {
-        return Structure::create(vm, globalObject, prototype, TypeInfo(ObjectType, StructureFlags), &s_info);
+        return Structure::create(vm, globalObject, prototype, TypeInfo(ObjectType, StructureFlags), info());
     }
     
-    static const ClassInfo s_info;
-
-protected:
-    static const unsigned StructureFlags = IsEnvironmentRecord | Base::StructureFlags;
+    DECLARE_INFO;
 
 private:
-    StrictEvalActivation(ExecState*);
+    StrictEvalActivation(ExecState*, JSScope*);
 };
 
 } // namespace JSC

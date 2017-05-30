@@ -26,8 +26,12 @@
 #ifndef WKRetainPtr_h
 #define WKRetainPtr_h
 
-#include <WebKit2/WKType.h>
+#include <WebKit/WKType.h>
 #include <algorithm>
+#include <wtf/GetPtr.h>
+#include <wtf/HashFunctions.h>
+#include <wtf/HashTraits.h>
+#include <wtf/RefPtr.h>
 
 namespace WebKit {
 
@@ -68,7 +72,6 @@ public:
             WKRetain(ptr);
     }
 
-#if COMPILER_SUPPORTS(CXX_RVALUE_REFERENCES)
     template<typename U> WKRetainPtr(WKRetainPtr<U>&& o)
         : m_ptr(o.leakRef())
     {
@@ -78,13 +81,21 @@ public:
         : m_ptr(o.leakRef())
     {
     }
-#endif
 
     ~WKRetainPtr()
     {
         if (PtrType ptr = m_ptr)
             WKRelease(ptr);
     }
+
+    // Hash table deleted values, which are only constructed and never copied or destroyed.
+    WKRetainPtr(WTF::HashTableDeletedValueType)
+        : m_ptr(hashTableDeletedValue())
+    {
+    }
+
+    bool isHashTableDeletedValue() const { return m_ptr == hashTableDeletedValue(); }
+    constexpr static T hashTableDeletedValue() { return reinterpret_cast<T>(-1); }
 
     PtrType get() const { return m_ptr; }
 
@@ -115,10 +126,8 @@ public:
     WKRetainPtr& operator=(PtrType);
     template<typename U> WKRetainPtr& operator=(U*);
 
-#if COMPILER_SUPPORTS(CXX_RVALUE_REFERENCES)
     WKRetainPtr& operator=(WKRetainPtr&&);
     template<typename U> WKRetainPtr& operator=(WKRetainPtr<U>&&);
-#endif
 
     void adopt(PtrType);
     void swap(WKRetainPtr&);
@@ -173,7 +182,6 @@ template<typename T> template<typename U> inline WKRetainPtr<T>& WKRetainPtr<T>:
     return *this;
 }
 
-#if COMPILER_SUPPORTS(CXX_RVALUE_REFERENCES)
 template<typename T> inline WKRetainPtr<T>& WKRetainPtr<T>::operator=(WKRetainPtr<T>&& o)
 {
     adopt(o.leakRef());
@@ -185,7 +193,6 @@ template<typename T> template<typename U> inline WKRetainPtr<T>& WKRetainPtr<T>:
     adopt(o.leakRef());
     return *this;
 }
-#endif
 
 template<typename T> inline void WKRetainPtr<T>::adopt(PtrType optr)
 {
@@ -236,8 +243,7 @@ template<typename T, typename U> inline bool operator!=(T* a, const WKRetainPtr<
 }
 
 template<typename T> inline WKRetainPtr<T> adoptWK(T) WARN_UNUSED_RETURN;
-
-template<typename T> inline WKRetainPtr<T> adoptWK(T o) 
+template<typename T> inline WKRetainPtr<T> adoptWK(T o)
 {
     return WKRetainPtr<T>(AdoptWK, o);
 }
@@ -247,5 +253,25 @@ template<typename T> inline WKRetainPtr<T> adoptWK(T o)
 using WebKit::WKRetainPtr;
 using WebKit::AdoptWK;
 using WebKit::adoptWK;
+
+namespace WTF {
+
+template <typename T> struct IsSmartPtr<WKRetainPtr<T>> {
+    static const bool value = true;
+};
+
+template<typename P> struct DefaultHash<WKRetainPtr<P>> {
+    typedef PtrHash<WKRetainPtr<P>> Hash;
+};
+
+template<typename P> struct HashTraits<WKRetainPtr<P>> : SimpleClassHashTraits<WKRetainPtr<P>> {
+    static P emptyValue() { return nullptr; }
+
+    typedef P PeekType;
+    static PeekType peek(const WKRetainPtr<P>& value) { return value.get(); }
+    static PeekType peek(P value) { return value; }
+};
+
+} // namespace WTF
 
 #endif // WKRetainPtr_h

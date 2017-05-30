@@ -22,6 +22,7 @@
 # THE POSSIBILITY OF SUCH DAMAGE.
 
 require "config"
+require "set"
 
 # Interesting invariant, which we take advantage of: branching instructions
 # always begin with "b", and no non-branching instructions begin with "b".
@@ -29,6 +30,7 @@ require "config"
 
 MACRO_INSTRUCTIONS =
     [
+     "emit",
      "addi",
      "andi",
      "lshifti",
@@ -206,8 +208,6 @@ MACRO_INSTRUCTIONS =
      "tqs",
      "tqz",
      "tqnz",
-     "peekq",
-     "pokeq",
      "bqeq",
      "bqneq",
      "bqa",
@@ -249,6 +249,7 @@ MACRO_INSTRUCTIONS =
      "bnz",
      "leai",
      "leap",
+     "memfence"
     ]
 
 X86_INSTRUCTIONS =
@@ -259,10 +260,23 @@ X86_INSTRUCTIONS =
 
 ARM_INSTRUCTIONS =
     [
-     "smulli",
-     "addis",
-     "subis",
-     "oris"
+     "clrbp",
+     "mvlbl"
+    ]
+
+ARM64_INSTRUCTIONS =
+    [
+     "pcrtoaddr",   # Address from PC relative offset - adr instruction
+     "nopFixCortexA53Err835769" # nop on Cortex-A53 (nothing otherwise)
+    ]
+
+RISC_INSTRUCTIONS =
+    [
+     "smulli",  # Multiply two 32-bit words and produce a 64-bit word
+     "addis",   # Add integers and set a flag.
+     "subis",   # Same, but for subtraction.
+     "oris",    # Same, but for bitwise or.
+     "addps"    # addis but for pointers.
     ]
 
 MIPS_INSTRUCTIONS =
@@ -270,6 +284,7 @@ MIPS_INSTRUCTIONS =
     "la",
     "movz",
     "movn",
+    "setcallreg",
     "slt",
     "sltu",
     "pichdr"
@@ -277,6 +292,9 @@ MIPS_INSTRUCTIONS =
 
 SH4_INSTRUCTIONS =
     [
+    "flushcp",
+    "alignformova",
+    "mova",
     "shllx",
     "shlrx",
     "shld",
@@ -285,15 +303,17 @@ SH4_INSTRUCTIONS =
     "loaddReversedAndIncrementAddress",
     "storedReversedAndDecrementAddress",
     "ldspr",
-    "stspr"
+    "stspr",
+    "setargs"
     ]
 
 CXX_INSTRUCTIONS =
     [
-     "cloopCrash",           # no operands
-     "cloopCallJSFunction",  # operands: callee
-     "cloopCallNative",      # operands: callee
-     "cloopCallSlowPath",    # operands: callTarget, currentFrame, currentPC
+     "cloopCrash",              # no operands
+     "cloopCallJSFunction",     # operands: callee
+     "cloopCallNative",         # operands: callee
+     "cloopCallSlowPath",       # operands: callTarget, currentFrame, currentPC
+     "cloopCallSlowPathVoid",   # operands: callTarget, currentFrame, currentPC
 
      # For debugging only:
      # Takes no operands but simply emits whatever follows in // comments as
@@ -304,9 +324,9 @@ CXX_INSTRUCTIONS =
      "cloopDo",              # no operands
     ]
 
-INSTRUCTIONS = MACRO_INSTRUCTIONS + X86_INSTRUCTIONS + ARM_INSTRUCTIONS + MIPS_INSTRUCTIONS + SH4_INSTRUCTIONS + CXX_INSTRUCTIONS
+INSTRUCTIONS = MACRO_INSTRUCTIONS + X86_INSTRUCTIONS + ARM_INSTRUCTIONS + ARM64_INSTRUCTIONS + RISC_INSTRUCTIONS + MIPS_INSTRUCTIONS + SH4_INSTRUCTIONS + CXX_INSTRUCTIONS
 
-INSTRUCTION_PATTERN = Regexp.new('\\A((' + INSTRUCTIONS.join(')|(') + '))\\Z')
+INSTRUCTION_SET = INSTRUCTIONS.to_set
 
 def isBranch(instruction)
     instruction =~ /^b/

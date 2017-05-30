@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -33,30 +33,30 @@
 
 namespace WebCore {
 
-class AccessibilityListBox : public AccessibilityRenderObject {
+class AccessibilityListBox final : public AccessibilityRenderObject {
+public:
+    static Ref<AccessibilityListBox> create(RenderObject*);
+    virtual ~AccessibilityListBox();
+    
+    virtual bool canSetSelectedChildrenAttribute() const override;
+    void setSelectedChildren(const AccessibilityChildrenVector&);
+    virtual AccessibilityRole roleValue() const override { return ListBoxRole; }
+        
+    virtual void selectedChildren(AccessibilityChildrenVector&) override;
+    virtual void visibleChildren(AccessibilityChildrenVector&) override;
+    
+    virtual void addChildren() override;
 
 private:
     explicit AccessibilityListBox(RenderObject*);
-public:
-    static PassRefPtr<AccessibilityListBox> create(RenderObject*);
-    virtual ~AccessibilityListBox();
-    
-    virtual bool isListBox() const { return true; }
-    
-    virtual bool canSetSelectedChildrenAttribute() const;
-    void setSelectedChildren(AccessibilityChildrenVector&);
-    virtual AccessibilityRole roleValue() const { return ListBoxRole; }
-        
-    virtual void selectedChildren(AccessibilityChildrenVector&);
-    virtual void visibleChildren(AccessibilityChildrenVector&);
-    
-    virtual void addChildren();
 
-private:    
+    virtual bool isListBox() const override { return true; }
     AccessibilityObject* listBoxOptionAccessibilityObject(HTMLElement*) const;
-    virtual AccessibilityObject* elementAccessibilityHitTest(const IntPoint&) const;
+    virtual AccessibilityObject* elementAccessibilityHitTest(const IntPoint&) const override;
 };
     
 } // namespace WebCore
+
+SPECIALIZE_TYPE_TRAITS_ACCESSIBILITY(AccessibilityListBox, isListBox())
 
 #endif // AccessibilityListBox_h

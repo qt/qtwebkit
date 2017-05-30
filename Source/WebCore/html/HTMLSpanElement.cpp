@@ -32,15 +32,15 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-HTMLSpanElement::HTMLSpanElement(const QualifiedName& tagName, Document* document)
+HTMLSpanElement::HTMLSpanElement(const QualifiedName& tagName, Document& document)
     : HTMLElement(tagName, document)
 {
     ASSERT(hasTagName(spanTag));
 }
 
-PassRefPtr<HTMLSpanElement> HTMLSpanElement::create(const QualifiedName& tagName, Document* document)
+Ref<HTMLSpanElement> HTMLSpanElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new HTMLSpanElement(tagName, document));
+    return adoptRef(*new HTMLSpanElement(tagName, document));
 }
 
 }

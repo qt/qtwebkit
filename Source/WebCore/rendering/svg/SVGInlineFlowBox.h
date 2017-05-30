@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2006 Oliver Hunt <ojh16@student.canterbury.ac.nz>
- * Copyright (C) 2006 Apple Computer Inc.
+ * Copyright (C) 2006 Apple Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -21,44 +21,38 @@
 #ifndef SVGInlineFlowBox_h
 #define SVGInlineFlowBox_h
 
-#if ENABLE(SVG)
 #include "InlineFlowBox.h"
+#include "RenderSVGInline.h"
 
 namespace WebCore {
 
 class RenderSVGInlineText;
 
-class SVGInlineFlowBox FINAL : public InlineFlowBox {
+class SVGInlineFlowBox final : public InlineFlowBox {
 public:
-    SVGInlineFlowBox(RenderObject* obj)
-        : InlineFlowBox(obj)
+    SVGInlineFlowBox(RenderSVGInline& renderer)
+        : InlineFlowBox(renderer)
         , m_logicalHeight(0)
     {
     }
 
-    virtual bool isSVGInlineFlowBox() const { return true; }
-    virtual float virtualLogicalHeight() const { return m_logicalHeight; }
+    RenderSVGInline& renderer() { return static_cast<RenderSVGInline&>(InlineFlowBox::renderer()); }
+
+    virtual FloatRect calculateBoundaries() const override;
+
     void setLogicalHeight(float h) { m_logicalHeight = h; }
-
     void paintSelectionBackground(PaintInfo&);
-    virtual void paint(PaintInfo&, const LayoutPoint&, LayoutUnit lineTop, LayoutUnit lineBottom);
-
-    virtual FloatRect calculateBoundaries() const;
-
-    static void computeTextMatchMarkerRectForRenderer(RenderSVGInlineText*);
 
 private:
+    virtual bool isSVGInlineFlowBox() const override { return true; }
+    virtual float virtualLogicalHeight() const override { return m_logicalHeight; }
+    virtual void paint(PaintInfo&, const LayoutPoint&, LayoutUnit lineTop, LayoutUnit lineBottom) override;
+
     float m_logicalHeight;
 };
 
-inline SVGInlineFlowBox* toSVGInlineFlowBox(InlineBox* box)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!box || box->isSVGInlineFlowBox());
-    return static_cast<SVGInlineFlowBox*>(box);
-}
-
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
+SPECIALIZE_TYPE_TRAITS_INLINE_BOX(SVGInlineFlowBox, isSVGInlineFlowBox())
 
 #endif // SVGInlineFlowBox_h

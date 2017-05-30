@@ -24,58 +24,40 @@
 
 #include "FontPlatformData.h"
 #include "SharedBuffer.h"
-#if USE(ZLIB)
 #include "WOFFFileFormat.h"
-#endif
 #include <QStringList>
 
 namespace WebCore {
 
-FontPlatformData FontCustomPlatformData::fontPlatformData(int size, bool bold, bool italic, FontOrientation, FontWidthVariant, FontRenderingMode)
+FontPlatformData FontCustomPlatformData::fontPlatformData(const FontDescription& description, bool bold, bool italic)
 {
     Q_ASSERT(m_rawFont.isValid());
+    int size = description.computedPixelSize();
     m_rawFont.setPixelSize(qreal(size));
     return FontPlatformData(m_rawFont);
 }
 
-FontCustomPlatformData* createFontCustomPlatformData(SharedBuffer* buffer)
+std::unique_ptr<FontCustomPlatformData> createFontCustomPlatformData(SharedBuffer& buffer)
 {
-    ASSERT_ARG(buffer, buffer);
+    const QByteArray fontData(buffer.data(), buffer.size());
 
-#if USE(ZLIB)
-    RefPtr<SharedBuffer> sfntBuffer;
-    if (isWOFF(buffer)) {
-        Vector<char> sfnt;
-        if (!convertWOFFToSfnt(buffer, sfnt))
-            return 0;
-
-        sfntBuffer = SharedBuffer::adoptVector(sfnt);
-        buffer = sfntBuffer.get();
-    }
-#endif // USE(ZLIB)
-
-    const QByteArray fontData(buffer->data(), buffer->size());
-#if !USE(ZLIB)
-    if (fontData.startsWith("wOFF")) {
-        qWarning("WOFF support requires QtWebKit to be built with zlib support.");
-        return 0;
-    }
-#endif // !USE(ZLIB)
     // Pixel size doesn't matter at this point, it is set in FontCustomPlatformData::fontPlatformData.
     QRawFont rawFont(fontData, /*pixelSize = */0, QFont::PreferDefaultHinting);
     if (!rawFont.isValid())
         return 0;
 
-    FontCustomPlatformData *data = new FontCustomPlatformData;
+    auto data = std::make_unique<FontCustomPlatformData>();
     data->m_rawFont = rawFont;
     return data;
 }
 
 bool FontCustomPlatformData::supportsFormat(const String& format)
 {
-    return equalIgnoringCase(format, "truetype") || equalIgnoringCase(format, "opentype")
-#if USE(ZLIB)
-            || equalIgnoringCase(format, "woff")
+    return equalLettersIgnoringASCIICase(format, "truetype")
+        || equalLettersIgnoringASCIICase(format, "opentype")
+        || equalLettersIgnoringASCIICase(format, "woff")
+#if USE(WOFF2)
+        || equalLettersIgnoringASCIICase(format, "woff2")
 #endif
     ;
 }

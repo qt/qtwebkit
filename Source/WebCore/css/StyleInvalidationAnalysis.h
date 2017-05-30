@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2012, 2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -27,28 +27,36 @@
 #define StyleInvalidationAnalysis_h
 
 #include <wtf/HashSet.h>
-#include <wtf/PassOwnPtr.h>
 #include <wtf/text/AtomicStringImpl.h>
 
 namespace WebCore {
 
 class Document;
+class Element;
+class MediaQueryEvaluator;
+class RuleSet;
+class SelectorFilter;
 class StyleSheetContents;
 
 class StyleInvalidationAnalysis {
 public:
-    StyleInvalidationAnalysis(const Vector<StyleSheetContents*>&);
+    StyleInvalidationAnalysis(const Vector<StyleSheetContents*>&, const MediaQueryEvaluator&);
+    StyleInvalidationAnalysis(const RuleSet&);
 
     bool dirtiesAllStyle() const { return m_dirtiesAllStyle; }
-    void invalidateStyle(Document*);
+    bool hasShadowPseudoElementRulesInAuthorSheet() const { return m_hasShadowPseudoElementRulesInAuthorSheet; }
+    void invalidateStyle(Document&);
+    void invalidateStyle(Element&);
 
 private:
+    enum class CheckDescendants { Yes, No };
+    CheckDescendants invalidateIfNeeded(Element&, const SelectorFilter*);
+    void invalidateStyleForTree(Element&, SelectorFilter*);
 
-    void analyzeStyleSheet(StyleSheetContents*);
-
-    bool m_dirtiesAllStyle;
-    HashSet<AtomicStringImpl*> m_idScopes;
-    HashSet<AtomicStringImpl*> m_classScopes;
+    std::unique_ptr<RuleSet> m_ownedRuleSet;
+    const RuleSet& m_ruleSet;
+    bool m_dirtiesAllStyle { false };
+    bool m_hasShadowPseudoElementRulesInAuthorSheet { false };
 };
 
 }

@@ -47,7 +47,7 @@ public:
 
     // Can be called from any thread.
     AudioNode* node() const { return m_node; }
-    AudioContext* context() { return m_node->context(); }
+    AudioContext& context() { return m_node->context(); }
     
     // Causes our AudioNode to process if it hasn't already for this render quantum.
     // It returns the bus containing the processed audio for this output, returning inPlaceBus if in-place processing was possible.
@@ -144,8 +144,8 @@ private:
     unsigned m_renderingFanOutCount;
     unsigned m_renderingParamFanOutCount;
 
-    HashSet<RefPtr<AudioParam> > m_params;
-    typedef HashSet<RefPtr<AudioParam> >::iterator ParamsIterator;
+    HashSet<RefPtr<AudioParam>> m_params;
+    typedef HashSet<RefPtr<AudioParam>>::iterator ParamsIterator;
 };
 
 } // namespace WebCore

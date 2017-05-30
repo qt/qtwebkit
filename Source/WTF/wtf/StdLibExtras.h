@@ -27,34 +27,32 @@
 #ifndef WTF_StdLibExtras_h
 #define WTF_StdLibExtras_h
 
+#include <chrono>
+#include <memory>
 #include <wtf/Assertions.h>
 #include <wtf/CheckedArithmetic.h>
 
-// Use these to declare and define a static local variable (static T;) so that
-//  it is leaked so that its destructors are not called at exit. Using this
-//  macro also allows workarounds a compiler bug present in Apple's version of GCC 4.0.1.
-#ifndef DEFINE_STATIC_LOCAL
-#if COMPILER(GCC) && defined(__APPLE_CC__) && __GNUC__ == 4 && __GNUC_MINOR__ == 0 && __GNUC_PATCHLEVEL__ == 1
-#define DEFINE_STATIC_LOCAL(type, name, arguments) \
-    static type* name##Ptr = new type arguments; \
-    type& name = *name##Ptr
-#else
-#define DEFINE_STATIC_LOCAL(type, name, arguments) \
+// This was used to declare and define a static local variable (static T;) so that
+//  it was leaked so that its destructors were not called at exit.
+// Newly written code should use static NeverDestroyed<T> instead.
+#ifndef DEPRECATED_DEFINE_STATIC_LOCAL
+#define DEPRECATED_DEFINE_STATIC_LOCAL(type, name, arguments) \
     static type& name = *new type arguments
-#endif
 #endif
 
 // Use this macro to declare and define a debug-only global variable that may have a
 // non-trivial constructor and destructor. When building with clang, this will suppress
 // warnings about global constructors and exit-time destructors.
-#ifndef NDEBUG
-#if COMPILER(CLANG)
-#define DEFINE_DEBUG_ONLY_GLOBAL(type, name, arguments) \
+#define DEFINE_GLOBAL_FOR_LOGGING(type, name, arguments) \
     _Pragma("clang diagnostic push") \
     _Pragma("clang diagnostic ignored \"-Wglobal-constructors\"") \
     _Pragma("clang diagnostic ignored \"-Wexit-time-destructors\"") \
     static type name arguments; \
     _Pragma("clang diagnostic pop")
+
+#ifndef NDEBUG
+#if COMPILER(CLANG)
+#define DEFINE_DEBUG_ONLY_GLOBAL(type, name, arguments) DEFINE_GLOBAL_FOR_LOGGING(type, name, arguments)
 #else
 #define DEFINE_DEBUG_ONLY_GLOBAL(type, name, arguments) \
     static type name arguments;
@@ -82,29 +80,29 @@
  * - https://bugs.webkit.org/show_bug.cgi?id=38045
  * - http://gcc.gnu.org/bugzilla/show_bug.cgi?id=43976
  */
-#if (CPU(ARM) || CPU(MIPS)) && COMPILER(GCC)
+#if (CPU(ARM) || CPU(MIPS)) && COMPILER(GCC_OR_CLANG)
 template<typename Type>
-bool isPointerTypeAlignmentOkay(Type* ptr)
+inline bool isPointerTypeAlignmentOkay(Type* ptr)
 {
     return !(reinterpret_cast<intptr_t>(ptr) % __alignof__(Type));
 }
 
 template<typename TypePtr>
-TypePtr reinterpret_cast_ptr(void* ptr)
+inline TypePtr reinterpret_cast_ptr(void* ptr)
 {
     ASSERT(isPointerTypeAlignmentOkay(reinterpret_cast<TypePtr>(ptr)));
     return reinterpret_cast<TypePtr>(ptr);
 }
 
 template<typename TypePtr>
-TypePtr reinterpret_cast_ptr(const void* ptr)
+inline TypePtr reinterpret_cast_ptr(const void* ptr)
 {
     ASSERT(isPointerTypeAlignmentOkay(reinterpret_cast<TypePtr>(ptr)));
     return reinterpret_cast<TypePtr>(ptr);
 }
 #else
 template<typename Type>
-bool isPointerTypeAlignmentOkay(Type*)
+inline bool isPointerTypeAlignmentOkay(Type*)
 {
     return true;
 }
@@ -112,6 +110,8 @@ bool isPointerTypeAlignmentOkay(Type*)
 #endif
 
 namespace WTF {
+
+enum CheckMoveParameterTag { CheckMoveParameter };
 
 static const size_t KB = 1024;
 static const size_t MB = 1024 * 1024;
@@ -129,23 +129,23 @@ inline bool is8ByteAligned(void* p)
 /*
  * C++'s idea of a reinterpret_cast lacks sufficient cojones.
  */
-template<typename TO, typename FROM>
-inline TO bitwise_cast(FROM from)
+template<typename ToType, typename FromType>
+inline ToType bitwise_cast(FromType from)
 {
-    COMPILE_ASSERT(sizeof(TO) == sizeof(FROM), WTF_bitwise_cast_sizeof_casted_types_is_equal);
+    static_assert(sizeof(FromType) == sizeof(ToType), "bitwise_cast size of FromType and ToType must be equal!");
     union {
-        FROM from;
-        TO to;
+        FromType from;
+        ToType to;
     } u;
     u.from = from;
     return u.to;
 }
 
-template<typename To, typename From>
-inline To safeCast(From value)
+template<typename ToType, typename FromType>
+inline ToType safeCast(FromType value)
 {
-    ASSERT(isInBounds<To>(value));
-    return static_cast<To>(value);
+    ASSERT(isInBounds<ToType>(value));
+    return static_cast<ToType>(value);
 }
 
 // Returns a count of the number of bits set in 'bits'.
@@ -156,10 +156,15 @@ inline size_t bitCount(unsigned bits)
     return (((bits + (bits >> 4)) & 0xF0F0F0F) * 0x1010101) >> 24;
 }
 
+inline size_t bitCount(uint64_t bits)
+{
+    return bitCount(static_cast<unsigned>(bits)) + bitCount(static_cast<unsigned>(bits >> 32));
+}
+
 // Macro that returns a compile time constant with the length of an array, but gives an error if passed a non-array.
 template<typename T, size_t Size> char (&ArrayLengthHelperFunction(T (&)[Size]))[Size];
 // GCC needs some help to deduce a 0 length array.
-#if COMPILER(GCC)
+#if COMPILER(GCC_OR_CLANG)
 template<typename T> char (&ArrayLengthHelperFunction(T (&)[0]))[0];
 #endif
 #define WTF_ARRAY_LENGTH(array) sizeof(::WTF::ArrayLengthHelperFunction(array))
@@ -171,9 +176,10 @@ inline size_t roundUpToMultipleOf(size_t divisor, size_t x)
     size_t remainderMask = divisor - 1;
     return (x + remainderMask) & ~remainderMask;
 }
+
 template<size_t divisor> inline size_t roundUpToMultipleOf(size_t x)
 {
-    COMPILE_ASSERT(divisor && !(divisor & (divisor - 1)), divisor_is_a_power_of_two);
+    static_assert(divisor && !(divisor & (divisor - 1)), "divisor must be a power of two!");
     return roundUpToMultipleOf(divisor, x);
 }
 
@@ -260,32 +266,20 @@ inline ArrayElementType* approximateBinarySearch(const ArrayType& array, size_t 
     return binarySearchImpl<ArrayElementType, KeyType, ArrayType, ExtractKey, ReturnAdjacentElementIfKeyIsNotPresent>(const_cast<ArrayType&>(array), size, key, extractKey);
 }
 
-} // namespace WTF
-
-#if OS(WINCE)
-// Windows CE CRT has does not implement bsearch().
-inline void* wtf_bsearch(const void* key, const void* base, size_t count, size_t size, int (*compare)(const void *, const void *))
+template<typename VectorType, typename ElementType>
+inline void insertIntoBoundedVector(VectorType& vector, size_t size, const ElementType& element, size_t index)
 {
-    const char* first = static_cast<const char*>(base);
-
-    while (count) {
-        size_t pos = (count - 1) >> 1;
-        const char* item = first + pos * size;
-        int compareResult = compare(item, key);
-        if (!compareResult)
-            return const_cast<char*>(item);
-        if (compareResult < 0) {
-            count -= (pos + 1);
-            first += (pos + 1) * size;
-        } else
-            count = pos;
-    }
-
-    return 0;
+    for (size_t i = size; i-- > index + 1;)
+        vector[i] = vector[i - 1];
+    vector[index] = element;
 }
 
-#define bsearch(key, base, count, size, compare) wtf_bsearch(key, base, count, size, compare)
-#endif
+// This is here instead of CompilationThread.h to prevent that header from being included
+// everywhere. The fact that this method, and that header, exist outside of JSC is a bug.
+// https://bugs.webkit.org/show_bug.cgi?id=131815
+WTF_EXPORT_PRIVATE bool isCompilationThread();
+
+} // namespace WTF
 
 // This version of placement new omits a 0 check.
 enum NotNullTag { NotNull };
@@ -295,8 +289,108 @@ inline void* operator new(size_t, NotNullTag, void* location)
     return location;
 }
 
+// This adds various C++14 features for versions of the STL that may not yet have them.
+namespace std {
+// MSVC 2013 supports std::make_unique already.
+#if !defined(_MSC_VER) || _MSC_VER < 1800
+template<class T> struct _Unique_if {
+    typedef unique_ptr<T> _Single_object;
+};
+
+template<class T> struct _Unique_if<T[]> {
+    typedef unique_ptr<T[]> _Unknown_bound;
+};
+
+template<class T, size_t N> struct _Unique_if<T[N]> {
+    typedef void _Known_bound;
+};
+
+template<class T, class... Args> inline typename _Unique_if<T>::_Single_object
+make_unique(Args&&... args)
+{
+    return unique_ptr<T>(new T(std::forward<Args>(args)...));
+}
+
+template<class T> inline typename _Unique_if<T>::_Unknown_bound
+make_unique(size_t n)
+{
+    typedef typename remove_extent<T>::type U;
+    return unique_ptr<T>(new U[n]());
+}
+
+template<class T, class... Args> typename _Unique_if<T>::_Known_bound
+make_unique(Args&&...) = delete;
+#endif
+
+// MSVC 2015 supports these functions.
+#if !COMPILER(MSVC) || _MSC_VER < 1900
+// Compile-time integer sequences
+// http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2013/n3658.html
+// (Note that we only implement index_sequence, and not the more generic integer_sequence).
+template<size_t... indexes> struct index_sequence {
+    static size_t size() { return sizeof...(indexes); }
+};
+
+template<size_t currentIndex, size_t...indexes> struct make_index_sequence_helper;
+
+template<size_t...indexes> struct make_index_sequence_helper<0, indexes...> {
+    typedef std::index_sequence<indexes...> type;
+};
+
+template<size_t currentIndex, size_t...indexes> struct make_index_sequence_helper {
+    typedef typename make_index_sequence_helper<currentIndex - 1, currentIndex - 1, indexes...>::type type;
+};
+
+template<size_t length> struct make_index_sequence : public make_index_sequence_helper<length>::type { };
+
+// std::exchange
+template<class T, class U = T>
+T exchange(T& t, U&& newValue)
+{
+    T oldValue = std::move(t);
+    t = std::forward<U>(newValue);
+
+    return oldValue;
+}
+#endif
+
+#if COMPILER_SUPPORTS(CXX_USER_LITERALS)
+// These literals are available in C++14, so once we require C++14 compilers we can get rid of them here.
+// (User-literals need to have a leading underscore so we add it here - the "real" literals don't have underscores).
+namespace literals {
+namespace chrono_literals {
+    constexpr inline chrono::seconds operator"" _s(unsigned long long s)
+    {
+        return chrono::seconds(static_cast<chrono::seconds::rep>(s));
+    }
+
+    constexpr chrono::milliseconds operator"" _ms(unsigned long long ms)
+    {
+        return chrono::milliseconds(static_cast<chrono::milliseconds::rep>(ms));
+    }
+}
+}
+#endif
+
+template<WTF::CheckMoveParameterTag, typename T>
+ALWAYS_INLINE constexpr typename remove_reference<T>::type&& move(T&& value)
+{
+    static_assert(is_lvalue_reference<T>::value, "T is not an lvalue reference; move() is unnecessary.");
+
+    using NonRefQualifiedType = typename remove_reference<T>::type;
+    static_assert(!is_const<NonRefQualifiedType>::value, "T is const qualified.");
+
+    return move(forward<T>(value));
+}
+
+} // namespace std
+
+#define WTFMove(value) std::move<WTF::CheckMoveParameter>(value)
+
 using WTF::KB;
 using WTF::MB;
+using WTF::isCompilationThread;
+using WTF::insertIntoBoundedVector;
 using WTF::isPointerAligned;
 using WTF::is8ByteAligned;
 using WTF::binarySearch;
@@ -304,5 +398,10 @@ using WTF::tryBinarySearch;
 using WTF::approximateBinarySearch;
 using WTF::bitwise_cast;
 using WTF::safeCast;
+
+#if COMPILER_SUPPORTS(CXX_USER_LITERALS)
+// We normally don't want to bring in entire std namespaces, but literals are an exception.
+using namespace std::literals::chrono_literals;
+#endif
 
 #endif // WTF_StdLibExtras_h

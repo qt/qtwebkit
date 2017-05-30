@@ -25,7 +25,7 @@
 
 #ifndef SVGSMILElement_h
 #define SVGSMILElement_h
-#if ENABLE(SVG)
+
 #include "SMILTime.h"
 #include "SVGElement.h"
 
@@ -33,28 +33,30 @@
 
 namespace WebCore {
 
+class SVGSMILElement;
+
+template<typename T> class EventSender;
+typedef EventSender<SVGSMILElement> SMILEventSender;
+
 class ConditionEventListener;
 class SMILTimeContainer;
 
 // This class implements SMIL interval timing model as needed for SVG animation.
 class SVGSMILElement : public SVGElement {
 public:
-    SVGSMILElement(const QualifiedName&, Document*);
+    SVGSMILElement(const QualifiedName&, Document&);
     virtual ~SVGSMILElement();
 
-    static bool isSMILElement(Node*);
-
-    bool isSupportedAttribute(const QualifiedName&);
-    virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
-    virtual void svgAttributeChanged(const QualifiedName&) OVERRIDE;
-    virtual InsertionNotificationRequest insertedInto(ContainerNode*) OVERRIDE;
-    virtual void removedFrom(ContainerNode*) OVERRIDE;
+    virtual void parseAttribute(const QualifiedName&, const AtomicString&) override;
+    virtual void svgAttributeChanged(const QualifiedName&) override;
+    virtual InsertionNotificationRequest insertedInto(ContainerNode&) override;
+    virtual void removedFrom(ContainerNode&) override;
     
     virtual bool hasValidAttributeType() = 0;
     virtual bool hasValidAttributeName();
     virtual void animationAttributeChanged() = 0;
 
-    SMILTimeContainer* timeContainer() const { return m_timeContainer.get(); }
+    SMILTimeContainer* timeContainer() { return m_timeContainer.get(); }
 
     SVGElement* targetElement() const { return m_targetElement; }
     const QualifiedName& attributeName() const { return m_attributeName; }
@@ -110,28 +112,38 @@ public:
     virtual void clearAnimatedType(SVGElement* targetElement) = 0;
     virtual void applyResultsToTarget() = 0;
 
+    void connectConditions();
+    bool hasConditionsConnected() const { return m_conditionsConnected; }
+    
+    void dispatchPendingEvent(SMILEventSender*);
+
 protected:
     void addBeginTime(SMILTime eventTime, SMILTime endTime, SMILTimeWithOrigin::Origin = SMILTimeWithOrigin::ParserOrigin);
     void addEndTime(SMILTime eventTime, SMILTime endTime, SMILTimeWithOrigin::Origin = SMILTimeWithOrigin::ParserOrigin);
 
     void setInactive() { m_activeState = Inactive; }
 
+    virtual bool rendererIsNeeded(const RenderStyle&) override { return false; }
+
     // Sub-classes may need to take action when the target is changed.
     virtual void setTargetElement(SVGElement*);
     virtual void setAttributeName(const QualifiedName&);
 
+    virtual void finishedInsertingSubtree() override;
+
 private:
-    void buildPendingResource();
+    void buildPendingResource() override;
     void clearResourceReferences();
+
+    virtual void clearTarget() override;
 
     virtual void startedActiveInterval() = 0;
     void endedActiveInterval();
     virtual void updateAnimation(float percent, unsigned repeat, SVGSMILElement* resultElement) = 0;
 
-    enum BeginOrEnd {
-        Begin,
-        End
-    };
+    static bool isSupportedAttribute(const QualifiedName&);
+
+    enum BeginOrEnd { Begin, End };
     
     SMILTime findInstanceTime(BeginOrEnd, SMILTime minimumTime, bool equalsMinimumOK) const;
     void resolveFirstInterval();
@@ -166,7 +178,6 @@ private:
     void parseBeginOrEnd(const String&, BeginOrEnd beginOrEnd);
     Element* eventBaseFor(const Condition&);
 
-    void connectConditions();
     void disconnectConditions();
 
     // Event base timing
@@ -195,7 +206,9 @@ private:
     float calculateAnimationPercentAndRepeat(SMILTime elapsed, unsigned& repeat) const;
     SMILTime calculateNextProgressTime(SMILTime elapsed) const;
 
-    mutable SVGElement* m_targetElement;
+    virtual bool isSMILElement() const override final { return true; }
+
+    SVGElement* m_targetElement;
 
     Vector<Condition> m_conditions;
     bool m_conditionsConnected;
@@ -234,7 +247,11 @@ private:
     friend class ConditionEventListener;
 };
 
-}
+} // namespace WebCore
 
-#endif // ENABLE(SVG)
+SPECIALIZE_TYPE_TRAITS_BEGIN(WebCore::SVGSMILElement)
+    static bool isType(const WebCore::SVGElement& element) { return element.isSMILElement(); }
+    static bool isType(const WebCore::Node& node) { return is<WebCore::SVGElement>(node) && isType(downcast<WebCore::SVGElement>(node)); }
+SPECIALIZE_TYPE_TRAITS_END()
+
 #endif // SVGSMILElement_h

@@ -23,10 +23,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
-[
-    Conditional=SVG
-] interface SVGScriptElement : SVGElement {
-    [TreatNullAs=NullString] attribute DOMString type;
+interface SVGScriptElement : SVGElement {
+    [TreatNullAs=NullString, Reflect] attribute DOMString type;
 };
 
 SVGScriptElement implements SVGExternalResourcesRequired;

@@ -26,35 +26,33 @@
 
 namespace WebCore {
 
-class RenderTextControlMultiLine : public RenderTextControl {
+class HTMLTextAreaElement;
+
+class RenderTextControlMultiLine final : public RenderTextControl {
 public:
-    RenderTextControlMultiLine(Element*);
+    RenderTextControlMultiLine(HTMLTextAreaElement&, Ref<RenderStyle>&&);
     virtual ~RenderTextControlMultiLine();
 
+    HTMLTextAreaElement& textAreaElement() const;
+
 private:
-    virtual bool isTextArea() const { return true; }
+    void element() const = delete;
 
-    virtual bool nodeAtPoint(const HitTestRequest&, HitTestResult&, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, HitTestAction) OVERRIDE;
+    virtual bool isTextArea() const override { return true; }
 
-    virtual float getAvgCharWidth(AtomicString family);
-    virtual LayoutUnit preferredContentLogicalWidth(float charWidth) const;
-    virtual LayoutUnit computeControlLogicalHeight(LayoutUnit lineHeight, LayoutUnit nonContentHeight) const OVERRIDE;
-    virtual int baselinePosition(FontBaseline, bool firstLine, LineDirectionMode, LinePositionMode = PositionOnContainingLine) const;
+    virtual bool nodeAtPoint(const HitTestRequest&, HitTestResult&, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, HitTestAction) override;
 
-    virtual RenderStyle* textBaseStyle() const;
-    virtual PassRefPtr<RenderStyle> createInnerTextStyle(const RenderStyle* startStyle) const;
-    virtual RenderObject* layoutSpecialExcludedChild(bool relayoutChildren);
+    virtual float getAverageCharWidth() override;
+    virtual LayoutUnit preferredContentLogicalWidth(float charWidth) const override;
+    virtual LayoutUnit computeControlLogicalHeight(LayoutUnit lineHeight, LayoutUnit nonContentHeight) const override;
+    virtual int baselinePosition(FontBaseline, bool firstLine, LineDirectionMode, LinePositionMode = PositionOnContainingLine) const override;
+
+    virtual Ref<RenderStyle> createInnerTextStyle(const RenderStyle* startStyle) const override;
+    virtual RenderObject* layoutSpecialExcludedChild(bool relayoutChildren) override;
 };
 
-inline RenderTextControlMultiLine* toRenderTextControlMultiLine(RenderObject* object)
-{ 
-    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isTextArea());
-    return static_cast<RenderTextControlMultiLine*>(object);
-}
+} // namespace WebCore
 
-// This will catch anyone doing an unnecessary cast.
-void toRenderTextControlMultiLine(const RenderTextControlMultiLine*);
+SPECIALIZE_TYPE_TRAITS_RENDER_OBJECT(RenderTextControlMultiLine, isTextArea())
 
-}
-
-#endif
+#endif // RenderTextControlMultiLine_h

@@ -24,9 +24,12 @@
  */
 
 #include "config.h"
+
+#if WK_HAVE_C_SPI
+
 #include "PlatformUtilities.h"
 #include "PlatformWebView.h"
-#include <WebKit2/WKRetainPtr.h>
+#include <WebKit/WKRetainPtr.h>
 
 namespace TestWebKitAPI {
 
@@ -52,21 +55,23 @@ TEST(WebKit2, InjectedBundleBasic)
 {
     WKRetainPtr<WKContextRef> context(AdoptWK, Util::createContextForInjectedBundleTest("InjectedBundleBasicTest"));
 
-    WKContextInjectedBundleClient injectedBundleClient;
+    WKContextInjectedBundleClientV0 injectedBundleClient;
     memset(&injectedBundleClient, 0, sizeof(injectedBundleClient));
-    injectedBundleClient.version = 0;
-    injectedBundleClient.clientInfo = 0;
+
+    injectedBundleClient.base.version = 0;
     injectedBundleClient.didReceiveMessageFromInjectedBundle = didReceiveMessageFromInjectedBundle;
-    WKContextSetInjectedBundleClient(context.get(), &injectedBundleClient);
+
+    WKContextSetInjectedBundleClient(context.get(), &injectedBundleClient.base);
  
     PlatformWebView webView(context.get());
 
-    WKPageLoaderClient loaderClient;
+    WKPageLoaderClientV0 loaderClient;
     memset(&loaderClient, 0, sizeof(loaderClient));
-    loaderClient.version = 0;
-    loaderClient.clientInfo = 0;
+
+    loaderClient.base.version = 0;
     loaderClient.didFinishLoadForFrame = didFinishLoadForFrame;
-    WKPageSetPageLoaderClient(webView.page(), &loaderClient);
+
+    WKPageSetPageLoaderClient(webView.page(), &loaderClient.base);
 
     WKRetainPtr<WKURLRef> url(AdoptWK, Util::createURLForResource("simple", "html"));
     WKPageLoadURL(webView.page(), url.get());
@@ -75,3 +80,5 @@ TEST(WebKit2, InjectedBundleBasic)
 }
 
 } // namespace TestWebKitAPI
+
+#endif

@@ -25,7 +25,7 @@
 #define FontPlatformData_h
 
 #include "FontDescription.h"
-#include "FontOrientation.h"
+#include "TextFlags.h"
 #include <QFont>
 #include <QHash>
 #include <QRawFont>
@@ -33,6 +33,8 @@
 #include <wtf/RefCounted.h>
 
 namespace WebCore {
+
+class SharedBuffer;
 
 class FontPlatformDataPrivate : public RefCounted<FontPlatformDataPrivate> {
     WTF_MAKE_NONCOPYABLE(FontPlatformDataPrivate); WTF_MAKE_FAST_ALLOCATED;
@@ -117,6 +119,7 @@ public:
 
     FontOrientation orientation() const { return Horizontal; } // FIXME: Implement.
     void setOrientation(FontOrientation) { } // FIXME: Implement.
+    PassRefPtr<SharedBuffer> openTypeTable(uint32_t table) const;
 
     unsigned hash() const;
 

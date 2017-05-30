@@ -37,8 +37,10 @@
 #include "HTMLDocument.h"
 #include "Page.h"
 #include "SecurityOrigin.h"
+#include "SecurityOriginPolicy.h"
 #include "Text.h"
 #include "TextResourceDecoder.h"
+#include "XMLDocument.h"
 #include "markup.h"
 
 #include <wtf/Assertions.h>
@@ -67,19 +69,19 @@ XSLTProcessor::~XSLTProcessor()
     ASSERT(!m_stylesheetRootNode || !m_stylesheet || m_stylesheet->hasOneRef());
 }
 
-PassRefPtr<Document> XSLTProcessor::createDocumentFromSource(const String& sourceString,
+Ref<Document> XSLTProcessor::createDocumentFromSource(const String& sourceString,
     const String& sourceEncoding, const String& sourceMIMEType, Node* sourceNode, Frame* frame)
 {
-    RefPtr<Document> ownerDocument = sourceNode->document();
-    bool sourceIsDocument = (sourceNode == ownerDocument.get());
+    Ref<Document> ownerDocument(sourceNode->document());
+    bool sourceIsDocument = (sourceNode == &ownerDocument.get());
     String documentSource = sourceString;
 
     RefPtr<Document> result;
     if (sourceMIMEType == "text/plain") {
-        result = Document::create(frame, sourceIsDocument ? ownerDocument->url() : KURL());
+        result = XMLDocument::createXHTML(frame, sourceIsDocument ? ownerDocument->url() : URL());
         transformTextStringToXHTMLDocumentString(documentSource);
     } else
-        result = DOMImplementation::createDocument(sourceMIMEType, frame, sourceIsDocument ? ownerDocument->url() : KURL(), false);
+        result = DOMImplementation::createDocument(sourceMIMEType, frame, sourceIsDocument ? ownerDocument->url() : URL());
 
     // Before parsing, we need to save & detach the old document and get the new document
     // in place. We have to do this only if we're rendering the result document.
@@ -90,41 +92,41 @@ PassRefPtr<Document> XSLTProcessor::createDocumentFromSource(const String& sourc
         if (Document* oldDocument = frame->document()) {
             result->setTransformSourceDocument(oldDocument);
             result->takeDOMWindowFrom(oldDocument);
-            result->setSecurityOrigin(oldDocument->securityOrigin());
+            result->setSecurityOriginPolicy(oldDocument->securityOriginPolicy());
             result->setCookieURL(oldDocument->cookieURL());
             result->setFirstPartyForCookies(oldDocument->firstPartyForCookies());
             result->contentSecurityPolicy()->copyStateFrom(oldDocument->contentSecurityPolicy());
         }
 
-        frame->setDocument(result);
+        frame->setDocument(result.copyRef());
     }
 
     RefPtr<TextResourceDecoder> decoder = TextResourceDecoder::create(sourceMIMEType);
     decoder->setEncoding(sourceEncoding.isEmpty() ? UTF8Encoding() : TextEncoding(sourceEncoding), TextResourceDecoder::EncodingFromXMLHeader);
-    result->setDecoder(decoder.release());
+    result->setDecoder(WTFMove(decoder));
 
     result->setContent(documentSource);
 
-    return result.release();
+    return result.releaseNonNull();
 }
 
-PassRefPtr<Document> XSLTProcessor::transformToDocument(Node* sourceNode)
+RefPtr<Document> XSLTProcessor::transformToDocument(Node* sourceNode)
 {
     if (!sourceNode)
-        return 0;
+        return nullptr;
 
     String resultMIMEType;
     String resultString;
     String resultEncoding;
-    if (!transformToString(sourceNode, resultMIMEType, resultString, resultEncoding))
-        return 0;
+    if (!transformToString(*sourceNode, resultMIMEType, resultString, resultEncoding))
+        return nullptr;
     return createDocumentFromSource(resultString, resultEncoding, resultMIMEType, sourceNode, 0);
 }
 
-PassRefPtr<DocumentFragment> XSLTProcessor::transformToFragment(Node* sourceNode, Document* outputDoc)
+RefPtr<DocumentFragment> XSLTProcessor::transformToFragment(Node* sourceNode, Document* outputDoc)
 {
     if (!sourceNode || !outputDoc)
-        return 0;
+        return nullptr;
 
     String resultMIMEType;
     String resultString;
@@ -134,8 +136,8 @@ PassRefPtr<DocumentFragment> XSLTProcessor::transformToFragment(Node* sourceNode
     if (outputDoc->isHTMLDocument())
         resultMIMEType = "text/html";
 
-    if (!transformToString(sourceNode, resultMIMEType, resultString, resultEncoding))
-        return 0;
+    if (!transformToString(*sourceNode, resultMIMEType, resultString, resultEncoding))
+        return nullptr;
     return createFragmentForTransformToFragment(resultString, resultMIMEType, outputDoc);
 }
 
@@ -161,8 +163,8 @@ void XSLTProcessor::removeParameter(const String& /*namespaceURI*/, const String
 
 void XSLTProcessor::reset()
 {
-    m_stylesheet.clear();
-    m_stylesheetRootNode.clear();
+    m_stylesheet = nullptr;
+    m_stylesheetRootNode = nullptr;
     m_parameters.clear();
 }
 

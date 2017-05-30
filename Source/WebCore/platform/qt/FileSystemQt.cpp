@@ -42,9 +42,7 @@
 #include <wtf/text/CString.h>
 #include <wtf/text/WTFString.h>
 
-#if OS(ANDROID)
-#include <sys/vfs.h>
-#elif !defined(Q_OS_WIN)
+#if !defined(Q_OS_WIN)
 #include <sys/statvfs.h>
 #endif
 
@@ -77,6 +75,13 @@ bool getFileModificationTime(const String& path, time_t& result)
 {
     QFileInfo info(path);
     result = info.lastModified().toTime_t();
+    return info.exists();
+}
+
+bool getFileCreationTime(const String& path, time_t& result)
+{
+    QFileInfo info(path);
+    result = info.created().toTime_t();
     return info.exists();
 }
 
@@ -130,6 +135,22 @@ Vector<String> listDirectory(const String& path, const String& filter)
     }
 
     return entries;
+}
+
+CString fileSystemRepresentation(const String& path)
+{
+    // FIXME: Check if we need to handle escaping or encoding issues here
+    //
+    // Right now this function is used in SQLiteFileSystem::openDatabase where UTF8
+    // is *required* by sqlite_open, but it may need to return local encoding in other
+    // circumstances
+    return path.utf8();
+}
+
+String stringFromFileSystemRepresentation(const char* fileSystemRepresentation)
+{
+    // This needs to do the opposite of fileSystemRepresentation.
+    return String::fromUTF8(fileSystemRepresentation);
 }
 
 String openTemporaryFile(const String& prefix, PlatformFileHandle& handle)
@@ -217,15 +238,9 @@ uint64_t getVolumeFreeSizeForPath(const char* path)
         return 0;
     return static_cast<uint64_t>(freeBytesToCaller.QuadPart);
 #else
-#if OS(ANDROID)
-    struct statfs volumeInfo;
-    if (statfs(path, &volumeInfo))
-        return 0;
-#else
     struct statvfs volumeInfo;
     if (statvfs(path, &volumeInfo))
         return 0;
-#endif
 
     return static_cast<uint64_t>(volumeInfo.f_bavail) * static_cast<uint64_t>(volumeInfo.f_frsize);
 #endif
@@ -242,7 +257,7 @@ int writeToFile(PlatformFileHandle handle, const char* data, int length)
 
 bool unloadModule(PlatformModule module)
 {
-#if defined(Q_OS_MACX)
+#if defined(Q_OS_MAC)
     CFRelease(module);
     return true;
 

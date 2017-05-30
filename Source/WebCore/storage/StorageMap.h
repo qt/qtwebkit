@@ -27,7 +27,6 @@
 #define StorageMap_h
 
 #include <wtf/HashMap.h>
-#include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
 #include <wtf/text/StringHash.h>
 #include <wtf/text/WTFString.h>
@@ -37,18 +36,18 @@ namespace WebCore {
 class StorageMap : public RefCounted<StorageMap> {
 public:
     // Quota size measured in bytes.
-    static PassRefPtr<StorageMap> create(unsigned quotaSize);
+    WEBCORE_EXPORT static Ref<StorageMap> create(unsigned quotaSize);
 
-    unsigned length() const;
-    String key(unsigned index);
-    String getItem(const String&) const;
-    PassRefPtr<StorageMap> setItem(const String& key, const String& value, String& oldValue, bool& quotaException);
-    PassRefPtr<StorageMap> setItemIgnoringQuota(const String& key, const String& value);
-    PassRefPtr<StorageMap> removeItem(const String&, String& oldValue);
+    WEBCORE_EXPORT unsigned length() const;
+    WEBCORE_EXPORT String key(unsigned index);
+    WEBCORE_EXPORT String getItem(const String&) const;
+    WEBCORE_EXPORT RefPtr<StorageMap> setItem(const String& key, const String& value, String& oldValue, bool& quotaException);
+    WEBCORE_EXPORT RefPtr<StorageMap> setItemIgnoringQuota(const String& key, const String& value);
+    WEBCORE_EXPORT RefPtr<StorageMap> removeItem(const String&, String& oldValue);
 
-    bool contains(const String& key) const;
+    WEBCORE_EXPORT bool contains(const String& key) const;
 
-    void importItems(const HashMap<String, String>&);
+    WEBCORE_EXPORT void importItems(const HashMap<String, String>&);
     const HashMap<String, String>& items() const { return m_map; }
 
     unsigned quota() const { return m_quotaSize; }
@@ -57,7 +56,7 @@ public:
 
 private:
     explicit StorageMap(unsigned quota);
-    PassRefPtr<StorageMap> copy();
+    Ref<StorageMap> copy();
     void invalidateIterator();
     void setIteratorToIndex(unsigned);
 

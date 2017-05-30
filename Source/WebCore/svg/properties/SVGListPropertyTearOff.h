@@ -20,7 +20,6 @@
 #ifndef SVGListPropertyTearOff_h
 #define SVGListPropertyTearOff_h
 
-#if ENABLE(SVG)
 #include "SVGListProperty.h"
 
 namespace WebCore {
@@ -33,7 +32,7 @@ public:
 
     typedef typename SVGPropertyTraits<PropertyType>::ListItemType ListItemType;
     typedef SVGPropertyTearOff<ListItemType> ListItemTearOff;
-    typedef PassRefPtr<ListItemTearOff> PassListItemTearOff;
+    typedef RefPtr<ListItemTearOff> PtrListItemTearOff;
     typedef SVGAnimatedListPropertyTearOff<PropertyType> AnimatedListPropertyTearOff;
     typedef typename SVGAnimatedListPropertyTearOff<PropertyType>::ListWrapperCache ListWrapperCache;
 
@@ -41,10 +40,10 @@ public:
     using Base::m_values;
     using Base::m_wrappers;
 
-    static PassRefPtr<Self> create(AnimatedListPropertyTearOff* animatedProperty, SVGPropertyRole role, PropertyType& values, ListWrapperCache& wrappers)
+    static Ref<Self> create(AnimatedListPropertyTearOff* animatedProperty, SVGPropertyRole role, PropertyType& values, ListWrapperCache& wrappers)
     {
         ASSERT(animatedProperty);
-        return adoptRef(new Self(animatedProperty, role, values, wrappers));
+        return adoptRef(*new Self(animatedProperty, role, values, wrappers));
     }
 
     int findItem(ListItemTearOff* item) const
@@ -84,34 +83,34 @@ public:
         Base::clearValuesAndWrappers(ec);
     }
 
-    PassListItemTearOff initialize(PassListItemTearOff passNewItem, ExceptionCode& ec)
+    PtrListItemTearOff initialize(PtrListItemTearOff newItem, ExceptionCode& ec)
     {
-        return Base::initializeValuesAndWrappers(passNewItem, ec);
+        return Base::initializeValuesAndWrappers(newItem, ec);
     }
 
-    PassListItemTearOff getItem(unsigned index, ExceptionCode& ec)
+    PtrListItemTearOff getItem(unsigned index, ExceptionCode& ec)
     {
         return Base::getItemValuesAndWrappers(m_animatedProperty.get(), index, ec);
     }
 
-    PassListItemTearOff insertItemBefore(PassListItemTearOff passNewItem, unsigned index, ExceptionCode& ec)
+    PtrListItemTearOff insertItemBefore(PtrListItemTearOff newItem, unsigned index, ExceptionCode& ec)
     {
-        return Base::insertItemBeforeValuesAndWrappers(passNewItem, index, ec);
+        return Base::insertItemBeforeValuesAndWrappers(newItem, index, ec);
     }
 
-    PassListItemTearOff replaceItem(PassListItemTearOff passNewItem, unsigned index, ExceptionCode& ec)
+    PtrListItemTearOff replaceItem(PtrListItemTearOff newItem, unsigned index, ExceptionCode& ec)
     {
-        return Base::replaceItemValuesAndWrappers(passNewItem, index, ec);
+        return Base::replaceItemValuesAndWrappers(newItem, index, ec);
     }
 
-    PassListItemTearOff removeItem(unsigned index, ExceptionCode& ec)
+    PtrListItemTearOff removeItem(unsigned index, ExceptionCode& ec)
     {
         return Base::removeItemValuesAndWrappers(m_animatedProperty.get(), index, ec);
     }
 
-    PassListItemTearOff appendItem(PassListItemTearOff passNewItem, ExceptionCode& ec)
+    PtrListItemTearOff appendItem(PtrListItemTearOff newItem, ExceptionCode& ec)
     {
-        return Base::appendItemValuesAndWrappers(passNewItem, ec);
+        return Base::appendItemValuesAndWrappers(newItem, ec);
     }
 
 protected:
@@ -127,7 +126,7 @@ protected:
             m_animatedProperty->propertyWillBeDeleted(*this);
     }
 
-    virtual bool isReadOnly() const
+    virtual bool isReadOnly() const override
     {
         if (m_role == AnimValRole)
             return true;
@@ -136,7 +135,7 @@ protected:
         return false;
     }
 
-    virtual void commitChange()
+    virtual void commitChange() override
     {
         ASSERT(m_values);
         ASSERT(m_wrappers);
@@ -155,13 +154,13 @@ protected:
         m_animatedProperty->commitChange();
     }
 
-    virtual bool processIncomingListItemValue(const ListItemType&, unsigned*)
+    virtual bool processIncomingListItemValue(const ListItemType&, unsigned*) override
     {
         ASSERT_NOT_REACHED();
         return true;
     }
 
-    virtual bool processIncomingListItemWrapper(RefPtr<ListItemTearOff>& newItem, unsigned* indexToModify)
+    virtual bool processIncomingListItemWrapper(RefPtr<ListItemTearOff>& newItem, unsigned* indexToModify) override
     {
         SVGAnimatedProperty* animatedPropertyOfItem = newItem->animatedProperty();
 
@@ -193,7 +192,7 @@ protected:
         if (!livesInOtherList && indexToModify && static_cast<unsigned>(indexToRemove) == *indexToModify)
             return false;
 
-        propertyTearOff->removeItemFromList(indexToRemove, livesInOtherList);
+        propertyTearOff->removeItemFromList(indexToRemove, true);
 
         if (!indexToModify)
             return true;
@@ -216,5 +215,4 @@ protected:
 
 }
 
-#endif // ENABLE(SVG)
 #endif // SVGListPropertyTearOff_h

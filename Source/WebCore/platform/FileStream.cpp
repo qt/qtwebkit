@@ -30,8 +30,6 @@
 
 #include "config.h"
 
-#if ENABLE(BLOB)
-
 #include "FileStream.h"
 
 #include "FileSystem.h"
@@ -47,16 +45,6 @@ FileStream::FileStream()
 }
 
 FileStream::~FileStream()
-{
-    ASSERT(!isHandleValid(m_handle));
-}
-
-// FIXME: To be removed when we switch to using BlobData.
-void FileStream::start()
-{
-}
-
-void FileStream::stop()
 {
     close();
 }
@@ -134,7 +122,7 @@ int FileStream::read(char* buffer, int bufferSize)
     return bytesRead;
 }
 
-int FileStream::write(const KURL&, long long, int)
+int FileStream::write(const URL&, long long, int)
 {
     // FIXME: to be implemented.
     return -1;
@@ -147,5 +135,3 @@ bool FileStream::truncate(long long)
 }
 
 } // namespace WebCore
-
-#endif // ENABLE(BLOB)

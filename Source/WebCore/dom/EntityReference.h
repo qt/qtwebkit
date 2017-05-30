@@ -26,18 +26,9 @@
 
 namespace WebCore {
 
-class EntityReference FINAL : public ContainerNode {
-public:
-    static PassRefPtr<EntityReference> create(Document*, const String& entityName);
-
+class EntityReference : public ContainerNode {
 private:
-    EntityReference(Document*, const String& entityName);
-
-    virtual String nodeName() const;
-    virtual NodeType nodeType() const;
-    virtual PassRefPtr<Node> cloneNode(bool deep);
-
-    String m_entityName;
+    EntityReference(Document&, const String& entityName);
 };
 
 } //namespace

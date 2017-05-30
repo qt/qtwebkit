@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2008, 2012 Apple Inc. All rights reserved.
+ *  Copyright (C) 2008, 2012, 2015 Apple Inc. All rights reserved.
  *
  *  This library is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU Lesser General Public
@@ -21,70 +21,61 @@
 #include "Lookup.h"
 
 #include "Executable.h"
+#include "GetterSetter.h"
 #include "JSFunction.h"
-#include "Operations.h"
+#include "JSCInlines.h"
 
 namespace JSC {
 
-void HashTable::createTable(VM* vm) const
+void reifyStaticAccessor(VM& vm, const HashTableValue& value, JSObject& thisObj, PropertyName propertyName)
 {
-    ASSERT(!table);
-    int linkIndex = compactHashSizeMask + 1;
-    HashEntry* entries = new HashEntry[compactSize];
-    for (int i = 0; i < compactSize; ++i)
-        entries[i].setKey(0);
-    for (int i = 0; values[i].key; ++i) {
-        StringImpl* identifier = Identifier::add(vm, values[i].key).leakRef();
-        int hashIndex = identifier->existingHash() & compactHashSizeMask;
-        HashEntry* entry = &entries[hashIndex];
-
-        if (entry->key()) {
-            while (entry->next()) {
-                entry = entry->next();
-            }
-            ASSERT(linkIndex < compactSize);
-            entry->setNext(&entries[linkIndex++]);
-            entry = entry->next();
-        }
-
-        entry->initialize(identifier, values[i].attributes, values[i].value1, values[i].value2, values[i].intrinsic);
+    JSGlobalObject* globalObject = thisObj.globalObject();
+    GetterSetter* accessor = GetterSetter::create(vm, globalObject);
+    if (value.accessorGetter()) {
+        String getterName = WTF::tryMakeString(ASCIILiteral("get "), String(*propertyName.publicName()));
+        if (!getterName)
+            return;
+        accessor->setGetter(vm, globalObject, value.attributes() & Builtin
+            ? JSFunction::createBuiltinFunction(vm, value.builtinAccessorGetterGenerator()(vm), globalObject, getterName)
+            : JSFunction::create(vm, globalObject, 0, getterName, value.accessorGetter()));
     }
-    table = entries;
+    thisObj.putDirectNonIndexAccessor(vm, propertyName, accessor, attributesForStructure(value.attributes()));
 }
 
-void HashTable::deleteTable() const
-{
-    if (table) {
-        int max = compactSize;
-        for (int i = 0; i != max; ++i) {
-            if (StringImpl* key = table[i].key())
-                key->deref();
-        }
-        delete [] table;
-        table = 0;
-    }
-}
-
-bool setUpStaticFunctionSlot(ExecState* exec, const HashEntry* entry, JSObject* thisObj, PropertyName propertyName, PropertySlot& slot)
+bool setUpStaticFunctionSlot(ExecState* exec, const HashTableValue* entry, JSObject* thisObj, PropertyName propertyName, PropertySlot& slot)
 {
     ASSERT(thisObj->globalObject());
-    ASSERT(entry->attributes() & Function);
-    PropertyOffset offset = thisObj->getDirectOffset(exec->vm(), propertyName);
+    ASSERT(entry->attributes() & BuiltinOrFunctionOrAccessor);
+    VM& vm = exec->vm();
+    unsigned attributes;
+    bool isAccessor = entry->attributes() & Accessor;
+    PropertyOffset offset = thisObj->getDirectOffset(vm, propertyName, attributes);
 
     if (!isValidOffset(offset)) {
         // If a property is ever deleted from an object with a static table, then we reify
         // all static functions at that time - after this we shouldn't be re-adding anything.
         if (thisObj->staticFunctionsReified())
             return false;
-    
-        thisObj->putDirectNativeFunction(
-            exec, thisObj->globalObject(), propertyName, entry->functionLength(),
-            entry->function(), entry->intrinsic(), entry->attributes());
-        offset = thisObj->getDirectOffset(exec->vm(), propertyName);
+
+        if (entry->attributes() & Builtin)
+            thisObj->putDirectBuiltinFunction(vm, thisObj->globalObject(), propertyName, entry->builtinGenerator()(vm), attributesForStructure(entry->attributes()));
+        else if (entry->attributes() & Function) {
+            thisObj->putDirectNativeFunction(
+                vm, thisObj->globalObject(), propertyName, entry->functionLength(),
+                entry->function(), entry->intrinsic(), attributesForStructure(entry->attributes()));
+        } else {
+            ASSERT(isAccessor);
+            reifyStaticAccessor(vm, *entry, *thisObj, propertyName);
+        }
+
+        offset = thisObj->getDirectOffset(vm, propertyName, attributes);
         ASSERT(isValidOffset(offset));
     }
 
-    slot.setValue(thisObj, thisObj->getDirect(offset), offset);
+    if (isAccessor)
+        slot.setCacheableGetterSlot(thisObj, attributes, jsCast<GetterSetter*>(thisObj->getDirect(offset)), offset);
+    else
+        slot.setValue(thisObj, attributes, thisObj->getDirect(offset), offset);
     return true;
 }
 

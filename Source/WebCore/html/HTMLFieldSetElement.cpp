@@ -25,11 +25,12 @@
 #include "config.h"
 #include "HTMLFieldSetElement.h"
 
-#include "HTMLCollection.h"
+#include "ElementIterator.h"
+#include "HTMLFormControlsCollection.h"
 #include "HTMLLegendElement.h"
 #include "HTMLNames.h"
 #include "HTMLObjectElement.h"
-#include "NodeTraversal.h"
+#include "NodeRareData.h"
 #include "RenderFieldset.h"
 #include <wtf/StdLibExtras.h>
 
@@ -37,40 +38,105 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-inline HTMLFieldSetElement::HTMLFieldSetElement(const QualifiedName& tagName, Document* document, HTMLFormElement* form)
+inline HTMLFieldSetElement::HTMLFieldSetElement(const QualifiedName& tagName, Document& document, HTMLFormElement* form)
     : HTMLFormControlElement(tagName, document, form)
     , m_documentVersion(0)
 {
     ASSERT(hasTagName(fieldsetTag));
 }
 
-PassRefPtr<HTMLFieldSetElement> HTMLFieldSetElement::create(const QualifiedName& tagName, Document* document, HTMLFormElement* form)
+HTMLFieldSetElement::~HTMLFieldSetElement()
 {
-    return adoptRef(new HTMLFieldSetElement(tagName, document, form));
+    if (fastHasAttribute(disabledAttr))
+        document().removeDisabledFieldsetElement();
 }
 
-void HTMLFieldSetElement::invalidateDisabledStateUnder(Element* base)
+Ref<HTMLFieldSetElement> HTMLFieldSetElement::create(const QualifiedName& tagName, Document& document, HTMLFormElement* form)
 {
-    for (Element* element = ElementTraversal::firstWithin(base); element; element = ElementTraversal::next(element, base)) {
-        if (element->isFormControlElement())
-            static_cast<HTMLFormControlElement*>(element)->ancestorDisabledStateWasChanged();
+    return adoptRef(*new HTMLFieldSetElement(tagName, document, form));
+}
+
+static void updateFromControlElementsAncestorDisabledStateUnder(HTMLElement& startNode, bool isDisabled)
+{
+    HTMLFormControlElement* control;
+    if (is<HTMLFormControlElement>(startNode))
+        control = &downcast<HTMLFormControlElement>(startNode);
+    else
+        control = Traversal<HTMLFormControlElement>::firstWithin(startNode);
+    while (control) {
+        control->setAncestorDisabled(isDisabled);
+        // Don't call setAncestorDisabled(false) on form contorls inside disabled fieldsets.
+        if (is<HTMLFieldSetElement>(*control) && control->fastHasAttribute(disabledAttr))
+            control = Traversal<HTMLFormControlElement>::nextSkippingChildren(*control, &startNode);
+        else
+            control = Traversal<HTMLFormControlElement>::next(*control, &startNode);
     }
 }
 
 void HTMLFieldSetElement::disabledAttributeChanged()
 {
-    // This element must be updated before the style of nodes in its subtree gets recalculated.
+    if (fastHasAttribute(disabledAttr))
+        document().addDisabledFieldsetElement();
+    else
+        document().removeDisabledFieldsetElement();
+
     HTMLFormControlElement::disabledAttributeChanged();
-    invalidateDisabledStateUnder(this);
 }
 
-void HTMLFieldSetElement::childrenChanged(bool changedByParser, Node* beforeChange, Node* afterChange, int childCountDelta)
+void HTMLFieldSetElement::disabledStateChanged()
 {
-    HTMLFormControlElement::childrenChanged(changedByParser, beforeChange, afterChange, childCountDelta);
-    for (Element* element = ElementTraversal::firstWithin(this); element; element = ElementTraversal::nextSkippingChildren(element, this)) {
-        if (element->hasTagName(legendTag))
-            invalidateDisabledStateUnder(element);
+    // This element must be updated before the style of nodes in its subtree gets recalculated.
+    HTMLFormControlElement::disabledStateChanged();
+
+    if (disabledByAncestorFieldset())
+        return;
+
+    bool thisFieldsetIsDisabled = fastHasAttribute(disabledAttr);
+    bool hasSeenFirstLegendElement = false;
+    for (HTMLElement* control = Traversal<HTMLElement>::firstChild(*this); control; control = Traversal<HTMLElement>::nextSibling(*control)) {
+        if (!hasSeenFirstLegendElement && is<HTMLLegendElement>(*control)) {
+            hasSeenFirstLegendElement = true;
+            updateFromControlElementsAncestorDisabledStateUnder(*control, false /* isDisabled */);
+            continue;
+        }
+        updateFromControlElementsAncestorDisabledStateUnder(*control, thisFieldsetIsDisabled);
     }
+}
+
+void HTMLFieldSetElement::childrenChanged(const ChildChange& change)
+{
+    HTMLFormControlElement::childrenChanged(change);
+    if (!fastHasAttribute(disabledAttr))
+        return;
+
+    HTMLLegendElement* legend = Traversal<HTMLLegendElement>::firstChild(*this);
+    if (!legend)
+        return;
+
+    // We only care about the first legend element (in which form contorls are not disabled by this element) changing here.
+    updateFromControlElementsAncestorDisabledStateUnder(*legend, false /* isDisabled */);
+    while ((legend = Traversal<HTMLLegendElement>::nextSibling(*legend)))
+        updateFromControlElementsAncestorDisabledStateUnder(*legend, true);
+}
+
+void HTMLFieldSetElement::didMoveToNewDocument(Document* oldDocument)
+{
+    HTMLFormControlElement::didMoveToNewDocument(oldDocument);
+    if (fastHasAttribute(disabledAttr)) {
+        if (oldDocument)
+            oldDocument->removeDisabledFieldsetElement();
+        document().addDisabledFieldsetElement();
+    }
+}
+
+bool HTMLFieldSetElement::matchesValidPseudoClass() const
+{
+    return m_invalidDescendants.isEmpty();
+}
+
+bool HTMLFieldSetElement::matchesInvalidPseudoClass() const
+{
+    return !m_invalidDescendants.isEmpty();
 }
 
 bool HTMLFieldSetElement::supportsFocus() const
@@ -80,49 +146,45 @@ bool HTMLFieldSetElement::supportsFocus() const
 
 const AtomicString& HTMLFieldSetElement::formControlType() const
 {
-    DEFINE_STATIC_LOCAL(const AtomicString, fieldset, ("fieldset", AtomicString::ConstructFromLiteral));
+    static NeverDestroyed<const AtomicString> fieldset("fieldset", AtomicString::ConstructFromLiteral);
     return fieldset;
 }
 
-RenderObject* HTMLFieldSetElement::createRenderer(RenderArena* arena, RenderStyle*)
+RenderPtr<RenderElement> HTMLFieldSetElement::createElementRenderer(Ref<RenderStyle>&& style, const RenderTreePosition&)
 {
-    return new (arena) RenderFieldset(this);
+    return createRenderer<RenderFieldset>(*this, WTFMove(style));
 }
 
 HTMLLegendElement* HTMLFieldSetElement::legend() const
 {
-    for (Element* child = ElementTraversal::firstWithin(this); child; child = ElementTraversal::nextSkippingChildren(child, this)) {
-        if (child->hasTagName(legendTag))
-            return static_cast<HTMLLegendElement*>(child);
-    }
-    return 0;
+    return const_cast<HTMLLegendElement*>(childrenOfType<HTMLLegendElement>(*this).first());
 }
 
-PassRefPtr<HTMLCollection> HTMLFieldSetElement::elements()
+Ref<HTMLFormControlsCollection> HTMLFieldSetElement::elements()
 {
-    return ensureCachedHTMLCollection(FormControls);
+    return ensureRareData().ensureNodeLists().addCachedCollection<HTMLFormControlsCollection>(*this, FormControls);
+}
+
+Ref<HTMLCollection> HTMLFieldSetElement::elementsForNativeBindings()
+{
+    return elements();
 }
 
 void HTMLFieldSetElement::refreshElementsIfNeeded() const
 {
-    uint64_t docVersion = document()->domTreeVersion();
-    if (m_documentVersion == docVersion)
+    uint64_t documentVersion = document().domTreeVersion();
+    if (m_documentVersion == documentVersion)
         return;
 
-    m_documentVersion = docVersion;
+    m_documentVersion = documentVersion;
 
     m_associatedElements.clear();
 
-    for (Element* element = ElementTraversal::firstWithin(this); element; element = ElementTraversal::next(element, this)) {
-        if (element->hasTagName(objectTag)) {
-            m_associatedElements.append(static_cast<HTMLObjectElement*>(element));
-            continue;
-        }
-
-        if (!element->isFormControlElement())
-            continue;
-
-        m_associatedElements.append(static_cast<HTMLFormControlElement*>(element));
+    for (auto& element : descendantsOfType<Element>(const_cast<HTMLFieldSetElement&>(*this))) {
+        if (element.hasTagName(objectTag))
+            m_associatedElements.append(&downcast<HTMLObjectElement>(element));
+        else if (is<HTMLFormControlElement>(element))
+            m_associatedElements.append(&downcast<HTMLFormControlElement>(element));
     }
 }
 
@@ -135,11 +197,33 @@ const Vector<FormAssociatedElement*>& HTMLFieldSetElement::associatedElements() 
 unsigned HTMLFieldSetElement::length() const
 {
     refreshElementsIfNeeded();
-    unsigned len = 0;
-    for (unsigned i = 0; i < m_associatedElements.size(); ++i)
-        if (m_associatedElements[i]->isEnumeratable())
-            ++len;
-    return len;
+    unsigned length = 0;
+    for (auto& element : m_associatedElements) {
+        if (element->isEnumeratable())
+            ++length;
+    }
+    return length;
+}
+
+void HTMLFieldSetElement::addInvalidDescendant(const HTMLFormControlElement& invalidFormControlElement)
+{
+    ASSERT_WITH_MESSAGE(!is<HTMLFieldSetElement>(invalidFormControlElement), "FieldSet are never candidates for constraint validation.");
+    ASSERT(static_cast<const Element&>(invalidFormControlElement).matchesInvalidPseudoClass());
+    ASSERT_WITH_MESSAGE(!m_invalidDescendants.contains(&invalidFormControlElement), "Updating the fieldset on validity change is not an efficient operation, it should only be done when necessary.");
+
+    if (m_invalidDescendants.isEmpty())
+        setNeedsStyleRecalc();
+    m_invalidDescendants.add(&invalidFormControlElement);
+}
+
+void HTMLFieldSetElement::removeInvalidDescendant(const HTMLFormControlElement& formControlElement)
+{
+    ASSERT_WITH_MESSAGE(!is<HTMLFieldSetElement>(formControlElement), "FieldSet are never candidates for constraint validation.");
+    ASSERT_WITH_MESSAGE(m_invalidDescendants.contains(&formControlElement), "Updating the fieldset on validity change is not an efficient operation, it should only be done when necessary.");
+
+    m_invalidDescendants.remove(&formControlElement);
+    if (m_invalidDescendants.isEmpty())
+        setNeedsStyleRecalc();
 }
 
 } // namespace

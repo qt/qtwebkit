@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -32,8 +32,6 @@
 #include "AXObjectCache.h"
 #include "AccessibilityTable.h"
 
-using namespace std;
-
 namespace WebCore {
 
 AccessibilityTableHeaderContainer::AccessibilityTableHeaderContainer()
@@ -44,9 +42,9 @@ AccessibilityTableHeaderContainer::~AccessibilityTableHeaderContainer()
 {
 }
 
-PassRefPtr<AccessibilityTableHeaderContainer> AccessibilityTableHeaderContainer::create()
+Ref<AccessibilityTableHeaderContainer> AccessibilityTableHeaderContainer::create()
 {
-    return adoptRef(new AccessibilityTableHeaderContainer());
+    return adoptRef(*new AccessibilityTableHeaderContainer());
 }
     
 LayoutRect AccessibilityTableHeaderContainer::elementRect() const
@@ -60,7 +58,7 @@ bool AccessibilityTableHeaderContainer::computeAccessibilityIsIgnored() const
     if (!m_parent)
         return true;
     
-#if PLATFORM(GTK)
+#if PLATFORM(IOS) || PLATFORM(GTK) || PLATFORM(EFL)
     return true;
 #endif
 
@@ -72,14 +70,17 @@ void AccessibilityTableHeaderContainer::addChildren()
     ASSERT(!m_haveChildren); 
     
     m_haveChildren = true;
-    if (!m_parent || !m_parent->isAccessibilityTable())
+    if (!is<AccessibilityTable>(m_parent))
+        return;
+
+    auto& parentTable = downcast<AccessibilityTable>(*m_parent);
+    if (!parentTable.isExposableThroughAccessibility())
         return;
     
-    static_cast<AccessibilityTable*>(m_parent)->columnHeaders(m_children);
+    parentTable.columnHeaders(m_children);
     
-    unsigned length = m_children.size();
-    for (unsigned k = 0; k < length; ++k)
-        m_headerRect.unite(m_children[k]->elementRect());
+    for (const auto& child : m_children)
+        m_headerRect.unite(child->elementRect());
 }
 
 } // namespace WebCore

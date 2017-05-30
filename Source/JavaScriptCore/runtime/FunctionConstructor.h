@@ -29,37 +29,45 @@ class TextPosition;
 
 namespace JSC {
 
-    class FunctionPrototype;
+class FunctionPrototype;
 
-    class FunctionConstructor : public InternalFunction {
-    public:
-        typedef InternalFunction Base;
+class FunctionConstructor : public InternalFunction {
+public:
+    typedef InternalFunction Base;
 
-        static FunctionConstructor* create(ExecState* exec, JSGlobalObject* globalObject, Structure* structure, FunctionPrototype* functionPrototype)
-        {
-            FunctionConstructor* constructor = new (NotNull, allocateCell<FunctionConstructor>(*exec->heap())) FunctionConstructor(globalObject, structure);
-            constructor->finishCreation(exec, functionPrototype);
-            return constructor;
-        }
+    static FunctionConstructor* create(VM& vm, Structure* structure, FunctionPrototype* functionPrototype)
+    {
+        FunctionConstructor* constructor = new (NotNull, allocateCell<FunctionConstructor>(vm.heap)) FunctionConstructor(vm, structure);
+        constructor->finishCreation(vm, functionPrototype);
+        return constructor;
+    }
 
-        static const ClassInfo s_info;
+    DECLARE_INFO;
 
-        static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype) 
-        { 
-            return Structure::create(vm, globalObject, prototype, TypeInfo(ObjectType, StructureFlags), &s_info); 
-        }
+    static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype) 
+    { 
+        return Structure::create(vm, globalObject, prototype, TypeInfo(ObjectType, StructureFlags), info()); 
+    }
 
-    private:
-        FunctionConstructor(JSGlobalObject*, Structure*);
-        void finishCreation(ExecState*, FunctionPrototype*);
-        static ConstructType getConstructData(JSCell*, ConstructData&);
-        static CallType getCallData(JSCell*, CallData&);
-    };
+private:
+    FunctionConstructor(VM&, Structure*);
+    void finishCreation(VM&, FunctionPrototype*);
+    static ConstructType getConstructData(JSCell*, ConstructData&);
+    static CallType getCallData(JSCell*, CallData&);
+};
 
-    JSObject* constructFunction(ExecState*, JSGlobalObject*, const ArgList&, const Identifier& functionName, const String& sourceURL, const WTF::TextPosition&);
-    JSObject* constructFunction(ExecState*, JSGlobalObject*, const ArgList&);
+enum class FunctionConstructionMode {
+    Function,
+    Generator,
+};
 
-    JS_EXPORT_PRIVATE JSObject* constructFunctionSkippingEvalEnabledCheck(ExecState*, JSGlobalObject*, const ArgList&, const Identifier&, const String&, const WTF::TextPosition&);
+JSObject* constructFunction(ExecState*, JSGlobalObject*, const ArgList&, const Identifier& functionName, const String& sourceURL, const WTF::TextPosition&, FunctionConstructionMode = FunctionConstructionMode::Function, JSValue newTarget = JSValue());
+JSObject* constructFunction(ExecState*, JSGlobalObject*, const ArgList&, FunctionConstructionMode = FunctionConstructionMode::Function, JSValue newTarget = JSValue());
+
+JS_EXPORT_PRIVATE JSObject* constructFunctionSkippingEvalEnabledCheck(
+    ExecState*, JSGlobalObject*, const ArgList&, const Identifier&, 
+    const String&, const WTF::TextPosition&, int overrideLineNumber = -1,
+    FunctionConstructionMode = FunctionConstructionMode::Function, JSValue newTarget = JSValue());
 
 } // namespace JSC
 

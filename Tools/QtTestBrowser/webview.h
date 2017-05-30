@@ -45,48 +45,48 @@ QT_BEGIN_NAMESPACE
 class QStateMachine;
 QT_END_NAMESPACE
 
-class WebViewTraditional : public QWebView {
+class WebViewTraditional final : public QWebView {
     Q_OBJECT
 
 public:
     WebViewTraditional(QWidget* parent) : QWebView(parent) {}
 
 protected:
-    virtual void contextMenuEvent(QContextMenuEvent*);
-    virtual void mousePressEvent(QMouseEvent*);
+    void contextMenuEvent(QContextMenuEvent*) final;
+    void mousePressEvent(QMouseEvent*) final;
 };
 
 
-class GraphicsWebView : public QGraphicsWebView {
+class GraphicsWebView final : public QGraphicsWebView {
     Q_OBJECT
 
 public:
     GraphicsWebView(QGraphicsItem* parent = 0) : QGraphicsWebView(parent) {};
 
 protected:
-    virtual void contextMenuEvent(QGraphicsSceneContextMenuEvent*);
-    virtual void mousePressEvent(QGraphicsSceneMouseEvent*);
+    void contextMenuEvent(QGraphicsSceneContextMenuEvent*) final;
+    void mousePressEvent(QGraphicsSceneMouseEvent*) final;
 };
 
 
-class WebViewGraphicsBased : public QGraphicsView {
+class WebViewGraphicsBased final : public QGraphicsView {
     Q_OBJECT
     Q_PROPERTY(qreal yRotation READ yRotation WRITE setYRotation)
 
 public:
     WebViewGraphicsBased(QWidget* parent);
-    void setPage(QWebPage* page);
+    void setPage(QWebPage*);
 
     void setItemCacheMode(QGraphicsItem::CacheMode mode) { graphicsWebView()->setCacheMode(mode); }
     QGraphicsItem::CacheMode itemCacheMode() { return graphicsWebView()->cacheMode(); }
 
-    void setFrameRateMeasurementEnabled(bool enabled);
+    void setFrameRateMeasurementEnabled(bool);
     bool frameRateMeasurementEnabled() const { return m_measureFps; }
 
-    virtual void resizeEvent(QResizeEvent*);
-    virtual void paintEvent(QPaintEvent* event);
+    void resizeEvent(QResizeEvent*) final;
+    void paintEvent(QPaintEvent*) final;
 
-    void setResizesToContents(bool b);
+    void setResizesToContents(bool);
     bool resizesToContents() const { return m_resizesToContents; }
 
     void setYRotation(qreal angle);

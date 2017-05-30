@@ -29,19 +29,16 @@
 #define PlatformStrategiesQt_h
 
 #include <CookiesStrategy.h>
-#include <DatabaseStrategy.h>
 #include <LoaderStrategy.h>
 #include <PlatformStrategies.h>
 #include <PluginStrategy.h>
-#include <SharedWorkerStrategy.h>
-#include <StorageStrategy.h>
-#include <VisitedLinkStrategy.h>
 
 namespace WebCore {
 class PasteboardStrategy;
 }
 
-class PlatformStrategiesQt : public WebCore::PlatformStrategies, private WebCore::CookiesStrategy, private WebCore::DatabaseStrategy, private WebCore::LoaderStrategy, private WebCore::PluginStrategy, private WebCore::SharedWorkerStrategy, private WebCore::StorageStrategy, private WebCore::VisitedLinkStrategy {
+class PlatformStrategiesQt : public WebCore::PlatformStrategies, private WebCore::CookiesStrategy, private WebCore::PluginStrategy {
+    friend class WTF::NeverDestroyed<PlatformStrategiesQt>;
 public:
     static void initialize();
 
@@ -49,33 +46,26 @@ private:
     PlatformStrategiesQt();
 
     // WebCore::PlatformStrategies
-    virtual WebCore::CookiesStrategy* createCookiesStrategy();
-    virtual WebCore::DatabaseStrategy* createDatabaseStrategy();
-    virtual WebCore::LoaderStrategy* createLoaderStrategy();
-    virtual WebCore::PasteboardStrategy* createPasteboardStrategy();
-    virtual WebCore::PluginStrategy* createPluginStrategy();
-    virtual WebCore::SharedWorkerStrategy* createSharedWorkerStrategy();
-    virtual WebCore::StorageStrategy* createStorageStrategy();
-    virtual WebCore::VisitedLinkStrategy* createVisitedLinkStrategy();
+    WebCore::CookiesStrategy* createCookiesStrategy() override;
+    WebCore::LoaderStrategy* createLoaderStrategy() override;
+    WebCore::PasteboardStrategy* createPasteboardStrategy() override;
+    WebCore::PluginStrategy* createPluginStrategy() override;
     
     // WebCore::CookiesStrategy
-    virtual String cookiesForDOM(const WebCore::NetworkStorageSession&, const WebCore::KURL& firstParty, const WebCore::KURL&);
-    virtual void setCookiesFromDOM(const WebCore::NetworkStorageSession&, const WebCore::KURL& firstParty, const WebCore::KURL&, const String&);
-    virtual bool cookiesEnabled(const WebCore::NetworkStorageSession&, const WebCore::KURL& firstParty, const WebCore::KURL&);
-    virtual String cookieRequestHeaderFieldValue(const WebCore::NetworkStorageSession&, const WebCore::KURL& firstParty, const WebCore::KURL&);
-    virtual bool getRawCookies(const WebCore::NetworkStorageSession&, const WebCore::KURL& firstParty, const WebCore::KURL&, Vector<WebCore::Cookie>&);
-    virtual void deleteCookie(const WebCore::NetworkStorageSession&, const WebCore::KURL&, const String&);
-
-    // WebCore::DatabaseStrategy
-    // - Using default implementation.
+    String cookiesForDOM(const WebCore::NetworkStorageSession&, const WebCore::URL& firstParty, const WebCore::URL&) override;
+    void setCookiesFromDOM(const WebCore::NetworkStorageSession&, const WebCore::URL& firstParty, const WebCore::URL&, const String&) override;
+    bool cookiesEnabled(const WebCore::NetworkStorageSession&, const WebCore::URL& firstParty, const WebCore::URL&) override;
+    String cookieRequestHeaderFieldValue(const WebCore::NetworkStorageSession&, const WebCore::URL& firstParty, const WebCore::URL&) override;
+    bool getRawCookies(const WebCore::NetworkStorageSession&, const WebCore::URL& firstParty, const WebCore::URL&, Vector<WebCore::Cookie>&) override;
+    void deleteCookie(const WebCore::NetworkStorageSession&, const WebCore::URL&, const String&) override;
 
     // WebCore::PluginStrategy
-    virtual void refreshPlugins();
-    virtual void getPluginInfo(const WebCore::Page*, Vector<WebCore::PluginInfo>&);
+    void refreshPlugins() override;
+    void getPluginInfo(const WebCore::Page*, Vector<WebCore::PluginInfo>&) override;
+    void getWebVisiblePluginInfo(const WebCore::Page*, Vector<WebCore::PluginInfo>&) override;
 
-    // WebCore::VisitedLinkStrategy
-    virtual bool isLinkVisited(WebCore::Page*, WebCore::LinkHash, const WebCore::KURL& baseURL, const WTF::AtomicString& attributeURL);
-    virtual void addVisitedLink(WebCore::Page*, WebCore::LinkHash);
+    // PlatformStrategies interface
+    WebCore::BlobRegistry* createBlobRegistry() override;
 };
 
 #endif // PlatformStrategiesQt_h

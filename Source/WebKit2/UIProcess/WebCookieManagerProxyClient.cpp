@@ -27,6 +27,7 @@
 #include "WebCookieManagerProxyClient.h"
 
 #include "WKAPICast.h"
+#include "WebCookieManagerProxy.h"
 
 namespace WebKit {
 
@@ -35,7 +36,7 @@ void WebCookieManagerProxyClient::cookiesDidChange(WebCookieManagerProxy* cookie
     if (!m_client.cookiesDidChange)
         return;
 
-    m_client.cookiesDidChange(toAPI(cookieManager), m_client.clientInfo);
+    m_client.cookiesDidChange(toAPI(cookieManager), m_client.base.clientInfo);
 }
 
 } // namespace WebKit

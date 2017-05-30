@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2012, 2013, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -46,11 +46,28 @@ public:
     void addVariable(VariableAccessData* variable)
     {
         m_variables.append(variable);
+        
+        // We may set this early. Merging it here saves us time in prediction propagation.
+        variable->mergeShouldNeverUnbox(m_shouldNeverUnbox);
+    }
+    
+    VariableAccessData* someVariable() const
+    {
+        if (m_variables.isEmpty())
+            return 0;
+        return m_variables[0]->find();
+    }
+    
+    FlushFormat flushFormat() const
+    {
+        if (VariableAccessData* variable = someVariable())
+            return variable->flushFormat();
+        return DeadFlush;
     }
     
     bool mergeShouldNeverUnbox(bool shouldNeverUnbox)
     {
-        return checkAndSet(m_shouldNeverUnbox, m_shouldNeverUnbox | shouldNeverUnbox);
+        return checkAndSet(m_shouldNeverUnbox, m_shouldNeverUnbox || shouldNeverUnbox);
     }
     
     bool mergeArgumentPredictionAwareness()
@@ -79,7 +96,7 @@ public:
         bool changed = false;
         for (unsigned i = 0; i < m_variables.size(); ++i) {
             VariableAccessData* variable = m_variables[i]->find();
-            changed |= checkAndSet(m_isProfitableToUnbox, m_isProfitableToUnbox | variable->isProfitableToUnbox());
+            changed |= checkAndSet(m_isProfitableToUnbox, m_isProfitableToUnbox || variable->isProfitableToUnbox());
         }
         if (!changed)
             return false;
@@ -104,15 +121,12 @@ public:
     {
         for (unsigned i = 0; i < m_variables.size(); ++i) {
             VariableAccessData* variable = m_variables[i]->find();
-            int operand = variable->operand();
+            VirtualRegister operand = variable->local();
 
             if (i)
                 out.print(" ");
 
-            if (operandIsArgument(operand))
-                out.print("arg", operandToArgument(operand), "(", VariableAccessDataDump(*graph, variable), ")");
-            else
-                out.print("r", operand, "(", VariableAccessDataDump(*graph, variable), ")");
+            out.print(operand, "(", VariableAccessDataDump(*graph, variable), ")");
         }
         out.print("\n");
     }

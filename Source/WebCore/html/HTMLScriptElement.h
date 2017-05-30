@@ -29,54 +29,44 @@
 
 namespace WebCore {
 
-class HTMLScriptElement FINAL : public HTMLElement, public ScriptElement {
+class HTMLScriptElement final : public HTMLElement, public ScriptElement {
 public:
-    static PassRefPtr<HTMLScriptElement> create(const QualifiedName&, Document*, bool wasInsertedByParser, bool alreadyStarted = false);
+    static Ref<HTMLScriptElement> create(const QualifiedName&, Document&, bool wasInsertedByParser, bool alreadyStarted = false);
 
     String text() const { return scriptContent(); }
     void setText(const String&);
 
-    KURL src() const;
+    URL src() const;
 
     void setAsync(bool);
     bool async() const;
 
 private:
-    HTMLScriptElement(const QualifiedName&, Document*, bool wasInsertedByParser, bool alreadyStarted);
+    HTMLScriptElement(const QualifiedName&, Document&, bool wasInsertedByParser, bool alreadyStarted);
 
-    virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
-    virtual InsertionNotificationRequest insertedInto(ContainerNode*) OVERRIDE;
-    virtual void childrenChanged(bool changedByParser = false, Node* beforeChange = 0, Node* afterChange = 0, int childCountDelta = 0);
+    virtual void parseAttribute(const QualifiedName&, const AtomicString&) override;
+    virtual InsertionNotificationRequest insertedInto(ContainerNode&) override;
+    virtual void finishedInsertingSubtree() override;
+    virtual void childrenChanged(const ChildChange&) override;
 
-    virtual bool isURLAttribute(const Attribute&) const OVERRIDE;
+    virtual bool isURLAttribute(const Attribute&) const override;
 
-    virtual void addSubresourceAttributeURLs(ListHashSet<KURL>&) const;
+    virtual void addSubresourceAttributeURLs(ListHashSet<URL>&) const override;
 
-    virtual String sourceAttributeValue() const;
-    virtual String charsetAttributeValue() const;
-    virtual String typeAttributeValue() const;
-    virtual String languageAttributeValue() const;
-    virtual String forAttributeValue() const;
-    virtual String eventAttributeValue() const;
-    virtual bool asyncAttributeValue() const;
-    virtual bool deferAttributeValue() const;
-    virtual bool hasSourceAttribute() const;
+    virtual String sourceAttributeValue() const override;
+    virtual String charsetAttributeValue() const override;
+    virtual String typeAttributeValue() const override;
+    virtual String languageAttributeValue() const override;
+    virtual String forAttributeValue() const override;
+    virtual String eventAttributeValue() const override;
+    virtual bool asyncAttributeValue() const override;
+    virtual bool deferAttributeValue() const override;
+    virtual bool hasSourceAttribute() const override;
 
-    virtual void dispatchLoadEvent();
+    virtual void dispatchLoadEvent() override;
 
-    virtual PassRefPtr<Element> cloneElementWithoutAttributesAndChildren();
+    virtual Ref<Element> cloneElementWithoutAttributesAndChildren(Document&) override;
 };
-
-inline bool isHTMLScriptElement(Node* node)
-{
-    return node->hasTagName(HTMLNames::scriptTag);
-}
-
-inline HTMLScriptElement* toHTMLScriptElement(Node* node)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->hasTagName(HTMLNames::scriptTag));
-    return static_cast<HTMLScriptElement*>(node);
-}
 
 } //namespace
 

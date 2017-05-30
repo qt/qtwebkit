@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2010, 2011, 2014-2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,13 +27,9 @@
 #define EventSendingController_h
 
 #include "JSWrappable.h"
-#include <WebKit2/WKEvent.h>
-#include <WebKit2/WKGeometry.h>
+#include <WebKit/WKEvent.h>
+#include <WebKit/WKGeometry.h>
 #include <wtf/PassRefPtr.h>
-
-#if !PLATFORM(MAC) && !PLATFORM(QT) && !PLATFORM(GTK) && !PLATFORM(EFL)
-#define USE_WEBPROCESS_EVENT_SIMULATION
-#endif
 
 namespace WTR {
 
@@ -50,11 +46,20 @@ public:
     void mouseDown(int button, JSValueRef modifierArray);
     void mouseUp(int button, JSValueRef modifierArray);
     void mouseMoveTo(int x, int y);
+    void mouseForceClick();
+    void startAndCancelMouseForceClick();
+    void mouseForceDown();
+    void mouseForceUp();
+    void mouseForceChanged(double force);
     void mouseScrollBy(int x, int y);
+    void mouseScrollByWithWheelAndMomentumPhases(int x, int y, JSStringRef phase, JSStringRef momentum);
+    void swipeGestureWithWheelAndMomentumPhases(int x, int y, JSStringRef phase, JSStringRef momentum);
     void continuousMouseScrollBy(int x, int y, bool paged);
     JSValueRef contextClick();
     void leapForward(int milliseconds);
     void scheduleAsynchronousClick();
+    void monitorWheelEvents();
+    void callAfterScrollingCompletes(JSValueRef functionCallback);
 
     void keyDown(JSStringRef key, JSValueRef modifierArray, int location);
     void scheduleAsynchronousKeyDown(JSStringRef key);
@@ -83,18 +88,7 @@ public:
 
 private:
     EventSendingController();
-
-#ifdef USE_WEBPROCESS_EVENT_SIMULATION
-    void updateClickCount(WKEventMouseButton);
-
-    double m_time;
     WKPoint m_position;
-
-    int m_clickCount;
-    double m_clickTime;
-    WKPoint m_clickPosition;
-    WKEventMouseButton m_clickButton;
-#endif
 };
 
 } // namespace WTR

@@ -26,8 +26,8 @@
 #ifndef WKPagePrivate_h
 #define WKPagePrivate_h
 
-#include <WebKit2/WKBase.h>
-#include <WebKit2/WKPage.h>
+#include <WebKit/WKBase.h>
+#include <WebKit/WKPage.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -35,11 +35,6 @@ extern "C" {
 
 typedef void (*WKPageRenderTreeExternalRepresentationFunction)(WKStringRef, WKErrorRef, void*);
 WK_EXPORT void WKPageRenderTreeExternalRepresentation(WKPageRef page, void *context, WKPageRenderTreeExternalRepresentationFunction function);
-
-#ifdef __BLOCKS__
-typedef void (^WKPageRenderTreeExternalRepresentationBlock)(WKStringRef, WKErrorRef);
-WK_EXPORT void WKPageRenderTreeExternalRepresentation_b(WKPageRef page, WKPageRenderTreeExternalRepresentationBlock block);
-#endif
 
 enum {
     kWKDebugFlashViewUpdates = 1 << 0,
@@ -69,6 +64,8 @@ WK_EXPORT void WKPageSetPageLength(WKPageRef page, double pageLength);
 WK_EXPORT double WKPageGetPageLength(WKPageRef page);
 WK_EXPORT void WKPageSetGapBetweenPages(WKPageRef page, double gap);
 WK_EXPORT double WKPageGetGapBetweenPages(WKPageRef page);
+WK_EXPORT void WKPageSetPaginationLineGridEnabled(WKPageRef page, bool lineGridEnabled);
+WK_EXPORT bool WKPageGetPaginationLineGridEnabled(WKPageRef page);
 
 WK_EXPORT unsigned WKPageGetPageCount(WKPageRef page);
 
@@ -87,18 +84,19 @@ WK_EXPORT void WKPageBeginPrinting(WKPageRef page, WKFrameRef frame, WKPrintInfo
 WK_EXPORT void WKPageDrawPagesToPDF(WKPageRef page, WKFrameRef frame, WKPrintInfo printInfo, uint32_t first, uint32_t count, WKPageDrawToPDFFunction callback, void* context);
 WK_EXPORT void WKPageEndPrinting(WKPageRef page);
 
-// FIXME https://bugs.webkit.org/show_bug.cgi?id=66979: Remove this sync call.
-WK_EXPORT WKImageRef WKPageCreateSnapshotOfVisibleContent(WKPageRef page);
-
-WK_EXPORT void WKPageSetShouldSendEventsSynchronously(WKPageRef page, bool sync);
+WK_EXPORT bool WKPageGetAllowsRemoteInspection(WKPageRef page);
+WK_EXPORT void WKPageSetAllowsRemoteInspection(WKPageRef page, bool allow);
 
 WK_EXPORT void WKPageSetMediaVolume(WKPageRef page, float volume);
 WK_EXPORT void WKPageSetMayStartMediaWhenInWindow(WKPageRef page, bool mayStartMedia);
 
-WK_EXPORT WKArrayRef WKPageCopyRelatedPages(WKPageRef page);
+typedef void (*WKPageGetBytecodeProfileFunction)(WKStringRef, WKErrorRef, void*);
+WK_EXPORT void WKPageGetBytecodeProfile(WKPageRef page, void* context, WKPageGetBytecodeProfileFunction function);
 
-typedef void (*WKPageInvalidMessageFunction)(uint32_t messageID);
-WK_EXPORT void WKPageSetInvalidMessageFunction(WKPageInvalidMessageFunction function);
+typedef void (*WKPageIsWebProcessResponsiveFunction)(bool isWebProcessResponsive, void* context);
+WK_EXPORT void WKPageIsWebProcessResponsive(WKPageRef page, void* context, WKPageIsWebProcessResponsiveFunction function);
+    
+WK_EXPORT WKArrayRef WKPageCopyRelatedPages(WKPageRef page);
 
 enum {
     kWKScrollPinningBehaviorDoNotPin,
@@ -109,6 +107,27 @@ typedef uint32_t WKScrollPinningBehavior;
 
 WK_EXPORT WKScrollPinningBehavior WKPageGetScrollPinningBehavior(WKPageRef page);
 WK_EXPORT void WKPageSetScrollPinningBehavior(WKPageRef page, WKScrollPinningBehavior pinning);
+
+WK_EXPORT bool WKPageGetAddsVisitedLinks(WKPageRef page);
+WK_EXPORT void WKPageSetAddsVisitedLinks(WKPageRef page, bool visitedLinks);
+
+WK_EXPORT bool WKPageIsPlayingAudio(WKPageRef page);
+WK_EXPORT void WKPageSetMuted(WKPageRef page, bool muted);
+
+enum {
+    kWKMediaEventTypePlayPause,
+    kWKMediaEventTypeTrackNext,
+    kWKMediaEventTypeTrackPrevious
+};
+typedef uint32_t WKMediaEventType;
+
+WK_EXPORT bool WKPageHasMediaSessionWithActiveMediaElements(WKPageRef page);
+WK_EXPORT void WKPageHandleMediaEvent(WKPageRef page, WKMediaEventType event);
+
+WK_EXPORT void WKPageLoadURLWithShouldOpenExternalURLsPolicy(WKPageRef page, WKURLRef url, bool shouldOpenExternalURLs);
+
+typedef void (*WKPagePostPresentationUpdateFunction)(WKErrorRef, void*);
+WK_EXPORT void WKPageCallAfterNextPresentationUpdate(WKPageRef page, void* context, WKPagePostPresentationUpdateFunction function);
 
 #ifdef __cplusplus
 }

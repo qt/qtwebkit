@@ -20,7 +20,7 @@
 #ifndef TextureMapperSurfaceBackingStore_h
 #define TextureMapperSurfaceBackingStore_h
 
-#if USE(ACCELERATED_COMPOSITING) && USE(GRAPHICS_SURFACE)
+#if USE(GRAPHICS_SURFACE)
 
 #include "GraphicsSurface.h"
 #include "TextureMapperBackingStore.h"
@@ -36,8 +36,8 @@ public:
     static PassRefPtr<TextureMapperSurfaceBackingStore> create() { return adoptRef(new TextureMapperSurfaceBackingStore); }
     void setGraphicsSurface(PassRefPtr<GraphicsSurface>);
     void swapBuffersIfNeeded(uint32_t frontBuffer);
-    virtual PassRefPtr<BitmapTexture> texture() const;
-    virtual void paintToTextureMapper(TextureMapper*, const FloatRect&, const TransformationMatrix&, float);
+    virtual RefPtr<BitmapTexture> texture() const;
+    virtual void paintToTextureMapper(TextureMapper&, const FloatRect&, const TransformationMatrix&, float);
     virtual ~TextureMapperSurfaceBackingStore() { }
 
 private:

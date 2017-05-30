@@ -22,10 +22,9 @@
 #include "config.h"
 #include "FontCache.h"
 
+#include "FcUniquePtr.h"
 #include "Font.h"
-#include "OwnPtrCairo.h"
 #include "RefPtrCairo.h"
-#include "SimpleFontData.h"
 #include "UTF16UChar32Iterator.h"
 #include <cairo-ft.h>
 #include <cairo.h>
@@ -42,102 +41,128 @@ void FontCache::platformInit()
         ASSERT_NOT_REACHED();
 }
 
-FcPattern* createFontConfigPatternForCharacters(const UChar* characters, int bufferLength)
+static RefPtr<FcPattern> createFontConfigPatternForCharacters(const UChar* characters, int bufferLength)
 {
-    FcPattern* pattern = FcPatternCreate();
-    FcCharSet* fontConfigCharSet = FcCharSetCreate();
+    RefPtr<FcPattern> pattern = adoptRef(FcPatternCreate());
+    FcUniquePtr<FcCharSet> fontConfigCharSet(FcCharSetCreate());
 
     UTF16UChar32Iterator iterator(characters, bufferLength);
     UChar32 character = iterator.next();
     while (character != iterator.end()) {
-        FcCharSetAddChar(fontConfigCharSet, character);
+        FcCharSetAddChar(fontConfigCharSet.get(), character);
         character = iterator.next();
     }
 
-    FcPatternAddCharSet(pattern, FC_CHARSET, fontConfigCharSet);
-    FcCharSetDestroy(fontConfigCharSet);
+    FcPatternAddCharSet(pattern.get(), FC_CHARSET, fontConfigCharSet.get());
 
-    FcPatternAddBool(pattern, FC_SCALABLE, FcTrue);
-    FcConfigSubstitute(0, pattern, FcMatchPattern);
-    FcDefaultSubstitute(pattern);
+    FcPatternAddBool(pattern.get(), FC_SCALABLE, FcTrue);
+    FcConfigSubstitute(nullptr, pattern.get(), FcMatchPattern);
+    FcDefaultSubstitute(pattern.get());
     return pattern;
 }
 
-FcPattern* findBestFontGivenFallbacks(const FontPlatformData& fontData, FcPattern* pattern)
+static RefPtr<FcPattern> findBestFontGivenFallbacks(const FontPlatformData& fontData, FcPattern* pattern)
 {
     if (!fontData.m_pattern)
-        return 0;
+        return nullptr;
 
     if (!fontData.m_fallbacks) {
         FcResult fontConfigResult;
-        fontData.m_fallbacks = FcFontSort(0, fontData.m_pattern.get(), FcTrue, 0, &fontConfigResult);
+        fontData.m_fallbacks = FcFontSort(nullptr, fontData.m_pattern.get(), FcTrue, nullptr, &fontConfigResult);
     }
 
     if (!fontData.m_fallbacks)
-        return 0;
+        return nullptr;
 
     FcFontSet* sets[] = { fontData.m_fallbacks };
     FcResult fontConfigResult;
-    return FcFontSetMatch(0, sets, 1, pattern, &fontConfigResult);
+    return FcFontSetMatch(nullptr, sets, 1, pattern, &fontConfigResult);
 }
 
-PassRefPtr<SimpleFontData> FontCache::systemFallbackForCharacters(const FontDescription& description, const SimpleFontData* originalFontData, bool, const UChar* characters, int length)
+RefPtr<Font> FontCache::systemFallbackForCharacters(const FontDescription& description, const Font* originalFontData, bool, const UChar* characters, unsigned length)
 {
-    RefPtr<FcPattern> pattern = adoptRef(createFontConfigPatternForCharacters(characters, length));
+    RefPtr<FcPattern> pattern = createFontConfigPatternForCharacters(characters, length);
     const FontPlatformData& fontData = originalFontData->platformData();
 
-    RefPtr<FcPattern> fallbackPattern = adoptRef(findBestFontGivenFallbacks(fontData, pattern.get()));
+    RefPtr<FcPattern> fallbackPattern = findBestFontGivenFallbacks(fontData, pattern.get());
     if (fallbackPattern) {
         FontPlatformData alternateFontData(fallbackPattern.get(), description);
-        return getCachedFontData(&alternateFontData, DoNotRetain);
+        return fontForPlatformData(alternateFontData);
     }
 
     FcResult fontConfigResult;
-    RefPtr<FcPattern> resultPattern = adoptRef(FcFontMatch(0, pattern.get(), &fontConfigResult));
+    RefPtr<FcPattern> resultPattern = adoptRef(FcFontMatch(nullptr, pattern.get(), &fontConfigResult));
     if (!resultPattern)
-        return 0;
+        return nullptr;
     FontPlatformData alternateFontData(resultPattern.get(), description);
-    return getCachedFontData(&alternateFontData, DoNotRetain);
+    return fontForPlatformData(alternateFontData);
 }
 
-PassRefPtr<SimpleFontData> FontCache::getLastResortFallbackFont(const FontDescription& fontDescription, ShouldRetain shouldRetain)
+static Vector<String> patternToFamilies(FcPattern& pattern)
+{
+    char* patternChars = reinterpret_cast<char*>(FcPatternFormat(&pattern, reinterpret_cast<const FcChar8*>("%{family}")));
+    String patternString = String::fromUTF8(patternChars);
+    free(patternChars);
+
+    Vector<String> results;
+    patternString.split(',', results);
+    return results;
+}
+
+Vector<String> FontCache::systemFontFamilies()
+{
+    RefPtr<FcPattern> scalablesOnlyPattern = adoptRef(FcPatternCreate());
+    FcPatternAddBool(scalablesOnlyPattern.get(), FC_SCALABLE, FcTrue);
+
+    FcUniquePtr<FcObjectSet> familiesOnly(FcObjectSetBuild(FC_FAMILY, nullptr));
+    FcUniquePtr<FcFontSet> fontSet(FcFontList(nullptr, scalablesOnlyPattern.get(), familiesOnly.get()));
+
+    Vector<String> fontFamilies;
+    for (int i = 0; i < fontSet->nfont; i++) {
+        FcPattern* pattern = fontSet->fonts[i];
+        FcChar8* family = nullptr;
+        FcPatternGetString(pattern, FC_FAMILY, 0, &family);
+        if (family)
+            fontFamilies.appendVector(patternToFamilies(*pattern));
+    }
+
+    return fontFamilies;
+}
+
+Ref<Font> FontCache::lastResortFallbackFont(const FontDescription& fontDescription)
 {
     // We want to return a fallback font here, otherwise the logic preventing FontConfig
     // matches for non-fallback fonts might return 0. See isFallbackFontAllowed.
     static AtomicString timesStr("serif");
-    return getCachedFontData(fontDescription, timesStr, false, shouldRetain);
+    return *fontForFamily(fontDescription, timesStr);
 }
 
-void FontCache::getTraitsInFamily(const AtomicString&, Vector<unsigned>&)
+Vector<FontTraitsMask> FontCache::getTraitsInFamily(const AtomicString&)
 {
+    return { };
 }
 
-static String getFamilyNameStringFromFontDescriptionAndFamily(const FontDescription& fontDescription, const AtomicString& family)
+static String getFamilyNameStringFromFamily(const AtomicString& family)
 {
     // If we're creating a fallback font (e.g. "-webkit-monospace"), convert the name into
     // the fallback name (like "monospace") that fontconfig understands.
     if (family.length() && !family.startsWith("-webkit-"))
         return family.string();
 
-    switch (fontDescription.genericFamily()) {
-    case FontDescription::StandardFamily:
-    case FontDescription::SerifFamily:
+    if (family == standardFamily || family == serifFamily)
         return "serif";
-    case FontDescription::SansSerifFamily:
+    if (family == sansSerifFamily)
         return "sans-serif";
-    case FontDescription::MonospaceFamily:
+    if (family == monospaceFamily)
         return "monospace";
-    case FontDescription::CursiveFamily:
+    if (family == cursiveFamily)
         return "cursive";
-    case FontDescription::FantasyFamily:
+    if (family == fantasyFamily)
         return "fantasy";
-    case FontDescription::NoFamily:
-    default:
-        return "";
-    }
+    return "";
 }
 
-int fontWeightToFontconfigWeight(FontWeight weight)
+static int fontWeightToFontconfigWeight(FontWeight weight)
 {
     switch (weight) {
     case FontWeight100:
@@ -164,13 +189,152 @@ int fontWeightToFontconfigWeight(FontWeight weight)
     }
 }
 
-PassOwnPtr<FontPlatformData> FontCache::createFontPlatformData(const FontDescription& fontDescription, const AtomicString& family)
+// This is based on Chromium BSD code from Skia (src/ports/SkFontMgr_fontconfig.cpp). It is a
+// hack for lack of API in Fontconfig: https://bugs.freedesktop.org/show_bug.cgi?id=19375
+// FIXME: This is horrible. It should be deleted once Fontconfig can do this itself.
+enum class AliasStrength {
+    Weak,
+    Strong,
+    Done
+};
+
+static AliasStrength strengthOfFirstAlias(const FcPattern& original)
+{
+    // Ideally there would exist a call like
+    // FcResult FcPatternIsWeak(pattern, object, id, FcBool* isWeak);
+    //
+    // However, there is no such call and as of Fc 2.11.0 even FcPatternEquals ignores the weak bit.
+    // Currently, the only reliable way of finding the weak bit is by its effect on matching.
+    // The weak bit only affects the matching of FC_FAMILY and FC_POSTSCRIPT_NAME object values.
+    // A element with the weak bit is scored after FC_LANG, without the weak bit is scored before.
+    // Note that the weak bit is stored on the element, not on the value it holds.
+    FcValue value;
+    FcResult result = FcPatternGet(&original, FC_FAMILY, 0, &value);
+    if (result != FcResultMatch)
+        return AliasStrength::Done;
+
+    RefPtr<FcPattern> pattern = adoptRef(FcPatternDuplicate(&original));
+    FcBool hasMultipleFamilies = true;
+    while (hasMultipleFamilies)
+        hasMultipleFamilies = FcPatternRemove(pattern.get(), FC_FAMILY, 1);
+
+    // Create a font set with two patterns.
+    // 1. the same FC_FAMILY as pattern and a lang object with only 'nomatchlang'.
+    // 2. a different FC_FAMILY from pattern and a lang object with only 'matchlang'.
+    FcUniquePtr<FcFontSet> fontSet(FcFontSetCreate());
+
+    FcUniquePtr<FcLangSet> strongLangSet(FcLangSetCreate());
+    FcLangSetAdd(strongLangSet.get(), reinterpret_cast<const FcChar8*>("nomatchlang"));
+    // Ownership of this FcPattern will be transferred with FcFontSetAdd.
+    FcPattern* strong = FcPatternDuplicate(pattern.get());
+    FcPatternAddLangSet(strong, FC_LANG, strongLangSet.get());
+
+    FcUniquePtr<FcLangSet> weakLangSet(FcLangSetCreate());
+    FcLangSetAdd(weakLangSet.get(), reinterpret_cast<const FcChar8*>("matchlang"));
+    // Ownership of this FcPattern will be transferred via FcFontSetAdd.
+    FcPattern* weak = FcPatternCreate();
+    FcPatternAddString(weak, FC_FAMILY, reinterpret_cast<const FcChar8*>("nomatchstring"));
+    FcPatternAddLangSet(weak, FC_LANG, weakLangSet.get());
+
+    FcFontSetAdd(fontSet.get(), strong);
+    FcFontSetAdd(fontSet.get(), weak);
+
+    // Add 'matchlang' to the copy of the pattern.
+    FcPatternAddLangSet(pattern.get(), FC_LANG, weakLangSet.get());
+
+    // Run a match against the copy of the pattern.
+    // If the first element was weak, then we should match the pattern with 'matchlang'.
+    // If the first element was strong, then we should match the pattern with 'nomatchlang'.
+
+    // Note that this config is only used for FcFontRenderPrepare, which we don't even want.
+    // However, there appears to be no way to match/sort without it.
+    RefPtr<FcConfig> config = adoptRef(FcConfigCreate());
+    FcFontSet* fontSets[1] = { fontSet.get() };
+    RefPtr<FcPattern> match = adoptRef(FcFontSetMatch(config.get(), fontSets, 1, pattern.get(), &result));
+
+    FcLangSet* matchLangSet;
+    FcPatternGetLangSet(match.get(), FC_LANG, 0, &matchLangSet);
+    return FcLangEqual == FcLangSetHasLang(matchLangSet, reinterpret_cast<const FcChar8*>("matchlang"))
+        ? AliasStrength::Weak : AliasStrength::Strong;
+}
+
+static Vector<String> strongAliasesForFamily(const String& family)
+{
+    RefPtr<FcPattern> pattern = adoptRef(FcPatternCreate());
+    if (!FcPatternAddString(pattern.get(), FC_FAMILY, reinterpret_cast<const FcChar8*>(family.utf8().data())))
+        return Vector<String>();
+
+    FcConfigSubstitute(nullptr, pattern.get(), FcMatchPattern);
+    FcDefaultSubstitute(pattern.get());
+
+    FcUniquePtr<FcObjectSet> familiesOnly(FcObjectSetBuild(FC_FAMILY, nullptr));
+    RefPtr<FcPattern> minimal = adoptRef(FcPatternFilter(pattern.get(), familiesOnly.get()));
+
+    // We really want to match strong (preferred) and same (acceptable) only here.
+    // If a family name was specified, assume that any weak matches after the last strong match
+    // are weak (default) and ignore them.
+    // The reason for is that after substitution the pattern for 'sans-serif' looks like
+    // "wwwwwwwwwwwwwwswww" where there are many weak but preferred names, followed by defaults.
+    // So it is possible to have weakly matching but preferred names.
+    // In aliases, bindings are weak by default, so this is easy and common.
+    // If no family name was specified, we'll probably only get weak matches, but that's ok.
+    int lastStrongId = -1;
+    int numIds = 0;
+    for (int id = 0; ; ++id) {
+        AliasStrength result = strengthOfFirstAlias(*minimal);
+        if (result == AliasStrength::Done) {
+            numIds = id;
+            break;
+        }
+        if (result == AliasStrength::Strong)
+            lastStrongId = id;
+        if (!FcPatternRemove(minimal.get(), FC_FAMILY, 0))
+            return Vector<String>();
+    }
+
+    // If they were all weak, then leave the pattern alone.
+    if (lastStrongId < 0)
+        return Vector<String>();
+
+    // Remove everything after the last strong.
+    for (int id = lastStrongId + 1; id < numIds; ++id) {
+        if (!FcPatternRemove(pattern.get(), FC_FAMILY, lastStrongId + 1)) {
+            ASSERT_NOT_REACHED();
+            return Vector<String>();
+        }
+    }
+
+    return patternToFamilies(*pattern);
+}
+
+static bool areStronglyAliased(const String& familyA, const String& familyB)
+{
+    for (auto& family : strongAliasesForFamily(familyA)) {
+        if (family == familyB)
+            return true;
+    }
+    return false;
+}
+
+static inline bool isCommonlyUsedGenericFamily(const String& familyNameString)
+{
+    return equalLettersIgnoringASCIICase(familyNameString, "sans")
+        || equalLettersIgnoringASCIICase(familyNameString, "sans-serif")
+        || equalLettersIgnoringASCIICase(familyNameString, "serif")
+        || equalLettersIgnoringASCIICase(familyNameString, "monospace")
+        || equalLettersIgnoringASCIICase(familyNameString, "fantasy")
+        || equalLettersIgnoringASCIICase(familyNameString, "cursive");
+}
+
+std::unique_ptr<FontPlatformData> FontCache::createFontPlatformData(const FontDescription& fontDescription, const AtomicString& family, const FontFeatureSettings*, const FontVariantSettings*)
 {
     // The CSS font matching algorithm (http://www.w3.org/TR/css3-fonts/#font-matching-algorithm)
     // says that we must find an exact match for font family, slant (italic or oblique can be used)
     // and font weight (we only match bold/non-bold here).
     RefPtr<FcPattern> pattern = adoptRef(FcPatternCreate());
-    String familyNameString(getFamilyNameStringFromFontDescriptionAndFamily(fontDescription, family));
+    // Never choose unscalable fonts, as they pixelate when displayed at different sizes.
+    FcPatternAddBool(pattern.get(), FC_SCALABLE, FcTrue);
+    String familyNameString(getFamilyNameStringFromFamily(family));
     if (!FcPatternAddString(pattern.get(), FC_FAMILY, reinterpret_cast<const FcChar8*>(familyNameString.utf8().data())))
         return nullptr;
 
@@ -183,11 +347,18 @@ PassOwnPtr<FontPlatformData> FontCache::createFontPlatformData(const FontDescrip
         return nullptr;
 
     // The strategy is originally from Skia (src/ports/SkFontHost_fontconfig.cpp):
-
-    // Allow Fontconfig to do pre-match substitution. Unless we are accessing a "fallback"
-    // family like "sans," this is the only time we allow Fontconfig to substitute one
-    // family name for another (i.e. if the fonts are aliased to each other).
-    FcConfigSubstitute(0, pattern.get(), FcMatchPattern);
+    //
+    // We do not normally allow fontconfig to substitute one font family for another, since this
+    // would break CSS font family fallback: the website should be in control of fallback. During
+    // normal font matching, the only font family substitution permitted is for generic families
+    // (sans, serif, monospace) or for strongly-aliased fonts (which are to be treated as
+    // effectively identical). This is because the font matching step is designed to always find a
+    // match for the font, which we don't want.
+    //
+    // Fontconfig is used in two stages: (1) configuration and (2) matching. During the
+    // configuration step, before any matching occurs, we allow arbitrary family substitutions,
+    // since this is an exact matter of respecting the user's font configuration.
+    FcConfigSubstitute(nullptr, pattern.get(), FcMatchPattern);
     FcDefaultSubstitute(pattern.get());
 
     FcChar8* fontConfigFamilyNameAfterConfiguration;
@@ -195,7 +366,7 @@ PassOwnPtr<FontPlatformData> FontCache::createFontPlatformData(const FontDescrip
     String familyNameAfterConfiguration = String::fromUTF8(reinterpret_cast<char*>(fontConfigFamilyNameAfterConfiguration));
 
     FcResult fontConfigResult;
-    RefPtr<FcPattern> resultPattern = adoptRef(FcFontMatch(0, pattern.get(), &fontConfigResult));
+    RefPtr<FcPattern> resultPattern = adoptRef(FcFontMatch(nullptr, pattern.get(), &fontConfigResult));
     if (!resultPattern) // No match.
         return nullptr;
 
@@ -203,23 +374,21 @@ PassOwnPtr<FontPlatformData> FontCache::createFontPlatformData(const FontDescrip
     FcPatternGetString(resultPattern.get(), FC_FAMILY, 0, &fontConfigFamilyNameAfterMatching);
     String familyNameAfterMatching = String::fromUTF8(reinterpret_cast<char*>(fontConfigFamilyNameAfterMatching));
 
-    // If Fontconfig gave use a different font family than the one we requested, we should ignore it
-    // and allow WebCore to give us the next font on the CSS fallback list. The only exception is if
-    // this family name is a commonly used generic family.
-    if (!equalIgnoringCase(familyNameAfterConfiguration, familyNameAfterMatching)
-        && !(equalIgnoringCase(familyNameString, "sans") || equalIgnoringCase(familyNameString, "sans-serif")
-          || equalIgnoringCase(familyNameString, "serif") || equalIgnoringCase(familyNameString, "monospace")
-          || equalIgnoringCase(familyNameString, "fantasy") || equalIgnoringCase(familyNameString, "cursive")))
+    // If Fontconfig gave us a different font family than the one we requested, we should ignore it
+    // and allow WebCore to give us the next font on the CSS fallback list. The exceptions are if
+    // this family name is a commonly-used generic family, or if the families are strongly-aliased.
+    // Checking for a strong alias comes last, since it is slow.
+    if (!equalIgnoringASCIICase(familyNameAfterConfiguration, familyNameAfterMatching) && !isCommonlyUsedGenericFamily(familyNameString) && !areStronglyAliased(familyNameAfterConfiguration, familyNameAfterMatching))
         return nullptr;
 
     // Verify that this font has an encoding compatible with Fontconfig. Fontconfig currently
     // supports three encodings in FcFreeTypeCharIndex: Unicode, Symbol and AppleRoman.
     // If this font doesn't have one of these three encodings, don't select it.
-    OwnPtr<FontPlatformData> platformData = adoptPtr(new FontPlatformData(resultPattern.get(), fontDescription));
+    auto platformData = std::make_unique<FontPlatformData>(resultPattern.get(), fontDescription);
     if (!platformData->hasCompatibleCharmap())
         return nullptr;
 
-    return platformData.release();
+    return platformData;
 }
 
 }

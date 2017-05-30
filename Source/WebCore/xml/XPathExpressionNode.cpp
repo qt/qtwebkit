@@ -1,6 +1,6 @@
 /*
  * Copyright 2005 Frerich Raabe <raabe@kde.org>
- * Copyright (C) 2006 Apple Computer, Inc.
+ * Copyright (C) 2006, 2013 Apple Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,7 +27,7 @@
 #include "config.h"
 #include "XPathExpressionNode.h"
 
-#include "Node.h"
+#include <wtf/NeverDestroyed.h>
 #include <wtf/StdLibExtras.h>
 
 namespace WebCore {
@@ -35,8 +35,8 @@ namespace XPath {
 
 EvaluationContext& Expression::evaluationContext()
 {
-    DEFINE_STATIC_LOCAL(EvaluationContext, evaluationContext, ());
-    return evaluationContext;
+    static NeverDestroyed<EvaluationContext> context;
+    return context;
 }
 
 Expression::Expression()
@@ -46,10 +46,16 @@ Expression::Expression()
 {
 }
 
-Expression::~Expression()
+void Expression::setSubexpressions(Vector<std::unique_ptr<Expression>> subexpressions)
 {
-    deleteAllValues(m_subExpressions);
+    ASSERT(m_subexpressions.isEmpty());
+    m_subexpressions = WTFMove(subexpressions);
+    for (auto& subexpression : m_subexpressions) {
+        m_isContextNodeSensitive |= subexpression->m_isContextNodeSensitive;
+        m_isContextPositionSensitive |= subexpression->m_isContextPositionSensitive;
+        m_isContextSizeSensitive |= subexpression->m_isContextSizeSensitive;
+    }
 }
 
-}
-}
+} // namespace XPath
+} // namespace WebCore

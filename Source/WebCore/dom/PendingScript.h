@@ -29,7 +29,6 @@
 #include "CachedResourceClient.h"
 #include "CachedResourceHandle.h"
 #include <wtf/text/TextPosition.h>
-#include <wtf/PassRefPtr.h>
 #include <wtf/RefPtr.h>
 
 namespace WebCore {
@@ -42,7 +41,7 @@ class Element;
 // A CachedResourceHandle alone does not prevent the underlying CachedResource
 // from purging its data buffer. This class holds a dummy client open for its
 // lifetime in order to guarantee that the data buffer will not be purged.
-class PendingScript : public CachedResourceClient {
+class PendingScript final : public CachedResourceClient {
 public:
     PendingScript()
         : m_watchingForLoad(false)
@@ -66,7 +65,7 @@ public:
         setCachedScript(other.cachedScript());
     }
 
-    ~PendingScript();
+    virtual ~PendingScript();
 
     PendingScript& operator=(const PendingScript& other)
     {
@@ -89,12 +88,12 @@ public:
 
     Element* element() const { return m_element.get(); }
     void setElement(Element* element) { m_element = element; }
-    PassRefPtr<Element> releaseElementAndClear();
+    RefPtr<Element> releaseElementAndClear();
 
     CachedScript* cachedScript() const;
     void setCachedScript(CachedScript*);
 
-    virtual void notifyFinished(CachedResource*);
+    virtual void notifyFinished(CachedResource*) override;
 
 private:
     bool m_watchingForLoad;

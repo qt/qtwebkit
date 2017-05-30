@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -25,13 +25,11 @@
 #include "config.h"
 #include "WebCoreTextRenderer.h"
 
-#include "Font.h"
-#include "FontCache.h"
+#include "FontCascade.h"
 #include "FontDescription.h"
 #include "GraphicsContext.h"
 #include "StringTruncator.h"
 #include "TextRun.h"
-#include <wtf/unicode/Unicode.h>
 
 namespace WebCore {
 
@@ -40,22 +38,20 @@ static bool shouldUseFontSmoothing = true;
 static bool isOneLeftToRightRun(const TextRun& run)
 {
     for (int i = 0; i < run.length(); i++) {
-        WTF::Unicode::Direction direction = WTF::Unicode::direction(run[i]);
-        if (direction == WTF::Unicode::RightToLeft || direction > WTF::Unicode::OtherNeutral)
+        UCharDirection direction = u_charDirection(run[i]);
+        if (direction == U_RIGHT_TO_LEFT || direction > U_OTHER_NEUTRAL)
             return false;
     }
     return true;
 }
 
-static void doDrawTextAtPoint(GraphicsContext& context, const String& text, const IntPoint& point, const Font& font, const Color& color, int underlinedIndex)
+static void doDrawTextAtPoint(GraphicsContext& context, const String& text, const IntPoint& point, const FontCascade& font, const Color& color, int underlinedIndex)
 {
-    FontCachePurgePreventer fontCachePurgePreventer;
+    TextRun run(text);
 
-    TextRun run(text.characters(), text.length());
-
-    context.setFillColor(color, ColorSpaceDeviceRGB);
+    context.setFillColor(color);
     if (isOneLeftToRightRun(run))
-        font.drawText(&context, run, point);
+        font.drawText(context, run, point);
     else
         context.drawBidiText(font, run, point);
 
@@ -64,32 +60,23 @@ static void doDrawTextAtPoint(GraphicsContext& context, const String& text, cons
 
         int beforeWidth;
         if (underlinedIndex > 0) {
-            TextRun beforeRun(text.characters(), underlinedIndex);
+            TextRun beforeRun(StringView(text).substring(0, underlinedIndex));
             beforeWidth = font.width(beforeRun);
         } else
             beforeWidth = 0;
 
-        TextRun underlinedRun(text.characters() + underlinedIndex, 1);
+        TextRun underlinedRun(StringView(text).substring(underlinedIndex, 1));
         int underlinedWidth = font.width(underlinedRun);
 
         IntPoint underlinePoint(point);
         underlinePoint.move(beforeWidth, 1);
 
-        context.setStrokeColor(color, ColorSpaceDeviceRGB);
+        context.setStrokeColor(color);
         context.drawLineForText(underlinePoint, underlinedWidth, false);
     }
 }
 
-void WebCoreDrawTextAtPoint(GraphicsContext& context, const String& text, const IntPoint& point, const Font& font, const Color& color, int underlinedIndex)
-{
-    context.save();
-
-    doDrawTextAtPoint(context, text, point, font, color, underlinedIndex);
-
-    context.restore();
-}
-
-void WebCoreDrawDoubledTextAtPoint(GraphicsContext& context, const String& text, const IntPoint& point, const Font& font, const Color& topColor, const Color& bottomColor, int underlinedIndex)
+void WebCoreDrawDoubledTextAtPoint(GraphicsContext& context, const String& text, const IntPoint& point, const FontCascade& font, const Color& topColor, const Color& bottomColor, int underlinedIndex)
 {
     context.save();
 
@@ -102,11 +89,9 @@ void WebCoreDrawDoubledTextAtPoint(GraphicsContext& context, const String& text,
     context.restore();
 }
 
-float WebCoreTextFloatWidth(const String& text, const Font& font)
+float WebCoreTextFloatWidth(const String& text, const FontCascade& font)
 {
-    FontCachePurgePreventer fontCachePurgePreventer;
-
-    return StringTruncator::width(text, font, StringTruncator::EnableRoundingHacks);
+    return StringTruncator::width(text, font);
 }
 
 void WebCoreSetShouldUseFontSmoothing(bool smooth)
@@ -121,12 +106,12 @@ bool WebCoreShouldUseFontSmoothing()
 
 void WebCoreSetAlwaysUsesComplexTextCodePath(bool complex)
 {
-    Font::setCodePath(complex ? Font::Complex : Font::Auto);
+    FontCascade::setCodePath(complex ? FontCascade::Complex : FontCascade::Auto);
 }
 
 bool WebCoreAlwaysUsesComplexTextCodePath()
 {
-    return Font::codePath() == Font::Complex;
+    return FontCascade::codePath() == FontCascade::Complex;
 }
 
 } // namespace WebCore

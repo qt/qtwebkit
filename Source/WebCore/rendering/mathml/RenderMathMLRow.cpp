@@ -30,73 +30,79 @@
 #include "RenderMathMLRow.h"
 
 #include "MathMLNames.h"
+#include "RenderIterator.h"
 #include "RenderMathMLOperator.h"
+#include "RenderMathMLRoot.h"
 
 namespace WebCore {
 
 using namespace MathMLNames;
 
-RenderMathMLRow::RenderMathMLRow(Element* element)
-    : RenderMathMLBlock(element)
+RenderMathMLRow::RenderMathMLRow(Element& element, Ref<RenderStyle>&& style)
+    : RenderMathMLBlock(element, WTFMove(style))
 {
 }
 
-// FIXME: Change all these createAnonymous... routines to return a PassOwnPtr<>.
-RenderMathMLRow* RenderMathMLRow::createAnonymousWithParentRenderer(const RenderObject* parent)
+RenderMathMLRow::RenderMathMLRow(Document& document, Ref<RenderStyle>&& style)
+    : RenderMathMLBlock(document, WTFMove(style))
 {
-    RefPtr<RenderStyle> newStyle = RenderStyle::createAnonymousStyleWithDisplay(parent->style(), FLEX);
-    RenderMathMLRow* newMRow = new (parent->renderArena()) RenderMathMLRow(0);
-    newMRow->setDocumentForAnonymous(parent->document());
-    newMRow->setStyle(newStyle.release());
+}
+
+RenderPtr<RenderMathMLRow> RenderMathMLRow::createAnonymousWithParentRenderer(RenderMathMLRoot& parent)
+{
+    RenderPtr<RenderMathMLRow> newMRow = createRenderer<RenderMathMLRow>(parent.document(), RenderStyle::createAnonymousStyleWithDisplay(&parent.style(), FLEX));
+    newMRow->initializeStyle();
     return newMRow;
 }
 
-void RenderMathMLRow::computePreferredLogicalWidths()
+void RenderMathMLRow::updateOperatorProperties()
 {
-    ASSERT(preferredLogicalWidthsDirty() && needsLayout());
-
-#ifndef NDEBUG
-    // FIXME: Remove this once mathml stops modifying the render tree here.
-    SetLayoutNeededForbiddenScope layoutForbiddenScope(this, false);
-#endif
-
-    computeChildrenPreferredLogicalHeights();
-    int stretchLogicalHeight = 0;
     for (RenderObject* child = firstChild(); child; child = child->nextSibling()) {
-        if (child->isRenderMathMLBlock()) {
-            RenderMathMLOperator* renderMo = toRenderMathMLBlock(child)->unembellishedOperator();
-            // FIXME: Only skip renderMo if it is stretchy.
-            if (renderMo)
-                continue;
-        }
-        stretchLogicalHeight = max<int>(stretchLogicalHeight, roundToInt(preferredLogicalHeightAfterSizing(child)));
-    }
-    if (!stretchLogicalHeight)
-        stretchLogicalHeight = style()->fontSize();
-    
-    // Set the sizes of (possibly embellished) stretchy operator children.
-    for (RenderObject* child = firstChild(); child; child = child->nextSibling()) {
-        if (child->isRenderMathMLBlock()) {
-            RenderMathMLOperator* renderMo = toRenderMathMLBlock(child)->unembellishedOperator();
-            if (renderMo)
-                renderMo->stretchToHeight(stretchLogicalHeight);
+        if (is<RenderMathMLBlock>(*child)) {
+            if (auto* renderOperator = downcast<RenderMathMLBlock>(*child).unembellishedOperator())
+                renderOperator->updateOperatorProperties();
         }
     }
-
-    RenderMathMLBlock::computePreferredLogicalWidths();
-    
-    // Shrink our logical width to its probable value now without triggering unnecessary relayout of our children.
-    ASSERT(needsLayout() && logicalWidth() >= maxPreferredLogicalWidth());
-    setLogicalWidth(maxPreferredLogicalWidth());
+    setNeedsLayoutAndPrefWidthsRecalc();
 }
 
 void RenderMathMLRow::layout()
 {
-    // Our computePreferredLogicalWidths() may change our logical width and then layout our children, which
-    // RenderBlock::layout()'s relayoutChildren logic isn't expecting.
-    if (preferredLogicalWidthsDirty())
-        computePreferredLogicalWidths();
+    int stretchHeightAboveBaseline = 0, stretchDepthBelowBaseline = 0;
+    for (RenderObject* child = firstChild(); child; child = child->nextSibling()) {
+        if (child->needsLayout())
+            downcast<RenderElement>(*child).layout();
+        if (is<RenderMathMLBlock>(*child)) {
+            // We skip the stretchy operators as they must not be included in the computation of the stretch size.
+            auto* renderOperator = downcast<RenderMathMLBlock>(*child).unembellishedOperator();
+            if (renderOperator && renderOperator->hasOperatorFlag(MathMLOperatorDictionary::Stretchy))
+                continue;
+        }
+        LayoutUnit childHeightAboveBaseline = 0, childDepthBelowBaseline = 0;
+        if (is<RenderMathMLBlock>(*child)) {
+            RenderMathMLBlock& mathmlChild = downcast<RenderMathMLBlock>(*child);
+            childHeightAboveBaseline = mathmlChild.firstLineBaseline().valueOr(mathmlChild.logicalHeight());
+            childDepthBelowBaseline = mathmlChild.logicalHeight() - childHeightAboveBaseline;
+        } else if (is<RenderMathMLTable>(*child)) {
+            RenderMathMLTable& tableChild = downcast<RenderMathMLTable>(*child);
+            childHeightAboveBaseline = tableChild.firstLineBaseline().valueOr(-1);
+            childDepthBelowBaseline = tableChild.logicalHeight() - childHeightAboveBaseline;
+        } else if (is<RenderBox>(*child)) {
+            childHeightAboveBaseline = downcast<RenderBox>(*child).logicalHeight();
+            childDepthBelowBaseline = 0;
+        }
+        stretchHeightAboveBaseline = std::max<LayoutUnit>(stretchHeightAboveBaseline, childHeightAboveBaseline);
+        stretchDepthBelowBaseline = std::max<LayoutUnit>(stretchDepthBelowBaseline, childDepthBelowBaseline);
+    }
+    if (stretchHeightAboveBaseline + stretchDepthBelowBaseline <= 0)
+        stretchHeightAboveBaseline = style().fontSize();
     
+    // Set the sizes of (possibly embellished) stretchy operator children.
+    for (auto& child : childrenOfType<RenderMathMLBlock>(*this)) {
+        if (auto renderOperator = child.unembellishedOperator())
+            renderOperator->stretchTo(stretchHeightAboveBaseline, stretchDepthBelowBaseline);
+    }
+
     RenderMathMLBlock::layout();
 }
 

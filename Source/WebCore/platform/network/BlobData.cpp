@@ -33,95 +33,62 @@
 
 #include "Blob.h"
 #include "BlobURL.h"
-#include "ThreadableBlobRegistry.h"
-
-#include <wtf/OwnPtr.h>
-#include <wtf/PassOwnPtr.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefPtr.h>
 #include <wtf/Vector.h>
 
 namespace WebCore {
 
-const long long BlobDataItem::toEndOfFile = -1;
-
-RawData::RawData()
-{
-}
-
-void RawData::detachFromCurrentThread()
-{
-}
-
-void BlobDataItem::detachFromCurrentThread()
-{
-    data->detachFromCurrentThread();
-    path = path.isolatedCopy();
-    url = url.copy();
-}
-
-PassOwnPtr<BlobData> BlobData::create()
-{
-    return adoptPtr(new BlobData());
-}
-
-void BlobData::detachFromCurrentThread()
-{
-    m_contentType = m_contentType.isolatedCopy();
-    m_contentDisposition = m_contentDisposition.isolatedCopy();
-    for (size_t i = 0; i < m_items.size(); ++i)
-        m_items.at(i).detachFromCurrentThread();
-}
-
-void BlobData::setContentType(const String& contentType)
+BlobData::BlobData(const String& contentType)
+    : m_contentType(contentType)
 {
     ASSERT(Blob::isNormalizedContentType(contentType));
-    m_contentType = contentType;
 }
 
-void BlobData::appendData(PassRefPtr<RawData> data, long long offset, long long length)
+const long long BlobDataItem::toEndOfFile = -1;
+
+long long BlobDataItem::length() const
+{
+    if (m_length != toEndOfFile)
+        return m_length;
+
+    switch (m_type) {
+    case Type::Data:
+        ASSERT_NOT_REACHED();
+        return m_length;
+    case Type::File:
+        return m_file->size();
+    }
+
+    ASSERT_NOT_REACHED();
+    return m_length;
+}
+
+void BlobData::appendData(const ThreadSafeDataBuffer& data)
+{
+    size_t dataSize = data.data() ? data.data()->size() : 0;
+    appendData(data, 0, dataSize);
+}
+
+void BlobData::appendData(const ThreadSafeDataBuffer& data, long long offset, long long length)
 {
     m_items.append(BlobDataItem(data, offset, length));
 }
 
-void BlobData::appendFile(const String& path)
+void BlobData::appendFile(PassRefPtr<BlobDataFileReference> file)
 {
-    m_items.append(BlobDataItem(path));
+    file->startTrackingModifications();
+    m_items.append(BlobDataItem(file));
 }
 
-void BlobData::appendFile(const String& path, long long offset, long long length, double expectedModificationTime)
+void BlobData::appendFile(BlobDataFileReference* file, long long offset, long long length)
 {
-    m_items.append(BlobDataItem(path, offset, length, expectedModificationTime));
+    m_items.append(BlobDataItem(file, offset, length));
 }
-
-void BlobData::appendBlob(const KURL& url, long long offset, long long length)
-{
-    m_items.append(BlobDataItem(url, offset, length));
-}
-
-#if ENABLE(FILE_SYSTEM)
-void BlobData::appendURL(const KURL& url, long long offset, long long length, double expectedModificationTime)
-{
-    m_items.append(BlobDataItem(url, offset, length, expectedModificationTime));
-}
-#endif
 
 void BlobData::swapItems(BlobDataItemList& items)
 {
     m_items.swap(items);
-}
-
-
-BlobDataHandle::BlobDataHandle(PassOwnPtr<BlobData> data, long long size)
-{
-    UNUSED_PARAM(size);
-    m_internalURL = BlobURL::createInternalURL();
-    ThreadableBlobRegistry::registerBlobURL(m_internalURL, data);
-}
-
-BlobDataHandle::~BlobDataHandle()
-{
-    ThreadableBlobRegistry::unregisterBlobURL(m_internalURL);
 }
 
 } // namespace WebCore

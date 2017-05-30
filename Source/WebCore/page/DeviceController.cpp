@@ -35,7 +35,7 @@ namespace WebCore {
 
 DeviceController::DeviceController(DeviceClient* client)
     : m_client(client)
-    , m_timer(this, &DeviceController::fireDeviceEvent)
+    , m_timer(*this, &DeviceController::fireDeviceEvent)
 {
     ASSERT(m_client);
 }
@@ -71,33 +71,31 @@ void DeviceController::removeAllDeviceEventListeners(DOMWindow* window)
         m_client->stopUpdating();
 }
 
-void DeviceController::dispatchDeviceEvent(PassRefPtr<Event> prpEvent)
+void DeviceController::dispatchDeviceEvent(Event& event)
 {
-    RefPtr<Event> event = prpEvent;
-    Vector<RefPtr<DOMWindow> > listenerVector;
+    Vector<RefPtr<DOMWindow>> listenerVector;
     copyToVector(m_listeners, listenerVector);
-    for (size_t i = 0; i < listenerVector.size(); ++i) {
-        if (listenerVector[i]->document()
-            && !listenerVector[i]->document()->activeDOMObjectsAreSuspended()
-            && !listenerVector[i]->document()->activeDOMObjectsAreStopped())
-        listenerVector[i]->dispatchEvent(event);
+    for (auto& listener : listenerVector) {
+        auto document = listener->document();
+        if (document && !document->activeDOMObjectsAreSuspended() && !document->activeDOMObjectsAreStopped())
+            listener->dispatchEvent(event);
     }
 }
 
-void DeviceController::fireDeviceEvent(Timer<DeviceController>* timer)
+void DeviceController::fireDeviceEvent()
 {
-    ASSERT_UNUSED(timer, timer == &m_timer);
     ASSERT(hasLastData());
 
     m_timer.stop();
-    Vector<RefPtr<DOMWindow> > listenerVector;
+    Vector<RefPtr<DOMWindow>> listenerVector;
     copyToVector(m_lastEventListeners, listenerVector);
     m_lastEventListeners.clear();
-    for (size_t i = 0; i < listenerVector.size(); ++i) {
-        if (listenerVector[i]->document()
-            && !listenerVector[i]->document()->activeDOMObjectsAreSuspended()
-            && !listenerVector[i]->document()->activeDOMObjectsAreStopped())
-        listenerVector[i]->dispatchEvent(getLastEvent());
+    for (auto& listener : listenerVector) {
+        auto document = listener->document();
+        if (document && !document->activeDOMObjectsAreSuspended() && !document->activeDOMObjectsAreStopped()) {
+            if (auto lastEvent = getLastEvent())
+                listener->dispatchEvent(*lastEvent);
+        }
     }
 }
 

@@ -11,13 +11,14 @@ applet constructorNeedsCreatedByParser
 area
 article interfaceName=HTMLElement
 aside interfaceName=HTMLElement
-audio wrapperOnlyIfMediaIsAvailable, conditional=VIDEO, constructorNeedsCreatedByParser
+attachment conditional=ATTACHMENT_ELEMENT, settingsConditional=attachmentElementEnabled
+audio wrapperOnlyIfMediaIsAvailable, conditional=VIDEO, constructorNeedsCreatedByParser, customTypeHelper
 b interfaceName=HTMLElement
 base
-basefont interfaceName=HTMLBaseFontElement
+basefont interfaceName=HTMLUnknownElement
 bdi interfaceName=HTMLBDIElement, JSInterfaceName=HTMLElement
 bdo interfaceName=HTMLElement
-bgsound interfaceName=HTMLElement
+bgsound interfaceName=HTMLUnknownElement
 big interfaceName=HTMLElement
 blockquote interfaceName=HTMLQuoteElement
 body
@@ -31,15 +32,14 @@ code interfaceName=HTMLElement
 col interfaceName=HTMLTableColElement
 colgroup interfaceName=HTMLTableColElement
 command interfaceName=HTMLElement
-content interfaceName=HTMLContentElement, conditional=SHADOW_DOM, runtimeConditional=shadowDOM
 webkitShadowContent interfaceName=HTMLElement, noConstructor
+data
 datalist interfaceName=HTMLDataListElement, conditional=DATALIST_ELEMENT
 dd interfaceName=HTMLElement
 del interfaceName=HTMLModElement
 details conditional=DETAILS_ELEMENT
 dfn interfaceName=HTMLElement
 dir interfaceName=HTMLDirectoryElement
-dialog conditional=DIALOG_ELEMENT, contextConditional=dialogElement
 div
 dl interfaceName=HTMLDListElement
 dt interfaceName=HTMLElement
@@ -66,7 +66,7 @@ hr interfaceName=HTMLHRElement
 html
 i interfaceName=HTMLElement
 iframe interfaceName=HTMLIFrameElement
-image interfaceName=HTMLElement
+image interfaceName=HTMLUnknownElement
 img interfaceName=HTMLImageElement, constructorNeedsFormElement
 input constructorNeedsFormElement, constructorNeedsCreatedByParser
 ins interfaceName=HTMLModElement
@@ -98,20 +98,24 @@ option
 output constructorNeedsFormElement
 p interfaceName=HTMLParagraphElement
 param
+picture interfaceName=HTMLPictureElement
 plaintext interfaceName=HTMLElement
 pre
-progress interfaceName=HTMLProgressElement, conditional=PROGRESS_ELEMENT
+progress interfaceName=HTMLProgressElement
 q interfaceName=HTMLQuoteElement
+rb interfaceName=HTMLElement
 rp interfaceName=HTMLElement
-rt interfaceName=HTMLElement
-ruby interfaceName=HTMLElement
+rt interfaceName=RubyTextElement, JSInterfaceName=HTMLElement
+rtc interfaceName=HTMLElement
+ruby interfaceName=RubyElement, JSInterfaceName=HTMLElement
 s interfaceName=HTMLElement
 samp interfaceName=HTMLElement
 script constructorNeedsCreatedByParser
 section interfaceName=HTMLElement
 select constructorNeedsFormElement
+slot conditional=SHADOW_DOM
 small interfaceName=HTMLElement
-source wrapperOnlyIfMediaIsAvailable, conditional=VIDEO
+source
 span
 strike interfaceName=HTMLElement
 strong interfaceName=HTMLElement
@@ -121,12 +125,13 @@ summary interfaceName=HTMLSummaryElement, JSInterfaceName=HTMLElement, condition
 sup interfaceName=HTMLElement
 table
 tbody interfaceName=HTMLTableSectionElement
-td interfaceName=HTMLTableCellElement
+td interfaceName=HTMLTableDataCellElement
 template conditional=TEMPLATE_ELEMENT
 textarea interfaceName=HTMLTextAreaElement, constructorNeedsFormElement
 tfoot interfaceName=HTMLTableSectionElement
-th interfaceName=HTMLTableCellElement
+th interfaceName=HTMLTableHeaderCellElement
 thead interfaceName=HTMLTableSectionElement
+time
 title
 tr interfaceName=HTMLTableRowElement
 track wrapperOnlyIfMediaIsAvailable, conditional=VIDEO_TRACK
@@ -134,7 +139,7 @@ tt interfaceName=HTMLElement
 u interfaceName=HTMLElement
 ul interfaceName=HTMLUListElement
 var interfaceName=HTMLElement
-video wrapperOnlyIfMediaIsAvailable, conditional=VIDEO, constructorNeedsCreatedByParser
-wbr interfaceName=HTMLElement
+video wrapperOnlyIfMediaIsAvailable, conditional=VIDEO, constructorNeedsCreatedByParser, customTypeHelper
+wbr interfaceName=HTMLWBRElement, JSInterfaceName=HTMLElement
 xmp interfaceName=HTMLPreElement
 noscript interfaceName=HTMLElement

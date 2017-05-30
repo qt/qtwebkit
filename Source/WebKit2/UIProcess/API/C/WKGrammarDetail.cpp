@@ -26,8 +26,8 @@
 #include "config.h"
 #include "WKGrammarDetail.h"
 
+#include "APIArray.h"
 #include "APIObject.h"
-#include "ImmutableArray.h"
 #include "WKAPICast.h"
 #include "WebGrammarDetail.h"
 
@@ -35,7 +35,7 @@ using namespace WebKit;
 
 WKTypeID WKGrammarDetailGetTypeID()
 {
-    return toAPI(APIObject::TypeGrammarDetail);
+    return toAPI(API::Object::Type::GrammarDetail);
 }
 
 WKGrammarDetailRef WKGrammarDetailCreate(int location, int length, WKArrayRef guesses, WKStringRef userDescription)
@@ -56,7 +56,7 @@ int WKGrammarDetailGetLength(WKGrammarDetailRef grammarDetailRef)
 
 WKArrayRef WKGrammarDetailCopyGuesses(WKGrammarDetailRef grammarDetailRef)
 {
-    return toAPI(toImpl(grammarDetailRef)->guesses().leakRef());
+    return toAPI(&toImpl(grammarDetailRef)->guesses().leakRef());
 }
 
 WKStringRef WKGrammarDetailCopyUserDescription(WKGrammarDetailRef grammarDetailRef)

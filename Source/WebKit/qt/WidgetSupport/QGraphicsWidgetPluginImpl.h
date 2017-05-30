@@ -28,17 +28,17 @@ QT_BEGIN_NAMESPACE
 class QGraphicsWidget;
 QT_END_NAMESPACE
 
-class QGraphicsWidgetPluginImpl : public QtPluginWidgetAdapter {
+class QGraphicsWidgetPluginImpl final : public QtPluginWidgetAdapter {
     Q_OBJECT
 public:
     QGraphicsWidgetPluginImpl(QGraphicsWidget *w) : m_graphicsWidget(w) { }
-    virtual ~QGraphicsWidgetPluginImpl();
-    virtual void update(const QRect &) OVERRIDE;
-    virtual void setGeometryAndClip(const QRect&, const QRect&, bool) OVERRIDE;
-    virtual void setVisible(bool);
-    virtual void setStyleSheet(const QString&) OVERRIDE { }
-    virtual void setWidgetParent(QObject*) OVERRIDE;
-    virtual QObject* handle() const OVERRIDE;
+    ~QGraphicsWidgetPluginImpl();
+    void update(const QRect &) final;
+    void setGeometryAndClip(const QRect&, const QRect&, bool) final;
+    void setVisible(bool) final;
+    void setStyleSheet(const QString&) final { }
+    void setWidgetParent(QObject*) final;
+    QObject* handle() const final;
 private:
     QGraphicsWidget *m_graphicsWidget;
 };

@@ -38,11 +38,6 @@
 #include "IntRect.h"
 #include "Timer.h"
 #include "UpdateAtlas.h"
-#include <wtf/OwnPtr.h>
-
-#if ENABLE(CSS_SHADERS)
-#include "FilterOperations.h"
-#endif
 
 namespace WebCore {
 
@@ -60,17 +55,16 @@ class CompositingCoordinator : public GraphicsLayerClient
 public:
     class Client {
     public:
-        virtual void didFlushRootLayer() = 0;
-        virtual void willSyncLayerState(CoordinatedGraphicsLayerState&) = 0;
+        virtual void didFlushRootLayer(const FloatRect& visibleContentRect) = 0;
         virtual void notifyFlushRequired() = 0;
         virtual void commitSceneState(const CoordinatedGraphicsState&) = 0;
         virtual void paintLayerContents(const GraphicsLayer*, GraphicsContext&, const IntRect& clipRect) = 0;
     };
 
-    static PassOwnPtr<CompositingCoordinator> create(Page*, CompositingCoordinator::Client*);
+    CompositingCoordinator(Page*, CompositingCoordinator::Client*);
     virtual ~CompositingCoordinator();
 
-    void setRootCompositingLayer(GraphicsLayer*);
+    void setRootCompositingLayer(GraphicsLayer* compositingLayer, GraphicsLayer* overlayLayer);
     void sizeDidChange(const IntSize& newSize);
     void deviceOrPageScaleFactorChanged();
 
@@ -94,35 +88,33 @@ public:
 #endif
 
 private:
-    CompositingCoordinator(Page*, CompositingCoordinator::Client*);
-
     // GraphicsLayerClient
-    virtual void notifyAnimationStarted(const GraphicsLayer*, double time) OVERRIDE;
-    virtual void notifyFlushRequired(const GraphicsLayer*) OVERRIDE;
-    virtual void paintContents(const GraphicsLayer*, GraphicsContext&, GraphicsLayerPaintingPhase, const IntRect& clipRect) OVERRIDE;
-    virtual float deviceScaleFactor() const OVERRIDE;
-    virtual float pageScaleFactor() const OVERRIDE;
+    virtual void notifyAnimationStarted(const GraphicsLayer*, const String&, double time) override;
+    virtual void notifyFlushRequired(const GraphicsLayer*) override;
+    virtual void paintContents(const GraphicsLayer*, GraphicsContext&, GraphicsLayerPaintingPhase, const FloatRect& clipRect) override;
+    virtual float deviceScaleFactor() const override;
+    virtual float pageScaleFactor() const override;
 
     // CoordinatedImageBacking::Client
-    virtual void createImageBacking(CoordinatedImageBackingID) OVERRIDE;
-    virtual void updateImageBacking(CoordinatedImageBackingID, PassRefPtr<CoordinatedSurface>) OVERRIDE;
-    virtual void clearImageBackingContents(CoordinatedImageBackingID) OVERRIDE;
-    virtual void removeImageBacking(CoordinatedImageBackingID) OVERRIDE;
+    virtual void createImageBacking(CoordinatedImageBackingID) override;
+    virtual void updateImageBacking(CoordinatedImageBackingID, PassRefPtr<CoordinatedSurface>) override;
+    virtual void clearImageBackingContents(CoordinatedImageBackingID) override;
+    virtual void removeImageBacking(CoordinatedImageBackingID) override;
 
     // CoordinatedGraphicsLayerClient
-    virtual bool isFlushingLayerChanges() const OVERRIDE { return m_isFlushingLayerChanges; }
-    virtual FloatRect visibleContentsRect() const OVERRIDE;
-    virtual PassRefPtr<CoordinatedImageBacking> createImageBackingIfNeeded(Image*) OVERRIDE;
-    virtual void detachLayer(CoordinatedGraphicsLayer*) OVERRIDE;
-    virtual bool paintToSurface(const WebCore::IntSize&, WebCore::CoordinatedSurface::Flags, uint32_t& /* atlasID */, WebCore::IntPoint&, WebCore::CoordinatedSurface::Client*) OVERRIDE;
-    virtual void syncLayerState(CoordinatedLayerID, CoordinatedGraphicsLayerState&) OVERRIDE;
+    virtual bool isFlushingLayerChanges() const override { return m_isFlushingLayerChanges; }
+    virtual FloatRect visibleContentsRect() const override;
+    virtual PassRefPtr<CoordinatedImageBacking> createImageBackingIfNeeded(Image*) override;
+    virtual void detachLayer(CoordinatedGraphicsLayer*) override;
+    virtual bool paintToSurface(const WebCore::IntSize&, WebCore::CoordinatedSurface::Flags, uint32_t& /* atlasID */, WebCore::IntPoint&, WebCore::CoordinatedSurface::Client*) override;
+    virtual void syncLayerState(CoordinatedLayerID, CoordinatedGraphicsLayerState&) override;
 
     // UpdateAtlas::Client
-    virtual void createUpdateAtlas(uint32_t atlasID, PassRefPtr<CoordinatedSurface>) OVERRIDE;
-    virtual void removeUpdateAtlas(uint32_t atlasID) OVERRIDE;
+    virtual void createUpdateAtlas(uint32_t atlasID, PassRefPtr<CoordinatedSurface>) override;
+    virtual void removeUpdateAtlas(uint32_t atlasID) override;
 
     // GraphicsLayerFactory
-    virtual PassOwnPtr<GraphicsLayer> createGraphicsLayer(GraphicsLayerClient*) OVERRIDE;
+    virtual std::unique_ptr<GraphicsLayer> createGraphicsLayer(GraphicsLayer::Type, GraphicsLayerClient&) override;
 
     void initializeRootCompositingLayerIfNeeded();
     void flushPendingImageBackingChanges();
@@ -130,13 +122,14 @@ private:
 
     void scheduleReleaseInactiveAtlases();
 
-    void releaseInactiveAtlasesTimerFired(Timer<CompositingCoordinator>*);
+    void releaseInactiveAtlasesTimerFired();
 
     Page* m_page;
     CompositingCoordinator::Client* m_client;
 
-    OwnPtr<GraphicsLayer> m_rootLayer;
+    std::unique_ptr<GraphicsLayer> m_rootLayer;
     GraphicsLayer* m_rootCompositingLayer;
+    GraphicsLayer* m_overlayCompositingLayer;
 
     CoordinatedGraphicsState m_state;
 
@@ -144,9 +137,10 @@ private:
     LayerMap m_registeredLayers;
     typedef HashMap<CoordinatedImageBackingID, RefPtr<CoordinatedImageBacking> > ImageBackingMap;
     ImageBackingMap m_imageBackings;
-    Vector<OwnPtr<UpdateAtlas> > m_updateAtlases;
+    Vector<std::unique_ptr<UpdateAtlas>> m_updateAtlases;
 
     // We don't send the messages related to releasing resources to renderer during purging, because renderer already had removed all resources.
+    bool m_isDestructing;
     bool m_isPurging;
     bool m_isFlushingLayerChanges;
 
@@ -154,7 +148,7 @@ private:
 
     bool m_shouldSyncFrame;
     bool m_didInitializeRootCompositingLayer;
-    Timer<CompositingCoordinator> m_releaseInactiveAtlasesTimer;
+    Timer m_releaseInactiveAtlasesTimer;
 
 #if ENABLE(REQUEST_ANIMATION_FRAME)
     double m_lastAnimationServiceTime;

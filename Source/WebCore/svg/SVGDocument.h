@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2004, 2005 Nikolas Zimmermann <zimmermann@kde.org>
  * Copyright (C) 2004, 2005, 2006, 2007 Rob Buis <buis@kde.org>
+ * Copyright (C) 2015 Apple Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -20,60 +21,41 @@
 
 #ifndef SVGDocument_h
 #define SVGDocument_h
-#if ENABLE(SVG)
 
-#include "Document.h"
-#include "FloatPoint.h"
+#include "XMLDocument.h"
 
 namespace WebCore {
 
-class DOMImplementation;
-class SVGElement;
 class SVGSVGElement;
 
-class SVGDocument FINAL : public Document {
+class SVGDocument final : public XMLDocument {
 public:
-    static PassRefPtr<SVGDocument> create(Frame* frame, const KURL& url)
-    {
-        return adoptRef(new SVGDocument(frame, url));
-    }
+    static Ref<SVGDocument> create(Frame*, const URL&);
 
     SVGSVGElement* rootElement() const;
 
-    void dispatchZoomEvent(float prevScale, float newScale);
-    void dispatchScrollEvent();
-
     bool zoomAndPanEnabled() const;
-
     void startPan(const FloatPoint& start);
-    void updatePan(const FloatPoint& pos) const;
+    void updatePan(const FloatPoint& position) const;
 
 private:
-    SVGDocument(Frame*, const KURL&);
+    SVGDocument(Frame*, const URL&);
 
-    virtual bool childShouldCreateRenderer(const NodeRenderingContext&) const;
+    virtual Ref<Document> cloneDocumentWithoutChildren() const override;
 
-    FloatPoint m_translate;
+    FloatSize m_panningOffset;
 };
 
-inline SVGDocument* toSVGDocument(Document* document)
+inline Ref<SVGDocument> SVGDocument::create(Frame* frame, const URL& url)
 {
-    ASSERT_WITH_SECURITY_IMPLICATION(!document || document->isSVGDocument());
-    return static_cast<SVGDocument*>(document);
+    return adoptRef(*new SVGDocument(frame, url));
 }
-
-inline const SVGDocument* toSVGDocument(const Document* document)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!document || document->isSVGDocument());
-    return static_cast<const SVGDocument*>(document);
-}
-
-// This will catch anyone doing an unnecessary cast.
-void toSVGDocument(const SVGDocument*);
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
-#endif // SVGDocument_h
+SPECIALIZE_TYPE_TRAITS_BEGIN(WebCore::SVGDocument)
+    static bool isType(const WebCore::Document& document) { return document.isSVGDocument(); }
+    static bool isType(const WebCore::Node& node) { return is<WebCore::Document>(node) && isType(downcast<WebCore::Document>(node)); }
+SPECIALIZE_TYPE_TRAITS_END()
 
-// vim:ts=4:noet
+#endif // SVGDocument_h

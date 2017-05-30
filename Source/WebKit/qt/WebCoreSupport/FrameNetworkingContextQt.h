@@ -30,12 +30,16 @@ public:
 
 private:
     FrameNetworkingContextQt(Frame*, QObject* originatingObject, bool mimeSniffingEnabled);
+    void setSession(std::unique_ptr<NetworkStorageSession>&&);
 
-    virtual QObject* originatingObject() const;
-    virtual QNetworkAccessManager* networkAccessManager() const;
-    virtual bool mimeSniffingEnabled() const;
-    virtual bool thirdPartyCookiePolicyPermission(const QUrl&) const;
+    NetworkStorageSession& storageSession() const override;
 
+    QObject* originatingObject() const override;
+    QNetworkAccessManager* networkAccessManager() const override;
+    bool mimeSniffingEnabled() const override;
+    bool thirdPartyCookiePolicyPermission(const QUrl&) const override;
+
+    mutable std::unique_ptr<NetworkStorageSession> m_session;
     QObject* m_originatingObject;
     bool m_mimeSniffingEnabled;
 };

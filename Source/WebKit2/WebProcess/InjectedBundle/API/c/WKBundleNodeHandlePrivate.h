@@ -27,13 +27,20 @@
 #define WKBundleNodeHandlePrivate_h
 
 #include <JavaScriptCore/JavaScript.h>
-#include <WebKit2/WKBase.h>
-#include <WebKit2/WKGeometry.h>
-#include <WebKit2/WKImage.h>
+#include <WebKit/WKBase.h>
+#include <WebKit/WKGeometry.h>
+#include <WebKit/WKImage.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+enum {
+    kWKAutoFillButtonTypeNone,
+    kWKAutoFillButtonTypeCredentials,
+    kWKAutoFillButtonTypeContacts
+};
+typedef uint8_t WKAutoFillButtonType;
 
 WK_EXPORT WKBundleNodeHandleRef WKBundleNodeHandleCreate(JSContextRef context, JSObjectRef object);
 
@@ -45,14 +52,18 @@ WK_EXPORT WKBundleNodeHandleRef WKBundleNodeHandleCopyDocument(WKBundleNodeHandl
 
 WK_EXPORT WKRect WKBundleNodeHandleGetRenderRect(WKBundleNodeHandleRef nodeHandle, bool* isReplaced);
 WK_EXPORT WKImageRef WKBundleNodeHandleCopySnapshotWithOptions(WKBundleNodeHandleRef nodeHandle, WKSnapshotOptions options);
+WK_EXPORT WKBundleRangeHandleRef WKBundleNodeHandleCopyVisibleRange(WKBundleNodeHandleRef nodeHandle);
 
 /* Element Specific Operations */
 WK_EXPORT WKRect WKBundleNodeHandleGetElementBounds(WKBundleNodeHandleRef elementHandle);
 
 /* HTMLInputElement Specific Operations */
 WK_EXPORT void WKBundleNodeHandleSetHTMLInputElementValueForUser(WKBundleNodeHandleRef htmlInputElementHandle, WKStringRef value);
-WK_EXPORT bool WKBundleNodeHandleGetHTMLInputElementAutofilled(WKBundleNodeHandleRef htmlInputElementHandle);
-WK_EXPORT void WKBundleNodeHandleSetHTMLInputElementAutofilled(WKBundleNodeHandleRef htmlInputElementHandle, bool filled);
+WK_EXPORT bool WKBundleNodeHandleGetHTMLInputElementAutoFilled(WKBundleNodeHandleRef htmlInputElementHandle);
+WK_EXPORT void WKBundleNodeHandleSetHTMLInputElementAutoFilled(WKBundleNodeHandleRef htmlInputElementHandle, bool filled);
+WK_EXPORT bool WKBundleNodeHandleGetHTMLInputElementAutoFillButtonEnabled(WKBundleNodeHandleRef htmlInputElementHandle);
+WK_EXPORT void WKBundleNodeHandleSetHTMLInputElementAutoFillButtonEnabledWithButtonType(WKBundleNodeHandleRef htmlInputElementHandle, WKAutoFillButtonType autoFillButtonType);
+WK_EXPORT WKRect WKBundleNodeHandleGetHTMLInputElementAutoFillButtonBounds(WKBundleNodeHandleRef htmlInputElementHandle);
 WK_EXPORT bool WKBundleNodeHandleGetHTMLInputElementLastChangeWasUserEdit(WKBundleNodeHandleRef htmlInputElementHandle);
 
 /* HTMLTextAreaElement Specific Operations */
@@ -69,6 +80,14 @@ WK_EXPORT WKBundleFrameRef WKBundleNodeHandleCopyHTMLFrameElementContentFrame(WK
 
 /* HTMLIFrameElement Specific Operations */
 WK_EXPORT WKBundleFrameRef WKBundleNodeHandleCopyHTMLIFrameElementContentFrame(WKBundleNodeHandleRef htmlIFrameElementHandle);
+
+
+/* Deprecated - use WKBundleNodeHandleGetHTMLInputElementAutoFilled(WKBundleNodeHandleRef) */
+WK_EXPORT bool WKBundleNodeHandleGetHTMLInputElementAutofilled(WKBundleNodeHandleRef htmlInputElementHandle);
+/* Deprecated - use WKBundleNodeHandleSetHTMLInputElementAutoFilled(WKBundleNodeHandleRef, bool) */
+WK_EXPORT void WKBundleNodeHandleSetHTMLInputElementAutofilled(WKBundleNodeHandleRef htmlInputElementHandle, bool filled);
+/* Deprecated - use WKBundleNodeHandleSetHTMLInputElementAutoFillButtonEnabled(WKBundleNodeHandleRef, WKAutoFillButtonType)*/
+WK_EXPORT void WKBundleNodeHandleSetHTMLInputElementAutoFillButtonEnabled(WKBundleNodeHandleRef htmlInputElementHandle, bool enabled);
 
 #ifdef __cplusplus
 }

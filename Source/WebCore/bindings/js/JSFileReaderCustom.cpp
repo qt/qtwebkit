@@ -30,26 +30,23 @@
 
 #include "config.h"
 
-#if ENABLE(BLOB)
-
 #include "JSFileReader.h"
 
 #include "FileReader.h"
-#include "JSArrayBuffer.h"
-#include <wtf/ArrayBuffer.h>
+#include "JSDOMBinding.h"
+#include <runtime/ArrayBuffer.h>
+#include <runtime/JSArrayBuffer.h>
 
 using namespace JSC;
 
 namespace WebCore {
 
-JSValue JSFileReader::result(ExecState* exec) const
+JSValue JSFileReader::result(ExecState& state) const
 {
-    FileReader* imp = impl();
-    if (imp->readType() == FileReaderLoader::ReadAsArrayBuffer)
-        return toJS(exec, globalObject(), WTF::getPtr(imp->arrayBufferResult()));
-    return jsOwnedStringOrNull(exec, imp->stringResult());
+    FileReader& imp = wrapped();
+    if (imp.readType() == FileReaderLoader::ReadAsArrayBuffer)
+        return toJS(&state, globalObject(), WTF::getPtr(imp.arrayBufferResult()));
+    return jsOwnedStringOrNull(&state, imp.stringResult());
 }
 
 } // namespace WebCore
-
-#endif // ENABLE(BLOB)

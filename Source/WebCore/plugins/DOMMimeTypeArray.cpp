@@ -26,6 +26,12 @@
 #include "PluginData.h"
 #include <wtf/text/AtomicString.h>
 
+#if ENABLE(WEB_REPLAY)
+#include "Document.h"
+#include "WebReplayInputs.h"
+#include <replay/InputCursor.h>
+#endif
+
 namespace WebCore {
 
 DOMMimeTypeArray::DOMMimeTypeArray(Frame* frame)
@@ -42,54 +48,75 @@ unsigned DOMMimeTypeArray::length() const
     PluginData* data = getPluginData();
     if (!data)
         return 0;
-    return data->mimes().size();
+
+    Vector<MimeClassInfo> mimes;
+    Vector<size_t> mimePluginIndices;
+    data->getWebVisibleMimesAndPluginIndices(mimes, mimePluginIndices);
+    return mimes.size();
 }
 
-PassRefPtr<DOMMimeType> DOMMimeTypeArray::item(unsigned index)
+RefPtr<DOMMimeType> DOMMimeTypeArray::item(unsigned index)
 {
     PluginData* data = getPluginData();
     if (!data)
-        return 0;
-    const Vector<MimeClassInfo>& mimes = data->mimes();
+        return nullptr;
+
+    Vector<MimeClassInfo> mimes;
+    Vector<size_t> mimePluginIndices;
+    data->getWebVisibleMimesAndPluginIndices(mimes, mimePluginIndices);
+
     if (index >= mimes.size())
-        return 0;
-    return DOMMimeType::create(data, m_frame, index).get();
+        return nullptr;
+    return DOMMimeType::create(data, m_frame, index);
 }
 
-bool DOMMimeTypeArray::canGetItemsForName(const AtomicString& propertyName)
+RefPtr<DOMMimeType> DOMMimeTypeArray::namedItem(const AtomicString& propertyName)
 {
-    PluginData *data = getPluginData();
+    PluginData* data = getPluginData();
     if (!data)
-        return 0;
-    const Vector<MimeClassInfo>& mimes = data->mimes();
+        return nullptr;
+
+    Vector<MimeClassInfo> mimes;
+    Vector<size_t> mimePluginIndices;
+    data->getWebVisibleMimesAndPluginIndices(mimes, mimePluginIndices);
     for (unsigned i = 0; i < mimes.size(); ++i) {
         if (mimes[i].type == propertyName)
-            return true;
+            return DOMMimeType::create(data, m_frame, i);
     }
-    return false;
+    return nullptr;
 }
 
-PassRefPtr<DOMMimeType> DOMMimeTypeArray::namedItem(const AtomicString& propertyName)
+Vector<AtomicString> DOMMimeTypeArray::supportedPropertyNames()
 {
-    PluginData *data = getPluginData();
-    if (!data)
-        return 0;
-    const Vector<MimeClassInfo>& mimes = data->mimes();
-    for (unsigned i = 0; i < mimes.size(); ++i) {
-        if (mimes[i].type == propertyName)
-            return DOMMimeType::create(data, m_frame, i).get();
-    }
-    return 0;
+    // FIXME: Should be implemented.
+    return Vector<AtomicString>();
 }
 
 PluginData* DOMMimeTypeArray::getPluginData() const
 {
     if (!m_frame)
-        return 0;
-    Page* p = m_frame->page();
-    if (!p)
-        return 0;
-    return p->pluginData();
+        return nullptr;
+
+    Page* page = m_frame->page();
+    if (!page)
+        return nullptr;
+
+    PluginData* pluginData = &page->pluginData();
+
+#if ENABLE(WEB_REPLAY)
+    if (!m_frame->document())
+        return pluginData;
+
+    InputCursor& cursor = m_frame->document()->inputCursor();
+    if (cursor.isCapturing())
+        cursor.appendInput<FetchPluginData>(pluginData);
+    else if (cursor.isReplaying()) {
+        if (FetchPluginData* input = cursor.fetchInput<FetchPluginData>())
+            pluginData = input->pluginData().get();
+    }
+#endif
+
+    return pluginData;
 }
 
 } // namespace WebCore

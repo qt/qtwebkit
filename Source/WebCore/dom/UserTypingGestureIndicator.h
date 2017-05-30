@@ -37,10 +37,10 @@ class Node;
 class UserTypingGestureIndicator {
     WTF_MAKE_NONCOPYABLE(UserTypingGestureIndicator);
 public:
-    static bool processingUserTypingGesture();
-    static Node* focusedElementAtGestureStart();
+    WEBCORE_EXPORT static bool processingUserTypingGesture();
+    WEBCORE_EXPORT static Node* focusedElementAtGestureStart();
 
-    explicit UserTypingGestureIndicator(Frame*);
+    explicit UserTypingGestureIndicator(Frame&);
     ~UserTypingGestureIndicator();
 
 private:

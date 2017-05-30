@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2012, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,14 +26,17 @@
 #ifndef ScrollingThread_h
 #define ScrollingThread_h
 
-#if ENABLE(THREADED_SCROLLING)
+#if ENABLE(ASYNC_SCROLLING)
 
-#include <wtf/Functional.h>
+#include <functional>
+#include <wtf/Condition.h>
+#include <wtf/Forward.h>
+#include <wtf/Lock.h>
 #include <wtf/Noncopyable.h>
 #include <wtf/Threading.h>
 #include <wtf/Vector.h>
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
 #include <wtf/RetainPtr.h>
 #endif
 
@@ -44,16 +47,18 @@ class ScrollingThread {
 
 public:
     static bool isCurrentThread();
-    static void dispatch(const Function<void()>&);
+    WEBCORE_EXPORT static void dispatch(std::function<void ()>);
 
     // Will dispatch the given function on the main thread once all pending functions
     // on the scrolling thread have finished executing. Used for synchronization purposes.
-    static void dispatchBarrier(const Function<void()>&);
+    WEBCORE_EXPORT static void dispatchBarrier(std::function<void ()>);
 
 private:
+    friend NeverDestroyed<ScrollingThread>;
+
     ScrollingThread();
 
-    static ScrollingThread& shared();
+    static ScrollingThread& singleton();
 
     void createThreadIfNeeded();
     static void threadCallback(void* scrollingThread);
@@ -63,20 +68,20 @@ private:
     void initializeRunLoop();
     void wakeUpRunLoop();
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     static void threadRunLoopSourceCallback(void* scrollingThread);
     void threadRunLoopSourceCallback();
 #endif
 
     ThreadIdentifier m_threadIdentifier;
 
-    ThreadCondition m_initializeRunLoopCondition;
-    Mutex m_initializeRunLoopConditionMutex;
+    Condition m_initializeRunLoopConditionVariable;
+    Lock m_initializeRunLoopMutex;
 
-    Mutex m_functionsMutex;
-    Vector<Function<void()> > m_functions;
+    Lock m_functionsMutex;
+    Vector<std::function<void ()>> m_functions;
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     // FIXME: We should use WebCore::RunLoop here.
     RetainPtr<CFRunLoopRef> m_threadRunLoop;
     RetainPtr<CFRunLoopSourceRef> m_threadRunLoopSource;
@@ -85,6 +90,6 @@ private:
 
 } // namespace WebCore
 
-#endif // ENABLE(THREADED_SCROLLING)
+#endif // ENABLE(ASYNC_SCROLLING)
 
 #endif // ScrollingThread_h

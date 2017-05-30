@@ -11,10 +11,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -30,41 +30,41 @@
 
 namespace WebCore {
 
-PassRefPtr<RGBColor> RGBColor::create(unsigned rgbColor)
+Ref<RGBColor> RGBColor::create(unsigned rgbColor)
 {
-    return adoptRef(new RGBColor(rgbColor));
+    return adoptRef(*new RGBColor(rgbColor));
 }
 
-PassRefPtr<CSSPrimitiveValue> RGBColor::red()
+Ref<CSSPrimitiveValue> RGBColor::red()
 {
     unsigned value = (m_rgbColor >> 16) & 0xFF;
-    RefPtr<CSSPrimitiveValue> result = CSSPrimitiveValue::create(value, CSSPrimitiveValue::CSS_NUMBER);
+    Ref<CSSPrimitiveValue> result = CSSPrimitiveValue::create(value, CSSPrimitiveValue::CSS_NUMBER);
     result->setCSSOMSafe();
-    return result.release();
+    return result;
 }
 
-PassRefPtr<CSSPrimitiveValue> RGBColor::green()
+Ref<CSSPrimitiveValue> RGBColor::green()
 {
     unsigned value = (m_rgbColor >> 8) & 0xFF;
-    RefPtr<CSSPrimitiveValue> result = CSSPrimitiveValue::create(value, CSSPrimitiveValue::CSS_NUMBER);
+    Ref<CSSPrimitiveValue> result = CSSPrimitiveValue::create(value, CSSPrimitiveValue::CSS_NUMBER);
     result->setCSSOMSafe();
-    return result.release();
+    return result;
 }
 
-PassRefPtr<CSSPrimitiveValue> RGBColor::blue()
+Ref<CSSPrimitiveValue> RGBColor::blue()
 {
     unsigned value = m_rgbColor & 0xFF;
-    RefPtr<CSSPrimitiveValue> result = CSSPrimitiveValue::create(value, CSSPrimitiveValue::CSS_NUMBER);
+    Ref<CSSPrimitiveValue> result = CSSPrimitiveValue::create(value, CSSPrimitiveValue::CSS_NUMBER);
     result->setCSSOMSafe();
-    return result.release();
+    return result;
 }
 
-PassRefPtr<CSSPrimitiveValue> RGBColor::alpha()
+Ref<CSSPrimitiveValue> RGBColor::alpha()
 {
     float value = static_cast<float>((m_rgbColor >> 24) & 0xFF) / 0xFF;
-    RefPtr<CSSPrimitiveValue> result = CSSPrimitiveValue::create(value, CSSPrimitiveValue::CSS_NUMBER);
+    Ref<CSSPrimitiveValue> result = CSSPrimitiveValue::create(value, CSSPrimitiveValue::CSS_NUMBER);
     result->setCSSOMSafe();
-    return result.release();
+    return result;
 }
 
 } // namespace WebCore

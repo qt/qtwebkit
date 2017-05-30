@@ -2,7 +2,7 @@
  * Copyright (C) 1999 Lars Knoll (knoll@kde.org)
  *           (C) 1999 Antti Koivisto (koivisto@kde.org)
  *           (C) 2000 Dirk Mueller (mueller@kde.org)
- * Copyright (C) 2004, 2005, 2006, 2010 Apple Inc. All rights reserved.
+ * Copyright (C) 2004, 2005, 2006, 2010, 2014 Apple Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -30,30 +30,29 @@ namespace WebCore {
 
 class HTMLSelectElement;
 
-class HTMLKeygenElement FINAL : public HTMLFormControlElementWithState {
+class HTMLKeygenElement final : public HTMLFormControlElementWithState {
 public:
-    static PassRefPtr<HTMLKeygenElement> create(const QualifiedName&, Document*, HTMLFormElement*);
-
-    virtual bool willValidate() const { return false; }
+    static Ref<HTMLKeygenElement> create(const QualifiedName&, Document&, HTMLFormElement*);
 
 private:
-    HTMLKeygenElement(const QualifiedName&, Document*, HTMLFormElement*);
+    HTMLKeygenElement(const QualifiedName&, Document&, HTMLFormElement*);
 
-    virtual bool areAuthorShadowsAllowed() const OVERRIDE { return false; }
+    virtual bool computeWillValidate() const override { return false; }
+    virtual bool canStartSelection() const override { return false; }
 
-    virtual bool canStartSelection() const { return false; }
+    virtual void parseAttribute(const QualifiedName&, const AtomicString&) override;
 
-    virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
+    virtual bool appendFormData(FormDataList&, bool) override;
+    virtual const AtomicString& formControlType() const override;
+    virtual bool isOptionalFormControl() const override { return false; }
 
-    virtual bool appendFormData(FormDataList&, bool);
-    virtual const AtomicString& formControlType() const;
-    virtual bool isOptionalFormControl() const { return false; }
+    virtual bool isEnumeratable() const override { return true; }
+    virtual bool supportLabels() const override { return true; }
 
-    virtual bool isEnumeratable() const { return true; }
-    virtual bool supportLabels() const OVERRIDE { return true; }
+    virtual void reset() override;
+    virtual bool shouldSaveAndRestoreFormControlState() const override;
 
-    virtual void reset();
-    virtual bool shouldSaveAndRestoreFormControlState() const OVERRIDE;
+    virtual bool canHaveUserAgentShadowRoot() const override final { return true; }
 
     HTMLSelectElement* shadowSelect() const;
 };

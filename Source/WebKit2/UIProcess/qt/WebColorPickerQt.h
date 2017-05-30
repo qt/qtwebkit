@@ -24,7 +24,6 @@
 #include "IntRect.h"
 #include "WebColorPicker.h"
 #include <QtCore/QObject>
-#include <wtf/OwnPtr.h>
 
 QT_BEGIN_NAMESPACE
 class QQmlComponent;
@@ -40,7 +39,7 @@ class Color;
 
 namespace WebKit {
 
-class WebColorPickerQt : public QObject, public WebColorPicker {
+class WebColorPickerQt final : public QObject, public WebColorPicker {
     Q_OBJECT
 
 public:
@@ -50,10 +49,11 @@ public:
     }
     ~WebColorPickerQt();
 
-    virtual void setSelectedColor(const WebCore::Color&);
+    void setSelectedColor(const WebCore::Color&) final;
+    void showColorPicker(const WebCore::Color&) final;
 
 public Q_SLOTS:
-    virtual void endChooser();
+    void endPicker() final;
 
 private Q_SLOTS:
     void notifyColorSelected(const QColor&);
@@ -64,8 +64,8 @@ private:
     void createItem(QObject*);
     void createContext(QQmlComponent*, QObject*);
 
-    OwnPtr<QQmlContext> m_context;
-    OwnPtr<QQuickItem> m_colorChooser;
+    std::unique_ptr<QQmlContext> m_context;
+    std::unique_ptr<QQuickItem> m_colorChooser;
 
     QQuickWebView* m_webView;
 };

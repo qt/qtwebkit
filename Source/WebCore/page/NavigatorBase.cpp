@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -28,6 +28,7 @@
 #include "NavigatorBase.h"
 
 #include "NetworkStateNotifier.h"
+#include <wtf/NeverDestroyed.h>
 #include <wtf/text/WTFString.h>
 
 #if OS(LINUX)
@@ -35,15 +36,19 @@
 #include <wtf/StdLibExtras.h>
 #endif
 
+#if PLATFORM(IOS)
+#include "Device.h"
+#endif
+
 #ifndef WEBCORE_NAVIGATOR_PLATFORM
-#if OS(MAC_OS_X) && (CPU(PPC) || CPU(PPC64))
+#if PLATFORM(IOS)
+#define WEBCORE_NAVIGATOR_PLATFORM deviceName()
+#elif OS(MAC_OS_X) && (CPU(PPC) || CPU(PPC64))
 #define WEBCORE_NAVIGATOR_PLATFORM "MacPPC"
 #elif OS(MAC_OS_X) && (CPU(X86) || CPU(X86_64))
 #define WEBCORE_NAVIGATOR_PLATFORM "MacIntel"
 #elif OS(WINDOWS)
 #define WEBCORE_NAVIGATOR_PLATFORM "Win32"
-#elif PLATFORM(BLACKBERRY)
-#define WEBCORE_NAVIGATOR_PLATFORM "BlackBerry"
 #else
 #define WEBCORE_NAVIGATOR_PLATFORM ""
 #endif
@@ -64,7 +69,6 @@
 #ifndef WEBCORE_NAVIGATOR_VENDOR_SUB
 #define WEBCORE_NAVIGATOR_VENDOR_SUB ""
 #endif // ifndef WEBCORE_NAVIGATOR_VENDOR_SUB
-
 
 namespace WebCore {
 
@@ -90,7 +94,7 @@ String NavigatorBase::platform() const
     if (!String(WEBCORE_NAVIGATOR_PLATFORM).isEmpty())
         return WEBCORE_NAVIGATOR_PLATFORM;
     struct utsname osname;
-    DEFINE_STATIC_LOCAL(String, platformName, (uname(&osname) >= 0 ? String(osname.sysname) + String(" ") + String(osname.machine) : emptyString()));
+    static NeverDestroyed<String> platformName(uname(&osname) >= 0 ? String(osname.sysname) + String(" ") + String(osname.machine) : emptyString());
     return platformName;
 #else
     return WEBCORE_NAVIGATOR_PLATFORM;

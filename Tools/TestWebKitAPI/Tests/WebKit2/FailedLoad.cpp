@@ -24,10 +24,13 @@
  */
 
 #include "config.h"
+
+#if WK_HAVE_C_SPI
+
 #include "PlatformUtilities.h"
 #include "PlatformWebView.h"
 #include "Test.h"
-#include <WebKit2/WKRetainPtr.h>
+#include <WebKit/WKRetainPtr.h>
 
 namespace TestWebKitAPI {
 
@@ -50,13 +53,13 @@ TEST(WebKit2, FailedLoad)
     WKRetainPtr<WKContextRef> context(AdoptWK, WKContextCreate());
     PlatformWebView webView(context.get());
 
-    WKPageLoaderClient loaderClient;
+    WKPageLoaderClientV0 loaderClient;
     memset(&loaderClient, 0, sizeof(loaderClient));
 
-    loaderClient.version = 0;
-    loaderClient.clientInfo = 0;
+    loaderClient.base.version = 0;
     loaderClient.didFailProvisionalLoadWithErrorForFrame = didFailProvisionalLoadWithErrorForFrame;
-    WKPageSetPageLoaderClient(webView.page(), &loaderClient);
+
+    WKPageSetPageLoaderClient(webView.page(), &loaderClient.base);
 
     WKRetainPtr<WKURLRef> url(AdoptWK, Util::URLForNonExistentResource());
     WKPageLoadURL(webView.page(), url.get());
@@ -65,3 +68,5 @@ TEST(WebKit2, FailedLoad)
 }
 
 } // namespace TestWebKitAPI
+
+#endif

@@ -18,11 +18,9 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "SVGAnimatedString.h"
 
-#include "SVGAnimateElement.h"
+#include "SVGAnimateElementBase.h"
 
 namespace WebCore {
 
@@ -31,14 +29,14 @@ SVGAnimatedStringAnimator::SVGAnimatedStringAnimator(SVGAnimationElement* animat
 {
 }
 
-PassOwnPtr<SVGAnimatedType> SVGAnimatedStringAnimator::constructFromString(const String& string)
+std::unique_ptr<SVGAnimatedType> SVGAnimatedStringAnimator::constructFromString(const String& string)
 {
-    OwnPtr<SVGAnimatedType> animatedType = SVGAnimatedType::createString(new String);
+    auto animatedType = SVGAnimatedType::createString(std::make_unique<String>());
     animatedType->string() = string;
-    return animatedType.release();
+    return animatedType;
 }
 
-PassOwnPtr<SVGAnimatedType> SVGAnimatedStringAnimator::startAnimValAnimation(const SVGElementAnimatedPropertyList& animatedTypes)
+std::unique_ptr<SVGAnimatedType> SVGAnimatedStringAnimator::startAnimValAnimation(const SVGElementAnimatedPropertyList& animatedTypes)
 {
     return SVGAnimatedType::createString(constructFromBaseValue<SVGAnimatedString>(animatedTypes));
 }
@@ -48,7 +46,7 @@ void SVGAnimatedStringAnimator::stopAnimValAnimation(const SVGElementAnimatedPro
     stopAnimValAnimationForType<SVGAnimatedString>(animatedTypes);
 }
 
-void SVGAnimatedStringAnimator::resetAnimValToBaseVal(const SVGElementAnimatedPropertyList& animatedTypes, SVGAnimatedType* type)
+void SVGAnimatedStringAnimator::resetAnimValToBaseVal(const SVGElementAnimatedPropertyList& animatedTypes, SVGAnimatedType& type)
 {
     resetFromBaseValue<SVGAnimatedString>(animatedTypes, type, &SVGAnimatedType::string);
 }
@@ -96,5 +94,3 @@ float SVGAnimatedStringAnimator::calculateDistance(const String&, const String&)
 }
 
 }
-
-#endif // ENABLE(SVG)

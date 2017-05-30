@@ -53,6 +53,7 @@ typedef unsigned char MutationObserverOptions;
 typedef unsigned char MutationRecordDeliveryOptions;
 
 class MutationObserver : public RefCounted<MutationObserver> {
+    friend class MutationObserverMicrotask;
 public:
     enum MutationType {
         ChildList = 1 << 0,
@@ -72,13 +73,12 @@ public:
         CharacterDataOldValue = 1 << 6,
     };
 
-    static PassRefPtr<MutationObserver> create(PassRefPtr<MutationCallback>);
-    static void deliverAllMutations();
+    static Ref<MutationObserver> create(PassRefPtr<MutationCallback>);
 
     ~MutationObserver();
 
     void observe(Node*, const Dictionary&, ExceptionCode&);
-    Vector<RefPtr<MutationRecord> > takeRecords();
+    Vector<RefPtr<MutationRecord>> takeRecords();
     void disconnect();
     void observationStarted(MutationObserverRegistration*);
     void observationEnded(MutationObserverRegistration*);
@@ -94,10 +94,11 @@ private:
     explicit MutationObserver(PassRefPtr<MutationCallback>);
     void deliver();
 
+    static void deliverAllMutations();
     static bool validateOptions(MutationObserverOptions);
 
     RefPtr<MutationCallback> m_callback;
-    Vector<RefPtr<MutationRecord> > m_records;
+    Vector<RefPtr<MutationRecord>> m_records;
     HashSet<MutationObserverRegistration*> m_registrations;
     unsigned m_priority;
 };

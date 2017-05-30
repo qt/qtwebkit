@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2015 The Qt Company Ltd
+    Copyright (C) 2014 Digia Plc. and/or its subsidiary(-ies)
 
     This library is free software; you can redistribute it and/or
     modify it under the terms of the GNU Library General Public
@@ -19,13 +19,13 @@
 
 #include "config.h"
 #include "QFramebufferPaintDevice.h"
+
 #include <QOpenGLFunctions>
 
 QFramebufferPaintDevice::QFramebufferPaintDevice(const QSize& size,
-                                                 QOpenGLFramebufferObject::Attachment attachment,
-                                                 bool clearOnInit)
-    : QOpenGLPaintDevice(size)
-    , m_framebufferObject(size, attachment)
+    QOpenGLFramebufferObject::Attachment attachment, bool clearOnInit)
+        : QOpenGLPaintDevice(size)
+        , m_framebufferObject(size, attachment)
 {
     m_surface = QOpenGLContext::currentContext()->surface();
 #if QT_VERSION >= QT_VERSION_CHECK(5, 4, 0)

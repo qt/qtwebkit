@@ -25,24 +25,30 @@
 
 #include "config.h"
 
-#if USE(3D_GRAPHICS)
+#if ENABLE(GRAPHICS_CONTEXT_3D)
 
 #include "Extensions3DOpenGL.h"
 
 #include "GraphicsContext3D.h"
-#include "NotImplemented.h"
 #include <wtf/Vector.h>
 
-#if PLATFORM(MAC)
-#include "ANGLE/ShaderLang.h"
+#if PLATFORM(IOS)
+#include <OpenGLES/ES2/glext.h>
+#elif PLATFORM(MAC)
 #include <OpenGL/gl.h>
 #elif PLATFORM(QT)
-#include <private/qopenglextensions_p.h>
+#define FUNCTIONS m_context->m_functions
+#include "OpenGLShimsQt.h"
 #if QT_VERSION >= QT_VERSION_CHECK(5, 4, 0)
-#include <private/qopenglvertexarrayobject_p.h>
+#define VAO_FUNCTIONS m_vaoFunctions
+#include "OpenGLShimsQtVAO.h"
 #endif
 #elif PLATFORM(GTK) || PLATFORM(EFL) || PLATFORM(WIN)
 #include "OpenGLShims.h"
+#endif
+
+#if PLATFORM(IOS)
+#include "GraphicsContext3DIOS.h"
 #endif
 
 // Note this implementation serves a double role for Qt where it also handles OpenGLES.
@@ -66,10 +72,21 @@ Extensions3DOpenGL::~Extensions3DOpenGL()
 #endif
 }
 
+
 void Extensions3DOpenGL::blitFramebuffer(long srcX0, long srcY0, long srcX1, long srcY1, long dstX0, long dstY0, long dstX1, long dstY1, unsigned long mask, unsigned long filter)
 {
-#if PLATFORM(QT)
-    m_context->m_functions->glBlitFramebuffer(srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter);
+#if PLATFORM(IOS)
+    UNUSED_PARAM(srcX0);
+    UNUSED_PARAM(srcY0);
+    UNUSED_PARAM(srcX1);
+    UNUSED_PARAM(srcY1);
+    UNUSED_PARAM(dstX0);
+    UNUSED_PARAM(dstY0);
+    UNUSED_PARAM(dstX1);
+    UNUSED_PARAM(dstY1);
+    UNUSED_PARAM(mask);
+    UNUSED_PARAM(filter);
+    ::glResolveMultisampleFramebufferAPPLE();
 #else
     ::glBlitFramebufferEXT(srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter);
 #endif
@@ -77,25 +94,16 @@ void Extensions3DOpenGL::blitFramebuffer(long srcX0, long srcY0, long srcX1, lon
 
 void Extensions3DOpenGL::renderbufferStorageMultisample(unsigned long target, unsigned long samples, unsigned long internalformat, unsigned long width, unsigned long height)
 {
-#if PLATFORM(QT)
-    m_context->m_functions->glRenderbufferStorageMultisample(target, samples, internalformat, width, height);
-#else
     ::glRenderbufferStorageMultisampleEXT(target, samples, internalformat, width, height);
-#endif
 }
 
 Platform3DObject Extensions3DOpenGL::createVertexArrayOES()
 {
     m_context->makeContextCurrent();
     GLuint array = 0;
-#if (PLATFORM(GTK) || PLATFORM(EFL)) || PLATFORM(WIN)
+#if (PLATFORM(GTK) || PLATFORM(QT) || PLATFORM(EFL) || PLATFORM(WIN) || PLATFORM(IOS))
     if (isVertexArrayObjectSupported())
         glGenVertexArrays(1, &array);
-#elif PLATFORM(QT)
-#if QT_VERSION >= QT_VERSION_CHECK(5, 4, 0)
-    if (isVertexArrayObjectSupported())
-        m_vaoFunctions->glGenVertexArrays(1, &array);
-#endif
 #elif defined(GL_APPLE_vertex_array_object) && GL_APPLE_vertex_array_object
     glGenVertexArraysAPPLE(1, &array);
 #endif
@@ -108,14 +116,9 @@ void Extensions3DOpenGL::deleteVertexArrayOES(Platform3DObject array)
         return;
 
     m_context->makeContextCurrent();
-#if (PLATFORM(GTK) || PLATFORM(EFL) || PLATFORM(WIN))
+#if (PLATFORM(GTK) || PLATFORM(QT) || PLATFORM(EFL) || PLATFORM(WIN) || PLATFORM(IOS))
     if (isVertexArrayObjectSupported())
         glDeleteVertexArrays(1, &array);
-#elif PLATFORM(QT)
-#if QT_VERSION >= QT_VERSION_CHECK(5, 4, 0)
-    if (isVertexArrayObjectSupported())
-        m_vaoFunctions->glDeleteVertexArrays(1, &array);
-#endif
 #elif defined(GL_APPLE_vertex_array_object) && GL_APPLE_vertex_array_object
     glDeleteVertexArraysAPPLE(1, &array);
 #endif
@@ -127,14 +130,9 @@ GC3Dboolean Extensions3DOpenGL::isVertexArrayOES(Platform3DObject array)
         return GL_FALSE;
 
     m_context->makeContextCurrent();
-#if (PLATFORM(GTK) || PLATFORM(EFL) || PLATFORM(WIN))
+#if (PLATFORM(GTK) || PLATFORM(QT) || PLATFORM(EFL) || PLATFORM(WIN) || PLATFORM(IOS))
     if (isVertexArrayObjectSupported())
         return glIsVertexArray(array);
-#elif PLATFORM(QT)
-#if QT_VERSION >= QT_VERSION_CHECK(5, 4, 0)
-    if (isVertexArrayObjectSupported())
-        return m_vaoFunctions->glIsVertexArray(array);
-#endif
 #elif defined(GL_APPLE_vertex_array_object) && GL_APPLE_vertex_array_object
     return glIsVertexArrayAPPLE(array);
 #endif
@@ -146,25 +144,14 @@ GC3Dboolean Extensions3DOpenGL::isVertexArrayOES(Platform3DObject array)
 void Extensions3DOpenGL::bindVertexArrayOES(Platform3DObject array)
 {
     m_context->makeContextCurrent();
-#if (PLATFORM(GTK) || PLATFORM(EFL) || PLATFORM(WIN))
+#if (PLATFORM(GTK) || PLATFORM(QT) || PLATFORM(EFL) || PLATFORM(WIN) || PLATFORM(IOS))
     if (isVertexArrayObjectSupported())
         glBindVertexArray(array);
-#elif PLATFORM(QT)
-#if QT_VERSION >= QT_VERSION_CHECK(5, 4, 0)
-    if (isVertexArrayObjectSupported())
-        m_vaoFunctions->glBindVertexArray(array);
-#endif
 #elif defined(GL_APPLE_vertex_array_object) && GL_APPLE_vertex_array_object
     glBindVertexArrayAPPLE(array);
 #else
     UNUSED_PARAM(array);
 #endif
-}
-
-void Extensions3DOpenGL::copyTextureCHROMIUM(GC3Denum, Platform3DObject, Platform3DObject, GC3Dint, GC3Denum)
-{
-    // FIXME: implement this function and add GL_CHROMIUM_copy_texture in supports().
-    return;
 }
 
 void Extensions3DOpenGL::insertEventMarkerEXT(const String&)
@@ -188,8 +175,10 @@ void Extensions3DOpenGL::popGroupMarkerEXT(void)
 bool Extensions3DOpenGL::supportsExtension(const String& name)
 {
     // GL_ANGLE_framebuffer_blit and GL_ANGLE_framebuffer_multisample are "fake". They are implemented using other
-    // extensions. In particular GL_EXT_framebuffer_blit and GL_EXT_framebuffer_multisample
+    // extensions. In particular GL_EXT_framebuffer_blit and GL_EXT_framebuffer_multisample/GL_APPLE_framebuffer_multisample.
 #if PLATFORM(QT)
+    m_context->makeContextCurrent();
+
     if (name == "GL_ANGLE_framebuffer_blit" || name == "GL_EXT_framebuffer_blit")
         return m_context->m_functions->hasOpenGLExtension(QOpenGLExtensions::FramebufferBlit);
     if (name == "GL_ANGLE_framebuffer_multisample" || name == "GL_EXT_framebuffer_multisample")
@@ -207,13 +196,55 @@ bool Extensions3DOpenGL::supportsExtension(const String& name)
     if (name == "GL_ANGLE_framebuffer_blit")
         return m_availableExtensions.contains("GL_EXT_framebuffer_blit");
     if (name == "GL_ANGLE_framebuffer_multisample")
+#if PLATFORM(IOS)
+        return m_availableExtensions.contains("GL_APPLE_framebuffer_multisample");
+#else
         return m_availableExtensions.contains("GL_EXT_framebuffer_multisample");
+#endif
+#endif // !PLATFORM(QT)
+
+    if (name == "GL_ANGLE_instanced_arrays") {
+        return (m_availableExtensions.contains("GL_ARB_instanced_arrays") || m_availableExtensions.contains("GL_EXT_instanced_arrays"))
+            && (m_availableExtensions.contains("GL_ARB_draw_instanced") || m_availableExtensions.contains("GL_EXT_draw_instanced"));
+    }
+
+    if (name == "GL_EXT_sRGB")
+#if PLATFORM(IOS)
+        return m_availableExtensions.contains("GL_EXT_sRGB");
+#else
+        return m_availableExtensions.contains("GL_EXT_texture_sRGB") && (m_availableExtensions.contains("GL_EXT_framebuffer_sRGB") || m_availableExtensions.contains("GL_ARB_framebuffer_sRGB"));
+#endif
+
+    if (name == "GL_EXT_frag_depth")
+#if PLATFORM(MAC)
+        return true;
+#else
+        return m_availableExtensions.contains("GL_EXT_frag_depth");
+#endif
+
+#if PLATFORM(QT)
+    if (!m_context->isGLES2Compliant()) {
+#endif
+
+    // Desktop GL always supports GL_OES_rgb8_rgba8.
+    if (name == "GL_OES_rgb8_rgba8")
+        return true;
+
+    // If GL_ARB_texture_float or GL_OES_texture_float is available then we report
+    // GL_OES_texture_half_float, GL_OES_texture_float_linear and GL_OES_texture_half_float_linear as available.
+    if (name == "GL_OES_texture_float" || name == "GL_OES_texture_half_float" || name == "GL_OES_texture_float_linear" || name == "GL_OES_texture_half_float_linear")
+        return m_availableExtensions.contains("GL_ARB_texture_float") || m_availableExtensions.contains("GL_OES_texture_float");
+
+#if PLATFORM(QT)
+    }
 #endif
 
     // GL_OES_vertex_array_object
     if (name == "GL_OES_vertex_array_object") {
 #if (PLATFORM(GTK) || PLATFORM(EFL))
         return m_availableExtensions.contains("GL_ARB_vertex_array_object");
+#elif PLATFORM(IOS)
+        return m_availableExtensions.contains("GL_OES_vertex_array_object");
 #elif PLATFORM(QT)
         return isVertexArrayObjectSupported();
 #else
@@ -221,33 +252,44 @@ bool Extensions3DOpenGL::supportsExtension(const String& name)
 #endif
     }
 
+#if PLATFORM(QT)
     if (!m_context->isGLES2Compliant()) {
-        // Desktop GL always supports GL_OES_rgb8_rgba8.
-        if (name == "GL_OES_rgb8_rgba8")
-            return true;
+#endif
 
-        // If GL_ARB_texture_float is available then we report GL_OES_texture_float and
-        // GL_OES_texture_half_float as available.
-        if (name == "GL_OES_texture_float" || name == "GL_OES_texture_half_float")
-            return m_availableExtensions.contains("GL_ARB_texture_float");
+    // Desktop GL always supports the standard derivative functions
+    if (name == "GL_OES_standard_derivatives")
+        return true;
 
-        // Desktop GL always supports the standard derivative functions
-        if (name == "GL_OES_standard_derivatives")
-            return true;
+    // Desktop GL always supports UNSIGNED_INT indices
+    if (name == "GL_OES_element_index_uint")
+        return true;
 
-        // Desktop GL always supports UNSIGNED_INT indices
-        if (name == "GL_OES_element_index_uint")
-            return true;
+#if PLATFORM(QT)
     }
+#endif
+    
+    if (name == "GL_EXT_shader_texture_lod")
+        return m_availableExtensions.contains("GL_EXT_shader_texture_lod");
+    
+    if (name == "GL_EXT_texture_filter_anisotropic")
+        return m_availableExtensions.contains("GL_EXT_texture_filter_anisotropic");
 
     if (name == "GL_EXT_draw_buffers") {
-#if PLATFORM(MAC)
+#if PLATFORM(IOS)
+        return m_availableExtensions.contains(name);
+#elif PLATFORM(MAC) || PLATFORM(GTK) || (PLATFORM(QT) && QT_VERSION >= QT_VERSION_CHECK(5, 6, 0))
         return m_availableExtensions.contains("GL_ARB_draw_buffers");
 #else
         // FIXME: implement support for other platforms.
         return false;
 #endif
     }
+
+#if PLATFORM(IOS)
+    if (name == "GL_EXT_packed_depth_stencil")
+        return m_availableExtensions.contains("GL_OES_packed_depth_stencil");
+#endif
+
     return m_availableExtensions.contains(name);
 }
 
@@ -256,22 +298,64 @@ void Extensions3DOpenGL::drawBuffersEXT(GC3Dsizei n, const GC3Denum* bufs)
     //  FIXME: implement support for other platforms.
 #if PLATFORM(MAC)
     ::glDrawBuffersARB(n, bufs);
+#elif PLATFORM(GTK) || (PLATFORM(QT) && QT_VERSION >= QT_VERSION_CHECK(5, 6, 0))
+    ::glDrawBuffers(n, bufs);
 #else
     UNUSED_PARAM(n);
     UNUSED_PARAM(bufs);
 #endif
 }
 
-String Extensions3DOpenGL::getExtensions()
+void Extensions3DOpenGL::drawArraysInstanced(GC3Denum mode, GC3Dint first, GC3Dsizei count, GC3Dsizei primcount)
 {
-#if PLATFORM(QT)
-    return String(reinterpret_cast<const char*>(m_context->m_functions->glGetString(GL_EXTENSIONS)));
+    m_context->makeContextCurrent();
+#if PLATFORM(GTK) || (PLATFORM(QT) && QT_VERSION >= QT_VERSION_CHECK(5, 6, 0))
+    ::glDrawArraysInstanced(mode, first, count, primcount);
+#elif PLATFORM(COCOA)
+    ::glDrawArraysInstancedARB(mode, first, count, primcount);
 #else
-    return String(reinterpret_cast<const char*>(::glGetString(GL_EXTENSIONS)));
+    UNUSED_PARAM(mode);
+    UNUSED_PARAM(first);
+    UNUSED_PARAM(count);
+    UNUSED_PARAM(primcount);
 #endif
 }
 
-#if (PLATFORM(GTK) || PLATFORM(EFL) || PLATFORM(WIN))
+void Extensions3DOpenGL::drawElementsInstanced(GC3Denum mode, GC3Dsizei count, GC3Denum type, long long offset, GC3Dsizei primcount)
+{
+    m_context->makeContextCurrent();
+#if PLATFORM(GTK) || (PLATFORM(QT) && QT_VERSION >= QT_VERSION_CHECK(5, 6, 0))
+    ::glDrawElementsInstanced(mode, count, type, reinterpret_cast<GLvoid*>(static_cast<intptr_t>(offset)), primcount);
+#elif PLATFORM(COCOA)
+    ::glDrawElementsInstancedARB(mode, count, type, reinterpret_cast<GLvoid*>(static_cast<intptr_t>(offset)), primcount);
+#else
+    UNUSED_PARAM(mode);
+    UNUSED_PARAM(count);
+    UNUSED_PARAM(type);
+    UNUSED_PARAM(offset);
+    UNUSED_PARAM(primcount);
+#endif
+}
+
+void Extensions3DOpenGL::vertexAttribDivisor(GC3Duint index, GC3Duint divisor)
+{
+    m_context->makeContextCurrent();
+#if PLATFORM(GTK) || (PLATFORM(QT) && QT_VERSION >= QT_VERSION_CHECK(5, 6, 0))
+    ::glVertexAttribDivisor(index, divisor);
+#elif PLATFORM(COCOA)
+    ::glVertexAttribDivisorARB(index, divisor);
+#else
+    UNUSED_PARAM(index);
+    UNUSED_PARAM(divisor);
+#endif
+}
+
+String Extensions3DOpenGL::getExtensions()
+{
+    return String(reinterpret_cast<const char*>(::glGetString(GL_EXTENSIONS)));
+}
+
+#if (PLATFORM(GTK) || PLATFORM(EFL) || PLATFORM(WIN) || PLATFORM(IOS))
 bool Extensions3DOpenGL::isVertexArrayObjectSupported()
 {
     static const bool supportsVertexArrayObject = supports("GL_OES_vertex_array_object");
@@ -290,4 +374,4 @@ bool Extensions3DOpenGL::isVertexArrayObjectSupported()
 
 } // namespace WebCore
 
-#endif // USE(3D_GRAPHICS)
+#endif // ENABLE(GRAPHICS_CONTEXT_3D)

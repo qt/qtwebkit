@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2012, 2013, 2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,33 +26,103 @@
 #include "config.h"
 #include "CallLinkInfo.h"
 
+#include "CallFrameShuffleData.h"
 #include "DFGOperations.h"
 #include "DFGThunks.h"
-#include "RepatchBuffer.h"
+#include "JSCInlines.h"
+#include "Repatch.h"
+#include <wtf/ListDump.h>
+#include <wtf/NeverDestroyed.h>
 
 #if ENABLE(JIT)
 namespace JSC {
 
-void CallLinkInfo::unlink(VM& vm, RepatchBuffer& repatchBuffer)
+CallLinkInfo::CallLinkInfo()
+    : m_hasSeenShouldRepatch(false)
+    , m_hasSeenClosure(false)
+    , m_clearedByGC(false)
+    , m_allowStubs(true)
+    , m_callType(None)
+    , m_maxNumArguments(0)
+    , m_slowPathCount(0)
 {
-    ASSERT(isLinked());
+}
+
+CallLinkInfo::~CallLinkInfo()
+{
+    clearStub();
     
-    repatchBuffer.revertJumpReplacementToBranchPtrWithPatch(RepatchBuffer::startOfBranchPtrWithPatchOnRegister(hotPathBegin), static_cast<MacroAssembler::RegisterID>(calleeGPR), 0);
-    if (isDFG) {
-#if ENABLE(DFG_JIT)
-        repatchBuffer.relink(callReturnLocation, (callType == Construct ? vm.getCTIStub(DFG::linkConstructThunkGenerator) : vm.getCTIStub(DFG::linkCallThunkGenerator)).code());
-#else
-        RELEASE_ASSERT_NOT_REACHED();
-#endif
-    } else
-        repatchBuffer.relink(callReturnLocation, callType == Construct ? vm.getCTIStub(linkConstructGenerator).code() : vm.getCTIStub(linkCallGenerator).code());
-    hasSeenShouldRepatch = false;
-    callee.clear();
-    stub.clear();
+    if (isOnList())
+        remove();
+}
+
+void CallLinkInfo::clearStub()
+{
+    if (!stub())
+        return;
+
+    m_stub->clearCallNodesFor(this);
+    m_stub = nullptr;
+}
+
+void CallLinkInfo::unlink(VM& vm)
+{
+    if (!isLinked()) {
+        // We could be called even if we're not linked anymore because of how polymorphic calls
+        // work. Each callsite within the polymorphic call stub may separately ask us to unlink().
+        RELEASE_ASSERT(!isOnList());
+        return;
+    }
+    
+    unlinkFor(vm, *this);
 
     // It will be on a list if the callee has a code block.
     if (isOnList())
         remove();
+}
+
+void CallLinkInfo::visitWeak(VM& vm)
+{
+    auto handleSpecificCallee = [&] (JSFunction* callee) {
+        if (Heap::isMarked(callee->executable()))
+            m_hasSeenClosure = true;
+        else
+            m_clearedByGC = true;
+    };
+    
+    if (isLinked()) {
+        if (stub()) {
+            if (!stub()->visitWeak(vm)) {
+                if (Options::verboseOSR()) {
+                    dataLog(
+                        "Clearing closure call to ",
+                        listDump(stub()->variants()), ", stub routine ", RawPointer(stub()),
+                        ".\n");
+                }
+                unlink(vm);
+                m_clearedByGC = true;
+            }
+        } else if (!Heap::isMarked(m_callee.get())) {
+            if (Options::verboseOSR()) {
+                dataLog(
+                    "Clearing call to ",
+                    RawPointer(m_callee.get()), " (",
+                    m_callee.get()->executable()->hashFor(specializationKind()),
+                    ").\n");
+            }
+            handleSpecificCallee(m_callee.get());
+            unlink(vm);
+        }
+    }
+    if (haveLastSeenCallee() && !Heap::isMarked(lastSeenCallee())) {
+        handleSpecificCallee(lastSeenCallee());
+        clearLastSeenCallee();
+    }
+}
+
+void CallLinkInfo::setFrameShuffleData(const CallFrameShuffleData& shuffleData)
+{
+    m_frameShuffleData = std::make_unique<CallFrameShuffleData>(shuffleData);
 }
 
 } // namespace JSC

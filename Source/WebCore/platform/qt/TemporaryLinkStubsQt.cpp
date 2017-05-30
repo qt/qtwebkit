@@ -47,16 +47,13 @@
 #include "GraphicsContext.h"
 #include "IconLoader.h"
 #include "IntPoint.h"
-#include "KURL.h"
+#include "URL.h"
 #include "Language.h"
 #include "LocalizedStrings.h"
 #include "Node.h"
 #include "NotImplemented.h"
 #include "Path.h"
 #include "PlatformMouseEvent.h"
-#include "PluginDatabase.h"
-#include "PluginPackage.h"
-#include "PluginView.h"
 #include "RenderTheme.h"
 #include "SharedBuffer.h"
 #include "TextBoundaries.h"
@@ -69,34 +66,6 @@
 
 using namespace WebCore;
 
-#if defined(Q_OS_WINCE)
-Vector<String> PluginDatabase::defaultPluginDirectories()
-{
-    notImplemented();
-    return Vector<String>();
-}
-
-void PluginDatabase::getPluginPathsInDirectories(HashSet<String>& paths) const
-{
-    notImplemented();
-}
-
-bool PluginDatabase::isPreferredPluginDirectory(const String& directory)
-{
-    notImplemented();
-    return false;
-}
-
-PassRefPtr<JSC::Bindings::Instance> PluginView::bindingInstance()
-{
-    return 0;
-}
-
-void PluginView::setJavaScriptPaused(bool)
-{
-}
-#endif
-
 namespace WebCore {
 
 void getSupportedKeySizes(Vector<String>&)
@@ -104,7 +73,7 @@ void getSupportedKeySizes(Vector<String>&)
     notImplemented();
 }
 
-String signedPublicKeyAndChallengeString(unsigned, const String&, const KURL&)
+String signedPublicKeyAndChallengeString(unsigned, const String&, const URL&)
 {
     return String();
 }

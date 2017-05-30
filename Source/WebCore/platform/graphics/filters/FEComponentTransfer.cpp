@@ -22,24 +22,21 @@
  */
 
 #include "config.h"
-
-#if ENABLE(FILTERS)
 #include "FEComponentTransfer.h"
 
 #include "Filter.h"
 #include "GraphicsContext.h"
-#include "RenderTreeAsText.h"
 #include "TextStream.h"
 
+#include <runtime/Uint8ClampedArray.h>
 #include <wtf/MathExtras.h>
 #include <wtf/StdLibExtras.h>
-#include <wtf/Uint8ClampedArray.h>
 
 namespace WebCore {
 
 typedef void (*TransferType)(unsigned char*, const ComponentTransferFunction&);
 
-FEComponentTransfer::FEComponentTransfer(Filter* filter, const ComponentTransferFunction& redFunc, const ComponentTransferFunction& greenFunc,
+FEComponentTransfer::FEComponentTransfer(Filter& filter, const ComponentTransferFunction& redFunc, const ComponentTransferFunction& greenFunc,
                                          const ComponentTransferFunction& blueFunc, const ComponentTransferFunction& alphaFunc)
     : FilterEffect(filter)
     , m_redFunc(redFunc)
@@ -49,10 +46,10 @@ FEComponentTransfer::FEComponentTransfer(Filter* filter, const ComponentTransfer
 {
 }
 
-PassRefPtr<FEComponentTransfer> FEComponentTransfer::create(Filter* filter, const ComponentTransferFunction& redFunc, 
+Ref<FEComponentTransfer> FEComponentTransfer::create(Filter& filter, const ComponentTransferFunction& redFunc,
     const ComponentTransferFunction& greenFunc, const ComponentTransferFunction& blueFunc, const ComponentTransferFunction& alphaFunc)
 {
-    return adoptRef(new FEComponentTransfer(filter, redFunc, greenFunc, blueFunc, alphaFunc));
+    return adoptRef(*new FEComponentTransfer(filter, redFunc, greenFunc, blueFunc, alphaFunc));
 }
 
 ComponentTransferFunction FEComponentTransfer::redFunction() const
@@ -248,5 +245,3 @@ TextStream& FEComponentTransfer::externalRepresentation(TextStream& ts, int inde
 }
 
 } // namespace WebCore
-
-#endif // ENABLE(FILTERS)

@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -30,60 +30,63 @@
 #include "JSObject.h"
 #include "Structure.h"
 
-#include <wtf/OwnArrayPtr.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
 #include <wtf/RefPtr.h>
+#include <wtf/StdLibExtras.h>
 
 namespace JSC {
 
-    class LLIntOffsetsExtractor;
-    class Structure;
+class LLIntOffsetsExtractor;
+class Structure;
 
-    class StructureChain : public JSCell {
-        friend class JIT;
+class StructureChain final : public JSCell {
+    friend class JIT;
 
-    public:
-        typedef JSCell Base;
+public:
+    typedef JSCell Base;
+    static const unsigned StructureFlags = Base::StructureFlags | StructureIsImmortal;
 
-        static StructureChain* create(VM& vm, Structure* head)
-        { 
-            StructureChain* chain = new (NotNull, allocateCell<StructureChain>(vm.heap)) StructureChain(vm, vm.structureChainStructure.get());
-            chain->finishCreation(vm, head);
-            return chain;
-        }
-        WriteBarrier<Structure>* head() { return m_vector.get(); }
-        static void visitChildren(JSCell*, SlotVisitor&);
+    static StructureChain* create(VM& vm, Structure* head)
+    { 
+        StructureChain* chain = new (NotNull, allocateCell<StructureChain>(vm.heap)) StructureChain(vm, vm.structureChainStructure.get());
+        chain->finishCreation(vm, head);
+        return chain;
+    }
+    WriteBarrier<Structure>* head() { return m_vector.get(); }
+    static void visitChildren(JSCell*, SlotVisitor&);
 
-        static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype) { return Structure::create(vm, globalObject, prototype, TypeInfo(CompoundType, OverridesVisitChildren), &s_info); }
-        
-        static ClassInfo s_info;
+    static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype)
+    {
+        return Structure::create(vm, globalObject, prototype, TypeInfo(CellType, StructureFlags), info());
+    }
 
-        static const bool needsDestruction = true;
-        static const bool hasImmortalStructure = true;
-        static void destroy(JSCell*);
+    DECLARE_INFO;
 
-    protected:
-        void finishCreation(VM& vm, Structure* head)
-        {
-            Base::finishCreation(vm);
-            size_t size = 0;
-            for (Structure* current = head; current; current = current->storedPrototype().isNull() ? 0 : asObject(current->storedPrototype())->structure())
-                ++size;
-    
-            m_vector = adoptArrayPtr(new WriteBarrier<Structure>[size + 1]);
+    static const bool needsDestruction = true;
+    static void destroy(JSCell*);
 
-            size_t i = 0;
-            for (Structure* current = head; current; current = current->storedPrototype().isNull() ? 0 : asObject(current->storedPrototype())->structure())
-                m_vector[i++].set(vm, this, current);
-        }
+protected:
+    void finishCreation(VM& vm, Structure* head)
+    {
+        Base::finishCreation(vm);
+        size_t size = 0;
+        for (Structure* current = head; current; current = current->storedPrototype().isNull() ? 0 : asObject(current->storedPrototype())->structure())
+            ++size;
 
-    private:
-        friend class LLIntOffsetsExtractor;
-        
-        StructureChain(VM&, Structure*);
-        OwnArrayPtr<WriteBarrier<Structure> > m_vector;
-    };
+        m_vector = std::make_unique<WriteBarrier<Structure>[]>(size + 1);
+
+        size_t i = 0;
+        for (Structure* current = head; current; current = current->storedPrototype().isNull() ? 0 : asObject(current->storedPrototype())->structure())
+            m_vector[i++].set(vm, this, current);
+    }
+
+private:
+    friend class LLIntOffsetsExtractor;
+
+    StructureChain(VM&, Structure*);
+    std::unique_ptr<WriteBarrier<Structure>[]> m_vector;
+};
 
 } // namespace JSC
 

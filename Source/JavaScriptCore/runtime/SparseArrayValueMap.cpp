@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2012, 2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,7 +29,7 @@
 #include "ClassInfo.h"
 #include "GetterSetter.h"
 #include "JSObject.h"
-#include "Operations.h"
+#include "JSCInlines.h"
 #include "PropertySlot.h"
 #include "Reject.h"
 #include "SlotVisitor.h"
@@ -37,7 +37,7 @@
 
 namespace JSC {
 
-const ClassInfo SparseArrayValueMap::s_info = { "SparseArrayValueMap", 0, 0, 0, CREATE_METHOD_TABLE(SparseArrayValueMap) };
+const ClassInfo SparseArrayValueMap::s_info = { "SparseArrayValueMap", 0, 0, CREATE_METHOD_TABLE(SparseArrayValueMap) };
 
 SparseArrayValueMap::SparseArrayValueMap(VM& vm)
     : Base(vm, vm.sparseArrayValueMapStructure.get())
@@ -69,7 +69,7 @@ void SparseArrayValueMap::destroy(JSCell* cell)
 
 Structure* SparseArrayValueMap::createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype)
 {
-    return Structure::create(vm, globalObject, prototype, TypeInfo(CompoundType, StructureFlags), &s_info);
+    return Structure::create(vm, globalObject, prototype, TypeInfo(CellType, StructureFlags), info());
 }
 
 SparseArrayValueMap::AddResult SparseArrayValueMap::add(JSObject* array, unsigned i)
@@ -80,7 +80,9 @@ SparseArrayValueMap::AddResult SparseArrayValueMap::add(JSObject* array, unsigne
     AddResult result = m_map.add(i, entry);
     size_t capacity = m_map.capacity();
     if (capacity != m_reportedCapacity) {
-        Heap::heap(array)->reportExtraMemoryCost((capacity - m_reportedCapacity) * (sizeof(unsigned) + sizeof(WriteBarrier<Unknown>)));
+        // FIXME: Adopt reportExtraMemoryVisited, and switch to reportExtraMemoryAllocated.
+        // https://bugs.webkit.org/show_bug.cgi?id=142595
+        Heap::heap(array)->deprecatedReportExtraMemory((capacity - m_reportedCapacity) * (sizeof(unsigned) + sizeof(WriteBarrier<Unknown>)));
         m_reportedCapacity = capacity;
     }
     return result;
@@ -88,6 +90,8 @@ SparseArrayValueMap::AddResult SparseArrayValueMap::add(JSObject* array, unsigne
 
 void SparseArrayValueMap::putEntry(ExecState* exec, JSObject* array, unsigned i, JSValue value, bool shouldThrow)
 {
+    ASSERT(value);
+    
     AddResult result = add(array, i);
     SparseArrayEntry& entry = result.iterator->value;
 
@@ -106,6 +110,8 @@ void SparseArrayValueMap::putEntry(ExecState* exec, JSObject* array, unsigned i,
 
 bool SparseArrayValueMap::putDirect(ExecState* exec, JSObject* array, unsigned i, JSValue value, unsigned attributes, PutDirectIndexMode mode)
 {
+    ASSERT(value);
+    
     AddResult result = add(array, i);
     SparseArrayEntry& entry = result.iterator->value;
 
@@ -122,45 +128,22 @@ bool SparseArrayValueMap::putDirect(ExecState* exec, JSObject* array, unsigned i
     return true;
 }
 
-void SparseArrayEntry::get(PropertySlot& slot) const
+void SparseArrayEntry::get(JSObject* thisObject, PropertySlot& slot) const
 {
     JSValue value = Base::get();
     ASSERT(value);
 
     if (LIKELY(!value.isGetterSetter())) {
-        slot.setValue(value);
+        slot.setValue(thisObject, attributes, value);
         return;
     }
 
-    JSObject* getter = asGetterSetter(value)->getter();
-    if (!getter) {
-        slot.setUndefined();
-        return;
-    }
-
-    slot.setGetterSlot(getter);
+    slot.setGetterSlot(thisObject, attributes, jsCast<GetterSetter*>(value));
 }
 
 void SparseArrayEntry::get(PropertyDescriptor& descriptor) const
 {
     descriptor.setDescriptor(Base::get(), attributes);
-}
-
-JSValue SparseArrayEntry::get(ExecState* exec, JSObject* array) const
-{
-    JSValue result = Base::get();
-    ASSERT(result);
-
-    if (LIKELY(!result.isGetterSetter()))
-        return result;
-
-    JSObject* getter = asGetterSetter(result)->getter();
-    if (!getter)
-        return jsUndefined();
-
-    CallData callData;
-    CallType callType = getter->methodTable()->getCallData(getter, callData);
-    return call(exec, getter, callType, callData, array->methodTable()->toThisObject(array, exec), exec->emptyList());
 }
 
 void SparseArrayEntry::put(ExecState* exec, JSValue thisValue, SparseArrayValueMap* map, JSValue value, bool shouldThrow)
@@ -176,23 +159,7 @@ void SparseArrayEntry::put(ExecState* exec, JSValue thisValue, SparseArrayValueM
         return;
     }
 
-    JSValue accessor = Base::get();
-    ASSERT(accessor.isGetterSetter());
-    JSObject* setter = asGetterSetter(accessor)->setter();
-    
-    if (!setter) {
-        if (shouldThrow)
-            throwTypeError(exec, StrictModeReadonlyPropertyWriteError);
-        return;
-    }
-
-    CallData callData;
-    CallType callType = setter->methodTable()->getCallData(setter, callData);
-    MarkedArgumentBuffer args;
-    args.append(value);
-    if (thisValue.isObject())
-        thisValue = asObject(thisValue)->methodTable()->toThisObject(asObject(thisValue), exec);
-    call(exec, setter, callType, callData, thisValue, args);
+    callSetter(exec, thisValue, Base::get(), value, shouldThrow ? StrictMode : NotStrictMode);
 }
 
 JSValue SparseArrayEntry::getNonSparseMode() const

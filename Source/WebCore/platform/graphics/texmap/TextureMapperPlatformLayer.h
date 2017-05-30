@@ -20,6 +20,8 @@
 #ifndef TextureMapperPlatformLayer_h
 #define TextureMapperPlatformLayer_h
 
+#if USE(TEXTURE_MAPPER)
+
 #if USE(GRAPHICS_SURFACE)
 #include "GraphicsSurface.h"
 #endif
@@ -33,17 +35,17 @@ class TextureMapperPlatformLayer {
 public:
     class Client {
     public:
+        virtual void platformLayerWillBeDestroyed() = 0;
         virtual void setPlatformLayerNeedsDisplay() = 0;
-        virtual void platformLayerWasDestroyed() = 0;
     };
 
     TextureMapperPlatformLayer() : m_client(0) { }
     virtual ~TextureMapperPlatformLayer() { }
-    virtual void paintToTextureMapper(TextureMapper*, const FloatRect&, const TransformationMatrix& modelViewMatrix = TransformationMatrix(), float opacity = 1.0) = 0;
+    virtual void paintToTextureMapper(TextureMapper&, const FloatRect&, const TransformationMatrix& modelViewMatrix = TransformationMatrix(), float opacity = 1.0) = 0;
     virtual void swapBuffers() { }
-    virtual void drawBorder(TextureMapper* textureMapper, const Color& color, float borderWidth, const FloatRect& targetRect, const TransformationMatrix& transform)
+    virtual void drawBorder(TextureMapper& textureMapper, const Color& color, float borderWidth, const FloatRect& targetRect, const TransformationMatrix& transform)
     {
-        textureMapper->drawBorder(color, borderWidth, targetRect, transform);
+        textureMapper.drawBorder(color, borderWidth, targetRect, transform);
     }
     void setClient(TextureMapperPlatformLayer::Client* client)
     {
@@ -64,5 +66,7 @@ private:
 };
 
 };
+
+#endif // USE(TEXTURE_MAPPER)
 
 #endif // TextureMapperPlatformLayer_h

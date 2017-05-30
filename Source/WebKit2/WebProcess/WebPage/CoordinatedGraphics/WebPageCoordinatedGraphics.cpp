@@ -33,29 +33,33 @@
 #include "WebCoreArgumentCoders.h"
 #include "WebFrame.h"
 #include "WebPageProxyMessages.h"
+#include <WebCore/Document.h>
 #include <WebCore/EventHandler.h>
 #include <WebCore/Frame.h>
 #include <WebCore/FrameView.h>
+#include <WebCore/RenderObject.h>
 #include <WebCore/ScrollView.h>
 
 using namespace WebCore;
 
 namespace WebKit {
 
+#if USE(COORDINATED_GRAPHICS_MULTIPROCESS)
+
 #if ENABLE(TOUCH_ADJUSTMENT)
 void WebPage::findZoomableAreaForPoint(const IntPoint& point, const IntSize& area)
 {
     Node* node = 0;
     IntRect zoomableArea;
-    bool foundAreaForTouchPoint = m_mainFrame->coreFrame()->eventHandler()->bestZoomableAreaForTouchPoint(point, IntSize(area.width() / 2, area.height() / 2), zoomableArea, node);
+    bool foundAreaForTouchPoint = m_mainFrame->coreFrame()->eventHandler().bestZoomableAreaForTouchPoint(point, IntSize(area.width() / 2, area.height() / 2), zoomableArea, node);
 
     if (!foundAreaForTouchPoint)
         return;
 
     ASSERT(node);
 
-    if (node->document() && node->document()->view())
-        zoomableArea = node->document()->view()->contentsToWindow(zoomableArea);
+    if (node->document().view())
+        zoomableArea = node->document().view()->contentsToWindow(zoomableArea);
 
     send(Messages::WebPageProxy::DidFindZoomableArea(point, zoomableArea));
 }
@@ -65,14 +69,16 @@ void WebPage::findZoomableAreaForPoint(const IntPoint& point, const IntSize& are
 {
     UNUSED_PARAM(area);
     Frame* mainframe = m_mainFrame->coreFrame();
-    HitTestResult result = mainframe->eventHandler()->hitTestResultAtPoint(mainframe->view()->windowToContents(point), HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::IgnoreClipping | HitTestRequest::DisallowShadowContent);
+    HitTestResult result = mainframe->eventHandler().hitTestResultAtPoint(mainframe->view()->windowToContents(point), HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::IgnoreClipping | HitTestRequest::DisallowShadowContent);
 
     Node* node = result.innerNode();
 
     if (!node)
         return;
 
-    IntRect zoomableArea = node->pixelSnappedBoundingBox();
+    IntRect zoomableArea;
+    if (RenderObject* renderer = node->renderer())
+        zoomableArea = renderer->absoluteBoundingBoxRect();
 
     while (true) {
         bool found = !node->isTextNode() && !node->isShadowRoot();
@@ -82,22 +88,25 @@ void WebPage::findZoomableAreaForPoint(const IntPoint& point, const IntSize& are
             return;
 
         // Candidate found, and it is a better candidate than its parent.
-        // NB: A parent is considered a better candidate iff the node is
+        // NB: A parent is considered a better candidate if the node is
         // contained by it and it is the only child.
-        if (found && (!node->parentNode() || node->parentNode()->childNodeCount() != 1))
+        if (found && (!node->parentNode() || !node->parentNode()->hasOneChild()))
             break;
 
         node = node->parentNode();
-        zoomableArea.unite(node->pixelSnappedBoundingBox());
+        if (RenderObject* renderer = node->renderer())
+            zoomableArea.unite(renderer->absoluteBoundingBoxRect());
     }
 
-    if (node->document() && node->document()->frame() && node->document()->frame()->view()) {
-        const ScrollView* view = node->document()->frame()->view();
+    if (node->document().frame() && node->document().frame()->view()) {
+        const ScrollView* view = node->document().frame()->view();
         zoomableArea = view->contentsToWindow(zoomableArea);
     }
 
     send(Messages::WebPageProxy::DidFindZoomableArea(point, zoomableArea));
 }
+#endif // ENABLE(TOUCH_ADJUSTMENT)
+
 #endif
 
 } // namespace WebKit

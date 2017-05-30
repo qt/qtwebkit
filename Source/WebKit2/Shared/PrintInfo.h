@@ -26,18 +26,18 @@
 #ifndef PrintInfo_h
 #define PrintInfo_h
 
-#if PLATFORM(MAC)
+#if USE(APPKIT)
 OBJC_CLASS NSPrintInfo;
 #elif PLATFORM(GTK)
 typedef struct _GtkPrintSettings GtkPrintSettings;
 typedef struct _GtkPageSetup GtkPageSetup;
-#include <wtf/gobject/GRefPtr.h>
+#include <wtf/glib/GRefPtr.h>
 #else
 // FIXME: This should use the windows equivalent.
 class NSPrintInfo;
 #endif
 
-namespace CoreIPC {
+namespace IPC {
     class ArgumentDecoder;
     class ArgumentEncoder;
 }
@@ -47,7 +47,12 @@ namespace WebKit {
 struct PrintInfo {
     PrintInfo();
 #if PLATFORM(GTK)
-    explicit PrintInfo(GtkPrintSettings*, GtkPageSetup*);
+    enum PrintMode {
+        PrintModeAsync,
+        PrintModeSync
+    };
+
+    explicit PrintInfo(GtkPrintSettings*, GtkPageSetup*, PrintMode = PrintModeAsync);
 #else
     explicit PrintInfo(NSPrintInfo *);
 #endif
@@ -59,10 +64,11 @@ struct PrintInfo {
 #if PLATFORM(GTK)
     GRefPtr<GtkPrintSettings> printSettings;
     GRefPtr<GtkPageSetup> pageSetup;
+    PrintMode printMode;
 #endif
 
-    void encode(CoreIPC::ArgumentEncoder&) const;
-    static bool decode(CoreIPC::ArgumentDecoder&, PrintInfo&);
+    void encode(IPC::ArgumentEncoder&) const;
+    static bool decode(IPC::ArgumentDecoder&, PrintInfo&);
 };
 
 }

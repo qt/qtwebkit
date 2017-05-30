@@ -3,7 +3,7 @@
  * Copyright (C) 2008 Holger Hans Peter Freyther
  * Copyright (C) 2009 Dirk Schulze <krit@webkit.org>
  * Copyright (C) 2010 Torch Mobile (Beijing) Co. Ltd. All rights reserved.
- * Copyright (C) 2015 The Qt Company Ltd
+ * Copyright (C) 2014 Digia Plc. and/or its subsidiary(-ies)
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,9 +32,12 @@
 
 #include "GraphicsContext.h"
 #include "ImageData.h"
+#include "IntRect.h"
 #include "MIMETypeRegistry.h"
 #include "StillImageQt.h"
 #include "TransparencyLayer.h"
+#include <runtime/JSCInlines.h>
+#include <runtime/TypedArrayInlines.h>
 #include <wtf/text/CString.h>
 #include <wtf/text/WTFString.h>
 
@@ -57,12 +60,12 @@ ImageBuffer::ImageBuffer(const IntSize& size, float /* resolutionScale */, Color
     if (!success)
         return;
 
-    m_context = adoptPtr(new GraphicsContext(m_data.m_painter));
+    m_data.m_context = std::make_unique<GraphicsContext>(m_data.m_painter);
 }
 #endif
 
-ImageBuffer::ImageBuffer(const IntSize& size, float /* resolutionScale */, ColorSpace, RenderingMode /*renderingMode*/, bool& success)
-    : m_data(size)
+ImageBuffer::ImageBuffer(const FloatSize& size, float /* resolutionScale */, ColorSpace, RenderingMode /*renderingMode*/, bool& success)
+    : m_data(IntSize(size))
     , m_size(size)
     , m_logicalSize(size)
 {
@@ -70,7 +73,7 @@ ImageBuffer::ImageBuffer(const IntSize& size, float /* resolutionScale */, Color
     if (!success)
         return;
 
-    m_context = adoptPtr(new GraphicsContext(m_data.m_painter));
+    m_data.m_context = std::make_unique<GraphicsContext>(m_data.m_painter);
 }
 
 ImageBuffer::~ImageBuffer()
@@ -78,24 +81,24 @@ ImageBuffer::~ImageBuffer()
 }
 
 #if ENABLE(ACCELERATED_2D_CANVAS)
-PassOwnPtr<ImageBuffer> ImageBuffer::createCompatibleBuffer(const IntSize& size, float resolutionScale, ColorSpace colorSpace, QOpenGLContext* context)
+std::unique_ptr<ImageBuffer> ImageBuffer::createCompatibleBuffer(const IntSize& size, float resolutionScale, ColorSpace colorSpace, QOpenGLContext* context)
 {
     bool success = false;
-    OwnPtr<ImageBuffer> buf = adoptPtr(new ImageBuffer(size, resolutionScale, colorSpace, context, success));
+    std::unique_ptr<ImageBuffer> buf(new ImageBuffer(size, resolutionScale, colorSpace, context, success));
     if (!success)
         return nullptr;
-    return buf.release();
+    return buf;
 }
 #endif
 
-GraphicsContext* ImageBuffer::context() const
+GraphicsContext& ImageBuffer::context() const
 {
     ASSERT(m_data.m_painter->isActive());
 
-    return m_context.get();
+    return *m_data.m_context;
 }
 
-PassRefPtr<Image> ImageBuffer::copyImage(BackingStoreCopy copyBehavior, ScaleBehavior) const
+RefPtr<Image> ImageBuffer::copyImage(BackingStoreCopy copyBehavior, ScaleBehavior) const
 {
     if (copyBehavior == CopyBackingStore)
         return m_data.m_impl->copyImage();
@@ -103,26 +106,31 @@ PassRefPtr<Image> ImageBuffer::copyImage(BackingStoreCopy copyBehavior, ScaleBeh
     return m_data.m_impl->image();
 }
 
+RefPtr<Image> ImageBuffer::sinkIntoImage(std::unique_ptr<ImageBuffer> imageBuffer, ScaleBehavior)
+{
+    return imageBuffer->m_data.m_impl->takeImage();
+}
+
 BackingStoreCopy ImageBuffer::fastCopyImageMode()
 {
     return DontCopyBackingStore;
 }
 
-void ImageBuffer::draw(GraphicsContext* destContext, ColorSpace styleColorSpace, const FloatRect& destRect, const FloatRect& srcRect,
-                       CompositeOperator op, BlendMode blendMode, bool useLowQualityScale)
+void ImageBuffer::drawConsuming(std::unique_ptr<ImageBuffer> imageBuffer, GraphicsContext& destContext, const FloatRect& destRect, const FloatRect& srcRect, CompositeOperator op, BlendMode blendMode)
 {
-    m_data.m_impl->draw(destContext, styleColorSpace, destRect, srcRect, op, blendMode, useLowQualityScale, destContext == context());
+    imageBuffer->draw(destContext, destRect, srcRect, op, blendMode);
 }
 
-void ImageBuffer::drawPattern(GraphicsContext* destContext, const FloatRect& srcRect, const AffineTransform& patternTransform,
-                              const FloatPoint& phase, ColorSpace styleColorSpace, CompositeOperator op, const FloatRect& destRect)
+void ImageBuffer::draw(GraphicsContext& destContext, const FloatRect& destRect, const FloatRect& srcRect,
+    CompositeOperator op, BlendMode blendMode)
 {
-    m_data.m_impl->drawPattern(destContext, srcRect, patternTransform, phase, styleColorSpace, op, destRect, destContext == context());
+    m_data.m_impl->draw(destContext, destRect, srcRect, op, blendMode, &destContext == &context());
 }
 
-void ImageBuffer::clip(GraphicsContext* context, const FloatRect& floatRect) const
+void ImageBuffer::drawPattern(GraphicsContext& destContext, const FloatRect& srcRect, const AffineTransform& patternTransform,
+                              const FloatPoint& phase, const FloatSize& spacing, CompositeOperator op, const FloatRect& destRect, BlendMode blendMode)
 {
-    m_data.m_impl->clip(context, floatRect);
+    m_data.m_impl->drawPattern(destContext, srcRect, patternTransform, phase, spacing, op, destRect, blendMode, &destContext == &context());
 }
 
 void ImageBuffer::platformTransformColorSpace(const Vector<int>& lookUpTable)
@@ -148,7 +156,7 @@ PassRefPtr<Uint8ClampedArray> getImageData(const IntRect& rect, const ImageBuffe
     // FIXME: This is inefficient for accelerated ImageBuffers when only part of the imageData is read.
     QPainter painter(&image);
     painter.setCompositionMode(QPainter::CompositionMode_Source);
-    painter.drawImage(QPoint(0,0), imageData.m_impl->toQImage(), rect);
+    painter.drawImage(QPoint(0, 0), imageData.m_impl->toQImage(), rect);
     painter.end();
 
     return result.release();

@@ -27,7 +27,6 @@
 #include "WebConnectionToWebProcess.h"
 
 #include "WebConnectionMessages.h"
-#include "WebContextUserMessageCoders.h"
 #include "WebProcessProxy.h"
 
 namespace WebKit {
@@ -40,25 +39,26 @@ PassRefPtr<WebConnectionToWebProcess> WebConnectionToWebProcess::create(WebProce
 WebConnectionToWebProcess::WebConnectionToWebProcess(WebProcessProxy* process)
     : m_process(process)
 {
-    m_process->addMessageReceiver(Messages::WebConnection::messageReceiverName(), this);
+    m_process->addMessageReceiver(Messages::WebConnection::messageReceiverName(), *this);
 }
 
 void WebConnectionToWebProcess::invalidate()
 {
+    m_process->removeMessageReceiver(Messages::WebConnection::messageReceiverName());
+
     m_process = 0;
 }
 
 // WebConnection
 
-void WebConnectionToWebProcess::encodeMessageBody(CoreIPC::ArgumentEncoder& encoder, APIObject* messageBody)
+RefPtr<API::Object> WebConnectionToWebProcess::transformHandlesToObjects(API::Object* object)
 {
-    encoder << WebContextUserMessageEncoder(messageBody);
+    return m_process->transformHandlesToObjects(object);
 }
 
-bool WebConnectionToWebProcess::decodeMessageBody(CoreIPC::ArgumentDecoder& decoder, RefPtr<APIObject>& messageBody)
+RefPtr<API::Object> WebConnectionToWebProcess::transformObjectsToHandles(API::Object* object)
 {
-    WebContextUserMessageDecoder messageBodyDecoder(messageBody, m_process);
-    return decoder.decode(messageBodyDecoder);
+    return m_process->transformObjectsToHandles(object);
 }
 
 bool WebConnectionToWebProcess::hasValidConnection() const
@@ -66,7 +66,7 @@ bool WebConnectionToWebProcess::hasValidConnection() const
     return m_process;
 }
 
-CoreIPC::Connection* WebConnectionToWebProcess::messageSenderConnection()
+IPC::Connection* WebConnectionToWebProcess::messageSenderConnection()
 {
     return m_process->connection();
 }

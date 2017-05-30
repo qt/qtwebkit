@@ -30,10 +30,6 @@
 #include <QCursor>
 #endif
 
-#if USE(ACCELERATED_COMPOSITING)
-#include <GraphicsLayer.h>
-#endif
-
 #include <QPalette>
 #include <QRect>
 
@@ -56,12 +52,12 @@ public:
     virtual void scroll(int dx, int dy, const QRect&) = 0;
     virtual void update(const QRect&) = 0;
     virtual void repaintViewport() = 0;
-    virtual void setInputMethodEnabled(bool enable) = 0;
+    virtual void setInputMethodEnabled(bool) = 0;
     virtual bool inputMethodEnabled() const = 0;
     virtual bool makeOpenGLContextCurrentIfAvailable() { return false; }
     virtual QOpenGLContext* openGLContextIfAvailable() { return 0; }
 
-    virtual void setInputMethodHints(Qt::InputMethodHints hint) = 0;
+    virtual void setInputMethodHints(Qt::InputMethodHints) = 0;
     virtual bool isViewVisible() = 0;
 
 #ifndef QT_NO_CURSOR
@@ -104,7 +100,7 @@ public:
 protected:
 #ifndef QT_NO_CURSOR
     virtual QCursor cursor() const = 0;
-    virtual void updateCursor(const QCursor& cursor) = 0;
+    virtual void updateCursor(const QCursor&) = 0;
 #endif
 
 private:

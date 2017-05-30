@@ -10,13 +10,16 @@ false		FALSETOKEN
 break		BREAK
 case		CASE
 catch		CATCH
+class		CLASSTOKEN
 const		CONSTTOKEN
 default		DEFAULT
+extends	EXTENDS
 finally		FINALLY
 for		FOR
 instanceof	INSTANCEOF
 new		NEW
 var		VAR
+let		LET
 continue	CONTINUE
 function	FUNCTION
 return		RETURN
@@ -28,30 +31,27 @@ do		DO
 while		WHILE
 else		ELSE
 in		INTOKEN
+super		SUPER
 switch		SWITCH
 throw		THROW
 try		TRY
 typeof		TYPEOF
 with		WITH
 debugger	DEBUGGER
+yield	YIELD
 
 # Reserved for future use.
-class           RESERVED
 enum            RESERVED
-export          RESERVED
-extends         RESERVED
-import          RESERVED
-super           RESERVED
+export          EXPORT
+import          IMPORT
 
 # Reserved for future use in strict code.
 implements      RESERVED_IF_STRICT
 interface       RESERVED_IF_STRICT
-let             RESERVED_IF_STRICT
 package         RESERVED_IF_STRICT
 private         RESERVED_IF_STRICT
 protected       RESERVED_IF_STRICT
 public          RESERVED_IF_STRICT
 static          RESERVED_IF_STRICT
-yield           RESERVED_IF_STRICT
 
 @end

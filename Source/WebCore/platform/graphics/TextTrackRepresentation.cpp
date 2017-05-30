@@ -29,23 +29,27 @@
 
 #include "TextTrackRepresentation.h"
 
+#include "IntRect.h"
+
 namespace WebCore {
 
 class NullTextTrackRepresentation : public TextTrackRepresentation {
 public:
     virtual ~NullTextTrackRepresentation() { }
     virtual void update() { }
-#if USE(ACCELERATED_COMPOSITING)
-    virtual PlatformLayer* platformLayer() { return 0; }
-#endif
+    virtual PlatformLayer* platformLayer() { return nullptr; }
     virtual void setContentScale(float) { }
     virtual IntRect bounds() const { return IntRect(); }
 };
 
-PassOwnPtr<TextTrackRepresentation> TextTrackRepresentation::create(TextTrackRepresentationClient*)
+#if !PLATFORM(IOS)
+
+std::unique_ptr<TextTrackRepresentation> TextTrackRepresentation::create(TextTrackRepresentationClient&)
 {
-    return WTF::adoptPtr(new NullTextTrackRepresentation());
+    return std::make_unique<NullTextTrackRepresentation>();
 }
+
+#endif
 
 }
 

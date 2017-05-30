@@ -21,7 +21,6 @@
 
 interface HTMLTextAreaElement : HTMLElement {
     [Reflect] attribute boolean autofocus;
-    attribute long cols;
     [Reflect] attribute DOMString dirName;
     [Reflect] attribute boolean disabled;
     readonly attribute HTMLFormElement form;
@@ -30,11 +29,17 @@ interface HTMLTextAreaElement : HTMLElement {
     [Reflect] attribute DOMString placeholder;
     [Reflect] attribute boolean readOnly;
     [Reflect] attribute boolean required;
+#if defined(LANGUAGE_OBJECTIVE_C) && LANGUAGE_OBJECTIVE_C || defined(LANGUAGE_GOBJECT) && LANGUAGE_GOBJECT
     attribute long rows;
+    attribute long cols;
+#else
+    attribute unsigned long rows;
+    attribute unsigned long cols;
+#endif
     [Reflect] attribute DOMString wrap;
 
     readonly attribute DOMString type;
-    [TreatNullAs=NullString] attribute DOMString defaultValue;
+    attribute DOMString defaultValue;
     [TreatNullAs=NullString] attribute DOMString value;
     readonly attribute unsigned long textLength;
 
@@ -65,7 +70,12 @@ interface HTMLTextAreaElement : HTMLElement {
                            optional DOMString direction);
 #endif
 
+    [Conditional=IOS_AUTOCORRECT_AND_AUTOCAPITALIZE] attribute boolean autocorrect;
+    [Conditional=IOS_AUTOCORRECT_AND_AUTOCAPITALIZE, TreatNullAs=NullString] attribute DOMString autocapitalize;
+
 #if defined(LANGUAGE_OBJECTIVE_C) && LANGUAGE_OBJECTIVE_C
     [Reflect] attribute DOMString accessKey;
 #endif
+
+    attribute DOMString autocomplete;
 };

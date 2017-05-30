@@ -37,19 +37,19 @@
 
 QT_BEGIN_NAMESPACE
 
-class WebKitQmlPlugin : public QQmlExtensionPlugin {
+class WebKitQmlPlugin final : public QQmlExtensionPlugin {
     Q_PLUGIN_METADATA(IID QQmlExtensionInterface_iid FILE "plugin.json")
     Q_OBJECT
 public:
 #if defined(HAVE_WEBKIT2)
-    virtual void initializeEngine(QQmlEngine* engine, const char* uri)
+    void initializeEngine(QQmlEngine* engine, const char* uri) final
     {
         Q_UNUSED(uri);
         engine->addImageProvider(QLatin1String("webicon"), new QWebIconImageProvider);
     }
 #endif
 
-    virtual void registerTypes(const char* uri)
+    void registerTypes(const char* uri) final
     {
         Q_ASSERT(QLatin1String(uri) == QLatin1String("QtWebKit"));
 
@@ -57,7 +57,7 @@ public:
         qmlRegisterType<QQuickWebView>(uri, 3, 0, "WebView");
         qmlRegisterUncreatableType<QQuickWebPage>(uri, 3, 0, "WebPage", QObject::tr("Cannot create separate instance of WebPage, use WebView"));
         qmlRegisterUncreatableType<QNetworkReply>(uri, 3, 0, "NetworkReply", QObject::tr("Cannot create separate instance of NetworkReply"));
-        qmlRegisterUncreatableType<QWebNavigationRequest>(uri, 3, 0, "NavigationRequest", QObject::tr("Cannot create separate instance of NavigationRequest"));
+        qmlRegisterUncreatableType<QWebNavigationRequest, 1>(uri, 3, 1, "NavigationRequest", QObject::tr("Cannot create separate instance of NavigationRequest"));
         qmlRegisterUncreatableType<QWebLoadRequest>(uri, 3, 0, "WebLoadRequest", QObject::tr("Cannot create separate instance of WebLoadRequest"));
 #endif
     }

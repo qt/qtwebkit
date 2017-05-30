@@ -29,71 +29,88 @@
 #include "CacheModel.h"
 #include "SandboxExtension.h"
 #include "TextCheckerState.h"
+#include "UserData.h"
+#include <WebCore/SessionID.h>
 #include <wtf/RetainPtr.h>
 #include <wtf/Vector.h>
 #include <wtf/text/StringHash.h>
 #include <wtf/text/WTFString.h>
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
 #include "MachPort.h"
+#include <WebCore/MachSendRight.h>
 #endif
 
 #if USE(SOUP)
 #include "HTTPCookieAcceptPolicy.h"
 #endif
 
-namespace CoreIPC {
-    class ArgumentDecoder;
-    class ArgumentEncoder;
+namespace API {
+class Data;
+}
+
+namespace IPC {
+class ArgumentDecoder;
+class ArgumentEncoder;
 }
 
 namespace WebKit {
 
 struct WebProcessCreationParameters {
     WebProcessCreationParameters();
+    ~WebProcessCreationParameters();
 
-    void encode(CoreIPC::ArgumentEncoder&) const;
-    static bool decode(CoreIPC::ArgumentDecoder&, WebProcessCreationParameters&);
+    void encode(IPC::ArgumentEncoder&) const;
+    static bool decode(IPC::ArgumentDecoder&, WebProcessCreationParameters&);
 
     String injectedBundlePath;
     SandboxExtension::Handle injectedBundlePathExtensionHandle;
 
+    UserData initializationUserData;
+
     String applicationCacheDirectory;    
     SandboxExtension::Handle applicationCacheDirectoryExtensionHandle;
-    String databaseDirectory;
-    SandboxExtension::Handle databaseDirectoryExtensionHandle;
-    String localStorageDirectory;
-    SandboxExtension::Handle localStorageDirectoryExtensionHandle;
-    String diskCacheDirectory;
-    SandboxExtension::Handle diskCacheDirectoryExtensionHandle;
+    String webSQLDatabaseDirectory;
+    SandboxExtension::Handle webSQLDatabaseDirectoryExtensionHandle;
+#if ENABLE(SECCOMP_FILTERS)
     String cookieStorageDirectory;
+#endif
+#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101100
+    Vector<uint8_t> uiProcessCookieStorageIdentifier;
+#endif
+#if PLATFORM(IOS)
     SandboxExtension::Handle cookieStorageDirectoryExtensionHandle;
+    SandboxExtension::Handle containerCachesDirectoryExtensionHandle;
+    SandboxExtension::Handle containerTemporaryDirectoryExtensionHandle;
+#endif
+    SandboxExtension::Handle mediaKeyStorageDirectoryExtensionHandle;
+    String mediaKeyStorageDirectory;
 
-    Vector<String> urlSchemesRegistererdAsEmptyDocument;
+    bool shouldUseTestingNetworkSession;
+
+    Vector<String> urlSchemesRegisteredAsEmptyDocument;
     Vector<String> urlSchemesRegisteredAsSecure;
+    Vector<String> urlSchemesRegisteredAsBypassingContentSecurityPolicy;
     Vector<String> urlSchemesForWhichDomainRelaxationIsForbidden;
     Vector<String> urlSchemesRegisteredAsLocal;
     Vector<String> urlSchemesRegisteredAsNoAccess;
     Vector<String> urlSchemesRegisteredAsDisplayIsolated;
     Vector<String> urlSchemesRegisteredAsCORSEnabled;
-#if ENABLE(CUSTOM_PROTOCOLS)
-    Vector<String> urlSchemesRegisteredForCustomProtocols;
-#endif
-#if USE(SOUP)
-    Vector<String> urlSchemesRegistered;
-    String cookiePersistentStoragePath;
-    uint32_t cookiePersistentStorageType;
-    HTTPCookieAcceptPolicy cookieAcceptPolicy;
-    bool ignoreTLSErrors;
+    Vector<String> urlSchemesRegisteredAsAlwaysRevalidated;
+#if ENABLE(CACHE_PARTITIONING)
+    Vector<String> urlSchemesRegisteredAsCachePartitioned;
 #endif
 
     CacheModel cacheModel;
-    bool shouldTrackVisitedLinks;
 
     bool shouldAlwaysUseComplexTextCodePath;
+    bool shouldEnableMemoryPressureReliefLogging;
     bool shouldUseFontSmoothing;
 
+    Vector<String> fontWhitelist;
+
     bool iconDatabaseEnabled;
+    bool shouldRewriteConstAsVar { false };
 
     double terminationTimeout;
 
@@ -105,35 +122,53 @@ struct WebProcessCreationParameters {
 
     double defaultRequestTimeoutInterval;
 
-#if PLATFORM(MAC) || USE(CFNETWORK)
+#if PLATFORM(COCOA) || USE(CFNETWORK)
     String uiProcessBundleIdentifier;
 #endif
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     pid_t presenterApplicationPid;
 
-    uint64_t nsURLCacheMemoryCapacity;
-    uint64_t nsURLCacheDiskCapacity;
+    bool accessibilityEnhancedUserInterfaceEnabled;
 
-    CoreIPC::MachPort acceleratedCompositingPort;
+    WebCore::MachSendRight acceleratedCompositingPort;
 
     String uiProcessBundleResourcePath;
     SandboxExtension::Handle uiProcessBundleResourcePathExtensionHandle;
 
-    bool shouldForceScreenFontSubstitution;
-    bool shouldEnableKerningAndLigaturesByDefault;
-#endif // PLATFORM(MAC)
+    bool shouldEnableJIT;
+    bool shouldEnableFTLJIT;
+    
+    RefPtr<API::Data> bundleParameterData;
+
+#endif // PLATFORM(COCOA)
+
+#if PLATFORM(MAC)
+    bool shouldEnableTabSuspension;
+#endif
 
 #if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
     HashMap<String, bool> notificationPermissions;
 #endif
 
-#if ENABLE(NETWORK_PROCESS)
-    bool usesNetworkProcess;
+    HashMap<WebCore::SessionID, HashMap<unsigned, double>> plugInAutoStartOriginHashes;
+    Vector<String> plugInAutoStartOrigins;
+
+    bool memoryCacheDisabled;
+
+#if ENABLE(SERVICE_CONTROLS)
+    bool hasImageServices;
+    bool hasSelectionServices;
+    bool hasRichContentServices;
 #endif
 
-    HashMap<unsigned, double> plugInAutoStartOriginHashes;
-    Vector<String> plugInAutoStartOrigins;
+#if ENABLE(NETSCAPE_PLUGIN_API)
+    HashMap<String, HashMap<String, HashMap<String, uint8_t>>> pluginLoadClientPolicies;
+#endif
+
+#if TARGET_OS_IPHONE || (PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101100)
+    RetainPtr<CFDataRef> networkATSContext;
+#endif
 };
 
 } // namespace WebKit

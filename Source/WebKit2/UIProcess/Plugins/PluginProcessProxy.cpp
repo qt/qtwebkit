@@ -26,22 +26,17 @@
 #include "config.h"
 #include "PluginProcessProxy.h"
 
-#if ENABLE(PLUGIN_PROCESS)
+#if ENABLE(NETSCAPE_PLUGIN_API)
 
 #include "PluginProcessConnectionManagerMessages.h"
 #include "PluginProcessCreationParameters.h"
 #include "PluginProcessManager.h"
 #include "PluginProcessMessages.h"
-#include "WebContext.h"
 #include "WebCoreArgumentCoders.h"
-#include "WebPluginSiteDataManager.h"
+#include "WebProcessPool.h"
 #include "WebProcessProxy.h"
 #include <WebCore/NotImplemented.h>
-#include <WebCore/RunLoop.h>
-
-#if PLATFORM(MAC)
-#include "MachPort.h"
-#endif
+#include <wtf/RunLoop.h>
 
 using namespace WebCore;
 
@@ -53,9 +48,16 @@ static const double snapshottingMinimumLifetime = 30;
 static const double shutdownTimeout = 1 * 60;
 static const double snapshottingShutdownTimeout = 15;
 
-PassRefPtr<PluginProcessProxy> PluginProcessProxy::create(PluginProcessManager* PluginProcessManager, const PluginProcessAttributes& pluginProcessAttributes, uint64_t pluginProcessToken)
+static uint64_t generateCallbackID()
 {
-    return adoptRef(new PluginProcessProxy(PluginProcessManager, pluginProcessAttributes, pluginProcessToken));
+    static uint64_t callbackID;
+
+    return ++callbackID;
+}
+
+Ref<PluginProcessProxy> PluginProcessProxy::create(PluginProcessManager* PluginProcessManager, const PluginProcessAttributes& pluginProcessAttributes, uint64_t pluginProcessToken)
+{
+    return adoptRef(*new PluginProcessProxy(PluginProcessManager, pluginProcessAttributes, pluginProcessToken));
 }
 
 PluginProcessProxy::PluginProcessProxy(PluginProcessManager* PluginProcessManager, const PluginProcessAttributes& pluginProcessAttributes, uint64_t pluginProcessToken)
@@ -63,7 +65,7 @@ PluginProcessProxy::PluginProcessProxy(PluginProcessManager* PluginProcessManage
     , m_pluginProcessAttributes(pluginProcessAttributes)
     , m_pluginProcessToken(pluginProcessToken)
     , m_numPendingConnectionRequests(0)
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     , m_modalWindowIsShowing(false)
     , m_fullscreenWindowIsShowing(false)
     , m_preFullscreenAppPresentationOptions(0)
@@ -74,12 +76,21 @@ PluginProcessProxy::PluginProcessProxy(PluginProcessManager* PluginProcessManage
 
 PluginProcessProxy::~PluginProcessProxy()
 {
+    ASSERT(m_pendingFetchWebsiteDataRequests.isEmpty());
+    ASSERT(m_pendingFetchWebsiteDataCallbacks.isEmpty());
+    ASSERT(m_pendingDeleteWebsiteDataRequests.isEmpty());
+    ASSERT(m_pendingDeleteWebsiteDataCallbacks.isEmpty());
 }
 
 void PluginProcessProxy::getLaunchOptions(ProcessLauncher::LaunchOptions& launchOptions)
 {
-    launchOptions.processType = ProcessLauncher::PluginProcess;
+    ChildProcessProxy::getLaunchOptions(launchOptions);
     platformGetLaunchOptions(launchOptions, m_pluginProcessAttributes);
+}
+
+void PluginProcessProxy::processWillShutDown(IPC::Connection& connection)
+{
+    ASSERT_UNUSED(connection, this->connection() == &connection);
 }
 
 // Asks the plug-in process to create a new connection to a web process. The connection identifier will be 
@@ -88,47 +99,53 @@ void PluginProcessProxy::getPluginProcessConnection(PassRefPtr<Messages::WebProc
 {
     m_pendingConnectionReplies.append(reply);
 
-    if (isLaunching()) {
+    if (state() == State::Launching) {
         m_numPendingConnectionRequests++;
         return;
     }
     
     // Ask the plug-in process to create a connection. Since the plug-in can be waiting for a synchronous reply
     // we need to make sure that this message is always processed, even when the plug-in is waiting for a synchronus reply.
-    m_connection->send(Messages::PluginProcess::CreateWebProcessConnection(), 0, CoreIPC::DispatchMessageEvenWhenWaitingForSyncReply);
+    m_connection->send(Messages::PluginProcess::CreateWebProcessConnection(), 0, IPC::DispatchMessageEvenWhenWaitingForSyncReply);
 }
 
-void PluginProcessProxy::getSitesWithData(WebPluginSiteDataManager* webPluginSiteDataManager, uint64_t callbackID)
+void PluginProcessProxy::fetchWebsiteData(std::function<void (Vector<String>)> completionHandler)
 {
-    ASSERT(!m_pendingGetSitesReplies.contains(callbackID));
-    m_pendingGetSitesReplies.set(callbackID, webPluginSiteDataManager);
+    uint64_t callbackID = generateCallbackID();
+    m_pendingFetchWebsiteDataCallbacks.set(callbackID, WTFMove(completionHandler));
 
-    if (isLaunching()) {
-        m_pendingGetSitesRequests.append(callbackID);
+    if (state() == State::Launching) {
+        m_pendingFetchWebsiteDataRequests.append(callbackID);
         return;
     }
 
-    // Ask the plug-in process for the sites with data.
     m_connection->send(Messages::PluginProcess::GetSitesWithData(callbackID), 0);
 }
 
-void PluginProcessProxy::clearSiteData(WebPluginSiteDataManager* webPluginSiteDataManager, const Vector<String>& sites, uint64_t flags, uint64_t maxAgeInSeconds, uint64_t callbackID)
+void PluginProcessProxy::deleteWebsiteData(std::chrono::system_clock::time_point modifiedSince, std::function<void ()> completionHandler)
 {
-    ASSERT(!m_pendingClearSiteDataReplies.contains(callbackID));
-    m_pendingClearSiteDataReplies.set(callbackID, webPluginSiteDataManager);
+    uint64_t callbackID = generateCallbackID();
+    m_pendingDeleteWebsiteDataCallbacks.set(callbackID, WTFMove(completionHandler));
 
-    if (isLaunching()) {
-        ClearSiteDataRequest request;
-        request.sites = sites;
-        request.flags = flags;
-        request.maxAgeInSeconds = maxAgeInSeconds;
-        request.callbackID = callbackID;
-        m_pendingClearSiteDataRequests.append(request);
+    if (state() == State::Launching) {
+        m_pendingDeleteWebsiteDataRequests.append({ modifiedSince, callbackID });
         return;
     }
 
-    // Ask the plug-in process to clear the site data.
-    m_connection->send(Messages::PluginProcess::ClearSiteData(sites, flags, maxAgeInSeconds, callbackID), 0);
+    m_connection->send(Messages::PluginProcess::DeleteWebsiteData(modifiedSince, callbackID), 0);
+}
+
+void PluginProcessProxy::deleteWebsiteDataForHostNames(const Vector<String>& hostNames, std::function<void ()> completionHandler)
+{
+    uint64_t callbackID = generateCallbackID();
+    m_pendingDeleteWebsiteDataForHostNamesCallbacks.set(callbackID, WTFMove(completionHandler));
+
+    if (state() == State::Launching) {
+        m_pendingDeleteWebsiteDataForHostNamesRequests.append({ hostNames, callbackID });
+        return;
+    }
+
+    m_connection->send(Messages::PluginProcess::DeleteWebsiteDataForHostNames(hostNames, callbackID), 0);
 }
 
 void PluginProcessProxy::pluginProcessCrashedOrFailedToLaunch()
@@ -137,28 +154,37 @@ void PluginProcessProxy::pluginProcessCrashedOrFailedToLaunch()
     while (!m_pendingConnectionReplies.isEmpty()) {
         RefPtr<Messages::WebProcessProxy::GetPluginProcessConnection::DelayedReply> reply = m_pendingConnectionReplies.takeFirst();
 
-#if PLATFORM(MAC)
-        reply->send(CoreIPC::Attachment(0, MACH_MSG_TYPE_MOVE_SEND), false);
-#elif USE(UNIX_DOMAIN_SOCKETS)
-        reply->send(CoreIPC::Attachment(), false);
+#if USE(UNIX_DOMAIN_SOCKETS)
+        reply->send(IPC::Attachment(), false);
+#elif OS(DARWIN)
+        reply->send(IPC::Attachment(0, MACH_MSG_TYPE_MOVE_SEND), false);
 #else
         notImplemented();
 #endif
     }
 
-    while (!m_pendingGetSitesReplies.isEmpty())
-        didGetSitesWithData(Vector<String>(), m_pendingGetSitesReplies.begin()->key);
+    m_pendingFetchWebsiteDataRequests.clear();
+    for (const auto& callback : m_pendingFetchWebsiteDataCallbacks.values())
+        callback({ });
+    m_pendingFetchWebsiteDataCallbacks.clear();
 
-    while (!m_pendingClearSiteDataReplies.isEmpty())
-        didClearSiteData(m_pendingClearSiteDataReplies.begin()->key);
+    m_pendingDeleteWebsiteDataRequests.clear();
+    for (const auto& callback : m_pendingDeleteWebsiteDataCallbacks.values())
+        callback();
+    m_pendingDeleteWebsiteDataRequests.clear();
+
+    m_pendingDeleteWebsiteDataForHostNamesRequests.clear();
+    for (const auto& callback : m_pendingDeleteWebsiteDataForHostNamesCallbacks.values())
+        callback();
+    m_pendingDeleteWebsiteDataForHostNamesCallbacks.clear();
 
     // Tell the plug-in process manager to forget about this plug-in process proxy. This may cause us to be deleted.
     m_pluginProcessManager->removePluginProcessProxy(this);
 }
 
-void PluginProcessProxy::didClose(CoreIPC::Connection*)
+void PluginProcessProxy::didClose(IPC::Connection&)
 {
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     if (m_modalWindowIsShowing)
         endModal();
 
@@ -166,31 +192,31 @@ void PluginProcessProxy::didClose(CoreIPC::Connection*)
         exitFullscreen();
 #endif
 
-    const Vector<WebContext*>& contexts = WebContext::allContexts();
-    for (size_t i = 0; i < contexts.size(); ++i)
-        contexts[i]->sendToAllProcesses(Messages::PluginProcessConnectionManager::PluginProcessCrashed(m_pluginProcessToken));
+    const Vector<WebProcessPool*>& processPools = WebProcessPool::allProcessPools();
+    for (size_t i = 0; i < processPools.size(); ++i)
+        processPools[i]->sendToAllProcesses(Messages::PluginProcessConnectionManager::PluginProcessCrashed(m_pluginProcessToken));
 
     // This will cause us to be deleted.
     pluginProcessCrashedOrFailedToLaunch();
 }
 
-void PluginProcessProxy::didReceiveInvalidMessage(CoreIPC::Connection*, CoreIPC::StringReference, CoreIPC::StringReference)
+void PluginProcessProxy::didReceiveInvalidMessage(IPC::Connection&, IPC::StringReference, IPC::StringReference)
 {
 }
 
-void PluginProcessProxy::didFinishLaunching(ProcessLauncher*, CoreIPC::Connection::Identifier connectionIdentifier)
+void PluginProcessProxy::didFinishLaunching(ProcessLauncher*, IPC::Connection::Identifier connectionIdentifier)
 {
     ASSERT(!m_connection);
 
-    if (CoreIPC::Connection::identifierIsNull(connectionIdentifier)) {
+    if (IPC::Connection::identifierIsNull(connectionIdentifier)) {
         pluginProcessCrashedOrFailedToLaunch();
         return;
     }
 
-    m_connection = CoreIPC::Connection::createServerConnection(connectionIdentifier, this, RunLoop::main());
-#if PLATFORM(MAC)
+    m_connection = IPC::Connection::createServerConnection(connectionIdentifier, *this);
+#if (PLATFORM(MAC) || PLATFORM(QT) && USE(MACH_PORTS)) && __MAC_OS_X_VERSION_MIN_REQUIRED <= 101000
     m_connection->setShouldCloseConnectionOnMachExceptions();
-#elif PLATFORM(QT)
+#elif PLATFORM(QT) && USE(UNIX_DOMAIN_SOCKETS)
     m_connection->setShouldCloseConnectionOnProcessTermination(processIdentifier());
 #endif
 
@@ -210,39 +236,44 @@ void PluginProcessProxy::didFinishLaunching(ProcessLauncher*, CoreIPC::Connectio
     // Initialize the plug-in host process.
     m_connection->send(Messages::PluginProcess::InitializePluginProcess(parameters), 0);
 
-    // Send all our pending requests.
-    for (size_t i = 0; i < m_pendingGetSitesRequests.size(); ++i)
-        m_connection->send(Messages::PluginProcess::GetSitesWithData(m_pendingGetSitesRequests[i]), 0);
-    m_pendingGetSitesRequests.clear();
+#if PLATFORM(COCOA)
+    m_connection->send(Messages::PluginProcess::SetQOS(pluginProcessLatencyQOS(), pluginProcessThroughputQOS()), 0);
+#endif
 
-    for (size_t i = 0; i < m_pendingClearSiteDataRequests.size(); ++i) {
-        const ClearSiteDataRequest& request = m_pendingClearSiteDataRequests[i];
-        m_connection->send(Messages::PluginProcess::ClearSiteData(request.sites, request.flags, request.maxAgeInSeconds, request.callbackID), 0);
-    }
-    m_pendingClearSiteDataRequests.clear();
+    for (auto callbackID : m_pendingFetchWebsiteDataRequests)
+        m_connection->send(Messages::PluginProcess::GetSitesWithData(callbackID), 0);
+    m_pendingFetchWebsiteDataRequests.clear();
+
+    for (auto& request : m_pendingDeleteWebsiteDataRequests)
+        m_connection->send(Messages::PluginProcess::DeleteWebsiteData(request.modifiedSince, request.callbackID), 0);
+    m_pendingDeleteWebsiteDataRequests.clear();
+
+    for (auto& request : m_pendingDeleteWebsiteDataForHostNamesRequests)
+        m_connection->send(Messages::PluginProcess::DeleteWebsiteDataForHostNames(request.hostNames, request.callbackID), 0);
+    m_pendingDeleteWebsiteDataForHostNamesRequests.clear();
 
     for (unsigned i = 0; i < m_numPendingConnectionRequests; ++i)
         m_connection->send(Messages::PluginProcess::CreateWebProcessConnection(), 0);
     
     m_numPendingConnectionRequests = 0;
 
-#if PLATFORM(MAC)
-    if (WebContext::canEnableProcessSuppressionForGlobalChildProcesses())
+#if PLATFORM(COCOA)
+    if (!PluginProcessManager::singleton().processSuppressionDisabled())
         setProcessSuppressionEnabled(true);
 #endif
 }
 
-void PluginProcessProxy::didCreateWebProcessConnection(const CoreIPC::Attachment& connectionIdentifier, bool supportsAsynchronousPluginInitialization)
+void PluginProcessProxy::didCreateWebProcessConnection(const IPC::Attachment& connectionIdentifier, bool supportsAsynchronousPluginInitialization)
 {
     ASSERT(!m_pendingConnectionReplies.isEmpty());
 
     // Grab the first pending connection reply.
     RefPtr<Messages::WebProcessProxy::GetPluginProcessConnection::DelayedReply> reply = m_pendingConnectionReplies.takeFirst();
 
-#if PLATFORM(MAC)
-    reply->send(CoreIPC::Attachment(connectionIdentifier.port(), MACH_MSG_TYPE_MOVE_SEND), supportsAsynchronousPluginInitialization);
-#elif USE(UNIX_DOMAIN_SOCKETS)
+#if USE(UNIX_DOMAIN_SOCKETS)
     reply->send(connectionIdentifier, supportsAsynchronousPluginInitialization);
+#elif OS(DARWIN)
+    reply->send(IPC::Attachment(connectionIdentifier.port(), MACH_MSG_TYPE_MOVE_SEND), supportsAsynchronousPluginInitialization);
 #else
     notImplemented();
 #endif
@@ -250,20 +281,22 @@ void PluginProcessProxy::didCreateWebProcessConnection(const CoreIPC::Attachment
 
 void PluginProcessProxy::didGetSitesWithData(const Vector<String>& sites, uint64_t callbackID)
 {
-    RefPtr<WebPluginSiteDataManager> webPluginSiteDataManager = m_pendingGetSitesReplies.take(callbackID);
-    ASSERT(webPluginSiteDataManager);
-
-    webPluginSiteDataManager->didGetSitesWithDataForSinglePlugin(sites, callbackID);
+    auto callback = m_pendingFetchWebsiteDataCallbacks.take(callbackID);
+    callback(sites);
 }
 
-void PluginProcessProxy::didClearSiteData(uint64_t callbackID)
+void PluginProcessProxy::didDeleteWebsiteData(uint64_t callbackID)
 {
-    RefPtr<WebPluginSiteDataManager> webPluginSiteDataManager = m_pendingClearSiteDataReplies.take(callbackID);
-    ASSERT(webPluginSiteDataManager);
-    
-    webPluginSiteDataManager->didClearSiteDataForSinglePlugin(callbackID);
+    auto callback = m_pendingDeleteWebsiteDataCallbacks.take(callbackID);
+    callback();
+}
+
+void PluginProcessProxy::didDeleteWebsiteDataForHostNames(uint64_t callbackID)
+{
+    auto callback = m_pendingDeleteWebsiteDataForHostNamesCallbacks.take(callbackID);
+    callback();
 }
 
 } // namespace WebKit
 
-#endif // ENABLE(PLUGIN_PROCESS)
+#endif // ENABLE(NETSCAPE_PLUGIN_API)

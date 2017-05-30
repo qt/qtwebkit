@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Apple Inc. All rights reserved.
+ * Copyright (C) 2010, 2014, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,39 +26,75 @@
 #include "config.h"
 #include "WebInspectorClient.h"
 
-#if ENABLE(INSPECTOR)
-
+#include "DrawingArea.h"
 #include "WebInspector.h"
 #include "WebPage.h"
 #include <WebCore/InspectorController.h>
+#include <WebCore/MainFrame.h>
 #include <WebCore/Page.h>
+#include <WebCore/PageOverlayController.h>
+#include <wtf/CurrentTime.h>
+
+#if PLATFORM(IOS)
+#include <WebCore/InspectorOverlay.h>
+#endif
 
 using namespace WebCore;
 
 namespace WebKit {
 
-void WebInspectorClient::inspectorDestroyed()
+class RepaintIndicatorLayerClient final : public GraphicsLayerClient {
+public:
+    RepaintIndicatorLayerClient(WebInspectorClient& inspectorClient)
+        : m_inspectorClient(inspectorClient)
+    {
+    }
+    virtual ~RepaintIndicatorLayerClient() { }
+private:
+    virtual void notifyAnimationEnded(const GraphicsLayer* layer, const String&) override
+    {
+        m_inspectorClient.animationEndedForLayer(layer);
+    }
+    
+    WebInspectorClient& m_inspectorClient;
+};
+
+WebInspectorClient::WebInspectorClient(WebPage* page)
+    : m_page(page)
+    , m_highlightOverlay(nullptr)
 {
-    closeInspectorFrontend();
+}
+
+WebInspectorClient::~WebInspectorClient()
+{
+    for (auto layer : m_paintRectLayers) {
+        layer->removeFromParent();
+        delete layer;
+    }
+
+    if (m_paintRectOverlay && m_page->mainFrame())
+        m_page->mainFrame()->pageOverlayController().uninstallPageOverlay(m_paintRectOverlay.get(), PageOverlay::FadeMode::Fade);
+}
+
+void WebInspectorClient::inspectedPageDestroyed()
+{
+    if (WebInspector* inspector = m_page->inspector(WebPage::LazyCreationPolicy::UseExistingOnly))
+        inspector->close();
+
     delete this;
 }
 
-WebCore::InspectorFrontendChannel* WebInspectorClient::openInspectorFrontend(InspectorController*)
+Inspector::FrontendChannel* WebInspectorClient::openLocalFrontend(InspectorController* controller)
 {
-    WebPage* inspectorPage = m_page->inspector()->createInspectorPage();
-    ASSERT_UNUSED(inspectorPage, inspectorPage);
-    return this;
-}
+    m_page->inspector()->openFrontendConnection(controller->isUnderTest());
 
-void WebInspectorClient::closeInspectorFrontend()
-{
-    if (m_page->inspector())
-        m_page->inspector()->didClose();
+    return m_page->inspector();
 }
 
 void WebInspectorClient::bringFrontendToFront()
 {
-    m_page->inspector()->bringToFront();
+    if (m_page->inspector())
+        m_page->inspector()->bringToFront();
 }
 
 void WebInspectorClient::didResizeMainFrame(Frame*)
@@ -69,79 +105,119 @@ void WebInspectorClient::didResizeMainFrame(Frame*)
 
 void WebInspectorClient::highlight()
 {
+#if !PLATFORM(IOS)
     if (!m_highlightOverlay) {
-        RefPtr<PageOverlay> highlightOverlay = PageOverlay::create(this);
+        RefPtr<PageOverlay> highlightOverlay = PageOverlay::create(*this);
         m_highlightOverlay = highlightOverlay.get();
-        m_page->installPageOverlay(highlightOverlay.release(), true);
+        m_page->mainFrame()->pageOverlayController().installPageOverlay(highlightOverlay.release(), PageOverlay::FadeMode::Fade);
         m_highlightOverlay->setNeedsDisplay();
     } else {
         m_highlightOverlay->stopFadeOutAnimation();
         m_highlightOverlay->setNeedsDisplay();
     }
+#else
+    Highlight highlight;
+    m_page->corePage()->inspectorController().getHighlight(highlight, InspectorOverlay::CoordinateSystem::Document);
+    m_page->showInspectorHighlight(highlight);
+#endif
 }
 
 void WebInspectorClient::hideHighlight()
 {
-    if (m_highlightOverlay)
-        m_page->uninstallPageOverlay(m_highlightOverlay, true);
+#if !PLATFORM(IOS)
+    if (m_highlightOverlay && m_page->mainFrame())
+        m_page->mainFrame()->pageOverlayController().uninstallPageOverlay(m_highlightOverlay, PageOverlay::FadeMode::Fade);
+#else
+    m_page->hideInspectorHighlight();
+#endif
 }
 
-bool WebInspectorClient::sendMessageToFrontend(const String& message)
+void WebInspectorClient::showPaintRect(const FloatRect& rect)
 {
-    WebInspector* inspector = m_page->inspector();
-    if (!inspector)
-        return false;
-
-#if ENABLE(INSPECTOR_SERVER)
-    if (inspector->hasRemoteFrontendConnected()) {
-        inspector->sendMessageToRemoteFrontend(message);
-        return true;
+    if (!m_paintRectOverlay) {
+        m_paintRectOverlay = PageOverlay::create(*this, PageOverlay::OverlayType::Document);
+        m_page->mainFrame()->pageOverlayController().installPageOverlay(m_paintRectOverlay, PageOverlay::FadeMode::DoNotFade);
     }
+
+    if (!m_paintIndicatorLayerClient)
+        m_paintIndicatorLayerClient = std::make_unique<RepaintIndicatorLayerClient>(*this);
+
+    std::unique_ptr<GraphicsLayer> paintLayer = GraphicsLayer::create(m_page->drawingArea()->graphicsLayerFactory(), *m_paintIndicatorLayerClient);
+    
+    paintLayer->setAnchorPoint(FloatPoint3D());
+    paintLayer->setPosition(rect.location());
+    paintLayer->setSize(rect.size());
+    paintLayer->setBackgroundColor(Color(1.0f, 0.0f, 0.0f, 0.2f));
+
+    KeyframeValueList fadeKeyframes(AnimatedPropertyOpacity);
+    fadeKeyframes.insert(std::make_unique<FloatAnimationValue>(0, 1));
+
+    fadeKeyframes.insert(std::make_unique<FloatAnimationValue>(0.25, 0));
+    
+    RefPtr<Animation> opacityAnimation = Animation::create();
+    opacityAnimation->setDuration(0.25);
+
+    paintLayer->addAnimation(fadeKeyframes, FloatSize(), opacityAnimation.get(), ASCIILiteral("opacity"), 0);
+    
+    m_paintRectLayers.add(paintLayer.get());
+
+    GraphicsLayer& overlayRootLayer = m_paintRectOverlay->layer();
+    overlayRootLayer.addChild(paintLayer.release());
+}
+
+void WebInspectorClient::animationEndedForLayer(const GraphicsLayer* layer)
+{
+    const_cast<GraphicsLayer*>(layer)->removeFromParent();
+    m_paintRectLayers.remove(const_cast<GraphicsLayer*>(layer));
+    delete layer;
+}
+
+#if PLATFORM(IOS)
+void WebInspectorClient::showInspectorIndication()
+{
+    m_page->showInspectorIndication();
+}
+
+void WebInspectorClient::hideInspectorIndication()
+{
+    m_page->hideInspectorIndication();
+}
+
+void WebInspectorClient::didSetSearchingForNode(bool enabled)
+{
+    if (enabled)
+        m_page->enableInspectorNodeSearch();
+    else
+        m_page->disableInspectorNodeSearch();
+}
 #endif
 
-    WebPage* inspectorPage = inspector->inspectorPage();
-    if (inspectorPage)
-        return doDispatchMessageOnFrontendPage(inspectorPage->corePage(), message);
-
-    return false;
-}
-
-bool WebInspectorClient::supportsFrameInstrumentation()
-{
-#if USE(COORDINATED_GRAPHICS)
-    return true;
-#endif
-    return false;
-}
-
-void WebInspectorClient::pageOverlayDestroyed(PageOverlay*)
+void WebInspectorClient::pageOverlayDestroyed(PageOverlay&)
 {
 }
 
-void WebInspectorClient::willMoveToWebPage(PageOverlay*, WebPage* webPage)
+void WebInspectorClient::willMoveToPage(PageOverlay&, Page* page)
 {
-    if (webPage)
+    if (page)
         return;
 
     // The page overlay is moving away from the web page, reset it.
     ASSERT(m_highlightOverlay);
-    m_highlightOverlay = 0;
+    m_highlightOverlay = nullptr;
 }
 
-void WebInspectorClient::didMoveToWebPage(PageOverlay*, WebPage*)
+void WebInspectorClient::didMoveToPage(PageOverlay&, Page*)
 {
 }
 
-void WebInspectorClient::drawRect(PageOverlay*, WebCore::GraphicsContext& context, const WebCore::IntRect& /*dirtyRect*/)
+void WebInspectorClient::drawRect(PageOverlay&, WebCore::GraphicsContext& context, const WebCore::IntRect& /*dirtyRect*/)
 {
-    m_page->corePage()->inspectorController()->drawHighlight(context);
+    m_page->corePage()->inspectorController().drawHighlight(context);
 }
 
-bool WebInspectorClient::mouseEvent(PageOverlay*, const WebMouseEvent&)
+bool WebInspectorClient::mouseEvent(PageOverlay&, const PlatformMouseEvent&)
 {
     return false;
 }
 
 } // namespace WebKit
-
-#endif // ENABLE(INSPECTOR)

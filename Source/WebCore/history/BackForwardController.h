@@ -32,35 +32,32 @@
 
 namespace WebCore {
 
-class BackForwardList;
+class BackForwardClient;
 class HistoryItem;
 class Page;
 
 class BackForwardController {
     WTF_MAKE_NONCOPYABLE(BackForwardController); WTF_MAKE_FAST_ALLOCATED;
 public:
+    BackForwardController(Page&, RefPtr<BackForwardClient>&&);
     ~BackForwardController();
 
-    static PassOwnPtr<BackForwardController> create(Page*, PassRefPtr<BackForwardList>);
+    BackForwardClient* client() const { return m_client.get(); }
 
-    BackForwardList* client() const { return m_client.get(); }
-
-    bool canGoBackOrForward(int distance) const;
+    WEBCORE_EXPORT bool canGoBackOrForward(int distance) const;
     void goBackOrForward(int distance);
 
-    bool goBack();
-    bool goForward();
+    WEBCORE_EXPORT bool goBack();
+    WEBCORE_EXPORT bool goForward();
 
-    void addItem(PassRefPtr<HistoryItem>);
+    void addItem(Ref<HistoryItem>&&);
     void setCurrentItem(HistoryItem*);
         
     int count() const;
-    int backCount() const;
-    int forwardCount() const;
+    WEBCORE_EXPORT int backCount() const;
+    WEBCORE_EXPORT int forwardCount() const;
 
-    HistoryItem* itemAtIndex(int);
-
-    bool isActive();
+    WEBCORE_EXPORT HistoryItem* itemAtIndex(int);
 
     void close();
 
@@ -69,10 +66,8 @@ public:
     HistoryItem* forwardItem() { return itemAtIndex(1); }
 
 private:
-    BackForwardController(Page*, PassRefPtr<BackForwardList>);
-
-    Page* m_page;
-    RefPtr<BackForwardList> m_client;
+    Page& m_page;
+    RefPtr<BackForwardClient> m_client;
 };
 
 } // namespace WebCore

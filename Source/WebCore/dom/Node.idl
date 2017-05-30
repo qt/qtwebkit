@@ -23,16 +23,14 @@
     JSCustomMarkFunction,
     JSCustomPushEventHandlerScope,
     CustomIsReachable,
-    JSCustomFinalize,
     CustomToJSObject,
-    EventTarget,
-    JSGenerateToNativeObject,
-    JSInlineGetOwnPropertySlot,
     ObjCPolymorphic,
 ] interface Node
 #if defined(LANGUAGE_OBJECTIVE_C) && LANGUAGE_OBJECTIVE_C
     : Object, EventTarget
-#endif /* defined(LANGUAGE_OBJECTIVE_C) */
+#else
+    : EventTarget
+#endif
  {
     // NodeType
     const unsigned short      ELEMENT_NODE                   = 1;
@@ -62,6 +60,8 @@
     readonly attribute Node             nextSibling;
     readonly attribute Document         ownerDocument;
 
+    [Conditional=SHADOW_DOM, ImplementedAs=highestAncestor] readonly attribute Node treeRoot;
+
     [ObjCLegacyUnnamedParameters, Custom, RaisesException] Node insertBefore([CustomReturn] Node newChild,
                                                             Node refChild);
     [ObjCLegacyUnnamedParameters, Custom, RaisesException] Node replaceChild(Node newChild,
@@ -70,13 +70,15 @@
     [Custom, RaisesException] Node appendChild([CustomReturn] Node newChild);
 
     boolean            hasChildNodes();
-    Node               cloneNode([Default=Undefined] optional boolean deep);
+    [NewObject] Node cloneNode([Default=Undefined] optional boolean deep);
     void               normalize();
 
     // Introduced in DOM Level 2:
 
-    [ObjCLegacyUnnamedParameters] boolean isSupported([Default=Undefined] optional DOMString feature, 
+#if !defined(LANGUAGE_JAVASCRIPT) || !LANGUAGE_JAVASCRIPT
+    [ObjCLegacyUnnamedParameters, ImplementedAs=isSupportedForBindings] boolean isSupported([Default=Undefined] optional DOMString feature,
                                        [TreatNullAs=NullString,Default=Undefined] optional DOMString version);
+#endif
 
     [TreatReturnedNullStringAs=Null] readonly attribute DOMString        namespaceURI;
     [TreatReturnedNullStringAs=Null, TreatNullAs=NullString, SetterRaisesException] attribute DOMString prefix;
@@ -93,7 +95,7 @@
     [TreatReturnedNullStringAs=Null] readonly attribute DOMString       baseURI;
 
     // FIXME: the spec says this can also raise on retrieval.
-    [TreatReturnedNullStringAs=Null, TreatNullAs=NullString, SetterRaisesException] attribute DOMString textContent;
+    [TreatReturnedNullStringAs=Null, TreatNullAs=NullString, TreatUndefinedAs=NullString, SetterRaisesException] attribute DOMString textContent;
 
     boolean            isSameNode([Default=Undefined] optional Node other);
     boolean            isEqualNode([Default=Undefined] optional Node other);
@@ -122,29 +124,6 @@
     readonly attribute boolean          isContentEditable;
 
     void inspect();
-#endif /* defined(LANGUAGE_OBJECTIVE_C) */
-
-#if !defined(LANGUAGE_CPP) || !LANGUAGE_CPP
-#if !defined(LANGUAGE_OBJECTIVE_C) || !LANGUAGE_OBJECTIVE_C
-    void addEventListener(DOMString type, 
-                          EventListener listener, 
-                          optional boolean useCapture);
-    void removeEventListener(DOMString type, 
-                             EventListener listener, 
-                             optional boolean useCapture);
-    [RaisesException] boolean dispatchEvent(Event event);
 #endif
-#endif
-
-#if defined(LANGUAGE_CPP) && LANGUAGE_CPP
-    [Custom] void addEventListener(DOMString type, 
-                                      EventListener listener, 
-                                      boolean useCapture);
-    [Custom] void removeEventListener(DOMString type, 
-                                         EventListener listener, 
-                                         boolean useCapture);
-    [RaisesException] boolean dispatchEvent(Event event);
-#endif
-
 };
 

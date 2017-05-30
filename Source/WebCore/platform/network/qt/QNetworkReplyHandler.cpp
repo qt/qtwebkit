@@ -30,10 +30,10 @@
 #include "ResourceHandleInternal.h"
 #include "ResourceRequest.h"
 #include "ResourceResponse.h"
+#include "SharedBuffer.h"
 #include <QDateTime>
 #include <QFile>
 #include <QFileInfo>
-#include <QMimeDatabase>
 #include <QNetworkCookie>
 #include <QNetworkReply>
 
@@ -70,7 +70,11 @@ bool FormDataIODevice::reset()
         m_currentFile->close();
 
     m_currentDelta = 0;
-    m_formElements = m_formData->elements();
+
+    if (m_formData)
+        m_formElements = m_formData->elements();
+    else
+        m_formElements.clear();
 
     prepareCurrentElement();
     return true;
@@ -81,31 +85,24 @@ void FormDataIODevice::prepareFormElements()
     if (!m_formData)
         return;
 
-#if ENABLE(BLOB)
     m_formData = m_formData->resolveBlobReferences();
-#endif
 
     // Take a deep copy of the FormDataElements
     m_formElements = m_formData->elements();
 }
 
 
-qint64 FormDataIODevice::computeSize() 
+qint64 FormDataIODevice::computeSize()
 {
-    for (int i = 0; i < m_formElements.size(); ++i) {
-        const FormDataElement& element = m_formElements[i];
-        if (element.m_type == FormDataElement::data) 
+    for (const auto& element : m_formElements) {
+        if (element.m_type == FormDataElement::Type::Data)
             m_dataSize += element.m_data.size();
         else {
             QFileInfo fi(element.m_filename);
-#if ENABLE(BLOB)
             qint64 fileEnd = fi.size();
             if (element.m_fileLength != BlobDataItem::toEndOfFile)
                 fileEnd = qMin<qint64>(fi.size(), element.m_fileStart + element.m_fileLength);
             m_fileSize += qMax<qint64>(0, fileEnd - element.m_fileStart);
-#else
-            m_fileSize += fi.size();
-#endif
         }
     }
     return m_dataSize + m_fileSize;
@@ -128,9 +125,9 @@ void FormDataIODevice::prepareCurrentElement()
         return;
 
     switch (m_formElements[0].m_type) {
-    case FormDataElement::data:
+    case FormDataElement::Type::Data:
         return;
-    case FormDataElement::encodedFile:
+    case FormDataElement::Type::EncodedFile:
         openFileForCurrentElement();
         break;
     default:
@@ -146,7 +143,6 @@ void FormDataIODevice::openFileForCurrentElement()
 
     m_currentFile->setFileName(m_formElements[0].m_filename);
     m_currentFile->open(QFile::ReadOnly);
-#if ENABLE(BLOB)
     if (isValidFileTime(m_formElements[0].m_expectedFileModificationTime)) {
         QFileInfo info(*m_currentFile);
         if (!info.exists() || static_cast<time_t>(m_formElements[0].m_expectedFileModificationTime) < info.lastModified().toTime_t()) {
@@ -156,7 +152,6 @@ void FormDataIODevice::openFileForCurrentElement()
     }
     if (m_formElements[0].m_fileStart)
         m_currentFile->seek(m_formElements[0].m_fileStart);
-#endif
 }
 
 // m_formElements[0] is the current item. If the destination buffer is
@@ -171,7 +166,7 @@ qint64 FormDataIODevice::readData(char* destination, qint64 size)
         const FormDataElement& element = m_formElements[0];
         const qint64 available = size-copied;
 
-        if (element.m_type == FormDataElement::data) {
+        if (element.m_type == FormDataElement::Type::Data) {
             const qint64 toCopy = qMin<qint64>(available, element.m_data.size() - m_currentDelta);
             memcpy(destination+copied, element.m_data.data()+m_currentDelta, toCopy); 
             m_currentDelta += toCopy;
@@ -179,12 +174,10 @@ qint64 FormDataIODevice::readData(char* destination, qint64 size)
 
             if (m_currentDelta == element.m_data.size())
                 moveToNextElement();
-        } else if (element.m_type == FormDataElement::encodedFile) {
+        } else if (element.m_type == FormDataElement::Type::EncodedFile) {
             quint64 toCopy = available;
-#if ENABLE(BLOB)
             if (element.m_fileLength != BlobDataItem::toEndOfFile)
                 toCopy = qMin<qint64>(toCopy, element.m_fileLength - m_currentDelta);
-#endif
             const QByteArray data = m_currentFile->read(toCopy);
             memcpy(destination+copied, data.constData(), data.size());
             m_currentDelta += data.size();
@@ -192,10 +185,8 @@ qint64 FormDataIODevice::readData(char* destination, qint64 size)
 
             if (m_currentFile->atEnd() || !m_currentFile->isOpen())
                 moveToNextElement();
-#if ENABLE(BLOB)
             else if (element.m_fileLength != BlobDataItem::toEndOfFile && m_currentDelta == element.m_fileLength)
                 moveToNextElement();
-#endif
         }
     }
 
@@ -356,7 +347,7 @@ void QNetworkReplyWrapper::receiveMetaData()
 
     Q_ASSERT(!m_sniffer);
 
-    m_sniffer = adoptPtr(new QtMIMETypeSniffer(m_reply, m_advertisedMIMEType, isSupportedImageType));
+    m_sniffer = std::make_unique<QtMIMETypeSniffer>(m_reply, m_advertisedMIMEType, isSupportedImageType);
 
     if (m_sniffer->isFinished()) {
         receiveSniffedMIMEType();
@@ -549,17 +540,17 @@ void QNetworkReplyHandler::timeout()
 
     ResourceHandleClient* client = m_resourceHandle->client();
     if (!client) {
-        m_replyWrapper.clear();
+        m_replyWrapper = nullptr;
         return;
     }
 
     ASSERT(m_replyWrapper->reply());
 
-    ResourceError timeoutError("QtNetwork", QNetworkReply::TimeoutError, m_replyWrapper->reply()->url().toString(), "Request timed out");
+    ResourceError timeoutError("QtNetwork", QNetworkReply::TimeoutError, m_replyWrapper->reply()->url(), "Request timed out");
     timeoutError.setIsTimeout(true);
     client->didFail(m_resourceHandle, timeoutError);
 
-    m_replyWrapper.clear();
+    m_replyWrapper = nullptr;
 }
 
 void QNetworkReplyHandler::timerEvent(QTimerEvent* timerEvent)
@@ -572,6 +563,7 @@ void QNetworkReplyHandler::timerEvent(QTimerEvent* timerEvent)
 void QNetworkReplyHandler::sendResponseIfNeeded()
 {
     ASSERT(m_replyWrapper && m_replyWrapper->reply() && !wasAborted());
+    ASSERT(!m_queue.deferSignals());
 
     if (m_replyWrapper->reply()->error() && m_replyWrapper->reply()->attribute(QNetworkRequest::HttpStatusCodeAttribute).isNull())
         return;
@@ -587,13 +579,18 @@ void QNetworkReplyHandler::sendResponseIfNeeded()
         mimeType = MIMETypeRegistry::getMIMETypeForPath(m_replyWrapper->reply()->url().path());
     }
 
-    KURL url(m_replyWrapper->reply()->url());
-    ResourceResponse response(url, mimeType.lower(),
+    URL url(m_replyWrapper->reply()->url());
+    // FIXME: we might not need convertToASCIILowercase() because MIME types should always be matched case-insensitively
+    ResourceResponse response(url, mimeType.convertToASCIILowercase(),
                               m_replyWrapper->reply()->header(QNetworkRequest::ContentLengthHeader).toLongLong(),
-                              m_replyWrapper->encoding(), String());
+                              m_replyWrapper->encoding());
 
     if (url.isLocalFile()) {
-        client->didReceiveResponse(m_resourceHandle, response);
+        if (client->usesAsyncCallbacks()) {
+            setLoadingDeferred(true);
+            client->didReceiveResponseAsync(m_resourceHandle, response);
+        } else
+            client->didReceiveResponse(m_resourceHandle, response);
         return;
     }
 
@@ -601,32 +598,12 @@ void QNetworkReplyHandler::sendResponseIfNeeded()
     int statusCode = m_replyWrapper->reply()->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
 
     if (url.protocolIsInHTTPFamily()) {
-        String suggestedFilename = filenameFromHTTPContentDisposition(QString::fromLatin1(m_replyWrapper->reply()->rawHeader("Content-Disposition")));
-
-        if (!suggestedFilename.isEmpty())
-            response.setSuggestedFilename(suggestedFilename);
-        else {
-            Vector<String> extensions = MIMETypeRegistry::getExtensionsForMIMEType(mimeType);
-            if (extensions.isEmpty())
-                response.setSuggestedFilename(url.lastPathComponent());
-            else {
-                // If the suffix doesn't match the MIME type, correct the suffix.
-                QString filename = url.lastPathComponent();
-                const String suffix = QMimeDatabase().suffixForFileName(filename);
-                if (!extensions.contains(suffix)) {
-                    filename.chop(suffix.length());
-                    filename += MIMETypeRegistry::getPreferredExtensionForMIMEType(mimeType);
-                }
-                response.setSuggestedFilename(filename);
-            }
-        }
-
         response.setHTTPStatusCode(statusCode);
         response.setHTTPStatusText(m_replyWrapper->reply()->attribute(QNetworkRequest::HttpReasonPhraseAttribute).toByteArray().constData());
 
         // Add remaining headers.
         foreach (const QNetworkReply::RawHeaderPair& pair, m_replyWrapper->reply()->rawHeaderPairs())
-            response.setHTTPHeaderField(QString::fromLatin1(pair.first), QString::fromLatin1(pair.second));
+            response.setHTTPHeaderField(String(pair.first.constData(), pair.first.size()), String(pair.second.constData(), pair.second.size()));
     }
 
     QUrl redirection = m_replyWrapper->reply()->attribute(QNetworkRequest::RedirectionTargetAttribute).toUrl();
@@ -635,11 +612,41 @@ void QNetworkReplyHandler::sendResponseIfNeeded()
         return;
     }
 
-    client->didReceiveResponse(m_resourceHandle, response);
+    if (client->usesAsyncCallbacks()) {
+        setLoadingDeferred(true);
+        client->didReceiveResponseAsync(m_resourceHandle, response);
+    } else
+        client->didReceiveResponse(m_resourceHandle, response);
+}
+
+void QNetworkReplyHandler::continueAfterWillSendRequest(const ResourceRequest& newRequest)
+{
+    if (wasAborted()) // Network error cancelled the request.
+        return;
+
+    m_request = newRequest.toNetworkRequest(m_resourceHandle->getInternal()->m_context.get());
+}
+
+void QNetworkReplyHandler::continueWillSendRequest(const ResourceRequest& newRequest)
+{
+    ASSERT(!m_resourceHandle->client() || m_resourceHandle->client()->usesAsyncCallbacks());
+    ASSERT(m_queue.deferSignals());
+    setLoadingDeferred(false);
+
+    continueAfterWillSendRequest(newRequest);
+}
+
+void QNetworkReplyHandler::continueDidReceiveResponse()
+{
+    ASSERT(!m_resourceHandle->client() || m_resourceHandle->client()->usesAsyncCallbacks());
+    ASSERT(m_queue.deferSignals());
+    setLoadingDeferred(false);
 }
 
 void QNetworkReplyHandler::redirect(ResourceResponse& response, const QUrl& redirection)
 {
+    ASSERT(!m_queue.deferSignals());
+
     QUrl newUrl = m_replyWrapper->reply()->url().resolved(redirection);
 
     ResourceHandleClient* client = m_resourceHandle->client();
@@ -650,7 +657,7 @@ void QNetworkReplyHandler::redirect(ResourceResponse& response, const QUrl& redi
     m_redirectionTries--;
     if (!m_redirectionTries) {
         ResourceError error("HTTP", 400 /*bad request*/,
-                            newUrl.toString(),
+                            newUrl,
                             QCoreApplication::translate("QWebPage", "Redirection limit reached"));
         client->didFail(m_resourceHandle, error);
         m_replyWrapper = nullptr;
@@ -672,11 +679,13 @@ void QNetworkReplyHandler::redirect(ResourceResponse& response, const QUrl& redi
     if (!newRequest.url().protocolIs("https") && protocolIs(newRequest.httpReferrer(), "https") && m_resourceHandle->context()->shouldClearReferrerOnHTTPSToHTTPRedirect())
         newRequest.clearHTTPReferrer();
 
-    client->willSendRequest(m_resourceHandle, newRequest, response);
-    if (wasAborted()) // Network error cancelled the request.
-        return;
-
-    m_request = newRequest.toNetworkRequest(m_resourceHandle->getInternal()->m_context.get());
+    if (client->usesAsyncCallbacks()) {
+        setLoadingDeferred(true);
+        client->willSendRequestAsync(m_resourceHandle, newRequest, response);
+    } else {
+        client->willSendRequest(m_resourceHandle, newRequest, response);
+        continueAfterWillSendRequest(newRequest);
+    }
 }
 
 void QNetworkReplyHandler::forwardData()
@@ -691,22 +700,32 @@ void QNetworkReplyHandler::forwardData()
     if (!client)
         return;
 
+    // We have to use didReceiveBuffer instead of didReceiveData
+    // See https://bugs.webkit.org/show_bug.cgi?id=118598
+    // and https://bugs.webkit.org/show_bug.cgi?id=118448#c32
+    // NetworkResourceLoader implements only didReceiveBuffer and sends it over IPC to WebProcess
+
+    // See also https://codereview.qt-project.org/#/c/79565/
+    //
+    // FIXME: We need API to get unflattened array of data segments to convert it to non-contiguous SharedBuffer
+
     qint64 bytesAvailable = m_replyWrapper->reply()->bytesAvailable();
-    char* buffer = new char[8128]; // smaller than 8192 to fit within 8k including overhead.
+    Vector<char> buffer(8128); // smaller than 8192 to fit within 8k including overhead.
     while (bytesAvailable > 0 && !m_queue.deferSignals()) {
-        qint64 readSize = m_replyWrapper->reply()->read(buffer, 8128);
+        qint64 readSize = m_replyWrapper->reply()->read(buffer.data(), buffer.size());
         if (readSize <= 0)
             break;
+        buffer.shrink(readSize);
         bytesAvailable -= readSize;
+
         // FIXME: https://bugs.webkit.org/show_bug.cgi?id=19793
         // -1 means we do not provide any data about transfer size to inspector so it would use
         // Content-Length headers or content size to show transfer size.
-        client->didReceiveData(m_resourceHandle, buffer, readSize, -1);
+        client->didReceiveBuffer(m_resourceHandle, SharedBuffer::adoptVector(buffer), -1);
         // Check if the request has been aborted or this reply-handler was otherwise released.
         if (wasAborted() || !m_replyWrapper)
             break;
     }
-    delete[] buffer;
     if (bytesAvailable > 0 && m_replyWrapper)
         m_queue.requeue(&QNetworkReplyHandler::forwardData);
 }
@@ -810,7 +829,7 @@ void QNetworkReplyHandler::start()
     if (!reply)
         return;
 
-    m_replyWrapper = adoptPtr(new QNetworkReplyWrapper(&m_queue, reply, m_resourceHandle->shouldContentSniff() && d->m_context->mimeSniffingEnabled(), this));
+    m_replyWrapper = std::make_unique<QNetworkReplyWrapper>(&m_queue, reply, m_resourceHandle->shouldContentSniff() && d->m_context->mimeSniffingEnabled(), this);
 
     if (m_loadType == SynchronousLoad) {
         m_replyWrapper->synchronousLoad();
@@ -832,9 +851,9 @@ ResourceError QNetworkReplyHandler::errorForReply(QNetworkReply* reply)
     int httpStatusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
 
     if (httpStatusCode)
-        return ResourceError("HTTP", httpStatusCode, url.toString(), reply->attribute(QNetworkRequest::HttpReasonPhraseAttribute).toString());
+        return ResourceError("HTTP", httpStatusCode, url, reply->attribute(QNetworkRequest::HttpReasonPhraseAttribute).toString());
 
-    return ResourceError("QtNetwork", reply->error(), url.toString(), reply->errorString());
+    return ResourceError("QtNetwork", reply->error(), url, reply->errorString());
 }
 
 }

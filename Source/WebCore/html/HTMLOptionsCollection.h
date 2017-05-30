@@ -24,32 +24,59 @@
 #ifndef HTMLOptionsCollection_h
 #define HTMLOptionsCollection_h
 
-#include "HTMLCollection.h"
+#include "CachedHTMLCollection.h"
+#include "HTMLSelectElement.h"
 
 namespace WebCore {
 
 class HTMLOptionElement;
-class HTMLSelectElement;
 
 typedef int ExceptionCode;
 
-class HTMLOptionsCollection : public HTMLCollection {
+class HTMLOptionsCollection final : public CachedHTMLCollection<HTMLOptionsCollection, CollectionTypeTraits<SelectOptions>::traversalType> {
 public:
-    static PassRefPtr<HTMLOptionsCollection> create(Node*, CollectionType);
+    static Ref<HTMLOptionsCollection> create(HTMLSelectElement&, CollectionType);
 
-    void add(PassRefPtr<HTMLOptionElement>, ExceptionCode&);
-    void add(PassRefPtr<HTMLOptionElement>, int index, ExceptionCode&);
+    HTMLSelectElement& selectElement() { return downcast<HTMLSelectElement>(ownerNode()); }
+    const HTMLSelectElement& selectElement() const { return downcast<HTMLSelectElement>(ownerNode()); }
+
+    virtual HTMLOptionElement* item(unsigned offset) const override;
+    virtual HTMLOptionElement* namedItem(const AtomicString& name) const override;
+
+    void add(HTMLElement*, HTMLElement* beforeElement, ExceptionCode&);
+    void add(HTMLElement*, int beforeIndex, ExceptionCode&);
     void remove(int index);
+    void remove(HTMLOptionElement*);
 
     int selectedIndex() const;
     void setSelectedIndex(int);
 
     void setLength(unsigned, ExceptionCode&);
 
+    // For CachedHTMLCollection.
+    bool elementMatches(Element&) const;
+
 private:
-    HTMLOptionsCollection(Node*);
+    explicit HTMLOptionsCollection(HTMLSelectElement&);
 };
 
-} //namespace
+inline HTMLOptionElement* HTMLOptionsCollection::item(unsigned offset) const
+{
+    return downcast<HTMLOptionElement>(CachedHTMLCollection<HTMLOptionsCollection, CollectionTypeTraits<SelectOptions>::traversalType>::item(offset));
+}
 
-#endif
+inline HTMLOptionElement* HTMLOptionsCollection::namedItem(const AtomicString& name) const
+{
+    return downcast<HTMLOptionElement>(CachedHTMLCollection<HTMLOptionsCollection, CollectionTypeTraits<SelectOptions>::traversalType>::namedItem(name));
+}
+
+inline bool HTMLOptionsCollection::elementMatches(Element& element) const
+{
+    return element.hasTagName(HTMLNames::optionTag);
+}
+
+} // namespace WebCore
+
+SPECIALIZE_TYPE_TRAITS_HTMLCOLLECTION(HTMLOptionsCollection, SelectOptions)
+
+#endif // HTMLOptionsCollection_h

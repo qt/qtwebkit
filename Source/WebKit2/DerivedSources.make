@@ -1,4 +1,4 @@
-# Copyright (C) 2010, 2011, 2012 Apple Inc. All rights reserved.
+# Copyright (C) 2010, 2011, 2012, 2013 Apple Inc. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -22,108 +22,134 @@
 
 VPATH = \
     $(WebKit2) \
+    $(WebKit2)/DatabaseProcess \
+    $(WebKit2)/DatabaseProcess/IndexedDB \
+    $(WebKit2)/DatabaseProcess/mac \
     $(WebKit2)/NetworkProcess \
+    $(WebKit2)/NetworkProcess/CustomProtocols \
     $(WebKit2)/NetworkProcess/mac \
     $(WebKit2)/PluginProcess \
     $(WebKit2)/PluginProcess/mac \
     $(WebKit2)/Shared/Plugins \
     $(WebKit2)/Shared \
-    $(WebKit2)/Shared/mac \
+    $(WebKit2)/Shared/API/Cocoa \
     $(WebKit2)/Shared/Authentication \
-    $(WebKit2)/Shared/Network/CustomProtocols \
-    $(WebKit2)/SharedWorkerProcess \
-    $(WebKit2)/OfflineStorageProcess \
+    $(WebKit2)/Shared/mac \
     $(WebKit2)/WebProcess/ApplicationCache \
     $(WebKit2)/WebProcess/Cookies \
+    $(WebKit2)/WebProcess/Databases/IndexedDB \
     $(WebKit2)/WebProcess/FullScreen \
     $(WebKit2)/WebProcess/Geolocation \
     $(WebKit2)/WebProcess/IconDatabase \
     $(WebKit2)/WebProcess/MediaCache \
     $(WebKit2)/WebProcess/Network \
     $(WebKit2)/WebProcess/Notifications \
+    $(WebKit2)/WebProcess/OriginData \
     $(WebKit2)/WebProcess/Plugins \
     $(WebKit2)/WebProcess/ResourceCache \
+    $(WebKit2)/WebProcess/Scrolling \
     $(WebKit2)/WebProcess/Storage \
+    $(WebKit2)/WebProcess/UserContent \
     $(WebKit2)/WebProcess/WebCoreSupport \
     $(WebKit2)/WebProcess/WebPage \
+    $(WebKit2)/WebProcess/cocoa \
+    $(WebKit2)/WebProcess/ios \
     $(WebKit2)/WebProcess \
     $(WebKit2)/UIProcess \
+    $(WebKit2)/UIProcess/Cocoa \
+    $(WebKit2)/UIProcess/Databases \
     $(WebKit2)/UIProcess/Downloads \
     $(WebKit2)/UIProcess/Network \
     $(WebKit2)/UIProcess/Network/CustomProtocols \
     $(WebKit2)/UIProcess/Notifications \
     $(WebKit2)/UIProcess/Plugins \
-    $(WebKit2)/UIProcess/SharedWorkers \
     $(WebKit2)/UIProcess/Storage \
+    $(WebKit2)/UIProcess/UserContent \
     $(WebKit2)/UIProcess/mac \
+    $(WebKit2)/UIProcess/ios \
+    $(WEBKITADDITIONS_HEADER_SEARCH_PATHS) \
 #
 
 MESSAGE_RECEIVERS = \
     AuthenticationManager \
+    ChildProcess \
     CustomProtocolManager \
     CustomProtocolManagerProxy \
+    DatabaseProcess \
+    DatabaseProcessProxy \
+    DatabaseToWebProcessConnection \
+    DownloadProxy \
     DrawingArea \
     DrawingAreaProxy \
-    DownloadProxy \
     EventDispatcher \
+    NPObjectMessageReceiver \
+    NetworkConnectionToWebProcess \
     NetworkProcess \
     NetworkProcessConnection \
     NetworkProcessProxy \
     NetworkResourceLoader \
-    NPObjectMessageReceiver \
-    OfflineStorageProcess \
     PluginControllerProxy \
     PluginProcess \
     PluginProcessConnection \
     PluginProcessConnectionManager \
     PluginProcessProxy \
     PluginProxy \
-    SharedWorkerProcess \
-    SharedWorkerProcessProxy \
-    StorageManager \
-    WebApplicationCacheManager \
-    WebApplicationCacheManagerProxy \
-    WebCookieManager \
-    WebCookieManagerProxy \
-    WebConnection \
-    NetworkConnectionToWebProcess \
-    RemoteLayerTreeHost \
+    RemoteLayerTreeDrawingAreaProxy \
+    RemoteObjectRegistry \
+    RemoteScrollingCoordinator \
     SecItemShim \
     SecItemShimProxy \
+    SmartMagnificationController \
     StorageAreaMap \
-    WebContext \
-    WebDatabaseManager \
-    WebDatabaseManagerProxy \
+    StorageManager \
+    ViewGestureController \
+    ViewGestureGeometryCollector \
+    ViewUpdateDispatcher \
+    VisitedLinkStore \
+    VisitedLinkTableController \
+    WebConnection \
+    WebCookieManager \
+    WebCookieManagerProxy \
     WebFullScreenManager \
     WebFullScreenManagerProxy \
     WebGeolocationManager \
     WebGeolocationManagerProxy \
+    WebIDBConnectionToClient \
+    WebIDBConnectionToServer \
     WebIconDatabase \
     WebIconDatabaseProxy \
     WebInspector \
     WebInspectorProxy \
-    WebMediaCacheManager \
-    WebMediaCacheManagerProxy \
+    WebInspectorUI \
     WebNotificationManager \
     WebPage \
     WebPageGroupProxy \
     WebPageProxy \
+    WebPasteboardProxy \
     WebProcess \
     WebProcessConnection \
+    WebProcessPool \
     WebProcessProxy \
-    WebResourceCacheManager \
-    WebResourceCacheManagerProxy \
     WebResourceLoader \
+    WebUserContentController \
+    WebUserContentControllerProxy \
+    WebVideoFullscreenManager \
+    WebVideoFullscreenManagerProxy \
 #
 
 SCRIPTS = \
     $(WebKit2)/Scripts/generate-message-receiver.py \
     $(WebKit2)/Scripts/generate-messages-header.py \
-    $(WebKit2)/Scripts/webkit2/__init__.py \
-    $(WebKit2)/Scripts/webkit2/messages.py \
-    $(WebKit2)/Scripts/webkit2/model.py \
-    $(WebKit2)/Scripts/webkit2/parser.py \
+    $(WebKit2)/Scripts/webkit/__init__.py \
+    $(WebKit2)/Scripts/webkit/messages.py \
+    $(WebKit2)/Scripts/webkit/model.py \
+    $(WebKit2)/Scripts/webkit/parser.py \
 #
+
+FRAMEWORK_FLAGS = $(shell echo $(BUILT_PRODUCTS_DIR) $(FRAMEWORK_SEARCH_PATHS) | perl -e 'print "-F " . join(" -F ", split(" ", <>));')
+HEADER_FLAGS = $(shell echo $(BUILT_PRODUCTS_DIR) $(HEADER_SEARCH_PATHS) | perl -e 'print "-I" . join(" -I", split(" ", <>));')
+
+-include WebKitDerivedSourcesAdditions.make
 
 .PHONY : all
 
@@ -140,12 +166,6 @@ all : \
 	@echo Generating message receiver for $*...
 	@python $(WebKit2)/Scripts/generate-messages-header.py $< > $@
 
-# Mac-specific rules
-
-ifeq ($(PLATFORM_NAME),macosx)
-
-FRAMEWORK_FLAGS = $(shell echo $(BUILT_PRODUCTS_DIR) $(FRAMEWORK_SEARCH_PATHS) | perl -e 'print "-F " . join(" -F ", split(" ", <>));')
-HEADER_FLAGS = $(shell echo $(BUILT_PRODUCTS_DIR) $(HEADER_SEARCH_PATHS) | perl -e 'print "-I" . join(" -I", split(" ", <>));')
 
 # Some versions of clang incorrectly strip out // comments in c89 code.
 # Use -traditional as a workaround, but only when needed since that causes
@@ -162,6 +182,7 @@ endif
 
 SANDBOX_PROFILES = \
 	com.apple.WebProcess.sb \
+	com.apple.WebKit.Databases.sb \
 	com.apple.WebKit.NetworkProcess.sb
 
 all: $(SANDBOX_PROFILES)
@@ -169,19 +190,3 @@ all: $(SANDBOX_PROFILES)
 %.sb : %.sb.in
 	@echo Pre-processing $* sandbox profile...
 	$(CC) $(SDK_FLAGS) $(TEXT_PREPROCESSOR_FLAGS) $(FRAMEWORK_FLAGS) $(HEADER_FLAGS) -include "wtf/Platform.h" $< > $@
-
-endif # macosx
-
-# ------------------------
-
-# Windows-specific rules
-
-ifeq ($(OS),Windows_NT)
-
-all : HeaderDetection.h
-
-HeaderDetection.h : DerivedSources.make
-	if [ -f "$(WEBKITLIBRARIESDIR)/include/WebKitQuartzCoreAdditions/WebKitQuartzCoreAdditionsBase.h" ] && [ ! -f "$(WEBKITLIBRARIESDIR)/include/cairo/cairo.h" ]; then echo "#define HAVE_WKQCA 1" > $@; else echo > $@; fi
-	if [ -f "$(WEBKITLIBRARIESDIR)/include/AVFoundationCF/AVCFBase.h" ]; then echo "#define HAVE_AVCF 1" >> $@; else echo >> $@; fi
-
-endif # Windows_NT

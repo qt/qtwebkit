@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, 2012, 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2011-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,50 +26,12 @@
 #ifndef DFGCommon_h
 #define DFGCommon_h
 
-#include <wtf/Platform.h>
+#include "DFGCompilationMode.h"
 
 #if ENABLE(DFG_JIT)
 
-#include "CodeOrigin.h"
 #include "Options.h"
 #include "VirtualRegister.h"
-
-/* DFG_ENABLE() - turn on a specific features in the DFG JIT */
-#define DFG_ENABLE(DFG_FEATURE) (defined DFG_ENABLE_##DFG_FEATURE  && DFG_ENABLE_##DFG_FEATURE)
-
-// Emit various logging information for debugging, including dumping the dataflow graphs.
-#define DFG_ENABLE_DEBUG_VERBOSE 0
-// Emit dumps during propagation, in addition to just after.
-#define DFG_ENABLE_DEBUG_PROPAGATION_VERBOSE 0
-// Emit logging for OSR exit value recoveries at every node, not just nodes that
-// actually has speculation checks.
-#define DFG_ENABLE_VERBOSE_VALUE_RECOVERIES 0
-// Enable generation of dynamic checks into the instruction stream.
-#if !ASSERT_DISABLED
-#define DFG_ENABLE_JIT_ASSERT 1
-#else
-#define DFG_ENABLE_JIT_ASSERT 0
-#endif
-// Consistency check contents compiler data structures.
-#define DFG_ENABLE_CONSISTENCY_CHECK 0
-// Emit a breakpoint into the head of every generated function, to aid debugging in GDB.
-#define DFG_ENABLE_JIT_BREAK_ON_EVERY_FUNCTION 0
-// Emit a breakpoint into the head of every generated block, to aid debugging in GDB.
-#define DFG_ENABLE_JIT_BREAK_ON_EVERY_BLOCK 0
-// Emit a breakpoint into the head of every generated node, to aid debugging in GDB.
-#define DFG_ENABLE_JIT_BREAK_ON_EVERY_NODE 0
-// Emit a pair of xorPtr()'s on regT0 with the node index to make it easy to spot node boundaries in disassembled code.
-#define DFG_ENABLE_XOR_DEBUG_AID 0
-// Emit a breakpoint into the speculation failure code.
-#define DFG_ENABLE_JIT_BREAK_ON_SPECULATION_FAILURE 0
-// Disable the DFG JIT without having to touch Platform.h
-#define DFG_DEBUG_LOCAL_DISBALE 0
-// Enable OSR entry from baseline JIT.
-#define DFG_ENABLE_OSR_ENTRY ENABLE(DFG_JIT)
-// Generate stats on how successful we were in making use of the DFG jit, and remaining on the hot path.
-#define DFG_ENABLE_SUCCESS_STATS 0
-// Enable verification that the DFG is able to insert code for control flow edges.
-#define DFG_ENABLE_EDGE_CODE_VERIFICATION 0
 
 namespace JSC { namespace DFG {
 
@@ -77,11 +39,6 @@ struct Node;
 
 typedef uint32_t BlockIndex;
 static const BlockIndex NoBlock = UINT_MAX;
-
-struct NodePointerTraits {
-    static Node* defaultValue() { return 0; }
-    static void dump(Node* value, PrintStream& out);
-};
 
 // Use RefChildren if the child ref counts haven't already been adjusted using
 // other means and either of the following is true:
@@ -100,31 +57,28 @@ enum RefNodeMode {
     DontRefNode
 };
 
-inline bool verboseCompilationEnabled()
+enum SwitchKind {
+    SwitchImm,
+    SwitchChar,
+    SwitchString,
+    SwitchCell
+};
+
+inline bool verboseCompilationEnabled(CompilationMode mode = DFGMode)
 {
-#if DFG_ENABLE(DEBUG_VERBOSE)
-    return true;
-#else
-    return Options::verboseCompilation() || Options::dumpGraphAtEachPhase();
-#endif
+    return Options::verboseCompilation() || Options::dumpGraphAtEachPhase() || (isFTL(mode) && Options::verboseFTLCompilation());
 }
 
-inline bool logCompilationChanges()
+inline bool logCompilationChanges(CompilationMode mode = DFGMode)
 {
-#if DFG_ENABLE(DEBUG_VERBOSE)
-    return true;
-#else
-    return verboseCompilationEnabled() || Options::logCompilationChanges();
-#endif
+    return verboseCompilationEnabled(mode) || Options::logCompilationChanges();
 }
 
-inline bool shouldDumpGraphAtEachPhase()
+inline bool shouldDumpGraphAtEachPhase(CompilationMode mode)
 {
-#if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
-    return true;
-#else
-    return Options::dumpGraphAtEachPhase();
-#endif
+    if (isFTL(mode))
+        return Options::dumpGraphAtEachPhase() || Options::dumpDFGFTLGraphAtEachPhase();
+    return Options::dumpGraphAtEachPhase() || Options::dumpDFGGraphAtEachPhase();
 }
 
 inline bool validationEnabled()
@@ -136,9 +90,68 @@ inline bool validationEnabled()
 #endif
 }
 
-enum SpillRegistersMode { NeedToSpill, DontSpill };
+inline bool enableInt52()
+{
+#if USE(JSVALUE64)
+    return true;
+#else
+    return false;
+#endif
+}
 
 enum NoResultTag { NoResult };
+
+// The prediction propagator effectively does four passes, with the last pass
+// being done by the separate FixuPhase.
+enum PredictionPass {
+    // We're converging in a straight-forward forward flow fixpoint. This is the
+    // most conventional part of the propagator - it makes only monotonic decisions
+    // based on value profiles and rare case profiles. It ignores baseline JIT rare
+    // case profiles. The goal here is to develop a good guess of which variables
+    // are likely to be purely numerical, which generally doesn't require knowing
+    // the rare case profiles.
+    PrimaryPass,
+    
+    // At this point we know what is numerical and what isn't. Non-numerical inputs
+    // to arithmetic operations will not have useful information in the Baseline JIT
+    // rare case profiles because Baseline may take slow path on non-numerical
+    // inputs even if the DFG could handle the input on the fast path. Boolean
+    // inputs are the most obvious example. This pass of prediction propagation will
+    // use Baseline rare case profiles for purely numerical operations and it will
+    // ignore them for everything else. The point of this pass is to develop a good
+    // guess of which variables are likely to be doubles.
+    //
+    // This pass is intentionally weird and goes against what is considered good
+    // form when writing a static analysis: a new data flow of booleans will cause
+    // us to ignore rare case profiles except that by then, we will have already
+    // propagated double types based on our prior assumption that we shouldn't
+    // ignore rare cases. This probably won't happen because the PrimaryPass is
+    // almost certainly going to establish what is and isn't numerical. But it's
+    // conceivable that during this pass we will discover a new boolean data flow.
+    // This ends up being sound because the prediction propagator could literally
+    // make any guesses it wants and still be sound (worst case, we OSR exit more
+    // often or use too general of types are run a bit slower). This will converge
+    // because we force monotonicity on the types of nodes and variables. So, the
+    // worst thing that can happen is that we violate basic laws of theoretical
+    // decency.
+    RareCasePass,
+    
+    // At this point we know what is numerical and what isn't, and we also know what
+    // is a double and what isn't. So, we start forcing variables to be double.
+    // Doing so may have a cascading effect so this is a fixpoint. It's monotonic
+    // in the sense that once a variable is forced double, it cannot be forced in
+    // the other direction.
+    DoubleVotingPass,
+    
+    // This pass occurs once we have converged. At this point we are just installing
+    // type checks based on the conclusions we have already reached. It's important
+    // for this pass to reach the same conclusions that DoubleVotingPass reached.
+    FixupPass
+};
+
+enum StructureRegistrationState { HaveNotStartedRegistering, AllStructuresAreRegistered };
+
+enum StructureRegistrationResult { StructureRegisteredNormally, StructureRegisteredAndWatched };
 
 enum OptimizationFixpointState { BeforeFixpoint, FixpointNotConverged, FixpointConverged };
 
@@ -176,18 +189,19 @@ enum GraphForm {
     // expect to be live at the head, and which locals they make available at the
     // tail. ThreadedCPS form also implies that:
     //
-    // - GetLocals and SetLocals to uncaptured variables are not redundant within
-    //   a basic block.
+    // - GetLocals and SetLocals are not redundant within a basic block.
     //
     // - All GetLocals and Flushes are linked directly to the last access point
-    //   of the variable, which must not be another GetLocal if the variable is
-    //   uncaptured.
+    //   of the variable, which must not be another GetLocal.
     //
     // - Phantom(Phi) is not legal, but PhantomLocal is.
     //
     // ThreadedCPS form is suitable for data flow analysis (CFA, prediction
     // propagation), register allocation, and code generation.
-    ThreadedCPS
+    ThreadedCPS,
+    
+    // SSA form. See DFGSSAConversionPhase.h for a description.
+    SSA
 };
 
 // Describes the state of the UnionFind structure of VariableAccessData's.
@@ -210,8 +224,6 @@ enum RefCountState {
 
 enum OperandSpeculationMode { AutomaticOperandSpeculation, ManualOperandSpeculation };
 
-enum SpeculationDirection { ForwardSpeculation, BackwardSpeculation };
-
 enum ProofStatus { NeedsCheck, IsProved };
 
 inline bool isProved(ProofStatus proofStatus)
@@ -225,6 +237,24 @@ inline ProofStatus proofStatusForIsProved(bool isProved)
     return isProved ? IsProved : NeedsCheck;
 }
 
+enum KillStatus { DoesNotKill, DoesKill };
+
+inline bool doesKill(KillStatus killStatus)
+{
+    ASSERT(killStatus == DoesNotKill || killStatus == DoesKill);
+    return killStatus == DoesKill;
+}
+
+inline KillStatus killStatusForDoesKill(bool doesKill)
+{
+    return doesKill ? DoesKill : DoesNotKill;
+}
+
+enum class PlanStage {
+    Initial,
+    AfterFixup
+};
+
 template<typename T, typename U>
 bool checkAndSet(T& left, U right)
 {
@@ -233,6 +263,40 @@ bool checkAndSet(T& left, U right)
     left = right;
     return true;
 }
+
+// If possible, this will acquire a lock to make sure that if multiple threads
+// start crashing at the same time, you get coherent dump output. Use this only
+// when you're forcing a crash with diagnostics.
+void startCrashing();
+
+JS_EXPORT_PRIVATE bool isCrashing();
+
+struct NodeAndIndex {
+    NodeAndIndex()
+        : node(nullptr)
+        , index(UINT_MAX)
+    {
+    }
+    
+    NodeAndIndex(Node* node, unsigned index)
+        : node(node)
+        , index(index)
+    {
+        ASSERT(!node == (index == UINT_MAX));
+    }
+    
+    bool operator!() const
+    {
+        return !node;
+    }
+    
+    Node* node;
+    unsigned index;
+};
+
+// A less-than operator for strings that is useful for generating string switches. Sorts by <
+// relation on characters. Ensures that if a is a prefix of b, then a < b.
+bool stringLessThan(StringImpl& a, StringImpl& b);
 
 } } // namespace JSC::DFG
 
@@ -252,19 +316,75 @@ namespace JSC { namespace DFG {
 
 // Put things here that must be defined even if ENABLE(DFG_JIT) is false.
 
-enum CapabilityLevel { CannotCompile, MayInline, CanCompile, CapabilityLevelNotSet };
+enum CapabilityLevel {
+    CannotCompile,
+    CanCompile,
+    CanCompileAndInline,
+    CapabilityLevelNotSet
+};
+
+inline bool canCompile(CapabilityLevel level)
+{
+    switch (level) {
+    case CanCompile:
+    case CanCompileAndInline:
+        return true;
+    default:
+        return false;
+    }
+}
+
+inline bool canInline(CapabilityLevel level)
+{
+    switch (level) {
+    case CanCompileAndInline:
+        return true;
+    default:
+        return false;
+    }
+}
+
+inline CapabilityLevel leastUpperBound(CapabilityLevel a, CapabilityLevel b)
+{
+    switch (a) {
+    case CannotCompile:
+        return CannotCompile;
+    case CanCompile:
+        switch (b) {
+        case CanCompile:
+        case CanCompileAndInline:
+            return CanCompile;
+        default:
+            return CannotCompile;
+        }
+    case CanCompileAndInline:
+        return b;
+    case CapabilityLevelNotSet:
+        ASSERT_NOT_REACHED();
+        return CannotCompile;
+    }
+    ASSERT_NOT_REACHED();
+    return CannotCompile;
+}
 
 // Unconditionally disable DFG disassembly support if the DFG is not compiled in.
-inline bool shouldShowDisassembly()
+inline bool shouldDumpDisassembly(CompilationMode mode = DFGMode)
 {
 #if ENABLE(DFG_JIT)
-    return Options::showDisassembly() || Options::showDFGDisassembly();
+    return Options::dumpDisassembly() || Options::dumpDFGDisassembly() || (isFTL(mode) && Options::dumpFTLDisassembly());
 #else
+    UNUSED_PARAM(mode);
     return false;
 #endif
 }
 
 } } // namespace JSC::DFG
+
+namespace WTF {
+
+void printInternal(PrintStream&, JSC::DFG::CapabilityLevel);
+
+} // namespace WTF
 
 #endif // DFGCommon_h
 

@@ -30,7 +30,11 @@
 #include <CoreGraphics/CGGeometry.h>
 #endif
 
-#ifdef __APPLE__
+#if PLATFORM(MAC)
+#include <objc/objc.h>
+#endif
+
+#if defined(__APPLE__) && !PLATFORM(GTK)
 #ifdef __OBJC__
 @class WKView;
 @class NSWindow;
@@ -40,19 +44,10 @@ class NSWindow;
 #endif
 typedef WKView *PlatformWKView;
 typedef NSWindow *PlatformWindow;
-#elif defined(WIN32) || defined(_WIN32)
-typedef WKViewRef PlatformWKView;
-typedef HWND PlatformWindow;
 #elif PLATFORM(GTK)
 typedef WKViewRef PlatformWKView;
 typedef GtkWidget *PlatformWindow;
 #elif PLATFORM(EFL)
-typedef struct _Ecore_Evas Ecore_Evas;
-#if USE(EO)
-typedef struct _Eo Evas_Object;
-#else
-typedef struct _Evas_Object Evas_Object;
-#endif
 typedef Evas_Object* PlatformWKView;
 typedef Ecore_Evas* PlatformWindow;
 #elif PLATFORM(QT)
@@ -66,13 +61,14 @@ typedef QQuickView* PlatformWindow;
 
 namespace TestWebKitAPI {
 
-#if PLATFORM(WIN)
-class WindowMessageObserver;
-#endif
-
 class PlatformWebView {
 public:
-    PlatformWebView(WKContextRef, WKPageGroupRef = 0);
+    explicit PlatformWebView(WKPageConfigurationRef);
+    explicit PlatformWebView(WKContextRef, WKPageGroupRef = 0);
+    explicit PlatformWebView(WKPageRef relatedPage);
+#if PLATFORM(MAC)
+    explicit PlatformWebView(WKContextRef, WKPageGroupRef, Class wkViewSubclass);
+#endif
     ~PlatformWebView();
 
     WKPageRef page() const;
@@ -84,24 +80,19 @@ public:
     void simulateAltKeyPress();
     void simulateRightClick(unsigned x, unsigned y);
     void simulateMouseMove(unsigned x, unsigned y);
-
-#if PLATFORM(WIN)
-    void simulateAKeyDown();
-    void setParentWindowMessageObserver(WindowMessageObserver* observer) { m_parentWindowMessageObserver = observer; }
+#if PLATFORM(MAC)
+    void simulateButtonClick(WKEventMouseButton, unsigned x, unsigned y, WKEventModifiers);
 #endif
 
 private:
-#if PLATFORM(WIN)
-    static void registerWindowClass();
-    static LRESULT CALLBACK wndProc(HWND, UINT message, WPARAM, LPARAM);
+#if PLATFORM(MAC)
+    void initialize(WKPageConfigurationRef, Class wkViewSubclass);
+#elif PLATFORM(GTK)
+    void initialize(WKPageConfigurationRef);
 #endif
 
     PlatformWKView m_view;
     PlatformWindow m_window;
-
-#if PLATFORM(WIN)
-    WindowMessageObserver* m_parentWindowMessageObserver;
-#endif
 };
 
 } // namespace TestWebKitAPI

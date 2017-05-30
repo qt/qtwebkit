@@ -21,14 +21,12 @@
 #ifndef SVGFilterPrimitiveStandardAttributes_h
 #define SVGFilterPrimitiveStandardAttributes_h
 
-#if ENABLE(SVG) && ENABLE(FILTERS)
 #include "RenderSVGResourceFilter.h"
 #include "RenderSVGResourceFilterPrimitive.h"
 #include "SVGAnimatedLength.h"
 #include "SVGAnimatedString.h"
-#include "SVGStyledElement.h"
+#include "SVGElement.h"
 
-#include <wtf/PassRefPtr.h>
 #include <wtf/RefPtr.h>
 
 namespace WebCore {
@@ -37,40 +35,32 @@ class Filter;
 class FilterEffect;
 class SVGFilterBuilder;
 
-class SVGFilterPrimitiveStandardAttributes : public SVGStyledElement {
+class SVGFilterPrimitiveStandardAttributes : public SVGElement {
 public:
     void setStandardAttributes(FilterEffect*) const;
 
-    virtual PassRefPtr<FilterEffect> build(SVGFilterBuilder*, Filter* filter) = 0;
+    virtual RefPtr<FilterEffect> build(SVGFilterBuilder*, Filter&) = 0;
     // Returns true, if the new value is different from the old one.
     virtual bool setFilterEffectAttribute(FilterEffect*, const QualifiedName&);
 
 protected:
-    SVGFilterPrimitiveStandardAttributes(const QualifiedName&, Document*);
+    SVGFilterPrimitiveStandardAttributes(const QualifiedName&, Document&);
 
-    bool isSupportedAttribute(const QualifiedName&);
-    virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
-    virtual void svgAttributeChanged(const QualifiedName&);
-    virtual void childrenChanged(bool changedByParser = false, Node* beforeChange = 0, Node* afterChange = 0, int childCountDelta = 0);
+    virtual void parseAttribute(const QualifiedName&, const AtomicString&) override;
+    virtual void svgAttributeChanged(const QualifiedName&) override;
+    virtual void childrenChanged(const ChildChange&) override;
 
-    inline void invalidate()
-    {
-        if (RenderObject* primitiveRenderer = renderer())
-            RenderSVGResource::markForLayoutAndParentResourceInvalidation(primitiveRenderer);
-    }
-
-    inline void primitiveAttributeChanged(const QualifiedName& attribute)
-    {
-        if (RenderObject* primitiveRenderer = renderer())
-            static_cast<RenderSVGResourceFilterPrimitive*>(primitiveRenderer)->primitiveAttributeChanged(attribute);
-    }
+    void invalidate();
+    void primitiveAttributeChanged(const QualifiedName& attributeName);
 
 private:
-    virtual bool isFilterEffect() const { return true; }
+    virtual bool isFilterEffect() const override { return true; }
 
-    virtual RenderObject* createRenderer(RenderArena*, RenderStyle*) OVERRIDE;
-    virtual bool rendererIsNeeded(const NodeRenderingContext&) OVERRIDE;
-    virtual bool childShouldCreateRenderer(const NodeRenderingContext&) const OVERRIDE { return false; }
+    virtual RenderPtr<RenderElement> createElementRenderer(Ref<RenderStyle>&&, const RenderTreePosition&) override;
+    virtual bool rendererIsNeeded(const RenderStyle&) override;
+    virtual bool childShouldCreateRenderer(const Node&) const override { return false; }
+
+    static bool isSupportedAttribute(const QualifiedName&);
 
     BEGIN_DECLARE_ANIMATED_PROPERTIES(SVGFilterPrimitiveStandardAttributes)
         DECLARE_ANIMATED_LENGTH(X, x)
@@ -83,7 +73,23 @@ private:
 
 void invalidateFilterPrimitiveParent(SVGElement*);
 
+inline void SVGFilterPrimitiveStandardAttributes::invalidate()
+{
+    if (auto* primitiveRenderer = renderer())
+        RenderSVGResource::markForLayoutAndParentResourceInvalidation(*primitiveRenderer);
+}
+
+inline void SVGFilterPrimitiveStandardAttributes::primitiveAttributeChanged(const QualifiedName& attribute)
+{
+    if (auto* primitiveRenderer = renderer())
+        static_cast<RenderSVGResourceFilterPrimitive*>(primitiveRenderer)->primitiveAttributeChanged(attribute);
+}
+
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
+SPECIALIZE_TYPE_TRAITS_BEGIN(WebCore::SVGFilterPrimitiveStandardAttributes)
+    static bool isType(const WebCore::SVGElement& element) { return element.isFilterEffect(); }
+    static bool isType(const WebCore::Node& node) { return is<WebCore::SVGElement>(node) && isType(downcast<WebCore::SVGElement>(node)); }
+SPECIALIZE_TYPE_TRAITS_END()
+
 #endif

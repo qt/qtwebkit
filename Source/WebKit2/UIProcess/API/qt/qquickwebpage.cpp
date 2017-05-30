@@ -21,6 +21,7 @@
 #include "config.h"
 #include "qquickwebpage_p.h"
 
+#include "CoordinatedGraphicsScene.h"
 #include "QtWebPageEventHandler.h"
 #include "QtWebPageSGNode.h"
 #include "TransformationMatrix.h"
@@ -30,7 +31,6 @@
 #include "qwebkittest_p.h"
 #include <QQuickWindow>
 #include <WKPage.h>
-#include <WebCore/CoordinatedGraphicsScene.h>
 
 using namespace WebKit;
 
@@ -59,10 +59,10 @@ QQuickWebPagePrivate::QQuickWebPagePrivate(QQuickWebPage* q, QQuickWebView* view
 {
 }
 
-void QQuickWebPagePrivate::paint(QPainter* painter)
+void QQuickWebPagePrivate::paint(QPainter* painter, const WebCore::Color& backgroundColor, bool drawsBackground)
 {
-    if (WebCore::CoordinatedGraphicsScene* scene = QQuickWebViewPrivate::get(viewportItem)->coordinatedGraphicsScene())
-        scene->paintToGraphicsContext(painter);
+    if (CoordinatedGraphicsScene* scene = QQuickWebViewPrivate::get(viewportItem)->coordinatedGraphicsScene())
+        scene->paintToGraphicsContext(painter, backgroundColor, drawsBackground);
 }
 
 
@@ -70,7 +70,7 @@ QSGNode* QQuickWebPage::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*)
 {
     QQuickWebViewPrivate* webViewPrivate = QQuickWebViewPrivate::get(d->viewportItem);
 
-    WebCore::CoordinatedGraphicsScene* scene = webViewPrivate->coordinatedGraphicsScene();
+    CoordinatedGraphicsScene* scene = webViewPrivate->coordinatedGraphicsScene();
     if (!scene)
         return oldNode;
 
@@ -88,7 +88,7 @@ QSGNode* QQuickWebPage::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*)
     }
 
     if (!node)
-        node = new QtWebPageSGNode;
+        node = new QtWebPageSGNode(*webViewPrivate->webPageProxy);
 
     node->setCoordinatedGraphicsScene(scene);
 

@@ -30,25 +30,22 @@
 #if USE(COORDINATED_GRAPHICS)
 
 #include "Color.h"
+#include "FilterOperations.h"
 #include "FloatRect.h"
 #include "FloatSize.h"
-#include "GraphicsLayerAnimation.h"
 #include "IntRect.h"
 #include "IntSize.h"
 #include "SurfaceUpdateInfo.h"
+#include "TextureMapperAnimation.h"
 #include "TransformationMatrix.h"
-
-#if ENABLE(CSS_FILTERS)
-#include "FilterOperations.h"
-#endif
-
-#if ENABLE(CSS_FILTERS)
-#include "CustomFilterProgramInfo.h"
-#endif
 
 #if USE(GRAPHICS_SURFACE)
 #include "GraphicsSurface.h"
 #include "GraphicsSurfaceToken.h"
+#endif
+
+#if USE(COORDINATED_GRAPHICS_THREADED)
+#include "TextureMapperPlatformLayerProxy.h"
 #endif
 
 namespace WebCore {
@@ -93,8 +90,8 @@ struct CoordinatedGraphicsLayerState {
             bool filtersChanged: 1;
             bool childrenChanged: 1;
             bool repaintCountChanged : 1;
-            bool canvasChanged: 1;
-            bool canvasShouldSwapBuffers: 1;
+            bool platformLayerChanged: 1;
+            bool platformLayerShouldSwapBuffers: 1;
             bool isScrollableChanged: 1;
             bool committedScrollOffsetChanged: 1;
             bool contentsTilingChanged: 1;
@@ -134,8 +131,9 @@ struct CoordinatedGraphicsLayerState {
         , replica(InvalidCoordinatedLayerID)
         , mask(InvalidCoordinatedLayerID)
         , imageID(InvalidCoordinatedImageBackingID)
-#if USE(GRAPHICS_SURFACE)
-        , canvasFrontBuffer(0)
+        , repaintCount(0)
+#if USE(COORDINATED_GRAPHICS_THREADED)
+        , platformLayerProxy(0)
 #endif
     {
     }
@@ -145,17 +143,15 @@ struct CoordinatedGraphicsLayerState {
     FloatSize size;
     TransformationMatrix transform;
     TransformationMatrix childrenTransform;
-    IntRect contentsRect;
-    IntPoint contentsTilePhase;
-    IntSize contentsTileSize;
+    FloatRect contentsRect;
+    FloatSize contentsTilePhase;
+    FloatSize contentsTileSize;
     float opacity;
     Color solidColor;
     Color debugBorderColor;
     float debugBorderWidth;
-#if ENABLE(CSS_FILTERS)
     FilterOperations filters;
-#endif
-    GraphicsLayerAnimations animations;
+    TextureMapperAnimations animations;
     Vector<uint32_t> children;
     Vector<TileCreationInfo> tilesToCreate;
     Vector<uint32_t> tilesToRemove;
@@ -167,10 +163,14 @@ struct CoordinatedGraphicsLayerState {
     Vector<TileUpdateInfo> tilesToUpdate;
 
 #if USE(GRAPHICS_SURFACE)
-    IntSize canvasSize;
-    GraphicsSurfaceToken canvasToken;
-    uint32_t canvasFrontBuffer;
-    GraphicsSurface::Flags canvasSurfaceFlags;
+    IntSize platformLayerSize;
+    GraphicsSurfaceToken platformLayerToken;
+    uint32_t platformLayerFrontBuffer { 0 };
+    GraphicsSurface::Flags platformLayerSurfaceFlags;
+#endif
+
+#if USE(COORDINATED_GRAPHICS_THREADED)
+    RefPtr<TextureMapperPlatformLayerProxy> platformLayerProxy;
 #endif
 
     IntSize committedScrollOffset;
@@ -198,11 +198,6 @@ struct CoordinatedGraphicsState {
 
     Vector<std::pair<uint32_t /* atlasID */, RefPtr<CoordinatedSurface> > > updateAtlasesToCreate;
     Vector<uint32_t /* atlasID */> updateAtlasesToRemove;
-
-#if ENABLE(CSS_SHADERS)
-    Vector<std::pair<uint32_t /* FilterID */, CustomFilterProgramInfo> > customFiltersToCreate;
-    Vector<uint32_t> customFiltersToRemove;
-#endif
 };
 
 } // namespace WebCore

@@ -24,14 +24,18 @@
  */
 
 #include "config.h"
+
+#if WK_HAVE_C_SPI
+
 #include "JavaScriptTest.h"
 #include "PlatformUtilities.h"
 #include "PlatformWebView.h"
 #include "Test.h"
 #include <JavaScriptCore/JSContextRef.h>
-#include <WebKit2/WKContextPrivate.h>
-#include <WebKit2/WKPagePrivate.h>
-#include <WebKit2/WKSerializedScriptValue.h>
+#include <WebKit/WKContextPrivate.h>
+#include <WebKit/WKPagePrivate.h>
+#include <WebKit/WKPreferencesRefPrivate.h>
+#include <WebKit/WKSerializedScriptValue.h>
 
 namespace TestWebKitAPI {
 
@@ -68,15 +72,24 @@ static void didFinishDocumentLoadForFrame(WKPageRef page, WKFrameRef frame, WKTy
 TEST(WebKit2, ScrollPinningBehaviors)
 {
     WKRetainPtr<WKContextRef> context(AdoptWK, WKContextCreate());
-    PlatformWebView webView(context.get());
 
-    WKPageLoaderClient loaderClient;
+    // Turn off threaded scrolling; synchronously waiting for the main thread scroll position to
+    // update using WKPageForceRepaint would be better, but for some reason doesn't block until
+    // it's updated after the initial WKPageSetScrollPinningBehavior above.
+    WKRetainPtr<WKPageGroupRef> pageGroup(AdoptWK, WKPageGroupCreateWithIdentifier(Util::toWK("NoThreadedScrollingPageGroup").get()));
+    WKPreferencesRef preferences = WKPageGroupGetPreferences(pageGroup.get());
+    WKPreferencesSetThreadedScrollingEnabled(preferences, false);
+
+    PlatformWebView webView(context.get(), pageGroup.get());
+
+    WKPageLoaderClientV3 loaderClient;
     memset(&loaderClient, 0, sizeof(loaderClient));
-    loaderClient.version = kWKPageLoaderClientCurrentVersion;
-    loaderClient.didFinishDocumentLoadForFrame = didFinishDocumentLoadForFrame;
-    loaderClient.clientInfo = &webView;
 
-    WKPageSetPageLoaderClient(webView.page(), &loaderClient);
+    loaderClient.base.version = 3;
+    loaderClient.base.clientInfo = &webView;
+    loaderClient.didFinishDocumentLoadForFrame = didFinishDocumentLoadForFrame;
+
+    WKPageSetPageLoaderClient(webView.page(), &loaderClient.base);
 
     WKPageLoadURL(webView.page(), adoptWK(Util::createURLForResource("simple-tall", "html")).get());
 
@@ -85,3 +98,5 @@ TEST(WebKit2, ScrollPinningBehaviors)
 }
 
 } // namespace TestWebKitAPI
+
+#endif

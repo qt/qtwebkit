@@ -22,22 +22,13 @@
 #ifndef FilterEffect_h
 #define FilterEffect_h
 
-#if ENABLE(FILTERS)
 #include "ColorSpace.h"
 #include "FloatRect.h"
 #include "IntRect.h"
-
-#include <wtf/PassOwnPtr.h>
+#include <runtime/Uint8ClampedArray.h>
 #include <wtf/RefCounted.h>
 #include <wtf/RefPtr.h>
-#include <wtf/Uint8ClampedArray.h>
 #include <wtf/Vector.h>
-
-#if ENABLE(OPENCL)
-#include "FilterContextOpenCL.h"
-#endif
-
-static const float kMaxFilterSize = 5000.0f;
 
 namespace WebCore {
 
@@ -46,7 +37,7 @@ class FilterEffect;
 class ImageBuffer;
 class TextStream;
 
-typedef Vector<RefPtr<FilterEffect> > FilterEffectVector;
+typedef Vector<RefPtr<FilterEffect>> FilterEffectVector;
 
 enum FilterEffectType {
     FilterEffectTypeUnknown,
@@ -77,6 +68,7 @@ public:
     FilterEffectVector& inputEffects() { return m_inputEffects; }
     FilterEffect* inputEffect(unsigned) const;
     unsigned numberOfEffectInputs() const { return m_inputEffects.size(); }
+    unsigned totalNumberOfEffectInputs() const;
     
     inline bool hasResult() const
     {
@@ -89,7 +81,7 @@ public:
             || m_premultipliedImageResult;
     }
 
-    IntRect drawingRegionOfInputImage(const IntRect&) const;
+    FloatRect drawingRegionOfInputImage(const IntRect&) const;
     IntRect requestedRegionOfInputImageData(const IntRect&) const;
 
     // Solid black image with different alpha values.
@@ -147,7 +139,7 @@ public:
     FloatRect effectBoundaries() const { return m_effectBoundaries; }
     void setEffectBoundaries(const FloatRect& effectBoundaries) { m_effectBoundaries = effectBoundaries; }
 
-    Filter* filter() { return m_filter; }
+    Filter& filter() { return m_filter; }
 
     bool clipsToBounds() const { return m_clipsToBounds; }
     void setClipsToBounds(bool value) { m_clipsToBounds = value; }
@@ -161,7 +153,7 @@ public:
     void transformResultColorSpace(ColorSpace);
 
 protected:
-    FilterEffect(Filter*);
+    FilterEffect(Filter&);
 
     ImageBuffer* createImageBufferResult();
     Uint8ClampedArray* createUnmultipliedImageResult();
@@ -177,8 +169,10 @@ protected:
     // If a pre-multiplied image, check every pixel for validity and correct if necessary.
     void forceValidPreMultipliedPixels();
 
+    void clipAbsolutePaintRect();
+
 private:
-    OwnPtr<ImageBuffer> m_imageBufferResult;
+    std::unique_ptr<ImageBuffer> m_imageBufferResult;
     RefPtr<Uint8ClampedArray> m_unmultipliedImageResult;
     RefPtr<Uint8ClampedArray> m_premultipliedImageResult;
     FilterEffectVector m_inputEffects;
@@ -193,7 +187,7 @@ private:
     // The maximum size of a filter primitive. In SVG this is the primitive subregion in absolute coordinate space.
     // The absolute paint rect should never be bigger than m_maxEffectRect.
     FloatRect m_maxEffectRect;
-    Filter* m_filter;
+    Filter& m_filter;
     
 private:
     inline void copyImageBytes(Uint8ClampedArray* source, Uint8ClampedArray* destination, const IntRect&);
@@ -221,7 +215,5 @@ private:
 };
 
 } // namespace WebCore
-
-#endif // ENABLE(FILTERS)
 
 #endif // FilterEffect_h

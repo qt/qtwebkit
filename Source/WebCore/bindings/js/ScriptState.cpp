@@ -31,8 +31,10 @@
 #include "config.h"
 #include "ScriptState.h"
 
-#include "Frame.h"
+#include "Document.h"
 #include "JSDOMWindowBase.h"
+#include "JSWorkerGlobalScope.h"
+#include "MainFrame.h"
 #include "Node.h"
 #include "Page.h"
 #include "ScriptController.h"
@@ -42,61 +44,60 @@
 #include <interpreter/CallFrame.h>
 #include <runtime/JSGlobalObject.h>
 
-#if ENABLE(WORKERS)
-#include "JSWorkerGlobalScope.h"
-#endif
 
 namespace WebCore {
 
-DOMWindow* domWindowFromScriptState(ScriptState* scriptState)
+DOMWindow* domWindowFromExecState(JSC::ExecState* scriptState)
 {
     JSC::JSGlobalObject* globalObject = scriptState->lexicalGlobalObject();
-    if (!globalObject->inherits(&JSDOMWindowBase::s_info))
-        return 0;
-    return JSC::jsCast<JSDOMWindowBase*>(globalObject)->impl();
+    if (!globalObject->inherits(JSDOMWindowBase::info()))
+        return nullptr;
+    return &JSC::jsCast<JSDOMWindowBase*>(globalObject)->wrapped();
 }
 
-ScriptExecutionContext* scriptExecutionContextFromScriptState(ScriptState* scriptState)
+Frame* frameFromExecState(JSC::ExecState* scriptState)
+{
+    ScriptExecutionContext* context = scriptExecutionContextFromExecState(scriptState);
+    Document* document = is<Document>(context) ? downcast<Document>(context) : nullptr;
+    return document ? document->frame() : nullptr;
+}
+
+ScriptExecutionContext* scriptExecutionContextFromExecState(JSC::ExecState* scriptState)
 {
     JSC::JSGlobalObject* globalObject = scriptState->lexicalGlobalObject();
-    if (!globalObject->inherits(&JSDOMGlobalObject::s_info))
-        return 0;
+    if (!globalObject->inherits(JSDOMGlobalObject::info()))
+        return nullptr;
     return JSC::jsCast<JSDOMGlobalObject*>(globalObject)->scriptExecutionContext();
 }
 
-ScriptState* mainWorldScriptState(Frame* frame)
+JSC::ExecState* mainWorldExecState(Frame* frame)
 {
     if (!frame)
-        return 0;
-    JSDOMWindowShell* shell = frame->script()->windowShell(mainThreadNormalWorld());
+        return nullptr;
+    JSDOMWindowShell* shell = frame->script().windowShell(mainThreadNormalWorld());
     return shell->window()->globalExec();
 }
 
-ScriptState* scriptStateFromNode(DOMWrapperWorld* world, Node* node)
+JSC::ExecState* execStateFromNode(DOMWrapperWorld& world, Node* node)
 {
     if (!node)
-        return 0;
-    Document* document = node->document();
-    if (!document)
-        return 0;
-    Frame* frame = document->frame();
+        return nullptr;
+    Frame* frame = node->document().frame();
     if (!frame)
-        return 0;
-    if (!frame->script()->canExecuteScripts(NotAboutToExecuteScript))
-        return 0;
-    return frame->script()->globalObject(world)->globalExec();
+        return nullptr;
+    if (!frame->script().canExecuteScripts(NotAboutToExecuteScript))
+        return nullptr;
+    return frame->script().globalObject(world)->globalExec();
 }
 
-ScriptState* scriptStateFromPage(DOMWrapperWorld* world, Page* page)
+JSC::ExecState* execStateFromPage(DOMWrapperWorld& world, Page* page)
 {
-    return page->mainFrame()->script()->globalObject(world)->globalExec();
+    return page ? page->mainFrame().script().globalObject(world)->globalExec() : nullptr;
 }
 
-#if ENABLE(WORKERS)
-ScriptState* scriptStateFromWorkerGlobalScope(WorkerGlobalScope* workerGlobalScope)
+JSC::ExecState* execStateFromWorkerGlobalScope(WorkerGlobalScope* workerGlobalScope)
 {
     return workerGlobalScope->script()->workerGlobalScopeWrapper()->globalExec();
 }
-#endif
 
 }

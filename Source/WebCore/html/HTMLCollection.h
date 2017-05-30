@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 1999 Lars Knoll (knoll@kde.org)
  *           (C) 1999 Antti Koivisto (koivisto@kde.org)
- * Copyright (C) 2003, 2004, 2005, 2006, 2007, 2008, 2011, 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2003, 2004, 2005, 2006, 2007, 2008, 2011, 2012, 2013, 2014 Apple Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -23,74 +23,212 @@
 #ifndef HTMLCollection_h
 #define HTMLCollection_h
 
-#include "CollectionType.h"
+#include "CollectionIndexCache.h"
+#include "HTMLNames.h"
 #include "LiveNodeList.h"
 #include "ScriptWrappable.h"
-#include <wtf/Forward.h>
 #include <wtf/HashMap.h>
-#include <wtf/Vector.h>
 
 namespace WebCore {
 
-class HTMLCollection : public LiveNodeListBase {
+class Element;
+
+class CollectionNamedElementCache {
 public:
-    static PassRefPtr<HTMLCollection> create(Node* base, CollectionType);
+    const Vector<Element*>* findElementsWithId(const AtomicString& id) const;
+    const Vector<Element*>* findElementsWithName(const AtomicString& name) const;
+    const Vector<AtomicString>& propertyNames() const { return m_propertyNames; }
+
+    void appendToIdCache(const AtomicString& id, Element&);
+    void appendToNameCache(const AtomicString& name, Element&);
+    void didPopulate();
+
+    size_t memoryCost() const;
+
+private:
+    typedef HashMap<AtomicStringImpl*, Vector<Element*>> StringToElementsMap;
+
+    const Vector<Element*>* find(const StringToElementsMap&, const AtomicString& key) const;
+    void append(StringToElementsMap&, const AtomicString& key, Element&);
+
+    StringToElementsMap m_idMap;
+    StringToElementsMap m_nameMap;
+    Vector<AtomicString> m_propertyNames;
+
+#if !ASSERT_DISABLED
+    bool m_didPopulate { false };
+#endif
+};
+
+// HTMLCollection subclasses NodeList to maintain legacy ObjC API compatibility.
+class HTMLCollection : public NodeList {
+public:
     virtual ~HTMLCollection();
 
     // DOM API
-    virtual Node* namedItem(const AtomicString& name) const;
-    PassRefPtr<NodeList> tags(const String&);
+    virtual Element* item(unsigned index) const override = 0; // Tighten return type from NodeList::item().
+    virtual Element* namedItem(const AtomicString& name) const = 0;
+    const Vector<AtomicString>& supportedPropertyNames();
+    RefPtr<NodeList> tags(const String&);
 
     // Non-DOM API
-    virtual bool hasNamedItem(const AtomicString& name) const;
-    void namedItems(const AtomicString& name, Vector<RefPtr<Node> >&) const;
-    bool isEmpty() const
-    {
-        if (isLengthCacheValid())
-            return !cachedLength();
-        if (isItemCacheValid())
-            return !cachedItem();
-        return !item(0);
-    }
-    bool hasExactlyOneItem() const
-    {
-        if (isLengthCacheValid())
-            return cachedLength() == 1;
-        if (isItemCacheValid())
-            return cachedItem() && !cachedItemOffset() && !item(1);
-        return item(0) && !item(1);
-    }
+    Vector<Ref<Element>> namedItems(const AtomicString& name) const;
+    virtual size_t memoryCost() const override;
 
-    virtual Element* virtualItemAfter(unsigned& offsetInArray, Element*) const;
+    bool isRootedAtDocument() const;
+    NodeListInvalidationType invalidationType() const;
+    CollectionType type() const;
+    ContainerNode& ownerNode() const;
+    ContainerNode& rootNode() const;
+    void invalidateCacheForAttribute(const QualifiedName* attributeName);
+    virtual void invalidateCache(Document&);
 
-    Element* traverseFirstElement(unsigned& offsetInArray, ContainerNode* root) const;
-    Element* traverseForwardToOffset(unsigned offset, Element* currentElement, unsigned& currentOffset, unsigned& offsetInArray, ContainerNode* root) const;
+    bool hasNamedElementCache() const;
 
 protected:
-    HTMLCollection(Node* base, CollectionType, ItemAfterOverrideType);
+    HTMLCollection(ContainerNode& base, CollectionType);
 
-    virtual void updateNameCache() const;
+    virtual void updateNamedElementCache() const;
+    Element* namedItemSlow(const AtomicString& name) const;
 
-    typedef HashMap<AtomicStringImpl*, OwnPtr<Vector<Element*> > > NodeCacheMap;
-    Vector<Element*>* idCache(const AtomicString& name) const { return m_idCache.get(name.impl()); }
-    Vector<Element*>* nameCache(const AtomicString& name) const { return m_nameCache.get(name.impl()); }
-    void appendIdCache(const AtomicString& name, Element* element) const { append(m_idCache, name, element); }
-    void appendNameCache(const AtomicString& name, Element* element) const { append(m_nameCache, name, element); }
+    void setNamedItemCache(std::unique_ptr<CollectionNamedElementCache>) const;
+    const CollectionNamedElementCache& namedItemCaches() const;
 
-private:
-    Element* traverseNextElement(unsigned& offsetInArray, Element* previous, ContainerNode* root) const;
+    Document& document() const;
 
-    virtual bool isLiveNodeList() const OVERRIDE { ASSERT_NOT_REACHED(); return true; }
+    void invalidateNamedElementCache(Document&) const;
 
-    static void append(NodeCacheMap&, const AtomicString&, Element*);
+    enum RootType { IsRootedAtNode, IsRootedAtDocument };
+    static RootType rootTypeFromCollectionType(CollectionType);
 
-    mutable NodeCacheMap m_idCache;
-    mutable NodeCacheMap m_nameCache;
-    mutable unsigned m_cachedElementsArrayOffset;
+    Ref<ContainerNode> m_ownerNode;
 
-    friend class LiveNodeListBase;
+    mutable std::unique_ptr<CollectionNamedElementCache> m_namedElementCache;
+
+    const unsigned m_collectionType : 5;
+    const unsigned m_invalidationType : 4;
+    const unsigned m_rootType : 1;
 };
 
-} // namespace
+inline ContainerNode& HTMLCollection::rootNode() const
+{
+    if (isRootedAtDocument() && ownerNode().inDocument())
+        return ownerNode().document();
 
+    return ownerNode();
+}
+
+inline const Vector<Element*>* CollectionNamedElementCache::findElementsWithId(const AtomicString& id) const
+{
+    return find(m_idMap, id);
+}
+
+inline const Vector<Element*>* CollectionNamedElementCache::findElementsWithName(const AtomicString& name) const
+{
+    return find(m_nameMap, name);
+}
+
+inline void CollectionNamedElementCache::appendToIdCache(const AtomicString& id, Element& element)
+{
+    append(m_idMap, id, element);
+}
+
+inline void CollectionNamedElementCache::appendToNameCache(const AtomicString& name, Element& element)
+{
+    append(m_nameMap, name, element);
+}
+
+inline size_t CollectionNamedElementCache::memoryCost() const
+{
+    return (m_idMap.size() + m_nameMap.size()) * sizeof(Element*) + m_propertyNames.size() * sizeof(AtomicString);
+}
+
+inline void CollectionNamedElementCache::didPopulate()
+{
+#if !ASSERT_DISABLED
+    m_didPopulate = true;
 #endif
+    if (size_t cost = memoryCost())
+        reportExtraMemoryAllocatedForCollectionIndexCache(cost);
+}
+
+inline const Vector<Element*>* CollectionNamedElementCache::find(const StringToElementsMap& map, const AtomicString& key) const
+{
+    ASSERT(m_didPopulate);
+    auto it = map.find(key.impl());
+    return it != map.end() ? &it->value : nullptr;
+}
+
+inline void CollectionNamedElementCache::append(StringToElementsMap& map, const AtomicString& key, Element& element)
+{
+    if (!m_idMap.contains(key.impl()) && !m_nameMap.contains(key.impl()))
+        m_propertyNames.append(key);
+    map.add(key.impl(), Vector<Element*>()).iterator->value.append(&element);
+}
+
+inline size_t HTMLCollection::memoryCost() const
+{
+    return m_namedElementCache ? m_namedElementCache->memoryCost() : 0;
+}
+
+inline bool HTMLCollection::isRootedAtDocument() const
+{
+    return m_rootType == IsRootedAtDocument;
+}
+
+inline NodeListInvalidationType HTMLCollection::invalidationType() const
+{
+    return static_cast<NodeListInvalidationType>(m_invalidationType);
+}
+
+inline CollectionType HTMLCollection::type() const
+{
+    return static_cast<CollectionType>(m_collectionType);
+}
+
+inline ContainerNode& HTMLCollection::ownerNode() const
+{
+    return const_cast<ContainerNode&>(m_ownerNode.get());
+}
+
+inline Document& HTMLCollection::document() const
+{
+    return m_ownerNode->document();
+}
+
+inline void HTMLCollection::invalidateCacheForAttribute(const QualifiedName* attributeName)
+{
+    if (!attributeName || shouldInvalidateTypeOnAttributeChange(invalidationType(), *attributeName))
+        invalidateCache(document());
+    else if (hasNamedElementCache() && (*attributeName == HTMLNames::idAttr || *attributeName == HTMLNames::nameAttr))
+        invalidateNamedElementCache(document());
+}
+
+inline bool HTMLCollection::hasNamedElementCache() const
+{
+    return !!m_namedElementCache;
+}
+
+inline void HTMLCollection::setNamedItemCache(std::unique_ptr<CollectionNamedElementCache> cache) const
+{
+    ASSERT(cache);
+    ASSERT(!m_namedElementCache);
+    cache->didPopulate();
+    m_namedElementCache = WTFMove(cache);
+    document().collectionCachedIdNameMap(*this);
+}
+
+inline const CollectionNamedElementCache& HTMLCollection::namedItemCaches() const
+{
+    ASSERT(!!m_namedElementCache);
+    return *m_namedElementCache;
+}
+
+} // namespace WebCore
+
+#define SPECIALIZE_TYPE_TRAITS_HTMLCOLLECTION(ClassName, Type) \
+SPECIALIZE_TYPE_TRAITS_BEGIN(WebCore::ClassName) \
+    static bool isType(const WebCore::HTMLCollection& collection) { return collection.type() == WebCore::Type; } \
+SPECIALIZE_TYPE_TRAITS_END()
+
+#endif // HTMLCollection_h

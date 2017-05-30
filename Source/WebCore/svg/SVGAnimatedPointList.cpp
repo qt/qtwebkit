@@ -18,11 +18,9 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "SVGAnimatedPointList.h"
 
-#include "SVGAnimateElement.h"
+#include "SVGAnimateElementBase.h"
 #include "SVGParserUtilities.h"
 #include "SVGPointList.h"
 
@@ -33,14 +31,14 @@ SVGAnimatedPointListAnimator::SVGAnimatedPointListAnimator(SVGAnimationElement* 
 {
 }
 
-PassOwnPtr<SVGAnimatedType> SVGAnimatedPointListAnimator::constructFromString(const String& string)
+std::unique_ptr<SVGAnimatedType> SVGAnimatedPointListAnimator::constructFromString(const String& string)
 {
-    OwnPtr<SVGAnimatedType> animtedType = SVGAnimatedType::createPointList(new SVGPointList);
-    pointsListFromSVGData(animtedType->pointList(), string);
-    return animtedType.release();
+    auto animatedType = SVGAnimatedType::createPointList(std::make_unique<SVGPointList>());
+    pointsListFromSVGData(animatedType->pointList(), string);
+    return animatedType;
 }
 
-PassOwnPtr<SVGAnimatedType> SVGAnimatedPointListAnimator::startAnimValAnimation(const SVGElementAnimatedPropertyList& animatedTypes)
+std::unique_ptr<SVGAnimatedType> SVGAnimatedPointListAnimator::startAnimValAnimation(const SVGElementAnimatedPropertyList& animatedTypes)
 {
     return SVGAnimatedType::createPointList(constructFromBaseValue<SVGAnimatedPointList>(animatedTypes));
 }
@@ -50,7 +48,7 @@ void SVGAnimatedPointListAnimator::stopAnimValAnimation(const SVGElementAnimated
     stopAnimValAnimationForType<SVGAnimatedPointList>(animatedTypes);
 }
 
-void SVGAnimatedPointListAnimator::resetAnimValToBaseVal(const SVGElementAnimatedPropertyList& animatedTypes, SVGAnimatedType* type)
+void SVGAnimatedPointListAnimator::resetAnimValToBaseVal(const SVGElementAnimatedPropertyList& animatedTypes, SVGAnimatedType& type)
 {
     resetFromBaseValue<SVGAnimatedPointList>(animatedTypes, type, &SVGAnimatedType::pointList);
 }
@@ -117,5 +115,3 @@ float SVGAnimatedPointListAnimator::calculateDistance(const String&, const Strin
 }
 
 }
-
-#endif // ENABLE(SVG)

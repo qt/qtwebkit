@@ -19,22 +19,22 @@
  */
 
 #include "config.h"
-#if ENABLE(SVG)
 #include "SVGSetElement.h"
+
 #include "SVGNames.h"
 
 namespace WebCore {
     
-inline SVGSetElement::SVGSetElement(const QualifiedName& tagName, Document* document)
-    : SVGAnimateElement(tagName, document)
+inline SVGSetElement::SVGSetElement(const QualifiedName& tagName, Document& document)
+    : SVGAnimateElementBase(tagName, document)
 {
     setAnimationMode(ToAnimation);
     ASSERT(hasTagName(SVGNames::setTag));
 }
 
-PassRefPtr<SVGSetElement> SVGSetElement::create(const QualifiedName& tagName, Document* document)
+Ref<SVGSetElement> SVGSetElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new SVGSetElement(tagName, document));
+    return adoptRef(*new SVGSetElement(tagName, document));
 }
 
 void SVGSetElement::updateAnimationMode()
@@ -44,7 +44,3 @@ void SVGSetElement::updateAnimationMode()
 }
 
 }
-
-// vim:ts=4:noet
-#endif // ENABLE(SVG)
-

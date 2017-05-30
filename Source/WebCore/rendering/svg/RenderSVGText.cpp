@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006 Apple Computer, Inc.
+ * Copyright (C) 2006 Apple Inc.
  * Copyright (C) 2006 Alexander Kellett <lypanov@kde.org>
  * Copyright (C) 2006 Oliver Hunt <ojh16@student.canterbury.ac.nz>
  * Copyright (C) 2007 Nikolas Zimmermann <zimmermann@kde.org>
@@ -25,39 +25,35 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "RenderSVGText.h"
 
-#include "FloatConversion.h"
 #include "FloatQuad.h"
-#include "FontCache.h"
+#include "Font.h"
 #include "GraphicsContext.h"
 #include "HitTestRequest.h"
 #include "HitTestResult.h"
 #include "LayoutRepainter.h"
 #include "PointerEventsHitRules.h"
+#include "RenderIterator.h"
+#include "RenderSVGInline.h"
 #include "RenderSVGInlineText.h"
 #include "RenderSVGResource.h"
 #include "RenderSVGRoot.h"
 #include "SVGLengthList.h"
-#include "SVGRenderSupport.h"
 #include "SVGResourcesCache.h"
 #include "SVGRootInlineBox.h"
 #include "SVGTextElement.h"
-#include "SVGTextLayoutAttributesBuilder.h"
 #include "SVGTextRunRenderingContext.h"
 #include "SVGTransformList.h"
 #include "SVGURIReference.h"
-#include "SimpleFontData.h"
 #include "TransformState.h"
 #include "VisiblePosition.h"
 #include <wtf/StackStats.h>
 
 namespace WebCore {
 
-RenderSVGText::RenderSVGText(SVGTextElement* node) 
-    : RenderSVGBlock(node)
+RenderSVGText::RenderSVGText(SVGTextElement& element, Ref<RenderStyle>&& style)
+    : RenderSVGBlock(element, WTFMove(style))
     , m_needsReordering(false)
     , m_needsPositioningValuesUpdate(false)
     , m_needsTransformUpdate(true)
@@ -70,81 +66,74 @@ RenderSVGText::~RenderSVGText()
     ASSERT(m_layoutAttributes.isEmpty());
 }
 
-bool RenderSVGText::isChildAllowed(RenderObject* child, RenderStyle*) const
+SVGTextElement& RenderSVGText::textElement() const
 {
-    return child->isInline();
+    return downcast<SVGTextElement>(RenderSVGBlock::graphicsElement());
 }
 
-RenderSVGText* RenderSVGText::locateRenderSVGTextAncestor(RenderObject* start)
+bool RenderSVGText::isChildAllowed(const RenderObject& child, const RenderStyle&) const
 {
-    ASSERT(start);
-    while (start && !start->isSVGText())
-        start = start->parent();
-    if (!start || !start->isSVGText())
-        return 0;
-    return toRenderSVGText(start);
+    return child.isInline();
 }
 
-const RenderSVGText* RenderSVGText::locateRenderSVGTextAncestor(const RenderObject* start)
+RenderSVGText* RenderSVGText::locateRenderSVGTextAncestor(RenderObject& start)
 {
-    ASSERT(start);
-    while (start && !start->isSVGText())
-        start = start->parent();
-    if (!start || !start->isSVGText())
-        return 0;
-    return toRenderSVGText(start);
+    return lineageOfType<RenderSVGText>(start).first();
+}
+
+const RenderSVGText* RenderSVGText::locateRenderSVGTextAncestor(const RenderObject& start)
+{
+    return lineageOfType<RenderSVGText>(start).first();
 }
 
 LayoutRect RenderSVGText::clippedOverflowRectForRepaint(const RenderLayerModelObject* repaintContainer) const
 {
-    return SVGRenderSupport::clippedOverflowRectForRepaint(this, repaintContainer);
+    return SVGRenderSupport::clippedOverflowRectForRepaint(*this, repaintContainer);
 }
 
-void RenderSVGText::computeRectForRepaint(const RenderLayerModelObject* repaintContainer, LayoutRect& rect, bool fixed) const
+LayoutRect RenderSVGText::computeRectForRepaint(const LayoutRect& rect, const RenderLayerModelObject* repaintContainer, bool fixed) const
 {
-    FloatRect repaintRect = rect;
-    computeFloatRectForRepaint(repaintContainer, repaintRect, fixed);
-    rect = enclosingLayoutRect(repaintRect);
+    return enclosingLayoutRect(computeFloatRectForRepaint(rect, repaintContainer, fixed));
 }
 
-void RenderSVGText::computeFloatRectForRepaint(const RenderLayerModelObject* repaintContainer, FloatRect& repaintRect, bool fixed) const
+FloatRect RenderSVGText::computeFloatRectForRepaint(const FloatRect& repaintRect, const RenderLayerModelObject* repaintContainer, bool fixed) const
 {
-    SVGRenderSupport::computeFloatRectForRepaint(this, repaintContainer, repaintRect, fixed);
+    return SVGRenderSupport::computeFloatRectForRepaint(*this, repaintRect, repaintContainer, fixed);
 }
 
 void RenderSVGText::mapLocalToContainer(const RenderLayerModelObject* repaintContainer, TransformState& transformState, MapCoordinatesFlags, bool* wasFixed) const
 {
-    SVGRenderSupport::mapLocalToContainer(this, repaintContainer, transformState, wasFixed);
+    SVGRenderSupport::mapLocalToContainer(*this, repaintContainer, transformState, wasFixed);
 }
 
 const RenderObject* RenderSVGText::pushMappingToContainer(const RenderLayerModelObject* ancestorToStopAt, RenderGeometryMap& geometryMap) const
 {
-    return SVGRenderSupport::pushMappingToContainer(this, ancestorToStopAt, geometryMap);
+    return SVGRenderSupport::pushMappingToContainer(*this, ancestorToStopAt, geometryMap);
 }
 
 static inline void collectLayoutAttributes(RenderObject* text, Vector<SVGTextLayoutAttributes*>& attributes)
 {
     for (RenderObject* descendant = text; descendant; descendant = descendant->nextInPreOrder(text)) {
-        if (descendant->isSVGInlineText())
-            attributes.append(toRenderSVGInlineText(descendant)->layoutAttributes());
+        if (is<RenderSVGInlineText>(*descendant))
+            attributes.append(downcast<RenderSVGInlineText>(*descendant).layoutAttributes());
     }
 }
 
-static inline bool findPreviousAndNextAttributes(RenderObject* start, RenderSVGInlineText* locateElement, bool& stopAfterNext, SVGTextLayoutAttributes*& previous, SVGTextLayoutAttributes*& next)
+static inline bool findPreviousAndNextAttributes(RenderElement* start, RenderSVGInlineText* locateElement, bool& stopAfterNext, SVGTextLayoutAttributes*& previous, SVGTextLayoutAttributes*& next)
 {
     ASSERT(start);
     ASSERT(locateElement);
     // FIXME: Make this iterative.
     for (RenderObject* child = start->firstChild(); child; child = child->nextSibling()) {
-        if (child->isSVGInlineText()) {
-            RenderSVGInlineText* text = toRenderSVGInlineText(child);
-            if (locateElement != text) {
+        if (is<RenderSVGInlineText>(*child)) {
+            RenderSVGInlineText& text = downcast<RenderSVGInlineText>(*child);
+            if (locateElement != &text) {
                 if (stopAfterNext) {
-                    next = text->layoutAttributes();
+                    next = text.layoutAttributes();
                     return true;
                 }
 
-                previous = text->layoutAttributes();
+                previous = text.layoutAttributes();
                 continue;
             }
 
@@ -152,10 +141,10 @@ static inline bool findPreviousAndNextAttributes(RenderObject* start, RenderSVGI
             continue;
         }
 
-        if (!child->isSVGInline())
+        if (!is<RenderSVGInline>(*child))
             continue;
 
-        if (findPreviousAndNextAttributes(child, locateElement, stopAfterNext, previous, next))
+        if (findPreviousAndNextAttributes(downcast<RenderElement>(child), locateElement, stopAfterNext, previous, next))
             return true;
     }
 
@@ -177,9 +166,6 @@ void RenderSVGText::subtreeChildWasAdded(RenderObject* child)
     ASSERT(child);
     if (!shouldHandleSubtreeMutations() || documentBeingDestroyed())
         return;
-
-    // Always protect the cache before clearing text positioning elements when the cache will subsequently be rebuilt.
-    FontCachePurgePreventer fontCachePurgePreventer;
 
     // The positioning elements cache doesn't include the new 'child' yet. Clear the
     // cache, as the next buildLayoutAttributesForTextRenderer() call rebuilds it.
@@ -206,8 +192,8 @@ void RenderSVGText::subtreeChildWasAdded(RenderObject* child)
             bool stopAfterNext = false;
             SVGTextLayoutAttributes* previous = 0;
             SVGTextLayoutAttributes* next = 0;
-            ASSERT_UNUSED(child, attributes->context() == child);
-            findPreviousAndNextAttributes(this, attributes->context(), stopAfterNext, previous, next);
+            ASSERT_UNUSED(child, &attributes->context() == child);
+            findPreviousAndNextAttributes(this, &attributes->context(), stopAfterNext, previous, next);
 
             if (previous)
                 m_layoutAttributesBuilder.buildLayoutAttributesForTextRenderer(previous->context());
@@ -262,21 +248,20 @@ void RenderSVGText::subtreeChildWillBeRemoved(RenderObject* child, Vector<SVGTex
         return;
 
     // This logic requires that the 'text' child is still inserted in the tree.
-    RenderSVGInlineText* text = toRenderSVGInlineText(child);
+    auto& text = downcast<RenderSVGInlineText>(*child);
     bool stopAfterNext = false;
-    SVGTextLayoutAttributes* previous = 0;
-    SVGTextLayoutAttributes* next = 0;
+    SVGTextLayoutAttributes* previous = nullptr;
+    SVGTextLayoutAttributes* next = nullptr;
     if (!documentBeingDestroyed())
-        findPreviousAndNextAttributes(this, text, stopAfterNext, previous, next);
+        findPreviousAndNextAttributes(this, &text, stopAfterNext, previous, next);
 
     if (previous)
         affectedAttributes.append(previous);
     if (next)
         affectedAttributes.append(next);
 
-    size_t position = m_layoutAttributes.find(text->layoutAttributes());
-    ASSERT(position != notFound);
-    m_layoutAttributes.remove(position);
+    bool removed = m_layoutAttributes.removeFirst(text.layoutAttributes());
+    ASSERT_UNUSED(removed, removed);
 }
 
 void RenderSVGText::subtreeChildWasRemoved(const Vector<SVGTextLayoutAttributes*, 2>& affectedAttributes)
@@ -303,10 +288,9 @@ void RenderSVGText::subtreeStyleDidChange(RenderSVGInlineText* text)
 
     // Only update the metrics cache, but not the text positioning element cache
     // nor the layout attributes cached in the leaf #text renderers.
-    FontCachePurgePreventer fontCachePurgePreventer;
     for (RenderObject* descendant = text; descendant; descendant = descendant->nextInPreOrder(text)) {
-        if (descendant->isSVGInlineText())
-            m_layoutAttributesBuilder.rebuildMetricsForTextRenderer(toRenderSVGInlineText(descendant));
+        if (is<RenderSVGInlineText>(*descendant))
+            m_layoutAttributesBuilder.rebuildMetricsForTextRenderer(downcast<RenderSVGInlineText>(*descendant));
     }
 }
 
@@ -319,9 +303,11 @@ void RenderSVGText::subtreeTextDidChange(RenderSVGInlineText* text)
         ASSERT(!m_layoutAttributesBuilder.numberOfTextPositioningElements());
         return;
     }
-
-    // Always protect the cache before clearing text positioning elements when the cache will subsequently be rebuilt.
-    FontCachePurgePreventer fontCachePurgePreventer;
+    // Text transforms can cause text change to be signaled during addChild before m_layoutAttributes has been updated.
+    if (!m_layoutAttributes.contains(text->layoutAttributes())) {
+        ASSERT(!text->everHadLayout());
+        return;
+    }
 
     // The positioning elements cache depends on the size of each text renderer in the
     // subtree. If this changes, clear the cache. It's going to be rebuilt below.
@@ -329,18 +315,18 @@ void RenderSVGText::subtreeTextDidChange(RenderSVGInlineText* text)
 
     checkLayoutAttributesConsistency(this, m_layoutAttributes);
     for (RenderObject* descendant = text; descendant; descendant = descendant->nextInPreOrder(text)) {
-        if (descendant->isSVGInlineText())
-            m_layoutAttributesBuilder.buildLayoutAttributesForTextRenderer(toRenderSVGInlineText(descendant));
+        if (is<RenderSVGInlineText>(*descendant))
+            m_layoutAttributesBuilder.buildLayoutAttributesForTextRenderer(downcast<RenderSVGInlineText>(*descendant));
     }
 }
 
-static inline void updateFontInAllDescendants(RenderObject* start, SVGTextLayoutAttributesBuilder* builder = 0)
+static inline void updateFontInAllDescendants(RenderObject* start, SVGTextLayoutAttributesBuilder* builder = nullptr)
 {
     for (RenderObject* descendant = start; descendant; descendant = descendant->nextInPreOrder(start)) {
-        if (!descendant->isSVGInlineText())
+        if (!is<RenderSVGInlineText>(*descendant))
             continue;
-        RenderSVGInlineText* text = toRenderSVGInlineText(descendant);
-        text->updateScaledFont();
+        auto& text = downcast<RenderSVGInlineText>(*descendant);
+        text.updateScaledFont();
         if (builder)
             builder->rebuildMetricsForTextRenderer(text);
     }
@@ -350,12 +336,11 @@ void RenderSVGText::layout()
 {
     StackStats::LayoutCheckPoint layoutCheckPoint;
     ASSERT(needsLayout());
-    LayoutRepainter repainter(*this, SVGRenderSupport::checkForSVGRepaintDuringLayout(this));
+    LayoutRepainter repainter(*this, SVGRenderSupport::checkForSVGRepaintDuringLayout(*this));
 
     bool updateCachedBoundariesInParents = false;
     if (m_needsTransformUpdate) {
-        SVGTextElement* text = static_cast<SVGTextElement*>(node());
-        m_localTransform = text->animatedLocalTransform();
+        m_localTransform = textElement().animatedLocalTransform();
         m_needsTransformUpdate = false;
         updateCachedBoundariesInParents = true;
     }
@@ -366,7 +351,7 @@ void RenderSVGText::layout()
         ASSERT(m_layoutAttributes.isEmpty());
         collectLayoutAttributes(this, m_layoutAttributes);
         updateFontInAllDescendants(this);
-        m_layoutAttributesBuilder.buildLayoutAttributesForForSubtree(this);
+        m_layoutAttributesBuilder.buildLayoutAttributesForForSubtree(*this);
 
         m_needsReordering = true;
         m_needsTextMetricsUpdate = false;
@@ -380,11 +365,11 @@ void RenderSVGText::layout()
             m_needsTextMetricsUpdate = false;
         }
 
-        m_layoutAttributesBuilder.buildLayoutAttributesForForSubtree(this);
+        m_layoutAttributesBuilder.buildLayoutAttributesForForSubtree(*this);
         m_needsReordering = true;
         m_needsPositioningValuesUpdate = false;
         updateCachedBoundariesInParents = true;
-    } else if (m_needsTextMetricsUpdate || SVGRenderSupport::findTreeRootObject(this)->isLayoutSizeChanged()) {
+    } else if (m_needsTextMetricsUpdate || SVGRenderSupport::findTreeRootObject(*this)->isLayoutSizeChanged()) {
         // If the root layout size changed (eg. window size changes) or the transform to the root
         // context has changed then recompute the on-screen font size.
         updateFontInAllDescendants(this, &m_layoutAttributesBuilder);
@@ -403,7 +388,7 @@ void RenderSVGText::layout()
     ASSERT(!simplifiedLayout());
     ASSERT(!scrollsOverflow());
     ASSERT(!hasControlClip());
-    ASSERT(!hasColumns());
+    ASSERT(!multiColumnFlowThread());
     ASSERT(!positionedObjects());
     ASSERT(!m_overflow);
     ASSERT(!isAnonymousBlock());
@@ -414,7 +399,10 @@ void RenderSVGText::layout()
     // FIXME: We need to find a way to only layout the child boxes, if needed.
     FloatRect oldBoundaries = objectBoundingBox();
     ASSERT(childrenInline());
-    forceLayoutInlineChildren();
+    LayoutUnit repaintLogicalTop = 0;
+    LayoutUnit repaintLogicalBottom = 0;
+    rebuildFloatingObjectSetFromIntrudingFloats();
+    layoutInlineChildren(true, repaintLogicalTop, repaintLogicalBottom);
 
     if (m_needsReordering)
         m_needsReordering = false;
@@ -424,33 +412,33 @@ void RenderSVGText::layout()
 
     // Invalidate all resources of this client if our layout changed.
     if (everHadLayout() && selfNeedsLayout())
-        SVGResourcesCache::clientLayoutChanged(this);
+        SVGResourcesCache::clientLayoutChanged(*this);
 
     // If our bounds changed, notify the parents.
     if (updateCachedBoundariesInParents)
         RenderSVGBlock::setNeedsBoundariesUpdate();
 
     repainter.repaintAfterLayout();
-    setNeedsLayout(false);
+    clearNeedsLayout();
 }
 
-RootInlineBox* RenderSVGText::createRootInlineBox() 
+std::unique_ptr<RootInlineBox> RenderSVGText::createRootInlineBox()
 {
-    RootInlineBox* box = new (renderArena()) SVGRootInlineBox(this);
+    auto box = std::make_unique<SVGRootInlineBox>(*this);
     box->setHasVirtualLogicalHeight();
-    return box;
+    return WTFMove(box);
 }
 
 bool RenderSVGText::nodeAtFloatPoint(const HitTestRequest& request, HitTestResult& result, const FloatPoint& pointInParent, HitTestAction hitTestAction)
 {
-    PointerEventsHitRules hitRules(PointerEventsHitRules::SVG_TEXT_HITTESTING, request, style()->pointerEvents());
-    bool isVisible = (style()->visibility() == VISIBLE);
+    PointerEventsHitRules hitRules(PointerEventsHitRules::SVG_TEXT_HITTESTING, request, style().pointerEvents());
+    bool isVisible = (style().visibility() == VISIBLE);
     if (isVisible || !hitRules.requireVisible) {
-        if ((hitRules.canHitStroke && (style()->svgStyle()->hasStroke() || !hitRules.requireStroke))
-            || (hitRules.canHitFill && (style()->svgStyle()->hasFill() || !hitRules.requireFill))) {
-            FloatPoint localPoint = localToParentTransform().inverse().mapPoint(pointInParent);
+        if ((hitRules.canHitStroke && (style().svgStyle().hasStroke() || !hitRules.requireStroke))
+            || (hitRules.canHitFill && (style().svgStyle().hasFill() || !hitRules.requireFill))) {
+            FloatPoint localPoint = localToParentTransform().inverse().valueOr(AffineTransform()).mapPoint(pointInParent);
 
-            if (!SVGRenderSupport::pointInClippingArea(this, localPoint))
+            if (!SVGRenderSupport::pointInClippingArea(*this, localPoint))
                 return false;       
 
             HitTestLocation hitTestLocation(LayoutPoint(flooredIntPoint(localPoint)));
@@ -467,64 +455,66 @@ bool RenderSVGText::nodeAtPoint(const HitTestRequest&, HitTestResult&, const Hit
     return false;
 }
 
-VisiblePosition RenderSVGText::positionForPoint(const LayoutPoint& pointInContents)
+VisiblePosition RenderSVGText::positionForPoint(const LayoutPoint& pointInContents, const RenderRegion* region)
 {
     RootInlineBox* rootBox = firstRootBox();
     if (!rootBox)
         return createVisiblePosition(0, DOWNSTREAM);
 
-    ASSERT_WITH_SECURITY_IMPLICATION(rootBox->isSVGRootInlineBox());
     ASSERT(!rootBox->nextRootBox());
     ASSERT(childrenInline());
 
-    InlineBox* closestBox = static_cast<SVGRootInlineBox*>(rootBox)->closestLeafChildForPosition(pointInContents);
+    InlineBox* closestBox = downcast<SVGRootInlineBox>(*rootBox).closestLeafChildForPosition(pointInContents);
     if (!closestBox)
         return createVisiblePosition(0, DOWNSTREAM);
 
-    return closestBox->renderer()->positionForPoint(LayoutPoint(pointInContents.x(), closestBox->y()));
+    return closestBox->renderer().positionForPoint(LayoutPoint(pointInContents.x(), closestBox->y()), region);
 }
 
 void RenderSVGText::absoluteQuads(Vector<FloatQuad>& quads, bool* wasFixed) const
 {
-    quads.append(localToAbsoluteQuad(strokeBoundingBox(), 0 /* mode */, wasFixed));
+    quads.append(localToAbsoluteQuad(strokeBoundingBox(), UseTransforms, wasFixed));
 }
 
 void RenderSVGText::paint(PaintInfo& paintInfo, const LayoutPoint&)
 {
-    if (paintInfo.context->paintingDisabled())
+    if (paintInfo.context().paintingDisabled())
         return;
 
     if (paintInfo.phase != PaintPhaseForeground
-     && paintInfo.phase != PaintPhaseSelfOutline
      && paintInfo.phase != PaintPhaseSelection)
          return;
 
     PaintInfo blockInfo(paintInfo);
-    GraphicsContextStateSaver stateSaver(*blockInfo.context);
+    GraphicsContextStateSaver stateSaver(blockInfo.context());
     blockInfo.applyTransform(localToParentTransform());
     RenderBlock::paint(blockInfo, LayoutPoint());
+
+    // Paint the outlines, if any
+    if (paintInfo.phase == PaintPhaseForeground) {
+        blockInfo.phase = PaintPhaseSelfOutline;
+        RenderBlock::paint(blockInfo, LayoutPoint());
+    }
 }
 
 FloatRect RenderSVGText::strokeBoundingBox() const
 {
     FloatRect strokeBoundaries = objectBoundingBox();
-    const SVGRenderStyle* svgStyle = style()->svgStyle();
-    if (!svgStyle->hasStroke())
+    const SVGRenderStyle& svgStyle = style().svgStyle();
+    if (!svgStyle.hasStroke())
         return strokeBoundaries;
 
-    ASSERT(node());
-    ASSERT(node()->isSVGElement());
-    SVGLengthContext lengthContext(toSVGElement(node()));
-    strokeBoundaries.inflate(svgStyle->strokeWidth().value(lengthContext));
+    SVGLengthContext lengthContext(&textElement());
+    strokeBoundaries.inflate(lengthContext.valueForLength(svgStyle.strokeWidth()));
     return strokeBoundaries;
 }
 
 FloatRect RenderSVGText::repaintRectInLocalCoordinates() const
 {
     FloatRect repaintRect = strokeBoundingBox();
-    SVGRenderSupport::intersectRepaintRectWithResources(this, repaintRect);
+    SVGRenderSupport::intersectRepaintRectWithResources(*this, repaintRect);
 
-    if (const ShadowData* textShadow = style()->textShadow())
+    if (const ShadowData* textShadow = style().textShadow())
         textShadow->adjustRectForShadow(repaintRect);
 
     return repaintRect;
@@ -534,17 +524,16 @@ void RenderSVGText::addChild(RenderObject* child, RenderObject* beforeChild)
 {
     RenderSVGBlock::addChild(child, beforeChild);
 
-    SVGResourcesCache::clientWasAddedToTree(child, child->style());
+    SVGResourcesCache::clientWasAddedToTree(*child);
     subtreeChildWasAdded(child);
 }
 
-void RenderSVGText::removeChild(RenderObject* child)
+void RenderSVGText::removeChild(RenderObject& child)
 {
     SVGResourcesCache::clientWillBeRemovedFromTree(child);
 
     Vector<SVGTextLayoutAttributes*, 2> affectedAttributes;
-    FontCachePurgePreventer fontCachePurgePreventer;
-    subtreeChildWillBeRemoved(child, affectedAttributes);
+    subtreeChildWillBeRemoved(&child, affectedAttributes);
     RenderSVGBlock::removeChild(child);
     subtreeChildWasRemoved(affectedAttributes);
 }
@@ -563,5 +552,3 @@ void RenderSVGText::updateFirstLetter()
 }
 
 }
-
-#endif // ENABLE(SVG)

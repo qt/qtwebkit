@@ -21,11 +21,10 @@
 #ifndef QtPlatformPlugin_h
 #define QtPlatformPlugin_h
 
+#include "qwebkitplatformplugin.h"
 #include <QPluginLoader>
-#include <wtf/PassOwnPtr.h>
 
 class QWebSelectMethod;
-class QWebKitPlatformPlugin;
 class QWebNotificationPresenter;
 class QWebHapticFeedbackPlayer;
 class QWebSelectData;
@@ -47,14 +46,14 @@ public:
 
     ~QtPlatformPlugin();
 
-    PassOwnPtr<QWebSelectMethod> createSelectInputMethod();
-    PassOwnPtr<QWebNotificationPresenter> createNotificationPresenter();
-    PassOwnPtr<QWebHapticFeedbackPlayer> createHapticFeedbackPlayer();
-    PassOwnPtr<QWebTouchModifier> createTouchModifier();
+    std::unique_ptr<QWebSelectMethod> createSelectInputMethod();
+    std::unique_ptr<QWebNotificationPresenter> createNotificationPresenter();
+    std::unique_ptr<QWebHapticFeedbackPlayer> createHapticFeedbackPlayer();
+    std::unique_ptr<QWebTouchModifier> createTouchModifier();
 #if ENABLE(VIDEO) && USE(QT_MULTIMEDIA)
-    PassOwnPtr<QWebFullScreenVideoHandler> createFullScreenVideoHandler();
+    std::unique_ptr<QWebFullScreenVideoHandler> createFullScreenVideoHandler();
 #endif
-    PassOwnPtr<QWebSpellChecker> createSpellChecker();
+    std::unique_ptr<QWebSpellChecker> createSpellChecker();
 
     QWebKitPlatformPlugin* plugin();
 
@@ -65,6 +64,7 @@ private:
     bool load();
     bool load(const QString& file);
     bool loadStaticallyLinkedPlugin();
+    template<typename T> std::unique_ptr<T> createExtension(QWebKitPlatformPlugin::Extension);
 };
 
 }

@@ -26,10 +26,10 @@
 #ifndef BlockingResponseMap_h
 #define BlockingResponseMap_h
 
+#include <wtf/Condition.h>
 #include <wtf/HashMap.h>
-#include <wtf/OwnPtr.h>
-#include <wtf/PassOwnPtr.h>
-#include <wtf/ThreadingPrimitives.h>
+#include <wtf/Lock.h>
+#include <wtf/Noncopyable.h>
 
 template<typename T>
 class BlockingResponseMap {
@@ -38,46 +38,47 @@ public:
     BlockingResponseMap() : m_canceled(false) { }
     ~BlockingResponseMap() { ASSERT(m_responses.isEmpty()); }
 
-    PassOwnPtr<T> waitForResponse(uint64_t requestID)
+    std::unique_ptr<T> waitForResponse(uint64_t requestID)
     {
         while (true) {
-            MutexLocker locker(m_mutex);
+            std::unique_lock<Lock> lock(m_mutex);
 
             if (m_canceled)
                 return nullptr;
 
-            if (OwnPtr<T> response = m_responses.take(requestID))
-                return response.release();
+            if (std::unique_ptr<T> response = m_responses.take(requestID))
+                return response;
 
-            m_condition.wait(m_mutex);
+            m_condition.wait(lock);
         }
 
         return nullptr;
     }
 
-    void didReceiveResponse(uint64_t requestID, PassOwnPtr<T> response)
+    void didReceiveResponse(uint64_t requestID, std::unique_ptr<T> response)
     {
-        MutexLocker locker(m_mutex);
+        std::lock_guard<Lock> lock(m_mutex);
         ASSERT(!m_responses.contains(requestID));
 
-        m_responses.set(requestID, response);
-        // FIXME: Waking up all threads is quite inefficient.
-        m_condition.broadcast();
+        m_responses.set(requestID, WTFMove(response));
+
+        // FIXME: Could get a slight speed-up from using notifyOne().
+        m_condition.notifyAll();
     }
 
     void cancel()
     {
         m_canceled = true;
 
-        // FIXME: Waking up all threads is quite inefficient.
-        m_condition.broadcast();
+        // FIXME: Could get a slight speed-up from using notifyOne().
+        m_condition.notifyAll();
     }
 
 private:
-    Mutex m_mutex;
-    ThreadCondition m_condition;
+    Lock m_mutex;
+    Condition m_condition;
 
-    HashMap<uint64_t, OwnPtr<T> > m_responses;
+    HashMap<uint64_t, std::unique_ptr<T>> m_responses;
     bool m_canceled;
 };
 

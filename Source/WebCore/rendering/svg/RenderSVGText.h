@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006 Apple Computer, Inc.
+ * Copyright (C) 2006 Apple Inc.
  * Copyright (C) 2007 Nikolas Zimmermann <zimmermann@kde.org>
  * Copyright (C) Research In Motion Limited 2010-2012. All rights reserved.
  *
@@ -22,7 +22,6 @@
 #ifndef RenderSVGText_h
 #define RenderSVGText_h
 
-#if ENABLE(SVG)
 #include "AffineTransform.h"
 #include "RenderSVGBlock.h"
 #include "SVGTextLayoutAttributesBuilder.h"
@@ -33,20 +32,22 @@ class RenderSVGInlineText;
 class SVGTextElement;
 class RenderSVGInlineText;
 
-class RenderSVGText : public RenderSVGBlock {
+class RenderSVGText final : public RenderSVGBlock {
 public:
-    RenderSVGText(SVGTextElement*);
+    RenderSVGText(SVGTextElement&, Ref<RenderStyle>&&);
     virtual ~RenderSVGText();
 
-    virtual bool isChildAllowed(RenderObject*, RenderStyle*) const;
+    SVGTextElement& textElement() const;
+
+    virtual bool isChildAllowed(const RenderObject&, const RenderStyle&) const override;
 
     void setNeedsPositioningValuesUpdate() { m_needsPositioningValuesUpdate = true; }
-    virtual void setNeedsTransformUpdate() { m_needsTransformUpdate = true; }
+    virtual void setNeedsTransformUpdate() override { m_needsTransformUpdate = true; }
     void setNeedsTextMetricsUpdate() { m_needsTextMetricsUpdate = true; }
-    virtual FloatRect repaintRectInLocalCoordinates() const;
+    virtual FloatRect repaintRectInLocalCoordinates() const override;
 
-    static RenderSVGText* locateRenderSVGTextAncestor(RenderObject*);
-    static const RenderSVGText* locateRenderSVGTextAncestor(const RenderObject*);
+    static RenderSVGText* locateRenderSVGTextAncestor(RenderObject&);
+    static const RenderSVGText* locateRenderSVGTextAncestor(const RenderObject&);
 
     bool needsReordering() const { return m_needsReordering; }
     Vector<SVGTextLayoutAttributes*>& layoutAttributes() { return m_layoutAttributes; }
@@ -57,39 +58,41 @@ public:
     void subtreeStyleDidChange(RenderSVGInlineText*);
     void subtreeTextDidChange(RenderSVGInlineText*);
 
+    virtual FloatRect objectBoundingBox() const override { return frameRect(); }
+    virtual FloatRect strokeBoundingBox() const override;
+
 private:
-    virtual const char* renderName() const { return "RenderSVGText"; }
-    virtual bool isSVGText() const { return true; }
+    void graphicsElement() const = delete;
 
-    virtual void paint(PaintInfo&, const LayoutPoint&);
-    virtual bool nodeAtPoint(const HitTestRequest&, HitTestResult&, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, HitTestAction) OVERRIDE;
-    virtual bool nodeAtFloatPoint(const HitTestRequest&, HitTestResult&, const FloatPoint& pointInParent, HitTestAction);
-    virtual VisiblePosition positionForPoint(const LayoutPoint&);
+    virtual const char* renderName() const override { return "RenderSVGText"; }
+    virtual bool isSVGText() const override { return true; }
 
-    virtual bool requiresLayer() const { return false; }
-    virtual void layout();
+    virtual void paint(PaintInfo&, const LayoutPoint&) override;
+    virtual bool nodeAtPoint(const HitTestRequest&, HitTestResult&, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, HitTestAction) override;
+    virtual bool nodeAtFloatPoint(const HitTestRequest&, HitTestResult&, const FloatPoint& pointInParent, HitTestAction) override;
+    virtual VisiblePosition positionForPoint(const LayoutPoint&, const RenderRegion*) override;
 
-    virtual void absoluteQuads(Vector<FloatQuad>&, bool* wasFixed) const;
+    virtual bool requiresLayer() const override { return false; }
+    virtual void layout() override;
 
-    virtual LayoutRect clippedOverflowRectForRepaint(const RenderLayerModelObject* repaintContainer) const OVERRIDE;
-    virtual void computeRectForRepaint(const RenderLayerModelObject* repaintContainer, LayoutRect&, bool fixed = false) const OVERRIDE;
-    virtual void computeFloatRectForRepaint(const RenderLayerModelObject* repaintContainer, FloatRect&, bool fixed = false) const OVERRIDE;
+    virtual void absoluteQuads(Vector<FloatQuad>&, bool* wasFixed) const override;
 
-    virtual void mapLocalToContainer(const RenderLayerModelObject* repaintContainer, TransformState&, MapCoordinatesFlags = ApplyContainerFlip, bool* wasFixed = 0) const OVERRIDE;
-    virtual const RenderObject* pushMappingToContainer(const RenderLayerModelObject* ancestorToStopAt, RenderGeometryMap&) const OVERRIDE;
-    virtual void addChild(RenderObject* child, RenderObject* beforeChild = 0);
-    virtual void removeChild(RenderObject*) OVERRIDE;
-    virtual void willBeDestroyed() OVERRIDE;
+    virtual LayoutRect clippedOverflowRectForRepaint(const RenderLayerModelObject* repaintContainer) const override;
+    virtual LayoutRect computeRectForRepaint(const LayoutRect&, const RenderLayerModelObject* repaintContainer, bool fixed = false) const override;
+    virtual FloatRect computeFloatRectForRepaint(const FloatRect&, const RenderLayerModelObject* repaintContainer, bool fixed = false) const override;
 
-    virtual FloatRect objectBoundingBox() const { return frameRect(); }
-    virtual FloatRect strokeBoundingBox() const;
+    virtual void mapLocalToContainer(const RenderLayerModelObject* repaintContainer, TransformState&, MapCoordinatesFlags, bool* wasFixed) const override;
+    virtual const RenderObject* pushMappingToContainer(const RenderLayerModelObject* ancestorToStopAt, RenderGeometryMap&) const override;
+    virtual void addChild(RenderObject* child, RenderObject* beforeChild = nullptr) override;
+    virtual void removeChild(RenderObject&) override;
+    virtual void willBeDestroyed() override;
 
-    virtual const AffineTransform& localToParentTransform() const { return m_localTransform; }
-    virtual AffineTransform localTransform() const { return m_localTransform; }
-    virtual RootInlineBox* createRootInlineBox();
+    virtual const AffineTransform& localToParentTransform() const override { return m_localTransform; }
+    virtual AffineTransform localTransform() const override { return m_localTransform; }
+    virtual std::unique_ptr<RootInlineBox> createRootInlineBox() override;
 
-    virtual RenderBlock* firstLineBlock() const;
-    virtual void updateFirstLetter();
+    virtual RenderBlock* firstLineBlock() const override;
+    virtual void updateFirstLetter() override;
 
     bool shouldHandleSubtreeMutations() const;
 
@@ -102,22 +105,8 @@ private:
     Vector<SVGTextLayoutAttributes*> m_layoutAttributes;
 };
 
-inline RenderSVGText* toRenderSVGText(RenderObject* object)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isSVGText());
-    return static_cast<RenderSVGText*>(object);
-}
+} // namespace WebCore
 
-inline const RenderSVGText* toRenderSVGText(const RenderObject* object)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isSVGText());
-    return static_cast<const RenderSVGText*>(object);
-}
+SPECIALIZE_TYPE_TRAITS_RENDER_OBJECT(RenderSVGText, isSVGText())
 
-// This will catch anyone doing an unnecessary cast.
-void toRenderSVGText(const RenderSVGText*);
-
-}
-
-#endif // ENABLE(SVG)
-#endif
+#endif // RenderSVGText_h

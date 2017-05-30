@@ -24,7 +24,8 @@
 #include "config.h"
 #include "FontPlatformData.h"
 
-#include "Font.h"
+#include "FontCascade.h"
+#include "SharedBuffer.h"
 #include <wtf/text/WTFString.h>
 
 namespace WebCore {
@@ -102,22 +103,9 @@ FontPlatformData::FontPlatformData(const FontDescription& description, const Ato
     font.setWeight(toQFontWeight(description.weight()));
     font.setWordSpacing(wordSpacing);
     font.setLetterSpacing(QFont::AbsoluteSpacing, letterSpacing);
-    switch (description.fontSmoothing()) {
-        case AutoSmoothing:
-            if (Font::shouldUseSmoothing())
-                break;
-            // no break
-        case NoSmoothing:
-            font.setStyleStrategy(QFont::NoAntialias);
-            break;
-        case Antialiased:
-#if QT_VERSION >= QT_VERSION_CHECK(5, 4, 0)
-            font.setStyleStrategy(QFont::NoSubpixelAntialias);
-            break;
-#endif
-        case SubpixelAntialiased:
-            break;
-    }
+
+    if (!FontCascade::shouldUseSmoothing())
+        font.setStyleStrategy(QFont::NoAntialias);
 
     m_data->bold = font.bold();
     // WebKit allows font size zero but QFont does not. We will return
@@ -150,6 +138,20 @@ bool FontPlatformData::operator==(const FontPlatformData& other) const
                          && m_data->oblique == other.m_data->oblique
                          && m_data->rawFont == other.m_data->rawFont);
     return equals;
+}
+
+PassRefPtr<SharedBuffer> FontPlatformData::openTypeTable(uint32_t table) const
+{
+    const char tag[4] = {
+        char(table & 0xff),
+        char((table & 0xff00) >> 8),
+        char((table & 0xff0000) >> 16),
+        char(table >> 24)
+    };
+    QByteArray tableData = m_data->rawFont.fontTable(tag);
+
+    // TODO: Wrap SharedBuffer around QByteArray when it's possible
+    return SharedBuffer::create(tableData.data(), tableData.size());
 }
 
 unsigned FontPlatformData::hash() const

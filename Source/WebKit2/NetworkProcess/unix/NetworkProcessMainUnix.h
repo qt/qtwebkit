@@ -27,15 +27,13 @@
 #ifndef NetworkProcessMainUnix_h
 #define NetworkProcessMainUnix_h
 
-#include <WebKit2/WKBase.h>
+#include <WebKit/WKBase.h>
 
 namespace WebKit {
 
-#ifdef __cplusplus
 extern "C" {
-WK_EXPORT int NetworkProcessMain(int argc, char* argv[]);
-} // extern "C"
-#endif // __cplusplus
+WK_EXPORT int NetworkProcessMainUnix(int argc, char** argv);
+}
 
 } // namespace WebKit
 

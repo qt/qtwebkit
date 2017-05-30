@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -27,14 +27,11 @@
 #ifndef JSWorkerGlobalScopeBase_h
 #define JSWorkerGlobalScopeBase_h
 
-#if ENABLE(WORKERS)
-
 #include "JSDOMGlobalObject.h"
 
 namespace WebCore {
 
     class JSDedicatedWorkerGlobalScope;
-    class JSSharedWorkerGlobalScope;
     class JSWorkerGlobalScope;
     class WorkerGlobalScope;
 
@@ -43,22 +40,32 @@ namespace WebCore {
     public:
         static void destroy(JSC::JSCell*);
 
-        static const JSC::ClassInfo s_info;
+        DECLARE_INFO;
 
-        WorkerGlobalScope* impl() const { return m_impl.get(); }
+        WorkerGlobalScope& wrapped() const { return *m_wrapped; }
         ScriptExecutionContext* scriptExecutionContext() const;
 
         static JSC::Structure* createStructure(JSC::VM& vm, JSC::JSGlobalObject* globalObject, JSC::JSValue prototype)
         {
-            return JSC::Structure::create(vm, globalObject, prototype, JSC::TypeInfo(JSC::GlobalObjectType, StructureFlags), &s_info);
+            return JSC::Structure::create(vm, globalObject, prototype, JSC::TypeInfo(JSC::GlobalObjectType, StructureFlags), info());
         }
+
+        static const JSC::GlobalObjectMethodTable s_globalObjectMethodTable;
+
+        static bool allowsAccessFrom(const JSC::JSGlobalObject*, JSC::ExecState*);
+        static bool supportsLegacyProfiling(const JSC::JSGlobalObject*);
+        static bool supportsRichSourceInfo(const JSC::JSGlobalObject*);
+        static bool shouldInterruptScript(const JSC::JSGlobalObject*);
+        static bool shouldInterruptScriptBeforeTimeout(const JSC::JSGlobalObject*);
+        static JSC::RuntimeFlags javaScriptRuntimeFlags(const JSC::JSGlobalObject*);
+        static void queueTaskToEventLoop(const JSC::JSGlobalObject*, PassRefPtr<JSC::Microtask>);
 
     protected:
         JSWorkerGlobalScopeBase(JSC::VM&, JSC::Structure*, PassRefPtr<WorkerGlobalScope>);
         void finishCreation(JSC::VM&);
 
     private:
-        RefPtr<WorkerGlobalScope> m_impl;
+        RefPtr<WorkerGlobalScope> m_wrapped;
     };
 
     // Returns a JSWorkerGlobalScope or jsNull()
@@ -69,12 +76,6 @@ namespace WebCore {
     JSDedicatedWorkerGlobalScope* toJSDedicatedWorkerGlobalScope(JSC::JSValue);
     JSWorkerGlobalScope* toJSWorkerGlobalScope(JSC::JSValue);
 
-#if ENABLE(SHARED_WORKERS)
-    JSSharedWorkerGlobalScope* toJSSharedWorkerGlobalScope(JSC::JSValue);
-#endif
-
 } // namespace WebCore
-
-#endif // ENABLE(WORKERS)
 
 #endif // JSWorkerGlobalScopeBase_h

@@ -29,7 +29,6 @@
 
 #include "WebPopupMenuProxy.h"
 #include <QtCore/QObject>
-#include <wtf/OwnPtr.h>
 
 QT_BEGIN_NAMESPACE
 class QQmlComponent;
@@ -41,7 +40,7 @@ class QQuickWebView;
 
 namespace WebKit {
 
-class WebPopupMenuProxyQt : public QObject, public WebPopupMenuProxy {
+class WebPopupMenuProxyQt final : public QObject, public WebPopupMenuProxy {
     Q_OBJECT
 
 public:
@@ -50,27 +49,27 @@ public:
         MultipleSelection
     };
 
-    static PassRefPtr<WebPopupMenuProxyQt> create(WebPopupMenuProxy::Client* client, QQuickWebView* webView)
+    static Ref<WebPopupMenuProxyQt> create(WebPopupMenuProxy::Client& client, QQuickWebView* webView)
     {
-        return adoptRef(new WebPopupMenuProxyQt(client, webView));
+        return adoptRef(*new WebPopupMenuProxyQt(client, webView));
     }
     ~WebPopupMenuProxyQt();
 
-    virtual void showPopupMenu(const WebCore::IntRect&, WebCore::TextDirection, double pageScaleFactor, const Vector<WebPopupItem>&, const PlatformPopupMenuData&, int32_t selectedIndex);
+    void showPopupMenu(const WebCore::IntRect&, WebCore::TextDirection, double pageScaleFactor, const Vector<WebPopupItem>&, const PlatformPopupMenuData&, int32_t selectedIndex) final;
 
 public Q_SLOTS:
-    virtual void hidePopupMenu();
+    void hidePopupMenu() final;
 
 private Q_SLOTS:
     void selectIndex(int);
 
 private:
-    WebPopupMenuProxyQt(WebPopupMenuProxy::Client*, QQuickWebView*);
+    WebPopupMenuProxyQt(WebPopupMenuProxy::Client&, QQuickWebView*);
     void createItem(QObject*);
     void createContext(QQmlComponent*, QObject*);
 
-    OwnPtr<QQmlContext> m_context;
-    OwnPtr<QQuickItem> m_itemSelector;
+    std::unique_ptr<QQmlContext> m_context;
+    std::unique_ptr<QQuickItem> m_itemSelector;
 
     QQuickWebView* m_webView;
     SelectionType m_selectionType;

@@ -34,10 +34,6 @@
 #include <wtf/text/CString.h>
 #include <wtf/text/WTFString.h>
 
-#ifndef NDEBUG
-#include <stdio.h>
-#endif
-
 using namespace WTF;
 
 namespace JSC { namespace Yarr {
@@ -158,7 +154,7 @@ public:
 
     ParenthesesDisjunctionContext* allocParenthesesDisjunctionContext(ByteDisjunction* disjunction, unsigned* output, ByteTerm& term)
     {
-        size_t size = sizeof(ParenthesesDisjunctionContext) - sizeof(unsigned) + (term.atom.parenthesesDisjunction->m_numSubpatterns << 1) * sizeof(unsigned) + sizeof(DisjunctionContext) - sizeof(uintptr_t) + disjunction->m_frameSize * sizeof(uintptr_t);
+        size_t size = sizeof(ParenthesesDisjunctionContext) - sizeof(unsigned) + (term.atom.parenthesesDisjunction->m_numSubpatterns << 1) * sizeof(unsigned) + sizeof(DisjunctionContext) - sizeof(uintptr_t) + static_cast<size_t>(disjunction->m_frameSize) * sizeof(uintptr_t);
         allocatorPool = allocatorPool->ensureCapacity(size);
         RELEASE_ASSERT(allocatorPool);
         return new (allocatorPool->alloc(size)) ParenthesesDisjunctionContext(output, term);
@@ -711,6 +707,7 @@ public:
             return true;
         case QuantifierNonGreedy:
             ASSERT(backTrack->begin != notFound);
+            FALLTHROUGH;
         case QuantifierFixedCount:
             break;
         }
@@ -731,6 +728,7 @@ public:
                 context->term -= term.atom.parenthesesWidth;
                 return false;
             }
+            FALLTHROUGH;
         case QuantifierNonGreedy:
             if (backTrack->begin == notFound) {
                 backTrack->begin = input.getPos();
@@ -746,6 +744,7 @@ public:
                 context->term -= term.atom.parenthesesWidth;
                 return true;
             }
+            FALLTHROUGH;
         case QuantifierFixedCount:
             break;
         }
@@ -1473,13 +1472,13 @@ public:
         m_currentAlternativeIndex = 0;
     }
 
-    PassOwnPtr<BytecodePattern> compile(BumpPointerAllocator* allocator)
+    std::unique_ptr<BytecodePattern> compile(BumpPointerAllocator* allocator)
     {
         regexBegin(m_pattern.m_numSubpatterns, m_pattern.m_body->m_callFrameSize, m_pattern.m_body->m_alternatives[0]->onceThrough());
         emitDisjunction(m_pattern.m_body);
         regexEnd();
 
-        return adoptPtr(new BytecodePattern(m_bodyDisjunction.release(), m_allParenthesesInfo, m_pattern, allocator));
+        return std::make_unique<BytecodePattern>(WTFMove(m_bodyDisjunction), m_allParenthesesInfo, m_pattern, allocator);
     }
 
     void checkInput(unsigned count)
@@ -1510,8 +1509,11 @@ public:
     void atomPatternCharacter(UChar ch, unsigned inputPosition, unsigned frameLocation, Checked<unsigned> quantityCount, QuantifierType quantityType)
     {
         if (m_pattern.m_ignoreCase) {
-            UChar lo = Unicode::toLower(ch);
-            UChar hi = Unicode::toUpper(ch);
+            ASSERT(u_tolower(ch) <= 0xFFFF);
+            ASSERT(u_toupper(ch) <= 0xFFFF);
+
+            UChar lo = u_tolower(ch);
+            UChar hi = u_toupper(ch);
 
             if (lo != hi) {
                 m_bodyDisjunction->terms.append(ByteTerm(lo, hi, inputPosition, frameLocation, quantityCount, quantityType));
@@ -1710,7 +1712,7 @@ public:
         unsigned subpatternId = parenthesesBegin.atom.subpatternId;
 
         unsigned numSubpatterns = lastSubpatternId - subpatternId + 1;
-        OwnPtr<ByteDisjunction> parenthesesDisjunction = adoptPtr(new ByteDisjunction(numSubpatterns, callFrameSize));
+        auto parenthesesDisjunction = std::make_unique<ByteDisjunction>(numSubpatterns, callFrameSize);
 
         unsigned firstTermInParentheses = beginTerm + 1;
         parenthesesDisjunction->terms.reserveInitialCapacity(endTerm - firstTermInParentheses + 2);
@@ -1723,7 +1725,7 @@ public:
         m_bodyDisjunction->terms.shrink(beginTerm);
 
         m_bodyDisjunction->terms.append(ByteTerm(ByteTerm::TypeParenthesesSubpattern, subpatternId, parenthesesDisjunction.get(), capture, inputPosition));
-        m_allParenthesesInfo.append(parenthesesDisjunction.release());
+        m_allParenthesesInfo.append(WTFMove(parenthesesDisjunction));
 
         m_bodyDisjunction->terms[beginTerm].atom.quantityCount = quantityCount.unsafeGet();
         m_bodyDisjunction->terms[beginTerm].atom.quantityType = quantityType;
@@ -1776,7 +1778,7 @@ public:
 
     void regexBegin(unsigned numSubpatterns, unsigned callFrameSize, bool onceThrough)
     {
-        m_bodyDisjunction = adoptPtr(new ByteDisjunction(numSubpatterns, callFrameSize));
+        m_bodyDisjunction = std::make_unique<ByteDisjunction>(numSubpatterns, callFrameSize);
         m_bodyDisjunction->terms.append(ByteTerm::BodyAlternativeBegin(onceThrough));
         m_bodyDisjunction->terms[0].frameLocation = 0;
         m_currentAlternativeIndex = 0;
@@ -1918,13 +1920,13 @@ public:
 
 private:
     YarrPattern& m_pattern;
-    OwnPtr<ByteDisjunction> m_bodyDisjunction;
+    std::unique_ptr<ByteDisjunction> m_bodyDisjunction;
     unsigned m_currentAlternativeIndex;
     Vector<ParenthesesStackEntry> m_parenthesesStack;
-    Vector<OwnPtr<ByteDisjunction> > m_allParenthesesInfo;
+    Vector<std::unique_ptr<ByteDisjunction>> m_allParenthesesInfo;
 };
 
-PassOwnPtr<BytecodePattern> byteCompile(YarrPattern& pattern, BumpPointerAllocator* allocator)
+std::unique_ptr<BytecodePattern> byteCompile(YarrPattern& pattern, BumpPointerAllocator* allocator)
 {
     return ByteCompiler(pattern).compile(allocator);
 }

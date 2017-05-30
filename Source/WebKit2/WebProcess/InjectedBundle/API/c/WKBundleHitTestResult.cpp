@@ -30,6 +30,7 @@
 #include "InjectedBundleNodeHandle.h"
 #include "WKAPICast.h"
 #include "WKBundleAPICast.h"
+#include "WebFrame.h"
 
 using namespace WebKit;
 
@@ -42,6 +43,12 @@ WKBundleNodeHandleRef WKBundleHitTestResultCopyNodeHandle(WKBundleHitTestResultR
 {
     RefPtr<InjectedBundleNodeHandle> nodeHandle = toImpl(hitTestResultRef)->nodeHandle();
     return toAPI(nodeHandle.release().leakRef());
+}
+
+WKBundleNodeHandleRef WKBundleHitTestResultCopyURLElementHandle(WKBundleHitTestResultRef hitTestResultRef)
+{
+    RefPtr<InjectedBundleNodeHandle> urlElementNodeHandle = toImpl(hitTestResultRef)->urlElementHandle();
+    return toAPI(urlElementNodeHandle.release().leakRef());
 }
 
 WKBundleFrameRef WKBundleHitTestResultGetFrame(WKBundleHitTestResultRef hitTestResultRef)
@@ -82,6 +89,11 @@ bool WKBundleHitTestResultMediaIsInFullscreen(WKBundleHitTestResultRef hitTestRe
 bool WKBundleHitTestResultMediaHasAudio(WKBundleHitTestResultRef hitTestResultRef)
 {
     return toImpl(hitTestResultRef)->mediaHasAudio();
+}
+
+bool WKBundleHitTestResultIsDownloadableMedia(WKBundleHitTestResultRef hitTestResultRef)
+{
+    return toImpl(hitTestResultRef)->isDownloadableMedia();
 }
 
 WKBundleHitTestResultMediaType WKBundleHitTestResultGetMediaType(WKBundleHitTestResultRef hitTestResultRef)

@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2010 Google Inc. All rights reserved.
+ * Copyright (C) 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -29,13 +30,14 @@
  */
 
 #include "config.h"
+
 #if ENABLE(INPUT_TYPE_COLOR)
+
 #include "ColorInputType.h"
 
 #include "CSSPropertyNames.h"
 #include "Chrome.h"
 #include "Color.h"
-#include "ElementShadow.h"
 #include "HTMLDataListElement.h"
 #include "HTMLDivElement.h"
 #include "HTMLInputElement.h"
@@ -46,8 +48,6 @@
 #include "RenderView.h"
 #include "ScriptController.h"
 #include "ShadowRoot.h"
-#include <wtf/PassOwnPtr.h>
-#include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
@@ -67,19 +67,9 @@ static bool isValidColorString(const String& value)
     return color.isValid() && !color.hasAlpha();
 }
 
-PassOwnPtr<InputType> ColorInputType::create(HTMLInputElement* element)
-{
-    return adoptPtr(new ColorInputType(element));
-}
-
 ColorInputType::~ColorInputType()
 {
     endColorChooser();
-}
-
-void ColorInputType::attach()
-{
-    observeFeatureIfVisible(FeatureObserver::InputTypeColor);
 }
 
 bool ColorInputType::isColorControl() const
@@ -99,7 +89,7 @@ bool ColorInputType::supportsRequired() const
 
 String ColorInputType::fallbackValue() const
 {
-    return String("#000000");
+    return ASCIILiteral("#000000");
 }
 
 String ColorInputType::sanitizeValue(const String& proposedValue) const
@@ -107,25 +97,25 @@ String ColorInputType::sanitizeValue(const String& proposedValue) const
     if (!isValidColorString(proposedValue))
         return fallbackValue();
 
-    return proposedValue.lower();
+    return proposedValue.convertToASCIILowercase();
 }
 
 Color ColorInputType::valueAsColor() const
 {
-    return Color(element()->value());
+    return Color(element().value());
 }
 
 void ColorInputType::createShadowSubtree()
 {
-    ASSERT(element()->shadow());
+    ASSERT(element().shadowRoot());
 
-    Document* document = element()->document();
-    RefPtr<HTMLDivElement> wrapperElement = HTMLDivElement::create(document);
+    Document& document = element().document();
+    Ref<HTMLDivElement> wrapperElement = HTMLDivElement::create(document);
     wrapperElement->setPseudo(AtomicString("-webkit-color-swatch-wrapper", AtomicString::ConstructFromLiteral));
-    RefPtr<HTMLDivElement> colorSwatch = HTMLDivElement::create(document);
+    Ref<HTMLDivElement> colorSwatch = HTMLDivElement::create(document);
     colorSwatch->setPseudo(AtomicString("-webkit-color-swatch", AtomicString::ConstructFromLiteral));
-    wrapperElement->appendChild(colorSwatch.release(), ASSERT_NO_EXCEPTION);
-    element()->userAgentShadowRoot()->appendChild(wrapperElement.release(), ASSERT_NO_EXCEPTION);
+    wrapperElement->appendChild(WTFMove(colorSwatch), ASSERT_NO_EXCEPTION);
+    element().userAgentShadowRoot()->appendChild(WTFMove(wrapperElement), ASSERT_NO_EXCEPTION);
     
     updateColorSwatch();
 }
@@ -144,15 +134,18 @@ void ColorInputType::setValue(const String& value, bool valueChanged, TextFieldE
 
 void ColorInputType::handleDOMActivateEvent(Event* event)
 {
-    if (element()->isDisabledOrReadOnly() || !element()->renderer())
+    if (element().isDisabledOrReadOnly() || !element().renderer())
         return;
 
     if (!ScriptController::processingUserGesture())
         return;
 
-    Chrome* chrome = this->chrome();
-    if (chrome && !m_chooser)
-        m_chooser = chrome->createColorChooser(this, valueAsColor());
+    if (Chrome* chrome = this->chrome()) {
+        if (!m_chooser)
+            m_chooser = chrome->createColorChooser(this, valueAsColor());
+        else
+            m_chooser->reattachColorChooser(valueAsColor());
+    }
 
     event->setDefaultHandled();
 }
@@ -172,18 +165,23 @@ bool ColorInputType::typeMismatchFor(const String& value) const
     return !isValidColorString(value);
 }
 
+bool ColorInputType::shouldResetOnDocumentActivation()
+{
+    return true;
+}
+
 void ColorInputType::didChooseColor(const Color& color)
 {
-    if (element()->isDisabledOrReadOnly() || color == valueAsColor())
+    if (element().isDisabledOrReadOnly() || color == valueAsColor())
         return;
-    element()->setValueFromRenderer(color.serialized());
+    element().setValueFromRenderer(color.serialized());
     updateColorSwatch();
-    element()->dispatchFormControlChangeEvent();
+    element().dispatchFormControlChangeEvent();
 }
 
 void ColorInputType::didEndChooser()
 {
-    m_chooser.clear();
+    m_chooser = nullptr;
 }
 
 void ColorInputType::endColorChooser()
@@ -198,18 +196,20 @@ void ColorInputType::updateColorSwatch()
     if (!colorSwatch)
         return;
 
-    colorSwatch->setInlineStyleProperty(CSSPropertyBackgroundColor, element()->value(), false);
+    colorSwatch->setInlineStyleProperty(CSSPropertyBackgroundColor, element().value(), false);
 }
 
 HTMLElement* ColorInputType::shadowColorSwatch() const
 {
-    ShadowRoot* shadow = element()->userAgentShadowRoot();
-    return shadow ? toHTMLElement(shadow->firstChild()->firstChild()) : 0;
+    ShadowRoot* shadow = element().userAgentShadowRoot();
+    return shadow ? downcast<HTMLElement>(shadow->firstChild()->firstChild()) : nullptr;
 }
 
 IntRect ColorInputType::elementRectRelativeToRootView() const
 {
-    return element()->document()->view()->contentsToRootView(element()->pixelSnappedBoundingBox());
+    if (!element().renderer())
+        return IntRect();
+    return element().document().view()->contentsToRootView(element().renderer()->absoluteBoundingBoxRect());
 }
 
 Color ColorInputType::currentColor()
@@ -220,7 +220,7 @@ Color ColorInputType::currentColor()
 bool ColorInputType::shouldShowSuggestions() const
 {
 #if ENABLE(DATALIST_ELEMENT)
-    return element()->fastHasAttribute(listAttr);
+    return element().fastHasAttribute(listAttr);
 #else
     return false;
 #endif
@@ -230,20 +230,23 @@ Vector<Color> ColorInputType::suggestions() const
 {
     Vector<Color> suggestions;
 #if ENABLE(DATALIST_ELEMENT)
-    HTMLDataListElement* dataList = element()->dataList();
-    if (dataList) {
-        RefPtr<HTMLCollection> options = dataList->options();
-        for (unsigned i = 0; HTMLOptionElement* option = toHTMLOptionElement(options->item(i)); i++) {
-            if (!element()->isValidValue(option->value()))
-                continue;
-            Color color(option->value());
-            if (!color.isValid())
-                continue;
-            suggestions.append(color);
+    if (auto* dataList = element().dataList()) {
+        Ref<HTMLCollection> options = dataList->options();
+        unsigned length = options->length();
+        suggestions.reserveInitialCapacity(length);
+        for (unsigned i = 0; i != length; ++i) {
+            auto value = downcast<HTMLOptionElement>(*options->item(i)).value();
+            if (isValidColorString(value))
+                suggestions.uncheckedAppend(Color(value));
         }
     }
 #endif
     return suggestions;
+}
+
+void ColorInputType::selectColor(const Color& color)
+{
+    didChooseColor(color);
 }
 
 } // namespace WebCore

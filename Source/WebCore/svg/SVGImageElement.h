@@ -21,48 +21,45 @@
 #ifndef SVGImageElement_h
 #define SVGImageElement_h
 
-#if ENABLE(SVG)
 #include "SVGAnimatedBoolean.h"
 #include "SVGAnimatedLength.h"
 #include "SVGAnimatedPreserveAspectRatio.h"
 #include "SVGExternalResourcesRequired.h"
 #include "SVGGraphicsElement.h"
 #include "SVGImageLoader.h"
-#include "SVGNames.h"
 #include "SVGURIReference.h"
 
 namespace WebCore {
 
-class SVGImageElement FINAL : public SVGGraphicsElement,
+class SVGImageElement final : public SVGGraphicsElement,
                               public SVGExternalResourcesRequired,
                               public SVGURIReference {
 public:
-    static PassRefPtr<SVGImageElement> create(const QualifiedName&, Document*);
+    static Ref<SVGImageElement> create(const QualifiedName&, Document&);
+
+    bool hasSingleSecurityOrigin() const;
 
 private:
-    SVGImageElement(const QualifiedName&, Document*);
+    SVGImageElement(const QualifiedName&, Document&);
     
-    virtual bool isValid() const { return SVGTests::isValid(); }
-    virtual bool supportsFocus() const OVERRIDE { return true; }
+    virtual bool isValid() const override { return SVGTests::isValid(); }
 
-    bool isSupportedAttribute(const QualifiedName&);
-    virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
-    virtual bool isPresentationAttribute(const QualifiedName&) const OVERRIDE;
-    virtual void collectStyleForPresentationAttribute(const QualifiedName&, const AtomicString&, MutableStylePropertySet*) OVERRIDE;
-    virtual void svgAttributeChanged(const QualifiedName&);
+    static bool isSupportedAttribute(const QualifiedName&);
+    virtual void parseAttribute(const QualifiedName&, const AtomicString&) override;
+    virtual void svgAttributeChanged(const QualifiedName&) override;
 
-    virtual void attach(const AttachContext& = AttachContext()) OVERRIDE;
-    virtual InsertionNotificationRequest insertedInto(ContainerNode*) OVERRIDE;
+    virtual void didAttachRenderers() override;
+    virtual InsertionNotificationRequest insertedInto(ContainerNode&) override;
 
-    virtual RenderObject* createRenderer(RenderArena*, RenderStyle*);
+    virtual RenderPtr<RenderElement> createElementRenderer(Ref<RenderStyle>&&, const RenderTreePosition&) override;
 
-    virtual const AtomicString& imageSourceURL() const OVERRIDE;
-    virtual void addSubresourceAttributeURLs(ListHashSet<KURL>&) const;
+    virtual const AtomicString& imageSourceURL() const override;
+    virtual void addSubresourceAttributeURLs(ListHashSet<URL>&) const override;
 
-    virtual bool haveLoadedRequiredResources();
+    virtual bool haveLoadedRequiredResources() override;
 
-    virtual bool selfHasRelativeLengths() const;
-    virtual void didMoveToNewDocument(Document* oldDocument) OVERRIDE;
+    virtual bool selfHasRelativeLengths() const override { return true; }
+    virtual void didMoveToNewDocument(Document* oldDocument) override;
 
     BEGIN_DECLARE_ANIMATED_PROPERTIES(SVGImageElement)
         DECLARE_ANIMATED_LENGTH(X, x)
@@ -70,25 +67,13 @@ private:
         DECLARE_ANIMATED_LENGTH(Width, width)
         DECLARE_ANIMATED_LENGTH(Height, height)
         DECLARE_ANIMATED_PRESERVEASPECTRATIO(PreserveAspectRatio, preserveAspectRatio)
-        DECLARE_ANIMATED_STRING(Href, href)
-        DECLARE_ANIMATED_BOOLEAN(ExternalResourcesRequired, externalResourcesRequired)
+        DECLARE_ANIMATED_STRING_OVERRIDE(Href, href)
+        DECLARE_ANIMATED_BOOLEAN_OVERRIDE(ExternalResourcesRequired, externalResourcesRequired)
     END_DECLARE_ANIMATED_PROPERTIES
 
     SVGImageLoader m_imageLoader;
 };
 
-inline bool isSVGImageElement(const Node* node)
-{
-    return node->hasTagName(SVGNames::imageTag);
-}
-
-inline SVGImageElement* toSVGImageElement(Node* node)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!node || isSVGImageElement(node));
-    return static_cast<SVGImageElement*>(node);
-}
-
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif

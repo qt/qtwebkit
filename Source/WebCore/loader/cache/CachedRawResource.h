@@ -30,9 +30,9 @@ namespace WebCore {
 class CachedResourceClient;
 class SubresourceLoader;
 
-class CachedRawResource FINAL : public CachedResource {
+class CachedRawResource final : public CachedResource {
 public:
-    CachedRawResource(ResourceRequest&, Type);
+    CachedRawResource(ResourceRequest&, Type, SessionID);
 
     // FIXME: AssociatedURLLoader shouldn't be a DocumentThreadableLoader and therefore shouldn't
     // use CachedRawResource. However, it is, and it needs to be able to defer loading.
@@ -46,32 +46,35 @@ public:
 
     void clear();
 
+    bool canReuse(const ResourceRequest&) const;
+
+    bool wasRedirected() const { return !m_redirectChain.isEmpty(); };
+
 private:
-    virtual void didAddClient(CachedResourceClient*) OVERRIDE;
-    virtual void addDataBuffer(ResourceBuffer*) OVERRIDE;
-    virtual void addData(const char* data, unsigned length) OVERRIDE;
-    virtual void finishLoading(ResourceBuffer*) OVERRIDE;
+    virtual void didAddClient(CachedResourceClient*) override;
+    virtual void addDataBuffer(SharedBuffer&) override;
+    virtual void addData(const char* data, unsigned length) override;
+    virtual void finishLoading(SharedBuffer*) override;
 
-    virtual bool shouldIgnoreHTTPStatusCodeErrors() const OVERRIDE { return true; }
-    virtual void allClientsRemoved() OVERRIDE;
+    virtual bool shouldIgnoreHTTPStatusCodeErrors() const override { return true; }
+    virtual void allClientsRemoved() override;
 
-    virtual void willSendRequest(ResourceRequest&, const ResourceResponse&) OVERRIDE;
-    virtual void responseReceived(const ResourceResponse&) OVERRIDE;
-    virtual void didSendData(unsigned long long bytesSent, unsigned long long totalBytesToBeSent) OVERRIDE;
+    virtual void redirectReceived(ResourceRequest&, const ResourceResponse&) override;
+    virtual void responseReceived(const ResourceResponse&) override;
+    virtual void didSendData(unsigned long long bytesSent, unsigned long long totalBytesToBeSent) override;
 
-    virtual void switchClientsToRevalidatedResource() OVERRIDE;
-    virtual bool mayTryReplaceEncodedData() const OVERRIDE { return true; }
+    virtual void switchClientsToRevalidatedResource() override;
+    virtual bool mayTryReplaceEncodedData() const override { return m_allowEncodedDataReplacement; }
 
-    virtual bool canReuse(const ResourceRequest&) const OVERRIDE;
-
-    const char* calculateIncrementalDataChunk(ResourceBuffer*, unsigned& incrementalDataLength);
+    const char* calculateIncrementalDataChunk(SharedBuffer*, unsigned& incrementalDataLength);
     void notifyClientsDataWasReceived(const char* data, unsigned length);
 
 #if USE(SOUP)
-    virtual char* getOrCreateReadBuffer(size_t requestedSize, size_t& actualSize);
+    virtual char* getOrCreateReadBuffer(size_t requestedSize, size_t& actualSize) override;
 #endif
 
     unsigned long m_identifier;
+    bool m_allowEncodedDataReplacement;
 
     struct RedirectPair {
     public:
@@ -88,6 +91,10 @@ private:
     Vector<RedirectPair> m_redirectChain;
 };
 
-}
+} // namespace WebCore
+
+SPECIALIZE_TYPE_TRAITS_BEGIN(WebCore::CachedRawResource)
+    static bool isType(const WebCore::CachedResource& resource) { return resource.isMainOrRawResource(); }
+SPECIALIZE_TYPE_TRAITS_END()
 
 #endif // CachedRawResource_h
