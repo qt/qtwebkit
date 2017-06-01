@@ -178,6 +178,18 @@ static const char* editorCommandWebActions[] =
 
     0, // OpenLinkInThisWindow,
 
+    0, // DownloadMediaToDisk,
+    0, // CopyMediaUrlToClipboard,
+    0, // ToggleMediaControls,
+    0, // ToggleMediaLoop,
+    0, // ToggleMediaPlayPause,
+    0, // ToggleMediaMute,
+    0, // ToggleVideoFullscreen,
+
+    0, // RequestClose,
+
+    "Unselect", // Unselect,
+
     0 // WebActionCount
 };
 
@@ -476,6 +488,9 @@ QMenu *createContextMenu(QWebPage* page, const QList<MenuItem>& items, QBitArray
     for (int i = 0; i < items.count(); ++i) {
         const MenuItem &item = items.at(i);
         switch (item.type) {
+        case MenuItem::NoType:
+            Q_UNREACHABLE();
+            break;
         case MenuItem::Action: {
             QAction* a = nullptr;
             if (item.action < QWebPageAdapter::ActionCount) {
@@ -746,6 +761,7 @@ void QWebPagePrivate::updateEditorActions()
     updateAction(QWebPage::AlignJustified);
     updateAction(QWebPage::AlignLeft);
     updateAction(QWebPage::AlignRight);
+    updateAction(QWebPage::Unselect);
 }
 
 void QWebPagePrivate::timerEvent(QTimerEvent *ev)
@@ -832,6 +848,7 @@ QWebPage::WebAction QWebPagePrivate::editorActionForKeyEvent(QKeyEvent* event)
         { QKeySequence::InsertParagraphSeparator, QWebPage::InsertParagraphSeparator },
         { QKeySequence::InsertLineSeparator, QWebPage::InsertLineSeparator },
         { QKeySequence::SelectAll, QWebPage::SelectAll },
+        { QKeySequence::Deselect, QWebPage::Unselect },
         { QKeySequence::UnknownKey, QWebPage::NoWebAction }
     };
 
@@ -1209,6 +1226,7 @@ QWebInspector* QWebPagePrivate::getOrCreateInspector()
     \value ToggleMediaMute Mutes or unmutes the hovered audio or video element. (Added in Qt 5.2)
     \value ToggleVideoFullscreen Switches the hovered video element into or out of fullscreen mode. (Added in Qt 5.2)
     \value RequestClose Request to close the web page. If defined, the window.onbeforeunload handler is run, and the user can confirm or reject to close the page. If the close request is confirmed, windowCloseRequested is emitted. (Added in ?)
+    \value Unselect Deselects existing selection. (Added in QtWebKit 5.9)
 
     \omitvalue WebActionCount
 
@@ -2042,8 +2060,25 @@ void QWebPagePrivate::updateWindow()
 
 void QWebPagePrivate::_q_updateScreen(QScreen* screen)
 {
-    if (screen)
+    if (screen && !m_customDevicePixelRatioIsSet)
         setDevicePixelRatio(screen->devicePixelRatio());
+}
+
+void QWebPage::setDevicePixelRatio(qreal ratio)
+{
+    d->setDevicePixelRatio(ratio);
+    d->m_customDevicePixelRatioIsSet = true;
+}
+
+qreal QWebPage::devicePixelRatio() const
+{
+    return d->devicePixelRatio();
+}
+
+void QWebPage::resetDevicePixelRatio()
+{
+    d->m_customDevicePixelRatioIsSet = false;
+    d->updateWindow();
 }
 
 static int getintenv(const char* variable)

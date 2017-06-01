@@ -213,6 +213,7 @@ public:
     Qt::DropAction m_lastDropAction;
 
     QMetaMethod m_fullScreenRequested;
+    bool m_customDevicePixelRatioIsSet { false };
 };
 
 #endif

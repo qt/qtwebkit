@@ -237,8 +237,9 @@ public:
     bool areBeingProcessed() const { return !!m_currentRecord; }
     Record* next();
 
-private:
     ExceededDatabaseQuotaRecords() { }
+
+private:
     ~ExceededDatabaseQuotaRecords() { }
 
     Deque<std::unique_ptr<Record>> m_records;
@@ -873,6 +874,7 @@ void WebPageProxy::close()
     resetState(ResetStateReason::PageInvalidated);
 
     m_loaderClient = std::make_unique<API::LoaderClient>();
+    m_navigationClient = nullptr;
     m_policyClient = std::make_unique<API::PolicyClient>();
     m_formClient = std::make_unique<API::FormClient>();
     m_uiClient = std::make_unique<API::UIClient>();

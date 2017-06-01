@@ -195,6 +195,8 @@ public:
 
         RequestClose,
 
+        Unselect,
+
         WebActionCount
     };
 
@@ -333,6 +335,10 @@ public:
     QAction *customAction(int action) const;
 #endif
     virtual void triggerAction(WebAction action, bool checked = false);
+
+    void setDevicePixelRatio(qreal ratio);
+    qreal devicePixelRatio() const;
+    void resetDevicePixelRatio();
 
     QSize viewportSize() const;
     void setViewportSize(const QSize &size) const;
