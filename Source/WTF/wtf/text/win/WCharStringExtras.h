@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2016 Apple Inc. All rights reserved.
+ * Copyright (C) 2017 Konstantin Tokarev <annulen@yandex.ru>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -23,48 +23,48 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "config.h"
-#include "ContentExtensionStyleSheet.h"
+#pragma once
 
-#if ENABLE(CONTENT_EXTENSIONS)
+#include <wchar.h>
+#include <wtf/text/WTFString.h>
 
-#include "CSSStyleSheet.h"
-#include "ContentExtensionsBackend.h"
-#include "Document.h"
-#include "StyleSheetContents.h"
-#include <wtf/text/StringBuilder.h>
+namespace WTF {
 
-namespace WebCore {
-namespace ContentExtensions {
-
-ContentExtensionStyleSheet::ContentExtensionStyleSheet(Document& document)
-    : m_styleSheet(CSSStyleSheet::create(StyleSheetContents::create(), &document))
+inline Vector<wchar_t> stringToNullTerminatedWChar(const String& string)
 {
-    m_styleSheet->contents().setIsUserStyleSheet(true);
+    Vector<wchar_t> result;
+
+    if (!string.isNull()) {
+        result.reserveInitialCapacity(string.impl()->length() + 1);
+
+        if (string.is8Bit()) {
+            const LChar* characters8 = string.impl()->characters8();
+            for (size_t i = 0; i < string.impl()->length(); ++i)
+                result.uncheckedAppend(characters8[i]);
+        } else {
+            const UChar* characters16 = string.impl()->characters16();
+            result.append(characters16, string.impl()->length());
+        }
+
+        result.append(0);
+    }
+
+    return result;
 }
 
-ContentExtensionStyleSheet::~ContentExtensionStyleSheet()
+inline String wcharToString(const wchar_t* characters, unsigned length)
 {
-    m_styleSheet->clearOwnerNode();
+    static_assert(sizeof(wchar_t) == sizeof(UChar), "We assume wchar_t and UChar have the same size");
+    return String(reinterpret_cast<const UChar*>(characters), length);
 }
 
-bool ContentExtensionStyleSheet::addDisplayNoneSelector(const String& selector, uint32_t selectorID)
+inline String nullTerminatedWCharToString(const wchar_t* characters)
 {
-    ASSERT(selectorID != std::numeric_limits<uint32_t>::max());
-
-    if (!m_addedSelectorIDs.add(selectorID).isNewEntry)
-        return false;
-
-    StringBuilder css;
-    css.append(selector);
-    css.append('{');
-    css.append(ContentExtensionsBackend::displayNoneCSSRule());
-    css.append('}');
-    m_styleSheet->contents().parseString(css.toString());
-    return true;
+    return wcharToString(characters, wcslen(characters) - 1);
 }
 
-} // namespace ContentExtensions
-} // namespace WebCore
+} // namespace WTF
 
-#endif // ENABLE(CONTENT_EXTENSIONS)
+using WTF::stringToNullTerminatedWChar;
+using WTF::wcharToString;
+using WTF::nullTerminatedWCharToString;
