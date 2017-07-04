@@ -1,4 +1,5 @@
 include(FeatureSummary)
+include(ECMEnableSanitizers)
 include(ECMPackageConfigHelpers)
 
 set(ECM_MODULE_DIR ${CMAKE_MODULE_PATH})
@@ -59,6 +60,40 @@ macro(QT_ADD_EXTRA_WEBKIT_TARGET_EXPORT target)
     endif ()
 endmacro()
 
+macro(QTWEBKIT_GENERATE_MOC_FILES_CPP)
+    foreach (_file ${ARGN})
+        get_filename_component(_ext ${_file} EXT)
+        if (NOT _ext STREQUAL ".cpp")
+            message(FATAL_ERROR "QTWEBKIT_GENERATE_MOC_FILES_CPP must be used for .cpp files only")
+        endif ()
+        get_filename_component(_name_we ${_file} NAME_WE)
+        set(_moc_name "${CMAKE_CURRENT_BINARY_DIR}/${_name_we}.moc")
+        qt5_generate_moc(${_file} ${_moc_name})
+        ADD_SOURCE_DEPENDENCIES(${_file} ${_moc_name})
+    endforeach ()
+endmacro()
+
+macro(QTWEBKIT_GENERATE_MOC_FILE_H _header _source)
+    get_filename_component(_header_ext ${_header} EXT)
+    get_filename_component(_source_ext ${_source} EXT)
+    if ((NOT _header_ext STREQUAL ".h") OR (NOT _source_ext STREQUAL ".cpp"))
+        message(FATAL_ERROR "QTWEBKIT_GENERATE_MOC_FILE_H must be called with arguments being .h and .cpp files")
+    endif ()
+    get_filename_component(_name_we ${_header} NAME_WE)
+    set(_moc_name "${CMAKE_CURRENT_BINARY_DIR}/moc_${_name_we}.cpp")
+    qt5_generate_moc(${_header} ${_moc_name})
+    ADD_SOURCE_DEPENDENCIES(${_source} ${_moc_name})
+endmacro()
+
+macro(QTWEBKIT_GENERATE_MOC_FILES_H)
+    foreach (_header ${ARGN})
+        get_filename_component(_header_dir ${_header} DIRECTORY)
+        get_filename_component(_name_we ${_header} NAME_WE)
+        set(_source "${_header_dir}/${_name_we}.cpp")
+        QTWEBKIT_GENERATE_MOC_FILE_H(${_header} ${_source})
+    endforeach ()
+endmacro()
+
 set(CMAKE_MACOSX_RPATH ON)
 
 add_definitions(-DBUILDING_QT__=1)
@@ -98,6 +133,13 @@ else ()
     set(USE_QT_MULTIMEDIA_DEFAULT OFF)
 endif ()
 
+if (MSVC)
+    set(USE_QT_MULTIMEDIA_DEFAULT OFF)
+    set(USE_MEDIA_FOUNDATION_DEFAULT ON)
+else ()
+    set(USE_MEDIA_FOUNDATION_DEFAULT OFF)
+endif ()
+
 if (CMAKE_SYSTEM_NAME MATCHES "Linux")
     set(ENABLE_GAMEPAD_DEPRECATED_DEFAULT ON)
 else ()
@@ -111,7 +153,21 @@ else ()
 endif ()
 
 # FIXME: Move Qt handling here
-find_package(Qt5Gui QUIET)
+set(REQUIRED_QT_VERSION 5.2.0)
+find_package(Qt5 ${REQUIRED_QT_VERSION} REQUIRED COMPONENTS Core Gui QUIET)
+
+get_target_property(QT_CORE_TYPE Qt5::Core TYPE)
+if (QT_CORE_TYPE MATCHES STATIC)
+    set(QT_STATIC_BUILD ON)
+    set(SHARED_CORE OFF)
+    set(MACOS_BUILD_FRAMEWORKS OFF)
+endif ()
+
+if (QT_STATIC_BUILD)
+    set(ENABLE_WEBKIT2_DEFAULT OFF)
+else ()
+    set(ENABLE_WEBKIT2_DEFAULT ON)
+endif ()
 
 if (UNIX AND TARGET Qt5::QXcbIntegrationPlugin AND NOT APPLE)
     set(ENABLE_X11_TARGET_DEFAULT ON)
@@ -130,7 +186,7 @@ endif ()
 # and the option is not relevant to any other WebKit ports.
 WEBKIT_OPTION_DEFINE(USE_GSTREAMER "Use GStreamer implementation of MediaPlayer" PUBLIC ${USE_GSTREAMER_DEFAULT})
 WEBKIT_OPTION_DEFINE(USE_LIBHYPHEN "Use automatic hyphenation with LibHyphen" PUBLIC ${USE_LIBHYPHEN_DEFAULT})
-WEBKIT_OPTION_DEFINE(USE_MEDIA_FOUNDATION "Use MediaFoundation implementation of MediaPlayer" PUBLIC OFF)
+WEBKIT_OPTION_DEFINE(USE_MEDIA_FOUNDATION "Use MediaFoundation implementation of MediaPlayer" PUBLIC ${USE_MEDIA_FOUNDATION_DEFAULT})
 WEBKIT_OPTION_DEFINE(USE_QT_MULTIMEDIA "Use Qt Multimedia implementation of MediaPlayer" PUBLIC ${USE_QT_MULTIMEDIA_DEFAULT})
 WEBKIT_OPTION_DEFINE(USE_WOFF2 "Include support of WOFF2 fonts format" PUBLIC ON)
 WEBKIT_OPTION_DEFINE(ENABLE_INSPECTOR_UI "Include Inspector UI into resources" PUBLIC ON)
@@ -138,7 +194,7 @@ WEBKIT_OPTION_DEFINE(ENABLE_OPENGL "Whether to use OpenGL." PUBLIC ON)
 WEBKIT_OPTION_DEFINE(ENABLE_PRINT_SUPPORT "Enable support for printing web pages" PUBLIC ON)
 WEBKIT_OPTION_DEFINE(ENABLE_QT_GESTURE_EVENTS "Enable support for gesture events (required for mouse in WK2)" PUBLIC ON)
 WEBKIT_OPTION_DEFINE(ENABLE_QT_WEBCHANNEL "Enable support for Qt WebChannel" PUBLIC ON)
-WEBKIT_OPTION_DEFINE(ENABLE_WEBKIT2 "Enable WebKit2 (QML API)" PUBLIC ON)
+WEBKIT_OPTION_DEFINE(ENABLE_WEBKIT2 "Enable WebKit2 (QML API)" PUBLIC ${ENABLE_WEBKIT2_DEFAULT})
 WEBKIT_OPTION_DEFINE(ENABLE_X11_TARGET "Whether to enable support for the X11 windowing target." PUBLIC ${ENABLE_X11_TARGET_DEFAULT})
 
 option(GENERATE_DOCUMENTATION "Generate HTML and QCH documentation" OFF)
@@ -208,6 +264,8 @@ if (MINGW AND CMAKE_SIZEOF_VOID_P EQUAL 8)
 endif ()
 
 WEBKIT_OPTION_CONFLICT(USE_GSTREAMER USE_QT_MULTIMEDIA)
+WEBKIT_OPTION_CONFLICT(USE_GSTREAMER USE_MEDIA_FOUNDATION)
+WEBKIT_OPTION_CONFLICT(USE_QT_MULTIMEDIA USE_MEDIA_FOUNDATION)
 
 WEBKIT_OPTION_DEPEND(ENABLE_3D_TRANSFORMS ENABLE_OPENGL)
 WEBKIT_OPTION_DEPEND(ENABLE_ACCELERATED_2D_CANVAS ENABLE_OPENGL)
@@ -230,9 +288,9 @@ WEBKIT_OPTION_END()
 # FTL JIT and IndexedDB support require GCC 4.9
 # TODO: Patch code to avoid variadic lambdas
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    if (ENABLE_FTL_JIT OR ENABLE_INDEXED_DATABASE)
+    if (ENABLE_FTL_JIT OR ENABLE_INDEXED_DATABASE OR (ENABLE_WEBKIT2 AND ENABLE_DATABASE_PROCESS))
         if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS "4.9.0")
-            message(FATAL_ERROR "GCC 4.9.0 is required to build QtWebKit with FTL JIT and Indexed Database, use a newer GCC version or clang, or disable these features")
+            message(FATAL_ERROR "GCC 4.9.0 is required to build QtWebKit with FTL JIT, Indexed Database, and Database Process (WebKit 2). Use a newer GCC version or clang, or disable these features")
         endif ()
     else ()
         if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS "4.8.0")
@@ -249,13 +307,6 @@ endif ()
 
 set(ENABLE_WEBKIT ON)
 set(WTF_USE_UDIS86 1)
-
-get_target_property(QT_CORE_TYPE Qt5::Core TYPE)
-if (QT_CORE_TYPE MATCHES STATIC)
-    set(QT_STATIC_BUILD ON)
-    set(SHARED_CORE OFF)
-    set(MACOS_BUILD_FRAMEWORKS OFF)
-endif ()
 
 if (SHARED_CORE)
     set(WebCoreTestSupport_LIBRARY_TYPE SHARED)
@@ -390,7 +441,6 @@ if (WEBP_FOUND)
     SET_AND_EXPOSE_TO_BUILD(USE_WEBP 1)
 endif ()
 
-set(REQUIRED_QT_VERSION 5.2.0)
 set(QT_REQUIRED_COMPONENTS Core Gui Network)
 
 # FIXME: Allow building w/o these components
@@ -490,8 +540,6 @@ option(USE_LINKER_VERSION_SCRIPT "Use linker script for ABI compatibility with Q
 
 # Find includes in corresponding build directories
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
-# Instruct CMake to run moc automatically when needed.
-set(CMAKE_AUTOMOC ON)
 
 # TODO: figure out if we can run automoc only on Qt sources
 
@@ -574,6 +622,7 @@ if (ENABLE_OPENGL)
 endif ()
 
 if (NOT ENABLE_VIDEO)
+    set(USE_MEDIA_FOUNDATION OFF)
     set(USE_QT_MULTIMEDIA OFF)
 
     if (NOT ENABLE_WEB_AUDIO)
