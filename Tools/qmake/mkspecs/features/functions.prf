@@ -73,7 +73,7 @@ defineTest(isPlatformSupported) {
             skipBuild("WinRT is not supported.")
         }
         msvc {
-            !isEqual(MSVC_VER, "14.0") {
+            !isVersionAtLeast($$MSVC_VER, "14.0") {
                 skipBuild("QtWebKit on Windows requires MSVC 2015.")
             }
             CONFIG(debug, debug|release):!contains(QMAKE_HOST.arch, x86_64) {
