@@ -299,13 +299,13 @@
 #define WTF_DELETED_FUNCTION
 #endif
 
-/* REFERENCED_FROM_ASM */
+/* REFERENCE_KEEP_FOR_LTO */
 
-#ifndef REFERENCED_FROM_ASM
+#ifndef REFERENCE_KEEP_FOR_LTO
 #if COMPILER(GCC)
-#define REFERENCED_FROM_ASM __attribute__((used))
+#define REFERENCE_KEEP_FOR_LTO __attribute__((used))
 #else
-#define REFERENCED_FROM_ASM
+#define REFERENCE_KEEP_FOR_LTO
 #endif
 #endif
 
