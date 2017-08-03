@@ -311,19 +311,19 @@
 #endif
 
 #define P_FUNCTION_WRAPPER_WITH_RETURN_ADDRESS_E(function) \
-void* DFG_OPERATION function##WithReturnAddress(ExecState*, ReturnAddressPtr) REFERENCED_FROM_ASM WTF_INTERNAL; \
+void* DFG_OPERATION function##WithReturnAddress(ExecState*, ReturnAddressPtr) REFERENCE_KEEP_FOR_LTO WTF_INTERNAL; \
 FUNCTION_WRAPPER_WITH_RETURN_ADDRESS_E(function)
 
 #define J_FUNCTION_WRAPPER_WITH_RETURN_ADDRESS_ECI(function) \
-EncodedJSValue DFG_OPERATION function##WithReturnAddress(ExecState*, JSCell*, Identifier*, ReturnAddressPtr) REFERENCED_FROM_ASM WTF_INTERNAL; \
+EncodedJSValue DFG_OPERATION function##WithReturnAddress(ExecState*, JSCell*, Identifier*, ReturnAddressPtr) REFERENCE_KEEP_FOR_LTO WTF_INTERNAL; \
 FUNCTION_WRAPPER_WITH_RETURN_ADDRESS_ECI(function)
 
 #define J_FUNCTION_WRAPPER_WITH_RETURN_ADDRESS_EJI(function) \
-EncodedJSValue DFG_OPERATION function##WithReturnAddress(ExecState*, EncodedJSValue, Identifier*, ReturnAddressPtr) REFERENCED_FROM_ASM WTF_INTERNAL; \
+EncodedJSValue DFG_OPERATION function##WithReturnAddress(ExecState*, EncodedJSValue, Identifier*, ReturnAddressPtr) REFERENCE_KEEP_FOR_LTO WTF_INTERNAL; \
 FUNCTION_WRAPPER_WITH_RETURN_ADDRESS_EJI(function)
 
 #define V_FUNCTION_WRAPPER_WITH_RETURN_ADDRESS_EJCI(function) \
-void DFG_OPERATION function##WithReturnAddress(ExecState*, EncodedJSValue, JSCell*, Identifier*, ReturnAddressPtr) REFERENCED_FROM_ASM WTF_INTERNAL; \
+void DFG_OPERATION function##WithReturnAddress(ExecState*, EncodedJSValue, JSCell*, Identifier*, ReturnAddressPtr) REFERENCE_KEEP_FOR_LTO WTF_INTERNAL; \
 FUNCTION_WRAPPER_WITH_RETURN_ADDRESS_EJCI(function)
 
 namespace JSC { namespace DFG {
