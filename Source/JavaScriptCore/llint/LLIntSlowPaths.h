@@ -96,7 +96,7 @@ extern "C" SlowPathReturnType llint_trace_value(ExecState*, Instruction*, int fr
     extern "C" SlowPathReturnType llint_##name(ExecState* exec, Instruction* pc)
 
 #define LLINT_SLOW_PATH_HIDDEN_DECL(name) \
-    LLINT_SLOW_PATH_DECL(name) WTF_INTERNAL
+    LLINT_SLOW_PATH_DECL(name) REFERENCE_KEEP_FOR_LTO WTF_INTERNAL
 
 LLINT_SLOW_PATH_HIDDEN_DECL(trace_prologue);
 LLINT_SLOW_PATH_HIDDEN_DECL(trace_prologue_function_for_call);
