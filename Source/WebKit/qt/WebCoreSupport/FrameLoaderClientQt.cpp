@@ -1300,7 +1300,9 @@ void FrameLoaderClientQt::startDownload(const WebCore::ResourceRequest& request,
     if (!m_webFrame)
         return;
 
-    m_webFrame->pageAdapter->emitDownloadRequested(request.toNetworkRequest(m_frame->loader()->networkingContext()));
+    QNetworkRequest r = request.toNetworkRequest(m_frame->loader()->networkingContext());
+    if (r.url().isValid())
+        m_webFrame->pageAdapter->emitDownloadRequested(r);
 }
 
 PassRefPtr<Frame> FrameLoaderClientQt::createFrame(const KURL& url, const String& name, HTMLFrameOwnerElement* ownerElement, const String& referrer, bool allowsScrolling, int marginWidth, int marginHeight)

@@ -28,10 +28,9 @@
 #include "BlobStorageData.h"
 #endif
 
-#include <qglobal.h>
-
 #include <QNetworkRequest>
 #include <QUrl>
+#include <wtf/text/Base64.h>
 
 namespace WebCore {
 
@@ -47,11 +46,11 @@ unsigned initializeMaximumHTTPConnectionCountPerHost()
 }
 
 #if ENABLE(BLOB)
-static void appendBlobResolved(QByteArray& data, const QUrl& url, QString* contentType = 0)
+static bool appendBlobResolved(Vector<char>& out, const KURL& url, QString* contentType = 0)
 {
     RefPtr<BlobStorageData> blobData = static_cast<BlobRegistryImpl&>(blobRegistry()).getBlobDataFromURL(url);
     if (!blobData)
-        return;
+        return false;
 
     if (contentType)
         *contentType = blobData->contentType();
@@ -60,34 +59,57 @@ static void appendBlobResolved(QByteArray& data, const QUrl& url, QString* conte
     const BlobDataItemList::const_iterator itend = blobData->items().end();
     for (; it != itend; ++it) {
         const BlobDataItem& blobItem = *it;
-        if (blobItem.type == BlobDataItem::Data)
-            data.append(blobItem.data->data() + static_cast<int>(blobItem.offset), static_cast<int>(blobItem.length));
-        else if (blobItem.type == BlobDataItem::Blob)
-            appendBlobResolved(data, blobItem.url);
-        else if (blobItem.type == BlobDataItem::File) {
+        if (blobItem.type == BlobDataItem::Data) {
+            if (!out.tryAppend(reinterpret_cast<const char*>(blobItem.data->data()) + blobItem.offset, blobItem.length))
+                return false;
+        } else if (blobItem.type == BlobDataItem::File) {
             // File types are not allowed here, so just ignore it.
         } else
             ASSERT_NOT_REACHED();
     }
+    return true;
 }
 
-static void resolveBlobUrl(const QUrl& url, QUrl& resolvedUrl)
+static QUrl resolveBlobUrl(const KURL& url)
 {
     RefPtr<BlobStorageData> blobData = static_cast<BlobRegistryImpl&>(blobRegistry()).getBlobDataFromURL(url);
     if (!blobData)
-        return;
+        return QUrl();
 
-    QByteArray data;
+    Vector<char> data;
     QString contentType;
-    appendBlobResolved(data, url, &contentType);
+    if (!appendBlobResolved(data, url, &contentType)) {
+        qWarning("Failed to convert blob data to base64: cannot allocate memory for continuous blob data");
+        return QUrl();
+    }
+
+    // QByteArray::{from,to}Base64 are prone to integer overflow, this is the maximum size that can be safe
+    size_t maxBase64Size = std::numeric_limits<int>::max() / 3 - 1;
+
+    Vector<char> base64;
+    WTF::base64Encode(data, base64, WTF::Base64URLPolicy);
+    if (base64.isEmpty() || base64.size() > maxBase64Size) {
+        qWarning("Failed to convert blob data to base64: data is too large");
+        return QUrl();
+    }
 
     QString dataUri(QStringLiteral("data:"));
     dataUri.append(contentType);
     dataUri.append(QStringLiteral(";base64,"));
-    dataUri.append(QString::fromLatin1(data.toBase64()));
-    resolvedUrl = QUrl(dataUri);
+    dataUri.reserve(dataUri.size() + base64.size());
+    dataUri.append(QLatin1String(base64.data(), base64.size()));
+    return QUrl(dataUri);
 }
 #endif
+
+static QUrl toQUrl(const KURL& url)
+{
+#if ENABLE(BLOB)
+    if (url.protocolIs("blob"))
+        return resolveBlobUrl(url);
+#endif
+    return url;
+}
 
 static inline QByteArray stringToByteArray(const String& string)
 {
@@ -99,13 +121,7 @@ static inline QByteArray stringToByteArray(const String& string)
 QNetworkRequest ResourceRequest::toNetworkRequest(NetworkingContext *context) const
 {
     QNetworkRequest request;
-    QUrl newurl = url();
-
-#if ENABLE(BLOB)
-    if (newurl.scheme() == QLatin1String("blob"))
-        resolveBlobUrl(url(), newurl);
-#endif
-
+    QUrl newurl = toQUrl(url());
     request.setUrl(newurl);
     request.setOriginatingObject(context ? context->originatingObject() : 0);
 
