@@ -100,13 +100,23 @@ static QUrl resolveBlobUrl(const KURL& url)
     dataUri.append(QLatin1String(base64.data(), base64.size()));
     return QUrl(dataUri);
 }
+
+QUrl convertBlobToDataUrl(const QUrl& url)
+{
+    QT_TRY {
+        return resolveBlobUrl(url);
+    } QT_CATCH(const std::bad_alloc &) {
+        qWarning("Failed to convert blob data to base64: not enough memory");
+    }
+    return QUrl();
+}
 #endif
 
 static QUrl toQUrl(const KURL& url)
 {
 #if ENABLE(BLOB)
     if (url.protocolIs("blob"))
-        return resolveBlobUrl(url);
+        return convertBlobToDataUrl(url);
 #endif
     return url;
 }
