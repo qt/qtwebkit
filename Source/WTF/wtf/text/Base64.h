@@ -35,7 +35,8 @@ namespace WTF {
 
 enum Base64EncodePolicy {
     Base64DoNotInsertLFs,
-    Base64InsertLFs
+    Base64InsertLFs,
+    Base64URLPolicy // No padding, no LFs.
 };
 
 enum Base64DecodePolicy {

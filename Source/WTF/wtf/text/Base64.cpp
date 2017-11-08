@@ -122,9 +122,13 @@ void base64Encode(const char* data, unsigned len, Vector<char>& out, Base64Encod
     }
 
     // Add padding
-    while (didx < out.size()) {
-        out[didx] = '=';
-        ++didx;
+    if (policy == Base64URLPolicy)
+        out.resize(didx);
+    else {
+        while (didx < out.size()) {
+            out[didx] = '=';
+            ++didx;
+        }
     }
 }
 
