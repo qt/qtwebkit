@@ -2,6 +2,10 @@ include(platform/ImageDecoders.cmake)
 include(platform/Linux.cmake)
 include(platform/TextureMapper.cmake)
 
+if (JPEG_DEFINITIONS)
+    add_definitions(${JPEG_DEFINITIONS})
+endif ()
+
 list(APPEND WebCore_INCLUDE_DIRECTORIES
     "${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}"
     "${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/inspector"
@@ -69,6 +73,8 @@ list(APPEND WebCore_SOURCES
 
     platform/audio/qt/AudioBusQt.cpp
 
+    platform/crypto/qt/CryptoDigestQt.cpp
+
     platform/graphics/ImageSource.cpp
     platform/graphics/PlatformDisplay.cpp
     platform/graphics/WOFFFileFormat.cpp
@@ -110,6 +116,7 @@ list(APPEND WebCore_SOURCES
     platform/network/NetworkStorageSessionStub.cpp
     platform/network/MIMESniffing.cpp
 
+    platform/network/qt/BlobUrlConversion.cpp
     platform/network/qt/CookieJarQt.cpp
     platform/network/qt/CredentialStorageQt.cpp
     platform/network/qt/DNSQt.cpp
@@ -162,25 +169,31 @@ list(APPEND WebCore_SOURCES
     platform/text/qt/TextBreakIteratorInternalICUQt.cpp
 )
 
-QTWEBKIT_GENERATE_MOC_FILES_CPP(
+QTWEBKIT_GENERATE_MOC_FILES_CPP(WebCore
     platform/network/qt/DNSQt.cpp
     platform/qt/MainThreadSharedTimerQt.cpp
 )
 
-QTWEBKIT_GENERATE_MOC_FILES_H(
+QTWEBKIT_GENERATE_MOC_FILES_H(WebCore
     platform/network/qt/CookieJarQt.h
     platform/network/qt/QNetworkReplyHandler.h
     platform/network/qt/QtMIMETypeSniffer.h
 )
 
-QTWEBKIT_GENERATE_MOC_FILE_H(platform/network/qt/NetworkStateNotifierPrivate.h platform/network/qt/NetworkStateNotifierQt.cpp)
-QTWEBKIT_GENERATE_MOC_FILE_H(platform/network/qt/SocketStreamHandlePrivate.h platform/network/qt/SocketStreamHandleQt.cpp)
+QTWEBKIT_GENERATE_MOC_FILE_H(WebCore platform/network/qt/NetworkStateNotifierPrivate.h platform/network/qt/NetworkStateNotifierQt.cpp)
+QTWEBKIT_GENERATE_MOC_FILE_H(WebCore platform/network/qt/SocketStreamHandlePrivate.h platform/network/qt/SocketStreamHandleQt.cpp)
 
 if (COMPILER_IS_GCC_OR_CLANG)
     set_source_files_properties(
         platform/graphics/qt/ImageBufferDataQt.cpp
     PROPERTIES
         COMPILE_FLAGS "-frtti -UQT_NO_DYNAMIC_CAST"
+    )
+
+    set_source_files_properties(
+        platform/network/qt/BlobUrlConversion.cpp
+    PROPERTIES
+        COMPILE_FLAGS "-fexceptions -UQT_NO_EXCEPTIONS"
     )
 endif ()
 
@@ -197,7 +210,7 @@ if (ENABLE_GAMEPAD_DEPRECATED)
     list(APPEND WebCore_SOURCES
         platform/qt/GamepadsQt.cpp
     )
-    QTWEBKIT_GENERATE_MOC_FILES_CPP(platform/qt/GamepadsQt.cpp)
+    QTWEBKIT_GENERATE_MOC_FILES_CPP(WebCore platform/qt/GamepadsQt.cpp)
 endif ()
 
 if (ENABLE_GRAPHICS_CONTEXT_3D)
@@ -221,7 +234,7 @@ if (ENABLE_NETSCAPE_PLUGIN_API)
             platform/win/WebCoreInstanceHandle.cpp
         )
         list(APPEND WebCore_LIBRARIES
-            Shlwapi
+            shlwapi
             version
         )
     elseif (PLUGIN_BACKEND_XLIB)
@@ -374,7 +387,7 @@ if (USE_QT_MULTIMEDIA)
     list(APPEND WebCore_LIBRARIES
         ${Qt5Multimedia_LIBRARIES}
     )
-    QTWEBKIT_GENERATE_MOC_FILES_H(platform/graphics/qt/MediaPlayerPrivateQt.h)
+    QTWEBKIT_GENERATE_MOC_FILES_H(WebCore platform/graphics/qt/MediaPlayerPrivateQt.h)
 endif ()
 
 if (ENABLE_VIDEO)

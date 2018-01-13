@@ -33,7 +33,7 @@
 
 namespace WebKit {
 
-class WebIDBConnectionToServer final : public WebCore::IDBClient::IDBConnectionToServerDelegate, public IPC::MessageSender, public RefCounted<WebIDBConnectionToServer> {
+class WebIDBConnectionToServer final : private WebCore::IDBClient::IDBConnectionToServerDelegate, private IPC::MessageSender, public RefCounted<WebIDBConnectionToServer> {
 public:
     static Ref<WebIDBConnectionToServer> create();
 
@@ -95,7 +95,7 @@ private:
 
     virtual IPC::Connection* messageSenderConnection() override final;
 
-    uint64_t m_identifier;
+    uint64_t m_identifier { 0 };
     bool m_isOpenInServer { false };
     RefPtr<WebCore::IDBClient::IDBConnectionToServer> m_connectionToServer;
 };

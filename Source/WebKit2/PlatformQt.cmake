@@ -1,7 +1,7 @@
 set(WebKit2_WebProcess_OUTPUT_NAME QtWebProcess)
 set(WebKit2_NetworkProcess_OUTPUT_NAME QtWebNetworkProcess)
 set(WebKit2_PluginProcess_OUTPUT_NAME QtWebPluginProcess)
-set(WebKit2_DatabaseProcess_OUTPUT_NAME QtWebDatabaseProcess)
+set(WebKit2_DatabaseProcess_OUTPUT_NAME QtWebStorageProcess)
 
 file(MAKE_DIRECTORY ${DERIVED_SOURCES_WEBKIT2_DIR})
 
@@ -16,6 +16,8 @@ add_definitions(-DBUILDING_WEBKIT)
 if (${JavaScriptCore_LIBRARY_TYPE} MATCHES STATIC)
     add_definitions(-DSTATICALLY_LINKED_WITH_WTF -DSTATICALLY_LINKED_WITH_JavaScriptCore)
 endif ()
+
+QTWEBKIT_SKIP_AUTOMOC(WebKit2)
 
 #set(WebKit2_USE_PREFIX_HEADER ON)
 
@@ -257,6 +259,7 @@ if (ENABLE_NETSCAPE_PLUGIN_API)
 endif ()
 
 list(APPEND WebKit2_SYSTEM_INCLUDE_DIRECTORIES
+    ${GLIB_INCLUDE_DIRS}
     ${GSTREAMER_INCLUDE_DIRS}
     ${Qt5Quick_INCLUDE_DIRS}
     ${Qt5Quick_PRIVATE_INCLUDE_DIRS}
@@ -280,23 +283,25 @@ list(APPEND WebProcess_SOURCES
     qt/MainQt.cpp
 )
 
+if (NOT SHARED_CORE)
+    set(WebProcess_LIBRARIES
+        WebKit
+    )
+    set(NetworkProcess_LIBRARIES
+        WebKit
+    )
+    set(DatabaseProcess_LIBRARIES
+        WebKit
+    )
+    set(PluginProcess_LIBRARIES
+        WebKit
+    )
+endif ()
+
 # FIXME: Allow building without widgets
-set(WebProcess_LIBRARIES
-    WebKit
+list(APPEND WebProcess_LIBRARIES
     Qt5::Widgets
     WebKitWidgets
-)
-
-set(NetworkProcess_LIBRARIES
-    WebKit
-)
-
-set(DatabaseProcess_LIBRARIES
-    WebKit
-)
-
-set(PluginProcess_LIBRARIES
-    WebKit
 )
 
 list(APPEND NetworkProcess_SOURCES
@@ -324,3 +329,12 @@ WEBKIT_CREATE_FORWARDING_HEADERS(QtWebKit/private DIRECTORIES UIProcess/API/qt)
 if (ENABLE_API_TESTS)
     add_subdirectory(UIProcess/API/qt/tests)
 endif ()
+
+file(GLOB WebKit2_PRIVATE_HEADERS UIProcess/API/qt/*_p.h)
+install(
+    FILES
+       ${WebKit2_PRIVATE_HEADERS}
+    DESTINATION
+        ${KDE_INSTALL_INCLUDEDIR}/QtWebKit/${PROJECT_VERSION}/QtWebKit/private
+    COMPONENT Data
+)

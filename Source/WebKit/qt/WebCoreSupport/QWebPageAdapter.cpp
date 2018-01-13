@@ -390,7 +390,10 @@ QString QWebPageAdapter::selectedText() const
 
 QString QWebPageAdapter::selectedHtml() const
 {
-    return page->focusController().focusedOrMainFrame().editor().selectedRange()->toHTML();
+    RefPtr<Range> range = page->focusController().focusedOrMainFrame().editor().selectedRange();
+    if (!range)
+        return QString();
+    return range->toHTML();
 }
 
 bool QWebPageAdapter::isContentEditable() const
@@ -433,6 +436,9 @@ bool QWebPageAdapter::findText(const QString& subString, FindFlag options)
 
     if (options & FindBeginsInSelection)
         webCoreFindOptions |= WebCore::StartInSelection;
+
+    if (options & FindAtWordEndingsOnly)
+        webCoreFindOptions |= WebCore::AtWordEnds;
 
     if (options & HighlightAllOccurrences) {
         if (subString.isEmpty()) {

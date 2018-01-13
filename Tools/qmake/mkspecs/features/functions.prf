@@ -65,10 +65,9 @@ defineTest(isPlatformSupported) {
         skipBuild("Using cmake version $$cmake_version, but at least cmake 2.8.12 is required to build QtWebKit.")
     }
 
+    intel_icc: skipBuild("Building QtWebKit with ICC is not supported.")
+
     win32 {
-        qtConfig(opengles2):!qtConfig(dynamicgl) {
-            skipBuild("QtWebKit supports only dynamic GL Qt builds on Windows at the moment.")
-        }
         winrt {
             skipBuild("WinRT is not supported.")
         }

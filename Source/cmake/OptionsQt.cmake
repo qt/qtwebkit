@@ -60,7 +60,16 @@ macro(QT_ADD_EXTRA_WEBKIT_TARGET_EXPORT target)
     endif ()
 endmacro()
 
-macro(QTWEBKIT_GENERATE_MOC_FILES_CPP)
+macro(QTWEBKIT_SKIP_AUTOMOC _target)
+    foreach (_src ${${_target}_SOURCES})
+        set_property(SOURCE ${_src} PROPERTY SKIP_AUTOMOC ON)
+    endforeach ()
+endmacro()
+
+macro(QTWEBKIT_GENERATE_MOC_FILES_CPP _target)
+    if (${ARGC} LESS 2)
+        message(FATAL_ERROR "QTWEBKIT_GENERATE_MOC_FILES_CPP must be called with at least 2 arguments")
+    endif ()
     foreach (_file ${ARGN})
         get_filename_component(_ext ${_file} EXT)
         if (NOT _ext STREQUAL ".cpp")
@@ -68,12 +77,12 @@ macro(QTWEBKIT_GENERATE_MOC_FILES_CPP)
         endif ()
         get_filename_component(_name_we ${_file} NAME_WE)
         set(_moc_name "${CMAKE_CURRENT_BINARY_DIR}/${_name_we}.moc")
-        qt5_generate_moc(${_file} ${_moc_name})
+        qt5_generate_moc(${_file} ${_moc_name} TARGET ${_target})
         ADD_SOURCE_DEPENDENCIES(${_file} ${_moc_name})
     endforeach ()
 endmacro()
 
-macro(QTWEBKIT_GENERATE_MOC_FILE_H _header _source)
+macro(QTWEBKIT_GENERATE_MOC_FILE_H _target _header _source)
     get_filename_component(_header_ext ${_header} EXT)
     get_filename_component(_source_ext ${_source} EXT)
     if ((NOT _header_ext STREQUAL ".h") OR (NOT _source_ext STREQUAL ".cpp"))
@@ -81,16 +90,19 @@ macro(QTWEBKIT_GENERATE_MOC_FILE_H _header _source)
     endif ()
     get_filename_component(_name_we ${_header} NAME_WE)
     set(_moc_name "${CMAKE_CURRENT_BINARY_DIR}/moc_${_name_we}.cpp")
-    qt5_generate_moc(${_header} ${_moc_name})
+    qt5_generate_moc(${_header} ${_moc_name} TARGET ${_target})
     ADD_SOURCE_DEPENDENCIES(${_source} ${_moc_name})
 endmacro()
 
-macro(QTWEBKIT_GENERATE_MOC_FILES_H)
+macro(QTWEBKIT_GENERATE_MOC_FILES_H _target)
+    if (${ARGC} LESS 2)
+        message(FATAL_ERROR "QTWEBKIT_GENERATE_MOC_FILES_H must be called with at least 2 arguments")
+    endif ()
     foreach (_header ${ARGN})
         get_filename_component(_header_dir ${_header} DIRECTORY)
         get_filename_component(_name_we ${_header} NAME_WE)
         set(_source "${_header_dir}/${_name_we}.cpp")
-        QTWEBKIT_GENERATE_MOC_FILE_H(${_header} ${_source})
+        QTWEBKIT_GENERATE_MOC_FILE_H(${_target} ${_header} ${_source})
     endforeach ()
 endmacro()
 
@@ -120,7 +132,15 @@ WEBKIT_OPTION_BEGIN()
 
 if (APPLE)
     option(MACOS_FORCE_SYSTEM_XML_LIBRARIES "Use system installation of libxml2 and libxslt on macOS" ON)
+    option(MACOS_USE_SYSTEM_ICU "Use system installation of ICU on macOS" ON)
+    option(USE_UNIX_DOMAIN_SOCKETS "Use Unix domain sockets instead of native IPC code on macOS" OFF)
+    option(USE_APPSTORE_COMPLIANT_CODE "Avoid using private macOS APIs which are not allowed on App Store (experimental)" OFF)
     set(MACOS_BUILD_FRAMEWORKS ON) # TODO: Make it an option
+
+    if (USE_APPSTORE_COMPLIANT_CODE)
+        set(MACOS_USE_SYSTEM_ICU OFF)
+        set(USE_UNIX_DOMAIN_SOCKETS ON)
+    endif ()
 endif ()
 
 if (WIN32 OR APPLE)
@@ -161,6 +181,13 @@ if (QT_CORE_TYPE MATCHES STATIC)
     set(QT_STATIC_BUILD ON)
     set(SHARED_CORE OFF)
     set(MACOS_BUILD_FRAMEWORKS OFF)
+endif ()
+
+# static icu libraries on windows are build with 's' prefix
+if (QT_STATIC_BUILD AND MSVC)
+    set(ICU_LIBRARY_PREFIX "s")
+else ()
+    set(ICU_LIBRARY_PREFIX "")
 endif ()
 
 if (QT_STATIC_BUILD)
@@ -271,12 +298,18 @@ WEBKIT_OPTION_DEPEND(ENABLE_3D_TRANSFORMS ENABLE_OPENGL)
 WEBKIT_OPTION_DEPEND(ENABLE_ACCELERATED_2D_CANVAS ENABLE_OPENGL)
 WEBKIT_OPTION_DEPEND(ENABLE_WEBGL ENABLE_OPENGL)
 
+# Building video without these options is not supported
+WEBKIT_OPTION_DEPEND(ENABLE_VIDEO ENABLE_VIDEO_TRACK)
+WEBKIT_OPTION_DEPEND(ENABLE_VIDEO ENABLE_MEDIA_CONTROLS_SCRIPT)
+
 # WebAudio and MediaSource are supported with GStreamer only
 WEBKIT_OPTION_DEPEND(ENABLE_WEB_AUDIO USE_GSTREAMER)
 WEBKIT_OPTION_DEPEND(ENABLE_LEGACY_WEB_AUDIO USE_GSTREAMER)
 WEBKIT_OPTION_DEPEND(ENABLE_MEDIA_SOURCE USE_GSTREAMER)
 
 WEBKIT_OPTION_DEPEND(ENABLE_QT_WEBCHANNEL ENABLE_WEBKIT2)
+
+WEBKIT_OPTION_DEPEND(ENABLE_TOUCH_ADJUSTMENT ENABLE_QT_GESTURE_EVENTS)
 
 # While it's possible to have UI-less NPAPI plugins without X11, we don't support this case yet
 if (UNIX AND NOT APPLE)
@@ -370,6 +403,7 @@ if (SQLITE3_SOURCE_DIR)
     add_library(qtsqlite STATIC ${SQLITE_SOURCE_FILE})
     target_compile_definitions(qtsqlite PUBLIC -DSQLITE_CORE -DSQLITE_OMIT_LOAD_EXTENSION -DSQLITE_OMIT_COMPLETE)
     WEBKIT_SET_EXTRA_COMPILER_FLAGS(qtsqlite)
+    QT_ADD_EXTRA_WEBKIT_TARGET_EXPORT(qtsqlite)
     set(SQLITE_LIBRARIES qtsqlite)
     set(SQLITE_FOUND 1)
 else ()
@@ -382,6 +416,19 @@ if (NOT QT_BUNDLED_JPEG)
     find_package(JPEG REQUIRED)
 else ()
     set(JPEG_FOUND 1)
+    # As of Qt 5.10, libjpeg-turbo shipped as a part of Qt requires using a few macro definitions
+    # WARNING: Keep in sync with libjpeg.pri
+    # FIXME: Change Qt so we can avoid this
+    include(CheckTypeSize)
+    check_type_size(size_t _SIZEOF_SIZE_T)
+    set(JPEG_DEFINITIONS
+        -DC_ARITH_CODING_SUPPORTED=1
+        -DD_ARITH_CODING_SUPPORTED=1
+        -DBITS_IN_JSAMPLE=8
+        -DJPEG_LIB_VERSION=80
+        -DSIZEOF_SIZE_T=${_SIZEOF_SIZE_T}
+    )
+    unset(_SIZEOF_SIZE_T)
 endif ()
 
 if (NOT QT_BUNDLED_PNG)
@@ -396,15 +443,19 @@ else ()
     set(ZLIB_FOUND 1)
 endif ()
 
-if (NOT APPLE)
-    find_package(ICU REQUIRED)
-else ()
+if (MACOS_USE_SYSTEM_ICU)
+    # Use system ICU library and bundled headers
     set(ICU_INCLUDE_DIRS
         "${WEBCORE_DIR}/icu"
         "${JAVASCRIPTCORE_DIR}/icu"
         "${WTF_DIR}/icu"
     )
     set(ICU_LIBRARIES libicucore.dylib)
+else ()
+    find_package(ICU REQUIRED)
+endif ()
+
+if (APPLE)
     find_library(COREFOUNDATION_LIBRARY CoreFoundation)
     if (QT_STATIC_BUILD)
         find_library(CARBON_LIBRARY Carbon)
@@ -429,10 +480,11 @@ else ()
     endif ()
 endif ()
 
-find_package(Fontconfig)
-
-if (FONTCONFIG_FOUND)
-    SET_AND_EXPOSE_TO_BUILD(HAVE_FONTCONFIG 1)
+if (ENABLE_TEST_SUPPORT)
+    find_package(Fontconfig)
+    if (FONTCONFIG_FOUND)
+        SET_AND_EXPOSE_TO_BUILD(HAVE_FONTCONFIG 1)
+    endif ()
 endif ()
 
 find_package(WebP)
@@ -470,6 +522,33 @@ if (ENABLE_DEVICE_ORIENTATION)
     SET_AND_EXPOSE_TO_BUILD(HAVE_QTSENSORS 1)
 endif ()
 
+if (ENABLE_OPENGL)
+    # Note: Gui module is already found
+    # Warning: quotes are sinificant here!
+    if (NOT DEFINED Qt5Gui_OPENGL_IMPLEMENTATION OR "${Qt5Gui_OPENGL_IMPLEMENTATION}" STREQUAL "")
+       message(FATAL_ERROR "Qt with OpenGL support is required for ENABLE_OPENGL")
+    endif ()
+
+    SET_AND_EXPOSE_TO_BUILD(USE_TEXTURE_MAPPER_GL TRUE)
+    SET_AND_EXPOSE_TO_BUILD(ENABLE_GRAPHICS_CONTEXT_3D TRUE)
+
+    if (WIN32)
+        include(CheckCXXSymbolExists)
+        set(CMAKE_REQUIRED_INCLUDES ${Qt5Gui_INCLUDE_DIRS})
+        set(CMAKE_REQUIRED_FLAGS ${Qt5Gui_EXECUTABLE_COMPILE_FLAGS})
+        check_cxx_symbol_exists(QT_OPENGL_DYNAMIC qopenglcontext.h HAVE_QT_OPENGL_DYNAMIC)
+        if (HAVE_QT_OPENGL_DYNAMIC)
+            set(Qt5Gui_OPENGL_IMPLEMENTATION DynamicGL)
+        endif ()
+        unset(CMAKE_REQUIRED_INCLUDES)
+        unset(CMAKE_REQUIRED_FLAGS)
+    endif ()
+
+    message(STATUS "Qt OpenGL implementation: ${Qt5Gui_OPENGL_IMPLEMENTATION}")
+    message(STATUS "Qt OpenGL libraries: ${Qt5Gui_OPENGL_LIBRARIES}")
+    message(STATUS "Qt EGL libraries: ${Qt5Gui_EGL_LIBRARIES}")
+endif ()
+
 if (ENABLE_PRINT_SUPPORT)
     list(APPEND QT_REQUIRED_COMPONENTS PrintSupport)
     SET_AND_EXPOSE_TO_BUILD(HAVE_QTPRINTSUPPORT 1)
@@ -489,7 +568,7 @@ endif ()
 
 # Mach ports and Unix sockets are currently used by WK2, but their USE() values
 # affect building WorkQueue
-if (APPLE)
+if (APPLE AND NOT USE_UNIX_DOMAIN_SOCKETS)
     SET_AND_EXPOSE_TO_BUILD(USE_MACH_PORTS 1) # Qt-specific
 elseif (UNIX)
     SET_AND_EXPOSE_TO_BUILD(USE_UNIX_DOMAIN_SOCKETS 1)
@@ -558,6 +637,14 @@ if (COMPILER_IS_GCC_OR_CLANG AND UNIX)
     endif ()
 endif ()
 
+# Improvised backport of r222112 - not needed with current WebKit
+# -Wexpansion-to-defined produces false positives with GCC but not Clang
+# https://bugs.webkit.org/show_bug.cgi?id=167643#c13
+if (CMAKE_COMPILER_IS_GNUCXX AND (NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS "7.0.0"))
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-expansion-to-defined")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-expansion-to-defined")
+endif ()
+
 if (WIN32 AND COMPILER_IS_GCC_OR_CLANG)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-keep-inline-dllexport")
 endif ()
@@ -603,21 +690,6 @@ if (ENABLE_X11_TARGET)
         message(FATAL_ERROR "libXcomposite is required for ENABLE_X11_TARGET")
     elseif (NOT X11_Xrender_FOUND)
         message(FATAL_ERROR "libXrender is required for ENABLE_X11_TARGET")
-    endif ()
-endif ()
-
-if (ENABLE_OPENGL)
-    SET_AND_EXPOSE_TO_BUILD(USE_TEXTURE_MAPPER_GL TRUE)
-    SET_AND_EXPOSE_TO_BUILD(ENABLE_GRAPHICS_CONTEXT_3D TRUE)
-
-    # TODO: Add proper support of DynamicGL detection to Qt and use it
-    if (WIN32)
-        if  (QT_USES_GLES2_ONLY)
-            # FIXME: Fix build with ANGLE-only Qt
-            message(FATAL_ERROR "Only dynamic GL is supported on Windows at the moment")
-        else ()
-            set(Qt5Gui_OPENGL_IMPLEMENTATION GL)
-        endif ()
     endif ()
 endif ()
 
@@ -810,7 +882,7 @@ if (MSVC)
     endif ()
 
     if (NOT QT_CONAN_DIR)
-        set(ICU_LIBRARIES icuuc${CMAKE_DEBUG_POSTFIX} icuin${CMAKE_DEBUG_POSTFIX} icudt${CMAKE_DEBUG_POSTFIX})
+        set(ICU_LIBRARIES ${ICU_LIBRARY_PREFIX}icuuc${CMAKE_DEBUG_POSTFIX} ${ICU_LIBRARY_PREFIX}icuin${CMAKE_DEBUG_POSTFIX} ${ICU_LIBRARY_PREFIX}icudt${CMAKE_DEBUG_POSTFIX})
     endif ()
 endif ()
 
