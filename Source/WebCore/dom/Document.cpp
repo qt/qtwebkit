@@ -4742,6 +4742,9 @@ void Document::initDNSPrefetch()
 
 void Document::parseDNSPrefetchControlHeader(const String& dnsPrefetchControl)
 {
+    if (!settings()->dnsPrefetchingEnabled())
+        return;
+
     if (equalIgnoringCase(dnsPrefetchControl, "on") && !m_haveExplicitlyDisabledDNSPrefetch) {
         m_isDNSPrefetchEnabled = true;
         return;
