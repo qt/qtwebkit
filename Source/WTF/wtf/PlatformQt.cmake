@@ -27,7 +27,13 @@ if (QT_STATIC_BUILD)
     )
 endif ()
 
-if (UNIX AND NOT APPLE)
+if (USE_MACH_PORTS)
+    list(APPEND WTF_SOURCES
+        cocoa/WorkQueueCocoa.cpp
+    )
+endif ()
+
+if (USE_UNIX_DOMAIN_SOCKETS)
     list(APPEND WTF_SOURCES
         UniStdExtras.cpp
 
@@ -66,8 +72,6 @@ endif ()
 
 if (APPLE)
     list(APPEND WTF_SOURCES
-        cocoa/WorkQueueCocoa.cpp
-
         text/cf/AtomicStringImplCF.cpp
         text/cf/StringCF.cpp
         text/cf/StringImplCF.cpp
@@ -76,4 +80,15 @@ if (APPLE)
     list(APPEND WTF_LIBRARIES
         ${COREFOUNDATION_LIBRARY}
     )
+endif ()
+
+if (UNIX AND NOT APPLE)
+    check_function_exists(clock_gettime CLOCK_GETTIME_EXISTS)
+    if (NOT CLOCK_GETTIME_EXISTS)
+        set(CMAKE_REQUIRED_LIBRARIES rt)
+        check_function_exists(clock_gettime CLOCK_GETTIME_REQUIRES_LIBRT)
+        if (CLOCK_GETTIME_REQUIRES_LIBRT)
+            list(APPEND WTF_LIBRARIES rt)
+        endif ()
+    endif ()
 endif ()

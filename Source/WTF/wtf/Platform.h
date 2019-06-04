@@ -238,7 +238,8 @@
     || defined(__ARM_ARCH_7S__)
 #define WTF_ARM_ARCH_VERSION 7
 
-#elif defined(__ARM_ARCH_8__)
+#elif defined(__ARM_ARCH_8__) \
+    || defined(__ARM_ARCH_8A__)
 #define WTF_ARM_ARCH_VERSION 8
 
 /* MSVC sets _M_ARM */
@@ -1027,7 +1028,7 @@
 #define USE_VIDEOTOOLBOX 1
 #endif
 
-#if PLATFORM(COCOA) || PLATFORM(GTK) || (PLATFORM(WIN) && !USE(WINGDI))
+#if PLATFORM(COCOA) || PLATFORM(GTK) || PLATFORM(QT) || (PLATFORM(WIN) && !USE(WINGDI))
 #define USE_REQUEST_ANIMATION_FRAME_TIMER 1
 #endif
 
