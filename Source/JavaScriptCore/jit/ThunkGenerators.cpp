@@ -499,7 +499,7 @@ enum MathThunkCallingConvention { };
 typedef MathThunkCallingConvention(*MathThunk)(MathThunkCallingConvention);
 extern "C" {
 
-double jsRound(double) REFERENCED_FROM_ASM;
+double jsRound(double) REFERENCE_KEEP_FOR_LTO;
 double jsRound(double d)
 {
     double integer = ceil(d);
