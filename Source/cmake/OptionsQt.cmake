@@ -14,7 +14,10 @@ set(PROJECT_VERSION_STRING "${PROJECT_VERSION}")
 set(QT_CONAN_DIR "" CACHE PATH "Directory containing conanbuildinfo.cmake and conanfile.txt")
 if (QT_CONAN_DIR)
     include("${QT_CONAN_DIR}/conanbuildinfo.cmake")
+    set(_BACKUP_CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH})
     conan_basic_setup()
+    set(CMAKE_MODULE_PATH ${_BACKUP_CMAKE_MODULE_PATH})
+    unset(_BACKUP_CMAKE_MODULE_PATH)
 
     install(CODE "
         set(_conan_imports_dest \${CMAKE_INSTALL_PREFIX})
