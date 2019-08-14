@@ -41,6 +41,29 @@
 
 #include <QCoreApplication>
 
+#if USE(HTTP2)
+
+#include <private/http2protocol_p.h>
+#include <cstdlib>
+
+// Redefine private bits which are not currenly exported from QtNetwork
+
+QT_BEGIN_NAMESPACE
+
+namespace Http2 {
+const char *http2ParametersPropertyName = "QT_HTTP2_PARAMETERS_PROPERTY";
+
+ProtocolParameters::ProtocolParameters()
+{
+    settingsFrameData[Settings::INITIAL_WINDOW_SIZE_ID] = qtDefaultStreamReceiveWindowSize;
+    settingsFrameData[Settings::ENABLE_PUSH_ID] = 0;
+}
+}
+
+QT_END_NAMESPACE
+
+#endif // USE(HTTP2)
+
 static const int gMaxRedirections = 10;
 
 namespace WebCore {
@@ -773,6 +796,18 @@ QNetworkReply* QNetworkReplyHandler::sendNetworkRequest(QNetworkAccessManager* m
 
     if (!manager)
         return 0;
+
+#if USE(HTTP2)
+    static const bool alpnIsSupported = ResourceRequest::alpnIsSupported();
+    if (alpnIsSupported && !manager->property(Http2::http2ParametersPropertyName).isValid()) {
+        Http2::ProtocolParameters params;
+        // QTBUG-77308
+        params.maxSessionReceiveWindowSize = Http2::maxSessionReceiveWindowSize / 2;
+        // Enable HTTP/2 push
+        params.settingsFrameData[Http2::Settings::ENABLE_PUSH_ID] = 1;
+        manager->setProperty(Http2::http2ParametersPropertyName, QVariant::fromValue(params));
+    }
+#endif
 
     const QUrl url = m_request.url();
 

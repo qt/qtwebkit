@@ -29,6 +29,13 @@
 
 #include "ResourceRequestBase.h"
 
+// HTTP/2 is implemented since Qt 5.8, but various QtNetwork bugs make it unusable in browser with Qt < 5.10.1
+// We also don't enable HTTP/2 for unencrypted connections because of possible compatibility issues; it can be
+// enabled manually by user application via custom QNAM subclass
+#if QT_VERSION >= QT_VERSION_CHECK(5, 10, 1)
+#define USE_HTTP2 1
+#endif
+
 QT_BEGIN_NAMESPACE
 class QNetworkRequest;
 QT_END_NAMESPACE
@@ -62,6 +69,12 @@ class NetworkingContext;
         void updateFromDelegatePreservingOldProperties(const ResourceRequest& delegateProvidedRequest) { *this = delegateProvidedRequest; }
 
         QNetworkRequest toNetworkRequest(NetworkingContext* = 0) const;
+
+#if USE(HTTP2)
+        // Don't enable HTTP/2 when ALPN support status is unknown
+        static bool alpnIsSupported();
+#endif
+
 
     private:
         friend class ResourceRequestBase;

@@ -27,20 +27,8 @@
 #include <QNetworkRequest>
 #include <QUrl>
 
-// HTTP/2 is implemented since Qt 5.8, but various QtNetwork bugs make it unusable in browser with Qt < 5.10.1
-// We also don't enable HTTP/2 for unencrypted connections because of possible compatibility issues; it can be
-// enabled manually by user application via custom QNAM subclass
-#if QT_VERSION >= QT_VERSION_CHECK(5, 10, 1)
+#if USE(HTTP2)
 #include <QSslSocket>
-#define USE_HTTP2 1
-
-// Don't enable HTTP/2 when ALPN support status is unknown
-// Before QTBUG-65903 is implemented there is no better way than to check OpenSSL version
-static bool alpnIsSupported()
-{
-    return QSslSocket::sslLibraryVersionNumber() > 0x10002000L &&
-        QSslSocket::sslLibraryVersionString().startsWith(QLatin1String("OpenSSL"));
-}
 #endif
 
 namespace WebCore {
@@ -69,6 +57,15 @@ static inline QByteArray stringToByteArray(const String& string)
         return QByteArray(reinterpret_cast<const char*>(string.characters8()), string.length());
     return QString(string).toLatin1();
 }
+
+#if USE(HTTP2)
+bool ResourceRequest::alpnIsSupported()
+{
+    // Before QTBUG-65903 is implemented there is no better way than to check OpenSSL version
+    return QSslSocket::sslLibraryVersionNumber() > 0x10002000L &&
+        QSslSocket::sslLibraryVersionString().startsWith(QLatin1String("OpenSSL"));
+}
+#endif
 
 QNetworkRequest ResourceRequest::toNetworkRequest(NetworkingContext *context) const
 {
