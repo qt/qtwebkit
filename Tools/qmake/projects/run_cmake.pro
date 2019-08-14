@@ -35,7 +35,7 @@ build_pass|!debug_and_release {
     static_runtime: CMAKE_CONFIG += USE_STATIC_RUNTIME=ON
 
     QT_FOR_CONFIG += gui-private
-    !qtConfig(system-jpeg):qtConfig(jpeg) {
+    !win32:!qtConfig(system-jpeg):qtConfig(jpeg) {
         # Use QImageReader for JPEG
         CMAKE_CONFIG += USE_LIBJPEG=OFF
     }
