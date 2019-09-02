@@ -42,6 +42,7 @@ typedef HICON HCURSOR;
 #include "GRefPtrGtk.h"
 #elif PLATFORM(QT)
 #include <QCursor>
+#include <wtf/Optional.h>
 #endif
 
 #if USE(APPKIT)
@@ -140,7 +141,9 @@ namespace WebCore {
 #if ENABLE(MOUSE_CURSOR_SCALE)
             , m_imageScaleFactor(1)
 #endif
+#if !PLATFORM(QT)
             , m_platformCursor(nullptr)
+#endif
 #endif // !PLATFORM(IOS)
         {
         }
@@ -182,7 +185,7 @@ namespace WebCore {
 #endif
 
 #if PLATFORM(QT)
-        mutable std::unique_ptr<QCursor> m_platformCursor;
+        mutable Optional<QCursor> m_platformCursor;
 #elif !USE(APPKIT)
         mutable PlatformCursor m_platformCursor;
 #else
