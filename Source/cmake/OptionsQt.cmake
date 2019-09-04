@@ -153,6 +153,7 @@ if (COMPILER_IS_GCC_OR_CLANG)
     add_definitions(-DQT_NO_DYNAMIC_CAST)
 endif ()
 
+# Align build product names with QMake conventions
 if (WIN32)
     if (${CMAKE_BUILD_TYPE} MATCHES "Debug")
         set(CMAKE_DEBUG_POSTFIX d)
@@ -160,6 +161,8 @@ if (WIN32)
 
     set(CMAKE_SHARED_LIBRARY_PREFIX "")
     set(CMAKE_SHARED_MODULE_PREFIX "")
+    # QMake doesn't treat import libraries as a separate product kind
+    set(CMAKE_IMPORT_LIBRARY_SUFFIX "${CMAKE_STATIC_LIBRARY_SUFFIX}")
 endif ()
 
 WEBKIT_OPTION_BEGIN()
