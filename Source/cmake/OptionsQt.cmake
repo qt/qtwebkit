@@ -13,6 +13,10 @@ set(PROJECT_VERSION_STRING "${PROJECT_VERSION}")
 
 set(QT_CONAN_DIR "" CACHE PATH "Directory containing conanbuildinfo.cmake and conanfile.txt")
 if (QT_CONAN_DIR)
+    find_program(CONAN_COMMAND NAMES conan PATHS $ENV{PIP3_PATH})
+    if (NOT CONAN_COMMAND)
+        message(FATAL_ERROR "conan executable not found. Make sure that Conan is installed and available in PATH")
+    endif ()
     include("${QT_CONAN_DIR}/conanbuildinfo.cmake")
 
     # Remove this workaround when libxslt package is fixed
@@ -35,7 +39,7 @@ if (QT_CONAN_DIR)
 
         message(\"Importing dependencies from conan to \${_conan_imports_dest}\")
         execute_process(
-            COMMAND conan imports --import-folder \${_conan_imports_dest} \"${QT_CONAN_DIR}/conanfile.txt\"
+            COMMAND \"${CONAN_COMMAND}\" imports --import-folder \${_conan_imports_dest} \"${QT_CONAN_DIR}/conanfile.txt\"
             WORKING_DIRECTORY \"${QT_CONAN_DIR}\"
             RESULT_VARIABLE _conan_imports_result
         )
