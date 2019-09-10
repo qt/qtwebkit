@@ -32,9 +32,7 @@
 
 #include "FormState.h"
 #include "FrameLoaderClient.h"
-#include "HTMLFormElement.h"
 #include "ResourceResponse.h"
-#include "SharedBuffer.h"
 #include "URL.h"
 #include <QUrl>
 #include <qobject.h>
@@ -254,6 +252,10 @@ private:
 
     URL m_lastRequestedUrl;
     bool m_isOriginatingLoad;
+
+    // QTFIXME: consider introducing some sort of flags for storing state
+    bool m_isDisplayingErrorPage;
+    bool m_shouldSuppressLoadStarted;
 };
 
 }

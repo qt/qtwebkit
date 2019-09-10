@@ -240,10 +240,6 @@ if (isInspectorFrontend()) {
 }
 
 if (isCMakeBuild() && (!isAnyWindows() || isQt())) {
-    if ($shouldInstall) {
-        $makeArgs .= ($makeArgs ? " " : "") . "install";
-    }
-
     # Visual Studio generator doesn't support -j switch
     if (canUseNinja() || !isAnyWindows()) {
         # By default we build using all of the available CPUs.
@@ -258,6 +254,10 @@ if (isCMakeBuild() && (!isAnyWindows() || isQt())) {
     removeCMakeCache(@featureArgs);
 
     buildCMakeProjectOrExit($clean, $prefixPath, $makeArgs, (cmakeBasedPortArguments(), @featureArgs), $cmakeArgs);
+
+    if ($shouldInstall) {
+        installCMakeProjectOrExit();
+    }
 }
 
 my $baseProductDir = baseProductDir();

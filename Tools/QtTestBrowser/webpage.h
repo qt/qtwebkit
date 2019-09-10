@@ -46,8 +46,6 @@ public:
 
     QWebPage* createWindow(QWebPage::WebWindowType) override;
     QObject* createPlugin(const QString&, const QUrl&, const QStringList&, const QStringList&) override;
-    bool supportsExtension(QWebPage::Extension) const override;
-    bool extension(Extension, const ExtensionOption*, ExtensionReturn*) override;
 
     bool acceptNavigationRequest(QWebFrame*, const QNetworkRequest&, NavigationType) override;
 

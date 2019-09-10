@@ -48,6 +48,10 @@ qt_wrap_cpp(WebKit QtTestBrowser_SOURCES
     webinspector.h
 )
 
+qt5_add_resources(QtTestBrowser_SOURCES
+    QtTestBrowser.qrc
+)
+
 if (Qt5OpenGL_FOUND)
     list(APPEND QtTestBrowser_SYSTEM_INCLUDE_DIRECTORIES
         ${Qt5OpenGL_INCLUDE_DIRS}
