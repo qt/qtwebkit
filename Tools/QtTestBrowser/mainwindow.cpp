@@ -43,6 +43,7 @@
 #include <QFileDialog>
 #endif
 #include <QMenuBar>
+#include <QMessageBox>
 
 MainWindow::MainWindow()
     : m_page(new WebPage(this))

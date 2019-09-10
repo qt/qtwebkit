@@ -60,8 +60,6 @@ public:
     void load(const String& url) override;
     void cancelLoad() override;
 
-    void prepareToPlay() override;
-
     void play() override;
     void pause() override;
 

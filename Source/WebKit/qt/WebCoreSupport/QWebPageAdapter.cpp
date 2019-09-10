@@ -192,21 +192,12 @@ static WebCore::FrameLoadRequest frameLoadRequest(const QUrl &url, WebCore::Fram
         );
 }
 
-static void openNewWindow(const QUrl& url, Frame* frame)
-{
-    if (Page* oldPage = frame->page()) {
-        WindowFeatures features;
-        NavigationAction action;
-        FrameLoadRequest request = frameLoadRequest(url, frame);
-        if (Page* newPage = oldPage->chrome().createWindow(frame, request, features, action)) {
-            newPage->mainFrame().loader().loadFrameRequest(request, /*event*/ 0, /*FormState*/ 0);
-            newPage->chrome().show();
-        }
-    }
-}
-
 // FIXME: Find a better place
-Ref<UserContentController> s_userContentProvider = UserContentController::create();
+static UserContentController& userContentProvider()
+{
+    static NeverDestroyed<Ref<UserContentController>> s_userContentProvider(UserContentController::create());
+    return s_userContentProvider.get();
+}
 
 QWebPageAdapter::QWebPageAdapter()
     : settings(0)
@@ -242,7 +233,7 @@ void QWebPageAdapter::initializeWebCorePage()
     pageConfiguration.databaseProvider = &WebDatabaseProvider::singleton();
     pageConfiguration.storageNamespaceProvider = WebStorageNamespaceProvider::create(
         QWebSettings::globalSettings()->localStoragePath());
-    pageConfiguration.userContentController = &s_userContentProvider.get();
+    pageConfiguration.userContentController = &userContentProvider();
     pageConfiguration.visitedLinkStore = &VisitedLinkStoreQt::singleton();
     page = new Page(pageConfiguration);
 
@@ -1585,4 +1576,17 @@ bool QWebPageAdapter::swallowContextMenuEvent(QContextMenuEvent *event, QWebFram
     // on maps.google.com for example.
 
     return !menu;
+}
+
+void QWebPageAdapter::openNewWindow(const QUrl& url, Frame* frame)
+{
+    if (Page* oldPage = frame->page()) {
+        WindowFeatures features;
+        NavigationAction action;
+        FrameLoadRequest request = frameLoadRequest(url, frame);
+        if (Page* newPage = oldPage->chrome().createWindow(frame, request, features, action)) {
+            newPage->mainFrame().loader().loadFrameRequest(request, /*event*/ 0, /*FormState*/ 0);
+            newPage->chrome().show();
+        }
+    }
 }

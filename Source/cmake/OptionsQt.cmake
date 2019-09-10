@@ -1,3 +1,4 @@
+include(CheckCXXSourceCompiles)
 include(FeatureSummary)
 include(ECMEnableSanitizers)
 include(ECMPackageConfigHelpers)
@@ -12,8 +13,21 @@ set(PROJECT_VERSION_STRING "${PROJECT_VERSION}")
 
 set(QT_CONAN_DIR "" CACHE PATH "Directory containing conanbuildinfo.cmake and conanfile.txt")
 if (QT_CONAN_DIR)
+    find_program(CONAN_COMMAND NAMES conan PATHS $ENV{PIP3_PATH})
+    if (NOT CONAN_COMMAND)
+        message(FATAL_ERROR "conan executable not found. Make sure that Conan is installed and available in PATH")
+    endif ()
     include("${QT_CONAN_DIR}/conanbuildinfo.cmake")
+
+    # Remove this workaround when libxslt package is fixed
+    string(REPLACE "include/libxslt" "include" replace_CONAN_INCLUDE_DIRS ${CONAN_INCLUDE_DIRS})
+    set(CONAN_INCLUDE_DIRS ${replace_CONAN_INCLUDE_DIRS})
+
+    # Remove this workaround when libxml2 package is fixed
+    set(_BACKUP_CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH})
     conan_basic_setup()
+    set(CMAKE_MODULE_PATH ${_BACKUP_CMAKE_MODULE_PATH})
+    unset(_BACKUP_CMAKE_MODULE_PATH)
 
     install(CODE "
         set(_conan_imports_dest \${CMAKE_INSTALL_PREFIX})
@@ -23,10 +37,13 @@ if (QT_CONAN_DIR)
             set(_conan_imports_dest \"\${_absolute_destdir}\${_conan_imports_dest}\")
         endif ()
 
+        message(\"Importing dependencies from conan to \${_conan_imports_dest}\")
         execute_process(
-            COMMAND conan imports -f \"${QT_CONAN_DIR}/conanfile.txt\" --dest \${_conan_imports_dest}
+            COMMAND \"${CONAN_COMMAND}\" imports --import-folder \${_conan_imports_dest} \"${QT_CONAN_DIR}/conanfile.txt\"
             WORKING_DIRECTORY \"${QT_CONAN_DIR}\"
+            RESULT_VARIABLE _conan_imports_result
         )
+        message(\"conan imports result: \${_conan_imports_result}\")
 
         set(_conan_imports_manifest \"\${_conan_imports_dest}/conan_imports_manifest.txt\")
         if (EXISTS \${_conan_imports_manifest})
@@ -50,6 +67,30 @@ macro(CONVERT_PRL_LIBS_TO_CMAKE _qt_component)
             --component ${_qt_component}
             --compiler ${CMAKE_CXX_COMPILER_ID}
         )
+    endif ()
+endmacro()
+
+macro(CHECK_QT5_PRIVATE_INCLUDE_DIRS _qt_component _header)
+    set(INCLUDE_TEST_SOURCE
+    "
+        #include <${_header}>
+        int main() { return 0; }
+    "
+    )
+    set(CMAKE_REQUIRED_INCLUDES ${Qt5${_qt_component}_PRIVATE_INCLUDE_DIRS})
+    set(CMAKE_REQUIRED_LIBRARIES Qt5::${_qt_component})
+
+    # Avoid check_include_file_cxx() because it performs linking but doesn't support CMAKE_REQUIRED_LIBRARIES (doh!)
+    check_cxx_source_compiles("${INCLUDE_TEST_SOURCE}" Qt5${_qt_component}_PRIVATE_HEADER_FOUND)
+
+    unset(INCLUDE_TEST_SOURCE)
+    unset(CMAKE_REQUIRED_INCLUDES)
+    unset(CMAKE_REQUIRED_LIBRARIES)
+
+    if (NOT Qt5${_qt_component}_PRIVATE_HEADER_FOUND)
+        message(FATAL_ERROR "Header ${_header} is not found. Please make sure that:
+    1. Private headers of Qt5${_qt_component} are installed
+    2. Qt5${_qt_component}_PRIVATE_INCLUDE_DIRS is correctly defined in Qt5${_qt_component}Config.cmake")
     endif ()
 endmacro()
 
@@ -119,6 +160,7 @@ if (COMPILER_IS_GCC_OR_CLANG)
     add_definitions(-DQT_NO_DYNAMIC_CAST)
 endif ()
 
+# Align build product names with QMake conventions
 if (WIN32)
     if (${CMAKE_BUILD_TYPE} MATCHES "Debug")
         set(CMAKE_DEBUG_POSTFIX d)
@@ -126,16 +168,20 @@ if (WIN32)
 
     set(CMAKE_SHARED_LIBRARY_PREFIX "")
     set(CMAKE_SHARED_MODULE_PREFIX "")
+    # QMake doesn't treat import libraries as a separate product kind
+    set(CMAKE_IMPORT_LIBRARY_SUFFIX "${CMAKE_STATIC_LIBRARY_SUFFIX}")
 endif ()
 
 WEBKIT_OPTION_BEGIN()
 
 if (APPLE)
+    set(MACOS_COMPATIBILITY_VERSION "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}" CACHE STRING "Compatibility version that macOS dylibs should have")
+
     option(MACOS_FORCE_SYSTEM_XML_LIBRARIES "Use system installation of libxml2 and libxslt on macOS" ON)
     option(MACOS_USE_SYSTEM_ICU "Use system installation of ICU on macOS" ON)
     option(USE_UNIX_DOMAIN_SOCKETS "Use Unix domain sockets instead of native IPC code on macOS" OFF)
     option(USE_APPSTORE_COMPLIANT_CODE "Avoid using private macOS APIs which are not allowed on App Store (experimental)" OFF)
-    set(MACOS_BUILD_FRAMEWORKS ON) # TODO: Make it an option
+    option(MACOS_BUILD_FRAMEWORKS "Build QtWebKit as framework bundles" ON)
 
     if (USE_APPSTORE_COMPLIANT_CODE)
         set(MACOS_USE_SYSTEM_ICU OFF)
@@ -232,6 +278,7 @@ option(USE_STATIC_RUNTIME "Use static runtime (MSVC only)" OFF)
 # Private options specific to the Qt port. Changing these options is
 # completely unsupported. They are intended for use only by WebKit developers.
 WEBKIT_OPTION_DEFINE(ENABLE_TOUCH_ADJUSTMENT "Whether to use touch adjustment" PRIVATE ON)
+WEBKIT_OPTION_DEFINE(USE_LIBJPEG "Support JPEG format directly. If it is disabled, QImageReader will be used with possible degradation of user experience" PUBLIC ON)
 
 
 # Public options shared with other WebKit ports. There must be strong reason
@@ -267,6 +314,7 @@ WEBKIT_OPTION_DEFAULT_PORT_VALUE(USE_SYSTEM_MALLOC PUBLIC OFF)
 # we need a value different from the default defined in WebKitFeatures.cmake.
 # Changing these options is completely unsupported.
 WEBKIT_OPTION_DEFAULT_PORT_VALUE(ENABLE_3D_TRANSFORMS PRIVATE ON)
+WEBKIT_OPTION_DEFAULT_PORT_VALUE(ENABLE_CSS_COMPOSITING PRIVATE ON)
 WEBKIT_OPTION_DEFAULT_PORT_VALUE(ENABLE_CSS_IMAGE_SET PRIVATE ON)
 WEBKIT_OPTION_DEFAULT_PORT_VALUE(ENABLE_CSS_REGIONS PRIVATE ON)
 WEBKIT_OPTION_DEFAULT_PORT_VALUE(ENABLE_CSS_SHAPES PRIVATE ON)
@@ -412,23 +460,15 @@ endif ()
 
 find_package(Threads REQUIRED)
 
-if (NOT QT_BUNDLED_JPEG)
-    find_package(JPEG REQUIRED)
+if (USE_LIBJPEG)
+    # Additional names of libjpeg to search (fixed in CMake 3.12.0)
+    set(JPEG_NAMES jpeg-static libjpeg-static)
+    find_package(JPEG)
+    if (NOT JPEG_FOUND)
+        message(FATAL_ERROR "libjpeg not found. Please make sure that CMake can find its header files and libraries, or build with -DUSE_LIBJPEG=OFF with possible degradation of user experience")
+    endif ()
 else ()
-    set(JPEG_FOUND 1)
-    # As of Qt 5.10, libjpeg-turbo shipped as a part of Qt requires using a few macro definitions
-    # WARNING: Keep in sync with libjpeg.pri
-    # FIXME: Change Qt so we can avoid this
-    include(CheckTypeSize)
-    check_type_size(size_t _SIZEOF_SIZE_T)
-    set(JPEG_DEFINITIONS
-        -DC_ARITH_CODING_SUPPORTED=1
-        -DD_ARITH_CODING_SUPPORTED=1
-        -DBITS_IN_JSAMPLE=8
-        -DJPEG_LIB_VERSION=80
-        -DSIZEOF_SIZE_T=${_SIZEOF_SIZE_T}
-    )
-    unset(_SIZEOF_SIZE_T)
+    message(WARNING "USE_LIBJPEG is disabled, will attempt using QImageReader to decode JPEG with possible degradation of user experience")
 endif ()
 
 if (NOT QT_BUNDLED_PNG)
@@ -581,6 +621,15 @@ if (ENABLE_QT_WEBCHANNEL)
 endif ()
 
 find_package(Qt5 ${REQUIRED_QT_VERSION} REQUIRED COMPONENTS ${QT_REQUIRED_COMPONENTS})
+
+CHECK_QT5_PRIVATE_INCLUDE_DIRS(Gui private/qhexstring_p.h)
+if (Qt5_VERSION VERSION_GREATER 5.10.1)
+    CHECK_QT5_PRIVATE_INCLUDE_DIRS(Network private/http2protocol_p.h)
+endif ()
+if (ENABLE_WEBKIT2)
+    CHECK_QT5_PRIVATE_INCLUDE_DIRS(Quick private/qsgrendernode_p.h)
+endif ()
+
 if (QT_STATIC_BUILD)
     foreach (qt_module ${QT_REQUIRED_COMPONENTS})
         CONVERT_PRL_LIBS_TO_CMAKE(${qt_module})
@@ -757,6 +806,15 @@ if (USE_LIBHYPHEN)
     find_package(Hyphen REQUIRED)
     if (NOT HYPHEN_FOUND)
        message(FATAL_ERROR "libhyphen is needed for USE_LIBHYPHEN.")
+    endif ()
+endif ()
+
+if (USE_WOFF2)
+    find_package(WOFF2Dec 1.0.1)
+    if (WOFF2DEC_FOUND)
+        message(STATUS "Using system WOFF2Dec library.")
+    else ()
+        message(STATUS "WOFF2Dec not found, using the bundled library.")
     endif ()
 endif ()
 

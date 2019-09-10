@@ -41,6 +41,29 @@
 
 #include <QCoreApplication>
 
+#if USE(HTTP2) && QT_VERSION < QT_VERSION_CHECK(5, 14, 0)
+
+#include <private/http2protocol_p.h>
+#include <cstdlib>
+
+// Redefine private bits which are not currenly exported from QtNetwork
+
+QT_BEGIN_NAMESPACE
+
+namespace Http2 {
+const char *http2ParametersPropertyName = "QT_HTTP2_PARAMETERS_PROPERTY";
+
+ProtocolParameters::ProtocolParameters()
+{
+    settingsFrameData[Settings::INITIAL_WINDOW_SIZE_ID] = qtDefaultStreamReceiveWindowSize;
+    settingsFrameData[Settings::ENABLE_PUSH_ID] = 0;
+}
+}
+
+QT_END_NAMESPACE
+
+#endif // USE(HTTP2) && QT_VERSION < QT_VERSION_CHECK(5, 14, 0)
+
 static const int gMaxRedirections = 10;
 
 namespace WebCore {
@@ -488,11 +511,14 @@ QNetworkReply* QNetworkReplyHandler::release()
 
 static bool shouldIgnoreHttpError(QNetworkReply* reply, bool receivedData)
 {
+    int httpStatusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    // Don't ignore error if we haven't received HTTP status code
+    if (httpStatusCode == 0)
+        return false;
+
     // An HEAD XmlHTTPRequest shouldn't be marked as failure for HTTP errors.
     if (reply->operation() == QNetworkAccessManager::HeadOperation)
         return true;
-
-    int httpStatusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
 
     if (httpStatusCode == 401 || httpStatusCode == 407)
         return true;
@@ -585,19 +611,10 @@ void QNetworkReplyHandler::sendResponseIfNeeded()
                               m_replyWrapper->reply()->header(QNetworkRequest::ContentLengthHeader).toLongLong(),
                               m_replyWrapper->encoding());
 
-    if (url.isLocalFile()) {
-        if (client->usesAsyncCallbacks()) {
-            setLoadingDeferred(true);
-            client->didReceiveResponseAsync(m_resourceHandle, response);
-        } else
-            client->didReceiveResponse(m_resourceHandle, response);
-        return;
-    }
-
-    // The status code is equal to 0 for protocols not in the HTTP family.
-    int statusCode = m_replyWrapper->reply()->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
 
     if (url.protocolIsInHTTPFamily()) {
+        // The status code is equal to 0 for protocols not in the HTTP family.
+        int statusCode = m_replyWrapper->reply()->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
         response.setHTTPStatusCode(statusCode);
         response.setHTTPStatusText(m_replyWrapper->reply()->attribute(QNetworkRequest::HttpReasonPhraseAttribute).toByteArray().constData());
 
@@ -606,6 +623,7 @@ void QNetworkReplyHandler::sendResponseIfNeeded()
             response.setHTTPHeaderField(String(pair.first.constData(), pair.first.size()), String(pair.second.constData(), pair.second.size()));
     }
 
+    // Note: Qt sets RedirectionTargetAttribute only for 3xx responses, so Location header in 201 responce won't affect this code
     QUrl redirection = m_replyWrapper->reply()->attribute(QNetworkRequest::RedirectionTargetAttribute).toUrl();
     if (redirection.isValid()) {
         redirect(response, redirection);
@@ -648,8 +666,10 @@ void QNetworkReplyHandler::redirect(ResourceResponse& response, const QUrl& redi
     ASSERT(!m_queue.deferSignals());
 
     QUrl currentUrl = m_replyWrapper->reply()->url();
+
+    // RFC7231 section 7.1.2
     QUrl newUrl = currentUrl.resolved(redirection);
-    if (currentUrl.hasFragment())
+    if (!newUrl.hasFragment() && currentUrl.hasFragment())
         newUrl.setFragment(currentUrl.fragment());
 
     ResourceHandleClient* client = m_resourceHandle->client();
@@ -776,6 +796,18 @@ QNetworkReply* QNetworkReplyHandler::sendNetworkRequest(QNetworkAccessManager* m
 
     if (!manager)
         return 0;
+
+#if USE(HTTP2) && QT_VERSION < QT_VERSION_CHECK(5, 14, 0)
+    static const bool alpnIsSupported = ResourceRequest::alpnIsSupported();
+    if (alpnIsSupported && !manager->property(Http2::http2ParametersPropertyName).isValid()) {
+        Http2::ProtocolParameters params;
+        // QTBUG-77308
+        params.maxSessionReceiveWindowSize = Http2::maxSessionReceiveWindowSize / 2;
+        // Enable HTTP/2 push
+        params.settingsFrameData[Http2::Settings::ENABLE_PUSH_ID] = 1;
+        manager->setProperty(Http2::http2ParametersPropertyName, QVariant::fromValue(params));
+    }
+#endif
 
     const QUrl url = m_request.url();
 

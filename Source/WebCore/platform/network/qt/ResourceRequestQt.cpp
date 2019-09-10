@@ -27,17 +27,12 @@
 #include <QNetworkRequest>
 #include <QUrl>
 
-// HTTP/2 is implemented since Qt 5.8, but QTBUG-64359 makes it unusable in browser
-#if QT_VERSION >= QT_VERSION_CHECK(5, 9, 4)
-#define USE_HTTP2 1
+#if USE(HTTP2)
+#include <QSslSocket>
+#if QT_VERSION >= QT_VERSION_CHECK(5, 14, 0)
+#include <QHttp2Configuration>
 #endif
-
-// HTTP2AllowedAttribute enforces HTTP/2 instead of negotiating, see QTBUG-61397
-#if QT_VERSION < QT_VERSION_CHECK(5, 10, 0)
-#define HTTP2_IS_BUGGY_WITHOUT_HTTPS 1
-#else
-#define HTTP2_IS_BUGGY_WITHOUT_HTTPS 0
-#endif
+#endif // USE(HTTP2)
 
 namespace WebCore {
 
@@ -66,6 +61,25 @@ static inline QByteArray stringToByteArray(const String& string)
     return QString(string).toLatin1();
 }
 
+#if USE(HTTP2)
+bool ResourceRequest::alpnIsSupported()
+{
+    // Before QTBUG-65903 is implemented there is no better way than to check OpenSSL version
+    return QSslSocket::sslLibraryVersionNumber() > 0x10002000L &&
+        QSslSocket::sslLibraryVersionString().startsWith(QLatin1String("OpenSSL"));
+}
+
+#if QT_VERSION >= QT_VERSION_CHECK(5, 14, 0)
+static QHttp2Configuration createHttp2Configuration()
+{
+    QHttp2Configuration params;
+    params.setServerPushEnabled(true);
+    return params;
+}
+#endif
+
+#endif
+
 QNetworkRequest ResourceRequest::toNetworkRequest(NetworkingContext *context) const
 {
     QNetworkRequest request;
@@ -74,14 +88,15 @@ QNetworkRequest ResourceRequest::toNetworkRequest(NetworkingContext *context) co
     request.setOriginatingObject(context ? context->originatingObject() : 0);
 
 #if USE(HTTP2)
-#if HTTP2_IS_BUGGY_WITHOUT_HTTPS
-    if (originalUrl.protocolIs("https"))
+    static const bool NegotiateHttp2ForHttps = alpnIsSupported();
+    if (originalUrl.protocolIs("https") && NegotiateHttp2ForHttps) {
+#if QT_VERSION >= QT_VERSION_CHECK(5, 14, 0)
+        static const auto params = createHttp2Configuration();
+        request.setHttp2Configuration(params);
 #endif
-    {
         request.setAttribute(QNetworkRequest::HTTP2AllowedAttribute, true);
     }
 #endif // USE(HTTP2)
-
 
     const HTTPHeaderMap &headers = httpHeaderFields();
     for (HTTPHeaderMap::const_iterator it = headers.begin(), end = headers.end();

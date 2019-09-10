@@ -32,7 +32,14 @@
 #include "config.h"
 #include "InspectorClientWebPage.h"
 
+#include <QApplication>
+#include <QClipboard>
+#include <QContextMenuEvent>
+
+#include <qwebelement.h>
 #include <qwebframe.h>
+#include <qwebframe_p.h>
+#include <qwebpage_p.h>
 
 using namespace WebKit;
 
@@ -41,7 +48,21 @@ InspectorClientWebPage::InspectorClientWebPage()
     QWebView* view = new QWebView;
     view->setPage(this);
     setParent(view);
+    settings()->setAttribute(QWebSettings::JavascriptEnabled, true);
+#if !ENABLE(DEVELOPER_MODE)
+    settings()->setAttribute(QWebSettings::DeveloperExtrasEnabled, false);
+#endif
     connect(mainFrame(), SIGNAL(javaScriptWindowObjectCleared()), SLOT(javaScriptWindowObjectCleared()));
+
+    // FIXME: Find out what's going on with Settings
+    settings()->setAttribute(QWebSettings::AcceleratedCompositingEnabled, false);
+
+    // We treat "qrc:" scheme as local, but by default local content is not allowed to use
+    // LocalStorage which is required for Inspector to work.
+    // See https://bugs.webkit.org/show_bug.cgi?id=155265
+    // Alternatively we can make "qrc:" scheme non-local like GTK port does:
+    // https://bugs.webkit.org/show_bug.cgi?id=155497
+    settings()->setAttribute(QWebSettings::LocalContentCanAccessRemoteUrls, true);
 }
 
 QWebPage* InspectorClientWebPage::createWindow(QWebPage::WebWindowType)
@@ -51,6 +72,18 @@ QWebPage* InspectorClientWebPage::createWindow(QWebPage::WebWindowType)
     view->setPage(page);
     view->setAttribute(Qt::WA_DeleteOnClose);
     return page;
+}
+
+bool InspectorClientWebPage::event(QEvent* ev)
+{
+    if (ev->type() == QEvent::ContextMenu) {
+        auto* contextMenuEvent = static_cast<QContextMenuEvent*>(ev);
+
+        if (contextMenuEvent)
+            m_clickPos = contextMenuEvent->pos();
+    }
+
+    return QWebPage::event(ev);
 }
 
 void InspectorClientWebPage::javaScriptWindowObjectCleared()
@@ -69,3 +102,28 @@ void InspectorClientWebPage::javaScriptWindowObjectCleared()
     }
 }
 
+void InspectorClientWebPage::triggerAction(WebAction action, bool checked)
+{
+    const QWebHitTestResult hitTestResult = mainFrame()->hitTestContent(m_clickPos);
+
+    if (hitTestResult.imageUrl().isValid() && hitTestResult.element().hasAttribute(QStringLiteral("data-url"))) {
+        switch (action) {
+        case OpenImageInNewWindow: {
+            auto* frame = static_cast<QWebFramePrivate*>(hitTestResult.frame()->d);
+
+            if (frame) {
+                QWebPagePrivate::openNewWindow(QUrl(hitTestResult.element().attribute(QStringLiteral("data-url"))), frame->frame);
+                return;
+            }
+        }
+
+        case CopyImageUrlToClipboard:
+            QApplication::clipboard()->setText(hitTestResult.element().attribute(QStringLiteral("data-url")));
+            return;
+        default:
+            break;
+        }
+    }
+
+    QWebPage::triggerAction(action, checked);
+}

@@ -2,6 +2,12 @@ include(platform/ImageDecoders.cmake)
 include(platform/Linux.cmake)
 include(platform/TextureMapper.cmake)
 
+if (NOT USE_LIBJPEG)
+    list(REMOVE_ITEM WebCore_SOURCES
+        platform/image-decoders/jpeg/JPEGImageDecoder.cpp
+    )
+endif ()
+
 if (JPEG_DEFINITIONS)
     add_definitions(${JPEG_DEFINITIONS})
 endif ()
@@ -277,6 +283,7 @@ list(APPEND WebCore_SYSTEM_INCLUDE_DIRECTORIES
     ${Qt5Gui_INCLUDE_DIRS}
     ${Qt5Gui_PRIVATE_INCLUDE_DIRS}
     ${Qt5Network_INCLUDE_DIRS}
+    ${Qt5Network_PRIVATE_INCLUDE_DIRS}
     ${Qt5Sensors_INCLUDE_DIRS}
     ${SQLITE_INCLUDE_DIR}
     ${ZLIB_INCLUDE_DIRS}
@@ -446,6 +453,11 @@ endif ()
 # From PlatformWin.cmake
 
 if (WIN32)
+    # Eliminate C2139 errors
+    if (MSVC)
+        add_compile_options(/D_ENABLE_EXTENDED_ALIGNED_STORAGE)
+    endif ()
+
     if (${JavaScriptCore_LIBRARY_TYPE} MATCHES STATIC)
         add_definitions(-DSTATICALLY_LINKED_WITH_WTF -DSTATICALLY_LINKED_WITH_JavaScriptCore)
     endif ()

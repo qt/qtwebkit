@@ -5,7 +5,7 @@ include(ECMGeneratePriFile)
 macro(generate_header _file _var _content)
     file(GENERATE OUTPUT ${_file} CONTENT ${_content})
     list(APPEND ${_var} ${_file})
-    set_source_files_properties(${_file} PROPERTIES GENERATED TRUE)
+    set_source_files_properties(${_file} PROPERTIES GENERATED TRUE SKIP_AUTOMOC TRUE)
 endmacro()
 
 macro(generate_version_header _file _var _prefix)
@@ -13,7 +13,7 @@ macro(generate_version_header _file _var _prefix)
     configure_file(VersionHeader.h.in ${_file} @ONLY)
     unset(HEADER_PREFIX)
     list(APPEND ${_var} ${_file})
-    set_source_files_properties(${_file} PROPERTIES GENERATED TRUE)
+    set_source_files_properties(${_file} PROPERTIES GENERATED TRUE SKIP_AUTOMOC TRUE)
 endmacro()
 
 macro(append_lib_names_to_list _lib_names_list)
@@ -353,6 +353,7 @@ if (NOT SHARED_CORE)
         list(APPEND WebKit_SOURCES
             "${DERIVED_SOURCES_WEBINSPECTORUI_DIR}/qrc_WebInspector.cpp"
         )
+        set_property(SOURCE "${DERIVED_SOURCES_WEBINSPECTORUI_DIR}/qrc_WebInspector.cpp" PROPERTY SKIP_AUTOMOC ON)
     endif ()
 endif ()
 
@@ -427,7 +428,7 @@ install(
     COMPONENT Data
 )
 
-set(WEBKIT_PKGCONGIG_DEPS "Qt5Core Qt5Gui Qt5Network")
+set(WEBKIT_PKGCONFIG_DEPS "Qt5Core Qt5Gui Qt5Network")
 set(WEBKIT_PRI_DEPS "core gui network")
 set(WEBKIT_PRI_EXTRA_LIBS "")
 set(WEBKIT_PRI_RUNTIME_DEPS "core_private gui_private")
@@ -448,11 +449,11 @@ if (USE_MEDIA_FOUNDATION)
     set(WEBKIT_PRI_EXTRA_LIBS "-lmfuuid -lstrmiids ${WEBKIT_PRI_EXTRA_LIBS}")
 endif ()
 if (USE_QT_MULTIMEDIA)
-    set(WEBKIT_PKGCONGIG_DEPS "${WEBKIT_PKGCONGIG_DEPS} Qt5Multimedia")
+    set(WEBKIT_PKGCONFIG_DEPS "${WEBKIT_PKGCONFIG_DEPS} Qt5Multimedia")
     set(WEBKIT_PRI_RUNTIME_DEPS "multimedia ${WEBKIT_PRI_RUNTIME_DEPS}")
 endif ()
 
-set(WEBKITWIDGETS_PKGCONGIG_DEPS "${WEBKIT_PKGCONGIG_DEPS} Qt5Widgets Qt5WebKit")
+set(WEBKITWIDGETS_PKGCONFIG_DEPS "${WEBKIT_PKGCONFIG_DEPS} Qt5Widgets Qt5WebKit")
 set(WEBKITWIDGETS_PRI_DEPS "${WEBKIT_PRI_DEPS} widgets webkit")
 set(WEBKITWIDGETS_PRI_RUNTIME_DEPS "${WEBKIT_PRI_RUNTIME_DEPS} widgets_private")
 
@@ -465,12 +466,12 @@ if (ENABLE_PRINT_SUPPORT)
 endif ()
 
 if (USE_QT_MULTIMEDIA)
-    set(WEBKITWIDGETS_PKGCONGIG_DEPS "${WEBKITWIDGETS_PKGCONGIG_DEPS} Qt5MultimediaWidgets")
+    set(WEBKITWIDGETS_PKGCONFIG_DEPS "${WEBKITWIDGETS_PKGCONFIG_DEPS} Qt5MultimediaWidgets")
     set(WEBKITWIDGETS_PRI_RUNTIME_DEPS "${WEBKITWIDGETS_PRI_RUNTIME_DEPS} multimediawidgets")
 endif ()
 
 if (QT_STATIC_BUILD)
-    set(WEBKITWIDGETS_PKGCONGIG_DEPS "${WEBKITWIDGETS_PKGCONGIG_DEPS} Qt5PrintSupport")
+    set(WEBKITWIDGETS_PKGCONFIG_DEPS "${WEBKITWIDGETS_PKGCONFIG_DEPS} Qt5PrintSupport")
     set(WEBKITWIDGETS_PRI_DEPS "${WEBKITWIDGETS_PRI_DEPS} printsupport")
     set(EXTRA_LIBS_NAMES WebCore JavaScriptCore WTF)
     append_lib_names_to_list(EXTRA_LIBS_NAMES ${LIBXML2_LIBRARIES} ${SQLITE_LIBRARIES} ${ZLIB_LIBRARIES} ${JPEG_LIBRARIES} ${PNG_LIBRARIES})
@@ -494,7 +495,7 @@ if (QT_STATIC_BUILD)
     endif ()
     list(REMOVE_DUPLICATES EXTRA_LIBS_NAMES)
     foreach (LIB_NAME ${EXTRA_LIBS_NAMES})
-        set(WEBKIT_PKGCONGIG_DEPS "${WEBKIT_PKGCONGIG_DEPS} ${LIB_PREFIX}${LIB_NAME}")
+        set(WEBKIT_PKGCONFIG_DEPS "${WEBKIT_PKGCONFIG_DEPS} ${LIB_PREFIX}${LIB_NAME}")
         set(WEBKIT_PRI_EXTRA_LIBS "${WEBKIT_PRI_EXTRA_LIBS} -l${LIB_PREFIX}${LIB_NAME}")
     endforeach ()
 endif ()
@@ -503,7 +504,8 @@ if (NOT MACOS_BUILD_FRAMEWORKS)
     ecm_generate_pkgconfig_file(
         BASE_NAME Qt5WebKit
         DESCRIPTION "Qt WebKit module"
-        DEPS "${WEBKIT_PKGCONGIG_DEPS}"
+        INCLUDE_INSTALL_DIR "${KDE_INSTALL_INCLUDEDIR}/QtWebKit"
+        DEPS "${WEBKIT_PKGCONFIG_DEPS}"
         FILENAME_VAR WebKit_PKGCONFIG_FILENAME
     )
     set(ECM_PKGCONFIG_INSTALL_DIR "${LIB_INSTALL_DIR}/pkgconfig" CACHE PATH "The directory where pkgconfig will be installed to.")
@@ -728,6 +730,7 @@ if (NOT MACOS_BUILD_FRAMEWORKS)
     ecm_generate_pkgconfig_file(
         BASE_NAME Qt5WebKitWidgets
         DESCRIPTION "Qt WebKitWidgets module"
+        INCLUDE_INSTALL_DIR "${KDE_INSTALL_INCLUDEDIR}/QtWebKitWidgets"
         DEPS "${WEBKITWIDGETS_PKGCONFIG_DEPS}"
         FILENAME_VAR WebKitWidgets_PKGCONFIG_FILENAME
     )
@@ -861,7 +864,8 @@ endif ()
 
 if (MACOS_BUILD_FRAMEWORKS)
     set_target_properties(WebKitWidgets PROPERTIES
-        FRAMEWORK_VERSION 5
+        FRAMEWORK_VERSION ${PROJECT_VERSION_MAJOR}
+        SOVERSION ${MACOS_COMPATIBILITY_VERSION}
         MACOSX_FRAMEWORK_IDENTIFIER org.qt-project.QtWebKitWidgets
     )
 endif ()
