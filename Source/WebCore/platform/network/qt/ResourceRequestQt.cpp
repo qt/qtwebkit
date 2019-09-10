@@ -29,7 +29,10 @@
 
 #if USE(HTTP2)
 #include <QSslSocket>
+#if QT_VERSION >= QT_VERSION_CHECK(5, 14, 0)
+#include <QHttp2Configuration>
 #endif
+#endif // USE(HTTP2)
 
 namespace WebCore {
 
@@ -65,6 +68,16 @@ bool ResourceRequest::alpnIsSupported()
     return QSslSocket::sslLibraryVersionNumber() > 0x10002000L &&
         QSslSocket::sslLibraryVersionString().startsWith(QLatin1String("OpenSSL"));
 }
+
+#if QT_VERSION >= QT_VERSION_CHECK(5, 14, 0)
+static QHttp2Configuration createHttp2Configuration()
+{
+    QHttp2Configuration params;
+    params.setServerPushEnabled(true);
+    return params;
+}
+#endif
+
 #endif
 
 QNetworkRequest ResourceRequest::toNetworkRequest(NetworkingContext *context) const
@@ -76,8 +89,13 @@ QNetworkRequest ResourceRequest::toNetworkRequest(NetworkingContext *context) co
 
 #if USE(HTTP2)
     static const bool NegotiateHttp2ForHttps = alpnIsSupported();
-    if (originalUrl.protocolIs("https") && NegotiateHttp2ForHttps)
+    if (originalUrl.protocolIs("https") && NegotiateHttp2ForHttps) {
+#if QT_VERSION >= QT_VERSION_CHECK(5, 14, 0)
+        static const auto params = createHttp2Configuration();
+        request.setHttp2Configuration(params);
+#endif
         request.setAttribute(QNetworkRequest::HTTP2AllowedAttribute, true);
+    }
 #endif // USE(HTTP2)
 
     const HTTPHeaderMap &headers = httpHeaderFields();
