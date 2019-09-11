@@ -64,6 +64,11 @@ if (${PORT} STREQUAL "Qt")
         install(FILES $<TARGET_PDB_FILE:WebKit> DESTINATION "${BIN_INSTALL_DIR}" OPTIONAL)
     endif ()
 
+    if (SEPARATE_DEBUG_INFO)
+        QTWEBKIT_SEPARATE_DEBUG_INFO(WebKit WebKit_DEBUG_INFO)
+        install(FILES ${WebKit_DEBUG_INFO} DESTINATION "${LIB_INSTALL_DIR}" OPTIONAL)
+    endif ()
+
     if (NOT MSVC)
         ADD_PREFIX_HEADER(WebKit "${WEBKIT_DIR}/qt/WebKitPrefix.h")
     endif ()

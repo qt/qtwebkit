@@ -147,6 +147,24 @@ macro(QTWEBKIT_GENERATE_MOC_FILES_H _target)
     endforeach ()
 endmacro()
 
+macro(QTWEBKIT_SEPARATE_DEBUG_INFO _target _target_debug)
+    if (UNIX AND NOT APPLE)
+        if (NOT CMAKE_OBJCOPY)
+            message(WARNING "CMAKE_OBJCOPY is not defined - debug information will not be split")
+        else ()
+            set(_target_file "$<TARGET_FILE:${_target}>")
+            set(${_target_debug} "${_target_file}.debug")
+            add_custom_command(TARGET ${_target} POST_BUILD
+                COMMAND ${CMAKE_OBJCOPY} --only-keep-debug ${_target_file} ${${_target_debug}}
+                COMMAND ${CMAKE_OBJCOPY} --strip-debug ${_target_file}
+                COMMAND ${CMAKE_OBJCOPY} --add-gnu-debuglink=${${_target_debug}} ${_target_file}
+                VERBATIM
+            )
+            unset(_target_file)
+        endif ()
+    endif ()
+endmacro()
+
 set(CMAKE_MACOSX_RPATH ON)
 
 add_definitions(-DBUILDING_QT__=1)
@@ -696,6 +714,19 @@ endif ()
 
 if (WIN32 AND COMPILER_IS_GCC_OR_CLANG)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-keep-inline-dllexport")
+endif ()
+
+# See also FORCE_DEBUG_INFO in Source/PlatformQt.cmake
+if (FORCE_DEBUG_INFO)
+    if (COMPILER_IS_GCC_OR_CLANG)
+        # Enable debug info in Release builds
+        set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -g")
+        set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -g")
+    endif ()
+    if (USE_LD_GOLD)
+       set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--gdb-index")
+       set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--gdb-index")
+    endif ()
 endif ()
 
 if (APPLE)

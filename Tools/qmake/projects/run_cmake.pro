@@ -63,6 +63,11 @@ build_pass|!debug_and_release {
         CMAKE_CONFIG += USE_MINIMAL_DEBUG_INFO_MSVC=ON
     }
 
+    !macos {
+        force_debug_info: CMAKE_CONFIG += FORCE_DEBUG_INFO=ON
+        qtConfig(separate_debug_info): CMAKE_CONFIG += SEPARATE_DEBUG_INFO=ON
+    }
+
     macos {
         # Reuse the cached sdk version value from mac/sdk.prf if available
         # otherwise query for it.

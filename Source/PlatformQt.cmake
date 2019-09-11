@@ -54,6 +54,15 @@ if (USE_MINIMAL_DEBUG_INFO_MSVC AND MSVC AND CMAKE_BUILD_TYPE STREQUAL "Debug")
     endif ()
 endif ()
 
+if (FORCE_DEBUG_INFO)
+    if (COMPILER_IS_GCC_OR_CLANG)
+        if (NOT APPLE)
+            target_compile_options(WebKit        PRIVATE -fdebug-types-section)
+            target_compile_options(WebKit2       PRIVATE -fdebug-types-section)
+        endif ()
+    endif ()
+endif ()
+
 # GTest
 
 if (TARGET gtest)
