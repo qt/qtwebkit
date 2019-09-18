@@ -29,6 +29,15 @@ if (QT_CONAN_DIR)
     set(CMAKE_MODULE_PATH ${_BACKUP_CMAKE_MODULE_PATH})
     unset(_BACKUP_CMAKE_MODULE_PATH)
 
+    # Because we've reset CMAKE_MODULE_PATH, FindZLIB from Conan is not used, which causes error with MinGW
+    if (NOT QT_BUNDLED_ZLIB)
+        if (NOT CONAN_ZLIB_ROOT)
+            message(FATAL_ERROR "CONAN_ZLIB_ROOT is not set")
+        endif ()
+        set(ZLIB_ROOT ${CONAN_ZLIB_ROOT})
+        message(STATUS "ZLIB_ROOT: ${ZLIB_ROOT}")
+    endif ()
+
     install(CODE "
         set(_conan_imports_dest \${CMAKE_INSTALL_PREFIX})
         if (DEFINED ENV{DESTDIR})
