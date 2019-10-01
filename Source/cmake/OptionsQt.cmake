@@ -20,7 +20,7 @@ if (QT_CONAN_DIR)
     include("${QT_CONAN_DIR}/conanbuildinfo.cmake")
 
     # Remove this workaround when libxslt package is fixed
-    string(REPLACE "include/libxslt" "include" replace_CONAN_INCLUDE_DIRS ${CONAN_INCLUDE_DIRS})
+    string(REPLACE "include/libxslt" "include" replace_CONAN_INCLUDE_DIRS "${CONAN_INCLUDE_DIRS}")
     set(CONAN_INCLUDE_DIRS ${replace_CONAN_INCLUDE_DIRS})
 
     # Remove this workaround when libxml2 package is fixed
