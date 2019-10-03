@@ -909,7 +909,3 @@ endif ()
 if (ENABLE_WEBKIT2)
     add_subdirectory(qt/declarative)
 endif ()
-
-if (ENABLE_API_TESTS)
-    add_subdirectory(qt/tests)
-endif ()
