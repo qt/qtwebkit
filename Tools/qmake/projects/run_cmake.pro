@@ -86,6 +86,8 @@ build_pass|!debug_and_release {
         !qt_framework: CMAKE_CONFIG += MACOS_BUILD_FRAMEWORKS=OFF
     }
 
+    linux:isEqual(EXTRA_RPATHS, "."): CMAKE_CONFIG += QT_ORIGIN_RPATH=ON
+
     !isEmpty(use_ninja): cmake_args += "-G Ninja"
 
     equals(QMAKE_HOST.os, Windows) {
