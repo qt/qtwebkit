@@ -858,6 +858,11 @@ if (MSVC AND NOT QT_STATIC_BUILD)
     install(FILES $<TARGET_PDB_FILE:WebKitWidgets> DESTINATION "${BIN_INSTALL_DIR}" OPTIONAL)
 endif ()
 
+if (SEPARATE_DEBUG_INFO)
+    QTWEBKIT_SEPARATE_DEBUG_INFO(WebKitWidgets WebKitWidgets_DEBUG_INFO)
+    install(FILES ${WebKitWidgets_DEBUG_INFO} DESTINATION "${LIB_INSTALL_DIR}" OPTIONAL)
+endif ()
+
 if (NOT MSVC AND WIN32)
     ADD_PREFIX_HEADER(WebKitWidgets "qt/WebKitWidgetsPrefix.h")
 endif ()
@@ -903,8 +908,4 @@ endif ()
 
 if (ENABLE_WEBKIT2)
     add_subdirectory(qt/declarative)
-endif ()
-
-if (ENABLE_API_TESTS)
-    add_subdirectory(qt/tests)
 endif ()

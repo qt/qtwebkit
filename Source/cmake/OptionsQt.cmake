@@ -20,7 +20,7 @@ if (QT_CONAN_DIR)
     include("${QT_CONAN_DIR}/conanbuildinfo.cmake")
 
     # Remove this workaround when libxslt package is fixed
-    string(REPLACE "include/libxslt" "include" replace_CONAN_INCLUDE_DIRS ${CONAN_INCLUDE_DIRS})
+    string(REPLACE "include/libxslt" "include" replace_CONAN_INCLUDE_DIRS "${CONAN_INCLUDE_DIRS}")
     set(CONAN_INCLUDE_DIRS ${replace_CONAN_INCLUDE_DIRS})
 
     # Remove this workaround when libxml2 package is fixed
@@ -28,6 +28,15 @@ if (QT_CONAN_DIR)
     conan_basic_setup()
     set(CMAKE_MODULE_PATH ${_BACKUP_CMAKE_MODULE_PATH})
     unset(_BACKUP_CMAKE_MODULE_PATH)
+
+    # Because we've reset CMAKE_MODULE_PATH, FindZLIB from Conan is not used, which causes error with MinGW
+    if (NOT QT_BUNDLED_ZLIB)
+        if (NOT CONAN_ZLIB_ROOT)
+            message(FATAL_ERROR "CONAN_ZLIB_ROOT is not set")
+        endif ()
+        set(ZLIB_ROOT ${CONAN_ZLIB_ROOT})
+        message(STATUS "ZLIB_ROOT: ${ZLIB_ROOT}")
+    endif ()
 
     install(CODE "
         set(_conan_imports_dest \${CMAKE_INSTALL_PREFIX})
@@ -145,6 +154,24 @@ macro(QTWEBKIT_GENERATE_MOC_FILES_H _target)
         set(_source "${_header_dir}/${_name_we}.cpp")
         QTWEBKIT_GENERATE_MOC_FILE_H(${_target} ${_header} ${_source})
     endforeach ()
+endmacro()
+
+macro(QTWEBKIT_SEPARATE_DEBUG_INFO _target _target_debug)
+    if (UNIX AND NOT APPLE)
+        if (NOT CMAKE_OBJCOPY)
+            message(WARNING "CMAKE_OBJCOPY is not defined - debug information will not be split")
+        else ()
+            set(_target_file "$<TARGET_FILE:${_target}>")
+            set(${_target_debug} "${_target_file}.debug")
+            add_custom_command(TARGET ${_target} POST_BUILD
+                COMMAND ${CMAKE_OBJCOPY} --only-keep-debug ${_target_file} ${${_target_debug}}
+                COMMAND ${CMAKE_OBJCOPY} --strip-debug ${_target_file}
+                COMMAND ${CMAKE_OBJCOPY} --add-gnu-debuglink=${${_target_debug}} ${_target_file}
+                VERBATIM
+            )
+            unset(_target_file)
+        endif ()
+    endif ()
 endmacro()
 
 set(CMAKE_MACOSX_RPATH ON)
@@ -696,6 +723,19 @@ endif ()
 
 if (WIN32 AND COMPILER_IS_GCC_OR_CLANG)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-keep-inline-dllexport")
+endif ()
+
+# See also FORCE_DEBUG_INFO in Source/PlatformQt.cmake
+if (FORCE_DEBUG_INFO)
+    if (COMPILER_IS_GCC_OR_CLANG)
+        # Enable debug info in Release builds
+        set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -g")
+        set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -g")
+    endif ()
+    if (USE_LD_GOLD)
+       set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--gdb-index")
+       set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--gdb-index")
+    endif ()
 endif ()
 
 if (APPLE)
