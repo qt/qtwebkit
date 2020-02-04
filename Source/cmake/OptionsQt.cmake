@@ -18,25 +18,7 @@ if (QT_CONAN_DIR)
         message(FATAL_ERROR "conan executable not found. Make sure that Conan is installed and available in PATH")
     endif ()
     include("${QT_CONAN_DIR}/conanbuildinfo.cmake")
-
-    # Remove this workaround when libxslt package is fixed
-    string(REPLACE "include/libxslt" "include" replace_CONAN_INCLUDE_DIRS "${CONAN_INCLUDE_DIRS}")
-    set(CONAN_INCLUDE_DIRS ${replace_CONAN_INCLUDE_DIRS})
-
-    # Remove this workaround when libxml2 package is fixed
-    set(_BACKUP_CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH})
-    conan_basic_setup()
-    set(CMAKE_MODULE_PATH ${_BACKUP_CMAKE_MODULE_PATH})
-    unset(_BACKUP_CMAKE_MODULE_PATH)
-
-    # Because we've reset CMAKE_MODULE_PATH, FindZLIB from Conan is not used, which causes error with MinGW
-    if (NOT QT_BUNDLED_ZLIB)
-        if (NOT CONAN_ZLIB_ROOT)
-            message(FATAL_ERROR "CONAN_ZLIB_ROOT is not set")
-        endif ()
-        set(ZLIB_ROOT ${CONAN_ZLIB_ROOT})
-        message(STATUS "ZLIB_ROOT: ${ZLIB_ROOT}")
-    endif ()
+    conan_basic_setup(TARGETS)
 
     install(CODE "
         set(_conan_imports_dest \${CMAKE_INSTALL_PREFIX})

@@ -186,6 +186,8 @@ void LauncherWindow::initializeView()
         view->viewport()->installEventFilter(this);
     }
 
+    toggleForcedAntialiasing(m_windowOptions.useForcedAntialiasing);
+
     m_touchMocking = false;
 
     connect(page(), SIGNAL(loadStarted()), this, SLOT(loadStarted()));
@@ -321,6 +323,10 @@ void LauncherWindow::createChrome()
     QAction* toggleGraphicsView = graphicsViewMenu->addAction("Toggle use of QGraphicsView", this, SLOT(toggleWebView(bool)));
     toggleGraphicsView->setCheckable(true);
     toggleGraphicsView->setChecked(isGraphicsBased());
+
+    QAction* toggleForcedAntialiasing = toolsMenu->addAction("Toggle forced use of antialiasing", this, SLOT(toggleForcedAntialiasing(bool)));
+    toggleForcedAntialiasing->setCheckable(true);
+    toggleForcedAntialiasing->setChecked(m_windowOptions.useForcedAntialiasing);
 
     QAction* toggleWebGL = toolsMenu->addAction("Toggle WebGL", this, SLOT(toggleWebGL(bool)));
     toggleWebGL->setCheckable(true);
@@ -1085,6 +1091,19 @@ void LauncherWindow::toggleQOpenGLWidgetViewport(bool enable)
 #endif
 }
 #endif
+
+void LauncherWindow::toggleForcedAntialiasing(bool enable)
+{
+    m_windowOptions.useForcedAntialiasing = enable;
+
+    if (isGraphicsBased()) {
+        auto* view = static_cast<WebViewGraphicsBased*>(m_view);
+        view->graphicsWebView()->setRenderHint(QPainter::Antialiasing, enable);
+    } else {
+        auto* view = static_cast<QWebView*>(m_view);
+        view->setRenderHint(QPainter::Antialiasing, enable);
+    }
+}
 
 void LauncherWindow::changeViewportUpdateMode(int mode)
 {

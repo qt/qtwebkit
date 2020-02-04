@@ -1,0 +1,54 @@
+#!/usr/bin/env perl
+# Copyright (C) 2019 Konstantin Tokarev <annulen@yandex.ru>
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+# 1. Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+# 2. Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+#
+# THIS SOFTWARE IS PROVIDED BY APPLE INC. AND ITS CONTRIBUTORS ``AS IS''
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+# THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+# PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL APPLE INC. OR ITS CONTRIBUTORS
+# BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+# THE POSSIBILITY OF SUCH DAMAGE.
+
+use YAML::XS;
+use strict;
+use warnings;
+
+my $qt_ref = shift @ARGV or die "Usage: $0 <qt_ref>";
+my @qt_dependencies = qw(qtbase qtdeclarative qtlocation qtmultimedia qtsensors qtwebchannel);
+
+
+sub qtModuleRef {
+    my ($module, $tag) = @_;
+
+    -d $module or die "No such directory $module - this script must be run in qt5";
+    my $output = `git ls-tree $tag $module`;
+
+    # Format is "<mode> SP <type> SP <object> TAB <file>"
+    # For submodule <type> is "commit"
+    $output =~ /^(.*) commit (.*)\t(.*)/ or die "git ls-tree output is malformed for $module";
+    $3 eq $module or die "Module name in git ls-tree does not match $module";
+    return $2;
+}
+
+print "# This file is generated automatically by Tools/qt/generate-dependencies-yaml\n";
+print "# Qt modules git ref: $qt_ref\n";
+print "# All changes will be lost!\n";
+
+my $data;
+for my $module (@qt_dependencies) {
+    $data->{dependencies}->{"../$module"} = { ref => qtModuleRef($module, $qt_ref), required => "true" };
+}
+print Dump $data;

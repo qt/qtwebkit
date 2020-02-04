@@ -92,6 +92,7 @@ public:
     QUrl inspectorUrl;
     quint16 remoteInspectorPort { 0 };
     bool startMaximized { false };
+    bool useForcedAntialiasing { false };
 };
 
 class LauncherWindow final : public MainWindow {
@@ -164,6 +165,7 @@ protected Q_SLOTS:
     void toggleQGLWidgetViewport(bool enable);
     void toggleQOpenGLWidgetViewport(bool enable);
 #endif
+    void toggleForcedAntialiasing(bool enable);
 
     void changeViewportUpdateMode(int mode);
     void animatedFlip();
