@@ -29,10 +29,16 @@ import logging
 import string
 from string import Template
 
-from generator import Generator, ucfirst
-from models import ObjectType
-from objc_generator import ObjCGenerator
-from objc_generator_templates import ObjCGeneratorTemplates as ObjCTemplates
+try:
+    from .generator import Generator, ucfirst
+    from .models import ObjectType
+    from .objc_generator import ObjCTypeCategory, ObjCGenerator
+    from .objc_generator_templates import ObjCGeneratorTemplates as ObjCTemplates
+except ValueError:
+    from generator import Generator, ucfirst
+    from models import ObjectType
+    from objc_generator import ObjCTypeCategory, ObjCGenerator
+    from objc_generator_templates import ObjCGeneratorTemplates as ObjCTemplates
 
 log = logging.getLogger('global')
 
@@ -51,7 +57,7 @@ class ObjCProtocolTypesImplementationGenerator(Generator):
         return '%sTypes.mm' % ObjCGenerator.OBJC_PREFIX
 
     def domains_to_generate(self):
-        return filter(ObjCGenerator.should_generate_domain_types_filter(self.model()), Generator.domains_to_generate(self))
+        return list(filter(ObjCGenerator.should_generate_domain_types_filter(self.model()), Generator.domains_to_generate(self)))
 
     def generate_output(self):
         secondary_headers = [
@@ -69,7 +75,7 @@ class ObjCProtocolTypesImplementationGenerator(Generator):
         sections = []
         sections.append(self.generate_license())
         sections.append(Template(ObjCTemplates.ImplementationPrelude).substitute(None, **header_args))
-        sections.extend(map(self.generate_type_implementations, domains))
+        sections.extend(list(map(self.generate_type_implementations, domains)))
         sections.append(Template(ObjCTemplates.ImplementationPostlude).substitute(None, **header_args))
         return '\n\n'.join(sections)
 
@@ -84,7 +90,7 @@ class ObjCProtocolTypesImplementationGenerator(Generator):
     def generate_type_implementation(self, domain, declaration):
         lines = []
         lines.append('@implementation %s' % ObjCGenerator.objc_name_for_type(declaration.type))
-        required_members = filter(lambda member: not member.is_optional, declaration.type_members)
+        required_members = [member for member in declaration.type_members if not member.is_optional]
         if required_members:
             lines.append('')
             lines.append(self._generate_init_method_for_required_members(domain, declaration, required_members))
@@ -112,7 +118,7 @@ class ObjCProtocolTypesImplementationGenerator(Generator):
         lines.append('        return nil;')
         lines.append('')
 
-        required_pointer_members = filter(lambda member: ObjCGenerator.is_type_objc_pointer_type(member.type), required_members)
+        required_pointer_members = [member for member in required_members if ObjCGenerator.is_type_objc_pointer_type(member.type)]
         if required_pointer_members:
             for member in required_pointer_members:
                 var_name = ObjCGenerator.identifier_to_objc_identifier(member.member_name)

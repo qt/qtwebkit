@@ -48,8 +48,8 @@ try:
 
 # When copying generator files to JavaScriptCore's private headers on Mac,
 # the codegen/ module directory is flattened. So, import directly.
-except ImportError, e:
-    # log.error(e) # Uncomment this to debug early import errors.
+except ImportError as e:
+    #log.error(e) # Uncomment this to debug early import errors.
     import models
     from models import *
     from generator import *

@@ -30,9 +30,14 @@ import string
 import re
 from string import Template
 
-from cpp_generator import CppGenerator
-from cpp_generator_templates import CppGeneratorTemplates as CppTemplates
-from generator import Generator
+try:
+    from .cpp_generator import CppGenerator
+    from .cpp_generator_templates import CppGeneratorTemplates as CppTemplates
+    from .generator import Generator
+except ValueError:
+    from cpp_generator import CppGenerator
+    from cpp_generator_templates import CppGeneratorTemplates as CppTemplates
+    from generator import Generator
 
 log = logging.getLogger('global')
 
@@ -60,7 +65,7 @@ class CppAlternateBackendDispatcherHeaderGenerator(Generator):
         sections = []
         sections.append(self.generate_license())
         sections.append(Template(CppTemplates.AlternateDispatchersHeaderPrelude).substitute(None, **header_args))
-        sections.append('\n'.join(filter(None, map(self._generate_handler_declarations_for_domain, domains))))
+        sections.append('\n'.join([_f for _f in map(self._generate_handler_declarations_for_domain, domains) if _f]))
         sections.append(Template(CppTemplates.AlternateDispatchersHeaderPostlude).substitute(None, **header_args))
         return '\n\n'.join(sections)
 

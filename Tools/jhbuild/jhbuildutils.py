@@ -49,7 +49,7 @@ def enter_jhbuild_environment_if_available(platform):
         import jhbuild.config
         from jhbuild.errors import FatalError
         config = jhbuild.config.Config(get_config_file_for_platform(platform), [])
-    except FatalError, exception:
+    except FatalError as exception:
         sys.stderr.write('Could not load jhbuild config file: %s\n' % exception.args[0])
         return False
 

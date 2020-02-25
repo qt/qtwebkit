@@ -29,8 +29,12 @@ import os.path
 import re
 from string import Template
 
-from generator_templates import GeneratorTemplates as Templates
-from models import PrimitiveType, ObjectType, ArrayType, EnumType, AliasedType, Frameworks
+try:
+    from .generator_templates import GeneratorTemplates as Templates
+    from .models import PrimitiveType, ObjectType, ArrayType, EnumType, AliasedType, Frameworks
+except ValueError:
+    from generator_templates import GeneratorTemplates as Templates
+    from models import PrimitiveType, ObjectType, ArrayType, EnumType, AliasedType, Frameworks
 
 log = logging.getLogger('global')
 
@@ -87,7 +91,7 @@ class Generator:
 
     # These methods are overridden by subclasses.
     def non_supplemental_domains(self):
-        return filter(lambda domain: not domain.is_supplemental, self.model().domains)
+        return [domain for domain in self.model().domains if not domain.is_supplemental]
 
     def domains_to_generate(self):
         return self.non_supplemental_domains()
@@ -129,7 +133,7 @@ class Generator:
     # set of types will not be automatically regenerated on subsequent calls to
     # Generator.types_needing_shape_assertions().
     def calculate_types_requiring_shape_assertions(self, domains):
-        domain_names = map(lambda domain: domain.domain_name, domains)
+        domain_names = [domain.domain_name for domain in domains]
         log.debug("> Calculating types that need shape assertions (eligible domains: %s)" % ", ".join(domain_names))
 
         # Mutates the passed-in set; this simplifies checks to prevent infinite recursion.
@@ -185,7 +189,7 @@ class Generator:
         for _type in all_types:
             if not isinstance(_type, EnumType):
                 continue
-            map(self._assign_encoding_for_enum_value, _type.enum_values())
+            list(map(self._assign_encoding_for_enum_value, _type.enum_values()))
 
     def _assign_encoding_for_enum_value(self, enum_value):
         if enum_value in self._enum_value_encodings:
@@ -219,7 +223,7 @@ class Generator:
             return match.group(1).upper()
 
         # Split on hyphen, introduce camelcase, and force uppercasing of acronyms.
-        subwords = map(ucfirst, enum_value.split('-'))
+        subwords = list(map(ucfirst, enum_value.split('-')))
         return re.sub(re.compile(regex, re.IGNORECASE), replaceCallback, "".join(subwords))
 
     @staticmethod
