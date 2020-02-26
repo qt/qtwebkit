@@ -146,6 +146,8 @@ CachedResource::CachedResource(const ResourceRequest& request, Type type, Sessio
 
     if (!m_resourceRequest.url().hasFragmentIdentifier())
         return;
+    if (m_type == ImageResource)
+        return;
     URL urlForCache = MemoryCache::removeFragmentIdentifierIfNeeded(m_resourceRequest.url());
     if (urlForCache.hasFragmentIdentifier())
         return;
