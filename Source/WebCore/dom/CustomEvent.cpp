@@ -45,7 +45,7 @@ CustomEvent::~CustomEvent()
 {
 }
 
-void CustomEvent::initCustomEvent(const AtomicString& type, bool canBubble, bool cancelable, const Deprecated::ScriptValue& detail)
+void CustomEvent::initCustomEvent(const AtomicString& type, bool canBubble, bool cancelable, JSC::JSValue detail)
 {
     if (dispatched())
         return;
@@ -60,7 +60,7 @@ void CustomEvent::initCustomEvent(const AtomicString& type, bool canBubble, bool
 RefPtr<SerializedScriptValue> CustomEvent::trySerializeDetail(JSC::ExecState* exec)
 {
     if (!m_serializedDetail && !m_triedToSerialize) {
-        m_serializedDetail = SerializedScriptValue::create(exec, m_detail.jsValue(), nullptr, nullptr, NonThrowing);
+        m_serializedDetail = SerializedScriptValue::create(exec, m_detail, nullptr, nullptr, NonThrowing);
         m_triedToSerialize = true;
     }
     
