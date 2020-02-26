@@ -75,9 +75,6 @@ defineTest(isPlatformSupported) {
             !isVersionAtLeast($$MSVC_VER, "14.0") {
                 skipBuild("QtWebKit on Windows requires MSVC 2015.")
             }
-            isVersionAtLeast($$MSVC_VER, "16.0") {
-                skipBuild("Temporary skipped MSVC 2019.")
-            }
             CONFIG(debug, debug|release):!contains(QMAKE_HOST.arch, x86_64) {
                 # debug_and_release is built as release, see Tools/qmake/projects/run_cmake.pro
                 !debug_and_release {
