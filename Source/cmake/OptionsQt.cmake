@@ -139,7 +139,7 @@ macro(QTWEBKIT_GENERATE_MOC_FILES_H _target)
 endmacro()
 
 macro(QTWEBKIT_SEPARATE_DEBUG_INFO _target _target_debug)
-    if (UNIX AND NOT APPLE)
+    if (MINGW OR UNIX AND NOT APPLE) # Not using COMPILER_IS_GCC_OR_CLANG because other ELF compilers may work as well
         if (NOT CMAKE_OBJCOPY)
             message(WARNING "CMAKE_OBJCOPY is not defined - debug information will not be split")
         else ()
