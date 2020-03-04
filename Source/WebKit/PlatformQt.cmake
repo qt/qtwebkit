@@ -289,10 +289,9 @@ if (ENABLE_GEOLOCATION)
 endif ()
 
 if (USE_QT_MULTIMEDIA)
-    qt_wrap_cpp(WebKit WebKit_SOURCES
-        qt/Api/qwebfullscreenvideohandler.h
-    )
     list(APPEND WebKit_SOURCES
+        qt/Api/qwebfullscreenvideohandler.h
+
         qt/WebCoreSupport/FullScreenVideoQt.cpp
     )
 endif ()
