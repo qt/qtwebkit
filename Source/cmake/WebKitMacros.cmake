@@ -285,7 +285,8 @@ macro(WEBKIT_FRAMEWORK _target)
         add_custom_command(TARGET ${_target} POST_BUILD COMMAND ${${_target}_POST_BUILD_COMMAND} VERBATIM)
     endif ()
 
-    if (APPLE AND NOT PORT STREQUAL "GTK" AND NOT ${${_target}_LIBRARY_TYPE} MATCHES STATIC)
+
+    if (APPLE AND NOT PORT STREQUAL "GTK" AND NOT ${${_target}_LIBRARY_TYPE} MATCHES STATIC AND (MACOS_BUILD_FRAMEWORKS OR NOT PORT STREQUAL "Qt"))
         set_target_properties(${_target} PROPERTIES FRAMEWORK TRUE)
         if (${_target}_PUBLIC_HEADERS)
             set_target_properties(${_target} PROPERTIES PUBLIC_HEADER "${${_target}_PUBLIC_HEADERS}")
