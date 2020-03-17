@@ -34,6 +34,9 @@ defined $commit or usage();
 print "Remote '$remote': ", `git remote get-url $remote`, "\n";
 $? == 0 or die "git exited with code $?";
 
+print "Remote 'qtwebkit': ", `git remote get-url qtwebkit`, "\n";
+$? == 0 or die "git exited with code $?";
+
 print `git --no-pager log --color -n1 --decorate=full $commit`;
 $? == 0 or die "git exited with code $?";
 
@@ -44,4 +47,9 @@ lc $answer eq "y" or die "Got '$answer', exiting";
 
 print "git push -f $remote $commit:refs/heads/wip/qtwebkit/5.212 && git push -f $remote $commit:refs/staging/wip/qtwebkit/5.212\n";
 `git push -f $remote $commit:refs/heads/wip/qtwebkit/5.212 && git push -f $remote $commit:refs/staging/wip/qtwebkit/5.212`;
+$? == 0 or die "git exited with code $?";
+
+my $qt5TagName = "qtwebkit-5.212-" . time();
+print "git tag -a '$qt5TagName' -m '$qt5TagName' && git push qtwebkit '$qt5TagName'\n";
+`git tag -a '$qt5TagName' -m '$qt5TagName' && git push qtwebkit '$qt5TagName'`;
 $? == 0 or die "git exited with code $?";
