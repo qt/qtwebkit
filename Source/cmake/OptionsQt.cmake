@@ -3,7 +3,7 @@ include(FeatureSummary)
 include(ECMEnableSanitizers)
 include(ECMPackageConfigHelpers)
 
-set(ECM_MODULE_DIR ${CMAKE_MODULE_PATH})
+set(ECM_MODULE_DIR ${CMAKE_CURRENT_LIST_DIR})
 
 set(PROJECT_VERSION_MAJOR 5)
 set(PROJECT_VERSION_MINOR 212)
@@ -290,6 +290,7 @@ option(GENERATE_DOCUMENTATION "Generate HTML and QCH documentation" OFF)
 cmake_dependent_option(ENABLE_TEST_SUPPORT "Build tools for running layout tests and related library code" ON
                                            "DEVELOPER_MODE" OFF)
 option(USE_STATIC_RUNTIME "Use static runtime (MSVC only)" OFF)
+option(ENABLE_PCH "Use pre-compiled headers (MSVC only)" ON)
 
 # Private options specific to the Qt port. Changing these options is
 # completely unsupported. They are intended for use only by WebKit developers.
@@ -732,6 +733,14 @@ if (FORCE_DEBUG_INFO)
        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--gdb-index")
        set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--gdb-index")
     endif ()
+
+    if (MSVC AND CMAKE_SIZEOF_VOID_P EQUAL 8)
+        # Create pdb files for debugging purposes, also for Release builds
+        set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} /Zi")
+        set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /Zi")
+        set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS} /DEBUG")
+        set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS} /DEBUG")
+    endif ()
 endif ()
 
 if (APPLE)
@@ -895,14 +904,6 @@ if (MSVC)
         /wd4706 /wd4800 /wd4819 /wd4951 /wd4952 /wd4996 /wd6011 /wd6031 /wd6211
         /wd6246 /wd6255 /wd6387
     )
-
-    if (CMAKE_SIZEOF_VOID_P EQUAL 8)
-        # Create pdb files for debugging purposes, also for Release builds
-        set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} /Zi")
-        set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /Zi")
-        set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS} /DEBUG")
-        set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS} /DEBUG")
-    endif ()
 
     add_compile_options(/GS)
 
