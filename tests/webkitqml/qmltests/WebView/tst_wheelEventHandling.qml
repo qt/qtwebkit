@@ -32,6 +32,8 @@ Item {
         }
 
         function test_wheelScrollEvent() {
+            skip("https://github.com/qtwebkit/qtwebkit/issues/951")
+
             scrollSpy.clear()
             var centerPoint = Qt.point(webView.width / 2, webView.height / 2)
             test.wheelEvent(webView, centerPoint.x, centerPoint.y, -500);
@@ -45,6 +47,8 @@ Item {
         }
 
         function test_wheelScrollEventAfterReload() {
+            skip("https://github.com/qtwebkit/qtwebkit/issues/951")
+
             scrollSpy.clear()
             webView.reload()
             verify(webView.waitForViewportReady())

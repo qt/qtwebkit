@@ -7,7 +7,8 @@ INCLUDEPATH += $$PWD
 SOURCES +=  ../util.cpp
 
 QT += testlib webkit
-have?(QTQUICK) {
+
+qtHaveModule(quick) {
     QT += qml quick quick-private
     HEADERS += ../bytearraytestdata.h \
                ../util.h

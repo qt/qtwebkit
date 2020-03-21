@@ -72,6 +72,7 @@ Item {
             webView.url = webView.content
             verify(webView.waitForViewportReady())
 
+            skip("https://github.com/qtwebkit/qtwebkit/issues/951")
             compare(documentSize(), "480x720")
             compare(test.contentsScale, 1.0)
 
@@ -100,6 +101,7 @@ Item {
 
             webView.url = "../common/test5.html"
             verify(webView.waitForLoadSucceeded())
+            skip("https://github.com/qtwebkit/qtwebkit/issues/951")
             compare(test.contentsScale, 0.5)
 
             // Add user interaction.
@@ -117,7 +119,7 @@ Item {
 
             webView.url = "../common/test4.html"
             verify(webView.waitForLoadSucceeded())
-
+            skip("https://github.com/qtwebkit/qtwebkit/issues/951")
             compare(test.contentsScale, 2.0)
 
             // Add user interaction.
