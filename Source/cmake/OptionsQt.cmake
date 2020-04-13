@@ -29,18 +29,23 @@ if (QT_CONAN_DIR)
             set(_conan_imports_dest \"\${_absolute_destdir}\${_conan_imports_dest}\")
         endif ()
 
-        message(\"Importing dependencies from conan to \${_conan_imports_dest}\")
+        message(STATUS \"Importing dependencies from conan to \${_conan_imports_dest}\")
         execute_process(
             COMMAND \"${CONAN_COMMAND}\" imports --import-folder \${_conan_imports_dest} \"${QT_CONAN_DIR}/conanfile.txt\"
             WORKING_DIRECTORY \"${QT_CONAN_DIR}\"
             RESULT_VARIABLE _conan_imports_result
         )
-        message(\"conan imports result: \${_conan_imports_result}\")
+
+        if (NOT _conan_imports_result EQUAL 0)
+            message(FATAL_ERROR \"conan imports failed with code \${_conan_imports_result}\")
+        else ()
+            message(STATUS \"conan imports result: \${_conan_imports_result}\")
+        endif ()
 
         set(_conan_imports_manifest \"\${_conan_imports_dest}/conan_imports_manifest.txt\")
         if (EXISTS \${_conan_imports_manifest})
             file(REMOVE \${_conan_imports_manifest})
-            message(\"Removed conan install manifest: \${_conan_imports_manifest}\")
+            message(STATUS \"Removed conan install manifest: \${_conan_imports_manifest}\")
         endif ()
     ")
 endif ()
@@ -171,6 +176,7 @@ add_definitions(-DQT_NO_EXCEPTIONS)
 add_definitions(-DQT_USE_QSTRINGBUILDER)
 add_definitions(-DQT_NO_CAST_TO_ASCII -DQT_ASCII_CAST_WARNINGS)
 add_definitions(-DQT_DEPRECATED_WARNINGS -DQT_DISABLE_DEPRECATED_BEFORE=0x050000)
+add_definitions(-DQT_NO_NARROWING_CONVERSIONS_IN_CONNECT)
 
 # We use -fno-rtti with GCC and Clang, see OptionsCommon.cmake
 if (COMPILER_IS_GCC_OR_CLANG)
