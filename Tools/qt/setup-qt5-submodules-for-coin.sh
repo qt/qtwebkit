@@ -22,6 +22,20 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
 # THE POSSIBILITY OF SUCH DAMAGE.
 
+usage() {
+    echo "Usage: $0 <qt_ref>"
+    echo "    where qt_ref is tag or other git reference from qt5.git repo to take submodules from"
+    exit 0
+}
+
+if [ -z "$1" ]; then
+    usage
+fi
+
+if [ "$1" = "--help" ]; then
+    usage
+fi
+
 QT_REF="$1"
 SCRIPTNAME=$(basename "$0")
 

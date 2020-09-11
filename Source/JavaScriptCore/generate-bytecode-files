@@ -163,7 +163,7 @@ if __name__ == "__main__":
         initBytecodesFile = openOrExit(initASMFileName, "w")
 
     try:
-        bytecodeSections = json.load(bytecodeFile, encoding = "utf-8")
+        bytecodeSections = json.load(bytecodeFile)
     except:
         print("Unexpected error parsing {0}: {1}".format(bytecodeJSONFile, sys.exc_info()))
 

@@ -170,11 +170,13 @@ void LauncherWindow::initializeView()
     } else {
         WebViewGraphicsBased* view = new WebViewGraphicsBased(splitter);
         m_view = view;
+#ifndef QT_NO_OPENGL
         if (!m_windowOptions.useQOpenGLWidgetViewport)
             toggleQGLWidgetViewport(m_windowOptions.useQGLWidgetViewport);
 #ifdef QT_OPENGL_LIB
         if (!m_windowOptions.useQGLWidgetViewport)
             toggleQOpenGLWidgetViewport(m_windowOptions.useQOpenGLWidgetViewport);
+#endif // QT_OPENGL_LIB
 #endif
         view->setPage(page());
 
@@ -1357,3 +1359,5 @@ void LauncherWindow::find(int mode = s_findNormalFlag)
         page()->findText(m_lineEdit->text(), QFlag(m_findFlag));
 }
 #endif
+
+#include "moc_launcherwindow.cpp"

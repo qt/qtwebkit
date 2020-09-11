@@ -254,6 +254,9 @@ static void initializeSupportedImageMIMETypes()
     // Do not treat SVG as images directly because WebKit can handle them.
     supportedImageMIMETypes->remove("image/svg+xml");
     supportedImageResourceMIMETypes->remove("image/svg+xml");
+    // Do not treat PDF as images
+    supportedImageMIMETypes->remove("application/pdf");
+    supportedImageResourceMIMETypes->remove("application/pdf");
 #endif // PLATFORM(QT)
 #endif // USE(CG)
 }
