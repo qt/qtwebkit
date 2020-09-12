@@ -24,7 +24,11 @@ if (NOT HAS_RUN_WEBKIT_COMMON)
     # TODO Enforce version requirement for perl
     find_package(Perl 5.10.0 REQUIRED)
 
-    set(Python_ADDITIONAL_VERSIONS 3)
+    # Workaround for Windows Store python3.exe
+    # Official Python packages for Windows don't have python3.exe, only python.exe
+    if (NOT WIN32)
+        set(Python_ADDITIONAL_VERSIONS 3)
+    endif ()
     find_package(PythonInterp 2.7.0 REQUIRED)
 
     # We cannot check for RUBY_FOUND because it is set only when the full package is installed and
