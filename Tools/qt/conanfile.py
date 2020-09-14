@@ -47,6 +47,8 @@ class QtWebKitConan(ConanFile):
         "install_prefix": "ANY"
     }
     default_options = {
+        "install_prefix": None,
+
         "icu:shared": True,
         "icu:data_packaging": "library",
 
@@ -132,6 +134,8 @@ class QtWebKitConan(ConanFile):
 
         if self.options.install_prefix:
             cmake.definitions["CMAKE_INSTALL_PREFIX"] = str(self.options.install_prefix)
+        else:
+            del cmake.definitions["CMAKE_INSTALL_PREFIX"]
 
         print(self.source_folder)
         print()
