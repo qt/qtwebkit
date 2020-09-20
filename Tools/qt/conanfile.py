@@ -35,11 +35,6 @@ class QtWebKitConan(ConanFile):
     generators = "cmake", "virtualenv", "txt"
     exports_sources = "../../*"
     no_copy_source = True
-    requires = (
-        "libjpeg-turbo/2.0.3@qtproject/stable",
-        "libpng/1.6.37",
-        "libwebp/1.1.0"
-    )
     options = {
         "qt": "ANY",
         "cmakeargs": "ANY",
@@ -84,18 +79,31 @@ class QtWebKitConan(ConanFile):
         if not tools.which("flex"):
             self.build_requires("flex_installer/2.6.4@bincrafters/stable")
         if not tools.which("ninja"):
-            self.build_requires("ninja/1.9.0")
+            self.build_requires("ninja/[>=1.9.0]")
         if not tools.which("cmake"):
-            self.build_requires("cmake/3.16.4")
+            self.build_requires("cmake/[>=3.18.2]")
 
     def requirements(self):
         # TODO: Handle case when custom ICU is needed (AppStore etc., MACOS_USE_SYSTEM_ICU=OFF in CMake)
-        if self.settings.os != 'Macos':
+        if self.settings.os == 'Windows':
             self.requires("icu/65.1@qtproject/stable")
             self.requires("libxml2/2.9.10@qtproject/stable")
             self.requires("libxslt/1.1.34@qtproject/stable")
             self.requires("zlib/1.2.11")
-            self.requires("sqlite3/3.31.1")
+
+        if self.settings.os == 'Windows' or self.settings.os == 'Macos':
+            # FIXME: Pass Qt version, handle more versions
+            qt_version = "5.15.1"
+            if qt_version == "5.14.1":
+                self.requires("sqlite3/3.30.1")
+                self.requires("libjpeg-turbo/2.0.3@qtproject/stable")
+                self.requires("libpng/1.6.37")
+            if qt_version == "5.15.1":
+                self.requires("sqlite3/3.32.3")
+                self.requires("libjpeg-turbo/2.0.5@qtproject/stable")
+                self.requires("libpng/1.6.37")
+
+            self.requires("libwebp/1.1.0")
 
     def build(self):
         cmake = CMake(self, set_cmake_flags=True)

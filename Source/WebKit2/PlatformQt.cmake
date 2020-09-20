@@ -217,6 +217,19 @@ list(APPEND WebKit2_SOURCES
     WebProcess/qt/WebProcessQt.cpp
 )
 
+if (COMPILER_IS_GCC_OR_CLANG)
+    set_source_files_properties(
+        UIProcess/API/qt/qquicknetworkreply.cpp
+        UIProcess/API/qt/qquicknetworkrequest.cpp
+        UIProcess/API/qt/qquickurlschemedelegate.cpp
+        UIProcess/API/qt/qquickwebpage.cpp
+        UIProcess/API/qt/qquickwebview.cpp
+        UIProcess/API/qt/qwebiconimageprovider.cpp
+    PROPERTIES
+        COMPILE_FLAGS -frtti
+    )
+endif ()
+
 qt5_add_resources(WebKit2_SOURCES
     WebKit2.qrc
 )
