@@ -225,6 +225,8 @@ if (COMPILER_IS_GCC_OR_CLANG)
         UIProcess/API/qt/qquickwebpage.cpp
         UIProcess/API/qt/qquickwebview.cpp
         UIProcess/API/qt/qwebiconimageprovider.cpp
+
+        UIProcess/Launcher/qt/ProcessLauncherQt.cpp
     PROPERTIES
         COMPILE_FLAGS -frtti
     )
