@@ -4,16 +4,16 @@ VPATH += $$_PRO_FILE_PWD_
 TARGET = tst_$$TARGET
 
 INCLUDEPATH += $$PWD
-SOURCES +=  ../util.cpp
+SOURCES +=  $$PWD/util.cpp
 
 QT += testlib webkit
 
 qtHaveModule(quick) {
     QT += qml quick quick-private
-    HEADERS += ../bytearraytestdata.h \
-               ../util.h
+    HEADERS += $$PWD/bytearraytestdata.h \
+               $$PWD/util.h
 
-    SOURCES += ../bytearraytestdata.cpp
+    SOURCES += $$PWD/bytearraytestdata.cpp
 }
 WEBKIT += wtf # For platform macros
 

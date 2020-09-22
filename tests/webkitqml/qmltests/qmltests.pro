@@ -1,3 +1,3 @@
 TEMPLATE = subdirs
 
-SUBDIRS += DesktopBehavior.pro WebView.pro
+SUBDIRS += DesktopBehavior WebView

@@ -1,2 +1,2 @@
 TEMPLATE = subdirs
-# SUBDIRS += qmltests
+SUBDIRS += qmltests
