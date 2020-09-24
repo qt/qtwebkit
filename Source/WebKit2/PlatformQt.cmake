@@ -217,6 +217,21 @@ list(APPEND WebKit2_SOURCES
     WebProcess/qt/WebProcessQt.cpp
 )
 
+if (COMPILER_IS_GCC_OR_CLANG)
+    set_source_files_properties(
+        UIProcess/API/qt/qquicknetworkreply.cpp
+        UIProcess/API/qt/qquicknetworkrequest.cpp
+        UIProcess/API/qt/qquickurlschemedelegate.cpp
+        UIProcess/API/qt/qquickwebpage.cpp
+        UIProcess/API/qt/qquickwebview.cpp
+        UIProcess/API/qt/qwebiconimageprovider.cpp
+
+        UIProcess/Launcher/qt/ProcessLauncherQt.cpp
+    PROPERTIES
+        COMPILE_FLAGS -frtti
+    )
+endif ()
+
 qt5_add_resources(WebKit2_SOURCES
     WebKit2.qrc
 )
@@ -328,10 +343,6 @@ set(WEBKIT2_EXTRA_DEPENDENCIES
 )
 
 WEBKIT_CREATE_FORWARDING_HEADERS(QtWebKit/private DIRECTORIES UIProcess/API/qt)
-
-if (ENABLE_API_TESTS)
-    add_subdirectory(UIProcess/API/qt/tests)
-endif ()
 
 file(GLOB WebKit2_PRIVATE_HEADERS UIProcess/API/qt/*_p.h)
 install(

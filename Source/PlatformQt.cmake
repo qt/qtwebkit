@@ -146,6 +146,18 @@ list(REMOVE_DUPLICATES Qt5@MODULE_NAME@_PRIVATE_INCLUDE_DIRS)
 list(REMOVE_DUPLICATES Qt5@MODULE_NAME@_DEFINITIONS)
 list(REMOVE_DUPLICATES Qt5@MODULE_NAME@_COMPILE_DEFINITIONS)
 list(REMOVE_DUPLICATES Qt5@MODULE_NAME@_EXECUTABLE_COMPILE_FLAGS)
+
+# Fixup order of configurations to match behavior of other Qt modules
+# See also https://bugreports.qt.io/browse/QTBUG-29186
+get_target_property(_configurations Qt5::@MODULE_NAME@ IMPORTED_CONFIGURATIONS)
+list(FIND _configurations RELEASE _index)
+if (\${_index} GREATER -1)
+    list(REMOVE_AT _configurations \${_index})
+    list(INSERT _configurations 0 RELEASE)
+    set_property(TARGET Qt5::@MODULE_NAME@ PROPERTY IMPORTED_CONFIGURATIONS \"\${_configurations}\")
+endif ()
+unset(_configurations)
+unset(_index)
 ")
 
 set(MODULE_NAME WebKit)

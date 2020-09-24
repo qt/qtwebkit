@@ -3,7 +3,7 @@ include(FeatureSummary)
 include(ECMEnableSanitizers)
 include(ECMPackageConfigHelpers)
 
-set(ECM_MODULE_DIR ${CMAKE_MODULE_PATH})
+set(ECM_MODULE_DIR ${CMAKE_CURRENT_LIST_DIR})
 
 set(PROJECT_VERSION_MAJOR 5)
 set(PROJECT_VERSION_MINOR 212)
@@ -13,30 +13,16 @@ set(PROJECT_VERSION_STRING "${PROJECT_VERSION}")
 
 set(QT_CONAN_DIR "" CACHE PATH "Directory containing conanbuildinfo.cmake and conanfile.txt")
 if (QT_CONAN_DIR)
+    if (NOT QT_CONAN_FILE)
+        set(QT_CONAN_FILE "${QT_CONAN_DIR}/conanfile.txt")
+    endif ()
+    message(STATUS "Using conan directory: ${QT_CONAN_DIR}")
     find_program(CONAN_COMMAND NAMES conan PATHS $ENV{PIP3_PATH})
     if (NOT CONAN_COMMAND)
         message(FATAL_ERROR "conan executable not found. Make sure that Conan is installed and available in PATH")
     endif ()
     include("${QT_CONAN_DIR}/conanbuildinfo.cmake")
-
-    # Remove this workaround when libxslt package is fixed
-    string(REPLACE "include/libxslt" "include" replace_CONAN_INCLUDE_DIRS "${CONAN_INCLUDE_DIRS}")
-    set(CONAN_INCLUDE_DIRS ${replace_CONAN_INCLUDE_DIRS})
-
-    # Remove this workaround when libxml2 package is fixed
-    set(_BACKUP_CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH})
-    conan_basic_setup()
-    set(CMAKE_MODULE_PATH ${_BACKUP_CMAKE_MODULE_PATH})
-    unset(_BACKUP_CMAKE_MODULE_PATH)
-
-    # Because we've reset CMAKE_MODULE_PATH, FindZLIB from Conan is not used, which causes error with MinGW
-    if (NOT QT_BUNDLED_ZLIB)
-        if (NOT CONAN_ZLIB_ROOT)
-            message(FATAL_ERROR "CONAN_ZLIB_ROOT is not set")
-        endif ()
-        set(ZLIB_ROOT ${CONAN_ZLIB_ROOT})
-        message(STATUS "ZLIB_ROOT: ${ZLIB_ROOT}")
-    endif ()
+    conan_basic_setup(TARGETS)
 
     install(CODE "
         set(_conan_imports_dest \${CMAKE_INSTALL_PREFIX})
@@ -46,18 +32,23 @@ if (QT_CONAN_DIR)
             set(_conan_imports_dest \"\${_absolute_destdir}\${_conan_imports_dest}\")
         endif ()
 
-        message(\"Importing dependencies from conan to \${_conan_imports_dest}\")
+        message(STATUS \"Importing dependencies from conan to \${_conan_imports_dest}\")
         execute_process(
-            COMMAND \"${CONAN_COMMAND}\" imports --import-folder \${_conan_imports_dest} \"${QT_CONAN_DIR}/conanfile.txt\"
+            COMMAND \"${CONAN_COMMAND}\" imports --import-folder \${_conan_imports_dest} \"${QT_CONAN_FILE}\"
             WORKING_DIRECTORY \"${QT_CONAN_DIR}\"
             RESULT_VARIABLE _conan_imports_result
         )
-        message(\"conan imports result: \${_conan_imports_result}\")
+
+        if (NOT _conan_imports_result EQUAL 0)
+            message(FATAL_ERROR \"conan imports failed with code \${_conan_imports_result}\")
+        else ()
+            message(STATUS \"conan imports result: \${_conan_imports_result}\")
+        endif ()
 
         set(_conan_imports_manifest \"\${_conan_imports_dest}/conan_imports_manifest.txt\")
         if (EXISTS \${_conan_imports_manifest})
             file(REMOVE \${_conan_imports_manifest})
-            message(\"Removed conan install manifest: \${_conan_imports_manifest}\")
+            message(STATUS \"Removed conan install manifest: \${_conan_imports_manifest}\")
         endif ()
     ")
 endif ()
@@ -157,14 +148,21 @@ macro(QTWEBKIT_GENERATE_MOC_FILES_H _target)
 endmacro()
 
 macro(QTWEBKIT_SEPARATE_DEBUG_INFO _target _target_debug)
-    if (UNIX AND NOT APPLE)
+    if (MINGW OR UNIX AND NOT APPLE) # Not using COMPILER_IS_GCC_OR_CLANG because other ELF compilers may work as well
         if (NOT CMAKE_OBJCOPY)
             message(WARNING "CMAKE_OBJCOPY is not defined - debug information will not be split")
         else ()
             set(_target_file "$<TARGET_FILE:${_target}>")
             set(${_target_debug} "${_target_file}.debug")
+
+            if (DWZ_FOUND AND NOT SKIP_DWZ)
+                set(EXTRACT_DEBUG_INFO_COMMAND COMMAND ${DWZ_EXECUTABLE} -L 1000000000 -o ${${_target_debug}} ${_target_file})
+            else ()
+                set(EXTRACT_DEBUG_INFO_COMMAND COMMAND ${CMAKE_OBJCOPY} --only-keep-debug ${_target_file} ${${_target_debug}})
+            endif ()
+
             add_custom_command(TARGET ${_target} POST_BUILD
-                COMMAND ${CMAKE_OBJCOPY} --only-keep-debug ${_target_file} ${${_target_debug}}
+                ${EXTRACT_DEBUG_INFO_COMMAND}
                 COMMAND ${CMAKE_OBJCOPY} --strip-debug ${_target_file}
                 COMMAND ${CMAKE_OBJCOPY} --add-gnu-debuglink=${${_target_debug}} ${_target_file}
                 VERBATIM
@@ -174,13 +172,17 @@ macro(QTWEBKIT_SEPARATE_DEBUG_INFO _target _target_debug)
     endif ()
 endmacro()
 
-set(CMAKE_MACOSX_RPATH ON)
+if (APPLE)
+    set(CMAKE_MACOSX_RPATH ON)
+    set(CMAKE_FIND_FRAMEWORK LAST)
+endif ()
 
 add_definitions(-DBUILDING_QT__=1)
 add_definitions(-DQT_NO_EXCEPTIONS)
 add_definitions(-DQT_USE_QSTRINGBUILDER)
 add_definitions(-DQT_NO_CAST_TO_ASCII -DQT_ASCII_CAST_WARNINGS)
 add_definitions(-DQT_DEPRECATED_WARNINGS -DQT_DISABLE_DEPRECATED_BEFORE=0x050000)
+add_definitions(-DQT_NO_NARROWING_CONVERSIONS_IN_CONNECT)
 
 # We use -fno-rtti with GCC and Clang, see OptionsCommon.cmake
 if (COMPILER_IS_GCC_OR_CLANG)
@@ -301,6 +303,7 @@ option(GENERATE_DOCUMENTATION "Generate HTML and QCH documentation" OFF)
 cmake_dependent_option(ENABLE_TEST_SUPPORT "Build tools for running layout tests and related library code" ON
                                            "DEVELOPER_MODE" OFF)
 option(USE_STATIC_RUNTIME "Use static runtime (MSVC only)" OFF)
+option(ENABLE_PCH "Use pre-compiled headers (MSVC only)" ON)
 
 # Private options specific to the Qt port. Changing these options is
 # completely unsupported. They are intended for use only by WebKit developers.
@@ -430,40 +433,6 @@ if (WIN32)
     set(USE_SYSTEM_MALLOC 1)
 endif ()
 
-if (MSVC)
-    if (NOT WEBKIT_LIBRARIES_DIR)
-        if (DEFINED ENV{WEBKIT_LIBRARIES})
-            set(WEBKIT_LIBRARIES_DIR "$ENV{WEBKIT_LIBRARIES}")
-        else ()
-            set(WEBKIT_LIBRARIES_DIR "${CMAKE_SOURCE_DIR}/WebKitLibraries/win")
-        endif ()
-    endif ()
-
-    include_directories("${CMAKE_BINARY_DIR}/DerivedSources/ForwardingHeaders" "${CMAKE_BINARY_DIR}/DerivedSources" "${WEBKIT_LIBRARIES_DIR}/include")
-    set(CMAKE_INCLUDE_PATH "${WEBKIT_LIBRARIES_DIR}/include")
-    # bundled FindZlib is strange
-    set(ZLIB_ROOT "${WEBKIT_LIBRARIES_DIR}/include")
-    if (${MSVC_CXX_ARCHITECTURE_ID} STREQUAL "X86")
-        link_directories("${CMAKE_BINARY_DIR}/lib32" "${WEBKIT_LIBRARIES_DIR}/lib32")
-        set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib32)
-        set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib32)
-        set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin32)
-        set(CMAKE_LIBRARY_PATH "${WEBKIT_LIBRARIES_DIR}/lib32")
-    else ()
-        link_directories("${CMAKE_BINARY_DIR}/lib64" "${WEBKIT_LIBRARIES_DIR}/lib64")
-        set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib64)
-        set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib64)
-        set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin64)
-        set(CMAKE_LIBRARY_PATH "${WEBKIT_LIBRARIES_DIR}/lib64")
-    endif ()
-    set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_DEBUG "${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}")
-    set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_RELEASE "${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}")
-    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_DEBUG "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}")
-    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_RELEASE "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}")
-    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
-    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
-endif ()
-
 if (DEFINED ENV{SQLITE3SRCDIR})
     get_filename_component(SQLITE3SRC_ABS_DIR $ENV{SQLITE3SRCDIR} ABSOLUTE)
     set(SQLITE3_SOURCE_DIR ${SQLITE3SRC_ABS_DIR} CACHE PATH "Path to SQLite sources to use instead of system library" FORCE)
@@ -544,6 +513,13 @@ else ()
     find_package(LibXml2 2.8.0 REQUIRED)
     if (ENABLE_XSLT)
         find_package(LibXslt 1.1.7 REQUIRED)
+    endif ()
+endif ()
+
+if (UNIX AND NOT APPLE AND CMAKE_OBJCOPY AND NOT SKIP_DWZ)
+    find_package(Dwz 0.13)
+    if (DWZ_FOUND)
+        message(STATUS "WARNING: dwz may use a lot of RAM - build with -DSKIP_DWZ=ON if you don't have enough")
     endif ()
 endif ()
 
@@ -736,6 +712,14 @@ if (FORCE_DEBUG_INFO)
        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--gdb-index")
        set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--gdb-index")
     endif ()
+
+    if (MSVC AND CMAKE_SIZEOF_VOID_P EQUAL 8)
+        # Create pdb files for debugging purposes, also for Release builds
+        set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} /Zi")
+        set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /Zi")
+        set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS} /DEBUG")
+        set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS} /DEBUG")
+    endif ()
 endif ()
 
 if (APPLE)
@@ -899,14 +883,6 @@ if (MSVC)
         /wd4706 /wd4800 /wd4819 /wd4951 /wd4952 /wd4996 /wd6011 /wd6031 /wd6211
         /wd6246 /wd6255 /wd6387
     )
-
-    if (CMAKE_SIZEOF_VOID_P EQUAL 8)
-        # Create pdb files for debugging purposes, also for Release builds
-        set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} /Zi")
-        set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /Zi")
-        set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS} /DEBUG")
-        set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS} /DEBUG")
-    endif ()
 
     add_compile_options(/GS)
 

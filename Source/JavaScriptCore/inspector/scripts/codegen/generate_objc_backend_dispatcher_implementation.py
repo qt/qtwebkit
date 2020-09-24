@@ -30,11 +30,18 @@ import string
 import re
 from string import Template
 
-from cpp_generator import CppGenerator
-from generator import Generator
-from models import PrimitiveType, EnumType, AliasedType, Frameworks
-from objc_generator import ObjCTypeCategory, ObjCGenerator, join_type_and_name
-from objc_generator_templates import ObjCGeneratorTemplates as ObjCTemplates
+try:
+    from .cpp_generator import CppGenerator
+    from .generator import Generator
+    from .models import PrimitiveType, EnumType, AliasedType, Frameworks
+    from .objc_generator import ObjCTypeCategory, ObjCGenerator, join_type_and_name
+    from .objc_generator_templates import ObjCGeneratorTemplates as ObjCTemplates
+except ValueError:
+    from cpp_generator import CppGenerator
+    from generator import Generator
+    from models import PrimitiveType, EnumType, AliasedType, Frameworks
+    from objc_generator import ObjCTypeCategory, ObjCGenerator, join_type_and_name
+    from objc_generator_templates import ObjCGeneratorTemplates as ObjCTemplates
 
 log = logging.getLogger('global')
 
@@ -47,7 +54,7 @@ class ObjCConfigurationImplementationGenerator(Generator):
         return '%sBackendDispatchers.mm' % ObjCGenerator.OBJC_PREFIX
 
     def domains_to_generate(self):
-        return filter(ObjCGenerator.should_generate_domain_command_handler_filter(self.model()), Generator.domains_to_generate(self))
+        return list(filter(ObjCGenerator.should_generate_domain_command_handler_filter(self.model()), Generator.domains_to_generate(self)))
 
     def generate_output(self):
         secondary_headers = [
@@ -65,7 +72,7 @@ class ObjCConfigurationImplementationGenerator(Generator):
         sections = []
         sections.append(self.generate_license())
         sections.append(Template(ObjCTemplates.BackendDispatcherImplementationPrelude).substitute(None, **header_args))
-        sections.extend(map(self._generate_handler_implementation_for_domain, domains))
+        sections.extend(list(map(self._generate_handler_implementation_for_domain, domains)))
         sections.append(Template(ObjCTemplates.BackendDispatcherImplementationPostlude).substitute(None, **header_args))
         return '\n\n'.join(sections)
 
@@ -112,7 +119,7 @@ class ObjCConfigurationImplementationGenerator(Generator):
         if command.return_parameters:
             lines.append('        Ref<InspectorObject> resultObject = InspectorObject::create();')
 
-            required_pointer_parameters = filter(lambda parameter: not parameter.is_optional and ObjCGenerator.is_type_objc_pointer_type(parameter.type), command.return_parameters)
+            required_pointer_parameters = [parameter for parameter in command.return_parameters if not parameter.is_optional and ObjCGenerator.is_type_objc_pointer_type(parameter.type)]
             for parameter in required_pointer_parameters:
                 var_name = ObjCGenerator.identifier_to_objc_identifier(parameter.parameter_name)
                 lines.append('        THROW_EXCEPTION_FOR_REQUIRED_PARAMETER(%s, @"%s");' % (var_name, var_name))
@@ -120,7 +127,7 @@ class ObjCConfigurationImplementationGenerator(Generator):
                 if objc_array_class and objc_array_class.startswith(ObjCGenerator.OBJC_PREFIX):
                     lines.append('        THROW_EXCEPTION_FOR_BAD_TYPE_IN_ARRAY(%s, [%s class]);' % (var_name, objc_array_class))
 
-            optional_pointer_parameters = filter(lambda parameter: parameter.is_optional and ObjCGenerator.is_type_objc_pointer_type(parameter.type), command.return_parameters)
+            optional_pointer_parameters = [parameter for parameter in command.return_parameters if parameter.is_optional and ObjCGenerator.is_type_objc_pointer_type(parameter.type)]
             for parameter in optional_pointer_parameters:
                 var_name = ObjCGenerator.identifier_to_objc_identifier(parameter.parameter_name)
                 lines.append('        THROW_EXCEPTION_FOR_BAD_OPTIONAL_PARAMETER(%s, @"%s");' % (var_name, var_name))

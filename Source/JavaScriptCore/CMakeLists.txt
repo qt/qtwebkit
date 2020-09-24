@@ -883,7 +883,8 @@ set(JavaScriptCore_SCRIPTS_SOURCES_DIR "${JAVASCRIPTCORE_DIR}/Scripts")
 set(JavaScriptCore_SCRIPTS_SOURCES_PATHS
     ${JavaScriptCore_SCRIPTS_SOURCES_DIR}/*.pl
     ${JavaScriptCore_SCRIPTS_SOURCES_DIR}/*.py
-    ${JavaScriptCore_SCRIPTS_SOURCES_DIR}/builtins/builtins*.py
+    ${JavaScriptCore_SCRIPTS_SOURCES_DIR}/wkbuiltins/builtins*.py
+    ${JavaScriptCore_SCRIPTS_SOURCES_DIR}/wkbuiltins/wkbuiltins.py
 )
 
 # Force JavaScriptCore to run scripts from the same staging path as WebCore.
@@ -1174,7 +1175,7 @@ add_custom_command(
 # JSCBuiltins
 
 set(BUILTINS_GENERATOR_SCRIPTS
-    ${JavaScriptCore_SCRIPTS_DIR}/builtins.py
+    ${JavaScriptCore_SCRIPTS_DIR}/wkbuiltins.py
     ${JavaScriptCore_SCRIPTS_DIR}/builtins_generator.py
     ${JavaScriptCore_SCRIPTS_DIR}/builtins_model.py
     ${JavaScriptCore_SCRIPTS_DIR}/builtins_templates.py
@@ -1286,6 +1287,7 @@ elseif (WTF_CPU_S390)
 elseif (WTF_CPU_S390X)
 elseif (WTF_CPU_MIPS)
 elseif (WTF_CPU_SH4)
+elseif (WTF_CPU_RISCV64)
 elseif (WTF_CPU_X86)
 elseif (WTF_CPU_X86_64)
     if (MSVC AND ENABLE_JIT)

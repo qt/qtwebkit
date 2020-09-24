@@ -75,6 +75,7 @@ TestWebView {
             webView.url = bogusSite
             compare(webView.url, bogusSite)
             verify(webView.waitForLoadFailed())
+            skip("https://github.com/qtwebkit/qtwebkit/issues/951")
             compare(webView.url, bogusSite)
 
             webView.url = "about:blank" // Reset from previous test

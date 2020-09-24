@@ -38,13 +38,13 @@ namespace WebCore {
     
 JSValue JSCustomEvent::detail(ExecState& state) const
 {
-    CustomEvent& event = wrapped();
+    auto& event = wrapped();
+
+    JSValue detail = event.detail();
     
-    if (event.detail().hasNoValue())
+    if (!detail)
         return jsNull();
 
-    JSValue detail = event.detail().jsValue();
-    
     if (detail.isObject() && &worldForDOMObject(detail.getObject()) != &currentWorld(&state)) {
         // We need to make sure CustomEvents do not leak their detail property across isolated DOM worlds.
         // Ideally, we would check that the worlds have different privileges but that's not possible yet.
@@ -57,6 +57,11 @@ JSValue JSCustomEvent::detail(ExecState& state) const
     }
     
     return detail;
+}
+
+void JSCustomEvent::visitAdditionalChildren(JSC::SlotVisitor& visitor)
+{
+    wrapped().detail().visit(visitor);
 }
 
 } // namespace WebCore

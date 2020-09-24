@@ -24,12 +24,12 @@ if (USE_WOFF2 AND NOT WOFF2DEC_FOUND)
     add_subdirectory(ThirdParty/woff2)
 endif ()
 
-if (ENABLE_WEBKIT)
-    add_subdirectory(WebKit)
-endif ()
-
 if (ENABLE_WEBKIT2)
     add_subdirectory(WebKit2)
+endif ()
+
+if (ENABLE_WEBKIT)
+    add_subdirectory(WebKit)
 endif ()
 
 WEBKIT_INCLUDE_CONFIG_FILES_IF_EXISTS()

@@ -30,11 +30,18 @@ import string
 import re
 from string import Template
 
-from cpp_generator import CppGenerator
-from generator import Generator
-from models import Frameworks
-from objc_generator import ObjCGenerator
-from objc_generator_templates import ObjCGeneratorTemplates as ObjCTemplates
+try:
+    from .cpp_generator import CppGenerator
+    from .generator import Generator
+    from .models import Frameworks
+    from .objc_generator import ObjCGenerator
+    from .objc_generator_templates import ObjCGeneratorTemplates as ObjCTemplates
+except ValueError:
+    from cpp_generator import CppGenerator
+    from generator import Generator
+    from models import Frameworks
+    from objc_generator import ObjCGenerator
+    from objc_generator_templates import ObjCGeneratorTemplates as ObjCTemplates
 
 log = logging.getLogger('global')
 
@@ -47,7 +54,7 @@ class ObjCBackendDispatcherHeaderGenerator(Generator):
         return '%sBackendDispatchers.h' % ObjCGenerator.OBJC_PREFIX
 
     def domains_to_generate(self):
-        return filter(ObjCGenerator.should_generate_domain_command_handler_filter(self.model()), Generator.domains_to_generate(self))
+        return list(filter(ObjCGenerator.should_generate_domain_command_handler_filter(self.model()), Generator.domains_to_generate(self)))
 
     def generate_output(self):
         headers = [
@@ -65,7 +72,7 @@ class ObjCBackendDispatcherHeaderGenerator(Generator):
         sections = []
         sections.append(self.generate_license())
         sections.append(Template(ObjCTemplates.BackendDispatcherHeaderPrelude).substitute(None, **header_args))
-        sections.extend(map(self._generate_objc_handler_declarations_for_domain, domains))
+        sections.extend(list(map(self._generate_objc_handler_declarations_for_domain, domains)))
         sections.append(Template(ObjCTemplates.BackendDispatcherHeaderPostlude).substitute(None, **header_args))
         return '\n\n'.join(sections)
 

@@ -250,15 +250,15 @@ list(REMOVE_DUPLICATES WebKit_SYSTEM_INCLUDE_DIRECTORIES)
 
 if (ENABLE_WEBKIT2)
     if (APPLE)
-        set(WEBKIT2_LIBRARY -Wl,-force_load WebKit2)
+        set(WEBKIT2_LIBRARY -Wl,-force_load $<TARGET_FILE:WebKit2>)
     elseif (MSVC)
-        set(WEBKIT2_LIBRARY "-WHOLEARCHIVE:WebKit2${CMAKE_DEBUG_POSTFIX}")
+        set(WEBKIT2_LIBRARY "-WHOLEARCHIVE:$<TARGET_FILE:WebKit2>")
     elseif (UNIX OR MINGW)
-        set(WEBKIT2_LIBRARY -Wl,--whole-archive WebKit2 -Wl,--no-whole-archive)
+        set(WEBKIT2_LIBRARY -Wl,--whole-archive $<TARGET_FILE:WebKit2> -Wl,--no-whole-archive)
     else ()
         message(WARNING "Unknown system, linking with WebKit2 may fail!")
-        set(WEBKIT2_LIBRARY WebKit2)
     endif ()
+    set(WEBKIT2_LIBRARY ${WEBKIT2_LIBRARY} WebKit2) # For linking dependencies
 endif ()
 
 list(APPEND WebKit_LIBRARIES
@@ -289,10 +289,9 @@ if (ENABLE_GEOLOCATION)
 endif ()
 
 if (USE_QT_MULTIMEDIA)
-    qt_wrap_cpp(WebKit WebKit_SOURCES
-        qt/Api/qwebfullscreenvideohandler.h
-    )
     list(APPEND WebKit_SOURCES
+        qt/Api/qwebfullscreenvideohandler.h
+
         qt/WebCoreSupport/FullScreenVideoQt.cpp
     )
 endif ()
@@ -420,6 +419,16 @@ install(
 )
 
 file(GLOB WebKit_PRIVATE_HEADERS qt/Api/*_p.h)
+
+# This is needed to install WK2 private headers into macOS bundle
+if (ENABLE_WEBKIT2)
+    file(GLOB WebKit2_PRIVATE_HEADERS "${WEBKIT2_DIR}/UIProcess/API/qt/*_p.h")
+    foreach (_src ${WebKit2_PRIVATE_HEADERS})
+        set_property(SOURCE ${_src} PROPERTY SKIP_AUTOMOC ON)
+    endforeach ()
+    list(APPEND WebKit_PRIVATE_HEADERS ${WebKit2_PRIVATE_HEADERS})
+endif ()
+
 install(
     FILES
         ${WebKit_PRIVATE_HEADERS}
@@ -517,6 +526,10 @@ if (KDE_INSTALL_USE_QT_SYS_PATHS)
         BIN_INSTALL_DIR "$$QT_MODULE_BIN_BASE"
         LIB_INSTALL_DIR "$$QT_MODULE_LIB_BASE"
     )
+    set(WebKit_Private_PRI_ARGUMENTS
+        BIN_INSTALL_DIR "$$QT_MODULE_BIN_BASE"
+        LIB_INSTALL_DIR "$$QT_MODULE_LIB_BASE"
+    )
     if (MACOS_BUILD_FRAMEWORKS)
         list(APPEND WebKit_PRI_ARGUMENTS
             INCLUDE_INSTALL_DIR "$$QT_MODULE_LIB_BASE/QtWebKit.framework/Headers"
@@ -525,6 +538,7 @@ if (KDE_INSTALL_USE_QT_SYS_PATHS)
         list(APPEND WebKit_Private_PRI_ARGUMENTS
             INCLUDE_INSTALL_DIR "$$QT_MODULE_LIB_BASE/QtWebKit.framework/Headers/${PROJECT_VERSION}"
             INCLUDE_INSTALL_DIR2 "$$QT_MODULE_LIB_BASE/QtWebKit.framework/Headers/${PROJECT_VERSION}/QtWebKit"
+            MODULE_CONFIG "lib_bundle"
         )
     else ()
         list(APPEND WebKit_PRI_ARGUMENTS

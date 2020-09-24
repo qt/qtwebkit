@@ -19,6 +19,10 @@ set_target_properties(qmlwebkitexperimentalplugin PROPERTIES
     AUTOMOC ON
 )
 
+if (COMPILER_IS_GCC_OR_CLANG)
+    target_compile_options(qmlwebkitexperimentalplugin PRIVATE -frtti)
+endif ()
+
 add_custom_target(
     qmlwebkitexperimentalplugin-files ALL
     COMMAND ${CMAKE_COMMAND} -E copy_if_different qmldir "${CMAKE_BINARY_DIR}/imports/QtWebKit/experimental/qmldir"

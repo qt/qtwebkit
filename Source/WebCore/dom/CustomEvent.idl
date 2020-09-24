@@ -26,6 +26,7 @@
 // Introduced in DOM Level 3:
 [
     ConstructorTemplate=Event,
+    JSCustomMarkFunction,
 ] interface CustomEvent : Event {
     [InitializedByEventConstructor, CustomGetter] readonly attribute any detail;
 

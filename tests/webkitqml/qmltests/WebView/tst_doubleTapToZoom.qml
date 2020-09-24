@@ -81,6 +81,8 @@ Item {
         }
 
         function test_basic_zoomInAndBack() {
+            skip("https://github.com/qtwebkit/qtwebkit/issues/951")
+
             webView.url = webView.content
             verify(webView.waitForViewportReady())
 
@@ -100,6 +102,8 @@ Item {
         }
 
         function test_double_zoomInAndBack() {
+            skip("https://github.com/qtwebkit/qtwebkit/issues/951")
+
             webView.url = webView.content
             verify(webView.waitForViewportReady())
 
@@ -130,6 +134,8 @@ Item {
         }
 
         function test_double_zoomInAndBack2() {
+            skip("https://github.com/qtwebkit/qtwebkit/issues/951")
+
             webView.url = webView.content
             verify(webView.waitForViewportReady())
 
@@ -160,6 +166,8 @@ Item {
         }
 
         function test_double_zoomInOutAndBack() {
+            skip("https://github.com/qtwebkit/qtwebkit/issues/951")
+
             webView.url = webView.content
             verify(webView.waitForViewportReady())
 
@@ -190,6 +198,8 @@ Item {
         }
 
         function test_double_zoomInOutAndBack2() {
+            skip("https://github.com/qtwebkit/qtwebkit/issues/951")
+
             webView.url = webView.content
             verify(webView.waitForViewportReady())
 

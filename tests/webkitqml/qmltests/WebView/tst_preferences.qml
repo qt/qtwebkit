@@ -207,6 +207,7 @@ Item {
                 titleSpy.clear()
 
                 titleSpy.wait()
+                skip("https://github.com/qtwebkit/qtwebkit/issues/951")
                 compare(unquote(webView.title), defaultStandardFontFamily)
 
                 webView.experimental.preferences.standardFontFamily = "foobar"

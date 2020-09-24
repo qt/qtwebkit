@@ -31,15 +31,21 @@ import fnmatch
 import logging
 import optparse
 import os
+import sys
 
 logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.ERROR)
 log = logging.getLogger('global')
 
 from lazywriter import LazyFileWriter
 
-import builtins
-from builtins import *
+from wkbuiltins import *
 
+
+def do_open(file, mode):
+    if sys.version_info.major == 2:
+        return open(file, mode)
+    else:
+        return open(file, mode, encoding="UTF-8")
 
 def generate_bindings_for_builtins_files(builtins_files=[],
                                          output_path=None,
@@ -53,7 +59,7 @@ def generate_bindings_for_builtins_files(builtins_files=[],
     model = BuiltinsCollection(framework_name=framework_name)
 
     for filepath in builtins_files:
-        with open(filepath, "r") as file:
+        with do_open(filepath, "r") as file:
             file_text = file.read()
             file_name = os.path.basename(filepath)
 
@@ -118,7 +124,7 @@ if __name__ == '__main__':
     cli_parser.add_option("-t", "--test", action="store_true", help="Enable test mode.")
 
     arg_options, arg_values = cli_parser.parse_args()
-    if len(arg_values) is 0 and not arg_options.input_directory:
+    if len(arg_values) == 0 and not arg_options.input_directory:
         raise ParseException("At least one input file or directory expected.")
 
     if not arg_options.output_directory:
@@ -132,7 +138,7 @@ if __name__ == '__main__':
         for filepath in os.listdir(arg_options.input_directory):
             input_filepaths.append(os.path.join(arg_options.input_directory, filepath))
 
-    input_filepaths = filter(lambda name: fnmatch.fnmatch(name, '*.js'), input_filepaths)
+    input_filepaths = sorted([name for name in input_filepaths if fnmatch.fnmatch(name, '*.js')])
 
     options = {
         'output_path': arg_options.output_directory,
@@ -144,7 +150,7 @@ if __name__ == '__main__':
 
     log.debug("Generating code for builtins.")
     log.debug("Parsed options:")
-    for option, value in options.items():
+    for option, value in list(options.items()):
         log.debug("    %s: %s" % (option, value))
     log.debug("")
     log.debug("Input files:")

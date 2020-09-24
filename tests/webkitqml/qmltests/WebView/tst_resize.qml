@@ -105,6 +105,7 @@ Item {
         }
 
         function test_resizeAfterNeutralZoom() {
+            skip("https://github.com/qtwebkit/qtwebkit/issues/951")
             webView.url = webView.content
             verify(webView.waitForViewportReady())
 
@@ -134,6 +135,8 @@ Item {
         }
 
         function test_resizeZoomedIn() {
+            skip("https://github.com/qtwebkit/qtwebkit/issues/951")
+
             // Note that if we change the behavior of resize on zoomed-in content, for instance
             // to preserve the visible width (like rotate), this test will need to be updated.
             webView.url = webView.content

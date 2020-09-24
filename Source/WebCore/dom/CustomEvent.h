@@ -27,6 +27,7 @@
 #define CustomEvent_h
 
 #include "Event.h"
+#include "JSValueInWrappedObject.h"
 #include "SerializedScriptValue.h"
 #include <bindings/ScriptValue.h>
 
@@ -50,11 +51,11 @@ public:
         return adoptRef(*new CustomEvent(type, initializer));
     }
 
-    void initCustomEvent(const AtomicString& type, bool canBubble, bool cancelable, const Deprecated::ScriptValue& detail);
+    void initCustomEvent(const AtomicString& type, bool canBubble, bool cancelable, JSC::JSValue detail);
 
     virtual EventInterface eventInterface() const override;
 
-    const Deprecated::ScriptValue& detail() const { return m_detail; }
+    JSValueInWrappedObject& detail() { return m_detail; }
     
     RefPtr<SerializedScriptValue> trySerializeDetail(JSC::ExecState*);
 
@@ -62,7 +63,7 @@ private:
     CustomEvent();
     CustomEvent(const AtomicString& type, const CustomEventInit& initializer);
 
-    Deprecated::ScriptValue m_detail;
+    JSValueInWrappedObject m_detail;
     RefPtr<SerializedScriptValue> m_serializedDetail;
     bool m_triedToSerialize { false };
 };

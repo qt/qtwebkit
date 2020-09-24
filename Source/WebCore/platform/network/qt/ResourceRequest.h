@@ -32,7 +32,7 @@
 // HTTP/2 is implemented since Qt 5.8, but various QtNetwork bugs make it unusable in browser with Qt < 5.10.1
 // We also don't enable HTTP/2 for unencrypted connections because of possible compatibility issues; it can be
 // enabled manually by user application via custom QNAM subclass
-#if QT_VERSION >= QT_VERSION_CHECK(5, 10, 1)
+#if QT_VERSION >= QT_VERSION_CHECK(5, 10, 1) && !defined(QT_NO_SSL)
 #define USE_HTTP2 1
 #endif
 

@@ -368,6 +368,10 @@ static ssize_t readBytesFromSocket(int socketDescriptor, Vector<uint8_t>& buffer
 void Connection::readyReadHandler()
 {
 #if PLATFORM(QT)
+    if (!m_socketNotifier) {
+        WTFLogAlways("Error receiving IPC message on socket %d in process %d: m_socketNotifier is null", m_socketDescriptor, getpid());
+        return;
+    }
     SocketNotifierResourceGuard socketNotifierEnabler(m_socketNotifier);
 #endif
 

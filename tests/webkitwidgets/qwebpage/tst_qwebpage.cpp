@@ -105,6 +105,7 @@ class tst_QWebPage : public QObject
 public:
     tst_QWebPage();
     virtual ~tst_QWebPage();
+    void createRendererTreeInWebPage();
 
 public Q_SLOTS:
     void init();
@@ -198,6 +199,8 @@ private Q_SLOTS:
     void showModalDialog();
     void testStopScheduledPageRefresh();
     void findText();
+    void findTextScroll();
+    void javascriptScroll();
     void supportedContentType();
     // [Qt] tst_QWebPage::infiniteLoopJS() timeouts with DFG JIT
     // https://bugs.webkit.org/show_bug.cgi?id=79040
@@ -3070,6 +3073,46 @@ void tst_QWebPage::findText()
         QVERIFY(m_page->selectedText().isEmpty());
         QVERIFY(m_page->selectedHtml().isEmpty());
     }
+}
+
+void tst_QWebPage::createRendererTreeInWebPage()
+{
+    QImage image(m_page->viewportSize(), QImage::Format_ARGB32);
+    QPainter painter(&image);
+    m_page->mainFrame()->render(&painter);
+    painter.end();
+}
+
+void tst_QWebPage::findTextScroll()
+{
+    m_view->setHtml(QString("<html><head></head><body style=\"padding:250px;\"><div>foo bar</div></body></html>"));
+    m_page->setViewportSize(QSize(200, 200));
+    QSignalSpy scrollRequestedSpy(m_page, SIGNAL(scrollRequested(int,int,QRect)));
+
+    QCOMPARE(m_page->mainFrame()->scrollPosition().y(), 0);
+
+    createRendererTreeInWebPage();
+
+    m_page->findText("bar");
+
+    QTRY_COMPARE(scrollRequestedSpy.count(), 1);
+    QVERIFY(m_page->mainFrame()->scrollPosition().y() > 40);
+}
+
+void tst_QWebPage::javascriptScroll()
+{
+    m_view->setHtml(QString("<html><head></head><body style=\"padding:250px;\"><div>foo bar</div></body></html>"));
+    m_page->setViewportSize(QSize(200, 200));
+    QSignalSpy scrollRequestedSpy(m_page, SIGNAL(scrollRequested(int,int,QRect)));
+
+    QCOMPARE(m_page->mainFrame()->scrollPosition().y(), 0);
+
+    createRendererTreeInWebPage();
+
+    m_page->mainFrame()->evaluateJavaScript("document.getElementsByTagName('div')[0].scrollIntoView()");
+
+    QTRY_COMPARE(scrollRequestedSpy.count(), 1);
+    QVERIFY(m_page->mainFrame()->scrollPosition().y() > 40);
 }
 
 void tst_QWebPage::supportedContentType()

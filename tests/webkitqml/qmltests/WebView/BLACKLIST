@@ -1,0 +1,4 @@
+[WebViewLoadFavIcon::test_favIconLoad]
+ci *
+[WebViewLoadFavIcon::test_favIconLoadEncodedUrl]
+ci *

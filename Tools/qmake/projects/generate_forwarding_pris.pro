@@ -26,12 +26,28 @@ defineTest(writeForwardingPri) {
     write_file($$forwarding_pri_name, FORWARDING_PRI_CONTENTS)|error()
 }
 
+defineTest(writeWebKitPrivateForwardingPri) {
+    module = webkit_private
+    configuration = $$1
+    cmake_build_dir = $$ROOT_BUILD_DIR/$$configuration
+    forwarding_pri_name = $$MODULE_QMAKE_OUTDIR/mkspecs/modules/qt_lib_$${module}.pri
+
+    FORWARDING_PRI_CONTENTS += \
+        "include($$cmake_build_dir/Source/WebKit/qt_lib_$${module}.pri)" \
+        "QT.$${module}.priority = 1" \
+        "QT.$${module}.includes = $$cmake_build_dir/DerivedSources/ForwardingHeaders/QtWebKit $$ROOT_WEBKIT_DIR/Source"
+
+    message("Writing $$forwarding_pri_name")
+    write_file($$forwarding_pri_name, FORWARDING_PRI_CONTENTS)|error()
+}
+
 
 debug_and_release {
     !build_pass {
         # Use release build in case of debug_and_release
         writeForwardingPri(webkit, release)
         writeForwardingPri(webkitwidgets, release)
+        writeWebKitPrivateForwardingPri(release)
     }
 } else {
     CONFIG(debug, debug|release) {
@@ -41,4 +57,5 @@ debug_and_release {
     }
     writeForwardingPri(webkit, $$configuration)
     writeForwardingPri(webkitwidgets, $$configuration)
+    writeWebKitPrivateForwardingPri($$configuration)
 }

@@ -27,7 +27,7 @@ set(ALL_PORTS
     WinCairo
     Qt
 )
-set(PORT "NOPORT" CACHE STRING "choose which WebKit port to build (one of ${ALL_PORTS})")
+set(PORT "Qt" CACHE STRING "choose which WebKit port to build (one of ${ALL_PORTS})")
 
 list(FIND ALL_PORTS ${PORT} RET)
 if (${RET} EQUAL -1)
@@ -83,6 +83,8 @@ elseif (LOWERCASE_CMAKE_SYSTEM_PROCESSOR MATCHES "s390")
     set(WTF_CPU_S390 1)
 elseif (LOWERCASE_CMAKE_SYSTEM_PROCESSOR MATCHES "s390x")
     set(WTF_CPU_S390X 1)
+elseif (LOWERCASE_CMAKE_SYSTEM_PROCESSOR MATCHES "riscv64")
+    set(WTF_CPU_RISCV64 1)
 else ()
     message(FATAL_ERROR "Unknown CPU '${LOWERCASE_CMAKE_SYSTEM_PROCESSOR}'")
 endif ()

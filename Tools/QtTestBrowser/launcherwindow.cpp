@@ -170,11 +170,13 @@ void LauncherWindow::initializeView()
     } else {
         WebViewGraphicsBased* view = new WebViewGraphicsBased(splitter);
         m_view = view;
+#ifndef QT_NO_OPENGL
         if (!m_windowOptions.useQOpenGLWidgetViewport)
             toggleQGLWidgetViewport(m_windowOptions.useQGLWidgetViewport);
 #ifdef QT_OPENGL_LIB
         if (!m_windowOptions.useQGLWidgetViewport)
             toggleQOpenGLWidgetViewport(m_windowOptions.useQOpenGLWidgetViewport);
+#endif // QT_OPENGL_LIB
 #endif
         view->setPage(page());
 
@@ -185,6 +187,8 @@ void LauncherWindow::initializeView()
         // to install the event filter also on the viewport of a QGraphicsView.
         view->viewport()->installEventFilter(this);
     }
+
+    toggleForcedAntialiasing(m_windowOptions.useForcedAntialiasing);
 
     m_touchMocking = false;
 
@@ -321,6 +325,10 @@ void LauncherWindow::createChrome()
     QAction* toggleGraphicsView = graphicsViewMenu->addAction("Toggle use of QGraphicsView", this, SLOT(toggleWebView(bool)));
     toggleGraphicsView->setCheckable(true);
     toggleGraphicsView->setChecked(isGraphicsBased());
+
+    QAction* toggleForcedAntialiasing = toolsMenu->addAction("Toggle forced use of antialiasing", this, SLOT(toggleForcedAntialiasing(bool)));
+    toggleForcedAntialiasing->setCheckable(true);
+    toggleForcedAntialiasing->setChecked(m_windowOptions.useForcedAntialiasing);
 
     QAction* toggleWebGL = toolsMenu->addAction("Toggle WebGL", this, SLOT(toggleWebGL(bool)));
     toggleWebGL->setCheckable(true);
@@ -1086,6 +1094,19 @@ void LauncherWindow::toggleQOpenGLWidgetViewport(bool enable)
 }
 #endif
 
+void LauncherWindow::toggleForcedAntialiasing(bool enable)
+{
+    m_windowOptions.useForcedAntialiasing = enable;
+
+    if (isGraphicsBased()) {
+        auto* view = static_cast<WebViewGraphicsBased*>(m_view);
+        view->graphicsWebView()->setRenderHint(QPainter::Antialiasing, enable);
+    } else {
+        auto* view = static_cast<QWebView*>(m_view);
+        view->setRenderHint(QPainter::Antialiasing, enable);
+    }
+}
+
 void LauncherWindow::changeViewportUpdateMode(int mode)
 {
     m_windowOptions.viewportUpdateMode = QGraphicsView::ViewportUpdateMode(mode);
@@ -1338,3 +1359,5 @@ void LauncherWindow::find(int mode = s_findNormalFlag)
         page()->findText(m_lineEdit->text(), QFlag(m_findFlag));
 }
 #endif
+
+#include "moc_launcherwindow.cpp"
